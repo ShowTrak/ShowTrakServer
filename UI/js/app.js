@@ -55,15 +55,14 @@ window.API.UpdateScriptExecutions(async (Executions) => {
                 ${Badge}    
             </div>
         </div>`;
-
     }
+
     $('#SHOWTRAK_EXECUTIONQUEUE').html(Filler);
     return;
 })
 
-window.API.SetScriptList(async (Data) => {
-    ScriptList = Data;
-    console.log('Script List:', ScriptList);
+window.API.SetScriptList(async (Scripts) => {
+    ScriptList = Scripts;
     return;
 })
 
@@ -77,26 +76,26 @@ window.API.SetFullClientList(async (Clients, Groups) => {
         Weight: 100000,
     })
 
+    // Sort groups by weight
     Groups = Groups.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
 
-    for (const Group of Groups) {
+    for (const { GroupID, Title } of Groups) {
 
+        let GroupClients = Clients.filter(Client => Client.GroupID === GroupID);
 
-        let GroupClients = Clients.filter(Client => Client.GroupID === Group.GroupID);
+        GroupUUIDCache.set(`${GroupID}`, GroupClients.map(c => c.UUID));
 
-        GroupUUIDCache.set(`${Group.GroupID}`, GroupClients.map(c => c.UUID));
-
-        if (GroupClients.length == 0 && Group.GroupID == null) continue; 
+        if (GroupClients.length == 0 && GroupID == null) continue; 
 
         Filler += `<div class="d-flex justify-content-start">
-            <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" onclick="SelectByGroup('${Group.GroupID}')">
-                <div class="d-flex align-items-center text-center h-100">
-                    <span class="GROUP_TITLE py-2">
-                        ${Group.Title}
-                    </span>
-                </div>
+        <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" onclick="SelectByGroup('${GroupID}')">
+            <div class="d-flex align-items-center text-center h-100">
+                <span class="GROUP_TITLE py-2">
+                    ${Title}
+                </span>
             </div>
-            <div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100">`
+        </div>
+        <div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100">`
 
         if (GroupClients.length == 0) {
             Filler += `<div class="SHOWTRAK_PC_PLACEHOLDER"
@@ -117,12 +116,10 @@ window.API.SetFullClientList(async (Clients, Groups) => {
                         ${IP ? IP : 'Unknown IP'}
                     </small>
                     <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-grid' : 'd-none'} gap-2" data-type="INDICATOR_ONLINE">
+                        <div class="progress"><div data-type="CPU" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div></div>
                         <div class="progress">
-                            <div data-type="CPU" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
-                        </div>
-                        <div class="progress">
-                            <div data-type="RAM" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
-                        </div>
+                        <div data-type="RAM" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
+                    </div>
                     </div>
                     <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-none' : 'd-grid'}" data-type="INDICATOR_OFFLINE">
                         <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${LastSeen}">
@@ -134,19 +131,17 @@ window.API.SetFullClientList(async (Clients, Groups) => {
         }
 
         Filler += `</div></div>`
-
     }    
 
     Filler += `<div class="d-flex justify-content-start">
         <div class="GROUP_TITLE_CLICKABLE m-3 me-0 rounded" onclick="OpenGroupCreationModal()">
             <div class="d-flex align-items-center text-center h-100">
-                <span class="GROUP_CREATE_BUTTON py-2">
-                    +
-                </span>
+                <span class="GROUP_CREATE_BUTTON py-2">+</span>
             </div>
-        </div></div>`
+        </div>
+    </div>`
 
-    $('#APPLICATION').html(Filler);
+    $('#APPLICATION_CONTENT').html(Filler);
 
 })
 

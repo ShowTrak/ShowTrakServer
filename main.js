@@ -35,10 +35,11 @@ app.whenReady().then(async () => {
   }
 
   PreloaderWindow = new BrowserWindow({
-    show: true,
+    show: false,
     backgroundColor: '#161618',
     width: 400,
     height: 500,
+    resizable: false,
     webPreferences: { 
       preload: path.join(__dirname, 'preload.js'),
       devTools: !app.isPackaged,
@@ -48,7 +49,9 @@ app.whenReady().then(async () => {
     titleBarStyle: 'hidden',
   })
 
-  PreloaderWindow.loadFile('UI/preloader.html')
+  PreloaderWindow.loadFile('UI/preloader.html').then(() => {
+    PreloaderWindow.show()
+  })
 
   MainWindow = new BrowserWindow({
     show: false,
@@ -69,13 +72,10 @@ app.whenReady().then(async () => {
   MainWindow.loadFile('UI/index.html').then(async () => {
     Logger.log('MainWindow finished loading UI');
     UpdateAdoptionList();
-    await Wait(1500);
+    await Wait(2000);
     PreloaderWindow.close();
     MainWindow.show()
   });
-
-
-
 
   RPC.handle('BackupConfig', async () => {
     let { canceled, filePath } = await FileSelectorManager.SaveDialog('Export ShowTrak Configuration');

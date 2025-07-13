@@ -1,5 +1,5 @@
 body {
-    background: #212124 !important;
+    background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
 }
 
 .dragbar {
@@ -8,7 +8,7 @@ body {
     width: 100vw;
     height: 2rem;
     app-region: drag;
-    background-color: #161618 !important;
+    background-color: #ffffff10 !important;
     padding: 0.3rem 0.8rem !important;
     color: #ffffff !important;
     user-select: none !important;
@@ -18,11 +18,13 @@ body {
 }
 
 #APPLICATION {
+    height: 100vh;
     padding-top: 2rem !important;
     user-select: none !important;
     -webkit-user-select: none !important;
     -moz-user-select: none !important;
     -ms-user-select: none !important;
+    /* background: radial-gradient(circle at 50%80%, #120e34 0%, #0c091c 100%) !important; */
 }
 
 #STATUS_BAR {
@@ -167,7 +169,7 @@ body {
     border-radius: 0.5rem;
     border: transparent 2px solid;
     transition-duration: 200ms;
-    background-color: rgba(207, 0, 0, 0.189);
+    background-color: rgba(255, 0, 0, 0.189);
     cursor: pointer !important;
 }
 
@@ -185,7 +187,7 @@ body {
 }
 
 .SHOWTRAK_PC.ONLINE {
-    background-color: rgba(26, 255, 0, 0.225) !important;
+    background-color: rgba(26, 255, 0, 0.25) !important;
 }
 
 .progress {
@@ -263,13 +265,13 @@ body {
 }
 
 .modal-content {
-    background-color: #212124 !important;
+    background-color: #1e1643 !important;
     color: white;
     border-radius: 1rem !important;
 }
 
 .modal-body {
-    background-color: #212124 !important;
+    /* background-color: #0c091c !important; */
     color: white;
     display: grid;
     gap: 0.5rem;
@@ -316,6 +318,13 @@ small, .text-sm {
     color: white !important;
     border: none !important;
     border-radius: 0.5rem !important;
+}
+
+.form-control:focus {
+    color: #212529;
+    background-color: #ffffff1d !important;
+    outline: 0;
+    box-shadow: none !important;
 }
 
 option {
