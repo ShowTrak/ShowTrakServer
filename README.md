@@ -34,7 +34,7 @@ Features include:
 * 1 Click adoption of new devices
 * Automated client discovery powered by bonjour
 
-[![ShowTrak Screen Shot][showtrak-screenshot]](https://example.com)
+[![ShowTrak Screen Shot][showtrak-screenshot]](https://tkw.bz/ShowTrak)
 
 ### Built With
 [![Electron][Electronjs.org]][Electron-url]
