@@ -2,7 +2,7 @@
   "name": "showtrak-server",
   "productName": "ShowTrak Server",
   "version": "3.0.0",
-  "description": "ShowTrak is designed to make controlling show computers simpler.",
+  "description": "Simple, Free LAN PC Monitoring for arcade style environments.",
   "main": "main.js",
   "scripts": {
     "start": "electron-forge start",
@@ -12,10 +12,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ShowTrak/App.git"
+    "url": "git+https://github.com/ShowTrak/ShowTrakServer.git"
   },
   "author": "ShowTrak",
-  "license": "ISC",
+  "license": "AGPL-3.0-only",
   "bugs": {
     "url": "https://github.com/ShowTrak/App/issues"
   },
