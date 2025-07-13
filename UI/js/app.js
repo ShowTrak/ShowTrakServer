@@ -5,6 +5,12 @@ let AllClients = [];
 let ScriptList = [];
 const GroupUUIDCache = new Map();
 
+window.API.ShutdownRequested(async () => {
+    let Confirmation = await ConfirmationDialog('Are you sure you want to shutdown ShowTrak?');
+    if (!Confirmation) return;
+    await window.API.Shutdown();
+})
+
 window.API.UpdateScriptExecutions(async (Executions) => {
     Executions = Executions.reverse();
 

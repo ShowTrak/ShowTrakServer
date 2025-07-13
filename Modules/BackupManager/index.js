@@ -40,12 +40,8 @@ Manager.ExportConfig = async (Path) => {
     }
 }
 
-Manager.ValidateConfig = async (Path) => {
-
-}
 
 Manager.ImportConfig = async (Path) => {
-    Logger.log('Importing configuration from:', Path);
     if (!fs.existsSync(Path)) {
         Logger.error('Configuration file does not exist:', Path);
         return ['Configuration file does not exist', null];
@@ -53,13 +49,16 @@ Manager.ImportConfig = async (Path) => {
     try {
         const data = fs.readFileSync(Path, 'utf8');
         const ImportedConfig = JSON.parse(data);
+
+        // Validate structure
         if (!ImportedConfig || !ImportedConfig.Groups || !ImportedConfig.Clients) {
             Logger.error('Invalid configuration format');
             return ['Invalid configuration format', null];
         }
+
         // Validate version
         if (ImportedConfig.Version !== Config.Application.Version) {
-            return ['Configuration version mismatch', null];
+            Logger.warn(`Configuration version mismatch: expected ${Config.Application.Version}, got ${ImportedConfig.Version}`);
         }
 
         // Import groups

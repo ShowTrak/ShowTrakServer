@@ -34,6 +34,17 @@ app.whenReady().then(async () => {
     MainWindow = null;
   }
 
+  app.on("web-contents-created", (_, contents) => {
+    contents.on("before-input-event", (event, input) => {
+      if (input.code == "F4" && input.alt) {
+        event.preventDefault();
+        if (!MainWindow || !MainWindow.isVisible()) return Shutdown();
+        Logger.warn("Prevented alt+f4 shutdown, passing request to agent",);
+        MainWindow.webContents.send('ShutdownRequested');
+      }
+    });
+  });
+
   PreloaderWindow = new BrowserWindow({
     show: false,
     backgroundColor: '#161618',
@@ -76,6 +87,8 @@ app.whenReady().then(async () => {
     PreloaderWindow.close();
     MainWindow.show()
   });
+
+
 
   RPC.handle('BackupConfig', async () => {
     let { canceled, filePath } = await FileSelectorManager.SaveDialog('Export ShowTrak Configuration');
@@ -164,10 +177,15 @@ app.whenReady().then(async () => {
     return;
   })
 
-  RPC.handle('Shutdown', async () => {
+  async function Shutdown() {
     Logger.log('Application shutdown requested');
     app.quit();
+    process.exit(0);
     return;
+  }
+
+  RPC.handle('Shutdown', async () => {
+    Shutdown()
   })
 
   RPC.handle('AdoptDevice', async (_event, UUID) => {
