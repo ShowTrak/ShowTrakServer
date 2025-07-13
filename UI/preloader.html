@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>ShowTrak Server Booting</title>
+  </head>
+  <body>
+    <div id="DRAGBAR">
+      <img id="PRELOADER_LOGO" src="./img/icon.png" alt="ShowTrak Logo">
+    </div>
+  </body>
+    <style>
+      body {
+        background: #1c1c1e !important;
+        user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+      }
+
+      #DRAGBAR {
+        app-region: drag;
+        -webkit-app-region: drag;
+        display: grid;
+        place-items: center;
+      }
+
+      #PRELOADER_LOGO {
+        pointer-events: none;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 200px;
+        height: 200px;
+        user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+      }
+    </style>
+</html>

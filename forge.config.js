@@ -1,27 +1,22 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+const { Config } = require('./Modules/Config');
 
 module.exports = {
   packagerConfig: {
     asar: true,
+    icon: './images/icon.ico',
   },
   rebuildConfig: {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
-    },
-    {
-      name: '@electron-forge/maker-zip',
-      platforms: ['darwin'],
-    },
-    {
-      name: '@electron-forge/maker-deb',
-      config: {},
-    },
-    {
-      name: '@electron-forge/maker-rpm',
-      config: {},
+      config: {
+        // An URL to an ICO file to use as the application icon (displayed in Control Panel > Programs and Features).
+        iconUrl: 'https://tkw.bz/img/ShowTrak.ico',
+        // The ICO file to use as the icon for the generated Setup.exe
+        setupIcon: './images/icon.ico'
+      },
     },
   ],
   plugins: [
