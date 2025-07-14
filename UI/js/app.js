@@ -400,10 +400,10 @@ async function OpenClientEditor(UUID) {
     $('#CLIENT_EDITOR_VERSION').val(Version)
 
     $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').html('');
-    if (Client.USBDeviceList) {
+    if (Client.USBDeviceList && Client.USBDeviceList.length > 0) {
         for (const { ManufacturerName, ProductName, ProductID, SerialNumber, VendorID } of Client.USBDeviceList) {
             $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').append(`
-                <div class="SHOWTRAK_CLIENT_EDITOR_USB_DEVICE rounded-3 p-2 bg-ghost">
+                <div class="rounded-3 p-2 bg-ghost">
                     <h6 class="mb-0">${ManufacturerName || 'Generic'} ${ProductName || 'USB Device'}</h6>
                     <small class="text-light">Serial Number: ${SerialNumber || 'Unavailable'}</small>
                 </div>
@@ -411,9 +411,9 @@ async function OpenClientEditor(UUID) {
         }
     } else {
         $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').html(`
-            <div class="SHOWTRAK_CLIENT_EDITOR_USB_DEVICE rounded-3 p-2">
-                <h6 class="mb-0">No USB Devices</h6>
-                <small class="text-muted">This client has no USB devices adopted.</small>
+            <div class="rounded-3 p-2 bg-ghost">
+                <h6 class="mb-0">No USB Devices Connected</h6>
+                <p class="text-sm mb-0">Devices that do not comply with WebUSB 1.3 cannot be displayed.</p>
             </div>
         `);
     }
