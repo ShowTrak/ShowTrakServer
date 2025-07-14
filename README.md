@@ -22,19 +22,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-ShowTrak is a project created to make monitoring and controlling computers on a local network easier for arcade style pc setups.
-
-Features include:
-* Automated Script Deployment (With checksum verification to reduce traffic)
-* Live RAM + CPU Reporting of all clients
-* Groups for easy client organisation
-* Lightweight client service with very low network overheads
-* Fully customisable scripts
-* Import & Export configs to files for backups
-* 1 Click adoption of new devices
-* Automated client discovery powered by bonjour
-
-[![ShowTrak Screen Shot][showtrak-screenshot]](https://tkw.bz/ShowTrak)
+Please see the ShowTrak repo <a href="https://github.com/ShowTrak"><strong>here</strong></a>
 
 ### Built With
 [![Electron][Electronjs.org]][Electron-url]
@@ -44,37 +32,6 @@ Features include:
 ### Installation
 1. Download the executable from the releases page
 2. Install the executable.
-
-<!-- CONTRIBUTING -->
-## Contributing
-
-Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
-If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
-Don't forget to give the project a star! Thanks again!
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-<!-- CONTACT -->
-## Contact
-
-Your Name - [tkw.bz](https://tkw.bz) - tom@tkw.bz
-
-Project Link: [https://github.com/ShowTrak/ShowTrakServer](https://github.com/ShowTrak/ShowTrakServer)
-
-<!-- ACKNOWLEDGMENTS -->
-## Acknowledgments
-* Ben Sugrue - Co-Founder
-* Cameron Tarplett
-* Royal Opera House [Alpha Testing]
-* Layered Reality [Beta Testing]
-
-<!-- MARKDOWN LINKS & IMAGES -->
-<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 
 [linkedin-url]: https://www.linkedin.com/in/thomas-kirkman-wood-aa0242190/
 [showtrak-logo]: images/icon.png
