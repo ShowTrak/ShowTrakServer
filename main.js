@@ -1,8 +1,6 @@
 const { app, BrowserWindow, ipcMain: RPC } = require('electron/main')
 if (require('electron-squirrel-startup')) app.quit();
-const path = require('path')
 
-// Load Backend
 const { CreateLogger } = require('./Modules/Logger');
 const Logger = CreateLogger('Main');
 const { Config } = require('./Modules/Config');
@@ -17,15 +15,12 @@ BonjourManager.Init()
 const { Manager: AdoptionManager } = require('./Modules/AdoptionManager');
 const { Manager: ClientManager } = require('./Modules/ClientManager');
 const { Manager: GroupManager } = require('./Modules/GroupManager');
-
 const { Manager: FileSelectorManager } = require('./Modules/FileSelectorManager');
 const { Manager: BackupManager } = require('./Modules/BackupManager');
-
 const { Manager: ScriptExecutionManager } = require('./Modules/ScriptExecutionManager');
-
 const { Manager: WOLManager } = require('./Modules/WOLManager');
-
 const { Wait } = require('./Modules/Utils');
+const path = require('path')
 
 var MainWindow = null;
 
@@ -92,8 +87,6 @@ app.whenReady().then(async () => {
     MainWindow.show()
   });
 
-
-
   RPC.handle('BackupConfig', async () => {
     let { canceled, filePath } = await FileSelectorManager.SaveDialog('Export ShowTrak Configuration');
     if (canceled || !filePath) {
@@ -122,8 +115,6 @@ app.whenReady().then(async () => {
     if (Err) return [Err, null];
     return [null, Result];
   })
-
-  
 
   RPC.handle('Config:Get', async () => {
     return Config;

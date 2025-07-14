@@ -6,7 +6,6 @@ const { Config } = require('../Config');
 
 const instance = new Bonjour()
 
-// advertise an HTTP server on port 3000
 const Manager = {
     Init: () => {
         const Hostname = OSManager.Hostname || 'Unknown PC';
