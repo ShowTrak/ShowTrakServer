@@ -85,6 +85,22 @@ window.API.SetFullClientList(async (Clients, Groups) => {
     // Sort groups by weight
     Groups = Groups.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
 
+    if (Groups.length == 1 && Clients.length == 0) {
+        Filler += `<div class="bg-ghost rounded m-3 mb-0 d-grid gap-0 gap-3 p-3">
+            <h5 class="text-light mb-0">
+                Welcome to ShowTrak Server v${Config.Application.Version}
+            </h5>
+            <p class="text-light mb-0">
+                You don't have any clients configured yet. Discover clients on your network and adopt them with the Adoption Manager below.
+            </p>
+            <div>
+                <a class="btn btn-sm btn-light" onclick="OpenAdoptionManager()">
+                    Open Adoption Manager
+                </a>
+            </div>
+        </div>`;
+    }
+
     for (const { GroupID, Title } of Groups) {
 
         let GroupClients = Clients.filter(Client => Client.GroupID === GroupID);
@@ -660,6 +676,11 @@ $(function() {
 
 setInterval(UpdateOfflineIndicators, 1000)
 
+async function OpenAdoptionManager() {
+    await CloseAllModals();
+    $('#SHOWTRAK_MODEL_ADOPTION').modal('show');
+}
+
 async function Init() {
     Config = await window.API.GetConfig()
     $('#APPLICATION_NAVBAR_TITLE').text(`${Config.Application.Name}`);
@@ -670,8 +691,7 @@ async function Init() {
     })
 
     $('#SHOWTRAK_MODEL_CORE_ADOPT_BUTTON').on('click', async () => {
-        await CloseAllModals();
-        $('#SHOWTRAK_MODEL_ADOPTION').modal('show');
+        await OpenAdoptionManager();
     })
 
     $('#SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON').on('click', async () => {
