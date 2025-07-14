@@ -8,10 +8,7 @@
     <div id="DRAGBAR">
       <img id="PRELOADER_LOGO" src="./img/icon.png" alt="ShowTrak Logo">
     </div>
-    <h1 id="FOOTER">
-      ShowTrak v3.0.2
-    </h1>
-  <!-- TODO: Automate Version -->
+    <h1 id="FOOTER"></h1>
   </body>
     <style>
       body {
@@ -54,4 +51,15 @@
         -ms-user-select: none;
       }
     </style>
+    <script>
+      async function Init() {
+        Config = await window.API.GetConfig()
+        if (Config && Config.Application && Config.Application.Version && Config.Application.Name) {
+          document.getElementById('FOOTER').innerText = `${Config.Application.Name} v${Config.Application.Version}`;
+        } else {
+          document.getElementById('FOOTER').innerText = 'ShowTrak Server';
+        }
+      }
+      Init();
+    </script>
 </html>
