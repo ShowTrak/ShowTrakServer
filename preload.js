@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('API', {
   ShutdownRequested: (Callback) => ipcRenderer.on('ShutdownRequested', (_event) => {
     Callback()
   }),
+  WakeOnLan: async (Targets) => ipcRenderer.invoke('WakeOnLan', Targets),
   UpdateClient: async (UUID, Data) => ipcRenderer.invoke('UpdateClient', UUID, Data),
   ExecuteScript: async (Script, Targets, ResetList) => ipcRenderer.invoke('ExecuteScript', Script, Targets, ResetList),
   UnadoptClient: async (UUID) => ipcRenderer.invoke('UnadoptClient', UUID),

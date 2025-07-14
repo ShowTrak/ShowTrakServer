@@ -21,6 +21,10 @@ const { Manager: GroupManager } = require('./Modules/GroupManager');
 const { Manager: FileSelectorManager } = require('./Modules/FileSelectorManager');
 const { Manager: BackupManager } = require('./Modules/BackupManager');
 
+const { Manager: ScriptExecutionManager } = require('./Modules/ScriptExecutionManager');
+
+const { Manager: WOLManager } = require('./Modules/WOLManager');
+
 const { Wait } = require('./Modules/Utils');
 
 var MainWindow = null;
@@ -167,6 +171,33 @@ app.whenReady().then(async () => {
   RPC.handle('UpdateScripts', async (_Event, List) => {
     await ServerManager.ExecuteBulkRequest('UpdateScripts', List);
     return;
+  })  
+
+  RPC.handle('WakeOnLan', async (_Event, List) => {
+    await ScriptExecutionManager.ClearQueue();
+    for (const UUID of List) {
+      const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, 'Wake On LAN');
+      const [ClientErr, Client] = await ClientManager.Get(UUID);
+      if (ClientErr) {
+        await ScriptExecutionManager.Complete(RequestID, ClientErr);
+        continue;
+      }
+      if (!Client) {
+        await ScriptExecutionManager.Complete(RequestID, 'Client not found');
+        continue;
+      }
+      if (!Client.MacAddress) {
+        await ScriptExecutionManager.Complete(RequestID, 'Client does not have a valid MAC address in internal database.');
+        continue;
+      }
+      if (Client.Online) {
+        await ScriptExecutionManager.Complete(RequestID, 'Client is already online');
+        continue;
+      }
+      let [WOLErr, Result] = await WOLManager.Wake(Client.MacAddress, 3, 100);
+      await ScriptExecutionManager.Complete(RequestID, WOLErr);
+    }
+
   })  
 
   RPC.handle('Loaded', async () => {

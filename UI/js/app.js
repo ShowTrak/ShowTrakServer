@@ -17,6 +17,8 @@ window.API.UpdateScriptExecutions(async (Executions) => {
     let Filler = "";
     for (const Request of Executions) {
 
+        let ExtraContent = ''
+
         let Badge = `<span class="badge bg-secondary text-light">
             ${Request.Status}
         </span>`
@@ -35,6 +37,11 @@ window.API.UpdateScriptExecutions(async (Executions) => {
             <span class="badge bg-danger text-light">
                 ${Request.Status}
             </span>`
+            if (Request.Error) {
+                ExtraContent = `<div class="bg-ghost p-2 text-center text-danger rounded">
+                    ${Request.Error}
+                </div>`;
+            }
         }
         if (Request.Status == 'Timed Out') {
             Badge = `<span class="badge bg-danger text-light">
@@ -60,7 +67,8 @@ window.API.UpdateScriptExecutions(async (Executions) => {
             <div class="d-flex justify-content-start gap-2">
                 ${Badge}    
             </div>
-        </div>`;
+        </div>
+        ${ExtraContent}`;
     }
 
     $('#SHOWTRAK_EXECUTIONQUEUE').html(Filler);
@@ -586,6 +594,15 @@ $(function() {
         }
 
         if (Selected.length > 0) {
+            Options.push({
+                Type: 'Action',
+                Title: 'Wake On LAN',
+                Class: 'text-light',
+                Action: async function() {
+                    window.API.WakeOnLan(Selected);
+                    $('#SHOWTRAK_MODEL_EXECUTIONQUEUE').modal('show');
+                }
+            });
             Options.push({
                 Type: 'Action',
                 Title: 'Delete Scripts',
