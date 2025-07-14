@@ -7,7 +7,6 @@ const Manager = {};
 
 Manager.Initialize = async () => {
   if (!fs.existsSync(appDataPath)) {
-    Logger.log(`Creating application data directory at ${appDataPath}`);
     fs.mkdirSync(appDataPath, { recursive: true });
   }
 
@@ -19,7 +18,6 @@ Manager.Initialize = async () => {
   AppDataFolders.forEach(folder => {
     const folderPath = path.join(appDataPath, folder);
     if (!fs.existsSync(folderPath)) {
-      Logger.log(`Creating folder: ${folderPath}`);
       fs.mkdirSync(folderPath, { recursive: true });
     }
   });
@@ -42,7 +40,6 @@ Manager.OpenFolder = (FolderPath) => {
     require('child_process').exec(`start "" "${FolderPath}"`);
     return true;
   } else {
-    Logger.error(`Directory does not exist: ${FolderPath}`);
     return false;
   }
 }
