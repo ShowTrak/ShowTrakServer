@@ -51,7 +51,7 @@ app.whenReady().then(async () => {
     height: 500,
     resizable: false,
     webPreferences: { 
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'bridge_preloader.js'),
       devTools: !app.isPackaged,
     },
     icon: path.join(__dirname, 'images/icon.ico'),
@@ -71,7 +71,7 @@ app.whenReady().then(async () => {
     minWidth: 815,
     minHeight: 600,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'bridge_main.js'),
       devTools: !app.isPackaged,
     },
     icon: path.join(__dirname, 'images/icon.ico'),

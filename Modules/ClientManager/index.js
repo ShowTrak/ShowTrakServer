@@ -14,7 +14,7 @@ var ClientList = [];
 class Client {
     constructor(Data) {
         this.UUID = Data.UUID;
-        this.Nickname = Data.Nickname || null;
+        this.Nickname = Data.Nickname ? Data.Nickname : Data.Hostname;
         this.Hostname = Data.Hostname || null;
         this.GroupID = Data.GroupID || null;;
         this.MacAddress = Data.MacAddress || null;
