@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('API', {
   CreateGroup: async (Title) => ipcRenderer.invoke('CreateGroup', Title),
   DeleteGroup: async (GroupID) => ipcRenderer.invoke('DeleteGroup', GroupID),
   OpenLogsFolder: async () => ipcRenderer.invoke('OpenLogsFolder'),
+  OpenScriptsFolder: async () => ipcRenderer.invoke('OpenScriptsFolder'),
   BackupConfig: async () => ipcRenderer.invoke('BackupConfig'),
   ImportConfig: async () => ipcRenderer.invoke('ImportConfig'),
   SetDevicesPendingAdoption: (Callback) => ipcRenderer.on('SetDevicesPendingAdoption', (_event, Data) => {

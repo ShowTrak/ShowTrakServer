@@ -209,12 +209,16 @@ app.whenReady().then(async () => {
   RPC.handle('OpenLogsFolder', async (_event) => {
     let LogsPath = AppDataManager.GetLogsDirectory();
     Logger.log('Opening logs folder:', LogsPath);
-    // await shell.openPath(LogsPath);
     require('child_process').exec(`start ${LogsPath}`);
     return;
   })
 
-  
+  RPC.handle('OpenScriptsFolder', async (_event) => {
+    let LogsPath = AppDataManager.GetScriptsDirectory();
+    Logger.log('Opening scrippts folder:', LogsPath);
+    require('child_process').exec(`start ${LogsPath}`);
+    return;
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

@@ -104,10 +104,16 @@ window.API.SetFullClientList(async (Clients, Groups) => {
         <div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100">`
 
         if (GroupClients.length == 0) {
-            Filler += `<div class="SHOWTRAK_PC_PLACEHOLDER"
-                <h5 class="my-4 text-muted">
+            Filler += `<div class="SHOWTRAK_PC_PLACEHOLDER w-100 p-3"
+                <h5 class="text-muted mb-0">
                     Empty Group
                 </h5>
+                <p class="text-muted mb-0">
+                    This group has no clients assigned to it.
+                </p>
+                <p class="text-muted mb-0">
+                    You can add clients to this group via the client editor!
+                </p>
             </div>`
         } else {
             for (const { Nickname, Hostname, IP, UUID, Version, Online, LastSeen } of GroupClients) {
@@ -674,6 +680,10 @@ async function Init() {
 
     $('#SHOWTRAK_MODEL_CORE_LOGSFOLDER').on('click', async () => {
         await window.API.OpenLogsFolder();
+    })
+
+    $('#SHOWTRAK_MODEL_CORE_SCRIPTSFOLDER').on('click', async () => {
+        await window.API.OpenScriptsFolder();
     })
 
     $('#SHOWTRAK_MODEL_CORE_BACKUPCONFIG').on('click', async () => {
