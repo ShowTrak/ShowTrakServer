@@ -11,6 +11,13 @@ window.API.ShutdownRequested(async () => {
     await window.API.Shutdown();
 })
 
+window.API.USBDeviceAdded(async (Client, Device) => {
+    console.log(`USB Device Added: ${Device.ManufacturerName} ${Device.ProductName} to Client ${Client.Nickname}`);
+})
+window.API.USBDeviceRemoved(async (Client, Device) => {
+    console.log(`USB Device Removed: ${Device.ManufacturerName} ${Device.ProductName} to Client ${Client.Nickname}`);
+})
+
 window.API.UpdateScriptExecutions(async (Executions) => {
     Executions = Executions.reverse();
 
@@ -380,9 +387,7 @@ async function OpenClientEditor(UUID) {
         $('#CLIENT_EDITOR_GROUPID').append(`<option value="${Group.GroupID}" ${Client.GroupID == Group.GroupID ? 'selected' : ''}>${Group.Title}</option>`);
     }
 
-
     ClearSelection();
-    console.log(Client);
 
     const { Nickname, Hostname, IP, Version } = Client;
 
@@ -392,7 +397,29 @@ async function OpenClientEditor(UUID) {
     $('#CLIENT_EDITOR_UUID').val(UUID)
     $('#CLIENT_EDITOR_VERSION').val(Version)
 
+    $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').html('');
+    if (Client.USBDeviceList) {
+        for (const { ManufacturerName, ProductName, ProductID, SerialNumber, VendorID } of Client.USBDeviceList) {
+            $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').append(`
+                <div class="SHOWTRAK_CLIENT_EDITOR_USB_DEVICE rounded-3 p-2 bg-ghost">
+                    <h6 class="mb-0">${ManufacturerName || 'Generic'} ${ProductName || 'USB Device'}</h6>
+                    <small class="text-light">Serial Number: ${SerialNumber || 'Unavailable'}</small>
+                </div>
+            `);
+        }
+    } else {
+        $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').html(`
+            <div class="SHOWTRAK_CLIENT_EDITOR_USB_DEVICE rounded-3 p-2">
+                <h6 class="mb-0">No USB Devices</h6>
+                <small class="text-muted">This client has no USB devices adopted.</small>
+            </div>
+        `);
+    }
+
     $('#SHOWTRAK_CLIENT_EDITOR_REMOVE').off('click').on('click', async () => {
+        await CloseAllModals();
+        let Confirmation = await ConfirmationDialog(`Are you sure you want to unadopt ${Nickname || Hostname}?`);
+        if (!Confirmation) return;
         await window.API.UnadoptClient(UUID)
         await CloseAllModals();
     })

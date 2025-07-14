@@ -8,7 +8,7 @@ body {
     width: 100vw;
     height: 2rem;
     app-region: drag;
-    background-color: #ffffff10 !important;
+    background-color: #1d1a2ffc !important;
     padding: 0.3rem 0.8rem !important;
     color: #ffffff !important;
     user-select: none !important;
@@ -18,7 +18,7 @@ body {
 }
 
 #APPLICATION {
-    height: 100vh;
+    height: 100%;
     padding-top: 2rem !important;
     user-select: none !important;
     -webkit-user-select: none !important;
@@ -66,6 +66,10 @@ body {
     -webkit-user-select: none !important;
     -moz-user-select: none !important;
     -ms-user-select: none !important;
+}
+
+.rounded-3 {
+    border-radius: 0.5rem !important;
 }
 
 .btn {

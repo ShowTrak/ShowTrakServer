@@ -29,6 +29,7 @@ class Client {
             Ram: {},
             Uptime: {},
         };
+        this.USBDeviceList = [];
     }
 
     // RAM Storage
@@ -51,7 +52,19 @@ class Client {
         // Logger.debug(`Client ${this.UUID} Vitals updated`, Vitals);
         BroadcastManager.emit('ClientUpdated', this);
     }
-
+    SetUSBDeviceList(USBDeviceList) {
+        this.USBDeviceList = USBDeviceList;
+        Logger.debug(`Client ${this.UUID} USB Device List updated`);
+        return;
+    }
+    USBDeviceAdded(Device) {
+        BroadcastManager.emit('USBDeviceAdded', this, Device);
+        return;
+    }
+    USBDeviceRemoved(Device) {
+        BroadcastManager.emit('USBDeviceRemoved', this, Device);
+        return;
+    }
 
     // Persistent Storage
     async SetNickname(Nickname) {
@@ -146,34 +159,40 @@ Manager.Heartbeat = async (UUID, Data, IP) => {
     return [null, 'Heartbeat processed successfully'];
 }
 
-Manager.SystemInfo = async (UUID, Data, IP) => {
-    let CachedClient = ClientList.find(c => c.UUID === UUID);
-    if (!CachedClient) {
-        Logger.warn(`Client ${UUID} not found in memory, fetching from database.`);
-        let [Err, FetchedClient] = await DB.Get('SELECT * FROM Clients WHERE UUID = ?', [UUID]);
-        if (Err) {
-            Logger.error('Failed to fetch client from database:', Err);
-            return ['Failed to fetch client', null];
-        }
-        if (!FetchedClient) {
-            Logger.warn(`Client ${UUID} not found in database, creating new entry.`);
-            return ['Client Not Valid', null]
-        } else {
-            CachedClient = new Client(FetchedClient);
-            ClientList.push(CachedClient);
-            BroadcastManager.emit('ClientListChanged');
-        }
-    }
+Manager.SetUSBDeviceList = async (UUID, DeviceList) => {
+    let [Err, Target] = await Manager.Get(UUID);
+    if (Err) return [Err, null];
+    if (!Target) return ['Client Not Found', null];
+    Target.SetUSBDeviceList(DeviceList);
+    return [null, 'USB Device List updated successfully'];
+}
 
-    await CachedClient.SetHostname(Data.Hostname || null);
+Manager.USBDeviceAdded = async (UUID, Device) => {
+    let [Err, Target] = await Manager.Get(UUID);
+    if (Err) return [Err, null];
+    if (!Target) return ['Client Not Found', null];
+    Target.USBDeviceAdded(Device);
+    return [null, 'Updated'];
+}
+
+Manager.USBDeviceRemoved = async (UUID, Device) => {
+    let [Err, Target] = await Manager.Get(UUID);
+    if (Err) return [Err, null];
+    if (!Target) return ['Client Not Found', null];
+    Target.USBDeviceRemoved(Device);
+    return [null, 'Updated'];
+}
+
+Manager.SystemInfo = async (UUID, Data, IP) => {
+    let [Err, Target] = await Manager.Get(UUID);
+    if (Err) return [Err, null];
+    if (!Target) return ['Client Not Found', null];
+
+    await Target.SetHostname(Data.Hostname || null);
     let Macs = Object.values(Data.MacAddresses || {});    
     for (let Interface of Macs) {
-        if (Interface.ipv4 == IP) {
-            // console.log(`Client ${UUID} has IPv4 address ${IP} with MAC ${Interface.mac}`);
-            await CachedClient.SetMacAddress(Interface.mac);
-        }
+        if (Interface.ipv4 == IP) await Target.SetMacAddress(Interface.mac);
     }
-
 
     return [null, 'Heartbeat processed successfully'];
 }

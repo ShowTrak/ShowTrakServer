@@ -252,6 +252,24 @@ app.whenReady().then(async () => {
 
 })
 
+async function USBDeviceAdded(Client, Device) {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  Logger.log(`USB Device Added to ${Client.UUID} (${Device.ManufacturerName} ${Device.ProductName})`);
+  MainWindow.webContents.send('USBDeviceAdded', Client, Device);
+  return;
+}
+
+BroadcastManager.on('USBDeviceAdded', USBDeviceAdded);
+
+async function USBDeviceRemoved(Client, Device) {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  Logger.log(`USB Device Removed from ${Client.UUID} (${Device.ManufacturerName} ${Device.ProductName})`);
+  MainWindow.webContents.send('USBDeviceRemoved', Client, Device);
+  return;
+}
+
+BroadcastManager.on('USBDeviceRemoved', USBDeviceRemoved);
+
 
 async function ReadoptDevice(UUID) {
   await ServerManager.SendMessageByGroup(UUID, 'Adopt');

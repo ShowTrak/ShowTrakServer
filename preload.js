@@ -31,6 +31,12 @@ contextBridge.exposeInMainWorld('API', {
   ShutdownRequested: (Callback) => ipcRenderer.on('ShutdownRequested', (_event) => {
     Callback()
   }),
+  USBDeviceAdded: (Callback) => ipcRenderer.on('USBDeviceAdded', (_event, Client, Device) => {
+    Callback(Client, Device)
+  }),
+  USBDeviceRemoved: (Callback) => ipcRenderer.on('USBDeviceRemoved', (_event, Client, Device) => {
+    Callback(Client, Device)
+  }),
   WakeOnLan: async (Targets) => ipcRenderer.invoke('WakeOnLan', Targets),
   UpdateClient: async (UUID, Data) => ipcRenderer.invoke('UpdateClient', UUID, Data),
   ExecuteScript: async (Script, Targets, ResetList) => ipcRenderer.invoke('ExecuteScript', Script, Targets, ResetList),

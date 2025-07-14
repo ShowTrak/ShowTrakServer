@@ -9,8 +9,8 @@ const { Manager: ClientManager } = require('../ClientManager');
 const { Manager: ScriptManager } = require('../ScriptManager'); 
 const { Manager: ScriptExecutionManager } = require('../ScriptExecutionManager');
 const { Manager: AppDataManager } = require('../AppData');
+const { Manager: BroadcastManager } = require('../Broadcast');
 const express = require('express');
-const path = require('path');
 
 const { Wait } = require('../Utils');
 
@@ -81,12 +81,21 @@ io.on('connection', async (socket) => {
         await ClientManager.SystemInfo(socket.UUID, Data, socket.IP)
     });
 
-    socket.on('USBDeviceConnected', async (Device) => {
-        Logger.log(`USB Device Connected to ${socket.UUID}:`, Device);
-
+    socket.on('USBDeviceList', async (DeviceList) => {
+        Logger.log(`USB Device list recieved from ${socket.UUID} (${DeviceList.length} ${DeviceList.length === 1 ? 'Device' : 'Devices'})`);
+        await ClientManager.SetUSBDeviceList(socket.UUID, DeviceList)
     })
+
+    socket.on('USBDeviceConnected', async (Device) => {
+        Logger.log(`USB Device Connected to ${socket.UUID} (${Device.ManufacturerName} ${Device.ProductName})`);
+        await ClientManager.USBDeviceAdded(socket.UUID, Device);
+        return;
+    })
+    
     socket.on('USBDeviceDisconnected', async (Device) => {
-        Logger.log(`USB Device Disconnected from ${socket.UUID}:`, Device);
+        Logger.log(`USB Device Disconnected from ${socket.UUID} (${Device.ManufacturerName} ${Device.ProductName})`);
+        await ClientManager.USBDeviceRemoved(socket.UUID, Device);
+        return;    
     })
 
     socket.on('disconnect', () => {
