@@ -1,14 +1,11 @@
 const { app, BrowserWindow, ipcMain: RPC } = require('electron/main')
 if (require('electron-squirrel-startup')) app.quit();
-const path = require('path')
 
-// Load Backend
+const { Manager: AppDataManager } = require('./Modules/AppData');
+AppDataManager.Initialize();
 const { CreateLogger } = require('./Modules/Logger');
 const Logger = CreateLogger('Main');
 const { Config } = require('./Modules/Config');
-const { Manager: BroadcastManager } = require('./Modules/Broadcast');
-const { Manager: AppDataManager } = require('./Modules/AppData');
-AppDataManager.Initialize();
 const { Manager: ScriptManager } = require('./Modules/ScriptManager');
 ScriptManager.GetScripts();
 const { Manager: ServerManager } = require('./Modules/Server');
@@ -17,11 +14,13 @@ BonjourManager.Init()
 const { Manager: AdoptionManager } = require('./Modules/AdoptionManager');
 const { Manager: ClientManager } = require('./Modules/ClientManager');
 const { Manager: GroupManager } = require('./Modules/GroupManager');
-
 const { Manager: FileSelectorManager } = require('./Modules/FileSelectorManager');
 const { Manager: BackupManager } = require('./Modules/BackupManager');
-
+const { Manager: ScriptExecutionManager } = require('./Modules/ScriptExecutionManager');
+const { Manager: WOLManager } = require('./Modules/WOLManager');
+const { Manager: BroadcastManager } = require('./Modules/Broadcast');
 const { Wait } = require('./Modules/Utils');
+const path = require('path')
 
 var MainWindow = null;
 
@@ -34,11 +33,23 @@ app.whenReady().then(async () => {
     MainWindow = null;
   }
 
+  app.on("web-contents-created", (_, contents) => {
+    contents.on("before-input-event", (event, input) => {
+      if (input.code == "F4" && input.alt) {
+        event.preventDefault();
+        if (!MainWindow || !MainWindow.isVisible()) return Shutdown();
+        Logger.warn("Prevented alt+f4 shutdown, passing request to agent",);
+        MainWindow.webContents.send('ShutdownRequested');
+      }
+    });
+  });
+
   PreloaderWindow = new BrowserWindow({
-    show: true,
+    show: false,
     backgroundColor: '#161618',
     width: 400,
     height: 500,
+    resizable: false,
     webPreferences: { 
       preload: path.join(__dirname, 'preload.js'),
       devTools: !app.isPackaged,
@@ -48,7 +59,9 @@ app.whenReady().then(async () => {
     titleBarStyle: 'hidden',
   })
 
-  PreloaderWindow.loadFile('UI/preloader.html')
+  PreloaderWindow.loadFile('UI/preloader.html').then(() => {
+    PreloaderWindow.show()
+  })
 
   MainWindow = new BrowserWindow({
     show: false,
@@ -69,13 +82,10 @@ app.whenReady().then(async () => {
   MainWindow.loadFile('UI/index.html').then(async () => {
     Logger.log('MainWindow finished loading UI');
     UpdateAdoptionList();
-    await Wait(1500);
+    await Wait(2000);
     PreloaderWindow.close();
     MainWindow.show()
   });
-
-
-
 
   RPC.handle('BackupConfig', async () => {
     let { canceled, filePath } = await FileSelectorManager.SaveDialog('Export ShowTrak Configuration');
@@ -105,8 +115,6 @@ app.whenReady().then(async () => {
     if (Err) return [Err, null];
     return [null, Result];
   })
-
-  
 
   RPC.handle('Config:Get', async () => {
     return Config;
@@ -147,13 +155,40 @@ app.whenReady().then(async () => {
   })  
 
   RPC.handle('DeleteScripts', async (_Event, List) => {
-    await ServerManager.ExecuteBulkRequest('DeleteScripts', List);
+    await ServerManager.ExecuteBulkRequest('DeleteScripts', List, 'Delete Scripts');
     return;
   })  
   
   RPC.handle('UpdateScripts', async (_Event, List) => {
-    await ServerManager.ExecuteBulkRequest('UpdateScripts', List);
+    await ServerManager.ExecuteBulkRequest('UpdateScripts', List, 'Update Scripts');
     return;
+  })  
+
+  RPC.handle('WakeOnLan', async (_Event, List) => {
+    await ScriptExecutionManager.ClearQueue();
+    for (const UUID of List) {
+      const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, 'Wake On LAN');
+      const [ClientErr, Client] = await ClientManager.Get(UUID);
+      if (ClientErr) {
+        await ScriptExecutionManager.Complete(RequestID, ClientErr);
+        continue;
+      }
+      if (!Client) {
+        await ScriptExecutionManager.Complete(RequestID, 'Client not found');
+        continue;
+      }
+      if (!Client.MacAddress) {
+        await ScriptExecutionManager.Complete(RequestID, 'Client does not have a valid MAC address in internal database.');
+        continue;
+      }
+      if (Client.Online) {
+        await ScriptExecutionManager.Complete(RequestID, 'Client is already online');
+        continue;
+      }
+      let [WOLErr, Result] = await WOLManager.Wake(Client.MacAddress, 3, 100);
+      await ScriptExecutionManager.Complete(RequestID, WOLErr);
+    }
+
   })  
 
   RPC.handle('Loaded', async () => {
@@ -164,10 +199,15 @@ app.whenReady().then(async () => {
     return;
   })
 
-  RPC.handle('Shutdown', async () => {
+  async function Shutdown() {
     Logger.log('Application shutdown requested');
     app.quit();
+    process.exit(0);
     return;
+  }
+
+  RPC.handle('Shutdown', async () => {
+    Shutdown()
   })
 
   RPC.handle('AdoptDevice', async (_event, UUID) => {
@@ -191,12 +231,16 @@ app.whenReady().then(async () => {
   RPC.handle('OpenLogsFolder', async (_event) => {
     let LogsPath = AppDataManager.GetLogsDirectory();
     Logger.log('Opening logs folder:', LogsPath);
-    // await shell.openPath(LogsPath);
     require('child_process').exec(`start ${LogsPath}`);
     return;
   })
 
-  
+  RPC.handle('OpenScriptsFolder', async (_event) => {
+    let LogsPath = AppDataManager.GetScriptsDirectory();
+    Logger.log('Opening scrippts folder:', LogsPath);
+    require('child_process').exec(`start ${LogsPath}`);
+    return;
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -207,6 +251,24 @@ app.whenReady().then(async () => {
   // MainWindow.webContents.openDevTools();
 
 })
+
+async function USBDeviceAdded(Client, Device) {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  Logger.log(`USB Device Added to ${Client.UUID} (${Device.ManufacturerName} ${Device.ProductName})`);
+  MainWindow.webContents.send('USBDeviceAdded', Client, Device);
+  return;
+}
+
+BroadcastManager.on('USBDeviceAdded', USBDeviceAdded);
+
+async function USBDeviceRemoved(Client, Device) {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  Logger.log(`USB Device Removed from ${Client.UUID} (${Device.ManufacturerName} ${Device.ProductName})`);
+  MainWindow.webContents.send('USBDeviceRemoved', Client, Device);
+  return;
+}
+
+BroadcastManager.on('USBDeviceRemoved', USBDeviceRemoved);
 
 
 async function ReadoptDevice(UUID) {

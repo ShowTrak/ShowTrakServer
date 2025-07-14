@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('API', {
   CreateGroup: async (Title) => ipcRenderer.invoke('CreateGroup', Title),
   DeleteGroup: async (GroupID) => ipcRenderer.invoke('DeleteGroup', GroupID),
   OpenLogsFolder: async () => ipcRenderer.invoke('OpenLogsFolder'),
+  OpenScriptsFolder: async () => ipcRenderer.invoke('OpenScriptsFolder'),
   BackupConfig: async () => ipcRenderer.invoke('BackupConfig'),
   ImportConfig: async () => ipcRenderer.invoke('ImportConfig'),
   SetDevicesPendingAdoption: (Callback) => ipcRenderer.on('SetDevicesPendingAdoption', (_event, Data) => {
@@ -27,6 +28,16 @@ contextBridge.exposeInMainWorld('API', {
   UpdateScriptExecutions: (Callback) => ipcRenderer.on('UpdateScriptExecutions', (_event, Data) => {
     Callback(Data)
   }),
+  ShutdownRequested: (Callback) => ipcRenderer.on('ShutdownRequested', (_event) => {
+    Callback()
+  }),
+  USBDeviceAdded: (Callback) => ipcRenderer.on('USBDeviceAdded', (_event, Client, Device) => {
+    Callback(Client, Device)
+  }),
+  USBDeviceRemoved: (Callback) => ipcRenderer.on('USBDeviceRemoved', (_event, Client, Device) => {
+    Callback(Client, Device)
+  }),
+  WakeOnLan: async (Targets) => ipcRenderer.invoke('WakeOnLan', Targets),
   UpdateClient: async (UUID, Data) => ipcRenderer.invoke('UpdateClient', UUID, Data),
   ExecuteScript: async (Script, Targets, ResetList) => ipcRenderer.invoke('ExecuteScript', Script, Targets, ResetList),
   UnadoptClient: async (UUID) => ipcRenderer.invoke('UnadoptClient', UUID),

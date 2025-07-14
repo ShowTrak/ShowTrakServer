@@ -102,7 +102,10 @@ Manager.AddToQueue = async (UUID, ScriptID) => {
 
 Manager.Complete = async (RequestID, Err) => {
     let Request = ScriptExecutions.find(execution => execution.RequestID === RequestID);
+    if (Err) Logger.error(`Script execution failed for ${Request.Client.UUID}`, Err);
     if (!Request) return;
+    if (Err) Request.Error = typeof Err === 'string' ? Err : (Err.message || 'Unknown error');
+    else Request.Error = null;
     Request.Status = Err ? 'Failed' : 'Completed';
     Request.Timer.End = Date.now();
     Request.Timer.Duration = Request.Timer.End - Request.Timer.Start;

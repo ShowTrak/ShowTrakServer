@@ -8,13 +8,29 @@
     <div id="DRAGBAR">
       <img id="PRELOADER_LOGO" src="./img/icon.png" alt="ShowTrak Logo">
     </div>
+    <h1 id="FOOTER">
+      ShowTrak v3.0.1
+    </h1>
   </body>
     <style>
       body {
-        background: #1c1c1e !important;
+        background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
         user-select: none;
         -webkit-user-select: none;
         -ms-user-select: none;
+      }
+
+      #FOOTER {
+        position: absolute;
+        bottom: 1.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        color: rgba(255,255,255,0.7);
+        font-size: 1rem;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        text-align: center;
+        width: 100%;
+        font-weight: 700;
       }
 
       #DRAGBAR {

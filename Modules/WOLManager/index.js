@@ -7,13 +7,13 @@ const wol = require('wakeonlan')
 
 const Manager = {};
 
-Manager.SendWOL = async (MAC) => {
+Manager.Wake = async (MAC, Count = 3, Interval = 100) => {
     return new Promise((resolve, reject) => {
-        wol('04:18:D6:A0:47:27', {
-            count: 3,
-            interval: 100,
+        wol(MAC, {
+            count: Count,
+            interval: Interval,
         }).then(() => {
-            return resolve([null, 'Sent Successfully']);
+            return resolve([null, 'Wake On LAN packet sent successfully']);
         }).catch((err) => {
             return resolve([err, null]);
         });

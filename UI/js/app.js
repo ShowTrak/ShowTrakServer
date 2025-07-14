@@ -2,66 +2,30 @@ var Config = {}
 
 let Selected = [];
 let AllClients = [];
-
+let ScriptList = [];
 const GroupUUIDCache = new Map();
 
-async function Init() {
-    Config = await window.API.GetConfig();
-    console.log('Config loaded');
-    $('#APPLICATION_NAVBAR_TITLE').text(`${Config.Application.Name}`);
-    $('#APPLICATION_NAVBAR_STATUS').text(`v${Config.Application.Version}`);
+window.API.ShutdownRequested(async () => {
+    let Confirmation = await ConfirmationDialog('Are you sure you want to shutdown ShowTrak?');
+    if (!Confirmation) return;
+    await window.API.Shutdown();
+})
 
-    $('#NAVBAR_CORE_BUTTON').on('click', async () => {
-        $('#SHOWTRAK_MODEL_CORE').modal('show');
-    })
-
-    $('#SHOWTRAK_MODEL_CORE_ADOPT_BUTTON').on('click', async () => {
-        await CloseAllModals();
-        $('#SHOWTRAK_MODEL_ADOPTION').modal('show');
-    })
-
-    $('#SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON').on('click', async () => {
-        await OpenGroupManager();
-    })
-
-    $('#SHOWTRAK_MODEL_CORE_LOGSFOLDER').on('click', async () => {
-        await window.API.OpenLogsFolder();
-    })
-
-    $('#SHOWTRAK_MODEL_CORE_BACKUPCONFIG').on('click', async () => {
-        await BackupConfig();
-    })
-
-    $('#SHOWTRAK_MODEL_CORE_IMPORTCONFIG').on('click', async () => {
-        await ImportConfig();
-    })
-
-    $('#SHOWTRAK_MODEL_CORE_SHUTDOWN_BUTTON').on('click', async () => {
-        window.API.Shutdown();
-    })
-    
-    await Main();
-    await window.API.Loaded();
-}
-
-async function ExecuteScript(Script, Targets) {
-    let ScriptTarget = ScriptList.find(s => s.ID === Script);
-    if (!ScriptTarget) {
-        console.error('Script not found:', Script);
-        return;
-    }
-    console.log(`Executing script ${ScriptTarget.Name} on targets:`, Targets);
-
-    await window.API.ExecuteScript(Script, Targets, true);
-    $('#SHOWTRAK_MODEL_EXECUTIONQUEUE').modal('show');
-}
+window.API.USBDeviceAdded(async (Client, Device) => {
+    console.log(`USB Device Added: ${Device.ManufacturerName} ${Device.ProductName} to Client ${Client.Nickname}`);
+})
+window.API.USBDeviceRemoved(async (Client, Device) => {
+    console.log(`USB Device Removed: ${Device.ManufacturerName} ${Device.ProductName} to Client ${Client.Nickname}`);
+})
 
 window.API.UpdateScriptExecutions(async (Executions) => {
     Executions = Executions.reverse();
 
     let Filler = "";
     for (const Request of Executions) {
-        console.log(Request);
+
+        let ExtraContent = ''
+
         let Badge = `<span class="badge bg-secondary text-light">
             ${Request.Status}
         </span>`
@@ -80,6 +44,11 @@ window.API.UpdateScriptExecutions(async (Executions) => {
             <span class="badge bg-danger text-light">
                 ${Request.Status}
             </span>`
+            if (Request.Error) {
+                ExtraContent = `<div class="bg-ghost p-2 text-center text-danger rounded">
+                    ${Request.Error}
+                </div>`;
+            }
         }
         if (Request.Status == 'Timed Out') {
             Badge = `<span class="badge bg-danger text-light">
@@ -105,12 +74,205 @@ window.API.UpdateScriptExecutions(async (Executions) => {
             <div class="d-flex justify-content-start gap-2">
                 ${Badge}    
             </div>
-        </div>`;
-
+        </div>
+        ${ExtraContent}`;
     }
+
     $('#SHOWTRAK_EXECUTIONQUEUE').html(Filler);
     return;
 })
+
+window.API.SetScriptList(async (Scripts) => {
+    ScriptList = Scripts;
+    return;
+})
+
+window.API.SetFullClientList(async (Clients, Groups) => {
+    AllClients = Clients.map(Client => Client.UUID);
+    let Filler = "";
+
+    Groups.push({
+        GroupID: null,
+        Title: 'No Group',
+        Weight: 100000,
+    })
+
+    // Sort groups by weight
+    Groups = Groups.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
+
+    if (Groups.length == 1 && Clients.length == 0) {
+        Filler += `<div class="bg-ghost rounded m-3 mb-0 d-grid gap-0 gap-3 p-3">
+            <h5 class="text-light mb-0">
+                Welcome to ShowTrak Server v${Config.Application.Version}
+            </h5>
+            <p class="text-light mb-0">
+                You don't have any clients configured yet. Discover clients on your network and adopt them with the Adoption Manager below.
+            </p>
+            <div>
+                <a class="btn btn-sm btn-light" onclick="OpenAdoptionManager()">
+                    Open Adoption Manager
+                </a>
+            </div>
+        </div>`;
+    }
+
+    for (const { GroupID, Title } of Groups) {
+
+        let GroupClients = Clients.filter(Client => Client.GroupID === GroupID);
+
+        GroupUUIDCache.set(`${GroupID}`, GroupClients.map(c => c.UUID));
+
+        if (GroupClients.length == 0 && GroupID == null) continue; 
+
+        Filler += `<div class="d-flex justify-content-start">
+        <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" onclick="SelectByGroup('${GroupID}')">
+            <div class="d-flex align-items-center text-center h-100">
+                <span class="GROUP_TITLE py-2">
+                    ${Title}
+                </span>
+            </div>
+        </div>
+        <div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100">`
+
+        if (GroupClients.length == 0) {
+            Filler += `<div class="SHOWTRAK_PC_PLACEHOLDER w-100 p-3"
+                <h5 class="text-muted mb-0">
+                    Empty Group
+                </h5>
+                <p class="text-muted mb-0">
+                    This group has no clients assigned to it.
+                </p>
+                <p class="text-muted mb-0">
+                    You can add clients to this group via the client editor!
+                </p>
+            </div>`
+        } else {
+            for (const { Nickname, Hostname, IP, UUID, Version, Online, LastSeen } of GroupClients) {
+                Filler += `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${Online ? 'ONLINE' : ''} ${Selected.includes(UUID) ? 'SELECTED' : ''}" data-uuid="${UUID}">
+                    <label class="text-sm" data-type="Hostname">
+                        ${Nickname ? Hostname : 'v'+Version}
+                    </label>
+                    <h5 class="mb-0" data-type="Nickname">
+                    ${Nickname ? Nickname : Hostname}
+                    </h5>
+                    <small class="text-sm text-light" data-type="IP">
+                        ${IP ? IP : 'Unknown IP'}
+                    </small>
+                    <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-grid' : 'd-none'} gap-2" data-type="INDICATOR_ONLINE">
+                        <div class="progress"><div data-type="CPU" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div></div>
+                        <div class="progress">
+                        <div data-type="RAM" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
+                    </div>
+                    </div>
+                    <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-none' : 'd-grid'}" data-type="INDICATOR_OFFLINE">
+                        <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${LastSeen}">
+                            OFFLINE <span class="badge bg-ghost">00:00:00</span>
+                        </h7>
+                    </div>
+                </div>`
+            }
+        }
+
+        Filler += `</div></div>`
+    }    
+
+    Filler += `<div class="d-flex justify-content-start">
+        <div class="GROUP_TITLE_CLICKABLE m-3 me-0 rounded" onclick="OpenGroupCreationModal()">
+            <div class="d-flex align-items-center text-center h-100">
+                <span class="GROUP_CREATE_BUTTON py-2">+</span>
+            </div>
+        </div>
+    </div>`
+
+    $('#APPLICATION_CONTENT').html(Filler);
+
+})
+
+window.API.ClientUpdated(async (Data) => {
+    const { UUID, Nickname, Hostname, Version, IP, Online, Vitals } = Data;
+    $(`[data-uuid='${UUID}']`).toggleClass('ONLINE', Online);
+
+    let ComputedHostname = Nickname ? Hostname : 'v'+Version;
+    if ($(`[data-uuid='${UUID}']>[data-type="Hostname"]`).text() !== ComputedHostname) {
+        $(`[data-uuid='${UUID}']>[data-type="Hostname"]`).text(ComputedHostname);
+    }
+
+    let ComputedNickname = Nickname ? Nickname : Hostname;
+    if ($(`[data-uuid='${UUID}']>[data-type="Nickname"]`).text() !== ComputedNickname) {
+        $(`[data-uuid='${UUID}']>[data-type="Nickname"]`).text(ComputedNickname);
+    }
+
+    let ComputedIP = IP ? IP : 'Unknown IP';
+    if ($(`[data-uuid='${UUID}']>[data-type="IP"]`).text() !== ComputedIP) {
+        $(`[data-uuid='${UUID}']>[data-type="IP"]`).text(ComputedIP);
+    }
+
+    if (Online) {
+        $(`[data-uuid='${UUID}']>div>.progress>[data-type="CPU"]`).css('width', `${Vitals.CPU.UsagePercentage}%`);
+        $(`[data-uuid='${UUID}']>div>.progress>[data-type="RAM"]`).css('width', `${Vitals.Ram.UsagePercentage}%`);
+        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]`).addClass('d-none');
+        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]`).removeClass('d-grid');
+        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).addClass('d-grid');
+        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).removeClass('d-none');
+    } else {
+        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]`).addClass('d-grid');
+        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]`).removeClass('d-none');
+        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).addClass('d-none');
+        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).removeClass('d-grid');
+    }
+
+    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]>[data-type="OFFLINE_SINCE"]`).attr('data-offlinesince', Data.LastSeen);
+    return;
+})
+
+window.API.SetDevicesPendingAdoption(async (Data) => {
+
+    let Filler = "";
+    for (const { Hostname, IP, UUID, Version, State } of Data) {
+        let ButtonState = ` <div class="d-flex flex-column justify-content-center gap-0">
+                <a class="btn btn-light btn-sm" onclick="AdoptDevice('${UUID}')">Adopt</a>
+            </div>`
+        if (Version != Config.Application.Version) {
+            ButtonState = ` <div class="d-flex flex-column justify-content-center gap-0">
+                <a class="btn btn-danger btn-sm disabled" disabled>Incompatible Version (v${Version})</a>
+            </div>`;
+        }
+        if (State === 'Adopting') {
+            ButtonState = `<div class="d-flex flex-column justify-content-center gap-0">
+                <button class="btn btn-secondary btn-sm" disabled>
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Adopting...
+                </button>
+            </div>`;
+        }
+
+        Filler += `<div class="SHOWTRAK_CLIENT_PENDING_ADOPTION rounded-3 d-flex justify-content-between p-3" data-uuid="${UUID}">
+            <div class="d-flex flex-column justify-content-center gap-1 text-start">
+                <h6 class="card-title mb-0">${Hostname}</h6>
+                <small class="text-muted">${IP}</small>
+                <small class="text-muted">${UUID} - v${Version}</small>
+            </div>
+            ${ButtonState}
+        </div>`;
+    }
+    if (Data.length === 0) {
+        Filler = `<div class="SHOWTRAK_CLIENT_PENDING_ADOPTION rounded-3 text-center text-muted p-3">No devices pending adoption</div>`;
+    }
+    $('#DEVICES_PENDING_ADOPTION').html(Filler);
+
+});
+
+async function ExecuteScript(Script, Targets) {
+    let ScriptTarget = ScriptList.find(s => s.ID === Script);
+    if (!ScriptTarget) {
+        console.error('Script not found:', Script);
+        return;
+    }
+    console.log(`Executing script ${ScriptTarget.Name} on targets:`, Targets);
+
+    await window.API.ExecuteScript(Script, Targets, true);
+    $('#SHOWTRAK_MODEL_EXECUTIONQUEUE').modal('show');
+}
 
 async function CloseAllModals() {
     $('.modal').modal('hide');
@@ -129,6 +291,14 @@ async function OpenGroupCreationModal() {
     $('#GROUP_CREATION_SUBMIT').off('click').on('click', async () => {
         let GroupName = $('#GROUP_CREATION_TITLE').val();
         if (!GroupName) return Notify('Please enter a group name', 'error');
+        if (GroupName.length < 3) return Notify('Group name must be at least 3 characters long', 'error');
+        if (Groups.some(g => g.Title.toLowerCase() === GroupName.toLowerCase())) {
+            return Notify('A group with this name already exists', 'error');
+        }
+        if (GroupName.length > 10) return Notify('Group name must be less than 50 characters long', 'error');
+
+        // Clear the input field
+        $('#GROUP_CREATION_TITLE').val('');
 
         await window.API.CreateGroup(GroupName);
         OpenGroupManager();
@@ -204,6 +374,8 @@ async function OpenClientEditor(UUID) {
     let Client = await window.API.GetClient(UUID);
     if (!Client) return console.error('Client not found:', UUID);
 
+    console.log('Opening client editor for:', Client);
+
     let Groups = await window.API.GetAllGroups();
     if (!Groups) Groups = [];
     Groups.push({
@@ -217,9 +389,7 @@ async function OpenClientEditor(UUID) {
         $('#CLIENT_EDITOR_GROUPID').append(`<option value="${Group.GroupID}" ${Client.GroupID == Group.GroupID ? 'selected' : ''}>${Group.Title}</option>`);
     }
 
-
     ClearSelection();
-    console.log(Client);
 
     const { Nickname, Hostname, IP, Version } = Client;
 
@@ -229,7 +399,29 @@ async function OpenClientEditor(UUID) {
     $('#CLIENT_EDITOR_UUID').val(UUID)
     $('#CLIENT_EDITOR_VERSION').val(Version)
 
+    $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').html('');
+    if (Client.USBDeviceList) {
+        for (const { ManufacturerName, ProductName, ProductID, SerialNumber, VendorID } of Client.USBDeviceList) {
+            $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').append(`
+                <div class="SHOWTRAK_CLIENT_EDITOR_USB_DEVICE rounded-3 p-2 bg-ghost">
+                    <h6 class="mb-0">${ManufacturerName || 'Generic'} ${ProductName || 'USB Device'}</h6>
+                    <small class="text-light">Serial Number: ${SerialNumber || 'Unavailable'}</small>
+                </div>
+            `);
+        }
+    } else {
+        $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').html(`
+            <div class="SHOWTRAK_CLIENT_EDITOR_USB_DEVICE rounded-3 p-2">
+                <h6 class="mb-0">No USB Devices</h6>
+                <small class="text-muted">This client has no USB devices adopted.</small>
+            </div>
+        `);
+    }
+
     $('#SHOWTRAK_CLIENT_EDITOR_REMOVE').off('click').on('click', async () => {
+        await CloseAllModals();
+        let Confirmation = await ConfirmationDialog(`Are you sure you want to unadopt ${Nickname || Hostname}?`);
+        if (!Confirmation) return;
         await window.API.UnadoptClient(UUID)
         await CloseAllModals();
     })
@@ -260,14 +452,6 @@ async function AdoptDevice(UUID) {
     await window.API.AdoptDevice(UUID);
 }
 
-let ScriptList = [];
-window.API.SetScriptList(async (Data) => {
-    ScriptList = Data;
-    console.log('Script List:', ScriptList);
-    return;
-})
-
-
 function SelectByGroup(GroupID) {
     if (!GroupUUIDCache.has(`${GroupID}`)) return;
     let UUIDs = GroupUUIDCache.get(`${GroupID}`);
@@ -283,181 +467,6 @@ function SelectByGroup(GroupID) {
 
 }
 
-window.API.SetFullClientList(async (Clients, Groups) => {
-    AllClients = Clients.map(Client => Client.UUID);
-    let Filler = "";
-
-    Groups.push({
-        GroupID: null,
-        Title: 'No Group',
-        Weight: 100000,
-    })
-
-    Groups = Groups.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
-
-    for (const Group of Groups) {
-
-
-        let GroupClients = Clients.filter(Client => Client.GroupID === Group.GroupID);
-
-        GroupUUIDCache.set(`${Group.GroupID}`, GroupClients.map(c => c.UUID));
-
-        if (GroupClients.length == 0 && Group.GroupID == null) continue; 
-
-        Filler += `<div class="d-flex justify-content-start">
-            <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" onclick="SelectByGroup('${Group.GroupID}')">
-                <div class="d-flex align-items-center text-center h-100">
-                    <span class="GROUP_TITLE py-2">
-                        ${Group.Title}
-                    </span>
-                </div>
-            </div>
-            <div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100">`
-
-        if (GroupClients.length == 0) {
-            Filler += `<div class="SHOWTRAK_PC_PLACEHOLDER"
-                <h5 class="my-4 text-muted">
-                    Empty Group
-                </h5>
-            </div>`
-        } else {
-            for (const { Nickname, Hostname, IP, UUID, Version, Online, LastSeen } of GroupClients) {
-                Filler += `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${Online ? 'ONLINE' : ''} ${Selected.includes(UUID) ? 'SELECTED' : ''}" data-uuid="${UUID}">
-                    <label class="text-sm" data-type="Hostname">
-                        ${Nickname ? Hostname : 'v'+Version}
-                    </label>
-                    <h5 class="mb-0" data-type="Nickname">
-                    ${Nickname ? Nickname : Hostname}
-                    </h5>
-                    <small class="text-sm text-light" data-type="IP">
-                        ${IP ? IP : 'Unknown IP'}
-                    </small>
-                    <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-grid' : 'd-none'} gap-2" data-type="INDICATOR_ONLINE">
-                        <div class="progress">
-                            <div data-type="CPU" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
-                        </div>
-                        <div class="progress">
-                            <div data-type="RAM" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
-                        </div>
-                    </div>
-                    <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-none' : 'd-grid'}" data-type="INDICATOR_OFFLINE">
-                        <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${LastSeen}">
-                            OFFLINE <span class="badge bg-ghost">00:00:00</span>
-                        </h7>
-                    </div>
-                </div>`
-            }
-        }
-
-        Filler += `</div></div>`
-
-    }    
-
-    Filler += `<div class="d-flex justify-content-start">
-        <div class="GROUP_TITLE_CLICKABLE m-3 me-0 rounded" onclick="OpenGroupCreationModal()">
-            <div class="d-flex align-items-center text-center h-100">
-                <span class="GROUP_CREATE_BUTTON py-2">
-                    +
-                </span>
-            </div>
-        </div></div>`
-
-    $('#APPLICATION').html(Filler);
-
-})
-
-window.API.ClientUpdated(async (Data) => {
-    const { UUID, Nickname, Hostname, Version, IP, Online, Vitals } = Data;
-    $(`[data-uuid='${UUID}']`).toggleClass('ONLINE', Online);
-
-    let ComputedHostname = Nickname ? Hostname : 'v'+Version;
-    if ($(`[data-uuid='${UUID}']>[data-type="Hostname"]`).text() !== ComputedHostname) {
-        $(`[data-uuid='${UUID}']>[data-type="Hostname"]`).text(ComputedHostname);
-    }
-
-    let ComputedNickname = Nickname ? Nickname : Hostname;
-    if ($(`[data-uuid='${UUID}']>[data-type="Nickname"]`).text() !== ComputedNickname) {
-        $(`[data-uuid='${UUID}']>[data-type="Nickname"]`).text(ComputedNickname);
-    }
-
-    let ComputedIP = IP ? IP : 'Unknown IP';
-    if ($(`[data-uuid='${UUID}']>[data-type="IP"]`).text() !== ComputedIP) {
-        $(`[data-uuid='${UUID}']>[data-type="IP"]`).text(ComputedIP);
-    }
-
-    if (Online) {
-        $(`[data-uuid='${UUID}']>div>.progress>[data-type="CPU"]`).css('width', `${Vitals.CPU.UsagePercentage}%`);
-        $(`[data-uuid='${UUID}']>div>.progress>[data-type="RAM"]`).css('width', `${Vitals.Ram.UsagePercentage}%`);
-        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]`).addClass('d-none');
-        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]`).removeClass('d-grid');
-        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).addClass('d-grid');
-        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).removeClass('d-none');
-    } else {
-        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]`).addClass('d-grid');
-        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]`).removeClass('d-none');
-        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).addClass('d-none');
-        $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).removeClass('d-grid');
-    }
-
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]>[data-type="OFFLINE_SINCE"]`).attr('data-offlinesince', Data.LastSeen);
-    return;
-})
-
-setInterval(async () => {
-    let CurrentTime = new Date().getTime();
-    $('.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]>[data-type="OFFLINE_SINCE"]').each(function() {
-        let LastSeen = $(this).attr('data-offlinesince');
-        if (!LastSeen) return;
-        LastSeen = parseInt(LastSeen);
-        let OfflineDuration = CurrentTime - LastSeen;
-        let Hours = Math.floor(OfflineDuration / (1000 * 60 * 60));
-        let Minutes = Math.floor((OfflineDuration % (1000 * 60 * 60)) / (1000 * 60));
-        let Seconds = Math.floor((OfflineDuration % (1000 * 60)) / 1000);
-        let HH = String(Hours).padStart(2, '0');
-        let MM = String(Minutes).padStart(2, '0');
-        let SS = String(Seconds).padStart(2, '0');
-        $(this).html(`OFFLINE <span class="badge bg-ghost">${HH}:${MM}:${SS}</span>`);
-    });
-}, 1000)
-
-
-window.API.SetDevicesPendingAdoption(async (Data) => {
-
-    let Filler = "";
-    for (const { Hostname, IP, UUID, Version, State } of Data) {
-        let ButtonState = ` <div class="d-flex flex-column justify-content-center gap-0">
-                <a class="btn btn-light btn-sm" onclick="AdoptDevice('${UUID}')">Adopt</a>
-            </div>`
-        if (Version != Config.Application.Version) {
-            ButtonState = ` <div class="d-flex flex-column justify-content-center gap-0">
-                <a class="btn btn-danger btn-sm disabled" disabled>Incompatible Version (v${Version})</a>
-            </div>`;
-        }
-        if (State === 'Adopting') {
-            ButtonState = `<div class="d-flex flex-column justify-content-center gap-0">
-                <button class="btn btn-secondary btn-sm" disabled>
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    Adopting...
-                </button>
-            </div>`;
-        }
-
-        Filler += `<div class="SHOWTRAK_CLIENT_PENDING_ADOPTION rounded-3 d-flex justify-content-between p-3" data-uuid="${UUID}">
-            <div class="d-flex flex-column justify-content-center gap-1 text-start">
-                <h6 class="card-title mb-0">${Hostname}</h6>
-                <small class="text-muted">${IP}</small>
-                <small class="text-muted">${UUID} - v${Version}</small>
-            </div>
-            ${ButtonState}
-        </div>`;
-    }
-    if (Data.length === 0) {
-        Filler = `<div class="SHOWTRAK_CLIENT_PENDING_ADOPTION rounded-3 text-center text-muted p-3">No devices pending adoption</div>`;
-    }
-    $('#DEVICES_PENDING_ADOPTION').html(Filler);
-
-});
-
 async function Main() {
     console.log(Config);
 }
@@ -465,8 +474,6 @@ async function Main() {
 async function Wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-Init();
 
 async function Notify(Message, Type = 'info') {
     console.log('Notify:', Message, Type);
@@ -539,169 +546,234 @@ function ToggleSelection(UUID) {
     UpdateSelectionCount();
 }
 
-function ContextMenu(e) {
-    const $menu = $('#SHOWTRAK_CONTEXT_MENU');
-    e.preventDefault()
-    let Options = [];
-
-    if (Selected.length == 1) {
-        Options.push({
-            Type: 'Action',
-            Title: 'View Client',
-            Class: 'text-light',
-            Action: function() {
-                let Target = Selected[0];
-                OpenClientEditor(Target);
-            }
-        });
-        Options.push({
-            Type: 'Divider'
-        });
-    }
-
-    if (Selected.length == 0) {
-        Options.push({
-            Type: 'Info',
-            Title: 'No Selected Clients',
-            Class: 'text-muted',
-        });
-    }
-
-    if (Selected.length > 0) {
-        ScriptList = ScriptList.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
-        for (const Script of ScriptList) {
-            Options.push({
-                Type: 'Action',
-                Title: `Run "${Script.Name}"`,
-                Class: `text-${Script.LabelStyle}`,
-                Action: async function() {
-                    if (Script.Confirmation) {
-                        let Confirmation = await ConfirmationDialog(`Are you sure you want to run "${Script.Name}" on ${Selected.length} ${Selected.length == 1 ? 'Client' : 'Clients'}?`);
-                        if (!Confirmation) return;
-                    }
-                    await ExecuteScript(Script.ID, Selected, true);
-                }
-            });
-        }
-    }
-
-    if (Options.length > 0) {
-        Options.push({
-            Type: 'Divider'
-        });
-    }
-
-    if (Selected.length > 0) {
-
-        Options.push({
-            Type: 'Action',
-            Title: 'Delete Scripts',
-            Class: 'text-warning',
-            Action: async function() {
-                let Confirmation = await ConfirmationDialog('Are you sure you want to delete scripts from this pc?');
-                if (!Confirmation) return;
-                window.API.DeleteScripts(Selected);
-                $('#SHOWTRAK_MODEL_EXECUTIONQUEUE').modal('show');
-            }
-        });
-
-        Options.push({
-            Type: 'Action',
-            Title: 'Update Scripts',
-            Class: 'text-warning',
-            Action: async function() {
-                let Confirmation = await ConfirmationDialog('Are you sure you want to update scripts on this pc?');
-                if (!Confirmation) return;
-                window.API.UpdateScripts(Selected);
-                $('#SHOWTRAK_MODEL_EXECUTIONQUEUE').modal('show');
-            }
-        });
-
-        Options.push({
-            Type: 'Action',
-            Title: 'Clear Selection',
-            Class: 'text-danger',
-            Action: async function() {
-                ClearSelection();
-            }
-        });
-
-    }
-
-    Options.push({
-        Type: 'Action',
-        Title: 'Select All',
-        Class: 'text-light',
-        Action: async function() {
-            AllClients.map(UUID => Select(UUID));
-        }
+async function UpdateOfflineIndicators() {
+    let CurrentTime = new Date().getTime();
+    $('.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]>[data-type="OFFLINE_SINCE"]').each(function() {
+        let LastSeen = $(this).attr('data-offlinesince');
+        if (!LastSeen) return;
+        LastSeen = parseInt(LastSeen);
+        let OfflineDuration = CurrentTime - LastSeen;
+        let Hours = Math.floor(OfflineDuration / (1000 * 60 * 60));
+        let Minutes = Math.floor((OfflineDuration % (1000 * 60 * 60)) / (1000 * 60));
+        let Seconds = Math.floor((OfflineDuration % (1000 * 60)) / 1000);
+        let HH = String(Hours).padStart(2, '0');
+        let MM = String(Minutes).padStart(2, '0');
+        let SS = String(Seconds).padStart(2, '0');
+        $(this).html(`OFFLINE <span class="badge bg-ghost">${HH}:${MM}:${SS}</span>`);
     });
-
-
-    // Clear all existing items
-    $menu.html('');
-    // Add new items from Options
-    Options.forEach(option => {
-        if (option.Type === 'Divider') {
-            $menu.append(`<hr class="my-2">`);
-        }
-        if (option.Type === 'Info') {
-            $menu.append(`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${option.Class}">${option.Title}</a>`);
-        }
-        if (option.Type === 'Action') {
-            $menu.append(`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${option.Class}">${option.Title}</a>`);
-            $menu.find('a:last').on('click', function() {
-                option.Action();
-            });
-        }
-    });
-    // Calculate menu position to prevent overflow
-    const menuWidth = $menu.outerWidth();
-    const menuHeight = $menu.outerHeight();
-    const pageWidth = $(window).width();
-    const pageHeight = $(window).height();
-    let left = e.pageX;
-    let top = e.pageY;
-
-    // If menu would overflow right, show to the left
-    if (left + menuWidth > pageWidth) {
-        left = Math.max(0, left - menuWidth);
-    }
-    // If menu would overflow bottom, show above
-    if (top + menuHeight > pageHeight) {
-        top = Math.max(0, top - menuHeight);
-    }
-
-    $menu.css({
-        display: 'block',
-        left: left,
-        top: top
-    });
-    $menu.data('target', this);
-
 }
 
-// Context Menu
 $(function() {
+    const $menu = $('#SHOWTRAK_CONTEXT_MENU');
     $(document).on('click', '.SHOWTRAK_PC', function(e) {
-        const $menu = $('#SHOWTRAK_CONTEXT_MENU');
         e.preventDefault();
         let UUID = $(this).attr('data-uuid');
         ToggleSelection(UUID);
         return;
     });
     $(document).on('contextmenu', 'html', function(e) {
-        ContextMenu(e);
+        e.preventDefault()
+        let Options = [];
+
+        if (Selected.length == 1) {
+            Options.push({
+                Type: 'Action',
+                Title: 'View Client',
+                Class: 'text-light',
+                Action: function() {
+                    let Target = Selected[0];
+                    OpenClientEditor(Target);
+                }
+            });
+            Options.push({
+                Type: 'Divider'
+            });
+        }
+
+        if (Selected.length == 0) {
+            Options.push({
+                Type: 'Info',
+                Title: 'No Selected Clients',
+                Class: 'text-muted',
+            });
+        }
+
+        if (Selected.length > 0) {
+            ScriptList = ScriptList.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
+            for (const Script of ScriptList) {
+                Options.push({
+                    Type: 'Action',
+                    Title: `Run "${Script.Name}"`,
+                    Class: `text-${Script.LabelStyle}`,
+                    Action: async function() {
+                        if (Script.Confirmation) {
+                            let Confirmation = await ConfirmationDialog(`Are you sure you want to run "${Script.Name}" on ${Selected.length} ${Selected.length == 1 ? 'Client' : 'Clients'}?`);
+                            if (!Confirmation) return;
+                        }
+                        await ExecuteScript(Script.ID, Selected, true);
+                    }
+                });
+            }
+        }
+
+        if (Options.length > 0) {
+            Options.push({
+                Type: 'Divider'
+            });
+        }
+
+        if (Selected.length > 0) {
+            Options.push({
+                Type: 'Action',
+                Title: 'Wake On LAN',
+                Class: 'text-light',
+                Action: async function() {
+                    window.API.WakeOnLan(Selected);
+                    $('#SHOWTRAK_MODEL_EXECUTIONQUEUE').modal('show');
+                }
+            });
+            Options.push({
+                Type: 'Action',
+                Title: 'Delete Scripts',
+                Class: 'text-warning',
+                Action: async function() {
+                    let Confirmation = await ConfirmationDialog('Are you sure you want to delete scripts from this pc?');
+                    if (!Confirmation) return;
+                    window.API.DeleteScripts(Selected);
+                    $('#SHOWTRAK_MODEL_EXECUTIONQUEUE').modal('show');
+                }
+            });
+            Options.push({
+                Type: 'Action',
+                Title: 'Update Scripts',
+                Class: 'text-warning',
+                Action: async function() {
+                    let Confirmation = await ConfirmationDialog('Are you sure you want to update scripts on this pc?');
+                    if (!Confirmation) return;
+                    window.API.UpdateScripts(Selected);
+                    $('#SHOWTRAK_MODEL_EXECUTIONQUEUE').modal('show');
+                }
+            });
+            Options.push({
+                Type: 'Action',
+                Title: 'Clear Selection',
+                Class: 'text-danger',
+                Action: async function() {
+                    ClearSelection();
+                }
+            });
+        }
+
+        Options.push({
+            Type: 'Action',
+            Title: 'Select All',
+            Class: 'text-light',
+            Action: async function() {
+                AllClients.map(UUID => Select(UUID));
+            }
+        });
+
+
+        $menu.html('');
+
+        Options.forEach(option => {
+            if (option.Type === 'Divider') {
+                $menu.append(`<hr class="my-2">`);
+            }
+            if (option.Type === 'Info') {
+                $menu.append(`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${option.Class}">${option.Title}</a>`);
+            }
+            if (option.Type === 'Action') {
+                $menu.append(`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${option.Class}">${option.Title}</a>`);
+                $menu.find('a:last').on('click', function() {
+                    option.Action();
+                });
+            }
+        });
+
+        // Calculate menu position to prevent overflow
+        const menuWidth = $menu.outerWidth();
+        const menuHeight = $menu.outerHeight();
+        const pageWidth = $(window).width();
+        const pageHeight = $(window).height();
+        let left = e.pageX;
+        let top = e.pageY;
+
+        // If menu would overflow right, show to the left
+        if (left + menuWidth > pageWidth) {
+            left = Math.max(0, left - menuWidth);
+        }
+        // If menu would overflow bottom, show above
+        if (top + menuHeight > pageHeight) {
+            top = Math.max(0, top - menuHeight);
+        }
+
+        $menu.css({
+            display: 'block',
+            left: left,
+            top: top
+        });
+
+        $menu.data('target', this);
+        return;
     });
     $(document).on('click', function() {
-        const $menu = $('#SHOWTRAK_CONTEXT_MENU');
         $menu.hide();
+        return;
     });
     $menu.on('click', 'a', function(e) {
-        const $menu = $('#SHOWTRAK_CONTEXT_MENU');
         e.stopPropagation();
         $menu.hide();
-        // Add your action handlers here
-        // Example: alert($(this).text());
+        return;
     });
 });
+
+setInterval(UpdateOfflineIndicators, 1000)
+
+async function OpenAdoptionManager() {
+    await CloseAllModals();
+    $('#SHOWTRAK_MODEL_ADOPTION').modal('show');
+}
+
+async function Init() {
+    Config = await window.API.GetConfig()
+    $('#APPLICATION_NAVBAR_TITLE').text(`${Config.Application.Name}`);
+    $('#APPLICATION_NAVBAR_STATUS').text(`v${Config.Application.Version}`);
+
+    $('#NAVBAR_CORE_BUTTON').on('click', async () => {
+        $('#SHOWTRAK_MODEL_CORE').modal('show');
+    })
+
+    $('#SHOWTRAK_MODEL_CORE_ADOPT_BUTTON').on('click', async () => {
+        await OpenAdoptionManager();
+    })
+
+    $('#SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON').on('click', async () => {
+        await OpenGroupManager();
+    })
+
+    $('#SHOWTRAK_MODEL_CORE_LOGSFOLDER').on('click', async () => {
+        await window.API.OpenLogsFolder();
+    })
+
+    $('#SHOWTRAK_MODEL_CORE_SCRIPTSFOLDER').on('click', async () => {
+        await window.API.OpenScriptsFolder();
+    })
+
+    $('#SHOWTRAK_MODEL_CORE_BACKUPCONFIG').on('click', async () => {
+        await BackupConfig();
+    })
+
+    $('#SHOWTRAK_MODEL_CORE_IMPORTCONFIG').on('click', async () => {
+        await ImportConfig();
+    })
+
+    $('#SHOWTRAK_MODEL_CORE_SHUTDOWN_BUTTON').on('click', async () => {
+        window.API.Shutdown();
+    })
+    
+    await Main();
+    await window.API.Loaded();
+}
+
+Init();
