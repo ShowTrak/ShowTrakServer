@@ -374,6 +374,8 @@ async function OpenClientEditor(UUID) {
     let Client = await window.API.GetClient(UUID);
     if (!Client) return console.error('Client not found:', UUID);
 
+    console.log('Opening client editor for:', Client);
+
     let Groups = await window.API.GetAllGroups();
     if (!Groups) Groups = [];
     Groups.push({
