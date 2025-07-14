@@ -276,6 +276,14 @@ async function OpenGroupCreationModal() {
     $('#GROUP_CREATION_SUBMIT').off('click').on('click', async () => {
         let GroupName = $('#GROUP_CREATION_TITLE').val();
         if (!GroupName) return Notify('Please enter a group name', 'error');
+        if (GroupName.length < 3) return Notify('Group name must be at least 3 characters long', 'error');
+        if (Groups.some(g => g.Title.toLowerCase() === GroupName.toLowerCase())) {
+            return Notify('A group with this name already exists', 'error');
+        }
+        if (GroupName.length > 10) return Notify('Group name must be less than 50 characters long', 'error');
+
+        // Clear the input field
+        $('#GROUP_CREATION_TITLE').val('');
 
         await window.API.CreateGroup(GroupName);
         OpenGroupManager();
