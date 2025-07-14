@@ -114,11 +114,12 @@ Manager.ExecuteScripts = async (ScriptID, Targets, ResetList) => {
     }
 }
 
-Manager.ExecuteBulkRequest = async (Action, Targets) => {
+Manager.ExecuteBulkRequest = async (Action, Targets, ReadableName) => {
+    if (!ReadableName) ReadableName = Action;
     await ScriptExecutionManager.ClearQueue();
     for (const UUID of Targets) {
         await Wait(150);
-        const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, Action);
+        const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, ReadableName);
         io.to(UUID).emit(Action, RequestID);
     }
 }

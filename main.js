@@ -1,12 +1,11 @@
 const { app, BrowserWindow, ipcMain: RPC } = require('electron/main')
 if (require('electron-squirrel-startup')) app.quit();
 
+const { Manager: AppDataManager } = require('./Modules/AppData');
+AppDataManager.Initialize();
 const { CreateLogger } = require('./Modules/Logger');
 const Logger = CreateLogger('Main');
 const { Config } = require('./Modules/Config');
-const { Manager: BroadcastManager } = require('./Modules/Broadcast');
-const { Manager: AppDataManager } = require('./Modules/AppData');
-AppDataManager.Initialize();
 const { Manager: ScriptManager } = require('./Modules/ScriptManager');
 ScriptManager.GetScripts();
 const { Manager: ServerManager } = require('./Modules/Server');
@@ -19,6 +18,7 @@ const { Manager: FileSelectorManager } = require('./Modules/FileSelectorManager'
 const { Manager: BackupManager } = require('./Modules/BackupManager');
 const { Manager: ScriptExecutionManager } = require('./Modules/ScriptExecutionManager');
 const { Manager: WOLManager } = require('./Modules/WOLManager');
+const { Manager: BroadcastManager } = require('./Modules/Broadcast');
 const { Wait } = require('./Modules/Utils');
 const path = require('path')
 
@@ -155,12 +155,12 @@ app.whenReady().then(async () => {
   })  
 
   RPC.handle('DeleteScripts', async (_Event, List) => {
-    await ServerManager.ExecuteBulkRequest('DeleteScripts', List);
+    await ServerManager.ExecuteBulkRequest('DeleteScripts', List, 'Delete Scripts');
     return;
   })  
   
   RPC.handle('UpdateScripts', async (_Event, List) => {
-    await ServerManager.ExecuteBulkRequest('UpdateScripts', List);
+    await ServerManager.ExecuteBulkRequest('UpdateScripts', List, 'Update Scripts');
     return;
   })  
 
