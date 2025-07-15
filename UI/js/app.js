@@ -18,6 +18,11 @@ function Safe(Input) {
     return Input;
 }
 
+window.API.ShortcutTriggered(async (Name) => {
+    if (Name === 'SelectAll') return AllClients.map(UUID => Select(UUID));
+    if (Name === 'ClearSelection') return ClearSelection();
+})
+
 window.API.ShutdownRequested(async () => {
     let Confirmation = await ConfirmationDialog('Are you sure you want to shutdown ShowTrak?');
     if (!Confirmation) return;

@@ -43,4 +43,7 @@ contextBridge.exposeInMainWorld('API', {
   UnadoptClient: async (UUID) => ipcRenderer.invoke('UnadoptClient', UUID),
   DeleteScripts: async (List) => ipcRenderer.invoke('DeleteScripts', List),
   UpdateScripts: async (List) => ipcRenderer.invoke('UpdateScripts', List),
+  ShortcutTriggered: (Callback) => ipcRenderer.on('ShortcutTriggered', (_event, Name) => {
+    Callback(Name)
+  }),
 })
