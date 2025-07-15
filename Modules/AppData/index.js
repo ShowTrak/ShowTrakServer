@@ -7,7 +7,10 @@ const appDataPath = path.join(BasePath, 'ShowTrakServer');
 
 const Manager = {};
 
+Manager.Initialized = false;
+
 Manager.Initialize = async () => {
+  if (Manager.Initialized) return;
   if (!fs.existsSync(appDataPath)) {
     fs.mkdirSync(appDataPath, { recursive: true });
   }
@@ -23,6 +26,7 @@ Manager.Initialize = async () => {
       fs.mkdirSync(folderPath, { recursive: true });
     }
   });
+  Manager.Initialized = true;
 }
 
 Manager.GetLogsDirectory = () => {
