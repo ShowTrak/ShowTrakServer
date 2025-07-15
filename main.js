@@ -5,6 +5,15 @@ const { Manager: AppDataManager } = require('./Modules/AppData');
 AppDataManager.Initialize();
 const { CreateLogger } = require('./Modules/Logger');
 const Logger = CreateLogger('Main');
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  Logger.error('Another instance of ShowTrak Client is already running. Exiting this instance.');
+  app.quit();
+  process.exit(0);
+} else {
+  Logger.log('Single instance lock acquired');
+}
+
 const { Config } = require('./Modules/Config');
 const { Manager: ScriptManager } = require('./Modules/ScriptManager');
 ScriptManager.GetScripts();
@@ -51,7 +60,7 @@ app.whenReady().then(async () => {
     height: 500,
     resizable: false,
     webPreferences: { 
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'bridge_preloader.js'),
       devTools: !app.isPackaged,
     },
     icon: path.join(__dirname, 'images/icon.ico'),
@@ -71,7 +80,7 @@ app.whenReady().then(async () => {
     minWidth: 815,
     minHeight: 600,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'bridge_main.js'),
       devTools: !app.isPackaged,
     },
     icon: path.join(__dirname, 'images/icon.ico'),

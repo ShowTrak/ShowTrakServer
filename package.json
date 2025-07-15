@@ -1,14 +1,15 @@
 {
   "name": "showtrak-server",
   "productName": "ShowTrak Server",
-  "version": "3.0.1",
+  "version": "3.0.3",
   "description": "Simple, Free LAN PC Monitoring for arcade style environments.",
   "main": "main.js",
   "scripts": {
     "start": "electron-forge start",
     "dev": "electron-forge start",
     "package": "electron-forge package",
-    "make": "electron-forge make"
+    "make": "electron-forge make",
+    "publish": "electron-forge publish"
   },
   "repository": {
     "type": "git",
@@ -17,7 +18,7 @@
   "author": "ShowTrak",
   "license": "AGPL-3.0-only",
   "bugs": {
-    "url": "https://github.com/ShowTrak/App/issues"
+    "url": "https://github.com/ShowTrak/ShowTrakServer/issues"
   },
   "homepage": "https://github.com/ShowTrak/App#readme",
   "devDependencies": {

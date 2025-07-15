@@ -5,6 +5,19 @@ let AllClients = [];
 let ScriptList = [];
 const GroupUUIDCache = new Map();
 
+function Safe(Input) {
+    if (typeof Input === 'string') {
+        return Input.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    if (typeof Input === 'number') {
+        return Input.toString();
+    }
+    if (Array.isArray(Input)) {
+        return Input.map(Safe);
+    }
+    return Input;
+}
+
 window.API.ShutdownRequested(async () => {
     let Confirmation = await ConfirmationDialog('Are you sure you want to shutdown ShowTrak?');
     if (!Confirmation) return;
@@ -27,32 +40,32 @@ window.API.UpdateScriptExecutions(async (Executions) => {
         let ExtraContent = ''
 
         let Badge = `<span class="badge bg-secondary text-light">
-            ${Request.Status}
+            ${Safe(Request.Status)}
         </span>`
         if (Request.Status == 'Completed') {
             Badge = `<span class="badge bg-secondary text-light">
-                ${Request.Timer.Duration}ms
+                ${Safe(Request.Timer.Duration)}ms
             </span>
             <span class="badge bg-success text-light">
-                ${Request.Status}
+                ${Safe(Request.Status)}
             </span>`
         }
         if (Request.Status == 'Failed') {
             Badge = `<span class="badge bg-ghost-light text-light">
-                ${Request.Timer.Duration}ms
+                ${Safe(Request.Timer.Duration)}ms
             </span>
             <span class="badge bg-danger text-light">
-                ${Request.Status}
+                ${Safe(Request.Status)}
             </span>`
             if (Request.Error) {
                 ExtraContent = `<div class="bg-ghost p-2 text-center text-danger rounded">
-                    ${Request.Error}
+                    ${Safe(Request.Error)}
                 </div>`;
             }
         }
         if (Request.Status == 'Timed Out') {
             Badge = `<span class="badge bg-danger text-light">
-                ${Request.Status}
+                ${Safe(Request.Status)}
             </span>`
 
             if (!Request.Internal) {
@@ -65,10 +78,10 @@ window.API.UpdateScriptExecutions(async (Executions) => {
         Filler += `<div class="d-flex justify-content-between p-2 rounded bg-ghost">
             <div class="d-flex justify-content-start gap-2">
             <span class="badge bg-ghost-light text-light">
-                ${Request.Client.Nickname || Request.Client.Hostname}
+                ${Request.Client.Nickname ? Safe(Request.Client.Nickname) : Safe(Request.Client.Hostname)}
             </span>
             <span class="badge bg-ghost-light text-light">
-                ${Request.Script.Name}
+                ${Safe(Request.Script.Name)}
             </span>
             </div>
             <div class="d-flex justify-content-start gap-2">
@@ -103,7 +116,7 @@ window.API.SetFullClientList(async (Clients, Groups) => {
     if (Groups.length == 1 && Clients.length == 0) {
         Filler += `<div class="bg-ghost rounded m-3 mb-0 d-grid gap-0 gap-3 p-3">
             <h5 class="text-light mb-0">
-                Welcome to ShowTrak Server v${Config.Application.Version}
+                Welcome to ShowTrak Server v${Safe(Config.Application.Version)}
             </h5>
             <p class="text-light mb-0">
                 You don't have any clients configured yet. Discover clients on your network and adopt them with the Adoption Manager below.
@@ -128,7 +141,7 @@ window.API.SetFullClientList(async (Clients, Groups) => {
         <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" onclick="SelectByGroup('${GroupID}')">
             <div class="d-flex align-items-center text-center h-100">
                 <span class="GROUP_TITLE py-2">
-                    ${Title}
+                    ${Safe(Title)}
                 </span>
             </div>
         </div>
@@ -150,13 +163,13 @@ window.API.SetFullClientList(async (Clients, Groups) => {
             for (const { Nickname, Hostname, IP, UUID, Version, Online, LastSeen } of GroupClients) {
                 Filler += `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${Online ? 'ONLINE' : ''} ${Selected.includes(UUID) ? 'SELECTED' : ''}" data-uuid="${UUID}">
                     <label class="text-sm" data-type="Hostname">
-                        ${Nickname ? Hostname : 'v'+Version}
+                        ${Nickname && Nickname.length ? Safe(Hostname) : 'v'+Version}
                     </label>
                     <h5 class="mb-0" data-type="Nickname">
-                    ${Nickname ? Nickname : Hostname}
+                    ${Nickname && Nickname.length ? Safe(Nickname) : Safe(Hostname)}
                     </h5>
                     <small class="text-sm text-light" data-type="IP">
-                        ${IP ? IP : 'Unknown IP'}
+                        ${IP ? Safe(IP) : 'Unknown IP'}
                     </small>
                     <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-grid' : 'd-none'} gap-2" data-type="INDICATOR_ONLINE">
                         <div class="progress"><div data-type="CPU" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div></div>
@@ -192,12 +205,12 @@ window.API.ClientUpdated(async (Data) => {
     const { UUID, Nickname, Hostname, Version, IP, Online, Vitals } = Data;
     $(`[data-uuid='${UUID}']`).toggleClass('ONLINE', Online);
 
-    let ComputedHostname = Nickname ? Hostname : 'v'+Version;
+    let ComputedHostname = Nickname && Nickname.length ? Hostname : 'v'+Version;
     if ($(`[data-uuid='${UUID}']>[data-type="Hostname"]`).text() !== ComputedHostname) {
         $(`[data-uuid='${UUID}']>[data-type="Hostname"]`).text(ComputedHostname);
     }
 
-    let ComputedNickname = Nickname ? Nickname : Hostname;
+    let ComputedNickname = Nickname && Nickname.length ? Nickname : Hostname;
     if ($(`[data-uuid='${UUID}']>[data-type="Nickname"]`).text() !== ComputedNickname) {
         $(`[data-uuid='${UUID}']>[data-type="Nickname"]`).text(ComputedNickname);
     }
@@ -234,7 +247,7 @@ window.API.SetDevicesPendingAdoption(async (Data) => {
             </div>`
         if (Version != Config.Application.Version) {
             ButtonState = ` <div class="d-flex flex-column justify-content-center gap-0">
-                <a class="btn btn-danger btn-sm disabled" disabled>Incompatible Version (v${Version})</a>
+                <a class="btn btn-danger btn-sm disabled" disabled>Incompatible Version (v${Safe(Version)})</a>
             </div>`;
         }
         if (State === 'Adopting') {
@@ -248,9 +261,9 @@ window.API.SetDevicesPendingAdoption(async (Data) => {
 
         Filler += `<div class="SHOWTRAK_CLIENT_PENDING_ADOPTION rounded-3 d-flex justify-content-between p-3" data-uuid="${UUID}">
             <div class="d-flex flex-column justify-content-center gap-1 text-start">
-                <h6 class="card-title mb-0">${Hostname}</h6>
-                <small class="text-muted">${IP}</small>
-                <small class="text-muted">${UUID} - v${Version}</small>
+                <h6 class="card-title mb-0">${Safe(Hostname)}</h6>
+                <small class="text-muted">${Safe(IP)}</small>
+                <small class="text-muted">${Safe(UUID)} - v${Safe(Version)}</small>
             </div>
             ${ButtonState}
         </div>`;
@@ -264,12 +277,7 @@ window.API.SetDevicesPendingAdoption(async (Data) => {
 
 async function ExecuteScript(Script, Targets) {
     let ScriptTarget = ScriptList.find(s => s.ID === Script);
-    if (!ScriptTarget) {
-        console.error('Script not found:', Script);
-        return;
-    }
-    console.log(`Executing script ${ScriptTarget.Name} on targets:`, Targets);
-
+    if (!ScriptTarget) return Notify('Script not found', 'error');
     await window.API.ExecuteScript(Script, Targets, true);
     $('#SHOWTRAK_MODEL_EXECUTIONQUEUE').modal('show');
 }
@@ -307,20 +315,21 @@ async function OpenGroupCreationModal() {
 }
 
 async function ImportConfig() {
-    console.warn('Starting import');
+    console.log('Starting import');
     await window.API.ImportConfig();
-    console.warn('Backup Completed');
+    await Notify('Import completed successfully', 'success');
 }
 
 async function BackupConfig() {
-    console.warn('Starting backup');
+    console.log('Starting backup');
     await window.API.BackupConfig();
-    console.warn('Backup Completed');
+    await Notify('Backup completed successfully', 'success');
 }
 
 async function DeleteGroup(GroupID) {
     await window.API.DeleteGroup(GroupID);
     await OpenGroupManager(true)
+    await Notify('Group deleted successfully', 'success');
 }
 
 async function OpenGroupManager(Relaunching = false) {
@@ -335,7 +344,7 @@ async function OpenGroupManager(Relaunching = false) {
         $('#GROUP_MANAGER_GROUP_LIST').append(`
             <div class="GROUP_MANAGER_GROUP_ITEM d-flex justify-content-between align-items-center p-3 rounded bg-ghost" data-groupid="${Group.GroupID}">
                 <span class="GROUP_MANAGER_GROUP_TITLE text-bold">
-                    ${Group.Title} 
+                    ${Safe(Group.Title)} 
                 </span>
                 <div class="d-flex gap-2">
                     <span class="badge bg-ghost-light text-light">
@@ -374,8 +383,6 @@ async function OpenClientEditor(UUID) {
     let Client = await window.API.GetClient(UUID);
     if (!Client) return console.error('Client not found:', UUID);
 
-    console.log('Opening client editor for:', Client);
-
     let Groups = await window.API.GetAllGroups();
     if (!Groups) Groups = [];
     Groups.push({
@@ -386,7 +393,7 @@ async function OpenClientEditor(UUID) {
 
     $('#CLIENT_EDITOR_GROUPID').html('');
     for (const Group of Groups) {
-        $('#CLIENT_EDITOR_GROUPID').append(`<option value="${Group.GroupID}" ${Client.GroupID == Group.GroupID ? 'selected' : ''}>${Group.Title}</option>`);
+        $('#CLIENT_EDITOR_GROUPID').append(`<option value="${Group.GroupID}" ${Client.GroupID == Group.GroupID ? 'selected' : ''}>${Safe(Group.Title)}</option>`);
     }
 
     ClearSelection();
@@ -400,20 +407,20 @@ async function OpenClientEditor(UUID) {
     $('#CLIENT_EDITOR_VERSION').val(Version)
 
     $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').html('');
-    if (Client.USBDeviceList) {
+    if (Client.USBDeviceList && Client.USBDeviceList.length > 0) {
         for (const { ManufacturerName, ProductName, ProductID, SerialNumber, VendorID } of Client.USBDeviceList) {
             $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').append(`
-                <div class="SHOWTRAK_CLIENT_EDITOR_USB_DEVICE rounded-3 p-2 bg-ghost">
-                    <h6 class="mb-0">${ManufacturerName || 'Generic'} ${ProductName || 'USB Device'}</h6>
-                    <small class="text-light">Serial Number: ${SerialNumber || 'Unavailable'}</small>
+                <div class="rounded-3 p-2 bg-ghost">
+                    <h6 class="mb-0">${ManufacturerName ? Safe(ManufacturerName) : 'Generic'} ${ProductName ? Safe(ProductName) : 'USB Device'}</h6>
+                    <small class="text-light">Serial Number: ${SerialNumber ? Safe(SerialNumber) : 'Unavailable'}</small>
                 </div>
             `);
         }
     } else {
         $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').html(`
-            <div class="SHOWTRAK_CLIENT_EDITOR_USB_DEVICE rounded-3 p-2">
-                <h6 class="mb-0">No USB Devices</h6>
-                <small class="text-muted">This client has no USB devices adopted.</small>
+            <div class="rounded-3 p-2 bg-ghost">
+                <h6 class="mb-0">No USB Devices Connected</h6>
+                <p class="text-sm mb-0">Devices that do not comply with WebUSB 1.3 cannot be displayed.</p>
             </div>
         `);
     }
@@ -424,6 +431,7 @@ async function OpenClientEditor(UUID) {
         if (!Confirmation) return;
         await window.API.UnadoptClient(UUID)
         await CloseAllModals();
+        await Notify(`Unadopted ${Nickname ? Nickname : Hostname} successfully`, 'success');
     })
 
     $('#SHOWTRAK_CLIENT_EDITOR_SAVE').off('click').on('click', async () => {
@@ -436,7 +444,6 @@ async function OpenClientEditor(UUID) {
         } else {
             GroupID = parseInt(GroupID);
         }
-
 
         await window.API.UpdateClient(UUID, {
             Nickname: Nickname,
@@ -456,19 +463,12 @@ function SelectByGroup(GroupID) {
     if (!GroupUUIDCache.has(`${GroupID}`)) return;
     let UUIDs = GroupUUIDCache.get(`${GroupID}`);
 
-    // If all uuids are already selected, deselect them
     if (UUIDs.every(UUID => IsSelected(UUID))) {
         UUIDs.forEach(UUID => Deselect(UUID));
-        return;
     } else {
         UUIDs.forEach(UUID => Select(UUID));
     }
-
-
-}
-
-async function Main() {
-    console.log(Config);
+    return;
 }
 
 async function Wait(ms) {
@@ -481,8 +481,6 @@ async function Notify(Message, Type = 'info') {
 
 async function ConfirmationDialog(Message) {
     return new Promise((resolve, reject) => {
-        console.log('Opening confirmation dialog:', Message);
-
         $('#SHOWTRAK_CONFIRMATION_MESSAGE').text(Message);
 
         $('#SHOWTRAK_CONFIRMATION_CANCEL').off('click').on('click', () => {
@@ -505,6 +503,7 @@ async function ConfirmationDialog(Message) {
 function UpdateSelectionCount() {
     $('#STATUS_BAR').text(`${Selected.length} ${Selected.length == 1 ? 'Client' : 'Clients'} Selected`);
     $('#STATUS_BAR').toggleClass('STATUS_BAR_ACTIVE', Selected.length > 0);
+    return;
 }
 
 function IsSelected(UUID) {
@@ -681,10 +680,10 @@ $(function() {
                 $menu.append(`<hr class="my-2">`);
             }
             if (option.Type === 'Info') {
-                $menu.append(`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${option.Class}">${option.Title}</a>`);
+                $menu.append(`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${Safe(option.Class)}">${Safe(option.Title)}</a>`);
             }
             if (option.Type === 'Action') {
-                $menu.append(`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${option.Class}">${option.Title}</a>`);
+                $menu.append(`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${Safe(option.Class)}">${Safe(option.Title)}</a>`);
                 $menu.find('a:last').on('click', function() {
                     option.Action();
                 });
@@ -772,7 +771,6 @@ async function Init() {
         window.API.Shutdown();
     })
     
-    await Main();
     await window.API.Loaded();
 }
 
