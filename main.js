@@ -31,7 +31,6 @@ const { Manager: BroadcastManager } = require('./Modules/Broadcast');
 const { Wait } = require('./Modules/Utils');
 const path = require('path')
 
-
 var MainWindow = null;
 
 app.whenReady().then(async () => {
