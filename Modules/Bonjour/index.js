@@ -9,6 +9,7 @@ const instance = new Bonjour()
 const Manager = {
     Init: () => {
         const Hostname = OSManager.Hostname || 'Unknown PC';
+
         instance.publish({ 
             name: `${Hostname} - ShowTrak Server V3`,
             type: 'ShowTrak',
@@ -23,6 +24,7 @@ const Manager = {
                 Logger.error('Error publishing Bonjour service');
             }
         })
+
         Logger.log(`Bonjour service published: ${Hostname} - ShowTrak Server V3`);
     },
     Find: () => {

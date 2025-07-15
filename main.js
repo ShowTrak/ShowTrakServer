@@ -5,6 +5,15 @@ const { Manager: AppDataManager } = require('./Modules/AppData');
 AppDataManager.Initialize();
 const { CreateLogger } = require('./Modules/Logger');
 const Logger = CreateLogger('Main');
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  Logger.error('Another instance of ShowTrak Client is already running. Exiting this instance.');
+  app.quit();
+  process.exit(0);
+} else {
+  Logger.log('Single instance lock acquired');
+}
+
 const { Config } = require('./Modules/Config');
 const { Manager: ScriptManager } = require('./Modules/ScriptManager');
 ScriptManager.GetScripts();
@@ -21,6 +30,7 @@ const { Manager: WOLManager } = require('./Modules/WOLManager');
 const { Manager: BroadcastManager } = require('./Modules/Broadcast');
 const { Wait } = require('./Modules/Utils');
 const path = require('path')
+
 
 var MainWindow = null;
 
