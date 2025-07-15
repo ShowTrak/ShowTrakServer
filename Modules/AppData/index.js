@@ -1,11 +1,16 @@
 const { Config } = require('../Config');
 const path = require('path');
 const fs = require('fs');
-const appDataPath = path.join(process.env.APPDATA, 'ShowTrakServer');
+
+let BasePath = process.env.APPDATA || (process.platform == 'darwin' ? process.env.HOME + '/Library/Preferences' : process.env.HOME + "/.local/share")
+const appDataPath = path.join(BasePath, 'ShowTrakServer');
 
 const Manager = {};
 
+Manager.Initialized = false;
+
 Manager.Initialize = async () => {
+  if (Manager.Initialized) return;
   if (!fs.existsSync(appDataPath)) {
     fs.mkdirSync(appDataPath, { recursive: true });
   }
@@ -21,6 +26,7 @@ Manager.Initialize = async () => {
       fs.mkdirSync(folderPath, { recursive: true });
     }
   });
+  Manager.Initialized = true;
 }
 
 Manager.GetLogsDirectory = () => {

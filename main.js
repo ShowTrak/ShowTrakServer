@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain: RPC } = require('electron/main')
+const { app, BrowserWindow, ipcMain: RPC, Menu, globalShortcut } = require('electron/main')
 if (require('electron-squirrel-startup')) app.quit();
 
 const { Manager: AppDataManager } = require('./Modules/AppData');
@@ -33,6 +33,7 @@ const path = require('path')
 
 var MainWindow = null;
 
+Menu.setApplicationMenu(null)
 app.whenReady().then(async () => {
 
   if (require('electron-squirrel-startup')) return app.quit();
@@ -52,6 +53,14 @@ app.whenReady().then(async () => {
       }
     });
   });
+
+  globalShortcut.register('CommandOrControl+A', () => {
+    MainWindow.webContents.send('ShortcutTriggered', 'SelectAll');
+  })
+
+  globalShortcut.register('CommandOrControl+D', () => {
+    MainWindow.webContents.send('ShortcutTriggered', 'ClearSelection');
+  })
 
   PreloaderWindow = new BrowserWindow({
     show: false,

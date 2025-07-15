@@ -18,6 +18,11 @@ function Safe(Input) {
     return Input;
 }
 
+window.API.ShortcutTriggered(async (Name) => {
+    if (Name === 'SelectAll') return AllClients.map(UUID => Select(UUID));
+    if (Name === 'ClearSelection') return ClearSelection();
+})
+
 window.API.ShutdownRequested(async () => {
     let Confirmation = await ConfirmationDialog('Are you sure you want to shutdown ShowTrak?');
     if (!Confirmation) return;
@@ -242,10 +247,18 @@ window.API.SetDevicesPendingAdoption(async (Data) => {
 
     let Filler = "";
     for (const { Hostname, IP, UUID, Version, State } of Data) {
+
+        let VersionArr = Version.split('.');
+        let MyVersionArr = Config.Application.Version.split('.');
+
+        let VersionCompatible = true;
+        if (VersionArr[0] !== MyVersionArr[0]) VersionCompatible = false;
+        if (VersionArr[1] !== MyVersionArr[1]) VersionCompatible = false;
+        
         let ButtonState = ` <div class="d-flex flex-column justify-content-center gap-0">
                 <a class="btn btn-light btn-sm" onclick="AdoptDevice('${UUID}')">Adopt</a>
             </div>`
-        if (Version != Config.Application.Version) {
+        if (!VersionCompatible) {
             ButtonState = ` <div class="d-flex flex-column justify-content-center gap-0">
                 <a class="btn btn-danger btn-sm disabled" disabled>Incompatible Version (v${Safe(Version)})</a>
             </div>`;

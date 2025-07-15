@@ -218,7 +218,7 @@ Manager.Create = async (UUID) => {
     // Insert new client into the database
     let [InsertErr, _Res] = await DB.Run('INSERT INTO Clients (UUID, Hostname, Version, IP, Timestamp) VALUES (?, ?, ?, ?, ?)', [
         UUID, 
-        null, 
+        'ShowTrak Client', 
         null, 
         null, 
         Date.now()
@@ -227,7 +227,7 @@ Manager.Create = async (UUID) => {
     ClientList.push(new Client({
         UUID: UUID,
         Hostname: null,
-        Version: null,
+        Version: 'X.X.X',
         IP: null,
         Timestamp: Date.now()
     }))
