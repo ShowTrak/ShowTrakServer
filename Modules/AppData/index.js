@@ -1,7 +1,9 @@
 const { Config } = require('../Config');
 const path = require('path');
 const fs = require('fs');
-const appDataPath = path.join(process.env.APPDATA, 'ShowTrakServer');
+
+let BasePath = process.env.APPDATA || (process.platform == 'darwin' ? process.env.HOME + '/Library/Preferences' : process.env.HOME + "/.local/share")
+const appDataPath = path.join(BasePath, 'ShowTrakServer');
 
 const Manager = {};
 
