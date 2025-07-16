@@ -354,3 +354,8 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
+
+const { updateElectronApp } = require('update-electron-app')
+updateElectronApp({
+  notifyUser: true,
+})
