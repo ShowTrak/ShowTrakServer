@@ -1,7 +1,7 @@
 const { CreateLogger } = require('../Logger');
 const Logger = CreateLogger('ScriptManager');
 
-const { Config } = require('../Config');
+// const { Config } = require('../Config');
 const path = require('path');
 const fs = require('fs');
 

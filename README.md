@@ -36,9 +36,6 @@ Join our [Discord Server](https://discord.gg/DACmwsbSGW) for support
 1. Download the installer from the releases page
 2. Run the installer.
 
-[linkedin-url]: https://www.linkedin.com/in/thomas-kirkman-wood-aa0242190/
-[showtrak-logo]: images/icon.png
-[showtrak-screenshot]: images/screenshot-1.png
 [Electronjs.org]: https://img.shields.io/badge/Electron-563D7C?style=for-the-badge&logo=electron&logoColor=white
 [Electron-url]: https://www.electronjs.org/
 [Bootstrap.com]: https://img.shields.io/badge/Bootstrap-563D7C?style=for-the-badge&logo=bootstrap&logoColor=white

@@ -1,7 +1,7 @@
 const { CreateLogger } = require('../Logger');
 const Logger = CreateLogger('ClientManager');
 
-const { Config } = require('../Config');
+// const { Config } = require('../Config');
 
 const { Manager: DB } = require('../DB');
 
@@ -37,7 +37,7 @@ class Group {
 
 Manager.Create = async (Title = 'New Group') => {
     if (!Title) return [new Error('Group title is required')];
-    let [Err, Res] = await DB.Run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', [Title, 100]);
+    let [Err, _Res] = await DB.Run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', [Title, 100]);
     if (Err) return;
     BroadcastManager.emit('GroupListChanged');
     return;

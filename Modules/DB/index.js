@@ -22,7 +22,7 @@ Manager.InitializeSchema = async () => {
     let Tables = require('./schema.js');
     for (let Table of Tables) {
         Logger.database(`Creating table: ${Table.Name}`);
-        let [Err, Result] = await Manager.Run(Table.SQL);
+        let [Err, _Result] = await Manager.Run(Table.SQL);
         if (Err) {
             Logger.databaseError(`Failed to create table ${Table.Name}:`, Err);
         } else {
@@ -32,7 +32,7 @@ Manager.InitializeSchema = async () => {
 }
 
 Manager.Get = async (Query, Params) => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, _reject) => {
         DB.get(Query, Params, (err, row) => {
             if (err) {
                 Logger.databaseError('Error fetching data:', err);
@@ -44,7 +44,7 @@ Manager.Get = async (Query, Params) => {
 }
 
 Manager.All = async (Query, Params) => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, _reject) => {
         DB.all(Query, Params, (err, rows) => {
             if (err) {
                 Logger.databaseError('Error fetching data:', err);
@@ -56,7 +56,7 @@ Manager.All = async (Query, Params) => {
 }
 
 Manager.Run = async (Query, Params) => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, _reject) => {
         DB.run(Query, Params, function (err) {
             if (err) {
                 Logger.databaseError('Error running query:', err);

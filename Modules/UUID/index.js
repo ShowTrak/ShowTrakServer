@@ -1,5 +1,5 @@
-const { CreateLogger } = require('../Logger');
-const Logger = CreateLogger('UUID');
+// const { CreateLogger } = require('../Logger');
+// const Logger = CreateLogger('UUID');
 
 const { v4: uuidv4 } = require('uuid');
 

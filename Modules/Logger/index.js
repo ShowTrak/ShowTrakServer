@@ -34,7 +34,7 @@ const Types = {
 }
 
 function Tag(Text, Type) {
-	return `[${colors.cyan('ShowTrakServer')}] [${colors.cyan(Pad(Text))}] [${Types.hasOwnProperty(Type) ? Types[Type] : Types["Info"]}]`
+	return `[${colors.cyan('ShowTrakServer')}] [${colors.cyan(Pad(Text))}] [${Object.prototype.hasOwnProperty.call(Types, Type) ? Types[Type] : Types["Info"]}]`
 }
 
 function GetDatestampLabel() {

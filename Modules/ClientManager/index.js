@@ -1,7 +1,7 @@
 const { CreateLogger } = require('../Logger');
 const Logger = CreateLogger('ClientManager');
 
-const { Config } = require('../Config');
+// const { Config } = require('../Config');
 
 const { Manager: DB } = require('../DB');
 
@@ -201,10 +201,10 @@ Manager.Update = async (UUID, Data) => {
     let [Err, Client] = await Manager.Get(UUID);
     if (Err) return false;
     if (!Client) return false;
-    if (Data.hasOwnProperty('Nickname')) {
+    if (Object.prototype.hasOwnProperty.call(Data, 'Nickname')) {
         await Client.SetNickname(Data.Nickname);
     }
-    if (Data.hasOwnProperty('GroupID')) {
+    if (Object.prototype.hasOwnProperty.call(Data, 'GroupID')) {
         await Client.SetGroupID(Data.GroupID);
     }
     return true;

@@ -9,7 +9,7 @@ const { Manager: ClientManager } = require('../ClientManager');
 const { Manager: ScriptManager } = require('../ScriptManager'); 
 const { Manager: ScriptExecutionManager } = require('../ScriptExecutionManager');
 const { Manager: AppDataManager } = require('../AppData');
-const { Manager: BroadcastManager } = require('../Broadcast');
+// const { Manager: BroadcastManager } = require('../Broadcast');
 const express = require('express');
 
 const { Wait } = require('../Utils');
@@ -107,8 +107,7 @@ io.on('connection', async (socket) => {
         ClientManager.Timeout(socket.UUID)
     });
 
-
-    socket.on('ScriptExecutionResponse', (RequestID, Error, Result) => {
+    socket.on('ScriptExecutionResponse', (RequestID, Error, _Result) => {
         Logger.log(`Received Script Execution Response for RequestID: ${RequestID}`);
         ScriptExecutionManager.Complete(RequestID, Error);
     })

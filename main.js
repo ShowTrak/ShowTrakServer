@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain: RPC, Menu, globalShortcut } = require('electron/main')
+const { app, BrowserWindow, ipcMain: RPC, Menu } = require('electron/main')
 if (require('electron-squirrel-startup')) app.quit();
 
 const { Manager: AppDataManager } = require('./Modules/AppData');
@@ -34,6 +34,7 @@ const path = require('path')
 var MainWindow = null;
 
 Menu.setApplicationMenu(null)
+let PreloaderWindow = null;
 app.whenReady().then(async () => {
 
   if (require('electron-squirrel-startup')) return app.quit();
@@ -197,7 +198,7 @@ app.whenReady().then(async () => {
         await ScriptExecutionManager.Complete(RequestID, 'Client is already online');
         continue;
       }
-      let [WOLErr, Result] = await WOLManager.Wake(Client.MacAddress, 3, 100);
+      let [WOLErr, _Result] = await WOLManager.Wake(Client.MacAddress, 3, 100);
       await ScriptExecutionManager.Complete(RequestID, WOLErr);
     }
 
@@ -254,7 +255,7 @@ app.whenReady().then(async () => {
     return;
   })
 
-  RPC.handle('OpenDiscordInviteLinkInBrowser', async (_event, URL) => {
+  RPC.handle('OpenDiscordInviteLinkInBrowser', async (_event, _URL) => {
     var url = 'https://discord.gg/DACmwsbSGW';
     var start = (process.platform == 'darwin'? 'open': process.platform == 'win32'? 'start': 'xdg-open');
     require('child_process').exec(start + ' ' + url);
@@ -263,7 +264,7 @@ app.whenReady().then(async () => {
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow()
+      // TODO: Recreate the main window
     }
   })
 
@@ -361,7 +362,7 @@ const { powerSaveBlocker } = require('electron')
 const id = powerSaveBlocker.start('prevent-display-sleep')
 console.log(powerSaveBlocker.isStarted(id))
 
-app.on('will-quit', (event) => {
+app.on('will-quit', (_event) => {
   Logger.log('App is closing, performing cleanup...');
   powerSaveBlocker.stop(id)
 });

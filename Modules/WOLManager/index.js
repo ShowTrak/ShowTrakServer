@@ -1,14 +1,14 @@
-const { CreateLogger } = require('../Logger');
-const Logger = CreateLogger('ScriptManager');
+// const { CreateLogger } = require('../Logger');
+// const Logger = CreateLogger('ScriptManager');
 
-const { Config } = require('../Config');
+// const { Config } = require('../Config');
 
 const wol = require('wakeonlan')
 
 const Manager = {};
 
 Manager.Wake = async (MAC, Count = 3, Interval = 100) => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, _reject) => {
         wol(MAC, {
             count: Count,
             interval: Interval,

@@ -1,5 +1,5 @@
-const { CreateLogger } = require('../Logger');
-const Logger = CreateLogger('FileSelector');
+// const { CreateLogger } = require('../Logger');
+// const Logger = CreateLogger('FileSelector');
 
 const { dialog } = require('electron')
 
