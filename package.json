@@ -1,26 +1,30 @@
 {
   "name": "showtrak-server",
   "productName": "ShowTrak Server",
-  "version": "3.0.4",
+  "version": "3.0.6",
   "description": "Simple, Free LAN PC Monitoring for arcade style environments.",
   "main": "main.js",
   "scripts": {
     "start": "electron-forge start",
-    "dev": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish"
   },
+  "keywords": [],
+  "author": {
+    "name": "ShowTrak",
+    "email": "tom@tkw.bz",
+    "url": "https://tkw.bz/"
+  },
+  "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ShowTrak/ShowTrakServer.git"
+    "url": "https://github.com/ShowTrak/ShowTrakServer.git"
   },
-  "author": "ShowTrak",
-  "license": "AGPL-3.0-only",
   "bugs": {
     "url": "https://github.com/ShowTrak/ShowTrakServer/issues"
   },
-  "homepage": "https://github.com/ShowTrak/App#readme",
+  "homepage": "https://github.com/ShowTrak",
   "devDependencies": {
     "@electron-forge/cli": "^7.7.0",
     "@electron-forge/maker-deb": "^7.7.0",
@@ -42,6 +46,7 @@
     "express": "^5.1.0",
     "socket.io": "^4.8.1",
     "sqlite3": "^5.1.7",
+    "update-electron-app": "^3.1.1",
     "uuid": "^11.1.0",
     "wakeonlan": "^0.1.0"
   }
