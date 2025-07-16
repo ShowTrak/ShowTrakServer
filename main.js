@@ -54,14 +54,6 @@ app.whenReady().then(async () => {
     });
   });
 
-  globalShortcut.register('CommandOrControl+A', () => {
-    MainWindow.webContents.send('ShortcutTriggered', 'SelectAll');
-  })
-
-  globalShortcut.register('CommandOrControl+D', () => {
-    MainWindow.webContents.send('ShortcutTriggered', 'ClearSelection');
-  })
-
   PreloaderWindow = new BrowserWindow({
     show: false,
     backgroundColor: '#161618',
@@ -272,7 +264,6 @@ app.whenReady().then(async () => {
       createWindow()
     }
   })
-
 
   // MainWindow.webContents.openDevTools();
 

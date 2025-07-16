@@ -18,10 +18,16 @@ function Safe(Input) {
     return Input;
 }
 
-window.API.ShortcutTriggered(async (Name) => {
-    if (Name === 'SelectAll') return AllClients.map(UUID => Select(UUID));
-    if (Name === 'ClearSelection') return ClearSelection();
-})
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        return AllClients.map(UUID => Select(UUID));
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        return ClearSelection()
+    }
+});
 
 window.API.ShutdownRequested(async () => {
     let Confirmation = await ConfirmationDialog('Are you sure you want to shutdown ShowTrak?');
