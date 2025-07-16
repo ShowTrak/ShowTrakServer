@@ -780,6 +780,10 @@ async function Init() {
         await ImportConfig();
     })
 
+    $('#SHOWTRAK_MODEL_CORE_SUPPORTDISCORD').on('click', async () => {
+        await window.API.OpenDiscordInviteLinkInBrowser();
+    })
+
     $('#SHOWTRAK_MODEL_CORE_SHUTDOWN_BUTTON').on('click', async () => {
         window.API.Shutdown();
     })

@@ -260,11 +260,19 @@ app.whenReady().then(async () => {
     return;
   })
 
+  RPC.handle('OpenDiscordInviteLinkInBrowser', async (_event, URL) => {
+    var url = 'https://discord.gg/DACmwsbSGW';
+    var start = (process.platform == 'darwin'? 'open': process.platform == 'win32'? 'start': 'xdg-open');
+    require('child_process').exec(start + ' ' + url);
+    return;
+  })
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow()
     }
   })
+
 
   // MainWindow.webContents.openDevTools();
 
@@ -315,7 +323,6 @@ async function ClientUpdated(Client) {
 BroadcastManager.on('ClientUpdated', ClientUpdated)
 
 async function UpdateScriptList() {
-  // SetScriptList
   if (!MainWindow || MainWindow.isDestroyed()) return;
   let ScriptList = await ScriptManager.GetScripts();
   MainWindow.webContents.send('SetScriptList', ScriptList);

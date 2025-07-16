@@ -19,10 +19,13 @@
   </p>
 </div>
 
-<!-- ABOUT THE PROJECT -->
 ## About The Project
 
 Please see the ShowTrak repo <a href="https://github.com/ShowTrak"><strong>here</strong></a>
+
+## Support
+
+Join our [Discord Server](https://discord.gg/DACmwsbSGW) for support
 
 ### Built With
 [![Electron][Electronjs.org]][Electron-url]

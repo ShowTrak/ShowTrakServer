@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('API', {
+  OpenDiscordInviteLinkInBrowser: async () => ipcRenderer.invoke('OpenDiscordInviteLinkInBrowser'),
   GetConfig: async () => ipcRenderer.invoke('Config:Get'),
   AdoptDevice: async (UUID) => ipcRenderer.invoke('AdoptDevice', UUID),
   Loaded: () => ipcRenderer.invoke('Loaded'),
