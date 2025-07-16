@@ -69,9 +69,11 @@ app.whenReady().then(async () => {
     titleBarStyle: 'hidden',
   })
 
-  PreloaderWindow.loadFile('UI/preloader.html').then(() => {
+  PreloaderWindow.once('ready-to-show', () => {
     PreloaderWindow.show()
   })
+
+  PreloaderWindow.loadFile('UI/preloader.html')
 
   MainWindow = new BrowserWindow({
     show: false,
@@ -353,6 +355,18 @@ app.on('window-all-closed', () => {
   }
 })
 
+// Prevent display sleep
+const { powerSaveBlocker } = require('electron')
+
+const id = powerSaveBlocker.start('prevent-display-sleep')
+console.log(powerSaveBlocker.isStarted(id))
+
+app.on('will-quit', (event) => {
+  Logger.log('App is closing, performing cleanup...');
+  powerSaveBlocker.stop(id)
+});
+
+// Auto Updates
 const { updateElectronApp } = require('update-electron-app')
 updateElectronApp({
   notifyUser: true,

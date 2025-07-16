@@ -30,6 +30,7 @@ document.addEventListener('keydown', function(e) {
 });
 
 window.API.ShutdownRequested(async () => {
+    await CloseAllModals();
     let Confirmation = await ConfirmationDialog('Are you sure you want to shutdown ShowTrak?');
     if (!Confirmation) return;
     await window.API.Shutdown();
