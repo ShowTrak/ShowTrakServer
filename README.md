@@ -30,8 +30,8 @@ Please see the ShowTrak repo <a href="https://github.com/ShowTrak"><strong>here<
 [![JQuery][JQuery.com]][JQuery-url]
 
 ### Installation
-1. Download the executable from the releases page
-2. Install the executable.
+1. Download the installer from the releases page
+2. Run the installer.
 
 [linkedin-url]: https://www.linkedin.com/in/thomas-kirkman-wood-aa0242190/
 [showtrak-logo]: images/icon.png
