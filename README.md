@@ -1,4 +1,3 @@
-
 <br />
 <div align="center">
 
@@ -28,11 +27,12 @@ Please see the ShowTrak repo <a href="https://github.com/ShowTrak"><strong>here<
 Join our [Discord Server](https://discord.gg/DACmwsbSGW) for support
 
 ### Built With
-[![Electron][Electronjs.org]][Electron-url]
-[![Bootstrap][Bootstrap.com]][Bootstrap-url]
+
+[![Electron][Electronjs.org]][Electron-url] [![Bootstrap][Bootstrap.com]][Bootstrap-url]
 [![JQuery][JQuery.com]][JQuery-url]
 
 ### Installation
+
 1. Download the installer from the releases page
 2. Run the installer.
 
@@ -41,4 +41,4 @@ Join our [Discord Server](https://discord.gg/DACmwsbSGW) for support
 [Bootstrap.com]: https://img.shields.io/badge/Bootstrap-563D7C?style=for-the-badge&logo=bootstrap&logoColor=white
 [Bootstrap-url]: https://getbootstrap.com
 [JQuery.com]: https://img.shields.io/badge/jQuery-0769AD?style=for-the-badge&logo=jquery&logoColor=white
-[JQuery-url]: https://jquery.com 
+[JQuery-url]: https://jquery.com

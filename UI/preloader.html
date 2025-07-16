@@ -1,65 +1,67 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>ShowTrak Server Booting</title>
-  </head>
-  <body>
-    <div id="DRAGBAR">
-      <img id="PRELOADER_LOGO" src="./img/icon.png" alt="ShowTrak Logo">
-    </div>
-    <h1 id="FOOTER"></h1>
-  </body>
-    <style>
-      body {
-        background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
-        user-select: none;
-        -webkit-user-select: none;
-        -ms-user-select: none;
-      }
+	<head>
+		<meta charset="UTF-8" />
+		<title>ShowTrak Server Booting</title>
+	</head>
+	<body>
+		<div id="DRAGBAR">
+			<img id="PRELOADER_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+		</div>
+		<h1 id="FOOTER"></h1>
+	</body>
+	<style>
+		body {
+			background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
+			user-select: none;
+			-webkit-user-select: none;
+			-ms-user-select: none;
+		}
 
-      #FOOTER {
-        position: absolute;
-        bottom: 1.5rem;
-        left: 50%;
-        transform: translateX(-50%);
-        color: rgba(255,255,255,0.7);
-        font-size: 1rem;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        text-align: center;
-        width: 100%;
-        font-weight: 700;
-      }
+		#FOOTER {
+			position: absolute;
+			bottom: 1.5rem;
+			left: 50%;
+			transform: translateX(-50%);
+			color: rgba(255, 255, 255, 0.7);
+			font-size: 1rem;
+			font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+			text-align: center;
+			width: 100%;
+			font-weight: 700;
+		}
 
-      #DRAGBAR {
-        app-region: drag;
-        -webkit-app-region: drag;
-        display: grid;
-        place-items: center;
-      }
+		#DRAGBAR {
+			app-region: drag;
+			-webkit-app-region: drag;
+			display: grid;
+			place-items: center;
+		}
 
-      #PRELOADER_LOGO {
-        pointer-events: none;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 200px;
-        height: 200px;
-        user-select: none;
-        -webkit-user-select: none;
-        -ms-user-select: none;
-      }
-    </style>
-    <script>
-      async function Init() {
-        Config = await window.API.GetConfig()
-        if (Config && Config.Application && Config.Application.Version && Config.Application.Name) {
-          document.getElementById('FOOTER').innerText = `${Config.Application.Name} v${Config.Application.Version}`;
-        } else {
-          document.getElementById('FOOTER').innerText = 'ShowTrak Server';
-        }
-      }
-      Init();
-    </script>
+		#PRELOADER_LOGO {
+			pointer-events: none;
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			width: 200px;
+			height: 200px;
+			user-select: none;
+			-webkit-user-select: none;
+			-ms-user-select: none;
+		}
+	</style>
+	<script>
+		async function Init() {
+			Config = await window.API.GetConfig();
+			if (Config && Config.Application && Config.Application.Version && Config.Application.Name) {
+				document.getElementById(
+					"FOOTER"
+				).innerText = `${Config.Application.Name} v${Config.Application.Version}`;
+			} else {
+				document.getElementById("FOOTER").innerText = "ShowTrak Server";
+			}
+		}
+		Init();
+	</script>
 </html>

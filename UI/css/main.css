@@ -1,352 +1,353 @@
 .dragbar {
-    z-index: 1000000;
-    position: fixed;
-    width: 100vw;
-    height: 2rem;
-    app-region: drag;
-    background-color: #1d1a2ffc !important;
-    padding: 0.3rem 0.8rem !important;
-    color: #ffffff !important;
-    user-select: none !important;
-    -webkit-user-select: none !important;
-    -moz-user-select: none !important;
-    -ms-user-select: none !important;
+	z-index: 1000000;
+	position: fixed;
+	width: 100vw;
+	height: 2rem;
+	app-region: drag;
+	background-color: #1d1a2ffc !important;
+	padding: 0.3rem 0.8rem !important;
+	color: #ffffff !important;
+	user-select: none !important;
+	-webkit-user-select: none !important;
+	-moz-user-select: none !important;
+	-ms-user-select: none !important;
 }
 
 #APPLICATION_CONTAINER {
-    position: absolute;
-    width: 100%;
-    height: calc(100%-2rem);
-    overflow: auto;
-    display: grid;
-    grid-template-rows: auto 1fr;
-    background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important
+	position: absolute;
+	width: 100%;
+	height: calc(100%-2rem);
+	overflow: auto;
+	display: grid;
+	grid-template-rows: auto 1fr;
+	background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
 }
 
 #APPLICATION {
-    height: max(100%, 100vh);
-    padding-top: 2rem !important;
-    user-select: none !important;
-    -webkit-user-select: none !important;
-    -moz-user-select: none !important;
-    -ms-user-select: none !important;
-    background: transparent !important;
+	height: max(100%, 100vh);
+	padding-top: 2rem !important;
+	user-select: none !important;
+	-webkit-user-select: none !important;
+	-moz-user-select: none !important;
+	-ms-user-select: none !important;
+	background: transparent !important;
 }
 
 #STATUS_BAR {
-    position: fixed;
-    bottom: -2rem;
-    left: 50%;
-    transform: translateX(-50%);
-    width: auto;
-    padding: 0 1rem;
-    height: 2rem;
-    background-color: #3d3d3f;
-    z-index: 1000;
-    border-radius: 0.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(255,255,255,0.3);
-    font-weight: 700;
-    transition-duration: 500ms;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    opacity: 0;
+	position: fixed;
+	bottom: -2rem;
+	left: 50%;
+	transform: translateX(-50%);
+	width: auto;
+	padding: 0 1rem;
+	height: 2rem;
+	background-color: #3d3d3f;
+	z-index: 1000;
+	border-radius: 0.5rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: rgba(255, 255, 255, 0.3);
+	font-weight: 700;
+	transition-duration: 500ms;
+	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+	opacity: 0;
 }
 
 .STATUS_BAR_ACTIVE {
-    opacity: 1 !important;
-    bottom: 1rem !important;
-    color: rgba(255,255,255,0.9) !important;
+	opacity: 1 !important;
+	bottom: 1rem !important;
+	color: rgba(255, 255, 255, 0.9) !important;
 }
 
 .nav {
-    position: fixed;
-    bottom: 1rem;
-    right: 1rem;
-    /* transform: translateX(-50%); */
-    background: rgba(255,255,255,0.1) !important;
-    padding: 0.5rem;
-    border-radius: 50px;
-    user-select: none !important;
-    -webkit-user-select: none !important;
-    -moz-user-select: none !important;
-    -ms-user-select: none !important;
+	position: fixed;
+	bottom: 1rem;
+	right: 1rem;
+	/* transform: translateX(-50%); */
+	background: rgba(255, 255, 255, 0.1) !important;
+	padding: 0.5rem;
+	border-radius: 50px;
+	user-select: none !important;
+	-webkit-user-select: none !important;
+	-moz-user-select: none !important;
+	-ms-user-select: none !important;
 }
 
 .rounded-3 {
-    border-radius: 0.5rem !important;
+	border-radius: 0.5rem !important;
 }
 
 .btn {
-    border: none !important;
-    border-radius: 0.5rem !important;
-    transition-duration: 100ms;;
+	border: none !important;
+	border-radius: 0.5rem !important;
+	transition-duration: 100ms;
 }
 
 .btn-light {
-    background-color: rgba(255,255,255,0.1) !important;
-    color: white !important;
+	background-color: rgba(255, 255, 255, 0.1) !important;
+	color: white !important;
 }
 
 .btn-light:hover {
-    background-color: rgba(255,255,255,0.2) !important;
+	background-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 .bg-ghost {
-    background-color: rgba(255,255,255,0.03) !important;
+	background-color: rgba(255, 255, 255, 0.03) !important;
 }
 
 .bg-ghost-light {
-    background-color: rgba(255,255,255,0.1) !important;
+	background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .GROUP_TITLE {
-    writing-mode: vertical-rl; 
-    transform: rotate(180deg); 
-    font-weight: 700;
-    letter-spacing: 0.1rem;
-    color: rgba(255,255,255,0.6);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-transform: uppercase;
+	writing-mode: vertical-rl;
+	transform: rotate(180deg);
+	font-weight: 700;
+	letter-spacing: 0.1rem;
+	color: rgba(255, 255, 255, 0.6);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-transform: uppercase;
 }
 
 .GROUP_TITLE_CLICKABLE {
-    background-color: rgba(255,255,255,0.1) !important;
-    cursor: pointer !important;
+	background-color: rgba(255, 255, 255, 0.1) !important;
+	cursor: pointer !important;
 }
 
 .GROUP_TITLE_CLICKABLE:hover {
-    background-color: rgba(255, 255, 255, 0.2) !important;
-    border-radius: 0.3rem;
+	background-color: rgba(255, 255, 255, 0.2) !important;
+	border-radius: 0.3rem;
 }
 
 .GROUP_CREATE_BUTTON {
-    writing-mode: vertical-rl; 
-    transform: rotate(180deg); 
-    font-weight: 700;
-    /* letter-spacing: 0.1rem; */
-    color: rgba(255,255,255,0.6);
-    /* overflow: hidden; */
-    /* text-overflow: ellipsis; */
-    /* white-space: nowrap; */
-    text-transform: uppercase;
+	writing-mode: vertical-rl;
+	transform: rotate(180deg);
+	font-weight: 700;
+	/* letter-spacing: 0.1rem; */
+	color: rgba(255, 255, 255, 0.6);
+	/* overflow: hidden; */
+	/* text-overflow: ellipsis; */
+	/* white-space: nowrap; */
+	text-transform: uppercase;
 }
 
 .GROUP_CREATE_BUTTON:hover {
-    background-color: rgba(255,255,255,0.1) !important;
-    border-radius: 0.3rem;
+	background-color: rgba(255, 255, 255, 0.1) !important;
+	border-radius: 0.3rem;
 }
-
 
 .SHOWTRAK_CLIENT_PENDING_ADOPTION {
-    background-color: rgba(255,255,255,0.03);
+	background-color: rgba(255, 255, 255, 0.03);
 }
 
 .SHOWTRAK_PC_STATUS {
-    height: 15px !important;
+	height: 15px !important;
 }
 
 .SHOWTRAK_PC_STATUS {
-    font-size: 14px !important;
-    font-weight: 600 !important;
-    color: rgba(255,255,255,0.6)
+	font-size: 14px !important;
+	font-weight: 600 !important;
+	color: rgba(255, 255, 255, 0.6);
 }
 
 .SHOWTRAK_PC_STATUS > .progress:first-of-type {
-    margin-top: 0.2rem
+	margin-top: 0.2rem;
 }
 
 .SHOWTRAK_PC_PLACEHOLDER {
-    width:220px;
-    display: grid;
-    border-radius: 0.5rem;
-    font-weight: 700;
-    color: rgba(255,255,255,0.6);
-    padding: 2rem;
-    border: transparent 2px solid;
-    background-color: rgba(255,255,255,0.03);
-    cursor:no-drop
+	width: 220px;
+	display: grid;
+	border-radius: 0.5rem;
+	font-weight: 700;
+	color: rgba(255, 255, 255, 0.6);
+	padding: 2rem;
+	border: transparent 2px solid;
+	background-color: rgba(255, 255, 255, 0.03);
+	cursor: no-drop;
 }
 
 .SHOWTRAK_PC {
-    width:220px;
-    display: grid;
-    gap: 0.1rem;
-    padding: 0.5rem;
-    border-radius: 0.5rem;
-    border: transparent 2px solid;
-    transition-duration: 200ms;
-    background-color: rgba(255, 0, 0, 0.189);
-    cursor: pointer !important;
+	width: 220px;
+	display: grid;
+	gap: 0.1rem;
+	padding: 0.5rem;
+	border-radius: 0.5rem;
+	border: transparent 2px solid;
+	transition-duration: 200ms;
+	background-color: rgba(255, 0, 0, 0.189);
+	cursor: pointer !important;
 }
 
 .text-bold {
-    font-weight: 600 !important;
+	font-weight: 600 !important;
 }
 
 .SHOWTRAK_PC:hover {
-    border-color: rgba(255,255,255,0.4) !important;
+	border-color: rgba(255, 255, 255, 0.4) !important;
 }
 
 .SHOWTRAK_PC.SELECTED {
-    /* background-color: rgba(255, 22, 22, 0.1) !important; */
-    border-color: rgba(255,255,255,1) !important;
+	/* background-color: rgba(255, 22, 22, 0.1) !important; */
+	border-color: rgba(255, 255, 255, 1) !important;
 }
 
 .SHOWTRAK_PC.ONLINE {
-    background-color: rgba(26, 255, 0, 0.25) !important;
+	background-color: rgba(26, 255, 0, 0.25) !important;
 }
 
 .progress {
-    height: 3px !important;
-    border-radius: 5px;
-    background-color: rgba(255,255,255,0.1) !important;
+	height: 3px !important;
+	border-radius: 5px;
+	background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .SHOWTRAK_BTN_ROUNDED {
-    font-weight: 600;
+	font-weight: 600;
 }
 
 #NAVBAR_CORE_BUTTON {
-    width: 48px;
-    height: 48px;
-    cursor: pointer;
-    background: rgb(28 28 28 / 67%);
-    border-radius: 50%;
-    padding:0.4rem;
-    transition-duration: 300ms;
+	width: 48px;
+	height: 48px;
+	cursor: pointer;
+	background: rgb(28 28 28 / 67%);
+	border-radius: 50%;
+	padding: 0.4rem;
+	transition-duration: 300ms;
 }
 
 #NAVBAR_CORE_BUTTON:hover {
-    background: rgb(28 28 28 / 87%);
-    scale: 1.05;
-    animation: spin 3s;
+	background: rgb(28 28 28 / 87%);
+	scale: 1.05;
+	animation: spin 3s;
 }
 
 @keyframes spin {
-    100% {
-        transform: rotate(360deg);
-    }
+	100% {
+		transform: rotate(360deg);
+	}
 }
 
 #APPLICATION_NAVBAR_STATUS {
-    color: rgba(255,255,255,0.5);
+	color: rgba(255, 255, 255, 0.5);
 }
 
 #SHOWTRAK_CONTEXT_MENU {
-    display:none; 
-    position:absolute; 
-    z-index:100000;
-    background-color: #2a273b !important;
-    color: white;
-    border: none !important;
-    border-radius: 0.5rem;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    padding: 0.5rem;
-    user-select: none !important;
-    -webkit-user-select: none !important;
-    -moz-user-select: none !important;
-    -ms-user-select: none !important;
+	display: none;
+	position: absolute;
+	z-index: 100000;
+	background-color: #2a273b !important;
+	color: white;
+	border: none !important;
+	border-radius: 0.5rem;
+	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+	padding: 0.5rem;
+	user-select: none !important;
+	-webkit-user-select: none !important;
+	-moz-user-select: none !important;
+	-ms-user-select: none !important;
 }
 
-#SHOWTRAK_CONTEXT_MENU>a {
-    color: white;
-    text-decoration: none !important;
-    user-select: none !important;
-    -webkit-user-select: none !important;
-    -moz-user-select: none !important;
-    -ms-user-select: none !important;
+#SHOWTRAK_CONTEXT_MENU > a {
+	color: white;
+	text-decoration: none !important;
+	user-select: none !important;
+	-webkit-user-select: none !important;
+	-moz-user-select: none !important;
+	-ms-user-select: none !important;
 }
-#SHOWTRAK_CONTEXT_MENU>a:hover {
-    background-color: rgba(255,255,255,0.1) !important;
-    border-radius: 0.3rem;
+#SHOWTRAK_CONTEXT_MENU > a:hover {
+	background-color: rgba(255, 255, 255, 0.1) !important;
+	border-radius: 0.3rem;
 }
 
 .SHOWTRAK_CONTEXTMENU_BUTTON {
-    cursor: pointer;
+	cursor: pointer;
 }
 
 #APPLICATION_NAVBAR_LOGO {
-    width: 18px;
-    height: 18px;
+	width: 18px;
+	height: 18px;
 }
 
 .modal-dialog {
-    padding-top: 2rem !important;
+	padding-top: 2rem !important;
 }
 
 .modal-content {
-    background-color: #1e1643 !important;
-    color: white;
-    border-radius: 1rem !important;
+	background-color: #1e1643 !important;
+	color: white;
+	border-radius: 1rem !important;
 }
 
 .modal-body {
-    /* background-color: #0c091c !important; */
-    color: white;
-    display: grid;
-    gap: 0.5rem;
+	/* background-color: #0c091c !important; */
+	color: white;
+	display: grid;
+	gap: 0.5rem;
 }
 
 .SHOWTRAK_MODEL_CORE_LOGO {
-    width: 84px;
-    height: 84px;
-
+	width: 84px;
+	height: 84px;
 }
 
-small, .text-sm {
-    font-size: 10px;
+small,
+.text-sm {
+	font-size: 10px;
 }
 
 /* Custom Scrollbar Styles */
 ::-webkit-scrollbar {
-    width: 8px;
-    background: #18181b;
-    border-radius: 1rem;
+	width: 8px;
+	background: #18181b;
+	border-radius: 1rem;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #35353a;
-    border-radius: 12px;
+	background: #35353a;
+	border-radius: 12px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #505055;
+	background: #505055;
 }
 
 ::-webkit-scrollbar-corner {
-    background: #18181b;
+	background: #18181b;
 }
 
 /* Firefox */
 * {
-    scrollbar-width: thin;
-    scrollbar-color: #35353a #18181b;
+	scrollbar-width: thin;
+	scrollbar-color: #35353a #18181b;
 }
 
-.form-control, .form-select {
-    background-color: rgba(255,255,255,0.03) !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 0.5rem !important;
+.form-control,
+.form-select {
+	background-color: rgba(255, 255, 255, 0.03) !important;
+	color: white !important;
+	border: none !important;
+	border-radius: 0.5rem !important;
 }
 
-.form-control:focus, .form-select:focus {
-    color: #212529;
-    background-color: #ffffff1d !important;
-    outline: 0;
-    box-shadow: none !important;
+.form-control:focus,
+.form-select:focus {
+	color: #212529;
+	background-color: #ffffff1d !important;
+	outline: 0;
+	box-shadow: none !important;
 }
 
 option {
-    background-color: #212124 !important;
-    color: white !important;
-    border: none !important;
+	background-color: #212124 !important;
+	color: white !important;
+	border: none !important;
 }
 
 .cursor-pointer {
-    cursor: pointer !important;
+	cursor: pointer !important;
 }
