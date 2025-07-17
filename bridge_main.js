@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("API", {
 	OpenDiscordInviteLinkInBrowser: async () => ipcRenderer.invoke("OpenDiscordInviteLinkInBrowser"),
 	GetConfig: async () => ipcRenderer.invoke("Config:Get"),
+	GetSettings: async () => ipcRenderer.invoke("Settings:Get"),
 	AdoptDevice: async (UUID) => ipcRenderer.invoke("AdoptDevice", UUID),
 	Loaded: () => ipcRenderer.invoke("Loaded"),
 	Shutdown: () => ipcRenderer.invoke("Shutdown"),
@@ -46,6 +47,10 @@ contextBridge.exposeInMainWorld("API", {
 		ipcRenderer.on("USBDeviceRemoved", (_event, Client, Device) => {
 			Callback(Client, Device);
 		}),
+	UpdateSettings: (Callback) => ipcRenderer.on("UpdateSettings", (_event, Settings, SettingsGroupps) => {
+			Callback(Settings, SettingsGroupps);
+		}),
+	SetSetting: async (Key, Value) => ipcRenderer.invoke("SetSetting", Key, Value),
 	WakeOnLan: async (Targets) => ipcRenderer.invoke("WakeOnLan", Targets),
 	UpdateClient: async (UUID, Data) => ipcRenderer.invoke("UpdateClient", UUID, Data),
 	ExecuteScript: async (Script, Targets, ResetList) =>

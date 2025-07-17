@@ -5,6 +5,58 @@ let AllClients = [];
 let ScriptList = [];
 const GroupUUIDCache = new Map();
 
+
+let SettingsGroups = [];
+let Settings = [];
+
+async function GetSettingValue(Key) {
+	if (Settings.length == 0) Settings = await window.API.GetSettings();
+	let Setting = Settings.find((s) => s.Key === Key);
+	if (!Setting) return null;
+	return Setting.Value;
+}
+
+window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
+	Settings = NewSettings;
+	SettingsGroups = NewSettingsGroups;
+
+	$('#SETTINGS').html("");
+
+	for (const Group of SettingsGroups) {
+		$(`#SETTINGS`).append(`<div class="bg-ghost-light p-2 rounded">
+			<strong class="text-start">
+				${Group.Title}
+			</strong>
+		</div>`);
+		let GroupSettings = Settings.filter((s) => s.Group == Group.Name);
+		for (const Setting of GroupSettings) {
+			if (Setting.Type === "BOOLEAN") {
+				$(`#SETTINGS`).append(`<div class="bg-ghost p-2 rounded d-flex justify-content-between text-start">
+					<div class="d-grid">
+						<span>${Setting.Title}</span>
+						<span class="text-sm mb-0">${Setting.Description}</span>
+					</div>
+					<div class="form-check form-switch">
+						<input class="form-check-input" style="margin-top: 0.6em !important;" type="checkbox" id="SETTING_${Setting.Key}" ${Setting.Value ? "checked" : ""}>
+					</div>
+				</div>`);
+				$(`#SETTING_${Setting.Key}`).off("change").on("change", async function () {
+					let NewValue = $(this).is(":checked");
+					if (NewValue === Setting.Value) return;
+					let Set = Settings.find((s) => s.Key === Setting.Key);
+					Set.Value = NewValue;
+					Setting.Value = NewValue;
+					await window.API.SetSetting(Setting.Key, NewValue);
+					Notify(`Updated setting ${Setting.Title} to ${NewValue}`);
+				})
+			}
+		}
+	}
+
+	return;
+	
+})
+
 function Safe(Input) {
 	if (typeof Input === "string") {
 		return Input.replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -19,6 +71,10 @@ function Safe(Input) {
 }
 
 document.addEventListener("keydown", function (e) {
+	if (e.key === "Escape") {
+		e.preventDefault();
+		return ClearSelection();
+	}
 	if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
 		e.preventDefault();
 		return AllClients.map((UUID) => Select(UUID));
@@ -152,53 +208,55 @@ window.API.SetFullClientList(async (Clients, Groups) => {
 		if (GroupClients.length == 0 && GroupID == null) continue;
 
 		Filler += `<div class="d-flex justify-content-start">
-        <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" onclick="SelectByGroup('${GroupID}')">
-            <div class="d-flex align-items-center text-center h-100">
-                <span class="GROUP_TITLE py-2">
-                    ${Safe(Title)}
-                </span>
-            </div>
-        </div>
-        <div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100">`;
+		<div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" onclick="SelectByGroup('${GroupID}')">
+			<div class="d-flex align-items-center text-center h-100">
+				<span class="GROUP_TITLE py-2">
+					${Safe(Title)}
+				</span>
+			</div>
+		</div>
+		<div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100">`;
 
 		if (GroupClients.length == 0) {
 			Filler += `<div class="SHOWTRAK_PC_PLACEHOLDER w-100 p-3"
-                <h5 class="text-muted mb-0">
-                    Empty Group
-                </h5>
-                <p class="text-muted mb-0">
-                    This group has no clients assigned to it.
-                </p>
-                <p class="text-muted mb-0">
-                    You can add clients to this group via the client editor!
-                </p>
-            </div>`;
+				<h5 class="text-muted mb-0">
+					Empty Group
+				</h5>
+				<p class="text-muted mb-0">
+					This group has no clients assigned to it.
+				</p>
+				<p class="text-muted mb-0">
+					You can add clients to this group via the client editor!
+				</p>
+			</div>`;
 		} else {
 			for (const { Nickname, Hostname, IP, UUID, Version, Online, LastSeen } of GroupClients) {
 				Filler += `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${Online ? "ONLINE" : ""} ${
 					Selected.includes(UUID) ? "SELECTED" : ""
 				}" data-uuid="${UUID}">
-                    <label class="text-sm" data-type="Hostname">
-                        ${Nickname && Nickname.length ? Safe(Hostname) : "v" + Version}
-                    </label>
-                    <h5 class="mb-0" data-type="Nickname">
-                    ${Nickname && Nickname.length ? Safe(Nickname) : Safe(Hostname)}
-                    </h5>
-                    <small class="text-sm text-light" data-type="IP">
-                        ${IP ? Safe(IP) : "Unknown IP"}
-                    </small>
-                    <div class="SHOWTRAK_PC_STATUS ${Online ? "d-grid" : "d-none"} gap-2" data-type="INDICATOR_ONLINE">
-                        <div class="progress"><div data-type="CPU" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div></div>
-                        <div class="progress">
-                        <div data-type="RAM" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
-                    </div>
-                    </div>
-                    <div class="SHOWTRAK_PC_STATUS ${Online ? "d-none" : "d-grid"}" data-type="INDICATOR_OFFLINE">
-                        <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${LastSeen}">
-                            OFFLINE <span class="badge bg-ghost">00:00:00</span>
-                        </h7>
-                    </div>
-                </div>`;
+					<label class="text-sm" data-type="Hostname">
+						${Nickname && Nickname.length ? Safe(Hostname) : "v" + Version}
+					</label>
+					<h5 class="mb-0" data-type="Nickname">
+					${Nickname && Nickname.length ? Safe(Nickname) : Safe(Hostname)}
+					</h5>
+					<small class="text-sm text-light" data-type="IP">
+						${IP ? Safe(IP) : "Unknown IP"}
+					</small>
+					<div class="SHOWTRAK_PC_STATUS ${Online ? "d-grid" : "d-none"} gap-2" data-type="INDICATOR_ONLINE">
+						<div class="progress">
+							<div data-type="CPU" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
+						</div>
+						<div class="progress">
+							<div data-type="RAM" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
+						</div>
+					</div>
+					<div class="SHOWTRAK_PC_STATUS ${Online ? "d-none" : "d-grid"}" data-type="INDICATOR_OFFLINE">
+						<h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${LastSeen}">
+							OFFLINE <span class="badge bg-ghost">00:00:00</span>
+						</h7>
+					</div>
+				</div>`;
 			}
 		}
 
@@ -206,13 +264,13 @@ window.API.SetFullClientList(async (Clients, Groups) => {
 	}
 
 	Filler += `<div class="d-flex justify-content-start">
-        <div class="GROUP_TITLE_CLICKABLE m-3 me-0 rounded" onclick="OpenGroupCreationModal()">
-            <div class="d-flex align-items-center text-center h-100">
-                <span class="GROUP_CREATE_BUTTON py-2">+</span>
-            </div>
-        </div>
-    </div>`;
-
+		<div class="GROUP_TITLE_CLICKABLE m-3 me-0 rounded" onclick="OpenGroupCreationModal()">
+			<div class="d-flex align-items-center text-center h-100">
+				<span class="GROUP_CREATE_BUTTON py-2">+</span>
+			</div>
+		</div>
+	</div>`;
+	
 	$("#APPLICATION_CONTENT").html(Filler);
 });
 
@@ -607,7 +665,7 @@ async function UpdateOfflineIndicators() {
 	});
 }
 
-$(function () {
+$(async function () {
 	const $menu = $("#SHOWTRAK_CONTEXT_MENU");
 	$(document).on("click", ".SHOWTRAK_PC", function (e) {
 		e.preventDefault();
@@ -615,7 +673,7 @@ $(function () {
 		ToggleSelection(UUID);
 		return;
 	});
-	$(document).on("contextmenu", "html", function (e) {
+	$(document).on("contextmenu", "html", async function (e) {
 		e.preventDefault();
 		let Options = [];
 
@@ -647,7 +705,7 @@ $(function () {
 			for (const Script of ScriptList) {
 				Options.push({
 					Type: "Action",
-					Title: `Run "${Script.Name}"`,
+					Title: `${Script.Name}`,
 					Class: `text-${Script.LabelStyle}`,
 					Action: async function () {
 						if (Script.Confirmation) {
@@ -671,39 +729,45 @@ $(function () {
 		}
 
 		if (Selected.length > 0) {
-			Options.push({
-				Type: "Action",
-				Title: "Wake On LAN",
-				Class: "text-light",
-				Action: async function () {
-					window.API.WakeOnLan(Selected);
-					$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
-				},
-			});
-			Options.push({
-				Type: "Action",
-				Title: "Delete Scripts",
-				Class: "text-warning",
-				Action: async function () {
-					let Confirmation = await ConfirmationDialog(
-						"Are you sure you want to delete scripts from this pc?"
-					);
-					if (!Confirmation) return;
-					window.API.DeleteScripts(Selected);
-					$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
-				},
-			});
-			Options.push({
-				Type: "Action",
-				Title: "Update Scripts",
-				Class: "text-warning",
-				Action: async function () {
-					let Confirmation = await ConfirmationDialog("Are you sure you want to update scripts on this pc?");
-					if (!Confirmation) return;
-					window.API.UpdateScripts(Selected);
-					$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
-				},
-			});
+			let SYSTEM_ALLOW_WOL = await GetSettingValue("SYSTEM_ALLOW_WOL");
+			if (SYSTEM_ALLOW_WOL) {
+				Options.push({
+					Type: "Action",
+					Title: "Wake On LAN",
+					Class: "text-light",
+					Action: async function () {
+						window.API.WakeOnLan(Selected);
+						$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
+					},
+				});
+			}
+			let SYSTEM_ALLOW_SCRIPT_EDITS = await GetSettingValue("SYSTEM_ALLOW_SCRIPT_EDITS");
+			if (SYSTEM_ALLOW_SCRIPT_EDITS) {
+				Options.push({
+					Type: "Action",
+					Title: "Delete Scripts",
+					Class: "text-warning",
+					Action: async function () {
+						let Confirmation = await ConfirmationDialog(
+							"Are you sure you want to delete scripts from this pc?"
+						);
+						if (!Confirmation) return;
+						window.API.DeleteScripts(Selected);
+						$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
+					},
+				});
+				Options.push({
+					Type: "Action",
+					Title: "Update Scripts",
+					Class: "text-warning",
+					Action: async function () {
+						let Confirmation = await ConfirmationDialog("Are you sure you want to update scripts on this pc?");
+						if (!Confirmation) return;
+						window.API.UpdateScripts(Selected);
+						$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
+					},
+				});
+			}
 			Options.push({
 				Type: "Action",
 				Title: "Clear Selection",
@@ -796,6 +860,11 @@ async function Init() {
 	Config = await window.API.GetConfig();
 	$("#APPLICATION_NAVBAR_TITLE").text(`${Config.Application.Name}`);
 	$("#APPLICATION_NAVBAR_STATUS").text(`v${Config.Application.Version}`);
+
+	$('#SHOWTRAK_MODEL_CORE_OPEN_SETTINGS').on("click", async () => {
+		await CloseAllModals();
+		$("#SHOWTRAK_MODAL_SETTINGS").modal("show")
+	})
 
 	$("#NAVBAR_CORE_BUTTON").on("click", async () => {
 		$("#SHOWTRAK_MODEL_CORE").modal("show");
