@@ -34,7 +34,7 @@ const path = require("path");
 
 var MainWindow = null;
 
-// Menu.setApplicationMenu(null);
+if (app.app.isPackaged) Menu.setApplicationMenu(null);
 let PreloaderWindow = null;
 app.whenReady().then(async () => {
 	if (require("electron-squirrel-startup")) return app.quit();
