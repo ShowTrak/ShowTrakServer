@@ -400,19 +400,19 @@ async function OpenGroupCreationModal() {
 async function ImportConfig() {
 	console.log("Starting import");
 	await window.API.ImportConfig();
-	await Notify("Import completed successfully", "success");
+	await Notify("Restored from backup.", "success");
 }
 
 async function BackupConfig() {
 	console.log("Starting backup");
 	await window.API.BackupConfig();
-	await Notify("Backup completed successfully", "success");
+	await Notify("Backup completed.", "success");
 }
 
 async function DeleteGroup(GroupID) {
 	await window.API.DeleteGroup(GroupID);
 	await OpenGroupManager(true);
-	await Notify("Group deleted successfully", "success");
+	await Notify("Group deleted.", "success");
 }
 
 async function OpenGroupManager(Relaunching = false) {
@@ -535,7 +535,7 @@ async function OpenClientEditor(UUID) {
 			let Confirmation = await ConfirmationDialog(`Are you sure you want to delete ${Nickname || Hostname}?`);
 			if (!Confirmation) return;
 			await window.API.UnadoptClient(UUID);
-			await Notify(`Unadopted ${Nickname ? Nickname : Hostname} successfully`, "success");
+			await Notify(`Unadopted ${Nickname ? Nickname : Hostname}`, "success");
 		});
 
 	$("#SHOWTRAK_CLIENT_EDITOR_SAVE")
