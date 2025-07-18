@@ -722,7 +722,7 @@ $(async function () {
 			}
 		}
 
-		if (Options.length > 0) {
+		if (ScriptList.length > 0) {
 			Options.push({
 				Type: "Divider",
 			});
@@ -749,7 +749,7 @@ $(async function () {
 					Class: "text-warning",
 					Action: async function () {
 						let Confirmation = await ConfirmationDialog(
-							"Are you sure you want to delete scripts from this pc?"
+							"Are you sure you want to delete scripts from clients?"
 						);
 						if (!Confirmation) return;
 						window.API.DeleteScripts(Selected);
@@ -758,11 +758,9 @@ $(async function () {
 				});
 				Options.push({
 					Type: "Action",
-					Title: "Update Scripts",
+					Title: "Deploy Scripts",
 					Class: "text-warning",
 					Action: async function () {
-						let Confirmation = await ConfirmationDialog("Are you sure you want to update scripts on this pc?");
-						if (!Confirmation) return;
 						window.API.UpdateScripts(Selected);
 						$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
 					},
