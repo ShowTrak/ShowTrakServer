@@ -274,6 +274,43 @@ window.API.SetFullClientList(async (Clients, Groups) => {
 	$("#APPLICATION_CONTENT").html(Filler);
 });
 
+async function OpenOSCDictionary() {
+	await CloseAllModals();
+	$("#OSC_ROUTE_LIST_MODAL").modal("show");
+}
+
+window.API.Notify(async (Message, Type, Duration) => {
+	Notify(Message, Type, Duration);
+})
+
+window.API.SetOSCList(async (Routes) => {
+	$('#OSC_ROUTE_LIST').html("");
+	$('#OSC_ROUTE_LIST').append(`
+		<div class="d-grid gap-2 p-2 rounded bg-ghost-light rounded-3">
+			The following OSC routes are accessible on port 3333.
+		</div>
+	`);
+	for (const Route of Routes) {
+		let PathFiller = "";
+		for (const Segment of Route.Path.split("/").filter((s) => s.length > 0)) {
+			PathFiller += `<span class="">/</span>`;
+			if (Segment.startsWith(":")) {
+				PathFiller += `<span class="text-info">[${Safe(Segment.substring(1))}]</span>`;
+			} else {
+				PathFiller += `<span>${Safe(Segment)}</span>`;
+			}
+		}
+
+		$('#OSC_ROUTE_LIST').append(`
+			<div class="d-grid gap-2 p-2 rounded bg-ghost rounded-3">
+				<code class="bg-ghost rounded p-2">${PathFiller}</code>
+				<p class="mb-0">${Safe(Route.Title)}</p>
+			</div>
+		`);
+	}
+	return;
+})
+
 window.API.ClientUpdated(async (Data) => {
 	const { UUID, Nickname, Hostname, Version, IP, Online, Vitals } = Data;
 	$(`[data-uuid='${UUID}']`).toggleClass("ONLINE", Online);
@@ -893,6 +930,10 @@ async function Init() {
 
 	$("#NAVBAR_CORE_BUTTON").on("click", async () => {
 		$("#SHOWTRAK_MODEL_CORE").modal("show");
+	});
+
+	$("#SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON").on("click", async () => {
+		await OpenOSCDictionary();
 	});
 
 	$("#SHOWTRAK_MODEL_CORE_ADOPT_BUTTON").on("click", async () => {

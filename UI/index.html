@@ -52,6 +52,9 @@
 						<strong class="mb-0"> ShowTrak Server </strong>
 
 						<div class="d-grid gap-2">
+							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON">
+								OSC Dictionary
+							</a>
 							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS"> Preferences </a>
 							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_ADOPT_BUTTON"> Adoption </a>
 							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON">
@@ -114,6 +117,26 @@
 						<strong class="mb-0"> Group Manager </strong>
 
 						<div id="GROUP_MANAGER_GROUP_LIST" class="d-grid gap-2"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div
+			class="modal fade"
+			id="OSC_ROUTE_LIST_MODAL"
+			tabindex="-1"
+			aria-labelledby="OSC_ROUTE_LIST_MODAL_Label"
+			aria-hidden="true"
+		>
+			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable modal-lg">
+				<div class="modal-content">
+					<div class="modal-body text-center ">
+						<div class="d-flex justify-content-center">
+							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+						</div>
+
+						<div id="OSC_ROUTE_LIST" class="d-grid gap-2 text-start"></div>
 					</div>
 				</div>
 			</div>

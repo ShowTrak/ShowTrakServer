@@ -7,6 +7,7 @@ const fs = require("fs");
 
 const { Manager: AppDataManager } = require("../AppData");
 const { Manager: ChecksumManager } = require("../ChecksumManager");
+const { Manager: BroadcastManager } = require("../Broadcast");
 
 var Scripts = [];
 
@@ -53,6 +54,7 @@ function RecursiveFileList(dir, baseDir = dir) {
 }
 
 Manager.GetScripts = async () => {
+	if (Scripts.length > 0) return Scripts; // If scripts are already loaded, return them
 	let TempScripts = [];
 	const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
 
@@ -69,6 +71,7 @@ Manager.GetScripts = async () => {
 		const scriptJsonPath = path.join(ScriptsDirectory, ScriptFolder, "Script.json");
 		if (!fs.existsSync(scriptJsonPath)) {
 			Logger.error(`Script.json not found in ${ScriptFolder}, skipping...`);
+			BroadcastManager.emit('Notify', `Script.json not found in ${ScriptFolder}`, 'error', 15000);
 			continue;
 		}
 		try {
@@ -84,6 +87,7 @@ Manager.GetScripts = async () => {
 			TempScripts.push(new Script(ScriptFolder, ScriptData, AllFilesInFolder));
 		} catch (err) {
 			Logger.error(`Failed to load Script.json for ${ScriptFolder}:`, err);
+			BroadcastManager.emit('Notify', `Error in Script.json for ${ScriptFolder} Script`, 'error', 15000);
 		}
 	}
 	Scripts = TempScripts;

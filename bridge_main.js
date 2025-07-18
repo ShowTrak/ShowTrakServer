@@ -16,6 +16,14 @@ contextBridge.exposeInMainWorld("API", {
 	OpenScriptsFolder: async () => ipcRenderer.invoke("OpenScriptsFolder"),
 	BackupConfig: async () => ipcRenderer.invoke("BackupConfig"),
 	ImportConfig: async () => ipcRenderer.invoke("ImportConfig"),
+	Notify: (Callback) =>
+		ipcRenderer.on("Notify", (_event, Message, Type, Duration) => {
+			Callback(Message, Type, Duration);
+		}),
+	SetOSCList: (Callback) =>
+		ipcRenderer.on("SetOSCList", (_event, Routes) => {
+			Callback(Routes);
+		}),
 	SetDevicesPendingAdoption: (Callback) =>
 		ipcRenderer.on("SetDevicesPendingAdoption", (_event, Data) => {
 			Callback(Data);

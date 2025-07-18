@@ -29,12 +29,13 @@ const { Manager: ScriptExecutionManager } = require("./Modules/ScriptExecutionMa
 const { Manager: WOLManager } = require("./Modules/WOLManager");
 const { Manager: BroadcastManager } = require("./Modules/Broadcast");
 const { Manager: SettingsManager } = require("./Modules/SettingsManager");
+const { OSC } = require("./Modules/OSC");
 const { Wait } = require("./Modules/Utils");
 const path = require("path");
 
 var MainWindow = null;
 
-if (app.app.isPackaged) Menu.setApplicationMenu(null);
+if (app.isPackaged) Menu.setApplicationMenu(null);
 let PreloaderWindow = null;
 app.whenReady().then(async () => {
 	if (require("electron-squirrel-startup")) return app.quit();
@@ -228,6 +229,7 @@ app.whenReady().then(async () => {
 		await UpdateAdoptionList();
 		await UpdateFullClientList();
 		await UpdateScriptList();
+		await UpdateOSCList();
 		return;
 	});
 
@@ -348,6 +350,12 @@ async function ClientUpdated(Client) {
 
 BroadcastManager.on("ClientUpdated", ClientUpdated);
 
+async function UpdateOSCList() {
+	if (!MainWindow || MainWindow.isDestroyed()) return;
+	let Routes = OSC.GetRoutes();
+	MainWindow.webContents.send("SetOSCList", JSON.parse(JSON.stringify(Routes)));
+}
+
 async function UpdateScriptList() {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	let ScriptList = await ScriptManager.GetScripts();
@@ -380,6 +388,13 @@ async function UpdateScriptExecutions(Executions) {
 }
 
 BroadcastManager.on("ScriptExecutionUpdated", UpdateScriptExecutions);
+
+async function Notify(Message, Type = "info", Duration = 5000) {
+	if (!MainWindow || MainWindow.isDestroyed()) return;
+	MainWindow.webContents.send("Notify", Message, Type, Duration);
+}
+
+BroadcastManager.on("Notify", Notify)
 
 app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") {
