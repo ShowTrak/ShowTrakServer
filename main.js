@@ -150,6 +150,12 @@ app.whenReady().then(async () => {
 		return Client;
 	});
 
+	RPC.handle("CheckForUpdatesOnClient", async (_Event, UUID) => {
+		Logger.warn("CheckForUpdatesOnClient called for UUID:", UUID);
+		await ServerManager.ExecuteBulkRequest("UpdateSoftware", [UUID], "Check For Softawre Updates");
+		return;
+	});
+
 	RPC.handle("GetAllGroups", async (_Event) => {
 		let [Err, Groups] = await GroupManager.GetAll();
 		if (Err) return [];

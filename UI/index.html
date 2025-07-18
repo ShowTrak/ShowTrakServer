@@ -51,9 +51,7 @@
 						<strong class="mb-0"> ShowTrak Server </strong>
 
 						<div class="d-grid gap-2">
-							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS">
-								Preferences
-							</a>
+							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS"> Preferences </a>
 							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_ADOPT_BUTTON"> Adoption </a>
 							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON">
 								Group Manager
@@ -135,7 +133,6 @@
 						</div>
 
 						<div id="SETTINGS" class="d-grid gap-2"></div>
-
 					</div>
 				</div>
 			</div>
@@ -216,18 +213,16 @@
 								/>
 								<label for="CLIENT_EDITOR_NICKNAME">Nickname</label>
 							</div>
-
+							<div class="form-floating">
+								<input type="text" class="form-control disabled" id="CLIENT_EDITOR_HOSTNAME" disabled />
+								<label for="CLIENT_EDITOR_HOSTNAME">Hostname</label>
+							</div>
 							<div class="form-floating">
 								<select class="form-select" id="CLIENT_EDITOR_GROUPID">
 									<option value="0" selected>No Group</option>
 									<option value="1">Viewer</option>
 								</select>
 								<label for="CLIENT_EDITOR_GROUPID">Group</label>
-							</div>
-
-							<div class="form-floating">
-								<input type="text" class="form-control disabled" id="CLIENT_EDITOR_HOSTNAME" disabled />
-								<label for="CLIENT_EDITOR_HOSTNAME">Hostname</label>
 							</div>
 							<div class="form-floating">
 								<input type="text" class="form-control disabled" id="CLIENT_EDITOR_IP" disabled />
@@ -257,7 +252,9 @@
 						<div class="rounded-3 p-2 bg-ghost-light text-danger">
 							<h6 class="mb-0">Danger Zone</h6>
 						</div>
-
+						<button type="button" class="btn btn-danger" id="SHOWTRAK_CLIENT_EDITOR_UPDATE">
+							Check For Updates
+						</button>
 						<button type="button" class="btn btn-danger" id="SHOWTRAK_CLIENT_EDITOR_REMOVE">
 							Delete Client
 						</button>

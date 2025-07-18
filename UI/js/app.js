@@ -520,14 +520,21 @@ async function OpenClientEditor(UUID) {
         `);
 	}
 
+	$("#SHOWTRAK_CLIENT_EDITOR_UPDATE")
+		.off("click")
+		.on("click", async () => {
+			await CloseAllModals();
+			await window.API.CheckForUpdatesOnClient(UUID);
+			$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
+		});
+
 	$("#SHOWTRAK_CLIENT_EDITOR_REMOVE")
 		.off("click")
 		.on("click", async () => {
 			await CloseAllModals();
-			let Confirmation = await ConfirmationDialog(`Are you sure you want to unadopt ${Nickname || Hostname}?`);
+			let Confirmation = await ConfirmationDialog(`Are you sure you want to delete ${Nickname || Hostname}?`);
 			if (!Confirmation) return;
 			await window.API.UnadoptClient(UUID);
-			await CloseAllModals();
 			await Notify(`Unadopted ${Nickname ? Nickname : Hostname} successfully`, "success");
 		});
 

@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("API", {
 	GetConfig: async () => ipcRenderer.invoke("Config:Get"),
 	GetSettings: async () => ipcRenderer.invoke("Settings:Get"),
 	AdoptDevice: async (UUID) => ipcRenderer.invoke("AdoptDevice", UUID),
+	CheckForUpdatesOnClient: async (UUID) => ipcRenderer.invoke("CheckForUpdatesOnClient", UUID),
 	Loaded: () => ipcRenderer.invoke("Loaded"),
 	Shutdown: () => ipcRenderer.invoke("Shutdown"),
 	GetClient: async (UUID) => ipcRenderer.invoke("GetClient", UUID),
