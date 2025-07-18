@@ -47,7 +47,7 @@ window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
 					Set.Value = NewValue;
 					Setting.Value = NewValue;
 					await window.API.SetSetting(Setting.Key, NewValue);
-					Notify(`Updated setting ${Setting.Title} to ${NewValue}`);
+					Notify(`Turned ${Setting.Title} ${NewValue ? 'On' : 'Off'}`, 'success');
 				})
 			}
 		}
@@ -581,8 +581,28 @@ async function Wait(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function Notify(Message, Type = "info") {
-	console.log("Notify:", Message, Type);
+async function Notify(Message, Type = "info", Duration = 5000) {
+
+	let Styles = {
+		info: "linear-gradient(to right, rgb(63 59 104), rgb(56 52 109))",
+		success: "linear-gradient(to right, rgb(40 167 69), rgb(30 139 54))",
+		error: "linear-gradient(to right, rgb(220 53 69), rgb(185 28 28))",
+	}
+
+	Toastify({
+		text: Message,
+		duration: Duration,
+		close: false,
+		gravity: "top", // `top` or `bottom`
+		position: "right", // `left`, `center` or `right`
+		stopOnFocus: true, // Prevents dismissing of toast on hover
+		offset: {
+			y: '2rem',
+		},
+		style: {
+			background: Styles[Type] || Styles.info,
+		},
+	}).showToast();
 }
 
 async function ConfirmationDialog(Message) {
