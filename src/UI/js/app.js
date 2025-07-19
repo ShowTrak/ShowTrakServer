@@ -235,7 +235,7 @@ window.API.SetFullClientList(async (Clients, Groups) => {
 					Selected.includes(UUID) ? "SELECTED" : ""
 				}" data-uuid="${UUID}">
 					<label class="text-sm" data-type="Hostname">
-						${Nickname && Nickname.length ? Safe(Hostname) : "v" + Version}
+						${Nickname && Nickname.length ? Safe(Hostname) + " - v" + Version : "v" + Version}
 					</label>
 					<h5 class="mb-0" data-type="Nickname">
 					${Nickname && Nickname.length ? Safe(Nickname) : Safe(Hostname)}
@@ -315,7 +315,7 @@ window.API.ClientUpdated(async (Data) => {
 	const { UUID, Nickname, Hostname, Version, IP, Online, Vitals } = Data;
 	$(`[data-uuid='${UUID}']`).toggleClass("ONLINE", Online);
 
-	let ComputedHostname = Nickname && Nickname.length ? Hostname : "v" + Version;
+	let ComputedHostname = Nickname && Nickname.length ? `${Hostname} - v${Version}` : "v" + Version;
 	if ($(`[data-uuid='${UUID}']>[data-type="Hostname"]`).text() !== ComputedHostname) {
 		$(`[data-uuid='${UUID}']>[data-type="Hostname"]`).text(ComputedHostname);
 	}
