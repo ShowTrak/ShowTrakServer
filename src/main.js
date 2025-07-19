@@ -69,7 +69,7 @@ app.whenReady().then(async () => {
 			preload: path.join(__dirname, "bridge_preloader.js"),
 			devTools: !app.isPackaged,
 		},
-		icon: path.join(__dirname, "images/icon.ico"),
+		icon: path.join(__dirname, "./Images/icon.ico"),
 		frame: true,
 		titleBarStyle: "hidden",
 	});
@@ -91,7 +91,7 @@ app.whenReady().then(async () => {
 			preload: path.join(__dirname, "bridge_main.js"),
 			devTools: !app.isPackaged,
 		},
-		icon: path.join(__dirname, "./images/icon.ico"),
+		icon: path.join(__dirname, "./Images/icon.ico"),
 		frame: true,
 		titleBarStyle: "hidden",
 	});
