@@ -3,7 +3,7 @@
 	"productName": "ShowTrak Server",
 	"version": "3.1.0",
 	"description": "Simple, Free LAN PC Monitoring for arcade style environments.",
-	"main": "main.js",
+	"main": "src/main.js",
 	"scripts": {
 		"start": "electron-forge start",
 		"package": "electron-forge package",

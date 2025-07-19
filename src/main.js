@@ -78,7 +78,7 @@ app.whenReady().then(async () => {
 		PreloaderWindow.show();
 	});
 
-	PreloaderWindow.loadFile("UI/preloader.html");
+	PreloaderWindow.loadFile(path.join(__dirname, 'UI', 'preloader.html'));
 
 	MainWindow = new BrowserWindow({
 		show: false,
@@ -91,12 +91,12 @@ app.whenReady().then(async () => {
 			preload: path.join(__dirname, "bridge_main.js"),
 			devTools: !app.isPackaged,
 		},
-		icon: path.join(__dirname, "images/icon.ico"),
+		icon: path.join(__dirname, "./images/icon.ico"),
 		frame: true,
 		titleBarStyle: "hidden",
 	});
 
-	MainWindow.loadFile("UI/index.html").then(async () => {
+	MainWindow.loadFile(path.join(__dirname, 'UI', 'index.html')).then(async () => {
 		Logger.log("MainWindow finished loading UI");
 		UpdateAdoptionList();
 		await Wait(800);
