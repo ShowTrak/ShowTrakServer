@@ -64,59 +64,59 @@ OSC.CreateRoute = (Path, Callback, Title = "Default OSC Route") => {
 
 // Other
 
-OSC.CreateRoute('/ShowTrak/Shutdown', async (Req) => {
+OSC.CreateRoute('/ShowTrak/Shutdown', async (_Req) => {
     return false;
 }, 'Close the ShowTrak Server');
 
 // Client
-OSC.CreateRoute('/ShowTrak/Client/:UUID/Select', async (Req) => {
+OSC.CreateRoute('/ShowTrak/Client/:UUID/Select', async (_Req) => {
     return false;
 }, 'Select a Client by their UUID');
 
-OSC.CreateRoute('/ShowTrak/Client/:UUID/Deselect', async (Req) => {
+OSC.CreateRoute('/ShowTrak/Client/:UUID/Deselect', async (_Req) => {
     return false;
 }, 'Deselect a Client by their UUID');
 
-OSC.CreateRoute('/ShowTrak/Client/:UUID/WakeOnLAN', async (Req) => {
+OSC.CreateRoute('/ShowTrak/Client/:UUID/WakeOnLAN', async (_Req) => {
     return false;
 }, 'Send a WOL packet to a Client by UUID');
 
-OSC.CreateRoute('/ShowTrak/Client/:UUID/RunScript/:ScriptID', async (Req) => {
+OSC.CreateRoute('/ShowTrak/Client/:UUID/RunScript/:ScriptID', async (_Req) => {
     return false;
 }, 'Execute a script on a Client by UUID and Script ID');
 
 // Selected
-OSC.CreateRoute('/ShowTrak/Selected/WakeOnLAN', async (Req) => {
+OSC.CreateRoute('/ShowTrak/Selected/WakeOnLAN', async (_Req) => {
     return false;
 }, 'Send a WOL packet to the currently selected Client(s)');
 
-OSC.CreateRoute('/ShowTrak/Selected/RunScript/:ScriptID', async (Req) => {
+OSC.CreateRoute('/ShowTrak/Selected/RunScript/:ScriptID', async (_Req) => {
     return false;
 }, 'Execute a script on the currently selected online Client(s) by Script ID');
 
 // Group
-OSC.CreateRoute('/ShowTrak/Group/:GroupID/Select', async (Req) => {
+OSC.CreateRoute('/ShowTrak/Group/:GroupID/Select', async (_Req) => {
     return false;
 }, 'Select all members of a Group by its Group ID');
 
-OSC.CreateRoute('/ShowTrak/Group/:GroupID/Deselect', async (Req) => {
+OSC.CreateRoute('/ShowTrak/Group/:GroupID/Deselect', async (_Req) => {
     return false;
 }, 'Deselect all members of a Group by its Group ID');
 
-OSC.CreateRoute('/ShowTrak/Group/:GroupID/WakeOnLAN', async (Req) => {
+OSC.CreateRoute('/ShowTrak/Group/:GroupID/WakeOnLAN', async (_Req) => {
     return false;
 }, 'Send a WOL packet to all offline members of a Group by its Group ID');
 
-OSC.CreateRoute('/ShowTrak/Group/:GroupID/RunScript/:ScriptID', async (Req) => {
+OSC.CreateRoute('/ShowTrak/Group/:GroupID/RunScript/:ScriptID', async (_Req) => {
     return false;
 }, 'Execute a script on all online members of a Group by its Group ID and Script ID');
 
 // All
-OSC.CreateRoute('/ShowTrak/All/WakeOnLAN', async (Req) => {
+OSC.CreateRoute('/ShowTrak/All/WakeOnLAN', async (_Req) => {
     return false;
 }, 'Send a WOL packet to all offline Clients');
 
-OSC.CreateRoute('/ShowTrak/All/RunScript/:ScriptID', async (Req) => {
+OSC.CreateRoute('/ShowTrak/All/RunScript/:ScriptID', async (_Req) => {
     return false;
 }, 'Execute a script on all online Clients by Script ID');
 
