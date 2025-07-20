@@ -11,7 +11,7 @@
       content="default-src 'self'; script-src 'self'"
     /> -->
 		<link rel="stylesheet" href="./vendors/bootstrap/css/bootstrap.min.css" />
-		<link rel="stylesheet" type="text/css" href="./vendors/toastify/index.min.css">
+		<link rel="stylesheet" type="text/css" href="./vendors/toastify/index.min.css" />
 		<link rel="stylesheet" href="./css/main.css" />
 
 		<title>ShowTrak Server</title>
@@ -52,10 +52,10 @@
 						<strong class="mb-0"> ShowTrak Server </strong>
 
 						<div class="d-grid gap-2">
+							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS"> Settings </a>
 							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON">
 								OSC Dictionary
 							</a>
-							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS"> Preferences </a>
 							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_ADOPT_BUTTON"> Adoption </a>
 							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON">
 								Group Manager
@@ -131,7 +131,7 @@
 		>
 			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable modal-lg">
 				<div class="modal-content">
-					<div class="modal-body text-center ">
+					<div class="modal-body text-center">
 						<div class="d-flex justify-content-center">
 							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
 						</div>
@@ -276,10 +276,10 @@
 						<div class="rounded-3 p-2 bg-ghost-light text-danger">
 							<h6 class="mb-0">Danger Zone</h6>
 						</div>
-						<button type="button" class="btn btn-danger" id="SHOWTRAK_CLIENT_EDITOR_UPDATE">
+						<button type="button" class="btn btn-ghost text-warning" id="SHOWTRAK_CLIENT_EDITOR_UPDATE">
 							Check For Updates
 						</button>
-						<button type="button" class="btn btn-danger" id="SHOWTRAK_CLIENT_EDITOR_REMOVE">
+						<button type="button" class="btn btn-ghost text-danger" id="SHOWTRAK_CLIENT_EDITOR_REMOVE">
 							Delete Client
 						</button>
 					</div>
@@ -360,6 +360,7 @@
 		<script src="./vendors/jquery/index.js" defer></script>
 		<script src="./vendors/bootstrap/js/bootstrap.bundle.min.js" defer></script>
 		<script src="./vendors/toastify/index.js" defer></script>
+		<script src="./vendors/howler/index.min.js"></script>
 		<script src="./js/app.js" defer></script>
 	</footer>
 </html>

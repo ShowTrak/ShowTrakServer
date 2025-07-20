@@ -84,6 +84,14 @@
 	transition-duration: 100ms;
 }
 
+.btn-ghost {
+	background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.btn-ghost:hover {
+	background-color: rgba(255, 255, 255, 0.07) !important;
+}
+
 .btn-light {
 	background-color: rgba(255, 255, 255, 0.1) !important;
 	color: white !important;

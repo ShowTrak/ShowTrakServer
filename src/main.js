@@ -396,6 +396,11 @@ async function Notify(Message, Type = "info", Duration = 5000) {
 
 BroadcastManager.on("Notify", Notify)
 
+async function PlaySound(SoundName) {
+	MainWindow.webContents.send("PlaySound", SoundName);
+}
+BroadcastManager.on("PlaySound", PlaySound)
+
 app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") {
 		app.quit();

@@ -16,6 +16,26 @@ async function GetSettingValue(Key) {
 	return Setting.Value;
 }
 
+let Sounds = {
+	Notification: new Howl({
+		src: ['audio/alert_1.wav'],
+		volume: 0.5,
+	}),
+	Alert: new Howl({
+		src: ['audio/alert_2.wav'],
+		volume: 0.5,
+	}),
+	Warning: new Howl({
+		src: ['audio/alert_3.wav'],
+		volume: 0.5,
+	}),
+}
+
+window.API.PlaySound(async (SoundName) => {
+	let sound = Sounds[SoundName] || Sounds.Notification;
+	sound.play();
+})
+
 window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
 	Settings = NewSettings;
 	SettingsGroups = NewSettingsGroups;
@@ -47,7 +67,7 @@ window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
 					Set.Value = NewValue;
 					Setting.Value = NewValue;
 					await window.API.SetSetting(Setting.Key, NewValue);
-					Notify(`Turned ${Setting.Title} ${NewValue ? 'On' : 'Off'}`, 'success');
+					Notify(`[${Setting.Title}] ${NewValue ? 'Enabled' : 'Disabled'}`, NewValue ? 'success' : 'error');
 				})
 			}
 		}
@@ -623,6 +643,7 @@ async function Notify(Message, Type = "info", Duration = 5000) {
 	let Styles = {
 		info: "linear-gradient(to right, rgb(63 59 104), rgb(56 52 109))",
 		success: "linear-gradient(to right, rgb(40 167 69), rgb(30 139 54))",
+		warning: "linear-gradient(to right, rgb(255 193 7), rgb(217 130 43))",
 		error: "linear-gradient(to right, rgb(220 53 69), rgb(185 28 28))",
 	}
 
