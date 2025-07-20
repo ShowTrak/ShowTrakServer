@@ -3,6 +3,8 @@ const Logger = CreateLogger('OSC');
 
 const { Server } = require("node-osc");
 
+const { Manager: ClientManager } = require('../ClientManager');
+const { Manager: Broadcast } = require('../Broadcast');
 var OSCServer = new Server(3333, "0.0.0.0", () => {
 	console.log("OSC Server is listening");
 });
@@ -63,9 +65,10 @@ OSC.CreateRoute = (Path, Callback, Title = "Default OSC Route") => {
 };
 
 // Other
-
 OSC.CreateRoute('/ShowTrak/Shutdown', async (_Req) => {
-    return false;
+    Logger.warn('Received shutdown command via OSC');
+    Broadcast.emit('Shutdown');
+    return true;
 }, 'Close the ShowTrak Server');
 
 // Client
@@ -113,7 +116,13 @@ OSC.CreateRoute('/ShowTrak/Group/:GroupID/RunScript/:ScriptID', async (_Req) => 
 
 // All
 OSC.CreateRoute('/ShowTrak/All/WakeOnLAN', async (_Req) => {
-    return false;
+    let [Err, AllClients] = await ClientManager.GetAll()
+    if (Err) {
+        Logger.error(`Failed to get all clients: ${Err}`);
+        return false;
+    }
+    Broadcast.emit('OSCBulkAction', 'WOL', AllClients.map(Client => Client.UUID), null)
+    return true;
 }, 'Send a WOL packet to all offline Clients');
 
 OSC.CreateRoute('/ShowTrak/All/RunScript/:ScriptID', async (_Req) => {

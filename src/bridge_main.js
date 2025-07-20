@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld("API", {
 	OpenScriptsFolder: async () => ipcRenderer.invoke("OpenScriptsFolder"),
 	BackupConfig: async () => ipcRenderer.invoke("BackupConfig"),
 	ImportConfig: async () => ipcRenderer.invoke("ImportConfig"),
+	OSCBulkAction: (Callback) =>
+		ipcRenderer.on("OSCBulkAction", (_event, Type, Targets, Args = null) => {
+			Callback(Type, Targets, Args);
+		}),
 	PlaySound: (Callback) =>
 		ipcRenderer.on("PlaySound", (_event, SoundName) => {
 			Callback(SoundName);
