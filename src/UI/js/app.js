@@ -432,6 +432,8 @@ window.API.OSCBulkAction(async (Type, Targets, Args = null) => {
 	if (Type == 'InternalScript') {
 
 	}
+	if (Type == 'Select') return Targets.map((UUID) => Select(UUID));
+	if (Type == 'Deselect') return Targets.map((UUID) => Deselect(UUID));
 })
 
 async function CloseAllModals() {

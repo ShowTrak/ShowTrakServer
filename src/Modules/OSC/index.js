@@ -72,12 +72,18 @@ OSC.CreateRoute('/ShowTrak/Shutdown', async (_Req) => {
 }, 'Close the ShowTrak Server');
 
 // Client
-OSC.CreateRoute('/ShowTrak/Client/:UUID/Select', async (_Req) => {
-    return false;
+OSC.CreateRoute('/ShowTrak/Client/:UUID/Select', async (Req) => {
+    let [Err, Client] = await ClientManager.Get(Req.UUID);
+    if (Err) return Broadcast.emit('Notify', `OSC - Invalid UUID "${Req.UUID}"`, 'error');
+    Broadcast.emit('OSCBulkAction', 'Select', [Client.UUID], null)
+    return true;
 }, 'Select a Client by their UUID');
 
-OSC.CreateRoute('/ShowTrak/Client/:UUID/Deselect', async (_Req) => {
-    return false;
+OSC.CreateRoute('/ShowTrak/Client/:UUID/Deselect', async (Req) => {
+    let [Err, Client] = await ClientManager.Get(Req.UUID);
+    if (Err) return Broadcast.emit('Notify', `OSC - Invalid UUID "${Req.UUID}"`, 'error');
+    Broadcast.emit('OSCBulkAction', 'Deselect', [Client.UUID], null)
+    return true;
 }, 'Deselect a Client by their UUID');
 
 OSC.CreateRoute('/ShowTrak/Client/:UUID/WakeOnLAN', async (_Req) => {
