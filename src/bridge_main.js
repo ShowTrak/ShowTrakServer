@@ -3,7 +3,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("API", {
 	OpenDiscordInviteLinkInBrowser: async () => ipcRenderer.invoke("OpenDiscordInviteLinkInBrowser"),
 	GetConfig: async () => ipcRenderer.invoke("Config:Get"),
+	GetSettings: async () => ipcRenderer.invoke("Settings:Get"),
 	AdoptDevice: async (UUID) => ipcRenderer.invoke("AdoptDevice", UUID),
+	CheckForUpdatesOnClient: async (UUID) => ipcRenderer.invoke("CheckForUpdatesOnClient", UUID),
 	Loaded: () => ipcRenderer.invoke("Loaded"),
 	Shutdown: () => ipcRenderer.invoke("Shutdown"),
 	GetClient: async (UUID) => ipcRenderer.invoke("GetClient", UUID),
@@ -14,6 +16,18 @@ contextBridge.exposeInMainWorld("API", {
 	OpenScriptsFolder: async () => ipcRenderer.invoke("OpenScriptsFolder"),
 	BackupConfig: async () => ipcRenderer.invoke("BackupConfig"),
 	ImportConfig: async () => ipcRenderer.invoke("ImportConfig"),
+	PlaySound: (Callback) =>
+		ipcRenderer.on("PlaySound", (_event, SoundName) => {
+			Callback(SoundName);
+		}),
+	Notify: (Callback) =>
+		ipcRenderer.on("Notify", (_event, Message, Type, Duration) => {
+			Callback(Message, Type, Duration);
+		}),
+	SetOSCList: (Callback) =>
+		ipcRenderer.on("SetOSCList", (_event, Routes) => {
+			Callback(Routes);
+		}),
 	SetDevicesPendingAdoption: (Callback) =>
 		ipcRenderer.on("SetDevicesPendingAdoption", (_event, Data) => {
 			Callback(Data);
@@ -46,6 +60,10 @@ contextBridge.exposeInMainWorld("API", {
 		ipcRenderer.on("USBDeviceRemoved", (_event, Client, Device) => {
 			Callback(Client, Device);
 		}),
+	UpdateSettings: (Callback) => ipcRenderer.on("UpdateSettings", (_event, Settings, SettingsGroupps) => {
+			Callback(Settings, SettingsGroupps);
+		}),
+	SetSetting: async (Key, Value) => ipcRenderer.invoke("SetSetting", Key, Value),
 	WakeOnLan: async (Targets) => ipcRenderer.invoke("WakeOnLan", Targets),
 	UpdateClient: async (UUID, Data) => ipcRenderer.invoke("UpdateClient", UUID, Data),
 	ExecuteScript: async (Script, Targets, ResetList) =>

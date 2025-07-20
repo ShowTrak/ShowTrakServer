@@ -28,12 +28,14 @@ const { Manager: BackupManager } = require("./Modules/BackupManager");
 const { Manager: ScriptExecutionManager } = require("./Modules/ScriptExecutionManager");
 const { Manager: WOLManager } = require("./Modules/WOLManager");
 const { Manager: BroadcastManager } = require("./Modules/Broadcast");
+const { Manager: SettingsManager } = require("./Modules/SettingsManager");
+const { OSC } = require("./Modules/OSC");
 const { Wait } = require("./Modules/Utils");
 const path = require("path");
 
 var MainWindow = null;
 
-Menu.setApplicationMenu(null);
+if (app.isPackaged) Menu.setApplicationMenu(null);
 let PreloaderWindow = null;
 app.whenReady().then(async () => {
 	if (require("electron-squirrel-startup")) return app.quit();
@@ -43,16 +45,19 @@ app.whenReady().then(async () => {
 		MainWindow = null;
 	}
 
-	app.on("web-contents-created", (_, contents) => {
-		contents.on("before-input-event", (event, input) => {
-			if (input.code == "F4" && input.alt) {
-				event.preventDefault();
-				if (!MainWindow || !MainWindow.isVisible()) return Shutdown();
-				Logger.warn("Prevented alt+f4 shutdown, passing request to agent");
-				MainWindow.webContents.send("ShutdownRequested");
-			}
+	let SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4 = await SettingsManager.GetValue("SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4")
+	if (SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4) {
+		app.on("web-contents-created", (_, contents) => {
+			contents.on("before-input-event", (event, input) => {
+				if (input.code == "F4" && input.alt) {
+					event.preventDefault();
+					if (!MainWindow || !MainWindow.isVisible()) return Shutdown();
+					Logger.warn("Prevented alt+f4 shutdown, passing request to agent");
+					MainWindow.webContents.send("ShutdownRequested");
+				}
+			});
 		});
-	});
+	}
 
 	PreloaderWindow = new BrowserWindow({
 		show: false,
@@ -64,7 +69,7 @@ app.whenReady().then(async () => {
 			preload: path.join(__dirname, "bridge_preloader.js"),
 			devTools: !app.isPackaged,
 		},
-		icon: path.join(__dirname, "images/icon.ico"),
+		icon: path.join(__dirname, "./Images/icon.ico"),
 		frame: true,
 		titleBarStyle: "hidden",
 	});
@@ -73,7 +78,7 @@ app.whenReady().then(async () => {
 		PreloaderWindow.show();
 	});
 
-	PreloaderWindow.loadFile("UI/preloader.html");
+	PreloaderWindow.loadFile(path.join(__dirname, 'UI', 'preloader.html'));
 
 	MainWindow = new BrowserWindow({
 		show: false,
@@ -86,15 +91,15 @@ app.whenReady().then(async () => {
 			preload: path.join(__dirname, "bridge_main.js"),
 			devTools: !app.isPackaged,
 		},
-		icon: path.join(__dirname, "images/icon.ico"),
+		icon: path.join(__dirname, "./Images/icon.ico"),
 		frame: true,
 		titleBarStyle: "hidden",
 	});
 
-	MainWindow.loadFile("UI/index.html").then(async () => {
+	MainWindow.loadFile(path.join(__dirname, 'UI', 'index.html')).then(async () => {
 		Logger.log("MainWindow finished loading UI");
 		UpdateAdoptionList();
-		await Wait(2000);
+		await Wait(800);
 		PreloaderWindow.close();
 		MainWindow.show();
 	});
@@ -134,11 +139,22 @@ app.whenReady().then(async () => {
 		return Config;
 	});
 
+	RPC.handle("Settings:Get", async () => {
+		let Settings = await SettingsManager.GetAll();
+		return Settings
+	});
+
 	RPC.handle("GetClient", async (_Event, UUID) => {
 		let [Err, Client] = await ClientManager.Get(UUID);
 		if (Err) return null;
 		if (!Client) return null;
 		return Client;
+	});
+
+	RPC.handle("CheckForUpdatesOnClient", async (_Event, UUID) => {
+		Logger.warn("CheckForUpdatesOnClient called for UUID:", UUID);
+		await ServerManager.ExecuteBulkRequest("UpdateSoftware", [UUID], "Check For Softawre Updates");
+		return;
 	});
 
 	RPC.handle("GetAllGroups", async (_Event) => {
@@ -209,9 +225,11 @@ app.whenReady().then(async () => {
 
 	RPC.handle("Loaded", async () => {
 		Logger.log("Application Page Hot Reloaded");
-		UpdateAdoptionList();
-		UpdateFullClientList();
-		UpdateScriptList();
+		await UpdateSettings();
+		await UpdateAdoptionList();
+		await UpdateFullClientList();
+		await UpdateScriptList();
+		await UpdateOSCList();
 		return;
 	});
 
@@ -265,6 +283,12 @@ app.whenReady().then(async () => {
 		return;
 	});
 
+	RPC.handle("SetSetting", async (_event, Key, Value) => {
+		let [Err, Setting] = await SettingsManager.Set(Key, Value);
+		if (Err) return [Err, null];
+		return [null, Setting];
+	});
+
 	app.on("activate", () => {
 		if (BrowserWindow.getAllWindows().length === 0) {
 			// TODO: Recreate the main window
@@ -273,6 +297,15 @@ app.whenReady().then(async () => {
 
 	// MainWindow.webContents.openDevTools();
 });
+
+async function UpdateSettings() {
+	if (!MainWindow || MainWindow.isDestroyed()) return;
+	let Settings = await SettingsManager.GetAll();
+	let SettingGroups = await SettingsManager.GetGroups();
+	MainWindow.webContents.send("UpdateSettings", Settings, SettingGroups);
+}
+
+BroadcastManager.on("SettingsUpdated", UpdateSettings);
 
 async function USBDeviceAdded(Client, Device) {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
@@ -317,6 +350,12 @@ async function ClientUpdated(Client) {
 
 BroadcastManager.on("ClientUpdated", ClientUpdated);
 
+async function UpdateOSCList() {
+	if (!MainWindow || MainWindow.isDestroyed()) return;
+	let Routes = OSC.GetRoutes();
+	MainWindow.webContents.send("SetOSCList", JSON.parse(JSON.stringify(Routes)));
+}
+
 async function UpdateScriptList() {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	let ScriptList = await ScriptManager.GetScripts();
@@ -350,25 +389,47 @@ async function UpdateScriptExecutions(Executions) {
 
 BroadcastManager.on("ScriptExecutionUpdated", UpdateScriptExecutions);
 
+async function Notify(Message, Type = "info", Duration = 5000) {
+	if (!MainWindow || MainWindow.isDestroyed()) return;
+	MainWindow.webContents.send("Notify", Message, Type, Duration);
+}
+
+BroadcastManager.on("Notify", Notify)
+
+async function PlaySound(SoundName) {
+	MainWindow.webContents.send("PlaySound", SoundName);
+}
+BroadcastManager.on("PlaySound", PlaySound)
+
 app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") {
 		app.quit();
 	}
 });
 
-// Prevent display sleep
 const { powerSaveBlocker } = require("electron");
+async function StartOptionalFeatures() {
+	let SYSTEM_PREVENT_DISPLAY_SLEEP = await SettingsManager.GetValue("SYSTEM_PREVENT_DISPLAY_SLEEP")
+	if (SYSTEM_PREVENT_DISPLAY_SLEEP) {
+		Logger.log("Prevent Display Sleep is enabled, starting powerSaveBlocker.");
+		powerSaveBlocker.start("prevent-display-sleep");
+	} else {
+		Logger.log("Prevent Display Sleep is disabled in settings, not starting powerSaveBlocker.");
+	}
 
-const id = powerSaveBlocker.start("prevent-display-sleep");
-console.log(powerSaveBlocker.isStarted(id));
+	let SYSTEM_AUTO_UPDATE = await SettingsManager.GetValue("SYSTEM_AUTO_UPDATE");
+	if (SYSTEM_AUTO_UPDATE) {
+		Logger.log("Automatic updates are enabled, starting update process...");
+		const { updateElectronApp } = require("update-electron-app");
+		updateElectronApp({
+			notifyUser: true,
+		});
+	} else {
+		Logger.log("Automatic updates are disabled in settings, not starting update process.");
+	}
+}
+StartOptionalFeatures()
 
 app.on("will-quit", (_event) => {
 	Logger.log("App is closing, performing cleanup...");
-	powerSaveBlocker.stop(id);
-});
-
-// Auto Updates
-const { updateElectronApp } = require("update-electron-app");
-updateElectronApp({
-	notifyUser: true,
 });

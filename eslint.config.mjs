@@ -6,7 +6,7 @@ import { defineConfig } from "eslint/config";
 
 export default defineConfig([
 	{
-		ignores: ["UI/**", "node_modules/**", "dist/**", "forge.config.mjs", ".vscode/**"],
+		ignores: ["src/UI/**", "node_modules/**", "out/**", "forge.config.mjs", ".vscode/**"],
 	},
 	{
 		files: ["**/*.{js,mjs,cjs}"],

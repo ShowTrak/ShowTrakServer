@@ -24,4 +24,12 @@ Schema.push({
     )",
 });
 
+Schema.push({
+	Name: "Settings",
+	SQL: "CREATE TABLE IF NOT EXISTS `Settings` ( \
+            Key TEXT PRIMARY KEY, \
+            Value BLOB \
+    )",
+});
+
 module.exports = Schema;

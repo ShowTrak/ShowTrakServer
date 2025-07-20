@@ -11,12 +11,13 @@
       content="default-src 'self'; script-src 'self'"
     /> -->
 		<link rel="stylesheet" href="./vendors/bootstrap/css/bootstrap.min.css" />
+		<link rel="stylesheet" type="text/css" href="./vendors/toastify/index.min.css" />
 		<link rel="stylesheet" href="./css/main.css" />
 
 		<title>ShowTrak Server</title>
 	</head>
 	<body>
-		<div class="dragbar bg-light d-flex justify-content-between align-items-center p-2">
+		<div class="dragbar bg-light d-flex justify-content-center gap-3 align-items-center p-2">
 			<img id="APPLICATION_NAVBAR_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
 			<span id="APPLICATION_NAVBAR_TITLE">ShowTrak</span>
 			<span id="APPLICATION_NAVBAR_STATUS"></span>
@@ -51,6 +52,10 @@
 						<strong class="mb-0"> ShowTrak Server </strong>
 
 						<div class="d-grid gap-2">
+							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS"> Settings </a>
+							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON">
+								OSC Dictionary
+							</a>
 							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_ADOPT_BUTTON"> Adoption </a>
 							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON">
 								Group Manager
@@ -112,6 +117,46 @@
 						<strong class="mb-0"> Group Manager </strong>
 
 						<div id="GROUP_MANAGER_GROUP_LIST" class="d-grid gap-2"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div
+			class="modal fade"
+			id="OSC_ROUTE_LIST_MODAL"
+			tabindex="-1"
+			aria-labelledby="OSC_ROUTE_LIST_MODAL_Label"
+			aria-hidden="true"
+		>
+			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable modal-lg">
+				<div class="modal-content">
+					<div class="modal-body text-center">
+						<div class="d-flex justify-content-center">
+							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+						</div>
+
+						<div id="OSC_ROUTE_LIST" class="d-grid gap-2 text-start"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div
+			class="modal fade"
+			id="SHOWTRAK_MODAL_SETTINGS"
+			tabindex="-1"
+			aria-labelledby="SHOWTRAK_MODAL_SETTINGS_Label"
+			aria-hidden="true"
+		>
+			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+				<div class="modal-content">
+					<div class="modal-body text-center">
+						<div class="d-flex justify-content-center">
+							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+						</div>
+
+						<div id="SETTINGS" class="d-grid gap-2"></div>
 					</div>
 				</div>
 			</div>
@@ -192,18 +237,16 @@
 								/>
 								<label for="CLIENT_EDITOR_NICKNAME">Nickname</label>
 							</div>
-
+							<div class="form-floating">
+								<input type="text" class="form-control disabled" id="CLIENT_EDITOR_HOSTNAME" disabled />
+								<label for="CLIENT_EDITOR_HOSTNAME">Hostname</label>
+							</div>
 							<div class="form-floating">
 								<select class="form-select" id="CLIENT_EDITOR_GROUPID">
 									<option value="0" selected>No Group</option>
 									<option value="1">Viewer</option>
 								</select>
 								<label for="CLIENT_EDITOR_GROUPID">Group</label>
-							</div>
-
-							<div class="form-floating">
-								<input type="text" class="form-control disabled" id="CLIENT_EDITOR_HOSTNAME" disabled />
-								<label for="CLIENT_EDITOR_HOSTNAME">Hostname</label>
 							</div>
 							<div class="form-floating">
 								<input type="text" class="form-control disabled" id="CLIENT_EDITOR_IP" disabled />
@@ -233,8 +276,10 @@
 						<div class="rounded-3 p-2 bg-ghost-light text-danger">
 							<h6 class="mb-0">Danger Zone</h6>
 						</div>
-
-						<button type="button" class="btn btn-danger" id="SHOWTRAK_CLIENT_EDITOR_REMOVE">
+						<button type="button" class="btn btn-ghost text-warning" id="SHOWTRAK_CLIENT_EDITOR_UPDATE">
+							Check For Updates
+						</button>
+						<button type="button" class="btn btn-ghost text-danger" id="SHOWTRAK_CLIENT_EDITOR_REMOVE">
 							Delete Client
 						</button>
 					</div>
@@ -314,6 +359,8 @@
 	<footer>
 		<script src="./vendors/jquery/index.js" defer></script>
 		<script src="./vendors/bootstrap/js/bootstrap.bundle.min.js" defer></script>
+		<script src="./vendors/toastify/index.js" defer></script>
+		<script src="./vendors/howler/index.min.js"></script>
 		<script src="./js/app.js" defer></script>
 	</footer>
 </html>

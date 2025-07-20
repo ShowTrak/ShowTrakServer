@@ -1,9 +1,9 @@
 {
 	"name": "showtrak-server",
 	"productName": "ShowTrak Server",
-	"version": "3.0.7",
+	"version": "3.1.0",
 	"description": "Simple, Free LAN PC Monitoring for arcade style environments.",
-	"main": "main.js",
+	"main": "src/main.js",
 	"scripts": {
 		"start": "electron-forge start",
 		"package": "electron-forge package",
@@ -51,6 +51,7 @@
 		"colors": "^1.4.0",
 		"electron-squirrel-startup": "^1.0.1",
 		"express": "^5.1.0",
+		"node-osc": "^9.1.7",
 		"socket.io": "^4.8.1",
 		"sqlite3": "^5.1.7",
 		"update-electron-app": "^3.1.1",

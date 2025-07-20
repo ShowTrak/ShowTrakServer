@@ -11,6 +11,11 @@
 	-webkit-user-select: none !important;
 	-moz-user-select: none !important;
 	-ms-user-select: none !important;
+	font-weight: 700;
+}
+
+#APPLICATION_NAVBAR_TITLE {
+	color: rgba(255,255,255,0.95)
 }
 
 #APPLICATION_CONTAINER {
@@ -84,6 +89,14 @@
 	transition-duration: 100ms;
 }
 
+.btn-ghost {
+	background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.btn-ghost:hover {
+	background-color: rgba(255, 255, 255, 0.07) !important;
+}
+
 .btn-light {
 	background-color: rgba(255, 255, 255, 0.1) !important;
 	color: white !important;
@@ -144,59 +157,8 @@
 	background-color: rgba(255, 255, 255, 0.03);
 }
 
-.SHOWTRAK_PC_STATUS {
-	height: 15px !important;
-}
-
-.SHOWTRAK_PC_STATUS {
-	font-size: 14px !important;
-	font-weight: 600 !important;
-	color: rgba(255, 255, 255, 0.6);
-}
-
-.SHOWTRAK_PC_STATUS > .progress:first-of-type {
-	margin-top: 0.2rem;
-}
-
-.SHOWTRAK_PC_PLACEHOLDER {
-	width: 220px;
-	display: grid;
-	border-radius: 0.5rem;
-	font-weight: 700;
-	color: rgba(255, 255, 255, 0.6);
-	padding: 2rem;
-	border: transparent 2px solid;
-	background-color: rgba(255, 255, 255, 0.03);
-	cursor: no-drop;
-}
-
-.SHOWTRAK_PC {
-	width: 220px;
-	display: grid;
-	gap: 0.1rem;
-	padding: 0.5rem;
-	border-radius: 0.5rem;
-	border: transparent 2px solid;
-	transition-duration: 200ms;
-	background-color: rgba(255, 0, 0, 0.189);
-	cursor: pointer !important;
-}
-
 .text-bold {
 	font-weight: 600 !important;
-}
-
-.SHOWTRAK_PC:hover {
-	border-color: rgba(255, 255, 255, 0.4) !important;
-}
-
-.SHOWTRAK_PC.SELECTED {
-	/* background-color: rgba(255, 22, 22, 0.1) !important; */
-	border-color: rgba(255, 255, 255, 1) !important;
-}
-
-.SHOWTRAK_PC.ONLINE {
-	background-color: rgba(26, 255, 0, 0.25) !important;
 }
 
 .progress {
@@ -342,6 +304,19 @@ small,
 	box-shadow: none !important;
 }
 
+.form-switch .form-check-input {
+    width: 2.5em;
+    margin-left: -2.5em;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e") !important;
+    background-position: left center;
+    border-radius: 2em;
+    transition: background-position .15s ease-in-out;
+    height: 1.5em;
+    background-color: rgba(154, 171, 255, 0.43);
+    border-color: transparent !important;
+	box-shadow: none !important;
+}
+
 option {
 	background-color: #212124 !important;
 	color: white !important;
@@ -350,4 +325,71 @@ option {
 
 .cursor-pointer {
 	cursor: pointer !important;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.SHOWTRAK_PC {
+	width: 220px;
+	display: grid;
+	gap: 0.1rem;
+	padding: 0.5rem;
+	border-radius: 0.5rem;
+	border: transparent 2px solid;
+	transition-duration: 200ms;
+	background-color: rgba(255, 0, 0, 0.189);
+	cursor: pointer !important;
+}
+
+.SHOWTRAK_PC:hover {
+	border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.SHOWTRAK_PC.SELECTED {
+	/* background-color: rgba(255, 22, 22, 0.1) !important; */
+	border-color: rgba(255, 255, 255, 1) !important;
+}
+
+.SHOWTRAK_PC.ONLINE {
+	background-color: rgba(26, 255, 0, 0.25) !important;
+}
+
+.SHOWTRAK_PC_STATUS {
+	height: 15px !important;
+}
+
+.SHOWTRAK_PC_STATUS {
+	font-size: 14px !important;
+	font-weight: 600 !important;
+	color: rgba(255, 255, 255, 0.6);
+}
+
+.SHOWTRAK_PC_STATUS > .progress:first-of-type {
+	margin-top: 0.2rem;
+}
+
+.SHOWTRAK_PC_PLACEHOLDER {
+	width: 220px;
+	display: grid;
+	border-radius: 0.5rem;
+	font-weight: 700;
+	color: rgba(255, 255, 255, 0.6);
+	padding: 2rem;
+	border: transparent 2px solid;
+	background-color: rgba(255, 255, 255, 0.03);
+	cursor: no-drop;
 }
