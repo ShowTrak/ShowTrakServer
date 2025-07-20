@@ -31,6 +31,8 @@ let Sounds = {
 	}),
 }
 
+
+
 window.API.PlaySound(async (SoundName) => {
 	let sound = Sounds[SoundName] || Sounds.Notification;
 	sound.play();
@@ -419,6 +421,18 @@ async function ExecuteScript(Script, Targets) {
 	await window.API.ExecuteScript(Script, Targets, true);
 	$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
 }
+
+window.API.OSCBulkAction(async (Type, Targets, Args = null) => {
+	if (Type == 'ExecuteScript') return await ExecuteScript(Args, Targets);
+	if (Type == 'WOL') {
+		window.API.WakeOnLan(Targets);
+		$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
+		return;
+	}
+	if (Type == 'InternalScript') {
+
+	}
+})
 
 async function CloseAllModals() {
 	$(".modal").modal("hide");
