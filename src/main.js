@@ -401,6 +401,17 @@ async function PlaySound(SoundName) {
 }
 BroadcastManager.on("PlaySound", PlaySound)
 
+async function HandleOSCBulkAction(Type, Targets, Args = null) {
+	if (!MainWindow || MainWindow.isDestroyed()) return;
+	MainWindow.webContents.send("OSCBulkAction", Type, Targets, Args);
+}
+
+BroadcastManager.on("OSCBulkAction", HandleOSCBulkAction)
+
+BroadcastManager.on("Shutdown", async () => {
+	app.quit();
+});
+
 app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") {
 		app.quit();

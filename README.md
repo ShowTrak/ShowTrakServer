@@ -31,6 +31,10 @@ Join our [Discord Server](https://discord.gg/DACmwsbSGW) for support
 [![Electron][Electronjs.org]][Electron-url] [![Bootstrap][Bootstrap.com]][Bootstrap-url]
 [![JQuery][JQuery.com]][JQuery-url]
 
+## Getting Started
+
+The following instructions are for installing ShowTrak Server, To install the Client monitoring application please visit [ShowTrak Client](https://github.com/ShowTrak/ShowTrakClient)
+
 ### Installation
 
 1. Download the installer from the releases page
