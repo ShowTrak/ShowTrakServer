@@ -10,7 +10,7 @@ const Manager = {
 	Init: () => {
 		const Hostname = OSManager.Hostname || "Unknown PC";
 
-		instance.publish(
+	instance.publish(
 			{
 				name: `${Hostname} - ShowTrak Server V3`,
 				type: "ShowTrak",
@@ -28,7 +28,8 @@ const Manager = {
 			}
 		);
 
-		Logger.log(`Bonjour service published: ${Hostname} - ShowTrak Server V3`);
+	// TODO(macOS): Validate Bonjour/mDNS discovery and firewall prompts on macOS; adjust service options if needed.
+	Logger.log(`Bonjour service published: ${Hostname} - ShowTrak Server V3`);
 	},
 	Find: () => {
 		instance.find({ type: "ShowTrak" }, function (Service) {

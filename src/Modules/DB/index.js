@@ -4,6 +4,7 @@ const Logger = CreateLogger("DB");
 const { Manager: AppDataManager } = require("../AppData");
 
 const sqlite3 = require("sqlite3").verbose();
+// TODO(macOS): Ensure Electron Rebuild covers darwin (arm64/x64). On Apple Silicon, Xcode CLT may be required to build sqlite3 if prebuilt not available.
 const path = require("path");
 
 const DatabasePath = AppDataManager.GetStorageDirectory();

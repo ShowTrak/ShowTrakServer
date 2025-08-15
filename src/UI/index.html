@@ -57,7 +57,6 @@
 			<div id="ALERTS_TRAY" class="alerts-tray no-drag" aria-live="polite" aria-label="Alerts" hidden>
 			<div class="alerts-header">
 					<strong>Alerts</strong>
-					<small class="text-sm" style="opacity:0.8;">Ctrl+Y to open • Ctrl+U to clear • Esc to close</small>
 				<div class="alerts-actions">
 						<button type="button" class="btn btn-sm btn-light" id="ALERTS_DISMISS_ALL">Dismiss All (Ctrl+U)</button>
 				</div>
@@ -68,6 +67,36 @@
 		<!-- Context Menu -->
 		<div id="SHOWTRAK_CONTEXT_MENU"></div>
 		<!-- End Context Menu -->
+
+		<!-- Keyboard Shortcuts Modal -->
+		<div
+			class="modal fade"
+			id="SHOWTRAK_MODAL_SHORTCUTS"
+			tabindex="-1"
+			aria-labelledby="SHOWTRAK_MODAL_SHORTCUTS_Label"
+			aria-hidden="true"
+		>
+			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+				<div class="modal-content">
+					<div class="modal-body text-center">
+						<div class="d-flex justify-content-center">
+							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+						</div>
+
+						<strong class="mb-0"> Keyboard Shortcuts </strong>
+
+						<div id="KEYBOARD_SHORTCUTS_LIST" class="d-grid gap-2 text-start mt-2"></div>
+
+						<div class="row g-2 mt-2">
+							<div class="col-12 d-grid">
+								<button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- End Keyboard Shortcuts Modal -->
 
 		<div
 			class="modal fade"

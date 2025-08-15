@@ -2,6 +2,8 @@
 const path = require("path");
 const fs = require("fs");
 
+// TODO(macOS): Consider using ~/Library/Application Support/ShowTrakServer instead of Preferences (more standard for app data).
+// Add a simple migration if changing paths (copy/move existing data on first run).
 let BasePath =
 	process.env.APPDATA ||
 	(process.platform == "darwin" ? process.env.HOME + "/Library/Preferences" : process.env.HOME + "/.local/share");
@@ -41,6 +43,10 @@ Manager.GetStorageDirectory = () => {
 
 Manager.OpenFolder = (FolderPath) => {
 	if (fs.existsSync(FolderPath)) {
+		// TODO(macOS/Linux): Use `open` on macOS and `xdg-open` on Linux instead of Windows-only `start`.
+		// Example:
+		// const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+		// require('child_process').exec(`${opener} "${FolderPath}"`);
 		require("child_process").exec(`start "" "${FolderPath}"`);
 		return true;
 	} else {

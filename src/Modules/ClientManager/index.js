@@ -62,10 +62,6 @@ class Client {
 	async USBDeviceAdded(Device) {
 		this.USBDeviceList.push(Device);
 		BroadcastManager.emit("USBDeviceAdded", this, Device);
-		let NOTIFIY_ON_USB_DEVICE_CONNECT = await SettingsManager.GetValue("NOTIFIY_ON_USB_DEVICE_CONNECT")
-		if (NOTIFIY_ON_USB_DEVICE_CONNECT) {
-			BroadcastManager.emit("Notify", `[${this.Nickname}] Device Connected: ${Device.ManufacturerName} ${Device.ProductName}`, 'info', 15000);
-		}
 		let AUDIO_ON_USB_DEVICE_CONNECT = await SettingsManager.GetValue("AUDIO_ON_USB_DEVICE_CONNECT")
 		if (AUDIO_ON_USB_DEVICE_CONNECT) {
 			BroadcastManager.emit('PlaySound', 'Notification')
@@ -75,10 +71,6 @@ class Client {
 	async USBDeviceRemoved(Device) {
 		this.USBDeviceList = this.USBDeviceList.filter((d) => d.SerialNumber !== Device.SerialNumber);
 		BroadcastManager.emit("USBDeviceRemoved", this, Device);
-		let NOTIFIY_ON_USB_DEVICE_DISCONNECT = await SettingsManager.GetValue("NOTIFIY_ON_USB_DEVICE_DISCONNECT")
-		if (NOTIFIY_ON_USB_DEVICE_DISCONNECT) {
-			BroadcastManager.emit("Notify", `[${this.Nickname}] Device Disconnected: ${Device.ManufacturerName} ${Device.ProductName}`, 'warning', 15000);
-		}
 		let AUDIO_ON_USB_DEVICE_CONNECT = await SettingsManager.GetValue("AUDIO_ON_USB_DEVICE_DISCONNECT")
 		if (AUDIO_ON_USB_DEVICE_CONNECT) {
 			BroadcastManager.emit('PlaySound', 'Warning')

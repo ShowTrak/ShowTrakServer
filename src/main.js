@@ -7,7 +7,8 @@ const { CreateLogger } = require("./Modules/Logger");
 const Logger = CreateLogger("Main");
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
-	Logger.error("Another instance of ShowTrak Client is already running. Exiting this instance.");
+	// TODO: Message says "Client" but this app is Server. Consider updating for clarity.
+	Logger.error("Another instance of ShowTrak Server is already running. Exiting this instance.");
 	app.quit();
 	process.exit(0);
 } else {
@@ -36,6 +37,9 @@ const path = require("path");
 
 var MainWindow = null;
 
+// TODO(macOS): Keep a minimal menu on macOS so standard shortcuts work.
+// Consider only removing menu on non-darwin:
+// if (app.isPackaged && process.platform !== 'darwin') Menu.setApplicationMenu(null);
 if (app.isPackaged) Menu.setApplicationMenu(null);
 let PreloaderWindow = null;
 app.whenReady().then(async () => {
@@ -70,6 +74,7 @@ app.whenReady().then(async () => {
 			preload: path.join(__dirname, "bridge_preloader.js"),
 			devTools: !app.isPackaged,
 		},
+		// TODO(macOS): Use an .icns icon on macOS or omit icon. Also standardize folder name case (Images vs images).
 		icon: path.join(__dirname, "./Images/icon.ico"),
 		frame: true,
 		titleBarStyle: "hidden",
@@ -92,6 +97,7 @@ app.whenReady().then(async () => {
 			preload: path.join(__dirname, "bridge_main.js"),
 			devTools: !app.isPackaged,
 		},
+		// TODO(macOS): Use an .icns icon on macOS or omit icon. Also standardize folder name case (Images vs images).
 		icon: path.join(__dirname, "./Images/icon.ico"),
 		frame: true,
 		titleBarStyle: "hidden",
@@ -286,6 +292,10 @@ app.whenReady().then(async () => {
 	RPC.handle("OpenLogsFolder", async (_event) => {
 		let LogsPath = AppDataManager.GetLogsDirectory();
 		Logger.log("Opening logs folder:", LogsPath);
+		// TODO(macOS/Linux): Replace Windows-only `start` with cross-platform opener (open/xdg-open).
+		// Example:
+		// const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+		// require('child_process').exec(`${opener} "${LogsPath}"`);
 		require("child_process").exec(`start ${LogsPath}`);
 		return;
 	});
@@ -293,6 +303,7 @@ app.whenReady().then(async () => {
 	RPC.handle("OpenScriptsFolder", async (_event) => {
 		let LogsPath = AppDataManager.GetScriptsDirectory();
 		Logger.log("Opening scrippts folder:", LogsPath);
+		// TODO(macOS/Linux): Replace Windows-only `start` with cross-platform opener (open/xdg-open). See comment above.
 		require("child_process").exec(`start ${LogsPath}`);
 		return;
 	});
@@ -312,7 +323,8 @@ app.whenReady().then(async () => {
 
 	app.on("activate", () => {
 		if (BrowserWindow.getAllWindows().length === 0) {
-			// TODO: Recreate the main window
+			// TODO(macOS): Recreate/show the main window when the dock icon is clicked and no windows are open.
+			// e.g., createBrowserWindow(); or show existing hidden window.
 		}
 	});
 
