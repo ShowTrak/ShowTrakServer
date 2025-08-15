@@ -223,6 +223,10 @@ function Safe(Input) {
 }
 
 document.addEventListener("keydown", function (e) {
+	// Suppress global shortcuts while a confirmation prompt is active
+	if (window.__SHOWTRAK_CONFIRM_ACTIVE) {
+		return;
+	}
 	// Double-tap Control/Command opens context menu centered
 	if (!e.shiftKey && !e.altKey && !e.repeat && (e.key === 'Control' || e.key === 'Meta')) {
 		const now = Date.now();
@@ -1119,27 +1123,72 @@ async function Notify(Message, Type = "info", Duration = 5000) {
 }
 
 async function ConfirmationDialog(Message) {
-	return new Promise((resolve, reject) => {
-		$("#SHOWTRAK_CONFIRMATION_MESSAGE").text(Message);
+	return new Promise((resolve) => {
+		// Create or reuse toast container
+		const existing = document.getElementById('SHOWTRAK_CONFIRM_TOAST');
+		if (existing) { try { existing.remove(); } catch {} }
 
-		$("#SHOWTRAK_CONFIRMATION_CANCEL")
-			.off("click")
-			.on("click", () => {
-				$("#SHOWTRAL_MODAL_CONFIRMATION").modal("hide");
-				resolve(false);
-			});
-		$("#SHOWTRAK_CONFIRMATION_CONFIRM")
-			.off("click")
-			.on("click", () => {
-				$("#SHOWTRAL_MODAL_CONFIRMATION").modal("hide");
-				resolve(true);
-			});
+		const toastHtml = `
+			<div id="SHOWTRAK_CONFIRM_TOAST" role="dialog" aria-live="assertive" aria-modal="true" class="confirm-toast no-drag">
+				<div class="confirm-toast-body">
+					<div class="confirm-toast-msg">${Safe(Message)}</div>
+					<div class="confirm-toast-actions">
+						<button type="button" class="btn btn-sm btn-secondary" id="CONFIRM_TOAST_CANCEL" tabindex="0">Cancel</button>
+						<button type="button" class="btn btn-sm btn-danger" id="CONFIRM_TOAST_CONFIRM" tabindex="0">Confirm</button>
+					</div>
+				</div>
+			</div>`;
 
-		$("#SHOWTRAL_MODAL_CONFIRMATION").modal({
-			backdrop: "static",
-			keyboard: false,
+		$("body").append(toastHtml);
+		const $toast = $("#SHOWTRAK_CONFIRM_TOAST");
+		const $btnCancel = $("#CONFIRM_TOAST_CANCEL");
+		const $btnConfirm = $("#CONFIRM_TOAST_CONFIRM");
+
+		window.__SHOWTRAK_CONFIRM_ACTIVE = true;
+
+		const cleanup = () => {
+			$(document).off('keydown.confirmToast');
+			$btnCancel.off('click.confirmToast');
+			$btnConfirm.off('click.confirmToast');
+			try { $toast.remove(); } catch {}
+			window.__SHOWTRAK_CONFIRM_ACTIVE = false;
+		};
+
+		$btnCancel.on('click.confirmToast', () => { cleanup(); resolve(false); });
+		$btnConfirm.on('click.confirmToast', () => { cleanup(); resolve(true); });
+
+		// Keyboard controls while toast is visible
+		$(document).on('keydown.confirmToast', function (e) {
+			// If context menu is open/visible, ignore Enter/Space here
+			const $ctx = $('#SHOWTRAK_CONTEXT_MENU');
+			if ($ctx && $ctx.is(':visible')) {
+				return;
+			}
+			const key = e.key;
+			if (key === 'Enter' || key === ' ') {
+				e.preventDefault();
+				const active = document.activeElement;
+				if (active === $btnConfirm.get(0)) return $btnConfirm.trigger('click');
+				if (active === $btnCancel.get(0)) return $btnCancel.trigger('click');
+				// default to confirm if focus is elsewhere
+				return $btnConfirm.trigger('click');
+			}
+			if (key === 'Escape') {
+				e.preventDefault();
+				return $btnCancel.trigger('click');
+			}
+			if (key === 'ArrowLeft') {
+				e.preventDefault();
+				return $btnCancel.trigger('focus');
+			}
+			if (key === 'ArrowRight') {
+				e.preventDefault();
+				return $btnConfirm.trigger('focus');
+			}
 		});
-		$("#SHOWTRAL_MODAL_CONFIRMATION").modal("show");
+
+		// Default focus on Confirm so Enter activates it naturally
+		setTimeout(() => { try { $btnConfirm.trigger('focus'); } catch {} }, 0);
 	});
 }
 
@@ -1480,8 +1529,13 @@ $(async function () {
 			}
 			if (key === 'Enter' || key === ' ') {
 				ev.preventDefault();
+				// Prevent bubbling to document-level handlers (e.g., confirmation toast)
+				try { ev.stopImmediatePropagation(); } catch {}
+				try { ev.stopPropagation(); } catch {}
 				if (idx >= 0) {
-					$items.eq(idx).trigger('click');
+					const $target = $items.eq(idx);
+					// Defer the click so it occurs after keydown completes
+					setTimeout(() => { try { $target.trigger('click'); } catch {} }, 0);
 				}
 				return;
 			}

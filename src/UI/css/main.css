@@ -418,6 +418,24 @@ button.btn:focus {
 	box-shadow: none !important;
 }
 
+/* Confirmation modal: restore clear keyboard focus rings */
+#SHOWTRAL_MODAL_CONFIRMATION .btn:focus,
+#SHOWTRAL_MODAL_CONFIRMATION .btn:focus-visible {
+	outline: 2px solid rgba(255,255,255,0.85) !important;
+	outline-offset: 2px !important;
+	box-shadow: 0 0 0 3px rgba(255,255,255,0.18) !important;
+}
+#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CONFIRM:focus,
+#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CONFIRM:focus-visible {
+	outline-color: rgba(220,53,69,0.95) !important; /* match .btn-danger */
+	box-shadow: 0 0 0 3px rgba(220,53,69,0.35) !important;
+}
+#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CANCEL:focus,
+#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CANCEL:focus-visible {
+	outline-color: rgba(108,117,125,0.95) !important; /* match .btn-secondary */
+	box-shadow: 0 0 0 3px rgba(108,117,125,0.35) !important;
+}
+
 /* Copy buttons inside form-floating fields */
 .form-floating.has-copy { position: relative; }
 .form-floating.has-copy .copy-field-btn {
@@ -449,6 +467,47 @@ button.btn:focus {
 	display: flex;
 	align-items: center;
 	z-index: 1000;
+}
+
+/* Compact bottom-center confirmation toast */
+#SHOWTRAK_CONFIRM_TOAST.confirm-toast {
+	position: fixed;
+	left: 50%;
+	bottom: 48px; /* sit above bottom bar */
+	transform: translateX(-50%);
+	z-index: 1100;
+	background: rgba(29, 26, 47, 0.98);
+	border: 1px solid rgba(255,255,255,0.08);
+	border-radius: 10px;
+	box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+	color: #fff;
+}
+#SHOWTRAK_CONFIRM_TOAST .confirm-toast-body {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 12px;
+	align-items: center;
+	padding: 8px 10px;
+}
+#SHOWTRAK_CONFIRM_TOAST .confirm-toast-msg {
+	font-size: 14px;
+	line-height: 1.2;
+}
+#SHOWTRAK_CONFIRM_TOAST .confirm-toast-actions {
+	display: flex;
+	gap: 8px;
+}
+#SHOWTRAK_CONFIRM_TOAST .btn { padding: 4px 10px; }
+#SHOWTRAK_CONFIRM_TOAST .btn:focus,
+#SHOWTRAK_CONFIRM_TOAST .btn:focus-visible {
+	outline: 2px solid rgba(255,255,255,0.85) !important;
+	outline-offset: 2px !important;
+	box-shadow: 0 0 0 3px rgba(255,255,255,0.18) !important;
+}
+#SHOWTRAK_CONFIRM_TOAST #CONFIRM_TOAST_CONFIRM:focus,
+#SHOWTRAK_CONFIRM_TOAST #CONFIRM_TOAST_CONFIRM:focus-visible {
+	outline-color: rgba(220,53,69,0.95) !important;
+	box-shadow: 0 0 0 3px rgba(220,53,69,0.35) !important;
 }
 
 
