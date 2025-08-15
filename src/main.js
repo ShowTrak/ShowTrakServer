@@ -378,7 +378,7 @@ async function ReinitializeSystem() {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	Logger.log("Reinitializing system...");
 	await ClientManager.ClearCache();
-	await AdoptionManager.ClearAllDevicesPendingAdopption();
+	await AdoptionManager.ClearAllDevicesPendingAdoption();
 	let [ClientsErr, Clients] = await ClientManager.GetAll();
 	if (ClientsErr) return Logger.error("Failed to fetch full client list:", ClientsErr);
 	let [GroupsErr, Groups] = await GroupManager.GetAll();

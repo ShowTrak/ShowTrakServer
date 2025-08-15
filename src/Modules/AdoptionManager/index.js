@@ -27,7 +27,7 @@ Manager.GetClientsPendingAdoption = () => {
 };
 
 // Reset the list (e.g., on reinitialize)
-Manager.ClearAllDevicesPendingAdopption = async () => {
+Manager.ClearAllDevicesPendingAdoption = async () => {
 	ClientsPendingAdoption = [];
 	BroadcastManager.emit("AdoptionListUpdated");
 	return;
