@@ -1,3 +1,7 @@
+// ScriptManager
+// - Discovers scripts from the scripts directory (one folder per script)
+// - Loads Script.json metadata and calculates checksums for all files
+// - Exposes a readonly in-memory catalog for other modules
 const { CreateLogger } = require("../Logger");
 const Logger = CreateLogger("ScriptManager");
 
@@ -9,6 +13,7 @@ const { Manager: AppDataManager } = require("../AppData");
 const { Manager: ChecksumManager } = require("../ChecksumManager");
 const { Manager: BroadcastManager } = require("../Broadcast");
 
+// Catalog cache; populated on first GetScripts() call
 var Scripts = [];
 
 class Script {
@@ -30,6 +35,7 @@ class Script {
 
 const Manager = {};
 
+// Enumerate files recursively and produce relative paths, adding a checksum later
 function RecursiveFileList(dir, baseDir = dir) {
 	let results = [];
 	var list = fs.readdirSync(dir);
@@ -87,6 +93,7 @@ Manager.GetScripts = async () => {
 			TempScripts.push(new Script(ScriptFolder, ScriptData, AllFilesInFolder));
 		} catch (err) {
 			Logger.error(`Failed to load Script.json for ${ScriptFolder}:`, err);
+			// Surface actionable feedback; prevents silent failure in the UI
 			BroadcastManager.emit('Notify', `Error in Script.json for ${ScriptFolder} Script`, 'error', 15000);
 		}
 	}
@@ -94,6 +101,7 @@ Manager.GetScripts = async () => {
 	return Scripts;
 };
 
+// Resolve a script by folder ID; ensure catalog is loaded first
 Manager.Get = async (ID) => {
 	if (Scripts.length === 0) await Manager.GetScripts();
 	const Script = Scripts.find((s) => s.ID === ID);

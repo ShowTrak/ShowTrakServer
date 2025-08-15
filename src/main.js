@@ -1,3 +1,8 @@
+// Electron main process entrypoint. Responsibilities:
+// - Enforce single-instance behavior
+// - Create and manage the Preloader and Main windows
+// - Bridge IPC between renderer and back-end managers
+// - Fan-out broadcast events to the UI (webContents.send guards everywhere)
 const { app, BrowserWindow, ipcMain: RPC, Menu } = require("electron/main");
 if (require("electron-squirrel-startup")) app.quit();
 
@@ -5,9 +10,9 @@ const { Manager: AppDataManager } = require("./Modules/AppData");
 AppDataManager.Initialize();
 const { CreateLogger } = require("./Modules/Logger");
 const Logger = CreateLogger("Main");
+// Gate multiple instances. If another instance is already running, quit early.
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
-	// TODO: Message says "Client" but this app is Server. Consider updating for clarity.
 	Logger.error("Another instance of ShowTrak Server is already running. Exiting this instance.");
 	app.quit();
 	process.exit(0);
@@ -35,11 +40,12 @@ const { Manager: ModeManager } = require("./Modules/ModeManager");
 const { Wait } = require("./Modules/Utils");
 const path = require("path");
 
+// Main UI window. Always check isDestroyed() before using.
 var MainWindow = null;
 
-// TODO(macOS): Keep a minimal menu on macOS so standard shortcuts work.
-// Consider only removing menu on non-darwin:
-// if (app.isPackaged && process.platform !== 'darwin') Menu.setApplicationMenu(null);
+// Note: Hiding the app menu disables common shortcuts on macOS. If you ship on macOS,
+// prefer to keep a minimal menu there and only remove on Windows/Linux.
+// Example: if (app.isPackaged && process.platform !== 'darwin') Menu.setApplicationMenu(null);
 if (app.isPackaged) Menu.setApplicationMenu(null);
 let PreloaderWindow = null;
 app.whenReady().then(async () => {
@@ -50,6 +56,7 @@ app.whenReady().then(async () => {
 		MainWindow = null;
 	}
 
+	// Optional safety: intercept Alt+F4 and request a graceful shutdown via the UI
 	let SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4 = await SettingsManager.GetValue("SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4")
 	if (SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4) {
 		app.on("web-contents-created", (_, contents) => {
@@ -64,6 +71,7 @@ app.whenReady().then(async () => {
 		});
 	}
 
+	// Lightweight splash that keeps the app responsive while heavy init finishes
 	PreloaderWindow = new BrowserWindow({
 		show: false,
 		backgroundColor: "#161618",
@@ -74,7 +82,7 @@ app.whenReady().then(async () => {
 			preload: path.join(__dirname, "bridge_preloader.js"),
 			devTools: !app.isPackaged,
 		},
-		// TODO(macOS): Use an .icns icon on macOS or omit icon. Also standardize folder name case (Images vs images).
+		// macOS: prefer an .icns icon or omit to use the app bundle icon.
 		icon: path.join(__dirname, "./Images/icon.ico"),
 		frame: true,
 		titleBarStyle: "hidden",
@@ -86,6 +94,7 @@ app.whenReady().then(async () => {
 
 	PreloaderWindow.loadFile(path.join(__dirname, 'UI', 'preloader.html'));
 
+	// Primary UI window. Defer showing until UI is loaded to avoid white flash.
 	MainWindow = new BrowserWindow({
 		show: false,
 		backgroundColor: "#161618",
@@ -97,7 +106,7 @@ app.whenReady().then(async () => {
 			preload: path.join(__dirname, "bridge_main.js"),
 			devTools: !app.isPackaged,
 		},
-		// TODO(macOS): Use an .icns icon on macOS or omit icon. Also standardize folder name case (Images vs images).
+		// macOS: prefer an .icns icon or omit to use the app bundle icon.
 		icon: path.join(__dirname, "./Images/icon.ico"),
 		frame: true,
 		titleBarStyle: "hidden",
@@ -105,12 +114,14 @@ app.whenReady().then(async () => {
 
 	MainWindow.loadFile(path.join(__dirname, 'UI', 'index.html')).then(async () => {
 		Logger.log("MainWindow finished loading UI");
+		// Initial payloads to hydrate renderer stores
 		UpdateAdoptionList();
 		await Wait(800);
 		PreloaderWindow.close();
 		MainWindow.show();
 	});
 
+	// Config backup/restore IPC. Returns [err, result] tuples consistently.
 	RPC.handle("BackupConfig", async () => {
 		let { canceled, filePath } = await FileSelectorManager.SaveDialog("Export ShowTrak Configuration");
 		if (canceled || !filePath) {
@@ -246,6 +257,7 @@ app.whenReady().then(async () => {
 		await Promise.allSettled(tasks);
 	});
 
+	// Renderer signaled it (re)loaded: push the current authoritative state.
 	RPC.handle("Loaded", async () => {
 		Logger.log("Application Page Hot Reloaded");
 		await UpdateSettings();
@@ -292,10 +304,7 @@ app.whenReady().then(async () => {
 	RPC.handle("OpenLogsFolder", async (_event) => {
 		let LogsPath = AppDataManager.GetLogsDirectory();
 		Logger.log("Opening logs folder:", LogsPath);
-		// TODO(macOS/Linux): Replace Windows-only `start` with cross-platform opener (open/xdg-open).
-		// Example:
-		// const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
-		// require('child_process').exec(`${opener} "${LogsPath}"`);
+		// Cross-platform open is recommended if supporting non-Windows builds (open/xdg-open/start).
 		require("child_process").exec(`start ${LogsPath}`);
 		return;
 	});
@@ -303,7 +312,7 @@ app.whenReady().then(async () => {
 	RPC.handle("OpenScriptsFolder", async (_event) => {
 		let LogsPath = AppDataManager.GetScriptsDirectory();
 		Logger.log("Opening scrippts folder:", LogsPath);
-		// TODO(macOS/Linux): Replace Windows-only `start` with cross-platform opener (open/xdg-open). See comment above.
+		// See note above re: cross-platform opener.
 		require("child_process").exec(`start ${LogsPath}`);
 		return;
 	});
@@ -323,14 +332,14 @@ app.whenReady().then(async () => {
 
 	app.on("activate", () => {
 		if (BrowserWindow.getAllWindows().length === 0) {
-			// TODO(macOS): Recreate/show the main window when the dock icon is clicked and no windows are open.
-			// e.g., createBrowserWindow(); or show existing hidden window.
+			// macOS: consider re-creating or showing a window when the dock icon is clicked.
 		}
 	});
 
 	// MainWindow.webContents.openDevTools();
 });
 
+// Push the entire settings payload and group metadata to the renderer.
 async function UpdateSettings() {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	let Settings = await SettingsManager.GetAll();
@@ -340,6 +349,7 @@ async function UpdateSettings() {
 
 BroadcastManager.on("SettingsUpdated", UpdateSettings);
 
+// USB add/remove fan-out: provide contextual client + device to the UI.
 async function USBDeviceAdded(Client, Device) {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	Logger.log(`USB Device Added to ${Client.UUID} (${Device.ManufacturerName} ${Device.ProductName})`);
@@ -363,6 +373,7 @@ async function ReadoptDevice(UUID) {
 }
 BroadcastManager.on("ReadoptDevice", ReadoptDevice);
 
+// Full re-hydration: clear caches, re-fetch, and send authoritative lists.
 async function ReinitializeSystem() {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	Logger.log("Reinitializing system...");
@@ -383,18 +394,21 @@ async function ClientUpdated(Client) {
 
 BroadcastManager.on("ClientUpdated", ClientUpdated);
 
+// OSC routes are read-only here; clone to avoid accidental mutation downstream.
 async function UpdateOSCList() {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	let Routes = OSC.GetRoutes();
 	MainWindow.webContents.send("SetOSCList", JSON.parse(JSON.stringify(Routes)));
 }
 
+// Scripts are filesystem-driven; this pushes the current catalog to the UI.
 async function UpdateScriptList() {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	let ScriptList = await ScriptManager.GetScripts();
 	MainWindow.webContents.send("SetScriptList", ScriptList);
 }
 
+// Clients + Groups form the primary topology data model used by the UI.
 async function UpdateFullClientList() {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	let [ClientsErr, Clients] = await ClientManager.GetAll();
@@ -407,6 +421,7 @@ async function UpdateFullClientList() {
 BroadcastManager.on("GroupListChanged", UpdateFullClientList);
 BroadcastManager.on("ClientListChanged", UpdateFullClientList);
 
+// Pending adoption list is ephemeral; pull from manager and push to UI.
 async function UpdateAdoptionList() {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	let DevicesPendingAdoption = AdoptionManager.GetClientsPendingAdoption();
@@ -415,6 +430,7 @@ async function UpdateAdoptionList() {
 
 BroadcastManager.on("AdoptionListUpdated", UpdateAdoptionList);
 
+// Execution queue status updates (progress, completion, errors).
 async function UpdateScriptExecutions(Executions) {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	MainWindow.webContents.send("UpdateScriptExecutions", Executions);
@@ -422,6 +438,7 @@ async function UpdateScriptExecutions(Executions) {
 
 BroadcastManager.on("ScriptExecutionUpdated", UpdateScriptExecutions);
 
+// Thin wrapper to surface system notifications in the renderer.
 async function Notify(Message, Type = "info", Duration = 5000) {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	MainWindow.webContents.send("Notify", Message, Type, Duration);
@@ -429,11 +446,13 @@ async function Notify(Message, Type = "info", Duration = 5000) {
 
 BroadcastManager.on("Notify", Notify)
 
+// UI-triggered audio feedback (short, non-blocking).
 async function PlaySound(SoundName) {
 	MainWindow.webContents.send("PlaySound", SoundName);
 }
 BroadcastManager.on("PlaySound", PlaySound)
 
+// Batch an OSC-triggered action and let the renderer decide the UX.
 async function HandleOSCBulkAction(Type, Targets, Args = null) {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	MainWindow.webContents.send("OSCBulkAction", Type, Targets, Args);
@@ -458,6 +477,7 @@ app.on("window-all-closed", () => {
 });
 
 const { powerSaveBlocker } = require("electron");
+// Feature toggles controlled by Settings: power-save blocker and auto-update.
 async function StartOptionalFeatures() {
 	let SYSTEM_PREVENT_DISPLAY_SLEEP = await SettingsManager.GetValue("SYSTEM_PREVENT_DISPLAY_SLEEP")
 	if (SYSTEM_PREVENT_DISPLAY_SLEEP) {
@@ -480,6 +500,7 @@ async function StartOptionalFeatures() {
 }
 StartOptionalFeatures()
 
+// Final shutdown hook: place for flushing buffers/closing resources if needed.
 app.on("will-quit", (_event) => {
 	Logger.log("App is closing, performing cleanup...");
 });

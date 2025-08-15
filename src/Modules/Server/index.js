@@ -1,3 +1,7 @@
+// Socket/HTTP server for ShowTrak Clients
+// - Hosts static script assets
+// - Manages Socket.IO connections per-client (room = UUID)
+// - Bridges server-originated actions to specific clients/groups
 const { CreateLogger } = require("../Logger");
 const Logger = CreateLogger("WebServer");
 
@@ -14,7 +18,7 @@ const express = require("express");
 
 const { Wait } = require("../Utils");
 
-// Create a basic HTTP server
+// HTTP server backing express + Socket.IO
 const Server = HTTP.createServer();
 
 const app = express();
@@ -23,28 +27,29 @@ const ScriptDirectory = AppDataManager.GetScriptsDirectory();
 app.use(express.static(ScriptDirectory));
 Server.on("request", app);
 
-// Initialize Socket.IO server
+// Initialize Socket.IO server with conservative timeouts
 const io = new WebServer(Server, {
 	cors: {
 		origin: "*", // Adjust as needed for security
 		methods: ["GET", "POST"],
 	},
-	connectTimeout: 4000, // 5 seconds
-	pingTimeout: 2500, // 10 seconds
-	pingInterval: 5000, // 25 seconds
+	connectTimeout: 4000,
+	pingTimeout: 2500,
+	pingInterval: 5000,
 });
 
 const Manager = {};
 
-// Handle new connections
+// Per-connection lifecycle
 io.on("connection", async (socket) => {
-	// UUID
+	// Expect clients to provide a UUID and whether they believe they are adopted
 	if (!socket.handshake.query || Object.keys(socket.handshake.query).length === 0 || !socket.handshake.query.UUID)
 		return socket.disconnect(true);
 	socket.UUID = socket.handshake.query.UUID;
 	socket.Adopted = socket.handshake.query.Adopted === "true" ? true : false;
 	Logger.log(`Client Connected As ${socket.UUID} ${socket.Adopted ? "(Adopted)" : "(Pending Adoption)"}`);
-	socket.join(socket.UUID); // Join the socket to a room with its UUID
+	// Join a room keyed by UUID so we can message specific clients
+	socket.join(socket.UUID);
 
 	// IP
 	socket.IP = socket.handshake.address;
@@ -52,7 +57,7 @@ io.on("connection", async (socket) => {
 		socket.IP = socket.IP.substring(7); // Remove IPv6 prefix if present
 	}
 
-	// Does client think it's adopted?
+	// If the client claims adoption, verify against our DB to prevent drift
 	if (socket.Adopted) {
 		let IsInDatabase = await ClientManager.Exists(socket.UUID);
 		if (!IsInDatabase) {
@@ -62,7 +67,7 @@ io.on("connection", async (socket) => {
 		}
 	}
 
-	// Client making itself discoverable as an unadopted device
+	// Unadopted devices send presence to appear in the adoption list
 	socket.on("AdoptionHeartbeat", async (Data) => {
 		await AdoptionManager.AddClientPendingAdoption(socket.UUID, socket.IP, Data);
 	});
@@ -102,6 +107,7 @@ io.on("connection", async (socket) => {
 		return;
 	});
 
+	// Cleanup on disconnect: clear adoption entry and mark offline
 	socket.on("disconnect", () => {
 		if (!socket.UUID) {
 			Logger.log("Socket disconnected without UUID:", socket.id);
@@ -117,6 +123,7 @@ io.on("connection", async (socket) => {
 	});
 });
 
+// Ask specific clients to execute a script by ID; optionally reset the queue first
 Manager.ExecuteScripts = async (ScriptID, Targets, ResetList) => {
 	if (ResetList) await ScriptExecutionManager.ClearQueue();
 	for (const UUID of Targets) {
@@ -125,6 +132,7 @@ Manager.ExecuteScripts = async (ScriptID, Targets, ResetList) => {
 	}
 };
 
+// Emit an arbitrary action to many clients with a user-friendly name for the queue UI
 Manager.ExecuteBulkRequest = async (Action, Targets, ReadableName) => {
 	if (!ReadableName) ReadableName = Action;
 	await ScriptExecutionManager.ClearQueue();
@@ -135,6 +143,7 @@ Manager.ExecuteBulkRequest = async (Action, Targets, ReadableName) => {
 	}
 };
 
+// Send a message to all sockets in a room (UUID or group ID)
 Manager.SendMessageByGroup = async (Group, Message, Data) => {
 	return io.to(Group).emit(Message, Data);
 };

@@ -1,3 +1,7 @@
+// SettingsManager
+// - Loads default settings and merges persisted overrides from DB
+// - Coerces types on read/write to keep a consistent shape across the app
+// - Emits 'SettingsUpdated' and optional per-setting events on change
 const { CreateLogger } = require("../Logger");
 const Logger = CreateLogger("Settings");
 
@@ -7,6 +11,7 @@ const { Manager: BroadcastManager } = require("../Broadcast");
 
 const { Manager: DB } = require("../DB");
 
+// In-memory cache keyed by setting.Key -> setting object
 const Settings = new Map();
 
 const Manager = [];
@@ -20,7 +25,7 @@ Manager.Init = async () => {
 		let [Err, ManualSetting] = await DB.Get("SELECT * FROM settings WHERE key = ?", [Setting.Key]);
 		if (Err) throw Err;
 
-		// Normalize value based on type
+		// Normalize value based on type so persisted strings/ints map to the declared Setting.Type
 		const normalize = (val) => {
 			switch (Setting.Type) {
 				case "BOOLEAN": {
@@ -66,7 +71,7 @@ Manager.Init = async () => {
 
 		Settings.set(NewSetting.Key, NewSetting);
 
-		// Logger.log(`Setting ${NewSetting.Key} is ${NewSetting.Value}`);
+		// Avoid log spam during boot; enable if you need verbose setting audits.
 	}
 	return;
 };
@@ -75,11 +80,13 @@ Manager.GetGroups = async () => {
     return Groups;
 }
 
+// Return a snapshot array; callers shouldn't mutate entries in-place.
 Manager.GetAll = async () => {
 	if (!Manager.Initialized) await Manager.Init();
 	return Array.from(Settings.values());
 };
 
+// Get just the setting.Value; returns null for unknown keys.
 Manager.GetValue = async (Key) => {
 	if (!Manager.Initialized) await Manager.Init();
 	let Setting = Settings.get(Key);
@@ -92,6 +99,7 @@ Manager.Get = async (Key) => {
 	return Settings.get(Key);
 };
 
+// Persist a change with strict type coercion and broadcast change events.
 Manager.Set = async (Key, Value) => {
 	if (!Manager.Initialized) await Manager.Init();
 
@@ -144,6 +152,7 @@ Manager.Set = async (Key, Value) => {
 
     BroadcastManager.emit('SettingsUpdated');
 
+	// Fire optional feature-specific follow-up event (e.g., to start/stop services)
 	if (Setting.OnUpdateEvent) BroadcastManager.emit(Setting.OnUpdateEvent);
 
 	return [null, Setting];

@@ -1,5 +1,8 @@
+// GroupManager
+// - CRUD for groups (title, weight)
+// - Reassigns clients to null on group deletion and notifies listeners
 const { CreateLogger } = require("../Logger");
-const Logger = CreateLogger("ClientManager");
+const Logger = CreateLogger("GroupManager");
 
 // const { Config } = require('../Config');
 
@@ -18,7 +21,7 @@ class Group {
 		this.Weight = Data.Weight || 0;
 	}
 
-	// Persistent Storage
+	// Persistent fields (DB-backed)
 	async SetTitle(Title) {
 		if (this.Title === Title) return;
 		this.Title = Title;
@@ -43,6 +46,7 @@ Manager.Create = async (Title = "New Group") => {
 	return;
 };
 
+// Delete a group and unassign any clients currently in it
 Manager.Delete = async (GroupID) => {
 	if (!GroupID) return ["GroupID is required to delete a group", null];
 	let [Err, _Res] = await DB.Run("DELETE FROM Groups WHERE GroupID = ?", [GroupID]);
@@ -63,11 +67,12 @@ Manager.Get = async (GroupID) => {
 		Logger.error("Failed to fetch group:", Err);
 		return [Err, null];
 	}
-	if (Rows.length === 0) return [null, null];
-	let Group = new Group(Rows);
-	return [null, Group];
+	if (!Rows) return [null, null];
+	const GroupObj = new Group(Rows);
+	return [null, GroupObj];
 };
 
+// Ordered by Weight descending for display purposes (heavier first)
 Manager.GetAll = async () => {
 	let [Err, Rows] = await DB.All("SELECT * FROM Groups ORDER BY Weight DESC");
 	if (Err) {

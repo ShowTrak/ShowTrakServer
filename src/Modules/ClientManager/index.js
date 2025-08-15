@@ -1,3 +1,7 @@
+// ClientManager
+// - Tracks connected clients in memory for fast updates
+// - Persists durable fields to the database (nickname, group, IP, etc.)
+// - Emits events on changes so UI and other modules remain reactive
 const { CreateLogger } = require("../Logger");
 const Logger = CreateLogger("ClientManager");
 
@@ -10,6 +14,7 @@ const { Manager: SettingsManager } = require("../SettingsManager");
 
 const Manager = {};
 
+// Hot cache of Client instances reflecting current state
 var ClientList = [];
 
 class Client {
@@ -18,7 +23,8 @@ class Client {
 		this.Nickname = Data.Nickname ? Data.Nickname : Data.Hostname;
 		this.Hostname = Data.Hostname || null;
 		this.GroupID = Data.GroupID || null;
-	this.Weight = typeof Data.Weight === 'number' ? Data.Weight : 100;
+		// Weight supports manual ordering within groups; defaults to 100 if unspecified
+		this.Weight = typeof Data.Weight === 'number' ? Data.Weight : 100;
 		this.MacAddress = Data.MacAddress || null;
 		this.Version = Data.Version || null;
 		this.IP = Data.IP || null;
@@ -34,7 +40,7 @@ class Client {
 		this.USBDeviceList = [];
 	}
 
-	// RAM Storage
+	// RAM-only fields and notifications
 	SetOnline(Online) {
 		if (this.Online === Online) return;
 		this.Online = Online;
@@ -45,13 +51,12 @@ class Client {
 	SetLastSeen(LastSeen) {
 		if (this.LastSeen === LastSeen) return;
 		this.LastSeen = LastSeen;
-		// Logger.success(`Client ${this.UUID} LastSeen updated to ${LastSeen}`);
-		// BroadcastManager.emit('ClientUpdated', this);
+		// Intentionally quiet: LastSeen is high-churn and not UI-critical.
 		return;
 	}
 	SetVitals(Vitals) {
 		this.Vitals = Vitals;
-		// Logger.debug(`Client ${this.UUID} Vitals updated`, Vitals);
+		// Broadcast vitals so UI can animate/refresh live stats.
 		BroadcastManager.emit("ClientUpdated", this);
 	}
 	SetUSBDeviceList(USBDeviceList) {
@@ -78,7 +83,7 @@ class Client {
 		return;
 	}
 
-	// Persistent Storage
+	// Persistent fields (DB-backed)
 	async SetNickname(Nickname) {
 		if (this.Nickname === Nickname) return;
 		this.Nickname = Nickname;
@@ -149,6 +154,7 @@ Manager.Timeout = async (UUID) => {
 	return;
 };
 
+// Fast path for frequent telemetry: update cached client or hydrate from DB
 Manager.Heartbeat = async (UUID, Data, IP) => {
 	let CachedClient = ClientList.find((c) => c.UUID === UUID);
 	if (!CachedClient) {
@@ -201,6 +207,7 @@ Manager.USBDeviceRemoved = async (UUID, Device) => {
 	return [null, "Updated"];
 };
 
+// One-shot richer payload: hostname + NICs -> derive MAC for the active IP
 Manager.SystemInfo = async (UUID, Data, IP) => {
 	let [Err, Target] = await Manager.Get(UUID);
 	if (Err) return [Err, null];
@@ -228,6 +235,7 @@ Manager.Update = async (UUID, Data) => {
 	return true;
 };
 
+// Adopt a client by creating a durable DB row and adding to the cache
 Manager.Create = async (UUID) => {
 	// Verify if the client already exists
 	let [Err, ExistingClient] = await DB.Get("SELECT * FROM Clients WHERE UUID = ?", [UUID]);
@@ -251,6 +259,7 @@ Manager.Create = async (UUID) => {
 	BroadcastManager.emit("ClientListChanged");
 };
 
+// Unadopt or purge a client; remove from DB and cache
 Manager.Delete = async (UUID) => {
 	// Remove from database
 	let [Err, _Res] = await DB.Run("DELETE FROM Clients WHERE UUID = ?", [UUID]);
@@ -261,6 +270,7 @@ Manager.Delete = async (UUID) => {
 	return null;
 };
 
+// Truthy existence check: prefer cache, fallback to DB
 Manager.Exists = async (UUID) => {
 	// Check in memory first
 	let CachedClient = ClientList.find((c) => c.UUID === UUID);
@@ -272,6 +282,7 @@ Manager.Exists = async (UUID) => {
 	return true;
 };
 
+// Fetch a Client object (cached or hydrated); callers should not mutate DB-only fields directly
 Manager.Get = async (UUID) => {
 	// Check in memory first
 	let CachedClient = ClientList.find((c) => c.UUID === UUID);
@@ -287,6 +298,7 @@ Manager.Get = async (UUID) => {
 };
 
 Manager.Initialized = false;
+// Warm the cache from DB so early UI renders have data
 Manager.Init = async () => {
 	let [Err, Clients] = await DB.All("SELECT * FROM Clients");
 	if (Err || !Clients) {
@@ -300,6 +312,7 @@ Manager.Init = async () => {
 	return;
 }
 
+// Snapshot the current list; ensures cache is initialized first
 Manager.GetAll = async () => {
 	// Check in memory first
 	if (!Manager.Initialized) await Manager.Init();

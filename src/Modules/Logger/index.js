@@ -1,3 +1,5 @@
+// Console + file logger with colored tags; writes to daily log file under AppData.
+// Debug-level logs are suppressed in production builds via Config.Production.
 const Config = require("../Config");
 const colors = require("colors");
 const fs = require("fs");
@@ -25,7 +27,6 @@ function Pad(Text, Length = 17) {
 const Types = {
 	Info: colors.cyan(Pad("INFO")),
 	Warn: colors.magenta(Pad("WARN")),
-	Gay: colors.rainbow(Pad("GAY")),
 	Error: colors.red(Pad("ERROR")),
 	Trace: colors.magenta(Pad("TRACE")),
 	Debug: colors.grey(Pad("DEBUG")),

@@ -1,9 +1,13 @@
+// AdoptionManager
+// - Tracks devices that are discoverable but not yet adopted into the DB
+// - Provides a small in-memory list for the UI and transitions to adopted
 const { CreateLogger } = require("../Logger");
-const Logger = CreateLogger("AdopptionManager");
+const Logger = CreateLogger("AdoptionManager");
 const { Manager: BroadcastManager } = require("../Broadcast");
 
 const { Manager: ClientManager } = require("../ClientManager");
 
+// Ephemeral list of discoverable, not-yet-adopted clients
 var ClientsPendingAdoption = [];
 
 class ClientPendingAdoption {
@@ -22,12 +26,14 @@ Manager.GetClientsPendingAdoption = () => {
 	return ClientsPendingAdoption;
 };
 
+// Reset the list (e.g., on reinitialize)
 Manager.ClearAllDevicesPendingAdopption = async () => {
 	ClientsPendingAdoption = [];
 	BroadcastManager.emit("AdoptionListUpdated");
 	return;
 };
 
+// Register or refresh a device in the pending list; if already adopted, trigger readopt flow
 Manager.AddClientPendingAdoption = async (UUID, IP, Data) => {
 	let IsClientMeantToBeAdopted = await ClientManager.Exists(UUID);
 	if (IsClientMeantToBeAdopted) {
@@ -46,6 +52,7 @@ Manager.AddClientPendingAdoption = async (UUID, IP, Data) => {
 	}
 };
 
+// Update UI-visible state for a pending device (e.g., "Adopting")
 Manager.SetState = async (UUID, State) => {
 	const client = ClientsPendingAdoption.find((client) => client.UUID === UUID);
 	if (!client) {
@@ -58,6 +65,7 @@ Manager.SetState = async (UUID, State) => {
 	return;
 };
 
+// Remove a device from the pending list; safe if missing
 Manager.RemoveClientPendingAdoption = (UUID) => {
 	const index = ClientsPendingAdoption.findIndex((client) => client.UUID === UUID);
 	if (index !== -1) {

@@ -47,7 +47,7 @@ Keys
 Demo settings (in Demo group)
 - DEMO_INTEGER_EXAMPLE: INTEGER, default 10
 - DEMO_STRING_EXAMPLE: STRING, default "Hello World"
-- DEMO_OPTION_EXAMPLE: OPTION, default "Medium", options [Low, Medium, High]
+- DEMO_OPTION_EXAMPLE: OPTION, default "Medium", options `["Low", "Medium", "High"]`
 
 Notes
 - Some settings require restart (labeled in title).

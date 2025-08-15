@@ -4,13 +4,14 @@ const Logger = CreateLogger("DB");
 const { Manager: AppDataManager } = require("../AppData");
 
 const sqlite3 = require("sqlite3").verbose();
-// TODO(macOS): Ensure Electron Rebuild covers darwin (arm64/x64). On Apple Silicon, Xcode CLT may be required to build sqlite3 if prebuilt not available.
+// Note: On macOS/ARM64, ensure prebuilt sqlite3 is available or rebuild during packaging.
 const path = require("path");
 
 const DatabasePath = AppDataManager.GetStorageDirectory();
 const DatabaseFileName = "DB.sqlite";
 
 const dbPath = path.join(DatabasePath, DatabaseFileName);
+// Open DB and ensure schema exists before first use
 const DB = new sqlite3.Database(dbPath, async (err) => {
 	if (err) return Logger.error("Failed to connect to database:", err);
 	Logger.success("Connected to SQLite database.");
@@ -19,6 +20,7 @@ const DB = new sqlite3.Database(dbPath, async (err) => {
 
 const Manager = {};
 
+// Create tables idempotently using schema.js definitions
 Manager.InitializeSchema = async () => {
 	let Tables = require("./schema.js");
 	for (let Table of Tables) {
@@ -32,6 +34,7 @@ Manager.InitializeSchema = async () => {
 	}
 };
 
+// Wrapper returning [err, row] for single-row queries
 Manager.Get = async (Query, Params) => {
 	return new Promise((resolve, _reject) => {
 		DB.get(Query, Params, (err, row) => {
@@ -44,6 +47,7 @@ Manager.Get = async (Query, Params) => {
 	});
 };
 
+// Wrapper returning [err, rows] for multi-row queries
 Manager.All = async (Query, Params) => {
 	return new Promise((resolve, _reject) => {
 		DB.all(Query, Params, (err, rows) => {
@@ -56,6 +60,7 @@ Manager.All = async (Query, Params) => {
 	});
 };
 
+// Wrapper returning [err, stmt] for INSERT/UPDATE/DELETE/DDL
 Manager.Run = async (Query, Params) => {
 	return new Promise((resolve, _reject) => {
 		DB.run(Query, Params, function (err) {

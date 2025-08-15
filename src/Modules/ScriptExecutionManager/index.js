@@ -1,3 +1,6 @@
+// ScriptExecutionManager
+// - Tracks execution requests (internal tasks or client scripts)
+// - Provides queue semantics with timeouts and progress updates
 const { CreateLogger } = require("../Logger");
 const Logger = CreateLogger("ScriptExecutionManager");
 
@@ -6,6 +9,7 @@ const { Manager: ClientManager } = require("../ClientManager");
 const { Manager: BroadcastManager } = require("../Broadcast");
 const { Manager: UUIDManager } = require("../UUID");
 
+// FIFO-ish list used for UI progress; not a strict job queue
 let ScriptExecutions = [];
 
 const Manager = {};
@@ -14,11 +18,13 @@ Manager.GetAllExecutions = async () => {
 	return ScriptExecutions;
 };
 
+// Drop all pending/complete entries and notify the UI
 Manager.ClearQueue = async () => {
 	ScriptExecutions = [];
 	BroadcastManager.emit("ScriptExecutionUpdated", ScriptExecutions);
 };
 
+// Convert a pending request to Failed after Timeout ms, if still pending
 Manager.SetTimeout = (RequestID, Timeout) => {
 	setTimeout(() => {
 		let Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
@@ -34,6 +40,7 @@ Manager.SetTimeout = (RequestID, Timeout) => {
 	return;
 };
 
+// Enqueue a synthetic/internal action for a client (e.g., Wake On LAN)
 Manager.AddInternalTaskToQueue = async (UUID, TaskName) => {
 	let [Err, Client] = await ClientManager.Get(UUID);
 	if (Err || !Client) return;
@@ -63,6 +70,7 @@ Manager.AddInternalTaskToQueue = async (UUID, TaskName) => {
 	return RequestID;
 };
 
+// Enqueue a script for a client. Replace existing entry if one exists for this client.
 Manager.AddToQueue = async (UUID, ScriptID) => {
 	let Script = await ScriptManager.Get(ScriptID);
 	if (!Script) return;
@@ -103,6 +111,7 @@ Manager.AddToQueue = async (UUID, ScriptID) => {
 	return RequestID;
 };
 
+// Mark a request as completed or failed; compute duration and broadcast
 Manager.Complete = async (RequestID, Err) => {
 	let Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
 	if (Err) Logger.error(`Script execution failed for ${Request.Client.UUID}`, Err);
