@@ -1210,21 +1210,6 @@ $(async function () {
 		e.preventDefault();
 		let Options = [];
 
-		if (Selected.length == 1) {
-			Options.push({
-				Type: "Action",
-				Title: "View Client",
-				Class: "text-light",
-				Action: function () {
-					let Target = Selected[0];
-					OpenClientEditor(Target);
-				},
-			});
-			Options.push({
-				Type: "Divider",
-			});
-		}
-
 		if (Selected.length == 0) {
 			Options.push({
 				Type: "Info",
@@ -1275,7 +1260,7 @@ $(async function () {
 				});
 			}
 			let SYSTEM_ALLOW_SCRIPT_EDITS = await GetSettingValue("SYSTEM_ALLOW_SCRIPT_EDITS");
-			if (SYSTEM_ALLOW_SCRIPT_EDITS) {
+			if (SYSTEM_ALLOW_SCRIPT_EDITS && AppMode === "EDIT") {
 				Options.push({
 					Type: "Action",
 					Title: "Delete Scripts",
