@@ -380,7 +380,6 @@ async function UpdateScriptList() {
 async function UpdateFullClientList() {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	let [ClientsErr, Clients] = await ClientManager.GetAll();
-	Logger.log("CLEN", Clients.length)
 	if (ClientsErr) return Logger.error("Failed to fetch full client list:", ClientsErr);
 	let [GroupsErr, Groups] = await GroupManager.GetAll();
 	if (GroupsErr) return Logger.error("Failed to fetch client groups:", GroupsErr);

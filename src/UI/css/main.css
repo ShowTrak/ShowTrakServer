@@ -68,18 +68,25 @@
 #APP_BOTTOM_BAR .bar-section.center { justify-self: center; color: rgba(255,255,255,0.85); font-weight: 700; font-size: 12px; }
 #APP_BOTTOM_BAR .bar-section.right { justify-self: end; }
 
+/* Ensure left section content is vertically centered in the bar */
+#APP_BOTTOM_BAR .bar-section.left {
+	display: flex;
+	align-items: center;
+}
+
 /* Compact mode button group */
 .mode-group.btn-group {
 	gap: 0;
 }
 .mode-group .btn {
-	padding: 2px 8px; /* minimal padding */
-	line-height: 1.1;
+	padding: 4px 10px; /* slightly taller */
+	line-height: 1.2;
 	font-size: 12px;
 	border-width: 1px;
 	font-weight: 700; /* consistent weight to avoid width shift */
 	transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 }
+.mode-group.btn-group { align-items: center; }
 .mode-group .btn + .btn {
 	margin-left: 2px;
 }
