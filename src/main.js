@@ -4,6 +4,8 @@
 // - Bridge IPC between renderer and back-end managers
 // - Fan-out broadcast events to the UI (webContents.send guards everywhere)
 const { app, BrowserWindow, ipcMain: RPC, Menu } = require("electron/main");
+// Use Electron's shell for opening folders/URLs instead of spawning platform-specific commands
+const { shell } = require("electron");
 if (require("electron-squirrel-startup")) app.quit();
 
 const { Manager: AppDataManager } = require("./Modules/AppData");
@@ -304,23 +306,22 @@ app.whenReady().then(async () => {
 	RPC.handle("OpenLogsFolder", async (_event) => {
 		let LogsPath = AppDataManager.GetLogsDirectory();
 		Logger.log("Opening logs folder:", LogsPath);
-		// Cross-platform open is recommended if supporting non-Windows builds (open/xdg-open/start).
-		require("child_process").exec(`start ${LogsPath}`);
+		// Cross-platform and properly quoted
+		await shell.openPath(LogsPath);
 		return;
 	});
 
 	RPC.handle("OpenScriptsFolder", async (_event) => {
 		let LogsPath = AppDataManager.GetScriptsDirectory();
 		Logger.log("Opening scrippts folder:", LogsPath);
-		// See note above re: cross-platform opener.
-		require("child_process").exec(`start ${LogsPath}`);
+		// Cross-platform and properly quoted
+		await shell.openPath(LogsPath);
 		return;
 	});
 
 	RPC.handle("OpenDiscordInviteLinkInBrowser", async (_event, _URL) => {
-		var url = "https://discord.gg/DACmwsbSGW";
-		var start = process.platform == "darwin" ? "open" : process.platform == "win32" ? "start" : "xdg-open";
-		require("child_process").exec(start + " " + url);
+		const url = "https://discord.gg/DACmwsbSGW";
+		await shell.openExternal(url);
 		return;
 	});
 

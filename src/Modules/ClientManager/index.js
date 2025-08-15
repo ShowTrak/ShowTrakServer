@@ -304,6 +304,7 @@ Manager.Init = async () => {
 	if (Err || !Clients) {
 		Manager.Initialized = true;
 		ClientList = [];
+		return;
 	}
 	Clients = Clients.map((row) => new Client(row));
 	ClientList = Clients; // Update in-memory list

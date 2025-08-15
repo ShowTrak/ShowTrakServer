@@ -88,7 +88,6 @@ class Logger {
 		args.forEach(WriteToFile);
 	}
 	debug(...args) {
-		if (Config.Production) return;
 		args.forEach((arg) => console.log(Tag(this.Alias, "Debug"), arg));
 	}
 	success(...args) {

@@ -35,6 +35,21 @@ class Script {
 
 const Manager = {};
 
+// Simple bounded-concurrency runner
+async function runWithConcurrency(items, limit, worker) {
+	if (!items || items.length === 0) return;
+	const size = Math.max(1, Math.min(limit || 8, items.length));
+	let index = 0;
+	const runners = new Array(size).fill(0).map(async () => {
+		while (true) {
+			const i = index++;
+			if (i >= items.length) break;
+			await worker(items[i], i);
+		}
+	});
+	await Promise.all(runners);
+}
+
 // Enumerate files recursively and produce relative paths, adding a checksum later
 function RecursiveFileList(dir, baseDir = dir) {
 	let results = [];
@@ -83,13 +98,14 @@ Manager.GetScripts = async () => {
 		try {
 			const ScriptData = JSON.parse(fs.readFileSync(scriptJsonPath, "utf-8"));
 			const AllFilesInFolder = RecursiveFileList(path.join(ScriptsDirectory, ScriptFolder));
-			for (const File of AllFilesInFolder) {
-				if (File.Type === "file") {
-					File.Checksum = await ChecksumManager.Checksum(
-						path.join(ScriptsDirectory, ScriptFolder, File.Path)
-					);
-				}
-			}
+			const filesNeedingChecksum = AllFilesInFolder.filter((f) => f.Type === "file");
+			// Compute checksums with bounded concurrency to avoid blocking startup
+			await runWithConcurrency(filesNeedingChecksum, 8, async (File) => {
+				const sum = await ChecksumManager.Checksum(
+					path.join(ScriptsDirectory, ScriptFolder, File.Path)
+				);
+				File.Checksum = sum || null;
+			});
 			TempScripts.push(new Script(ScriptFolder, ScriptData, AllFilesInFolder));
 		} catch (err) {
 			Logger.error(`Failed to load Script.json for ${ScriptFolder}:`, err);

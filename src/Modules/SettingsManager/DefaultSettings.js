@@ -10,7 +10,7 @@ const DefaultSettings = [
     // },
     {
         Group: "Notifications",
-        Key: "NOTIFIY_ON_USB_DEVICE_CONNECT",
+        Key: "NOTIFY_ON_USB_DEVICE_CONNECT",
         Title: "Notify on USB Device Connect",
         Description: "Send a notification when a USB device connects to a client.",
         Type: "BOOLEAN",
@@ -27,7 +27,7 @@ const DefaultSettings = [
 
     {
         Group: "Notifications",
-        Key: "NOTIFIY_ON_USB_DEVICE_DISCONNECT",
+        Key: "NOTIFY_ON_USB_DEVICE_DISCONNECT",
         Title: "Notify on USB Device Disconnect",
         Description: "Send a notification when a USB device disconnects from a client.",
         Type: "BOOLEAN",

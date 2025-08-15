@@ -25,14 +25,14 @@ class Group {
 	async SetTitle(Title) {
 		if (this.Title === Title) return;
 		this.Title = Title;
-		let [Err, _Res] = await DB.Run("UPDATE Groups SET Title = ? WHERE UUID = ?", [Title, this.GroupID]);
+		let [Err, _Res] = await DB.Run("UPDATE Groups SET Title = ? WHERE GroupID = ?", [Title, this.GroupID]);
 		if (Err) return Logger.error("Failed to update group Title");
 		Logger.debug(`Group ${this.GroupID} Title updated to ${Title}`);
 	}
 	async SetWeight(Weight) {
 		if (this.Weight === Weight) return;
 		this.Weight = Weight;
-		let [Err, _Res] = await DB.Run("UPDATE Groups SET Weight = ? WHERE UUID = ?", [Weight, this.GroupID]);
+		let [Err, _Res] = await DB.Run("UPDATE Groups SET Weight = ? WHERE GroupID = ?", [Weight, this.GroupID]);
 		if (Err) return Logger.error("Failed to update group Weight");
 		Logger.debug(`Group ${this.GroupID} Weight updated to ${Weight}`);
 	}

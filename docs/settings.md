@@ -16,13 +16,13 @@ Data types
 
 Keys
 
-- NOTIFIY_ON_USB_DEVICE_CONNECT (Notifications)
+- NOTIFY_ON_USB_DEVICE_CONNECT (Notifications)
   - Type: BOOLEAN, Default: true
   - Sends toast on USB connect; may also play sound if AUDIO_* is enabled.
 - AUDIO_ON_USB_DEVICE_CONNECT (Notifications)
   - Type: BOOLEAN, Default: true
   - Plays Notification sound on USB connect.
-- NOTIFIY_ON_USB_DEVICE_DISCONNECT (Notifications)
+- NOTIFY_ON_USB_DEVICE_DISCONNECT (Notifications)
   - Type: BOOLEAN, Default: true
   - Sends toast on USB disconnect.
 - AUDIO_ON_USB_DEVICE_DISCONNECT (Notifications)
