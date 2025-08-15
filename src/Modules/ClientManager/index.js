@@ -18,6 +18,7 @@ class Client {
 		this.Nickname = Data.Nickname ? Data.Nickname : Data.Hostname;
 		this.Hostname = Data.Hostname || null;
 		this.GroupID = Data.GroupID || null;
+	this.Weight = typeof Data.Weight === 'number' ? Data.Weight : 100;
 		this.MacAddress = Data.MacAddress || null;
 		this.Version = Data.Version || null;
 		this.IP = Data.IP || null;
@@ -127,6 +128,14 @@ class Client {
 		if (Err) return Logger.error("Failed to update client version");
 		BroadcastManager.emit("ClientUpdated", this);
 		Logger.debug(`Client ${this.UUID} version updated to ${Version}`);
+	}
+	async SetWeight(Weight) {
+		if (this.Weight === Weight) return;
+		this.Weight = Weight;
+		let [Err, _Res] = await DB.Run("UPDATE Clients SET Weight = ? WHERE UUID = ?", [Weight, this.UUID]);
+		if (Err) return Logger.error("Failed to update client weight");
+		BroadcastManager.emit("ClientUpdated", this);
+		Logger.debug(`Client ${this.UUID} weight updated to ${Weight}`);
 	}
 	async SetIP(IP) {
 		if (this.IP === IP) return;
@@ -318,6 +327,29 @@ Manager.GetAll = async () => {
 
 Manager.GetClientsInGroup = async (GroupID) => {
 	return ClientList.filter((c) => c.GroupID === GroupID);
+};
+
+// Persist a specific order of clients in a group and optionally move clients into that group
+// orderedUUIDs: string[] in the desired order. Any client not in orderedUUIDs will retain existing weight.
+Manager.SetGroupOrder = async (GroupID, orderedUUIDs) => {
+	if (!Array.isArray(orderedUUIDs)) return ["Invalid orderedUUIDs", null];
+	// normalize GroupID null
+	const TargetGroupID = GroupID === undefined ? null : GroupID;
+	let weight = 10;
+	for (const uuid of orderedUUIDs) {
+		const [err, client] = await Manager.Get(uuid);
+		if (err) continue;
+		if (!client) continue;
+		// move to target group if needed
+		if (client.GroupID !== TargetGroupID) {
+			await client.SetGroupID(TargetGroupID);
+		}
+		await client.SetWeight(weight);
+		weight += 10;
+	}
+	// Emit a single list changed after batch
+	BroadcastManager.emit("ClientListChanged");
+	return [null, true];
 };
 
 Manager.ClearCache = async () => {

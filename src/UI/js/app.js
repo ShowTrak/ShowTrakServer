@@ -39,6 +39,10 @@ function RenderMode(mode) {
 // Subscribe to backend push updates
 window.API.OnModeUpdated((mode) => {
 	RenderMode(mode);
+	// Re-evaluate drag state when mode changes
+	if (typeof initializeEditInteractions === 'function') {
+		try { initializeEditInteractions(); } catch {}
+	}
 });
 
 // Wire the toggle to backend
@@ -346,7 +350,9 @@ window.API.SetFullClientList(async (Clients, Groups) => {
 	}
 
 	for (const { GroupID, Title } of Groups) {
-		let GroupClients = Clients.filter((Client) => Client.GroupID === GroupID);
+		let GroupClients = Clients
+			.filter((Client) => Client.GroupID === GroupID)
+			.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
 
 		GroupUUIDCache.set(
 			`${GroupID}`,
@@ -355,7 +361,7 @@ window.API.SetFullClientList(async (Clients, Groups) => {
 
 		if (GroupClients.length == 0 && GroupID == null) continue;
 
-		Filler += `<div class="d-flex justify-content-start">
+	Filler += `<div class="d-flex justify-content-start">
 		<div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" onclick="SelectByGroup('${GroupID}')">
 			<div class="d-flex align-items-center text-center h-100">
 				<span class="GROUP_TITLE py-2">
@@ -363,7 +369,7 @@ window.API.SetFullClientList(async (Clients, Groups) => {
 				</span>
 			</div>
 		</div>
-		<div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100">`;
+	<div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100 group-drop-zone" data-groupid="${GroupID}">`;
 
 		if (GroupClients.length == 0) {
 			Filler += `<div class="SHOWTRAK_PC_PLACEHOLDER w-100 p-3"
@@ -381,7 +387,7 @@ window.API.SetFullClientList(async (Clients, Groups) => {
 			for (const { Nickname, Hostname, IP, UUID, Version, Online, LastSeen } of GroupClients) {
 				Filler += `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${Online ? "ONLINE" : ""} ${
 					Selected.includes(UUID) ? "SELECTED" : ""
-				}" data-uuid="${UUID}">
+				}" data-uuid="${UUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
 					<button type="button" class="CLIENT_TILE_COG" aria-label="Edit Client" title="Edit Client">
 						<i class="bi bi-gear-fill"></i>
 					</button>
@@ -423,7 +429,267 @@ window.API.SetFullClientList(async (Clients, Groups) => {
 	</div>`;
 	
 	$("#APPLICATION_CONTENT").html(Filler);
+	// Initialize or teardown edit-mode interactions after render
+	if (typeof initializeEditInteractions === 'function') {
+		try { initializeEditInteractions(); } catch {}
+	}
 });
+
+// Drag & Drop reordering/move (only active in EDIT mode)
+let DnDState = { dragUUID: null, sourceGroupId: null, ghostEl: null, currentOverGroup: null, rowIndex: null };
+
+function initializeEditInteractions() {
+	const isEdit = AppMode === 'EDIT';
+	$(".SHOWTRAK_PC").attr("draggable", isEdit);
+	if (!isEdit) { teardownDnD(); return; }
+	setupDnD();
+}
+
+function teardownDnD() {
+	if (DnDState.ghostEl && DnDState.ghostEl.remove) {
+		try { DnDState.ghostEl.remove(); } catch {}
+	}
+	DnDState = { dragUUID: null, sourceGroupId: null, ghostEl: null, currentOverGroup: null, rowIndex: null };
+	$(document).off("dragstart.dnd dragend.dnd dragover.dnd dragenter.dnd dragleave.dnd drop.dnd");
+}
+
+function setupDnD() {
+	// Avoid duplicate bindings
+	$(document).off("dragstart.dnd dragend.dnd dragover.dnd dragenter.dnd dragleave.dnd drop.dnd");
+
+	$(document).on("dragstart.dnd", ".SHOWTRAK_PC", function (e) {
+		if (AppMode !== 'EDIT') return;
+		const uuid = $(this).attr('data-uuid');
+		DnDState.dragUUID = uuid;
+		const $group = $(this).closest('.group-drop-zone');
+		DnDState.sourceGroupId = normalizeGroupId($group.attr('data-groupid'));
+		try {
+			e.originalEvent.dataTransfer.setData('text/plain', uuid);
+			e.originalEvent.dataTransfer.effectAllowed = 'move';
+		} catch {}
+		$(this).addClass('dragging');
+	});
+
+	$(document).on("dragend.dnd", ".SHOWTRAK_PC", function () {
+		$(this).removeClass('dragging');
+	clearGhost();
+		if (DnDState.currentOverGroup) $(DnDState.currentOverGroup).removeClass('dnd-over');
+	DnDState.currentOverGroup = null;
+	DnDState.rowIndex = null;
+		DnDState.dragUUID = null;
+	});
+
+	$(document).on("dragover.dnd", ".group-drop-zone", function (e) {
+		if (AppMode !== 'EDIT') return;
+		e.preventDefault();
+	try { if (e.originalEvent && e.originalEvent.dataTransfer) e.originalEvent.dataTransfer.dropEffect = 'move'; } catch {}
+		const container = this;
+		if (DnDState.currentOverGroup !== container) {
+			$(DnDState.currentOverGroup).removeClass('dnd-over');
+			$(container).addClass('dnd-over');
+			DnDState.currentOverGroup = container;
+		}
+		const mouseX = e.originalEvent.clientX;
+		const mouseY = e.originalEvent.clientY;
+	positionGhostMarker(container, mouseX, mouseY);
+	});
+
+	$(document).on("dragenter.dnd", ".group-drop-zone", function () {
+		if (AppMode !== 'EDIT') return;
+		$(this).addClass('dnd-over');
+	});
+	$(document).on("dragleave.dnd", ".group-drop-zone", function (e) {
+		if (AppMode !== 'EDIT') return;
+		if (!this.contains(e.relatedTarget)) {
+			$(this).removeClass('dnd-over');
+			clearGhost();
+		}
+	});
+
+	$(document).on("drop.dnd", ".group-drop-zone", async function (e) {
+		if (AppMode !== 'EDIT') return;
+		e.preventDefault();
+		const targetGroupId = normalizeGroupId($(this).attr('data-groupid'));
+		const dragUUID = DnDState.dragUUID || (e.originalEvent.dataTransfer ? e.originalEvent.dataTransfer.getData('text/plain') : null);
+		if (!dragUUID) return;
+	const order = computeOrderWithGhost(this, dragUUID);
+	clearGhost();
+		$(this).removeClass('dnd-over');
+		DnDState.currentOverGroup = null;
+		try { await window.API.SetGroupOrder(targetGroupId, order); } catch {}
+	});
+}
+
+function normalizeGroupId(val) {
+	if (val === undefined || val === null || String(val) === 'null' || String(val) === '') return null;
+	const num = parseInt(val, 10);
+	return isNaN(num) ? null : num;
+}
+
+function createGhostEl() {
+	const el = document.createElement('div');
+	el.className = 'dnd-ghost';
+	el.setAttribute('aria-hidden', 'true');
+	el.style.pointerEvents = 'none';
+	return el;
+}
+
+function clearGhost() {
+	if (DnDState.ghostEl && DnDState.ghostEl.parentNode) {
+		DnDState.ghostEl.parentNode.removeChild(DnDState.ghostEl);
+	}
+	DnDState.ghostEl = null;
+}
+
+function positionGhostMarker(container, x, y) {
+	const tiles = Array.from(container.querySelectorAll('.SHOWTRAK_PC:not(.dragging)'))
+		.filter(el => !el.classList.contains('dnd-ghost'));
+	const HYSTERESIS_X = 6; // horizontal jitter buffer within a row
+	const ROW_TOL = 14;     // tolerance to group tiles into rows
+	const ROW_STICKY = 16;  // vertical stickiness to keep current row
+	const EDGE_X = 12;      // edge stickiness at start/end of rows
+	const EDGE_Y = 12;      // vertical edge tolerance for group start/end
+
+	if (tiles.length === 0) {
+		if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
+		DnDState.ghostEl.style.width = '220px';
+		DnDState.ghostEl.style.height = '110px';
+		container.appendChild(DnDState.ghostEl);
+		return;
+	}
+
+	// Compute rects and rows (group by top within tolerance)
+	const rects = tiles.map(t => ({ el: t, r: t.getBoundingClientRect() }))
+		.sort((a,b) => a.r.top - b.r.top || a.r.left - b.r.left);
+	const rows = [];
+	for (const o of rects) {
+		const last = rows[rows.length - 1];
+		if (!last || Math.abs(o.r.top - last.top) > ROW_TOL) {
+			rows.push({ top: o.r.top, bottom: o.r.bottom, tiles: [o], left: o.r.left, right: o.r.right });
+		} else {
+			last.tiles.push(o);
+			last.top = Math.min(last.top, o.r.top);
+			last.bottom = Math.max(last.bottom, o.r.bottom);
+			last.left = Math.min(last.left, o.r.left);
+			last.right = Math.max(last.right, o.r.right);
+		}
+	}
+	// Useful group edges
+	const firstRow = rows[0];
+	const lastRow = rows[rows.length - 1];
+
+	// Start-of-group zone: snap before first
+	const firstTile = tiles[0];
+	const firstRect = rects[0].r;
+	if ((x <= firstRow.left + EDGE_X && y <= firstRow.bottom + EDGE_Y) || (y <= firstRect.top - EDGE_Y)) {
+		if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
+		const ghost = DnDState.ghostEl;
+		ghost.style.width = `${firstRect.width}px`;
+		ghost.style.height = `${firstRect.height}px`;
+		firstTile.parentNode.insertBefore(ghost, firstTile);
+		return;
+	}
+
+	// End-of-group zone: snap after last
+	const lastTile = tiles[tiles.length - 1];
+	const lastRect = rects[rects.length - 1].r;
+	if ((x >= lastRow.right - EDGE_X && y >= lastRow.top - EDGE_Y) || (y >= lastRow.bottom - 2)) {
+		if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
+		const ghost = DnDState.ghostEl;
+		ghost.style.width = `${lastRect.width}px`;
+		ghost.style.height = `${lastRect.height}px`;
+		container.appendChild(ghost);
+		return;
+	}
+
+	// Determine active row with hysteresis
+	let rowIdx = -1;
+	// Keep previous row if cursor still within its sticky band
+	if (DnDState.rowIndex !== null && rows[DnDState.rowIndex]) {
+		const prev = rows[DnDState.rowIndex];
+		if (y >= prev.top - ROW_STICKY && y <= prev.bottom + ROW_STICKY) {
+			rowIdx = DnDState.rowIndex;
+		}
+	}
+	if (rowIdx === -1) {
+		// Prefer a row whose band contains the cursor
+		for (let i = 0; i < rows.length; i++) {
+			const rw = rows[i];
+			if (y >= rw.top - ROW_STICKY && y <= rw.bottom + ROW_STICKY) { rowIdx = i; break; }
+		}
+	}
+	if (rowIdx === -1) {
+		// Fallback: closest by vertical distance to row center
+		let bestD = Infinity;
+		for (let i = 0; i < rows.length; i++) {
+			const rw = rows[i];
+			const cy = (rw.top + rw.bottom) / 2;
+			const d = Math.abs(y - cy);
+			if (d < bestD) { bestD = d; rowIdx = i; }
+		}
+	}
+	if (rowIdx < 0) rowIdx = 0;
+	DnDState.rowIndex = rowIdx;
+
+	// Place within the selected row
+	const row = rows[rowIdx];
+	// Find nearest tile by x within the row
+	let nearest = null;
+	let nearestDist = Infinity;
+	for (const { el, r } of row.tiles) {
+		const cx = r.left + r.width / 2;
+		const d = Math.abs(x - cx);
+		if (d < nearestDist) { nearestDist = d; nearest = { tile: el, rect: r }; }
+	}
+	if (!nearest) return;
+
+	// Snap to row ends with edge stickiness
+	if (x <= row.left + EDGE_X) {
+		if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
+		const ghost = DnDState.ghostEl;
+		ghost.style.width = `${nearest.rect.width}px`;
+		ghost.style.height = `${nearest.rect.height}px`;
+		const firstInRow = row.tiles[0].el;
+		firstInRow.parentNode.insertBefore(ghost, firstInRow);
+		return;
+	}
+	if (x >= row.right - EDGE_X) {
+		if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
+		const ghost = DnDState.ghostEl;
+		ghost.style.width = `${nearest.rect.width}px`;
+		ghost.style.height = `${nearest.rect.height}px`;
+		const lastInRow = row.tiles[row.tiles.length - 1].el;
+		lastInRow.parentNode.insertBefore(ghost, lastInRow.nextSibling);
+		return;
+	}
+
+	// General within-row placement with horizontal hysteresis
+	const centerX = (nearest.rect.left + nearest.rect.right) / 2;
+	const before = x < (centerX - HYSTERESIS_X);
+	if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
+	const ghost = DnDState.ghostEl;
+	ghost.style.width = `${nearest.rect.width}px`;
+	ghost.style.height = `${nearest.rect.height}px`;
+	if (before) {
+		nearest.tile.parentNode.insertBefore(ghost, nearest.tile);
+	} else {
+		nearest.tile.parentNode.insertBefore(ghost, nearest.tile.nextSibling);
+	}
+}
+
+function computeOrderWithGhost(container, dragUUID) {
+	const children = Array.from(container.children);
+	let order = [];
+	for (const el of children) {
+		if (el.classList && el.classList.contains('dnd-ghost')) { order.push(dragUUID); continue; }
+		if (el.classList && el.classList.contains('SHOWTRAK_PC')) {
+			const id = el.getAttribute('data-uuid');
+			if (id && id !== dragUUID) order.push(id);
+		}
+	}
+	if (!order.includes(dragUUID)) order.push(dragUUID);
+	return order;
+}
 
 async function OpenOSCDictionary() {
 	await CloseAllModals();

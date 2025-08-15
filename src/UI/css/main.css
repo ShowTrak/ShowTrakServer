@@ -496,6 +496,25 @@ button.btn:focus {
 	cursor: no-drop;
 }
 
+/* Drag-and-drop visuals */
+.group-drop-zone.dnd-over {
+	outline: 2px dashed rgba(255,255,255,0.18);
+	outline-offset: -6px;
+	background-color: rgba(255,255,255,0.04) !important;
+}
+.dnd-ghost {
+	width: 220px;
+	min-height: 90px;
+	border: 2px dashed rgba(255,255,255,0.7);
+	border-radius: 8px;
+	background: transparent;
+	opacity: 0.9;
+	margin: 2px 0;
+}
+.SHOWTRAK_PC.dragging {
+	opacity: 0.6;
+}
+
 /* Edit cog overlay for client tiles (visible only in EDIT mode) */
 .CLIENT_TILE_COG {
 	position: absolute;

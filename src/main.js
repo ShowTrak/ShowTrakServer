@@ -190,6 +190,11 @@ app.whenReady().then(async () => {
 		return;
 	});
 
+	RPC.handle("SetGroupOrder", async (_Event, GroupID, OrderedUUIDs) => {
+		await ClientManager.SetGroupOrder(GroupID, OrderedUUIDs || []);
+		return true;
+	});
+
 	RPC.handle("ExecuteScript", async (_Event, Scripts, Targets, ResetList) => {
 		await ServerManager.ExecuteScripts(Scripts, Targets, ResetList);
 		return;

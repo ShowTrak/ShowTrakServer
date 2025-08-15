@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld("API", {
 	OpenScriptsFolder: async () => ipcRenderer.invoke("OpenScriptsFolder"),
 	BackupConfig: async () => ipcRenderer.invoke("BackupConfig"),
 	ImportConfig: async () => ipcRenderer.invoke("ImportConfig"),
+	SetGroupOrder: async (GroupID, OrderedUUIDs) => ipcRenderer.invoke("SetGroupOrder", GroupID, OrderedUUIDs),
 	// Application Mode API
 	GetMode: async () => ipcRenderer.invoke("Mode:Get"),
 	SetMode: async (Mode) => ipcRenderer.invoke("Mode:Set", Mode),
