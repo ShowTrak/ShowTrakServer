@@ -293,66 +293,73 @@ window.API.USBDeviceRemoved(async (Client, Device) => {
 });
 
 window.API.UpdateScriptExecutions(async (Executions) => {
+	// Close any open popovers before re-render to prevent duplicates
+	try { $('.exec-info.open').removeClass('open'); } catch {}
 	Executions = Executions.reverse();
 
+	// Determine if all executions are for the same action/script
+	const names = Array.from(new Set(Executions
+		.map(r => r && r.Script && r.Script.Name ? String(r.Script.Name).trim() : null)
+		.filter(Boolean)));
+	const uniformScriptName = names.length === 1 ? names[0] : null;
+
+	// Ensure toast exists and is visible with dynamic title
+	ShowExecutionToast(uniformScriptName || 'Script Executions');
+
+	const $list = $("#SHOWTRAK_EXECUTION_LIST");
+	if ($list.length === 0) return;
+
 	let Filler = "";
-	for (const Request of Executions) {
-		let ExtraContent = "";
 
-		let Badge = `<span class="badge bg-secondary text-light">
-            ${Safe(Request.Status)}
-        </span>`;
-		if (Request.Status == "Completed") {
-			Badge = `<span class="badge bg-secondary text-light">
-                ${Safe(Request.Timer.Duration)}ms
-            </span>
-            <span class="badge bg-success text-light">
-                ${Safe(Request.Status)}
-            </span>`;
-		}
-		if (Request.Status == "Failed") {
-			Badge = `<span class="badge bg-ghost-light text-light">
-                ${Safe(Request.Timer.Duration)}ms
-            </span>
-            <span class="badge bg-danger text-light">
-                ${Safe(Request.Status)}
-            </span>`;
-			if (Request.Error) {
-				ExtraContent = `<div class="bg-ghost p-2 text-center text-danger rounded">
-                    ${Safe(Request.Error)}
-                </div>`;
-			}
-		}
-		if (Request.Status == "Timed Out") {
-			Badge = `<span class="badge bg-danger text-light">
-                ${Safe(Request.Status)}
-            </span>`;
-
-			if (!Request.Internal) {
-				Badge =
-					`<span class="badge bg-ghost-light text-light cursor-pointer" onclick="window.API.ExecuteScript('${Request.Script.ID}', ['${Request.Client.UUID}'], false)">
-                    Retry
-                </span>` + Badge;
-			}
-		}
-
-		Filler += `<div class="d-flex justify-content-between p-2 rounded bg-ghost">
-            <div class="d-flex justify-content-start gap-2">
-            <span class="badge bg-ghost-light text-light">
-                ${Request.Client.Nickname ? Safe(Request.Client.Nickname) : Safe(Request.Client.Hostname)}
-            </span>
-            <span class="badge bg-ghost-light text-light">
-                ${Safe(Request.Script.Name)}
-            </span>
-            </div>
-            <div class="d-flex justify-content-start gap-2">
-                ${Badge}    
-            </div>
-        </div>
-        ${ExtraContent}`;
+	function durationText(ms) {
+		let cls = "text-success";
+		if (ms > 2000) cls = "text-danger";
+		else if (ms > 800) cls = "text-warning";
+		return `<small class="exec-duration ${cls}">${Safe(ms)}ms</small>`;
 	}
 
-	$("#SHOWTRAK_EXECUTIONQUEUE").html(Filler);
+	for (let i = 0; i < Executions.length; i++) {
+		const Request = Executions[i];
+		const clientName = Request.Client.Nickname ? Safe(Request.Client.Nickname) : Safe(Request.Client.Hostname);
+		const scriptName = Request.Script && Request.Script.Name ? Safe(Request.Script.Name) : '';
+		let statusBadge = ""; // Remove visual badges; use icon instead
+		let timeBadge = "";
+		let actionsHtml = ""; // right-side icon area (only rendered if non-empty)
+
+		if (Request.Timer && typeof Request.Timer.Duration === 'number') {
+			timeBadge = durationText(Request.Timer.Duration);
+		}
+
+		if (Request.Status === 'Completed') {
+			// Success check icon in the actions area
+			actionsHtml = `<span class="exec-btn-icon exec-success" role="img" aria-label="Completed"><i class="bi bi-check-circle-fill"></i></span>`;
+		}
+		else if (Request.Status === 'Failed') {
+			// Passive info icon (no click behavior)
+			actionsHtml = `<span class="exec-btn-icon" role="img" aria-label="Failed"><i class="bi bi-info-circle"></i></span>`;
+		}
+		else if (Request.Status === 'Timed Out') {
+			// Passive info icon (no click behavior)
+			actionsHtml = `<span class=\"exec-btn-icon\" role=\"img\" aria-label=\"Timed Out\"><i class=\"bi bi-info-circle\"></i></span>`;
+		}
+
+		Filler += `
+			<div class="exec-item">
+				<div class="exec-row">
+					<div class="exec-left">
+						<span class="badge bg-ghost-light text-light">${clientName}</span>
+						${uniformScriptName ? '' : `<span class="badge bg-ghost-light text-light">${scriptName}</span>`}
+					</div>
+					<div class="exec-right">
+						${timeBadge}
+						${statusBadge}
+						${actionsHtml ? `<div class=\"exec-actions\">${actionsHtml}</div>` : ''}
+					</div>
+				</div>
+			</div>`;
+	}
+
+	$list.html(Filler);
 	return;
 });
 
@@ -513,17 +520,16 @@ function setupDnD() {
 
 	$(document).on("dragend.dnd", ".SHOWTRAK_PC", function () {
 		$(this).removeClass('dragging');
-	clearGhost();
+		clearGhost();
 		if (DnDState.currentOverGroup) $(DnDState.currentOverGroup).removeClass('dnd-over');
-	DnDState.currentOverGroup = null;
-	DnDState.rowIndex = null;
+		DnDState.currentOverGroup = null;
+		DnDState.rowIndex = null;
 		DnDState.dragUUID = null;
 	});
 
 	$(document).on("dragover.dnd", ".group-drop-zone", function (e) {
 		if (AppMode !== 'EDIT') return;
 		e.preventDefault();
-	try { if (e.originalEvent && e.originalEvent.dataTransfer) e.originalEvent.dataTransfer.dropEffect = 'move'; } catch {}
 		const container = this;
 		if (DnDState.currentOverGroup !== container) {
 			$(DnDState.currentOverGroup).removeClass('dnd-over');
@@ -532,18 +538,15 @@ function setupDnD() {
 		}
 		const mouseX = e.originalEvent.clientX;
 		const mouseY = e.originalEvent.clientY;
-	positionGhostMarker(container, mouseX, mouseY);
+		positionGhostMarker(container, mouseX, mouseY);
 	});
 
-	$(document).on("dragenter.dnd", ".group-drop-zone", function () {
-		if (AppMode !== 'EDIT') return;
-		$(this).addClass('dnd-over');
-	});
 	$(document).on("dragleave.dnd", ".group-drop-zone", function (e) {
 		if (AppMode !== 'EDIT') return;
 		if (!this.contains(e.relatedTarget)) {
 			$(this).removeClass('dnd-over');
 			clearGhost();
+			DnDState.currentOverGroup = null;
 		}
 	});
 
@@ -551,10 +554,10 @@ function setupDnD() {
 		if (AppMode !== 'EDIT') return;
 		e.preventDefault();
 		const targetGroupId = normalizeGroupId($(this).attr('data-groupid'));
-		const dragUUID = DnDState.dragUUID || (e.originalEvent.dataTransfer ? e.originalEvent.dataTransfer.getData('text/plain') : null);
+		const dragUUID = DnDState.dragUUID;
 		if (!dragUUID) return;
-	const order = computeOrderWithGhost(this, dragUUID);
-	clearGhost();
+		const order = computeOrderWithGhost(this, dragUUID);
+		clearGhost();
 		$(this).removeClass('dnd-over');
 		DnDState.currentOverGroup = null;
 		try { await window.API.SetGroupOrder(targetGroupId, order); } catch {}
@@ -855,14 +858,14 @@ async function ExecuteScript(Script, Targets) {
 	let ScriptTarget = ScriptList.find((s) => s.ID === Script);
 	if (!ScriptTarget) return Notify("Script not found", "error");
 	await window.API.ExecuteScript(Script, Targets, true);
-	$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
+						ShowExecutionToast();
 }
 
 window.API.OSCBulkAction(async (Type, Targets, Args = null) => {
 	if (Type == 'ExecuteScript') return await ExecuteScript(Args, Targets);
 	if (Type == 'WOL') {
 		window.API.WakeOnLan(Targets);
-		$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
+						ShowExecutionToast();
 		return;
 	}
 	if (Type == 'InternalScript') {
@@ -1041,7 +1044,7 @@ async function OpenClientEditor(UUID) {
 		.on("click", async () => {
 			await CloseAllModals();
 			await window.API.CheckForUpdatesOnClient(UUID);
-			$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
+			ShowExecutionToast();
 		});
 
 	$("#SHOWTRAK_CLIENT_EDITOR_REMOVE")
@@ -1341,7 +1344,7 @@ $(async function () {
 					Class: "text-light",
 					Action: async function () {
 						window.API.WakeOnLan(Selected);
-						$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
+						ShowExecutionToast();
 					},
 				});
 			}
@@ -1357,7 +1360,7 @@ $(async function () {
 						);
 						if (!Confirmation) return;
 						window.API.DeleteScripts(Selected);
-						$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
+						ShowExecutionToast();
 					},
 				});
 				Options.push({
@@ -1366,7 +1369,7 @@ $(async function () {
 					Class: "text-warning",
 					Action: async function () {
 						window.API.UpdateScripts(Selected);
-						$("#SHOWTRAK_MODEL_EXECUTIONQUEUE").modal("show");
+						ShowExecutionToast();
 					},
 				});
 			}
@@ -1570,6 +1573,13 @@ $(async function () {
 		$menu.hide();
 		return;
 	});
+
+	// Close execution toast on Escape
+	$(document).on('keydown.execToast', function (e) {
+		if (e.key === 'Escape') {
+			HideExecutionToast();
+		}
+	});
 });
 
 setInterval(UpdateOfflineIndicators, 1000);
@@ -1577,6 +1587,62 @@ setInterval(UpdateOfflineIndicators, 1000);
 async function OpenAdoptionManager() {
 	await CloseAllModals();
 	$("#SHOWTRAK_MODEL_ADOPTION").modal("show");
+}
+
+function ShowExecutionToast(title) {
+	const $existing = $('#EXECUTION_TOAST');
+	if ($existing.length) {
+		$existing.addClass('show');
+		if (title) { $existing.find('.exec-toast-header .exec-title').text(title); }
+		// Bind outside click to dismiss when reused
+		enableExecToastOutsideClose();
+		return;
+	}
+	const safeTitle = title ? Safe(title) : 'Script Executions';
+	const html = `
+	<div id="EXECUTION_TOAST" class="exec-toast show no-drag" role="region" aria-live="polite" aria-label="Script executions">
+		<div class="exec-toast-header">
+			<strong class="exec-title">${safeTitle}</strong>
+			<button type="button" class="btn btn-sm btn-light exec-toast-close" aria-label="Close">✕</button>
+		</div>
+		<div id="SHOWTRAK_EXECUTION_LIST" class="exec-toast-body"></div>
+	</div>`;
+	$('body').append(html);
+	$('.exec-toast-close').on('click', () => HideExecutionToast());
+	// Bind outside click to dismiss on create
+	enableExecToastOutsideClose();
+
+	// No modal on click per requirements; ensure no handler is attached
+	$(document).off('click.execInfo', '.exec-info-btn');
+}
+
+function HideExecutionToast() {
+	const $t = $('#EXECUTION_TOAST');
+	if ($t.length) {
+		$t.removeClass('show');
+		// Remove outside-click handler when closing
+		$(document).off('mousedown.execToastOutside touchstart.execToastOutside');
+		// keep in DOM for quick reopen; remove after short delay
+		setTimeout(() => { try { $t.remove(); } catch {} }, 150);
+	}
+}
+
+// Enable click/touch outside toast to dismiss
+function enableExecToastOutsideClose() {
+	$(document)
+		.off('mousedown.execToastOutside touchstart.execToastOutside')
+		.on('mousedown.execToastOutside touchstart.execToastOutside', function (e) {
+			const $toast = $('#EXECUTION_TOAST');
+			if (!$toast.length) {
+				$(document).off('mousedown.execToastOutside touchstart.execToastOutside');
+				return;
+			}
+			const $target = $(e.target);
+			const inside = $target.closest('#EXECUTION_TOAST').length > 0;
+			if (!inside) {
+				HideExecutionToast();
+			}
+		});
 }
 
 async function Init() {
@@ -1640,5 +1706,7 @@ async function Init() {
 
 	await window.API.Loaded();
 }
+
+// Modal display removed per requirements
 
 Init();

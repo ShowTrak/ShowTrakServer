@@ -24,7 +24,8 @@ Manager.SetTimeout = (RequestID, Timeout) => {
 		let Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
 		if (!Request) return;
 		if (Request.Status === "Pending") {
-			Request.Status = "Timed Out";
+			Request.Status = "Failed";
+			Request.Error = "Script execution timed out after " + Timeout + "ms";
 		}
 		BroadcastManager.emit("ScriptExecutionUpdated", ScriptExecutions);
 	}, Timeout);

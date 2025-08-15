@@ -510,6 +510,51 @@ button.btn:focus {
 	box-shadow: 0 0 0 3px rgba(220,53,69,0.35) !important;
 }
 
+/* Right-side script execution toast */
+#EXECUTION_TOAST.exec-toast {
+	position: fixed;
+	right: 10px;
+	top: 56px; /* below top dragbar */
+	width: 360px;
+	max-height: calc(100vh - 80px);
+	overflow: auto;
+	z-index: 1100;
+	background: rgba(29, 26, 47, 0.98);
+	border: 1px solid rgba(255,255,255,0.08);
+	border-radius: 10px;
+	box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+	color: #fff;
+}
+#EXECUTION_TOAST .exec-toast-header {
+	display: flex; align-items: center; justify-content: space-between;
+	padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+#EXECUTION_TOAST .exec-toast-header .exec-toast-close {
+	line-height: 1; padding: 0 6px; font-weight: 700;
+}
+#EXECUTION_TOAST .exec-toast-body { padding: 8px; display: grid; gap: 8px; }
+
+.exec-item { background: rgba(255,255,255,0.04); border-radius: 8px; }
+.exec-row { display: flex; align-items: center; height: 2rem !important; justify-content: space-between; gap: 8px; padding: 6px 8px; }
+.exec-left { display: flex; gap: 6px; flex-wrap: wrap; }
+.exec-right { display: flex; gap: 6px; align-items: center; }
+.exec-error { margin: 0; padding: 8px; background: rgba(255,0,0,0.07); border-top: 1px solid rgba(255,255,255,0.08); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; white-space: pre-wrap; }
+.exec-toggle { padding: 2px 8px !important; }
+.exec-actions { width: 22px; display: flex; justify-content: flex-end; }
+.exec-btn-icon { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 0; background: transparent; color: #ffd86b; padding: 0; cursor: pointer; }
+.exec-btn-icon i { font-size: 14px; line-height: 1; }
+.exec-btn-icon:hover { background: transparent; }
+/* success check icon */
+.exec-success { color: #28a745; }
+/* removed exec-info popover styling; modal used instead */
+
+/* Small badge sizing harmony */
+#EXECUTION_TOAST .badge { font-size: 11px; }
+
+/* tiny duration text next to icons */
+.exec-duration { opacity: 0.9; }
+
+
 
 
 
