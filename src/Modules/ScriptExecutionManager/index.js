@@ -26,6 +26,8 @@ Manager.SetTimeout = (RequestID, Timeout) => {
 		if (Request.Status === "Pending") {
 			Request.Status = "Failed";
 			Request.Error = "Script execution timed out after " + Timeout + "ms";
+			Request.Timer.End = Date.now();
+			Request.Timer.Duration = Request.Timer.End - Request.Timer.Start;
 		}
 		BroadcastManager.emit("ScriptExecutionUpdated", ScriptExecutions);
 	}, Timeout);

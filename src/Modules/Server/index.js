@@ -120,7 +120,6 @@ io.on("connection", async (socket) => {
 Manager.ExecuteScripts = async (ScriptID, Targets, ResetList) => {
 	if (ResetList) await ScriptExecutionManager.ClearQueue();
 	for (const UUID of Targets) {
-		await Wait(75);
 		const RequestID = await ScriptExecutionManager.AddToQueue(UUID, ScriptID);
 		io.to(UUID).emit("ExecuteScript", RequestID, ScriptID);
 	}

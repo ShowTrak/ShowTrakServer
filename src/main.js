@@ -212,31 +212,32 @@ app.whenReady().then(async () => {
 
 	RPC.handle("WakeOnLan", async (_Event, List) => {
 		await ScriptExecutionManager.ClearQueue();
-		for (const UUID of List) {
+		const tasks = List.map(async (UUID) => {
 			const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, "Wake On LAN");
 			const [ClientErr, Client] = await ClientManager.Get(UUID);
 			if (ClientErr) {
 				await ScriptExecutionManager.Complete(RequestID, ClientErr);
-				continue;
+				return;
 			}
 			if (!Client) {
 				await ScriptExecutionManager.Complete(RequestID, "Client not found");
-				continue;
+				return;
 			}
 			if (!Client.MacAddress) {
 				await ScriptExecutionManager.Complete(
 					RequestID,
 					"Client does not have a valid MAC address in internal database."
 				);
-				continue;
+				return;
 			}
 			if (Client.Online) {
 				await ScriptExecutionManager.Complete(RequestID, "Client is already online");
-				continue;
+				return;
 			}
-			let [WOLErr, _Result] = await WOLManager.Wake(Client.MacAddress);
+			const [WOLErr, _Result] = await WOLManager.Wake(Client.MacAddress);
 			await ScriptExecutionManager.Complete(RequestID, WOLErr);
-		}
+		});
+		await Promise.allSettled(tasks);
 	});
 
 	RPC.handle("Loaded", async () => {

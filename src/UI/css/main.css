@@ -538,7 +538,7 @@ button.btn:focus {
 .exec-row { display: flex; align-items: center; height: 2rem !important; justify-content: space-between; gap: 8px; padding: 6px 8px; }
 .exec-left { display: flex; gap: 6px; flex-wrap: wrap; }
 .exec-right { display: flex; gap: 6px; align-items: center; }
-.exec-error { margin: 0; padding: 8px; background: rgba(255,0,0,0.07); border-top: 1px solid rgba(255,255,255,0.08); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; white-space: pre-wrap; }
+.exec-error { font-size: 10px; margin: 0; padding: 8px; background: rgba(255,0,0,0.07); border-top: 1px solid rgba(255,255,255,0.08); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; white-space: pre-wrap; }
 .exec-toggle { padding: 2px 8px !important; }
 .exec-actions { width: 22px; display: flex; justify-content: flex-end; }
 .exec-btn-icon { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 0; background: transparent; color: #ffd86b; padding: 0; cursor: pointer; }

@@ -325,6 +325,7 @@ window.API.UpdateScriptExecutions(async (Executions) => {
 		let statusBadge = ""; // Remove visual badges; use icon instead
 		let timeBadge = "";
 		let actionsHtml = ""; // right-side icon area (only rendered if non-empty)
+		let errorBlock = ""; // error details below the row
 
 		if (Request.Timer && typeof Request.Timer.Duration === 'number') {
 			timeBadge = durationText(Request.Timer.Duration);
@@ -337,10 +338,10 @@ window.API.UpdateScriptExecutions(async (Executions) => {
 		else if (Request.Status === 'Failed') {
 			// Passive info icon (no click behavior)
 			actionsHtml = `<span class="exec-btn-icon" role="img" aria-label="Failed"><i class="bi bi-info-circle"></i></span>`;
-		}
-		else if (Request.Status === 'Timed Out') {
-			// Passive info icon (no click behavior)
-			actionsHtml = `<span class=\"exec-btn-icon\" role=\"img\" aria-label=\"Timed Out\"><i class=\"bi bi-info-circle\"></i></span>`;
+			if (Request.Error) {
+				const err = Safe(Request.Error);
+				errorBlock = `<pre class="exec-error">${err}</pre>`;
+			}
 		}
 
 		Filler += `
@@ -356,6 +357,7 @@ window.API.UpdateScriptExecutions(async (Executions) => {
 						${actionsHtml ? `<div class=\"exec-actions\">${actionsHtml}</div>` : ''}
 					</div>
 				</div>
+				${errorBlock}
 			</div>`;
 	}
 
