@@ -411,6 +411,7 @@ button.btn:focus {
 	transition-duration: 200ms;
 	background-color: rgba(255, 0, 0, 0.189);
 	cursor: pointer !important;
+	position: relative; /* allow overlay positioning */
 }
 
 .SHOWTRAK_PC:hover {
@@ -451,6 +452,40 @@ button.btn:focus {
 	background-color: rgba(255, 255, 255, 0.03);
 	cursor: no-drop;
 }
+
+/* Edit cog overlay for client tiles (visible only in EDIT mode) */
+.CLIENT_TILE_COG {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	width: 26px;
+	height: 26px;
+	border-radius: 999px;
+	border: none;
+	display: grid;
+	place-items: center;
+	background: transparent;
+	color: rgba(255,255,255,0.9);
+	opacity: 0; /* hidden by default (SHOW mode) */
+	pointer-events: none; /* do not intercept clicks when hidden */
+	transform: scale(0.96);
+	transition: opacity 160ms ease, transform 160ms ease, color 160ms ease;
+	z-index: 2;
+}
+.CLIENT_TILE_COG i { font-size: 14px; line-height: 1; }
+/* Show cog only while hovering a tile in EDIT mode (no layout shift) */
+body.mode-edit .SHOWTRAK_PC:hover > .CLIENT_TILE_COG {
+	opacity: 1;
+	transform: scale(1);
+	pointer-events: auto;
+}
+/* Also show when cog is keyboard focused in EDIT mode */
+body.mode-edit .CLIENT_TILE_COG:focus-visible {
+	opacity: 1;
+	transform: scale(1);
+	pointer-events: auto;
+}
+.CLIENT_TILE_COG:hover { color: #ffffff; }
 
 /* No standalone #MODE_SWITCH positioning; switch sits in bottom bar */
 /* removed old toggle styles (.mode-switch ...) */

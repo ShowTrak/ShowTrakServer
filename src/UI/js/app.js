@@ -382,6 +382,9 @@ window.API.SetFullClientList(async (Clients, Groups) => {
 				Filler += `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${Online ? "ONLINE" : ""} ${
 					Selected.includes(UUID) ? "SELECTED" : ""
 				}" data-uuid="${UUID}">
+					<button type="button" class="CLIENT_TILE_COG" aria-label="Edit Client" title="Edit Client">
+						<i class="bi bi-gear-fill"></i>
+					</button>
 					<label class="text-sm" data-type="Hostname">
 						${Nickname && Nickname.length ? Safe(Hostname) + " - v" + Version : "v" + Version}
 					</label>
@@ -893,6 +896,17 @@ async function UpdateOfflineIndicators() {
 
 $(async function () {
 	const $menu = $("#SHOWTRAK_CONTEXT_MENU");
+
+	// Open client editor from cog without affecting selection
+	$(document).on("click", ".CLIENT_TILE_COG", function (e) {
+		e.preventDefault();
+		e.stopPropagation();
+		const uuid = $(this).closest('.SHOWTRAK_PC').attr('data-uuid');
+		if (uuid) {
+			OpenClientEditor(uuid);
+		}
+		return false;
+	});
 	$(document).on("click", ".SHOWTRAK_PC", function (e) {
 		e.preventDefault();
 		let UUID = $(this).attr("data-uuid");
