@@ -184,6 +184,18 @@
 	border-radius: 0.3rem;
 }
 
+/* Show the "+" add-group tile only in EDIT mode with a fade */
+/* Target the wrapper that specifically contains the create button */
+.GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
+	opacity: 0;
+	pointer-events: none; /* prevent clicks when hidden */
+	transition: opacity 200ms ease-in-out;
+}
+body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
+	opacity: 1;
+	pointer-events: auto;
+}
+
 .SHOWTRAK_CLIENT_PENDING_ADOPTION {
 	background-color: rgba(255, 255, 255, 0.03);
 }
