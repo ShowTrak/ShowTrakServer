@@ -20,7 +20,15 @@
 
 ## About The Project
 
-Please see the ShowTrak repo <a href="https://github.com/ShowTrak"><strong>here</strong></a>
+ShowTrak Server is an Electron application that lets you monitor and manage Windows PCs on your LAN, designed for arcade-style environments. It pairs with the ShowTrak Client and provides:
+
+- Realtime presence and vitals for clients (CPU, RAM, uptime)
+- Easy adoption workflow for new clients on the network
+- Grouping, nicknaming, and management actions
+- Script distribution and execution with progress/status queue
+- Wake-on-LAN, USB connect/disconnect notifications, and OSC control
+
+This repository contains the server UI and runtime. The companion agent runs on each client machine here: <a href="https://github.com/ShowTrak/ShowTrakClient"><strong>ShowTrak Client</strong></a>.
 
 ## Support
 
@@ -39,6 +47,60 @@ The following instructions are for installing ShowTrak Server, To install the Cl
 
 1. Download the installer from the releases page
 2. Run the installer.
+
+### Development (build from source)
+
+Prerequisites:
+- Node.js 18+ and npm
+- Windows, macOS, or Linux (Windows recommended for production packaging)
+
+Steps:
+1. Clone this repo and install dependencies.
+2. Start the Electron app using Electron Forge.
+
+Try it:
+
+```powershell
+# from the repository root
+npm install
+npm run start
+```
+
+Packaging installers (optional):
+
+```powershell
+npm run make
+```
+
+Lint:
+
+```powershell
+npm run lint
+```
+
+### Project structure (high level)
+
+- `src/main.js` – Electron main process and app lifecycle
+- `src/bridge_main.js` – Preload bridge exposing IPC-backed APIs to the renderer
+- `src/UI/` – Renderer UI (Bootstrap/jQuery)
+- `src/Modules/` – Server modules (data, network, business logic)
+  - `Server/` – Socket.IO server for client connections
+  - `ClientManager/`, `GroupManager/`, `AdoptionManager/` – core domain managers
+  - `SettingsManager/`, `DB/`, `AppData/` – settings, SQLite, and app data paths
+  - `ScriptManager/`, `ScriptExecutionManager/` – script distribution and queue
+  - `Bonjour/`, `OSC/`, `WOLManager/` – discovery, control, and wake-on-LAN
+
+See the docs below for details.
+
+## Documentation
+
+- Architecture: docs/architecture.md
+- Modules and events: docs/modules.md
+- Settings reference: docs/settings.md
+- OSC routes: docs/osc.md
+- Scripts: folder layout and Script.json: docs/scripts.md
+- Storage and database schema: docs/storage.md
+- Renderer IPC API (window.API) and channels: docs/ipc.md
 
 [Electronjs.org]: https://img.shields.io/badge/Electron-563D7C?style=for-the-badge&logo=electron&logoColor=white
 [Electron-url]: https://www.electronjs.org/
