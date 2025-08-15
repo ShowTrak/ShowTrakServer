@@ -67,6 +67,7 @@
 #APP_BOTTOM_BAR .bar-section.left { justify-self: start; }
 #APP_BOTTOM_BAR .bar-section.center { justify-self: center; color: rgba(255,255,255,0.85); font-weight: 700; font-size: 12px; }
 #APP_BOTTOM_BAR .bar-section.right { justify-self: end; }
+#APP_BOTTOM_BAR .bar-section.right { display: inline-flex; align-items: center; gap: 6px; }
 
 /* Ensure left section content is vertically centered in the bar */
 #APP_BOTTOM_BAR .bar-section.left {
@@ -132,17 +133,94 @@
 	background-color: rgba(255, 255, 255, 0.2) !important;
 }
 
-#NAVBAR_CORE_BUTTON {
-	width: 22px;
-	height: 22px;
+/* Settings button (cog icon) */
+#NAVBAR_CORE_BUTTON.settings-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 6px;
+	border: 0;
+	background: transparent;
+	color: rgba(255,255,255,0.8);
 	cursor: pointer;
-	opacity: 0.85;
-	transition: opacity .2s ease;
+	transition: color 120ms ease, transform 120ms ease;
+}
+#NAVBAR_CORE_BUTTON.settings-btn:hover { color: #fff; }
+#NAVBAR_CORE_BUTTON.settings-btn .bi { font-size: 16px; line-height: 1; }
+
+/* Alerts button next to settings */
+#ALERTS_BUTTON.alerts-btn {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	margin-right: 8px; /* space from settings cog */
+	border: 0;
+	background: transparent;
+	color: rgba(255,255,255,0.7); /* grey by default */
+	cursor: pointer;
+}
+#ALERTS_BUTTON .bi { font-size: 18px; line-height: 1; }
+#ALERTS_BUTTON .alerts-count {
+	position: absolute;
+	top: -2px;
+	right: -2px;
+	min-width: 15px;
+	height: 15px;
+	padding: 0 3px;
+	border-radius: 999px;
+	background: #ff9800;
+	color: #111;
+	font-size: 9px;
+	font-weight: 900;
+	display: grid; place-items: center;
 }
 
-#NAVBAR_CORE_BUTTON:hover {
-	opacity: 1;
+@keyframes pulse-orange {
+	0% { box-shadow: 0 0 0 0 rgba(255,152,0, 0.55); }
+	70% { box-shadow: 0 0 0 8px rgba(255,152,0, 0); }
+	100% { box-shadow: 0 0 0 0 rgba(255,152,0, 0); }
 }
+
+#ALERTS_BUTTON.has-alerts .bi { color: #ffb54d; animation: pulse-orange 1.8s infinite; }
+
+/* Alerts tray */
+#ALERTS_TRAY.alerts-tray {
+	position: fixed;
+	right: 10px;
+	bottom: 48px; /* above bottom bar */
+	width: 380px;
+	max-height: 50vh;
+	overflow: auto;
+	z-index: 1100;
+	background: rgba(29, 26, 47, 0.98);
+	border: 1px solid rgba(255,255,255,0.08);
+	border-radius: 10px;
+	box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+	color: #fff;
+}
+#ALERTS_TRAY .alerts-header { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+#ALERTS_TRAY .alerts-list { padding: 8px; display: grid; gap: 8px; }
+.alert-item {
+	display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: start;
+	background: rgba(255,255,255,0.04);
+	border: 1px solid rgba(255,255,255,0.08);
+	border-radius: 8px;
+	padding: 8px;
+}
+.alert-item .alert-icon { width: 22px; height: 22px; display: grid; place-items: center; }
+.alert-item .alert-icon i { font-size: 14px; }
+.alert-item .alert-content { font-size: 12px; line-height: 1.25; }
+.alert-item .alert-meta { opacity: 0.8; font-size: 10px; }
+.alert-item .alert-dismiss { display: inline-flex; align-items: center; gap: 6px; }
+.alert-item .btn-dismiss {
+	border: 0; background: transparent; color: rgba(255,255,255,0.9); padding: 2px 6px; border-radius: 6px;
+}
+.alert-item .btn-dismiss:hover { background: rgba(255,255,255,0.08); }
 
 .bg-ghost {
 	background-color: rgba(255, 255, 255, 0.03) !important;

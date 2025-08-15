@@ -41,11 +41,30 @@
 					<span id="SELECTION_STATUS" class="cursor-pointer" onclick="ClearSelection()">0 Clients Selected</span>
 				</div>
 				<div class="bar-section right">
-					<img id="NAVBAR_CORE_BUTTON" src="./img/settings-icon.png" alt="Settings" />
+					<button id="ALERTS_BUTTON" class="alerts-btn no-drag" title="Alerts (Ctrl+Y)" aria-label="Alerts">
+						<i class="bi bi-exclamation-triangle-fill"></i>
+						<span class="alerts-count d-none">0</span>
+					</button>
+					<button id="NAVBAR_CORE_BUTTON" class="settings-btn no-drag" title="Settings" aria-label="Settings">
+						<i class="bi bi-gear-fill"></i>
+					</button>
 				</div>
 			</div>
 		</div>
 		<!-- End Bottom Bar -->
+
+		<!-- Alerts Tray -->
+			<div id="ALERTS_TRAY" class="alerts-tray no-drag" aria-live="polite" aria-label="Alerts" hidden>
+			<div class="alerts-header">
+					<strong>Alerts</strong>
+					<small class="text-sm" style="opacity:0.8;">Ctrl+Y to open • Ctrl+U to clear • Esc to close</small>
+				<div class="alerts-actions">
+						<button type="button" class="btn btn-sm btn-light" id="ALERTS_DISMISS_ALL">Dismiss All (Ctrl+U)</button>
+				</div>
+			</div>
+			<div id="ALERTS_LIST" class="alerts-list"></div>
+		</div>
+		<!-- End Alerts Tray -->
 		<!-- Context Menu -->
 		<div id="SHOWTRAK_CONTEXT_MENU"></div>
 		<!-- End Context Menu -->
