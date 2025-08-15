@@ -691,11 +691,18 @@ async function OpenClientEditor(UUID) {
 
 	ClearSelection();
 
-	const { Nickname, Hostname, IP, Version } = Client;
+	const { Nickname, Hostname, IP, Version, MacAddress } = Client;
 
 	$("#CLIENT_EDITOR_NICKNAME").val(Nickname ? Nickname : Hostname);
 	$("#CLIENT_EDITOR_HOSTNAME").val(Hostname);
 	$("#CLIENT_EDITOR_IP").val(IP);
+	if (MacAddress && String(MacAddress).trim().length > 0) {
+		$("#CLIENT_EDITOR_MAC").val(MacAddress.toUpperCase());
+		$("#CLIENT_EDITOR_MAC_WRAPPER").removeClass("d-none");
+	} else {
+		$("#CLIENT_EDITOR_MAC").val("");
+		$("#CLIENT_EDITOR_MAC_WRAPPER").addClass("d-none");
+	}
 	$("#CLIENT_EDITOR_UUID").val(UUID);
 	$("#CLIENT_EDITOR_VERSION").val(Version);
 
