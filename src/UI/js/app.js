@@ -223,6 +223,28 @@ function Safe(Input) {
 }
 
 document.addEventListener("keydown", function (e) {
+	// Double-tap Control/Command opens context menu centered
+	if (!e.shiftKey && !e.altKey && !e.repeat && (e.key === 'Control' || e.key === 'Meta')) {
+		const now = Date.now();
+		const last = window.__SHOWTRAK_LAST_MOD_TAP || { key: null, time: 0 };
+		if (last.key === e.key && (now - last.time) <= 350) {
+			e.preventDefault();
+			try {
+				const pageWidth = $(window).width();
+				const pageHeight = $(window).height();
+				const centerX = Math.floor(pageWidth / 2);
+				const centerY = Math.floor(pageHeight / 2);
+				const evt = $.Event('contextmenu');
+				evt.pageX = centerX;
+				evt.pageY = centerY;
+				$('html').trigger(evt);
+			} catch {}
+			window.__SHOWTRAK_LAST_MOD_TAP = { key: null, time: 0 };
+			return;
+		}
+		window.__SHOWTRAK_LAST_MOD_TAP = { key: e.key, time: now };
+		// do not return; allow other handlers if any
+	}
 	if (e.key === "Escape") {
 		e.preventDefault();
 		return ClearSelection();
@@ -234,6 +256,21 @@ document.addEventListener("keydown", function (e) {
 	if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
 		e.preventDefault();
 		return ClearSelection();
+	}
+	// Open context menu via keyboard: standard Windows bindings
+	if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+		e.preventDefault();
+		try {
+			const pageWidth = $(window).width();
+			const pageHeight = $(window).height();
+			const centerX = Math.floor(pageWidth / 2);
+			const centerY = Math.floor(pageHeight / 2);
+			const evt = $.Event('contextmenu');
+			evt.pageX = centerX;
+			evt.pageY = centerY;
+			$('html').trigger(evt);
+		} catch {}
+		return;
 	}
 });
 
