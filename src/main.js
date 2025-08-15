@@ -218,13 +218,14 @@ app.whenReady().then(async () => {
 				await ScriptExecutionManager.Complete(RequestID, "Client is already online");
 				continue;
 			}
-			let [WOLErr, _Result] = await WOLManager.Wake(Client.MacAddress, 3, 100);
+			let [WOLErr, _Result] = await WOLManager.Wake(Client.MacAddress);
 			await ScriptExecutionManager.Complete(RequestID, WOLErr);
 		}
 	});
 
 	RPC.handle("Loaded", async () => {
 		Logger.log("Application Page Hot Reloaded");
+		await Wait(1000)
 		await UpdateSettings();
 		await UpdateAdoptionList();
 		await UpdateFullClientList();
@@ -365,6 +366,7 @@ async function UpdateScriptList() {
 async function UpdateFullClientList() {
 	if (!MainWindow || MainWindow.isDestroyed()) return;
 	let [ClientsErr, Clients] = await ClientManager.GetAll();
+	Logger.log("CLEN", Clients.length)
 	if (ClientsErr) return Logger.error("Failed to fetch full client list:", ClientsErr);
 	let [GroupsErr, Groups] = await GroupManager.GetAll();
 	if (GroupsErr) return Logger.error("Failed to fetch client groups:", GroupsErr);

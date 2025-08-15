@@ -285,8 +285,23 @@ Manager.Get = async (UUID) => {
 	return [null, ClientRow];
 };
 
+Manager.Initialized = false;
+Manager.Init = async () => {
+	let [Err, Clients] = await DB.All("SELECT * FROM Clients");
+	if (Err || !Clients) {
+		Manager.Initialized = true;
+		ClientList = [];
+	}
+	Clients = Clients.map((row) => new Client(row));
+	ClientList = Clients; // Update in-memory list
+	BroadcastManager.emit("ClientListChanged");
+	Manager.Initialized = true;
+	return;
+}
+
 Manager.GetAll = async () => {
 	// Check in memory first
+	if (!Manager.Initialized) await Manager.Init();
 	if (ClientList.length > 0) {
 		return [null, ClientList];
 	}
@@ -299,6 +314,7 @@ Manager.GetAll = async () => {
 	BroadcastManager.emit("ClientListChanged");
 	return [null, Clients];
 };
+
 
 Manager.GetClientsInGroup = async (GroupID) => {
 	return ClientList.filter((c) => c.GroupID === GroupID);

@@ -7,7 +7,8 @@ const wol = require("wakeonlan");
 
 const Manager = {};
 
-Manager.Wake = async (MAC, Count = 3, Interval = 100) => {
+Manager.Wake = async (MAC, Count = 20, Interval = 50) => {
+	if (!MAC) return console.log('NO MAC PROVIDED');
 	return new Promise((resolve, _reject) => {
 		wol(MAC, {
 			count: Count,
