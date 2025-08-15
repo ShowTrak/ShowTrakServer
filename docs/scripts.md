@@ -9,7 +9,7 @@ Location
 
 Folder layout
 
-```
+```text
 Scripts/
   MyScript/
     Script.json
@@ -20,7 +20,7 @@ Scripts/
 
 Script.json schema (minimal)
 
-```
+```json
 {
   "Name": "Update Client",
   "Type": "powershell", // freeform label

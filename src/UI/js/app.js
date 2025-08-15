@@ -8,6 +8,7 @@ const GroupUUIDCache = new Map();
 
 let SettingsGroups = [];
 let Settings = [];
+let SettingDebounceTimers = new Map();
 
 async function GetSettingValue(Key) {
 	if (Settings.length == 0) Settings = await window.API.GetSettings();
@@ -71,6 +72,76 @@ window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
 					await window.API.SetSetting(Setting.Key, NewValue);
 					Notify(`[${Setting.Title}] ${NewValue ? 'Enabled' : 'Disabled'}`, NewValue ? 'success' : 'error');
 				})
+			}
+			else if (Setting.Type === "STRING") {
+				$(`#SETTINGS`).append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
+					<div class="d-grid">
+						<span>${Setting.Title}</span>
+						<span class="text-sm mb-0">${Setting.Description}</span>
+					</div>
+					<input type="text" class="form-control form-control-sm bg-ghost-light text-light border-0" id="SETTING_${Setting.Key}" value="${Safe(Setting.Value)}" placeholder="Enter text..." />
+				</div>`);
+				$(`#SETTING_${Setting.Key}`).off("input").on("input", function () {
+					let el = $(this);
+					let NewValue = el.val();
+					if (SettingDebounceTimers.has(Setting.Key)) clearTimeout(SettingDebounceTimers.get(Setting.Key));
+					SettingDebounceTimers.set(Setting.Key, setTimeout(async () => {
+						if (NewValue === Setting.Value) return;
+						let Set = Settings.find((s) => s.Key === Setting.Key);
+						Set.Value = NewValue;
+						Setting.Value = NewValue;
+						await window.API.SetSetting(Setting.Key, NewValue);
+						Notify(`[${Setting.Title}] Saved`, 'success', 1200);
+					}, 600));
+				});
+			}
+			else if (Setting.Type === "INTEGER") {
+				$(`#SETTINGS`).append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
+					<div class="d-grid">
+						<span>${Setting.Title}</span>
+						<span class="text-sm mb-0">${Setting.Description}</span>
+					</div>
+					<input type="number" class="form-control form-control-sm bg-ghost-light text-light border-0" id="SETTING_${Setting.Key}" value="${Safe(Setting.Value)}" step="1" />
+				</div>`);
+				$(`#SETTING_${Setting.Key}`).off("input").on("input", function () {
+					let el = $(this);
+					let Raw = el.val();
+					if (SettingDebounceTimers.has(Setting.Key)) clearTimeout(SettingDebounceTimers.get(Setting.Key));
+					SettingDebounceTimers.set(Setting.Key, setTimeout(async () => {
+						let NewValue = parseInt(Raw, 10);
+						if (isNaN(NewValue)) NewValue = Setting.Value; // keep previous until valid
+						if (NewValue === Setting.Value) return;
+						let Set = Settings.find((s) => s.Key === Setting.Key);
+						Set.Value = NewValue;
+						Setting.Value = NewValue;
+						await window.API.SetSetting(Setting.Key, NewValue);
+						Notify(`[${Setting.Title}] Saved (${NewValue})`, 'success', 1200);
+					}, 600));
+				});
+			}
+			else if (Setting.Type === "OPTION") {
+				let optionsHtml = '';
+				if (Array.isArray(Setting.Options)) {
+					for (const opt of Setting.Options) {
+						optionsHtml += `<option value="${Safe(opt)}" ${Setting.Value === opt ? 'selected' : ''}>${Safe(opt)}</option>`;
+					}
+				}
+				$(`#SETTINGS`).append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
+					<div class="d-grid">
+						<span>${Setting.Title}</span>
+						<span class="text-sm mb-0">${Setting.Description}</span>
+					</div>
+					<select class="form-select form-select-sm bg-ghost-light text-light border-0" id="SETTING_${Setting.Key}">${optionsHtml}</select>
+				</div>`);
+				$(`#SETTING_${Setting.Key}`).off("change").on("change", async function () {
+					let NewValue = $(this).val();
+					if (NewValue === Setting.Value) return;
+					let Set = Settings.find((s) => s.Key === Setting.Key);
+					Set.Value = NewValue;
+					Setting.Value = NewValue;
+					await window.API.SetSetting(Setting.Key, NewValue);
+					Notify(`[${Setting.Title}] ${NewValue}`, 'success', 1200);
+				});
 			}
 		}
 	}

@@ -1,11 +1,18 @@
 # Settings reference
 
-Settings are defined in `src/Modules/SettingsManager/DefaultSettings.js` and persisted in SQLite (`Settings` table). The UI groups them by `Group` and toggles values via IPC.
+Settings are defined in `src/Modules/SettingsManager/DefaultSettings.js` and persisted in SQLite (`Settings` table). The UI groups them by `Group` and edits values via IPC with auto-save for most types.
 
 Groups
 - Notifications
 - Features
 - System
+
+Data types
+
+- BOOLEAN: switch, instant save on toggle
+- STRING: text input, debounced auto-save (600ms)
+- INTEGER: numeric input, debounced auto-save (600ms), coerced to integer
+- OPTION: dropdown, instant save on change; define options via `Options: ["A","B"]` in the default setting entry
 
 Keys
 
@@ -36,6 +43,11 @@ Keys
 - SYSTEM_AUTO_UPDATE (System)
   - Type: BOOLEAN, Default: true
   - Enables `update-electron-app` auto-updates.
+
+Demo settings (in Demo group)
+- DEMO_INTEGER_EXAMPLE: INTEGER, default 10
+- DEMO_STRING_EXAMPLE: STRING, default "Hello World"
+- DEMO_OPTION_EXAMPLE: OPTION, default "Medium", options [Low, Medium, High]
 
 Notes
 - Some settings require restart (labeled in title).
