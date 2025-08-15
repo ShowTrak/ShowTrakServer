@@ -10,6 +10,61 @@ let SettingsGroups = [];
 let Settings = [];
 let SettingDebounceTimers = new Map();
 
+// --- Application Mode (SHOW | EDIT) ---
+let AppMode = "SHOW"; // default visual state until backend confirms
+function RenderMode(mode) {
+	AppMode = (String(mode).toUpperCase() === "EDIT") ? "EDIT" : "SHOW";
+	// Highlight the active button
+	const btnShow = document.getElementById("MODE_BTN_SHOW");
+	const btnEdit = document.getElementById("MODE_BTN_EDIT");
+	if (btnShow && btnEdit) {
+		const activeClasses = ["btn-light", "text-dark"];
+		const inactiveClasses = ["btn-outline-light", "text-light"];
+
+		// reset
+		btnShow.classList.remove(...activeClasses, ...inactiveClasses);
+		btnEdit.classList.remove(...activeClasses, ...inactiveClasses);
+
+		if (AppMode === "SHOW") {
+			btnShow.classList.add(...activeClasses);
+			btnEdit.classList.add(...inactiveClasses);
+		} else {
+			btnEdit.classList.add(...activeClasses);
+			btnShow.classList.add(...inactiveClasses);
+		}
+	}
+	document.body.classList.toggle("mode-edit", AppMode === "EDIT");
+}
+
+// Subscribe to backend push updates
+window.API.OnModeUpdated((mode) => {
+	RenderMode(mode);
+});
+
+// Wire the toggle to backend
+document.addEventListener('DOMContentLoaded', async () => {
+	// Wire new button group
+	const btnShow = document.getElementById('MODE_BTN_SHOW');
+	const btnEdit = document.getElementById('MODE_BTN_EDIT');
+	if (btnShow && !btnShow.dataset.bound) {
+		btnShow.addEventListener('click', async () => {
+			await window.API.SetMode('SHOW');
+		});
+		btnShow.dataset.bound = '1';
+	}
+	if (btnEdit && !btnEdit.dataset.bound) {
+		btnEdit.addEventListener('click', async () => {
+			await window.API.SetMode('EDIT');
+		});
+		btnEdit.dataset.bound = '1';
+	}
+	// Initialize with backend mode
+	try {
+		const mode = await window.API.GetMode();
+		RenderMode(mode);
+	} catch {}
+});
+
 async function GetSettingValue(Key) {
 	if (Settings.length == 0) Settings = await window.API.GetSettings();
 	let Setting = Settings.find((s) => s.Key === Key);
@@ -776,8 +831,7 @@ async function ConfirmationDialog(Message) {
 }
 
 function UpdateSelectionCount() {
-	$("#STATUS_BAR").text(`${Selected.length} ${Selected.length == 1 ? "Client" : "Clients"} Selected`);
-	$("#STATUS_BAR").toggleClass("STATUS_BAR_ACTIVE", Selected.length > 0);
+	$("#SELECTION_STATUS").text(`${Selected.length} ${Selected.length == 1 ? "Client" : "Clients"} Selected`);
 	return;
 }
 
@@ -1075,6 +1129,15 @@ async function Init() {
 	$("#SHOWTRAK_MODEL_CORE_SHUTDOWN_BUTTON").on("click", async () => {
 		window.API.Shutdown();
 	});
+
+	// Initialize application mode from backend and wire toggle
+	try {
+		const mode = await window.API.GetMode();
+		RenderMode(mode);
+	} catch (_) {
+		RenderMode("SHOW");
+	}
+	// legacy toggle binding removed
 
 	await window.API.Loaded();
 }

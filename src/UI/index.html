@@ -18,19 +18,33 @@
 	</head>
 	<body>
 		<div class="dragbar bg-light d-flex justify-content-center gap-3 align-items-center p-2">
-			<img id="APPLICATION_NAVBAR_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-			<span id="APPLICATION_NAVBAR_TITLE">ShowTrak</span>
-			<span id="APPLICATION_NAVBAR_STATUS"></span>
+			<img class="no-drag" id="APPLICATION_NAVBAR_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+			<span class="no-drag" id="APPLICATION_NAVBAR_TITLE">ShowTrak</span>
+			<span class="no-drag" id="APPLICATION_NAVBAR_STATUS"></span>
 		</div>
 		<div id="APPLICATION_CONTAINER" class="h-100">
 			<div id="APPLICATION" class="container-fluid text-center text-light p-0 d-grid">
 				<div id="APPLICATION_CONTENT"></div>
 			</div>
 		</div>
-		<div id="STATUS_BAR" class="cursor-pointer" onclick="ClearSelection()">0 Clients Selected</div>
-		<div class="nav d-flex justify-content-center gap-3">
-			<img id="NAVBAR_CORE_BUTTON" src="./img/settings-icon.png" alt="ShowTrak Logo" />
+		<!-- Bottom Bar -->
+		<div id="APP_BOTTOM_BAR">
+			<div class="bar-content">
+				<div class="bar-section left">
+					<div class="mode-group btn-group btn-group-sm" role="group" aria-label="Mode Switch">
+						<button type="button" id="MODE_BTN_SHOW" class="btn btn-outline-light">SHOW</button>
+						<button type="button" id="MODE_BTN_EDIT" class="btn btn-outline-light">EDIT</button>
+					</div>
+				</div>
+				<div class="bar-section center">
+					<span id="SELECTION_STATUS" class="cursor-pointer" onclick="ClearSelection()">0 Clients Selected</span>
+				</div>
+				<div class="bar-section right">
+					<img id="NAVBAR_CORE_BUTTON" src="./img/settings-icon.png" alt="Settings" />
+				</div>
+			</div>
 		</div>
+		<!-- End Bottom Bar -->
 		<!-- Context Menu -->
 		<div id="SHOWTRAK_CONTEXT_MENU"></div>
 		<!-- End Context Menu -->

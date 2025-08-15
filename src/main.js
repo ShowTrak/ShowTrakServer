@@ -30,6 +30,7 @@ const { Manager: WOLManager } = require("./Modules/WOLManager");
 const { Manager: BroadcastManager } = require("./Modules/Broadcast");
 const { Manager: SettingsManager } = require("./Modules/SettingsManager");
 const { OSC } = require("./Modules/OSC");
+const { Manager: ModeManager } = require("./Modules/ModeManager");
 const { Wait } = require("./Modules/Utils");
 const path = require("path");
 
@@ -139,6 +140,16 @@ app.whenReady().then(async () => {
 		return Config;
 	});
 
+	// Application Mode IPC
+	RPC.handle("Mode:Get", async () => {
+		return ModeManager.Get();
+	});
+
+	RPC.handle("Mode:Set", async (_event, NewMode) => {
+		const Updated = ModeManager.Set(NewMode);
+		return Updated;
+	});
+
 	RPC.handle("Settings:Get", async () => {
 		let Settings = await SettingsManager.GetAll();
 		return Settings
@@ -231,6 +242,10 @@ app.whenReady().then(async () => {
 		await UpdateFullClientList();
 		await UpdateScriptList();
 		await UpdateOSCList();
+		// Push current application mode to renderer on initial load
+		if (MainWindow && !MainWindow.isDestroyed()) {
+			MainWindow.webContents.send("ModeUpdated", ModeManager.Get());
+		}
 		return;
 	});
 
@@ -412,6 +427,12 @@ BroadcastManager.on("OSCBulkAction", HandleOSCBulkAction)
 
 BroadcastManager.on("Shutdown", async () => {
 	app.quit();
+});
+
+// Relay application mode changes to renderer windows
+ModeManager.on("ModeUpdated", (Mode) => {
+	if (!MainWindow || MainWindow.isDestroyed()) return;
+	MainWindow.webContents.send("ModeUpdated", Mode);
 });
 
 app.on("window-all-closed", () => {

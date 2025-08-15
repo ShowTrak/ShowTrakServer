@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld("API", {
 	OpenScriptsFolder: async () => ipcRenderer.invoke("OpenScriptsFolder"),
 	BackupConfig: async () => ipcRenderer.invoke("BackupConfig"),
 	ImportConfig: async () => ipcRenderer.invoke("ImportConfig"),
+	// Application Mode API
+	GetMode: async () => ipcRenderer.invoke("Mode:Get"),
+	SetMode: async (Mode) => ipcRenderer.invoke("Mode:Set", Mode),
+	OnModeUpdated: (Callback) => ipcRenderer.on("ModeUpdated", (_event, Mode) => Callback(Mode)),
 	OSCBulkAction: (Callback) =>
 		ipcRenderer.on("OSCBulkAction", (_event, Type, Targets, Args = null) => {
 			Callback(Type, Targets, Args);

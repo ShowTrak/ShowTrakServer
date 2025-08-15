@@ -39,9 +39,16 @@ Renderer API (window.API)
 - UnadoptClient(UUID)
 - DeleteScripts(List)
 - UpdateScripts(List)
+// Application Mode
+- GetMode() -> 'SHOW' | 'EDIT'
+- SetMode(Mode: 'SHOW' | 'EDIT') -> 'SHOW' | 'EDIT'
+- OnModeUpdated(callback) -> subscribes to mode changes
 
 IPC channels (main handlers)
 - See `src/main.js` for the matching `RPC.handle(...)` registrations.
+Additional Mode channels
+- "Mode:Get" -> returns current mode ('SHOW' | 'EDIT')
+- "Mode:Set" (Mode: 'SHOW' | 'EDIT') -> sets and returns the new mode; broadcasts "ModeUpdated"
 
 Notes
 - Callbacks subscribe to push events (renderer listens via `ipcRenderer.on`).

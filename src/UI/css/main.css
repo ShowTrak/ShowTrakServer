@@ -3,7 +3,7 @@
 	position: fixed;
 	width: 100vw;
 	height: 2rem;
-	app-region: drag;
+	-webkit-app-region: drag; /* allow window dragging on Electron */
 	background-color: #1d1a2ffc !important;
 	padding: 0.3rem 0.8rem !important;
 	color: #ffffff !important;
@@ -21,7 +21,7 @@
 #APPLICATION_CONTAINER {
 	position: absolute;
 	width: 100%;
-	height: calc(100%-2rem);
+	height: calc(100% - 2rem);
 	overflow: auto;
 	display: grid;
 	grid-template-rows: auto 1fr;
@@ -31,6 +31,7 @@
 #APPLICATION {
 	height: max(100%, 100vh);
 	padding-top: 2rem !important;
+	padding-bottom: 36px !important; /* space for bottom bar */
 	user-select: none !important;
 	-webkit-user-select: none !important;
 	-moz-user-select: none !important;
@@ -38,55 +39,73 @@
 	background: transparent !important;
 }
 
-#STATUS_BAR {
+/* Deprecated old floating status bar */
+#STATUS_BAR { display: none; }
+
+/* Bottom thin bar */
+#APP_BOTTOM_BAR {
 	position: fixed;
-	bottom: -2rem;
-	left: 50%;
-	transform: translateX(-50%);
-	width: auto;
-	padding: 0 1rem;
-	height: 2rem;
-	background-color: #3d3d3f;
-	z-index: 1000;
-	border-radius: 0.5rem;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 36px;
+	background: #1d1a2f; /* solid, not transparent */
+	border-top: 1px solid rgba(255,255,255,0.08);
 	display: flex;
 	align-items: center;
-	justify-content: center;
-	color: rgba(255, 255, 255, 0.3);
-	font-weight: 700;
-	transition-duration: 500ms;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-	opacity: 0;
+	z-index: 1000;
 }
 
-.STATUS_BAR_ACTIVE {
-	opacity: 1 !important;
-	bottom: 1rem !important;
-	color: rgba(255, 255, 255, 0.9) !important;
+#APP_BOTTOM_BAR .bar-content {
+	width: 100%;
+	display: grid;
+	grid-template-columns: 1fr auto 1fr;
+	align-items: center;
+	padding: 0 8px;
 }
 
-.nav {
-	position: fixed;
-	bottom: 1rem;
-	right: 1rem;
-	/* transform: translateX(-50%); */
-	background: rgba(255, 255, 255, 0.1) !important;
-	padding: 0.5rem;
-	border-radius: 50px;
-	user-select: none !important;
-	-webkit-user-select: none !important;
-	-moz-user-select: none !important;
-	-ms-user-select: none !important;
+#APP_BOTTOM_BAR .bar-section.left { justify-self: start; }
+#APP_BOTTOM_BAR .bar-section.center { justify-self: center; color: rgba(255,255,255,0.85); font-weight: 700; font-size: 12px; }
+#APP_BOTTOM_BAR .bar-section.right { justify-self: end; }
+
+/* Compact mode button group */
+.mode-group.btn-group {
+	gap: 0;
+}
+.mode-group .btn {
+	padding: 2px 8px; /* minimal padding */
+	line-height: 1.1;
+	font-size: 12px;
+	border-width: 1px;
+	font-weight: 700; /* consistent weight to avoid width shift */
+	transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.mode-group .btn + .btn {
+	margin-left: 2px;
 }
 
-.rounded-3 {
-	border-radius: 0.5rem !important;
+/* Softer hover for inactive, stronger look for active */
+.mode-group .btn.btn-outline-light {
+	color: rgba(255,255,255,0.9) !important;
+	border-color: rgba(255,255,255,0.35) !important;
+	background-color: transparent !important;
+}
+.mode-group .btn.btn-outline-light:hover,
+.mode-group .btn.btn-outline-light:focus {
+	background-color: rgba(255,255,255,0.04) !important; /* softer hover */
+}
+.mode-group .btn.btn-light {
+	background-color: rgba(255,255,255,0.32) !important; /* stronger active background */
+	color: #111 !important;
+	border-color: rgba(255,255,255,0.85) !important;
+}
+.mode-group .btn.btn-light:hover,
+.mode-group .btn.btn-light:focus {
+	background-color: rgba(255,255,255,0.36) !important; /* subtle hover for active */
 }
 
 .btn {
-	border: none !important;
-	border-radius: 0.5rem !important;
-	transition-duration: 100ms;
+	border: none;
 }
 
 .btn-ghost {
@@ -106,12 +125,25 @@
 	background-color: rgba(255, 255, 255, 0.2) !important;
 }
 
+#NAVBAR_CORE_BUTTON {
+	width: 22px;
+	height: 22px;
+	cursor: pointer;
+	opacity: 0.85;
+	transition: opacity .2s ease;
+}
+
+#NAVBAR_CORE_BUTTON:hover {
+	opacity: 1;
+}
+
 .bg-ghost {
 	background-color: rgba(255, 255, 255, 0.03) !important;
 }
 
+/* Light ghost background, used for modal section headings */
 .bg-ghost-light {
-	background-color: rgba(255, 255, 255, 0.1) !important;
+	background-color: rgba(255, 255, 255, 0.10) !important;
 }
 
 .GROUP_TITLE {
@@ -125,7 +157,6 @@
 	white-space: nowrap;
 	text-transform: uppercase;
 }
-
 .GROUP_TITLE_CLICKABLE {
 	background-color: rgba(255, 255, 255, 0.1) !important;
 	cursor: pointer !important;
@@ -171,21 +202,7 @@
 	font-weight: 600;
 }
 
-#NAVBAR_CORE_BUTTON {
-	width: 48px;
-	height: 48px;
-	cursor: pointer;
-	background: rgb(28 28 28 / 67%);
-	border-radius: 50%;
-	padding: 0.4rem;
-	transition-duration: 300ms;
-}
-
-#NAVBAR_CORE_BUTTON:hover {
-	background: rgb(28 28 28 / 87%);
-	scale: 1.05;
-	animation: spin 3s;
-}
+/* removed old floating cog styles */
 
 @keyframes spin {
 	100% {
@@ -288,6 +305,11 @@ small,
 	scrollbar-color: #35353a #18181b;
 }
 
+/* No visual overlay change for EDIT mode */
+body.mode-edit #APPLICATION_CONTAINER { background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important; }
+
+#STATUS_BAR { display: none; }
+
 .form-control,
 .form-select {
 	background-color: rgba(255, 255, 255, 0.03) !important;
@@ -298,33 +320,50 @@ small,
 
 .form-control:focus,
 .form-select:focus {
-	color: #212529;
-	background-color: #ffffff1d !important;
-	outline: 0;
-	box-shadow: none !important;
-}
-
-.form-switch .form-check-input {
-    width: 2.5em;
-    margin-left: -2.5em;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e") !important;
-    background-position: left center;
-    border-radius: 2em;
-    transition: background-position .15s ease-in-out;
-    height: 1.5em;
-    background-color: rgba(154, 171, 255, 0.43);
-    border-color: transparent !important;
-	box-shadow: none !important;
-}
-
-option {
-	background-color: #212124 !important;
 	color: white !important;
-	border: none !important;
+	background-color: #ffffff1d !important;
+	outline: 0 !important;
+	box-shadow: none !important;
 }
 
-.cursor-pointer {
-	cursor: pointer !important;
+/* Remove outlines/shadows from buttons everywhere (including Bootstrap btn-check patterns) */
+.btn,
+.btn:hover,
+.btn:focus,
+.btn:focus-visible,
+.btn:active,
+.btn:active:focus,
+.modal .btn,
+.modal .btn:hover,
+.modal .btn:focus,
+.modal .btn:focus-visible,
+.modal .btn:active,
+.modal .btn:active:focus,
+.btn-check:focus + .btn,
+.btn-check:active + .btn,
+.btn-check:checked + .btn,
+.btn-check:checked + .btn:focus,
+a.btn,
+a.btn:focus,
+button.btn,
+button.btn:focus {
+	outline: none !important;
+	box-shadow: none !important;
+}
+
+.no-drag { -webkit-app-region: no-drag; }
+
+#APP_BOTTOM_BAR {
+	position: fixed;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 36px;
+	background: #1d1a2f;
+	border-top: 1px solid rgba(255,255,255,0.08);
+	display: flex;
+	align-items: center;
+	z-index: 1000;
 }
 
 
@@ -393,3 +432,6 @@ option {
 	background-color: rgba(255, 255, 255, 0.03);
 	cursor: no-drop;
 }
+
+/* No standalone #MODE_SWITCH positioning; switch sits in bottom bar */
+/* removed old toggle styles (.mode-switch ...) */
