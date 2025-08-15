@@ -1288,6 +1288,7 @@ $(async function () {
 				Type: "Action",
 				Title: "Clear Selection",
 				Class: "text-danger",
+				Shortcut: "Ctrl+D",
 				Action: async function () {
 					ClearSelection();
 				},
@@ -1298,6 +1299,7 @@ $(async function () {
 			Type: "Action",
 			Title: "Select All",
 			Class: "text-light",
+			Shortcut: "Ctrl+A",
 			Action: async function () {
 				AllClients.map((UUID) => Select(UUID));
 			},
@@ -1311,16 +1313,18 @@ $(async function () {
 			}
 			if (option.Type === "Info") {
 				$menu.append(
-					`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${Safe(option.Class)}">${Safe(
-						option.Title
-					)}</a>`
+					`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${Safe(option.Class)}">` +
+						`<span class="context-title">${Safe(option.Title)}</span>` +
+						`<span class="context-shortcut">${Safe(option.Shortcut || "")}</span>` +
+					`</a>`
 				);
 			}
 			if (option.Type === "Action") {
 				$menu.append(
-					`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${Safe(option.Class)}">${Safe(
-						option.Title
-					)}</a>`
+					`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${Safe(option.Class)}">` +
+						`<span class="context-title">${Safe(option.Title)}</span>` +
+						`<span class="context-shortcut">${Safe(option.Shortcut || "")}</span>` +
+					`</a>`
 				);
 				$menu.find("a:last").on("click", function () {
 					option.Action();

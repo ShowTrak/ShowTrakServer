@@ -256,6 +256,10 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 	-webkit-user-select: none !important;
 	-moz-user-select: none !important;
 	-ms-user-select: none !important;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
 }
 #SHOWTRAK_CONTEXT_MENU > a:hover {
 	background-color: rgba(255, 255, 255, 0.1) !important;
@@ -264,6 +268,20 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 
 .SHOWTRAK_CONTEXTMENU_BUTTON {
 	cursor: pointer;
+}
+
+/* Right-aligned shortcut hint in context menu */
+#SHOWTRAK_CONTEXT_MENU .context-title {
+	flex: 1 1 auto;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+#SHOWTRAK_CONTEXT_MENU .context-shortcut {
+	flex: 0 0 auto;
+	color: rgba(255, 255, 255, 0.6);
+	font-size: 0.85em;
+	margin-left: 1rem;
 }
 
 #APPLICATION_NAVBAR_LOGO {
