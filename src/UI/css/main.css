@@ -370,6 +370,24 @@ button.btn:focus {
 	box-shadow: none !important;
 }
 
+/* Copy buttons inside form-floating fields */
+.form-floating.has-copy { position: relative; }
+.form-floating.has-copy .copy-field-btn {
+	position: absolute;
+	top: 50%;
+	right: 8px;
+	transform: translateY(-50%);
+	border: 0;
+	background: transparent;
+	color: rgba(255,255,255,0.6);
+	padding: 0;
+	width: 28px;
+	height: 28px;
+	display: grid; place-items: center;
+}
+.form-floating.has-copy .copy-field-btn:hover { color: rgba(255,255,255,0.92); }
+.form-floating.has-copy .copy-field-btn i { font-size: 15px; line-height: 1; }
+
 .no-drag { -webkit-app-region: no-drag; }
 
 #APP_BOTTOM_BAR {

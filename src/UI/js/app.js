@@ -904,6 +904,26 @@ async function UpdateOfflineIndicators() {
 $(async function () {
 	const $menu = $("#SHOWTRAK_CONTEXT_MENU");
 
+	// Copy-to-clipboard for readonly editor fields
+	$(document).on('click', '.copy-field-btn', async function (e) {
+		e.preventDefault();
+		e.stopPropagation();
+		const targetSel = $(this).attr('data-target');
+		const $input = $(targetSel);
+		if (!$input || $input.length === 0) return;
+		const value = String($input.val() || '').trim();
+		if (!value) return;
+		try {
+			await navigator.clipboard.writeText(value);
+			// quick feedback: icon swap
+			const $icon = $(this).find('i');
+			const prev = $icon.attr('class');
+			$icon.attr('class', 'bi bi-clipboard-check');
+			setTimeout(() => { $icon.attr('class', prev); }, 900);
+		} catch {}
+		return false;
+	});
+
 	// Open client editor from cog without affecting selection
 	$(document).on("click", ".CLIENT_TILE_COG", function (e) {
 		e.preventDefault();
