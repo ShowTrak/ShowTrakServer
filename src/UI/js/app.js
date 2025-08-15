@@ -1313,7 +1313,7 @@ $(async function () {
 			}
 			if (option.Type === "Info") {
 				$menu.append(
-					`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${Safe(option.Class)}">` +
+					`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${Safe(option.Class)}" role="menuitem" aria-disabled="true" tabindex="-1">` +
 						`<span class="context-title">${Safe(option.Title)}</span>` +
 						`<span class="context-shortcut">${Safe(option.Shortcut || "")}</span>` +
 					`</a>`
@@ -1321,7 +1321,7 @@ $(async function () {
 			}
 			if (option.Type === "Action") {
 				$menu.append(
-					`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${Safe(option.Class)}">` +
+					`<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${Safe(option.Class)}" role="menuitem" tabindex="-1">` +
 						`<span class="context-title">${Safe(option.Title)}</span>` +
 						`<span class="context-shortcut">${Safe(option.Shortcut || "")}</span>` +
 					`</a>`
@@ -1353,6 +1353,118 @@ $(async function () {
 			display: "block",
 			left: left,
 			top: top,
+		});
+
+		// A11y roles and initial focus
+		$menu.attr('role', 'menu');
+		const $focusable = $menu.find('a.SHOWTRAK_CONTEXTMENU_BUTTON[role="menuitem"]:not([aria-disabled="true"])');
+		if ($focusable.length > 0) {
+			setTimeout(() => { try { $focusable.first().trigger('focus')[0].scrollIntoView({ block: 'nearest' }); } catch {} }, 0);
+		}
+
+		// Keyboard navigation within context menu
+		$menu.off('keydown').on('keydown', function (ev) {
+			const key = ev.key;
+			const $items = $menu.find('a.SHOWTRAK_CONTEXTMENU_BUTTON[role="menuitem"]:not([aria-disabled="true"])');
+			if ($items.length === 0) return;
+			const activeEl = document.activeElement;
+			let idx = $items.index(activeEl);
+
+			// Type-to-search (typeahead) for menu items by visible title
+			const isChar = key && key.length === 1 && !ev.ctrlKey && !ev.metaKey && !ev.altKey && key !== ' ';
+			if (isChar) {
+				ev.preventDefault();
+				const now = Date.now();
+				let buf = ($menu.data('typeaheadBuffer') || '').toString();
+				const lastTime = $menu.data('typeaheadTime') || 0;
+				let cycleSingle = false;
+				const lower = key.toLowerCase();
+				if (now - lastTime > 700) {
+					buf = lower; // start new buffer after pause
+				} else if (buf.length === 1 && buf === lower) {
+					// repeating the same char cycles matches
+					buf = lower;
+					cycleSingle = true;
+				} else {
+					buf = (buf + lower).slice(0, 64);
+				}
+				$menu.data('typeaheadBuffer', buf);
+				$menu.data('typeaheadTime', now);
+				const prevTimer = $menu.data('typeaheadTimer');
+				if (prevTimer) { try { clearTimeout(prevTimer); } catch {} }
+				$menu.data('typeaheadTimer', setTimeout(() => {
+					$menu.removeData('typeaheadBuffer');
+					$menu.removeData('typeaheadTimer');
+					$menu.removeData('typeaheadTime');
+				}, 900));
+
+				const titles = $items.map((i, el) => $(el).find('.context-title').text().trim().toLowerCase()).get();
+				let start = (idx >= 0 ? (idx + 1) : 0) % $items.length;
+				if (cycleSingle) start = (idx >= 0 ? (idx + 1) : 0) % $items.length;
+
+				let found = -1;
+				for (let k = 0; k < titles.length; k++) {
+					const pos = (start + k) % titles.length;
+					if (titles[pos].startsWith(buf)) { found = pos; break; }
+				}
+				if (found === -1) {
+					for (let k = 0; k < titles.length; k++) {
+						const pos = (start + k) % titles.length;
+						if (titles[pos].includes(buf)) { found = pos; break; }
+					}
+				}
+				if (found !== -1) {
+					const $t = $items.eq(found);
+					$t.trigger('focus')[0].scrollIntoView({ block: 'nearest' });
+				}
+				return;
+			}
+			if (key === 'ArrowDown') {
+				ev.preventDefault();
+				idx = (idx + 1 + $items.length) % $items.length;
+				$items.eq(idx).trigger('focus')[0].scrollIntoView({ block: 'nearest' });
+				return;
+			}
+			if (key === 'ArrowUp') {
+				ev.preventDefault();
+				idx = (idx - 1 + $items.length) % $items.length;
+				$items.eq(idx).trigger('focus')[0].scrollIntoView({ block: 'nearest' });
+				return;
+			}
+			if (key === 'Home') {
+				ev.preventDefault();
+				$items.first().trigger('focus')[0].scrollIntoView({ block: 'nearest' });
+				return;
+			}
+			if (key === 'End') {
+				ev.preventDefault();
+				$items.last().trigger('focus')[0].scrollIntoView({ block: 'nearest' });
+				return;
+			}
+			if (key === 'Enter' || key === ' ') {
+				ev.preventDefault();
+				if (idx >= 0) {
+					$items.eq(idx).trigger('click');
+				}
+				return;
+			}
+			if (key === 'Escape') {
+				ev.preventDefault();
+				$menu.hide();
+				return;
+			}
+		});
+
+		// Hover-to-focus: hovering should take over keyboard control
+		$menu.off('mouseenter', 'a.SHOWTRAK_CONTEXTMENU_BUTTON').on('mouseenter', 'a.SHOWTRAK_CONTEXTMENU_BUTTON', function () {
+			const $a = $(this);
+			if ($a.attr('aria-disabled') === 'true') return;
+			const prevTimer = $menu.data('typeaheadTimer');
+			if (prevTimer) { try { clearTimeout(prevTimer); } catch {} }
+			$menu.removeData('typeaheadBuffer');
+			$menu.removeData('typeaheadTimer');
+			$menu.removeData('typeaheadTime');
+			$a.trigger('focus');
 		});
 
 		$menu.data("target", this);

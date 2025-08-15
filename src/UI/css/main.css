@@ -265,6 +265,11 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 	background-color: rgba(255, 255, 255, 0.1) !important;
 	border-radius: 0.3rem;
 }
+#SHOWTRAK_CONTEXT_MENU > a:focus {
+	outline: none;
+	background-color: rgba(255, 255, 255, 0.14) !important;
+	border-radius: 0.3rem;
+}
 
 .SHOWTRAK_CONTEXTMENU_BUTTON {
 	cursor: pointer;
