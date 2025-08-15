@@ -236,7 +236,6 @@ app.whenReady().then(async () => {
 
 	RPC.handle("Loaded", async () => {
 		Logger.log("Application Page Hot Reloaded");
-		await Wait(1000)
 		await UpdateSettings();
 		await UpdateAdoptionList();
 		await UpdateFullClientList();
