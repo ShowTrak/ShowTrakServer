@@ -345,6 +345,31 @@ body.mode-edit #APPLICATION_CONTAINER { background: radial-gradient(circle at 50
 	box-shadow: none !important;
 }
 
+/* Enhanced select styling to match dark UI and increase padding */
+.form-select {
+	-webkit-appearance: none;
+	appearance: none;
+	/* keep Bootstrap's default vertical/left padding to avoid clipping; only expand right for the arrow */
+	padding-right: 2.0rem !important;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23ffffff' viewBox='0 0 16 16'><path d='M1.5 5.5 8 12l6.5-6.5-1-1L8 10 2.5 4.5z'/></svg>");
+	background-repeat: no-repeat !important;
+	background-position: right 0.6rem center !important;
+	background-size: 0.9rem !important;
+}
+.form-select.form-select-sm {
+	/* small size: only reserve arrow space on the right */
+	padding-right: 1.8rem !important;
+	background-position: right 0.5rem center !important;
+	background-size: 0.85rem !important;
+}
+
+/* Dropdown list colors (Chromium/Electron supports styling option background) */
+select.form-select option,
+select.form-select optgroup {
+	background-color: #1e1643;
+	color: #ffffff;
+}
+
 /* Remove outlines/shadows from buttons everywhere (including Bootstrap btn-check patterns) */
 .btn,
 .btn:hover,
