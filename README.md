@@ -61,7 +61,6 @@ Steps:
 Try it:
 
 ```powershell
-# from the repository root
 npm install
 npm run start
 ```
