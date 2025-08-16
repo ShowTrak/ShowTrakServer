@@ -10,8 +10,9 @@ Core modules
   - SQLite wrapper; auto-initializes schema from `DB/schema.js` with tables: Groups, Clients, Settings.
   - API: `Get(query, params)`, `All(query, params)`, `Run(query, params)`.
 - Logger (`Logger/`)
-  - Colored console + daily file logs under Logs/.
-  - `CreateLogger(alias)` returns a class with `log, warn, error, success, debug, database`.
+  - Colored console + daily file logs under Logs/ with levels, async writes, and retention cleanup.
+  - `CreateLogger(alias)` returns a class with `log, info, warn, error, success, debug, trace, database, databaseError, silent`.
+  - Env vars: `LOG_LEVEL` (error|warn|info|debug|trace), `LOG_TO_CONSOLE=true|false`, `LOG_TO_FILE=true|false`, `LOG_RETENTION_DAYS=30`.
 - Broadcast (`Broadcast/`)
   - `new EventEmitter()` used for cross-module events.
 
