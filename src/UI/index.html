@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-	<head>
-		<meta charset="UTF-8" />
-		<!-- <meta
+  <head>
+    <meta charset="UTF-8" />
+    <!-- <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'"
     />
@@ -10,439 +10,498 @@
       http-equiv="X-Content-Security-Policy"
       content="default-src 'self'; script-src 'self'"
     /> -->
-		<link rel="stylesheet" href="./vendors/bootstrap/css/bootstrap.min.css" />
-		<link rel="stylesheet" href="./vendors/bootstrap-icons/font/bootstrap-icons.css" />
-		<link rel="stylesheet" type="text/css" href="./vendors/toastify/index.min.css" />
-		<link rel="stylesheet" href="./css/main.css" />
+    <link rel="stylesheet" href="./vendors/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="./vendors/bootstrap-icons/font/bootstrap-icons.css" />
+    <link rel="stylesheet" type="text/css" href="./vendors/toastify/index.min.css" />
+    <link rel="stylesheet" href="./css/main.css" />
 
-		<title>ShowTrak Server</title>
-	</head>
-	<body>
-		<div class="dragbar bg-light d-flex justify-content-center gap-3 align-items-center p-2">
-			<img class="no-drag" id="APPLICATION_NAVBAR_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-			<span class="no-drag" id="APPLICATION_NAVBAR_TITLE">ShowTrak</span>
-			<span class="no-drag" id="APPLICATION_NAVBAR_STATUS"></span>
-		</div>
-		<div id="APPLICATION_CONTAINER" class="h-100">
-			<div id="APPLICATION" class="container-fluid text-center text-light p-0 d-grid">
-				<div id="APPLICATION_CONTENT"></div>
-			</div>
-		</div>
-		<!-- Bottom Bar -->
-		<div id="APP_BOTTOM_BAR">
-			<div class="bar-content">
-				<div class="bar-section left">
-					<div class="mode-group btn-group btn-group-sm" role="group" aria-label="Mode Switch">
-						<button type="button" id="MODE_BTN_SHOW" class="btn btn-outline-light">SHOW</button>
-						<button type="button" id="MODE_BTN_EDIT" class="btn btn-outline-light">EDIT</button>
-					</div>
-				</div>
-				<div class="bar-section center">
-					<span id="SELECTION_STATUS" class="cursor-pointer" onclick="ClearSelection()">0 Clients Selected</span>
-				</div>
-				<div class="bar-section right">
-					<button id="ALERTS_BUTTON" class="alerts-btn no-drag" title="Alerts (Ctrl+Y)" aria-label="Alerts">
-						<i class="bi bi-exclamation-triangle-fill"></i>
-						<span class="alerts-count d-none">0</span>
-					</button>
-					<button id="NAVBAR_CORE_BUTTON" class="settings-btn no-drag" title="Settings" aria-label="Settings">
-						<i class="bi bi-gear-fill"></i>
-					</button>
-				</div>
-			</div>
-		</div>
-		<!-- End Bottom Bar -->
+    <title>ShowTrak Server</title>
+  </head>
+  <body>
+    <div class="dragbar bg-light d-flex justify-content-center gap-3 align-items-center p-2">
+      <img class="no-drag" id="APPLICATION_NAVBAR_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+      <span class="no-drag" id="APPLICATION_NAVBAR_TITLE">ShowTrak</span>
+      <span class="no-drag" id="APPLICATION_NAVBAR_STATUS"></span>
+    </div>
+    <div id="APPLICATION_CONTAINER" class="h-100">
+      <div id="APPLICATION" class="container-fluid text-center text-light p-0 d-grid">
+        <div id="APPLICATION_CONTENT"></div>
+      </div>
+    </div>
+    <!-- Bottom Bar -->
+    <div id="APP_BOTTOM_BAR">
+      <div class="bar-content">
+        <div class="bar-section left">
+          <div class="mode-group btn-group btn-group-sm" role="group" aria-label="Mode Switch">
+            <button type="button" id="MODE_BTN_SHOW" class="btn btn-outline-light">SHOW</button>
+            <button type="button" id="MODE_BTN_EDIT" class="btn btn-outline-light">EDIT</button>
+          </div>
+        </div>
+        <div class="bar-section center">
+          <span id="SELECTION_STATUS" class="cursor-pointer" onclick="ClearSelection()"
+            >0 Clients Selected</span
+          >
+        </div>
+        <div class="bar-section right">
+          <button
+            id="ALERTS_BUTTON"
+            class="alerts-btn no-drag"
+            title="Alerts (Ctrl+Y)"
+            aria-label="Alerts"
+          >
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <span class="alerts-count d-none">0</span>
+          </button>
+          <button
+            id="NAVBAR_CORE_BUTTON"
+            class="settings-btn no-drag"
+            title="Settings"
+            aria-label="Settings"
+          >
+            <i class="bi bi-gear-fill"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- End Bottom Bar -->
 
-		<!-- Alerts Tray -->
-			<div id="ALERTS_TRAY" class="alerts-tray no-drag" aria-live="polite" aria-label="Alerts" hidden>
-			<div class="alerts-header">
-					<strong>Alerts</strong>
-				<div class="alerts-actions">
-						<button type="button" class="btn btn-sm btn-light" id="ALERTS_DISMISS_ALL">Dismiss All (Ctrl+U)</button>
-				</div>
-			</div>
-			<div id="ALERTS_LIST" class="alerts-list"></div>
-		</div>
-		<!-- End Alerts Tray -->
-		<!-- Context Menu -->
-		<div id="SHOWTRAK_CONTEXT_MENU"></div>
-		<!-- End Context Menu -->
+    <!-- Alerts Tray -->
+    <div id="ALERTS_TRAY" class="alerts-tray no-drag" aria-live="polite" aria-label="Alerts" hidden>
+      <div class="alerts-header">
+        <strong>Alerts</strong>
+        <div class="alerts-actions">
+          <button type="button" class="btn btn-sm btn-light" id="ALERTS_DISMISS_ALL">
+            Dismiss All (Ctrl+U)
+          </button>
+        </div>
+      </div>
+      <div id="ALERTS_LIST" class="alerts-list"></div>
+    </div>
+    <!-- End Alerts Tray -->
+    <!-- Context Menu -->
+    <div id="SHOWTRAK_CONTEXT_MENU"></div>
+    <!-- End Context Menu -->
 
-		<!-- Keyboard Shortcuts Modal -->
-		<div
-			class="modal fade"
-			id="SHOWTRAK_MODAL_SHORTCUTS"
-			tabindex="-1"
-			aria-labelledby="SHOWTRAK_MODAL_SHORTCUTS_Label"
-			aria-hidden="true"
-		>
-			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
-				<div class="modal-content">
-					<div class="modal-body text-center">
-						<div class="d-flex justify-content-center">
-							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-						</div>
+    <!-- Keyboard Shortcuts Modal -->
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_SHORTCUTS"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_SHORTCUTS_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-flex justify-content-center">
+              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            </div>
 
-						<strong class="mb-0"> Keyboard Shortcuts </strong>
+            <strong class="mb-0"> Keyboard Shortcuts </strong>
 
-						<div id="KEYBOARD_SHORTCUTS_LIST" class="d-grid gap-2 text-start mt-2"></div>
+            <div id="KEYBOARD_SHORTCUTS_LIST" class="d-grid gap-2 text-start mt-2"></div>
 
-						<div class="row g-2 mt-2">
-							<div class="col-12 d-grid">
-								<button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-		<!-- End Keyboard Shortcuts Modal -->
+            <div class="row g-2 mt-2">
+              <div class="col-12 d-grid">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- End Keyboard Shortcuts Modal -->
 
-		<div
-			class="modal fade"
-			id="SHOWTRAK_MODEL_CORE"
-			tabindex="-1"
-			aria-labelledby="SHOWTRAK_MODEL_CORE_Label"
-			aria-hidden="true"
-		>
-			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
-				<div class="modal-content">
-					<div class="modal-body text-center">
-						<div class="d-flex justify-content-center">
-							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-						</div>
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODEL_CORE"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODEL_CORE_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-flex justify-content-center">
+              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            </div>
 
-						<strong class="mb-0"> ShowTrak Server </strong>
+            <strong class="mb-0"> ShowTrak Server </strong>
 
-						<div class="d-grid gap-2">
-							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS"> Settings </a>
-							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON">
-								OSC Dictionary
-							</a>
-							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_ADOPT_BUTTON"> Adoption </a>
-							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON">
-								Group Manager
-							</a>
+            <div class="d-grid gap-2">
+              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS"> Settings </a>
+              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON">
+                OSC Dictionary
+              </a>
+              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_ADOPT_BUTTON"> Adoption </a>
+              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON">
+                Group Manager
+              </a>
 
-							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_LOGSFOLDER">
-								Open Logs Directory
-							</a>
+              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_LOGSFOLDER">
+                Open Logs Directory
+              </a>
 
-							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_SCRIPTSFOLDER">
-								Open Scripts Directory
-							</a>
+              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_SCRIPTSFOLDER">
+                Open Scripts Directory
+              </a>
 
-							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_BACKUPCONFIG">
-								Export Configuration
-							</a>
+              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_BACKUPCONFIG">
+                Export Configuration
+              </a>
 
-							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_IMPORTCONFIG">
-								Import Configuration From File
-							</a>
+              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_IMPORTCONFIG">
+                Import Configuration From File
+              </a>
 
-							<a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_SUPPORTDISCORD">
-								Open Suppport Discord
-							</a>
+              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_SUPPORTDISCORD">
+                Open Suppport Discord
+              </a>
 
-							<a class="btn btn-sm btn-danger" id="SHOWTRAK_MODEL_CORE_SHUTDOWN_BUTTON">
-								Close ShowTrak
-							</a>
-						</div>
+              <a class="btn btn-sm btn-danger" id="SHOWTRAK_MODEL_CORE_SHUTDOWN_BUTTON">
+                Close ShowTrak
+              </a>
+            </div>
 
-						<strong class="mb-0"> About ShowTrak </strong>
+            <strong class="mb-0"> About ShowTrak </strong>
 
-						<div class="card bg-ghost-light border-0 rounded">
-							<div class="card-body text-sm p-2">
-								ShowTrak Server is an open-source project founded by
-								<span class="text-info">Tom Kirkman-Wood</span> &amp;
-								<span class="text-info">Ben Sugrue</span> in 2019.
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
+            <div class="card bg-ghost-light border-0 rounded">
+              <div class="card-body text-sm p-2">
+                ShowTrak Server is an open-source project founded by
+                <span class="text-info">Tom Kirkman-Wood</span> &amp;
+                <span class="text-info">Ben Sugrue</span> in 2019.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-		<div
-			class="modal fade"
-			id="SHOWTRAK_MODAL_GROUPMANAGER"
-			tabindex="-1"
-			aria-labelledby="SHOWTRAK_MODAL_GROUPMANAGER_Label"
-			aria-hidden="true"
-		>
-			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
-				<div class="modal-content">
-					<div class="modal-body text-center">
-						<div class="d-flex justify-content-center">
-							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-						</div>
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_GROUPMANAGER"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_GROUPMANAGER_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-flex justify-content-center">
+              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            </div>
 
-						<strong class="mb-0"> Group Manager </strong>
+            <strong class="mb-0"> Group Manager </strong>
 
-						<div id="GROUP_MANAGER_GROUP_LIST" class="d-grid gap-2"></div>
-					</div>
-				</div>
-			</div>
-		</div>
+            <div id="GROUP_MANAGER_GROUP_LIST" class="d-grid gap-2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-		<div
-			class="modal fade"
-			id="OSC_ROUTE_LIST_MODAL"
-			tabindex="-1"
-			aria-labelledby="OSC_ROUTE_LIST_MODAL_Label"
-			aria-hidden="true"
-		>
-			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable modal-lg">
-				<div class="modal-content">
-					<div class="modal-body text-center">
-						<div class="d-flex justify-content-center">
-							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-						</div>
+    <div
+      class="modal fade"
+      id="OSC_ROUTE_LIST_MODAL"
+      tabindex="-1"
+      aria-labelledby="OSC_ROUTE_LIST_MODAL_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-flex justify-content-center">
+              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            </div>
 
-						<div id="OSC_ROUTE_LIST" class="d-grid gap-2 text-start"></div>
-					</div>
-				</div>
-			</div>
-		</div>
+            <div id="OSC_ROUTE_LIST" class="d-grid gap-2 text-start"></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-		<div
-			class="modal fade"
-			id="SHOWTRAK_MODAL_SETTINGS"
-			tabindex="-1"
-			aria-labelledby="SHOWTRAK_MODAL_SETTINGS_Label"
-			aria-hidden="true"
-		>
-			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
-				<div class="modal-content">
-					<div class="modal-body text-center">
-						<div class="d-flex justify-content-center">
-							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-						</div>
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_SETTINGS"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_SETTINGS_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-flex justify-content-center">
+              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            </div>
 
-						<div id="SETTINGS" class="d-grid gap-2"></div>
-					</div>
-				</div>
-			</div>
-		</div>
+            <div id="SETTINGS" class="d-grid gap-2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-		<div
-			class="modal fade"
-			id="SHOWTRAK_MODEL_ADOPTION"
-			tabindex="-1"
-			aria-labelledby="SHOWTRAK_MODEL_ADOPTION_Label"
-			aria-hidden="true"
-		>
-			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
-				<div class="modal-content">
-					<div class="modal-body text-center">
-						<div class="d-flex justify-content-center">
-							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-						</div>
-						<h6 class="mb-0">Clients Pending Adoption</h6>
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODEL_ADOPTION"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODEL_ADOPTION_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-flex justify-content-center">
+              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            </div>
+            <h6 class="mb-0">Clients Pending Adoption</h6>
 
-						<div id="DEVICES_PENDING_ADOPTION" class="d-grid gap-2"></div>
-					</div>
-				</div>
-			</div>
-		</div>
+            <div id="DEVICES_PENDING_ADOPTION" class="d-grid gap-2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-		<div
-			class="modal fade"
-			id="SHOWTRAK_MODEL_EXECUTIONQUEUE"
-			tabindex="-1"
-			aria-labelledby="SHOWTRAK_MODEL_EXECUTIONQUEUE_Label"
-			aria-hidden="true"
-		>
-			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
-				<div class="modal-content">
-					<div class="modal-body text-center">
-						<div class="d-flex justify-content-center">
-							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-						</div>
-						<h6 class="mb-0">Executing Scripts</h6>
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODEL_EXECUTIONQUEUE"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODEL_EXECUTIONQUEUE_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-flex justify-content-center">
+              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            </div>
+            <h6 class="mb-0">Executing Scripts</h6>
 
-						<div id="SHOWTRAK_EXECUTIONQUEUE" class="d-grid gap-2"></div>
-					</div>
-				</div>
-			</div>
-		</div>
+            <div id="SHOWTRAK_EXECUTIONQUEUE" class="d-grid gap-2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-		<div
-			class="modal fade"
-			id="SHOWTRAK_CLIENT_EDITOR"
-			tabindex="-1"
-			aria-labelledby="SHOWTRAK_CLIENT_EDIT_Label"
-			aria-hidden="true"
-		>
-			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
-				<div class="modal-content">
-					<div class="modal-body text-center">
-						<div class="d-flex justify-content-center">
-							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-						</div>
+    <div
+      class="modal fade"
+      id="SHOWTRAK_CLIENT_EDITOR"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_CLIENT_EDIT_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-flex justify-content-center">
+              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            </div>
 
-						<div class="rounded-3 p-2 bg-ghost-light">
-							<h6 class="mb-0">Connected USB Devices</h6>
-						</div>
-						<div id="SHOWTRAK_CLIENT_EDITOR_USB_DEVICES" class="d-grid gap-2"></div>
+            <div class="rounded-3 p-2 bg-ghost-light">
+              <h6 class="mb-0">Connected USB Devices</h6>
+            </div>
+            <div id="SHOWTRAK_CLIENT_EDITOR_USB_DEVICES" class="d-grid gap-2"></div>
 
-						<div class="rounded-3 p-2 bg-ghost-light">
-							<h6 class="mb-0">Client Settings</h6>
-						</div>
+            <div class="rounded-3 p-2 bg-ghost-light">
+              <h6 class="mb-0">Client Settings</h6>
+            </div>
 
-						<div class="d-grid gap-2">
-							<div class="form-floating">
-								<input
-									type="text"
-									class="form-control"
-									id="CLIENT_EDITOR_NICKNAME"
-									placeholder="Nickname"
-								/>
-								<label for="CLIENT_EDITOR_NICKNAME">Nickname</label>
-							</div>
-							<div class="form-floating has-copy">
-								<input type="text" class="form-control disabled" id="CLIENT_EDITOR_HOSTNAME" disabled />
-								<label for="CLIENT_EDITOR_HOSTNAME">Hostname</label>
-								<button type="button" class="copy-field-btn" data-target="#CLIENT_EDITOR_HOSTNAME" title="Copy">
-									<i class="bi bi-clipboard"></i>
-								</button>
-							</div>
-							<div class="form-floating">
-								<select class="form-select" id="CLIENT_EDITOR_GROUPID">
-									<option value="0" selected>No Group</option>
-									<option value="1">Viewer</option>
-								</select>
-								<label for="CLIENT_EDITOR_GROUPID">Group</label>
-							</div>
-							<div class="form-floating has-copy">
-								<input type="text" class="form-control disabled" id="CLIENT_EDITOR_IP" disabled />
-								<label for="CLIENT_EDITOR_IP">IP</label>
-								<button type="button" class="copy-field-btn" data-target="#CLIENT_EDITOR_IP" title="Copy">
-									<i class="bi bi-clipboard"></i>
-								</button>
-							</div>
-							<div class="form-floating has-copy d-none" id="CLIENT_EDITOR_MAC_WRAPPER">
-								<input type="text" class="form-control disabled" id="CLIENT_EDITOR_MAC" disabled />
-								<label for="CLIENT_EDITOR_MAC">MAC Address</label>
-								<button type="button" class="copy-field-btn" data-target="#CLIENT_EDITOR_MAC" title="Copy">
-									<i class="bi bi-clipboard"></i>
-								</button>
-							</div>
-							<div class="form-floating has-copy">
-								<input type="text" class="form-control disabled" id="CLIENT_EDITOR_UUID" disabled />
-								<label for="CLIENT_EDITOR_UUID">Client ID</label>
-								<button type="button" class="copy-field-btn" data-target="#CLIENT_EDITOR_UUID" title="Copy">
-									<i class="bi bi-clipboard"></i>
-								</button>
-							</div>
-							<div class="form-floating has-copy">
-								<input type="text" class="form-control disabled" id="CLIENT_EDITOR_VERSION" disabled />
-								<label for="CLIENT_EDITOR_VERSION">Client Version</label>
-								<button type="button" class="copy-field-btn" data-target="#CLIENT_EDITOR_VERSION" title="Copy">
-									<i class="bi bi-clipboard"></i>
-								</button>
-							</div>
-						</div>
+            <div class="d-grid gap-2">
+              <div class="form-floating">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="CLIENT_EDITOR_NICKNAME"
+                  placeholder="Nickname"
+                />
+                <label for="CLIENT_EDITOR_NICKNAME">Nickname</label>
+              </div>
+              <div class="form-floating has-copy">
+                <input
+                  type="text"
+                  class="form-control disabled"
+                  id="CLIENT_EDITOR_HOSTNAME"
+                  disabled
+                />
+                <label for="CLIENT_EDITOR_HOSTNAME">Hostname</label>
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#CLIENT_EDITOR_HOSTNAME"
+                  title="Copy"
+                >
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+              <div class="form-floating">
+                <select class="form-select" id="CLIENT_EDITOR_GROUPID">
+                  <option value="0" selected>No Group</option>
+                  <option value="1">Viewer</option>
+                </select>
+                <label for="CLIENT_EDITOR_GROUPID">Group</label>
+              </div>
+              <div class="form-floating has-copy">
+                <input type="text" class="form-control disabled" id="CLIENT_EDITOR_IP" disabled />
+                <label for="CLIENT_EDITOR_IP">IP</label>
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#CLIENT_EDITOR_IP"
+                  title="Copy"
+                >
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+              <div class="form-floating has-copy d-none" id="CLIENT_EDITOR_MAC_WRAPPER">
+                <input type="text" class="form-control disabled" id="CLIENT_EDITOR_MAC" disabled />
+                <label for="CLIENT_EDITOR_MAC">MAC Address</label>
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#CLIENT_EDITOR_MAC"
+                  title="Copy"
+                >
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+              <div class="form-floating has-copy">
+                <input type="text" class="form-control disabled" id="CLIENT_EDITOR_UUID" disabled />
+                <label for="CLIENT_EDITOR_UUID">Client ID</label>
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#CLIENT_EDITOR_UUID"
+                  title="Copy"
+                >
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+              <div class="form-floating has-copy">
+                <input
+                  type="text"
+                  class="form-control disabled"
+                  id="CLIENT_EDITOR_VERSION"
+                  disabled
+                />
+                <label for="CLIENT_EDITOR_VERSION">Client Version</label>
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#CLIENT_EDITOR_VERSION"
+                  title="Copy"
+                >
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+            </div>
 
-						<div class="row g-2">
-							<div class="col-6 d-grid">
-								<button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-							</div>
-							<div class="col-6 d-grid">
-								<button type="button" class="btn btn-success" id="SHOWTRAK_CLIENT_EDITOR_SAVE">
-									Save
-								</button>
-							</div>
-						</div>
+            <div class="row g-2">
+              <div class="col-6 d-grid">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+              </div>
+              <div class="col-6 d-grid">
+                <button type="button" class="btn btn-success" id="SHOWTRAK_CLIENT_EDITOR_SAVE">
+                  Save
+                </button>
+              </div>
+            </div>
 
-						<div class="rounded-3 p-2 bg-ghost-light text-danger">
-							<h6 class="mb-0">Danger Zone</h6>
-						</div>
-						<button type="button" class="btn btn-ghost text-warning" id="SHOWTRAK_CLIENT_EDITOR_UPDATE">
-							Check For Updates
-						</button>
-						<button type="button" class="btn btn-ghost text-danger" id="SHOWTRAK_CLIENT_EDITOR_REMOVE">
-							Delete Client
-						</button>
-					</div>
-				</div>
-			</div>
-		</div>
+            <div class="rounded-3 p-2 bg-ghost-light text-danger">
+              <h6 class="mb-0">Danger Zone</h6>
+            </div>
+            <button
+              type="button"
+              class="btn btn-ghost text-warning"
+              id="SHOWTRAK_CLIENT_EDITOR_UPDATE"
+            >
+              Check For Updates
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost text-danger"
+              id="SHOWTRAK_CLIENT_EDITOR_REMOVE"
+            >
+              Delete Client
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
-		<div
-			class="modal fade"
-			id="SHOWTRAL_MODAL_GROUPCREATION"
-			tabindex="-1"
-			aria-labelledby="SHOWTRAL_MODAL_GROUPCREATION_Label"
-			aria-hidden="true"
-		>
-			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
-				<div class="modal-content">
-					<div class="modal-body text-center">
-						<div class="d-flex justify-content-center">
-							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-						</div>
+    <div
+      class="modal fade"
+      id="SHOWTRAL_MODAL_GROUPCREATION"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAL_MODAL_GROUPCREATION_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-flex justify-content-center">
+              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            </div>
 
-						<h6 class="mb-0">Create New Group</h6>
+            <h6 class="mb-0">Create New Group</h6>
 
-						<div class="form-floating">
-							<input
-								type="text"
-								class="form-control"
-								id="GROUP_CREATION_TITLE"
-								placeholder="Group Title"
-							/>
-							<label for="GROUP_CREATION_TITLE">Group Title</label>
-						</div>
+            <div class="form-floating">
+              <input
+                type="text"
+                class="form-control"
+                id="GROUP_CREATION_TITLE"
+                placeholder="Group Title"
+              />
+              <label for="GROUP_CREATION_TITLE">Group Title</label>
+            </div>
 
-						<div class="d-grid">
-							<button type="button" class="btn btn-success" id="GROUP_CREATION_SUBMIT">
-								Create Group
-							</button>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
+            <div class="d-grid">
+              <button type="button" class="btn btn-success" id="GROUP_CREATION_SUBMIT">
+                Create Group
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-		<div
-			class="modal fade"
-			id="SHOWTRAL_MODAL_CONFIRMATION"
-			tabindex="-1"
-			aria-labelledby="SHOWTRAL_MODAL_CONFIRMATION_Label"
-			aria-hidden="true"
-		>
-			<div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
-				<div class="modal-content">
-					<div class="modal-body text-center">
-						<div class="d-flex justify-content-center">
-							<img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-						</div>
+    <div
+      class="modal fade"
+      id="SHOWTRAL_MODAL_CONFIRMATION"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAL_MODAL_CONFIRMATION_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-flex justify-content-center">
+              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            </div>
 
-						<h6 id="SHOWTRAK_CONFIRMATION_MESSAGE" class="mb-0">Are you sure you want to do this?</h6>
+            <h6 id="SHOWTRAK_CONFIRMATION_MESSAGE" class="mb-0">
+              Are you sure you want to do this?
+            </h6>
 
-						<div class="row g-2 mt-1">
-							<div class="col-6 d-grid">
-								<button type="button" class="btn btn-secondary" id="SHOWTRAK_CONFIRMATION_CANCEL">
-									Cancel
-								</button>
-							</div>
-							<div class="col-6 d-grid">
-								<button type="button" class="btn btn-danger" id="SHOWTRAK_CONFIRMATION_CONFIRM">
-									Confirm
-								</button>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	</body>
-	<footer>
-		<script src="./vendors/jquery/index.js" defer></script>
-		<script src="./vendors/bootstrap/js/bootstrap.bundle.min.js" defer></script>
-		<script src="./vendors/toastify/index.js" defer></script>
-		<script src="./vendors/howler/index.min.js"></script>
-		<script src="./js/app.js" defer></script>
-	</footer>
+            <div class="row g-2 mt-1">
+              <div class="col-6 d-grid">
+                <button type="button" class="btn btn-secondary" id="SHOWTRAK_CONFIRMATION_CANCEL">
+                  Cancel
+                </button>
+              </div>
+              <div class="col-6 d-grid">
+                <button type="button" class="btn btn-danger" id="SHOWTRAK_CONFIRMATION_CONFIRM">
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+  <footer>
+    <script src="./vendors/jquery/index.js" defer></script>
+    <script src="./vendors/bootstrap/js/bootstrap.bundle.min.js" defer></script>
+    <script src="./vendors/toastify/index.js" defer></script>
+    <script src="./vendors/howler/index.min.js"></script>
+    <script src="./js/app.js" defer></script>
+  </footer>
 </html>

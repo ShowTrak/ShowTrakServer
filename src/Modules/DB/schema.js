@@ -1,17 +1,17 @@
 const Schema = [];
 
 Schema.push({
-	Name: "Groups",
-	SQL: "CREATE TABLE IF NOT EXISTS `Groups` ( \
+  Name: 'Groups',
+  SQL: 'CREATE TABLE IF NOT EXISTS `Groups` ( \
         GroupID INTEGER PRIMARY KEY AUTOINCREMENT, \
         Title TEXT, \
         Weight INTEGER \
-    )",
+    )',
 });
 
 Schema.push({
-	Name: "Clients",
-	SQL: "CREATE TABLE IF NOT EXISTS `Clients` ( \
+  Name: 'Clients',
+  SQL: 'CREATE TABLE IF NOT EXISTS `Clients` ( \
             UUID TEXT PRIMARY KEY, \
             Nickname TEXT, \
             Hostname TEXT, \
@@ -21,15 +21,15 @@ Schema.push({
             Version TEXT, \
             IP TEXT, \
             Timestamp BIGINT(11) NOT NULL \
-    )",
+    )',
 });
 
 Schema.push({
-	Name: "Settings",
-	SQL: "CREATE TABLE IF NOT EXISTS `Settings` ( \
+  Name: 'Settings',
+  SQL: 'CREATE TABLE IF NOT EXISTS `Settings` ( \
             Key TEXT PRIMARY KEY, \
             Value BLOB \
-    )",
+    )',
 });
 
 module.exports = Schema;

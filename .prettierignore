@@ -1,0 +1,6 @@
+node_modules/
+out/
+build/
+logs/
+**/*.lock
+src/UI/vendors/**

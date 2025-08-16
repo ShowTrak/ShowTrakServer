@@ -30,8 +30,14 @@ try {
   // Copy full font folder and the main CSS files
   copyDir(path.join(NODE_ROOT, 'font'), path.join(UI_VENDOR_ROOT, 'font'));
   // Copy unminified and minified CSS for flexibility
-  copyFile(path.join(NODE_ROOT, 'font', 'bootstrap-icons.css'), path.join(UI_VENDOR_ROOT, 'font', 'bootstrap-icons.css'));
-  copyFile(path.join(NODE_ROOT, 'font', 'bootstrap-icons.min.css'), path.join(UI_VENDOR_ROOT, 'font', 'bootstrap-icons.min.css'));
+  copyFile(
+    path.join(NODE_ROOT, 'font', 'bootstrap-icons.css'),
+    path.join(UI_VENDOR_ROOT, 'font', 'bootstrap-icons.css')
+  );
+  copyFile(
+    path.join(NODE_ROOT, 'font', 'bootstrap-icons.min.css'),
+    path.join(UI_VENDOR_ROOT, 'font', 'bootstrap-icons.min.css')
+  );
   console.log('[postinstall] Copied Bootstrap Icons to UI/vendors/bootstrap-icons');
 } catch (e) {
   console.warn('[postinstall] Failed to copy Bootstrap Icons:', e.message);

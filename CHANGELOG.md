@@ -7,6 +7,7 @@ The format is inspired by Keep a Changelog, and this project adheres to Semantic
 ## [3.1.3] - 2025-08-16
 
 ### Added
+
 - Alert Manager for in-app alerts/notifications.
 - Script Execution Manager groundwork and enhancements for queued script runs.
 - Bottom menu bar UI.
@@ -19,16 +20,19 @@ The format is inspired by Keep a Changelog, and this project adheres to Semantic
 - Basic TODO/notifications panel (internal tooling).
 
 ### Changed
+
 - Improved confirmation dialogs for safer actions.
 - Hide Add Group button when in Show Mode.
 - Prevent deploying/deleting scripts while in Show Mode.
 - Various select styling and small UI refinements.
 
 ### Fixed
+
 - Addressed delay on initial load.
 - Spelling corrections and minor cleanups.
 
 ### Documentation
+
 - Expanded and refined docs.
 
 ---

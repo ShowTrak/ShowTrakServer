@@ -1,12 +1,12 @@
 // const { CreateLogger } = require('../Logger');
 // const Logger = CreateLogger('OSManager');
 
-const os = require("os");
+const os = require('os');
 
 const Manager = {
-	Hostname: os.hostname(),
+  Hostname: os.hostname(),
 };
 
 module.exports = {
-	Manager,
+  Manager,
 };

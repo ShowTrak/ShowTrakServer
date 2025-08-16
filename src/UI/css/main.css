@@ -1,496 +1,586 @@
 .dragbar {
-	z-index: 1000000;
-	position: fixed;
-	width: 100vw;
-	height: 2rem;
-	-webkit-app-region: drag; /* allow window dragging on Electron */
-	background-color: #1d1a2ffc !important;
-	padding: 0.3rem 0.8rem !important;
-	color: #ffffff !important;
-	user-select: none !important;
-	-webkit-user-select: none !important;
-	-moz-user-select: none !important;
-	-ms-user-select: none !important;
-	font-weight: 700;
+  z-index: 1000000;
+  position: fixed;
+  width: 100vw;
+  height: 2rem;
+  -webkit-app-region: drag; /* allow window dragging on Electron */
+  background-color: #1d1a2ffc !important;
+  padding: 0.3rem 0.8rem !important;
+  color: #ffffff !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  font-weight: 700;
 }
 
 #APPLICATION_NAVBAR_TITLE {
-	color: rgba(255,255,255,0.95)
+  color: rgba(255, 255, 255, 0.95);
 }
 
 #APPLICATION_CONTAINER {
-	position: absolute;
-	width: 100%;
-	height: calc(100% - 2rem);
-	overflow: auto;
-	display: grid;
-	grid-template-rows: auto 1fr;
-	background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
+  position: absolute;
+  width: 100%;
+  height: calc(100% - 2rem);
+  overflow: auto;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
 }
 
 #APPLICATION {
-	height: max(100%, 100vh);
-	padding-top: 2rem !important;
-	padding-bottom: 36px !important; /* space for bottom bar */
-	user-select: none !important;
-	-webkit-user-select: none !important;
-	-moz-user-select: none !important;
-	-ms-user-select: none !important;
-	background: transparent !important;
+  height: max(100%, 100vh);
+  padding-top: 2rem !important;
+  padding-bottom: 36px !important; /* space for bottom bar */
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  background: transparent !important;
 }
 
 /* Deprecated old floating status bar */
-#STATUS_BAR { display: none; }
+#STATUS_BAR {
+  display: none;
+}
 
 /* Bottom thin bar */
 #APP_BOTTOM_BAR {
-	position: fixed;
-	bottom: 0;
-	left: 0;
-	right: 0;
-	height: 36px;
-	background: #1d1a2f; /* solid, not transparent */
-	border-top: 1px solid rgba(255,255,255,0.08);
-	display: flex;
-	align-items: center;
-	z-index: 1000;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  background: #1d1a2f; /* solid, not transparent */
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  z-index: 1000;
 }
 
 #APP_BOTTOM_BAR .bar-content {
-	width: 100%;
-	display: grid;
-	grid-template-columns: 1fr auto 1fr;
-	align-items: center;
-	padding: 0 8px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 8px;
 }
 
-#APP_BOTTOM_BAR .bar-section.left { justify-self: start; }
-#APP_BOTTOM_BAR .bar-section.center { justify-self: center; color: rgba(255,255,255,0.85); font-weight: 700; font-size: 12px; }
-#APP_BOTTOM_BAR .bar-section.right { justify-self: end; }
-#APP_BOTTOM_BAR .bar-section.right { display: inline-flex; align-items: center; gap: 6px; }
+#APP_BOTTOM_BAR .bar-section.left {
+  justify-self: start;
+}
+#APP_BOTTOM_BAR .bar-section.center {
+  justify-self: center;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 700;
+  font-size: 12px;
+}
+#APP_BOTTOM_BAR .bar-section.right {
+  justify-self: end;
+}
+#APP_BOTTOM_BAR .bar-section.right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 
 /* Ensure left section content is vertically centered in the bar */
 #APP_BOTTOM_BAR .bar-section.left {
-	display: flex;
-	align-items: center;
+  display: flex;
+  align-items: center;
 }
 
 /* Compact mode button group */
 .mode-group.btn-group {
-	gap: 0;
+  gap: 0;
 }
 .mode-group .btn {
-	padding: 4px 10px; /* slightly taller */
-	line-height: 1.2;
-	font-size: 12px;
-	border-width: 1px;
-	font-weight: 700; /* consistent weight to avoid width shift */
-	transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+  padding: 4px 10px; /* slightly taller */
+  line-height: 1.2;
+  font-size: 12px;
+  border-width: 1px;
+  font-weight: 700; /* consistent weight to avoid width shift */
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
 }
-.mode-group.btn-group { align-items: center; }
+.mode-group.btn-group {
+  align-items: center;
+}
 .mode-group .btn + .btn {
-	margin-left: 2px;
+  margin-left: 2px;
 }
 
 /* Softer hover for inactive, stronger look for active */
 .mode-group .btn.btn-outline-light {
-	color: rgba(255,255,255,0.9) !important;
-	border-color: rgba(255,255,255,0.35) !important;
-	background-color: transparent !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  background-color: transparent !important;
 }
 .mode-group .btn.btn-outline-light:hover,
 .mode-group .btn.btn-outline-light:focus {
-	background-color: rgba(255,255,255,0.04) !important; /* softer hover */
+  background-color: rgba(255, 255, 255, 0.04) !important; /* softer hover */
 }
 .mode-group .btn.btn-light {
-	background-color: rgba(255,255,255,0.32) !important; /* stronger active background */
-	color: #111 !important;
-	border-color: rgba(255,255,255,0.85) !important;
+  background-color: rgba(255, 255, 255, 0.32) !important; /* stronger active background */
+  color: #111 !important;
+  border-color: rgba(255, 255, 255, 0.85) !important;
 }
 .mode-group .btn.btn-light:hover,
 .mode-group .btn.btn-light:focus {
-	background-color: rgba(255,255,255,0.36) !important; /* subtle hover for active */
+  background-color: rgba(255, 255, 255, 0.36) !important; /* subtle hover for active */
 }
 
 .btn {
-	border: none;
+  border: none;
 }
 
 .btn-ghost {
-	background-color: rgba(255, 255, 255, 0.03) !important;
+  background-color: rgba(255, 255, 255, 0.03) !important;
 }
 
 .btn-ghost:hover {
-	background-color: rgba(255, 255, 255, 0.07) !important;
+  background-color: rgba(255, 255, 255, 0.07) !important;
 }
 
 .btn-light {
-	background-color: rgba(255, 255, 255, 0.1) !important;
-	color: white !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
 }
 
 .btn-light:hover {
-	background-color: rgba(255, 255, 255, 0.2) !important;
+  background-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 /* Settings button (cog icon) */
 #NAVBAR_CORE_BUTTON.settings-btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 28px;
-	height: 28px;
-	border-radius: 6px;
-	border: 0;
-	background: transparent;
-	color: rgba(255,255,255,0.8);
-	cursor: pointer;
-	transition: color 120ms ease, transform 120ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    transform 120ms ease;
 }
-#NAVBAR_CORE_BUTTON.settings-btn:hover { color: #fff; }
-#NAVBAR_CORE_BUTTON.settings-btn .bi { font-size: 16px; line-height: 1; }
+#NAVBAR_CORE_BUTTON.settings-btn:hover {
+  color: #fff;
+}
+#NAVBAR_CORE_BUTTON.settings-btn .bi {
+  font-size: 16px;
+  line-height: 1;
+}
 
 /* Alerts button next to settings */
 #ALERTS_BUTTON.alerts-btn {
-	position: relative;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 28px;
-	height: 28px;
-	margin-right: 8px; /* space from settings cog */
-	border: 0;
-	background: transparent;
-	color: rgba(255,255,255,0.7); /* grey by default */
-	cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 8px; /* space from settings cog */
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7); /* grey by default */
+  cursor: pointer;
 }
-#ALERTS_BUTTON .bi { font-size: 18px; line-height: 1; }
+#ALERTS_BUTTON .bi {
+  font-size: 18px;
+  line-height: 1;
+}
 #ALERTS_BUTTON .alerts-count {
-	position: absolute;
-	top: -2px;
-	right: -2px;
-	min-width: 15px;
-	height: 15px;
-	padding: 0 3px;
-	border-radius: 999px;
-	background: #ff9800;
-	color: #111;
-	font-size: 9px;
-	font-weight: 900;
-	display: grid; place-items: center;
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #ff9800;
+  color: #111;
+  font-size: 9px;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
 }
 
 @keyframes pulse-orange {
-	0% { box-shadow: 0 0 0 0 rgba(255,152,0, 0.55); }
-	70% { box-shadow: 0 0 0 8px rgba(255,152,0, 0); }
-	100% { box-shadow: 0 0 0 0 rgba(255,152,0, 0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 152, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0);
+  }
 }
 
-#ALERTS_BUTTON.has-alerts .bi { color: #ffb54d; animation: pulse-orange 1.8s infinite; }
+#ALERTS_BUTTON.has-alerts .bi {
+  color: #ffb54d;
+  animation: pulse-orange 1.8s infinite;
+}
 
 /* Alerts tray */
 #ALERTS_TRAY.alerts-tray {
-	position: fixed;
-	right: 10px;
-	bottom: 48px; /* above bottom bar */
-	width: 380px;
-	max-height: 50vh;
-	overflow: auto;
-	z-index: 1100;
-	background: rgba(29, 26, 47, 0.98);
-	border: 1px solid rgba(255,255,255,0.08);
-	border-radius: 10px;
-	box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-	color: #fff;
+  position: fixed;
+  right: 10px;
+  bottom: 48px; /* above bottom bar */
+  width: 380px;
+  max-height: 50vh;
+  overflow: auto;
+  z-index: 1100;
+  background: rgba(29, 26, 47, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  color: #fff;
 }
-#ALERTS_TRAY .alerts-header { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-#ALERTS_TRAY .alerts-list { padding: 8px; display: grid; gap: 8px; }
+#ALERTS_TRAY .alerts-header {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+#ALERTS_TRAY .alerts-list {
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
 .alert-item {
-	display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: start;
-	background: rgba(255,255,255,0.04);
-	border: 1px solid rgba(255,255,255,0.08);
-	border-radius: 8px;
-	padding: 8px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: start;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px;
 }
-.alert-item .alert-icon { width: 22px; height: 22px; display: grid; place-items: center; }
-.alert-item .alert-icon i { font-size: 14px; color: #fff; }
-.alert-item .alert-content { font-size: 12px; line-height: 1.25; color: #fff; }
-.alert-item .alert-content strong { color: #fff; }
-.alert-item .alert-meta { font-size: 10px; color: #fff; opacity: 1; }
-.alert-item .alert-dismiss { display: inline-flex; align-items: center; gap: 6px; }
+.alert-item .alert-icon {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+}
+.alert-item .alert-icon i {
+  font-size: 14px;
+  color: #fff;
+}
+.alert-item .alert-content {
+  font-size: 12px;
+  line-height: 1.25;
+  color: #fff;
+}
+.alert-item .alert-content strong {
+  color: #fff;
+}
+.alert-item .alert-meta {
+  font-size: 10px;
+  color: #fff;
+  opacity: 1;
+}
+.alert-item .alert-dismiss {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .alert-item .btn-dismiss {
-	border: 0; background: transparent; color: rgba(255,255,255,0.9); padding: 2px 6px; border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  padding: 2px 6px;
+  border-radius: 6px;
 }
-.alert-item .btn-dismiss:hover { background: rgba(255,255,255,0.08); }
+.alert-item .btn-dismiss:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
 
 .bg-ghost {
-	background-color: rgba(255, 255, 255, 0.03) !important;
+  background-color: rgba(255, 255, 255, 0.03) !important;
 }
 
 /* Light ghost background, used for modal section headings */
 .bg-ghost-light {
-	background-color: rgba(255, 255, 255, 0.10) !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .GROUP_TITLE {
-	writing-mode: vertical-rl;
-	transform: rotate(180deg);
-	font-weight: 700;
-	letter-spacing: 0.1rem;
-	color: rgba(255, 255, 255, 0.6);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	text-transform: uppercase;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-weight: 700;
+  letter-spacing: 0.1rem;
+  color: rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
 }
 .GROUP_TITLE_CLICKABLE {
-	background-color: rgba(255, 255, 255, 0.1) !important;
-	cursor: pointer !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  cursor: pointer !important;
 }
 
 .GROUP_TITLE_CLICKABLE:hover {
-	background-color: rgba(255, 255, 255, 0.2) !important;
-	border-radius: 0.3rem;
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  border-radius: 0.3rem;
 }
 
 .GROUP_CREATE_BUTTON {
-	writing-mode: vertical-rl;
-	transform: rotate(180deg);
-	font-weight: 700;
-	/* letter-spacing: 0.1rem; */
-	color: rgba(255, 255, 255, 0.6);
-	/* overflow: hidden; */
-	/* text-overflow: ellipsis; */
-	/* white-space: nowrap; */
-	text-transform: uppercase;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-weight: 700;
+  /* letter-spacing: 0.1rem; */
+  color: rgba(255, 255, 255, 0.6);
+  /* overflow: hidden; */
+  /* text-overflow: ellipsis; */
+  /* white-space: nowrap; */
+  text-transform: uppercase;
 }
 
 .GROUP_CREATE_BUTTON:hover {
-	background-color: rgba(255, 255, 255, 0.1) !important;
-	border-radius: 0.3rem;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 0.3rem;
 }
 
 /* Show the "+" add-group tile only in EDIT mode with a fade */
 /* Target the wrapper that specifically contains the create button */
 .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
-	opacity: 0;
-	pointer-events: none; /* prevent clicks when hidden */
-	transition: opacity 200ms ease-in-out;
+  opacity: 0;
+  pointer-events: none; /* prevent clicks when hidden */
+  transition: opacity 200ms ease-in-out;
 }
 body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
-	opacity: 1;
-	pointer-events: auto;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .SHOWTRAK_CLIENT_PENDING_ADOPTION {
-	background-color: rgba(255, 255, 255, 0.03);
+  background-color: rgba(255, 255, 255, 0.03);
 }
 
 .text-bold {
-	font-weight: 600 !important;
+  font-weight: 600 !important;
 }
 
 .progress {
-	height: 3px !important;
-	border-radius: 5px;
-	background-color: rgba(255, 255, 255, 0.1) !important;
+  height: 3px !important;
+  border-radius: 5px;
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .SHOWTRAK_BTN_ROUNDED {
-	font-weight: 600;
+  font-weight: 600;
 }
 
 /* removed old floating cog styles */
 
 @keyframes spin {
-	100% {
-		transform: rotate(360deg);
-	}
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 #APPLICATION_NAVBAR_STATUS {
-	color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 #SHOWTRAK_CONTEXT_MENU {
-	display: none;
-	position: absolute;
-	z-index: 100000;
-	background-color: #2a273b !important;
-	color: white;
-	border: none !important;
-	border-radius: 0.5rem;
-	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-	padding: 0.5rem;
-	user-select: none !important;
-	-webkit-user-select: none !important;
-	-moz-user-select: none !important;
-	-ms-user-select: none !important;
+  display: none;
+  position: absolute;
+  z-index: 100000;
+  background-color: #2a273b !important;
+  color: white;
+  border: none !important;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  padding: 0.5rem;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
 }
 
 #SHOWTRAK_CONTEXT_MENU > a {
-	color: white;
-	text-decoration: none !important;
-	user-select: none !important;
-	-webkit-user-select: none !important;
-	-moz-user-select: none !important;
-	-ms-user-select: none !important;
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 1rem;
+  color: white;
+  text-decoration: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 #SHOWTRAK_CONTEXT_MENU > a:hover {
-	background-color: rgba(255, 255, 255, 0.1) !important;
-	border-radius: 0.3rem;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 0.3rem;
 }
 #SHOWTRAK_CONTEXT_MENU > a:focus {
-	outline: none;
-	background-color: rgba(255, 255, 255, 0.14) !important;
-	border-radius: 0.3rem;
+  outline: none;
+  background-color: rgba(255, 255, 255, 0.14) !important;
+  border-radius: 0.3rem;
 }
 
 .SHOWTRAK_CONTEXTMENU_BUTTON {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 /* Right-aligned shortcut hint in context menu */
 #SHOWTRAK_CONTEXT_MENU .context-title {
-	flex: 1 1 auto;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 #SHOWTRAK_CONTEXT_MENU .context-shortcut {
-	flex: 0 0 auto;
-	color: rgba(255, 255, 255, 0.6);
-	font-size: 0.85em;
-	margin-left: 1rem;
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85em;
+  margin-left: 1rem;
 }
 
 #APPLICATION_NAVBAR_LOGO {
-	width: 18px;
-	height: 18px;
+  width: 18px;
+  height: 18px;
 }
 
 .modal-dialog {
-	padding-top: 2rem !important;
+  padding-top: 2rem !important;
 }
 
 .modal-content {
-	background-color: #1e1643 !important;
-	color: white;
-	border-radius: 1rem !important;
+  background-color: #1e1643 !important;
+  color: white;
+  border-radius: 1rem !important;
 }
 
 .modal-body {
-	/* background-color: #0c091c !important; */
-	color: white;
-	display: grid;
-	gap: 0.5rem;
+  /* background-color: #0c091c !important; */
+  color: white;
+  display: grid;
+  gap: 0.5rem;
 }
 
 .SHOWTRAK_MODEL_CORE_LOGO {
-	width: 84px;
-	height: 84px;
+  width: 84px;
+  height: 84px;
 }
 
 small,
 .text-sm {
-	font-size: 10px;
+  font-size: 10px;
 }
 
 /* Custom Scrollbar Styles */
 ::-webkit-scrollbar {
-	width: 8px;
-	background: #18181b;
-	border-radius: 1rem;
+  width: 8px;
+  background: #18181b;
+  border-radius: 1rem;
 }
 
 ::-webkit-scrollbar-thumb {
-	background: #35353a;
-	border-radius: 12px;
+  background: #35353a;
+  border-radius: 12px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: #505055;
+  background: #505055;
 }
 
 ::-webkit-scrollbar-corner {
-	background: #18181b;
+  background: #18181b;
 }
 
 /* Firefox */
 * {
-	scrollbar-width: thin;
-	scrollbar-color: #35353a #18181b;
+  scrollbar-width: thin;
+  scrollbar-color: #35353a #18181b;
 }
 
 /* No visual overlay change for EDIT mode */
-body.mode-edit #APPLICATION_CONTAINER { background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important; }
+body.mode-edit #APPLICATION_CONTAINER {
+  background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
+}
 
-#STATUS_BAR { display: none; }
+#STATUS_BAR {
+  display: none;
+}
 
 .form-control,
 .form-select {
-	background-color: rgba(255, 255, 255, 0.03) !important;
-	color: white !important;
-	border: none !important;
-	border-radius: 0.5rem !important;
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 0.5rem !important;
 }
 
 .form-control:focus,
 .form-select:focus {
-	color: white !important;
-	background-color: #ffffff1d !important;
-	outline: 0 !important;
-	box-shadow: none !important;
+  color: white !important;
+  background-color: #ffffff1d !important;
+  outline: 0 !important;
+  box-shadow: none !important;
 }
 
 /* 3D keyboard key styling for <kbd> elements */
 kbd {
-	display: inline-block;
-	min-width: 1.6em;
-	padding: 0.12rem 0.4rem;
-	margin: 0 0.05rem;
-	text-align: center;
-	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-	font-size: 0.85em;
-	line-height: 1.1;
-	color: #fff;
-	background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-	border: 1px solid rgba(255,255,255,0.2);
-	border-radius: 6px;
-	box-shadow: inset 0 -1px 0 rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.05), 0 2px 6px rgba(0,0,0,0.3);
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0.12rem 0.4rem;
+  margin: 0 0.05rem;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.85em;
+  line-height: 1.1;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 1px 0 rgba(255, 255, 255, 0.05),
+    0 2px 6px rgba(0, 0, 0, 0.3);
 }
-.key-plus, .key-sep {
-	color: rgba(255,255,255,0.65);
-	padding: 0 0.15rem;
+.key-plus,
+.key-sep {
+  color: rgba(255, 255, 255, 0.65);
+  padding: 0 0.15rem;
 }
 
 /* Enhanced select styling to match dark UI and increase padding */
 .form-select {
-	-webkit-appearance: none;
-	appearance: none;
-	/* keep Bootstrap's default vertical/left padding to avoid clipping; only expand right for the arrow */
-	padding-right: 2.0rem !important;
-	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23ffffff' viewBox='0 0 16 16'><path d='M1.5 5.5 8 12l6.5-6.5-1-1L8 10 2.5 4.5z'/></svg>");
-	background-repeat: no-repeat !important;
-	background-position: right 0.6rem center !important;
-	background-size: 0.9rem !important;
+  -webkit-appearance: none;
+  appearance: none;
+  /* keep Bootstrap's default vertical/left padding to avoid clipping; only expand right for the arrow */
+  padding-right: 2rem !important;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23ffffff' viewBox='0 0 16 16'><path d='M1.5 5.5 8 12l6.5-6.5-1-1L8 10 2.5 4.5z'/></svg>");
+  background-repeat: no-repeat !important;
+  background-position: right 0.6rem center !important;
+  background-size: 0.9rem !important;
 }
 .form-select.form-select-sm {
-	/* small size: only reserve arrow space on the right */
-	padding-right: 1.8rem !important;
-	background-position: right 0.5rem center !important;
-	background-size: 0.85rem !important;
+  /* small size: only reserve arrow space on the right */
+  padding-right: 1.8rem !important;
+  background-position: right 0.5rem center !important;
+  background-size: 0.85rem !important;
 }
 
 /* Dropdown list colors (Chromium/Electron supports styling option background) */
 select.form-select option,
 select.form-select optgroup {
-	background-color: #1e1643;
-	color: #ffffff;
+  background-color: #1e1643;
+  color: #ffffff;
 }
 
 /* Remove outlines/shadows from buttons everywhere (including Bootstrap btn-check patterns) */
@@ -514,297 +604,388 @@ a.btn,
 a.btn:focus,
 button.btn,
 button.btn:focus {
-	outline: none !important;
-	box-shadow: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Confirmation modal: restore clear keyboard focus rings */
 #SHOWTRAL_MODAL_CONFIRMATION .btn:focus,
 #SHOWTRAL_MODAL_CONFIRMATION .btn:focus-visible {
-	outline: 2px solid rgba(255,255,255,0.85) !important;
-	outline-offset: 2px !important;
-	box-shadow: 0 0 0 3px rgba(255,255,255,0.18) !important;
+  outline: 2px solid rgba(255, 255, 255, 0.85) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18) !important;
 }
 #SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CONFIRM:focus,
 #SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CONFIRM:focus-visible {
-	outline-color: rgba(220,53,69,0.95) !important; /* match .btn-danger */
-	box-shadow: 0 0 0 3px rgba(220,53,69,0.35) !important;
+  outline-color: rgba(220, 53, 69, 0.95) !important; /* match .btn-danger */
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.35) !important;
 }
 #SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CANCEL:focus,
 #SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CANCEL:focus-visible {
-	outline-color: rgba(108,117,125,0.95) !important; /* match .btn-secondary */
-	box-shadow: 0 0 0 3px rgba(108,117,125,0.35) !important;
+  outline-color: rgba(108, 117, 125, 0.95) !important; /* match .btn-secondary */
+  box-shadow: 0 0 0 3px rgba(108, 117, 125, 0.35) !important;
 }
 
 /* Copy buttons inside form-floating fields */
-.form-floating.has-copy { position: relative; }
-.form-floating.has-copy .copy-field-btn {
-	position: absolute;
-	top: 50%;
-	right: 8px;
-	transform: translateY(-50%);
-	border: 0;
-	background: transparent;
-	color: rgba(255,255,255,0.6);
-	padding: 0;
-	width: 28px;
-	height: 28px;
-	display: grid; place-items: center;
+.form-floating.has-copy {
+  position: relative;
 }
-.form-floating.has-copy .copy-field-btn:hover { color: rgba(255,255,255,0.92); }
-.form-floating.has-copy .copy-field-btn i { font-size: 15px; line-height: 1; }
+.form-floating.has-copy .copy-field-btn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+}
+.form-floating.has-copy .copy-field-btn:hover {
+  color: rgba(255, 255, 255, 0.92);
+}
+.form-floating.has-copy .copy-field-btn i {
+  font-size: 15px;
+  line-height: 1;
+}
 
-.no-drag { -webkit-app-region: no-drag; }
+.no-drag {
+  -webkit-app-region: no-drag;
+}
 
 #APP_BOTTOM_BAR {
-	position: fixed;
-	bottom: 0;
-	left: 0;
-	right: 0;
-	height: 36px;
-	background: #1d1a2f;
-	border-top: 1px solid rgba(255,255,255,0.08);
-	display: flex;
-	align-items: center;
-	z-index: 1000;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  background: #1d1a2f;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  z-index: 1000;
 }
 
 /* Compact bottom-center confirmation toast */
 #SHOWTRAK_CONFIRM_TOAST.confirm-toast {
-	position: fixed;
-	left: 50%;
-	bottom: 48px; /* sit above bottom bar */
-	transform: translateX(-50%);
-	z-index: 1100;
-	background: rgba(29, 26, 47, 0.98);
-	border: 1px solid rgba(255,255,255,0.08);
-	border-radius: 10px;
-	box-shadow: 0 6px 18px rgba(0,0,0,0.35);
-	color: #fff;
+  position: fixed;
+  left: 50%;
+  bottom: 48px; /* sit above bottom bar */
+  transform: translateX(-50%);
+  z-index: 1100;
+  background: rgba(29, 26, 47, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  color: #fff;
 }
 #SHOWTRAK_CONFIRM_TOAST .confirm-toast-body {
-	display: grid;
-	grid-template-columns: 1fr auto;
-	gap: 12px;
-	align-items: center;
-	padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 10px;
 }
 #SHOWTRAK_CONFIRM_TOAST .confirm-toast-msg {
-	font-size: 14px;
-	line-height: 1.2;
+  font-size: 14px;
+  line-height: 1.2;
 }
 #SHOWTRAK_CONFIRM_TOAST .confirm-toast-actions {
-	display: flex;
-	gap: 8px;
+  display: flex;
+  gap: 8px;
 }
-#SHOWTRAK_CONFIRM_TOAST .btn { padding: 4px 10px; }
+#SHOWTRAK_CONFIRM_TOAST .btn {
+  padding: 4px 10px;
+}
 #SHOWTRAK_CONFIRM_TOAST .btn:focus,
 #SHOWTRAK_CONFIRM_TOAST .btn:focus-visible {
-	outline: 2px solid rgba(255,255,255,0.85) !important;
-	outline-offset: 2px !important;
-	box-shadow: 0 0 0 3px rgba(255,255,255,0.18) !important;
+  outline: 2px solid rgba(255, 255, 255, 0.85) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18) !important;
 }
 #SHOWTRAK_CONFIRM_TOAST #CONFIRM_TOAST_CONFIRM:focus,
 #SHOWTRAK_CONFIRM_TOAST #CONFIRM_TOAST_CONFIRM:focus-visible {
-	outline-color: rgba(220,53,69,0.95) !important;
-	box-shadow: 0 0 0 3px rgba(220,53,69,0.35) !important;
+  outline-color: rgba(220, 53, 69, 0.95) !important;
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.35) !important;
 }
 
 /* Right-side script execution toast */
 #EXECUTION_TOAST.exec-toast {
-	position: fixed;
-	right: 10px;
-	top: 56px; /* below top dragbar */
-	width: 360px;
-	max-height: calc(100vh - 80px);
-	overflow: auto;
-	z-index: 1100;
-	background: rgba(29, 26, 47, 0.98);
-	border: 1px solid rgba(255,255,255,0.08);
-	border-radius: 10px;
-	box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-	color: #fff;
+  position: fixed;
+  right: 10px;
+  top: 56px; /* below top dragbar */
+  width: 360px;
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  z-index: 1100;
+  background: rgba(29, 26, 47, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  color: #fff;
 }
 #EXECUTION_TOAST .exec-toast-header {
-	display: flex; align-items: center; justify-content: space-between;
-	padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 #EXECUTION_TOAST .exec-toast-header .exec-toast-close {
-	line-height: 1; padding: 0 6px; font-weight: 700;
+  line-height: 1;
+  padding: 0 6px;
+  font-weight: 700;
 }
-#EXECUTION_TOAST .exec-toast-body { padding: 8px; display: grid; gap: 8px; }
+#EXECUTION_TOAST .exec-toast-body {
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
 
-.exec-item { background: rgba(255,255,255,0.04); border-radius: 8px; }
-.exec-row { display: flex; align-items: center; height: 2rem !important; justify-content: space-between; gap: 8px; padding: 6px 8px; }
-.exec-left { display: flex; gap: 6px; flex-wrap: wrap; }
-.exec-right { display: flex; gap: 6px; align-items: center; }
-.exec-error { font-size: 10px; margin: 0; padding: 8px; background: rgba(255,0,0,0.07); border-top: 1px solid rgba(255,255,255,0.08); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; white-space: pre-wrap; }
-.exec-toggle { padding: 2px 8px !important; }
-.exec-actions { width: 22px; display: flex; justify-content: flex-end; }
-.exec-btn-icon { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 0; background: transparent; color: #ffd86b; padding: 0; cursor: pointer; }
-.exec-btn-icon i { font-size: 14px; line-height: 1; }
-.exec-btn-icon:hover { background: transparent; }
+.exec-item {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+}
+.exec-row {
+  display: flex;
+  align-items: center;
+  height: 2rem !important;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+}
+.exec-left {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.exec-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.exec-error {
+  font-size: 10px;
+  margin: 0;
+  padding: 8px;
+  background: rgba(255, 0, 0, 0.07);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+  white-space: pre-wrap;
+}
+.exec-toggle {
+  padding: 2px 8px !important;
+}
+.exec-actions {
+  width: 22px;
+  display: flex;
+  justify-content: flex-end;
+}
+.exec-btn-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #ffd86b;
+  padding: 0;
+  cursor: pointer;
+}
+.exec-btn-icon i {
+  font-size: 14px;
+  line-height: 1;
+}
+.exec-btn-icon:hover {
+  background: transparent;
+}
 /* success check icon */
-.exec-success { color: #28a745; }
+.exec-success {
+  color: #28a745;
+}
 /* removed exec-info popover styling; modal used instead */
 
 /* Small badge sizing harmony */
-#EXECUTION_TOAST .badge { font-size: 11px; }
+#EXECUTION_TOAST .badge {
+  font-size: 11px;
+}
 
 /* tiny duration text next to icons */
-.exec-duration { opacity: 0.9; }
-
-
-
-
-
-
-
-
-
-
-
-
-
+.exec-duration {
+  opacity: 0.9;
+}
 
 .alert-toast-host,
 #ALERTS_TOAST_HOST {
-	position: fixed;
-	top: 56px; /* below dragbar */
-	left: 50%;
-	transform: translateX(-50%);
-	z-index: 1200;
-	display: grid;
-	gap: 10px;
-	max-width: min(680px, 92vw);
+  position: fixed;
+  top: 56px; /* below dragbar */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: grid;
+  gap: 10px;
+  max-width: min(680px, 92vw);
 }
 .alert-toast {
-	background: rgba(29, 26, 47, 0.98);
-	border: 1px solid rgba(255,255,255,0.08);
-	border-radius: 12px;
-	box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-	padding: 12px; /* larger click/reading target */
+  background: rgba(29, 26, 47, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  padding: 12px; /* larger click/reading target */
 }
 
 /* Upsize icon and text specifically for toasts */
-.alert-toast .alert-icon { width: 28px; height: 28px; }
-.alert-toast .alert-icon i { font-size: 18px; }
-.alert-toast .alert-content { font-size: 14px; line-height: 1.35; }
-.alert-toast .alert-content strong { font-size: 15px; line-height: 1.3; }
-.alert-toast .btn-dismiss { padding: 4px 8px; }
+.alert-toast .alert-icon {
+  width: 28px;
+  height: 28px;
+}
+.alert-toast .alert-icon i {
+  font-size: 18px;
+}
+.alert-toast .alert-content {
+  font-size: 14px;
+  line-height: 1.35;
+}
+.alert-toast .alert-content strong {
+  font-size: 15px;
+  line-height: 1.3;
+}
+.alert-toast .btn-dismiss {
+  padding: 4px 8px;
+}
 
 /* Single-line (title only) toast polish */
-.alert-toast.single-line .alert-content { display: flex; align-items: center; }
-.alert-toast.single-line .alert-content > div:first-child strong { font-size: 16px; line-height: 1.2; }
-.alert-toast.single-line { padding-top: 10px; padding-bottom: 10px; }
-
-
-
+.alert-toast.single-line .alert-content {
+  display: flex;
+  align-items: center;
+}
+.alert-toast.single-line .alert-content > div:first-child strong {
+  font-size: 16px;
+  line-height: 1.2;
+}
+.alert-toast.single-line {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
 
 .SHOWTRAK_PC {
-	width: 220px;
-	display: grid;
-	gap: 0.1rem;
-	padding: 0.5rem;
-	border-radius: 0.5rem;
-	border: transparent 2px solid;
-	transition-duration: 200ms;
-	background-color: rgba(255, 0, 0, 0.189);
-	cursor: pointer !important;
-	position: relative; /* allow overlay positioning */
+  width: 220px;
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  border: transparent 2px solid;
+  transition-duration: 200ms;
+  background-color: rgba(255, 0, 0, 0.189);
+  cursor: pointer !important;
+  position: relative; /* allow overlay positioning */
 }
 
 .SHOWTRAK_PC:hover {
-	border-color: rgba(255, 255, 255, 0.4) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
 }
 
 .SHOWTRAK_PC.SELECTED {
-	/* background-color: rgba(255, 22, 22, 0.1) !important; */
-	border-color: rgba(255, 255, 255, 1) !important;
+  /* background-color: rgba(255, 22, 22, 0.1) !important; */
+  border-color: rgba(255, 255, 255, 1) !important;
 }
 
 .SHOWTRAK_PC.ONLINE {
-	background-color: rgba(26, 255, 0, 0.25) !important;
+  background-color: rgba(26, 255, 0, 0.25) !important;
 }
 
 .SHOWTRAK_PC_STATUS {
-	height: 15px !important;
+  height: 15px !important;
 }
 
 .SHOWTRAK_PC_STATUS {
-	font-size: 14px !important;
-	font-weight: 600 !important;
-	color: rgba(255, 255, 255, 0.6);
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .SHOWTRAK_PC_STATUS > .progress:first-of-type {
-	margin-top: 0.2rem;
+  margin-top: 0.2rem;
 }
 
 .SHOWTRAK_PC_PLACEHOLDER {
-	width: 220px;
-	display: grid;
-	border-radius: 0.5rem;
-	font-weight: 700;
-	color: rgba(255, 255, 255, 0.6);
-	padding: 2rem;
-	border: transparent 2px solid;
-	background-color: rgba(255, 255, 255, 0.03);
-	cursor: no-drop;
+  width: 220px;
+  display: grid;
+  border-radius: 0.5rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 2rem;
+  border: transparent 2px solid;
+  background-color: rgba(255, 255, 255, 0.03);
+  cursor: no-drop;
 }
 
 /* Drag-and-drop visuals */
 .group-drop-zone.dnd-over {
-	outline: 2px dashed rgba(255,255,255,0.18);
-	outline-offset: -6px;
-	background-color: rgba(255,255,255,0.04) !important;
+  outline: 2px dashed rgba(255, 255, 255, 0.18);
+  outline-offset: -6px;
+  background-color: rgba(255, 255, 255, 0.04) !important;
 }
 .dnd-ghost {
-	width: 220px;
-	min-height: 90px;
-	border: 2px dashed rgba(255,255,255,0.7);
-	border-radius: 8px;
-	background: transparent;
-	opacity: 0.9;
-	margin: 2px 0;
+  width: 220px;
+  min-height: 90px;
+  border: 2px dashed rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  background: transparent;
+  opacity: 0.9;
+  margin: 2px 0;
 }
 .SHOWTRAK_PC.dragging {
-	opacity: 0.6;
+  opacity: 0.6;
 }
 
 /* Edit cog overlay for client tiles (visible only in EDIT mode) */
 .CLIENT_TILE_COG {
-	position: absolute;
-	top: 6px;
-	right: 6px;
-	width: 26px;
-	height: 26px;
-	border-radius: 999px;
-	border: none;
-	display: grid;
-	place-items: center;
-	background: transparent;
-	color: rgba(255,255,255,0.9);
-	opacity: 0; /* hidden by default (SHOW mode) */
-	pointer-events: none; /* do not intercept clicks when hidden */
-	transform: scale(0.96);
-	transition: opacity 160ms ease, transform 160ms ease, color 160ms ease;
-	z-index: 2;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: none;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  opacity: 0; /* hidden by default (SHOW mode) */
+  pointer-events: none; /* do not intercept clicks when hidden */
+  transform: scale(0.96);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    color 160ms ease;
+  z-index: 2;
 }
-.CLIENT_TILE_COG i { font-size: 14px; line-height: 1; }
+.CLIENT_TILE_COG i {
+  font-size: 14px;
+  line-height: 1;
+}
 /* Show cog only while hovering a tile in EDIT mode (no layout shift) */
 body.mode-edit .SHOWTRAK_PC:hover > .CLIENT_TILE_COG {
-	opacity: 1;
-	transform: scale(1);
-	pointer-events: auto;
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
 }
 /* Also show when cog is keyboard focused in EDIT mode */
 body.mode-edit .CLIENT_TILE_COG:focus-visible {
-	opacity: 1;
-	transform: scale(1);
-	pointer-events: auto;
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
 }
-.CLIENT_TILE_COG:hover { color: #ffffff; }
+.CLIENT_TILE_COG:hover {
+  color: #ffffff;
+}
 
 /* No standalone #MODE_SWITCH positioning; switch sits in bottom bar */
 /* removed old toggle styles (.mode-switch ...) */

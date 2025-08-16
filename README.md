@@ -51,10 +51,12 @@ The following instructions are for installing ShowTrak Server, To install the Cl
 ### Development (build from source)
 
 Prerequisites:
+
 - Node.js 18+ and npm
 - Windows, macOS, or Linux (Windows recommended for production packaging)
 
 Steps:
+
 1. Clone this repo and install dependencies.
 2. Start the Electron app using Electron Forge.
 

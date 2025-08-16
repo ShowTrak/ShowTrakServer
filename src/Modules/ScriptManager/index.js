@@ -2,129 +2,139 @@
 // - Discovers scripts from the scripts directory (one folder per script)
 // - Loads Script.json metadata and calculates checksums for all files
 // - Exposes a readonly in-memory catalog for other modules
-const { CreateLogger } = require("../Logger");
-const Logger = CreateLogger("ScriptManager");
+const { CreateLogger } = require('../Logger');
+const Logger = CreateLogger('ScriptManager');
 
 // const { Config } = require('../Config');
-const path = require("path");
-const fs = require("fs");
+const path = require('path');
+const fs = require('fs');
 
-const { Manager: AppDataManager } = require("../AppData");
-const { Manager: ChecksumManager } = require("../ChecksumManager");
-const { Manager: BroadcastManager } = require("../Broadcast");
+const { Manager: AppDataManager } = require('../AppData');
+const { Manager: ChecksumManager } = require('../ChecksumManager');
+const { Manager: BroadcastManager } = require('../Broadcast');
 
 // Catalog cache; populated on first GetScripts() call
 var Scripts = [];
 
 class Script {
-	constructor(ID, Data, AllFilesInFolder) {
-		this.ID = ID;
-		this.Name = Data.Name;
-		this.Type = Data.Type;
-		this.Path = Data.Path;
-		this.LabelStyle = Data.LabelStyle || "light";
-		this.Weight = Data.Weight || 0;
-		this.Confirmation = Data.Confirmation || false;
+  constructor(ID, Data, AllFilesInFolder) {
+    this.ID = ID;
+    this.Name = Data.Name;
+    this.Type = Data.Type;
+    this.Path = Data.Path;
+    this.LabelStyle = Data.LabelStyle || 'light';
+    this.Weight = Data.Weight || 0;
+    this.Confirmation = Data.Confirmation || false;
 
-		this.Files = AllFilesInFolder;
+    this.Files = AllFilesInFolder;
 
-		this.isEnabled = Data.Enabled || false;
-		this.isValid = true;
-	}
+    this.isEnabled = Data.Enabled || false;
+    this.isValid = true;
+  }
 }
 
 const Manager = {};
 
 // Simple bounded-concurrency runner
 async function runWithConcurrency(items, limit, worker) {
-	if (!items || items.length === 0) return;
-	const size = Math.max(1, Math.min(limit || 8, items.length));
-	let index = 0;
-	const runners = new Array(size).fill(0).map(async () => {
-		while (true) {
-			const i = index++;
-			if (i >= items.length) break;
-			await worker(items[i], i);
-		}
-	});
-	await Promise.all(runners);
+  if (!items || items.length === 0) return;
+  const size = Math.max(1, Math.min(limit || 8, items.length));
+  let index = 0;
+  const runners = new Array(size).fill(0).map(async () => {
+    while (true) {
+      const i = index++;
+      if (i >= items.length) break;
+      await worker(items[i], i);
+    }
+  });
+  await Promise.all(runners);
 }
 
 // Enumerate files recursively and produce relative paths, adding a checksum later
 function RecursiveFileList(dir, baseDir = dir) {
-	let results = [];
-	var list = fs.readdirSync(dir);
-	list.forEach((file) => {
-		const filePath = path.join(dir, file);
-		const stat = fs.statSync(filePath);
-		if (stat && stat.isDirectory()) {
-			results.push({
-				Path: path.relative(baseDir, filePath),
-				Type: "directory",
-			});
-			results = results.concat(RecursiveFileList(filePath, baseDir));
-		} else {
-			results.push({
-				Path: path.relative(baseDir, filePath),
-				Type: "file",
-				Checksum: null,
-			});
-		}
-	});
-	return results;
+  let results = [];
+  var list = fs.readdirSync(dir);
+  list.forEach((file) => {
+    const filePath = path.join(dir, file);
+    const stat = fs.statSync(filePath);
+    if (stat && stat.isDirectory()) {
+      results.push({
+        Path: path.relative(baseDir, filePath),
+        Type: 'directory',
+      });
+      results = results.concat(RecursiveFileList(filePath, baseDir));
+    } else {
+      results.push({
+        Path: path.relative(baseDir, filePath),
+        Type: 'file',
+        Checksum: null,
+      });
+    }
+  });
+  return results;
 }
 
 Manager.GetScripts = async () => {
-	if (Scripts.length > 0) return Scripts; // If scripts are already loaded, return them
-	let TempScripts = [];
-	const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
+  if (Scripts.length > 0) return Scripts; // If scripts are already loaded, return them
+  let TempScripts = [];
+  const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
 
-	Logger.log(`Loading scripts from ${ScriptsDirectory}`);
-	if (!fs.existsSync(ScriptsDirectory)) return [];
+  Logger.log(`Loading scripts from ${ScriptsDirectory}`);
+  if (!fs.existsSync(ScriptsDirectory)) return [];
 
-	const ScriptFolders = fs.readdirSync(ScriptsDirectory).filter((file) => {
-		const fullPath = path.join(ScriptsDirectory, file);
-		return fs.statSync(fullPath).isDirectory() && file !== "node_modules" && file !== ".git" && file !== ".vscode";
-	});
+  const ScriptFolders = fs.readdirSync(ScriptsDirectory).filter((file) => {
+    const fullPath = path.join(ScriptsDirectory, file);
+    return (
+      fs.statSync(fullPath).isDirectory() &&
+      file !== 'node_modules' &&
+      file !== '.git' &&
+      file !== '.vscode'
+    );
+  });
 
-	for (const ScriptFolder of ScriptFolders) {
-		Logger.log(`Loading script from folder: ${ScriptFolder}`);
-		const scriptJsonPath = path.join(ScriptsDirectory, ScriptFolder, "Script.json");
-		if (!fs.existsSync(scriptJsonPath)) {
-			Logger.error(`Script.json not found in ${ScriptFolder}, skipping...`);
-			BroadcastManager.emit('Notify', `Script.json not found in ${ScriptFolder}`, 'error', 15000);
-			continue;
-		}
-		try {
-			const ScriptData = JSON.parse(fs.readFileSync(scriptJsonPath, "utf-8"));
-			const AllFilesInFolder = RecursiveFileList(path.join(ScriptsDirectory, ScriptFolder));
-			const filesNeedingChecksum = AllFilesInFolder.filter((f) => f.Type === "file");
-			// Compute checksums with bounded concurrency to avoid blocking startup
-			await runWithConcurrency(filesNeedingChecksum, 8, async (File) => {
-				const sum = await ChecksumManager.Checksum(
-					path.join(ScriptsDirectory, ScriptFolder, File.Path)
-				);
-				File.Checksum = sum || null;
-			});
-			TempScripts.push(new Script(ScriptFolder, ScriptData, AllFilesInFolder));
-		} catch (err) {
-			Logger.error(`Failed to load Script.json for ${ScriptFolder}:`, err);
-			// Surface actionable feedback; prevents silent failure in the UI
-			BroadcastManager.emit('Notify', `Error in Script.json for ${ScriptFolder} Script`, 'error', 15000);
-		}
-	}
-	Scripts = TempScripts;
-	return Scripts;
+  for (const ScriptFolder of ScriptFolders) {
+    Logger.log(`Loading script from folder: ${ScriptFolder}`);
+    const scriptJsonPath = path.join(ScriptsDirectory, ScriptFolder, 'Script.json');
+    if (!fs.existsSync(scriptJsonPath)) {
+      Logger.error(`Script.json not found in ${ScriptFolder}, skipping...`);
+      BroadcastManager.emit('Notify', `Script.json not found in ${ScriptFolder}`, 'error', 15000);
+      continue;
+    }
+    try {
+      const ScriptData = JSON.parse(fs.readFileSync(scriptJsonPath, 'utf-8'));
+      const AllFilesInFolder = RecursiveFileList(path.join(ScriptsDirectory, ScriptFolder));
+      const filesNeedingChecksum = AllFilesInFolder.filter((f) => f.Type === 'file');
+      // Compute checksums with bounded concurrency to avoid blocking startup
+      await runWithConcurrency(filesNeedingChecksum, 8, async (File) => {
+        const sum = await ChecksumManager.Checksum(
+          path.join(ScriptsDirectory, ScriptFolder, File.Path)
+        );
+        File.Checksum = sum || null;
+      });
+      TempScripts.push(new Script(ScriptFolder, ScriptData, AllFilesInFolder));
+    } catch (err) {
+      Logger.error(`Failed to load Script.json for ${ScriptFolder}:`, err);
+      // Surface actionable feedback; prevents silent failure in the UI
+      BroadcastManager.emit(
+        'Notify',
+        `Error in Script.json for ${ScriptFolder} Script`,
+        'error',
+        15000
+      );
+    }
+  }
+  Scripts = TempScripts;
+  return Scripts;
 };
 
 // Resolve a script by folder ID; ensure catalog is loaded first
 Manager.Get = async (ID) => {
-	if (Scripts.length === 0) await Manager.GetScripts();
-	const Script = Scripts.find((s) => s.ID === ID);
-	if (!Script) return null;
-	return Script;
+  if (Scripts.length === 0) await Manager.GetScripts();
+  const Script = Scripts.find((s) => s.ID === ID);
+  if (!Script) return null;
+  return Script;
 };
 
 module.exports = {
-	Manager,
+  Manager,
 };
