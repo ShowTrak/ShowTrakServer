@@ -296,11 +296,6 @@
             </div>
 
             <div class="rounded-3 p-2 bg-ghost-light">
-              <h6 class="mb-0">Connected USB Devices</h6>
-            </div>
-            <div id="SHOWTRAK_CLIENT_EDITOR_USB_DEVICES" class="d-grid gap-2"></div>
-
-            <div class="rounded-3 p-2 bg-ghost-light">
               <h6 class="mb-0">Client Settings</h6>
             </div>
 
@@ -490,6 +485,116 @@
                 <button type="button" class="btn btn-danger" id="SHOWTRAK_CONFIRMATION_CONFIRM">
                   Confirm
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Read-only Client Info Modal (opens on double-click) -->
+    <div
+      class="modal fade"
+      id="SHOWTRAK_CLIENT_INFO"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_CLIENT_INFO_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-flex justify-content-center">
+              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            </div>
+
+            <div class="rounded-3 p-2 bg-ghost-light">
+              <h6 class="mb-0">Client Info</h6>
+            </div>
+
+            <div class="d-grid gap-2">
+              <div class="form-floating has-copy">
+                <input type="text" class="form-control disabled" id="CLIENT_INFO_NICKNAME" disabled />
+                <label for="CLIENT_INFO_NICKNAME">Nickname</label>
+                <button type="button" class="copy-field-btn" data-target="#CLIENT_INFO_NICKNAME" title="Copy">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+              <div class="form-floating has-copy">
+                <input type="text" class="form-control disabled" id="CLIENT_INFO_HOSTNAME" disabled />
+                <label for="CLIENT_INFO_HOSTNAME">Hostname</label>
+                <button type="button" class="copy-field-btn" data-target="#CLIENT_INFO_HOSTNAME" title="Copy">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+              <div class="form-floating">
+                <input type="text" class="form-control disabled" id="CLIENT_INFO_GROUP" disabled />
+                <label for="CLIENT_INFO_GROUP">Group</label>
+              </div>
+              <div class="form-floating has-copy">
+                <input type="text" class="form-control disabled" id="CLIENT_INFO_IP" disabled />
+                <label for="CLIENT_INFO_IP">IP</label>
+                <button type="button" class="copy-field-btn" data-target="#CLIENT_INFO_IP" title="Copy">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+              <div class="form-floating has-copy d-none" id="CLIENT_INFO_MAC_WRAPPER">
+                <input type="text" class="form-control disabled" id="CLIENT_INFO_MAC" disabled />
+                <label for="CLIENT_INFO_MAC">MAC Address</label>
+                <button type="button" class="copy-field-btn" data-target="#CLIENT_INFO_MAC" title="Copy">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+              <div class="form-floating has-copy">
+                <input type="text" class="form-control disabled" id="CLIENT_INFO_UUID" disabled />
+                <label for="CLIENT_INFO_UUID">Client ID</label>
+                <button type="button" class="copy-field-btn" data-target="#CLIENT_INFO_UUID" title="Copy">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+              <div class="form-floating has-copy">
+                <input type="text" class="form-control disabled" id="CLIENT_INFO_VERSION" disabled />
+                <label for="CLIENT_INFO_VERSION">Client Version</label>
+                <button type="button" class="copy-field-btn" data-target="#CLIENT_INFO_VERSION" title="Copy">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+              <div class="form-floating">
+                <input type="text" class="form-control disabled" id="CLIENT_INFO_STATUS" disabled />
+                <label for="CLIENT_INFO_STATUS">Status</label>
+              </div>
+              <div class="rounded-3 p-2 bg-ghost-light">
+                <h6 class="mb-0">Usage</h6>
+              </div>
+              <div id="CLIENT_INFO_VITALS" class="d-grid gap-2">
+                <div class="text-sm d-flex justify-content-between">
+                  <span>CPU</span>
+                  <span id="CLIENT_INFO_CPU_LABEL">0%</span>
+                </div>
+                <div class="progress">
+                  <div id="CLIENT_INFO_CPU_BAR" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
+                </div>
+                <div class="text-sm d-flex justify-content-between">
+                  <span>RAM</span>
+                  <span id="CLIENT_INFO_RAM_LABEL">0%</span>
+                </div>
+                <div class="progress">
+                  <div id="CLIENT_INFO_RAM_BAR" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
+                </div>
+              </div>
+              <div class="rounded-3 p-2 bg-ghost-light">
+                <h6 class="mb-0">Connected USB Devices</h6>
+              </div>
+              <div id="SHOWTRAK_CLIENT_INFO_USB_DEVICES" class="d-grid gap-2"></div>
+
+              <div class="rounded-3 p-2 bg-ghost-light">
+                <h6 class="mb-0">Network Interfaces</h6>
+              </div>
+              <div id="SHOWTRAK_CLIENT_INFO_NET_INTERFACES" class="d-grid gap-2"></div>
+            </div>
+
+            <div class="row g-2 mt-2">
+              <div class="col-12 d-grid">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
               </div>
             </div>
           </div>

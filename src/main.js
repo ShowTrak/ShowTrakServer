@@ -187,7 +187,7 @@ app.whenReady().then(async () => {
 
   RPC.handle('CheckForUpdatesOnClient', async (_Event, UUID) => {
     Logger.warn('CheckForUpdatesOnClient called for UUID:', UUID);
-    await ServerManager.ExecuteBulkRequest('UpdateSoftware', [UUID], 'Check For Softawre Updates');
+    await ServerManager.ExecuteBulkRequest('UpdateSoftware', [UUID], 'Check For Software Updates');
     return;
   });
 

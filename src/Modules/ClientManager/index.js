@@ -38,6 +38,7 @@ class Client {
       Uptime: {},
     };
     this.USBDeviceList = [];
+  this.NetworkInterfaces = [];
   }
 
   // RAM-only fields and notifications
@@ -63,6 +64,31 @@ class Client {
     this.USBDeviceList = USBDeviceList;
     Logger.debug(`Client ${this.UUID} USB Device List updated`);
     return;
+  }
+  SetNetworkInterfaces(Interfaces) {
+    try {
+      if (!Array.isArray(Interfaces)) Interfaces = [];
+      const normalized = Interfaces.map((iface) => ({
+        name: iface && iface.name ? String(iface.name) : 'unknown',
+        addresses: Array.isArray(iface && iface.addresses)
+          ? iface.addresses.map((a) => ({
+              family: a.family,
+              address: a.address,
+              netmask: a.netmask,
+              cidr: a.cidr || null,
+              mac: a.mac,
+              internal: !!a.internal,
+              scopeid: typeof a.scopeid !== 'undefined' ? a.scopeid : null,
+            }))
+          : [],
+      }));
+      this.NetworkInterfaces = normalized;
+      Logger.debug(`Client ${this.UUID} Network Interfaces updated (${normalized.length})`);
+      // Broadcast for UI updates if needed
+      BroadcastManager.emit('ClientUpdated', this);
+    } catch (e) {
+      Logger.error('Failed to set network interfaces for', this.UUID, e);
+    }
   }
   async USBDeviceAdded(Device) {
     this.USBDeviceList.push(Device);
@@ -209,6 +235,14 @@ Manager.SetUSBDeviceList = async (UUID, DeviceList) => {
   if (!Target) return ['Client Not Found', null];
   Target.SetUSBDeviceList(DeviceList);
   return [null, 'USB Device List updated successfully'];
+};
+
+Manager.SetNetworkInterfaces = async (UUID, Interfaces) => {
+  let [Err, Target] = await Manager.Get(UUID);
+  if (Err) return [Err, null];
+  if (!Target) return ['Client Not Found', null];
+  Target.SetNetworkInterfaces(Interfaces);
+  return [null, 'Network Interfaces updated successfully'];
 };
 
 Manager.USBDeviceAdded = async (UUID, Device) => {

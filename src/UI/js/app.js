@@ -8,6 +8,10 @@ const GroupUUIDCache = new Map();
 let SettingsGroups = [];
 let Settings = [];
 let SettingDebounceTimers = new Map();
+// Track which client is open in the Client Info modal for live updates
+let ClientInfoOpenUUID = null;
+let ClientInfoRefreshTimer = null;
+let __clientInfoRefreshInFlight = false;
 
 // --- Application Mode (SHOW | EDIT) ---
 let AppMode = 'SHOW'; // default visual state until backend confirms
@@ -245,6 +249,21 @@ function Safe(Input) {
   return Input;
 }
 
+// Format bytes into a short human-readable string (e.g., 15.2 GB)
+function FormatBytes(bytes) {
+  const n = typeof bytes === 'number' ? bytes : parseFloat(bytes);
+  if (!isFinite(n) || n < 0) return null;
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  let idx = 0;
+  let val = n;
+  while (val >= 1024 && idx < units.length - 1) {
+    val /= 1024;
+    idx++;
+  }
+  const precision = val >= 10 || idx === 0 ? 0 : 1; // keep 1 decimal for small MB/GB
+  return `${val.toFixed(precision)} ${units[idx]}`;
+}
+
 document.addEventListener('keydown', function (e) {
   // Suppress global shortcuts while a confirmation prompt is active
   if (window.__SHOWTRAK_CONFIRM_ACTIVE) {
@@ -343,6 +362,14 @@ window.API.USBDeviceAdded(async (Client, Device) => {
     message: `${Safe(Client.Nickname || Client.Hostname)} (${Safe(Client.Hostname)})`,
     clientUUID: Client.UUID,
   });
+  // If Client Info modal is open for this client, refresh its details
+  try {
+    const $modal = $('#SHOWTRAK_CLIENT_INFO');
+    if (ClientInfoOpenUUID && ClientInfoOpenUUID === Client.UUID && $modal.hasClass('show')) {
+      const fresh = await window.API.GetClient(Client.UUID);
+      if (fresh) RenderClientInfoDetails(fresh);
+    }
+  } catch {}
 });
 window.API.USBDeviceRemoved(async (Client, Device) => {
   AddAlert({
@@ -352,6 +379,14 @@ window.API.USBDeviceRemoved(async (Client, Device) => {
     message: `${Safe(Client.Nickname || Client.Hostname)} (${Safe(Client.Hostname)})`,
     clientUUID: Client.UUID,
   });
+  // If Client Info modal is open for this client, refresh its details
+  try {
+    const $modal = $('#SHOWTRAK_CLIENT_INFO');
+    if (ClientInfoOpenUUID && ClientInfoOpenUUID === Client.UUID && $modal.hasClass('show')) {
+      const fresh = await window.API.GetClient(Client.UUID);
+      if (fresh) RenderClientInfoDetails(fresh);
+    }
+  } catch {}
 });
 
 window.API.UpdateScriptExecutions(async (Executions) => {
@@ -1018,6 +1053,13 @@ window.API.ClientUpdated(async (Data) => {
   $(
     `[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]>[data-type="OFFLINE_SINCE"]`
   ).attr('data-offlinesince', Data.LastSeen);
+  // If Client Info modal is open for this client, refresh network interfaces (and USB if present)
+  try {
+    const $modal = $('#SHOWTRAK_CLIENT_INFO');
+    if (ClientInfoOpenUUID && ClientInfoOpenUUID === UUID && $modal.hasClass('show')) {
+      RenderClientInfoDetails(Data);
+    }
+  } catch {}
   return;
 });
 
@@ -1395,33 +1437,8 @@ async function OpenClientEditor(UUID) {
   $('#CLIENT_EDITOR_VERSION').val(Version);
 
   $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').html('');
-  if (Client.USBDeviceList && Client.USBDeviceList.length > 0) {
-    for (const {
-      ManufacturerName,
-      ProductName,
-      ProductID,
-      SerialNumber,
-      VendorID,
-    } of Client.USBDeviceList) {
-      $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').append(`
-                <div class="rounded-3 p-2 bg-ghost">
-                    <h6 class="mb-0">${ManufacturerName ? Safe(ManufacturerName) : 'Generic'} ${
-                      ProductName ? Safe(ProductName) : 'USB Device'
-                    }</h6>
-                    <small class="text-light">Serial Number: ${
-                      SerialNumber ? Safe(SerialNumber) : 'Unavailable'
-                    }</small>
-                </div>
-            `);
-    }
-  } else {
-    $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').html(`
-            <div class="rounded-3 p-2 bg-ghost">
-                <h6 class="mb-0">No USB Devices Connected</h6>
-                <p class="text-sm mb-0">Devices that do not comply with WebUSB 1.3 cannot be displayed.</p>
-            </div>
-        `);
-  }
+  // USB section moved to read-only Client Info modal
+  $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').remove();
 
   $('#SHOWTRAK_CLIENT_EDITOR_UPDATE')
     .off('click')
@@ -1757,15 +1774,21 @@ async function UpdateOfflineIndicators() {
 $(async function () {
   const $menu = $('#SHOWTRAK_CONTEXT_MENU');
 
-  // Copy-to-clipboard for readonly editor fields
+  // Copy-to-clipboard for readonly editor fields and inline values
   $(document).on('click', '.copy-field-btn', async function (e) {
     e.preventDefault();
     e.stopPropagation();
-    const targetSel = $(this).attr('data-target');
-    const $input = $(targetSel);
-    if (!$input || $input.length === 0) return;
-    const value = String($input.val() || '').trim();
-    if (!value) return;
+    const direct = $(this).attr('data-copy');
+    let value = null;
+    if (direct && String(direct).length > 0) {
+      value = String(direct);
+    } else {
+      const targetSel = $(this).attr('data-target');
+      const $input = targetSel ? $(targetSel) : null;
+      if (!$input || $input.length === 0) return false;
+      value = String($input.val() || '').trim();
+    }
+    if (!value) return false;
     try {
       await navigator.clipboard.writeText(value);
       // quick feedback: icon swap
@@ -1794,6 +1817,14 @@ $(async function () {
     let UUID = $(this).attr('data-uuid');
     ToggleSelection(UUID);
     return;
+  });
+  // Double-click opens read-only Client Info modal (not the editor)
+  $(document).on('dblclick', '.SHOWTRAK_PC', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const uuid = $(this).attr('data-uuid');
+    if (uuid) OpenClientInfo(uuid);
+    return false;
   });
   $(document).on('contextmenu', 'html', async function (e) {
     e.preventDefault();
@@ -2258,3 +2289,233 @@ async function Init() {
 // Modal display removed per requirements
 
 Init();
+
+// Read-only Client Info modal
+async function OpenClientInfo(UUID) {
+  try {
+    await CloseAllModals();
+  } catch {}
+  let Client = null;
+  try {
+    Client = await window.API.GetClient(UUID);
+  } catch (e) {
+    console.error('Failed to fetch client', e);
+  }
+  if (!Client) return Notify('Client not found', 'error');
+
+  const { Nickname, Hostname, IP, Version, MacAddress, GroupID, Online } = Client;
+  // Group title lookup
+  let groupTitle = 'No Group';
+  try {
+    const groups = await window.API.GetAllGroups();
+    if (Array.isArray(groups)) {
+      const g = groups.find((x) => x && x.GroupID === GroupID);
+      if (g && g.Title) groupTitle = g.Title;
+    }
+  } catch {}
+
+  $('#CLIENT_INFO_NICKNAME').val(Nickname && Nickname.length ? Nickname : Hostname || '');
+  $('#CLIENT_INFO_HOSTNAME').val(Hostname || '');
+  $('#CLIENT_INFO_GROUP').val(groupTitle);
+  $('#CLIENT_INFO_IP').val(IP || 'Unknown IP');
+  if (MacAddress && String(MacAddress).trim().length > 0) {
+    $('#CLIENT_INFO_MAC').val(String(MacAddress).toUpperCase());
+    $('#CLIENT_INFO_MAC_WRAPPER').removeClass('d-none');
+  } else {
+    $('#CLIENT_INFO_MAC').val('');
+    $('#CLIENT_INFO_MAC_WRAPPER').addClass('d-none');
+  }
+  $('#CLIENT_INFO_UUID').val(UUID);
+  $('#CLIENT_INFO_VERSION').val(Version || '');
+  $('#CLIENT_INFO_STATUS').val(Online ? 'Online' : 'Offline');
+
+  RenderClientInfoDetails(Client);
+
+  // mark modal as open for this UUID and clear when hidden
+  ClientInfoOpenUUID = UUID;
+  try {
+    const $modal = $('#SHOWTRAK_CLIENT_INFO');
+    $modal.off('hidden.bs.modal.clientinfo').on('hidden.bs.modal.clientinfo', function () {
+      ClientInfoOpenUUID = null;
+      if (ClientInfoRefreshTimer) {
+        clearInterval(ClientInfoRefreshTimer);
+        ClientInfoRefreshTimer = null;
+      }
+      __clientInfoRefreshInFlight = false;
+    });
+  } catch {}
+
+  $('#SHOWTRAK_CLIENT_INFO').modal('show');
+
+  // Start periodic refresh as a safety net in case events are missed
+  try {
+    if (ClientInfoRefreshTimer) {
+      clearInterval(ClientInfoRefreshTimer);
+      ClientInfoRefreshTimer = null;
+    }
+    ClientInfoRefreshTimer = setInterval(async () => {
+      if (!ClientInfoOpenUUID) return;
+      if (__clientInfoRefreshInFlight) return;
+      __clientInfoRefreshInFlight = true;
+      try {
+        const fresh = await window.API.GetClient(ClientInfoOpenUUID);
+        if (fresh) RenderClientInfoDetails(fresh);
+      } catch {}
+      __clientInfoRefreshInFlight = false;
+    }, 4000);
+  } catch {}
+}
+
+function RenderClientInfoDetails(Client) {
+  // Vitals (CPU/RAM) progress bars
+  try {
+    const rawCpu = Client && Client.Vitals ? Client.Vitals.CPU?.UsagePercentage : 0;
+    const cpuNum = typeof rawCpu === 'number' ? rawCpu : parseFloat(rawCpu);
+    const cpuClamped = isNaN(cpuNum) ? 0 : Math.max(0, Math.min(100, cpuNum));
+
+    const rawRam = Client && Client.Vitals ? Client.Vitals.Ram?.UsagePercentage : 0;
+    const ramNum = typeof rawRam === 'number' ? rawRam : parseFloat(rawRam);
+    const ramClamped = isNaN(ramNum) ? 0 : Math.max(0, Math.min(100, ramNum));
+
+    $('#CLIENT_INFO_CPU_BAR').css('width', `${cpuClamped}%`).attr('aria-valuenow', cpuClamped.toFixed(0));
+    $('#CLIENT_INFO_CPU_LABEL').text(`${cpuClamped.toFixed(0)}%`);
+    $('#CLIENT_INFO_RAM_BAR').css('width', `${ramClamped}%`).attr('aria-valuenow', ramClamped.toFixed(0));
+    // Compose RAM label: used/total (percent%) if we have byte counts
+    const ramUsed = Client && Client.Vitals && typeof Client.Vitals.Ram?.Used !== 'undefined' ? Client.Vitals.Ram.Used : null;
+    const ramTotal = Client && Client.Vitals && typeof Client.Vitals.Ram?.Total !== 'undefined' ? Client.Vitals.Ram.Total : null;
+    if (ramUsed != null && ramTotal != null) {
+      const usedStr = FormatBytes(ramUsed);
+      const totalStr = FormatBytes(ramTotal);
+      if (usedStr && totalStr) {
+        $('#CLIENT_INFO_RAM_LABEL').text(`${usedStr} / ${totalStr} (${ramClamped.toFixed(0)}%)`);
+      } else {
+        $('#CLIENT_INFO_RAM_LABEL').text(`${ramClamped.toFixed(0)}%`);
+      }
+    } else {
+      $('#CLIENT_INFO_RAM_LABEL').text(`${ramClamped.toFixed(0)}%`);
+    }
+  } catch {}
+
+  // USB devices
+  try {
+    const $usbList = $('#SHOWTRAK_CLIENT_INFO_USB_DEVICES');
+    $usbList.html('');
+    const list = Array.isArray(Client.USBDeviceList) ? Client.USBDeviceList : [];
+    if (list.length > 0) {
+      for (const dev of list) {
+        const ManufacturerName = dev.ManufacturerName;
+        const ProductName = dev.ProductName;
+        const SerialNumber = dev.SerialNumber;
+        $usbList.append(`
+          <div class="rounded-3 p-2 bg-ghost">
+            <h6 class="mb-0">${ManufacturerName ? Safe(ManufacturerName) : 'Generic'} ${
+          ProductName ? Safe(ProductName) : 'USB Device'
+        }</h6>
+            <small class="text-light">Serial Number: ${
+              SerialNumber ? Safe(SerialNumber) : 'Unavailable'
+            }</small>
+          </div>
+        `);
+      }
+    } else {
+      $usbList.html(`
+        <div class="rounded-3 p-2 bg-ghost">
+          <h6 class="mb-0">No USB Devices Connected</h6>
+          <p class="text-sm mb-0">Devices that do not comply with WebUSB 1.3 cannot be displayed.</p>
+        </div>`);
+    }
+  } catch {}
+
+  // Network Interfaces
+  try {
+    const $netList = $('#SHOWTRAK_CLIENT_INFO_NET_INTERFACES');
+    $netList.html('');
+    const ifaces = Array.isArray(Client.NetworkInterfaces) ? Client.NetworkInterfaces : [];
+    if (ifaces.length === 0) {
+      $netList.html(`<div class="rounded-3 p-2 bg-ghost"><h6 class="mb-0">No Interfaces Reported</h6></div>`);
+    } else {
+      // Sort active first: interfaces with any external (non-internal) address
+      const sorted = [...ifaces].sort((a, b) => {
+        const aActive = Array.isArray(a.addresses) && a.addresses.some((x) => x.address && !x.internal);
+        const bActive = Array.isArray(b.addresses) && b.addresses.some((x) => x.address && !x.internal);
+        return (bActive ? 1 : 0) - (aActive ? 1 : 0);
+      });
+    for (const iface of sorted) {
+  const nameRaw = iface && iface.name ? String(iface.name) : 'unknown';
+  const name = Safe(nameRaw || 'unknown');
+  const addresses = Array.isArray(iface.addresses) ? iface.addresses : [];
+  const macs = Array.from(new Set(addresses.map((a) => (a.mac ? String(a.mac).toUpperCase() : '')).filter(Boolean)));
+  const v4 = addresses.filter((a) => String(a.family).includes('4'));
+  const v6 = addresses.filter((a) => String(a.family).includes('6'));
+  const displayedAddrs = v4.length > 0 ? v4 : v6; // show IPv6 only if no IPv4 available
+  const activeCount = addresses.filter((a) => a.address && !a.internal).length;
+        const isActive = activeCount > 0;
+        let addrHtml = '';
+        if (displayedAddrs.length > 0) {
+          for (let i = 0; i < displayedAddrs.length; i++) {
+            const a = displayedAddrs[i];
+            const fam = Safe(a.family || '');
+            const addr = Safe(a.address || '');
+            const mask = Safe(a.netmask || '');
+            const cidr = a.cidr ? Safe(a.cidr) : '';
+            const prefix = cidr && cidr.includes('/') ? `/${cidr.split('/')[1]}` : '';
+            const mac = a.mac ? Safe(String(a.mac).toUpperCase()) : '';
+            const internalBadge = a.internal
+              ? '<span class="badge bg-ghost-light text-light">Internal Only</span>'
+              : '<span class="badge bg-ghost text-light">External</span>';
+            const scopeEl =
+              typeof a.scopeid !== 'undefined' && a.scopeid !== null
+                ? `<div class=\"text-sm text-muted\">scope ${Safe(a.scopeid)}</div>`
+                : '';
+            const idBase = 'IFACE_' + nameRaw.replace(/[^a-zA-Z0-9_-]/g, '') + '_' + i;
+            const addrId = idBase + '_ADDR';
+            const maskId = idBase + '_MASK';
+            const macId = idBase + '_MAC';
+            addrHtml += `
+              <div class="rounded p-2 d-grid gap-2">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="d-flex gap-2 align-items-center">
+                    <span class="badge bg-ghost text-light">${fam}</span>
+                    ${internalBadge}
+                  </div>
+                  ${scopeEl}
+                </div>
+                <div class="form-floating has-copy">
+                  <input type="text" class="form-control disabled" id="${addrId}" value="${addr}${prefix}" disabled />
+                  <label for="${addrId}">Address</label>
+                  <button type="button" class="copy-field-btn" data-target="#${addrId}" title="Copy">
+                    <i class="bi bi-clipboard"></i>
+                  </button>
+                </div>
+                ${mask ? `<div class=\"form-floating has-copy\">` +
+                  `<input type=\"text\" class=\"form-control disabled\" id=\"${maskId}\" value=\"${mask}\" disabled />` +
+                  `<label for=\"${maskId}\">Netmask</label>` +
+                  `<button type=\"button\" class=\"copy-field-btn\" data-target=\"#${maskId}\" title=\"Copy\"><i class=\"bi bi-clipboard\"></i></button>` +
+                `</div>` : ''}
+                ${mac ? `<div class=\"form-floating has-copy\">` +
+                  `<input type=\"text\" class=\"form-control disabled\" id=\"${macId}\" value=\"${mac}\" disabled />` +
+                  `<label for=\"${macId}\">MAC Address</label>` +
+                  `<button type=\"button\" class=\"copy-field-btn\" data-target=\"#${macId}\" title=\"Copy\"><i class=\"bi bi-clipboard\"></i></button>` +
+                `</div>` : ''}
+              </div>`;
+          }
+        } else {
+          addrHtml = '<div class="text-sm text-muted rounded p-2">No addresses (adapter inactive)</div>';
+        }
+        const macSummary = macs.length ? `<div class="text-sm text-muted">${macs.map((m) => `<code>${Safe(m)}</code>`).join(' • ')}</div>` : '';
+        $netList.append(`
+          <div class="rounded-3 p-2 bg-ghost">
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="text-start">
+                <h6 class="mb-0">${name}</h6>
+              </div>
+              <div class="d-flex gap-1 align-items-center">
+                <span class="badge ${isActive ? 'bg-success' : 'bg-secondary'}">${isActive ? 'Active' : 'Inactive'}</span>
+              </div>
+            </div>
+            <div class="d-grid gap-1 mt-2">${addrHtml}</div>
+          </div>`);
+      }
+    }
+  } catch {}
+}

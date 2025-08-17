@@ -117,6 +117,17 @@ io.on('connection', async (socket) => {
     return;
   });
 
+  socket.on('NetworkInterfaces', async (Interfaces) => {
+    try {
+      Logger.log(
+        `Network interfaces received from ${socket.UUID} (${Array.isArray(Interfaces) ? Interfaces.length : 0} interfaces)`
+      );
+      await ClientManager.SetNetworkInterfaces(socket.UUID, Interfaces || []);
+    } catch (e) {
+      Logger.error('Failed to handle NetworkInterfaces for', socket.UUID, e);
+    }
+  });
+
   // Cleanup on disconnect: clear adoption entry and mark offline
   socket.on('disconnect', () => {
     if (!socket.UUID) {
