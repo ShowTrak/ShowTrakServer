@@ -211,7 +211,6 @@ Manager.Heartbeat = async (UUID, Data, IP) => {
       return ['Failed to fetch client', null];
     }
     if (!FetchedClient) {
-      Logger.warn(`Client ${UUID} not found in database, creating new entry.`);
       return ['Client Not Valid', null];
     } else {
       CachedClient = new Client(FetchedClient);

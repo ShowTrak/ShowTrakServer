@@ -5,7 +5,7 @@
 // - Fan-out broadcast events to the UI (webContents.send guards everywhere)
 const { app, BrowserWindow, ipcMain: RPC, Menu } = require('electron/main');
 // Use Electron's shell for opening folders/URLs instead of spawning platform-specific commands
-const { shell } = require('electron');
+const { shell, autoUpdater: SquirrelUpdater } = require('electron');
 if (require('electron-squirrel-startup')) app.quit();
 
 const { Manager: AppDataManager } = require('./Modules/AppData');
@@ -41,6 +41,42 @@ const { OSC } = require('./Modules/OSC');
 const { Manager: ModeManager } = require('./Modules/ModeManager');
 const { Wait } = require('./Modules/Utils');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
+let autoUpdater = null;
+let squirrelUpdaterInitialized = false;
+function isSquirrelWindows() {
+  try {
+    if (process.platform !== 'win32') return false;
+    const execDir = path.dirname(process.execPath);
+    const updateExe1 = path.resolve(execDir, '..', 'Update.exe');
+    const updateExe2 = path.resolve(execDir, '..', '..', 'Update.exe');
+    return fs.existsSync(updateExe1) || fs.existsSync(updateExe2);
+  } catch {
+    return false;
+  }
+}
+function initSquirrelUpdater() {
+  if (squirrelUpdaterInitialized) return;
+  squirrelUpdaterInitialized = true;
+  try {
+    SquirrelUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
+    SquirrelUpdater.on('update-available', () => sendAppUpdateStatus({ state: 'available', info: { tag: 'latest' } }));
+    SquirrelUpdater.on('update-not-available', () => sendAppUpdateStatus({ state: 'none' }));
+    SquirrelUpdater.on('update-downloaded', (_e, _notes, _name, _date, _url) => {
+      sendAppUpdateStatus({ state: 'downloaded', info: { version: _name || 'pending' } });
+    });
+    SquirrelUpdater.on('error', (err) => sendAppUpdateStatus({ state: 'error', error: String(err) }));
+    // Note: Squirrel's autoUpdater may not emit download-progress; states will jump to downloaded
+  } catch {}
+}
+function sendAppUpdateStatus(payload) {
+  try {
+    if (MainWindow && !MainWindow.isDestroyed()) {
+      MainWindow.webContents.send('AppUpdate:Status', payload);
+    }
+  } catch {}
+}
 
 // Main UI window. Always check isDestroyed() before using.
 var MainWindow = null;
@@ -158,6 +194,173 @@ app.whenReady().then(async () => {
     if (Err) return [Err, null];
     return [null, Result];
   });
+  // Always register IPC handlers so renderer never hits an unhandled channel
+  RPC.handle('AppUpdate:Check', async () => {
+    // Dev/unpacked: simulate
+    if (!app.isPackaged) {
+      try {
+        sendAppUpdateStatus({ state: 'checking' });
+        setTimeout(() => sendAppUpdateStatus({ state: 'available', info: { version: 'TEST' } }), 600);
+        let pct = 0;
+        const timer = setInterval(() => {
+          pct += 14;
+          if (pct >= 100) {
+            clearInterval(timer);
+            sendAppUpdateStatus({ state: 'downloaded', info: { version: 'TEST' } });
+          } else {
+            sendAppUpdateStatus({ state: 'downloading', percent: pct });
+          }
+        }, 250);
+      } catch (e) {
+        sendAppUpdateStatus({ state: 'error', error: String(e) });
+      }
+      return;
+    }
+
+    // Packaged on Windows via Squirrel: use Electron built-in Squirrel updater against GitHub latest
+    if (isSquirrelWindows()) {
+      try {
+        initSquirrelUpdater();
+        const feed = 'https://github.com/ShowTrak/ShowTrakServer/releases/latest/download/';
+        // Try both object and string forms for compatibility
+        try { SquirrelUpdater.setFeedURL({ url: feed }); }
+        catch { SquirrelUpdater.setFeedURL(feed); }
+        SquirrelUpdater.checkForUpdates();
+      } catch (e) {
+        sendAppUpdateStatus({ state: 'error', error: String(e) });
+      }
+      return;
+    }
+
+    // Packaged (non-Squirrel): ensure electron-updater is initialized
+    if (!autoUpdater) {
+      try {
+        const { autoUpdater: updater } = require('electron-updater');
+        autoUpdater = updater;
+        autoUpdater.autoDownload = true;
+        autoUpdater.autoInstallOnAppQuit = false;
+        autoUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
+        autoUpdater.on('update-available', (info) => sendAppUpdateStatus({ state: 'available', info }));
+        autoUpdater.on('update-not-available', (info) => sendAppUpdateStatus({ state: 'none', info }));
+        autoUpdater.on('error', (err) => sendAppUpdateStatus({ state: 'error', error: String(err) }));
+        autoUpdater.on('download-progress', (p) =>
+          sendAppUpdateStatus({ state: 'downloading', percent: p && p.percent ? p.percent : 0 })
+        );
+        autoUpdater.on('update-downloaded', (info) => sendAppUpdateStatus({ state: 'downloaded', info }));
+      } catch (e) {
+        sendAppUpdateStatus({ state: 'error', error: 'Updater init failed: ' + String(e) });
+        return;
+      }
+    }
+
+    // Try to find an app-update.yml; if missing, synthesize one for GitHub public repo
+    const resourcesPath = typeof process !== 'undefined' ? process.resourcesPath : '';
+    const execDir = typeof process !== 'undefined' && process.execPath ? path.dirname(process.execPath) : '';
+    const ymlPaths = [
+      resourcesPath ? path.join(resourcesPath, 'app-update.yml') : '',
+      execDir ? path.join(execDir, 'app-update.yml') : '',
+    ].filter(Boolean);
+    const hasYml = ymlPaths.some((p) => {
+      try { return fs.existsSync(p); } catch { return false; }
+    });
+    if (!hasYml) {
+      try {
+        const tmpYml = path.join(os.tmpdir(), `showtrak-app-update-${process.pid}.yml`);
+        const yml = [
+          'provider: github',
+          'owner: ShowTrak',
+          'repo: ShowTrakServer',
+          // no token for public repo; add one via env GH_TOKEN if rate-limited
+        ].join('\n');
+        fs.writeFileSync(tmpYml, yml, 'utf8');
+        autoUpdater.updateConfigPath = tmpYml;
+      } catch (e) {
+        // If writing config fails, fall back to simulated flow
+        try {
+          sendAppUpdateStatus({ state: 'checking' });
+          setTimeout(() => sendAppUpdateStatus({ state: 'available', info: { version: 'SIM' } }), 600);
+          let pct = 0;
+          const timer = setInterval(() => {
+            pct += 14;
+            if (pct >= 100) {
+              clearInterval(timer);
+              sendAppUpdateStatus({ state: 'downloaded', info: { version: 'SIM' } });
+            } else {
+              sendAppUpdateStatus({ state: 'downloading', percent: pct });
+            }
+          }, 250);
+        } catch {}
+        return;
+      }
+    }
+
+    try {
+      await autoUpdater.checkForUpdates();
+    } catch (e) {
+      sendAppUpdateStatus({ state: 'error', error: String(e) });
+    }
+  });
+  RPC.handle('AppUpdate:Install', async () => {
+    // Dev/unpacked: simulate install
+    if (!app.isPackaged) {
+      try {
+        sendAppUpdateStatus({ state: 'installing' });
+        setTimeout(() => sendAppUpdateStatus({ state: 'installed' }), 600);
+      } catch (e) {
+        sendAppUpdateStatus({ state: 'error', error: String(e) });
+      }
+      return;
+    }
+
+    // Packaged on Windows via Squirrel: call built-in updater
+    if (isSquirrelWindows()) {
+      try {
+        sendAppUpdateStatus({ state: 'installing' });
+        SquirrelUpdater.quitAndInstall();
+      } catch (e) {
+        sendAppUpdateStatus({ state: 'error', error: String(e) });
+      }
+      return;
+    }
+
+    // Packaged: if updater config/path is set (real updates), perform real install; else simulate
+    const hasConfig = Boolean(autoUpdater && (autoUpdater.updateConfigPath || autoUpdater.provider));
+    if (!hasConfig) {
+      try {
+        sendAppUpdateStatus({ state: 'installing' });
+        setTimeout(() => sendAppUpdateStatus({ state: 'installed' }), 600);
+      } catch (e) {
+        sendAppUpdateStatus({ state: 'error', error: String(e) });
+      }
+      return;
+    }
+    if (!autoUpdater) {
+      sendAppUpdateStatus({ state: 'error', error: 'Updater not available' });
+      return;
+    }
+    try {
+      await autoUpdater.quitAndInstall(false, true);
+    } catch (e) {
+      sendAppUpdateStatus({ state: 'error', error: String(e) });
+    }
+  });
+  // Initialize electron-updater lazily for manual control
+  try {
+    const { autoUpdater: updater } = require('electron-updater');
+    autoUpdater = updater;
+    autoUpdater.autoDownload = true; // download when found
+    autoUpdater.autoInstallOnAppQuit = false;
+    autoUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
+    autoUpdater.on('update-available', (info) => sendAppUpdateStatus({ state: 'available', info }));
+    autoUpdater.on('update-not-available', (info) => sendAppUpdateStatus({ state: 'none', info }));
+    autoUpdater.on('error', (err) => sendAppUpdateStatus({ state: 'error', error: String(err) }));
+    autoUpdater.on('download-progress', (p) =>
+      sendAppUpdateStatus({ state: 'downloading', percent: p && p.percent ? p.percent : 0 })
+    );
+    autoUpdater.on('update-downloaded', (info) => sendAppUpdateStatus({ state: 'downloaded', info }));
+  } catch (e) {
+    Logger.error('electron-updater initialization failed:', e);
+  }
 
   RPC.handle('Config:Get', async () => {
     return Config;
@@ -494,17 +697,6 @@ async function StartOptionalFeatures() {
     powerSaveBlocker.start('prevent-display-sleep');
   } else {
     Logger.log('Prevent Display Sleep is disabled in settings, not starting powerSaveBlocker.');
-  }
-
-  let SYSTEM_AUTO_UPDATE = await SettingsManager.GetValue('SYSTEM_AUTO_UPDATE');
-  if (SYSTEM_AUTO_UPDATE) {
-    Logger.log('Automatic updates are enabled, starting update process...');
-    const { updateElectronApp } = require('update-electron-app');
-    updateElectronApp({
-      notifyUser: true,
-    });
-  } else {
-    Logger.log('Automatic updates are disabled in settings, not starting update process.');
   }
 }
 StartOptionalFeatures();

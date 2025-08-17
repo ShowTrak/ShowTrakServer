@@ -82,4 +82,8 @@ contextBridge.exposeInMainWorld('API', {
   UnadoptClient: async (UUID) => ipcRenderer.invoke('UnadoptClient', UUID),
   DeleteScripts: async (List) => ipcRenderer.invoke('DeleteScripts', List),
   UpdateScripts: async (List) => ipcRenderer.invoke('UpdateScripts', List),
+  // App update APIs
+  CheckForAppUpdates: async () => ipcRenderer.invoke('AppUpdate:Check'),
+  InstallAppUpdate: async () => ipcRenderer.invoke('AppUpdate:Install'),
+  OnAppUpdateStatus: (cb) => ipcRenderer.on('AppUpdate:Status', (_e, payload) => cb(payload)),
 });

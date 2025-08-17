@@ -74,40 +74,32 @@ const DefaultSettings = [
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
-  {
-    Group: 'System',
-    Key: 'SYSTEM_AUTO_UPDATE',
-    Title: 'Automatic Updates (Reboot Required)',
-    Description: 'Automatically update ShowTrak to the latest stable version.',
-    Type: 'BOOLEAN',
-    DefaultValue: true,
-  },
   // Demo settings to showcase new data types
-  {
-    Group: 'Demo',
-    Key: 'DEMO_INTEGER_EXAMPLE',
-    Title: 'Demo Integer',
-    Description: 'An example integer setting with debounced auto-save.',
-    Type: 'INTEGER',
-    DefaultValue: 10,
-  },
-  {
-    Group: 'Demo',
-    Key: 'DEMO_STRING_EXAMPLE',
-    Title: 'Demo String',
-    Description: 'An example string setting with debounced auto-save.',
-    Type: 'STRING',
-    DefaultValue: 'Hello World',
-  },
-  {
-    Group: 'Demo',
-    Key: 'DEMO_OPTION_EXAMPLE',
-    Title: 'Demo Option',
-    Description: 'An example dropdown (option) setting with auto-save.',
-    Type: 'OPTION',
-    DefaultValue: 'Medium',
-    Options: ['Low', 'Medium', 'High'],
-  },
+  // {
+  //   Group: 'Demo',
+  //   Key: 'DEMO_INTEGER_EXAMPLE',
+  //   Title: 'Demo Integer',
+  //   Description: 'An example integer setting with debounced auto-save.',
+  //   Type: 'INTEGER',
+  //   DefaultValue: 10,
+  // },
+  // {
+  //   Group: 'Demo',
+  //   Key: 'DEMO_STRING_EXAMPLE',
+  //   Title: 'Demo String',
+  //   Description: 'An example string setting with debounced auto-save.',
+  //   Type: 'STRING',
+  //   DefaultValue: 'Hello World',
+  // },
+  // {
+  //   Group: 'Demo',
+  //   Key: 'DEMO_OPTION_EXAMPLE',
+  //   Title: 'Demo Option',
+  //   Description: 'An example dropdown (option) setting with auto-save.',
+  //   Type: 'OPTION',
+  //   DefaultValue: 'Medium',
+  //   Options: ['Low', 'Medium', 'High'],
+  // },
 ];
 
 const Groups = [
@@ -115,7 +107,7 @@ const Groups = [
   { Name: 'Notifications', Title: 'Notifications' },
   { Name: 'Features', Title: 'Features' },
   { Name: 'System', Title: 'System Settings' },
-  { Name: 'Demo', Title: 'Demo Settings' },
+  // { Name: 'Demo', Title: 'Demo Settings' },
 ];
 
 module.exports = {

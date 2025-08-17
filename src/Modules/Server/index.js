@@ -20,6 +20,9 @@ const { Wait } = require('../Utils');
 
 // HTTP server backing express + Socket.IO
 const Server = HTTP.createServer();
+Server.on('error', (e) => {
+  Logger.error('HTTP/Socket server error:', e && e.code ? e.code : e);
+});
 
 const app = express();
 
@@ -42,6 +45,16 @@ const Manager = {};
 
 // Per-connection lifecycle
 io.on('connection', async (socket) => {
+  try {
+    Logger.log('Incoming socket connection', {
+      id: socket.id,
+      address: socket.handshake && socket.handshake.address,
+      query: socket.handshake && socket.handshake.query,
+      headers: socket.handshake && socket.handshake.headers && {
+        'x-forwarded-for': socket.handshake.headers['x-forwarded-for'],
+      },
+    });
+  } catch {}
   // Expect clients to provide a UUID and whether they believe they are adopted
   if (
     !socket.handshake.query ||
@@ -75,7 +88,17 @@ io.on('connection', async (socket) => {
 
   // Unadopted devices send presence to appear in the adoption list
   socket.on('AdoptionHeartbeat', async (Data) => {
-    await AdoptionManager.AddClientPendingAdoption(socket.UUID, socket.IP, Data);
+    try {
+      // Logger.log('AdoptionHeartbeat received', {
+      //   UUID: socket.UUID,
+      //   IP: socket.IP,
+      //   Hostname: Data && Data.Hostname,
+      //   Version: Data && Data.Version,
+      // });
+      await AdoptionManager.AddClientPendingAdoption(socket.UUID, socket.IP, Data);
+    } catch (e) {
+      Logger.error('AdoptionHeartbeat handler error for', socket.UUID, e);
+    }
   });
 
   socket.on('GetScripts', async (Callback) => {
@@ -85,11 +108,35 @@ io.on('connection', async (socket) => {
   });
 
   socket.on('Heartbeat', async (Data) => {
-    await ClientManager.Heartbeat(socket.UUID, Data, socket.IP);
+    try {
+      // Logger.debug('Heartbeat received', {
+      //   UUID: socket.UUID,
+      //   Vitals: Data && Data.Vitals ? {
+      //     cpu: Data.Vitals.CPU && Data.Vitals.CPU.UsagePercentage,
+      //     ram: Data.Vitals.Ram && Data.Vitals.Ram.UsagePercentage,
+      //   } : undefined,
+      //   Version: Data && Data.Version,
+      // });
+      let [Err, Client] = await ClientManager.Heartbeat(socket.UUID, Data, socket.IP);
+      if (Err) {
+        console.error(Err);
+      }
+    } catch (e) {
+      Logger.error('Heartbeat handler error for', socket.UUID, e);
+    }
   });
 
   socket.on('SystemInfo', async (Data) => {
-    await ClientManager.SystemInfo(socket.UUID, Data, socket.IP);
+    try {
+      // Logger.debug('SystemInfo received', {
+      //   UUID: socket.UUID,
+      //   Hostname: Data && Data.Hostname,
+      //   MacKeys: Data && Data.MacAddresses ? Object.keys(Data.MacAddresses) : [],
+      // });
+      await ClientManager.SystemInfo(socket.UUID, Data, socket.IP);
+    } catch (e) {
+      Logger.error('SystemInfo handler error for', socket.UUID, e);
+    }
   });
 
   socket.on('USBDeviceList', async (DeviceList) => {
@@ -129,13 +176,18 @@ io.on('connection', async (socket) => {
   });
 
   // Cleanup on disconnect: clear adoption entry and mark offline
-  socket.on('disconnect', () => {
-    if (!socket.UUID) {
-      Logger.log('Socket disconnected without UUID:', socket.id);
-      return;
+  socket.on('disconnect', (reason) => {
+    try {
+      if (!socket.UUID) {
+        Logger.log('Socket disconnected without UUID:', socket.id, reason);
+        return;
+      }
+      Logger.log('Client disconnected', { UUID: socket.UUID, reason });
+      AdoptionManager.RemoveClientPendingAdoption(socket.UUID);
+      ClientManager.Timeout(socket.UUID);
+    } catch (e) {
+      Logger.error('Disconnect handler error for', socket && socket.UUID, e);
     }
-    AdoptionManager.RemoveClientPendingAdoption(socket.UUID);
-    ClientManager.Timeout(socket.UUID);
   });
 
   socket.on('ScriptExecutionResponse', (RequestID, Error, _Result) => {
@@ -149,6 +201,7 @@ Manager.ExecuteScripts = async (ScriptID, Targets, ResetList) => {
   if (ResetList) await ScriptExecutionManager.ClearQueue();
   for (const UUID of Targets) {
     const RequestID = await ScriptExecutionManager.AddToQueue(UUID, ScriptID);
+  Logger.log('ExecuteScript dispatch', { ScriptID, UUID, RequestID });
     io.to(UUID).emit('ExecuteScript', RequestID, ScriptID);
   }
 };
@@ -160,12 +213,16 @@ Manager.ExecuteBulkRequest = async (Action, Targets, ReadableName) => {
   for (const UUID of Targets) {
     await Wait(150);
     const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, ReadableName);
+  Logger.log('ExecuteBulkRequest dispatch', { Action, ReadableName, UUID, RequestID });
     io.to(UUID).emit(Action, RequestID);
   }
 };
 
 // Send a message to all sockets in a room (UUID or group ID)
 Manager.SendMessageByGroup = async (Group, Message, Data) => {
+  try {
+    Logger.debug('SendMessageByGroup', { Group, Message });
+  } catch {}
   return io.to(Group).emit(Message, Data);
 };
 

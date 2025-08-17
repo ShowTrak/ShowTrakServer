@@ -25,7 +25,7 @@
     </div>
     <div id="APPLICATION_CONTAINER" class="h-100">
       <div id="APPLICATION" class="container-fluid text-center text-light p-0 d-grid">
-        <div id="APPLICATION_CONTENT"></div>
+        <div id="APPLICATION_CONTENT" class="pb-3"></div>
       </div>
     </div>
     <!-- Bottom Bar -->
@@ -133,10 +133,10 @@
               <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON">
                 OSC Dictionary
               </a>
-              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_ADOPT_BUTTON"> Adoption </a>
               <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON">
                 Group Manager
               </a>
+
 
               <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_LOGSFOLDER">
                 Open Logs Directory
@@ -157,6 +157,29 @@
               <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_SUPPORTDISCORD">
                 Open Suppport Discord
               </a>
+
+              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_CHECKUPDATES">
+                Check for Updates
+              </a>
+
+              <div id="UPDATE_SECTION" class="card bg-ghost-light border-0 rounded d-none">
+                <div class="card-body p-2 text-sm text-start">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                      <strong>Update</strong>
+                      <div id="UPDATE_STATUS" class="text-muted">No pending update</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                      <button type="button" class="btn btn-sm btn-success d-none" id="UPDATE_INSTALL_BTN">Install</button>
+                      <button type="button" class="btn btn-sm btn-light d-none" id="UPDATE_LATER_BTN">Later</button>
+                    </div>
+                  </div>
+                  <div id="UPDATE_NOTES_WRAPPER" class="mt-2 d-none">
+                    <div class="fw-semibold small mb-1">Changelog</div>
+                    <div id="UPDATE_CHANGELOG" class="border rounded bg-body p-2 small" style="max-height: 180px; overflow: auto; white-space: pre-wrap;"></div>
+                  </div>
+                </div>
+              </div>
 
               <a class="btn btn-sm btn-danger" id="SHOWTRAK_MODEL_CORE_SHUTDOWN_BUTTON">
                 Close ShowTrak
@@ -234,27 +257,6 @@
             </div>
 
             <div id="SETTINGS" class="d-grid gap-2"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div
-      class="modal fade"
-      id="SHOWTRAK_MODEL_ADOPTION"
-      tabindex="-1"
-      aria-labelledby="SHOWTRAK_MODEL_ADOPTION_Label"
-      aria-hidden="true"
-    >
-      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-          <div class="modal-body text-center">
-            <div class="d-flex justify-content-center">
-              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-            </div>
-            <h6 class="mb-0">Clients Pending Adoption</h6>
-
-            <div id="DEVICES_PENDING_ADOPTION" class="d-grid gap-2"></div>
           </div>
         </div>
       </div>

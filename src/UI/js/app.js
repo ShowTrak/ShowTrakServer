@@ -4,6 +4,11 @@ let Selected = [];
 let AllClients = [];
 let ScriptList = [];
 const GroupUUIDCache = new Map();
+// Pending adoption devices (unadopted clients discovered by the server)
+let PendingAdoption = [];
+// Cache last full lists to allow partial re-render when only pending changes
+let __LastClients = [];
+let __LastGroups = [];
 
 let SettingsGroups = [];
 let Settings = [];
@@ -48,6 +53,16 @@ window.API.OnModeUpdated((mode) => {
       initializeEditInteractions();
     } catch {}
   }
+  // Refresh discover/adopt section visibility when mode changes
+  try {
+    const html = RenderPendingAdoptionSection();
+    const $existing = $('#PENDING_ADOPTION_SECTION');
+    if ($existing.length) {
+      $existing.replaceWith(html);
+    } else if (AppMode === 'EDIT' && $('#APPLICATION_CONTENT').length) {
+      $('#APPLICATION_CONTENT').append(html);
+    }
+  } catch {}
 });
 
 // Wire the toggle to backend
@@ -475,6 +490,9 @@ window.API.SetScriptList(async (Scripts) => {
 });
 
 window.API.SetFullClientList(async (Clients, Groups) => {
+  // cache latest full lists
+  __LastClients = Array.isArray(Clients) ? Clients : [];
+  __LastGroups = Array.isArray(Groups) ? Groups : [];
   AllClients = Clients.map((Client) => Client.UUID);
   let Filler = '';
 
@@ -495,11 +513,6 @@ window.API.SetFullClientList(async (Clients, Groups) => {
             <p class="text-light mb-0">
                 You don't have any clients configured yet. Discover clients on your network and adopt them with the Adoption Manager below.
             </p>
-            <div>
-                <a class="btn btn-sm btn-light" onclick="OpenAdoptionManager()">
-                    Open Adoption Manager
-                </a>
-            </div>
         </div>`;
   }
 
@@ -574,13 +587,16 @@ window.API.SetFullClientList(async (Clients, Groups) => {
     Filler += `</div></div>`;
   }
 
-  Filler += `<div class="d-flex justify-content-start">
-		<div class="GROUP_TITLE_CLICKABLE m-3 me-0 rounded" onclick="OpenGroupCreationModal()">
-			<div class="d-flex align-items-center text-center h-100">
-				<span class="GROUP_CREATE_BUTTON py-2">+</span>
-			</div>
-		</div>
-	</div>`;
+  // Filler += `<div class="d-flex justify-content-start">
+	// 	<div class="GROUP_TITLE_CLICKABLE m-3 me-0 rounded" onclick="OpenGroupCreationModal()">
+	// 		<div class="d-flex align-items-center text-center h-100">
+	// 			<span class="GROUP_CREATE_BUTTON py-2">+</span>
+	// 		</div>
+	// 	</div>
+	// </div>`;
+
+  // Append Pending Adoption section after groups, if any
+  Filler += RenderPendingAdoptionSection();
 
   $('#APPLICATION_CONTENT').html(Filler);
   // Initialize or teardown edit-mode interactions after render
@@ -588,6 +604,130 @@ window.API.SetFullClientList(async (Clients, Groups) => {
     try {
       initializeEditInteractions();
     } catch {}
+  }
+});
+
+// Renderer receives live updates for devices pending adoption
+window.API.SetDevicesPendingAdoption(async (Devices) => {
+  const previous = Array.isArray(PendingAdoption) ? PendingAdoption : [];
+  const next = Array.isArray(Devices) ? Devices : [];
+  // Build fast lookup maps
+  const prevMap = new Map(previous.map((d) => [d.UUID, d]));
+  const nextMap = new Map(next.map((d) => [d.UUID, d]));
+
+  // 1) Add alerts for newly available devices
+  for (const dev of next) {
+    const uuid = dev && dev.UUID;
+    if (!uuid) continue;
+    if (!prevMap.has(uuid) && !PendingAdoptionAlerts.has(uuid)) {
+      const title = 'Device available for adoption';
+      const msg = `${Safe(dev.Hostname || 'Unknown Host')} (${Safe(dev.IP || 'Unknown IP')})`;
+      const id = AddAlert({
+        type: 'adoption',
+        severity: 'info',
+        title,
+        message: msg,
+        clientUUID: uuid,
+        iconHtml: '<i class="bi bi-person-plus"></i>',
+      });
+      PendingAdoptionAlerts.set(uuid, id);
+    }
+  }
+
+  // 2) Auto-dismiss alerts for devices that are no longer pending (adopted/removed) or state changed to Adopting
+  for (const dev of previous) {
+    const uuid = dev && dev.UUID;
+    if (!uuid) continue;
+    const stillPending = nextMap.has(uuid);
+    const now = nextMap.get(uuid);
+    const status = now && (now.State || now.status || now.state);
+    const shouldDismiss = !stillPending || String(status).toLowerCase() === 'adopting';
+    if (shouldDismiss && PendingAdoptionAlerts.has(uuid)) {
+      const alertId = PendingAdoptionAlerts.get(uuid);
+      DismissAlert(alertId);
+      PendingAdoptionAlerts.delete(uuid);
+    }
+  }
+
+  PendingAdoption = next;
+  // If main content already rendered, update/insert the section in place
+  try {
+    if (AppMode !== 'EDIT') {
+      const $existing = $('#PENDING_ADOPTION_SECTION');
+      if ($existing.length) $existing.replaceWith('<div id="PENDING_ADOPTION_SECTION"></div>');
+      return;
+    }
+    const html = RenderPendingAdoptionSection();
+    const $existing = $('#PENDING_ADOPTION_SECTION');
+    if ($existing.length) {
+      $existing.replaceWith(html);
+    } else {
+      // If no section yet (e.g., first update before full list), append to content if present
+      if ($('#APPLICATION_CONTENT').length) {
+        $('#APPLICATION_CONTENT').append(html);
+      }
+    }
+  } catch {}
+});
+
+function RenderPendingAdoptionSection() {
+  try {
+  if (AppMode !== 'EDIT') return '<div id="PENDING_ADOPTION_SECTION"></div>';
+    const list = Array.isArray(PendingAdoption) ? PendingAdoption : [];
+    if (!list.length) return '<div id="PENDING_ADOPTION_SECTION"></div>';
+    let html = '';
+    html += `<div id="PENDING_ADOPTION_SECTION" class="d-flex justify-content-start">`;
+    html += `  <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded">`;
+    html += `    <div class="d-flex align-items-center text-center h-100">`;
+    html += `      <span class="GROUP_TITLE py-2">DISCOVER</span>`;
+    html += `    </div>`;
+    html += `  </div>`;
+    html += `  <div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100">`;
+    for (const dev of list) {
+      const Hostname = dev && dev.Hostname ? dev.Hostname : 'Unknown Host';
+      const IP = dev && dev.IP ? dev.IP : 'Unknown IP';
+      const Version = dev && dev.Version ? dev.Version : 'X.X.X';
+      const UUID = dev && dev.UUID ? dev.UUID : '';
+      html += `
+        <div class="SHOWTRAK_PC PENDING" data-uuid="${Safe(UUID)}">
+          <h5 class="mb-0">${Safe(Hostname)}</h5>
+          <small class="text-sm text-light">${Safe(IP)}</small>
+          <div class="d-grid">
+            <button class="btn btn-sm btn-light SHOWTRAK_BTN_ROUNDED ADOPT_BTN" data-uuid="${Safe(
+              UUID
+            )}">Adopt</button>
+          </div>
+        </div>`;
+    }
+    html += `  </div>`;
+    html += `</div>`;
+    return html;
+  } catch (e) {
+    return '<div id="PENDING_ADOPTION_SECTION"></div>';
+  }
+}
+
+// Global event delegation for Adopt buttons (works across re-renders)
+document.addEventListener('click', async (e) => {
+  const target = e.target;
+  if (!(target && target.classList && target.classList.contains('ADOPT_BTN'))) return;
+  // Prevent bubbling to tile click handler (which toggles selection)
+  try { e.preventDefault(); e.stopPropagation(); } catch {}
+  const btn = target;
+  const UUID = btn.getAttribute('data-uuid');
+  if (!UUID) return;
+  try {
+    btn.disabled = true;
+    btn.textContent = 'Adopting…';
+    // Auto-dismiss any existing adoption alert for this UUID immediately
+    try {
+      const id = PendingAdoptionAlerts.get(UUID);
+      if (id) { DismissAlert(id); PendingAdoptionAlerts.delete(UUID); }
+    } catch {}
+    await window.API.AdoptDevice(UUID);
+  } catch {
+    btn.disabled = false;
+    btn.textContent = 'Adopt';
   }
 });
 
@@ -1066,6 +1206,8 @@ window.API.ClientUpdated(async (Data) => {
 // --- Alerts Manager ---
 const Alerts = [];
 let AlertsVisible = false;
+// Track adoption alerts per device UUID so we can auto-dismiss
+const PendingAdoptionAlerts = new Map();
 
 function AddAlert({
   type = 'info',
@@ -1099,6 +1241,7 @@ function AddAlert({
     linkAlert: true,
     iconHtml: alert.iconHtml,
   });
+  return alert.id;
 }
 
 function DismissAlert(id) {
@@ -1229,47 +1372,47 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-window.API.SetDevicesPendingAdoption(async (Data) => {
-  let Filler = '';
-  for (const { Hostname, IP, UUID, Version, State } of Data) {
-    let VersionArr = Version.split('.');
-    let MyVersionArr = Config.Application.Version.split('.');
+// window.API.SetDevicesPendingAdoption(async (Data) => {
+//   let Filler = '';
+//   for (const { Hostname, IP, UUID, Version, State } of Data) {
+//     let VersionArr = Version.split('.');
+//     let MyVersionArr = Config.Application.Version.split('.');
 
-    let VersionCompatible = true;
-    if (VersionArr[0] !== MyVersionArr[0]) VersionCompatible = false;
-    if (VersionArr[1] !== MyVersionArr[1]) VersionCompatible = false;
+//     let VersionCompatible = true;
+//     if (VersionArr[0] !== MyVersionArr[0]) VersionCompatible = false;
+//     if (VersionArr[1] !== MyVersionArr[1]) VersionCompatible = false;
 
-    let ButtonState = ` <div class="d-flex flex-column justify-content-center gap-0">
-                <a class="btn btn-light btn-sm" onclick="AdoptDevice('${UUID}')">Adopt</a>
-            </div>`;
-    if (!VersionCompatible) {
-      ButtonState = ` <div class="d-flex flex-column justify-content-center gap-0">
-                <a class="btn btn-danger btn-sm disabled" disabled>Incompatible Version (v${Safe(Version)})</a>
-            </div>`;
-    }
-    if (State === 'Adopting') {
-      ButtonState = `<div class="d-flex flex-column justify-content-center gap-0">
-                <button class="btn btn-secondary btn-sm" disabled>
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    Adopting...
-                </button>
-            </div>`;
-    }
+//     let ButtonState = ` <div class="d-flex flex-column justify-content-center gap-0">
+//                 <a class="btn btn-light btn-sm" onclick="AdoptDevice('${UUID}')">Adopt</a>
+//             </div>`;
+//     if (!VersionCompatible) {
+//       ButtonState = ` <div class="d-flex flex-column justify-content-center gap-0">
+//                 <a class="btn btn-danger btn-sm disabled" disabled>Incompatible Version (v${Safe(Version)})</a>
+//             </div>`;
+//     }
+//     if (State === 'Adopting') {
+//       ButtonState = `<div class="d-flex flex-column justify-content-center gap-0">
+//                 <button class="btn btn-secondary btn-sm" disabled>
+//                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+//                     Adopting...
+//                 </button>
+//             </div>`;
+//     }
 
-    Filler += `<div class="SHOWTRAK_CLIENT_PENDING_ADOPTION rounded-3 d-flex justify-content-between p-3" data-uuid="${UUID}">
-            <div class="d-flex flex-column justify-content-center gap-1 text-start">
-                <h6 class="card-title mb-0">${Safe(Hostname)}</h6>
-                <small class="text-muted">${Safe(IP)}</small>
-                <small class="text-muted">${Safe(UUID)} - v${Safe(Version)}</small>
-            </div>
-            ${ButtonState}
-        </div>`;
-  }
-  if (Data.length === 0) {
-    Filler = `<div class="SHOWTRAK_CLIENT_PENDING_ADOPTION rounded-3 text-center text-muted p-3">No devices pending adoption</div>`;
-  }
-  $('#DEVICES_PENDING_ADOPTION').html(Filler);
-});
+//     Filler += `<div class="SHOWTRAK_CLIENT_PENDING_ADOPTION rounded-3 d-flex justify-content-between p-3" data-uuid="${UUID}">
+//             <div class="d-flex flex-column justify-content-center gap-1 text-start">
+//                 <h6 class="card-title mb-0">${Safe(Hostname)}</h6>
+//                 <small class="text-muted">${Safe(IP)}</small>
+//                 <small class="text-muted">${Safe(UUID)} - v${Safe(Version)}</small>
+//             </div>
+//             ${ButtonState}
+//         </div>`;
+//   }
+//   if (Data.length === 0) {
+//     Filler = `<div class="SHOWTRAK_CLIENT_PENDING_ADOPTION rounded-3 text-center text-muted p-3">No devices pending adoption</div>`;
+//   }
+//   $('#DEVICES_PENDING_ADOPTION').html(Filler);
+// });
 
 async function ExecuteScript(Script, Targets) {
   let ScriptTarget = ScriptList.find((s) => s.ID === Script);
@@ -1718,6 +1861,11 @@ function IsSelected(UUID) {
 }
 
 function Select(UUID) {
+  // Do not allow selecting pending-adoption tiles
+  try {
+    const $tile = $(`.SHOWTRAK_PC[data-uuid='${UUID}']`);
+    if ($tile && $tile.hasClass('PENDING')) return;
+  } catch {}
   if (Selected.includes(UUID)) return;
   Selected.push(UUID);
   $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).addClass('SELECTED');
@@ -1742,6 +1890,11 @@ function ClearSelection() {
 }
 
 function ToggleSelection(UUID) {
+  // Do not toggle selection for pending-adoption tiles
+  try {
+    const $tile = $(`.SHOWTRAK_PC[data-uuid='${UUID}']`);
+    if ($tile && $tile.hasClass('PENDING')) return;
+  } catch {}
   if (Selected.includes(UUID)) {
     Selected = Selected.filter((id) => id !== UUID);
     $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).removeClass('SELECTED');
@@ -1802,6 +1955,161 @@ $(async function () {
     return false;
   });
 
+  // --- App Updates (manual check) ---
+  try {
+    // Bind Check for Updates button in core modal
+    $('#SHOWTRAK_MODEL_CORE_CHECKUPDATES').off('click').on('click', async () => {
+      try { await window.API.CheckForAppUpdates(); } catch {}
+      // Ensure section visible while checking
+      $('#UPDATE_SECTION').removeClass('d-none');
+      $('#UPDATE_STATUS').text('Checking for updates...');
+      $('#UPDATE_INSTALL_BTN').addClass('d-none');
+      $('#UPDATE_LATER_BTN').addClass('d-none');
+    });
+    // Bind Install and Later buttons
+    $('#UPDATE_INSTALL_BTN').off('click').on('click', async () => {
+      try { await window.API.InstallAppUpdate(); } catch {}
+    });
+    $('#UPDATE_LATER_BTN').off('click').on('click', async () => {
+      // Hide the section but keep state if needed later
+      $('#UPDATE_SECTION').addClass('d-none');
+    });
+
+    // Listen for updater status from main
+    window.API.OnAppUpdateStatus((payload) => {
+      try {
+        $('#UPDATE_SECTION').removeClass('d-none');
+        const st = (payload && payload.state) || 'none';
+        const $status = $('#UPDATE_STATUS');
+        const $install = $('#UPDATE_INSTALL_BTN');
+        const $later = $('#UPDATE_LATER_BTN');
+        const $notesWrap = $('#UPDATE_NOTES_WRAPPER');
+        const $notes = $('#UPDATE_CHANGELOG');
+        $install.addClass('d-none');
+        $later.addClass('d-none');
+        $notesWrap.addClass('d-none');
+        $notes.empty();
+        const escapeHtml = (s) => String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+        const sanitizeHref = (href) => {
+          try {
+            const h = String(href || '').trim();
+            if (/^(https?:|mailto:)/i.test(h)) return h;
+          } catch {}
+          return '#';
+        };
+        const renderMarkdownSafe = (md) => {
+          if (!md || typeof md !== 'string') return '';
+          let text = md.replace(/\r\n/g, '\n');
+          // Escape HTML first
+          text = escapeHtml(text);
+          // Extract fenced code blocks
+          const codeBlocks = [];
+          text = text.replace(/```([\s\S]*?)```/g, (_m, code) => {
+            const idx = codeBlocks.push(code) - 1;
+            return `%%CODEBLOCK_${idx}%%`;
+          });
+          // Headings
+          text = text.replace(/^#{1,6}\s+(.+)$/gm, (m) => {
+            const hashes = m.match(/^#+/)[0].length;
+            const content = m.replace(/^#{1,6}\s+/, '');
+            const level = Math.min(6, Math.max(1, hashes));
+            return `<h${level} class="h${level+2}">${content}</h${level}>`;
+          });
+          // Inline code (after fences are removed)
+          text = text.replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`);
+          // Links
+          text = text.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, (_m, label, href) => {
+            const url = sanitizeHref(href);
+            return `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
+          });
+          // Unordered lists (group contiguous items)
+          text = text.replace(/(?:^|\n)((?:[\-\*\+]\s+.*(?:\n|$))+)/g, (_m, block) => {
+            const items = block
+              .trim()
+              .split(/\n/)
+              .map((line) => line.replace(/^[\-\*\+]\s+/, '').trim())
+              .filter((x) => x.length > 0)
+              .map((x) => `<li>${x}</li>`) 
+              .join('');
+            return `\n<ul>${items}</ul>`;
+          });
+          // Bold and italic (do after lists so we don't break bullets)
+          text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                     .replace(/__(.+?)__/g, '<strong>$1</strong>')
+                     .replace(/(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)/g, '<em>$1</em>')
+                     .replace(/_(?!\s)(.+?)(?<!\s)_/g, '<em>$1</em>');
+          // Paragraphs: wrap blocks that are not already block-level tags
+          const blocks = text.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
+          const html = blocks.map((b) => {
+            if (/^<\/?(h\d|ul|ol|li|pre|blockquote|table|p|code)/i.test(b)) return b;
+            return `<p>${b.replace(/\n/g, '<br/>')}</p>`;
+          }).join('\n');
+          // Restore fenced code blocks
+          return html.replace(/%%CODEBLOCK_(\d+)%%/g, (_m, i) => {
+            const code = codeBlocks[Number(i)] || '';
+            return `<pre class="mb-2"><code>${code}</code></pre>`;
+          });
+        };
+        const extractNotes = (info) => {
+          if (!info) return '';
+          // electron-updater passes release notes in different shapes across platforms
+          // Prefer html: info.releaseNotes or markdown: info.notes
+          const raw = info.releaseNotes || info.notes || info.body || '';
+          if (Array.isArray(raw)) {
+            // mac: array of releases, take the first entry's notes
+            const first = raw.find(Boolean);
+            return first && (first.releaseNotes || first.notes || first.body) || '';
+          }
+          return raw || '';
+        };
+    const showNotes = (info) => {
+          const notes = extractNotes(info);
+          if (notes && typeof notes === 'string') {
+            // Allow basic HTML if present from GitHub; otherwise escape text
+            const looksHtml = /<\w+[^>]*>/.test(notes);
+            if (looksHtml) {
+              $notes.html(notes);
+            } else {
+      $notes.html(renderMarkdownSafe(notes));
+            }
+            $notesWrap.removeClass('d-none');
+          }
+        };
+        if (st === 'checking') {
+          $status.text('Checking for updates...');
+        } else if (st === 'available') {
+          const v = payload.info && (payload.info.version || payload.info.tag || 'Update available');
+          $status.text(`Update available: ${v}. Downloading...`);
+          showNotes(payload.info);
+        } else if (st === 'downloading') {
+          const pct = payload.percent ? Math.floor(payload.percent) : 0;
+          $status.text(`Downloading update... ${pct}%`);
+        } else if (st === 'downloaded') {
+          const v = payload.info && (payload.info.version || 'pending');
+          $status.text(`Update ready to install: ${v}`);
+          showNotes(payload.info);
+          $install.removeClass('d-none');
+          $later.removeClass('d-none');
+        } else if (st === 'installing') {
+          $status.text('Installing update...');
+        } else if (st === 'installed') {
+          $status.text('Update installed (simulated). Restart the app to finish.');
+          $later.removeClass('d-none');
+        } else if (st === 'none') {
+          $status.text('No updates available');
+        } else if (st === 'error') {
+          $status.text(`Update error: ${payload.error || 'Unknown error'}`);
+          $later.removeClass('d-none');
+        }
+      } catch {}
+    });
+  } catch {}
+
   // Open client editor from cog without affecting selection
   $(document).on('click', '.CLIENT_TILE_COG', function (e) {
     e.preventDefault();
@@ -1814,7 +2122,9 @@ $(async function () {
   });
   $(document).on('click', '.SHOWTRAK_PC', function (e) {
     e.preventDefault();
-    let UUID = $(this).attr('data-uuid');
+  // Ignore clicks on pending-adoption tiles (blue)
+  if ($(this).hasClass('PENDING')) return false;
+  let UUID = $(this).attr('data-uuid');
     ToggleSelection(UUID);
     return;
   });
@@ -1822,6 +2132,8 @@ $(async function () {
   $(document).on('dblclick', '.SHOWTRAK_PC', function (e) {
     e.preventDefault();
     e.stopPropagation();
+  // Ignore dblclick on pending-adoption tiles
+  if ($(this).hasClass('PENDING')) return false;
     const uuid = $(this).attr('data-uuid');
     if (uuid) OpenClientInfo(uuid);
     return false;
@@ -2157,11 +2469,6 @@ $(async function () {
 
 setInterval(UpdateOfflineIndicators, 1000);
 
-async function OpenAdoptionManager() {
-  await CloseAllModals();
-  $('#SHOWTRAK_MODEL_ADOPTION').modal('show');
-}
-
 function ShowExecutionToast(title) {
   const $existing = $('#EXECUTION_TOAST');
   if ($existing.length) {
@@ -2240,10 +2547,6 @@ async function Init() {
 
   $('#SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON').on('click', async () => {
     await OpenOSCDictionary();
-  });
-
-  $('#SHOWTRAK_MODEL_CORE_ADOPT_BUTTON').on('click', async () => {
-    await OpenAdoptionManager();
   });
 
   $('#SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON').on('click', async () => {
@@ -2377,12 +2680,22 @@ function RenderClientInfoDetails(Client) {
     const ramNum = typeof rawRam === 'number' ? rawRam : parseFloat(rawRam);
     const ramClamped = isNaN(ramNum) ? 0 : Math.max(0, Math.min(100, ramNum));
 
-    $('#CLIENT_INFO_CPU_BAR').css('width', `${cpuClamped}%`).attr('aria-valuenow', cpuClamped.toFixed(0));
+    $('#CLIENT_INFO_CPU_BAR')
+      .css('width', `${cpuClamped}%`)
+      .attr('aria-valuenow', cpuClamped.toFixed(0));
     $('#CLIENT_INFO_CPU_LABEL').text(`${cpuClamped.toFixed(0)}%`);
-    $('#CLIENT_INFO_RAM_BAR').css('width', `${ramClamped}%`).attr('aria-valuenow', ramClamped.toFixed(0));
+    $('#CLIENT_INFO_RAM_BAR')
+      .css('width', `${ramClamped}%`)
+      .attr('aria-valuenow', ramClamped.toFixed(0));
     // Compose RAM label: used/total (percent%) if we have byte counts
-    const ramUsed = Client && Client.Vitals && typeof Client.Vitals.Ram?.Used !== 'undefined' ? Client.Vitals.Ram.Used : null;
-    const ramTotal = Client && Client.Vitals && typeof Client.Vitals.Ram?.Total !== 'undefined' ? Client.Vitals.Ram.Total : null;
+    const ramUsed =
+      Client && Client.Vitals && typeof Client.Vitals.Ram?.Used !== 'undefined'
+        ? Client.Vitals.Ram.Used
+        : null;
+    const ramTotal =
+      Client && Client.Vitals && typeof Client.Vitals.Ram?.Total !== 'undefined'
+        ? Client.Vitals.Ram.Total
+        : null;
     if (ramUsed != null && ramTotal != null) {
       const usedStr = FormatBytes(ramUsed);
       const totalStr = FormatBytes(ramTotal);
@@ -2409,8 +2722,8 @@ function RenderClientInfoDetails(Client) {
         $usbList.append(`
           <div class="rounded-3 p-2 bg-ghost">
             <h6 class="mb-0">${ManufacturerName ? Safe(ManufacturerName) : 'Generic'} ${
-          ProductName ? Safe(ProductName) : 'USB Device'
-        }</h6>
+              ProductName ? Safe(ProductName) : 'USB Device'
+            }</h6>
             <small class="text-light">Serial Number: ${
               SerialNumber ? Safe(SerialNumber) : 'Unavailable'
             }</small>
@@ -2432,23 +2745,29 @@ function RenderClientInfoDetails(Client) {
     $netList.html('');
     const ifaces = Array.isArray(Client.NetworkInterfaces) ? Client.NetworkInterfaces : [];
     if (ifaces.length === 0) {
-      $netList.html(`<div class="rounded-3 p-2 bg-ghost"><h6 class="mb-0">No Interfaces Reported</h6></div>`);
+      $netList.html(
+        `<div class="rounded-3 p-2 bg-ghost"><h6 class="mb-0">No Interfaces Reported</h6></div>`
+      );
     } else {
       // Sort active first: interfaces with any external (non-internal) address
       const sorted = [...ifaces].sort((a, b) => {
-        const aActive = Array.isArray(a.addresses) && a.addresses.some((x) => x.address && !x.internal);
-        const bActive = Array.isArray(b.addresses) && b.addresses.some((x) => x.address && !x.internal);
+        const aActive =
+          Array.isArray(a.addresses) && a.addresses.some((x) => x.address && !x.internal);
+        const bActive =
+          Array.isArray(b.addresses) && b.addresses.some((x) => x.address && !x.internal);
         return (bActive ? 1 : 0) - (aActive ? 1 : 0);
       });
-    for (const iface of sorted) {
-  const nameRaw = iface && iface.name ? String(iface.name) : 'unknown';
-  const name = Safe(nameRaw || 'unknown');
-  const addresses = Array.isArray(iface.addresses) ? iface.addresses : [];
-  const macs = Array.from(new Set(addresses.map((a) => (a.mac ? String(a.mac).toUpperCase() : '')).filter(Boolean)));
-  const v4 = addresses.filter((a) => String(a.family).includes('4'));
-  const v6 = addresses.filter((a) => String(a.family).includes('6'));
-  const displayedAddrs = v4.length > 0 ? v4 : v6; // show IPv6 only if no IPv4 available
-  const activeCount = addresses.filter((a) => a.address && !a.internal).length;
+      for (const iface of sorted) {
+        const nameRaw = iface && iface.name ? String(iface.name) : 'unknown';
+        const name = Safe(nameRaw || 'unknown');
+        const addresses = Array.isArray(iface.addresses) ? iface.addresses : [];
+        const macs = Array.from(
+          new Set(addresses.map((a) => (a.mac ? String(a.mac).toUpperCase() : '')).filter(Boolean))
+        );
+        const v4 = addresses.filter((a) => String(a.family).includes('4'));
+        const v6 = addresses.filter((a) => String(a.family).includes('6'));
+        const displayedAddrs = v4.length > 0 ? v4 : v6; // show IPv6 only if no IPv4 available
+        const activeCount = addresses.filter((a) => a.address && !a.internal).length;
         const isActive = activeCount > 0;
         let addrHtml = '';
         if (displayedAddrs.length > 0) {
@@ -2487,22 +2806,33 @@ function RenderClientInfoDetails(Client) {
                     <i class="bi bi-clipboard"></i>
                   </button>
                 </div>
-                ${mask ? `<div class=\"form-floating has-copy\">` +
-                  `<input type=\"text\" class=\"form-control disabled\" id=\"${maskId}\" value=\"${mask}\" disabled />` +
-                  `<label for=\"${maskId}\">Netmask</label>` +
-                  `<button type=\"button\" class=\"copy-field-btn\" data-target=\"#${maskId}\" title=\"Copy\"><i class=\"bi bi-clipboard\"></i></button>` +
-                `</div>` : ''}
-                ${mac ? `<div class=\"form-floating has-copy\">` +
-                  `<input type=\"text\" class=\"form-control disabled\" id=\"${macId}\" value=\"${mac}\" disabled />` +
-                  `<label for=\"${macId}\">MAC Address</label>` +
-                  `<button type=\"button\" class=\"copy-field-btn\" data-target=\"#${macId}\" title=\"Copy\"><i class=\"bi bi-clipboard\"></i></button>` +
-                `</div>` : ''}
+                ${
+                  mask
+                    ? `<div class=\"form-floating has-copy\">` +
+                      `<input type=\"text\" class=\"form-control disabled\" id=\"${maskId}\" value=\"${mask}\" disabled />` +
+                      `<label for=\"${maskId}\">Netmask</label>` +
+                      `<button type=\"button\" class=\"copy-field-btn\" data-target=\"#${maskId}\" title=\"Copy\"><i class=\"bi bi-clipboard\"></i></button>` +
+                      `</div>`
+                    : ''
+                }
+                ${
+                  mac
+                    ? `<div class=\"form-floating has-copy\">` +
+                      `<input type=\"text\" class=\"form-control disabled\" id=\"${macId}\" value=\"${mac}\" disabled />` +
+                      `<label for=\"${macId}\">MAC Address</label>` +
+                      `<button type=\"button\" class=\"copy-field-btn\" data-target=\"#${macId}\" title=\"Copy\"><i class=\"bi bi-clipboard\"></i></button>` +
+                      `</div>`
+                    : ''
+                }
               </div>`;
           }
         } else {
-          addrHtml = '<div class="text-sm text-muted rounded p-2">No addresses (adapter inactive)</div>';
+          addrHtml =
+            '<div class="text-sm text-muted rounded p-2">No addresses (adapter inactive)</div>';
         }
-        const macSummary = macs.length ? `<div class="text-sm text-muted">${macs.map((m) => `<code>${Safe(m)}</code>`).join(' • ')}</div>` : '';
+        const macSummary = macs.length
+          ? `<div class="text-sm text-muted">${macs.map((m) => `<code>${Safe(m)}</code>`).join(' • ')}</div>`
+          : '';
         $netList.append(`
           <div class="rounded-3 p-2 bg-ghost">
             <div class="d-flex justify-content-between align-items-center">
