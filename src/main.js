@@ -366,6 +366,39 @@ app.whenReady().then(async () => {
     return Config;
   });
 
+  // Provide a list of Web UI addresses on the local network with port
+  RPC.handle('WebUI:GetAddresses', async () => {
+    try {
+      const port = Config && Config.Application && Config.Application.Port ? Config.Application.Port : 3000;
+      const hostname = os.hostname();
+      const net = os.networkInterfaces() || {};
+      const hosts = new Set();
+      const push = (h) => {
+        if (!h) return;
+        try { h = String(h).trim(); } catch {}
+        if (!h) return;
+        hosts.add(h);
+      };
+      push('localhost');
+      push('127.0.0.1');
+      push(hostname);
+      for (const key of Object.keys(net)) {
+        const list = net[key] || [];
+        for (const addr of list) {
+          if (!addr) continue;
+          const family = addr.family || addr.address && addr.address.includes(':') ? 'IPv6' : 'IPv4';
+          if (family !== 'IPv4') continue;
+          if (addr.internal) continue;
+          push(addr.address);
+        }
+      }
+      const urls = Array.from(hosts).map((host) => ({ host, url: `http://${host}:${port}/` }));
+      return { port, hostname, urls };
+    } catch (e) {
+      return { port: 3000, hostname: os.hostname(), urls: [{ host: 'localhost', url: 'http://localhost:3000/' }] };
+    }
+  });
+
   // Application Mode IPC
   RPC.handle('Mode:Get', async () => {
     return ModeManager.Get();

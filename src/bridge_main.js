@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('API', {
   OpenDiscordInviteLinkInBrowser: async () => ipcRenderer.invoke('OpenDiscordInviteLinkInBrowser'),
   GetConfig: async () => ipcRenderer.invoke('Config:Get'),
+  GetWebUIAddresses: async () => ipcRenderer.invoke('WebUI:GetAddresses'),
   GetSettings: async () => ipcRenderer.invoke('Settings:Get'),
   AdoptDevice: async (UUID) => ipcRenderer.invoke('AdoptDevice', UUID),
   CheckForUpdatesOnClient: async (UUID) => ipcRenderer.invoke('CheckForUpdatesOnClient', UUID),

@@ -1,0 +1,22 @@
+{
+  "name": "ShowTrak Web UI",
+  "short_name": "ShowTrak",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0c091c",
+  "theme_color": "#1d1a2f",
+  "description": "Mobile-friendly control surface for ShowTrak Server",
+  "icons": [
+    {
+      "src": "/images/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

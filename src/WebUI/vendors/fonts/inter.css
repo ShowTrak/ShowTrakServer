@@ -1,0 +1,23 @@
+/* Local Inter via @fontsource */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/vendors/fonts/files/inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/vendors/fonts/files/inter-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/vendors/fonts/files/inter-700.woff2') format('woff2');
+}
+body { font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }

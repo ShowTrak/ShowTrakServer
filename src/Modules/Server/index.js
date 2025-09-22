@@ -6,6 +6,7 @@ const { CreateLogger } = require('../Logger');
 const Logger = CreateLogger('WebServer');
 
 const HTTP = require('http');
+const path = require('path');
 const { Server: WebServer } = require('socket.io');
 const { Config } = require('../Config');
 const { Manager: AdoptionManager } = require('../AdoptionManager');
@@ -13,7 +14,8 @@ const { Manager: ClientManager } = require('../ClientManager');
 const { Manager: ScriptManager } = require('../ScriptManager');
 const { Manager: ScriptExecutionManager } = require('../ScriptExecutionManager');
 const { Manager: AppDataManager } = require('../AppData');
-// const { Manager: BroadcastManager } = require('../Broadcast');
+const { Manager: WOLManager } = require('../WOLManager');
+const { Manager: BroadcastManager } = require('../Broadcast');
 const express = require('express');
 
 const { Wait } = require('../Utils');
@@ -28,6 +30,12 @@ const app = express();
 
 const ScriptDirectory = AppDataManager.GetScriptsDirectory();
 app.use(express.static(ScriptDirectory));
+// Serve Web UI (PWA) at root
+const WebUIRoot = path.join(__dirname, '../../WebUI');
+app.use('/', express.static(WebUIRoot));
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(WebUIRoot, 'index.html'));
+});
 Server.on('request', app);
 
 // Initialize Socket.IO server with conservative timeouts
@@ -42,6 +50,118 @@ const io = new WebServer(Server, {
 });
 
 const Manager = {};
+
+// Helper: convert internal Client instance to a safe, serializable payload for Web UI
+const ToPublicClient = (c) => ({
+  UUID: c.UUID,
+  Nickname: c.Nickname,
+  Hostname: c.Hostname,
+  GroupID: c.GroupID,
+  Weight: c.Weight,
+  Version: c.Version,
+  IP: c.IP,
+  MacAddress: c.MacAddress,
+  Online: c.Online,
+  LastSeen: c.LastSeen,
+  Vitals: c.Vitals,
+  USBDeviceList: Array.isArray(c.USBDeviceList) ? c.USBDeviceList : [],
+  NetworkInterfaces: Array.isArray(c.NetworkInterfaces) ? c.NetworkInterfaces : [],
+});
+
+// Socket.IO namespace for Web UI so routes are isolated from ShowTrak clients
+const ui = io.of('/ui');
+ui.on('connection', async (socket) => {
+  try {
+    Logger.log('Web UI connected', { id: socket.id, ip: socket.handshake.address });
+  } catch {}
+
+  // Initial list request
+  socket.on('clients:get', async (cb) => {
+    try {
+      const [err, list] = await ClientManager.GetAll();
+      if (err) return cb && cb({ error: err });
+      cb && cb({ data: list.map(ToPublicClient) });
+    } catch (e) {
+      cb && cb({ error: 'failed' });
+    }
+  });
+
+  // Push full list when the underlying list changes
+  const onClientListChanged = async () => {
+    try {
+      const [err, list] = await ClientManager.GetAll();
+      if (err) return;
+      ui.emit('clients:list', list.map(ToPublicClient));
+    } catch {}
+  };
+
+  // Push incremental updates when a single client changes
+  const onClientUpdated = (client) => {
+    try {
+      ui.emit('clients:updated', ToPublicClient(client));
+    } catch {}
+  };
+
+  BroadcastManager.on('ClientListChanged', onClientListChanged);
+  BroadcastManager.on('ClientUpdated', onClientUpdated);
+
+  // Fetch a single client by UUID
+  socket.on('client:get', async (uuid, cb) => {
+    try {
+      const [err, client] = await ClientManager.Get(uuid);
+      if (err) return cb && cb({ error: err });
+      if (!client) return cb && cb({ error: 'not_found' });
+      cb && cb({ data: ToPublicClient(client) });
+    } catch (e) {
+      cb && cb({ error: 'failed' });
+    }
+  });
+
+  // List available scripts
+  socket.on('scripts:list', async (cb) => {
+    try {
+      const scripts = await ScriptManager.GetScripts();
+      const data = (scripts || []).map((s) => ({ id: s.ID, name: s.Name, style: s.LabelStyle, confirm: !!s.Confirmation }));
+      cb && cb({ data });
+    } catch (e) {
+      cb && cb({ error: 'failed' });
+    }
+  });
+
+  // Run a script against a single UUID
+  socket.on('scripts:run', async (payload, cb) => {
+    try {
+      const { uuid, scriptId } = payload || {};
+      if (!uuid || !scriptId) return cb && cb({ error: 'invalid_args' });
+      await Manager.ExecuteScripts(scriptId, [uuid], false);
+      cb && cb({ ok: true });
+    } catch (e) {
+      cb && cb({ error: 'failed' });
+    }
+  });
+
+  // Wake on LAN for a client
+  socket.on('wol:wake', async (payload, cb) => {
+    try {
+      const { uuid } = payload || {};
+      if (!uuid) return cb && cb({ error: 'invalid_args' });
+      const [err, client] = await ClientManager.Get(uuid);
+      if (err || !client) return cb && cb({ error: err || 'not_found' });
+      const mac = client.MacAddress;
+      if (!mac) return cb && cb({ error: 'no_mac' });
+      const [wolErr, result] = await WOLManager.Wake(mac);
+      if (wolErr) return cb && cb({ error: String(wolErr) });
+      cb && cb({ ok: true, message: result });
+    } catch (e) {
+      cb && cb({ error: 'failed' });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    BroadcastManager.off('ClientListChanged', onClientListChanged);
+    BroadcastManager.off('ClientUpdated', onClientUpdated);
+  });
+});
 
 // Per-connection lifecycle
 io.on('connection', async (socket) => {

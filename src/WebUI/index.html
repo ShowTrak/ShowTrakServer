@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>ShowTrak Web UI</title>
+  <link rel="stylesheet" href="/vendors/fonts/inter.css" />
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#1d1a2f" />
+  <link rel="apple-touch-icon" href="/images/icon.png" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <img src="/images/icon.png" alt="ShowTrak" class="logo" />
+        <span>ShowTrak</span>
+      </div>
+  <button id="refreshBtn" class="btn btn-light">Refresh</button>
+    </header>
+    <div id="offlineBanner" class="offline-banner hidden" role="status" aria-live="polite">
+      <span>Offline</span>
+      <span class="hint">— some features may be unavailable</span>
+    </div>
+
+    <main class="content">
+      <section id="view-list">
+        <div class="search">
+          <input id="searchInput" type="text" placeholder="Search clients" />
+        </div>
+        <section id="clients" class="cards" aria-live="polite"></section>
+      </section>
+
+      <section id="view-detail" class="hidden">
+        <div class="detail-header">
+          <button id="backBtn" class="btn btn-light">Back</button>
+          <div class="detail-title">
+            <div id="d-name" class="title"></div>
+            <div id="d-status" class="status"></div>
+          </div>
+        </div>
+        <div id="d-subtitle" class="subtitle"></div>
+
+        <div class="detail-actions">
+          <button id="openScriptsBtn" class="btn btn-light">Run Script</button>
+          <button id="wolBtn" class="btn btn-ghost">Wake on LAN</button>
+        </div>
+
+        <div class="detail-grid">
+          <div class="panel">
+            <div class="panel-title">Vitals</div>
+            <div class="charts">
+              <div class="chart">
+                <div class="chart-title">CPU</div>
+                <canvas id="cpuChart" width="600" height="160"></canvas>
+              </div>
+              <div class="chart">
+                <div class="chart-title">RAM</div>
+                <canvas id="ramChart" width="600" height="160"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Info</div>
+            <div id="info" class="info-grid"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">USB Devices</div>
+            <div id="usbList" class="list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Network Interfaces</div>
+            <div id="netList" class="list"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <section id="scripts-sheet" class="sheet hidden" aria-modal="true" role="dialog">
+      <div class="sheet-header">
+        <div class="sheet-title">Scripts</div>
+  <button id="closeScriptsBtn" class="btn btn-light">Close</button>
+      </div>
+      <div id="scriptsList" class="sheet-list"></div>
+    </section>
+
+    <section id="confirmModal" class="confirm hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <div class="confirm-body">
+        <div class="confirm-title" id="confirmTitle">Confirm Action</div>
+        <div class="confirm-text" id="confirmText">Are you sure?</div>
+        <div class="confirm-actions">
+          <button id="confirmCancel" class="btn btn-ghost">Cancel</button>
+          <button id="confirmOk" class="btn btn-light">Run</button>
+        </div>
+      </div>
+    </section>
+
+    <nav id="mobileNav" class="mobile-nav" role="navigation" aria-label="Primary">
+      <button id="homeBtn" class="nav-btn" aria-label="Home">Home</button>
+    </nav>
+
+    <template id="client-card-tmpl">
+      <article class="card">
+        <div class="card-row">
+          <div class="title"></div>
+          <div class="status"></div>
+        </div>
+        <div class="subtitle"></div>
+        <div class="meta"></div>
+      </article>
+    </template>
+
+  <script src="/vendors/socket.io/socket.io.min.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
+    <script src="/main.js" type="module"></script>
+  </body>
+</html>

@@ -55,17 +55,17 @@ window.API.OnModeUpdated((mode) => {
   }
   // Refresh discover/adopt section visibility when mode changes
   try {
-    const html = RenderPendingAdoptionSection();
     const $existing = $('#PENDING_ADOPTION_SECTION');
-    if ($existing.length) {
-      $existing.replaceWith(html);
-    } else if (AppMode === 'EDIT' && $('#APPLICATION_CONTENT').length) {
-      $('#APPLICATION_CONTENT').append(html);
+    if ($existing && $existing.length) {
+      if (AppMode !== 'EDIT') {
+        $existing.replaceWith('<div id="PENDING_ADOPTION_SECTION"></div>');
+      } else {
+        $existing.replaceWith(RenderPendingAdoptionSection());
+      }
     }
   } catch {}
 });
 
-// Wire the toggle to backend
 document.addEventListener('DOMContentLoaded', async () => {
   // Wire new button group
   const btnShow = document.getElementById('MODE_BTN_SHOW');
@@ -121,6 +121,7 @@ window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
   SettingsGroups = NewSettingsGroups;
 
   $('#SETTINGS').html('');
+  $('#REMOTE_ACCESS_SECTION').html('');
 
   for (const Group of SettingsGroups) {
     $(`#SETTINGS`).append(`<div class="bg-ghost-light p-2 rounded">
@@ -248,6 +249,39 @@ window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
     }
   }
 
+  // Remote Access section: enumerate Web UI addresses and render list with QR
+  try {
+    const info = await window.API.GetWebUIAddresses();
+    const urls = (info && info.urls) || [];
+    if (urls.length) {
+      const $container = $('#REMOTE_ACCESS_SECTION');
+      $container.append(`
+        <div class="bg-ghost-light p-2 rounded text-start">
+          <strong>Remote Access</strong>
+          <div class="text-sm text-muted">Connect from your phone on the same network.</div>
+        </div>
+      `);
+      const rows = urls
+        .map((u, idx) => {
+          const safe = Safe(u.url);
+          return `
+            <div class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center text-start">
+              <div class="d-grid">
+                <span>${safe}</span>
+                <span class="text-sm text-muted">${Safe(u.host)}</span>
+              </div>
+            </div>`;
+        })
+        .join('');
+      $container.append(rows);
+      // Bind QR buttons
+      $container.find('[data-qr-url]').off('click').on('click', function () {
+        const url = $(this).attr('data-qr-url');
+        ShowQRModal(url);
+      });
+    }
+  } catch {}
+
   return;
 });
 
@@ -262,6 +296,75 @@ function Safe(Input) {
     return Input.map(Safe);
   }
   return Input;
+}
+
+// Show QR modal for a given URL
+async function ShowQRModal(url) {
+  try {
+    // Ensure QRCode library is present (load dynamically if needed)
+    await ensureQRCodeLib();
+    const modalId = 'SHOWTRAK_QR_MODAL';
+    let $modal = $('#' + modalId);
+    if ($modal.length === 0) {
+      $('body').append(`
+        <div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-body text-center">
+                <div class="d-flex justify-content-center"><img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" /></div>
+                <strong class="mb-1">Scan to Open</strong>
+                <div id="SHOWTRAK_QR_CANVAS" class="d-flex justify-content-center my-2"></div>
+                <div class="small text-muted" id="SHOWTRAK_QR_URL"></div>
+                <div class="d-grid mt-2">
+                  <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>`);
+      $modal = $('#' + modalId);
+    }
+    // Set URL text
+    $('#SHOWTRAK_QR_URL').text(url);
+    // Render QR
+    const $canvas = $('#SHOWTRAK_QR_CANVAS');
+    $canvas.html('');
+    try {
+      // Resolve QRCode constructor from global
+      let QR = null;
+      if (typeof window !== 'undefined' && typeof window.QRCode !== 'undefined') QR = window.QRCode;
+      else if (typeof QRCode !== 'undefined') QR = QRCode;
+      if (!QR) throw new Error('qr-lib-missing');
+      // Preferred: let the library append an <img> to the container element
+      const el = $canvas.get(0);
+      if (!el) throw new Error('qr-container-missing');
+  // Append QR image
+  new QR(el, { text: String(url) });
+      // Force size for consistency
+      const img = $canvas.find('img').get(0);
+      if (img) {
+        img.width = 220;
+        img.height = 220;
+        img.alt = 'QR code';
+      } else {
+        // Fallback: generate data URL manually if no image was appended
+  const gen = new QR(null, { text: String(url) });
+        const dataUrl = gen.createDataURL(4, 4);
+        const im2 = document.createElement('img');
+        im2.src = dataUrl;
+        im2.alt = 'QR code';
+        im2.width = 220;
+        im2.height = 220;
+        $canvas.append(im2);
+      }
+    } catch (e) {
+      // Hard failure: show a short notice (no clickable link)
+      $canvas.html(`<div class="text-muted small">Unable to generate QR code</div>`);
+    }
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById(modalId));
+    modal.show();
+  } catch {}
 }
 
 // Format bytes into a short human-readable string (e.g., 15.2 GB)
@@ -2587,6 +2690,42 @@ async function Init() {
   // legacy toggle binding removed
 
   await window.API.Loaded();
+}
+
+// Ensure the QRCode library is loaded; if missing, load the vendor script dynamically
+function ensureQRCodeLib() {
+  return new Promise((resolve) => {
+    try {
+      if (typeof window !== 'undefined' && typeof window.QRCode !== 'undefined') return resolve();
+      // Attempt to load from the same path used in index.html
+      const existing = document.querySelector('script[data-dyn="qrcode"]');
+      if (existing) {
+        // If already loading, poll a bit until available
+        let tries = 0;
+        const timer = setInterval(() => {
+          tries++;
+          if (typeof window !== 'undefined' && typeof window.QRCode !== 'undefined') {
+            clearInterval(timer);
+            return resolve();
+          }
+          if (tries > 50) {
+            clearInterval(timer);
+            return resolve();
+          }
+        }, 50);
+        return;
+      }
+      const s = document.createElement('script');
+      s.src = './vendors/qrcode/qrcode.min.js';
+      s.async = false;
+      s.dataset.dyn = 'qrcode';
+      s.onload = () => resolve();
+      s.onerror = () => resolve();
+      document.head.appendChild(s);
+    } catch {
+      resolve();
+    }
+  });
 }
 
 // Modal display removed per requirements
