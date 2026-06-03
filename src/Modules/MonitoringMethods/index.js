@@ -7,7 +7,14 @@ const Logger = CreateLogger('MonitoringMethods');
 
 const Manager = {};
 
-const MethodModules = [require('./ping')];
+const MethodModules = [
+  require('./ping'),
+  require('./tcp-port'),
+  require('./http'),
+  require('./https'),
+  require('./http-json'),
+  require('./dns'),
+];
 
 const Methods = new Map();
 
