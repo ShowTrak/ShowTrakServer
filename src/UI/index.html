@@ -63,6 +63,14 @@
             <span class="alerts-count d-none">0</span>
           </button>
           <button
+            id="ADD_MONITORING_TARGET_BTN"
+            class="settings-btn no-drag"
+            title="Add Monitoring Target"
+            aria-label="Add Monitoring Target"
+          >
+            <i class="bi bi-plus-lg"></i>
+          </button>
+          <button
             id="NAVBAR_CORE_BUTTON"
             class="settings-btn no-drag"
             title="Settings"
@@ -463,6 +471,131 @@
             <div class="d-grid">
               <button type="button" class="btn btn-success" id="GROUP_CREATION_SUBMIT">
                 Create Group
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_MONITORING_TARGET"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_MONITORING_TARGET_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-flex justify-content-center">
+              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            </div>
+
+            <div class="rounded-3 p-2 bg-ghost-light">
+              <h6 class="mb-0" id="MONITORING_TARGET_MODAL_TITLE">Add Monitoring Target</h6>
+            </div>
+
+            <div class="d-grid gap-2 text-start">
+              <div class="form-floating">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="MONITORING_TARGET_NICKNAME"
+                  placeholder="Name"
+                />
+                <label for="MONITORING_TARGET_NICKNAME">Name</label>
+              </div>
+              <div class="form-floating">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="MONITORING_TARGET_ADDRESS"
+                  placeholder="IP / Hostname / Domain"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <label for="MONITORING_TARGET_ADDRESS">IP / Hostname / Domain</label>
+              </div>
+              <div class="form-floating">
+                <select class="form-select" id="MONITORING_TARGET_METHOD"></select>
+                <label for="MONITORING_TARGET_METHOD">Monitoring Method</label>
+              </div>
+
+              <div class="bg-ghost rounded px-3 py-2">
+                <label
+                  for="MONITORING_TARGET_INTERVAL"
+                  class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
+                >
+                  <span>Check Interval</span>
+                  <span id="MONITORING_TARGET_INTERVAL_LABEL" class="badge bg-ghost-light text-light"
+                    >30s</span
+                  >
+                </label>
+                <input
+                  type="range"
+                  class="form-range"
+                  id="MONITORING_TARGET_INTERVAL"
+                  min="3000"
+                  max="300000"
+                  step="1000"
+                  value="30000"
+                />
+              </div>
+
+              <div class="form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost rounded p-2">
+                <label class="form-check-label mb-0 ms-2" for="MONITORING_TARGET_STORE_HISTORY">
+                  Store historic data
+                </label>
+                <input
+                  class="form-check-input ms-2 me-2"
+                  type="checkbox"
+                  role="switch"
+                  id="MONITORING_TARGET_STORE_HISTORY"
+                />
+              </div>
+
+              <div class="form-floating">
+                <input
+                  type="number"
+                  class="form-control"
+                  id="MONITORING_TARGET_DEGRADED_THRESHOLD"
+                  min="0"
+                  max="600000"
+                  step="50"
+                  value="0"
+                  placeholder="Degraded Threshold (ms)"
+                />
+                <label for="MONITORING_TARGET_DEGRADED_THRESHOLD">Degraded Threshold (ms, 0 = off)</label>
+              </div>
+
+              <div id="MONITORING_TARGET_DYNAMIC_SETTINGS" class="d-grid gap-2"></div>
+            </div>
+
+            <div class="row g-2 mt-2">
+              <div class="col-6 d-grid">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+              </div>
+              <div class="col-6 d-grid">
+                <button type="button" class="btn btn-success" id="MONITORING_TARGET_SAVE">
+                  Save
+                </button>
+              </div>
+            </div>
+
+            <div
+              id="MONITORING_TARGET_DANGER_ZONE"
+              class="d-none"
+            >
+              <div class="rounded-3 p-2 bg-ghost-light text-danger mt-2">
+                <h6 class="mb-0">Danger Zone</h6>
+              </div>
+              <button
+                type="button"
+                class="btn btn-ghost text-danger w-100 mt-2"
+                id="MONITORING_TARGET_DELETE"
+              >
+                Delete Monitoring Target
               </button>
             </div>
           </div>

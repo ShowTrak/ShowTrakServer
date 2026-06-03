@@ -179,7 +179,8 @@
 }
 
 /* Settings button (cog icon) */
-#NAVBAR_CORE_BUTTON.settings-btn {
+#NAVBAR_CORE_BUTTON.settings-btn,
+#ADD_MONITORING_TARGET_BTN.settings-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -194,10 +195,12 @@
     color 120ms ease,
     transform 120ms ease;
 }
-#NAVBAR_CORE_BUTTON.settings-btn:hover {
+#NAVBAR_CORE_BUTTON.settings-btn:hover,
+#ADD_MONITORING_TARGET_BTN.settings-btn:hover {
   color: #fff;
 }
-#NAVBAR_CORE_BUTTON.settings-btn .bi {
+#NAVBAR_CORE_BUTTON.settings-btn .bi,
+#ADD_MONITORING_TARGET_BTN.settings-btn .bi {
   font-size: 16px;
   line-height: 1;
 }
@@ -356,9 +359,9 @@
 .GROUP_TITLE_CLICKABLE {
   background-color: rgba(255, 255, 255, 0.1) !important;
   cursor: pointer !important;
-  width: 28px;
-  min-width: 28px;
-  max-width: 28px;
+  width: 26px;
+  min-width: 26px;
+  max-width: 26px;
   flex: 0 0 38px;
   box-sizing: border-box;
 }
@@ -964,6 +967,12 @@ button.btn:focus {
   background-color: rgba(26, 255, 0, 0.25) !important;
 }
 
+/* Monitoring target above its DegradedThresholdMs setting. Listed after ONLINE
+ * so it wins when both classes are toggled mid-update. */
+.SHOWTRAK_PC.DEGRADED {
+  background-color: rgba(255, 153, 0, 0.25) !important;
+}
+
 /* Pending adoption tile style: blue tint */
 .SHOWTRAK_PC.PENDING {
   background-color: rgba(0, 123, 255, 0.25) !important;
@@ -977,6 +986,26 @@ button.btn:focus {
   font-size: 14px !important;
   font-weight: 600 !important;
   color: rgba(255, 255, 255, 0.6);
+}
+
+.SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] {
+  height: auto !important;
+  min-height: 19px;
+  line-height: 1.2;
+  justify-items: center;
+}
+
+.SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] > [data-type='OFFLINE_SINCE'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] .badge {
+  line-height: 1.1;
 }
 
 .SHOWTRAK_PC_STATUS > .progress:first-of-type {
@@ -1044,7 +1073,7 @@ body.compact-mode .GROUP_TITLE {
 
 body.compact-mode .SHOWTRAK_PC,
 body.compact-mode .SHOWTRAK_PC_PLACEHOLDER {
-  width: 170px;
+  width: 200px;
   height: 36px;
   min-height: 36px;
   box-sizing: border-box;
@@ -1055,6 +1084,7 @@ body.compact-mode .SHOWTRAK_PC {
   gap: 0;
   display: flex;
   align-items: center;
+  justify-content: space-between;
 }
 
 body.compact-mode .SHOWTRAK_PC > [data-type='Hostname'],
@@ -1065,14 +1095,57 @@ body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS {
   margin: 0 !important;
 }
 
+body.compact-mode .SHOWTRAK_PC > [data-type='Hostname'],
+body.compact-mode .SHOWTRAK_PC > [data-type='IP'],
+body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS {
+  display: none !important;
+}
+
 body.compact-mode .SHOWTRAK_PC > [data-type='Nickname'] {
   font-size: 1rem;
   line-height: 1.2;
   margin: 0;
-  width: 100%;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_ONLINE'] {
+  display: none !important;
+}
+
+body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] {
+  max-height: none;
+  opacity: 1;
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  margin: 0 0 0 0.5rem !important;
+  min-height: 0;
+  align-items: center;
+}
+
+body.compact-mode
+  .SHOWTRAK_PC
+  > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']
+  > [data-type='OFFLINE_SINCE'] {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0;
+  line-height: 1;
+}
+
+body.compact-mode
+  .SHOWTRAK_PC
+  > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']
+  > [data-type='OFFLINE_SINCE']
+  .badge {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.1;
 }
 
 body.compact-mode .SHOWTRAK_PC_PLACEHOLDER {
@@ -1093,6 +1166,60 @@ body.compact-mode .SHOWTRAK_PC_PLACEHOLDER h5 {
 
 body.compact-mode .SHOWTRAK_PC_PLACEHOLDER p {
   display: none;
+}
+
+/* --- Monitoring target tiles --- */
+/* Status text uses a slightly smaller font so values like "1234 ms" don't
+ * get truncated by the fixed tile width. */
+.SHOWTRAK_PC.MONITOR .SHOWTRAK_PC_STATUS {
+  font-size: 11px !important;
+}
+
+/* The monitoring method label should always read clearly in white,
+ * regardless of online/offline state. */
+.SHOWTRAK_PC.MONITOR > [data-type='Method'] {
+  color: #fff !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04rem;
+}
+
+/* Inline latency badge used only in compact mode; hidden by default. */
+.SHOWTRAK_PC.MONITOR > .MONITOR_COMPACT_LATENCY {
+  display: none;
+}
+
+body.compact-mode .SHOWTRAK_PC.MONITOR {
+  justify-content: space-between;
+}
+
+/* Hide the verbose monitor fields in compact mode; show just Name + latency. */
+body.compact-mode .SHOWTRAK_PC.MONITOR > [data-type='Method'],
+body.compact-mode .SHOWTRAK_PC.MONITOR > [data-type='Address'],
+body.compact-mode .SHOWTRAK_PC.MONITOR > .SHOWTRAK_PC_STATUS {
+  display: none !important;
+}
+
+body.compact-mode .SHOWTRAK_PC.MONITOR > [data-type='Nickname'],
+body.compact-mode .SHOWTRAK_PC.MONITOR > [data-type='Name'] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  text-align: left;
+  font-size: 1rem;
+  line-height: 1.2;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.compact-mode .SHOWTRAK_PC.MONITOR > .MONITOR_COMPACT_LATENCY {
+  display: inline-block;
+  flex: 0 0 auto;
+  margin-left: 0.5rem;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* Drag-and-drop visuals */

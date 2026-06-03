@@ -59,6 +59,23 @@ Manager.InitializeSchema = async () => {
       Logger.database(`Table ${Table.Name} created successfully.`);
     }
   }
+  // Apply additive migrations. SQLite lacks "ADD COLUMN IF NOT EXISTS",
+  // so duplicate-column errors are expected on already-migrated installs.
+  const Migrations = Array.isArray(Tables.Migrations) ? Tables.Migrations : [];
+  for (const SQL of Migrations) {
+    const Match = /ALTER\s+TABLE\s+`?([A-Za-z_][A-Za-z0-9_]*)`?\s+ADD\s+COLUMN\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(SQL);
+    if (Match) {
+      const [, Table, Column] = Match;
+      const [PErr, Cols] = await Manager.All(`PRAGMA table_info(\`${Table}\`)`);
+      if (PErr) {
+        Logger.databaseError(`Migration probe failed for ${Table}`, PErr);
+        continue;
+      }
+      if ((Cols || []).some((c) => c && c.name === Column)) continue;
+    }
+    const [Err] = await Manager.Run(SQL);
+    if (Err) Logger.databaseError(`Migration failed: ${SQL}`, Err);
+  }
   schemaInitialized = true;
   })();
 

@@ -29,6 +29,12 @@ const INVOKE_CHANNELS = new Set([
   'UpdateScripts',
   'AppUpdate:Check',
   'AppUpdate:Install',
+  'GetMonitoringMethods',
+  'GetAllMonitoringTargets',
+  'GetMonitoringTarget',
+  'CreateMonitoringTarget',
+  'UpdateMonitoringTarget',
+  'DeleteMonitoringTarget',
 ]);
 
 const SUBSCRIBE_CHANNELS = new Set([
@@ -47,6 +53,8 @@ const SUBSCRIBE_CHANNELS = new Set([
   'USBDeviceRemoved',
   'UpdateSettings',
   'AppUpdate:Status',
+  'SetFullMonitoringTargetList',
+  'MonitoringTargetUpdated',
 ]);
 
 function invoke(channel, ...args) {
@@ -133,4 +141,14 @@ contextBridge.exposeInMainWorld('API', {
   CheckForAppUpdates: async () => invoke('AppUpdate:Check'),
   InstallAppUpdate: async () => invoke('AppUpdate:Install'),
   OnAppUpdateStatus: (cb) => subscribe('AppUpdate:Status', cb),
+  // Monitoring Targets
+  GetMonitoringMethods: async () => invoke('GetMonitoringMethods'),
+  GetAllMonitoringTargets: async () => invoke('GetAllMonitoringTargets'),
+  GetMonitoringTarget: async (TargetID) => invoke('GetMonitoringTarget', TargetID),
+  CreateMonitoringTarget: async (Payload) => invoke('CreateMonitoringTarget', Payload),
+  UpdateMonitoringTarget: async (TargetID, Payload) =>
+    invoke('UpdateMonitoringTarget', TargetID, Payload),
+  DeleteMonitoringTarget: async (TargetID) => invoke('DeleteMonitoringTarget', TargetID),
+  SetFullMonitoringTargetList: (Callback) => subscribe('SetFullMonitoringTargetList', Callback),
+  MonitoringTargetUpdated: (Callback) => subscribe('MonitoringTargetUpdated', Callback),
 });

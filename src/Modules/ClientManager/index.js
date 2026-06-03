@@ -412,6 +412,24 @@ Manager.SetGroupOrder = async (GroupID, orderedUUIDs) => {
   return [null, true];
 };
 
+// Like SetGroupOrder but accepts an explicit weight per UUID. Used when ordering
+// is shared across multiple entity types (e.g. clients + monitoring targets).
+Manager.SetGroupOrderWithWeights = async (GroupID, orderedUUIDs, weights) => {
+  if (!Array.isArray(orderedUUIDs) || !Array.isArray(weights)) return ['Invalid input', null];
+  if (orderedUUIDs.length !== weights.length) return ['Length mismatch', null];
+  const TargetGroupID = GroupID === undefined ? null : GroupID;
+  for (let i = 0; i < orderedUUIDs.length; i++) {
+    const uuid = orderedUUIDs[i];
+    const w = Number(weights[i]) || 0;
+    const [err, client] = await Manager.Get(uuid);
+    if (err || !client) continue;
+    if (client.GroupID !== TargetGroupID) await client.SetGroupID(TargetGroupID);
+    await client.SetWeight(w);
+  }
+  BroadcastManager.emit('ClientListChanged');
+  return [null, true];
+};
+
 Manager.ClearCache = async () => {
   ClientList = [];
   return;

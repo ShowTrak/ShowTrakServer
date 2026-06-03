@@ -111,6 +111,84 @@ Manager.ClientUpdatePayload = (value) => {
   return normalized;
 };
 
+Manager.MonitoringTargetID = (value, fieldName = 'TargetID') => {
+  if (typeof value === 'number') {
+    if (!Number.isInteger(value) || value <= 0) _fail(`${fieldName} must be a positive integer`);
+    return value;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    if (!/^\d+$/.test(normalized)) _fail(`${fieldName} must be numeric`);
+    return parseInt(normalized, 10);
+  }
+  _fail(`${fieldName} is invalid`);
+};
+
+// Method-specific Settings are validated against the registered schema by
+// the MonitoringMethods module; here we only enforce the shape.
+function _normalizeMonitoringSettings(value) {
+  if (value == null) return {};
+  if (!_isPlainObject(value)) _fail('Monitoring Settings must be an object');
+  return value;
+}
+
+Manager.MonitoringTargetCreatePayload = (value) => {
+  if (!_isPlainObject(value)) _fail('Monitoring target payload must be an object');
+  const out = {};
+  out.Nickname = _normalizeNonEmptyString(value.Nickname, 'Nickname', { minLength: 1, maxLength: 64 });
+  out.Address = _normalizeNonEmptyString(value.Address, 'Address', { minLength: 1, maxLength: 253 });
+  out.Method = _normalizeNonEmptyString(value.Method, 'Method', { minLength: 1, maxLength: 64 });
+  if (value.Interval === undefined || value.Interval === null) _fail('Interval is required');
+  const Interval = Number(value.Interval);
+  if (!Number.isFinite(Interval)) _fail('Interval must be a number');
+  out.Interval = Interval;
+  out.StoreHistory =
+    Object.prototype.hasOwnProperty.call(value, 'StoreHistory') ? !!value.StoreHistory : false;
+  if (Object.prototype.hasOwnProperty.call(value, 'DegradedThresholdMs')) {
+    const Threshold = Number(value.DegradedThresholdMs);
+    if (!Number.isFinite(Threshold)) _fail('DegradedThresholdMs must be a number');
+    out.DegradedThresholdMs = Threshold;
+  }
+  out.GroupID =
+    Object.prototype.hasOwnProperty.call(value, 'GroupID') ? Manager.GroupID(value.GroupID) : null;
+  out.Settings = _normalizeMonitoringSettings(value.Settings);
+  return out;
+};
+
+Manager.MonitoringTargetUpdatePayload = (value) => {
+  if (!_isPlainObject(value)) _fail('Monitoring target payload must be an object');
+  const out = {};
+  if (Object.prototype.hasOwnProperty.call(value, 'Nickname')) {
+    out.Nickname = _normalizeNonEmptyString(value.Nickname, 'Nickname', { minLength: 1, maxLength: 64 });
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'Address')) {
+    out.Address = _normalizeNonEmptyString(value.Address, 'Address', { minLength: 1, maxLength: 253 });
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'Method')) {
+    out.Method = _normalizeNonEmptyString(value.Method, 'Method', { minLength: 1, maxLength: 64 });
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'Interval')) {
+    const Interval = Number(value.Interval);
+    if (!Number.isFinite(Interval)) _fail('Interval must be a number');
+    out.Interval = Interval;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'StoreHistory')) {
+    out.StoreHistory = !!value.StoreHistory;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'DegradedThresholdMs')) {
+    const Threshold = Number(value.DegradedThresholdMs);
+    if (!Number.isFinite(Threshold)) _fail('DegradedThresholdMs must be a number');
+    out.DegradedThresholdMs = Threshold;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'GroupID')) {
+    out.GroupID = Manager.GroupID(value.GroupID);
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'Settings')) {
+    out.Settings = _normalizeMonitoringSettings(value.Settings);
+  }
+  return out;
+};
+
 Manager.SettingUpdatePayload = (key, value) => {
   const normalizedKey = _normalizeNonEmptyString(key, 'Setting key', { minLength: 2, maxLength: 128 });
 

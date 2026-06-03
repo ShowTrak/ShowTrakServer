@@ -31,6 +31,8 @@ BonjourManager.Init();
 const { Manager: AdoptionManager } = require('./Modules/AdoptionManager');
 const { Manager: ClientManager } = require('./Modules/ClientManager');
 const { Manager: GroupManager } = require('./Modules/GroupManager');
+const { Manager: MonitoringTargetManager } = require('./Modules/MonitoringTargetManager');
+const { Manager: MonitoringMethods } = require('./Modules/MonitoringMethods');
 const { Manager: FileSelectorManager } = require('./Modules/FileSelectorManager');
 const { Manager: BackupManager } = require('./Modules/BackupManager');
 const { Manager: ScriptExecutionManager } = require('./Modules/ScriptExecutionManager');
@@ -195,6 +197,10 @@ app.whenReady().then(async () => {
     Logger.log('MainWindow finished loading UI');
     // Initial payloads to hydrate renderer stores
     UpdateAdoptionList();
+    // Boot monitoring loops once the DB schema is ready
+    MonitoringTargetManager.Init().catch((Err) =>
+      Logger.error('Failed to init MonitoringTargetManager:', Err)
+    );
     await Wait(800);
     PreloaderWindow.close();
     MainWindow.show();
@@ -518,6 +524,62 @@ app.whenReady().then(async () => {
     return [null, Result];
   });
 
+  // ---- Monitoring Targets ----
+  RPC.handle('GetMonitoringMethods', async () => {
+    return MonitoringMethods.GetAll();
+  });
+
+  RPC.handle('GetAllMonitoringTargets', async () => {
+    const [Err, List] = await MonitoringTargetManager.GetAll();
+    if (Err) return [];
+    return List || [];
+  });
+
+  RPC.handle('GetMonitoringTarget', async (_Event, TargetID) => {
+    try {
+      TargetID = IPCValidation.MonitoringTargetID(TargetID);
+    } catch {
+      return null;
+    }
+    const [Err, Target] = await MonitoringTargetManager.Get(TargetID);
+    if (Err) return null;
+    return Target;
+  });
+
+  RPC.handle('CreateMonitoringTarget', async (_Event, Payload) => {
+    try {
+      Payload = IPCValidation.MonitoringTargetCreatePayload(Payload);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Result] = await MonitoringTargetManager.Create(Payload);
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
+  RPC.handle('UpdateMonitoringTarget', async (_Event, TargetID, Payload) => {
+    try {
+      TargetID = IPCValidation.MonitoringTargetID(TargetID);
+      Payload = IPCValidation.MonitoringTargetUpdatePayload(Payload);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Result] = await MonitoringTargetManager.Update(TargetID, Payload);
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
+  RPC.handle('DeleteMonitoringTarget', async (_Event, TargetID) => {
+    try {
+      TargetID = IPCValidation.MonitoringTargetID(TargetID);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Result] = await MonitoringTargetManager.Delete(TargetID);
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
   RPC.handle('SetGroupOrder', async (_Event, GroupID, OrderedUUIDs) => {
     try {
       GroupID = IPCValidation.GroupID(GroupID);
@@ -525,7 +587,41 @@ app.whenReady().then(async () => {
     } catch (error) {
       return validationErrorTuple(error, false);
     }
-    await ClientManager.SetGroupOrder(GroupID, OrderedUUIDs || []);
+    // Mixed list: client UUIDs and "monitor:<TargetID>" entries.
+    // Walk in order assigning a single shared weight counter so visual order
+    // is preserved across both entity types when rendered together.
+    let Weight = 10;
+    const ClientOrder = [];
+    const MonitorAssignments = [];
+    for (const ID of OrderedUUIDs) {
+      if (typeof ID === 'string' && ID.startsWith('monitor:')) {
+        const TargetID = parseInt(ID.slice('monitor:'.length), 10);
+        if (Number.isFinite(TargetID)) {
+          MonitorAssignments.push({ TargetID, Weight });
+        }
+      } else {
+        ClientOrder.push({ UUID: ID, Weight });
+      }
+      Weight += 10;
+    }
+    // Apply monitor moves first (they don't emit per-change broadcasts here).
+    for (const { TargetID, Weight: W } of MonitorAssignments) {
+      await MonitoringTargetManager.SetGroupAndWeight(TargetID, GroupID, W);
+    }
+    // Apply client ordering. ClientManager.SetGroupOrder reassigns weights
+    // sequentially starting at 10, so feed it just the UUIDs in order — but
+    // we want the shared weight scale, so apply directly per-client instead.
+    if (ClientOrder.length) {
+      await ClientManager.SetGroupOrderWithWeights(
+        GroupID,
+        ClientOrder.map((c) => c.UUID),
+        ClientOrder.map((c) => c.Weight)
+      );
+    }
+    if (MonitorAssignments.length) {
+      // Single coalesced refresh for monitors after batch.
+      BroadcastManager.emit('MonitoringTargetListChanged');
+    }
     return true;
   });
 
@@ -595,6 +691,7 @@ app.whenReady().then(async () => {
     await UpdateFullClientList();
     await UpdateScriptList();
     await UpdateOSCList();
+    await UpdateMonitoringTargetList();
     // Push current application mode to renderer on initial load
     if (MainWindow && !MainWindow.isDestroyed()) {
       MainWindow.webContents.send('ModeUpdated', ModeManager.Get());
@@ -768,6 +865,21 @@ async function UpdateFullClientList() {
 
 BroadcastManager.on('GroupListChanged', UpdateFullClientList);
 BroadcastManager.on('ClientListChanged', UpdateFullClientList);
+
+// Monitoring target fan-out
+async function UpdateMonitoringTargetList() {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  const [Err, List] = await MonitoringTargetManager.GetAll();
+  if (Err) return Logger.error('Failed to fetch monitoring targets:', Err);
+  MainWindow.webContents.send('SetFullMonitoringTargetList', List || []);
+}
+BroadcastManager.on('MonitoringTargetListChanged', UpdateMonitoringTargetList);
+
+async function MonitoringTargetUpdated(Target) {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  MainWindow.webContents.send('MonitoringTargetUpdated', Target);
+}
+BroadcastManager.on('MonitoringTargetUpdated', MonitoringTargetUpdated);
 
 // Pending adoption list is ephemeral; pull from manager and push to UI.
 async function UpdateAdoptionList() {

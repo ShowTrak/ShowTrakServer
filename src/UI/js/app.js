@@ -6,6 +6,10 @@ let ScriptList = [];
 const GroupUUIDCache = new Map();
 // Pending adoption devices (unadopted clients discovered by the server)
 let PendingAdoption = [];
+// Monitoring targets (server-driven probes; not installed clients)
+let MonitoringTargets = [];
+let MonitoringMethodsCache = [];
+let MonitoringEditorTargetID = null;
 // Cache last full lists to allow partial re-render when only pending changes
 let __LastClients = [];
 let __LastGroups = [];
@@ -646,6 +650,13 @@ window.API.SetFullClientList(async (Clients, Groups) => {
   __LastClients = Array.isArray(Clients) ? Clients : [];
   __LastGroups = Array.isArray(Groups) ? Groups : [];
   AllClients = Clients.map((Client) => Client.UUID);
+  RenderFullClientAndMonitorList();
+});
+
+function RenderFullClientAndMonitorList() {
+  const Clients = Array.isArray(__LastClients) ? __LastClients.slice() : [];
+  let Groups = Array.isArray(__LastGroups) ? __LastGroups.slice() : [];
+  const Monitors = Array.isArray(MonitoringTargets) ? MonitoringTargets.slice() : [];
   let Filler = '';
 
   Groups.push({
@@ -657,7 +668,7 @@ window.API.SetFullClientList(async (Clients, Groups) => {
   // Sort groups by weight
   Groups = Groups.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
 
-  if (Groups.length == 1 && Clients.length == 0) {
+  if (Groups.length == 1 && Clients.length == 0 && Monitors.length == 0) {
     Filler += `<div class="bg-ghost rounded m-3 mb-0 d-grid gap-0 gap-3 p-3">
             <h5 class="text-light mb-0">
                 Welcome to ShowTrak Server v${Safe(Config.Application.Version)}
@@ -672,13 +683,23 @@ window.API.SetFullClientList(async (Clients, Groups) => {
     let GroupClients = Clients.filter((Client) => Client.GroupID === GroupID).sort(
       (a, b) => (a.Weight || 0) - (b.Weight || 0)
     );
+    let GroupMonitors = Monitors.filter((M) => (M.GroupID || null) === GroupID);
 
     GroupUUIDCache.set(
       `${GroupID}`,
       GroupClients.map((c) => c.UUID)
     );
 
-    if (GroupClients.length == 0 && GroupID == null) continue;
+    if (GroupClients.length == 0 && GroupMonitors.length == 0 && GroupID == null) continue;
+
+    // Merge clients + monitors and sort by Weight so a unified ordering set
+    // by drag/drop is preserved.
+    const Merged = []
+      .concat(
+        GroupClients.map((c) => ({ kind: 'client', weight: c.Weight || 0, data: c })),
+        GroupMonitors.map((m) => ({ kind: 'monitor', weight: m.Weight || 0, data: m }))
+      )
+      .sort((a, b) => a.weight - b.weight);
 
     Filler += `<div class="d-flex justify-content-start">
 		<div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" onclick="SelectByGroup('${GroupID}')">
@@ -690,7 +711,7 @@ window.API.SetFullClientList(async (Clients, Groups) => {
 		</div>
 	<div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100 group-drop-zone" data-groupid="${GroupID}">`;
 
-    if (GroupClients.length == 0) {
+    if (Merged.length == 0) {
       Filler += `<div class="SHOWTRAK_PC_PLACEHOLDER w-100 p-3"
 				<h5 class="text-muted mb-0">
 					Empty Group
@@ -703,10 +724,12 @@ window.API.SetFullClientList(async (Clients, Groups) => {
 				</p>
 			</div>`;
     } else {
-      for (const { Nickname, Hostname, IP, UUID, Version, Online, LastSeen } of GroupClients) {
-        Filler += `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${Online ? 'ONLINE' : ''} ${
-          Selected.includes(UUID) ? 'SELECTED' : ''
-        }" data-uuid="${UUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
+      for (const Item of Merged) {
+        if (Item.kind === 'client') {
+          const { Nickname, Hostname, IP, UUID, Version, Online, LastSeen } = Item.data;
+          Filler += `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${Online ? 'ONLINE' : ''} ${
+            Selected.includes(UUID) ? 'SELECTED' : ''
+          }" data-uuid="${UUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
 					<button type="button" class="CLIENT_TILE_COG" aria-label="Edit Client" title="Edit Client">
 						<i class="bi bi-gear-fill"></i>
 					</button>
@@ -733,19 +756,14 @@ window.API.SetFullClientList(async (Clients, Groups) => {
 						</h7>
 					</div>
 				</div>`;
+        } else {
+          Filler += RenderMonitoringTargetTile(Item.data);
+        }
       }
     }
 
     Filler += `</div></div>`;
   }
-
-  // Filler += `<div class="d-flex justify-content-start">
-	// 	<div class="GROUP_TITLE_CLICKABLE m-3 me-0 rounded" onclick="OpenGroupCreationModal()">
-	// 		<div class="d-flex align-items-center text-center h-100">
-	// 			<span class="GROUP_CREATE_BUTTON py-2">+</span>
-	// 		</div>
-	// 	</div>
-	// </div>`;
 
   // Append Pending Adoption section after groups, if any
   Filler += RenderPendingAdoptionSection();
@@ -757,7 +775,7 @@ window.API.SetFullClientList(async (Clients, Groups) => {
       initializeEditInteractions();
     } catch {}
   }
-});
+}
 
 // Renderer receives live updates for devices pending adoption
 window.API.SetDevicesPendingAdoption(async (Devices) => {
@@ -857,6 +875,82 @@ function RenderPendingAdoptionSection() {
   } catch (e) {
     return '<div id="PENDING_ADOPTION_SECTION"></div>';
   }
+}
+
+function FormatInterval(ms) {
+  const n = Number(ms) || 0;
+  if (n < 60000) return `${Math.round(n / 1000)}s`;
+  const m = Math.floor(n / 60000);
+  const s = Math.round((n % 60000) / 1000);
+  return s ? `${m}m ${s}s` : `${m}m`;
+}
+
+function FormatLatency(ms) {
+  if (ms == null) return '';
+  if (ms < 1) return '<1ms';
+  return `${Math.round(ms)}ms`;
+}
+
+function RenderMonitoringTargetsSection() {
+  // Deprecated: monitoring targets are now rendered inline within their group's
+  // drop zone alongside clients. Kept as a no-op for backwards compatibility.
+  return '';
+}
+
+function RenderMonitoringTargetTile(T) {
+  const Online = !!T.Online;
+  const Degraded = !!T.Degraded;
+  const Name = T.Nickname || T.Address || 'Unnamed';
+  const Sub = T.Address || '';
+  const Latency = Online ? FormatLatency(T.LastLatencyMs) : '';
+  const Status = Online ? Latency : T.LastError || 'OFFLINE';
+  const Method = String(T.Method || '').toUpperCase();
+  const DragUUID = `monitor:${T.TargetID}`;
+  const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
+  const TextClass = Degraded ? 'text-warning' : Online ? 'text-success' : 'text-warning';
+  return `
+    <div id="MONITOR_TILE_${T.TargetID}" class="SHOWTRAK_PC MONITOR ${TileStateClass}" data-target-id="${T.TargetID}" data-uuid="${DragUUID}" draggable="${
+      AppMode === 'EDIT' ? 'true' : 'false'
+    }">
+      <button type="button" class="CLIENT_TILE_COG MONITOR_TILE_COG" aria-label="Edit Monitor" title="Edit Monitor">
+        <i class="bi bi-gear-fill"></i>
+      </button>
+      <label class="text-sm" data-type="Method">${Safe(Method)} · ${Safe(
+        FormatInterval(T.Interval)
+      )}</label>
+      <h5 class="mb-0" data-type="Name">${Safe(Name)}</h5>
+      <small class="text-sm text-light" data-type="Address">${Safe(Sub)}</small>
+      <div class="SHOWTRAK_PC_STATUS d-grid" data-type="MONITOR_STATUS">
+        <h7 class="mb-0 ${TextClass}" data-type="MONITOR_STATUS_LABEL">${Safe(
+          Status
+        )}</h7>
+      </div>
+      <span class="MONITOR_COMPACT_LATENCY ${TextClass}" data-type="MONITOR_COMPACT_LATENCY">${Safe(Status)}</span>
+    </div>`;
+}
+
+function UpdateMonitoringTargetTile(T) {
+  const $tile = $(`#MONITOR_TILE_${T.TargetID}`);
+  if (!$tile.length) return;
+  const Online = !!T.Online;
+  const Degraded = !!T.Degraded;
+  $tile.toggleClass('ONLINE', Online && !Degraded);
+  $tile.toggleClass('DEGRADED', Degraded);
+  const Name = T.Nickname || T.Address || 'Unnamed';
+  $tile.find('[data-type="Name"]').text(Name);
+  $tile.find('[data-type="Address"]').text(T.Address || '');
+  $tile
+    .find('[data-type="Method"]')
+    .text(`${String(T.Method || '').toUpperCase()} · ${FormatInterval(T.Interval)}`);
+  const Latency = Online ? FormatLatency(T.LastLatencyMs) : '';
+  const Status = Online ? Latency : T.LastError || 'OFFLINE';
+  const Success = Online && !Degraded;
+  const $label = $tile.find('[data-type="MONITOR_STATUS_LABEL"]');
+  $label.text(Status);
+  $label.toggleClass('text-success', Success).toggleClass('text-warning', !Success);
+  const $compact = $tile.find('[data-type="MONITOR_COMPACT_LATENCY"]');
+  $compact.text(Status);
+  $compact.toggleClass('text-success', Success).toggleClass('text-warning', !Success);
 }
 
 // Global event delegation for Adopt buttons (works across re-renders)
@@ -1355,6 +1449,34 @@ window.API.ClientUpdated(async (Data) => {
   return;
 });
 
+// --- Monitoring Targets ---
+window.API.SetFullMonitoringTargetList(async (List) => {
+  MonitoringTargets = Array.isArray(List) ? List : [];
+  // Re-render the full client+monitor view so monitors slot back into their groups.
+  if (typeof RenderFullClientAndMonitorList === 'function') {
+    RenderFullClientAndMonitorList();
+  }
+});
+
+window.API.MonitoringTargetUpdated(async (Target) => {
+  if (!Target || !Target.TargetID) return;
+  const idx = MonitoringTargets.findIndex((t) => t.TargetID === Target.TargetID);
+  const prev = idx === -1 ? null : MonitoringTargets[idx];
+  if (idx === -1) {
+    MonitoringTargets.push(Target);
+  } else {
+    MonitoringTargets[idx] = Target;
+  }
+  // If a monitor changed groups, re-render. Otherwise update in place.
+  if (!prev || (prev.GroupID || null) !== (Target.GroupID || null)) {
+    if (typeof RenderFullClientAndMonitorList === 'function') {
+      RenderFullClientAndMonitorList();
+    }
+  } else {
+    UpdateMonitoringTargetTile(Target);
+  }
+});
+
 // --- Alerts Manager ---
 const Alerts = [];
 let AlertsVisible = false;
@@ -1781,6 +1903,193 @@ async function OpenClientEditor(UUID) {
 async function AdoptDevice(UUID) {
   await window.API.AdoptDevice(UUID);
 }
+
+// --- Monitoring Target Editor ---
+async function EnsureMonitoringMethodsLoaded() {
+  if (Array.isArray(MonitoringMethodsCache) && MonitoringMethodsCache.length) return;
+  try {
+    MonitoringMethodsCache = (await window.API.GetMonitoringMethods()) || [];
+  } catch {
+    MonitoringMethodsCache = [];
+  }
+}
+
+function RenderMonitoringDynamicSettings(MethodID, CurrentSettings) {
+  const Method = MonitoringMethodsCache.find((m) => m.ID === MethodID);
+  const $host = $('#MONITORING_TARGET_DYNAMIC_SETTINGS');
+  $host.empty();
+  if (!Method || !Array.isArray(Method.Settings) || !Method.Settings.length) return;
+  const Cur = CurrentSettings || {};
+  for (const Field of Method.Settings) {
+    const Val = Cur[Field.Key] !== undefined ? Cur[Field.Key] : Field.Default;
+    if (Field.Type === 'boolean') {
+      $host.append(`
+        <div class="form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost-light rounded p-2">
+          <label class="form-check-label mb-0" for="MON_DYN_${Safe(Field.Key)}">${Safe(
+            Field.Label || Field.Key
+          )}</label>
+          <input class="form-check-input ms-2" type="checkbox" role="switch" id="MON_DYN_${Safe(
+            Field.Key
+          )}" data-key="${Safe(Field.Key)}" data-type="boolean" ${Val ? 'checked' : ''} />
+        </div>`);
+    } else if (Field.Type === 'number') {
+      $host.append(`
+        <div class="form-floating">
+          <input type="number" class="form-control" id="MON_DYN_${Safe(Field.Key)}"
+            data-key="${Safe(Field.Key)}" data-type="number"
+            ${typeof Field.Min === 'number' ? `min="${Field.Min}"` : ''}
+            ${typeof Field.Max === 'number' ? `max="${Field.Max}"` : ''}
+            value="${Safe(String(Val))}" placeholder="${Safe(Field.Label || Field.Key)}" />
+          <label for="MON_DYN_${Safe(Field.Key)}">${Safe(Field.Label || Field.Key)}</label>
+        </div>`);
+    } else {
+      $host.append(`
+        <div class="form-floating">
+          <input type="text" class="form-control" id="MON_DYN_${Safe(Field.Key)}"
+            data-key="${Safe(Field.Key)}" data-type="string"
+            value="${Safe(String(Val == null ? '' : Val))}" placeholder="${Safe(
+              Field.Label || Field.Key
+            )}" />
+          <label for="MON_DYN_${Safe(Field.Key)}">${Safe(Field.Label || Field.Key)}</label>
+        </div>`);
+    }
+  }
+}
+
+function CollectMonitoringDynamicSettings() {
+  const out = {};
+  $('#MONITORING_TARGET_DYNAMIC_SETTINGS')
+    .find('[data-key]')
+    .each(function () {
+      const $el = $(this);
+      const key = $el.attr('data-key');
+      const type = $el.attr('data-type');
+      if (type === 'boolean') {
+        out[key] = $el.is(':checked');
+      } else if (type === 'number') {
+        const n = Number($el.val());
+        out[key] = Number.isFinite(n) ? n : null;
+      } else {
+        out[key] = $el.val();
+      }
+    });
+  return out;
+}
+
+async function OpenMonitoringTargetEditor(TargetID) {
+  await CloseAllModals();
+  await EnsureMonitoringMethodsLoaded();
+
+  // Populate method dropdown
+  const $method = $('#MONITORING_TARGET_METHOD');
+  $method.empty();
+  for (const M of MonitoringMethodsCache) {
+    $method.append(`<option value="${Safe(M.ID)}">${Safe(M.Name)}</option>`);
+  }
+
+  let Existing = null;
+  if (TargetID) {
+    Existing = await window.API.GetMonitoringTarget(TargetID);
+  }
+  MonitoringEditorTargetID = Existing ? Existing.TargetID : null;
+
+  $('#MONITORING_TARGET_MODAL_TITLE').text(
+    Existing ? 'Edit Monitoring Target' : 'Add Monitoring Target'
+  );
+  $('#MONITORING_TARGET_DANGER_ZONE').toggleClass('d-none', !Existing);
+
+  const Defaults = {
+    Nickname: '',
+    Address: '',
+    Method: MonitoringMethodsCache[0] && MonitoringMethodsCache[0].ID,
+    Interval: 30000,
+    StoreHistory: false,
+    DegradedThresholdMs: 0,
+    Settings: {},
+  };
+  const T = Existing || Defaults;
+
+  $('#MONITORING_TARGET_NICKNAME').val(T.Nickname || '');
+  $('#MONITORING_TARGET_ADDRESS').val(T.Address || '');
+  $method.val(T.Method || Defaults.Method);
+  $('#MONITORING_TARGET_INTERVAL').val(T.Interval || 30000);
+  $('#MONITORING_TARGET_INTERVAL_LABEL').text(FormatInterval(T.Interval || 30000));
+  $('#MONITORING_TARGET_STORE_HISTORY').prop('checked', !!T.StoreHistory);
+  $('#MONITORING_TARGET_DEGRADED_THRESHOLD').val(
+    Number.isFinite(Number(T.DegradedThresholdMs)) ? Number(T.DegradedThresholdMs) : 0
+  );
+
+  RenderMonitoringDynamicSettings($method.val(), T.Settings || {});
+
+  // Live label for the slider
+  $('#MONITORING_TARGET_INTERVAL')
+    .off('input.mon')
+    .on('input.mon', function () {
+      $('#MONITORING_TARGET_INTERVAL_LABEL').text(FormatInterval($(this).val()));
+    });
+
+  // Re-render dynamic settings when method changes (preserve overlapping keys)
+  $method
+    .off('change.mon')
+    .on('change.mon', function () {
+      RenderMonitoringDynamicSettings($(this).val(), CollectMonitoringDynamicSettings());
+    });
+
+  $('#MONITORING_TARGET_SAVE')
+    .off('click.mon')
+    .on('click.mon', async () => {
+      const Payload = {
+        Nickname: ($('#MONITORING_TARGET_NICKNAME').val() || '').trim(),
+        Address: ($('#MONITORING_TARGET_ADDRESS').val() || '').trim(),
+        Method: $method.val(),
+        Interval: parseInt($('#MONITORING_TARGET_INTERVAL').val(), 10),
+        StoreHistory: $('#MONITORING_TARGET_STORE_HISTORY').is(':checked'),
+        DegradedThresholdMs: Math.max(
+          0,
+          parseInt($('#MONITORING_TARGET_DEGRADED_THRESHOLD').val(), 10) || 0
+        ),
+        Settings: CollectMonitoringDynamicSettings(),
+      };
+      if (!Payload.Nickname) return Notify('Please enter a name', 'error');
+      if (!Payload.Address) return Notify('Please enter an address', 'error');
+      if (!Payload.Method) return Notify('Please choose a monitoring method', 'error');
+
+      try {
+        if (MonitoringEditorTargetID) {
+          const [Err] = await window.API.UpdateMonitoringTarget(
+            MonitoringEditorTargetID,
+            Payload
+          );
+          if (Err) return Notify(Err, 'error');
+          await Notify('Monitoring target updated', 'success');
+        } else {
+          const [Err] = await window.API.CreateMonitoringTarget(Payload);
+          if (Err) return Notify(Err, 'error');
+          await Notify('Monitoring target created', 'success');
+        }
+        await CloseAllModals();
+      } catch (e) {
+        Notify(e && e.message ? e.message : 'Failed to save monitoring target', 'error');
+      }
+    });
+
+  $('#MONITORING_TARGET_DELETE')
+    .off('click.mon')
+    .on('click.mon', async () => {
+      if (!MonitoringEditorTargetID) return;
+      const Confirmation = await ConfirmationDialog(
+        'Delete this monitoring target? This cannot be undone.'
+      );
+      if (!Confirmation) return;
+      const [Err] = await window.API.DeleteMonitoringTarget(MonitoringEditorTargetID);
+      if (Err) return Notify(Err, 'error');
+      await Notify('Monitoring target deleted', 'success');
+      await CloseAllModals();
+    });
+
+  $('#SHOWTRAK_MODAL_MONITORING_TARGET').modal('show');
+}
+
 
 function SelectByGroup(GroupID) {
   if (!GroupUUIDCache.has(`${GroupID}`)) return;
@@ -2266,6 +2575,12 @@ $(async function () {
   $(document).on('click', '.CLIENT_TILE_COG', function (e) {
     e.preventDefault();
     e.stopPropagation();
+    // Monitoring targets use their own editor
+    if ($(this).hasClass('MONITOR_TILE_COG')) {
+      const tid = $(this).closest('.SHOWTRAK_PC').attr('data-target-id');
+      if (tid) OpenMonitoringTargetEditor(parseInt(tid, 10));
+      return false;
+    }
     const uuid = $(this).closest('.SHOWTRAK_PC').attr('data-uuid');
     if (uuid) {
       OpenClientEditor(uuid);
@@ -2276,6 +2591,8 @@ $(async function () {
     e.preventDefault();
   // Ignore clicks on pending-adoption tiles (blue)
   if ($(this).hasClass('PENDING')) return false;
+  // Monitoring tiles aren't selectable client targets
+  if ($(this).hasClass('MONITOR')) return false;
   let UUID = $(this).attr('data-uuid');
     ToggleSelection(UUID);
     return;
@@ -2286,6 +2603,12 @@ $(async function () {
     e.stopPropagation();
   // Ignore dblclick on pending-adoption tiles
   if ($(this).hasClass('PENDING')) return false;
+  // Monitoring tiles open their own editor on dblclick instead
+  if ($(this).hasClass('MONITOR')) {
+    const tid = $(this).attr('data-target-id');
+    if (tid) OpenMonitoringTargetEditor(parseInt(tid, 10));
+    return false;
+  }
     const uuid = $(this).attr('data-uuid');
     if (uuid) OpenClientInfo(uuid);
     return false;
@@ -2725,6 +3048,10 @@ async function Init() {
 
   $('#NAVBAR_CORE_BUTTON').on('click', async () => {
     $('#SHOWTRAK_MODEL_CORE').modal('show');
+  });
+
+  $('#ADD_MONITORING_TARGET_BTN').on('click', async () => {
+    await OpenMonitoringTargetEditor(null);
   });
 
   $('#SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON').on('click', async () => {
