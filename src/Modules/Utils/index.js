@@ -7,4 +7,12 @@ Manager.Wait = async (ms) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
+Manager.Ok = (value = null) => {
+  return [null, value];
+};
+
+Manager.Fail = (error, value = null) => {
+  return [error || 'Unknown Error', value];
+};
+
 module.exports = Manager;

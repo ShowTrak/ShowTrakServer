@@ -88,6 +88,7 @@
 #APP_BOTTOM_BAR .bar-section.left {
   display: flex;
   align-items: center;
+  gap: 6px;
 }
 
 /* Compact mode button group */
@@ -130,6 +131,30 @@
 .mode-group .btn.btn-light:hover,
 .mode-group .btn.btn-light:focus {
   background-color: rgba(255, 255, 255, 0.36) !important; /* subtle hover for active */
+}
+
+#COMPACT_MODE_BTN.compact-mode-btn {
+  width: 30px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-width: 1px;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+#COMPACT_MODE_BTN.compact-mode-btn:hover {
+  transform: translateY(-1px);
+}
+
+#COMPACT_MODE_BTN.compact-mode-btn .bi {
+  font-size: 13px;
+  line-height: 1;
 }
 
 .btn {
@@ -324,10 +349,18 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   text-transform: uppercase;
+  display: block;
+  width: 100%;
+  text-align: center;
 }
 .GROUP_TITLE_CLICKABLE {
   background-color: rgba(255, 255, 255, 0.1) !important;
   cursor: pointer !important;
+  width: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  flex: 0 0 38px;
+  box-sizing: border-box;
 }
 
 .GROUP_TITLE_CLICKABLE:hover {
@@ -396,7 +429,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 
 #SHOWTRAK_CONTEXT_MENU {
   display: none;
-  position: absolute;
+  position: fixed;
   z-index: 100000;
   background-color: #2a273b !important;
   color: white;
@@ -404,10 +437,20 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   border-radius: 0.5rem;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   padding: 0.5rem;
+  max-height: min(70vh, 460px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
   user-select: none !important;
   -webkit-user-select: none !important;
   -moz-user-select: none !important;
   -ms-user-select: none !important;
+}
+#SHOWTRAK_CONTEXT_MENU::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 #SHOWTRAK_CONTEXT_MENU > a {
@@ -881,10 +924,31 @@ button.btn:focus {
   padding: 0.5rem;
   border-radius: 0.5rem;
   border: transparent 2px solid;
-  transition-duration: 200ms;
+  transition:
+    width 180ms ease,
+    padding 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    gap 180ms ease;
   background-color: rgba(255, 0, 0, 0.189);
   cursor: pointer !important;
   position: relative; /* allow overlay positioning */
+}
+
+.SHOWTRAK_PC > [data-type='Hostname'],
+.SHOWTRAK_PC > [data-type='IP'],
+.SHOWTRAK_PC > .SHOWTRAK_PC_STATUS {
+  overflow: hidden;
+  max-height: 64px;
+  opacity: 1;
+  transition:
+    max-height 180ms ease,
+    opacity 140ms ease,
+    margin 180ms ease;
+}
+
+.SHOWTRAK_PC > [data-type='Nickname'] {
+  transition: font-size 180ms ease, line-height 180ms ease;
 }
 
 .SHOWTRAK_PC:hover {
@@ -929,6 +993,106 @@ button.btn:focus {
   border: transparent 2px solid;
   background-color: rgba(255, 255, 255, 0.03);
   cursor: no-drop;
+  transition:
+    width 180ms ease,
+    padding 180ms ease,
+    opacity 180ms ease;
+}
+
+.group-drop-zone {
+  transition: padding 180ms ease, gap 180ms ease, margin 180ms ease;
+}
+
+.GROUP_TITLE_CLICKABLE {
+  transition: margin 180ms ease;
+}
+
+body.compact-mode .group-drop-zone {
+  padding: 0.5rem !important;
+  gap: 0.5rem !important;
+  margin: 0.5rem 0.5rem 0 0.5rem !important;
+}
+
+body.compact-mode .GROUP_TITLE_CLICKABLE {
+  margin: 0.5rem 0 0 0.5rem !important;
+  padding: 0 0.5rem;
+  min-height: 2rem;
+  width: 120px;
+  min-width: 120px;
+  max-width: 120px;
+  flex: 0 0 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.compact-mode .GROUP_TITLE_CLICKABLE > div {
+  height: auto !important;
+  width: 100%;
+  justify-content: center;
+}
+
+body.compact-mode .GROUP_TITLE {
+  writing-mode: horizontal-tb;
+  transform: none;
+  letter-spacing: 0.04rem;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+body.compact-mode .SHOWTRAK_PC,
+body.compact-mode .SHOWTRAK_PC_PLACEHOLDER {
+  width: 170px;
+  height: 36px;
+  min-height: 36px;
+  box-sizing: border-box;
+}
+
+body.compact-mode .SHOWTRAK_PC {
+  padding: 0.35rem 0.45rem;
+  gap: 0;
+  display: flex;
+  align-items: center;
+}
+
+body.compact-mode .SHOWTRAK_PC > [data-type='Hostname'],
+body.compact-mode .SHOWTRAK_PC > [data-type='IP'],
+body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS {
+  max-height: 0;
+  opacity: 0;
+  margin: 0 !important;
+}
+
+body.compact-mode .SHOWTRAK_PC > [data-type='Nickname'] {
+  font-size: 1rem;
+  line-height: 1.2;
+  margin: 0;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.compact-mode .SHOWTRAK_PC_PLACEHOLDER {
+  padding: 0.35rem 0.45rem !important;
+  gap: 0;
+  min-height: 0;
+  align-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.compact-mode .SHOWTRAK_PC_PLACEHOLDER h5 {
+  font-size: 1rem;
+  line-height: 1.2;
+  margin: 0 !important;
+}
+
+body.compact-mode .SHOWTRAK_PC_PLACEHOLDER p {
+  display: none;
 }
 
 /* Drag-and-drop visuals */

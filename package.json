@@ -10,6 +10,7 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint",
+    "test": "node --test",
     "lint:fix": "eslint . --fix",
     "format": "prettier \"**/*.{js,mjs,cjs,css,md,json,html}\" --write",
     "format:check": "prettier \"**/*.{js,mjs,cjs,css,md,json,html}\" --check",

@@ -37,12 +37,20 @@ const { Manager: ScriptExecutionManager } = require('./Modules/ScriptExecutionMa
 const { Manager: WOLManager } = require('./Modules/WOLManager');
 const { Manager: BroadcastManager } = require('./Modules/Broadcast');
 const { Manager: SettingsManager } = require('./Modules/SettingsManager');
+const { Manager: IPCValidation } = require('./Modules/IPCValidation');
 const { OSC } = require('./Modules/OSC');
 const { Manager: ModeManager } = require('./Modules/ModeManager');
 const { Wait } = require('./Modules/Utils');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+
+const BASE_WEB_PREFERENCES = Object.freeze({
+  contextIsolation: true,
+  sandbox: true,
+  nodeIntegration: false,
+  webSecurity: true,
+});
 let autoUpdater = null;
 let squirrelUpdaterInitialized = false;
 function isSquirrelWindows() {
@@ -76,6 +84,34 @@ function sendAppUpdateStatus(payload) {
       MainWindow.webContents.send('AppUpdate:Status', payload);
     }
   } catch {}
+}
+
+function validationErrorTuple(error, fallback = null) {
+  const message = error && error.message ? error.message : String(error || 'Invalid request');
+  return [message, fallback];
+}
+
+function applyWindowSecurityGuards(windowInstance) {
+  if (!windowInstance || windowInstance.isDestroyed()) return;
+
+  windowInstance.webContents.setWindowOpenHandler(({ url }) => {
+    try {
+      if (/^https?:\/\//i.test(url)) {
+        shell.openExternal(url);
+      }
+    } catch (_error) {
+      return { action: 'deny' };
+    }
+    return { action: 'deny' };
+  });
+
+  windowInstance.webContents.on('will-navigate', (event, url) => {
+    const currentURL = windowInstance.webContents.getURL();
+    if (!currentURL || !url) return;
+    if (url !== currentURL) {
+      event.preventDefault();
+    }
+  });
 }
 
 // Main UI window. Always check isDestroyed() before using.
@@ -119,6 +155,7 @@ app.whenReady().then(async () => {
     height: 500,
     resizable: false,
     webPreferences: {
+      ...BASE_WEB_PREFERENCES,
       preload: path.join(__dirname, 'bridge_preloader.js'),
       devTools: !app.isPackaged,
     },
@@ -133,6 +170,7 @@ app.whenReady().then(async () => {
   });
 
   PreloaderWindow.loadFile(path.join(__dirname, 'UI', 'preloader.html'));
+  applyWindowSecurityGuards(PreloaderWindow);
 
   // Primary UI window. Defer showing until UI is loaded to avoid white flash.
   MainWindow = new BrowserWindow({
@@ -143,6 +181,7 @@ app.whenReady().then(async () => {
     minWidth: 815,
     minHeight: 600,
     webPreferences: {
+      ...BASE_WEB_PREFERENCES,
       preload: path.join(__dirname, 'bridge_main.js'),
       devTools: !app.isPackaged,
     },
@@ -160,6 +199,7 @@ app.whenReady().then(async () => {
     PreloaderWindow.close();
     MainWindow.show();
   });
+  applyWindowSecurityGuards(MainWindow);
 
   // Config backup/restore IPC. Returns [err, result] tuples consistently.
   RPC.handle('BackupConfig', async () => {
@@ -415,6 +455,11 @@ app.whenReady().then(async () => {
   });
 
   RPC.handle('GetClient', async (_Event, UUID) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch {
+      return null;
+    }
     let [Err, Client] = await ClientManager.Get(UUID);
     if (Err) return null;
     if (!Client) return null;
@@ -422,9 +467,14 @@ app.whenReady().then(async () => {
   });
 
   RPC.handle('CheckForUpdatesOnClient', async (_Event, UUID) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
     Logger.warn('CheckForUpdatesOnClient called for UUID:', UUID);
     await ServerManager.ExecuteBulkRequest('UpdateSoftware', [UUID], 'Check For Software Updates');
-    return;
+    return [null, true];
   });
 
   RPC.handle('GetAllGroups', async (_Event) => {
@@ -435,28 +485,60 @@ app.whenReady().then(async () => {
   });
 
   RPC.handle('CreateGroup', async (_Event, Title) => {
-    await GroupManager.Create(Title);
-    return true;
+    try {
+      Title = IPCValidation.GroupTitle(Title);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    let [Err, Result] = await GroupManager.Create(Title);
+    if (Err) return [Err, null];
+    return [null, Result];
   });
 
   RPC.handle('DeleteGroup', async (_Event, GroupID) => {
-    await GroupManager.Delete(GroupID);
-    return true;
+    try {
+      GroupID = IPCValidation.GroupID(GroupID);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    let [Err, Result] = await GroupManager.Delete(GroupID);
+    if (Err) return [Err, null];
+    return [null, Result];
   });
 
   RPC.handle('UpdateClient', async (_Event, UUID, Data) => {
-    await ClientManager.Update(UUID, Data);
-    return;
+    try {
+      UUID = IPCValidation.UUID(UUID);
+      Data = IPCValidation.ClientUpdatePayload(Data);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    let [Err, Result] = await ClientManager.Update(UUID, Data);
+    if (Err) return [Err, null];
+    return [null, Result];
   });
 
   RPC.handle('SetGroupOrder', async (_Event, GroupID, OrderedUUIDs) => {
+    try {
+      GroupID = IPCValidation.GroupID(GroupID);
+      OrderedUUIDs = IPCValidation.UUIDList(OrderedUUIDs || [], 'Ordered UUIDs');
+    } catch (error) {
+      return validationErrorTuple(error, false);
+    }
     await ClientManager.SetGroupOrder(GroupID, OrderedUUIDs || []);
     return true;
   });
 
   RPC.handle('ExecuteScript', async (_Event, Scripts, Targets, ResetList) => {
+    try {
+      Scripts = IPCValidation.ScriptID(Scripts);
+      Targets = IPCValidation.UUIDList(Targets || [], 'Targets');
+      ResetList = IPCValidation.Boolean(ResetList, 'ResetList');
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
     await ServerManager.ExecuteScripts(Scripts, Targets, ResetList);
-    return;
+    return [null, true];
   });
 
   RPC.handle('DeleteScripts', async (_Event, List) => {
@@ -470,6 +552,11 @@ app.whenReady().then(async () => {
   });
 
   RPC.handle('WakeOnLan', async (_Event, List) => {
+    try {
+      List = IPCValidation.UUIDList(List || [], 'WakeOnLan targets');
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
     await ScriptExecutionManager.ClearQueue();
     const tasks = List.map(async (UUID) => {
       const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, 'Wake On LAN');
@@ -497,6 +584,7 @@ app.whenReady().then(async () => {
       await ScriptExecutionManager.Complete(RequestID, WOLErr);
     });
     await Promise.allSettled(tasks);
+    return [null, true];
   });
 
   // Renderer signaled it (re)loaded: push the current authoritative state.
@@ -526,21 +614,31 @@ app.whenReady().then(async () => {
   });
 
   RPC.handle('AdoptDevice', async (_event, UUID) => {
-    if (!UUID) return false;
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch (error) {
+      return validationErrorTuple(error, false);
+    }
     Logger.log('Adopting device:', UUID);
-    await ClientManager.Create(UUID);
+    let [CreateErr, _CreateResult] = await ClientManager.Create(UUID);
+    if (CreateErr && CreateErr !== 'Client already exists') return [CreateErr, null];
     await AdoptionManager.SetState(UUID, 'Adopting');
     await ServerManager.SendMessageByGroup(UUID, 'Adopt');
-    return;
+    return [null, true];
   });
 
   RPC.handle('UnadoptClient', async (_event, UUID) => {
-    if (!UUID) return false;
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch (error) {
+      return validationErrorTuple(error, false);
+    }
     Logger.log('Unadopting device:', UUID);
     await ServerManager.SendMessageByGroup(UUID, 'Unadopt');
-    await ClientManager.Delete(UUID);
+    let [DeleteErr, _DeleteResult] = await ClientManager.Delete(UUID);
+    if (DeleteErr) return [DeleteErr, null];
     await UpdateFullClientList();
-    return;
+    return [null, true];
   });
 
   RPC.handle('OpenLogsFolder', async (_event) => {
@@ -566,6 +664,11 @@ app.whenReady().then(async () => {
   });
 
   RPC.handle('SetSetting', async (_event, Key, Value) => {
+    try {
+      [Key, Value] = IPCValidation.SettingUpdatePayload(Key, Value);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
     let [Err, Setting] = await SettingsManager.Set(Key, Value);
     if (Err) return [Err, null];
     return [null, Setting];

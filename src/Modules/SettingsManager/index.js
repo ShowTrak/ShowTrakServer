@@ -17,13 +17,23 @@ const Settings = new Map();
 const Manager = [];
 
 Manager.Initialized = false;
+Manager.Initializing = null;
 
 Manager.Init = async () => {
   if (Manager.Initialized) return;
+  if (Manager.Initializing) {
+    await Manager.Initializing;
+    return;
+  }
 
-  for (const Setting of DefaultSettings) {
-    let [Err, ManualSetting] = await DB.Get('SELECT * FROM settings WHERE key = ?', [Setting.Key]);
-    if (Err) throw Err;
+  Manager.Initializing = (async () => {
+    if (typeof DB.Ready === 'function') {
+      await DB.Ready();
+    }
+
+    for (const Setting of DefaultSettings) {
+      let [Err, ManualSetting] = await DB.Get('SELECT * FROM settings WHERE key = ?', [Setting.Key]);
+      if (Err) throw Err;
 
     // Normalize value based on type so persisted strings/ints map to the declared Setting.Type
     const normalize = (val) => {
@@ -54,26 +64,34 @@ Manager.Init = async () => {
       }
     };
 
-    const EffectiveValue = ManualSetting ? normalize(ManualSetting.Value) : Setting.DefaultValue;
+      const EffectiveValue = ManualSetting ? normalize(ManualSetting.Value) : Setting.DefaultValue;
 
-    let NewSetting = {
-      Group: Setting.Group,
-      Key: Setting.Key,
-      Title: Setting.Title,
-      Description: Setting.Description,
-      Type: Setting.Type,
-      Value: EffectiveValue,
-      isDefault: ManualSetting ? EffectiveValue === Setting.DefaultValue : true,
-      DefaultValue: Setting.DefaultValue,
-      OnUpdateEvent: Setting.OnUpdateEvent || null,
-      Options: Setting.Options || null,
-    };
+      let NewSetting = {
+        Group: Setting.Group,
+        Key: Setting.Key,
+        Title: Setting.Title,
+        Description: Setting.Description,
+        Type: Setting.Type,
+        Value: EffectiveValue,
+        isDefault: ManualSetting ? EffectiveValue === Setting.DefaultValue : true,
+        DefaultValue: Setting.DefaultValue,
+        OnUpdateEvent: Setting.OnUpdateEvent || null,
+        Options: Setting.Options || null,
+      };
 
-    Settings.set(NewSetting.Key, NewSetting);
+      Settings.set(NewSetting.Key, NewSetting);
 
-    // Avoid log spam during boot; enable if you need verbose setting audits.
+      // Avoid log spam during boot; enable if you need verbose setting audits.
+    }
+
+    Manager.Initialized = true;
+  })();
+
+  try {
+    await Manager.Initializing;
+  } finally {
+    Manager.Initializing = null;
   }
-  return;
 };
 
 Manager.GetGroups = async () => {
@@ -95,7 +113,7 @@ Manager.GetValue = async (Key) => {
 };
 
 Manager.Get = async (Key) => {
-  if (!Manager.Initialized) Manager.Init();
+  if (!Manager.Initialized) await Manager.Init();
   return Settings.get(Key);
 };
 
@@ -161,7 +179,9 @@ Manager.Set = async (Key, Value) => {
   return [null, Setting];
 };
 
-Manager.Init();
+Manager.Init().catch((Err) => {
+  Logger.error('Failed to initialize settings manager:', Err);
+});
 
 module.exports = {
   Manager,

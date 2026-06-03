@@ -11,6 +11,7 @@ const { Manager: DB } = require('../DB');
 const { Manager: BroadcastManager } = require('../Broadcast');
 
 const { Manager: ClientManager } = require('../ClientManager');
+const { Ok, Fail } = require('../Utils');
 
 const Manager = {};
 
@@ -45,37 +46,43 @@ class Group {
 }
 
 Manager.Create = async (Title = 'New Group') => {
-  if (!Title) return [new Error('Group title is required')];
+  if (!Title) return Fail('Group title is required');
   let [Err, _Res] = await DB.Run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', [Title, 100]);
-  if (Err) return;
+  if (Err) {
+    Logger.error('Failed to create group:', Err);
+    return Fail('Failed to create group');
+  }
   BroadcastManager.emit('GroupListChanged');
-  return;
+  return Ok(true);
 };
 
 // Delete a group and unassign any clients currently in it
 Manager.Delete = async (GroupID) => {
-  if (!GroupID) return ['GroupID is required to delete a group', null];
+  if (!GroupID) return Fail('GroupID is required to delete a group');
   let [Err, _Res] = await DB.Run('DELETE FROM Groups WHERE GroupID = ?', [GroupID]);
+  if (Err) {
+    Logger.error('Failed to delete group:', Err);
+    return Fail('Failed to delete group');
+  }
   let ClientsWithGroup = await ClientManager.GetClientsInGroup(GroupID);
   for (const Client of ClientsWithGroup) {
     await Client.SetGroupID(null);
   }
-  if (Err) return [Err];
   Logger.debug(`Deleted group with ID ${GroupID}`);
   BroadcastManager.emit('GroupListChanged');
-  return [null, 'Group Deleted Successfully'];
+  return Ok('Group Deleted Successfully');
 };
 
 Manager.Get = async (GroupID) => {
-  if (!GroupID) return [new Error('GroupID is required')];
+  if (!GroupID) return Fail('GroupID is required');
   let [Err, Rows] = await DB.Get('SELECT * FROM Groups WHERE GroupID = ?', [GroupID]);
   if (Err) {
     Logger.error('Failed to fetch group:', Err);
-    return [Err, null];
+    return Fail('Failed to fetch group');
   }
-  if (!Rows) return [null, null];
+  if (!Rows) return Ok(null);
   const GroupObj = new Group(Rows);
-  return [null, GroupObj];
+  return Ok(GroupObj);
 };
 
 // Ordered by Weight descending for display purposes (heavier first)
@@ -83,9 +90,9 @@ Manager.GetAll = async () => {
   let [Err, Rows] = await DB.All('SELECT * FROM Groups ORDER BY Weight DESC');
   if (Err) {
     Logger.error('Failed to fetch groups:', Err);
-    return [Err, []];
+    return Fail('Failed to fetch groups', []);
   }
-  return [null, Rows.map((row) => new Group(row))];
+  return Ok(Rows.map((row) => new Group(row)));
 };
 
 module.exports = {

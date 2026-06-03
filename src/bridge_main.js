@@ -1,90 +1,136 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+const INVOKE_CHANNELS = new Set([
+  'OpenDiscordInviteLinkInBrowser',
+  'Config:Get',
+  'WebUI:GetAddresses',
+  'Settings:Get',
+  'AdoptDevice',
+  'CheckForUpdatesOnClient',
+  'Loaded',
+  'Shutdown',
+  'GetClient',
+  'GetAllGroups',
+  'CreateGroup',
+  'DeleteGroup',
+  'OpenLogsFolder',
+  'OpenScriptsFolder',
+  'BackupConfig',
+  'ImportConfig',
+  'SetGroupOrder',
+  'Mode:Get',
+  'Mode:Set',
+  'SetSetting',
+  'WakeOnLan',
+  'UpdateClient',
+  'ExecuteScript',
+  'UnadoptClient',
+  'DeleteScripts',
+  'UpdateScripts',
+  'AppUpdate:Check',
+  'AppUpdate:Install',
+]);
+
+const SUBSCRIBE_CHANNELS = new Set([
+  'ModeUpdated',
+  'OSCBulkAction',
+  'PlaySound',
+  'Notify',
+  'SetOSCList',
+  'SetDevicesPendingAdoption',
+  'SetFullClientList',
+  'SetScriptList',
+  'ClientUpdated',
+  'UpdateScriptExecutions',
+  'ShutdownRequested',
+  'USBDeviceAdded',
+  'USBDeviceRemoved',
+  'UpdateSettings',
+  'AppUpdate:Status',
+]);
+
+function invoke(channel, ...args) {
+  if (!INVOKE_CHANNELS.has(channel)) {
+    throw new Error(`Blocked invoke channel: ${channel}`);
+  }
+  return ipcRenderer.invoke(channel, ...args);
+}
+
+function subscribe(channel, callback, mapper = (...payload) => payload) {
+  if (!SUBSCRIBE_CHANNELS.has(channel)) {
+    throw new Error(`Blocked subscribe channel: ${channel}`);
+  }
+  if (typeof callback !== 'function') {
+    throw new TypeError(`Callback for ${channel} must be a function`);
+  }
+
+  const handler = (_event, ...payload) => {
+    callback(...mapper(...payload));
+  };
+
+  ipcRenderer.on(channel, handler);
+  return () => ipcRenderer.removeListener(channel, handler);
+}
+
 contextBridge.exposeInMainWorld('API', {
-  OpenDiscordInviteLinkInBrowser: async () => ipcRenderer.invoke('OpenDiscordInviteLinkInBrowser'),
-  GetConfig: async () => ipcRenderer.invoke('Config:Get'),
-  GetWebUIAddresses: async () => ipcRenderer.invoke('WebUI:GetAddresses'),
-  GetSettings: async () => ipcRenderer.invoke('Settings:Get'),
-  AdoptDevice: async (UUID) => ipcRenderer.invoke('AdoptDevice', UUID),
-  CheckForUpdatesOnClient: async (UUID) => ipcRenderer.invoke('CheckForUpdatesOnClient', UUID),
-  Loaded: () => ipcRenderer.invoke('Loaded'),
-  Shutdown: () => ipcRenderer.invoke('Shutdown'),
-  GetClient: async (UUID) => ipcRenderer.invoke('GetClient', UUID),
-  GetAllGroups: async () => ipcRenderer.invoke('GetAllGroups'),
-  CreateGroup: async (Title) => ipcRenderer.invoke('CreateGroup', Title),
-  DeleteGroup: async (GroupID) => ipcRenderer.invoke('DeleteGroup', GroupID),
-  OpenLogsFolder: async () => ipcRenderer.invoke('OpenLogsFolder'),
-  OpenScriptsFolder: async () => ipcRenderer.invoke('OpenScriptsFolder'),
-  BackupConfig: async () => ipcRenderer.invoke('BackupConfig'),
-  ImportConfig: async () => ipcRenderer.invoke('ImportConfig'),
+  OpenDiscordInviteLinkInBrowser: async () => invoke('OpenDiscordInviteLinkInBrowser'),
+  GetConfig: async () => invoke('Config:Get'),
+  GetWebUIAddresses: async () => invoke('WebUI:GetAddresses'),
+  GetSettings: async () => invoke('Settings:Get'),
+  AdoptDevice: async (UUID) => invoke('AdoptDevice', UUID),
+  CheckForUpdatesOnClient: async (UUID) => invoke('CheckForUpdatesOnClient', UUID),
+  Loaded: () => invoke('Loaded'),
+  Shutdown: () => invoke('Shutdown'),
+  GetClient: async (UUID) => invoke('GetClient', UUID),
+  GetAllGroups: async () => invoke('GetAllGroups'),
+  CreateGroup: async (Title) => invoke('CreateGroup', Title),
+  DeleteGroup: async (GroupID) => invoke('DeleteGroup', GroupID),
+  OpenLogsFolder: async () => invoke('OpenLogsFolder'),
+  OpenScriptsFolder: async () => invoke('OpenScriptsFolder'),
+  BackupConfig: async () => invoke('BackupConfig'),
+  ImportConfig: async () => invoke('ImportConfig'),
   SetGroupOrder: async (GroupID, OrderedUUIDs) =>
-    ipcRenderer.invoke('SetGroupOrder', GroupID, OrderedUUIDs),
+    invoke('SetGroupOrder', GroupID, OrderedUUIDs),
   // Application Mode API
-  GetMode: async () => ipcRenderer.invoke('Mode:Get'),
-  SetMode: async (Mode) => ipcRenderer.invoke('Mode:Set', Mode),
-  OnModeUpdated: (Callback) => ipcRenderer.on('ModeUpdated', (_event, Mode) => Callback(Mode)),
+  GetMode: async () => invoke('Mode:Get'),
+  SetMode: async (Mode) => invoke('Mode:Set', Mode),
+  OnModeUpdated: (Callback) => subscribe('ModeUpdated', Callback),
   OSCBulkAction: (Callback) =>
-    ipcRenderer.on('OSCBulkAction', (_event, Type, Targets, Args = null) => {
-      Callback(Type, Targets, Args);
-    }),
+    subscribe('OSCBulkAction', Callback, (Type, Targets, Args = null) => [Type, Targets, Args]),
   PlaySound: (Callback) =>
-    ipcRenderer.on('PlaySound', (_event, SoundName) => {
-      Callback(SoundName);
-    }),
+    subscribe('PlaySound', Callback),
   Notify: (Callback) =>
-    ipcRenderer.on('Notify', (_event, Message, Type, Duration) => {
-      Callback(Message, Type, Duration);
-    }),
+    subscribe('Notify', Callback, (Message, Type, Duration) => [Message, Type, Duration]),
   SetOSCList: (Callback) =>
-    ipcRenderer.on('SetOSCList', (_event, Routes) => {
-      Callback(Routes);
-    }),
+    subscribe('SetOSCList', Callback),
   SetDevicesPendingAdoption: (Callback) =>
-    ipcRenderer.on('SetDevicesPendingAdoption', (_event, Data) => {
-      Callback(Data);
-    }),
+    subscribe('SetDevicesPendingAdoption', Callback),
   SetFullClientList: (Callback) =>
-    ipcRenderer.on('SetFullClientList', (_event, Clients, Groups) => {
-      Callback(Clients, Groups);
-    }),
+    subscribe('SetFullClientList', Callback, (Clients, Groups) => [Clients, Groups]),
   SetScriptList: (Callback) =>
-    ipcRenderer.on('SetScriptList', (_event, Data) => {
-      Callback(Data);
-    }),
+    subscribe('SetScriptList', Callback),
   ClientUpdated: (Callback) =>
-    ipcRenderer.on('ClientUpdated', (_event, Data) => {
-      Callback(Data);
-    }),
+    subscribe('ClientUpdated', Callback),
   UpdateScriptExecutions: (Callback) =>
-    ipcRenderer.on('UpdateScriptExecutions', (_event, Data) => {
-      Callback(Data);
-    }),
+    subscribe('UpdateScriptExecutions', Callback),
   ShutdownRequested: (Callback) =>
-    ipcRenderer.on('ShutdownRequested', (_event) => {
-      Callback();
-    }),
+    subscribe('ShutdownRequested', Callback, () => []),
   USBDeviceAdded: (Callback) =>
-    ipcRenderer.on('USBDeviceAdded', (_event, Client, Device) => {
-      Callback(Client, Device);
-    }),
+    subscribe('USBDeviceAdded', Callback, (Client, Device) => [Client, Device]),
   USBDeviceRemoved: (Callback) =>
-    ipcRenderer.on('USBDeviceRemoved', (_event, Client, Device) => {
-      Callback(Client, Device);
-    }),
+    subscribe('USBDeviceRemoved', Callback, (Client, Device) => [Client, Device]),
   UpdateSettings: (Callback) =>
-    ipcRenderer.on('UpdateSettings', (_event, Settings, SettingsGroupps) => {
-      Callback(Settings, SettingsGroupps);
-    }),
-  SetSetting: async (Key, Value) => ipcRenderer.invoke('SetSetting', Key, Value),
-  WakeOnLan: async (Targets) => ipcRenderer.invoke('WakeOnLan', Targets),
-  UpdateClient: async (UUID, Data) => ipcRenderer.invoke('UpdateClient', UUID, Data),
+    subscribe('UpdateSettings', Callback, (Settings, SettingsGroupps) => [Settings, SettingsGroupps]),
+  SetSetting: async (Key, Value) => invoke('SetSetting', Key, Value),
+  WakeOnLan: async (Targets) => invoke('WakeOnLan', Targets),
+  UpdateClient: async (UUID, Data) => invoke('UpdateClient', UUID, Data),
   ExecuteScript: async (Script, Targets, ResetList) =>
-    ipcRenderer.invoke('ExecuteScript', Script, Targets, ResetList),
-  UnadoptClient: async (UUID) => ipcRenderer.invoke('UnadoptClient', UUID),
-  DeleteScripts: async (List) => ipcRenderer.invoke('DeleteScripts', List),
-  UpdateScripts: async (List) => ipcRenderer.invoke('UpdateScripts', List),
+    invoke('ExecuteScript', Script, Targets, ResetList),
+  UnadoptClient: async (UUID) => invoke('UnadoptClient', UUID),
+  DeleteScripts: async (List) => invoke('DeleteScripts', List),
+  UpdateScripts: async (List) => invoke('UpdateScripts', List),
   // App update APIs
-  CheckForAppUpdates: async () => ipcRenderer.invoke('AppUpdate:Check'),
-  InstallAppUpdate: async () => ipcRenderer.invoke('AppUpdate:Install'),
-  OnAppUpdateStatus: (cb) => ipcRenderer.on('AppUpdate:Status', (_e, payload) => cb(payload)),
+  CheckForAppUpdates: async () => invoke('AppUpdate:Check'),
+  InstallAppUpdate: async () => invoke('AppUpdate:Install'),
+  OnAppUpdateStatus: (cb) => subscribe('AppUpdate:Status', cb),
 });

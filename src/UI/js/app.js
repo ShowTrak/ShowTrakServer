@@ -20,6 +20,45 @@ let __clientInfoRefreshInFlight = false;
 
 // --- Application Mode (SHOW | EDIT) ---
 let AppMode = 'SHOW'; // default visual state until backend confirms
+const COMPACT_MODE_STORAGE_KEY = 'showtrak.ui.compactMode';
+let CompactMode = false;
+
+function RenderCompactMode(isCompact) {
+  CompactMode = !!isCompact;
+  document.body.classList.toggle('compact-mode', CompactMode);
+
+  const btn = document.getElementById('COMPACT_MODE_BTN');
+  const icon = document.getElementById('COMPACT_MODE_ICON');
+  if (btn) {
+    btn.classList.toggle('btn-light', CompactMode);
+    btn.classList.toggle('btn-outline-light', !CompactMode);
+    btn.setAttribute('aria-pressed', CompactMode ? 'true' : 'false');
+    btn.title = CompactMode ? 'Disable Compact Mode' : 'Enable Compact Mode';
+  }
+  if (icon) {
+    icon.classList.remove('bi-arrows-angle-contract', 'bi-arrows-angle-expand');
+    icon.classList.add(CompactMode ? 'bi-arrows-angle-expand' : 'bi-arrows-angle-contract');
+  }
+}
+
+function SetCompactMode(isCompact, options = {}) {
+  const persist = options.persist !== false;
+  RenderCompactMode(isCompact);
+  if (persist) {
+    try {
+      localStorage.setItem(COMPACT_MODE_STORAGE_KEY, CompactMode ? '1' : '0');
+    } catch {}
+  }
+}
+
+function LoadCompactModePreference() {
+  try {
+    return localStorage.getItem(COMPACT_MODE_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 function RenderMode(mode) {
   AppMode = String(mode).toUpperCase() === 'EDIT' ? 'EDIT' : 'SHOW';
   // Highlight the active button
@@ -70,6 +109,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Wire new button group
   const btnShow = document.getElementById('MODE_BTN_SHOW');
   const btnEdit = document.getElementById('MODE_BTN_EDIT');
+  const btnCompact = document.getElementById('COMPACT_MODE_BTN');
+
+  SetCompactMode(LoadCompactModePreference(), { persist: false });
+
   if (btnShow && !btnShow.dataset.bound) {
     btnShow.addEventListener('click', async () => {
       await window.API.SetMode('SHOW');
@@ -81,6 +124,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       await window.API.SetMode('EDIT');
     });
     btnEdit.dataset.bound = '1';
+  }
+  if (btnCompact && !btnCompact.dataset.bound) {
+    btnCompact.addEventListener('click', () => {
+      SetCompactMode(!CompactMode);
+    });
+    btnCompact.dataset.bound = '1';
   }
   // Initialize with backend mode
   try {
@@ -2371,27 +2420,57 @@ $(async function () {
       }
     });
 
-    // Calculate menu position to prevent overflow
-    const menuWidth = $menu.outerWidth();
-    const menuHeight = $menu.outerHeight();
-    const pageWidth = $(window).width();
-    const pageHeight = $(window).height();
-    let left = e.pageX;
-    let top = e.pageY;
+    // Calculate menu position to prevent overflow and keep it within viewport bounds
+    const viewportWidth = window.innerWidth || $(window).width();
+    const viewportHeight = window.innerHeight || $(window).height();
+    const edgePadding = 8;
+    const boundsEl =
+      document.getElementById('APPLICATION_CONTAINER') ||
+      document.getElementById('APPLICATION') ||
+      document.documentElement;
+    const boundsRect = boundsEl.getBoundingClientRect();
+    const minX = Math.max(edgePadding, Math.floor(boundsRect.left) + edgePadding);
+    const minY = Math.max(edgePadding, Math.floor(boundsRect.top) + edgePadding);
+    const maxX = Math.min(viewportWidth - edgePadding, Math.floor(boundsRect.right) - edgePadding);
+    const maxY = Math.min(viewportHeight - edgePadding, Math.floor(boundsRect.bottom) - edgePadding);
+    const availableHeight = Math.max(120, maxY - minY);
+    const maxMenuHeight = Math.min(460, Math.max(220, Math.floor(availableHeight * 0.9)));
 
-    // If menu would overflow right, show to the left
-    if (left + menuWidth > pageWidth) {
-      left = Math.max(0, left - menuWidth);
+    // Measure with intended max height before final placement
+    $menu.css({
+      display: 'block',
+      visibility: 'hidden',
+      left: 0,
+      top: 0,
+      'max-height': `${maxMenuHeight}px`,
+    });
+
+    const menuWidth = $menu.outerWidth();
+    const menuHeight = Math.min($menu.outerHeight(), maxMenuHeight);
+
+    const clickX = e.clientX;
+    const clickY = e.clientY;
+    let left = clickX;
+    let top = clickY;
+
+    // Prefer opening toward available space first, then clamp to viewport
+    if (left + menuWidth > maxX) {
+      left = clickX - menuWidth;
     }
-    // If menu would overflow bottom, show above
-    if (top + menuHeight > pageHeight) {
-      top = Math.max(0, top - menuHeight);
+    if (top + menuHeight > maxY) {
+      top = clickY - menuHeight;
     }
+
+    const maxLeft = Math.max(minX, maxX - menuWidth);
+    const maxTop = Math.max(minY, maxY - menuHeight);
+    left = Math.min(Math.max(minX, left), maxLeft);
+    top = Math.min(Math.max(minY, top), maxTop);
 
     $menu.css({
       display: 'block',
-      left: left,
-      top: top,
+      visibility: 'visible',
+      left: `${left}px`,
+      top: `${top}px`,
     });
 
     // A11y roles and initial focus

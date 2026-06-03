@@ -11,17 +11,44 @@ const DatabasePath = AppDataManager.GetStorageDirectory();
 const DatabaseFileName = 'DB.sqlite';
 
 const dbPath = path.join(DatabasePath, DatabaseFileName);
+let schemaInitialized = false;
+let schemaInitializationPromise = null;
+
+const readyState = {
+  resolve: null,
+  reject: null,
+};
+
+const readyPromise = new Promise((resolve, reject) => {
+  readyState.resolve = resolve;
+  readyState.reject = reject;
+});
+
 // Open DB and ensure schema exists before first use
 const DB = new sqlite3.Database(dbPath, async (err) => {
-  if (err) return Logger.error('Failed to connect to database:', err);
+  if (err) {
+    Logger.error('Failed to connect to database:', err);
+    if (readyState.reject) readyState.reject(err);
+    return;
+  }
   Logger.success('Connected to SQLite database.');
-  await Manager.InitializeSchema();
+  try {
+    await Manager.InitializeSchema();
+    if (readyState.resolve) readyState.resolve();
+  } catch (schemaError) {
+    Logger.databaseError('Schema initialization failed:', schemaError);
+    if (readyState.reject) readyState.reject(schemaError);
+  }
 });
 
 const Manager = {};
 
 // Create tables idempotently using schema.js definitions
 Manager.InitializeSchema = async () => {
+  if (schemaInitialized) return;
+  if (schemaInitializationPromise) return schemaInitializationPromise;
+
+  schemaInitializationPromise = (async () => {
   let Tables = require('./schema.js');
   for (let Table of Tables) {
     Logger.database(`Creating table: ${Table.Name}`);
@@ -32,6 +59,14 @@ Manager.InitializeSchema = async () => {
       Logger.database(`Table ${Table.Name} created successfully.`);
     }
   }
+  schemaInitialized = true;
+  })();
+
+  return schemaInitializationPromise;
+};
+
+Manager.Ready = async () => {
+  await readyPromise;
 };
 
 // Wrapper returning [err, row] for single-row queries

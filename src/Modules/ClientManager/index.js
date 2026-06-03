@@ -11,6 +11,7 @@ const { Manager: DB } = require('../DB');
 
 const { Manager: BroadcastManager } = require('../Broadcast');
 const { Manager: SettingsManager } = require('../SettingsManager');
+const { Ok, Fail } = require('../Utils');
 
 const Manager = {};
 
@@ -277,29 +278,29 @@ Manager.SystemInfo = async (UUID, Data, IP) => {
 
 Manager.Update = async (UUID, Data) => {
   let [Err, Client] = await Manager.Get(UUID);
-  if (Err) return false;
-  if (!Client) return false;
+  if (Err) return Fail(Err);
+  if (!Client) return Fail('Client Not Found');
   if (Object.prototype.hasOwnProperty.call(Data, 'Nickname')) {
     await Client.SetNickname(Data.Nickname);
   }
   if (Object.prototype.hasOwnProperty.call(Data, 'GroupID')) {
     await Client.SetGroupID(Data.GroupID);
   }
-  return true;
+  return Ok(Client);
 };
 
 // Adopt a client by creating a durable DB row and adding to the cache
 Manager.Create = async (UUID) => {
   // Verify if the client already exists
   let [Err, ExistingClient] = await DB.Get('SELECT * FROM Clients WHERE UUID = ?', [UUID]);
-  if (Err) return 'Failed to fetch existing client';
-  if (ExistingClient) return 'Client already exists';
+  if (Err) return Fail('Failed to fetch existing client');
+  if (ExistingClient) return Fail('Client already exists');
   // Insert new client into the database
   let [InsertErr, _Res] = await DB.Run(
     'INSERT INTO Clients (UUID, Hostname, Version, IP, Timestamp) VALUES (?, ?, ?, ?, ?)',
     [UUID, 'ShowTrak Client', null, null, Date.now()]
   );
-  if (InsertErr) return 'Failed to insert new client';
+  if (InsertErr) return Fail('Failed to insert new client');
   ClientList.push(
     new Client({
       UUID: UUID,
@@ -310,17 +311,18 @@ Manager.Create = async (UUID) => {
     })
   );
   BroadcastManager.emit('ClientListChanged');
+  return Ok(true);
 };
 
 // Unadopt or purge a client; remove from DB and cache
 Manager.Delete = async (UUID) => {
   // Remove from database
   let [Err, _Res] = await DB.Run('DELETE FROM Clients WHERE UUID = ?', [UUID]);
-  if (Err) return 'Failed to delete client';
+  if (Err) return Fail('Failed to delete client');
   // Remove from in-memory list
   ClientList = ClientList.filter((c) => c.UUID !== UUID);
   Logger.success(`Client ${UUID} deleted successfully`);
-  return null;
+  return Ok(true);
 };
 
 // Truthy existence check: prefer cache, fallback to DB
