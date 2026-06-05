@@ -1,0 +1,97 @@
+name: Build And Draft Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release-meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from package.json
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+  make:
+    needs: release-meta
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build distributables
+        run: npm run make
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: make-${{ matrix.os }}
+          path: out/make/**
+          if-no-files-found: error
+
+  draft-release:
+    needs: [release-meta, make]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.release-meta.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.release-meta.outputs.version }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          pattern: make-*
+          merge-multiple: true
+
+      - name: Create or update draft release
+        run: |
+          TITLE="ShowTrak Server v${RELEASE_VERSION}"
+          NOTES="Automated draft release for v${RELEASE_VERSION}."
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --draft --title "$TITLE" --notes "$NOTES"
+          else
+            gh release create "$RELEASE_TAG" --draft --title "$TITLE" --notes "$NOTES" --target "$GITHUB_SHA"
+          fi
+
+      - name: Upload release assets
+        run: |
+          mapfile -t FILES < <(find release-artifacts -type f)
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "No release artifacts found."
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" "${FILES[@]}" --clobber
