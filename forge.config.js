@@ -5,6 +5,9 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
+    // Keep the runtime binary name stable across platforms so Linux makers
+    // can reliably locate it when building deb/rpm packages.
+    executableName: 'showtrak-server',
     // Use extensionless base path so Electron Packager can resolve
     // platform-specific icon formats (.icns on macOS, .ico on Windows).
     icon: './src/images/icon',
@@ -32,10 +35,20 @@ module.exports = {
     {
       name: '@electron-forge/maker-deb',
       platforms: ['linux'],
+      config: {
+        options: {
+          bin: 'showtrak-server',
+        },
+      },
     },
     {
       name: '@electron-forge/maker-rpm',
       platforms: ['linux'],
+      config: {
+        options: {
+          bin: 'showtrak-server',
+        },
+      },
     },
   ],
   plugins: [
