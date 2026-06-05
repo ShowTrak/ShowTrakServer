@@ -25,8 +25,8 @@ function BuildArgs(Address, TimeoutMs) {
     return ['-n', '1', '-w', String(Math.max(100, TimeoutMs | 0)), Address];
   }
   if (Platform === 'darwin') {
-    const TimeoutSec = Math.max(1, Math.ceil(TimeoutMs / 1000));
-    return ['-c', '1', '-W', String(TimeoutMs | 0), '-t', String(TimeoutSec), Address];
+    // macOS: -W is wait time per reply in milliseconds.
+    return ['-c', '1', '-W', String(Math.max(100, TimeoutMs | 0)), Address];
   }
   // linux + others
   const TimeoutSec = Math.max(1, Math.ceil(TimeoutMs / 1000));

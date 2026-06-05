@@ -53,7 +53,7 @@ The following instructions are for installing ShowTrak Server, To install the Cl
 Prerequisites:
 
 - Node.js 18+ and npm
-- Windows, macOS, or Linux (Windows recommended for production packaging)
+- Windows, macOS, or Linux
 
 Steps:
 
@@ -62,22 +62,36 @@ Steps:
 
 Try it:
 
-```powershell
 npm install
 npm run start
-```
 
 Packaging installers (optional):
 
-```powershell
 npm run make
-```
 
 Lint:
 
-```powershell
 npm run lint
-```
+
+### Build all platforms from one machine
+
+Short answer: not reliably with local tooling alone.
+
+- Native Electron packaging is platform-dependent, and macOS artifacts usually require a macOS runner.
+- The practical one-platform workflow is: push once, let CI build on macOS, Linux, and Windows runners.
+
+This repo includes a GitHub Actions matrix workflow at .github/workflows/build-matrix.yml.
+
+How to use it:
+
+1. Push a tag like v3.2.1, or run the workflow manually from GitHub Actions.
+2. CI runs npm run make on ubuntu-latest, macos-latest, and windows-latest.
+3. Download build artifacts from the workflow run.
+
+Notes:
+
+- Unsigned binaries/installers may still be generated, but signing/notarization is separate per platform.
+- For production releases, keep signing keys/certificates in GitHub Secrets and add signing steps.
 
 ### Project structure (high level)
 

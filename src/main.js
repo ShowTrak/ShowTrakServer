@@ -88,6 +88,11 @@ function sendAppUpdateStatus(payload) {
   } catch {}
 }
 
+function getWindowIconPath() {
+  const iconName = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+  return path.join(__dirname, 'images', iconName);
+}
+
 function validationErrorTuple(error, fallback = null) {
   const message = error && error.message ? error.message : String(error || 'Invalid request');
   return [message, fallback];
@@ -122,7 +127,7 @@ var MainWindow = null;
 // Note: Hiding the app menu disables common shortcuts on macOS. If you ship on macOS,
 // prefer to keep a minimal menu there and only remove on Windows/Linux.
 // Example: if (app.isPackaged && process.platform !== 'darwin') Menu.setApplicationMenu(null);
-if (app.isPackaged) Menu.setApplicationMenu(null);
+if (app.isPackaged && process.platform !== 'darwin') Menu.setApplicationMenu(null);
 let PreloaderWindow = null;
 app.whenReady().then(async () => {
   if (require('electron-squirrel-startup')) return app.quit();
@@ -161,8 +166,7 @@ app.whenReady().then(async () => {
       preload: path.join(__dirname, 'bridge_preloader.js'),
       devTools: !app.isPackaged,
     },
-    // macOS: prefer an .icns icon or omit to use the app bundle icon.
-    icon: path.join(__dirname, './Images/icon.ico'),
+    icon: getWindowIconPath(),
     frame: true,
     titleBarStyle: 'hidden',
   });
@@ -187,8 +191,7 @@ app.whenReady().then(async () => {
       preload: path.join(__dirname, 'bridge_main.js'),
       devTools: !app.isPackaged,
     },
-    // macOS: prefer an .icns icon or omit to use the app bundle icon.
-    icon: path.join(__dirname, './Images/icon.ico'),
+    icon: getWindowIconPath(),
     frame: true,
     titleBarStyle: 'hidden',
   });

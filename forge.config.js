@@ -5,35 +5,37 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
-    // TODO(macOS): Provide a macOS ICNS icon (e.g., ./src/images/icon.icns) and set a platform-conditional icon or base path without extension.
-    // Note: Folder name case "Images" vs "images" can break on case-sensitive filesystems. Standardize to one.
-    icon: './src/Images/icon.ico',
+    // Use extensionless base path so Electron Packager can resolve
+    // platform-specific icon formats (.icns on macOS, .ico on Windows).
+    icon: './src/images/icon',
   },
   rebuildConfig: {},
   makers: [
-    // TODO(macOS): Add makers for macOS distribution.
-    // - @electron-forge/maker-dmg for signed releases
-    // - @electron-forge/maker-zip for unsigned testing builds
-    // Example:
-    // {
-    //   name: "@electron-forge/maker-dmg",
-    //   config: { format: "ULFO" }
-    // },
-    // { name: "@electron-forge/maker-zip", platforms: ["darwin"] }
     {
       name: '@electron-forge/maker-squirrel',
-      // TODO(macOS): Restrict this maker to Windows only to avoid cross-platform noise.
-      // Example: add `platforms: ["win32"]` once you add mac makers above.
+      platforms: ['win32'],
       config: {
         // An URL to an ICO file to use as the application icon (displayed in Control Panel > Programs and Features).
         iconUrl: 'https://tkw.bz/img/ShowTrak.ico',
         // The ICO file to use as the icon for the generated Setup.exe
-        setupIcon: './src/Images/icon.ico',
+        setupIcon: './src/images/icon.ico',
       },
     },
     {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin'],
+    },
+    {
+      name: '@electron-forge/maker-zip',
+      platforms: ['linux'],
+    },
+    {
+      name: '@electron-forge/maker-deb',
+      platforms: ['linux'],
+    },
+    {
+      name: '@electron-forge/maker-rpm',
+      platforms: ['linux'],
     },
   ],
   plugins: [

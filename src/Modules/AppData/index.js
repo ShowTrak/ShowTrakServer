@@ -1,14 +1,16 @@
 // const { Config } = require('../Config');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const { spawn } = require('child_process');
 
-// TODO(macOS): Consider using ~/Library/Application Support/ShowTrakServer instead of Preferences (more standard for app data).
-// Add a simple migration if changing paths (copy/move existing data on first run).
+const HomeDirectory = process.env.HOME || os.homedir();
 let BasePath =
-  process.env.APPDATA ||
-  (process.platform == 'darwin'
-    ? process.env.HOME + '/Library/Preferences'
-    : process.env.HOME + '/.local/share');
+  process.platform === 'win32'
+    ? process.env.APPDATA || path.join(HomeDirectory, 'AppData', 'Roaming')
+    : process.platform === 'darwin'
+      ? path.join(HomeDirectory, 'Library', 'Application Support')
+      : process.env.XDG_DATA_HOME || path.join(HomeDirectory, '.local', 'share');
 const appDataPath = path.join(BasePath, 'ShowTrakServer');
 
 const Manager = {};
@@ -44,14 +46,27 @@ Manager.GetStorageDirectory = () => {
 };
 
 Manager.OpenFolder = (FolderPath) => {
-  if (fs.existsSync(FolderPath)) {
-    // TODO(macOS/Linux): Use `open` on macOS and `xdg-open` on Linux instead of Windows-only `start`.
-    // Example:
-    // const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
-    // require('child_process').exec(`${opener} "${FolderPath}"`);
-    require('child_process').exec(`start "" "${FolderPath}"`);
+  if (!fs.existsSync(FolderPath)) {
+    return false;
+  }
+
+  try {
+    let command = 'xdg-open';
+    let args = [FolderPath];
+
+    if (process.platform === 'darwin') {
+      command = 'open';
+    } else if (process.platform === 'win32') {
+      command = 'explorer';
+    }
+
+    const child = spawn(command, args, {
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
     return true;
-  } else {
+  } catch (_error) {
     return false;
   }
 };
