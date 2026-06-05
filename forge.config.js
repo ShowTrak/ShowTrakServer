@@ -31,6 +31,10 @@ module.exports = {
         setupIcon: './src/Images/icon.ico',
       },
     },
+    {
+      name: '@electron-forge/maker-zip',
+      platforms: ['darwin'],
+    },
   ],
   plugins: [
     {
