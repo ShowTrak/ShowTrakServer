@@ -45,6 +45,12 @@ Manager.GetStorageDirectory = () => {
   return path.join(appDataPath, 'Storage');
 };
 
+// App-level state that must survive across relaunches and is NOT part of the
+// swappable show database (e.g. which .ShowTrak file is currently open).
+Manager.GetStateFilePath = () => {
+  return path.join(appDataPath, 'state.json');
+};
+
 Manager.OpenFolder = (FolderPath) => {
   if (!fs.existsSync(FolderPath)) {
     return false;

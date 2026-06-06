@@ -389,6 +389,48 @@ Manager.GetClientsInGroup = async (GroupID) => {
   return ClientList.filter((c) => c.GroupID === GroupID);
 };
 
+// Move all clients from a specific group into the default no-group bucket (null).
+Manager.MoveGroupToNoGroup = async (GroupID) => {
+  if (!Manager.Initialized) await Manager.Init();
+  const TargetGroupID = Number(GroupID);
+  if (!Number.isFinite(TargetGroupID)) return ['Invalid GroupID', null];
+
+  const [Err] = await DB.Run('UPDATE Clients SET GroupID = NULL WHERE GroupID = ?', [TargetGroupID]);
+  if (Err) return ['Failed to move clients to no group', null];
+
+  let Changed = 0;
+  for (const Client of ClientList) {
+    if (Client.GroupID == null) continue;
+    if (Number(Client.GroupID) !== TargetGroupID) continue;
+    Client.GroupID = null;
+    Changed += 1;
+  }
+
+  if (Changed > 0) BroadcastManager.emit('ClientListChanged');
+  return [null, Changed];
+};
+
+// Ensure all clients reference an existing group; unknown groups are reassigned to null.
+Manager.ReconcileOrphanedGroups = async (ValidGroupIDs) => {
+  if (!Manager.Initialized) await Manager.Init();
+  const Valid = new Set(
+    (Array.isArray(ValidGroupIDs) ? ValidGroupIDs : [])
+      .map((ID) => Number(ID))
+      .filter((ID) => Number.isFinite(ID))
+  );
+
+  let Changed = 0;
+  for (const Client of ClientList) {
+    if (Client.GroupID == null) continue;
+    const ClientGroupID = Number(Client.GroupID);
+    if (Valid.has(ClientGroupID)) continue;
+    await Client.SetGroupID(null);
+    Changed += 1;
+  }
+
+  return [null, Changed];
+};
+
 // Persist a specific order of clients in a group and optionally move clients into that group
 // orderedUUIDs: string[] in the desired order. Any client not in orderedUUIDs will retain existing weight.
 Manager.SetGroupOrder = async (GroupID, orderedUUIDs) => {

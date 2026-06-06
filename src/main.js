@@ -33,6 +33,7 @@ const { Manager: ClientManager } = require('./Modules/ClientManager');
 const { Manager: GroupManager } = require('./Modules/GroupManager');
 const { Manager: MonitoringTargetManager } = require('./Modules/MonitoringTargetManager');
 const { Manager: MonitoringMethods } = require('./Modules/MonitoringMethods');
+const { Manager: AlertsManager } = require('./Modules/AlertsManager');
 const { Manager: NetworkDiscoveryManager } = require('./Modules/NetworkDiscovery');
 const { Manager: FileSelectorManager } = require('./Modules/FileSelectorManager');
 const { Manager: BackupManager } = require('./Modules/BackupManager');
@@ -87,6 +88,16 @@ function sendAppUpdateStatus(payload) {
       MainWindow.webContents.send('AppUpdate:Status', payload);
     }
   } catch {}
+}
+
+function sendShowFileUpdated(filePath) {
+  try {
+    if (MainWindow && !MainWindow.isDestroyed()) {
+      MainWindow.webContents.send('ShowFileUpdated', filePath || null);
+    }
+  } catch {
+    // Window may be mid-teardown; navbar update is non-critical.
+  }
 }
 
 function getWindowIconPath() {
@@ -205,43 +216,78 @@ app.whenReady().then(async () => {
     MonitoringTargetManager.Init().catch((Err) =>
       Logger.error('Failed to init MonitoringTargetManager:', Err)
     );
+    AlertsManager.Init().catch((Err) => Logger.error('Failed to init AlertsManager:', Err));
     await Wait(800);
     PreloaderWindow.close();
     MainWindow.show();
   });
   applyWindowSecurityGuards(MainWindow);
 
-  // Config backup/restore IPC. Returns [err, result] tuples consistently.
-  RPC.handle('BackupConfig', async () => {
-    let { canceled, filePath } = await FileSelectorManager.SaveDialog(
-      'Export ShowTrak Configuration'
-    );
-    if (canceled || !filePath) {
-      Logger.log('BackupConfig canceled');
-      return ['Cancelled By User', null];
+  // ShowTrak file save/open IPC. Returns [err, result] tuples consistently.
+  RPC.handle('Show:Save', async () => {
+    let CurrentPath = BackupManager.GetCurrentFilePath();
+    if (!CurrentPath) {
+      // No file opened or saved yet this session — fall back to Save As.
+      let { canceled, filePath } = await FileSelectorManager.SaveDialog('Save ShowTrak File As');
+      if (canceled || !filePath) {
+        Logger.log('Show:Save canceled');
+        return ['Cancelled By User', null];
+      }
+      CurrentPath = filePath;
     }
-    Logger.log('Backing up configuration to:', filePath);
-    let [Err, Result] = await BackupManager.ExportConfig(filePath);
+    Logger.log('Saving ShowTrak file to:', CurrentPath);
+    let [Err, Result] = await BackupManager.Save(CurrentPath);
     if (Err) return [Err, null];
+    sendShowFileUpdated(BackupManager.GetCurrentFilePath());
     return [null, Result];
   });
 
-  RPC.handle('ImportConfig', async () => {
-    let { canceled, filePaths } = await FileSelectorManager.SelectFile(
-      'Select ShowTrak Configuration File to Import'
-    );
-    if (canceled || !filePaths) {
-      console.log(canceled, filePaths);
-      Logger.log('ImportConfig canceled');
+  RPC.handle('Show:SaveAs', async () => {
+    let { canceled, filePath } = await FileSelectorManager.SaveDialog('Save ShowTrak File As');
+    if (canceled || !filePath) {
+      Logger.log('Show:SaveAs canceled');
       return ['Cancelled By User', null];
     }
-    if (filePaths.length === 0) {
-      Logger.log('No files selected for import');
-      return ['No files selected for import', null];
-    }
-    Logger.log('Importing configuration from:', filePaths[0]);
-    let [Err, Result] = await BackupManager.ImportConfig(filePaths[0]);
+    Logger.log('Saving ShowTrak file to:', filePath);
+    let [Err, Result] = await BackupManager.Save(filePath);
     if (Err) return [Err, null];
+    sendShowFileUpdated(BackupManager.GetCurrentFilePath());
+    return [null, Result];
+  });
+
+  RPC.handle('Show:Open', async () => {
+    let { canceled, filePaths } = await FileSelectorManager.OpenDialog('Open ShowTrak File');
+    if (canceled || !filePaths || filePaths.length === 0) {
+      Logger.log('Show:Open canceled');
+      return ['Cancelled By User', null];
+    }
+    Logger.log('Opening ShowTrak file from:', filePaths[0]);
+    let [Err, Result] = await BackupManager.Open(filePaths[0]);
+    if (Err) return [Err, null];
+    sendShowFileUpdated(BackupManager.GetCurrentFilePath());
+    return [null, Result];
+  });
+
+  RPC.handle('Show:GetCurrentFile', async () => {
+    return BackupManager.GetCurrentFilePath();
+  });
+
+  RPC.handle('Show:HasUnsavedData', async () => {
+    return await BackupManager.HasUnsavedWorkingData();
+  });
+
+  RPC.handle('Show:EnsureFileExists', async () => {
+    let [Err, Result] = await BackupManager.EnsureCurrentFileExists();
+    if (Err) return [Err, null];
+    if (Result && Result.Missing) sendShowFileUpdated(BackupManager.GetCurrentFilePath());
+    return [null, Result];
+  });
+
+  RPC.handle('Show:New', async () => {
+    Logger.log('Creating new ShowTrak show');
+    let [Err, Result] = await BackupManager.New();
+    if (Err) return [Err, null];
+    sendShowFileUpdated(BackupManager.GetCurrentFilePath());
     return [null, Result];
   });
   // Always register IPC handlers so renderer never hits an unhandled channel
@@ -347,7 +393,21 @@ app.whenReady().then(async () => {
     try {
       await autoUpdater.checkForUpdates();
     } catch (e) {
-      sendAppUpdateStatus({ state: 'error', error: String(e) });
+      const message = String(e || 'Unknown updater error');
+      const missingMacManifest =
+        process.platform === 'darwin' &&
+        message.includes('latest-mac.yml') &&
+        message.includes('404');
+
+      if (missingMacManifest) {
+        sendAppUpdateStatus({
+          state: 'none',
+          info: { reason: 'latest-mac.yml is missing from release assets' },
+        });
+        return;
+      }
+
+      sendAppUpdateStatus({ state: 'error', error: message });
     }
   });
   RPC.handle('AppUpdate:Install', async () => {
@@ -584,6 +644,78 @@ app.whenReady().then(async () => {
     return [null, Result];
   });
 
+  // ---- Alert Rules ----
+  RPC.handle('GetAlertTriggers', async () => {
+    return AlertsManager.GetTriggers();
+  });
+
+  RPC.handle('GetAlertActionTypes', async () => {
+    return AlertsManager.GetActionTypes();
+  });
+
+  RPC.handle('GetAllAlertRules', async () => {
+    const [Err, Rules] = await AlertsManager.GetAll();
+    if (Err) return [];
+    return Rules || [];
+  });
+
+  RPC.handle('GetAlertRule', async (_Event, RuleID) => {
+    try {
+      RuleID = IPCValidation.AlertRuleID(RuleID);
+    } catch {
+      return null;
+    }
+    const [Err, Rule] = await AlertsManager.Get(RuleID);
+    if (Err) return null;
+    return Rule;
+  });
+
+  RPC.handle('CreateAlertRule', async (_Event, Payload) => {
+    try {
+      Payload = IPCValidation.AlertRuleCreatePayload(Payload);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Rule] = await AlertsManager.Create(Payload);
+    if (Err) return [Err, null];
+    return [null, Rule];
+  });
+
+  RPC.handle('UpdateAlertRule', async (_Event, RuleID, Payload) => {
+    try {
+      RuleID = IPCValidation.AlertRuleID(RuleID);
+      Payload = IPCValidation.AlertRuleUpdatePayload(Payload);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Rule] = await AlertsManager.Update(RuleID, Payload);
+    if (Err) return [Err, null];
+    return [null, Rule];
+  });
+
+  RPC.handle('DeleteAlertRule', async (_Event, RuleID) => {
+    try {
+      RuleID = IPCValidation.AlertRuleID(RuleID);
+    } catch (error) {
+      return validationErrorTuple(error, false);
+    }
+    const [Err, Result] = await AlertsManager.Delete(RuleID);
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
+  RPC.handle('SetAlertRuleEnabled', async (_Event, RuleID, Enabled) => {
+    try {
+      RuleID = IPCValidation.AlertRuleID(RuleID);
+      Enabled = !!Enabled;
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Rule] = await AlertsManager.SetEnabled(RuleID, Enabled);
+    if (Err) return [Err, null];
+    return [null, Rule];
+  });
+
   RPC.handle('NetworkDiscovery:Start', async (_Event, Options) => {
     try {
       Options = IPCValidation.NetworkDiscoveryScanOptions(Options);
@@ -721,6 +853,7 @@ app.whenReady().then(async () => {
     await UpdateScriptList();
     await UpdateOSCList();
     await UpdateMonitoringTargetList();
+    await UpdateAlertRuleList();
     // Push current application mode to renderer on initial load
     if (MainWindow && !MainWindow.isDestroyed()) {
       MainWindow.webContents.send('ModeUpdated', ModeManager.Get());
@@ -789,6 +922,67 @@ app.whenReady().then(async () => {
     return;
   });
 
+  RPC.handle('OpenShowTrakWebsiteInBrowser', async (_event) => {
+    const url = 'https://showtrak.co.uk';
+    await shell.openExternal(url);
+    return;
+  });
+
+  RPC.handle('OpenShowTrakGithubInBrowser', async (_event) => {
+    const url = 'https://github.com/ShowTrak/ShowTrakServer';
+    await shell.openExternal(url);
+    return;
+  });
+
+  RPC.handle('OpenNpmPackageInBrowser', async (_event, PackageName) => {
+    const Name = String(PackageName || '').trim();
+    if (!Name) return;
+    const url = `https://www.npmjs.com/package/${encodeURIComponent(Name)}`;
+    await shell.openExternal(url);
+    return;
+  });
+
+  RPC.handle('GetProjectDependencies', async (_event) => {
+    try {
+      const CandidatePaths = [
+        path.join(app.getAppPath(), 'package.json'),
+        path.resolve(app.getAppPath(), '..', 'package.json'),
+      ];
+
+      let PackageJsonPath = null;
+      for (const CandidatePath of CandidatePaths) {
+        if (fs.existsSync(CandidatePath)) {
+          PackageJsonPath = CandidatePath;
+          break;
+        }
+      }
+
+      if (!PackageJsonPath) {
+        return ['Could not locate package.json', null];
+      }
+
+      const PackageJsonRaw = fs.readFileSync(PackageJsonPath, 'utf8');
+      const PackageJson = JSON.parse(PackageJsonRaw);
+
+      const DefaultRuntimeDependencies = new Set(['electron-squirrel-startup']);
+
+      const Dependencies = Object.entries(PackageJson.dependencies || {})
+        .filter(([name]) => !DefaultRuntimeDependencies.has(name))
+        .map(([name, version]) => ({ name, version }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      return [
+        null,
+        {
+          dependencies: Dependencies,
+        },
+      ];
+    } catch (error) {
+      Logger.error('GetProjectDependencies failed', error);
+      return [String(error), null];
+    }
+  });
+
   RPC.handle('SetSetting', async (_event, Key, Value) => {
     try {
       [Key, Value] = IPCValidation.SettingUpdatePayload(Key, Value);
@@ -819,7 +1013,46 @@ async function UpdateSettings() {
 
 BroadcastManager.on('SettingsUpdated', UpdateSettings);
 
-// USB add/remove fan-out: provide contextual client + device to the UI.
+// Autosave: periodically snapshot the open ShowTrak file back to its path. The
+// timer is rescheduled whenever the relevant settings change. A tick is a no-op
+// when autosave is disabled or no file is currently open.
+let AutosaveTimer = null;
+
+async function RunAutosaveTick() {
+  try {
+    const Enabled = await SettingsManager.GetValue('SYSTEM_AUTOSAVE_ENABLED');
+    if (!Enabled) return;
+    const CurrentPath = BackupManager.GetCurrentFilePath();
+    if (!CurrentPath) return;
+    const [Err] = await BackupManager.Save(CurrentPath);
+    if (Err) {
+      Logger.error('Autosave failed:', Err);
+      return;
+    }
+    Logger.log('Autosave completed to:', CurrentPath);
+  } catch (Err) {
+    Logger.error('Autosave tick error:', Err);
+  }
+}
+
+async function ScheduleAutosave() {
+  if (AutosaveTimer) {
+    clearInterval(AutosaveTimer);
+    AutosaveTimer = null;
+  }
+  const Enabled = await SettingsManager.GetValue('SYSTEM_AUTOSAVE_ENABLED');
+  if (!Enabled) return;
+  let Minutes = await SettingsManager.GetValue('SYSTEM_AUTOSAVE_INTERVAL_MINUTES');
+  Minutes = Number(Minutes);
+  if (!Number.isFinite(Minutes) || Minutes < 1) Minutes = 1;
+  AutosaveTimer = setInterval(RunAutosaveTick, Minutes * 60 * 1000);
+  Logger.log(`Autosave scheduled every ${Minutes} minute(s)`);
+}
+
+BroadcastManager.on('AutosaveSettingsChanged', ScheduleAutosave);
+ScheduleAutosave().catch((Err) => Logger.error('Failed to schedule autosave:', Err));
+
+
 async function USBDeviceAdded(Client, Device) {
   if (!MainWindow || MainWindow.isDestroyed()) return;
   Logger.log(
@@ -851,12 +1084,34 @@ BroadcastManager.on('ReadoptDevice', ReadoptDevice);
 async function ReinitializeSystem() {
   if (!MainWindow || MainWindow.isDestroyed()) return;
   Logger.log('Reinitializing system...');
+
+  // Refresh manager caches that hold DB-backed state in memory.
+  if (typeof SettingsManager.Reload === 'function') {
+    await SettingsManager.Reload();
+  }
+  if (typeof AlertsManager.Reload === 'function') {
+    await AlertsManager.Reload();
+  }
+  if (typeof MonitoringTargetManager.Reload === 'function') {
+    await MonitoringTargetManager.Reload();
+  }
+
+  if (typeof GroupManager.ReconcileOrphanedGroups === 'function') {
+    const [OrphanErr] = await GroupManager.ReconcileOrphanedGroups();
+    if (OrphanErr) Logger.error('Failed to reconcile orphaned group assignments:', OrphanErr);
+  }
+
   await ClientManager.ClearCache();
   await AdoptionManager.ClearAllDevicesPendingAdoption();
   let [ClientsErr, Clients] = await ClientManager.GetAll();
   if (ClientsErr) return Logger.error('Failed to fetch full client list:', ClientsErr);
   let [GroupsErr, Groups] = await GroupManager.GetAll();
   if (GroupsErr) return Logger.error('Failed to fetch client groups:', GroupsErr);
+
+  await UpdateSettings();
+  await UpdateMonitoringTargetList();
+  await UpdateAlertRuleList();
+
   MainWindow.webContents.send('SetFullClientList', Clients, Groups);
 }
 BroadcastManager.on('ReinitializeSystem', ReinitializeSystem);
@@ -864,6 +1119,9 @@ BroadcastManager.on('ReinitializeSystem', ReinitializeSystem);
 async function ClientUpdated(Client) {
   if (!MainWindow || MainWindow.isDestroyed()) return;
   MainWindow.webContents.send('ClientUpdated', Client);
+  AlertsManager.HandleClientUpdated(Client).catch((Err) =>
+    Logger.error('AlertsManager.HandleClientUpdated failed', Err)
+  );
 }
 
 BroadcastManager.on('ClientUpdated', ClientUpdated);
@@ -907,6 +1165,9 @@ BroadcastManager.on('MonitoringTargetListChanged', UpdateMonitoringTargetList);
 async function MonitoringTargetUpdated(Target) {
   if (!MainWindow || MainWindow.isDestroyed()) return;
   MainWindow.webContents.send('MonitoringTargetUpdated', Target);
+  AlertsManager.HandleMonitoringTargetUpdated(Target).catch((Err) =>
+    Logger.error('AlertsManager.HandleMonitoringTargetUpdated failed', Err)
+  );
 }
 BroadcastManager.on('MonitoringTargetUpdated', MonitoringTargetUpdated);
 
@@ -923,9 +1184,26 @@ BroadcastManager.on('AdoptionListUpdated', UpdateAdoptionList);
 async function UpdateScriptExecutions(Executions) {
   if (!MainWindow || MainWindow.isDestroyed()) return;
   MainWindow.webContents.send('UpdateScriptExecutions', Executions);
+  AlertsManager.HandleScriptExecutionUpdated(Executions).catch((Err) =>
+    Logger.error('AlertsManager.HandleScriptExecutionUpdated failed', Err)
+  );
 }
 
 BroadcastManager.on('ScriptExecutionUpdated', UpdateScriptExecutions);
+
+async function UpdateAlertRuleList() {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  const [Err, Rules] = await AlertsManager.GetAll();
+  if (Err) return Logger.error('Failed to fetch alert rules:', Err);
+  MainWindow.webContents.send('SetFullAlertRuleList', Rules || []);
+}
+BroadcastManager.on('AlertRuleListChanged', UpdateAlertRuleList);
+
+async function AlertTriggered(Payload) {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  MainWindow.webContents.send('AlertTriggered', Payload);
+}
+BroadcastManager.on('AlertTriggered', AlertTriggered);
 
 // Thin wrapper to surface system notifications in the renderer.
 async function Notify(Message, Type = 'info', Duration = 5000) {

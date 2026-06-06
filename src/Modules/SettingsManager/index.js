@@ -179,6 +179,22 @@ Manager.Set = async (Key, Value) => {
   return [null, Setting];
 };
 
+// Rebuild in-memory settings cache from DB after external bulk writes.
+Manager.Reload = async () => {
+  Settings.clear();
+  Manager.Initialized = false;
+  Manager.Initializing = null;
+  await Manager.Init();
+
+  BroadcastManager.emit('SettingsUpdated');
+
+  const Events = new Set();
+  for (const Setting of Settings.values()) {
+    if (Setting && Setting.OnUpdateEvent) Events.add(Setting.OnUpdateEvent);
+  }
+  for (const EventName of Events) BroadcastManager.emit(EventName);
+};
+
 Manager.Init().catch((Err) => {
   Logger.error('Failed to initialize settings manager:', Err);
 });

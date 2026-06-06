@@ -76,6 +76,69 @@ jobs:
           pattern: make-*
           merge-multiple: true
 
+      - name: Generate macOS updater manifest
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const crypto = require('node:crypto');
+
+          const releaseRoot = path.resolve('release-artifacts');
+          const version = require('./package.json').version;
+
+          function walkFiles(dir) {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            const output = [];
+            for (const entry of entries) {
+              const fullPath = path.join(dir, entry.name);
+              if (entry.isDirectory()) {
+                output.push(...walkFiles(fullPath));
+              } else {
+                output.push(fullPath);
+              }
+            }
+            return output;
+          }
+
+          const files = walkFiles(releaseRoot);
+          const macZipFiles = files.filter((filePath) => {
+            const lowered = filePath.toLowerCase();
+            return lowered.endsWith('.zip') && lowered.includes('darwin');
+          });
+
+          if (macZipFiles.length === 0) {
+            console.log('No macOS zip artifact found, skipping latest-mac.yml generation.');
+            process.exit(0);
+          }
+
+          const preferredZip =
+            macZipFiles.find((filePath) => filePath.toLowerCase().includes('darwin-arm64')) ||
+            macZipFiles.find((filePath) => filePath.toLowerCase().includes('darwin-x64')) ||
+            macZipFiles[0];
+
+          const zipBuffer = fs.readFileSync(preferredZip);
+          const sha512 = crypto.createHash('sha512').update(zipBuffer).digest('base64');
+          const zipSize = fs.statSync(preferredZip).size;
+          const zipName = path.basename(preferredZip);
+          const releaseDate = new Date().toISOString();
+
+          const manifest = [
+            `version: ${version}`,
+            'files:',
+            `  - url: ${zipName}`,
+            `    sha512: ${sha512}`,
+            `    size: ${zipSize}`,
+            `path: ${zipName}`,
+            `sha512: ${sha512}`,
+            `releaseDate: '${releaseDate}'`,
+            '',
+          ].join('\n');
+
+          const outputPath = path.join(releaseRoot, 'latest-mac.yml');
+          fs.writeFileSync(outputPath, manifest, 'utf8');
+          console.log(`Generated ${outputPath} for ${zipName}`);
+          NODE
+
       - name: Create or update draft release
         run: |
           TITLE="ShowTrak Server v${RELEASE_VERSION}"

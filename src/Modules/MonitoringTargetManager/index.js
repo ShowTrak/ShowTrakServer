@@ -172,6 +172,14 @@ Manager.Init = async () => {
   BroadcastManager.emit('MonitoringTargetListChanged');
 };
 
+// Rebuild runtime state from DB after external bulk changes (e.g., config import).
+Manager.Reload = async () => {
+  for (const Target of TargetList) Target.StopLoop();
+  TargetList = [];
+  Manager.Initialized = false;
+  await Manager.Init();
+};
+
 Manager.GetAll = async () => {
   if (!Manager.Initialized) await Manager.Init();
   return [null, TargetList.map((T) => T.ToJSON())];
@@ -329,6 +337,56 @@ Manager.SetGroupAndWeight = async (TargetID, GroupID, Weight) => {
   Target.GroupID = NextGroupID;
   Target.Weight = NextWeight;
   return Ok(true);
+};
+
+// Move all monitoring targets from a specific group into the default no-group bucket (null).
+Manager.MoveGroupToNoGroup = async (GroupID) => {
+  if (!Manager.Initialized) await Manager.Init();
+  const TargetGroupID = Number(GroupID);
+  if (!Number.isFinite(TargetGroupID)) return Fail('Invalid GroupID');
+
+  let Changed = 0;
+  for (const Target of TargetList) {
+    if (Target.GroupID == null) continue;
+    if (Number(Target.GroupID) !== TargetGroupID) continue;
+    const [Err] = await DB.Run('UPDATE MonitoringTargets SET GroupID = ? WHERE TargetID = ?', [
+      null,
+      Target.TargetID,
+    ]);
+    if (Err) return Fail('Failed to move monitoring targets to no group');
+    Target.GroupID = null;
+    Changed += 1;
+  }
+
+  if (Changed > 0) BroadcastManager.emit('MonitoringTargetListChanged');
+  return Ok(Changed);
+};
+
+// Ensure all monitoring targets reference an existing group; unknown groups are reassigned to null.
+Manager.ReconcileOrphanedGroups = async (ValidGroupIDs) => {
+  if (!Manager.Initialized) await Manager.Init();
+  const Valid = new Set(
+    (Array.isArray(ValidGroupIDs) ? ValidGroupIDs : [])
+      .map((ID) => Number(ID))
+      .filter((ID) => Number.isFinite(ID))
+  );
+
+  let Changed = 0;
+  for (const Target of TargetList) {
+    if (Target.GroupID == null) continue;
+    const TargetGroupID = Number(Target.GroupID);
+    if (Valid.has(TargetGroupID)) continue;
+    const [Err] = await DB.Run('UPDATE MonitoringTargets SET GroupID = ? WHERE TargetID = ?', [
+      null,
+      Target.TargetID,
+    ]);
+    if (Err) return Fail('Failed to reconcile orphaned monitoring targets');
+    Target.GroupID = null;
+    Changed += 1;
+  }
+
+  if (Changed > 0) BroadcastManager.emit('MonitoringTargetListChanged');
+  return Ok(Changed);
 };
 
 Manager.GetAllSync = () => TargetList.map((T) => T.ToJSON());

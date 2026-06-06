@@ -195,26 +195,50 @@
     color 120ms ease,
     transform 120ms ease;
 }
-#ADD_MONITORING_TARGET_DROPDOWN .dropdown-toggle::after {
+#ADD_MONITORING_TARGET_DROPDOWN .dropdown-toggle::after,
+#SETTINGS_MENU_DROPDOWN .dropdown-toggle::after {
   display: none;
 }
-#ADD_MONITORING_TARGET_MENU.dropdown-menu {
+#ADD_MONITORING_TARGET_MENU.dropdown-menu,
+#SETTINGS_MENU.dropdown-menu {
   min-width: 240px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 0.6rem;
   background: rgba(23, 20, 38, 0.98);
   padding: 0.35rem;
 }
-#ADD_MONITORING_TARGET_MENU .dropdown-item {
+#ADD_MONITORING_TARGET_MENU .dropdown-item,
+#SETTINGS_MENU .dropdown-item {
   color: rgba(255, 255, 255, 0.92);
   border-radius: 0.45rem;
   font-size: 13px;
   padding: 0.45rem 0.6rem;
 }
 #ADD_MONITORING_TARGET_MENU .dropdown-item:hover,
-#ADD_MONITORING_TARGET_MENU .dropdown-item:focus {
+#ADD_MONITORING_TARGET_MENU .dropdown-item:focus,
+#SETTINGS_MENU .dropdown-item:hover,
+#SETTINGS_MENU .dropdown-item:focus {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
+}
+#SETTINGS_MENU .dropdown-header {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.35rem 0.6rem 0.15rem;
+}
+#SETTINGS_MENU .dropdown-divider {
+  border-top-color: rgba(255, 255, 255, 0.12);
+  margin: 0.3rem 0.2rem;
+}
+#SETTINGS_MENU .dropdown-item.text-danger {
+  color: #ff6b6b !important;
+}
+#SETTINGS_MENU .dropdown-item.text-danger:hover,
+#SETTINGS_MENU .dropdown-item.text-danger:focus {
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff8787 !important;
 }
 #NAVBAR_CORE_BUTTON.settings-btn:hover,
 #ADD_MONITORING_TARGET_BTN.settings-btn:hover {
@@ -354,6 +378,56 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.alert-rule-open {
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.03);
+  color: #fff;
+  cursor: pointer;
+}
+
+.alert-rule-open:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.alert-multiselect {
+  position: relative;
+}
+
+.alert-multiselect-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow: auto;
+  background: #201a3f;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+  z-index: 1200;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+}
+
+.alert-multiselect-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.alert-multiselect-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.alert-multiselect-option input[type='checkbox'] {
+  margin: 0;
+}
+
 .bg-ghost {
   background-color: rgba(255, 255, 255, 0.03) !important;
 }
@@ -451,6 +525,24 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   color: rgba(255, 255, 255, 0.5);
 }
 
+#APPLICATION_NAVBAR_FILE {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+}
+
+/* Hide entirely when no file is open so the flex gap does not leave a space. */
+#APPLICATION_NAVBAR_FILE:empty {
+  display: none;
+}
+
+/* Subtle separator between the version and the open file name. */
+#APPLICATION_NAVBAR_FILE:not(:empty)::before {
+  content: '•';
+  margin-right: 0.75rem;
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+}
+
 #SHOWTRAK_CONTEXT_MENU {
   display: none;
   position: fixed;
@@ -527,7 +619,8 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .modal-content {
-  background-color: #1e1643 !important;
+  border: 0 !important;
+  background: linear-gradient(180deg, #160f35 0%, #0f0b23 100%) !important;
   color: white;
   border-radius: 1rem !important;
 }
@@ -542,6 +635,129 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 .SHOWTRAK_MODEL_CORE_LOGO {
   width: 84px;
   height: 84px;
+}
+
+.SHOWTRAK_ABOUT_MODAL_CONTENT {
+  border: 0 !important;
+  background: linear-gradient(180deg, #160f35 0%, #0f0b23 100%) !important;
+}
+
+.SHOWTRAK_ABOUT_MODAL_BODY {
+  gap: 0.75rem;
+  padding: 1.2rem;
+}
+
+.SHOWTRAK_ABOUT_TITLE {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.SHOWTRAK_ABOUT_VERSION {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.SHOWTRAK_ABOUT_CARD {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  border: 0 !important;
+}
+
+.SHOWTRAK_ABOUT_CARD .card-body {
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.SHOWTRAK_ABOUT_WEBSITE_BTN {
+  font-size: 0.96rem;
+  font-weight: 700;
+  padding: 0.55rem 0.9rem;
+}
+
+.SHOWTRAK_ABOUT_UPDATE_BODY {
+  font-size: 0.94rem;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCIES_LIST {
+  max-height: 220px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 0.5rem;
+  padding: 0.6rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCIES_SECTION_TITLE {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_ITEM {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.15rem 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_ITEM:last-child {
+  border-bottom: 0;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_NAME {
+  color: rgba(255, 255, 255, 0.92);
+  word-break: break-word;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_LINK {
+  color: rgba(126, 205, 255, 0.95) !important;
+  text-decoration: none;
+  font-size: 0.92rem;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_LINK:hover,
+.SHOWTRAK_ABOUT_DEPENDENCY_LINK:focus {
+  color: #a9e2ff !important;
+  text-decoration: underline;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_VERSION {
+  color: rgba(255, 255, 255, 0.68);
+  white-space: nowrap;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_GROUP {
+  margin-bottom: 0.65rem;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_GROUP:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 576px) {
+  .SHOWTRAK_ABOUT_MODAL_BODY {
+    padding: 1rem;
+  }
+
+  .SHOWTRAK_ABOUT_TITLE {
+    font-size: 1.2rem;
+  }
+
+  .SHOWTRAK_ABOUT_VERSION {
+    font-size: 0.88rem;
+  }
+
+  .SHOWTRAK_ABOUT_CARD .card-body {
+    font-size: 0.92rem;
+  }
+
+  .SHOWTRAK_ABOUT_DEPENDENCIES_LIST {
+    max-height: 180px;
+    font-size: 0.84rem;
+  }
 }
 
 small,
@@ -1063,7 +1279,7 @@ button.btn:focus {
     border-color 180ms ease,
     background-color 180ms ease,
     gap 180ms ease;
-  background-color: rgba(255, 0, 0, 0.189);
+  background-color: rgba(255, 0, 0, 0.24);
   cursor: pointer !important;
   position: relative; /* allow overlay positioning */
 }
@@ -1094,13 +1310,13 @@ button.btn:focus {
 }
 
 .SHOWTRAK_PC.ONLINE {
-  background-color: rgba(26, 255, 0, 0.25) !important;
+  background-color: rgba(18, 255, 0, 0.32) !important;
 }
 
 /* Monitoring target above its DegradedThresholdMs setting. Listed after ONLINE
  * so it wins when both classes are toggled mid-update. */
 .SHOWTRAK_PC.DEGRADED {
-  background-color: rgba(255, 153, 0, 0.25) !important;
+  background-color: rgba(255, 140, 0, 0.32) !important;
 }
 
 /* Pending adoption tile style: blue tint */
@@ -1203,7 +1419,7 @@ body.compact-mode .GROUP_TITLE {
 
 body.compact-mode .SHOWTRAK_PC,
 body.compact-mode .SHOWTRAK_PC_PLACEHOLDER {
-  width: 200px;
+  width: 240px;
   height: 36px;
   min-height: 36px;
   box-sizing: border-box;

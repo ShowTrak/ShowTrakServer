@@ -22,6 +22,7 @@
       <img class="no-drag" id="APPLICATION_NAVBAR_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
       <span class="no-drag" id="APPLICATION_NAVBAR_TITLE">ShowTrak</span>
       <span class="no-drag" id="APPLICATION_NAVBAR_STATUS"></span>
+      <span class="no-drag" id="APPLICATION_NAVBAR_FILE"></span>
     </div>
     <div id="APPLICATION_CONTAINER" class="h-100">
       <div id="APPLICATION" class="container-fluid text-center text-light p-0 d-grid">
@@ -95,14 +96,112 @@
               
             </ul>
           </div>
-          <button
-            id="NAVBAR_CORE_BUTTON"
-            class="settings-btn no-drag"
-            title="Settings"
-            aria-label="Settings"
-          >
-            <i class="bi bi-gear-fill"></i>
-          </button>
+          <div class="dropdown no-drag" id="SETTINGS_MENU_DROPDOWN">
+            <button
+              type="button"
+              id="NAVBAR_CORE_BUTTON"
+              class="settings-btn dropdown-toggle no-drag"
+              title="Settings"
+              aria-label="Settings"
+              data-bs-toggle="dropdown"
+              data-bs-offset="0,6"
+              data-bs-auto-close="true"
+              aria-expanded="false"
+            >
+              <i class="bi bi-gear-fill"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" id="SETTINGS_MENU">
+              <li><h6 class="dropdown-header">Show File</h6></li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_NEW">
+                  New Show
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_OPEN">
+                  Open
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SAVE">
+                  Save
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SAVEAS">
+                  Save As
+                </button>
+              </li>
+              <li><hr class="dropdown-divider" /></li>
+              <li><h6 class="dropdown-header">Manage</h6></li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS">
+                  Settings
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item"
+                  id="SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON"
+                >
+                  OSC Dictionary
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item"
+                  id="SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON"
+                >
+                  Group Manager
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item"
+                  id="SHOWTRAK_MODEL_CORE_ALERT_MANAGER_BUTTON"
+                >
+                  Alerts Manager
+                </button>
+              </li>
+              <li><hr class="dropdown-divider" /></li>
+              <li><h6 class="dropdown-header">Folders</h6></li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_LOGSFOLDER">
+                  Open Logs Directory
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SCRIPTSFOLDER">
+                  Open Scripts Directory
+                </button>
+              </li>
+              <li><hr class="dropdown-divider" /></li>
+              <li><h6 class="dropdown-header">Help &amp; Support</h6></li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_CHECKUPDATES">
+                  Check for Updates
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_ABOUT_BUTTON">
+                  About ShowTrak
+                </button>
+              </li>
+              <li><hr class="dropdown-divider" /></li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item text-danger"
+                  id="SHOWTRAK_MODEL_CORE_SHUTDOWN_BUTTON"
+                >
+                  Close ShowTrak
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
@@ -136,9 +235,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="d-flex justify-content-center">
-              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-            </div>
 
             <strong class="mb-0"> Keyboard Shortcuts </strong>
 
@@ -155,88 +251,148 @@
     </div>
     <!-- End Keyboard Shortcuts Modal -->
 
+    <!-- No Show Open Prompt Modal -->
     <div
       class="modal fade"
-      id="SHOWTRAK_MODEL_CORE"
+      id="SHOWTRAK_MODAL_NO_SHOW"
       tabindex="-1"
-      aria-labelledby="SHOWTRAK_MODEL_CORE_Label"
+      data-bs-backdrop="static"
+      data-bs-keyboard="false"
+      aria-labelledby="SHOWTRAK_MODAL_NO_SHOW_Label"
       aria-hidden="true"
     >
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
+
+            <strong class="mb-0"> No Show Open </strong>
+            <p class="text-muted text-sm mb-2">
+              Open an existing ShowTrak file or create a new show to get started.
+            </p>
+
+            <div class="d-grid gap-2">
+              <button type="button" class="btn btn-success" id="NO_SHOW_OPEN">Open Show</button>
+              <button type="button" class="btn btn-light" id="NO_SHOW_NEW">New Show</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- End No Show Open Prompt Modal -->
+
+    <!-- Legacy Data Migration Prompt Modal -->
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_MIGRATE"
+      tabindex="-1"
+      data-bs-backdrop="static"
+      data-bs-keyboard="false"
+      aria-labelledby="SHOWTRAK_MODAL_MIGRATE_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+
+            <strong class="mb-0"> Save Your Existing Data </strong>
+            <p class="text-muted text-sm mb-2">
+              This version stores your configuration in a ShowTrak file. We found data from
+              a previous version that is not yet saved to a file. Choose a location to save it
+              now to avoid losing your data.
+            </p>
+
+            <div class="d-grid gap-2">
+              <button type="button" class="btn btn-success" id="MIGRATE_SAVE">
+                Save Show File
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- End Legacy Data Migration Prompt Modal -->
+
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_ABOUT"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_ABOUT_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content SHOWTRAK_ABOUT_MODAL_CONTENT">
+          <div class="modal-body text-center SHOWTRAK_ABOUT_MODAL_BODY">
+
             <div class="d-flex justify-content-center">
               <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
             </div>
 
-            <strong class="mb-0"> ShowTrak Server </strong>
+            <strong class="mb-0 SHOWTRAK_ABOUT_TITLE"> About ShowTrak </strong>
+            <div id="SHOWTRAK_ABOUT_VERSION" class="SHOWTRAK_ABOUT_VERSION mb-2"></div>
 
-            <div class="d-grid gap-2">
-              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS"> Settings </a>
-              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON">
-                OSC Dictionary
-              </a>
-              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON">
-                Group Manager
-              </a>
-
-
-              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_LOGSFOLDER">
-                Open Logs Directory
-              </a>
-
-              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_SCRIPTSFOLDER">
-                Open Scripts Directory
-              </a>
-
-              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_BACKUPCONFIG">
-                Export Configuration
-              </a>
-
-              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_IMPORTCONFIG">
-                Import Configuration From File
-              </a>
-
-              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_SUPPORTDISCORD">
-                Open Suppport Discord
-              </a>
-
-              <a class="btn btn-sm btn-light" id="SHOWTRAK_MODEL_CORE_CHECKUPDATES">
-                Check for Updates
-              </a>
-
-              <div id="UPDATE_SECTION" class="card bg-ghost-light border-0 rounded d-none">
-                <div class="card-body p-2 text-sm text-start">
-                  <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                      <strong>Update</strong>
-                      <div id="UPDATE_STATUS" class="text-muted">No pending update</div>
-                    </div>
-                    <div class="d-flex gap-2">
-                      <button type="button" class="btn btn-sm btn-success d-none" id="UPDATE_INSTALL_BTN">Install</button>
-                      <button type="button" class="btn btn-sm btn-light d-none" id="UPDATE_LATER_BTN">Later</button>
-                    </div>
-                  </div>
-                  <div id="UPDATE_NOTES_WRAPPER" class="mt-2 d-none">
-                    <div class="fw-semibold small mb-1">Changelog</div>
-                    <div id="UPDATE_CHANGELOG" class="border rounded bg-body p-2 small" style="max-height: 180px; overflow: auto; white-space: pre-wrap;"></div>
-                  </div>
-                </div>
-              </div>
-
-              <a class="btn btn-sm btn-danger" id="SHOWTRAK_MODEL_CORE_SHUTDOWN_BUTTON">
-                Close ShowTrak
-              </a>
-            </div>
-
-            <strong class="mb-0"> About ShowTrak </strong>
-
-            <div class="card bg-ghost-light border-0 rounded">
-              <div class="card-body text-sm p-2">
-                ShowTrak Server is an open-source project founded by
+            <div class="card bg-ghost-light border-0 rounded SHOWTRAK_ABOUT_CARD">
+              <div class="card-body p-3">
+                ShowTrak is an open-source project founded by
                 <span class="text-info">Tom Kirkman-Wood</span> &amp;
                 <span class="text-info">Ben Sugrue</span> in 2019.
               </div>
+            </div>
+
+            <div class="d-grid gap-2 mt-2">
+              <a class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN" id="SHOWTRAK_ABOUT_WEBSITE"> Visit ShowTrak Website </a>
+              <a class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN" id="SHOWTRAK_ABOUT_GITHUB"> View on GitHub </a>
+              <button type="button" class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN" id="SHOWTRAK_MODEL_CORE_SUPPORTDISCORD">
+                Open Support Discord
+              </button>
+            </div>
+
+            <div class="card border-0 rounded mt-2 SHOWTRAK_ABOUT_CARD">
+              <div class="card-body p-3 text-start SHOWTRAK_ABOUT_UPDATE_BODY">
+                <strong>Open Source and Contributions</strong>
+                <div class="text-muted mt-2">
+                  Open source projects are built and improved by people sharing code, feedback, bug reports, documentation, and time.
+                  If ShowTrak helps your setup, you can contribute by reporting issues, proposing improvements, opening pull requests,
+                  or helping other users in the community.
+                </div>
+                <div class="text-muted mt-2">
+                  Huge thanks to the maintainers and contributors of the open source packages listed below. Their work makes ShowTrak possible.
+                </div>
+              </div>
+            </div>
+
+            <div id="UPDATE_SECTION" class="card bg-ghost-light border-0 rounded d-none mt-2 SHOWTRAK_ABOUT_CARD">
+              <div class="card-body p-3 text-start SHOWTRAK_ABOUT_UPDATE_BODY">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong>Update</strong>
+                    <div id="UPDATE_STATUS" class="text-muted">No pending update</div>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-success d-none" id="UPDATE_INSTALL_BTN">Install</button>
+                    <button type="button" class="btn btn-sm btn-light d-none" id="UPDATE_LATER_BTN">Later</button>
+                  </div>
+                </div>
+                <div id="UPDATE_NOTES_WRAPPER" class="mt-2 d-none">
+                  <div class="fw-semibold small mb-1">Changelog</div>
+                  <div id="UPDATE_CHANGELOG" class="border rounded bg-body p-2 small" style="max-height: 180px; overflow: auto; white-space: pre-wrap;"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card border-0 rounded mt-2 SHOWTRAK_ABOUT_CARD">
+              <div class="card-body p-3 text-start SHOWTRAK_ABOUT_UPDATE_BODY">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <strong>Dependencies</strong>
+                  <span id="SHOWTRAK_ABOUT_DEPENDENCY_COUNT" class="text-muted small"></span>
+                </div>
+                <div id="SHOWTRAK_ABOUT_DEPENDENCIES" class="SHOWTRAK_ABOUT_DEPENDENCIES_LIST text-muted">
+                  Loading dependencies...
+                </div>
+              </div>
+            </div>
+
+            <div class="d-grid gap-2 mt-2">
+              <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
             </div>
           </div>
         </div>
@@ -253,9 +409,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="d-flex justify-content-center">
-              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-            </div>
 
             <strong class="mb-0"> Group Manager </strong>
 
@@ -275,9 +428,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable modal-lg">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="d-flex justify-content-center">
-              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-            </div>
 
             <div id="OSC_ROUTE_LIST" class="d-grid gap-2 text-start"></div>
           </div>
@@ -295,9 +445,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="d-flex justify-content-center">
-              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-            </div>
 
             <div id="SETTINGS" class="d-grid gap-2"></div>
             <div id="REMOTE_ACCESS_SECTION" class="d-grid gap-2 mt-2"></div>
@@ -316,9 +463,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="d-flex justify-content-center">
-              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-            </div>
             <h6 class="mb-0">Executing Scripts</h6>
 
             <div id="SHOWTRAK_EXECUTIONQUEUE" class="d-grid gap-2"></div>
@@ -337,9 +481,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="d-flex justify-content-center">
-              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-            </div>
 
             <div class="rounded-3 p-2 bg-ghost-light">
               <h6 class="mb-0">Client Settings</h6>
@@ -477,9 +618,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="d-flex justify-content-center">
-              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-            </div>
 
             <h6 class="mb-0">Create New Group</h6>
 
@@ -513,9 +651,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="d-flex justify-content-center">
-              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-            </div>
 
             <div class="rounded-3 p-2 bg-ghost-light">
               <h6 class="mb-0" id="MONITORING_TARGET_MODAL_TITLE">Add Monitoring Target</h6>
@@ -630,6 +765,163 @@
 
     <div
       class="modal fade"
+      id="SHOWTRAK_MODAL_ALERT_MANAGER"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_ALERT_MANAGER_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+
+            <div class="rounded-3 p-2 bg-ghost-light">
+              <h6 class="mb-0">Alerts Manager</h6>
+            </div>
+
+            <div id="ALERT_MANAGER_LIST_PANEL" class="d-grid gap-2 text-start mt-1">
+              <div class="d-flex justify-content-between align-items-center">
+                <strong>Alerts</strong>
+                <button type="button" class="btn btn-sm btn-success" id="ALERT_RULE_CREATE_BUTTON">
+                  New Alert
+                </button>
+              </div>
+              <div id="ALERT_RULE_MANAGER_LIST" class="d-grid gap-2"></div>
+            </div>
+
+            <div id="ALERT_MANAGER_EDITOR_PANEL" class="d-none d-grid gap-2 text-start mt-1">
+              <div class="d-flex justify-content-between align-items-center gap-2">
+                <button type="button" class="btn btn-sm btn-light" id="ALERT_RULE_BACK_TO_LIST">
+                  Back to Alerts
+                </button>
+                <div class="rounded-3 p-2 bg-ghost flex-grow-1 text-center">
+                  <h6 id="ALERT_RULE_EDITOR_TITLE" class="mb-0">Create Alert Rule</h6>
+                </div>
+              </div>
+
+              <div class="form-floating">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="ALERT_RULE_TITLE"
+                  placeholder="Rule Title"
+                />
+                <label for="ALERT_RULE_TITLE">Rule Title</label>
+              </div>
+
+              <div class="form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost rounded p-2">
+                <label class="form-check-label mb-0 ms-2" for="ALERT_RULE_SCOPE_WORKSPACE">
+                  Workspace (All Clients)
+                </label>
+                <input
+                  class="form-check-input ms-2 me-2"
+                  type="checkbox"
+                  role="switch"
+                  id="ALERT_RULE_SCOPE_WORKSPACE"
+                />
+              </div>
+
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label mb-1">Groups</label>
+                  <div class="alert-multiselect" id="ALERT_SCOPE_GROUPS_DROPDOWN">
+                    <button type="button" class="btn btn-light w-100 text-start" id="ALERT_SCOPE_GROUPS_TOGGLE">
+                      Select groups
+                    </button>
+                    <div class="alert-multiselect-menu d-none" id="ALERT_SCOPE_GROUPS_MENU"></div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label mb-1">Clients / Targets</label>
+                  <div class="alert-multiselect" id="ALERT_SCOPE_CLIENTS_DROPDOWN">
+                    <button type="button" class="btn btn-light w-100 text-start" id="ALERT_SCOPE_CLIENTS_TOGGLE">
+                      Select clients / targets
+                    </button>
+                    <div class="alert-multiselect-menu d-none" id="ALERT_SCOPE_CLIENTS_MENU"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-floating">
+                <select class="form-select" id="ALERT_RULE_TRIGGER_TYPE"></select>
+                <label for="ALERT_RULE_TRIGGER_TYPE">Trigger</label>
+              </div>
+
+              <div id="ALERT_RULE_TRIGGER_CONFIG" class="d-grid gap-2 bg-ghost rounded p-2"></div>
+
+              <div class="d-flex justify-content-between align-items-center">
+                <strong>Actions</strong>
+                <button type="button" class="btn btn-sm btn-light" id="ALERT_RULE_ADD_ACTION">
+                  Add Action
+                </button>
+              </div>
+              <div id="ALERT_RULE_ACTIONS_LIST" class="d-grid gap-2"></div>
+
+              <div id="ALERT_ACTION_EDITOR_PANEL" class="d-none rounded bg-ghost p-2 d-grid gap-2">
+                <div class="d-flex justify-content-between align-items-center">
+                  <strong id="ALERT_ACTION_EDITOR_TITLE">Edit Action</strong>
+                  <button type="button" class="btn btn-sm btn-light" id="ALERT_ACTION_EDITOR_CLOSE">
+                    Back to Actions
+                  </button>
+                </div>
+
+                <div class="form-floating">
+                  <select class="form-select" id="ALERT_ACTION_EDITOR_TYPE"></select>
+                  <label for="ALERT_ACTION_EDITOR_TYPE">Action Type</label>
+                </div>
+
+                <div class="form-floating">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="ALERT_ACTION_EDITOR_TITLE_INPUT"
+                    placeholder="Action Title"
+                  />
+                  <label for="ALERT_ACTION_EDITOR_TITLE_INPUT">Action Title (optional)</label>
+                </div>
+
+                <div id="ALERT_ACTION_EDITOR_SETTINGS" class="d-grid gap-2"></div>
+
+                <div class="row g-2">
+                  <div class="col-6 d-grid">
+                    <button type="button" class="btn btn-danger" id="ALERT_ACTION_EDITOR_DELETE">
+                      Delete Action
+                    </button>
+                  </div>
+                  <div class="col-6 d-grid">
+                    <button type="button" class="btn btn-success" id="ALERT_ACTION_EDITOR_SAVE">
+                      Save Action
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div id="ALERT_RULE_CONTEXT_PREVIEW" class="rounded bg-ghost p-2 text-sm"></div>
+
+              <div class="row g-2 mt-1">
+                <div class="col-4 d-grid">
+                  <button type="button" class="btn btn-light" id="ALERT_RULE_RESET">Reset</button>
+                </div>
+                <div class="col-4 d-grid">
+                  <button type="button" class="btn btn-danger d-none" id="ALERT_RULE_DELETE">Delete</button>
+                </div>
+                <div class="col-4 d-grid">
+                  <button type="button" class="btn btn-success" id="ALERT_RULE_SAVE">Save</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-2 mt-2">
+              <div class="col-12 d-grid">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
       id="SHOWTRAK_MODAL_NETWORK_DISCOVERY"
       tabindex="-1"
       aria-labelledby="SHOWTRAK_MODAL_NETWORK_DISCOVERY_Label"
@@ -638,9 +930,6 @@
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="d-flex justify-content-center">
-              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-            </div>
 
             <div class="rounded-3 p-2 bg-ghost-light">
               <h6 class="mb-0">LAN Discovery</h6>
@@ -694,9 +983,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="d-flex justify-content-center">
-              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-            </div>
 
             <h6 id="SHOWTRAK_CONFIRMATION_MESSAGE" class="mb-0">
               Are you sure you want to do this?
@@ -730,9 +1016,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="d-flex justify-content-center">
-              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
-            </div>
 
             <div class="rounded-3 p-2 bg-ghost-light">
               <h6 class="mb-0">Client Info</h6>

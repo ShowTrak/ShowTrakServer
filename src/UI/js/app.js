@@ -10,6 +10,16 @@ let PendingAdoption = [];
 let MonitoringTargets = [];
 let MonitoringMethodsCache = [];
 let MonitoringEditorTargetID = null;
+let AlertRuleEditorRuleID = null;
+let AlertEditingActionIndex = null;
+let AlertRuleDraftActions = [];
+let AlertRulesCache = [];
+let AlertActionTypesCache = [];
+let AlertTriggerTypesCache = [];
+let AlertScopeGroupOptions = [];
+let AlertScopeClientOptions = [];
+let AlertScopeGroupSelected = [];
+let AlertScopeClientSelected = [];
 let NetworkDiscoveryScanID = null;
 let NetworkDiscoveryScanning = false;
 let NetworkDiscoveryResults = new Map();
@@ -448,6 +458,19 @@ document.addEventListener('keydown', function (e) {
   if (window.__SHOWTRAK_CONFIRM_ACTIVE) {
     return;
   }
+
+  const target = e.target;
+  const isEditableTarget =
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
+      Boolean(target.closest('[contenteditable=""], [contenteditable="true"]')));
+
+  // Keep native text-editing shortcuts (e.g. Cmd/Ctrl+A) inside editable fields.
+  if (isEditableTarget) {
+    return;
+  }
+
   // Ctrl/Cmd + Q opens context menu centered
   if (
     (e.ctrlKey || e.metaKey) &&
@@ -899,6 +922,24 @@ function FormatLatency(ms) {
   return `${Math.round(ms)}ms`;
 }
 
+function FormatMonitorStatus(Online, LastLatencyMs, LastError) {
+  if (Online) return FormatLatency(LastLatencyMs);
+  const ErrorText = typeof LastError === 'string' ? LastError.trim() : '';
+  if (!ErrorText) return 'Offline';
+  if (/timed?\s*out|timeout|unreachable|refused|reset|network\s+is\s+unreachable|no\s+route\s+to\s+host|socket\s+hang\s+up|econnrefused|econnreset|ehostunreach|enetunreach/i.test(ErrorText)) {
+    return 'Offline';
+  }
+  if (/enotfound|eai_again|nxdomain|dns|name\s+or\s+service\s+not\s+known/i.test(ErrorText)) {
+    return 'DNS Error';
+  }
+  if (/cert|certificate|tls|ssl|self\s*signed|unable\s+to\s+verify|hostname\/?ip\s+does\s+not\s+match/i.test(ErrorText)) {
+    return 'TLS Error';
+  }
+  const HttpMatch = ErrorText.match(/\bHTTP\s+(\d{3})\b/i);
+  if (HttpMatch) return `HTTP ${HttpMatch[1]}`;
+  return ErrorText;
+}
+
 function RenderMonitoringTargetsSection() {
   // Deprecated: monitoring targets are now rendered inline within their group's
   // drop zone alongside clients. Kept as a no-op for backwards compatibility.
@@ -910,8 +951,7 @@ function RenderMonitoringTargetTile(T) {
   const Degraded = !!T.Degraded;
   const Name = T.Nickname || T.Address || 'Unnamed';
   const Sub = T.Address || '';
-  const Latency = Online ? FormatLatency(T.LastLatencyMs) : '';
-  const Status = Online ? Latency : T.LastError || 'OFFLINE';
+  const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
   const Method = String(T.Method || '').toUpperCase();
   const DragUUID = `monitor:${T.TargetID}`;
   const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
@@ -950,8 +990,7 @@ function UpdateMonitoringTargetTile(T) {
   $tile
     .find('[data-type="Method"]')
     .text(`${String(T.Method || '').toUpperCase()} · ${FormatInterval(T.Interval)}`);
-  const Latency = Online ? FormatLatency(T.LastLatencyMs) : '';
-  const Status = Online ? Latency : T.LastError || 'OFFLINE';
+  const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
   const Success = Online && !Degraded;
   const $label = $tile.find('[data-type="MONITOR_STATUS_LABEL"]');
   $label.text(Status);
@@ -1485,6 +1524,24 @@ window.API.MonitoringTargetUpdated(async (Target) => {
   }
 });
 
+window.API.SetFullAlertRuleList(async (List) => {
+  AlertRulesCache = Array.isArray(List) ? List : [];
+  RenderAlertRuleManagerList();
+});
+
+window.API.AlertTriggered(async (Event) => {
+  if (!Event || !Event.Context) return;
+  const Ctx = Event.Context;
+  const TriggerLabel = String(Event.TriggerType || '').replace(/_/g, ' ').toLowerCase();
+  AddAlert({
+    type: 'warning',
+    severity: Ctx.Severity || 'warning',
+    title: Event.RuleTitle || `Alert (${TriggerLabel})`,
+    message: Ctx.Description || `${Ctx.EntityName || 'Unknown'} (${TriggerLabel})`,
+    clientUUID: Ctx.UUID || null,
+  });
+});
+
 // --- Alerts Manager ---
 const Alerts = [];
 let AlertsVisible = false;
@@ -1722,6 +1779,70 @@ async function CloseAllModals() {
   return;
 }
 
+function FormatDependencyVersion(Version) {
+  const RawVersion = Version ? String(Version) : '';
+  const SemverMatch = RawVersion.match(/(\d+)\.(\d+)/);
+  if (SemverMatch) return `${SemverMatch[1]}.${SemverMatch[2]}`;
+  return RawVersion.replace(/^[~^<>=\s]+/, '') || '-';
+}
+
+function RenderAboutDependencyList(Dependencies = []) {
+  const Group = $('<div class="SHOWTRAK_ABOUT_DEPENDENCY_GROUP"></div>');
+
+  if (!Dependencies.length) {
+    Group.append($('<div class="text-muted"></div>').text('None'));
+    return Group;
+  }
+
+  for (const Dependency of Dependencies) {
+    const Name = Dependency && Dependency.name ? String(Dependency.name) : 'unknown';
+    const Version = FormatDependencyVersion(Dependency && Dependency.version);
+    const Item = $('<div class="SHOWTRAK_ABOUT_DEPENDENCY_ITEM"></div>');
+    const PackageLink = $('<button type="button" class="btn btn-link p-0 SHOWTRAK_ABOUT_DEPENDENCY_LINK"></button>')
+      .text(Name)
+      .attr('data-package-name', Name);
+
+    Item.append($('<span class="SHOWTRAK_ABOUT_DEPENDENCY_NAME"></span>').append(PackageLink));
+    Item.append($('<span class="SHOWTRAK_ABOUT_DEPENDENCY_VERSION"></span>').text(Version));
+    Group.append(Item);
+  }
+
+  return Group;
+}
+
+async function OpenAboutModal() {
+  await CloseAllModals();
+  try {
+    const Version = Config && Config.Application ? Config.Application.Version : null;
+    $('#SHOWTRAK_ABOUT_VERSION').text(Version ? `Version ${Version}` : '');
+  } catch {
+    $('#SHOWTRAK_ABOUT_VERSION').text('');
+  }
+
+  const DependenciesContainer = $('#SHOWTRAK_ABOUT_DEPENDENCIES');
+  const DependenciesCount = $('#SHOWTRAK_ABOUT_DEPENDENCY_COUNT');
+  DependenciesContainer.empty().text('Loading dependencies...');
+  DependenciesCount.text('');
+
+  try {
+    const [Err, Payload] = await window.API.GetProjectDependencies();
+    if (Err) throw new Error(Err);
+
+    const RuntimeDependencies = Array.isArray(Payload && Payload.dependencies)
+      ? Payload.dependencies
+      : [];
+
+    DependenciesContainer.empty();
+    DependenciesContainer.append(RenderAboutDependencyList(RuntimeDependencies));
+    DependenciesCount.text(`${RuntimeDependencies.length} total`);
+  } catch {
+    DependenciesContainer.empty().text('Could not load dependencies.');
+    DependenciesCount.text('Unavailable');
+  }
+
+  $('#SHOWTRAK_MODAL_ABOUT').modal('show');
+}
+
 async function OpenGroupCreationModal() {
   await CloseAllModals();
 
@@ -1740,8 +1861,8 @@ async function OpenGroupCreationModal() {
       if (Groups.some((g) => g.Title.toLowerCase() === GroupName.toLowerCase())) {
         return Notify('A group with this name already exists', 'error');
       }
-      if (GroupName.length > 10)
-        return Notify('Group name must be less than 50 characters long', 'error');
+      if (GroupName.length > 12)
+        return Notify('Group name must be less than 12 characters long', 'error');
 
       // Clear the input field
       $('#GROUP_CREATION_TITLE').val('');
@@ -1752,16 +1873,62 @@ async function OpenGroupCreationModal() {
     });
 }
 
-async function ImportConfig() {
-  console.log('Starting import');
-  await window.API.ImportConfig();
-  await Notify('Restored from backup.', 'success');
+async function OpenShow() {
+  console.log('Opening ShowTrak file');
+  const [Err] = await window.API.OpenShow();
+  if (Err) {
+    if (/cancelled by user/i.test(String(Err))) return;
+    await Notify(String(Err), 'error');
+    return;
+  }
+  await Notify('Opened ShowTrak file.', 'success');
 }
 
-async function BackupConfig() {
-  console.log('Starting backup');
-  await window.API.BackupConfig();
-  await Notify('Backup completed.', 'success');
+// Derive a display name from a .ShowTrak path: basename without the extension.
+function GetShowFileDisplayName(Path) {
+  if (!Path) return '';
+  const Base = String(Path).split(/[\\/]/).pop() || '';
+  return Base.replace(/\.showtrak$/i, '');
+}
+
+// Show the currently open file name in the navbar (empty when none is open).
+function RenderShowFileName(Path) {
+  $('#APPLICATION_NAVBAR_FILE').text(GetShowFileDisplayName(Path));
+}
+
+async function SaveShow() {
+  console.log('Saving ShowTrak file');
+  const [Err] = await window.API.SaveShow();
+  if (Err) {
+    if (/cancelled by user/i.test(String(Err))) return;
+    await Notify(String(Err), 'error');
+    return;
+  }
+  await Notify('Saved ShowTrak file.', 'success');
+}
+
+async function SaveShowAs() {
+  console.log('Saving ShowTrak file');
+  const [Err] = await window.API.SaveShowAs();
+  if (Err) {
+    if (/cancelled by user/i.test(String(Err))) return;
+    await Notify(String(Err), 'error');
+    return;
+  }
+  await Notify('Saved ShowTrak file.', 'success');
+}
+
+async function NewShow() {
+  const Confirmed = await ConfirmationDialog(
+    'Create a new show? This clears the current working data.'
+  );
+  if (!Confirmed) return;
+  const [Err] = await window.API.NewShow();
+  if (Err) {
+    await Notify(String(Err), 'error');
+    return;
+  }
+  await Notify('Created new show.', 'success');
 }
 
 async function DeleteGroup(GroupID) {
@@ -2340,6 +2507,666 @@ async function OpenMonitoringTargetEditor(TargetID, Prefill = null) {
   $('#SHOWTRAK_MODAL_MONITORING_TARGET').modal('show');
 }
 
+async function EnsureAlertCatalogsLoaded() {
+  if (!AlertTriggerTypesCache.length) {
+    AlertTriggerTypesCache = await window.API.GetAlertTriggers();
+  }
+  if (!AlertActionTypesCache.length) {
+    AlertActionTypesCache = await window.API.GetAlertActionTypes();
+  }
+}
+
+function ShowAlertListPanel() {
+  $('#ALERT_MANAGER_LIST_PANEL').removeClass('d-none');
+  $('#ALERT_MANAGER_EDITOR_PANEL').addClass('d-none');
+}
+
+function ShowAlertEditorPanel() {
+  $('#ALERT_MANAGER_LIST_PANEL').addClass('d-none');
+  $('#ALERT_MANAGER_EDITOR_PANEL').removeClass('d-none');
+}
+
+function CloseAllScopeDropdowns() {
+  $('#ALERT_SCOPE_GROUPS_MENU, #ALERT_SCOPE_CLIENTS_MENU').addClass('d-none');
+}
+
+function ScopeSummaryText(Selected, Placeholder) {
+  if (!Array.isArray(Selected) || !Selected.length) return Placeholder;
+  if (Selected.length === 1) return Selected[0].Label;
+  return `${Selected[0].Label} +${Selected.length - 1}`;
+}
+
+function RenderScopeDropdown(MenuSelector, ToggleSelector, Options, SelectedValues, Placeholder) {
+  const SelectedSet = new Set((SelectedValues || []).map((x) => `${x}`));
+  const SelectedObjects = (Options || []).filter((Opt) => SelectedSet.has(`${Opt.Value}`));
+  const ToggleText = ScopeSummaryText(SelectedObjects, Placeholder);
+
+  $(ToggleSelector).text(ToggleText);
+
+  const Html = (Options || [])
+    .map(
+      (Opt) => `
+      <label class="alert-multiselect-option">
+        <input type="checkbox" value="${Safe(`${Opt.Value}`)}" ${SelectedSet.has(`${Opt.Value}`) ? 'checked' : ''} />
+        <span>${Safe(Opt.Label)}</span>
+      </label>
+    `
+    )
+    .join('');
+
+  $(MenuSelector).html(
+    Html || '<div class="text-muted text-sm p-2">No options available.</div>'
+  );
+}
+
+function RenderScopeDropdowns() {
+  RenderScopeDropdown(
+    '#ALERT_SCOPE_GROUPS_MENU',
+    '#ALERT_SCOPE_GROUPS_TOGGLE',
+    AlertScopeGroupOptions,
+    AlertScopeGroupSelected,
+    'Select groups'
+  );
+  RenderScopeDropdown(
+    '#ALERT_SCOPE_CLIENTS_MENU',
+    '#ALERT_SCOPE_CLIENTS_TOGGLE',
+    AlertScopeClientOptions,
+    AlertScopeClientSelected,
+    'Select clients / targets'
+  );
+}
+
+function BindScopeDropdownHandlers() {
+  $('#ALERT_SCOPE_GROUPS_TOGGLE')
+    .off('click.alertScope')
+    .on('click.alertScope', function (Event) {
+      Event.preventDefault();
+      Event.stopPropagation();
+      const $menu = $('#ALERT_SCOPE_GROUPS_MENU');
+      const IsOpen = !$menu.hasClass('d-none');
+      CloseAllScopeDropdowns();
+      if (!IsOpen) $menu.removeClass('d-none');
+    });
+
+  $('#ALERT_SCOPE_CLIENTS_TOGGLE')
+    .off('click.alertScope')
+    .on('click.alertScope', function (Event) {
+      Event.preventDefault();
+      Event.stopPropagation();
+      const $menu = $('#ALERT_SCOPE_CLIENTS_MENU');
+      const IsOpen = !$menu.hasClass('d-none');
+      CloseAllScopeDropdowns();
+      if (!IsOpen) $menu.removeClass('d-none');
+    });
+
+  $('#ALERT_SCOPE_GROUPS_MENU')
+    .off('change.alertScope')
+    .on('change.alertScope', 'input[type="checkbox"]', function () {
+      const Values = [];
+      $('#ALERT_SCOPE_GROUPS_MENU input[type="checkbox"]:checked').each(function () {
+        Values.push($(this).val());
+      });
+      AlertScopeGroupSelected = Values;
+      RenderScopeDropdowns();
+      RenderAlertRuleContextPreview();
+      $('#ALERT_SCOPE_GROUPS_MENU').removeClass('d-none');
+    });
+
+  $('#ALERT_SCOPE_CLIENTS_MENU')
+    .off('change.alertScope')
+    .on('change.alertScope', 'input[type="checkbox"]', function () {
+      const Values = [];
+      $('#ALERT_SCOPE_CLIENTS_MENU input[type="checkbox"]:checked').each(function () {
+        Values.push($(this).val());
+      });
+      AlertScopeClientSelected = Values;
+      RenderScopeDropdowns();
+      RenderAlertRuleContextPreview();
+      $('#ALERT_SCOPE_CLIENTS_MENU').removeClass('d-none');
+    });
+
+  $(document)
+    .off('mousedown.alertScopeDropdown touchstart.alertScopeDropdown')
+    .on('mousedown.alertScopeDropdown touchstart.alertScopeDropdown', function (Event) {
+      const inside = $(Event.target).closest('#ALERT_SCOPE_GROUPS_DROPDOWN, #ALERT_SCOPE_CLIENTS_DROPDOWN').length > 0;
+      if (!inside) CloseAllScopeDropdowns();
+    });
+}
+
+function RenderAlertRuleTriggerConfig(TriggerType, Config = {}) {
+  const $host = $('#ALERT_RULE_TRIGGER_CONFIG');
+  if (!$host.length) return;
+
+  if (TriggerType !== 'CLIENT_DEGRADED') {
+    $host.html('<small class="text-muted">No additional configuration required for this trigger.</small>');
+    RenderAlertRuleContextPreview();
+    return;
+  }
+
+  const Source = Safe((Config && Config.Source) || 'any');
+  const Cpu = Number.isFinite(Number(Config && Config.ClientCpuUsagePct))
+    ? Number(Config.ClientCpuUsagePct)
+    : '';
+  const Ram = Number.isFinite(Number(Config && Config.ClientRamUsagePct))
+    ? Number(Config.ClientRamUsagePct)
+    : '';
+  const StaleMs = Number.isFinite(Number(Config && Config.ClientLastSeenStaleMs))
+    ? Number(Config.ClientLastSeenStaleMs)
+    : '';
+
+  $host.html(`
+    <div class="row g-2">
+      <div class="col-md-4">
+        <label class="form-label mb-1">Source</label>
+        <select class="form-select" id="ALERT_TRIGGER_CONFIG_SOURCE">
+          <option value="any" ${Source === 'any' ? 'selected' : ''}>Any</option>
+          <option value="client" ${Source === 'client' ? 'selected' : ''}>Adopted Client</option>
+          <option value="monitor" ${Source === 'monitor' ? 'selected' : ''}>Monitoring Target</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label mb-1">Client CPU >= (%)</label>
+        <input type="number" min="1" max="100" class="form-control" id="ALERT_TRIGGER_CONFIG_CPU" value="${Cpu}" placeholder="e.g. 90" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label mb-1">Client RAM >= (%)</label>
+        <input type="number" min="1" max="100" class="form-control" id="ALERT_TRIGGER_CONFIG_RAM" value="${Ram}" placeholder="e.g. 90" />
+      </div>
+      <div class="col-md-12">
+        <label class="form-label mb-1">Client LastSeen Stale >= (ms)</label>
+        <input type="number" min="1" max="86400000" class="form-control" id="ALERT_TRIGGER_CONFIG_STALE" value="${StaleMs}" placeholder="e.g. 30000" />
+      </div>
+    </div>
+  `);
+  RenderAlertRuleContextPreview();
+}
+
+function CollectAlertTriggerConfig() {
+  const TriggerType = $('#ALERT_RULE_TRIGGER_TYPE').val();
+  if (TriggerType !== 'CLIENT_DEGRADED') return {};
+
+  const Source = ($('#ALERT_TRIGGER_CONFIG_SOURCE').val() || 'any').toString().toLowerCase();
+  const Cpu = parseInt($('#ALERT_TRIGGER_CONFIG_CPU').val(), 10);
+  const Ram = parseInt($('#ALERT_TRIGGER_CONFIG_RAM').val(), 10);
+  const Stale = parseInt($('#ALERT_TRIGGER_CONFIG_STALE').val(), 10);
+
+  const Out = {
+    Source: Source === 'client' || Source === 'monitor' ? Source : 'any',
+  };
+  if (Number.isFinite(Cpu) && Cpu > 0) Out.ClientCpuUsagePct = Cpu;
+  if (Number.isFinite(Ram) && Ram > 0) Out.ClientRamUsagePct = Ram;
+  if (Number.isFinite(Stale) && Stale > 0) Out.ClientLastSeenStaleMs = Stale;
+  return Out;
+}
+
+function actionTypeByID(ID) {
+  return AlertActionTypesCache.find((A) => A.ID === ID) || null;
+}
+
+function RenderAlertActionSettingsFields(ActionTypeID, ExistingSettings = {}) {
+  const ActionType = actionTypeByID(ActionTypeID);
+  if (!ActionType) {
+    return '<small class="text-muted">Unknown action type.</small>';
+  }
+
+  let Html = '';
+  for (const Field of ActionType.Settings || []) {
+    const Key = Field.Key;
+    const Type = Field.Type || 'string';
+    const Value = Object.prototype.hasOwnProperty.call(ExistingSettings, Key)
+      ? ExistingSettings[Key]
+      : Field.Default;
+
+    if (Type === 'boolean') {
+      Html += `
+        <div class="form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost rounded p-2">
+          <label class="form-check-label mb-0 ms-2" for="alert-action-${Safe(Key)}-${Math.random().toString(36).slice(2)}">${Safe(Field.Label || Key)}</label>
+          <input class="form-check-input ms-2 me-2" type="checkbox" data-key="${Safe(Key)}" data-type="boolean" ${Value ? 'checked' : ''} />
+        </div>
+      `;
+    } else if (Type === 'number') {
+      Html += `
+        <div class="form-floating">
+          <input
+            type="number"
+            class="form-control"
+            data-key="${Safe(Key)}"
+            data-type="number"
+            value="${Safe(String(Value == null ? '' : Value))}"
+            ${typeof Field.Min === 'number' ? `min="${Field.Min}"` : ''}
+            ${typeof Field.Max === 'number' ? `max="${Field.Max}"` : ''}
+            placeholder="${Safe(Field.Label || Key)}"
+          />
+          <label>${Safe(Field.Label || Key)}</label>
+        </div>
+      `;
+    } else {
+      Html += `
+        <div class="form-floating">
+          <input
+            type="text"
+            class="form-control"
+            data-key="${Safe(Key)}"
+            data-type="string"
+            value="${Safe(String(Value == null ? '' : Value))}"
+            placeholder="${Safe(Field.Label || Key)}"
+          />
+          <label>${Safe(Field.Label || Key)}</label>
+        </div>
+      `;
+    }
+  }
+  return Html || '<small class="text-muted">This action has no configurable settings.</small>';
+}
+
+function RenderAlertActionTypeOptions(SelectedType = null) {
+  return (AlertActionTypesCache || [])
+    .map(
+      (ActionType) =>
+        `<option value="${Safe(ActionType.ID)}" ${ActionType.ID === SelectedType ? 'selected' : ''}>${Safe(ActionType.Name)}</option>`
+    )
+    .join('');
+}
+
+function RenderAlertActionsList() {
+  const $host = $('#ALERT_RULE_ACTIONS_LIST');
+  if (!$host.length) return;
+  if (!Array.isArray(AlertRuleDraftActions) || !AlertRuleDraftActions.length) {
+    $host.html('<div class="rounded bg-ghost p-2 text-muted text-center">No actions configured.</div>');
+    return;
+  }
+
+  let Html = '';
+  AlertRuleDraftActions.forEach((Action, Index) => {
+    const ActionType = actionTypeByID(Action.Type);
+    Html += `
+      <div class="rounded bg-ghost p-2 d-grid gap-1">
+        <div class="d-flex justify-content-between align-items-center">
+          <strong>${Safe(Action.Title || (ActionType ? ActionType.Name : Action.Type || 'Action'))}</strong>
+          <small class="text-muted">${Safe(ActionType ? ActionType.Name : Action.Type || 'Unknown')}</small>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-light alert-action-edit" data-action-index="${Index}">Edit</button>
+          <button type="button" class="btn btn-sm btn-danger alert-action-remove" data-action-index="${Index}">Remove</button>
+        </div>
+      </div>
+    `;
+  });
+
+  $host.html(Html);
+
+  $host
+    .find('.alert-action-edit')
+    .off('click')
+    .on('click', function () {
+      const Index = parseInt($(this).attr('data-action-index'), 10);
+      if (!Number.isFinite(Index)) return;
+      OpenAlertActionEditor(Index);
+    });
+
+  $host
+    .find('.alert-action-remove')
+    .off('click')
+    .on('click', function () {
+      const Index = parseInt($(this).attr('data-action-index'), 10);
+      if (!Number.isFinite(Index)) return;
+      AlertRuleDraftActions.splice(Index, 1);
+      if (AlertEditingActionIndex === Index) {
+        CloseAlertActionEditor();
+      }
+      RenderAlertActionsList();
+      RenderAlertRuleContextPreview();
+    });
+}
+
+function CollectActionSettingsFromEditorHost() {
+  const Settings = {};
+  $('#ALERT_ACTION_EDITOR_SETTINGS')
+    .find('[data-key]')
+    .each(function () {
+      const Key = ($(this).attr('data-key') || '').toString();
+      const Type = ($(this).attr('data-type') || 'string').toString();
+      if (!Key) return;
+      if (Type === 'boolean') {
+        Settings[Key] = $(this).is(':checked');
+      } else if (Type === 'number') {
+        const Parsed = Number($(this).val());
+        Settings[Key] = Number.isFinite(Parsed) ? Parsed : 0;
+      } else {
+        Settings[Key] = ($(this).val() || '').toString();
+      }
+    });
+  return Settings;
+}
+
+function CloseAlertActionEditor() {
+  AlertEditingActionIndex = null;
+  $('#ALERT_ACTION_EDITOR_PANEL').addClass('d-none');
+}
+
+function OpenAlertActionEditor(Index) {
+  if (!Array.isArray(AlertRuleDraftActions) || !AlertRuleDraftActions[Index]) return;
+  AlertEditingActionIndex = Index;
+  const Action = AlertRuleDraftActions[Index];
+  const TypeID = Action.Type || (AlertActionTypesCache[0] && AlertActionTypesCache[0].ID) || '';
+
+  $('#ALERT_ACTION_EDITOR_PANEL').removeClass('d-none');
+  $('#ALERT_ACTION_EDITOR_TITLE').text(`Edit Action #${Index + 1}`);
+  $('#ALERT_ACTION_EDITOR_TYPE').html(RenderAlertActionTypeOptions(TypeID));
+  $('#ALERT_ACTION_EDITOR_TITLE_INPUT').val(Action.Title || '');
+  $('#ALERT_ACTION_EDITOR_SETTINGS').html(RenderAlertActionSettingsFields(TypeID, Action.Settings || {}));
+}
+
+function AddAlertActionAndEdit() {
+  const DefaultType = (AlertActionTypesCache[0] && AlertActionTypesCache[0].ID) || '';
+  AlertRuleDraftActions.push({
+    Type: DefaultType,
+    Title: '',
+    Settings: {},
+  });
+  RenderAlertActionsList();
+  OpenAlertActionEditor(AlertRuleDraftActions.length - 1);
+  RenderAlertRuleContextPreview();
+}
+
+async function PopulateAlertScopeOptions(Rule = null) {
+  let Groups = await window.API.GetAllGroups();
+  if (!Array.isArray(Groups)) Groups = [];
+
+  AlertScopeGroupOptions = Groups.map((G) => ({
+    Value: String(G.GroupID),
+    Label: G.Title || `Group ${G.GroupID}`,
+  }));
+
+  AlertScopeClientOptions = [];
+  for (const C of AllClients || []) {
+    AlertScopeClientOptions.push({
+      Value: C.UUID,
+      Label: `${C.Nickname || C.Hostname || C.UUID} (${C.UUID})`,
+    });
+  }
+  for (const T of MonitoringTargets || []) {
+    AlertScopeClientOptions.push({
+      Value: `monitor:${T.TargetID}`,
+      Label: `[Monitor] ${T.Nickname || T.Address || `Target ${T.TargetID}`}`,
+    });
+  }
+
+  const Scope = Rule && Rule.Scope ? Rule.Scope : { Workspace: false, Groups: [], Clients: [] };
+  $('#ALERT_RULE_SCOPE_WORKSPACE').prop('checked', !!Scope.Workspace);
+  AlertScopeGroupSelected = (Scope.Groups || []).map((x) => `${x}`);
+  AlertScopeClientSelected = (Scope.Clients || []).map((x) => `${x}`);
+  RenderScopeDropdowns();
+}
+
+function RenderAlertRuleContextPreview() {
+  const Trigger = $('#ALERT_RULE_TRIGGER_TYPE').val() || 'Unknown Trigger';
+  const ScopeWorkspace = $('#ALERT_RULE_SCOPE_WORKSPACE').is(':checked');
+  const GroupCount = AlertScopeGroupSelected.length;
+  const ClientCount = AlertScopeClientSelected.length;
+  const ActionCount = Array.isArray(AlertRuleDraftActions) ? AlertRuleDraftActions.length : 0;
+
+  const ScopeSummary = ScopeWorkspace
+    ? 'Workspace'
+    : `${GroupCount} group(s), ${ClientCount} client target(s)`;
+
+  $('#ALERT_RULE_CONTEXT_PREVIEW').html(`
+    <strong>Context Preview</strong><br/>
+    Trigger: ${Safe(Trigger)}<br/>
+    Scope: ${Safe(ScopeSummary)}<br/>
+    Actions: ${Safe(String(ActionCount))}<br/>
+    Runtime fields available to actions: <code>{{triggerType}}</code>, <code>{{entityName}}</code>, <code>{{severity}}</code>, <code>{{ip}}</code>, <code>{{uuid}}</code>, <code>{{groupId}}</code>
+  `);
+}
+
+function ResetAlertRuleEditor() {
+  AlertRuleEditorRuleID = null;
+  AlertEditingActionIndex = null;
+  AlertRuleDraftActions = [];
+  $('#ALERT_RULE_EDITOR_TITLE').text('Create Alert Rule');
+  $('#ALERT_RULE_TITLE').val('');
+  $('#ALERT_RULE_DELETE').addClass('d-none');
+  $('#ALERT_RULE_SCOPE_WORKSPACE').prop('checked', false);
+  AlertScopeGroupSelected = [];
+  AlertScopeClientSelected = [];
+  RenderScopeDropdowns();
+
+  const DefaultTrigger = AlertTriggerTypesCache.length ? AlertTriggerTypesCache[0].ID : 'CLIENT_OFFLINE';
+  $('#ALERT_RULE_TRIGGER_TYPE').val(DefaultTrigger);
+  RenderAlertRuleTriggerConfig(DefaultTrigger, {});
+
+  RenderAlertActionsList();
+  CloseAlertActionEditor();
+  RenderAlertRuleContextPreview();
+}
+
+function OpenAlertRuleEditor(Rule) {
+  if (!Rule) {
+    ResetAlertRuleEditor();
+    return;
+  }
+
+  AlertRuleEditorRuleID = Rule.RuleID;
+  AlertEditingActionIndex = null;
+  $('#ALERT_RULE_EDITOR_TITLE').text(`Edit Rule #${Rule.RuleID}`);
+  $('#ALERT_RULE_TITLE').val(Rule.Title || '');
+  $('#ALERT_RULE_DELETE').removeClass('d-none');
+
+  PopulateAlertScopeOptions(Rule);
+
+  $('#ALERT_RULE_TRIGGER_TYPE').val(Rule.TriggerType || 'CLIENT_OFFLINE');
+  RenderAlertRuleTriggerConfig(Rule.TriggerType || 'CLIENT_OFFLINE', Rule.TriggerConfig || {});
+
+  const Actions = Array.isArray(Rule.Actions) ? Rule.Actions : [];
+  AlertRuleDraftActions = Actions.map((Action) => ({
+    Type: Action.Type,
+    Title: Action.Title || '',
+    Settings: Action.Settings || {},
+  }));
+  RenderAlertActionsList();
+  CloseAlertActionEditor();
+  RenderAlertRuleContextPreview();
+  ShowAlertEditorPanel();
+}
+
+function RenderAlertRuleManagerList() {
+  const $host = $('#ALERT_RULE_MANAGER_LIST');
+  if (!$host.length) return;
+  if (!AlertRulesCache.length) {
+    $host.html('<div class="rounded bg-ghost p-2 text-center text-muted">No alert rules yet.</div>');
+    return;
+  }
+
+  let Html = '';
+  for (const Rule of AlertRulesCache) {
+    const TriggerLabel = String(Rule.TriggerType || '').replace(/_/g, ' ');
+    Html += `
+      <div class="rounded bg-ghost p-2 d-grid gap-1 text-start border-0 alert-rule-open" data-ruleid="${Rule.RuleID}" role="button" tabindex="0">
+        <div class="d-flex justify-content-between align-items-center gap-2">
+          <strong>${Safe(Rule.Title || `Rule ${Rule.RuleID}`)}</strong>
+          <span class="badge ${Rule.Enabled ? 'bg-success' : 'bg-secondary'}">${Rule.Enabled ? 'Enabled' : 'Disabled'}</span>
+        </div>
+        <small class="text-muted">${Safe(TriggerLabel)}</small>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm ${Rule.Enabled ? 'btn-warning' : 'btn-success'} alert-rule-toggle" data-ruleid="${Rule.RuleID}" data-enabled="${Rule.Enabled ? '1' : '0'}">
+            ${Rule.Enabled ? 'Disable' : 'Enable'}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  $host.html(Html);
+
+  $host
+    .find('.alert-rule-open')
+    .off('click')
+    .on('click', function (Event) {
+      if ($(Event.target).closest('.alert-rule-toggle').length) return;
+      const RuleID = parseInt($(this).attr('data-ruleid'), 10);
+      if (!Number.isFinite(RuleID)) return;
+      const Rule = AlertRulesCache.find((R) => R.RuleID === RuleID);
+      if (Rule) OpenAlertRuleEditor(Rule);
+    });
+
+  $host
+    .find('.alert-rule-toggle')
+    .off('click')
+    .on('click', async function (Event) {
+      Event.stopPropagation();
+      const RuleID = parseInt($(this).attr('data-ruleid'), 10);
+      const Enabled = $(this).attr('data-enabled') === '1';
+      if (!Number.isFinite(RuleID)) return;
+      const [Err] = await window.API.SetAlertRuleEnabled(RuleID, !Enabled);
+      if (Err) Notify(Err, 'error');
+    });
+}
+
+function BuildAlertRulePayloadFromEditor() {
+  const Title = ($('#ALERT_RULE_TITLE').val() || '').toString().trim();
+  const TriggerType = ($('#ALERT_RULE_TRIGGER_TYPE').val() || '').toString().trim();
+
+  return {
+    Title,
+    Scope: {
+      Workspace: $('#ALERT_RULE_SCOPE_WORKSPACE').is(':checked'),
+      Groups: AlertScopeGroupSelected.map((x) => parseInt(x, 10)).filter(Number.isFinite),
+      Clients: AlertScopeClientSelected,
+    },
+    TriggerType,
+    TriggerConfig: CollectAlertTriggerConfig(),
+    Actions: AlertRuleDraftActions,
+    Enabled: true,
+  };
+}
+
+async function OpenAlertRuleManager() {
+  await CloseAllModals();
+  await EnsureAlertCatalogsLoaded();
+  await PopulateAlertScopeOptions();
+
+  const TriggerOptions = (AlertTriggerTypesCache || [])
+    .map((T) => `<option value="${Safe(T.ID)}">${Safe(T.Name)}</option>`)
+    .join('');
+  $('#ALERT_RULE_TRIGGER_TYPE').html(TriggerOptions);
+
+  BindScopeDropdownHandlers();
+  ResetAlertRuleEditor();
+  RenderAlertRuleManagerList();
+  ShowAlertListPanel();
+
+  $('#ALERT_RULE_TRIGGER_TYPE')
+    .off('change.alertRule')
+    .on('change.alertRule', function () {
+      RenderAlertRuleTriggerConfig($(this).val(), {});
+      RenderAlertRuleContextPreview();
+    });
+
+  $('#ALERT_RULE_SCOPE_WORKSPACE')
+    .off('input.alertRule change.alertRule')
+    .on('input.alertRule change.alertRule', () => RenderAlertRuleContextPreview());
+
+  $('#ALERT_RULE_BACK_TO_LIST')
+    .off('click.alertRule')
+    .on('click.alertRule', () => {
+      ShowAlertListPanel();
+      CloseAlertActionEditor();
+    });
+
+  $('#ALERT_RULE_CREATE_BUTTON')
+    .off('click.alertRule')
+    .on('click.alertRule', () => {
+      ResetAlertRuleEditor();
+      ShowAlertEditorPanel();
+    });
+
+  $('#ALERT_RULE_ADD_ACTION')
+    .off('click.alertRule')
+    .on('click.alertRule', () => {
+      AddAlertActionAndEdit();
+    });
+
+  $('#ALERT_ACTION_EDITOR_TYPE')
+    .off('change.alertRule')
+    .on('change.alertRule', function () {
+      const TypeID = ($(this).val() || '').toString();
+      $('#ALERT_ACTION_EDITOR_SETTINGS').html(RenderAlertActionSettingsFields(TypeID, {}));
+    });
+
+  $('#ALERT_ACTION_EDITOR_CLOSE')
+    .off('click.alertRule')
+    .on('click.alertRule', () => CloseAlertActionEditor());
+
+  $('#ALERT_ACTION_EDITOR_DELETE')
+    .off('click.alertRule')
+    .on('click.alertRule', () => {
+      if (!Number.isFinite(AlertEditingActionIndex)) return;
+      AlertRuleDraftActions.splice(AlertEditingActionIndex, 1);
+      RenderAlertActionsList();
+      CloseAlertActionEditor();
+      RenderAlertRuleContextPreview();
+    });
+
+  $('#ALERT_ACTION_EDITOR_SAVE')
+    .off('click.alertRule')
+    .on('click.alertRule', () => {
+      if (!Number.isFinite(AlertEditingActionIndex)) return;
+      const Type = ($('#ALERT_ACTION_EDITOR_TYPE').val() || '').toString();
+      if (!Type) return Notify('Please choose an action type', 'error');
+      AlertRuleDraftActions[AlertEditingActionIndex] = {
+        Type,
+        Title: ($('#ALERT_ACTION_EDITOR_TITLE_INPUT').val() || '').toString().trim(),
+        Settings: CollectActionSettingsFromEditorHost(),
+      };
+      RenderAlertActionsList();
+      CloseAlertActionEditor();
+      RenderAlertRuleContextPreview();
+    });
+
+  $('#ALERT_RULE_RESET')
+    .off('click.alertRule')
+    .on('click.alertRule', () => {
+      ResetAlertRuleEditor();
+    });
+
+  $('#ALERT_RULE_DELETE')
+    .off('click.alertRule')
+    .on('click.alertRule', async () => {
+      if (!AlertRuleEditorRuleID) return;
+      const Confirmed = await ConfirmationDialog('Delete this alert rule? This cannot be undone.');
+      if (!Confirmed) return;
+      const [Err] = await window.API.DeleteAlertRule(AlertRuleEditorRuleID);
+      if (Err) return Notify(Err, 'error');
+      Notify('Alert rule deleted', 'success', 1500);
+      ResetAlertRuleEditor();
+      ShowAlertListPanel();
+    });
+
+  $('#ALERT_RULE_SAVE')
+    .off('click.alertRule')
+    .on('click.alertRule', async () => {
+      const Payload = BuildAlertRulePayloadFromEditor();
+      if (!Payload.Title) return Notify('Please enter a rule title', 'error');
+      if (!Payload.TriggerType) return Notify('Please choose a trigger', 'error');
+      if (!Array.isArray(Payload.Actions) || !Payload.Actions.length) {
+        return Notify('Please add at least one action', 'error');
+      }
+
+      if (AlertRuleEditorRuleID) {
+        const [Err] = await window.API.UpdateAlertRule(AlertRuleEditorRuleID, Payload);
+        if (Err) return Notify(Err, 'error');
+        Notify('Alert rule updated', 'success', 1500);
+      } else {
+        const [Err] = await window.API.CreateAlertRule(Payload);
+        if (Err) return Notify(Err, 'error');
+        Notify('Alert rule created', 'success', 1500);
+      }
+      ShowAlertListPanel();
+    });
+
+  $('#SHOWTRAK_MODAL_ALERT_MANAGER').modal('show');
+}
+
 
 function SelectByGroup(GroupID) {
   if (!GroupUUIDCache.has(`${GroupID}`)) return;
@@ -2670,6 +3497,7 @@ $(async function () {
   try {
     // Bind Check for Updates button in core modal
     $('#SHOWTRAK_MODEL_CORE_CHECKUPDATES').off('click').on('click', async () => {
+      await OpenAboutModal();
       try { await window.API.CheckForAppUpdates(); } catch {}
       // Ensure section visible while checking
       $('#UPDATE_SECTION').removeClass('d-none');
@@ -3291,14 +4119,91 @@ async function Init() {
   $('#APPLICATION_NAVBAR_TITLE').text(`${Config.Application.Name}`);
   $('#APPLICATION_NAVBAR_STATUS').text(`v${Config.Application.Version}`);
 
+  // Show the currently open .ShowTrak file name in the navbar and keep it in
+  // sync as files are opened/saved/created.
+  // First, verify the previously open file still exists; if it was deleted or
+  // moved, the working data is wiped so we can prompt for a fresh start.
+  const [, MissingResult] = (await window.API.EnsureShowFileExists()) || [];
+  if (MissingResult && MissingResult.Missing) {
+    await Notify('Previous show file was missing. Open or create a new show.', 'error');
+  }
+  const CurrentShowFile = await window.API.GetCurrentShowFile();
+  RenderShowFileName(CurrentShowFile);
+  window.API.OnShowFileUpdated((Path) => RenderShowFileName(Path));
+
+  // When no show is open, prompt the user to open one or create a new show.
+  $('#NO_SHOW_OPEN').on('click', async () => {
+    await OpenShow();
+    const Opened = await window.API.GetCurrentShowFile();
+    if (Opened) $('#SHOWTRAK_MODAL_NO_SHOW').modal('hide');
+  });
+  $('#NO_SHOW_NEW').on('click', async () => {
+    const [Err] = await window.API.NewShow();
+    if (Err) {
+      await Notify(String(Err), 'error');
+      return;
+    }
+    $('#SHOWTRAK_MODAL_NO_SHOW').modal('hide');
+    await Notify('Created new show.', 'success');
+  });
+
+  // Legacy-data migration guard: force a Save As before continuing so data from
+  // a pre-show-file version is not lost.
+  $('#MIGRATE_SAVE').on('click', async () => {
+    await SaveShowAs();
+    const Saved = await window.API.GetCurrentShowFile();
+    if (Saved) $('#SHOWTRAK_MODAL_MIGRATE').modal('hide');
+  });
+
+  if (!CurrentShowFile) {
+    const HasLegacyData = await window.API.HasUnsavedShowData();
+    if (HasLegacyData) {
+      $('#SHOWTRAK_MODAL_MIGRATE').modal('show');
+    } else {
+      $('#SHOWTRAK_MODAL_NO_SHOW').modal('show');
+    }
+  }
+
   $('#SHOWTRAK_MODEL_CORE_OPEN_SETTINGS').on('click', async () => {
     await CloseAllModals();
     $('#SHOWTRAK_MODAL_SETTINGS').modal('show');
   });
 
-  $('#NAVBAR_CORE_BUTTON').on('click', async () => {
-    $('#SHOWTRAK_MODEL_CORE').modal('show');
+  $('#SHOWTRAK_ABOUT_BUTTON').on('click', async () => {
+    await OpenAboutModal();
   });
+
+  $('#SHOWTRAK_ABOUT_WEBSITE').on('click', async () => {
+    await window.API.OpenShowTrakWebsiteInBrowser();
+  });
+
+  $('#SHOWTRAK_ABOUT_GITHUB').on('click', async () => {
+    await window.API.OpenShowTrakGithubInBrowser();
+  });
+
+  $('#SHOWTRAK_ABOUT_DEPENDENCIES').on('click', '.SHOWTRAK_ABOUT_DEPENDENCY_LINK', async (Event) => {
+    const PackageName = $(Event.currentTarget).attr('data-package-name');
+    if (!PackageName) return;
+    await window.API.OpenNpmPackageInBrowser(PackageName);
+  });
+
+  const settingsMenu = document.getElementById('SETTINGS_MENU');
+  $('#SETTINGS_MENU_DROPDOWN')
+    .off('shown.bs.dropdown.settingsOffset hidden.bs.dropdown.settingsOffset')
+    .on('shown.bs.dropdown.settingsOffset', () => {
+      if (!settingsMenu) return;
+      const currentTransform = settingsMenu.style.transform || '';
+      if (currentTransform.includes('translateY(-10px)')) return;
+      settingsMenu.style.transform = `${currentTransform} translateY(-10px)`.trim();
+    })
+    .on('hidden.bs.dropdown.settingsOffset', () => {
+      if (!settingsMenu) return;
+      const currentTransform = settingsMenu.style.transform || '';
+      settingsMenu.style.transform = currentTransform
+        .replace(' translateY(-10px)', '')
+        .replace('translateY(-10px)', '')
+        .trim();
+    });
 
   $('#ADD_TARGET_MANUAL_ACTION').on('click', async () => {
     await OpenMonitoringTargetEditor(null);
@@ -3372,6 +4277,10 @@ async function Init() {
     await OpenGroupManager();
   });
 
+  $('#SHOWTRAK_MODEL_CORE_ALERT_MANAGER_BUTTON').on('click', async () => {
+    await OpenAlertRuleManager();
+  });
+
   $('#SHOWTRAK_MODEL_CORE_LOGSFOLDER').on('click', async () => {
     await window.API.OpenLogsFolder();
   });
@@ -3380,12 +4289,20 @@ async function Init() {
     await window.API.OpenScriptsFolder();
   });
 
-  $('#SHOWTRAK_MODEL_CORE_BACKUPCONFIG').on('click', async () => {
-    await BackupConfig();
+  $('#SHOWTRAK_MODEL_CORE_SAVEAS').on('click', async () => {
+    await SaveShowAs();
   });
 
-  $('#SHOWTRAK_MODEL_CORE_IMPORTCONFIG').on('click', async () => {
-    await ImportConfig();
+  $('#SHOWTRAK_MODEL_CORE_SAVE').on('click', async () => {
+    await SaveShow();
+  });
+
+  $('#SHOWTRAK_MODEL_CORE_OPEN').on('click', async () => {
+    await OpenShow();
+  });
+
+  $('#SHOWTRAK_MODEL_CORE_NEW').on('click', async () => {
+    await NewShow();
   });
 
   $('#SHOWTRAK_MODEL_CORE_SUPPORTDISCORD').on('click', async () => {

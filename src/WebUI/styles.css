@@ -408,7 +408,7 @@ body {
 /* Confirmation modal */
 .confirm{position:fixed;inset:0;background:rgba(12,9,28,.6);backdrop-filter:blur(4px);display:grid;place-items:center;z-index:60}
 .confirm.hidden{display:none}
-.confirm-body{width:min(94%,560px);background:#1d1a2f;border:1px solid var(--ring);border-radius:12px;padding:16px;display:grid;gap:12px}
+.confirm-body{width:min(94%,560px);background:linear-gradient(180deg,#160f35 0%,#0f0b23 100%);border:1px solid var(--ring);border-radius:12px;padding:16px;display:grid;gap:12px}
 .confirm-title{font-weight:800}
 .confirm-text{color:var(--muted)}
 .confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}

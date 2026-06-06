@@ -74,6 +74,24 @@ const DefaultSettings = [
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
+  {
+    Group: 'System',
+    Key: 'SYSTEM_AUTOSAVE_ENABLED',
+    Title: 'Enable Autosave',
+    Description: 'Automatically save the open ShowTrak file at a regular interval.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+    OnUpdateEvent: 'AutosaveSettingsChanged',
+  },
+  {
+    Group: 'System',
+    Key: 'SYSTEM_AUTOSAVE_INTERVAL_MINUTES',
+    Title: 'Autosave Interval (Minutes)',
+    Description: 'How often, in minutes, to automatically save the open ShowTrak file.',
+    Type: 'INTEGER',
+    DefaultValue: 5,
+    OnUpdateEvent: 'AutosaveSettingsChanged',
+  },
   // Demo settings to showcase new data types
   // {
   //   Group: 'Demo',

@@ -5,10 +5,16 @@ const { dialog } = require('electron');
 
 const Manager = {};
 
-Manager.SelectFile = async (Title) => {
+const SHOWTRAK_FILE_FILTER = {
+  name: 'ShowTrak File',
+  extensions: ['ShowTrak'],
+};
+
+Manager.OpenDialog = async (Title) => {
   return await dialog.showOpenDialog({
-    filters: [{ name: 'ShowTrak Server Config', extensions: ['ShowTrakConfig'] }],
-    properties: ['openFile', 'createDirectory'],
+    title: Title,
+    filters: [SHOWTRAK_FILE_FILTER],
+    properties: ['openFile'],
     message: Title,
   });
 };
@@ -17,8 +23,8 @@ Manager.SaveDialog = async (Title) => {
   let CurrentDatestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 10);
   return await dialog.showSaveDialog({
     title: Title,
-    defaultPath: `ShowTrak Server Backup ${CurrentDatestamp}.ShowTrak`,
-    filters: [{ name: 'ShowTrak Server Config', extensions: ['ShowTrakConfig'] }],
+    defaultPath: `ShowTrak ${CurrentDatestamp}.ShowTrak`,
+    filters: [SHOWTRAK_FILE_FILTER],
     properties: ['createDirectory', 'showOverwriteConfirmation'],
   });
 };

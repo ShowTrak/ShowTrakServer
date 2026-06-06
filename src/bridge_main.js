@@ -2,6 +2,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const INVOKE_CHANNELS = new Set([
   'OpenDiscordInviteLinkInBrowser',
+  'OpenShowTrakWebsiteInBrowser',
+  'OpenShowTrakGithubInBrowser',
+  'OpenNpmPackageInBrowser',
+  'GetProjectDependencies',
   'Config:Get',
   'WebUI:GetAddresses',
   'Settings:Get',
@@ -15,8 +19,13 @@ const INVOKE_CHANNELS = new Set([
   'DeleteGroup',
   'OpenLogsFolder',
   'OpenScriptsFolder',
-  'BackupConfig',
-  'ImportConfig',
+  'Show:New',
+  'Show:Save',
+  'Show:SaveAs',
+  'Show:Open',
+  'Show:GetCurrentFile',
+  'Show:HasUnsavedData',
+  'Show:EnsureFileExists',
   'SetGroupOrder',
   'Mode:Get',
   'Mode:Set',
@@ -37,6 +46,14 @@ const INVOKE_CHANNELS = new Set([
   'DeleteMonitoringTarget',
   'NetworkDiscovery:Start',
   'NetworkDiscovery:Stop',
+  'GetAlertTriggers',
+  'GetAlertActionTypes',
+  'GetAllAlertRules',
+  'GetAlertRule',
+  'CreateAlertRule',
+  'UpdateAlertRule',
+  'DeleteAlertRule',
+  'SetAlertRuleEnabled',
 ]);
 
 const SUBSCRIBE_CHANNELS = new Set([
@@ -58,6 +75,9 @@ const SUBSCRIBE_CHANNELS = new Set([
   'SetFullMonitoringTargetList',
   'MonitoringTargetUpdated',
   'NetworkDeviceScanEvent',
+  'SetFullAlertRuleList',
+  'AlertTriggered',
+  'ShowFileUpdated',
 ]);
 
 function invoke(channel, ...args) {
@@ -85,6 +105,10 @@ function subscribe(channel, callback, mapper = (...payload) => payload) {
 
 contextBridge.exposeInMainWorld('API', {
   OpenDiscordInviteLinkInBrowser: async () => invoke('OpenDiscordInviteLinkInBrowser'),
+  OpenShowTrakWebsiteInBrowser: async () => invoke('OpenShowTrakWebsiteInBrowser'),
+  OpenShowTrakGithubInBrowser: async () => invoke('OpenShowTrakGithubInBrowser'),
+  OpenNpmPackageInBrowser: async (PackageName) => invoke('OpenNpmPackageInBrowser', PackageName),
+  GetProjectDependencies: async () => invoke('GetProjectDependencies'),
   GetConfig: async () => invoke('Config:Get'),
   GetWebUIAddresses: async () => invoke('WebUI:GetAddresses'),
   GetSettings: async () => invoke('Settings:Get'),
@@ -98,8 +122,14 @@ contextBridge.exposeInMainWorld('API', {
   DeleteGroup: async (GroupID) => invoke('DeleteGroup', GroupID),
   OpenLogsFolder: async () => invoke('OpenLogsFolder'),
   OpenScriptsFolder: async () => invoke('OpenScriptsFolder'),
-  BackupConfig: async () => invoke('BackupConfig'),
-  ImportConfig: async () => invoke('ImportConfig'),
+  NewShow: async () => invoke('Show:New'),
+  SaveShow: async () => invoke('Show:Save'),
+  SaveShowAs: async () => invoke('Show:SaveAs'),
+  OpenShow: async () => invoke('Show:Open'),
+  GetCurrentShowFile: async () => invoke('Show:GetCurrentFile'),
+  HasUnsavedShowData: async () => invoke('Show:HasUnsavedData'),
+  EnsureShowFileExists: async () => invoke('Show:EnsureFileExists'),
+  OnShowFileUpdated: (Callback) => subscribe('ShowFileUpdated', Callback),
   SetGroupOrder: async (GroupID, OrderedUUIDs) =>
     invoke('SetGroupOrder', GroupID, OrderedUUIDs),
   // Application Mode API
@@ -157,4 +187,15 @@ contextBridge.exposeInMainWorld('API', {
   StartNetworkDeviceScan: async (Options) => invoke('NetworkDiscovery:Start', Options),
   StopNetworkDeviceScan: async (ScanID) => invoke('NetworkDiscovery:Stop', ScanID),
   OnNetworkDeviceScanEvent: (Callback) => subscribe('NetworkDeviceScanEvent', Callback),
+  // Alert Rules
+  GetAlertTriggers: async () => invoke('GetAlertTriggers'),
+  GetAlertActionTypes: async () => invoke('GetAlertActionTypes'),
+  GetAllAlertRules: async () => invoke('GetAllAlertRules'),
+  GetAlertRule: async (RuleID) => invoke('GetAlertRule', RuleID),
+  CreateAlertRule: async (Payload) => invoke('CreateAlertRule', Payload),
+  UpdateAlertRule: async (RuleID, Payload) => invoke('UpdateAlertRule', RuleID, Payload),
+  DeleteAlertRule: async (RuleID) => invoke('DeleteAlertRule', RuleID),
+  SetAlertRuleEnabled: async (RuleID, Enabled) => invoke('SetAlertRuleEnabled', RuleID, Enabled),
+  SetFullAlertRuleList: (Callback) => subscribe('SetFullAlertRuleList', Callback),
+  AlertTriggered: (Callback) => subscribe('AlertTriggered', Callback),
 });

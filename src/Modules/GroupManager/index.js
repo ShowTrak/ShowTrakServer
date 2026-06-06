@@ -11,6 +11,7 @@ const { Manager: DB } = require('../DB');
 const { Manager: BroadcastManager } = require('../Broadcast');
 
 const { Manager: ClientManager } = require('../ClientManager');
+const { Manager: MonitoringTargetManager } = require('../MonitoringTargetManager');
 const { Ok, Fail } = require('../Utils');
 
 const Manager = {};
@@ -56,21 +57,69 @@ Manager.Create = async (Title = 'New Group') => {
   return Ok(true);
 };
 
-// Delete a group and unassign any clients currently in it
+// Delete a group and move all assigned entities to the default no-group bucket.
 Manager.Delete = async (GroupID) => {
   if (!GroupID) return Fail('GroupID is required to delete a group');
+
+  if (typeof ClientManager.MoveGroupToNoGroup === 'function') {
+    const [ClientErr] = await ClientManager.MoveGroupToNoGroup(GroupID);
+    if (ClientErr) {
+      Logger.error('Failed to move clients to no group while deleting group:', ClientErr);
+      return Fail('Failed to move clients to no group');
+    }
+  } else {
+    // Backward-compatible fallback for older manager implementations.
+    let ClientsWithGroup = await ClientManager.GetClientsInGroup(GroupID);
+    for (const Client of ClientsWithGroup) {
+      await Client.SetGroupID(null);
+    }
+  }
+
+  if (typeof MonitoringTargetManager.MoveGroupToNoGroup === 'function') {
+    const [TargetErr] = await MonitoringTargetManager.MoveGroupToNoGroup(GroupID);
+    if (TargetErr) {
+      Logger.error(
+        'Failed to move monitoring targets to no group while deleting group:',
+        TargetErr
+      );
+      return Fail('Failed to move monitoring targets to no group');
+    }
+  }
+
   let [Err, _Res] = await DB.Run('DELETE FROM Groups WHERE GroupID = ?', [GroupID]);
   if (Err) {
     Logger.error('Failed to delete group:', Err);
     return Fail('Failed to delete group');
   }
-  let ClientsWithGroup = await ClientManager.GetClientsInGroup(GroupID);
-  for (const Client of ClientsWithGroup) {
-    await Client.SetGroupID(null);
-  }
   Logger.debug(`Deleted group with ID ${GroupID}`);
   BroadcastManager.emit('GroupListChanged');
   return Ok('Group Deleted Successfully');
+};
+
+// Reassign entities whose GroupID points to a non-existent group.
+Manager.ReconcileOrphanedGroups = async () => {
+  const [GroupsErr, Groups] = await Manager.GetAll();
+  if (GroupsErr) return Fail('Failed to load groups for orphan reconciliation');
+
+  const GroupIDs = (Groups || []).map((G) => G.GroupID);
+
+  if (typeof ClientManager.ReconcileOrphanedGroups === 'function') {
+    const [ClientErr] = await ClientManager.ReconcileOrphanedGroups(GroupIDs);
+    if (ClientErr) {
+      Logger.error('Failed to reconcile orphaned clients:', ClientErr);
+      return Fail('Failed to reconcile orphaned clients');
+    }
+  }
+
+  if (typeof MonitoringTargetManager.ReconcileOrphanedGroups === 'function') {
+    const [TargetErr] = await MonitoringTargetManager.ReconcileOrphanedGroups(GroupIDs);
+    if (TargetErr) {
+      Logger.error('Failed to reconcile orphaned monitoring targets:', TargetErr);
+      return Fail('Failed to reconcile orphaned monitoring targets');
+    }
+  }
+
+  return Ok(true);
 };
 
 Manager.Get = async (GroupID) => {
