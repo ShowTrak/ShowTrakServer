@@ -84,7 +84,10 @@ jobs:
           const crypto = require('node:crypto');
 
           const releaseRoot = path.resolve('release-artifacts');
-          const version = require('./package.json').version;
+          const version = process.env.RELEASE_VERSION;
+          if (!version) {
+            throw new Error('RELEASE_VERSION env var is required to generate latest-mac.yml');
+          }
 
           function walkFiles(dir) {
             const entries = fs.readdirSync(dir, { withFileTypes: true });
