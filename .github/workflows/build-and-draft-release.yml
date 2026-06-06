@@ -150,7 +150,7 @@ jobs:
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release edit "$RELEASE_TAG" --draft --title "$TITLE" --notes "$NOTES"
           else
-            gh release create "$RELEASE_TAG" --draft --title "$TITLE" --notes "$NOTES" --target "$GITHUB_SHA"
+            gh release create "$RELEASE_TAG" --draft --title "$TITLE" --notes "$NOTES"
           fi
 
       - name: Upload release assets
