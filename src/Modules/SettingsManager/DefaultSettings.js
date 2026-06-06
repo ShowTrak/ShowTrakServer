@@ -70,7 +70,7 @@ const DefaultSettings = [
     Group: 'System',
     Key: 'SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4',
     Title: 'Stop Accidental Shutdowns (Reboot Required)',
-    Description: 'Requires confirmation before shutting down ShowTrak when pressing Alt+F4.',
+    Description: 'Requires confirmation before quitting ShowTrak from system or app quit actions.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },

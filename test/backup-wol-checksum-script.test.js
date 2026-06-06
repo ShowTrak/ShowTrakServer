@@ -22,6 +22,7 @@ test('BackupManager saves, opens, and creates new ShowTrak files', async () => {
   const snapshotCalls = [];
   const replaceCalls = [];
   let resetCalls = 0;
+  let hasUnsavedChanges = true;
   const dbMock = {
     Manager: {
       // Emulate VACUUM INTO by writing a placeholder snapshot file.
@@ -40,6 +41,10 @@ test('BackupManager saves, opens, and creates new ShowTrak files', async () => {
         return [null, 'db'];
       },
       HasData: async () => true,
+      HasUnsavedChanges: async () => hasUnsavedChanges,
+      MarkClean: () => {
+        hasUnsavedChanges = false;
+      },
     },
   };
 
@@ -63,6 +68,7 @@ test('BackupManager saves, opens, and creates new ShowTrak files', async () => {
   assert.equal(JSON.parse(fs.readFileSync(statePath, 'utf8')).CurrentFilePath, savePath);
   // With a file associated, working data is considered saved (not legacy).
   assert.equal(await Manager.HasUnsavedWorkingData(), false);
+  assert.equal(await Manager.HasUnsavedChanges(), false);
 
   // The saved file exists on disk, so the boot-time integrity check is a no-op.
   const [, presentResult] = await Manager.EnsureCurrentFileExists();
@@ -91,6 +97,7 @@ test('BackupManager saves, opens, and creates new ShowTrak files', async () => {
   assert.equal(JSON.parse(fs.readFileSync(statePath, 'utf8')).CurrentFilePath, null);
   // With no file associated but data present, it reports unsaved legacy data.
   assert.equal(await Manager.HasUnsavedWorkingData(), true);
+  assert.equal(await Manager.HasUnsavedChanges(), false);
 
   // Boot-time integrity check: re-associate a file then delete it from disk;
   // the next check wipes the working data and clears the pointer.

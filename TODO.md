@@ -1,11 +1,3 @@
-Alerts
- - Discord Webhook
- - OSC Trigger
-
- - Workspace Level
- - Group Level
- - Client Level
-
 Maintenance Mode (Suppress alerts)
 
 Monitoring

@@ -54,6 +54,8 @@ const INVOKE_CHANNELS = new Set([
   'UpdateAlertRule',
   'DeleteAlertRule',
   'SetAlertRuleEnabled',
+  'AlertActionsEnabled:Get',
+  'AlertActionsEnabled:Set',
 ]);
 
 const SUBSCRIBE_CHANNELS = new Set([
@@ -115,7 +117,7 @@ contextBridge.exposeInMainWorld('API', {
   AdoptDevice: async (UUID) => invoke('AdoptDevice', UUID),
   CheckForUpdatesOnClient: async (UUID) => invoke('CheckForUpdatesOnClient', UUID),
   Loaded: () => invoke('Loaded'),
-  Shutdown: () => invoke('Shutdown'),
+  Shutdown: async (Confirmed = false) => invoke('Shutdown', Confirmed),
   GetClient: async (UUID) => invoke('GetClient', UUID),
   GetAllGroups: async () => invoke('GetAllGroups'),
   CreateGroup: async (Title) => invoke('CreateGroup', Title),
@@ -196,6 +198,8 @@ contextBridge.exposeInMainWorld('API', {
   UpdateAlertRule: async (RuleID, Payload) => invoke('UpdateAlertRule', RuleID, Payload),
   DeleteAlertRule: async (RuleID) => invoke('DeleteAlertRule', RuleID),
   SetAlertRuleEnabled: async (RuleID, Enabled) => invoke('SetAlertRuleEnabled', RuleID, Enabled),
+  GetAlertActionsEnabled: async () => invoke('AlertActionsEnabled:Get'),
+  SetAlertActionsEnabled: async (Enabled) => invoke('AlertActionsEnabled:Set', Enabled),
   SetFullAlertRuleList: (Callback) => subscribe('SetFullAlertRuleList', Callback),
   AlertTriggered: (Callback) => subscribe('AlertTriggered', Callback),
 });

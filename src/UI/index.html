@@ -39,6 +39,16 @@
           </div>
           <button
             type="button"
+            id="ALERT_ACTIONS_TOGGLE_BTN"
+            class="btn btn-sm alert-actions-toggle-btn"
+            title="Disable Alert Actions"
+            aria-label="Toggle Alert Actions"
+            aria-pressed="true"
+          >
+            ALERTS
+          </button>
+          <button
+            type="button"
             id="COMPACT_MODE_BTN"
             class="btn btn-outline-light btn-sm compact-mode-btn"
             title="Toggle Compact Mode"
@@ -75,7 +85,7 @@
               data-bs-auto-close="true"
               aria-expanded="false"
             >
-              <i class="bi bi-plus-lg"></i>
+              <i class="bi bi-plus-circle-fill"></i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end" id="ADD_MONITORING_TARGET_MENU">
               <li>
@@ -296,7 +306,7 @@
 
             <strong class="mb-0"> Save Your Existing Data </strong>
             <p class="text-muted text-sm mb-2">
-              This version stores your configuration in a ShowTrak file. We found data from
+              ShowTrak now stores configuration and show data in a .showtrak file. We found data from
               a previous version that is not yet saved to a file. Choose a location to save it
               now to avoid losing your data.
             </p>

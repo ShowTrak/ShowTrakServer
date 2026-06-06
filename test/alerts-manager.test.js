@@ -96,6 +96,7 @@ test('AlertsManager supports CRUD and action type metadata', async () => {
 test('AlertsManager evaluates client, monitor, and script contexts against matching rules', async () => {
   const executeCalls = [];
   const runCalls = [];
+  const untrackedRunCalls = [];
   const events = [];
 
   const rules = [
@@ -139,6 +140,10 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
       All: async () => [null, rules],
       Run: async (sql, params) => {
         runCalls.push([sql, params]);
+        return [null, { changes: 1 }];
+      },
+      RunWithoutDirtyTracking: async (sql, params) => {
+        untrackedRunCalls.push([sql, params]);
         return [null, { changes: 1 }];
       },
     },
@@ -204,7 +209,7 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
   assert.ok(executeCalls.some((c) => c.action.Type === 'discord-webhook'));
   assert.ok(executeCalls.some((c) => c.action.Type === 'osc-trigger'));
 
-  const historyWrites = runCalls.filter(([sql]) => sql.includes('INSERT INTO AlertHistory'));
+  const historyWrites = untrackedRunCalls.filter(([sql]) => sql.includes('INSERT INTO AlertHistory'));
   assert.equal(historyWrites.length, 3);
 
   const triggeredEvents = events.filter(([event]) => event === 'AlertTriggered');

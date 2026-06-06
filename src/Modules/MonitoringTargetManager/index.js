@@ -144,7 +144,11 @@ class MonitoringTarget {
 
   async SetLastSuccessAt(Ts) {
     this.LastSuccessAt = Ts;
-    const [Err] = await DB.Run('UPDATE MonitoringTargets SET LastSuccessAt = ? WHERE TargetID = ?', [
+    const Run =
+      typeof DB.RunWithoutDirtyTracking === 'function'
+        ? DB.RunWithoutDirtyTracking.bind(DB)
+        : DB.Run.bind(DB);
+    const [Err] = await Run('UPDATE MonitoringTargets SET LastSuccessAt = ? WHERE TargetID = ?', [
       Ts,
       this.TargetID,
     ]);

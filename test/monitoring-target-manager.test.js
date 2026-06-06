@@ -27,8 +27,9 @@ function withFakeTimers(fn) {
 }
 
 test('MonitoringTargetManager initializes rows and handles create/update/delete lifecycle', async () => {
-  await withFakeTimers(async () => {
+  await withFakeTimers(async (timers) => {
     const runCalls = [];
+    const untrackedRunCalls = [];
     const events = [];
     const normalizeCalls = [];
 
@@ -56,6 +57,10 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
         Run: async (sql, params) => {
           runCalls.push([sql, params]);
           if (sql.includes('INSERT INTO MonitoringTargets')) return [null, { lastID: 12 }];
+          return [null, { changes: 1 }];
+        },
+        RunWithoutDirtyTracking: async (sql, params) => {
+          untrackedRunCalls.push([sql, params]);
           return [null, { changes: 1 }];
         },
       },
@@ -128,6 +133,16 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
     assert.ok(insertCall);
     assert.equal(insertCall[1][3], Manager.MIN_INTERVAL_MS);
     assert.equal(insertCall[1][4], 1);
+
+    const firstScheduledTick = timers.find((handle) => handle && !handle.cleared && typeof handle.cb === 'function');
+    assert.ok(firstScheduledTick);
+    await firstScheduledTick.cb();
+
+    assert.ok(
+      untrackedRunCalls.some(([sql]) =>
+        sql.includes('UPDATE MonitoringTargets SET LastSuccessAt = ? WHERE TargetID = ?')
+      )
+    );
 
     const [updateErr, updated] = await Manager.Update(12, {
       Method: 'http',
@@ -215,6 +230,7 @@ test('MonitoringTargetManager reload replaces runtime list from latest DB rows',
           ];
         },
         Run: async () => [null, { changes: 1 }],
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
       },
     };
 
@@ -297,6 +313,7 @@ test('MonitoringTargetManager moves group members and orphaned targets to no gro
           runCalls.push([sql, params]);
           return [null, { changes: 1 }];
         },
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
       },
     };
 

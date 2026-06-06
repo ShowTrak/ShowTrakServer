@@ -15,6 +15,13 @@ const { Ok, Fail } = require('../Utils');
 
 const Manager = {};
 
+function getDBRunner(markUnsaved = true) {
+  if (markUnsaved === false && typeof DB.RunWithoutDirtyTracking === 'function') {
+    return DB.RunWithoutDirtyTracking.bind(DB);
+  }
+  return DB.Run.bind(DB);
+}
+
 // Hot cache of Client instances reflecting current state
 var ClientList = [];
 
@@ -137,10 +144,11 @@ class Client {
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} GroupID updated to ${GroupID}`);
   }
-  async SetHostname(Hostname) {
+  async SetHostname(Hostname, Options = {}) {
     if (this.Hostname === Hostname) return;
     this.Hostname = Hostname;
-    let [Err, _Res] = await DB.Run('UPDATE Clients SET Hostname = ? WHERE UUID = ?', [
+    const Run = getDBRunner(Options.markUnsaved);
+    let [Err, _Res] = await Run('UPDATE Clients SET Hostname = ? WHERE UUID = ?', [
       Hostname,
       this.UUID,
     ]);
@@ -148,10 +156,11 @@ class Client {
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} hostname updated to ${Hostname}`);
   }
-  async SetMacAddress(MacAddress) {
+  async SetMacAddress(MacAddress, Options = {}) {
     if (this.MacAddress === MacAddress) return;
     this.MacAddress = MacAddress;
-    let [Err, _Res] = await DB.Run('UPDATE Clients SET MacAddress = ? WHERE UUID = ?', [
+    const Run = getDBRunner(Options.markUnsaved);
+    let [Err, _Res] = await Run('UPDATE Clients SET MacAddress = ? WHERE UUID = ?', [
       MacAddress,
       this.UUID,
     ]);
@@ -159,10 +168,11 @@ class Client {
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} mac address updated to ${MacAddress}`);
   }
-  async SetVersion(Version) {
+  async SetVersion(Version, Options = {}) {
     if (this.Version === Version) return;
     this.Version = Version;
-    let [Err, _Res] = await DB.Run('UPDATE Clients SET Version = ? WHERE UUID = ?', [
+    const Run = getDBRunner(Options.markUnsaved);
+    let [Err, _Res] = await Run('UPDATE Clients SET Version = ? WHERE UUID = ?', [
       Version,
       this.UUID,
     ]);
@@ -181,10 +191,11 @@ class Client {
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} weight updated to ${Weight}`);
   }
-  async SetIP(IP) {
+  async SetIP(IP, Options = {}) {
     if (this.IP === IP) return;
     this.IP = IP;
-    let [Err, _Res] = await DB.Run('UPDATE Clients SET IP = ? WHERE UUID = ?', [IP, this.UUID]);
+    const Run = getDBRunner(Options.markUnsaved);
+    let [Err, _Res] = await Run('UPDATE Clients SET IP = ? WHERE UUID = ?', [IP, this.UUID]);
     if (Err) return Logger.error('Failed to update client IP');
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} IP updated to ${IP}`);
@@ -220,8 +231,8 @@ Manager.Heartbeat = async (UUID, Data, IP) => {
     }
   }
 
-  await CachedClient.SetVersion(Data.Version || null);
-  await CachedClient.SetIP(IP || null);
+  await CachedClient.SetVersion(Data.Version || null, { markUnsaved: false });
+  await CachedClient.SetIP(IP || null, { markUnsaved: false });
   CachedClient.SetOnline(true);
   CachedClient.SetLastSeen(Date.now());
   CachedClient.SetVitals(Data.Vitals);
@@ -267,10 +278,10 @@ Manager.SystemInfo = async (UUID, Data, IP) => {
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
 
-  await Target.SetHostname(Data.Hostname || null);
+  await Target.SetHostname(Data.Hostname || null, { markUnsaved: false });
   let Macs = Object.values(Data.MacAddresses || {});
   for (let Interface of Macs) {
-    if (Interface.ipv4 == IP) await Target.SetMacAddress(Interface.mac);
+    if (Interface.ipv4 == IP) await Target.SetMacAddress(Interface.mac, { markUnsaved: false });
   }
 
   return [null, 'Heartbeat processed successfully'];

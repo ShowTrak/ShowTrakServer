@@ -92,10 +92,16 @@
 }
 
 /* Compact mode button group */
+:root {
+  --bottom-bar-toggle-height: 26px;
+  --client-online-bg: rgba(18, 255, 0, 0.32);
+}
+
 .mode-group.btn-group {
   gap: 0;
 }
 .mode-group .btn {
+  height: var(--bottom-bar-toggle-height);
   padding: 4px 10px; /* slightly taller */
   line-height: 1.2;
   font-size: 12px;
@@ -135,7 +141,7 @@
 
 #COMPACT_MODE_BTN.compact-mode-btn {
   width: 30px;
-  height: 26px;
+  height: var(--bottom-bar-toggle-height);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -148,8 +154,48 @@
     transform 140ms ease;
 }
 
+#ALERT_ACTIONS_TOGGLE_BTN.alert-actions-toggle-btn {
+  height: var(--bottom-bar-toggle-height);
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-width: 1px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+#ALERT_ACTIONS_TOGGLE_BTN.alert-actions-toggle-btn:hover {
+  transform: none;
+}
+
+#ALERT_ACTIONS_TOGGLE_BTN.alert-actions-toggle-btn.alerts-enabled {
+  background-color: var(--client-online-bg) !important;
+  color: #fff !important;
+  border-color: var(--client-online-bg) !important;
+}
+
+#ALERT_ACTIONS_TOGGLE_BTN.alert-actions-toggle-btn.alerts-disabled {
+  background-color: #dc3545 !important;
+  color: #fff !important;
+  border-color: #dc3545 !important;
+}
+
 #COMPACT_MODE_BTN.compact-mode-btn:hover {
-  transform: translateY(-1px);
+  transform: none;
+}
+
+#COMPACT_MODE_BTN.compact-mode-btn.btn-outline-light:hover,
+#COMPACT_MODE_BTN.compact-mode-btn.btn-outline-light:focus {
+  background-color: rgba(255, 255, 255, 0.028) !important;
+  border-color: rgba(255, 255, 255, 0.32) !important;
+  color: rgba(255, 255, 255, 0.88) !important;
 }
 
 #COMPACT_MODE_BTN.compact-mode-btn .bi {
@@ -258,7 +304,7 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  margin-right: 8px; /* space from settings cog */
+  margin-right: 0;
   border: 0;
   background: transparent;
   color: rgba(255, 255, 255, 0.7); /* grey by default */
@@ -525,6 +571,10 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   color: rgba(255, 255, 255, 0.5);
 }
 
+#APPLICATION_NAVBAR_STATUS:empty {
+  display: none;
+}
+
 #APPLICATION_NAVBAR_FILE {
   color: rgba(255, 255, 255, 0.85);
   font-weight: 600;
@@ -535,7 +585,6 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   display: none;
 }
 
-/* Subtle separator between the version and the open file name. */
 #APPLICATION_NAVBAR_FILE:not(:empty)::before {
   content: '•';
   margin-right: 0.75rem;
@@ -1310,7 +1359,7 @@ button.btn:focus {
 }
 
 .SHOWTRAK_PC.ONLINE {
-  background-color: rgba(18, 255, 0, 0.32) !important;
+  background-color: var(--client-online-bg) !important;
 }
 
 /* Monitoring target above its DegradedThresholdMs setting. Listed after ONLINE

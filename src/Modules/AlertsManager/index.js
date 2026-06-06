@@ -18,6 +18,7 @@ const TRIGGERS = {
 let Initialized = false;
 let RuleList = [];
 const EntityOnlineState = new Map();
+let AlertActionsEnabled = true;
 
 function parseJson(Value, Fallback) {
   if (Value == null) return Fallback;
@@ -170,7 +171,11 @@ async function writeHistory(Rule, Context, Results) {
   const ResultPayload = {
     Actions: Results,
   };
-  const [Err] = await DB.Run(
+  const Run =
+    typeof DB.RunWithoutDirtyTracking === 'function'
+      ? DB.RunWithoutDirtyTracking.bind(DB)
+      : DB.Run.bind(DB);
+  const [Err] = await Run(
     'INSERT INTO AlertHistory (RuleID, TriggerType, TriggerSource, Context, Result, Timestamp) VALUES (?, ?, ?, ?, ?, ?)',
     [
       Rule.RuleID,
@@ -185,6 +190,8 @@ async function writeHistory(Rule, Context, Results) {
 }
 
 async function executeRule(Rule, Context) {
+  if (!AlertActionsEnabled) return;
+
   const Actions = Array.isArray(Rule.Actions) ? Rule.Actions : [];
   if (!Actions.length) return;
 
@@ -377,6 +384,15 @@ Manager.Delete = async (RuleID) => {
 
 Manager.SetEnabled = async (RuleID, Enabled) => {
   return Manager.Update(RuleID, { Enabled: !!Enabled });
+};
+
+Manager.GetActionsEnabled = () => {
+  return AlertActionsEnabled;
+};
+
+Manager.SetActionsEnabled = (Enabled) => {
+  AlertActionsEnabled = !!Enabled;
+  return AlertActionsEnabled;
 };
 
 Manager.HandleClientUpdated = async (Client) => {

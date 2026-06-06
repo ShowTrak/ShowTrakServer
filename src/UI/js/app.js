@@ -44,6 +44,7 @@ let __clientInfoRefreshInFlight = false;
 let AppMode = 'SHOW'; // default visual state until backend confirms
 const COMPACT_MODE_STORAGE_KEY = 'showtrak.ui.compactMode';
 let CompactMode = false;
+let AlertActionsEnabled = true;
 
 function RenderCompactMode(isCompact) {
   CompactMode = !!isCompact;
@@ -79,6 +80,26 @@ function LoadCompactModePreference() {
   } catch {
     return false;
   }
+}
+
+function RenderAlertActionsToggle(isEnabled) {
+  AlertActionsEnabled = !!isEnabled;
+  const btn = document.getElementById('ALERT_ACTIONS_TOGGLE_BTN');
+  if (btn) {
+    btn.classList.toggle('alerts-enabled', AlertActionsEnabled);
+    btn.classList.toggle('alerts-disabled', !AlertActionsEnabled);
+    btn.setAttribute('aria-pressed', AlertActionsEnabled ? 'true' : 'false');
+    btn.title = AlertActionsEnabled ? 'Disable Alert Actions' : 'Enable Alert Actions';
+  }
+  UpdateSelectionCount();
+}
+
+async function SetAlertActionsEnabled(isEnabled) {
+  RenderAlertActionsToggle(isEnabled);
+  try {
+    const NextEnabled = await window.API.SetAlertActionsEnabled(!!isEnabled);
+    RenderAlertActionsToggle(NextEnabled);
+  } catch {}
 }
 
 function RenderMode(mode) {
@@ -131,6 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Wire new button group
   const btnShow = document.getElementById('MODE_BTN_SHOW');
   const btnEdit = document.getElementById('MODE_BTN_EDIT');
+  const btnAlertActions = document.getElementById('ALERT_ACTIONS_TOGGLE_BTN');
   const btnCompact = document.getElementById('COMPACT_MODE_BTN');
 
   SetCompactMode(LoadCompactModePreference(), { persist: false });
@@ -147,6 +169,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     btnEdit.dataset.bound = '1';
   }
+  if (btnAlertActions && !btnAlertActions.dataset.bound) {
+    btnAlertActions.addEventListener('click', async () => {
+      await SetAlertActionsEnabled(!AlertActionsEnabled);
+    });
+    btnAlertActions.dataset.bound = '1';
+  }
   if (btnCompact && !btnCompact.dataset.bound) {
     btnCompact.addEventListener('click', () => {
       SetCompactMode(!CompactMode);
@@ -158,6 +186,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const mode = await window.API.GetMode();
     RenderMode(mode);
   } catch {}
+  try {
+    const isEnabled = await window.API.GetAlertActionsEnabled();
+    RenderAlertActionsToggle(isEnabled);
+  } catch {
+    RenderAlertActionsToggle(true);
+  }
 });
 
 async function GetSettingValue(Key) {
@@ -553,7 +587,7 @@ window.API.ShutdownRequested(async () => {
   await CloseAllModals();
   let Confirmation = await ConfirmationDialog('Are you sure you want to shutdown ShowTrak?');
   if (!Confirmation) return;
-  await window.API.Shutdown();
+  await window.API.Shutdown(true);
 });
 
 window.API.USBDeviceAdded(async (Client, Device) => {
@@ -3388,9 +3422,19 @@ async function ConfirmationDialog(Message) {
 }
 
 function UpdateSelectionCount() {
-  $('#SELECTION_STATUS').text(
-    `${Selected.length} ${Selected.length == 1 ? 'Client' : 'Clients'} Selected`
-  );
+  const $status = $('#SELECTION_STATUS');
+  if (!$status || !$status.length) return;
+
+  if (!AlertActionsEnabled) {
+    $status
+      .text('Alert actions are currently disabled')
+      .addClass('text-danger');
+    return;
+  }
+
+  $status
+    .text(`${Selected.length} ${Selected.length == 1 ? 'Client' : 'Clients'} Selected`)
+    .removeClass('text-danger');
   return;
 }
 
@@ -4117,7 +4161,7 @@ function enableExecToastOutsideClose() {
 async function Init() {
   Config = await window.API.GetConfig();
   $('#APPLICATION_NAVBAR_TITLE').text(`${Config.Application.Name}`);
-  $('#APPLICATION_NAVBAR_STATUS').text(`v${Config.Application.Version}`);
+  $('#APPLICATION_NAVBAR_STATUS').text('');
 
   // Show the currently open .ShowTrak file name in the navbar and keep it in
   // sync as files are opened/saved/created.
@@ -4310,7 +4354,7 @@ async function Init() {
   });
 
   $('#SHOWTRAK_MODEL_CORE_SHUTDOWN_BUTTON').on('click', async () => {
-    window.API.Shutdown();
+    await window.API.Shutdown();
   });
 
   // Initialize application mode from backend and wire toggle

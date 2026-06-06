@@ -35,6 +35,7 @@ Manager.EnsureCurrentFileExists = async () => {
     Logger.error('Failed to wipe working data after missing show file:', Err);
     return [String(Err && Err.message ? Err.message : Err), null];
   }
+  if (typeof DB.MarkClean === 'function') DB.MarkClean();
   PersistFilePath(null);
   Broadcast.emit('ReinitializeSystem');
   return [null, { Missing: true }];
@@ -46,6 +47,11 @@ Manager.EnsureCurrentFileExists = async () => {
 Manager.HasUnsavedWorkingData = async () => {
   if (CurrentFilePath) return false;
   return await DB.HasData();
+};
+
+Manager.HasUnsavedChanges = async () => {
+  if (typeof DB.HasUnsavedChanges !== 'function') return false;
+  return await DB.HasUnsavedChanges();
 };
 
 function LoadPersistedFilePath() {
@@ -83,6 +89,7 @@ Manager.Save = async (Path) => {
     Logger.error('Failed to save ShowTrak file:', Err);
     return [String(Err && Err.message ? Err.message : Err), null];
   }
+  if (typeof DB.MarkClean === 'function') DB.MarkClean();
   PersistFilePath(Path);
   return [null, 'Saved successfully'];
 };
@@ -101,6 +108,7 @@ Manager.Open = async (Path) => {
     Logger.error('Failed to open ShowTrak file:', Err);
     return [String(Err && Err.message ? Err.message : Err), null];
   }
+  if (typeof DB.MarkClean === 'function') DB.MarkClean();
   PersistFilePath(Path);
   Broadcast.emit('ReinitializeSystem');
   return [null, 'Opened successfully'];
@@ -115,6 +123,7 @@ Manager.New = async () => {
     Logger.error('Failed to create new show:', Err);
     return [String(Err && Err.message ? Err.message : Err), null];
   }
+  if (typeof DB.MarkClean === 'function') DB.MarkClean();
   PersistFilePath(null);
   Broadcast.emit('ReinitializeSystem');
   return [null, 'New show created'];

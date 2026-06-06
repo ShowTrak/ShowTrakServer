@@ -25,8 +25,14 @@ let DB = null;
 let schemaInitialized = false;
 let schemaInitializationPromise = null;
 let readyPromise = null;
+let hasUnsavedChanges = false;
+let suppressDirtyTracking = false;
 
 const Manager = {};
+
+function ShouldMarkAsUnsaved(Query) {
+  return /^(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(String(Query || '').trim());
+}
 
 // Create tables idempotently using schema.js definitions
 Manager.InitializeSchema = async () => {
@@ -77,6 +83,7 @@ Manager.InitializeSchema = async () => {
 function OpenConnection() {
   schemaInitialized = false;
   schemaInitializationPromise = null;
+  hasUnsavedChanges = false;
   readyPromise = new Promise((resolve, reject) => {
     DB = new sqlite3.Database(dbPath, async (err) => {
       if (err) {
@@ -134,9 +141,28 @@ Manager.Run = async (Query, Params) => {
         Logger.databaseError('Error running query:', err);
         return resolve([err, null]);
       }
+      if (!suppressDirtyTracking && ShouldMarkAsUnsaved(Query)) {
+        hasUnsavedChanges = true;
+      }
       resolve([null, this]);
     });
   });
+};
+
+Manager.RunWithoutDirtyTracking = async (Query, Params) => {
+  const previousSuppressDirtyTracking = suppressDirtyTracking;
+  suppressDirtyTracking = true;
+  try {
+    return await Manager.Run(Query, Params);
+  } finally {
+    suppressDirtyTracking = previousSuppressDirtyTracking;
+  }
+};
+
+Manager.HasUnsavedChanges = async () => hasUnsavedChanges;
+
+Manager.MarkClean = () => {
+  hasUnsavedChanges = false;
 };
 
 // Write a consistent, compacted snapshot of the entire database to TargetPath.
@@ -144,6 +170,7 @@ Manager.Run = async (Query, Params) => {
 // the destination to not already exist.
 Manager.SnapshotTo = async (TargetPath) => {
   try {
+    suppressDirtyTracking = true;
     const Dir = path.dirname(TargetPath);
     if (!fs.existsSync(Dir)) fs.mkdirSync(Dir, { recursive: true });
     if (fs.existsSync(TargetPath)) fs.unlinkSync(TargetPath);
@@ -156,6 +183,8 @@ Manager.SnapshotTo = async (TargetPath) => {
   } catch (err) {
     Logger.databaseError('Failed to snapshot database:', err);
     return [err, null];
+  } finally {
+    suppressDirtyTracking = false;
   }
 };
 

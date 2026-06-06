@@ -5,7 +5,13 @@
 // - Fan-out broadcast events to the UI (webContents.send guards everywhere)
 const { app, BrowserWindow, ipcMain: RPC, Menu } = require('electron/main');
 // Use Electron's shell for opening folders/URLs instead of spawning platform-specific commands
-const { shell, autoUpdater: SquirrelUpdater } = require('electron');
+const {
+  shell,
+  autoUpdater: SquirrelUpdater,
+  dialog,
+  powerMonitor,
+  powerSaveBlocker,
+} = require('electron');
 if (require('electron-squirrel-startup')) app.quit();
 
 const { Manager: AppDataManager } = require('./Modules/AppData');
@@ -135,6 +141,82 @@ function applyWindowSecurityGuards(windowInstance) {
 
 // Main UI window. Always check isDestroyed() before using.
 var MainWindow = null;
+let mainWindowCloseApproved = false;
+let closePromptInFlight = false;
+let quitRequested = false;
+let accidentalShutdownProtectionEnabled = false;
+let bypassShutdownConfirmation = false;
+
+function hasMainWindow() {
+  return MainWindow && !MainWindow.isDestroyed();
+}
+
+async function PromptConfirmBeforeShutdown() {
+  const shouldConfirmShutdown =
+    accidentalShutdownProtectionEnabled &&
+    ModeManager.Get() === 'SHOW' &&
+    !bypassShutdownConfirmation;
+
+  if (!shouldConfirmShutdown) {
+    return true;
+  }
+
+  const parentWindow = hasMainWindow() ? MainWindow : null;
+  const { response } = await dialog.showMessageBox(parentWindow, {
+    type: 'question',
+    buttons: ['Quit', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+    message: 'Close ShowTrak Server?',
+    detail: 'You are currently in show mode, are you sure you want to close?',
+  });
+
+  return response === 0;
+}
+
+async function PromptSaveBeforeClose() {
+  const currentFilePath = BackupManager.GetCurrentFilePath();
+  const hasNeverBeenSaved = !currentFilePath;
+  const hasUnsavedChanges =
+    typeof BackupManager.HasUnsavedChanges === 'function'
+      ? await BackupManager.HasUnsavedChanges()
+      : false;
+
+  if (!hasNeverBeenSaved && !hasUnsavedChanges) {
+    return true;
+  }
+
+  const { response } = await dialog.showMessageBox(MainWindow, {
+    type: 'question',
+    buttons: ['Save', "Don't Save", 'Cancel'],
+    defaultId: 0,
+    cancelId: 2,
+    noLink: true,
+    message: 'You have unsaved show changes.',
+    detail: 'Save changes before closing ShowTrak?',
+  });
+
+  if (response === 2) return false;
+  if (response === 1) return true;
+
+  let SavePath = currentFilePath;
+  if (!SavePath) {
+    const { canceled, filePath } = await FileSelectorManager.SaveDialog('Save ShowTrak File As');
+    if (canceled || !filePath) return false;
+    SavePath = filePath;
+  }
+
+  const [Err] = await BackupManager.Save(SavePath);
+  if (Err) {
+    Logger.error('Failed to save show during shutdown:', Err);
+    dialog.showErrorBox('Unable to Save Show', String(Err));
+    return false;
+  }
+
+  sendShowFileUpdated(BackupManager.GetCurrentFilePath());
+  return true;
+}
 
 // Note: Hiding the app menu disables common shortcuts on macOS. If you ship on macOS,
 // prefer to keep a minimal menu there and only remove on Windows/Linux.
@@ -149,22 +231,9 @@ app.whenReady().then(async () => {
     MainWindow = null;
   }
 
-  // Optional safety: intercept Alt+F4 and request a graceful shutdown via the UI
-  let SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4 = await SettingsManager.GetValue(
+  accidentalShutdownProtectionEnabled = await SettingsManager.GetValue(
     'SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4'
   );
-  if (SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4) {
-    app.on('web-contents-created', (_, contents) => {
-      contents.on('before-input-event', (event, input) => {
-        if (input.code == 'F4' && input.alt) {
-          event.preventDefault();
-          if (!MainWindow || !MainWindow.isVisible()) return Shutdown();
-          Logger.warn('Prevented alt+f4 shutdown, passing request to agent');
-          MainWindow.webContents.send('ShutdownRequested');
-        }
-      });
-    });
-  }
 
   // Lightweight splash that keeps the app responsive while heavy init finishes
   PreloaderWindow = new BrowserWindow({
@@ -222,6 +291,42 @@ app.whenReady().then(async () => {
     MainWindow.show();
   });
   applyWindowSecurityGuards(MainWindow);
+  MainWindow.on('close', async (event) => {
+    if (mainWindowCloseApproved) return;
+    event.preventDefault();
+    if (closePromptInFlight) return;
+
+    closePromptInFlight = true;
+    try {
+      const shouldProceedWithShutdown = await PromptConfirmBeforeShutdown();
+      if (!shouldProceedWithShutdown) {
+        quitRequested = false;
+        return;
+      }
+
+      const shouldClose = await PromptSaveBeforeClose();
+      if (!shouldClose) {
+        quitRequested = false;
+        return;
+      }
+
+      mainWindowCloseApproved = true;
+      if (quitRequested) {
+        app.quit();
+        return;
+      }
+      MainWindow.close();
+    } catch (Err) {
+      Logger.error('Unexpected error while prompting to save before close:', Err);
+    } finally {
+      closePromptInFlight = false;
+    }
+  });
+  MainWindow.on('closed', () => {
+    mainWindowCloseApproved = false;
+    bypassShutdownConfirmation = false;
+    MainWindow = null;
+  });
 
   // ShowTrak file save/open IPC. Returns [err, result] tuples consistently.
   RPC.handle('Show:Save', async () => {
@@ -716,6 +821,14 @@ app.whenReady().then(async () => {
     return [null, Rule];
   });
 
+  RPC.handle('AlertActionsEnabled:Get', async () => {
+    return AlertsManager.GetActionsEnabled();
+  });
+
+  RPC.handle('AlertActionsEnabled:Set', async (_Event, Enabled) => {
+    return AlertsManager.SetActionsEnabled(!!Enabled);
+  });
+
   RPC.handle('NetworkDiscovery:Start', async (_Event, Options) => {
     try {
       Options = IPCValidation.NetworkDiscoveryScanOptions(Options);
@@ -861,15 +974,27 @@ app.whenReady().then(async () => {
     return;
   });
 
-  async function Shutdown() {
+  async function Shutdown({ bypassAccidentalConfirmation = true } = {}) {
     Logger.log('Application shutdown requested');
+    bypassShutdownConfirmation = bypassAccidentalConfirmation;
+    quitRequested = true;
     app.quit();
-    process.exit(0);
     return;
   }
 
-  RPC.handle('Shutdown', async () => {
-    Shutdown();
+  RPC.handle('Shutdown', async (_event, Confirmed = false) => {
+    const shouldRequestRendererConfirmation =
+      !Confirmed &&
+      accidentalShutdownProtectionEnabled &&
+      ModeManager.Get() === 'SHOW' &&
+      hasMainWindow();
+
+    if (shouldRequestRendererConfirmation) {
+      MainWindow.webContents.send('ShutdownRequested');
+      return;
+    }
+
+    Shutdown({ bypassAccidentalConfirmation: true });
   });
 
   RPC.handle('AdoptDevice', async (_event, UUID) => {
@@ -1228,7 +1353,7 @@ async function HandleOSCBulkAction(Type, Targets, Args = null) {
 BroadcastManager.on('OSCBulkAction', HandleOSCBulkAction);
 
 BroadcastManager.on('Shutdown', async () => {
-  app.quit();
+  Shutdown();
 });
 
 // Relay application mode changes to renderer windows
@@ -1238,12 +1363,17 @@ ModeManager.on('ModeUpdated', (Mode) => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  app.quit();
 });
 
-const { powerSaveBlocker } = require('electron');
+app.on('before-quit', (event) => {
+  quitRequested = true;
+  if (mainWindowCloseApproved) return;
+  if (!hasMainWindow()) return;
+  event.preventDefault();
+  MainWindow.close();
+});
+
 // Feature toggles controlled by Settings: power-save blocker and auto-update.
 async function StartOptionalFeatures() {
   let SYSTEM_PREVENT_DISPLAY_SLEEP = await SettingsManager.GetValue('SYSTEM_PREVENT_DISPLAY_SLEEP');
@@ -1255,6 +1385,14 @@ async function StartOptionalFeatures() {
   }
 }
 StartOptionalFeatures();
+
+powerMonitor.on('shutdown', (event) => {
+  Logger.warn('System shutdown detected, routing through graceful app shutdown');
+  event.preventDefault();
+  bypassShutdownConfirmation = true;
+  quitRequested = true;
+  app.quit();
+});
 
 // Final shutdown hook: place for flushing buffers/closing resources if needed.
 app.on('will-quit', (_event) => {
