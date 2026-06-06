@@ -195,6 +195,27 @@
     color 120ms ease,
     transform 120ms ease;
 }
+#ADD_MONITORING_TARGET_DROPDOWN .dropdown-toggle::after {
+  display: none;
+}
+#ADD_MONITORING_TARGET_MENU.dropdown-menu {
+  min-width: 240px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.6rem;
+  background: rgba(23, 20, 38, 0.98);
+  padding: 0.35rem;
+}
+#ADD_MONITORING_TARGET_MENU .dropdown-item {
+  color: rgba(255, 255, 255, 0.92);
+  border-radius: 0.45rem;
+  font-size: 13px;
+  padding: 0.45rem 0.6rem;
+}
+#ADD_MONITORING_TARGET_MENU .dropdown-item:hover,
+#ADD_MONITORING_TARGET_MENU .dropdown-item:focus {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
 #NAVBAR_CORE_BUTTON.settings-btn:hover,
 #ADD_MONITORING_TARGET_BTN.settings-btn:hover {
   color: #fff;
@@ -867,6 +888,115 @@ button.btn:focus {
   opacity: 0.9;
 }
 
+#NETWORK_DISCOVERY_RESULTS {
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.02);
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.NETWORK_DISCOVERY_TABLE_WRAP {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border-radius: 0.6rem;
+}
+.NETWORK_DISCOVERY_TABLE {
+  color: #fff;
+  border-collapse: collapse;
+}
+.NETWORK_DISCOVERY_TABLE thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background-color: #27233b;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+}
+.NETWORK_DISCOVERY_TABLE tbody td {
+  border-top: 0;
+  font-size: 12px;
+  vertical-align: middle;
+  background: transparent;
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+.NETWORK_DISCOVERY_TABLE thead th:first-child,
+.NETWORK_DISCOVERY_TABLE tbody td:first-child {
+  padding-left: 0.75rem;
+}
+.NETWORK_DISCOVERY_TABLE thead th:last-child,
+.NETWORK_DISCOVERY_TABLE tbody td:last-child {
+  padding-right: 0.75rem;
+}
+.NETWORK_DISCOVERY_TABLE tbody tr:nth-child(odd) td {
+  background: rgba(255, 255, 255, 0.03);
+}
+.NETWORK_DISCOVERY_TABLE tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.075);
+}
+.NETWORK_DISCOVERY_TABLE tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.12);
+}
+.NETWORK_DISCOVERY_TABLE .nd-name {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.2;
+}
+.NETWORK_DISCOVERY_TABLE .nd-address {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 12px;
+}
+.NETWORK_DISCOVERY_TABLE .nd-details {
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 11px;
+  line-height: 1.3;
+  word-break: break-word;
+}
+#NETWORK_DISCOVERY_TOGGLE_SCAN {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  border: 0 !important;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.24) 0,
+      rgba(255, 255, 255, 0.24) var(--scan-progress, 0%),
+      rgba(255, 255, 255, 0.1) var(--scan-progress, 0%),
+      rgba(255, 255, 255, 0.1) 100%
+    ) !important;
+}
+
+#SHOWTRAK_MODAL_NETWORK_DISCOVERY .modal-dialog {
+  position: fixed;
+  top: calc(2rem + 12px);
+  bottom: calc(36px + 20px);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding-top: 0 !important;
+  height: auto;
+  width: min(800px, calc(100vw - 24px));
+  max-width: none;
+}
+
+#SHOWTRAK_MODAL_NETWORK_DISCOVERY .modal-content {
+  height: 100%;
+}
+
+#SHOWTRAK_MODAL_NETWORK_DISCOVERY .modal-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .alert-toast-host,
 #ALERTS_TOAST_HOST {
   position: fixed;
@@ -1267,6 +1397,18 @@ body.compact-mode .SHOWTRAK_PC.MONITOR > .MONITOR_COMPACT_LATENCY {
   font-size: 14px;
   line-height: 1;
 }
+/* In compact mode, vertically center the cog instead of anchoring to top */
+body.compact-mode .CLIENT_TILE_COG {
+  top: 50%;
+  transform: translateY(-50%) scale(0.96);
+}
+body.compact-mode.mode-edit .SHOWTRAK_PC:hover > .CLIENT_TILE_COG {
+  transform: translateY(-50%) scale(1);
+}
+body.compact-mode.mode-edit .CLIENT_TILE_COG:focus-visible {
+  transform: translateY(-50%) scale(1);
+}
+
 /* Show cog only while hovering a tile in EDIT mode (no layout shift) */
 body.mode-edit .SHOWTRAK_PC:hover > .CLIENT_TILE_COG {
   opacity: 1;

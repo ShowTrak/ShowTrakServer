@@ -189,6 +189,56 @@ Manager.MonitoringTargetUpdatePayload = (value) => {
   return out;
 };
 
+Manager.NetworkDiscoveryScanID = (value) => {
+  return _normalizeNonEmptyString(value, 'ScanID', { minLength: 8, maxLength: 128 });
+};
+
+Manager.NetworkDiscoveryScanOptions = (value) => {
+  if (value == null) return {};
+  if (!_isPlainObject(value)) _fail('Network discovery options must be an object');
+
+  const out = {};
+
+  if (Object.prototype.hasOwnProperty.call(value, 'EnableBonjour')) {
+    out.EnableBonjour = !!value.EnableBonjour;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'EnableProbe')) {
+    out.EnableProbe = !!value.EnableProbe;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'TimeoutMs')) {
+    const timeout = Number(value.TimeoutMs);
+    if (!Number.isFinite(timeout)) _fail('TimeoutMs must be a number');
+    if (timeout < 1000 || timeout > 120000) _fail('TimeoutMs must be between 1000 and 120000');
+    out.TimeoutMs = Math.floor(timeout);
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'MaxHostsPerSubnet')) {
+    const maxHosts = Number(value.MaxHostsPerSubnet);
+    if (!Number.isFinite(maxHosts)) _fail('MaxHostsPerSubnet must be a number');
+    if (maxHosts < 8 || maxHosts > 4096) _fail('MaxHostsPerSubnet must be between 8 and 4096');
+    out.MaxHostsPerSubnet = Math.floor(maxHosts);
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'Concurrency')) {
+    const concurrency = Number(value.Concurrency);
+    if (!Number.isFinite(concurrency)) _fail('Concurrency must be a number');
+    if (concurrency < 1 || concurrency > 128) _fail('Concurrency must be between 1 and 128');
+    out.Concurrency = Math.floor(concurrency);
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'ProbePorts')) {
+    if (!Array.isArray(value.ProbePorts)) _fail('ProbePorts must be an array');
+    if (!value.ProbePorts.length) _fail('ProbePorts cannot be empty');
+    const ports = value.ProbePorts.map((p) => {
+      const port = Number(p);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        _fail('ProbePorts must contain valid TCP port numbers');
+      }
+      return port;
+    });
+    out.ProbePorts = Array.from(new Set(ports));
+  }
+
+  return out;
+};
+
 Manager.SettingUpdatePayload = (key, value) => {
   const normalizedKey = _normalizeNonEmptyString(key, 'Setting key', { minLength: 2, maxLength: 128 });
 

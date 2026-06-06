@@ -62,14 +62,39 @@
             <i class="bi bi-exclamation-triangle-fill"></i>
             <span class="alerts-count d-none">0</span>
           </button>
-          <button
-            id="ADD_MONITORING_TARGET_BTN"
-            class="settings-btn no-drag"
-            title="Add Monitoring Target"
-            aria-label="Add Monitoring Target"
-          >
-            <i class="bi bi-plus-lg"></i>
-          </button>
+          <div class="dropdown no-drag" id="ADD_MONITORING_TARGET_DROPDOWN">
+            <button
+              type="button"
+              id="ADD_MONITORING_TARGET_BTN"
+              class="settings-btn dropdown-toggle no-drag"
+              title="Add Monitoring Target"
+              aria-label="Add Monitoring Target"
+              data-bs-toggle="dropdown"
+              data-bs-offset="0,6"
+              data-bs-auto-close="true"
+              aria-expanded="false"
+            >
+              <i class="bi bi-plus-lg"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" id="ADD_MONITORING_TARGET_MENU">
+              <li>
+                <button type="button" class="dropdown-item" id="ADD_TARGET_MANUAL_ACTION">
+                  Create Monitoring Target
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item" id="ADD_TARGET_BROWSE_ACTION">
+                  LAN Discovery Wizard
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item" id="ADD_GROUP_ACTION">
+                  Create Group
+                </button>
+              </li>
+              
+            </ul>
+          </div>
           <button
             id="NAVBAR_CORE_BUTTON"
             class="settings-btn no-drag"
@@ -597,6 +622,62 @@
               >
                 Delete Monitoring Target
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_NETWORK_DISCOVERY"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_NETWORK_DISCOVERY_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-flex justify-content-center">
+              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            </div>
+
+            <div class="rounded-3 p-2 bg-ghost-light">
+              <h6 class="mb-0">LAN Discovery</h6>
+            </div>
+
+            <div id="NETWORK_DISCOVERY_RESULTS" class="text-start mt-2">
+              <div class="table-responsive NETWORK_DISCOVERY_TABLE_WRAP">
+                <table class="table table-sm table-borderless align-middle NETWORK_DISCOVERY_TABLE mb-0">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Address</th>
+                      <th>Source</th>
+                      <th>Details</th>
+                      <th class="text-end">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="NETWORK_DISCOVERY_RESULTS_BODY"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="d-grid mt-2">
+              <button
+                type="button"
+                class="btn btn-light"
+                id="NETWORK_DISCOVERY_TOGGLE_SCAN"
+                style="--scan-progress: 0%"
+              >
+                Start Scan
+              </button>
+            </div>
+
+            <div class="row g-2 mt-0">
+              <div class="col-12 d-grid">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+              </div>
             </div>
           </div>
         </div>

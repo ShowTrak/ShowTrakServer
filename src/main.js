@@ -33,6 +33,7 @@ const { Manager: ClientManager } = require('./Modules/ClientManager');
 const { Manager: GroupManager } = require('./Modules/GroupManager');
 const { Manager: MonitoringTargetManager } = require('./Modules/MonitoringTargetManager');
 const { Manager: MonitoringMethods } = require('./Modules/MonitoringMethods');
+const { Manager: NetworkDiscoveryManager } = require('./Modules/NetworkDiscovery');
 const { Manager: FileSelectorManager } = require('./Modules/FileSelectorManager');
 const { Manager: BackupManager } = require('./Modules/BackupManager');
 const { Manager: ScriptExecutionManager } = require('./Modules/ScriptExecutionManager');
@@ -579,6 +580,31 @@ app.whenReady().then(async () => {
       return validationErrorTuple(error);
     }
     const [Err, Result] = await MonitoringTargetManager.Delete(TargetID);
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
+  RPC.handle('NetworkDiscovery:Start', async (_Event, Options) => {
+    try {
+      Options = IPCValidation.NetworkDiscoveryScanOptions(Options);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Result] = NetworkDiscoveryManager.Start(Options, (Payload) => {
+      if (!MainWindow || MainWindow.isDestroyed()) return;
+      MainWindow.webContents.send('NetworkDeviceScanEvent', Payload);
+    });
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
+  RPC.handle('NetworkDiscovery:Stop', async (_Event, ScanID) => {
+    try {
+      ScanID = IPCValidation.NetworkDiscoveryScanID(ScanID);
+    } catch (error) {
+      return validationErrorTuple(error, false);
+    }
+    const [Err, Result] = NetworkDiscoveryManager.Stop(ScanID);
     if (Err) return [Err, null];
     return [null, Result];
   });

@@ -10,6 +10,14 @@ let PendingAdoption = [];
 let MonitoringTargets = [];
 let MonitoringMethodsCache = [];
 let MonitoringEditorTargetID = null;
+let NetworkDiscoveryScanID = null;
+let NetworkDiscoveryScanning = false;
+let NetworkDiscoveryResults = new Map();
+let NetworkDiscoveryProgress = {
+  percent: 0,
+  current: 0,
+  total: 0,
+};
 // Cache last full lists to allow partial re-render when only pending changes
 let __LastClients = [];
 let __LastGroups = [];
@@ -1976,7 +1984,245 @@ function CollectMonitoringDynamicSettings() {
   return out;
 }
 
-async function OpenMonitoringTargetEditor(TargetID) {
+function ResolveMonitoringMethodHint(Hint) {
+  const normalized = String(Hint || '').trim().toLowerCase();
+  if (!normalized) return null;
+  const preferred = [normalized];
+  if (normalized === 'web') preferred.push('http', 'https');
+  if (normalized === 'http' || normalized === 'https') preferred.push('http-json', 'http', 'https');
+  if (normalized === 'tcp') preferred.push('tcp-port');
+  for (const candidate of preferred) {
+    const match = MonitoringMethodsCache.find((m) => String(m.ID).toLowerCase() === candidate);
+    if (match) return match.ID;
+  }
+  return null;
+}
+
+function SetNetworkDiscoveryStatus(label) {
+  $('#NETWORK_DISCOVERY_STATUS').text(label || 'Idle');
+}
+
+function ParseIPv4ToNumber(address) {
+  const parts = String(address || '')
+    .trim()
+    .split('.')
+    .map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+    return null;
+  }
+  return (((parts[0] * 256 + parts[1]) * 256 + parts[2]) * 256 + parts[3]) >>> 0;
+}
+
+function RenderNetworkDiscoveryScanButton() {
+  const $btn = $('#NETWORK_DISCOVERY_TOGGLE_SCAN');
+  if (!$btn.length) return;
+  $btn.prop('disabled', false);
+  if (NetworkDiscoveryScanning) {
+    $btn.addClass('is-scanning').text('Cancel Scan');
+  } else {
+    $btn.removeClass('is-scanning').text('Start Scan');
+  }
+}
+
+function SetNetworkDiscoveryProgress(percent, current = 0, total = 0) {
+  const p = Math.max(0, Math.min(100, Number.isFinite(Number(percent)) ? Number(percent) : 0));
+  const cur = Number.isFinite(Number(current)) ? Number(current) : 0;
+  const tot = Number.isFinite(Number(total)) ? Number(total) : 0;
+  NetworkDiscoveryProgress = {
+    percent: p,
+    current: cur,
+    total: tot,
+  };
+  const $btn = $('#NETWORK_DISCOVERY_TOGGLE_SCAN');
+  if ($btn.length) {
+    $btn.css('--scan-progress', `${p}%`);
+  }
+}
+
+function RenderNetworkDiscoveryResults() {
+  const $host = $('#NETWORK_DISCOVERY_RESULTS_BODY');
+  if (!$host.length) return;
+  const list = Array.from(NetworkDiscoveryResults.values()).sort((a, b) => {
+    const aIp = ParseIPv4ToNumber(a.Address);
+    const bIp = ParseIPv4ToNumber(b.Address);
+    if (aIp != null && bIp != null) return aIp - bIp;
+    if (aIp != null) return -1;
+    if (bIp != null) return 1;
+    return String(a.Address || '').localeCompare(String(b.Address || ''));
+  });
+
+  if (!list.length) {
+    $host.html(`
+      <tr>
+        <td colspan="5" class="text-muted text-center py-3">
+          No devices discovered yet. Start a scan to search your local network.
+        </td>
+      </tr>
+    `);
+    return;
+  }
+
+  let html = '';
+  for (const item of list) {
+    const id = Safe(item.ID);
+    const sourceLabel =
+      String(item.Source || 'unknown').toLowerCase() === 'bonjour'
+        ? 'mDNS'
+        : 'Scan';
+    const serviceList = Array.isArray(item.Services) ? item.Services.slice(0, 5) : [];
+    const details = [];
+    if (item.Hostname) details.push(`host: ${Safe(item.Hostname)}`);
+    if (serviceList.length) {
+      details.push(`services: ${Safe(serviceList.map((s) => s.type).join(', '))}`);
+    } else if (item.ServiceType) {
+      details.push(`service: ${Safe(item.ServiceType)}`);
+    }
+    if (item.Port) details.push(`port: ${Safe(String(item.Port))}`);
+    const detailsText = details.length ? details.join(' · ') : '-';
+    html += `
+      <tr>
+        <td>
+          <div class="nd-name">${Safe(item.Name || item.Address || 'Unnamed Device')}</div>
+        </td>
+        <td>
+          <div class="nd-address">${Safe(item.Address || '')}</div>
+        </td>
+        <td>
+          <span class="badge bg-ghost-light text-light">${Safe(sourceLabel)}</span>
+        </td>
+        <td>
+          <div class="nd-details">${Safe(detailsText)}</div>
+        </td>
+        <td class="text-end">
+          <button type="button" class="btn btn-light btn-sm NETWORK_DISCOVERY_ADD" data-id="${id}">
+            Add
+          </button>
+        </td>
+      </tr>`;
+  }
+  $host.html(html);
+}
+
+function ResetNetworkDiscoveryState() {
+  NetworkDiscoveryScanID = null;
+  NetworkDiscoveryScanning = false;
+  NetworkDiscoveryResults = new Map();
+  RenderNetworkDiscoveryScanButton();
+  SetNetworkDiscoveryStatus('Idle');
+  SetNetworkDiscoveryProgress(0, 0, 0);
+  RenderNetworkDiscoveryResults();
+}
+
+function MergeNetworkDiscoveryResult(result) {
+  if (!result || !result.Address) return;
+  const addressKey = String(result.Address).trim().toLowerCase();
+  if (!addressKey) return;
+  const existing = NetworkDiscoveryResults.get(addressKey) || {};
+  const existingServices = Array.isArray(existing.Services) ? existing.Services : [];
+  const nextServices = existingServices.slice();
+  if (result.Source === 'bonjour') {
+    const serviceType = String(result.ServiceType || '').trim();
+    const servicePort = result.Port == null ? null : Number(result.Port);
+    const dedupeKey = `${serviceType.toLowerCase()}:${Number.isFinite(servicePort) ? servicePort : 0}`;
+    if (
+      serviceType &&
+      !nextServices.some(
+        (s) => `${String(s.type || '').toLowerCase()}:${Number(s.port) || 0}` === dedupeKey
+      )
+    ) {
+      nextServices.push({ type: serviceType, port: Number.isFinite(servicePort) ? servicePort : null });
+    }
+  }
+
+  NetworkDiscoveryResults.set(addressKey, {
+    ...existing,
+    ...result,
+    Hostname: result.Hostname || existing.Hostname || null,
+    Services: nextServices,
+    ID: addressKey,
+  });
+  RenderNetworkDiscoveryResults();
+}
+
+function HandleNetworkDiscoveryEvent(event) {
+  if (!event || !event.ScanID) return;
+  if (!NetworkDiscoveryScanID || event.ScanID !== NetworkDiscoveryScanID) return;
+  if (event.Type === 'status') {
+    SetNetworkDiscoveryStatus(event.Status || 'Scanning');
+    if (event.Progress) {
+      SetNetworkDiscoveryProgress(event.Progress.Percent, event.Progress.Current, event.Progress.Total);
+    }
+    return;
+  }
+  if (event.Type === 'result' && event.Result) {
+    MergeNetworkDiscoveryResult(event.Result);
+    return;
+  }
+  if (event.Type === 'done') {
+    NetworkDiscoveryScanning = false;
+    RenderNetworkDiscoveryScanButton();
+    SetNetworkDiscoveryStatus(event.Status || 'Completed');
+    SetNetworkDiscoveryProgress(100, NetworkDiscoveryProgress.total, NetworkDiscoveryProgress.total);
+  }
+}
+
+async function StopNetworkDiscoveryScan() {
+  if (!NetworkDiscoveryScanID) {
+    NetworkDiscoveryScanning = false;
+    RenderNetworkDiscoveryScanButton();
+    return;
+  }
+  const scanID = NetworkDiscoveryScanID;
+  NetworkDiscoveryScanID = null;
+  NetworkDiscoveryScanning = false;
+  RenderNetworkDiscoveryScanButton();
+  try {
+    await window.API.StopNetworkDeviceScan(scanID);
+  } catch {}
+}
+
+async function StartNetworkDiscoveryScan() {
+  if (NetworkDiscoveryScanning) return;
+  await EnsureMonitoringMethodsLoaded();
+  NetworkDiscoveryResults = new Map();
+  SetNetworkDiscoveryProgress(0, 0, 0);
+  RenderNetworkDiscoveryResults();
+  NetworkDiscoveryScanning = true;
+  RenderNetworkDiscoveryScanButton();
+  SetNetworkDiscoveryStatus('Starting...');
+
+  try {
+    const [Err, Result] = await window.API.StartNetworkDeviceScan({
+      EnableBonjour: true,
+      EnableProbe: true,
+      TimeoutMs: 12000,
+      MaxHostsPerSubnet: 512,
+      ProbePorts: [80, 443, 22, 445, 3389, 8080],
+    });
+    if (Err) {
+      NetworkDiscoveryScanning = false;
+      RenderNetworkDiscoveryScanButton();
+      SetNetworkDiscoveryStatus('Failed');
+      return Notify(Err, 'error');
+    }
+    NetworkDiscoveryScanID = Result && Result.ScanID ? Result.ScanID : null;
+    SetNetworkDiscoveryStatus('Scanning...');
+  } catch (e) {
+    NetworkDiscoveryScanning = false;
+    RenderNetworkDiscoveryScanButton();
+    SetNetworkDiscoveryStatus('Failed');
+    Notify(e && e.message ? e.message : 'Failed to start scan', 'error');
+  }
+}
+
+async function OpenNetworkDiscoveryModal() {
+  await CloseAllModals();
+  ResetNetworkDiscoveryState();
+  $('#SHOWTRAK_MODAL_NETWORK_DISCOVERY').modal('show');
+  await StartNetworkDiscoveryScan();
+}
+
+async function OpenMonitoringTargetEditor(TargetID, Prefill = null) {
   await CloseAllModals();
   await EnsureMonitoringMethodsLoaded();
 
@@ -1999,14 +2245,18 @@ async function OpenMonitoringTargetEditor(TargetID) {
   $('#MONITORING_TARGET_DANGER_ZONE').toggleClass('d-none', !Existing);
 
   const Defaults = {
-    Nickname: '',
-    Address: '',
+    Nickname: (Prefill && Prefill.Nickname) || '',
+    Address: (Prefill && Prefill.Address) || '',
     Method: MonitoringMethodsCache[0] && MonitoringMethodsCache[0].ID,
     Interval: 30000,
     StoreHistory: false,
     DegradedThresholdMs: 0,
     Settings: {},
   };
+  if (!Existing && Prefill && Prefill.Method) {
+    const hinted = ResolveMonitoringMethodHint(Prefill.Method);
+    if (hinted) Defaults.Method = hinted;
+  }
   const T = Existing || Defaults;
 
   $('#MONITORING_TARGET_NICKNAME').val(T.Nickname || '');
@@ -3050,8 +3300,68 @@ async function Init() {
     $('#SHOWTRAK_MODEL_CORE').modal('show');
   });
 
-  $('#ADD_MONITORING_TARGET_BTN').on('click', async () => {
+  $('#ADD_TARGET_MANUAL_ACTION').on('click', async () => {
     await OpenMonitoringTargetEditor(null);
+  });
+
+  $('#ADD_TARGET_BROWSE_ACTION').on('click', async () => {
+    await OpenNetworkDiscoveryModal();
+  });
+
+  $('#ADD_GROUP_ACTION').on('click', async () => {
+    await OpenGroupCreationModal();
+  });
+
+  const addTargetMenu = document.getElementById('ADD_MONITORING_TARGET_MENU');
+  $('#ADD_MONITORING_TARGET_DROPDOWN')
+    .off('shown.bs.dropdown.addTargetOffset hidden.bs.dropdown.addTargetOffset')
+    .on('shown.bs.dropdown.addTargetOffset', () => {
+      if (!addTargetMenu) return;
+      const currentTransform = addTargetMenu.style.transform || '';
+      if (currentTransform.includes('translateY(-10px)')) return;
+      addTargetMenu.style.transform = `${currentTransform} translateY(-10px)`.trim();
+    })
+    .on('hidden.bs.dropdown.addTargetOffset', () => {
+      if (!addTargetMenu) return;
+      const currentTransform = addTargetMenu.style.transform || '';
+      addTargetMenu.style.transform = currentTransform
+        .replace(' translateY(-10px)', '')
+        .replace('translateY(-10px)', '')
+        .trim();
+    });
+
+  $('#NETWORK_DISCOVERY_TOGGLE_SCAN').on('click', async () => {
+    if (NetworkDiscoveryScanning) {
+      await StopNetworkDiscoveryScan();
+      SetNetworkDiscoveryStatus('Stopped');
+      return;
+    }
+    await StartNetworkDiscoveryScan();
+  });
+
+  $('#NETWORK_DISCOVERY_RESULTS')
+    .off('click', '.NETWORK_DISCOVERY_ADD')
+    .on('click', '.NETWORK_DISCOVERY_ADD', async function () {
+      const id = String($(this).attr('data-id') || '').trim().toLowerCase();
+      if (!id || !NetworkDiscoveryResults.has(id)) return;
+      const selected = NetworkDiscoveryResults.get(id);
+      await StopNetworkDiscoveryScan();
+      await OpenMonitoringTargetEditor(null, {
+        Nickname: selected.Name || '',
+        Address: selected.Address || '',
+        Method: selected.MethodHint || null,
+      });
+    });
+
+  $('#SHOWTRAK_MODAL_NETWORK_DISCOVERY')
+    .off('hidden.bs.modal.networkDiscovery')
+    .on('hidden.bs.modal.networkDiscovery', async () => {
+      await StopNetworkDiscoveryScan();
+      ResetNetworkDiscoveryState();
+    });
+
+  window.API.OnNetworkDeviceScanEvent((Event) => {
+    HandleNetworkDiscoveryEvent(Event);
   });
 
   $('#SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON').on('click', async () => {

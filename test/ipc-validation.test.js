@@ -40,3 +40,40 @@ test('IPCValidation.SettingUpdatePayload allows primitive setting values', () =>
     /must be a boolean, string, or number/i
   );
 });
+
+test('IPCValidation.NetworkDiscoveryScanID validates scan identifiers', () => {
+  assert.equal(
+    IPCValidation.NetworkDiscoveryScanID('  12345678-1234-1234-1234-123456789abc  '),
+    '12345678-1234-1234-1234-123456789abc'
+  );
+  assert.throws(() => IPCValidation.NetworkDiscoveryScanID('tiny'), /at least 8 characters/i);
+});
+
+test('IPCValidation.NetworkDiscoveryScanOptions validates and normalizes options', () => {
+  const options = IPCValidation.NetworkDiscoveryScanOptions({
+    EnableBonjour: 1,
+    EnableProbe: 0,
+    TimeoutMs: 15000,
+    MaxHostsPerSubnet: 256,
+    Concurrency: 24,
+    ProbePorts: [80, 443, 443, 8080],
+  });
+
+  assert.deepEqual(options, {
+    EnableBonjour: true,
+    EnableProbe: false,
+    TimeoutMs: 15000,
+    MaxHostsPerSubnet: 256,
+    Concurrency: 24,
+    ProbePorts: [80, 443, 8080],
+  });
+
+  assert.throws(
+    () => IPCValidation.NetworkDiscoveryScanOptions({ ProbePorts: ['abc'] }),
+    /valid TCP port numbers/i
+  );
+  assert.throws(
+    () => IPCValidation.NetworkDiscoveryScanOptions({ TimeoutMs: 10 }),
+    /between 1000 and 120000/i
+  );
+});

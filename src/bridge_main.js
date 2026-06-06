@@ -35,6 +35,8 @@ const INVOKE_CHANNELS = new Set([
   'CreateMonitoringTarget',
   'UpdateMonitoringTarget',
   'DeleteMonitoringTarget',
+  'NetworkDiscovery:Start',
+  'NetworkDiscovery:Stop',
 ]);
 
 const SUBSCRIBE_CHANNELS = new Set([
@@ -55,6 +57,7 @@ const SUBSCRIBE_CHANNELS = new Set([
   'AppUpdate:Status',
   'SetFullMonitoringTargetList',
   'MonitoringTargetUpdated',
+  'NetworkDeviceScanEvent',
 ]);
 
 function invoke(channel, ...args) {
@@ -151,4 +154,7 @@ contextBridge.exposeInMainWorld('API', {
   DeleteMonitoringTarget: async (TargetID) => invoke('DeleteMonitoringTarget', TargetID),
   SetFullMonitoringTargetList: (Callback) => subscribe('SetFullMonitoringTargetList', Callback),
   MonitoringTargetUpdated: (Callback) => subscribe('MonitoringTargetUpdated', Callback),
+  StartNetworkDeviceScan: async (Options) => invoke('NetworkDiscovery:Start', Options),
+  StopNetworkDeviceScan: async (ScanID) => invoke('NetworkDiscovery:Stop', ScanID),
+  OnNetworkDeviceScanEvent: (Callback) => subscribe('NetworkDeviceScanEvent', Callback),
 });
