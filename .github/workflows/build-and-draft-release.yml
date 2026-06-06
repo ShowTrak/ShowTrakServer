@@ -69,6 +69,9 @@ jobs:
       RELEASE_TAG: ${{ needs.release-meta.outputs.tag }}
       RELEASE_VERSION: ${{ needs.release-meta.outputs.version }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
