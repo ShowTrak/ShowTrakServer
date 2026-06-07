@@ -38,6 +38,7 @@ const { Manager: AdoptionManager } = require('./Modules/AdoptionManager');
 const { Manager: ClientManager } = require('./Modules/ClientManager');
 const { Manager: GroupManager } = require('./Modules/GroupManager');
 const { Manager: MonitoringTargetManager } = require('./Modules/MonitoringTargetManager');
+const { Manager: DBManager } = require('./Modules/DB');
 const { Manager: MonitoringMethods } = require('./Modules/MonitoringMethods');
 const { Manager: AlertsManager } = require('./Modules/AlertsManager');
 const { Manager: NetworkDiscoveryManager } = require('./Modules/NetworkDiscovery');
@@ -146,6 +147,8 @@ let closePromptInFlight = false;
 let quitRequested = false;
 let accidentalShutdownProtectionEnabled = false;
 let bypassShutdownConfirmation = false;
+let shutdownCleanupInFlight = false;
+let shutdownCleanupComplete = false;
 
 function hasMainWindow() {
   return MainWindow && !MainWindow.isDestroyed();
@@ -1366,12 +1369,52 @@ app.on('window-all-closed', () => {
   app.quit();
 });
 
+async function runShutdownCleanup() {
+  try {
+    if (AutosaveTimer) {
+      clearInterval(AutosaveTimer);
+      AutosaveTimer = null;
+    }
+  } catch {}
+
+  try {
+    if (typeof MonitoringTargetManager.Shutdown === 'function') {
+      await MonitoringTargetManager.Shutdown();
+    }
+  } catch (Err) {
+    Logger.error('Monitoring target shutdown cleanup failed:', Err);
+  }
+
+  try {
+    await DBManager.Shutdown({ TimeoutMs: 15000 });
+  } catch (Err) {
+    Logger.error('DB shutdown cleanup failed:', Err);
+  }
+}
+
 app.on('before-quit', (event) => {
   quitRequested = true;
-  if (mainWindowCloseApproved) return;
-  if (!hasMainWindow()) return;
+
+  if (!mainWindowCloseApproved && hasMainWindow()) {
+    event.preventDefault();
+    MainWindow.close();
+    return;
+  }
+
+  if (shutdownCleanupComplete) return;
   event.preventDefault();
-  MainWindow.close();
+  if (shutdownCleanupInFlight) return;
+
+  shutdownCleanupInFlight = true;
+  runShutdownCleanup()
+    .catch((Err) => {
+      Logger.error('Unexpected error during shutdown cleanup:', Err);
+    })
+    .finally(() => {
+      shutdownCleanupComplete = true;
+      shutdownCleanupInFlight = false;
+      app.quit();
+    });
 });
 
 // Feature toggles controlled by Settings: power-save blocker and auto-update.

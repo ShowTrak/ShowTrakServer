@@ -27,8 +27,66 @@ let schemaInitializationPromise = null;
 let readyPromise = null;
 let hasUnsavedChanges = false;
 let suppressDirtyTracking = false;
+let isShuttingDown = false;
+let shutdownPromise = null;
+let pendingOperations = 0;
+let pendingDrainResolvers = [];
 
 const Manager = {};
+
+function ResolvePendingDrainWaiters() {
+  if (pendingOperations !== 0) return;
+  const Waiters = pendingDrainResolvers;
+  pendingDrainResolvers = [];
+  for (const Resolve of Waiters) {
+    try {
+      Resolve();
+    } catch {}
+  }
+}
+
+function BeginOperation() {
+  if (isShuttingDown || !DB) return false;
+  pendingOperations += 1;
+  return true;
+}
+
+function EndOperation() {
+  pendingOperations = Math.max(0, pendingOperations - 1);
+  ResolvePendingDrainWaiters();
+}
+
+function WaitForPendingOperations(TimeoutMs = 15000) {
+  if (pendingOperations === 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      Logger.warn(
+        `Timed out waiting for ${pendingOperations} SQLite operation(s) to finish during shutdown`
+      );
+      done();
+    }, TimeoutMs);
+    pendingDrainResolvers.push(done);
+  });
+}
+
+function CloseLiveConnection() {
+  if (!DB) return Promise.resolve();
+  const Connection = DB;
+  DB = null;
+  return new Promise((resolve, reject) => {
+    Connection.close((err) => {
+      if (err) return reject(err);
+      resolve();
+    });
+  });
+}
 
 function ShouldMarkAsUnsaved(Query) {
   return /^(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(String(Query || '').trim());
@@ -81,6 +139,8 @@ Manager.InitializeSchema = async () => {
 // the returned promise resolves. Resets the schema-init state so migrations are
 // re-applied against whatever file is now on disk (e.g. a just-opened .ShowTrak).
 function OpenConnection() {
+  isShuttingDown = false;
+  shutdownPromise = null;
   schemaInitialized = false;
   schemaInitializationPromise = null;
   hasUnsavedChanges = false;
@@ -110,11 +170,16 @@ Manager.Ready = async () => {
 // Wrapper returning [err, row] for single-row queries
 Manager.Get = async (Query, Params) => {
   return new Promise((resolve, _reject) => {
+    if (!BeginOperation()) {
+      return resolve([new Error('Database is closing'), null]);
+    }
     DB.get(Query, Params, (err, row) => {
       if (err) {
         Logger.databaseError('Error fetching data:', err);
+        EndOperation();
         return resolve([err, null]);
       }
+      EndOperation();
       resolve([null, row]);
     });
   });
@@ -123,11 +188,16 @@ Manager.Get = async (Query, Params) => {
 // Wrapper returning [err, rows] for multi-row queries
 Manager.All = async (Query, Params) => {
   return new Promise((resolve, _reject) => {
+    if (!BeginOperation()) {
+      return resolve([new Error('Database is closing'), null]);
+    }
     DB.all(Query, Params, (err, rows) => {
       if (err) {
         Logger.databaseError('Error fetching data:', err);
+        EndOperation();
         return resolve([err, null]);
       }
+      EndOperation();
       resolve([null, rows]);
     });
   });
@@ -136,17 +206,41 @@ Manager.All = async (Query, Params) => {
 // Wrapper returning [err, stmt] for INSERT/UPDATE/DELETE/DDL
 Manager.Run = async (Query, Params) => {
   return new Promise((resolve, _reject) => {
+    if (!BeginOperation()) {
+      return resolve([new Error('Database is closing'), null]);
+    }
     DB.run(Query, Params, function (err) {
       if (err) {
         Logger.databaseError('Error running query:', err);
+        EndOperation();
         return resolve([err, null]);
       }
       if (!suppressDirtyTracking && ShouldMarkAsUnsaved(Query)) {
         hasUnsavedChanges = true;
       }
+      EndOperation();
       resolve([null, this]);
     });
   });
+};
+
+Manager.Shutdown = async (Options = {}) => {
+  const TimeoutMs = Number(Options.TimeoutMs) || 15000;
+  if (shutdownPromise) return shutdownPromise;
+
+  isShuttingDown = true;
+  shutdownPromise = (async () => {
+    await WaitForPendingOperations(TimeoutMs);
+    try {
+      await CloseLiveConnection();
+      Logger.log('SQLite connection closed cleanly');
+    } catch (err) {
+      Logger.databaseError('Failed to close SQLite connection during shutdown:', err);
+      throw err;
+    }
+  })();
+
+  return shutdownPromise;
 };
 
 Manager.RunWithoutDirtyTracking = async (Query, Params) => {

@@ -184,6 +184,14 @@ Manager.Reload = async () => {
   await Manager.Init();
 };
 
+Manager.Shutdown = async () => {
+  for (const Target of TargetList) {
+    try {
+      Target.StopLoop();
+    } catch {}
+  }
+};
+
 Manager.GetAll = async () => {
   if (!Manager.Initialized) await Manager.Init();
   return [null, TargetList.map((T) => T.ToJSON())];

@@ -505,13 +505,13 @@ document.addEventListener('keydown', function (e) {
     return;
   }
 
-  // Ctrl/Cmd + Q opens context menu centered
+  // Ctrl/Cmd + Shift + M opens context menu centered
   if (
     (e.ctrlKey || e.metaKey) &&
-    !e.shiftKey &&
+    e.shiftKey &&
     !e.altKey &&
     !e.repeat &&
-    e.key.toLowerCase() === 'q'
+    e.key.toLowerCase() === 'm'
   ) {
     e.preventDefault();
     try {
@@ -1093,7 +1093,7 @@ function ShowShortcutsModal() {
   items.push({ title: 'Open Keyboard Shortcuts', shortcut: 'Ctrl/Cmd+K' });
   items.push({ title: 'Close current modal / alerts tray', shortcut: 'Esc' });
   // Context menu
-  items.push({ title: 'Open Context Menu (global)', shortcut: 'Ctrl/Cmd+Q' });
+  items.push({ title: 'Open Context Menu (global)', shortcut: 'Ctrl/Cmd+Shift+M' });
   items.push({ title: 'Open Context Menu', shortcut: 'Menu key/Shift+F10' });
 
   const $list = $('#KEYBOARD_SHORTCUTS_LIST');
