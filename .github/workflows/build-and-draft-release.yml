@@ -148,7 +148,7 @@ jobs:
       - name: Create or update draft release
         run: |
           TITLE="v${RELEASE_VERSION} - Showtrak Server"
-          NOTES="Automated draft release for v${RELEASE_VERSION}."
+          NOTES="Release for ShowTrak Server v${RELEASE_VERSION}."
 
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release edit "$RELEASE_TAG" --draft --title "$TITLE" --notes "$NOTES"
