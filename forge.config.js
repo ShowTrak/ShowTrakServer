@@ -4,6 +4,7 @@ const path = require('node:path');
 // const { Config } = require('./Modules/Config');
 
 const appleSignIdentity = process.env.APPLE_SIGN_IDENTITY;
+const appleSigningKeychain = process.env.APPLE_KEYCHAIN_PATH;
 const shouldSignMac = Boolean(appleSignIdentity);
 const shouldNotarizeMac =
   shouldSignMac &&
@@ -27,10 +28,12 @@ module.exports = {
       ? {
           osxSign: {
             identity: appleSignIdentity,
+            ...(appleSigningKeychain ? { keychain: appleSigningKeychain } : {}),
             hardenedRuntime: true,
             entitlements: path.resolve(__dirname, 'build/entitlements.mac.plist'),
             entitlementsInherit: path.resolve(__dirname, 'build/entitlements.mac.plist'),
             gatekeeperAssess: false,
+            strictVerify: true,
           },
         }
       : {}),
