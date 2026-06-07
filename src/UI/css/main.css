@@ -1617,6 +1617,104 @@ body.compact-mode .SHOWTRAK_PC.MONITOR > .MONITOR_COMPACT_LATENCY {
   white-space: nowrap;
 }
 
+#SHOWTRAK_MONITOR_HISTORY_MODAL .modal-body {
+  text-align: left;
+}
+
+.monitor-history-range .btn {
+  font-size: 12px;
+}
+
+#MONITOR_HISTORY_GRAPH_PANEL {
+  position: relative;
+}
+
+#MONITOR_HISTORY_CANVAS {
+  display: block;
+  width: 100%;
+  min-height: 155px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: radial-gradient(circle at top, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+}
+
+#MONITOR_HISTORY_EMPTY {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  padding: 1rem;
+  pointer-events: none;
+}
+
+#MONITOR_HISTORY_TOOLTIP {
+  position: absolute;
+  z-index: 5;
+  min-width: 150px;
+  max-width: 260px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(17, 22, 29, 0.94);
+  color: rgba(255, 255, 255, 0.94);
+  padding: 0.4rem 0.5rem;
+  font-size: 11px;
+  line-height: 1.3;
+  text-align: left;
+  pointer-events: none;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.38);
+}
+
+#MONITOR_HISTORY_TOOLTIP .monitor-tooltip-title {
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+#MONITOR_HISTORY_TOOLTIP .monitor-tooltip-row {
+  opacity: 0.95;
+}
+
+.monitor-history-summary {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.monitor-history-legend {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.9rem;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.monitor-history-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.status-dot-online {
+  background: rgba(32, 201, 151, 0.92);
+}
+
+.status-dot-degraded {
+  background: rgba(255, 193, 7, 0.95);
+}
+
+.status-dot-offline {
+  background: rgba(220, 53, 69, 0.95);
+}
+
 /* Drag-and-drop visuals */
 .group-drop-zone.dnd-over {
   outline: 2px dashed rgba(255, 255, 255, 0.18);

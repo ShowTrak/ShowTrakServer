@@ -775,6 +775,59 @@
 
     <div
       class="modal fade"
+      id="SHOWTRAK_MONITOR_HISTORY_MODAL"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MONITOR_HISTORY_MODAL_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+
+            <div class="rounded-3 p-2 bg-ghost-light mb-2">
+              <h6 class="mb-0" id="MONITOR_HISTORY_TITLE">Monitoring History</h6>
+            </div>
+
+            <div
+              id="MONITOR_HISTORY_RANGE_GROUP"
+              class="btn-group monitor-history-range w-100"
+              role="group"
+              aria-label="History range"
+            >
+              <button type="button" class="btn btn-outline-light" data-range="5m">5 Minutes</button>
+              <button type="button" class="btn btn-outline-light" data-range="15m">15 Minutes</button>
+              <button type="button" class="btn btn-outline-light" data-range="30m">30 Minutes</button>
+              <button type="button" class="btn btn-outline-light" data-range="1h">1 Hour</button>
+              <button type="button" class="btn btn-outline-light" data-range="12h">12 Hours</button>
+            </div>
+
+            <div id="MONITOR_HISTORY_GRAPH_PANEL" class="mt-2">
+              <canvas
+                id="MONITOR_HISTORY_CANVAS"
+                class="w-100"
+                height="175"
+                aria-label="Monitoring history graph"
+                role="img"
+              ></canvas>
+              <div id="MONITOR_HISTORY_TOOLTIP" class="d-none" role="status" aria-live="polite"></div>
+              <div id="MONITOR_HISTORY_EMPTY" class="d-none">No samples in this range yet.</div>
+            </div>
+
+            <div id="MONITOR_HISTORY_SUMMARY" class="monitor-history-summary mt-2"></div>
+
+            <div class="monitor-history-legend mt-2" aria-hidden="true">
+              <span><i class="status-dot status-dot-online"></i>Online</span>
+              <span><i class="status-dot status-dot-degraded"></i>Degraded</span>
+              <span><i class="status-dot status-dot-offline"></i>Offline</span>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
       id="SHOWTRAK_MODAL_ALERT_MANAGER"
       tabindex="-1"
       aria-labelledby="SHOWTRAK_MODAL_ALERT_MANAGER_Label"

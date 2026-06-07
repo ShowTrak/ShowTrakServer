@@ -41,6 +41,7 @@ const INVOKE_CHANNELS = new Set([
   'GetMonitoringMethods',
   'GetAllMonitoringTargets',
   'GetMonitoringTarget',
+  'GetMonitoringTargetHistory',
   'CreateMonitoringTarget',
   'UpdateMonitoringTarget',
   'DeleteMonitoringTarget',
@@ -180,6 +181,7 @@ contextBridge.exposeInMainWorld('API', {
   GetMonitoringMethods: async () => invoke('GetMonitoringMethods'),
   GetAllMonitoringTargets: async () => invoke('GetAllMonitoringTargets'),
   GetMonitoringTarget: async (TargetID) => invoke('GetMonitoringTarget', TargetID),
+  GetMonitoringTargetHistory: async (TargetID) => invoke('GetMonitoringTargetHistory', TargetID),
   CreateMonitoringTarget: async (Payload) => invoke('CreateMonitoringTarget', Payload),
   UpdateMonitoringTarget: async (TargetID, Payload) =>
     invoke('UpdateMonitoringTarget', TargetID, Payload),

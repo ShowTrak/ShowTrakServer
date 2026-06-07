@@ -64,6 +64,76 @@ const BASE_WEB_PREFERENCES = Object.freeze({
 });
 let autoUpdater = null;
 let squirrelUpdaterInitialized = false;
+const MONITORING_HISTORY_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const MonitoringTargetHistoryStore = new Map();
+
+function pruneMonitoringHistoryStore(now = Date.now()) {
+  const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
+  for (const [targetID, samples] of MonitoringTargetHistoryStore.entries()) {
+    const next = Array.isArray(samples) ? samples.filter((s) => s && s.ts >= cutoff) : [];
+    if (!next.length) {
+      MonitoringTargetHistoryStore.delete(targetID);
+      continue;
+    }
+    MonitoringTargetHistoryStore.set(targetID, next);
+  }
+}
+
+function recordMonitoringHistorySample(target) {
+  if (!target || !target.TargetID) return;
+  const targetID = Number(target.TargetID);
+  if (!Number.isFinite(targetID)) return;
+
+  const now = Date.now();
+  const parsedLatency = Number(target.LastLatencyMs);
+  const latencyMs = Number.isFinite(parsedLatency) && parsedLatency >= 0 ? parsedLatency : null;
+  const sample = {
+    ts: now,
+    online: !!target.Online,
+    degraded: !!target.Degraded,
+    latencyMs,
+  };
+
+  const samples = MonitoringTargetHistoryStore.get(targetID) || [];
+  const last = samples.length ? samples[samples.length - 1] : null;
+  const duplicateQuickUpdate =
+    last &&
+    now - last.ts < 900 &&
+    last.online === sample.online &&
+    last.degraded === sample.degraded &&
+    ((last.latencyMs == null && sample.latencyMs == null) ||
+      Math.round(last.latencyMs || 0) === Math.round(sample.latencyMs || 0));
+
+  if (duplicateQuickUpdate) {
+    last.ts = now;
+  } else {
+    samples.push(sample);
+  }
+
+  const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
+  while (samples.length && samples[0].ts < cutoff) samples.shift();
+
+  MonitoringTargetHistoryStore.set(targetID, samples);
+}
+
+function syncMonitoringHistoryStore(list) {
+  const safeList = Array.isArray(list) ? list : [];
+  const validIDs = new Set();
+
+  for (const target of safeList) {
+    const targetID = Number(target && target.TargetID);
+    if (!Number.isFinite(targetID)) continue;
+    validIDs.add(targetID);
+    recordMonitoringHistorySample(target);
+  }
+
+  for (const existingID of MonitoringTargetHistoryStore.keys()) {
+    if (!validIDs.has(existingID)) MonitoringTargetHistoryStore.delete(existingID);
+  }
+
+  pruneMonitoringHistoryStore();
+}
+
 function isSquirrelWindows() {
   try {
     if (process.platform !== 'win32') return false;
@@ -718,6 +788,17 @@ app.whenReady().then(async () => {
     return Target;
   });
 
+  RPC.handle('GetMonitoringTargetHistory', async (_Event, TargetID) => {
+    try {
+      TargetID = IPCValidation.MonitoringTargetID(TargetID);
+    } catch {
+      return [];
+    }
+    pruneMonitoringHistoryStore();
+    const samples = MonitoringTargetHistoryStore.get(Number(TargetID)) || [];
+    return samples;
+  });
+
   RPC.handle('CreateMonitoringTarget', async (_Event, Payload) => {
     try {
       Payload = IPCValidation.MonitoringTargetCreatePayload(Payload);
@@ -1286,12 +1367,15 @@ async function UpdateMonitoringTargetList() {
   if (!MainWindow || MainWindow.isDestroyed()) return;
   const [Err, List] = await MonitoringTargetManager.GetAll();
   if (Err) return Logger.error('Failed to fetch monitoring targets:', Err);
-  MainWindow.webContents.send('SetFullMonitoringTargetList', List || []);
+  const SafeList = List || [];
+  syncMonitoringHistoryStore(SafeList);
+  MainWindow.webContents.send('SetFullMonitoringTargetList', SafeList);
 }
 BroadcastManager.on('MonitoringTargetListChanged', UpdateMonitoringTargetList);
 
 async function MonitoringTargetUpdated(Target) {
   if (!MainWindow || MainWindow.isDestroyed()) return;
+  recordMonitoringHistorySample(Target);
   MainWindow.webContents.send('MonitoringTargetUpdated', Target);
   AlertsManager.HandleMonitoringTargetUpdated(Target).catch((Err) =>
     Logger.error('AlertsManager.HandleMonitoringTargetUpdated failed', Err)
