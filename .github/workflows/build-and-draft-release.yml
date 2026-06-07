@@ -212,7 +212,6 @@ jobs:
       - name: Build signed distributables
         if: runner.os == 'macOS' && env.MACOS_VARIANT == 'signed'
         env:
-          DEBUG: electron-notarize*,electron-osx-sign*
           BUILD_VARIANT_NAME: signed
           APPLE_SIGN_IDENTITY: ${{ env.APPLE_SIGN_IDENTITY_RESOLVED }}
           APPLE_KEYCHAIN_PATH: ${{ env.APPLE_KEYCHAIN_PATH }}
@@ -221,7 +220,6 @@ jobs:
       - name: Build signed + notarized distributables
         if: runner.os == 'macOS' && env.MACOS_VARIANT == 'signed-notarized'
         env:
-          DEBUG: electron-notarize*,electron-osx-sign*
           BUILD_VARIANT_NAME: signed-notarized
           APPLE_SIGN_IDENTITY: ${{ env.APPLE_SIGN_IDENTITY_RESOLVED }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
