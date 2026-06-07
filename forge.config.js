@@ -44,7 +44,6 @@ module.exports = {
             appleApiKey: process.env.APPLE_API_KEY_PATH,
             appleApiKeyId: process.env.APPLE_API_KEY_ID,
             appleApiIssuer: process.env.APPLE_API_ISSUER_ID,
-            teamId: process.env.APPLE_TEAM_ID,
           },
         }
       : {}),
