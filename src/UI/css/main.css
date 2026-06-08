@@ -274,6 +274,7 @@
   letter-spacing: 0.04em;
   padding: 0.35rem 0.6rem 0.15rem;
 }
+#ADD_MONITORING_TARGET_MENU .dropdown-divider,
 #SETTINGS_MENU .dropdown-divider {
   border-top-color: rgba(255, 255, 255, 0.12);
   margin: 0.3rem 0.2rem;
@@ -425,7 +426,9 @@
 }
 
 .alert-rule-open {
+  position: relative;
   width: 100%;
+  padding-right: 2rem !important;
   background-color: rgba(255, 255, 255, 0.03);
   color: #fff;
   cursor: pointer;
@@ -435,8 +438,45 @@
   background-color: rgba(255, 255, 255, 0.08);
 }
 
+.alert-rule-chevron {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.95rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.65);
+  pointer-events: none;
+}
+
+.alert-action-open {
+  position: relative;
+  cursor: pointer;
+  padding-right: 2rem !important;
+}
+
+.alert-action-open:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.alert-action-chevron {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.95rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.65);
+  pointer-events: none;
+}
+
 .alert-multiselect {
   position: relative;
+}
+
+#ALERT_SCOPE_TOGGLE {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  border: none !important;
 }
 
 .alert-multiselect-menu {
@@ -464,6 +504,7 @@
   padding: 4px 6px;
   border-radius: 6px;
   cursor: pointer;
+  font-size: 0.92rem;
 }
 
 .alert-multiselect-option:hover {

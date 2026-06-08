@@ -28,10 +28,14 @@ let AlertRuleDraftActions = [];
 let AlertRulesCache = [];
 let AlertActionTypesCache = [];
 let AlertTriggerTypesCache = [];
-let AlertScopeGroupOptions = [];
-let AlertScopeClientOptions = [];
-let AlertScopeGroupSelected = [];
-let AlertScopeClientSelected = [];
+let AlertScopeOptions = [];
+let AlertScopeSelected = [];
+let AlertActionEditorIsCreating = false;
+const ALERT_TRIGGER_ALLOWLIST = new Set([
+  'CLIENT_ONLINE',
+  'CLIENT_OFFLINE',
+  'SCRIPT_EXECUTION_FAILED',
+]);
 let NetworkDiscoveryScanID = null;
 let NetworkDiscoveryScanning = false;
 let NetworkDiscoveryResults = new Map();
@@ -2938,7 +2942,39 @@ function ShowAlertEditorPanel() {
 }
 
 function CloseAllScopeDropdowns() {
-  $('#ALERT_SCOPE_GROUPS_MENU, #ALERT_SCOPE_CLIENTS_MENU').addClass('d-none');
+  $('#ALERT_SCOPE_MENU').addClass('d-none');
+}
+
+function ParseAlertScopeSelection() {
+  const Scope = {
+    Workspace: false,
+    Groups: [],
+    Clients: [],
+  };
+
+  for (const RawValue of AlertScopeSelected || []) {
+    const Value = `${RawValue}`;
+    if (Value === 'workspace:*') {
+      Scope.Workspace = true;
+      continue;
+    }
+    if (Value.startsWith('group:')) {
+      const GroupID = parseInt(Value.slice(6), 10);
+      if (Number.isFinite(GroupID)) Scope.Groups.push(GroupID);
+      continue;
+    }
+    if (Value.startsWith('client:')) {
+      Scope.Clients.push(Value.slice(7));
+    }
+  }
+
+  return Scope;
+}
+
+function NormalizeAlertTriggerType(TriggerType) {
+  const Normalized = `${TriggerType || ''}`.trim().toUpperCase();
+  if (ALERT_TRIGGER_ALLOWLIST.has(Normalized)) return Normalized;
+  return 'CLIENT_OFFLINE';
 }
 
 function ScopeSummaryText(Selected, Placeholder) {
@@ -2947,12 +2983,28 @@ function ScopeSummaryText(Selected, Placeholder) {
   return `${Selected[0].Label} +${Selected.length - 1}`;
 }
 
+function ShowAlertRuleMainContent() {
+  $('#ALERT_RULE_MAIN_CONTENT').removeClass('d-none');
+  $('#ALERT_ACTION_EDITOR_PANEL').addClass('d-none');
+}
+
+function ShowAlertActionEditorPanel() {
+  $('#ALERT_RULE_MAIN_CONTENT').addClass('d-none');
+  $('#ALERT_ACTION_EDITOR_PANEL').removeClass('d-none');
+}
+
 function RenderScopeDropdown(MenuSelector, ToggleSelector, Options, SelectedValues, Placeholder) {
   const SelectedSet = new Set((SelectedValues || []).map((x) => `${x}`));
   const SelectedObjects = (Options || []).filter((Opt) => SelectedSet.has(`${Opt.Value}`));
   const ToggleText = ScopeSummaryText(SelectedObjects, Placeholder);
 
-  $(ToggleSelector).text(ToggleText);
+  if (ToggleSelector === '#ALERT_SCOPE_TOGGLE') {
+    $(ToggleSelector).html(
+      `<span>${Safe(ToggleText)}</span><i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>`
+    );
+  } else {
+    $(ToggleSelector).text(ToggleText);
+  }
 
   const Html = (Options || [])
     .map(
@@ -2972,74 +3024,42 @@ function RenderScopeDropdown(MenuSelector, ToggleSelector, Options, SelectedValu
 
 function RenderScopeDropdowns() {
   RenderScopeDropdown(
-    '#ALERT_SCOPE_GROUPS_MENU',
-    '#ALERT_SCOPE_GROUPS_TOGGLE',
-    AlertScopeGroupOptions,
-    AlertScopeGroupSelected,
-    'Select groups'
-  );
-  RenderScopeDropdown(
-    '#ALERT_SCOPE_CLIENTS_MENU',
-    '#ALERT_SCOPE_CLIENTS_TOGGLE',
-    AlertScopeClientOptions,
-    AlertScopeClientSelected,
-    'Select clients / targets'
+    '#ALERT_SCOPE_MENU',
+    '#ALERT_SCOPE_TOGGLE',
+    AlertScopeOptions,
+    AlertScopeSelected,
+    'Select targets'
   );
 }
 
 function BindScopeDropdownHandlers() {
-  $('#ALERT_SCOPE_GROUPS_TOGGLE')
+  $('#ALERT_SCOPE_TOGGLE')
     .off('click.alertScope')
     .on('click.alertScope', function (Event) {
       Event.preventDefault();
       Event.stopPropagation();
-      const $menu = $('#ALERT_SCOPE_GROUPS_MENU');
-      const IsOpen = !$menu.hasClass('d-none');
+      const $menu = $('#ALERT_SCOPE_MENU');
+      const isOpen = !$menu.hasClass('d-none');
       CloseAllScopeDropdowns();
-      if (!IsOpen) $menu.removeClass('d-none');
+      if (!isOpen) $menu.removeClass('d-none');
     });
 
-  $('#ALERT_SCOPE_CLIENTS_TOGGLE')
-    .off('click.alertScope')
-    .on('click.alertScope', function (Event) {
-      Event.preventDefault();
-      Event.stopPropagation();
-      const $menu = $('#ALERT_SCOPE_CLIENTS_MENU');
-      const IsOpen = !$menu.hasClass('d-none');
-      CloseAllScopeDropdowns();
-      if (!IsOpen) $menu.removeClass('d-none');
-    });
-
-  $('#ALERT_SCOPE_GROUPS_MENU')
+  $('#ALERT_SCOPE_MENU')
     .off('change.alertScope')
     .on('change.alertScope', 'input[type="checkbox"]', function () {
-      const Values = [];
-      $('#ALERT_SCOPE_GROUPS_MENU input[type="checkbox"]:checked').each(function () {
-        Values.push($(this).val());
+      const values = [];
+      $('#ALERT_SCOPE_MENU input[type="checkbox"]:checked').each(function () {
+        values.push($(this).val());
       });
-      AlertScopeGroupSelected = Values;
+      AlertScopeSelected = values;
       RenderScopeDropdowns();
-      RenderAlertRuleContextPreview();
-      $('#ALERT_SCOPE_GROUPS_MENU').removeClass('d-none');
-    });
-
-  $('#ALERT_SCOPE_CLIENTS_MENU')
-    .off('change.alertScope')
-    .on('change.alertScope', 'input[type="checkbox"]', function () {
-      const Values = [];
-      $('#ALERT_SCOPE_CLIENTS_MENU input[type="checkbox"]:checked').each(function () {
-        Values.push($(this).val());
-      });
-      AlertScopeClientSelected = Values;
-      RenderScopeDropdowns();
-      RenderAlertRuleContextPreview();
-      $('#ALERT_SCOPE_CLIENTS_MENU').removeClass('d-none');
+      $('#ALERT_SCOPE_MENU').removeClass('d-none');
     });
 
   $(document)
     .off('mousedown.alertScopeDropdown touchstart.alertScopeDropdown')
     .on('mousedown.alertScopeDropdown touchstart.alertScopeDropdown', function (Event) {
-      const inside = $(Event.target).closest('#ALERT_SCOPE_GROUPS_DROPDOWN, #ALERT_SCOPE_CLIENTS_DROPDOWN').length > 0;
+      const inside = $(Event.target).closest('#ALERT_SCOPE_DROPDOWN').length > 0;
       if (!inside) CloseAllScopeDropdowns();
     });
 }
@@ -3048,66 +3068,11 @@ function RenderAlertRuleTriggerConfig(TriggerType, Config = {}) {
   const $host = $('#ALERT_RULE_TRIGGER_CONFIG');
   if (!$host.length) return;
 
-  if (TriggerType !== 'CLIENT_DEGRADED') {
-    $host.html('<small class="text-muted">No additional configuration required for this trigger.</small>');
-    RenderAlertRuleContextPreview();
-    return;
-  }
-
-  const Source = Safe((Config && Config.Source) || 'any');
-  const Cpu = Number.isFinite(Number(Config && Config.ClientCpuUsagePct))
-    ? Number(Config.ClientCpuUsagePct)
-    : '';
-  const Ram = Number.isFinite(Number(Config && Config.ClientRamUsagePct))
-    ? Number(Config.ClientRamUsagePct)
-    : '';
-  const StaleMs = Number.isFinite(Number(Config && Config.ClientLastSeenStaleMs))
-    ? Number(Config.ClientLastSeenStaleMs)
-    : '';
-
-  $host.html(`
-    <div class="row g-2">
-      <div class="col-md-4">
-        <label class="form-label mb-1">Source</label>
-        <select class="form-select" id="ALERT_TRIGGER_CONFIG_SOURCE">
-          <option value="any" ${Source === 'any' ? 'selected' : ''}>Any</option>
-          <option value="client" ${Source === 'client' ? 'selected' : ''}>Adopted Client</option>
-          <option value="monitor" ${Source === 'monitor' ? 'selected' : ''}>Monitoring Target</option>
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label mb-1">Client CPU >= (%)</label>
-        <input type="number" min="1" max="100" class="form-control" id="ALERT_TRIGGER_CONFIG_CPU" value="${Cpu}" placeholder="e.g. 90" />
-      </div>
-      <div class="col-md-4">
-        <label class="form-label mb-1">Client RAM >= (%)</label>
-        <input type="number" min="1" max="100" class="form-control" id="ALERT_TRIGGER_CONFIG_RAM" value="${Ram}" placeholder="e.g. 90" />
-      </div>
-      <div class="col-md-12">
-        <label class="form-label mb-1">Client LastSeen Stale >= (ms)</label>
-        <input type="number" min="1" max="86400000" class="form-control" id="ALERT_TRIGGER_CONFIG_STALE" value="${StaleMs}" placeholder="e.g. 30000" />
-      </div>
-    </div>
-  `);
-  RenderAlertRuleContextPreview();
+  $host.empty().addClass('d-none');
 }
 
 function CollectAlertTriggerConfig() {
-  const TriggerType = $('#ALERT_RULE_TRIGGER_TYPE').val();
-  if (TriggerType !== 'CLIENT_DEGRADED') return {};
-
-  const Source = ($('#ALERT_TRIGGER_CONFIG_SOURCE').val() || 'any').toString().toLowerCase();
-  const Cpu = parseInt($('#ALERT_TRIGGER_CONFIG_CPU').val(), 10);
-  const Ram = parseInt($('#ALERT_TRIGGER_CONFIG_RAM').val(), 10);
-  const Stale = parseInt($('#ALERT_TRIGGER_CONFIG_STALE').val(), 10);
-
-  const Out = {
-    Source: Source === 'client' || Source === 'monitor' ? Source : 'any',
-  };
-  if (Number.isFinite(Cpu) && Cpu > 0) Out.ClientCpuUsagePct = Cpu;
-  if (Number.isFinite(Ram) && Ram > 0) Out.ClientRamUsagePct = Ram;
-  if (Number.isFinite(Stale) && Stale > 0) Out.ClientLastSeenStaleMs = Stale;
-  return Out;
+  return {};
 }
 
 function actionTypeByID(ID) {
@@ -3191,15 +3156,11 @@ function RenderAlertActionsList() {
   AlertRuleDraftActions.forEach((Action, Index) => {
     const ActionType = actionTypeByID(Action.Type);
     Html += `
-      <div class="rounded bg-ghost p-2 d-grid gap-1">
-        <div class="d-flex justify-content-between align-items-center">
-          <strong>${Safe(Action.Title || (ActionType ? ActionType.Name : Action.Type || 'Action'))}</strong>
-          <small class="text-muted">${Safe(ActionType ? ActionType.Name : Action.Type || 'Unknown')}</small>
+      <div class="rounded bg-ghost p-2 d-grid gap-1 text-start border-0 alert-action-open" data-action-index="${Index}" role="button" tabindex="0">
+        <div class="d-flex align-items-center">
+          <strong>${Safe(ActionType ? ActionType.Name : Action.Type || 'Action')}</strong>
         </div>
-        <div class="d-flex gap-2">
-          <button type="button" class="btn btn-sm btn-light alert-action-edit" data-action-index="${Index}">Edit</button>
-          <button type="button" class="btn btn-sm btn-danger alert-action-remove" data-action-index="${Index}">Remove</button>
-        </div>
+        <i class="bi bi-chevron-right alert-action-chevron" aria-hidden="true"></i>
       </div>
     `;
   });
@@ -3207,26 +3168,19 @@ function RenderAlertActionsList() {
   $host.html(Html);
 
   $host
-    .find('.alert-action-edit')
-    .off('click')
+    .find('.alert-action-open')
+    .off('click keydown')
     .on('click', function () {
       const Index = parseInt($(this).attr('data-action-index'), 10);
       if (!Number.isFinite(Index)) return;
       OpenAlertActionEditor(Index);
-    });
-
-  $host
-    .find('.alert-action-remove')
-    .off('click')
-    .on('click', function () {
+    })
+    .on('keydown', function (Event) {
+      if (Event.key !== 'Enter' && Event.key !== ' ') return;
+      Event.preventDefault();
       const Index = parseInt($(this).attr('data-action-index'), 10);
       if (!Number.isFinite(Index)) return;
-      AlertRuleDraftActions.splice(Index, 1);
-      if (AlertEditingActionIndex === Index) {
-        CloseAlertActionEditor();
-      }
-      RenderAlertActionsList();
-      RenderAlertRuleContextPreview();
+      OpenAlertActionEditor(Index);
     });
 }
 
@@ -3251,20 +3205,28 @@ function CollectActionSettingsFromEditorHost() {
 }
 
 function CloseAlertActionEditor() {
+  if (AlertActionEditorIsCreating && Number.isFinite(AlertEditingActionIndex)) {
+    AlertRuleDraftActions.splice(AlertEditingActionIndex, 1);
+    RenderAlertActionsList();
+  }
+  AlertActionEditorIsCreating = false;
   AlertEditingActionIndex = null;
-  $('#ALERT_ACTION_EDITOR_PANEL').addClass('d-none');
+  ShowAlertRuleMainContent();
 }
 
-function OpenAlertActionEditor(Index) {
+function OpenAlertActionEditor(Index, IsCreating = false) {
   if (!Array.isArray(AlertRuleDraftActions) || !AlertRuleDraftActions[Index]) return;
   AlertEditingActionIndex = Index;
+  AlertActionEditorIsCreating = !!IsCreating;
   const Action = AlertRuleDraftActions[Index];
   const TypeID = Action.Type || (AlertActionTypesCache[0] && AlertActionTypesCache[0].ID) || '';
 
-  $('#ALERT_ACTION_EDITOR_PANEL').removeClass('d-none');
-  $('#ALERT_ACTION_EDITOR_TITLE').text(`Edit Action #${Index + 1}`);
+  ShowAlertActionEditorPanel();
+  $('#ALERT_ACTION_EDITOR_TITLE').text(
+    AlertActionEditorIsCreating ? `Create Action #${Index + 1}` : `Edit Action #${Index + 1}`
+  );
+  $('#ALERT_ACTION_EDITOR_CLOSE').text(AlertActionEditorIsCreating ? 'Cancel New Action' : 'Back to Actions');
   $('#ALERT_ACTION_EDITOR_TYPE').html(RenderAlertActionTypeOptions(TypeID));
-  $('#ALERT_ACTION_EDITOR_TITLE_INPUT').val(Action.Title || '');
   $('#ALERT_ACTION_EDITOR_SETTINGS').html(RenderAlertActionSettingsFields(TypeID, Action.Settings || {}));
 }
 
@@ -3272,83 +3234,73 @@ function AddAlertActionAndEdit() {
   const DefaultType = (AlertActionTypesCache[0] && AlertActionTypesCache[0].ID) || '';
   AlertRuleDraftActions.push({
     Type: DefaultType,
-    Title: '',
     Settings: {},
   });
   RenderAlertActionsList();
-  OpenAlertActionEditor(AlertRuleDraftActions.length - 1);
-  RenderAlertRuleContextPreview();
+  OpenAlertActionEditor(AlertRuleDraftActions.length - 1, true);
 }
 
 async function PopulateAlertScopeOptions(Rule = null) {
   let Groups = await window.API.GetAllGroups();
   if (!Array.isArray(Groups)) Groups = [];
 
-  AlertScopeGroupOptions = Groups.map((G) => ({
-    Value: String(G.GroupID),
-    Label: G.Title || `Group ${G.GroupID}`,
-  }));
+  const ScopeOptions = [
+    {
+      Value: 'workspace:*',
+      Label: 'Workspace (All Clients)',
+    },
+  ];
 
-  AlertScopeClientOptions = [];
+  for (const G of Groups) {
+    ScopeOptions.push({
+      Value: `group:${G.GroupID}`,
+      Label: `[Group] ${G.Title || `Group ${G.GroupID}`}`,
+    });
+  }
+
   for (const C of AllClients || []) {
-    AlertScopeClientOptions.push({
-      Value: C.UUID,
+    ScopeOptions.push({
+      Value: `client:${C.UUID}`,
       Label: `${C.Nickname || C.Hostname || C.UUID} (${C.UUID})`,
     });
   }
   for (const T of MonitoringTargets || []) {
-    AlertScopeClientOptions.push({
-      Value: `monitor:${T.TargetID}`,
+    ScopeOptions.push({
+      Value: `client:monitor:${T.TargetID}`,
       Label: `[Monitor] ${T.Nickname || T.Address || `Target ${T.TargetID}`}`,
     });
   }
 
+  AlertScopeOptions = ScopeOptions;
+
   const Scope = Rule && Rule.Scope ? Rule.Scope : { Workspace: false, Groups: [], Clients: [] };
-  $('#ALERT_RULE_SCOPE_WORKSPACE').prop('checked', !!Scope.Workspace);
-  AlertScopeGroupSelected = (Scope.Groups || []).map((x) => `${x}`);
-  AlertScopeClientSelected = (Scope.Clients || []).map((x) => `${x}`);
+  const Selected = [];
+  if (Scope.Workspace) Selected.push('workspace:*');
+  for (const GroupID of Scope.Groups || []) Selected.push(`group:${GroupID}`);
+  for (const ClientID of Scope.Clients || []) Selected.push(`client:${ClientID}`);
+  AlertScopeSelected = Selected;
   RenderScopeDropdowns();
-}
-
-function RenderAlertRuleContextPreview() {
-  const Trigger = $('#ALERT_RULE_TRIGGER_TYPE').val() || 'Unknown Trigger';
-  const ScopeWorkspace = $('#ALERT_RULE_SCOPE_WORKSPACE').is(':checked');
-  const GroupCount = AlertScopeGroupSelected.length;
-  const ClientCount = AlertScopeClientSelected.length;
-  const ActionCount = Array.isArray(AlertRuleDraftActions) ? AlertRuleDraftActions.length : 0;
-
-  const ScopeSummary = ScopeWorkspace
-    ? 'Workspace'
-    : `${GroupCount} group(s), ${ClientCount} client target(s)`;
-
-  $('#ALERT_RULE_CONTEXT_PREVIEW').html(`
-    <strong>Context Preview</strong><br/>
-    Trigger: ${Safe(Trigger)}<br/>
-    Scope: ${Safe(ScopeSummary)}<br/>
-    Actions: ${Safe(String(ActionCount))}<br/>
-    Runtime fields available to actions: <code>{{triggerType}}</code>, <code>{{entityName}}</code>, <code>{{severity}}</code>, <code>{{ip}}</code>, <code>{{uuid}}</code>, <code>{{groupId}}</code>
-  `);
 }
 
 function ResetAlertRuleEditor() {
   AlertRuleEditorRuleID = null;
   AlertEditingActionIndex = null;
+  AlertActionEditorIsCreating = false;
   AlertRuleDraftActions = [];
   $('#ALERT_RULE_EDITOR_TITLE').text('Create Alert Rule');
   $('#ALERT_RULE_TITLE').val('');
   $('#ALERT_RULE_DELETE').addClass('d-none');
-  $('#ALERT_RULE_SCOPE_WORKSPACE').prop('checked', false);
-  AlertScopeGroupSelected = [];
-  AlertScopeClientSelected = [];
+  AlertScopeSelected = [];
   RenderScopeDropdowns();
 
-  const DefaultTrigger = AlertTriggerTypesCache.length ? AlertTriggerTypesCache[0].ID : 'CLIENT_OFFLINE';
+  const DefaultTrigger = AlertTriggerTypesCache.length
+    ? NormalizeAlertTriggerType(AlertTriggerTypesCache[0].ID)
+    : 'CLIENT_OFFLINE';
   $('#ALERT_RULE_TRIGGER_TYPE').val(DefaultTrigger);
   RenderAlertRuleTriggerConfig(DefaultTrigger, {});
 
   RenderAlertActionsList();
-  CloseAlertActionEditor();
-  RenderAlertRuleContextPreview();
+  ShowAlertRuleMainContent();
 }
 
 function OpenAlertRuleEditor(Rule) {
@@ -3359,25 +3311,126 @@ function OpenAlertRuleEditor(Rule) {
 
   AlertRuleEditorRuleID = Rule.RuleID;
   AlertEditingActionIndex = null;
+  AlertActionEditorIsCreating = false;
   $('#ALERT_RULE_EDITOR_TITLE').text(`Edit Rule #${Rule.RuleID}`);
   $('#ALERT_RULE_TITLE').val(Rule.Title || '');
   $('#ALERT_RULE_DELETE').removeClass('d-none');
 
   PopulateAlertScopeOptions(Rule);
 
-  $('#ALERT_RULE_TRIGGER_TYPE').val(Rule.TriggerType || 'CLIENT_OFFLINE');
-  RenderAlertRuleTriggerConfig(Rule.TriggerType || 'CLIENT_OFFLINE', Rule.TriggerConfig || {});
+  const TriggerType = NormalizeAlertTriggerType(Rule.TriggerType || 'CLIENT_OFFLINE');
+  $('#ALERT_RULE_TRIGGER_TYPE').val(TriggerType);
+  RenderAlertRuleTriggerConfig(TriggerType, Rule.TriggerConfig || {});
 
   const Actions = Array.isArray(Rule.Actions) ? Rule.Actions : [];
   AlertRuleDraftActions = Actions.map((Action) => ({
     Type: Action.Type,
-    Title: Action.Title || '',
     Settings: Action.Settings || {},
   }));
   RenderAlertActionsList();
-  CloseAlertActionEditor();
-  RenderAlertRuleContextPreview();
+  ShowAlertRuleMainContent();
   ShowAlertEditorPanel();
+}
+
+function actionTypeNameByID(ID) {
+  const ActionType = actionTypeByID(ID);
+  return ActionType && ActionType.Name ? ActionType.Name : String(ID || 'action');
+}
+
+function triggerSummaryText(TriggerType) {
+  if (TriggerType === 'CLIENT_OFFLINE') return 'is offline';
+  if (TriggerType === 'CLIENT_ONLINE') return 'is online';
+  if (TriggerType === 'SCRIPT_EXECUTION_FAILED') return 'fails to execute a script';
+  return 'triggers';
+}
+
+function summarizeActionType(Type, Count) {
+  if (Type === 'osc-trigger') {
+    return Count > 1 ? `send ${Count} OSC messages` : 'send an OSC message';
+  }
+  if (Type === 'discord-webhook') {
+    return Count > 1 ? `send ${Count} messages on Discord` : 'send a message on Discord';
+  }
+  if (Type === 'http-api') {
+    return Count > 1 ? `send ${Count} HTTP requests` : 'send an HTTP request';
+  }
+  const Name = actionTypeNameByID(Type);
+  return Count > 1 ? `run ${Count} ${Name} actions` : `run ${Name}`;
+}
+
+function naturalJoin(Items) {
+  if (!Array.isArray(Items) || !Items.length) return '';
+  if (Items.length === 1) return Items[0];
+  if (Items.length === 2) return `${Items[0]} and ${Items[1]}`;
+  return `${Items.slice(0, -1).join(', ')}, and ${Items[Items.length - 1]}`;
+}
+
+function targetNameFromScopedID(ScopedID) {
+  const ID = String(ScopedID || '');
+  if (!ID) return 'Target';
+
+  if (ID.startsWith('monitor:')) {
+    const TargetID = ID.slice('monitor:'.length);
+    const Monitor = (MonitoringTargets || []).find((T) => String(T.TargetID) === TargetID);
+    return Monitor ? Monitor.Nickname || Monitor.Address || `Target ${TargetID}` : `Target ${TargetID}`;
+  }
+
+  const Client = (AllClients || []).find((C) => String(C.UUID) === ID);
+  return Client ? Client.Nickname || Client.Hostname || Client.UUID : ID;
+}
+
+function scopedTargetsInfo(Rule) {
+  const Scope = Rule && Rule.Scope ? Rule.Scope : {};
+  if (Scope.Workspace) {
+    const WorkspaceTargets = [];
+    for (const Client of AllClients || []) {
+      WorkspaceTargets.push(Client.Nickname || Client.Hostname || Client.UUID);
+    }
+    for (const Monitor of MonitoringTargets || []) {
+      WorkspaceTargets.push(Monitor.Nickname || Monitor.Address || `Target ${Monitor.TargetID}`);
+    }
+    return {
+      Count: WorkspaceTargets.length,
+      SingleName: WorkspaceTargets.length === 1 ? WorkspaceTargets[0] : null,
+    };
+  }
+
+  const Selected = new Set((Scope.Clients || []).map((ClientID) => String(ClientID)));
+
+  for (const GroupID of Scope.Groups || []) {
+    const UUIDs = GroupUUIDCache.get(String(GroupID));
+    if (!Array.isArray(UUIDs)) continue;
+    for (const UUID of UUIDs) Selected.add(String(UUID));
+  }
+
+  const IDs = Array.from(Selected);
+  return {
+    Count: IDs.length,
+    SingleName: IDs.length === 1 ? targetNameFromScopedID(IDs[0]) : null,
+  };
+}
+
+function buildRuleSummary(Rule) {
+  const TriggerText = triggerSummaryText(Rule && Rule.TriggerType ? Rule.TriggerType : '');
+  const ScopeInfo = scopedTargetsInfo(Rule);
+  const Actions = Array.isArray(Rule && Rule.Actions) ? Rule.Actions : [];
+
+  const CountsByType = new Map();
+  for (const Action of Actions) {
+    const Type = String((Action && Action.Type) || 'action');
+    CountsByType.set(Type, (CountsByType.get(Type) || 0) + 1);
+  }
+
+  const ActionPhrases = [];
+  for (const [Type, Count] of CountsByType.entries()) {
+    ActionPhrases.push(summarizeActionType(Type, Count));
+  }
+
+  const ActionText = ActionPhrases.length ? naturalJoin(ActionPhrases) : 'take no actions';
+  const Subject = ScopeInfo.SingleName
+    ? ScopeInfo.SingleName
+    : `one of ${ScopeInfo.Count} clients`;
+  return `When ${Subject} ${TriggerText}, ${ActionText}.`;
 }
 
 function RenderAlertRuleManagerList() {
@@ -3390,19 +3443,14 @@ function RenderAlertRuleManagerList() {
 
   let Html = '';
   for (const Rule of AlertRulesCache) {
-    const TriggerLabel = String(Rule.TriggerType || '').replace(/_/g, ' ');
+    const Summary = buildRuleSummary(Rule);
     Html += `
       <div class="rounded bg-ghost p-2 d-grid gap-1 text-start border-0 alert-rule-open" data-ruleid="${Rule.RuleID}" role="button" tabindex="0">
         <div class="d-flex justify-content-between align-items-center gap-2">
           <strong>${Safe(Rule.Title || `Rule ${Rule.RuleID}`)}</strong>
-          <span class="badge ${Rule.Enabled ? 'bg-success' : 'bg-secondary'}">${Rule.Enabled ? 'Enabled' : 'Disabled'}</span>
         </div>
-        <small class="text-muted">${Safe(TriggerLabel)}</small>
-        <div class="d-flex gap-2">
-          <button type="button" class="btn btn-sm ${Rule.Enabled ? 'btn-warning' : 'btn-success'} alert-rule-toggle" data-ruleid="${Rule.RuleID}" data-enabled="${Rule.Enabled ? '1' : '0'}">
-            ${Rule.Enabled ? 'Disable' : 'Enable'}
-          </button>
-        </div>
+        <small class="text-muted">${Safe(Summary)}</small>
+        <i class="bi bi-chevron-right alert-rule-chevron" aria-hidden="true"></i>
       </div>
     `;
   }
@@ -3412,38 +3460,24 @@ function RenderAlertRuleManagerList() {
   $host
     .find('.alert-rule-open')
     .off('click')
-    .on('click', function (Event) {
-      if ($(Event.target).closest('.alert-rule-toggle').length) return;
+    .on('click', function () {
       const RuleID = parseInt($(this).attr('data-ruleid'), 10);
       if (!Number.isFinite(RuleID)) return;
       const Rule = AlertRulesCache.find((R) => R.RuleID === RuleID);
       if (Rule) OpenAlertRuleEditor(Rule);
     });
-
-  $host
-    .find('.alert-rule-toggle')
-    .off('click')
-    .on('click', async function (Event) {
-      Event.stopPropagation();
-      const RuleID = parseInt($(this).attr('data-ruleid'), 10);
-      const Enabled = $(this).attr('data-enabled') === '1';
-      if (!Number.isFinite(RuleID)) return;
-      const [Err] = await window.API.SetAlertRuleEnabled(RuleID, !Enabled);
-      if (Err) Notify(Err, 'error');
-    });
 }
 
 function BuildAlertRulePayloadFromEditor() {
   const Title = ($('#ALERT_RULE_TITLE').val() || '').toString().trim();
-  const TriggerType = ($('#ALERT_RULE_TRIGGER_TYPE').val() || '').toString().trim();
+  const TriggerType = NormalizeAlertTriggerType(
+    ($('#ALERT_RULE_TRIGGER_TYPE').val() || '').toString().trim()
+  );
+  const Scope = ParseAlertScopeSelection();
 
   return {
     Title,
-    Scope: {
-      Workspace: $('#ALERT_RULE_SCOPE_WORKSPACE').is(':checked'),
-      Groups: AlertScopeGroupSelected.map((x) => parseInt(x, 10)).filter(Number.isFinite),
-      Clients: AlertScopeClientSelected,
-    },
+    Scope,
     TriggerType,
     TriggerConfig: CollectAlertTriggerConfig(),
     Actions: AlertRuleDraftActions,
@@ -3457,6 +3491,7 @@ async function OpenAlertRuleManager() {
   await PopulateAlertScopeOptions();
 
   const TriggerOptions = (AlertTriggerTypesCache || [])
+    .filter((T) => ALERT_TRIGGER_ALLOWLIST.has(`${T.ID || ''}`.toUpperCase()))
     .map((T) => `<option value="${Safe(T.ID)}">${Safe(T.Name)}</option>`)
     .join('');
   $('#ALERT_RULE_TRIGGER_TYPE').html(TriggerOptions);
@@ -3470,18 +3505,15 @@ async function OpenAlertRuleManager() {
     .off('change.alertRule')
     .on('change.alertRule', function () {
       RenderAlertRuleTriggerConfig($(this).val(), {});
-      RenderAlertRuleContextPreview();
     });
-
-  $('#ALERT_RULE_SCOPE_WORKSPACE')
-    .off('input.alertRule change.alertRule')
-    .on('input.alertRule change.alertRule', () => RenderAlertRuleContextPreview());
 
   $('#ALERT_RULE_BACK_TO_LIST')
     .off('click.alertRule')
     .on('click.alertRule', () => {
       ShowAlertListPanel();
-      CloseAlertActionEditor();
+      AlertActionEditorIsCreating = false;
+      AlertEditingActionIndex = null;
+      ShowAlertRuleMainContent();
     });
 
   $('#ALERT_RULE_CREATE_BUTTON')
@@ -3501,7 +3533,11 @@ async function OpenAlertRuleManager() {
     .off('change.alertRule')
     .on('change.alertRule', function () {
       const TypeID = ($(this).val() || '').toString();
-      $('#ALERT_ACTION_EDITOR_SETTINGS').html(RenderAlertActionSettingsFields(TypeID, {}));
+      const Existing =
+        Number.isFinite(AlertEditingActionIndex) && AlertRuleDraftActions[AlertEditingActionIndex]
+          ? AlertRuleDraftActions[AlertEditingActionIndex].Settings || {}
+          : {};
+      $('#ALERT_ACTION_EDITOR_SETTINGS').html(RenderAlertActionSettingsFields(TypeID, Existing));
     });
 
   $('#ALERT_ACTION_EDITOR_CLOSE')
@@ -3513,9 +3549,10 @@ async function OpenAlertRuleManager() {
     .on('click.alertRule', () => {
       if (!Number.isFinite(AlertEditingActionIndex)) return;
       AlertRuleDraftActions.splice(AlertEditingActionIndex, 1);
+      AlertActionEditorIsCreating = false;
       RenderAlertActionsList();
-      CloseAlertActionEditor();
-      RenderAlertRuleContextPreview();
+      AlertEditingActionIndex = null;
+      ShowAlertRuleMainContent();
     });
 
   $('#ALERT_ACTION_EDITOR_SAVE')
@@ -3526,18 +3563,12 @@ async function OpenAlertRuleManager() {
       if (!Type) return Notify('Please choose an action type', 'error');
       AlertRuleDraftActions[AlertEditingActionIndex] = {
         Type,
-        Title: ($('#ALERT_ACTION_EDITOR_TITLE_INPUT').val() || '').toString().trim(),
         Settings: CollectActionSettingsFromEditorHost(),
       };
+      AlertActionEditorIsCreating = false;
       RenderAlertActionsList();
-      CloseAlertActionEditor();
-      RenderAlertRuleContextPreview();
-    });
-
-  $('#ALERT_RULE_RESET')
-    .off('click.alertRule')
-    .on('click.alertRule', () => {
-      ResetAlertRuleEditor();
+      AlertEditingActionIndex = null;
+      ShowAlertRuleMainContent();
     });
 
   $('#ALERT_RULE_DELETE')
@@ -3576,6 +3607,12 @@ async function OpenAlertRuleManager() {
     });
 
   $('#SHOWTRAK_MODAL_ALERT_MANAGER').modal('show');
+}
+
+async function OpenCreateAlertRuleEditor() {
+  await OpenAlertRuleManager();
+  ResetAlertRuleEditor();
+  ShowAlertEditorPanel();
 }
 
 
@@ -4642,6 +4679,10 @@ async function Init() {
 
   $('#ADD_GROUP_ACTION').on('click', async () => {
     await OpenGroupCreationModal();
+  });
+
+  $('#ADD_ALERT_ACTION').on('click', async () => {
+    await OpenCreateAlertRuleEditor();
   });
 
   const addTargetMenu = document.getElementById('ADD_MONITORING_TARGET_MENU');

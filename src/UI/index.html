@@ -93,9 +93,14 @@
                   Create Monitoring Target
                 </button>
               </li>
+              <li><hr class="dropdown-divider" /></li>
               <li>
-                <button type="button" class="dropdown-item" id="ADD_TARGET_BROWSE_ACTION">
-                  LAN Discovery Wizard
+                <button
+                  type="button"
+                  class="dropdown-item"
+                  id="SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON"
+                >
+                  Manage Groups
                 </button>
               </li>
               <li>
@@ -103,7 +108,21 @@
                   Create Group
                 </button>
               </li>
-              
+              <li><hr class="dropdown-divider" /></li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item"
+                  id="SHOWTRAK_MODEL_CORE_ALERT_MANAGER_BUTTON"
+                >
+                  Manage Alerts
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item" id="ADD_ALERT_ACTION">
+                  Create Alert
+                </button>
+              </li>
             </ul>
           </div>
           <div class="dropdown no-drag" id="SETTINGS_MENU_DROPDOWN">
@@ -143,40 +162,6 @@
                 </button>
               </li>
               <li><hr class="dropdown-divider" /></li>
-              <li><h6 class="dropdown-header">Manage</h6></li>
-              <li>
-                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS">
-                  Settings
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  class="dropdown-item"
-                  id="SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON"
-                >
-                  OSC Dictionary
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  class="dropdown-item"
-                  id="SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON"
-                >
-                  Group Manager
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  class="dropdown-item"
-                  id="SHOWTRAK_MODEL_CORE_ALERT_MANAGER_BUTTON"
-                >
-                  Alerts Manager
-                </button>
-              </li>
-              <li><hr class="dropdown-divider" /></li>
               <li><h6 class="dropdown-header">Folders</h6></li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_LOGSFOLDER">
@@ -189,6 +174,22 @@
                 </button>
               </li>
               <li><hr class="dropdown-divider" /></li>
+              <li><h6 class="dropdown-header">Manage</h6></li>
+              <li>
+                <button type="button" class="dropdown-item" id="ADD_TARGET_BROWSE_ACTION">
+                  LAN Discovery Wizard
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item"
+                  id="SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON"
+                >
+                  OSC Dictionary
+                </button>
+              </li>
+              <li><hr class="dropdown-divider" /></li>
               <li><h6 class="dropdown-header">Help &amp; Support</h6></li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_CHECKUPDATES">
@@ -197,10 +198,15 @@
               </li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_ABOUT_BUTTON">
-                  About ShowTrak
+                  About
                 </button>
               </li>
               <li><hr class="dropdown-divider" /></li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS">
+                  ShowTrak Preferences
+                </button>
+              </li>
               <li>
                 <button
                   type="button"
@@ -837,10 +843,6 @@
         <div class="modal-content">
           <div class="modal-body text-center">
 
-            <div class="rounded-3 p-2 bg-ghost-light">
-              <h6 class="mb-0">Alerts Manager</h6>
-            </div>
-
             <div id="ALERT_MANAGER_LIST_PANEL" class="d-grid gap-2 text-start mt-1">
               <div class="d-flex justify-content-between align-items-center">
                 <strong>Alerts</strong>
@@ -854,7 +856,7 @@
             <div id="ALERT_MANAGER_EDITOR_PANEL" class="d-none d-grid gap-2 text-start mt-1">
               <div class="d-flex justify-content-between align-items-center gap-2">
                 <button type="button" class="btn btn-sm btn-light" id="ALERT_RULE_BACK_TO_LIST">
-                  Back to Alerts
+                  <i class="bi bi-chevron-left me-1" aria-hidden="true"></i>Back
                 </button>
                 <div class="rounded-3 p-2 bg-ghost flex-grow-1 text-center">
                   <h6 id="ALERT_RULE_EDITOR_TITLE" class="mb-0">Create Alert Rule</h6>
@@ -871,36 +873,13 @@
                 <label for="ALERT_RULE_TITLE">Rule Title</label>
               </div>
 
-              <div class="form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost rounded p-2">
-                <label class="form-check-label mb-0 ms-2" for="ALERT_RULE_SCOPE_WORKSPACE">
-                  Workspace (All Clients)
-                </label>
-                <input
-                  class="form-check-input ms-2 me-2"
-                  type="checkbox"
-                  role="switch"
-                  id="ALERT_RULE_SCOPE_WORKSPACE"
-                />
-              </div>
-
-              <div class="row g-2">
-                <div class="col-md-6">
-                  <label class="form-label mb-1">Groups</label>
-                  <div class="alert-multiselect" id="ALERT_SCOPE_GROUPS_DROPDOWN">
-                    <button type="button" class="btn btn-light w-100 text-start" id="ALERT_SCOPE_GROUPS_TOGGLE">
-                      Select groups
-                    </button>
-                    <div class="alert-multiselect-menu d-none" id="ALERT_SCOPE_GROUPS_MENU"></div>
-                  </div>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label mb-1">Clients / Targets</label>
-                  <div class="alert-multiselect" id="ALERT_SCOPE_CLIENTS_DROPDOWN">
-                    <button type="button" class="btn btn-light w-100 text-start" id="ALERT_SCOPE_CLIENTS_TOGGLE">
-                      Select clients / targets
-                    </button>
-                    <div class="alert-multiselect-menu d-none" id="ALERT_SCOPE_CLIENTS_MENU"></div>
-                  </div>
+              <div>
+                <div class="alert-multiselect" id="ALERT_SCOPE_DROPDOWN">
+                  <button type="button" class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center" id="ALERT_SCOPE_TOGGLE">
+                    <span>Select targets</span>
+                    <i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>
+                  </button>
+                  <div class="alert-multiselect-menu d-none" id="ALERT_SCOPE_MENU"></div>
                 </div>
               </div>
 
@@ -909,15 +888,22 @@
                 <label for="ALERT_RULE_TRIGGER_TYPE">Trigger</label>
               </div>
 
-              <div id="ALERT_RULE_TRIGGER_CONFIG" class="d-grid gap-2 bg-ghost rounded p-2"></div>
+              <div id="ALERT_RULE_MAIN_CONTENT" class="d-grid gap-2">
+                <div id="ALERT_RULE_TRIGGER_CONFIG" class="d-none d-grid gap-2 bg-ghost rounded p-2"></div>
 
-              <div class="d-flex justify-content-between align-items-center">
-                <strong>Actions</strong>
-                <button type="button" class="btn btn-sm btn-light" id="ALERT_RULE_ADD_ACTION">
-                  Add Action
-                </button>
+                <div class="d-flex justify-content-between align-items-center">
+                  <strong>Actions</strong>
+                  <button type="button" class="btn btn-sm btn-light" id="ALERT_RULE_ADD_ACTION">
+                    Add Action
+                  </button>
+                </div>
+                <div id="ALERT_RULE_ACTIONS_LIST" class="d-grid gap-2"></div>
+
+                <div class="d-grid gap-2 mt-1">
+                  <button type="button" class="btn btn-danger d-none" id="ALERT_RULE_DELETE">Delete</button>
+                  <button type="button" class="btn btn-success" id="ALERT_RULE_SAVE">Save</button>
+                </div>
               </div>
-              <div id="ALERT_RULE_ACTIONS_LIST" class="d-grid gap-2"></div>
 
               <div id="ALERT_ACTION_EDITOR_PANEL" class="d-none rounded bg-ghost p-2 d-grid gap-2">
                 <div class="d-flex justify-content-between align-items-center">
@@ -930,16 +916,6 @@
                 <div class="form-floating">
                   <select class="form-select" id="ALERT_ACTION_EDITOR_TYPE"></select>
                   <label for="ALERT_ACTION_EDITOR_TYPE">Action Type</label>
-                </div>
-
-                <div class="form-floating">
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="ALERT_ACTION_EDITOR_TITLE_INPUT"
-                    placeholder="Action Title"
-                  />
-                  <label for="ALERT_ACTION_EDITOR_TITLE_INPUT">Action Title (optional)</label>
                 </div>
 
                 <div id="ALERT_ACTION_EDITOR_SETTINGS" class="d-grid gap-2"></div>
@@ -957,27 +933,9 @@
                   </div>
                 </div>
               </div>
-
-              <div id="ALERT_RULE_CONTEXT_PREVIEW" class="rounded bg-ghost p-2 text-sm"></div>
-
-              <div class="row g-2 mt-1">
-                <div class="col-4 d-grid">
-                  <button type="button" class="btn btn-light" id="ALERT_RULE_RESET">Reset</button>
-                </div>
-                <div class="col-4 d-grid">
-                  <button type="button" class="btn btn-danger d-none" id="ALERT_RULE_DELETE">Delete</button>
-                </div>
-                <div class="col-4 d-grid">
-                  <button type="button" class="btn btn-success" id="ALERT_RULE_SAVE">Save</button>
-                </div>
-              </div>
             </div>
 
-            <div class="row g-2 mt-2">
-              <div class="col-12 d-grid">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-              </div>
-            </div>
+
           </div>
         </div>
       </div>

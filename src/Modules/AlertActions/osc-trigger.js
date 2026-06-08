@@ -6,12 +6,6 @@ const Settings = [
   { Key: 'TargetIP', Label: 'Target IP / Hostname', Type: 'string', Default: '127.0.0.1' },
   { Key: 'Port', Label: 'Port', Type: 'number', Default: 3333, Min: 1, Max: 65535 },
   { Key: 'Message', Label: 'OSC Message Path', Type: 'string', Default: '/ShowTrak/Alert' },
-  {
-    Key: 'ArgsJson',
-    Label: 'Args JSON Array',
-    Type: 'string',
-    Default: '["{{triggerType}}","{{entityName}}","{{severity}}"]',
-  },
 ];
 
 function interpolate(Input, Context) {
@@ -30,17 +24,6 @@ function interpolate(Input, Context) {
   );
 }
 
-function parseArgs(ArgsJson, Context) {
-  const Interpolated = interpolate(ArgsJson, Context);
-  try {
-    const Parsed = JSON.parse(Interpolated);
-    if (!Array.isArray(Parsed)) return [];
-    return Parsed;
-  } catch {
-    return [];
-  }
-}
-
 function NormalizeSettings(Input) {
   const Next = Input && typeof Input === 'object' ? Input : {};
   const Port = Number(Next.Port);
@@ -48,7 +31,6 @@ function NormalizeSettings(Input) {
     TargetIP: String(Next.TargetIP || '127.0.0.1').trim(),
     Port: Number.isFinite(Port) ? Math.max(1, Math.min(65535, Math.round(Port))) : 3333,
     Message: String(Next.Message || '/ShowTrak/Alert').trim() || '/ShowTrak/Alert',
-    ArgsJson: String(Next.ArgsJson || '["{{triggerType}}","{{entityName}}","{{severity}}"]'),
   };
 }
 
@@ -61,14 +43,13 @@ function ValidateSettings(SettingsInput) {
 
 async function Execute(Action, Context, Logger) {
   const S = NormalizeSettings(Action && Action.Settings ? Action.Settings : {});
-  const Args = parseArgs(S.ArgsJson, Context);
   const MsgPath = interpolate(S.Message, Context);
 
   return new Promise((resolve) => {
     let ClientRef;
     try {
       ClientRef = new Client(S.TargetIP, S.Port);
-      const MessageRef = new Message(MsgPath, ...Args);
+      const MessageRef = new Message(MsgPath);
       ClientRef.send(MessageRef, () => {
         try {
           ClientRef.close();
@@ -95,7 +76,7 @@ async function Execute(Action, Context, Logger) {
 module.exports = {
   ID,
   Name: 'OSC Trigger',
-  Description: 'Sends an OSC message to a remote endpoint with optional tokenized arguments.',
+  Description: 'Sends an OSC message route/path to a remote endpoint.',
   Settings,
   NormalizeSettings,
   ValidateSettings,
