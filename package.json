@@ -1,7 +1,7 @@
 {
   "name": "showtrak-server",
   "productName": "ShowTrak Server",
-  "version": "3.2.6",
+  "version": "3.2.7",
   "description": "Open source network/device monitoring & control for bulk installations.",
   "main": "src/main.js",
   "scripts": {
@@ -20,11 +20,15 @@
   },
   "keywords": [
     "electron",
-    "electron-forge",
     "monitoring",
     "lan",
     "arcade",
-    "pc-monitoring",
+    "device-management",
+    "network-monitoring",
+    "client-management",
+    "network-discovery",
+    "remote-control",
+    "script-execution",
     "mdns",
     "bonjour",
     "osc",

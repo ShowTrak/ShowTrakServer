@@ -1,5 +1,3 @@
-Maintenance Mode (Suppress alerts)
-
 Monitoring
  - Art-Net/sACN Continuity Checks
  - NDI/Dante Stream Continuity Checks
