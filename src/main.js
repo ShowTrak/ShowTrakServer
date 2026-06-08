@@ -66,6 +66,28 @@ let autoUpdater = null;
 let squirrelUpdaterInitialized = false;
 const MONITORING_HISTORY_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const MonitoringTargetHistoryStore = new Map();
+const WINDOW_DRAGBAR_HEIGHT_PX = 32;
+const MAC_TRAFFIC_LIGHT_DIAMETER_PX = 12;
+const MAC_TRAFFIC_LIGHT_LEFT_PADDING_PX = 12;
+const MAC_TRAFFIC_LIGHT_TOP_PADDING_PX = Math.max(
+  0,
+  Math.round((WINDOW_DRAGBAR_HEIGHT_PX - MAC_TRAFFIC_LIGHT_DIAMETER_PX) / 2)
+);
+
+const WINDOW_CHROME_OPTIONS =
+  process.platform === 'darwin'
+    ? {
+        frame: true,
+        titleBarStyle: 'hidden',
+        trafficLightPosition: {
+          x: MAC_TRAFFIC_LIGHT_LEFT_PADDING_PX,
+          y: MAC_TRAFFIC_LIGHT_TOP_PADDING_PX,
+        },
+      }
+    : {
+        frame: true,
+        titleBarStyle: 'hidden',
+      };
 
 function pruneMonitoringHistoryStore(now = Date.now()) {
   const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
@@ -321,8 +343,7 @@ app.whenReady().then(async () => {
       devTools: !app.isPackaged,
     },
     icon: getWindowIconPath(),
-    frame: true,
-    titleBarStyle: 'hidden',
+    ...WINDOW_CHROME_OPTIONS,
   });
 
   PreloaderWindow.once('ready-to-show', () => {
@@ -346,8 +367,7 @@ app.whenReady().then(async () => {
       devTools: !app.isPackaged,
     },
     icon: getWindowIconPath(),
-    frame: true,
-    titleBarStyle: 'hidden',
+    ...WINDOW_CHROME_OPTIONS,
   });
 
   MainWindow.loadFile(path.join(__dirname, 'UI', 'index.html')).then(async () => {

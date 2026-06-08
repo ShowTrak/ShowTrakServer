@@ -1001,7 +1001,7 @@ function RenderMonitoringTargetTile(T) {
   const Method = String(T.Method || '').toUpperCase();
   const DragUUID = `monitor:${T.TargetID}`;
   const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
-  const TextClass = Degraded ? 'text-warning' : Online ? 'text-success' : 'text-warning';
+  const TextClass = 'text-light';
   return `
     <div id="MONITOR_TILE_${T.TargetID}" class="SHOWTRAK_PC MONITOR ${TileStateClass}" data-target-id="${T.TargetID}" data-uuid="${DragUUID}" draggable="${
       AppMode === 'EDIT' ? 'true' : 'false'
@@ -1037,13 +1037,12 @@ function UpdateMonitoringTargetTile(T) {
     .find('[data-type="Method"]')
     .text(`${String(T.Method || '').toUpperCase()} · ${FormatInterval(T.Interval)}`);
   const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
-  const Success = Online && !Degraded;
   const $label = $tile.find('[data-type="MONITOR_STATUS_LABEL"]');
   $label.text(Status);
-  $label.toggleClass('text-success', Success).toggleClass('text-warning', !Success);
+  $label.removeClass('text-success text-warning').addClass('text-light');
   const $compact = $tile.find('[data-type="MONITOR_COMPACT_LATENCY"]');
   $compact.text(Status);
-  $compact.toggleClass('text-success', Success).toggleClass('text-warning', !Success);
+  $compact.removeClass('text-success text-warning').addClass('text-light');
 }
 
 async function LoadMonitoringTargetHistory(TargetID) {

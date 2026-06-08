@@ -337,7 +337,7 @@
     const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
     const Method = String(T.Method || '').toUpperCase();
     const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
-    const TextClass = Degraded ? 'text-warning' : Online ? 'text-success' : 'text-warning';
+    const TextClass = 'text-light';
     return `<div id="MONITOR_TILE_${safe(T.TargetID)}" class="SHOWTRAK_PC MONITOR ${TileStateClass}" data-target-id="${safe(
       T.TargetID
     )}" data-kind="monitor">
@@ -476,9 +476,8 @@
     if (label) {
       const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
       label.textContent = Status;
-      const ok = Online && !Degraded;
-      label.classList.toggle('text-success', ok);
-      label.classList.toggle('text-warning', !ok);
+      label.classList.remove('text-success', 'text-warning');
+      label.classList.add('text-light');
     }
     return true;
   }
