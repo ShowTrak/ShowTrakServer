@@ -1,415 +1,971 @@
+/* ShowTrak Web UI
+ * Mirrors the desktop application tile + group styling, with a responsive,
+ * mobile-first chrome (top bar, bottom sheets, passcode overlay).
+ */
+
 :root {
   --bg: #0c091c;
-  --bg-grad: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%);
-  --card: #1d1a2f;
-  --panel: #1d1a2f;
-  --text: #ffffff;
-  --muted: rgba(255, 255, 255, 0.7);
-  --ring: rgba(255, 255, 255, 0.08);
-  --ok: #22c55e;
-  --warn: #f59e0b;
-  --bad: #ef4444;
+  --bg-elev: #1d1a2f;
+  --client-online-bg: rgba(18, 255, 0, 0.32);
+  --client-offline-bg: rgba(255, 0, 0, 0.24);
+  --ghost: rgba(255, 255, 255, 0.03);
+  --ghost-light: rgba(255, 255, 255, 0.1);
+  --line: rgba(255, 255, 255, 0.08);
+  --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --topbar-h: 56px;
 }
+
 * {
   box-sizing: border-box;
 }
+
 html,
 body {
+  margin: 0;
+  padding: 0;
   height: 100%;
 }
+
 body {
-  margin: 0;
-  font-family:
-    Inter,
-    system-ui,
-    Segoe UI,
-    Roboto,
-    Helvetica,
-    Arial,
-    sans-serif;
-  background: var(--bg-grad);
-  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #fff;
+  background: radial-gradient(circle at 50% 90%, #151232 0%, #0c091c 60%) fixed;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+  overflow-x: hidden;
 }
+
+.hidden {
+  display: none !important;
+}
+
+/* Ghost backgrounds shared with the desktop app */
+.bg-ghost {
+  background-color: var(--ghost) !important;
+}
+.bg-ghost-light {
+  background-color: var(--ghost-light) !important;
+}
+
+small,
+.text-sm {
+  font-size: 10px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Top bar                                                            */
+/* ------------------------------------------------------------------ */
 .topbar {
   position: sticky;
   top: 0;
+  z-index: 50;
+  height: calc(var(--topbar-h) + var(--safe-top));
+  padding: var(--safe-top) 14px 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.6rem 0.9rem;
-  background: #1d1a2f;
-  border-bottom: 1px solid var(--ring);
-  z-index: 10;
+  background: rgba(13, 10, 28, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
 }
-.offline-banner {
-  position: sticky;
-  top: 0;
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  padding: 0.4rem 0.9rem;
-  background: #7f1d1d;
-  color: #fff;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  z-index: 9;
-  font-weight: 700;
-}
-.offline-banner .hint {
-  font-weight: 400;
-  opacity: 0.9;
-}
-.hidden {
-  display: none;
-}
+
 .brand {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--ring);
-  border-radius: 0.5rem;
-  padding: 0.5rem;
-  overflow: hidden;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.brand .logo {
+  width: 26px;
+  height: 26px;
+}
+.brand-name {
+  font-size: 1.05rem;
 }
 
-.brand .logo {
-  width: 28px;
-  height: 28px;
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.conn-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #6c757d;
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  transition: background 200ms ease, box-shadow 200ms ease;
+}
+.conn-dot.online {
+  background: #28d17c;
+  box-shadow: 0 0 0 4px rgba(40, 209, 124, 0.18);
+}
+.conn-dot.connecting {
+  background: #ffc107;
+  box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.18);
+}
+.conn-dot.offline {
+  background: #dc3545;
+  box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.18);
+}
+
+#logoutBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Top bar pill buttons (view toggle + logout) — solid ghost, no border */
+.topbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: var(--ghost-light);
+  color: #fff;
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.topbar-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.topbar-btn:active {
+  background: rgba(255, 255, 255, 0.24);
+}
+.topbar-btn i {
+  font-size: 1rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Connection banner                                                  */
+/* ------------------------------------------------------------------ */
+.conn-banner {
+  position: fixed;
+  top: calc(var(--topbar-h) + var(--safe-top));
+  left: 0;
+  right: 0;
+  z-index: 49;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(180deg, #7a1320, #5e0f19);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  animation: bannerIn 200ms ease;
+}
+@keyframes bannerIn {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Content + groups (mirrors desktop app)                             */
+/* ------------------------------------------------------------------ */
+.content {
+  padding-bottom: calc(24px + var(--safe-bottom));
+  min-height: calc(100dvh - var(--topbar-h));
+}
+
+#APPLICATION_CONTENT {
   display: block;
 }
 
-.chart-title {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--muted);
-  margin: 0 0 0.25rem 0.25rem;
+.GROUP_ROW {
+  display: flex;
+  justify-content: flex-start;
 }
 
-.btn {
-  appearance: none;
-  border: 0;
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text);
-  padding: 0.45rem 0.7rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-}
-.btn-ghost {
-  background: rgba(255, 255, 255, 0.03);
-}
-.btn-light {
-  background: rgba(255, 255, 255, 0.14);
-}
-.btn-success {
-  background: #166534;
-}
-.content {
-  padding: 1rem;
-  max-width: 960px;
-  margin: 0 auto;
-}
-.content {
-  padding-bottom: calc(120px + var(--safe-bottom));
-}
-.search {
-  margin-bottom: 0.75rem;
-}
-.search input {
-  width: 100%;
-  padding: 0.7rem 0.8rem;
-  border-radius: 0.6rem;
-  border: 1px solid var(--ring);
-  background: #0f1522;
-  color: var(--text);
-}
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 0.75rem;
-}
-.card {
-  background: var(--card);
-  border: 1px solid var(--ring);
-  border-radius: 0.8rem;
-  padding: 0.8rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-.card-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-.title {
+.GROUP_TITLE {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
   font-weight: 700;
+  letter-spacing: 0.1rem;
+  color: rgba(255, 255, 255, 0.6);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.status {
-  font-size: 0.8rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  border: 1px solid var(--ring);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--muted);
-}
-.subtitle,
-.meta {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-.meta {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-.badge {
-  font-size: 0.75rem;
-  border: 1px solid var(--ring);
-  background: #0f1522;
-  border-radius: 0.4rem;
-  padding: 0.15rem 0.4rem;
-  color: var(--muted);
-}
-@media (hover: hover) {
-  .card:hover {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-  }
-}
-@media (max-width: 420px) {
-  .cards {
-    grid-template-columns: 1fr;
-  }
+  text-transform: uppercase;
+  display: block;
+  width: 100%;
+  text-align: center;
 }
 
-/* Detail view */
-.hidden {
+.GROUP_TITLE_CLICKABLE {
+  background-color: var(--ghost-light) !important;
+  cursor: pointer !important;
+  width: 26px;
+  min-width: 26px;
+  max-width: 26px;
+  flex: 0 0 38px;
+  box-sizing: border-box;
+}
+.GROUP_TITLE_CLICKABLE:hover {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  border-radius: 0.3rem;
+}
+
+/* Drop-zone equivalent: clients + monitors wrap inside the group */
+.GROUP_CLIENTS {
+  background-color: var(--ghost) !important;
+}
+
+/* Client / monitor tile — ported verbatim from the desktop UI */
+.SHOWTRAK_PC {
+  width: 220px;
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  border: transparent 2px solid;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
+  background-color: var(--client-offline-bg);
+  cursor: pointer !important;
+  position: relative;
+  justify-items: center;
+  text-align: center;
+}
+
+.SHOWTRAK_PC > [data-type='Hostname'],
+.SHOWTRAK_PC > [data-type='IP'],
+.SHOWTRAK_PC > .SHOWTRAK_PC_STATUS {
+  overflow: hidden;
+  max-height: 64px;
+  opacity: 1;
+}
+
+/* Status rows (progress bars / offline badge) must span the tile width even
+ * though the tile centers its other content. */
+.SHOWTRAK_PC > .SHOWTRAK_PC_STATUS {
+  width: 100%;
+}
+
+.SHOWTRAK_PC:hover {
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+.SHOWTRAK_PC:active {
+  border-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.SHOWTRAK_PC.ONLINE {
+  background-color: var(--client-online-bg) !important;
+}
+.SHOWTRAK_PC.DEGRADED {
+  background-color: rgba(255, 140, 0, 0.32) !important;
+}
+.SHOWTRAK_PC.PENDING {
+  background-color: rgba(0, 123, 255, 0.25) !important;
+}
+
+.SHOWTRAK_PC_STATUS {
+  height: 15px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: rgba(255, 255, 255, 0.6);
+}
+.SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] {
+  height: auto !important;
+  min-height: 19px;
+  line-height: 1.2;
+  justify-items: center;
+}
+.SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] > [data-type='OFFLINE_SINCE'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  margin: 0;
+  line-height: 1.2;
+}
+.SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] .badge {
+  line-height: 1.1;
+}
+.SHOWTRAK_PC_STATUS > .progress:first-of-type {
+  margin-top: 0.2rem;
+}
+
+/* Monitor compact latency badge is unused on web; keep hidden */
+.MONITOR_COMPACT_LATENCY {
   display: none;
 }
-.detail-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
+
+.progress {
+  height: 3px !important;
+  border-radius: 5px;
+  background-color: var(--ghost-light) !important;
 }
-.detail-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+
+h7 {
+  display: block;
+  font-size: 14px;
 }
-.detail-actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin: 0.75rem 0;
+
+.text-bold {
+  font-weight: 600 !important;
 }
-.select {
-  appearance: none;
-  border: 1px solid var(--ring);
-  background: #0f1522;
-  color: var(--text);
-  padding: 0.5rem 0.6rem;
+
+.SHOWTRAK_PC_PLACEHOLDER {
+  width: 220px;
+  display: grid;
   border-radius: 0.5rem;
-  min-width: 160px;
-}
-.btn-success {
-  background: #166534;
-  border-color: #14532d;
-}
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--ring);
-  border-radius: 0.8rem;
-  padding: 0.8rem;
-}
-.panel + .panel {
-  margin-top: 0.75rem;
-}
-.panel-title {
   font-weight: 700;
-  margin-bottom: 0.5rem;
-}
-.detail-grid {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: 1fr;
-}
-.charts {
-  display: grid;
-  gap: 0.5rem;
-}
-.chart {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--ring);
-  border-radius: 0.5rem;
-  padding: 0.5rem;
-  overflow: hidden;
-}
-.info-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.5rem;
-}
-@media (min-width: 700px) {
-  .info-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-.kv {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--ring);
-  border-radius: 0.5rem;
-  padding: 0.4rem 0.5rem;
-  background: #0f1522;
-}
-.kv .k {
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-.kv .v {
-  font-weight: 600;
-}
-.list {
-  display: grid;
-  gap: 0.4rem;
-}
-.list-item {
-  border: 1px solid var(--ring);
-  border-radius: 0.5rem;
-  padding: 0.4rem 0.5rem;
-  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+  padding: 2rem;
+  border: transparent 2px solid;
+  background-color: var(--ghost);
 }
 
-@media (min-width: 900px) {
-  .detail-grid {
-    grid-template-columns: 1.2fr 0.8fr;
-  }
+.empty-state {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 18vh 24px;
+}
+.empty-state i {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 12px;
+  opacity: 0.6;
 }
 
-/* Scripts sheet */
-.sheet {
+/* ------------------------------------------------------------------ */
+/* Overlays (loading / login / confirm)                               */
+/* ------------------------------------------------------------------ */
+.overlay {
   position: fixed;
   inset: 0;
-  background: rgba(12, 9, 28, 0.6);
-  backdrop-filter: blur(4px);
+  z-index: 200;
   display: flex;
-  flex-direction: column;
-  z-index: 50;
-}
-.sheet.hidden {
-  display: none;
-}
-.sheet-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
-  background: linear-gradient(180deg, #0f1320 0%, rgba(15, 19, 32, 0.75) 100%);
-  border-bottom: 1px solid var(--ring);
-}
-.sheet-title {
-  font-weight: 700;
-}
-.sheet-list {
-  padding: 1rem;
-  display: grid;
-  gap: 0.6rem;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  flex: 1;
-  overflow: auto;
-  min-height: 0;
-  -webkit-overflow-scrolling: touch;
-}
-.script-btn {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.75rem;
-  border: none;
-  background: #1d1a2f;
-  color: #ffffff;
-  padding: 1rem 1.1rem;
-  border-radius: 0.8rem;
-  font-size: 1rem;
-  font-weight: 700;
-}
-.script-name {
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-@media (hover: hover) {
-  .script-btn:hover {
-    filter: brightness(1.05);
-  }
-}
-.script-btn:active {
-  transform: translateY(1px);
-}
-/* Filled variants instead of outline */
-.script-style-light {
-  background: #3b82f6;
-  color: #0b1220;
-}
-.script-style-danger {
-  background: #ef4444;
-  color: #220707;
-}
-.script-style-success {
-  background: #22c55e;
-  color: #03120a;
-}
-.script-style-warning {
-  background: #f59e0b;
-  color: #1f1303;
+  justify-content: center;
+  background: rgba(8, 6, 18, 0.92);
+  backdrop-filter: blur(6px);
+  padding: 24px;
 }
 
-/* Mobile bottom nav */
-.mobile-nav {
+.spinner {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 255, 255, 0.15);
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Login / passcode */
+.login-card {
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+}
+.login-logo {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 12px;
+}
+.pin-display {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin: 10px 0 6px;
+}
+.pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  transition: background 120ms ease, transform 120ms ease;
+}
+.pin-dot.filled {
+  background: #fff;
+  border-color: #fff;
+  transform: scale(1.05);
+}
+.pin-error {
+  color: #ff6b7d;
+  font-size: 0.85rem;
+  min-height: 1.2em;
+  margin-bottom: 6px;
+}
+.pin-display.shake {
+  animation: shake 0.4s ease;
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+.keypad {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.keypad-btn {
+  height: 64px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, transform 80ms ease;
+  user-select: none;
+}
+.keypad-btn:active {
+  background: rgba(255, 255, 255, 0.16);
+  transform: scale(0.96);
+}
+.keypad-muted {
+  background: transparent;
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Confirm */
+.confirm-overlay {
+  z-index: 320;
+}
+.confirm-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+.confirm-text {
+  font-size: 1.02rem;
+  line-height: 1.4;
+  margin-bottom: 18px;
+  white-space: pre-line;
+}
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Bottom sheets (detail + scripts)                                   */
+/* ------------------------------------------------------------------ */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 290;
+  background: rgba(6, 4, 14, 0.6);
+  backdrop-filter: blur(2px);
+}
+.sheet {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  height: calc(76px + var(--safe-bottom));
-  background: #1d1a2f;
-  border-top: 1px solid var(--ring);
+  z-index: 300;
+  max-height: 88dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elev);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+  padding-bottom: var(--safe-bottom);
+  animation: sheetUp 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes sheetUp {
+  from {
+    transform: translateY(100%);
+  }
+}
+.sheet-grabber {
+  width: 42px;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.25);
+  margin: 10px auto 4px;
+}
+.sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 6px 18px 12px;
+  gap: 12px;
+}
+.sheet-title-wrap {
+  min-width: 0;
+}
+.sheet-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sheet-status {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 2px;
+}
+.sheet-status.online {
+  color: #28d17c;
+}
+.sheet-status.offline {
+  color: rgba(255, 255, 255, 0.5);
+}
+.sheet-body {
+  overflow-y: auto;
+  padding: 0 18px 22px;
   display: grid;
-  grid-template-columns: 1fr;
-  align-items: center;
-  justify-items: center;
-  padding: 8px 12px;
-  padding-bottom: calc(12px + var(--safe-bottom));
-  z-index: 20;
+  gap: 16px;
 }
-.nav-btn {
-  appearance: none;
-  border: 0;
-  border-radius: 14px;
-  height: 48px;
-  padding: 0 18px;
-  font-weight: 800;
-  background: rgba(255, 255, 255, 0.14);
+
+.icon-btn {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
   color: #fff;
-  width: min(92%, 480px);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
 }
-@media (min-width: 820px) {
-  .mobile-nav {
-    display: none;
+.icon-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.detail-vitals {
+  display: grid;
+  gap: 12px;
+}
+.vital-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 5px;
+}
+.detail-vitals .progress {
+  height: 6px !important;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.detail-section-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 8px;
+}
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.kv {
+  background: var(--ghost);
+  border-radius: 10px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+.kv .k {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.45);
+}
+.kv .v {
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  background: var(--ghost-light);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+.chip-empty {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.85rem;
+}
+
+/* Scripts list */
+.scripts-list {
+  display: grid;
+  gap: 10px;
+}
+.script-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  padding: 14px 16px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.script-btn:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+.script-btn .script-go {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+.scripts-empty {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 24px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Toasts                                                             */
+/* ------------------------------------------------------------------ */
+.toast-host {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + var(--safe-bottom));
+  transform: translateX(-50%);
+  z-index: 400;
+  display: grid;
+  gap: 8px;
+  width: min(420px, calc(100vw - 28px));
+}
+.toast {
+  background: rgba(29, 26, 47, 0.98);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 0.92rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  animation: toastIn 200ms ease;
+}
+.toast.success {
+  border-left: 3px solid #28d17c;
+}
+.toast.error {
+  border-left: 3px solid #dc3545;
+}
+.toast.info {
+  border-left: 3px solid #4aa3ff;
+}
+@keyframes toastIn {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
   }
 }
 
-/* Confirmation modal */
-.confirm{position:fixed;inset:0;background:rgba(12,9,28,.6);backdrop-filter:blur(4px);display:grid;place-items:center;z-index:60}
-.confirm.hidden{display:none}
-.confirm-body{width:min(94%,560px);background:linear-gradient(180deg,#160f35 0%,#0f0b23 100%);border:1px solid var(--ring);border-radius:12px;padding:16px;display:grid;gap:12px}
-.confirm-title{font-weight:800}
-.confirm-text{color:var(--muted)}
-.confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.confirm-actions .btn{height:44px;font-weight:800}
+/* ------------------------------------------------------------------ */
+/* Buttons                                                            */
+/* ------------------------------------------------------------------ */
+.btn {
+  font-weight: 600;
+}
+.btn-light {
+  background: #fff;
+  color: #14111f;
+}
+.flex-fill {
+  flex: 1 1 0;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #35353a;
+  border-radius: 12px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Compact view (web-only, local toggle — default on)                */
+/* Collapses each tile to a single 36px row showing just the name.    */
+/* ------------------------------------------------------------------ */
+/* GROUP_ROW keeps the default `align-items: stretch` so the label
+ * matches the height of the clients container (like the desktop app). */
+body.compact .GROUP_CLIENTS {
+  gap: 0.5rem !important;
+  padding: 0.5rem !important;
+}
+
+/* Group label becomes a short horizontal pill (like the desktop app). */
+body.compact .GROUP_TITLE_CLICKABLE {
+  width: 120px !important;
+  min-width: 120px !important;
+  max-width: 120px !important;
+  flex: 0 0 120px !important;
+  min-height: 2rem;
+  padding: 0 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+body.compact .GROUP_TITLE_CLICKABLE > div {
+  height: auto !important;
+  width: 100%;
+  justify-content: center;
+}
+body.compact .GROUP_TITLE {
+  writing-mode: horizontal-tb;
+  transform: none;
+  letter-spacing: 0.04rem;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+body.compact .SHOWTRAK_PC,
+body.compact .SHOWTRAK_PC_PLACEHOLDER {
+  width: 220px;
+  height: 36px;
+  min-height: 36px;
+  box-sizing: border-box;
+}
+
+body.compact .SHOWTRAK_PC {
+  padding: 0.35rem 0.5rem;
+  gap: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+}
+
+/* Hide the secondary lines in compact mode */
+body.compact .SHOWTRAK_PC > [data-type='Hostname'],
+body.compact .SHOWTRAK_PC > [data-type='IP'],
+body.compact .SHOWTRAK_PC > [data-type='Method'],
+body.compact .SHOWTRAK_PC > [data-type='Address'],
+body.compact .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_ONLINE'] {
+  display: none !important;
+}
+
+/* Single-line title fills the row, pinned to the left like the desktop app */
+body.compact .SHOWTRAK_PC > [data-type='Nickname'],
+body.compact .SHOWTRAK_PC > [data-type='Name'] {
+  font-size: 1rem;
+  line-height: 1.2;
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Offline badge sits inline at the right of the row (only when actually
+ * offline — :not(.d-none) lets the JS toggle still hide it when online).
+ * width:auto overrides the base `width:100%` (used for expanded centering)
+ * which would otherwise consume the row and hide the client name. */
+body.compact .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']:not(.d-none) {
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  width: auto !important;
+  max-height: none;
+  opacity: 1;
+  min-height: 0;
+  margin: 0 0 0 0.5rem !important;
+  align-items: center;
+}
+body.compact
+  .SHOWTRAK_PC
+  > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']
+  > [data-type='OFFLINE_SINCE'] {
+  font-size: 0;
+}
+body.compact
+  .SHOWTRAK_PC
+  > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']
+  .badge {
+  font-size: 11px;
+}
+
+/* Monitor status label stays visible, pushed to the right */
+body.compact .SHOWTRAK_PC.MONITOR > .SHOWTRAK_PC_STATUS[data-type='MONITOR_STATUS'] {
+  flex: 0 0 auto;
+  width: auto !important;
+  height: auto !important;
+  margin-left: 0.5rem;
+}
+body.compact .SHOWTRAK_PC.MONITOR > .SHOWTRAK_PC_STATUS[data-type='MONITOR_STATUS'] h7 {
+  font-size: 12px;
+}
+
+body.compact .SHOWTRAK_PC_PLACEHOLDER {
+  padding: 0.35rem 0.5rem !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+body.compact .SHOWTRAK_PC_PLACEHOLDER h5 {
+  font-size: 1rem;
+  margin: 0 !important;
+}
+body.compact .SHOWTRAK_PC_PLACEHOLDER p {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive — transition to mobile view                            */
+/* ------------------------------------------------------------------ */
+@media (min-width: 700px) {
+  .topbar {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .info-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .sheet {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(640px, 100vw);
+    border-bottom-left-radius: 20px;
+    border-bottom-right-radius: 20px;
+    bottom: 24px;
+    max-height: 82dvh;
+    animation: sheetUpCentered 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @keyframes sheetUpCentered {
+    from {
+      transform: translate(-50%, 100%);
+    }
+  }
+}
+
+/* Mobile: stack the group label above its tiles and let tiles fill width */
+@media (max-width: 640px) {
+  .brand-name {
+    font-size: 1rem;
+  }
+  .topbar-btn .btn-label {
+    display: none;
+  }
+  .topbar-right {
+    gap: 8px;
+  }
+
+  .GROUP_ROW {
+    flex-direction: column;
+  }
+
+  .GROUP_TITLE_CLICKABLE {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: 0 0 auto !important;
+    align-self: stretch;
+    margin: 12px 12px 0 12px !important;
+    padding: 8px 12px;
+    border-radius: 0.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .GROUP_TITLE_CLICKABLE > div {
+    height: auto !important;
+    width: 100%;
+    justify-content: center !important;
+  }
+  .GROUP_TITLE {
+    writing-mode: horizontal-tb;
+    transform: none;
+    text-align: center;
+    width: auto;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  /* Override Bootstrap .w-100 + margins which caused horizontal overflow */
+  .GROUP_CLIENTS {
+    width: auto !important;
+    margin: 8px 12px 0 12px !important;
+    padding: 10px !important;
+    gap: 10px !important;
+  }
+
+  .SHOWTRAK_PC,
+  .SHOWTRAK_PC_PLACEHOLDER {
+    width: 100% !important;
+    flex: 1 1 100%;
+  }
+
+  /* Compact mode on mobile: keep the single-row tiles but force the group
+   * label and tiles back to full width (compact's desktop 120px label rule
+   * has higher specificity, so it must be overridden here). */
+  body.compact .GROUP_TITLE_CLICKABLE {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: 0 0 auto !important;
+    align-self: stretch;
+    min-height: 44px !important;
+    padding: 10px 12px;
+    justify-content: center !important;
+  }
+  body.compact .GROUP_TITLE_CLICKABLE > div {
+    justify-content: center !important;
+  }
+  body.compact .GROUP_TITLE {
+    display: block;
+    width: 100%;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+  body.compact .SHOWTRAK_PC,
+  body.compact .SHOWTRAK_PC_PLACEHOLDER {
+    width: 100% !important;
+  }
+}
+
+/* Tablet: keep vertical labels but allow tiles to flex a bit */
+@media (min-width: 641px) and (max-width: 900px) {
+  .SHOWTRAK_PC {
+    width: 200px;
+  }
+}

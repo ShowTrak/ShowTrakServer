@@ -1,116 +1,177 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
     <title>ShowTrak Web UI</title>
-  <link rel="stylesheet" href="/vendors/fonts/inter.css" />
-  <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="theme-color" content="#1d1a2f" />
-  <link rel="apple-touch-icon" href="/images/icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0c091c" />
+    <link rel="apple-touch-icon" href="/images/icon.png" />
+    <link rel="stylesheet" href="/vendors/fonts/inter.css" />
+    <link rel="stylesheet" href="/vendors/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="/vendors/bootstrap-icons/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
+  <body class="compact">
+    <!-- Connection status banner (web socket detection) -->
+    <div id="connBanner" class="conn-banner hidden" role="status" aria-live="polite">
+      <i class="bi bi-wifi-off"></i>
+      <span id="connBannerText">Reconnecting to ShowTrak Server…</span>
+    </div>
+
+    <!-- Top bar -->
     <header class="topbar">
       <div class="brand">
         <img src="/images/icon.png" alt="ShowTrak" class="logo" />
-        <span>ShowTrak</span>
+        <span class="brand-name">ShowTrak</span>
       </div>
-  <button id="refreshBtn" class="btn btn-light">Refresh</button>
+      <div class="topbar-right">
+        <span id="connDot" class="conn-dot connecting" title="Connecting…"></span>
+        <button id="viewToggleBtn" class="topbar-btn" type="button" title="Toggle compact / expanded view">
+          <i class="bi bi-arrows-angle-expand" id="viewToggleIcon"></i>
+          <span class="btn-label" id="viewToggleLabel">Expand</span>
+        </button>
+        <button id="logoutBtn" class="topbar-btn hidden" type="button">
+          <i class="bi bi-box-arrow-right"></i>
+          <span class="btn-label">Logout</span>
+        </button>
+      </div>
     </header>
-    <div id="offlineBanner" class="offline-banner hidden" role="status" aria-live="polite">
-      <span>Offline</span>
-      <span class="hint">— some features may be unavailable</span>
-    </div>
 
-    <main class="content">
-      <section id="view-list">
-        <div class="search">
-          <input id="searchInput" type="text" placeholder="Search clients" />
-        </div>
-        <section id="clients" class="cards" aria-live="polite"></section>
-      </section>
-
-      <section id="view-detail" class="hidden">
-        <div class="detail-header">
-          <button id="backBtn" class="btn btn-light">Back</button>
-          <div class="detail-title">
-            <div id="d-name" class="title"></div>
-            <div id="d-status" class="status"></div>
-          </div>
-        </div>
-        <div id="d-subtitle" class="subtitle"></div>
-
-        <div class="detail-actions">
-          <button id="openScriptsBtn" class="btn btn-light">Run Script</button>
-          <button id="wolBtn" class="btn btn-ghost">Wake on LAN</button>
-        </div>
-
-        <div class="detail-grid">
-          <div class="panel">
-            <div class="panel-title">Vitals</div>
-            <div class="charts">
-              <div class="chart">
-                <div class="chart-title">CPU</div>
-                <canvas id="cpuChart" width="600" height="160"></canvas>
-              </div>
-              <div class="chart">
-                <div class="chart-title">RAM</div>
-                <canvas id="ramChart" width="600" height="160"></canvas>
-              </div>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="panel-title">Info</div>
-            <div id="info" class="info-grid"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-title">USB Devices</div>
-            <div id="usbList" class="list"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-title">Network Interfaces</div>
-            <div id="netList" class="list"></div>
-          </div>
-        </div>
-      </section>
+    <!-- Main content -->
+    <main id="appMain" class="content hidden">
+      <div id="APPLICATION_CONTENT"></div>
+      <div id="emptyState" class="empty-state hidden">
+        <i class="bi bi-pc-display-horizontal"></i>
+        <h5>No clients yet</h5>
+        <p>Adopt clients in the ShowTrak desktop application and they will appear here.</p>
+      </div>
     </main>
 
-    <section id="scripts-sheet" class="sheet hidden" aria-modal="true" role="dialog">
+    <!-- Loading overlay -->
+    <div id="loadingOverlay" class="overlay loading-overlay">
+      <div class="spinner"></div>
+    </div>
+
+    <!-- Login / passcode overlay -->
+    <div id="loginOverlay" class="overlay login-overlay hidden">
+      <div class="login-card">
+        <img src="/images/icon.png" alt="ShowTrak" class="login-logo" />
+        <h5 class="mb-1">ShowTrak Web UI</h5>
+        <p class="text-muted mb-3" id="loginSubtitle">Enter the access passcode</p>
+        <div id="pinDisplay" class="pin-display" aria-label="Passcode">
+          <span class="pin-dot"></span>
+          <span class="pin-dot"></span>
+          <span class="pin-dot"></span>
+          <span class="pin-dot"></span>
+        </div>
+        <div id="pinError" class="pin-error hidden">Incorrect passcode</div>
+        <div class="keypad">
+          <button class="keypad-btn" data-key="1" type="button">1</button>
+          <button class="keypad-btn" data-key="2" type="button">2</button>
+          <button class="keypad-btn" data-key="3" type="button">3</button>
+          <button class="keypad-btn" data-key="4" type="button">4</button>
+          <button class="keypad-btn" data-key="5" type="button">5</button>
+          <button class="keypad-btn" data-key="6" type="button">6</button>
+          <button class="keypad-btn" data-key="7" type="button">7</button>
+          <button class="keypad-btn" data-key="8" type="button">8</button>
+          <button class="keypad-btn" data-key="9" type="button">9</button>
+          <button class="keypad-btn keypad-muted" data-key="clear" type="button" aria-label="Clear">
+            <i class="bi bi-x-lg"></i>
+          </button>
+          <button class="keypad-btn" data-key="0" type="button">0</button>
+          <button class="keypad-btn keypad-muted" data-key="back" type="button" aria-label="Backspace">
+            <i class="bi bi-backspace"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail bottom sheet -->
+    <div id="sheetBackdrop" class="sheet-backdrop hidden"></div>
+    <section id="detailSheet" class="sheet hidden" role="dialog" aria-modal="true">
+      <div class="sheet-grabber"></div>
       <div class="sheet-header">
-        <div class="sheet-title">Scripts</div>
-  <button id="closeScriptsBtn" class="btn btn-light">Close</button>
+        <div class="sheet-title-wrap">
+          <div id="detailName" class="sheet-title"></div>
+          <div id="detailStatus" class="sheet-status"></div>
+        </div>
+        <button id="detailClose" class="icon-btn" type="button" aria-label="Close">
+          <i class="bi bi-x-lg"></i>
+        </button>
       </div>
-      <div id="scriptsList" class="sheet-list"></div>
+      <div class="sheet-body">
+        <div id="detailVitals" class="detail-vitals hidden">
+          <div class="vital">
+            <div class="vital-label"><span>CPU</span><span id="cpuPct">0%</span></div>
+            <div class="progress"><div id="cpuBar" class="progress-bar bg-white" style="width:0%"></div></div>
+          </div>
+          <div class="vital">
+            <div class="vital-label"><span>RAM</span><span id="ramPct">0%</span></div>
+            <div class="progress"><div id="ramBar" class="progress-bar bg-white" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <div class="detail-actions" id="detailActions">
+          <button id="runScriptBtn" class="btn btn-light flex-fill hidden" type="button">
+            <i class="bi bi-terminal"></i> Run Script
+          </button>
+          <button id="wolBtn" class="btn btn-outline-light flex-fill hidden" type="button">
+            <i class="bi bi-power"></i> Wake on LAN
+          </button>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-title">Info</div>
+          <div id="detailInfo" class="info-grid"></div>
+        </div>
+
+        <div class="detail-section" id="usbSection">
+          <div class="detail-section-title">USB Devices</div>
+          <div id="usbList" class="chip-list"></div>
+        </div>
+
+        <div class="detail-section" id="netSection">
+          <div class="detail-section-title">Network Interfaces</div>
+          <div id="netList" class="chip-list"></div>
+        </div>
+      </div>
     </section>
 
-    <section id="confirmModal" class="confirm hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
-      <div class="confirm-body">
-        <div class="confirm-title" id="confirmTitle">Confirm Action</div>
-        <div class="confirm-text" id="confirmText">Are you sure?</div>
+    <!-- Scripts bottom sheet -->
+    <section id="scriptsSheet" class="sheet hidden" role="dialog" aria-modal="true">
+      <div class="sheet-grabber"></div>
+      <div class="sheet-header">
+        <div class="sheet-title-wrap">
+          <div class="sheet-title">Run Script</div>
+          <div id="scriptsSubtitle" class="sheet-status"></div>
+        </div>
+        <button id="scriptsClose" class="icon-btn" type="button" aria-label="Close">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+      <div class="sheet-body">
+        <div id="scriptsList" class="scripts-list"></div>
+      </div>
+    </section>
+
+    <!-- Confirmation modal -->
+    <div id="confirmModal" class="overlay confirm-overlay hidden" role="dialog" aria-modal="true">
+      <div class="confirm-card">
+        <div id="confirmText" class="confirm-text">Are you sure?</div>
         <div class="confirm-actions">
-          <button id="confirmCancel" class="btn btn-ghost">Cancel</button>
-          <button id="confirmOk" class="btn btn-light">Run</button>
+          <button id="confirmCancel" class="btn btn-outline-light flex-fill" type="button">Cancel</button>
+          <button id="confirmOk" class="btn btn-light flex-fill" type="button">Confirm</button>
         </div>
       </div>
-    </section>
+    </div>
 
-    <nav id="mobileNav" class="mobile-nav" role="navigation" aria-label="Primary">
-      <button id="homeBtn" class="nav-btn" aria-label="Home">Home</button>
-    </nav>
+    <!-- Toast host -->
+    <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
-    <template id="client-card-tmpl">
-      <article class="card">
-        <div class="card-row">
-          <div class="title"></div>
-          <div class="status"></div>
-        </div>
-        <div class="subtitle"></div>
-        <div class="meta"></div>
-      </article>
-    </template>
-
-  <script src="/vendors/socket.io/socket.io.min.js"></script>
+    <script src="/vendors/socket.io/socket.io.min.js"></script>
+    <script src="/vendors/jquery.js"></script>
+    <script src="/main.js"></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -118,6 +179,5 @@
         });
       }
     </script>
-    <script src="/main.js" type="module"></script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'showtrak-ui-v2';
+const CACHE_NAME = 'showtrak-ui-v6';
 const CORE_ASSETS = [
   '/',
   '/index.html',
@@ -6,6 +6,9 @@ const CORE_ASSETS = [
   '/main.js',
   '/images/icon.png',
   '/vendors/socket.io/socket.io.min.js',
+  '/vendors/jquery.js',
+  '/vendors/bootstrap/css/bootstrap.min.css',
+  '/vendors/bootstrap-icons/font/bootstrap-icons.min.css',
   '/vendors/fonts/inter.css',
   '/vendors/fonts/files/inter-400.woff2',
   '/vendors/fonts/files/inter-600.woff2',

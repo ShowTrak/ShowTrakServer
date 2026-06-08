@@ -50,6 +50,34 @@ const DefaultSettings = [
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
+
+  {
+    Group: 'Web UI',
+    Key: 'WEBUI_PASSWORD_PROTECTION_ENABLED',
+    Title: 'Password Protection Enabled',
+    Description:
+      'Require a password to access the Web UI. Sessions are remembered per browser tab and can be ended with the Logout button.',
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+  },
+  {
+    Group: 'Web UI',
+    Key: 'WEBUI_PASSWORD',
+    Title: 'Password (4 Digit Numeric)',
+    Description:
+      'Optional 4 digit numeric passcode used to access the Web UI when password protection is enabled.',
+    Type: 'STRING',
+    DefaultValue: '',
+  },
+  {
+    Group: 'Web UI',
+    Key: 'WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION',
+    Title: 'Remote Script Execution',
+    Description:
+      'Allow scripts and Wake on LAN to be triggered from the Web UI. When disabled the Web UI is read-only.',
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+  },
   {
     Group: 'Features',
     Key: 'SYSTEM_ALLOW_SCRIPT_EDITS',
@@ -124,6 +152,7 @@ const Groups = [
   // { Name: "UI", Title: "User Interface" },
   { Name: 'Notifications', Title: 'Notifications' },
   { Name: 'Features', Title: 'Features' },
+  { Name: 'Web UI', Title: 'Web UI' },
   { Name: 'System', Title: 'System Settings' },
   // { Name: 'Demo', Title: 'Demo Settings' },
 ];
