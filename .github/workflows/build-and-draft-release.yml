@@ -371,10 +371,10 @@ jobs:
           TITLE="v${RELEASE_VERSION} - Showtrak Server (${RELEASE_VARIANT_LABEL})"
           NOTES="${RELEASE_VARIANT_LABEL} for ShowTrak Server v${RELEASE_VERSION}."
 
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG" --draft --title "$TITLE" --notes "$NOTES"
+          if gh release view "$RELEASE_TAG" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft --title "$TITLE" --notes "$NOTES"
           else
-            gh release create "$RELEASE_TAG" --draft --title "$TITLE" --notes "$NOTES"
+            gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft --title "$TITLE" --notes "$NOTES"
           fi
 
       - name: Upload release assets
@@ -384,5 +384,27 @@ jobs:
             echo "No release artifacts found."
             exit 1
           fi
-          echo "Uploading ${#FILES[@]} release assets to ${RELEASE_REPO}:${RELEASE_TAG}"
-          gh release upload "$RELEASE_TAG" "${FILES[@]}" --repo "$RELEASE_REPO" --clobber
+
+          declare -A SEEN
+          UPLOAD_FILES=()
+          for file in "${FILES[@]}"; do
+            name=$(basename "$file")
+            if [[ -n "${SEEN[$name]:-}" ]]; then
+              echo "Skipping duplicate asset basename: $name ($file)"
+              continue
+            fi
+            SEEN[$name]=1
+            UPLOAD_FILES+=("$file")
+          done
+
+          if [ "${#UPLOAD_FILES[@]}" -eq 0 ]; then
+            echo "No unique release assets found after de-duplication."
+            exit 1
+          fi
+
+          echo "Uploading ${#UPLOAD_FILES[@]} release assets to ${RELEASE_REPO}:${RELEASE_TAG}"
+          for file in "${UPLOAD_FILES[@]}"; do
+            name=$(basename "$file")
+            gh release delete-asset "$RELEASE_TAG" "$name" --repo "$RELEASE_REPO" --yes >/dev/null 2>&1 || true
+            gh release upload "$RELEASE_TAG" "$file" --repo "$RELEASE_REPO"
+          done
