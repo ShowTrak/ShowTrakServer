@@ -28,6 +28,38 @@ function sendAppUpdateStatus(payload) {
   } catch {}
 }
 
+function normalizeUpdaterError(err) {
+  const message = String(err || 'Unknown updater error');
+  const isMac = process.platform === 'darwin';
+  const has404 = message.includes('status 404');
+  const referencesManifest = message.includes('latest-mac.yml');
+  const referencesReleaseZip =
+    message.includes('Cannot download') &&
+    message.includes('/releases/download/') &&
+    message.includes('.zip');
+
+  if (isMac && has404 && referencesManifest) {
+    return {
+      state: 'none',
+      info: { reason: 'latest-mac.yml is missing from release assets' },
+    };
+  }
+
+  if (isMac && has404 && referencesReleaseZip) {
+    return {
+      state: 'error',
+      error:
+        'macOS update package is missing from this GitHub release (asset filename mismatch). Regenerate latest-mac.yml and upload a matching macOS zip asset.',
+      info: {
+        reason: 'mac_release_asset_name_mismatch',
+        details: message,
+      },
+    };
+  }
+
+  return { state: 'error', error: message };
+}
+
 function isSquirrelWindows() {
   try {
     if (process.platform !== 'win32') return false;
@@ -102,7 +134,7 @@ async function handleCheck() {
       autoUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
       autoUpdater.on('update-available', (info) => sendAppUpdateStatus({ state: 'available', info }));
       autoUpdater.on('update-not-available', (info) => sendAppUpdateStatus({ state: 'none', info }));
-      autoUpdater.on('error', (err) => sendAppUpdateStatus({ state: 'error', error: String(err) }));
+      autoUpdater.on('error', (err) => sendAppUpdateStatus(normalizeUpdaterError(err)));
       autoUpdater.on('download-progress', (p) =>
         sendAppUpdateStatus({ state: 'downloading', percent: p && p.percent ? p.percent : 0 })
       );
@@ -157,21 +189,7 @@ async function handleCheck() {
   try {
     await autoUpdater.checkForUpdates();
   } catch (e) {
-    const message = String(e || 'Unknown updater error');
-    const missingMacManifest =
-      process.platform === 'darwin' &&
-      message.includes('latest-mac.yml') &&
-      message.includes('404');
-
-    if (missingMacManifest) {
-      sendAppUpdateStatus({
-        state: 'none',
-        info: { reason: 'latest-mac.yml is missing from release assets' },
-      });
-      return;
-    }
-
-    sendAppUpdateStatus({ state: 'error', error: message });
+    sendAppUpdateStatus(normalizeUpdaterError(e));
   }
 }
 
@@ -231,7 +249,7 @@ function initElectronUpdater() {
     autoUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
     autoUpdater.on('update-available', (info) => sendAppUpdateStatus({ state: 'available', info }));
     autoUpdater.on('update-not-available', (info) => sendAppUpdateStatus({ state: 'none', info }));
-    autoUpdater.on('error', (err) => sendAppUpdateStatus({ state: 'error', error: String(err) }));
+    autoUpdater.on('error', (err) => sendAppUpdateStatus(normalizeUpdaterError(err)));
     autoUpdater.on('download-progress', (p) =>
       sendAppUpdateStatus({ state: 'downloading', percent: p && p.percent ? p.percent : 0 })
     );

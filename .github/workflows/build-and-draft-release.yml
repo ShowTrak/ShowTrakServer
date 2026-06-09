@@ -317,10 +317,36 @@ jobs:
             macZipFiles.find((filePath) => filePath.toLowerCase().includes('darwin-x64')) ||
             macZipFiles[0];
 
-          const zipBuffer = fs.readFileSync(preferredZip);
+          const preferredDir = path.dirname(preferredZip);
+          const preferredBaseName = path.basename(preferredZip);
+          const archMatch = preferredBaseName.match(/darwin-(arm64|x64)/i);
+          const arch = (archMatch && archMatch[1]) ? archMatch[1].toLowerCase() : 'arm64';
+          const canonicalZipName = `ShowTrak-Server-darwin-${arch}-${version}.zip`;
+
+          // Keep compatibility with older naming styles while ensuring
+          // updater manifests always reference a stable canonical filename.
+          const aliasNames = [
+            canonicalZipName,
+            `ShowTrak Server-darwin-${arch}-${version}.zip`,
+            `ShowTrak.Server-darwin-${arch}-${version}.zip`,
+          ];
+
+          for (const aliasName of aliasNames) {
+            const aliasPath = path.join(preferredDir, aliasName);
+            if (path.basename(preferredZip) === aliasName) continue;
+            if (!fs.existsSync(aliasPath)) {
+              fs.copyFileSync(preferredZip, aliasPath);
+              console.log(`Created macOS zip alias: ${aliasName}`);
+            }
+          }
+
+          const canonicalZipPath = path.join(preferredDir, canonicalZipName);
+          const zipSourcePath = fs.existsSync(canonicalZipPath) ? canonicalZipPath : preferredZip;
+
+          const zipBuffer = fs.readFileSync(zipSourcePath);
           const sha512 = crypto.createHash('sha512').update(zipBuffer).digest('base64');
-          const zipSize = fs.statSync(preferredZip).size;
-          const zipName = path.basename(preferredZip);
+          const zipSize = fs.statSync(zipSourcePath).size;
+          const zipName = canonicalZipName;
           const releaseDate = new Date().toISOString();
 
           const manifest = [
