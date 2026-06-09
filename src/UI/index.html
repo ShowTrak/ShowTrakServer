@@ -1139,6 +1139,22 @@
     <script src="./vendors/toastify/index.js" defer></script>
     <script src="./vendors/howler/index.min.js"></script>
     <script src="./vendors/qrcode/qrcode.min.js"></script>
-    <script src="./js/app.js" defer></script>
+    <!-- app.js was split into ordered topical modules. They are classic scripts
+         that share global scope and MUST load in this order (defer preserves
+         document order). Concatenated, they are identical to the original app.js. -->
+    <script src="./js/app/01-state.js" defer></script>
+    <script src="./js/app/02-mode.js" defer></script>
+    <script src="./js/app/03-settings.js" defer></script>
+    <script src="./js/app/04-utils.js" defer></script>
+    <script src="./js/app/05-keyboard.js" defer></script>
+    <script src="./js/app/06-client-list.js" defer></script>
+    <script src="./js/app/07-monitoring.js" defer></script>
+    <script src="./js/app/08-dnd.js" defer></script>
+    <script src="./js/app/09-osc-feeds.js" defer></script>
+    <script src="./js/app/10-alerts-tray.js" defer></script>
+    <script src="./js/app/11-modals.js" defer></script>
+    <script src="./js/app/12-monitoring-editor.js" defer></script>
+    <script src="./js/app/13-alert-rules.js" defer></script>
+    <script src="./js/app/14-selection-init.js" defer></script>
   </footer>
 </html>

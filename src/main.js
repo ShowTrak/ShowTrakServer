@@ -7,7 +7,6 @@ const { app, BrowserWindow, ipcMain: RPC, Menu } = require('electron/main');
 // Use Electron's shell for opening folders/URLs instead of spawning platform-specific commands
 const {
   shell,
-  autoUpdater: SquirrelUpdater,
   dialog,
   powerMonitor,
   powerSaveBlocker,
@@ -56,16 +55,19 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
+const {
+  recordMonitoringHistorySample,
+  syncMonitoringHistoryStore,
+  getMonitoringHistorySamples,
+} = require('./main/monitoring-history');
+const { Manager: AppUpdater } = require('./main/app-updater');
+
 const BASE_WEB_PREFERENCES = Object.freeze({
   contextIsolation: true,
   sandbox: true,
   nodeIntegration: false,
   webSecurity: true,
 });
-let autoUpdater = null;
-let squirrelUpdaterInitialized = false;
-const MONITORING_HISTORY_MAX_AGE_MS = 12 * 60 * 60 * 1000;
-const MonitoringTargetHistoryStore = new Map();
 const WINDOW_DRAGBAR_HEIGHT_PX = 32;
 const MAC_TRAFFIC_LIGHT_DIAMETER_PX = 12;
 const MAC_TRAFFIC_LIGHT_LEFT_PADDING_PX = 12;
@@ -88,106 +90,6 @@ const WINDOW_CHROME_OPTIONS =
         frame: true,
         titleBarStyle: 'hidden',
       };
-
-function pruneMonitoringHistoryStore(now = Date.now()) {
-  const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
-  for (const [targetID, samples] of MonitoringTargetHistoryStore.entries()) {
-    const next = Array.isArray(samples) ? samples.filter((s) => s && s.ts >= cutoff) : [];
-    if (!next.length) {
-      MonitoringTargetHistoryStore.delete(targetID);
-      continue;
-    }
-    MonitoringTargetHistoryStore.set(targetID, next);
-  }
-}
-
-function recordMonitoringHistorySample(target) {
-  if (!target || !target.TargetID) return;
-  const targetID = Number(target.TargetID);
-  if (!Number.isFinite(targetID)) return;
-
-  const now = Date.now();
-  const parsedLatency = Number(target.LastLatencyMs);
-  const latencyMs = Number.isFinite(parsedLatency) && parsedLatency >= 0 ? parsedLatency : null;
-  const sample = {
-    ts: now,
-    online: !!target.Online,
-    degraded: !!target.Degraded,
-    latencyMs,
-  };
-
-  const samples = MonitoringTargetHistoryStore.get(targetID) || [];
-  const last = samples.length ? samples[samples.length - 1] : null;
-  const duplicateQuickUpdate =
-    last &&
-    now - last.ts < 900 &&
-    last.online === sample.online &&
-    last.degraded === sample.degraded &&
-    ((last.latencyMs == null && sample.latencyMs == null) ||
-      Math.round(last.latencyMs || 0) === Math.round(sample.latencyMs || 0));
-
-  if (duplicateQuickUpdate) {
-    last.ts = now;
-  } else {
-    samples.push(sample);
-  }
-
-  const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
-  while (samples.length && samples[0].ts < cutoff) samples.shift();
-
-  MonitoringTargetHistoryStore.set(targetID, samples);
-}
-
-function syncMonitoringHistoryStore(list) {
-  const safeList = Array.isArray(list) ? list : [];
-  const validIDs = new Set();
-
-  for (const target of safeList) {
-    const targetID = Number(target && target.TargetID);
-    if (!Number.isFinite(targetID)) continue;
-    validIDs.add(targetID);
-    recordMonitoringHistorySample(target);
-  }
-
-  for (const existingID of MonitoringTargetHistoryStore.keys()) {
-    if (!validIDs.has(existingID)) MonitoringTargetHistoryStore.delete(existingID);
-  }
-
-  pruneMonitoringHistoryStore();
-}
-
-function isSquirrelWindows() {
-  try {
-    if (process.platform !== 'win32') return false;
-    const execDir = path.dirname(process.execPath);
-    const updateExe1 = path.resolve(execDir, '..', 'Update.exe');
-    const updateExe2 = path.resolve(execDir, '..', '..', 'Update.exe');
-    return fs.existsSync(updateExe1) || fs.existsSync(updateExe2);
-  } catch {
-    return false;
-  }
-}
-function initSquirrelUpdater() {
-  if (squirrelUpdaterInitialized) return;
-  squirrelUpdaterInitialized = true;
-  try {
-    SquirrelUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
-    SquirrelUpdater.on('update-available', () => sendAppUpdateStatus({ state: 'available', info: { tag: 'latest' } }));
-    SquirrelUpdater.on('update-not-available', () => sendAppUpdateStatus({ state: 'none' }));
-    SquirrelUpdater.on('update-downloaded', (_e, _notes, _name, _date, _url) => {
-      sendAppUpdateStatus({ state: 'downloaded', info: { version: _name || 'pending' } });
-    });
-    SquirrelUpdater.on('error', (err) => sendAppUpdateStatus({ state: 'error', error: String(err) }));
-    // Note: Squirrel's autoUpdater may not emit download-progress; states will jump to downloaded
-  } catch {}
-}
-function sendAppUpdateStatus(payload) {
-  try {
-    if (MainWindow && !MainWindow.isDestroyed()) {
-      MainWindow.webContents.send('AppUpdate:Status', payload);
-    }
-  } catch {}
-}
 
 function sendShowFileUpdated(filePath) {
   try {
@@ -488,187 +390,10 @@ app.whenReady().then(async () => {
     sendShowFileUpdated(BackupManager.GetCurrentFilePath());
     return [null, Result];
   });
-  // Always register IPC handlers so renderer never hits an unhandled channel
-  RPC.handle('AppUpdate:Check', async () => {
-    // Dev/unpacked: simulate
-    if (!app.isPackaged) {
-      try {
-        sendAppUpdateStatus({ state: 'checking' });
-        setTimeout(() => sendAppUpdateStatus({ state: 'available', info: { version: 'TEST' } }), 600);
-        let pct = 0;
-        const timer = setInterval(() => {
-          pct += 14;
-          if (pct >= 100) {
-            clearInterval(timer);
-            sendAppUpdateStatus({ state: 'downloaded', info: { version: 'TEST' } });
-          } else {
-            sendAppUpdateStatus({ state: 'downloading', percent: pct });
-          }
-        }, 250);
-      } catch (e) {
-        sendAppUpdateStatus({ state: 'error', error: String(e) });
-      }
-      return;
-    }
-
-    // Packaged on Windows via Squirrel: use Electron built-in Squirrel updater against GitHub latest
-    if (isSquirrelWindows()) {
-      try {
-        initSquirrelUpdater();
-        const feed = 'https://github.com/ShowTrak/ShowTrakServer/releases/latest/download/';
-        // Try both object and string forms for compatibility
-        try { SquirrelUpdater.setFeedURL({ url: feed }); }
-        catch { SquirrelUpdater.setFeedURL(feed); }
-        SquirrelUpdater.checkForUpdates();
-      } catch (e) {
-        sendAppUpdateStatus({ state: 'error', error: String(e) });
-      }
-      return;
-    }
-
-    // Packaged (non-Squirrel): ensure electron-updater is initialized
-    if (!autoUpdater) {
-      try {
-        const { autoUpdater: updater } = require('electron-updater');
-        autoUpdater = updater;
-        autoUpdater.autoDownload = true;
-        autoUpdater.autoInstallOnAppQuit = false;
-        autoUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
-        autoUpdater.on('update-available', (info) => sendAppUpdateStatus({ state: 'available', info }));
-        autoUpdater.on('update-not-available', (info) => sendAppUpdateStatus({ state: 'none', info }));
-        autoUpdater.on('error', (err) => sendAppUpdateStatus({ state: 'error', error: String(err) }));
-        autoUpdater.on('download-progress', (p) =>
-          sendAppUpdateStatus({ state: 'downloading', percent: p && p.percent ? p.percent : 0 })
-        );
-        autoUpdater.on('update-downloaded', (info) => sendAppUpdateStatus({ state: 'downloaded', info }));
-      } catch (e) {
-        sendAppUpdateStatus({ state: 'error', error: 'Updater init failed: ' + String(e) });
-        return;
-      }
-    }
-
-    // Try to find an app-update.yml; if missing, synthesize one for GitHub public repo
-    const resourcesPath = typeof process !== 'undefined' ? process.resourcesPath : '';
-    const execDir = typeof process !== 'undefined' && process.execPath ? path.dirname(process.execPath) : '';
-    const ymlPaths = [
-      resourcesPath ? path.join(resourcesPath, 'app-update.yml') : '',
-      execDir ? path.join(execDir, 'app-update.yml') : '',
-    ].filter(Boolean);
-    const hasYml = ymlPaths.some((p) => {
-      try { return fs.existsSync(p); } catch { return false; }
-    });
-    if (!hasYml) {
-      try {
-        const tmpYml = path.join(os.tmpdir(), `showtrak-app-update-${process.pid}.yml`);
-        const yml = [
-          'provider: github',
-          'owner: ShowTrak',
-          'repo: ShowTrakServer',
-          // no token for public repo; add one via env GH_TOKEN if rate-limited
-        ].join('\n');
-        fs.writeFileSync(tmpYml, yml, 'utf8');
-        autoUpdater.updateConfigPath = tmpYml;
-      } catch (e) {
-        // If writing config fails, fall back to simulated flow
-        try {
-          sendAppUpdateStatus({ state: 'checking' });
-          setTimeout(() => sendAppUpdateStatus({ state: 'available', info: { version: 'SIM' } }), 600);
-          let pct = 0;
-          const timer = setInterval(() => {
-            pct += 14;
-            if (pct >= 100) {
-              clearInterval(timer);
-              sendAppUpdateStatus({ state: 'downloaded', info: { version: 'SIM' } });
-            } else {
-              sendAppUpdateStatus({ state: 'downloading', percent: pct });
-            }
-          }, 250);
-        } catch {}
-        return;
-      }
-    }
-
-    try {
-      await autoUpdater.checkForUpdates();
-    } catch (e) {
-      const message = String(e || 'Unknown updater error');
-      const missingMacManifest =
-        process.platform === 'darwin' &&
-        message.includes('latest-mac.yml') &&
-        message.includes('404');
-
-      if (missingMacManifest) {
-        sendAppUpdateStatus({
-          state: 'none',
-          info: { reason: 'latest-mac.yml is missing from release assets' },
-        });
-        return;
-      }
-
-      sendAppUpdateStatus({ state: 'error', error: message });
-    }
-  });
-  RPC.handle('AppUpdate:Install', async () => {
-    // Dev/unpacked: simulate install
-    if (!app.isPackaged) {
-      try {
-        sendAppUpdateStatus({ state: 'installing' });
-        setTimeout(() => sendAppUpdateStatus({ state: 'installed' }), 600);
-      } catch (e) {
-        sendAppUpdateStatus({ state: 'error', error: String(e) });
-      }
-      return;
-    }
-
-    // Packaged on Windows via Squirrel: call built-in updater
-    if (isSquirrelWindows()) {
-      try {
-        sendAppUpdateStatus({ state: 'installing' });
-        SquirrelUpdater.quitAndInstall();
-      } catch (e) {
-        sendAppUpdateStatus({ state: 'error', error: String(e) });
-      }
-      return;
-    }
-
-    // Packaged: if updater config/path is set (real updates), perform real install; else simulate
-    const hasConfig = Boolean(autoUpdater && (autoUpdater.updateConfigPath || autoUpdater.provider));
-    if (!hasConfig) {
-      try {
-        sendAppUpdateStatus({ state: 'installing' });
-        setTimeout(() => sendAppUpdateStatus({ state: 'installed' }), 600);
-      } catch (e) {
-        sendAppUpdateStatus({ state: 'error', error: String(e) });
-      }
-      return;
-    }
-    if (!autoUpdater) {
-      sendAppUpdateStatus({ state: 'error', error: 'Updater not available' });
-      return;
-    }
-    try {
-      await autoUpdater.quitAndInstall(false, true);
-    } catch (e) {
-      sendAppUpdateStatus({ state: 'error', error: String(e) });
-    }
-  });
-  // Initialize electron-updater lazily for manual control
-  try {
-    const { autoUpdater: updater } = require('electron-updater');
-    autoUpdater = updater;
-    autoUpdater.autoDownload = true; // download when found
-    autoUpdater.autoInstallOnAppQuit = false;
-    autoUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
-    autoUpdater.on('update-available', (info) => sendAppUpdateStatus({ state: 'available', info }));
-    autoUpdater.on('update-not-available', (info) => sendAppUpdateStatus({ state: 'none', info }));
-    autoUpdater.on('error', (err) => sendAppUpdateStatus({ state: 'error', error: String(err) }));
-    autoUpdater.on('download-progress', (p) =>
-      sendAppUpdateStatus({ state: 'downloading', percent: p && p.percent ? p.percent : 0 })
-    );
-    autoUpdater.on('update-downloaded', (info) => sendAppUpdateStatus({ state: 'downloaded', info }));
-  } catch (e) {
-    Logger.error('electron-updater initialization failed:', e);
-  }
+  // App self-update flows (dev simulation, Squirrel, electron-updater) are
+  // encapsulated in the AppUpdater module. It registers the AppUpdate:* IPC
+  // handlers and performs the eager electron-updater init.
+  AppUpdater.Register(RPC, { getMainWindow: () => MainWindow });
 
   RPC.handle('Config:Get', async () => {
     return Config;
@@ -814,9 +539,7 @@ app.whenReady().then(async () => {
     } catch {
       return [];
     }
-    pruneMonitoringHistoryStore();
-    const samples = MonitoringTargetHistoryStore.get(Number(TargetID)) || [];
-    return samples;
+    return getMonitoringHistorySamples(TargetID);
   });
 
   RPC.handle('CreateMonitoringTarget', async (_Event, Payload) => {
