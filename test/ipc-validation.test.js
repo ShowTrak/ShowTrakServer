@@ -77,3 +77,175 @@ test('IPCValidation.NetworkDiscoveryScanOptions validates and normalizes options
     /between 1000 and 120000/i
   );
 });
+
+test('IPCValidation.GroupID and GroupTitle normalize and validate', () => {
+  assert.equal(IPCValidation.GroupID(null), null);
+  assert.equal(IPCValidation.GroupID('null'), null);
+  assert.equal(IPCValidation.GroupID('17'), 17);
+  assert.equal(IPCValidation.GroupID(5), 5);
+  assert.throws(() => IPCValidation.GroupID('abc'), /must be numeric/i);
+  assert.throws(() => IPCValidation.GroupID(-1), /positive integer/i);
+  assert.throws(() => IPCValidation.GroupID({}), /is invalid/i);
+
+  assert.equal(IPCValidation.GroupTitle('  My Group  '), 'My Group');
+  assert.throws(() => IPCValidation.GroupTitle('ab'), /at least 3 characters/i);
+});
+
+test('IPCValidation.ScriptID accepts strings and numbers', () => {
+  assert.equal(IPCValidation.ScriptID('deploy'), 'deploy');
+  assert.equal(IPCValidation.ScriptID(42), '42');
+  assert.throws(() => IPCValidation.ScriptID(''), /at least 1 character/i);
+});
+
+test('IPCValidation.MonitoringTargetID validates numeric identifiers', () => {
+  assert.equal(IPCValidation.MonitoringTargetID(3), 3);
+  assert.equal(IPCValidation.MonitoringTargetID(' 12 '), 12);
+  assert.throws(() => IPCValidation.MonitoringTargetID(0), /positive integer/i);
+  assert.throws(() => IPCValidation.MonitoringTargetID('x'), /must be numeric/i);
+  assert.throws(() => IPCValidation.MonitoringTargetID(null), /is invalid/i);
+});
+
+test('IPCValidation.MonitoringTargetCreatePayload enforces required fields', () => {
+  const payload = IPCValidation.MonitoringTargetCreatePayload({
+    Nickname: '  Switch  ',
+    Address: '10.0.0.1',
+    Method: 'ping',
+    Interval: 30000,
+    StoreHistory: 1,
+    GroupID: '4',
+    DegradedThresholdMs: 250,
+    Settings: { Timeout: 2000 },
+  });
+  assert.equal(payload.Nickname, 'Switch');
+  assert.equal(payload.Interval, 30000);
+  assert.equal(payload.StoreHistory, true);
+  assert.equal(payload.GroupID, 4);
+  assert.equal(payload.DegradedThresholdMs, 250);
+  assert.deepEqual(payload.Settings, { Timeout: 2000 });
+
+  assert.throws(() => IPCValidation.MonitoringTargetCreatePayload({}), /Nickname/i);
+  assert.throws(
+    () => IPCValidation.MonitoringTargetCreatePayload({ Nickname: 'a', Address: 'b', Method: 'ping' }),
+    /Interval is required/i
+  );
+  assert.throws(
+    () =>
+      IPCValidation.MonitoringTargetCreatePayload({
+        Nickname: 'a',
+        Address: 'b',
+        Method: 'ping',
+        Interval: 'fast',
+      }),
+    /Interval must be a number/i
+  );
+  assert.throws(
+    () => IPCValidation.MonitoringTargetCreatePayload({ Nickname: 'a', Address: 'b', Method: 'ping', Interval: 1, Settings: 5 }),
+    /Settings must be an object/i
+  );
+});
+
+test('IPCValidation.MonitoringTargetUpdatePayload validates partial updates', () => {
+  const payload = IPCValidation.MonitoringTargetUpdatePayload({
+    Address: 'host.local',
+    Interval: 5000,
+    StoreHistory: 0,
+    GroupID: null,
+  });
+  assert.equal(payload.Address, 'host.local');
+  assert.equal(payload.Interval, 5000);
+  assert.equal(payload.StoreHistory, false);
+  assert.equal(payload.GroupID, null);
+
+  assert.throws(
+    () => IPCValidation.MonitoringTargetUpdatePayload({ Interval: 'slow' }),
+    /Interval must be a number/i
+  );
+  assert.throws(
+    () => IPCValidation.MonitoringTargetUpdatePayload({ DegradedThresholdMs: 'x' }),
+    /DegradedThresholdMs must be a number/i
+  );
+});
+
+test('IPCValidation.AlertRuleID validates numeric rule identifiers', () => {
+  assert.equal(IPCValidation.AlertRuleID(8), 8);
+  assert.equal(IPCValidation.AlertRuleID(' 9 '), 9);
+  assert.throws(() => IPCValidation.AlertRuleID(-2), /positive integer/i);
+  assert.throws(() => IPCValidation.AlertRuleID('zz'), /must be numeric/i);
+  assert.throws(() => IPCValidation.AlertRuleID(null), /is invalid/i);
+});
+
+test('IPCValidation.AlertRuleCreatePayload normalizes scope, trigger, and actions', () => {
+  const payload = IPCValidation.AlertRuleCreatePayload({
+    Title: 'Offline alert',
+    Scope: {
+      Workspace: true,
+      Groups: ['1', 2, 2],
+      Clients: ['abc', 'monitor:5', '  '],
+    },
+    TriggerType: 'CLIENT_OFFLINE',
+    TriggerConfig: { Threshold: 3 },
+    Actions: [{ Type: 'discord-webhook', Title: 'Notify', Settings: { WebhookURL: 'x' } }],
+    Enabled: 0,
+  });
+  assert.equal(payload.Title, 'Offline alert');
+  assert.equal(payload.Scope.Workspace, true);
+  assert.deepEqual(payload.Scope.Groups, [1, 2]);
+  assert.deepEqual(payload.Scope.Clients, ['abc', 'monitor:5']);
+  assert.equal(payload.TriggerType, 'CLIENT_OFFLINE');
+  assert.deepEqual(payload.TriggerConfig, { Threshold: 3 });
+  assert.equal(payload.Actions.length, 1);
+  assert.equal(payload.Actions[0].Type, 'discord-webhook');
+  assert.equal(payload.Enabled, false);
+
+  assert.throws(
+    () => IPCValidation.AlertRuleCreatePayload({ Title: 'x', Scope: {}, TriggerType: 'NOPE', Actions: [] }),
+    /at least 2 characters|Unsupported TriggerType/i
+  );
+  assert.throws(
+    () =>
+      IPCValidation.AlertRuleCreatePayload({
+        Title: 'Valid title',
+        Scope: {},
+        TriggerType: 'UNKNOWN_TRIGGER',
+        Actions: [],
+      }),
+    /Unsupported TriggerType/i
+  );
+  assert.throws(
+    () =>
+      IPCValidation.AlertRuleCreatePayload({
+        Title: 'Valid title',
+        Scope: { Clients: ['monitor:abc'] },
+        TriggerType: 'CLIENT_ONLINE',
+        Actions: [],
+      }),
+    /monitor:<TargetID>/i
+  );
+  assert.throws(
+    () =>
+      IPCValidation.AlertRuleCreatePayload({
+        Title: 'Valid title',
+        Scope: {},
+        TriggerType: 'CLIENT_ONLINE',
+        Actions: 'not-an-array',
+      }),
+    /Actions must be an array/i
+  );
+});
+
+test('IPCValidation.AlertRuleUpdatePayload validates partial alert updates', () => {
+  const payload = IPCValidation.AlertRuleUpdatePayload({
+    Title: 'Renamed rule',
+    Enabled: true,
+    TriggerType: 'CLIENT_DEGRADED',
+  });
+  assert.equal(payload.Title, 'Renamed rule');
+  assert.equal(payload.Enabled, true);
+  assert.equal(payload.TriggerType, 'CLIENT_DEGRADED');
+
+  assert.throws(
+    () => IPCValidation.AlertRuleUpdatePayload({ TriggerType: 'BOGUS' }),
+    /Unsupported TriggerType/i
+  );
+  assert.throws(() => IPCValidation.AlertRuleUpdatePayload('nope'), /must be an object/i);
+});
