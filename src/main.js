@@ -10,6 +10,7 @@ const {
   dialog,
   powerMonitor,
   powerSaveBlocker,
+  autoUpdater: nativeAutoUpdater,
 } = require('electron');
 if (require('electron-squirrel-startup')) app.quit();
 
@@ -143,12 +144,17 @@ let accidentalShutdownProtectionEnabled = false;
 let bypassShutdownConfirmation = false;
 let shutdownCleanupInFlight = false;
 let shutdownCleanupComplete = false;
+let quittingForUpdate = false;
 
 function hasMainWindow() {
   return MainWindow && !MainWindow.isDestroyed();
 }
 
 async function PromptConfirmBeforeShutdown() {
+  if (quittingForUpdate) {
+    return true;
+  }
+
   const shouldConfirmShutdown =
     accidentalShutdownProtectionEnabled &&
     ModeManager.Get() === 'SHOW' &&
@@ -287,7 +293,7 @@ app.whenReady().then(async () => {
   });
   applyWindowSecurityGuards(MainWindow);
   MainWindow.on('close', async (event) => {
-    if (mainWindowCloseApproved) return;
+    if (mainWindowCloseApproved || quittingForUpdate) return;
     event.preventDefault();
     if (closePromptInFlight) return;
 
@@ -1222,6 +1228,10 @@ async function runShutdownCleanup() {
 app.on('before-quit', (event) => {
   quitRequested = true;
 
+  if (quittingForUpdate) {
+    return;
+  }
+
   if (!mainWindowCloseApproved && hasMainWindow()) {
     event.preventDefault();
     MainWindow.close();
@@ -1262,6 +1272,13 @@ powerMonitor.on('shutdown', (event) => {
   bypassShutdownConfirmation = true;
   quitRequested = true;
   app.quit();
+});
+
+nativeAutoUpdater.on('before-quit-for-update', () => {
+  Logger.log('Update install requested, bypassing shutdown guards');
+  quittingForUpdate = true;
+  bypassShutdownConfirmation = true;
+  quitRequested = true;
 });
 
 // Final shutdown hook: place for flushing buffers/closing resources if needed.
