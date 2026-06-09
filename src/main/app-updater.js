@@ -19,6 +19,7 @@ let autoUpdater = null;
 let squirrelUpdaterInitialized = false;
 let getMainWindow = () => null;
 let checkWatchdogTimer = null;
+let hasDownloadedUpdate = false;
 
 function clearCheckWatchdog() {
   if (!checkWatchdogTimer) return;
@@ -63,6 +64,18 @@ function runSimulatedInstall() {
 
 function sendAppUpdateStatus(payload) {
   const state = payload && payload.state;
+  if (state === 'downloaded') {
+    hasDownloadedUpdate = true;
+  } else if (
+    state === 'checking' ||
+    state === 'available' ||
+    state === 'downloading' ||
+    state === 'none' ||
+    state === 'error' ||
+    state === 'installed'
+  ) {
+    hasDownloadedUpdate = false;
+  }
   if (state === 'available' || state === 'none' || state === 'error' || state === 'downloaded') {
     clearCheckWatchdog();
   }
@@ -242,17 +255,12 @@ async function handleInstall() {
     return;
   }
 
-  // Packaged: if updater config/path is set (real updates), perform real install; else error.
-  const hasConfig = Boolean(autoUpdater && (autoUpdater.updateConfigPath || autoUpdater.provider));
-  if (!hasConfig) {
+  // Only install after a successful check/download cycle in this app session.
+  if (!autoUpdater || !hasDownloadedUpdate) {
     sendAppUpdateStatus({
       state: 'error',
-      error: 'No updater configuration available in packaged app. Run check/download again before install.',
+      error: 'No downloaded update is ready to install. Run check/download again before install.',
     });
-    return;
-  }
-  if (!autoUpdater) {
-    sendAppUpdateStatus({ state: 'error', error: 'Updater not available' });
     return;
   }
   try {
