@@ -209,12 +209,16 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
   assert.ok(executeCalls.some((c) => c.action.Type === 'discord-webhook'));
   assert.ok(executeCalls.some((c) => c.action.Type === 'osc-trigger'));
 
-  const historyWrites = untrackedRunCalls.filter(([sql]) => sql.includes('INSERT INTO AlertHistory'));
+  const historyWrites = untrackedRunCalls.filter(([sql]) =>
+    sql.includes('INSERT INTO AlertHistory')
+  );
   assert.equal(historyWrites.length, 3);
 
   const triggeredEvents = events.filter(([event]) => event === 'AlertTriggered');
   assert.equal(triggeredEvents.length, 3);
   assert.ok(triggeredEvents.some(([, payload]) => payload.TriggerType === 'CLIENT_OFFLINE'));
   assert.ok(triggeredEvents.some(([, payload]) => payload.TriggerType === 'CLIENT_DEGRADED'));
-  assert.ok(triggeredEvents.some(([, payload]) => payload.TriggerType === 'SCRIPT_EXECUTION_FAILED'));
+  assert.ok(
+    triggeredEvents.some(([, payload]) => payload.TriggerType === 'SCRIPT_EXECUTION_FAILED')
+  );
 });

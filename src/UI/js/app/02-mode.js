@@ -99,4 +99,3 @@ window.API.OnModeUpdated((mode) => {
     }
   } catch {}
 });
-

@@ -34,7 +34,10 @@ test('ClientManager ignores dirty tracking for automatic heartbeat and system in
     '../DB': {
       Manager: {
         Get: async (sql, params) => {
-          if (String(sql).includes('SELECT * FROM Clients WHERE UUID = ?') && params[0] === 'client-1') {
+          if (
+            String(sql).includes('SELECT * FROM Clients WHERE UUID = ?') &&
+            params[0] === 'client-1'
+          ) {
             return [null, { ...clientRow }];
           }
           return [null, null];
@@ -124,5 +127,7 @@ test('ClientManager manual updates still use dirty-tracked writes', async () => 
 
   const [updateErr] = await Manager.Update('client-2', { Nickname: 'Renamed' });
   assert.equal(updateErr, null);
-  assert.deepEqual(trackedRuns, [['UPDATE Clients SET Nickname = ? WHERE UUID = ?', ['Renamed', 'client-2']]]);
+  assert.deepEqual(trackedRuns, [
+    ['UPDATE Clients SET Nickname = ? WHERE UUID = ?', ['Renamed', 'client-2']],
+  ]);
 });

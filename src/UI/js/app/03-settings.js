@@ -132,7 +132,7 @@ window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
 					</div>
 					<input type="${inputType}" inputmode="${inputMode}" class="form-control form-control-sm bg-ghost-light text-light border-0" id="SETTING_${
             Setting.Key
-					}" value="${initialValue}" placeholder="${inputPlaceholder}" ${inputPattern} />
+          }" value="${initialValue}" placeholder="${inputPlaceholder}" ${inputPattern} />
 					<div class="invalid-feedback" id="SETTING_${Setting.Key}_ERROR">Must be exactly 4 digits (0-9).</div>
 				</div>`);
 
@@ -158,45 +158,43 @@ window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
           errorEl.hide();
         }
 
-        inputEl
-          .off('input')
-          .on('input', function () {
-            let el = $(this);
-            let NewValue = el.val();
-            const validation = applyWebUiPasswordValidation(NewValue);
+        inputEl.off('input').on('input', function () {
+          let el = $(this);
+          let NewValue = el.val();
+          const validation = applyWebUiPasswordValidation(NewValue);
 
-            if (isWebUiPassword) {
-              if (validation.normalized !== NewValue) {
-                el.val(validation.normalized);
-              }
-              NewValue = validation.normalized;
-              el.toggleClass('is-invalid', !validation.valid);
-              errorEl.toggle(!validation.valid);
+          if (isWebUiPassword) {
+            if (validation.normalized !== NewValue) {
+              el.val(validation.normalized);
             }
+            NewValue = validation.normalized;
+            el.toggleClass('is-invalid', !validation.valid);
+            errorEl.toggle(!validation.valid);
+          }
 
-            if (SettingDebounceTimers.has(Setting.Key))
-              clearTimeout(SettingDebounceTimers.get(Setting.Key));
-            SettingDebounceTimers.set(
-              Setting.Key,
-              setTimeout(async () => {
-                if (isWebUiPassword && !validation.saveable) return;
-                if (NewValue === Setting.Value) return;
-                let Set = Settings.find((s) => s.Key === Setting.Key);
-                Set.Value = NewValue;
-                Setting.Value = NewValue;
-                const [Err] = await window.API.SetSetting(Setting.Key, NewValue);
-                if (Err) {
-                  if (isWebUiPassword) {
-                    el.addClass('is-invalid');
-                    errorEl.text('Must be exactly 4 digits (0-9).').show();
-                  }
-                  Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
-                  return;
+          if (SettingDebounceTimers.has(Setting.Key))
+            clearTimeout(SettingDebounceTimers.get(Setting.Key));
+          SettingDebounceTimers.set(
+            Setting.Key,
+            setTimeout(async () => {
+              if (isWebUiPassword && !validation.saveable) return;
+              if (NewValue === Setting.Value) return;
+              let Set = Settings.find((s) => s.Key === Setting.Key);
+              Set.Value = NewValue;
+              Setting.Value = NewValue;
+              const [Err] = await window.API.SetSetting(Setting.Key, NewValue);
+              if (Err) {
+                if (isWebUiPassword) {
+                  el.addClass('is-invalid');
+                  errorEl.text('Must be exactly 4 digits (0-9).').show();
                 }
-                Notify(`[${Setting.Title}] Saved`, 'success', 1200);
-              }, 600)
-            );
-          });
+                Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
+                return;
+              }
+              Notify(`[${Setting.Title}] Saved`, 'success', 1200);
+            }, 600)
+          );
+        });
       } else if (Setting.Type === 'INTEGER') {
         $(`#SETTINGS`).append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
@@ -285,13 +283,15 @@ window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
         .join('');
       $container.append(rows);
       // Bind QR buttons
-      $container.find('[data-qr-url]').off('click').on('click', function () {
-        const url = $(this).attr('data-qr-url');
-        ShowQRModal(url);
-      });
+      $container
+        .find('[data-qr-url]')
+        .off('click')
+        .on('click', function () {
+          const url = $(this).attr('data-qr-url');
+          ShowQRModal(url);
+        });
     }
   } catch {}
 
   return;
 });
-

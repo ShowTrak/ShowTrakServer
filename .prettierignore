@@ -1,6 +1,8 @@
 node_modules/
 out/
 build/
+coverage/
 logs/
 **/*.lock
 src/UI/vendors/**
+src/WebUI/vendors/**

@@ -134,7 +134,9 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
     assert.equal(insertCall[1][3], Manager.MIN_INTERVAL_MS);
     assert.equal(insertCall[1][4], 1);
 
-    const firstScheduledTick = timers.find((handle) => handle && !handle.cleared && typeof handle.cb === 'function');
+    const firstScheduledTick = timers.find(
+      (handle) => handle && !handle.cleared && typeof handle.cb === 'function'
+    );
     assert.ok(firstScheduledTick);
     await firstScheduledTick.cb();
 

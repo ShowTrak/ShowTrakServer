@@ -10,8 +10,15 @@ function loggerStub() {
   const noop = () => {};
   return {
     CreateLogger: () => ({
-      log: noop, info: noop, warn: noop, error: noop,
-      debug: noop, trace: noop, success: noop, database: noop, databaseError: noop,
+      log: noop,
+      info: noop,
+      warn: noop,
+      error: noop,
+      debug: noop,
+      trace: noop,
+      success: noop,
+      database: noop,
+      databaseError: noop,
     }),
   };
 }
@@ -87,7 +94,10 @@ test('http method validates status ranges and follows redirects', async () => {
   });
 
   try {
-    const ok = await httpMethod.Run({ Address: '127.0.0.1', Settings: { Port: server.port, Path: '/ok' } });
+    const ok = await httpMethod.Run({
+      Address: '127.0.0.1',
+      Settings: { Port: server.port, Path: '/ok' },
+    });
     assert.equal(ok.Success, true);
 
     const outOfRange = await httpMethod.Run({
@@ -100,7 +110,12 @@ test('http method validates status ranges and follows redirects', async () => {
     // Without FollowRedirects the 302 is out of the 200-399 default range? 302 is in range -> success.
     const redirectNoFollow = await httpMethod.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Path: '/redirect', ExpectedStatusMin: 200, ExpectedStatusMax: 299 },
+      Settings: {
+        Port: server.port,
+        Path: '/redirect',
+        ExpectedStatusMin: 200,
+        ExpectedStatusMax: 299,
+      },
     });
     assert.equal(redirectNoFollow.Success, false);
 
@@ -150,7 +165,12 @@ test('http-json method asserts JSON paths and substring matches', async () => {
     // JSON path match.
     const jsonOk = await httpJson.Run({
       ...base,
-      Settings: { ...base.Settings, Path: '/json', JsonPath: 'data.status', ExpectedValue: 'green' },
+      Settings: {
+        ...base.Settings,
+        Path: '/json',
+        JsonPath: 'data.status',
+        ExpectedValue: 'green',
+      },
     });
     assert.equal(jsonOk.Success, true);
 
@@ -286,7 +306,10 @@ test('https method returns an invalid-address result without a network call', as
 
 test('http method reports connection errors against a closed port', async () => {
   const httpMethod = loadHttpMethod('http.js');
-  const result = await httpMethod.Run({ Address: '127.0.0.1', Settings: { Port: 1, Timeout: 800 } });
+  const result = await httpMethod.Run({
+    Address: '127.0.0.1',
+    Settings: { Port: 1, Timeout: 800 },
+  });
   assert.equal(result.Success, false);
 });
 

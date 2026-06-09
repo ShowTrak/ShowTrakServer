@@ -93,9 +93,7 @@ function RenderScopeDropdown(MenuSelector, ToggleSelector, Options, SelectedValu
     )
     .join('');
 
-  $(MenuSelector).html(
-    Html || '<div class="text-muted text-sm p-2">No options available.</div>'
-  );
+  $(MenuSelector).html(Html || '<div class="text-muted text-sm p-2">No options available.</div>');
 }
 
 function RenderScopeDropdowns() {
@@ -224,7 +222,9 @@ function RenderAlertActionsList() {
   const $host = $('#ALERT_RULE_ACTIONS_LIST');
   if (!$host.length) return;
   if (!Array.isArray(AlertRuleDraftActions) || !AlertRuleDraftActions.length) {
-    $host.html('<div class="rounded bg-ghost p-2 text-muted text-center">No actions configured.</div>');
+    $host.html(
+      '<div class="rounded bg-ghost p-2 text-muted text-center">No actions configured.</div>'
+    );
     return;
   }
 
@@ -301,9 +301,13 @@ function OpenAlertActionEditor(Index, IsCreating = false) {
   $('#ALERT_ACTION_EDITOR_TITLE').text(
     AlertActionEditorIsCreating ? `Create Action #${Index + 1}` : `Edit Action #${Index + 1}`
   );
-  $('#ALERT_ACTION_EDITOR_CLOSE').text(AlertActionEditorIsCreating ? 'Cancel New Action' : 'Back to Actions');
+  $('#ALERT_ACTION_EDITOR_CLOSE').text(
+    AlertActionEditorIsCreating ? 'Cancel New Action' : 'Back to Actions'
+  );
   $('#ALERT_ACTION_EDITOR_TYPE').html(RenderAlertActionTypeOptions(TypeID));
-  $('#ALERT_ACTION_EDITOR_SETTINGS').html(RenderAlertActionSettingsFields(TypeID, Action.Settings || {}));
+  $('#ALERT_ACTION_EDITOR_SETTINGS').html(
+    RenderAlertActionSettingsFields(TypeID, Action.Settings || {})
+  );
 }
 
 function AddAlertActionAndEdit() {
@@ -448,7 +452,9 @@ function targetNameFromScopedID(ScopedID) {
   if (ID.startsWith('monitor:')) {
     const TargetID = ID.slice('monitor:'.length);
     const Monitor = (MonitoringTargets || []).find((T) => String(T.TargetID) === TargetID);
-    return Monitor ? Monitor.Nickname || Monitor.Address || `Target ${TargetID}` : `Target ${TargetID}`;
+    return Monitor
+      ? Monitor.Nickname || Monitor.Address || `Target ${TargetID}`
+      : `Target ${TargetID}`;
   }
 
   const Client = (AllClients || []).find((C) => String(C.UUID) === ID);
@@ -503,9 +509,7 @@ function buildRuleSummary(Rule) {
   }
 
   const ActionText = ActionPhrases.length ? naturalJoin(ActionPhrases) : 'take no actions';
-  const Subject = ScopeInfo.SingleName
-    ? ScopeInfo.SingleName
-    : `one of ${ScopeInfo.Count} clients`;
+  const Subject = ScopeInfo.SingleName ? ScopeInfo.SingleName : `one of ${ScopeInfo.Count} clients`;
   return `When ${Subject} ${TriggerText}, ${ActionText}.`;
 }
 
@@ -513,7 +517,9 @@ function RenderAlertRuleManagerList() {
   const $host = $('#ALERT_RULE_MANAGER_LIST');
   if (!$host.length) return;
   if (!AlertRulesCache.length) {
-    $host.html('<div class="rounded bg-ghost p-2 text-center text-muted">No alert rules yet.</div>');
+    $host.html(
+      '<div class="rounded bg-ghost p-2 text-center text-muted">No alert rules yet.</div>'
+    );
     return;
   }
 
@@ -690,5 +696,3 @@ async function OpenCreateAlertRuleEditor() {
   ResetAlertRuleEditor();
   ShowAlertEditorPanel();
 }
-
-

@@ -43,7 +43,9 @@ function RenderAboutDependencyList(Dependencies = []) {
     const Name = Dependency && Dependency.name ? String(Dependency.name) : 'unknown';
     const Version = FormatDependencyVersion(Dependency && Dependency.version);
     const Item = $('<div class="SHOWTRAK_ABOUT_DEPENDENCY_ITEM"></div>');
-    const PackageLink = $('<button type="button" class="btn btn-link p-0 SHOWTRAK_ABOUT_DEPENDENCY_LINK"></button>')
+    const PackageLink = $(
+      '<button type="button" class="btn btn-link p-0 SHOWTRAK_ABOUT_DEPENDENCY_LINK"></button>'
+    )
       .text(Name)
       .attr('data-package-name', Name);
 
@@ -323,4 +325,3 @@ async function OpenClientEditor(UUID) {
 async function AdoptDevice(UUID) {
   await window.API.AdoptDevice(UUID);
 }
-

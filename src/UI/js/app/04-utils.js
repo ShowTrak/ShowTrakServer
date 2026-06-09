@@ -51,8 +51,8 @@ async function ShowQRModal(url) {
       // Preferred: let the library append an <img> to the container element
       const el = $canvas.get(0);
       if (!el) throw new Error('qr-container-missing');
-  // Append QR image
-  new QR(el, { text: String(url) });
+      // Append QR image
+      new QR(el, { text: String(url) });
       // Force size for consistency
       const img = $canvas.find('img').get(0);
       if (img) {
@@ -61,7 +61,7 @@ async function ShowQRModal(url) {
         img.alt = 'QR code';
       } else {
         // Fallback: generate data URL manually if no image was appended
-  const gen = new QR(null, { text: String(url) });
+        const gen = new QR(null, { text: String(url) });
         const dataUrl = gen.createDataURL(4, 4);
         const im2 = document.createElement('img');
         im2.src = dataUrl;
@@ -94,4 +94,3 @@ function FormatBytes(bytes) {
   const precision = val >= 10 || idx === 0 ? 0 : 1; // keep 1 decimal for small MB/GB
   return `${val.toFixed(precision)} ${units[idx]}`;
 }
-

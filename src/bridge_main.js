@@ -133,38 +133,33 @@ contextBridge.exposeInMainWorld('API', {
   HasUnsavedShowData: async () => invoke('Show:HasUnsavedData'),
   EnsureShowFileExists: async () => invoke('Show:EnsureFileExists'),
   OnShowFileUpdated: (Callback) => subscribe('ShowFileUpdated', Callback),
-  SetGroupOrder: async (GroupID, OrderedUUIDs) =>
-    invoke('SetGroupOrder', GroupID, OrderedUUIDs),
+  SetGroupOrder: async (GroupID, OrderedUUIDs) => invoke('SetGroupOrder', GroupID, OrderedUUIDs),
   // Application Mode API
   GetMode: async () => invoke('Mode:Get'),
   SetMode: async (Mode) => invoke('Mode:Set', Mode),
   OnModeUpdated: (Callback) => subscribe('ModeUpdated', Callback),
   OSCBulkAction: (Callback) =>
     subscribe('OSCBulkAction', Callback, (Type, Targets, Args = null) => [Type, Targets, Args]),
-  PlaySound: (Callback) =>
-    subscribe('PlaySound', Callback),
+  PlaySound: (Callback) => subscribe('PlaySound', Callback),
   Notify: (Callback) =>
     subscribe('Notify', Callback, (Message, Type, Duration) => [Message, Type, Duration]),
-  SetOSCList: (Callback) =>
-    subscribe('SetOSCList', Callback),
-  SetDevicesPendingAdoption: (Callback) =>
-    subscribe('SetDevicesPendingAdoption', Callback),
+  SetOSCList: (Callback) => subscribe('SetOSCList', Callback),
+  SetDevicesPendingAdoption: (Callback) => subscribe('SetDevicesPendingAdoption', Callback),
   SetFullClientList: (Callback) =>
     subscribe('SetFullClientList', Callback, (Clients, Groups) => [Clients, Groups]),
-  SetScriptList: (Callback) =>
-    subscribe('SetScriptList', Callback),
-  ClientUpdated: (Callback) =>
-    subscribe('ClientUpdated', Callback),
-  UpdateScriptExecutions: (Callback) =>
-    subscribe('UpdateScriptExecutions', Callback),
-  ShutdownRequested: (Callback) =>
-    subscribe('ShutdownRequested', Callback, () => []),
+  SetScriptList: (Callback) => subscribe('SetScriptList', Callback),
+  ClientUpdated: (Callback) => subscribe('ClientUpdated', Callback),
+  UpdateScriptExecutions: (Callback) => subscribe('UpdateScriptExecutions', Callback),
+  ShutdownRequested: (Callback) => subscribe('ShutdownRequested', Callback, () => []),
   USBDeviceAdded: (Callback) =>
     subscribe('USBDeviceAdded', Callback, (Client, Device) => [Client, Device]),
   USBDeviceRemoved: (Callback) =>
     subscribe('USBDeviceRemoved', Callback, (Client, Device) => [Client, Device]),
   UpdateSettings: (Callback) =>
-    subscribe('UpdateSettings', Callback, (Settings, SettingsGroupps) => [Settings, SettingsGroupps]),
+    subscribe('UpdateSettings', Callback, (Settings, SettingsGroupps) => [
+      Settings,
+      SettingsGroupps,
+    ]),
   SetSetting: async (Key, Value) => invoke('SetSetting', Key, Value),
   WakeOnLan: async (Targets) => invoke('WakeOnLan', Targets),
   UpdateClient: async (UUID, Data) => invoke('UpdateClient', UUID, Data),

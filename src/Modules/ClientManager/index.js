@@ -221,7 +221,9 @@ Manager.MoveGroupToNoGroup = async (GroupID) => {
   const TargetGroupID = Number(GroupID);
   if (!Number.isFinite(TargetGroupID)) return ['Invalid GroupID', null];
 
-  const [Err] = await DB.Run('UPDATE Clients SET GroupID = NULL WHERE GroupID = ?', [TargetGroupID]);
+  const [Err] = await DB.Run('UPDATE Clients SET GroupID = NULL WHERE GroupID = ?', [
+    TargetGroupID,
+  ]);
   if (Err) return ['Failed to move clients to no group', null];
 
   let Changed = 0;

@@ -157,7 +157,10 @@ window.API.MonitoringTargetUpdated(async (Target) => {
   } else {
     UpdateMonitoringTargetTile(Target);
   }
-  if (MonitorHistoryModalTargetID && Number(MonitorHistoryModalTargetID) === Number(Target.TargetID)) {
+  if (
+    MonitorHistoryModalTargetID &&
+    Number(MonitorHistoryModalTargetID) === Number(Target.TargetID)
+  ) {
     await LoadMonitoringTargetHistory(Target.TargetID);
     RenderMonitoringHistoryModal();
   }
@@ -171,7 +174,9 @@ window.API.SetFullAlertRuleList(async (List) => {
 window.API.AlertTriggered(async (Event) => {
   if (!Event || !Event.Context) return;
   const Ctx = Event.Context;
-  const TriggerLabel = String(Event.TriggerType || '').replace(/_/g, ' ').toLowerCase();
+  const TriggerLabel = String(Event.TriggerType || '')
+    .replace(/_/g, ' ')
+    .toLowerCase();
   AddAlert({
     type: 'warning',
     severity: Ctx.Severity || 'warning',
@@ -180,4 +185,3 @@ window.API.AlertTriggered(async (Event) => {
     clientUUID: Ctx.UUID || null,
   });
 });
-

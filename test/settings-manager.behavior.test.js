@@ -77,7 +77,10 @@ test('SettingsManager coerces values, persists updates, and emits events', async
     '../Logger': { CreateLogger: () => ({ log: () => {}, error: () => {} }) },
     '../Broadcast': { Manager: { emit: (event) => events.push(event) } },
     '../DB': dbMock,
-    './DefaultSettings': { DefaultSettings: defaultSettings, Groups: [{ Name: 'Test', Title: 'Test' }] },
+    './DefaultSettings': {
+      DefaultSettings: defaultSettings,
+      Groups: [{ Name: 'Test', Title: 'Test' }],
+    },
   });
 
   const all = await Manager.GetAll();

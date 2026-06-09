@@ -6,7 +6,12 @@ const { loadWithMocks } = require('../test-support/load-with-mocks');
 
 const noopLogger = {
   CreateLogger: () => ({
-    log: () => {}, info: () => {}, warn: () => {}, error: () => {}, success: () => {}, debug: () => {},
+    log: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    success: () => {},
+    debug: () => {},
   }),
 };
 
@@ -34,11 +39,16 @@ function loadOSC(overrides = {}) {
       },
     },
     '../Broadcast': { Manager: { emit: (...args) => broadcastEvents.push(args) } },
-    '../ScriptManager': { Manager: { Get: async (id) => (id === 'script1' ? { ID: 'script1' } : null) } },
+    '../ScriptManager': {
+      Manager: { Get: async (id) => (id === 'script1' ? { ID: 'script1' } : null) },
+    },
     ...overrides,
   };
 
-  const { OSC } = loadWithMocks(path.join(__dirname, '..', 'src', 'Modules', 'OSC', 'index.js'), mocks);
+  const { OSC } = loadWithMocks(
+    path.join(__dirname, '..', 'src', 'Modules', 'OSC', 'index.js'),
+    mocks
+  );
   return { OSC, handlers, broadcastEvents };
 }
 
@@ -56,7 +66,8 @@ test('OSC dispatches a client select route with a valid UUID', async () => {
   await handlers.message(['/ShowTrak/Client/good/Select']);
   assert.ok(
     broadcastEvents.some(
-      ([event, action, uuids]) => event === 'OSCBulkAction' && action === 'Select' && uuids[0] === 'good'
+      ([event, action, uuids]) =>
+        event === 'OSCBulkAction' && action === 'Select' && uuids[0] === 'good'
     )
   );
 });
@@ -64,9 +75,7 @@ test('OSC dispatches a client select route with a valid UUID', async () => {
 test('OSC reports an error notification for an invalid UUID', async () => {
   const { handlers, broadcastEvents } = loadOSC();
   await handlers.message(['/ShowTrak/Client/bad/Select']);
-  assert.ok(
-    broadcastEvents.some(([event, , level]) => event === 'Notify' && level === 'error')
-  );
+  assert.ok(broadcastEvents.some(([event, , level]) => event === 'Notify' && level === 'error'));
 });
 
 test('OSC RunScript route validates both UUID and script', async () => {
@@ -75,7 +84,10 @@ test('OSC RunScript route validates both UUID and script', async () => {
   assert.ok(
     broadcastEvents.some(
       ([event, action, uuids, scriptId]) =>
-        event === 'OSCBulkAction' && action === 'ExecuteScript' && uuids[0] === 'good' && scriptId === 'script1'
+        event === 'OSCBulkAction' &&
+        action === 'ExecuteScript' &&
+        uuids[0] === 'good' &&
+        scriptId === 'script1'
     )
   );
 
@@ -87,7 +99,9 @@ test('OSC RunScript route validates both UUID and script', async () => {
 test('OSC All/WakeOnLAN broadcasts to every client', async () => {
   const { handlers, broadcastEvents } = loadOSC();
   await handlers.message(['/ShowTrak/All/WakeOnLAN']);
-  const wol = broadcastEvents.find(([event, action]) => event === 'OSCBulkAction' && action === 'WOL');
+  const wol = broadcastEvents.find(
+    ([event, action]) => event === 'OSCBulkAction' && action === 'WOL'
+  );
   assert.ok(wol);
   assert.deepEqual(wol[2], ['a', 'b']);
 });

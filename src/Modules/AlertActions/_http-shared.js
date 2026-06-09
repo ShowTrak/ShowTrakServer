@@ -12,7 +12,11 @@ function requestJson({ Url, Method = 'POST', Headers = {}, Timeout = 5000, Body 
 
     const IsHttps = Parsed.protocol === 'https:';
     if (!IsHttps && Parsed.protocol !== 'http:') {
-      return resolve({ Success: false, StatusCode: 0, Error: 'Only http/https URLs are supported' });
+      return resolve({
+        Success: false,
+        StatusCode: 0,
+        Error: 'Only http/https URLs are supported',
+      });
     }
 
     const Transport = IsHttps ? https : http;

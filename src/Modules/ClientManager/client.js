@@ -38,7 +38,7 @@ class Client {
       Uptime: {},
     };
     this.USBDeviceList = [];
-  this.NetworkInterfaces = [];
+    this.NetworkInterfaces = [];
   }
 
   // RAM-only fields and notifications

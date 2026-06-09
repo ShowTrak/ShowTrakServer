@@ -11,7 +11,12 @@ function serverPath(name) {
 
 const loggerStub = {
   CreateLogger: () => ({
-    log: () => {}, info: () => {}, warn: () => {}, error: () => {}, debug: () => {}, success: () => {},
+    log: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    debug: () => {},
+    success: () => {},
   }),
 };
 
@@ -65,7 +70,18 @@ test('Server client namespace rejects sockets without a UUID', async () => {
 });
 
 test('Server client namespace wires telemetry handlers and disconnect cleanup', async () => {
-  const calls = { heartbeat: 0, systemInfo: 0, usbList: 0, usbAdd: 0, usbRemove: 0, nics: 0, timeout: 0, removeAdopt: 0, complete: 0, adopt: 0 };
+  const calls = {
+    heartbeat: 0,
+    systemInfo: 0,
+    usbList: 0,
+    usbAdd: 0,
+    usbRemove: 0,
+    nics: 0,
+    timeout: 0,
+    removeAdopt: 0,
+    complete: 0,
+    adopt: 0,
+  };
 
   const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
     '../Logger': loggerStub,
@@ -78,8 +94,14 @@ test('Server client namespace wires telemetry handlers and disconnect cleanup', 
     '../ClientManager': {
       Manager: {
         Exists: async () => false, // adopted client missing -> triggers Unadopt
-        Heartbeat: async () => { calls.heartbeat += 1; return [null, 'ok']; },
-        SystemInfo: async () => { calls.systemInfo += 1; return [null]; },
+        Heartbeat: async () => {
+          calls.heartbeat += 1;
+          return [null, 'ok'];
+        },
+        SystemInfo: async () => {
+          calls.systemInfo += 1;
+          return [null];
+        },
         SetUSBDeviceList: async () => (calls.usbList += 1),
         USBDeviceAdded: async () => (calls.usbAdd += 1),
         USBDeviceRemoved: async () => (calls.usbRemove += 1),
@@ -142,14 +164,19 @@ function loadWebUi(settings, broadcast) {
     '../ClientManager': {
       Manager: {
         GetAll: async () => [null, [{ UUID: 'u1', Nickname: 'PC' }]],
-        Get: async (uuid) => (uuid === 'u1' ? [null, { UUID: 'u1', MacAddress: 'aa:bb' }] : ['not_found', null]),
+        Get: async (uuid) =>
+          uuid === 'u1' ? [null, { UUID: 'u1', MacAddress: 'aa:bb' }] : ['not_found', null],
       },
     },
-    '../GroupManager': { Manager: { GetAll: async () => [null, [{ GroupID: 1, Title: 'G', Weight: 1 }]] } },
+    '../GroupManager': {
+      Manager: { GetAll: async () => [null, [{ GroupID: 1, Title: 'G', Weight: 1 }]] },
+    },
     '../MonitoringTargetManager': { Manager: { GetAll: async () => [null, []] } },
     '../SettingsManager': { Manager: { GetValue: async (key) => settings[key] } },
     '../WOLManager': { Manager: { Wake: async () => [null, 'magic packet sent'] } },
-    '../ScriptManager': { Manager: { GetScripts: async () => [{ ID: 's1', Name: 'Deploy', Weight: 1 }] } },
+    '../ScriptManager': {
+      Manager: { GetScripts: async () => [{ ID: 's1', Name: 'Deploy', Weight: 1 }] },
+    },
     '../Broadcast': { Manager: broadcast },
   };
   return loadWithMocks(serverPath('webui-namespace.js'), managers);
@@ -172,7 +199,13 @@ test('Web UI namespace gates data behind authentication', async () => {
   const broadcast = new EventEmitter();
   broadcast.off = broadcast.removeListener.bind(broadcast);
   const { SetupWebUiNamespace } = loadWebUi(
-    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: true, WEBUI_PASSWORD: 'secret', WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true, SYSTEM_ALLOW_WOL: true },
+    {
+      WEBUI_ENABLED: true,
+      WEBUI_PASSWORD_PROTECTION_ENABLED: true,
+      WEBUI_PASSWORD: 'secret',
+      WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true,
+      SYSTEM_ALLOW_WOL: true,
+    },
     broadcast
   );
 
@@ -188,7 +221,10 @@ test('Web UI namespace gates data behind authentication', async () => {
   await io._ns._connection(socket);
   // hello is always emitted; bootstrap is withheld until authed.
   assert.ok(socket.emitted.some((e) => e.event === 'hello'));
-  assert.equal(socket.emitted.some((e) => e.event === 'bootstrap'), false);
+  assert.equal(
+    socket.emitted.some((e) => e.event === 'bootstrap'),
+    false
+  );
 
   // Unauthed data request is rejected.
   let resp;
@@ -224,11 +260,18 @@ test('Web UI namespace dispatches script and WOL actions when permitted', async 
   broadcast.off = broadcast.removeListener.bind(broadcast);
   const dispatched = [];
   const { SetupWebUiNamespace } = loadWebUi(
-    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false, WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true, SYSTEM_ALLOW_WOL: true },
+    {
+      WEBUI_ENABLED: true,
+      WEBUI_PASSWORD_PROTECTION_ENABLED: false,
+      WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true,
+      SYSTEM_ALLOW_WOL: true,
+    },
     broadcast
   );
 
-  const ServerManager = { ExecuteScripts: async (scriptId, targets) => dispatched.push({ scriptId, targets }) };
+  const ServerManager = {
+    ExecuteScripts: async (scriptId, targets) => dispatched.push({ scriptId, targets }),
+  };
   const io = makeUiIo();
   SetupWebUiNamespace(io, ServerManager);
 
@@ -272,7 +315,12 @@ test('Web UI namespace disables access when the master toggle is off', async () 
   const broadcast = new EventEmitter();
   broadcast.off = broadcast.removeListener.bind(broadcast);
   const { SetupWebUiNamespace } = loadWebUi(
-    { WEBUI_ENABLED: false, WEBUI_PASSWORD_PROTECTION_ENABLED: false, WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true, SYSTEM_ALLOW_WOL: true },
+    {
+      WEBUI_ENABLED: false,
+      WEBUI_PASSWORD_PROTECTION_ENABLED: false,
+      WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true,
+      SYSTEM_ALLOW_WOL: true,
+    },
     broadcast
   );
 
@@ -286,7 +334,10 @@ test('Web UI namespace disables access when the master toggle is off', async () 
 
   const hello = socket.emitted.find((e) => e.event === 'hello');
   assert.equal(hello.args[0].Enabled, false);
-  assert.equal(socket.emitted.some((e) => e.event === 'bootstrap'), false);
+  assert.equal(
+    socket.emitted.some((e) => e.event === 'bootstrap'),
+    false
+  );
 
   let resp;
   await socket.trigger('auth:login', { password: '1234' }, (r) => (resp = r));
@@ -308,7 +359,13 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
   const { Manager } = loadWithMocks(serverPath('index.js'), {
     '../Logger': loggerStub,
     http: { createServer: () => ({ on: () => {}, listen: (_p, cb) => cb && cb() }) },
-    'socket.io': { Server: class { constructor() { return ioMock; } } },
+    'socket.io': {
+      Server: class {
+        constructor() {
+          return ioMock;
+        }
+      },
+    },
     express: Object.assign(
       () => {
         const app = () => {};

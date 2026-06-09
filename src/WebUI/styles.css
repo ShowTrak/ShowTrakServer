@@ -28,7 +28,13 @@ body {
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   color: #fff;
   background: radial-gradient(circle at 50% 90%, #151232 0%, #0c091c 60%) fixed;
   -webkit-font-smoothing: antialiased;
@@ -97,7 +103,9 @@ small,
   border-radius: 50%;
   background: #6c757d;
   box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
-  transition: background 200ms ease, box-shadow 200ms ease;
+  transition:
+    background 200ms ease,
+    box-shadow 200ms ease;
 }
 .conn-dot.online {
   background: #28d17c;
@@ -418,7 +426,9 @@ h7 {
   height: 16px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.45);
-  transition: background 120ms ease, transform 120ms ease;
+  transition:
+    background 120ms ease,
+    transform 120ms ease;
 }
 .pin-dot.filled {
   background: #fff;
@@ -435,9 +445,18 @@ h7 {
   animation: shake 0.4s ease;
 }
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-8px); }
-  40%, 80% { transform: translateX(8px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-8px);
+  }
+  40%,
+  80% {
+    transform: translateX(8px);
+  }
 }
 .keypad {
   margin-top: 14px;
@@ -454,7 +473,9 @@ h7 {
   font-size: 1.5rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 120ms ease, transform 80ms ease;
+  transition:
+    background 120ms ease,
+    transform 80ms ease;
   user-select: none;
 }
 .keypad-btn:active {
@@ -841,10 +862,7 @@ body.compact
   > [data-type='OFFLINE_SINCE'] {
   font-size: 0;
 }
-body.compact
-  .SHOWTRAK_PC
-  > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']
-  .badge {
+body.compact .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] .badge {
   font-size: 11px;
 }
 

@@ -1351,14 +1351,13 @@ button.btn:focus {
   position: relative;
   overflow: hidden;
   border: 0 !important;
-  background:
-    linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.24) 0,
-      rgba(255, 255, 255, 0.24) var(--scan-progress, 0%),
-      rgba(255, 255, 255, 0.1) var(--scan-progress, 0%),
-      rgba(255, 255, 255, 0.1) 100%
-    ) !important;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.24) 0,
+    rgba(255, 255, 255, 0.24) var(--scan-progress, 0%),
+    rgba(255, 255, 255, 0.1) var(--scan-progress, 0%),
+    rgba(255, 255, 255, 0.1) 100%
+  ) !important;
 }
 
 #SHOWTRAK_MODAL_NETWORK_DISCOVERY .modal-dialog {
@@ -1399,7 +1398,11 @@ button.btn:focus {
 .alert-toast {
   pointer-events: auto;
   background:
-    radial-gradient(circle at 90% -10%, color-mix(in srgb, var(--alert-accent) 24%, transparent), transparent 48%),
+    radial-gradient(
+      circle at 90% -10%,
+      color-mix(in srgb, var(--alert-accent) 24%, transparent),
+      transparent 48%
+    ),
     linear-gradient(165deg, rgba(38, 34, 59, 0.98), rgba(23, 20, 40, 0.98));
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;
@@ -1523,7 +1526,9 @@ button.btn:focus {
 }
 
 .SHOWTRAK_PC > [data-type='Nickname'] {
-  transition: font-size 180ms ease, line-height 180ms ease;
+  transition:
+    font-size 180ms ease,
+    line-height 180ms ease;
 }
 
 .SHOWTRAK_PC:hover {
@@ -1601,7 +1606,10 @@ button.btn:focus {
 }
 
 .group-drop-zone {
-  transition: padding 180ms ease, gap 180ms ease, margin 180ms ease;
+  transition:
+    padding 180ms ease,
+    gap 180ms ease,
+    margin 180ms ease;
 }
 
 .GROUP_TITLE_CLICKABLE {

@@ -18,9 +18,12 @@ function createScan(options, onEvent) {
     EnableProbe: !!options.EnableProbe,
     TimeoutMs: clampInt(options.TimeoutMs, 3000, 60000, 12000),
     MaxHostsPerSubnet: clampInt(options.MaxHostsPerSubnet, 32, 2048, 512),
-    ProbePorts: Array.isArray(options.ProbePorts) && options.ProbePorts.length
-      ? options.ProbePorts.filter((p) => Number.isInteger(Number(p)) && Number(p) > 0 && Number(p) <= 65535).map(Number)
-      : [80, 443, 22, 445, 3389, 8080],
+    ProbePorts:
+      Array.isArray(options.ProbePorts) && options.ProbePorts.length
+        ? options.ProbePorts.filter(
+            (p) => Number.isInteger(Number(p)) && Number(p) > 0 && Number(p) <= 65535
+          ).map(Number)
+        : [80, 443, 22, 445, 3389, 8080],
     Concurrency: clampInt(options.Concurrency, 4, 96, 32),
     Seen: new Set(),
     Browsers: [],
@@ -56,7 +59,9 @@ function emitProgress(scan, current, total) {
 }
 
 function pushResult(scan, result) {
-  const key = String(result.Key || result.Address || '').trim().toLowerCase();
+  const key = String(result.Key || result.Address || '')
+    .trim()
+    .toLowerCase();
   if (!key || scan.Seen.has(key)) return;
   scan.Seen.add(key);
   emitEvent(scan, { Type: 'result', Result: result });
@@ -144,10 +149,7 @@ function startBonjourScan(scan) {
     } catch {}
     scan.Browsers.push(browser);
   } catch (error) {
-    Logger.warn(
-      'Bonjour browser setup failed:',
-      error && error.message ? error.message : error
-    );
+    Logger.warn('Bonjour browser setup failed:', error && error.message ? error.message : error);
   }
 }
 
@@ -164,27 +166,30 @@ async function startProbeScan(scan) {
   emitProgress(scan, completed, targets.length);
 
   for (let worker = 0; worker < workerCount; worker++) {
-    workers.push((async () => {
-      while (!scan.Cancelled && !scan.Finished) {
-        const current = index;
-        index += 1;
-        if (current >= targets.length) return;
-        const ip = targets[current];
-        const openPort = await probeHost(ip, scan.ProbePorts, 350, scan);
-        if (scan.Cancelled || scan.Finished) return;
-        if (openPort != null) {
-          pushResult(scan, {
-            Name: ip,
-            Address: ip,
-            Source: 'probe',
-            Port: openPort,
-            MethodHint: openPort === 80 || openPort === 443 || openPort === 8080 ? 'http' : 'ping',
-          });
+    workers.push(
+      (async () => {
+        while (!scan.Cancelled && !scan.Finished) {
+          const current = index;
+          index += 1;
+          if (current >= targets.length) return;
+          const ip = targets[current];
+          const openPort = await probeHost(ip, scan.ProbePorts, 350, scan);
+          if (scan.Cancelled || scan.Finished) return;
+          if (openPort != null) {
+            pushResult(scan, {
+              Name: ip,
+              Address: ip,
+              Source: 'probe',
+              Port: openPort,
+              MethodHint:
+                openPort === 80 || openPort === 443 || openPort === 8080 ? 'http' : 'ping',
+            });
+          }
+          completed += 1;
+          emitProgress(scan, completed, targets.length);
         }
-        completed += 1;
-        emitProgress(scan, completed, targets.length);
-      }
-    })());
+      })()
+    );
   }
 
   await Promise.allSettled(workers);

@@ -223,9 +223,7 @@ function UpdateSelectionCount() {
   if (!$status || !$status.length) return;
 
   if (!AlertActionsEnabled) {
-    $status
-      .text('Alert actions are currently disabled')
-      .addClass('text-danger');
+    $status.text('Alert actions are currently disabled').addClass('text-danger');
     return;
   }
 
@@ -337,23 +335,33 @@ $(async function () {
   // --- App Updates (manual check) ---
   try {
     // Bind Check for Updates button in core modal
-    $('#SHOWTRAK_MODEL_CORE_CHECKUPDATES').off('click').on('click', async () => {
-      await OpenAboutModal();
-      // Ensure section visible while checking
-      $('#UPDATE_SECTION').removeClass('d-none');
-      $('#UPDATE_STATUS').text('Checking for updates...');
-      $('#UPDATE_INSTALL_BTN').addClass('d-none');
-      $('#UPDATE_LATER_BTN').addClass('d-none');
-      try { await window.API.CheckForAppUpdates(); } catch {}
-    });
+    $('#SHOWTRAK_MODEL_CORE_CHECKUPDATES')
+      .off('click')
+      .on('click', async () => {
+        await OpenAboutModal();
+        // Ensure section visible while checking
+        $('#UPDATE_SECTION').removeClass('d-none');
+        $('#UPDATE_STATUS').text('Checking for updates...');
+        $('#UPDATE_INSTALL_BTN').addClass('d-none');
+        $('#UPDATE_LATER_BTN').addClass('d-none');
+        try {
+          await window.API.CheckForAppUpdates();
+        } catch {}
+      });
     // Bind Install and Later buttons
-    $('#UPDATE_INSTALL_BTN').off('click').on('click', async () => {
-      try { await window.API.InstallAppUpdate(); } catch {}
-    });
-    $('#UPDATE_LATER_BTN').off('click').on('click', async () => {
-      // Hide the section but keep state if needed later
-      $('#UPDATE_SECTION').addClass('d-none');
-    });
+    $('#UPDATE_INSTALL_BTN')
+      .off('click')
+      .on('click', async () => {
+        try {
+          await window.API.InstallAppUpdate();
+        } catch {}
+      });
+    $('#UPDATE_LATER_BTN')
+      .off('click')
+      .on('click', async () => {
+        // Hide the section but keep state if needed later
+        $('#UPDATE_SECTION').addClass('d-none');
+      });
 
     // Listen for updater status from main
     window.API.OnAppUpdateStatus((payload) => {
@@ -369,12 +377,13 @@ $(async function () {
         $later.addClass('d-none');
         $notesWrap.addClass('d-none');
         $notes.empty();
-        const escapeHtml = (s) => String(s)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#39;');
+        const escapeHtml = (s) =>
+          String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
         const sanitizeHref = (href) => {
           try {
             const h = String(href || '').trim();
@@ -398,7 +407,7 @@ $(async function () {
             const hashes = m.match(/^#+/)[0].length;
             const content = m.replace(/^#{1,6}\s+/, '');
             const level = Math.min(6, Math.max(1, hashes));
-            return `<h${level} class="h${level+2}">${content}</h${level}>`;
+            return `<h${level} class="h${level + 2}">${content}</h${level}>`;
           });
           // Inline code (after fences are removed)
           text = text.replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`);
@@ -414,21 +423,27 @@ $(async function () {
               .split(/\n/)
               .map((line) => line.replace(/^[\-\*\+]\s+/, '').trim())
               .filter((x) => x.length > 0)
-              .map((x) => `<li>${x}</li>`) 
+              .map((x) => `<li>${x}</li>`)
               .join('');
             return `\n<ul>${items}</ul>`;
           });
           // Bold and italic (do after lists so we don't break bullets)
-          text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                     .replace(/__(.+?)__/g, '<strong>$1</strong>')
-                     .replace(/(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)/g, '<em>$1</em>')
-                     .replace(/_(?!\s)(.+?)(?<!\s)_/g, '<em>$1</em>');
+          text = text
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/__(.+?)__/g, '<strong>$1</strong>')
+            .replace(/(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)/g, '<em>$1</em>')
+            .replace(/_(?!\s)(.+?)(?<!\s)_/g, '<em>$1</em>');
           // Paragraphs: wrap blocks that are not already block-level tags
-          const blocks = text.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
-          const html = blocks.map((b) => {
-            if (/^<\/?(h\d|ul|ol|li|pre|blockquote|table|p|code)/i.test(b)) return b;
-            return `<p>${b.replace(/\n/g, '<br/>')}</p>`;
-          }).join('\n');
+          const blocks = text
+            .split(/\n{2,}/)
+            .map((b) => b.trim())
+            .filter(Boolean);
+          const html = blocks
+            .map((b) => {
+              if (/^<\/?(h\d|ul|ol|li|pre|blockquote|table|p|code)/i.test(b)) return b;
+              return `<p>${b.replace(/\n/g, '<br/>')}</p>`;
+            })
+            .join('\n');
           // Restore fenced code blocks
           return html.replace(/%%CODEBLOCK_(\d+)%%/g, (_m, i) => {
             const code = codeBlocks[Number(i)] || '';
@@ -443,11 +458,11 @@ $(async function () {
           if (Array.isArray(raw)) {
             // mac: array of releases, take the first entry's notes
             const first = raw.find(Boolean);
-            return first && (first.releaseNotes || first.notes || first.body) || '';
+            return (first && (first.releaseNotes || first.notes || first.body)) || '';
           }
           return raw || '';
         };
-    const showNotes = (info) => {
+        const showNotes = (info) => {
           const notes = extractNotes(info);
           if (notes && typeof notes === 'string') {
             // Allow basic HTML if present from GitHub; otherwise escape text
@@ -455,7 +470,7 @@ $(async function () {
             if (looksHtml) {
               $notes.html(notes);
             } else {
-      $notes.html(renderMarkdownSafe(notes));
+              $notes.html(renderMarkdownSafe(notes));
             }
             $notesWrap.removeClass('d-none');
           }
@@ -463,7 +478,8 @@ $(async function () {
         if (st === 'checking') {
           $status.text('Checking for updates...');
         } else if (st === 'available') {
-          const v = payload.info && (payload.info.version || payload.info.tag || 'Update available');
+          const v =
+            payload.info && (payload.info.version || payload.info.tag || 'Update available');
           $status.text(`Update available: ${v}. Downloading...`);
           showNotes(payload.info);
         } else if (st === 'downloading') {
@@ -512,11 +528,11 @@ $(async function () {
   });
   $(document).on('click', '.SHOWTRAK_PC', function (e) {
     e.preventDefault();
-  // Ignore clicks on pending-adoption tiles (blue)
-  if ($(this).hasClass('PENDING')) return false;
-  // Monitoring tiles aren't selectable client targets
-  if ($(this).hasClass('MONITOR')) return false;
-  let UUID = $(this).attr('data-uuid');
+    // Ignore clicks on pending-adoption tiles (blue)
+    if ($(this).hasClass('PENDING')) return false;
+    // Monitoring tiles aren't selectable client targets
+    if ($(this).hasClass('MONITOR')) return false;
+    let UUID = $(this).attr('data-uuid');
     ToggleSelection(UUID);
     return;
   });
@@ -524,20 +540,20 @@ $(async function () {
   $(document).on('dblclick', '.SHOWTRAK_PC', function (e) {
     e.preventDefault();
     e.stopPropagation();
-  // Ignore dblclick on pending-adoption tiles
-  if ($(this).hasClass('PENDING')) return false;
-  // Monitoring tiles open their own editor on dblclick instead
-  if ($(this).hasClass('MONITOR')) {
-    const tid = $(this).attr('data-target-id');
-    if (tid) {
-      if (AppMode === 'SHOW') {
-        OpenMonitoringTargetHistory(parseInt(tid, 10));
-      } else {
-        OpenMonitoringTargetEditor(parseInt(tid, 10));
+    // Ignore dblclick on pending-adoption tiles
+    if ($(this).hasClass('PENDING')) return false;
+    // Monitoring tiles open their own editor on dblclick instead
+    if ($(this).hasClass('MONITOR')) {
+      const tid = $(this).attr('data-target-id');
+      if (tid) {
+        if (AppMode === 'SHOW') {
+          OpenMonitoringTargetHistory(parseInt(tid, 10));
+        } else {
+          OpenMonitoringTargetEditor(parseInt(tid, 10));
+        }
       }
+      return false;
     }
-    return false;
-  }
     const uuid = $(this).attr('data-uuid');
     if (uuid) OpenClientInfo(uuid);
     return false;
@@ -684,7 +700,10 @@ $(async function () {
     const minX = Math.max(edgePadding, Math.floor(boundsRect.left) + edgePadding);
     const minY = Math.max(edgePadding, Math.floor(boundsRect.top) + edgePadding);
     const maxX = Math.min(viewportWidth - edgePadding, Math.floor(boundsRect.right) - edgePadding);
-    const maxY = Math.min(viewportHeight - edgePadding, Math.floor(boundsRect.bottom) - edgePadding);
+    const maxY = Math.min(
+      viewportHeight - edgePadding,
+      Math.floor(boundsRect.bottom) - edgePadding
+    );
     const availableHeight = Math.max(120, maxY - minY);
     const maxMenuHeight = Math.min(460, Math.max(220, Math.floor(availableHeight * 0.9)));
 
@@ -1032,11 +1051,15 @@ async function Init() {
     await window.API.OpenShowTrakGithubInBrowser();
   });
 
-  $('#SHOWTRAK_ABOUT_DEPENDENCIES').on('click', '.SHOWTRAK_ABOUT_DEPENDENCY_LINK', async (Event) => {
-    const PackageName = $(Event.currentTarget).attr('data-package-name');
-    if (!PackageName) return;
-    await window.API.OpenNpmPackageInBrowser(PackageName);
-  });
+  $('#SHOWTRAK_ABOUT_DEPENDENCIES').on(
+    'click',
+    '.SHOWTRAK_ABOUT_DEPENDENCY_LINK',
+    async (Event) => {
+      const PackageName = $(Event.currentTarget).attr('data-package-name');
+      if (!PackageName) return;
+      await window.API.OpenNpmPackageInBrowser(PackageName);
+    }
+  );
 
   const settingsMenu = document.getElementById('SETTINGS_MENU');
   $('#SETTINGS_MENU_DROPDOWN')
@@ -1102,7 +1125,9 @@ async function Init() {
   $('#NETWORK_DISCOVERY_RESULTS')
     .off('click', '.NETWORK_DISCOVERY_ADD')
     .on('click', '.NETWORK_DISCOVERY_ADD', async function () {
-      const id = String($(this).attr('data-id') || '').trim().toLowerCase();
+      const id = String($(this).attr('data-id') || '')
+        .trim()
+        .toLowerCase();
       if (!id || !NetworkDiscoveryResults.has(id)) return;
       const selected = NetworkDiscoveryResults.get(id);
       await StopNetworkDiscoveryScan();

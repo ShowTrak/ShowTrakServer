@@ -148,7 +148,8 @@ async function Run(Target) {
 module.exports = {
   ID,
   Name: 'HTTP/S JSON / Text',
-  Description: 'HTTP or HTTPS request that asserts a JSON path value or a substring in the response body.',
+  Description:
+    'HTTP or HTTPS request that asserts a JSON path value or a substring in the response body.',
   DefaultInterval: 60000,
   Settings,
   Run,

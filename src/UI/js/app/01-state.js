@@ -61,4 +61,3 @@ let AppMode = 'SHOW'; // default visual state until backend confirms
 const COMPACT_MODE_STORAGE_KEY = 'showtrak.ui.compactMode';
 let CompactMode = false;
 let AlertActionsEnabled = true;
-

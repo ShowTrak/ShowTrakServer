@@ -408,13 +408,16 @@ app.whenReady().then(async () => {
   // Provide a list of Web UI addresses on the local network with port
   RPC.handle('WebUI:GetAddresses', async () => {
     try {
-      const port = Config && Config.Application && Config.Application.Port ? Config.Application.Port : 3000;
+      const port =
+        Config && Config.Application && Config.Application.Port ? Config.Application.Port : 3000;
       const hostname = os.hostname();
       const net = os.networkInterfaces() || {};
       const hosts = new Set();
       const push = (h) => {
         if (!h) return;
-        try { h = String(h).trim(); } catch {}
+        try {
+          h = String(h).trim();
+        } catch {}
         if (!h) return;
         hosts.add(h);
       };
@@ -425,7 +428,8 @@ app.whenReady().then(async () => {
         const list = net[key] || [];
         for (const addr of list) {
           if (!addr) continue;
-          const family = addr.family || addr.address && addr.address.includes(':') ? 'IPv6' : 'IPv4';
+          const family =
+            addr.family || (addr.address && addr.address.includes(':')) ? 'IPv6' : 'IPv4';
           if (family !== 'IPv4') continue;
           if (addr.internal) continue;
           push(addr.address);
@@ -434,7 +438,11 @@ app.whenReady().then(async () => {
       const urls = Array.from(hosts).map((host) => ({ host, url: `http://${host}:${port}/` }));
       return { port, hostname, urls };
     } catch (e) {
-      return { port: 3000, hostname: os.hostname(), urls: [{ host: 'localhost', url: 'http://localhost:3000/' }] };
+      return {
+        port: 3000,
+        hostname: os.hostname(),
+        urls: [{ host: 'localhost', url: 'http://localhost:3000/' }],
+      };
     }
   });
 
@@ -1010,7 +1018,6 @@ async function ScheduleAutosave() {
 BroadcastManager.on('AutosaveSettingsChanged', ScheduleAutosave);
 ScheduleAutosave().catch((Err) => Logger.error('Failed to schedule autosave:', Err));
 
-
 async function USBDeviceAdded(Client, Device) {
   if (!MainWindow || MainWindow.isDestroyed()) return;
   Logger.log(
@@ -1189,7 +1196,10 @@ async function HandleOSCBulkAction(Type, Targets, Args = null) {
 BroadcastManager.on('OSCBulkAction', HandleOSCBulkAction);
 
 BroadcastManager.on('Shutdown', async () => {
-  Shutdown();
+  Logger.log('Application shutdown requested (broadcast)');
+  bypassShutdownConfirmation = true;
+  quitRequested = true;
+  app.quit();
 });
 
 // Relay application mode changes to renderer windows

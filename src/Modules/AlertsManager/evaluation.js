@@ -25,11 +25,15 @@ function clientDegradedByConfig(Data, Config) {
 
   let Hit = false;
   if (Number.isFinite(CpuThreshold) && CpuThreshold > 0) {
-    const Cpu = Number(Data && Data.Vitals && Data.Vitals.CPU ? Data.Vitals.CPU.UsagePercentage : NaN);
+    const Cpu = Number(
+      Data && Data.Vitals && Data.Vitals.CPU ? Data.Vitals.CPU.UsagePercentage : NaN
+    );
     if (Number.isFinite(Cpu) && Cpu >= CpuThreshold) Hit = true;
   }
   if (Number.isFinite(RamThreshold) && RamThreshold > 0) {
-    const Ram = Number(Data && Data.Vitals && Data.Vitals.Ram ? Data.Vitals.Ram.UsagePercentage : NaN);
+    const Ram = Number(
+      Data && Data.Vitals && Data.Vitals.Ram ? Data.Vitals.Ram.UsagePercentage : NaN
+    );
     if (Number.isFinite(Ram) && Ram >= RamThreshold) Hit = true;
   }
   if (Number.isFinite(LastSeenStaleMs) && LastSeenStaleMs > 0) {
@@ -50,13 +54,17 @@ function triggerMatches(Rule, Context) {
       return Context.TriggerType === TRIGGERS.SCRIPT_EXECUTION_FAILED;
     case TRIGGERS.CLIENT_DEGRADED: {
       if (Context.EntityType === 'monitor') {
-        const Source = String((Rule.TriggerConfig && Rule.TriggerConfig.Source) || 'any').toLowerCase();
+        const Source = String(
+          (Rule.TriggerConfig && Rule.TriggerConfig.Source) || 'any'
+        ).toLowerCase();
         if (Source !== 'any' && Source !== 'monitor') return false;
         return !!Context.Degraded;
       }
 
       if (Context.EntityType === 'client') {
-        const Source = String((Rule.TriggerConfig && Rule.TriggerConfig.Source) || 'any').toLowerCase();
+        const Source = String(
+          (Rule.TriggerConfig && Rule.TriggerConfig.Source) || 'any'
+        ).toLowerCase();
         if (Source !== 'any' && Source !== 'client') return false;
         return clientDegradedByConfig(Context.RawData || {}, Rule.TriggerConfig || {});
       }
@@ -69,13 +77,21 @@ function triggerMatches(Rule, Context) {
 
 function describeMonitorReason(Context) {
   const ErrorText = typeof Context.LastError === 'string' ? Context.LastError.trim() : '';
-  if (/timed?\s*out|timeout|unreachable|refused|reset|network\s+is\s+unreachable|no\s+route\s+to\s+host|socket\s+hang\s+up|econnrefused|econnreset|ehostunreach|enetunreach/i.test(ErrorText)) {
+  if (
+    /timed?\s*out|timeout|unreachable|refused|reset|network\s+is\s+unreachable|no\s+route\s+to\s+host|socket\s+hang\s+up|econnrefused|econnreset|ehostunreach|enetunreach/i.test(
+      ErrorText
+    )
+  ) {
     return 'Offline';
   }
   if (/enotfound|eai_again|nxdomain|dns|name\s+or\s+service\s+not\s+known/i.test(ErrorText)) {
     return 'DNS Error';
   }
-  if (/cert|certificate|tls|ssl|self\s*signed|unable\s+to\s+verify|hostname\/?ip\s+does\s+not\s+match/i.test(ErrorText)) {
+  if (
+    /cert|certificate|tls|ssl|self\s*signed|unable\s+to\s+verify|hostname\/?ip\s+does\s+not\s+match/i.test(
+      ErrorText
+    )
+  ) {
     return 'TLS Error';
   }
   const HttpMatch = ErrorText.match(/\bHTTP\s+(\d{3})\b/i);

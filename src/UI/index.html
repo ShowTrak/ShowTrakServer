@@ -251,7 +251,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <strong class="mb-0"> Keyboard Shortcuts </strong>
 
             <div id="KEYBOARD_SHORTCUTS_LIST" class="d-grid gap-2 text-start mt-2"></div>
@@ -280,7 +279,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <strong class="mb-0"> No Show Open </strong>
             <p class="text-muted text-sm mb-2">
               Open an existing ShowTrak file or create a new show to get started.
@@ -309,11 +307,10 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <strong class="mb-0"> Save Your Existing Data </strong>
             <p class="text-muted text-sm mb-2">
-              ShowTrak now stores configuration and show data in a .showtrak file. We found data from
-              a previous version that is not yet saved to a file. Choose a location to save it
+              ShowTrak now stores configuration and show data in a .showtrak file. We found data
+              from a previous version that is not yet saved to a file. Choose a location to save it
               now to avoid losing your data.
             </p>
 
@@ -338,7 +335,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content SHOWTRAK_ABOUT_MODAL_CONTENT">
           <div class="modal-body text-center SHOWTRAK_ABOUT_MODAL_BODY">
-
             <div class="d-flex justify-content-center">
               <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
             </div>
@@ -355,9 +351,17 @@
             </div>
 
             <div class="d-grid gap-2 mt-2">
-              <a class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN" id="SHOWTRAK_ABOUT_WEBSITE"> Visit ShowTrak Website </a>
-              <a class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN" id="SHOWTRAK_ABOUT_GITHUB"> View on GitHub </a>
-              <button type="button" class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN" id="SHOWTRAK_MODEL_CORE_SUPPORTDISCORD">
+              <a class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN" id="SHOWTRAK_ABOUT_WEBSITE">
+                Visit ShowTrak Website
+              </a>
+              <a class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN" id="SHOWTRAK_ABOUT_GITHUB">
+                View on GitHub
+              </a>
+              <button
+                type="button"
+                class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN"
+                id="SHOWTRAK_MODEL_CORE_SUPPORTDISCORD"
+              >
                 Open Support Discord
               </button>
             </div>
@@ -366,17 +370,22 @@
               <div class="card-body p-3 text-start SHOWTRAK_ABOUT_UPDATE_BODY">
                 <strong>Open Source and Contributions</strong>
                 <div class="text-muted mt-2">
-                  Open source projects are built and improved by people sharing code, feedback, bug reports, documentation, and time.
-                  If ShowTrak helps your setup, you can contribute by reporting issues, proposing improvements, opening pull requests,
-                  or helping other users in the community.
+                  Open source projects are built and improved by people sharing code, feedback, bug
+                  reports, documentation, and time. If ShowTrak helps your setup, you can contribute
+                  by reporting issues, proposing improvements, opening pull requests, or helping
+                  other users in the community.
                 </div>
                 <div class="text-muted mt-2">
-                  Huge thanks to the maintainers and contributors of the open source packages listed below. Their work makes ShowTrak possible.
+                  Huge thanks to the maintainers and contributors of the open source packages listed
+                  below. Their work makes ShowTrak possible.
                 </div>
               </div>
             </div>
 
-            <div id="UPDATE_SECTION" class="card bg-ghost-light border-0 rounded d-none mt-2 SHOWTRAK_ABOUT_CARD">
+            <div
+              id="UPDATE_SECTION"
+              class="card bg-ghost-light border-0 rounded d-none mt-2 SHOWTRAK_ABOUT_CARD"
+            >
               <div class="card-body p-3 text-start SHOWTRAK_ABOUT_UPDATE_BODY">
                 <div class="d-flex justify-content-between align-items-center">
                   <div>
@@ -384,13 +393,25 @@
                     <div id="UPDATE_STATUS" class="text-muted">No pending update</div>
                   </div>
                   <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-success d-none" id="UPDATE_INSTALL_BTN">Install</button>
-                    <button type="button" class="btn btn-sm btn-light d-none" id="UPDATE_LATER_BTN">Later</button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-success d-none"
+                      id="UPDATE_INSTALL_BTN"
+                    >
+                      Install
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light d-none" id="UPDATE_LATER_BTN">
+                      Later
+                    </button>
                   </div>
                 </div>
                 <div id="UPDATE_NOTES_WRAPPER" class="mt-2 d-none">
                   <div class="fw-semibold small mb-1">Changelog</div>
-                  <div id="UPDATE_CHANGELOG" class="border rounded bg-ghost p-2 small" style="max-height: 180px; overflow: auto; white-space: pre-wrap;"></div>
+                  <div
+                    id="UPDATE_CHANGELOG"
+                    class="border rounded bg-ghost p-2 small"
+                    style="max-height: 180px; overflow: auto; white-space: pre-wrap"
+                  ></div>
                 </div>
               </div>
             </div>
@@ -401,7 +422,10 @@
                   <strong>Dependencies</strong>
                   <span id="SHOWTRAK_ABOUT_DEPENDENCY_COUNT" class="text-muted small"></span>
                 </div>
-                <div id="SHOWTRAK_ABOUT_DEPENDENCIES" class="SHOWTRAK_ABOUT_DEPENDENCIES_LIST text-muted">
+                <div
+                  id="SHOWTRAK_ABOUT_DEPENDENCIES"
+                  class="SHOWTRAK_ABOUT_DEPENDENCIES_LIST text-muted"
+                >
                   Loading dependencies...
                 </div>
               </div>
@@ -425,7 +449,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <strong class="mb-0"> Group Manager </strong>
 
             <div id="GROUP_MANAGER_GROUP_LIST" class="d-grid gap-2"></div>
@@ -444,7 +467,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable modal-lg">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <div id="OSC_ROUTE_LIST" class="d-grid gap-2 text-start"></div>
           </div>
         </div>
@@ -461,7 +483,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <div id="SETTINGS" class="d-grid gap-2"></div>
             <div id="REMOTE_ACCESS_SECTION" class="d-grid gap-2 mt-2"></div>
           </div>
@@ -497,7 +518,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <div class="rounded-3 p-2 bg-ghost-light">
               <h6 class="mb-0">Client Settings</h6>
             </div>
@@ -634,7 +654,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <h6 class="mb-0">Create New Group</h6>
 
             <div class="form-floating">
@@ -667,7 +686,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <div class="rounded-3 p-2 bg-ghost-light">
               <h6 class="mb-0" id="MONITORING_TARGET_MODAL_TITLE">Add Monitoring Target</h6>
             </div>
@@ -704,7 +722,9 @@
                   class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
                 >
                   <span>Check Interval</span>
-                  <span id="MONITORING_TARGET_INTERVAL_LABEL" class="badge bg-ghost-light text-light"
+                  <span
+                    id="MONITORING_TARGET_INTERVAL_LABEL"
+                    class="badge bg-ghost-light text-light"
                     >30s</span
                   >
                 </label>
@@ -719,7 +739,9 @@
                 />
               </div>
 
-              <div class="form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost rounded p-2">
+              <div
+                class="form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost rounded p-2"
+              >
                 <label class="form-check-label mb-0 ms-2" for="MONITORING_TARGET_STORE_HISTORY">
                   Store historic data
                 </label>
@@ -742,7 +764,9 @@
                   value="0"
                   placeholder="Degraded Threshold (ms)"
                 />
-                <label for="MONITORING_TARGET_DEGRADED_THRESHOLD">Degraded Threshold (ms, 0 = off)</label>
+                <label for="MONITORING_TARGET_DEGRADED_THRESHOLD"
+                  >Degraded Threshold (ms, 0 = off)</label
+                >
               </div>
 
               <div id="MONITORING_TARGET_DYNAMIC_SETTINGS" class="d-grid gap-2"></div>
@@ -759,10 +783,7 @@
               </div>
             </div>
 
-            <div
-              id="MONITORING_TARGET_DANGER_ZONE"
-              class="d-none"
-            >
+            <div id="MONITORING_TARGET_DANGER_ZONE" class="d-none">
               <div class="rounded-3 p-2 bg-ghost-light text-danger mt-2">
                 <h6 class="mb-0">Danger Zone</h6>
               </div>
@@ -789,7 +810,6 @@
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <div class="rounded-3 p-2 bg-ghost-light mb-2">
               <h6 class="mb-0" id="MONITOR_HISTORY_TITLE">Monitoring History</h6>
             </div>
@@ -801,8 +821,12 @@
               aria-label="History range"
             >
               <button type="button" class="btn btn-outline-light" data-range="5m">5 Minutes</button>
-              <button type="button" class="btn btn-outline-light" data-range="15m">15 Minutes</button>
-              <button type="button" class="btn btn-outline-light" data-range="30m">30 Minutes</button>
+              <button type="button" class="btn btn-outline-light" data-range="15m">
+                15 Minutes
+              </button>
+              <button type="button" class="btn btn-outline-light" data-range="30m">
+                30 Minutes
+              </button>
               <button type="button" class="btn btn-outline-light" data-range="1h">1 Hour</button>
               <button type="button" class="btn btn-outline-light" data-range="12h">12 Hours</button>
             </div>
@@ -815,7 +839,12 @@
                 aria-label="Monitoring history graph"
                 role="img"
               ></canvas>
-              <div id="MONITOR_HISTORY_TOOLTIP" class="d-none" role="status" aria-live="polite"></div>
+              <div
+                id="MONITOR_HISTORY_TOOLTIP"
+                class="d-none"
+                role="status"
+                aria-live="polite"
+              ></div>
               <div id="MONITOR_HISTORY_EMPTY" class="d-none">No samples in this range yet.</div>
             </div>
 
@@ -826,7 +855,6 @@
               <span><i class="status-dot status-dot-degraded"></i>Degraded</span>
               <span><i class="status-dot status-dot-offline"></i>Offline</span>
             </div>
-
           </div>
         </div>
       </div>
@@ -842,7 +870,6 @@
       <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <div id="ALERT_MANAGER_LIST_PANEL" class="d-grid gap-2 text-start mt-1">
               <div class="d-flex justify-content-between align-items-center">
                 <strong>Alerts</strong>
@@ -875,7 +902,11 @@
 
               <div>
                 <div class="alert-multiselect" id="ALERT_SCOPE_DROPDOWN">
-                  <button type="button" class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center" id="ALERT_SCOPE_TOGGLE">
+                  <button
+                    type="button"
+                    class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center"
+                    id="ALERT_SCOPE_TOGGLE"
+                  >
                     <span>Select targets</span>
                     <i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>
                   </button>
@@ -889,7 +920,10 @@
               </div>
 
               <div id="ALERT_RULE_MAIN_CONTENT" class="d-grid gap-2">
-                <div id="ALERT_RULE_TRIGGER_CONFIG" class="d-none d-grid gap-2 bg-ghost rounded p-2"></div>
+                <div
+                  id="ALERT_RULE_TRIGGER_CONFIG"
+                  class="d-none d-grid gap-2 bg-ghost rounded p-2"
+                ></div>
 
                 <div class="d-flex justify-content-between align-items-center">
                   <strong>Actions</strong>
@@ -900,7 +934,9 @@
                 <div id="ALERT_RULE_ACTIONS_LIST" class="d-grid gap-2"></div>
 
                 <div class="d-grid gap-2 mt-1">
-                  <button type="button" class="btn btn-danger d-none" id="ALERT_RULE_DELETE">Delete</button>
+                  <button type="button" class="btn btn-danger d-none" id="ALERT_RULE_DELETE">
+                    Delete
+                  </button>
                   <button type="button" class="btn btn-success" id="ALERT_RULE_SAVE">Save</button>
                 </div>
               </div>
@@ -934,8 +970,6 @@
                 </div>
               </div>
             </div>
-
-
           </div>
         </div>
       </div>
@@ -951,14 +985,15 @@
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <div class="rounded-3 p-2 bg-ghost-light">
               <h6 class="mb-0">LAN Discovery</h6>
             </div>
 
             <div id="NETWORK_DISCOVERY_RESULTS" class="text-start mt-2">
               <div class="table-responsive NETWORK_DISCOVERY_TABLE_WRAP">
-                <table class="table table-sm table-borderless align-middle NETWORK_DISCOVERY_TABLE mb-0">
+                <table
+                  class="table table-sm table-borderless align-middle NETWORK_DISCOVERY_TABLE mb-0"
+                >
                   <thead>
                     <tr>
                       <th>Name</th>
@@ -1004,7 +1039,6 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <h6 id="SHOWTRAK_CONFIRMATION_MESSAGE" class="mb-0">
               Are you sure you want to do this?
             </h6>
@@ -1037,23 +1071,42 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-
             <div class="rounded-3 p-2 bg-ghost-light">
               <h6 class="mb-0">Client Info</h6>
             </div>
 
             <div class="d-grid gap-2">
               <div class="form-floating has-copy">
-                <input type="text" class="form-control disabled" id="CLIENT_INFO_NICKNAME" disabled />
+                <input
+                  type="text"
+                  class="form-control disabled"
+                  id="CLIENT_INFO_NICKNAME"
+                  disabled
+                />
                 <label for="CLIENT_INFO_NICKNAME">Nickname</label>
-                <button type="button" class="copy-field-btn" data-target="#CLIENT_INFO_NICKNAME" title="Copy">
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#CLIENT_INFO_NICKNAME"
+                  title="Copy"
+                >
                   <i class="bi bi-clipboard"></i>
                 </button>
               </div>
               <div class="form-floating has-copy">
-                <input type="text" class="form-control disabled" id="CLIENT_INFO_HOSTNAME" disabled />
+                <input
+                  type="text"
+                  class="form-control disabled"
+                  id="CLIENT_INFO_HOSTNAME"
+                  disabled
+                />
                 <label for="CLIENT_INFO_HOSTNAME">Hostname</label>
-                <button type="button" class="copy-field-btn" data-target="#CLIENT_INFO_HOSTNAME" title="Copy">
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#CLIENT_INFO_HOSTNAME"
+                  title="Copy"
+                >
                   <i class="bi bi-clipboard"></i>
                 </button>
               </div>
@@ -1064,28 +1117,53 @@
               <div class="form-floating has-copy">
                 <input type="text" class="form-control disabled" id="CLIENT_INFO_IP" disabled />
                 <label for="CLIENT_INFO_IP">IP</label>
-                <button type="button" class="copy-field-btn" data-target="#CLIENT_INFO_IP" title="Copy">
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#CLIENT_INFO_IP"
+                  title="Copy"
+                >
                   <i class="bi bi-clipboard"></i>
                 </button>
               </div>
               <div class="form-floating has-copy d-none" id="CLIENT_INFO_MAC_WRAPPER">
                 <input type="text" class="form-control disabled" id="CLIENT_INFO_MAC" disabled />
                 <label for="CLIENT_INFO_MAC">MAC Address</label>
-                <button type="button" class="copy-field-btn" data-target="#CLIENT_INFO_MAC" title="Copy">
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#CLIENT_INFO_MAC"
+                  title="Copy"
+                >
                   <i class="bi bi-clipboard"></i>
                 </button>
               </div>
               <div class="form-floating has-copy">
                 <input type="text" class="form-control disabled" id="CLIENT_INFO_UUID" disabled />
                 <label for="CLIENT_INFO_UUID">Client ID</label>
-                <button type="button" class="copy-field-btn" data-target="#CLIENT_INFO_UUID" title="Copy">
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#CLIENT_INFO_UUID"
+                  title="Copy"
+                >
                   <i class="bi bi-clipboard"></i>
                 </button>
               </div>
               <div class="form-floating has-copy">
-                <input type="text" class="form-control disabled" id="CLIENT_INFO_VERSION" disabled />
+                <input
+                  type="text"
+                  class="form-control disabled"
+                  id="CLIENT_INFO_VERSION"
+                  disabled
+                />
                 <label for="CLIENT_INFO_VERSION">Client Version</label>
-                <button type="button" class="copy-field-btn" data-target="#CLIENT_INFO_VERSION" title="Copy">
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#CLIENT_INFO_VERSION"
+                  title="Copy"
+                >
                   <i class="bi bi-clipboard"></i>
                 </button>
               </div>
@@ -1102,14 +1180,24 @@
                   <span id="CLIENT_INFO_CPU_LABEL">0%</span>
                 </div>
                 <div class="progress">
-                  <div id="CLIENT_INFO_CPU_BAR" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
+                  <div
+                    id="CLIENT_INFO_CPU_BAR"
+                    class="progress-bar bg-white"
+                    role="progressbar"
+                    style="width: 0%"
+                  ></div>
                 </div>
                 <div class="text-sm d-flex justify-content-between">
                   <span>RAM</span>
                   <span id="CLIENT_INFO_RAM_LABEL">0%</span>
                 </div>
                 <div class="progress">
-                  <div id="CLIENT_INFO_RAM_BAR" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
+                  <div
+                    id="CLIENT_INFO_RAM_BAR"
+                    class="progress-bar bg-white"
+                    role="progressbar"
+                    style="width: 0%"
+                  ></div>
                 </div>
               </div>
               <div class="rounded-3 p-2 bg-ghost-light">

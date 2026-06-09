@@ -38,7 +38,8 @@ function PerformHttpRequest(Target, Opts) {
   const Cfg = (Target && Target.Settings) || {};
   const Protocol = Opts && Opts.Protocol === 'https' ? 'https' : 'http';
   const ConfiguredPort = Number.isFinite(Cfg.Port) ? Cfg.Port | 0 : 0;
-  const DefaultPort = ConfiguredPort > 0 ? ConfiguredPort : Opts.DefaultPort || (Protocol === 'https' ? 443 : 80);
+  const DefaultPort =
+    ConfiguredPort > 0 ? ConfiguredPort : Opts.DefaultPort || (Protocol === 'https' ? 443 : 80);
 
   const Url = ParseAddress(Target && Target.Address, Protocol, DefaultPort);
   if (!Url) return Promise.resolve({ Success: false, Error: 'Invalid address' });
@@ -137,7 +138,10 @@ function DoRequest(Url, State) {
         try {
           Next = new URL(Res.headers.location, Url);
         } catch (_e) {
-          return Finish({ Success: false, Error: `Invalid redirect target: ${Res.headers.location}` });
+          return Finish({
+            Success: false,
+            Error: `Invalid redirect target: ${Res.headers.location}`,
+          });
         }
         if (Next.protocol !== 'http:' && Next.protocol !== 'https:') {
           return Finish({ Success: false, Error: `Refusing redirect to ${Next.protocol}` });
@@ -148,7 +152,7 @@ function DoRequest(Url, State) {
             RedirectsLeft: State.RedirectsLeft - 1,
             // Per RFC, methods other than GET/HEAD should become GET on 301/302/303.
             Method: Status === 307 || Status === 308 ? State.Method : 'GET',
-          }),
+          })
         );
       }
 

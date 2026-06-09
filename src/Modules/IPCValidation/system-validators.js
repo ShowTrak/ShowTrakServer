@@ -53,7 +53,10 @@ module.exports = function registerSystemValidators(Manager) {
   };
 
   Manager.SettingUpdatePayload = (key, value) => {
-    const normalizedKey = normalizeNonEmptyString(key, 'Setting key', { minLength: 2, maxLength: 128 });
+    const normalizedKey = normalizeNonEmptyString(key, 'Setting key', {
+      minLength: 2,
+      maxLength: 128,
+    });
 
     if (typeof value !== 'boolean' && typeof value !== 'string' && typeof value !== 'number') {
       fail('Setting value must be a boolean, string, or number');

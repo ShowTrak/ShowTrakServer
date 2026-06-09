@@ -98,38 +98,41 @@ Manager.InitializeSchema = async () => {
   if (schemaInitializationPromise) return schemaInitializationPromise;
 
   schemaInitializationPromise = (async () => {
-  let Tables = require('./schema.js');
-  for (let Table of Tables) {
-    Logger.database(`Creating table: ${Table.Name}`);
-    let [Err, _Result] = await Manager.Run(Table.SQL);
-    if (Err) {
-      Logger.databaseError(`Failed to create table ${Table.Name}:`, Err);
-    } else {
-      Logger.database(`Table ${Table.Name} created successfully.`);
-    }
-  }
-  // Apply additive migrations. SQLite lacks "ADD COLUMN IF NOT EXISTS",
-  // so duplicate-column errors are expected on already-migrated installs.
-  const Migrations = Array.isArray(Tables.Migrations) ? Tables.Migrations : [];
-  for (const SQL of Migrations) {
-    const Match = /ALTER\s+TABLE\s+`?([A-Za-z_][A-Za-z0-9_]*)`?\s+ADD\s+COLUMN\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(SQL);
-    if (Match) {
-      const [, Table, Column] = Match;
-      const [PErr, Cols] = await Manager.All(`PRAGMA table_info(\`${Table}\`)`);
-      if (PErr) {
-        Logger.databaseError(`Migration probe failed for ${Table}`, PErr);
-        continue;
+    let Tables = require('./schema.js');
+    for (let Table of Tables) {
+      Logger.database(`Creating table: ${Table.Name}`);
+      let [Err, _Result] = await Manager.Run(Table.SQL);
+      if (Err) {
+        Logger.databaseError(`Failed to create table ${Table.Name}:`, Err);
+      } else {
+        Logger.database(`Table ${Table.Name} created successfully.`);
       }
-      if ((Cols || []).some((c) => c && c.name === Column)) continue;
     }
-    const [Err] = await Manager.Run(SQL);
-    if (Err) Logger.databaseError(`Migration failed: ${SQL}`, Err);
-  }
-  // Tag the database header so saved .ShowTrak files are positively
-  // identifiable as ShowTrak documents (used when validating Open targets).
-  const [TagErr] = await Manager.Run(`PRAGMA application_id = ${SHOWTRAK_APPLICATION_ID}`);
-  if (TagErr) Logger.databaseError('Failed to set application_id', TagErr);
-  schemaInitialized = true;
+    // Apply additive migrations. SQLite lacks "ADD COLUMN IF NOT EXISTS",
+    // so duplicate-column errors are expected on already-migrated installs.
+    const Migrations = Array.isArray(Tables.Migrations) ? Tables.Migrations : [];
+    for (const SQL of Migrations) {
+      const Match =
+        /ALTER\s+TABLE\s+`?([A-Za-z_][A-Za-z0-9_]*)`?\s+ADD\s+COLUMN\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(
+          SQL
+        );
+      if (Match) {
+        const [, Table, Column] = Match;
+        const [PErr, Cols] = await Manager.All(`PRAGMA table_info(\`${Table}\`)`);
+        if (PErr) {
+          Logger.databaseError(`Migration probe failed for ${Table}`, PErr);
+          continue;
+        }
+        if ((Cols || []).some((c) => c && c.name === Column)) continue;
+      }
+      const [Err] = await Manager.Run(SQL);
+      if (Err) Logger.databaseError(`Migration failed: ${SQL}`, Err);
+    }
+    // Tag the database header so saved .ShowTrak files are positively
+    // identifiable as ShowTrak documents (used when validating Open targets).
+    const [TagErr] = await Manager.Run(`PRAGMA application_id = ${SHOWTRAK_APPLICATION_ID}`);
+    if (TagErr) Logger.databaseError('Failed to set application_id', TagErr);
+    schemaInitialized = true;
   })();
 
   return schemaInitializationPromise;
@@ -309,7 +312,9 @@ function ValidateDatabaseFile(SourcePath) {
           const Missing = Required.filter((name) => !Names.has(name));
           if (Missing.length) {
             return resolve([
-              new Error(`Selected file is not a valid ShowTrak file (missing: ${Missing.join(', ')})`),
+              new Error(
+                `Selected file is not a valid ShowTrak file (missing: ${Missing.join(', ')})`
+              ),
               null,
             ]);
           }
@@ -398,7 +403,14 @@ Manager.ResetToEmpty = async () => {
 // user data. Used to detect data carried over from a previous boot (e.g. when
 // upgrading from a pre-show-file version that wrote straight to the DB).
 Manager.HasData = async () => {
-  const Tables = ['Groups', 'Clients', 'MonitoringTargets', 'AlertRules', 'AlertHistory', 'Settings'];
+  const Tables = [
+    'Groups',
+    'Clients',
+    'MonitoringTargets',
+    'AlertRules',
+    'AlertHistory',
+    'Settings',
+  ];
   for (const Table of Tables) {
     const [Err, Row] = await Manager.Get(`SELECT 1 FROM \`${Table}\` LIMIT 1`);
     if (Err) continue; // Table may not exist on a fresh/partial schema; skip it.

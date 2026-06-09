@@ -16,13 +16,21 @@ function FormatMonitorStatus(Online, LastLatencyMs, LastError) {
   if (Online) return FormatLatency(LastLatencyMs);
   const ErrorText = typeof LastError === 'string' ? LastError.trim() : '';
   if (!ErrorText) return 'Offline';
-  if (/timed?\s*out|timeout|unreachable|refused|reset|network\s+is\s+unreachable|no\s+route\s+to\s+host|socket\s+hang\s+up|econnrefused|econnreset|ehostunreach|enetunreach/i.test(ErrorText)) {
+  if (
+    /timed?\s*out|timeout|unreachable|refused|reset|network\s+is\s+unreachable|no\s+route\s+to\s+host|socket\s+hang\s+up|econnrefused|econnreset|ehostunreach|enetunreach/i.test(
+      ErrorText
+    )
+  ) {
     return 'Offline';
   }
   if (/enotfound|eai_again|nxdomain|dns|name\s+or\s+service\s+not\s+known/i.test(ErrorText)) {
     return 'DNS Error';
   }
-  if (/cert|certificate|tls|ssl|self\s*signed|unable\s+to\s+verify|hostname\/?ip\s+does\s+not\s+match/i.test(ErrorText)) {
+  if (
+    /cert|certificate|tls|ssl|self\s*signed|unable\s+to\s+verify|hostname\/?ip\s+does\s+not\s+match/i.test(
+      ErrorText
+    )
+  ) {
     return 'TLS Error';
   }
   const HttpMatch = ErrorText.match(/\bHTTP\s+(\d{3})\b/i);
@@ -59,9 +67,7 @@ function RenderMonitoringTargetTile(T) {
       <h5 class="mb-0" data-type="Name">${Safe(Name)}</h5>
       <small class="text-sm text-light" data-type="Address">${Safe(Sub)}</small>
       <div class="SHOWTRAK_PC_STATUS d-grid" data-type="MONITOR_STATUS">
-        <h7 class="mb-0 ${TextClass}" data-type="MONITOR_STATUS_LABEL">${Safe(
-          Status
-        )}</h7>
+        <h7 class="mb-0 ${TextClass}" data-type="MONITOR_STATUS_LABEL">${Safe(Status)}</h7>
       </div>
       <span class="MONITOR_COMPACT_LATENCY ${TextClass}" data-type="MONITOR_COMPACT_LATENCY">${Safe(Status)}</span>
     </div>`;
@@ -224,8 +230,7 @@ function DrawMonitoringHistoryGraph(Canvas, BucketSamples, RangeConfig) {
   Ctx.lineTo(PadLeft + PlotWidth, PadTop + PlotHeight + 0.5);
   Ctx.stroke();
 
-  const NumericLatency = BucketSamples
-    .filter((S) => S && S.online && S.latencyMs != null)
+  const NumericLatency = BucketSamples.filter((S) => S && S.online && S.latencyMs != null)
     .map((S) => Number(S.latencyMs))
     .filter((L) => Number.isFinite(L) && L >= 0);
   const MaxObservedLatency = NumericLatency.length ? Math.max(...NumericLatency) : 0;
@@ -257,7 +262,9 @@ function DrawMonitoringHistoryGraph(Canvas, BucketSamples, RangeConfig) {
   let BarWidth = 1;
   if (BucketSamples.length > 1) {
     const FirstTs = Number(BucketSamples[0] && BucketSamples[0].ts);
-    const LastTs = Number(BucketSamples[BucketSamples.length - 1] && BucketSamples[BucketSamples.length - 1].ts);
+    const LastTs = Number(
+      BucketSamples[BucketSamples.length - 1] && BucketSamples[BucketSamples.length - 1].ts
+    );
     if (Number.isFinite(FirstTs) && Number.isFinite(LastTs)) {
       const SampleSpanMs = Math.max(1, LastTs - FirstTs);
       const AvgSampleMs = SampleSpanMs / Math.max(1, BucketSamples.length - 1);
@@ -342,9 +349,9 @@ function BuildMonitoringHistoryBuckets(Samples, RangeConfig) {
   const SafeSamples = Array.isArray(Samples) ? Samples : [];
   const Now = Date.now();
   const Start = Now - RangeConfig.ms;
-  const InRangeSamples = SafeSamples
-    .filter((S) => S && Number.isFinite(S.ts) && S.ts >= Start && S.ts <= Now)
-    .sort((a, b) => a.ts - b.ts);
+  const InRangeSamples = SafeSamples.filter(
+    (S) => S && Number.isFinite(S.ts) && S.ts >= Start && S.ts <= Now
+  ).sort((a, b) => a.ts - b.ts);
 
   return {
     buckets: InRangeSamples,
@@ -354,7 +361,9 @@ function BuildMonitoringHistoryBuckets(Samples, RangeConfig) {
 
 function RenderMonitoringHistoryModal() {
   if (!MonitorHistoryModalTargetID) return;
-  const Target = MonitoringTargets.find((T) => Number(T.TargetID) === Number(MonitorHistoryModalTargetID));
+  const Target = MonitoringTargets.find(
+    (T) => Number(T.TargetID) === Number(MonitorHistoryModalTargetID)
+  );
   if (!Target) return;
 
   const IntervalMs = Number(Target.Interval);
@@ -367,8 +376,12 @@ function RenderMonitoringHistoryModal() {
 
   if (!VisibleRangeKeys.length) {
     $('#MONITOR_HISTORY_RANGE_GROUP').addClass('d-none');
-    $('#MONITOR_HISTORY_EMPTY').removeClass('d-none').text('No graph ranges available for this check interval.');
-    $('#MONITOR_HISTORY_SUMMARY').text('Increase history range or lower check interval to view at least 10 samples.');
+    $('#MONITOR_HISTORY_EMPTY')
+      .removeClass('d-none')
+      .text('No graph ranges available for this check interval.');
+    $('#MONITOR_HISTORY_SUMMARY').text(
+      'Increase history range or lower check interval to view at least 10 samples.'
+    );
     const Canvas = document.getElementById('MONITOR_HISTORY_CANVAS');
     if (Canvas) {
       const Ctx = Canvas.getContext('2d');
@@ -390,9 +403,13 @@ function RenderMonitoringHistoryModal() {
   const { buckets, visibleSampleCount } = BuildMonitoringHistoryBuckets(Samples, Range);
   const Latest = Samples.length ? Samples[Samples.length - 1] : null;
 
-  $('#MONITOR_HISTORY_TITLE').text(Target.Nickname || Target.Address || `Target ${Target.TargetID}`);
+  $('#MONITOR_HISTORY_TITLE').text(
+    Target.Nickname || Target.Address || `Target ${Target.TargetID}`
+  );
 
-  $('#MONITOR_HISTORY_RANGE_GROUP [data-range]').removeClass('active btn-light').addClass('btn-outline-light');
+  $('#MONITOR_HISTORY_RANGE_GROUP [data-range]')
+    .removeClass('active btn-light')
+    .addClass('btn-outline-light');
   $(`#MONITOR_HISTORY_RANGE_GROUP [data-range='${MonitorHistoryRangeKey}']`)
     .addClass('active btn-light')
     .removeClass('btn-outline-light');
@@ -450,4 +467,3 @@ async function OpenMonitoringTargetHistory(TargetID) {
   $modal.modal('show');
   RenderMonitoringHistoryModal();
 }
-

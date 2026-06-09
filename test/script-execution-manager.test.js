@@ -5,7 +5,10 @@ const path = require('node:path');
 const { loadWithMocks } = require('../test-support/load-with-mocks');
 
 function load(mocks) {
-  return loadWithMocks(path.join(__dirname, '..', 'src', 'Modules', 'ScriptExecutionManager', 'index.js'), mocks);
+  return loadWithMocks(
+    path.join(__dirname, '..', 'src', 'Modules', 'ScriptExecutionManager', 'index.js'),
+    mocks
+  );
 }
 
 const noopLogger = { CreateLogger: () => ({ error: () => {}, warn: () => {}, log: () => {} }) };

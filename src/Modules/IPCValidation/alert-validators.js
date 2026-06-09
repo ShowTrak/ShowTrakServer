@@ -79,7 +79,10 @@ module.exports = function registerAlertValidators(Manager) {
   }
 
   function normalizeAlertTriggerType(value) {
-    const TriggerType = normalizeNonEmptyString(value, 'TriggerType', { minLength: 2, maxLength: 64 });
+    const TriggerType = normalizeNonEmptyString(value, 'TriggerType', {
+      minLength: 2,
+      maxLength: 64,
+    });
     if (!ALERT_TRIGGER_TYPES.has(TriggerType)) {
       fail(`Unsupported TriggerType: ${TriggerType}`);
     }

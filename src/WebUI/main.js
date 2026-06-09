@@ -339,9 +339,7 @@
         <div class="progress"><div data-type="CPU" class="progress-bar bg-white" role="progressbar" style="width:0%"></div></div>
         <div class="progress"><div data-type="RAM" class="progress-bar bg-white" role="progressbar" style="width:0%"></div></div>
       </div>
-      <div class="SHOWTRAK_PC_STATUS ${
-        Online ? 'd-none' : 'd-grid'
-      }" data-type="INDICATOR_OFFLINE">
+      <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-none' : 'd-grid'}" data-type="INDICATOR_OFFLINE">
         <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${safe(
           c.LastSeen
         )}">OFFLINE <span class="badge bg-ghost">00:00:00</span></h7>
@@ -448,7 +446,10 @@
     const nick = tile.querySelector('[data-type="Nickname"]');
     if (nick) nick.textContent = hasNick ? c.Nickname : c.Hostname || c.UUID;
     const host = tile.querySelector('[data-type="Hostname"]');
-    if (host) host.textContent = hasNick ? `${c.Hostname || ''} - v${c.Version || ''}` : `v${c.Version || ''}`;
+    if (host)
+      host.textContent = hasNick
+        ? `${c.Hostname || ''} - v${c.Version || ''}`
+        : `v${c.Version || ''}`;
     const ip = tile.querySelector('[data-type="IP"]');
     if (ip) ip.textContent = c.IP ? c.IP : 'Unknown IP';
 
@@ -491,7 +492,8 @@
     const addrEl = tile.querySelector('[data-type="Address"]');
     if (addrEl) addrEl.textContent = T.Address || '';
     const methodEl = tile.querySelector('[data-type="Method"]');
-    if (methodEl) methodEl.textContent = `${String(T.Method || '').toUpperCase()} · ${FormatInterval(T.Interval)}`;
+    if (methodEl)
+      methodEl.textContent = `${String(T.Method || '').toUpperCase()} · ${FormatInterval(T.Interval)}`;
     const label = tile.querySelector('[data-type="MONITOR_STATUS_LABEL"]');
     if (label) {
       const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
@@ -505,19 +507,17 @@
   // ---- Offline timers -----------------------------------------------------
   setInterval(() => {
     const now = Date.now();
-    document
-      .querySelectorAll('[data-type="OFFLINE_SINCE"]')
-      .forEach((node) => {
-        const ls = node.getAttribute('data-offlinesince');
-        if (!ls) return;
-        const dur = now - parseInt(ls, 10);
-        if (!isFinite(dur) || dur < 0) return;
-        const h = Math.floor(dur / 3600000);
-        const m = Math.floor((dur % 3600000) / 60000);
-        const s = Math.floor((dur % 60000) / 1000);
-        const pad = (n) => String(n).padStart(2, '0');
-        node.innerHTML = `OFFLINE <span class="badge bg-ghost">${pad(h)}:${pad(m)}:${pad(s)}</span>`;
-      });
+    document.querySelectorAll('[data-type="OFFLINE_SINCE"]').forEach((node) => {
+      const ls = node.getAttribute('data-offlinesince');
+      if (!ls) return;
+      const dur = now - parseInt(ls, 10);
+      if (!isFinite(dur) || dur < 0) return;
+      const h = Math.floor(dur / 3600000);
+      const m = Math.floor((dur % 3600000) / 60000);
+      const s = Math.floor((dur % 60000) / 1000);
+      const pad = (n) => String(n).padStart(2, '0');
+      node.innerHTML = `OFFLINE <span class="badge bg-ghost">${pad(h)}:${pad(m)}:${pad(s)}</span>`;
+    });
   }, 1000);
 
   // ---- Detail sheet -------------------------------------------------------
@@ -588,7 +588,8 @@
     el.usbList.innerHTML = usb.length
       ? usb
           .map((d) => {
-            const name = `${d.ManufacturerName || ''} ${d.ProductName || ''}`.trim() || 'USB Device';
+            const name =
+              `${d.ManufacturerName || ''} ${d.ProductName || ''}`.trim() || 'USB Device';
             return `<span class="chip">${safe(name)}</span>`;
           })
           .join('')
@@ -600,7 +601,9 @@
     nets.forEach((n) => {
       const addrs = (n.addresses || []).filter((a) => a.family === 'IPv4' && !a.internal);
       if (!addrs.length) return;
-      netChips.push(`<span class="chip">${safe(n.name)} · ${safe(addrs.map((a) => a.address).join(', '))}</span>`);
+      netChips.push(
+        `<span class="chip">${safe(n.name)} · ${safe(addrs.map((a) => a.address).join(', '))}</span>`
+      );
     });
     el.netList.innerHTML = netChips.length
       ? netChips.join('')

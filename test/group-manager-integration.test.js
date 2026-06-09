@@ -10,8 +10,16 @@ function loggerStub() {
   const noop = () => {};
   return {
     CreateLogger: () => ({
-      log: noop, info: noop, warn: noop, error: noop, debug: noop,
-      trace: noop, success: noop, database: noop, databaseError: noop, silent: noop,
+      log: noop,
+      info: noop,
+      warn: noop,
+      error: noop,
+      debug: noop,
+      trace: noop,
+      success: noop,
+      database: noop,
+      databaseError: noop,
+      silent: noop,
     }),
   };
 }
@@ -57,7 +65,13 @@ async function loadGroupManager() {
       },
     }
   );
-  return { Manager: groupManager.Manager, DB: dbModule.Manager, events, movedClients, movedTargets };
+  return {
+    Manager: groupManager.Manager,
+    DB: dbModule.Manager,
+    events,
+    movedClients,
+    movedTargets,
+  };
 }
 
 test('GroupManager creates, lists, fetches, and updates groups', async () => {

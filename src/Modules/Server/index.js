@@ -55,7 +55,7 @@ Manager.ExecuteScripts = async (ScriptID, Targets, ResetList) => {
   if (ResetList) await ScriptExecutionManager.ClearQueue();
   for (const UUID of Targets) {
     const RequestID = await ScriptExecutionManager.AddToQueue(UUID, ScriptID);
-  Logger.log('ExecuteScript dispatch', { ScriptID, UUID, RequestID });
+    Logger.log('ExecuteScript dispatch', { ScriptID, UUID, RequestID });
     io.to(UUID).emit('ExecuteScript', RequestID, ScriptID);
   }
 };
@@ -67,7 +67,7 @@ Manager.ExecuteBulkRequest = async (Action, Targets, ReadableName) => {
   for (const UUID of Targets) {
     await Wait(150);
     const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, ReadableName);
-  Logger.log('ExecuteBulkRequest dispatch', { Action, ReadableName, UUID, RequestID });
+    Logger.log('ExecuteBulkRequest dispatch', { Action, ReadableName, UUID, RequestID });
     io.to(UUID).emit(Action, RequestID);
   }
 };

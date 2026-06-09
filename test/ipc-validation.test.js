@@ -133,7 +133,8 @@ test('IPCValidation.MonitoringTargetCreatePayload enforces required fields', () 
 
   assert.throws(() => IPCValidation.MonitoringTargetCreatePayload({}), /Nickname/i);
   assert.throws(
-    () => IPCValidation.MonitoringTargetCreatePayload({ Nickname: 'a', Address: 'b', Method: 'ping' }),
+    () =>
+      IPCValidation.MonitoringTargetCreatePayload({ Nickname: 'a', Address: 'b', Method: 'ping' }),
     /Interval is required/i
   );
   assert.throws(
@@ -147,7 +148,14 @@ test('IPCValidation.MonitoringTargetCreatePayload enforces required fields', () 
     /Interval must be a number/i
   );
   assert.throws(
-    () => IPCValidation.MonitoringTargetCreatePayload({ Nickname: 'a', Address: 'b', Method: 'ping', Interval: 1, Settings: 5 }),
+    () =>
+      IPCValidation.MonitoringTargetCreatePayload({
+        Nickname: 'a',
+        Address: 'b',
+        Method: 'ping',
+        Interval: 1,
+        Settings: 5,
+      }),
     /Settings must be an object/i
   );
 });
@@ -206,7 +214,13 @@ test('IPCValidation.AlertRuleCreatePayload normalizes scope, trigger, and action
   assert.equal(payload.Enabled, false);
 
   assert.throws(
-    () => IPCValidation.AlertRuleCreatePayload({ Title: 'x', Scope: {}, TriggerType: 'NOPE', Actions: [] }),
+    () =>
+      IPCValidation.AlertRuleCreatePayload({
+        Title: 'x',
+        Scope: {},
+        TriggerType: 'NOPE',
+        Actions: [],
+      }),
     /at least 2 characters|Unsupported TriggerType/i
   );
   assert.throws(

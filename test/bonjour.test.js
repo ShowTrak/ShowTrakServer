@@ -54,7 +54,10 @@ function loadBonjour() {
     '../Config': { Config: { Application: { Port: 1234 }, Shared: { Version: '3.0.0' } } },
   };
 
-  const { Manager } = loadWithMocks(path.join(__dirname, '..', 'src', 'Modules', 'Bonjour', 'index.js'), mocks);
+  const { Manager } = loadWithMocks(
+    path.join(__dirname, '..', 'src', 'Modules', 'Bonjour', 'index.js'),
+    mocks
+  );
   return { Manager, published, browsers };
 }
 

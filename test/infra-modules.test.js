@@ -98,7 +98,10 @@ test('FileSelectorManager delegates to the electron dialog', async () => {
 });
 
 test('Server serializers project safe public shapes', () => {
-  const { ToPublicClient, ToPublicGroup } = loadWithMocks(modulePath('Server', 'serializers.js'), {});
+  const { ToPublicClient, ToPublicGroup } = loadWithMocks(
+    modulePath('Server', 'serializers.js'),
+    {}
+  );
 
   const client = ToPublicClient({
     UUID: 'u1',
@@ -178,7 +181,13 @@ test('NetworkDiscovery manager starts and stops probe scans', async () => {
 
   const events = [];
   const [startErr, started] = Manager.Start(
-    { EnableProbe: true, EnableBonjour: false, MaxHostsPerSubnet: 32, TimeoutMs: 3000, ProbePorts: [65000] },
+    {
+      EnableProbe: true,
+      EnableBonjour: false,
+      MaxHostsPerSubnet: 32,
+      TimeoutMs: 3000,
+      ProbePorts: [65000],
+    },
     (evt) => events.push(evt)
   );
   assert.equal(startErr, null);

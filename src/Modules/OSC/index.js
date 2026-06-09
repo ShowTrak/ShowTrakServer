@@ -189,7 +189,12 @@ OSC.CreateRoute(
       Broadcast.emit('Notify', `OSC - Invalid Script ID "${Req.ScriptID}"`, 'error');
       return false;
     }
-    Broadcast.emit('OSCBulkAction', 'ExecuteScript', AllClients.map((Client) => Client.UUID), Req.ScriptID);
+    Broadcast.emit(
+      'OSCBulkAction',
+      'ExecuteScript',
+      AllClients.map((Client) => Client.UUID),
+      Req.ScriptID
+    );
     return true;
   },
   'Execute a script on all online Clients by Script ID'

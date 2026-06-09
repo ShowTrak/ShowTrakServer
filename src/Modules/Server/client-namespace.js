@@ -20,9 +20,10 @@ function SetupClientNamespace(io) {
         id: socket.id,
         address: socket.handshake && socket.handshake.address,
         query: socket.handshake && socket.handshake.query,
-        headers: socket.handshake && socket.handshake.headers && {
-          'x-forwarded-for': socket.handshake.headers['x-forwarded-for'],
-        },
+        headers: socket.handshake &&
+          socket.handshake.headers && {
+            'x-forwarded-for': socket.handshake.headers['x-forwarded-for'],
+          },
       });
     } catch {}
     // Expect clients to provide a UUID and whether they believe they are adopted
@@ -87,7 +88,7 @@ function SetupClientNamespace(io) {
         //   } : undefined,
         //   Version: Data && Data.Version,
         // });
-        let [Err, Client] = await ClientManager.Heartbeat(socket.UUID, Data, socket.IP);
+        let [Err] = await ClientManager.Heartbeat(socket.UUID, Data, socket.IP);
         if (Err) {
           console.error(Err);
         }

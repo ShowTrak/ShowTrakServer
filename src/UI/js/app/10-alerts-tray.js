@@ -208,4 +208,3 @@ document.addEventListener('DOMContentLoaded', () => {
 //   }
 //   $('#DEVICES_PENDING_ADOPTION').html(Filler);
 // });
-

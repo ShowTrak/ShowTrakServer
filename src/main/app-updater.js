@@ -71,7 +71,8 @@ function startCheckWatchdog(timeoutMs = CHECK_TIMEOUT_MS) {
 function runSimulatedCheck(versionLabel) {
   sendAppUpdateStatus({ state: 'checking', simulated: true });
   setTimeout(
-    () => sendAppUpdateStatus({ state: 'available', info: { version: versionLabel }, simulated: true }),
+    () =>
+      sendAppUpdateStatus({ state: 'available', info: { version: versionLabel }, simulated: true }),
     600
   );
   let pct = 0;
@@ -79,7 +80,11 @@ function runSimulatedCheck(versionLabel) {
     pct += 14;
     if (pct >= 100) {
       clearInterval(timer);
-      sendAppUpdateStatus({ state: 'downloaded', info: { version: versionLabel }, simulated: true });
+      sendAppUpdateStatus({
+        state: 'downloaded',
+        info: { version: versionLabel },
+        simulated: true,
+      });
     } else {
       sendAppUpdateStatus({ state: 'downloading', percent: pct, simulated: true });
     }
@@ -183,7 +188,10 @@ function isMacDeveloperIdSignedBuild() {
   const hasTeamIdentifier = /TeamIdentifier=/i.test(details);
 
   if (probe.error) {
-    Logger.warn('codesign probe failed; allowing updater eligibility check to continue:', probe.error);
+    Logger.warn(
+      'codesign probe failed; allowing updater eligibility check to continue:',
+      probe.error
+    );
     cachedMacDeveloperIdSigned = true;
     return cachedMacDeveloperIdSigned;
   }
@@ -243,12 +251,16 @@ function initSquirrelUpdater() {
   squirrelUpdaterInitialized = true;
   try {
     SquirrelUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
-    SquirrelUpdater.on('update-available', () => sendAppUpdateStatus({ state: 'available', info: { tag: 'latest' } }));
+    SquirrelUpdater.on('update-available', () =>
+      sendAppUpdateStatus({ state: 'available', info: { tag: 'latest' } })
+    );
     SquirrelUpdater.on('update-not-available', () => sendAppUpdateStatus({ state: 'none' }));
     SquirrelUpdater.on('update-downloaded', (_e, _notes, _name, _date, _url) => {
       sendAppUpdateStatus({ state: 'downloaded', info: { version: _name || 'pending' } });
     });
-    SquirrelUpdater.on('error', (err) => sendAppUpdateStatus({ state: 'error', error: String(err) }));
+    SquirrelUpdater.on('error', (err) =>
+      sendAppUpdateStatus({ state: 'error', error: String(err) })
+    );
     // Note: Squirrel's autoUpdater may not emit download-progress; states will jump to downloaded
   } catch {}
 }
@@ -281,8 +293,11 @@ async function handleCheck() {
       initSquirrelUpdater();
       const feed = 'https://github.com/ShowTrak/ShowTrakServer/releases/latest/download/';
       // Try both object and string forms for compatibility
-      try { SquirrelUpdater.setFeedURL({ url: feed }); }
-      catch { SquirrelUpdater.setFeedURL(feed); }
+      try {
+        SquirrelUpdater.setFeedURL({ url: feed });
+      } catch {
+        SquirrelUpdater.setFeedURL(feed);
+      }
       SquirrelUpdater.checkForUpdates();
     } catch (e) {
       sendAppUpdateStatus({ state: 'error', error: String(e) });
@@ -299,13 +314,19 @@ async function handleCheck() {
       autoUpdater.autoDownload = true;
       autoUpdater.autoInstallOnAppQuit = false;
       autoUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
-      autoUpdater.on('update-available', (info) => sendAppUpdateStatus({ state: 'available', info }));
-      autoUpdater.on('update-not-available', (info) => sendAppUpdateStatus({ state: 'none', info }));
+      autoUpdater.on('update-available', (info) =>
+        sendAppUpdateStatus({ state: 'available', info })
+      );
+      autoUpdater.on('update-not-available', (info) =>
+        sendAppUpdateStatus({ state: 'none', info })
+      );
       autoUpdater.on('error', (err) => sendAppUpdateStatus(normalizeUpdaterError(err)));
       autoUpdater.on('download-progress', (p) =>
         sendAppUpdateStatus({ state: 'downloading', percent: p && p.percent ? p.percent : 0 })
       );
-      autoUpdater.on('update-downloaded', (info) => sendAppUpdateStatus({ state: 'downloaded', info }));
+      autoUpdater.on('update-downloaded', (info) =>
+        sendAppUpdateStatus({ state: 'downloaded', info })
+      );
     } catch (e) {
       sendAppUpdateStatus({ state: 'error', error: 'Updater init failed: ' + String(e) });
       return;
@@ -314,13 +335,18 @@ async function handleCheck() {
 
   // Try to find an app-update.yml; if missing, synthesize one for GitHub public repo
   const resourcesPath = typeof process !== 'undefined' ? process.resourcesPath : '';
-  const execDir = typeof process !== 'undefined' && process.execPath ? path.dirname(process.execPath) : '';
+  const execDir =
+    typeof process !== 'undefined' && process.execPath ? path.dirname(process.execPath) : '';
   const ymlPaths = [
     resourcesPath ? path.join(resourcesPath, 'app-update.yml') : '',
     execDir ? path.join(execDir, 'app-update.yml') : '',
   ].filter(Boolean);
   const hasYml = ymlPaths.some((p) => {
-    try { return fs.existsSync(p); } catch { return false; }
+    try {
+      return fs.existsSync(p);
+    } catch {
+      return false;
+    }
   });
   if (!hasYml) {
     try {
@@ -420,7 +446,9 @@ function initElectronUpdater() {
     autoUpdater.on('download-progress', (p) =>
       sendAppUpdateStatus({ state: 'downloading', percent: p && p.percent ? p.percent : 0 })
     );
-    autoUpdater.on('update-downloaded', (info) => sendAppUpdateStatus({ state: 'downloaded', info }));
+    autoUpdater.on('update-downloaded', (info) =>
+      sendAppUpdateStatus({ state: 'downloaded', info })
+    );
   } catch (e) {
     Logger.error('electron-updater initialization failed:', e);
   }

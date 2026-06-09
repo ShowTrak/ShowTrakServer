@@ -56,13 +56,16 @@ async function Run(Target) {
     }
 
     // Hard kill guard; OS-level timeout flags don't always fire reliably.
-    const KillTimer = setTimeout(() => {
-      try {
-        Child.kill();
-      } catch (_e) {
-        // ignore: process may have already exited
-      }
-    }, Math.max(1000, TimeoutMs + 2000));
+    const KillTimer = setTimeout(
+      () => {
+        try {
+          Child.kill();
+        } catch (_e) {
+          // ignore: process may have already exited
+        }
+      },
+      Math.max(1000, TimeoutMs + 2000)
+    );
 
     Child.stdout.on('data', (Chunk) => {
       Stdout += Chunk.toString();

@@ -13,7 +13,9 @@ const Settings = [
 
 function NormalizeSettings(Input) {
   const Next = Input && typeof Input === 'object' ? Input : {};
-  const ProtocolRaw = String(Next.Protocol || 'http').toLowerCase().trim();
+  const ProtocolRaw = String(Next.Protocol || 'http')
+    .toLowerCase()
+    .trim();
   const Protocol = ProtocolRaw === 'https' ? 'https' : 'http';
   const Port = Number(Next.Port);
   const Timeout = Number(Next.Timeout);
@@ -23,7 +25,10 @@ function NormalizeSettings(Input) {
     TargetIP: String(Next.TargetIP || '127.0.0.1').trim(),
     Port: Number.isFinite(Port) ? Math.max(1, Math.min(65535, Math.round(Port))) : 8080,
     Route: RouteRaw.startsWith('/') ? RouteRaw : `/${RouteRaw}`,
-    Method: String(Next.Method || 'POST').toUpperCase().trim() || 'POST',
+    Method:
+      String(Next.Method || 'POST')
+        .toUpperCase()
+        .trim() || 'POST',
     Timeout: Number.isFinite(Timeout) ? Math.max(250, Math.min(60000, Math.round(Timeout))) : 5000,
   };
 }

@@ -26,22 +26,30 @@ module.exports = function registerMonitoringValidators(Manager) {
   Manager.MonitoringTargetCreatePayload = (value) => {
     if (!isPlainObject(value)) fail('Monitoring target payload must be an object');
     const out = {};
-    out.Nickname = normalizeNonEmptyString(value.Nickname, 'Nickname', { minLength: 1, maxLength: 64 });
-    out.Address = normalizeNonEmptyString(value.Address, 'Address', { minLength: 1, maxLength: 253 });
+    out.Nickname = normalizeNonEmptyString(value.Nickname, 'Nickname', {
+      minLength: 1,
+      maxLength: 64,
+    });
+    out.Address = normalizeNonEmptyString(value.Address, 'Address', {
+      minLength: 1,
+      maxLength: 253,
+    });
     out.Method = normalizeNonEmptyString(value.Method, 'Method', { minLength: 1, maxLength: 64 });
     if (value.Interval === undefined || value.Interval === null) fail('Interval is required');
     const Interval = Number(value.Interval);
     if (!Number.isFinite(Interval)) fail('Interval must be a number');
     out.Interval = Interval;
-    out.StoreHistory =
-      Object.prototype.hasOwnProperty.call(value, 'StoreHistory') ? !!value.StoreHistory : false;
+    out.StoreHistory = Object.prototype.hasOwnProperty.call(value, 'StoreHistory')
+      ? !!value.StoreHistory
+      : false;
     if (Object.prototype.hasOwnProperty.call(value, 'DegradedThresholdMs')) {
       const Threshold = Number(value.DegradedThresholdMs);
       if (!Number.isFinite(Threshold)) fail('DegradedThresholdMs must be a number');
       out.DegradedThresholdMs = Threshold;
     }
-    out.GroupID =
-      Object.prototype.hasOwnProperty.call(value, 'GroupID') ? Manager.GroupID(value.GroupID) : null;
+    out.GroupID = Object.prototype.hasOwnProperty.call(value, 'GroupID')
+      ? Manager.GroupID(value.GroupID)
+      : null;
     out.Settings = normalizeMonitoringSettings(value.Settings);
     return out;
   };
@@ -50,10 +58,16 @@ module.exports = function registerMonitoringValidators(Manager) {
     if (!isPlainObject(value)) fail('Monitoring target payload must be an object');
     const out = {};
     if (Object.prototype.hasOwnProperty.call(value, 'Nickname')) {
-      out.Nickname = normalizeNonEmptyString(value.Nickname, 'Nickname', { minLength: 1, maxLength: 64 });
+      out.Nickname = normalizeNonEmptyString(value.Nickname, 'Nickname', {
+        minLength: 1,
+        maxLength: 64,
+      });
     }
     if (Object.prototype.hasOwnProperty.call(value, 'Address')) {
-      out.Address = normalizeNonEmptyString(value.Address, 'Address', { minLength: 1, maxLength: 253 });
+      out.Address = normalizeNonEmptyString(value.Address, 'Address', {
+        minLength: 1,
+        maxLength: 253,
+      });
     }
     if (Object.prototype.hasOwnProperty.call(value, 'Method')) {
       out.Method = normalizeNonEmptyString(value.Method, 'Method', { minLength: 1, maxLength: 64 });

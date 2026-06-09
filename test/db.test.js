@@ -44,7 +44,14 @@ test('DB initializes schema, runs queries, and tracks dirty state', async () => 
   );
   assert.equal(tablesErr, null);
   const names = new Set(tables.map((t) => t.name));
-  for (const required of ['Groups', 'Clients', 'Settings', 'MonitoringTargets', 'AlertRules', 'AlertHistory']) {
+  for (const required of [
+    'Groups',
+    'Clients',
+    'Settings',
+    'MonitoringTargets',
+    'AlertRules',
+    'AlertHistory',
+  ]) {
     assert.equal(names.has(required), true, `expected table ${required}`);
   }
 
@@ -53,7 +60,10 @@ test('DB initializes schema, runs queries, and tracks dirty state', async () => 
   assert.equal(await DB.HasUnsavedChanges(), false);
 
   // A write marks the database dirty and is persisted.
-  const [insErr, insStmt] = await DB.Run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', ['Alpha', 10]);
+  const [insErr, insStmt] = await DB.Run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', [
+    'Alpha',
+    10,
+  ]);
   assert.equal(insErr, null);
   assert.equal(insStmt.changes, 1);
   assert.equal(await DB.HasUnsavedChanges(), true);
@@ -68,7 +78,10 @@ test('DB initializes schema, runs queries, and tracks dirty state', async () => 
   assert.equal(await DB.HasUnsavedChanges(), false);
 
   // RunWithoutDirtyTracking does not flip the unsaved flag.
-  const [silentErr] = await DB.RunWithoutDirtyTracking('UPDATE Groups SET Weight = ? WHERE Title = ?', [99, 'Alpha']);
+  const [silentErr] = await DB.RunWithoutDirtyTracking(
+    'UPDATE Groups SET Weight = ? WHERE Title = ?',
+    [99, 'Alpha']
+  );
   assert.equal(silentErr, null);
   assert.equal(await DB.HasUnsavedChanges(), false);
 
@@ -113,7 +126,10 @@ test('DB.SnapshotTo creates a portable file that ReplaceWithFile can open', asyn
   await DB.Ready();
 
   const [, rows] = await DB.All('SELECT Title FROM Groups');
-  assert.deepEqual(rows.map((r) => r.Title), ['Saved']);
+  assert.deepEqual(
+    rows.map((r) => r.Title),
+    ['Saved']
+  );
 
   await DB.Shutdown();
 });

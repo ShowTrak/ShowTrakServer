@@ -2,7 +2,10 @@
 <html lang="en" data-bs-theme="dark">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+    />
     <title>ShowTrak Web UI</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0c091c" />
@@ -27,7 +30,12 @@
       </div>
       <div class="topbar-right">
         <span id="connDot" class="conn-dot connecting" title="Connecting…"></span>
-        <button id="viewToggleBtn" class="topbar-btn" type="button" title="Toggle compact / expanded view">
+        <button
+          id="viewToggleBtn"
+          class="topbar-btn"
+          type="button"
+          title="Toggle compact / expanded view"
+        >
           <i class="bi bi-arrows-angle-expand" id="viewToggleIcon"></i>
           <span class="btn-label" id="viewToggleLabel">Expand</span>
         </button>
@@ -81,11 +89,21 @@
             <button class="keypad-btn" data-key="7" type="button">7</button>
             <button class="keypad-btn" data-key="8" type="button">8</button>
             <button class="keypad-btn" data-key="9" type="button">9</button>
-            <button class="keypad-btn keypad-muted" data-key="clear" type="button" aria-label="Clear">
+            <button
+              class="keypad-btn keypad-muted"
+              data-key="clear"
+              type="button"
+              aria-label="Clear"
+            >
               <i class="bi bi-x-lg"></i>
             </button>
             <button class="keypad-btn" data-key="0" type="button">0</button>
-            <button class="keypad-btn keypad-muted" data-key="back" type="button" aria-label="Backspace">
+            <button
+              class="keypad-btn keypad-muted"
+              data-key="back"
+              type="button"
+              aria-label="Backspace"
+            >
               <i class="bi bi-backspace"></i>
             </button>
           </div>
@@ -110,11 +128,15 @@
         <div id="detailVitals" class="detail-vitals hidden">
           <div class="vital">
             <div class="vital-label"><span>CPU</span><span id="cpuPct">0%</span></div>
-            <div class="progress"><div id="cpuBar" class="progress-bar bg-white" style="width:0%"></div></div>
+            <div class="progress">
+              <div id="cpuBar" class="progress-bar bg-white" style="width: 0%"></div>
+            </div>
           </div>
           <div class="vital">
             <div class="vital-label"><span>RAM</span><span id="ramPct">0%</span></div>
-            <div class="progress"><div id="ramBar" class="progress-bar bg-white" style="width:0%"></div></div>
+            <div class="progress">
+              <div id="ramBar" class="progress-bar bg-white" style="width: 0%"></div>
+            </div>
           </div>
         </div>
 
@@ -166,7 +188,9 @@
       <div class="confirm-card">
         <div id="confirmText" class="confirm-text">Are you sure?</div>
         <div class="confirm-actions">
-          <button id="confirmCancel" class="btn btn-outline-light flex-fill" type="button">Cancel</button>
+          <button id="confirmCancel" class="btn btn-outline-light flex-fill" type="button">
+            Cancel
+          </button>
           <button id="confirmOk" class="btn btn-light flex-fill" type="button">Confirm</button>
         </div>
       </div>

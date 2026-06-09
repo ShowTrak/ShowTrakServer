@@ -28,9 +28,15 @@ const Manager = {
         txt: Config.Shared,
         port,
       });
-      try { publishedService.on('up', () => Logger.log('Bonjour service announced (up)')); } catch {}
-      try { publishedService.on('error', (e) => Logger.error('Bonjour service error:', e)); } catch {}
-      try { publishedService.start(); } catch {}
+      try {
+        publishedService.on('up', () => Logger.log('Bonjour service announced (up)'));
+      } catch {}
+      try {
+        publishedService.on('error', (e) => Logger.error('Bonjour service error:', e));
+      } catch {}
+      try {
+        publishedService.start();
+      } catch {}
       Logger.log('Bonjour publish call issued');
     } catch (e) {
       Logger.error('Bonjour publish exception:', e);
@@ -47,7 +53,14 @@ const Manager = {
           });
         } catch {}
       });
-      try { selfBrowser.start(); setTimeout(() => { try { selfBrowser.update(); } catch {} }, 100); } catch {}
+      try {
+        selfBrowser.start();
+        setTimeout(() => {
+          try {
+            selfBrowser.update();
+          } catch {}
+        }, 100);
+      } catch {}
     } catch (e) {}
 
     // TODO(macOS): Validate Bonjour/mDNS discovery and firewall prompts on macOS; adjust service options if needed.
@@ -67,8 +80,16 @@ const Manager = {
           });
         } catch {}
       });
-      try { browser.start(); Logger.log('Bonjour.Find browser started'); } catch {}
-      setTimeout(() => { try { browser.update(); Logger.log('Bonjour.Find browser initial update'); } catch {} }, 100);
+      try {
+        browser.start();
+        Logger.log('Bonjour.Find browser started');
+      } catch {}
+      setTimeout(() => {
+        try {
+          browser.update();
+          Logger.log('Bonjour.Find browser initial update');
+        } catch {}
+      }, 100);
     } catch (e) {
       Logger.error('Bonjour.Find exception:', e);
     }
@@ -78,8 +99,16 @@ const Manager = {
       Logger.log('Bonjour.OnFind invoked');
       const browser = instance.find({ type: 'showtrak' });
       browser.on('up', callback);
-      try { browser.start(); Logger.log('Bonjour.OnFind browser started'); } catch {}
-      setTimeout(() => { try { browser.update(); Logger.log('Bonjour.OnFind browser initial update'); } catch {} }, 100);
+      try {
+        browser.start();
+        Logger.log('Bonjour.OnFind browser started');
+      } catch {}
+      setTimeout(() => {
+        try {
+          browser.update();
+          Logger.log('Bonjour.OnFind browser initial update');
+        } catch {}
+      }, 100);
     } catch (e) {
       Logger.error('Bonjour.OnFind exception:', e);
     }

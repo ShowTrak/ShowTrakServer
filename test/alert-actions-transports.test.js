@@ -73,7 +73,13 @@ test('http-api action normalizes settings, validates, and posts context', async 
   assert.equal(action.ID, 'http-api');
 
   // Normalization clamps and defaults.
-  const norm = action.NormalizeSettings({ Protocol: 'HTTPS', Port: 0, Route: 'api/x', Method: 'put', Timeout: 5 });
+  const norm = action.NormalizeSettings({
+    Protocol: 'HTTPS',
+    Port: 0,
+    Route: 'api/x',
+    Method: 'put',
+    Timeout: 5,
+  });
   assert.equal(norm.Protocol, 'https');
   assert.equal(norm.Port, 1);
   assert.equal(norm.Route, '/api/x');
@@ -83,7 +89,10 @@ test('http-api action normalizes settings, validates, and posts context', async 
   // Validation.
   assert.equal(action.ValidateSettings({ TargetIP: '127.0.0.1', Route: '/x' }), true);
   // Whitespace-only TargetIP trims to empty and fails validation.
-  assert.throws(() => action.ValidateSettings({ TargetIP: '   ', Route: '/x' }), /TargetIP is required/);
+  assert.throws(
+    () => action.ValidateSettings({ TargetIP: '   ', Route: '/x' }),
+    /TargetIP is required/
+  );
 
   const received = [];
   const server = await startServer((req, res) => {
@@ -98,8 +107,22 @@ test('http-api action normalizes settings, validates, and posts context', async 
 
   try {
     const result = await action.Execute(
-      { Settings: { Protocol: 'http', TargetIP: '127.0.0.1', Port: server.port, Route: '/api/alerts', Method: 'POST' } },
-      { TriggerType: 'CLIENT_OFFLINE', EntityType: 'client', EntityName: 'PC1', Severity: 'critical', UUID: 'abc' },
+      {
+        Settings: {
+          Protocol: 'http',
+          TargetIP: '127.0.0.1',
+          Port: server.port,
+          Route: '/api/alerts',
+          Method: 'POST',
+        },
+      },
+      {
+        TriggerType: 'CLIENT_OFFLINE',
+        EntityType: 'client',
+        EntityName: 'PC1',
+        Severity: 'critical',
+        UUID: 'abc',
+      },
       loggerStub()
     );
     assert.equal(result.Success, true);
@@ -145,7 +168,12 @@ test('discord-webhook action builds an embed and validates the URL', async () =>
   try {
     const result = await action.Execute(
       { Settings: { WebhookURL: `http://127.0.0.1:${server.port}/webhook` } },
-      { TriggerType: 'CLIENT_OFFLINE', EntityName: 'PC1', Severity: 'critical', Description: 'down' },
+      {
+        TriggerType: 'CLIENT_OFFLINE',
+        EntityName: 'PC1',
+        Severity: 'critical',
+        Description: 'down',
+      },
       loggerStub()
     );
     assert.equal(result.Success, true);
@@ -190,7 +218,13 @@ test('osc-trigger action interpolates message tokens and sends via node-osc', as
   assert.throws(() => action.ValidateSettings({ Message: 'no-slash' }), /must start with/);
 
   const result = await action.Execute(
-    { Settings: { TargetIP: '127.0.0.1', Port: 3333, Message: '/alert/{{entityName}}/{{severity}}' } },
+    {
+      Settings: {
+        TargetIP: '127.0.0.1',
+        Port: 3333,
+        Message: '/alert/{{entityName}}/{{severity}}',
+      },
+    },
     { EntityName: 'PC1', Severity: 'warning' },
     loggerStub()
   );

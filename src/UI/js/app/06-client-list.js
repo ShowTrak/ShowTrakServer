@@ -322,7 +322,7 @@ window.API.SetDevicesPendingAdoption(async (Devices) => {
 
 function RenderPendingAdoptionSection() {
   try {
-  if (AppMode !== 'EDIT') return '<div id="PENDING_ADOPTION_SECTION"></div>';
+    if (AppMode !== 'EDIT') return '<div id="PENDING_ADOPTION_SECTION"></div>';
     const list = Array.isArray(PendingAdoption) ? PendingAdoption : [];
     if (!list.length) return '<div id="PENDING_ADOPTION_SECTION"></div>';
     let html = '';
@@ -356,4 +356,3 @@ function RenderPendingAdoptionSection() {
     return '<div id="PENDING_ADOPTION_SECTION"></div>';
   }
 }
-

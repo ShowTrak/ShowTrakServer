@@ -3,7 +3,10 @@ document.addEventListener('click', async (e) => {
   const target = e.target;
   if (!(target && target.classList && target.classList.contains('ADOPT_BTN'))) return;
   // Prevent bubbling to tile click handler (which toggles selection)
-  try { e.preventDefault(); e.stopPropagation(); } catch {}
+  try {
+    e.preventDefault();
+    e.stopPropagation();
+  } catch {}
   const btn = target;
   const UUID = btn.getAttribute('data-uuid');
   if (!UUID) return;
@@ -13,7 +16,10 @@ document.addEventListener('click', async (e) => {
     // Auto-dismiss any existing adoption alert for this UUID immediately
     try {
       const id = PendingAdoptionAlerts.get(UUID);
-      if (id) { DismissAlert(id); PendingAdoptionAlerts.delete(UUID); }
+      if (id) {
+        DismissAlert(id);
+        PendingAdoptionAlerts.delete(UUID);
+      }
     } catch {}
     await window.API.AdoptDevice(UUID);
   } catch {
@@ -360,4 +366,3 @@ function computeOrderWithGhost(container, dragUUID) {
   if (!order.includes(dragUUID)) order.push(dragUUID);
   return order;
 }
-

@@ -49,7 +49,11 @@ async function Execute(Action, Context, Logger) {
       { name: 'Type', value: String(Context.EntityType || 'Unknown'), inline: true },
       { name: 'Severity', value: String(Context.Severity || 'info'), inline: true },
       { name: 'IP', value: String(Context.IP || 'N/A'), inline: true },
-      { name: 'Group', value: Context.GroupID == null ? 'No Group' : String(Context.GroupID), inline: true },
+      {
+        name: 'Group',
+        value: Context.GroupID == null ? 'No Group' : String(Context.GroupID),
+        inline: true,
+      },
       { name: 'UUID', value: String(Context.UUID || 'N/A'), inline: true },
       {
         name: 'Details',

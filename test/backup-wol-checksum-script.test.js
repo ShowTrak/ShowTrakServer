@@ -134,7 +134,14 @@ test('WOLManager returns success and error tuples from wakeonlan', async () => {
 });
 
 test('ChecksumManager delegates to checksum.file and returns the digest', async () => {
-  const checksumModulePath = path.join(__dirname, '..', 'src', 'Modules', 'ChecksumManager', 'index.js');
+  const checksumModulePath = path.join(
+    __dirname,
+    '..',
+    'src',
+    'Modules',
+    'ChecksumManager',
+    'index.js'
+  );
   const { Manager } = loadWithMocks(checksumModulePath, {
     checksum: {
       file: (_filePath, cb) => cb(null, 'deadbeef'),
@@ -169,7 +176,10 @@ test('ScriptManager loads script folders and computes file checksums', async () 
   const scripts = await Manager.GetScripts();
   assert.equal(scripts.length, 1);
   assert.equal(scripts[0].ID, 'MyScript');
-  assert.equal(scripts[0].Files.some((f) => f.Path === 'run.sh' && f.Checksum === 'sum123'), true);
+  assert.equal(
+    scripts[0].Files.some((f) => f.Path === 'run.sh' && f.Checksum === 'sum123'),
+    true
+  );
 
   const script = await Manager.Get('MyScript');
   assert.equal(script.Name, 'My Script');

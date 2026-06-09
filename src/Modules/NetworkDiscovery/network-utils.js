@@ -11,8 +11,13 @@ function clampInt(value, min, max, fallback) {
 }
 
 function ipv4ToInt(ip) {
-  const parts = String(ip).split('.').map((part) => parseInt(part, 10));
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+  const parts = String(ip)
+    .split('.')
+    .map((part) => parseInt(part, 10));
+  if (
+    parts.length !== 4 ||
+    parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
+  ) {
     return null;
   }
   return (((parts[0] << 24) >>> 0) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
@@ -33,7 +38,7 @@ function getLocalSubnets(maxHostsPerSubnet) {
       const cidr = String(addr.cidr || '').trim();
       const prefix = parseInt(cidr.split('/')[1], 10);
       if (ipInt == null || !Number.isInteger(prefix) || prefix < 8 || prefix > 30) continue;
-      const mask = prefix === 0 ? 0 : ((0xffffffff << (32 - prefix)) >>> 0);
+      const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
       const base = (ipInt & mask) >>> 0;
       const broadcast = (base | (~mask >>> 0)) >>> 0;
       const hostCount = Math.max(0, broadcast - base - 1);

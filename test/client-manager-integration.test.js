@@ -10,8 +10,16 @@ function loggerStub() {
   const noop = () => {};
   return {
     CreateLogger: () => ({
-      log: noop, info: noop, warn: noop, error: noop, debug: noop,
-      trace: noop, success: noop, database: noop, databaseError: noop, silent: noop,
+      log: noop,
+      info: noop,
+      warn: noop,
+      error: noop,
+      debug: noop,
+      trace: noop,
+      success: noop,
+      database: noop,
+      databaseError: noop,
+      silent: noop,
     }),
   };
 }
@@ -95,7 +103,11 @@ test('ClientManager hydrates a heartbeat from the database when uncached', async
     Date.now(),
   ]);
 
-  const [err, msg] = await Manager.Heartbeat('hb-1', { Version: '2.0', Vitals: { CPU: {} } }, '10.0.0.5');
+  const [err, msg] = await Manager.Heartbeat(
+    'hb-1',
+    { Version: '2.0', Vitals: { CPU: {} } },
+    '10.0.0.5'
+  );
   assert.equal(err, null);
   assert.match(msg, /processed/i);
 

@@ -89,7 +89,10 @@ async function Run(Target) {
   const Started = Date.now();
   const Lookup = Resolver.resolve(Address, RecordType);
   const Timeout = new Promise((_resolve, reject) => {
-    setTimeout(() => reject(new Error(`DNS lookup timed out after ${TimeoutMs}ms`)), Math.max(200, TimeoutMs | 0));
+    setTimeout(
+      () => reject(new Error(`DNS lookup timed out after ${TimeoutMs}ms`)),
+      Math.max(200, TimeoutMs | 0)
+    );
   });
 
   let Records;

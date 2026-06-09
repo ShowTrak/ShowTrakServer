@@ -71,7 +71,9 @@ function CollectMonitoringDynamicSettings() {
 }
 
 function ResolveMonitoringMethodHint(Hint) {
-  const normalized = String(Hint || '').trim().toLowerCase();
+  const normalized = String(Hint || '')
+    .trim()
+    .toLowerCase();
   if (!normalized) return null;
   const preferred = [normalized];
   if (normalized === 'web') preferred.push('http', 'https');
@@ -152,9 +154,7 @@ function RenderNetworkDiscoveryResults() {
   for (const item of list) {
     const id = Safe(item.ID);
     const sourceLabel =
-      String(item.Source || 'unknown').toLowerCase() === 'bonjour'
-        ? 'mDNS'
-        : 'Scan';
+      String(item.Source || 'unknown').toLowerCase() === 'bonjour' ? 'mDNS' : 'Scan';
     const serviceList = Array.isArray(item.Services) ? item.Services.slice(0, 5) : [];
     const details = [];
     if (item.Hostname) details.push(`host: ${Safe(item.Hostname)}`);
@@ -216,7 +216,10 @@ function MergeNetworkDiscoveryResult(result) {
         (s) => `${String(s.type || '').toLowerCase()}:${Number(s.port) || 0}` === dedupeKey
       )
     ) {
-      nextServices.push({ type: serviceType, port: Number.isFinite(servicePort) ? servicePort : null });
+      nextServices.push({
+        type: serviceType,
+        port: Number.isFinite(servicePort) ? servicePort : null,
+      });
     }
   }
 
@@ -236,7 +239,11 @@ function HandleNetworkDiscoveryEvent(event) {
   if (event.Type === 'status') {
     SetNetworkDiscoveryStatus(event.Status || 'Scanning');
     if (event.Progress) {
-      SetNetworkDiscoveryProgress(event.Progress.Percent, event.Progress.Current, event.Progress.Total);
+      SetNetworkDiscoveryProgress(
+        event.Progress.Percent,
+        event.Progress.Current,
+        event.Progress.Total
+      );
     }
     return;
   }
@@ -248,7 +255,11 @@ function HandleNetworkDiscoveryEvent(event) {
     NetworkDiscoveryScanning = false;
     RenderNetworkDiscoveryScanButton();
     SetNetworkDiscoveryStatus(event.Status || 'Completed');
-    SetNetworkDiscoveryProgress(100, NetworkDiscoveryProgress.total, NetworkDiscoveryProgress.total);
+    SetNetworkDiscoveryProgress(
+      100,
+      NetworkDiscoveryProgress.total,
+      NetworkDiscoveryProgress.total
+    );
   }
 }
 
@@ -365,11 +376,9 @@ async function OpenMonitoringTargetEditor(TargetID, Prefill = null) {
     });
 
   // Re-render dynamic settings when method changes (preserve overlapping keys)
-  $method
-    .off('change.mon')
-    .on('change.mon', function () {
-      RenderMonitoringDynamicSettings($(this).val(), CollectMonitoringDynamicSettings());
-    });
+  $method.off('change.mon').on('change.mon', function () {
+    RenderMonitoringDynamicSettings($(this).val(), CollectMonitoringDynamicSettings());
+  });
 
   $('#MONITORING_TARGET_SAVE')
     .off('click.mon')
@@ -392,10 +401,7 @@ async function OpenMonitoringTargetEditor(TargetID, Prefill = null) {
 
       try {
         if (MonitoringEditorTargetID) {
-          const [Err] = await window.API.UpdateMonitoringTarget(
-            MonitoringEditorTargetID,
-            Payload
-          );
+          const [Err] = await window.API.UpdateMonitoringTarget(MonitoringEditorTargetID, Payload);
           if (Err) return Notify(Err, 'error');
           await Notify('Monitoring target updated', 'success');
         } else {
@@ -425,4 +431,3 @@ async function OpenMonitoringTargetEditor(TargetID, Prefill = null) {
 
   $('#SHOWTRAK_MODAL_MONITORING_TARGET').modal('show');
 }
-

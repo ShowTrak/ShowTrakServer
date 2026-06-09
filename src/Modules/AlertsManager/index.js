@@ -194,8 +194,12 @@ Manager.Update = async (RuleID, Payload) => {
     TriggerConfig: Object.prototype.hasOwnProperty.call(Payload, 'TriggerConfig')
       ? Payload.TriggerConfig
       : Existing.TriggerConfig,
-    Actions: Object.prototype.hasOwnProperty.call(Payload, 'Actions') ? Payload.Actions : Existing.Actions,
-    Enabled: Object.prototype.hasOwnProperty.call(Payload, 'Enabled') ? !!Payload.Enabled : Existing.Enabled,
+    Actions: Object.prototype.hasOwnProperty.call(Payload, 'Actions')
+      ? Payload.Actions
+      : Existing.Actions,
+    Enabled: Object.prototype.hasOwnProperty.call(Payload, 'Enabled')
+      ? !!Payload.Enabled
+      : Existing.Enabled,
   };
 
   const UpdatedAt = Date.now();

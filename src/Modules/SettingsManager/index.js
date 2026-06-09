@@ -48,37 +48,39 @@ Manager.Init = async () => {
     }
 
     for (const Setting of DefaultSettings) {
-      let [Err, ManualSetting] = await DB.Get('SELECT * FROM settings WHERE key = ?', [Setting.Key]);
+      let [Err, ManualSetting] = await DB.Get('SELECT * FROM settings WHERE key = ?', [
+        Setting.Key,
+      ]);
       if (Err) throw Err;
 
-    // Normalize value based on type so persisted strings/ints map to the declared Setting.Type
-    const normalize = (val) => {
-      switch (Setting.Type) {
-        case 'BOOLEAN': {
-          if (typeof val === 'boolean') return val;
-          if (val === 1 || val === '1' || val === 'true') return true;
-          if (val === 0 || val === '0' || val === 'false') return false;
-          return !!val;
-        }
-        case 'INTEGER': {
-          if (val === null || val === undefined || val === '') return Setting.DefaultValue;
-          const n = parseInt(val, 10);
-          return isNaN(n) ? Setting.DefaultValue : n;
-        }
-        case 'STRING': {
-          return val == null ? '' : String(val);
-        }
-        case 'OPTION': {
-          if (Setting.Options && Array.isArray(Setting.Options)) {
-            return Setting.Options.includes(val) ? val : Setting.DefaultValue;
+      // Normalize value based on type so persisted strings/ints map to the declared Setting.Type
+      const normalize = (val) => {
+        switch (Setting.Type) {
+          case 'BOOLEAN': {
+            if (typeof val === 'boolean') return val;
+            if (val === 1 || val === '1' || val === 'true') return true;
+            if (val === 0 || val === '0' || val === 'false') return false;
+            return !!val;
           }
-          return val;
+          case 'INTEGER': {
+            if (val === null || val === undefined || val === '') return Setting.DefaultValue;
+            const n = parseInt(val, 10);
+            return isNaN(n) ? Setting.DefaultValue : n;
+          }
+          case 'STRING': {
+            return val == null ? '' : String(val);
+          }
+          case 'OPTION': {
+            if (Setting.Options && Array.isArray(Setting.Options)) {
+              return Setting.Options.includes(val) ? val : Setting.DefaultValue;
+            }
+            return val;
+          }
+          default: {
+            return val;
+          }
         }
-        default: {
-          return val;
-        }
-      }
-    };
+      };
 
       let EffectiveValue = ManualSetting ? normalize(ManualSetting.Value) : Setting.DefaultValue;
       const [RuleErr, RuleValue] = ApplySettingRules(Setting, EffectiveValue);
