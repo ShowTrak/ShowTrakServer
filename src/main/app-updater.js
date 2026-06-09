@@ -18,6 +18,25 @@ const Logger = CreateLogger('AppUpdater');
 let autoUpdater = null;
 let squirrelUpdaterInitialized = false;
 let getMainWindow = () => null;
+let checkWatchdogTimer = null;
+
+function clearCheckWatchdog() {
+  if (!checkWatchdogTimer) return;
+  clearTimeout(checkWatchdogTimer);
+  checkWatchdogTimer = null;
+}
+
+function startCheckWatchdog(timeoutMs = 20000) {
+  clearCheckWatchdog();
+  checkWatchdogTimer = setTimeout(() => {
+    checkWatchdogTimer = null;
+    sendAppUpdateStatus({
+      state: 'error',
+      error: 'Update check timed out. Please try again in a moment.',
+      info: { reason: 'check_timeout' },
+    });
+  }, timeoutMs);
+}
 
 function runSimulatedCheck(versionLabel) {
   sendAppUpdateStatus({ state: 'checking', simulated: true });
@@ -43,6 +62,10 @@ function runSimulatedInstall() {
 }
 
 function sendAppUpdateStatus(payload) {
+  const state = payload && payload.state;
+  if (state === 'available' || state === 'none' || state === 'error' || state === 'downloaded') {
+    clearCheckWatchdog();
+  }
   try {
     const MainWindow = getMainWindow();
     if (MainWindow && !MainWindow.isDestroyed()) {
@@ -111,6 +134,8 @@ function initSquirrelUpdater() {
 }
 
 async function handleCheck() {
+  startCheckWatchdog();
+
   // Dev/unpacked: simulate
   if (!app.isPackaged) {
     try {
