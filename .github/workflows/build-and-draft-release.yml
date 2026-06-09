@@ -263,6 +263,7 @@ jobs:
       RELEASE_TAG: ${{ needs.release-meta.outputs.tag }}
       RELEASE_VERSION: ${{ needs.release-meta.outputs.version }}
       RELEASE_VARIANT_LABEL: ${{ needs.release-meta.outputs.variant_label }}
+      RELEASE_REPO: ${{ github.repository }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -327,7 +328,6 @@ jobs:
           // updater manifests always reference a stable canonical filename.
           const aliasNames = [
             canonicalZipName,
-            `ShowTrak Server-darwin-${arch}-${version}.zip`,
             `ShowTrak.Server-darwin-${arch}-${version}.zip`,
           ];
 
@@ -379,9 +379,10 @@ jobs:
 
       - name: Upload release assets
         run: |
-          mapfile -t FILES < <(find release-artifacts -type f)
+          mapfile -t FILES < <(find release-artifacts -type f ! -name '.DS_Store' | sort)
           if [ "${#FILES[@]}" -eq 0 ]; then
             echo "No release artifacts found."
             exit 1
           fi
-          gh release upload "$RELEASE_TAG" "${FILES[@]}" --clobber
+          echo "Uploading ${#FILES[@]} release assets to ${RELEASE_REPO}:${RELEASE_TAG}"
+          gh release upload "$RELEASE_TAG" "${FILES[@]}" --repo "$RELEASE_REPO" --clobber
