@@ -11,6 +11,7 @@ const { autoUpdater: SquirrelUpdater } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { execFileSync } = require('child_process');
 
 const { CreateLogger } = require('../Modules/Logger');
 const Logger = CreateLogger('AppUpdater');
@@ -20,6 +21,7 @@ let squirrelUpdaterInitialized = false;
 let getMainWindow = () => null;
 let checkWatchdogTimer = null;
 let hasDownloadedUpdate = false;
+let cachedMacDeveloperIdSigned = null;
 
 function clearCheckWatchdog() {
   if (!checkWatchdogTimer) return;
@@ -96,6 +98,10 @@ function normalizeUpdaterError(err) {
     message.includes('Cannot download') &&
     message.includes('/releases/download/') &&
     message.includes('.zip');
+  const referencesShipIt = message.includes('ShipIt');
+  const referencesSignatureValidation =
+    message.includes('did not pass validation') &&
+    message.includes('code failed to satisfy specified code requirement');
 
   if (isMac && has404 && referencesManifest) {
     return {
@@ -116,7 +122,50 @@ function normalizeUpdaterError(err) {
     };
   }
 
+  if (isMac && referencesShipIt && referencesSignatureValidation) {
+    return {
+      state: 'error',
+      error:
+        'The downloaded macOS update failed signature validation. The installed app and update must be signed with the same Developer ID identity (same Team ID), and unsigned builds cannot auto-update.',
+      info: {
+        reason: 'mac_code_signature_requirement_mismatch',
+        details: message,
+      },
+    };
+  }
+
   return { state: 'error', error: message };
+}
+
+function isMacDeveloperIdSignedBuild() {
+  if (process.platform !== 'darwin') return true;
+  if (cachedMacDeveloperIdSigned !== null) return cachedMacDeveloperIdSigned;
+
+  try {
+    const output = execFileSync('codesign', ['-dv', '--verbose=4', process.execPath], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    cachedMacDeveloperIdSigned = /Authority=Developer ID Application:/i.test(String(output || ''));
+  } catch (err) {
+    const details = String((err && err.stderr) || (err && err.message) || '');
+    cachedMacDeveloperIdSigned = /Authority=Developer ID Application:/i.test(details);
+  }
+
+  return cachedMacDeveloperIdSigned;
+}
+
+function ensureMacAutoUpdateEligibility() {
+  if (process.platform !== 'darwin') return true;
+  if (isMacDeveloperIdSignedBuild()) return true;
+
+  sendAppUpdateStatus({
+    state: 'error',
+    error:
+      'This macOS app build is not Developer ID signed, so automatic updates are disabled. Install an official signed release build to use in-app updates.',
+    info: { reason: 'mac_unsigned_build_no_auto_update' },
+  });
+  return false;
 }
 
 function isSquirrelWindows() {
@@ -147,6 +196,10 @@ function initSquirrelUpdater() {
 }
 
 async function handleCheck() {
+  if (app.isPackaged && !ensureMacAutoUpdateEligibility()) {
+    return;
+  }
+
   startCheckWatchdog();
 
   // Dev/unpacked: simulate
@@ -234,6 +287,10 @@ async function handleCheck() {
 }
 
 async function handleInstall() {
+  if (app.isPackaged && !ensureMacAutoUpdateEligibility()) {
+    return;
+  }
+
   // Dev/unpacked: simulate install
   if (!app.isPackaged) {
     try {
