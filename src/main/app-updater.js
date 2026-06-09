@@ -22,6 +22,31 @@ let getMainWindow = () => null;
 let checkWatchdogTimer = null;
 let hasDownloadedUpdate = false;
 let cachedMacDeveloperIdSigned = null;
+const CHECK_TIMEOUT_MS = 20000;
+
+function toErrorMessage(value) {
+  if (!value) return 'Unknown error';
+  if (value instanceof Error) return value.message || String(value);
+  return String(value);
+}
+
+function withTimeout(promise, timeoutMs, label) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    Promise.resolve(promise)
+      .then((result) => {
+        clearTimeout(timer);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
 
 function clearCheckWatchdog() {
   if (!checkWatchdogTimer) return;
@@ -29,10 +54,12 @@ function clearCheckWatchdog() {
   checkWatchdogTimer = null;
 }
 
-function startCheckWatchdog(timeoutMs = 20000) {
+function startCheckWatchdog(timeoutMs = CHECK_TIMEOUT_MS) {
   clearCheckWatchdog();
+  Logger.log(`Update check watchdog started (${timeoutMs}ms)`);
   checkWatchdogTimer = setTimeout(() => {
     checkWatchdogTimer = null;
+    Logger.error('Update check watchdog timed out');
     sendAppUpdateStatus({
       state: 'error',
       error: 'Update check timed out. Please try again in a moment.',
@@ -66,6 +93,11 @@ function runSimulatedInstall() {
 
 function sendAppUpdateStatus(payload) {
   const state = payload && payload.state;
+  try {
+    if (state) {
+      Logger.log(`Updater status: ${state}`);
+    }
+  } catch {}
   if (state === 'downloaded') {
     hasDownloadedUpdate = true;
   } else if (
@@ -90,7 +122,7 @@ function sendAppUpdateStatus(payload) {
 }
 
 function normalizeUpdaterError(err) {
-  const message = String(err || 'Unknown updater error');
+  const message = toErrorMessage(err);
   const isMac = process.platform === 'darwin';
   const has404 = message.includes('status 404');
   const referencesManifest = message.includes('latest-mac.yml');
@@ -196,15 +228,20 @@ function initSquirrelUpdater() {
 }
 
 async function handleCheck() {
+  Logger.log('AppUpdate:Check invoked');
+
   if (app.isPackaged && !ensureMacAutoUpdateEligibility()) {
+    Logger.warn('AppUpdate:Check blocked by macOS signing eligibility guard');
     return;
   }
 
+  sendAppUpdateStatus({ state: 'checking' });
   startCheckWatchdog();
 
   // Dev/unpacked: simulate
   if (!app.isPackaged) {
     try {
+      Logger.log('Running simulated update check (unpackaged app)');
       runSimulatedCheck('TEST');
     } catch (e) {
       sendAppUpdateStatus({ state: 'error', error: String(e) });
@@ -215,6 +252,7 @@ async function handleCheck() {
   // Packaged on Windows via Squirrel: use Electron built-in Squirrel updater against GitHub latest
   if (isSquirrelWindows()) {
     try {
+      Logger.log('Using Squirrel updater check flow');
       initSquirrelUpdater();
       const feed = 'https://github.com/ShowTrak/ShowTrakServer/releases/latest/download/';
       // Try both object and string forms for compatibility
@@ -232,6 +270,7 @@ async function handleCheck() {
     try {
       const { autoUpdater: updater } = require('electron-updater');
       autoUpdater = updater;
+      Logger.log('Initialized electron-updater in handleCheck()');
       autoUpdater.autoDownload = true;
       autoUpdater.autoInstallOnAppQuit = false;
       autoUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
@@ -269,6 +308,7 @@ async function handleCheck() {
       ].join('\n');
       fs.writeFileSync(tmpYml, yml, 'utf8');
       autoUpdater.updateConfigPath = tmpYml;
+      Logger.warn(`app-update.yml not found; using temporary updater config at ${tmpYml}`);
     } catch (e) {
       sendAppUpdateStatus({
         state: 'error',
@@ -277,23 +317,31 @@ async function handleCheck() {
       });
       return;
     }
+  } else {
+    Logger.log('Using packaged app-update.yml config for updater');
   }
 
   try {
-    await autoUpdater.checkForUpdates();
+    await withTimeout(autoUpdater.checkForUpdates(), CHECK_TIMEOUT_MS, 'checkForUpdates');
+    Logger.log('checkForUpdates() returned');
   } catch (e) {
+    Logger.error('checkForUpdates() failed:', e);
     sendAppUpdateStatus(normalizeUpdaterError(e));
   }
 }
 
 async function handleInstall() {
+  Logger.log('AppUpdate:Install invoked');
+
   if (app.isPackaged && !ensureMacAutoUpdateEligibility()) {
+    Logger.warn('AppUpdate:Install blocked by macOS signing eligibility guard');
     return;
   }
 
   // Dev/unpacked: simulate install
   if (!app.isPackaged) {
     try {
+      Logger.log('Running simulated update install (unpackaged app)');
       runSimulatedInstall();
     } catch (e) {
       sendAppUpdateStatus({ state: 'error', error: String(e) });
@@ -304,6 +352,7 @@ async function handleInstall() {
   // Packaged on Windows via Squirrel: call built-in updater
   if (isSquirrelWindows()) {
     try {
+      Logger.log('Using Squirrel updater install flow');
       sendAppUpdateStatus({ state: 'installing' });
       SquirrelUpdater.quitAndInstall();
     } catch (e) {
@@ -314,6 +363,7 @@ async function handleInstall() {
 
   // Only install after a successful check/download cycle in this app session.
   if (!autoUpdater || !hasDownloadedUpdate) {
+    Logger.warn('Install requested without downloaded update in current session');
     sendAppUpdateStatus({
       state: 'error',
       error: 'No downloaded update is ready to install. Run check/download again before install.',
@@ -321,8 +371,10 @@ async function handleInstall() {
     return;
   }
   try {
+    Logger.log('Calling electron-updater quitAndInstall(false, true)');
     await autoUpdater.quitAndInstall(false, true);
   } catch (e) {
+    Logger.error('quitAndInstall failed:', e);
     sendAppUpdateStatus({ state: 'error', error: String(e) });
   }
 }
@@ -333,6 +385,7 @@ function initElectronUpdater() {
   try {
     const { autoUpdater: updater } = require('electron-updater');
     autoUpdater = updater;
+    Logger.log('Initialized electron-updater in initElectronUpdater()');
     autoUpdater.autoDownload = true; // download when found
     autoUpdater.autoInstallOnAppQuit = false;
     autoUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));

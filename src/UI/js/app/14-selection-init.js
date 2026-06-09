@@ -338,12 +338,12 @@ $(async function () {
     // Bind Check for Updates button in core modal
     $('#SHOWTRAK_MODEL_CORE_CHECKUPDATES').off('click').on('click', async () => {
       await OpenAboutModal();
-      try { await window.API.CheckForAppUpdates(); } catch {}
       // Ensure section visible while checking
       $('#UPDATE_SECTION').removeClass('d-none');
       $('#UPDATE_STATUS').text('Checking for updates...');
       $('#UPDATE_INSTALL_BTN').addClass('d-none');
       $('#UPDATE_LATER_BTN').addClass('d-none');
+      try { await window.API.CheckForAppUpdates(); } catch {}
     });
     // Bind Install and Later buttons
     $('#UPDATE_INSTALL_BTN').off('click').on('click', async () => {
