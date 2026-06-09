@@ -4,9 +4,6 @@ run-name: >-
   Build (${{ github.event_name == 'workflow_dispatch' && (inputs.draft_release && 'Build + Draft Release' || 'Build Only') || 'Build + Draft Release' }})
 
 on:
-  push:
-    tags:
-      - v*
   workflow_dispatch:
     inputs:
       macos_variant:
@@ -29,7 +26,6 @@ permissions:
 
 jobs:
   release-meta:
-    if: ${{ !(github.event_name == 'push' && github.actor == 'github-actions[bot]') }}
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
