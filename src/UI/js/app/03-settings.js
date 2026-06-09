@@ -114,30 +114,85 @@ window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
             );
           });
       } else if (Setting.Type === 'STRING') {
+        const isWebUiPassword = Setting.Key === 'WEBUI_PASSWORD';
+        const inputType = 'text';
+        const inputMode = isWebUiPassword ? 'numeric' : 'text';
+        const inputPattern = isWebUiPassword ? 'pattern="[0-9]{4}" maxlength="4"' : '';
+        const inputPlaceholder = isWebUiPassword ? '4 digit code' : 'Enter text...';
+        const initialValue = isWebUiPassword
+          ? String(Setting.Value == null ? '' : Setting.Value)
+              .replace(/\D/g, '')
+              .slice(0, 4)
+          : Safe(Setting.Value);
+
         $(`#SETTINGS`).append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}</span>
 						<span class="text-sm mb-0">${Setting.Description}</span>
 					</div>
-					<input type="text" class="form-control form-control-sm bg-ghost-light text-light border-0" id="SETTING_${
+					<input type="${inputType}" inputmode="${inputMode}" class="form-control form-control-sm bg-ghost-light text-light border-0" id="SETTING_${
             Setting.Key
-          }" value="${Safe(Setting.Value)}" placeholder="Enter text..." />
+					}" value="${initialValue}" placeholder="${inputPlaceholder}" ${inputPattern} />
+					<div class="invalid-feedback" id="SETTING_${Setting.Key}_ERROR">Must be exactly 4 digits (0-9).</div>
 				</div>`);
-        $(`#SETTING_${Setting.Key}`)
+
+        const inputEl = $(`#SETTING_${Setting.Key}`);
+        const errorEl = $(`#SETTING_${Setting.Key}_ERROR`);
+
+        const applyWebUiPasswordValidation = (value) => {
+          if (!isWebUiPassword) return { normalized: value, valid: true, saveable: true };
+          const normalized = String(value == null ? '' : value)
+            .replace(/\D/g, '')
+            .slice(0, 4);
+          const isEmpty = normalized.length === 0;
+          const isValid = isEmpty || /^\d{4}$/.test(normalized);
+          return { normalized, valid: isValid, saveable: isEmpty || normalized.length === 4 };
+        };
+
+        const initialValidation = applyWebUiPasswordValidation(inputEl.val());
+        if (isWebUiPassword) {
+          inputEl.val(initialValidation.normalized);
+          inputEl.toggleClass('is-invalid', !initialValidation.valid);
+          errorEl.toggle(!initialValidation.valid);
+        } else {
+          errorEl.hide();
+        }
+
+        inputEl
           .off('input')
           .on('input', function () {
             let el = $(this);
             let NewValue = el.val();
+            const validation = applyWebUiPasswordValidation(NewValue);
+
+            if (isWebUiPassword) {
+              if (validation.normalized !== NewValue) {
+                el.val(validation.normalized);
+              }
+              NewValue = validation.normalized;
+              el.toggleClass('is-invalid', !validation.valid);
+              errorEl.toggle(!validation.valid);
+            }
+
             if (SettingDebounceTimers.has(Setting.Key))
               clearTimeout(SettingDebounceTimers.get(Setting.Key));
             SettingDebounceTimers.set(
               Setting.Key,
               setTimeout(async () => {
+                if (isWebUiPassword && !validation.saveable) return;
                 if (NewValue === Setting.Value) return;
                 let Set = Settings.find((s) => s.Key === Setting.Key);
                 Set.Value = NewValue;
                 Setting.Value = NewValue;
-                await window.API.SetSetting(Setting.Key, NewValue);
+                const [Err] = await window.API.SetSetting(Setting.Key, NewValue);
+                if (Err) {
+                  if (isWebUiPassword) {
+                    el.addClass('is-invalid');
+                    errorEl.text('Must be exactly 4 digits (0-9).').show();
+                  }
+                  Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
+                  return;
+                }
                 Notify(`[${Setting.Title}] Saved`, 'success', 1200);
               }, 600)
             );

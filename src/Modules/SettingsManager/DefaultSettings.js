@@ -53,6 +53,14 @@ const DefaultSettings = [
 
   {
     Group: 'Web UI',
+    Key: 'WEBUI_ENABLED',
+    Title: 'Web UI Enabled',
+    Description: 'Enable access to the Web UI.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
+    Group: 'Web UI',
     Key: 'WEBUI_PASSWORD_PROTECTION_ENABLED',
     Title: 'Password Protection Enabled',
     Description:

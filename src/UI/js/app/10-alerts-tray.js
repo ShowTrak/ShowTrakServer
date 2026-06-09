@@ -107,7 +107,7 @@ function RenderAlerts() {
     let html = '';
     for (const a of items) {
       html += `
-			<div class="alert-item" data-id="${a.id}">
+      <div class="alert-item" data-id="${a.id}" data-severity="${Safe(String(a.severity || a.type || 'info').toLowerCase())}">
 				<div class="alert-icon">${iconForAlert(a)}</div>
 				<div class="alert-content">
 					<div><strong>${Safe(a.title || 'Alert')}</strong></div>

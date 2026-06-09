@@ -58,31 +58,37 @@
       <div class="login-card">
         <img src="/images/icon.png" alt="ShowTrak" class="login-logo" />
         <h5 class="mb-1">ShowTrak Web UI</h5>
-        <p class="text-muted mb-3" id="loginSubtitle">Enter the access passcode</p>
-        <div id="pinDisplay" class="pin-display" aria-label="Passcode">
-          <span class="pin-dot"></span>
-          <span class="pin-dot"></span>
-          <span class="pin-dot"></span>
-          <span class="pin-dot"></span>
+        <div id="disabledNotice" class="disabled-notice hidden" role="status" aria-live="polite">
+          <strong>Web UI disabled.</strong>
+          <span>ShowTrak Preferences &gt; Web UI &gt; Web UI Enabled to enable.</span>
         </div>
-        <div id="pinError" class="pin-error hidden">Incorrect passcode</div>
-        <div class="keypad">
-          <button class="keypad-btn" data-key="1" type="button">1</button>
-          <button class="keypad-btn" data-key="2" type="button">2</button>
-          <button class="keypad-btn" data-key="3" type="button">3</button>
-          <button class="keypad-btn" data-key="4" type="button">4</button>
-          <button class="keypad-btn" data-key="5" type="button">5</button>
-          <button class="keypad-btn" data-key="6" type="button">6</button>
-          <button class="keypad-btn" data-key="7" type="button">7</button>
-          <button class="keypad-btn" data-key="8" type="button">8</button>
-          <button class="keypad-btn" data-key="9" type="button">9</button>
-          <button class="keypad-btn keypad-muted" data-key="clear" type="button" aria-label="Clear">
-            <i class="bi bi-x-lg"></i>
-          </button>
-          <button class="keypad-btn" data-key="0" type="button">0</button>
-          <button class="keypad-btn keypad-muted" data-key="back" type="button" aria-label="Backspace">
-            <i class="bi bi-backspace"></i>
-          </button>
+        <div id="authControls">
+          <p class="text-muted mb-3" id="loginSubtitle">Enter the access passcode</p>
+          <div id="pinDisplay" class="pin-display" aria-label="Passcode">
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+          </div>
+          <div id="pinError" class="pin-error hidden">Incorrect passcode</div>
+          <div class="keypad">
+            <button class="keypad-btn" data-key="1" type="button">1</button>
+            <button class="keypad-btn" data-key="2" type="button">2</button>
+            <button class="keypad-btn" data-key="3" type="button">3</button>
+            <button class="keypad-btn" data-key="4" type="button">4</button>
+            <button class="keypad-btn" data-key="5" type="button">5</button>
+            <button class="keypad-btn" data-key="6" type="button">6</button>
+            <button class="keypad-btn" data-key="7" type="button">7</button>
+            <button class="keypad-btn" data-key="8" type="button">8</button>
+            <button class="keypad-btn" data-key="9" type="button">9</button>
+            <button class="keypad-btn keypad-muted" data-key="clear" type="button" aria-label="Clear">
+              <i class="bi bi-x-lg"></i>
+            </button>
+            <button class="keypad-btn" data-key="0" type="button">0</button>
+            <button class="keypad-btn keypad-muted" data-key="back" type="button" aria-label="Backspace">
+              <i class="bi bi-backspace"></i>
+            </button>
+          </div>
         </div>
       </div>
     </div>

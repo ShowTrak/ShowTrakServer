@@ -24,6 +24,7 @@
   let monitors = [];
   let scripts = [];
   let config = {
+    Enabled: true,
     PasswordProtection: false,
     AllowRemoteScripts: false,
     WOLEnabled: false,
@@ -41,7 +42,9 @@
     empty: $('emptyState'),
     loading: $('loadingOverlay'),
     login: $('loginOverlay'),
+    authControls: $('authControls'),
     loginSubtitle: $('loginSubtitle'),
+    disabledNotice: $('disabledNotice'),
     pinDisplay: $('pinDisplay'),
     pinError: $('pinError'),
     logoutBtn: $('logoutBtn'),
@@ -205,13 +208,29 @@
 
   // ---- Auth / view gating -------------------------------------------------
   function applyAuthView() {
+    const disabled = config.Enabled === false;
     const needsLogin = config.PasswordProtection && !config.Authed;
-    if (needsLogin) {
+    if (disabled) {
+      el.login.classList.remove('hidden');
+      el.main.classList.add('hidden');
+      el.loading.classList.add('hidden');
+      el.logoutBtn.classList.add('hidden');
+      el.loginSubtitle.textContent = 'Access is disabled in ShowTrak settings';
+      el.disabledNotice.classList.remove('hidden');
+      el.authControls.classList.add('hidden');
+      el.pinError.classList.add('hidden');
+    } else if (needsLogin) {
+      el.loginSubtitle.textContent = 'Enter the access passcode';
+      el.disabledNotice.classList.add('hidden');
+      el.authControls.classList.remove('hidden');
       el.login.classList.remove('hidden');
       el.main.classList.add('hidden');
       el.loading.classList.add('hidden');
       el.logoutBtn.classList.add('hidden');
     } else {
+      el.loginSubtitle.textContent = 'Enter the access passcode';
+      el.disabledNotice.classList.add('hidden');
+      el.authControls.classList.remove('hidden');
       el.login.classList.add('hidden');
       el.main.classList.remove('hidden');
       el.loading.classList.add('hidden');
@@ -230,6 +249,7 @@
     setTimeout(() => el.pinDisplay.classList.remove('shake'), 420);
   }
   function submitPin() {
+    if (config.Enabled === false) return;
     socket.emit('auth:login', { password: pin }, (res) => {
       if (res && res.ok) {
         if (res.token) {

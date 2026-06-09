@@ -14,6 +14,22 @@ const { Manager: DB } = require('../DB');
 // In-memory cache keyed by setting.Key -> setting object
 const Settings = new Map();
 
+function ApplySettingRules(Setting, Value) {
+  if (!Setting || !Setting.Key) return [null, Value];
+
+  if (Setting.Key === 'WEBUI_PASSWORD') {
+    const Normalized = String(Value == null ? '' : Value)
+      .replace(/\D/g, '')
+      .slice(0, 4);
+    if (Normalized !== '' && !/^\d{4}$/.test(Normalized)) {
+      return ['WEBUI_PASSWORD must be exactly 4 digits', null];
+    }
+    return [null, Normalized];
+  }
+
+  return [null, Value];
+}
+
 const Manager = [];
 
 Manager.Initialized = false;
@@ -64,7 +80,13 @@ Manager.Init = async () => {
       }
     };
 
-      const EffectiveValue = ManualSetting ? normalize(ManualSetting.Value) : Setting.DefaultValue;
+      let EffectiveValue = ManualSetting ? normalize(ManualSetting.Value) : Setting.DefaultValue;
+      const [RuleErr, RuleValue] = ApplySettingRules(Setting, EffectiveValue);
+      if (RuleErr) {
+        EffectiveValue = Setting.DefaultValue;
+      } else {
+        EffectiveValue = RuleValue;
+      }
 
       let NewSetting = {
         Group: Setting.Group,
@@ -155,9 +177,12 @@ Manager.Set = async (Key, Value) => {
 
   const CoercedValue = coerce(Value);
 
-  if (Setting.Value === CoercedValue) return [null, Setting];
+  const [RuleErr, NormalizedValue] = ApplySettingRules(Setting, CoercedValue);
+  if (RuleErr) return [RuleErr, null];
 
-  Setting.Value = CoercedValue;
+  if (Setting.Value === NormalizedValue) return [null, Setting];
+
+  Setting.Value = NormalizedValue;
 
   let [Err, _Res] = await DB.Run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [
     Key,

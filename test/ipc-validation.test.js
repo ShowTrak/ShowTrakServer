@@ -35,6 +35,14 @@ test('IPCValidation.SettingUpdatePayload allows primitive setting values', () =>
     true,
   ]);
   assert.deepEqual(IPCValidation.SettingUpdatePayload('AB', 'x'), ['AB', 'x']);
+  assert.deepEqual(IPCValidation.SettingUpdatePayload('WEBUI_PASSWORD', '12ab34'), [
+    'WEBUI_PASSWORD',
+    '1234',
+  ]);
+  assert.deepEqual(IPCValidation.SettingUpdatePayload('WEBUI_PASSWORD', ''), [
+    'WEBUI_PASSWORD',
+    '',
+  ]);
   assert.throws(
     () => IPCValidation.SettingUpdatePayload('SETTING_X', { bad: true }),
     /must be a boolean, string, or number/i

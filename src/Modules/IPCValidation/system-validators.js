@@ -62,6 +62,16 @@ module.exports = function registerSystemValidators(Manager) {
       fail('Setting value number is invalid');
     }
 
+    if (normalizedKey === 'WEBUI_PASSWORD') {
+      const normalizedValue = String(value == null ? '' : value)
+        .replace(/\D/g, '')
+        .slice(0, 4);
+      if (normalizedValue !== '' && !/^\d{4}$/.test(normalizedValue)) {
+        fail('WEBUI_PASSWORD must be exactly 4 digits');
+      }
+      return [normalizedKey, normalizedValue];
+    }
+
     return [normalizedKey, value];
   };
 };

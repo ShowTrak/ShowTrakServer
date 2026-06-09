@@ -319,6 +319,31 @@ h7 {
   font-weight: 600 !important;
 }
 
+.disabled-notice {
+  width: 100%;
+  margin: 0 0 1rem;
+  padding: 1rem 1.05rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  background: rgba(255, 193, 7, 0.12);
+  color: #ffe08a;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.45;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.disabled-notice strong {
+  font-size: 1.05rem;
+  color: #fff2bf;
+}
+
+.disabled-notice span {
+  font-size: 0.95rem;
+  color: rgba(255, 224, 138, 0.92);
+}
+
 .SHOWTRAK_PC_PLACEHOLDER {
   width: 220px;
   display: grid;

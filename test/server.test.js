@@ -172,7 +172,7 @@ test('Web UI namespace gates data behind authentication', async () => {
   const broadcast = new EventEmitter();
   broadcast.off = broadcast.removeListener.bind(broadcast);
   const { SetupWebUiNamespace } = loadWebUi(
-    { WEBUI_PASSWORD_PROTECTION_ENABLED: true, WEBUI_PASSWORD: 'secret', WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true, SYSTEM_ALLOW_WOL: true },
+    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: true, WEBUI_PASSWORD: 'secret', WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true, SYSTEM_ALLOW_WOL: true },
     broadcast
   );
 
@@ -224,7 +224,7 @@ test('Web UI namespace dispatches script and WOL actions when permitted', async 
   broadcast.off = broadcast.removeListener.bind(broadcast);
   const dispatched = [];
   const { SetupWebUiNamespace } = loadWebUi(
-    { WEBUI_PASSWORD_PROTECTION_ENABLED: false, WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true, SYSTEM_ALLOW_WOL: true },
+    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false, WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true, SYSTEM_ALLOW_WOL: true },
     broadcast
   );
 
@@ -266,6 +266,34 @@ test('Web UI namespace dispatches script and WOL actions when permitted', async 
   // Disconnect detaches broadcast listeners.
   await socket.trigger('disconnect');
   assert.equal(broadcast.listenerCount('ClientListChanged'), 0);
+});
+
+test('Web UI namespace disables access when the master toggle is off', async () => {
+  const broadcast = new EventEmitter();
+  broadcast.off = broadcast.removeListener.bind(broadcast);
+  const { SetupWebUiNamespace } = loadWebUi(
+    { WEBUI_ENABLED: false, WEBUI_PASSWORD_PROTECTION_ENABLED: false, WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true, SYSTEM_ALLOW_WOL: true },
+    broadcast
+  );
+
+  const ServerManager = { ExecuteScripts: async () => {} };
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, ServerManager);
+
+  const socket = makeSocket({ auth: {}, query: {}, address: '127.0.0.1' });
+  await new Promise((resolve) => io._ns.middlewares[0](socket, resolve));
+  await io._ns._connection(socket);
+
+  const hello = socket.emitted.find((e) => e.event === 'hello');
+  assert.equal(hello.args[0].Enabled, false);
+  assert.equal(socket.emitted.some((e) => e.event === 'bootstrap'), false);
+
+  let resp;
+  await socket.trigger('auth:login', { password: '1234' }, (r) => (resp = r));
+  assert.deepEqual(resp, { error: 'disabled' });
+
+  await socket.trigger('clients:get', (r) => (resp = r));
+  assert.deepEqual(resp, { error: 'unauthorized' });
 });
 
 test('Server Manager dispatches scripts, bulk requests, and group messages', async () => {

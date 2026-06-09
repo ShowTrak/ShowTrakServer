@@ -353,61 +353,114 @@
   position: fixed;
   right: 10px;
   bottom: 48px; /* above bottom bar */
-  width: 380px;
-  max-height: 50vh;
-  overflow: auto;
+  width: min(390px, calc(100vw - 20px));
+  max-height: min(62vh, 560px);
+  overflow: hidden;
   z-index: 1100;
   background: rgba(29, 26, 47, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
   color: #fff;
 }
 #ALERTS_TRAY .alerts-header {
   display: grid;
   grid-template-columns: 1fr auto auto;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
-  padding: 8px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0));
 }
 #ALERTS_TRAY .alerts-list {
-  padding: 8px;
+  padding: 10px;
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  max-height: calc(min(62vh, 560px) - 58px);
+  overflow: auto;
 }
 .alert-item {
+  --alert-accent: rgba(255, 181, 77, 0.9);
+  position: relative;
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 8px;
-  align-items: start;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 8px;
+  gap: 10px;
+  align-items: center;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03)),
+    rgba(17, 14, 31, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 11px;
+  padding: 10px;
+  box-shadow:
+    0 7px 18px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+.alert-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--alert-accent);
+  opacity: 0.95;
+}
+.alert-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 .alert-item .alert-icon {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--alert-accent) 24%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--alert-accent) 32%, transparent);
 }
 .alert-item .alert-icon i {
-  font-size: 14px;
-  color: #fff;
+  font-size: 15px;
+  color: color-mix(in srgb, var(--alert-accent) 86%, #fff);
 }
 .alert-item .alert-content {
-  font-size: 12px;
-  line-height: 1.25;
-  color: #fff;
+  display: grid;
+  align-content: center;
+  min-height: 26px;
+  font-size: 12.5px;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.alert-item .alert-content > div:first-child {
+  display: flex;
+  align-items: center;
+  min-height: 16px;
 }
 .alert-item .alert-content strong {
   color: #fff;
+  font-size: 13px;
+  letter-spacing: 0.01em;
 }
 .alert-item .alert-meta {
-  font-size: 10px;
-  color: #fff;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.76);
   opacity: 1;
+}
+.alert-item.single-line .alert-content {
+  min-height: 30px;
 }
 .alert-item .alert-dismiss {
   display: inline-flex;
@@ -415,14 +468,36 @@
   gap: 6px;
 }
 .alert-item .btn-dismiss {
-  border: 0;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.9);
-  padding: 2px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 2px 7px;
   border-radius: 6px;
+  line-height: 1;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 .alert-item .btn-dismiss:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+.alert-item[data-severity='success'] {
+  --alert-accent: rgba(63, 214, 111, 0.92);
+}
+
+.alert-item[data-severity='warning'] {
+  --alert-accent: rgba(255, 181, 77, 0.96);
+}
+
+.alert-item[data-severity='error'] {
+  --alert-accent: rgba(255, 107, 107, 0.96);
+}
+
+.alert-item[data-severity='info'] {
+  --alert-accent: rgba(102, 184, 255, 0.96);
 }
 
 .alert-rule-open {
@@ -1049,22 +1124,28 @@ button.btn:focus {
   bottom: 48px; /* sit above bottom bar */
   transform: translateX(-50%);
   z-index: 1100;
-  background: rgba(29, 26, 47, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  width: min(560px, calc(100vw - 20px));
+  background:
+    radial-gradient(circle at 20% -70%, rgba(255, 181, 77, 0.2), transparent 70%),
+    linear-gradient(160deg, rgba(40, 35, 62, 0.98), rgba(25, 22, 42, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   color: #fff;
 }
 #SHOWTRAK_CONFIRM_TOAST .confirm-toast-body {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
-  padding: 8px 10px;
+  padding: 10px 12px;
 }
 #SHOWTRAK_CONFIRM_TOAST .confirm-toast-msg {
-  font-size: 14px;
-  line-height: 1.2;
+  font-size: 13px;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.92);
 }
 #SHOWTRAK_CONFIRM_TOAST .confirm-toast-actions {
   display: flex;
@@ -1312,40 +1393,49 @@ button.btn:focus {
   z-index: 1200;
   display: grid;
   gap: 10px;
-  max-width: min(680px, 92vw);
+  width: min(680px, calc(100vw - 20px));
+  pointer-events: none;
 }
 .alert-toast {
-  background: rgba(29, 26, 47, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: auto;
+  background:
+    radial-gradient(circle at 90% -10%, color-mix(in srgb, var(--alert-accent) 24%, transparent), transparent 48%),
+    linear-gradient(165deg, rgba(38, 34, 59, 0.98), rgba(23, 20, 40, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-  padding: 12px; /* larger click/reading target */
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 11px;
+  animation: alert-toast-enter 220ms ease-out;
 }
 
 /* Upsize icon and text specifically for toasts */
 .alert-toast .alert-icon {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
 }
 .alert-toast .alert-icon i {
-  font-size: 18px;
+  font-size: 17px;
 }
 .alert-toast .alert-content {
-  font-size: 14px;
+  min-height: 30px;
+  font-size: 13.5px;
   line-height: 1.35;
 }
 .alert-toast .alert-content strong {
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.3;
 }
 .alert-toast .btn-dismiss {
-  padding: 4px 8px;
+  padding: 3px 8px;
 }
 
 /* Single-line (title only) toast polish */
 .alert-toast.single-line .alert-content {
-  display: flex;
-  align-items: center;
+  display: grid;
+  align-content: center;
+  min-height: 30px;
 }
 .alert-toast.single-line .alert-content > div:first-child strong {
   font-size: 16px;
@@ -1354,6 +1444,52 @@ button.btn:focus {
 .alert-toast.single-line {
   padding-top: 10px;
   padding-bottom: 10px;
+}
+
+@keyframes alert-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 768px) {
+  #ALERTS_TRAY.alerts-tray {
+    right: 8px;
+    bottom: 44px;
+    width: calc(100vw - 16px);
+    max-height: min(68vh, 560px);
+  }
+
+  #ALERTS_TRAY .alerts-list {
+    max-height: calc(min(68vh, 560px) - 58px);
+  }
+
+  #SHOWTRAK_CONFIRM_TOAST.confirm-toast {
+    width: calc(100vw - 16px);
+    bottom: 44px;
+  }
+
+  #SHOWTRAK_CONFIRM_TOAST .confirm-toast-body {
+    grid-template-columns: 1fr;
+  }
+
+  #SHOWTRAK_CONFIRM_TOAST .confirm-toast-actions {
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alert-item,
+  .alert-item .btn-dismiss,
+  .alert-toast {
+    transition: none;
+    animation: none;
+  }
 }
 
 .SHOWTRAK_PC {

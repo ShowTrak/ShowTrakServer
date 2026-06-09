@@ -24,25 +24,29 @@ const WebSessions = new Set();
 
 // Snapshot of the relevant Web UI settings used for permissions.
 const GetWebConfig = async () => {
+  let Enabled = true;
   let ProtectionEnabled = false;
   let Password = '';
   let AllowRemoteScripts = false;
   let WOLEnabled = false;
   try {
+    Enabled = !!(await SettingsManager.GetValue('WEBUI_ENABLED'));
     ProtectionEnabled = !!(await SettingsManager.GetValue('WEBUI_PASSWORD_PROTECTION_ENABLED'));
     Password = String((await SettingsManager.GetValue('WEBUI_PASSWORD')) || '').trim();
     AllowRemoteScripts = !!(await SettingsManager.GetValue('WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION'));
     WOLEnabled = !!(await SettingsManager.GetValue('SYSTEM_ALLOW_WOL'));
   } catch {}
+  if (Enabled === undefined) Enabled = true;
   // Protection is only meaningful when a passcode is actually set.
   const RequireAuth = ProtectionEnabled && Password.length > 0;
-  return { ProtectionEnabled, Password, AllowRemoteScripts, WOLEnabled, RequireAuth };
+  return { Enabled, ProtectionEnabled, Password, AllowRemoteScripts, WOLEnabled, RequireAuth };
 };
 
 // Public-facing config (never leaks the password itself).
 const GetPublicConfig = async (socket) => {
   const Cfg = await GetWebConfig();
   return {
+    Enabled: Cfg.Enabled,
     PasswordProtection: Cfg.RequireAuth,
     AllowRemoteScripts: Cfg.AllowRemoteScripts,
     WOLEnabled: Cfg.WOLEnabled,
@@ -54,6 +58,7 @@ const GetPublicConfig = async (socket) => {
 // Is this socket allowed to receive/act on data right now?
 const IsAuthed = async (socket) => {
   const Cfg = await GetWebConfig();
+  if (!Cfg.Enabled) return false;
   if (!Cfg.RequireAuth) return true;
   return !!(socket && socket.Authed);
 };
@@ -120,6 +125,9 @@ function SetupWebUiNamespace(io, ServerManager) {
     socket.on('auth:login', async (payload, cb) => {
       try {
         const Cfg = await GetWebConfig();
+        if (!Cfg.Enabled) {
+          return cb && cb({ error: 'disabled' });
+        }
         if (!Cfg.RequireAuth) {
           socket.Authed = true;
           const token = crypto.randomBytes(24).toString('hex');
@@ -237,7 +245,7 @@ function SetupWebUiNamespace(io, ServerManager) {
     const onSettingsUpdated = async () => {
       try {
         const Cfg = await GetWebConfig();
-        if (Cfg.RequireAuth && !socket.Authed) {
+        if (!Cfg.Enabled || (Cfg.RequireAuth && !socket.Authed)) {
           socket.emit('config', await GetPublicConfig(socket));
           return;
         }

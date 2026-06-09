@@ -54,6 +54,7 @@ function showAlertStyleToast({
   const host = ensureToastHost();
   const el = document.createElement('div');
   el.className = 'alert-item alert-toast';
+  el.setAttribute('data-severity', String(type || 'info').toLowerCase());
   if (id && linkAlert) el.setAttribute('data-alert-id', id);
   const hasMessage = Boolean(message && String(message).trim().length > 0);
   if (!hasMessage) el.classList.add('single-line');
