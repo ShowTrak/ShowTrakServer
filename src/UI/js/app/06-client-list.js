@@ -20,7 +20,9 @@ window.API.USBDeviceAdded(async (Client, Device) => {
       const fresh = await window.API.GetClient(Client.UUID);
       if (fresh) RenderClientInfoDetails(fresh);
     }
-  } catch {}
+  } catch (e) {
+    HandleNonFatalError('USBDeviceAdded:RefreshClientInfo', e);
+  }
 });
 window.API.USBDeviceRemoved(async (Client, Device) => {
   AddAlert({
@@ -37,14 +39,18 @@ window.API.USBDeviceRemoved(async (Client, Device) => {
       const fresh = await window.API.GetClient(Client.UUID);
       if (fresh) RenderClientInfoDetails(fresh);
     }
-  } catch {}
+  } catch (e) {
+    HandleNonFatalError('USBDeviceRemoved:RefreshClientInfo', e);
+  }
 });
 
 window.API.UpdateScriptExecutions(async (Executions) => {
   // Close any open popovers before re-render to prevent duplicates
   try {
     $('.exec-info.open').removeClass('open');
-  } catch {}
+  } catch (e) {
+    HandleNonFatalError('UpdateScriptExecutions:ClosePopovers', e);
+  }
   Executions = Executions.reverse();
 
   // Determine if all executions are for the same action/script
@@ -182,7 +188,7 @@ function RenderFullClientAndMonitorList() {
       .sort((a, b) => a.weight - b.weight);
 
     Filler += `<div class="d-flex justify-content-start">
-		<div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" onclick="SelectByGroup('${GroupID}')">
+    <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" data-groupid="${GroupID}">
 			<div class="d-flex align-items-center text-center h-100">
 				<span class="GROUP_TITLE py-2">
 					${Safe(Title)}
@@ -253,7 +259,9 @@ function RenderFullClientAndMonitorList() {
   if (typeof initializeEditInteractions === 'function') {
     try {
       initializeEditInteractions();
-    } catch {}
+    } catch (e) {
+      HandleNonFatalError('RenderFullClientAndMonitorList:initializeEditInteractions', e);
+    }
   }
 }
 
@@ -317,7 +325,9 @@ window.API.SetDevicesPendingAdoption(async (Devices) => {
         $('#APPLICATION_CONTENT').append(html);
       }
     }
-  } catch {}
+  } catch (e) {
+    HandleNonFatalError('SetDevicesPendingAdoption:Render', e);
+  }
 });
 
 function RenderPendingAdoptionSection() {

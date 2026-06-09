@@ -8,7 +8,7 @@ import { defineConfig } from 'eslint/config';
 export default defineConfig([
   {
     ignores: [
-      'src/UI/**',
+      'src/UI/vendors/**',
       'src/WebUI/vendors/**',
       'coverage/**',
       'node_modules/**',
@@ -38,6 +38,16 @@ export default defineConfig([
           caughtErrorsIgnorePattern: '^_[^_].*$|^_$',
         },
       ],
+    },
+  },
+  {
+    files: ['src/UI/js/app/**/*.js', 'src/WebUI/main.js'],
+    rules: {
+      // Classic renderer scripts share globals across many files.
+      // Keep lint coverage enabled while avoiding false positives.
+      'no-undef': 'off',
+      'no-unused-vars': 'off',
+      'no-useless-escape': 'off',
     },
   },
   {

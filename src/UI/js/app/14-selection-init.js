@@ -39,7 +39,9 @@ function RemoveAlertToastById(id) {
     if (!host) return;
     const node = host.querySelector(`.alert-toast[data-alert-id="${CSS.escape(id)}"]`);
     if (node) node.remove();
-  } catch {}
+  } catch (e) {
+    HandleNonFatalError('RemoveAlertToastById', e);
+  }
 }
 
 function showAlertStyleToast({
@@ -97,7 +99,9 @@ function showAlertStyleToast({
       timerId = setTimeout(() => {
         try {
           el.remove();
-        } catch {}
+        } catch (e) {
+          HandleNonFatalError('showAlertStyleToast:AutoRemove', e);
+        }
       }, remaining);
     };
     const onMouseEnter = () => {
@@ -110,7 +114,9 @@ function showAlertStyleToast({
       if (remaining === 0) {
         try {
           el.remove();
-        } catch {}
+        } catch (e) {
+          HandleNonFatalError('showAlertStyleToast:MouseLeaveRemove', e);
+        }
       } else {
         tick();
       }
@@ -139,7 +145,9 @@ async function ConfirmationDialog(Message) {
     if (existing) {
       try {
         existing.remove();
-      } catch {}
+      } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
     }
 
     const toastHtml = `
@@ -166,7 +174,9 @@ async function ConfirmationDialog(Message) {
       $btnConfirm.off('click.confirmToast');
       try {
         $toast.remove();
-      } catch {}
+      } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
       window.__SHOWTRAK_CONFIRM_ACTIVE = false;
     };
 
@@ -213,7 +223,9 @@ async function ConfirmationDialog(Message) {
     setTimeout(() => {
       try {
         $btnConfirm.trigger('focus');
-      } catch {}
+      } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
     }, 0);
   });
 }
@@ -242,7 +254,9 @@ function Select(UUID) {
   try {
     const $tile = $(`.SHOWTRAK_PC[data-uuid='${UUID}']`);
     if ($tile && $tile.hasClass('PENDING')) return;
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
   if (Selected.includes(UUID)) return;
   Selected.push(UUID);
   $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).addClass('SELECTED');
@@ -271,7 +285,9 @@ function ToggleSelection(UUID) {
   try {
     const $tile = $(`.SHOWTRAK_PC[data-uuid='${UUID}']`);
     if ($tile && $tile.hasClass('PENDING')) return;
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
   if (Selected.includes(UUID)) {
     Selected = Selected.filter((id) => id !== UUID);
     $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).removeClass('SELECTED');
@@ -328,9 +344,21 @@ $(async function () {
       setTimeout(() => {
         $icon.attr('class', prev);
       }, 900);
-    } catch {}
+      } catch (e) {
+        HandleNonFatalError('Clipboard:CopyField', e);
+      }
     return false;
   });
+
+    $(document).on('click', '#SELECTION_STATUS', function () {
+      ClearSelection();
+    });
+
+    $(document).on('click', '.GROUP_TITLE_CLICKABLE[data-groupid]', function (e) {
+      e.preventDefault();
+      const groupId = $(this).attr('data-groupid');
+      SelectByGroup(groupId);
+    });
 
   // --- App Updates (manual check) ---
   try {
@@ -346,7 +374,9 @@ $(async function () {
         $('#UPDATE_LATER_BTN').addClass('d-none');
         try {
           await window.API.CheckForAppUpdates();
-        } catch {}
+        } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
       });
     // Bind Install and Later buttons
     $('#UPDATE_INSTALL_BTN')
@@ -354,7 +384,9 @@ $(async function () {
       .on('click', async () => {
         try {
           await window.API.InstallAppUpdate();
-        } catch {}
+        } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
       });
     $('#UPDATE_LATER_BTN')
       .off('click')
@@ -388,7 +420,9 @@ $(async function () {
           try {
             const h = String(href || '').trim();
             if (/^(https?:|mailto:)/i.test(h)) return h;
-          } catch {}
+          } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
           return '#';
         };
         const renderMarkdownSafe = (md) => {
@@ -506,9 +540,13 @@ $(async function () {
           $status.text(`Update error: ${payload.error || 'Unknown error'}`);
           $later.removeClass('d-none');
         }
-      } catch {}
+      } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
     });
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
 
   // Open client editor from cog without affecting selection
   $(document).on('click', '.CLIENT_TILE_COG', function (e) {
@@ -753,7 +791,9 @@ $(async function () {
       setTimeout(() => {
         try {
           $focusable.first().trigger('focus')[0].scrollIntoView({ block: 'nearest' });
-        } catch {}
+        } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
       }, 0);
     }
 
@@ -792,7 +832,9 @@ $(async function () {
         if (prevTimer) {
           try {
             clearTimeout(prevTimer);
-          } catch {}
+          } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
         }
         $menu.data(
           'typeaheadTimer',
@@ -859,17 +901,23 @@ $(async function () {
         // Prevent bubbling to document-level handlers (e.g., confirmation toast)
         try {
           ev.stopImmediatePropagation();
-        } catch {}
+        } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
         try {
           ev.stopPropagation();
-        } catch {}
+        } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
         if (idx >= 0) {
           const $target = $items.eq(idx);
           // Defer the click so it occurs after keydown completes
           setTimeout(() => {
             try {
               $target.trigger('click');
-            } catch {}
+            } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
           }, 0);
         }
         return;
@@ -891,7 +939,9 @@ $(async function () {
         if (prevTimer) {
           try {
             clearTimeout(prevTimer);
-          } catch {}
+          } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
         }
         $menu.removeData('typeaheadBuffer');
         $menu.removeData('typeaheadTimer');
@@ -961,7 +1011,9 @@ function HideExecutionToast() {
     setTimeout(() => {
       try {
         $t.remove();
-      } catch {}
+      } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
     }, 150);
   }
 }
@@ -1306,7 +1358,9 @@ Init();
 async function OpenClientInfo(UUID) {
   try {
     await CloseAllModals();
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
   let Client = null;
   try {
     Client = await window.API.GetClient(UUID);
@@ -1324,7 +1378,9 @@ async function OpenClientInfo(UUID) {
       const g = groups.find((x) => x && x.GroupID === GroupID);
       if (g && g.Title) groupTitle = g.Title;
     }
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
 
   $('#CLIENT_INFO_NICKNAME').val(Nickname && Nickname.length ? Nickname : Hostname || '');
   $('#CLIENT_INFO_HOSTNAME').val(Hostname || '');
@@ -1355,7 +1411,9 @@ async function OpenClientInfo(UUID) {
       }
       __clientInfoRefreshInFlight = false;
     });
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
 
   $('#SHOWTRAK_CLIENT_INFO').modal('show');
 
@@ -1372,10 +1430,14 @@ async function OpenClientInfo(UUID) {
       try {
         const fresh = await window.API.GetClient(ClientInfoOpenUUID);
         if (fresh) RenderClientInfoDetails(fresh);
-      } catch {}
+      } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
       __clientInfoRefreshInFlight = false;
     }, 4000);
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
 }
 
 function RenderClientInfoDetails(Client) {
@@ -1416,7 +1478,9 @@ function RenderClientInfoDetails(Client) {
     } else {
       $('#CLIENT_INFO_RAM_LABEL').text(`${ramClamped.toFixed(0)}%`);
     }
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
 
   // USB devices
   try {
@@ -1446,7 +1510,9 @@ function RenderClientInfoDetails(Client) {
           <p class="text-sm mb-0">Devices that do not comply with WebUSB 1.3 cannot be displayed.</p>
         </div>`);
     }
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
 
   // Network Interfaces
   try {
@@ -1556,5 +1622,7 @@ function RenderClientInfoDetails(Client) {
           </div>`);
       }
     }
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
 }

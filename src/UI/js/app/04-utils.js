@@ -11,6 +11,26 @@ function Safe(Input) {
   return Input;
 }
 
+function HandleNonFatalError(Context, Error = null) {
+  try {
+    const Label = Context ? `[NonFatal] ${Context}` : '[NonFatal]';
+    if (Error) {
+      console.warn(Label, Error);
+      return;
+    }
+    console.warn(Label);
+  } catch {}
+}
+
+async function WithNonFatal(Context, Operation, Fallback = null) {
+  try {
+    return await Operation();
+  } catch (Error) {
+    HandleNonFatalError(Context, Error);
+    return Fallback;
+  }
+}
+
 // Show QR modal for a given URL
 async function ShowQRModal(url) {
   try {
@@ -72,12 +92,15 @@ async function ShowQRModal(url) {
       }
     } catch (e) {
       // Hard failure: show a short notice (no clickable link)
+      HandleNonFatalError('ShowQRModal:Render', e);
       $canvas.html(`<div class="text-muted small">Unable to generate QR code</div>`);
     }
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById(modalId));
     modal.show();
-  } catch {}
+  } catch (e) {
+    HandleNonFatalError('ShowQRModal', e);
+  }
 }
 
 // Format bytes into a short human-readable string (e.g., 15.2 GB)

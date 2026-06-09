@@ -275,7 +275,9 @@ async function StopNetworkDiscoveryScan() {
   RenderNetworkDiscoveryScanButton();
   try {
     await window.API.StopNetworkDeviceScan(scanID);
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('MonitoringEditor:StopNetworkDiscoveryScan', err);
+  }
 }
 
 async function StartNetworkDiscoveryScan() {

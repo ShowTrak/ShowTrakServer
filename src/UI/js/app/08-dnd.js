@@ -6,7 +6,9 @@ document.addEventListener('click', async (e) => {
   try {
     e.preventDefault();
     e.stopPropagation();
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('DnD:AdoptButtonPreventDefault', err);
+  }
   const btn = target;
   const UUID = btn.getAttribute('data-uuid');
   if (!UUID) return;
@@ -20,9 +22,12 @@ document.addEventListener('click', async (e) => {
         DismissAlert(id);
         PendingAdoptionAlerts.delete(UUID);
       }
-    } catch {}
+    } catch (err) {
+      HandleNonFatalError('DnD:DismissPendingAdoptionAlert', err);
+    }
     await window.API.AdoptDevice(UUID);
-  } catch {
+  } catch (err) {
+    HandleNonFatalError('DnD:AdoptDevice', err);
     btn.disabled = false;
     btn.textContent = 'Adopt';
   }
@@ -51,7 +56,9 @@ function initializeEditInteractions() {
 function ShowShortcutsModal() {
   try {
     $('#KEYBOARD_SHORTCUTS_LIST').html('');
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('DnD:ShowShortcutsModal:ClearList', err);
+  }
   const items = [];
   // Core selection/navigation (Ctrl or Cmd)
   items.push({ title: 'Select All', shortcut: 'Ctrl/Cmd+A' });
@@ -101,7 +108,9 @@ function teardownDnD() {
   if (DnDState.ghostEl && DnDState.ghostEl.remove) {
     try {
       DnDState.ghostEl.remove();
-    } catch {}
+    } catch (err) {
+      HandleNonFatalError('DnD:TeardownGhostRemove', err);
+    }
   }
   DnDState = {
     dragUUID: null,
@@ -126,7 +135,9 @@ function setupDnD() {
     try {
       e.originalEvent.dataTransfer.setData('text/plain', uuid);
       e.originalEvent.dataTransfer.effectAllowed = 'move';
-    } catch {}
+    } catch (err) {
+      HandleNonFatalError('DnD:DragStartDataTransfer', err);
+    }
     $(this).addClass('dragging');
   });
 
@@ -174,7 +185,9 @@ function setupDnD() {
     DnDState.currentOverGroup = null;
     try {
       await window.API.SetGroupOrder(targetGroupId, order);
-    } catch {}
+    } catch (err) {
+      HandleNonFatalError('DnD:DropSetGroupOrder', err);
+    }
   });
 }
 

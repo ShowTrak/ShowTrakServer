@@ -451,7 +451,9 @@ async function OpenMonitoringTargetHistory(TargetID) {
   if (!Target) return Notify('Monitoring target not found', 'error');
   try {
     await CloseAllModals();
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('Monitoring:OpenMonitoringTargetHistory:CloseAllModals', err);
+  }
 
   MonitorHistoryModalTargetID = Number(Target.TargetID);
   MonitorHistorySamples = [];

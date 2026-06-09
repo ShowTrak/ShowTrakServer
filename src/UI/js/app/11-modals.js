@@ -12,8 +12,7 @@ window.API.OSCBulkAction(async (Type, Targets, Args = null) => {
     ShowExecutionToast();
     return;
   }
-  if (Type == 'InternalScript') {
-  }
+  if (Type == 'InternalScript') return;
   if (Type == 'Select') return Targets.map((UUID) => Select(UUID));
   if (Type == 'Deselect') return Targets.map((UUID) => Deselect(UUID));
 });
@@ -206,11 +205,11 @@ async function OpenGroupManager(Relaunching = false) {
                     <span class="badge bg-ghost-light text-light">
                         ${GroupMembers.length} ${GroupMembers.length == 1 ? 'Client' : 'Clients'}
                     </span>
-                    <a class="badge bg-danger text-light cursor-pointer text-decoration-none GROUP_MANAGER_GROUP_DELETE" onclick="DeleteGroup(${
+                    <button type="button" class="badge bg-danger text-light cursor-pointer text-decoration-none border-0 GROUP_MANAGER_GROUP_DELETE" data-groupid="${
                       Group.GroupID
-                    })">
+                    }">
                         Delete
-                    </a>
+                    </button>
                 </div>
             </div>
         `);
@@ -230,9 +229,23 @@ async function OpenGroupManager(Relaunching = false) {
 
   $('#GROUP_MANAGER_GROUP_LIST').append(`
         <div class="d-grid gap-2">
-            <button class="btn btn-sm btn-success" onclick="OpenGroupCreationModal()">New Group</button>
+            <button type="button" class="btn btn-sm btn-success" id="GROUP_MANAGER_NEW_GROUP">New Group</button>
         </div>
     `);
+
+  $('#GROUP_MANAGER_GROUP_LIST')
+    .off('click', '.GROUP_MANAGER_GROUP_DELETE')
+    .on('click', '.GROUP_MANAGER_GROUP_DELETE', async function () {
+      const GroupID = parseInt($(this).attr('data-groupid'), 10);
+      if (isNaN(GroupID)) return;
+      await DeleteGroup(GroupID);
+    });
+
+  $('#GROUP_MANAGER_GROUP_LIST')
+    .off('click', '#GROUP_MANAGER_NEW_GROUP')
+    .on('click', '#GROUP_MANAGER_NEW_GROUP', function () {
+      OpenGroupCreationModal();
+    });
 
   $('#SHOWTRAK_MODAL_GROUPMANAGER').modal('show');
 }

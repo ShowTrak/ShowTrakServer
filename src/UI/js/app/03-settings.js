@@ -35,11 +35,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     const mode = await window.API.GetMode();
     RenderMode(mode);
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('Settings:InitMode', err);
+  }
   try {
     const isEnabled = await window.API.GetAlertActionsEnabled();
     RenderAlertActionsToggle(isEnabled);
-  } catch {
+  } catch (err) {
+    HandleNonFatalError('Settings:InitAlertActionsEnabled', err);
     RenderAlertActionsToggle(true);
   }
 });
@@ -291,7 +294,9 @@ window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
           ShowQRModal(url);
         });
     }
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('Settings:RenderRemoteAccessSection', err);
+  }
 
   return;
 });

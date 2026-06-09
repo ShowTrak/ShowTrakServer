@@ -22,14 +22,17 @@ function SetCompactMode(isCompact, options = {}) {
   if (persist) {
     try {
       localStorage.setItem(COMPACT_MODE_STORAGE_KEY, CompactMode ? '1' : '0');
-    } catch {}
+      } catch (err) {
+        HandleNonFatalError('Mode:SetCompactModePersist', err);
+      }
   }
 }
 
 function LoadCompactModePreference() {
   try {
     return localStorage.getItem(COMPACT_MODE_STORAGE_KEY) === '1';
-  } catch {
+    } catch (err) {
+      HandleNonFatalError('Mode:LoadCompactModePreference', err);
     return false;
   }
 }
@@ -51,7 +54,9 @@ async function SetAlertActionsEnabled(isEnabled) {
   try {
     const NextEnabled = await window.API.SetAlertActionsEnabled(!!isEnabled);
     RenderAlertActionsToggle(NextEnabled);
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('Mode:SetAlertActionsEnabled', err);
+  }
 }
 
 function RenderMode(mode) {
@@ -85,7 +90,9 @@ window.API.OnModeUpdated((mode) => {
   if (typeof initializeEditInteractions === 'function') {
     try {
       initializeEditInteractions();
-    } catch {}
+      } catch (err) {
+        HandleNonFatalError('Mode:initializeEditInteractions', err);
+      }
   }
   // Refresh discover/adopt section visibility when mode changes
   try {
@@ -97,5 +104,7 @@ window.API.OnModeUpdated((mode) => {
         $existing.replaceWith(RenderPendingAdoptionSection());
       }
     }
-  } catch {}
+    } catch (err) {
+      HandleNonFatalError('Mode:RenderPendingAdoptionSection', err);
+    }
 });

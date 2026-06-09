@@ -63,11 +63,15 @@ window.API.ClientUpdated(async (Data) => {
             UpdateAlertsIndicator();
             if (AlertsVisible) RenderAlerts();
           }
-        } catch {}
+        } catch (err) {
+          HandleNonFatalError('ClientUpdated:DismissOfflineAlert', err);
+        }
       }
     }
     window.__CLIENT_ONLINE_STATE.set(Data.UUID, !!Data.Online);
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('ClientUpdated:TransitionAlerts', err);
+  }
   const { UUID, Nickname, Hostname, Version, IP, Online, Vitals } = Data;
   $(`[data-uuid='${UUID}']`).toggleClass('ONLINE', Online);
 
@@ -127,7 +131,9 @@ window.API.ClientUpdated(async (Data) => {
     if (ClientInfoOpenUUID && ClientInfoOpenUUID === UUID && $modal.hasClass('show')) {
       RenderClientInfoDetails(Data);
     }
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('ClientUpdated:RenderClientInfoDetails', err);
+  }
   return;
 });
 

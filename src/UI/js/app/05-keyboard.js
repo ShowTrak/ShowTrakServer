@@ -34,7 +34,9 @@ document.addEventListener('keydown', function (e) {
       evt.pageX = centerX;
       evt.pageY = centerY;
       $('html').trigger(evt);
-    } catch {}
+    } catch (err) {
+      HandleNonFatalError('Keyboard:OpenContextMenuCenter', err);
+    }
     return;
   }
   if (e.key === 'Escape') {
@@ -61,7 +63,9 @@ document.addEventListener('keydown', function (e) {
       evt.pageX = centerX;
       evt.pageY = centerY;
       $('html').trigger(evt);
-    } catch {}
+    } catch (err) {
+      HandleNonFatalError('Keyboard:OpenContextMenuHotkey', err);
+    }
     return;
   }
 
@@ -91,5 +95,7 @@ document.addEventListener('keydown', function (e) {
       ToggleAlertsTray(false);
       return;
     }
-  } catch {}
+  } catch (err) {
+    HandleNonFatalError('Keyboard:AlertsShortcuts', err);
+  }
 });
