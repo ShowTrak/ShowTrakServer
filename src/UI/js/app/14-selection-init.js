@@ -477,7 +477,11 @@ $(async function () {
         } else if (st === 'installing') {
           $status.text('Installing update...');
         } else if (st === 'installed') {
-          $status.text('Update installed (simulated). Restart the app to finish.');
+          if (payload.simulated) {
+            $status.text('Update installed (simulated). Restart the app to finish.');
+          } else {
+            $status.text('Update installed. Restart the app to finish.');
+          }
           $later.removeClass('d-none');
         } else if (st === 'none') {
           $status.text('No updates available');

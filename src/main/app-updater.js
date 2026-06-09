@@ -19,6 +19,29 @@ let autoUpdater = null;
 let squirrelUpdaterInitialized = false;
 let getMainWindow = () => null;
 
+function runSimulatedCheck(versionLabel) {
+  sendAppUpdateStatus({ state: 'checking', simulated: true });
+  setTimeout(
+    () => sendAppUpdateStatus({ state: 'available', info: { version: versionLabel }, simulated: true }),
+    600
+  );
+  let pct = 0;
+  const timer = setInterval(() => {
+    pct += 14;
+    if (pct >= 100) {
+      clearInterval(timer);
+      sendAppUpdateStatus({ state: 'downloaded', info: { version: versionLabel }, simulated: true });
+    } else {
+      sendAppUpdateStatus({ state: 'downloading', percent: pct, simulated: true });
+    }
+  }, 250);
+}
+
+function runSimulatedInstall() {
+  sendAppUpdateStatus({ state: 'installing', simulated: true });
+  setTimeout(() => sendAppUpdateStatus({ state: 'installed', simulated: true }), 600);
+}
+
 function sendAppUpdateStatus(payload) {
   try {
     const MainWindow = getMainWindow();
@@ -91,18 +114,7 @@ async function handleCheck() {
   // Dev/unpacked: simulate
   if (!app.isPackaged) {
     try {
-      sendAppUpdateStatus({ state: 'checking' });
-      setTimeout(() => sendAppUpdateStatus({ state: 'available', info: { version: 'TEST' } }), 600);
-      let pct = 0;
-      const timer = setInterval(() => {
-        pct += 14;
-        if (pct >= 100) {
-          clearInterval(timer);
-          sendAppUpdateStatus({ state: 'downloaded', info: { version: 'TEST' } });
-        } else {
-          sendAppUpdateStatus({ state: 'downloading', percent: pct });
-        }
-      }, 250);
+      runSimulatedCheck('TEST');
     } catch (e) {
       sendAppUpdateStatus({ state: 'error', error: String(e) });
     }
@@ -167,21 +179,11 @@ async function handleCheck() {
       fs.writeFileSync(tmpYml, yml, 'utf8');
       autoUpdater.updateConfigPath = tmpYml;
     } catch (e) {
-      // If writing config fails, fall back to simulated flow
-      try {
-        sendAppUpdateStatus({ state: 'checking' });
-        setTimeout(() => sendAppUpdateStatus({ state: 'available', info: { version: 'SIM' } }), 600);
-        let pct = 0;
-        const timer = setInterval(() => {
-          pct += 14;
-          if (pct >= 100) {
-            clearInterval(timer);
-            sendAppUpdateStatus({ state: 'downloaded', info: { version: 'SIM' } });
-          } else {
-            sendAppUpdateStatus({ state: 'downloading', percent: pct });
-          }
-        }, 250);
-      } catch {}
+      sendAppUpdateStatus({
+        state: 'error',
+        error: 'Updater config failed: could not create app-update.yml for packaged app.',
+        info: { details: String(e || 'Unknown error') },
+      });
       return;
     }
   }
@@ -197,8 +199,7 @@ async function handleInstall() {
   // Dev/unpacked: simulate install
   if (!app.isPackaged) {
     try {
-      sendAppUpdateStatus({ state: 'installing' });
-      setTimeout(() => sendAppUpdateStatus({ state: 'installed' }), 600);
+      runSimulatedInstall();
     } catch (e) {
       sendAppUpdateStatus({ state: 'error', error: String(e) });
     }
@@ -216,15 +217,13 @@ async function handleInstall() {
     return;
   }
 
-  // Packaged: if updater config/path is set (real updates), perform real install; else simulate
+  // Packaged: if updater config/path is set (real updates), perform real install; else error.
   const hasConfig = Boolean(autoUpdater && (autoUpdater.updateConfigPath || autoUpdater.provider));
   if (!hasConfig) {
-    try {
-      sendAppUpdateStatus({ state: 'installing' });
-      setTimeout(() => sendAppUpdateStatus({ state: 'installed' }), 600);
-    } catch (e) {
-      sendAppUpdateStatus({ state: 'error', error: String(e) });
-    }
+    sendAppUpdateStatus({
+      state: 'error',
+      error: 'No updater configuration available in packaged app. Run check/download again before install.',
+    });
     return;
   }
   if (!autoUpdater) {
