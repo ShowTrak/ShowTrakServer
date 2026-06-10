@@ -55,6 +55,7 @@ const { Wait } = require('./Modules/Utils');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { execFile } = require('child_process');
 
 const {
   recordMonitoringHistorySample,
@@ -110,6 +111,197 @@ function getWindowIconPath() {
 function validationErrorTuple(error, fallback = null) {
   const message = error && error.message ? error.message : String(error || 'Invalid request');
   return [message, fallback];
+}
+
+function runCommandForOpen(command, args) {
+  return new Promise((resolve) => {
+    execFile(command, args, (error) => {
+      if (error) {
+        resolve(error.message || String(error));
+        return;
+      }
+      resolve(null);
+    });
+  });
+}
+
+function normalizeRelativePathForCompare(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '');
+}
+
+function getLocalPlatformKey() {
+  if (process.platform === 'win32') return 'Windows';
+  if (process.platform === 'darwin') return 'macOS';
+  return 'Linux';
+}
+
+function parseArgumentString(value) {
+  const input = String(value || '').trim();
+  if (!input) return [];
+
+  const args = [];
+  let current = '';
+  let inSingle = false;
+  let inDouble = false;
+  let escaping = false;
+
+  const pushCurrent = () => {
+    if (current.length > 0) {
+      args.push(current);
+      current = '';
+    }
+  };
+
+  for (let i = 0; i < input.length; i += 1) {
+    const ch = input[i];
+
+    if (escaping) {
+      current += ch;
+      escaping = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaping = true;
+      continue;
+    }
+
+    if (inSingle) {
+      if (ch === "'") inSingle = false;
+      else current += ch;
+      continue;
+    }
+
+    if (inDouble) {
+      if (ch === '"') inDouble = false;
+      else current += ch;
+      continue;
+    }
+
+    if (ch === "'") {
+      inSingle = true;
+      continue;
+    }
+    if (ch === '"') {
+      inDouble = true;
+      continue;
+    }
+
+    if (/\s/.test(ch)) {
+      pushCurrent();
+      continue;
+    }
+
+    current += ch;
+  }
+
+  if (escaping) current += '\\';
+  pushCurrent();
+  return args;
+}
+
+function resolveLocalScriptLauncher(scriptPath) {
+  const extension = path.extname(scriptPath).toLowerCase();
+
+  if (process.platform === 'win32') {
+    switch (extension) {
+      case '.bat':
+      case '.cmd':
+        return { command: 'cmd.exe', args: ['/c', scriptPath] };
+      case '.ps1':
+        return {
+          command: 'powershell.exe',
+          args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
+        };
+      case '.exe':
+        return { command: scriptPath, args: [] };
+      default:
+        return { command: 'cmd.exe', args: ['/c', scriptPath] };
+    }
+  }
+
+  switch (extension) {
+    case '.sh':
+    case '.command':
+      return { command: '/bin/sh', args: [scriptPath] };
+    case '.bash':
+    case '.zsh':
+      return { command: '/bin/bash', args: [scriptPath] };
+    case '.py':
+      return { command: 'python3', args: [scriptPath] };
+    case '.js':
+      return { command: 'node', args: [scriptPath] };
+    default:
+      return { command: scriptPath, args: [] };
+  }
+}
+
+function runLocalScriptFile(scriptPath, extraArgs = []) {
+  return new Promise((resolve) => {
+    const launcher = resolveLocalScriptLauncher(scriptPath);
+
+    if (process.platform !== 'win32') {
+      try {
+        fs.chmodSync(scriptPath, 0o755);
+      } catch (chmodError) {
+        Logger.warn(`Unable to set executable bit on ${scriptPath}: ${chmodError.message}`);
+      }
+    }
+
+    execFile(
+      launcher.command,
+      launcher.args.concat(extraArgs),
+      {
+        cwd: path.dirname(scriptPath),
+        windowsHide: true,
+        maxBuffer: 10 * 1024 * 1024,
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          const message = (stderr || '').trim() || error.message || 'Script execution failed';
+          resolve(message);
+          return;
+        }
+        Logger.success(`Local script completed: ${scriptPath}`);
+        if ((stdout || '').trim()) {
+          Logger.log(`Local script output: ${(stdout || '').trim()}`);
+        }
+        resolve(null);
+      }
+    );
+  });
+}
+
+async function openFileWithWorkspaceEditor(filePath) {
+  const selectedEditor = await SettingsManager.GetValue('SYSTEM_WORKSPACE_DEFAULT_EDITOR');
+  const editorName = String(selectedEditor || 'System Default').trim();
+
+  if (!editorName || editorName === 'System Default') {
+    return shell.openPath(filePath);
+  }
+
+  if (editorName === 'Visual Studio Code') {
+    if (process.platform === 'darwin') {
+      const openErr = await runCommandForOpen('open', ['-a', 'Visual Studio Code', filePath]);
+      if (!openErr) return '';
+      Logger.warn('Open in Visual Studio Code failed, falling back to system default:', openErr);
+      return shell.openPath(filePath);
+    }
+    if (process.platform === 'win32') {
+      const openErr = await runCommandForOpen('cmd', ['/c', 'code', '-g', filePath]);
+      if (!openErr) return '';
+      Logger.warn('Open in Visual Studio Code failed, falling back to system default:', openErr);
+      return shell.openPath(filePath);
+    }
+    const openErr = await runCommandForOpen('code', ['-g', filePath]);
+    if (!openErr) return '';
+    Logger.warn('Open in Visual Studio Code failed, falling back to system default:', openErr);
+    return shell.openPath(filePath);
+  }
+
+  return shell.openPath(filePath);
 }
 
 function applyWindowSecurityGuards(windowInstance) {
@@ -762,6 +954,61 @@ app.whenReady().then(async () => {
     return;
   });
 
+  // Script Manager: return the catalog (including invalid scripts) for editing.
+  RPC.handle('Scripts:GetManagerList', async () => {
+    const Scripts = (await ScriptManager.GetScripts()) || [];
+    return Scripts.map((s) => ({
+      id: s.ID,
+      name: s.Name,
+      description: s.Description || '',
+      colour: typeof s.Colour === 'number' ? s.Colour : 6,
+      weight: s.Weight || 0,
+      confirm: !!s.Confirmation,
+      enabled: !!s.isEnabled,
+      valid: !!s.isValid,
+      parseError: s.ParseError || null,
+      platforms: s.Platforms || {},
+      compatiblePlatforms: s.CompatiblePlatforms || [],
+      issues: s.ValidationErrors || [],
+    }));
+  });
+
+  // Script Manager: read the editable fields + folder file list for one script.
+  RPC.handle('Scripts:GetConfig', async (_Event, ID) => {
+    const [data, err] = await ScriptManager.GetEditable(ID);
+    if (err) return [err, null];
+    return [null, data];
+  });
+
+  // Script Manager: validate, normalize and persist structured field edits
+  // (optionally renaming the script folder/ID).
+  RPC.handle('Scripts:SaveConfig', async (_Event, ID, Fields) => {
+    if (!Fields || typeof Fields !== 'object') return ['Invalid script fields', null];
+    const Result = await ScriptManager.SaveFields(ID, Fields);
+    if (!Result.ok) {
+      return [Result.errors && Result.errors[0] ? Result.errors[0] : 'Invalid', Result];
+    }
+    return [null, Result];
+  });
+
+  // Script Manager: persist a new display order (drag-and-drop reordering).
+  RPC.handle('Scripts:SetOrder', async (_Event, OrderedIDs) => {
+    if (!Array.isArray(OrderedIDs)) return ['Invalid order', null];
+    const Result = await ScriptManager.SetOrder(OrderedIDs);
+    if (!Result.ok) {
+      return [Result.errors && Result.errors[0] ? Result.errors[0] : 'Invalid', Result];
+    }
+    return [null, Result];
+  });
+
+  // Script Manager: delete a script folder from disk.
+  RPC.handle('Scripts:Delete', async (_Event, ID) => {
+    if (typeof ID !== 'string') return ['Invalid script ID', null];
+    const Result = await ScriptManager.Delete(ID);
+    if (!Result.ok) return [Result.error || 'Failed to delete script', null];
+    return [null, true];
+  });
+
   RPC.handle('WakeOnLan', async (_Event, List) => {
     try {
       List = IPCValidation.UUIDList(List || [], 'WakeOnLan targets');
@@ -880,6 +1127,92 @@ app.whenReady().then(async () => {
     // Cross-platform and properly quoted
     await shell.openPath(LogsPath);
     return;
+  });
+
+  RPC.handle('Scripts:OpenFolder', async (_event, ID) => {
+    if (typeof ID !== 'string' || !ID.trim()) return;
+    const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
+    const ScriptFolderPath = require('path').join(ScriptsDirectory, ID);
+    Logger.log('Opening script folder:', ScriptFolderPath);
+    await shell.openPath(ScriptFolderPath);
+  });
+
+  RPC.handle('Scripts:OpenFile', async (_event, ID, RelativeFilePath) => {
+    if (typeof ID !== 'string' || !ID.trim()) return ['Invalid script ID', null];
+    if (typeof RelativeFilePath !== 'string' || !RelativeFilePath.trim()) {
+      return ['Invalid file path', null];
+    }
+    if (ID.includes('..') || ID.includes('/') || ID.includes('\\')) {
+      return ['Invalid script ID', null];
+    }
+    if (path.isAbsolute(RelativeFilePath)) return ['Invalid file path', null];
+
+    const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
+    const ScriptFolderPath = path.resolve(ScriptsDirectory, ID);
+    const TargetFilePath = path.resolve(ScriptFolderPath, RelativeFilePath);
+    const ScriptFolderPrefix = ScriptFolderPath.endsWith(path.sep)
+      ? ScriptFolderPath
+      : `${ScriptFolderPath}${path.sep}`;
+    if (TargetFilePath !== ScriptFolderPath && !TargetFilePath.startsWith(ScriptFolderPrefix)) {
+      return ['Invalid file path', null];
+    }
+
+    if (!fs.existsSync(TargetFilePath)) return ['File not found', null];
+    const stat = fs.statSync(TargetFilePath);
+    if (!stat.isFile()) return ['Path is not a file', null];
+
+    Logger.log('Opening script file:', TargetFilePath);
+    const OpenErr = await openFileWithWorkspaceEditor(TargetFilePath);
+    if (OpenErr) return [OpenErr, null];
+    return [null, true];
+  });
+
+  RPC.handle('Scripts:RunLocalFile', async (_event, ID, RelativeFilePath) => {
+    if (typeof ID !== 'string' || !ID.trim()) return ['Invalid script ID', null];
+    if (typeof RelativeFilePath !== 'string' || !RelativeFilePath.trim()) {
+      return ['Invalid file path', null];
+    }
+    if (ID.includes('..') || ID.includes('/') || ID.includes('\\')) {
+      return ['Invalid script ID', null];
+    }
+    if (path.isAbsolute(RelativeFilePath)) return ['Invalid file path', null];
+
+    const Script = await ScriptManager.Get(ID);
+    if (!Script || !Script.Platforms) return ['Script not found', null];
+
+    const PlatformKey = getLocalPlatformKey();
+    const MappedFile = normalizeRelativePathForCompare(Script.Platforms[PlatformKey]);
+    const PlatformArgumentString =
+      Script && Script.Arguments && typeof Script.Arguments[PlatformKey] === 'string'
+        ? Script.Arguments[PlatformKey]
+        : '';
+    const PlatformArgs = parseArgumentString(PlatformArgumentString);
+    const RequestedFile = normalizeRelativePathForCompare(RelativeFilePath);
+    if (!MappedFile) {
+      return [`No ${PlatformKey} executable is configured for this script`, null];
+    }
+    if (RequestedFile !== MappedFile) {
+      return [`Only the mapped ${PlatformKey} executable can be run locally`, null];
+    }
+
+    const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
+    const ScriptFolderPath = path.resolve(ScriptsDirectory, ID);
+    const TargetFilePath = path.resolve(ScriptFolderPath, RelativeFilePath);
+    const ScriptFolderPrefix = ScriptFolderPath.endsWith(path.sep)
+      ? ScriptFolderPath
+      : `${ScriptFolderPath}${path.sep}`;
+    if (TargetFilePath !== ScriptFolderPath && !TargetFilePath.startsWith(ScriptFolderPrefix)) {
+      return ['Invalid file path', null];
+    }
+
+    if (!fs.existsSync(TargetFilePath)) return ['File not found', null];
+    const stat = fs.statSync(TargetFilePath);
+    if (!stat.isFile()) return ['Path is not a file', null];
+
+    Logger.log(`Running local script (${PlatformKey}):`, TargetFilePath);
+    const RunErr = await runLocalScriptFile(TargetFilePath, PlatformArgs);
+    if (RunErr) return [RunErr, null];
+    return [null, true];
   });
 
   RPC.handle('OpenDiscordInviteLinkInBrowser', async (_event, _URL) => {
@@ -1104,6 +1437,10 @@ async function UpdateScriptList() {
   let ScriptList = await ScriptManager.GetScripts();
   MainWindow.webContents.send('SetScriptList', ScriptList);
 }
+
+// Re-push the script catalog whenever it is reloaded from disk (e.g. after the
+// Script Manager saves an edited Script.json).
+BroadcastManager.on('ScriptsUpdated', UpdateScriptList);
 
 // Clients + Groups form the primary topology data model used by the UI.
 async function UpdateFullClientList() {

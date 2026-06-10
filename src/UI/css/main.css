@@ -758,6 +758,8 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 
 .SHOWTRAK_CONTEXTMENU_BUTTON {
   cursor: pointer;
+  display: flex;
+  align-items: center;
 }
 
 /* Right-aligned shortcut hint in context menu */
@@ -1975,3 +1977,273 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 
 /* No standalone #MODE_SWITCH positioning; switch sits in bottom bar */
 /* removed old toggle styles (.mode-switch ...) */
+
+/* ------------------------------------------------------------------ */
+/* Script Manager modal                                               */
+/* ------------------------------------------------------------------ */
+.script-manager-item {
+  transition: background-color 140ms ease;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+}
+.script-manager-item:hover {
+  background-color: rgba(255, 255, 255, 0.09) !important;
+}
+.script-manager-item.dragging {
+  opacity: 0.5;
+}
+.script-manager-item-invalid {
+  border: 1px solid rgba(220, 53, 69, 0.5);
+  background-color: rgba(220, 53, 69, 0.1) !important;
+}
+.script-manager-item-disabled {
+  opacity: 0.45;
+}
+.script-manager-item-id {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+  line-height: 1.2;
+  margin-bottom: 1px;
+}
+.script-manager-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.script-manager-item-desc {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.script-manager-chevron {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+}
+/* Coloured left-edge accent strip driven by --script-accent CSS var */
+.script-manager-accent-strip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--script-accent, transparent);
+  border-radius: 6px 0 0 6px;
+}
+.script-manager-grip {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: grab;
+  font-size: 1.1rem;
+  padding-top: 1px;
+}
+.script-manager-grip:active {
+  cursor: grabbing;
+}
+.script-manager-os-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.script-manager-os-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.55);
+}
+.script-manager-os-chip i {
+  font-size: 0.85rem;
+}
+.script-manager-os-chip.compatible {
+  background: rgba(40, 209, 124, 0.16);
+  border-color: rgba(40, 209, 124, 0.4);
+  color: #9af0c4;
+}
+.script-manager-os-chip.broken {
+  background: rgba(255, 193, 7, 0.14);
+  border-color: rgba(255, 193, 7, 0.4);
+  color: #ffe08a;
+}
+.script-manager-os-chip.missing {
+  background: rgba(220, 53, 69, 0.14);
+  border-color: rgba(220, 53, 69, 0.4);
+  color: #ffb3bc;
+}
+.script-manager-os-empty {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+.script-manager-platform-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 90px;
+  flex: 0 0 90px;
+  font-size: 0.85rem;
+}
+.script-manager-platform-label i {
+  opacity: 0.8;
+}
+.script-manager-platform-select {
+  flex: 1 1 auto;
+}
+.script-manager-platform-args {
+  flex: 1 1 240px;
+  min-width: 180px;
+}
+@media (max-width: 768px) {
+  .script-manager-platform-row {
+    flex-wrap: wrap;
+  }
+  .script-manager-platform-label {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  .script-manager-platform-select,
+  .script-manager-platform-args {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
+.script-manager-file-row {
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.script-manager-file-row i {
+  opacity: 0.75;
+}
+.script-manager-file-edit-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.82rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 150ms ease, background 150ms ease;
+}
+.script-manager-file-edit-btn:hover {
+  color: #4aa3ff;
+  background: rgba(74, 163, 255, 0.12);
+}
+.script-manager-file-run-btn {
+  background: transparent;
+  border: none;
+  color: rgba(106, 217, 138, 0.8);
+  font-size: 0.82rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 150ms ease, background 150ms ease, opacity 150ms ease;
+}
+.script-manager-file-run-btn:hover {
+  color: #8ce6a8;
+  background: rgba(46, 204, 113, 0.12);
+}
+.script-manager-file-run-btn:disabled {
+  color: rgba(255, 255, 255, 0.35);
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.script-manager-issues {
+  display: grid;
+  gap: 6px;
+  border-radius: 10px;
+  padding: 11px 13px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.script-manager-issues.info {
+  background: rgba(74, 163, 255, 0.12);
+  border: 1px solid rgba(74, 163, 255, 0.35);
+  color: #bcd9ff;
+}
+.script-manager-issues.error {
+  background: rgba(220, 53, 69, 0.14);
+  border: 1px solid rgba(220, 53, 69, 0.4);
+  color: #ffb3bc;
+}
+.script-manager-issues ul {
+  padding-left: 18px;
+}
+/* Delete button in the Script Manager editor header */
+.script-manager-delete-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 150ms ease, background 150ms ease;
+}
+.script-manager-delete-btn:hover {
+  color: #dc3545;
+  background: rgba(220, 53, 69, 0.12);
+}
+.script-manager-folder-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 150ms ease, background 150ms ease;
+}
+.script-manager-folder-btn:hover {
+  color: #4aa3ff;
+  background: rgba(74, 163, 255, 0.12);
+}
+/* Colour swatch picker */
+.script-manager-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  flex: 0 0 30px;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+.script-manager-swatch:hover {
+  transform: scale(1.15);
+}
+.script-manager-swatch.selected {
+  border-color: #fff;
+  transform: scale(1.1);
+}
+/* Floating textarea label fix */
+.script-manager-textarea-float textarea.form-control {
+  height: auto;
+  padding-top: 1.625rem;
+  padding-bottom: 0.625rem;
+}
+.script-manager-textarea-float label {
+  top: 0;
+}
+/* Colour dot in context menu script entries */
+.context-colour-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 10px;
+  margin-right: 8px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}

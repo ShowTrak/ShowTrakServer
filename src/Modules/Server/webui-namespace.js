@@ -103,13 +103,15 @@ function SetupWebUiNamespace(io, ServerManager) {
           clients: cErr ? [] : clients.map(ToPublicClient),
           groups: gErr ? [] : (groups || []).map(ToPublicGroup),
           monitors: mErr ? [] : monitors || [],
-          scripts: scripts.map((s) => ({
-            id: s.ID,
-            name: s.Name,
-            style: s.LabelStyle,
-            weight: s.Weight || 0,
-            confirm: !!s.Confirmation,
-          })),
+          scripts: scripts
+            .filter((s) => s.isValid)
+            .map((s) => ({
+              id: s.ID,
+              name: s.Name,
+              colour: typeof s.Colour === 'number' ? s.Colour : 6,
+              weight: s.Weight || 0,
+              confirm: !!s.Confirmation,
+            })),
           config: await GetPublicConfig(socket),
         });
       } catch (e) {

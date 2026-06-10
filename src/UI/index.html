@@ -184,6 +184,15 @@
                 <button
                   type="button"
                   class="dropdown-item"
+                  id="SHOWTRAK_MODEL_CORE_SCRIPT_MANAGER_BUTTON"
+                >
+                  Script Manager
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item"
                   id="SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON"
                 >
                   OSC Dictionary
@@ -468,6 +477,161 @@
         <div class="modal-content">
           <div class="modal-body text-center">
             <div id="OSC_ROUTE_LIST" class="d-grid gap-2 text-start"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_SCRIPTMANAGER"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_SCRIPTMANAGER_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-start">
+            <!-- List view -->
+            <div id="SCRIPT_MANAGER_LIST_VIEW">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <strong class="mb-2">Script Manager</strong>
+              </div>
+              <div id="SCRIPT_MANAGER_LIST" class="d-grid gap-2"></div>
+            </div>
+
+            <!-- Editor view -->
+            <div id="SCRIPT_MANAGER_EDITOR_VIEW" class="d-none">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <button
+                  type="button"
+                  id="SCRIPT_MANAGER_BACK"
+                  class="btn btn-sm btn-ghost-light text-light border-0 ps-0"
+                >
+                  <i class="bi bi-chevron-left"></i> Back to list
+                </button>
+                <div class="d-flex gap-2">
+                  <button
+                    type="button"
+                    id="SCRIPT_MANAGER_OPEN_FOLDER"
+                    class="btn btn-sm script-manager-folder-btn"
+                    title="Open script folder"
+                  >
+                    <i class="bi bi-folder2-open"></i>
+                  </button>
+                  <button
+                    type="button"
+                    id="SCRIPT_MANAGER_DELETE"
+                    class="btn btn-sm script-manager-delete-btn"
+                    title="Delete script"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div id="SCRIPT_MANAGER_ISSUES" class="script-manager-issues d-none mb-2"></div>
+
+              <div class="d-grid gap-2">
+                <div class="form-floating bg-ghost rounded">
+                  <input
+                    type="text"
+                    id="SCRIPT_MANAGER_FIELD_ID"
+                    class="form-control bg-transparent text-light border-0"
+                    placeholder="ID"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <label for="SCRIPT_MANAGER_FIELD_ID">ID</label>
+                </div>
+
+                <div class="form-floating bg-ghost rounded">
+                  <input
+                    type="text"
+                    id="SCRIPT_MANAGER_FIELD_NAME"
+                    class="form-control bg-transparent text-light border-0"
+                    placeholder="Name"
+                    autocomplete="off"
+                  />
+                  <label for="SCRIPT_MANAGER_FIELD_NAME">Name</label>
+                </div>
+
+                <div class="form-floating bg-ghost rounded script-manager-textarea-float">
+                  <textarea
+                    id="SCRIPT_MANAGER_FIELD_DESCRIPTION"
+                    class="form-control bg-transparent text-light border-0"
+                    placeholder="Description"
+                    rows="3"
+                  ></textarea>
+                  <label for="SCRIPT_MANAGER_FIELD_DESCRIPTION">Description</label>
+                </div>
+
+                <div class="bg-ghost p-2 rounded d-grid gap-2">
+                  <span class="text-sm">Colour</span>
+                  <div id="SCRIPT_MANAGER_COLOUR_SWATCHES" class="d-flex gap-2 flex-wrap"></div>
+                </div>
+
+                <div
+                  class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center"
+                >
+                  <div class="d-grid">
+                    <span>Confirmation</span>
+                    <span class="text-sm text-muted mb-0"
+                      >Ask before running this script.</span
+                    >
+                  </div>
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      style="margin-top: 0.6em !important"
+                      type="checkbox"
+                      id="SCRIPT_MANAGER_FIELD_CONFIRM"
+                    />
+                  </div>
+                </div>
+
+                <div
+                  class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center"
+                >
+                  <div class="d-grid">
+                    <span>Enabled</span>
+                    <span class="text-sm text-muted mb-0"
+                      >Make this script available to run.</span
+                    >
+                  </div>
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      style="margin-top: 0.6em !important"
+                      type="checkbox"
+                      id="SCRIPT_MANAGER_FIELD_ENABLED"
+                    />
+                  </div>
+                </div>
+
+                <div class="bg-ghost p-2 rounded d-grid gap-2">
+                  <span class="text-sm">Platforms</span>
+                  <span class="text-sm text-muted mb-0"
+                    >Choose the file and optional arguments for each operating system.</span
+                  >
+                  <div class="d-grid gap-2" id="SCRIPT_MANAGER_PLATFORMS"></div>
+                </div>
+
+                <div class="bg-ghost p-2 rounded d-grid gap-2">
+                  <span class="text-sm">Files in this script</span>
+                  <div id="SCRIPT_MANAGER_FILE_LIST" class="d-grid gap-1"></div>
+                </div>
+              </div>
+
+              <div class="d-flex justify-content-end gap-2 mt-2">
+                <button type="button" id="SCRIPT_MANAGER_REVERT" class="btn btn-sm btn-outline-light">
+                  <i class="bi bi-arrow-clockwise"></i> Revert
+                </button>
+                <button type="button" id="SCRIPT_MANAGER_SAVE" class="btn btn-sm btn-success">
+                  <i class="bi bi-save"></i> Save
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1244,5 +1408,6 @@
     <script src="./js/app/12-monitoring-editor.js" defer></script>
     <script src="./js/app/13-alert-rules.js" defer></script>
     <script src="./js/app/14-selection-init.js" defer></script>
+    <script src="./js/app/15-script-manager.js" defer></script>
   </footer>
 </html>

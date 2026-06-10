@@ -684,10 +684,21 @@ h7 {
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
   color: #fff;
-  padding: 14px 16px;
+  padding: 14px 16px 14px 20px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
+  overflow: hidden;
+  position: relative;
+}
+.script-accent-strip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: var(--script-accent, transparent);
+  border-radius: 12px 0 0 12px;
 }
 .script-btn:active {
   background: rgba(255, 255, 255, 0.14);

@@ -128,6 +128,16 @@ const DefaultSettings = [
     DefaultValue: 5,
     OnUpdateEvent: 'AutosaveSettingsChanged',
   },
+  {
+    Group: 'System',
+    Key: 'SYSTEM_WORKSPACE_DEFAULT_EDITOR',
+    Title: 'Workspace Default Editor',
+    Description:
+      'Choose which editor is used to edit script files from Script Manager. "System Default" uses your OS default app.',
+    Type: 'OPTION',
+    DefaultValue: 'System Default',
+    Options: ['System Default', 'Visual Studio Code'],
+  },
   // Demo settings to showcase new data types
   // {
   //   Group: 'Demo',

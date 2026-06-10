@@ -653,12 +653,18 @@
       el.scriptsList.innerHTML = '<div class="scripts-empty">No scripts available.</div>';
       return;
     }
+    const COLOURS = [
+      '#e74c3c','#e67e22','#f1c40f','#2ecc71',
+      '#3498db','#9b59b6','#bdc3c7','#7f8c8d',
+    ];
     el.scriptsList.innerHTML = '';
     for (const s of list) {
+      const hex = COLOURS[s.colour] || COLOURS[6];
       const btn = document.createElement('button');
       btn.className = 'script-btn';
       btn.type = 'button';
-      btn.innerHTML = `<span class="script-name">${safe(s.name)}</span><span class="script-go"><i class="bi bi-play-fill"></i> Run</span>`;
+      btn.style.setProperty('--script-accent', hex);
+      btn.innerHTML = `<span class="script-accent-strip"></span><span class="script-name">${safe(s.name)}</span><span class="script-go"><i class="bi bi-play-fill"></i> Run</span>`;
       btn.addEventListener('click', () => {
         if (s.confirm) {
           openConfirm(`Run "${s.name}" on this client?`, () => runScript(s));

@@ -611,10 +611,14 @@ $(async function () {
     if (Selected.length > 0) {
       ScriptList = ScriptList.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
       for (const Script of ScriptList) {
+        const ColourHex = (typeof Script.Colour === 'number' && Script.Colour >= 0 && Script.Colour <= 7)
+          ? ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#3498db','#9b59b6','#bdc3c7','#7f8c8d'][Script.Colour]
+          : '#bdc3c7';
         Options.push({
           Type: 'Action',
           Title: `${Script.Name}`,
-          Class: `text-${Script.LabelStyle}`,
+          Class: '',
+          ColourHex,
           Action: async function () {
             if (Script.Confirmation) {
               let Confirmation = await ConfirmationDialog(
@@ -712,10 +716,14 @@ $(async function () {
         );
       }
       if (option.Type === 'Action') {
+        const dotHtml = option.ColourHex
+          ? `<span class="context-colour-dot" style="background:${option.ColourHex}"></span>`
+          : '';
         $menu.append(
           `<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${Safe(
             option.Class
           )}" role="menuitem" tabindex="-1">` +
+            dotHtml +
             `<span class="context-title">${Safe(option.Title)}</span>` +
             `<span class="context-shortcut">${Safe(option.Shortcut || '')}</span>` +
             `</a>`
@@ -1260,6 +1268,10 @@ async function Init() {
 
   $('#SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON').on('click', async () => {
     await OpenOSCDictionary();
+  });
+
+  $('#SHOWTRAK_MODEL_CORE_SCRIPT_MANAGER_BUTTON').on('click', async () => {
+    await OpenScriptManager();
   });
 
   $('#SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON').on('click', async () => {
