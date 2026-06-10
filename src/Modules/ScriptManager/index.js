@@ -10,6 +10,7 @@ const Logger = CreateLogger('ScriptManager');
 // const { Config } = require('../Config');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const { Manager: AppDataManager } = require('../AppData');
 const { Manager: ChecksumManager } = require('../ChecksumManager');
@@ -19,6 +20,10 @@ const { PLATFORM_KEYS, SCRIPT_COLOURS, NormalizeScriptConfig } = require('./sche
 
 // Catalog cache; populated on first GetScripts() call
 var Scripts = [];
+let ScriptDirectoryWatcher = null;
+let ScriptDirectoryWatcherPath = null;
+let ScriptDirectoryReloadTimer = null;
+let DeploymentFingerprint = '';
 
 class Script {
   constructor(ID, Config, AllFilesInFolder, CompatiblePlatforms, ValidationErrors) {
@@ -71,6 +76,100 @@ class InvalidScript {
 }
 
 const Manager = {};
+
+function NormalizeFileEntryForFingerprint(File) {
+  if (!File || typeof File !== 'object') return null;
+  return {
+    Path: String(File.Path || ''),
+    Type: String(File.Type || ''),
+    Checksum: File.Checksum ? String(File.Checksum) : null,
+  };
+}
+
+function BuildDeploymentFingerprint(ScriptList) {
+  const Normalized = (Array.isArray(ScriptList) ? ScriptList : [])
+    .map((Script) => {
+      if (!Script || typeof Script !== 'object') return null;
+      const Files = (Array.isArray(Script.Files) ? Script.Files : [])
+        .map((File) => NormalizeFileEntryForFingerprint(File))
+        .filter(Boolean)
+        .sort((A, B) => {
+          if (A.Path === B.Path) return A.Type.localeCompare(B.Type);
+          return A.Path.localeCompare(B.Path);
+        });
+
+      return {
+        ID: String(Script.ID || ''),
+        Name: String(Script.Name || ''),
+        Description: String(Script.Description || ''),
+        Colour: typeof Script.Colour === 'number' ? Script.Colour : 6,
+        Weight: typeof Script.Weight === 'number' ? Script.Weight : 0,
+        Confirmation: !!Script.Confirmation,
+        Enabled: !!Script.isEnabled,
+        Platforms: Script.Platforms || {},
+        Arguments: Script.Arguments || {},
+        isValid: Script.isValid !== false,
+        ParseError: Script.ParseError ? String(Script.ParseError) : '',
+        Files,
+      };
+    })
+    .filter(Boolean)
+    .sort((A, B) => A.ID.localeCompare(B.ID));
+
+  return crypto.createHash('sha256').update(JSON.stringify(Normalized)).digest('hex');
+}
+
+function CloseScriptDirectoryWatcher() {
+  if (!ScriptDirectoryWatcher) return;
+  try {
+    ScriptDirectoryWatcher.close();
+  } catch {}
+  ScriptDirectoryWatcher = null;
+  ScriptDirectoryWatcherPath = null;
+}
+
+function ScheduleScriptDirectoryReload() {
+  if (ScriptDirectoryReloadTimer) clearTimeout(ScriptDirectoryReloadTimer);
+  ScriptDirectoryReloadTimer = setTimeout(async () => {
+    ScriptDirectoryReloadTimer = null;
+    try {
+      await Manager.ReloadScripts();
+    } catch (Err) {
+      Logger.error('Failed to reload scripts after filesystem change:', Err);
+    }
+  }, 350);
+}
+
+function EnsureScriptDirectoryWatcher(ScriptsDirectory) {
+  if (!ScriptsDirectory || !fs.existsSync(ScriptsDirectory)) {
+    CloseScriptDirectoryWatcher();
+    return;
+  }
+  if (ScriptDirectoryWatcher && ScriptDirectoryWatcherPath === ScriptsDirectory) {
+    return;
+  }
+
+  CloseScriptDirectoryWatcher();
+
+  const RecursiveWatchSupported = process.platform === 'darwin' || process.platform === 'win32';
+
+  try {
+    ScriptDirectoryWatcher = fs.watch(
+      ScriptsDirectory,
+      { recursive: RecursiveWatchSupported },
+      (_EventType, FileName) => {
+        if (FileName && String(FileName).includes('.DS_Store')) return;
+        ScheduleScriptDirectoryReload();
+      }
+    );
+    ScriptDirectoryWatcherPath = ScriptsDirectory;
+    Logger.log(
+      `Watching scripts directory for changes: ${ScriptsDirectory} (${RecursiveWatchSupported ? 'recursive' : 'non-recursive'})`
+    );
+  } catch (Err) {
+    Logger.warn(`Unable to watch scripts directory (${ScriptsDirectory}): ${Err.message}`);
+  }
+}
 
 // Simple bounded-concurrency runner
 async function runWithConcurrency(items, limit, worker) {
@@ -195,6 +294,7 @@ Manager.GetScripts = async (Force = false) => {
   if (!Force && Scripts.length > 0) return Scripts; // Return cached catalog
   let TempScripts = [];
   const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
+  EnsureScriptDirectoryWatcher(ScriptsDirectory);
 
   Logger.log(`Loading scripts from ${ScriptsDirectory}`);
   if (!fs.existsSync(ScriptsDirectory)) {
@@ -215,6 +315,7 @@ Manager.GetScripts = async (Force = false) => {
     TempScripts.push(await LoadScriptFolder(ScriptsDirectory, ScriptFolder));
   }
   Scripts = TempScripts;
+  DeploymentFingerprint = BuildDeploymentFingerprint(Scripts);
   return Scripts;
 };
 
@@ -223,6 +324,14 @@ Manager.ReloadScripts = async () => {
   await Manager.GetScripts(true);
   BroadcastManager.emit('ScriptsUpdated');
   return Scripts;
+};
+
+Manager.GetDeploymentFingerprint = async () => {
+  if (Scripts.length === 0) await Manager.GetScripts();
+  if (!DeploymentFingerprint) {
+    DeploymentFingerprint = BuildDeploymentFingerprint(Scripts);
+  }
+  return DeploymentFingerprint;
 };
 
 // Resolve a script by folder ID; ensure catalog is loaded first

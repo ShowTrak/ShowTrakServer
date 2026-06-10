@@ -48,6 +48,7 @@ Manager.Heartbeat = async (UUID, Data, IP) => {
 
   await CachedClient.SetVersion(Data.Version || null, { markUnsaved: false });
   await CachedClient.SetIP(IP || null, { markUnsaved: false });
+  CachedClient.SetScriptsFingerprint(Data && Data.ScriptsFingerprint ? Data.ScriptsFingerprint : null);
   CachedClient.SetOnline(true);
   CachedClient.SetLastSeen(Date.now());
   CachedClient.SetVitals(Data.Vitals);

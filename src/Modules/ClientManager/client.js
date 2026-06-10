@@ -39,6 +39,7 @@ class Client {
     };
     this.USBDeviceList = [];
     this.NetworkInterfaces = [];
+    this.ScriptsFingerprint = null;
   }
 
   // RAM-only fields and notifications
@@ -89,6 +90,15 @@ class Client {
     } catch (e) {
       Logger.error('Failed to set network interfaces for', this.UUID, e);
     }
+  }
+  SetScriptsFingerprint(ScriptsFingerprint) {
+    const NextValue =
+      typeof ScriptsFingerprint === 'string' && ScriptsFingerprint.trim().length > 0
+        ? ScriptsFingerprint.trim()
+        : null;
+    if (this.ScriptsFingerprint === NextValue) return;
+    this.ScriptsFingerprint = NextValue;
+    BroadcastManager.emit('ClientUpdated', this);
   }
   async USBDeviceAdded(Device) {
     this.USBDeviceList.push(Device);

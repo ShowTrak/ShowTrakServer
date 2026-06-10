@@ -418,6 +418,167 @@ async function PromptSaveBeforeClose() {
 // Example: if (app.isPackaged && process.platform !== 'darwin') Menu.setApplicationMenu(null);
 if (app.isPackaged && process.platform !== 'darwin') Menu.setApplicationMenu(null);
 let PreloaderWindow = null;
+const ONLINE_DEPLOY_COOLDOWN_MS = 10000;
+const LastOnlineStateByUUID = new Map();
+const LastOnlineDeployAtByUUID = new Map();
+let ScriptChangeDeployTimer = null;
+const ActiveScriptDeployment = {
+  inFlight: false,
+  serverFingerprint: '',
+  targets: new Set(),
+  queuedServerFingerprint: '',
+  queuedTargets: new Set(),
+};
+
+function normalizeDeploymentTargets(TargetUUIDs) {
+  if (!Array.isArray(TargetUUIDs)) return [];
+  return [...new Set(TargetUUIDs.filter((UUID) => typeof UUID === 'string' && UUID.trim()))];
+}
+
+async function GetAllAdoptedClientUUIDs() {
+  const [Err, Clients] = await ClientManager.GetAll();
+  if (Err || !Array.isArray(Clients)) return [];
+  return normalizeDeploymentTargets(Clients.map((Client) => Client.UUID));
+}
+
+async function MarkDeploymentFailedForTargets(Targets, ErrorMessage) {
+  await ScriptExecutionManager.ClearQueue();
+  for (const UUID of Targets) {
+    const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, 'Deploying Scripts');
+    if (!RequestID) continue;
+    await ScriptExecutionManager.Complete(RequestID, ErrorMessage);
+  }
+}
+
+async function ResolveOutOfDateDeploymentTargets(TargetUUIDs) {
+  const ServerFingerprint = await ScriptManager.GetDeploymentFingerprint();
+  const OnlineOutOfDateTargets = [];
+  const OfflineOutOfDateTargets = [];
+  const UpToDateTargets = [];
+
+  for (const UUID of TargetUUIDs) {
+    const [ClientErr, Client] = await ClientManager.Get(UUID);
+    if (ClientErr || !Client) continue;
+
+    const ClientFingerprint =
+      typeof Client.ScriptsFingerprint === 'string' ? Client.ScriptsFingerprint.trim() : '';
+    const IsOutOfDate = !ClientFingerprint || ClientFingerprint !== ServerFingerprint;
+
+    if (!IsOutOfDate) {
+      UpToDateTargets.push(UUID);
+      continue;
+    }
+
+    if (!Client.Online) {
+      OfflineOutOfDateTargets.push(UUID);
+      continue;
+    }
+
+    OnlineOutOfDateTargets.push(UUID);
+  }
+
+  return {
+    serverFingerprint: ServerFingerprint,
+    onlineOutOfDateTargets: OnlineOutOfDateTargets,
+    offlineOutOfDateTargets: OfflineOutOfDateTargets,
+    upToDateTargets: UpToDateTargets,
+  };
+}
+
+async function TriggerScriptDeployment(TargetUUIDs, Reason = 'manual') {
+  const Targets = normalizeDeploymentTargets(TargetUUIDs);
+  if (Targets.length === 0) return;
+
+  const DeploymentTargetInfo = await ResolveOutOfDateDeploymentTargets(Targets);
+  const DeployTargets = DeploymentTargetInfo.onlineOutOfDateTargets;
+  if (DeployTargets.length === 0) {
+    Logger.log('Skipping script deployment; no out-of-date online clients', {
+      reason: Reason,
+      requestedTargets: Targets.length,
+      upToDateTargets: DeploymentTargetInfo.upToDateTargets.length,
+      offlineOutOfDateTargets: DeploymentTargetInfo.offlineOutOfDateTargets.length,
+    });
+    return;
+  }
+
+  const Scripts = (await ScriptManager.GetScripts()) || [];
+  const InvalidScripts = Scripts.filter((Script) => !Script || Script.isValid === false);
+
+  if (InvalidScripts.length > 0) {
+    const InvalidIDs = InvalidScripts.map((Script) => {
+      const ID = Script && Script.ID ? Script.ID : 'Unknown Script';
+      const ParseError = Script && Script.ParseError ? String(Script.ParseError) : '';
+      return ParseError ? `${ID} (${ParseError})` : ID;
+    });
+    const ReasonMessage = `Invalid command JSON (Script.json): ${InvalidIDs.join(', ')}`;
+    Logger.warn('Skipping script deployment due to invalid Script.json', {
+      reason: Reason,
+      targets: DeployTargets.length,
+      invalidScripts: InvalidIDs,
+    });
+    await MarkDeploymentFailedForTargets(DeployTargets, ReasonMessage);
+    return;
+  }
+
+  Logger.log('Triggering script deployment', {
+    reason: Reason,
+    targets: DeployTargets.length,
+    requestedTargets: Targets.length,
+    upToDateTargets: DeploymentTargetInfo.upToDateTargets.length,
+    offlineOutOfDateTargets: DeploymentTargetInfo.offlineOutOfDateTargets.length,
+    serverFingerprint: DeploymentTargetInfo.serverFingerprint,
+  });
+
+  const IsSameDeploymentSession =
+    ActiveScriptDeployment.inFlight &&
+    ActiveScriptDeployment.serverFingerprint === DeploymentTargetInfo.serverFingerprint;
+
+  if (IsSameDeploymentSession) {
+    const AdditionalTargets = DeployTargets.filter((UUID) => !ActiveScriptDeployment.targets.has(UUID));
+    if (AdditionalTargets.length === 0) {
+      Logger.log('Skipping duplicate in-flight deployment dispatch', {
+        reason: Reason,
+        targets: DeployTargets.length,
+        serverFingerprint: DeploymentTargetInfo.serverFingerprint,
+      });
+      return;
+    }
+    await ServerManager.ExecuteBulkRequest('UpdateScripts', AdditionalTargets, 'Deploying Scripts', {
+      resetQueue: false,
+    });
+    AdditionalTargets.forEach((UUID) => ActiveScriptDeployment.targets.add(UUID));
+    return;
+  }
+
+  if (ActiveScriptDeployment.inFlight) {
+    DeployTargets.forEach((UUID) => ActiveScriptDeployment.queuedTargets.add(UUID));
+    ActiveScriptDeployment.queuedServerFingerprint = DeploymentTargetInfo.serverFingerprint;
+    Logger.log('Queued deployment while another deployment is active', {
+      reason: Reason,
+      queuedTargets: ActiveScriptDeployment.queuedTargets.size,
+      queuedServerFingerprint: ActiveScriptDeployment.queuedServerFingerprint,
+      activeServerFingerprint: ActiveScriptDeployment.serverFingerprint,
+    });
+    return;
+  }
+
+  ActiveScriptDeployment.inFlight = true;
+  ActiveScriptDeployment.serverFingerprint = DeploymentTargetInfo.serverFingerprint;
+  ActiveScriptDeployment.targets = new Set(DeployTargets);
+
+  await ServerManager.ExecuteBulkRequest('UpdateScripts', DeployTargets, 'Deploying Scripts', {
+    resetQueue: true,
+  });
+}
+
+function ScheduleScriptChangeDeployment() {
+  if (ScriptChangeDeployTimer) clearTimeout(ScriptChangeDeployTimer);
+  ScriptChangeDeployTimer = setTimeout(async () => {
+    ScriptChangeDeployTimer = null;
+    const Targets = await GetAllAdoptedClientUUIDs();
+    await TriggerScriptDeployment(Targets, 'scripts-changed');
+  }, 450);
+}
 app.whenReady().then(async () => {
   if (require('electron-squirrel-startup')) return app.quit();
 
@@ -950,8 +1111,13 @@ app.whenReady().then(async () => {
   });
 
   RPC.handle('UpdateScripts', async (_Event, List) => {
-    await ServerManager.ExecuteBulkRequest('UpdateScripts', List, 'Update Scripts');
-    return;
+    try {
+      List = IPCValidation.UUIDList(List || [], 'Targets');
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    await TriggerScriptDeployment(List, 'manual-request');
+    return [null, true];
   });
 
   // Script Manager: return the catalog (including invalid scripts) for editing.
@@ -1096,6 +1262,7 @@ app.whenReady().then(async () => {
     if (CreateErr && CreateErr !== 'Client already exists') return [CreateErr, null];
     await AdoptionManager.SetState(UUID, 'Adopting');
     await ServerManager.SendMessageByGroup(UUID, 'Adopt');
+    await TriggerScriptDeployment([UUID], 'client-adopted');
     return [null, true];
   });
 
@@ -1415,8 +1582,27 @@ async function ReinitializeSystem() {
 BroadcastManager.on('ReinitializeSystem', ReinitializeSystem);
 
 async function ClientUpdated(Client) {
-  if (!MainWindow || MainWindow.isDestroyed()) return;
-  MainWindow.webContents.send('ClientUpdated', Client);
+  if (MainWindow && !MainWindow.isDestroyed()) {
+    MainWindow.webContents.send('ClientUpdated', Client);
+  }
+
+  const UUID = Client && Client.UUID ? Client.UUID : null;
+  const IsOnline = !!(Client && Client.Online);
+  if (UUID) {
+    const WasOnline = LastOnlineStateByUUID.get(UUID);
+    LastOnlineStateByUUID.set(UUID, IsOnline);
+    if (IsOnline && WasOnline !== true) {
+      const Now = Date.now();
+      const LastDeployAt = LastOnlineDeployAtByUUID.get(UUID) || 0;
+      if (Now - LastDeployAt >= ONLINE_DEPLOY_COOLDOWN_MS) {
+        LastOnlineDeployAtByUUID.set(UUID, Now);
+        TriggerScriptDeployment([UUID], 'client-online').catch((Err) =>
+          Logger.error('Auto deployment on online transition failed', Err)
+        );
+      }
+    }
+  }
+
   AlertsManager.HandleClientUpdated(Client).catch((Err) =>
     Logger.error('AlertsManager.HandleClientUpdated failed', Err)
   );
@@ -1439,8 +1625,11 @@ async function UpdateScriptList() {
 }
 
 // Re-push the script catalog whenever it is reloaded from disk (e.g. after the
-// Script Manager saves an edited Script.json).
-BroadcastManager.on('ScriptsUpdated', UpdateScriptList);
+// Script Manager saves an edited Script.json), then auto-deploy updates.
+BroadcastManager.on('ScriptsUpdated', async () => {
+  await UpdateScriptList();
+  ScheduleScriptChangeDeployment();
+});
 
 // Clients + Groups form the primary topology data model used by the UI.
 async function UpdateFullClientList() {
@@ -1489,6 +1678,32 @@ BroadcastManager.on('AdoptionListUpdated', UpdateAdoptionList);
 async function UpdateScriptExecutions(Executions) {
   if (!MainWindow || MainWindow.isDestroyed()) return;
   MainWindow.webContents.send('UpdateScriptExecutions', Executions);
+
+  const PendingScriptDeployments = (Executions || []).filter((Execution) => {
+    return (
+      Execution &&
+      Execution.Script &&
+      Execution.Script.Name === 'Deploying Scripts' &&
+      Execution.Status === 'Pending'
+    );
+  });
+
+  if (PendingScriptDeployments.length === 0) {
+    const QueuedTargets = [...ActiveScriptDeployment.queuedTargets];
+    ActiveScriptDeployment.inFlight = false;
+    ActiveScriptDeployment.serverFingerprint = '';
+    ActiveScriptDeployment.targets.clear();
+
+    ActiveScriptDeployment.queuedTargets.clear();
+    ActiveScriptDeployment.queuedServerFingerprint = '';
+
+    if (QueuedTargets.length > 0) {
+      TriggerScriptDeployment(QueuedTargets, 'queued-after-inflight').catch((Err) =>
+        Logger.error('Queued deployment trigger failed', Err)
+      );
+    }
+  }
+
   AlertsManager.HandleScriptExecutionUpdated(Executions).catch((Err) =>
     Logger.error('AlertsManager.HandleScriptExecutionUpdated failed', Err)
   );

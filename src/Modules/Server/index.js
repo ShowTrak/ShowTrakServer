@@ -12,6 +12,7 @@ const { Server: WebServer } = require('socket.io');
 const { Config } = require('../Config');
 const { Manager: AppDataManager } = require('../AppData');
 const { Manager: ScriptExecutionManager } = require('../ScriptExecutionManager');
+const { Manager: ClientManager } = require('../ClientManager');
 const express = require('express');
 
 const { Wait } = require('../Utils');
@@ -61,12 +62,32 @@ Manager.ExecuteScripts = async (ScriptID, Targets, ResetList) => {
 };
 
 // Emit an arbitrary action to many clients with a user-friendly name for the queue UI
-Manager.ExecuteBulkRequest = async (Action, Targets, ReadableName) => {
+Manager.ExecuteBulkRequest = async (Action, Targets, ReadableName, Options = {}) => {
   if (!ReadableName) ReadableName = Action;
-  await ScriptExecutionManager.ClearQueue();
+  const ResetQueue =
+    !Options || typeof Options.resetQueue === 'undefined' ? true : !!Options.resetQueue;
+  if (ResetQueue) await ScriptExecutionManager.ClearQueue();
   for (const UUID of Targets) {
     await Wait(150);
     const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, ReadableName);
+    if (!RequestID) {
+      continue;
+    }
+
+    const [ClientErr, Client] = await ClientManager.Get(UUID);
+    if (ClientErr || !Client) {
+      await ScriptExecutionManager.Complete(
+        RequestID,
+        ClientErr || 'Client not found in internal database'
+      );
+      continue;
+    }
+
+    if (!Client.Online) {
+      await ScriptExecutionManager.Complete(RequestID, 'Client is not online');
+      continue;
+    }
+
     Logger.log('ExecuteBulkRequest dispatch', { Action, ReadableName, UUID, RequestID });
     io.to(UUID).emit(Action, RequestID);
   }

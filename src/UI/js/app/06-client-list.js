@@ -62,14 +62,181 @@ window.API.UpdateScriptExecutions(async (Executions) => {
     )
   );
   const uniformScriptName = names.length === 1 ? names[0] : null;
+  let deploymentRequests = Executions.filter(
+    (Request) =>
+      Request &&
+      Request.Script &&
+      typeof Request.Script.Name === 'string' &&
+      Request.Script.Name.trim() === 'Deploying Scripts'
+  );
+  const hasFreshDeploymentData = deploymentRequests.length > 0;
+
+  let deploymentSummary = {
+    total: deploymentRequests.length,
+    successful: deploymentRequests.filter((Request) => Request.Status === 'Completed').length,
+    failed: deploymentRequests.filter((Request) => Request.Status === 'Failed'),
+  };
+  deploymentSummary.finished =
+    deploymentSummary.total > 0 &&
+    deploymentSummary.successful + deploymentSummary.failed.length === deploymentSummary.total;
+  deploymentSummary.pending =
+    deploymentSummary.total - deploymentSummary.successful - deploymentSummary.failed.length;
+  deploymentSummary.percent =
+    deploymentSummary.total > 0
+      ? Math.round(
+          ((deploymentSummary.successful + deploymentSummary.failed.length) /
+            deploymentSummary.total) *
+            100
+        )
+      : 0;
+
+  if (!window.__ShowTrakDeploymentUiState) {
+    window.__ShowTrakDeploymentUiState = {
+      summary: null,
+      requests: [],
+      holdUntil: 0,
+      hadRenderableDeployment: false,
+    };
+  }
+  const deploymentUiState = window.__ShowTrakDeploymentUiState;
+  const now = Date.now();
+
+  if (deploymentSummary.total > 0) {
+    deploymentUiState.summary = {
+      total: deploymentSummary.total,
+      successful: deploymentSummary.successful,
+      failed: deploymentSummary.failed,
+      finished: deploymentSummary.finished,
+      pending: deploymentSummary.pending,
+      percent: deploymentSummary.percent,
+    };
+    deploymentUiState.requests = deploymentRequests;
+    // Hold briefly so queue reset/reenqueue does not cause visible flicker.
+    deploymentUiState.holdUntil = deploymentSummary.finished ? now + 3200 : now + 15000;
+  } else if (
+    !hasFreshDeploymentData &&
+    deploymentUiState.summary &&
+    deploymentUiState.summary.finished === false &&
+    now < (deploymentUiState.holdUntil || 0)
+  ) {
+    deploymentSummary = deploymentUiState.summary;
+    deploymentRequests = Array.isArray(deploymentUiState.requests)
+      ? deploymentUiState.requests
+      : [];
+  }
+
+  const nonDeploymentExecutions = Executions.filter((Request) => {
+    const Name =
+      Request && Request.Script && Request.Script.Name ? String(Request.Script.Name).trim() : '';
+    return Name !== 'Deploying Scripts';
+  });
+  const hasActiveDeployment = deploymentSummary.total > 0 && !deploymentSummary.finished;
+  const hasDeploymentIssues = deploymentSummary.finished && deploymentSummary.failed.length > 0;
+  const hasDeploymentSuccess =
+    deploymentSummary.total > 0 &&
+    deploymentSummary.finished &&
+    deploymentSummary.failed.length === 0;
+  const shouldDisplayDeploymentToast =
+    hasActiveDeployment || hasDeploymentIssues || hasDeploymentSuccess;
+  const hasRenderableDeploymentToast =
+    shouldDisplayDeploymentToast && Array.isArray(deploymentRequests) && deploymentRequests.length > 0;
+
+  if (hasRenderableDeploymentToast) {
+    deploymentUiState.hadRenderableDeployment = true;
+  }
+
+  if (!window.__ShowTrakDeploymentAutoDismissTimer) {
+    window.__ShowTrakDeploymentAutoDismissTimer = null;
+  }
+
+  if (
+    deploymentSummary.total > 0 &&
+    deploymentSummary.finished &&
+    deploymentSummary.failed.length === 0 &&
+    nonDeploymentExecutions.length === 0
+  ) {
+    if (!window.__ShowTrakDeploymentAutoDismissTimer) {
+      window.__ShowTrakDeploymentAutoDismissTimer = setTimeout(() => {
+        window.__ShowTrakDeploymentAutoDismissTimer = null;
+        HideExecutionToast();
+      }, 3000);
+    }
+  } else if (window.__ShowTrakDeploymentAutoDismissTimer) {
+    clearTimeout(window.__ShowTrakDeploymentAutoDismissTimer);
+    window.__ShowTrakDeploymentAutoDismissTimer = null;
+  }
 
   // Ensure toast exists and is visible with dynamic title
-  ShowExecutionToast(uniformScriptName || 'Script Executions');
+  if (hasRenderableDeploymentToast || nonDeploymentExecutions.length > 0) {
+    const ToastTitle = hasRenderableDeploymentToast
+      ? 'Deploying Scripts'
+      : uniformScriptName || 'Script Executions';
+    ShowExecutionToast(
+      ToastTitle
+    );
+  }
+
+  // Ignore transient empty updates so we don't flash an empty deployment toast.
+  if (!hasRenderableDeploymentToast && nonDeploymentExecutions.length === 0) {
+    // Ignore empty transient updates while deployment has recently been visible.
+    if (
+      !hasFreshDeploymentData &&
+      deploymentUiState.hadRenderableDeployment &&
+      deploymentUiState.summary &&
+      now < (deploymentUiState.holdUntil || 0)
+    ) {
+      return;
+    }
+    if (!window.__ShowTrakDeploymentAutoDismissTimer) {
+      deploymentUiState.hadRenderableDeployment = false;
+      HideExecutionToast();
+    }
+    return;
+  }
 
   const $list = $('#SHOWTRAK_EXECUTION_LIST');
   if ($list.length === 0) return;
 
   let Filler = '';
+
+  if (hasRenderableDeploymentToast) {
+    const ExpandFailures = deploymentSummary.finished && deploymentSummary.failed.length > 0;
+    const FailedItems = deploymentSummary.failed
+      .map((Request) => {
+        const Name = Request && Request.Client
+          ? Request.Client.Nickname || Request.Client.Hostname || Request.Client.UUID || 'Unknown Client'
+          : 'Unknown Client';
+        const Reason = Request && Request.Error ? String(Request.Error) : 'Unknown deployment error';
+        return `<li><span class="badge bg-ghost-light text-light">${Safe(
+          Name
+        )}</span><span class="exec-deploy-fail-reason">${Safe(Reason)}</span></li>`;
+      })
+      .join('');
+
+    Filler += `
+      <div class="exec-deploy-summary ${ExpandFailures ? 'open' : ''}">
+        <div class="exec-deploy-title-row">
+          <strong>Deploying Scripts</strong>
+          <span class="badge bg-ghost-light text-light">${deploymentSummary.successful}/${deploymentSummary.total} Updated</span>
+        </div>
+        <div class="progress exec-deploy-progress">
+          <div
+            class="progress-bar ${deploymentSummary.failed.length > 0 ? 'bg-warning' : 'bg-success'}"
+            role="progressbar"
+            style="width: ${deploymentSummary.percent}%"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="${deploymentSummary.percent}"
+          ></div>
+        </div>
+        <div class="exec-deploy-meta">
+          <span>${deploymentSummary.percent}% complete</span>
+          <span>${deploymentSummary.pending} pending</span>
+          <span>${deploymentSummary.failed.length} failed</span>
+        </div>
+        ${deploymentSummary.failed.length > 0 ? `<div class="exec-deploy-failures ${ExpandFailures ? '' : 'd-none'}"><div class="exec-deploy-failures-title">Failed Clients</div><ul>${FailedItems}</ul></div>` : ''}
+      </div>`;
+  }
 
   function durationText(ms) {
     let cls = 'text-success';
@@ -78,12 +245,18 @@ window.API.UpdateScriptExecutions(async (Executions) => {
     return `<small class="exec-duration ${cls}">${Safe(ms)}ms</small>`;
   }
 
-  for (let i = 0; i < Executions.length; i++) {
-    const Request = Executions[i];
+  const renderExecutions = hasRenderableDeploymentToast
+    ? deploymentRequests
+    : nonDeploymentExecutions;
+
+  for (let i = 0; i < renderExecutions.length; i++) {
+    const Request = renderExecutions[i];
+    const rawScriptName =
+      Request && Request.Script && Request.Script.Name ? String(Request.Script.Name).trim() : '';
     const clientName = Request.Client.Nickname
       ? Safe(Request.Client.Nickname)
       : Safe(Request.Client.Hostname);
-    const scriptName = Request.Script && Request.Script.Name ? Safe(Request.Script.Name) : '';
+    const scriptName = rawScriptName ? Safe(rawScriptName) : '';
     let statusBadge = ''; // Remove visual badges; use icon instead
     let timeBadge = '';
     let actionsHtml = ''; // right-side icon area (only rendered if non-empty)
@@ -99,7 +272,7 @@ window.API.UpdateScriptExecutions(async (Executions) => {
     } else if (Request.Status === 'Failed') {
       // Passive info icon (no click behavior)
       actionsHtml = `<span class="exec-btn-icon" role="img" aria-label="Failed"><i class="bi bi-info-circle"></i></span>`;
-      if (Request.Error) {
+      if (Request.Error && rawScriptName !== 'Deploying Scripts') {
         const err = Safe(Request.Error);
         errorBlock = `<pre class="exec-error">${err}</pre>`;
       }
