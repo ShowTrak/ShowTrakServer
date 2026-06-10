@@ -132,6 +132,13 @@ Manager.GetTriggers = () => {
     { ID: TRIGGERS.CLIENT_DEGRADED, Name: 'Client Degraded' },
     { ID: TRIGGERS.CLIENT_ONLINE, Name: 'Client Online' },
     { ID: TRIGGERS.SCRIPT_EXECUTION_FAILED, Name: 'Script Execution Failed' },
+    { ID: TRIGGERS.USB_DEVICE_CONNECTED, Name: 'USB Device Connected' },
+    { ID: TRIGGERS.USB_DEVICE_DISCONNECTED, Name: 'USB Device Disconnected' },
+    { ID: TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED, Name: 'Critical USB Device Connected' },
+    {
+      ID: TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED,
+      Name: 'Critical USB Device Disconnected',
+    },
   ];
 };
 
@@ -252,6 +259,66 @@ Manager.GetActionsEnabled = () => {
 Manager.SetActionsEnabled = (Enabled) => {
   AlertActionsEnabled = !!Enabled;
   return AlertActionsEnabled;
+};
+
+Manager.HandleUSBDeviceConnected = async (Client, Device) => {
+  if (!Client || !Client.UUID) return;
+  await evaluateAgainstRules({
+    TriggerType: TRIGGERS.USB_DEVICE_CONNECTED,
+    EntityType: 'client',
+    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+    UUID: Client.UUID,
+    GroupID: Client.GroupID == null ? null : Client.GroupID,
+    IP: Client.IP || null,
+    Severity: 'info',
+    Device: Device || null,
+    RawData: Client,
+  });
+};
+
+Manager.HandleUSBDeviceDisconnected = async (Client, Device) => {
+  if (!Client || !Client.UUID) return;
+  await evaluateAgainstRules({
+    TriggerType: TRIGGERS.USB_DEVICE_DISCONNECTED,
+    EntityType: 'client',
+    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+    UUID: Client.UUID,
+    GroupID: Client.GroupID == null ? null : Client.GroupID,
+    IP: Client.IP || null,
+    Severity: 'warning',
+    Device: Device || null,
+    RawData: Client,
+  });
+};
+
+Manager.HandleCriticalUSBDeviceConnected = async (Client, Device) => {
+  if (!Client || !Client.UUID) return;
+  await evaluateAgainstRules({
+    TriggerType: TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED,
+    EntityType: 'client',
+    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+    UUID: Client.UUID,
+    GroupID: Client.GroupID == null ? null : Client.GroupID,
+    IP: Client.IP || null,
+    Severity: 'warning',
+    Device: Device || null,
+    RawData: Client,
+  });
+};
+
+Manager.HandleCriticalUSBDeviceDisconnected = async (Client, Device) => {
+  if (!Client || !Client.UUID) return;
+  await evaluateAgainstRules({
+    TriggerType: TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED,
+    EntityType: 'client',
+    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+    UUID: Client.UUID,
+    GroupID: Client.GroupID == null ? null : Client.GroupID,
+    IP: Client.IP || null,
+    Severity: 'warning',
+    Device: Device || null,
+    RawData: Client,
+  });
 };
 
 Manager.HandleClientUpdated = async (Client) => {

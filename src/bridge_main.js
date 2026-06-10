@@ -32,6 +32,8 @@ const INVOKE_CHANNELS = new Set([
   'SetSetting',
   'WakeOnLan',
   'UpdateClient',
+  'MarkClientUSBDeviceCritical',
+  'RemoveClientUSBDeviceCritical',
   'ExecuteScript',
   'UnadoptClient',
   'DeleteScripts',
@@ -88,6 +90,7 @@ const SUBSCRIBE_CHANNELS = new Set([
   'NetworkDeviceScanEvent',
   'SetFullAlertRuleList',
   'AlertTriggered',
+  'CreateShowTrakAlert',
   'ShowFileUpdated',
 ]);
 
@@ -171,6 +174,10 @@ contextBridge.exposeInMainWorld('API', {
   SetSetting: async (Key, Value) => invoke('SetSetting', Key, Value),
   WakeOnLan: async (Targets) => invoke('WakeOnLan', Targets),
   UpdateClient: async (UUID, Data) => invoke('UpdateClient', UUID, Data),
+  MarkClientUSBDeviceCritical: async (UUID, Device) =>
+    invoke('MarkClientUSBDeviceCritical', UUID, Device),
+  RemoveClientUSBDeviceCritical: async (UUID, SerialNumber) =>
+    invoke('RemoveClientUSBDeviceCritical', UUID, SerialNumber),
   ExecuteScript: async (Script, Targets, ResetList) =>
     invoke('ExecuteScript', Script, Targets, ResetList),
   UnadoptClient: async (UUID) => invoke('UnadoptClient', UUID),
@@ -216,4 +223,5 @@ contextBridge.exposeInMainWorld('API', {
   SetAlertActionsEnabled: async (Enabled) => invoke('AlertActionsEnabled:Set', Enabled),
   SetFullAlertRuleList: (Callback) => subscribe('SetFullAlertRuleList', Callback),
   AlertTriggered: (Callback) => subscribe('AlertTriggered', Callback),
+  CreateShowTrakAlert: (Callback) => subscribe('CreateShowTrakAlert', Callback),
 });

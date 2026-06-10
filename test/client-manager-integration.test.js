@@ -122,11 +122,9 @@ test('ClientManager hydrates a heartbeat from the database when uncached', async
 });
 
 test('ClientManager updates system info, USB devices, and network interfaces', async () => {
-  const { Manager, sounds } = await loadClientManager({
-    AUDIO_ON_USB_DEVICE_CONNECT: true,
-    AUDIO_ON_USB_DEVICE_DISCONNECT: true,
-  });
+  const { Manager, events } = await loadClientManager();
   await Manager.Create('dev-1');
+  await Manager.Create('dev-2');
 
   const [siErr] = await Manager.SystemInfo(
     'dev-1',
@@ -140,15 +138,46 @@ test('ClientManager updates system info, USB devices, and network interfaces', a
 
   await Manager.SetUSBDeviceList('dev-1', [{ SerialNumber: 'S1' }]);
   await Manager.USBDeviceAdded('dev-1', { SerialNumber: 'S2' });
+  await Manager.SetUSBDeviceList('dev-2', [{ SerialNumber: 'S2' }]);
   let [, withUsb] = await Manager.Get('dev-1');
   assert.equal(withUsb.USBDeviceList.length, 2);
 
+  const [markErr] = await Manager.MarkUSBDeviceCritical('dev-1', {
+    SerialNumber: 's2',
+    ManufacturerName: 'SanDisk',
+    ProductName: 'Ultra',
+  });
+  assert.equal(markErr, null);
+
+  [, withUsb] = await Manager.Get('dev-1');
+  const criticalDevice = withUsb.USBDeviceList.find((d) => d.SerialNumber === 'S2');
+  assert.equal(criticalDevice.IsCritical, true);
+
+  const [, withUsbOther] = await Manager.Get('dev-2');
+  const otherDevice = withUsbOther.USBDeviceList.find((d) => d.SerialNumber === 'S2');
+  assert.equal(otherDevice.IsCritical, false);
+
+  assert.deepEqual(await Manager.IsUSBDeviceCritical('dev-1', 'S2'), [null, true]);
+  assert.deepEqual(await Manager.IsUSBDeviceCritical('dev-2', 'S2'), [null, false]);
+
   await Manager.USBDeviceRemoved('dev-1', { SerialNumber: 'S2' });
   [, withUsb] = await Manager.Get('dev-1');
-  assert.equal(withUsb.USBDeviceList.length, 1);
+  assert.equal(withUsb.USBDeviceList.length, 2);
+  const missingCritical = withUsb.USBDeviceList.find((d) => d.SerialNumber === 'S2');
+  assert.equal(!!missingCritical, true);
+  assert.equal(missingCritical.IsConnected, false);
+  assert.equal(missingCritical.IsCritical, true);
 
-  // Connect + disconnect each trigger a sound when enabled.
-  assert.ok(sounds.length >= 2);
+  const [removeErr] = await Manager.RemoveUSBDeviceCritical('dev-1', 'S2');
+  assert.equal(removeErr, null);
+  [, withUsb] = await Manager.Get('dev-1');
+  assert.equal(withUsb.USBDeviceList.length, 1);
+  assert.equal(withUsb.USBDeviceList.some((d) => d.SerialNumber === 'S2'), false);
+
+  // Connect + disconnect each broadcast a device event (audio/alerts are handled
+  // downstream by the alerts system, not by ClientManager directly).
+  assert.ok(events.includes('USBDeviceAdded'));
+  assert.ok(events.includes('USBDeviceRemoved'));
 
   await Manager.SetNetworkInterfaces('dev-1', [
     { name: 'eth0', addresses: [{ family: 'IPv4', address: '10.0.0.7', mac: 'aa:bb' }] },

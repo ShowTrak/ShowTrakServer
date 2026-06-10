@@ -8,13 +8,19 @@ const Logger = CreateLogger('ClientManager');
 
 const { Manager: DB } = require('../DB');
 const { Manager: BroadcastManager } = require('../Broadcast');
-const { Manager: SettingsManager } = require('../SettingsManager');
 
 function getDBRunner(markUnsaved = true) {
   if (markUnsaved === false && typeof DB.RunWithoutDirtyTracking === 'function') {
     return DB.RunWithoutDirtyTracking.bind(DB);
   }
   return DB.Run.bind(DB);
+}
+
+function normalizeSerialNumber(SerialNumber) {
+  if (typeof SerialNumber !== 'string') return null;
+  const Value = SerialNumber.trim();
+  if (!Value) return null;
+  return Value.toUpperCase();
 }
 
 class Client {
@@ -37,7 +43,13 @@ class Client {
       Ram: {},
       Uptime: {},
     };
+    this.ConnectedUSBDeviceList = [];
     this.USBDeviceList = [];
+    this.CriticalUSBDevices = [];
+    this.CriticalUSBSerials = [];
+    this.MissingCriticalUSBDevices = [];
+    this.Degraded = false;
+    this.DegradedWarnings = [];
     this.NetworkInterfaces = [];
     this.ScriptsFingerprint = null;
   }
@@ -46,6 +58,7 @@ class Client {
   SetOnline(Online) {
     if (this.Online === Online) return;
     this.Online = Online;
+    this._refreshClientHealthState();
     Logger.debug(`Client ${this.UUID} Online updated to ${Online}`);
     BroadcastManager.emit('ClientUpdated', this);
     return;
@@ -62,9 +75,137 @@ class Client {
     BroadcastManager.emit('ClientUpdated', this);
   }
   SetUSBDeviceList(USBDeviceList) {
-    this.USBDeviceList = USBDeviceList;
+    this.ConnectedUSBDeviceList = Array.isArray(USBDeviceList) ? USBDeviceList : [];
+    this._rebuildUSBDeviceView();
     Logger.debug(`Client ${this.UUID} USB Device List updated`);
+    BroadcastManager.emit('ClientUpdated', this);
     return;
+  }
+  SetCriticalUSBDevices(Devices) {
+    if (!Array.isArray(Devices)) Devices = [];
+    const Normalized = [];
+    const Seen = new Set();
+    for (const Entry of Devices) {
+      const SerialNumber = normalizeSerialNumber(Entry && Entry.SerialNumber);
+      if (!SerialNumber || Seen.has(SerialNumber)) continue;
+      Seen.add(SerialNumber);
+      Normalized.push({
+        SerialNumber,
+        ManufacturerName: Entry && Entry.ManufacturerName ? String(Entry.ManufacturerName) : null,
+        ProductName: Entry && Entry.ProductName ? String(Entry.ProductName) : null,
+        Timestamp: Entry && Entry.Timestamp ? Entry.Timestamp : null,
+      });
+    }
+    this.CriticalUSBDevices = Normalized;
+    this.CriticalUSBSerials = Normalized.map((Entry) => Entry.SerialNumber);
+    this._rebuildUSBDeviceView();
+    return;
+  }
+  IsUSBDeviceCritical(SerialNumber) {
+    const Normalized = normalizeSerialNumber(SerialNumber);
+    if (!Normalized) return false;
+    return this.CriticalUSBSerials.includes(Normalized);
+  }
+  MarkCriticalUSBDevice(Device) {
+    const SerialNumber = Device && Device.SerialNumber;
+    const Normalized = normalizeSerialNumber(SerialNumber);
+    if (!Normalized) return false;
+    const Existing = this.CriticalUSBDevices.find((Entry) => Entry.SerialNumber === Normalized);
+    if (Existing) {
+      if (!Existing.ManufacturerName && Device && Device.ManufacturerName) {
+        Existing.ManufacturerName = String(Device.ManufacturerName);
+      }
+      if (!Existing.ProductName && Device && Device.ProductName) {
+        Existing.ProductName = String(Device.ProductName);
+      }
+      if (!Existing.Timestamp && Device && Device.Timestamp) {
+        Existing.Timestamp = Device.Timestamp;
+      }
+      this._rebuildUSBDeviceView();
+      return false;
+    }
+
+    this.CriticalUSBDevices.push({
+      SerialNumber: Normalized,
+      ManufacturerName: Device && Device.ManufacturerName ? String(Device.ManufacturerName) : null,
+      ProductName: Device && Device.ProductName ? String(Device.ProductName) : null,
+      Timestamp: Device && Device.Timestamp ? Device.Timestamp : null,
+    });
+    this.CriticalUSBSerials = this.CriticalUSBDevices.map((Entry) => Entry.SerialNumber);
+    this._rebuildUSBDeviceView();
+    return true;
+  }
+  UnmarkCriticalUSBSerial(SerialNumber) {
+    const Normalized = normalizeSerialNumber(SerialNumber);
+    if (!Normalized) return false;
+    const PrevLength = this.CriticalUSBDevices.length;
+    this.CriticalUSBDevices = this.CriticalUSBDevices.filter(
+      (Entry) => Entry.SerialNumber !== Normalized
+    );
+    if (this.CriticalUSBDevices.length === PrevLength) return false;
+    this.CriticalUSBSerials = this.CriticalUSBDevices.map((Entry) => Entry.SerialNumber);
+    this._rebuildUSBDeviceView();
+    return true;
+  }
+  _refreshClientHealthState() {
+    const MissingCount = Array.isArray(this.MissingCriticalUSBDevices)
+      ? this.MissingCriticalUSBDevices.length
+      : 0;
+    this.Degraded = !!this.Online && MissingCount > 0;
+    this.DegradedWarnings = this.Degraded ? ['Missing USB Device'] : [];
+  }
+  _rebuildUSBDeviceView() {
+    const CriticalBySerial = new Map(
+      (Array.isArray(this.CriticalUSBDevices) ? this.CriticalUSBDevices : [])
+        .map((Entry) => {
+          const SerialNumber = normalizeSerialNumber(Entry && Entry.SerialNumber);
+          if (!SerialNumber) return null;
+          return [SerialNumber, Entry];
+        })
+        .filter((Entry) => !!Entry)
+    );
+
+    const Connected = (Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : []).map(
+      (Device) => {
+        const SerialNumber = normalizeSerialNumber(Device && Device.SerialNumber);
+        const CriticalEntry = SerialNumber ? CriticalBySerial.get(SerialNumber) : null;
+        return {
+          ...(Device || {}),
+          SerialNumber: Device && Device.SerialNumber ? String(Device.SerialNumber) : null,
+          IsConnected: true,
+          IsCritical: !!CriticalEntry,
+          Missing: false,
+          ManufacturerName:
+            (Device && Device.ManufacturerName) ||
+            (CriticalEntry && CriticalEntry.ManufacturerName) ||
+            null,
+          ProductName:
+            (Device && Device.ProductName) || (CriticalEntry && CriticalEntry.ProductName) || null,
+        };
+      }
+    );
+
+    const ConnectedSerials = new Set(
+      Connected.map((Device) => normalizeSerialNumber(Device && Device.SerialNumber)).filter(Boolean)
+    );
+
+    const Missing = [];
+    for (const Entry of this.CriticalUSBDevices) {
+      if (!Entry || !Entry.SerialNumber) continue;
+      if (ConnectedSerials.has(Entry.SerialNumber)) continue;
+      Missing.push({
+        ManufacturerName: Entry.ManufacturerName,
+        ProductName: Entry.ProductName,
+        SerialNumber: Entry.SerialNumber,
+        IsConnected: false,
+        IsCritical: true,
+        Missing: true,
+      });
+    }
+
+    this.MissingCriticalUSBDevices = Missing;
+    this.USBDeviceList = Connected.concat(Missing);
+    this._refreshClientHealthState();
   }
   SetNetworkInterfaces(Interfaces) {
     try {
@@ -101,23 +242,26 @@ class Client {
     BroadcastManager.emit('ClientUpdated', this);
   }
   async USBDeviceAdded(Device) {
-    this.USBDeviceList.push(Device);
+    const AddedSerial = normalizeSerialNumber(Device && Device.SerialNumber);
+    this.ConnectedUSBDeviceList = (Array.isArray(this.ConnectedUSBDeviceList)
+      ? this.ConnectedUSBDeviceList
+      : []
+    ).filter((Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) !== AddedSerial);
+    this.ConnectedUSBDeviceList.push(Device || {});
+    this._rebuildUSBDeviceView();
+    BroadcastManager.emit('ClientUpdated', this);
     BroadcastManager.emit('USBDeviceAdded', this, Device);
-    let AUDIO_ON_USB_DEVICE_CONNECT = await SettingsManager.GetValue('AUDIO_ON_USB_DEVICE_CONNECT');
-    if (AUDIO_ON_USB_DEVICE_CONNECT) {
-      BroadcastManager.emit('PlaySound', 'Notification');
-    }
     return;
   }
   async USBDeviceRemoved(Device) {
-    this.USBDeviceList = this.USBDeviceList.filter((d) => d.SerialNumber !== Device.SerialNumber);
+    const RemovedSerial = normalizeSerialNumber(Device && Device.SerialNumber);
+    this.ConnectedUSBDeviceList = (Array.isArray(this.ConnectedUSBDeviceList)
+      ? this.ConnectedUSBDeviceList
+      : []
+    ).filter((Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) !== RemovedSerial);
+    this._rebuildUSBDeviceView();
+    BroadcastManager.emit('ClientUpdated', this);
     BroadcastManager.emit('USBDeviceRemoved', this, Device);
-    let AUDIO_ON_USB_DEVICE_CONNECT = await SettingsManager.GetValue(
-      'AUDIO_ON_USB_DEVICE_DISCONNECT'
-    );
-    if (AUDIO_ON_USB_DEVICE_CONNECT) {
-      BroadcastManager.emit('PlaySound', 'Warning');
-    }
     return;
   }
 

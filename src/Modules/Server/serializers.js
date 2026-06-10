@@ -13,6 +13,13 @@ const ToPublicClient = (c) => ({
   LastSeen: c.LastSeen,
   Vitals: c.Vitals,
   USBDeviceList: Array.isArray(c.USBDeviceList) ? c.USBDeviceList : [],
+  CriticalUSBDevices: Array.isArray(c.CriticalUSBDevices) ? c.CriticalUSBDevices : [],
+  CriticalUSBSerials: Array.isArray(c.CriticalUSBSerials) ? c.CriticalUSBSerials : [],
+  MissingCriticalUSBDevices: Array.isArray(c.MissingCriticalUSBDevices)
+    ? c.MissingCriticalUSBDevices
+    : [],
+  Degraded: !!c.Degraded,
+  DegradedWarnings: Array.isArray(c.DegradedWarnings) ? c.DegradedWarnings : [],
   NetworkInterfaces: Array.isArray(c.NetworkInterfaces) ? c.NetworkInterfaces : [],
 });
 

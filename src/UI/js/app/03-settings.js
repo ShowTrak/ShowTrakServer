@@ -74,6 +74,10 @@ window.API.PlaySound(async (SoundName) => {
   sound.play();
 });
 
+function PreviewSound(SoundName) {
+  const sound = Sounds[SoundName] || Sounds.Notification;
+  sound.play();
+}
 window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
   Settings = NewSettings;
   SettingsGroups = NewSettingsGroups;

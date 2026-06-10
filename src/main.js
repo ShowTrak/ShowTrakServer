@@ -878,6 +878,30 @@ app.whenReady().then(async () => {
     return [null, Result];
   });
 
+  RPC.handle('MarkClientUSBDeviceCritical', async (_Event, UUID, Device) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+      Device = IPCValidation.CriticalUSBDevicePayload(Device);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Result] = await ClientManager.MarkUSBDeviceCritical(UUID, Device);
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
+  RPC.handle('RemoveClientUSBDeviceCritical', async (_Event, UUID, SerialNumber) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+      SerialNumber = IPCValidation.USBSerialNumber(SerialNumber);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Result] = await ClientManager.RemoveUSBDeviceCritical(UUID, SerialNumber);
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
   // ---- Monitoring Targets ----
   RPC.handle('GetMonitoringMethods', async () => {
     return MonitoringMethods.GetAll();
@@ -1524,6 +1548,20 @@ async function USBDeviceAdded(Client, Device) {
     `USB Device Added to ${Client.UUID} (${Device.ManufacturerName} ${Device.ProductName})`
   );
   MainWindow.webContents.send('USBDeviceAdded', Client, Device);
+  AlertsManager.HandleUSBDeviceConnected(Client, Device).catch((Err) =>
+    Logger.error('AlertsManager.HandleUSBDeviceConnected failed', Err)
+  );
+  const [criticalErr, isCritical] = await ClientManager.IsUSBDeviceCritical(
+    Client.UUID,
+    Device && Device.SerialNumber
+  );
+  if (criticalErr) {
+    Logger.error('ClientManager.IsUSBDeviceCritical failed', criticalErr);
+  } else if (isCritical) {
+    AlertsManager.HandleCriticalUSBDeviceConnected(Client, Device).catch((Err) =>
+      Logger.error('AlertsManager.HandleCriticalUSBDeviceConnected failed', Err)
+    );
+  }
   return;
 }
 
@@ -1535,6 +1573,20 @@ async function USBDeviceRemoved(Client, Device) {
     `USB Device Removed from ${Client.UUID} (${Device.ManufacturerName} ${Device.ProductName})`
   );
   MainWindow.webContents.send('USBDeviceRemoved', Client, Device);
+  AlertsManager.HandleUSBDeviceDisconnected(Client, Device).catch((Err) =>
+    Logger.error('AlertsManager.HandleUSBDeviceDisconnected failed', Err)
+  );
+  const [criticalErr, isCritical] = await ClientManager.IsUSBDeviceCritical(
+    Client.UUID,
+    Device && Device.SerialNumber
+  );
+  if (criticalErr) {
+    Logger.error('ClientManager.IsUSBDeviceCritical failed', criticalErr);
+  } else if (isCritical) {
+    AlertsManager.HandleCriticalUSBDeviceDisconnected(Client, Device).catch((Err) =>
+      Logger.error('AlertsManager.HandleCriticalUSBDeviceDisconnected failed', Err)
+    );
+  }
   return;
 }
 
@@ -1724,6 +1776,13 @@ async function AlertTriggered(Payload) {
   MainWindow.webContents.send('AlertTriggered', Payload);
 }
 BroadcastManager.on('AlertTriggered', AlertTriggered);
+
+// Raises an alert in the renderer alerts tray (driven by the ShowTrak Alert action).
+async function CreateShowTrakAlert(Payload) {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  MainWindow.webContents.send('CreateShowTrakAlert', Payload);
+}
+BroadcastManager.on('CreateShowTrakAlert', CreateShowTrakAlert);
 
 // Thin wrapper to surface system notifications in the renderer.
 async function Notify(Message, Type = 'info', Duration = 5000) {

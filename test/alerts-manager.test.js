@@ -83,6 +83,8 @@ test('AlertsManager supports CRUD and action type metadata', async () => {
 
   const triggers = Manager.GetTriggers();
   assert.ok(triggers.some((t) => t.ID === 'CLIENT_OFFLINE'));
+  assert.ok(triggers.some((t) => t.ID === 'CRITICAL_USB_DEVICE_CONNECTED'));
+  assert.ok(triggers.some((t) => t.ID === 'CRITICAL_USB_DEVICE_DISCONNECTED'));
 
   const actionTypes = Manager.GetActionTypes();
   assert.deepEqual(actionTypes, [{ ID: 'http-api', Name: 'HTTP API' }]);
@@ -129,6 +131,17 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
       TriggerType: 'SCRIPT_EXECUTION_FAILED',
       TriggerConfig: JSON.stringify({}),
       Actions: JSON.stringify([{ Type: 'osc-trigger', Settings: {} }]),
+      Enabled: 1,
+      Timestamp: 1,
+      UpdatedAt: 1,
+    },
+    {
+      RuleID: 4,
+      Title: 'Critical USB Connected',
+      Scope: JSON.stringify({ Workspace: true, Groups: [], Clients: [] }),
+      TriggerType: 'CRITICAL_USB_DEVICE_CONNECTED',
+      TriggerConfig: JSON.stringify({}),
+      Actions: JSON.stringify([{ Type: 'http-api', Settings: { Route: '/critical-usb' } }]),
       Enabled: 1,
       Timestamp: 1,
       UpdatedAt: 1,
@@ -204,7 +217,21 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
     },
   ]);
 
-  assert.equal(executeCalls.length, 3);
+  await Manager.HandleCriticalUSBDeviceConnected(
+    {
+      UUID: 'client-3',
+      Nickname: 'Cabinet 3',
+      GroupID: 7,
+      IP: '10.0.0.10',
+    },
+    {
+      ManufacturerName: 'SanDisk',
+      ProductName: 'Ultra',
+      SerialNumber: 'S2',
+    }
+  );
+
+  assert.equal(executeCalls.length, 4);
   assert.ok(executeCalls.some((c) => c.action.Type === 'http-api'));
   assert.ok(executeCalls.some((c) => c.action.Type === 'discord-webhook'));
   assert.ok(executeCalls.some((c) => c.action.Type === 'osc-trigger'));
@@ -212,13 +239,16 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
   const historyWrites = untrackedRunCalls.filter(([sql]) =>
     sql.includes('INSERT INTO AlertHistory')
   );
-  assert.equal(historyWrites.length, 3);
+  assert.equal(historyWrites.length, 4);
 
   const triggeredEvents = events.filter(([event]) => event === 'AlertTriggered');
-  assert.equal(triggeredEvents.length, 3);
+  assert.equal(triggeredEvents.length, 4);
   assert.ok(triggeredEvents.some(([, payload]) => payload.TriggerType === 'CLIENT_OFFLINE'));
   assert.ok(triggeredEvents.some(([, payload]) => payload.TriggerType === 'CLIENT_DEGRADED'));
   assert.ok(
     triggeredEvents.some(([, payload]) => payload.TriggerType === 'SCRIPT_EXECUTION_FAILED')
+  );
+  assert.ok(
+    triggeredEvents.some(([, payload]) => payload.TriggerType === 'CRITICAL_USB_DEVICE_CONNECTED')
   );
 });

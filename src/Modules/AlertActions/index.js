@@ -2,6 +2,8 @@ const { CreateLogger } = require('../Logger');
 const Logger = CreateLogger('AlertActions');
 
 const ActionModules = [
+  require('./showtrak-alert'),
+  require('./play-sound'),
   require('./osc-trigger'),
   require('./http-api'),
   require('./discord-webhook'),

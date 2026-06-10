@@ -36,36 +36,27 @@ window.API.SetOSCList(async (Routes) => {
 });
 
 window.API.ClientUpdated(async (Data) => {
-  // Online/offline transition alerts
+  // Online transition handling: auto-dismiss any pending offline alerts when a
+  // client comes back online. Offline transitions intentionally do not raise a
+  // UI notification.
   try {
     if (!window.__CLIENT_ONLINE_STATE) window.__CLIENT_ONLINE_STATE = new Map();
     const prev = window.__CLIENT_ONLINE_STATE.get(Data.UUID);
-    if (typeof prev === 'boolean' && prev !== Data.Online) {
-      if (!Data.Online) {
-        AddAlert({
-          type: 'offline',
-          severity: 'warning',
-          title: 'Client offline',
-          message: Safe(Data.Nickname || Data.Hostname),
-          clientUUID: Data.UUID,
-        });
-      } else {
-        // Came back online: auto-dismiss any pending offline alerts for this client
-        try {
-          let changed = false;
-          for (const a of Alerts) {
-            if (!a.dismissed && a.type === 'offline' && a.clientUUID === Data.UUID) {
-              a.dismissed = true;
-              changed = true;
-            }
+    if (typeof prev === 'boolean' && prev !== Data.Online && Data.Online) {
+      try {
+        let changed = false;
+        for (const a of Alerts) {
+          if (!a.dismissed && a.type === 'offline' && a.clientUUID === Data.UUID) {
+            a.dismissed = true;
+            changed = true;
           }
-          if (changed) {
-            UpdateAlertsIndicator();
-            if (AlertsVisible) RenderAlerts();
-          }
-        } catch (err) {
-          HandleNonFatalError('ClientUpdated:DismissOfflineAlert', err);
         }
+        if (changed) {
+          UpdateAlertsIndicator();
+          if (AlertsVisible) RenderAlerts();
+        }
+      } catch (err) {
+        HandleNonFatalError('ClientUpdated:DismissOfflineAlert', err);
       }
     }
     window.__CLIENT_ONLINE_STATE.set(Data.UUID, !!Data.Online);
@@ -73,7 +64,17 @@ window.API.ClientUpdated(async (Data) => {
     HandleNonFatalError('ClientUpdated:TransitionAlerts', err);
   }
   const { UUID, Nickname, Hostname, Version, IP, Online, Vitals } = Data;
-  $(`[data-uuid='${UUID}']`).toggleClass('ONLINE', Online);
+  const Degraded = !!Data.Degraded;
+  const DegradedWarning =
+    Array.isArray(Data.DegradedWarnings) && Data.DegradedWarnings.length
+      ? String(Data.DegradedWarnings[0])
+      : 'Missing USB Device';
+
+  $(`[data-uuid='${UUID}']`).toggleClass('ONLINE', Online && !Degraded);
+  $(`[data-uuid='${UUID}']`).toggleClass('DEGRADED', Degraded);
+  $(`[data-uuid='${UUID}']>[data-type='INDICATOR_DEGRADED']>[data-type='DEGRADED_WARNING']`).text(
+    DegradedWarning
+  );
 
   let ComputedHostname = Nickname && Nickname.length ? `${Hostname} - v${Version}` : 'v' + Version;
   if ($(`[data-uuid='${UUID}']>[data-type="Hostname"]`).text() !== ComputedHostname) {
@@ -109,6 +110,23 @@ window.API.ClientUpdated(async (Data) => {
     $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).removeClass(
       'd-none'
     );
+
+    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_DEGRADED"]`).toggleClass(
+      'd-grid',
+      Degraded
+    );
+    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_DEGRADED"]`).toggleClass(
+      'd-none',
+      !Degraded
+    );
+    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).toggleClass(
+      'd-none',
+      Degraded
+    );
+    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).toggleClass(
+      'd-grid',
+      !Degraded
+    );
   } else {
     $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]`).addClass(
       'd-grid'
@@ -118,6 +136,12 @@ window.API.ClientUpdated(async (Data) => {
     );
     $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).addClass('d-none');
     $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).removeClass(
+      'd-grid'
+    );
+    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_DEGRADED"]`).addClass(
+      'd-none'
+    );
+    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_DEGRADED"]`).removeClass(
       'd-grid'
     );
   }
@@ -177,17 +201,13 @@ window.API.SetFullAlertRuleList(async (List) => {
   RenderAlertRuleManagerList();
 });
 
-window.API.AlertTriggered(async (Event) => {
-  if (!Event || !Event.Context) return;
-  const Ctx = Event.Context;
-  const TriggerLabel = String(Event.TriggerType || '')
-    .replace(/_/g, ' ')
-    .toLowerCase();
+window.API.CreateShowTrakAlert(async (Payload) => {
+  if (!Payload) return;
   AddAlert({
     type: 'warning',
-    severity: Ctx.Severity || 'warning',
-    title: Event.RuleTitle || `Alert (${TriggerLabel})`,
-    message: Ctx.Description || `${Ctx.EntityName || 'Unknown'} (${TriggerLabel})`,
-    clientUUID: Ctx.UUID || null,
+    severity: Payload.Severity || 'info',
+    title: Payload.Title || 'ShowTrak Alert',
+    message: Payload.Message || '',
+    clientUUID: Payload.UUID || null,
   });
 });

@@ -190,6 +190,30 @@ function RenderAlertActionSettingsFields(ActionTypeID, ExistingSettings = {}) {
           <label>${Safe(Field.Label || Key)}</label>
         </div>
       `;
+    } else if (Type === 'select') {
+      const Options = Array.isArray(Field.Options) ? Field.Options : [];
+      const OptionsHtml = Options.map((Option) => {
+        const OptionValue = Option && typeof Option === 'object' ? Option.Value : Option;
+        const OptionLabel =
+          Option && typeof Option === 'object' ? Option.Label || Option.Value : Option;
+        const Selected = String(OptionValue) === String(Value) ? 'selected' : '';
+        return `<option value="${Safe(String(OptionValue))}" ${Selected}>${Safe(String(OptionLabel))}</option>`;
+      }).join('');
+      const PreviewButton =
+        Field.Preview === 'sound'
+            ? `<button type="button" class="btn bg-ghost text-white" data-sound-preview title="Preview sound">
+              <i class="bi bi-play-fill"></i> Preview
+            </button>`
+          : '';
+      Html += `
+        <div class="d-flex gap-2 align-items-stretch">
+          <div class="form-floating flex-grow-1">
+            <select class="form-select" data-key="${Safe(Key)}" data-type="select">${OptionsHtml}</select>
+            <label>${Safe(Field.Label || Key)}</label>
+          </div>
+          ${PreviewButton}
+        </div>
+      `;
     } else {
       Html += `
         <div class="form-floating">
@@ -421,6 +445,10 @@ function triggerSummaryText(TriggerType) {
   if (TriggerType === 'CLIENT_OFFLINE') return 'is offline';
   if (TriggerType === 'CLIENT_ONLINE') return 'is online';
   if (TriggerType === 'SCRIPT_EXECUTION_FAILED') return 'fails to execute a script';
+  if (TriggerType === 'USB_DEVICE_CONNECTED') return 'has a USB device connected';
+  if (TriggerType === 'USB_DEVICE_DISCONNECTED') return 'has a USB device disconnected';
+    if (TriggerType === 'CRITICAL_USB_DEVICE_CONNECTED') return 'has a critical USB device connected';
+    if (TriggerType === 'CRITICAL_USB_DEVICE_DISCONNECTED') return 'has a critical USB device disconnected';
   return 'triggers';
 }
 
@@ -433,6 +461,12 @@ function summarizeActionType(Type, Count) {
   }
   if (Type === 'http-api') {
     return Count > 1 ? `send ${Count} HTTP requests` : 'send an HTTP request';
+  }
+  if (Type === 'play-sound') {
+    return Count > 1 ? `play ${Count} alert sounds` : 'play an alert sound';
+  }
+  if (Type === 'showtrak-alert') {
+    return Count > 1 ? `create ${Count} ShowTrak alerts` : 'create a ShowTrak alert';
   }
   const Name = actionTypeNameByID(Type);
   return Count > 1 ? `run ${Count} ${Name} actions` : `run ${Name}`;
@@ -620,6 +654,16 @@ async function OpenAlertRuleManager() {
           ? AlertRuleDraftActions[AlertEditingActionIndex].Settings || {}
           : {};
       $('#ALERT_ACTION_EDITOR_SETTINGS').html(RenderAlertActionSettingsFields(TypeID, Existing));
+    });
+
+  $('#ALERT_ACTION_EDITOR_SETTINGS')
+    .off('click.alertSoundPreview')
+    .on('click.alertSoundPreview', '[data-sound-preview]', function (Event) {
+      Event.preventDefault();
+      const SoundName = (
+        $('#ALERT_ACTION_EDITOR_SETTINGS [data-key="Sound"]').val() || 'Notification'
+      ).toString();
+      if (typeof PreviewSound === 'function') PreviewSound(SoundName);
     });
 
   $('#ALERT_ACTION_EDITOR_CLOSE')

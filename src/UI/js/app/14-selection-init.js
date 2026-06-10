@@ -1407,9 +1407,45 @@ async function OpenClientInfo(UUID) {
   }
   $('#CLIENT_INFO_UUID').val(UUID);
   $('#CLIENT_INFO_VERSION').val(Version || '');
-  $('#CLIENT_INFO_STATUS').val(Online ? 'Online' : 'Offline');
+  $('#CLIENT_INFO_STATUS').val(Online ? (Client.Degraded ? 'Degraded' : 'Online') : 'Offline');
 
   RenderClientInfoDetails(Client);
+
+  $('#SHOWTRAK_CLIENT_INFO_USB_DEVICES')
+    .off('click.critical-usb-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_USB')
+    .on('click.critical-usb-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_USB', async function () {
+      try {
+        const IsUnavailable = String($(this).attr('data-unavailable') || '0') === '1';
+        if (IsUnavailable) return;
+        const SerialToken = ($(this).attr('data-serial') || '').toString();
+        const SerialNumber = decodeURIComponent(SerialToken);
+        const IsCritical = String($(this).attr('data-critical') || '0') === '1';
+        if (!ClientInfoOpenUUID || !SerialNumber) return;
+
+        const [Err] = IsCritical
+          ? await window.API.RemoveClientUSBDeviceCritical(ClientInfoOpenUUID, SerialNumber)
+          : await window.API.MarkClientUSBDeviceCritical(ClientInfoOpenUUID, {
+              SerialNumber,
+            });
+        if (Err) return Notify(String(Err), 'error');
+
+        await Notify(
+          IsCritical ? 'Critical USB status removed' : 'USB device marked as critical',
+          'success',
+          1400
+        );
+
+        const Fresh = await window.API.GetClient(ClientInfoOpenUUID);
+        if (Fresh) {
+          $('#CLIENT_INFO_STATUS').val(
+            Fresh.Online ? (Fresh.Degraded ? 'Degraded' : 'Online') : 'Offline'
+          );
+          RenderClientInfoDetails(Fresh);
+        }
+      } catch (err) {
+        HandleNonFatalError('OpenClientInfo:ToggleCriticalUSB', err);
+      }
+    });
 
   // mark modal as open for this UUID and clear when hidden
   ClientInfoOpenUUID = UUID;
@@ -1422,6 +1458,17 @@ async function OpenClientInfo(UUID) {
         ClientInfoRefreshTimer = null;
       }
       __clientInfoRefreshInFlight = false;
+      
+      // Dispose all popovers to prevent stuck state
+      try {
+        const popovers = document.querySelectorAll('[data-bs-toggle="popover"]');
+        for (const el of popovers) {
+          const instance = bootstrap.Popover.getInstance(el);
+          if (instance) instance.dispose();
+        }
+      } catch (e) {
+        // ignore popover cleanup errors
+      }
     });
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
@@ -1453,6 +1500,14 @@ async function OpenClientInfo(UUID) {
 }
 
 function RenderClientInfoDetails(Client) {
+  try {
+    $('#CLIENT_INFO_STATUS').val(
+      Client && Client.Online ? (Client.Degraded ? 'Degraded' : 'Online') : 'Offline'
+    );
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
+
   // Vitals (CPU/RAM) progress bars
   try {
     const rawCpu = Client && Client.Vitals ? Client.Vitals.CPU?.UsagePercentage : 0;
@@ -1497,30 +1552,110 @@ function RenderClientInfoDetails(Client) {
   // USB devices
   try {
     const $usbList = $('#SHOWTRAK_CLIENT_INFO_USB_DEVICES');
-    $usbList.html('');
     const list = Array.isArray(Client.USBDeviceList) ? Client.USBDeviceList : [];
-    if (list.length > 0) {
-      for (const dev of list) {
-        const ManufacturerName = dev.ManufacturerName;
-        const ProductName = dev.ProductName;
-        const SerialNumber = dev.SerialNumber;
-        $usbList.append(`
-          <div class="rounded-3 p-2 bg-ghost">
-            <h6 class="mb-0">${ManufacturerName ? Safe(ManufacturerName) : 'Generic'} ${
-              ProductName ? Safe(ProductName) : 'USB Device'
-            }</h6>
-            <small class="text-light">Serial Number: ${
-              SerialNumber ? Safe(SerialNumber) : 'Unavailable'
-            }</small>
-          </div>
-        `);
+    const clientKey = Client && Client.UUID ? String(Client.UUID) : '';
+    const renderKey = `${clientKey}::${list
+      .map((d) => `${d.SerialNumber || ''}|${d.IsCritical ? '1' : '0'}|${d.IsConnected === false ? '0' : '1'}`)
+      .join(';;')}`;
+    const previousRenderKey = $usbList.attr('data-render-key') || '';
+
+    if (previousRenderKey !== renderKey) {
+      // Dispose old popovers before replacing USB rows to avoid dangling tooltips.
+      try {
+        $usbList.find('.SHOWTRAK_TOGGLE_CRITICAL_USB[data-bs-toggle="popover"]').each(function () {
+          const instance = bootstrap.Popover.getInstance(this);
+          if (instance) instance.dispose();
+        });
+      } catch (e) {
+        // Best effort cleanup only.
       }
-    } else {
-      $usbList.html(`
-        <div class="rounded-3 p-2 bg-ghost">
-          <h6 class="mb-0">No USB Devices Connected</h6>
-          <p class="text-sm mb-0">Devices that do not comply with WebUSB 1.3 cannot be displayed.</p>
-        </div>`);
+
+      if (list.length === 0) {
+        $usbList.html(`
+          <div class="rounded-3 p-2 bg-ghost">
+            <h6 class="mb-0">No USB Devices Connected</h6>
+            <p class="text-sm mb-0">Devices that do not comply with WebUSB 1.3 cannot be displayed.</p>
+          </div>`);
+      } else {
+        $usbList.html('');
+        for (const dev of list) {
+          const ManufacturerName = dev.ManufacturerName;
+          const ProductName = dev.ProductName;
+          const SerialNumber = dev.SerialNumber;
+          const IsCritical = !!dev.IsCritical;
+          const IsConnected = dev.IsConnected !== false;
+          const HasSerial = typeof SerialNumber === 'string' && SerialNumber.trim().length > 0;
+          const SerialToken = HasSerial ? encodeURIComponent(SerialNumber.trim()) : '';
+          $usbList.append(`
+            <div class="rounded-3 p-2 bg-ghost SHOWTRAK_CLIENT_USB_DEVICE_CARD">
+              <div class="d-flex align-items-center gap-2">
+                <h6 class="mb-0">${ManufacturerName ? Safe(ManufacturerName) : 'Generic'} ${
+                  ProductName ? Safe(ProductName) : 'USB Device'
+                }</h6>
+              </div>
+              <small class="text-light d-block mb-0 text-start">${
+                HasSerial ? Safe(SerialNumber) : 'Unavailable'
+              }</small>
+              <button
+                type="button"
+                class="SHOWTRAK_TOGGLE_CRITICAL_USB ${IsCritical ? 'is-critical' : ''} ${
+                  IsCritical && !IsConnected ? 'is-disconnected-critical' : ''
+                } ${
+                  HasSerial ? '' : 'is-unavailable'
+                }"
+                data-serial="${SerialToken}"
+                data-critical="${IsCritical ? '1' : '0'}"
+                data-unavailable="${HasSerial ? '0' : '1'}"
+                ${
+                  HasSerial
+                    ? `title="${
+                        IsCritical && !IsConnected
+                          ? 'Remove critical status (device disconnected)'
+                          : IsCritical
+                          ? 'Remove critical status'
+                          : 'Mark as critical'
+                      }"`
+                    : ''
+                }
+                aria-label="${
+                  HasSerial
+                    ? IsCritical && !IsConnected
+                      ? 'Remove critical status (device disconnected)'
+                      : IsCritical
+                      ? 'Remove critical status'
+                      : 'Mark as critical'
+                    : 'Unavailble due to missing serial number'
+                }"
+                ${
+                  HasSerial
+                    ? ''
+                    : 'data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-placement="left" data-bs-custom-class="SHOWTRAK_USB_POPOVER" data-bs-content="Unavailble due to missing serial number"'
+                }
+              >
+                <i class="bi ${IsCritical && !IsConnected ? 'bi-x-circle-fill' : IsCritical ? 'bi-check-circle-fill' : 'bi-check-circle'}"></i>
+                <span>${IsCritical && !IsConnected ? 'Disconnected' : 'Critical'}</span>
+              </button>
+            </div>
+          `);
+        }
+      }
+
+      $usbList.attr('data-render-key', renderKey);
+
+      try {
+        const Nodes = document.querySelectorAll(
+          '#SHOWTRAK_CLIENT_INFO_USB_DEVICES .SHOWTRAK_TOGGLE_CRITICAL_USB[data-bs-toggle="popover"]'
+        );
+        for (const Node of Nodes) {
+          if (!Node) continue;
+          if (bootstrap.Popover.getInstance(Node)) continue;
+          new bootstrap.Popover(Node, {
+            container: 'body',
+          });
+        }
+      } catch (err) {
+        HandleNonFatalError('RenderClientInfoDetails:CriticalUSBPopoverInit', err);
+      }
     }
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);

@@ -19,6 +19,11 @@ function isScopeMatch(Rule, Context) {
 }
 
 function clientDegradedByConfig(Data, Config) {
+  const MissingCritical = Array.isArray(Data && Data.MissingCriticalUSBDevices)
+    ? Data.MissingCriticalUSBDevices.length
+    : 0;
+  if (MissingCritical > 0) return true;
+
   const CpuThreshold = Number(Config && Config.ClientCpuUsagePct);
   const RamThreshold = Number(Config && Config.ClientRamUsagePct);
   const LastSeenStaleMs = Number(Config && Config.ClientLastSeenStaleMs);
@@ -50,6 +55,14 @@ function triggerMatches(Rule, Context) {
       return Context.TriggerType === TRIGGERS.CLIENT_OFFLINE;
     case TRIGGERS.CLIENT_ONLINE:
       return Context.TriggerType === TRIGGERS.CLIENT_ONLINE;
+    case TRIGGERS.USB_DEVICE_CONNECTED:
+      return Context.TriggerType === TRIGGERS.USB_DEVICE_CONNECTED;
+    case TRIGGERS.USB_DEVICE_DISCONNECTED:
+      return Context.TriggerType === TRIGGERS.USB_DEVICE_DISCONNECTED;
+    case TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED:
+      return Context.TriggerType === TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED;
+    case TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED:
+      return Context.TriggerType === TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED;
     case TRIGGERS.SCRIPT_EXECUTION_FAILED:
       return Context.TriggerType === TRIGGERS.SCRIPT_EXECUTION_FAILED;
     case TRIGGERS.CLIENT_DEGRADED: {
@@ -101,6 +114,12 @@ function describeMonitorReason(Context) {
   return 'unknown reason';
 }
 
+function describeUSBDevice(Context) {
+  const Device = (Context && Context.Device) || {};
+  const Name = [Device.ManufacturerName, Device.ProductName].filter(Boolean).join(' ').trim();
+  return Name || 'USB device';
+}
+
 function describeContext(Context) {
   if (Context.TriggerType === TRIGGERS.SCRIPT_EXECUTION_FAILED) {
     return `${Context.ScriptName || 'Script'} failed on ${Context.EntityName || 'Unknown Client'}`;
@@ -116,6 +135,18 @@ function describeContext(Context) {
   }
   if (Context.TriggerType === TRIGGERS.CLIENT_ONLINE) {
     return `${Context.EntityName || 'Client'} came online`;
+  }
+  if (Context.TriggerType === TRIGGERS.USB_DEVICE_CONNECTED) {
+    return `${describeUSBDevice(Context)} connected to ${Context.EntityName || 'Client'}`;
+  }
+  if (Context.TriggerType === TRIGGERS.USB_DEVICE_DISCONNECTED) {
+    return `${describeUSBDevice(Context)} disconnected from ${Context.EntityName || 'Client'}`;
+  }
+  if (Context.TriggerType === TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED) {
+    return `${describeUSBDevice(Context)} (critical) connected to ${Context.EntityName || 'Client'}`;
+  }
+  if (Context.TriggerType === TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED) {
+    return `${describeUSBDevice(Context)} (critical) disconnected from ${Context.EntityName || 'Client'}`;
   }
   return 'Alert triggered';
 }

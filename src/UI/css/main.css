@@ -1102,6 +1102,103 @@ button.btn:focus {
   line-height: 1;
 }
 
+.SHOWTRAK_CLIENT_USB_DEVICE_CARD {
+  position: relative;
+  padding-right: 6.9rem !important;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 98px;
+  height: 30px;
+  padding: 0 0.65rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(220, 220, 220, 0.6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB .bi {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB:hover {
+  color: rgba(255, 214, 102, 0.9);
+  background-color: rgba(255, 193, 7, 0.12);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-critical {
+  color: #ffc107;
+  background-color: rgba(255, 193, 7, 0.2);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-critical:hover {
+  color: #ffd54a;
+  background-color: rgba(255, 193, 7, 0.24);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:focus {
+  color: #ff6b6b;
+  background-color: rgba(220, 53, 69, 0.24);
+  cursor: pointer;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:hover {
+  background-color: rgba(220, 53, 69, 0.28);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-unavailable,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-unavailable:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-unavailable:focus,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-unavailable:active {
+  cursor: not-allowed;
+  color: rgba(190, 190, 190, 0.5);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Dark-themed USB critical-state popover */
+.SHOWTRAK_USB_POPOVER {
+  --bs-popover-bg: #0c091c;
+  --bs-popover-border-color: rgba(255, 255, 255, 0.14);
+  --bs-popover-header-bg: transparent;
+  --bs-popover-header-border-color: rgba(255, 255, 255, 0.14);
+  --bs-popover-body-padding-y: 0.5rem;
+  --bs-popover-body-padding-x: 0.75rem;
+  --bs-popover-max-width: 240px;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.SHOWTRAK_USB_POPOVER .popover-header {
+  display: none;
+}
+
+.SHOWTRAK_USB_POPOVER .popover-body {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+
+.SHOWTRAK_USB_POPOVER .popover-arrow::before,
+.SHOWTRAK_USB_POPOVER .popover-arrow::after {
+  border-color: #0c091c;
+}
+
 .no-drag {
   -webkit-app-region: no-drag;
 }

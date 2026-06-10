@@ -6,13 +6,6 @@ window.API.ShutdownRequested(async () => {
 });
 
 window.API.USBDeviceAdded(async (Client, Device) => {
-  AddAlert({
-    type: 'usb',
-    severity: 'info',
-    title: `${Safe(Device.ManufacturerName || 'Generic')} ${Safe(Device.ProductName || 'USB Device')} connected`,
-    message: `${Safe(Client.Nickname || Client.Hostname)} (${Safe(Client.Hostname)})`,
-    clientUUID: Client.UUID,
-  });
   // If Client Info modal is open for this client, refresh its details
   try {
     const $modal = $('#SHOWTRAK_CLIENT_INFO');
@@ -25,13 +18,6 @@ window.API.USBDeviceAdded(async (Client, Device) => {
   }
 });
 window.API.USBDeviceRemoved(async (Client, Device) => {
-  AddAlert({
-    type: 'usb',
-    severity: 'warning',
-    title: `${Safe(Device.ManufacturerName || 'Generic')} ${Safe(Device.ProductName || 'USB Device')} removed`,
-    message: `${Safe(Client.Nickname || Client.Hostname)} (${Safe(Client.Hostname)})`,
-    clientUUID: Client.UUID,
-  });
   // If Client Info modal is open for this client, refresh its details
   try {
     const $modal = $('#SHOWTRAK_CLIENT_INFO');
@@ -385,8 +371,13 @@ function RenderFullClientAndMonitorList() {
     } else {
       for (const Item of Merged) {
         if (Item.kind === 'client') {
-          const { Nickname, Hostname, IP, UUID, Version, Online, LastSeen } = Item.data;
-          Filler += `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${Online ? 'ONLINE' : ''} ${
+          const { Nickname, Hostname, IP, UUID, Version, Online, LastSeen, Degraded } = Item.data;
+          const WarningText =
+            Array.isArray(Item.data.DegradedWarnings) && Item.data.DegradedWarnings.length
+              ? String(Item.data.DegradedWarnings[0])
+              : 'Missing USB Device';
+          const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
+          Filler += `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${TileStateClass} ${
             Selected.includes(UUID) ? 'SELECTED' : ''
           }" data-uuid="${UUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
 					<button type="button" class="CLIENT_TILE_COG" aria-label="Edit Client" title="Edit Client">
@@ -401,7 +392,7 @@ function RenderFullClientAndMonitorList() {
 					<small class="text-sm text-light" data-type="IP">
 						${IP ? Safe(IP) : 'Unknown IP'}
 					</small>
-					<div class="SHOWTRAK_PC_STATUS ${Online ? 'd-grid' : 'd-none'} gap-2" data-type="INDICATOR_ONLINE">
+          <div class="SHOWTRAK_PC_STATUS ${Online && !Degraded ? 'd-grid' : 'd-none'} gap-2" data-type="INDICATOR_ONLINE">
 						<div class="progress">
 							<div data-type="CPU" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
 						</div>
@@ -409,6 +400,9 @@ function RenderFullClientAndMonitorList() {
 							<div data-type="RAM" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
 						</div>
 					</div>
+          <div class="SHOWTRAK_PC_STATUS ${Online && Degraded ? 'd-grid' : 'd-none'}" data-type="INDICATOR_DEGRADED">
+            <h7 class="mb-0 text-warning" data-type="DEGRADED_WARNING">${Safe(WarningText)}</h7>
+          </div>
 					<div class="SHOWTRAK_PC_STATUS ${Online ? 'd-none' : 'd-grid'}" data-type="INDICATOR_OFFLINE">
 						<h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${LastSeen}">
 							OFFLINE <span class="badge bg-ghost">00:00:00</span>

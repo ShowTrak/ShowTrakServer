@@ -9,40 +9,6 @@ const DefaultSettings = [
   //     OnUpdateEvent: "GroupListChanged"
   // },
   {
-    Group: 'Notifications',
-    Key: 'NOTIFY_ON_USB_DEVICE_CONNECT',
-    Title: 'Notify on USB Device Connect',
-    Description: 'Send a notification when a USB device connects to a client.',
-    Type: 'BOOLEAN',
-    DefaultValue: true,
-  },
-  {
-    Group: 'Notifications',
-    Key: 'AUDIO_ON_USB_DEVICE_CONNECT',
-    Title: 'Play audio on USB Device Connect',
-    Description: 'Play a sound when a USB device connects to a client.',
-    Type: 'BOOLEAN',
-    DefaultValue: true,
-  },
-
-  {
-    Group: 'Notifications',
-    Key: 'NOTIFY_ON_USB_DEVICE_DISCONNECT',
-    Title: 'Notify on USB Device Disconnect',
-    Description: 'Send a notification when a USB device disconnects from a client.',
-    Type: 'BOOLEAN',
-    DefaultValue: true,
-  },
-  {
-    Group: 'Notifications',
-    Key: 'AUDIO_ON_USB_DEVICE_DISCONNECT',
-    Title: 'Play audio on USB Device Disconnect',
-    Description: 'Play a sound when a USB device connects to a client.',
-    Type: 'BOOLEAN',
-    DefaultValue: true,
-  },
-
-  {
     Group: 'Features',
     Key: 'SYSTEM_ALLOW_WOL',
     Title: 'Wake on LAN',
@@ -168,7 +134,6 @@ const DefaultSettings = [
 
 const Groups = [
   // { Name: "UI", Title: "User Interface" },
-  { Name: 'Notifications', Title: 'Notifications' },
   { Name: 'Features', Title: 'Features' },
   { Name: 'Web UI', Title: 'Web UI' },
   { Name: 'System', Title: 'System Settings' },

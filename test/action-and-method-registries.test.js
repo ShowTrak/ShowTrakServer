@@ -36,6 +36,8 @@ test('AlertActions manager normalizes, validates, and executes actions', async (
     './osc-trigger': actionA,
     './http-api': actionB,
     './discord-webhook': { Name: 'invalid-no-id' },
+    './play-sound': { Name: 'invalid-no-id' },
+    './showtrak-alert': { Name: 'invalid-no-id' },
   });
 
   assert.equal(Manager.Has('alpha'), true);

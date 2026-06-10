@@ -51,6 +51,7 @@ test('DB initializes schema, runs queries, and tracks dirty state', async () => 
     'MonitoringTargets',
     'AlertRules',
     'AlertHistory',
+    'CriticalUSBDevices',
   ]) {
     assert.equal(names.has(required), true, `expected table ${required}`);
   }

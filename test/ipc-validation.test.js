@@ -29,6 +29,20 @@ test('IPCValidation.ClientUpdatePayload validates supported fields only', () => 
   assert.throws(() => IPCValidation.ClientUpdatePayload({}), /supported fields/i);
 });
 
+test('IPCValidation.CriticalUSBDevicePayload validates and normalizes serials', () => {
+  const payload = IPCValidation.CriticalUSBDevicePayload({
+    SerialNumber: '  abcd-1234  ',
+    ManufacturerName: '  SanDisk  ',
+    ProductName: '  Ultra  ',
+  });
+  assert.equal(payload.SerialNumber, 'ABCD-1234');
+  assert.equal(payload.ManufacturerName, 'SanDisk');
+  assert.equal(payload.ProductName, 'Ultra');
+
+  assert.throws(() => IPCValidation.CriticalUSBDevicePayload({}), /SerialNumber/i);
+  assert.throws(() => IPCValidation.CriticalUSBDevicePayload(null), /must be an object/i);
+});
+
 test('IPCValidation.SettingUpdatePayload allows primitive setting values', () => {
   assert.deepEqual(IPCValidation.SettingUpdatePayload('SYSTEM_ALLOW_WOL', true), [
     'SYSTEM_ALLOW_WOL',
@@ -270,4 +284,20 @@ test('IPCValidation.AlertRuleUpdatePayload validates partial alert updates', () 
     /Unsupported TriggerType/i
   );
   assert.throws(() => IPCValidation.AlertRuleUpdatePayload('nope'), /must be an object/i);
+});
+
+test('IPCValidation alert payloads accept critical USB trigger types', () => {
+  const created = IPCValidation.AlertRuleCreatePayload({
+    Title: 'Critical USB connected',
+    Scope: {},
+    TriggerType: 'CRITICAL_USB_DEVICE_CONNECTED',
+    Actions: [{ Type: 'http-api', Settings: {} }],
+    Enabled: true,
+  });
+  assert.equal(created.TriggerType, 'CRITICAL_USB_DEVICE_CONNECTED');
+
+  const updated = IPCValidation.AlertRuleUpdatePayload({
+    TriggerType: 'CRITICAL_USB_DEVICE_DISCONNECTED',
+  });
+  assert.equal(updated.TriggerType, 'CRITICAL_USB_DEVICE_DISCONNECTED');
 });

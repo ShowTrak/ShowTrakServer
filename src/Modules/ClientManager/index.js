@@ -16,6 +16,52 @@ const Manager = {};
 
 // Hot cache of Client instances reflecting current state
 var ClientList = [];
+const CriticalUSBIndex = new Map();
+
+function normalizeSerialNumber(SerialNumber) {
+  if (typeof SerialNumber !== 'string') return null;
+  const Value = SerialNumber.trim();
+  if (!Value) return null;
+  return Value.toUpperCase();
+}
+
+function getCriticalMapForClient(UUID, CreateIfMissing = false) {
+  const Key = String(UUID || '');
+  let Existing = CriticalUSBIndex.get(Key);
+  if (!Existing && CreateIfMissing) {
+    Existing = new Map();
+    CriticalUSBIndex.set(Key, Existing);
+  }
+  return Existing || null;
+}
+
+function applyCriticalUSBState(TargetClient) {
+  if (!TargetClient || !TargetClient.UUID) return;
+  const Entries = getCriticalMapForClient(TargetClient.UUID, false);
+  const Devices = Entries ? Array.from(Entries.values()) : [];
+  TargetClient.SetCriticalUSBDevices(Devices);
+}
+
+async function loadCriticalUSBIndex() {
+  CriticalUSBIndex.clear();
+  const [Err, Rows] = await DB.All(
+    'SELECT UUID, SerialNumber, ManufacturerName, ProductName, Timestamp FROM CriticalUSBDevices'
+  );
+  if (Err || !Rows) return;
+  for (const Row of Rows) {
+    const UUID = Row && Row.UUID ? String(Row.UUID) : '';
+    const SerialNumber = normalizeSerialNumber(Row && Row.SerialNumber);
+    if (!UUID || !SerialNumber) continue;
+    const PerClient = getCriticalMapForClient(UUID, true);
+    PerClient.set(SerialNumber, {
+      UUID,
+      SerialNumber,
+      ManufacturerName: Row.ManufacturerName || null,
+      ProductName: Row.ProductName || null,
+      Timestamp: Row.Timestamp || null,
+    });
+  }
+}
 
 Manager.Timeout = async (UUID) => {
   let Exists = await Manager.Exists(UUID);
@@ -41,6 +87,7 @@ Manager.Heartbeat = async (UUID, Data, IP) => {
       return ['Client Not Valid', null];
     } else {
       CachedClient = new Client(FetchedClient);
+      applyCriticalUSBState(CachedClient);
       ClientList.push(CachedClient);
       BroadcastManager.emit('ClientListChanged');
     }
@@ -88,6 +135,90 @@ Manager.USBDeviceRemoved = async (UUID, Device) => {
   return [null, 'Updated'];
 };
 
+Manager.MarkUSBDeviceCritical = async (UUID, Device) => {
+  let [Err, Target] = await Manager.Get(UUID);
+  if (Err) return [Err, null];
+  if (!Target) return ['Client Not Found', null];
+
+  const SerialNumber = normalizeSerialNumber(Device && Device.SerialNumber);
+  if (!SerialNumber) return ['Device serial number is required', null];
+
+  const KnownDevice = (Array.isArray(Target.ConnectedUSBDeviceList)
+    ? Target.ConnectedUSBDeviceList
+    : []
+  ).find(
+    (Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) === SerialNumber
+  );
+  const ManufacturerName =
+    (KnownDevice && KnownDevice.ManufacturerName) ||
+    (Device && Device.ManufacturerName) ||
+    null;
+  const ProductName = (KnownDevice && KnownDevice.ProductName) || (Device && Device.ProductName) || null;
+
+  const [WriteErr] = await DB.Run(
+    'INSERT OR REPLACE INTO CriticalUSBDevices (UUID, SerialNumber, ManufacturerName, ProductName, Timestamp) VALUES (?, ?, ?, ?, ?)',
+    [UUID, SerialNumber, ManufacturerName, ProductName, Date.now()]
+  );
+  if (WriteErr) return Fail('Failed to save critical USB device');
+
+  const PerClient = getCriticalMapForClient(UUID, true);
+  PerClient.set(SerialNumber, {
+    UUID,
+    SerialNumber,
+    ManufacturerName,
+    ProductName,
+    Timestamp: Date.now(),
+  });
+  Target.MarkCriticalUSBDevice({
+    SerialNumber,
+    ManufacturerName,
+    ProductName,
+    Timestamp: Date.now(),
+  });
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(true);
+};
+
+Manager.RemoveUSBDeviceCritical = async (UUID, SerialNumber) => {
+  let [Err, Target] = await Manager.Get(UUID);
+  if (Err) return [Err, null];
+  if (!Target) return ['Client Not Found', null];
+
+  const NormalizedSerial = normalizeSerialNumber(SerialNumber);
+  if (!NormalizedSerial) return ['Device serial number is required', null];
+
+  const [WriteErr] = await DB.Run(
+    'DELETE FROM CriticalUSBDevices WHERE UUID = ? AND SerialNumber = ?',
+    [UUID, NormalizedSerial]
+  );
+  if (WriteErr) return Fail('Failed to remove critical USB device');
+
+  const PerClient = getCriticalMapForClient(UUID, false);
+  if (PerClient) {
+    PerClient.delete(NormalizedSerial);
+    if (PerClient.size === 0) CriticalUSBIndex.delete(String(UUID || ''));
+  }
+
+  Target.UnmarkCriticalUSBSerial(NormalizedSerial);
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(true);
+};
+
+Manager.IsUSBDeviceCritical = async (UUID, SerialNumber) => {
+  const Normalized = normalizeSerialNumber(SerialNumber);
+  if (!Normalized) return [null, false];
+
+  const Cached = getCriticalMapForClient(UUID, false);
+  if (Cached) return [null, Cached.has(Normalized)];
+
+  const [Err, Row] = await DB.Get(
+    'SELECT 1 AS Found FROM CriticalUSBDevices WHERE UUID = ? AND SerialNumber = ? LIMIT 1',
+    [UUID, Normalized]
+  );
+  if (Err) return ['Failed to determine critical USB status', null];
+  return [null, !!Row];
+};
+
 // One-shot richer payload: hostname + NICs -> derive MAC for the active IP
 Manager.SystemInfo = async (UUID, Data, IP) => {
   let [Err, Target] = await Manager.Get(UUID);
@@ -128,26 +259,29 @@ Manager.Create = async (UUID) => {
     [UUID, 'ShowTrak Client', null, null, Date.now()]
   );
   if (InsertErr) return Fail('Failed to insert new client');
-  ClientList.push(
-    new Client({
-      UUID: UUID,
-      Hostname: null,
-      Version: 'X.X.X',
-      IP: null,
-      Timestamp: Date.now(),
-    })
-  );
+  const Created = new Client({
+    UUID: UUID,
+    Hostname: null,
+    Version: 'X.X.X',
+    IP: null,
+    Timestamp: Date.now(),
+  });
+  applyCriticalUSBState(Created);
+  ClientList.push(Created);
   BroadcastManager.emit('ClientListChanged');
   return Ok(true);
 };
 
 // Unadopt or purge a client; remove from DB and cache
 Manager.Delete = async (UUID) => {
+  const [criticalErr] = await DB.Run('DELETE FROM CriticalUSBDevices WHERE UUID = ?', [UUID]);
+  if (criticalErr) return Fail('Failed to delete critical USB devices for client');
   // Remove from database
   let [Err, _Res] = await DB.Run('DELETE FROM Clients WHERE UUID = ?', [UUID]);
   if (Err) return Fail('Failed to delete client');
   // Remove from in-memory list
   ClientList = ClientList.filter((c) => c.UUID !== UUID);
+  CriticalUSBIndex.delete(String(UUID || ''));
   Logger.success(`Client ${UUID} deleted successfully`);
   return Ok(true);
 };
@@ -176,19 +310,25 @@ Manager.Get = async (UUID) => {
   if (Err) return ['Failed to fetch client', null];
   if (!ClientRow) return ['Client Not Found', null];
   ClientRow = new Client(ClientRow);
+  applyCriticalUSBState(ClientRow);
   return [null, ClientRow];
 };
 
 Manager.Initialized = false;
 // Warm the cache from DB so early UI renders have data
 Manager.Init = async () => {
+  await loadCriticalUSBIndex();
   let [Err, Clients] = await DB.All('SELECT * FROM Clients');
   if (Err || !Clients) {
     Manager.Initialized = true;
     ClientList = [];
     return;
   }
-  Clients = Clients.map((row) => new Client(row));
+  Clients = Clients.map((row) => {
+    const ClientEntity = new Client(row);
+    applyCriticalUSBState(ClientEntity);
+    return ClientEntity;
+  });
   ClientList = Clients; // Update in-memory list
   BroadcastManager.emit('ClientListChanged');
   Manager.Initialized = true;
@@ -206,7 +346,11 @@ Manager.GetAll = async () => {
   let [Err, Clients] = await DB.All('SELECT * FROM Clients');
   if (Err) return ['Failed to fetch clients', null];
   if (!Clients || Clients.length === 0) return [null, []];
-  Clients = Clients.map((row) => new Client(row));
+  Clients = Clients.map((row) => {
+    const ClientEntity = new Client(row);
+    applyCriticalUSBState(ClientEntity);
+    return ClientEntity;
+  });
   ClientList = Clients; // Update in-memory list
   BroadcastManager.emit('ClientListChanged');
   return [null, Clients];
@@ -303,6 +447,8 @@ Manager.SetGroupOrderWithWeights = async (GroupID, orderedUUIDs, weights) => {
 
 Manager.ClearCache = async () => {
   ClientList = [];
+  CriticalUSBIndex.clear();
+  Manager.Initialized = false;
   return;
 };
 

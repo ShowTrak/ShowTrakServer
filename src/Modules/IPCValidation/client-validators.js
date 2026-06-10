@@ -62,6 +62,31 @@ module.exports = function registerClientValidators(Manager) {
     return value;
   };
 
+  Manager.USBSerialNumber = (value, fieldName = 'SerialNumber') => {
+    return normalizeNonEmptyString(value, fieldName, { minLength: 1, maxLength: 256 }).toUpperCase();
+  };
+
+  Manager.CriticalUSBDevicePayload = (value) => {
+    if (!isPlainObject(value)) {
+      fail('Critical USB payload must be an object');
+    }
+    return {
+      SerialNumber: Manager.USBSerialNumber(value.SerialNumber),
+      ManufacturerName: Object.prototype.hasOwnProperty.call(value, 'ManufacturerName')
+        ? normalizeNonEmptyString(value.ManufacturerName, 'ManufacturerName', {
+            minLength: 1,
+            maxLength: 256,
+          })
+        : null,
+      ProductName: Object.prototype.hasOwnProperty.call(value, 'ProductName')
+        ? normalizeNonEmptyString(value.ProductName, 'ProductName', {
+            minLength: 1,
+            maxLength: 256,
+          })
+        : null,
+    };
+  };
+
   Manager.ClientUpdatePayload = (value) => {
     if (!isPlainObject(value)) {
       fail('Client update payload must be an object');
