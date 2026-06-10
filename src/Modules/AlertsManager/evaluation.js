@@ -18,37 +18,6 @@ function isScopeMatch(Rule, Context) {
   return false;
 }
 
-function clientDegradedByConfig(Data, Config) {
-  const MissingCritical = Array.isArray(Data && Data.MissingCriticalUSBDevices)
-    ? Data.MissingCriticalUSBDevices.length
-    : 0;
-  if (MissingCritical > 0) return true;
-
-  const CpuThreshold = Number(Config && Config.ClientCpuUsagePct);
-  const RamThreshold = Number(Config && Config.ClientRamUsagePct);
-  const LastSeenStaleMs = Number(Config && Config.ClientLastSeenStaleMs);
-
-  let Hit = false;
-  if (Number.isFinite(CpuThreshold) && CpuThreshold > 0) {
-    const Cpu = Number(
-      Data && Data.Vitals && Data.Vitals.CPU ? Data.Vitals.CPU.UsagePercentage : NaN
-    );
-    if (Number.isFinite(Cpu) && Cpu >= CpuThreshold) Hit = true;
-  }
-  if (Number.isFinite(RamThreshold) && RamThreshold > 0) {
-    const Ram = Number(
-      Data && Data.Vitals && Data.Vitals.Ram ? Data.Vitals.Ram.UsagePercentage : NaN
-    );
-    if (Number.isFinite(Ram) && Ram >= RamThreshold) Hit = true;
-  }
-  if (Number.isFinite(LastSeenStaleMs) && LastSeenStaleMs > 0) {
-    const LastSeen = Number(Data && Data.LastSeen);
-    if (Number.isFinite(LastSeen) && Date.now() - LastSeen >= LastSeenStaleMs) Hit = true;
-  }
-
-  return Hit;
-}
-
 function triggerMatches(Rule, Context) {
   switch (Rule.TriggerType) {
     case TRIGGERS.CLIENT_OFFLINE:
@@ -59,6 +28,10 @@ function triggerMatches(Rule, Context) {
       return Context.TriggerType === TRIGGERS.USB_DEVICE_CONNECTED;
     case TRIGGERS.USB_DEVICE_DISCONNECTED:
       return Context.TriggerType === TRIGGERS.USB_DEVICE_DISCONNECTED;
+    case TRIGGERS.NON_CRITICAL_USB_DEVICE_CONNECTED:
+      return Context.TriggerType === TRIGGERS.NON_CRITICAL_USB_DEVICE_CONNECTED;
+    case TRIGGERS.NON_CRITICAL_USB_DEVICE_DISCONNECTED:
+      return Context.TriggerType === TRIGGERS.NON_CRITICAL_USB_DEVICE_DISCONNECTED;
     case TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED:
       return Context.TriggerType === TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED;
     case TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED:
@@ -79,7 +52,7 @@ function triggerMatches(Rule, Context) {
           (Rule.TriggerConfig && Rule.TriggerConfig.Source) || 'any'
         ).toLowerCase();
         if (Source !== 'any' && Source !== 'client') return false;
-        return clientDegradedByConfig(Context.RawData || {}, Rule.TriggerConfig || {});
+        return !!Context.Degraded;
       }
       return false;
     }
@@ -128,7 +101,7 @@ function describeContext(Context) {
     if (Context.EntityType === 'monitor') {
       return `${Context.EntityName || 'Monitor'} degraded (${describeMonitorReason(Context)})`;
     }
-    return `${Context.EntityName || 'Client'} exceeded degradation criteria`;
+    return `${Context.EntityName || 'Client'} is degraded`;
   }
   if (Context.TriggerType === TRIGGERS.CLIENT_OFFLINE) {
     return `${Context.EntityName || 'Client'} is offline`;
@@ -142,6 +115,12 @@ function describeContext(Context) {
   if (Context.TriggerType === TRIGGERS.USB_DEVICE_DISCONNECTED) {
     return `${describeUSBDevice(Context)} disconnected from ${Context.EntityName || 'Client'}`;
   }
+  if (Context.TriggerType === TRIGGERS.NON_CRITICAL_USB_DEVICE_CONNECTED) {
+    return `${describeUSBDevice(Context)} (non-critical) connected to ${Context.EntityName || 'Client'}`;
+  }
+  if (Context.TriggerType === TRIGGERS.NON_CRITICAL_USB_DEVICE_DISCONNECTED) {
+    return `${describeUSBDevice(Context)} (non-critical) disconnected from ${Context.EntityName || 'Client'}`;
+  }
   if (Context.TriggerType === TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED) {
     return `${describeUSBDevice(Context)} (critical) connected to ${Context.EntityName || 'Client'}`;
   }
@@ -153,7 +132,6 @@ function describeContext(Context) {
 
 module.exports = {
   isScopeMatch,
-  clientDegradedByConfig,
   triggerMatches,
   describeMonitorReason,
   describeContext,

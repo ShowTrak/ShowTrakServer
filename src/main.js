@@ -1561,6 +1561,10 @@ async function USBDeviceAdded(Client, Device) {
     AlertsManager.HandleCriticalUSBDeviceConnected(Client, Device).catch((Err) =>
       Logger.error('AlertsManager.HandleCriticalUSBDeviceConnected failed', Err)
     );
+  } else {
+    AlertsManager.HandleNonCriticalUSBDeviceConnected(Client, Device).catch((Err) =>
+      Logger.error('AlertsManager.HandleNonCriticalUSBDeviceConnected failed', Err)
+    );
   }
   return;
 }
@@ -1585,6 +1589,10 @@ async function USBDeviceRemoved(Client, Device) {
   } else if (isCritical) {
     AlertsManager.HandleCriticalUSBDeviceDisconnected(Client, Device).catch((Err) =>
       Logger.error('AlertsManager.HandleCriticalUSBDeviceDisconnected failed', Err)
+    );
+  } else {
+    AlertsManager.HandleNonCriticalUSBDeviceDisconnected(Client, Device).catch((Err) =>
+      Logger.error('AlertsManager.HandleNonCriticalUSBDeviceDisconnected failed', Err)
     );
   }
   return;

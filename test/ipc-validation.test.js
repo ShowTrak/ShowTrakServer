@@ -301,3 +301,19 @@ test('IPCValidation alert payloads accept critical USB trigger types', () => {
   });
   assert.equal(updated.TriggerType, 'CRITICAL_USB_DEVICE_DISCONNECTED');
 });
+
+test('IPCValidation alert payloads accept non-critical USB trigger types', () => {
+  const created = IPCValidation.AlertRuleCreatePayload({
+    Title: 'Non-critical USB connected',
+    Scope: {},
+    TriggerType: 'NON_CRITICAL_USB_DEVICE_CONNECTED',
+    Actions: [{ Type: 'http-api', Settings: {} }],
+    Enabled: true,
+  });
+  assert.equal(created.TriggerType, 'NON_CRITICAL_USB_DEVICE_CONNECTED');
+
+  const updated = IPCValidation.AlertRuleUpdatePayload({
+    TriggerType: 'NON_CRITICAL_USB_DEVICE_DISCONNECTED',
+  });
+  assert.equal(updated.TriggerType, 'NON_CRITICAL_USB_DEVICE_DISCONNECTED');
+});

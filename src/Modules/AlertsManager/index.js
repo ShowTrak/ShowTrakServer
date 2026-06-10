@@ -20,6 +20,7 @@ const Manager = {};
 let Initialized = false;
 let RuleList = [];
 const EntityOnlineState = new Map();
+const EntityDegradedState = new Map();
 let AlertActionsEnabled = true;
 
 async function writeHistory(Rule, Context, Results) {
@@ -134,6 +135,14 @@ Manager.GetTriggers = () => {
     { ID: TRIGGERS.SCRIPT_EXECUTION_FAILED, Name: 'Script Execution Failed' },
     { ID: TRIGGERS.USB_DEVICE_CONNECTED, Name: 'USB Device Connected' },
     { ID: TRIGGERS.USB_DEVICE_DISCONNECTED, Name: 'USB Device Disconnected' },
+    {
+      ID: TRIGGERS.NON_CRITICAL_USB_DEVICE_CONNECTED,
+      Name: 'Non Critical USB Device Connected',
+    },
+    {
+      ID: TRIGGERS.NON_CRITICAL_USB_DEVICE_DISCONNECTED,
+      Name: 'Non Critical USB Device Disconnected',
+    },
     { ID: TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED, Name: 'Critical USB Device Connected' },
     {
       ID: TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED,
@@ -291,6 +300,36 @@ Manager.HandleUSBDeviceDisconnected = async (Client, Device) => {
   });
 };
 
+Manager.HandleNonCriticalUSBDeviceConnected = async (Client, Device) => {
+  if (!Client || !Client.UUID) return;
+  await evaluateAgainstRules({
+    TriggerType: TRIGGERS.NON_CRITICAL_USB_DEVICE_CONNECTED,
+    EntityType: 'client',
+    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+    UUID: Client.UUID,
+    GroupID: Client.GroupID == null ? null : Client.GroupID,
+    IP: Client.IP || null,
+    Severity: 'info',
+    Device: Device || null,
+    RawData: Client,
+  });
+};
+
+Manager.HandleNonCriticalUSBDeviceDisconnected = async (Client, Device) => {
+  if (!Client || !Client.UUID) return;
+  await evaluateAgainstRules({
+    TriggerType: TRIGGERS.NON_CRITICAL_USB_DEVICE_DISCONNECTED,
+    EntityType: 'client',
+    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+    UUID: Client.UUID,
+    GroupID: Client.GroupID == null ? null : Client.GroupID,
+    IP: Client.IP || null,
+    Severity: 'warning',
+    Device: Device || null,
+    RawData: Client,
+  });
+};
+
 Manager.HandleCriticalUSBDeviceConnected = async (Client, Device) => {
   if (!Client || !Client.UUID) return;
   await evaluateAgainstRules({
@@ -355,16 +394,23 @@ Manager.HandleClientUpdated = async (Client) => {
     }
   }
 
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.CLIENT_DEGRADED,
-    EntityType: 'client',
-    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-    UUID: Client.UUID,
-    GroupID: Client.GroupID == null ? null : Client.GroupID,
-    IP: Client.IP || null,
-    Severity: 'warning',
-    RawData: Client,
-  });
+  const PrevDegraded = EntityDegradedState.get(Key) === true;
+  const CurrentDegraded = Current && !!Client.Degraded;
+  EntityDegradedState.set(Key, CurrentDegraded);
+
+  if (CurrentDegraded && !PrevDegraded) {
+    await evaluateAgainstRules({
+      TriggerType: TRIGGERS.CLIENT_DEGRADED,
+      EntityType: 'client',
+      EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+      UUID: Client.UUID,
+      GroupID: Client.GroupID == null ? null : Client.GroupID,
+      IP: Client.IP || null,
+      Severity: 'warning',
+      Degraded: true,
+      RawData: Client,
+    });
+  }
 };
 
 Manager.HandleMonitoringTargetUpdated = async (Target) => {
@@ -403,20 +449,26 @@ Manager.HandleMonitoringTargetUpdated = async (Target) => {
     }
   }
 
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.CLIENT_DEGRADED,
-    EntityType: 'monitor',
-    EntityName: Target.Nickname || Target.Address || `Target ${Target.TargetID}`,
-    UUID: `monitor:${Target.TargetID}`,
-    TargetID: Target.TargetID,
-    GroupID: Target.GroupID == null ? null : Target.GroupID,
-    IP: Target.Address || null,
-    Severity: Target.Degraded ? 'warning' : 'info',
-    Degraded: !!Target.Degraded,
-    LastLatencyMs: Target.LastLatencyMs == null ? null : Target.LastLatencyMs,
-    LastError: Target.LastError || null,
-    RawData: Target,
-  });
+  const PrevDegraded = EntityDegradedState.get(Key) === true;
+  const CurrentDegraded = Current && !!Target.Degraded;
+  EntityDegradedState.set(Key, CurrentDegraded);
+
+  if (CurrentDegraded && !PrevDegraded) {
+    await evaluateAgainstRules({
+      TriggerType: TRIGGERS.CLIENT_DEGRADED,
+      EntityType: 'monitor',
+      EntityName: Target.Nickname || Target.Address || `Target ${Target.TargetID}`,
+      UUID: `monitor:${Target.TargetID}`,
+      TargetID: Target.TargetID,
+      GroupID: Target.GroupID == null ? null : Target.GroupID,
+      IP: Target.Address || null,
+      Severity: 'warning',
+      Degraded: true,
+      LastLatencyMs: Target.LastLatencyMs == null ? null : Target.LastLatencyMs,
+      LastError: Target.LastError || null,
+      RawData: Target,
+    });
+  }
 };
 
 Manager.HandleScriptExecutionUpdated = async (Executions) => {
@@ -445,6 +497,7 @@ Manager.Reload = async () => {
   Initialized = false;
   RuleList = [];
   EntityOnlineState.clear();
+  EntityDegradedState.clear();
   await Manager.Init();
   BroadcastManager.emit('AlertRuleListChanged');
 };

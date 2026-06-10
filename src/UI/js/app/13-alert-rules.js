@@ -444,11 +444,20 @@ function actionTypeNameByID(ID) {
 function triggerSummaryText(TriggerType) {
   if (TriggerType === 'CLIENT_OFFLINE') return 'is offline';
   if (TriggerType === 'CLIENT_ONLINE') return 'is online';
+  if (TriggerType === 'CLIENT_DEGRADED') return 'is degraded';
   if (TriggerType === 'SCRIPT_EXECUTION_FAILED') return 'fails to execute a script';
   if (TriggerType === 'USB_DEVICE_CONNECTED') return 'has a USB device connected';
   if (TriggerType === 'USB_DEVICE_DISCONNECTED') return 'has a USB device disconnected';
-    if (TriggerType === 'CRITICAL_USB_DEVICE_CONNECTED') return 'has a critical USB device connected';
-    if (TriggerType === 'CRITICAL_USB_DEVICE_DISCONNECTED') return 'has a critical USB device disconnected';
+  if (TriggerType === 'NON_CRITICAL_USB_DEVICE_CONNECTED') {
+    return 'has a non-critical USB device connected';
+  }
+  if (TriggerType === 'NON_CRITICAL_USB_DEVICE_DISCONNECTED') {
+    return 'has a non-critical USB device disconnected';
+  }
+  if (TriggerType === 'CRITICAL_USB_DEVICE_CONNECTED') return 'has a critical USB device connected';
+  if (TriggerType === 'CRITICAL_USB_DEVICE_DISCONNECTED') {
+    return 'has a critical USB device disconnected';
+  }
   return 'triggers';
 }
 

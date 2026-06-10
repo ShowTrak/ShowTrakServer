@@ -83,6 +83,8 @@ test('AlertsManager supports CRUD and action type metadata', async () => {
 
   const triggers = Manager.GetTriggers();
   assert.ok(triggers.some((t) => t.ID === 'CLIENT_OFFLINE'));
+  assert.ok(triggers.some((t) => t.ID === 'NON_CRITICAL_USB_DEVICE_CONNECTED'));
+  assert.ok(triggers.some((t) => t.ID === 'NON_CRITICAL_USB_DEVICE_DISCONNECTED'));
   assert.ok(triggers.some((t) => t.ID === 'CRITICAL_USB_DEVICE_CONNECTED'));
   assert.ok(triggers.some((t) => t.ID === 'CRITICAL_USB_DEVICE_DISCONNECTED'));
 
@@ -146,6 +148,28 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
       Timestamp: 1,
       UpdatedAt: 1,
     },
+    {
+      RuleID: 5,
+      Title: 'Non-Critical USB Connected',
+      Scope: JSON.stringify({ Workspace: true, Groups: [], Clients: [] }),
+      TriggerType: 'NON_CRITICAL_USB_DEVICE_CONNECTED',
+      TriggerConfig: JSON.stringify({}),
+      Actions: JSON.stringify([{ Type: 'http-api', Settings: { Route: '/non-critical-usb' } }]),
+      Enabled: 1,
+      Timestamp: 1,
+      UpdatedAt: 1,
+    },
+    {
+      RuleID: 6,
+      Title: 'Client Degraded Workspace',
+      Scope: JSON.stringify({ Workspace: true, Groups: [], Clients: [] }),
+      TriggerType: 'CLIENT_DEGRADED',
+      TriggerConfig: JSON.stringify({ Source: 'client' }),
+      Actions: JSON.stringify([{ Type: 'http-api', Settings: { Route: '/client-degraded' } }]),
+      Enabled: 1,
+      Timestamp: 1,
+      UpdatedAt: 1,
+    },
   ];
 
   const dbMock = {
@@ -198,6 +222,15 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
     IP: '10.0.0.8',
   });
 
+  await Manager.HandleClientUpdated({
+    UUID: 'client-5',
+    Online: true,
+    Degraded: true,
+    Nickname: 'Player PC 5',
+    GroupID: 9,
+    IP: '10.0.0.12',
+  });
+
   await Manager.HandleMonitoringTargetUpdated({
     TargetID: 42,
     Online: true,
@@ -231,7 +264,21 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
     }
   );
 
-  assert.equal(executeCalls.length, 4);
+  await Manager.HandleNonCriticalUSBDeviceConnected(
+    {
+      UUID: 'client-4',
+      Nickname: 'Cabinet 4',
+      GroupID: 8,
+      IP: '10.0.0.11',
+    },
+    {
+      ManufacturerName: 'Kingston',
+      ProductName: 'DataTraveler',
+      SerialNumber: 'S3',
+    }
+  );
+
+  assert.equal(executeCalls.length, 6);
   assert.ok(executeCalls.some((c) => c.action.Type === 'http-api'));
   assert.ok(executeCalls.some((c) => c.action.Type === 'discord-webhook'));
   assert.ok(executeCalls.some((c) => c.action.Type === 'osc-trigger'));
@@ -239,16 +286,127 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
   const historyWrites = untrackedRunCalls.filter(([sql]) =>
     sql.includes('INSERT INTO AlertHistory')
   );
-  assert.equal(historyWrites.length, 4);
+  assert.equal(historyWrites.length, 6);
 
   const triggeredEvents = events.filter(([event]) => event === 'AlertTriggered');
-  assert.equal(triggeredEvents.length, 4);
+  assert.equal(triggeredEvents.length, 6);
   assert.ok(triggeredEvents.some(([, payload]) => payload.TriggerType === 'CLIENT_OFFLINE'));
   assert.ok(triggeredEvents.some(([, payload]) => payload.TriggerType === 'CLIENT_DEGRADED'));
   assert.ok(
     triggeredEvents.some(([, payload]) => payload.TriggerType === 'SCRIPT_EXECUTION_FAILED')
   );
   assert.ok(
+    triggeredEvents.some(
+      ([, payload]) => payload.TriggerType === 'NON_CRITICAL_USB_DEVICE_CONNECTED'
+    )
+  );
+  assert.ok(
     triggeredEvents.some(([, payload]) => payload.TriggerType === 'CRITICAL_USB_DEVICE_CONNECTED')
   );
+  assert.ok(
+    executeCalls.some(
+      (c) => c.context.TriggerType === 'CLIENT_DEGRADED' && c.context.EntityType === 'client'
+    )
+  );
+});
+
+test('AlertsManager fires client degraded only on state transitions', async () => {
+  const executeCalls = [];
+
+  const rules = [
+    {
+      RuleID: 1,
+      Title: 'Client Degraded Workspace',
+      Scope: JSON.stringify({ Workspace: true, Groups: [], Clients: [] }),
+      TriggerType: 'CLIENT_DEGRADED',
+      TriggerConfig: JSON.stringify({ Source: 'client' }),
+      Actions: JSON.stringify([{ Type: 'http-api', Settings: { Route: '/client-degraded' } }]),
+      Enabled: 1,
+      Timestamp: 1,
+      UpdatedAt: 1,
+    },
+  ];
+
+  const dbMock = {
+    Manager: {
+      All: async () => [null, rules],
+      Run: async () => [null, { changes: 1 }],
+      RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
+    },
+  };
+
+  const actionsMock = {
+    Manager: {
+      GetAll: () => [],
+      Execute: async (action, context) => {
+        executeCalls.push({ action, context });
+        return { Success: true };
+      },
+    },
+  };
+
+  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'AlertsManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => ({ error: () => {} }) },
+    '../DB': dbMock,
+    '../AlertActions': actionsMock,
+    '../Broadcast': { Manager: { emit: () => {} } },
+    '../Utils': require('../src/Modules/Utils'),
+  });
+
+  await Manager.Init();
+
+  await Manager.HandleClientUpdated({
+    UUID: 'client-10',
+    Online: true,
+    Degraded: true,
+    Nickname: 'Client 10',
+    GroupID: 1,
+    IP: '10.0.0.20',
+  });
+  await Manager.HandleClientUpdated({
+    UUID: 'client-10',
+    Online: true,
+    Degraded: true,
+    Nickname: 'Client 10',
+    GroupID: 1,
+    IP: '10.0.0.20',
+  });
+  await Manager.HandleClientUpdated({
+    UUID: 'client-10',
+    Online: true,
+    Degraded: false,
+    Nickname: 'Client 10',
+    GroupID: 1,
+    IP: '10.0.0.20',
+  });
+  await Manager.HandleClientUpdated({
+    UUID: 'client-10',
+    Online: true,
+    Degraded: true,
+    Nickname: 'Client 10',
+    GroupID: 1,
+    IP: '10.0.0.20',
+  });
+  await Manager.HandleClientUpdated({
+    UUID: 'client-10',
+    Online: false,
+    Degraded: true,
+    Nickname: 'Client 10',
+    GroupID: 1,
+    IP: '10.0.0.20',
+  });
+  await Manager.HandleClientUpdated({
+    UUID: 'client-10',
+    Online: true,
+    Degraded: true,
+    Nickname: 'Client 10',
+    GroupID: 1,
+    IP: '10.0.0.20',
+  });
+
+  const degradedCalls = executeCalls.filter(
+    (c) => c.context.TriggerType === 'CLIENT_DEGRADED' && c.context.EntityType === 'client'
+  );
+  assert.equal(degradedCalls.length, 3);
 });
