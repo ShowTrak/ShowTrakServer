@@ -31,6 +31,8 @@ if (!gotTheLock) {
 const { Config } = require('./Modules/Config');
 const { Manager: ScriptManager } = require('./Modules/ScriptManager');
 ScriptManager.GetScripts();
+const { Manager: SampleScriptsManager } = require('./Modules/SampleScripts');
+SampleScriptsManager.Initialize();
 const { Manager: ServerManager } = require('./Modules/Server');
 const { Manager: BonjourManager } = require('./Modules/Bonjour');
 BonjourManager.Init();
@@ -1197,6 +1199,48 @@ app.whenReady().then(async () => {
     const Result = await ScriptManager.Delete(ID);
     if (!Result.ok) return [Result.error || 'Failed to delete script', null];
     return [null, true];
+  });
+
+  // Script Manager: create a new blank script (placeholder config + empty
+  // per-platform script files, not yet runnable). Returns the new script ID.
+  RPC.handle('Scripts:Create', async () => {
+    const Result = await ScriptManager.CreateBlank();
+    if (!Result.ok) return [Result.error || 'Failed to create script', null];
+    return [null, { id: Result.id }];
+  });
+
+  // Script Manager: list the available sample scripts (templates) fetched from
+  // the public ShowTrak SampleScripts repository.
+  RPC.handle('Scripts:GetSampleList', async () => {
+    try {
+      const List = await SampleScriptsManager.GetSampleList();
+      return [null, List];
+    } catch (err) {
+      Logger.error('Failed to list sample scripts:', err);
+      return ['Failed to load sample scripts', null];
+    }
+  });
+
+  // Script Manager: force a refresh of the sample scripts catalog.
+  RPC.handle('Scripts:RefreshSamples', async () => {
+    const Result = await SampleScriptsManager.Refresh();
+    if (!Result.ok) return [Result.error || 'Failed to refresh sample scripts', null];
+    const List = await SampleScriptsManager.GetSampleList();
+    return [null, List];
+  });
+
+  // Script Manager: create a new script from a sample template. Requires a
+  // DesiredID that does not collide with an existing script.
+  RPC.handle('Scripts:CreateFromTemplate', async (_Event, SampleID, DesiredID) => {
+    if (typeof SampleID !== 'string' || !SampleID.trim()) return ['Invalid template', null];
+    const Sample = await SampleScriptsManager.GetSample(SampleID);
+    if (!Sample) return ['Template not found', null];
+    const Result = await ScriptManager.CreateFromTemplate(Sample, DesiredID);
+    if (!Result.ok) {
+      const Message = Result.errors && Result.errors[0] ? Result.errors[0] : 'Failed to create script';
+      return [Message, Result];
+    }
+    return [null, Result];
   });
 
   RPC.handle('WakeOnLan', async (_Event, List) => {

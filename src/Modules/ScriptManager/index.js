@@ -485,6 +485,176 @@ Manager.SetOrder = async (OrderedIDs) => {
   return { ok: true };
 };
 
+// Compute the next Weight value that places a new script at the bottom of the
+// list (existing max + 10, or 10 when there are no scripts yet).
+async function GetBottomWeight() {
+  const Existing = await Manager.GetScripts();
+  let Max = 0;
+  for (const Script of Existing) {
+    const Weight = typeof Script.Weight === 'number' ? Script.Weight : 0;
+    if (Weight > Max) Max = Weight;
+  }
+  return Max + 10;
+}
+
+// Find an unused, schema-valid script ID derived from Base (e.g. "NewScript",
+// "NewScript2", "NewScript3", ...). Base is sanitized to letters/numbers only.
+function GetAvailableID(Base, ScriptsDirectory) {
+  let Root = String(Base || '').replace(/[^A-Za-z0-9]/g, '');
+  if (!Root) Root = 'NewScript';
+  let Candidate = Root;
+  let Counter = 1;
+  while (fs.existsSync(path.join(ScriptsDirectory, Candidate))) {
+    Counter += 1;
+    Candidate = `${Root}${Counter}`;
+  }
+  return Candidate;
+}
+
+// Create a brand new, blank script. Picks an unused ID, writes a placeholder
+// Script.json plus empty per-platform script files, and forces the new script
+// to the bottom of the list. The platform mappings are intentionally left
+// empty (and Enabled=false) so a half-finished script is never runnable.
+Manager.CreateBlank = async () => {
+  const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
+  if (!fs.existsSync(ScriptsDirectory)) {
+    fs.mkdirSync(ScriptsDirectory, { recursive: true });
+  }
+
+  const ID = GetAvailableID('NewScript', ScriptsDirectory);
+  const ScriptFolderPath = path.join(ScriptsDirectory, ID);
+
+  const Weight = await GetBottomWeight();
+
+  const PlaceholderFiles = {
+    'windows.bat': '@echo off\r\nREM TODO: Add your Windows commands here\r\n',
+    'macos.sh': '#!/bin/bash\n# TODO: Add your macOS commands here\n',
+    'linux.sh': '#!/bin/bash\n# TODO: Add your Linux commands here\n',
+  };
+
+  const RawConfig = {
+    Name: 'New Script',
+    Description: 'Describe what this script does.',
+    Colour: 6,
+    Weight,
+    Confirmation: false,
+    // Not runnable until the author maps platforms and enables it.
+    Enabled: false,
+    Platforms: { Windows: '', macOS: '', Linux: '' },
+    Arguments: { Windows: '', macOS: '', Linux: '' },
+  };
+
+  const { config } = NormalizeScriptConfig(RawConfig, ID);
+
+  try {
+    fs.mkdirSync(ScriptFolderPath, { recursive: true });
+    for (const [FileName, Contents] of Object.entries(PlaceholderFiles)) {
+      fs.writeFileSync(path.join(ScriptFolderPath, FileName), Contents, 'utf-8');
+    }
+    fs.writeFileSync(
+      path.join(ScriptFolderPath, 'Script.json'),
+      JSON.stringify(config, null, 2) + '\n',
+      'utf-8'
+    );
+  } catch (err) {
+    return { ok: false, error: `Failed to create script: ${err.message}` };
+  }
+
+  await Manager.ReloadScripts();
+  return { ok: true, id: ID };
+};
+
+// Create a new script from a fetched sample (template). Sample is expected to
+// be { id, name, description, colour, confirm, platforms, files: [{ path,
+// content (base64) }] }. DesiredID must be supplied and must not collide with
+// an existing script (callers prompt the operator to change it on conflict).
+// The new script's Weight is always forced to the bottom of the list.
+Manager.CreateFromTemplate = async (Sample, DesiredID) => {
+  if (!Sample || typeof Sample !== 'object' || !Array.isArray(Sample.files)) {
+    return { ok: false, errors: ['Invalid template'] };
+  }
+
+  const TargetID = typeof DesiredID === 'string' ? DesiredID.trim() : '';
+  const IDError = ValidateNewID(TargetID);
+  if (IDError) return { ok: false, errors: [IDError] };
+
+  const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
+  if (!fs.existsSync(ScriptsDirectory)) {
+    fs.mkdirSync(ScriptsDirectory, { recursive: true });
+  }
+
+  const ScriptFolderPath = path.join(ScriptsDirectory, TargetID);
+  if (fs.existsSync(ScriptFolderPath)) {
+    return {
+      ok: false,
+      conflict: true,
+      errors: [`A script named "${TargetID}" already exists; choose a different ID.`],
+    };
+  }
+
+  const Weight = await GetBottomWeight();
+
+  try {
+    fs.mkdirSync(ScriptFolderPath, { recursive: true });
+
+    for (const File of Sample.files) {
+      if (!File || typeof File.path !== 'string') continue;
+      if (File.path === 'Script.json') continue; // written separately below
+      const RelativePath = File.path.replace(/\\/g, '/');
+      // Reject any path that escapes the script folder.
+      if (RelativePath.split('/').some((Seg) => Seg === '..' || Seg === '')) continue;
+      if (path.isAbsolute(RelativePath)) continue;
+      const TargetFilePath = path.join(ScriptFolderPath, RelativePath);
+      const Resolved = path.resolve(TargetFilePath);
+      const Prefix = path.resolve(ScriptFolderPath) + path.sep;
+      if (!Resolved.startsWith(Prefix)) continue;
+      fs.mkdirSync(path.dirname(TargetFilePath), { recursive: true });
+      fs.writeFileSync(TargetFilePath, Buffer.from(String(File.content || ''), 'base64'));
+    }
+  } catch (err) {
+    try {
+      fs.rmSync(ScriptFolderPath, { recursive: true, force: true });
+    } catch {
+      // best-effort cleanup
+    }
+    return { ok: false, errors: [`Failed to create script from template: ${err.message}`] };
+  }
+
+  // Build the config from the template's Script.json (if present) but always
+  // force the new script to the bottom of the list.
+  let TemplateConfig = {};
+  const ConfigFile = Sample.files.find((f) => f && f.path === 'Script.json');
+  if (ConfigFile) {
+    try {
+      TemplateConfig = JSON.parse(Buffer.from(String(ConfigFile.content || ''), 'base64').toString('utf-8'));
+    } catch {
+      TemplateConfig = {};
+    }
+  }
+  TemplateConfig.Weight = Weight;
+
+  const { config } = NormalizeScriptConfig(TemplateConfig, TargetID);
+  config.Weight = Weight;
+
+  try {
+    fs.writeFileSync(
+      path.join(ScriptFolderPath, 'Script.json'),
+      JSON.stringify(config, null, 2) + '\n',
+      'utf-8'
+    );
+  } catch (err) {
+    try {
+      fs.rmSync(ScriptFolderPath, { recursive: true, force: true });
+    } catch {
+      // best-effort cleanup
+    }
+    return { ok: false, errors: [`Failed to write Script.json: ${err.message}`] };
+  }
+
+  await Manager.ReloadScripts();
+  return { ok: true, id: TargetID };
+};
+
 // Delete a script folder from disk entirely.
 Manager.Delete = async (ID) => {
   if (!IsSafeFolderID(ID)) return { ok: false, error: 'Invalid script ID' };

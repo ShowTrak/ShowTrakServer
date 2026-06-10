@@ -23,7 +23,7 @@ Manager.Initialize = async () => {
     fs.mkdirSync(appDataPath, { recursive: true });
   }
 
-  let AppDataFolders = ['Logs', 'Scripts', 'Storage'];
+  let AppDataFolders = ['Logs', 'Scripts', 'Storage', 'SampleScripts'];
   AppDataFolders.forEach((folder) => {
     const folderPath = path.join(appDataPath, folder);
     if (!fs.existsSync(folderPath)) {
@@ -43,6 +43,12 @@ Manager.GetScriptsDirectory = () => {
 
 Manager.GetStorageDirectory = () => {
   return path.join(appDataPath, 'Storage');
+};
+
+// Cache directory for sample scripts fetched from the public ShowTrak
+// SampleScripts repository (catalog JSON + downloaded file contents).
+Manager.GetSampleScriptsDirectory = () => {
+  return path.join(appDataPath, 'SampleScripts');
 };
 
 // App-level state that must survive across relaunches and is NOT part of the

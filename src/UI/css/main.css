@@ -2362,6 +2362,32 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   color: #4aa3ff;
   background: rgba(74, 163, 255, 0.12);
 }
+.script-manager-create-btn {
+  background: transparent;
+  border: none;
+  color: rgba(105, 214, 125, 0.78);
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 150ms ease, background 150ms ease;
+}
+.script-manager-create-btn:hover {
+  color: #69d67d;
+  background: rgba(105, 214, 125, 0.14);
+}
+.script-manager-template-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.85rem;
+  padding: 5px 10px;
+  border-radius: 6px;
+  transition: color 150ms ease, background 150ms ease, border-color 150ms ease;
+}
+.script-manager-template-btn:hover {
+  color: #ffffff;
+  background: rgba(74, 163, 255, 0.12);
+}
 /* Colour swatch picker */
 .script-manager-swatch {
   width: 30px;

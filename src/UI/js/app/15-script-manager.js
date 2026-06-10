@@ -34,6 +34,7 @@ let ScriptManagerCache = [];
 let ScriptManagerEditingId = null;
 let ScriptManagerOriginal = null;
 let ScriptManagerEditingFiles = [];
+let ScriptManagerSampleCache = [];
 
 function GetScriptManagerPlatformKey() {
   const ua = String(navigator.userAgent || '').toLowerCase();
@@ -72,11 +73,19 @@ function ShowScriptManagerList() {
   ScriptManagerEditingId = null;
   $('#SCRIPT_MANAGER_LIST_VIEW').removeClass('d-none');
   $('#SCRIPT_MANAGER_EDITOR_VIEW').addClass('d-none');
+  $('#SCRIPT_MANAGER_TEMPLATES_VIEW').addClass('d-none');
 }
 
 function ShowScriptManagerEditor() {
   $('#SCRIPT_MANAGER_LIST_VIEW').addClass('d-none');
   $('#SCRIPT_MANAGER_EDITOR_VIEW').removeClass('d-none');
+  $('#SCRIPT_MANAGER_TEMPLATES_VIEW').addClass('d-none');
+}
+
+function ShowScriptManagerTemplates() {
+  $('#SCRIPT_MANAGER_LIST_VIEW').addClass('d-none');
+  $('#SCRIPT_MANAGER_EDITOR_VIEW').addClass('d-none');
+  $('#SCRIPT_MANAGER_TEMPLATES_VIEW').removeClass('d-none');
 }
 
 async function RefreshScriptManagerList() {
@@ -87,6 +96,157 @@ async function RefreshScriptManagerList() {
     ScriptManagerCache = [];
   }
   RenderScriptManagerList();
+}
+
+// Validate a candidate script ID against the schema rules + existing scripts.
+// Returns null when valid, otherwise a human-readable reason.
+function ScriptManagerIDError(ID) {
+  const Trimmed = String(ID || '').trim();
+  if (!Trimmed) return 'ID is required';
+  if (/\s/.test(Trimmed)) return 'ID cannot contain spaces';
+  if (!/^[A-Za-z0-9]+$/.test(Trimmed)) return 'ID can only contain letters and numbers';
+  const Taken = ScriptManagerCache.some(
+    (s) => String(s.id).toLowerCase() === Trimmed.toLowerCase()
+  );
+  if (Taken) return 'A script with this ID already exists';
+  return null;
+}
+
+// Create a brand new blank script and open it in the editor.
+async function CreateBlankScript() {
+  const Btn = $('#SCRIPT_MANAGER_CREATE');
+  Btn.prop('disabled', true);
+  const [Err, Result] = await window.API.CreateScript();
+  Btn.prop('disabled', false);
+  if (Err || !Result || !Result.id) {
+    Notify(`Could not create script: ${Err || 'unknown error'}`, 'error');
+    return;
+  }
+  await RefreshScriptManagerList();
+  Notify('Blank script created', 'success');
+  OpenScriptManagerEditor(Result.id);
+}
+
+async function OpenScriptManagerTemplates() {
+  ShowScriptManagerTemplates();
+  const Container = document.getElementById('SCRIPT_MANAGER_TEMPLATES_LIST');
+  Container.innerHTML =
+    '<div class="p-3 rounded bg-ghost text-center text-muted">Loading sample scripts…</div>';
+  await RefreshScriptManagerTemplates(false);
+}
+
+async function RefreshScriptManagerTemplates(Force) {
+  try {
+    const [Err, List] = Force
+      ? await window.API.RefreshSampleScripts()
+      : await window.API.GetSampleScripts();
+    if (Err) {
+      Notify(`Could not load sample scripts: ${Err}`, 'error');
+      ScriptManagerSampleCache = ScriptManagerSampleCache || [];
+    } else {
+      ScriptManagerSampleCache = List || [];
+    }
+  } catch (Err) {
+    HandleNonFatalError('ScriptManager:Templates', Err);
+    ScriptManagerSampleCache = [];
+  }
+  RenderScriptManagerTemplates();
+}
+
+function GenerateTemplatePlaceholderID() {
+  const Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let Candidate = '';
+  do {
+    Candidate = 'Script';
+    for (let Index = 0; Index < 6; Index += 1) {
+      Candidate += Alphabet[Math.floor(Math.random() * Alphabet.length)];
+    }
+  } while (ScriptManagerIDError(Candidate));
+  return Candidate;
+}
+
+async function CreateScriptFromTemplateWithGeneratedID(SampleID) {
+  const MaxAttempts = 10;
+  for (let Attempt = 0; Attempt < MaxAttempts; Attempt += 1) {
+    const DesiredID = GenerateTemplatePlaceholderID();
+    const [Err, Result] = await window.API.CreateScriptFromTemplate(SampleID, DesiredID);
+    if (!Err) return [null, Result];
+    if (!(Result && Result.conflict)) {
+      return [Err, Result];
+    }
+  }
+  return ['Could not generate a unique script ID', null];
+}
+
+function RenderScriptManagerTemplates() {
+  const Container = document.getElementById('SCRIPT_MANAGER_TEMPLATES_LIST');
+  Container.innerHTML = '';
+
+  if (!ScriptManagerSampleCache.length) {
+    Container.innerHTML =
+      '<div class="p-3 rounded bg-ghost text-center text-muted">No sample scripts available. Check your internet connection and try refreshing.</div>';
+    return;
+  }
+
+  for (const Sample of ScriptManagerSampleCache) {
+    const OSChips = RenderScriptManagerOSChips({
+      platforms: Sample.platforms || {},
+      compatiblePlatforms: SCRIPT_MANAGER_PLATFORMS
+        .filter((p) => Sample.platforms && String(Sample.platforms[p.key] || '').trim())
+        .map((p) => p.key),
+    });
+    const DescriptionLine = Sample.description
+      ? `<div class="script-manager-item-desc">${Safe(Sample.description)}</div>`
+      : '';
+    const AccentColour = ScriptColourHex(Sample.colour);
+
+    const Item = document.createElement('div');
+    Item.className = 'script-manager-item p-3 rounded bg-ghost';
+    Item.style.setProperty('--script-accent', AccentColour);
+    Item.innerHTML = `
+      <div class="script-manager-accent-strip"></div>
+      <div class="d-flex align-items-center gap-2">
+        <div class="flex-grow-1 min-w-0">
+          <div class="d-flex align-items-center">
+            <span class="text-bold script-manager-item-name">${Safe(Sample.name || Sample.id)}</span>
+          </div>
+          ${DescriptionLine}
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+          <div class="script-manager-os-list">${OSChips}</div>
+          <button type="button" class="btn btn-sm script-manager-folder-btn script-manager-template-create flex-shrink-0">
+            <i class="bi bi-plus-lg"></i> Create
+          </button>
+        </div>
+      </div>
+      <div class="script-manager-template-hint text-sm text-muted mt-1"></div>
+    `;
+
+    const CreateBtn = Item.querySelector('.script-manager-template-create');
+    const Hint = Item.querySelector('.script-manager-template-hint');
+
+    CreateBtn.addEventListener('click', async () => {
+      CreateBtn.disabled = true;
+      Hint.textContent = '';
+      Hint.classList.remove('text-danger');
+      Hint.classList.add('text-muted');
+      const [Err, Result] = await CreateScriptFromTemplateWithGeneratedID(Sample.id);
+      if (Err) {
+        Hint.textContent = Err;
+        Hint.classList.add('text-danger');
+        Hint.classList.remove('text-muted');
+        CreateBtn.disabled = false;
+        Notify(`Could not create script: ${Err}`, 'error');
+        return;
+      }
+      const NewID = Result && Result.id;
+      await RefreshScriptManagerList();
+      Notify(`Script "${NewID}" created from template`, 'success');
+      OpenScriptManagerEditor(NewID);
+    });
+
+    Container.appendChild(Item);
+  }
 }
 
 // Pick a Bootstrap icon for a file based on its extension.
@@ -125,13 +285,10 @@ function RenderScriptManagerOSChips(Script) {
   return SCRIPT_MANAGER_PLATFORMS.map((p) => {
     const Path = typeof Platforms[p.key] === 'string' ? Platforms[p.key].trim() : '';
 
-    // Always show macOS/Linux and mark missing paths in red so cross-platform
-    // gaps are immediately visible while authoring scripts.
+    // Always show every platform and mark missing paths in red so authoring
+    // gaps are immediately visible.
     if (!Path) {
-      if (p.key === 'macOS' || p.key === 'Linux') {
-        return `<span class="script-manager-os-chip missing" title="${p.label}: no script configured"><i class="bi ${p.icon}"></i>${p.label}</span>`;
-      }
-      return `<span class="script-manager-os-chip" title="${p.label}: no script configured"><i class="bi ${p.icon}"></i>${p.label}</span>`;
+      return `<span class="script-manager-os-chip missing" title="${p.label}: no script configured"><i class="bi ${p.icon}"></i>${p.label}</span>`;
     }
 
     const State = Compatible.has(p.key) ? 'compatible' : 'broken';
@@ -185,7 +342,6 @@ function RenderScriptManagerList() {
       <div class="d-flex align-items-center gap-2">
         <span class="script-manager-grip" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></span>
         <div class="flex-grow-1 min-w-0">
-          <div class="script-manager-item-id">${Safe(Script.id)}</div>
           <div class="d-flex align-items-center">
             <span class="text-bold script-manager-item-name">${Safe(Script.name || Script.id)}</span>
             ${InvalidBadge}
@@ -501,6 +657,22 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#SCRIPT_MANAGER_BACK')
     .off('click')
     .on('click', () => ShowScriptManagerList());
+
+  $('#SCRIPT_MANAGER_CREATE')
+    .off('click')
+    .on('click', () => CreateBlankScript());
+
+  $('#SCRIPT_MANAGER_CREATE_TEMPLATE')
+    .off('click')
+    .on('click', () => OpenScriptManagerTemplates());
+
+  $('#SCRIPT_MANAGER_TEMPLATES_BACK')
+    .off('click')
+    .on('click', () => ShowScriptManagerList());
+
+  $('#SCRIPT_MANAGER_TEMPLATES_REFRESH')
+    .off('click')
+    .on('click', () => RefreshScriptManagerTemplates(true));
 
   $('#SCRIPT_MANAGER_OPEN_FOLDER')
     .off('click')

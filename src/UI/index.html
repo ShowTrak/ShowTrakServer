@@ -494,10 +494,54 @@
           <div class="modal-body text-start">
             <!-- List view -->
             <div id="SCRIPT_MANAGER_LIST_VIEW">
-              <div class="d-flex justify-content-between align-items-center mb-1">
+              <div class="d-flex justify-content-between align-items-center mb-2">
                 <strong class="mb-2">Script Manager</strong>
+                <div class="d-flex gap-2">
+                  <button
+                    type="button"
+                    id="SCRIPT_MANAGER_CREATE_TEMPLATE"
+                    class="btn btn-sm script-manager-template-btn"
+                    title="Browse the ShowTrak sample scripts and use one as a template"
+                  >
+                    <i class="bi bi-collection"></i> New from template
+                  </button>
+                  <button
+                    type="button"
+                    id="SCRIPT_MANAGER_CREATE"
+                    class="btn btn-sm script-manager-create-btn"
+                    title="Create a new blank script"
+                  >
+                    <i class="bi bi-plus-lg"></i>
+                  </button>
+                </div>
               </div>
               <div id="SCRIPT_MANAGER_LIST" class="d-grid gap-2"></div>
+            </div>
+
+            <!-- Templates (sample scripts) view -->
+            <div id="SCRIPT_MANAGER_TEMPLATES_VIEW" class="d-none">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <button
+                  type="button"
+                  id="SCRIPT_MANAGER_TEMPLATES_BACK"
+                  class="btn btn-sm btn-ghost-light text-light border-0 ps-0"
+                >
+                  <i class="bi bi-chevron-left"></i> Back to list
+                </button>
+                <button
+                  type="button"
+                  id="SCRIPT_MANAGER_TEMPLATES_REFRESH"
+                  class="btn btn-sm script-manager-folder-btn"
+                  title="Check for updated sample scripts"
+                >
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </div>
+              <strong class="d-block mb-1">Create From Template</strong>
+              <span class="text-sm text-muted d-block mb-2"
+                >Pick an approved ShowTrak sample script to use as a starting point.</span
+              >
+              <div id="SCRIPT_MANAGER_TEMPLATES_LIST" class="d-grid gap-2"></div>
             </div>
 
             <!-- Editor view -->

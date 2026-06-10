@@ -653,31 +653,6 @@ $(async function () {
           },
         });
       }
-      let SYSTEM_ALLOW_SCRIPT_EDITS = await GetSettingValue('SYSTEM_ALLOW_SCRIPT_EDITS');
-      if (SYSTEM_ALLOW_SCRIPT_EDITS && AppMode === 'EDIT') {
-        Options.push({
-          Type: 'Action',
-          Title: 'Delete Scripts',
-          Class: 'text-warning',
-          Action: async function () {
-            let Confirmation = await ConfirmationDialog(
-              'Are you sure you want to delete scripts from clients?'
-            );
-            if (!Confirmation) return;
-            window.API.DeleteScripts(Selected);
-            ShowExecutionToast();
-          },
-        });
-        Options.push({
-          Type: 'Action',
-          Title: 'Deploy Scripts',
-          Class: 'text-warning',
-          Action: async function () {
-            window.API.UpdateScripts(Selected);
-            ShowExecutionToast();
-          },
-        });
-      }
       Options.push({
         Type: 'Action',
         Title: 'Clear Selection',
