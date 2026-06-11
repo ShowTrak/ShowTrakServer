@@ -202,6 +202,15 @@ async function OpenGroupManager(Relaunching = false) {
                     ${Safe(Group.Title)} 
                 </span>
                 <div class="d-flex gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-light copy-field-btn"
+                      data-copy="${Group.GroupID}"
+                      title="Copy Group ID"
+                      aria-label="Copy Group ID"
+                    >
+                      <i class="bi bi-clipboard"></i>
+                    </button>
                     <span class="badge bg-ghost-light text-light">
                         ${GroupMembers.length} ${GroupMembers.length == 1 ? 'Client' : 'Clients'}
                     </span>

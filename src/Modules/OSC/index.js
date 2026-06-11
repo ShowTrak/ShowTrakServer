@@ -7,6 +7,7 @@ const { Manager: ClientManager } = require('../ClientManager');
 const { Manager: Broadcast } = require('../Broadcast');
 const { Manager: ScriptManager } = require('../ScriptManager');
 const { Manager: DummyClientManager } = require('../DummyClientManager');
+const { Manager: GroupManager } = require('../GroupManager');
 var OSCServer = new Server(3333, '0.0.0.0', () => {
   console.log('OSC Server is listening');
 });
@@ -35,6 +36,26 @@ function successResult(detail = '') {
     ok: true,
     detail: String(detail || ''),
   };
+}
+
+async function getGroupClients(GroupIDRaw) {
+  const GroupID = Number(GroupIDRaw);
+  if (!Number.isFinite(GroupID)) {
+    return [failureResult(`Invalid Group ID "${GroupIDRaw}"`), null, null];
+  }
+
+  const [GroupErr, Group] = await GroupManager.Get(GroupID);
+  if (GroupErr || !Group) {
+    return [failureResult(`Invalid Group ID "${GroupIDRaw}"`), null, null];
+  }
+
+  const [ClientsErr, Clients] = await ClientManager.GetAll();
+  if (ClientsErr) {
+    return [failureResult('Failed to fetch all clients'), null, null];
+  }
+
+  const GroupClients = (Clients || []).filter((Client) => Number(Client.GroupID) === GroupID);
+  return [null, Group, GroupClients];
 }
 
 OSCServer.on('message', async function (Route, Info) {
@@ -221,21 +242,81 @@ OSC.CreateRoute(
 );
 
 // Group
-// OSC.CreateRoute('/ShowTrak/Group/:GroupID/Select', async (_Req) => {
-//     return false;
-// }, 'Select all members of a Group by its Group ID');
+OSC.CreateRoute(
+  '/ShowTrak/Group/:GroupID/Select',
+  async (Req) => {
+    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID);
+    if (GroupErr) {
+      Broadcast.emit('Notify', `OSC - ${GroupErr.detail}`, 'error');
+      return GroupErr;
+    }
 
-// OSC.CreateRoute('/ShowTrak/Group/:GroupID/Deselect', async (_Req) => {
-//     return false;
-// }, 'Deselect all members of a Group by its Group ID');
+    const UUIDs = GroupClients.map((Client) => Client.UUID);
+    Broadcast.emit('OSCBulkAction', 'Select', UUIDs, null);
+    return successResult(`Selected ${UUIDs.length} clients in group "${Group.Title}" (${Group.GroupID})`);
+  },
+  'Select all members of a Group by its Group ID'
+);
 
-// OSC.CreateRoute('/ShowTrak/Group/:GroupID/WakeOnLAN', async (_Req) => {
-//     return false;
-// }, 'Send a WOL packet to all offline members of a Group by its Group ID');
+OSC.CreateRoute(
+  '/ShowTrak/Group/:GroupID/Deselect',
+  async (Req) => {
+    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID);
+    if (GroupErr) {
+      Broadcast.emit('Notify', `OSC - ${GroupErr.detail}`, 'error');
+      return GroupErr;
+    }
 
-// OSC.CreateRoute('/ShowTrak/Group/:GroupID/RunScript/:ScriptID', async (_Req) => {
-//     return false;
-// }, 'Execute a script on all online members of a Group by its Group ID and Script ID');
+    const UUIDs = GroupClients.map((Client) => Client.UUID);
+    Broadcast.emit('OSCBulkAction', 'Deselect', UUIDs, null);
+    return successResult(
+      `Deselected ${UUIDs.length} clients in group "${Group.Title}" (${Group.GroupID})`
+    );
+  },
+  'Deselect all members of a Group by its Group ID'
+);
+
+OSC.CreateRoute(
+  '/ShowTrak/Group/:GroupID/WakeOnLAN',
+  async (Req) => {
+    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID);
+    if (GroupErr) {
+      Broadcast.emit('Notify', `OSC - ${GroupErr.detail}`, 'error');
+      return GroupErr;
+    }
+
+    const UUIDs = GroupClients.map((Client) => Client.UUID);
+    Broadcast.emit('OSCBulkAction', 'WOL', UUIDs, null);
+    return successResult(
+      `Wake-on-LAN queued for ${UUIDs.length} clients in group "${Group.Title}" (${Group.GroupID})`
+    );
+  },
+  'Send a WOL packet to all offline members of a Group by its Group ID'
+);
+
+OSC.CreateRoute(
+  '/ShowTrak/Group/:GroupID/RunScript/:ScriptID',
+  async (Req) => {
+    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID);
+    if (GroupErr) {
+      Broadcast.emit('Notify', `OSC - ${GroupErr.detail}`, 'error');
+      return GroupErr;
+    }
+
+    let Script = await ScriptManager.Get(Req.ScriptID);
+    if (!Script) {
+      Broadcast.emit('Notify', `OSC - Invalid Script ID "${Req.ScriptID}"`, 'error');
+      return failureResult(`Invalid Script ID "${Req.ScriptID}"`);
+    }
+
+    const UUIDs = GroupClients.map((Client) => Client.UUID);
+    Broadcast.emit('OSCBulkAction', 'ExecuteScript', UUIDs, Req.ScriptID);
+    return successResult(
+      `Script "${Req.ScriptID}" queued for ${UUIDs.length} clients in group "${Group.Title}" (${Group.GroupID})`
+    );
+  },
+  'Execute a script on all online members of a Group by its Group ID and Script ID'
+);
 
 // All
 OSC.CreateRoute(

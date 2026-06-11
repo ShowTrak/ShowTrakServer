@@ -35,12 +35,24 @@ function loadOSC(overrides = {}) {
     '../ClientManager': {
       Manager: {
         Get: async (uuid) => (uuid === 'good' ? [null, { UUID: 'good' }] : ['not found', null]),
-        GetAll: async () => [null, [{ UUID: 'a' }, { UUID: 'b' }]],
+        GetAll: async () => [
+          null,
+          [
+            { UUID: 'a', GroupID: 1 },
+            { UUID: 'b', GroupID: 1 },
+            { UUID: 'c', GroupID: 2 },
+          ],
+        ],
       },
     },
     '../Broadcast': { Manager: { emit: (...args) => broadcastEvents.push(args) } },
     '../ScriptManager': {
       Manager: { Get: async (id) => (id === 'script1' ? { ID: 'script1' } : null) },
+    },
+    '../GroupManager': {
+      Manager: {
+        Get: async (id) => (Number(id) === 1 ? [null, { GroupID: 1, Title: 'Main' }] : [null, null]),
+      },
     },
     '../DummyClientManager': {
       Manager: {
@@ -64,6 +76,8 @@ test('OSC registers the built-in routes', () => {
   assert.ok(routes.includes('/ShowTrak/Shutdown/Force'));
   assert.ok(routes.includes('/ShowTrak/Client/:UUID/Select'));
   assert.ok(routes.includes('/ShowTrak/Client/:UUID/RunScript/:ScriptID'));
+  assert.ok(routes.includes('/ShowTrak/Group/:GroupID/Select'));
+  assert.ok(routes.includes('/ShowTrak/Group/:GroupID/RunScript/:ScriptID'));
   assert.ok(routes.includes('/ShowTrak/All/WakeOnLAN'));
 });
 
@@ -115,7 +129,36 @@ test('OSC All/WakeOnLAN broadcasts to every client', async () => {
     ([event, action]) => event === 'OSCBulkAction' && action === 'WOL'
   );
   assert.ok(wol);
-  assert.deepEqual(wol[2], ['a', 'b']);
+  assert.deepEqual(wol[2], ['a', 'b', 'c']);
+});
+
+test('OSC Group/Select broadcasts only matching group clients', async () => {
+  const { handlers, broadcastEvents } = loadOSC();
+  await handlers.message(['/ShowTrak/Group/1/Select']);
+  const select = broadcastEvents.find(
+    ([event, action]) => event === 'OSCBulkAction' && action === 'Select'
+  );
+  assert.ok(select);
+  assert.deepEqual(select[2], ['a', 'b']);
+});
+
+test('OSC Group/RunScript validates script and group', async () => {
+  const { handlers, broadcastEvents } = loadOSC();
+  await handlers.message(['/ShowTrak/Group/1/RunScript/script1']);
+  assert.ok(
+    broadcastEvents.some(
+      ([event, action, uuids, scriptId]) =>
+        event === 'OSCBulkAction' &&
+        action === 'ExecuteScript' &&
+        scriptId === 'script1' &&
+        Array.isArray(uuids) &&
+        uuids.length === 2
+    )
+  );
+
+  broadcastEvents.length = 0;
+  await handlers.message(['/ShowTrak/Group/999/Select']);
+  assert.ok(broadcastEvents.some(([event, , level]) => event === 'Notify' && level === 'error'));
 });
 
 test('OSC ignores routes that do not match any registered path', async () => {
