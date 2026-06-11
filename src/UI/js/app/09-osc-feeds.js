@@ -6,6 +6,63 @@ const HttpApiRoutes = [
   },
 ];
 
+const OSC_HTTP_DEBUG_MAX_LINES = 300;
+let OscHttpDebugEntries = [];
+let OscHttpDebugModalOpen = false;
+
+function FormatDebugTime(timestamp) {
+  const date = new Date(Number(timestamp) || Date.now());
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${hours}:${minutes}:${seconds}`;
+}
+
+function EscapeHtml(value) {
+  return Safe(value == null ? '' : String(value));
+}
+
+function RenderOscHttpDebugTerminal() {
+  const $terminal = $('#OSC_HTTP_DEBUG_TERMINAL');
+  if (!$terminal.length) return;
+
+  if (!OscHttpDebugEntries.length) {
+    $terminal.html(
+      '<div class="osc-http-debug-empty">Open this terminal and send OSC or /API traffic to inspect requests.</div>'
+    );
+    return;
+  }
+
+  $terminal.html(
+    OscHttpDebugEntries.map((entry) => {
+      const stateClass = entry.valid ? 'is-valid' : 'is-invalid';
+      const icon = entry.valid ? '&#10003;' : '&#10005;';
+      const protocol = EscapeHtml(String(entry.protocol || '').toUpperCase());
+      const summary = EscapeHtml(entry.summary || 'Unknown request');
+      const detail = entry.detail ? `<span class="osc-http-debug-detail">${EscapeHtml(entry.detail)}</span>` : '';
+      return `
+		<div class="osc-http-debug-line ${stateClass}">
+			<div class="osc-http-debug-status">${icon}</div>
+			<div class="osc-http-debug-meta">[${EscapeHtml(FormatDebugTime(entry.timestamp))}] ${protocol}</div>
+			<div class="osc-http-debug-text"><span class="osc-http-debug-summary">${summary}</span>${detail}</div>
+		</div>
+	`;
+    }).join('')
+  );
+
+  const terminal = $terminal.get(0);
+  if (terminal) terminal.scrollTop = terminal.scrollHeight;
+}
+
+function AppendOscHttpDebugEntry(entry) {
+  if (!OscHttpDebugModalOpen) return;
+  OscHttpDebugEntries.push(entry);
+  if (OscHttpDebugEntries.length > OSC_HTTP_DEBUG_MAX_LINES) {
+    OscHttpDebugEntries = OscHttpDebugEntries.slice(-OSC_HTTP_DEBUG_MAX_LINES);
+  }
+  RenderOscHttpDebugTerminal();
+}
+
 function RenderRouteEntry($Container, Route) {
   let PathFiller = '';
   for (const Segment of String(Route.Path || '').split('/').filter((s) => s.length > 0)) {
@@ -33,8 +90,36 @@ async function OpenOSCDictionary() {
   $('#OSC_ROUTE_LIST_MODAL').modal('show');
 }
 
+async function OpenOscHttpDebugTerminal() {
+  await CloseAllModals();
+  $('#OSC_HTTP_DEBUG_MODAL').modal('show');
+}
+
+$('#OSC_HTTP_DEBUG_MODAL')
+  .off('shown.bs.modal.oschttpdebug hidden.bs.modal.oschttpdebug')
+  .on('shown.bs.modal.oschttpdebug', () => {
+    OscHttpDebugEntries = [];
+    OscHttpDebugModalOpen = true;
+    RenderOscHttpDebugTerminal();
+  })
+  .on('hidden.bs.modal.oschttpdebug', () => {
+    OscHttpDebugModalOpen = false;
+    OscHttpDebugEntries = [];
+    RenderOscHttpDebugTerminal();
+  });
+
 window.API.Notify(async (Message, Type, Duration) => {
   Notify(Message, Type, Duration);
+});
+
+window.API.DebugTrafficEntry(async (Entry) => {
+  AppendOscHttpDebugEntry({
+    protocol: Entry && Entry.protocol ? Entry.protocol : 'unknown',
+    timestamp: Entry && Entry.timestamp ? Entry.timestamp : Date.now(),
+    valid: !!(Entry && Entry.valid),
+    summary: Entry && Entry.summary ? Entry.summary : 'Unknown request',
+    detail: Entry && Entry.detail ? Entry.detail : '',
+  });
 });
 
 window.API.SetOSCList(async (Routes) => {

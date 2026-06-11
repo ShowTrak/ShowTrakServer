@@ -91,6 +91,7 @@ const SUBSCRIBE_CHANNELS = new Set([
   'OSCBulkAction',
   'PlaySound',
   'Notify',
+  'DebugTrafficEntry',
   'SetOSCList',
   'SetDevicesPendingAdoption',
   'SetFullClientList',
@@ -184,6 +185,7 @@ contextBridge.exposeInMainWorld('API', {
   PlaySound: (Callback) => subscribe('PlaySound', Callback),
   Notify: (Callback) =>
     subscribe('Notify', Callback, (Message, Type, Duration) => [Message, Type, Duration]),
+  DebugTrafficEntry: (Callback) => subscribe('DebugTrafficEntry', Callback),
   SetOSCList: (Callback) => subscribe('SetOSCList', Callback),
   SetDevicesPendingAdoption: (Callback) => subscribe('SetDevicesPendingAdoption', Callback),
   SetFullClientList: (Callback) =>

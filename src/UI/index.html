@@ -216,6 +216,15 @@
                   OSC/API Reference
                 </button>
               </li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item"
+                  id="SHOWTRAK_MODEL_CORE_OSC_HTTP_DEBUG_BUTTON"
+                >
+                  OSC/API Debug Terminal
+                </button>
+              </li>
               <li><hr class="dropdown-divider" /></li>
               <li><h6 class="dropdown-header">Help &amp; Support</h6></li>
               <li>
@@ -563,6 +572,30 @@
           <div class="modal-body text-center">
             <strong id="OSC_ROUTE_LIST_MODAL_Label" class="mb-0">OSC/API Reference</strong>
             <div id="OSC_ROUTE_LIST" class="d-grid gap-2 text-start"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="OSC_HTTP_DEBUG_MODAL"
+      tabindex="-1"
+      aria-labelledby="OSC_HTTP_DEBUG_MODAL_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content osc-http-debug-modal-content">
+          <div class="modal-body osc-http-debug-modal-body">
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+              <div>
+                <strong id="OSC_HTTP_DEBUG_MODAL_Label" class="mb-0">OSC/API Debug Terminal</strong>
+              </div>
+              <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Close</button>
+            </div>
+            <div id="OSC_HTTP_DEBUG_TERMINAL" class="osc-http-debug-terminal" role="log" aria-live="polite">
+              <div class="osc-http-debug-empty">Open this terminal and send OSC or /API traffic to inspect requests.</div>
+            </div>
           </div>
         </div>
       </div>

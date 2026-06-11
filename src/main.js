@@ -407,6 +407,10 @@ function buildMacAppMenuTemplate() {
       label: 'OSC/API Reference',
       click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON'),
     },
+    {
+      label: 'OSC/API Debug Terminal',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_OSC_HTTP_DEBUG_BUTTON'),
+    },
     { type: 'separator' },
     {
       label: 'Check for Updates',
@@ -2249,9 +2253,25 @@ async function HandleOSCBulkAction(Type, Targets, Args = null) {
 
 BroadcastManager.on('OSCBulkAction', HandleOSCBulkAction);
 
+async function ForwardDebugTrafficEntry(Entry) {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  MainWindow.webContents.send('DebugTrafficEntry', Entry);
+}
+
+BroadcastManager.on('DebugTrafficEntry', ForwardDebugTrafficEntry);
+
 BroadcastManager.on('Shutdown', async () => {
   Logger.log('Application shutdown requested (broadcast)');
   bypassShutdownConfirmation = true;
+  quitRequested = true;
+  app.quit();
+});
+
+BroadcastManager.on('ShutdownForce', async () => {
+  Logger.warn('Application force shutdown requested (broadcast)');
+  // Bypass close prompts so remote forced shutdowns can proceed immediately.
+  bypassShutdownConfirmation = true;
+  mainWindowCloseApproved = true;
   quitRequested = true;
   app.quit();
 });

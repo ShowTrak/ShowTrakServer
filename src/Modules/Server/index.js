@@ -32,6 +32,37 @@ const app = express();
 
 UpdateManager.RegisterRoutes(app);
 
+app.use('/API', (req, res, next) => {
+  const startAt = Date.now();
+  res.on('finish', () => {
+    const statusCode = Number(res.statusCode || 0);
+    const sourceIP =
+      (req.ip ||
+        (req.socket && req.socket.remoteAddress) ||
+        (req.connection && req.connection.remoteAddress)) ||
+      null;
+
+    const detailParts = [];
+    if (res.locals && res.locals.debugTrafficDetail) {
+      detailParts.push(String(res.locals.debugTrafficDetail));
+    }
+    detailParts.push(`${statusCode || '---'}`);
+    if (Date.now() - startAt >= 0) detailParts.push(`${Date.now() - startAt}ms`);
+    if (sourceIP) detailParts.push(sourceIP);
+
+    Logger.log(`API ${req.method} ${req.originalUrl} -> ${statusCode}`);
+    require('../Broadcast').Manager.emit('DebugTrafficEntry', {
+      protocol: 'http',
+      timestamp: Date.now(),
+      valid: statusCode > 0 && statusCode < 400,
+      summary: `${req.method} ${req.originalUrl || req.url || '/API'}`,
+      detail: detailParts.join(' • '),
+      source: sourceIP,
+    });
+  });
+  next();
+});
+
 // Dummy Client heartbeat (HTTP GET/POST). Addressed by the user-facing DummyID.
 // Mirrors the OSC /ShowTrak/Dummy/:ID/Heartbeat route.
 const DummyHeartbeatHandler = async (req, res) => {
@@ -41,12 +72,18 @@ const DummyHeartbeatHandler = async (req, res) => {
     null;
   const [Err] = await DummyClientManager.Heartbeat(ID, SourceIP);
   if (Err) {
+    res.locals.debugTrafficDetail = `Invalid dummy ID \"${String(ID || '')}\"`;
     return res.status(404).json({ ok: false, error: String(Err) });
   }
+  res.locals.debugTrafficDetail = `Dummy heartbeat accepted for \"${String(ID || '')}\"`;
   return res.json({ ok: true });
 };
 app.get('/API/Dummy/:id/Heartbeat', DummyHeartbeatHandler);
 app.post('/API/Dummy/:id/Heartbeat', DummyHeartbeatHandler);
+app.use('/API', (_req, res) => {
+  res.locals.debugTrafficDetail = 'API route not found';
+  return res.status(404).json({ ok: false, error: 'API route not found' });
+});
 
 
 const ScriptDirectory = AppDataManager.GetScriptsDirectory();

@@ -1279,6 +1279,10 @@ async function Init() {
     await OpenOSCDictionary();
   });
 
+  $('#SHOWTRAK_MODEL_CORE_OSC_HTTP_DEBUG_BUTTON').on('click', async () => {
+    await OpenOscHttpDebugTerminal();
+  });
+
   $('#SHOWTRAK_MODEL_CORE_SCRIPT_MANAGER_BUTTON').on('click', async () => {
     await OpenScriptManager();
   });

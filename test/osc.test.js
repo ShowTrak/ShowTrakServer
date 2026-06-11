@@ -42,6 +42,11 @@ function loadOSC(overrides = {}) {
     '../ScriptManager': {
       Manager: { Get: async (id) => (id === 'script1' ? { ID: 'script1' } : null) },
     },
+    '../DummyClientManager': {
+      Manager: {
+        Heartbeat: async () => [null, true],
+      },
+    },
     ...overrides,
   };
 
@@ -56,9 +61,16 @@ test('OSC registers the built-in routes', () => {
   const { OSC } = loadOSC();
   const routes = OSC.GetRoutes().map((r) => r.Path);
   assert.ok(routes.includes('/ShowTrak/Shutdown'));
+  assert.ok(routes.includes('/ShowTrak/Shutdown/Force'));
   assert.ok(routes.includes('/ShowTrak/Client/:UUID/Select'));
   assert.ok(routes.includes('/ShowTrak/Client/:UUID/RunScript/:ScriptID'));
   assert.ok(routes.includes('/ShowTrak/All/WakeOnLAN'));
+});
+
+test('OSC force shutdown route emits ShutdownForce broadcast', async () => {
+  const { handlers, broadcastEvents } = loadOSC();
+  await handlers.message(['/ShowTrak/Shutdown/Force']);
+  assert.ok(broadcastEvents.some(([event]) => event === 'ShutdownForce'));
 });
 
 test('OSC dispatches a client select route with a valid UUID', async () => {
@@ -109,7 +121,11 @@ test('OSC All/WakeOnLAN broadcasts to every client', async () => {
 test('OSC ignores routes that do not match any registered path', async () => {
   const { handlers, broadcastEvents } = loadOSC();
   await handlers.message(['/Unknown/Route']);
-  assert.equal(broadcastEvents.length, 0);
+  assert.ok(
+    !broadcastEvents.some(
+      ([event]) => event === 'OSCBulkAction' || event === 'Notify' || event === 'Shutdown'
+    )
+  );
 });
 
 test('OSC.CreateRoute registers custom routes', () => {
