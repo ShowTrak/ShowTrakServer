@@ -2026,6 +2026,24 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Nickname'] {
   white-space: nowrap;
 }
 
+.SHOWTRAK_PC > .CLIENT_TILE_COMPACT_STATUS {
+  display: none;
+}
+
+body.compact-mode .SHOWTRAK_PC > .CLIENT_TILE_COMPACT_STATUS:not(.d-none) {
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  margin: 0 0 0 auto !important;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.88);
+}
+
 body.compact-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_HOSTNAME'] {
   display: none !important;
 }
@@ -2049,11 +2067,7 @@ body.compact-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_ACTION'] {
   margin-left: 0.5rem;
 }
 
-body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_ONLINE'] {
-  display: none !important;
-}
-
-body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] {
+body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']:not(.d-none) {
   max-height: none;
   opacity: 1;
   display: inline-flex !important;

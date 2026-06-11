@@ -114,6 +114,12 @@ window.API.ClientUpdated(async (Data) => {
     $(`[data-uuid='${UUID}']>[data-type="IP"]`).text(ComputedIP);
   }
 
+  const CompactOnlineStatus = $(`[data-uuid='${UUID}']>[data-type="COMPACT_ONLINE_STATUS"]`);
+  if (CompactOnlineStatus.length) {
+    CompactOnlineStatus.text('Online');
+    CompactOnlineStatus.toggleClass('d-none', !Online);
+  }
+
   if (Online) {
     $(`[data-uuid='${UUID}']>div>.progress>[data-type="CPU"]`).css(
       'width',

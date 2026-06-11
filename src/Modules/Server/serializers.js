@@ -4,6 +4,7 @@ const ToPublicClient = (c) => ({
   UUID: c.UUID,
   Nickname: c.Nickname,
   Hostname: c.Hostname,
+  OperatingSystem: c.OperatingSystem || '',
   GroupID: c.GroupID,
   Weight: c.Weight,
   Version: c.Version,

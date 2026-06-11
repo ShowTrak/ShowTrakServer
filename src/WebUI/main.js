@@ -71,6 +71,8 @@
     netFamilyV4Btn: $('netFamilyV4Btn'),
     netFamilyV6Btn: $('netFamilyV6Btn'),
     netList: $('netList'),
+    appsSection: $('appsSection'),
+    appsList: $('appsList'),
     runScriptBtn: $('runScriptBtn'),
     wolBtn: $('wolBtn'),
     detailClose: $('detailClose'),
@@ -409,6 +411,7 @@
     }" data-uuid="${safe(UUID)}" data-kind="client">
       <label class="text-sm" data-type="Hostname">${safe(hostVersion)}</label>
       <h5 class="mb-0" data-type="Nickname">${safe(primaryName)}</h5>
+      <span class="CLIENT_TILE_COMPACT_STATUS${Online ? '' : ' d-none'}" data-type="COMPACT_ONLINE_STATUS">Online</span>
       <small class="text-sm text-light" data-type="IP">${IP ? safe(IP) : 'Unknown IP'}</small>
       <div class="SHOWTRAK_PC_STATUS ${
         Online ? 'd-grid' : 'd-none'
@@ -530,6 +533,9 @@
     const ip = tile.querySelector('[data-type="IP"]');
     if (ip) ip.textContent = c.IP ? c.IP : 'Unknown IP';
 
+    const compactStatus = tile.querySelector('[data-type="COMPACT_ONLINE_STATUS"]');
+    if (compactStatus) compactStatus.classList.toggle('d-none', !c.Online);
+
     const onlineInd = tile.querySelector('[data-type="INDICATOR_ONLINE"]');
     const offlineInd = tile.querySelector('[data-type="INDICATOR_OFFLINE"]');
     if (c.Online) {
@@ -622,12 +628,27 @@
     closeScripts();
   });
 
+  function FormatBytes(bytes) {
+    const n = Number(bytes);
+    if (!isFinite(n) || n <= 0) return null;
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    let val = n;
+    while (val >= 1024 && i < units.length - 1) {
+      val /= 1024;
+      i++;
+    }
+    return `${val < 10 ? val.toFixed(1) : Math.round(val)} ${units[i]}`;
+  }
+
   function paintDetail() {
     const c = clients.find((x) => x.UUID === detailUUID);
     if (!c) return;
     el.detailName.textContent = c.Nickname || c.Hostname || c.UUID;
-    el.detailStatus.textContent = c.Online ? 'Online' : `Offline · ${timeAgo(c.LastSeen)}`;
-    el.detailStatus.classList.toggle('online', !!c.Online);
+    const statusText = c.Online ? (c.Degraded ? 'Degraded' : 'Online') : `Offline · ${timeAgo(c.LastSeen)}`;
+    el.detailStatus.textContent = statusText;
+    el.detailStatus.classList.toggle('online', !!c.Online && !c.Degraded);
+    el.detailStatus.classList.toggle('degraded', !!c.Online && !!c.Degraded);
     el.detailStatus.classList.toggle('offline', !c.Online);
 
     // Vitals
@@ -638,21 +659,36 @@
       el.cpuBar.style.width = cpu + '%';
       el.ramBar.style.width = ram + '%';
       el.cpuPct.textContent = Math.round(cpu) + '%';
-      el.ramPct.textContent = Math.round(ram) + '%';
+      // RAM label: used/total (pct%) when byte counts are available
+      const ramUsed = c.Vitals && c.Vitals.Ram && c.Vitals.Ram.Used != null ? c.Vitals.Ram.Used : null;
+      const ramTotal = c.Vitals && c.Vitals.Ram && c.Vitals.Ram.Total != null ? c.Vitals.Ram.Total : null;
+      if (ramUsed != null && ramTotal != null) {
+        const usedStr = FormatBytes(ramUsed);
+        const totalStr = FormatBytes(ramTotal);
+        el.ramPct.textContent = (usedStr && totalStr)
+          ? `${usedStr} / ${totalStr} (${Math.round(ram)}%)`
+          : `${Math.round(ram)}%`;
+      } else {
+        el.ramPct.textContent = Math.round(ram) + '%';
+      }
     } else {
       el.detailVitals.classList.add('hidden');
     }
 
-    // Info grid
+    // Info grid — mirrors the desktop modal fields
     const group = groups.find((g) => g.GroupID === c.GroupID);
     const fields = [
+      c.Nickname && c.Nickname.length ? ['Nickname', c.Nickname] : null,
+      ['Hostname', c.Hostname || '—'],
+      c.OperatingSystem ? ['OS', c.OperatingSystem] : null,
+      ['Status', c.Online ? (c.Degraded ? 'Degraded' : 'Online') : 'Offline'],
       ['IP', c.IP || '—'],
-      ['MAC', c.MacAddress || '—'],
+      c.MacAddress ? ['MAC', c.MacAddress] : null,
       ['Version', c.Version || '—'],
       ['Group', group ? group.Title : 'No Group'],
       ['Last Seen', c.LastSeen ? timeAgo(c.LastSeen) : '—'],
       ['UUID', c.UUID],
-    ];
+    ].filter(Boolean);
     el.detailInfo.innerHTML = fields
       .map(
         ([k, v]) =>
@@ -660,20 +696,69 @@
       )
       .join('');
 
-    // USB devices
+    // USB devices — card layout matching desktop modal (read-only, no critical toggle)
     const usb = Array.isArray(c.USBDeviceList) ? c.USBDeviceList : [];
-    el.usbList.innerHTML = usb.length
-      ? usb
-          .map((d) => {
-            const name =
-              `${d.ManufacturerName || ''} ${d.ProductName || ''}`.trim() || 'USB Device';
-            return `<span class="chip">${safe(name)}</span>`;
-          })
-          .join('')
-      : '<span class="chip-empty">No USB devices reported.</span>';
+    if (usb.length === 0) {
+      el.usbList.innerHTML = '<div class="device-card-empty">No USB devices reported.</div>';
+    } else {
+      el.usbList.innerHTML = usb.map((d) => {
+        const name = (`${d.ManufacturerName || ''} ${d.ProductName || ''}`).trim() || 'USB Device';
+        const serial = d.SerialNumber && String(d.SerialNumber).trim()
+          ? String(d.SerialNumber).trim() : null;
+        const isCritical = !!d.IsCritical;
+        const isConnected = d.IsConnected !== false;
+        let badges = '';
+        if (isCritical && !isConnected) {
+          badges = '<div class="device-card-badges"><span class="device-badge badge-critical-missing"><i class="bi bi-x-circle-fill"></i> Disconnected Critical</span></div>';
+        } else if (isCritical) {
+          badges = '<div class="device-card-badges"><span class="device-badge badge-critical"><i class="bi bi-check-circle-fill"></i> Critical</span></div>';
+        }
+        return `<div class="device-card">
+          <div class="device-card-name">${safe(name)}</div>
+          <div class="device-card-sub">${serial ? safe(serial) : 'Serial unavailable'}</div>
+          ${badges}
+        </div>`;
+      }).join('');
+    }
 
     // Network interfaces
     paintNetworkInterfaces(c);
+
+    // Running applications — card layout matching desktop modal (read-only, no critical toggle)
+    const apps = Array.isArray(c.RunningApplications && c.RunningApplications.Items)
+      ? c.RunningApplications.Items : [];
+    const appStatus = (c.RunningApplications && c.RunningApplications.Status) || {};
+    const appStatusState = typeof appStatus.State === 'string' ? appStatus.State.trim().toLowerCase() : 'unknown';
+    const appStatusMsg = typeof appStatus.Message === 'string' && appStatus.Message.trim()
+      ? appStatus.Message.trim() : null;
+
+    let appsHtml = '';
+    if (appStatusState === 'permission_denied' || appStatusState === 'error') {
+      appsHtml += `<div class="device-card" style="border:1px solid rgba(220,53,69,0.3);background:rgba(220,53,69,0.08);">
+        <div class="device-card-name">Application Monitoring Warning</div>
+        <div class="device-card-sub">${safe(appStatusMsg || 'The client cannot collect running applications because system permission was denied.')}</div>
+      </div>`;
+    }
+    if (apps.length === 0) {
+      appsHtml += '<div class="device-card-empty">No applications reported.</div>';
+    } else {
+      appsHtml += apps.map((app) => {
+        const name = app && app.Name ? String(app.Name) : 'Unknown Application';
+        const isCritical = !!app.IsCritical;
+        const isRunning = app.IsRunning !== false;
+        let badges = '';
+        if (isCritical && !isRunning) {
+          badges = '<div class="device-card-badges"><span class="device-badge badge-critical-missing"><i class="bi bi-x-circle-fill"></i> Not Running</span></div>';
+        } else if (isCritical) {
+          badges = '<div class="device-card-badges"><span class="device-badge badge-critical"><i class="bi bi-check-circle-fill"></i> Critical</span></div>';
+        }
+        return `<div class="device-card">
+          <div class="device-card-name">${safe(name)}</div>
+          ${badges}
+        </div>`;
+      }).join('');
+    }
+    el.appsList.innerHTML = appsHtml;
 
     // Permission-gated actions
     const canScript = config.AllowRemoteScripts && scripts.length > 0;
@@ -744,10 +829,11 @@
 
   function runScript(s) {
     if (!detailUUID) return;
+    // Close scripts sheet immediately — return to client detail view first
+    closeScripts();
     socket.emit('scripts:run', { uuid: detailUUID, scriptId: s.id }, (res) => {
       if (res && res.ok) {
-        toast(`Running "${s.name}"`, 'success');
-        closeScripts();
+        toast(`"${s.name}" dispatched successfully`, 'success');
       } else if (res && res.error === 'forbidden') {
         toast('Remote script execution is disabled', 'error');
       } else if (res && typeof res.message === 'string' && res.message.trim()) {

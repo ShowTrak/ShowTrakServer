@@ -397,6 +397,7 @@ function RenderFullClientAndMonitorList() {
 					<h5 class="mb-0" data-type="Nickname">
 					${Nickname && Nickname.length ? Safe(Nickname) : Safe(Hostname)}
 					</h5>
+          <span class="CLIENT_TILE_COMPACT_STATUS d-none" data-type="COMPACT_ONLINE_STATUS">Online</span>
 					<small class="text-sm text-light" data-type="IP">
 						${IP ? Safe(IP) : 'Unknown IP'}
 					</small>

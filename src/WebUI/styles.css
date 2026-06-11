@@ -307,6 +307,10 @@ small,
   margin-top: 0.2rem;
 }
 
+.SHOWTRAK_PC_STATUS[data-type='INDICATOR_ONLINE'] {
+  gap: 0.2rem !important;
+}
+
 /* Monitor compact latency badge is unused on web; keep hidden */
 .MONITOR_COMPACT_LATENCY {
   display: none;
@@ -578,6 +582,9 @@ h7 {
 .sheet-status.online {
   color: #28d17c;
 }
+.sheet-status.degraded {
+  color: #ffc107;
+}
 .sheet-status.offline {
   color: rgba(255, 255, 255, 0.5);
 }
@@ -674,6 +681,70 @@ h7 {
 .chip-empty {
   color: rgba(255, 255, 255, 0.4);
   font-size: 0.85rem;
+}
+
+/* Device cards (USB devices + running applications) */
+.device-card-list {
+  display: grid;
+  gap: 8px;
+}
+
+.device-card {
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--ghost);
+  display: grid;
+  gap: 2px;
+}
+
+.device-card-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.device-card-sub {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.device-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.device-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.device-badge.badge-critical {
+  background: rgba(40, 209, 124, 0.12);
+  border-color: rgba(40, 209, 124, 0.35);
+  color: #28d17c;
+}
+
+.device-badge.badge-critical-missing {
+  background: rgba(220, 53, 69, 0.12);
+  border-color: rgba(220, 53, 69, 0.35);
+  color: #ff6b7d;
+}
+
+.device-card-empty {
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.85rem;
+  text-align: left;
 }
 
 .net-card-list {
@@ -910,6 +981,23 @@ body.compact .SHOWTRAK_PC > [data-type='Method'],
 body.compact .SHOWTRAK_PC > [data-type='Address'],
 body.compact .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_ONLINE'] {
   display: none !important;
+}
+
+.SHOWTRAK_PC > .CLIENT_TILE_COMPACT_STATUS {
+  display: none;
+}
+
+body.compact .SHOWTRAK_PC > .CLIENT_TILE_COMPACT_STATUS:not(.d-none) {
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0 0 0 auto !important;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.88);
 }
 
 /* Single-line title fills the row, pinned to the left like the desktop app */
