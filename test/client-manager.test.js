@@ -20,6 +20,7 @@ test('ClientManager ignores dirty tracking for automatic heartbeat and system in
   const clientRow = {
     UUID: 'client-1',
     Hostname: 'Initial Host',
+    OperatingSystem: null,
     Version: null,
     IP: null,
     MacAddress: null,
@@ -69,6 +70,7 @@ test('ClientManager ignores dirty tracking for automatic heartbeat and system in
     'client-1',
     {
       Hostname: 'Arcade PC',
+      OperatingSystem: 'Windows',
       MacAddresses: {
         ethernet: { ipv4: '10.0.0.5', mac: 'aa:bb:cc:dd:ee:ff' },
       },
@@ -84,6 +86,7 @@ test('ClientManager ignores dirty tracking for automatic heartbeat and system in
       'UPDATE Clients SET Version = ? WHERE UUID = ?',
       'UPDATE Clients SET IP = ? WHERE UUID = ?',
       'UPDATE Clients SET Hostname = ? WHERE UUID = ?',
+      'UPDATE Clients SET OperatingSystem = ? WHERE UUID = ?',
       'UPDATE Clients SET MacAddress = ? WHERE UUID = ?',
     ]
   );
@@ -105,6 +108,7 @@ test('ClientManager manual updates still use dirty-tracked writes', async () => 
             Nickname: 'Original',
             Version: '1.0.0',
             IP: '10.0.0.2',
+            OperatingSystem: null,
             MacAddress: null,
             GroupID: null,
             Weight: 100,

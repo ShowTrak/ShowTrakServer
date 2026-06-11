@@ -128,12 +128,17 @@ test('ClientManager updates system info, USB devices, and network interfaces', a
 
   const [siErr] = await Manager.SystemInfo(
     'dev-1',
-    { Hostname: 'STAGE-PC', MacAddresses: { eth0: { ipv4: '10.0.0.7', mac: 'aa:bb' } } },
+    {
+      Hostname: 'STAGE-PC',
+      OperatingSystem: 'macOS',
+      MacAddresses: { eth0: { ipv4: '10.0.0.7', mac: 'aa:bb' } },
+    },
     '10.0.0.7'
   );
   assert.equal(siErr, null);
   const [, afterSI] = await Manager.Get('dev-1');
   assert.equal(afterSI.Hostname, 'STAGE-PC');
+  assert.equal(afterSI.OperatingSystem, 'macOS');
   assert.equal(afterSI.MacAddress, 'aa:bb');
 
   await Manager.SetUSBDeviceList('dev-1', [{ SerialNumber: 'S1' }]);

@@ -226,6 +226,7 @@ Manager.SystemInfo = async (UUID, Data, IP) => {
   if (!Target) return ['Client Not Found', null];
 
   await Target.SetHostname(Data.Hostname || null, { markUnsaved: false });
+  await Target.SetOperatingSystem(Data.OperatingSystem || null, { markUnsaved: false });
   let Macs = Object.values(Data.MacAddresses || {});
   for (let Interface of Macs) {
     if (Interface.ipv4 == IP) await Target.SetMacAddress(Interface.mac, { markUnsaved: false });
@@ -255,13 +256,14 @@ Manager.Create = async (UUID) => {
   if (ExistingClient) return Fail('Client already exists');
   // Insert new client into the database
   let [InsertErr, _Res] = await DB.Run(
-    'INSERT INTO Clients (UUID, Hostname, Version, IP, Timestamp) VALUES (?, ?, ?, ?, ?)',
-    [UUID, 'ShowTrak Client', null, null, Date.now()]
+    'INSERT INTO Clients (UUID, Hostname, OperatingSystem, Version, IP, Timestamp) VALUES (?, ?, ?, ?, ?, ?)',
+    [UUID, 'ShowTrak Client', null, null, null, Date.now()]
   );
   if (InsertErr) return Fail('Failed to insert new client');
   const Created = new Client({
     UUID: UUID,
     Hostname: null,
+    OperatingSystem: null,
     Version: 'X.X.X',
     IP: null,
     Timestamp: Date.now(),

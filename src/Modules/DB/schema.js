@@ -15,6 +15,7 @@ Schema.push({
             UUID TEXT PRIMARY KEY, \
             Nickname TEXT, \
             Hostname TEXT, \
+            OperatingSystem TEXT, \
             MacAddress TEXT, \
             GroupID INTEGER, \
             Weight INTEGER NOT NULL DEFAULT 100, \
@@ -98,6 +99,7 @@ Schema.push({
 // the column already exists; sqlite has no native "ADD COLUMN IF NOT EXISTS".
 Schema.Migrations = [
   'ALTER TABLE `MonitoringTargets` ADD COLUMN DegradedThresholdMs INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE `Clients` ADD COLUMN OperatingSystem TEXT',
 ];
 
 module.exports = Schema;

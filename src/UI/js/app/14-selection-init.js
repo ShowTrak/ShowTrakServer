@@ -1356,7 +1356,7 @@ async function OpenClientInfo(UUID) {
   }
   if (!Client) return Notify('Client not found', 'error');
 
-  const { Nickname, Hostname, IP, Version, MacAddress, GroupID, Online } = Client;
+  const { Nickname, Hostname, IP, Version, MacAddress, OperatingSystem, GroupID, Online } = Client;
   // Group title lookup
   let groupTitle = 'No Group';
   try {
@@ -1371,6 +1371,7 @@ async function OpenClientInfo(UUID) {
 
   $('#CLIENT_INFO_NICKNAME').val(Nickname && Nickname.length ? Nickname : Hostname || '');
   $('#CLIENT_INFO_HOSTNAME').val(Hostname || '');
+  $('#CLIENT_INFO_OPERATING_SYSTEM').val(OperatingSystem || '');
   $('#CLIENT_INFO_GROUP').val(groupTitle);
   $('#CLIENT_INFO_IP').val(IP || 'Unknown IP');
   if (MacAddress && String(MacAddress).trim().length > 0) {
@@ -1475,6 +1476,14 @@ async function OpenClientInfo(UUID) {
 }
 
 function RenderClientInfoDetails(Client) {
+  try {
+    $('#CLIENT_INFO_OPERATING_SYSTEM').val(
+      (Client && Client.OperatingSystem ? String(Client.OperatingSystem) : '') || ''
+    );
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
+
   try {
     $('#CLIENT_INFO_STATUS').val(
       Client && Client.Online ? (Client.Degraded ? 'Degraded' : 'Online') : 'Offline'

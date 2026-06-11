@@ -28,6 +28,7 @@ class Client {
     this.UUID = Data.UUID;
     this.Nickname = Data.Nickname ? Data.Nickname : Data.Hostname;
     this.Hostname = Data.Hostname || null;
+    this.OperatingSystem = Data.OperatingSystem || null;
     this.GroupID = Data.GroupID || null;
     // Weight supports manual ordering within groups; defaults to 100 if unspecified
     this.Weight = typeof Data.Weight === 'number' ? Data.Weight : 100;
@@ -301,6 +302,18 @@ class Client {
     if (Err) return Logger.error('Failed to update client hostname');
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} hostname updated to ${Hostname}`);
+  }
+  async SetOperatingSystem(OperatingSystem, Options = {}) {
+    if (this.OperatingSystem === OperatingSystem) return;
+    this.OperatingSystem = OperatingSystem;
+    const Run = getDBRunner(Options.markUnsaved);
+    let [Err, _Res] = await Run('UPDATE Clients SET OperatingSystem = ? WHERE UUID = ?', [
+      OperatingSystem,
+      this.UUID,
+    ]);
+    if (Err) return Logger.error('Failed to update client operating system');
+    BroadcastManager.emit('ClientUpdated', this);
+    Logger.debug(`Client ${this.UUID} operating system updated to ${OperatingSystem}`);
   }
   async SetMacAddress(MacAddress, Options = {}) {
     if (this.MacAddress === MacAddress) return;
