@@ -60,20 +60,20 @@ function NormalizeClientPlatformKey(Client) {
 function ResolveDispatchBlockReason(Script, Client) {
   const PlatformKey = NormalizeClientPlatformKey(Client);
   if (!PlatformKey) {
-    return 'Unable to determine client operating system; script was not sent.';
+    return 'Unable to determine client operating system.';
   }
 
   const Platforms = Script && Script.Platforms ? Script.Platforms : {};
   const PlatformPath = typeof Platforms[PlatformKey] === 'string' ? Platforms[PlatformKey].trim() : '';
   if (!PlatformPath) {
-    return `No ${PlatformKey} script is configured for this script; it was not sent to the client.`;
+    return `No ${PlatformKey} script is configured for this script.`;
   }
 
   const Compatible = Array.isArray(Script && Script.CompatiblePlatforms)
     ? Script.CompatiblePlatforms
     : [];
   if (!Compatible.includes(PlatformKey)) {
-    return `${PlatformKey} script file "${PlatformPath}" was not found; script was not sent to the client.`;
+    return `${PlatformKey} script file "${PlatformPath}" was not found.`;
   }
 
   return null;
