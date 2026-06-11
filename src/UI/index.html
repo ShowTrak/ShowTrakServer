@@ -93,6 +93,11 @@
                   Create Monitoring Target
                 </button>
               </li>
+              <li>
+                <button type="button" class="dropdown-item" id="ADD_DUMMY_CLIENT_ACTION">
+                  Create Dummy Client
+                </button>
+              </li>
               <li><hr class="dropdown-divider" /></li>
               <li>
                 <button
@@ -1103,6 +1108,96 @@
 
     <div
       class="modal fade"
+      id="SHOWTRAK_MODAL_DUMMY_CLIENT"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_DUMMY_CLIENT_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="rounded-3 p-2 bg-ghost-light">
+              <h6 class="mb-0" id="DUMMY_CLIENT_MODAL_TITLE">Add Dummy Client</h6>
+            </div>
+
+            <div class="d-grid gap-2 text-start">
+              <div class="form-floating">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="DUMMY_CLIENT_TITLE"
+                  placeholder="Title"
+                />
+                <label for="DUMMY_CLIENT_TITLE">Title</label>
+              </div>
+              <div class="form-floating">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="DUMMY_CLIENT_ID"
+                  placeholder="ID"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <label for="DUMMY_CLIENT_ID">ID (alphanumeric, no spaces)</label>
+              </div>
+              <div class="form-floating">
+                <select class="form-select" id="DUMMY_CLIENT_GROUPID">
+                  <option value="null" selected>No Group</option>
+                </select>
+                <label for="DUMMY_CLIENT_GROUPID">Group</label>
+              </div>
+
+              <div class="bg-ghost rounded px-3 py-2">
+                <label
+                  for="DUMMY_CLIENT_INTERVAL"
+                  class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
+                >
+                  <span>Heartbeat Interval</span>
+                  <span id="DUMMY_CLIENT_INTERVAL_LABEL" class="badge bg-ghost-light text-light"
+                    >30s</span
+                  >
+                </label>
+                <input
+                  type="range"
+                  class="form-range"
+                  id="DUMMY_CLIENT_INTERVAL"
+                  min="5000"
+                  max="300000"
+                  step="1000"
+                  value="30000"
+                />
+              </div>
+            </div>
+
+            <div class="row g-2 mt-2">
+              <div class="col-6 d-grid">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+              </div>
+              <div class="col-6 d-grid">
+                <button type="button" class="btn btn-success" id="DUMMY_CLIENT_SAVE">Save</button>
+              </div>
+            </div>
+
+            <div id="DUMMY_CLIENT_DANGER_ZONE" class="d-none">
+              <div class="rounded-3 p-2 bg-ghost-light text-danger mt-2">
+                <h6 class="mb-0">Danger Zone</h6>
+              </div>
+              <button
+                type="button"
+                class="btn btn-ghost text-danger w-100 mt-2"
+                id="DUMMY_CLIENT_DELETE"
+              >
+                Delete Dummy Client
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
       id="SHOWTRAK_MONITOR_HISTORY_MODAL"
       tabindex="-1"
       aria-labelledby="SHOWTRAK_MONITOR_HISTORY_MODAL_Label"
@@ -1585,5 +1680,6 @@
     <script src="./js/app/13-alert-rules.js" defer></script>
     <script src="./js/app/14-selection-init.js" defer></script>
     <script src="./js/app/15-script-manager.js" defer></script>
+    <script src="./js/app/16-dummy-clients.js" defer></script>
   </footer>
 </html>

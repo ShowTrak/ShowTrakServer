@@ -310,6 +310,7 @@ function RenderFullClientAndMonitorList() {
   const Clients = Array.isArray(__LastClients) ? __LastClients.slice() : [];
   let Groups = Array.isArray(__LastGroups) ? __LastGroups.slice() : [];
   const Monitors = Array.isArray(MonitoringTargets) ? MonitoringTargets.slice() : [];
+  const Dummies = Array.isArray(DummyClients) ? DummyClients.slice() : [];
   let Filler = '';
 
   Groups.push({
@@ -321,7 +322,7 @@ function RenderFullClientAndMonitorList() {
   // Sort groups by weight
   Groups = Groups.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
 
-  if (Groups.length == 1 && Clients.length == 0 && Monitors.length == 0) {
+  if (Groups.length == 1 && Clients.length == 0 && Monitors.length == 0 && Dummies.length == 0) {
     Filler += `<div class="bg-ghost rounded m-3 mb-0 d-grid gap-0 gap-3 p-3">
             <h5 class="text-light mb-0">
                 Welcome to ShowTrak Server v${Safe(Config.Application.Version)}
@@ -337,20 +338,28 @@ function RenderFullClientAndMonitorList() {
       (a, b) => (a.Weight || 0) - (b.Weight || 0)
     );
     let GroupMonitors = Monitors.filter((M) => (M.GroupID || null) === GroupID);
+    let GroupDummies = Dummies.filter((D) => (D.GroupID || null) === GroupID);
 
     GroupUUIDCache.set(
       `${GroupID}`,
       GroupClients.map((c) => c.UUID)
     );
 
-    if (GroupClients.length == 0 && GroupMonitors.length == 0 && GroupID == null) continue;
+    if (
+      GroupClients.length == 0 &&
+      GroupMonitors.length == 0 &&
+      GroupDummies.length == 0 &&
+      GroupID == null
+    )
+      continue;
 
     // Merge clients + monitors and sort by Weight so a unified ordering set
     // by drag/drop is preserved.
     const Merged = []
       .concat(
         GroupClients.map((c) => ({ kind: 'client', weight: c.Weight || 0, data: c })),
-        GroupMonitors.map((m) => ({ kind: 'monitor', weight: m.Weight || 0, data: m }))
+        GroupMonitors.map((m) => ({ kind: 'monitor', weight: m.Weight || 0, data: m })),
+        GroupDummies.map((d) => ({ kind: 'dummy', weight: d.Weight || 0, data: d }))
       )
       .sort((a, b) => a.weight - b.weight);
 
@@ -414,10 +423,14 @@ function RenderFullClientAndMonitorList() {
           </div>
 					<div class="SHOWTRAK_PC_STATUS ${Online ? 'd-none' : 'd-grid'}" data-type="INDICATOR_OFFLINE">
 						<h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${LastSeen}">
-							OFFLINE <span class="badge bg-ghost">00:00:00</span>
+              Offline <span class="badge bg-ghost">00:00:00</span>
 						</h7>
 					</div>
 				</div>`;
+        } else if (Item.kind === 'dummy') {
+          if (typeof RenderDummyClientTile === 'function') {
+            Filler += RenderDummyClientTile(Item.data);
+          }
         } else {
           Filler += RenderMonitoringTargetTile(Item.data);
         }

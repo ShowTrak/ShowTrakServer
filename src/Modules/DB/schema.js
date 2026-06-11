@@ -55,6 +55,25 @@ Schema.push({
     )',
 });
 
+// Dummy Clients are a virtual class of "client": there is no installed agent.
+// Instead they are kept alive by external heartbeats delivered over OSC or
+// HTTP. They carry a stable, user-editable DummyID (distinct from the auto
+// assigned backend UUID), a title and a heartbeat interval. All connection
+// state (Idle/Online/Degraded/Offline) is runtime-only and never persisted.
+Schema.push({
+  Name: 'DummyClients',
+  SQL: 'CREATE TABLE IF NOT EXISTS `DummyClients` ( \
+            UUID TEXT PRIMARY KEY, \
+            DummyID TEXT NOT NULL UNIQUE, \
+            Nickname TEXT, \
+            Interval INTEGER NOT NULL DEFAULT 30000, \
+            IP TEXT, \
+            GroupID INTEGER, \
+            Weight INTEGER NOT NULL DEFAULT 100, \
+            Timestamp BIGINT(11) NOT NULL \
+    )',
+});
+
 Schema.push({
   Name: 'AlertRules',
   SQL: 'CREATE TABLE IF NOT EXISTS `AlertRules` ( \
@@ -111,6 +130,7 @@ Schema.push({
 Schema.Migrations = [
   'ALTER TABLE `MonitoringTargets` ADD COLUMN DegradedThresholdMs INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE `Clients` ADD COLUMN OperatingSystem TEXT',
+  'ALTER TABLE `DummyClients` ADD COLUMN IP TEXT',
 ];
 
 module.exports = Schema;

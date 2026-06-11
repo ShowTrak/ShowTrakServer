@@ -10,6 +10,9 @@ let PendingAdoption = [];
 let MonitoringTargets = [];
 let MonitoringMethodsCache = [];
 let MonitoringEditorTargetID = null;
+// Dummy clients (virtual heartbeat-driven clients)
+let DummyClients = [];
+let DummyClientEditorUUID = null;
 const MONITORING_HISTORY_RANGES = {
   '5m': { label: '5 Minutes', ms: 5 * 60 * 1000, bars: 75 },
   '15m': { label: '15 Minutes', ms: 15 * 60 * 1000, bars: 90 },

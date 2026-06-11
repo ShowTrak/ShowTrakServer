@@ -22,6 +22,7 @@
   let clients = [];
   let groups = [];
   let monitors = [];
+  let dummies = [];
   let scripts = [];
   let config = {
     Enabled: true,
@@ -422,7 +423,7 @@
       <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-none' : 'd-grid'}" data-type="INDICATOR_OFFLINE">
         <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${safe(
           c.LastSeen
-        )}">OFFLINE <span class="badge bg-ghost">00:00:00</span></h7>
+        )}">Offline <span class="badge bg-ghost">00:00:00</span></h7>
       </div>
     </div>`;
   }
@@ -450,6 +451,62 @@
     </div>`;
   }
 
+  function dummyTileHTML(D) {
+    const displayDummyIP = (IP) => {
+      const raw = typeof IP === 'string' ? IP.trim() : '';
+      if (!raw) return 'Unknown IP';
+
+      let display = raw;
+      if (display.startsWith('::ffff:')) display = display.substring(7);
+      if (display.startsWith('[') && display.endsWith(']')) {
+        display = display.substring(1, display.length - 1);
+      }
+
+      const normalized = display.toLowerCase();
+      if (
+        normalized === 'localhost' ||
+        normalized === '127.0.0.1' ||
+        normalized === '::1' ||
+        normalized === '0:0:0:0:0:0:0:1'
+      ) {
+        return 'localhost';
+      }
+      return display;
+    };
+
+    const State = String(D.State || 'IDLE');
+    const Online = !!D.Online;
+    const Degraded = !!D.Degraded;
+    const Name = D.Nickname || D.DummyID || 'Dummy';
+    const Warning =
+      Array.isArray(D.DegradedWarnings) && D.DegradedWarnings.length
+        ? String(D.DegradedWarnings[0])
+        : 'Missed Heartbeat';
+    const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : State === 'IDLE' ? 'IDLE' : '';
+    let StatusHtml;
+    if (State === 'IDLE') {
+      StatusHtml = `<h7 class="mb-0 text-light" data-type="DUMMY_STATUS_LABEL">Idle</h7>`;
+    } else if (Online && Degraded) {
+      StatusHtml = `<h7 class="mb-0 text-warning" data-type="DUMMY_STATUS_LABEL">${safe(Warning)}</h7>`;
+    } else if (Online) {
+      StatusHtml = `<h7 class="mb-0 text-light" data-type="DUMMY_STATUS_LABEL">Online</h7>`;
+    } else {
+      StatusHtml = `<h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${safe(
+        D.LastSeen
+      )}">Offline <span class="badge bg-ghost">00:00:00</span></h7>`;
+    }
+    return `<div id="DUMMY_TILE_${safe(D.UUID)}" class="SHOWTRAK_PC DUMMY ${TileStateClass}" data-dummy-uuid="${safe(
+      D.UUID
+    )}" data-kind="dummy">
+      <label class="text-sm" data-type="DummyLabel">Dummy</label>
+      <h5 class="mb-0" data-type="Name">${safe(Name)}</h5>
+      <small class="text-sm text-light" data-type="IP">${safe(displayDummyIP(D.IP))}</small>
+      <div class="SHOWTRAK_PC_STATUS d-grid" data-type="DUMMY_STATUS">
+        ${StatusHtml}
+      </div>
+    </div>`;
+  }
+
   function renderAll() {
     const groupList = groups.slice();
     groupList.push({ GroupID: null, Title: 'No Group', Weight: 100000 });
@@ -466,8 +523,13 @@
       const groupMonitors = monitors
         .filter((m) => (m.GroupID || null) === GroupID)
         .map((m) => ({ kind: 'monitor', weight: m.Weight || 0, data: m }));
+      const groupDummies = dummies
+        .filter((d) => (d.GroupID || null) === GroupID)
+        .map((d) => ({ kind: 'dummy', weight: d.Weight || 0, data: d }));
 
-      const merged = groupClients.concat(groupMonitors).sort((a, b) => a.weight - b.weight);
+      const merged = groupClients
+        .concat(groupMonitors, groupDummies)
+        .sort((a, b) => a.weight - b.weight);
 
       // Hide an empty "No Group" bucket, exactly like the desktop app.
       if (merged.length === 0 && GroupID == null) continue;
@@ -481,7 +543,12 @@
       } else {
         for (const item of merged) {
           tileCount++;
-          tiles += item.kind === 'client' ? clientTileHTML(item.data) : monitorTileHTML(item.data);
+          tiles +=
+            item.kind === 'client'
+              ? clientTileHTML(item.data)
+              : item.kind === 'dummy'
+                ? dummyTileHTML(item.data)
+                : monitorTileHTML(item.data);
         }
       }
 
@@ -599,7 +666,7 @@
       const m = Math.floor((dur % 3600000) / 60000);
       const s = Math.floor((dur % 60000) / 1000);
       const pad = (n) => String(n).padStart(2, '0');
-      node.innerHTML = `OFFLINE <span class="badge bg-ghost">${pad(h)}:${pad(m)}:${pad(s)}</span>`;
+      node.innerHTML = `Offline <span class="badge bg-ghost">${pad(h)}:${pad(m)}:${pad(s)}</span>`;
     });
   }, 1000);
 
@@ -893,6 +960,7 @@
     clients = Array.isArray(data.clients) ? data.clients : [];
     groups = Array.isArray(data.groups) ? data.groups : [];
     monitors = Array.isArray(data.monitors) ? data.monitors : [];
+    dummies = Array.isArray(data.dummies) ? data.dummies : [];
     scripts = Array.isArray(data.scripts) ? data.scripts : [];
     if (data.config) config = Object.assign(config, data.config);
     applyAuthView();
@@ -938,6 +1006,22 @@
       monitors[idx] = monitor;
       if (!updateMonitorTile(monitor)) renderAll();
     }
+  });
+
+  socket.on('dummies:list', (list) => {
+    dummies = Array.isArray(list) ? list : [];
+    renderAll();
+  });
+
+  socket.on('dummies:updated', (dummy) => {
+    if (!dummy || !dummy.UUID) return;
+    const idx = dummies.findIndex((d) => d.UUID === dummy.UUID);
+    if (idx === -1) {
+      dummies.push(dummy);
+    } else {
+      dummies[idx] = dummy;
+    }
+    renderAll();
   });
 
   // Initial connecting state

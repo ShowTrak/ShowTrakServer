@@ -41,6 +41,7 @@ const { Manager: ClientManager } = require('./Modules/ClientManager');
 const { Manager: GroupManager } = require('./Modules/GroupManager');
 const { Manager: MonitoringTargetManager } = require('./Modules/MonitoringTargetManager');
 const { Manager: UpdateManager } = require('./Modules/UpdateManager');
+const { Manager: DummyClientManager } = require('./Modules/DummyClientManager');
 const { Manager: DBManager } = require('./Modules/DB');
 const { Manager: MonitoringMethods } = require('./Modules/MonitoringMethods');
 const { Manager: AlertsManager } = require('./Modules/AlertsManager');
@@ -649,6 +650,9 @@ app.whenReady().then(async () => {
     MonitoringTargetManager.Init().catch((Err) =>
       Logger.error('Failed to init MonitoringTargetManager:', Err)
     );
+    DummyClientManager.Init().catch((Err) =>
+      Logger.error('Failed to init DummyClientManager:', Err)
+    );
     AlertsManager.Init().catch((Err) => Logger.error('Failed to init AlertsManager:', Err));
     await Wait(800);
     PreloaderWindow.close();
@@ -1111,6 +1115,62 @@ app.whenReady().then(async () => {
     return [null, Result];
   });
 
+  // ---- Dummy Clients ----
+  RPC.handle('GetAllDummyClients', async () => {
+    const [Err, List] = await DummyClientManager.GetAll();
+    if (Err) return [];
+    return List || [];
+  });
+
+  RPC.handle('GetDummyClient', async (_Event, UUID) => {
+    try {
+      UUID = IPCValidation.DummyClientUUID(UUID);
+    } catch {
+      return null;
+    }
+    const [Err, Dummy] = await DummyClientManager.Get(UUID);
+    if (Err) return null;
+    return Dummy;
+  });
+
+  RPC.handle('GenerateDummyClientDefaults', async () => {
+    return DummyClientManager.GenerateDefaults();
+  });
+
+  RPC.handle('CreateDummyClient', async (_Event, Payload) => {
+    try {
+      Payload = IPCValidation.DummyClientCreatePayload(Payload);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Result] = await DummyClientManager.Create(Payload);
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
+  RPC.handle('UpdateDummyClient', async (_Event, UUID, Payload) => {
+    try {
+      UUID = IPCValidation.DummyClientUUID(UUID);
+      Payload = IPCValidation.DummyClientUpdatePayload(Payload);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Result] = await DummyClientManager.Update(UUID, Payload);
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
+  RPC.handle('DeleteDummyClient', async (_Event, UUID) => {
+    try {
+      UUID = IPCValidation.DummyClientUUID(UUID);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Result] = await DummyClientManager.Delete(UUID);
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
   // ---- Alert Rules ----
   RPC.handle('GetAlertTriggers', async () => {
     return AlertsManager.GetTriggers();
@@ -1223,17 +1283,23 @@ app.whenReady().then(async () => {
     } catch (error) {
       return validationErrorTuple(error, false);
     }
-    // Mixed list: client UUIDs and "monitor:<TargetID>" entries.
+    // Mixed list: client UUIDs, "monitor:<TargetID>" and "dummy:<UUID>" entries.
     // Walk in order assigning a single shared weight counter so visual order
-    // is preserved across both entity types when rendered together.
+    // is preserved across all entity types when rendered together.
     let Weight = 10;
     const ClientOrder = [];
     const MonitorAssignments = [];
+    const DummyAssignments = [];
     for (const ID of OrderedUUIDs) {
       if (typeof ID === 'string' && ID.startsWith('monitor:')) {
         const TargetID = parseInt(ID.slice('monitor:'.length), 10);
         if (Number.isFinite(TargetID)) {
           MonitorAssignments.push({ TargetID, Weight });
+        }
+      } else if (typeof ID === 'string' && ID.startsWith('dummy:')) {
+        const DummyUUID = ID.slice('dummy:'.length);
+        if (DummyUUID) {
+          DummyAssignments.push({ UUID: DummyUUID, Weight });
         }
       } else {
         ClientOrder.push({ UUID: ID, Weight });
@@ -1243,6 +1309,10 @@ app.whenReady().then(async () => {
     // Apply monitor moves first (they don't emit per-change broadcasts here).
     for (const { TargetID, Weight: W } of MonitorAssignments) {
       await MonitoringTargetManager.SetGroupAndWeight(TargetID, GroupID, W);
+    }
+    // Apply dummy client moves (also silent until the coalesced refresh below).
+    for (const { UUID, Weight: W } of DummyAssignments) {
+      await DummyClientManager.SetGroupAndWeight(UUID, GroupID, W);
     }
     // Apply client ordering. ClientManager.SetGroupOrder reassigns weights
     // sequentially starting at 10, so feed it just the UUIDs in order — but
@@ -1257,6 +1327,9 @@ app.whenReady().then(async () => {
     if (MonitorAssignments.length) {
       // Single coalesced refresh for monitors after batch.
       BroadcastManager.emit('MonitoringTargetListChanged');
+    }
+    if (DummyAssignments.length) {
+      BroadcastManager.emit('DummyClientListChanged');
     }
     return true;
   });
@@ -1431,6 +1504,7 @@ app.whenReady().then(async () => {
     await UpdateScriptList();
     await UpdateOSCList();
     await UpdateMonitoringTargetList();
+    await UpdateDummyClientList();
     await UpdateAlertRuleList();
     // Push current application mode to renderer on initial load
     if (MainWindow && !MainWindow.isDestroyed()) {
@@ -1856,6 +1930,10 @@ async function ReinitializeSystem() {
     await MonitoringTargetManager.Reload();
   }
 
+  if (typeof DummyClientManager.Reload === 'function') {
+    await DummyClientManager.Reload();
+  }
+
   if (typeof GroupManager.ReconcileOrphanedGroups === 'function') {
     const [OrphanErr] = await GroupManager.ReconcileOrphanedGroups();
     if (OrphanErr) Logger.error('Failed to reconcile orphaned group assignments:', OrphanErr);
@@ -1870,6 +1948,7 @@ async function ReinitializeSystem() {
 
   await UpdateSettings();
   await UpdateMonitoringTargetList();
+  await UpdateDummyClientList();
   await UpdateAlertRuleList();
 
   MainWindow.webContents.send('SetFullClientList', Clients, Groups);
@@ -1921,9 +2000,17 @@ async function UpdateScriptList() {
 
 // Re-push the script catalog whenever it is reloaded from disk (e.g. after the
 // Script Manager saves an edited Script.json), then auto-deploy updates.
+// Only trigger deployment when the fingerprint has actually changed to avoid
+// reacting to filesystem noise (Spotlight, Time Machine, etc.) that fires
+// the directory watcher without any script content changing.
+let LastScriptDeploymentFingerprint = null;
 BroadcastManager.on('ScriptsUpdated', async () => {
   await UpdateScriptList();
-  ScheduleScriptChangeDeployment();
+  const CurrentFingerprint = await ScriptManager.GetDeploymentFingerprint();
+  if (CurrentFingerprint !== LastScriptDeploymentFingerprint) {
+    LastScriptDeploymentFingerprint = CurrentFingerprint;
+    ScheduleScriptChangeDeployment();
+  }
 });
 
 // Clients + Groups form the primary topology data model used by the UI.
@@ -1959,6 +2046,27 @@ async function MonitoringTargetUpdated(Target) {
   );
 }
 BroadcastManager.on('MonitoringTargetUpdated', MonitoringTargetUpdated);
+
+// Dummy client fan-out
+async function UpdateDummyClientList() {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  const [Err, List] = await DummyClientManager.GetAll();
+  if (Err) return Logger.error('Failed to fetch dummy clients:', Err);
+  MainWindow.webContents.send('SetFullDummyClientList', List || []);
+}
+BroadcastManager.on('DummyClientListChanged', UpdateDummyClientList);
+
+async function DummyClientUpdated(Dummy) {
+  if (MainWindow && !MainWindow.isDestroyed()) {
+    MainWindow.webContents.send('DummyClientUpdated', Dummy);
+  }
+  // Dummy clients fire the same online/degraded/offline alert triggers as real
+  // clients. Their snapshot is shaped client-like, so reuse the client handler.
+  AlertsManager.HandleClientUpdated(Dummy).catch((Err) =>
+    Logger.error('AlertsManager.HandleClientUpdated (dummy) failed', Err)
+  );
+}
+BroadcastManager.on('DummyClientUpdated', DummyClientUpdated);
 
 // Pending adoption list is ephemeral; pull from manager and push to UI.
 async function UpdateAdoptionList() {
@@ -2080,6 +2188,14 @@ async function runShutdownCleanup() {
     }
   } catch (Err) {
     Logger.error('Monitoring target shutdown cleanup failed:', Err);
+  }
+
+  try {
+    if (typeof DummyClientManager.Shutdown === 'function') {
+      await DummyClientManager.Shutdown();
+    }
+  } catch (Err) {
+    Logger.error('Dummy client shutdown cleanup failed:', Err);
   }
 
   try {

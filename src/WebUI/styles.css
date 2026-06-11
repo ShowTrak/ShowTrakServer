@@ -8,6 +8,10 @@
   --bg-elev: #1d1a2f;
   --client-online-bg: rgba(18, 255, 0, 0.32);
   --client-offline-bg: rgba(255, 0, 0, 0.24);
+  --tile-name-font-size: 1rem;
+  --tile-hostname-font-size: 0.72rem;
+  --tile-expanded-height: 100px;
+  --tile-status-height: 20px;
   --ghost: rgba(255, 255, 255, 0.03);
   --ghost-light: rgba(255, 255, 255, 0.1);
   --line: rgba(255, 255, 255, 0.08);
@@ -234,7 +238,11 @@ small,
 /* Client / monitor tile — ported verbatim from the desktop UI */
 .SHOWTRAK_PC {
   width: 220px;
+  height: var(--tile-expanded-height);
+  min-height: var(--tile-expanded-height);
+  box-sizing: border-box;
   display: grid;
+  align-content: center;
   gap: 0.1rem;
   padding: 0.5rem;
   border-radius: 0.5rem;
@@ -257,6 +265,15 @@ small,
   opacity: 1;
 }
 
+.SHOWTRAK_PC > [data-type='Nickname'],
+.SHOWTRAK_PC > [data-type='Name'] {
+  font-size: var(--tile-name-font-size);
+}
+
+.SHOWTRAK_PC > [data-type='Hostname'] {
+  font-size: var(--tile-hostname-font-size);
+}
+
 /* Status rows (progress bars / offline badge) must span the tile width even
  * though the tile centers its other content. */
 .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS {
@@ -273,6 +290,9 @@ small,
 .SHOWTRAK_PC.ONLINE {
   background-color: var(--client-online-bg) !important;
 }
+.SHOWTRAK_PC.IDLE {
+  background-color: rgba(64, 64, 64, 0.5) !important;
+}
 .SHOWTRAK_PC.DEGRADED {
   background-color: rgba(255, 140, 0, 0.32) !important;
 }
@@ -281,14 +301,29 @@ small,
 }
 
 .SHOWTRAK_PC_STATUS {
-  height: 15px !important;
+  height: var(--tile-status-height) !important;
+  min-height: var(--tile-status-height);
   font-size: 14px !important;
   font-weight: 600 !important;
+  line-height: 1.25;
   color: rgba(255, 255, 255, 0.6);
+  align-items: center;
+}
+
+.SHOWTRAK_PC_STATUS h7,
+.SHOWTRAK_PC_STATUS [data-type='DEGRADED_WARNING'],
+.SHOWTRAK_PC_STATUS [data-type='DUMMY_IDLE_LABEL'],
+.SHOWTRAK_PC_STATUS [data-type='DUMMY_ONLINE_LABEL'] {
+  display: block;
+  line-height: 1.25;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] {
-  height: auto !important;
-  min-height: 19px;
+  height: var(--tile-status-height) !important;
+  min-height: var(--tile-status-height);
   line-height: 1.2;
   justify-items: center;
 }
@@ -1003,7 +1038,7 @@ body.compact .SHOWTRAK_PC > .CLIENT_TILE_COMPACT_STATUS:not(.d-none) {
 /* Single-line title fills the row, pinned to the left like the desktop app */
 body.compact .SHOWTRAK_PC > [data-type='Nickname'],
 body.compact .SHOWTRAK_PC > [data-type='Name'] {
-  font-size: 1rem;
+  font-size: var(--tile-name-font-size);
   line-height: 1.2;
   margin: 0;
   flex: 1 1 auto;
@@ -1047,6 +1082,45 @@ body.compact .SHOWTRAK_PC.MONITOR > .SHOWTRAK_PC_STATUS[data-type='MONITOR_STATU
 }
 body.compact .SHOWTRAK_PC.MONITOR > .SHOWTRAK_PC_STATUS[data-type='MONITOR_STATUS'] h7 {
   font-size: 12px;
+}
+
+/* Dummy clients: hide the "Dummy" label in compact mode and keep the status
+ * (ONLINE / IDLE / DEGRADED / offline timer) visible, pushed to the right. */
+body.compact .SHOWTRAK_PC.DUMMY > [data-type='DummyLabel'] {
+  display: none !important;
+}
+
+/* Ensure dummy names stay left aligned in compact mode. */
+body.compact .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  text-align: left !important;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.compact .SHOWTRAK_PC.DUMMY > .SHOWTRAK_PC_STATUS[data-type='DUMMY_STATUS'] {
+  flex: 0 0 auto;
+  width: auto !important;
+  height: auto !important;
+  margin-left: 0.5rem;
+}
+body.compact .SHOWTRAK_PC.DUMMY > .SHOWTRAK_PC_STATUS[data-type='DUMMY_STATUS'] h7 {
+  font-size: 12px;
+}
+
+body.compact
+  .SHOWTRAK_PC.DUMMY
+  > .SHOWTRAK_PC_STATUS[data-type='DUMMY_STATUS']
+  > [data-type='OFFLINE_SINCE'] {
+  font-size: 0;
+}
+
+body.compact .SHOWTRAK_PC.DUMMY > .SHOWTRAK_PC_STATUS[data-type='DUMMY_STATUS'] .badge {
+  font-size: 11px;
 }
 
 body.compact .SHOWTRAK_PC_PLACEHOLDER {

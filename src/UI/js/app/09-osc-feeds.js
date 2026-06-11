@@ -230,6 +230,34 @@ window.API.SetFullAlertRuleList(async (List) => {
   RenderAlertRuleManagerList();
 });
 
+// --- Dummy Clients ---
+window.API.SetFullDummyClientList(async (List) => {
+  DummyClients = Array.isArray(List) ? List : [];
+  // Re-render the full client+monitor view so dummies slot back into groups.
+  if (typeof RenderFullClientAndMonitorList === 'function') {
+    RenderFullClientAndMonitorList();
+  }
+});
+
+window.API.DummyClientUpdated(async (Dummy) => {
+  if (!Dummy || !Dummy.UUID) return;
+  const idx = DummyClients.findIndex((d) => d.UUID === Dummy.UUID);
+  const prev = idx === -1 ? null : DummyClients[idx];
+  if (idx === -1) {
+    DummyClients.push(Dummy);
+  } else {
+    DummyClients[idx] = Dummy;
+  }
+  // If a dummy changed groups (or is new), re-render. Otherwise update in place.
+  if (!prev || (prev.GroupID || null) !== (Dummy.GroupID || null)) {
+    if (typeof RenderFullClientAndMonitorList === 'function') {
+      RenderFullClientAndMonitorList();
+    }
+  } else {
+    UpdateDummyClientTile(Dummy);
+  }
+});
+
 window.API.CreateShowTrakAlert(async (Payload) => {
   if (!Payload) return;
   AddAlert({

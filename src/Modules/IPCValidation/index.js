@@ -6,6 +6,7 @@ const Manager = {};
 
 require('./client-validators')(Manager);
 require('./monitoring-validators')(Manager);
+require('./dummy-validators')(Manager);
 require('./alert-validators')(Manager);
 require('./system-validators')(Manager);
 

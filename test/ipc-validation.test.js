@@ -15,13 +15,35 @@ test('IPCValidation.UUIDList validates arrays, deduplicates, and rejects empty l
   assert.throws(() => IPCValidation.UUIDList('bad'), /must be an array/i);
 });
 
+test('IPCValidation.DummyClientCreatePayload validates ID, title, and interval', () => {
+  const payload = IPCValidation.DummyClientCreatePayload({
+    DummyID: '  DummyClient123456  ',
+    Nickname: '  Stage Left  ',
+    Interval: 15000,
+    GroupID: '3',
+  });
+  assert.equal(payload.DummyID, 'DummyClient123456');
+  assert.equal(payload.Nickname, 'Stage Left');
+  assert.equal(payload.Interval, 15000);
+  assert.equal(payload.GroupID, 3);
+
+  // IDs with spaces or symbols are rejected at the IPC boundary.
+  assert.throws(
+    () => IPCValidation.DummyClientCreatePayload({ DummyID: 'has space' }),
+    /alphanumeric/i
+  );
+  assert.throws(
+    () => IPCValidation.DummyClientUpdatePayload({ Interval: 'soon' }),
+    /must be a number/i
+  );
+});
+
 test('IPCValidation.ClientUpdatePayload validates supported fields only', () => {
   const payload = IPCValidation.ClientUpdatePayload({
     Nickname: '  Arcade-PC 01  ',
     GroupID: '42',
     Ignored: true,
   });
-
   assert.equal(payload.Nickname, 'Arcade-PC 01');
   assert.equal(payload.GroupID, 42);
   assert.equal(Object.prototype.hasOwnProperty.call(payload, 'Ignored'), false);

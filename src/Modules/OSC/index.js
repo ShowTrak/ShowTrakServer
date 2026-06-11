@@ -6,6 +6,7 @@ const { Server } = require('node-osc');
 const { Manager: ClientManager } = require('../ClientManager');
 const { Manager: Broadcast } = require('../Broadcast');
 const { Manager: ScriptManager } = require('../ScriptManager');
+const { Manager: DummyClientManager } = require('../DummyClientManager');
 var OSCServer = new Server(3333, '0.0.0.0', () => {
   console.log('OSC Server is listening');
 });
@@ -14,7 +15,7 @@ let Routes = [];
 
 const OSC = {};
 
-OSCServer.on('message', async function (Route) {
+OSCServer.on('message', async function (Route, Info) {
   let ValidRoutes = [];
 
   Main: for (const PRoute of Routes) {
@@ -45,7 +46,10 @@ OSCServer.on('message', async function (Route) {
       }
     }
 
-    let RequestComplete = await ValidRoute.Callback(Req);
+    // Source address of the UDP packet (used by routes that record sender IPs).
+    const Meta = { IP: Info && Info.address ? Info.address : null };
+
+    let RequestComplete = await ValidRoute.Callback(Req, Meta);
     if (RequestComplete === false) continue;
     Broadcast.emit('Notify', `OSC Processed Successfully`, 'success', 1200);
     return Logger.success(`OSC Complete: ${Route[0]}`);
@@ -137,6 +141,21 @@ OSC.CreateRoute(
     return true;
   },
   'Execute a script on a Client by UUID and Script ID'
+);
+
+// Dummy Clients
+// Heartbeat for a virtual dummy client, addressed by its user-facing DummyID.
+OSC.CreateRoute(
+  '/ShowTrak/Dummy/:ID/Heartbeat',
+  async (Req, Meta) => {
+    let [Err] = await DummyClientManager.Heartbeat(Req.ID, Meta && Meta.IP ? Meta.IP : null);
+    if (Err) {
+      Broadcast.emit('Notify', `OSC - ${Err}`, 'error');
+      return false;
+    }
+    return true;
+  },
+  'Deliver a heartbeat to a Dummy Client by its Dummy ID'
 );
 
 // Group

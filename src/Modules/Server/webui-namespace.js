@@ -11,6 +11,7 @@ const { Config } = require('../Config');
 const { Manager: ClientManager } = require('../ClientManager');
 const { Manager: GroupManager } = require('../GroupManager');
 const { Manager: MonitoringTargetManager } = require('../MonitoringTargetManager');
+const { Manager: DummyClientManager } = require('../DummyClientManager');
 const { Manager: SettingsManager } = require('../SettingsManager');
 const { Manager: WOLManager } = require('../WOLManager');
 const { Manager: ScriptManager } = require('../ScriptManager');
@@ -95,6 +96,7 @@ function SetupWebUiNamespace(io, ServerManager) {
         const [cErr, clients] = await ClientManager.GetAll();
         const [gErr, groups] = await GroupManager.GetAll();
         const [mErr, monitors] = await MonitoringTargetManager.GetAll();
+        const [dErr, dummies] = await DummyClientManager.GetAll();
         let scripts = [];
         try {
           scripts = (await ScriptManager.GetScripts()) || [];
@@ -103,6 +105,7 @@ function SetupWebUiNamespace(io, ServerManager) {
           clients: cErr ? [] : clients.map(ToPublicClient),
           groups: gErr ? [] : (groups || []).map(ToPublicGroup),
           monitors: mErr ? [] : monitors || [],
+          dummies: dErr ? [] : dummies || [],
           scripts: scripts
             .filter((s) => s.isValid)
             .map((s) => ({
@@ -242,6 +245,22 @@ function SetupWebUiNamespace(io, ServerManager) {
       } catch {}
     };
 
+    const onDummyListChanged = async () => {
+      try {
+        if (!(await IsAuthed(socket))) return;
+        const [err, dummies] = await DummyClientManager.GetAll();
+        if (err) return;
+        socket.emit('dummies:list', dummies || []);
+      } catch {}
+    };
+
+    const onDummyUpdated = async (dummy) => {
+      try {
+        if (!(await IsAuthed(socket))) return;
+        socket.emit('dummies:updated', dummy);
+      } catch {}
+    };
+
     // When server settings change, permissions may change. If auth is now
     // required and this socket isn't authed, force it back to the login screen.
     const onSettingsUpdated = async () => {
@@ -261,6 +280,8 @@ function SetupWebUiNamespace(io, ServerManager) {
     BroadcastManager.on('GroupListChanged', onGroupListChanged);
     BroadcastManager.on('MonitoringTargetListChanged', onMonitorListChanged);
     BroadcastManager.on('MonitoringTargetUpdated', onMonitorUpdated);
+    BroadcastManager.on('DummyClientListChanged', onDummyListChanged);
+    BroadcastManager.on('DummyClientUpdated', onDummyUpdated);
     BroadcastManager.on('SettingsUpdated', onSettingsUpdated);
 
     // --- Action handlers (gated on auth + permission) ----------------------
@@ -310,6 +331,8 @@ function SetupWebUiNamespace(io, ServerManager) {
       BroadcastManager.off('GroupListChanged', onGroupListChanged);
       BroadcastManager.off('MonitoringTargetListChanged', onMonitorListChanged);
       BroadcastManager.off('MonitoringTargetUpdated', onMonitorUpdated);
+      BroadcastManager.off('DummyClientListChanged', onDummyListChanged);
+      BroadcastManager.off('DummyClientUpdated', onDummyUpdated);
       BroadcastManager.off('SettingsUpdated', onSettingsUpdated);
     });
   });

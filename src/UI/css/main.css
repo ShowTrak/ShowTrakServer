@@ -95,6 +95,10 @@
 :root {
   --bottom-bar-toggle-height: 26px;
   --client-online-bg: rgba(18, 255, 0, 0.32);
+  --tile-name-font-size: 1rem;
+  --tile-hostname-font-size: 0.72rem;
+  --tile-expanded-height: 100px;
+  --tile-status-height: 20px;
 }
 
 .mode-group.btn-group {
@@ -1814,7 +1818,11 @@ button.btn:focus {
 
 .SHOWTRAK_PC {
   width: 220px;
+  height: var(--tile-expanded-height);
+  min-height: var(--tile-expanded-height);
+  box-sizing: border-box;
   display: grid;
+  align-content: center;
   gap: 0.1rem;
   padding: 0.5rem;
   border-radius: 0.5rem;
@@ -1849,9 +1857,18 @@ button.btn:focus {
 }
 
 .SHOWTRAK_PC > [data-type='Nickname'],
-.SHOWTRAK_PC > [data-type='Name'],
+.SHOWTRAK_PC > [data-type='Name'] {
+  font-size: var(--tile-name-font-size);
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .SHOWTRAK_PC > [data-type='Hostname'],
 .SHOWTRAK_PC.PENDING > [data-type='PENDING_HOSTNAME'] {
+  font-size: var(--tile-hostname-font-size);
   width: 100%;
   max-width: 100%;
   overflow: hidden;
@@ -1872,6 +1889,10 @@ button.btn:focus {
   background-color: var(--client-online-bg) !important;
 }
 
+.SHOWTRAK_PC.IDLE {
+  background-color: rgba(64, 64, 64, 0.5) !important;
+}
+
 /* Monitoring target above its DegradedThresholdMs setting. Listed after ONLINE
  * so it wins when both classes are toggled mid-update. */
 .SHOWTRAK_PC.DEGRADED {
@@ -1884,18 +1905,30 @@ button.btn:focus {
 }
 
 .SHOWTRAK_PC_STATUS {
-  height: 15px !important;
-}
-
-.SHOWTRAK_PC_STATUS {
+  height: var(--tile-status-height) !important;
+  min-height: var(--tile-status-height);
   font-size: 14px !important;
   font-weight: 600 !important;
+  line-height: 1.25;
   color: rgba(255, 255, 255, 0.6);
+  align-items: center;
+}
+
+.SHOWTRAK_PC_STATUS h7,
+.SHOWTRAK_PC_STATUS [data-type='DEGRADED_WARNING'],
+.SHOWTRAK_PC_STATUS [data-type='DUMMY_IDLE_LABEL'],
+.SHOWTRAK_PC_STATUS [data-type='DUMMY_ONLINE_LABEL'] {
+  display: block;
+  line-height: 1.25;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] {
-  height: auto !important;
-  min-height: 19px;
+  height: var(--tile-status-height) !important;
+  min-height: var(--tile-status-height);
   line-height: 1.2;
   justify-items: center;
 }
@@ -2013,8 +2046,9 @@ body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS {
   display: none !important;
 }
 
-body.compact-mode .SHOWTRAK_PC > [data-type='Nickname'] {
-  font-size: 1rem;
+body.compact-mode .SHOWTRAK_PC > [data-type='Nickname'],
+body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
+  font-size: var(--tile-name-font-size);
   line-height: 1.2;
   margin: 0;
   flex: 1 1 auto;
@@ -2168,6 +2202,26 @@ body.compact-mode .SHOWTRAK_PC.MONITOR > .MONITOR_COMPACT_LATENCY {
   margin-left: 0.5rem;
   font-size: 11px;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+/* --- Dummy client tiles --- */
+/* In compact mode only the name + a short status badge should remain; hide the
+ * "Dummy" type label (the IP line and status indicator rows are already hidden
+ * by the shared compact rules above, and the offline timer is re-shown). */
+body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='DummyLabel'] {
+  display: none !important;
+}
+
+/* Ensure dummy names stay left aligned in compact mode. */
+body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  text-align: left !important;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

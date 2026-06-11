@@ -312,7 +312,7 @@ async function UpdateOfflineIndicators() {
       let HH = String(Hours).padStart(2, '0');
       let MM = String(Minutes).padStart(2, '0');
       let SS = String(Seconds).padStart(2, '0');
-      $(this).html(`OFFLINE <span class="badge bg-ghost">${HH}:${MM}:${SS}</span>`);
+      $(this).html(`Offline <span class="badge bg-ghost">${HH}:${MM}:${SS}</span>`);
     }
   );
 }
@@ -558,6 +558,12 @@ $(async function () {
       if (tid) OpenMonitoringTargetEditor(parseInt(tid, 10));
       return false;
     }
+    // Dummy clients use their own editor
+    if ($(this).hasClass('DUMMY_TILE_COG')) {
+      const duid = $(this).closest('.SHOWTRAK_PC').attr('data-dummy-uuid');
+      if (duid) OpenDummyClientEditor(duid);
+      return false;
+    }
     const uuid = $(this).closest('.SHOWTRAK_PC').attr('data-uuid');
     if (uuid) {
       OpenClientEditor(uuid);
@@ -570,6 +576,8 @@ $(async function () {
     if ($(this).hasClass('PENDING')) return false;
     // Monitoring tiles aren't selectable client targets
     if ($(this).hasClass('MONITOR')) return false;
+    // Dummy tiles aren't selectable client targets
+    if ($(this).hasClass('DUMMY')) return false;
     let UUID = $(this).attr('data-uuid');
     ToggleSelection(UUID);
     return;
@@ -590,6 +598,12 @@ $(async function () {
           OpenMonitoringTargetEditor(parseInt(tid, 10));
         }
       }
+      return false;
+    }
+    // Dummy tiles open their own editor on dblclick
+    if ($(this).hasClass('DUMMY')) {
+      const duid = $(this).attr('data-dummy-uuid');
+      if (duid) OpenDummyClientEditor(duid);
       return false;
     }
     const uuid = $(this).attr('data-uuid');
@@ -1116,6 +1130,10 @@ async function Init() {
 
   $('#ADD_TARGET_MANUAL_ACTION').on('click', async () => {
     await OpenMonitoringTargetEditor(null);
+  });
+
+  $('#ADD_DUMMY_CLIENT_ACTION').on('click', async () => {
+    await OpenDummyClientEditor(null);
   });
 
   $('#ADD_TARGET_BROWSE_ACTION').on('click', async () => {

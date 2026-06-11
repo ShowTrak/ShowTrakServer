@@ -12,6 +12,7 @@ const { Manager: BroadcastManager } = require('../Broadcast');
 
 const { Manager: ClientManager } = require('../ClientManager');
 const { Manager: MonitoringTargetManager } = require('../MonitoringTargetManager');
+const { Manager: DummyClientManager } = require('../DummyClientManager');
 const { Ok, Fail } = require('../Utils');
 
 const Manager = {};
@@ -86,6 +87,14 @@ Manager.Delete = async (GroupID) => {
     }
   }
 
+  if (typeof DummyClientManager.MoveGroupToNoGroup === 'function') {
+    const [DummyErr] = await DummyClientManager.MoveGroupToNoGroup(GroupID);
+    if (DummyErr) {
+      Logger.error('Failed to move dummy clients to no group while deleting group:', DummyErr);
+      return Fail('Failed to move dummy clients to no group');
+    }
+  }
+
   let [Err, _Res] = await DB.Run('DELETE FROM Groups WHERE GroupID = ?', [GroupID]);
   if (Err) {
     Logger.error('Failed to delete group:', Err);
@@ -116,6 +125,14 @@ Manager.ReconcileOrphanedGroups = async () => {
     if (TargetErr) {
       Logger.error('Failed to reconcile orphaned monitoring targets:', TargetErr);
       return Fail('Failed to reconcile orphaned monitoring targets');
+    }
+  }
+
+  if (typeof DummyClientManager.ReconcileOrphanedGroups === 'function') {
+    const [DummyErr] = await DummyClientManager.ReconcileOrphanedGroups(GroupIDs);
+    if (DummyErr) {
+      Logger.error('Failed to reconcile orphaned dummy clients:', DummyErr);
+      return Fail('Failed to reconcile orphaned dummy clients');
     }
   }
 

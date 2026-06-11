@@ -14,6 +14,7 @@ const { Manager: AppDataManager } = require('../AppData');
 const { Manager: ScriptExecutionManager } = require('../ScriptExecutionManager');
 const { Manager: ClientManager } = require('../ClientManager');
 const { Manager: UpdateManager } = require('../UpdateManager');
+const { Manager: DummyClientManager } = require('../DummyClientManager');
 const express = require('express');
 
 const { Wait } = require('../Utils');
@@ -30,6 +31,23 @@ Server.on('error', (e) => {
 const app = express();
 
 UpdateManager.RegisterRoutes(app);
+
+// Dummy Client heartbeat (HTTP GET/POST). Addressed by the user-facing DummyID.
+// Mirrors the OSC /ShowTrak/Dummy/:ID/Heartbeat route.
+const DummyHeartbeatHandler = async (req, res) => {
+  const ID = req.params && req.params.id;
+  const SourceIP =
+    (req.ip || (req.socket && req.socket.remoteAddress) || (req.connection && req.connection.remoteAddress)) ||
+    null;
+  const [Err] = await DummyClientManager.Heartbeat(ID, SourceIP);
+  if (Err) {
+    return res.status(404).json({ ok: false, error: String(Err) });
+  }
+  return res.json({ ok: true });
+};
+app.get('/API/Dummy/:id/Heartbeat', DummyHeartbeatHandler);
+app.post('/API/Dummy/:id/Heartbeat', DummyHeartbeatHandler);
+
 
 const ScriptDirectory = AppDataManager.GetScriptsDirectory();
 app.use(express.static(ScriptDirectory));

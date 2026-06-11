@@ -172,6 +172,7 @@ function loadWebUi(settings, broadcast) {
       Manager: { GetAll: async () => [null, [{ GroupID: 1, Title: 'G', Weight: 1 }]] },
     },
     '../MonitoringTargetManager': { Manager: { GetAll: async () => [null, []] } },
+    '../DummyClientManager': { Manager: { GetAll: async () => [null, []] } },
     '../SettingsManager': { Manager: { GetValue: async (key) => settings[key] } },
     '../WOLManager': { Manager: { Wake: async () => [null, 'magic packet sent'] } },
     '../ScriptManager': {
@@ -371,6 +372,7 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
         const app = () => {};
         app.use = () => {};
         app.get = () => {};
+        app.post = () => {};
         return app;
       },
       { static: () => () => {} }
