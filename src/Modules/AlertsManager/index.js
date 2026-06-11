@@ -148,6 +148,18 @@ Manager.GetTriggers = () => {
       ID: TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED,
       Name: 'Critical USB Device Disconnected',
     },
+    { ID: TRIGGERS.APPLICATION_STARTED, Name: 'Application Started' },
+    { ID: TRIGGERS.APPLICATION_STOPPED, Name: 'Application Stopped' },
+    { ID: TRIGGERS.CRITICAL_APPLICATION_STARTED, Name: 'Critical Application Started' },
+    { ID: TRIGGERS.CRITICAL_APPLICATION_STOPPED, Name: 'Critical Application Stopped' },
+    {
+      ID: TRIGGERS.NON_CRITICAL_APPLICATION_STARTED,
+      Name: 'Non Critical Application Started',
+    },
+    {
+      ID: TRIGGERS.NON_CRITICAL_APPLICATION_STOPPED,
+      Name: 'Non Critical Application Stopped',
+    },
   ];
 };
 
@@ -356,6 +368,96 @@ Manager.HandleCriticalUSBDeviceDisconnected = async (Client, Device) => {
     IP: Client.IP || null,
     Severity: 'warning',
     Device: Device || null,
+    RawData: Client,
+  });
+};
+
+Manager.HandleApplicationStarted = async (Client, Application) => {
+  if (!Client || !Client.UUID) return;
+  await evaluateAgainstRules({
+    TriggerType: TRIGGERS.APPLICATION_STARTED,
+    EntityType: 'client',
+    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+    UUID: Client.UUID,
+    GroupID: Client.GroupID == null ? null : Client.GroupID,
+    IP: Client.IP || null,
+    Severity: 'info',
+    Application: Application || null,
+    RawData: Client,
+  });
+};
+
+Manager.HandleApplicationStopped = async (Client, Application) => {
+  if (!Client || !Client.UUID) return;
+  await evaluateAgainstRules({
+    TriggerType: TRIGGERS.APPLICATION_STOPPED,
+    EntityType: 'client',
+    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+    UUID: Client.UUID,
+    GroupID: Client.GroupID == null ? null : Client.GroupID,
+    IP: Client.IP || null,
+    Severity: 'warning',
+    Application: Application || null,
+    RawData: Client,
+  });
+};
+
+Manager.HandleCriticalApplicationStarted = async (Client, Application) => {
+  if (!Client || !Client.UUID) return;
+  await evaluateAgainstRules({
+    TriggerType: TRIGGERS.CRITICAL_APPLICATION_STARTED,
+    EntityType: 'client',
+    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+    UUID: Client.UUID,
+    GroupID: Client.GroupID == null ? null : Client.GroupID,
+    IP: Client.IP || null,
+    Severity: 'warning',
+    Application: Application || null,
+    RawData: Client,
+  });
+};
+
+Manager.HandleCriticalApplicationStopped = async (Client, Application) => {
+  if (!Client || !Client.UUID) return;
+  await evaluateAgainstRules({
+    TriggerType: TRIGGERS.CRITICAL_APPLICATION_STOPPED,
+    EntityType: 'client',
+    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+    UUID: Client.UUID,
+    GroupID: Client.GroupID == null ? null : Client.GroupID,
+    IP: Client.IP || null,
+    Severity: 'warning',
+    Application: Application || null,
+    RawData: Client,
+  });
+};
+
+Manager.HandleNonCriticalApplicationStarted = async (Client, Application) => {
+  if (!Client || !Client.UUID) return;
+  await evaluateAgainstRules({
+    TriggerType: TRIGGERS.NON_CRITICAL_APPLICATION_STARTED,
+    EntityType: 'client',
+    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+    UUID: Client.UUID,
+    GroupID: Client.GroupID == null ? null : Client.GroupID,
+    IP: Client.IP || null,
+    Severity: 'info',
+    Application: Application || null,
+    RawData: Client,
+  });
+};
+
+Manager.HandleNonCriticalApplicationStopped = async (Client, Application) => {
+  if (!Client || !Client.UUID) return;
+  await evaluateAgainstRules({
+    TriggerType: TRIGGERS.NON_CRITICAL_APPLICATION_STOPPED,
+    EntityType: 'client',
+    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+    UUID: Client.UUID,
+    GroupID: Client.GroupID == null ? null : Client.GroupID,
+    IP: Client.IP || null,
+    Severity: 'warning',
+    Application: Application || null,
     RawData: Client,
   });
 };

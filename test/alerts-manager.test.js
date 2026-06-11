@@ -87,6 +87,12 @@ test('AlertsManager supports CRUD and action type metadata', async () => {
   assert.ok(triggers.some((t) => t.ID === 'NON_CRITICAL_USB_DEVICE_DISCONNECTED'));
   assert.ok(triggers.some((t) => t.ID === 'CRITICAL_USB_DEVICE_CONNECTED'));
   assert.ok(triggers.some((t) => t.ID === 'CRITICAL_USB_DEVICE_DISCONNECTED'));
+  assert.ok(triggers.some((t) => t.ID === 'APPLICATION_STARTED'));
+  assert.ok(triggers.some((t) => t.ID === 'APPLICATION_STOPPED'));
+  assert.ok(triggers.some((t) => t.ID === 'CRITICAL_APPLICATION_STARTED'));
+  assert.ok(triggers.some((t) => t.ID === 'CRITICAL_APPLICATION_STOPPED'));
+  assert.ok(triggers.some((t) => t.ID === 'NON_CRITICAL_APPLICATION_STARTED'));
+  assert.ok(triggers.some((t) => t.ID === 'NON_CRITICAL_APPLICATION_STOPPED'));
 
   const actionTypes = Manager.GetActionTypes();
   assert.deepEqual(actionTypes, [{ ID: 'http-api', Name: 'HTTP API' }]);
@@ -166,6 +172,17 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
       TriggerType: 'CLIENT_DEGRADED',
       TriggerConfig: JSON.stringify({ Source: 'client' }),
       Actions: JSON.stringify([{ Type: 'http-api', Settings: { Route: '/client-degraded' } }]),
+      Enabled: 1,
+      Timestamp: 1,
+      UpdatedAt: 1,
+    },
+    {
+      RuleID: 7,
+      Title: 'Critical Application Started',
+      Scope: JSON.stringify({ Workspace: true, Groups: [], Clients: [] }),
+      TriggerType: 'CRITICAL_APPLICATION_STARTED',
+      TriggerConfig: JSON.stringify({}),
+      Actions: JSON.stringify([{ Type: 'http-api', Settings: { Route: '/critical-app-started' } }]),
       Enabled: 1,
       Timestamp: 1,
       UpdatedAt: 1,
@@ -278,7 +295,19 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
     }
   );
 
-  assert.equal(executeCalls.length, 6);
+  await Manager.HandleCriticalApplicationStarted(
+    {
+      UUID: 'client-6',
+      Nickname: 'Cabinet 6',
+      GroupID: 8,
+      IP: '10.0.0.16',
+    },
+    {
+      Name: 'Spotify',
+    }
+  );
+
+  assert.equal(executeCalls.length, 7);
   assert.ok(executeCalls.some((c) => c.action.Type === 'http-api'));
   assert.ok(executeCalls.some((c) => c.action.Type === 'discord-webhook'));
   assert.ok(executeCalls.some((c) => c.action.Type === 'osc-trigger'));
@@ -286,10 +315,10 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
   const historyWrites = untrackedRunCalls.filter(([sql]) =>
     sql.includes('INSERT INTO AlertHistory')
   );
-  assert.equal(historyWrites.length, 6);
+  assert.equal(historyWrites.length, 7);
 
   const triggeredEvents = events.filter(([event]) => event === 'AlertTriggered');
-  assert.equal(triggeredEvents.length, 6);
+  assert.equal(triggeredEvents.length, 7);
   assert.ok(triggeredEvents.some(([, payload]) => payload.TriggerType === 'CLIENT_OFFLINE'));
   assert.ok(triggeredEvents.some(([, payload]) => payload.TriggerType === 'CLIENT_DEGRADED'));
   assert.ok(
@@ -302,6 +331,9 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
   );
   assert.ok(
     triggeredEvents.some(([, payload]) => payload.TriggerType === 'CRITICAL_USB_DEVICE_CONNECTED')
+  );
+  assert.ok(
+    triggeredEvents.some(([, payload]) => payload.TriggerType === 'CRITICAL_APPLICATION_STARTED')
   );
   assert.ok(
     executeCalls.some(

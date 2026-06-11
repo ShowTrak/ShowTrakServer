@@ -43,6 +43,16 @@ test('IPCValidation.CriticalUSBDevicePayload validates and normalizes serials', 
   assert.throws(() => IPCValidation.CriticalUSBDevicePayload(null), /must be an object/i);
 });
 
+test('IPCValidation.CriticalApplicationPayload validates application names', () => {
+  const payload = IPCValidation.CriticalApplicationPayload({
+    Name: '  Spotify  ',
+  });
+  assert.equal(payload.Name, 'Spotify');
+
+  assert.throws(() => IPCValidation.CriticalApplicationPayload({}), /Name/i);
+  assert.throws(() => IPCValidation.CriticalApplicationPayload(null), /must be an object/i);
+});
+
 test('IPCValidation.SettingUpdatePayload allows primitive setting values', () => {
   assert.deepEqual(IPCValidation.SettingUpdatePayload('SYSTEM_ALLOW_WOL', true), [
     'SYSTEM_ALLOW_WOL',
@@ -316,4 +326,20 @@ test('IPCValidation alert payloads accept non-critical USB trigger types', () =>
     TriggerType: 'NON_CRITICAL_USB_DEVICE_DISCONNECTED',
   });
   assert.equal(updated.TriggerType, 'NON_CRITICAL_USB_DEVICE_DISCONNECTED');
+});
+
+test('IPCValidation alert payloads accept application trigger types', () => {
+  const created = IPCValidation.AlertRuleCreatePayload({
+    Title: 'Application started',
+    Scope: {},
+    TriggerType: 'APPLICATION_STARTED',
+    Actions: [{ Type: 'http-api', Settings: {} }],
+    Enabled: true,
+  });
+  assert.equal(created.TriggerType, 'APPLICATION_STARTED');
+
+  const updated = IPCValidation.AlertRuleUpdatePayload({
+    TriggerType: 'CRITICAL_APPLICATION_STOPPED',
+  });
+  assert.equal(updated.TriggerType, 'CRITICAL_APPLICATION_STOPPED');
 });

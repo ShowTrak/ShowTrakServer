@@ -36,6 +36,18 @@ function triggerMatches(Rule, Context) {
       return Context.TriggerType === TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED;
     case TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED:
       return Context.TriggerType === TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED;
+    case TRIGGERS.APPLICATION_STARTED:
+      return Context.TriggerType === TRIGGERS.APPLICATION_STARTED;
+    case TRIGGERS.APPLICATION_STOPPED:
+      return Context.TriggerType === TRIGGERS.APPLICATION_STOPPED;
+    case TRIGGERS.CRITICAL_APPLICATION_STARTED:
+      return Context.TriggerType === TRIGGERS.CRITICAL_APPLICATION_STARTED;
+    case TRIGGERS.CRITICAL_APPLICATION_STOPPED:
+      return Context.TriggerType === TRIGGERS.CRITICAL_APPLICATION_STOPPED;
+    case TRIGGERS.NON_CRITICAL_APPLICATION_STARTED:
+      return Context.TriggerType === TRIGGERS.NON_CRITICAL_APPLICATION_STARTED;
+    case TRIGGERS.NON_CRITICAL_APPLICATION_STOPPED:
+      return Context.TriggerType === TRIGGERS.NON_CRITICAL_APPLICATION_STOPPED;
     case TRIGGERS.SCRIPT_EXECUTION_FAILED:
       return Context.TriggerType === TRIGGERS.SCRIPT_EXECUTION_FAILED;
     case TRIGGERS.CLIENT_DEGRADED: {
@@ -93,6 +105,12 @@ function describeUSBDevice(Context) {
   return Name || 'USB device';
 }
 
+function describeApplication(Context) {
+  const Application = (Context && Context.Application) || {};
+  const Name = typeof Application.Name === 'string' ? Application.Name.trim() : '';
+  return Name || 'application';
+}
+
 function describeContext(Context) {
   if (Context.TriggerType === TRIGGERS.SCRIPT_EXECUTION_FAILED) {
     return `${Context.ScriptName || 'Script'} failed on ${Context.EntityName || 'Unknown Client'}`;
@@ -126,6 +144,24 @@ function describeContext(Context) {
   }
   if (Context.TriggerType === TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED) {
     return `${describeUSBDevice(Context)} (critical) disconnected from ${Context.EntityName || 'Client'}`;
+  }
+  if (Context.TriggerType === TRIGGERS.APPLICATION_STARTED) {
+    return `${describeApplication(Context)} started on ${Context.EntityName || 'Client'}`;
+  }
+  if (Context.TriggerType === TRIGGERS.APPLICATION_STOPPED) {
+    return `${describeApplication(Context)} stopped on ${Context.EntityName || 'Client'}`;
+  }
+  if (Context.TriggerType === TRIGGERS.CRITICAL_APPLICATION_STARTED) {
+    return `${describeApplication(Context)} (critical) started on ${Context.EntityName || 'Client'}`;
+  }
+  if (Context.TriggerType === TRIGGERS.CRITICAL_APPLICATION_STOPPED) {
+    return `${describeApplication(Context)} (critical) stopped on ${Context.EntityName || 'Client'}`;
+  }
+  if (Context.TriggerType === TRIGGERS.NON_CRITICAL_APPLICATION_STARTED) {
+    return `${describeApplication(Context)} (non-critical) started on ${Context.EntityName || 'Client'}`;
+  }
+  if (Context.TriggerType === TRIGGERS.NON_CRITICAL_APPLICATION_STOPPED) {
+    return `${describeApplication(Context)} (non-critical) stopped on ${Context.EntityName || 'Client'}`;
   }
   return 'Alert triggered';
 }

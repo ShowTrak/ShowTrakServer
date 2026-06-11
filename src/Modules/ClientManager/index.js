@@ -17,6 +17,7 @@ const Manager = {};
 // Hot cache of Client instances reflecting current state
 var ClientList = [];
 const CriticalUSBIndex = new Map();
+const CriticalApplicationIndex = new Map();
 
 function normalizeSerialNumber(SerialNumber) {
   if (typeof SerialNumber !== 'string') return null;
@@ -35,11 +36,28 @@ function getCriticalMapForClient(UUID, CreateIfMissing = false) {
   return Existing || null;
 }
 
+function getCriticalApplicationMapForClient(UUID, CreateIfMissing = false) {
+  const Key = String(UUID || '');
+  let Existing = CriticalApplicationIndex.get(Key);
+  if (!Existing && CreateIfMissing) {
+    Existing = new Map();
+    CriticalApplicationIndex.set(Key, Existing);
+  }
+  return Existing || null;
+}
+
 function applyCriticalUSBState(TargetClient) {
   if (!TargetClient || !TargetClient.UUID) return;
   const Entries = getCriticalMapForClient(TargetClient.UUID, false);
   const Devices = Entries ? Array.from(Entries.values()) : [];
   TargetClient.SetCriticalUSBDevices(Devices);
+}
+
+function applyCriticalApplicationState(TargetClient) {
+  if (!TargetClient || !TargetClient.UUID) return;
+  const Entries = getCriticalApplicationMapForClient(TargetClient.UUID, false);
+  const Applications = Entries ? Array.from(Entries.values()) : [];
+  TargetClient.SetCriticalApplications(Applications);
 }
 
 async function loadCriticalUSBIndex() {
@@ -58,6 +76,26 @@ async function loadCriticalUSBIndex() {
       SerialNumber,
       ManufacturerName: Row.ManufacturerName || null,
       ProductName: Row.ProductName || null,
+      Timestamp: Row.Timestamp || null,
+    });
+  }
+}
+
+async function loadCriticalApplicationIndex() {
+  CriticalApplicationIndex.clear();
+  const [Err, Rows] = await DB.All(
+    'SELECT UUID, ApplicationKey, ApplicationName, Timestamp FROM CriticalApplications'
+  );
+  if (Err || !Rows) return;
+  for (const Row of Rows) {
+    const UUID = Row && Row.UUID ? String(Row.UUID) : '';
+    const ApplicationKey = Row && Row.ApplicationKey ? String(Row.ApplicationKey).trim() : '';
+    const ApplicationName = Row && Row.ApplicationName ? String(Row.ApplicationName).trim() : '';
+    if (!UUID || !ApplicationKey || !ApplicationName) continue;
+    const PerClient = getCriticalApplicationMapForClient(UUID, true);
+    PerClient.set(ApplicationKey, {
+      Name: ApplicationName,
+      Key: ApplicationKey,
       Timestamp: Row.Timestamp || null,
     });
   }
@@ -88,6 +126,7 @@ Manager.Heartbeat = async (UUID, Data, IP) => {
     } else {
       CachedClient = new Client(FetchedClient);
       applyCriticalUSBState(CachedClient);
+      applyCriticalApplicationState(CachedClient);
       ClientList.push(CachedClient);
       BroadcastManager.emit('ClientListChanged');
     }
@@ -117,6 +156,95 @@ Manager.SetNetworkInterfaces = async (UUID, Interfaces) => {
   if (!Target) return ['Client Not Found', null];
   Target.SetNetworkInterfaces(Interfaces);
   return [null, 'Network Interfaces updated successfully'];
+};
+
+Manager.SetRunningApplications = async (UUID, Snapshot) => {
+  let [Err, Target] = await Manager.Get(UUID);
+  if (Err) return [Err, null];
+  if (!Target) return ['Client Not Found', null];
+  if (!ClientList.find((Client) => Client.UUID === UUID)) {
+    ClientList.push(Target);
+    BroadcastManager.emit('ClientListChanged');
+  }
+  Target.SetRunningApplications(Snapshot || {});
+  return [null, 'Running applications updated successfully'];
+};
+
+Manager.MarkApplicationCritical = async (UUID, Application) => {
+  let [Err, Target] = await Manager.Get(UUID);
+  if (Err) return [Err, null];
+  if (!Target) return ['Client Not Found', null];
+
+  const ApplicationName =
+    typeof Application?.Name === 'string' && Application.Name.trim().length > 0
+      ? Application.Name.trim()
+      : null;
+  if (!ApplicationName) return ['Application name is required', null];
+
+  const ApplicationKey = ApplicationName.toLowerCase();
+  const Timestamp = Date.now();
+  const [WriteErr] = await DB.Run(
+    'INSERT OR REPLACE INTO CriticalApplications (UUID, ApplicationKey, ApplicationName, Timestamp) VALUES (?, ?, ?, ?)',
+    [UUID, ApplicationKey, ApplicationName, Timestamp]
+  );
+  if (WriteErr) return Fail('Failed to save critical application');
+
+  const PerClient = getCriticalApplicationMapForClient(UUID, true);
+  PerClient.set(ApplicationKey, {
+    Name: ApplicationName,
+    Key: ApplicationKey,
+    Timestamp,
+  });
+  Target.MarkCriticalApplication({ Name: ApplicationName, Timestamp });
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(true);
+};
+
+Manager.RemoveApplicationCritical = async (UUID, ApplicationName) => {
+  let [Err, Target] = await Manager.Get(UUID);
+  if (Err) return [Err, null];
+  if (!Target) return ['Client Not Found', null];
+
+  const NormalizedName =
+    typeof ApplicationName === 'string' && ApplicationName.trim().length > 0
+      ? ApplicationName.trim()
+      : null;
+  if (!NormalizedName) return ['Application name is required', null];
+  const ApplicationKey = NormalizedName.toLowerCase();
+
+  const [WriteErr] = await DB.Run(
+    'DELETE FROM CriticalApplications WHERE UUID = ? AND ApplicationKey = ?',
+    [UUID, ApplicationKey]
+  );
+  if (WriteErr) return Fail('Failed to remove critical application');
+
+  const PerClient = getCriticalApplicationMapForClient(UUID, false);
+  if (PerClient) {
+    PerClient.delete(ApplicationKey);
+    if (PerClient.size === 0) CriticalApplicationIndex.delete(String(UUID || ''));
+  }
+
+  Target.UnmarkCriticalApplication(NormalizedName);
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(true);
+};
+
+Manager.IsApplicationCritical = async (UUID, ApplicationName) => {
+  const NormalizedName =
+    typeof ApplicationName === 'string' && ApplicationName.trim().length > 0
+      ? ApplicationName.trim().toLowerCase()
+      : null;
+  if (!NormalizedName) return [null, false];
+
+  const Cached = getCriticalApplicationMapForClient(UUID, false);
+  if (Cached) return [null, Cached.has(NormalizedName)];
+
+  const [Err, Row] = await DB.Get(
+    'SELECT 1 AS Found FROM CriticalApplications WHERE UUID = ? AND ApplicationKey = ? LIMIT 1',
+    [UUID, NormalizedName]
+  );
+  if (Err) return ['Failed to determine critical application status', null];
+  return [null, !!Row];
 };
 
 Manager.USBDeviceAdded = async (UUID, Device) => {
@@ -269,6 +397,7 @@ Manager.Create = async (UUID) => {
     Timestamp: Date.now(),
   });
   applyCriticalUSBState(Created);
+  applyCriticalApplicationState(Created);
   ClientList.push(Created);
   BroadcastManager.emit('ClientListChanged');
   return Ok(true);
@@ -278,12 +407,15 @@ Manager.Create = async (UUID) => {
 Manager.Delete = async (UUID) => {
   const [criticalErr] = await DB.Run('DELETE FROM CriticalUSBDevices WHERE UUID = ?', [UUID]);
   if (criticalErr) return Fail('Failed to delete critical USB devices for client');
+  const [criticalAppErr] = await DB.Run('DELETE FROM CriticalApplications WHERE UUID = ?', [UUID]);
+  if (criticalAppErr) return Fail('Failed to delete critical applications for client');
   // Remove from database
   let [Err, _Res] = await DB.Run('DELETE FROM Clients WHERE UUID = ?', [UUID]);
   if (Err) return Fail('Failed to delete client');
   // Remove from in-memory list
   ClientList = ClientList.filter((c) => c.UUID !== UUID);
   CriticalUSBIndex.delete(String(UUID || ''));
+  CriticalApplicationIndex.delete(String(UUID || ''));
   Logger.success(`Client ${UUID} deleted successfully`);
   return Ok(true);
 };
@@ -313,6 +445,7 @@ Manager.Get = async (UUID) => {
   if (!ClientRow) return ['Client Not Found', null];
   ClientRow = new Client(ClientRow);
   applyCriticalUSBState(ClientRow);
+  applyCriticalApplicationState(ClientRow);
   return [null, ClientRow];
 };
 
@@ -320,6 +453,7 @@ Manager.Initialized = false;
 // Warm the cache from DB so early UI renders have data
 Manager.Init = async () => {
   await loadCriticalUSBIndex();
+  await loadCriticalApplicationIndex();
   let [Err, Clients] = await DB.All('SELECT * FROM Clients');
   if (Err || !Clients) {
     Manager.Initialized = true;
@@ -329,6 +463,7 @@ Manager.Init = async () => {
   Clients = Clients.map((row) => {
     const ClientEntity = new Client(row);
     applyCriticalUSBState(ClientEntity);
+    applyCriticalApplicationState(ClientEntity);
     return ClientEntity;
   });
   ClientList = Clients; // Update in-memory list
@@ -351,6 +486,7 @@ Manager.GetAll = async () => {
   Clients = Clients.map((row) => {
     const ClientEntity = new Client(row);
     applyCriticalUSBState(ClientEntity);
+    applyCriticalApplicationState(ClientEntity);
     return ClientEntity;
   });
   ClientList = Clients; // Update in-memory list
@@ -450,6 +586,7 @@ Manager.SetGroupOrderWithWeights = async (GroupID, orderedUUIDs, weights) => {
 Manager.ClearCache = async () => {
   ClientList = [];
   CriticalUSBIndex.clear();
+  CriticalApplicationIndex.clear();
   Manager.Initialized = false;
   return;
 };

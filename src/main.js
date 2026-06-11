@@ -904,6 +904,30 @@ app.whenReady().then(async () => {
     return [null, Result];
   });
 
+  RPC.handle('MarkClientApplicationCritical', async (_Event, UUID, Application) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+      Application = IPCValidation.CriticalApplicationPayload(Application);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Result] = await ClientManager.MarkApplicationCritical(UUID, Application);
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
+  RPC.handle('RemoveClientApplicationCritical', async (_Event, UUID, ApplicationName) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+      ApplicationName = IPCValidation.CriticalApplicationPayload({ Name: ApplicationName }).Name;
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Result] = await ClientManager.RemoveApplicationCritical(UUID, ApplicationName);
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
   // ---- Monitoring Targets ----
   RPC.handle('GetMonitoringMethods', async () => {
     return MonitoringMethods.GetAll();
@@ -1643,6 +1667,54 @@ async function USBDeviceRemoved(Client, Device) {
 }
 
 BroadcastManager.on('USBDeviceRemoved', USBDeviceRemoved);
+
+async function ApplicationStarted(Client, Application) {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  AlertsManager.HandleApplicationStarted(Client, Application).catch((Err) =>
+    Logger.error('AlertsManager.HandleApplicationStarted failed', Err)
+  );
+  const [criticalErr, isCritical] = await ClientManager.IsApplicationCritical(
+    Client.UUID,
+    Application && Application.Name
+  );
+  if (criticalErr) {
+    Logger.error('ClientManager.IsApplicationCritical failed', criticalErr);
+  } else if (isCritical) {
+    AlertsManager.HandleCriticalApplicationStarted(Client, Application).catch((Err) =>
+      Logger.error('AlertsManager.HandleCriticalApplicationStarted failed', Err)
+    );
+  } else {
+    AlertsManager.HandleNonCriticalApplicationStarted(Client, Application).catch((Err) =>
+      Logger.error('AlertsManager.HandleNonCriticalApplicationStarted failed', Err)
+    );
+  }
+}
+
+BroadcastManager.on('ApplicationStarted', ApplicationStarted);
+
+async function ApplicationStopped(Client, Application) {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  AlertsManager.HandleApplicationStopped(Client, Application).catch((Err) =>
+    Logger.error('AlertsManager.HandleApplicationStopped failed', Err)
+  );
+  const [criticalErr, isCritical] = await ClientManager.IsApplicationCritical(
+    Client.UUID,
+    Application && Application.Name
+  );
+  if (criticalErr) {
+    Logger.error('ClientManager.IsApplicationCritical failed', criticalErr);
+  } else if (isCritical) {
+    AlertsManager.HandleCriticalApplicationStopped(Client, Application).catch((Err) =>
+      Logger.error('AlertsManager.HandleCriticalApplicationStopped failed', Err)
+    );
+  } else {
+    AlertsManager.HandleNonCriticalApplicationStopped(Client, Application).catch((Err) =>
+      Logger.error('AlertsManager.HandleNonCriticalApplicationStopped failed', Err)
+    );
+  }
+}
+
+BroadcastManager.on('ApplicationStopped', ApplicationStopped);
 
 async function ReadoptDevice(UUID) {
   await ServerManager.SendMessageByGroup(UUID, 'Adopt');

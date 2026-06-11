@@ -458,6 +458,16 @@ function triggerSummaryText(TriggerType) {
   if (TriggerType === 'CRITICAL_USB_DEVICE_DISCONNECTED') {
     return 'has a critical USB device disconnected';
   }
+  if (TriggerType === 'APPLICATION_STARTED') return 'has an application started';
+  if (TriggerType === 'APPLICATION_STOPPED') return 'has an application stopped';
+  if (TriggerType === 'CRITICAL_APPLICATION_STARTED') return 'has a critical application started';
+  if (TriggerType === 'CRITICAL_APPLICATION_STOPPED') return 'has a critical application stopped';
+  if (TriggerType === 'NON_CRITICAL_APPLICATION_STARTED') {
+    return 'has a non-critical application started';
+  }
+  if (TriggerType === 'NON_CRITICAL_APPLICATION_STOPPED') {
+    return 'has a non-critical application stopped';
+  }
   return 'triggers';
 }
 

@@ -21,6 +21,11 @@ const ToPublicClient = (c) => ({
   Degraded: !!c.Degraded,
   DegradedWarnings: Array.isArray(c.DegradedWarnings) ? c.DegradedWarnings : [],
   NetworkInterfaces: Array.isArray(c.NetworkInterfaces) ? c.NetworkInterfaces : [],
+  RunningApplications: c && c.RunningApplications ? c.RunningApplications : { Items: [] },
+  CriticalApplications: Array.isArray(c.CriticalApplications) ? c.CriticalApplications : [],
+  MissingCriticalApplications: Array.isArray(c.MissingCriticalApplications)
+    ? c.MissingCriticalApplications
+    : [],
 });
 
 const ToPublicGroup = (g) => ({

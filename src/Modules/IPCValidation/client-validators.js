@@ -87,6 +87,18 @@ module.exports = function registerClientValidators(Manager) {
     };
   };
 
+  Manager.CriticalApplicationPayload = (value) => {
+    if (!isPlainObject(value)) {
+      fail('Critical application payload must be an object');
+    }
+    return {
+      Name: normalizeNonEmptyString(value.Name, 'Name', {
+        minLength: 1,
+        maxLength: 256,
+      }),
+    };
+  };
+
   Manager.ClientUpdatePayload = (value) => {
     if (!isPlainObject(value)) {
       fail('Client update payload must be an object');

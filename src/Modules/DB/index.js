@@ -410,6 +410,7 @@ Manager.HasData = async () => {
     'AlertRules',
     'AlertHistory',
     'CriticalUSBDevices',
+    'CriticalApplications',
     'Settings',
   ];
   for (const Table of Tables) {

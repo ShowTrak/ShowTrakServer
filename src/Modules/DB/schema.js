@@ -95,6 +95,17 @@ Schema.push({
     )',
 });
 
+Schema.push({
+  Name: 'CriticalApplications',
+  SQL: 'CREATE TABLE IF NOT EXISTS `CriticalApplications` ( \
+            UUID TEXT NOT NULL, \
+            ApplicationKey TEXT NOT NULL, \
+            ApplicationName TEXT NOT NULL, \
+            Timestamp BIGINT(11) NOT NULL, \
+            PRIMARY KEY (UUID, ApplicationKey) \
+    )',
+});
+
 // Idempotent column additions for existing installs. Errors are ignored when
 // the column already exists; sqlite has no native "ADD COLUMN IF NOT EXISTS".
 Schema.Migrations = [

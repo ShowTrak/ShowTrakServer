@@ -34,6 +34,8 @@ const INVOKE_CHANNELS = new Set([
   'UpdateClient',
   'MarkClientUSBDeviceCritical',
   'RemoveClientUSBDeviceCritical',
+  'MarkClientApplicationCritical',
+  'RemoveClientApplicationCritical',
   'ExecuteScript',
   'UnadoptClient',
   'DeleteScripts',
@@ -182,6 +184,10 @@ contextBridge.exposeInMainWorld('API', {
     invoke('MarkClientUSBDeviceCritical', UUID, Device),
   RemoveClientUSBDeviceCritical: async (UUID, SerialNumber) =>
     invoke('RemoveClientUSBDeviceCritical', UUID, SerialNumber),
+  MarkClientApplicationCritical: async (UUID, Application) =>
+    invoke('MarkClientApplicationCritical', UUID, Application),
+  RemoveClientApplicationCritical: async (UUID, ApplicationName) =>
+    invoke('RemoveClientApplicationCritical', UUID, ApplicationName),
   ExecuteScript: async (Script, Targets, ResetList) =>
     invoke('ExecuteScript', Script, Targets, ResetList),
   UnadoptClient: async (UUID) => invoke('UnadoptClient', UUID),

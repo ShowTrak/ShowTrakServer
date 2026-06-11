@@ -146,6 +146,17 @@ function SetupClientNamespace(io) {
       }
     });
 
+    socket.on('RunningApplications', async (Snapshot) => {
+      try {
+        Logger.log(
+          `Running applications received from ${socket.UUID} (${Array.isArray(Snapshot && Snapshot.Items) ? Snapshot.Items.length : 0} items)`
+        );
+        await ClientManager.SetRunningApplications(socket.UUID, Snapshot || {});
+      } catch (e) {
+        Logger.error('Failed to handle RunningApplications for', socket.UUID, e);
+      }
+    });
+
     // Cleanup on disconnect: clear adoption entry and mark offline
     socket.on('disconnect', (reason) => {
       try {

@@ -1451,6 +1451,40 @@ async function OpenClientInfo(UUID) {
       }
     });
 
+  $('#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS')
+    .off('click.critical-app-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_APP')
+    .on('click.critical-app-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_APP', async function () {
+      try {
+        const NameToken = ($(this).attr('data-name') || '').toString();
+        const ApplicationName = decodeURIComponent(NameToken);
+        const IsCritical = String($(this).attr('data-critical') || '0') === '1';
+        if (!ClientInfoOpenUUID || !ApplicationName) return;
+
+        const [Err] = IsCritical
+          ? await window.API.RemoveClientApplicationCritical(ClientInfoOpenUUID, ApplicationName)
+          : await window.API.MarkClientApplicationCritical(ClientInfoOpenUUID, {
+              Name: ApplicationName,
+            });
+        if (Err) return Notify(String(Err), 'error');
+
+        await Notify(
+          IsCritical ? 'Critical application status removed' : 'Application marked as critical',
+          'success',
+          1400
+        );
+
+        const Fresh = await window.API.GetClient(ClientInfoOpenUUID);
+        if (Fresh) {
+          $('#CLIENT_INFO_STATUS').val(
+            Fresh.Online ? (Fresh.Degraded ? 'Degraded' : 'Online') : 'Offline'
+          );
+          RenderClientInfoDetails(Fresh);
+        }
+      } catch (err) {
+        HandleNonFatalError('OpenClientInfo:ToggleCriticalApplication', err);
+      }
+    });
+
   // mark modal as open for this UUID and clear when hidden
   ClientInfoOpenUUID = UUID;
   try {
@@ -1668,6 +1702,102 @@ function RenderClientInfoDetails(Client) {
       } catch (err) {
         HandleNonFatalError('RenderClientInfoDetails:CriticalUSBPopoverInit', err);
       }
+    }
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
+
+  // Running applications
+  try {
+    const $appsList = $('#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS');
+    const apps = Array.isArray(Client?.RunningApplications?.Items)
+      ? Client.RunningApplications.Items
+      : [];
+    const appStatus = Client?.RunningApplications?.Status || {};
+    const appStatusState =
+      typeof appStatus.State === 'string' && appStatus.State.trim().length > 0
+        ? appStatus.State.trim().toLowerCase()
+        : 'unknown';
+    const appStatusMessage =
+      typeof appStatus.Message === 'string' && appStatus.Message.trim().length > 0
+        ? appStatus.Message.trim()
+        : null;
+    const renderKey = `${Client?.UUID || ''}::${apps
+      .map((app) => `${app?.Name || ''}|${app?.IsCritical ? '1' : '0'}|${app?.IsRunning === false ? '0' : '1'}`)
+      .join(';;')}::${appStatusState}|${appStatusMessage || ''}`;
+
+    if (($appsList.attr('data-render-key') || '') !== renderKey) {
+      if (apps.length === 0) {
+        let filler = '';
+        if (appStatusState === 'permission_denied' || appStatusState === 'error') {
+          filler += `
+            <div class="rounded-3 p-2 bg-danger bg-opacity-25 border border-danger-subtle">
+              <h6 class="mb-1">Application Monitoring Warning</h6>
+              <p class="text-sm mb-0">${Safe(
+                appStatusMessage ||
+                  'The client cannot collect running applications because system permission was denied.'
+              )}</p>
+            </div>`;
+        }
+        filler += `
+          <div class="rounded-3 p-2 bg-ghost">
+            <h6 class="mb-0">No applications reported</h6>
+            <p class="text-sm mb-0">The client has not sent an application snapshot yet.</p>
+          </div>`;
+        $appsList.html(filler);
+      } else {
+        let html = '';
+        if (appStatusState === 'permission_denied' || appStatusState === 'error') {
+          html += `
+            <div class="rounded-3 p-2 bg-danger bg-opacity-25 border border-danger-subtle">
+              <h6 class="mb-1">Application Monitoring Warning</h6>
+              <p class="text-sm mb-0">${Safe(
+                appStatusMessage ||
+                  'The client cannot collect running applications because system permission was denied.'
+              )}</p>
+            </div>`;
+        }
+        for (const app of apps) {
+          const name = app?.Name ? String(app.Name) : 'Unknown Application';
+          const IsCritical = !!app?.IsCritical;
+          const IsRunning = app?.IsRunning !== false;
+          const NameToken = encodeURIComponent(name);
+          html += `
+            <div class="rounded-3 p-2 bg-ghost SHOWTRAK_CLIENT_USB_DEVICE_CARD">
+              <div class="d-flex align-items-center gap-2">
+                <h6 class="mb-0">${Safe(name)}</h6>
+              </div>
+              <button
+                type="button"
+                class="SHOWTRAK_TOGGLE_CRITICAL_USB SHOWTRAK_TOGGLE_CRITICAL_APP ${IsCritical ? 'is-critical' : ''} ${
+                  IsCritical && !IsRunning ? 'is-disconnected-critical' : ''
+                }"
+                data-name="${NameToken}"
+                data-critical="${IsCritical ? '1' : '0'}"
+                title="${
+                  IsCritical && !IsRunning
+                    ? 'Remove critical status (application not running)'
+                    : IsCritical
+                    ? 'Remove critical status'
+                    : 'Mark as critical'
+                }"
+                aria-label="${
+                  IsCritical && !IsRunning
+                    ? 'Remove critical status (application not running)'
+                    : IsCritical
+                    ? 'Remove critical status'
+                    : 'Mark as critical'
+                }"
+              >
+                <i class="bi ${IsCritical && !IsRunning ? 'bi-x-circle-fill' : IsCritical ? 'bi-check-circle-fill' : 'bi-check-circle'}"></i>
+                <span>${IsCritical && !IsRunning ? 'Not Running' : 'Critical'}</span>
+              </button>
+            </div>`;
+        }
+        $appsList.html(html);
+      }
+
+      $appsList.attr('data-render-key', renderKey);
     }
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);

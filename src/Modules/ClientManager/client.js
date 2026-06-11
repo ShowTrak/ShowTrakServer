@@ -23,6 +23,19 @@ function normalizeSerialNumber(SerialNumber) {
   return Value.toUpperCase();
 }
 
+function normalizeApplicationName(Name) {
+  if (typeof Name !== 'string') return null;
+  const Value = Name.trim();
+  if (!Value) return null;
+  return Value;
+}
+
+function normalizeApplicationKey(Name) {
+  const Value = normalizeApplicationName(Name);
+  if (!Value) return null;
+  return Value.toLowerCase();
+}
+
 class Client {
   constructor(Data) {
     this.UUID = Data.UUID;
@@ -49,10 +62,37 @@ class Client {
     this.CriticalUSBDevices = [];
     this.CriticalUSBSerials = [];
     this.MissingCriticalUSBDevices = [];
+    this.CriticalApplications = [];
+    this.CriticalApplicationKeys = [];
+    this.MissingCriticalApplications = [];
     this.Degraded = false;
     this.DegradedWarnings = [];
     this.NetworkInterfaces = [];
     this.ScriptsFingerprint = null;
+    this.ObservedRunningApplications = {
+      SampledAt: null,
+      TotalCount: 0,
+      Truncated: false,
+      Items: [],
+      Status: {
+        State: 'unknown',
+        Message: null,
+        Platform: null,
+      },
+    };
+    this.RunningApplications = {
+      SampledAt: null,
+      TotalCount: 0,
+      Truncated: false,
+      Items: [],
+      Status: {
+        State: 'unknown',
+        Message: null,
+        Platform: null,
+      },
+    };
+    this.RunningApplicationsSignature = null;
+    this.ObservedRunningApplicationsSignature = null;
   }
 
   // RAM-only fields and notifications
@@ -148,12 +188,81 @@ class Client {
     this._rebuildUSBDeviceView();
     return true;
   }
+  SetCriticalApplications(Applications) {
+    if (!Array.isArray(Applications)) Applications = [];
+    const Normalized = [];
+    const Seen = new Set();
+    for (const Entry of Applications) {
+      const Name = normalizeApplicationName(Entry && Entry.Name);
+      const Key = normalizeApplicationKey(Name);
+      if (!Name || !Key || Seen.has(Key)) continue;
+      Seen.add(Key);
+      Normalized.push({
+        Name,
+        Key,
+        Timestamp: Entry && Entry.Timestamp ? Entry.Timestamp : null,
+      });
+    }
+    this.CriticalApplications = Normalized;
+    this.CriticalApplicationKeys = Normalized.map((Entry) => Entry.Key);
+    this._rebuildRunningApplicationsView();
+    return;
+  }
+  IsApplicationCritical(Name) {
+    const Key = normalizeApplicationKey(Name);
+    if (!Key) return false;
+    return this.CriticalApplicationKeys.includes(Key);
+  }
+  MarkCriticalApplication(Application) {
+    const Name = normalizeApplicationName(Application && Application.Name);
+    const Key = normalizeApplicationKey(Name);
+    if (!Name || !Key) return false;
+    const Existing = this.CriticalApplications.find((Entry) => Entry.Key === Key);
+    if (Existing) {
+      if (!Existing.Name) Existing.Name = Name;
+      if (!Existing.Timestamp && Application && Application.Timestamp) {
+        Existing.Timestamp = Application.Timestamp;
+      }
+      this._rebuildRunningApplicationsView();
+      return false;
+    }
+    this.CriticalApplications.push({
+      Name,
+      Key,
+      Timestamp: Application && Application.Timestamp ? Application.Timestamp : null,
+    });
+    this.CriticalApplicationKeys = this.CriticalApplications.map((Entry) => Entry.Key);
+    this._rebuildRunningApplicationsView();
+    return true;
+  }
+  UnmarkCriticalApplication(Name) {
+    const Key = normalizeApplicationKey(Name);
+    if (!Key) return false;
+    const PrevLength = this.CriticalApplications.length;
+    this.CriticalApplications = this.CriticalApplications.filter((Entry) => Entry.Key !== Key);
+    if (this.CriticalApplications.length === PrevLength) return false;
+    this.CriticalApplicationKeys = this.CriticalApplications.map((Entry) => Entry.Key);
+    this._rebuildRunningApplicationsView();
+    return true;
+  }
   _refreshClientHealthState() {
-    const MissingCount = Array.isArray(this.MissingCriticalUSBDevices)
+    const MissingUSBCount = Array.isArray(this.MissingCriticalUSBDevices)
       ? this.MissingCriticalUSBDevices.length
       : 0;
-    this.Degraded = !!this.Online && MissingCount > 0;
-    this.DegradedWarnings = this.Degraded ? ['Missing USB Device'] : [];
+    const ProcessStatusState = String(
+      this.RunningApplications && this.RunningApplications.Status && this.RunningApplications.Status.State
+        ? this.RunningApplications.Status.State
+        : 'unknown'
+    ).toLowerCase();
+    const CanEvaluateCriticalApplications = ProcessStatusState === 'ok';
+    const MissingApplicationCount = CanEvaluateCriticalApplications && Array.isArray(this.MissingCriticalApplications)
+      ? this.MissingCriticalApplications.length
+      : 0;
+    const Warnings = [];
+    if (MissingApplicationCount > 0) Warnings.push('Critical Application Issue');
+    if (MissingUSBCount > 0) Warnings.push('Missing USB Device');
+    this.Degraded = !!this.Online && Warnings.length > 0;
+    this.DegradedWarnings = this.Degraded ? Warnings : [];
   }
   _rebuildUSBDeviceView() {
     const CriticalBySerial = new Map(
@@ -208,6 +317,70 @@ class Client {
     this.USBDeviceList = Connected.concat(Missing);
     this._refreshClientHealthState();
   }
+  _rebuildRunningApplicationsView() {
+    const Observed = Array.isArray(this.ObservedRunningApplications?.Items)
+      ? this.ObservedRunningApplications.Items
+      : [];
+    const CriticalByKey = new Map(
+      (Array.isArray(this.CriticalApplications) ? this.CriticalApplications : [])
+        .map((Entry) => {
+          if (!Entry || !Entry.Key) return null;
+          return [Entry.Key, Entry];
+        })
+        .filter(Boolean)
+    );
+
+    const Running = Observed.map((Entry) => {
+      const Name = normalizeApplicationName(Entry && Entry.Name) || 'Unknown Application';
+      const Key = normalizeApplicationKey(Name);
+      const CriticalEntry = Key ? CriticalByKey.get(Key) : null;
+      return {
+        Name,
+        Count: Math.max(1, parseInt(Entry && Entry.Count, 10) || 1),
+        Key,
+        IsRunning: true,
+        IsCritical: !!CriticalEntry,
+        Missing: false,
+      };
+    });
+
+    const RunningKeys = new Set(Running.map((Entry) => Entry.Key).filter(Boolean));
+    const Missing = [];
+    for (const Entry of this.CriticalApplications) {
+      if (!Entry || !Entry.Key) continue;
+      if (RunningKeys.has(Entry.Key)) continue;
+      Missing.push({
+        Name: Entry.Name,
+        Count: 0,
+        Key: Entry.Key,
+        IsRunning: false,
+        IsCritical: true,
+        Missing: true,
+      });
+    }
+
+    this.MissingCriticalApplications = Missing;
+    this.RunningApplications = {
+      SampledAt: this.ObservedRunningApplications?.SampledAt || null,
+      TotalCount: this.ObservedRunningApplications?.TotalCount || Running.length,
+      Truncated: !!this.ObservedRunningApplications?.Truncated,
+      Items: Running.concat(Missing),
+      Status: this.ObservedRunningApplications?.Status || {
+        State: 'unknown',
+        Message: null,
+        Platform: null,
+      },
+    };
+    this.RunningApplicationsSignature = `${this.RunningApplications.TotalCount}|${
+      this.RunningApplications.Truncated ? '1' : '0'
+    }|${this.RunningApplications.Items
+      .map(
+        (Entry) =>
+          `${Entry.Name}:${Entry.IsRunning ? '1' : '0'}:${Entry.IsCritical ? '1' : '0'}`
+      )
+      .join('|')}`;
+    this._refreshClientHealthState();
+  }
   SetNetworkInterfaces(Interfaces) {
     try {
       if (!Array.isArray(Interfaces)) Interfaces = [];
@@ -240,6 +413,124 @@ class Client {
         : null;
     if (this.ScriptsFingerprint === NextValue) return;
     this.ScriptsFingerprint = NextValue;
+    BroadcastManager.emit('ClientUpdated', this);
+  }
+  SetRunningApplications(Snapshot) {
+    const PreviousItems = Array.isArray(this.ObservedRunningApplications?.Items)
+      ? this.ObservedRunningApplications.Items
+      : [];
+    const PreviousByKey = new Map(
+      PreviousItems
+        .map((Entry) => {
+          const Name = normalizeApplicationName(Entry && Entry.Name);
+          const Key = normalizeApplicationKey(Name);
+          if (!Name || !Key) return null;
+          return [Key, { Name, Count: Math.max(1, parseInt(Entry && Entry.Count, 10) || 1) }];
+        })
+        .filter(Boolean)
+    );
+    const RawItems = Array.isArray(Snapshot && Snapshot.Items) ? Snapshot.Items : [];
+    const RawStatus = Snapshot && Snapshot.Status ? Snapshot.Status : null;
+    const NextStatus = {
+      State:
+        typeof RawStatus?.State === 'string' && RawStatus.State.trim().length > 0
+          ? RawStatus.State.trim().toLowerCase()
+          : 'ok',
+      Message:
+        typeof RawStatus?.Message === 'string' && RawStatus.Message.trim().length > 0
+          ? RawStatus.Message.trim()
+          : null,
+      Platform:
+        typeof RawStatus?.Platform === 'string' && RawStatus.Platform.trim().length > 0
+          ? RawStatus.Platform.trim()
+          : null,
+    };
+    const PreviousStatus = this.ObservedRunningApplications?.Status || {
+      State: 'unknown',
+      Message: null,
+      Platform: null,
+    };
+    const StatusChanged =
+      PreviousStatus.State !== NextStatus.State ||
+      PreviousStatus.Message !== NextStatus.Message ||
+      PreviousStatus.Platform !== NextStatus.Platform;
+    const Deduped = new Map();
+
+    for (const Entry of RawItems) {
+      const Name = normalizeApplicationName(Entry && Entry.Name);
+      const Key = normalizeApplicationKey(Name);
+      if (!Name || !Key) continue;
+      const Count = Math.max(1, parseInt(Entry && Entry.Count, 10) || 1);
+      const Existing = Deduped.get(Key);
+      if (Existing) {
+        Existing.Count += Count;
+        continue;
+      }
+      Deduped.set(Key, { Name, Count });
+    }
+
+    const Items = Array.from(Deduped.values()).sort((left, right) => {
+      if (right.Count !== left.Count) return right.Count - left.Count;
+      return left.Name.localeCompare(right.Name);
+    });
+    const TotalCount = Math.max(0, parseInt(Snapshot && Snapshot.TotalCount, 10) || Items.length);
+    const Truncated = !!(Snapshot && Snapshot.Truncated);
+    const SampledAt = Number.isFinite(Number(Snapshot && Snapshot.SampledAt))
+      ? Number(Snapshot.SampledAt)
+      : Date.now();
+    const Signature = `${TotalCount}|${Truncated ? '1' : '0'}|${Items
+      .map((Entry) => `${Entry.Name}:${Entry.Count}`)
+      .join('|')}`;
+
+    const ShouldSkipItems = !!(Snapshot && Snapshot.NoChanges);
+    if (!ShouldSkipItems && this.ObservedRunningApplicationsSignature === Signature && !StatusChanged) return;
+
+    if (!ShouldSkipItems) {
+      this.ObservedRunningApplications = {
+        SampledAt,
+        TotalCount,
+        Truncated,
+        Items,
+        Status: NextStatus,
+      };
+      this.ObservedRunningApplicationsSignature = Signature;
+    } else {
+      this.ObservedRunningApplications = {
+        ...this.ObservedRunningApplications,
+        SampledAt,
+        TotalCount: Math.max(0, parseInt(Snapshot && Snapshot.TotalCount, 10) || this.ObservedRunningApplications.TotalCount || 0),
+        Truncated:
+          typeof Snapshot?.Truncated === 'boolean'
+            ? Snapshot.Truncated
+            : !!this.ObservedRunningApplications.Truncated,
+        Status: NextStatus,
+      };
+    }
+
+    if (ShouldSkipItems) {
+      this._rebuildRunningApplicationsView();
+      BroadcastManager.emit('ClientUpdated', this);
+      return;
+    }
+
+    const NextKeys = new Set(Items.map((Entry) => normalizeApplicationKey(Entry.Name)).filter(Boolean));
+    for (const Entry of Items) {
+      const Key = normalizeApplicationKey(Entry.Name);
+      if (!Key || PreviousByKey.has(Key)) continue;
+      BroadcastManager.emit('ApplicationStarted', this, {
+        Name: Entry.Name,
+        Count: Entry.Count,
+      });
+    }
+    for (const [Key, Entry] of PreviousByKey.entries()) {
+      if (NextKeys.has(Key)) continue;
+      BroadcastManager.emit('ApplicationStopped', this, {
+        Name: Entry.Name,
+        Count: Entry.Count,
+      });
+    }
+
+    this._rebuildRunningApplicationsView();
     BroadcastManager.emit('ClientUpdated', this);
   }
   async USBDeviceAdded(Device) {
