@@ -376,7 +376,18 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
       { static: () => () => {} }
     ),
     '../Config': { Config: { Application: { Port: 0, Version: '1.0' } } },
-    '../AppData': { Manager: { GetScriptsDirectory: () => '/tmp/scripts' } },
+    '../AppData': {
+      Manager: {
+        GetScriptsDirectory: () => '/tmp/scripts',
+        GetStorageDirectory: () => '/tmp',
+      },
+    },
+    '../UpdateManager': { Manager: { RegisterRoutes: () => {} } },
+    '../ClientManager': {
+      Manager: {
+        Get: async (uuid) => [null, { UUID: uuid, Online: true }],
+      },
+    },
     '../ScriptExecutionManager': {
       Manager: {
         ClearQueue: async () => queue.push('clear'),

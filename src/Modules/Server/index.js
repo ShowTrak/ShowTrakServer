@@ -56,12 +56,39 @@ const Manager = {};
 
 // Ask specific clients to execute a script by ID; optionally reset the queue first
 Manager.ExecuteScripts = async (ScriptID, Targets, ResetList) => {
+  const Summary = { queued: 0, dispatched: 0, failed: [] };
   if (ResetList) await ScriptExecutionManager.ClearQueue();
   for (const UUID of Targets) {
     const RequestID = await ScriptExecutionManager.AddToQueue(UUID, ScriptID);
+    if (!RequestID) {
+      Summary.failed.push({ UUID, message: 'Failed to queue script execution request' });
+      continue;
+    }
+    Summary.queued += 1;
+
+    const CanDispatch =
+      typeof ScriptExecutionManager.ShouldDispatch === 'function'
+        ? await ScriptExecutionManager.ShouldDispatch(RequestID)
+        : true;
+
     Logger.log('ExecuteScript dispatch', { ScriptID, UUID, RequestID });
+    if (!CanDispatch) {
+      const Request =
+        typeof ScriptExecutionManager.GetExecution === 'function'
+          ? await ScriptExecutionManager.GetExecution(RequestID)
+          : null;
+      Summary.failed.push({
+        UUID,
+        message:
+          (Request && Request.Error) ||
+          'Script was blocked before dispatch',
+      });
+      continue;
+    }
     io.to(UUID).emit('ExecuteScript', RequestID, ScriptID);
+    Summary.dispatched += 1;
   }
+  return Summary;
 };
 
 // Emit an arbitrary action to many clients with a user-friendly name for the queue UI

@@ -17,8 +17,20 @@ function baseMocks(overrides = {}) {
   let counter = 0;
   return {
     '../Logger': noopLogger,
-    '../ScriptManager': { Manager: { Get: async (id) => ({ ID: id, Name: id, Timeout: 5000 }) } },
-    '../ClientManager': { Manager: { Get: async (uuid) => [null, { UUID: uuid }] } },
+    '../ScriptManager': {
+      Manager: {
+        Get: async (id) => ({
+          ID: id,
+          Name: id,
+          Timeout: 5000,
+          Platforms: { Windows: 'windows.bat', macOS: '', Linux: '' },
+          CompatiblePlatforms: ['Windows'],
+        }),
+      },
+    },
+    '../ClientManager': {
+      Manager: { Get: async (uuid) => [null, { UUID: uuid, OperatingSystem: 'Windows' }] },
+    },
     '../Broadcast': { Manager: { emit: () => {} } },
     '../UUID': { Manager: { Generate: () => `req-${++counter}` } },
     ...overrides,
@@ -106,7 +118,17 @@ test('ScriptExecutionManager times out pending executions', async () => {
   const { Manager } = load(
     baseMocks({
       '../Broadcast': { Manager: { emit: (event, data) => emitted.push({ event, data }) } },
-      '../ScriptManager': { Manager: { Get: async (id) => ({ ID: id, Name: id, Timeout: 20 }) } },
+      '../ScriptManager': {
+        Manager: {
+          Get: async (id) => ({
+            ID: id,
+            Name: id,
+            Timeout: 20,
+            Platforms: { Windows: 'windows.bat', macOS: '', Linux: '' },
+            CompatiblePlatforms: ['Windows'],
+          }),
+        },
+      },
     })
   );
 
@@ -116,4 +138,32 @@ test('ScriptExecutionManager times out pending executions', async () => {
   const entry = all.find((e) => e.RequestID === id);
   assert.equal(entry.Status, 'Failed');
   assert.match(entry.Error, /timed out/i);
+});
+
+test('ScriptExecutionManager fails early when no script exists for client OS', async () => {
+  const { Manager } = load(
+    baseMocks({
+      '../ClientManager': {
+        Manager: { Get: async (uuid) => [null, { UUID: uuid, OperatingSystem: 'macOS' }] },
+      },
+      '../ScriptManager': {
+        Manager: {
+          Get: async (id) => ({
+            ID: id,
+            Name: id,
+            Timeout: 5000,
+            Platforms: { Windows: 'windows.bat', macOS: '', Linux: '' },
+            CompatiblePlatforms: ['Windows'],
+          }),
+        },
+      },
+    })
+  );
+
+  const id = await Manager.AddToQueue('uuid-macos', 'script-windows-only');
+  assert.ok(id);
+  const all = await Manager.GetAllExecutions();
+  const entry = all.find((e) => e.RequestID === id);
+  assert.equal(entry.Status, 'Failed');
+  assert.match(entry.Error, /not sent/i);
 });

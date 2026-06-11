@@ -138,8 +138,10 @@ test('NormalizeScriptConfig leaves an already-valid config untouched', () => {
     Colour: 3,
     Weight: 0,
     Confirmation: false,
+    Timeout: 15000,
     Enabled: false,
     Platforms: { Windows: 'win.bat', macOS: '', Linux: '' },
+    Arguments: { Windows: '', macOS: '', Linux: '' },
   };
   const { changed, errors } = NormalizeScriptConfig(valid, 'Deploy');
   assert.equal(changed, false);

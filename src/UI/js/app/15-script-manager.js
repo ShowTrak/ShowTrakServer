@@ -455,6 +455,12 @@ function PopulateScriptManagerEditor(Data) {
 
   $('#SCRIPT_MANAGER_FIELD_CONFIRM').prop('checked', !!Data.confirm);
   $('#SCRIPT_MANAGER_FIELD_ENABLED').prop('checked', !!Data.enabled);
+  const timeoutMs =
+    typeof Data.timeoutMs === 'number' && Number.isFinite(Data.timeoutMs) && Data.timeoutMs > 0
+      ? Data.timeoutMs
+      : 15000;
+  const timeoutSeconds = Math.max(5, Math.round(timeoutMs / 1000));
+  $('#SCRIPT_MANAGER_FIELD_TIMEOUT_SECONDS').val(timeoutSeconds);
 
   RenderScriptManagerPlatforms(Data.platforms || {}, Data.arguments || {});
   RenderScriptManagerFileList(Data.files || []);
@@ -599,12 +605,18 @@ function CollectScriptManagerFields() {
   const colourIndex = selectedSwatch
     ? parseInt(selectedSwatch.getAttribute('data-colour-index'), 10)
     : 6;
+  const timeoutSecondsRaw = Number($('#SCRIPT_MANAGER_FIELD_TIMEOUT_SECONDS').val());
+  const timeoutSeconds =
+    Number.isFinite(timeoutSecondsRaw) && Number.isInteger(timeoutSecondsRaw) && timeoutSecondsRaw >= 5
+      ? timeoutSecondsRaw
+      : 15;
   return {
     id: String($('#SCRIPT_MANAGER_FIELD_ID').val() || '').trim(),
     name: $('#SCRIPT_MANAGER_FIELD_NAME').val(),
     description: $('#SCRIPT_MANAGER_FIELD_DESCRIPTION').val(),
     colour: isNaN(colourIndex) ? 6 : colourIndex,
     confirm: $('#SCRIPT_MANAGER_FIELD_CONFIRM').is(':checked'),
+    timeoutMs: timeoutSeconds * 1000,
     enabled: $('#SCRIPT_MANAGER_FIELD_ENABLED').is(':checked'),
     platforms: Platforms,
     arguments: Arguments,

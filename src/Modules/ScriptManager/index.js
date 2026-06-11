@@ -34,6 +34,10 @@ class Script {
     this.Colour = typeof Config.Colour === 'number' ? Config.Colour : 6;
     this.Weight = Config.Weight || 0;
     this.Confirmation = Config.Confirmation || false;
+    this.Timeout =
+      typeof Config.Timeout === 'number' && Number.isInteger(Config.Timeout) && Config.Timeout > 0
+        ? Config.Timeout
+        : 15000;
 
     // Cross-platform launch map ({ Windows, macOS, Linux }).
     this.Platforms = Config.Platforms || {};
@@ -105,6 +109,7 @@ function BuildDeploymentFingerprint(ScriptList) {
         Colour: typeof Script.Colour === 'number' ? Script.Colour : 6,
         Weight: typeof Script.Weight === 'number' ? Script.Weight : 0,
         Confirmation: !!Script.Confirmation,
+        Timeout: typeof Script.Timeout === 'number' ? Script.Timeout : 15000,
         Enabled: !!Script.isEnabled,
         Platforms: Script.Platforms || {},
         Arguments: Script.Arguments || {},
@@ -377,6 +382,7 @@ Manager.GetEditable = async (ID) => {
       description: Script.Description || '',
       colour: typeof Script.Colour === 'number' ? Script.Colour : 6,
       confirm: !!Script.Confirmation,
+      timeoutMs: typeof Script.Timeout === 'number' ? Script.Timeout : 15000,
       enabled: !!Script.isEnabled,
       platforms: Script.Platforms || {},
       arguments: Script.Arguments || {},
@@ -425,6 +431,7 @@ Manager.SaveFields = async (ID, Fields) => {
     Colour: typeof Fields.colour === 'number' ? Fields.colour : 6,
     Weight,
     Confirmation: !!Fields.confirm,
+    Timeout: Fields.timeoutMs,
     Enabled: !!Fields.enabled,
     Platforms: {
       Windows: Platforms.Windows,
@@ -538,6 +545,7 @@ Manager.CreateBlank = async () => {
     Colour: 6,
     Weight,
     Confirmation: false,
+    Timeout: 15000,
     // Not runnable until the author maps platforms and enables it.
     Enabled: false,
     Platforms: { Windows: '', macOS: '', Linux: '' },

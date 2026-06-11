@@ -728,6 +728,24 @@
                   </div>
                 </div>
 
+                <div class="bg-ghost p-2 rounded d-grid gap-1">
+                  <label for="SCRIPT_MANAGER_FIELD_TIMEOUT_SECONDS" class="text-sm mb-0"
+                    >Timeout (seconds)</label
+                  >
+                  <input
+                    type="number"
+                    id="SCRIPT_MANAGER_FIELD_TIMEOUT_SECONDS"
+                    class="form-control form-control-sm bg-ghost-light text-light border-0"
+                    min="5"
+                    step="1"
+                    inputmode="numeric"
+                    placeholder="15"
+                  />
+                  <span class="text-sm text-muted mb-0"
+                    >Execution timeout per script. Stored in Script.json as milliseconds.</span
+                  >
+                </div>
+
                 <div class="bg-ghost p-2 rounded d-grid gap-2">
                   <span class="text-sm">Platforms</span>
                   <span class="text-sm text-muted mb-0"

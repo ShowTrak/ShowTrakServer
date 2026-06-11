@@ -1298,6 +1298,7 @@ app.whenReady().then(async () => {
       colour: typeof s.Colour === 'number' ? s.Colour : 6,
       weight: s.Weight || 0,
       confirm: !!s.Confirmation,
+      timeoutMs: typeof s.Timeout === 'number' ? s.Timeout : 15000,
       enabled: !!s.isEnabled,
       valid: !!s.isValid,
       parseError: s.ParseError || null,

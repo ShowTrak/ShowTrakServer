@@ -59,6 +59,16 @@ function NormalizeArgumentString(value) {
   return value.trim();
 }
 
+function NormalizeTimeoutMs(value) {
+  // Stored in Script.json as integer milliseconds.
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 5000) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isInteger(parsed) && parsed >= 5000) return parsed;
+  }
+  return null;
+}
+
 function ResolveLegacyPathTargets(legacyPath) {
   const extension = path.extname(legacyPath).toLowerCase();
   if (WINDOWS_SCRIPT_EXTENSIONS.has(extension)) return ['Windows'];
@@ -154,6 +164,20 @@ function NormalizeScriptConfig(RawData, ID) {
   } else {
     config.Enabled = false;
     errors.push('"Enabled" was missing or invalid; defaulted to false.');
+  }
+
+  // Timeout --------------------------------------------------------------
+  // Per-script execution timeout in milliseconds.
+  const TimeoutMs = NormalizeTimeoutMs(data.Timeout);
+  if (TimeoutMs !== null) {
+    config.Timeout = TimeoutMs;
+  } else {
+    config.Timeout = 15000;
+    if (data.Timeout !== undefined) {
+      errors.push('"Timeout" was invalid (minimum 5000ms); defaulted to 15000ms.');
+    } else {
+      errors.push('"Timeout" was missing; defaulted to 15000ms.');
+    }
   }
 
   // Platforms ------------------------------------------------------------

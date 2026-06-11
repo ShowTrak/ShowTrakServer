@@ -750,6 +750,8 @@
         closeScripts();
       } else if (res && res.error === 'forbidden') {
         toast('Remote script execution is disabled', 'error');
+      } else if (res && typeof res.message === 'string' && res.message.trim()) {
+        toast(res.message, 'error');
       } else {
         toast('Failed to run script', 'error');
       }

@@ -18,6 +18,10 @@ Manager.GetAllExecutions = async () => {
   return ScriptExecutions;
 };
 
+Manager.GetExecution = async (RequestID) => {
+  return ScriptExecutions.find((execution) => execution.RequestID === RequestID) || null;
+};
+
 // Drop all pending/complete entries and notify the UI
 Manager.ClearQueue = async () => {
   ScriptExecutions = [];
@@ -39,6 +43,41 @@ Manager.SetTimeout = (RequestID, Timeout) => {
   }, Timeout);
   return;
 };
+
+function NormalizeClientPlatformKey(Client) {
+  const Raw = String((Client && Client.OperatingSystem) || '')
+    .trim()
+    .toLowerCase();
+  if (!Raw) return null;
+  if (Raw.includes('win')) return 'Windows';
+  if (Raw.includes('mac') || Raw.includes('darwin') || Raw.includes('os x')) return 'macOS';
+  if (Raw.includes('linux') || Raw.includes('ubuntu') || Raw.includes('debian') || Raw.includes('raspbian')) {
+    return 'Linux';
+  }
+  return null;
+}
+
+function ResolveDispatchBlockReason(Script, Client) {
+  const PlatformKey = NormalizeClientPlatformKey(Client);
+  if (!PlatformKey) {
+    return 'Unable to determine client operating system; script was not sent.';
+  }
+
+  const Platforms = Script && Script.Platforms ? Script.Platforms : {};
+  const PlatformPath = typeof Platforms[PlatformKey] === 'string' ? Platforms[PlatformKey].trim() : '';
+  if (!PlatformPath) {
+    return `No ${PlatformKey} script is configured for this script; it was not sent to the client.`;
+  }
+
+  const Compatible = Array.isArray(Script && Script.CompatiblePlatforms)
+    ? Script.CompatiblePlatforms
+    : [];
+  if (!Compatible.includes(PlatformKey)) {
+    return `${PlatformKey} script file "${PlatformPath}" was not found; script was not sent to the client.`;
+  }
+
+  return null;
+}
 
 // Enqueue a synthetic/internal action for a client (e.g., Wake On LAN)
 Manager.AddInternalTaskToQueue = async (UUID, TaskName) => {
@@ -110,11 +149,34 @@ Manager.AddToQueue = async (UUID, ScriptID) => {
     });
   }
 
-  Manager.SetTimeout(RequestID, Script.Timeout || 5000);
+  const DispatchBlockReason = ResolveDispatchBlockReason(Script, Client);
+  if (DispatchBlockReason) {
+    const Request = ScriptExecutions.find((Exe) => Exe.RequestID === RequestID);
+    if (Request) {
+      Request.Status = 'Failed';
+      Request.Error = DispatchBlockReason;
+      Request.StatusText = 'Failed';
+      Request.Timer.End = Date.now();
+      Request.Timer.Duration = Request.Timer.End - Request.Timer.Start;
+    }
+    BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
+    return RequestID;
+  }
+
+  const Timeout =
+    typeof Script.Timeout === 'number' && Number.isInteger(Script.Timeout) && Script.Timeout > 0
+      ? Script.Timeout
+      : 15000;
+  Manager.SetTimeout(RequestID, Timeout);
 
   BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
 
   return RequestID;
+};
+
+Manager.ShouldDispatch = async (RequestID) => {
+  const Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
+  return !!(Request && Request.Status === 'Pending');
 };
 
 // Update request progress without completing the task.

@@ -271,7 +271,14 @@ function SetupWebUiNamespace(io, ServerManager) {
         if (!Cfg.AllowRemoteScripts) return cb && cb({ error: 'forbidden' });
         const { uuid, scriptId } = payload || {};
         if (!uuid || !scriptId) return cb && cb({ error: 'invalid_args' });
-        await ServerManager.ExecuteScripts(scriptId, [uuid], false);
+        const Summary = await ServerManager.ExecuteScripts(scriptId, [uuid], false);
+        const Failed =
+          Summary && Array.isArray(Summary.failed)
+            ? Summary.failed.find((Entry) => Entry && Entry.UUID === uuid)
+            : null;
+        if (Failed) {
+          return cb && cb({ error: 'failed', message: Failed.message || 'Script was blocked' });
+        }
         cb && cb({ ok: true });
       } catch (e) {
         cb && cb({ error: 'failed' });
