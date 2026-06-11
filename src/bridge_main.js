@@ -86,6 +86,7 @@ const INVOKE_CHANNELS = new Set([
 ]);
 
 const SUBSCRIBE_CHANNELS = new Set([
+  'AppMenuAction',
   'ModeUpdated',
   'OSCBulkAction',
   'PlaySound',
@@ -111,6 +112,7 @@ const SUBSCRIBE_CHANNELS = new Set([
   'CreateShowTrakAlert',
   'UpdateManager:DownloadProgress',
   'ShowFileUpdated',
+  'MainWindowFullscreenChanged',
 ]);
 
 function invoke(channel, ...args) {
@@ -170,6 +172,8 @@ contextBridge.exposeInMainWorld('API', {
   HasUnsavedShowData: async () => invoke('Show:HasUnsavedData'),
   EnsureShowFileExists: async () => invoke('Show:EnsureFileExists'),
   OnShowFileUpdated: (Callback) => subscribe('ShowFileUpdated', Callback),
+  OnAppMenuAction: (Callback) => subscribe('AppMenuAction', Callback),
+  OnWindowFullscreenChanged: (Callback) => subscribe('MainWindowFullscreenChanged', Callback),
   SetGroupOrder: async (GroupID, OrderedUUIDs) => invoke('SetGroupOrder', GroupID, OrderedUUIDs),
   // Application Mode API
   GetMode: async () => invoke('Mode:Get'),

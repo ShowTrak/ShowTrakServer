@@ -107,6 +107,16 @@ function sendShowFileUpdated(filePath) {
   }
 }
 
+function sendMainWindowFullscreenChanged(isFullscreen) {
+  try {
+    if (MainWindow && !MainWindow.isDestroyed()) {
+      MainWindow.webContents.send('MainWindowFullscreenChanged', Boolean(isFullscreen));
+    }
+  } catch {
+    // Non-critical UI sync; ignore transient teardown errors.
+  }
+}
+
 function getWindowIconPath() {
   const iconName = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
   return path.join(__dirname, 'images', iconName);
@@ -353,6 +363,87 @@ function hasMainWindow() {
   return MainWindow && !MainWindow.isDestroyed();
 }
 
+function sendAppMenuAction(actionID) {
+  try {
+    if (hasMainWindow()) {
+      MainWindow.webContents.send('AppMenuAction', String(actionID || ''));
+    }
+  } catch {
+    // Best-effort UI action dispatch; ignore teardown races.
+  }
+}
+
+function buildMacAppMenuTemplate() {
+  const fileSubmenu = [
+    { label: 'New Show', accelerator: 'CmdOrCtrl+N', click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_NEW') },
+    { label: 'Open', accelerator: 'CmdOrCtrl+O', click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_OPEN') },
+    { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_SAVE') },
+    {
+      label: 'Save As',
+      accelerator: 'CmdOrCtrl+Shift+S',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_SAVEAS'),
+    },
+    { type: 'separator' },
+    { label: 'Open Logs Directory', click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_LOGSFOLDER') },
+    {
+      label: 'Open Scripts Directory',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_SCRIPTSFOLDER'),
+    },
+    { type: 'separator' },
+    {
+      label: 'LAN Discovery Wizard',
+      accelerator: 'CmdOrCtrl+L',
+      click: () => sendAppMenuAction('ADD_TARGET_BROWSE_ACTION'),
+    },
+    {
+      label: 'Script Manager',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_SCRIPT_MANAGER_BUTTON'),
+    },
+    {
+      label: 'Update Manager',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_UPDATE_MANAGER_BUTTON'),
+    },
+    {
+      label: 'OSC/API Reference',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON'),
+    },
+    { type: 'separator' },
+    {
+      label: 'Check for Updates',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_CHECKUPDATES'),
+    },
+    { label: 'About', click: () => sendAppMenuAction('SHOWTRAK_ABOUT_BUTTON') },
+    { type: 'separator' },
+    {
+      label: 'ShowTrak Preferences',
+      accelerator: 'CmdOrCtrl+,',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_OPEN_SETTINGS'),
+    },
+    {
+      label: 'Close ShowTrak',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_SHUTDOWN_BUTTON'),
+    },
+  ];
+
+  return [
+    { role: 'appMenu' },
+    { label: 'File', submenu: fileSubmenu },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+  ];
+}
+
+function configureApplicationMenu() {
+  if (process.platform !== 'darwin') {
+    Menu.setApplicationMenu(null);
+    return;
+  }
+
+  const menu = Menu.buildFromTemplate(buildMacAppMenuTemplate());
+  Menu.setApplicationMenu(menu);
+}
+
 async function PromptConfirmBeforeShutdown() {
   if (quittingForUpdate) {
     return true;
@@ -424,10 +515,6 @@ async function PromptSaveBeforeClose() {
   return true;
 }
 
-// Note: Hiding the app menu disables common shortcuts on macOS. If you ship on macOS,
-// prefer to keep a minimal menu there and only remove on Windows/Linux.
-// Example: if (app.isPackaged && process.platform !== 'darwin') Menu.setApplicationMenu(null);
-if (app.isPackaged && process.platform !== 'darwin') Menu.setApplicationMenu(null);
 let PreloaderWindow = null;
 const ONLINE_DEPLOY_COOLDOWN_MS = 10000;
 const LastOnlineStateByUUID = new Map();
@@ -593,6 +680,8 @@ function ScheduleScriptChangeDeployment() {
 app.whenReady().then(async () => {
   if (require('electron-squirrel-startup')) return app.quit();
 
+  configureApplicationMenu();
+
   if (MainWindow) {
     MainWindow.close();
     MainWindow = null;
@@ -644,6 +733,7 @@ app.whenReady().then(async () => {
 
   MainWindow.loadFile(path.join(__dirname, 'UI', 'index.html')).then(async () => {
     Logger.log('MainWindow finished loading UI');
+    sendMainWindowFullscreenChanged(MainWindow.isFullScreen());
     // Initial payloads to hydrate renderer stores
     UpdateAdoptionList();
     // Boot monitoring loops once the DB schema is ready
@@ -695,6 +785,8 @@ app.whenReady().then(async () => {
     bypassShutdownConfirmation = false;
     MainWindow = null;
   });
+  MainWindow.on('enter-full-screen', () => sendMainWindowFullscreenChanged(true));
+  MainWindow.on('leave-full-screen', () => sendMainWindowFullscreenChanged(false));
 
   // ShowTrak file save/open IPC. Returns [err, result] tuples consistently.
   RPC.handle('Show:Save', async () => {

@@ -37,6 +37,8 @@ document.addEventListener('click', async (e) => {
 let DnDState = {
   dragUUID: null,
   sourceGroupId: null,
+  dragSize: null,
+  dragGhostClasses: null,
   ghostEl: null,
   currentOverGroup: null,
   rowIndex: null,
@@ -63,8 +65,16 @@ function ShowShortcutsModal() {
   // Core selection/navigation (Ctrl or Cmd)
   items.push({ title: 'Select All', shortcut: 'Ctrl/Cmd+A' });
   items.push({ title: 'Clear Selection', shortcut: 'Ctrl/Cmd+D' });
+  // Core menu actions
+  items.push({ title: 'New Show', shortcut: 'Ctrl/Cmd+N' });
+  items.push({ title: 'Open Show', shortcut: 'Ctrl/Cmd+O' });
+  items.push({ title: 'Save Show', shortcut: 'Ctrl/Cmd+S' });
+  items.push({ title: 'Save Show As', shortcut: 'Ctrl/Cmd+Shift+S' });
+  items.push({ title: 'ShowTrak Preferences', shortcut: 'Ctrl/Cmd+,' });
+  items.push({ title: 'LAN Discovery Wizard', shortcut: 'Ctrl/Cmd+L' });
   // Alerts
-  items.push({ title: 'Toggle Alerts', shortcut: 'Ctrl/Cmd+Y' });
+  items.push({ title: 'Toggle Alert Actions Enabled/Disabled', shortcut: 'Ctrl/Cmd+T' });
+  items.push({ title: 'Toggle Alerts Panel', shortcut: 'Ctrl/Cmd+Y' });
   items.push({ title: 'Dismiss All Alerts', shortcut: 'Ctrl/Cmd+U' });
   // Modals/UI
   items.push({ title: 'Open Keyboard Shortcuts', shortcut: 'Ctrl/Cmd+K' });
@@ -115,6 +125,8 @@ function teardownDnD() {
   DnDState = {
     dragUUID: null,
     sourceGroupId: null,
+    dragSize: null,
+    dragGhostClasses: null,
     ghostEl: null,
     currentOverGroup: null,
     rowIndex: null,
@@ -130,6 +142,28 @@ function setupDnD() {
     if (AppMode !== 'EDIT') return;
     const uuid = $(this).attr('data-uuid');
     DnDState.dragUUID = uuid;
+    try {
+      const r = this.getBoundingClientRect();
+      DnDState.dragSize = {
+        width: r.width,
+        height: r.height,
+      };
+      const variantMap = {
+        ONLINE: 'dnd-ghost--online',
+        IDLE: 'dnd-ghost--idle',
+        DEGRADED: 'dnd-ghost--degraded',
+        PENDING: 'dnd-ghost--pending',
+        MONITOR: 'dnd-ghost--monitor',
+        DUMMY: 'dnd-ghost--dummy',
+      };
+      DnDState.dragGhostClasses = Object.entries(variantMap)
+        .filter(([srcClass]) => this.classList.contains(srcClass))
+        .map(([, ghostClass]) => ghostClass);
+    } catch (err) {
+      HandleNonFatalError('DnD:CaptureDragSize', err);
+      DnDState.dragSize = null;
+      DnDState.dragGhostClasses = null;
+    }
     const $group = $(this).closest('.group-drop-zone');
     DnDState.sourceGroupId = normalizeGroupId($group.attr('data-groupid'));
     try {
@@ -148,6 +182,7 @@ function setupDnD() {
     DnDState.currentOverGroup = null;
     DnDState.rowIndex = null;
     DnDState.dragUUID = null;
+    DnDState.dragGhostClasses = null;
   });
 
   $(document).on('dragover.dnd', '.group-drop-zone', function (e) {
@@ -201,6 +236,9 @@ function normalizeGroupId(val) {
 function createGhostEl() {
   const el = document.createElement('div');
   el.className = 'dnd-ghost';
+  if (Array.isArray(DnDState.dragGhostClasses) && DnDState.dragGhostClasses.length) {
+    el.classList.add(...DnDState.dragGhostClasses);
+  }
   el.setAttribute('aria-hidden', 'true');
   el.style.pointerEvents = 'none';
   return el;
@@ -211,6 +249,13 @@ function clearGhost() {
     DnDState.ghostEl.parentNode.removeChild(DnDState.ghostEl);
   }
   DnDState.ghostEl = null;
+}
+
+function applyGhostSize(ghost, fallbackRect) {
+  const width = DnDState.dragSize?.width || fallbackRect?.width || 220;
+  const height = DnDState.dragSize?.height || fallbackRect?.height || 110;
+  ghost.style.width = `${Math.max(1, Math.round(width))}px`;
+  ghost.style.height = `${Math.max(1, Math.round(height))}px`;
 }
 
 function positionGhostMarker(container, x, y) {
@@ -225,8 +270,7 @@ function positionGhostMarker(container, x, y) {
 
   if (tiles.length === 0) {
     if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
-    DnDState.ghostEl.style.width = '220px';
-    DnDState.ghostEl.style.height = '110px';
+    applyGhostSize(DnDState.ghostEl, null);
     container.appendChild(DnDState.ghostEl);
     return;
   }
@@ -261,8 +305,7 @@ function positionGhostMarker(container, x, y) {
   ) {
     if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
     const ghost = DnDState.ghostEl;
-    ghost.style.width = `${firstRect.width}px`;
-    ghost.style.height = `${firstRect.height}px`;
+    applyGhostSize(ghost, firstRect);
     firstTile.parentNode.insertBefore(ghost, firstTile);
     return;
   }
@@ -273,8 +316,7 @@ function positionGhostMarker(container, x, y) {
   if ((x >= lastRow.right - EDGE_X && y >= lastRow.top - EDGE_Y) || y >= lastRow.bottom - 2) {
     if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
     const ghost = DnDState.ghostEl;
-    ghost.style.width = `${lastRect.width}px`;
-    ghost.style.height = `${lastRect.height}px`;
+    applyGhostSize(ghost, lastRect);
     container.appendChild(ghost);
     return;
   }
@@ -333,8 +375,7 @@ function positionGhostMarker(container, x, y) {
   if (x <= row.left + EDGE_X) {
     if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
     const ghost = DnDState.ghostEl;
-    ghost.style.width = `${nearest.rect.width}px`;
-    ghost.style.height = `${nearest.rect.height}px`;
+    applyGhostSize(ghost, nearest.rect);
     const firstInRow = row.tiles[0].el;
     firstInRow.parentNode.insertBefore(ghost, firstInRow);
     return;
@@ -342,8 +383,7 @@ function positionGhostMarker(container, x, y) {
   if (x >= row.right - EDGE_X) {
     if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
     const ghost = DnDState.ghostEl;
-    ghost.style.width = `${nearest.rect.width}px`;
-    ghost.style.height = `${nearest.rect.height}px`;
+    applyGhostSize(ghost, nearest.rect);
     const lastInRow = row.tiles[row.tiles.length - 1].el;
     lastInRow.parentNode.insertBefore(ghost, lastInRow.nextSibling);
     return;
@@ -354,8 +394,7 @@ function positionGhostMarker(container, x, y) {
   const before = x < centerX - HYSTERESIS_X;
   if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
   const ghost = DnDState.ghostEl;
-  ghost.style.width = `${nearest.rect.width}px`;
-  ghost.style.height = `${nearest.rect.height}px`;
+  applyGhostSize(ghost, nearest.rect);
   if (before) {
     nearest.tile.parentNode.insertBefore(ghost, nearest.tile);
   } else {

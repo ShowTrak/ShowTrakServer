@@ -14,6 +14,18 @@
   font-weight: 700;
 }
 
+body.macos-native-fullscreen .dragbar {
+  display: none !important;
+}
+
+body.macos-native-fullscreen #APPLICATION_CONTAINER {
+  height: 100% !important;
+}
+
+body.macos-native-fullscreen #APPLICATION {
+  padding-top: 0 !important;
+}
+
 #APPLICATION_NAVBAR_TITLE {
   color: rgba(255, 255, 255, 0.95);
 }
@@ -263,6 +275,19 @@
   border-radius: 0.45rem;
   font-size: 13px;
   padding: 0.45rem 0.6rem;
+}
+#SETTINGS_MENU .dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+#SETTINGS_MENU .dropdown-item .menu-shortcut {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 #ADD_MONITORING_TARGET_MENU .dropdown-item:hover,
 #ADD_MONITORING_TARGET_MENU .dropdown-item:focus,
@@ -1817,7 +1842,7 @@ button.btn:focus {
 }
 
 .SHOWTRAK_PC {
-  width: 220px;
+  width: 218px;
   height: var(--tile-expanded-height);
   min-height: var(--tile-expanded-height);
   box-sizing: border-box;
@@ -2018,7 +2043,7 @@ body.compact-mode .GROUP_TITLE {
 
 body.compact-mode .SHOWTRAK_PC,
 body.compact-mode .SHOWTRAK_PC_PLACEHOLDER {
-  width: 240px;
+  width: 254px;
   height: 36px;
   min-height: 36px;
   box-sizing: border-box;
@@ -2330,13 +2355,30 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   background-color: rgba(255, 255, 255, 0.04) !important;
 }
 .dnd-ghost {
-  width: 220px;
-  min-height: 90px;
+  box-sizing: border-box;
   border: 2px dashed rgba(255, 255, 255, 0.7);
   border-radius: 8px;
   background: transparent;
   opacity: 0.9;
   margin: 2px 0;
+}
+.dnd-ghost.dnd-ghost--online {
+  background-color: var(--client-online-bg);
+}
+.dnd-ghost.dnd-ghost--idle {
+  background-color: rgba(64, 64, 64, 0.5);
+}
+.dnd-ghost.dnd-ghost--degraded {
+  background-color: rgba(255, 140, 0, 0.32);
+}
+.dnd-ghost.dnd-ghost--pending {
+  background-color: rgba(0, 123, 255, 0.25);
+}
+.dnd-ghost.dnd-ghost--monitor {
+  border-style: dashed;
+}
+.dnd-ghost.dnd-ghost--dummy {
+  border-style: dotted;
 }
 .SHOWTRAK_PC.dragging {
   opacity: 0.6;

@@ -1034,6 +1034,22 @@ function enableExecToastOutsideClose() {
 }
 
 async function Init() {
+  window.API.OnAppMenuAction((ActionID) => {
+    const id = String(ActionID || '').trim();
+    if (!id) return;
+    const button = document.getElementById(id);
+    if (!button) return;
+    button.click();
+  });
+
+  const isMacOS =
+    navigator.userAgentData?.platform === 'macOS' || /Mac/i.test(navigator.platform || '');
+  if (isMacOS) {
+    window.API.OnWindowFullscreenChanged((IsFullscreen) => {
+      document.body.classList.toggle('macos-native-fullscreen', Boolean(IsFullscreen));
+    });
+  }
+
   Config = await window.API.GetConfig();
   $('#APPLICATION_NAVBAR_TITLE').text(`${Config.Application.Name}`);
   $('#APPLICATION_NAVBAR_STATUS').text('');

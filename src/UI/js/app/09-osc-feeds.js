@@ -1,3 +1,33 @@
+const HttpApiRoutes = [
+  {
+    Methods: 'GET, POST',
+    Path: '/API/Dummy/:id/Heartbeat',
+    Title: 'Deliver a heartbeat to a Dummy Client by its Dummy ID',
+  },
+];
+
+function RenderRouteEntry($Container, Route) {
+  let PathFiller = '';
+  for (const Segment of String(Route.Path || '').split('/').filter((s) => s.length > 0)) {
+    PathFiller += `<span class="">/</span>`;
+    if (Segment.startsWith(':')) {
+      PathFiller += `<span class="text-info">[${Safe(Segment.substring(1))}]</span>`;
+    } else {
+      PathFiller += `<span>${Safe(Segment)}</span>`;
+    }
+  }
+
+  const MethodLabel = Route.Methods ? `<div class="text-uppercase small text-muted">${Safe(Route.Methods)}</div>` : '';
+
+  $Container.append(`
+		<div class="d-grid gap-2 p-2 rounded bg-ghost rounded-3">
+			${MethodLabel}
+			<code class="bg-ghost rounded p-2">${PathFiller}</code>
+			<p class="mb-0">${Safe(Route.Title)}</p>
+		</div>
+	`);
+}
+
 async function OpenOSCDictionary() {
   await CloseAllModals();
   $('#OSC_ROUTE_LIST_MODAL').modal('show');
@@ -11,26 +41,22 @@ window.API.SetOSCList(async (Routes) => {
   $('#OSC_ROUTE_LIST').html('');
   $('#OSC_ROUTE_LIST').append(`
 		<div class="d-grid gap-2 p-2 rounded bg-ghost-light rounded-3">
-			The following OSC routes are accessible on port 3333.
+			<div class="fw-semibold">HTTP API</div>
+			<div class="text-muted small">The following HTTP API routes are accessible on port 3000.</div>
+		</div>
+	`);
+  for (const Route of HttpApiRoutes) {
+    RenderRouteEntry($('#OSC_ROUTE_LIST'), Route);
+  }
+
+  $('#OSC_ROUTE_LIST').append(`
+		<div class="d-grid gap-2 p-2 rounded bg-ghost-light rounded-3 mt-2">
+			<div class="fw-semibold">OSC Routes</div>
+			<div class="text-muted small">The following OSC routes are accessible on port 3333.</div>
 		</div>
 	`);
   for (const Route of Routes) {
-    let PathFiller = '';
-    for (const Segment of Route.Path.split('/').filter((s) => s.length > 0)) {
-      PathFiller += `<span class="">/</span>`;
-      if (Segment.startsWith(':')) {
-        PathFiller += `<span class="text-info">[${Safe(Segment.substring(1))}]</span>`;
-      } else {
-        PathFiller += `<span>${Safe(Segment)}</span>`;
-      }
-    }
-
-    $('#OSC_ROUTE_LIST').append(`
-			<div class="d-grid gap-2 p-2 rounded bg-ghost rounded-3">
-				<code class="bg-ghost rounded p-2">${PathFiller}</code>
-				<p class="mb-0">${Safe(Route.Title)}</p>
-			</div>
-		`);
+    RenderRouteEntry($('#OSC_ROUTE_LIST'), Route);
   }
   return;
 });

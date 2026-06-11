@@ -67,7 +67,7 @@
           <button
             id="ALERTS_BUTTON"
             class="alerts-btn no-drag"
-            title="Alerts (Ctrl+Y)"
+            title="Toggle Alerts Panel (Ctrl/Cmd+Y)"
             aria-label="Alerts"
           >
             <i class="bi bi-exclamation-triangle-fill"></i>
@@ -148,22 +148,26 @@
               <li><h6 class="dropdown-header">Show File</h6></li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_NEW">
-                  New Show
+                  <span>New Show</span>
+                  <span class="menu-shortcut">Cmd/Ctrl+N</span>
                 </button>
               </li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_OPEN">
-                  Open
+                  <span>Open</span>
+                  <span class="menu-shortcut">Cmd/Ctrl+O</span>
                 </button>
               </li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SAVE">
-                  Save
+                  <span>Save</span>
+                  <span class="menu-shortcut">Cmd/Ctrl+S</span>
                 </button>
               </li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SAVEAS">
-                  Save As
+                  <span>Save As</span>
+                  <span class="menu-shortcut">Cmd/Ctrl+Shift+S</span>
                 </button>
               </li>
               <li><hr class="dropdown-divider" /></li>
@@ -209,7 +213,7 @@
                   class="dropdown-item"
                   id="SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON"
                 >
-                  OSC Dictionary
+                  OSC/API Reference
                 </button>
               </li>
               <li><hr class="dropdown-divider" /></li>
@@ -227,7 +231,8 @@
               <li><hr class="dropdown-divider" /></li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS">
-                  ShowTrak Preferences
+                  <span>ShowTrak Preferences</span>
+                  <span class="menu-shortcut">Cmd/Ctrl+,</span>
                 </button>
               </li>
               <li>
@@ -556,6 +561,7 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable modal-lg">
         <div class="modal-content">
           <div class="modal-body text-center">
+            <strong id="OSC_ROUTE_LIST_MODAL_Label" class="mb-0">OSC/API Reference</strong>
             <div id="OSC_ROUTE_LIST" class="d-grid gap-2 text-start"></div>
           </div>
         </div>

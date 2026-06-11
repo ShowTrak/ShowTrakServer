@@ -16,6 +16,53 @@ document.addEventListener('keydown', function (e) {
     return;
   }
 
+  // Core cogs menu shortcuts (Cmd on macOS, Ctrl on Windows/Linux)
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.repeat) {
+    const key = e.key.toLowerCase();
+
+    // Save
+    if (!e.shiftKey && key === 's') {
+      e.preventDefault();
+      document.getElementById('SHOWTRAK_MODEL_CORE_SAVE')?.click();
+      return;
+    }
+
+    // Save As
+    if (e.shiftKey && key === 's') {
+      e.preventDefault();
+      document.getElementById('SHOWTRAK_MODEL_CORE_SAVEAS')?.click();
+      return;
+    }
+
+    // Open
+    if (!e.shiftKey && key === 'o') {
+      e.preventDefault();
+      document.getElementById('SHOWTRAK_MODEL_CORE_OPEN')?.click();
+      return;
+    }
+
+    // New Show
+    if (!e.shiftKey && key === 'n') {
+      e.preventDefault();
+      document.getElementById('SHOWTRAK_MODEL_CORE_NEW')?.click();
+      return;
+    }
+
+    // Preferences
+    if (!e.shiftKey && key === ',') {
+      e.preventDefault();
+      document.getElementById('SHOWTRAK_MODEL_CORE_OPEN_SETTINGS')?.click();
+      return;
+    }
+
+    // LAN Discovery Wizard
+    if (!e.shiftKey && key === 'l') {
+      e.preventDefault();
+      document.getElementById('ADD_TARGET_BROWSE_ACTION')?.click();
+      return;
+    }
+  }
+
   // Ctrl/Cmd + Shift + M opens context menu centered
   if (
     (e.ctrlKey || e.metaKey) &&
@@ -77,7 +124,13 @@ document.addEventListener('keydown', function (e) {
       ShowShortcutsModal();
       return;
     }
-    // Toggle alerts: Ctrl+Y
+    // Toggle alert actions enabled/disabled: Ctrl+T
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 't') {
+      e.preventDefault();
+      SetAlertActionsEnabled(!AlertActionsEnabled);
+      return;
+    }
+    // Toggle alerts panel: Ctrl+Y
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'y') {
       e.preventDefault();
       ToggleAlertsTray();
