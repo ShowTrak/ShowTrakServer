@@ -509,17 +509,18 @@ function RenderPendingAdoptionSection() {
     html += `      <span class="GROUP_TITLE py-2">DISCOVER</span>`;
     html += `    </div>`;
     html += `  </div>`;
-    html += `  <div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100">`;
+    html += `  <div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100 group-drop-zone">`;
     for (const dev of list) {
       const Hostname = dev && dev.Hostname ? dev.Hostname : 'Unknown Host';
       const IP = dev && dev.IP ? dev.IP : 'Unknown IP';
-      const Version = dev && dev.Version ? dev.Version : 'X.X.X';
       const UUID = dev && dev.UUID ? dev.UUID : '';
       html += `
         <div class="SHOWTRAK_PC PENDING" data-uuid="${Safe(UUID)}">
-          <h5 class="mb-0">${Safe(Hostname)}</h5>
-          <small class="text-sm text-light">${Safe(IP)}</small>
-          <div class="d-grid">
+          <h5 class="mb-0" data-type="PENDING_HOSTNAME" title="${Safe(Hostname)}">${Safe(
+            Hostname
+          )}</h5>
+          <small class="text-sm text-light" data-type="PENDING_IP">${Safe(IP)}</small>
+          <div class="d-grid" data-type="PENDING_ACTION">
             <button class="btn btn-sm btn-light SHOWTRAK_BTN_ROUNDED ADOPT_BTN" data-uuid="${Safe(
               UUID
             )}">Adopt</button>

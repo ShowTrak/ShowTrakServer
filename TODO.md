@@ -7,3 +7,5 @@ Monitoring
 - Scripts to be enabled for certain clients
 - Script failure when OS not available
 - OS being stored in DB
+
+- Dummy clients (HTTP/OSC API)

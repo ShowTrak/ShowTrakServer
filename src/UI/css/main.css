@@ -1685,6 +1685,17 @@ button.btn:focus {
     line-height 180ms ease;
 }
 
+.SHOWTRAK_PC > [data-type='Nickname'],
+.SHOWTRAK_PC > [data-type='Name'],
+.SHOWTRAK_PC > [data-type='Hostname'],
+.SHOWTRAK_PC.PENDING > [data-type='PENDING_HOSTNAME'] {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .SHOWTRAK_PC:hover {
   border-color: rgba(255, 255, 255, 0.4) !important;
 }
@@ -1741,6 +1752,10 @@ button.btn:focus {
 
 .SHOWTRAK_PC_STATUS > .progress:first-of-type {
   margin-top: 0.2rem;
+}
+
+.SHOWTRAK_PC_STATUS[data-type='INDICATOR_ONLINE'] {
+  row-gap: 0.35rem !important;
 }
 
 .SHOWTRAK_PC_PLACEHOLDER {
@@ -1846,6 +1861,29 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Nickname'] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+body.compact-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_HOSTNAME'] {
+  display: none !important;
+}
+
+body.compact-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_IP'] {
+  display: block !important;
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  font-size: 1rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.compact-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_ACTION'] {
+  display: block !important;
+  flex: 0 0 auto;
+  margin-left: 0.5rem;
 }
 
 body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_ONLINE'] {
