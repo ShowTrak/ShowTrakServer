@@ -1171,6 +1171,50 @@ button.btn:focus {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
+.SHOWTRAK_NET_IFACE_CARD {
+  position: relative;
+  text-align: left;
+}
+
+.SHOWTRAK_NET_IFACE_CARD.is-inactive {
+  opacity: 0.5;
+  filter: grayscale(0.45);
+}
+
+.SHOWTRAK_NET_IFACE_NAME {
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: left;
+}
+
+.SHOWTRAK_NET_IFACE_IP {
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: left;
+  word-break: break-all;
+}
+
+.SHOWTRAK_NET_IFACE_META {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.56);
+  text-align: left;
+}
+
+.SHOWTRAK_NET_IFACE_KIND_BADGE {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffe08a;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+}
+
 /* Dark-themed USB critical-state popover */
 .SHOWTRAK_USB_POPOVER {
   --bs-popover-bg: #0c091c;

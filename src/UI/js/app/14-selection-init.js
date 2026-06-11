@@ -1385,7 +1385,35 @@ async function OpenClientInfo(UUID) {
   $('#CLIENT_INFO_VERSION').val(Version || '');
   $('#CLIENT_INFO_STATUS').val(Online ? (Client.Degraded ? 'Degraded' : 'Online') : 'Offline');
 
+  window.__ClientInfoNetFamily = 'IPv4';
+
   RenderClientInfoDetails(Client);
+
+  $('#SHOWTRAK_CLIENT_INFO_NET_FAMILY_V4')
+    .off('click.net-family')
+    .on('click.net-family', async function () {
+      try {
+        window.__ClientInfoNetFamily = 'IPv4';
+        if (!ClientInfoOpenUUID) return;
+        const Fresh = await window.API.GetClient(ClientInfoOpenUUID);
+        if (Fresh) RenderClientInfoDetails(Fresh);
+      } catch (err) {
+        HandleNonFatalError('OpenClientInfo:NetFamilyToggle', err);
+      }
+    });
+
+  $('#SHOWTRAK_CLIENT_INFO_NET_FAMILY_V6')
+    .off('click.net-family')
+    .on('click.net-family', async function () {
+      try {
+        window.__ClientInfoNetFamily = 'IPv6';
+        if (!ClientInfoOpenUUID) return;
+        const Fresh = await window.API.GetClient(ClientInfoOpenUUID);
+        if (Fresh) RenderClientInfoDetails(Fresh);
+      } catch (err) {
+        HandleNonFatalError('OpenClientInfo:NetFamilyToggle', err);
+      }
+    });
 
   $('#SHOWTRAK_CLIENT_INFO_USB_DEVICES')
     .off('click.critical-usb-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_USB')
@@ -1648,109 +1676,80 @@ function RenderClientInfoDetails(Client) {
   // Network Interfaces
   try {
     const $netList = $('#SHOWTRAK_CLIENT_INFO_NET_INTERFACES');
+    const $v4 = $('#SHOWTRAK_CLIENT_INFO_NET_FAMILY_V4');
+    const $v6 = $('#SHOWTRAK_CLIENT_INFO_NET_FAMILY_V6');
+    const selectedFamily = window.__ClientInfoNetFamily === 'IPv6' ? 'IPv6' : 'IPv4';
+    window.__ClientInfoNetFamily = selectedFamily;
+    const isV4 = selectedFamily === 'IPv4';
+    $v4
+      .toggleClass('btn-light', isV4)
+      .toggleClass('btn-outline-light', !isV4)
+      .attr('aria-pressed', isV4 ? 'true' : 'false');
+    $v6
+      .toggleClass('btn-light', !isV4)
+      .toggleClass('btn-outline-light', isV4)
+      .attr('aria-pressed', isV4 ? 'false' : 'true');
+
     $netList.html('');
     const ifaces = Array.isArray(Client.NetworkInterfaces) ? Client.NetworkInterfaces : [];
+
+    const normalizeFamily = (family) => {
+      const value = String(family || '').toUpperCase();
+      if (value === '4' || value === 'IPV4') return 'IPv4';
+      if (value === '6' || value === 'IPV6') return 'IPv6';
+      return value;
+    };
+    const isAddressActive = (address) => {
+      if (!address || typeof address !== 'object') return false;
+      if (typeof address.active === 'boolean') return address.active;
+      const ip = String(address.address || '').trim();
+      if (!ip) return false;
+      if (ip === '0.0.0.0' || ip === '::') return false;
+      return true;
+    };
+
     if (ifaces.length === 0) {
       $netList.html(
-        `<div class="rounded-3 p-2 bg-ghost"><h6 class="mb-0">No Interfaces Reported</h6></div>`
+        '<div class="rounded-3 p-2 bg-ghost"><h6 class="mb-0">No Interfaces Reported</h6></div>'
       );
     } else {
-      // Sort active first: interfaces with any external (non-internal) address
-      const sorted = [...ifaces].sort((a, b) => {
-        const aActive =
-          Array.isArray(a.addresses) && a.addresses.some((x) => x.address && !x.internal);
-        const bActive =
-          Array.isArray(b.addresses) && b.addresses.some((x) => x.address && !x.internal);
-        return (bActive ? 1 : 0) - (aActive ? 1 : 0);
-      });
-      for (const iface of sorted) {
+      const cards = [];
+      for (const iface of ifaces) {
         const nameRaw = iface && iface.name ? String(iface.name) : 'unknown';
         const name = Safe(nameRaw || 'unknown');
         const addresses = Array.isArray(iface.addresses) ? iface.addresses : [];
-        const macs = Array.from(
-          new Set(addresses.map((a) => (a.mac ? String(a.mac).toUpperCase() : '')).filter(Boolean))
+        const matchingAddresses = addresses.filter(
+          (a) => normalizeFamily(a && a.family) === selectedFamily
         );
-        const v4 = addresses.filter((a) => String(a.family).includes('4'));
-        const v6 = addresses.filter((a) => String(a.family).includes('6'));
-        const displayedAddrs = v4.length > 0 ? v4 : v6; // show IPv6 only if no IPv4 available
-        const activeCount = addresses.filter((a) => a.address && !a.internal).length;
-        const isActive = activeCount > 0;
-        let addrHtml = '';
-        if (displayedAddrs.length > 0) {
-          for (let i = 0; i < displayedAddrs.length; i++) {
-            const a = displayedAddrs[i];
-            const fam = Safe(a.family || '');
-            const addr = Safe(a.address || '');
-            const mask = Safe(a.netmask || '');
-            const cidr = a.cidr ? Safe(a.cidr) : '';
-            const prefix = cidr && cidr.includes('/') ? `/${cidr.split('/')[1]}` : '';
-            const mac = a.mac ? Safe(String(a.mac).toUpperCase()) : '';
-            const internalBadge = a.internal
-              ? '<span class="badge bg-ghost-light text-light">Internal Only</span>'
-              : '<span class="badge bg-ghost text-light">External</span>';
-            const scopeEl =
-              typeof a.scopeid !== 'undefined' && a.scopeid !== null
-                ? `<div class=\"text-sm text-muted\">scope ${Safe(a.scopeid)}</div>`
-                : '';
-            const idBase = 'IFACE_' + nameRaw.replace(/[^a-zA-Z0-9_-]/g, '') + '_' + i;
-            const addrId = idBase + '_ADDR';
-            const maskId = idBase + '_MASK';
-            const macId = idBase + '_MAC';
-            addrHtml += `
-              <div class="rounded p-2 d-grid gap-2">
-                <div class="d-flex justify-content-between align-items-center">
-                  <div class="d-flex gap-2 align-items-center">
-                    <span class="badge bg-ghost text-light">${fam}</span>
-                    ${internalBadge}
-                  </div>
-                  ${scopeEl}
-                </div>
-                <div class="form-floating has-copy">
-                  <input type="text" class="form-control disabled" id="${addrId}" value="${addr}${prefix}" disabled />
-                  <label for="${addrId}">Address</label>
-                  <button type="button" class="copy-field-btn" data-target="#${addrId}" title="Copy">
-                    <i class="bi bi-clipboard"></i>
-                  </button>
-                </div>
-                ${
-                  mask
-                    ? `<div class=\"form-floating has-copy\">` +
-                      `<input type=\"text\" class=\"form-control disabled\" id=\"${maskId}\" value=\"${mask}\" disabled />` +
-                      `<label for=\"${maskId}\">Netmask</label>` +
-                      `<button type=\"button\" class=\"copy-field-btn\" data-target=\"#${maskId}\" title=\"Copy\"><i class=\"bi bi-clipboard\"></i></button>` +
-                      `</div>`
-                    : ''
-                }
-                ${
-                  mac
-                    ? `<div class=\"form-floating has-copy\">` +
-                      `<input type=\"text\" class=\"form-control disabled\" id=\"${macId}\" value=\"${mac}\" disabled />` +
-                      `<label for=\"${macId}\">MAC Address</label>` +
-                      `<button type=\"button\" class=\"copy-field-btn\" data-target=\"#${macId}\" title=\"Copy\"><i class=\"bi bi-clipboard\"></i></button>` +
-                      `</div>`
-                    : ''
-                }
-              </div>`;
-          }
-        } else {
-          addrHtml =
-            '<div class="text-sm text-muted rounded p-2">No addresses (adapter inactive)</div>';
+        if (!matchingAddresses.length) continue;
+
+        for (const address of matchingAddresses) {
+          const ip = Safe(address && address.address ? address.address : 'Unknown address');
+          const mask = Safe(address && address.netmask ? address.netmask : 'Unknown');
+          const mac = Safe(
+            address && address.mac ? String(address.mac).toUpperCase() : 'Unknown'
+          );
+          const inactiveClass = isAddressActive(address) ? '' : ' is-inactive';
+          const kindBadge = address && address.internal
+            ? '<span class="SHOWTRAK_NET_IFACE_KIND_BADGE">Internal Only</span>'
+            : '';
+          cards.push(`
+            <div class="rounded-3 p-2 bg-ghost SHOWTRAK_NET_IFACE_CARD${inactiveClass}">
+              ${kindBadge}
+              <div class="SHOWTRAK_NET_IFACE_NAME">${name}</div>
+              <div class="SHOWTRAK_NET_IFACE_IP mt-1">${ip}</div>
+              <div class="SHOWTRAK_NET_IFACE_META mt-1">${mask}</div>
+              <div class="SHOWTRAK_NET_IFACE_META">${mac}</div>
+            </div>`);
         }
-        const macSummary = macs.length
-          ? `<div class="text-sm text-muted">${macs.map((m) => `<code>${Safe(m)}</code>`).join(' • ')}</div>`
-          : '';
-        $netList.append(`
-          <div class="rounded-3 p-2 bg-ghost">
-            <div class="d-flex justify-content-between align-items-center">
-              <div class="text-start">
-                <h6 class="mb-0">${name}</h6>
-              </div>
-              <div class="d-flex gap-1 align-items-center">
-                <span class="badge ${isActive ? 'bg-success' : 'bg-secondary'}">${isActive ? 'Active' : 'Inactive'}</span>
-              </div>
-            </div>
-            <div class="d-grid gap-1 mt-2">${addrHtml}</div>
-          </div>`);
+      }
+
+      if (!cards.length) {
+        $netList.html(
+          `<div class="rounded-3 p-2 bg-ghost"><h6 class="mb-0">No ${selectedFamily} Interfaces Detected</h6></div>`
+        );
+      } else {
+        $netList.html(cards.join(''));
       }
     }
   } catch (err) {

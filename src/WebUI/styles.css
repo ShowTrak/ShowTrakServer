@@ -624,6 +624,14 @@ h7 {
   gap: 10px;
 }
 
+.net-family-toggle {
+  margin-bottom: 10px;
+}
+
+.net-family-toggle .btn {
+  flex: 1 1 0;
+}
+
 .detail-section-title {
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -666,6 +674,71 @@ h7 {
 .chip-empty {
   color: rgba(255, 255, 255, 0.4);
   font-size: 0.85rem;
+}
+
+.net-card-list {
+  display: grid;
+  gap: 10px;
+}
+
+.net-iface-card {
+  position: relative;
+  border-radius: 12px;
+  background: var(--ghost);
+  padding: 12px;
+  text-align: left;
+}
+
+.net-iface-card.inactive {
+  opacity: 0.5;
+  filter: grayscale(0.5);
+}
+
+.net-iface-name {
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 6px;
+  text-align: left;
+}
+
+.net-iface-ip {
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 8px;
+  text-align: left;
+  word-break: break-all;
+}
+
+.net-iface-meta {
+  display: grid;
+  gap: 2px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.56);
+  text-align: left;
+}
+
+.net-iface-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffe08a;
+}
+
+.net-empty-card {
+  border: 1px dashed rgba(255, 255, 255, 0.24);
+  border-radius: 12px;
+  padding: 12px;
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.88rem;
 }
 
 /* Scripts list */

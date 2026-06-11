@@ -31,6 +31,7 @@
     Authed: false,
   };
   let detailUUID = null;
+  let netFamily = 'IPv4';
   let pin = '';
   let everConnected = false;
 
@@ -67,6 +68,8 @@
     usbSection: $('usbSection'),
     usbList: $('usbList'),
     netSection: $('netSection'),
+    netFamilyV4Btn: $('netFamilyV4Btn'),
+    netFamilyV6Btn: $('netFamilyV6Btn'),
     netList: $('netList'),
     runScriptBtn: $('runScriptBtn'),
     wolBtn: $('wolBtn'),
@@ -155,6 +158,77 @@
     return c && c.Vitals && c.Vitals.Ram ? c.Vitals.Ram.UsagePercentage : 0;
   }
 
+  function normalizeFamily(family) {
+    const value = String(family || '').toUpperCase();
+    if (value === '4' || value === 'IPV4') return 'IPv4';
+    if (value === '6' || value === 'IPV6') return 'IPv6';
+    return value;
+  }
+
+  function inferAddressActive(address) {
+    if (!address || typeof address !== 'object') return false;
+    if (typeof address.active === 'boolean') return address.active;
+    const ip = String(address.address || '').trim();
+    if (!ip) return false;
+    if (ip === '0.0.0.0' || ip === '::') return false;
+    return true;
+  }
+
+  function paintNetworkInterfaces(client) {
+    const isIPv4 = netFamily === 'IPv4';
+    el.netFamilyV4Btn.classList.toggle('btn-light', isIPv4);
+    el.netFamilyV4Btn.classList.toggle('btn-outline-light', !isIPv4);
+    el.netFamilyV4Btn.setAttribute('aria-pressed', String(isIPv4));
+    el.netFamilyV6Btn.classList.toggle('btn-light', !isIPv4);
+    el.netFamilyV6Btn.classList.toggle('btn-outline-light', isIPv4);
+    el.netFamilyV6Btn.setAttribute('aria-pressed', String(!isIPv4));
+
+    const nets = Array.isArray(client && client.NetworkInterfaces) ? client.NetworkInterfaces : [];
+    const cards = [];
+
+    for (const iface of nets) {
+      const ifaceName = iface && iface.name ? iface.name : 'Interface';
+      const addresses = Array.isArray(iface && iface.addresses) ? iface.addresses : [];
+      const matching = addresses.filter((a) => normalizeFamily(a && a.family) === netFamily);
+
+      for (const addr of matching) {
+        const ip = addr && addr.address ? addr.address : 'Unknown address';
+        const mask = addr && addr.netmask ? addr.netmask : 'Unknown';
+        const mac = addr && addr.mac ? addr.mac : 'Unknown';
+        const isInternal = !!(addr && addr.internal);
+        const isActive = inferAddressActive(addr);
+        cards.push(
+          `<article class="net-iface-card${isActive ? '' : ' inactive'}">`
+            + `${isInternal ? '<span class="net-iface-badge">Internal Only</span>' : ''}`
+            + `<div class="net-iface-name">${safe(ifaceName)}</div>`
+            + `<div class="net-iface-ip">${safe(ip)}</div>`
+            + `<div class="net-iface-meta"><div>${safe(mask)}</div><div>${safe(mac)}</div></div>`
+          + '</article>'
+        );
+      }
+    }
+
+    if (cards.length) {
+      el.netList.innerHTML = cards.join('');
+      return;
+    }
+
+    if (nets.length) {
+      el.netList.innerHTML = `<div class="net-empty-card">No ${safe(netFamily)} network interfaces detected for this client.</div>`;
+      return;
+    }
+
+    el.netList.innerHTML = '<div class="net-empty-card">No network interfaces reported.</div>';
+  }
+
+  function setNetFamily(family) {
+    const normalized = normalizeFamily(family);
+    if (normalized !== 'IPv4' && normalized !== 'IPv6') return;
+    if (netFamily === normalized) return;
+    netFamily = normalized;
+    if (detailUUID) paintDetail();
+  }
+
   // ---- Toasts -------------------------------------------------------------
   function toast(message, type) {
     const node = document.createElement('div');
@@ -185,6 +259,9 @@
     if (h) h();
   });
   el.confirmCancel.addEventListener('click', closeConfirm);
+
+  el.netFamilyV4Btn.addEventListener('click', () => setNetFamily('IPv4'));
+  el.netFamilyV6Btn.addEventListener('click', () => setNetFamily('IPv6'));
 
   // ---- Connection status --------------------------------------------------
   function setConn(state) {
@@ -596,18 +673,7 @@
       : '<span class="chip-empty">No USB devices reported.</span>';
 
     // Network interfaces
-    const nets = Array.isArray(c.NetworkInterfaces) ? c.NetworkInterfaces : [];
-    const netChips = [];
-    nets.forEach((n) => {
-      const addrs = (n.addresses || []).filter((a) => a.family === 'IPv4' && !a.internal);
-      if (!addrs.length) return;
-      netChips.push(
-        `<span class="chip">${safe(n.name)} · ${safe(addrs.map((a) => a.address).join(', '))}</span>`
-      );
-    });
-    el.netList.innerHTML = netChips.length
-      ? netChips.join('')
-      : '<span class="chip-empty">No network interfaces reported.</span>';
+    paintNetworkInterfaces(c);
 
     // Permission-gated actions
     const canScript = config.AllowRemoteScripts && scripts.length > 0;
