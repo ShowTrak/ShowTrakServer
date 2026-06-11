@@ -60,6 +60,13 @@ let NetworkDiscoveryProgress = {
 // Cache last full lists to allow partial re-render when only pending changes
 let __LastClients = [];
 let __LastGroups = [];
+let UpdateManagerClientProgress = new Map();
+let UpdateManagerReleaseStatus = null;
+let UpdateManagerReleaseOptions = [];
+let UpdateManagerSelectedReleaseTag = '';
+let UpdateManagerSelectedClients = new Set();
+let UpdateManagerRunning = false;
+let UpdateManagerDownloadInProgress = false;
 
 let SettingsGroups = [];
 let Settings = [];

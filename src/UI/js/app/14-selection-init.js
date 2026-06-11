@@ -1257,6 +1257,10 @@ async function Init() {
     await OpenAlertRuleManager();
   });
 
+  $('#SHOWTRAK_MODEL_CORE_UPDATE_MANAGER_BUTTON').on('click', async () => {
+    await OpenUpdateManagerModal();
+  });
+
   $('#SHOWTRAK_MODEL_CORE_LOGSFOLDER').on('click', async () => {
     await window.API.OpenLogsFolder();
   });
@@ -1287,6 +1291,21 @@ async function Init() {
 
   $('#SHOWTRAK_MODEL_CORE_SHUTDOWN_BUTTON').on('click', async () => {
     await window.API.Shutdown();
+  });
+
+  window.API.OnUpdateManagerDownloadProgress((Progress) => {
+    try {
+      if (!Progress || typeof SetUpdateManagerDownloadProgress !== 'function') return;
+      const Percent = typeof Progress.percent === 'number' ? Progress.percent : 0;
+      const Message = Progress.message || '';
+      UpdateManagerDownloadInProgress = (Progress.phase || '') !== 'complete';
+      SetUpdateManagerDownloadProgress(Percent, Message);
+      if (typeof ApplyUpdateManagerButtonLocks === 'function') {
+        ApplyUpdateManagerButtonLocks();
+      }
+    } catch (e) {
+      HandleNonFatalError('UpdateManager:DownloadProgress', e);
+    }
   });
 
   // Initialize application mode from backend and wire toggle

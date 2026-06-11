@@ -1,7 +1,7 @@
 {
   "name": "showtrak-server",
   "productName": "ShowTrak Server",
-  "version": "3.3.1",
+  "version": "3.4.1",
   "description": "Open source network/device monitoring & control for bulk installations.",
   "main": "src/main.js",
   "scripts": {

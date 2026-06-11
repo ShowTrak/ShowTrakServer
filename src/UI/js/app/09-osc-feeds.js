@@ -36,6 +36,29 @@ window.API.SetOSCList(async (Routes) => {
 });
 
 window.API.ClientUpdated(async (Data) => {
+  // Keep cached full-client list in sync with live heartbeat updates so
+  // secondary views (e.g. Update Manager) reflect current Online state.
+  try {
+    if (Array.isArray(__LastClients) && Data && Data.UUID) {
+      const idx = __LastClients.findIndex((client) => client && client.UUID === Data.UUID);
+      if (idx >= 0) {
+        __LastClients[idx] = {
+          ...__LastClients[idx],
+          ...Data,
+        };
+      }
+    }
+
+    if (
+      typeof RenderUpdateManagerClientList === 'function' &&
+      $('#SHOWTRAK_MODAL_UPDATE_MANAGER').hasClass('show')
+    ) {
+      RenderUpdateManagerClientList();
+    }
+  } catch (err) {
+    HandleNonFatalError('ClientUpdated:UpdateManagerCacheSync', err);
+  }
+
   // Online transition handling: auto-dismiss any pending offline alerts when a
   // client comes back online. Offline transitions intentionally do not raise a
   // UI notification.

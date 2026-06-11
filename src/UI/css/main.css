@@ -904,6 +904,125 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   margin-bottom: 0;
 }
 
+.UPDATE_MANAGER_CLIENT_ITEM {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.6rem;
+  padding: 0.65rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.UPDATE_MANAGER_CLIENT_ITEM.OFFLINE {
+  opacity: 0.72;
+}
+
+.UPDATE_MANAGER_CLIENT_HEADER {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.UPDATE_MANAGER_CLIENT_SELECT_WRAP {
+  padding-top: 1px;
+}
+
+.UPDATE_MANAGER_CLIENT_MAIN {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.UPDATE_MANAGER_CLIENT_SELECT {
+  cursor: pointer;
+}
+
+.UPDATE_MANAGER_CLIENT_SELECT:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.UPDATE_MANAGER_CLIENT_NAME {
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.UPDATE_MANAGER_CLIENT_META {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 11px;
+}
+
+.UPDATE_MANAGER_CLIENT_STATUS {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.UPDATE_MANAGER_CLIENT_PROGRESS {
+  height: 0.45rem;
+  margin-top: 0.4rem;
+  margin-bottom: 0.35rem;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.UPDATE_MANAGER_CLIENT_STATUS_TEXT {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  min-height: 16px;
+}
+
+.UPDATE_MANAGER_WARNING {
+  border: 1px solid rgba(255, 189, 89, 0.45);
+  background: rgba(255, 189, 89, 0.12);
+  border-radius: 0.6rem;
+  padding: 0.65rem;
+}
+
+.UPDATE_MANAGER_WARNING_TITLE {
+  color: #ffd58a;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 0.2rem;
+}
+
+.UPDATE_MANAGER_WARNING_TEXT {
+  color: rgba(255, 237, 204, 0.9);
+  font-size: 11px;
+}
+
+.UPDATE_MANAGER_WARNING_LIST {
+  margin: 0.45rem 0 0;
+  padding-left: 1rem;
+  color: rgba(255, 237, 204, 0.92);
+  font-size: 11px;
+}
+
+.UPDATE_MANAGER_DOWNLOAD_PROGRESS {
+  height: 0.55rem;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.UPDATE_MANAGER_RELEASE_BADGE {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.UPDATE_MANAGER_RELEASE_BADGE.DOWNLOADED {
+  color: #d7ffe8;
+  border-color: rgba(66, 196, 126, 0.55);
+  background: rgba(66, 196, 126, 0.2);
+}
+
+.UPDATE_MANAGER_RELEASE_BADGE.NOT_DOWNLOADED {
+  color: #ffe5e5;
+  border-color: rgba(220, 84, 84, 0.55);
+  background: rgba(220, 84, 84, 0.2);
+}
+
 @media (max-width: 576px) {
   .SHOWTRAK_ABOUT_MODAL_BODY {
     padding: 1rem;

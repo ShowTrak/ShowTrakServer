@@ -176,6 +176,10 @@ function SetupClientNamespace(io) {
       Logger.log(`Received Script Execution Response for RequestID: ${RequestID}`);
       ScriptExecutionManager.Complete(RequestID, Error);
     });
+
+    socket.on('ScriptExecutionProgress', (RequestID, Progress, StatusText) => {
+      ScriptExecutionManager.UpdateProgress(RequestID, Progress, StatusText);
+    });
   });
 }
 

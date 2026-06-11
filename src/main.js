@@ -40,6 +40,7 @@ const { Manager: AdoptionManager } = require('./Modules/AdoptionManager');
 const { Manager: ClientManager } = require('./Modules/ClientManager');
 const { Manager: GroupManager } = require('./Modules/GroupManager');
 const { Manager: MonitoringTargetManager } = require('./Modules/MonitoringTargetManager');
+const { Manager: UpdateManager } = require('./Modules/UpdateManager');
 const { Manager: DBManager } = require('./Modules/DB');
 const { Manager: MonitoringMethods } = require('./Modules/MonitoringMethods');
 const { Manager: AlertsManager } = require('./Modules/AlertsManager');
@@ -202,6 +203,13 @@ function parseArgumentString(value) {
   if (escaping) current += '\\';
   pushCurrent();
   return args;
+}
+
+function normalizeVersionToken(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^v/i, '')
+    .toLowerCase();
 }
 
 function resolveLocalScriptLauncher(scriptPath) {
@@ -837,6 +845,116 @@ app.whenReady().then(async () => {
     Logger.warn('CheckForUpdatesOnClient called for UUID:', UUID);
     await ServerManager.ExecuteBulkRequest('UpdateSoftware', [UUID], 'Check For Software Updates');
     return [null, true];
+  });
+
+  RPC.handle('UpdateManager:GetStatus', async () => {
+    try {
+      const Status = await UpdateManager.GetStatus();
+      return [null, Status];
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+  });
+
+  RPC.handle('UpdateManager:GetReleases', async () => {
+    try {
+      const Releases = await UpdateManager.ListReleases();
+      return [null, Releases];
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+  });
+
+  RPC.handle('UpdateManager:DownloadRelease', async (_Event, Tag) => {
+    try {
+      const Release = await UpdateManager.DownloadRelease(Tag, {
+        onProgress: (Progress) => {
+          try {
+            if (MainWindow && !MainWindow.isDestroyed()) {
+              MainWindow.webContents.send('UpdateManager:DownloadProgress', Progress);
+            }
+          } catch {}
+        },
+      });
+
+      return [null, Release];
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+  });
+
+  RPC.handle('UpdateManager:DeployRelease', async (_Event, Tag, Targets) => {
+    try {
+      const Status = await UpdateManager.GetStatus();
+      if (!Status || !Status.Ready || !Status.ReleaseVersion) {
+        return ['Download a release build before deploying', null];
+      }
+
+      const SelectedTag = String(Tag || '').trim();
+      if (!SelectedTag) {
+        return ['Select a release to deploy', null];
+      }
+      if (Status.ReleaseVersion !== SelectedTag) {
+        return ['Selected release is not downloaded yet', null];
+      }
+
+      const RawTargets = Array.isArray(Targets) ? Targets : [];
+      if (RawTargets.length === 0) {
+        return ['Select at least one client for deployment', null];
+      }
+
+      let SelectedTargets = [];
+      try {
+        SelectedTargets = IPCValidation.UUIDList(RawTargets, 'Deployment targets');
+      } catch (error) {
+        return validationErrorTuple(error);
+      }
+
+      const [ClientsErr, Clients] = await ClientManager.GetAll();
+      if (ClientsErr) return [ClientsErr, null];
+
+      const AllClients = (Clients || []).filter((Client) => Client && Client.UUID);
+      const SelectedSet = new Set(SelectedTargets);
+      const SelectedClients = AllClients.filter((Client) => SelectedSet.has(Client.UUID));
+      const SelectedVersionToken = normalizeVersionToken(SelectedTag);
+
+      const EligibleClients = SelectedClients.filter((Client) => {
+        if (!Client.Online) return false;
+        const ClientVersionToken = normalizeVersionToken(Client.Version);
+        return ClientVersionToken !== SelectedVersionToken;
+      });
+
+      const DeployTargets = EligibleClients.map((Client) => Client.UUID);
+      if (DeployTargets.length === 0) {
+        return ['No selected clients are eligible for deployment', null];
+      }
+
+      await ServerManager.ExecuteBulkRequest(
+        'UpdateSoftwareFromLAN',
+        DeployTargets,
+        'Updating Client Software',
+        {
+          resetQueue: false,
+          payload: {
+            FeedPath: Status.FeedPath,
+            ReleaseVersion: SelectedTag,
+          },
+        }
+      );
+
+      return [
+        null,
+        {
+          ReleaseVersion: SelectedTag,
+          TargetCount: DeployTargets.length,
+          SelectedCount: SelectedTargets.length,
+          TotalClientCount: AllClients.length,
+          FeedPath: Status.FeedPath,
+        },
+      ];
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
   });
 
   RPC.handle('GetAllGroups', async (_Event) => {

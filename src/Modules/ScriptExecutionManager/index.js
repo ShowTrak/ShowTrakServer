@@ -51,6 +51,8 @@ Manager.AddInternalTaskToQueue = async (UUID, TaskName) => {
     Internal: true,
     RequestID: RequestID,
     Status: 'Pending',
+    Progress: 0,
+    StatusText: 'Pending',
     Timer: {
       Start: Date.now(),
       End: null,
@@ -89,11 +91,15 @@ Manager.AddToQueue = async (UUID, ScriptID) => {
       Duration: null,
     };
     ExistingCommand.Status = 'Pending';
+    ExistingCommand.Progress = 0;
+    ExistingCommand.StatusText = 'Pending';
   } else {
     ScriptExecutions.push({
       Internal: false,
       RequestID: RequestID,
       Status: 'Pending',
+      Progress: 0,
+      StatusText: 'Pending',
       Timer: {
         Start: Date.now(),
         End: null,
@@ -111,6 +117,25 @@ Manager.AddToQueue = async (UUID, ScriptID) => {
   return RequestID;
 };
 
+// Update request progress without completing the task.
+Manager.UpdateProgress = async (RequestID, Progress = 0, StatusText = null) => {
+  const Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
+  if (!Request) return;
+  if (Request.Status !== 'Pending') return;
+
+  let NormalizedProgress = Number(Progress);
+  if (!Number.isFinite(NormalizedProgress)) NormalizedProgress = 0;
+  if (NormalizedProgress < 0) NormalizedProgress = 0;
+  if (NormalizedProgress > 100) NormalizedProgress = 100;
+
+  Request.Progress = Math.round(NormalizedProgress);
+  if (typeof StatusText === 'string' && StatusText.trim().length > 0) {
+    Request.StatusText = StatusText.trim();
+  }
+
+  BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
+};
+
 // Mark a request as completed or failed; compute duration and broadcast
 Manager.Complete = async (RequestID, Err) => {
   let Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
@@ -119,6 +144,8 @@ Manager.Complete = async (RequestID, Err) => {
   if (Err) Request.Error = typeof Err === 'string' ? Err : Err.message || 'Unknown error';
   else Request.Error = null;
   Request.Status = Err ? 'Failed' : 'Completed';
+  Request.Progress = Err ? Request.Progress || 0 : 100;
+  Request.StatusText = Err ? 'Failed' : 'Completed';
   Request.Timer.End = Date.now();
   Request.Timer.Duration = Request.Timer.End - Request.Timer.Start;
   BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);

@@ -13,6 +13,7 @@ const { Config } = require('../Config');
 const { Manager: AppDataManager } = require('../AppData');
 const { Manager: ScriptExecutionManager } = require('../ScriptExecutionManager');
 const { Manager: ClientManager } = require('../ClientManager');
+const { Manager: UpdateManager } = require('../UpdateManager');
 const express = require('express');
 
 const { Wait } = require('../Utils');
@@ -27,6 +28,8 @@ Server.on('error', (e) => {
 });
 
 const app = express();
+
+UpdateManager.RegisterRoutes(app);
 
 const ScriptDirectory = AppDataManager.GetScriptsDirectory();
 app.use(express.static(ScriptDirectory));
@@ -66,6 +69,9 @@ Manager.ExecuteBulkRequest = async (Action, Targets, ReadableName, Options = {})
   if (!ReadableName) ReadableName = Action;
   const ResetQueue =
     !Options || typeof Options.resetQueue === 'undefined' ? true : !!Options.resetQueue;
+  const Payload = Options && Object.prototype.hasOwnProperty.call(Options, 'payload')
+    ? Options.payload
+    : undefined;
   if (ResetQueue) await ScriptExecutionManager.ClearQueue();
   for (const UUID of Targets) {
     await Wait(150);
@@ -89,7 +95,7 @@ Manager.ExecuteBulkRequest = async (Action, Targets, ReadableName, Options = {})
     }
 
     Logger.log('ExecuteBulkRequest dispatch', { Action, ReadableName, UUID, RequestID });
-    io.to(UUID).emit(Action, RequestID);
+    io.to(UUID).emit(Action, RequestID, Payload);
   }
 };
 

@@ -31,6 +31,14 @@ window.API.USBDeviceRemoved(async (Client, Device) => {
 });
 
 window.API.UpdateScriptExecutions(async (Executions) => {
+  try {
+    if (typeof UpdateManagerHandleExecutions === 'function') {
+      UpdateManagerHandleExecutions(Executions || []);
+    }
+  } catch (e) {
+    HandleNonFatalError('UpdateManagerHandleExecutions', e);
+  }
+
   // Close any open popovers before re-render to prevent duplicates
   try {
     $('.exec-info.open').removeClass('open');

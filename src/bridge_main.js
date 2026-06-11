@@ -11,6 +11,10 @@ const INVOKE_CHANNELS = new Set([
   'Settings:Get',
   'AdoptDevice',
   'CheckForUpdatesOnClient',
+  'UpdateManager:GetStatus',
+  'UpdateManager:GetReleases',
+  'UpdateManager:DownloadRelease',
+  'UpdateManager:DeployRelease',
   'Loaded',
   'Shutdown',
   'GetClient',
@@ -97,6 +101,7 @@ const SUBSCRIBE_CHANNELS = new Set([
   'SetFullAlertRuleList',
   'AlertTriggered',
   'CreateShowTrakAlert',
+  'UpdateManager:DownloadProgress',
   'ShowFileUpdated',
 ]);
 
@@ -134,6 +139,13 @@ contextBridge.exposeInMainWorld('API', {
   GetSettings: async () => invoke('Settings:Get'),
   AdoptDevice: async (UUID) => invoke('AdoptDevice', UUID),
   CheckForUpdatesOnClient: async (UUID) => invoke('CheckForUpdatesOnClient', UUID),
+  GetUpdateManagerStatus: async () => invoke('UpdateManager:GetStatus'),
+  GetUpdateManagerReleases: async () => invoke('UpdateManager:GetReleases'),
+  DownloadUpdateManagerRelease: async (Tag) => invoke('UpdateManager:DownloadRelease', Tag),
+  DeployUpdateManagerRelease: async (Tag, Targets) =>
+    invoke('UpdateManager:DeployRelease', Tag, Targets),
+  OnUpdateManagerDownloadProgress: (Callback) =>
+    subscribe('UpdateManager:DownloadProgress', Callback),
   Loaded: () => invoke('Loaded'),
   Shutdown: async (Confirmed = false) => invoke('Shutdown', Confirmed),
   GetClient: async (UUID) => invoke('GetClient', UUID),
