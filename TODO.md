@@ -5,6 +5,3 @@ Monitoring
 - Multi step checks (Cue state, Expected value etc)
 
 - Scripts to be enabled for certain clients
-
-- Group Manager UI Overhaul
-- Reordering Groups
