@@ -165,14 +165,12 @@ test('IPCValidation.MonitoringTargetCreatePayload enforces required fields', () 
     Address: '10.0.0.1',
     Method: 'ping',
     Interval: 30000,
-    StoreHistory: 1,
     GroupID: '4',
     DegradedThresholdMs: 250,
     Settings: { Timeout: 2000 },
   });
   assert.equal(payload.Nickname, 'Switch');
   assert.equal(payload.Interval, 30000);
-  assert.equal(payload.StoreHistory, true);
   assert.equal(payload.GroupID, 4);
   assert.equal(payload.DegradedThresholdMs, 250);
   assert.deepEqual(payload.Settings, { Timeout: 2000 });
@@ -210,12 +208,10 @@ test('IPCValidation.MonitoringTargetUpdatePayload validates partial updates', ()
   const payload = IPCValidation.MonitoringTargetUpdatePayload({
     Address: 'host.local',
     Interval: 5000,
-    StoreHistory: 0,
     GroupID: null,
   });
   assert.equal(payload.Address, 'host.local');
   assert.equal(payload.Interval, 5000);
-  assert.equal(payload.StoreHistory, false);
   assert.equal(payload.GroupID, null);
 
   assert.throws(

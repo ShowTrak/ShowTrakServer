@@ -39,9 +39,6 @@ module.exports = function registerMonitoringValidators(Manager) {
     const Interval = Number(value.Interval);
     if (!Number.isFinite(Interval)) fail('Interval must be a number');
     out.Interval = Interval;
-    out.StoreHistory = Object.prototype.hasOwnProperty.call(value, 'StoreHistory')
-      ? !!value.StoreHistory
-      : false;
     if (Object.prototype.hasOwnProperty.call(value, 'DegradedThresholdMs')) {
       const Threshold = Number(value.DegradedThresholdMs);
       if (!Number.isFinite(Threshold)) fail('DegradedThresholdMs must be a number');
@@ -76,9 +73,6 @@ module.exports = function registerMonitoringValidators(Manager) {
       const Interval = Number(value.Interval);
       if (!Number.isFinite(Interval)) fail('Interval must be a number');
       out.Interval = Interval;
-    }
-    if (Object.prototype.hasOwnProperty.call(value, 'StoreHistory')) {
-      out.StoreHistory = !!value.StoreHistory;
     }
     if (Object.prototype.hasOwnProperty.call(value, 'DegradedThresholdMs')) {
       const Threshold = Number(value.DegradedThresholdMs);

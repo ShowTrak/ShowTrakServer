@@ -71,19 +71,17 @@ Manager.Create = async (Payload) => {
 
   const Interval = ClampInterval(Payload.Interval);
   const SettingsJson = ToRowSettings(Method, Payload.Settings);
-  const StoreHistory = Payload.StoreHistory ? 1 : 0;
   const GroupID = Payload.GroupID == null ? null : Payload.GroupID;
   const Weight = typeof Payload.Weight === 'number' ? Payload.Weight : 100;
   const DegradedThresholdMs = ClampThreshold(Payload.DegradedThresholdMs);
 
   const [Err, Res] = await DB.Run(
-    'INSERT INTO MonitoringTargets (Nickname, Address, Method, Interval, StoreHistory, Settings, GroupID, Weight, LastSuccessAt, DegradedThresholdMs, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO MonitoringTargets (Nickname, Address, Method, Interval, Settings, GroupID, Weight, LastSuccessAt, DegradedThresholdMs, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       Payload.Nickname,
       Payload.Address,
       Method,
       Interval,
-      StoreHistory,
       SettingsJson,
       GroupID,
       Weight,
@@ -100,7 +98,6 @@ Manager.Create = async (Payload) => {
     Address: Payload.Address,
     Method,
     Interval,
-    StoreHistory,
     Settings: SettingsJson,
     GroupID,
     Weight,
@@ -132,9 +129,6 @@ Manager.Update = async (TargetID, Payload) => {
   const NextAddress = Object.prototype.hasOwnProperty.call(Payload, 'Address')
     ? Payload.Address
     : Target.Address;
-  const NextStoreHistory = Object.prototype.hasOwnProperty.call(Payload, 'StoreHistory')
-    ? !!Payload.StoreHistory
-    : Target.StoreHistory;
   const NextGroupID = Object.prototype.hasOwnProperty.call(Payload, 'GroupID')
     ? Payload.GroupID
     : Target.GroupID;
@@ -152,13 +146,12 @@ Manager.Update = async (TargetID, Payload) => {
   const SettingsJson = ToRowSettings(Method, SettingsBase);
 
   const [Err] = await DB.Run(
-    'UPDATE MonitoringTargets SET Nickname = ?, Address = ?, Method = ?, Interval = ?, StoreHistory = ?, Settings = ?, GroupID = ?, DegradedThresholdMs = ? WHERE TargetID = ?',
+    'UPDATE MonitoringTargets SET Nickname = ?, Address = ?, Method = ?, Interval = ?, Settings = ?, GroupID = ?, DegradedThresholdMs = ? WHERE TargetID = ?',
     [
       NextNickname,
       NextAddress,
       Method,
       NextInterval,
-      NextStoreHistory ? 1 : 0,
       SettingsJson,
       NextGroupID,
       NextDegradedThresholdMs,
@@ -171,7 +164,6 @@ Manager.Update = async (TargetID, Payload) => {
   Target.Address = NextAddress;
   Target.Method = Method;
   Target.Interval = NextInterval;
-  Target.StoreHistory = NextStoreHistory;
   Target.Settings = ParseSettings(SettingsJson);
   Target.GroupID = NextGroupID;
   Target.DegradedThresholdMs = NextDegradedThresholdMs;

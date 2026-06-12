@@ -21,7 +21,7 @@ const MONITORING_HISTORY_RANGES = {
   '12h': { label: '12 Hours', ms: 12 * 60 * 60 * 1000, bars: 96 },
 };
 let MonitorHistorySamples = [];
-let MonitorHistoryModalTargetID = null;
+let MonitorHistoryModalContext = null;
 let MonitorHistoryRangeKey = '5m';
 let MonitorHistoryResizeTimer = null;
 let MonitorHistoryHoverBars = [];
@@ -31,6 +31,7 @@ let AlertRuleDraftActions = [];
 let AlertRulesCache = [];
 let AlertActionTypesCache = [];
 let AlertTriggerTypesCache = [];
+let AlertScopeGroups = [];
 let AlertScopeOptions = [];
 let AlertScopeSelected = [];
 let AlertActionEditorIsCreating = false;

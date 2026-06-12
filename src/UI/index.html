@@ -496,6 +496,81 @@
 
     <div
       class="modal fade"
+      id="SHOWTRAK_MODAL_GROUP_EDITOR"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_GROUP_EDITOR_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-start">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <button
+                type="button"
+                id="GROUP_MANAGER_EDITOR_BACK"
+                class="btn btn-sm btn-ghost-light text-light border-0 ps-0"
+              >
+                <i class="bi bi-chevron-left"></i> Back to list
+              </button>
+              <button
+                type="button"
+                id="GROUP_MANAGER_EDITOR_DELETE"
+                class="btn btn-sm script-manager-delete-btn"
+                title="Delete group"
+              >
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+
+            <div class="d-grid gap-2">
+              <div class="form-floating bg-ghost rounded">
+                <input
+                  type="text"
+                  id="GROUP_MANAGER_EDITOR_NAME"
+                  class="form-control bg-transparent text-light border-0"
+                  placeholder="Group Name"
+                  autocomplete="off"
+                />
+                <label for="GROUP_MANAGER_EDITOR_NAME">Group Name</label>
+              </div>
+
+              <div class="form-floating bg-ghost rounded has-copy group-manager-editor-id-field">
+                <input
+                  type="text"
+                  id="GROUP_MANAGER_EDITOR_GROUPID"
+                  class="form-control bg-transparent text-light border-0"
+                  placeholder="Group ID"
+                  readonly
+                />
+                <label for="GROUP_MANAGER_EDITOR_GROUPID">Group ID</label>
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#GROUP_MANAGER_EDITOR_GROUPID"
+                  title="Copy Group ID"
+                  aria-label="Copy Group ID"
+                >
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+
+              <div class="bg-ghost p-2 rounded d-grid gap-2">
+                <div class="group-manager-client-header d-flex align-items-center">
+                  <span class="group-manager-client-col group-manager-client-col-name">Name</span>
+                  <span class="group-manager-client-col group-manager-client-col-hostname">Hostname</span>
+                  <span class="group-manager-client-col group-manager-client-col-ip">IP</span>
+                  <span class="group-manager-client-col group-manager-client-col-action"></span>
+                </div>
+                <div id="GROUP_MANAGER_EDITOR_CLIENT_LIST" class="group-manager-member-list d-grid gap-2"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
       id="SHOWTRAK_MODAL_UPDATE_MANAGER"
       tabindex="-1"
       aria-labelledby="SHOWTRAK_MODAL_UPDATE_MANAGER_Label"
@@ -594,7 +669,7 @@
               <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Close</button>
             </div>
             <div id="OSC_HTTP_DEBUG_TERMINAL" class="osc-http-debug-terminal" role="log" aria-live="polite">
-              <div class="osc-http-debug-empty">Open this terminal and send OSC or /API traffic to inspect requests.</div>
+              <div class="osc-http-debug-empty">Send OSC or HTTP traffic to inspect requests.</div>
             </div>
           </div>
         </div>
@@ -1084,19 +1159,7 @@
                 />
               </div>
 
-              <div
-                class="form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost rounded p-2"
-              >
-                <label class="form-check-label mb-0 ms-2" for="MONITORING_TARGET_STORE_HISTORY">
-                  Store historic data
-                </label>
-                <input
-                  class="form-check-input ms-2 me-2"
-                  type="checkbox"
-                  role="switch"
-                  id="MONITORING_TARGET_STORE_HISTORY"
-                />
-              </div>
+
 
               <div class="form-floating">
                 <input
@@ -1368,7 +1431,7 @@
                 </div>
                 <div id="ALERT_RULE_ACTIONS_LIST" class="d-grid gap-2"></div>
 
-                <div class="d-grid gap-2 mt-1">
+                <div class="d-grid gap-2 mt-1" id="ALERT_RULE_EDITOR_ACTIONS">
                   <button type="button" class="btn btn-danger d-none" id="ALERT_RULE_DELETE">
                     Delete
                   </button>

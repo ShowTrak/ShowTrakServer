@@ -18,11 +18,11 @@ function RenderMonitoringDynamicSettings(MethodID, CurrentSettings) {
     const Val = Cur[Field.Key] !== undefined ? Cur[Field.Key] : Field.Default;
     if (Field.Type === 'boolean') {
       $host.append(`
-        <div class="form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost-light rounded p-2">
-          <label class="form-check-label mb-0" for="MON_DYN_${Safe(Field.Key)}">${Safe(
+        <div class="form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost rounded p-2">
+          <label class="form-check-label mb-0 ms-2" for="MON_DYN_${Safe(Field.Key)}">${Safe(
             Field.Label || Field.Key
           )}</label>
-          <input class="form-check-input ms-2" type="checkbox" role="switch" id="MON_DYN_${Safe(
+          <input class="form-check-input ms-2 me-2" type="checkbox" role="switch" id="MON_DYN_${Safe(
             Field.Key
           )}" data-key="${Safe(Field.Key)}" data-type="boolean" ${Val ? 'checked' : ''} />
         </div>`);
@@ -348,7 +348,6 @@ async function OpenMonitoringTargetEditor(TargetID, Prefill = null) {
     Address: (Prefill && Prefill.Address) || '',
     Method: MonitoringMethodsCache[0] && MonitoringMethodsCache[0].ID,
     Interval: 30000,
-    StoreHistory: false,
     DegradedThresholdMs: 0,
     Settings: {},
   };
@@ -363,7 +362,6 @@ async function OpenMonitoringTargetEditor(TargetID, Prefill = null) {
   $method.val(T.Method || Defaults.Method);
   $('#MONITORING_TARGET_INTERVAL').val(T.Interval || 30000);
   $('#MONITORING_TARGET_INTERVAL_LABEL').text(FormatInterval(T.Interval || 30000));
-  $('#MONITORING_TARGET_STORE_HISTORY').prop('checked', !!T.StoreHistory);
   $('#MONITORING_TARGET_DEGRADED_THRESHOLD').val(
     Number.isFinite(Number(T.DegradedThresholdMs)) ? Number(T.DegradedThresholdMs) : 0
   );
@@ -390,7 +388,6 @@ async function OpenMonitoringTargetEditor(TargetID, Prefill = null) {
         Address: ($('#MONITORING_TARGET_ADDRESS').val() || '').trim(),
         Method: $method.val(),
         Interval: parseInt($('#MONITORING_TARGET_INTERVAL').val(), 10),
-        StoreHistory: $('#MONITORING_TARGET_STORE_HISTORY').is(':checked'),
         DegradedThresholdMs: Math.max(
           0,
           parseInt($('#MONITORING_TARGET_DEGRADED_THRESHOLD').val(), 10) || 0

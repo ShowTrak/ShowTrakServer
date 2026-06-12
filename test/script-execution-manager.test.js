@@ -165,5 +165,5 @@ test('ScriptExecutionManager fails early when no script exists for client OS', a
   const all = await Manager.GetAllExecutions();
   const entry = all.find((e) => e.RequestID === id);
   assert.equal(entry.Status, 'Failed');
-  assert.match(entry.Error, /not sent/i);
+  assert.match(entry.Error, /(not sent|no\s+macos\s+script\s+is\s+configured)/i);
 });

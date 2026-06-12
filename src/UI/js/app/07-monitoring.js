@@ -95,9 +95,54 @@ function UpdateMonitoringTargetTile(T) {
   $compact.removeClass('text-success text-warning').addClass('text-light');
 }
 
-async function LoadMonitoringTargetHistory(TargetID) {
+function ResolveMonitorHistoryContextEntity() {
+  if (!MonitorHistoryModalContext || !MonitorHistoryModalContext.type) return null;
+  if (MonitorHistoryModalContext.type === 'target') {
+    const target = MonitoringTargets.find(
+      (T) => Number(T.TargetID) === Number(MonitorHistoryModalContext.id)
+    );
+    if (!target) return null;
+    return {
+      type: 'target',
+      id: Number(target.TargetID),
+      title: target.Nickname || target.Address || `Target ${target.TargetID}`,
+      intervalMs: Number(target.Interval),
+      notFoundLabel: 'Monitoring target not found',
+    };
+  }
+  if (MonitorHistoryModalContext.type === 'dummy') {
+    const id = String(MonitorHistoryModalContext.id || '').trim();
+    const dummy = DummyClients.find((D) => String(D.UUID) === id);
+    if (!dummy) return null;
+    return {
+      type: 'dummy',
+      id,
+      title: dummy.Nickname || dummy.DummyID || 'Dummy Client',
+      intervalMs: Number(dummy.Interval),
+      notFoundLabel: 'Dummy client not found',
+    };
+  }
+  return null;
+}
+
+function IsMonitorHistoryContextFor(entityType, id) {
+  if (!MonitorHistoryModalContext || MonitorHistoryModalContext.type !== entityType) return false;
+  if (entityType === 'target') return Number(MonitorHistoryModalContext.id) === Number(id);
+  if (entityType === 'dummy') return String(MonitorHistoryModalContext.id || '') === String(id || '');
+  return false;
+}
+
+async function LoadHistorySamplesForContext() {
+  const entity = ResolveMonitorHistoryContextEntity();
+  if (!entity) {
+    MonitorHistorySamples = [];
+    return;
+  }
   try {
-    const Samples = await window.API.GetMonitoringTargetHistory(TargetID);
+    const Samples =
+      entity.type === 'target'
+        ? await window.API.GetMonitoringTargetHistory(entity.id)
+        : await window.API.GetDummyClientHistory(entity.id);
     MonitorHistorySamples = Array.isArray(Samples) ? Samples : [];
   } catch {
     MonitorHistorySamples = [];
@@ -360,13 +405,10 @@ function BuildMonitoringHistoryBuckets(Samples, RangeConfig) {
 }
 
 function RenderMonitoringHistoryModal() {
-  if (!MonitorHistoryModalTargetID) return;
-  const Target = MonitoringTargets.find(
-    (T) => Number(T.TargetID) === Number(MonitorHistoryModalTargetID)
-  );
-  if (!Target) return;
+  const Entity = ResolveMonitorHistoryContextEntity();
+  if (!Entity) return;
 
-  const IntervalMs = Number(Target.Interval);
+  const IntervalMs = Number(Entity.intervalMs);
   const VisibleRangeKeys = GetVisibleMonitorHistoryRangeKeys(IntervalMs);
   const $rangeButtons = $('#MONITOR_HISTORY_RANGE_GROUP [data-range]');
   $rangeButtons.each(function () {
@@ -403,9 +445,7 @@ function RenderMonitoringHistoryModal() {
   const { buckets, visibleSampleCount } = BuildMonitoringHistoryBuckets(Samples, Range);
   const Latest = Samples.length ? Samples[Samples.length - 1] : null;
 
-  $('#MONITOR_HISTORY_TITLE').text(
-    Target.Nickname || Target.Address || `Target ${Target.TargetID}`
-  );
+  $('#MONITOR_HISTORY_TITLE').text(Entity.title);
 
   $('#MONITOR_HISTORY_RANGE_GROUP [data-range]')
     .removeClass('active btn-light')
@@ -455,13 +495,39 @@ async function OpenMonitoringTargetHistory(TargetID) {
     HandleNonFatalError('Monitoring:OpenMonitoringTargetHistory:CloseAllModals', err);
   }
 
-  MonitorHistoryModalTargetID = Number(Target.TargetID);
+  MonitorHistoryModalContext = { type: 'target', id: Number(Target.TargetID) };
   MonitorHistorySamples = [];
-  await LoadMonitoringTargetHistory(MonitorHistoryModalTargetID);
+  await LoadHistorySamplesForContext();
 
   const $modal = $('#SHOWTRAK_MONITOR_HISTORY_MODAL');
   $modal.off('hidden.bs.modal.monitorhistory').on('hidden.bs.modal.monitorhistory', function () {
-    MonitorHistoryModalTargetID = null;
+    MonitorHistoryModalContext = null;
+    MonitorHistorySamples = [];
+    MonitorHistoryHoverBars = [];
+    HideMonitoringHistoryTooltip();
+  });
+  $modal.modal('show');
+  RenderMonitoringHistoryModal();
+}
+
+async function OpenDummyClientHistory(UUID) {
+  const DummyUUID = String(UUID || '').trim();
+  const Dummy = DummyClients.find((D) => String(D.UUID) === DummyUUID);
+  if (!Dummy) return Notify('Dummy client not found', 'error');
+
+  try {
+    await CloseAllModals();
+  } catch (err) {
+    HandleNonFatalError('Monitoring:OpenDummyClientHistory:CloseAllModals', err);
+  }
+
+  MonitorHistoryModalContext = { type: 'dummy', id: DummyUUID };
+  MonitorHistorySamples = [];
+  await LoadHistorySamplesForContext();
+
+  const $modal = $('#SHOWTRAK_MONITOR_HISTORY_MODAL');
+  $modal.off('hidden.bs.modal.monitorhistory').on('hidden.bs.modal.monitorhistory', function () {
+    MonitorHistoryModalContext = null;
     MonitorHistorySamples = [];
     MonitorHistoryHoverBars = [];
     HideMonitoringHistoryTooltip();

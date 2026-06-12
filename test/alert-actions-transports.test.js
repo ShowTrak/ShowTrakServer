@@ -214,7 +214,7 @@ test('osc-trigger action interpolates message tokens and sends via node-osc', as
   // Normalization + validation.
   const norm = action.NormalizeSettings({ Port: 99999, Message: '' });
   assert.equal(norm.Port, 65535);
-  assert.equal(norm.Message, '/ShowTrak/Alert');
+  assert.equal(norm.Message, '/API/Alert');
   assert.throws(() => action.ValidateSettings({ Message: 'no-slash' }), /must start with/);
 
   const result = await action.Execute(

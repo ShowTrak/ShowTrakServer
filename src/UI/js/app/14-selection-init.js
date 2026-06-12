@@ -582,7 +582,7 @@ $(async function () {
     ToggleSelection(UUID);
     return;
   });
-  // Double-click opens read-only Client Info modal (not the editor)
+  // Double-click opens read-only info/history views (not editors)
   $(document).on('dblclick', '.SHOWTRAK_PC', function (e) {
     e.preventDefault();
     e.stopPropagation();
@@ -600,10 +600,10 @@ $(async function () {
       }
       return false;
     }
-    // Dummy tiles open their own editor on dblclick
+    // Dummy tiles open uptime history on dblclick
     if ($(this).hasClass('DUMMY')) {
       const duid = $(this).attr('data-dummy-uuid');
-      if (duid) OpenDummyClientEditor(duid);
+      if (duid) OpenDummyClientHistory(duid);
       return false;
     }
     const uuid = $(this).attr('data-uuid');
@@ -684,7 +684,7 @@ $(async function () {
       Class: 'text-light',
       Shortcut: 'Ctrl+A',
       Action: async function () {
-        AllClients.map((UUID) => Select(UUID));
+        AllClients.map((Client) => Select(Client.UUID));
       },
     });
 
@@ -1261,7 +1261,7 @@ async function Init() {
   if (!window.__monitorHistoryResizeBound) {
     window.__monitorHistoryResizeBound = true;
     window.addEventListener('resize', () => {
-      if (!MonitorHistoryModalTargetID) return;
+      if (!MonitorHistoryModalContext) return;
       if (!$('#SHOWTRAK_MONITOR_HISTORY_MODAL').hasClass('show')) return;
       if (MonitorHistoryResizeTimer) clearTimeout(MonitorHistoryResizeTimer);
       MonitorHistoryResizeTimer = setTimeout(() => {

@@ -510,7 +510,12 @@
   function renderAll() {
     const groupList = groups.slice();
     groupList.push({ GroupID: null, Title: 'No Group', Weight: 100000 });
-    groupList.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
+    groupList.sort((a, b) => {
+      const aDefault = a && a.GroupID == null;
+      const bDefault = b && b.GroupID == null;
+      if (aDefault !== bDefault) return aDefault ? 1 : -1;
+      return (a.Weight || 0) - (b.Weight || 0);
+    });
 
     let html = '';
     let tileCount = 0;

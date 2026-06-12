@@ -92,7 +92,7 @@ document.addEventListener('keydown', function (e) {
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
     e.preventDefault();
-    return AllClients.map((UUID) => Select(UUID));
+    return AllClients.map((Client) => Select(Client.UUID));
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
     e.preventDefault();

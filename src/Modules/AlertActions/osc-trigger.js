@@ -5,7 +5,7 @@ const ID = 'osc-trigger';
 const Settings = [
   { Key: 'TargetIP', Label: 'Target IP / Hostname', Type: 'string', Default: '127.0.0.1' },
   { Key: 'Port', Label: 'Port', Type: 'number', Default: 3333, Min: 1, Max: 65535 },
-  { Key: 'Message', Label: 'OSC Message Path', Type: 'string', Default: '/ShowTrak/Alert' },
+  { Key: 'Message', Label: 'OSC Message Path', Type: 'string', Default: '/API/Alert' },
 ];
 
 function interpolate(Input, Context) {
@@ -30,7 +30,7 @@ function NormalizeSettings(Input) {
   return {
     TargetIP: String(Next.TargetIP || '127.0.0.1').trim(),
     Port: Number.isFinite(Port) ? Math.max(1, Math.min(65535, Math.round(Port))) : 3333,
-    Message: String(Next.Message || '/ShowTrak/Alert').trim() || '/ShowTrak/Alert',
+    Message: String(Next.Message || '/API/Alert').trim() || '/API/Alert',
   };
 }
 

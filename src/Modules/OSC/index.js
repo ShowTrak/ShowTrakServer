@@ -13,6 +13,7 @@ var OSCServer = new Server(3333, '0.0.0.0', () => {
 });
 
 let Routes = [];
+const SelectedClientUUIDs = new Set();
 
 const OSC = {};
 
@@ -36,6 +37,24 @@ function successResult(detail = '') {
     ok: true,
     detail: String(detail || ''),
   };
+}
+
+function getSelectedUUIDList() {
+  return Array.from(SelectedClientUUIDs);
+}
+
+function addSelectedUUIDs(UUIDs) {
+  for (const UUID of UUIDs || []) {
+    if (!UUID) continue;
+    SelectedClientUUIDs.add(String(UUID));
+  }
+}
+
+function removeSelectedUUIDs(UUIDs) {
+  for (const UUID of UUIDs || []) {
+    if (!UUID) continue;
+    SelectedClientUUIDs.delete(String(UUID));
+  }
 }
 
 async function getGroupClients(GroupIDRaw) {
@@ -143,9 +162,9 @@ OSC.CreateRoute = (Path, Callback, Title = 'Default OSC Route') => {
   return;
 };
 
-// Other
+// System Control
 OSC.CreateRoute(
-  '/ShowTrak/Shutdown',
+  '/API/Shutdown',
   async (_Req) => {
     Logger.warn('Received shutdown command via OSC');
     Broadcast.emit('Shutdown');
@@ -155,7 +174,7 @@ OSC.CreateRoute(
 );
 
 OSC.CreateRoute(
-  '/ShowTrak/Shutdown/Force',
+  '/API/Shutdown/Force',
   async (_Req) => {
     Logger.warn('Received force shutdown command via OSC');
     Broadcast.emit('ShutdownForce');
@@ -164,15 +183,16 @@ OSC.CreateRoute(
   'Force close the ShowTrak Server without save/show-mode prompts'
 );
 
-// Client
+// Individual Client Operations
 OSC.CreateRoute(
-  '/ShowTrak/Client/:UUID/Select',
+  '/API/Client/:UUID/Select',
   async (Req) => {
     let [Err, Client] = await ClientManager.Get(Req.UUID);
     if (Err) {
       Broadcast.emit('Notify', `OSC - Invalid UUID "${Req.UUID}"`, 'error');
       return failureResult(`Invalid UUID "${Req.UUID}"`);
     }
+    addSelectedUUIDs([Client.UUID]);
     Broadcast.emit('OSCBulkAction', 'Select', [Client.UUID], null);
     return successResult(`Selected client "${Client.UUID}"`);
   },
@@ -180,13 +200,14 @@ OSC.CreateRoute(
 );
 
 OSC.CreateRoute(
-  '/ShowTrak/Client/:UUID/Deselect',
+  '/API/Client/:UUID/Deselect',
   async (Req) => {
     let [Err, Client] = await ClientManager.Get(Req.UUID);
     if (Err) {
       Broadcast.emit('Notify', `OSC - Invalid UUID "${Req.UUID}"`, 'error');
       return failureResult(`Invalid UUID "${Req.UUID}"`);
     }
+    removeSelectedUUIDs([Client.UUID]);
     Broadcast.emit('OSCBulkAction', 'Deselect', [Client.UUID], null);
     return successResult(`Deselected client "${Client.UUID}"`);
   },
@@ -194,7 +215,7 @@ OSC.CreateRoute(
 );
 
 OSC.CreateRoute(
-  '/ShowTrak/Client/:UUID/WakeOnLAN',
+  '/API/Client/:UUID/WakeOnLAN',
   async (Req) => {
     let [Err, Client] = await ClientManager.Get(Req.UUID);
     if (Err) {
@@ -208,7 +229,7 @@ OSC.CreateRoute(
 );
 
 OSC.CreateRoute(
-  '/ShowTrak/Client/:UUID/RunScript/:ScriptID',
+  '/API/Client/:UUID/RunScript/:ScriptID',
   async (Req) => {
     let [Err, Client] = await ClientManager.Get(Req.UUID);
     if (Err) {
@@ -226,10 +247,9 @@ OSC.CreateRoute(
   'Execute a script on a Client by UUID and Script ID'
 );
 
-// Dummy Clients
-// Heartbeat for a virtual dummy client, addressed by its user-facing DummyID.
+// Dummy Client Operations
 OSC.CreateRoute(
-  '/ShowTrak/Dummy/:ID/Heartbeat',
+  '/API/Dummy/:ID/Heartbeat',
   async (Req, Meta) => {
     let [Err] = await DummyClientManager.Heartbeat(Req.ID, Meta && Meta.IP ? Meta.IP : null);
     if (Err) {
@@ -241,9 +261,9 @@ OSC.CreateRoute(
   'Deliver a heartbeat to a Dummy Client by its Dummy ID'
 );
 
-// Group
+// Group Operations
 OSC.CreateRoute(
-  '/ShowTrak/Group/:GroupID/Select',
+  '/API/Group/:GroupID/Select',
   async (Req) => {
     const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID);
     if (GroupErr) {
@@ -252,6 +272,7 @@ OSC.CreateRoute(
     }
 
     const UUIDs = GroupClients.map((Client) => Client.UUID);
+    addSelectedUUIDs(UUIDs);
     Broadcast.emit('OSCBulkAction', 'Select', UUIDs, null);
     return successResult(`Selected ${UUIDs.length} clients in group "${Group.Title}" (${Group.GroupID})`);
   },
@@ -259,7 +280,7 @@ OSC.CreateRoute(
 );
 
 OSC.CreateRoute(
-  '/ShowTrak/Group/:GroupID/Deselect',
+  '/API/Group/:GroupID/Deselect',
   async (Req) => {
     const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID);
     if (GroupErr) {
@@ -268,6 +289,7 @@ OSC.CreateRoute(
     }
 
     const UUIDs = GroupClients.map((Client) => Client.UUID);
+    removeSelectedUUIDs(UUIDs);
     Broadcast.emit('OSCBulkAction', 'Deselect', UUIDs, null);
     return successResult(
       `Deselected ${UUIDs.length} clients in group "${Group.Title}" (${Group.GroupID})`
@@ -277,7 +299,7 @@ OSC.CreateRoute(
 );
 
 OSC.CreateRoute(
-  '/ShowTrak/Group/:GroupID/WakeOnLAN',
+  '/API/Group/:GroupID/WakeOnLAN',
   async (Req) => {
     const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID);
     if (GroupErr) {
@@ -295,7 +317,7 @@ OSC.CreateRoute(
 );
 
 OSC.CreateRoute(
-  '/ShowTrak/Group/:GroupID/RunScript/:ScriptID',
+  '/API/Group/:GroupID/RunScript/:ScriptID',
   async (Req) => {
     const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID);
     if (GroupErr) {
@@ -318,9 +340,42 @@ OSC.CreateRoute(
   'Execute a script on all online members of a Group by its Group ID and Script ID'
 );
 
-// All
+// Bulk All Operations
 OSC.CreateRoute(
-  '/ShowTrak/All/WakeOnLAN',
+  '/API/All/Select',
+  async (_Req) => {
+    let [Err, AllClients] = await ClientManager.GetAll();
+    if (Err) {
+      Broadcast.emit('Notify', `OSC - Failed to fetch all clients.`, 'error');
+      return failureResult('Failed to fetch all clients');
+    }
+    Broadcast.emit(
+      'OSCBulkAction',
+      'Select',
+      AllClients.map((Client) => Client.UUID),
+      null
+    );
+    addSelectedUUIDs(AllClients.map((Client) => Client.UUID));
+    return successResult(`Selected ${AllClients.length} clients`);
+  },
+  'Select all Clients'
+);
+
+OSC.CreateRoute(
+  '/API/All/Deselect',
+  async (_Req) => {
+    const UUIDs = getSelectedUUIDList();
+    if (UUIDs.length > 0) {
+      Broadcast.emit('OSCBulkAction', 'Deselect', UUIDs, null);
+    }
+    SelectedClientUUIDs.clear();
+    return successResult(`Deselected ${UUIDs.length} selected clients`);
+  },
+  'Clear the selected clients'
+);
+
+OSC.CreateRoute(
+  '/API/All/WakeOnLAN',
   async (_Req) => {
     let [Err, AllClients] = await ClientManager.GetAll();
     if (Err) {
@@ -339,7 +394,7 @@ OSC.CreateRoute(
 );
 
 OSC.CreateRoute(
-  '/ShowTrak/All/RunScript/:ScriptID',
+  '/API/All/RunScript/:ScriptID',
   async (Req) => {
     let [Err, AllClients] = await ClientManager.GetAll();
     if (Err) {
@@ -360,6 +415,42 @@ OSC.CreateRoute(
     return successResult(`Script "${Req.ScriptID}" queued for ${AllClients.length} clients`);
   },
   'Execute a script on all online Clients by Script ID'
+);
+
+// Selection-based Operations
+OSC.CreateRoute(
+  '/API/Selection/WakeOnLAN',
+  async (_Req) => {
+    const UUIDs = getSelectedUUIDList();
+    if (UUIDs.length === 0) {
+      Broadcast.emit('Notify', 'OSC - No selected clients', 'error');
+      return failureResult('No selected clients');
+    }
+    Broadcast.emit('OSCBulkAction', 'WOL', UUIDs, null);
+    return successResult(`Wake-on-LAN queued for ${UUIDs.length} selected clients`);
+  },
+  'Send a WOL packet to currently selected clients'
+);
+
+OSC.CreateRoute(
+  '/API/Selection/RunScript/:ScriptID',
+  async (Req) => {
+    const UUIDs = getSelectedUUIDList();
+    if (UUIDs.length === 0) {
+      Broadcast.emit('Notify', 'OSC - No selected clients', 'error');
+      return failureResult('No selected clients');
+    }
+
+    let Script = await ScriptManager.Get(Req.ScriptID);
+    if (!Script) {
+      Broadcast.emit('Notify', `OSC - Invalid Script ID "${Req.ScriptID}"`, 'error');
+      return failureResult(`Invalid Script ID "${Req.ScriptID}"`);
+    }
+
+    Broadcast.emit('OSCBulkAction', 'ExecuteScript', UUIDs, Req.ScriptID);
+    return successResult(`Script "${Req.ScriptID}" queued for ${UUIDs.length} selected clients`);
+  },
+  'Execute a script on currently selected clients by Script ID'
 );
 
 module.exports = { OSC };

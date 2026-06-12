@@ -45,7 +45,6 @@ Schema.push({
             Address TEXT, \
             Method TEXT NOT NULL, \
             Interval INTEGER NOT NULL DEFAULT 30000, \
-            StoreHistory INTEGER NOT NULL DEFAULT 0, \
             Settings TEXT, \
             GroupID INTEGER, \
             Weight INTEGER NOT NULL DEFAULT 100, \

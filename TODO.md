@@ -6,4 +6,5 @@ Monitoring
 
 - Scripts to be enabled for certain clients
 
-- Dummy clients (HTTP/OSC API)
+- Group Manager UI Overhaul
+- Reordering Groups

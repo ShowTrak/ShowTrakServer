@@ -302,7 +302,7 @@ window.API.SetFullClientList(async (Clients, Groups) => {
   // cache latest full lists
   __LastClients = Array.isArray(Clients) ? Clients : [];
   __LastGroups = Array.isArray(Groups) ? Groups : [];
-  AllClients = Clients.map((Client) => Client.UUID);
+  AllClients = Array.isArray(Clients) ? Clients.slice() : [];
   RenderFullClientAndMonitorList();
 });
 
@@ -319,8 +319,13 @@ function RenderFullClientAndMonitorList() {
     Weight: 100000,
   });
 
-  // Sort groups by weight
-  Groups = Groups.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
+  // Keep the synthetic no-group bucket pinned to the bottom.
+  Groups = Groups.sort((a, b) => {
+    const ADefault = a && a.GroupID == null;
+    const BDefault = b && b.GroupID == null;
+    if (ADefault !== BDefault) return ADefault ? 1 : -1;
+    return (a.Weight || 0) - (b.Weight || 0);
+  });
 
   if (Groups.length == 1 && Clients.length == 0 && Monitors.length == 0 && Dummies.length == 0) {
     Filler += `<div class="bg-ghost rounded m-3 mb-0 d-grid gap-0 gap-3 p-3">

@@ -588,13 +588,13 @@ body.macos-native-fullscreen #APPLICATION {
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  max-height: 220px;
+  max-height: 360px;
   overflow: auto;
   background: #201a3f;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
-  z-index: 1200;
+  z-index: 2000;
   padding: 6px;
   display: grid;
   gap: 2px;
@@ -617,6 +617,87 @@ body.macos-native-fullscreen #APPLICATION {
 
 .alert-multiselect-option input[type='checkbox'] {
   margin: 0;
+}
+
+.alert-scope-tree,
+.alert-scope-branch,
+.alert-scope-children {
+  --alert-scope-tree-line-color: #6c6f8d;
+  display: grid;
+  gap: 2px;
+}
+
+.alert-scope-children {
+  position: relative;
+  margin-left: 1.15rem;
+  padding-left: 0.9rem;
+}
+
+.alert-scope-children::before {
+  content: '';
+  position: absolute;
+  left: 0.2rem;
+  top: 0;
+  bottom: 0.85rem;
+  border-left: 1px solid var(--alert-scope-tree-line-color);
+}
+
+.alert-scope-node {
+  grid-template-columns: auto auto 1fr;
+  position: relative;
+}
+
+.alert-scope-node-root {
+  font-weight: 600;
+}
+
+.alert-scope-node-group {
+  font-weight: 500;
+}
+
+.alert-scope-node-group::before,
+.alert-scope-node-client::before {
+  content: '';
+  position: absolute;
+  top: calc(50% - 0.55rem);
+  left: -0.7rem;
+  width: 0.7rem;
+  height: 0.55rem;
+  border-bottom: 1px solid var(--alert-scope-tree-line-color);
+  border-left: 1px solid var(--alert-scope-tree-line-color);
+  border-bottom-left-radius: 10px;
+}
+
+.alert-scope-branch:last-child > .alert-scope-children::before {
+  bottom: 1.5rem;
+}
+
+.alert-scope-prefix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0.2rem;
+  width: 0.2rem;
+}
+
+#SHOWTRAK_MODAL_ALERT_MANAGER .modal-dialog,
+#SHOWTRAK_MODAL_ALERT_MANAGER .modal-content,
+#SHOWTRAK_MODAL_ALERT_MANAGER .modal-body {
+  overflow: visible;
+}
+
+.alert-scope-label-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.alert-scope-entity-icon {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 .bg-ghost {
@@ -650,6 +731,13 @@ body.macos-native-fullscreen #APPLICATION {
   max-width: 26px;
   flex: 0 0 38px;
   box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.GROUP_TITLE_CLICKABLE > div {
+  position: absolute;
+  inset: 0;
 }
 
 .GROUP_TITLE_CLICKABLE:hover {
@@ -1817,6 +1905,119 @@ button.btn:focus {
   margin-left: 0.45rem;
 }
 
+.osc-route-card {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.osc-action-card {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.osc-action-protocol-block {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.osc-action-protocol-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.osc-action-protocol-content {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.osc-action-route-row {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.55rem;
+  border-radius: 0.55rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.osc-action-route-methods {
+  color: rgba(177, 196, 221, 0.85);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.osc-action-route-unavailable {
+  color: rgba(211, 190, 190, 0.74);
+  font-size: 0.84rem;
+  padding: 0.55rem;
+  border-radius: 0.55rem;
+  background: rgba(255, 130, 130, 0.07);
+  border: 1px dashed rgba(255, 130, 130, 0.25);
+}
+
+.osc-route-path {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.osc-route-query-wrap {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+  padding: 0.55rem;
+  border-radius: 0.55rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.osc-route-query-grid {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(110px, 0.8fr) minmax(200px, 1.8fr);
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.osc-route-query-header {
+  color: rgba(255, 255, 255, 0.62);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 0.72rem;
+}
+
+.osc-route-query-row {
+  color: rgba(238, 245, 255, 0.92);
+}
+
+.osc-route-query-key {
+  color: rgba(132, 220, 255, 0.9);
+  font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', monospace;
+}
+
+.osc-route-query-type {
+  color: rgba(255, 214, 133, 0.92);
+}
+
+.osc-route-query-example {
+  color: rgba(211, 226, 246, 0.88);
+  font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', monospace;
+}
+
+@media (max-width: 720px) {
+  .osc-route-query-grid {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+
+  .osc-route-query-header {
+    display: none;
+  }
+}
+
 .alert-toast-host,
 #ALERTS_TOAST_HOST {
   position: fixed;
@@ -2528,6 +2729,110 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 
 /* No standalone #MODE_SWITCH positioning; switch sits in bottom bar */
 /* removed old toggle styles (.mode-switch ...) */
+
+/* ------------------------------------------------------------------ */
+/* Group Manager modal                                                */
+/* ------------------------------------------------------------------ */
+.GROUP_MANAGER_GROUP_ITEM {
+  transition: background-color 140ms ease;
+}
+.GROUP_MANAGER_GROUP_ITEM[draggable='true'] {
+  cursor: grab;
+}
+.GROUP_MANAGER_GROUP_ITEM.dragging {
+  opacity: 0.5;
+}
+.GROUP_MANAGER_GROUP_ITEM:hover {
+  background-color: rgba(255, 255, 255, 0.09) !important;
+}
+.GROUP_MANAGER_GROUP_TOGGLE {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.GROUP_MANAGER_GROUP_OPEN {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.group-manager-grip {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: grab;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.group-manager-grip i {
+  pointer-events: none;
+}
+.GROUP_MANAGER_GROUP_BODY {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 10px;
+}
+.group-manager-chevron {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.3);
+  transition: transform 140ms ease;
+}
+.group-manager-chevron.expanded {
+  transform: rotate(90deg);
+}
+.group-manager-member-list {
+  max-height: 180px;
+  overflow-y: auto;
+}
+.group-manager-member-row {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.group-manager-member-remove {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 1rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+  transition: color 140ms ease, background 140ms ease;
+}
+.group-manager-member-remove:hover {
+  color: #dc3545;
+  background: rgba(220, 53, 69, 0.12);
+}
+.GROUP_MANAGER_GROUP_ITEM_DEFAULT {
+  cursor: default;
+}
+.group-manager-editor-id-field {
+  position: relative;
+}
+.group-manager-client-header {
+  padding: 0 8px;
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.group-manager-client-row {
+  padding: 7px 8px;
+}
+.group-manager-client-col {
+  min-width: 0;
+  display: inline-block;
+}
+.group-manager-client-col-name {
+  flex: 2 1 0;
+  text-align: left;
+}
+.group-manager-client-col-hostname {
+  flex: 2 1 0;
+}
+.group-manager-client-col-ip {
+  flex: 1.5 1 0;
+}
+.group-manager-client-col-action {
+  flex: 0 0 42px;
+}
 
 /* ------------------------------------------------------------------ */
 /* Script Manager modal                                               */

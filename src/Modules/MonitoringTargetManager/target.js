@@ -18,7 +18,6 @@ class MonitoringTarget {
     this.Address = Row.Address || '';
     this.Method = Row.Method || 'ping';
     this.Interval = ClampInterval(Row.Interval);
-    this.StoreHistory = !!Row.StoreHistory;
     this.Settings = ParseSettings(Row.Settings);
     this.GroupID = Row.GroupID == null ? null : Row.GroupID;
     this.Weight = typeof Row.Weight === 'number' ? Row.Weight : 100;
@@ -44,7 +43,6 @@ class MonitoringTarget {
       Address: this.Address,
       Method: this.Method,
       Interval: this.Interval,
-      StoreHistory: this.StoreHistory,
       Settings: this.Settings,
       GroupID: this.GroupID,
       Weight: this.Weight,

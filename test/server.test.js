@@ -17,6 +17,8 @@ const loggerStub = {
     error: () => {},
     debug: () => {},
     success: () => {},
+    database: () => {},
+    databaseError: () => {},
   }),
 };
 
@@ -351,6 +353,9 @@ test('Web UI namespace disables access when the master toggle is off', async () 
 test('Server Manager dispatches scripts, bulk requests, and group messages', async () => {
   const emits = [];
   const queue = [];
+  const getRoutes = [];
+  const postRoutes = [];
+  const getHandlers = {};
   const ioMock = {
     to: (room) => ({ emit: (event, ...args) => emits.push({ room, event, args }) }),
     on: () => {},
@@ -371,12 +376,32 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
       () => {
         const app = () => {};
         app.use = () => {};
-        app.get = () => {};
-        app.post = () => {};
+        app.get = (routePath, handler) => {
+          getRoutes.push(routePath);
+          if (typeof handler === 'function') getHandlers[routePath] = handler;
+        };
+        app.post = (routePath) => postRoutes.push(routePath);
         return app;
       },
       { static: () => () => {} }
     ),
+    '../OSC': {
+      OSC: {
+        GetRoutes: () => [
+          { Path: '/API/Shutdown', Title: 'Shutdown', Callback: async () => ({ ok: true }) },
+          {
+            Path: '/API/Client/:UUID/Select',
+            Title: 'Client Select',
+            Callback: async () => ({ ok: true }),
+          },
+          {
+            Path: '/API/All/Select',
+            Title: 'All Select',
+            Callback: async () => ({ ok: true }),
+          },
+        ],
+      },
+    },
     '../Config': { Config: { Application: { Port: 0, Version: '1.0' } } },
     '../AppData': {
       Manager: {
@@ -387,7 +412,49 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
     '../UpdateManager': { Manager: { RegisterRoutes: () => {} } },
     '../ClientManager': {
       Manager: {
+        GetAll: async () => [
+          null,
+          [
+            { UUID: 'r1', GroupID: 1, OperatingSystem: 'Windows', Online: true, Degraded: false },
+            { UUID: 'r2', GroupID: 2, OperatingSystem: 'Linux', Online: false, Degraded: false },
+          ],
+        ],
         Get: async (uuid) => [null, { UUID: uuid, Online: true }],
+      },
+    },
+    '../MonitoringTargetManager': {
+      Manager: {
+        GetAll: async () => [
+          null,
+          [
+            {
+              TargetID: 10,
+              GroupID: 1,
+              Online: true,
+              Degraded: true,
+              Type: 'monitor',
+              Nickname: 'Web Monitor',
+            },
+          ],
+        ],
+      },
+    },
+    '../DummyClientManager': {
+      Manager: {
+        GetAll: async () => [
+          null,
+          [
+            {
+              UUID: 'd1',
+              GroupID: 1,
+              Online: false,
+              Degraded: false,
+              State: 'IDLE',
+              Type: 'dummy',
+            },
+          ],
+        ],
+        Heartbeat: async () => [null],
       },
     },
     '../ScriptExecutionManager': {
@@ -401,6 +468,58 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
     './client-namespace': { SetupClientNamespace: () => {} },
     './webui-namespace': { SetupWebUiNamespace: () => {} },
   });
+
+  assert.ok(getRoutes.includes('/API/Shutdown'));
+  assert.ok(postRoutes.includes('/API/Shutdown'));
+  assert.ok(getRoutes.includes('/API/Client/:UUID/Select'));
+  assert.ok(postRoutes.includes('/API/Client/:UUID/Select'));
+  assert.ok(getRoutes.includes('/API/All/Select'));
+  assert.ok(postRoutes.includes('/API/All/Select'));
+  assert.ok(!getRoutes.includes('/API/Dummy/:id/Heartbeat'));
+  assert.ok(!postRoutes.includes('/API/Dummy/:id/Heartbeat'));
+  assert.ok(getRoutes.includes('/API/Clients'));
+
+  const listClients = getHandlers['/API/Clients'];
+  assert.equal(typeof listClients, 'function');
+
+  let statusCode = 200;
+  let payload = null;
+  const makeRes = () => ({
+    locals: {},
+    status(code) {
+      statusCode = code;
+      return this;
+    },
+    json(body) {
+      payload = body;
+      return this;
+    },
+  });
+
+  statusCode = 200;
+  payload = null;
+  await listClients({ query: { Type: 'Dummy', Status: 'IDLE' } }, makeRes());
+  assert.equal(statusCode, 200);
+  assert.equal(payload.Error, false);
+  assert.equal(payload.Response.Count, 1);
+  assert.equal(payload.Response.Data[0].Type, 'Dummy');
+  assert.equal(payload.Response.Data[0].Status, 'IDLE');
+
+  statusCode = 200;
+  payload = null;
+  await listClients({ query: { Type: 'Remote', GroupID: '1', OperatingSystem: 'windows' } }, makeRes());
+  assert.equal(statusCode, 200);
+  assert.equal(payload.Error, false);
+  assert.equal(payload.Response.Count, 1);
+  assert.equal(payload.Response.Data[0].UUID, 'r1');
+
+  statusCode = 200;
+  payload = null;
+  await listClients({ query: { Status: 'BROKEN' } }, makeRes());
+  assert.equal(statusCode, 400);
+  assert.equal(payload.Error, true);
+  assert.equal(payload.Code, 'INVALID_QUERY_STATUS');
+  assert.equal(payload.Message, 'Invalid Status query');
 
   await Manager.ExecuteScripts('deploy', ['a', 'b'], true);
   assert.equal(queue.includes('clear'), true);

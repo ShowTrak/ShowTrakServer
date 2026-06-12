@@ -44,7 +44,6 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
               Address: 'api.local',
               Method: 'http',
               Interval: 1,
-              StoreHistory: 1,
               Settings: JSON.stringify({ Path: '/health' }),
               GroupID: 3,
               Weight: 80,
@@ -119,7 +118,6 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
       Address: '10.0.0.12',
       Method: 'ping',
       Interval: 1,
-      StoreHistory: true,
       Settings: { Timeout: 555 },
       GroupID: 4,
       Weight: 90,
@@ -151,12 +149,10 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
       Interval: 99999999,
       Settings: { Path: '/status' },
       DegradedThresholdMs: 700000,
-      StoreHistory: false,
     });
     assert.equal(updateErr, null);
     assert.equal(updated.Interval, Manager.MAX_INTERVAL_MS);
     assert.equal(updated.DegradedThresholdMs, 600000);
-    assert.equal(updated.StoreHistory, false);
     assert.equal(updated.Method, 'http');
     assert.deepEqual(updated.Settings, { method: 'http', Path: '/status' });
 
@@ -200,7 +196,6 @@ test('MonitoringTargetManager reload replaces runtime list from latest DB rows',
                   Address: 'old.local',
                   Method: 'ping',
                   Interval: 30000,
-                  StoreHistory: 0,
                   Settings: '{}',
                   GroupID: null,
                   Weight: 100,
@@ -220,7 +215,6 @@ test('MonitoringTargetManager reload replaces runtime list from latest DB rows',
                 Address: 'restored.local',
                 Method: 'ping',
                 Interval: 30000,
-                StoreHistory: 0,
                 Settings: '{}',
                 GroupID: null,
                 Weight: 100,
@@ -287,7 +281,6 @@ test('MonitoringTargetManager moves group members and orphaned targets to no gro
               Address: 'a.local',
               Method: 'ping',
               Interval: 30000,
-              StoreHistory: 0,
               Settings: '{}',
               GroupID: 3,
               Weight: 100,
@@ -301,7 +294,6 @@ test('MonitoringTargetManager moves group members and orphaned targets to no gro
               Address: 'b.local',
               Method: 'ping',
               Interval: 30000,
-              StoreHistory: 0,
               Settings: '{}',
               GroupID: 99,
               Weight: 100,

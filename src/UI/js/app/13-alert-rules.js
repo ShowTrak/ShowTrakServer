@@ -59,6 +59,269 @@ function ScopeSummaryText(Selected, Placeholder) {
   return `${Selected[0].Label} +${Selected.length - 1}`;
 }
 
+function alertScopeGroupsSorted() {
+  return (Array.isArray(AlertScopeGroups) ? AlertScopeGroups.slice() : []).sort((A, B) => {
+    const WeightDelta = (A && A.Weight ? A.Weight : 0) - (B && B.Weight ? B.Weight : 0);
+    if (WeightDelta !== 0) return WeightDelta;
+    return String((A && A.Title) || '').localeCompare(String((B && B.Title) || ''));
+  });
+}
+
+function buildAlertEntityLabel(Primary, Secondary, Fallback) {
+  const Base = `${Primary || Secondary || Fallback || 'Unknown Target'}`.trim();
+  const Detail =
+    Secondary && Primary && String(Secondary).trim() && String(Secondary).trim() !== Base
+      ? ` (${String(Secondary).trim()})`
+      : '';
+  return `${Base}${Detail}`;
+}
+
+function alertEntityIconClass(Kind) {
+  if (Kind === 'showtrak') return 'bi-display';
+  if (Kind === 'monitor') return 'bi-diagram-3';
+  if (Kind === 'dummy') return 'bi-cpu';
+  return '';
+}
+
+function compareAlertScopeEntities(A, B) {
+  const WeightDelta = (A && A.Weight ? A.Weight : 0) - (B && B.Weight ? B.Weight : 0);
+  if (WeightDelta !== 0) return WeightDelta;
+  return String((A && A.Label) || '').localeCompare(String((B && B.Label) || ''));
+}
+
+function alertClientValueToScopedID(Value) {
+  const Text = String(Value || '');
+  if (!Text.startsWith('client:')) return '';
+  return Text.slice(7);
+}
+
+function buildAlertScopeModel() {
+  const LabelByValue = new Map();
+  const GroupNodes = alertScopeGroupsSorted().map((Group) => ({
+    Kind: 'group',
+    Value: `group:${Group.GroupID}`,
+    GroupID: Group.GroupID,
+    Label: Group.Title || `Group ${Group.GroupID}`,
+    Children: [],
+    ChildValues: [],
+  }));
+  const GroupByID = new Map(GroupNodes.map((Group) => [String(Group.GroupID), Group]));
+  const Ungrouped = [];
+
+  const Entities = [];
+  for (const Client of AllClients || []) {
+    if (!Client || !Client.UUID) continue;
+    Entities.push({
+      Kind: 'showtrak',
+      Value: `client:${Client.UUID}`,
+      ScopedID: String(Client.UUID),
+      GroupID: Client.GroupID == null ? null : Client.GroupID,
+      Label: buildAlertEntityLabel(
+        Client.Nickname || Client.Hostname || Client.UUID,
+        Client.Nickname ? Client.Hostname || '' : '',
+        Client.UUID
+      ),
+      IconClass: alertEntityIconClass('showtrak'),
+      Weight: Client.Weight || 0,
+    });
+  }
+
+  for (const Target of MonitoringTargets || []) {
+    if (!Target || Target.TargetID == null) continue;
+    const ScopedID = `monitor:${Target.TargetID}`;
+    Entities.push({
+      Kind: 'monitor',
+      Value: `client:${ScopedID}`,
+      ScopedID,
+      GroupID: Target.GroupID == null ? null : Target.GroupID,
+      Label: buildAlertEntityLabel(
+        Target.Nickname || Target.Address || `Target ${Target.TargetID}`,
+        Target.Nickname ? Target.Address || '' : '',
+        `Target ${Target.TargetID}`
+      ),
+      IconClass: alertEntityIconClass('monitor'),
+      Weight: Target.Weight || 0,
+    });
+  }
+
+  for (const Dummy of DummyClients || []) {
+    if (!Dummy || !Dummy.UUID) continue;
+    Entities.push({
+      Kind: 'dummy',
+      Value: `client:${Dummy.UUID}`,
+      ScopedID: String(Dummy.UUID),
+      GroupID: Dummy.GroupID == null ? null : Dummy.GroupID,
+      Label: buildAlertEntityLabel(
+        Dummy.Nickname || Dummy.DummyID || Dummy.UUID,
+        Dummy.Nickname ? Dummy.DummyID || '' : '',
+        Dummy.UUID
+      ),
+      IconClass: alertEntityIconClass('dummy'),
+      Weight: Dummy.Weight || 0,
+    });
+  }
+
+  Entities.sort(compareAlertScopeEntities);
+
+  for (const Entity of Entities) {
+    LabelByValue.set(Entity.Value, Entity.Label);
+    const Group = Entity.GroupID == null ? null : GroupByID.get(String(Entity.GroupID));
+    if (!Group) {
+      Ungrouped.push(Entity);
+      continue;
+    }
+    Group.Children.push(Entity);
+    Group.ChildValues.push(Entity.Value);
+  }
+
+  for (const Group of GroupNodes) {
+    LabelByValue.set(Group.Value, Group.Label);
+  }
+  LabelByValue.set('workspace:*', 'All Clients');
+
+  const AllClientValues = [];
+  for (const Group of GroupNodes) {
+    AllClientValues.push(...Group.ChildValues);
+  }
+  for (const Entity of Ungrouped) {
+    AllClientValues.push(Entity.Value);
+  }
+
+  return {
+    Workspace: {
+      Kind: 'workspace',
+      Value: 'workspace:*',
+      Label: 'All Clients',
+    },
+    Groups: GroupNodes,
+    Ungrouped,
+    AllClientValues,
+    AllClientValueSet: new Set(AllClientValues),
+    LabelByValue,
+  };
+}
+
+function resolveAlertScopeTargetValues(Scope, Model = buildAlertScopeModel()) {
+  const Selected = new Set();
+  if (!Scope || !Model) return Selected;
+
+  if (Scope.Workspace) {
+    for (const Value of Model.AllClientValues) Selected.add(Value);
+    return Selected;
+  }
+
+  const Groups = new Set((Scope.Groups || []).map((GroupID) => String(GroupID)));
+  for (const Group of Model.Groups || []) {
+    if (!Groups.has(String(Group.GroupID))) continue;
+    for (const Value of Group.ChildValues || []) Selected.add(Value);
+  }
+
+  for (const ScopedID of Scope.Clients || []) {
+    const Value = `client:${ScopedID}`;
+    if (Model.AllClientValueSet.has(Value)) Selected.add(Value);
+  }
+
+  return Selected;
+}
+
+function buildAlertScopeFromTargetValues(TargetValues, Model = buildAlertScopeModel()) {
+  const Selected = new Set((TargetValues || []).map((Value) => String(Value)));
+  if (Model.AllClientValues.length && Model.AllClientValues.every((Value) => Selected.has(Value))) {
+    return {
+      Workspace: true,
+      Groups: [],
+      Clients: [],
+    };
+  }
+
+  const Scope = {
+    Workspace: false,
+    Groups: [],
+    Clients: [],
+  };
+  const Covered = new Set();
+
+  for (const Group of Model.Groups || []) {
+    if (!Group.ChildValues.length) continue;
+    if (!Group.ChildValues.every((Value) => Selected.has(Value))) continue;
+    Scope.Groups.push(Group.GroupID);
+    for (const Value of Group.ChildValues) Covered.add(Value);
+  }
+
+  for (const Value of Model.AllClientValues) {
+    if (!Selected.has(Value) || Covered.has(Value)) continue;
+    const ScopedID = alertClientValueToScopedID(Value);
+    if (ScopedID) Scope.Clients.push(ScopedID);
+  }
+
+  return Scope;
+}
+
+function alertScopeToSelectedValues(Scope) {
+  const Selected = [];
+  if (Scope && Scope.Workspace) Selected.push('workspace:*');
+  for (const GroupID of (Scope && Scope.Groups) || []) {
+    Selected.push(`group:${GroupID}`);
+  }
+  for (const ClientID of (Scope && Scope.Clients) || []) {
+    Selected.push(`client:${ClientID}`);
+  }
+  return Selected;
+}
+
+function summarizeAlertScopeSelection(Model, Scope, Placeholder) {
+  if (!Scope) return Placeholder;
+  if (Scope.Workspace) return 'All Clients';
+
+  const Selected = [];
+  for (const GroupID of Scope.Groups || []) {
+    const Value = `group:${GroupID}`;
+    Selected.push({ Label: Model.LabelByValue.get(Value) || `Group ${GroupID}` });
+  }
+  for (const ClientID of Scope.Clients || []) {
+    const Value = `client:${ClientID}`;
+    Selected.push({ Label: Model.LabelByValue.get(Value) || String(ClientID) });
+  }
+  return ScopeSummaryText(Selected, Placeholder);
+}
+
+function renderAlertScopeClientNode(Entity, SelectedValues) {
+  const Checked = SelectedValues.has(Entity.Value);
+  return `
+    <label class="alert-multiselect-option alert-scope-node alert-scope-node-client">
+      <input type="checkbox" data-kind="client" value="${Safe(Entity.Value)}" ${Checked ? 'checked' : ''} />
+      <span class="alert-scope-prefix" aria-hidden="true"></span>
+      <span class="alert-scope-label-wrap"><i class="bi ${Safe(Entity.IconClass || '')} alert-scope-entity-icon" aria-hidden="true"></i><span>${Safe(Entity.Label)}</span></span>
+    </label>
+  `;
+}
+
+function renderAlertScopeGroupNode(Group, SelectedValues, Scope) {
+  const ExplicitlySelected = (Scope.Groups || []).some((GroupID) => Number(GroupID) === Number(Group.GroupID));
+  const SelectedCount = Group.ChildValues.filter((Value) => SelectedValues.has(Value)).length;
+  const FullySelected =
+    ExplicitlySelected || (Group.ChildValues.length > 0 && SelectedCount === Group.ChildValues.length);
+  const Indeterminate = !FullySelected && SelectedCount > 0;
+  const ChildrenHtml = Group.Children.map((Entity) => renderAlertScopeClientNode(Entity, SelectedValues)).join('');
+
+  return `
+    <div class="alert-scope-branch">
+      <label class="alert-multiselect-option alert-scope-node alert-scope-node-group">
+        <input
+          type="checkbox"
+          data-kind="group"
+          value="${Safe(Group.Value)}"
+          ${FullySelected ? 'checked' : ''}
+          ${Indeterminate ? 'data-indeterminate="true"' : ''}
+        />
+        <span class="alert-scope-prefix" aria-hidden="true"></span>
+        <span>${Safe(Group.Label)}</span>
+      </label>
+      ${ChildrenHtml ? `<div class="alert-scope-children">${ChildrenHtml}</div>` : ''}
+    </div>
+  `;
+}
+
 function ShowAlertRuleMainContent() {
   $('#ALERT_RULE_MAIN_CONTENT').removeClass('d-none');
   $('#ALERT_ACTION_EDITOR_PANEL').addClass('d-none');
@@ -70,9 +333,10 @@ function ShowAlertActionEditorPanel() {
 }
 
 function RenderScopeDropdown(MenuSelector, ToggleSelector, Options, SelectedValues, Placeholder) {
-  const SelectedSet = new Set((SelectedValues || []).map((x) => `${x}`));
-  const SelectedObjects = (Options || []).filter((Opt) => SelectedSet.has(`${Opt.Value}`));
-  const ToggleText = ScopeSummaryText(SelectedObjects, Placeholder);
+  const Model = buildAlertScopeModel();
+  const Scope = ParseAlertScopeSelection();
+  const EffectiveSelectedValues = resolveAlertScopeTargetValues(Scope, Model);
+  const ToggleText = summarizeAlertScopeSelection(Model, Scope, Placeholder);
 
   if (ToggleSelector === '#ALERT_SCOPE_TOGGLE') {
     $(ToggleSelector).html(
@@ -82,18 +346,38 @@ function RenderScopeDropdown(MenuSelector, ToggleSelector, Options, SelectedValu
     $(ToggleSelector).text(ToggleText);
   }
 
-  const Html = (Options || [])
-    .map(
-      (Opt) => `
-      <label class="alert-multiselect-option">
-        <input type="checkbox" value="${Safe(`${Opt.Value}`)}" ${SelectedSet.has(`${Opt.Value}`) ? 'checked' : ''} />
-        <span>${Safe(Opt.Label)}</span>
+  const WorkspaceChecked =
+    !!Scope.Workspace ||
+    (Model.AllClientValues.length > 0 && EffectiveSelectedValues.size === Model.AllClientValues.length);
+  const WorkspaceIndeterminate = !WorkspaceChecked && EffectiveSelectedValues.size > 0;
+  const GroupHtml = Model.Groups.map((Group) => renderAlertScopeGroupNode(Group, EffectiveSelectedValues, Scope)).join('');
+  const UngroupedHtml = Model.Ungrouped.map((Entity) => renderAlertScopeClientNode(Entity, EffectiveSelectedValues)).join('');
+  const Html = `
+    <div class="alert-scope-tree">
+      <label class="alert-multiselect-option alert-scope-node alert-scope-node-root">
+        <input
+          type="checkbox"
+          data-kind="workspace"
+          value="workspace:*"
+          ${WorkspaceChecked ? 'checked' : ''}
+          ${WorkspaceIndeterminate ? 'data-indeterminate="true"' : ''}
+        />
+        <span class="alert-scope-prefix" aria-hidden="true"></span>
+        <span>All Clients</span>
       </label>
-    `
-    )
-    .join('');
+      <div class="alert-scope-children">
+        ${GroupHtml}
+        ${UngroupedHtml}
+      </div>
+    </div>
+  `;
 
   $(MenuSelector).html(Html || '<div class="text-muted text-sm p-2">No options available.</div>');
+  $(MenuSelector)
+    .find('input[data-indeterminate="true"]')
+    .each(function () {
+      this.indeterminate = true;
+    });
 }
 
 function RenderScopeDropdowns() {
@@ -121,11 +405,34 @@ function BindScopeDropdownHandlers() {
   $('#ALERT_SCOPE_MENU')
     .off('change.alertScope')
     .on('change.alertScope', 'input[type="checkbox"]', function () {
-      const values = [];
-      $('#ALERT_SCOPE_MENU input[type="checkbox"]:checked').each(function () {
-        values.push($(this).val());
-      });
-      AlertScopeSelected = values;
+      const Kind = String($(this).attr('data-kind') || '');
+      const Value = String($(this).val() || '');
+      const Checked = $(this).is(':checked');
+      const Model = buildAlertScopeModel();
+
+      if (Kind === 'workspace') {
+        AlertScopeSelected = Checked
+          ? ['workspace:*']
+          : [];
+      } else {
+        const Scope = ParseAlertScopeSelection();
+        const SelectedTargets = resolveAlertScopeTargetValues(Scope, Model);
+        if (Kind === 'group') {
+          const Group = Model.Groups.find((Entry) => Entry.Value === Value);
+          if (Group) {
+            for (const ChildValue of Group.ChildValues) {
+              if (Checked) SelectedTargets.add(ChildValue);
+              else SelectedTargets.delete(ChildValue);
+            }
+          }
+        } else if (Kind === 'client') {
+          if (Checked) SelectedTargets.add(Value);
+          else SelectedTargets.delete(Value);
+        }
+        AlertScopeSelected = alertScopeToSelectedValues(
+          buildAlertScopeFromTargetValues(Array.from(SelectedTargets), Model)
+        );
+      }
       RenderScopeDropdowns();
       $('#ALERT_SCOPE_MENU').removeClass('d-none');
     });
@@ -347,42 +654,11 @@ function AddAlertActionAndEdit() {
 async function PopulateAlertScopeOptions(Rule = null) {
   let Groups = await window.API.GetAllGroups();
   if (!Array.isArray(Groups)) Groups = [];
-
-  const ScopeOptions = [
-    {
-      Value: 'workspace:*',
-      Label: 'Workspace (All Clients)',
-    },
-  ];
-
-  for (const G of Groups) {
-    ScopeOptions.push({
-      Value: `group:${G.GroupID}`,
-      Label: `[Group] ${G.Title || `Group ${G.GroupID}`}`,
-    });
-  }
-
-  for (const C of AllClients || []) {
-    ScopeOptions.push({
-      Value: `client:${C.UUID}`,
-      Label: `${C.Nickname || C.Hostname || C.UUID} (${C.UUID})`,
-    });
-  }
-  for (const T of MonitoringTargets || []) {
-    ScopeOptions.push({
-      Value: `client:monitor:${T.TargetID}`,
-      Label: `[Monitor] ${T.Nickname || T.Address || `Target ${T.TargetID}`}`,
-    });
-  }
-
-  AlertScopeOptions = ScopeOptions;
+  AlertScopeGroups = Groups;
+  AlertScopeOptions = buildAlertScopeModel();
 
   const Scope = Rule && Rule.Scope ? Rule.Scope : { Workspace: false, Groups: [], Clients: [] };
-  const Selected = [];
-  if (Scope.Workspace) Selected.push('workspace:*');
-  for (const GroupID of Scope.Groups || []) Selected.push(`group:${GroupID}`);
-  for (const ClientID of Scope.Clients || []) Selected.push(`client:${ClientID}`);
-  AlertScopeSelected = Selected;
+  AlertScopeSelected = alertScopeToSelectedValues(Scope);
   RenderScopeDropdowns();
 }
 
@@ -510,35 +786,29 @@ function targetNameFromScopedID(ScopedID) {
       : `Target ${TargetID}`;
   }
 
+  const Dummy = (DummyClients || []).find((Entry) => String(Entry.UUID) === ID);
+  if (Dummy) return Dummy.Nickname || Dummy.DummyID || Dummy.UUID;
+
   const Client = (AllClients || []).find((C) => String(C.UUID) === ID);
   return Client ? Client.Nickname || Client.Hostname || Client.UUID : ID;
 }
 
 function scopedTargetsInfo(Rule) {
+  const Model = buildAlertScopeModel();
   const Scope = Rule && Rule.Scope ? Rule.Scope : {};
   if (Scope.Workspace) {
-    const WorkspaceTargets = [];
-    for (const Client of AllClients || []) {
-      WorkspaceTargets.push(Client.Nickname || Client.Hostname || Client.UUID);
-    }
-    for (const Monitor of MonitoringTargets || []) {
-      WorkspaceTargets.push(Monitor.Nickname || Monitor.Address || `Target ${Monitor.TargetID}`);
-    }
+    const WorkspaceTargets = Model.AllClientValues.map((Value) =>
+      targetNameFromScopedID(alertClientValueToScopedID(Value))
+    );
     return {
       Count: WorkspaceTargets.length,
       SingleName: WorkspaceTargets.length === 1 ? WorkspaceTargets[0] : null,
     };
   }
 
-  const Selected = new Set((Scope.Clients || []).map((ClientID) => String(ClientID)));
-
-  for (const GroupID of Scope.Groups || []) {
-    const UUIDs = GroupUUIDCache.get(String(GroupID));
-    if (!Array.isArray(UUIDs)) continue;
-    for (const UUID of UUIDs) Selected.add(String(UUID));
-  }
-
-  const IDs = Array.from(Selected);
+  const IDs = Array.from(resolveAlertScopeTargetValues(Scope, Model)).map((Value) =>
+    alertClientValueToScopedID(Value)
+  );
   return {
     Count: IDs.length,
     SingleName: IDs.length === 1 ? targetNameFromScopedID(IDs[0]) : null,
@@ -562,7 +832,7 @@ function buildRuleSummary(Rule) {
   }
 
   const ActionText = ActionPhrases.length ? naturalJoin(ActionPhrases) : 'take no actions';
-  const Subject = ScopeInfo.SingleName ? ScopeInfo.SingleName : `one of ${ScopeInfo.Count} clients`;
+  const Subject = ScopeInfo.SingleName ? ScopeInfo.SingleName : `one of ${ScopeInfo.Count} targets`;
   return `When ${Subject} ${TriggerText}, ${ActionText}.`;
 }
 

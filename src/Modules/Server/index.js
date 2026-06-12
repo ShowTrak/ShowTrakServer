@@ -15,6 +15,8 @@ const { Manager: ScriptExecutionManager } = require('../ScriptExecutionManager')
 const { Manager: ClientManager } = require('../ClientManager');
 const { Manager: UpdateManager } = require('../UpdateManager');
 const { Manager: DummyClientManager } = require('../DummyClientManager');
+const { Manager: MonitoringTargetManager } = require('../MonitoringTargetManager');
+const { OSC } = require('../OSC');
 const express = require('express');
 
 const { Wait } = require('../Utils');
@@ -63,26 +65,191 @@ app.use('/API', (req, res, next) => {
   next();
 });
 
-// Dummy Client heartbeat (HTTP GET/POST). Addressed by the user-facing DummyID.
-// Mirrors the OSC /ShowTrak/Dummy/:ID/Heartbeat route.
-const DummyHeartbeatHandler = async (req, res) => {
-  const ID = req.params && req.params.id;
-  const SourceIP =
-    (req.ip || (req.socket && req.socket.remoteAddress) || (req.connection && req.connection.remoteAddress)) ||
-    null;
-  const [Err] = await DummyClientManager.Heartbeat(ID, SourceIP);
-  if (Err) {
-    res.locals.debugTrafficDetail = `Invalid dummy ID \"${String(ID || '')}\"`;
-    return res.status(404).json({ ok: false, error: String(Err) });
+function sendApiError(res, httpStatus, code, message) {
+  return res.status(httpStatus).json({
+    Error: true,
+    Code: code || httpStatus,
+    Message: String(message || 'Request failed'),
+  });
+}
+
+function sendApiSuccess(res, response) {
+  return res.json({
+    Error: false,
+    Response: response,
+  });
+}
+
+function computeStatus(Entity) {
+  const Type = String((Entity && Entity.Type) || '').toLowerCase();
+  if (Type === 'dummy' && String((Entity && Entity.State) || '').toUpperCase() === 'IDLE') {
+    return 'IDLE';
   }
-  res.locals.debugTrafficDetail = `Dummy heartbeat accepted for \"${String(ID || '')}\"`;
-  return res.json({ ok: true });
+  if (Entity && Entity.Online && Entity.Degraded) return 'DEGRADED';
+  if (Entity && Entity.Online) return 'ONLINE';
+  return 'OFFLINE';
+}
+
+function canonicalizeTypeFilter(Value) {
+  const Normalized = String(Value || '').trim().toUpperCase();
+  if (!Normalized) return null;
+  if (Normalized === 'REMOTE') return 'Remote';
+  if (Normalized === 'MONITORING' || Normalized === 'MONITOR') return 'Monitoring';
+  if (Normalized === 'DUMMY') return 'Dummy';
+  return null;
+}
+
+const ClientsListHandler = async (req, res) => {
+  const RawGroupID = String((req.query && req.query.GroupID) || '').trim();
+  const HasGroupIDFilter = RawGroupID.length > 0;
+  const GroupIDFilter = HasGroupIDFilter ? Number(RawGroupID) : null;
+  if (HasGroupIDFilter && !Number.isFinite(GroupIDFilter)) {
+    res.locals.debugTrafficDetail = `Invalid GroupID query "${RawGroupID}"`;
+    return sendApiError(res, 400, 'INVALID_QUERY_GROUPID', 'Invalid GroupID query');
+  }
+
+  const OperatingSystemFilter = String((req.query && req.query.OperatingSystem) || '')
+    .trim()
+    .toLowerCase();
+
+  const RawStatusFilter = String((req.query && req.query.Status) || '').trim().toUpperCase();
+  const HasStatusFilter = RawStatusFilter.length > 0;
+  const AllowedStatuses = new Set(['IDLE', 'OFFLINE', 'DEGRADED', 'ONLINE']);
+  if (HasStatusFilter && !AllowedStatuses.has(RawStatusFilter)) {
+    res.locals.debugTrafficDetail = `Invalid Status query "${RawStatusFilter}"`;
+    return sendApiError(res, 400, 'INVALID_QUERY_STATUS', 'Invalid Status query');
+  }
+
+  const RawTypeFilter = String((req.query && req.query.Type) || '').trim();
+  const TypeFilter = canonicalizeTypeFilter(RawTypeFilter);
+  if (RawTypeFilter.length > 0 && !TypeFilter) {
+    res.locals.debugTrafficDetail = `Invalid Type query "${RawTypeFilter}"`;
+    return sendApiError(res, 400, 'INVALID_QUERY_TYPE', 'Invalid Type query');
+  }
+
+  const [ClientsErr, Clients] = await ClientManager.GetAll();
+  if (ClientsErr) {
+    res.locals.debugTrafficDetail = 'Failed to fetch remote clients';
+    return sendApiError(
+      res,
+      500,
+      'REMOTE_CLIENTS_FETCH_FAILED',
+      'Failed to fetch remote clients'
+    );
+  }
+
+  const [TargetsErr, Targets] = await MonitoringTargetManager.GetAll();
+  if (TargetsErr) {
+    res.locals.debugTrafficDetail = 'Failed to fetch monitoring targets';
+    return sendApiError(
+      res,
+      500,
+      'MONITORING_TARGETS_FETCH_FAILED',
+      'Failed to fetch monitoring targets'
+    );
+  }
+
+  const [DummiesErr, Dummies] = await DummyClientManager.GetAll();
+  if (DummiesErr) {
+    res.locals.debugTrafficDetail = 'Failed to fetch dummy clients';
+    return sendApiError(
+      res,
+      500,
+      'DUMMY_CLIENTS_FETCH_FAILED',
+      'Failed to fetch dummy clients'
+    );
+  }
+
+  const RemoteEntities = (Clients || []).map((Client) => ({
+    ...Client,
+    Type: 'Remote',
+    Status: computeStatus(Client),
+  }));
+
+  const MonitoringEntities = (Targets || []).map((Target) => ({
+    ...Target,
+    Type: 'Monitoring',
+    OperatingSystem: '',
+    Status: computeStatus(Target),
+  }));
+
+  const DummyEntities = (Dummies || []).map((Dummy) => ({
+    ...Dummy,
+    Type: 'Dummy',
+    OperatingSystem: '',
+    Status: computeStatus(Dummy),
+  }));
+
+  const Results = [...RemoteEntities, ...MonitoringEntities, ...DummyEntities].filter((Entity) => {
+    if (TypeFilter && Entity.Type !== TypeFilter) return false;
+    if (HasGroupIDFilter && Number(Entity.GroupID) !== GroupIDFilter) return false;
+    if (OperatingSystemFilter && String(Entity.OperatingSystem || '').toLowerCase() !== OperatingSystemFilter) {
+      return false;
+    }
+    if (HasStatusFilter && Entity.Status !== RawStatusFilter) return false;
+    return true;
+  });
+
+  res.locals.debugTrafficDetail = `Returned ${Results.length} entities`;
+  return sendApiSuccess(res, { Data: Results, Count: Results.length });
 };
-app.get('/API/Dummy/:id/Heartbeat', DummyHeartbeatHandler);
-app.post('/API/Dummy/:id/Heartbeat', DummyHeartbeatHandler);
+
+// API Routes (in logical order)
+// 1. Query/List endpoint (first in the logical list)
+app.get('/API/Clients', ClientsListHandler);
+
+// 2-7. OSC routes mirrored to HTTP (mirrors the logical order defined in OSC/index.js)
+//      System Control → Client → Dummy → Group → All → Selection
+// Mirror all OSC routes to HTTP API routes under /API.
+// Example: /API/Client/:UUID/Select -> /API/Client/:UUID/Select
+for (const Route of OSC.GetRoutes()) {
+  const NormalizedPath =
+    String(Route.Path || '').replace(/^\/(?:ShowTrak|API)(?=\/|$)/i, '') || '/';
+  const ApiPath = `/API${NormalizedPath === '/' ? '' : NormalizedPath}`;
+  const OSCToHTTPHandler = async (req, res) => {
+    const Params = req.params || {};
+    const SourceIP =
+      (req.ip ||
+        (req.socket && req.socket.remoteAddress) ||
+        (req.connection && req.connection.remoteAddress)) ||
+      null;
+
+    let Result = null;
+    try {
+      Result = await Route.Callback(Params, { IP: SourceIP });
+    } catch (Error) {
+      const Message = String(
+        (Error && Error.message) ||
+          Error ||
+          `Unhandled error while processing ${Route.Path}`
+      );
+      res.locals.debugTrafficDetail = Message;
+      return sendApiError(res, 500, 'OSC_HTTP_HANDLER_EXCEPTION', Message);
+    }
+
+    const Passed =
+      Result && typeof Result === 'object' ? Result.ok !== false : Result !== false;
+    const Detail =
+      Result && typeof Result === 'object' && Result.detail
+        ? String(Result.detail)
+        : Route.Title || Route.Path;
+
+    res.locals.debugTrafficDetail = Detail;
+    if (!Passed) {
+      return sendApiError(res, 400, 'OSC_ROUTE_FAILED', Detail);
+    }
+    return sendApiSuccess(res, {
+      Status: 'OK',
+      Detail,
+    });
+  };
+  app.get(ApiPath, OSCToHTTPHandler);
+  app.post(ApiPath, OSCToHTTPHandler);
+}
+
 app.use('/API', (_req, res) => {
   res.locals.debugTrafficDetail = 'API route not found';
-  return res.status(404).json({ ok: false, error: 'API route not found' });
+  return sendApiError(res, 404, 'API_ROUTE_NOT_FOUND', 'API route not found');
 });
 
 

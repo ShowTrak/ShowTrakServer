@@ -26,14 +26,18 @@ class Group {
 
   // Persistent fields (DB-backed)
   async SetTitle(Title) {
-    if (this.Title === Title) return;
+    if (this.Title === Title) return Ok(true);
     this.Title = Title;
     let [Err, _Res] = await DB.Run('UPDATE Groups SET Title = ? WHERE GroupID = ?', [
       Title,
       this.GroupID,
     ]);
-    if (Err) return Logger.error('Failed to update group Title');
+    if (Err) {
+      Logger.error('Failed to update group Title');
+      return Fail('Failed to update group title');
+    }
     Logger.debug(`Group ${this.GroupID} Title updated to ${Title}`);
+    return Ok(true);
   }
   async SetWeight(Weight) {
     if (this.Weight === Weight) return;
@@ -56,6 +60,62 @@ Manager.Create = async (Title = 'New Group') => {
   }
   BroadcastManager.emit('GroupListChanged');
   return Ok(true);
+};
+
+Manager.Rename = async (GroupID, Title) => {
+  if (!GroupID) return Fail('GroupID is required');
+  if (!Title) return Fail('Group title is required');
+
+  const [GetErr, Group] = await Manager.Get(GroupID);
+  if (GetErr) return Fail(GetErr);
+  if (!Group) return Fail('Group not found');
+
+  const [SetErr] = await Group.SetTitle(Title);
+  if (SetErr) return Fail(SetErr);
+
+  BroadcastManager.emit('GroupListChanged');
+  return Ok(true);
+};
+
+// Persist a new ordering by reassigning Group.Weight in display order.
+Manager.SetOrder = async (OrderedGroupIDs = []) => {
+  if (!Array.isArray(OrderedGroupIDs)) return { ok: false, errors: ['Invalid order'] };
+
+  const [Err, Rows] = await DB.All('SELECT GroupID FROM Groups ORDER BY Weight ASC, GroupID ASC');
+  if (Err) {
+    Logger.error('Failed to fetch groups while reordering:', Err);
+    return { ok: false, errors: ['Failed to reorder groups'] };
+  }
+
+  const Existing = (Rows || [])
+    .map((Row) => Number(Row.GroupID))
+    .filter((GroupID) => Number.isInteger(GroupID) && GroupID > 0);
+  const ExistingSet = new Set(Existing);
+
+  const Desired = [];
+  for (const RawGroupID of OrderedGroupIDs) {
+    const GroupID = Number(RawGroupID);
+    if (!Number.isInteger(GroupID) || GroupID <= 0) continue;
+    if (!ExistingSet.has(GroupID)) continue;
+    if (Desired.includes(GroupID)) continue;
+    Desired.push(GroupID);
+  }
+
+  const Remaining = Existing.filter((GroupID) => !Desired.includes(GroupID));
+  const FinalOrder = Desired.concat(Remaining);
+
+  let Weight = 10;
+  for (const GroupID of FinalOrder) {
+    const [SetErr] = await DB.Run('UPDATE Groups SET Weight = ? WHERE GroupID = ?', [Weight, GroupID]);
+    if (SetErr) {
+      Logger.error(`Failed to update group weight while reordering (${GroupID}):`, SetErr);
+      return { ok: false, errors: ['Failed to reorder groups'] };
+    }
+    Weight += 10;
+  }
+
+  BroadcastManager.emit('GroupListChanged');
+  return { ok: true };
 };
 
 // Delete a group and move all assigned entities to the default no-group bucket.
@@ -151,9 +211,9 @@ Manager.Get = async (GroupID) => {
   return Ok(GroupObj);
 };
 
-// Ordered by Weight descending for display purposes (heavier first)
+// Ordered by Weight ascending so lower weight renders first.
 Manager.GetAll = async () => {
-  let [Err, Rows] = await DB.All('SELECT * FROM Groups ORDER BY Weight DESC');
+  let [Err, Rows] = await DB.All('SELECT * FROM Groups ORDER BY Weight ASC, GroupID ASC');
   if (Err) {
     Logger.error('Failed to fetch groups:', Err);
     return Fail('Failed to fetch groups', []);

@@ -65,6 +65,9 @@ const {
   recordMonitoringHistorySample,
   syncMonitoringHistoryStore,
   getMonitoringHistorySamples,
+  recordDummyHistorySample,
+  syncDummyHistoryStore,
+  getDummyHistorySamples,
 } = require('./main/monitoring-history');
 const { Manager: AppUpdater } = require('./main/app-updater');
 
@@ -1075,6 +1078,18 @@ app.whenReady().then(async () => {
     return [null, Result];
   });
 
+  RPC.handle('RenameGroup', async (_Event, GroupID, Title) => {
+    try {
+      GroupID = IPCValidation.GroupID(GroupID);
+      Title = IPCValidation.GroupTitle(Title);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    let [Err, Result] = await GroupManager.Rename(GroupID, Title);
+    if (Err) return [Err, null];
+    return [null, Result];
+  });
+
   RPC.handle('DeleteGroup', async (_Event, GroupID) => {
     try {
       GroupID = IPCValidation.GroupID(GroupID);
@@ -1084,6 +1099,25 @@ app.whenReady().then(async () => {
     let [Err, Result] = await GroupManager.Delete(GroupID);
     if (Err) return [Err, null];
     return [null, Result];
+  });
+
+  RPC.handle('Groups:SetOrder', async (_Event, OrderedGroupIDs) => {
+    if (!Array.isArray(OrderedGroupIDs)) return ['Invalid order', null];
+
+    let ParsedGroupIDs;
+    try {
+      ParsedGroupIDs = OrderedGroupIDs.map((GroupID) => IPCValidation.GroupID(GroupID, 'GroupID'));
+    } catch (error) {
+      return validationErrorTuple(error, false);
+    }
+
+    const Result = await GroupManager.SetOrder(
+      Array.from(new Set(ParsedGroupIDs.filter((GroupID) => GroupID !== null)))
+    );
+    if (!Result.ok) {
+      return [Result.errors && Result.errors[0] ? Result.errors[0] : 'Failed to reorder groups', null];
+    }
+    return [null, true];
   });
 
   RPC.handle('UpdateClient', async (_Event, UUID, Data) => {
@@ -1175,6 +1209,15 @@ app.whenReady().then(async () => {
       return [];
     }
     return getMonitoringHistorySamples(TargetID);
+  });
+
+  RPC.handle('GetDummyClientHistory', async (_Event, UUID) => {
+    try {
+      UUID = IPCValidation.DummyClientUUID(UUID);
+    } catch {
+      return [];
+    }
+    return getDummyHistorySamples(UUID);
   });
 
   RPC.handle('CreateMonitoringTarget', async (_Event, Payload) => {
@@ -2148,11 +2191,14 @@ async function UpdateDummyClientList() {
   if (!MainWindow || MainWindow.isDestroyed()) return;
   const [Err, List] = await DummyClientManager.GetAll();
   if (Err) return Logger.error('Failed to fetch dummy clients:', Err);
-  MainWindow.webContents.send('SetFullDummyClientList', List || []);
+  const SafeList = List || [];
+  syncDummyHistoryStore(SafeList);
+  MainWindow.webContents.send('SetFullDummyClientList', SafeList);
 }
 BroadcastManager.on('DummyClientListChanged', UpdateDummyClientList);
 
 async function DummyClientUpdated(Dummy) {
+  recordDummyHistorySample(Dummy);
   if (MainWindow && !MainWindow.isDestroyed()) {
     MainWindow.webContents.send('DummyClientUpdated', Dummy);
   }
