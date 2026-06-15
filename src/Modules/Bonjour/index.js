@@ -3,6 +3,7 @@ const Logger = CreateLogger('Bonjour');
 const bonjour = require('bonjour');
 const { Manager: OSManager } = require('../OS');
 const { Config } = require('../Config');
+const { Manager: ServerIdentityManager } = require('../ServerIdentity');
 
 // Use classic 'bonjour' with multicast-dns under the hood; prefer IPv4 and enable loopback for localhost testing
 const instance = bonjour({ reuseAddr: true, loopback: true });
@@ -12,11 +13,16 @@ const Manager = {
   Init: () => {
     const Hostname = OSManager.Hostname || 'Unknown PC';
     const port = Config?.Application?.Port;
+    const serverIdentityToken = ServerIdentityManager.GetIdentityToken();
+    const txtPayload = {
+      ...(Config.Shared || {}),
+      ServerIdentity: serverIdentityToken,
+    };
     try {
       Logger.log('Bonjour.Init start', {
         Hostname,
         Port: port,
-        TxtKeys: Config && Config.Shared ? Object.keys(Config.Shared) : [],
+        TxtKeys: Object.keys(txtPayload),
       });
     } catch {}
 
@@ -25,7 +31,7 @@ const Manager = {
         name: `${Hostname} - ShowTrak Server V3`,
         type: 'showtrak',
         subtypes: ['showtrakv3server'],
-        txt: Config.Shared,
+        txt: txtPayload,
         port,
       });
       try {

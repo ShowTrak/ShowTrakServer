@@ -52,6 +52,7 @@ function loadBonjour() {
     '../Logger': noopLogger,
     '../OS': { Manager: { Hostname: 'TestHost' } },
     '../Config': { Config: { Application: { Port: 1234 }, Shared: { Version: '3.0.0' } } },
+    '../ServerIdentity': { Manager: { GetIdentityToken: () => 'server-identity-token' } },
   };
 
   const { Manager } = loadWithMocks(
@@ -69,6 +70,7 @@ test('Bonjour.Init publishes a service with hostname and port', () => {
   assert.match(service.opts.name, /TestHost/);
   assert.equal(service.opts.port, 1234);
   assert.equal(service.opts.type, 'showtrak');
+  assert.equal(service.opts.txt.ServerIdentity, 'server-identity-token');
   assert.equal(service.started, true);
 });
 

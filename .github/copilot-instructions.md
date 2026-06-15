@@ -31,8 +31,8 @@ Reuse-first rule (mandatory):
 - Keep renderer logic out of main process and vice versa.
 
 2. Validation and contracts:
-- All new IPC routes must include validator wiring.
-- All new invoke channels must be allowlisted where channel allowlists are enforced.
+- All IPC routes must include validator wiring.
+- All invoke channels must be allowlisted where channel allowlists are enforced.
 - Maintain strict payload shape parity between sender and receiver.
 
 3. State handling:
