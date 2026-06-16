@@ -387,6 +387,17 @@ function buildMacAppMenuTemplate() {
       click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_SAVEAS'),
     },
     { type: 'separator' },
+    {
+      label: 'Show Mode',
+      accelerator: 'CmdOrCtrl+1',
+      click: () => ModeManager.Set('SHOW'),
+    },
+    {
+      label: 'Edit Mode',
+      accelerator: 'CmdOrCtrl+2',
+      click: () => ModeManager.Set('EDIT'),
+    },
+    { type: 'separator' },
     { label: 'Open Logs Directory', click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_LOGSFOLDER') },
     {
       label: 'Open Scripts Directory',

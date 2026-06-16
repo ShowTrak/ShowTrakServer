@@ -284,14 +284,11 @@ async function LoadScriptFolder(ScriptsDirectory, ScriptFolder) {
 }
 
 function ListScriptFolders(ScriptsDirectory) {
+  const IsValidScriptFolderName = (FolderName) => /^[A-Za-z0-9]+$/.test(FolderName);
+
   return fs.readdirSync(ScriptsDirectory).filter((file) => {
     const fullPath = path.join(ScriptsDirectory, file);
-    return (
-      fs.statSync(fullPath).isDirectory() &&
-      file !== 'node_modules' &&
-      file !== '.git' &&
-      file !== '.vscode'
-    );
+    return fs.statSync(fullPath).isDirectory() && IsValidScriptFolderName(file);
   });
 }
 

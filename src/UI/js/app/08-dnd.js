@@ -70,6 +70,8 @@ function ShowShortcutsModal() {
   items.push({ title: 'Open Show', shortcut: 'Ctrl/Cmd+O' });
   items.push({ title: 'Save Show', shortcut: 'Ctrl/Cmd+S' });
   items.push({ title: 'Save Show As', shortcut: 'Ctrl/Cmd+Shift+S' });
+  items.push({ title: 'Switch to Show Mode', shortcut: 'Ctrl/Cmd+1' });
+  items.push({ title: 'Switch to Edit Mode', shortcut: 'Ctrl/Cmd+2' });
   items.push({ title: 'ShowTrak Preferences', shortcut: 'Ctrl/Cmd+,' });
   items.push({ title: 'LAN Discovery Wizard', shortcut: 'Ctrl/Cmd+L' });
   // Alerts

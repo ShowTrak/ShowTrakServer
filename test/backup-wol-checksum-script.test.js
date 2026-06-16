@@ -155,10 +155,20 @@ test('ChecksumManager delegates to checksum.file and returns the digest', async 
 test('ScriptManager loads script folders and computes file checksums', async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-scripts-'));
   const scriptDir = path.join(tmpDir, 'MyScript');
+  const invalidDotFolderDir = path.join(tmpDir, '.github');
+  const invalidSpacedFolderDir = path.join(tmpDir, 'Bad Script');
   fs.mkdirSync(scriptDir, { recursive: true });
+  fs.mkdirSync(invalidDotFolderDir, { recursive: true });
+  fs.mkdirSync(invalidSpacedFolderDir, { recursive: true });
   fs.writeFileSync(
     path.join(scriptDir, 'Script.json'),
     JSON.stringify({ Name: 'My Script', Type: 'Action', Path: 'run.sh', Enabled: true }),
+    'utf8'
+  );
+  fs.writeFileSync(path.join(invalidDotFolderDir, 'Script.json'), JSON.stringify({ Name: 'Ignored Dot' }), 'utf8');
+  fs.writeFileSync(
+    path.join(invalidSpacedFolderDir, 'Script.json'),
+    JSON.stringify({ Name: 'Ignored Spaced' }),
     'utf8'
   );
   fs.writeFileSync(path.join(scriptDir, 'run.sh'), 'echo test', 'utf8');
@@ -183,6 +193,8 @@ test('ScriptManager loads script folders and computes file checksums', async () 
 
   const script = await Manager.Get('MyScript');
   assert.equal(script.Name, 'My Script');
+  assert.equal(await Manager.Get('.github'), null);
+  assert.equal(await Manager.Get('Bad Script'), null);
 
   assert.equal(events.length, 0);
   fs.rmSync(tmpDir, { recursive: true, force: true });

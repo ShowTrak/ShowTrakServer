@@ -20,6 +20,20 @@ document.addEventListener('keydown', function (e) {
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.repeat) {
     const key = e.key.toLowerCase();
 
+    // Show Mode
+    if (!e.shiftKey && key === '1') {
+      e.preventDefault();
+      document.getElementById('MODE_BTN_SHOW')?.click();
+      return;
+    }
+
+    // Edit Mode
+    if (!e.shiftKey && key === '2') {
+      e.preventDefault();
+      document.getElementById('MODE_BTN_EDIT')?.click();
+      return;
+    }
+
     // Save
     if (!e.shiftKey && key === 's') {
       e.preventDefault();
