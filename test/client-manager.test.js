@@ -232,7 +232,10 @@ test('ClientManager tracks critical applications and emits started/stopped trans
     '../DB': {
       Manager: {
         Get: async (sql, params) => {
-          if (String(sql).includes('SELECT * FROM Clients WHERE UUID = ?') && params[0] === 'client-4') {
+          if (
+            String(sql).includes('SELECT * FROM Clients WHERE UUID = ?') &&
+            params[0] === 'client-4'
+          ) {
             return [
               null,
               {
@@ -296,8 +299,14 @@ test('ClientManager tracks critical applications and emits started/stopped trans
   });
   assert.equal(secondRunningErr, null);
 
-  assert.ok(events.some(([event, _client, app]) => event === 'ApplicationStarted' && app?.Name === 'Chrome'));
-  assert.ok(events.some(([event, _client, app]) => event === 'ApplicationStarted' && app?.Name === 'Spotify'));
+  assert.ok(
+    events.some(([event, _client, app]) => event === 'ApplicationStarted' && app?.Name === 'Chrome')
+  );
+  assert.ok(
+    events.some(
+      ([event, _client, app]) => event === 'ApplicationStarted' && app?.Name === 'Spotify'
+    )
+  );
 
   const [thirdRunningErr] = await Manager.SetRunningApplications('client-4', {
     SampledAt: 300,
@@ -306,8 +315,14 @@ test('ClientManager tracks critical applications and emits started/stopped trans
     Items: [],
   });
   assert.equal(thirdRunningErr, null);
-  assert.ok(events.some(([event, _client, app]) => event === 'ApplicationStopped' && app?.Name === 'Chrome'));
-  assert.ok(events.some(([event, _client, app]) => event === 'ApplicationStopped' && app?.Name === 'Spotify'));
+  assert.ok(
+    events.some(([event, _client, app]) => event === 'ApplicationStopped' && app?.Name === 'Chrome')
+  );
+  assert.ok(
+    events.some(
+      ([event, _client, app]) => event === 'ApplicationStopped' && app?.Name === 'Spotify'
+    )
+  );
 
   assert.ok(
     trackedRuns.some(([sql]) => sql.includes('INSERT OR REPLACE INTO CriticalApplications'))

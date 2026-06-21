@@ -59,9 +59,7 @@
           </button>
         </div>
         <div class="bar-section center">
-          <span id="SELECTION_STATUS" class="cursor-pointer"
-            >0 Clients Selected</span
-          >
+          <span id="SELECTION_STATUS" class="cursor-pointer">0 Clients Selected</span>
         </div>
         <div class="bar-section right">
           <button
@@ -557,11 +555,16 @@
               <div class="bg-ghost p-2 rounded d-grid gap-2">
                 <div class="group-manager-client-header d-flex align-items-center">
                   <span class="group-manager-client-col group-manager-client-col-name">Name</span>
-                  <span class="group-manager-client-col group-manager-client-col-hostname">Hostname</span>
+                  <span class="group-manager-client-col group-manager-client-col-hostname"
+                    >Hostname</span
+                  >
                   <span class="group-manager-client-col group-manager-client-col-ip">IP</span>
                   <span class="group-manager-client-col group-manager-client-col-action"></span>
                 </div>
-                <div id="GROUP_MANAGER_EDITOR_CLIENT_LIST" class="group-manager-member-list d-grid gap-2"></div>
+                <div
+                  id="GROUP_MANAGER_EDITOR_CLIENT_LIST"
+                  class="group-manager-member-list d-grid gap-2"
+                ></div>
               </div>
             </div>
           </div>
@@ -666,9 +669,16 @@
               <div>
                 <strong id="OSC_HTTP_DEBUG_MODAL_Label" class="mb-0">OSC/API Debug Terminal</strong>
               </div>
-              <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Close</button>
+              <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">
+                Close
+              </button>
             </div>
-            <div id="OSC_HTTP_DEBUG_TERMINAL" class="osc-http-debug-terminal" role="log" aria-live="polite">
+            <div
+              id="OSC_HTTP_DEBUG_TERMINAL"
+              class="osc-http-debug-terminal"
+              role="log"
+              aria-live="polite"
+            >
               <div class="osc-http-debug-empty">Send OSC or HTTP traffic to inspect requests.</div>
             </div>
           </div>
@@ -809,14 +819,10 @@
                   <div id="SCRIPT_MANAGER_COLOUR_SWATCHES" class="d-flex gap-2 flex-wrap"></div>
                 </div>
 
-                <div
-                  class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center"
-                >
+                <div class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center">
                   <div class="d-grid">
                     <span>Confirmation</span>
-                    <span class="text-sm text-muted mb-0"
-                      >Ask before running this script.</span
-                    >
+                    <span class="text-sm text-muted mb-0">Ask before running this script.</span>
                   </div>
                   <div class="form-check form-switch">
                     <input
@@ -828,14 +834,10 @@
                   </div>
                 </div>
 
-                <div
-                  class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center"
-                >
+                <div class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center">
                   <div class="d-grid">
                     <span>Enabled</span>
-                    <span class="text-sm text-muted mb-0"
-                      >Make this script available to run.</span
-                    >
+                    <span class="text-sm text-muted mb-0">Make this script available to run.</span>
                   </div>
                   <div class="form-check form-switch">
                     <input
@@ -880,7 +882,11 @@
               </div>
 
               <div class="d-flex justify-content-end gap-2 mt-2">
-                <button type="button" id="SCRIPT_MANAGER_REVERT" class="btn btn-sm btn-outline-light">
+                <button
+                  type="button"
+                  id="SCRIPT_MANAGER_REVERT"
+                  class="btn btn-sm btn-outline-light"
+                >
                   <i class="bi bi-arrow-clockwise"></i> Revert
                 </button>
                 <button type="button" id="SCRIPT_MANAGER_SAVE" class="btn btn-sm btn-success">
@@ -1059,6 +1065,43 @@
             >
               Delete Client
             </button>
+            <button
+              type="button"
+              class="btn btn-ghost text-warning"
+              id="SHOWTRAK_CLIENT_EDITOR_REPLACE"
+            >
+              Replace Client
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_CLIENT_REPLACE"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_CLIENT_REPLACE_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="rounded-3 p-2 bg-ghost-light">
+              <h6 class="mb-0" id="CLIENT_REPLACE_MODAL_TITLE">Replace Client</h6>
+            </div>
+
+            <p class="text-muted text-sm mb-2">
+              Choose a pending adoption device to take over this client identity.
+            </p>
+
+            <div id="CLIENT_REPLACE_LIST" class="d-grid gap-2"></div>
+
+            <div class="row g-2 mt-1">
+              <div class="col-12 d-grid">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1158,8 +1201,6 @@
                   value="30000"
                 />
               </div>
-
-
 
               <div class="form-floating">
                 <input

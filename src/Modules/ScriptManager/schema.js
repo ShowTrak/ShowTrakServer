@@ -27,14 +27,14 @@ const SCRIPT_COLOURS = [
 
 // Map legacy Bootstrap style names to the nearest SCRIPT_COLOURS index.
 const BOOTSTRAP_TO_COLOUR_INDEX = {
-  primary:   4, // blue
+  primary: 4, // blue
   secondary: 7, // dark grey
-  success:   3, // green
-  danger:    0, // red
-  warning:   2, // yellow
-  info:      4, // blue (closest)
-  light:     6, // light grey
-  dark:      7, // dark grey
+  success: 3, // green
+  danger: 0, // red
+  warning: 2, // yellow
+  info: 4, // blue (closest)
+  light: 6, // light grey
+  dark: 7, // dark grey
 };
 
 function IsPlainObject(value) {
@@ -122,10 +122,17 @@ function NormalizeScriptConfig(RawData, ID) {
         ? data.LabelStyle
         : null;
 
-  if (typeof rawColour === 'number' && Number.isInteger(rawColour) &&
-      rawColour >= 0 && rawColour < SCRIPT_COLOURS.length) {
+  if (
+    typeof rawColour === 'number' &&
+    Number.isInteger(rawColour) &&
+    rawColour >= 0 &&
+    rawColour < SCRIPT_COLOURS.length
+  ) {
     config.Colour = rawColour;
-  } else if (legacyStyle && Object.prototype.hasOwnProperty.call(BOOTSTRAP_TO_COLOUR_INDEX, legacyStyle)) {
+  } else if (
+    legacyStyle &&
+    Object.prototype.hasOwnProperty.call(BOOTSTRAP_TO_COLOUR_INDEX, legacyStyle)
+  ) {
     config.Colour = BOOTSTRAP_TO_COLOUR_INDEX[legacyStyle];
     errors.push(`Legacy Style "${legacyStyle}" was migrated to colour index ${config.Colour}.`);
   } else {
@@ -230,9 +237,7 @@ function NormalizeScriptConfig(RawData, ID) {
       }
     }
     if (migrated) {
-      errors.push(
-        `Legacy "Path" was migrated into platform targets: ${targets.join(', ')}.`
-      );
+      errors.push(`Legacy "Path" was migrated into platform targets: ${targets.join(', ')}.`);
     }
   }
 

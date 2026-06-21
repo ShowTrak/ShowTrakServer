@@ -297,12 +297,17 @@ function renderAlertScopeClientNode(Entity, SelectedValues) {
 }
 
 function renderAlertScopeGroupNode(Group, SelectedValues, Scope) {
-  const ExplicitlySelected = (Scope.Groups || []).some((GroupID) => Number(GroupID) === Number(Group.GroupID));
+  const ExplicitlySelected = (Scope.Groups || []).some(
+    (GroupID) => Number(GroupID) === Number(Group.GroupID)
+  );
   const SelectedCount = Group.ChildValues.filter((Value) => SelectedValues.has(Value)).length;
   const FullySelected =
-    ExplicitlySelected || (Group.ChildValues.length > 0 && SelectedCount === Group.ChildValues.length);
+    ExplicitlySelected ||
+    (Group.ChildValues.length > 0 && SelectedCount === Group.ChildValues.length);
   const Indeterminate = !FullySelected && SelectedCount > 0;
-  const ChildrenHtml = Group.Children.map((Entity) => renderAlertScopeClientNode(Entity, SelectedValues)).join('');
+  const ChildrenHtml = Group.Children.map((Entity) =>
+    renderAlertScopeClientNode(Entity, SelectedValues)
+  ).join('');
 
   return `
     <div class="alert-scope-branch">
@@ -348,10 +353,15 @@ function RenderScopeDropdown(MenuSelector, ToggleSelector, Options, SelectedValu
 
   const WorkspaceChecked =
     !!Scope.Workspace ||
-    (Model.AllClientValues.length > 0 && EffectiveSelectedValues.size === Model.AllClientValues.length);
+    (Model.AllClientValues.length > 0 &&
+      EffectiveSelectedValues.size === Model.AllClientValues.length);
   const WorkspaceIndeterminate = !WorkspaceChecked && EffectiveSelectedValues.size > 0;
-  const GroupHtml = Model.Groups.map((Group) => renderAlertScopeGroupNode(Group, EffectiveSelectedValues, Scope)).join('');
-  const UngroupedHtml = Model.Ungrouped.map((Entity) => renderAlertScopeClientNode(Entity, EffectiveSelectedValues)).join('');
+  const GroupHtml = Model.Groups.map((Group) =>
+    renderAlertScopeGroupNode(Group, EffectiveSelectedValues, Scope)
+  ).join('');
+  const UngroupedHtml = Model.Ungrouped.map((Entity) =>
+    renderAlertScopeClientNode(Entity, EffectiveSelectedValues)
+  ).join('');
   const Html = `
     <div class="alert-scope-tree">
       <label class="alert-multiselect-option alert-scope-node alert-scope-node-root">
@@ -411,9 +421,7 @@ function BindScopeDropdownHandlers() {
       const Model = buildAlertScopeModel();
 
       if (Kind === 'workspace') {
-        AlertScopeSelected = Checked
-          ? ['workspace:*']
-          : [];
+        AlertScopeSelected = Checked ? ['workspace:*'] : [];
       } else {
         const Scope = ParseAlertScopeSelection();
         const SelectedTargets = resolveAlertScopeTargetValues(Scope, Model);
@@ -508,7 +516,7 @@ function RenderAlertActionSettingsFields(ActionTypeID, ExistingSettings = {}) {
       }).join('');
       const PreviewButton =
         Field.Preview === 'sound'
-            ? `<button type="button" class="btn bg-ghost text-white" data-sound-preview title="Preview sound">
+          ? `<button type="button" class="btn bg-ghost text-white" data-sound-preview title="Preview sound">
               <i class="bi bi-play-fill"></i> Preview
             </button>`
           : '';

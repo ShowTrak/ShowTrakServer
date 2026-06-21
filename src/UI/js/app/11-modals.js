@@ -241,17 +241,18 @@ function GetGroupManagerMembers(GroupID) {
 
 function GetGroupManagerClients(GroupID) {
   const Clients = Array.isArray(__LastClients) ? __LastClients : [];
-  return Clients
-    .filter((Client) => GroupManagerInGroup(Client.GroupID, GroupID))
-    .sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
+  return Clients.filter((Client) => GroupManagerInGroup(Client.GroupID, GroupID)).sort(
+    (a, b) => (a.Weight || 0) - (b.Weight || 0)
+  );
 }
 
 async function ResolveGroupManagerClients(GroupID) {
   const CachedClients = GetGroupManagerClients(GroupID);
   const CacheByUUID = new Map(
-    CachedClients
-      .map((Client) => [String(Client && Client.UUID ? Client.UUID : '').trim(), Client])
-      .filter(([UUID]) => UUID.length > 0)
+    CachedClients.map((Client) => [
+      String(Client && Client.UUID ? Client.UUID : '').trim(),
+      Client,
+    ]).filter(([UUID]) => UUID.length > 0)
   );
 
   const GroupUUIDs = Array.isArray(GroupUUIDCache.get(`${GroupID}`))
@@ -359,9 +360,7 @@ async function ResolveGroupManagerEntities(GroupID) {
     const TargetID = Number(Target && Target.TargetID);
     if (!Number.isFinite(TargetID)) continue;
     const Address = String(Target && Target.Address ? Target.Address : '').trim();
-    const Name = String(
-      (Target && Target.Nickname) || Address || `Monitor ${TargetID}`
-    ).trim();
+    const Name = String((Target && Target.Nickname) || Address || `Monitor ${TargetID}`).trim();
     Entities.push({
       Kind: 'monitor',
       ID: String(TargetID),
@@ -501,7 +500,9 @@ function BindGroupManagerEditorHandlers(Groups = []) {
   $('#GROUP_MANAGER_EDITOR_CLIENT_LIST')
     .off('click', '.GROUP_MANAGER_MEMBER_REMOVE')
     .on('click', '.GROUP_MANAGER_MEMBER_REMOVE', async function () {
-      const Kind = String($(this).attr('data-kind') || '').trim().toLowerCase();
+      const Kind = String($(this).attr('data-kind') || '')
+        .trim()
+        .toLowerCase();
       const EntityID = String($(this).attr('data-id') || '').trim();
       const GroupID = parseInt($(this).attr('data-groupid'), 10);
       if (!EntityID || !Number.isFinite(GroupID)) return;
@@ -604,7 +605,9 @@ async function OpenGroupManager(Relaunching = false) {
   let Groups = await window.API.GetAllGroups();
   if (!Array.isArray(Groups)) Groups = [];
 
-  $('#GROUP_MANAGER_GROUP_LIST').html('<div id="GROUP_MANAGER_SORTABLE_LIST" class="d-grid gap-2"></div>');
+  $('#GROUP_MANAGER_GROUP_LIST').html(
+    '<div id="GROUP_MANAGER_SORTABLE_LIST" class="d-grid gap-2"></div>'
+  );
 
   for (const Group of Groups) {
     const GroupMembers = GetGroupManagerMembers(Group.GroupID);
@@ -686,7 +689,10 @@ async function OpenGroupManager(Relaunching = false) {
         return;
       }
 
-      const GroupID = parseInt($(this).closest('.GROUP_MANAGER_GROUP_ITEM').attr('data-groupid'), 10);
+      const GroupID = parseInt(
+        $(this).closest('.GROUP_MANAGER_GROUP_ITEM').attr('data-groupid'),
+        10
+      );
       if (!Number.isFinite(GroupID)) return;
       await OpenGroupManagerEditor(GroupID, false, Groups);
     });
@@ -762,6 +768,18 @@ async function OpenClientEditor(UUID) {
       await Notify(`Unadopted ${Nickname ? Nickname : Hostname}`, 'success');
     });
 
+  const replacementCandidates = (Array.isArray(PendingAdoption) ? PendingAdoption : []).filter(
+    (Device) => Device && Device.UUID && String(Device.UUID) !== String(UUID)
+  );
+  const canReplace = !Client.Online;
+  $('#SHOWTRAK_CLIENT_EDITOR_REPLACE')
+    .toggleClass('d-none', !canReplace)
+    .prop('disabled', replacementCandidates.length === 0)
+    .off('click')
+    .on('click', async () => {
+      await OpenClientReplacementModal(Client);
+    });
+
   $('#SHOWTRAK_CLIENT_EDITOR_SAVE')
     .off('click')
     .on('click', async () => {
@@ -783,6 +801,71 @@ async function OpenClientEditor(UUID) {
     });
 
   $('#SHOWTRAK_CLIENT_EDITOR').modal('show');
+}
+
+async function OpenClientReplacementModal(Client) {
+  if (!Client || !Client.UUID) return;
+  const currentUUID = String(Client.UUID);
+  const currentName = Client.Nickname || Client.Hostname || currentUUID;
+  const candidates = (Array.isArray(PendingAdoption) ? PendingAdoption : []).filter(
+    (Device) => Device && Device.UUID && String(Device.UUID) !== currentUUID
+  );
+
+  $('#CLIENT_REPLACE_MODAL_TITLE').text(`Replace ${currentName}`);
+
+  if (!candidates.length) {
+    $('#CLIENT_REPLACE_LIST').html(`
+      <div class="rounded-3 p-3 bg-ghost text-muted text-center">
+        No devices are pending adoption.
+      </div>
+    `);
+  } else {
+    let html = '';
+    for (const Device of candidates) {
+      const Name = Device.Hostname || 'Unknown Host';
+      const IP = Device.IP || 'Unknown IP';
+      const ReplacementUUID = String(Device.UUID);
+      html += `
+        <div class="SHOWTRAK_CLIENT_PENDING_ADOPTION rounded-3 d-flex justify-content-between align-items-center p-3">
+          <div class="text-start">
+            <h6 class="mb-1">${Safe(Name)}</h6>
+            <small class="text-sm text-light">${Safe(IP)}</small>
+          </div>
+          <button
+            type="button"
+            class="btn btn-sm btn-warning SHOWTRAK_BTN_ROUNDED REPLACE_CLIENT_BTN"
+            data-current-uuid="${Safe(currentUUID)}"
+            data-replacement-uuid="${Safe(ReplacementUUID)}"
+          >
+            Replace
+          </button>
+        </div>
+      `;
+    }
+    $('#CLIENT_REPLACE_LIST').html(html);
+  }
+
+  $('#CLIENT_REPLACE_LIST')
+    .off('click.replace', '.REPLACE_CLIENT_BTN')
+    .on('click.replace', '.REPLACE_CLIENT_BTN', async function () {
+      const CurrentUUID = String($(this).attr('data-current-uuid') || '').trim();
+      const ReplacementUUID = String($(this).attr('data-replacement-uuid') || '').trim();
+      if (!CurrentUUID || !ReplacementUUID) return;
+
+      $('#CLIENT_REPLACE_LIST .REPLACE_CLIENT_BTN').prop('disabled', true);
+      const [Err] = await window.API.ReplaceClient(CurrentUUID, ReplacementUUID);
+      if (Err) {
+        await Notify(String(Err), 'error');
+        $('#CLIENT_REPLACE_LIST .REPLACE_CLIENT_BTN').prop('disabled', false);
+        return;
+      }
+
+      await CloseAllModals();
+      await Notify('Client replaced successfully', 'success');
+    });
+
+  await CloseAllModals();
+  $('#SHOWTRAK_MODAL_CLIENT_REPLACE').modal('show');
 }
 
 async function AdoptDevice(UUID) {
@@ -925,14 +1008,13 @@ function RenderUpdateManagerReleaseBadge() {
     UpdateManagerReleaseStatus && UpdateManagerReleaseStatus.ReleaseVersion
       ? String(UpdateManagerReleaseStatus.ReleaseVersion)
       : '';
-  const isDownloaded =
-    !!(
-      selectedTag &&
-      downloadedTag &&
-      selectedTag === downloadedTag &&
-      UpdateManagerReleaseStatus &&
-      UpdateManagerReleaseStatus.Ready
-    );
+  const isDownloaded = !!(
+    selectedTag &&
+    downloadedTag &&
+    selectedTag === downloadedTag &&
+    UpdateManagerReleaseStatus &&
+    UpdateManagerReleaseStatus.Ready
+  );
 
   const $badge = $('#UPDATE_MANAGER_RELEASE_BADGE');
   if (!$badge.length) return;
@@ -964,7 +1046,8 @@ function RenderUpdateManagerReleaseOptions() {
 
   $select.html(html);
 
-  const targetTag = UpdateManagerSelectedReleaseTag || downloadedTag || (options[0] && options[0].tag) || '';
+  const targetTag =
+    UpdateManagerSelectedReleaseTag || downloadedTag || (options[0] && options[0].tag) || '';
   if (targetTag) {
     $select.val(targetTag);
     UpdateManagerSelectedReleaseTag = String($select.val() || targetTag);
@@ -988,14 +1071,13 @@ function ApplyUpdateManagerButtonLocks() {
   const selectedTag = GetSelectedUpdateManagerReleaseTag();
   UpdateManagerSelectedReleaseTag = selectedTag;
   const SelectedTargets = GetSelectedUpdateManagerDeployTargets();
-  const HasReadyBuild =
-    !!(
-      UpdateManagerReleaseStatus &&
-      UpdateManagerReleaseStatus.Ready &&
-      UpdateManagerReleaseStatus.ReleaseVersion &&
-      selectedTag &&
-      String(UpdateManagerReleaseStatus.ReleaseVersion) === selectedTag
-    );
+  const HasReadyBuild = !!(
+    UpdateManagerReleaseStatus &&
+    UpdateManagerReleaseStatus.Ready &&
+    UpdateManagerReleaseStatus.ReleaseVersion &&
+    selectedTag &&
+    String(UpdateManagerReleaseStatus.ReleaseVersion) === selectedTag
+  );
   const DisableDeploy =
     UpdateManagerDownloadInProgress ||
     UpdateManagerRunning ||
@@ -1049,7 +1131,11 @@ function RenderUpdateManagerClientList() {
     }
 
     const StatusText = Safe(
-      IsSelectable ? (Online ? GetUpdateStatusText(Execution) : eligibility.reason) : eligibility.reason
+      IsSelectable
+        ? Online
+          ? GetUpdateStatusText(Execution)
+          : eligibility.reason
+        : eligibility.reason
     );
 
     html += `
@@ -1125,7 +1211,8 @@ async function RefreshUpdateManagerStatus() {
 
   UpdateManagerReleaseStatus = Status || null;
   const Version = Status && Status.ReleaseVersion ? Status.ReleaseVersion : 'none downloaded';
-  const DownloadedAt = Status && Status.DownloadedAt ? new Date(Status.DownloadedAt).toLocaleString() : null;
+  const DownloadedAt =
+    Status && Status.DownloadedAt ? new Date(Status.DownloadedAt).toLocaleString() : null;
 
   $('#UPDATE_MANAGER_RELEASE').text(`Release: ${Version}`);
   $('#UPDATE_MANAGER_STATUS').text(

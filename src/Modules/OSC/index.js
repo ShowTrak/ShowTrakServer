@@ -274,7 +274,9 @@ OSC.CreateRoute(
     const UUIDs = GroupClients.map((Client) => Client.UUID);
     addSelectedUUIDs(UUIDs);
     Broadcast.emit('OSCBulkAction', 'Select', UUIDs, null);
-    return successResult(`Selected ${UUIDs.length} clients in group "${Group.Title}" (${Group.GroupID})`);
+    return successResult(
+      `Selected ${UUIDs.length} clients in group "${Group.Title}" (${Group.GroupID})`
+    );
   },
   'Select all members of a Group by its Group ID'
 );

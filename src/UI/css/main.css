@@ -2794,7 +2794,9 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   font-size: 1rem;
   padding: 3px 8px;
   border-radius: 6px;
-  transition: color 140ms ease, background 140ms ease;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
 }
 .group-manager-member-remove:hover {
   color: #dc3545;
@@ -2991,7 +2993,9 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  transition: color 150ms ease, background 150ms ease;
+  transition:
+    color 150ms ease,
+    background 150ms ease;
 }
 .script-manager-file-edit-btn:hover {
   color: #4aa3ff;
@@ -3007,7 +3011,10 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  transition: color 150ms ease, background 150ms ease, opacity 150ms ease;
+  transition:
+    color 150ms ease,
+    background 150ms ease,
+    opacity 150ms ease;
 }
 .script-manager-file-run-btn:hover {
   color: #8ce6a8;
@@ -3047,7 +3054,9 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   font-size: 1rem;
   padding: 4px 8px;
   border-radius: 6px;
-  transition: color 150ms ease, background 150ms ease;
+  transition:
+    color 150ms ease,
+    background 150ms ease;
 }
 .script-manager-delete-btn:hover {
   color: #dc3545;
@@ -3060,7 +3069,9 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   font-size: 1rem;
   padding: 4px 8px;
   border-radius: 6px;
-  transition: color 150ms ease, background 150ms ease;
+  transition:
+    color 150ms ease,
+    background 150ms ease;
 }
 .script-manager-folder-btn:hover {
   color: #4aa3ff;
@@ -3073,7 +3084,9 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   font-size: 1rem;
   padding: 4px 8px;
   border-radius: 6px;
-  transition: color 150ms ease, background 150ms ease;
+  transition:
+    color 150ms ease,
+    background 150ms ease;
 }
 .script-manager-create-btn:hover {
   color: #69d67d;
@@ -3086,7 +3099,10 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   font-size: 0.85rem;
   padding: 5px 10px;
   border-radius: 6px;
-  transition: color 150ms ease, background 150ms ease, border-color 150ms ease;
+  transition:
+    color 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease;
 }
 .script-manager-template-btn:hover {
   color: #ffffff;
@@ -3100,7 +3116,9 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   border: 3px solid transparent;
   cursor: pointer;
   flex: 0 0 30px;
-  transition: transform 120ms ease, border-color 120ms ease;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease;
 }
 .script-manager-swatch:hover {
   transform: scale(1.15);

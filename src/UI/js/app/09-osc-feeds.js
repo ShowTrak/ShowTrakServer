@@ -46,7 +46,9 @@ function RenderOscHttpDebugTerminal() {
       const icon = entry.valid ? '&#10003;' : '&#10005;';
       const protocol = EscapeHtml(String(entry.protocol || '').toUpperCase());
       const summary = EscapeHtml(entry.summary || 'Unknown request');
-      const detail = entry.detail ? `<span class="osc-http-debug-detail">${EscapeHtml(entry.detail)}</span>` : '';
+      const detail = entry.detail
+        ? `<span class="osc-http-debug-detail">${EscapeHtml(entry.detail)}</span>`
+        : '';
       return `
 		<div class="osc-http-debug-line ${stateClass}">
 			<div class="osc-http-debug-status">${icon}</div>
@@ -76,11 +78,14 @@ function RenderRouteEntry($Container, Route) {
 
 function normalizeMethods(Value) {
   if (Array.isArray(Value)) {
-    return Value.map((Method) => String(Method || '').trim().toUpperCase()).filter((Method) => Method);
+    return Value.map((Method) =>
+      String(Method || '')
+        .trim()
+        .toUpperCase()
+    ).filter((Method) => Method);
   }
   if (typeof Value === 'string') {
-    return Value
-      .split(',')
+    return Value.split(',')
       .map((Method) => Method.trim().toUpperCase())
       .filter((Method) => Method);
   }
@@ -89,7 +94,9 @@ function normalizeMethods(Value) {
 
 function formatRoutePath(PathValue) {
   let PathFiller = '';
-  for (const Segment of String(PathValue || '').split('/').filter((s) => s.length > 0)) {
+  for (const Segment of String(PathValue || '')
+    .split('/')
+    .filter((s) => s.length > 0)) {
     PathFiller += `<span>/</span>`;
     if (Segment.startsWith(':')) {
       PathFiller += `<span class="text-info">[${Safe(Segment.substring(1))}]</span>`;
@@ -127,25 +134,23 @@ function renderProtocolRows(Protocol, Routes) {
     return `<div class="osc-action-route-unavailable">Unavailable</div>`;
   }
 
-  return Items
-    .map((Route) => {
-      const Methods = normalizeMethods(Route.Methods)
-        .filter((Method) => Method !== 'OSC')
-        .join(', ');
-      const MethodLabel =
-        Protocol === 'HTTP' && Methods
-          ? `<div class="osc-action-route-methods">${Safe(Methods)}</div>`
-          : '';
-      const QueryRows = Protocol === 'HTTP' ? renderQueryRows(Route) : '';
-      return `
+  return Items.map((Route) => {
+    const Methods = normalizeMethods(Route.Methods)
+      .filter((Method) => Method !== 'OSC')
+      .join(', ');
+    const MethodLabel =
+      Protocol === 'HTTP' && Methods
+        ? `<div class="osc-action-route-methods">${Safe(Methods)}</div>`
+        : '';
+    const QueryRows = Protocol === 'HTTP' ? renderQueryRows(Route) : '';
+    return `
         <div class="osc-action-route-row">
           ${MethodLabel}
           <code class="bg-ghost rounded p-2 osc-route-path">${formatRoutePath(Route.Path)}</code>
           ${QueryRows}
         </div>
       `;
-    })
-    .join('');
+  }).join('');
 }
 
 function renderActionGroup($Container, Group) {
@@ -277,7 +282,9 @@ window.API.SetOSCList(async (Routes) => {
   const ActionGroups = new Map();
 
   for (const Route of UnifiedRoutes) {
-    const Key = String(Route.Title || Route.Path || '').trim().toLowerCase();
+    const Key = String(Route.Title || Route.Path || '')
+      .trim()
+      .toLowerCase();
     if (!ActionGroups.has(Key)) {
       ActionGroups.set(Key, {
         Title: Route.Title || Route.Path,

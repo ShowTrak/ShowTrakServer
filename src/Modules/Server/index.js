@@ -39,9 +39,9 @@ app.use('/API', (req, res, next) => {
   res.on('finish', () => {
     const statusCode = Number(res.statusCode || 0);
     const sourceIP =
-      (req.ip ||
-        (req.socket && req.socket.remoteAddress) ||
-        (req.connection && req.connection.remoteAddress)) ||
+      req.ip ||
+      (req.socket && req.socket.remoteAddress) ||
+      (req.connection && req.connection.remoteAddress) ||
       null;
 
     const detailParts = [];
@@ -91,7 +91,9 @@ function computeStatus(Entity) {
 }
 
 function canonicalizeTypeFilter(Value) {
-  const Normalized = String(Value || '').trim().toUpperCase();
+  const Normalized = String(Value || '')
+    .trim()
+    .toUpperCase();
   if (!Normalized) return null;
   if (Normalized === 'REMOTE') return 'Remote';
   if (Normalized === 'MONITORING' || Normalized === 'MONITOR') return 'Monitoring';
@@ -112,7 +114,9 @@ const ClientsListHandler = async (req, res) => {
     .trim()
     .toLowerCase();
 
-  const RawStatusFilter = String((req.query && req.query.Status) || '').trim().toUpperCase();
+  const RawStatusFilter = String((req.query && req.query.Status) || '')
+    .trim()
+    .toUpperCase();
   const HasStatusFilter = RawStatusFilter.length > 0;
   const AllowedStatuses = new Set(['IDLE', 'OFFLINE', 'DEGRADED', 'ONLINE']);
   if (HasStatusFilter && !AllowedStatuses.has(RawStatusFilter)) {
@@ -130,12 +134,7 @@ const ClientsListHandler = async (req, res) => {
   const [ClientsErr, Clients] = await ClientManager.GetAll();
   if (ClientsErr) {
     res.locals.debugTrafficDetail = 'Failed to fetch remote clients';
-    return sendApiError(
-      res,
-      500,
-      'REMOTE_CLIENTS_FETCH_FAILED',
-      'Failed to fetch remote clients'
-    );
+    return sendApiError(res, 500, 'REMOTE_CLIENTS_FETCH_FAILED', 'Failed to fetch remote clients');
   }
 
   const [TargetsErr, Targets] = await MonitoringTargetManager.GetAll();
@@ -152,12 +151,7 @@ const ClientsListHandler = async (req, res) => {
   const [DummiesErr, Dummies] = await DummyClientManager.GetAll();
   if (DummiesErr) {
     res.locals.debugTrafficDetail = 'Failed to fetch dummy clients';
-    return sendApiError(
-      res,
-      500,
-      'DUMMY_CLIENTS_FETCH_FAILED',
-      'Failed to fetch dummy clients'
-    );
+    return sendApiError(res, 500, 'DUMMY_CLIENTS_FETCH_FAILED', 'Failed to fetch dummy clients');
   }
 
   const RemoteEntities = (Clients || []).map((Client) => ({
@@ -183,7 +177,10 @@ const ClientsListHandler = async (req, res) => {
   const Results = [...RemoteEntities, ...MonitoringEntities, ...DummyEntities].filter((Entity) => {
     if (TypeFilter && Entity.Type !== TypeFilter) return false;
     if (HasGroupIDFilter && Number(Entity.GroupID) !== GroupIDFilter) return false;
-    if (OperatingSystemFilter && String(Entity.OperatingSystem || '').toLowerCase() !== OperatingSystemFilter) {
+    if (
+      OperatingSystemFilter &&
+      String(Entity.OperatingSystem || '').toLowerCase() !== OperatingSystemFilter
+    ) {
       return false;
     }
     if (HasStatusFilter && Entity.Status !== RawStatusFilter) return false;
@@ -209,9 +206,9 @@ for (const Route of OSC.GetRoutes()) {
   const OSCToHTTPHandler = async (req, res) => {
     const Params = req.params || {};
     const SourceIP =
-      (req.ip ||
-        (req.socket && req.socket.remoteAddress) ||
-        (req.connection && req.connection.remoteAddress)) ||
+      req.ip ||
+      (req.socket && req.socket.remoteAddress) ||
+      (req.connection && req.connection.remoteAddress) ||
       null;
 
     let Result = null;
@@ -219,16 +216,13 @@ for (const Route of OSC.GetRoutes()) {
       Result = await Route.Callback(Params, { IP: SourceIP });
     } catch (Error) {
       const Message = String(
-        (Error && Error.message) ||
-          Error ||
-          `Unhandled error while processing ${Route.Path}`
+        (Error && Error.message) || Error || `Unhandled error while processing ${Route.Path}`
       );
       res.locals.debugTrafficDetail = Message;
       return sendApiError(res, 500, 'OSC_HTTP_HANDLER_EXCEPTION', Message);
     }
 
-    const Passed =
-      Result && typeof Result === 'object' ? Result.ok !== false : Result !== false;
+    const Passed = Result && typeof Result === 'object' ? Result.ok !== false : Result !== false;
     const Detail =
       Result && typeof Result === 'object' && Result.detail
         ? String(Result.detail)
@@ -251,7 +245,6 @@ app.use('/API', (_req, res) => {
   res.locals.debugTrafficDetail = 'API route not found';
   return sendApiError(res, 404, 'API_ROUTE_NOT_FOUND', 'API route not found');
 });
-
 
 const ScriptDirectory = AppDataManager.GetScriptsDirectory();
 app.use(express.static(ScriptDirectory));
@@ -301,9 +294,7 @@ Manager.ExecuteScripts = async (ScriptID, Targets, ResetList) => {
           : null;
       Summary.failed.push({
         UUID,
-        message:
-          (Request && Request.Error) ||
-          'Script was blocked before dispatch',
+        message: (Request && Request.Error) || 'Script was blocked before dispatch',
       });
       continue;
     }
@@ -318,9 +309,10 @@ Manager.ExecuteBulkRequest = async (Action, Targets, ReadableName, Options = {})
   if (!ReadableName) ReadableName = Action;
   const ResetQueue =
     !Options || typeof Options.resetQueue === 'undefined' ? true : !!Options.resetQueue;
-  const Payload = Options && Object.prototype.hasOwnProperty.call(Options, 'payload')
-    ? Options.payload
-    : undefined;
+  const Payload =
+    Options && Object.prototype.hasOwnProperty.call(Options, 'payload')
+      ? Options.payload
+      : undefined;
   if (ResetQueue) await ScriptExecutionManager.ClearQueue();
   for (const UUID of Targets) {
     await Wait(150);

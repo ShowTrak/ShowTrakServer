@@ -201,12 +201,12 @@
         const isInternal = !!(addr && addr.internal);
         const isActive = inferAddressActive(addr);
         cards.push(
-          `<article class="net-iface-card${isActive ? '' : ' inactive'}">`
-            + `${isInternal ? '<span class="net-iface-badge">Internal Only</span>' : ''}`
-            + `<div class="net-iface-name">${safe(ifaceName)}</div>`
-            + `<div class="net-iface-ip">${safe(ip)}</div>`
-            + `<div class="net-iface-meta"><div>${safe(mask)}</div><div>${safe(mac)}</div></div>`
-          + '</article>'
+          `<article class="net-iface-card${isActive ? '' : ' inactive'}">` +
+            `${isInternal ? '<span class="net-iface-badge">Internal Only</span>' : ''}` +
+            `<div class="net-iface-name">${safe(ifaceName)}</div>` +
+            `<div class="net-iface-ip">${safe(ip)}</div>` +
+            `<div class="net-iface-meta"><div>${safe(mask)}</div><div>${safe(mac)}</div></div>` +
+            '</article>'
         );
       }
     }
@@ -482,7 +482,13 @@
       Array.isArray(D.DegradedWarnings) && D.DegradedWarnings.length
         ? String(D.DegradedWarnings[0])
         : 'Missed Heartbeat';
-    const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : State === 'IDLE' ? 'IDLE' : '';
+    const TileStateClass = Degraded
+      ? 'DEGRADED'
+      : Online
+        ? 'ONLINE'
+        : State === 'IDLE'
+          ? 'IDLE'
+          : '';
     let StatusHtml;
     if (State === 'IDLE') {
       StatusHtml = `<h7 class="mb-0 text-light" data-type="DUMMY_STATUS_LABEL">Idle</h7>`;
@@ -717,7 +723,11 @@
     const c = clients.find((x) => x.UUID === detailUUID);
     if (!c) return;
     el.detailName.textContent = c.Nickname || c.Hostname || c.UUID;
-    const statusText = c.Online ? (c.Degraded ? 'Degraded' : 'Online') : `Offline · ${timeAgo(c.LastSeen)}`;
+    const statusText = c.Online
+      ? c.Degraded
+        ? 'Degraded'
+        : 'Online'
+      : `Offline · ${timeAgo(c.LastSeen)}`;
     el.detailStatus.textContent = statusText;
     el.detailStatus.classList.toggle('online', !!c.Online && !c.Degraded);
     el.detailStatus.classList.toggle('degraded', !!c.Online && !!c.Degraded);
@@ -732,14 +742,17 @@
       el.ramBar.style.width = ram + '%';
       el.cpuPct.textContent = Math.round(cpu) + '%';
       // RAM label: used/total (pct%) when byte counts are available
-      const ramUsed = c.Vitals && c.Vitals.Ram && c.Vitals.Ram.Used != null ? c.Vitals.Ram.Used : null;
-      const ramTotal = c.Vitals && c.Vitals.Ram && c.Vitals.Ram.Total != null ? c.Vitals.Ram.Total : null;
+      const ramUsed =
+        c.Vitals && c.Vitals.Ram && c.Vitals.Ram.Used != null ? c.Vitals.Ram.Used : null;
+      const ramTotal =
+        c.Vitals && c.Vitals.Ram && c.Vitals.Ram.Total != null ? c.Vitals.Ram.Total : null;
       if (ramUsed != null && ramTotal != null) {
         const usedStr = FormatBytes(ramUsed);
         const totalStr = FormatBytes(ramTotal);
-        el.ramPct.textContent = (usedStr && totalStr)
-          ? `${usedStr} / ${totalStr} (${Math.round(ram)}%)`
-          : `${Math.round(ram)}%`;
+        el.ramPct.textContent =
+          usedStr && totalStr
+            ? `${usedStr} / ${totalStr} (${Math.round(ram)}%)`
+            : `${Math.round(ram)}%`;
       } else {
         el.ramPct.textContent = Math.round(ram) + '%';
       }
@@ -773,24 +786,28 @@
     if (usb.length === 0) {
       el.usbList.innerHTML = '<div class="device-card-empty">No USB devices reported.</div>';
     } else {
-      el.usbList.innerHTML = usb.map((d) => {
-        const name = (`${d.ManufacturerName || ''} ${d.ProductName || ''}`).trim() || 'USB Device';
-        const serial = d.SerialNumber && String(d.SerialNumber).trim()
-          ? String(d.SerialNumber).trim() : null;
-        const isCritical = !!d.IsCritical;
-        const isConnected = d.IsConnected !== false;
-        let badges = '';
-        if (isCritical && !isConnected) {
-          badges = '<div class="device-card-badges"><span class="device-badge badge-critical-missing"><i class="bi bi-x-circle-fill"></i> Disconnected Critical</span></div>';
-        } else if (isCritical) {
-          badges = '<div class="device-card-badges"><span class="device-badge badge-critical"><i class="bi bi-check-circle-fill"></i> Critical</span></div>';
-        }
-        return `<div class="device-card">
+      el.usbList.innerHTML = usb
+        .map((d) => {
+          const name = `${d.ManufacturerName || ''} ${d.ProductName || ''}`.trim() || 'USB Device';
+          const serial =
+            d.SerialNumber && String(d.SerialNumber).trim() ? String(d.SerialNumber).trim() : null;
+          const isCritical = !!d.IsCritical;
+          const isConnected = d.IsConnected !== false;
+          let badges = '';
+          if (isCritical && !isConnected) {
+            badges =
+              '<div class="device-card-badges"><span class="device-badge badge-critical-missing"><i class="bi bi-x-circle-fill"></i> Disconnected Critical</span></div>';
+          } else if (isCritical) {
+            badges =
+              '<div class="device-card-badges"><span class="device-badge badge-critical"><i class="bi bi-check-circle-fill"></i> Critical</span></div>';
+          }
+          return `<div class="device-card">
           <div class="device-card-name">${safe(name)}</div>
           <div class="device-card-sub">${serial ? safe(serial) : 'Serial unavailable'}</div>
           ${badges}
         </div>`;
-      }).join('');
+        })
+        .join('');
     }
 
     // Network interfaces
@@ -798,11 +815,15 @@
 
     // Running applications — card layout matching desktop modal (read-only, no critical toggle)
     const apps = Array.isArray(c.RunningApplications && c.RunningApplications.Items)
-      ? c.RunningApplications.Items : [];
+      ? c.RunningApplications.Items
+      : [];
     const appStatus = (c.RunningApplications && c.RunningApplications.Status) || {};
-    const appStatusState = typeof appStatus.State === 'string' ? appStatus.State.trim().toLowerCase() : 'unknown';
-    const appStatusMsg = typeof appStatus.Message === 'string' && appStatus.Message.trim()
-      ? appStatus.Message.trim() : null;
+    const appStatusState =
+      typeof appStatus.State === 'string' ? appStatus.State.trim().toLowerCase() : 'unknown';
+    const appStatusMsg =
+      typeof appStatus.Message === 'string' && appStatus.Message.trim()
+        ? appStatus.Message.trim()
+        : null;
 
     let appsHtml = '';
     if (appStatusState === 'permission_denied' || appStatusState === 'error') {
@@ -814,21 +835,25 @@
     if (apps.length === 0) {
       appsHtml += '<div class="device-card-empty">No applications reported.</div>';
     } else {
-      appsHtml += apps.map((app) => {
-        const name = app && app.Name ? String(app.Name) : 'Unknown Application';
-        const isCritical = !!app.IsCritical;
-        const isRunning = app.IsRunning !== false;
-        let badges = '';
-        if (isCritical && !isRunning) {
-          badges = '<div class="device-card-badges"><span class="device-badge badge-critical-missing"><i class="bi bi-x-circle-fill"></i> Not Running</span></div>';
-        } else if (isCritical) {
-          badges = '<div class="device-card-badges"><span class="device-badge badge-critical"><i class="bi bi-check-circle-fill"></i> Critical</span></div>';
-        }
-        return `<div class="device-card">
+      appsHtml += apps
+        .map((app) => {
+          const name = app && app.Name ? String(app.Name) : 'Unknown Application';
+          const isCritical = !!app.IsCritical;
+          const isRunning = app.IsRunning !== false;
+          let badges = '';
+          if (isCritical && !isRunning) {
+            badges =
+              '<div class="device-card-badges"><span class="device-badge badge-critical-missing"><i class="bi bi-x-circle-fill"></i> Not Running</span></div>';
+          } else if (isCritical) {
+            badges =
+              '<div class="device-card-badges"><span class="device-badge badge-critical"><i class="bi bi-check-circle-fill"></i> Critical</span></div>';
+          }
+          return `<div class="device-card">
           <div class="device-card-name">${safe(name)}</div>
           ${badges}
         </div>`;
-      }).join('');
+        })
+        .join('');
     }
     el.appsList.innerHTML = appsHtml;
 
@@ -877,8 +902,14 @@
       return;
     }
     const COLOURS = [
-      '#e74c3c','#e67e22','#f1c40f','#2ecc71',
-      '#3498db','#9b59b6','#bdc3c7','#7f8c8d',
+      '#e74c3c',
+      '#e67e22',
+      '#f1c40f',
+      '#2ecc71',
+      '#3498db',
+      '#9b59b6',
+      '#bdc3c7',
+      '#7f8c8d',
     ];
     el.scriptsList.innerHTML = '';
     for (const s of list) {

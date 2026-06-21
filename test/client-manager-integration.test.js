@@ -177,7 +177,10 @@ test('ClientManager updates system info, USB devices, and network interfaces', a
   assert.equal(removeErr, null);
   [, withUsb] = await Manager.Get('dev-1');
   assert.equal(withUsb.USBDeviceList.length, 1);
-  assert.equal(withUsb.USBDeviceList.some((d) => d.SerialNumber === 'S2'), false);
+  assert.equal(
+    withUsb.USBDeviceList.some((d) => d.SerialNumber === 'S2'),
+    false
+  );
 
   // Connect + disconnect each broadcast a device event (audio/alerts are handled
   // downstream by the alerts system, not by ClientManager directly).
@@ -258,4 +261,91 @@ test('ClientManager.Timeout marks a client offline', async () => {
 
   // Timeout on a missing client is a no-op (no throw).
   await Manager.Timeout('does-not-exist');
+});
+
+test('ClientManager.ReplaceClient migrates settings and UUID references', async () => {
+  const { Manager, DB } = await loadClientManager();
+
+  await Manager.Create('legacy-client');
+  const [, legacy] = await Manager.Get('legacy-client');
+  await legacy.SetNickname('Front Desk');
+  await legacy.SetGroupID(12);
+  await legacy.SetWeight(55);
+  await legacy.SetHostname('custom-host');
+
+  await Manager.SetUSBDeviceList('legacy-client', [
+    {
+      SerialNumber: 'ABC123',
+      ManufacturerName: 'Test',
+      ProductName: 'Drive',
+    },
+  ]);
+  await Manager.MarkUSBDeviceCritical('legacy-client', { SerialNumber: 'ABC123' });
+  await Manager.MarkApplicationCritical('legacy-client', { Name: 'Spotify' });
+
+  const scope = {
+    Workspace: false,
+    Groups: [],
+    Clients: ['legacy-client'],
+  };
+  const actions = [
+    {
+      Type: 'http-api',
+      Settings: {
+        Route: '/test',
+        UUID: 'legacy-client',
+      },
+    },
+  ];
+  const [ruleInsertErr] = await DB.Run(
+    'INSERT INTO AlertRules (Title, Scope, TriggerType, TriggerConfig, Actions, Enabled, Timestamp, UpdatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      'Replace Rule',
+      JSON.stringify(scope),
+      'CLIENT_OFFLINE',
+      JSON.stringify({}),
+      JSON.stringify(actions),
+      1,
+      Date.now(),
+      Date.now(),
+    ]
+  );
+  assert.equal(ruleInsertErr, null);
+
+  const [replaceErr] = await Manager.ReplaceClient('legacy-client', 'replacement-client');
+  assert.equal(replaceErr, null);
+
+  assert.equal(await Manager.Exists('legacy-client'), false);
+  assert.equal(await Manager.Exists('replacement-client'), true);
+
+  const [, replacement] = await Manager.Get('replacement-client');
+  assert.equal(replacement.Nickname, 'Front Desk');
+  assert.equal(replacement.GroupID, 12);
+  assert.equal(replacement.Weight, 55);
+  assert.equal(replacement.Hostname, 'custom-host');
+
+  assert.deepEqual(await Manager.IsUSBDeviceCritical('replacement-client', 'ABC123'), [null, true]);
+  assert.deepEqual(await Manager.IsApplicationCritical('replacement-client', 'Spotify'), [
+    null,
+    true,
+  ]);
+
+  const [, updatedRuleRow] = await DB.Get('SELECT Scope, Actions FROM AlertRules WHERE Title = ?', [
+    'Replace Rule',
+  ]);
+  const updatedScope = JSON.parse(updatedRuleRow.Scope);
+  const updatedActions = JSON.parse(updatedRuleRow.Actions);
+  assert.ok(updatedScope.Clients.includes('replacement-client'));
+  assert.ok(!updatedScope.Clients.includes('legacy-client'));
+  assert.equal(updatedActions[0].Settings.UUID, 'replacement-client');
+});
+
+test('ClientManager.ReplaceClient rejects replacing an online client', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.Create('online-client');
+  const [, online] = await Manager.Get('online-client');
+  online.SetOnline(true);
+
+  const [replaceErr] = await Manager.ReplaceClient('online-client', 'replacement-client');
+  assert.match(String(replaceErr), /offline/i);
 });

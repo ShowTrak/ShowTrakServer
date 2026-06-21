@@ -51,7 +51,12 @@ function NormalizeClientPlatformKey(Client) {
   if (!Raw) return null;
   if (Raw.includes('win')) return 'Windows';
   if (Raw.includes('mac') || Raw.includes('darwin') || Raw.includes('os x')) return 'macOS';
-  if (Raw.includes('linux') || Raw.includes('ubuntu') || Raw.includes('debian') || Raw.includes('raspbian')) {
+  if (
+    Raw.includes('linux') ||
+    Raw.includes('ubuntu') ||
+    Raw.includes('debian') ||
+    Raw.includes('raspbian')
+  ) {
     return 'Linux';
   }
   return null;
@@ -64,7 +69,8 @@ function ResolveDispatchBlockReason(Script, Client) {
   }
 
   const Platforms = Script && Script.Platforms ? Script.Platforms : {};
-  const PlatformPath = typeof Platforms[PlatformKey] === 'string' ? Platforms[PlatformKey].trim() : '';
+  const PlatformPath =
+    typeof Platforms[PlatformKey] === 'string' ? Platforms[PlatformKey].trim() : '';
   if (!PlatformPath) {
     return `No ${PlatformKey} script is configured for this script.`;
   }

@@ -378,9 +378,21 @@ function sendAppMenuAction(actionID) {
 
 function buildMacAppMenuTemplate() {
   const fileSubmenu = [
-    { label: 'New Show', accelerator: 'CmdOrCtrl+N', click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_NEW') },
-    { label: 'Open', accelerator: 'CmdOrCtrl+O', click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_OPEN') },
-    { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_SAVE') },
+    {
+      label: 'New Show',
+      accelerator: 'CmdOrCtrl+N',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_NEW'),
+    },
+    {
+      label: 'Open',
+      accelerator: 'CmdOrCtrl+O',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_OPEN'),
+    },
+    {
+      label: 'Save',
+      accelerator: 'CmdOrCtrl+S',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_SAVE'),
+    },
     {
       label: 'Save As',
       accelerator: 'CmdOrCtrl+Shift+S',
@@ -398,7 +410,10 @@ function buildMacAppMenuTemplate() {
       click: () => ModeManager.Set('EDIT'),
     },
     { type: 'separator' },
-    { label: 'Open Logs Directory', click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_LOGSFOLDER') },
+    {
+      label: 'Open Logs Directory',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_LOGSFOLDER'),
+    },
     {
       label: 'Open Scripts Directory',
       click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_SCRIPTSFOLDER'),
@@ -560,7 +575,10 @@ async function GetAllAdoptedClientUUIDs() {
 async function MarkDeploymentFailedForTargets(Targets, ErrorMessage) {
   await ScriptExecutionManager.ClearQueue();
   for (const UUID of Targets) {
-    const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, 'Deploying Scripts');
+    const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(
+      UUID,
+      'Deploying Scripts'
+    );
     if (!RequestID) continue;
     await ScriptExecutionManager.Complete(RequestID, ErrorMessage);
   }
@@ -650,7 +668,9 @@ async function TriggerScriptDeployment(TargetUUIDs, Reason = 'manual') {
     ActiveScriptDeployment.serverFingerprint === DeploymentTargetInfo.serverFingerprint;
 
   if (IsSameDeploymentSession) {
-    const AdditionalTargets = DeployTargets.filter((UUID) => !ActiveScriptDeployment.targets.has(UUID));
+    const AdditionalTargets = DeployTargets.filter(
+      (UUID) => !ActiveScriptDeployment.targets.has(UUID)
+    );
     if (AdditionalTargets.length === 0) {
       Logger.log('Skipping duplicate in-flight deployment dispatch', {
         reason: Reason,
@@ -659,9 +679,14 @@ async function TriggerScriptDeployment(TargetUUIDs, Reason = 'manual') {
       });
       return;
     }
-    await ServerManager.ExecuteBulkRequest('UpdateScripts', AdditionalTargets, 'Deploying Scripts', {
-      resetQueue: false,
-    });
+    await ServerManager.ExecuteBulkRequest(
+      'UpdateScripts',
+      AdditionalTargets,
+      'Deploying Scripts',
+      {
+        resetQueue: false,
+      }
+    );
     AdditionalTargets.forEach((UUID) => ActiveScriptDeployment.targets.add(UUID));
     return;
   }
@@ -1126,7 +1151,10 @@ app.whenReady().then(async () => {
       Array.from(new Set(ParsedGroupIDs.filter((GroupID) => GroupID !== null)))
     );
     if (!Result.ok) {
-      return [Result.errors && Result.errors[0] ? Result.errors[0] : 'Failed to reorder groups', null];
+      return [
+        Result.errors && Result.errors[0] ? Result.errors[0] : 'Failed to reorder groups',
+        null,
+      ];
     }
     return [null, true];
   });
@@ -1603,7 +1631,8 @@ app.whenReady().then(async () => {
     if (!Sample) return ['Template not found', null];
     const Result = await ScriptManager.CreateFromTemplate(Sample, DesiredID);
     if (!Result.ok) {
-      const Message = Result.errors && Result.errors[0] ? Result.errors[0] : 'Failed to create script';
+      const Message =
+        Result.errors && Result.errors[0] ? Result.errors[0] : 'Failed to create script';
       return [Message, Result];
     }
     return [null, Result];
@@ -1712,6 +1741,38 @@ app.whenReady().then(async () => {
     let [DeleteErr, _DeleteResult] = await ClientManager.Delete(UUID);
     if (DeleteErr) return [DeleteErr, null];
     await UpdateFullClientList();
+    return [null, true];
+  });
+
+  RPC.handle('ReplaceClient', async (_event, CurrentUUID, ReplacementUUID) => {
+    try {
+      CurrentUUID = IPCValidation.UUID(CurrentUUID, 'CurrentUUID');
+      ReplacementUUID = IPCValidation.UUID(ReplacementUUID, 'ReplacementUUID');
+    } catch (error) {
+      return validationErrorTuple(error, false);
+    }
+
+    if (CurrentUUID === ReplacementUUID) {
+      return ['Replacement client must be different', null];
+    }
+
+    const Pending = AdoptionManager.GetClientsPendingAdoption();
+    const ReplacementPending = Array.isArray(Pending)
+      ? Pending.find((Device) => String(Device && Device.UUID) === ReplacementUUID)
+      : null;
+    if (!ReplacementPending) {
+      return ['Replacement device is no longer pending adoption', null];
+    }
+
+    const [ReplaceErr] = await ClientManager.ReplaceClient(CurrentUUID, ReplacementUUID);
+    if (ReplaceErr) return [ReplaceErr, null];
+
+    await AlertsManager.Reload();
+
+    await AdoptionManager.SetState(ReplacementUUID, 'Adopting');
+    await ServerManager.SendMessageByGroup(ReplacementUUID, 'Adopt');
+    await TriggerScriptDeployment([ReplacementUUID], 'client-replaced');
+
     return [null, true];
   });
 

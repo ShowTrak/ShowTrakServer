@@ -51,7 +51,8 @@ function loadOSC(overrides = {}) {
     },
     '../GroupManager': {
       Manager: {
-        Get: async (id) => (Number(id) === 1 ? [null, { GroupID: 1, Title: 'Main' }] : [null, null]),
+        Get: async (id) =>
+          Number(id) === 1 ? [null, { GroupID: 1, Title: 'Main' }] : [null, null],
       },
     },
     '../DummyClientManager': {

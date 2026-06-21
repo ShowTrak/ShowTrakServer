@@ -165,7 +165,11 @@ test('ScriptManager loads script folders and computes file checksums', async () 
     JSON.stringify({ Name: 'My Script', Type: 'Action', Path: 'run.sh', Enabled: true }),
     'utf8'
   );
-  fs.writeFileSync(path.join(invalidDotFolderDir, 'Script.json'), JSON.stringify({ Name: 'Ignored Dot' }), 'utf8');
+  fs.writeFileSync(
+    path.join(invalidDotFolderDir, 'Script.json'),
+    JSON.stringify({ Name: 'Ignored Dot' }),
+    'utf8'
+  );
   fs.writeFileSync(
     path.join(invalidSpacedFolderDir, 'Script.json'),
     JSON.stringify({ Name: 'Ignored Spaced' }),

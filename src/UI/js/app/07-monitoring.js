@@ -128,7 +128,8 @@ function ResolveMonitorHistoryContextEntity() {
 function IsMonitorHistoryContextFor(entityType, id) {
   if (!MonitorHistoryModalContext || MonitorHistoryModalContext.type !== entityType) return false;
   if (entityType === 'target') return Number(MonitorHistoryModalContext.id) === Number(id);
-  if (entityType === 'dummy') return String(MonitorHistoryModalContext.id || '') === String(id || '');
+  if (entityType === 'dummy')
+    return String(MonitorHistoryModalContext.id || '') === String(id || '');
   return false;
 }
 

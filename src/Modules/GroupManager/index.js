@@ -106,7 +106,10 @@ Manager.SetOrder = async (OrderedGroupIDs = []) => {
 
   let Weight = 10;
   for (const GroupID of FinalOrder) {
-    const [SetErr] = await DB.Run('UPDATE Groups SET Weight = ? WHERE GroupID = ?', [Weight, GroupID]);
+    const [SetErr] = await DB.Run('UPDATE Groups SET Weight = ? WHERE GroupID = ?', [
+      Weight,
+      GroupID,
+    ]);
     if (SetErr) {
       Logger.error(`Failed to update group weight while reordering (${GroupID}):`, SetErr);
       return { ok: false, errors: ['Failed to reorder groups'] };

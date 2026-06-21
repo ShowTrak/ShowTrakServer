@@ -130,7 +130,7 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
     const insertCall = runCalls.find(([sql]) => sql.includes('INSERT INTO MonitoringTargets'));
     assert.ok(insertCall);
     assert.equal(insertCall[1][3], Manager.MIN_INTERVAL_MS);
-    assert.equal(insertCall[1][4], 1);
+    assert.deepEqual(JSON.parse(insertCall[1][4]), { method: 'ping', Timeout: 555 });
 
     const firstScheduledTick = timers.find(
       (handle) => handle && !handle.cleared && typeof handle.cb === 'function'

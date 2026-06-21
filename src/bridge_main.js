@@ -44,6 +44,7 @@ const INVOKE_CHANNELS = new Set([
   'RemoveClientApplicationCritical',
   'ExecuteScript',
   'UnadoptClient',
+  'ReplaceClient',
   'DeleteScripts',
   'UpdateScripts',
   'Scripts:GetManagerList',
@@ -222,6 +223,8 @@ contextBridge.exposeInMainWorld('API', {
   ExecuteScript: async (Script, Targets, ResetList) =>
     invoke('ExecuteScript', Script, Targets, ResetList),
   UnadoptClient: async (UUID) => invoke('UnadoptClient', UUID),
+  ReplaceClient: async (CurrentUUID, ReplacementUUID) =>
+    invoke('ReplaceClient', CurrentUUID, ReplacementUUID),
   DeleteScripts: async (List) => invoke('DeleteScripts', List),
   UpdateScripts: async (List) => invoke('UpdateScripts', List),
   // Script Manager (config editing)
@@ -237,7 +240,8 @@ contextBridge.exposeInMainWorld('API', {
     invoke('Scripts:CreateFromTemplate', SampleID, DesiredID),
   OpenScriptFolder: async (ID) => invoke('Scripts:OpenFolder', ID),
   OpenScriptFile: async (ID, RelativeFilePath) => invoke('Scripts:OpenFile', ID, RelativeFilePath),
-  RunScriptFileLocal: async (ID, RelativeFilePath) => invoke('Scripts:RunLocalFile', ID, RelativeFilePath),
+  RunScriptFileLocal: async (ID, RelativeFilePath) =>
+    invoke('Scripts:RunLocalFile', ID, RelativeFilePath),
   // App update APIs
   CheckForAppUpdates: async () => invoke('AppUpdate:Check'),
   InstallAppUpdate: async () => invoke('AppUpdate:Install'),

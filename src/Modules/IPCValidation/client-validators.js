@@ -63,7 +63,10 @@ module.exports = function registerClientValidators(Manager) {
   };
 
   Manager.USBSerialNumber = (value, fieldName = 'SerialNumber') => {
-    return normalizeNonEmptyString(value, fieldName, { minLength: 1, maxLength: 256 }).toUpperCase();
+    return normalizeNonEmptyString(value, fieldName, {
+      minLength: 1,
+      maxLength: 256,
+    }).toUpperCase();
   };
 
   Manager.CriticalUSBDevicePayload = (value) => {

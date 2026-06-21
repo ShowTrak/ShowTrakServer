@@ -133,7 +133,9 @@ window.API.UpdateScriptExecutions(async (Executions) => {
   const shouldDisplayDeploymentToast =
     hasActiveDeployment || hasDeploymentIssues || hasDeploymentSuccess;
   const hasRenderableDeploymentToast =
-    shouldDisplayDeploymentToast && Array.isArray(deploymentRequests) && deploymentRequests.length > 0;
+    shouldDisplayDeploymentToast &&
+    Array.isArray(deploymentRequests) &&
+    deploymentRequests.length > 0;
 
   if (hasRenderableDeploymentToast) {
     deploymentUiState.hadRenderableDeployment = true;
@@ -165,9 +167,7 @@ window.API.UpdateScriptExecutions(async (Executions) => {
     const ToastTitle = hasRenderableDeploymentToast
       ? 'Deploying Scripts'
       : uniformScriptName || 'Script Executions';
-    ShowExecutionToast(
-      ToastTitle
-    );
+    ShowExecutionToast(ToastTitle);
   }
 
   // Ignore transient empty updates so we don't flash an empty deployment toast.
@@ -197,10 +197,15 @@ window.API.UpdateScriptExecutions(async (Executions) => {
     const ExpandFailures = deploymentSummary.finished && deploymentSummary.failed.length > 0;
     const FailedItems = deploymentSummary.failed
       .map((Request) => {
-        const Name = Request && Request.Client
-          ? Request.Client.Nickname || Request.Client.Hostname || Request.Client.UUID || 'Unknown Client'
-          : 'Unknown Client';
-        const Reason = Request && Request.Error ? String(Request.Error) : 'Unknown deployment error';
+        const Name =
+          Request && Request.Client
+            ? Request.Client.Nickname ||
+              Request.Client.Hostname ||
+              Request.Client.UUID ||
+              'Unknown Client'
+            : 'Unknown Client';
+        const Reason =
+          Request && Request.Error ? String(Request.Error) : 'Unknown deployment error';
         return `<li><span class="badge bg-ghost-light text-light">${Safe(
           Name
         )}</span><span class="exec-deploy-fail-reason">${Safe(Reason)}</span></li>`;

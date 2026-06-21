@@ -191,9 +191,9 @@ function RenderScriptManagerTemplates() {
   for (const Sample of ScriptManagerSampleCache) {
     const OSChips = RenderScriptManagerOSChips({
       platforms: Sample.platforms || {},
-      compatiblePlatforms: SCRIPT_MANAGER_PLATFORMS
-        .filter((p) => Sample.platforms && String(Sample.platforms[p.key] || '').trim())
-        .map((p) => p.key),
+      compatiblePlatforms: SCRIPT_MANAGER_PLATFORMS.filter(
+        (p) => Sample.platforms && String(Sample.platforms[p.key] || '').trim()
+      ).map((p) => p.key),
     });
     const DescriptionLine = Sample.description
       ? `<div class="script-manager-item-desc">${Safe(Sample.description)}</div>`
@@ -329,7 +329,7 @@ function RenderScriptManagerList() {
       ? `<div class="script-manager-item-desc">${Safe(Script.description)}</div>`
       : '';
 
-    const DisabledClass = (Script.valid && !Script.enabled) ? ' script-manager-item-disabled' : '';
+    const DisabledClass = Script.valid && !Script.enabled ? ' script-manager-item-disabled' : '';
 
     const Item = document.createElement('div');
     Item.className = `script-manager-item p-3 rounded bg-ghost${Script.valid ? '' : ' script-manager-item-invalid'}${DisabledClass}`;
@@ -471,7 +471,8 @@ function RenderScriptManagerPlatforms(Platforms, Arguments) {
   Container.html('');
   for (const Platform of SCRIPT_MANAGER_PLATFORMS) {
     const Selected = typeof Platforms[Platform.key] === 'string' ? Platforms[Platform.key] : '';
-    const ArgumentValue = typeof Arguments[Platform.key] === 'string' ? Arguments[Platform.key] : '';
+    const ArgumentValue =
+      typeof Arguments[Platform.key] === 'string' ? Arguments[Platform.key] : '';
 
     // Build the option set from the folder's files; always include a "None"
     // option and preserve a configured path even if the file is missing.
@@ -548,8 +549,7 @@ function RenderScriptManagerFileList(Files) {
     `);
   }
 
-  Container
-    .find('.script-manager-file-edit-btn')
+  Container.find('.script-manager-file-edit-btn')
     .off('click')
     .on('click', async function (Event) {
       Event.preventDefault();
@@ -566,8 +566,7 @@ function RenderScriptManagerFileList(Files) {
       Notify(`Opened ${RelativeFilePath} for editing`, 'success', 1000);
     });
 
-  Container
-    .find('.script-manager-file-run-btn')
+  Container.find('.script-manager-file-run-btn')
     .off('click')
     .on('click', async function (Event) {
       Event.preventDefault();
@@ -576,9 +575,7 @@ function RenderScriptManagerFileList(Files) {
 
       const EncodedFile = $(this).attr('data-file') || '';
       const RelativeFilePath = decodeURIComponent(EncodedFile);
-      const Confirmed = await ConfirmationDialog(
-        `Run ${RelativeFilePath} on this machine now?`
-      );
+      const Confirmed = await ConfirmationDialog(`Run ${RelativeFilePath} on this machine now?`);
       if (!Confirmed) return;
 
       const [Err] = await window.API.RunScriptFileLocal(ScriptManagerEditingId, RelativeFilePath);
@@ -607,7 +604,9 @@ function CollectScriptManagerFields() {
     : 6;
   const timeoutSecondsRaw = Number($('#SCRIPT_MANAGER_FIELD_TIMEOUT_SECONDS').val());
   const timeoutSeconds =
-    Number.isFinite(timeoutSecondsRaw) && Number.isInteger(timeoutSecondsRaw) && timeoutSecondsRaw >= 5
+    Number.isFinite(timeoutSecondsRaw) &&
+    Number.isInteger(timeoutSecondsRaw) &&
+    timeoutSecondsRaw >= 5
       ? timeoutSecondsRaw
       : 15;
   return {
@@ -697,9 +696,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .on('click', async () => {
       if (!ScriptManagerEditingId) return;
       const ID = ScriptManagerEditingId;
-      const Confirmed = await ConfirmationDialog(
-        `Delete script "${ID}"? This cannot be undone.`
-      );
+      const Confirmed = await ConfirmationDialog(`Delete script "${ID}"? This cannot be undone.`);
       if (!Confirmed) return;
       const [Err] = await window.API.DeleteScript(ID);
       if (Err) {

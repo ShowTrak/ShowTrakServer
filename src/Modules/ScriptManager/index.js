@@ -346,7 +346,13 @@ Manager.Get = async (ID) => {
 
 // A folder ID must be a safe single path segment.
 function IsSafeFolderID(ID) {
-  return typeof ID === 'string' && ID.length > 0 && !ID.includes('..') && !ID.includes('/') && !ID.includes('\\');
+  return (
+    typeof ID === 'string' &&
+    ID.length > 0 &&
+    !ID.includes('..') &&
+    !ID.includes('/') &&
+    !ID.includes('\\')
+  );
 }
 
 // Validate a user-supplied new script ID. Must be non-empty, contain no spaces
@@ -417,11 +423,12 @@ Manager.SaveFields = async (ID, Fields) => {
 
   // Preserve the existing weight so editing fields never changes ordering.
   const Existing = await Manager.Get(ID);
-  const Weight =
-    Existing && typeof Existing.Weight === 'number' ? Existing.Weight : 0;
+  const Weight = Existing && typeof Existing.Weight === 'number' ? Existing.Weight : 0;
 
-  const Platforms = Fields.platforms && typeof Fields.platforms === 'object' ? Fields.platforms : {};
-  const Arguments = Fields.arguments && typeof Fields.arguments === 'object' ? Fields.arguments : {};
+  const Platforms =
+    Fields.platforms && typeof Fields.platforms === 'object' ? Fields.platforms : {};
+  const Arguments =
+    Fields.arguments && typeof Fields.arguments === 'object' ? Fields.arguments : {};
   const RawConfig = {
     Name: Fields.name,
     Description: Fields.description,
@@ -631,7 +638,9 @@ Manager.CreateFromTemplate = async (Sample, DesiredID) => {
   const ConfigFile = Sample.files.find((f) => f && f.path === 'Script.json');
   if (ConfigFile) {
     try {
-      TemplateConfig = JSON.parse(Buffer.from(String(ConfigFile.content || ''), 'base64').toString('utf-8'));
+      TemplateConfig = JSON.parse(
+        Buffer.from(String(ConfigFile.content || ''), 'base64').toString('utf-8')
+      );
     } catch {
       TemplateConfig = {};
     }

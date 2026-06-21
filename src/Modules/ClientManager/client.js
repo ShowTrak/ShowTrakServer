@@ -250,14 +250,17 @@ class Client {
       ? this.MissingCriticalUSBDevices.length
       : 0;
     const ProcessStatusState = String(
-      this.RunningApplications && this.RunningApplications.Status && this.RunningApplications.Status.State
+      this.RunningApplications &&
+        this.RunningApplications.Status &&
+        this.RunningApplications.Status.State
         ? this.RunningApplications.Status.State
         : 'unknown'
     ).toLowerCase();
     const CanEvaluateCriticalApplications = ProcessStatusState === 'ok';
-    const MissingApplicationCount = CanEvaluateCriticalApplications && Array.isArray(this.MissingCriticalApplications)
-      ? this.MissingCriticalApplications.length
-      : 0;
+    const MissingApplicationCount =
+      CanEvaluateCriticalApplications && Array.isArray(this.MissingCriticalApplications)
+        ? this.MissingCriticalApplications.length
+        : 0;
     const Warnings = [];
     if (MissingApplicationCount > 0) Warnings.push('Critical Application Issue');
     if (MissingUSBCount > 0) Warnings.push('Missing USB Device');
@@ -275,28 +278,30 @@ class Client {
         .filter((Entry) => !!Entry)
     );
 
-    const Connected = (Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : []).map(
-      (Device) => {
-        const SerialNumber = normalizeSerialNumber(Device && Device.SerialNumber);
-        const CriticalEntry = SerialNumber ? CriticalBySerial.get(SerialNumber) : null;
-        return {
-          ...(Device || {}),
-          SerialNumber: Device && Device.SerialNumber ? String(Device.SerialNumber) : null,
-          IsConnected: true,
-          IsCritical: !!CriticalEntry,
-          Missing: false,
-          ManufacturerName:
-            (Device && Device.ManufacturerName) ||
-            (CriticalEntry && CriticalEntry.ManufacturerName) ||
-            null,
-          ProductName:
-            (Device && Device.ProductName) || (CriticalEntry && CriticalEntry.ProductName) || null,
-        };
-      }
-    );
+    const Connected = (
+      Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : []
+    ).map((Device) => {
+      const SerialNumber = normalizeSerialNumber(Device && Device.SerialNumber);
+      const CriticalEntry = SerialNumber ? CriticalBySerial.get(SerialNumber) : null;
+      return {
+        ...(Device || {}),
+        SerialNumber: Device && Device.SerialNumber ? String(Device.SerialNumber) : null,
+        IsConnected: true,
+        IsCritical: !!CriticalEntry,
+        Missing: false,
+        ManufacturerName:
+          (Device && Device.ManufacturerName) ||
+          (CriticalEntry && CriticalEntry.ManufacturerName) ||
+          null,
+        ProductName:
+          (Device && Device.ProductName) || (CriticalEntry && CriticalEntry.ProductName) || null,
+      };
+    });
 
     const ConnectedSerials = new Set(
-      Connected.map((Device) => normalizeSerialNumber(Device && Device.SerialNumber)).filter(Boolean)
+      Connected.map((Device) => normalizeSerialNumber(Device && Device.SerialNumber)).filter(
+        Boolean
+      )
     );
 
     const Missing = [];
@@ -373,12 +378,9 @@ class Client {
     };
     this.RunningApplicationsSignature = `${this.RunningApplications.TotalCount}|${
       this.RunningApplications.Truncated ? '1' : '0'
-    }|${this.RunningApplications.Items
-      .map(
-        (Entry) =>
-          `${Entry.Name}:${Entry.IsRunning ? '1' : '0'}:${Entry.IsCritical ? '1' : '0'}`
-      )
-      .join('|')}`;
+    }|${this.RunningApplications.Items.map(
+      (Entry) => `${Entry.Name}:${Entry.IsRunning ? '1' : '0'}:${Entry.IsCritical ? '1' : '0'}`
+    ).join('|')}`;
     this._refreshClientHealthState();
   }
   SetNetworkInterfaces(Interfaces) {
@@ -420,14 +422,12 @@ class Client {
       ? this.ObservedRunningApplications.Items
       : [];
     const PreviousByKey = new Map(
-      PreviousItems
-        .map((Entry) => {
-          const Name = normalizeApplicationName(Entry && Entry.Name);
-          const Key = normalizeApplicationKey(Name);
-          if (!Name || !Key) return null;
-          return [Key, { Name, Count: Math.max(1, parseInt(Entry && Entry.Count, 10) || 1) }];
-        })
-        .filter(Boolean)
+      PreviousItems.map((Entry) => {
+        const Name = normalizeApplicationName(Entry && Entry.Name);
+        const Key = normalizeApplicationKey(Name);
+        if (!Name || !Key) return null;
+        return [Key, { Name, Count: Math.max(1, parseInt(Entry && Entry.Count, 10) || 1) }];
+      }).filter(Boolean)
     );
     const RawItems = Array.isArray(Snapshot && Snapshot.Items) ? Snapshot.Items : [];
     const RawStatus = Snapshot && Snapshot.Status ? Snapshot.Status : null;
@@ -478,12 +478,17 @@ class Client {
     const SampledAt = Number.isFinite(Number(Snapshot && Snapshot.SampledAt))
       ? Number(Snapshot.SampledAt)
       : Date.now();
-    const Signature = `${TotalCount}|${Truncated ? '1' : '0'}|${Items
-      .map((Entry) => `${Entry.Name}:${Entry.Count}`)
-      .join('|')}`;
+    const Signature = `${TotalCount}|${Truncated ? '1' : '0'}|${Items.map(
+      (Entry) => `${Entry.Name}:${Entry.Count}`
+    ).join('|')}`;
 
     const ShouldSkipItems = !!(Snapshot && Snapshot.NoChanges);
-    if (!ShouldSkipItems && this.ObservedRunningApplicationsSignature === Signature && !StatusChanged) return;
+    if (
+      !ShouldSkipItems &&
+      this.ObservedRunningApplicationsSignature === Signature &&
+      !StatusChanged
+    )
+      return;
 
     if (!ShouldSkipItems) {
       this.ObservedRunningApplications = {
@@ -498,7 +503,12 @@ class Client {
       this.ObservedRunningApplications = {
         ...this.ObservedRunningApplications,
         SampledAt,
-        TotalCount: Math.max(0, parseInt(Snapshot && Snapshot.TotalCount, 10) || this.ObservedRunningApplications.TotalCount || 0),
+        TotalCount: Math.max(
+          0,
+          parseInt(Snapshot && Snapshot.TotalCount, 10) ||
+            this.ObservedRunningApplications.TotalCount ||
+            0
+        ),
         Truncated:
           typeof Snapshot?.Truncated === 'boolean'
             ? Snapshot.Truncated
@@ -513,7 +523,9 @@ class Client {
       return;
     }
 
-    const NextKeys = new Set(Items.map((Entry) => normalizeApplicationKey(Entry.Name)).filter(Boolean));
+    const NextKeys = new Set(
+      Items.map((Entry) => normalizeApplicationKey(Entry.Name)).filter(Boolean)
+    );
     for (const Entry of Items) {
       const Key = normalizeApplicationKey(Entry.Name);
       if (!Key || PreviousByKey.has(Key)) continue;
@@ -535,9 +547,8 @@ class Client {
   }
   async USBDeviceAdded(Device) {
     const AddedSerial = normalizeSerialNumber(Device && Device.SerialNumber);
-    this.ConnectedUSBDeviceList = (Array.isArray(this.ConnectedUSBDeviceList)
-      ? this.ConnectedUSBDeviceList
-      : []
+    this.ConnectedUSBDeviceList = (
+      Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : []
     ).filter((Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) !== AddedSerial);
     this.ConnectedUSBDeviceList.push(Device || {});
     this._rebuildUSBDeviceView();
@@ -547,9 +558,8 @@ class Client {
   }
   async USBDeviceRemoved(Device) {
     const RemovedSerial = normalizeSerialNumber(Device && Device.SerialNumber);
-    this.ConnectedUSBDeviceList = (Array.isArray(this.ConnectedUSBDeviceList)
-      ? this.ConnectedUSBDeviceList
-      : []
+    this.ConnectedUSBDeviceList = (
+      Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : []
     ).filter((Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) !== RemovedSerial);
     this._rebuildUSBDeviceView();
     BroadcastManager.emit('ClientUpdated', this);

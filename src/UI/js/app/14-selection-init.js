@@ -146,8 +146,8 @@ async function ConfirmationDialog(Message) {
       try {
         existing.remove();
       } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+        HandleNonFatalError('SelectionInit:NonFatal', err);
+      }
     }
 
     const toastHtml = `
@@ -175,8 +175,8 @@ async function ConfirmationDialog(Message) {
       try {
         $toast.remove();
       } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+        HandleNonFatalError('SelectionInit:NonFatal', err);
+      }
       window.__SHOWTRAK_CONFIRM_ACTIVE = false;
     };
 
@@ -224,8 +224,8 @@ async function ConfirmationDialog(Message) {
       try {
         $btnConfirm.trigger('focus');
       } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+        HandleNonFatalError('SelectionInit:NonFatal', err);
+      }
     }, 0);
   });
 }
@@ -344,21 +344,21 @@ $(async function () {
       setTimeout(() => {
         $icon.attr('class', prev);
       }, 900);
-      } catch (e) {
-        HandleNonFatalError('Clipboard:CopyField', e);
-      }
+    } catch (e) {
+      HandleNonFatalError('Clipboard:CopyField', e);
+    }
     return false;
   });
 
-    $(document).on('click', '#SELECTION_STATUS', function () {
-      ClearSelection();
-    });
+  $(document).on('click', '#SELECTION_STATUS', function () {
+    ClearSelection();
+  });
 
-    $(document).on('click', '.GROUP_TITLE_CLICKABLE[data-groupid]', function (e) {
-      e.preventDefault();
-      const groupId = $(this).attr('data-groupid');
-      SelectByGroup(groupId);
-    });
+  $(document).on('click', '.GROUP_TITLE_CLICKABLE[data-groupid]', function (e) {
+    e.preventDefault();
+    const groupId = $(this).attr('data-groupid');
+    SelectByGroup(groupId);
+  });
 
   // --- App Updates (manual check) ---
   try {
@@ -375,8 +375,8 @@ $(async function () {
         try {
           await window.API.CheckForAppUpdates();
         } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+          HandleNonFatalError('SelectionInit:NonFatal', err);
+        }
       });
     // Bind Install and Later buttons
     $('#UPDATE_INSTALL_BTN')
@@ -385,8 +385,8 @@ $(async function () {
         try {
           await window.API.InstallAppUpdate();
         } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+          HandleNonFatalError('SelectionInit:NonFatal', err);
+        }
       });
     $('#UPDATE_LATER_BTN')
       .off('click')
@@ -421,8 +421,8 @@ $(async function () {
             const h = String(href || '').trim();
             if (/^(https?:|mailto:)/i.test(h)) return h;
           } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+            HandleNonFatalError('SelectionInit:NonFatal', err);
+          }
           return '#';
         };
         const renderMarkdownSafe = (md) => {
@@ -541,8 +541,8 @@ $(async function () {
           $later.removeClass('d-none');
         }
       } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+        HandleNonFatalError('SelectionInit:NonFatal', err);
+      }
     });
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
@@ -625,9 +625,19 @@ $(async function () {
     if (Selected.length > 0) {
       ScriptList = ScriptList.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
       for (const Script of ScriptList) {
-        const ColourHex = (typeof Script.Colour === 'number' && Script.Colour >= 0 && Script.Colour <= 7)
-          ? ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#3498db','#9b59b6','#bdc3c7','#7f8c8d'][Script.Colour]
-          : '#bdc3c7';
+        const ColourHex =
+          typeof Script.Colour === 'number' && Script.Colour >= 0 && Script.Colour <= 7
+            ? [
+                '#e74c3c',
+                '#e67e22',
+                '#f1c40f',
+                '#2ecc71',
+                '#3498db',
+                '#9b59b6',
+                '#bdc3c7',
+                '#7f8c8d',
+              ][Script.Colour]
+            : '#bdc3c7';
         Options.push({
           Type: 'Action',
           Title: `${Script.Name}`,
@@ -789,8 +799,8 @@ $(async function () {
         try {
           $focusable.first().trigger('focus')[0].scrollIntoView({ block: 'nearest' });
         } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+          HandleNonFatalError('SelectionInit:NonFatal', err);
+        }
       }, 0);
     }
 
@@ -830,8 +840,8 @@ $(async function () {
           try {
             clearTimeout(prevTimer);
           } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+            HandleNonFatalError('SelectionInit:NonFatal', err);
+          }
         }
         $menu.data(
           'typeaheadTimer',
@@ -899,13 +909,13 @@ $(async function () {
         try {
           ev.stopImmediatePropagation();
         } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+          HandleNonFatalError('SelectionInit:NonFatal', err);
+        }
         try {
           ev.stopPropagation();
         } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+          HandleNonFatalError('SelectionInit:NonFatal', err);
+        }
         if (idx >= 0) {
           const $target = $items.eq(idx);
           // Defer the click so it occurs after keydown completes
@@ -913,8 +923,8 @@ $(async function () {
             try {
               $target.trigger('click');
             } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+              HandleNonFatalError('SelectionInit:NonFatal', err);
+            }
           }, 0);
         }
         return;
@@ -937,8 +947,8 @@ $(async function () {
           try {
             clearTimeout(prevTimer);
           } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+            HandleNonFatalError('SelectionInit:NonFatal', err);
+          }
         }
         $menu.removeData('typeaheadBuffer');
         $menu.removeData('typeaheadTimer');
@@ -1009,8 +1019,8 @@ function HideExecutionToast() {
       try {
         $t.remove();
       } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+        HandleNonFatalError('SelectionInit:NonFatal', err);
+      }
     }, 150);
   }
 }
@@ -1553,7 +1563,7 @@ async function OpenClientInfo(UUID) {
         ClientInfoRefreshTimer = null;
       }
       __clientInfoRefreshInFlight = false;
-      
+
       // Dispose all popovers to prevent stuck state
       try {
         const popovers = document.querySelectorAll('[data-bs-toggle="popover"]');
@@ -1585,8 +1595,8 @@ async function OpenClientInfo(UUID) {
         const fresh = await window.API.GetClient(ClientInfoOpenUUID);
         if (fresh) RenderClientInfoDetails(fresh);
       } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+        HandleNonFatalError('SelectionInit:NonFatal', err);
+      }
       __clientInfoRefreshInFlight = false;
     }, 4000);
   } catch (err) {
@@ -1658,7 +1668,10 @@ function RenderClientInfoDetails(Client) {
     const list = Array.isArray(Client.USBDeviceList) ? Client.USBDeviceList : [];
     const clientKey = Client && Client.UUID ? String(Client.UUID) : '';
     const renderKey = `${clientKey}::${list
-      .map((d) => `${d.SerialNumber || ''}|${d.IsCritical ? '1' : '0'}|${d.IsConnected === false ? '0' : '1'}`)
+      .map(
+        (d) =>
+          `${d.SerialNumber || ''}|${d.IsCritical ? '1' : '0'}|${d.IsConnected === false ? '0' : '1'}`
+      )
       .join(';;')}`;
     const previousRenderKey = $usbList.attr('data-render-key') || '';
 
@@ -1703,9 +1716,7 @@ function RenderClientInfoDetails(Client) {
                 type="button"
                 class="SHOWTRAK_TOGGLE_CRITICAL_USB ${IsCritical ? 'is-critical' : ''} ${
                   IsCritical && !IsConnected ? 'is-disconnected-critical' : ''
-                } ${
-                  HasSerial ? '' : 'is-unavailable'
-                }"
+                } ${HasSerial ? '' : 'is-unavailable'}"
                 data-serial="${SerialToken}"
                 data-critical="${IsCritical ? '1' : '0'}"
                 data-unavailable="${HasSerial ? '0' : '1'}"
@@ -1715,8 +1726,8 @@ function RenderClientInfoDetails(Client) {
                         IsCritical && !IsConnected
                           ? 'Remove critical status (device disconnected)'
                           : IsCritical
-                          ? 'Remove critical status'
-                          : 'Mark as critical'
+                            ? 'Remove critical status'
+                            : 'Mark as critical'
                       }"`
                     : ''
                 }
@@ -1725,8 +1736,8 @@ function RenderClientInfoDetails(Client) {
                     ? IsCritical && !IsConnected
                       ? 'Remove critical status (device disconnected)'
                       : IsCritical
-                      ? 'Remove critical status'
-                      : 'Mark as critical'
+                        ? 'Remove critical status'
+                        : 'Mark as critical'
                     : 'Unavailble due to missing serial number'
                 }"
                 ${
@@ -1780,7 +1791,10 @@ function RenderClientInfoDetails(Client) {
         ? appStatus.Message.trim()
         : null;
     const renderKey = `${Client?.UUID || ''}::${apps
-      .map((app) => `${app?.Name || ''}|${app?.IsCritical ? '1' : '0'}|${app?.IsRunning === false ? '0' : '1'}`)
+      .map(
+        (app) =>
+          `${app?.Name || ''}|${app?.IsCritical ? '1' : '0'}|${app?.IsRunning === false ? '0' : '1'}`
+      )
       .join(';;')}::${appStatusState}|${appStatusMessage || ''}`;
 
     if (($appsList.attr('data-render-key') || '') !== renderKey) {
@@ -1835,15 +1849,15 @@ function RenderClientInfoDetails(Client) {
                   IsCritical && !IsRunning
                     ? 'Remove critical status (application not running)'
                     : IsCritical
-                    ? 'Remove critical status'
-                    : 'Mark as critical'
+                      ? 'Remove critical status'
+                      : 'Mark as critical'
                 }"
                 aria-label="${
                   IsCritical && !IsRunning
                     ? 'Remove critical status (application not running)'
                     : IsCritical
-                    ? 'Remove critical status'
-                    : 'Mark as critical'
+                      ? 'Remove critical status'
+                      : 'Mark as critical'
                 }"
               >
                 <i class="bi ${IsCritical && !IsRunning ? 'bi-x-circle-fill' : IsCritical ? 'bi-check-circle-fill' : 'bi-check-circle'}"></i>
@@ -1913,13 +1927,12 @@ function RenderClientInfoDetails(Client) {
         for (const address of matchingAddresses) {
           const ip = Safe(address && address.address ? address.address : 'Unknown address');
           const mask = Safe(address && address.netmask ? address.netmask : 'Unknown');
-          const mac = Safe(
-            address && address.mac ? String(address.mac).toUpperCase() : 'Unknown'
-          );
+          const mac = Safe(address && address.mac ? String(address.mac).toUpperCase() : 'Unknown');
           const inactiveClass = isAddressActive(address) ? '' : ' is-inactive';
-          const kindBadge = address && address.internal
-            ? '<span class="SHOWTRAK_NET_IFACE_KIND_BADGE">Internal Only</span>'
-            : '';
+          const kindBadge =
+            address && address.internal
+              ? '<span class="SHOWTRAK_NET_IFACE_KIND_BADGE">Internal Only</span>'
+              : '';
           cards.push(`
             <div class="rounded-3 p-2 bg-ghost SHOWTRAK_NET_IFACE_CARD${inactiveClass}">
               ${kindBadge}

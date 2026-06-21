@@ -179,8 +179,7 @@ async function BuildSamplesFromTree(Tree) {
       description: typeof Config.Description === 'string' ? Config.Description : '',
       colour: typeof Config.Colour === 'number' ? Config.Colour : 6,
       confirm: !!Config.Confirmation,
-      platforms:
-        Config.Platforms && typeof Config.Platforms === 'object' ? Config.Platforms : {},
+      platforms: Config.Platforms && typeof Config.Platforms === 'object' ? Config.Platforms : {},
       files: DownloadedFiles,
     });
   }

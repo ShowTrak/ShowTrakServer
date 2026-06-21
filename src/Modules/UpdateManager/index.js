@@ -251,10 +251,7 @@ Manager.ListReleases = async () => {
   return releases
     .filter(
       (release) =>
-        release &&
-        !release.draft &&
-        release.tag_name &&
-        isAtLeastMinimumRelease(release.tag_name)
+        release && !release.draft && release.tag_name && isAtLeastMinimumRelease(release.tag_name)
     )
     .map((release) => normalizeReleaseOption(release));
 };
@@ -330,7 +327,8 @@ Manager.DownloadRelease = async (Tag = null, Options = {}) => {
   for (let i = 0; i < assets.length; i++) {
     const asset = assets[i];
     const safeName = normalizeAssetName(asset && asset.name ? asset.name : `asset-${i}`);
-    const downloadUrl = asset && asset.browser_download_url ? String(asset.browser_download_url) : '';
+    const downloadUrl =
+      asset && asset.browser_download_url ? String(asset.browser_download_url) : '';
     if (!downloadUrl) continue;
     const destination = path.join(UpdateCacheDirectory, safeName);
     pushProgress(
@@ -425,7 +423,9 @@ Manager.RegisterRoutes = (expressApp) => {
     }
 
     const manifest = readManifest();
-    const allowed = new Set((manifest && manifest.assets ? manifest.assets : []).map((a) => a.name));
+    const allowed = new Set(
+      (manifest && manifest.assets ? manifest.assets : []).map((a) => a.name)
+    );
     if (!allowed.has(fileName)) {
       res.status(404).json({ error: 'Not found' });
       return;

@@ -507,7 +507,10 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
 
   statusCode = 200;
   payload = null;
-  await listClients({ query: { Type: 'Remote', GroupID: '1', OperatingSystem: 'windows' } }, makeRes());
+  await listClients(
+    { query: { Type: 'Remote', GroupID: '1', OperatingSystem: 'windows' } },
+    makeRes()
+  );
   assert.equal(statusCode, 200);
   assert.equal(payload.Error, false);
   assert.equal(payload.Response.Count, 1);

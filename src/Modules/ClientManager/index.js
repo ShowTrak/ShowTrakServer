@@ -19,6 +19,23 @@ var ClientList = [];
 const CriticalUSBIndex = new Map();
 const CriticalApplicationIndex = new Map();
 
+function replaceUUIDInValue(Value, OldUUID, NewUUID) {
+  if (typeof Value === 'string') {
+    return Value === OldUUID ? NewUUID : Value;
+  }
+  if (Array.isArray(Value)) {
+    return Value.map((Entry) => replaceUUIDInValue(Entry, OldUUID, NewUUID));
+  }
+  if (Value && typeof Value === 'object') {
+    const Next = {};
+    for (const [Key, Entry] of Object.entries(Value)) {
+      Next[Key] = replaceUUIDInValue(Entry, OldUUID, NewUUID);
+    }
+    return Next;
+  }
+  return Value;
+}
+
 function normalizeSerialNumber(SerialNumber) {
   if (typeof SerialNumber !== 'string') return null;
   const Value = SerialNumber.trim();
@@ -134,7 +151,9 @@ Manager.Heartbeat = async (UUID, Data, IP) => {
 
   await CachedClient.SetVersion(Data.Version || null, { markUnsaved: false });
   await CachedClient.SetIP(IP || null, { markUnsaved: false });
-  CachedClient.SetScriptsFingerprint(Data && Data.ScriptsFingerprint ? Data.ScriptsFingerprint : null);
+  CachedClient.SetScriptsFingerprint(
+    Data && Data.ScriptsFingerprint ? Data.ScriptsFingerprint : null
+  );
   CachedClient.SetOnline(true);
   CachedClient.SetLastSeen(Date.now());
   CachedClient.SetVitals(Data.Vitals);
@@ -271,17 +290,13 @@ Manager.MarkUSBDeviceCritical = async (UUID, Device) => {
   const SerialNumber = normalizeSerialNumber(Device && Device.SerialNumber);
   if (!SerialNumber) return ['Device serial number is required', null];
 
-  const KnownDevice = (Array.isArray(Target.ConnectedUSBDeviceList)
-    ? Target.ConnectedUSBDeviceList
-    : []
-  ).find(
-    (Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) === SerialNumber
-  );
+  const KnownDevice = (
+    Array.isArray(Target.ConnectedUSBDeviceList) ? Target.ConnectedUSBDeviceList : []
+  ).find((Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) === SerialNumber);
   const ManufacturerName =
-    (KnownDevice && KnownDevice.ManufacturerName) ||
-    (Device && Device.ManufacturerName) ||
-    null;
-  const ProductName = (KnownDevice && KnownDevice.ProductName) || (Device && Device.ProductName) || null;
+    (KnownDevice && KnownDevice.ManufacturerName) || (Device && Device.ManufacturerName) || null;
+  const ProductName =
+    (KnownDevice && KnownDevice.ProductName) || (Device && Device.ProductName) || null;
 
   const [WriteErr] = await DB.Run(
     'INSERT OR REPLACE INTO CriticalUSBDevices (UUID, SerialNumber, ManufacturerName, ProductName, Timestamp) VALUES (?, ?, ?, ?, ?)',
@@ -418,6 +433,126 @@ Manager.Delete = async (UUID) => {
   CriticalApplicationIndex.delete(String(UUID || ''));
   Logger.success(`Client ${UUID} deleted successfully`);
   return Ok(true);
+};
+
+Manager.ReplaceClient = async (CurrentUUID, ReplacementUUID) => {
+  const OldUUID = String(CurrentUUID || '').trim();
+  const NewUUID = String(ReplacementUUID || '').trim();
+  if (!OldUUID || !NewUUID) return Fail('Client UUID is required');
+  if (OldUUID === NewUUID) return Fail('Replacement client must be different');
+
+  const [OldErr, ExistingClient] = await Manager.Get(OldUUID);
+  if (OldErr || !ExistingClient) return Fail('Current client not found');
+  if (ExistingClient.Online) return Fail('Current client must be offline before replacement');
+
+  const NewExists = await Manager.Exists(NewUUID);
+  if (NewExists) return Fail('Replacement client is already adopted');
+
+  const oldCriticalUSB = getCriticalMapForClient(OldUUID, false);
+  const oldCriticalApps = getCriticalApplicationMapForClient(OldUUID, false);
+  const oldClientRows = ClientList.slice();
+
+  const [beginErr] = await DB.Run('BEGIN IMMEDIATE TRANSACTION');
+  if (beginErr) return Fail('Failed to start client replacement transaction');
+
+  let committed = false;
+  try {
+    const [clientUpdateErr] = await DB.Run('UPDATE Clients SET UUID = ? WHERE UUID = ?', [
+      NewUUID,
+      OldUUID,
+    ]);
+    if (clientUpdateErr) throw clientUpdateErr;
+
+    const [criticalUSBErr] = await DB.Run('UPDATE CriticalUSBDevices SET UUID = ? WHERE UUID = ?', [
+      NewUUID,
+      OldUUID,
+    ]);
+    if (criticalUSBErr) throw criticalUSBErr;
+
+    const [criticalAppErr] = await DB.Run(
+      'UPDATE CriticalApplications SET UUID = ? WHERE UUID = ?',
+      [NewUUID, OldUUID]
+    );
+    if (criticalAppErr) throw criticalAppErr;
+
+    const [rulesErr, RuleRows] = await DB.All('SELECT RuleID, Scope, Actions FROM AlertRules', []);
+    if (rulesErr) throw rulesErr;
+
+    for (const Row of RuleRows || []) {
+      const RuleID = Number(Row && Row.RuleID);
+      if (!Number.isFinite(RuleID)) continue;
+
+      let ParsedScope = null;
+      let ParsedActions = null;
+
+      try {
+        ParsedScope = JSON.parse(Row && Row.Scope ? Row.Scope : '{}');
+      } catch {
+        ParsedScope = null;
+      }
+      try {
+        ParsedActions = JSON.parse(Row && Row.Actions ? Row.Actions : '[]');
+      } catch {
+        ParsedActions = null;
+      }
+
+      const NextScope = ParsedScope
+        ? replaceUUIDInValue(ParsedScope, OldUUID, NewUUID)
+        : ParsedScope;
+      const NextActions = ParsedActions
+        ? replaceUUIDInValue(ParsedActions, OldUUID, NewUUID)
+        : ParsedActions;
+
+      const ScopeChanged =
+        ParsedScope != null && JSON.stringify(NextScope) !== JSON.stringify(ParsedScope);
+      const ActionsChanged =
+        ParsedActions != null && JSON.stringify(NextActions) !== JSON.stringify(ParsedActions);
+
+      if (!ScopeChanged && !ActionsChanged) continue;
+
+      const [ruleUpdateErr] = await DB.Run(
+        'UPDATE AlertRules SET Scope = ?, Actions = ?, UpdatedAt = ? WHERE RuleID = ?',
+        [
+          ScopeChanged ? JSON.stringify(NextScope) : Row.Scope,
+          ActionsChanged ? JSON.stringify(NextActions) : Row.Actions,
+          Date.now(),
+          RuleID,
+        ]
+      );
+      if (ruleUpdateErr) throw ruleUpdateErr;
+    }
+
+    const [commitErr] = await DB.Run('COMMIT');
+    if (commitErr) throw commitErr;
+    committed = true;
+  } catch (Err) {
+    await DB.Run('ROLLBACK');
+    Logger.error('Failed to replace client UUID', Err);
+    return Fail('Failed to replace client');
+  }
+
+  if (!committed) return Fail('Failed to replace client');
+
+  ExistingClient.UUID = NewUUID;
+  ClientList = oldClientRows.filter((Client) => Client.UUID !== OldUUID && Client.UUID !== NewUUID);
+  ClientList.push(ExistingClient);
+
+  if (oldCriticalUSB) {
+    CriticalUSBIndex.set(NewUUID, oldCriticalUSB);
+    CriticalUSBIndex.delete(OldUUID);
+  }
+  if (oldCriticalApps) {
+    CriticalApplicationIndex.set(NewUUID, oldCriticalApps);
+    CriticalApplicationIndex.delete(OldUUID);
+  }
+
+  applyCriticalUSBState(ExistingClient);
+  applyCriticalApplicationState(ExistingClient);
+
+  BroadcastManager.emit('ClientListChanged');
+  BroadcastManager.emit('ClientUpdated', ExistingClient);
+  BroadcastManager.emit('AlertRuleListChanged');
+  return Ok(ExistingClient);
 };
 
 // Truthy existence check: prefer cache, fallback to DB
