@@ -60,6 +60,23 @@ function SetupClientNamespace(io) {
     // Unadopted devices send presence to appear in the adoption list
     socket.on('AdoptionHeartbeat', async (Data) => {
       try {
+        // Guard against stale/incorrect client state so adopted devices never
+        // reappear in the pending-adoption lane.
+        if (socket.Adopted) {
+          AdoptionManager.RemoveClientPendingAdoption(socket.UUID);
+          return;
+        }
+
+        const IsAlreadyAdopted = await ClientManager.Exists(socket.UUID);
+        if (IsAlreadyAdopted) {
+          AdoptionManager.RemoveClientPendingAdoption(socket.UUID);
+          if (!socket.Adopted) {
+            socket.Adopted = true;
+            socket.emit('Adopt');
+          }
+          return;
+        }
+
         // Logger.log('AdoptionHeartbeat received', {
         //   UUID: socket.UUID,
         //   IP: socket.IP,
@@ -76,6 +93,44 @@ function SetupClientNamespace(io) {
       Logger.log(`Client ${socket.UUID} requested scripts.`);
       const Scripts = await ScriptManager.GetScripts();
       Callback(Scripts);
+    });
+
+    // Integrated clients declare their catalog of actions (events) on
+    // connection (and whenever it changes) via the ShowTrak Integration SDK.
+    socket.on('RegisterActions', async (Actions) => {
+      try {
+        const [Err, Normalized] = await ClientManager.SetIntegratedActions(socket.UUID, Actions);
+        if (Err) {
+          Logger.warn(`RegisterActions failed for ${socket.UUID}: ${Err}`);
+          return;
+        }
+        Logger.log(
+          `Integrated client ${socket.UUID} registered ${
+            Normalized ? Normalized.length : 0
+          } action(s)`
+        );
+      } catch (e) {
+        Logger.error('RegisterActions handler error for', socket.UUID, e);
+      }
+    });
+
+    // Feedback path for integrated events that declared HasFeedback=true. The
+    // RequestID maps back to the queued execution entry created at dispatch.
+    socket.on('IntegratedEventResponse', (RequestID, Error) => {
+      Logger.log(`Received Integrated Event Response for RequestID: ${RequestID}`);
+      ScriptExecutionManager.Complete(RequestID, Error);
+    });
+
+    // Integrated clients can self-report a health state via the SDK
+    // (ShowTrak.SetState). ONLINE clears any degraded reason; DEGRADED records an
+    // optional reason. OFFLINE is not accepted from the client.
+    socket.on('SetIntegratedState', async (State, Message) => {
+      try {
+        const [Err] = await ClientManager.SetIntegratedState(socket.UUID, State, Message);
+        if (Err) Logger.warn(`SetIntegratedState failed for ${socket.UUID}: ${Err}`);
+      } catch (e) {
+        Logger.error('SetIntegratedState handler error for', socket.UUID, e);
+      }
     });
 
     socket.on('Heartbeat', async (Data) => {

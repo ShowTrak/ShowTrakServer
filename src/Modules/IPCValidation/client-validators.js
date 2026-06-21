@@ -55,6 +55,15 @@ module.exports = function registerClientValidators(Manager) {
     return normalizeNonEmptyString(value, 'Script ID', { minLength: 1, maxLength: 128 });
   };
 
+  // Integrated client event identifier (declared by the client via the SDK).
+  Manager.IntegratedEventID = (value) => {
+    const normalized = normalizeNonEmptyString(value, 'Event ID', { minLength: 1, maxLength: 128 });
+    if (!/^[A-Za-z0-9_.-]+$/.test(normalized)) {
+      fail('Event ID contains invalid characters');
+    }
+    return normalized;
+  };
+
   Manager.Boolean = (value, fieldName) => {
     if (typeof value !== 'boolean') {
       fail(`${fieldName} must be a boolean`);

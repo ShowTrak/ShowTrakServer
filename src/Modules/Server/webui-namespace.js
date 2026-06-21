@@ -306,6 +306,29 @@ function SetupWebUiNamespace(io, ServerManager) {
       }
     });
 
+    // Trigger an integrated client action (event) declared by an integrated
+    // client. Gated on the same permission as remote scripts.
+    socket.on('integrated:trigger', async (payload, cb) => {
+      try {
+        if (!(await IsAuthed(socket))) return cb && cb({ error: 'unauthorized' });
+        const Cfg = await GetWebConfig();
+        if (!Cfg.AllowRemoteScripts) return cb && cb({ error: 'forbidden' });
+        const { uuid, eventId } = payload || {};
+        if (!uuid || !eventId) return cb && cb({ error: 'invalid_args' });
+        const Summary = await ServerManager.TriggerIntegratedEvent(eventId, [uuid]);
+        const Failed =
+          Summary && Array.isArray(Summary.failed)
+            ? Summary.failed.find((Entry) => Entry && Entry.UUID === uuid)
+            : null;
+        if (Failed) {
+          return cb && cb({ error: 'failed', message: Failed.message || 'Event was blocked' });
+        }
+        cb && cb({ ok: true });
+      } catch (e) {
+        cb && cb({ error: 'failed' });
+      }
+    });
+
     socket.on('wol:wake', async (payload, cb) => {
       try {
         if (!(await IsAuthed(socket))) return cb && cb({ error: 'unauthorized' });

@@ -146,7 +146,7 @@ test('Server client namespace wires telemetry handlers and disconnect cleanup', 
   await socket.trigger('ScriptExecutionResponse', 'req-1', null, {});
   await socket.trigger('disconnect', 'transport close');
 
-  assert.equal(calls.adopt, 1);
+  assert.equal(calls.adopt, 0);
   assert.equal(calls.heartbeat, 1);
   assert.equal(calls.systemInfo, 1);
   assert.equal(calls.usbList, 1);
@@ -154,8 +154,58 @@ test('Server client namespace wires telemetry handlers and disconnect cleanup', 
   assert.equal(calls.usbRemove, 1);
   assert.equal(calls.nics, 1);
   assert.equal(calls.complete, 1);
-  assert.equal(calls.removeAdopt, 1);
+  assert.equal(calls.removeAdopt, 2);
   assert.equal(calls.timeout, 1);
+});
+
+test('Server client namespace re-adopts stale unadopted handshake without adding pending entry', async () => {
+  const calls = {
+    adopt: 0,
+    removeAdopt: 0,
+  };
+
+  const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
+    '../Logger': loggerStub,
+    '../AdoptionManager': {
+      Manager: {
+        AddClientPendingAdoption: async () => (calls.adopt += 1),
+        RemoveClientPendingAdoption: () => (calls.removeAdopt += 1),
+      },
+    },
+    '../ClientManager': {
+      Manager: {
+        Exists: async () => true,
+        Heartbeat: async () => [null, 'ok'],
+        SystemInfo: async () => [null],
+        SetUSBDeviceList: async () => {},
+        USBDeviceAdded: async () => {},
+        USBDeviceRemoved: async () => {},
+        SetNetworkInterfaces: async () => {},
+        SetRunningApplications: async () => {},
+        SetIntegratedActions: async () => [null, []],
+        SetIntegratedState: async () => [null, true],
+        Timeout: async () => {},
+      },
+    },
+    '../ScriptManager': { Manager: { GetScripts: async () => [] } },
+    '../ScriptExecutionManager': { Manager: { Complete: async () => {} } },
+  });
+
+  let connectionHandler;
+  SetupClientNamespace({ on: (_e, h) => (connectionHandler = h) });
+
+  const socket = makeSocket({
+    query: { UUID: 'client-2', Adopted: 'false' },
+    address: '::ffff:10.0.0.10',
+    headers: {},
+  });
+  await connectionHandler(socket);
+
+  await socket.trigger('AdoptionHeartbeat', { Hostname: 'h' });
+
+  assert.equal(calls.adopt, 0);
+  assert.equal(calls.removeAdopt, 1);
+  assert.ok(socket.emitted.some((e) => e.event === 'Adopt'));
 });
 
 // Helpers to drive the Web UI namespace.
@@ -312,6 +362,42 @@ test('Web UI namespace dispatches script and WOL actions when permitted', async 
   // Disconnect detaches broadcast listeners.
   await socket.trigger('disconnect');
   assert.equal(broadcast.listenerCount('ClientListChanged'), 0);
+});
+
+test('Web UI namespace dispatches integrated events when permitted', async () => {
+  const broadcast = new EventEmitter();
+  broadcast.off = broadcast.removeListener.bind(broadcast);
+  const { SetupWebUiNamespace } = loadWebUi(
+    {
+      WEBUI_ENABLED: true,
+      WEBUI_PASSWORD_PROTECTION_ENABLED: false,
+      WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true,
+      SYSTEM_ALLOW_WOL: false,
+    },
+    broadcast
+  );
+
+  const triggered = [];
+  const ServerManager = {
+    ExecuteScripts: async () => ({ failed: [] }),
+    TriggerIntegratedEvent: async (eventId, targets) => {
+      triggered.push({ eventId, targets });
+      return { failed: [] };
+    },
+  };
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, ServerManager);
+
+  const socket = makeSocket({ auth: {}, query: {}, address: '127.0.0.1' });
+  await new Promise((resolve) => io._ns.middlewares[0](socket, resolve));
+  await io._ns._connection(socket);
+
+  const result = await new Promise((resolve) => {
+    socket.trigger('integrated:trigger', { uuid: 'u1', eventId: 'SetBoxBlue' }, resolve);
+  });
+
+  assert.equal(result && result.ok, true);
+  assert.deepEqual(triggered, [{ eventId: 'SetBoxBlue', targets: ['u1'] }]);
 });
 
 test('Web UI namespace disables access when the master toggle is off', async () => {
@@ -536,4 +622,100 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
   emits.length = 0;
   await Manager.SendMessageByGroup('group-1', 'Notify', { text: 'hi' });
   assert.deepEqual(emits[0], { room: 'group-1', event: 'Notify', args: [{ text: 'hi' }] });
+});
+
+test('Server Manager integrated event queue reports mixed target outcomes', async () => {
+  const emits = [];
+  const queueEntries = [];
+  const completions = [];
+
+  const clients = {
+    good: {
+      UUID: 'good',
+      Online: true,
+      IntegratedActions: [{ ID: 'SetBoxBlue', Label: 'Set Box Blue', HasFeedback: false }],
+    },
+    missing: {
+      UUID: 'missing',
+      Online: true,
+      IntegratedActions: [],
+    },
+  };
+
+  const { Manager } = loadWithMocks(serverPath('index.js'), {
+    '../Logger': loggerStub,
+    '../Config': { Config: { Application: { Version: '9.9.9' } } },
+    '../AppData': { Manager: { GetScriptsDirectory: () => __dirname } },
+    '../ScriptExecutionManager': {
+      Manager: {
+        AddToQueue: async () => 'req-script',
+        ShouldDispatch: async () => true,
+        GetExecution: async () => null,
+        Complete: async (requestId, err) => completions.push({ requestId, err }),
+        ClearQueue: async () => {},
+        AddInternalTaskToQueue: async (_uuid, taskName) => {
+          const id = `req-${queueEntries.length + 1}`;
+          queueEntries.push({ id, taskName });
+          return id;
+        },
+      },
+    },
+    '../ClientManager': {
+      Manager: {
+        Get: async (uuid) => [null, clients[uuid] || null],
+      },
+    },
+    '../UpdateManager': { Manager: { RegisterRoutes: () => {} } },
+    '../DummyClientManager': { Manager: {} },
+    '../MonitoringTargetManager': { Manager: {} },
+    '../OSC': { OSC: { GetRoutes: () => [] } },
+    express: Object.assign(
+      function () {
+        return {
+          use: () => {},
+          get: () => {},
+          post: () => {},
+        };
+      },
+      { static: () => (_req, _res, next) => next && next() }
+    ),
+    'socket.io': {
+      Server: function FakeServer() {
+        return {
+          on: () => {},
+          of: () => ({ use: () => {}, on: () => {} }),
+          to: (room) => ({ emit: (event, ...args) => emits.push({ room, event, args }) }),
+        };
+      },
+    },
+    './client-namespace': { SetupClientNamespace: () => {} },
+    './webui-namespace': { SetupWebUiNamespace: () => {} },
+    '../Utils': { Wait: async () => {} },
+    http: {
+      createServer: () => ({
+        on: () => {},
+        listen: (_port, cb) => {
+          if (typeof cb === 'function') cb();
+        },
+        close: () => {},
+        address: () => ({ port: 0 }),
+      }),
+    },
+    path: require('path'),
+  });
+
+  const summary = await Manager.TriggerIntegratedEvent('SetBoxBlue', ['good', 'missing']);
+
+  assert.equal(summary.queued, 2);
+  assert.equal(summary.dispatched, 1);
+  assert.equal(summary.failed.length, 1);
+  assert.equal(summary.failed[0].UUID, 'missing');
+  assert.equal(queueEntries.length, 2);
+  assert.ok(queueEntries.every((entry) => entry.taskName === 'Integrated Event: SetBoxBlue'));
+  assert.ok(emits.some((entry) => entry.event === 'TriggerIntegratedEvent' && entry.room === 'good'));
+  assert.ok(
+    completions.some(
+      (entry) => entry.requestId === queueEntries[1].id && /not available on client/.test(String(entry.err || ''))
+    )
+  );
 });

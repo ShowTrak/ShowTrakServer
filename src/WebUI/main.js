@@ -400,13 +400,33 @@
   applyViewToggle();
 
   // ---- Rendering: tiles ---------------------------------------------------
+  function formatVersionLabel(client) {
+    if (client && typeof client.VersionLabel === 'string' && client.VersionLabel.trim()) {
+      return client.VersionLabel.trim();
+    }
+    const isIntegrated = isIntegratedClient(client);
+    const version = String((client && client.Version) || '')
+      .trim()
+      .replace(/^v\s*/i, '');
+    return `${isIntegrated ? 'SDK v' : 'v'}${version || 'Unknown'}`;
+  }
+
+  function isIntegratedClient(client) {
+    if (!client) return false;
+    if (client.Integrated === true) return true;
+    return String(client.OperatingSystem || '')
+      .trim()
+      .toLowerCase() === 'integrated';
+  }
+
   function clientTileHTML(c) {
-    const { Nickname, Hostname, IP, UUID, Version, Online } = c;
+    const { Nickname, Hostname, IP, UUID, Online } = c;
     const hasNick = Nickname && Nickname.length;
     const primaryName = hasNick ? Nickname : Hostname || UUID || 'Unnamed Client';
+    const versionLabel = formatVersionLabel(c);
     const hostVersion = hasNick
-      ? `${Hostname || UUID || 'Unnamed Client'} - v${Version || ''}`
-      : `v${Version || ''}`;
+      ? `${Hostname || UUID || 'Unnamed Client'} - ${versionLabel}`
+      : versionLabel;
     return `<div id="CLIENT_TILE_${safe(UUID)}" class="SHOWTRAK_PC ${
       Online ? 'ONLINE' : ''
     }" data-uuid="${safe(UUID)}" data-kind="client">
@@ -604,10 +624,11 @@
     const nick = tile.querySelector('[data-type="Nickname"]');
     if (nick) nick.textContent = hasNick ? c.Nickname : c.Hostname || c.UUID;
     const host = tile.querySelector('[data-type="Hostname"]');
+    const versionLabel = formatVersionLabel(c);
     if (host)
       host.textContent = hasNick
-        ? `${c.Hostname || ''} - v${c.Version || ''}`
-        : `v${c.Version || ''}`;
+        ? `${c.Hostname || ''} - ${versionLabel}`
+        : versionLabel;
     const ip = tile.querySelector('[data-type="IP"]');
     if (ip) ip.textContent = c.IP ? c.IP : 'Unknown IP';
 
@@ -722,6 +743,7 @@
   function paintDetail() {
     const c = clients.find((x) => x.UUID === detailUUID);
     if (!c) return;
+    const integratedClient = isIntegratedClient(c);
     el.detailName.textContent = c.Nickname || c.Hostname || c.UUID;
     const statusText = c.Online
       ? c.Degraded
@@ -769,7 +791,7 @@
       ['Status', c.Online ? (c.Degraded ? 'Degraded' : 'Online') : 'Offline'],
       ['IP', c.IP || '—'],
       c.MacAddress ? ['MAC', c.MacAddress] : null,
-      ['Version', c.Version || '—'],
+      ['Version', formatVersionLabel(c)],
       ['Group', group ? group.Title : 'No Group'],
       ['Last Seen', c.LastSeen ? timeAgo(c.LastSeen) : '—'],
       ['UUID', c.UUID],
@@ -781,37 +803,52 @@
       )
       .join('');
 
+    // Integrated SDK clients do not expose USB/network/app runtime panes.
+    el.usbSection.classList.toggle('hidden', integratedClient);
+    el.netSection.classList.toggle('hidden', integratedClient);
+    el.appsSection.classList.toggle('hidden', integratedClient);
+
+    if (integratedClient) {
+      el.usbList.innerHTML = '';
+      el.netList.innerHTML = '';
+      el.appsList.innerHTML = '';
+    }
+
     // USB devices — card layout matching desktop modal (read-only, no critical toggle)
-    const usb = Array.isArray(c.USBDeviceList) ? c.USBDeviceList : [];
-    if (usb.length === 0) {
-      el.usbList.innerHTML = '<div class="device-card-empty">No USB devices reported.</div>';
-    } else {
-      el.usbList.innerHTML = usb
-        .map((d) => {
-          const name = `${d.ManufacturerName || ''} ${d.ProductName || ''}`.trim() || 'USB Device';
-          const serial =
-            d.SerialNumber && String(d.SerialNumber).trim() ? String(d.SerialNumber).trim() : null;
-          const isCritical = !!d.IsCritical;
-          const isConnected = d.IsConnected !== false;
-          let badges = '';
-          if (isCritical && !isConnected) {
-            badges =
-              '<div class="device-card-badges"><span class="device-badge badge-critical-missing"><i class="bi bi-x-circle-fill"></i> Disconnected Critical</span></div>';
-          } else if (isCritical) {
-            badges =
-              '<div class="device-card-badges"><span class="device-badge badge-critical"><i class="bi bi-check-circle-fill"></i> Critical</span></div>';
-          }
-          return `<div class="device-card">
+    if (!integratedClient) {
+      const usb = Array.isArray(c.USBDeviceList) ? c.USBDeviceList : [];
+      if (usb.length === 0) {
+        el.usbList.innerHTML = '<div class="device-card-empty">No USB devices reported.</div>';
+      } else {
+        el.usbList.innerHTML = usb
+          .map((d) => {
+            const name = `${d.ManufacturerName || ''} ${d.ProductName || ''}`.trim() || 'USB Device';
+            const serial =
+              d.SerialNumber && String(d.SerialNumber).trim() ? String(d.SerialNumber).trim() : null;
+            const isCritical = !!d.IsCritical;
+            const isConnected = d.IsConnected !== false;
+            let badges = '';
+            if (isCritical && !isConnected) {
+              badges =
+                '<div class="device-card-badges"><span class="device-badge badge-critical-missing"><i class="bi bi-x-circle-fill"></i> Disconnected Critical</span></div>';
+            } else if (isCritical) {
+              badges =
+                '<div class="device-card-badges"><span class="device-badge badge-critical"><i class="bi bi-check-circle-fill"></i> Critical</span></div>';
+            }
+            return `<div class="device-card">
           <div class="device-card-name">${safe(name)}</div>
           <div class="device-card-sub">${serial ? safe(serial) : 'Serial unavailable'}</div>
           ${badges}
         </div>`;
-        })
-        .join('');
+          })
+          .join('');
+      }
     }
 
     // Network interfaces
-    paintNetworkInterfaces(c);
+    if (!integratedClient) {
+      paintNetworkInterfaces(c);
+    }
 
     // Running applications — card layout matching desktop modal (read-only, no critical toggle)
     const apps = Array.isArray(c.RunningApplications && c.RunningApplications.Items)
@@ -825,40 +862,47 @@
         ? appStatus.Message.trim()
         : null;
 
-    let appsHtml = '';
-    if (appStatusState === 'permission_denied' || appStatusState === 'error') {
-      appsHtml += `<div class="device-card" style="border:1px solid rgba(220,53,69,0.3);background:rgba(220,53,69,0.08);">
+    if (!integratedClient) {
+      let appsHtml = '';
+      if (appStatusState === 'permission_denied' || appStatusState === 'error') {
+        appsHtml += `<div class="device-card" style="border:1px solid rgba(220,53,69,0.3);background:rgba(220,53,69,0.08);">
         <div class="device-card-name">Application Monitoring Warning</div>
         <div class="device-card-sub">${safe(appStatusMsg || 'The client cannot collect running applications because system permission was denied.')}</div>
       </div>`;
-    }
-    if (apps.length === 0) {
-      appsHtml += '<div class="device-card-empty">No applications reported.</div>';
-    } else {
-      appsHtml += apps
-        .map((app) => {
-          const name = app && app.Name ? String(app.Name) : 'Unknown Application';
-          const isCritical = !!app.IsCritical;
-          const isRunning = app.IsRunning !== false;
-          let badges = '';
-          if (isCritical && !isRunning) {
-            badges =
-              '<div class="device-card-badges"><span class="device-badge badge-critical-missing"><i class="bi bi-x-circle-fill"></i> Not Running</span></div>';
-          } else if (isCritical) {
-            badges =
-              '<div class="device-card-badges"><span class="device-badge badge-critical"><i class="bi bi-check-circle-fill"></i> Critical</span></div>';
-          }
-          return `<div class="device-card">
+      }
+      if (apps.length === 0) {
+        appsHtml += '<div class="device-card-empty">No applications reported.</div>';
+      } else {
+        appsHtml += apps
+          .map((app) => {
+            const name = app && app.Name ? String(app.Name) : 'Unknown Application';
+            const isCritical = !!app.IsCritical;
+            const isRunning = app.IsRunning !== false;
+            let badges = '';
+            if (isCritical && !isRunning) {
+              badges =
+                '<div class="device-card-badges"><span class="device-badge badge-critical-missing"><i class="bi bi-x-circle-fill"></i> Not Running</span></div>';
+            } else if (isCritical) {
+              badges =
+                '<div class="device-card-badges"><span class="device-badge badge-critical"><i class="bi bi-check-circle-fill"></i> Critical</span></div>';
+            }
+            return `<div class="device-card">
           <div class="device-card-name">${safe(name)}</div>
           ${badges}
         </div>`;
-        })
-        .join('');
+          })
+          .join('');
+      }
+      el.appsList.innerHTML = appsHtml;
     }
-    el.appsList.innerHTML = appsHtml;
 
     // Permission-gated actions
-    const canScript = config.AllowRemoteScripts && scripts.length > 0;
+    const integratedActions =
+      c && isIntegratedClient(c) && Array.isArray(c.IntegratedActions)
+        ? c.IntegratedActions
+        : [];
+    const canScript =
+      config.AllowRemoteScripts && (scripts.length > 0 || integratedActions.length > 0);
     const canWol = config.AllowRemoteScripts && config.WOLEnabled && !!c.MacAddress;
     el.runScriptBtn.classList.toggle('hidden', !canScript);
     el.wolBtn.classList.toggle('hidden', !canWol);
@@ -896,11 +940,7 @@
   el.scriptsClose.addEventListener('click', closeScripts);
 
   function renderScripts() {
-    const list = scripts.slice().sort((a, b) => (a.weight || 0) - (b.weight || 0));
-    if (!list.length) {
-      el.scriptsList.innerHTML = '<div class="scripts-empty">No scripts available.</div>';
-      return;
-    }
+    const detailClient = clients.find((x) => x.UUID === detailUUID);
     const COLOURS = [
       '#e74c3c',
       '#e67e22',
@@ -911,6 +951,37 @@
       '#bdc3c7',
       '#7f8c8d',
     ];
+
+    // Integrated clients expose declared events instead of OS scripts.
+    const integratedActions =
+      detailClient &&
+      isIntegratedClient(detailClient) &&
+      Array.isArray(detailClient.IntegratedActions)
+        ? detailClient.IntegratedActions
+        : [];
+    if (integratedActions.length) {
+      el.scriptsList.innerHTML = '';
+      const events = integratedActions
+        .slice()
+        .sort((a, b) => String(a.Label || '').localeCompare(String(b.Label || '')));
+      for (const ev of events) {
+        const hex = COLOURS[ev.ColourIndex] || COLOURS[6];
+        const btn = document.createElement('button');
+        btn.className = 'script-btn';
+        btn.type = 'button';
+        btn.style.setProperty('--script-accent', hex);
+        btn.innerHTML = `<span class="script-accent-strip"></span><span class="script-name">${safe(ev.Label || ev.ID)}</span><span class="script-go"><i class="bi bi-play-fill"></i> Run</span>`;
+        btn.addEventListener('click', () => triggerIntegratedEvent(ev));
+        el.scriptsList.appendChild(btn);
+      }
+      return;
+    }
+
+    const list = scripts.slice().sort((a, b) => (a.weight || 0) - (b.weight || 0));
+    if (!list.length) {
+      el.scriptsList.innerHTML = '<div class="scripts-empty">No scripts available.</div>';
+      return;
+    }
     el.scriptsList.innerHTML = '';
     for (const s of list) {
       const hex = COLOURS[s.colour] || COLOURS[6];
@@ -928,6 +999,22 @@
       });
       el.scriptsList.appendChild(btn);
     }
+  }
+
+  function triggerIntegratedEvent(ev) {
+    if (!detailUUID) return;
+    closeScripts();
+    socket.emit('integrated:trigger', { uuid: detailUUID, eventId: ev.ID }, (res) => {
+      if (res && res.ok) {
+        toast(`"${ev.Label || ev.ID}" dispatched successfully`, 'success');
+      } else if (res && res.error === 'forbidden') {
+        toast('Remote actions are disabled', 'error');
+      } else if (res && typeof res.message === 'string' && res.message.trim()) {
+        toast(res.message, 'error');
+      } else {
+        toast('Failed to trigger event', 'error');
+      }
+    });
   }
 
   function runScript(s) {

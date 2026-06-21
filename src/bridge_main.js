@@ -43,6 +43,7 @@ const INVOKE_CHANNELS = new Set([
   'MarkClientApplicationCritical',
   'RemoveClientApplicationCritical',
   'ExecuteScript',
+  'TriggerIntegratedEvent',
   'UnadoptClient',
   'ReplaceClient',
   'DeleteScripts',
@@ -222,6 +223,8 @@ contextBridge.exposeInMainWorld('API', {
     invoke('RemoveClientApplicationCritical', UUID, ApplicationName),
   ExecuteScript: async (Script, Targets, ResetList) =>
     invoke('ExecuteScript', Script, Targets, ResetList),
+  TriggerIntegratedEvent: async (EventID, Targets) =>
+    invoke('TriggerIntegratedEvent', EventID, Targets),
   UnadoptClient: async (UUID) => invoke('UnadoptClient', UUID),
   ReplaceClient: async (CurrentUUID, ReplacementUUID) =>
     invoke('ReplaceClient', CurrentUUID, ReplacementUUID),

@@ -18,6 +18,7 @@ const { Manager: DummyClientManager } = require('../DummyClientManager');
 const { Manager: MonitoringTargetManager } = require('../MonitoringTargetManager');
 const { OSC } = require('../OSC');
 const express = require('express');
+const { FormatClientVersionLabel } = require('./serializers');
 
 const { Wait } = require('../Utils');
 
@@ -157,6 +158,7 @@ const ClientsListHandler = async (req, res) => {
   const RemoteEntities = (Clients || []).map((Client) => ({
     ...Client,
     Type: 'Remote',
+    VersionLabel: FormatClientVersionLabel(Client),
     Status: computeStatus(Client),
   }));
 
@@ -300,6 +302,63 @@ Manager.ExecuteScripts = async (ScriptID, Targets, ResetList) => {
     }
     io.to(UUID).emit('ExecuteScript', RequestID, ScriptID);
     Summary.dispatched += 1;
+  }
+  return Summary;
+};
+
+// Trigger an integrated client action (event) on one or more integrated clients.
+// Mirrors ExecuteScripts but for the integrated-client event protocol: each
+// target is queued (so the execution shows in the queue UI) and then sent a
+// 'TriggerIntegratedEvent' message. When the matching action declared
+// HasFeedback=true we leave the queue entry open and wait for the client's
+// 'IntegratedEventResponse'; otherwise we complete it immediately.
+Manager.TriggerIntegratedEvent = async (EventID, Targets) => {
+  const Summary = { queued: 0, dispatched: 0, failed: [] };
+  for (const UUID of Targets) {
+    const [ClientErr, Client] = await ClientManager.Get(UUID);
+    if (ClientErr || !Client) {
+      Summary.failed.push({ UUID, message: ClientErr || 'Client not found' });
+      continue;
+    }
+
+    // Queue first so every selected integrated client produces a visible
+    // status row in the execution UI (success or failure) for this shared
+    // event dispatch.
+    const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(
+      UUID,
+      `Integrated Event: ${EventID}`
+    );
+    if (!RequestID) {
+      Summary.failed.push({ UUID, message: 'Failed to queue event' });
+      continue;
+    }
+    Summary.queued += 1;
+
+    const Action =
+      Array.isArray(Client.IntegratedActions) &&
+      Client.IntegratedActions.find((A) => A && A.ID === EventID);
+    if (!Action) {
+      const Message = `Event "${EventID}" not available on client`;
+      await ScriptExecutionManager.Complete(RequestID, Message);
+      Summary.failed.push({ UUID, message: Message });
+      continue;
+    }
+
+    if (!Client.Online) {
+      const Message = 'Client is not online';
+      await ScriptExecutionManager.Complete(RequestID, Message);
+      Summary.failed.push({ UUID, message: Message });
+      continue;
+    }
+
+    Logger.log('TriggerIntegratedEvent dispatch', { EventID, UUID, RequestID });
+    io.to(UUID).emit('TriggerIntegratedEvent', RequestID, EventID);
+    Summary.dispatched += 1;
+
+    // Fire-and-forget actions complete as soon as they are dispatched.
+    if (!Action.HasFeedback) {
+      await ScriptExecutionManager.Complete(RequestID, null);
+    }
   }
   return Summary;
 };

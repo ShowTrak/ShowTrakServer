@@ -56,6 +56,46 @@ window.API.UpdateScriptExecutions(async (Executions) => {
     )
   );
   const uniformScriptName = names.length === 1 ? names[0] : null;
+  const nonDeploymentExecutions = Executions.filter((Request) => {
+    const Name =
+      Request && Request.Script && Request.Script.Name ? String(Request.Script.Name).trim() : '';
+    return Name !== 'Deploying Scripts';
+  });
+
+  if (!window.__ShowTrakExecutionAutoDismissTimer) {
+    window.__ShowTrakExecutionAutoDismissTimer = null;
+  }
+
+  // Suppress deployment-only execution toasts. Deployments still run server-side,
+  // but they should not hijack the execution UI on app load or integrated actions.
+  if (nonDeploymentExecutions.length === 0) {
+    if (window.__ShowTrakExecutionAutoDismissTimer) {
+      clearTimeout(window.__ShowTrakExecutionAutoDismissTimer);
+      window.__ShowTrakExecutionAutoDismissTimer = null;
+    }
+    HideExecutionToast();
+    return;
+  }
+
+  const shouldAutoDismissNonDeployment =
+    nonDeploymentExecutions.length > 0 &&
+    nonDeploymentExecutions.every(
+      (Request) =>
+        Request && Request.Status === 'Completed' && !Request.Error
+    );
+
+  if (shouldAutoDismissNonDeployment) {
+    if (!window.__ShowTrakExecutionAutoDismissTimer) {
+      window.__ShowTrakExecutionAutoDismissTimer = setTimeout(() => {
+        window.__ShowTrakExecutionAutoDismissTimer = null;
+        HideExecutionToast();
+      }, 1000);
+    }
+  } else if (window.__ShowTrakExecutionAutoDismissTimer) {
+    clearTimeout(window.__ShowTrakExecutionAutoDismissTimer);
+    window.__ShowTrakExecutionAutoDismissTimer = null;
+  }
+
   let deploymentRequests = Executions.filter(
     (Request) =>
       Request &&
@@ -119,19 +159,17 @@ window.API.UpdateScriptExecutions(async (Executions) => {
       : [];
   }
 
-  const nonDeploymentExecutions = Executions.filter((Request) => {
-    const Name =
-      Request && Request.Script && Request.Script.Name ? String(Request.Script.Name).trim() : '';
-    return Name !== 'Deploying Scripts';
-  });
   const hasActiveDeployment = deploymentSummary.total > 0 && !deploymentSummary.finished;
   const hasDeploymentIssues = deploymentSummary.finished && deploymentSummary.failed.length > 0;
   const hasDeploymentSuccess =
     deploymentSummary.total > 0 &&
     deploymentSummary.finished &&
     deploymentSummary.failed.length === 0;
+  const hasOnlyDeploymentExecutions = nonDeploymentExecutions.length === 0;
   const shouldDisplayDeploymentToast =
-    hasActiveDeployment || hasDeploymentIssues || hasDeploymentSuccess;
+    hasActiveDeployment ||
+    hasDeploymentIssues ||
+    (hasDeploymentSuccess && hasOnlyDeploymentExecutions);
   const hasRenderableDeploymentToast =
     shouldDisplayDeploymentToast &&
     Array.isArray(deploymentRequests) &&
@@ -244,6 +282,13 @@ window.API.UpdateScriptExecutions(async (Executions) => {
     return `<small class="exec-duration ${cls}">${Safe(ms)}ms</small>`;
   }
 
+  function truncateExecutionLabel(value, maxLen = 34) {
+    const text = value == null ? '' : String(value).trim();
+    if (!text) return '';
+    if (text.length <= maxLen) return text;
+    return `${text.substring(0, Math.max(1, maxLen - 1))}…`;
+  }
+
   const renderExecutions = hasRenderableDeploymentToast
     ? deploymentRequests
     : nonDeploymentExecutions;
@@ -252,10 +297,11 @@ window.API.UpdateScriptExecutions(async (Executions) => {
     const Request = renderExecutions[i];
     const rawScriptName =
       Request && Request.Script && Request.Script.Name ? String(Request.Script.Name).trim() : '';
-    const clientName = Request.Client.Nickname
-      ? Safe(Request.Client.Nickname)
-      : Safe(Request.Client.Hostname);
-    const scriptName = rawScriptName ? Safe(rawScriptName) : '';
+    const rawClientName = Request.Client.Nickname ? Request.Client.Nickname : Request.Client.Hostname;
+    const clientName = Safe(truncateExecutionLabel(rawClientName, 40));
+    const scriptName = rawScriptName ? Safe(truncateExecutionLabel(rawScriptName, 28)) : '';
+    const fullClientName = Safe(rawClientName || 'Unknown Client');
+    const fullScriptName = Safe(rawScriptName || '');
     let statusBadge = ''; // Remove visual badges; use icon instead
     let timeBadge = '';
     let actionsHtml = ''; // right-side icon area (only rendered if non-empty)
@@ -281,8 +327,8 @@ window.API.UpdateScriptExecutions(async (Executions) => {
 			<div class="exec-item">
 				<div class="exec-row">
 					<div class="exec-left">
-						<span class="badge bg-ghost-light text-light">${clientName}</span>
-						${uniformScriptName ? '' : `<span class="badge bg-ghost-light text-light">${scriptName}</span>`}
+            <span class="badge bg-ghost-light text-light exec-chip" title="${fullClientName}">${clientName}</span>
+            ${uniformScriptName ? '' : `<span class="badge bg-ghost-light text-light exec-chip" title="${fullScriptName}">${scriptName}</span>`}
 					</div>
 					<div class="exec-right">
 						${timeBadge}
@@ -399,6 +445,8 @@ function RenderFullClientAndMonitorList() {
       for (const Item of Merged) {
         if (Item.kind === 'client') {
           const { Nickname, Hostname, IP, UUID, Version, Online, LastSeen, Degraded } = Item.data;
+          const HostnameVersionLabel = FormatClientHostnameVersionLabel(Item.data);
+          const CompactStatusLabel = Online && Degraded ? 'Degraded' : 'Online';
           const WarningText =
             Array.isArray(Item.data.DegradedWarnings) && Item.data.DegradedWarnings.length
               ? String(Item.data.DegradedWarnings[0])
@@ -411,12 +459,12 @@ function RenderFullClientAndMonitorList() {
 						<i class="bi bi-gear-fill"></i>
 					</button>
 					<label class="text-sm" data-type="Hostname">
-						${Nickname && Nickname.length ? Safe(Hostname) + ' - v' + Version : 'v' + Version}
+            ${Safe(HostnameVersionLabel)}
 					</label>
 					<h5 class="mb-0" data-type="Nickname">
 					${Nickname && Nickname.length ? Safe(Nickname) : Safe(Hostname)}
 					</h5>
-          <span class="CLIENT_TILE_COMPACT_STATUS d-none" data-type="COMPACT_ONLINE_STATUS">Online</span>
+          <span class="CLIENT_TILE_COMPACT_STATUS d-none" data-type="COMPACT_ONLINE_STATUS">${Safe(CompactStatusLabel)}</span>
 					<small class="text-sm text-light" data-type="IP">
 						${IP ? Safe(IP) : 'Unknown IP'}
 					</small>

@@ -5,6 +5,13 @@ async function ExecuteScript(Script, Targets) {
   ShowExecutionToast();
 }
 
+// Trigger an integrated client event (declared by an integrated client) on the
+// given targets. Mirrors ExecuteScript but uses the integrated event protocol.
+async function TriggerIntegratedEvent(EventID, Targets) {
+  await window.API.TriggerIntegratedEvent(EventID, Targets);
+  ShowExecutionToast('Integrated Events');
+}
+
 window.API.OSCBulkAction(async (Type, Targets, Args = null) => {
   if (Type == 'ExecuteScript') return await ExecuteScript(Args, Targets);
   if (Type == 'WOL') {
@@ -1117,7 +1124,7 @@ function RenderUpdateManagerClientList() {
   for (const Client of Clients) {
     const UUID = Client.UUID;
     const Name = Safe(Client.Nickname || Client.Hostname || UUID);
-    const Version = Safe(Client.Version || 'Unknown');
+    const Version = Safe(FormatClientVersionLabel(Client));
     const Online = !!Client.Online;
     const Execution = FindClientExecutionForUpdate(UUID);
     const Percent = GetUpdateProgressPercent(Execution);
@@ -1152,7 +1159,7 @@ function RenderUpdateManagerClientList() {
           </div>
           <div class="UPDATE_MANAGER_CLIENT_MAIN">
             <div class="UPDATE_MANAGER_CLIENT_NAME">${Name}</div>
-            <div class="UPDATE_MANAGER_CLIENT_META">v${Version}</div>
+            <div class="UPDATE_MANAGER_CLIENT_META">${Version}</div>
           </div>
           <div class="UPDATE_MANAGER_CLIENT_STATUS ${GetUpdateStatusClass(Status)}">${Safe(Status)}</div>
         </div>

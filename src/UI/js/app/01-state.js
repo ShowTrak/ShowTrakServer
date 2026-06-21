@@ -85,3 +85,31 @@ let AppMode = 'SHOW'; // default visual state until backend confirms
 const COMPACT_MODE_STORAGE_KEY = 'showtrak.ui.compactMode';
 let CompactMode = false;
 let AlertActionsEnabled = true;
+
+function IsIntegratedClientEntity(Client) {
+  if (!Client) return false;
+  if (Client.Integrated === true) return true;
+  const OperatingSystem = String(Client.OperatingSystem || '')
+    .trim()
+    .toLowerCase();
+  return OperatingSystem === 'integrated';
+}
+
+function FormatClientVersionLabel(Client) {
+  const RawVersion = String((Client && Client.Version) || '')
+    .trim()
+    .replace(/^v\s*/i, '');
+  const Version = RawVersion.length > 0 ? RawVersion : 'Unknown';
+  return `${IsIntegratedClientEntity(Client) ? 'SDK v' : 'v'}${Version}`;
+}
+
+function FormatClientHostnameVersionLabel(Client) {
+  const HasNickname = !!(
+    Client &&
+    typeof Client.Nickname === 'string' &&
+    Client.Nickname.trim().length > 0
+  );
+  const Hostname = String((Client && Client.Hostname) || '').trim();
+  const VersionLabel = FormatClientVersionLabel(Client);
+  return HasNickname && Hostname.length > 0 ? `${Hostname} - ${VersionLabel}` : VersionLabel;
+}

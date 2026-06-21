@@ -69,6 +69,14 @@ class Client {
     this.DegradedWarnings = [];
     this.NetworkInterfaces = [];
     this.ScriptsFingerprint = null;
+    // Integrated client runtime state (RAM-only). Integrated clients connect via
+    // the ShowTrak Integration SDK and declare a catalog of "actions" (events)
+    // on connection. These are not persisted; they are re-declared on reconnect.
+    this.Integrated = false;
+    this.IntegratedActions = [];
+    // When an integrated client reports a manual DEGRADED state via the SDK we
+    // record the reason here so it feeds into the standard health evaluation.
+    this.IntegratedDegradedReason = null;
     this.ObservedRunningApplications = {
       SampledAt: null,
       TotalCount: 0,
@@ -111,9 +119,36 @@ class Client {
     return;
   }
   SetVitals(Vitals) {
-    this.Vitals = Vitals;
+    // Normalize so the structure always has CPU/Ram/Uptime objects. Integrated
+    // clients report only the real metrics their platform exposes; we never
+    // fabricate values here, but we guarantee the shape so the UI can render
+    // safely without optional-chaining everywhere.
+    const Source = Vitals && typeof Vitals === 'object' ? Vitals : {};
+    this.Vitals = {
+      CPU: Source.CPU && typeof Source.CPU === 'object' ? Source.CPU : {},
+      Ram: Source.Ram && typeof Source.Ram === 'object' ? Source.Ram : {},
+      Uptime: Source.Uptime && typeof Source.Uptime === 'object' ? Source.Uptime : {},
+    };
     // Broadcast vitals so UI can animate/refresh live stats.
     BroadcastManager.emit('ClientUpdated', this);
+  }
+  // Apply a manual health state reported by an integrated client over the SDK.
+  // Only ONLINE (healthy) and DEGRADED (with an optional reason) are accepted;
+  // OFFLINE is intentionally not settable by a client (it is driven by the
+  // socket connection lifecycle).
+  SetIntegratedState(State, Message) {
+    const Normalized = String(State || '').trim().toUpperCase();
+    if (Normalized === 'DEGRADED') {
+      const Reason = typeof Message === 'string' && Message.trim() ? Message.trim() : 'Degraded';
+      this.IntegratedDegradedReason = Reason.slice(0, 120);
+    } else if (Normalized === 'ONLINE') {
+      this.IntegratedDegradedReason = null;
+    } else {
+      return false;
+    }
+    this._refreshClientHealthState();
+    BroadcastManager.emit('ClientUpdated', this);
+    return true;
   }
   SetUSBDeviceList(USBDeviceList) {
     this.ConnectedUSBDeviceList = Array.isArray(USBDeviceList) ? USBDeviceList : [];
@@ -264,6 +299,8 @@ class Client {
     const Warnings = [];
     if (MissingApplicationCount > 0) Warnings.push('Critical Application Issue');
     if (MissingUSBCount > 0) Warnings.push('Missing USB Device');
+    // Integrated clients can self-report a degraded state with a custom reason.
+    if (this.IntegratedDegradedReason) Warnings.push(this.IntegratedDegradedReason);
     this.Degraded = !!this.Online && Warnings.length > 0;
     this.DegradedWarnings = this.Degraded ? Warnings : [];
   }
@@ -415,6 +452,14 @@ class Client {
         : null;
     if (this.ScriptsFingerprint === NextValue) return;
     this.ScriptsFingerprint = NextValue;
+    BroadcastManager.emit('ClientUpdated', this);
+  }
+  // Replace the integrated action (event) catalog declared by an integrated
+  // client. Marks the client as integrated and notifies the UI so the
+  // right-click menu can offer the events.
+  SetIntegratedActions(Actions) {
+    this.Integrated = true;
+    this.IntegratedActions = Array.isArray(Actions) ? Actions : [];
     BroadcastManager.emit('ClientUpdated', this);
   }
   SetRunningApplications(Snapshot) {

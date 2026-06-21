@@ -566,6 +566,16 @@ function normalizeDeploymentTargets(TargetUUIDs) {
   return [...new Set(TargetUUIDs.filter((UUID) => typeof UUID === 'string' && UUID.trim()))];
 }
 
+function IsIntegratedClient(Client) {
+  return !!(
+    Client &&
+    (Client.Integrated ||
+      String(Client.OperatingSystem || '')
+        .trim()
+        .toLowerCase() === 'integrated')
+  );
+}
+
 async function GetAllAdoptedClientUUIDs() {
   const [Err, Clients] = await ClientManager.GetAll();
   if (Err || !Array.isArray(Clients)) return [];
@@ -589,10 +599,18 @@ async function ResolveOutOfDateDeploymentTargets(TargetUUIDs) {
   const OnlineOutOfDateTargets = [];
   const OfflineOutOfDateTargets = [];
   const UpToDateTargets = [];
+  const SkippedIntegratedTargets = [];
 
   for (const UUID of TargetUUIDs) {
     const [ClientErr, Client] = await ClientManager.Get(UUID);
     if (ClientErr || !Client) continue;
+
+    // Integrated clients execute event actions and should never receive
+    // script-catalog deployment tasks.
+    if (IsIntegratedClient(Client)) {
+      SkippedIntegratedTargets.push(UUID);
+      continue;
+    }
 
     const ClientFingerprint =
       typeof Client.ScriptsFingerprint === 'string' ? Client.ScriptsFingerprint.trim() : '';
@@ -616,6 +634,7 @@ async function ResolveOutOfDateDeploymentTargets(TargetUUIDs) {
     onlineOutOfDateTargets: OnlineOutOfDateTargets,
     offlineOutOfDateTargets: OfflineOutOfDateTargets,
     upToDateTargets: UpToDateTargets,
+    skippedIntegratedTargets: SkippedIntegratedTargets,
   };
 }
 
@@ -631,6 +650,7 @@ async function TriggerScriptDeployment(TargetUUIDs, Reason = 'manual') {
       requestedTargets: Targets.length,
       upToDateTargets: DeploymentTargetInfo.upToDateTargets.length,
       offlineOutOfDateTargets: DeploymentTargetInfo.offlineOutOfDateTargets.length,
+      skippedIntegratedTargets: DeploymentTargetInfo.skippedIntegratedTargets.length,
     });
     return;
   }
@@ -660,6 +680,7 @@ async function TriggerScriptDeployment(TargetUUIDs, Reason = 'manual') {
     requestedTargets: Targets.length,
     upToDateTargets: DeploymentTargetInfo.upToDateTargets.length,
     offlineOutOfDateTargets: DeploymentTargetInfo.offlineOutOfDateTargets.length,
+    skippedIntegratedTargets: DeploymentTargetInfo.skippedIntegratedTargets.length,
     serverFingerprint: DeploymentTargetInfo.serverFingerprint,
   });
 
@@ -1521,6 +1542,20 @@ app.whenReady().then(async () => {
       return validationErrorTuple(error);
     }
     await ServerManager.ExecuteScripts(Scripts, Targets, ResetList);
+    return [null, true];
+  });
+
+  // Trigger an integrated client action (event) on the selected integrated
+  // clients. Validated like ExecuteScript but routed through the integrated
+  // event protocol.
+  RPC.handle('TriggerIntegratedEvent', async (_Event, EventID, Targets) => {
+    try {
+      EventID = IPCValidation.IntegratedEventID(EventID);
+      Targets = IPCValidation.UUIDList(Targets || [], 'Targets');
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    await ServerManager.TriggerIntegratedEvent(EventID, Targets);
     return [null, true];
   });
 

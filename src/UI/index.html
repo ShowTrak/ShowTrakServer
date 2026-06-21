@@ -1756,37 +1756,44 @@
                   ></div>
                 </div>
               </div>
-              <div class="rounded-3 p-2 bg-ghost-light">
-                <h6 class="mb-0">Connected USB Devices</h6>
+              <div id="CLIENT_INFO_USB_SECTION" class="d-grid gap-2">
+                <div class="rounded-3 p-2 bg-ghost-light">
+                  <h6 class="mb-0">Connected USB Devices</h6>
+                </div>
+                <div id="SHOWTRAK_CLIENT_INFO_USB_DEVICES" class="d-grid gap-2"></div>
               </div>
-              <div id="SHOWTRAK_CLIENT_INFO_USB_DEVICES" class="d-grid gap-2"></div>
 
-              <div class="rounded-3 p-2 bg-ghost-light">
-                <h6 class="mb-0">Network Interfaces</h6>
+              <div id="CLIENT_INFO_NETWORK_SECTION" class="d-grid gap-2">
+                <div class="rounded-3 p-2 bg-ghost-light">
+                  <h6 class="mb-0">Network Interfaces</h6>
+                </div>
+                <div class="btn-group w-100" role="group" aria-label="Network family filter">
+                  <button
+                    type="button"
+                    id="SHOWTRAK_CLIENT_INFO_NET_FAMILY_V4"
+                    class="btn btn-light"
+                    aria-pressed="true"
+                  >
+                    IPv4
+                  </button>
+                  <button
+                    type="button"
+                    id="SHOWTRAK_CLIENT_INFO_NET_FAMILY_V6"
+                    class="btn btn-outline-light"
+                    aria-pressed="false"
+                  >
+                    IPv6
+                  </button>
+                </div>
+                <div id="SHOWTRAK_CLIENT_INFO_NET_INTERFACES" class="d-grid gap-2"></div>
               </div>
-              <div class="btn-group w-100" role="group" aria-label="Network family filter">
-                <button
-                  type="button"
-                  id="SHOWTRAK_CLIENT_INFO_NET_FAMILY_V4"
-                  class="btn btn-light"
-                  aria-pressed="true"
-                >
-                  IPv4
-                </button>
-                <button
-                  type="button"
-                  id="SHOWTRAK_CLIENT_INFO_NET_FAMILY_V6"
-                  class="btn btn-outline-light"
-                  aria-pressed="false"
-                >
-                  IPv6
-                </button>
+
+              <div id="CLIENT_INFO_RUNNING_APPS_SECTION" class="d-grid gap-2">
+                <div class="rounded-3 p-2 bg-ghost-light">
+                  <h6 class="mb-0">Running Applications</h6>
+                </div>
+                <div id="SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS" class="d-grid gap-2"></div>
               </div>
-              <div id="SHOWTRAK_CLIENT_INFO_NET_INTERFACES" class="d-grid gap-2"></div>
-              <div class="rounded-3 p-2 bg-ghost-light">
-                <h6 class="mb-0">Running Applications</h6>
-              </div>
-              <div id="SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS" class="d-grid gap-2"></div>
             </div>
 
             <div class="row g-2 mt-2">

@@ -11,6 +11,7 @@ const { Manager: BroadcastManager } = require('../Broadcast');
 const { Ok, Fail } = require('../Utils');
 
 const { Client } = require('./client');
+const { NormalizeIntegratedActions } = require('./integrated-actions');
 
 const Manager = {};
 
@@ -167,6 +168,29 @@ Manager.SetUSBDeviceList = async (UUID, DeviceList) => {
   if (!Target) return ['Client Not Found', null];
   Target.SetUSBDeviceList(DeviceList);
   return [null, 'USB Device List updated successfully'];
+};
+
+// Register/replace the integrated action (event) catalog declared by an
+// integrated client over Socket.IO. The payload is normalized/sanitized before
+// being stored on the cached Client instance.
+Manager.SetIntegratedActions = async (UUID, Actions) => {
+  let [Err, Target] = await Manager.Get(UUID);
+  if (Err) return [Err, null];
+  if (!Target) return ['Client Not Found', null];
+  const Normalized = NormalizeIntegratedActions(Actions);
+  Target.SetIntegratedActions(Normalized);
+  return [null, Normalized];
+};
+
+// Apply a manual health state (ONLINE / DEGRADED) reported by an integrated
+// client over the SDK. OFFLINE is rejected (driven by the connection only).
+Manager.SetIntegratedState = async (UUID, State, Message) => {
+  let [Err, Target] = await Manager.Get(UUID);
+  if (Err) return [Err, null];
+  if (!Target) return ['Client Not Found', null];
+  const Applied = Target.SetIntegratedState(State, Message);
+  if (!Applied) return ['Invalid integrated state', null];
+  return [null, true];
 };
 
 Manager.SetNetworkInterfaces = async (UUID, Interfaces) => {

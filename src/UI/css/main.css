@@ -1550,7 +1550,7 @@ button.btn:focus {
   position: fixed;
   right: 10px;
   top: 56px; /* below top dragbar */
-  width: 360px;
+  width: min(560px, calc(100vw - 20px));
   max-height: calc(100vh - 80px);
   overflow: auto;
   z-index: 1100;
@@ -1640,7 +1640,7 @@ button.btn:focus {
 .exec-row {
   display: flex;
   align-items: center;
-  height: 2rem !important;
+  min-height: 2.2rem;
   justify-content: space-between;
   gap: 8px;
   padding: 6px 8px;
@@ -1648,12 +1648,22 @@ button.btn:focus {
 .exec-left {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 .exec-right {
   display: flex;
   gap: 6px;
   align-items: center;
+  flex: 0 0 auto;
+}
+.exec-left .badge.exec-chip {
+  display: inline-block;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .exec-error {
   font-size: 10px;

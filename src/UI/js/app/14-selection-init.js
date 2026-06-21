@@ -250,30 +250,32 @@ function IsSelected(UUID) {
 }
 
 function Select(UUID) {
-  // Do not allow selecting pending-adoption tiles
+  // Do not allow selecting pending-adoption-only entries.
   try {
-    const $tile = $(`.SHOWTRAK_PC[data-uuid='${UUID}']`);
-    if ($tile && $tile.hasClass('PENDING')) return;
+    const $tiles = $(`.SHOWTRAK_PC[data-uuid='${UUID}']`);
+    if (!$tiles || !$tiles.length) return;
+    const $selectableTiles = $tiles.not('.PENDING');
+    if (!$selectableTiles.length) return;
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
   }
   if (Selected.includes(UUID)) return;
   Selected.push(UUID);
-  $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).addClass('SELECTED');
+  $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).not('.PENDING').addClass('SELECTED');
   UpdateSelectionCount();
   return;
 }
 
 function Deselect(UUID) {
   Selected = Selected.filter((id) => id !== UUID);
-  $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).removeClass('SELECTED');
+  $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).not('.PENDING').removeClass('SELECTED');
   UpdateSelectionCount();
   return;
 }
 
 function ClearSelection() {
   Selected.forEach((uuid) => {
-    $(`.SHOWTRAK_PC[data-uuid='${uuid}']`).removeClass('SELECTED');
+    $(`.SHOWTRAK_PC[data-uuid='${uuid}']`).not('.PENDING').removeClass('SELECTED');
   });
   Selected = [];
   UpdateSelectionCount();
@@ -281,19 +283,21 @@ function ClearSelection() {
 }
 
 function ToggleSelection(UUID) {
-  // Do not toggle selection for pending-adoption tiles
+  // Do not toggle selection for pending-adoption-only entries.
   try {
-    const $tile = $(`.SHOWTRAK_PC[data-uuid='${UUID}']`);
-    if ($tile && $tile.hasClass('PENDING')) return;
+    const $tiles = $(`.SHOWTRAK_PC[data-uuid='${UUID}']`);
+    if (!$tiles || !$tiles.length) return;
+    const $selectableTiles = $tiles.not('.PENDING');
+    if (!$selectableTiles.length) return;
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
   }
   if (Selected.includes(UUID)) {
     Selected = Selected.filter((id) => id !== UUID);
-    $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).removeClass('SELECTED');
+    $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).not('.PENDING').removeClass('SELECTED');
   } else {
     Selected.push(UUID);
-    $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).addClass('SELECTED');
+    $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).not('.PENDING').addClass('SELECTED');
   }
   UpdateSelectionCount();
 }
@@ -623,21 +627,80 @@ $(async function () {
     }
 
     if (Selected.length > 0) {
+      // Build the set of actions that can run on EVERY selected client.
+      //  - OS clients expose their scripts (compatible with the client's OS).
+      //  - Integrated clients expose their declared events.
+      // A mixed selection (e.g. a Windows client + an integrated client) shares
+      // no runnable actions, so the menu shows none.
+      const CONTEXT_COLOUR_PALETTE = [
+        '#e74c3c',
+        '#e67e22',
+        '#f1c40f',
+        '#2ecc71',
+        '#3498db',
+        '#9b59b6',
+        '#bdc3c7',
+        '#7f8c8d',
+      ];
+      const ColourFromIndex = (Index) =>
+        typeof Index === 'number' && Index >= 0 && Index <= 7
+          ? CONTEXT_COLOUR_PALETTE[Index]
+          : '#bdc3c7';
+
       ScriptList = ScriptList.sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
-      for (const Script of ScriptList) {
-        const ColourHex =
-          typeof Script.Colour === 'number' && Script.Colour >= 0 && Script.Colour <= 7
-            ? [
-                '#e74c3c',
-                '#e67e22',
-                '#f1c40f',
-                '#2ecc71',
-                '#3498db',
-                '#9b59b6',
-                '#bdc3c7',
-                '#7f8c8d',
-              ][Script.Colour]
-            : '#bdc3c7';
+
+      const SelectedClients = Selected.map((UUID) =>
+        AllClients.find((c) => c && c.UUID === UUID)
+      ).filter(Boolean);
+
+      const IsIntegratedClient = (Client) =>
+        !!(Client && (Client.Integrated || Client.OperatingSystem === 'Integrated'));
+
+      // Catalogue of every integrated event seen across the selection (by ID),
+      // used to render label/colour once an event is in the shared set.
+      const EventCatalogue = new Map();
+
+      // Compute the runnable action keys for a single client.
+      const RunnableKeysFor = (Client) => {
+        const Keys = new Set();
+        if (IsIntegratedClient(Client)) {
+          const Actions = Array.isArray(Client.IntegratedActions)
+            ? Client.IntegratedActions
+            : [];
+          for (const Action of Actions) {
+            if (!Action || !Action.ID) continue;
+            Keys.add(`event:${Action.ID}`);
+            if (!EventCatalogue.has(Action.ID)) EventCatalogue.set(Action.ID, Action);
+          }
+        } else {
+          const OS = Client.OperatingSystem;
+          for (const Script of ScriptList) {
+            const Compatible = Array.isArray(Script.CompatiblePlatforms)
+              ? Script.CompatiblePlatforms
+              : [];
+            if (OS && Compatible.includes(OS)) Keys.add(`script:${String(Script.ID)}`);
+          }
+        }
+        return Keys;
+      };
+
+      // Intersection of runnable keys across all selected clients.
+      let SharedKeys = null;
+      for (const Client of SelectedClients) {
+        const Keys = RunnableKeysFor(Client);
+        if (SharedKeys === null) {
+          SharedKeys = Keys;
+        } else {
+          SharedKeys = new Set([...SharedKeys].filter((Key) => Keys.has(Key)));
+        }
+      }
+      if (!SharedKeys) SharedKeys = new Set();
+
+      const SharedScripts = ScriptList.filter((Script) =>
+        SharedKeys.has(`script:${String(Script.ID)}`)
+      );
+      for (const Script of SharedScripts) {
+        const ColourHex = ColourFromIndex(Script.Colour);
         Options.push({
           Type: 'Action',
           Title: `${Script.Name}`,
@@ -656,12 +719,27 @@ $(async function () {
           },
         });
       }
-    }
 
-    if (ScriptList.length > 0) {
-      Options.push({
-        Type: 'Divider',
-      });
+      const SharedEvents = [...EventCatalogue.values()]
+        .filter((Action) => SharedKeys.has(`event:${Action.ID}`))
+        .sort((a, b) => String(a.Label || '').localeCompare(String(b.Label || '')));
+      for (const Event of SharedEvents) {
+        Options.push({
+          Type: 'Action',
+          Title: `${Event.Label || Event.ID}`,
+          Class: '',
+          ColourHex: ColourFromIndex(Event.ColourIndex),
+          Action: async function () {
+            await TriggerIntegratedEvent(Event.ID, Selected);
+          },
+        });
+      }
+
+      if (SharedScripts.length + SharedEvents.length > 0) {
+        Options.push({
+          Type: 'Divider',
+        });
+      }
     }
 
     if (Selected.length > 0) {
@@ -1009,6 +1087,14 @@ function ShowExecutionToast(title) {
 }
 
 function HideExecutionToast() {
+  if (window.__ShowTrakExecutionAutoDismissTimer) {
+    clearTimeout(window.__ShowTrakExecutionAutoDismissTimer);
+    window.__ShowTrakExecutionAutoDismissTimer = null;
+  }
+  if (window.__ShowTrakDeploymentAutoDismissTimer) {
+    clearTimeout(window.__ShowTrakDeploymentAutoDismissTimer);
+    window.__ShowTrakDeploymentAutoDismissTimer = null;
+  }
   const $t = $('#EXECUTION_TOAST');
   if ($t.length) {
     $t.removeClass('show');
@@ -1449,7 +1535,7 @@ async function OpenClientInfo(UUID) {
     $('#CLIENT_INFO_MAC_WRAPPER').addClass('d-none');
   }
   $('#CLIENT_INFO_UUID').val(UUID);
-  $('#CLIENT_INFO_VERSION').val(Version || '');
+  $('#CLIENT_INFO_VERSION').val(FormatClientVersionLabel(Client));
   $('#CLIENT_INFO_STATUS').val(Online ? (Client.Degraded ? 'Degraded' : 'Online') : 'Offline');
 
   window.__ClientInfoNetFamily = 'IPv4';
@@ -1605,6 +1691,16 @@ async function OpenClientInfo(UUID) {
 }
 
 function RenderClientInfoDetails(Client) {
+  const IsIntegrated = IsIntegratedClientEntity(Client);
+
+  try {
+    $('#CLIENT_INFO_USB_SECTION').toggleClass('d-none', IsIntegrated);
+    $('#CLIENT_INFO_NETWORK_SECTION').toggleClass('d-none', IsIntegrated);
+    $('#CLIENT_INFO_RUNNING_APPS_SECTION').toggleClass('d-none', IsIntegrated);
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
+
   try {
     $('#CLIENT_INFO_OPERATING_SYSTEM').val(
       (Client && Client.OperatingSystem ? String(Client.OperatingSystem) : '') || ''
@@ -1660,6 +1756,17 @@ function RenderClientInfoDetails(Client) {
     }
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
+
+  if (IsIntegrated) {
+    try {
+      $('#SHOWTRAK_CLIENT_INFO_USB_DEVICES').attr('data-render-key', '').html('');
+      $('#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS').attr('data-render-key', '').html('');
+      $('#SHOWTRAK_CLIENT_INFO_NET_INTERFACES').html('');
+    } catch (err) {
+      HandleNonFatalError('SelectionInit:NonFatal', err);
+    }
+    return;
   }
 
   // USB devices

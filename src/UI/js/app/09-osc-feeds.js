@@ -341,6 +341,18 @@ window.API.ClientUpdated(async (Data) => {
       }
     }
 
+    // Keep AllClients (used by the right-click action menu) in sync too, so the
+    // intersection logic sees live OperatingSystem / IntegratedActions / Online.
+    if (Array.isArray(AllClients) && Data && Data.UUID) {
+      const aidx = AllClients.findIndex((client) => client && client.UUID === Data.UUID);
+      if (aidx >= 0) {
+        AllClients[aidx] = {
+          ...AllClients[aidx],
+          ...Data,
+        };
+      }
+    }
+
     if (
       typeof RenderUpdateManagerClientList === 'function' &&
       $('#SHOWTRAK_MODAL_UPDATE_MANAGER').hasClass('show')
@@ -391,7 +403,7 @@ window.API.ClientUpdated(async (Data) => {
     DegradedWarning
   );
 
-  let ComputedHostname = Nickname && Nickname.length ? `${Hostname} - v${Version}` : 'v' + Version;
+  let ComputedHostname = FormatClientHostnameVersionLabel(Data);
   if ($(`[data-uuid='${UUID}']>[data-type="Hostname"]`).text() !== ComputedHostname) {
     $(`[data-uuid='${UUID}']>[data-type="Hostname"]`).text(ComputedHostname);
   }
@@ -408,7 +420,7 @@ window.API.ClientUpdated(async (Data) => {
 
   const CompactOnlineStatus = $(`[data-uuid='${UUID}']>[data-type="COMPACT_ONLINE_STATUS"]`);
   if (CompactOnlineStatus.length) {
-    CompactOnlineStatus.text('Online');
+    CompactOnlineStatus.text(Online && Degraded ? 'Degraded' : 'Online');
     CompactOnlineStatus.toggleClass('d-none', !Online);
   }
 
