@@ -664,9 +664,7 @@ $(async function () {
       const RunnableKeysFor = (Client) => {
         const Keys = new Set();
         if (IsIntegratedClient(Client)) {
-          const Actions = Array.isArray(Client.IntegratedActions)
-            ? Client.IntegratedActions
-            : [];
+          const Actions = Array.isArray(Client.IntegratedActions) ? Client.IntegratedActions : [];
           for (const Action of Actions) {
             if (!Action || !Action.ID) continue;
             Keys.add(`event:${Action.ID}`);

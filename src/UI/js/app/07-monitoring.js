@@ -44,7 +44,11 @@ function FormatMonitorCompactStatus(Online, LastLatencyMs, LastError) {
 }
 
 function GetMonitoringOfflineSince(Target) {
-  const Candidates = [Target && Target.LastSuccessAt, Target && Target.LastChecked, Target && Target.Timestamp];
+  const Candidates = [
+    Target && Target.LastSuccessAt,
+    Target && Target.LastChecked,
+    Target && Target.Timestamp,
+  ];
   for (const Value of Candidates) {
     const Ts = Number(Value);
     if (Number.isFinite(Ts) && Ts > 0) return String(Math.round(Ts));

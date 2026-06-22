@@ -2,9 +2,11 @@
 function IsIntegratedClient(c) {
   if (!c) return false;
   if (c.Integrated === true) return true;
-  return String(c.OperatingSystem || '')
-    .trim()
-    .toLowerCase() === 'integrated';
+  return (
+    String(c.OperatingSystem || '')
+      .trim()
+      .toLowerCase() === 'integrated'
+  );
 }
 
 function FormatClientVersionLabel(c) {

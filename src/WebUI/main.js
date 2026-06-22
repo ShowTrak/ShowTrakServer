@@ -438,9 +438,11 @@
   function isIntegratedClient(client) {
     if (!client) return false;
     if (client.Integrated === true) return true;
-    return String(client.OperatingSystem || '')
-      .trim()
-      .toLowerCase() === 'integrated';
+    return (
+      String(client.OperatingSystem || '')
+        .trim()
+        .toLowerCase() === 'integrated'
+    );
   }
 
   function clientTileHTML(c) {
@@ -655,10 +657,7 @@
     if (nick) nick.textContent = hasNick ? c.Nickname : c.Hostname || c.UUID;
     const host = tile.querySelector('[data-type="Hostname"]');
     const versionLabel = formatVersionLabel(c);
-    if (host)
-      host.textContent = hasNick
-        ? `${c.Hostname || ''} - ${versionLabel}`
-        : versionLabel;
+    if (host) host.textContent = hasNick ? `${c.Hostname || ''} - ${versionLabel}` : versionLabel;
     const ip = tile.querySelector('[data-type="IP"]');
     if (ip) ip.textContent = c.IP ? c.IP : 'Unknown IP';
 
@@ -762,11 +761,7 @@
     socket.emit('client:get', uuid, (res) => {
       if (res && res.data) {
         upsertClient(res.data);
-        if (
-          detailSelection &&
-          detailSelection.kind === 'client' &&
-          detailSelection.id === uuid
-        ) {
+        if (detailSelection && detailSelection.kind === 'client' && detailSelection.id === uuid) {
           paintDetail();
         }
       }
@@ -844,7 +839,8 @@
         ['Target ID', monitor.TargetID],
       ].filter(Boolean);
 
-      el.detailName.textContent = monitor.Nickname || monitor.Address || monitor.TargetID || 'Monitor';
+      el.detailName.textContent =
+        monitor.Nickname || monitor.Address || monitor.TargetID || 'Monitor';
       el.detailStatus.textContent = statusText;
       el.detailStatus.classList.toggle('online', online && !degraded);
       el.detailStatus.classList.toggle('degraded', online && degraded);
@@ -890,14 +886,23 @@
         ['IP', dummy.IP || 'Unknown IP'],
         ['Interval', FormatInterval(dummy.Interval)],
         ['State', state],
-        ['Status', online ? (degraded ? warning : 'Online') : state === 'IDLE' ? 'Idle' : 'Offline'],
+        [
+          'Status',
+          online ? (degraded ? warning : 'Online') : state === 'IDLE' ? 'Idle' : 'Offline',
+        ],
         ['Last Seen', dummy.LastSeen ? timeAgo(dummy.LastSeen) : '—'],
         ['Group', group ? group.Title : 'No Group'],
         ['UUID', dummy.UUID],
       ].filter(Boolean);
 
       el.detailName.textContent = dummy.Nickname || dummy.DummyID || 'Dummy';
-      el.detailStatus.textContent = online ? (degraded ? warning : 'Online') : state === 'IDLE' ? 'Idle' : 'Offline';
+      el.detailStatus.textContent = online
+        ? degraded
+          ? warning
+          : 'Online'
+        : state === 'IDLE'
+          ? 'Idle'
+          : 'Offline';
       el.detailStatus.classList.toggle('online', online && !degraded);
       el.detailStatus.classList.toggle('degraded', online && degraded);
       el.detailStatus.classList.toggle('offline', !online);
@@ -1005,9 +1010,12 @@
       } else {
         el.usbList.innerHTML = usb
           .map((d) => {
-            const name = `${d.ManufacturerName || ''} ${d.ProductName || ''}`.trim() || 'USB Device';
+            const name =
+              `${d.ManufacturerName || ''} ${d.ProductName || ''}`.trim() || 'USB Device';
             const serial =
-              d.SerialNumber && String(d.SerialNumber).trim() ? String(d.SerialNumber).trim() : null;
+              d.SerialNumber && String(d.SerialNumber).trim()
+                ? String(d.SerialNumber).trim()
+                : null;
             const isCritical = !!d.IsCritical;
             const isConnected = d.IsConnected !== false;
             let badges = '';
@@ -1262,7 +1270,11 @@
     if (groupChanged || !updateClientTile(clients.find((x) => x.UUID === client.UUID))) {
       renderAll();
     }
-    if (detailSelection && detailSelection.kind === 'client' && detailSelection.id === client.UUID) {
+    if (
+      detailSelection &&
+      detailSelection.kind === 'client' &&
+      detailSelection.id === client.UUID
+    ) {
       paintDetail();
     }
   });

@@ -80,8 +80,7 @@ window.API.UpdateScriptExecutions(async (Executions) => {
   const shouldAutoDismissNonDeployment =
     nonDeploymentExecutions.length > 0 &&
     nonDeploymentExecutions.every(
-      (Request) =>
-        Request && Request.Status === 'Completed' && !Request.Error
+      (Request) => Request && Request.Status === 'Completed' && !Request.Error
     );
 
   if (shouldAutoDismissNonDeployment) {
@@ -297,7 +296,9 @@ window.API.UpdateScriptExecutions(async (Executions) => {
     const Request = renderExecutions[i];
     const rawScriptName =
       Request && Request.Script && Request.Script.Name ? String(Request.Script.Name).trim() : '';
-    const rawClientName = Request.Client.Nickname ? Request.Client.Nickname : Request.Client.Hostname;
+    const rawClientName = Request.Client.Nickname
+      ? Request.Client.Nickname
+      : Request.Client.Hostname;
     const clientName = Safe(truncateExecutionLabel(rawClientName, 40));
     const scriptName = rawScriptName ? Safe(truncateExecutionLabel(rawScriptName, 28)) : '';
     const fullClientName = Safe(rawClientName || 'Unknown Client');

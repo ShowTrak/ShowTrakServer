@@ -7,9 +7,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
-const {
-  NormalizeIntegratedActions,
-} = require('../src/Modules/ClientManager/integrated-actions');
+const { NormalizeIntegratedActions } = require('../src/Modules/ClientManager/integrated-actions');
 
 test('NormalizeIntegratedActions keeps valid actions and clamps colour index', () => {
   const result = NormalizeIntegratedActions([

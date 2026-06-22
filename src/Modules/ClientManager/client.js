@@ -137,7 +137,9 @@ class Client {
   // OFFLINE is intentionally not settable by a client (it is driven by the
   // socket connection lifecycle).
   SetIntegratedState(State, Message) {
-    const Normalized = String(State || '').trim().toUpperCase();
+    const Normalized = String(State || '')
+      .trim()
+      .toUpperCase();
     if (Normalized === 'DEGRADED') {
       const Reason = typeof Message === 'string' && Message.trim() ? Message.trim() : 'Degraded';
       this.IntegratedDegradedReason = Reason.slice(0, 120);

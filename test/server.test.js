@@ -712,10 +712,14 @@ test('Server Manager integrated event queue reports mixed target outcomes', asyn
   assert.equal(summary.failed[0].UUID, 'missing');
   assert.equal(queueEntries.length, 2);
   assert.ok(queueEntries.every((entry) => entry.taskName === 'Integrated Event: SetBoxBlue'));
-  assert.ok(emits.some((entry) => entry.event === 'TriggerIntegratedEvent' && entry.room === 'good'));
+  assert.ok(
+    emits.some((entry) => entry.event === 'TriggerIntegratedEvent' && entry.room === 'good')
+  );
   assert.ok(
     completions.some(
-      (entry) => entry.requestId === queueEntries[1].id && /not available on client/.test(String(entry.err || ''))
+      (entry) =>
+        entry.requestId === queueEntries[1].id &&
+        /not available on client/.test(String(entry.err || ''))
     )
   );
 });
