@@ -351,6 +351,11 @@ small,
   display: none;
 }
 
+/* Keep the expanded monitor offline indicator on the shared client typography. */
+.SHOWTRAK_PC.MONITOR .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] {
+  font-size: inherit;
+}
+
 .progress {
   height: 3px !important;
   border-radius: 5px;

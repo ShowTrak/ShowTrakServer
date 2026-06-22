@@ -2478,8 +2478,13 @@ body.compact-mode .SHOWTRAK_PC_PLACEHOLDER p {
 /* --- Monitoring target tiles --- */
 /* Status text uses a slightly smaller font so values like "1234 ms" don't
  * get truncated by the fixed tile width. */
-.SHOWTRAK_PC.MONITOR .SHOWTRAK_PC_STATUS {
+.SHOWTRAK_PC.MONITOR .SHOWTRAK_PC_STATUS[data-type='MONITOR_STATUS'] {
   font-size: 11px !important;
+}
+
+/* Keep the expanded offline indicator on the shared client typography. */
+.SHOWTRAK_PC.MONITOR .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] {
+  font-size: inherit;
 }
 
 /* The monitoring method label should always read clearly in white,

@@ -513,6 +513,31 @@ async function PromptSaveBeforeClose() {
       ? await BackupManager.HasUnsavedChanges()
       : false;
 
+  let autoSaveEnabled = false;
+  try {
+    autoSaveEnabled = !!(await SettingsManager.GetValue('SYSTEM_AUTOSAVE_ENABLED'));
+  } catch (Err) {
+    Logger.error('Failed to read autosave setting during shutdown:', Err);
+  }
+
+  // If autosave is enabled, skip the save confirmation prompt and close directly.
+  // When a show file path exists and there are pending changes, save once before exit.
+  if (autoSaveEnabled) {
+    if (hasNeverBeenSaved || !hasUnsavedChanges) {
+      return true;
+    }
+
+    const [Err] = await BackupManager.Save(currentFilePath);
+    if (Err) {
+      Logger.error('Failed to autosave show during shutdown:', Err);
+      dialog.showErrorBox('Unable to Save Show', String(Err));
+      return false;
+    }
+
+    sendShowFileUpdated(BackupManager.GetCurrentFilePath());
+    return true;
+  }
+
   if (!hasNeverBeenSaved && !hasUnsavedChanges) {
     return true;
   }

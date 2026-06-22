@@ -31,7 +31,7 @@
     WOLEnabled: false,
     Authed: false,
   };
-  let detailUUID = null;
+  let detailSelection = null;
   let netFamily = 'IPv4';
   let pin = '';
   let everConnected = false;
@@ -76,6 +76,7 @@
     appsList: $('appsList'),
     runScriptBtn: $('runScriptBtn'),
     wolBtn: $('wolBtn'),
+    detailActions: $('detailActions'),
     detailClose: $('detailClose'),
     scriptsSheet: $('scriptsSheet'),
     scriptsList: $('scriptsList'),
@@ -97,6 +98,11 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  function isSameEntityId(a, b) {
+    if (a === null || a === undefined || b === null || b === undefined) return false;
+    return String(a) === String(b);
   }
 
   function clampPct(v) {
@@ -139,6 +145,24 @@
     const HttpMatch = ErrorText.match(/\bHTTP\s+(\d{3})\b/i);
     if (HttpMatch) return `HTTP ${HttpMatch[1]}`;
     return ErrorText;
+  }
+
+  function FormatMonitorCompactStatus(Online, LastLatencyMs, LastError) {
+    const Status = FormatMonitorStatus(Online, LastLatencyMs, LastError);
+    return !Online && Status === 'Offline' ? '' : Status;
+  }
+
+  function getMonitoringOfflineSince(target) {
+    const candidates = [
+      target && target.LastSuccessAt,
+      target && target.LastChecked,
+      target && target.Timestamp,
+    ];
+    for (const value of candidates) {
+      const ts = Number(value);
+      if (Number.isFinite(ts) && ts > 0) return String(Math.round(ts));
+    }
+    return '';
   }
 
   function timeAgo(ts) {
@@ -454,6 +478,8 @@
     const Name = T.Nickname || T.Address || 'Unnamed';
     const Sub = T.Address || '';
     const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
+    const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, T.LastError);
+    const OfflineSince = getMonitoringOfflineSince(T);
     const Method = String(T.Method || '').toUpperCase();
     const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
     const TextClass = 'text-light';
@@ -465,9 +491,13 @@
       )}</label>
       <h5 class="mb-0" data-type="Name">${safe(Name)}</h5>
       <small class="text-sm text-light" data-type="Address">${safe(Sub)}</small>
-      <div class="SHOWTRAK_PC_STATUS d-grid" data-type="MONITOR_STATUS">
+      <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-grid' : 'd-none'}" data-type="MONITOR_STATUS">
         <h7 class="mb-0 ${TextClass}" data-type="MONITOR_STATUS_LABEL">${safe(Status)}</h7>
       </div>
+      <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-none' : 'd-grid'}" data-type="INDICATOR_OFFLINE">
+        <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${safe(OfflineSince)}">Offline <span class="badge bg-ghost">00:00:00</span></h7>
+      </div>
+      <span class="MONITOR_COMPACT_LATENCY ${TextClass}${CompactStatus ? '' : ' d-none'}" data-type="MONITOR_COMPACT_LATENCY">${safe(CompactStatus)}</span>
     </div>`;
   }
 
@@ -677,12 +707,32 @@
     if (methodEl)
       methodEl.textContent = `${String(T.Method || '').toUpperCase()} · ${FormatInterval(T.Interval)}`;
     const label = tile.querySelector('[data-type="MONITOR_STATUS_LABEL"]');
+    const compact = tile.querySelector('[data-type="MONITOR_COMPACT_LATENCY"]');
     if (label) {
       const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
       label.textContent = Status;
       label.classList.remove('text-success', 'text-warning');
       label.classList.add('text-light');
     }
+    if (compact) {
+      const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, T.LastError);
+      compact.textContent = CompactStatus;
+      compact.classList.toggle('d-none', !CompactStatus);
+      compact.classList.remove('text-success', 'text-warning');
+      compact.classList.add('text-light');
+    }
+    const onlineInd = tile.querySelector('[data-type="MONITOR_STATUS"]');
+    const offlineInd = tile.querySelector('[data-type="INDICATOR_OFFLINE"]');
+    if (onlineInd) {
+      onlineInd.classList.toggle('d-grid', Online);
+      onlineInd.classList.toggle('d-none', !Online);
+    }
+    if (offlineInd) {
+      offlineInd.classList.toggle('d-grid', !Online);
+      offlineInd.classList.toggle('d-none', Online);
+    }
+    const since = tile.querySelector('[data-type="OFFLINE_SINCE"]');
+    if (since) since.setAttribute('data-offlinesince', getMonitoringOfflineSince(T));
     return true;
   }
 
@@ -704,7 +754,7 @@
 
   // ---- Detail sheet -------------------------------------------------------
   function openDetail(uuid) {
-    detailUUID = uuid;
+    detailSelection = { kind: 'client', id: uuid };
     paintDetail();
     el.sheetBackdrop.classList.remove('hidden');
     el.detailSheet.classList.remove('hidden');
@@ -712,12 +762,33 @@
     socket.emit('client:get', uuid, (res) => {
       if (res && res.data) {
         upsertClient(res.data);
-        if (detailUUID === uuid) paintDetail();
+        if (
+          detailSelection &&
+          detailSelection.kind === 'client' &&
+          detailSelection.id === uuid
+        ) {
+          paintDetail();
+        }
       }
     });
   }
+
+  function openMonitorDetail(targetID) {
+    detailSelection = { kind: 'monitor', id: targetID };
+    paintDetail();
+    el.sheetBackdrop.classList.remove('hidden');
+    el.detailSheet.classList.remove('hidden');
+  }
+
+  function openDummyDetail(uuid) {
+    detailSelection = { kind: 'dummy', id: uuid };
+    paintDetail();
+    el.sheetBackdrop.classList.remove('hidden');
+    el.detailSheet.classList.remove('hidden');
+  }
+
   function closeDetail() {
-    detailUUID = null;
+    detailSelection = null;
     el.detailSheet.classList.add('hidden');
     el.sheetBackdrop.classList.add('hidden');
   }
@@ -741,8 +812,119 @@
   }
 
   function paintDetail() {
-    const c = clients.find((x) => x.UUID === detailUUID);
-    if (!c) return;
+    if (!detailSelection) return;
+
+    if (detailSelection.kind === 'monitor') {
+      const monitor = monitors.find((m) => isSameEntityId(m.TargetID, detailSelection.id));
+      if (!monitor) {
+        closeDetail();
+        return;
+      }
+
+      const online = !!monitor.Online;
+      const degraded = !!monitor.Degraded;
+      const statusText = online
+        ? degraded
+          ? FormatMonitorStatus(false, monitor.LastLatencyMs, monitor.LastError)
+          : FormatLatency(monitor.LastLatencyMs) || 'Online'
+        : FormatMonitorStatus(false, monitor.LastLatencyMs, monitor.LastError);
+      const group = groups.find((g) => g.GroupID === (monitor.GroupID || null));
+      const fields = [
+        ['Type', 'Monitoring Target'],
+        monitor.Nickname ? ['Nickname', monitor.Nickname] : null,
+        ['Address', monitor.Address || '—'],
+        ['Method', String(monitor.Method || '').toUpperCase() || '—'],
+        ['Interval', FormatInterval(monitor.Interval)],
+        ['Status', online ? (degraded ? 'Degraded' : 'Online') : 'Offline'],
+        ['Last Check', monitor.LastChecked ? timeAgo(monitor.LastChecked) : '—'],
+        ['Last Success', monitor.LastSuccessAt ? timeAgo(monitor.LastSuccessAt) : '—'],
+        ['Latency', FormatLatency(monitor.LastLatencyMs) || '—'],
+        monitor.LastError ? ['Last Error', String(monitor.LastError)] : null,
+        ['Group', group ? group.Title : 'No Group'],
+        ['Target ID', monitor.TargetID],
+      ].filter(Boolean);
+
+      el.detailName.textContent = monitor.Nickname || monitor.Address || monitor.TargetID || 'Monitor';
+      el.detailStatus.textContent = statusText;
+      el.detailStatus.classList.toggle('online', online && !degraded);
+      el.detailStatus.classList.toggle('degraded', online && degraded);
+      el.detailStatus.classList.toggle('offline', !online);
+      el.detailVitals.classList.add('hidden');
+      el.detailActions.classList.add('hidden');
+      el.usbSection.classList.add('hidden');
+      el.netSection.classList.add('hidden');
+      el.appsSection.classList.add('hidden');
+      el.usbList.innerHTML = '';
+      el.netList.innerHTML = '';
+      el.appsList.innerHTML = '';
+      closeScripts();
+
+      el.detailInfo.innerHTML = fields
+        .map(
+          ([k, v]) =>
+            `<div class="kv"><div class="k">${safe(k)}</div><div class="v">${safe(v)}</div></div>`
+        )
+        .join('');
+      return;
+    }
+
+    if (detailSelection.kind === 'dummy') {
+      const dummy = dummies.find((d) => d.UUID === detailSelection.id);
+      if (!dummy) {
+        closeDetail();
+        return;
+      }
+
+      const state = String(dummy.State || 'IDLE').toUpperCase();
+      const online = !!dummy.Online;
+      const degraded = !!dummy.Degraded;
+      const warning =
+        Array.isArray(dummy.DegradedWarnings) && dummy.DegradedWarnings.length
+          ? String(dummy.DegradedWarnings[0])
+          : 'Missed Heartbeat';
+      const group = groups.find((g) => g.GroupID === (dummy.GroupID || null));
+      const fields = [
+        ['Type', 'Dummy Client'],
+        dummy.Nickname ? ['Nickname', dummy.Nickname] : null,
+        ['Dummy ID', dummy.DummyID || '—'],
+        ['IP', dummy.IP || 'Unknown IP'],
+        ['Interval', FormatInterval(dummy.Interval)],
+        ['State', state],
+        ['Status', online ? (degraded ? warning : 'Online') : state === 'IDLE' ? 'Idle' : 'Offline'],
+        ['Last Seen', dummy.LastSeen ? timeAgo(dummy.LastSeen) : '—'],
+        ['Group', group ? group.Title : 'No Group'],
+        ['UUID', dummy.UUID],
+      ].filter(Boolean);
+
+      el.detailName.textContent = dummy.Nickname || dummy.DummyID || 'Dummy';
+      el.detailStatus.textContent = online ? (degraded ? warning : 'Online') : state === 'IDLE' ? 'Idle' : 'Offline';
+      el.detailStatus.classList.toggle('online', online && !degraded);
+      el.detailStatus.classList.toggle('degraded', online && degraded);
+      el.detailStatus.classList.toggle('offline', !online);
+      el.detailVitals.classList.add('hidden');
+      el.detailActions.classList.add('hidden');
+      el.usbSection.classList.add('hidden');
+      el.netSection.classList.add('hidden');
+      el.appsSection.classList.add('hidden');
+      el.usbList.innerHTML = '';
+      el.netList.innerHTML = '';
+      el.appsList.innerHTML = '';
+      closeScripts();
+
+      el.detailInfo.innerHTML = fields
+        .map(
+          ([k, v]) =>
+            `<div class="kv"><div class="k">${safe(k)}</div><div class="v">${safe(v)}</div></div>`
+        )
+        .join('');
+      return;
+    }
+
+    const c = clients.find((x) => x.UUID === detailSelection.id);
+    if (!c) {
+      closeDetail();
+      return;
+    }
     const integratedClient = isIntegratedClient(c);
     el.detailName.textContent = c.Nickname || c.Hostname || c.UUID;
     const statusText = c.Online
@@ -812,6 +994,7 @@
       el.usbList.innerHTML = '';
       el.netList.innerHTML = '';
       el.appsList.innerHTML = '';
+      closeScripts();
     }
 
     // USB devices — card layout matching desktop modal (read-only, no critical toggle)
@@ -897,21 +1080,17 @@
     }
 
     // Permission-gated actions
-    const integratedActions =
-      c && isIntegratedClient(c) && Array.isArray(c.IntegratedActions)
-        ? c.IntegratedActions
-        : [];
-    const canScript =
-      config.AllowRemoteScripts && (scripts.length > 0 || integratedActions.length > 0);
+    const canScript = config.AllowRemoteScripts && !integratedClient && scripts.length > 0;
     const canWol = config.AllowRemoteScripts && config.WOLEnabled && !!c.MacAddress;
     el.runScriptBtn.classList.toggle('hidden', !canScript);
     el.wolBtn.classList.toggle('hidden', !canWol);
+    el.detailActions.classList.toggle('hidden', !canScript && !canWol);
   }
 
   el.runScriptBtn.addEventListener('click', openScripts);
   el.wolBtn.addEventListener('click', () => {
-    if (!detailUUID) return;
-    socket.emit('wol:wake', { uuid: detailUUID }, (res) => {
+    if (!detailSelection || detailSelection.kind !== 'client') return;
+    socket.emit('wol:wake', { uuid: detailSelection.id }, (res) => {
       if (res && res.ok) toast('Wake on LAN packet sent', 'success');
       else if (res && res.error === 'forbidden') toast('Remote actions are disabled', 'error');
       else toast('Failed to send Wake on LAN', 'error');
@@ -920,12 +1099,16 @@
 
   // ---- Scripts sheet ------------------------------------------------------
   function openScripts() {
-    if (!detailUUID) return;
+    if (!detailSelection || detailSelection.kind !== 'client') return;
     if (!config.AllowRemoteScripts) {
       toast('Remote script execution is disabled', 'error');
       return;
     }
-    const c = clients.find((x) => x.UUID === detailUUID);
+    const c = clients.find((x) => x.UUID === detailSelection.id);
+    if (c && isIntegratedClient(c)) {
+      toast('Integrated clients do not support remote scripts in Web UI', 'error');
+      return;
+    }
     el.scriptsSubtitle.textContent = c ? c.Nickname || c.Hostname || '' : '';
     renderScripts();
     el.sheetBackdrop.classList.remove('hidden');
@@ -941,6 +1124,10 @@
 
   function renderScripts() {
     const detailClient = clients.find((x) => x.UUID === detailUUID);
+    if (detailClient && isIntegratedClient(detailClient)) {
+      el.scriptsList.innerHTML = '<div class="scripts-empty">No scripts available.</div>';
+      return;
+    }
     const COLOURS = [
       '#e74c3c',
       '#e67e22',
@@ -951,32 +1138,6 @@
       '#bdc3c7',
       '#7f8c8d',
     ];
-
-    // Integrated clients expose declared events instead of OS scripts.
-    const integratedActions =
-      detailClient &&
-      isIntegratedClient(detailClient) &&
-      Array.isArray(detailClient.IntegratedActions)
-        ? detailClient.IntegratedActions
-        : [];
-    if (integratedActions.length) {
-      el.scriptsList.innerHTML = '';
-      const events = integratedActions
-        .slice()
-        .sort((a, b) => String(a.Label || '').localeCompare(String(b.Label || '')));
-      for (const ev of events) {
-        const hex = COLOURS[ev.ColourIndex] || COLOURS[6];
-        const btn = document.createElement('button');
-        btn.className = 'script-btn';
-        btn.type = 'button';
-        btn.style.setProperty('--script-accent', hex);
-        btn.innerHTML = `<span class="script-accent-strip"></span><span class="script-name">${safe(ev.Label || ev.ID)}</span><span class="script-go"><i class="bi bi-play-fill"></i> Run</span>`;
-        btn.addEventListener('click', () => triggerIntegratedEvent(ev));
-        el.scriptsList.appendChild(btn);
-      }
-      return;
-    }
-
     const list = scripts.slice().sort((a, b) => (a.weight || 0) - (b.weight || 0));
     if (!list.length) {
       el.scriptsList.innerHTML = '<div class="scripts-empty">No scripts available.</div>';
@@ -1001,27 +1162,11 @@
     }
   }
 
-  function triggerIntegratedEvent(ev) {
-    if (!detailUUID) return;
-    closeScripts();
-    socket.emit('integrated:trigger', { uuid: detailUUID, eventId: ev.ID }, (res) => {
-      if (res && res.ok) {
-        toast(`"${ev.Label || ev.ID}" dispatched successfully`, 'success');
-      } else if (res && res.error === 'forbidden') {
-        toast('Remote actions are disabled', 'error');
-      } else if (res && typeof res.message === 'string' && res.message.trim()) {
-        toast(res.message, 'error');
-      } else {
-        toast('Failed to trigger event', 'error');
-      }
-    });
-  }
-
   function runScript(s) {
-    if (!detailUUID) return;
+    if (!detailSelection || detailSelection.kind !== 'client') return;
     // Close scripts sheet immediately — return to client detail view first
     closeScripts();
-    socket.emit('scripts:run', { uuid: detailUUID, scriptId: s.id }, (res) => {
+    socket.emit('scripts:run', { uuid: detailSelection.id, scriptId: s.id }, (res) => {
       if (res && res.ok) {
         toast(`"${s.name}" dispatched successfully`, 'success');
       } else if (res && res.error === 'forbidden') {
@@ -1038,6 +1183,18 @@
   el.content.addEventListener('click', (e) => {
     const tile = e.target.closest('.SHOWTRAK_PC[data-kind="client"]');
     if (tile) openDetail(tile.getAttribute('data-uuid'));
+  });
+
+  el.content.addEventListener('dblclick', (e) => {
+    const monitorTile = e.target.closest('.SHOWTRAK_PC[data-kind="monitor"]');
+    if (monitorTile) {
+      openMonitorDetail(monitorTile.getAttribute('data-target-id'));
+      return;
+    }
+    const dummyTile = e.target.closest('.SHOWTRAK_PC[data-kind="dummy"]');
+    if (dummyTile) {
+      openDummyDetail(dummyTile.getAttribute('data-dummy-uuid'));
+    }
   });
 
   // ---- Cache helpers ------------------------------------------------------
@@ -1074,7 +1231,7 @@
     if (!cfg) return;
     config = Object.assign(config, cfg);
     applyAuthView();
-    if (detailUUID) paintDetail();
+    if (detailSelection) paintDetail();
   });
 
   // Full snapshot for an authenticated session.
@@ -1088,7 +1245,7 @@
     if (data.config) config = Object.assign(config, data.config);
     applyAuthView();
     renderAll();
-    if (detailUUID) paintDetail();
+    if (detailSelection) paintDetail();
   });
 
   socket.on('clients:list', (list) => {
@@ -1105,18 +1262,21 @@
     if (groupChanged || !updateClientTile(clients.find((x) => x.UUID === client.UUID))) {
       renderAll();
     }
-    if (detailUUID === client.UUID) paintDetail();
+    if (detailSelection && detailSelection.kind === 'client' && detailSelection.id === client.UUID) {
+      paintDetail();
+    }
   });
 
   socket.on('groups:list', (list) => {
     groups = Array.isArray(list) ? list : [];
     renderAll();
-    if (detailUUID) paintDetail();
+    if (detailSelection) paintDetail();
   });
 
   socket.on('monitors:list', (list) => {
     monitors = Array.isArray(list) ? list : [];
     renderAll();
+    if (detailSelection && detailSelection.kind === 'monitor') paintDetail();
   });
 
   socket.on('monitors:updated', (monitor) => {
@@ -1129,11 +1289,19 @@
       monitors[idx] = monitor;
       if (!updateMonitorTile(monitor)) renderAll();
     }
+    if (
+      detailSelection &&
+      detailSelection.kind === 'monitor' &&
+      isSameEntityId(detailSelection.id, monitor.TargetID)
+    ) {
+      paintDetail();
+    }
   });
 
   socket.on('dummies:list', (list) => {
     dummies = Array.isArray(list) ? list : [];
     renderAll();
+    if (detailSelection && detailSelection.kind === 'dummy') paintDetail();
   });
 
   socket.on('dummies:updated', (dummy) => {
@@ -1145,6 +1313,9 @@
       dummies[idx] = dummy;
     }
     renderAll();
+    if (detailSelection && detailSelection.kind === 'dummy' && detailSelection.id === dummy.UUID) {
+      paintDetail();
+    }
   });
 
   // Initial connecting state

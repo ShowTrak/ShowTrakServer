@@ -38,6 +38,20 @@ function FormatMonitorStatus(Online, LastLatencyMs, LastError) {
   return ErrorText;
 }
 
+function FormatMonitorCompactStatus(Online, LastLatencyMs, LastError) {
+  const Status = FormatMonitorStatus(Online, LastLatencyMs, LastError);
+  return !Online && Status === 'Offline' ? '' : Status;
+}
+
+function GetMonitoringOfflineSince(Target) {
+  const Candidates = [Target && Target.LastSuccessAt, Target && Target.LastChecked, Target && Target.Timestamp];
+  for (const Value of Candidates) {
+    const Ts = Number(Value);
+    if (Number.isFinite(Ts) && Ts > 0) return String(Math.round(Ts));
+  }
+  return '';
+}
+
 function RenderMonitoringTargetsSection() {
   // Deprecated: monitoring targets are now rendered inline within their group's
   // drop zone alongside clients. Kept as a no-op for backwards compatibility.
@@ -50,6 +64,8 @@ function RenderMonitoringTargetTile(T) {
   const Name = T.Nickname || T.Address || 'Unnamed';
   const Sub = T.Address || '';
   const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
+  const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, T.LastError);
+  const OfflineSince = GetMonitoringOfflineSince(T);
   const Method = String(T.Method || '').toUpperCase();
   const DragUUID = `monitor:${T.TargetID}`;
   const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
@@ -66,10 +82,15 @@ function RenderMonitoringTargetTile(T) {
       )}</label>
       <h5 class="mb-0" data-type="Name">${Safe(Name)}</h5>
       <small class="text-sm text-light" data-type="Address">${Safe(Sub)}</small>
-      <div class="SHOWTRAK_PC_STATUS d-grid" data-type="MONITOR_STATUS">
+      <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-grid' : 'd-none'}" data-type="MONITOR_STATUS">
         <h7 class="mb-0 ${TextClass}" data-type="MONITOR_STATUS_LABEL">${Safe(Status)}</h7>
       </div>
-      <span class="MONITOR_COMPACT_LATENCY ${TextClass}" data-type="MONITOR_COMPACT_LATENCY">${Safe(Status)}</span>
+      <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-none' : 'd-grid'}" data-type="INDICATOR_OFFLINE">
+        <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${Safe(OfflineSince)}">
+          Offline <span class="badge bg-ghost">00:00:00</span>
+        </h7>
+      </div>
+      <span class="MONITOR_COMPACT_LATENCY ${TextClass}${CompactStatus ? '' : ' d-none'}" data-type="MONITOR_COMPACT_LATENCY">${Safe(CompactStatus)}</span>
     </div>`;
 }
 
@@ -87,12 +108,23 @@ function UpdateMonitoringTargetTile(T) {
     .find('[data-type="Method"]')
     .text(`${String(T.Method || '').toUpperCase()} · ${FormatInterval(T.Interval)}`);
   const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
+  const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, T.LastError);
   const $label = $tile.find('[data-type="MONITOR_STATUS_LABEL"]');
   $label.text(Status);
   $label.removeClass('text-success text-warning').addClass('text-light');
   const $compact = $tile.find('[data-type="MONITOR_COMPACT_LATENCY"]');
-  $compact.text(Status);
+  $compact.text(CompactStatus);
   $compact.removeClass('text-success text-warning').addClass('text-light');
+  $compact.toggleClass('d-none', !CompactStatus);
+  $tile
+    .find('.SHOWTRAK_PC_STATUS[data-type="MONITOR_STATUS"]')
+    .toggleClass('d-grid', Online)
+    .toggleClass('d-none', !Online);
+  $tile
+    .find('.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]')
+    .toggleClass('d-grid', !Online)
+    .toggleClass('d-none', Online);
+  $tile.find('[data-type="OFFLINE_SINCE"]').attr('data-offlinesince', GetMonitoringOfflineSince(T));
 }
 
 function ResolveMonitorHistoryContextEntity() {
