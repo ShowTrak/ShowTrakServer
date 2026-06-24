@@ -56,7 +56,7 @@
     "url": "https://github.com/ShowTrak/ShowTrakServer/issues",
     "email": "tom@tkw.bz"
   },
-  "homepage": "https://showtrak.tkw.bz",
+  "homepage": "https://showtrak.co.uk",
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
     "@electron-forge/maker-deb": "^7.11.2",
