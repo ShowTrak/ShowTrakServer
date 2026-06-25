@@ -574,6 +574,151 @@ body.macos-native-fullscreen #APPLICATION {
   pointer-events: none;
 }
 
+/* Compact Audio Asset rows */
+.audio-asset-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.1fr) minmax(120px, 1fr) minmax(170px, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.audio-asset-row .audio-asset-label-inline {
+  height: 30px;
+  padding: 0.35rem 0.55rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  color: #fff;
+}
+
+.audio-asset-row .audio-asset-label-inline:focus {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: none;
+}
+
+.audio-asset-row .audio-asset-meta {
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.audio-asset-row .audio-asset-meta .badge {
+  vertical-align: baseline;
+}
+
+.audio-asset-row .audio-asset-volume-wrap {
+  min-width: 0;
+}
+
+.audio-asset-row [data-audio-volume-label] {
+  min-width: 3.2em;
+  text-align: right;
+}
+
+.audio-asset-row .audio-asset-actions .btn {
+  height: 30px;
+  min-width: 30px;
+  padding: 0.2rem 0.45rem;
+}
+
+@media (max-width: 991px) {
+  .audio-asset-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'label actions'
+      'meta actions'
+      'volume actions';
+    row-gap: 0.4rem;
+  }
+
+  .audio-asset-row .audio-asset-label-inline {
+    grid-area: label;
+  }
+
+  .audio-asset-row .audio-asset-meta {
+    grid-area: meta;
+  }
+
+  .audio-asset-row .audio-asset-volume-wrap {
+    grid-area: volume;
+  }
+
+  .audio-asset-row .audio-asset-actions {
+    grid-area: actions;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Global slider styling (macOS-inspired simplified track + thumb) */
+:root {
+  --st-slider-track: rgba(255, 255, 255, 0.16);
+  --st-slider-track-focus: rgba(255, 255, 255, 0.24);
+  --st-slider-fill: rgba(255, 255, 255, 0.92);
+  --st-slider-thumb: #ffffff;
+  --st-slider-thumb-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.34);
+}
+
+input[type='range'],
+.form-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1.15rem;
+  background: transparent;
+}
+
+input[type='range']:focus,
+.form-range:focus {
+  outline: none;
+}
+
+input[type='range']::-webkit-slider-runnable-track,
+.form-range::-webkit-slider-runnable-track {
+  height: 0.36rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--st-slider-track-focus), var(--st-slider-track));
+}
+
+input[type='range']::-webkit-slider-thumb,
+.form-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.82rem;
+  height: 0.82rem;
+  margin-top: -0.23rem;
+  border-radius: 50%;
+  border: none;
+  background: var(--st-slider-thumb);
+  box-shadow: var(--st-slider-thumb-shadow);
+}
+
+input[type='range']::-moz-range-track,
+.form-range::-moz-range-track {
+  height: 0.36rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--st-slider-track-focus), var(--st-slider-track));
+}
+
+input[type='range']::-moz-range-thumb,
+.form-range::-moz-range-thumb {
+  width: 0.82rem;
+  height: 0.82rem;
+  border: none;
+  border-radius: 50%;
+  background: var(--st-slider-thumb);
+  box-shadow: var(--st-slider-thumb-shadow);
+}
+
+input[type='range']::-moz-range-progress,
+.form-range::-moz-range-progress {
+  height: 0.36rem;
+  border-radius: 999px;
+  background: var(--st-slider-fill);
+}
+
 .alert-multiselect {
   position: relative;
 }

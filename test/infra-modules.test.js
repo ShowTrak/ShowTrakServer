@@ -41,10 +41,12 @@ test('AppData initializes folders and resolves directory paths', async () => {
   assert.ok(made.some((p) => p.endsWith('Logs')));
   assert.ok(made.some((p) => p.endsWith('Scripts')));
   assert.ok(made.some((p) => p.endsWith('Storage')));
+  assert.ok(made.some((p) => p.endsWith('Audio')));
 
   assert.match(Manager.GetLogsDirectory(), /Logs$/);
   assert.match(Manager.GetScriptsDirectory(), /Scripts$/);
   assert.match(Manager.GetStorageDirectory(), /Storage$/);
+  assert.match(Manager.GetAudioDirectory(), /Audio$/);
   assert.match(Manager.GetStateFilePath(), /state\.json$/);
 
   // OpenFolder returns false when the folder does not exist.

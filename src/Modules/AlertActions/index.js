@@ -4,6 +4,7 @@ const Logger = CreateLogger('AlertActions');
 const ActionModules = [
   require('./showtrak-alert'),
   require('./play-sound'),
+  require('./play-custom-audio'),
   require('./osc-trigger'),
   require('./http-api'),
   require('./discord-webhook'),

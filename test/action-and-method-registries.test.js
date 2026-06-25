@@ -37,6 +37,7 @@ test('AlertActions manager normalizes, validates, and executes actions', async (
     './http-api': actionB,
     './discord-webhook': { Name: 'invalid-no-id' },
     './play-sound': { Name: 'invalid-no-id' },
+    './play-custom-audio': { Name: 'invalid-no-id' },
     './showtrak-alert': { Name: 'invalid-no-id' },
   });
 

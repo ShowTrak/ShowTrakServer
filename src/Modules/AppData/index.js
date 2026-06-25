@@ -23,7 +23,7 @@ Manager.Initialize = async () => {
     fs.mkdirSync(appDataPath, { recursive: true });
   }
 
-  let AppDataFolders = ['Logs', 'Scripts', 'Storage', 'SampleScripts'];
+  let AppDataFolders = ['Logs', 'Scripts', 'Storage', 'SampleScripts', 'Audio'];
   AppDataFolders.forEach((folder) => {
     const folderPath = path.join(appDataPath, folder);
     if (!fs.existsSync(folderPath)) {
@@ -43,6 +43,13 @@ Manager.GetScriptsDirectory = () => {
 
 Manager.GetStorageDirectory = () => {
   return path.join(appDataPath, 'Storage');
+};
+
+// Persistent store for user-imported custom audio assets used as alert sounds.
+// Holds the audio files plus a manifest.json describing each asset. This is
+// app-global (survives show swaps) on purpose, matching how alert sounds work.
+Manager.GetAudioDirectory = () => {
+  return path.join(appDataPath, 'Audio');
 };
 
 // Cache directory for sample scripts fetched from the public ShowTrak

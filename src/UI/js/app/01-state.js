@@ -35,6 +35,9 @@ let AlertScopeGroups = [];
 let AlertScopeOptions = [];
 let AlertScopeSelected = [];
 let AlertActionEditorIsCreating = false;
+// Cache of imported custom audio assets (metadata only; data URLs fetched
+// on-demand for preview/playback). Keeps alert action warning icons in sync.
+let AudioAssetsCache = [];
 const ALERT_TRIGGER_ALLOWLIST = new Set([
   'CLIENT_ONLINE',
   'CLIENT_OFFLINE',

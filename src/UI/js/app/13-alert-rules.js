@@ -468,6 +468,16 @@ function actionTypeByID(ID) {
   return AlertActionTypesCache.find((A) => A.ID === ID) || null;
 }
 
+// True when a play-custom-audio action points at an audio asset that no longer
+// exists (deleted file or unknown ID). Drives the yellow warning indicators.
+function isAudioAssetActionMissing(Action) {
+  if (!Action || Action.Type !== 'play-custom-audio') return false;
+  const AssetID = Action.Settings && Action.Settings.AssetID ? Action.Settings.AssetID : '';
+  if (!AssetID) return true;
+  const Asset = (AudioAssetsCache || []).find((A) => A.ID === AssetID);
+  return !Asset || !!Asset.Missing;
+}
+
 function RenderAlertActionSettingsFields(ActionTypeID, ExistingSettings = {}) {
   const ActionType = actionTypeByID(ActionTypeID);
   if (!ActionType) {
@@ -481,6 +491,12 @@ function RenderAlertActionSettingsFields(ActionTypeID, ExistingSettings = {}) {
     const Value = Object.prototype.hasOwnProperty.call(ExistingSettings, Key)
       ? ExistingSettings[Key]
       : Field.Default;
+
+    if (Field.Hidden) {
+      const HiddenType = Type === 'number' ? 'number' : Type === 'boolean' ? 'boolean' : 'string';
+      Html += `<input type="hidden" data-key="${Safe(Key)}" data-type="${Safe(HiddenType)}" value="${Safe(String(Value == null ? '' : Value))}" />`;
+      continue;
+    }
 
     if (Type === 'boolean') {
       Html += `
@@ -506,7 +522,24 @@ function RenderAlertActionSettingsFields(ActionTypeID, ExistingSettings = {}) {
         </div>
       `;
     } else if (Type === 'select') {
-      const Options = Array.isArray(Field.Options) ? Field.Options : [];
+      let Options;
+      if (Field.Source === 'audio-assets') {
+        Options = (AudioAssetsCache || []).map((Asset) => ({
+          Value: Asset.ID,
+          Label: Asset.Missing ? `${Asset.Label} (missing)` : Asset.Label,
+        }));
+        // Ensure a previously-selected asset still shows even if it was deleted.
+        if (Value && !Options.some((Option) => String(Option.Value) === String(Value))) {
+          const ExistingLabel =
+            ExistingSettings && ExistingSettings.AssetLabel ? ExistingSettings.AssetLabel : Value;
+          Options.unshift({ Value, Label: `${ExistingLabel} (missing)` });
+        }
+        if (!Options.length) {
+          Options = [{ Value: '', Label: 'No audio assets — import some first' }];
+        }
+      } else {
+        Options = Array.isArray(Field.Options) ? Field.Options : [];
+      }
       const OptionsHtml = Options.map((Option) => {
         const OptionValue = Option && typeof Option === 'object' ? Option.Value : Option;
         const OptionLabel =
@@ -514,12 +547,16 @@ function RenderAlertActionSettingsFields(ActionTypeID, ExistingSettings = {}) {
         const Selected = String(OptionValue) === String(Value) ? 'selected' : '';
         return `<option value="${Safe(String(OptionValue))}" ${Selected}>${Safe(String(OptionLabel))}</option>`;
       }).join('');
-      const PreviewButton =
-        Field.Preview === 'sound'
-          ? `<button type="button" class="btn bg-ghost text-white" data-sound-preview title="Preview sound">
+      let PreviewButton = '';
+      if (Field.Preview === 'sound') {
+        PreviewButton = `<button type="button" class="btn bg-ghost text-white" data-sound-preview title="Preview sound">
               <i class="bi bi-play-fill"></i> Preview
-            </button>`
-          : '';
+            </button>`;
+      } else if (Field.Preview === 'audio-asset') {
+        PreviewButton = `<button type="button" class="btn bg-ghost text-white" data-audio-asset-preview title="Preview audio asset">
+              <i class="bi bi-play-fill"></i> Preview
+            </button>`;
+      }
       Html += `
         <div class="d-flex gap-2 align-items-stretch">
           <div class="form-floating flex-grow-1">
@@ -570,10 +607,14 @@ function RenderAlertActionsList() {
   let Html = '';
   AlertRuleDraftActions.forEach((Action, Index) => {
     const ActionType = actionTypeByID(Action.Type);
+    const MissingAudio = isAudioAssetActionMissing(Action);
+    const WarningIcon = MissingAudio
+      ? '<i class="bi bi-exclamation-triangle-fill text-warning ms-2" title="The audio file for this action is missing" aria-label="Audio file missing"></i>'
+      : '';
     Html += `
       <div class="rounded bg-ghost p-2 d-grid gap-1 text-start border-0 alert-action-open" data-action-index="${Index}" role="button" tabindex="0">
         <div class="d-flex align-items-center">
-          <strong>${Safe(ActionType ? ActionType.Name : Action.Type || 'Action')}</strong>
+          <strong>${Safe(ActionType ? ActionType.Name : Action.Type || 'Action')}</strong>${WarningIcon}
         </div>
         <i class="bi bi-chevron-right alert-action-chevron" aria-hidden="true"></i>
       </div>
@@ -768,6 +809,9 @@ function summarizeActionType(Type, Count) {
   if (Type === 'play-sound') {
     return Count > 1 ? `play ${Count} alert sounds` : 'play an alert sound';
   }
+  if (Type === 'play-custom-audio') {
+    return Count > 1 ? `play ${Count} custom audio assets` : 'play a custom audio asset';
+  }
   if (Type === 'showtrak-alert') {
     return Count > 1 ? `create ${Count} ShowTrak alerts` : 'create a ShowTrak alert';
   }
@@ -857,10 +901,16 @@ function RenderAlertRuleManagerList() {
   let Html = '';
   for (const Rule of AlertRulesCache) {
     const Summary = buildRuleSummary(Rule);
+    const HasMissingAudio = (Array.isArray(Rule.Actions) ? Rule.Actions : []).some((Action) =>
+      isAudioAssetActionMissing(Action)
+    );
+    const WarningIcon = HasMissingAudio
+      ? '<i class="bi bi-exclamation-triangle-fill text-warning ms-2" title="An audio file used by this alert is missing" aria-label="Audio file missing"></i>'
+      : '';
     Html += `
       <div class="rounded bg-ghost p-2 d-grid gap-1 text-start border-0 alert-rule-open" data-ruleid="${Rule.RuleID}" role="button" tabindex="0">
         <div class="d-flex justify-content-between align-items-center gap-2">
-          <strong>${Safe(Rule.Title || `Rule ${Rule.RuleID}`)}</strong>
+          <strong>${Safe(Rule.Title || `Rule ${Rule.RuleID}`)}${WarningIcon}</strong>
         </div>
         <small class="text-muted">${Safe(Summary)}</small>
         <i class="bi bi-chevron-right alert-rule-chevron" aria-hidden="true"></i>
@@ -901,6 +951,7 @@ function BuildAlertRulePayloadFromEditor() {
 async function OpenAlertRuleManager() {
   await CloseAllModals();
   await EnsureAlertCatalogsLoaded();
+  if (typeof LoadAudioAssets === 'function') await LoadAudioAssets();
   await PopulateAlertScopeOptions();
 
   const TriggerOptions = (AlertTriggerTypesCache || [])
@@ -961,6 +1012,27 @@ async function OpenAlertRuleManager() {
         $('#ALERT_ACTION_EDITOR_SETTINGS [data-key="Sound"]').val() || 'Notification'
       ).toString();
       if (typeof PreviewSound === 'function') PreviewSound(SoundName);
+    });
+
+  $('#ALERT_ACTION_EDITOR_SETTINGS')
+    .off('click.alertAudioPreview')
+    .on('click.alertAudioPreview', '[data-audio-asset-preview]', function (Event) {
+      Event.preventDefault();
+      const AssetID = (
+        $('#ALERT_ACTION_EDITOR_SETTINGS [data-key="AssetID"]').val() || ''
+      ).toString();
+      if (!AssetID) return Notify('Please choose an audio asset', 'error');
+      if (typeof PreviewAudioAsset === 'function') PreviewAudioAsset(AssetID);
+    });
+
+  // Keep the hidden AssetLabel in sync so a friendly name survives even if the
+  // asset is later deleted (used for the missing-asset warning text).
+  $('#ALERT_ACTION_EDITOR_SETTINGS')
+    .off('change.alertAudioAsset')
+    .on('change.alertAudioAsset', '[data-key="AssetID"]', function () {
+      const AssetID = ($(this).val() || '').toString();
+      const Asset = (AudioAssetsCache || []).find((A) => A.ID === AssetID);
+      $('#ALERT_ACTION_EDITOR_SETTINGS [data-key="AssetLabel"]').val(Asset ? Asset.Label : '');
     });
 
   $('#ALERT_ACTION_EDITOR_CLOSE')

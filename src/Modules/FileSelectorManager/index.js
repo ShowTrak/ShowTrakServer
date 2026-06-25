@@ -10,11 +10,25 @@ const SHOWTRAK_FILE_FILTER = {
   extensions: ['ShowTrak'],
 };
 
+const AUDIO_FILE_FILTER = {
+  name: 'Audio Files',
+  extensions: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'opus'],
+};
+
 Manager.OpenDialog = async (Title) => {
   return await dialog.showOpenDialog({
     title: Title,
     filters: [SHOWTRAK_FILE_FILTER],
     properties: ['openFile'],
+    message: Title,
+  });
+};
+
+Manager.OpenAudioDialog = async (Title) => {
+  return await dialog.showOpenDialog({
+    title: Title,
+    filters: [AUDIO_FILE_FILTER],
+    properties: ['openFile', 'multiSelections'],
     message: Title,
   });
 };

@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const net = require('node:net');
+const { EventEmitter } = require('node:events');
 const path = require('node:path');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
@@ -280,18 +281,36 @@ test('dns method validates record types and resolver IPs', async () => {
 });
 
 test('ping method reports success or failure via the spawned process', async () => {
-  // localhost should always be reachable; allow generous timeout.
-  const ping = loadWithMocks(methodPath('ping.js'), {});
-  assert.equal(ping.ID, 'ping');
+  function loadPingWithSpawn(spawnImpl) {
+    return loadWithMocks(methodPath('ping.js'), {
+      child_process: { spawn: spawnImpl },
+      os: { platform: () => 'darwin' },
+    });
+  }
 
-  assert.equal((await ping.Run({})).Success, false);
+  function spawnWith({ exitCode, stdout }) {
+    return () => {
+      const child = new EventEmitter();
+      child.stdout = new EventEmitter();
+      child.kill = () => {};
+      process.nextTick(() => {
+        if (stdout) child.stdout.emit('data', Buffer.from(stdout));
+        child.emit('close', exitCode);
+      });
+      return child;
+    };
+  }
 
-  const ok = await ping.Run({ Address: '127.0.0.1', Settings: { Timeout: 3000 } });
+  const pingOk = loadPingWithSpawn(spawnWith({ exitCode: 0, stdout: '64 bytes time=7.25 ms' }));
+  assert.equal(pingOk.ID, 'ping');
+  assert.equal((await pingOk.Run({})).Success, false);
+
+  const ok = await pingOk.Run({ Address: '127.0.0.1', Settings: { Timeout: 3000 } });
   assert.equal(ok.Success, true);
-  assert.equal(typeof ok.LatencyMs, 'number');
+  assert.equal(ok.LatencyMs, 7.25);
 
-  // An unroutable TEST-NET-1 address should fail to respond.
-  const fail = await ping.Run({ Address: '192.0.2.1', Settings: { Timeout: 1000 } });
+  const pingFail = loadPingWithSpawn(spawnWith({ exitCode: 1, stdout: '' }));
+  const fail = await pingFail.Run({ Address: '192.0.2.1', Settings: { Timeout: 1000 } });
   assert.equal(fail.Success, false);
 });
 

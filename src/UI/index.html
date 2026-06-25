@@ -1412,9 +1412,18 @@
             <div id="ALERT_MANAGER_LIST_PANEL" class="d-grid gap-2 text-start mt-1">
               <div class="d-flex justify-content-between align-items-center">
                 <strong>Alerts</strong>
-                <button type="button" class="btn btn-sm btn-success" id="ALERT_RULE_CREATE_BUTTON">
-                  New Alert
-                </button>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-sm btn-light" id="AUDIO_ASSETS_OPEN_BUTTON">
+                    Audio Assets
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-success"
+                    id="ALERT_RULE_CREATE_BUTTON"
+                  >
+                    New Alert
+                  </button>
+                </div>
               </div>
               <div id="ALERT_RULE_MANAGER_LIST" class="d-grid gap-2"></div>
             </div>
@@ -1508,6 +1517,37 @@
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_AUDIO_ASSETS"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_AUDIO_ASSETS_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="d-grid gap-2 text-start mt-1">
+              <div class="d-flex justify-content-between align-items-center gap-2">
+                <button type="button" class="btn btn-sm btn-light" id="AUDIO_ASSETS_BACK_BUTTON">
+                  <i class="bi bi-chevron-left me-1" aria-hidden="true"></i>Back
+                </button>
+                <div class="rounded-3 p-2 bg-ghost flex-grow-1 text-center">
+                  <h6 class="mb-0">Audio Assets</h6>
+                </div>
+              </div>
+
+              <div id="AUDIO_ASSETS_LIST" class="d-grid gap-2"></div>
+
+              <button type="button" class="btn btn-sm btn-success" id="AUDIO_ASSETS_SELECT_BUTTON">
+                <i class="bi bi-folder2-open me-1" aria-hidden="true"></i>Select Files
+              </button>
             </div>
           </div>
         </div>
@@ -1831,5 +1871,6 @@
     <script src="./js/app/14-selection-init.js" defer></script>
     <script src="./js/app/15-script-manager.js" defer></script>
     <script src="./js/app/16-dummy-clients.js" defer></script>
+    <script src="./js/app/17-audio-assets.js" defer></script>
   </footer>
 </html>

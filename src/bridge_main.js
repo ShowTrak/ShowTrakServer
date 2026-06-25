@@ -88,6 +88,13 @@ const INVOKE_CHANNELS = new Set([
   'SetAlertRuleEnabled',
   'AlertActionsEnabled:Get',
   'AlertActionsEnabled:Set',
+  'Audio:GetAll',
+  'Audio:GetData',
+  'Audio:Select',
+  'Audio:Import',
+  'Audio:Update',
+  'Audio:Delete',
+  'Audio:OpenFolder',
 ]);
 
 const SUBSCRIBE_CHANNELS = new Set([
@@ -95,6 +102,7 @@ const SUBSCRIBE_CHANNELS = new Set([
   'ModeUpdated',
   'OSCBulkAction',
   'PlaySound',
+  'PlayCustomAudio',
   'Notify',
   'DebugTrafficEntry',
   'SetOSCList',
@@ -116,6 +124,7 @@ const SUBSCRIBE_CHANNELS = new Set([
   'SetFullAlertRuleList',
   'AlertTriggered',
   'CreateShowTrakAlert',
+  'AudioAssetsUpdated',
   'UpdateManager:DownloadProgress',
   'ShowFileUpdated',
   'MainWindowFullscreenChanged',
@@ -287,4 +296,14 @@ contextBridge.exposeInMainWorld('API', {
   SetFullAlertRuleList: (Callback) => subscribe('SetFullAlertRuleList', Callback),
   AlertTriggered: (Callback) => subscribe('AlertTriggered', Callback),
   CreateShowTrakAlert: (Callback) => subscribe('CreateShowTrakAlert', Callback),
+  // Custom Audio Assets
+  GetAudioAssets: async () => invoke('Audio:GetAll'),
+  GetAudioAssetData: async (ID) => invoke('Audio:GetData', ID),
+  SelectAudioAssetFiles: async () => invoke('Audio:Select'),
+  ImportAudioAsset: async (Payload) => invoke('Audio:Import', Payload),
+  UpdateAudioAsset: async (ID, Payload) => invoke('Audio:Update', ID, Payload),
+  DeleteAudioAsset: async (ID) => invoke('Audio:Delete', ID),
+  OpenAudioAssetsFolder: async () => invoke('Audio:OpenFolder'),
+  PlayCustomAudio: (Callback) => subscribe('PlayCustomAudio', Callback),
+  OnAudioAssetsUpdated: (Callback) => subscribe('AudioAssetsUpdated', Callback),
 });

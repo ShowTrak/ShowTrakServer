@@ -45,6 +45,7 @@ const { Manager: DummyClientManager } = require('./Modules/DummyClientManager');
 const { Manager: DBManager } = require('./Modules/DB');
 const { Manager: MonitoringMethods } = require('./Modules/MonitoringMethods');
 const { Manager: AlertsManager } = require('./Modules/AlertsManager');
+const { Manager: AudioAssetManager } = require('./Modules/AudioAssetManager');
 const { Manager: NetworkDiscoveryManager } = require('./Modules/NetworkDiscovery');
 const { Manager: FileSelectorManager } = require('./Modules/FileSelectorManager');
 const { Manager: BackupManager } = require('./Modules/BackupManager');
@@ -833,6 +834,9 @@ app.whenReady().then(async () => {
       Logger.error('Failed to init DummyClientManager:', Err)
     );
     AlertsManager.Init().catch((Err) => Logger.error('Failed to init AlertsManager:', Err));
+    AudioAssetManager.Init()
+      .then(() => ValidateAlertAudioAssets())
+      .catch((Err) => Logger.error('Failed to init AudioAssetManager:', Err));
     await Wait(800);
     PreloaderWindow.close();
     MainWindow.show();
@@ -1473,6 +1477,80 @@ app.whenReady().then(async () => {
 
   RPC.handle('AlertActionsEnabled:Set', async (_Event, Enabled) => {
     return AlertsManager.SetActionsEnabled(!!Enabled);
+  });
+
+  // ---- Custom Audio Assets ----
+  RPC.handle('Audio:GetAll', async () => {
+    const [Err, List] = await AudioAssetManager.GetAll();
+    if (Err) return [];
+    return List || [];
+  });
+
+  RPC.handle('Audio:GetData', async (_Event, ID) => {
+    try {
+      ID = IPCValidation.AudioAssetID(ID);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Payload] = AudioAssetManager.GetDataURL(ID);
+    if (Err) return [Err, null];
+    return [null, Payload];
+  });
+
+  // Opens the OS file picker and returns inspected candidates (with base64 data
+  // URLs) so the renderer can run the duration check before importing.
+  RPC.handle('Audio:Select', async () => {
+    const { canceled, filePaths } = await FileSelectorManager.OpenAudioDialog('Select Audio Files');
+    if (canceled || !filePaths || !filePaths.length) return [null, []];
+    const Candidates = filePaths.map((FilePath) => AudioAssetManager.InspectCandidate(FilePath));
+    return [null, Candidates];
+  });
+
+  RPC.handle('Audio:Import', async (_Event, Payload) => {
+    try {
+      Payload = IPCValidation.AudioImportPayload(Payload);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Asset] = await AudioAssetManager.Import(Payload);
+    if (Err) return [Err, null];
+    if (MainWindow && !MainWindow.isDestroyed()) {
+      MainWindow.webContents.send('AudioAssetsUpdated');
+    }
+    return [null, Asset];
+  });
+
+  RPC.handle('Audio:Update', async (_Event, ID, Payload) => {
+    try {
+      ID = IPCValidation.AudioAssetID(ID);
+      Payload = IPCValidation.AudioUpdatePayload(Payload);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Asset] = await AudioAssetManager.Update(ID, Payload);
+    if (Err) return [Err, null];
+    if (MainWindow && !MainWindow.isDestroyed()) {
+      MainWindow.webContents.send('AudioAssetsUpdated');
+    }
+    return [null, Asset];
+  });
+
+  RPC.handle('Audio:Delete', async (_Event, ID) => {
+    try {
+      ID = IPCValidation.AudioAssetID(ID);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const [Err, Result] = await AudioAssetManager.Delete(ID);
+    if (Err) return [Err, null];
+    if (MainWindow && !MainWindow.isDestroyed()) {
+      MainWindow.webContents.send('AudioAssetsUpdated');
+    }
+    return [null, Result];
+  });
+
+  RPC.handle('Audio:OpenFolder', async () => {
+    return AppDataManager.OpenFolder(AppDataManager.GetAudioDirectory());
   });
 
   RPC.handle('NetworkDiscovery:Start', async (_Event, Options) => {
@@ -2417,11 +2495,54 @@ async function Notify(Message, Type = 'info', Duration = 5000) {
 
 BroadcastManager.on('Notify', Notify);
 
+// On show load/boot, verify every alert action that references a custom audio
+// asset still resolves to a file on disk. Missing assets are surfaced as a
+// renderer notification so the operator knows an alert sound was deleted; the
+// alert UI separately renders a warning icon on the affected actions.
+async function ValidateAlertAudioAssets() {
+  try {
+    const [Err, Rules] = await AlertsManager.GetAll();
+    if (Err || !Array.isArray(Rules)) return;
+
+    const ReferencedIDs = [];
+    for (const Rule of Rules) {
+      const Actions = Array.isArray(Rule.Actions) ? Rule.Actions : [];
+      for (const Action of Actions) {
+        if (Action && Action.Type === 'play-custom-audio') {
+          const AssetID = Action.Settings && Action.Settings.AssetID ? Action.Settings.AssetID : '';
+          if (AssetID) ReferencedIDs.push(String(AssetID));
+        }
+      }
+    }
+
+    const Missing = AudioAssetManager.FindMissing(ReferencedIDs);
+    if (!Missing.length) return;
+
+    Logger.warn(`Missing custom audio assets referenced by alerts: ${Missing.join(', ')}`);
+    const Count = Missing.length;
+    Notify(
+      `${Count} alert audio asset${Count === 1 ? ' is' : 's are'} missing and will fall back to a built-in sound.`,
+      'error',
+      10000
+    );
+  } catch (Err) {
+    Logger.error('Failed to validate alert audio assets', Err);
+  }
+}
+
 // UI-triggered audio feedback (short, non-blocking).
 async function PlaySound(SoundName) {
   MainWindow.webContents.send('PlaySound', SoundName);
 }
 BroadcastManager.on('PlaySound', PlaySound);
+
+// Custom audio asset playback requested by an alert action. The payload carries
+// a base64 data URL + per-asset volume so the renderer can play it via Howler.
+async function PlayCustomAudio(Payload) {
+  if (!MainWindow || MainWindow.isDestroyed()) return;
+  MainWindow.webContents.send('PlayCustomAudio', Payload);
+}
+BroadcastManager.on('PlayCustomAudio', PlayCustomAudio);
 
 // Batch an OSC-triggered action and let the renderer decide the UX.
 async function HandleOSCBulkAction(Type, Targets, Args = null) {

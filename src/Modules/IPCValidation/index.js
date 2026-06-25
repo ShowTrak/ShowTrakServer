@@ -8,6 +8,7 @@ require('./client-validators')(Manager);
 require('./monitoring-validators')(Manager);
 require('./dummy-validators')(Manager);
 require('./alert-validators')(Manager);
+require('./audio-validators')(Manager);
 require('./system-validators')(Manager);
 
 module.exports = {
