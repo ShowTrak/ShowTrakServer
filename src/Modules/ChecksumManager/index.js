@@ -1,4 +1,4 @@
-var checksum = require('checksum');
+const checksum = require('checksum');
 
 const Manager = {};
 

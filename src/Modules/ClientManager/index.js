@@ -16,7 +16,7 @@ const { NormalizeIntegratedActions } = require('./integrated-actions');
 const Manager = {};
 
 // Hot cache of Client instances reflecting current state
-var ClientList = [];
+let ClientList = [];
 const CriticalUSBIndex = new Map();
 const CriticalApplicationIndex = new Map();
 
@@ -120,9 +120,9 @@ async function loadCriticalApplicationIndex() {
 }
 
 Manager.Timeout = async (UUID) => {
-  let Exists = await Manager.Exists(UUID);
+  const Exists = await Manager.Exists(UUID);
   if (!Exists) return;
-  let [Err, TimedOutClient] = await Manager.Get(UUID);
+  const [Err, TimedOutClient] = await Manager.Get(UUID);
   if (Err) return Logger.error('Failed to get client for timeout:', Err);
   if (!TimedOutClient) return Logger.warn(`Client ${UUID} not found for timeout.`);
   TimedOutClient.SetOnline(false);
@@ -134,7 +134,7 @@ Manager.Heartbeat = async (UUID, Data, IP) => {
   let CachedClient = ClientList.find((c) => c.UUID === UUID);
   if (!CachedClient) {
     Logger.warn(`Client ${UUID} not found in memory, fetching from database.`);
-    let [Err, FetchedClient] = await DB.Get('SELECT * FROM Clients WHERE UUID = ?', [UUID]);
+    const [Err, FetchedClient] = await DB.Get('SELECT * FROM Clients WHERE UUID = ?', [UUID]);
     if (Err) {
       Logger.error('Failed to fetch client from database:', Err);
       return ['Failed to fetch client', null];
@@ -163,7 +163,7 @@ Manager.Heartbeat = async (UUID, Data, IP) => {
 };
 
 Manager.SetUSBDeviceList = async (UUID, DeviceList) => {
-  let [Err, Target] = await Manager.Get(UUID);
+  const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
   Target.SetUSBDeviceList(DeviceList);
@@ -174,7 +174,7 @@ Manager.SetUSBDeviceList = async (UUID, DeviceList) => {
 // integrated client over Socket.IO. The payload is normalized/sanitized before
 // being stored on the cached Client instance.
 Manager.SetIntegratedActions = async (UUID, Actions) => {
-  let [Err, Target] = await Manager.Get(UUID);
+  const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
   const Normalized = NormalizeIntegratedActions(Actions);
@@ -185,7 +185,7 @@ Manager.SetIntegratedActions = async (UUID, Actions) => {
 // Apply a manual health state (ONLINE / DEGRADED) reported by an integrated
 // client over the SDK. OFFLINE is rejected (driven by the connection only).
 Manager.SetIntegratedState = async (UUID, State, Message) => {
-  let [Err, Target] = await Manager.Get(UUID);
+  const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
   const Applied = Target.SetIntegratedState(State, Message);
@@ -194,7 +194,7 @@ Manager.SetIntegratedState = async (UUID, State, Message) => {
 };
 
 Manager.SetNetworkInterfaces = async (UUID, Interfaces) => {
-  let [Err, Target] = await Manager.Get(UUID);
+  const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
   Target.SetNetworkInterfaces(Interfaces);
@@ -202,7 +202,7 @@ Manager.SetNetworkInterfaces = async (UUID, Interfaces) => {
 };
 
 Manager.SetRunningApplications = async (UUID, Snapshot) => {
-  let [Err, Target] = await Manager.Get(UUID);
+  const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
   if (!ClientList.find((Client) => Client.UUID === UUID)) {
@@ -214,7 +214,7 @@ Manager.SetRunningApplications = async (UUID, Snapshot) => {
 };
 
 Manager.MarkApplicationCritical = async (UUID, Application) => {
-  let [Err, Target] = await Manager.Get(UUID);
+  const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
 
@@ -244,7 +244,7 @@ Manager.MarkApplicationCritical = async (UUID, Application) => {
 };
 
 Manager.RemoveApplicationCritical = async (UUID, ApplicationName) => {
-  let [Err, Target] = await Manager.Get(UUID);
+  const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
 
@@ -291,7 +291,7 @@ Manager.IsApplicationCritical = async (UUID, ApplicationName) => {
 };
 
 Manager.USBDeviceAdded = async (UUID, Device) => {
-  let [Err, Target] = await Manager.Get(UUID);
+  const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
   Target.USBDeviceAdded(Device);
@@ -299,7 +299,7 @@ Manager.USBDeviceAdded = async (UUID, Device) => {
 };
 
 Manager.USBDeviceRemoved = async (UUID, Device) => {
-  let [Err, Target] = await Manager.Get(UUID);
+  const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
   Target.USBDeviceRemoved(Device);
@@ -307,7 +307,7 @@ Manager.USBDeviceRemoved = async (UUID, Device) => {
 };
 
 Manager.MarkUSBDeviceCritical = async (UUID, Device) => {
-  let [Err, Target] = await Manager.Get(UUID);
+  const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
 
@@ -347,7 +347,7 @@ Manager.MarkUSBDeviceCritical = async (UUID, Device) => {
 };
 
 Manager.RemoveUSBDeviceCritical = async (UUID, SerialNumber) => {
-  let [Err, Target] = await Manager.Get(UUID);
+  const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
 
@@ -388,22 +388,22 @@ Manager.IsUSBDeviceCritical = async (UUID, SerialNumber) => {
 
 // One-shot richer payload: hostname + NICs -> derive MAC for the active IP
 Manager.SystemInfo = async (UUID, Data, IP) => {
-  let [Err, Target] = await Manager.Get(UUID);
+  const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
 
   await Target.SetHostname(Data.Hostname || null, { markUnsaved: false });
   await Target.SetOperatingSystem(Data.OperatingSystem || null, { markUnsaved: false });
-  let Macs = Object.values(Data.MacAddresses || {});
-  for (let Interface of Macs) {
-    if (Interface.ipv4 == IP) await Target.SetMacAddress(Interface.mac, { markUnsaved: false });
+  const Macs = Object.values(Data.MacAddresses || {});
+  for (const Interface of Macs) {
+    if (Interface.ipv4 === IP) await Target.SetMacAddress(Interface.mac, { markUnsaved: false });
   }
 
   return [null, 'Heartbeat processed successfully'];
 };
 
 Manager.Update = async (UUID, Data) => {
-  let [Err, Client] = await Manager.Get(UUID);
+  const [Err, Client] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
   if (!Client) return Fail('Client Not Found');
   if (Object.prototype.hasOwnProperty.call(Data, 'Nickname')) {
@@ -418,11 +418,11 @@ Manager.Update = async (UUID, Data) => {
 // Adopt a client by creating a durable DB row and adding to the cache
 Manager.Create = async (UUID) => {
   // Verify if the client already exists
-  let [Err, ExistingClient] = await DB.Get('SELECT * FROM Clients WHERE UUID = ?', [UUID]);
+  const [Err, ExistingClient] = await DB.Get('SELECT * FROM Clients WHERE UUID = ?', [UUID]);
   if (Err) return Fail('Failed to fetch existing client');
   if (ExistingClient) return Fail('Client already exists');
   // Insert new client into the database
-  let [InsertErr, _Res] = await DB.Run(
+  const [InsertErr, _Res] = await DB.Run(
     'INSERT INTO Clients (UUID, Hostname, OperatingSystem, Version, IP, Timestamp) VALUES (?, ?, ?, ?, ?, ?)',
     [UUID, 'ShowTrak Client', null, null, null, Date.now()]
   );
@@ -449,7 +449,7 @@ Manager.Delete = async (UUID) => {
   const [criticalAppErr] = await DB.Run('DELETE FROM CriticalApplications WHERE UUID = ?', [UUID]);
   if (criticalAppErr) return Fail('Failed to delete critical applications for client');
   // Remove from database
-  let [Err, _Res] = await DB.Run('DELETE FROM Clients WHERE UUID = ?', [UUID]);
+  const [Err, _Res] = await DB.Run('DELETE FROM Clients WHERE UUID = ?', [UUID]);
   if (Err) return Fail('Failed to delete client');
   // Remove from in-memory list
   ClientList = ClientList.filter((c) => c.UUID !== UUID);
@@ -582,10 +582,10 @@ Manager.ReplaceClient = async (CurrentUUID, ReplacementUUID) => {
 // Truthy existence check: prefer cache, fallback to DB
 Manager.Exists = async (UUID) => {
   // Check in memory first
-  let CachedClient = ClientList.find((c) => c.UUID === UUID);
+  const CachedClient = ClientList.find((c) => c.UUID === UUID);
   if (CachedClient) return true;
   // If not found in memory, check in database
-  let [Err, Client] = await DB.Get('SELECT * FROM Clients WHERE UUID = ?', [UUID]);
+  const [Err, Client] = await DB.Get('SELECT * FROM Clients WHERE UUID = ?', [UUID]);
   if (Err) return false;
   if (!Client) return false;
   return true;
@@ -594,7 +594,7 @@ Manager.Exists = async (UUID) => {
 // Fetch a Client object (cached or hydrated); callers should not mutate DB-only fields directly
 Manager.Get = async (UUID) => {
   // Check in memory first
-  let CachedClient = ClientList.find((c) => c.UUID === UUID);
+  const CachedClient = ClientList.find((c) => c.UUID === UUID);
   if (CachedClient) {
     return [null, CachedClient];
   }

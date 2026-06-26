@@ -253,12 +253,12 @@ test('MonitoringTargetManager reload replaces runtime list from latest DB rows',
     });
 
     await Manager.Init();
-    let [_beforeErr, before] = await Manager.GetAll();
+    const [_beforeErr, before] = await Manager.GetAll();
     assert.equal(before.length, 1);
     assert.equal(before[0].TargetID, 1);
 
     await Manager.Reload();
-    let [_afterErr, after] = await Manager.GetAll();
+    const [_afterErr, after] = await Manager.GetAll();
     assert.equal(after.length, 1);
     assert.equal(after[0].TargetID, 2);
     assert.equal(after[0].Nickname, 'Restored Target');

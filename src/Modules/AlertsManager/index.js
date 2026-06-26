@@ -282,185 +282,98 @@ Manager.SetActionsEnabled = (Enabled) => {
   return AlertActionsEnabled;
 };
 
-Manager.HandleUSBDeviceConnected = async (Client, Device) => {
-  if (!Client || !Client.UUID) return;
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.USB_DEVICE_CONNECTED,
-    EntityType: 'client',
-    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-    UUID: Client.UUID,
-    GroupID: Client.GroupID == null ? null : Client.GroupID,
-    IP: Client.IP || null,
-    Severity: 'info',
-    Device: Device || null,
-    RawData: Client,
-  });
-};
+// Many alert handlers share the same "client event with optional payload" shape:
+// they ignore events without a UUID and forward a normalized client Context to
+// the rule engine. This factory captures that shape; only the trigger type,
+// severity and payload key differ.
+function makeClientEventHandler(TriggerType, Severity, PayloadKey) {
+  return async (Client, Payload) => {
+    if (!Client || !Client.UUID) return;
+    await evaluateAgainstRules({
+      TriggerType,
+      EntityType: 'client',
+      EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+      UUID: Client.UUID,
+      GroupID: Client.GroupID == null ? null : Client.GroupID,
+      IP: Client.IP || null,
+      Severity,
+      ...(PayloadKey ? { [PayloadKey]: Payload || null } : {}),
+      RawData: Client,
+    });
+  };
+}
 
-Manager.HandleUSBDeviceDisconnected = async (Client, Device) => {
-  if (!Client || !Client.UUID) return;
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.USB_DEVICE_DISCONNECTED,
-    EntityType: 'client',
-    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-    UUID: Client.UUID,
-    GroupID: Client.GroupID == null ? null : Client.GroupID,
-    IP: Client.IP || null,
-    Severity: 'warning',
-    Device: Device || null,
-    RawData: Client,
-  });
-};
+Manager.HandleUSBDeviceConnected = makeClientEventHandler(
+  TRIGGERS.USB_DEVICE_CONNECTED,
+  'info',
+  'Device'
+);
 
-Manager.HandleNonCriticalUSBDeviceConnected = async (Client, Device) => {
-  if (!Client || !Client.UUID) return;
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.NON_CRITICAL_USB_DEVICE_CONNECTED,
-    EntityType: 'client',
-    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-    UUID: Client.UUID,
-    GroupID: Client.GroupID == null ? null : Client.GroupID,
-    IP: Client.IP || null,
-    Severity: 'info',
-    Device: Device || null,
-    RawData: Client,
-  });
-};
+Manager.HandleUSBDeviceDisconnected = makeClientEventHandler(
+  TRIGGERS.USB_DEVICE_DISCONNECTED,
+  'warning',
+  'Device'
+);
 
-Manager.HandleNonCriticalUSBDeviceDisconnected = async (Client, Device) => {
-  if (!Client || !Client.UUID) return;
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.NON_CRITICAL_USB_DEVICE_DISCONNECTED,
-    EntityType: 'client',
-    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-    UUID: Client.UUID,
-    GroupID: Client.GroupID == null ? null : Client.GroupID,
-    IP: Client.IP || null,
-    Severity: 'warning',
-    Device: Device || null,
-    RawData: Client,
-  });
-};
+Manager.HandleNonCriticalUSBDeviceConnected = makeClientEventHandler(
+  TRIGGERS.NON_CRITICAL_USB_DEVICE_CONNECTED,
+  'info',
+  'Device'
+);
 
-Manager.HandleCriticalUSBDeviceConnected = async (Client, Device) => {
-  if (!Client || !Client.UUID) return;
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED,
-    EntityType: 'client',
-    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-    UUID: Client.UUID,
-    GroupID: Client.GroupID == null ? null : Client.GroupID,
-    IP: Client.IP || null,
-    Severity: 'warning',
-    Device: Device || null,
-    RawData: Client,
-  });
-};
+Manager.HandleNonCriticalUSBDeviceDisconnected = makeClientEventHandler(
+  TRIGGERS.NON_CRITICAL_USB_DEVICE_DISCONNECTED,
+  'warning',
+  'Device'
+);
 
-Manager.HandleCriticalUSBDeviceDisconnected = async (Client, Device) => {
-  if (!Client || !Client.UUID) return;
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED,
-    EntityType: 'client',
-    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-    UUID: Client.UUID,
-    GroupID: Client.GroupID == null ? null : Client.GroupID,
-    IP: Client.IP || null,
-    Severity: 'warning',
-    Device: Device || null,
-    RawData: Client,
-  });
-};
+Manager.HandleCriticalUSBDeviceConnected = makeClientEventHandler(
+  TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED,
+  'warning',
+  'Device'
+);
 
-Manager.HandleApplicationStarted = async (Client, Application) => {
-  if (!Client || !Client.UUID) return;
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.APPLICATION_STARTED,
-    EntityType: 'client',
-    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-    UUID: Client.UUID,
-    GroupID: Client.GroupID == null ? null : Client.GroupID,
-    IP: Client.IP || null,
-    Severity: 'info',
-    Application: Application || null,
-    RawData: Client,
-  });
-};
+Manager.HandleCriticalUSBDeviceDisconnected = makeClientEventHandler(
+  TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED,
+  'warning',
+  'Device'
+);
 
-Manager.HandleApplicationStopped = async (Client, Application) => {
-  if (!Client || !Client.UUID) return;
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.APPLICATION_STOPPED,
-    EntityType: 'client',
-    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-    UUID: Client.UUID,
-    GroupID: Client.GroupID == null ? null : Client.GroupID,
-    IP: Client.IP || null,
-    Severity: 'warning',
-    Application: Application || null,
-    RawData: Client,
-  });
-};
+Manager.HandleApplicationStarted = makeClientEventHandler(
+  TRIGGERS.APPLICATION_STARTED,
+  'info',
+  'Application'
+);
 
-Manager.HandleCriticalApplicationStarted = async (Client, Application) => {
-  if (!Client || !Client.UUID) return;
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.CRITICAL_APPLICATION_STARTED,
-    EntityType: 'client',
-    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-    UUID: Client.UUID,
-    GroupID: Client.GroupID == null ? null : Client.GroupID,
-    IP: Client.IP || null,
-    Severity: 'warning',
-    Application: Application || null,
-    RawData: Client,
-  });
-};
+Manager.HandleApplicationStopped = makeClientEventHandler(
+  TRIGGERS.APPLICATION_STOPPED,
+  'warning',
+  'Application'
+);
 
-Manager.HandleCriticalApplicationStopped = async (Client, Application) => {
-  if (!Client || !Client.UUID) return;
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.CRITICAL_APPLICATION_STOPPED,
-    EntityType: 'client',
-    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-    UUID: Client.UUID,
-    GroupID: Client.GroupID == null ? null : Client.GroupID,
-    IP: Client.IP || null,
-    Severity: 'warning',
-    Application: Application || null,
-    RawData: Client,
-  });
-};
+Manager.HandleCriticalApplicationStarted = makeClientEventHandler(
+  TRIGGERS.CRITICAL_APPLICATION_STARTED,
+  'warning',
+  'Application'
+);
 
-Manager.HandleNonCriticalApplicationStarted = async (Client, Application) => {
-  if (!Client || !Client.UUID) return;
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.NON_CRITICAL_APPLICATION_STARTED,
-    EntityType: 'client',
-    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-    UUID: Client.UUID,
-    GroupID: Client.GroupID == null ? null : Client.GroupID,
-    IP: Client.IP || null,
-    Severity: 'info',
-    Application: Application || null,
-    RawData: Client,
-  });
-};
+Manager.HandleCriticalApplicationStopped = makeClientEventHandler(
+  TRIGGERS.CRITICAL_APPLICATION_STOPPED,
+  'warning',
+  'Application'
+);
 
-Manager.HandleNonCriticalApplicationStopped = async (Client, Application) => {
-  if (!Client || !Client.UUID) return;
-  await evaluateAgainstRules({
-    TriggerType: TRIGGERS.NON_CRITICAL_APPLICATION_STOPPED,
-    EntityType: 'client',
-    EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-    UUID: Client.UUID,
-    GroupID: Client.GroupID == null ? null : Client.GroupID,
-    IP: Client.IP || null,
-    Severity: 'warning',
-    Application: Application || null,
-    RawData: Client,
-  });
-};
+Manager.HandleNonCriticalApplicationStarted = makeClientEventHandler(
+  TRIGGERS.NON_CRITICAL_APPLICATION_STARTED,
+  'info',
+  'Application'
+);
+
+Manager.HandleNonCriticalApplicationStopped = makeClientEventHandler(
+  TRIGGERS.NON_CRITICAL_APPLICATION_STOPPED,
+  'warning',
+  'Application'
+);
 
 Manager.HandleClientUpdated = async (Client) => {
   if (!Client || !Client.UUID) return;

@@ -8,11 +8,11 @@ const { Manager: Broadcast } = require('../Broadcast');
 const { Manager: ScriptManager } = require('../ScriptManager');
 const { Manager: DummyClientManager } = require('../DummyClientManager');
 const { Manager: GroupManager } = require('../GroupManager');
-var OSCServer = new Server(3333, '0.0.0.0', () => {
+const OSCServer = new Server(3333, '0.0.0.0', () => {
   console.log('OSC Server is listening');
 });
 
-let Routes = [];
+const Routes = [];
 const SelectedClientUUIDs = new Set();
 
 const OSC = {};
@@ -79,11 +79,11 @@ async function getGroupClients(GroupIDRaw) {
 
 OSCServer.on('message', async function (Route, Info) {
   const RawPath = Array.isArray(Route) && Route.length > 0 ? String(Route[0] || '') : '';
-  let ValidRoutes = [];
+  const ValidRoutes = [];
 
   Main: for (const PRoute of Routes) {
-    let PRouteParts = PRoute.Path.split('/');
-    let RouteParts = RawPath.split('/');
+    const PRouteParts = PRoute.Path.split('/');
+    const RouteParts = RawPath.split('/');
     if (PRouteParts.length !== RouteParts.length) continue Main;
     Sub: for (let i = 0; i < PRouteParts.length; i++) {
       if (PRouteParts[i] === RouteParts[i] || PRouteParts[i].startsWith(':')) continue Sub;
@@ -92,7 +92,7 @@ OSCServer.on('message', async function (Route, Info) {
     ValidRoutes.push(PRoute);
   }
 
-  if (!ValidRoutes || ValidRoutes.length == 0) {
+  if (!ValidRoutes || ValidRoutes.length === 0) {
     emitDebugEntry({
       valid: false,
       summary: RawPath || '[empty route]',
@@ -104,10 +104,10 @@ OSCServer.on('message', async function (Route, Info) {
   for (const ValidRoute of ValidRoutes) {
     Logger.log(`Executing route: ${ValidRoute.Path}`);
 
-    let Req = {};
+    const Req = {};
 
-    let PRouteParts = ValidRoute.Path.split('/');
-    let RouteParts = RawPath.split('/');
+    const PRouteParts = ValidRoute.Path.split('/');
+    const RouteParts = RawPath.split('/');
 
     for (let i = 0; i < PRouteParts.length; i++) {
       if (PRouteParts[i].startsWith(':')) {
@@ -118,7 +118,7 @@ OSCServer.on('message', async function (Route, Info) {
     // Source address of the UDP packet (used by routes that record sender IPs).
     const Meta = { IP: Info && Info.address ? Info.address : null };
 
-    let RequestComplete = await ValidRoute.Callback(Req, Meta);
+    const RequestComplete = await ValidRoute.Callback(Req, Meta);
     const RequestPassed =
       RequestComplete && typeof RequestComplete === 'object'
         ? RequestComplete.ok !== false
@@ -187,7 +187,7 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Client/:UUID/Select',
   async (Req) => {
-    let [Err, Client] = await ClientManager.Get(Req.UUID);
+    const [Err, Client] = await ClientManager.Get(Req.UUID);
     if (Err) {
       Broadcast.emit('Notify', `OSC - Invalid UUID "${Req.UUID}"`, 'error');
       return failureResult(`Invalid UUID "${Req.UUID}"`);
@@ -202,7 +202,7 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Client/:UUID/Deselect',
   async (Req) => {
-    let [Err, Client] = await ClientManager.Get(Req.UUID);
+    const [Err, Client] = await ClientManager.Get(Req.UUID);
     if (Err) {
       Broadcast.emit('Notify', `OSC - Invalid UUID "${Req.UUID}"`, 'error');
       return failureResult(`Invalid UUID "${Req.UUID}"`);
@@ -217,7 +217,7 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Client/:UUID/WakeOnLAN',
   async (Req) => {
-    let [Err, Client] = await ClientManager.Get(Req.UUID);
+    const [Err, Client] = await ClientManager.Get(Req.UUID);
     if (Err) {
       Broadcast.emit('Notify', `OSC - Invalid UUID "${Req.UUID}"`, 'error');
       return failureResult(`Invalid UUID "${Req.UUID}"`);
@@ -231,12 +231,12 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Client/:UUID/RunScript/:ScriptID',
   async (Req) => {
-    let [Err, Client] = await ClientManager.Get(Req.UUID);
+    const [Err, Client] = await ClientManager.Get(Req.UUID);
     if (Err) {
       Broadcast.emit('Notify', `OSC - Invalid UUID "${Req.UUID}"`, 'error');
       return failureResult(`Invalid UUID "${Req.UUID}"`);
     }
-    let Script = await ScriptManager.Get(Req.ScriptID);
+    const Script = await ScriptManager.Get(Req.ScriptID);
     if (!Script) {
       Broadcast.emit('Notify', `OSC - Invalid Script ID "${Req.ScriptID}"`, 'error');
       return failureResult(`Invalid Script ID "${Req.ScriptID}"`);
@@ -251,7 +251,7 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Dummy/:ID/Heartbeat',
   async (Req, Meta) => {
-    let [Err] = await DummyClientManager.Heartbeat(Req.ID, Meta && Meta.IP ? Meta.IP : null);
+    const [Err] = await DummyClientManager.Heartbeat(Req.ID, Meta && Meta.IP ? Meta.IP : null);
     if (Err) {
       Broadcast.emit('Notify', `OSC - ${Err}`, 'error');
       return failureResult(String(Err));
@@ -327,7 +327,7 @@ OSC.CreateRoute(
       return GroupErr;
     }
 
-    let Script = await ScriptManager.Get(Req.ScriptID);
+    const Script = await ScriptManager.Get(Req.ScriptID);
     if (!Script) {
       Broadcast.emit('Notify', `OSC - Invalid Script ID "${Req.ScriptID}"`, 'error');
       return failureResult(`Invalid Script ID "${Req.ScriptID}"`);
@@ -346,7 +346,7 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/All/Select',
   async (_Req) => {
-    let [Err, AllClients] = await ClientManager.GetAll();
+    const [Err, AllClients] = await ClientManager.GetAll();
     if (Err) {
       Broadcast.emit('Notify', `OSC - Failed to fetch all clients.`, 'error');
       return failureResult('Failed to fetch all clients');
@@ -379,7 +379,7 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/All/WakeOnLAN',
   async (_Req) => {
-    let [Err, AllClients] = await ClientManager.GetAll();
+    const [Err, AllClients] = await ClientManager.GetAll();
     if (Err) {
       Broadcast.emit('Notify', `OSC - Failed to fetch all clients.`, 'error');
       return failureResult('Failed to fetch all clients');
@@ -398,12 +398,12 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/All/RunScript/:ScriptID',
   async (Req) => {
-    let [Err, AllClients] = await ClientManager.GetAll();
+    const [Err, AllClients] = await ClientManager.GetAll();
     if (Err) {
       Broadcast.emit('Notify', `OSC - Failed to fetch all clients.`, 'error');
       return failureResult('Failed to fetch all clients');
     }
-    let Script = await ScriptManager.Get(Req.ScriptID);
+    const Script = await ScriptManager.Get(Req.ScriptID);
     if (!Script) {
       Broadcast.emit('Notify', `OSC - Invalid Script ID "${Req.ScriptID}"`, 'error');
       return failureResult(`Invalid Script ID "${Req.ScriptID}"`);
@@ -443,7 +443,7 @@ OSC.CreateRoute(
       return failureResult('No selected clients');
     }
 
-    let Script = await ScriptManager.Get(Req.ScriptID);
+    const Script = await ScriptManager.Get(Req.ScriptID);
     if (!Script) {
       Broadcast.emit('Notify', `OSC - Invalid Script ID "${Req.ScriptID}"`, 'error');
       return failureResult(`Invalid Script ID "${Req.ScriptID}"`);

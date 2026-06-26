@@ -49,7 +49,7 @@ function SetupClientNamespace(io) {
 
     // If the client claims adoption, verify against our DB to prevent drift
     if (socket.Adopted) {
-      let IsInDatabase = await ClientManager.Exists(socket.UUID);
+      const IsInDatabase = await ClientManager.Exists(socket.UUID);
       if (!IsInDatabase) {
         Logger.warn('Client is adopted but not found in the database:', socket.UUID);
         Logger.warn('Unadopting Client');
@@ -143,7 +143,7 @@ function SetupClientNamespace(io) {
         //   } : undefined,
         //   Version: Data && Data.Version,
         // });
-        let [Err] = await ClientManager.Heartbeat(socket.UUID, Data, socket.IP);
+        const [Err] = await ClientManager.Heartbeat(socket.UUID, Data, socket.IP);
         if (Err) {
           console.error(Err);
         }

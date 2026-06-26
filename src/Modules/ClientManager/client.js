@@ -614,15 +614,22 @@ class Client {
     return;
   }
 
+  // Persist a single DB-backed column for this client. Column names are passed
+  // by the typed setters below (constants, never user input). Returns true on
+  // success; honours the markUnsaved option via getDBRunner.
+  async _persistColumn(Column, Value, Options = {}) {
+    const Run = getDBRunner(Options.markUnsaved);
+    const [Err] = await Run(`UPDATE Clients SET ${Column} = ? WHERE UUID = ?`, [Value, this.UUID]);
+    return !Err;
+  }
+
   // Persistent fields (DB-backed)
   async SetNickname(Nickname) {
     if (this.Nickname === Nickname) return;
     this.Nickname = Nickname;
-    let [Err, _Res] = await DB.Run('UPDATE Clients SET Nickname = ? WHERE UUID = ?', [
-      Nickname,
-      this.UUID,
-    ]);
-    if (Err) return Logger.error('Failed to update client nickname');
+    if (!(await this._persistColumn('Nickname', Nickname))) {
+      return Logger.error('Failed to update client nickname');
+    }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} nickname updated to ${Nickname}`);
   }
@@ -630,11 +637,9 @@ class Client {
     if (this.GroupID === GroupID) return;
     if (GroupID === 'null') GroupID = null;
     this.GroupID = GroupID;
-    let [Err, _Res] = await DB.Run('UPDATE Clients SET GroupID = ? WHERE UUID = ?', [
-      GroupID,
-      this.UUID,
-    ]);
-    if (Err) return Logger.error('Failed to update client GroupID');
+    if (!(await this._persistColumn('GroupID', GroupID))) {
+      return Logger.error('Failed to update client GroupID');
+    }
     BroadcastManager.emit('ClientListChanged');
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} GroupID updated to ${GroupID}`);
@@ -642,68 +647,54 @@ class Client {
   async SetHostname(Hostname, Options = {}) {
     if (this.Hostname === Hostname) return;
     this.Hostname = Hostname;
-    const Run = getDBRunner(Options.markUnsaved);
-    let [Err, _Res] = await Run('UPDATE Clients SET Hostname = ? WHERE UUID = ?', [
-      Hostname,
-      this.UUID,
-    ]);
-    if (Err) return Logger.error('Failed to update client hostname');
+    if (!(await this._persistColumn('Hostname', Hostname, Options))) {
+      return Logger.error('Failed to update client hostname');
+    }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} hostname updated to ${Hostname}`);
   }
   async SetOperatingSystem(OperatingSystem, Options = {}) {
     if (this.OperatingSystem === OperatingSystem) return;
     this.OperatingSystem = OperatingSystem;
-    const Run = getDBRunner(Options.markUnsaved);
-    let [Err, _Res] = await Run('UPDATE Clients SET OperatingSystem = ? WHERE UUID = ?', [
-      OperatingSystem,
-      this.UUID,
-    ]);
-    if (Err) return Logger.error('Failed to update client operating system');
+    if (!(await this._persistColumn('OperatingSystem', OperatingSystem, Options))) {
+      return Logger.error('Failed to update client operating system');
+    }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} operating system updated to ${OperatingSystem}`);
   }
   async SetMacAddress(MacAddress, Options = {}) {
     if (this.MacAddress === MacAddress) return;
     this.MacAddress = MacAddress;
-    const Run = getDBRunner(Options.markUnsaved);
-    let [Err, _Res] = await Run('UPDATE Clients SET MacAddress = ? WHERE UUID = ?', [
-      MacAddress,
-      this.UUID,
-    ]);
-    if (Err) return Logger.error('Failed to update client mac address');
+    if (!(await this._persistColumn('MacAddress', MacAddress, Options))) {
+      return Logger.error('Failed to update client mac address');
+    }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} mac address updated to ${MacAddress}`);
   }
   async SetVersion(Version, Options = {}) {
     if (this.Version === Version) return;
     this.Version = Version;
-    const Run = getDBRunner(Options.markUnsaved);
-    let [Err, _Res] = await Run('UPDATE Clients SET Version = ? WHERE UUID = ?', [
-      Version,
-      this.UUID,
-    ]);
-    if (Err) return Logger.error('Failed to update client version');
+    if (!(await this._persistColumn('Version', Version, Options))) {
+      return Logger.error('Failed to update client version');
+    }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} version updated to ${Version}`);
   }
   async SetWeight(Weight) {
     if (this.Weight === Weight) return;
     this.Weight = Weight;
-    let [Err, _Res] = await DB.Run('UPDATE Clients SET Weight = ? WHERE UUID = ?', [
-      Weight,
-      this.UUID,
-    ]);
-    if (Err) return Logger.error('Failed to update client weight');
+    if (!(await this._persistColumn('Weight', Weight))) {
+      return Logger.error('Failed to update client weight');
+    }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} weight updated to ${Weight}`);
   }
   async SetIP(IP, Options = {}) {
     if (this.IP === IP) return;
     this.IP = IP;
-    const Run = getDBRunner(Options.markUnsaved);
-    let [Err, _Res] = await Run('UPDATE Clients SET IP = ? WHERE UUID = ?', [IP, this.UUID]);
-    if (Err) return Logger.error('Failed to update client IP');
+    if (!(await this._persistColumn('IP', IP, Options))) {
+      return Logger.error('Failed to update client IP');
+    }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} IP updated to ${IP}`);
   }

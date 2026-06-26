@@ -71,6 +71,14 @@ const {
   getDummyHistorySamples,
 } = require('./main/monitoring-history');
 const { Manager: AppUpdater } = require('./main/app-updater');
+const { createTupleHandler, validationErrorTuple } = require('./main/ipc/create-handler');
+const {
+  normalizeRelativePathForCompare,
+  getLocalPlatformKey,
+  parseArgumentString,
+  normalizeVersionToken,
+  runLocalScriptFile,
+} = require('./main/local-scripts');
 
 const BASE_WEB_PREFERENCES = Object.freeze({
   contextIsolation: true,
@@ -126,11 +134,6 @@ function getWindowIconPath() {
   return path.join(__dirname, 'images', iconName);
 }
 
-function validationErrorTuple(error, fallback = null) {
-  const message = error && error.message ? error.message : String(error || 'Invalid request');
-  return [message, fallback];
-}
-
 function runCommandForOpen(command, args) {
   return new Promise((resolve) => {
     execFile(command, args, (error) => {
@@ -140,162 +143,6 @@ function runCommandForOpen(command, args) {
       }
       resolve(null);
     });
-  });
-}
-
-function normalizeRelativePathForCompare(value) {
-  return String(value || '')
-    .trim()
-    .replace(/\\/g, '/')
-    .replace(/^\.\//, '');
-}
-
-function getLocalPlatformKey() {
-  if (process.platform === 'win32') return 'Windows';
-  if (process.platform === 'darwin') return 'macOS';
-  return 'Linux';
-}
-
-function parseArgumentString(value) {
-  const input = String(value || '').trim();
-  if (!input) return [];
-
-  const args = [];
-  let current = '';
-  let inSingle = false;
-  let inDouble = false;
-  let escaping = false;
-
-  const pushCurrent = () => {
-    if (current.length > 0) {
-      args.push(current);
-      current = '';
-    }
-  };
-
-  for (let i = 0; i < input.length; i += 1) {
-    const ch = input[i];
-
-    if (escaping) {
-      current += ch;
-      escaping = false;
-      continue;
-    }
-    if (ch === '\\') {
-      escaping = true;
-      continue;
-    }
-
-    if (inSingle) {
-      if (ch === "'") inSingle = false;
-      else current += ch;
-      continue;
-    }
-
-    if (inDouble) {
-      if (ch === '"') inDouble = false;
-      else current += ch;
-      continue;
-    }
-
-    if (ch === "'") {
-      inSingle = true;
-      continue;
-    }
-    if (ch === '"') {
-      inDouble = true;
-      continue;
-    }
-
-    if (/\s/.test(ch)) {
-      pushCurrent();
-      continue;
-    }
-
-    current += ch;
-  }
-
-  if (escaping) current += '\\';
-  pushCurrent();
-  return args;
-}
-
-function normalizeVersionToken(value) {
-  return String(value || '')
-    .trim()
-    .replace(/^v/i, '')
-    .toLowerCase();
-}
-
-function resolveLocalScriptLauncher(scriptPath) {
-  const extension = path.extname(scriptPath).toLowerCase();
-
-  if (process.platform === 'win32') {
-    switch (extension) {
-      case '.bat':
-      case '.cmd':
-        return { command: 'cmd.exe', args: ['/c', scriptPath] };
-      case '.ps1':
-        return {
-          command: 'powershell.exe',
-          args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
-        };
-      case '.exe':
-        return { command: scriptPath, args: [] };
-      default:
-        return { command: 'cmd.exe', args: ['/c', scriptPath] };
-    }
-  }
-
-  switch (extension) {
-    case '.sh':
-    case '.command':
-      return { command: '/bin/sh', args: [scriptPath] };
-    case '.bash':
-    case '.zsh':
-      return { command: '/bin/bash', args: [scriptPath] };
-    case '.py':
-      return { command: 'python3', args: [scriptPath] };
-    case '.js':
-      return { command: 'node', args: [scriptPath] };
-    default:
-      return { command: scriptPath, args: [] };
-  }
-}
-
-function runLocalScriptFile(scriptPath, extraArgs = []) {
-  return new Promise((resolve) => {
-    const launcher = resolveLocalScriptLauncher(scriptPath);
-
-    if (process.platform !== 'win32') {
-      try {
-        fs.chmodSync(scriptPath, 0o755);
-      } catch (chmodError) {
-        Logger.warn(`Unable to set executable bit on ${scriptPath}: ${chmodError.message}`);
-      }
-    }
-
-    execFile(
-      launcher.command,
-      launcher.args.concat(extraArgs),
-      {
-        cwd: path.dirname(scriptPath),
-        windowsHide: true,
-        maxBuffer: 10 * 1024 * 1024,
-      },
-      (error, stdout, stderr) => {
-        if (error) {
-          const message = (stderr || '').trim() || error.message || 'Script execution failed';
-          resolve(message);
-          return;
-        }
-        Logger.success(`Local script completed: ${scriptPath}`);
-        if ((stdout || '').trim()) {
-          Logger.log(`Local script output: ${(stdout || '').trim()}`);
-        }
-        resolve(null);
-      }
-    );
   });
 }
 
@@ -353,7 +200,7 @@ function applyWindowSecurityGuards(windowInstance) {
 }
 
 // Main UI window. Always check isDestroyed() before using.
-var MainWindow = null;
+let MainWindow = null;
 let mainWindowCloseApproved = false;
 let closePromptInFlight = false;
 let quitRequested = false;
@@ -886,7 +733,7 @@ app.whenReady().then(async () => {
     let CurrentPath = BackupManager.GetCurrentFilePath();
     if (!CurrentPath) {
       // No file opened or saved yet this session — fall back to Save As.
-      let { canceled, filePath } = await FileSelectorManager.SaveDialog('Save ShowTrak File As');
+      const { canceled, filePath } = await FileSelectorManager.SaveDialog('Save ShowTrak File As');
       if (canceled || !filePath) {
         Logger.log('Show:Save canceled');
         return ['Cancelled By User', null];
@@ -894,33 +741,33 @@ app.whenReady().then(async () => {
       CurrentPath = filePath;
     }
     Logger.log('Saving ShowTrak file to:', CurrentPath);
-    let [Err, Result] = await BackupManager.Save(CurrentPath);
+    const [Err, Result] = await BackupManager.Save(CurrentPath);
     if (Err) return [Err, null];
     sendShowFileUpdated(BackupManager.GetCurrentFilePath());
     return [null, Result];
   });
 
   RPC.handle('Show:SaveAs', async () => {
-    let { canceled, filePath } = await FileSelectorManager.SaveDialog('Save ShowTrak File As');
+    const { canceled, filePath } = await FileSelectorManager.SaveDialog('Save ShowTrak File As');
     if (canceled || !filePath) {
       Logger.log('Show:SaveAs canceled');
       return ['Cancelled By User', null];
     }
     Logger.log('Saving ShowTrak file to:', filePath);
-    let [Err, Result] = await BackupManager.Save(filePath);
+    const [Err, Result] = await BackupManager.Save(filePath);
     if (Err) return [Err, null];
     sendShowFileUpdated(BackupManager.GetCurrentFilePath());
     return [null, Result];
   });
 
   RPC.handle('Show:Open', async () => {
-    let { canceled, filePaths } = await FileSelectorManager.OpenDialog('Open ShowTrak File');
+    const { canceled, filePaths } = await FileSelectorManager.OpenDialog('Open ShowTrak File');
     if (canceled || !filePaths || filePaths.length === 0) {
       Logger.log('Show:Open canceled');
       return ['Cancelled By User', null];
     }
     Logger.log('Opening ShowTrak file from:', filePaths[0]);
-    let [Err, Result] = await BackupManager.Open(filePaths[0]);
+    const [Err, Result] = await BackupManager.Open(filePaths[0]);
     if (Err) return [Err, null];
     sendShowFileUpdated(BackupManager.GetCurrentFilePath());
     return [null, Result];
@@ -935,7 +782,7 @@ app.whenReady().then(async () => {
   });
 
   RPC.handle('Show:EnsureFileExists', async () => {
-    let [Err, Result] = await BackupManager.EnsureCurrentFileExists();
+    const [Err, Result] = await BackupManager.EnsureCurrentFileExists();
     if (Err) return [Err, null];
     if (Result && Result.Missing) sendShowFileUpdated(BackupManager.GetCurrentFilePath());
     return [null, Result];
@@ -943,7 +790,7 @@ app.whenReady().then(async () => {
 
   RPC.handle('Show:New', async () => {
     Logger.log('Creating new ShowTrak show');
-    let [Err, Result] = await BackupManager.New();
+    const [Err, Result] = await BackupManager.New();
     if (Err) return [Err, null];
     sendShowFileUpdated(BackupManager.GetCurrentFilePath());
     return [null, Result];
@@ -1009,7 +856,7 @@ app.whenReady().then(async () => {
   });
 
   RPC.handle('Settings:Get', async () => {
-    let Settings = await SettingsManager.GetAll();
+    const Settings = await SettingsManager.GetAll();
     return Settings;
   });
 
@@ -1019,7 +866,7 @@ app.whenReady().then(async () => {
     } catch {
       return null;
     }
-    let [Err, Client] = await ClientManager.Get(UUID);
+    const [Err, Client] = await ClientManager.Get(UUID);
     if (Err) return null;
     if (!Client) return null;
     return Client;
@@ -1147,45 +994,35 @@ app.whenReady().then(async () => {
   });
 
   RPC.handle('GetAllGroups', async (_Event) => {
-    let [Err, Groups] = await GroupManager.GetAll();
+    const [Err, Groups] = await GroupManager.GetAll();
     if (Err) return [];
     if (!Groups) return [];
     return Groups;
   });
 
-  RPC.handle('CreateGroup', async (_Event, Title) => {
-    try {
-      Title = IPCValidation.GroupTitle(Title);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    let [Err, Result] = await GroupManager.Create(Title);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'CreateGroup',
+    createTupleHandler(
+      (Title) => IPCValidation.GroupTitle(Title),
+      (Title) => GroupManager.Create(Title)
+    )
+  );
 
-  RPC.handle('RenameGroup', async (_Event, GroupID, Title) => {
-    try {
-      GroupID = IPCValidation.GroupID(GroupID);
-      Title = IPCValidation.GroupTitle(Title);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    let [Err, Result] = await GroupManager.Rename(GroupID, Title);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'RenameGroup',
+    createTupleHandler(
+      (GroupID, Title) => [IPCValidation.GroupID(GroupID), IPCValidation.GroupTitle(Title)],
+      (GroupID, Title) => GroupManager.Rename(GroupID, Title)
+    )
+  );
 
-  RPC.handle('DeleteGroup', async (_Event, GroupID) => {
-    try {
-      GroupID = IPCValidation.GroupID(GroupID);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    let [Err, Result] = await GroupManager.Delete(GroupID);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'DeleteGroup',
+    createTupleHandler(
+      (GroupID) => IPCValidation.GroupID(GroupID),
+      (GroupID) => GroupManager.Delete(GroupID)
+    )
+  );
 
   RPC.handle('Groups:SetOrder', async (_Event, OrderedGroupIDs) => {
     if (!Array.isArray(OrderedGroupIDs)) return ['Invalid order', null];
@@ -1209,65 +1046,54 @@ app.whenReady().then(async () => {
     return [null, true];
   });
 
-  RPC.handle('UpdateClient', async (_Event, UUID, Data) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-      Data = IPCValidation.ClientUpdatePayload(Data);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    let [Err, Result] = await ClientManager.Update(UUID, Data);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'UpdateClient',
+    createTupleHandler(
+      (UUID, Data) => [IPCValidation.UUID(UUID), IPCValidation.ClientUpdatePayload(Data)],
+      (UUID, Data) => ClientManager.Update(UUID, Data)
+    )
+  );
 
-  RPC.handle('MarkClientUSBDeviceCritical', async (_Event, UUID, Device) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-      Device = IPCValidation.CriticalUSBDevicePayload(Device);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    const [Err, Result] = await ClientManager.MarkUSBDeviceCritical(UUID, Device);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'MarkClientUSBDeviceCritical',
+    createTupleHandler(
+      (UUID, Device) => [IPCValidation.UUID(UUID), IPCValidation.CriticalUSBDevicePayload(Device)],
+      (UUID, Device) => ClientManager.MarkUSBDeviceCritical(UUID, Device)
+    )
+  );
 
-  RPC.handle('RemoveClientUSBDeviceCritical', async (_Event, UUID, SerialNumber) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-      SerialNumber = IPCValidation.USBSerialNumber(SerialNumber);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    const [Err, Result] = await ClientManager.RemoveUSBDeviceCritical(UUID, SerialNumber);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'RemoveClientUSBDeviceCritical',
+    createTupleHandler(
+      (UUID, SerialNumber) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.USBSerialNumber(SerialNumber),
+      ],
+      (UUID, SerialNumber) => ClientManager.RemoveUSBDeviceCritical(UUID, SerialNumber)
+    )
+  );
 
-  RPC.handle('MarkClientApplicationCritical', async (_Event, UUID, Application) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-      Application = IPCValidation.CriticalApplicationPayload(Application);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    const [Err, Result] = await ClientManager.MarkApplicationCritical(UUID, Application);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'MarkClientApplicationCritical',
+    createTupleHandler(
+      (UUID, Application) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.CriticalApplicationPayload(Application),
+      ],
+      (UUID, Application) => ClientManager.MarkApplicationCritical(UUID, Application)
+    )
+  );
 
-  RPC.handle('RemoveClientApplicationCritical', async (_Event, UUID, ApplicationName) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-      ApplicationName = IPCValidation.CriticalApplicationPayload({ Name: ApplicationName }).Name;
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    const [Err, Result] = await ClientManager.RemoveApplicationCritical(UUID, ApplicationName);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'RemoveClientApplicationCritical',
+    createTupleHandler(
+      (UUID, ApplicationName) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.CriticalApplicationPayload({ Name: ApplicationName }).Name,
+      ],
+      (UUID, ApplicationName) => ClientManager.RemoveApplicationCritical(UUID, ApplicationName)
+    )
+  );
 
   // ---- Monitoring Targets ----
   RPC.handle('GetMonitoringMethods', async () => {
@@ -1309,28 +1135,24 @@ app.whenReady().then(async () => {
     return getDummyHistorySamples(UUID);
   });
 
-  RPC.handle('CreateMonitoringTarget', async (_Event, Payload) => {
-    try {
-      Payload = IPCValidation.MonitoringTargetCreatePayload(Payload);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    const [Err, Result] = await MonitoringTargetManager.Create(Payload);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'CreateMonitoringTarget',
+    createTupleHandler(
+      (Payload) => IPCValidation.MonitoringTargetCreatePayload(Payload),
+      (Payload) => MonitoringTargetManager.Create(Payload)
+    )
+  );
 
-  RPC.handle('UpdateMonitoringTarget', async (_Event, TargetID, Payload) => {
-    try {
-      TargetID = IPCValidation.MonitoringTargetID(TargetID);
-      Payload = IPCValidation.MonitoringTargetUpdatePayload(Payload);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    const [Err, Result] = await MonitoringTargetManager.Update(TargetID, Payload);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'UpdateMonitoringTarget',
+    createTupleHandler(
+      (TargetID, Payload) => [
+        IPCValidation.MonitoringTargetID(TargetID),
+        IPCValidation.MonitoringTargetUpdatePayload(Payload),
+      ],
+      (TargetID, Payload) => MonitoringTargetManager.Update(TargetID, Payload)
+    )
+  );
 
   RPC.handle('DeleteMonitoringTarget', async (_Event, TargetID) => {
     try {
@@ -1365,39 +1187,32 @@ app.whenReady().then(async () => {
     return DummyClientManager.GenerateDefaults();
   });
 
-  RPC.handle('CreateDummyClient', async (_Event, Payload) => {
-    try {
-      Payload = IPCValidation.DummyClientCreatePayload(Payload);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    const [Err, Result] = await DummyClientManager.Create(Payload);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'CreateDummyClient',
+    createTupleHandler(
+      (Payload) => IPCValidation.DummyClientCreatePayload(Payload),
+      (Payload) => DummyClientManager.Create(Payload)
+    )
+  );
 
-  RPC.handle('UpdateDummyClient', async (_Event, UUID, Payload) => {
-    try {
-      UUID = IPCValidation.DummyClientUUID(UUID);
-      Payload = IPCValidation.DummyClientUpdatePayload(Payload);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    const [Err, Result] = await DummyClientManager.Update(UUID, Payload);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'UpdateDummyClient',
+    createTupleHandler(
+      (UUID, Payload) => [
+        IPCValidation.DummyClientUUID(UUID),
+        IPCValidation.DummyClientUpdatePayload(Payload),
+      ],
+      (UUID, Payload) => DummyClientManager.Update(UUID, Payload)
+    )
+  );
 
-  RPC.handle('DeleteDummyClient', async (_Event, UUID) => {
-    try {
-      UUID = IPCValidation.DummyClientUUID(UUID);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    const [Err, Result] = await DummyClientManager.Delete(UUID);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'DeleteDummyClient',
+    createTupleHandler(
+      (UUID) => IPCValidation.DummyClientUUID(UUID),
+      (UUID) => DummyClientManager.Delete(UUID)
+    )
+  );
 
   // ---- Alert Rules ----
   RPC.handle('GetAlertTriggers', async () => {
@@ -1425,51 +1240,41 @@ app.whenReady().then(async () => {
     return Rule;
   });
 
-  RPC.handle('CreateAlertRule', async (_Event, Payload) => {
-    try {
-      Payload = IPCValidation.AlertRuleCreatePayload(Payload);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    const [Err, Rule] = await AlertsManager.Create(Payload);
-    if (Err) return [Err, null];
-    return [null, Rule];
-  });
+  RPC.handle(
+    'CreateAlertRule',
+    createTupleHandler(
+      (Payload) => IPCValidation.AlertRuleCreatePayload(Payload),
+      (Payload) => AlertsManager.Create(Payload)
+    )
+  );
 
-  RPC.handle('UpdateAlertRule', async (_Event, RuleID, Payload) => {
-    try {
-      RuleID = IPCValidation.AlertRuleID(RuleID);
-      Payload = IPCValidation.AlertRuleUpdatePayload(Payload);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    const [Err, Rule] = await AlertsManager.Update(RuleID, Payload);
-    if (Err) return [Err, null];
-    return [null, Rule];
-  });
+  RPC.handle(
+    'UpdateAlertRule',
+    createTupleHandler(
+      (RuleID, Payload) => [
+        IPCValidation.AlertRuleID(RuleID),
+        IPCValidation.AlertRuleUpdatePayload(Payload),
+      ],
+      (RuleID, Payload) => AlertsManager.Update(RuleID, Payload)
+    )
+  );
 
-  RPC.handle('DeleteAlertRule', async (_Event, RuleID) => {
-    try {
-      RuleID = IPCValidation.AlertRuleID(RuleID);
-    } catch (error) {
-      return validationErrorTuple(error, false);
-    }
-    const [Err, Result] = await AlertsManager.Delete(RuleID);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'DeleteAlertRule',
+    createTupleHandler(
+      (RuleID) => IPCValidation.AlertRuleID(RuleID),
+      (RuleID) => AlertsManager.Delete(RuleID),
+      { invalidFallback: false }
+    )
+  );
 
-  RPC.handle('SetAlertRuleEnabled', async (_Event, RuleID, Enabled) => {
-    try {
-      RuleID = IPCValidation.AlertRuleID(RuleID);
-      Enabled = !!Enabled;
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    const [Err, Rule] = await AlertsManager.SetEnabled(RuleID, Enabled);
-    if (Err) return [Err, null];
-    return [null, Rule];
-  });
+  RPC.handle(
+    'SetAlertRuleEnabled',
+    createTupleHandler(
+      (RuleID, Enabled) => [IPCValidation.AlertRuleID(RuleID), !!Enabled],
+      (RuleID, Enabled) => AlertsManager.SetEnabled(RuleID, Enabled)
+    )
+  );
 
   RPC.handle('AlertActionsEnabled:Get', async () => {
     return AlertsManager.GetActionsEnabled();
@@ -1860,7 +1665,7 @@ app.whenReady().then(async () => {
       return validationErrorTuple(error, false);
     }
     Logger.log('Adopting device:', UUID);
-    let [CreateErr, _CreateResult] = await ClientManager.Create(UUID);
+    const [CreateErr, _CreateResult] = await ClientManager.Create(UUID);
     if (CreateErr && CreateErr !== 'Client already exists') return [CreateErr, null];
     await AdoptionManager.SetState(UUID, 'Adopting');
     await ServerManager.SendMessageByGroup(UUID, 'Adopt');
@@ -1876,7 +1681,7 @@ app.whenReady().then(async () => {
     }
     Logger.log('Unadopting device:', UUID);
     await ServerManager.SendMessageByGroup(UUID, 'Unadopt');
-    let [DeleteErr, _DeleteResult] = await ClientManager.Delete(UUID);
+    const [DeleteErr, _DeleteResult] = await ClientManager.Delete(UUID);
     if (DeleteErr) return [DeleteErr, null];
     await UpdateFullClientList();
     return [null, true];
@@ -1915,7 +1720,7 @@ app.whenReady().then(async () => {
   });
 
   RPC.handle('OpenLogsFolder', async (_event) => {
-    let LogsPath = AppDataManager.GetLogsDirectory();
+    const LogsPath = AppDataManager.GetLogsDirectory();
     Logger.log('Opening logs folder:', LogsPath);
     // Cross-platform and properly quoted
     await shell.openPath(LogsPath);
@@ -1923,7 +1728,7 @@ app.whenReady().then(async () => {
   });
 
   RPC.handle('OpenScriptsFolder', async (_event) => {
-    let LogsPath = AppDataManager.GetScriptsDirectory();
+    const LogsPath = AppDataManager.GetScriptsDirectory();
     Logger.log('Opening scrippts folder:', LogsPath);
     // Cross-platform and properly quoted
     await shell.openPath(LogsPath);
@@ -2089,7 +1894,7 @@ app.whenReady().then(async () => {
     } catch (error) {
       return validationErrorTuple(error);
     }
-    let [Err, Setting] = await SettingsManager.Set(Key, Value);
+    const [Err, Setting] = await SettingsManager.Set(Key, Value);
     if (Err) return [Err, null];
     return [null, Setting];
   });
@@ -2106,8 +1911,8 @@ app.whenReady().then(async () => {
 // Push the entire settings payload and group metadata to the renderer.
 async function UpdateSettings() {
   if (!MainWindow || MainWindow.isDestroyed()) return;
-  let Settings = await SettingsManager.GetAll();
-  let SettingGroups = await SettingsManager.GetGroups();
+  const Settings = await SettingsManager.GetAll();
+  const SettingGroups = await SettingsManager.GetGroups();
   MainWindow.webContents.send('UpdateSettings', Settings, SettingGroups);
 }
 
@@ -2290,9 +2095,9 @@ async function ReinitializeSystem() {
 
   await ClientManager.ClearCache();
   await AdoptionManager.ClearAllDevicesPendingAdoption();
-  let [ClientsErr, Clients] = await ClientManager.GetAll();
+  const [ClientsErr, Clients] = await ClientManager.GetAll();
   if (ClientsErr) return Logger.error('Failed to fetch full client list:', ClientsErr);
-  let [GroupsErr, Groups] = await GroupManager.GetAll();
+  const [GroupsErr, Groups] = await GroupManager.GetAll();
   if (GroupsErr) return Logger.error('Failed to fetch client groups:', GroupsErr);
 
   await UpdateSettings();
@@ -2336,14 +2141,14 @@ BroadcastManager.on('ClientUpdated', ClientUpdated);
 // OSC routes are read-only here; clone to avoid accidental mutation downstream.
 async function UpdateOSCList() {
   if (!MainWindow || MainWindow.isDestroyed()) return;
-  let Routes = OSC.GetRoutes();
+  const Routes = OSC.GetRoutes();
   MainWindow.webContents.send('SetOSCList', JSON.parse(JSON.stringify(Routes)));
 }
 
 // Scripts are filesystem-driven; this pushes the current catalog to the UI.
 async function UpdateScriptList() {
   if (!MainWindow || MainWindow.isDestroyed()) return;
-  let ScriptList = await ScriptManager.GetScripts();
+  const ScriptList = await ScriptManager.GetScripts();
   MainWindow.webContents.send('SetScriptList', ScriptList);
 }
 
@@ -2365,9 +2170,9 @@ BroadcastManager.on('ScriptsUpdated', async () => {
 // Clients + Groups form the primary topology data model used by the UI.
 async function UpdateFullClientList() {
   if (!MainWindow || MainWindow.isDestroyed()) return;
-  let [ClientsErr, Clients] = await ClientManager.GetAll();
+  const [ClientsErr, Clients] = await ClientManager.GetAll();
   if (ClientsErr) return Logger.error('Failed to fetch full client list:', ClientsErr);
-  let [GroupsErr, Groups] = await GroupManager.GetAll();
+  const [GroupsErr, Groups] = await GroupManager.GetAll();
   if (GroupsErr) return Logger.error('Failed to fetch client groups:', GroupsErr);
   MainWindow.webContents.send('SetFullClientList', Clients, Groups);
 }
@@ -2423,7 +2228,7 @@ BroadcastManager.on('DummyClientUpdated', DummyClientUpdated);
 // Pending adoption list is ephemeral; pull from manager and push to UI.
 async function UpdateAdoptionList() {
   if (!MainWindow || MainWindow.isDestroyed()) return;
-  let DevicesPendingAdoption = AdoptionManager.GetClientsPendingAdoption();
+  const DevicesPendingAdoption = AdoptionManager.GetClientsPendingAdoption();
   MainWindow.webContents.send('SetDevicesPendingAdoption', DevicesPendingAdoption);
 }
 
@@ -2647,7 +2452,7 @@ app.on('before-quit', (event) => {
 
 // Feature toggles controlled by Settings: power-save blocker and auto-update.
 async function StartOptionalFeatures() {
-  let SYSTEM_PREVENT_DISPLAY_SLEEP = await SettingsManager.GetValue('SYSTEM_PREVENT_DISPLAY_SLEEP');
+  const SYSTEM_PREVENT_DISPLAY_SLEEP = await SettingsManager.GetValue('SYSTEM_PREVENT_DISPLAY_SLEEP');
   if (SYSTEM_PREVENT_DISPLAY_SLEEP) {
     Logger.log('Prevent Display Sleep is enabled, starting powerSaveBlocker.');
     powerSaveBlocker.start('prevent-display-sleep');

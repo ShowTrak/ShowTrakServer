@@ -48,7 +48,7 @@ Manager.Init = async () => {
     }
 
     for (const Setting of DefaultSettings) {
-      let [Err, ManualSetting] = await DB.Get('SELECT * FROM settings WHERE key = ?', [
+      const [Err, ManualSetting] = await DB.Get('SELECT * FROM settings WHERE key = ?', [
         Setting.Key,
       ]);
       if (Err) throw Err;
@@ -90,7 +90,7 @@ Manager.Init = async () => {
         EffectiveValue = RuleValue;
       }
 
-      let NewSetting = {
+      const NewSetting = {
         Group: Setting.Group,
         Key: Setting.Key,
         Title: Setting.Title,
@@ -131,7 +131,7 @@ Manager.GetAll = async () => {
 // Get just the setting.Value; returns null for unknown keys.
 Manager.GetValue = async (Key) => {
   if (!Manager.Initialized) await Manager.Init();
-  let Setting = Settings.get(Key);
+  const Setting = Settings.get(Key);
   if (!Setting) return null;
   return Setting.Value;
 };
@@ -145,7 +145,7 @@ Manager.Get = async (Key) => {
 Manager.Set = async (Key, Value) => {
   if (!Manager.Initialized) await Manager.Init();
 
-  let Setting = Settings.get(Key);
+  const Setting = Settings.get(Key);
   if (!Setting) return ['Invalid Setting Key', null];
 
   // Coerce incoming value to correct type
@@ -186,7 +186,7 @@ Manager.Set = async (Key, Value) => {
 
   Setting.Value = NormalizedValue;
 
-  let [Err, _Res] = await DB.Run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [
+  const [Err, _Res] = await DB.Run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [
     Key,
     Setting.Value,
   ]);

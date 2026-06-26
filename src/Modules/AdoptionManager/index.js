@@ -8,7 +8,7 @@ const { Manager: BroadcastManager } = require('../Broadcast');
 const { Manager: ClientManager } = require('../ClientManager');
 
 // Ephemeral list of discoverable, not-yet-adopted clients
-var ClientsPendingAdoption = [];
+let ClientsPendingAdoption = [];
 
 class ClientPendingAdoption {
   constructor(UUID, IP, Data) {
@@ -35,7 +35,7 @@ Manager.ClearAllDevicesPendingAdoption = async () => {
 
 // Register or refresh a device in the pending list; if already adopted, trigger readopt flow
 Manager.AddClientPendingAdoption = async (UUID, IP, Data) => {
-  let IsClientMeantToBeAdopted = await ClientManager.Exists(UUID);
+  const IsClientMeantToBeAdopted = await ClientManager.Exists(UUID);
   if (IsClientMeantToBeAdopted) {
     Manager.RemoveClientPendingAdoption(UUID);
     Logger.log(`Client ${UUID} is already adopted, removing from pending adoption list.`);

@@ -1,5 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+// NOTE: This file is a SANDBOXED preload script. Its `require` can only resolve
+// Electron built-ins, NOT local files — so the channel allowlists must be
+// inlined here (they cannot be imported from src/Modules/IPCRegistry/channels).
+// That registry remains the single source of truth, and
+// test/ipc-channel-registry.test.js asserts these inline lists stay identical to
+// it, so adding a channel in one place without the other fails CI.
 const INVOKE_CHANNELS = new Set([
   'OpenDiscordInviteLinkInBrowser',
   'OpenShowTrakWebsiteInBrowser',

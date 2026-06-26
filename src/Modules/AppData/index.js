@@ -5,7 +5,7 @@ const os = require('os');
 const { spawn } = require('child_process');
 
 const HomeDirectory = process.env.HOME || os.homedir();
-let BasePath =
+const BasePath =
   process.platform === 'win32'
     ? process.env.APPDATA || path.join(HomeDirectory, 'AppData', 'Roaming')
     : process.platform === 'darwin'
@@ -23,7 +23,7 @@ Manager.Initialize = async () => {
     fs.mkdirSync(appDataPath, { recursive: true });
   }
 
-  let AppDataFolders = ['Logs', 'Scripts', 'Storage', 'SampleScripts', 'Audio'];
+  const AppDataFolders = ['Logs', 'Scripts', 'Storage', 'SampleScripts', 'Audio'];
   AppDataFolders.forEach((folder) => {
     const folderPath = path.join(appDataPath, folder);
     if (!fs.existsSync(folderPath)) {
@@ -71,7 +71,7 @@ Manager.OpenFolder = (FolderPath) => {
 
   try {
     let command = 'xdg-open';
-    let args = [FolderPath];
+    const args = [FolderPath];
 
     if (process.platform === 'darwin') {
       command = 'open';

@@ -28,7 +28,7 @@ class Group {
   async SetTitle(Title) {
     if (this.Title === Title) return Ok(true);
     this.Title = Title;
-    let [Err, _Res] = await DB.Run('UPDATE Groups SET Title = ? WHERE GroupID = ?', [
+    const [Err, _Res] = await DB.Run('UPDATE Groups SET Title = ? WHERE GroupID = ?', [
       Title,
       this.GroupID,
     ]);
@@ -42,7 +42,7 @@ class Group {
   async SetWeight(Weight) {
     if (this.Weight === Weight) return;
     this.Weight = Weight;
-    let [Err, _Res] = await DB.Run('UPDATE Groups SET Weight = ? WHERE GroupID = ?', [
+    const [Err, _Res] = await DB.Run('UPDATE Groups SET Weight = ? WHERE GroupID = ?', [
       Weight,
       this.GroupID,
     ]);
@@ -53,7 +53,7 @@ class Group {
 
 Manager.Create = async (Title = 'New Group') => {
   if (!Title) return Fail('Group title is required');
-  let [Err, _Res] = await DB.Run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', [Title, 100]);
+  const [Err, _Res] = await DB.Run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', [Title, 100]);
   if (Err) {
     Logger.error('Failed to create group:', Err);
     return Fail('Failed to create group');
@@ -133,7 +133,7 @@ Manager.Delete = async (GroupID) => {
     }
   } else {
     // Backward-compatible fallback for older manager implementations.
-    let ClientsWithGroup = await ClientManager.GetClientsInGroup(GroupID);
+    const ClientsWithGroup = await ClientManager.GetClientsInGroup(GroupID);
     for (const Client of ClientsWithGroup) {
       await Client.SetGroupID(null);
     }
@@ -158,7 +158,7 @@ Manager.Delete = async (GroupID) => {
     }
   }
 
-  let [Err, _Res] = await DB.Run('DELETE FROM Groups WHERE GroupID = ?', [GroupID]);
+  const [Err, _Res] = await DB.Run('DELETE FROM Groups WHERE GroupID = ?', [GroupID]);
   if (Err) {
     Logger.error('Failed to delete group:', Err);
     return Fail('Failed to delete group');
@@ -204,7 +204,7 @@ Manager.ReconcileOrphanedGroups = async () => {
 
 Manager.Get = async (GroupID) => {
   if (!GroupID) return Fail('GroupID is required');
-  let [Err, Rows] = await DB.Get('SELECT * FROM Groups WHERE GroupID = ?', [GroupID]);
+  const [Err, Rows] = await DB.Get('SELECT * FROM Groups WHERE GroupID = ?', [GroupID]);
   if (Err) {
     Logger.error('Failed to fetch group:', Err);
     return Fail('Failed to fetch group');
@@ -216,7 +216,7 @@ Manager.Get = async (GroupID) => {
 
 // Ordered by Weight ascending so lower weight renders first.
 Manager.GetAll = async () => {
-  let [Err, Rows] = await DB.All('SELECT * FROM Groups ORDER BY Weight ASC, GroupID ASC');
+  const [Err, Rows] = await DB.All('SELECT * FROM Groups ORDER BY Weight ASC, GroupID ASC');
   if (Err) {
     Logger.error('Failed to fetch groups:', Err);
     return Fail('Failed to fetch groups', []);

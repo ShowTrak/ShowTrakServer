@@ -31,7 +31,7 @@ Manager.ClearQueue = async () => {
 // Convert a pending request to Failed after Timeout ms, if still pending
 Manager.SetTimeout = (RequestID, Timeout) => {
   setTimeout(() => {
-    let Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
+    const Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
     if (!Request) return;
     if (Request.Status === 'Pending') {
       Request.Status = 'Failed';
@@ -87,7 +87,7 @@ function ResolveDispatchBlockReason(Script, Client) {
 
 // Enqueue a synthetic/internal action for a client (e.g., Wake On LAN)
 Manager.AddInternalTaskToQueue = async (UUID, TaskName) => {
-  let [Err, Client] = await ClientManager.Get(UUID);
+  const [Err, Client] = await ClientManager.Get(UUID);
   if (Err || !Client) return;
 
   const RequestID = UUIDManager.Generate();
@@ -119,15 +119,15 @@ Manager.AddInternalTaskToQueue = async (UUID, TaskName) => {
 
 // Enqueue a script for a client. Replace existing entry if one exists for this client.
 Manager.AddToQueue = async (UUID, ScriptID) => {
-  let Script = await ScriptManager.Get(ScriptID);
+  const Script = await ScriptManager.Get(ScriptID);
   if (!Script) return;
 
-  let [Err, Client] = await ClientManager.Get(UUID);
+  const [Err, Client] = await ClientManager.Get(UUID);
   if (Err || !Client) return;
 
   const RequestID = UUIDManager.Generate();
 
-  let ExistingCommand = ScriptExecutions.find((Exe) => Exe.Client.UUID == UUID);
+  const ExistingCommand = ScriptExecutions.find((Exe) => Exe.Client.UUID === UUID);
   if (ExistingCommand) {
     ExistingCommand.RequestID = RequestID;
     ExistingCommand.Timer = {
@@ -206,7 +206,7 @@ Manager.UpdateProgress = async (RequestID, Progress = 0, StatusText = null) => {
 
 // Mark a request as completed or failed; compute duration and broadcast
 Manager.Complete = async (RequestID, Err) => {
-  let Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
+  const Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
   if (Err) Logger.error(`Script execution failed for ${Request.Client.UUID}`, Err);
   if (!Request) return;
   if (Err) Request.Error = typeof Err === 'string' ? Err : Err.message || 'Unknown error';

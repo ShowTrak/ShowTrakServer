@@ -34,7 +34,7 @@ Manager.OpenAudioDialog = async (Title) => {
 };
 
 Manager.SaveDialog = async (Title) => {
-  let CurrentDatestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 10);
+  const CurrentDatestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 10);
   return await dialog.showSaveDialog({
     title: Title,
     defaultPath: `ShowTrak ${CurrentDatestamp}.ShowTrak`,

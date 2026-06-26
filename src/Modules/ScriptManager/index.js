@@ -19,7 +19,7 @@ const { Manager: BroadcastManager } = require('../Broadcast');
 const { PLATFORM_KEYS, SCRIPT_COLOURS, NormalizeScriptConfig } = require('./schema');
 
 // Catalog cache; populated on first GetScripts() call
-var Scripts = [];
+let Scripts = [];
 let ScriptDirectoryWatcher = null;
 let ScriptDirectoryWatcherPath = null;
 let ScriptDirectoryReloadTimer = null;
@@ -194,7 +194,7 @@ async function runWithConcurrency(items, limit, worker) {
 // Enumerate files recursively and produce relative paths, adding a checksum later
 function RecursiveFileList(dir, baseDir = dir) {
   let results = [];
-  var list = fs.readdirSync(dir);
+  const list = fs.readdirSync(dir);
   list.forEach((file) => {
     const filePath = path.join(dir, file);
     const stat = fs.statSync(filePath);
@@ -294,7 +294,7 @@ function ListScriptFolders(ScriptsDirectory) {
 
 Manager.GetScripts = async (Force = false) => {
   if (!Force && Scripts.length > 0) return Scripts; // Return cached catalog
-  let TempScripts = [];
+  const TempScripts = [];
   const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
   EnsureScriptDirectoryWatcher(ScriptsDirectory);
 

@@ -51,6 +51,26 @@ export default defineConfig([
     },
   },
   {
+    // Non-renderer source (main process, modules, bridges, tests, scripts).
+    // Renderer files intentionally keep var/globals, so these rules are scoped
+    // away from src/UI/js/app and src/WebUI/main.js.
+    files: [
+      'src/Modules/**/*.js',
+      'src/main.js',
+      'src/main/**/*.js',
+      'src/bridge_main.js',
+      'src/bridge_preloader.js',
+      'test/**/*.js',
+      'test-support/**/*.js',
+      'scripts/**/*.js',
+    ],
+    rules: {
+      eqeqeq: ['error', 'smart'],
+      'no-var': 'error',
+      'prefer-const': ['error', { destructuring: 'all' }],
+    },
+  },
+  {
     files: ['**/*.md'],
     extends: [markdown.configs.recommended],
   },

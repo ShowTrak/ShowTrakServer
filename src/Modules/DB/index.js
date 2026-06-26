@@ -98,10 +98,10 @@ Manager.InitializeSchema = async () => {
   if (schemaInitializationPromise) return schemaInitializationPromise;
 
   schemaInitializationPromise = (async () => {
-    let Tables = require('./schema.js');
-    for (let Table of Tables) {
+    const Tables = require('./schema.js');
+    for (const Table of Tables) {
       Logger.database(`Creating table: ${Table.Name}`);
-      let [Err, _Result] = await Manager.Run(Table.SQL);
+      const [Err, _Result] = await Manager.Run(Table.SQL);
       if (Err) {
         Logger.databaseError(`Failed to create table ${Table.Name}:`, Err);
       } else {

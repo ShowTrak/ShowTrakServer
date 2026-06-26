@@ -2,6 +2,7 @@ const { Manager: DB } = require('../DB');
 const { Manager: BroadcastManager } = require('../Broadcast');
 const { Manager: MonitoringMethods } = require('../MonitoringMethods');
 const { Ok, Fail } = require('../Utils');
+const { createGroupOrdering } = require('../Shared/group-ordering');
 
 const {
   MIN_INTERVAL_MS,
@@ -186,72 +187,38 @@ Manager.Delete = async (TargetID) => {
   return Ok(true);
 };
 
+// Group ordering (SetGroupAndWeight / MoveGroupToNoGroup / ReconcileOrphanedGroups)
+// is shared with other list-backed managers via the group-ordering helper.
+const GroupOrdering = createGroupOrdering({
+  DB,
+  BroadcastManager,
+  table: 'MonitoringTargets',
+  keyColumn: 'TargetID',
+  getList: () => TargetList,
+  getKey: (Target) => Target.TargetID,
+  normalizeKey: (raw) => Number(raw),
+  listChangedEvent: 'MonitoringTargetListChanged',
+  ensureInitialized: async () => {
+    if (!Manager.Initialized) await Manager.Init();
+  },
+  labels: {
+    notFound: 'Monitoring target not found',
+    update: 'Failed to update monitoring target',
+    move: 'Failed to move monitoring targets to no group',
+    reconcile: 'Failed to reconcile orphaned monitoring targets',
+  },
+});
+
 // Move a monitoring target to a group with a specific weight (used by drag/drop ordering).
-Manager.SetGroupAndWeight = async (TargetID, GroupID, Weight) => {
-  const ID = Number(TargetID);
-  const Target = TargetList.find((T) => T.TargetID === ID);
-  if (!Target) return Fail('Monitoring target not found');
-  const NextGroupID = GroupID == null ? null : Number(GroupID);
-  const NextWeight = Number.isFinite(Number(Weight)) ? Number(Weight) : 100;
-  const [Err] = await DB.Run(
-    'UPDATE MonitoringTargets SET GroupID = ?, Weight = ? WHERE TargetID = ?',
-    [NextGroupID, NextWeight, ID]
-  );
-  if (Err) return Fail('Failed to update monitoring target');
-  Target.GroupID = NextGroupID;
-  Target.Weight = NextWeight;
-  return Ok(true);
-};
+Manager.SetGroupAndWeight = (TargetID, GroupID, Weight) =>
+  GroupOrdering.SetGroupAndWeight(TargetID, GroupID, Weight);
 
 // Move all monitoring targets from a specific group into the default no-group bucket (null).
-Manager.MoveGroupToNoGroup = async (GroupID) => {
-  if (!Manager.Initialized) await Manager.Init();
-  const TargetGroupID = Number(GroupID);
-  if (!Number.isFinite(TargetGroupID)) return Fail('Invalid GroupID');
-
-  let Changed = 0;
-  for (const Target of TargetList) {
-    if (Target.GroupID == null) continue;
-    if (Number(Target.GroupID) !== TargetGroupID) continue;
-    const [Err] = await DB.Run('UPDATE MonitoringTargets SET GroupID = ? WHERE TargetID = ?', [
-      null,
-      Target.TargetID,
-    ]);
-    if (Err) return Fail('Failed to move monitoring targets to no group');
-    Target.GroupID = null;
-    Changed += 1;
-  }
-
-  if (Changed > 0) BroadcastManager.emit('MonitoringTargetListChanged');
-  return Ok(Changed);
-};
+Manager.MoveGroupToNoGroup = (GroupID) => GroupOrdering.MoveGroupToNoGroup(GroupID);
 
 // Ensure all monitoring targets reference an existing group; unknown groups are reassigned to null.
-Manager.ReconcileOrphanedGroups = async (ValidGroupIDs) => {
-  if (!Manager.Initialized) await Manager.Init();
-  const Valid = new Set(
-    (Array.isArray(ValidGroupIDs) ? ValidGroupIDs : [])
-      .map((ID) => Number(ID))
-      .filter((ID) => Number.isFinite(ID))
-  );
-
-  let Changed = 0;
-  for (const Target of TargetList) {
-    if (Target.GroupID == null) continue;
-    const TargetGroupID = Number(Target.GroupID);
-    if (Valid.has(TargetGroupID)) continue;
-    const [Err] = await DB.Run('UPDATE MonitoringTargets SET GroupID = ? WHERE TargetID = ?', [
-      null,
-      Target.TargetID,
-    ]);
-    if (Err) return Fail('Failed to reconcile orphaned monitoring targets');
-    Target.GroupID = null;
-    Changed += 1;
-  }
-
-  if (Changed > 0) BroadcastManager.emit('MonitoringTargetListChanged');
-  return Ok(Changed);
-};
+Manager.ReconcileOrphanedGroups = (ValidGroupIDs) =>
+  GroupOrdering.ReconcileOrphanedGroups(ValidGroupIDs);
 
 Manager.GetAllSync = () => TargetList.map((T) => T.ToJSON());
 

@@ -6,6 +6,7 @@
 const { Manager: DB } = require('../DB');
 const { Manager: BroadcastManager } = require('../Broadcast');
 const { Ok, Fail } = require('../Utils');
+const { createGroupOrdering } = require('../Shared/group-ordering');
 
 const {
   MIN_INTERVAL_MS,
@@ -103,7 +104,7 @@ Manager.Create = async (Payload = {}) => {
   const Now = Date.now();
   const Defaults = Manager.GenerateDefaults();
 
-  let DummyID = Object.prototype.hasOwnProperty.call(Payload, 'DummyID')
+  const DummyID = Object.prototype.hasOwnProperty.call(Payload, 'DummyID')
     ? SanitizeDummyID(Payload.DummyID)
     : Defaults.DummyID;
   if (!IsValidDummyID(DummyID)) return Fail('Dummy ID must be alphanumeric with no spaces');
@@ -215,67 +216,37 @@ Manager.Heartbeat = async (DummyID, IP = null) => {
   return Ok(true);
 };
 
+// Group ordering (SetGroupAndWeight / MoveGroupToNoGroup / ReconcileOrphanedGroups)
+// is shared with other list-backed managers via the group-ordering helper.
+const GroupOrdering = createGroupOrdering({
+  DB,
+  BroadcastManager,
+  table: 'DummyClients',
+  keyColumn: 'UUID',
+  getList: () => DummyList,
+  getKey: (Dummy) => Dummy.UUID,
+  listChangedEvent: 'DummyClientListChanged',
+  ensureInitialized: async () => {
+    if (!Manager.Initialized) await Manager.Init();
+  },
+  labels: {
+    notFound: 'Dummy client not found',
+    update: 'Failed to update dummy client',
+    move: 'Failed to move dummy clients to no group',
+    reconcile: 'Failed to reconcile orphaned dummy clients',
+  },
+});
+
 // Move a dummy to a group with a specific weight (used by drag/drop ordering).
-Manager.SetGroupAndWeight = async (UUID, GroupID, Weight) => {
-  const Dummy = DummyList.find((D) => D.UUID === UUID);
-  if (!Dummy) return Fail('Dummy client not found');
-  const NextGroupID = GroupID == null ? null : Number(GroupID);
-  const NextWeight = Number.isFinite(Number(Weight)) ? Number(Weight) : 100;
-  const [Err] = await DB.Run('UPDATE DummyClients SET GroupID = ?, Weight = ? WHERE UUID = ?', [
-    NextGroupID,
-    NextWeight,
-    UUID,
-  ]);
-  if (Err) return Fail('Failed to update dummy client');
-  Dummy.GroupID = NextGroupID;
-  Dummy.Weight = NextWeight;
-  return Ok(true);
-};
+Manager.SetGroupAndWeight = (UUID, GroupID, Weight) =>
+  GroupOrdering.SetGroupAndWeight(UUID, GroupID, Weight);
 
 // Move all dummies in a specific group into the default no-group bucket (null).
-Manager.MoveGroupToNoGroup = async (GroupID) => {
-  if (!Manager.Initialized) await Manager.Init();
-  const TargetGroupID = Number(GroupID);
-  if (!Number.isFinite(TargetGroupID)) return Fail('Invalid GroupID');
-  let Changed = 0;
-  for (const Dummy of DummyList) {
-    if (Dummy.GroupID == null) continue;
-    if (Number(Dummy.GroupID) !== TargetGroupID) continue;
-    const [Err] = await DB.Run('UPDATE DummyClients SET GroupID = ? WHERE UUID = ?', [
-      null,
-      Dummy.UUID,
-    ]);
-    if (Err) return Fail('Failed to move dummy clients to no group');
-    Dummy.GroupID = null;
-    Changed += 1;
-  }
-  if (Changed > 0) BroadcastManager.emit('DummyClientListChanged');
-  return Ok(Changed);
-};
+Manager.MoveGroupToNoGroup = (GroupID) => GroupOrdering.MoveGroupToNoGroup(GroupID);
 
 // Ensure all dummies reference an existing group; unknown groups reset to null.
-Manager.ReconcileOrphanedGroups = async (ValidGroupIDs) => {
-  if (!Manager.Initialized) await Manager.Init();
-  const Valid = new Set(
-    (Array.isArray(ValidGroupIDs) ? ValidGroupIDs : [])
-      .map((ID) => Number(ID))
-      .filter((ID) => Number.isFinite(ID))
-  );
-  let Changed = 0;
-  for (const Dummy of DummyList) {
-    if (Dummy.GroupID == null) continue;
-    if (Valid.has(Number(Dummy.GroupID))) continue;
-    const [Err] = await DB.Run('UPDATE DummyClients SET GroupID = ? WHERE UUID = ?', [
-      null,
-      Dummy.UUID,
-    ]);
-    if (Err) return Fail('Failed to reconcile orphaned dummy clients');
-    Dummy.GroupID = null;
-    Changed += 1;
-  }
-  if (Changed > 0) BroadcastManager.emit('DummyClientListChanged');
-  return Ok(Changed);
-};
+Manager.ReconcileOrphanedGroups = (ValidGroupIDs) =>
+  GroupOrdering.ReconcileOrphanedGroups(ValidGroupIDs);
 
 Manager.MIN_INTERVAL_MS = MIN_INTERVAL_MS;
 Manager.MAX_INTERVAL_MS = MAX_INTERVAL_MS;
