@@ -53,14 +53,6 @@ const DefaultSettings = [
     DefaultValue: false,
   },
   {
-    Group: 'Features',
-    Key: 'SYSTEM_ALLOW_SCRIPT_EDITS',
-    Title: 'Allow Script Edits',
-    Description: 'You can disable the ability to upload scripts to clients here.',
-    Type: 'BOOLEAN',
-    DefaultValue: true,
-  },
-  {
     Group: 'System',
     Key: 'SYSTEM_PREVENT_DISPLAY_SLEEP',
     Title: 'Prevent Display Sleep',
