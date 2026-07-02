@@ -453,7 +453,8 @@ function RenderFullClientAndMonitorList() {
               ? String(Item.data.DegradedWarnings[0])
               : 'Missing USB Device';
           const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
-          Filler += `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${TileStateClass} ${
+          const IdentifyingClass = Item.data && Item.data.Identifying ? 'IDENTIFYING' : '';
+          Filler += `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${TileStateClass} ${IdentifyingClass} ${
             Selected.includes(UUID) ? 'SELECTED' : ''
           }" data-uuid="${UUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
 					<button type="button" class="CLIENT_TILE_COG" aria-label="Edit Client" title="Edit Client">
@@ -595,8 +596,10 @@ function RenderPendingAdoptionSection() {
       const Hostname = dev && dev.Hostname ? dev.Hostname : 'Unknown Host';
       const IP = dev && dev.IP ? dev.IP : 'Unknown IP';
       const UUID = dev && dev.UUID ? dev.UUID : '';
+      const IdentifyingClass = dev && dev.Identifying ? 'IDENTIFYING' : '';
+      const SelectedClass = UUID && Selected.includes(UUID) ? 'SELECTED' : '';
       html += `
-        <div class="SHOWTRAK_PC PENDING" data-uuid="${Safe(UUID)}">
+        <div class="SHOWTRAK_PC PENDING ${IdentifyingClass} ${SelectedClass}" data-uuid="${Safe(UUID)}">
           <h5 class="mb-0" data-type="PENDING_HOSTNAME" title="${Safe(Hostname)}">${Safe(
             Hostname
           )}</h5>

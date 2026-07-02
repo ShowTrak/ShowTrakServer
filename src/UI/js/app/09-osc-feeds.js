@@ -399,6 +399,7 @@ window.API.ClientUpdated(async (Data) => {
 
   $(`[data-uuid='${UUID}']`).toggleClass('ONLINE', Online && !Degraded);
   $(`[data-uuid='${UUID}']`).toggleClass('DEGRADED', Degraded);
+  $(`[data-uuid='${UUID}']`).toggleClass('IDENTIFYING', !!Data.Identifying);
   $(`[data-uuid='${UUID}']>[data-type='INDICATOR_DEGRADED']>[data-type='DEGRADED_WARNING']`).text(
     DegradedWarning
   );

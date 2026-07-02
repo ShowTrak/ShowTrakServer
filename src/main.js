@@ -34,6 +34,7 @@ ScriptManager.GetScripts();
 const { Manager: SampleScriptsManager } = require('./Modules/SampleScripts');
 SampleScriptsManager.Initialize();
 const { Manager: ServerManager } = require('./Modules/Server');
+const { Manager: IdentifyManager } = require('./Modules/IdentifyManager');
 const { Manager: BonjourManager } = require('./Modules/Bonjour');
 BonjourManager.Init();
 const { Manager: AdoptionManager } = require('./Modules/AdoptionManager');
@@ -1465,6 +1466,26 @@ app.whenReady().then(async () => {
     }
     await ServerManager.TriggerIntegratedEvent(EventID, Targets);
     return [null, true];
+  });
+
+  // Start identify mode on a single client (adopted or pending adoption).
+  // Rejected for integrated (SDK) clients which cannot render the overlay.
+  RPC.handle('IdentifyClient', async (_Event, UUID) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    return IdentifyManager.Identify(UUID);
+  });
+
+  RPC.handle('StopIdentifyingClient', async (_Event, UUID) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    return IdentifyManager.Stop(UUID);
   });
 
   RPC.handle('DeleteScripts', async (_Event, List) => {

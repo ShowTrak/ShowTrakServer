@@ -69,6 +69,9 @@ class Client {
     this.DegradedWarnings = [];
     this.NetworkInterfaces = [];
     this.ScriptsFingerprint = null;
+    // Identify mode (RAM-only): when true the client is displaying its
+    // full-screen identify overlay and its tile pulses blue in the UI.
+    this.Identifying = false;
     // Integrated client runtime state (RAM-only). Integrated clients connect via
     // the ShowTrak Integration SDK and declare a catalog of "actions" (events)
     // on connection. These are not persisted; they are re-declared on reconnect.
@@ -116,6 +119,15 @@ class Client {
     if (this.LastSeen === LastSeen) return;
     this.LastSeen = LastSeen;
     // Intentionally quiet: LastSeen is high-churn and not UI-critical.
+    return;
+  }
+  // Toggle identify mode; broadcasts so the UI tile can pulse blue.
+  SetIdentifying(Identifying) {
+    const Next = !!Identifying;
+    if (this.Identifying === Next) return;
+    this.Identifying = Next;
+    Logger.debug(`Client ${this.UUID} Identifying updated to ${Next}`);
+    BroadcastManager.emit('ClientUpdated', this);
     return;
   }
   SetVitals(Vitals) {

@@ -250,32 +250,31 @@ function IsSelected(UUID) {
 }
 
 function Select(UUID) {
-  // Do not allow selecting pending-adoption-only entries.
+  // Allow selecting adopted clients and pending-adoption devices. Monitoring
+  // and dummy tiles use prefixed data-uuid values so they never match here.
   try {
     const $tiles = $(`.SHOWTRAK_PC[data-uuid='${UUID}']`);
     if (!$tiles || !$tiles.length) return;
-    const $selectableTiles = $tiles.not('.PENDING');
-    if (!$selectableTiles.length) return;
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
   }
   if (Selected.includes(UUID)) return;
   Selected.push(UUID);
-  $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).not('.PENDING').addClass('SELECTED');
+  $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).addClass('SELECTED');
   UpdateSelectionCount();
   return;
 }
 
 function Deselect(UUID) {
   Selected = Selected.filter((id) => id !== UUID);
-  $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).not('.PENDING').removeClass('SELECTED');
+  $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).removeClass('SELECTED');
   UpdateSelectionCount();
   return;
 }
 
 function ClearSelection() {
   Selected.forEach((uuid) => {
-    $(`.SHOWTRAK_PC[data-uuid='${uuid}']`).not('.PENDING').removeClass('SELECTED');
+    $(`.SHOWTRAK_PC[data-uuid='${uuid}']`).removeClass('SELECTED');
   });
   Selected = [];
   UpdateSelectionCount();
@@ -283,21 +282,19 @@ function ClearSelection() {
 }
 
 function ToggleSelection(UUID) {
-  // Do not toggle selection for pending-adoption-only entries.
+  // Allow toggling adopted clients and pending-adoption devices.
   try {
     const $tiles = $(`.SHOWTRAK_PC[data-uuid='${UUID}']`);
     if (!$tiles || !$tiles.length) return;
-    const $selectableTiles = $tiles.not('.PENDING');
-    if (!$selectableTiles.length) return;
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
   }
   if (Selected.includes(UUID)) {
     Selected = Selected.filter((id) => id !== UUID);
-    $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).not('.PENDING').removeClass('SELECTED');
+    $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).removeClass('SELECTED');
   } else {
     Selected.push(UUID);
-    $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).not('.PENDING').addClass('SELECTED');
+    $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).addClass('SELECTED');
   }
   UpdateSelectionCount();
 }
@@ -576,12 +573,18 @@ $(async function () {
   });
   $(document).on('click', '.SHOWTRAK_PC', function (e) {
     e.preventDefault();
-    // Ignore clicks on pending-adoption tiles (blue)
-    if ($(this).hasClass('PENDING')) return false;
     // Monitoring tiles aren't selectable client targets
     if ($(this).hasClass('MONITOR')) return false;
     // Dummy tiles aren't selectable client targets
     if ($(this).hasClass('DUMMY')) return false;
+    // Pending-adoption tiles are selectable (for Identify), but clicking the
+    // Adopt button must not toggle selection.
+    if ($(this).hasClass('PENDING')) {
+      if ($(e.target).closest('.ADOPT_BTN, [data-type="PENDING_ACTION"]').length) return false;
+      const PendingUUID = $(this).attr('data-uuid');
+      if (PendingUUID) ToggleSelection(PendingUUID);
+      return false;
+    }
     let UUID = $(this).attr('data-uuid');
     ToggleSelection(UUID);
     return;
@@ -616,6 +619,18 @@ $(async function () {
   });
   $(document).on('contextmenu', 'html', async function (e) {
     e.preventDefault();
+
+    const $tile = $(e.target).closest('.SHOWTRAK_PC');
+    if ($tile.length) {
+      const TileUUID = $tile.attr('data-uuid');
+      const IsClientTile =
+        TileUUID && !$tile.hasClass('MONITOR') && !$tile.hasClass('DUMMY') && !$tile.hasClass('GROUP');
+      if (IsClientTile && !Selected.includes(TileUUID)) {
+        ClearSelection();
+        Select(TileUUID);
+      }
+    }
+
     let Options = [];
 
     if (Selected.length == 0) {
@@ -737,6 +752,45 @@ $(async function () {
         Options.push({
           Type: 'Divider',
         });
+      }
+
+      // Identify Client / Stop Identifying — single-select only. Available for
+      // adopted (non-integrated) clients that are online and for pending-
+      // adoption devices. Integrated clients cannot render the overlay.
+      if (Selected.length === 1) {
+        const IdentifyUUID = Selected[0];
+        const AdoptedTarget = AllClients.find((c) => c && c.UUID === IdentifyUUID);
+        const PendingTarget = (Array.isArray(PendingAdoption) ? PendingAdoption : []).find(
+          (d) => d && d.UUID === IdentifyUUID
+        );
+        let IdentifyEligible = false;
+        let IsIdentifying = false;
+        if (AdoptedTarget && !IsIntegratedClient(AdoptedTarget) && AdoptedTarget.Online) {
+          IdentifyEligible = true;
+          IsIdentifying = !!AdoptedTarget.Identifying;
+        } else if (!AdoptedTarget && PendingTarget) {
+          IdentifyEligible = true;
+          IsIdentifying = !!PendingTarget.Identifying;
+        }
+        if (IdentifyEligible) {
+          Options.push({
+            Type: 'Action',
+            Title: IsIdentifying ? 'Stop Identifying' : 'Identify Client',
+            Class: 'text-light',
+            Action: async function () {
+              try {
+                const Result = IsIdentifying
+                  ? await window.API.StopIdentifyingClient(IdentifyUUID)
+                  : await window.API.IdentifyClient(IdentifyUUID);
+                const Err = Array.isArray(Result) ? Result[0] : null;
+                if (Err && typeof Notify === 'function') Notify(String(Err), 'danger');
+              } catch (err) {
+                HandleNonFatalError('SelectionInit:Identify', err);
+              }
+            },
+          });
+          Options.push({ Type: 'Divider' });
+        }
       }
     }
 

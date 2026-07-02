@@ -43,6 +43,7 @@ const ToPublicClient = (c) => ({
   NetworkInterfaces: Array.isArray(c.NetworkInterfaces) ? c.NetworkInterfaces : [],
   Integrated: !!c.Integrated,
   IntegratedActions: Array.isArray(c.IntegratedActions) ? c.IntegratedActions : [],
+  Identifying: !!c.Identifying,
   RunningApplications: c && c.RunningApplications ? c.RunningApplications : { Items: [] },
   CriticalApplications: Array.isArray(c.CriticalApplications) ? c.CriticalApplications : [],
   MissingCriticalApplications: Array.isArray(c.MissingCriticalApplications)

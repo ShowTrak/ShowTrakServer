@@ -24,6 +24,7 @@ const { Wait } = require('../Utils');
 
 const { SetupClientNamespace } = require('./client-namespace');
 const { SetupWebUiNamespace } = require('./webui-namespace');
+const { Manager: IdentifyManager } = require('../IdentifyManager');
 
 // HTTP server backing express + Socket.IO
 const Server = HTTP.createServer();
@@ -410,6 +411,10 @@ Manager.SendMessageByGroup = async (Group, Message, Data) => {
 // Wire both Socket.IO namespaces (client agents + Web UI).
 SetupClientNamespace(io);
 SetupWebUiNamespace(io, Manager);
+
+// Give the IdentifyManager the Socket.IO server so it can dispatch identify
+// commands to specific client rooms.
+IdentifyManager.RegisterIO(io);
 
 Server.listen(Config.Application.Port, () => {
   Logger.log(`Socket.IO server running on port ${Config.Application.Port}`);

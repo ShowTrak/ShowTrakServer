@@ -11,6 +11,7 @@ const { Manager: ClientManager } = require('../ClientManager');
 const { Manager: ScriptManager } = require('../ScriptManager');
 const { Manager: ScriptExecutionManager } = require('../ScriptExecutionManager');
 const { Manager: ServerIdentityManager } = require('../ServerIdentity');
+const { Manager: IdentifyManager } = require('../IdentifyManager');
 
 // Wire the default namespace (ShowTrak client agents) onto the Socket.IO server.
 function SetupClientNamespace(io) {
@@ -240,17 +241,27 @@ function SetupClientNamespace(io) {
     });
 
     // Cleanup on disconnect: clear adoption entry and mark offline
-    socket.on('disconnect', (reason) => {
+    socket.on('disconnect', async (reason) => {
       try {
         if (!socket.UUID) {
           Logger.log('Socket disconnected without UUID:', socket.id, reason);
           return;
         }
         Logger.log('Client disconnected', { UUID: socket.UUID, reason });
+        await IdentifyManager.HandleDisconnect(socket.UUID);
         AdoptionManager.RemoveClientPendingAdoption(socket.UUID);
         ClientManager.Timeout(socket.UUID);
       } catch (e) {
         Logger.error('Disconnect handler error for', socket && socket.UUID, e);
+      }
+    });
+
+    // Client-initiated stop of identify mode (esc pressed or overlay clicked).
+    socket.on('IdentifyStopped', () => {
+      try {
+        IdentifyManager.HandleClientStopped(socket.UUID);
+      } catch (e) {
+        Logger.error('IdentifyStopped handler error for', socket && socket.UUID, e);
       }
     });
 

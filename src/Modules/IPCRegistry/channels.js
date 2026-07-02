@@ -44,6 +44,8 @@ const INVOKE_CHANNELS = [
   'RemoveClientUSBDeviceCritical',
   'MarkClientApplicationCritical',
   'RemoveClientApplicationCritical',
+  'IdentifyClient',
+  'StopIdentifyingClient',
 
   // Client self-update
   'CheckForUpdatesOnClient',

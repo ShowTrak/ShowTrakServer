@@ -48,6 +48,8 @@ const INVOKE_CHANNELS = new Set([
   'RemoveClientUSBDeviceCritical',
   'MarkClientApplicationCritical',
   'RemoveClientApplicationCritical',
+  'IdentifyClient',
+  'StopIdentifyingClient',
   'ExecuteScript',
   'TriggerIntegratedEvent',
   'UnadoptClient',
@@ -227,6 +229,8 @@ contextBridge.exposeInMainWorld('API', {
     ]),
   SetSetting: async (Key, Value) => invoke('SetSetting', Key, Value),
   WakeOnLan: async (Targets) => invoke('WakeOnLan', Targets),
+  IdentifyClient: async (UUID) => invoke('IdentifyClient', UUID),
+  StopIdentifyingClient: async (UUID) => invoke('StopIdentifyingClient', UUID),
   UpdateClient: async (UUID, Data) => invoke('UpdateClient', UUID, Data),
   MarkClientUSBDeviceCritical: async (UUID, Device) =>
     invoke('MarkClientUSBDeviceCritical', UUID, Device),

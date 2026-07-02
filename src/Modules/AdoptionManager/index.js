@@ -17,6 +17,8 @@ class ClientPendingAdoption {
     this.Hostname = Data.Hostname || 'No Hostname Found';
     this.Version = Data.Version || 'No Version Found';
     this.IP = IP || 'No IP Found';
+    // Identify mode (RAM-only): pulses the pending tile blue while active.
+    this.Identifying = false;
   }
 }
 
@@ -50,6 +52,16 @@ Manager.AddClientPendingAdoption = async (UUID, IP, Data) => {
     BroadcastManager.emit('AdoptionListUpdated');
     return;
   }
+};
+
+// Toggle identify mode for a pending device so its tile pulses blue.
+// Returns true when the device exists in the pending list.
+Manager.SetIdentifying = (UUID, Identifying) => {
+  const client = ClientsPendingAdoption.find((client) => client.UUID === UUID);
+  if (!client) return false;
+  client.Identifying = !!Identifying;
+  BroadcastManager.emit('AdoptionListUpdated');
+  return true;
 };
 
 // Update UI-visible state for a pending device (e.g., "Adopting")

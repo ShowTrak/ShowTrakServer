@@ -2373,6 +2373,29 @@ button.btn:focus {
   background-color: rgba(0, 123, 255, 0.25) !important;
 }
 
+/* Identify mode: pulse the tile blue while the client shows its overlay.
+ * Listed after ONLINE/DEGRADED/PENDING so it wins whichever base state the
+ * tile is in. */
+@keyframes showtrak-identify-pulse {
+  0% {
+    background-color: rgba(52, 152, 219, 0.28);
+    box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.55);
+  }
+  50% {
+    background-color: rgba(52, 152, 219, 0.6);
+    box-shadow: 0 0 0 6px rgba(52, 152, 219, 0);
+  }
+  100% {
+    background-color: rgba(52, 152, 219, 0.28);
+    box-shadow: 0 0 0 0 rgba(52, 152, 219, 0);
+  }
+}
+
+.SHOWTRAK_PC.IDENTIFYING {
+  background-color: rgba(52, 152, 219, 0.4) !important;
+  animation: showtrak-identify-pulse 1.8s ease-in-out infinite;
+}
+
 .SHOWTRAK_PC_STATUS {
   height: var(--tile-status-height) !important;
   min-height: var(--tile-status-height);

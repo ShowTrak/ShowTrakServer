@@ -218,6 +218,19 @@ Manager.SetIntegratedState = async (UUID, State, Message) => {
   return [null, true];
 };
 
+// Toggle identify mode on a client. Ensures the client is cached so the
+// runtime flag survives until the next heartbeat re-render.
+Manager.SetIdentifying = async (UUID, Identifying) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return [Err, null];
+  if (!Target) return ['Client Not Found', null];
+  if (addClientToCache(Target)) {
+    BroadcastManager.emit('ClientListChanged');
+  }
+  Target.SetIdentifying(Identifying);
+  return [null, true];
+};
+
 Manager.SetNetworkInterfaces = async (UUID, Interfaces) => {
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
