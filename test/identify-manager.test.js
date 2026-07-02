@@ -63,6 +63,7 @@ test('Identify starts on an adopted online client and emits Identify with nickna
         Online: true,
         Integrated: false,
         OperatingSystem: 'Windows',
+        Version: '3.7.0',
         Hostname: 'HOST-1',
         Nickname: 'FrontDesk',
       },
@@ -111,6 +112,7 @@ test('Identify allows multiple clients to identify concurrently', async () => {
         Online: true,
         Integrated: false,
         OperatingSystem: 'macOS',
+        Version: '3.7.1',
         Hostname: uuid.toUpperCase(),
         Nickname: uuid.toUpperCase(),
       },
@@ -140,7 +142,7 @@ test('Identify works for pending-adoption devices', async () => {
   const pendingCalls = [];
   const { Manager, ioEmits } = loadIdentifyManager({
     exists: async () => false,
-    pending: [{ UUID: 'p1', Hostname: 'Pending-1', IP: '10.0.0.5' }],
+    pending: [{ UUID: 'p1', Hostname: 'Pending-1', IP: '10.0.0.5', Version: '3.7.2' }],
     setPendingIdentifying: (uuid, flag) => {
       pendingCalls.push({ uuid, flag });
       return true;
@@ -152,4 +154,50 @@ test('Identify works for pending-adoption devices', async () => {
   assert.equal(Ok, true);
   assert.deepEqual(pendingCalls, [{ uuid: 'p1', flag: true }]);
   assert.deepEqual(ioEmits, [{ uuid: 'p1', event: 'Identify', payload: { Nickname: null } }]);
+});
+
+test('Identify rejects adopted clients below minimum supported version', async () => {
+  const setCalls = [];
+  const { Manager, ioEmits } = loadIdentifyManager({
+    exists: async () => true,
+    get: async () => [
+      null,
+      {
+        UUID: 'legacy-1',
+        Online: true,
+        Integrated: false,
+        OperatingSystem: 'Windows',
+        Version: '3.6.9',
+        Hostname: 'LEGACY-1',
+      },
+    ],
+    setIdentifying: async (uuid, flag) => {
+      setCalls.push({ uuid, flag });
+      return [null, true];
+    },
+  });
+
+  const [Err, Ok] = await Manager.Identify('legacy-1');
+  assert.equal(Err, 'Identify requires client version 3.7.0 or newer.');
+  assert.equal(Ok, null);
+  assert.deepEqual(setCalls, []);
+  assert.equal(ioEmits.length, 0);
+});
+
+test('Identify rejects pending devices below minimum supported version', async () => {
+  const pendingCalls = [];
+  const { Manager, ioEmits } = loadIdentifyManager({
+    exists: async () => false,
+    pending: [{ UUID: 'legacy-p', Hostname: 'Legacy Pending', Version: '3.6.5' }],
+    setPendingIdentifying: (uuid, flag) => {
+      pendingCalls.push({ uuid, flag });
+      return true;
+    },
+  });
+
+  const [Err, Ok] = await Manager.Identify('legacy-p');
+  assert.equal(Err, 'Identify requires client version 3.7.0 or newer.');
+  assert.equal(Ok, null);
+  assert.deepEqual(pendingCalls, []);
+  assert.equal(ioEmits.length, 0);
 });

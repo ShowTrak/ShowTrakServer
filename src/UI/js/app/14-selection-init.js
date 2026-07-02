@@ -251,6 +251,28 @@ function IsSelected(UUID) {
   return Selected.includes(UUID);
 }
 
+const MINIMUM_IDENTIFY_VERSION = [3, 7, 0];
+
+function ParseSemverTuple(value) {
+  const Match = String(value || '')
+    .trim()
+    .match(/(?:^|[^0-9])(\d+)\.(\d+)\.(\d+)(?:[^0-9]|$)/);
+  if (!Match) return null;
+  return [Number(Match[1]), Number(Match[2]), Number(Match[3])];
+}
+
+function IsVersionAtLeast(value, minimumTuple) {
+  const Parsed = ParseSemverTuple(value);
+  if (!Parsed) return false;
+  for (let i = 0; i < minimumTuple.length; i++) {
+    const Current = Parsed[i] || 0;
+    const Minimum = minimumTuple[i] || 0;
+    if (Current > Minimum) return true;
+    if (Current < Minimum) return false;
+  }
+  return true;
+}
+
 function GetIdentifyTargetByUUID(UUID) {
   const AdoptedTarget = Array.isArray(AllClients)
     ? AllClients.find((c) => c && c.UUID === UUID)
@@ -260,7 +282,10 @@ function GetIdentifyTargetByUUID(UUID) {
     : null;
 
   if (AdoptedTarget) {
-    const Eligible = !IsIntegratedClientEntity(AdoptedTarget) && !!AdoptedTarget.Online;
+    const Eligible =
+      !IsIntegratedClientEntity(AdoptedTarget) &&
+      !!AdoptedTarget.Online &&
+      IsVersionAtLeast(AdoptedTarget.Version, MINIMUM_IDENTIFY_VERSION);
     return {
       UUID,
       Eligible,
@@ -271,7 +296,7 @@ function GetIdentifyTargetByUUID(UUID) {
   if (PendingTarget) {
     return {
       UUID,
-      Eligible: true,
+      Eligible: IsVersionAtLeast(PendingTarget.Version, MINIMUM_IDENTIFY_VERSION),
       IsIdentifying: !!PendingTarget.Identifying,
     };
   }

@@ -16,6 +16,7 @@ let io = null;
 
 // UUIDs currently in identify mode.
 const IdentifyingUUIDs = new Set();
+const MINIMUM_IDENTIFY_VERSION = [3, 7, 0];
 
 const Manager = {};
 
@@ -32,6 +33,26 @@ function IsIntegratedClient(Client) {
       .trim()
       .toLowerCase() === 'integrated'
   );
+}
+
+function ParseSemverTuple(value) {
+  const match = String(value || '')
+    .trim()
+    .match(/(?:^|[^0-9])(\d+)\.(\d+)\.(\d+)(?:[^0-9]|$)/);
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function IsVersionAtLeast(value, minimumTuple) {
+  const parsed = ParseSemverTuple(value);
+  if (!parsed) return false;
+  for (let i = 0; i < minimumTuple.length; i++) {
+    const current = parsed[i] || 0;
+    const minimum = minimumTuple[i] || 0;
+    if (current > minimum) return true;
+    if (current < minimum) return false;
+  }
+  return true;
 }
 
 // Clear the identify flag on whichever manager owns the UUID. Does not emit to
@@ -69,6 +90,9 @@ Manager.Identify = async (UUID) => {
     if (IsIntegratedClient(Client)) {
       return Fail('Integrated clients cannot be identified.');
     }
+    if (!IsVersionAtLeast(Client.Version, MINIMUM_IDENTIFY_VERSION)) {
+      return Fail('Identify requires client version 3.7.0 or newer.');
+    }
     if (!Client.Online) return Fail('Client is offline.');
     // Only surface a nickname when it meaningfully differs from the hostname.
     if (Client.Nickname && Client.Nickname !== Client.Hostname) {
@@ -77,6 +101,9 @@ Manager.Identify = async (UUID) => {
   } else {
     const Pending = AdoptionManager.GetClientsPendingAdoption().find((d) => d && d.UUID === UUID);
     if (!Pending) return Fail('Client not found.');
+    if (!IsVersionAtLeast(Pending.Version, MINIMUM_IDENTIFY_VERSION)) {
+      return Fail('Identify requires client version 3.7.0 or newer.');
+    }
   }
 
   if (IsAdopted) {
