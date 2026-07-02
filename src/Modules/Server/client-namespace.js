@@ -257,9 +257,9 @@ function SetupClientNamespace(io) {
     });
 
     // Client-initiated stop of identify mode (esc pressed or overlay clicked).
-    socket.on('IdentifyStopped', () => {
+    socket.on('IdentifyStopped', async () => {
       try {
-        IdentifyManager.HandleClientStopped(socket.UUID);
+        await IdentifyManager.HandleClientStopped(socket.UUID);
       } catch (e) {
         Logger.error('IdentifyStopped handler error for', socket && socket.UUID, e);
       }

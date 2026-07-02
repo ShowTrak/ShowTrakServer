@@ -30,6 +30,12 @@ window.API.USBDeviceRemoved(async (Client, Device) => {
   }
 });
 
+function GetClientStatusDisplayText(Client) {
+  if (Client && Client.Identifying) return 'Identifying';
+  if (Client && Client.Online) return Client.Degraded ? 'Degraded' : 'Online';
+  return 'Offline';
+}
+
 window.API.UpdateScriptExecutions(async (Executions) => {
   try {
     if (typeof UpdateManagerHandleExecutions === 'function') {
@@ -447,7 +453,7 @@ function RenderFullClientAndMonitorList() {
         if (Item.kind === 'client') {
           const { Nickname, Hostname, IP, UUID, Version, Online, LastSeen, Degraded } = Item.data;
           const HostnameVersionLabel = FormatClientHostnameVersionLabel(Item.data);
-          const CompactStatusLabel = Online && Degraded ? 'Degraded' : 'Online';
+          const CompactStatusLabel = GetClientStatusDisplayText(Item.data);
           const WarningText =
             Array.isArray(Item.data.DegradedWarnings) && Item.data.DegradedWarnings.length
               ? String(Item.data.DegradedWarnings[0])
@@ -512,6 +518,9 @@ function RenderFullClientAndMonitorList() {
       HandleNonFatalError('RenderFullClientAndMonitorList:initializeEditInteractions', e);
     }
   }
+  if (typeof UpdateIdentifyStatusBanner === 'function') {
+    UpdateIdentifyStatusBanner();
+  }
 }
 
 // Renderer receives live updates for devices pending adoption
@@ -562,6 +571,9 @@ window.API.SetDevicesPendingAdoption(async (Devices) => {
     if (AppMode !== 'EDIT') {
       const $existing = $('#PENDING_ADOPTION_SECTION');
       if ($existing.length) $existing.replaceWith('<div id="PENDING_ADOPTION_SECTION"></div>');
+      if (typeof UpdateIdentifyStatusBanner === 'function') {
+        UpdateIdentifyStatusBanner();
+      }
       return;
     }
     const html = RenderPendingAdoptionSection();
@@ -576,6 +588,9 @@ window.API.SetDevicesPendingAdoption(async (Devices) => {
     }
   } catch (e) {
     HandleNonFatalError('SetDevicesPendingAdoption:Render', e);
+  }
+  if (typeof UpdateIdentifyStatusBanner === 'function') {
+    UpdateIdentifyStatusBanner();
   }
 });
 

@@ -1,8 +1,7 @@
 // IdentifyManager
-// Orchestrates the "Identify Client" feature. Only ONE client can be in
-// identify mode at a time; starting identify on a new client clears the
-// previous one. Works for both adopted clients (ClientManager) and
-// pending-adoption devices (AdoptionManager); integrated (SDK) clients are
+// Orchestrates the "Identify Client" feature. Multiple clients can be in
+// identify mode concurrently. Works for both adopted clients (ClientManager)
+// and pending-adoption devices (AdoptionManager); integrated (SDK) clients are
 // rejected because they cannot render the overlay.
 const { CreateLogger } = require('../Logger');
 const Logger = CreateLogger('IdentifyManager');
@@ -10,12 +9,13 @@ const Logger = CreateLogger('IdentifyManager');
 const { Ok, Fail } = require('../Utils');
 const { Manager: ClientManager } = require('../ClientManager');
 const { Manager: AdoptionManager } = require('../AdoptionManager');
+const { Manager: BroadcastManager } = require('../Broadcast');
 
 // Socket.IO server instance, registered by the Server module during setup.
 let io = null;
 
-// UUID of the single client currently in identify mode (or null).
-let IdentifyingUUID = null;
+// UUIDs currently in identify mode.
+const IdentifyingUUIDs = new Set();
 
 const Manager = {};
 
@@ -37,16 +37,23 @@ function IsIntegratedClient(Client) {
 // Clear the identify flag on whichever manager owns the UUID. Does not emit to
 // the client (callers decide whether the client still needs telling to stop).
 async function ClearFlag(UUID) {
-  const IsAdopted = await ClientManager.Exists(UUID);
-  if (IsAdopted) {
-    await ClientManager.SetIdentifying(UUID, false);
-    return;
+  // Attempt both paths so transient lookup failures cannot leave stale
+  // identify state behind.
+  const [ClientErr] = await ClientManager.SetIdentifying(UUID, false);
+  const PendingCleared = AdoptionManager.SetIdentifying(UUID, false);
+  if (ClientErr && !PendingCleared) {
+    Logger.debug(`ClearFlag could not clear ${UUID}: ${ClientErr}`);
   }
-  AdoptionManager.SetIdentifying(UUID, false);
 }
 
-// Start identify mode on a client. Clears any previously-identifying client
-// first so only one overlay is ever active across the fleet.
+function EmitIdentifyStateChanged() {
+  // Force a fresh UI sync regardless of whether the mutation occurred on an
+  // adopted or pending client path.
+  BroadcastManager.emit('ClientListChanged');
+  BroadcastManager.emit('AdoptionListUpdated');
+}
+
+// Start identify mode on a client.
 Manager.Identify = async (UUID) => {
   UUID = String(UUID || '').trim();
   if (!UUID) return Fail('A client UUID is required.');
@@ -72,11 +79,6 @@ Manager.Identify = async (UUID) => {
     if (!Pending) return Fail('Client not found.');
   }
 
-  // Clear the previous client (state + tell it to stop) before starting anew.
-  if (IdentifyingUUID && IdentifyingUUID !== UUID) {
-    await Manager.Stop(IdentifyingUUID);
-  }
-
   if (IsAdopted) {
     const [SetErr] = await ClientManager.SetIdentifying(UUID, true);
     if (SetErr) return Fail(SetErr);
@@ -84,8 +86,9 @@ Manager.Identify = async (UUID) => {
     AdoptionManager.SetIdentifying(UUID, true);
   }
 
-  IdentifyingUUID = UUID;
+  IdentifyingUUIDs.add(UUID);
   io.to(UUID).emit('Identify', { Nickname });
+  EmitIdentifyStateChanged();
   Logger.log(`Identify started for ${UUID}`);
   return Ok(true);
 };
@@ -98,7 +101,8 @@ Manager.Stop = async (UUID) => {
 
   await ClearFlag(UUID);
   if (io) io.to(UUID).emit('StopIdentify');
-  if (IdentifyingUUID === UUID) IdentifyingUUID = null;
+  IdentifyingUUIDs.delete(UUID);
+  EmitIdentifyStateChanged();
   Logger.log(`Identify stopped for ${UUID}`);
   return Ok(true);
 };
@@ -109,7 +113,8 @@ Manager.HandleClientStopped = async (UUID) => {
   UUID = String(UUID || '').trim();
   if (!UUID) return;
   await ClearFlag(UUID);
-  if (IdentifyingUUID === UUID) IdentifyingUUID = null;
+  IdentifyingUUIDs.delete(UUID);
+  EmitIdentifyStateChanged();
   Logger.log(`Identify cleared by client ${UUID}`);
 };
 
@@ -117,18 +122,19 @@ Manager.HandleClientStopped = async (UUID) => {
 Manager.HandleDisconnect = async (UUID) => {
   UUID = String(UUID || '').trim();
   if (!UUID) return;
-  if (IdentifyingUUID !== UUID) return;
-  IdentifyingUUID = null;
+  if (!IdentifyingUUIDs.has(UUID)) return;
+  IdentifyingUUIDs.delete(UUID);
   try {
     // Use the shared clear path so adopted + pending entries both reset.
     await ClearFlag(UUID);
+    EmitIdentifyStateChanged();
     Logger.log(`Identify cleared on disconnect for ${UUID}`);
   } catch (e) {
     Logger.warn('HandleDisconnect cleanup failed for', UUID, e);
   }
 };
 
-Manager.GetIdentifyingUUID = () => IdentifyingUUID;
+Manager.GetIdentifyingUUIDs = () => Array.from(IdentifyingUUIDs);
 
 module.exports = {
   Manager,

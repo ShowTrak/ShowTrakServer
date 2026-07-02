@@ -100,8 +100,28 @@ document.addEventListener('keydown', function (e) {
     }
     return;
   }
+
+  // Best-effort global clear for identify mode. This intentionally does not
+  // block other shortcut behavior.
+  const clearIdentifyingViaShortcut = () => {
+    try {
+      if (
+        typeof GetIdentifyingUUIDs === 'function' &&
+        typeof StopIdentifyingForUUIDs === 'function'
+      ) {
+        const IDs = GetIdentifyingUUIDs();
+        if (Array.isArray(IDs) && IDs.length > 0) {
+          StopIdentifyingForUUIDs(IDs);
+        }
+      }
+    } catch (err) {
+      HandleNonFatalError('Keyboard:ClearIdentifying', err);
+    }
+  };
+
   if (e.key === 'Escape') {
     e.preventDefault();
+    clearIdentifyingViaShortcut();
     return ClearSelection();
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
@@ -110,6 +130,7 @@ document.addEventListener('keydown', function (e) {
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
     e.preventDefault();
+    clearIdentifyingViaShortcut();
     return ClearSelection();
   }
   // Open context menu via keyboard: standard Windows bindings

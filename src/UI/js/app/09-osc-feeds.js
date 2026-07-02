@@ -421,8 +421,8 @@ window.API.ClientUpdated(async (Data) => {
 
   const CompactOnlineStatus = $(`[data-uuid='${UUID}']>[data-type="COMPACT_ONLINE_STATUS"]`);
   if (CompactOnlineStatus.length) {
-    CompactOnlineStatus.text(Online && Degraded ? 'Degraded' : 'Online');
-    CompactOnlineStatus.toggleClass('d-none', !Online);
+    CompactOnlineStatus.text(GetClientStatusDisplayText(Data));
+    CompactOnlineStatus.toggleClass('d-none', !Online && !Data.Identifying);
   }
 
   if (Online) {
@@ -501,6 +501,9 @@ window.API.SetFullMonitoringTargetList(async (List) => {
   // Re-render the full client+monitor view so monitors slot back into their groups.
   if (typeof RenderFullClientAndMonitorList === 'function') {
     RenderFullClientAndMonitorList();
+  }
+  if (typeof UpdateIdentifyStatusBanner === 'function') {
+    UpdateIdentifyStatusBanner();
   }
 });
 

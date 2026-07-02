@@ -167,6 +167,7 @@ async function ConfirmationDialog(Message) {
     const $btnConfirm = $('#CONFIRM_TOAST_CONFIRM');
 
     window.__SHOWTRAK_CONFIRM_ACTIVE = true;
+    if (typeof UpdateIdentifyStatusBanner === 'function') UpdateIdentifyStatusBanner();
 
     const cleanup = () => {
       $(document).off('keydown.confirmToast');
@@ -178,6 +179,7 @@ async function ConfirmationDialog(Message) {
         HandleNonFatalError('SelectionInit:NonFatal', err);
       }
       window.__SHOWTRAK_CONFIRM_ACTIVE = false;
+      if (typeof UpdateIdentifyStatusBanner === 'function') UpdateIdentifyStatusBanner();
     };
 
     $btnCancel.on('click.confirmToast', () => {
@@ -247,6 +249,132 @@ function UpdateSelectionCount() {
 
 function IsSelected(UUID) {
   return Selected.includes(UUID);
+}
+
+function GetIdentifyTargetByUUID(UUID) {
+  const AdoptedTarget = Array.isArray(AllClients)
+    ? AllClients.find((c) => c && c.UUID === UUID)
+    : null;
+  const PendingTarget = Array.isArray(PendingAdoption)
+    ? PendingAdoption.find((d) => d && d.UUID === UUID)
+    : null;
+
+  if (AdoptedTarget) {
+    const Eligible = !IsIntegratedClientEntity(AdoptedTarget) && !!AdoptedTarget.Online;
+    return {
+      UUID,
+      Eligible,
+      IsIdentifying: !!AdoptedTarget.Identifying,
+    };
+  }
+
+  if (PendingTarget) {
+    return {
+      UUID,
+      Eligible: true,
+      IsIdentifying: !!PendingTarget.Identifying,
+    };
+  }
+
+  return {
+    UUID,
+    Eligible: false,
+    IsIdentifying: false,
+  };
+}
+
+function GetIdentifyingUUIDs() {
+  // Primary source: live rendered tiles. This stays accurate even when an
+  // incremental push updates classes before list caches are reconciled.
+  const FromDom = new Set();
+  try {
+    $('.SHOWTRAK_PC.IDENTIFYING[data-uuid]').each(function () {
+      const UUID = String($(this).attr('data-uuid') || '').trim();
+      if (UUID) FromDom.add(UUID);
+    });
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:GetIdentifyingUUIDs', err);
+  }
+  if (FromDom.size > 0) return Array.from(FromDom);
+
+  // Fallback source: cached entity lists.
+  const Identifying = new Set();
+  (Array.isArray(AllClients) ? AllClients : []).forEach((Client) => {
+    if (Client && Client.UUID && Client.Identifying) Identifying.add(Client.UUID);
+  });
+  (Array.isArray(PendingAdoption) ? PendingAdoption : []).forEach((Device) => {
+    if (Device && Device.UUID && Device.Identifying) Identifying.add(Device.UUID);
+  });
+  return Array.from(Identifying);
+}
+
+function ApplyIdentifyStateLocally(UUIDs, Identifying) {
+  const Unique = new Set((Array.isArray(UUIDs) ? UUIDs : []).filter(Boolean));
+  const Next = !!Identifying;
+  if (!Unique.size) return;
+
+  (Array.isArray(AllClients) ? AllClients : []).forEach((Client) => {
+    if (!Client || !Client.UUID) return;
+    if (!Unique.has(Client.UUID)) return;
+    Client.Identifying = Next;
+  });
+
+  (Array.isArray(PendingAdoption) ? PendingAdoption : []).forEach((Device) => {
+    if (!Device || !Device.UUID) return;
+    if (!Unique.has(Device.UUID)) return;
+    Device.Identifying = Next;
+  });
+
+  if (typeof RenderFullClientAndMonitorList === 'function') {
+    RenderFullClientAndMonitorList();
+  }
+  UpdateIdentifyStatusBanner();
+}
+
+async function StopIdentifyingForUUIDs(UUIDs) {
+  const List = Array.from(new Set((Array.isArray(UUIDs) ? UUIDs : []).filter(Boolean)));
+  if (!List.length) return { succeeded: [], failed: [] };
+  const Results = await Promise.all(List.map((UUID) => window.API.StopIdentifyingClient(UUID)));
+  const Succeeded = [];
+  const Failed = [];
+  Results.forEach((Result, Index) => {
+    const Err = Array.isArray(Result) ? Result[0] : null;
+    if (Err) {
+      Failed.push({ UUID: List[Index], Error: Err });
+    } else {
+      Succeeded.push(List[Index]);
+    }
+  });
+  if (Succeeded.length) ApplyIdentifyStateLocally(Succeeded, false);
+  // If server says a target is missing, clear it locally to avoid a stuck
+  // banner caused by stale UI state.
+  const Missing = Failed.filter((Entry) => /not found/i.test(String(Entry.Error || ''))).map(
+    (Entry) => Entry.UUID
+  );
+  if (Missing.length) ApplyIdentifyStateLocally(Missing, false);
+  const Errors = Failed.map((Entry) => Entry.Error).filter(Boolean);
+  if (Errors.length && typeof Notify === 'function') {
+    Notify(String(Errors[0]), 'danger');
+  }
+  return { succeeded: Succeeded, failed: Failed };
+}
+
+function UpdateIdentifyStatusBanner() {
+  const $Banner = $('#IDENTIFY_STATUS_BANNER');
+  const $Text = $('#IDENTIFY_STATUS_TEXT');
+  if (!$Banner.length || !$Text.length) return;
+  const IdentifyingUUIDs = GetIdentifyingUUIDs();
+  const Count = IdentifyingUUIDs.length;
+  if (!Count) {
+    $Banner.addClass('d-none');
+    return;
+  }
+  $Text.text(
+    `You are currently identifying ${Count} ${Count === 1 ? 'client' : 'clients'}`
+  );
+  const hasConfirmToast = $('#SHOWTRAK_CONFIRM_TOAST').length > 0;
+  $Banner.toggleClass('stacked-above-confirm', hasConfirmToast);
+  $Banner.removeClass('d-none');
 }
 
 function Select(UUID) {
@@ -353,6 +481,17 @@ $(async function () {
 
   $(document).on('click', '#SELECTION_STATUS', function () {
     ClearSelection();
+  });
+
+  $(document).on('click', '#IDENTIFY_STOP_ALL_BUTTON', async function (e) {
+    e.preventDefault();
+    try {
+      await StopIdentifyingForUUIDs(GetIdentifyingUUIDs());
+    } catch (err) {
+      HandleNonFatalError('SelectionInit:StopIdentifyAll', err);
+    } finally {
+      UpdateIdentifyStatusBanner();
+    }
   });
 
   $(document).on('click', '.GROUP_TITLE_CLICKABLE[data-groupid]', function (e) {
@@ -754,43 +893,58 @@ $(async function () {
         });
       }
 
-      // Identify Client / Stop Identifying — single-select only. Available for
-      // adopted (non-integrated) clients that are online and for pending-
-      // adoption devices. Integrated clients cannot render the overlay.
-      if (Selected.length === 1) {
-        const IdentifyUUID = Selected[0];
-        const AdoptedTarget = AllClients.find((c) => c && c.UUID === IdentifyUUID);
-        const PendingTarget = (Array.isArray(PendingAdoption) ? PendingAdoption : []).find(
-          (d) => d && d.UUID === IdentifyUUID
-        );
-        let IdentifyEligible = false;
-        let IsIdentifying = false;
-        if (AdoptedTarget && !IsIntegratedClient(AdoptedTarget) && AdoptedTarget.Online) {
-          IdentifyEligible = true;
-          IsIdentifying = !!AdoptedTarget.Identifying;
-        } else if (!AdoptedTarget && PendingTarget) {
-          IdentifyEligible = true;
-          IsIdentifying = !!PendingTarget.Identifying;
-        }
-        if (IdentifyEligible) {
-          Options.push({
-            Type: 'Action',
-            Title: IsIdentifying ? 'Stop Identifying' : 'Identify Client',
-            Class: 'text-light',
-            Action: async function () {
-              try {
-                const Result = IsIdentifying
-                  ? await window.API.StopIdentifyingClient(IdentifyUUID)
-                  : await window.API.IdentifyClient(IdentifyUUID);
+      // Identify / Stop Identifying for selected clients.
+      const IdentifyTargets = Selected.map((UUID) => GetIdentifyTargetByUUID(UUID)).filter(
+        (Target) => Target && Target.Eligible
+      );
+      const IdentifyStartTargets = IdentifyTargets.filter((Target) => !Target.IsIdentifying);
+      const IdentifyStopTargets = IdentifyTargets.filter((Target) => Target.IsIdentifying);
+
+      if (IdentifyStartTargets.length > 0) {
+        Options.push({
+          Type: 'Action',
+          Title: IdentifyStartTargets.length === 1 ? 'Identify Client' : 'Identify Clients',
+          Class: 'text-light',
+          Action: async function () {
+            try {
+              const UUIDs = IdentifyStartTargets.map((Target) => Target.UUID);
+              const Results = await Promise.all(
+                UUIDs.map((UUID) => window.API.IdentifyClient(UUID))
+              );
+              const Succeeded = [];
+              const Failed = [];
+              Results.forEach((Result, Index) => {
                 const Err = Array.isArray(Result) ? Result[0] : null;
-                if (Err && typeof Notify === 'function') Notify(String(Err), 'danger');
-              } catch (err) {
-                HandleNonFatalError('SelectionInit:Identify', err);
-              }
-            },
-          });
-          Options.push({ Type: 'Divider' });
-        }
+                if (Err) Failed.push({ UUID: UUIDs[Index], Error: Err });
+                else Succeeded.push(UUIDs[Index]);
+              });
+              if (Succeeded.length) ApplyIdentifyStateLocally(Succeeded, true);
+              const Errors = Failed.map((Entry) => Entry.Error).filter(Boolean);
+              if (Errors.length && typeof Notify === 'function') Notify(String(Errors[0]), 'danger');
+            } catch (err) {
+              HandleNonFatalError('SelectionInit:Identify', err);
+            }
+          },
+        });
+      }
+
+      if (IdentifyStopTargets.length > 0) {
+        Options.push({
+          Type: 'Action',
+          Title: IdentifyStopTargets.length === 1 ? 'Stop Identifying' : 'Stop Identifying Selected',
+          Class: 'text-light',
+          Action: async function () {
+            try {
+              await StopIdentifyingForUUIDs(IdentifyStopTargets.map((Target) => Target.UUID));
+            } catch (err) {
+              HandleNonFatalError('SelectionInit:StopIdentify', err);
+            }
+          },
+        });
+      }
+
+      if (IdentifyStartTargets.length + IdentifyStopTargets.length > 0) {
+        Options.push({ Type: 'Divider' });
       }
     }
 
@@ -872,15 +1026,23 @@ $(async function () {
       document.getElementById('APPLICATION') ||
       document.documentElement;
     const boundsRect = boundsEl.getBoundingClientRect();
+    const navbarEl = document.querySelector('.dragbar');
+    const navbarRect = navbarEl ? navbarEl.getBoundingClientRect() : null;
     const minX = Math.max(edgePadding, Math.floor(boundsRect.left) + edgePadding);
-    const minY = Math.max(edgePadding, Math.floor(boundsRect.top) + edgePadding);
+    const containerMinY = Math.max(edgePadding, Math.floor(boundsRect.top) + edgePadding);
+    const navbarMinY = navbarRect
+      ? Math.min(viewportHeight - edgePadding, Math.floor(navbarRect.bottom) + edgePadding)
+      : edgePadding;
+    const minY = Math.max(containerMinY, navbarMinY);
     const maxX = Math.min(viewportWidth - edgePadding, Math.floor(boundsRect.right) - edgePadding);
     const maxY = Math.min(
       viewportHeight - edgePadding,
       Math.floor(boundsRect.bottom) - edgePadding
     );
     const availableHeight = Math.max(120, maxY - minY);
-    const maxMenuHeight = Math.min(460, Math.max(220, Math.floor(availableHeight * 0.9)));
+    // Allow the menu to use most of the available UI height while still
+    // staying inside the viewport-clamped UI bounds.
+    const maxMenuHeight = Math.max(220, Math.floor(availableHeight - edgePadding));
 
     // Measure with intended max height before final placement
     $menu.css({
@@ -1105,6 +1267,8 @@ $(async function () {
       HideExecutionToast();
     }
   });
+
+  UpdateIdentifyStatusBanner();
 });
 
 setInterval(UpdateOfflineIndicators, 1000);
@@ -1504,6 +1668,7 @@ async function Init() {
   // legacy toggle binding removed
 
   await window.API.Loaded();
+  if (typeof UpdateIdentifyStatusBanner === 'function') UpdateIdentifyStatusBanner();
 }
 
 // Ensure the QRCode library is loaded; if missing, load the vendor script dynamically
@@ -1588,7 +1753,7 @@ async function OpenClientInfo(UUID) {
   }
   $('#CLIENT_INFO_UUID').val(UUID);
   $('#CLIENT_INFO_VERSION').val(FormatClientVersionLabel(Client));
-  $('#CLIENT_INFO_STATUS').val(Online ? (Client.Degraded ? 'Degraded' : 'Online') : 'Offline');
+  $('#CLIENT_INFO_STATUS').val(GetClientStatusDisplayText(Client));
 
   window.__ClientInfoNetFamily = 'IPv4';
 
@@ -1646,9 +1811,7 @@ async function OpenClientInfo(UUID) {
 
         const Fresh = await window.API.GetClient(ClientInfoOpenUUID);
         if (Fresh) {
-          $('#CLIENT_INFO_STATUS').val(
-            Fresh.Online ? (Fresh.Degraded ? 'Degraded' : 'Online') : 'Offline'
-          );
+          $('#CLIENT_INFO_STATUS').val(GetClientStatusDisplayText(Fresh));
           RenderClientInfoDetails(Fresh);
         }
       } catch (err) {
@@ -1680,9 +1843,7 @@ async function OpenClientInfo(UUID) {
 
         const Fresh = await window.API.GetClient(ClientInfoOpenUUID);
         if (Fresh) {
-          $('#CLIENT_INFO_STATUS').val(
-            Fresh.Online ? (Fresh.Degraded ? 'Degraded' : 'Online') : 'Offline'
-          );
+          $('#CLIENT_INFO_STATUS').val(GetClientStatusDisplayText(Fresh));
           RenderClientInfoDetails(Fresh);
         }
       } catch (err) {
@@ -1762,9 +1923,7 @@ function RenderClientInfoDetails(Client) {
   }
 
   try {
-    $('#CLIENT_INFO_STATUS').val(
-      Client && Client.Online ? (Client.Degraded ? 'Degraded' : 'Online') : 'Offline'
-    );
+    $('#CLIENT_INFO_STATUS').val(GetClientStatusDisplayText(Client));
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
   }

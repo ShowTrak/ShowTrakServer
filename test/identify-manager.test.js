@@ -100,7 +100,7 @@ test('Identify rejects integrated clients', async () => {
   assert.equal(ioEmits.length, 0);
 });
 
-test('Identify switches from one client to another by stopping the previous one first', async () => {
+test('Identify allows multiple clients to identify concurrently', async () => {
   const setCalls = [];
   const { Manager, ioEmits } = loadIdentifyManager({
     exists: async () => true,
@@ -128,12 +128,10 @@ test('Identify switches from one client to another by stopping the previous one 
 
   assert.deepEqual(setCalls, [
     { uuid: 'a1', flag: true },
-    { uuid: 'a1', flag: false },
     { uuid: 'a2', flag: true },
   ]);
   assert.deepEqual(ioEmits, [
     { uuid: 'a1', event: 'Identify', payload: { Nickname: null } },
-    { uuid: 'a1', event: 'StopIdentify', payload: undefined },
     { uuid: 'a2', event: 'Identify', payload: { Nickname: null } },
   ]);
 });
