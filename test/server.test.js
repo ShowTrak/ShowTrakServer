@@ -61,6 +61,7 @@ test('Server client namespace rejects sockets without a UUID', async () => {
     '../ClientManager': { Manager: {} },
     '../ScriptManager': { Manager: {} },
     '../ScriptExecutionManager': { Manager: {} },
+    '../ServerIdentity': { Manager: { GetIdentityToken: () => 'server-token-1' } },
   });
 
   let connectionHandler;
@@ -113,6 +114,7 @@ test('Server client namespace wires telemetry handlers and disconnect cleanup', 
     },
     '../ScriptManager': { Manager: { GetScripts: async () => [{ ID: 's1' }] } },
     '../ScriptExecutionManager': { Manager: { Complete: async () => (calls.complete += 1) } },
+    '../ServerIdentity': { Manager: { GetIdentityToken: () => 'server-token-1' } },
   });
 
   let connectionHandler;
@@ -189,6 +191,7 @@ test('Server client namespace re-adopts stale unadopted handshake without adding
     },
     '../ScriptManager': { Manager: { GetScripts: async () => [] } },
     '../ScriptExecutionManager': { Manager: { Complete: async () => {} } },
+    '../ServerIdentity': { Manager: { GetIdentityToken: () => 'server-token-1' } },
   });
 
   let connectionHandler;
@@ -206,6 +209,59 @@ test('Server client namespace re-adopts stale unadopted handshake without adding
   assert.equal(calls.adopt, 0);
   assert.equal(calls.removeAdopt, 1);
   assert.ok(socket.emitted.some((e) => e.event === 'Adopt'));
+});
+
+test('Server client namespace keeps unadopted clients visible for pending adoption across server identities', async () => {
+  const calls = {
+    adopt: 0,
+    removeAdopt: 0,
+  };
+
+  const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
+    '../Logger': loggerStub,
+    '../AdoptionManager': {
+      Manager: {
+        AddClientPendingAdoption: async () => (calls.adopt += 1),
+        RemoveClientPendingAdoption: () => (calls.removeAdopt += 1),
+      },
+    },
+    '../ClientManager': {
+      Manager: {
+        Exists: async () => false,
+        Heartbeat: async () => [null, 'ok'],
+        SystemInfo: async () => [null],
+        SetUSBDeviceList: async () => {},
+        USBDeviceAdded: async () => {},
+        USBDeviceRemoved: async () => {},
+        SetNetworkInterfaces: async () => {},
+        SetRunningApplications: async () => {},
+        SetIntegratedActions: async () => [null, []],
+        SetIntegratedState: async () => [null, true],
+        Timeout: async () => {},
+      },
+    },
+    '../ScriptManager': { Manager: { GetScripts: async () => [] } },
+    '../ScriptExecutionManager': { Manager: { Complete: async () => {} } },
+    '../ServerIdentity': { Manager: { GetIdentityToken: () => 'server-token-1' } },
+  });
+
+  let connectionHandler;
+  SetupClientNamespace({ on: (_e, h) => (connectionHandler = h) });
+
+  const socket = makeSocket({
+    query: { UUID: 'client-3', Adopted: 'false', ExpectedServerIdentity: 'different-token' },
+    address: '::ffff:10.0.0.11',
+    headers: {},
+  });
+  await connectionHandler(socket);
+
+  await socket.trigger('AdoptionHeartbeat', {
+    Hostname: 'h',
+    ExpectedServerIdentity: 'different-token',
+  });
+
+  assert.equal(calls.adopt, 1);
+  assert.equal(calls.removeAdopt, 0);
 });
 
 // Helpers to drive the Web UI namespace.

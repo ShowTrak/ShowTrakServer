@@ -17,8 +17,32 @@ const Manager = {};
 
 // Hot cache of Client instances reflecting current state
 let ClientList = [];
+const ClientIndex = new Map();
 const CriticalUSBIndex = new Map();
 const CriticalApplicationIndex = new Map();
+
+function rebuildClientIndex() {
+  ClientIndex.clear();
+  for (const Entry of ClientList) {
+    if (!Entry || !Entry.UUID) continue;
+    ClientIndex.set(Entry.UUID, Entry);
+  }
+}
+
+function addClientToCache(TargetClient) {
+  if (!TargetClient || !TargetClient.UUID) return false;
+  if (ClientIndex.has(TargetClient.UUID)) return false;
+  ClientList.push(TargetClient);
+  ClientIndex.set(TargetClient.UUID, TargetClient);
+  return true;
+}
+
+function removeClientFromCache(UUID) {
+  if (!ClientIndex.has(UUID)) return false;
+  ClientIndex.delete(UUID);
+  ClientList = ClientList.filter((Client) => Client.UUID !== UUID);
+  return true;
+}
 
 function replaceUUIDInValue(Value, OldUUID, NewUUID) {
   if (typeof Value === 'string') {
@@ -131,7 +155,7 @@ Manager.Timeout = async (UUID) => {
 
 // Fast path for frequent telemetry: update cached client or hydrate from DB
 Manager.Heartbeat = async (UUID, Data, IP) => {
-  let CachedClient = ClientList.find((c) => c.UUID === UUID);
+  let CachedClient = ClientIndex.get(UUID) || null;
   if (!CachedClient) {
     Logger.warn(`Client ${UUID} not found in memory, fetching from database.`);
     const [Err, FetchedClient] = await DB.Get('SELECT * FROM Clients WHERE UUID = ?', [UUID]);
@@ -145,8 +169,9 @@ Manager.Heartbeat = async (UUID, Data, IP) => {
       CachedClient = new Client(FetchedClient);
       applyCriticalUSBState(CachedClient);
       applyCriticalApplicationState(CachedClient);
-      ClientList.push(CachedClient);
-      BroadcastManager.emit('ClientListChanged');
+      if (addClientToCache(CachedClient)) {
+        BroadcastManager.emit('ClientListChanged');
+      }
     }
   }
 
@@ -205,8 +230,7 @@ Manager.SetRunningApplications = async (UUID, Snapshot) => {
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return [Err, null];
   if (!Target) return ['Client Not Found', null];
-  if (!ClientList.find((Client) => Client.UUID === UUID)) {
-    ClientList.push(Target);
+  if (addClientToCache(Target)) {
     BroadcastManager.emit('ClientListChanged');
   }
   Target.SetRunningApplications(Snapshot || {});
@@ -437,8 +461,9 @@ Manager.Create = async (UUID) => {
   });
   applyCriticalUSBState(Created);
   applyCriticalApplicationState(Created);
-  ClientList.push(Created);
-  BroadcastManager.emit('ClientListChanged');
+  if (addClientToCache(Created)) {
+    BroadcastManager.emit('ClientListChanged');
+  }
   return Ok(true);
 };
 
@@ -452,7 +477,7 @@ Manager.Delete = async (UUID) => {
   const [Err, _Res] = await DB.Run('DELETE FROM Clients WHERE UUID = ?', [UUID]);
   if (Err) return Fail('Failed to delete client');
   // Remove from in-memory list
-  ClientList = ClientList.filter((c) => c.UUID !== UUID);
+  removeClientFromCache(UUID);
   CriticalUSBIndex.delete(String(UUID || ''));
   CriticalApplicationIndex.delete(String(UUID || ''));
   Logger.success(`Client ${UUID} deleted successfully`);
@@ -560,6 +585,7 @@ Manager.ReplaceClient = async (CurrentUUID, ReplacementUUID) => {
   ExistingClient.UUID = NewUUID;
   ClientList = oldClientRows.filter((Client) => Client.UUID !== OldUUID && Client.UUID !== NewUUID);
   ClientList.push(ExistingClient);
+  rebuildClientIndex();
 
   if (oldCriticalUSB) {
     CriticalUSBIndex.set(NewUUID, oldCriticalUSB);
@@ -582,7 +608,7 @@ Manager.ReplaceClient = async (CurrentUUID, ReplacementUUID) => {
 // Truthy existence check: prefer cache, fallback to DB
 Manager.Exists = async (UUID) => {
   // Check in memory first
-  const CachedClient = ClientList.find((c) => c.UUID === UUID);
+  const CachedClient = ClientIndex.get(UUID);
   if (CachedClient) return true;
   // If not found in memory, check in database
   const [Err, Client] = await DB.Get('SELECT * FROM Clients WHERE UUID = ?', [UUID]);
@@ -594,7 +620,7 @@ Manager.Exists = async (UUID) => {
 // Fetch a Client object (cached or hydrated); callers should not mutate DB-only fields directly
 Manager.Get = async (UUID) => {
   // Check in memory first
-  const CachedClient = ClientList.find((c) => c.UUID === UUID);
+  const CachedClient = ClientIndex.get(UUID);
   if (CachedClient) {
     return [null, CachedClient];
   }
@@ -617,6 +643,7 @@ Manager.Init = async () => {
   if (Err || !Clients) {
     Manager.Initialized = true;
     ClientList = [];
+    rebuildClientIndex();
     return;
   }
   Clients = Clients.map((row) => {
@@ -626,6 +653,7 @@ Manager.Init = async () => {
     return ClientEntity;
   });
   ClientList = Clients; // Update in-memory list
+  rebuildClientIndex();
   BroadcastManager.emit('ClientListChanged');
   Manager.Initialized = true;
   return;
@@ -633,24 +661,8 @@ Manager.Init = async () => {
 
 // Snapshot the current list; ensures cache is initialized first
 Manager.GetAll = async () => {
-  // Check in memory first
   if (!Manager.Initialized) await Manager.Init();
-  if (ClientList.length > 0) {
-    return [null, ClientList];
-  }
-  // If not found in memory, fetch from database
-  let [Err, Clients] = await DB.All('SELECT * FROM Clients');
-  if (Err) return ['Failed to fetch clients', null];
-  if (!Clients || Clients.length === 0) return [null, []];
-  Clients = Clients.map((row) => {
-    const ClientEntity = new Client(row);
-    applyCriticalUSBState(ClientEntity);
-    applyCriticalApplicationState(ClientEntity);
-    return ClientEntity;
-  });
-  ClientList = Clients; // Update in-memory list
-  BroadcastManager.emit('ClientListChanged');
-  return [null, Clients];
+  return [null, ClientList];
 };
 
 Manager.GetClientsInGroup = async (GroupID) => {
@@ -744,6 +756,7 @@ Manager.SetGroupOrderWithWeights = async (GroupID, orderedUUIDs, weights) => {
 
 Manager.ClearCache = async () => {
   ClientList = [];
+  rebuildClientIndex();
   CriticalUSBIndex.clear();
   CriticalApplicationIndex.clear();
   Manager.Initialized = false;

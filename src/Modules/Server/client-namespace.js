@@ -10,9 +10,12 @@ const { Manager: AdoptionManager } = require('../AdoptionManager');
 const { Manager: ClientManager } = require('../ClientManager');
 const { Manager: ScriptManager } = require('../ScriptManager');
 const { Manager: ScriptExecutionManager } = require('../ScriptExecutionManager');
+const { Manager: ServerIdentityManager } = require('../ServerIdentity');
 
 // Wire the default namespace (ShowTrak client agents) onto the Socket.IO server.
 function SetupClientNamespace(io) {
+  const localServerIdentity = ServerIdentityManager.GetIdentityToken();
+
   // Per-connection lifecycle
   io.on('connection', async (socket) => {
     try {
@@ -35,6 +38,10 @@ function SetupClientNamespace(io) {
       return socket.disconnect(true);
     socket.UUID = socket.handshake.query.UUID;
     socket.Adopted = socket.handshake.query.Adopted === 'true' ? true : false;
+    socket.ExpectedServerIdentity =
+      typeof socket.handshake.query.ExpectedServerIdentity === 'string'
+        ? socket.handshake.query.ExpectedServerIdentity.trim()
+        : '';
     Logger.log(
       `Client Connected As ${socket.UUID} ${socket.Adopted ? '(Adopted)' : '(Pending Adoption)'}`
     );
@@ -49,11 +56,31 @@ function SetupClientNamespace(io) {
 
     // If the client claims adoption, verify against our DB to prevent drift
     if (socket.Adopted) {
+      if (
+        socket.ExpectedServerIdentity &&
+        localServerIdentity &&
+        socket.ExpectedServerIdentity !== localServerIdentity
+      ) {
+        Logger.warn('Adopted client server identity mismatch; rejecting adoption claim', {
+          UUID: socket.UUID,
+          expected: socket.ExpectedServerIdentity,
+          actual: localServerIdentity,
+        });
+        socket.emit('Unadopt', {
+          Reason: 'server_identity_mismatch',
+          ServerIdentity: localServerIdentity,
+        });
+        return;
+      }
+
       const IsInDatabase = await ClientManager.Exists(socket.UUID);
       if (!IsInDatabase) {
         Logger.warn('Client is adopted but not found in the database:', socket.UUID);
         Logger.warn('Unadopting Client');
-        socket.emit('Unadopt');
+        socket.emit('Unadopt', {
+          Reason: 'client_missing_in_server_database',
+          ServerIdentity: localServerIdentity,
+        });
       }
     }
 
