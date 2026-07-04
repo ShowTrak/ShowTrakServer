@@ -28,7 +28,17 @@ async function InsertCheckRow(TargetID, Check, Weight, Now) {
   const Threshold = ClampThreshold(Check.DegradedThresholdMs);
   const [Err, Res] = await DB.Run(
     'INSERT INTO MonitoringChecks (TargetID, Name, Address, Method, Settings, DegradedThresholdMs, Weight, LastSuccessAt, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [TargetID, Check.Name || '', Check.Address || '', Check.Method, SettingsJson, Threshold, Weight, null, Now]
+    [
+      TargetID,
+      Check.Name || '',
+      Check.Address || '',
+      Check.Method,
+      SettingsJson,
+      Threshold,
+      Weight,
+      null,
+      Now,
+    ]
   );
   if (Err || !Res) return null;
   return {
@@ -149,9 +159,9 @@ Manager.Init = async () => {
       const Migrated = await MigrateLegacyTargetToCheck(Row);
       if (Migrated) Checks = [Migrated];
     }
-    Checks = Checks
-      .slice()
-      .sort((a, b) => (a.Weight || 0) - (b.Weight || 0) || (a.CheckID || 0) - (b.CheckID || 0));
+    Checks = Checks.slice().sort(
+      (a, b) => (a.Weight || 0) - (b.Weight || 0) || (a.CheckID || 0) - (b.CheckID || 0)
+    );
     TargetList.push(new MonitoringTarget(Row, Checks));
   }
 
@@ -248,7 +258,18 @@ Manager.Create = async (Payload) => {
   // config is stored per-check in MonitoringChecks.
   const [Err, Res] = await DB.Run(
     'INSERT INTO MonitoringTargets (Nickname, Address, Method, Interval, Settings, GroupID, Weight, LastSuccessAt, DegradedThresholdMs, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [Payload.Nickname, '', Checks.length ? Checks[0].Method : '', Interval, '{}', GroupID, Weight, null, 0, Now]
+    [
+      Payload.Nickname,
+      '',
+      Checks.length ? Checks[0].Method : '',
+      Interval,
+      '{}',
+      GroupID,
+      Weight,
+      null,
+      0,
+      Now,
+    ]
   );
   if (Err || !Res) return Fail('Failed to create monitoring target');
   const TargetID = Res.lastID;

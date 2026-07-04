@@ -68,6 +68,8 @@
     detailInfo: $('detailInfo'),
     usbSection: $('usbSection'),
     usbList: $('usbList'),
+    displaysSection: $('displaysSection'),
+    displaysList: $('displaysList'),
     monitorChecksSection: $('monitorChecksSection'),
     monitorChecksList: $('monitorChecksList'),
     netSection: $('netSection'),
@@ -506,7 +508,12 @@
     const Name = T.Nickname || T.Address || 'Unnamed';
     const Sub = T.Address || '';
     const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
-    const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
+    const CompactStatus = FormatMonitorCompactStatus(
+      Online,
+      T.LastLatencyMs,
+      T.LastError,
+      Degraded
+    );
     const OfflineSince = getMonitoringOfflineSince(T);
     const Method = FormatMonitorMethodLabel(T);
     const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
@@ -729,7 +736,8 @@
     const addrEl = tile.querySelector('[data-type="Address"]');
     if (addrEl) addrEl.textContent = T.Address || '';
     const methodEl = tile.querySelector('[data-type="Method"]');
-    if (methodEl) methodEl.textContent = `${FormatMonitorMethodLabel(T)} · ${FormatInterval(T.Interval)}`;
+    if (methodEl)
+      methodEl.textContent = `${FormatMonitorMethodLabel(T)} · ${FormatInterval(T.Interval)}`;
     const label = tile.querySelector('[data-type="MONITOR_STATUS_LABEL"]');
     const compact = tile.querySelector('[data-type="MONITOR_COMPACT_LATENCY"]');
     if (label) {
@@ -739,7 +747,12 @@
       label.classList.add('text-light');
     }
     if (compact) {
-      const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
+      const CompactStatus = FormatMonitorCompactStatus(
+        Online,
+        T.LastLatencyMs,
+        T.LastError,
+        Degraded
+      );
       compact.textContent = CompactStatus;
       compact.classList.toggle('d-none', !CompactStatus);
       compact.classList.remove('text-success', 'text-warning');
@@ -894,7 +907,8 @@
 
       for (let i = 0; i < checks.length; i++) {
         const check = checks[i] || {};
-        const labelBase = String((check.Name || '').trim()) ||
+        const labelBase =
+          String((check.Name || '').trim()) ||
           `${String((check.Method || '').toUpperCase()) || 'CHECK'} ${i + 1}`;
         const endpoint = String((check.Address || '').trim());
         const label = endpoint ? `${labelBase} (${endpoint})` : labelBase;
@@ -915,6 +929,8 @@
       el.usbList.innerHTML = '';
       el.netList.innerHTML = '';
       el.appsList.innerHTML = '';
+      if (el.displaysSection) el.displaysSection.classList.add('hidden');
+      if (el.displaysList) el.displaysList.innerHTML = '';
       closeScripts();
 
       if (el.monitorChecksSection && el.monitorChecksList) {
@@ -983,6 +999,8 @@
       el.usbList.innerHTML = '';
       el.netList.innerHTML = '';
       el.appsList.innerHTML = '';
+      if (el.displaysSection) el.displaysSection.classList.add('hidden');
+      if (el.displaysList) el.displaysList.innerHTML = '';
       hideMonitorChecks();
       closeScripts();
 
@@ -1063,11 +1081,13 @@
 
     // Integrated SDK clients do not expose USB/network/app runtime panes.
     el.usbSection.classList.toggle('hidden', integratedClient);
+    if (el.displaysSection) el.displaysSection.classList.toggle('hidden', integratedClient);
     el.netSection.classList.toggle('hidden', integratedClient);
     el.appsSection.classList.toggle('hidden', integratedClient);
 
     if (integratedClient) {
       el.usbList.innerHTML = '';
+      if (el.displaysList) el.displaysList.innerHTML = '';
       el.netList.innerHTML = '';
       el.appsList.innerHTML = '';
       closeScripts();
@@ -1110,6 +1130,55 @@
     // Network interfaces
     if (!integratedClient) {
       paintNetworkInterfaces(c);
+    }
+
+    // Displays — read-only card layout matching desktop modal
+    if (!integratedClient && el.displaysList) {
+      const displays = Array.isArray(c.DisplayList) ? c.DisplayList : [];
+      const formatRes = (d) => {
+        const w = parseInt(d && d.Width, 10) || 0;
+        const h = parseInt(d && d.Height, 10) || 0;
+        if (!w || !h) return null;
+        const rate =
+          d && d.RefreshRate != null && Number.isFinite(Number(d.RefreshRate))
+            ? Math.round(Number(d.RefreshRate))
+            : null;
+        return rate ? `${w} × ${h} @ ${rate}Hz` : `${w} × ${h}`;
+      };
+      if (displays.length === 0) {
+        el.displaysList.innerHTML = '<div class="device-card-empty">No displays reported.</div>';
+      } else {
+        el.displaysList.innerHTML = displays
+          .map((d) => {
+            const label =
+              d.Label && String(d.Label).trim()
+                ? String(d.Label).trim()
+                : d.Primary
+                  ? 'Primary Display'
+                  : 'Display';
+            const isCritical = !!d.IsCritical;
+            const isConnected = d.IsConnected !== false;
+            const isMismatch = !!d.Mismatch;
+            const res = formatRes(d);
+            let badges = '';
+            if (isCritical && !isConnected) {
+              badges =
+                '<div class="device-card-badges"><span class="device-badge badge-critical-missing"><i class="bi bi-x-circle-fill"></i> Missing Critical</span></div>';
+            } else if (isCritical && isMismatch) {
+              badges =
+                '<div class="device-card-badges"><span class="device-badge badge-critical-missing"><i class="bi bi-exclamation-triangle-fill"></i> Config Changed</span></div>';
+            } else if (isCritical) {
+              badges =
+                '<div class="device-card-badges"><span class="device-badge badge-critical"><i class="bi bi-check-circle-fill"></i> Critical</span></div>';
+            }
+            return `<div class="device-card">
+          <div class="device-card-name">${safe(label)}${d.Primary ? ' (Primary)' : ''}</div>
+          <div class="device-card-sub">${res ? safe(res) : 'Resolution unavailable'}</div>
+          ${badges}
+        </div>`;
+          })
+          .join('');
+      }
     }
 
     // Running applications — card layout matching desktop modal (read-only, no critical toggle)

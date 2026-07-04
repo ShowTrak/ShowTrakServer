@@ -78,7 +78,8 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
         Run: async (sql, params) => {
           runCalls.push([sql, params]);
           if (sql.includes('INSERT INTO MonitoringTargets')) return [null, { lastID: 12 }];
-          if (sql.includes('INSERT INTO MonitoringChecks')) return [null, { lastID: nextInsertID++ }];
+          if (sql.includes('INSERT INTO MonitoringChecks'))
+            return [null, { lastID: nextInsertID++ }];
           return [null, { changes: 1 }];
         },
         RunWithoutDirtyTracking: async (sql, params) => {
@@ -141,7 +142,13 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
       GroupID: 4,
       Weight: 90,
       Checks: [
-        { Name: 'Ping', Address: '10.0.0.12', Method: 'ping', Settings: { Timeout: 555 }, DegradedThresholdMs: -10 },
+        {
+          Name: 'Ping',
+          Address: '10.0.0.12',
+          Method: 'ping',
+          Settings: { Timeout: 555 },
+          DegradedThresholdMs: -10,
+        },
       ],
     });
     assert.equal(createErr, null);
@@ -173,7 +180,13 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
     const [updateErr, updated] = await Manager.Update(12, {
       Interval: 99999999,
       Checks: [
-        { CheckID: createdCheckID, Address: '10.0.0.12', Method: 'http', Settings: { Path: '/status' }, DegradedThresholdMs: 700000 },
+        {
+          CheckID: createdCheckID,
+          Address: '10.0.0.12',
+          Method: 'http',
+          Settings: { Path: '/status' },
+          DegradedThresholdMs: 700000,
+        },
         { Address: '10.0.0.13', Method: 'ping', Settings: {} },
       ],
     });
@@ -505,7 +518,9 @@ test('MonitoringTargetManager.RunCheckNow runs a check, broadcasts, and returns 
     assert.equal(debug.Online, true);
     assert.equal(debug.LastLatencyMs, 7);
     // The manual run persists the success timestamp and broadcasts an update.
-    assert.ok(untrackedRunCalls.some(([sql]) => sql.includes('UPDATE MonitoringChecks SET LastSuccessAt')));
+    assert.ok(
+      untrackedRunCalls.some(([sql]) => sql.includes('UPDATE MonitoringChecks SET LastSuccessAt'))
+    );
     assert.ok(events.some(([event]) => event === 'MonitoringTargetUpdated'));
 
     const [missingErr, missingValue] = await Manager.RunCheckNow(999);

@@ -105,6 +105,7 @@ test('Server client namespace wires telemetry handlers and disconnect cleanup', 
           calls.systemInfo += 1;
           return [null];
         },
+        Get: async (uuid) => [null, { UUID: uuid, Online: true, USBDeviceList: [] }],
         SetUSBDeviceList: async () => (calls.usbList += 1),
         USBDeviceAdded: async () => (calls.usbAdd += 1),
         USBDeviceRemoved: async () => (calls.usbRemove += 1),

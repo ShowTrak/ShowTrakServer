@@ -211,28 +211,27 @@ function Debug(Result, Target) {
 
   const Mode = Result && Result.Mode;
   const Extra = [];
-  
+
   if (Mode === 'json') {
     Extra.push(TextRow('JSON path', (Result && Result.JsonPath) || '—'));
     if (Result && Object.prototype.hasOwnProperty.call(Result, 'MatchedValue')) {
       Extra.push(
-        Row(
-          'Resolved value',
-          `<span class="font-monospace">${Esc(Result.MatchedValue)}</span>`
-        )
+        Row('Resolved value', `<span class="font-monospace">${Esc(Result.MatchedValue)}</span>`)
       );
     }
   } else if (Mode === 'text') {
     const Found = !!(Result && Result.Success);
     Extra.push(TextRow('Expected substring', (Result && Result.Expected) || '—'));
-    Extra.push(Row('Body match', Pill(Found ? 'success' : 'danger', Found ? 'Found' : 'Not found')));
+    Extra.push(
+      Row('Body match', Pill(Found ? 'success' : 'danger', Found ? 'Found' : 'Not found'))
+    );
   }
 
   // Always display the JSON response if available
   if (Result && Result.JsonBody) {
     Extra.push(null); // Spacer
     Extra.push(`<div class="mt-2"><span class="text-muted small">Response Body:</span></div>`);
-    
+
     // If a JSON path was defined and this was successful JSON mode, highlight the path
     if (Mode === 'json' && Result.JsonPath) {
       Extra.push(JsonCodeBlockWithPath(Result.JsonBody, Result.JsonPath));

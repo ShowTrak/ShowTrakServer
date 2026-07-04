@@ -95,13 +95,13 @@ Manager.Has = (ID) => Methods.has(ID);
 Manager.NormalizeSettings = (ID, Input) => {
   const Method = Methods.get(ID);
   if (!Method) return {};
-  
+
   // Allow methods to apply custom normalization logic
   let MethodNormalized = Input;
   if (typeof Method.NormalizeSettings === 'function') {
     MethodNormalized = Method.NormalizeSettings(Input);
   }
-  
+
   const out = {};
   const Schema = Array.isArray(Method.Settings) ? Method.Settings : [];
   const Source = MethodNormalized && typeof MethodNormalized === 'object' ? MethodNormalized : {};
@@ -140,11 +140,7 @@ Manager.Run = async (ID, Target) => {
   const CacheKey = getMethodRunCacheKey(ID, Method, Target);
   const CacheTtlMs = getMethodRunCacheTtlMs(Method, Target);
   try {
-    return await RUN_CACHE.GetOrCreate(
-      CacheKey,
-      () => Method.Run(Target),
-      { ttlMs: CacheTtlMs }
-    );
+    return await RUN_CACHE.GetOrCreate(CacheKey, () => Method.Run(Target), { ttlMs: CacheTtlMs });
   } catch (Err) {
     return { Success: false, Error: Err && Err.message ? Err.message : String(Err) };
   }
@@ -161,7 +157,9 @@ Manager.BuildDebug = (ID, Result, Target) => {
     const Html = Method.Debug(Result, Target);
     return typeof Html === 'string' && Html.length ? Html : null;
   } catch (Err) {
-    Logger.warn(`Debug renderer failed for method ${ID}: ${Err && Err.message ? Err.message : Err}`);
+    Logger.warn(
+      `Debug renderer failed for method ${ID}: ${Err && Err.message ? Err.message : Err}`
+    );
     return null;
   }
 };

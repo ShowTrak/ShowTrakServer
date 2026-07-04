@@ -132,4 +132,14 @@ function JsonCodeBlockWithPath(JsonString, JsonPath) {
   }
 }
 
-module.exports = { Esc, Pill, Row, TextRow, Rows, Note, FormatLatency, JsonCodeBlock, JsonCodeBlockWithPath };
+module.exports = {
+  Esc,
+  Pill,
+  Row,
+  TextRow,
+  Rows,
+  Note,
+  FormatLatency,
+  JsonCodeBlock,
+  JsonCodeBlockWithPath,
+};

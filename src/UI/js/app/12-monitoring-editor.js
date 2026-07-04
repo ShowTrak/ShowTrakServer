@@ -356,9 +356,8 @@ async function OpenNetworkDiscoveryModal() {
 function GetLiveMonitoringTarget() {
   if (!MonitoringEditorState || MonitoringEditorState.TargetID == null) return null;
   return (
-    MonitoringTargets.find(
-      (t) => Number(t.TargetID) === Number(MonitoringEditorState.TargetID)
-    ) || null
+    MonitoringTargets.find((t) => Number(t.TargetID) === Number(MonitoringEditorState.TargetID)) ||
+    null
   );
 }
 

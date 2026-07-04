@@ -492,6 +492,16 @@ window.API.ClientUpdated(async (Data) => {
   } catch (err) {
     HandleNonFatalError('ClientUpdated:RenderClientInfoDetails', err);
   }
+  // If the shared status-timeline graph is showing this client, reload its
+  // series live so the timeline and status card stay current.
+  if (IsMonitorHistoryContextFor('client', UUID)) {
+    try {
+      await LoadHistorySamplesForContext();
+      RenderMonitoringHistoryModal();
+    } catch (err) {
+      HandleNonFatalError('ClientUpdated:RefreshClientHistory', err);
+    }
+  }
   return;
 });
 
@@ -532,12 +542,11 @@ window.API.MonitoringTargetUpdated(async (Target) => {
   if (typeof RefreshMonitoringCheckDebugIfOpen === 'function') {
     RefreshMonitoringCheckDebugIfOpen(Target.TargetID);
   }
-  // If the history modal is showing one of this target's checks, reload it.
+  // If the history modal is showing this target, reload its series live.
   if (
     MonitorHistoryModalContext &&
-    MonitorHistoryModalContext.type === 'check' &&
-    Array.isArray(Target.Checks) &&
-    Target.Checks.some((c) => Number(c.CheckID) === Number(MonitorHistoryModalContext.id))
+    MonitorHistoryModalContext.type === 'target' &&
+    Number(MonitorHistoryModalContext.id) === Number(Target.TargetID)
   ) {
     await LoadHistorySamplesForContext();
     RenderMonitoringHistoryModal();

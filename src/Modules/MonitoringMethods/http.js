@@ -95,7 +95,7 @@ async function Run(Target) {
   const Protocol = String(Cfg.Protocol || 'https').toLowerCase();
   const FinalProtocol = Protocol === 'http' ? 'http' : 'https';
   const DefaultPort = FinalProtocol === 'http' ? 80 : 443;
-  
+
   return PerformHttpRequest(Target, { Protocol: FinalProtocol, DefaultPort });
 }
 

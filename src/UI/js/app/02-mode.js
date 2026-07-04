@@ -86,6 +86,13 @@ function RenderMode(mode) {
 // Subscribe to backend push updates
 window.API.OnModeUpdated((mode) => {
   RenderMode(mode);
+  if (typeof UpdateMonitorHistoryEditButtonVisibility === 'function') {
+    try {
+      UpdateMonitorHistoryEditButtonVisibility();
+    } catch (err) {
+      HandleNonFatalError('Mode:UpdateMonitorHistoryEditButtonVisibility', err);
+    }
+  }
   // Re-evaluate drag state when mode changes
   if (typeof initializeEditInteractions === 'function') {
     try {

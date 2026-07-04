@@ -372,7 +372,12 @@ test('MonitoringMethods Manager.Run deduplicates concurrent identical checks', a
     },
   };
 
-  const staticMethod = (ID) => ({ ID, Name: ID, Settings: [], Run: async () => ({ Success: true }) });
+  const staticMethod = (ID) => ({
+    ID,
+    Name: ID,
+    Settings: [],
+    Run: async () => ({ Success: true }),
+  });
   const { Manager } = loadWithMocks(methodPath('index.js'), {
     '../Logger': loggerStub(),
     './ping': methodStub,

@@ -35,6 +35,10 @@ const INVOKE_CHANNELS = [
 
   // Clients
   'GetClient',
+  'GetClientHistory',
+  'GetClientApplicationHistory',
+  'GetClientUSBHistory',
+  'GetClientDisplayHistory',
   'AdoptDevice',
   'UpdateClient',
   'UnadoptClient',
@@ -44,6 +48,8 @@ const INVOKE_CHANNELS = [
   'RemoveClientUSBDeviceCritical',
   'MarkClientApplicationCritical',
   'RemoveClientApplicationCritical',
+  'MarkClientDisplayCritical',
+  'RemoveClientDisplayCritical',
   'IdentifyClient',
   'StopIdentifyingClient',
 
@@ -112,7 +118,6 @@ const INVOKE_CHANNELS = [
   'CreateDummyClient',
   'UpdateDummyClient',
   'DeleteDummyClient',
-
   // Network discovery
   'NetworkDiscovery:Start',
   'NetworkDiscovery:Stop',

@@ -78,7 +78,9 @@ test('Identify starts on an adopted online client and emits Identify with nickna
   assert.equal(Err, null);
   assert.equal(Ok, true);
   assert.deepEqual(setCalls, [{ uuid: 'c1', flag: true }]);
-  assert.deepEqual(ioEmits, [{ uuid: 'c1', event: 'Identify', payload: { Nickname: 'FrontDesk' } }]);
+  assert.deepEqual(ioEmits, [
+    { uuid: 'c1', event: 'Identify', payload: { Nickname: 'FrontDesk' } },
+  ]);
 });
 
 test('Identify rejects integrated clients', async () => {

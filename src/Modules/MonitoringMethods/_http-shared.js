@@ -240,7 +240,10 @@ function BuildHttpDebug(Result, Target, Opts) {
       ? Row('Status', Pill(StatusKind(Status), `HTTP ${Number(Status)}`))
       : Row('Reachable', Pill(Success ? 'success' : 'danger', Success ? 'Yes' : 'No')),
     Success
-      ? Row('Response time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
+      ? Row(
+          'Response time',
+          `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`
+        )
       : TextRow('Error', (Result && Result.Error) || 'Request failed'),
   ]);
 }

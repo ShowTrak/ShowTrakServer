@@ -133,11 +133,12 @@ async function Run(Target) {
 function Debug(Result, Target) {
   const Address = Target && Target.Address ? String(Target.Address).trim() : '';
   const Cfg = (Target && Target.Settings) || {};
-  const RecordType =
-    (Result && Result.RecordType) || String(Cfg.RecordType || 'A').toUpperCase();
+  const RecordType = (Result && Result.RecordType) || String(Cfg.RecordType || 'A').toUpperCase();
   const Records = Array.isArray(Result && Result.Records) ? Result.Records : [];
   const Success = !!(Result && Result.Success);
-  const Expected = (Result && Result.Expected) || (Cfg.ExpectedValue == null ? '' : String(Cfg.ExpectedValue).trim());
+  const Expected =
+    (Result && Result.Expected) ||
+    (Cfg.ExpectedValue == null ? '' : String(Cfg.ExpectedValue).trim());
 
   const Head = Rows([
     TextRow('Hostname', Address || '—'),

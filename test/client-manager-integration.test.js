@@ -198,6 +198,80 @@ test('ClientManager updates system info, USB devices, and network interfaces', a
   assert.match(String((await Manager.SystemInfo('missing', {}, '0'))[0]), /not found/i);
 });
 
+test('ClientManager tracks critical displays and flags resolution/refresh changes', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.Create('disp-1');
+
+  // Report two connected displays.
+  await Manager.SetDisplayList('disp-1', [
+    { DisplayID: '100', Label: 'Primary', Width: 1920, Height: 1080, RefreshRate: 60, Primary: true },
+    { DisplayID: '200', Label: 'Secondary', Width: 2560, Height: 1440, RefreshRate: 144 },
+  ]);
+  let [, client] = await Manager.Get('disp-1');
+  assert.equal(client.DisplayList.length, 2);
+
+  // Mark the primary display critical; baseline captured from the live report.
+  const [markErr] = await Manager.MarkDisplayCritical('disp-1', { DisplayID: '100' });
+  assert.equal(markErr, null);
+  assert.deepEqual(await Manager.IsDisplayCritical('disp-1', '100'), [null, true]);
+  assert.deepEqual(await Manager.IsDisplayCritical('disp-1', '200'), [null, false]);
+
+  [, client] = await Manager.Get('disp-1');
+  let primary = client.DisplayList.find((d) => d.DisplayID === '100');
+  assert.equal(primary.IsCritical, true);
+  assert.equal(primary.Mismatch, false);
+  assert.equal(client.MismatchedCriticalDisplays.length, 0);
+  assert.equal(client.Degraded, false);
+
+  // Same display, changed resolution/refresh -> mismatch + degraded.
+  client.SetOnline(true);
+  await Manager.SetDisplayList('disp-1', [
+    { DisplayID: '100', Label: 'Primary', Width: 1280, Height: 720, RefreshRate: 30 },
+    { DisplayID: '200', Label: 'Secondary', Width: 2560, Height: 1440, RefreshRate: 144 },
+  ]);
+  [, client] = await Manager.Get('disp-1');
+  primary = client.DisplayList.find((d) => d.DisplayID === '100');
+  assert.equal(primary.Mismatch, true);
+  assert.equal(client.MismatchedCriticalDisplays.length, 1);
+  assert.equal(client.Degraded, true);
+  assert.ok(client.DegradedWarnings.includes('Display Configuration Changed'));
+
+  // Restoring the original configuration clears the mismatch.
+  await Manager.SetDisplayList('disp-1', [
+    { DisplayID: '100', Label: 'Primary', Width: 1920, Height: 1080, RefreshRate: 60 },
+  ]);
+  [, client] = await Manager.Get('disp-1');
+  primary = client.DisplayList.find((d) => d.DisplayID === '100');
+  assert.equal(primary.Mismatch, false);
+  assert.equal(client.MismatchedCriticalDisplays.length, 0);
+
+  // Disconnecting the critical display surfaces it as missing + degraded.
+  await Manager.SetDisplayList('disp-1', [
+    { DisplayID: '200', Label: 'Secondary', Width: 2560, Height: 1440, RefreshRate: 144 },
+  ]);
+  [, client] = await Manager.Get('disp-1');
+  const missing = client.DisplayList.find((d) => d.DisplayID === '100');
+  assert.equal(missing.Missing, true);
+  assert.equal(missing.IsConnected, false);
+  assert.equal(client.MissingCriticalDisplays.length, 1);
+  assert.ok(client.DegradedWarnings.includes('Missing Display'));
+
+  // Removing the critical flag clears everything.
+  const [removeErr] = await Manager.RemoveDisplayCritical('disp-1', '100');
+  assert.equal(removeErr, null);
+  assert.deepEqual(await Manager.IsDisplayCritical('disp-1', '100'), [null, false]);
+  [, client] = await Manager.Get('disp-1');
+  assert.equal(client.MissingCriticalDisplays.length, 0);
+  assert.equal(
+    client.DisplayList.some((d) => d.DisplayID === '100'),
+    false
+  );
+
+  // Operations against a missing client return errors.
+  assert.match(String((await Manager.SetDisplayList('nope', []))[0]), /not found/i);
+  assert.match(String((await Manager.MarkDisplayCritical('nope', { DisplayID: '1' }))[0]), /not found/i);
+});
+
 test('ClientManager manages groups, ordering, and reconciliation', async () => {
   const { Manager, DB } = await loadClientManager();
   await Manager.Create('c1');

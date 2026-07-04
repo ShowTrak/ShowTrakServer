@@ -213,7 +213,8 @@ function WorkspaceMatches(Workspace, Wanted) {
   const WantedNorm = NormalizeWorkspace(Wanted);
   if (!WantedNorm) return false;
 
-  const UniqueID = Workspace.uniqueID == null ? '' : String(Workspace.uniqueID).trim().toLowerCase();
+  const UniqueID =
+    Workspace.uniqueID == null ? '' : String(Workspace.uniqueID).trim().toLowerCase();
   if (UniqueID && (UniqueID === WantedRaw || UniqueID === WantedNorm)) return true;
 
   const DisplayName = Workspace.displayName;
@@ -223,7 +224,9 @@ function WorkspaceMatches(Workspace, Wanted) {
 }
 
 function BuildWorkspaceQueryCacheKey(Address, Port, TimeoutMs) {
-  return `${String(Address || '').trim().toLowerCase()}|${Port}|${TimeoutMs}`;
+  return `${String(Address || '')
+    .trim()
+    .toLowerCase()}|${Port}|${TimeoutMs}`;
 }
 
 function ResolveWorkspaceQueryCacheTtlMs(TimeoutMs) {
@@ -347,8 +350,13 @@ function Debug(Result, Target) {
   const Address = Target && Target.Address ? String(Target.Address).trim() : '';
   const Cfg = (Target && Target.Settings) || {};
   const Port = Number.isFinite(Cfg.Port) ? Cfg.Port | 0 : 53000;
-  const Wanted = (Result && Result.Wanted) || (Cfg.Workspace == null ? '' : String(Cfg.Workspace).trim());
-  const Reachable = !!(Result && (Result.Success || Result.Degraded) && Array.isArray(Result.Workspaces));
+  const Wanted =
+    (Result && Result.Wanted) || (Cfg.Workspace == null ? '' : String(Cfg.Workspace).trim());
+  const Reachable = !!(
+    Result &&
+    (Result.Success || Result.Degraded) &&
+    Array.isArray(Result.Workspaces)
+  );
 
   let StatusPill;
   if (!Reachable) {
@@ -379,14 +387,13 @@ function Debug(Result, Target) {
   }
 
   const List = Workspaces.map((Workspace) => {
-    const Name = Workspace && Workspace.displayName != null ? String(Workspace.displayName) : '(unnamed)';
+    const Name =
+      Workspace && Workspace.displayName != null ? String(Workspace.displayName) : '(unnamed)';
     const UniqueID = Workspace && Workspace.uniqueID != null ? String(Workspace.uniqueID) : '';
     const HasPasscode = !!(Workspace && (Workspace.hasPasscode || Workspace.hasPasscodeSet));
     const IsMatch = WorkspaceMatches(Workspace, Wanted);
     const RowCls = IsMatch ? 'border border-success' : 'border border-transparent';
-    const PasscodePill = HasPasscode
-      ? Pill('warning', 'Passcode')
-      : Pill('muted', 'No passcode');
+    const PasscodePill = HasPasscode ? Pill('warning', 'Passcode') : Pill('muted', 'No passcode');
     return (
       `<div class="bg-ghost rounded p-2 ${RowCls}">` +
       '<div class="d-flex justify-content-between align-items-center gap-2">' +

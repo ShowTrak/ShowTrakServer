@@ -24,6 +24,10 @@ const INVOKE_CHANNELS = new Set([
   'Loaded',
   'Shutdown',
   'GetClient',
+  'GetClientHistory',
+  'GetClientApplicationHistory',
+  'GetClientUSBHistory',
+  'GetClientDisplayHistory',
   'GetAllGroups',
   'CreateGroup',
   'RenameGroup',
@@ -48,6 +52,8 @@ const INVOKE_CHANNELS = new Set([
   'RemoveClientUSBDeviceCritical',
   'MarkClientApplicationCritical',
   'RemoveClientApplicationCritical',
+  'MarkClientDisplayCritical',
+  'RemoveClientDisplayCritical',
   'IdentifyClient',
   'StopIdentifyingClient',
   'ExecuteScript',
@@ -184,6 +190,10 @@ contextBridge.exposeInMainWorld('API', {
   Loaded: () => invoke('Loaded'),
   Shutdown: async (Confirmed = false) => invoke('Shutdown', Confirmed),
   GetClient: async (UUID) => invoke('GetClient', UUID),
+  GetClientHistory: async (UUID) => invoke('GetClientHistory', UUID),
+  GetClientApplicationHistory: async (UUID) => invoke('GetClientApplicationHistory', UUID),
+  GetClientUSBHistory: async (UUID) => invoke('GetClientUSBHistory', UUID),
+  GetClientDisplayHistory: async (UUID) => invoke('GetClientDisplayHistory', UUID),
   GetAllGroups: async () => invoke('GetAllGroups'),
   CreateGroup: async (Title) => invoke('CreateGroup', Title),
   RenameGroup: async (GroupID, Title) => invoke('RenameGroup', GroupID, Title),
@@ -242,6 +252,10 @@ contextBridge.exposeInMainWorld('API', {
     invoke('MarkClientApplicationCritical', UUID, Application),
   RemoveClientApplicationCritical: async (UUID, ApplicationName) =>
     invoke('RemoveClientApplicationCritical', UUID, ApplicationName),
+  MarkClientDisplayCritical: async (UUID, Display) =>
+    invoke('MarkClientDisplayCritical', UUID, Display),
+  RemoveClientDisplayCritical: async (UUID, DisplayID) =>
+    invoke('RemoveClientDisplayCritical', UUID, DisplayID),
   ExecuteScript: async (Script, Targets, ResetList) =>
     invoke('ExecuteScript', Script, Targets, ResetList),
   TriggerIntegratedEvent: async (EventID, Targets) =>

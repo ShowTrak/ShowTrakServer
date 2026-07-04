@@ -12,6 +12,11 @@ const { Manager: ScriptManager } = require('../ScriptManager');
 const { Manager: ScriptExecutionManager } = require('../ScriptExecutionManager');
 const { Manager: ServerIdentityManager } = require('../ServerIdentity');
 const { Manager: IdentifyManager } = require('../IdentifyManager');
+const {
+  recordClientApplicationHistorySamples,
+  recordClientUSBHistorySamples,
+  recordClientDisplayHistorySamples,
+} = require('../../main/monitoring-history');
 
 // Wire the default namespace (ShowTrak client agents) onto the Socket.IO server.
 function SetupClientNamespace(io) {
@@ -200,6 +205,8 @@ function SetupClientNamespace(io) {
         })`
       );
       await ClientManager.SetUSBDeviceList(socket.UUID, DeviceList);
+      const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
+      if (!ClientErr && Client) recordClientUSBHistorySamples(Client);
     });
 
     socket.on('USBDeviceConnected', async (Device) => {
@@ -207,6 +214,8 @@ function SetupClientNamespace(io) {
         `USB Device Connected to ${socket.UUID} (${Device.ManufacturerName} ${Device.ProductName})`
       );
       await ClientManager.USBDeviceAdded(socket.UUID, Device);
+      const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
+      if (!ClientErr && Client) recordClientUSBHistorySamples(Client);
       return;
     });
 
@@ -215,7 +224,20 @@ function SetupClientNamespace(io) {
         `USB Device Disconnected from ${socket.UUID} (${Device.ManufacturerName} ${Device.ProductName})`
       );
       await ClientManager.USBDeviceRemoved(socket.UUID, Device);
+      const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
+      if (!ClientErr && Client) recordClientUSBHistorySamples(Client);
       return;
+    });
+
+    socket.on('DisplayList', async (DisplayList) => {
+      Logger.log(
+        `Display list received from ${socket.UUID} (${Array.isArray(DisplayList) ? DisplayList.length : 0} ${
+          Array.isArray(DisplayList) && DisplayList.length === 1 ? 'Display' : 'Displays'
+        })`
+      );
+      await ClientManager.SetDisplayList(socket.UUID, Array.isArray(DisplayList) ? DisplayList : []);
+      const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
+      if (!ClientErr && Client) recordClientDisplayHistorySamples(Client);
     });
 
     socket.on('NetworkInterfaces', async (Interfaces) => {
@@ -235,6 +257,12 @@ function SetupClientNamespace(io) {
           `Running applications received from ${socket.UUID} (${Array.isArray(Snapshot && Snapshot.Items) ? Snapshot.Items.length : 0} items)`
         );
         await ClientManager.SetRunningApplications(socket.UUID, Snapshot || {});
+          const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
+          if (!ClientErr && Client) {
+            recordClientApplicationHistorySamples(Client, Snapshot && Snapshot.SampledAt);
+            recordClientUSBHistorySamples(Client, Snapshot && Snapshot.SampledAt);
+            recordClientDisplayHistorySamples(Client, Snapshot && Snapshot.SampledAt);
+          }
       } catch (e) {
         Logger.error('Failed to handle RunningApplications for', socket.UUID, e);
       }

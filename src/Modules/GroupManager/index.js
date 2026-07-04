@@ -53,7 +53,10 @@ class Group {
 
 Manager.Create = async (Title = 'New Group') => {
   if (!Title) return Fail('Group title is required');
-  const [Err, _Res] = await DB.Run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', [Title, 100]);
+  const [Err, _Res] = await DB.Run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', [
+    Title,
+    100,
+  ]);
   if (Err) {
     Logger.error('Failed to create group:', Err);
     return Fail('Failed to create group');

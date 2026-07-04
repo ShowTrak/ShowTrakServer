@@ -394,9 +394,7 @@ function UpdateIdentifyStatusBanner() {
     $Banner.addClass('d-none');
     return;
   }
-  $Text.text(
-    `You are currently identifying ${Count} ${Count === 1 ? 'client' : 'clients'}`
-  );
+  $Text.text(`You are currently identifying ${Count} ${Count === 1 ? 'client' : 'clients'}`);
   const hasConfirmToast = $('#SHOWTRAK_CONFIRM_TOAST').length > 0;
   $Banner.toggleClass('stacked-above-confirm', hasConfirmToast);
   $Banner.removeClass('d-none');
@@ -759,15 +757,11 @@ $(async function () {
     e.stopPropagation();
     // Ignore dblclick on pending-adoption tiles
     if ($(this).hasClass('PENDING')) return false;
-    // Monitoring tiles open their own editor on dblclick instead
+    // Monitoring tiles always open history on dblclick; edit mode uses the cog.
     if ($(this).hasClass('MONITOR')) {
       const tid = $(this).attr('data-target-id');
       if (tid) {
-        if (AppMode === 'SHOW') {
-          OpenMonitoringTargetHistory(parseInt(tid, 10));
-        } else {
-          OpenMonitoringTargetEditor(parseInt(tid, 10));
-        }
+        OpenMonitoringTargetHistory(parseInt(tid, 10));
       }
       return false;
     }
@@ -788,7 +782,10 @@ $(async function () {
     if ($tile.length) {
       const TileUUID = $tile.attr('data-uuid');
       const IsClientTile =
-        TileUUID && !$tile.hasClass('MONITOR') && !$tile.hasClass('DUMMY') && !$tile.hasClass('GROUP');
+        TileUUID &&
+        !$tile.hasClass('MONITOR') &&
+        !$tile.hasClass('DUMMY') &&
+        !$tile.hasClass('GROUP');
       if (IsClientTile && !Selected.includes(TileUUID)) {
         ClearSelection();
         Select(TileUUID);
@@ -945,7 +942,8 @@ $(async function () {
               });
               if (Succeeded.length) ApplyIdentifyStateLocally(Succeeded, true);
               const Errors = Failed.map((Entry) => Entry.Error).filter(Boolean);
-              if (Errors.length && typeof Notify === 'function') Notify(String(Errors[0]), 'danger');
+              if (Errors.length && typeof Notify === 'function')
+                Notify(String(Errors[0]), 'danger');
             } catch (err) {
               HandleNonFatalError('SelectionInit:Identify', err);
             }
@@ -956,7 +954,8 @@ $(async function () {
       if (IdentifyStopTargets.length > 0) {
         Options.push({
           Type: 'Action',
-          Title: IdentifyStopTargets.length === 1 ? 'Stop Identifying' : 'Stop Identifying Selected',
+          Title:
+            IdentifyStopTargets.length === 1 ? 'Stop Identifying' : 'Stop Identifying Selected',
           Class: 'text-light',
           Action: async function () {
             try {
@@ -1551,62 +1550,33 @@ async function Init() {
       ResetNetworkDiscoveryState();
     });
 
-  $('#MONITOR_HISTORY_RANGE_GROUP')
-    .off('click.monitorRange', '[data-range]')
-    .on('click.monitorRange', '[data-range]', function (e) {
-      e.preventDefault();
-      const NextRange = String($(this).attr('data-range') || '').trim();
-      if (!MONITORING_HISTORY_RANGES[NextRange]) return;
-      MonitorHistoryRangeKey = NextRange;
-      RenderMonitoringHistoryModal();
-    });
-
-  $('#SHOWTRAK_MONITOR_HISTORY_MODAL')
+  $('#SHOWTRAK_CLIENT_INFO')
     .off('shown.bs.modal.monitorHistory')
     .on('shown.bs.modal.monitorHistory', () => {
       RenderMonitoringHistoryModal();
     });
 
-  $('#MONITOR_HISTORY_CANVAS')
-    .off('mousemove.monitorTooltip mouseleave.monitorTooltip')
-    .on('mousemove.monitorTooltip', function (e) {
-      if (!MonitorHistoryHoverBars.length) {
-        HideMonitoringHistoryTooltip();
-        return;
-      }
-      const Rect = this.getBoundingClientRect();
-      const X = e.clientX - Rect.left;
-      const Y = e.clientY - Rect.top;
-      let Hit = null;
-      for (let i = 0; i < MonitorHistoryHoverBars.length; i++) {
-        const Bar = MonitorHistoryHoverBars[i];
-        if (X >= Bar.x - 2 && X <= Bar.x + Bar.w + 2 && Y >= Bar.y && Y <= Bar.y + Bar.h) {
-          Hit = Bar;
-          break;
-        }
-      }
-      if (!Hit) {
-        HideMonitoringHistoryTooltip();
-        return;
-      }
-      ShowMonitoringHistoryTooltip(X, Y, Hit);
-    })
-    .on('mouseleave.monitorTooltip', function () {
-      HideMonitoringHistoryTooltip();
+  $('#MONITOR_HISTORY_EDIT_BUTTON')
+    .off('click.monitorHistoryEdit')
+    .on('click.monitorHistoryEdit', async function (e) {
+      e.preventDefault();
+      if (AppMode !== 'EDIT') return;
+      const TargetID = Number($(this).attr('data-target-id'));
+      if (!Number.isFinite(TargetID)) return;
+      await OpenMonitoringTargetEditor(TargetID);
     });
 
-  if (!window.__monitorHistoryResizeBound) {
-    window.__monitorHistoryResizeBound = true;
-    window.addEventListener('resize', () => {
-      if (!MonitorHistoryModalContext) return;
-      if (!$('#SHOWTRAK_MONITOR_HISTORY_MODAL').hasClass('show')) return;
-      if (MonitorHistoryResizeTimer) clearTimeout(MonitorHistoryResizeTimer);
-      MonitorHistoryResizeTimer = setTimeout(() => {
-        RenderMonitoringHistoryModal();
-        MonitorHistoryResizeTimer = null;
-      }, 80);
+  // Hover tooltip for status-timeline blocks (delegated; container persists).
+  $('#MONITOR_HISTORY_TIMELINES')
+    .off('mousemove.statusTt mouseleave.statusTt')
+    .on('mousemove.statusTt', '.status-timeline-block', function (e) {
+      MonitorHistoryTooltipHover = { x: e.clientX, y: e.clientY };
+      ShowStatusTimelineTooltip(this, e.clientX, e.clientY);
+    })
+    .on('mouseleave.statusTt', function () {
+      MonitorHistoryTooltipHover = null;
+      HideStatusTimelineTooltip();
     });
-  }
 
   window.API.OnNetworkDeviceScanEvent((Event) => {
     HandleNetworkDiscoveryEvent(Event);
@@ -1784,6 +1754,18 @@ async function OpenClientInfo(UUID) {
 
   RenderClientInfoDetails(Client);
 
+  // Drive the shared status-timeline graph (same modal used by monitoring
+  // targets and dummy clients) for this client.
+  MonitorHistoryModalContext = { type: 'client', id: UUID };
+  MonitorHistorySeries = [];
+  MonitorHistoryTooltipHover = null;
+  try {
+    await LoadHistorySamplesForContext();
+  } catch (err) {
+    HandleNonFatalError('OpenClientInfo:LoadHistory', err);
+  }
+  RenderMonitoringHistoryModal();
+
   $('#SHOWTRAK_CLIENT_INFO_NET_FAMILY_V4')
     .off('click.net-family')
     .on('click.net-family', async function () {
@@ -1844,6 +1826,40 @@ async function OpenClientInfo(UUID) {
       }
     });
 
+  $('#SHOWTRAK_CLIENT_INFO_DISPLAYS')
+    .off('click.critical-display-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY')
+    .on('click.critical-display-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY', async function () {
+      try {
+        const IsUnavailable = String($(this).attr('data-unavailable') || '0') === '1';
+        if (IsUnavailable) return;
+        const DisplayToken = ($(this).attr('data-display') || '').toString();
+        const DisplayID = decodeURIComponent(DisplayToken);
+        const IsCritical = String($(this).attr('data-critical') || '0') === '1';
+        if (!ClientInfoOpenUUID || !DisplayID) return;
+
+        const [Err] = IsCritical
+          ? await window.API.RemoveClientDisplayCritical(ClientInfoOpenUUID, DisplayID)
+          : await window.API.MarkClientDisplayCritical(ClientInfoOpenUUID, {
+              DisplayID,
+            });
+        if (Err) return Notify(String(Err), 'error');
+
+        await Notify(
+          IsCritical ? 'Critical display status removed' : 'Display marked as critical',
+          'success',
+          1400
+        );
+
+        const Fresh = await window.API.GetClient(ClientInfoOpenUUID);
+        if (Fresh) {
+          $('#CLIENT_INFO_STATUS').val(GetClientStatusDisplayText(Fresh));
+          RenderClientInfoDetails(Fresh);
+        }
+      } catch (err) {
+        HandleNonFatalError('OpenClientInfo:ToggleCriticalDisplay', err);
+      }
+    });
+
   $('#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS')
     .off('click.critical-app-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_APP')
     .on('click.critical-app-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_APP', async function () {
@@ -1887,6 +1903,12 @@ async function OpenClientInfo(UUID) {
         ClientInfoRefreshTimer = null;
       }
       __clientInfoRefreshInFlight = false;
+
+      // Shared status-timeline modal state teardown.
+      MonitorHistoryModalContext = null;
+      MonitorHistorySeries = [];
+      MonitorHistoryTooltipHover = null;
+      HideStatusTimelineTooltip();
 
       // Dispose all popovers to prevent stuck state
       try {
@@ -1933,6 +1955,7 @@ function RenderClientInfoDetails(Client) {
 
   try {
     $('#CLIENT_INFO_USB_SECTION').toggleClass('d-none', IsIntegrated);
+    $('#CLIENT_INFO_DISPLAYS_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_NETWORK_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_RUNNING_APPS_SECTION').toggleClass('d-none', IsIntegrated);
   } catch (err) {
@@ -1997,6 +2020,7 @@ function RenderClientInfoDetails(Client) {
   if (IsIntegrated) {
     try {
       $('#SHOWTRAK_CLIENT_INFO_USB_DEVICES').attr('data-render-key', '').html('');
+      $('#SHOWTRAK_CLIENT_INFO_DISPLAYS').attr('data-render-key', '').html('');
       $('#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS').attr('data-render-key', '').html('');
       $('#SHOWTRAK_CLIENT_INFO_NET_INTERFACES').html('');
     } catch (err) {
@@ -2108,11 +2132,136 @@ function RenderClientInfoDetails(Client) {
           if (bootstrap.Popover.getInstance(Node)) continue;
           new bootstrap.Popover(Node, {
             container: 'body',
+            customClass: 'SHOWTRAK_USB_POPOVER',
           });
         }
       } catch (err) {
         HandleNonFatalError('RenderClientInfoDetails:CriticalUSBPopoverInit', err);
       }
+    }
+  } catch (err) {
+    HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
+
+  // Displays
+  try {
+    const $displayList = $('#SHOWTRAK_CLIENT_INFO_DISPLAYS');
+    const displays = Array.isArray(Client.DisplayList) ? Client.DisplayList : [];
+    const clientKey = Client && Client.UUID ? String(Client.UUID) : '';
+    const renderKey = `${clientKey}::${displays
+      .map(
+        (d) =>
+          `${d.DisplayID || ''}|${d.IsCritical ? '1' : '0'}|${
+            d.IsConnected === false ? '0' : '1'
+          }|${d.Mismatch ? '1' : '0'}|${d.CurrentSignature || ''}|${d.ExpectedSignature || ''}`
+      )
+      .join(';;')}`;
+    const previousRenderKey = $displayList.attr('data-render-key') || '';
+
+    const FormatDisplayResolution = (d) => {
+      const w = parseInt(d && d.Width, 10) || 0;
+      const h = parseInt(d && d.Height, 10) || 0;
+      if (!w || !h) return null;
+      const rate =
+        d && d.RefreshRate != null && Number.isFinite(Number(d.RefreshRate))
+          ? Math.round(Number(d.RefreshRate))
+          : null;
+      return rate ? `${w} × ${h} @ ${rate}Hz` : `${w} × ${h}`;
+    };
+
+    if (previousRenderKey !== renderKey) {
+      if (displays.length === 0) {
+        $displayList.html(`
+          <div class="rounded-3 p-2 bg-ghost">
+            <h6 class="mb-0">No Displays Detected</h6>
+            <p class="text-sm mb-0">This client has not reported any connected displays.</p>
+          </div>`);
+      } else {
+        $displayList.html('');
+        for (const disp of displays) {
+          const DisplayID = disp.DisplayID;
+          const HasID = typeof DisplayID === 'string' && DisplayID.trim().length > 0;
+          const DisplayToken = HasID ? encodeURIComponent(DisplayID.trim()) : '';
+          const IsCritical = !!disp.IsCritical;
+          const IsConnected = disp.IsConnected !== false;
+          const IsMismatch = !!disp.Mismatch;
+          const Label =
+            disp.Label && String(disp.Label).trim().length > 0
+              ? String(disp.Label).trim()
+              : disp.Primary
+                ? 'Primary Display'
+                : 'Display';
+          const CurrentRes = FormatDisplayResolution(disp);
+          const ExpectedRes =
+            IsMismatch || !IsConnected
+              ? FormatDisplayResolution({
+                  Width: (disp.ExpectedSignature || '').split('x')[0],
+                  Height: ((disp.ExpectedSignature || '').split('x')[1] || '').split('@')[0],
+                  RefreshRate: (disp.ExpectedSignature || '').split('@')[1],
+                })
+              : null;
+
+          let subText;
+          if (!IsConnected) {
+            subText = ExpectedRes ? `Expected ${Safe(ExpectedRes)}` : 'Disconnected';
+          } else if (IsMismatch) {
+            subText = `${CurrentRes ? Safe(CurrentRes) : 'Unknown'}${
+              ExpectedRes ? ` (expected ${Safe(ExpectedRes)})` : ''
+            }`;
+          } else {
+            subText = CurrentRes ? Safe(CurrentRes) : 'Resolution unavailable';
+          }
+
+          const IconClass =
+            IsCritical && !IsConnected
+              ? 'bi-x-circle-fill'
+              : IsCritical && IsMismatch
+                ? 'bi-exclamation-triangle-fill'
+                : IsCritical
+                  ? 'bi-check-circle-fill'
+                  : 'bi-check-circle';
+          const ButtonLabel =
+            IsCritical && !IsConnected
+              ? 'Missing'
+              : IsCritical && IsMismatch
+                ? 'Changed'
+                : 'Critical';
+          const TitleText = !HasID
+            ? 'Unavailable due to missing identifier'
+            : IsCritical && !IsConnected
+              ? 'Remove critical status (display disconnected)'
+              : IsCritical && IsMismatch
+                ? 'Display configuration changed — remove critical status'
+                : IsCritical
+                  ? 'Remove critical status'
+                  : 'Mark as critical';
+
+          $displayList.append(`
+            <div class="rounded-3 p-2 bg-ghost SHOWTRAK_CLIENT_USB_DEVICE_CARD">
+              <div class="d-flex align-items-center gap-2">
+                <h6 class="mb-0">${Safe(Label)}${disp.Primary ? ' <small class="text-light">(Primary)</small>' : ''}</h6>
+              </div>
+              <small class="text-light d-block mb-0 text-start">${subText}</small>
+              <button
+                type="button"
+                class="SHOWTRAK_TOGGLE_CRITICAL_DISPLAY ${IsCritical ? 'is-critical' : ''} ${
+                  IsCritical && !IsConnected ? 'is-disconnected-critical' : ''
+                } ${IsCritical && IsMismatch ? 'is-mismatch-critical' : ''} ${HasID ? '' : 'is-unavailable'}"
+                data-display="${DisplayToken}"
+                data-critical="${IsCritical ? '1' : '0'}"
+                data-unavailable="${HasID ? '0' : '1'}"
+                ${HasID ? `title="${TitleText}"` : ''}
+                aria-label="${TitleText}"
+              >
+                <i class="bi ${IconClass}"></i>
+                <span>${ButtonLabel}</span>
+              </button>
+            </div>
+          `);
+        }
+      }
+
+      $displayList.attr('data-render-key', renderKey);
     }
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);

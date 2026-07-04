@@ -108,12 +108,20 @@ body.macos-native-fullscreen #APPLICATION {
   white-space: nowrap;
   color: rgba(222, 244, 255, 0.98) !important;
   border-color: rgba(130, 204, 255, 0.55) !important;
-  background: linear-gradient(160deg, rgba(53, 143, 212, 0.24), rgba(39, 108, 160, 0.18)) !important;
+  background: linear-gradient(
+    160deg,
+    rgba(53, 143, 212, 0.24),
+    rgba(39, 108, 160, 0.18)
+  ) !important;
   box-shadow: inset 0 0 0 1px rgba(172, 224, 255, 0.12);
 }
 
 #IDENTIFY_STOP_ALL_BUTTON:hover {
-  background: linear-gradient(160deg, rgba(72, 171, 255, 0.32), rgba(46, 128, 189, 0.26)) !important;
+  background: linear-gradient(
+    160deg,
+    rgba(72, 171, 255, 0.32),
+    rgba(46, 128, 189, 0.26)
+  ) !important;
   border-color: rgba(154, 216, 255, 0.72) !important;
 }
 
@@ -157,7 +165,21 @@ body.macos-native-fullscreen #APPLICATION {
 /* Compact mode button group */
 :root {
   --bottom-bar-toggle-height: 26px;
-  --client-online-bg: rgba(18, 255, 0, 0.32);
+  /* Shared status palette. Client tile backgrounds AND history timeline blocks
+   * both read from these variables so the colour scheme lives in one place.
+   *   IDLE / UNAVAILABLE -> grey, OFFLINE -> red, DEGRADED -> orange, ONLINE -> green */
+  --status-idle: rgba(64, 64, 64, 0.5);
+  --status-unavailable: rgba(64, 64, 64, 0.5);
+  --status-offline: rgba(255, 0, 0, 0.24);
+  --status-degraded: rgba(255, 140, 0, 0.32);
+  --status-online: rgba(18, 255, 0, 0.32);
+  /* More saturated variants used only for the history status timeline blocks. */
+  --status-graph-idle: rgba(120, 126, 134, 0.9);
+  --status-graph-offline: rgba(224, 36, 36, 0.98);
+  --status-graph-degraded: rgba(255, 149, 0, 0.98);
+  --status-graph-online: rgba(38, 214, 44, 0.98);
+  /* Backwards-compatible alias kept for existing references. */
+  --client-online-bg: var(--status-online);
   --tile-name-font-size: 1rem;
   --tile-hostname-font-size: 0.72rem;
   --tile-expanded-height: 100px;
@@ -1603,6 +1625,82 @@ button.btn:focus {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 98px;
+  height: 30px;
+  padding: 0 0.65rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(220, 220, 220, 0.6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY .bi {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY:hover {
+  color: rgba(255, 214, 102, 0.9);
+  background-color: rgba(255, 193, 7, 0.12);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-critical {
+  color: #ffc107;
+  background-color: rgba(255, 193, 7, 0.2);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-critical:hover {
+  color: #ffd54a;
+  background-color: rgba(255, 193, 7, 0.24);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical:focus {
+  color: #ff9f40;
+  background-color: rgba(253, 126, 20, 0.24);
+  cursor: pointer;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical:hover {
+  background-color: rgba(253, 126, 20, 0.3);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical:focus {
+  color: #ff6b6b;
+  background-color: rgba(220, 53, 69, 0.24);
+  cursor: pointer;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical:hover {
+  background-color: rgba(220, 53, 69, 0.28);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:focus,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:active {
+  cursor: not-allowed;
+  color: rgba(190, 190, 190, 0.5);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
 .SHOWTRAK_NET_IFACE_CARD {
   position: relative;
   text-align: left;
@@ -1653,10 +1751,12 @@ button.btn:focus {
   --bs-popover-border-color: rgba(255, 255, 255, 0.14);
   --bs-popover-header-bg: transparent;
   --bs-popover-header-border-color: rgba(255, 255, 255, 0.14);
-  --bs-popover-body-padding-y: 0.5rem;
-  --bs-popover-body-padding-x: 0.75rem;
-  --bs-popover-max-width: 240px;
-  border-radius: 10px;
+  --bs-popover-body-padding-y: 0.35rem;
+  --bs-popover-body-padding-x: 0.55rem;
+  --bs-popover-max-width: 200px;
+  background-color: #0c091c !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
@@ -1665,14 +1765,25 @@ button.btn:focus {
 }
 
 .SHOWTRAK_USB_POPOVER .popover-body {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.85rem;
-  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.9) !important;
+  background-color: transparent !important;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  padding: 0.35rem 0.55rem;
 }
 
-.SHOWTRAK_USB_POPOVER .popover-arrow::before,
+.SHOWTRAK_USB_POPOVER .popover-arrow::before {
+  border-left-color: rgba(255, 255, 255, 0.14);
+  border-right-color: rgba(255, 255, 255, 0.14);
+  border-top-color: rgba(255, 255, 255, 0.14);
+  border-bottom-color: rgba(255, 255, 255, 0.14);
+}
+
 .SHOWTRAK_USB_POPOVER .popover-arrow::after {
-  border-color: #0c091c;
+  border-left-color: #0c091c;
+  border-right-color: #0c091c;
+  border-top-color: #0c091c;
+  border-bottom-color: #0c091c;
 }
 
 .no-drag {
@@ -2353,7 +2464,7 @@ button.btn:focus {
     border-color 180ms ease,
     background-color 180ms ease,
     gap 180ms ease;
-  background-color: rgba(255, 0, 0, 0.24);
+  background-color: var(--status-offline);
   cursor: pointer !important;
   position: relative; /* allow overlay positioning */
 }
@@ -2406,17 +2517,17 @@ button.btn:focus {
 }
 
 .SHOWTRAK_PC.ONLINE {
-  background-color: var(--client-online-bg) !important;
+  background-color: var(--status-online) !important;
 }
 
 .SHOWTRAK_PC.IDLE {
-  background-color: rgba(64, 64, 64, 0.5) !important;
+  background-color: var(--status-idle) !important;
 }
 
 /* Monitoring target above its DegradedThresholdMs setting. Listed after ONLINE
  * so it wins when both classes are toggled mid-update. */
 .SHOWTRAK_PC.DEGRADED {
-  background-color: rgba(255, 140, 0, 0.32) !important;
+  background-color: var(--status-degraded) !important;
 }
 
 /* Pending adoption tile style: blue tint */
@@ -2777,68 +2888,267 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   white-space: nowrap;
 }
 
-#SHOWTRAK_MONITOR_HISTORY_MODAL .modal-body {
+#CLIENT_INFO_HISTORY_SECTION {
   text-align: left;
 }
 
-.monitor-history-range .btn {
+/* Window label + legend share one row above the timelines. */
+.monitor-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.monitor-history-window-label {
   font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
 }
 
-#MONITOR_HISTORY_GRAPH_PANEL {
-  position: relative;
+/* --- Status timelines (blocks over the past hour) ----------------------- */
+.monitor-history-timelines {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-#MONITOR_HISTORY_CANVAS {
-  display: block;
-  width: 100%;
-  min-height: 155px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: radial-gradient(circle at top, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+.monitor-history-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
-#MONITOR_HISTORY_EMPTY {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  text-align: center;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
-  padding: 1rem;
-  pointer-events: none;
+.status-timeline-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-#MONITOR_HISTORY_TOOLTIP {
-  position: absolute;
-  z-index: 5;
-  min-width: 150px;
-  max-width: 260px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(17, 22, 29, 0.94);
-  color: rgba(255, 255, 255, 0.94);
-  padding: 0.4rem 0.5rem;
+.status-timeline-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.status-timeline-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-timeline-sub {
   font-size: 11px;
-  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-timeline {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 28px;
+  border-radius: 6px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.status-timeline-block {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 2px;
+  background-color: var(--status-graph-idle);
+  transition: filter 90ms ease;
+}
+
+.status-timeline-block:hover {
+  filter: brightness(1.25);
+}
+
+.status-timeline-block.state-ONLINE {
+  background-color: var(--status-graph-online);
+}
+.status-timeline-block.state-DEGRADED {
+  background-color: var(--status-graph-degraded);
+}
+.status-timeline-block.state-OFFLINE {
+  background-color: var(--status-graph-offline);
+}
+.status-timeline-block.state-IDLE {
+  background-color: var(--status-graph-idle);
+}
+.status-timeline-block.state-UNAVAILABLE {
+  background-color: var(--status-graph-idle);
+}
+
+.status-timeline-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+/* --- Hover tooltip for timeline blocks ---------------------------------- */
+.monitor-history-tooltip {
+  position: fixed;
+  z-index: 2000;
+  min-width: 150px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(17, 22, 29, 0.96);
+  color: rgba(255, 255, 255, 0.94);
+  padding: 0.45rem 0.55rem;
+  font-size: 12px;
+  line-height: 1.35;
   text-align: left;
   pointer-events: none;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.38);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.42);
 }
 
-#MONITOR_HISTORY_TOOLTIP .monitor-tooltip-title {
+.status-tt-time {
   font-weight: 700;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.3rem;
 }
 
-#MONITOR_HISTORY_TOOLTIP .monitor-tooltip-row {
-  opacity: 0.95;
+.status-tt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-.monitor-history-summary {
+.status-tt-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.status-tt-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.status-tt-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--status-graph-idle);
+}
+.status-tt-dot.state-ONLINE {
+  background: var(--status-graph-online);
+}
+.status-tt-dot.state-DEGRADED {
+  background: var(--status-graph-degraded);
+}
+.status-tt-dot.state-OFFLINE {
+  background: var(--status-graph-offline);
+}
+
+/* --- Current status cards (mirrors how each check is listed) ------------- */
+.monitor-status-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem 0.55rem 0.85rem;
+  border-radius: 8px;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    rgba(17, 14, 31, 0.55);
+  overflow: visible;
+}
+
+/* Notification-style accent bar carrying the status colour. */
+.monitor-status-card::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: 6px;
+  bottom: 6px;
+  width: 6px;
+  border-radius: 999px;
+  background: var(--status-graph-idle);
+}
+.monitor-status-card.state-ONLINE::before {
+  background: var(--status-graph-online);
+}
+.monitor-status-card.state-DEGRADED::before {
+  background: var(--status-graph-degraded);
+}
+.monitor-status-card.state-OFFLINE::before {
+  background: var(--status-graph-offline);
+}
+.monitor-status-card.state-IDLE::before {
+  background: var(--status-graph-idle);
+}
+.monitor-status-card.state-UNAVAILABLE::before {
+  background: var(--status-graph-idle);
+}
+
+.monitor-status-card-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.monitor-status-card-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitor-status-card-sub {
+  display: inline-block;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitor-status-card-meta {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.monitor-status-card-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 10px;
+}
+
+.monitor-status-card-state {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.82);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .monitor-history-legend {
@@ -2864,15 +3174,19 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 }
 
 .status-dot-online {
-  background: rgba(32, 201, 151, 0.92);
+  background: var(--status-graph-online);
 }
 
 .status-dot-degraded {
-  background: rgba(255, 193, 7, 0.95);
+  background: var(--status-graph-degraded);
 }
 
 .status-dot-offline {
-  background: rgba(220, 53, 69, 0.95);
+  background: var(--status-graph-offline);
+}
+
+.status-dot-idle {
+  background: var(--status-graph-idle);
 }
 
 /* Drag-and-drop visuals */

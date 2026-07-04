@@ -20,6 +20,7 @@ let ClientList = [];
 const ClientIndex = new Map();
 const CriticalUSBIndex = new Map();
 const CriticalApplicationIndex = new Map();
+const CriticalDisplayIndex = new Map();
 
 function rebuildClientIndex() {
   ClientIndex.clear();
@@ -68,6 +69,13 @@ function normalizeSerialNumber(SerialNumber) {
   return Value.toUpperCase();
 }
 
+function normalizeDisplayID(DisplayID) {
+  if (DisplayID === null || DisplayID === undefined) return null;
+  const Value = String(DisplayID).trim();
+  if (!Value) return null;
+  return Value;
+}
+
 function getCriticalMapForClient(UUID, CreateIfMissing = false) {
   const Key = String(UUID || '');
   let Existing = CriticalUSBIndex.get(Key);
@@ -88,6 +96,16 @@ function getCriticalApplicationMapForClient(UUID, CreateIfMissing = false) {
   return Existing || null;
 }
 
+function getCriticalDisplayMapForClient(UUID, CreateIfMissing = false) {
+  const Key = String(UUID || '');
+  let Existing = CriticalDisplayIndex.get(Key);
+  if (!Existing && CreateIfMissing) {
+    Existing = new Map();
+    CriticalDisplayIndex.set(Key, Existing);
+  }
+  return Existing || null;
+}
+
 function applyCriticalUSBState(TargetClient) {
   if (!TargetClient || !TargetClient.UUID) return;
   const Entries = getCriticalMapForClient(TargetClient.UUID, false);
@@ -100,6 +118,13 @@ function applyCriticalApplicationState(TargetClient) {
   const Entries = getCriticalApplicationMapForClient(TargetClient.UUID, false);
   const Applications = Entries ? Array.from(Entries.values()) : [];
   TargetClient.SetCriticalApplications(Applications);
+}
+
+function applyCriticalDisplayState(TargetClient) {
+  if (!TargetClient || !TargetClient.UUID) return;
+  const Entries = getCriticalDisplayMapForClient(TargetClient.UUID, false);
+  const Displays = Entries ? Array.from(Entries.values()) : [];
+  TargetClient.SetCriticalDisplays(Displays);
 }
 
 async function loadCriticalUSBIndex() {
@@ -143,6 +168,32 @@ async function loadCriticalApplicationIndex() {
   }
 }
 
+async function loadCriticalDisplayIndex() {
+  CriticalDisplayIndex.clear();
+  const [Err, Rows] = await DB.All(
+    'SELECT UUID, DisplayID, Label, Width, Height, RefreshRate, ScaleFactor, Timestamp FROM CriticalDisplays'
+  );
+  if (Err || !Rows) return;
+  for (const Row of Rows) {
+    const UUID = Row && Row.UUID ? String(Row.UUID) : '';
+    const DisplayID = normalizeDisplayID(Row && Row.DisplayID);
+    if (!UUID || !DisplayID) continue;
+    const PerClient = getCriticalDisplayMapForClient(UUID, true);
+    PerClient.set(DisplayID, {
+      DisplayID,
+      Label: Row.Label || null,
+      Width: Row.Width != null ? parseInt(Row.Width, 10) || null : null,
+      Height: Row.Height != null ? parseInt(Row.Height, 10) || null : null,
+      RefreshRate: Row.RefreshRate != null ? parseInt(Row.RefreshRate, 10) || null : null,
+      ScaleFactor:
+        Row.ScaleFactor != null && Number.isFinite(Number(Row.ScaleFactor))
+          ? Number(Row.ScaleFactor)
+          : null,
+      Timestamp: Row.Timestamp || null,
+    });
+  }
+}
+
 Manager.Timeout = async (UUID) => {
   const Exists = await Manager.Exists(UUID);
   if (!Exists) return;
@@ -169,6 +220,7 @@ Manager.Heartbeat = async (UUID, Data, IP) => {
       CachedClient = new Client(FetchedClient);
       applyCriticalUSBState(CachedClient);
       applyCriticalApplicationState(CachedClient);
+      applyCriticalDisplayState(CachedClient);
       if (addClientToCache(CachedClient)) {
         BroadcastManager.emit('ClientListChanged');
       }
@@ -423,6 +475,114 @@ Manager.IsUSBDeviceCritical = async (UUID, SerialNumber) => {
   return [null, !!Row];
 };
 
+Manager.SetDisplayList = async (UUID, DisplayList) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return [Err, null];
+  if (!Target) return ['Client Not Found', null];
+  if (addClientToCache(Target)) {
+    BroadcastManager.emit('ClientListChanged');
+  }
+  Target.SetDisplayList(DisplayList);
+  return [null, 'Display List updated successfully'];
+};
+
+Manager.MarkDisplayCritical = async (UUID, Display) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return [Err, null];
+  if (!Target) return ['Client Not Found', null];
+
+  const DisplayID = normalizeDisplayID(Display && Display.DisplayID);
+  if (!DisplayID) return ['Display identifier is required', null];
+
+  // Prefer the live values reported by the client so the captured baseline
+  // (resolution + refresh rate) reflects the current, known-good state.
+  const KnownDisplay = (
+    Array.isArray(Target.ConnectedDisplayList) ? Target.ConnectedDisplayList : []
+  ).find((Entry) => normalizeDisplayID(Entry && Entry.DisplayID) === DisplayID);
+  const Source = KnownDisplay || Display || {};
+
+  const Label = (Source && Source.Label) || (Display && Display.Label) || null;
+  const Width = parseInt(Source && Source.Width, 10) || null;
+  const Height = parseInt(Source && Source.Height, 10) || null;
+  const RefreshRate =
+    Source && Source.RefreshRate != null && Number.isFinite(Number(Source.RefreshRate))
+      ? Math.round(Number(Source.RefreshRate))
+      : null;
+  const ScaleFactor =
+    Source && Source.ScaleFactor != null && Number.isFinite(Number(Source.ScaleFactor))
+      ? Number(Source.ScaleFactor)
+      : null;
+  const Timestamp = Date.now();
+
+  const [WriteErr] = await DB.Run(
+    'INSERT OR REPLACE INTO CriticalDisplays (UUID, DisplayID, Label, Width, Height, RefreshRate, ScaleFactor, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [UUID, DisplayID, Label, Width, Height, RefreshRate, ScaleFactor, Timestamp]
+  );
+  if (WriteErr) return Fail('Failed to save critical display');
+
+  const PerClient = getCriticalDisplayMapForClient(UUID, true);
+  PerClient.set(DisplayID, {
+    DisplayID,
+    Label,
+    Width,
+    Height,
+    RefreshRate,
+    ScaleFactor,
+    Timestamp,
+  });
+  Target.MarkCriticalDisplay({
+    DisplayID,
+    Label,
+    Width,
+    Height,
+    RefreshRate,
+    ScaleFactor,
+    Timestamp,
+  });
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(true);
+};
+
+Manager.RemoveDisplayCritical = async (UUID, DisplayID) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return [Err, null];
+  if (!Target) return ['Client Not Found', null];
+
+  const NormalizedID = normalizeDisplayID(DisplayID);
+  if (!NormalizedID) return ['Display identifier is required', null];
+
+  const [WriteErr] = await DB.Run(
+    'DELETE FROM CriticalDisplays WHERE UUID = ? AND DisplayID = ?',
+    [UUID, NormalizedID]
+  );
+  if (WriteErr) return Fail('Failed to remove critical display');
+
+  const PerClient = getCriticalDisplayMapForClient(UUID, false);
+  if (PerClient) {
+    PerClient.delete(NormalizedID);
+    if (PerClient.size === 0) CriticalDisplayIndex.delete(String(UUID || ''));
+  }
+
+  Target.UnmarkCriticalDisplay(NormalizedID);
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(true);
+};
+
+Manager.IsDisplayCritical = async (UUID, DisplayID) => {
+  const Normalized = normalizeDisplayID(DisplayID);
+  if (!Normalized) return [null, false];
+
+  const Cached = getCriticalDisplayMapForClient(UUID, false);
+  if (Cached) return [null, Cached.has(Normalized)];
+
+  const [Err, Row] = await DB.Get(
+    'SELECT 1 AS Found FROM CriticalDisplays WHERE UUID = ? AND DisplayID = ? LIMIT 1',
+    [UUID, Normalized]
+  );
+  if (Err) return ['Failed to determine critical display status', null];
+  return [null, !!Row];
+};
+
 // One-shot richer payload: hostname + NICs -> derive MAC for the active IP
 Manager.SystemInfo = async (UUID, Data, IP) => {
   const [Err, Target] = await Manager.Get(UUID);
@@ -474,6 +634,7 @@ Manager.Create = async (UUID) => {
   });
   applyCriticalUSBState(Created);
   applyCriticalApplicationState(Created);
+  applyCriticalDisplayState(Created);
   if (addClientToCache(Created)) {
     BroadcastManager.emit('ClientListChanged');
   }
@@ -486,6 +647,8 @@ Manager.Delete = async (UUID) => {
   if (criticalErr) return Fail('Failed to delete critical USB devices for client');
   const [criticalAppErr] = await DB.Run('DELETE FROM CriticalApplications WHERE UUID = ?', [UUID]);
   if (criticalAppErr) return Fail('Failed to delete critical applications for client');
+  const [criticalDisplayErr] = await DB.Run('DELETE FROM CriticalDisplays WHERE UUID = ?', [UUID]);
+  if (criticalDisplayErr) return Fail('Failed to delete critical displays for client');
   // Remove from database
   const [Err, _Res] = await DB.Run('DELETE FROM Clients WHERE UUID = ?', [UUID]);
   if (Err) return Fail('Failed to delete client');
@@ -493,6 +656,7 @@ Manager.Delete = async (UUID) => {
   removeClientFromCache(UUID);
   CriticalUSBIndex.delete(String(UUID || ''));
   CriticalApplicationIndex.delete(String(UUID || ''));
+  CriticalDisplayIndex.delete(String(UUID || ''));
   Logger.success(`Client ${UUID} deleted successfully`);
   return Ok(true);
 };
@@ -512,6 +676,7 @@ Manager.ReplaceClient = async (CurrentUUID, ReplacementUUID) => {
 
   const oldCriticalUSB = getCriticalMapForClient(OldUUID, false);
   const oldCriticalApps = getCriticalApplicationMapForClient(OldUUID, false);
+  const oldCriticalDisplays = getCriticalDisplayMapForClient(OldUUID, false);
   const oldClientRows = ClientList.slice();
 
   const [beginErr] = await DB.Run('BEGIN IMMEDIATE TRANSACTION');
@@ -536,6 +701,12 @@ Manager.ReplaceClient = async (CurrentUUID, ReplacementUUID) => {
       [NewUUID, OldUUID]
     );
     if (criticalAppErr) throw criticalAppErr;
+
+    const [criticalDisplayErr] = await DB.Run(
+      'UPDATE CriticalDisplays SET UUID = ? WHERE UUID = ?',
+      [NewUUID, OldUUID]
+    );
+    if (criticalDisplayErr) throw criticalDisplayErr;
 
     const [rulesErr, RuleRows] = await DB.All('SELECT RuleID, Scope, Actions FROM AlertRules', []);
     if (rulesErr) throw rulesErr;
@@ -608,9 +779,14 @@ Manager.ReplaceClient = async (CurrentUUID, ReplacementUUID) => {
     CriticalApplicationIndex.set(NewUUID, oldCriticalApps);
     CriticalApplicationIndex.delete(OldUUID);
   }
+  if (oldCriticalDisplays) {
+    CriticalDisplayIndex.set(NewUUID, oldCriticalDisplays);
+    CriticalDisplayIndex.delete(OldUUID);
+  }
 
   applyCriticalUSBState(ExistingClient);
   applyCriticalApplicationState(ExistingClient);
+  applyCriticalDisplayState(ExistingClient);
 
   BroadcastManager.emit('ClientListChanged');
   BroadcastManager.emit('ClientUpdated', ExistingClient);
@@ -644,6 +820,7 @@ Manager.Get = async (UUID) => {
   ClientRow = new Client(ClientRow);
   applyCriticalUSBState(ClientRow);
   applyCriticalApplicationState(ClientRow);
+  applyCriticalDisplayState(ClientRow);
   return [null, ClientRow];
 };
 
@@ -652,6 +829,7 @@ Manager.Initialized = false;
 Manager.Init = async () => {
   await loadCriticalUSBIndex();
   await loadCriticalApplicationIndex();
+  await loadCriticalDisplayIndex();
   let [Err, Clients] = await DB.All('SELECT * FROM Clients');
   if (Err || !Clients) {
     Manager.Initialized = true;
@@ -663,6 +841,7 @@ Manager.Init = async () => {
     const ClientEntity = new Client(row);
     applyCriticalUSBState(ClientEntity);
     applyCriticalApplicationState(ClientEntity);
+    applyCriticalDisplayState(ClientEntity);
     return ClientEntity;
   });
   ClientList = Clients; // Update in-memory list

@@ -70,6 +70,12 @@ const {
   recordDummyHistorySample,
   syncDummyHistoryStore,
   getDummyHistorySamples,
+  recordClientHistorySample,
+  syncClientHistoryStore,
+  getClientHistorySamples,
+  getClientApplicationHistorySamples,
+  getClientUSBHistorySamples,
+  getClientDisplayHistorySamples,
 } = require('./main/monitoring-history');
 const { Manager: AppUpdater } = require('./main/app-updater');
 const { createTupleHandler, validationErrorTuple } = require('./main/ipc/create-handler');
@@ -656,9 +662,9 @@ app.whenReady().then(async () => {
   MainWindow = new BrowserWindow({
     show: false,
     backgroundColor: '#161618',
-    width: 1515,
+    width: 1600,
     height: 940,
-    minWidth: 815,
+    minWidth: 1000,
     minHeight: 600,
     webPreferences: {
       ...BASE_WEB_PREFERENCES,
@@ -685,6 +691,7 @@ app.whenReady().then(async () => {
     AudioAssetManager.Init()
       .then(() => ValidateAlertAudioAssets())
       .catch((Err) => Logger.error('Failed to init AudioAssetManager:', Err));
+    MainWindow.maximize();
     await Wait(800);
     PreloaderWindow.close();
     MainWindow.show();
@@ -1096,6 +1103,22 @@ app.whenReady().then(async () => {
     )
   );
 
+  RPC.handle(
+    'MarkClientDisplayCritical',
+    createTupleHandler(
+      (UUID, Display) => [IPCValidation.UUID(UUID), IPCValidation.CriticalDisplayPayload(Display)],
+      (UUID, Display) => ClientManager.MarkDisplayCritical(UUID, Display)
+    )
+  );
+
+  RPC.handle(
+    'RemoveClientDisplayCritical',
+    createTupleHandler(
+      (UUID, DisplayID) => [IPCValidation.UUID(UUID), IPCValidation.DisplayID(DisplayID)],
+      (UUID, DisplayID) => ClientManager.RemoveDisplayCritical(UUID, DisplayID)
+    )
+  );
+
   // ---- Monitoring Targets ----
   RPC.handle('GetMonitoringMethods', async () => {
     return MonitoringMethods.GetAll();
@@ -1156,6 +1179,42 @@ app.whenReady().then(async () => {
       return [];
     }
     return getDummyHistorySamples(UUID);
+  });
+
+  RPC.handle('GetClientHistory', async (_Event, UUID) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch {
+      return [];
+    }
+    return getClientHistorySamples(UUID);
+  });
+
+  RPC.handle('GetClientApplicationHistory', async (_Event, UUID) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch {
+      return [];
+    }
+    return getClientApplicationHistorySamples(UUID);
+  });
+
+  RPC.handle('GetClientUSBHistory', async (_Event, UUID) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch {
+      return [];
+    }
+    return getClientUSBHistorySamples(UUID);
+  });
+
+  RPC.handle('GetClientDisplayHistory', async (_Event, UUID) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch {
+      return [];
+    }
+    return getClientDisplayHistorySamples(UUID);
   });
 
   RPC.handle(
@@ -2157,6 +2216,8 @@ async function ClientUpdated(Client) {
     MainWindow.webContents.send('ClientUpdated', Client);
   }
 
+  recordClientHistorySample(Client);
+
   const UUID = Client && Client.UUID ? Client.UUID : null;
   const IsOnline = !!(Client && Client.Online);
   if (UUID) {
@@ -2217,6 +2278,7 @@ async function UpdateFullClientList() {
   if (ClientsErr) return Logger.error('Failed to fetch full client list:', ClientsErr);
   const [GroupsErr, Groups] = await GroupManager.GetAll();
   if (GroupsErr) return Logger.error('Failed to fetch client groups:', GroupsErr);
+  syncClientHistoryStore(Clients || []);
   MainWindow.webContents.send('SetFullClientList', Clients, Groups);
 }
 
@@ -2495,7 +2557,9 @@ app.on('before-quit', (event) => {
 
 // Feature toggles controlled by Settings: power-save blocker and auto-update.
 async function StartOptionalFeatures() {
-  const SYSTEM_PREVENT_DISPLAY_SLEEP = await SettingsManager.GetValue('SYSTEM_PREVENT_DISPLAY_SLEEP');
+  const SYSTEM_PREVENT_DISPLAY_SLEEP = await SettingsManager.GetValue(
+    'SYSTEM_PREVENT_DISPLAY_SLEEP'
+  );
   if (SYSTEM_PREVENT_DISPLAY_SLEEP) {
     Logger.log('Prevent Display Sleep is enabled, starting powerSaveBlocker.');
     powerSaveBlocker.start('prevent-display-sleep');

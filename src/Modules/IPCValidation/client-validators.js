@@ -111,6 +111,35 @@ module.exports = function registerClientValidators(Manager) {
     };
   };
 
+  Manager.DisplayID = (value, fieldName = 'DisplayID') => {
+    return normalizeNonEmptyString(value, fieldName, {
+      minLength: 1,
+      maxLength: 256,
+    });
+  };
+
+  Manager.CriticalDisplayPayload = (value) => {
+    if (!isPlainObject(value)) {
+      fail('Critical display payload must be an object');
+    }
+    const OptionalNumber = (raw, name) => {
+      if (raw === null || raw === undefined || raw === '') return null;
+      const num = Number(raw);
+      if (!Number.isFinite(num)) fail(`${name} must be a number`);
+      return num;
+    };
+    return {
+      DisplayID: Manager.DisplayID(value.DisplayID),
+      Label: Object.prototype.hasOwnProperty.call(value, 'Label') && value.Label
+        ? normalizeNonEmptyString(value.Label, 'Label', { minLength: 1, maxLength: 256 })
+        : null,
+      Width: OptionalNumber(value.Width, 'Width'),
+      Height: OptionalNumber(value.Height, 'Height'),
+      RefreshRate: OptionalNumber(value.RefreshRate, 'RefreshRate'),
+      ScaleFactor: OptionalNumber(value.ScaleFactor, 'ScaleFactor'),
+    };
+  };
+
   Manager.ClientUpdatePayload = (value) => {
     if (!isPlainObject(value)) {
       fail('Client update payload must be an object');

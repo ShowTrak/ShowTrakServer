@@ -84,7 +84,11 @@ test('preload bridge only invokes/subscribes channels declared in the registry',
   const badInvokes = [...bridgeInvokes].filter((name) => !invokeRegistry.has(name)).sort();
   const badSubscribes = [...bridgeSubscribes].filter((name) => !subscribeRegistry.has(name)).sort();
 
-  assert.deepEqual(badInvokes, [], `bridge invoke() channels not in registry: ${badInvokes.join(', ')}`);
+  assert.deepEqual(
+    badInvokes,
+    [],
+    `bridge invoke() channels not in registry: ${badInvokes.join(', ')}`
+  );
   assert.deepEqual(
     badSubscribes,
     [],

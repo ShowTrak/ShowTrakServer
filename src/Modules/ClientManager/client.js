@@ -36,6 +36,26 @@ function normalizeApplicationKey(Name) {
   return Value.toLowerCase();
 }
 
+function normalizeDisplayID(DisplayID) {
+  if (DisplayID === null || DisplayID === undefined) return null;
+  const Value = String(DisplayID).trim();
+  if (!Value) return null;
+  return Value;
+}
+
+// A display "signature" captures the operator-visible configuration we want to
+// guard: resolution + refresh rate. When a critical display's live signature no
+// longer matches the one captured at mark-time we surface a mismatch/degraded.
+function buildDisplaySignature(Display) {
+  const Width = parseInt(Display && Display.Width, 10) || 0;
+  const Height = parseInt(Display && Display.Height, 10) || 0;
+  const RefreshRate =
+    Display && Display.RefreshRate != null && Number.isFinite(Number(Display.RefreshRate))
+      ? Math.round(Number(Display.RefreshRate))
+      : 0;
+  return `${Width}x${Height}@${RefreshRate}`;
+}
+
 class Client {
   constructor(Data) {
     this.UUID = Data.UUID;
@@ -65,6 +85,12 @@ class Client {
     this.CriticalApplications = [];
     this.CriticalApplicationKeys = [];
     this.MissingCriticalApplications = [];
+    this.ConnectedDisplayList = [];
+    this.DisplayList = [];
+    this.CriticalDisplays = [];
+    this.CriticalDisplayIDs = [];
+    this.MissingCriticalDisplays = [];
+    this.MismatchedCriticalDisplays = [];
     this.Degraded = false;
     this.DegradedWarnings = [];
     this.NetworkInterfaces = [];
@@ -237,6 +263,102 @@ class Client {
     this._rebuildUSBDeviceView();
     return true;
   }
+  SetDisplayList(DisplayList) {
+    this.ConnectedDisplayList = Array.isArray(DisplayList) ? DisplayList : [];
+    this._rebuildDisplayView();
+    Logger.debug(`Client ${this.UUID} Display List updated`);
+    BroadcastManager.emit('ClientUpdated', this);
+    return;
+  }
+  SetCriticalDisplays(Displays) {
+    if (!Array.isArray(Displays)) Displays = [];
+    const Normalized = [];
+    const Seen = new Set();
+    for (const Entry of Displays) {
+      const DisplayID = normalizeDisplayID(Entry && Entry.DisplayID);
+      if (!DisplayID || Seen.has(DisplayID)) continue;
+      Seen.add(DisplayID);
+      Normalized.push({
+        DisplayID,
+        Label: Entry && Entry.Label ? String(Entry.Label) : null,
+        Width: parseInt(Entry && Entry.Width, 10) || null,
+        Height: parseInt(Entry && Entry.Height, 10) || null,
+        RefreshRate:
+          Entry && Entry.RefreshRate != null && Number.isFinite(Number(Entry.RefreshRate))
+            ? Math.round(Number(Entry.RefreshRate))
+            : null,
+        ScaleFactor:
+          Entry && Entry.ScaleFactor != null && Number.isFinite(Number(Entry.ScaleFactor))
+            ? Number(Entry.ScaleFactor)
+            : null,
+        Timestamp: Entry && Entry.Timestamp ? Entry.Timestamp : null,
+      });
+    }
+    this.CriticalDisplays = Normalized;
+    this.CriticalDisplayIDs = Normalized.map((Entry) => Entry.DisplayID);
+    this._rebuildDisplayView();
+    return;
+  }
+  IsDisplayCritical(DisplayID) {
+    const Normalized = normalizeDisplayID(DisplayID);
+    if (!Normalized) return false;
+    return this.CriticalDisplayIDs.includes(Normalized);
+  }
+  MarkCriticalDisplay(Display) {
+    const DisplayID = normalizeDisplayID(Display && Display.DisplayID);
+    if (!DisplayID) return false;
+    const Existing = this.CriticalDisplays.find((Entry) => Entry.DisplayID === DisplayID);
+    if (Existing) {
+      // Re-marking refreshes the captured configuration so the operator can
+      // "accept" a new resolution/refresh as the expected baseline.
+      if (Display && Display.Label) Existing.Label = String(Display.Label);
+      if (Display && Display.Width != null) Existing.Width = parseInt(Display.Width, 10) || null;
+      if (Display && Display.Height != null) Existing.Height = parseInt(Display.Height, 10) || null;
+      if (Display && Display.RefreshRate != null) {
+        Existing.RefreshRate = Number.isFinite(Number(Display.RefreshRate))
+          ? Math.round(Number(Display.RefreshRate))
+          : null;
+      }
+      if (Display && Display.ScaleFactor != null) {
+        Existing.ScaleFactor = Number.isFinite(Number(Display.ScaleFactor))
+          ? Number(Display.ScaleFactor)
+          : null;
+      }
+      if (Display && Display.Timestamp) Existing.Timestamp = Display.Timestamp;
+      this._rebuildDisplayView();
+      return false;
+    }
+    this.CriticalDisplays.push({
+      DisplayID,
+      Label: Display && Display.Label ? String(Display.Label) : null,
+      Width: parseInt(Display && Display.Width, 10) || null,
+      Height: parseInt(Display && Display.Height, 10) || null,
+      RefreshRate:
+        Display && Display.RefreshRate != null && Number.isFinite(Number(Display.RefreshRate))
+          ? Math.round(Number(Display.RefreshRate))
+          : null,
+      ScaleFactor:
+        Display && Display.ScaleFactor != null && Number.isFinite(Number(Display.ScaleFactor))
+          ? Number(Display.ScaleFactor)
+          : null,
+      Timestamp: Display && Display.Timestamp ? Display.Timestamp : null,
+    });
+    this.CriticalDisplayIDs = this.CriticalDisplays.map((Entry) => Entry.DisplayID);
+    this._rebuildDisplayView();
+    return true;
+  }
+  UnmarkCriticalDisplay(DisplayID) {
+    const Normalized = normalizeDisplayID(DisplayID);
+    if (!Normalized) return false;
+    const PrevLength = this.CriticalDisplays.length;
+    this.CriticalDisplays = this.CriticalDisplays.filter(
+      (Entry) => Entry.DisplayID !== Normalized
+    );
+    if (this.CriticalDisplays.length === PrevLength) return false;
+    this.CriticalDisplayIDs = this.CriticalDisplays.map((Entry) => Entry.DisplayID);
+    this._rebuildDisplayView();
+    return true;
+  }
   SetCriticalApplications(Applications) {
     if (!Array.isArray(Applications)) Applications = [];
     const Normalized = [];
@@ -313,6 +435,14 @@ class Client {
     const Warnings = [];
     if (MissingApplicationCount > 0) Warnings.push('Critical Application Issue');
     if (MissingUSBCount > 0) Warnings.push('Missing USB Device');
+    const MissingDisplayCount = Array.isArray(this.MissingCriticalDisplays)
+      ? this.MissingCriticalDisplays.length
+      : 0;
+    const MismatchedDisplayCount = Array.isArray(this.MismatchedCriticalDisplays)
+      ? this.MismatchedCriticalDisplays.length
+      : 0;
+    if (MissingDisplayCount > 0) Warnings.push('Missing Display');
+    if (MismatchedDisplayCount > 0) Warnings.push('Display Configuration Changed');
     // Integrated clients can self-report a degraded state with a custom reason.
     if (this.IntegratedDegradedReason) Warnings.push(this.IntegratedDegradedReason);
     this.Degraded = !!this.Online && Warnings.length > 0;
@@ -371,6 +501,67 @@ class Client {
 
     this.MissingCriticalUSBDevices = Missing;
     this.USBDeviceList = Connected.concat(Missing);
+    this._refreshClientHealthState();
+  }
+  _rebuildDisplayView() {
+    const CriticalByID = new Map(
+      (Array.isArray(this.CriticalDisplays) ? this.CriticalDisplays : [])
+        .map((Entry) => {
+          const DisplayID = normalizeDisplayID(Entry && Entry.DisplayID);
+          if (!DisplayID) return null;
+          return [DisplayID, Entry];
+        })
+        .filter((Entry) => !!Entry)
+    );
+
+    const Connected = (
+      Array.isArray(this.ConnectedDisplayList) ? this.ConnectedDisplayList : []
+    ).map((Display) => {
+      const DisplayID = normalizeDisplayID(Display && Display.DisplayID);
+      const CriticalEntry = DisplayID ? CriticalByID.get(DisplayID) : null;
+      const CurrentSignature = buildDisplaySignature(Display);
+      const ExpectedSignature = CriticalEntry ? buildDisplaySignature(CriticalEntry) : null;
+      const Mismatch = !!CriticalEntry && ExpectedSignature !== CurrentSignature;
+      return {
+        ...(Display || {}),
+        DisplayID,
+        IsConnected: true,
+        IsCritical: !!CriticalEntry,
+        Missing: false,
+        Mismatch,
+        CurrentSignature,
+        ExpectedSignature,
+        Label: (Display && Display.Label) || (CriticalEntry && CriticalEntry.Label) || null,
+      };
+    });
+
+    const ConnectedIDs = new Set(
+      Connected.map((Display) => normalizeDisplayID(Display && Display.DisplayID)).filter(Boolean)
+    );
+
+    const Missing = [];
+    for (const Entry of this.CriticalDisplays) {
+      if (!Entry || !Entry.DisplayID) continue;
+      if (ConnectedIDs.has(normalizeDisplayID(Entry.DisplayID))) continue;
+      Missing.push({
+        DisplayID: Entry.DisplayID,
+        Label: Entry.Label || null,
+        Width: Entry.Width || null,
+        Height: Entry.Height || null,
+        RefreshRate: Entry.RefreshRate || null,
+        ScaleFactor: Entry.ScaleFactor || null,
+        IsConnected: false,
+        IsCritical: true,
+        Missing: true,
+        Mismatch: false,
+        CurrentSignature: null,
+        ExpectedSignature: buildDisplaySignature(Entry),
+      });
+    }
+
+    this.MissingCriticalDisplays = Missing;
+    this.MismatchedCriticalDisplays = Connected.filter((Display) => Display.Mismatch);
+    this.DisplayList = Connected.concat(Missing);
     this._refreshClientHealthState();
   }
   _rebuildRunningApplicationsView() {

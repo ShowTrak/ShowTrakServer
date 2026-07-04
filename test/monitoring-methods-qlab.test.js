@@ -10,7 +10,7 @@ function methodPath(name) {
 }
 
 function loadQlab() {
-  return loadWithMocks(methodPath('qlab.js'), {});
+  return loadWithMocks(methodPath('qlab-workspace.js'), {});
 }
 
 // --- OSC framing helpers (mirror QLab's SLIP-framed TCP replies) ------------
@@ -95,8 +95,16 @@ function startSilentServer() {
 }
 
 const WORKSPACES = [
-  { uniqueID: '63B4494C-CFA6-4EA0-8B60-53E7C7137A0D', displayName: 'Main Show', hasPasscode: false },
-  { uniqueID: 'AA11BB22-0000-0000-0000-1234567890AB', displayName: 'Backup Show', hasPasscode: true },
+  {
+    uniqueID: '63B4494C-CFA6-4EA0-8B60-53E7C7137A0D',
+    displayName: 'Main Show',
+    hasPasscode: false,
+  },
+  {
+    uniqueID: 'AA11BB22-0000-0000-0000-1234567890AB',
+    displayName: 'Backup Show',
+    hasPasscode: true,
+  },
 ];
 
 test('qlab method reports online when the workspace name matches', async () => {

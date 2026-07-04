@@ -49,6 +49,15 @@ const ToPublicClient = (c) => ({
   MissingCriticalApplications: Array.isArray(c.MissingCriticalApplications)
     ? c.MissingCriticalApplications
     : [],
+  DisplayList: Array.isArray(c.DisplayList) ? c.DisplayList : [],
+  CriticalDisplays: Array.isArray(c.CriticalDisplays) ? c.CriticalDisplays : [],
+  CriticalDisplayIDs: Array.isArray(c.CriticalDisplayIDs) ? c.CriticalDisplayIDs : [],
+  MissingCriticalDisplays: Array.isArray(c.MissingCriticalDisplays)
+    ? c.MissingCriticalDisplays
+    : [],
+  MismatchedCriticalDisplays: Array.isArray(c.MismatchedCriticalDisplays)
+    ? c.MismatchedCriticalDisplays
+    : [],
 });
 
 const ToPublicGroup = (g) => ({

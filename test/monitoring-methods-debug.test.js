@@ -65,7 +65,14 @@ test('http Debug surfaces the response status code', () => {
 test('http-json Debug reports the resolved JSON value', () => {
   const httpJson = load('http-json.js');
   const html = httpJson.Debug(
-    { Success: true, LatencyMs: 30, Status: 200, Mode: 'json', JsonPath: 'data.status', MatchedValue: 'ok' },
+    {
+      Success: true,
+      LatencyMs: 30,
+      Status: 200,
+      Mode: 'json',
+      JsonPath: 'data.status',
+      MatchedValue: 'ok',
+    },
     { Address: 'example.com', Settings: { Scheme: 'https', Path: '/api' } }
   );
   assert.match(html, /data\.status/);
@@ -73,7 +80,7 @@ test('http-json Debug reports the resolved JSON value', () => {
 });
 
 test('qlab Debug renders a row per workspace with name, id and passcode, escaping names', () => {
-  const qlab = load('qlab.js');
+  const qlab = load('qlab-workspace.js');
   const html = qlab.Debug(
     {
       Success: true,
@@ -108,19 +115,23 @@ test('MonitoringMethods.BuildDebug delegates to the method and guards unknowns',
 
 // --- Advanced settings flags ------------------------------------------------
 function advancedKeys(method) {
-  return method.Settings.filter((f) => f.Advanced).map((f) => f.Key).sort();
+  return method.Settings.filter((f) => f.Advanced)
+    .map((f) => f.Key)
+    .sort();
 }
 function normalKeys(method) {
-  return method.Settings.filter((f) => !f.Advanced).map((f) => f.Key).sort();
+  return method.Settings.filter((f) => !f.Advanced)
+    .map((f) => f.Key)
+    .sort();
 }
 
 test('ping / tcp-port / qlab mark Timeout as an advanced setting', () => {
   assert.deepEqual(advancedKeys(load('ping.js')), ['Timeout']);
   assert.deepEqual(advancedKeys(load('tcp-port.js')), ['Timeout']);
-  assert.deepEqual(advancedKeys(load('qlab.js')), ['Timeout']);
+  assert.deepEqual(advancedKeys(load('qlab-workspace.js')), ['Timeout']);
   // Core fields stay inline.
   assert.ok(normalKeys(load('tcp-port.js')).includes('Port'));
-  assert.ok(normalKeys(load('qlab.js')).includes('Workspace'));
+  assert.ok(normalKeys(load('qlab-workspace.js')).includes('Workspace'));
 });
 
 test('dns marks record type, resolver port and timeout advanced but keeps resolver + expected value inline', () => {

@@ -148,7 +148,8 @@ function buildAlertScopeModel() {
     for (const Check of Array.isArray(Target.Checks) ? Target.Checks : []) {
       if (!Check || Check.CheckID == null) continue;
       const CheckScopedID = `check:${Check.CheckID}`;
-      const CheckLabel = Check.Name || Check.Address || `${String(Check.Method || '').toUpperCase()} check`;
+      const CheckLabel =
+        Check.Name || Check.Address || `${String(Check.Method || '').toUpperCase()} check`;
       Entities.push({
         Kind: 'monitor-check',
         Value: `client:${CheckScopedID}`,

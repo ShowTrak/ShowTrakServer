@@ -15,18 +15,16 @@ let MonitoringEditorState = null;
 // Dummy clients (virtual heartbeat-driven clients)
 let DummyClients = [];
 let DummyClientEditorUUID = null;
-const MONITORING_HISTORY_RANGES = {
-  '5m': { label: '5 Minutes', ms: 5 * 60 * 1000, bars: 75 },
-  '15m': { label: '15 Minutes', ms: 15 * 60 * 1000, bars: 90 },
-  '30m': { label: '30 Minutes', ms: 30 * 60 * 1000, bars: 96 },
-  '1h': { label: '1 Hour', ms: 60 * 60 * 1000, bars: 90 },
-  '12h': { label: '12 Hours', ms: 12 * 60 * 60 * 1000, bars: 96 },
-};
-let MonitorHistorySamples = [];
+// History timeline: always show the past hour of checks as a fixed block
+// timeline (no user-selectable range). One block per minute.
+const MONITOR_HISTORY_WINDOW_MS = 60 * 60 * 1000;
+const MONITOR_HISTORY_BLOCK_COUNT = 60;
+// Live-fetched per-series samples backing the currently open history modal.
+let MonitorHistorySeries = [];
 let MonitorHistoryModalContext = null;
-let MonitorHistoryRangeKey = '5m';
-let MonitorHistoryResizeTimer = null;
-let MonitorHistoryHoverBars = [];
+// Last pointer position while hovering a timeline block; used to keep the
+// tooltip visible across live timeline re-renders.
+let MonitorHistoryTooltipHover = null;
 let AlertRuleEditorRuleID = null;
 let AlertEditingActionIndex = null;
 let AlertRuleDraftActions = [];

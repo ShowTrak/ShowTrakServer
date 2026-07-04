@@ -1056,22 +1056,12 @@
               </div>
             </div>
 
-            <div class="rounded-3 p-2 bg-ghost-light text-danger">
-              <h6 class="mb-0">Danger Zone</h6>
-            </div>
             <button
               type="button"
-              class="btn btn-ghost text-warning"
+              class="btn btn-ghost text-light"
               id="SHOWTRAK_CLIENT_EDITOR_UPDATE"
             >
               Check For Updates
-            </button>
-            <button
-              type="button"
-              class="btn btn-ghost text-danger"
-              id="SHOWTRAK_CLIENT_EDITOR_REMOVE"
-            >
-              Delete Client
             </button>
             <button
               type="button"
@@ -1079,6 +1069,13 @@
               id="SHOWTRAK_CLIENT_EDITOR_REPLACE"
             >
               Replace Client
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost text-danger"
+              id="SHOWTRAK_CLIENT_EDITOR_REMOVE"
+            >
+              Delete Client
             </button>
           </div>
         </div>
@@ -1415,9 +1412,6 @@
             </div>
 
             <div id="DUMMY_CLIENT_DANGER_ZONE" class="d-none">
-              <div class="rounded-3 p-2 bg-ghost-light text-danger mt-2">
-                <h6 class="mb-0">Danger Zone</h6>
-              </div>
               <button
                 type="button"
                 class="btn btn-ghost text-danger w-100 mt-2"
@@ -1425,66 +1419,6 @@
               >
                 Delete Dummy Client
               </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div
-      class="modal fade"
-      id="SHOWTRAK_MONITOR_HISTORY_MODAL"
-      tabindex="-1"
-      aria-labelledby="SHOWTRAK_MONITOR_HISTORY_MODAL_Label"
-      aria-hidden="true"
-    >
-      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-          <div class="modal-body text-center">
-            <div class="rounded-3 p-2 bg-ghost-light mb-2">
-              <h6 class="mb-0" id="MONITOR_HISTORY_TITLE">Monitoring History</h6>
-            </div>
-
-            <div
-              id="MONITOR_HISTORY_RANGE_GROUP"
-              class="btn-group monitor-history-range w-100"
-              role="group"
-              aria-label="History range"
-            >
-              <button type="button" class="btn btn-outline-light" data-range="5m">5 Minutes</button>
-              <button type="button" class="btn btn-outline-light" data-range="15m">
-                15 Minutes
-              </button>
-              <button type="button" class="btn btn-outline-light" data-range="30m">
-                30 Minutes
-              </button>
-              <button type="button" class="btn btn-outline-light" data-range="1h">1 Hour</button>
-              <button type="button" class="btn btn-outline-light" data-range="12h">12 Hours</button>
-            </div>
-
-            <div id="MONITOR_HISTORY_GRAPH_PANEL" class="mt-2">
-              <canvas
-                id="MONITOR_HISTORY_CANVAS"
-                class="w-100"
-                height="175"
-                aria-label="Monitoring history graph"
-                role="img"
-              ></canvas>
-              <div
-                id="MONITOR_HISTORY_TOOLTIP"
-                class="d-none"
-                role="status"
-                aria-live="polite"
-              ></div>
-              <div id="MONITOR_HISTORY_EMPTY" class="d-none">No samples in this range yet.</div>
-            </div>
-
-            <div id="MONITOR_HISTORY_SUMMARY" class="monitor-history-summary mt-2"></div>
-
-            <div class="monitor-history-legend mt-2" aria-hidden="true">
-              <span><i class="status-dot status-dot-online"></i>Online</span>
-              <span><i class="status-dot status-dot-degraded"></i>Degraded</span>
-              <span><i class="status-dot status-dot-offline"></i>Offline</span>
             </div>
           </div>
         </div>
@@ -1739,14 +1673,39 @@
       aria-labelledby="SHOWTRAK_CLIENT_INFO_Label"
       aria-hidden="true"
     >
-      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
             <div class="rounded-3 p-2 bg-ghost-light">
-              <h6 class="mb-0">Client Info</h6>
+              <h6 class="mb-0" id="CLIENT_INFO_TITLE">Client Info</h6>
             </div>
 
-            <div class="d-grid gap-2">
+            <div id="CLIENT_INFO_HISTORY_SECTION" class="mt-1">
+              <div class="monitor-history-header">
+                <span class="monitor-history-window-label">Status over the past hour</span>
+                <div class="monitor-history-legend" aria-hidden="true">
+                  <span><i class="status-dot status-dot-online"></i>Online</span>
+                  <span><i class="status-dot status-dot-degraded"></i>Degraded</span>
+                  <span><i class="status-dot status-dot-offline"></i>Offline</span>
+                  <span><i class="status-dot status-dot-idle"></i>Idle</span>
+                </div>
+              </div>
+
+              <div id="MONITOR_HISTORY_TIMELINES" class="monitor-history-timelines mt-2"></div>
+
+              <div class="mt-2">
+                <button
+                  type="button"
+                  class="btn btn-light w-100 d-none"
+                  id="MONITOR_HISTORY_EDIT_BUTTON"
+                  data-target-id=""
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+
+            <div id="CLIENT_INFO_DETAILS_SECTION" class="d-grid gap-2 mt-2">
               <div class="form-floating has-copy">
                 <input
                   type="text"
@@ -1895,6 +1854,13 @@
                 <div id="SHOWTRAK_CLIENT_INFO_USB_DEVICES" class="d-grid gap-2"></div>
               </div>
 
+              <div id="CLIENT_INFO_DISPLAYS_SECTION" class="d-grid gap-2">
+                <div class="rounded-3 p-2 bg-ghost-light">
+                  <h6 class="mb-0">Displays</h6>
+                </div>
+                <div id="SHOWTRAK_CLIENT_INFO_DISPLAYS" class="d-grid gap-2"></div>
+              </div>
+
               <div id="CLIENT_INFO_NETWORK_SECTION" class="d-grid gap-2">
                 <div class="rounded-3 p-2 bg-ghost-light">
                   <h6 class="mb-0">Network Interfaces</h6>
@@ -1928,11 +1894,17 @@
               </div>
             </div>
 
-            <div class="row g-2 mt-2">
+            <div class="row g-2 mt-0">
               <div class="col-12 d-grid">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
               </div>
             </div>
+
+            <div
+              id="MONITOR_HISTORY_TOOLTIP"
+              class="monitor-history-tooltip d-none"
+              role="status"
+            ></div>
           </div>
         </div>
       </div>
