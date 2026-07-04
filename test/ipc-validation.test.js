@@ -162,32 +162,50 @@ test('IPCValidation.MonitoringTargetID validates numeric identifiers', () => {
 test('IPCValidation.MonitoringTargetCreatePayload enforces required fields', () => {
   const payload = IPCValidation.MonitoringTargetCreatePayload({
     Nickname: '  Switch  ',
-    Address: '10.0.0.1',
-    Method: 'ping',
     Interval: 30000,
     GroupID: '4',
-    DegradedThresholdMs: 250,
-    Settings: { Timeout: 2000 },
+    Checks: [
+      {
+        Name: 'Primary',
+        Address: '10.0.0.1',
+        Method: 'ping',
+        DegradedThresholdMs: 250,
+        Settings: { Timeout: 2000 },
+      },
+    ],
   });
   assert.equal(payload.Nickname, 'Switch');
   assert.equal(payload.Interval, 30000);
   assert.equal(payload.GroupID, 4);
-  assert.equal(payload.DegradedThresholdMs, 250);
-  assert.deepEqual(payload.Settings, { Timeout: 2000 });
+  assert.equal(payload.Checks.length, 1);
+  assert.equal(payload.Checks[0].Name, 'Primary');
+  assert.equal(payload.Checks[0].Address, '10.0.0.1');
+  assert.equal(payload.Checks[0].Method, 'ping');
+  assert.equal(payload.Checks[0].DegradedThresholdMs, 250);
+  assert.deepEqual(payload.Checks[0].Settings, { Timeout: 2000 });
 
   assert.throws(() => IPCValidation.MonitoringTargetCreatePayload({}), /Nickname/i);
   assert.throws(
     () =>
-      IPCValidation.MonitoringTargetCreatePayload({ Nickname: 'a', Address: 'b', Method: 'ping' }),
+      IPCValidation.MonitoringTargetCreatePayload({
+        Nickname: 'a',
+        Checks: [{ Address: 'b', Method: 'ping' }],
+      }),
     /Interval is required/i
   );
+  // A target with zero checks is valid (it renders as degraded).
+  const emptyChecksPayload = IPCValidation.MonitoringTargetCreatePayload({
+    Nickname: 'a',
+    Interval: 1,
+    Checks: [],
+  });
+  assert.equal(emptyChecksPayload.Checks.length, 0);
   assert.throws(
     () =>
       IPCValidation.MonitoringTargetCreatePayload({
         Nickname: 'a',
-        Address: 'b',
-        Method: 'ping',
         Interval: 'fast',
+        Checks: [{ Address: 'b', Method: 'ping' }],
       }),
     /Interval must be a number/i
   );
@@ -195,10 +213,8 @@ test('IPCValidation.MonitoringTargetCreatePayload enforces required fields', () 
     () =>
       IPCValidation.MonitoringTargetCreatePayload({
         Nickname: 'a',
-        Address: 'b',
-        Method: 'ping',
         Interval: 1,
-        Settings: 5,
+        Checks: [{ Address: 'b', Method: 'ping', Settings: 5 }],
       }),
     /Settings must be an object/i
   );
@@ -206,20 +222,24 @@ test('IPCValidation.MonitoringTargetCreatePayload enforces required fields', () 
 
 test('IPCValidation.MonitoringTargetUpdatePayload validates partial updates', () => {
   const payload = IPCValidation.MonitoringTargetUpdatePayload({
-    Address: 'host.local',
     Interval: 5000,
     GroupID: null,
+    Checks: [{ CheckID: 3, Address: 'host.local', Method: 'ping' }],
   });
-  assert.equal(payload.Address, 'host.local');
   assert.equal(payload.Interval, 5000);
   assert.equal(payload.GroupID, null);
+  assert.equal(payload.Checks[0].CheckID, 3);
+  assert.equal(payload.Checks[0].Address, 'host.local');
 
   assert.throws(
     () => IPCValidation.MonitoringTargetUpdatePayload({ Interval: 'slow' }),
     /Interval must be a number/i
   );
   assert.throws(
-    () => IPCValidation.MonitoringTargetUpdatePayload({ DegradedThresholdMs: 'x' }),
+    () =>
+      IPCValidation.MonitoringTargetUpdatePayload({
+        Checks: [{ Address: 'b', Method: 'ping', DegradedThresholdMs: 'x' }],
+      }),
     /DegradedThresholdMs must be a number/i
   );
 });

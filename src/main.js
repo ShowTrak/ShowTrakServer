@@ -66,7 +66,7 @@ const { execFile } = require('child_process');
 const {
   recordMonitoringHistorySample,
   syncMonitoringHistoryStore,
-  getMonitoringHistorySamples,
+  getMonitoringCheckHistory,
   recordDummyHistorySample,
   syncDummyHistoryStore,
   getDummyHistorySamples,
@@ -1118,13 +1118,35 @@ app.whenReady().then(async () => {
     return Target;
   });
 
-  RPC.handle('GetMonitoringTargetHistory', async (_Event, TargetID) => {
+  RPC.handle('GetMonitoringCheckHistory', async (_Event, CheckID) => {
     try {
-      TargetID = IPCValidation.MonitoringTargetID(TargetID);
+      CheckID = IPCValidation.MonitoringTargetID(CheckID, 'CheckID');
     } catch {
       return [];
     }
-    return getMonitoringHistorySamples(TargetID);
+    return getMonitoringCheckHistory(CheckID);
+  });
+
+  RPC.handle('GetMonitoringCheckDebug', async (_Event, CheckID) => {
+    try {
+      CheckID = IPCValidation.MonitoringTargetID(CheckID, 'CheckID');
+    } catch {
+      return null;
+    }
+    const [Err, Debug] = await MonitoringTargetManager.GetCheckDebug(CheckID);
+    if (Err) return null;
+    return Debug;
+  });
+
+  RPC.handle('RunMonitoringCheckNow', async (_Event, CheckID) => {
+    try {
+      CheckID = IPCValidation.MonitoringTargetID(CheckID, 'CheckID');
+    } catch {
+      return null;
+    }
+    const [Err, Debug] = await MonitoringTargetManager.RunCheckNow(CheckID);
+    if (Err) return null;
+    return Debug;
   });
 
   RPC.handle('GetDummyClientHistory', async (_Event, UUID) => {

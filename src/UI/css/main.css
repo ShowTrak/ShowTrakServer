@@ -2949,6 +2949,23 @@ body.compact-mode.mode-edit .CLIENT_TILE_COG:focus-visible {
   transform: translateY(-50%) scale(1);
 }
 
+/* In compact EDIT mode, hide the right-side status/latency text while the cog is
+ * shown (on hover or keyboard focus) so it isn't layered over anything. */
+body.compact-mode.mode-edit .SHOWTRAK_PC:hover > .CLIENT_TILE_COMPACT_STATUS,
+body.compact-mode.mode-edit .SHOWTRAK_PC:hover > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'],
+body.compact-mode.mode-edit .SHOWTRAK_PC:hover > .MONITOR_COMPACT_LATENCY,
+body.compact-mode.mode-edit
+  .SHOWTRAK_PC:has(> .CLIENT_TILE_COG:focus-visible)
+  > .CLIENT_TILE_COMPACT_STATUS,
+body.compact-mode.mode-edit
+  .SHOWTRAK_PC:has(> .CLIENT_TILE_COG:focus-visible)
+  > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'],
+body.compact-mode.mode-edit
+  .SHOWTRAK_PC:has(> .CLIENT_TILE_COG:focus-visible)
+  > .MONITOR_COMPACT_LATENCY {
+  opacity: 0;
+}
+
 /* Show cog only while hovering a tile in EDIT mode (no layout shift) */
 body.mode-edit .SHOWTRAK_PC:hover > .CLIENT_TILE_COG {
   opacity: 1;
@@ -3384,4 +3401,20 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   margin-right: 8px;
   vertical-align: middle;
   flex-shrink: 0;
+}
+/* Collapse toggles in the monitoring check editor (Advanced / Last Response) */
+.monitoring-collapse-toggle .bi-chevron-down {
+  transition: transform 0.15s ease;
+}
+.monitoring-collapse-toggle[aria-expanded='true'] .bi-chevron-down {
+  transform: rotate(180deg);
+}
+/* Spinner for the monitoring "Check Now" button icon while a probe runs */
+@keyframes monitoring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.monitoring-spin {
+  animation: monitoring-spin 0.7s linear infinite;
 }

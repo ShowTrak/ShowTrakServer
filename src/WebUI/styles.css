@@ -723,6 +723,65 @@ h7 {
   font-size: 0.85rem;
 }
 
+.monitor-check-list {
+  display: grid;
+  gap: 8px;
+}
+
+.monitor-check-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--ghost);
+}
+
+.monitor-check-left {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+
+.monitor-check-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.monitor-check-meta {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.monitor-check-status {
+  flex: 0 0 auto;
+  text-align: right;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  max-width: 44%;
+  word-break: break-word;
+}
+
+.monitor-check-status.online {
+  color: #28d17c;
+}
+
+.monitor-check-status.degraded {
+  color: #ffc107;
+}
+
+.monitor-check-status.offline {
+  color: rgba(255, 255, 255, 0.68);
+}
+
 /* Device cards (USB devices + running applications) */
 .device-card-list {
   display: grid;

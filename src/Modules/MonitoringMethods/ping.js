@@ -2,6 +2,7 @@
 // privileges. Cross-platform argument shapes are kept tiny on purpose.
 const { spawn } = require('child_process');
 const os = require('os');
+const { Pill, Rows, TextRow, Row, FormatLatency } = require('./debug');
 
 const ID = 'ping';
 
@@ -15,6 +16,7 @@ const Settings = [
     Default: 2000,
     Min: 200,
     Max: 30000,
+    Advanced: true,
   },
 ];
 
@@ -99,6 +101,19 @@ async function Run(Target) {
   });
 }
 
+// Render a compact summary of the most recent probe for the check editor.
+function Debug(Result, Target) {
+  const Address = Target && Target.Address ? String(Target.Address).trim() : '';
+  const Reachable = !!(Result && Result.Success);
+  return Rows([
+    TextRow('Host', Address || '—'),
+    Row('Reachable', Pill(Reachable ? 'success' : 'danger', Reachable ? 'Yes' : 'No')),
+    Reachable
+      ? Row('Round-trip', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
+      : TextRow('Error', (Result && Result.Error) || 'Host unreachable'),
+  ]);
+}
+
 module.exports = {
   ID,
   Name: 'Ping (ICMP)',
@@ -106,4 +121,5 @@ module.exports = {
   DefaultInterval: 30000,
   Settings,
   Run,
+  Debug,
 };

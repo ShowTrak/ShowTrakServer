@@ -2,6 +2,7 @@
 // port and reports success when the three-way handshake completes within the
 // timeout. No data is sent or read, so this is safe against arbitrary services.
 const net = require('net');
+const { Pill, Rows, TextRow, Row, FormatLatency } = require('./debug');
 
 const ID = 'tcp-port';
 
@@ -21,6 +22,7 @@ const Settings = [
     Default: 3000,
     Min: 200,
     Max: 30000,
+    Advanced: true,
   },
 ];
 
@@ -63,15 +65,44 @@ async function Run(Target) {
     });
 
     Socket.once('error', (Err) => {
-      Finish({ Success: false, Error: Err && Err.message ? Err.message : String(Err) });
+      const ErrMsg = Err && Err.message ? Err.message : String(Err);
+      // Errors indicating the port exists but rejected connection = degraded.
+      // Errors indicating no response (timeout, unreachable, DNS fail) = offline.
+      const IsResponseError = ErrMsg.includes('ECONNREFUSED') || ErrMsg.includes('ECONNRESET');
+      Finish({
+        Success: false,
+        ...(IsResponseError ? { Degraded: true } : {}),
+        Error: ErrMsg,
+      });
     });
 
     try {
       Socket.connect(Port, Address);
     } catch (Err) {
-      Finish({ Success: false, Error: Err && Err.message ? Err.message : String(Err) });
+      const ErrMsg = Err && Err.message ? Err.message : String(Err);
+      const IsResponseError = ErrMsg.includes('ECONNREFUSED') || ErrMsg.includes('ECONNRESET');
+      Finish({
+        Success: false,
+        ...(IsResponseError ? { Degraded: true } : {}),
+        Error: ErrMsg,
+      });
     }
   });
+}
+
+function Debug(Result, Target) {
+  const Address = Target && Target.Address ? String(Target.Address).trim() : '';
+  const Cfg = (Target && Target.Settings) || {};
+  const Port = Number.isFinite(Cfg.Port) ? Cfg.Port | 0 : 80;
+  const Open = !!(Result && Result.Success);
+  return Rows([
+    TextRow('Host', Address || '—'),
+    TextRow('Port', String(Port)),
+    Row('Port state', Pill(Open ? 'success' : 'danger', Open ? 'Accepting' : 'Closed / filtered')),
+    Open
+      ? Row('Handshake', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
+      : TextRow('Error', (Result && Result.Error) || 'Connection failed'),
+  ]);
 }
 
 module.exports = {
@@ -81,4 +112,5 @@ module.exports = {
   DefaultInterval: 30000,
   Settings,
   Run,
+  Debug,
 };

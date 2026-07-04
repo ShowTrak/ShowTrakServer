@@ -23,6 +23,55 @@ module.exports = function registerMonitoringValidators(Manager) {
     fail(`${fieldName} is invalid`);
   };
 
+  // Normalize a single check within a monitoring target. `allowCheckID` permits
+  // an existing CheckID (used on update to distinguish edits from inserts).
+  function normalizeCheck(value, index, allowCheckID) {
+    if (!isPlainObject(value)) fail(`Check ${index + 1} must be an object`);
+    const out = {};
+    if (
+      allowCheckID &&
+      Object.prototype.hasOwnProperty.call(value, 'CheckID') &&
+      value.CheckID != null
+    ) {
+      out.CheckID = Manager.MonitoringTargetID(value.CheckID, 'CheckID');
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(value, 'Name') &&
+      value.Name != null &&
+      value.Name !== ''
+    ) {
+      out.Name = normalizeNonEmptyString(value.Name, `Check ${index + 1} name`, {
+        minLength: 1,
+        maxLength: 64,
+      });
+    } else {
+      out.Name = '';
+    }
+    out.Address = normalizeNonEmptyString(value.Address, `Check ${index + 1} address`, {
+      minLength: 1,
+      maxLength: 253,
+    });
+    out.Method = normalizeNonEmptyString(value.Method, `Check ${index + 1} method`, {
+      minLength: 1,
+      maxLength: 64,
+    });
+    if (Object.prototype.hasOwnProperty.call(value, 'DegradedThresholdMs')) {
+      const Threshold = Number(value.DegradedThresholdMs);
+      if (!Number.isFinite(Threshold)) {
+        fail(`Check ${index + 1} DegradedThresholdMs must be a number`);
+      }
+      out.DegradedThresholdMs = Threshold;
+    }
+    out.Settings = normalizeMonitoringSettings(value.Settings);
+    return out;
+  }
+
+  function normalizeChecks(value, allowCheckID) {
+    if (!Array.isArray(value)) fail('Checks must be an array');
+    // A target is allowed to have zero checks (it renders as degraded).
+    return value.map((Check, Index) => normalizeCheck(Check, Index, allowCheckID));
+  }
+
   Manager.MonitoringTargetCreatePayload = (value) => {
     if (!isPlainObject(value)) fail('Monitoring target payload must be an object');
     const out = {};
@@ -30,24 +79,14 @@ module.exports = function registerMonitoringValidators(Manager) {
       minLength: 1,
       maxLength: 64,
     });
-    out.Address = normalizeNonEmptyString(value.Address, 'Address', {
-      minLength: 1,
-      maxLength: 253,
-    });
-    out.Method = normalizeNonEmptyString(value.Method, 'Method', { minLength: 1, maxLength: 64 });
     if (value.Interval === undefined || value.Interval === null) fail('Interval is required');
     const Interval = Number(value.Interval);
     if (!Number.isFinite(Interval)) fail('Interval must be a number');
     out.Interval = Interval;
-    if (Object.prototype.hasOwnProperty.call(value, 'DegradedThresholdMs')) {
-      const Threshold = Number(value.DegradedThresholdMs);
-      if (!Number.isFinite(Threshold)) fail('DegradedThresholdMs must be a number');
-      out.DegradedThresholdMs = Threshold;
-    }
     out.GroupID = Object.prototype.hasOwnProperty.call(value, 'GroupID')
       ? Manager.GroupID(value.GroupID)
       : null;
-    out.Settings = normalizeMonitoringSettings(value.Settings);
+    out.Checks = normalizeChecks(value.Checks == null ? [] : value.Checks, false);
     return out;
   };
 
@@ -60,30 +99,16 @@ module.exports = function registerMonitoringValidators(Manager) {
         maxLength: 64,
       });
     }
-    if (Object.prototype.hasOwnProperty.call(value, 'Address')) {
-      out.Address = normalizeNonEmptyString(value.Address, 'Address', {
-        minLength: 1,
-        maxLength: 253,
-      });
-    }
-    if (Object.prototype.hasOwnProperty.call(value, 'Method')) {
-      out.Method = normalizeNonEmptyString(value.Method, 'Method', { minLength: 1, maxLength: 64 });
-    }
     if (Object.prototype.hasOwnProperty.call(value, 'Interval')) {
       const Interval = Number(value.Interval);
       if (!Number.isFinite(Interval)) fail('Interval must be a number');
       out.Interval = Interval;
     }
-    if (Object.prototype.hasOwnProperty.call(value, 'DegradedThresholdMs')) {
-      const Threshold = Number(value.DegradedThresholdMs);
-      if (!Number.isFinite(Threshold)) fail('DegradedThresholdMs must be a number');
-      out.DegradedThresholdMs = Threshold;
-    }
     if (Object.prototype.hasOwnProperty.call(value, 'GroupID')) {
       out.GroupID = Manager.GroupID(value.GroupID);
     }
-    if (Object.prototype.hasOwnProperty.call(value, 'Settings')) {
-      out.Settings = normalizeMonitoringSettings(value.Settings);
+    if (Object.prototype.hasOwnProperty.call(value, 'Checks')) {
+      out.Checks = normalizeChecks(value.Checks, true);
     }
     return out;
   };

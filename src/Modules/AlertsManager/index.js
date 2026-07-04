@@ -484,6 +484,56 @@ Manager.HandleMonitoringTargetUpdated = async (Target) => {
       RawData: Target,
     });
   }
+
+  // Per-check alerts (opt-in via check:<CheckID> scope). Track each check's
+  // online/degraded transitions independently of the aggregated target state.
+  const TargetName = Target.Nickname || Target.Address || `Target ${Target.TargetID}`;
+  const Checks = Array.isArray(Target.Checks) ? Target.Checks : [];
+  for (const Check of Checks) {
+    if (!Check || Check.CheckID == null) continue;
+    const CheckKey = `check:${Check.CheckID}`;
+    const CheckLabel =
+      Check.Name || Check.Address || `${String(Check.Method || '').toUpperCase()} check`;
+    const CheckName = `${TargetName} · ${CheckLabel}`;
+    const BaseContext = {
+      EntityType: 'monitor-check',
+      EntityName: CheckName,
+      UUID: CheckKey,
+      TargetID: Target.TargetID,
+      CheckID: Check.CheckID,
+      GroupID: Target.GroupID == null ? null : Target.GroupID,
+      IP: Check.Address || null,
+    };
+
+    const PrevCheck = EntityOnlineState.get(CheckKey);
+    const CurrentCheck = !!Check.Online;
+    EntityOnlineState.set(CheckKey, CurrentCheck);
+
+    if (typeof PrevCheck === 'boolean' && PrevCheck !== CurrentCheck) {
+      await evaluateAgainstRules({
+        ...BaseContext,
+        TriggerType: CurrentCheck ? TRIGGERS.CLIENT_ONLINE : TRIGGERS.CLIENT_OFFLINE,
+        Severity: CurrentCheck ? 'success' : 'warning',
+        RawData: Check,
+      });
+    }
+
+    const PrevCheckDegraded = EntityDegradedState.get(CheckKey) === true;
+    const CurrentCheckDegraded = CurrentCheck && !!Check.Degraded;
+    EntityDegradedState.set(CheckKey, CurrentCheckDegraded);
+
+    if (CurrentCheckDegraded && !PrevCheckDegraded) {
+      await evaluateAgainstRules({
+        ...BaseContext,
+        TriggerType: TRIGGERS.CLIENT_DEGRADED,
+        Severity: 'warning',
+        Degraded: true,
+        LastLatencyMs: Check.LastLatencyMs == null ? null : Check.LastLatencyMs,
+        LastError: Check.LastError || null,
+        RawData: Check,
+      });
+    }
+  }
 };
 
 Manager.HandleScriptExecutionUpdated = async (Executions) => {

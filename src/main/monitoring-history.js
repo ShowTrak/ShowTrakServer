@@ -119,28 +119,40 @@ function getEntityHistorySamples(entityType, id) {
 
 function recordMonitoringHistorySample(target) {
   if (!target || !target.TargetID) return;
-  recordEntityHistorySample(ENTITY_MONITOR_TARGET, target.TargetID, {
-    online: !!target.Online,
-    degraded: !!target.Degraded,
-    latencyMs: target.LastLatencyMs,
-  });
+  const checks = Array.isArray(target.Checks) ? target.Checks : [];
+  for (const check of checks) {
+    if (!check || check.CheckID == null) continue;
+    recordEntityHistorySample(ENTITY_MONITOR_TARGET, check.CheckID, {
+      online: !!check.Online,
+      degraded: !!check.Degraded,
+      latencyMs: check.LastLatencyMs,
+    });
+  }
 }
 
 function syncMonitoringHistoryStore(list) {
+  // Flatten every target's checks into a single per-check sample list so the
+  // shared sync helper can prune history for checks that no longer exist.
+  const checks = [];
+  for (const target of Array.isArray(list) ? list : []) {
+    for (const check of Array.isArray(target && target.Checks) ? target.Checks : []) {
+      if (check && check.CheckID != null) checks.push(check);
+    }
+  }
   syncEntityHistoryStore(
     ENTITY_MONITOR_TARGET,
-    list,
-    (target) => target && target.TargetID,
-    (target) => ({
-      online: !!(target && target.Online),
-      degraded: !!(target && target.Degraded),
-      latencyMs: target && target.LastLatencyMs,
+    checks,
+    (check) => check && check.CheckID,
+    (check) => ({
+      online: !!(check && check.Online),
+      degraded: !!(check && check.Degraded),
+      latencyMs: check && check.LastLatencyMs,
     })
   );
 }
 
-function getMonitoringHistorySamples(targetID) {
-  return getEntityHistorySamples(ENTITY_MONITOR_TARGET, targetID);
+function getMonitoringCheckHistory(checkID) {
+  return getEntityHistorySamples(ENTITY_MONITOR_TARGET, checkID);
 }
 
 function recordDummyHistorySample(dummy) {
@@ -177,7 +189,7 @@ module.exports = {
   getEntityHistorySamples,
   recordMonitoringHistorySample,
   syncMonitoringHistoryStore,
-  getMonitoringHistorySamples,
+  getMonitoringCheckHistory,
   recordDummyHistorySample,
   syncDummyHistoryStore,
   getDummyHistorySamples,

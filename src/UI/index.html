@@ -1154,103 +1154,187 @@
       aria-labelledby="SHOWTRAK_MODAL_MONITORING_TARGET_Label"
       aria-hidden="true"
     >
-      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="rounded-3 p-2 bg-ghost-light">
-              <h6 class="mb-0" id="MONITORING_TARGET_MODAL_TITLE">Add Monitoring Target</h6>
-            </div>
-
-            <div class="d-grid gap-2 text-start">
-              <div class="form-floating">
-                <input
-                  type="text"
-                  class="form-control"
-                  id="MONITORING_TARGET_NICKNAME"
-                  placeholder="Name"
-                />
-                <label for="MONITORING_TARGET_NICKNAME">Name</label>
-              </div>
-              <div class="form-floating">
-                <input
-                  type="text"
-                  class="form-control"
-                  id="MONITORING_TARGET_ADDRESS"
-                  placeholder="IP / Hostname / Domain"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-                <label for="MONITORING_TARGET_ADDRESS">IP / Hostname / Domain</label>
-              </div>
-              <div class="form-floating">
-                <select class="form-select" id="MONITORING_TARGET_METHOD"></select>
-                <label for="MONITORING_TARGET_METHOD">Monitoring Method</label>
+            <!-- LIST VIEW: global settings + per-check rows -->
+            <div id="MONITORING_TARGET_LIST_VIEW">
+              <div class="rounded-3 p-2 bg-ghost-light">
+                <h6 class="mb-0" id="MONITORING_TARGET_MODAL_TITLE">Add Monitoring Target</h6>
               </div>
 
-              <div class="bg-ghost rounded px-3 py-2">
-                <label
-                  for="MONITORING_TARGET_INTERVAL"
-                  class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
-                >
-                  <span>Check Interval</span>
-                  <span
-                    id="MONITORING_TARGET_INTERVAL_LABEL"
-                    class="badge bg-ghost-light text-light"
-                    >30s</span
+              <div class="d-grid gap-2 text-start mt-2">
+                <div class="form-floating">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="MONITORING_TARGET_NICKNAME"
+                    placeholder="Name"
+                  />
+                  <label for="MONITORING_TARGET_NICKNAME">Name</label>
+                </div>
+
+                <div class="bg-ghost rounded px-3 py-2">
+                  <label
+                    for="MONITORING_TARGET_INTERVAL"
+                    class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
                   >
-                </label>
-                <input
-                  type="range"
-                  class="form-range"
-                  id="MONITORING_TARGET_INTERVAL"
-                  min="3000"
-                  max="300000"
-                  step="1000"
-                  value="30000"
-                />
-              </div>
+                    <span>Check Interval</span>
+                    <span
+                      id="MONITORING_TARGET_INTERVAL_LABEL"
+                      class="badge bg-ghost-light text-light"
+                      >30s</span
+                    >
+                  </label>
+                  <input
+                    type="range"
+                    class="form-range"
+                    id="MONITORING_TARGET_INTERVAL"
+                    min="3000"
+                    max="300000"
+                    step="1000"
+                    value="30000"
+                  />
+                </div>
 
-              <div class="form-floating">
-                <input
-                  type="number"
-                  class="form-control"
-                  id="MONITORING_TARGET_DEGRADED_THRESHOLD"
-                  min="0"
-                  max="600000"
-                  step="50"
-                  value="0"
-                  placeholder="Degraded Threshold (ms)"
-                />
-                <label for="MONITORING_TARGET_DEGRADED_THRESHOLD"
-                  >Degraded Threshold (ms, 0 = off)</label
-                >
-              </div>
+                <div id="MONITORING_TARGET_CHECK_LIST" class="d-grid gap-2"></div>
 
-              <div id="MONITORING_TARGET_DYNAMIC_SETTINGS" class="d-grid gap-2"></div>
+                <button type="button" class="btn btn-light w-100" id="MONITORING_TARGET_ADD_CHECK">
+                  <i class="bi bi-plus-lg"></i> Add Check
+                </button>
+
+                <small id="MONITORING_TARGET_SAVE_HINT" class="text-muted text-center"></small>
+
+                <div id="MONITORING_TARGET_DANGER_ZONE" class="d-none">
+                  <button
+                    type="button"
+                    class="btn btn-ghost text-danger w-100"
+                    id="MONITORING_TARGET_DELETE"
+                  >
+                    Delete Monitoring Target
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div class="row g-2 mt-2">
-              <div class="col-6 d-grid">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+            <!-- CHECK EDIT VIEW: configure a single check -->
+            <div id="MONITORING_TARGET_CHECK_VIEW" class="d-none">
+              <div class="d-flex align-items-center gap-2">
+                <button
+                  type="button"
+                  class="btn btn-light rounded-3 px-3 d-flex align-items-center justify-content-center"
+                  id="MONITORING_CHECK_BACK"
+                  aria-label="Back"
+                  title="Back"
+                >
+                  <i class="bi bi-arrow-left"></i>
+                </button>
+                <div
+                  class="rounded-3 p-2 bg-ghost-light flex-grow-1 d-flex align-items-center justify-content-center"
+                >
+                  <h6 class="mb-0" id="MONITORING_CHECK_VIEW_TITLE">Edit Check</h6>
+                </div>
               </div>
-              <div class="col-6 d-grid">
-                <button type="button" class="btn btn-success" id="MONITORING_TARGET_SAVE">
-                  Save
+
+              <div class="d-grid gap-2 text-start mt-2">
+                <div class="form-floating">
+                  <select class="form-select" id="MONITORING_CHECK_METHOD"></select>
+                  <label for="MONITORING_CHECK_METHOD">Monitoring Method</label>
+                </div>
+                <div class="form-floating">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="MONITORING_CHECK_NAME"
+                    placeholder="Label"
+                  />
+                  <label for="MONITORING_CHECK_NAME">Label</label>
+                </div>
+                <div class="form-floating">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="MONITORING_CHECK_ADDRESS"
+                    placeholder="IP / Hostname / Domain"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <label for="MONITORING_CHECK_ADDRESS">IP / Hostname / Domain</label>
+                </div>
+                <div id="MONITORING_CHECK_DYNAMIC_SETTINGS" class="d-grid gap-2"></div>
+
+                <!-- ADVANCED: less-common per-check settings -->
+                <button
+                  type="button"
+                  class="btn btn-ghost monitoring-collapse-toggle d-flex align-items-center justify-content-between w-100 text-light"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#MONITORING_CHECK_ADVANCED"
+                  aria-expanded="false"
+                  aria-controls="MONITORING_CHECK_ADVANCED"
+                >
+                  <span>Advanced</span>
+                  <i class="bi bi-chevron-down"></i>
+                </button>
+                <div class="collapse" id="MONITORING_CHECK_ADVANCED">
+                  <div class="d-grid gap-2 pb-1 mb-0">
+                    <div id="MONITORING_CHECK_ADVANCED_SETTINGS" class="d-grid gap-2"></div>
+                    <div class="form-floating">
+                      <input
+                        type="number"
+                        class="form-control"
+                        id="MONITORING_CHECK_DEGRADED_THRESHOLD"
+                        min="0"
+                        max="600000"
+                        step="50"
+                        value="0"
+                        placeholder="Degraded Threshold (ms)"
+                      />
+                      <label for="MONITORING_CHECK_DEGRADED_THRESHOLD"
+                        >Degraded Threshold (ms, 0 = off)</label
+                      >
+                    </div>
+                  </div>
+                </div>
+
+                <!-- LAST RESPONSE: collapsible live per-check debug panel (memory-only) -->
+                <button
+                  type="button"
+                  class="btn btn-ghost monitoring-collapse-toggle d-flex align-items-center justify-content-between w-100 text-light"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#MONITORING_CHECK_DEBUG_COLLAPSE"
+                  aria-expanded="false"
+                  aria-controls="MONITORING_CHECK_DEBUG_COLLAPSE"
+                >
+                  <span>Last Response</span>
+                  <i class="bi bi-chevron-down"></i>
+                </button>
+                <div class="collapse" id="MONITORING_CHECK_DEBUG_COLLAPSE">
+                  <div class="d-grid gap-2 pt-1" id="MONITORING_CHECK_DEBUG_SECTION">
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                      <span class="text-muted small" id="MONITORING_CHECK_DEBUG_META"></span>
+                      <button
+                        type="button"
+                        class="btn btn-light btn-sm d-flex align-items-center flex-shrink-0"
+                        id="MONITORING_CHECK_RUN_NOW"
+                      >
+                        <i class="bi bi-arrow-clockwise me-1"></i>Check Now
+                      </button>
+                    </div>
+                    <div
+                      id="MONITORING_CHECK_DEBUG_BODY"
+                      class="bg-ghost rounded p-2 text-start"
+                    ></div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  class="btn btn-ghost text-danger w-100"
+                  id="MONITORING_CHECK_DELETE"
+                >
+                  Remove Check
                 </button>
               </div>
-            </div>
-
-            <div id="MONITORING_TARGET_DANGER_ZONE" class="d-none">
-              <div class="rounded-3 p-2 bg-ghost-light text-danger mt-2">
-                <h6 class="mb-0">Danger Zone</h6>
-              </div>
-              <button
-                type="button"
-                class="btn btn-ghost text-danger w-100 mt-2"
-                id="MONITORING_TARGET_DELETE"
-              >
-                Delete Monitoring Target
-              </button>
             </div>
           </div>
         </div>

@@ -3,6 +3,7 @@
 // returned (optionally matching an expected value).
 const dns = require('dns');
 const net = require('net');
+const { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } = require('./debug');
 
 const ID = 'dns';
 
@@ -14,6 +15,7 @@ const Settings = [
     Label: 'Record type',
     Type: 'string',
     Default: 'A',
+    Advanced: true,
   },
   {
     Key: 'Resolver',
@@ -28,6 +30,7 @@ const Settings = [
     Default: 53,
     Min: 1,
     Max: 65535,
+    Advanced: true,
   },
   {
     Key: 'ExpectedValue',
@@ -42,6 +45,7 @@ const Settings = [
     Default: 4000,
     Min: 200,
     Max: 30000,
+    Advanced: true,
   },
 ];
 
@@ -103,21 +107,69 @@ async function Run(Target) {
   }
 
   if (!Array.isArray(Records) || Records.length === 0) {
-    return { Success: false, Error: 'No DNS records returned' };
+    return { Success: false, Error: 'No DNS records returned', RecordType, Records: [] };
   }
 
+  const Flat = Records.map(NormalizeRecord);
+
   if (Expected) {
-    const Flat = Records.map(NormalizeRecord);
     const Match = Flat.some((R) => R.indexOf(Expected) !== -1);
     if (!Match) {
       return {
         Success: false,
         Error: `No ${RecordType} record matched "${Expected}" (got ${Flat.slice(0, 3).join(', ')})`,
+        RecordType,
+        Records: Flat,
+        Expected,
       };
     }
   }
 
-  return { Success: true, LatencyMs: Date.now() - Started };
+  return { Success: true, LatencyMs: Date.now() - Started, RecordType, Records: Flat, Expected };
+}
+
+// Render the resolved records (and any expected-value match state) for the
+// check editor.
+function Debug(Result, Target) {
+  const Address = Target && Target.Address ? String(Target.Address).trim() : '';
+  const Cfg = (Target && Target.Settings) || {};
+  const RecordType =
+    (Result && Result.RecordType) || String(Cfg.RecordType || 'A').toUpperCase();
+  const Records = Array.isArray(Result && Result.Records) ? Result.Records : [];
+  const Success = !!(Result && Result.Success);
+  const Expected = (Result && Result.Expected) || (Cfg.ExpectedValue == null ? '' : String(Cfg.ExpectedValue).trim());
+
+  const Head = Rows([
+    TextRow('Hostname', Address || '—'),
+    TextRow('Record type', RecordType),
+    Row('Result', Pill(Success ? 'success' : 'danger', Success ? 'Resolved' : 'Failed')),
+    Success
+      ? Row('Query time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
+      : null,
+    Expected ? TextRow('Expected match', Expected) : null,
+  ]);
+
+  if (!Records.length) {
+    return (
+      Head +
+      '<div class="mt-2">' +
+      Note((Result && Result.Error) || 'No records returned') +
+      '</div>'
+    );
+  }
+
+  const List = Records.map(
+    (R) =>
+      '<div class="bg-ghost rounded px-2 py-1 font-monospace small text-light text-break">' +
+      `${Esc(R)}` +
+      '</div>'
+  ).join('');
+
+  return (
+    Head +
+    `<div class="text-muted small mt-2 mb-1">${RecordType} records (${Records.length})</div>` +
+    `<div class="d-grid gap-1">${List}</div>`
+  );
 }
 
 module.exports = {
@@ -127,4 +179,5 @@ module.exports = {
   DefaultInterval: 60000,
   Settings,
   Run,
+  Debug,
 };

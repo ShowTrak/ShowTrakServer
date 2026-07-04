@@ -54,6 +54,27 @@ Schema.push({
     )',
 });
 
+// Each Monitoring Target can own multiple independent checks (e.g. two DNS
+// probes plus a QLab workspace check). A check carries its own Address,
+// method-specific Settings (JSON) and degraded threshold; the parent target
+// owns the shared check Interval and grouping. Legacy single-method targets are
+// migrated into a single check row on first boot (see MonitoringTargetManager).
+Schema.push({
+  Name: 'MonitoringChecks',
+  SQL: 'CREATE TABLE IF NOT EXISTS `MonitoringChecks` ( \
+            CheckID INTEGER PRIMARY KEY AUTOINCREMENT, \
+            TargetID INTEGER NOT NULL, \
+            Name TEXT, \
+            Address TEXT, \
+            Method TEXT NOT NULL, \
+            Settings TEXT, \
+            DegradedThresholdMs INTEGER NOT NULL DEFAULT 0, \
+            Weight INTEGER NOT NULL DEFAULT 100, \
+            LastSuccessAt BIGINT(11), \
+            Timestamp BIGINT(11) NOT NULL \
+    )',
+});
+
 // Dummy Clients are a virtual class of "client": there is no installed agent.
 // Instead they are kept alive by external heartbeats delivered over OSC or
 // HTTP. They carry a stable, user-editable DummyID (distinct from the auto

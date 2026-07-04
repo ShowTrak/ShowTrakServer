@@ -10,6 +10,8 @@ let PendingAdoption = [];
 let MonitoringTargets = [];
 let MonitoringMethodsCache = [];
 let MonitoringEditorTargetID = null;
+// Working state for the multi-check monitoring target editor.
+let MonitoringEditorState = null;
 // Dummy clients (virtual heartbeat-driven clients)
 let DummyClients = [];
 let DummyClientEditorUUID = null;

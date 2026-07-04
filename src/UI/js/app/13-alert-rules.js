@@ -142,6 +142,27 @@ function buildAlertScopeModel() {
       IconClass: alertEntityIconClass('monitor'),
       Weight: Target.Weight || 0,
     });
+
+    // Per-check entities let a rule target an individual check within a target.
+    const TargetTitle = Target.Nickname || Target.Address || `Target ${Target.TargetID}`;
+    for (const Check of Array.isArray(Target.Checks) ? Target.Checks : []) {
+      if (!Check || Check.CheckID == null) continue;
+      const CheckScopedID = `check:${Check.CheckID}`;
+      const CheckLabel = Check.Name || Check.Address || `${String(Check.Method || '').toUpperCase()} check`;
+      Entities.push({
+        Kind: 'monitor-check',
+        Value: `client:${CheckScopedID}`,
+        ScopedID: CheckScopedID,
+        GroupID: Target.GroupID == null ? null : Target.GroupID,
+        Label: buildAlertEntityLabel(
+          `${TargetTitle} · ${CheckLabel}`,
+          Check.Name ? Check.Address || '' : '',
+          `Check ${Check.CheckID}`
+        ),
+        IconClass: alertEntityIconClass('monitor'),
+        Weight: Target.Weight || 0,
+      });
+    }
   }
 
   for (const Dummy of DummyClients || []) {

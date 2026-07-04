@@ -68,6 +68,8 @@
     detailInfo: $('detailInfo'),
     usbSection: $('usbSection'),
     usbList: $('usbList'),
+    monitorChecksSection: $('monitorChecksSection'),
+    monitorChecksList: $('monitorChecksList'),
     netSection: $('netSection'),
     netFamilyV4Btn: $('netFamilyV4Btn'),
     netFamilyV6Btn: $('netFamilyV6Btn'),
@@ -125,8 +127,14 @@
     return `${Math.round(ms)}ms`;
   }
 
-  function FormatMonitorStatus(Online, LastLatencyMs, LastError) {
-    if (Online) return FormatLatency(LastLatencyMs) || 'Online';
+  function FormatMonitorStatus(Online, LastLatencyMs, LastError, Degraded) {
+    if (Online) {
+      if (Degraded) {
+        const Reason = typeof LastError === 'string' ? LastError.trim() : '';
+        if (Reason) return Reason;
+      }
+      return FormatLatency(LastLatencyMs) || 'Online';
+    }
     const ErrorText = typeof LastError === 'string' ? LastError.trim() : '';
     if (!ErrorText) return 'Offline';
     if (
@@ -147,9 +155,27 @@
     return ErrorText;
   }
 
-  function FormatMonitorCompactStatus(Online, LastLatencyMs, LastError) {
-    const Status = FormatMonitorStatus(Online, LastLatencyMs, LastError);
+  function FormatMonitorCompactStatus(Online, LastLatencyMs, LastError, Degraded) {
+    const Status = FormatMonitorStatus(Online, LastLatencyMs, LastError, Degraded);
     return !Online && Status === 'Offline' ? '' : Status;
+  }
+
+  function FormatMonitorMethodLabel(Target) {
+    const CheckCount = Number(Target && Target.CheckCount);
+    if (Number.isFinite(CheckCount)) {
+      if (CheckCount === 0) return 'NO CHECKS';
+      if (CheckCount > 1) return `${CheckCount} CHECKS`;
+    }
+    return String((Target && Target.Method) || '').toUpperCase();
+  }
+
+  function FormatMonitorCheckStatus(Check) {
+    if (!Check || typeof Check !== 'object') return 'Unknown';
+    const Online = !!Check.Online;
+    const Degraded = !!Check.Degraded;
+    if (!Online) return FormatMonitorStatus(false, Check.LastLatencyMs, Check.LastError, Degraded);
+    if (Degraded) return FormatMonitorStatus(true, Check.LastLatencyMs, Check.LastError, true);
+    return FormatLatency(Check.LastLatencyMs) || 'Online';
   }
 
   function getMonitoringOfflineSince(target) {
@@ -479,10 +505,10 @@
     const Degraded = !!T.Degraded;
     const Name = T.Nickname || T.Address || 'Unnamed';
     const Sub = T.Address || '';
-    const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
-    const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, T.LastError);
+    const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
+    const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
     const OfflineSince = getMonitoringOfflineSince(T);
-    const Method = String(T.Method || '').toUpperCase();
+    const Method = FormatMonitorMethodLabel(T);
     const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
     const TextClass = 'text-light';
     return `<div id="MONITOR_TILE_${safe(T.TargetID)}" class="SHOWTRAK_PC MONITOR ${TileStateClass}" data-target-id="${safe(
@@ -703,18 +729,17 @@
     const addrEl = tile.querySelector('[data-type="Address"]');
     if (addrEl) addrEl.textContent = T.Address || '';
     const methodEl = tile.querySelector('[data-type="Method"]');
-    if (methodEl)
-      methodEl.textContent = `${String(T.Method || '').toUpperCase()} · ${FormatInterval(T.Interval)}`;
+    if (methodEl) methodEl.textContent = `${FormatMonitorMethodLabel(T)} · ${FormatInterval(T.Interval)}`;
     const label = tile.querySelector('[data-type="MONITOR_STATUS_LABEL"]');
     const compact = tile.querySelector('[data-type="MONITOR_COMPACT_LATENCY"]');
     if (label) {
-      const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
+      const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
       label.textContent = Status;
       label.classList.remove('text-success', 'text-warning');
       label.classList.add('text-light');
     }
     if (compact) {
-      const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, T.LastError);
+      const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
       compact.textContent = CompactStatus;
       compact.classList.toggle('d-none', !CompactStatus);
       compact.classList.remove('text-success', 'text-warning');
@@ -809,6 +834,11 @@
   function paintDetail() {
     if (!detailSelection) return;
 
+    const hideMonitorChecks = () => {
+      if (el.monitorChecksSection) el.monitorChecksSection.classList.add('hidden');
+      if (el.monitorChecksList) el.monitorChecksList.innerHTML = '';
+    };
+
     if (detailSelection.kind === 'monitor') {
       const monitor = monitors.find((m) => isSameEntityId(m.TargetID, detailSelection.id));
       if (!monitor) {
@@ -824,20 +854,52 @@
           : FormatLatency(monitor.LastLatencyMs) || 'Online'
         : FormatMonitorStatus(false, monitor.LastLatencyMs, monitor.LastError);
       const group = groups.find((g) => g.GroupID === (monitor.GroupID || null));
+      const checks = Array.isArray(monitor.Checks) ? monitor.Checks.slice() : [];
+      checks.sort((a, b) => (Number(a && a.Weight) || 0) - (Number(b && b.Weight) || 0));
       const fields = [
         ['Type', 'Monitoring Target'],
         monitor.Nickname ? ['Nickname', monitor.Nickname] : null,
         ['Address', monitor.Address || '—'],
-        ['Method', String(monitor.Method || '').toUpperCase() || '—'],
+        ['Method', FormatMonitorMethodLabel(monitor) || '—'],
         ['Interval', FormatInterval(monitor.Interval)],
         ['Status', online ? (degraded ? 'Degraded' : 'Online') : 'Offline'],
         ['Last Check', monitor.LastChecked ? timeAgo(monitor.LastChecked) : '—'],
         ['Last Success', monitor.LastSuccessAt ? timeAgo(monitor.LastSuccessAt) : '—'],
         ['Latency', FormatLatency(monitor.LastLatencyMs) || '—'],
         monitor.LastError ? ['Last Error', String(monitor.LastError)] : null,
+        ['Checks', String(checks.length)],
         ['Group', group ? group.Title : 'No Group'],
         ['Target ID', monitor.TargetID],
       ].filter(Boolean);
+
+      const checkRows = checks.map((check, index) => {
+        const Check = check || {};
+        const labelBase =
+          String((Check.Name || '').trim()) ||
+          `${String((Check.Method || '').toUpperCase()) || 'CHECK'} ${index + 1}`;
+        const endpoint = String((Check.Address || '').trim());
+        const method = String((Check.Method || '').trim()).toUpperCase();
+        const statusText = FormatMonitorCheckStatus(Check);
+        const statusClass = !Check.Online ? 'offline' : Check.Degraded ? 'degraded' : 'online';
+        return (
+          `<div class="monitor-check-row">` +
+          '<div class="monitor-check-left">' +
+          `<div class="monitor-check-label">${safe(labelBase)}</div>` +
+          `<div class="monitor-check-meta">${safe(method || 'UNKNOWN')}${endpoint ? ` - ${safe(endpoint)}` : ''}</div>` +
+          '</div>' +
+          `<div class="monitor-check-status ${statusClass}">${safe(statusText)}</div>` +
+          '</div>'
+        );
+      });
+
+      for (let i = 0; i < checks.length; i++) {
+        const check = checks[i] || {};
+        const labelBase = String((check.Name || '').trim()) ||
+          `${String((check.Method || '').toUpperCase()) || 'CHECK'} ${i + 1}`;
+        const endpoint = String((check.Address || '').trim());
+        const label = endpoint ? `${labelBase} (${endpoint})` : labelBase;
+        fields.push([`Check ${i + 1}`, `${label} - ${FormatMonitorCheckStatus(check)}`]);
+      }
 
       el.detailName.textContent =
         monitor.Nickname || monitor.Address || monitor.TargetID || 'Monitor';
@@ -854,6 +916,13 @@
       el.netList.innerHTML = '';
       el.appsList.innerHTML = '';
       closeScripts();
+
+      if (el.monitorChecksSection && el.monitorChecksList) {
+        el.monitorChecksSection.classList.remove('hidden');
+        el.monitorChecksList.innerHTML = checkRows.length
+          ? checkRows.join('')
+          : '<div class="device-card-empty">No checks configured.</div>';
+      }
 
       el.detailInfo.innerHTML = fields
         .map(
@@ -914,6 +983,7 @@
       el.usbList.innerHTML = '';
       el.netList.innerHTML = '';
       el.appsList.innerHTML = '';
+      hideMonitorChecks();
       closeScripts();
 
       el.detailInfo.innerHTML = fields
@@ -931,6 +1001,7 @@
       return;
     }
     const integratedClient = isIntegratedClient(c);
+    hideMonitorChecks();
     el.detailName.textContent = c.Nickname || c.Hostname || c.UUID;
     const statusText = c.Online
       ? c.Degraded
@@ -1189,16 +1260,19 @@
 
   // ---- Tile click delegation ---------------------------------------------
   el.content.addEventListener('click', (e) => {
-    const tile = e.target.closest('.SHOWTRAK_PC[data-kind="client"]');
-    if (tile) openDetail(tile.getAttribute('data-uuid'));
-  });
+    const clientTile = e.target.closest('.SHOWTRAK_PC[data-kind="client"]');
+    if (clientTile) {
+      openDetail(clientTile.getAttribute('data-uuid'));
+      return;
+    }
 
-  el.content.addEventListener('dblclick', (e) => {
     const monitorTile = e.target.closest('.SHOWTRAK_PC[data-kind="monitor"]');
     if (monitorTile) {
       openMonitorDetail(monitorTile.getAttribute('data-target-id'));
-      return;
     }
+  });
+
+  el.content.addEventListener('dblclick', (e) => {
     const dummyTile = e.target.closest('.SHOWTRAK_PC[data-kind="dummy"]');
     if (dummyTile) {
       openDummyDetail(dummyTile.getAttribute('data-dummy-uuid'));

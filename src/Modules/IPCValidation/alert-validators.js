@@ -50,6 +50,10 @@ module.exports = function registerAlertValidators(Manager) {
           const id = normalized.slice('monitor:'.length).trim();
           if (!/^\d+$/.test(id)) fail('Scope monitor entries must use monitor:<TargetID> format');
           next.push(`monitor:${parseInt(id, 10)}`);
+        } else if (normalized.startsWith('check:')) {
+          const id = normalized.slice('check:'.length).trim();
+          if (!/^\d+$/.test(id)) fail('Scope check entries must use check:<CheckID> format');
+          next.push(`check:${parseInt(id, 10)}`);
         } else {
           next.push(Manager.UUID(normalized, 'Scope client UUID'));
         }

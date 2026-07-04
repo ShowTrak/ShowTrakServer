@@ -12,8 +12,25 @@ function FormatLatency(ms) {
   return `${Math.round(ms)}ms`;
 }
 
-function FormatMonitorStatus(Online, LastLatencyMs, LastError) {
-  if (Online) return FormatLatency(LastLatencyMs);
+// A target can hold multiple checks; show the single method when there is one,
+// otherwise summarise the number of checks (including the empty case).
+function FormatMonitoringMethodLabel(T) {
+  const Count = Number(T && T.CheckCount);
+  if (Number.isFinite(Count)) {
+    if (Count === 0) return 'NO CHECKS';
+    if (Count > 1) return `${Count} CHECKS`;
+  }
+  return String((T && T.Method) || '').toUpperCase();
+}
+
+function FormatMonitorStatus(Online, LastLatencyMs, LastError, Degraded) {
+  if (Online) {
+    if (Degraded) {
+      const Reason = typeof LastError === 'string' ? LastError.trim() : '';
+      if (Reason) return Reason;
+    }
+    return FormatLatency(LastLatencyMs);
+  }
   const ErrorText = typeof LastError === 'string' ? LastError.trim() : '';
   if (!ErrorText) return 'Offline';
   if (
@@ -38,9 +55,11 @@ function FormatMonitorStatus(Online, LastLatencyMs, LastError) {
   return ErrorText;
 }
 
-function FormatMonitorCompactStatus(Online, LastLatencyMs, LastError) {
-  const Status = FormatMonitorStatus(Online, LastLatencyMs, LastError);
-  return !Online && Status === 'Offline' ? '' : Status;
+function FormatMonitorCompactStatus(Online, LastLatencyMs) {
+  // Compact view must never surface error/degraded reason text: those messages
+  // can be arbitrarily long (e.g. "No reply from QLab after 2000ms") and break
+  // the tile layout. Show latency when online, otherwise nothing.
+  return Online ? FormatLatency(LastLatencyMs) : '';
 }
 
 function GetMonitoringOfflineSince(Target) {
@@ -67,10 +86,10 @@ function RenderMonitoringTargetTile(T) {
   const Degraded = !!T.Degraded;
   const Name = T.Nickname || T.Address || 'Unnamed';
   const Sub = T.Address || '';
-  const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
-  const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, T.LastError);
+  const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
+  const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs);
   const OfflineSince = GetMonitoringOfflineSince(T);
-  const Method = String(T.Method || '').toUpperCase();
+  const MethodLabel = FormatMonitoringMethodLabel(T);
   const DragUUID = `monitor:${T.TargetID}`;
   const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
   const TextClass = 'text-light';
@@ -81,7 +100,7 @@ function RenderMonitoringTargetTile(T) {
       <button type="button" class="CLIENT_TILE_COG MONITOR_TILE_COG" aria-label="Edit Monitor" title="Edit Monitor">
         <i class="bi bi-gear-fill"></i>
       </button>
-      <label class="text-sm" data-type="Method">${Safe(Method)} · ${Safe(
+      <label class="text-sm" data-type="Method">${Safe(MethodLabel)} · ${Safe(
         FormatInterval(T.Interval)
       )}</label>
       <h5 class="mb-0" data-type="Name">${Safe(Name)}</h5>
@@ -110,9 +129,9 @@ function UpdateMonitoringTargetTile(T) {
   $tile.find('[data-type="Address"]').text(T.Address || '');
   $tile
     .find('[data-type="Method"]')
-    .text(`${String(T.Method || '').toUpperCase()} · ${FormatInterval(T.Interval)}`);
-  const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError);
-  const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, T.LastError);
+    .text(`${FormatMonitoringMethodLabel(T)} · ${FormatInterval(T.Interval)}`);
+  const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
+  const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs);
   const $label = $tile.find('[data-type="MONITOR_STATUS_LABEL"]');
   $label.text(Status);
   $label.removeClass('text-success text-warning').addClass('text-light');
@@ -133,17 +152,28 @@ function UpdateMonitoringTargetTile(T) {
 
 function ResolveMonitorHistoryContextEntity() {
   if (!MonitorHistoryModalContext || !MonitorHistoryModalContext.type) return null;
-  if (MonitorHistoryModalContext.type === 'target') {
-    const target = MonitoringTargets.find(
-      (T) => Number(T.TargetID) === Number(MonitorHistoryModalContext.id)
-    );
-    if (!target) return null;
+  if (MonitorHistoryModalContext.type === 'check') {
+    const CheckID = Number(MonitorHistoryModalContext.id);
+    let FoundCheck = null;
+    let FoundTarget = null;
+    for (const T of MonitoringTargets) {
+      const Match = (T.Checks || []).find((c) => Number(c.CheckID) === CheckID);
+      if (Match) {
+        FoundCheck = Match;
+        FoundTarget = T;
+        break;
+      }
+    }
+    if (!FoundCheck || !FoundTarget) return null;
+    const TargetTitle =
+      FoundTarget.Nickname || FoundTarget.Address || `Target ${FoundTarget.TargetID}`;
+    const CheckLabel = FoundCheck.Name || FoundCheck.Address || '';
     return {
-      type: 'target',
-      id: Number(target.TargetID),
-      title: target.Nickname || target.Address || `Target ${target.TargetID}`,
-      intervalMs: Number(target.Interval),
-      notFoundLabel: 'Monitoring target not found',
+      type: 'check',
+      id: CheckID,
+      title: CheckLabel ? `${TargetTitle} · ${CheckLabel}` : TargetTitle,
+      intervalMs: Number(FoundTarget.Interval),
+      notFoundLabel: 'Monitoring check not found',
     };
   }
   if (MonitorHistoryModalContext.type === 'dummy') {
@@ -163,7 +193,7 @@ function ResolveMonitorHistoryContextEntity() {
 
 function IsMonitorHistoryContextFor(entityType, id) {
   if (!MonitorHistoryModalContext || MonitorHistoryModalContext.type !== entityType) return false;
-  if (entityType === 'target') return Number(MonitorHistoryModalContext.id) === Number(id);
+  if (entityType === 'check') return Number(MonitorHistoryModalContext.id) === Number(id);
   if (entityType === 'dummy')
     return String(MonitorHistoryModalContext.id || '') === String(id || '');
   return false;
@@ -177,8 +207,8 @@ async function LoadHistorySamplesForContext() {
   }
   try {
     const Samples =
-      entity.type === 'target'
-        ? await window.API.GetMonitoringTargetHistory(entity.id)
+      entity.type === 'check'
+        ? await window.API.GetMonitoringCheckHistory(entity.id)
         : await window.API.GetDummyClientHistory(entity.id);
     MonitorHistorySamples = Array.isArray(Samples) ? Samples : [];
   } catch {
@@ -526,13 +556,30 @@ function RenderMonitoringHistoryModal() {
 async function OpenMonitoringTargetHistory(TargetID) {
   const Target = MonitoringTargets.find((T) => Number(T.TargetID) === Number(TargetID));
   if (!Target) return Notify('Monitoring target not found', 'error');
+  const PrimaryCheck = (Target.Checks || [])[0];
+  if (!PrimaryCheck || PrimaryCheck.CheckID == null) {
+    return Notify('This target has no checks yet', 'error');
+  }
+  return OpenMonitoringCheckHistory(PrimaryCheck.CheckID);
+}
+
+async function OpenMonitoringCheckHistory(CheckID) {
+  const NumericCheckID = Number(CheckID);
+  let Found = null;
+  for (const T of MonitoringTargets) {
+    if ((T.Checks || []).some((c) => Number(c.CheckID) === NumericCheckID)) {
+      Found = T;
+      break;
+    }
+  }
+  if (!Found) return Notify('Monitoring check not found', 'error');
   try {
     await CloseAllModals();
   } catch (err) {
-    HandleNonFatalError('Monitoring:OpenMonitoringTargetHistory:CloseAllModals', err);
+    HandleNonFatalError('Monitoring:OpenMonitoringCheckHistory:CloseAllModals', err);
   }
 
-  MonitorHistoryModalContext = { type: 'target', id: Number(Target.TargetID) };
+  MonitorHistoryModalContext = { type: 'check', id: NumericCheckID };
   MonitorHistorySamples = [];
   await LoadHistorySamplesForContext();
 

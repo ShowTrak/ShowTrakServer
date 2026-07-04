@@ -1,7 +1,7 @@
 // HTTPS monitoring. Same flow as the HTTP method but over TLS. Certificate
 // validation can be relaxed via IgnoreTlsErrors for self-signed appliances on
 // internal networks.
-const { PerformHttpRequest } = require('./_http-shared');
+const { PerformHttpRequest, BuildHttpDebug } = require('./_http-shared');
 
 const ID = 'https';
 
@@ -33,6 +33,7 @@ const Settings = [
     Default: 200,
     Min: 100,
     Max: 599,
+    Advanced: true,
   },
   {
     Key: 'ExpectedStatusMax',
@@ -41,18 +42,21 @@ const Settings = [
     Default: 399,
     Min: 100,
     Max: 599,
+    Advanced: true,
   },
   {
     Key: 'FollowRedirects',
     Label: 'Follow Redirects',
     Type: 'boolean',
     Default: false,
+    Advanced: true,
   },
   {
     Key: 'IgnoreTlsErrors',
     Label: 'Ignore TLS Errors',
     Type: 'boolean',
     Default: false,
+    Advanced: true,
   },
   {
     Key: 'Timeout',
@@ -61,11 +65,16 @@ const Settings = [
     Default: 5000,
     Min: 500,
     Max: 60000,
+    Advanced: true,
   },
 ];
 
 async function Run(Target) {
   return PerformHttpRequest(Target, { Protocol: 'https', DefaultPort: 443 });
+}
+
+function Debug(Result, Target) {
+  return BuildHttpDebug(Result, Target, { Protocol: 'https' });
 }
 
 module.exports = {
@@ -75,4 +84,5 @@ module.exports = {
   DefaultInterval: 60000,
   Settings,
   Run,
+  Debug,
 };

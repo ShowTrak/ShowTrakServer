@@ -32,30 +32,53 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
     const untrackedRunCalls = [];
     const events = [];
     const normalizeCalls = [];
+    let nextInsertID = 100;
 
     const dbMock = {
       Manager: {
-        All: async () => [
-          null,
-          [
-            {
-              TargetID: 7,
-              Nickname: 'API Health',
-              Address: 'api.local',
-              Method: 'http',
-              Interval: 1,
-              Settings: JSON.stringify({ Path: '/health' }),
-              GroupID: 3,
-              Weight: 80,
-              LastSuccessAt: null,
-              DegradedThresholdMs: 999999,
-              Timestamp: 10,
-            },
-          ],
-        ],
+        All: async (sql) => {
+          if (String(sql).includes('MonitoringChecks')) {
+            return [
+              null,
+              [
+                {
+                  CheckID: 70,
+                  TargetID: 7,
+                  Name: 'Health',
+                  Address: 'api.local',
+                  Method: 'http',
+                  Settings: JSON.stringify({ Path: '/health' }),
+                  DegradedThresholdMs: 999999,
+                  Weight: 100,
+                  LastSuccessAt: null,
+                  Timestamp: 10,
+                },
+              ],
+            ];
+          }
+          return [
+            null,
+            [
+              {
+                TargetID: 7,
+                Nickname: 'API Health',
+                Address: 'api.local',
+                Method: 'http',
+                Interval: 1,
+                Settings: JSON.stringify({ Path: '/health' }),
+                GroupID: 3,
+                Weight: 80,
+                LastSuccessAt: null,
+                DegradedThresholdMs: 999999,
+                Timestamp: 10,
+              },
+            ],
+          ];
+        },
         Run: async (sql, params) => {
           runCalls.push([sql, params]);
           if (sql.includes('INSERT INTO MonitoringTargets')) return [null, { lastID: 12 }];
+          if (sql.includes('INSERT INTO MonitoringChecks')) return [null, { lastID: nextInsertID++ }];
           return [null, { changes: 1 }];
         },
         RunWithoutDirtyTracking: async (sql, params) => {
@@ -100,37 +123,38 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
     assert.equal(allErr, null);
     assert.equal(allTargets.length, 1);
     assert.equal(allTargets[0].Interval, Manager.MIN_INTERVAL_MS);
-    assert.equal(allTargets[0].DegradedThresholdMs, 600000);
-    assert.deepEqual(allTargets[0].Settings, { Path: '/health' });
+    assert.equal(allTargets[0].Checks.length, 1);
+    assert.equal(allTargets[0].Checks[0].DegradedThresholdMs, 600000);
+    assert.deepEqual(allTargets[0].Checks[0].Settings, { Path: '/health', Protocol: 'http' });
 
     const [createFailErr, createFailValue] = await Manager.Create({
       Nickname: 'Bad',
-      Address: 'bad.local',
-      Method: 'dns',
       Interval: 1000,
-      Settings: {},
+      Checks: [{ Address: 'bad.local', Method: 'dns', Settings: {} }],
     });
     assert.match(createFailErr, /Unknown monitoring method/i);
     assert.equal(createFailValue, null);
 
     const [createErr, created] = await Manager.Create({
       Nickname: 'Ping Check',
-      Address: '10.0.0.12',
-      Method: 'ping',
       Interval: 1,
-      Settings: { Timeout: 555 },
       GroupID: 4,
       Weight: 90,
-      DegradedThresholdMs: -10,
+      Checks: [
+        { Name: 'Ping', Address: '10.0.0.12', Method: 'ping', Settings: { Timeout: 555 }, DegradedThresholdMs: -10 },
+      ],
     });
     assert.equal(createErr, null);
     assert.equal(created.Interval, Manager.MIN_INTERVAL_MS);
-    assert.equal(created.DegradedThresholdMs, 0);
+    assert.equal(created.Checks.length, 1);
+    assert.equal(created.Checks[0].DegradedThresholdMs, 0);
 
-    const insertCall = runCalls.find(([sql]) => sql.includes('INSERT INTO MonitoringTargets'));
-    assert.ok(insertCall);
-    assert.equal(insertCall[1][3], Manager.MIN_INTERVAL_MS);
-    assert.deepEqual(JSON.parse(insertCall[1][4]), { method: 'ping', Timeout: 555 });
+    const targetInsert = runCalls.find(([sql]) => sql.includes('INSERT INTO MonitoringTargets'));
+    assert.ok(targetInsert);
+    assert.equal(targetInsert[1][3], Manager.MIN_INTERVAL_MS);
+    const checkInsert = runCalls.find(([sql]) => sql.includes('INSERT INTO MonitoringChecks'));
+    assert.ok(checkInsert);
+    assert.deepEqual(JSON.parse(checkInsert[1][4]), { method: 'ping', Timeout: 555 });
 
     const firstScheduledTick = timers.find(
       (handle) => handle && !handle.cleared && typeof handle.cb === 'function'
@@ -140,21 +164,35 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
 
     assert.ok(
       untrackedRunCalls.some(([sql]) =>
-        sql.includes('UPDATE MonitoringTargets SET LastSuccessAt = ? WHERE TargetID = ?')
+        sql.includes('UPDATE MonitoringChecks SET LastSuccessAt = ? WHERE CheckID = ?')
       )
     );
 
+    // Update: edit the existing check (method change) + add a second check.
+    const createdCheckID = created.Checks[0].CheckID;
     const [updateErr, updated] = await Manager.Update(12, {
-      Method: 'http',
       Interval: 99999999,
-      Settings: { Path: '/status' },
-      DegradedThresholdMs: 700000,
+      Checks: [
+        { CheckID: createdCheckID, Address: '10.0.0.12', Method: 'http', Settings: { Path: '/status' }, DegradedThresholdMs: 700000 },
+        { Address: '10.0.0.13', Method: 'ping', Settings: {} },
+      ],
     });
     assert.equal(updateErr, null);
     assert.equal(updated.Interval, Manager.MAX_INTERVAL_MS);
-    assert.equal(updated.DegradedThresholdMs, 600000);
-    assert.equal(updated.Method, 'http');
-    assert.deepEqual(updated.Settings, { method: 'http', Path: '/status' });
+    assert.equal(updated.Checks.length, 2);
+    assert.equal(updated.Checks[0].Method, 'http');
+    assert.equal(updated.Checks[0].DegradedThresholdMs, 600000);
+    assert.deepEqual(updated.Checks[0].Settings, { method: 'http', Path: '/status' });
+
+    // Update again removing the second check.
+    const [shrinkErr, shrunk] = await Manager.Update(12, {
+      Checks: [{ CheckID: createdCheckID, Address: '10.0.0.12', Method: 'http', Settings: {} }],
+    });
+    assert.equal(shrinkErr, null);
+    assert.equal(shrunk.Checks.length, 1);
+    assert.ok(
+      runCalls.some(([sql]) => sql.includes('DELETE FROM MonitoringChecks WHERE CheckID = ?'))
+    );
 
     const [groupErr, groupResult] = await Manager.SetGroupAndWeight(12, 11, 123);
     assert.equal(groupErr, null);
@@ -168,10 +206,24 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
     const [deleteErr, deleted] = await Manager.Delete(12);
     assert.equal(deleteErr, null);
     assert.equal(deleted, true);
+    assert.ok(
+      runCalls.some(([sql]) => sql.includes('DELETE FROM MonitoringChecks WHERE TargetID = ?'))
+    );
 
     const [missingDeleteErr, missingDeleteValue] = await Manager.Delete(999);
     assert.match(missingDeleteErr, /not found/i);
     assert.equal(missingDeleteValue, null);
+
+    // A target may be created with zero checks; it surfaces as degraded.
+    const [emptyErr, emptyCreated] = await Manager.Create({
+      Nickname: 'No Checks',
+      Interval: 5000,
+      Checks: [],
+    });
+    assert.equal(emptyErr, null);
+    assert.equal(emptyCreated.Checks.length, 0);
+    assert.equal(emptyCreated.Degraded, true);
+    assert.equal(emptyCreated.LastError, 'No Checks');
 
     assert.ok(normalizeCalls.some(([id]) => id === 'ping'));
     assert.ok(normalizeCalls.some(([id]) => id === 'http'));
@@ -356,5 +408,108 @@ test('MonitoringTargetManager moves group members and orphaned targets to no gro
       )
     );
     assert.ok(events.filter((event) => event === 'MonitoringTargetListChanged').length >= 2);
+  });
+});
+
+test('MonitoringTargetManager.RunCheckNow runs a check, broadcasts, and returns fresh debug', async () => {
+  await withFakeTimers(async () => {
+    const events = [];
+    const untrackedRunCalls = [];
+
+    const dbMock = {
+      Manager: {
+        All: async (sql) => {
+          if (String(sql).includes('MonitoringChecks')) {
+            return [
+              null,
+              [
+                {
+                  CheckID: 55,
+                  TargetID: 9,
+                  Name: 'Ping',
+                  Address: '10.0.0.9',
+                  Method: 'ping',
+                  Settings: JSON.stringify({}),
+                  DegradedThresholdMs: 0,
+                  Weight: 100,
+                  LastSuccessAt: null,
+                  Timestamp: 1,
+                },
+              ],
+            ];
+          }
+          return [
+            null,
+            [
+              {
+                TargetID: 9,
+                Nickname: 'Node',
+                Address: '10.0.0.9',
+                Method: 'ping',
+                Interval: 5000,
+                Settings: JSON.stringify({}),
+                GroupID: null,
+                Weight: 100,
+                LastSuccessAt: null,
+                DegradedThresholdMs: 0,
+                Timestamp: 1,
+              },
+            ],
+          ];
+        },
+        Run: async () => [null, { changes: 1 }],
+        RunWithoutDirtyTracking: async (sql, params) => {
+          untrackedRunCalls.push([sql, params]);
+          return [null, { changes: 1 }];
+        },
+      },
+    };
+
+    let runInvocations = 0;
+    const monitoringMethodsMock = {
+      Manager: {
+        Has: () => true,
+        NormalizeSettings: (_id, settings) => settings,
+        Run: async () => {
+          runInvocations += 1;
+          return { Success: true, LatencyMs: 7 };
+        },
+        BuildDebug: () => '<div>debug-panel</div>',
+      },
+    };
+
+    const modulePath = path.join(
+      __dirname,
+      '..',
+      'src',
+      'Modules',
+      'MonitoringTargetManager',
+      'index.js'
+    );
+    const { Manager } = loadWithMocks(modulePath, {
+      '../Logger': { CreateLogger: () => ({ error: () => {}, warn: () => {} }) },
+      '../DB': dbMock,
+      '../Broadcast': { Manager: { emit: (event, payload) => events.push([event, payload]) } },
+      '../MonitoringMethods': monitoringMethodsMock,
+      '../Utils': require('../src/Modules/Utils'),
+    });
+
+    await Manager.Init();
+
+    const [err, debug] = await Manager.RunCheckNow(55);
+    assert.equal(err, null);
+    assert.ok(runInvocations >= 1, 'the probe should have been executed');
+    assert.equal(debug.CheckID, 55);
+    assert.equal(debug.Method, 'ping');
+    assert.equal(debug.Html, '<div>debug-panel</div>');
+    assert.equal(debug.Online, true);
+    assert.equal(debug.LastLatencyMs, 7);
+    // The manual run persists the success timestamp and broadcasts an update.
+    assert.ok(untrackedRunCalls.some(([sql]) => sql.includes('UPDATE MonitoringChecks SET LastSuccessAt')));
+    assert.ok(events.some(([event]) => event === 'MonitoringTargetUpdated'));
+
+    const [missingErr, missingValue] = await Manager.RunCheckNow(999);
+    assert.match(missingErr, /not found/i);
+    assert.equal(missingValue, null);
   });
 });

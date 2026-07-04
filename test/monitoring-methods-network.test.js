@@ -97,13 +97,13 @@ test('http method validates status ranges and follows redirects', async () => {
   try {
     const ok = await httpMethod.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Path: '/ok' },
+      Settings: { Protocol: 'http', Port: server.port, Path: '/ok' },
     });
     assert.equal(ok.Success, true);
 
     const outOfRange = await httpMethod.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Path: '/teapot' },
+      Settings: { Protocol: 'http', Port: server.port, Path: '/teapot' },
     });
     assert.equal(outOfRange.Success, false);
     assert.match(outOfRange.Error, /HTTP 418/);
@@ -112,6 +112,7 @@ test('http method validates status ranges and follows redirects', async () => {
     const redirectNoFollow = await httpMethod.Run({
       Address: '127.0.0.1',
       Settings: {
+        Protocol: 'http',
         Port: server.port,
         Path: '/redirect',
         ExpectedStatusMin: 200,
@@ -122,7 +123,7 @@ test('http method validates status ranges and follows redirects', async () => {
 
     const redirectFollow = await httpMethod.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Path: '/redirect', FollowRedirects: true },
+      Settings: { Protocol: 'http', Port: server.port, Path: '/redirect', FollowRedirects: true },
     });
     assert.equal(redirectFollow.Success, true);
 
@@ -130,7 +131,7 @@ test('http method validates status ranges and follows redirects', async () => {
     assert.equal((await httpMethod.Run({ Address: '' })).Success, false);
     const badMethod = await httpMethod.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Method: 'CONNECT' },
+      Settings: { Protocol: 'http', Port: server.port, Method: 'CONNECT' },
     });
     assert.equal(badMethod.Success, false);
     assert.match(badMethod.Error, /not allowed/i);
@@ -161,7 +162,7 @@ test('http-json method asserts JSON paths and substring matches', async () => {
   });
 
   try {
-    const base = { Address: '127.0.0.1', Settings: { Scheme: 'http', Port: server.port } };
+    const base = { Address: '127.0.0.1', Settings: { Protocol: 'http', Port: server.port } };
 
     // JSON path match.
     const jsonOk = await httpJson.Run({
@@ -337,7 +338,7 @@ test('MonitoringMethods registry exposes public shapes and normalizes settings',
 
   const all = Manager.GetAll();
   const ids = all.map((m) => m.ID).sort();
-  assert.deepEqual(ids, ['dns', 'http', 'http-json', 'https', 'ping', 'tcp-port']);
+  assert.deepEqual(ids, ['dns', 'http', 'http-json', 'ping', 'qlab-workspace', 'tcp-port']);
   // Public shape strips Run().
   assert.equal(typeof all[0].Run, 'undefined');
 
@@ -352,4 +353,46 @@ test('MonitoringMethods registry exposes public shapes and normalizes settings',
 
   // Unknown method -> empty object.
   assert.deepEqual(Manager.NormalizeSettings('nope', {}), {});
+});
+
+test('MonitoringMethods Manager.Run deduplicates concurrent identical checks', async () => {
+  let runCount = 0;
+  const sharedResult = { Success: true, LatencyMs: 12.5 };
+  const methodStub = {
+    ID: 'ping',
+    Name: 'Ping',
+    Settings: [
+      { Key: 'Timeout', Type: 'number', Default: 2000, Min: 200, Max: 30000 },
+      { Key: 'Count', Type: 'number', Default: 1, Min: 1, Max: 10 },
+    ],
+    Run: async () => {
+      runCount += 1;
+      await new Promise((r) => setTimeout(r, 25));
+      return sharedResult;
+    },
+  };
+
+  const staticMethod = (ID) => ({ ID, Name: ID, Settings: [], Run: async () => ({ Success: true }) });
+  const { Manager } = loadWithMocks(methodPath('index.js'), {
+    '../Logger': loggerStub(),
+    './ping': methodStub,
+    './tcp-port': staticMethod('tcp-port'),
+    './http': staticMethod('http'),
+    './https': staticMethod('https'),
+    './http-json': staticMethod('http-json'),
+    './dns': staticMethod('dns'),
+    './qlab': staticMethod('qlab-workspace'),
+  });
+
+  const target = { Address: 'example.local', Settings: { Timeout: 1500, Count: 1 } };
+  const [A, B, C] = await Promise.all([
+    Manager.Run('ping', target),
+    Manager.Run('ping', target),
+    Manager.Run('ping', target),
+  ]);
+
+  assert.equal(runCount, 1);
+  assert.deepEqual(A, sharedResult);
+  assert.deepEqual(B, sharedResult);
+  assert.deepEqual(C, sharedResult);
 });

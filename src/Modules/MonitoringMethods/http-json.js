@@ -4,20 +4,25 @@
 //     expected value.
 //   - Text contains: raw substring search inside the response body.
 // The body is capped at 1 MiB to prevent unbounded memory use.
-const { PerformHttpRequest } = require('./_http-shared');
+const { PerformHttpRequest, BuildHttpDebug } = require('./_http-shared');
+const { Esc, Pill, Rows, TextRow, Row, JsonCodeBlock, JsonCodeBlockWithPath } = require('./debug');
 
 const ID = 'http-json';
 
 const Settings = [
   {
-    Key: 'Scheme',
-    Label: 'Scheme (http or https)',
-    Type: 'string',
+    Key: 'Protocol',
+    Label: 'Protocol',
+    Type: 'select',
     Default: 'https',
+    Options: [
+      { value: 'http', label: 'HTTP' },
+      { value: 'https', label: 'HTTPS' },
+    ],
   },
   {
     Key: 'Port',
-    Label: 'Port (0 = scheme default)',
+    Label: 'Port (0 = protocol default)',
     Type: 'number',
     Default: 0,
     Min: 0,
@@ -42,6 +47,7 @@ const Settings = [
     Default: 200,
     Min: 100,
     Max: 599,
+    Advanced: true,
   },
   {
     Key: 'ExpectedStatusMax',
@@ -50,6 +56,7 @@ const Settings = [
     Default: 299,
     Min: 100,
     Max: 599,
+    Advanced: true,
   },
   {
     Key: 'JsonPath',
@@ -68,12 +75,14 @@ const Settings = [
     Label: 'Follow Redirects',
     Type: 'boolean',
     Default: false,
+    Advanced: true,
   },
   {
     Key: 'IgnoreTlsErrors',
     Label: 'Ignore TLS Errors (HTTPS only)',
     Type: 'boolean',
     Default: false,
+    Advanced: true,
   },
   {
     Key: 'Timeout',
@@ -82,6 +91,7 @@ const Settings = [
     Default: 8000,
     Min: 500,
     Max: 60000,
+    Advanced: true,
   },
 ];
 
@@ -99,11 +109,13 @@ function ResolveJsonPath(Root, Path) {
 
 async function Run(Target) {
   const Cfg = (Target && Target.Settings) || {};
-  const Scheme = String(Cfg.Scheme || 'https').toLowerCase() === 'http' ? 'http' : 'https';
-  const DefaultPort = Scheme === 'http' ? 80 : 443;
+  // Support both old 'Scheme' and new 'Protocol' field names for migration
+  const Protocol = String(Cfg.Protocol || Cfg.Scheme || 'https').toLowerCase();
+  const FinalProtocol = Protocol === 'http' ? 'http' : 'https';
+  const DefaultPort = FinalProtocol === 'http' ? 80 : 443;
 
   const Result = await PerformHttpRequest(Target, {
-    Protocol: Scheme,
+    Protocol: FinalProtocol,
     DefaultPort,
     CaptureBody: true,
   });
@@ -115,7 +127,13 @@ async function Run(Target) {
 
   // No content assertion configured -> status check is enough.
   if (!Expected && !JsonPath) {
-    return { Success: true, LatencyMs: Result.LatencyMs };
+    return {
+      Success: true,
+      LatencyMs: Result.LatencyMs,
+      Status: Result.Status,
+      Mode: 'status',
+      JsonBody: Body,
+    };
   }
 
   if (JsonPath) {
@@ -123,26 +141,108 @@ async function Run(Target) {
     try {
       Parsed = JSON.parse(Body);
     } catch (Err) {
-      return { Success: false, Error: `Response is not valid JSON: ${Err.message}` };
+      return {
+        Success: false,
+        Error: `Response is not valid JSON: ${Err.message}`,
+        Status: Result.Status,
+        Mode: 'json',
+        JsonPath,
+        JsonBody: Body,
+      };
     }
     const Actual = ResolveJsonPath(Parsed, JsonPath);
     if (Actual === undefined) {
-      return { Success: false, Error: `JSON path "${JsonPath}" not found` };
+      return {
+        Success: false,
+        Error: `JSON path "${JsonPath}" not found`,
+        Status: Result.Status,
+        Mode: 'json',
+        JsonPath,
+        JsonBody: Body,
+      };
     }
     if (Expected !== '' && String(Actual) !== Expected) {
       return {
         Success: false,
         Error: `JSON path "${JsonPath}" returned "${String(Actual).slice(0, 64)}", expected "${Expected}"`,
+        Status: Result.Status,
+        Mode: 'json',
+        JsonPath,
+        MatchedValue: String(Actual).slice(0, 256),
+        JsonBody: Body,
       };
     }
-    return { Success: true, LatencyMs: Result.LatencyMs };
+    return {
+      Success: true,
+      LatencyMs: Result.LatencyMs,
+      Status: Result.Status,
+      Mode: 'json',
+      JsonPath,
+      MatchedValue: String(Actual).slice(0, 256),
+      JsonBody: Body,
+    };
   }
 
   // Plain substring search against the body.
   if (Body.indexOf(Expected) === -1) {
-    return { Success: false, Error: `Response body did not contain expected text` };
+    return {
+      Success: false,
+      Error: `Response body did not contain expected text`,
+      Status: Result.Status,
+      Mode: 'text',
+      Expected: Expected.slice(0, 256),
+      JsonBody: Body,
+    };
   }
-  return { Success: true, LatencyMs: Result.LatencyMs };
+  return {
+    Success: true,
+    LatencyMs: Result.LatencyMs,
+    Status: Result.Status,
+    Mode: 'text',
+    Expected: Expected.slice(0, 256),
+    JsonBody: Body,
+  };
+}
+
+function Debug(Result, Target) {
+  const Cfg = (Target && Target.Settings) || {};
+  const Scheme = String(Cfg.Scheme || 'https').toLowerCase() === 'http' ? 'http' : 'https';
+  let Html = BuildHttpDebug(Result, Target, { Scheme });
+
+  const Mode = Result && Result.Mode;
+  const Extra = [];
+  
+  if (Mode === 'json') {
+    Extra.push(TextRow('JSON path', (Result && Result.JsonPath) || '—'));
+    if (Result && Object.prototype.hasOwnProperty.call(Result, 'MatchedValue')) {
+      Extra.push(
+        Row(
+          'Resolved value',
+          `<span class="font-monospace">${Esc(Result.MatchedValue)}</span>`
+        )
+      );
+    }
+  } else if (Mode === 'text') {
+    const Found = !!(Result && Result.Success);
+    Extra.push(TextRow('Expected substring', (Result && Result.Expected) || '—'));
+    Extra.push(Row('Body match', Pill(Found ? 'success' : 'danger', Found ? 'Found' : 'Not found')));
+  }
+
+  // Always display the JSON response if available
+  if (Result && Result.JsonBody) {
+    Extra.push(null); // Spacer
+    Extra.push(`<div class="mt-2"><span class="text-muted small">Response Body:</span></div>`);
+    
+    // If a JSON path was defined and this was successful JSON mode, highlight the path
+    if (Mode === 'json' && Result.JsonPath) {
+      Extra.push(JsonCodeBlockWithPath(Result.JsonBody, Result.JsonPath));
+    } else {
+      Extra.push(JsonCodeBlock(Result.JsonBody));
+    }
+  }
+
+  if (Extra.length) Html += Rows(Extra);
+  return Html;
 }
 
 module.exports = {
@@ -153,4 +253,5 @@ module.exports = {
   DefaultInterval: 60000,
   Settings,
   Run,
+  Debug,
 };

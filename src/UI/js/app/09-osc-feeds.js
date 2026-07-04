@@ -524,7 +524,21 @@ window.API.MonitoringTargetUpdated(async (Target) => {
   } else {
     UpdateMonitoringTargetTile(Target);
   }
-  if (IsMonitorHistoryContextFor('target', Target.TargetID)) {
+  // Keep the open editor's per-check status list fresh.
+  if (typeof RefreshMonitoringEditorIfOpen === 'function') {
+    RefreshMonitoringEditorIfOpen(Target.TargetID);
+  }
+  // Keep the open check editor's "last response" debug panel fresh.
+  if (typeof RefreshMonitoringCheckDebugIfOpen === 'function') {
+    RefreshMonitoringCheckDebugIfOpen(Target.TargetID);
+  }
+  // If the history modal is showing one of this target's checks, reload it.
+  if (
+    MonitorHistoryModalContext &&
+    MonitorHistoryModalContext.type === 'check' &&
+    Array.isArray(Target.Checks) &&
+    Target.Checks.some((c) => Number(c.CheckID) === Number(MonitorHistoryModalContext.id))
+  ) {
     await LoadHistorySamplesForContext();
     RenderMonitoringHistoryModal();
   }

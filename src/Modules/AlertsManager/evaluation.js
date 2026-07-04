@@ -8,6 +8,14 @@ function isScopeMatch(Rule, Context) {
   const GroupIDs = new Set(Array.isArray(Scope.Groups) ? Scope.Groups.map((x) => Number(x)) : []);
   const Clients = new Set(Array.isArray(Scope.Clients) ? Scope.Clients.map((x) => String(x)) : []);
 
+  // Per-check alerts are strictly opt-in: they only fire when a rule explicitly
+  // targets that check (check:<CheckID>). They intentionally ignore Workspace /
+  // Group scopes so that a broad rule doesn't fire once per check on top of the
+  // aggregated target-level alert.
+  if (Context.EntityType === 'monitor-check') {
+    return Context.CheckID != null && Clients.has(`check:${Context.CheckID}`);
+  }
+
   if (Workspace) return true;
   if (Context.GroupID != null && GroupIDs.has(Number(Context.GroupID))) return true;
 
@@ -52,6 +60,14 @@ function triggerMatches(Rule, Context) {
       return Context.TriggerType === TRIGGERS.SCRIPT_EXECUTION_FAILED;
     case TRIGGERS.CLIENT_DEGRADED: {
       if (Context.EntityType === 'monitor') {
+        const Source = String(
+          (Rule.TriggerConfig && Rule.TriggerConfig.Source) || 'any'
+        ).toLowerCase();
+        if (Source !== 'any' && Source !== 'monitor') return false;
+        return !!Context.Degraded;
+      }
+
+      if (Context.EntityType === 'monitor-check') {
         const Source = String(
           (Rule.TriggerConfig && Rule.TriggerConfig.Source) || 'any'
         ).toLowerCase();

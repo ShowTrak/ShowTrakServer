@@ -7,6 +7,7 @@
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
+const { Pill, Rows, TextRow, Row, FormatLatency } = require('./debug');
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_REDIRECTS = 5;
@@ -161,7 +162,9 @@ function DoRequest(Url, State) {
         Res.resume();
         return Finish({
           Success: false,
+          Degraded: true,
           Error: `HTTP ${Status} (expected ${State.StatusMin}-${State.StatusMax})`,
+          Status,
         });
       }
 
@@ -169,7 +172,7 @@ function DoRequest(Url, State) {
         Res.resume();
         Res.on('end', () => {
           clearTimeout(KillTimer);
-          Finish({ Success: true, LatencyMs: Date.now() - State.Started });
+          Finish({ Success: true, LatencyMs: Date.now() - State.Started, Status });
         });
         Res.on('error', (Err) => {
           clearTimeout(KillTimer);
@@ -193,7 +196,7 @@ function DoRequest(Url, State) {
       Res.on('end', () => {
         clearTimeout(KillTimer);
         const Body = Buffer.concat(Chunks).toString('utf8');
-        Finish({ Success: true, LatencyMs: Date.now() - State.Started, Body });
+        Finish({ Success: true, LatencyMs: Date.now() - State.Started, Body, Status });
       });
       Res.on('error', (Err) => {
         clearTimeout(KillTimer);
@@ -210,4 +213,36 @@ function DoRequest(Url, State) {
   });
 }
 
-module.exports = { PerformHttpRequest };
+// Classify an HTTP status code into a status pill colour.
+function StatusKind(Status) {
+  const N = Number(Status);
+  if (!Number.isFinite(N) || N <= 0) return 'muted';
+  if (N >= 200 && N < 400) return 'success';
+  if (N >= 400) return 'danger';
+  return 'warning';
+}
+
+// Shared "last response" panel for the http/https methods. `Opts.Protocol`
+// controls the label; `Opts.Scheme` overrides it (used by http-json).
+function BuildHttpDebug(Result, Target, Opts) {
+  const Cfg = (Target && Target.Settings) || {};
+  const Scheme = (Opts && Opts.Scheme) || (Opts && Opts.Protocol) || 'http';
+  const Address = Target && Target.Address ? String(Target.Address).trim() : '';
+  const Path = Cfg.Path ? String(Cfg.Path) : '/';
+  const Method = String(Cfg.Method || 'GET').toUpperCase();
+  const Success = !!(Result && Result.Success);
+  const Status = Result && Result.Status;
+  const HasStatus = Number.isFinite(Number(Status)) && Number(Status) > 0;
+
+  return Rows([
+    TextRow('Request', `${Method} ${Scheme.toUpperCase()} ${Address || '—'}${Path}`),
+    HasStatus
+      ? Row('Status', Pill(StatusKind(Status), `HTTP ${Number(Status)}`))
+      : Row('Reachable', Pill(Success ? 'success' : 'danger', Success ? 'Yes' : 'No')),
+    Success
+      ? Row('Response time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
+      : TextRow('Error', (Result && Result.Error) || 'Request failed'),
+  ]);
+}
+
+module.exports = { PerformHttpRequest, BuildHttpDebug };
