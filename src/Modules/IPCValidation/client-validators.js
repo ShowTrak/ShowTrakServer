@@ -130,9 +130,10 @@ module.exports = function registerClientValidators(Manager) {
     };
     return {
       DisplayID: Manager.DisplayID(value.DisplayID),
-      Label: Object.prototype.hasOwnProperty.call(value, 'Label') && value.Label
-        ? normalizeNonEmptyString(value.Label, 'Label', { minLength: 1, maxLength: 256 })
-        : null,
+      Label:
+        Object.prototype.hasOwnProperty.call(value, 'Label') && value.Label
+          ? normalizeNonEmptyString(value.Label, 'Label', { minLength: 1, maxLength: 256 })
+          : null,
       Width: OptionalNumber(value.Width, 'Width'),
       Height: OptionalNumber(value.Height, 'Height'),
       RefreshRate: OptionalNumber(value.RefreshRate, 'RefreshRate'),

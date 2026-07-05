@@ -231,9 +231,10 @@ const ClientApplicationHistoryStore = new Map();
 // we never paint "not running" red bars for data we could not actually read.
 function extractCriticalApplicationStates(client) {
   if (!client || !client.Online) return null;
-  const running = client.RunningApplications && typeof client.RunningApplications === 'object'
-    ? client.RunningApplications
-    : null;
+  const running =
+    client.RunningApplications && typeof client.RunningApplications === 'object'
+      ? client.RunningApplications
+      : null;
   if (!running) return null;
   const status = running.Status && typeof running.Status === 'object' ? running.Status : {};
   const state = String(status.State || 'unknown').toLowerCase();

@@ -1648,6 +1648,23 @@ button.btn:focus {
     background-color 120ms ease;
 }
 
+.SHOWTRAK_DISPLAY_NUMBER {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 0.35rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 .SHOWTRAK_TOGGLE_CRITICAL_DISPLAY .bi {
   font-size: 1rem;
   line-height: 1;

@@ -802,6 +802,24 @@ h7 {
   line-height: 1.25;
 }
 
+.display-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  margin-right: 4px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  vertical-align: middle;
+}
+
 .device-card-sub {
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.5);

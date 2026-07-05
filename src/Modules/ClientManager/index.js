@@ -551,10 +551,10 @@ Manager.RemoveDisplayCritical = async (UUID, DisplayID) => {
   const NormalizedID = normalizeDisplayID(DisplayID);
   if (!NormalizedID) return ['Display identifier is required', null];
 
-  const [WriteErr] = await DB.Run(
-    'DELETE FROM CriticalDisplays WHERE UUID = ? AND DisplayID = ?',
-    [UUID, NormalizedID]
-  );
+  const [WriteErr] = await DB.Run('DELETE FROM CriticalDisplays WHERE UUID = ? AND DisplayID = ?', [
+    UUID,
+    NormalizedID,
+  ]);
   if (WriteErr) return Fail('Failed to remove critical display');
 
   const PerClient = getCriticalDisplayMapForClient(UUID, false);

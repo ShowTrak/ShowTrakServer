@@ -351,9 +351,7 @@ class Client {
     const Normalized = normalizeDisplayID(DisplayID);
     if (!Normalized) return false;
     const PrevLength = this.CriticalDisplays.length;
-    this.CriticalDisplays = this.CriticalDisplays.filter(
-      (Entry) => Entry.DisplayID !== Normalized
-    );
+    this.CriticalDisplays = this.CriticalDisplays.filter((Entry) => Entry.DisplayID !== Normalized);
     if (this.CriticalDisplays.length === PrevLength) return false;
     this.CriticalDisplayIDs = this.CriticalDisplays.map((Entry) => Entry.DisplayID);
     this._rebuildDisplayView();

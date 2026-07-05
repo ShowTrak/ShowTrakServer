@@ -235,7 +235,10 @@ function SetupClientNamespace(io) {
           Array.isArray(DisplayList) && DisplayList.length === 1 ? 'Display' : 'Displays'
         })`
       );
-      await ClientManager.SetDisplayList(socket.UUID, Array.isArray(DisplayList) ? DisplayList : []);
+      await ClientManager.SetDisplayList(
+        socket.UUID,
+        Array.isArray(DisplayList) ? DisplayList : []
+      );
       const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
       if (!ClientErr && Client) recordClientDisplayHistorySamples(Client);
     });
@@ -257,12 +260,12 @@ function SetupClientNamespace(io) {
           `Running applications received from ${socket.UUID} (${Array.isArray(Snapshot && Snapshot.Items) ? Snapshot.Items.length : 0} items)`
         );
         await ClientManager.SetRunningApplications(socket.UUID, Snapshot || {});
-          const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
-          if (!ClientErr && Client) {
-            recordClientApplicationHistorySamples(Client, Snapshot && Snapshot.SampledAt);
-            recordClientUSBHistorySamples(Client, Snapshot && Snapshot.SampledAt);
-            recordClientDisplayHistorySamples(Client, Snapshot && Snapshot.SampledAt);
-          }
+        const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
+        if (!ClientErr && Client) {
+          recordClientApplicationHistorySamples(Client, Snapshot && Snapshot.SampledAt);
+          recordClientUSBHistorySamples(Client, Snapshot && Snapshot.SampledAt);
+          recordClientDisplayHistorySamples(Client, Snapshot && Snapshot.SampledAt);
+        }
       } catch (e) {
         Logger.error('Failed to handle RunningApplications for', socket.UUID, e);
       }

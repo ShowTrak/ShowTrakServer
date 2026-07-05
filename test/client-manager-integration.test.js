@@ -204,7 +204,14 @@ test('ClientManager tracks critical displays and flags resolution/refresh change
 
   // Report two connected displays.
   await Manager.SetDisplayList('disp-1', [
-    { DisplayID: '100', Label: 'Primary', Width: 1920, Height: 1080, RefreshRate: 60, Primary: true },
+    {
+      DisplayID: '100',
+      Label: 'Primary',
+      Width: 1920,
+      Height: 1080,
+      RefreshRate: 60,
+      Primary: true,
+    },
     { DisplayID: '200', Label: 'Secondary', Width: 2560, Height: 1440, RefreshRate: 144 },
   ]);
   let [, client] = await Manager.Get('disp-1');
@@ -269,7 +276,10 @@ test('ClientManager tracks critical displays and flags resolution/refresh change
 
   // Operations against a missing client return errors.
   assert.match(String((await Manager.SetDisplayList('nope', []))[0]), /not found/i);
-  assert.match(String((await Manager.MarkDisplayCritical('nope', { DisplayID: '1' }))[0]), /not found/i);
+  assert.match(
+    String((await Manager.MarkDisplayCritical('nope', { DisplayID: '1' }))[0]),
+    /not found/i
+  );
 });
 
 test('ClientManager manages groups, ordering, and reconciliation', async () => {

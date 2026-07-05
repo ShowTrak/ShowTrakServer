@@ -252,6 +252,7 @@ function IsSelected(UUID) {
 }
 
 const MINIMUM_IDENTIFY_VERSION = [3, 7, 0];
+const MINIMUM_DISPLAY_MONITORING_VERSION = [3, 8, 0];
 
 function ParseSemverTuple(value) {
   const Match = String(value || '')
@@ -2146,14 +2147,18 @@ function RenderClientInfoDetails(Client) {
   // Displays
   try {
     const $displayList = $('#SHOWTRAK_CLIENT_INFO_DISPLAYS');
+    const DisplayMonitoringSupported = IsVersionAtLeast(
+      Client && Client.Version,
+      MINIMUM_DISPLAY_MONITORING_VERSION
+    );
     const displays = Array.isArray(Client.DisplayList) ? Client.DisplayList : [];
     const clientKey = Client && Client.UUID ? String(Client.UUID) : '';
-    const renderKey = `${clientKey}::${displays
+    const renderKey = `${clientKey}::${DisplayMonitoringSupported ? 'supported' : 'unsupported'}::${displays
       .map(
         (d) =>
           `${d.DisplayID || ''}|${d.IsCritical ? '1' : '0'}|${
             d.IsConnected === false ? '0' : '1'
-          }|${d.Mismatch ? '1' : '0'}|${d.CurrentSignature || ''}|${d.ExpectedSignature || ''}`
+          }|${d.Mismatch ? '1' : '0'}|${d.CurrentSignature || ''}|${d.ExpectedSignature || ''}|${d.ScreenNumber || ''}`
       )
       .join(';;')}`;
     const previousRenderKey = $displayList.attr('data-render-key') || '';
@@ -2170,7 +2175,14 @@ function RenderClientInfoDetails(Client) {
     };
 
     if (previousRenderKey !== renderKey) {
-      if (displays.length === 0) {
+      if (!DisplayMonitoringSupported) {
+        $displayList.html(`
+          <div class="rounded-3 p-2 bg-ghost">
+            <h6 class="mb-0">Display Monitoring Unavailable</h6>
+            <p class="text-sm mb-0">Display monitoring is only available in ShowTrak Client 3.8.0 and above.</p>
+          </div>`);
+        $displayList.attr('data-render-key', renderKey);
+      } else if (displays.length === 0) {
         $displayList.html(`
           <div class="rounded-3 p-2 bg-ghost">
             <h6 class="mb-0">No Displays Detected</h6>
@@ -2185,6 +2197,14 @@ function RenderClientInfoDetails(Client) {
           const IsCritical = !!disp.IsCritical;
           const IsConnected = disp.IsConnected !== false;
           const IsMismatch = !!disp.Mismatch;
+          const ScreenNumber =
+            disp.ScreenNumber != null && Number.isFinite(Number(disp.ScreenNumber))
+              ? Math.trunc(Number(disp.ScreenNumber))
+              : null;
+          const ScreenNumberBadge =
+            ScreenNumber != null && IsConnected
+              ? `<span class="SHOWTRAK_DISPLAY_NUMBER" title="Identify screen number">${ScreenNumber}</span>`
+              : '';
           const Label =
             disp.Label && String(disp.Label).trim().length > 0
               ? String(disp.Label).trim()
@@ -2239,6 +2259,7 @@ function RenderClientInfoDetails(Client) {
           $displayList.append(`
             <div class="rounded-3 p-2 bg-ghost SHOWTRAK_CLIENT_USB_DEVICE_CARD">
               <div class="d-flex align-items-center gap-2">
+                ${ScreenNumberBadge}
                 <h6 class="mb-0">${Safe(Label)}${disp.Primary ? ' <small class="text-light">(Primary)</small>' : ''}</h6>
               </div>
               <small class="text-light d-block mb-0 text-start">${subText}</small>

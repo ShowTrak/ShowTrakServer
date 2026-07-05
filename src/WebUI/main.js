@@ -1159,6 +1159,14 @@
             const isCritical = !!d.IsCritical;
             const isConnected = d.IsConnected !== false;
             const isMismatch = !!d.Mismatch;
+            const screenNumber =
+              d.ScreenNumber != null && Number.isFinite(Number(d.ScreenNumber))
+                ? Math.trunc(Number(d.ScreenNumber))
+                : null;
+            const numberPrefix =
+              screenNumber != null && isConnected
+                ? `<span class="display-number">${screenNumber}</span> `
+                : '';
             const res = formatRes(d);
             let badges = '';
             if (isCritical && !isConnected) {
@@ -1172,7 +1180,7 @@
                 '<div class="device-card-badges"><span class="device-badge badge-critical"><i class="bi bi-check-circle-fill"></i> Critical</span></div>';
             }
             return `<div class="device-card">
-          <div class="device-card-name">${safe(label)}${d.Primary ? ' (Primary)' : ''}</div>
+          <div class="device-card-name">${numberPrefix}${safe(label)}${d.Primary ? ' (Primary)' : ''}</div>
           <div class="device-card-sub">${res ? safe(res) : 'Resolution unavailable'}</div>
           ${badges}
         </div>`;
