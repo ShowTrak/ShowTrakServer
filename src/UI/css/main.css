@@ -953,7 +953,7 @@ input[type='range']::-moz-range-progress,
    column-gap + side padding so the spacing is not doubled between columns). */
 .group-column-grid {
   display: grid;
-  align-items: start;
+  align-items: stretch;
   column-gap: 1rem;
   padding-inline: 1rem;
 }
@@ -2664,8 +2664,14 @@ button.btn:focus {
 }
 
 .SHOWTRAK_PC_PLACEHOLDER {
-  width: 220px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  align-self: stretch;
+  flex: 1 1 auto;
+  min-height: var(--tile-expanded-height);
   border-radius: 0.5rem;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.6);
@@ -2674,7 +2680,6 @@ button.btn:focus {
   background-color: rgba(255, 255, 255, 0.03);
   cursor: no-drop;
   transition:
-    width 180ms ease,
     padding 180ms ease,
     opacity 180ms ease;
 }
@@ -2697,32 +2702,7 @@ body.compact-mode .group-drop-zone {
 }
 
 body.compact-mode .GROUP_TITLE_CLICKABLE {
-  margin: 0.5rem 0 0 0.25rem !important;
-  padding: 0 0.5rem;
-  min-height: 2rem;
-  width: 120px;
-  min-width: 120px;
-  max-width: 120px;
-  flex: 0 0 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-body.compact-mode .GROUP_TITLE_CLICKABLE > div {
-  height: auto !important;
-  width: 100%;
-  justify-content: center;
-}
-
-body.compact-mode .GROUP_TITLE {
-  writing-mode: horizontal-tb;
-  transform: none;
-  letter-spacing: 0.04rem;
-  font-size: 0.72rem;
-  line-height: 1;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
+  display: none;
 }
 
 body.compact-mode .SHOWTRAK_PC,
@@ -2841,9 +2821,11 @@ body.compact-mode
 }
 
 body.compact-mode .SHOWTRAK_PC_PLACEHOLDER {
+  flex: none;
+  align-self: auto;
   padding: 0.35rem 0.45rem !important;
   gap: 0;
-  min-height: 0;
+  min-height: 36px;
   align-content: center;
   display: flex;
   align-items: center;
@@ -3248,11 +3230,13 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 }
 .dnd-ghost {
   box-sizing: border-box;
-  border: 2px dashed rgba(255, 255, 255, 0.7);
+  border: 0;
+  outline: 2px dashed rgba(255, 255, 255, 0.7);
+  outline-offset: -2px;
   border-radius: 8px;
   background: transparent;
   opacity: 0.9;
-  margin: 2px 0;
+  margin: 0;
 }
 .dnd-ghost.dnd-ghost--online {
   background-color: var(--client-online-bg);
@@ -3267,10 +3251,10 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   background-color: rgba(0, 123, 255, 0.25);
 }
 .dnd-ghost.dnd-ghost--monitor {
-  border-style: dashed;
+  outline-style: dashed;
 }
 .dnd-ghost.dnd-ghost--dummy {
-  border-style: dotted;
+  outline-style: dotted;
 }
 .SHOWTRAK_PC.dragging {
   opacity: 0.6;

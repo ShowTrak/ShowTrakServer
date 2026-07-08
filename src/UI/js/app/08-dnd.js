@@ -248,7 +248,10 @@ function createGhostEl() {
 
 function clearGhost() {
   if (DnDState.ghostEl && DnDState.ghostEl.parentNode) {
-    DnDState.ghostEl.parentNode.removeChild(DnDState.ghostEl);
+    const parent = DnDState.ghostEl.parentNode;
+    parent.removeChild(DnDState.ghostEl);
+    const placeholder = parent.querySelector('.SHOWTRAK_PC_PLACEHOLDER');
+    if (placeholder) placeholder.style.display = '';
   }
   DnDState.ghostEl = null;
 }
@@ -273,7 +276,13 @@ function positionGhostMarker(container, x, y) {
   if (tiles.length === 0) {
     if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
     applyGhostSize(DnDState.ghostEl, null);
-    container.appendChild(DnDState.ghostEl);
+    const placeholder = container.querySelector('.SHOWTRAK_PC_PLACEHOLDER');
+    if (placeholder) {
+      placeholder.style.display = 'none';
+      container.insertBefore(DnDState.ghostEl, placeholder);
+    } else {
+      container.appendChild(DnDState.ghostEl);
+    }
     return;
   }
 

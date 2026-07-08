@@ -467,10 +467,7 @@ function RenderFullClientAndMonitorList() {
 					Empty Group
 				</h5>
 				<p class="text-muted mb-0">
-					This group has no clients assigned to it.
-				</p>
-				<p class="text-muted mb-0">
-					You can add clients to this group via the client editor!
+					This group has no clients.
 				</p>
 			</div>`;
     } else {

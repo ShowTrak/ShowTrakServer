@@ -397,8 +397,13 @@ h7 {
 }
 
 .SHOWTRAK_PC_PLACEHOLDER {
-  width: 220px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  align-self: stretch;
+  flex: 1 1 auto;
   border-radius: 0.5rem;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.6);
@@ -1047,31 +1052,8 @@ body.compact .GROUP_CLIENTS {
   padding: 0.5rem !important;
 }
 
-/* Group label becomes a short horizontal pill (like the desktop app). */
 body.compact .GROUP_TITLE_CLICKABLE {
-  width: 120px !important;
-  min-width: 120px !important;
-  max-width: 120px !important;
-  flex: 0 0 120px !important;
-  min-height: 2rem;
-  padding: 0 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-body.compact .GROUP_TITLE_CLICKABLE > div {
-  height: auto !important;
-  width: 100%;
-  justify-content: center;
-}
-body.compact .GROUP_TITLE {
-  writing-mode: horizontal-tb;
-  transform: none;
-  letter-spacing: 0.04rem;
-  font-size: 0.72rem;
-  line-height: 1;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
+  display: none;
 }
 
 body.compact .SHOWTRAK_PC,
@@ -1206,6 +1188,8 @@ body.compact .SHOWTRAK_PC.DUMMY > .SHOWTRAK_PC_STATUS[data-type='DUMMY_STATUS'] 
 }
 
 body.compact .SHOWTRAK_PC_PLACEHOLDER {
+  flex: none;
+  align-self: auto;
   padding: 0.35rem 0.5rem !important;
   display: flex;
   align-items: center;
@@ -1305,29 +1289,6 @@ body.compact .SHOWTRAK_PC_PLACEHOLDER p {
     flex: 1 1 100%;
   }
 
-  /* Compact mode on mobile: keep the single-row tiles but force the group
-   * label and tiles back to full width (compact's desktop 120px label rule
-   * has higher specificity, so it must be overridden here). */
-  body.compact .GROUP_TITLE_CLICKABLE {
-    width: auto !important;
-    min-width: 0 !important;
-    max-width: none !important;
-    flex: 0 0 auto !important;
-    align-self: stretch;
-    min-height: 44px !important;
-    padding: 10px 12px;
-    justify-content: center !important;
-  }
-  body.compact .GROUP_TITLE_CLICKABLE > div {
-    justify-content: center !important;
-  }
-  body.compact .GROUP_TITLE {
-    display: block;
-    width: 100%;
-    text-align: center;
-    font-size: 0.85rem;
-    font-weight: 700;
-  }
   body.compact .SHOWTRAK_PC,
   body.compact .SHOWTRAK_PC_PLACEHOLDER {
     width: 100% !important;
