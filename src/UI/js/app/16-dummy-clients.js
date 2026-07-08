@@ -62,7 +62,7 @@ function RenderDummyClientTile(D) {
   return `
     <div id="DUMMY_TILE_${D.UUID}" class="SHOWTRAK_PC DUMMY ${TileStateClass}" data-dummy-uuid="${
       D.UUID
-    }" data-uuid="${DragUUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
+    }" data-uuid="${DragUUID}" data-flip-key="${DragUUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
       <button type="button" class="CLIENT_TILE_COG DUMMY_TILE_COG" aria-label="Edit Dummy Client" title="Edit Dummy Client">
         <i class="bi bi-gear-fill"></i>
       </button>

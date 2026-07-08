@@ -94,7 +94,7 @@ function RenderMonitoringTargetTile(T) {
   const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
   const TextClass = 'text-light';
   return `
-    <div id="MONITOR_TILE_${T.TargetID}" class="SHOWTRAK_PC MONITOR ${TileStateClass}" data-target-id="${T.TargetID}" data-uuid="${DragUUID}" draggable="${
+    <div id="MONITOR_TILE_${T.TargetID}" class="SHOWTRAK_PC MONITOR ${TileStateClass}" data-target-id="${T.TargetID}" data-uuid="${DragUUID}" data-flip-key="${DragUUID}" draggable="${
       AppMode === 'EDIT' ? 'true' : 'false'
     }">
       <button type="button" class="CLIENT_TILE_COG MONITOR_TILE_COG" aria-label="Edit Monitor" title="Edit Monitor">

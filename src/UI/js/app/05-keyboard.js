@@ -75,6 +75,13 @@ document.addEventListener('keydown', function (e) {
       document.getElementById('ADD_TARGET_BROWSE_ACTION')?.click();
       return;
     }
+
+    // Toggle compact/expanded mode
+    if (!e.shiftKey && key === 'e') {
+      e.preventDefault();
+      SetCompactMode(!CompactMode);
+      return;
+    }
   }
 
   // Ctrl/Cmd + Shift + M opens context menu centered

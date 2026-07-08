@@ -451,7 +451,7 @@ function RenderFullClientAndMonitorList() {
       )
       .sort((a, b) => a.weight - b.weight);
 
-    Filler += `<div class="d-flex justify-content-start group-column-item" style="grid-column: span ${GroupSpan};">
+    Filler += `<div class="d-flex justify-content-start group-column-item" data-flip-key="group:${GroupID}" style="grid-column: span ${GroupSpan};">
     <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" data-groupid="${GroupID}">
 			<div class="d-flex align-items-center text-center h-100">
 				<span class="GROUP_TITLE py-2">
@@ -484,7 +484,7 @@ function RenderFullClientAndMonitorList() {
           const IdentifyingClass = Item.data && Item.data.Identifying ? 'IDENTIFYING' : '';
           Filler += `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${TileStateClass} ${IdentifyingClass} ${
             Selected.includes(UUID) ? 'SELECTED' : ''
-          }" data-uuid="${UUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
+          }" data-uuid="${UUID}" data-flip-key="client:${UUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
 					<button type="button" class="CLIENT_TILE_COG" aria-label="Edit Client" title="Edit Client">
 						<i class="bi bi-gear-fill"></i>
 					</button>
@@ -534,7 +534,18 @@ function RenderFullClientAndMonitorList() {
   // Append Pending Adoption section after groups, if any
   Filler += RenderPendingAdoptionSection();
 
-  $('#APPLICATION_CONTENT').html(Filler);
+  // Animate structural changes (clients moving groups, groups reordering) by
+  // capturing tile/group positions before the DOM is rebuilt and sliding them
+  // to their new positions afterwards. Falls back to a plain render when the
+  // helper is unavailable or reduced-motion is preferred.
+  const ContentRoot = document.getElementById('APPLICATION_CONTENT');
+  if (ContentRoot && window.ShowTrakFlip && typeof window.ShowTrakFlip.AnimateReflow === 'function') {
+    window.ShowTrakFlip.AnimateReflow(ContentRoot, () => {
+      $('#APPLICATION_CONTENT').html(Filler);
+    });
+  } else {
+    $('#APPLICATION_CONTENT').html(Filler);
+  }
   // Initialize or teardown edit-mode interactions after render
   if (typeof initializeEditInteractions === 'function') {
     try {

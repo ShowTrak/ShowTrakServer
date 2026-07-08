@@ -74,6 +74,7 @@ function ShowShortcutsModal() {
   items.push({ title: 'Switch to Edit Mode', shortcut: 'Ctrl/Cmd+2' });
   items.push({ title: 'ShowTrak Preferences', shortcut: 'Ctrl/Cmd+,' });
   items.push({ title: 'LAN Discovery Wizard', shortcut: 'Ctrl/Cmd+L' });
+  items.push({ title: 'Toggle Compact/Expanded Mode', shortcut: 'Ctrl/Cmd+E' });
   // Alerts
   items.push({ title: 'Toggle Alert Actions Enabled/Disabled', shortcut: 'Ctrl/Cmd+T' });
   items.push({ title: 'Toggle Alerts Panel', shortcut: 'Ctrl/Cmd+Y' });
@@ -124,6 +125,9 @@ function teardownDnD() {
       HandleNonFatalError('DnD:TeardownGhostRemove', err);
     }
   }
+  if (DnDState.sourceSpacer) {
+    try { DnDState.sourceSpacer.remove(); } catch (err) { /* ignore */ }
+  }
   DnDState = {
     dragUUID: null,
     sourceGroupId: null,
@@ -132,6 +136,7 @@ function teardownDnD() {
     ghostEl: null,
     currentOverGroup: null,
     rowIndex: null,
+    sourceSpacer: null,
   };
   $(document).off('dragstart.dnd dragend.dnd dragover.dnd dragenter.dnd dragleave.dnd drop.dnd');
 }
@@ -174,7 +179,26 @@ function setupDnD() {
     } catch (err) {
       HandleNonFatalError('DnD:DragStartDataTransfer', err);
     }
-    $(this).addClass('dragging');
+    // Defer hiding the source tile so the browser can capture the drag image
+    // before display:none is applied (synchronous hide aborts the drag).
+    const dragEl = this;
+    requestAnimationFrame(() => {
+      if (DnDState.dragUUID !== uuid) return;
+      dragEl.classList.add('dragging');
+      // Insert an invisible same-size spacer so the source group doesn't
+      // collapse when this is the only tile in it.
+      if (DnDState.dragSize && dragEl.parentNode) {
+        const spacer = document.createElement('div');
+        spacer.className = 'dnd-source-spacer';
+        spacer.setAttribute('aria-hidden', 'true');
+        spacer.style.width = `${DnDState.dragSize.width}px`;
+        spacer.style.height = `${DnDState.dragSize.height}px`;
+        spacer.style.flexShrink = '0';
+        spacer.style.pointerEvents = 'none';
+        dragEl.parentNode.insertBefore(spacer, dragEl);
+        DnDState.sourceSpacer = spacer;
+      }
+    });
   });
 
   $(document).on('dragend.dnd', '.SHOWTRAK_PC', function () {
@@ -185,6 +209,10 @@ function setupDnD() {
     DnDState.rowIndex = null;
     DnDState.dragUUID = null;
     DnDState.dragGhostClasses = null;
+    if (DnDState.sourceSpacer) {
+      try { DnDState.sourceSpacer.remove(); } catch (err) { /* ignore */ }
+      DnDState.sourceSpacer = null;
+    }
   });
 
   $(document).on('dragover.dnd', '.group-drop-zone', function (e) {
@@ -254,6 +282,8 @@ function clearGhost() {
     if (placeholder) placeholder.style.display = '';
   }
   DnDState.ghostEl = null;
+  // Ghost is no longer in the source group — restore spacer visibility.
+  if (DnDState.sourceSpacer) DnDState.sourceSpacer.style.display = '';
 }
 
 function applyGhostSize(ghost, fallbackRect) {
@@ -264,8 +294,16 @@ function applyGhostSize(ghost, fallbackRect) {
 }
 
 function positionGhostMarker(container, x, y) {
-  const tiles = Array.from(container.querySelectorAll('.SHOWTRAK_PC:not(.dragging)')).filter(
-    (el) => !el.classList.contains('dnd-ghost')
+  // When the ghost enters the source group the spacer's job is done by the
+  // ghost itself — hide it so we don't have two slots for one tile.
+  const isSourceGroup =
+    normalizeGroupId(container.getAttribute('data-groupid')) === DnDState.sourceGroupId;
+  if (DnDState.sourceSpacer) {
+    DnDState.sourceSpacer.style.display = isSourceGroup ? 'none' : '';
+  }
+
+  const tiles = Array.from(container.querySelectorAll('.SHOWTRAK_PC')).filter(
+    (el) => !el.classList.contains('dnd-ghost') && el.getAttribute('data-uuid') !== DnDState.dragUUID
   );
   const HYSTERESIS_X = 6; // horizontal jitter buffer within a row
   const ROW_TOL = 14; // tolerance to group tiles into rows

@@ -3257,7 +3257,7 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   outline-style: dotted;
 }
 .SHOWTRAK_PC.dragging {
-  opacity: 0.6;
+  display: none !important;
 }
 
 /* Edit cog overlay for client tiles (visible only in EDIT mode) */
