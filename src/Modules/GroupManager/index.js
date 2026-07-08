@@ -25,12 +25,46 @@ function NormalizeFullWidth(Value) {
   return Value === 1 || Value === '1' || Value === 'true';
 }
 
+// Allowed selection-toggle keybinds: keyboard number row (Digit0-9) and numpad
+// numbers (Numpad0-9). Stored as KeyboardEvent.code values. Anything else
+// (including empty selections) normalizes to null (no keybind).
+const VALID_KEYBINDS = new Set([
+  'Digit0',
+  'Digit1',
+  'Digit2',
+  'Digit3',
+  'Digit4',
+  'Digit5',
+  'Digit6',
+  'Digit7',
+  'Digit8',
+  'Digit9',
+  'Numpad0',
+  'Numpad1',
+  'Numpad2',
+  'Numpad3',
+  'Numpad4',
+  'Numpad5',
+  'Numpad6',
+  'Numpad7',
+  'Numpad8',
+  'Numpad9',
+]);
+
+function NormalizeKeyBind(Value) {
+  if (Value === null || Value === undefined) return null;
+  const KeyBind = String(Value).trim();
+  if (!KeyBind) return null;
+  return VALID_KEYBINDS.has(KeyBind) ? KeyBind : null;
+}
+
 class Group {
   constructor(Data) {
     this.GroupID = Data.GroupID;
     this.Title = Data.Title || null;
     this.Weight = Data.Weight || 0;
     this.isFullWidth = NormalizeFullWidth(Data.FullWidth);
+    this.KeyBind = NormalizeKeyBind(Data.KeyBind);
   }
 
   // Persistent fields (DB-backed)
@@ -73,6 +107,21 @@ class Group {
     Logger.debug(`Group ${this.GroupID} FullWidth updated to ${Next}`);
     return Ok(true);
   }
+  async SetKeyBind(KeyBind) {
+    const Next = NormalizeKeyBind(KeyBind);
+    if (this.KeyBind === Next) return Ok(true);
+    this.KeyBind = Next;
+    const [Err, _Res] = await DB.Run('UPDATE Groups SET KeyBind = ? WHERE GroupID = ?', [
+      Next,
+      this.GroupID,
+    ]);
+    if (Err) {
+      Logger.error('Failed to update group KeyBind');
+      return Fail('Failed to update group keybind');
+    }
+    Logger.debug(`Group ${this.GroupID} KeyBind updated to ${Next}`);
+    return Ok(true);
+  }
 }
 
 Manager.Create = async (Title = 'New Group') => {
@@ -112,6 +161,34 @@ Manager.SetFullWidth = async (GroupID, FullWidth) => {
   if (!Group) return Fail('Group not found');
 
   const [SetErr] = await Group.SetFullWidth(FullWidth);
+  if (SetErr) return Fail(SetErr);
+
+  BroadcastManager.emit('GroupListChanged');
+  return Ok(true);
+};
+
+// Assign (or clear) the keyboard shortcut used to toggle a group's selection.
+// Keybinds must be unique across groups so the same key never targets two
+// groups. Passing null/empty clears the group's keybind.
+Manager.SetKeyBind = async (GroupID, KeyBind) => {
+  if (!GroupID) return Fail('GroupID is required');
+
+  const [GetErr, Group] = await Manager.Get(GroupID);
+  if (GetErr) return Fail(GetErr);
+  if (!Group) return Fail('Group not found');
+
+  const Next = NormalizeKeyBind(KeyBind);
+
+  if (Next) {
+    const [AllErr, Groups] = await Manager.GetAll();
+    if (AllErr) return Fail('Failed to load groups');
+    const Conflict = (Groups || []).some(
+      (Other) => Number(Other.GroupID) !== Number(GroupID) && Other.KeyBind === Next
+    );
+    if (Conflict) return Fail('That keybind is already assigned to another group');
+  }
+
+  const [SetErr] = await Group.SetKeyBind(Next);
   if (SetErr) return Fail(SetErr);
 
   BroadcastManager.emit('GroupListChanged');

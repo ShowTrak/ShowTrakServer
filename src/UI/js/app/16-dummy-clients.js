@@ -6,6 +6,8 @@
 
 // Compute the compact-mode status shown to the right of the dummy's name.
 // Offline dummies hide this label and show the offline timer instead.
+const DUMMY_TYPE_LABEL = 'DUMMY';
+
 function DummyCompactStatus(D) {
   const State = String(D.State || 'IDLE');
   const Online = !!D.Online;
@@ -66,7 +68,7 @@ function RenderDummyClientTile(D) {
       <button type="button" class="CLIENT_TILE_COG DUMMY_TILE_COG" aria-label="Edit Dummy Client" title="Edit Dummy Client">
         <i class="bi bi-gear-fill"></i>
       </button>
-      <label class="text-sm" data-type="DummyLabel">Dummy</label>
+      <label class="text-sm" data-type="DummyLabel">${DUMMY_TYPE_LABEL}</label>
       <h5 class="mb-0" data-type="Name">${Safe(Name)}</h5>
       <span class="CLIENT_TILE_COMPACT_STATUS DUMMY_COMPACT_STATUS ${Compact.color}${
         Compact.offline ? ' d-none' : ''
@@ -106,6 +108,7 @@ function UpdateDummyClientTile(D) {
   $tile.toggleClass('ONLINE', Online && !Degraded);
   $tile.toggleClass('DEGRADED', Degraded);
   $tile.toggleClass('IDLE', State === 'IDLE');
+  $tile.find('[data-type="DummyLabel"]').text(DUMMY_TYPE_LABEL);
   $tile.find('[data-type="Name"]').text(D.Nickname || D.DummyID || 'Dummy');
   $tile.find('[data-type="IP"]').text(DummyDisplayIP(D.IP));
 

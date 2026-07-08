@@ -208,7 +208,9 @@ window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
         const minAttr = hasMin ? `min="${Setting.Min}"` : '';
         const maxAttr = hasMax ? `max="${Setting.Max}"` : '';
         const rangeHint =
-          hasMin && hasMax ? ` <span class="text-sm text-muted">(${Setting.Min}–${Setting.Max})</span>` : '';
+          hasMin && hasMax
+            ? ` <span class="text-sm text-muted">(${Setting.Min}–${Setting.Max})</span>`
+            : '';
         $(`#SETTINGS`).append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}${rangeHint}</span>

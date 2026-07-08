@@ -227,7 +227,7 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
     assert.match(missingDeleteErr, /not found/i);
     assert.equal(missingDeleteValue, null);
 
-    // A target may be created with zero checks; it surfaces as degraded.
+    // A target may be created with zero checks; it surfaces as idle.
     const [emptyErr, emptyCreated] = await Manager.Create({
       Nickname: 'No Checks',
       Interval: 5000,
@@ -235,8 +235,9 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
     });
     assert.equal(emptyErr, null);
     assert.equal(emptyCreated.Checks.length, 0);
-    assert.equal(emptyCreated.Degraded, true);
-    assert.equal(emptyCreated.LastError, 'No Checks');
+    assert.equal(emptyCreated.Online, false);
+    assert.equal(emptyCreated.Degraded, false);
+    assert.equal(emptyCreated.LastError, null);
 
     assert.ok(normalizeCalls.some(([id]) => id === 'ping'));
     assert.ok(normalizeCalls.some(([id]) => id === 'http'));

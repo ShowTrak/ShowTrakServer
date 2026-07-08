@@ -291,7 +291,9 @@
       aria-labelledby="SHOWTRAK_MODAL_SHORTCUTS_Label"
       aria-hidden="true"
     >
-      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+      <div
+        class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable showtrak-group-manager-dialog"
+      >
         <div class="modal-content">
           <div class="modal-body text-center">
             <strong class="mb-0"> Keyboard Shortcuts </strong>
@@ -375,31 +377,44 @@
       aria-labelledby="SHOWTRAK_MODAL_ABOUT_Label"
       aria-hidden="true"
     >
-      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content SHOWTRAK_ABOUT_MODAL_CONTENT">
           <div class="modal-body text-center SHOWTRAK_ABOUT_MODAL_BODY">
-            <div class="d-flex justify-content-center">
-              <img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+            <div class="d-flex justify-content-center my-5">
+              <img
+                class="SHOWTRAK_MODEL_CORE_LOGO"
+                src="./img/ShowTrakServer-Filled.png"
+                alt="ShowTrak Logo"
+              />
             </div>
 
-            <strong class="mb-0 SHOWTRAK_ABOUT_TITLE"> About ShowTrak </strong>
+            <strong class="mb-0 SHOWTRAK_ABOUT_TITLE"> ShowTrak Server </strong>
             <div id="SHOWTRAK_ABOUT_VERSION" class="SHOWTRAK_ABOUT_VERSION mb-2"></div>
 
             <div class="card bg-ghost-light border-0 rounded SHOWTRAK_ABOUT_CARD">
               <div class="card-body p-3">
                 ShowTrak is an open-source project founded by
-                <span class="text-info">Tom Kirkman-Wood</span> &amp;
-                <span class="text-info">Ben Sugrue</span> in 2019.
+                <span class="text-info">Tom Kirkman-Wood</span>;
               </div>
             </div>
 
             <div class="d-grid gap-2 mt-2">
-              <a class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN" id="SHOWTRAK_ABOUT_WEBSITE">
-                Visit ShowTrak Website
-              </a>
-              <a class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN" id="SHOWTRAK_ABOUT_GITHUB">
-                View on GitHub
-              </a>
+              <div class="d-flex gap-2">
+                <a
+                  class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN"
+                  id="SHOWTRAK_ABOUT_WEBSITE"
+                  style="width: 50%"
+                >
+                  Visit ShowTrak Website
+                </a>
+                <a
+                  class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN"
+                  id="SHOWTRAK_ABOUT_GITHUB"
+                  style="width: 50%"
+                >
+                  View on GitHub
+                </a>
+              </div>
               <button
                 type="button"
                 class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN"
@@ -473,10 +488,6 @@
                 </div>
               </div>
             </div>
-
-            <div class="d-grid gap-2 mt-2">
-              <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-            </div>
           </div>
         </div>
       </div>
@@ -536,6 +547,7 @@
                   class="form-control bg-transparent text-light border-0"
                   placeholder="Group Name"
                   autocomplete="off"
+                  maxlength="32"
                 />
                 <label for="GROUP_MANAGER_EDITOR_NAME">Group Name</label>
               </div>
@@ -580,6 +592,48 @@
                 </div>
               </div>
 
+              <div
+                class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center text-start gap-3"
+              >
+                <div class="d-grid">
+                  <span>Selection Keybind</span>
+                  <span class="text-sm mb-0 text-muted"
+                    >Assign a keyboard or numpad number to toggle this group's selection. Each
+                    keybind can only belong to one group.</span
+                  >
+                </div>
+                <select
+                  id="GROUP_MANAGER_EDITOR_KEYBIND"
+                  class="form-select form-select-sm bg-transparent text-light border-0 w-auto"
+                >
+                  <option value="">None</option>
+                  <optgroup label="Keyboard">
+                    <option value="Digit0">0 (Keyboard)</option>
+                    <option value="Digit1">1 (Keyboard)</option>
+                    <option value="Digit2">2 (Keyboard)</option>
+                    <option value="Digit3">3 (Keyboard)</option>
+                    <option value="Digit4">4 (Keyboard)</option>
+                    <option value="Digit5">5 (Keyboard)</option>
+                    <option value="Digit6">6 (Keyboard)</option>
+                    <option value="Digit7">7 (Keyboard)</option>
+                    <option value="Digit8">8 (Keyboard)</option>
+                    <option value="Digit9">9 (Keyboard)</option>
+                  </optgroup>
+                  <optgroup label="Numpad">
+                    <option value="Numpad0">0 (Numpad)</option>
+                    <option value="Numpad1">1 (Numpad)</option>
+                    <option value="Numpad2">2 (Numpad)</option>
+                    <option value="Numpad3">3 (Numpad)</option>
+                    <option value="Numpad4">4 (Numpad)</option>
+                    <option value="Numpad5">5 (Numpad)</option>
+                    <option value="Numpad6">6 (Numpad)</option>
+                    <option value="Numpad7">7 (Numpad)</option>
+                    <option value="Numpad8">8 (Numpad)</option>
+                    <option value="Numpad9">9 (Numpad)</option>
+                  </optgroup>
+                </select>
+              </div>
+
               <div class="bg-ghost p-2 rounded d-grid gap-2">
                 <div class="group-manager-client-header d-flex align-items-center">
                   <span class="group-manager-client-col group-manager-client-col-name">Name</span>
@@ -618,7 +672,8 @@
             </div>
             <p id="UPDATE_MANAGER_RELEASE" class="text-light mb-1">Release: loading...</p>
             <p id="UPDATE_MANAGER_STATUS" class="text-muted mb-2">
-              Download latest release from the server and push updates over LAN.
+              Download latest release from the server and push updates over LAN. Always update
+              clients before updating ShowTrak Server to avoid compatibility issues.
             </p>
 
             <div class="mb-2">
@@ -650,8 +705,6 @@
               </div>
             </div>
 
-            <div class="d-grid gap-2" id="UPDATE_MANAGER_CLIENT_LIST"></div>
-
             <div class="d-grid gap-2 mt-2">
               <button type="button" class="btn btn-info" id="UPDATE_MANAGER_DOWNLOAD_LATEST">
                 Download Selected Release
@@ -659,8 +712,9 @@
               <button type="button" class="btn btn-success" id="UPDATE_MANAGER_DEPLOY_ALL">
                 Deploy Release To Selected Clients
               </button>
-              <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
             </div>
+
+            <div class="d-grid gap-2" id="UPDATE_MANAGER_CLIENT_LIST"></div>
           </div>
         </div>
       </div>
@@ -934,7 +988,7 @@
       aria-labelledby="SHOWTRAK_MODAL_SETTINGS_Label"
       aria-hidden="true"
     >
-      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
             <div id="SETTINGS" class="d-grid gap-2"></div>
@@ -1150,6 +1204,7 @@
                 class="form-control"
                 id="GROUP_CREATION_TITLE"
                 placeholder="Group Title"
+                maxlength="32"
               />
               <label for="GROUP_CREATION_TITLE">Group Title</label>
             </div>

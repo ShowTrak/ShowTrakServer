@@ -67,6 +67,7 @@ const INVOKE_CHANNELS = [
   'DeleteGroup',
   'Groups:SetOrder',
   'Groups:SetFullWidth',
+  'Groups:SetKeyBind',
   'SetGroupOrder',
 
   // Show files

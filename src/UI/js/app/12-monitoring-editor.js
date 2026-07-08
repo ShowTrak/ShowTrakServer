@@ -677,6 +677,11 @@ function MonitoringPayloadIsValid(payload) {
   return true;
 }
 
+function SyncAddCheckButtonState() {
+  const enabled = !!(MonitoringEditorState && MonitoringEditorState.TargetID != null);
+  $('#MONITORING_TARGET_ADD_CHECK').prop('disabled', !enabled);
+}
+
 function ScheduleMonitoringAutoSave() {
   if (!MonitoringEditorState) return;
   if (MonitoringEditorState.saveTimer) clearTimeout(MonitoringEditorState.saveTimer);
@@ -711,6 +716,7 @@ async function PerformMonitoringAutoSave() {
       }
       $('#MONITORING_TARGET_MODAL_TITLE').text('Edit Monitoring Target');
       $('#MONITORING_TARGET_DANGER_ZONE').removeClass('d-none');
+      SyncAddCheckButtonState();
     } else {
       const [Err, Updated] = await window.API.UpdateMonitoringTarget(
         MonitoringEditorState.TargetID,
@@ -784,15 +790,7 @@ async function OpenMonitoringTargetEditor(TargetID, Prefill = null) {
       Nickname: (Prefill && Prefill.Nickname) || '',
       Interval: 30000,
       GroupID: null,
-      Checks: [
-        {
-          Name: '',
-          Address: (Prefill && Prefill.Address) || '',
-          Method: HintedMethod,
-          Settings: {},
-          DegradedThresholdMs: 0,
-        },
-      ],
+      Checks: [],
       View: 'list',
       EditingIndex: null,
       saveTimer: null,
@@ -826,10 +824,13 @@ async function OpenMonitoringTargetEditor(TargetID, Prefill = null) {
       ScheduleMonitoringAutoSave();
     });
 
+  SyncAddCheckButtonState();
+
   // Add a new (blank) check and drop straight into its edit view.
   $('#MONITORING_TARGET_ADD_CHECK')
     .off('click.mon')
     .on('click.mon', function () {
+      if (!MonitoringEditorState || MonitoringEditorState.TargetID == null) return;
       MonitoringEditorState.Checks.push({
         Name: '',
         Address: '',

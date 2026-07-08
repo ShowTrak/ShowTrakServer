@@ -44,7 +44,20 @@ module.exports = function registerClientValidators(Manager) {
   };
 
   Manager.GroupTitle = (value) => {
-    return normalizeNonEmptyString(value, 'Group title', { minLength: 3, maxLength: 50 });
+    return normalizeNonEmptyString(value, 'Group title', { minLength: 3, maxLength: 32 });
+  };
+
+  // Selection-toggle keybind: keyboard number row (Digit0-9) or numpad numbers
+  // (Numpad0-9). null/empty clears the keybind.
+  Manager.GroupKeyBind = (value, fieldName = 'KeyBind') => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value !== 'string') fail(`${fieldName} is invalid`);
+    const normalized = value.trim();
+    if (!normalized) return null;
+    if (!/^(Digit|Numpad)[0-9]$/.test(normalized)) {
+      fail(`${fieldName} must be a keyboard or numpad number`);
+    }
+    return normalized;
   };
 
   Manager.ScriptID = (value) => {

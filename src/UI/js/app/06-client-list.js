@@ -36,6 +36,12 @@ function GetClientStatusDisplayText(Client) {
   return 'Offline';
 }
 
+function GetClientCompactStatusLabel(Client) {
+  if (Client && Client.Identifying) return 'Identifying';
+  if (Client && Client.Online) return Client.Degraded ? 'Degraded' : 'Online';
+  return 'Offline';
+}
+
 window.API.UpdateScriptExecutions(async (Executions) => {
   try {
     if (typeof UpdateManagerHandleExecutions === 'function') {
@@ -378,6 +384,13 @@ function GetGroupColumnCount() {
   }
 }
 
+function TruncateGroupLabel(value, maxLen = 16) {
+  const text = value == null ? '' : String(value).trim();
+  if (!text) return '';
+  if (text.length <= maxLen) return text;
+  return `${text.substring(0, Math.max(1, maxLen - 3))}...`;
+}
+
 function RenderFullClientAndMonitorList() {
   const Clients = Array.isArray(__LastClients) ? __LastClients.slice() : [];
   let Groups = Array.isArray(__LastGroups) ? __LastGroups.slice() : [];
@@ -421,6 +434,8 @@ function RenderFullClientAndMonitorList() {
 
   for (const Group of Groups) {
     const { GroupID, Title } = Group;
+    const FullGroupTitle = Title == null ? '' : String(Title);
+    const GroupLabel = TruncateGroupLabel(FullGroupTitle);
     const GroupSpan = Group.isFullWidth === false ? 1 : ColumnCount;
     let GroupClients = Clients.filter((Client) => Client.GroupID === GroupID).sort(
       (a, b) => (a.Weight || 0) - (b.Weight || 0)
@@ -452,10 +467,10 @@ function RenderFullClientAndMonitorList() {
       .sort((a, b) => a.weight - b.weight);
 
     Filler += `<div class="d-flex justify-content-start group-column-item" data-flip-key="group:${GroupID}" style="grid-column: span ${GroupSpan};">
-    <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" data-groupid="${GroupID}">
+    <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" data-groupid="${GroupID}" title="${Safe(FullGroupTitle)}" aria-label="${Safe(FullGroupTitle)}">
 			<div class="d-flex align-items-center text-center h-100">
 				<span class="GROUP_TITLE py-2">
-					${Safe(Title)}
+          ${Safe(GroupLabel)}
 				</span>
 			</div>
 		</div>
@@ -475,7 +490,7 @@ function RenderFullClientAndMonitorList() {
         if (Item.kind === 'client') {
           const { Nickname, Hostname, IP, UUID, Version, Online, LastSeen, Degraded } = Item.data;
           const HostnameVersionLabel = FormatClientHostnameVersionLabel(Item.data);
-          const CompactStatusLabel = GetClientStatusDisplayText(Item.data);
+          const CompactStatusLabel = GetClientCompactStatusLabel(Item.data);
           const WarningText =
             Array.isArray(Item.data.DegradedWarnings) && Item.data.DegradedWarnings.length
               ? String(Item.data.DegradedWarnings[0])
@@ -494,7 +509,7 @@ function RenderFullClientAndMonitorList() {
 					<h5 class="mb-0" data-type="Nickname">
 					${Nickname && Nickname.length ? Safe(Nickname) : Safe(Hostname)}
 					</h5>
-          <span class="CLIENT_TILE_COMPACT_STATUS d-none" data-type="COMPACT_ONLINE_STATUS">${Safe(CompactStatusLabel)}</span>
+          <span class="CLIENT_TILE_COMPACT_STATUS" data-type="COMPACT_ONLINE_STATUS">${Safe(CompactStatusLabel)}</span>
 					<small class="text-sm text-light" data-type="IP">
 						${IP ? Safe(IP) : 'Unknown IP'}
 					</small>
@@ -539,7 +554,11 @@ function RenderFullClientAndMonitorList() {
   // to their new positions afterwards. Falls back to a plain render when the
   // helper is unavailable or reduced-motion is preferred.
   const ContentRoot = document.getElementById('APPLICATION_CONTENT');
-  if (ContentRoot && window.ShowTrakFlip && typeof window.ShowTrakFlip.AnimateReflow === 'function') {
+  if (
+    ContentRoot &&
+    window.ShowTrakFlip &&
+    typeof window.ShowTrakFlip.AnimateReflow === 'function'
+  ) {
     window.ShowTrakFlip.AnimateReflow(ContentRoot, () => {
       $('#APPLICATION_CONTENT').html(Filler);
     });

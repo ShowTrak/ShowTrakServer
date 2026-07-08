@@ -12,6 +12,73 @@ function FormatLatency(ms) {
   return `${Math.round(ms)}ms`;
 }
 
+function FormatMonitoringCheckSummary(T, MaxLength = 24) {
+  const Checks = Array.isArray(T && T.Checks) ? T.Checks : [];
+  const Labels = [];
+  const Seen = new Set();
+  const MethodLabels = {
+    ping: 'PING',
+    dns: 'DNS',
+    http: 'HTTP',
+    https: 'HTTPS',
+    'http-json': 'HTTP',
+    'tcp-port': 'TCP',
+    qlab: 'QLAB',
+    'qlab-workspace': 'QLAB',
+  };
+
+  for (const Check of Checks) {
+    const MethodID = String((Check && Check.Method) || '')
+      .trim()
+      .toLowerCase();
+    if (!MethodID) continue;
+    const Label = MethodLabels[MethodID] || MethodID.replace(/[-_]+/g, ' ').toUpperCase();
+    if (Seen.has(Label)) continue;
+    Seen.add(Label);
+    Labels.push(Label);
+  }
+
+  if (!Labels.length) return '';
+
+  const FormatVisibleLabels = (Items) => {
+    if (Items.length <= 1) return Items.join('');
+    if (Items.length === 2) return `${Items[0]} & ${Items[1]}`;
+    return `${Items.slice(0, -1).join(', ')} & ${Items[Items.length - 1]}`;
+  };
+
+  const Visible = [];
+  for (let Index = 0; Index < Labels.length; Index += 1) {
+    const Label = Labels[Index];
+    const Remaining = Labels.length - (Index + 1);
+    const Candidate = FormatVisibleLabels([...Visible, Label]);
+    const Suffix = Remaining > 0 ? ` + ${Remaining} More` : '';
+    if (Visible.length && Candidate.length + Suffix.length > MaxLength) break;
+    Visible.push(Label);
+  }
+
+  const HiddenCount = Labels.length - Visible.length;
+  const Summary = FormatVisibleLabels(Visible);
+  return HiddenCount > 0 ? `${Summary} + ${HiddenCount} More` : Summary;
+}
+
+// Extract just the hostname from an http/https URL, or show a compact check
+// summary for multi-check targets.
+function FormatMonitoringAddressSub(T) {
+  const Count = Number(T && T.CheckCount);
+  if (Number.isFinite(Count) && Count > 1) {
+    return FormatMonitoringCheckSummary(T) || `${Count} Checks`;
+  }
+  const Addr = String((T && T.Address) || '');
+  if (/^https?:\/\//i.test(Addr)) {
+    try {
+      return new URL(Addr).hostname;
+    } catch (_) {
+      // fall through
+    }
+  }
+  return Addr;
+}
+
 // A target can hold multiple checks; show the single method when there is one,
 // otherwise summarise the number of checks (including the empty case).
 function FormatMonitoringMethodLabel(T) {
@@ -55,11 +122,15 @@ function FormatMonitorStatus(Online, LastLatencyMs, LastError, Degraded) {
   return ErrorText;
 }
 
-function FormatMonitorCompactStatus(Online, LastLatencyMs) {
-  // Compact view must never surface error/degraded reason text: those messages
-  // can be arbitrarily long (e.g. "No reply from QLab after 2000ms") and break
-  // the tile layout. Show latency when online, otherwise nothing.
-  return Online ? FormatLatency(LastLatencyMs) : '';
+function FormatMonitorCompactStatus(Online, LastLatencyMs, Degraded, IsIdle) {
+  // Compact view keeps labels short and deterministic. Prefer latency when it
+  // exists, otherwise show a stable state label.
+  const Latency = Online ? FormatLatency(LastLatencyMs) : '';
+  if (Latency) return { text: Latency, color: 'text-light' };
+  if (IsIdle) return { text: 'Idle', color: 'text-light' };
+  if (Online && Degraded) return { text: 'Degraded', color: 'text-warning' };
+  if (Online) return { text: 'Online', color: 'text-light' };
+  return { text: 'Offline', color: 'text-light' };
 }
 
 function GetMonitoringOfflineSince(Target) {
@@ -84,14 +155,17 @@ function RenderMonitoringTargetsSection() {
 function RenderMonitoringTargetTile(T) {
   const Online = !!T.Online;
   const Degraded = !!T.Degraded;
+  const IsIdle = !T.CheckCount;
   const Name = T.Nickname || T.Address || 'Unnamed';
-  const Sub = T.Address || '';
-  const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
-  const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs);
+  const Sub = FormatMonitoringAddressSub(T);
+  const Status = IsIdle
+    ? 'Idle'
+    : FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
+  const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, Degraded, IsIdle);
   const OfflineSince = GetMonitoringOfflineSince(T);
   const MethodLabel = FormatMonitoringMethodLabel(T);
   const DragUUID = `monitor:${T.TargetID}`;
-  const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
+  const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : IsIdle ? 'IDLE' : '';
   const TextClass = 'text-light';
   return `
     <div id="MONITOR_TILE_${T.TargetID}" class="SHOWTRAK_PC MONITOR ${TileStateClass}" data-target-id="${T.TargetID}" data-uuid="${DragUUID}" data-flip-key="${DragUUID}" draggable="${
@@ -105,15 +179,18 @@ function RenderMonitoringTargetTile(T) {
       )}</label>
       <h5 class="mb-0" data-type="Name">${Safe(Name)}</h5>
       <small class="text-sm text-light" data-type="Address">${Safe(Sub)}</small>
+      <div class="SHOWTRAK_PC_STATUS ${IsIdle ? 'd-grid' : 'd-none'}" data-type="INDICATOR_IDLE">
+        <h7 class="mb-0 text-light" data-type="MONITOR_IDLE_LABEL">Idle</h7>
+      </div>
       <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-grid' : 'd-none'}" data-type="MONITOR_STATUS">
         <h7 class="mb-0 ${TextClass}" data-type="MONITOR_STATUS_LABEL">${Safe(Status)}</h7>
       </div>
-      <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-none' : 'd-grid'}" data-type="INDICATOR_OFFLINE">
+      <div class="SHOWTRAK_PC_STATUS ${!Online && !IsIdle ? 'd-grid' : 'd-none'}" data-type="INDICATOR_OFFLINE">
         <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${Safe(OfflineSince)}">
           Offline <span class="badge bg-ghost">00:00:00</span>
         </h7>
       </div>
-      <span class="MONITOR_COMPACT_LATENCY ${TextClass}${CompactStatus ? '' : ' d-none'}" data-type="MONITOR_COMPACT_LATENCY">${Safe(CompactStatus)}</span>
+      <span class="MONITOR_COMPACT_LATENCY ${CompactStatus.color}" data-type="MONITOR_COMPACT_LATENCY">${Safe(CompactStatus.text)}</span>
     </div>`;
 }
 
@@ -122,31 +199,33 @@ function UpdateMonitoringTargetTile(T) {
   if (!$tile.length) return;
   const Online = !!T.Online;
   const Degraded = !!T.Degraded;
+  const IsIdle = !T.CheckCount;
   $tile.toggleClass('ONLINE', Online && !Degraded);
   $tile.toggleClass('DEGRADED', Degraded);
+  $tile.toggleClass('IDLE', IsIdle);
   const Name = T.Nickname || T.Address || 'Unnamed';
   $tile.find('[data-type="Name"]').text(Name);
-  $tile.find('[data-type="Address"]').text(T.Address || '');
+  $tile.find('[data-type="Address"]').text(FormatMonitoringAddressSub(T));
   $tile
     .find('[data-type="Method"]')
     .text(`${FormatMonitoringMethodLabel(T)} · ${FormatInterval(T.Interval)}`);
   const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
-  const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs);
+  const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, Degraded, IsIdle);
   const $label = $tile.find('[data-type="MONITOR_STATUS_LABEL"]');
   $label.text(Status);
   $label.removeClass('text-success text-warning').addClass('text-light');
   const $compact = $tile.find('[data-type="MONITOR_COMPACT_LATENCY"]');
-  $compact.text(CompactStatus);
-  $compact.removeClass('text-success text-warning').addClass('text-light');
-  $compact.toggleClass('d-none', !CompactStatus);
-  $tile
-    .find('.SHOWTRAK_PC_STATUS[data-type="MONITOR_STATUS"]')
-    .toggleClass('d-grid', Online)
-    .toggleClass('d-none', !Online);
-  $tile
-    .find('.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]')
-    .toggleClass('d-grid', !Online)
-    .toggleClass('d-none', Online);
+  $compact.text(CompactStatus.text);
+  $compact.removeClass('text-light text-success text-warning').addClass(CompactStatus.color);
+  const ToggleIndicator = (Type, Show) => {
+    $tile
+      .find(`.SHOWTRAK_PC_STATUS[data-type="${Type}"]`)
+      .toggleClass('d-grid', Show)
+      .toggleClass('d-none', !Show);
+  };
+  ToggleIndicator('INDICATOR_IDLE', IsIdle);
+  ToggleIndicator('MONITOR_STATUS', Online);
+  ToggleIndicator('INDICATOR_OFFLINE', !Online && !IsIdle);
   $tile.find('[data-type="OFFLINE_SINCE"]').attr('data-offlinesince', GetMonitoringOfflineSince(T));
 }
 

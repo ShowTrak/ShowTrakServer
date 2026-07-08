@@ -185,3 +185,25 @@ test('MonitoringTarget aggregate preserves single degraded reason for one faulte
   assert.equal(target.Degraded, true);
   assert.equal(target.LastError, 'Incorrect Workspace');
 });
+
+test('MonitoringTarget with no checks is idle (Online=false, Degraded=false, LastError=null)', () => {
+  const target = new MonitoringTarget({
+    TargetID: 99,
+    Nickname: 'Empty Target',
+    Interval: 30000,
+    GroupID: null,
+    Weight: 100,
+    Timestamp: Date.now(),
+  });
+
+  assert.equal(target.Online, false);
+  assert.equal(target.Degraded, false);
+  assert.equal(target.LastError, null);
+  assert.equal(target.Checks.length, 0);
+
+  // RecomputeAggregate should preserve idle state.
+  target.RecomputeAggregate();
+  assert.equal(target.Online, false);
+  assert.equal(target.Degraded, false);
+  assert.equal(target.LastError, null);
+});

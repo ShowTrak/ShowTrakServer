@@ -81,7 +81,6 @@ function ShowShortcutsModal() {
   items.push({ title: 'Dismiss All Alerts', shortcut: 'Ctrl/Cmd+U' });
   // Modals/UI
   items.push({ title: 'Open Keyboard Shortcuts', shortcut: 'Ctrl/Cmd+K' });
-  items.push({ title: 'Close current modal / alerts tray', shortcut: 'Esc' });
   // Context menu
   items.push({ title: 'Open Context Menu (global)', shortcut: 'Ctrl/Cmd+Shift+M' });
   items.push({ title: 'Open Context Menu', shortcut: 'Menu key/Shift+F10' });
@@ -126,7 +125,11 @@ function teardownDnD() {
     }
   }
   if (DnDState.sourceSpacer) {
-    try { DnDState.sourceSpacer.remove(); } catch (err) { /* ignore */ }
+    try {
+      DnDState.sourceSpacer.remove();
+    } catch (err) {
+      /* ignore */
+    }
   }
   DnDState = {
     dragUUID: null,
@@ -210,7 +213,11 @@ function setupDnD() {
     DnDState.dragUUID = null;
     DnDState.dragGhostClasses = null;
     if (DnDState.sourceSpacer) {
-      try { DnDState.sourceSpacer.remove(); } catch (err) { /* ignore */ }
+      try {
+        DnDState.sourceSpacer.remove();
+      } catch (err) {
+        /* ignore */
+      }
       DnDState.sourceSpacer = null;
     }
   });
@@ -303,7 +310,8 @@ function positionGhostMarker(container, x, y) {
   }
 
   const tiles = Array.from(container.querySelectorAll('.SHOWTRAK_PC')).filter(
-    (el) => !el.classList.contains('dnd-ghost') && el.getAttribute('data-uuid') !== DnDState.dragUUID
+    (el) =>
+      !el.classList.contains('dnd-ghost') && el.getAttribute('data-uuid') !== DnDState.dragUUID
   );
   const HYSTERESIS_X = 6; // horizontal jitter buffer within a row
   const ROW_TOL = 14; // tolerance to group tiles into rows

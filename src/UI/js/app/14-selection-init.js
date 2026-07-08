@@ -524,6 +524,29 @@ $(async function () {
     SelectByGroup(groupId);
   });
 
+  // Global keybinds: toggle a group's selection when its assigned keyboard/numpad
+  // number is pressed. Ignored while typing in a field or while a modal is open.
+  $(document).on('keydown.groupKeybind', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+
+    const Target = e.target;
+    if (Target) {
+      const Tag = String(Target.tagName || '').toUpperCase();
+      if (Tag === 'INPUT' || Tag === 'TEXTAREA' || Tag === 'SELECT' || Target.isContentEditable) {
+        return;
+      }
+    }
+
+    if (document.querySelector('.modal.show')) return;
+
+    const Groups = Array.isArray(__LastGroups) ? __LastGroups : [];
+    const Match = Groups.find((Group) => Group && Group.KeyBind === e.code);
+    if (!Match) return;
+
+    e.preventDefault();
+    SelectByGroup(Match.GroupID);
+  });
+
   // --- App Updates (manual check) ---
   try {
     // Bind Check for Updates button in core modal

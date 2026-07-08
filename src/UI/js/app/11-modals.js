@@ -114,8 +114,7 @@ async function OpenGroupCreationModal() {
       if (Groups.some((g) => g.Title.toLowerCase() === GroupName.toLowerCase())) {
         return Notify('A group with this name already exists', 'error');
       }
-      if (GroupName.length > 12)
-        return Notify('Group name must be less than 12 characters long', 'error');
+      if (GroupName.length > 32) return Notify('Group name must be 32 characters or less', 'error');
 
       // Clear the input field
       $('#GROUP_CREATION_TITLE').val('');
@@ -432,9 +431,9 @@ async function SaveGroupManagerName(Groups = [], { notifyOnValidationError = fal
     }
     return false;
   }
-  if (NextTitle.length > 50) {
+  if (NextTitle.length > 32) {
     if (notifyOnValidationError) {
-      await Notify('Group name must be 50 characters or less', 'error');
+      await Notify('Group name must be 32 characters or less', 'error');
     }
     return false;
   }
@@ -518,8 +517,26 @@ function BindGroupManagerEditorHandlers(Groups = []) {
       }
       const LocalGroup = Groups.find((Group) => Number(Group.GroupID) === GroupID);
       if (LocalGroup) LocalGroup.isFullWidth = NextFullWidth;
+      await Notify(`Group set to ${NextFullWidth ? 'full width' : 'single column'}.`, 'success');
+    });
+
+  $('#GROUP_MANAGER_EDITOR_KEYBIND')
+    .off('change')
+    .on('change', async function () {
+      const GroupID = Number(GroupManagerEditingGroupID);
+      if (!Number.isFinite(GroupID)) return;
+      const LocalGroup = Groups.find((Group) => Number(Group.GroupID) === GroupID);
+      const PreviousKeyBind = LocalGroup ? LocalGroup.KeyBind || '' : '';
+      const NextKeyBind = String($(this).val() || '');
+      const [Err] = await window.API.SetGroupKeyBind(GroupID, NextKeyBind || null);
+      if (Err) {
+        $(this).val(PreviousKeyBind);
+        await Notify(String(Err), 'error');
+        return;
+      }
+      if (LocalGroup) LocalGroup.KeyBind = NextKeyBind || null;
       await Notify(
-        `Group set to ${NextFullWidth ? 'full width' : 'single column'}.`,
+        NextKeyBind ? 'Group selection keybind updated.' : 'Group selection keybind cleared.',
         'success'
       );
     });
@@ -573,6 +590,7 @@ async function OpenGroupManagerEditor(GroupID, Relaunching = false, PrefetchedGr
   $('#GROUP_MANAGER_EDITOR_NAME').val(Group.Title || '');
   $('#GROUP_MANAGER_EDITOR_GROUPID').val(String(Group.GroupID));
   $('#GROUP_MANAGER_EDITOR_FULL_WIDTH').prop('checked', Group.isFullWidth !== false);
+  $('#GROUP_MANAGER_EDITOR_KEYBIND').val(Group.KeyBind || '');
 
   const Clients = await ResolveGroupManagerEntities(Group.GroupID);
   $('#GROUP_MANAGER_EDITOR_CLIENT_LIST').html(
@@ -633,6 +651,14 @@ async function OpenGroupManager(Relaunching = false) {
   let Groups = await window.API.GetAllGroups();
   if (!Array.isArray(Groups)) Groups = [];
 
+  function FormatGroupKeyBindLabel(KeyBind) {
+    const Code = String(KeyBind || '').trim();
+    const Match = Code.match(/^(Digit|Numpad)([0-9])$/);
+    if (!Match) return '';
+    const Source = Match[1] === 'Numpad' ? 'NP' : 'KB';
+    return `${Source} ${Match[2]}`;
+  }
+
   $('#GROUP_MANAGER_GROUP_LIST').html(
     '<div id="GROUP_MANAGER_SORTABLE_LIST" class="d-grid gap-2"></div>'
   );
@@ -640,6 +666,12 @@ async function OpenGroupManager(Relaunching = false) {
   for (const Group of Groups) {
     const GroupMembers = GetGroupManagerMembers(Group.GroupID);
     const GroupID = parseInt(Group.GroupID, 10);
+    const KeyBindLabel = FormatGroupKeyBindLabel(Group.KeyBind);
+    const KeyBindBadge = KeyBindLabel
+      ? `<span class="group-manager-keybind-indicator" title="Selection keybind: ${Safe(
+          Group.KeyBind
+        )}">${Safe(KeyBindLabel)}</span>`
+      : '';
 
     $('#GROUP_MANAGER_SORTABLE_LIST').append(`
       <div class="GROUP_MANAGER_GROUP_ITEM p-3 rounded bg-ghost d-flex align-items-center gap-2" data-groupid="${GroupID}" draggable="true">
@@ -647,6 +679,7 @@ async function OpenGroupManager(Relaunching = false) {
         <button type="button" class="GROUP_MANAGER_GROUP_OPEN d-flex justify-content-between align-items-center w-100 border-0" draggable="false">
           <span class="GROUP_MANAGER_GROUP_TITLE text-bold text-start">${Safe(Group.Title)}</span>
           <div class="d-flex align-items-center gap-2">
+            ${KeyBindBadge}
             <span class="badge bg-ghost-light text-light">
               ${GroupMembers.length} ${GroupMembers.length == 1 ? 'Member' : 'Members'}
             </span>
@@ -1119,6 +1152,47 @@ function ApplyUpdateManagerButtonLocks() {
   RenderUpdateManagerReleaseBadge();
 }
 
+function GetUpdateVersionHint(Client, SelectedTag, Eligibility) {
+  if (!SelectedTag) {
+    return {
+      text: 'Select release',
+      className: 'MUTED',
+      title: 'Pick a release to evaluate update compatibility',
+    };
+  }
+
+  if (!Client || !Client.Online) {
+    return {
+      text: 'Offline',
+      className: 'MUTED',
+      title: 'Client must be online to receive updates',
+    };
+  }
+
+  const reason = String((Eligibility && Eligibility.reason) || '').trim();
+  if (reason.includes('Manual update required')) {
+    return {
+      text: 'Manual only',
+      className: 'WARNING',
+      title: 'Client is below v3.4.0 and needs a manual update first',
+    };
+  }
+
+  if (reason === 'Already on selected version') {
+    return {
+      text: 'Current',
+      className: 'SUCCESS',
+      title: 'Client already matches the selected release',
+    };
+  }
+
+  if (Eligibility && Eligibility.eligible) {
+    return { text: 'Ready', className: 'INFO', title: 'Client can receive the selected release' };
+  }
+
+  return { text: reason || 'Unavailable', className: 'MUTED', title: reason || 'Not eligible' };
+}
+
 function RenderUpdateManagerClientList() {
   const $list = $('#UPDATE_MANAGER_CLIENT_LIST');
   if (!$list.length) return;
@@ -1151,6 +1225,7 @@ function RenderUpdateManagerClientList() {
     const Percent = GetUpdateProgressPercent(Execution);
     const Status = Online ? 'Online' : 'Offline';
     const eligibility = IsClientEligibleForSelectedRelease(Client, selectedTag);
+    const versionHint = GetUpdateVersionHint(Client, selectedTag, eligibility);
     const IsSelectable = !!eligibility.eligible;
     const IsChecked = IsSelectable && UpdateManagerSelectedClients.has(UUID);
 
@@ -1180,12 +1255,17 @@ function RenderUpdateManagerClientList() {
           </div>
           <div class="UPDATE_MANAGER_CLIENT_MAIN">
             <div class="UPDATE_MANAGER_CLIENT_NAME">${Name}</div>
-            <div class="UPDATE_MANAGER_CLIENT_META">${Version}</div>
+            <div class="UPDATE_MANAGER_CLIENT_META">
+              <span class="UPDATE_MANAGER_CLIENT_VERSION">${Version}</span>
+              <span class="UPDATE_MANAGER_CLIENT_HINT ${Safe(versionHint.className)}" title="${Safe(versionHint.title)}">${Safe(versionHint.text)}</span>
+            </div>
           </div>
-          <div class="UPDATE_MANAGER_CLIENT_STATUS ${GetUpdateStatusClass(Status)}">${Safe(Status)}</div>
-        </div>
-        <div class="progress UPDATE_MANAGER_CLIENT_PROGRESS">
-          <div class="progress-bar ${Execution && Execution.Status === 'Failed' ? 'bg-danger' : 'bg-success'}" role="progressbar" style="width: ${Percent}%" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Percent}"></div>
+          <div class="UPDATE_MANAGER_CLIENT_RIGHT">
+            <div class="UPDATE_MANAGER_CLIENT_STATUS ${GetUpdateStatusClass(Status)}">${Safe(Status)}</div>
+            <div class="progress UPDATE_MANAGER_CLIENT_PROGRESS">
+              <div class="progress-bar ${Execution && Execution.Status === 'Failed' ? 'bg-danger' : 'bg-success'}" role="progressbar" style="width: ${Percent}%" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Percent}"></div>
+            </div>
+          </div>
         </div>
         <div class="UPDATE_MANAGER_CLIENT_STATUS_TEXT">${StatusText}</div>
       </div>`;

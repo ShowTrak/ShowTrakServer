@@ -939,6 +939,10 @@ input[type='range']::-moz-range-progress,
   text-transform: uppercase;
   display: block;
   width: 100%;
+  height: 100%;
+  max-height: 100%;
+  inline-size: 100%;
+  max-inline-size: 100%;
   text-align: center;
 }
 
@@ -990,6 +994,7 @@ body.compact-mode .group-column-grid {
 .GROUP_TITLE_CLICKABLE > div {
   position: absolute;
   inset: 0;
+  min-height: 0;
 }
 
 .GROUP_TITLE_CLICKABLE:hover {
@@ -1169,8 +1174,9 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_MODEL_CORE_LOGO {
-  width: 84px;
-  height: 84px;
+  width: 256px;
+  height: 256px;
+  border-radius: 1.5rem;
 }
 
 .SHOWTRAK_ABOUT_MODAL_CONTENT {
@@ -1216,7 +1222,6 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_ABOUT_DEPENDENCIES_LIST {
-  max-height: 220px;
   overflow: auto;
   background: rgba(0, 0, 0, 0.22);
   border-radius: 0.5rem;
@@ -1276,7 +1281,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 .UPDATE_MANAGER_CLIENT_ITEM {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0.6rem;
-  padding: 0.65rem;
+  padding: 0.45rem 0.55rem;
   background: rgba(255, 255, 255, 0.04);
 }
 
@@ -1287,17 +1292,25 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 .UPDATE_MANAGER_CLIENT_HEADER {
   display: flex;
   justify-content: flex-start;
-  align-items: flex-start;
-  gap: 0.65rem;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .UPDATE_MANAGER_CLIENT_SELECT_WRAP {
-  padding-top: 1px;
+  padding-top: 0;
 }
 
 .UPDATE_MANAGER_CLIENT_MAIN {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.UPDATE_MANAGER_CLIENT_RIGHT {
+  flex: 0 0 118px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.22rem;
 }
 
 .UPDATE_MANAGER_CLIENT_SELECT {
@@ -1311,15 +1324,57 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 
 .UPDATE_MANAGER_CLIENT_NAME {
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.05;
+  margin-bottom: 1px;
 }
 
 .UPDATE_MANAGER_CLIENT_META {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
   color: rgba(255, 255, 255, 0.68);
   font-size: 11px;
 }
 
+.UPDATE_MANAGER_CLIENT_HINT {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.UPDATE_MANAGER_CLIENT_HINT.SUCCESS {
+  color: #d7ffe8;
+  border-color: rgba(66, 196, 126, 0.55);
+  background: rgba(66, 196, 126, 0.2);
+}
+
+.UPDATE_MANAGER_CLIENT_HINT.WARNING {
+  color: #ffe6b8;
+  border-color: rgba(255, 189, 89, 0.6);
+  background: rgba(255, 189, 89, 0.2);
+}
+
+.UPDATE_MANAGER_CLIENT_HINT.INFO {
+  color: #d9f1ff;
+  border-color: rgba(88, 187, 245, 0.58);
+  background: rgba(88, 187, 245, 0.2);
+}
+
+.UPDATE_MANAGER_CLIENT_HINT.MUTED {
+  color: rgba(255, 255, 255, 0.72);
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .UPDATE_MANAGER_CLIENT_STATUS {
+  text-align: right;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1328,15 +1383,16 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 
 .UPDATE_MANAGER_CLIENT_PROGRESS {
   height: 0.45rem;
-  margin-top: 0.4rem;
-  margin-bottom: 0.35rem;
+  width: 118px;
+  margin: 0;
   background: rgba(255, 255, 255, 0.1);
 }
 
 .UPDATE_MANAGER_CLIENT_STATUS_TEXT {
   color: rgba(255, 255, 255, 0.72);
   font-size: 11px;
-  min-height: 16px;
+  min-height: 14px;
+  margin-top: 0.18rem;
 }
 
 .UPDATE_MANAGER_WARNING {
@@ -3408,6 +3464,26 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .GROUP_MANAGER_GROUP_ITEM_DEFAULT {
   cursor: default;
+}
+.showtrak-group-manager-dialog {
+  max-width: min(920px, calc(100vw - 24px));
+}
+.group-manager-keybind-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.9rem;
+  height: 1.35rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
 }
 .group-manager-editor-id-field {
   position: relative;

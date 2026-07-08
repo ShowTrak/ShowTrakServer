@@ -157,9 +157,62 @@
     return ErrorText;
   }
 
-  function FormatMonitorCompactStatus(Online, LastLatencyMs, LastError, Degraded) {
-    const Status = FormatMonitorStatus(Online, LastLatencyMs, LastError, Degraded);
-    return !Online && Status === 'Offline' ? '' : Status;
+  function FormatMonitorCompactStatus(Online, LastLatencyMs, Degraded, IsIdle) {
+    const latency = Online ? FormatLatency(LastLatencyMs) : '';
+    if (latency) return { text: latency, color: 'text-light' };
+    if (IsIdle) return { text: 'Idle', color: 'text-light' };
+    if (Online && Degraded) return { text: 'Degraded', color: 'text-warning' };
+    if (Online) return { text: 'Online', color: 'text-light' };
+    return { text: 'Offline', color: 'text-light' };
+  }
+
+  function FormatMonitoringCheckSummary(Target, MaxLength = 24) {
+    const Checks = Array.isArray(Target && Target.Checks) ? Target.Checks : [];
+    const Labels = [];
+    const Seen = new Set();
+    const MethodLabels = {
+      ping: 'PING',
+      dns: 'DNS',
+      http: 'HTTP',
+      https: 'HTTPS',
+      'http-json': 'HTTP',
+      'tcp-port': 'TCP',
+      qlab: 'QLAB',
+      'qlab-workspace': 'QLAB',
+    };
+
+    for (const Check of Checks) {
+      const MethodID = String((Check && Check.Method) || '')
+        .trim()
+        .toLowerCase();
+      if (!MethodID) continue;
+      const Label = MethodLabels[MethodID] || MethodID.replace(/[-_]+/g, ' ').toUpperCase();
+      if (Seen.has(Label)) continue;
+      Seen.add(Label);
+      Labels.push(Label);
+    }
+
+    if (!Labels.length) return '';
+
+    const FormatVisibleLabels = (Items) => {
+      if (Items.length <= 1) return Items.join('');
+      if (Items.length === 2) return `${Items[0]} & ${Items[1]}`;
+      return `${Items.slice(0, -1).join(', ')} & ${Items[Items.length - 1]}`;
+    };
+
+    const Visible = [];
+    for (let Index = 0; Index < Labels.length; Index += 1) {
+      const Label = Labels[Index];
+      const Remaining = Labels.length - (Index + 1);
+      const Candidate = FormatVisibleLabels([...Visible, Label]);
+      const Suffix = Remaining > 0 ? ` + ${Remaining} More` : '';
+      if (Visible.length && Candidate.length + Suffix.length > MaxLength) break;
+      Visible.push(Label);
+    }
+
+    const HiddenCount = Labels.length - Visible.length;
+    const Summary = FormatVisibleLabels(Visible);
+    return HiddenCount > 0 ? `${Summary} + ${HiddenCount} More` : Summary;
   }
 
   function FormatMonitorMethodLabel(Target) {
@@ -473,8 +526,15 @@
     );
   }
 
+  function GetClientCompactStatusLabel(client) {
+    if (client && client.Identifying) return 'Identifying';
+    if (client && client.Online) return client.Degraded ? 'Degraded' : 'Online';
+    return 'Offline';
+  }
+
   function clientTileHTML(c) {
     const { Nickname, Hostname, IP, UUID, Online } = c;
+    const Degraded = !!c.Degraded;
     const hasNick = Nickname && Nickname.length;
     const primaryName = hasNick ? Nickname : Hostname || UUID || 'Unnamed Client';
     const versionLabel = formatVersionLabel(c);
@@ -482,11 +542,11 @@
       ? `${Hostname || UUID || 'Unnamed Client'} - ${versionLabel}`
       : versionLabel;
     return `<div id="CLIENT_TILE_${safe(UUID)}" class="SHOWTRAK_PC ${
-      Online ? 'ONLINE' : ''
+      Degraded ? 'DEGRADED' : Online ? 'ONLINE' : ''
     }" data-uuid="${safe(UUID)}" data-kind="client">
       <label class="text-sm" data-type="Hostname">${safe(hostVersion)}</label>
       <h5 class="mb-0" data-type="Nickname">${safe(primaryName)}</h5>
-      <span class="CLIENT_TILE_COMPACT_STATUS${Online ? '' : ' d-none'}" data-type="COMPACT_ONLINE_STATUS">Online</span>
+      <span class="CLIENT_TILE_COMPACT_STATUS" data-type="COMPACT_ONLINE_STATUS">${safe(GetClientCompactStatusLabel(c))}</span>
       <small class="text-sm text-light" data-type="IP">${IP ? safe(IP) : 'Unknown IP'}</small>
       <div class="SHOWTRAK_PC_STATUS ${
         Online ? 'd-grid' : 'd-none'
@@ -505,18 +565,19 @@
   function monitorTileHTML(T) {
     const Online = !!T.Online;
     const Degraded = !!T.Degraded;
+    const IsIdle = !T.CheckCount;
     const Name = T.Nickname || T.Address || 'Unnamed';
-    const Sub = T.Address || '';
-    const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
-    const CompactStatus = FormatMonitorCompactStatus(
-      Online,
-      T.LastLatencyMs,
-      T.LastError,
-      Degraded
-    );
+    const Sub =
+      Number(T && T.CheckCount) > 1
+        ? FormatMonitoringCheckSummary(T) || T.Address || ''
+        : T.Address || '';
+    const Status = IsIdle
+      ? 'Idle'
+      : FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
+    const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, Degraded, IsIdle);
     const OfflineSince = getMonitoringOfflineSince(T);
     const Method = FormatMonitorMethodLabel(T);
-    const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
+    const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : IsIdle ? 'IDLE' : '';
     const TextClass = 'text-light';
     return `<div id="MONITOR_TILE_${safe(T.TargetID)}" class="SHOWTRAK_PC MONITOR ${TileStateClass}" data-target-id="${safe(
       T.TargetID
@@ -526,17 +587,21 @@
       )}</label>
       <h5 class="mb-0" data-type="Name">${safe(Name)}</h5>
       <small class="text-sm text-light" data-type="Address">${safe(Sub)}</small>
+      <div class="SHOWTRAK_PC_STATUS ${IsIdle ? 'd-grid' : 'd-none'}" data-type="INDICATOR_IDLE">
+        <h7 class="mb-0 text-light" data-type="MONITOR_IDLE_LABEL">Idle</h7>
+      </div>
       <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-grid' : 'd-none'}" data-type="MONITOR_STATUS">
         <h7 class="mb-0 ${TextClass}" data-type="MONITOR_STATUS_LABEL">${safe(Status)}</h7>
       </div>
-      <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-none' : 'd-grid'}" data-type="INDICATOR_OFFLINE">
+      <div class="SHOWTRAK_PC_STATUS ${!Online && !IsIdle ? 'd-grid' : 'd-none'}" data-type="INDICATOR_OFFLINE">
         <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${safe(OfflineSince)}">Offline <span class="badge bg-ghost">00:00:00</span></h7>
       </div>
-      <span class="MONITOR_COMPACT_LATENCY ${TextClass}${CompactStatus ? '' : ' d-none'}" data-type="MONITOR_COMPACT_LATENCY">${safe(CompactStatus)}</span>
+      <span class="MONITOR_COMPACT_LATENCY ${safe(CompactStatus.color)}" data-type="MONITOR_COMPACT_LATENCY">${safe(CompactStatus.text)}</span>
     </div>`;
   }
 
   function dummyTileHTML(D) {
+    const DUMMY_TYPE_LABEL = 'DUMMY';
     const displayDummyIP = (IP) => {
       const raw = typeof IP === 'string' ? IP.trim() : '';
       if (!raw) return 'Unknown IP';
@@ -589,13 +654,20 @@
     return `<div id="DUMMY_TILE_${safe(D.UUID)}" class="SHOWTRAK_PC DUMMY ${TileStateClass}" data-dummy-uuid="${safe(
       D.UUID
     )}" data-kind="dummy">
-      <label class="text-sm" data-type="DummyLabel">Dummy</label>
+      <label class="text-sm" data-type="DummyLabel">${DUMMY_TYPE_LABEL}</label>
       <h5 class="mb-0" data-type="Name">${safe(Name)}</h5>
       <small class="text-sm text-light" data-type="IP">${safe(displayDummyIP(D.IP))}</small>
       <div class="SHOWTRAK_PC_STATUS d-grid" data-type="DUMMY_STATUS">
         ${StatusHtml}
       </div>
     </div>`;
+  }
+
+  function truncateGroupLabel(value, maxLen = 16) {
+    const text = value == null ? '' : String(value).trim();
+    if (!text) return '';
+    if (text.length <= maxLen) return text;
+    return `${text.substring(0, Math.max(1, maxLen - 3))}...`;
   }
 
   function renderAll() {
@@ -613,6 +685,8 @@
 
     for (const g of groupList) {
       const GroupID = g.GroupID;
+      const fullGroupTitle = g && g.Title != null ? String(g.Title) : '';
+      const groupLabel = truncateGroupLabel(fullGroupTitle);
       const groupClients = clients
         .filter((c) => c.GroupID === GroupID)
         .map((c) => ({ kind: 'client', weight: c.Weight || 0, data: c }));
@@ -649,9 +723,9 @@
       }
 
       html += `<div class="GROUP_ROW">
-        <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded">
+        <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" title="${safe(fullGroupTitle)}" aria-label="${safe(fullGroupTitle)}">
           <div class="d-flex align-items-center text-center h-100">
-            <span class="GROUP_TITLE py-2">${safe(g.Title)}</span>
+            <span class="GROUP_TITLE py-2">${safe(groupLabel)}</span>
           </div>
         </div>
         <div class="GROUP_CLIENTS bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100">
@@ -683,7 +757,8 @@
     const tile = document.getElementById(`CLIENT_TILE_${c.UUID}`);
     if (!tile) return false;
 
-    tile.classList.toggle('ONLINE', !!c.Online);
+    tile.classList.toggle('ONLINE', !!c.Online && !c.Degraded);
+    tile.classList.toggle('DEGRADED', !!c.Degraded);
 
     const hasNick = c.Nickname && c.Nickname.length;
     const nick = tile.querySelector('[data-type="Nickname"]');
@@ -695,7 +770,10 @@
     if (ip) ip.textContent = c.IP ? c.IP : 'Unknown IP';
 
     const compactStatus = tile.querySelector('[data-type="COMPACT_ONLINE_STATUS"]');
-    if (compactStatus) compactStatus.classList.toggle('d-none', !c.Online);
+    if (compactStatus) {
+      compactStatus.textContent = GetClientCompactStatusLabel(c);
+      compactStatus.classList.remove('d-none');
+    }
 
     const onlineInd = tile.querySelector('[data-type="INDICATOR_ONLINE"]');
     const offlineInd = tile.querySelector('[data-type="INDICATOR_OFFLINE"]');
@@ -729,12 +807,18 @@
     if (!tile) return false;
     const Online = !!T.Online;
     const Degraded = !!T.Degraded;
+    const IsIdle = !T.CheckCount;
     tile.classList.toggle('ONLINE', Online && !Degraded);
     tile.classList.toggle('DEGRADED', Degraded);
     const nameEl = tile.querySelector('[data-type="Name"]');
     if (nameEl) nameEl.textContent = T.Nickname || T.Address || 'Unnamed';
     const addrEl = tile.querySelector('[data-type="Address"]');
-    if (addrEl) addrEl.textContent = T.Address || '';
+    if (addrEl) {
+      addrEl.textContent =
+        Number(T && T.CheckCount) > 1
+          ? FormatMonitoringCheckSummary(T) || T.Address || ''
+          : T.Address || '';
+    }
     const methodEl = tile.querySelector('[data-type="Method"]');
     if (methodEl)
       methodEl.textContent = `${FormatMonitorMethodLabel(T)} · ${FormatInterval(T.Interval)}`;
@@ -747,27 +831,22 @@
       label.classList.add('text-light');
     }
     if (compact) {
-      const CompactStatus = FormatMonitorCompactStatus(
-        Online,
-        T.LastLatencyMs,
-        T.LastError,
-        Degraded
-      );
-      compact.textContent = CompactStatus;
-      compact.classList.toggle('d-none', !CompactStatus);
-      compact.classList.remove('text-success', 'text-warning');
-      compact.classList.add('text-light');
+      const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, Degraded, IsIdle);
+      compact.textContent = CompactStatus.text;
+      compact.classList.remove('text-light', 'text-success', 'text-warning');
+      compact.classList.add(CompactStatus.color);
     }
-    const onlineInd = tile.querySelector('[data-type="MONITOR_STATUS"]');
-    const offlineInd = tile.querySelector('[data-type="INDICATOR_OFFLINE"]');
-    if (onlineInd) {
-      onlineInd.classList.toggle('d-grid', Online);
-      onlineInd.classList.toggle('d-none', !Online);
-    }
-    if (offlineInd) {
-      offlineInd.classList.toggle('d-grid', !Online);
-      offlineInd.classList.toggle('d-none', Online);
-    }
+    tile.classList.toggle('IDLE', IsIdle);
+    const toggleInd = (sel, show) => {
+      const el = tile.querySelector(sel);
+      if (el) {
+        el.classList.toggle('d-grid', show);
+        el.classList.toggle('d-none', !show);
+      }
+    };
+    toggleInd('[data-type="INDICATOR_IDLE"]', IsIdle);
+    toggleInd('[data-type="MONITOR_STATUS"]', Online);
+    toggleInd('[data-type="INDICATOR_OFFLINE"]', !Online && !IsIdle);
     const since = tile.querySelector('[data-type="OFFLINE_SINCE"]');
     if (since) since.setAttribute('data-offlinesince', getMonitoringOfflineSince(T));
     return true;

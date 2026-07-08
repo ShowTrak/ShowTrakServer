@@ -34,6 +34,7 @@ const INVOKE_CHANNELS = new Set([
   'DeleteGroup',
   'Groups:SetOrder',
   'Groups:SetFullWidth',
+  'Groups:SetKeyBind',
   'OpenLogsFolder',
   'OpenScriptsFolder',
   'Show:New',
@@ -202,6 +203,7 @@ contextBridge.exposeInMainWorld('API', {
   SetGroupListOrder: async (OrderedGroupIDs) => invoke('Groups:SetOrder', OrderedGroupIDs),
   SetGroupFullWidth: async (GroupID, FullWidth) =>
     invoke('Groups:SetFullWidth', GroupID, FullWidth),
+  SetGroupKeyBind: async (GroupID, KeyBind) => invoke('Groups:SetKeyBind', GroupID, KeyBind),
   OpenLogsFolder: async () => invoke('OpenLogsFolder'),
   OpenScriptsFolder: async () => invoke('OpenScriptsFolder'),
   NewShow: async () => invoke('Show:New'),

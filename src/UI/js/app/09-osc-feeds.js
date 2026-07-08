@@ -421,8 +421,8 @@ window.API.ClientUpdated(async (Data) => {
 
   const CompactOnlineStatus = $(`[data-uuid='${UUID}']>[data-type="COMPACT_ONLINE_STATUS"]`);
   if (CompactOnlineStatus.length) {
-    CompactOnlineStatus.text(GetClientStatusDisplayText(Data));
-    CompactOnlineStatus.toggleClass('d-none', !Online && !Data.Identifying);
+    CompactOnlineStatus.text(GetClientCompactStatusLabel(Data));
+    CompactOnlineStatus.removeClass('d-none');
   }
 
   if (Online) {

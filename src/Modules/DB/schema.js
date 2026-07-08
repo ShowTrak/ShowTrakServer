@@ -6,7 +6,8 @@ Schema.push({
         GroupID INTEGER PRIMARY KEY AUTOINCREMENT, \
         Title TEXT, \
         Weight INTEGER, \
-        FullWidth INTEGER NOT NULL DEFAULT 1 \
+        FullWidth INTEGER NOT NULL DEFAULT 1, \
+        KeyBind TEXT \
     )',
 });
 
@@ -168,6 +169,7 @@ Schema.Migrations = [
   'ALTER TABLE `Clients` ADD COLUMN OperatingSystem TEXT',
   'ALTER TABLE `DummyClients` ADD COLUMN IP TEXT',
   'ALTER TABLE `Groups` ADD COLUMN FullWidth INTEGER NOT NULL DEFAULT 1',
+  'ALTER TABLE `Groups` ADD COLUMN KeyBind TEXT',
 ];
 
 module.exports = Schema;

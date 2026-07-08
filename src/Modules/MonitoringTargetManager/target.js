@@ -145,12 +145,9 @@ class MonitoringTarget {
     this._timer = null;
     this._running = false;
 
-    // A target with no checks reads as degraded immediately (before any tick).
-    if (!this.Checks.length) {
-      this.Online = true;
-      this.Degraded = true;
-      this.LastError = 'No Checks';
-    }
+    // A target with no checks is idle — it has nothing to probe, so it
+    // should not appear online, degraded, or offline.
+    // (Online/Degraded already default to false above.)
   }
 
   // The tile UI still references a single Address/Method for the subtitle; we
@@ -200,12 +197,11 @@ class MonitoringTarget {
   RecomputeAggregate() {
     const Checks = this.Checks;
     if (!Checks.length) {
-      // A target with no checks is surfaced as degraded so the operator notices
-      // the misconfiguration rather than it silently reading as offline.
-      this.Online = true;
-      this.Degraded = true;
+      // A target with no checks is idle — nothing to probe.
+      this.Online = false;
+      this.Degraded = false;
       this.LastLatencyMs = null;
-      this.LastError = 'No Checks';
+      this.LastError = null;
       return;
     }
 

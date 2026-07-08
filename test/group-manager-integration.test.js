@@ -155,3 +155,42 @@ test('GroupManager groups default to full width and can be toggled', async () =>
   const [, afterOn] = await Manager.Get(groupId);
   assert.equal(afterOn.isFullWidth, true);
 });
+
+test('GroupManager keybinds default to null, persist, and stay unique', async () => {
+  const { Manager, events } = await loadGroupManager();
+  await Manager.Create('Front of House');
+  await Manager.Create('Monitors');
+  const [, groups] = await Manager.GetAll();
+  const firstId = groups[0].GroupID;
+  const secondId = groups[1].GroupID;
+
+  // New groups have no keybind.
+  assert.equal(groups[0].KeyBind, null);
+
+  // Missing GroupID is rejected.
+  assert.match(String((await Manager.SetKeyBind())[0]), /required/i);
+
+  events.length = 0;
+  const [setErr] = await Manager.SetKeyBind(firstId, 'Digit1');
+  assert.equal(setErr, null);
+  assert.ok(events.includes('GroupListChanged'));
+
+  const [, afterSet] = await Manager.Get(firstId);
+  assert.equal(afterSet.KeyBind, 'Digit1');
+
+  // Same keybind on another group is rejected (uniqueness).
+  const [dupErr] = await Manager.SetKeyBind(secondId, 'Digit1');
+  assert.match(String(dupErr), /already assigned/i);
+
+  // A numpad keybind is accepted on the second group.
+  const [numErr] = await Manager.SetKeyBind(secondId, 'Numpad5');
+  assert.equal(numErr, null);
+  const [, afterNum] = await Manager.Get(secondId);
+  assert.equal(afterNum.KeyBind, 'Numpad5');
+
+  // Invalid keybinds normalize to null (cleared).
+  const [clearErr] = await Manager.SetKeyBind(firstId, 'KeyA');
+  assert.equal(clearErr, null);
+  const [, afterClear] = await Manager.Get(firstId);
+  assert.equal(afterClear.KeyBind, null);
+});

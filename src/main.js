@@ -1043,6 +1043,14 @@ app.whenReady().then(async () => {
     )
   );
 
+  RPC.handle(
+    'Groups:SetKeyBind',
+    createTupleHandler(
+      (GroupID, KeyBind) => [IPCValidation.GroupID(GroupID), IPCValidation.GroupKeyBind(KeyBind)],
+      (GroupID, KeyBind) => GroupManager.SetKeyBind(GroupID, KeyBind)
+    )
+  );
+
   RPC.handle('Groups:SetOrder', async (_Event, OrderedGroupIDs) => {
     if (!Array.isArray(OrderedGroupIDs)) return ['Invalid order', null];
 

@@ -143,6 +143,7 @@ test('IPCValidation.GroupID and GroupTitle normalize and validate', () => {
 
   assert.equal(IPCValidation.GroupTitle('  My Group  '), 'My Group');
   assert.throws(() => IPCValidation.GroupTitle('ab'), /at least 3 characters/i);
+  assert.throws(() => IPCValidation.GroupTitle('x'.repeat(33)), /at most 32 characters/i);
 });
 
 test('IPCValidation.ScriptID accepts strings and numbers', () => {

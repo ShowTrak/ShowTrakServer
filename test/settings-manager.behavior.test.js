@@ -185,4 +185,3 @@ test('SettingsManager clamps INTEGER settings to Min/Max on read and write', asy
   assert.equal(inErr, null);
   assert.equal(inSetting.Value, 4);
 });
-
