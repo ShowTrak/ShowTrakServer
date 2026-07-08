@@ -14,6 +14,18 @@ const { Manager: DB } = require('../DB');
 // In-memory cache keyed by setting.Key -> setting object
 const Settings = new Map();
 
+// Clamp an integer into a setting's optional [Min, Max] bounds.
+function ClampInteger(Setting, Value) {
+  let Result = Value;
+  if (typeof Setting.Min === 'number' && Number.isFinite(Setting.Min) && Result < Setting.Min) {
+    Result = Setting.Min;
+  }
+  if (typeof Setting.Max === 'number' && Number.isFinite(Setting.Max) && Result > Setting.Max) {
+    Result = Setting.Max;
+  }
+  return Result;
+}
+
 function ApplySettingRules(Setting, Value) {
   if (!Setting || !Setting.Key) return [null, Value];
 
@@ -65,7 +77,7 @@ Manager.Init = async () => {
           case 'INTEGER': {
             if (val === null || val === undefined || val === '') return Setting.DefaultValue;
             const n = parseInt(val, 10);
-            return isNaN(n) ? Setting.DefaultValue : n;
+            return isNaN(n) ? Setting.DefaultValue : ClampInteger(Setting, n);
           }
           case 'STRING': {
             return val == null ? '' : String(val);
@@ -101,6 +113,8 @@ Manager.Init = async () => {
         DefaultValue: Setting.DefaultValue,
         OnUpdateEvent: Setting.OnUpdateEvent || null,
         Options: Setting.Options || null,
+        Min: typeof Setting.Min === 'number' ? Setting.Min : null,
+        Max: typeof Setting.Max === 'number' ? Setting.Max : null,
       };
 
       Settings.set(NewSetting.Key, NewSetting);
@@ -160,7 +174,7 @@ Manager.Set = async (Key, Value) => {
       case 'INTEGER': {
         if (val === null || val === undefined || val === '') return Setting.DefaultValue;
         const n = parseInt(val, 10);
-        return isNaN(n) ? Setting.DefaultValue : n;
+        return isNaN(n) ? Setting.DefaultValue : ClampInteger(Setting, n);
       }
       case 'STRING': {
         return val == null ? '' : String(val);

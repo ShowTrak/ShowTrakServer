@@ -126,3 +126,63 @@ test('SettingsManager coerces values, persists updates, and emits events', async
   assert.ok(events.includes('SettingsUpdated'));
   assert.ok(events.includes('BoolSettingChanged'));
 });
+
+test('SettingsManager clamps INTEGER settings to Min/Max on read and write', async () => {
+  const defaultSettings = [
+    {
+      Group: 'Layout',
+      Key: 'COLUMN_COUNT',
+      Title: 'Columns',
+      Description: 'Column count',
+      Type: 'INTEGER',
+      DefaultValue: 2,
+      Min: 2,
+      Max: 6,
+    },
+  ];
+
+  const persistedValues = new Map([['COLUMN_COUNT', { Value: '99' }]]);
+
+  const dbMock = {
+    Manager: {
+      Ready: async () => {},
+      Get: async (_sql, params) => [null, persistedValues.get(params[0]) || null],
+      Run: async () => [null, { changes: 1 }],
+    },
+  };
+
+  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'SettingsManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => ({ log: () => {}, error: () => {} }) },
+    '../Broadcast': { Manager: { emit: () => {} } },
+    '../DB': dbMock,
+    './DefaultSettings': {
+      DefaultSettings: defaultSettings,
+      Groups: [{ Name: 'Layout', Title: 'Layout' }],
+    },
+  });
+
+  // Persisted out-of-range value is clamped to Max on read.
+  assert.equal(await Manager.GetValue('COLUMN_COUNT'), 6);
+
+  // Min/Max are surfaced to the UI.
+  const [setting] = await Manager.GetAll();
+  assert.equal(setting.Min, 2);
+  assert.equal(setting.Max, 6);
+
+  // Below-range writes clamp up to Min.
+  const [belowErr, belowSetting] = await Manager.Set('COLUMN_COUNT', 0);
+  assert.equal(belowErr, null);
+  assert.equal(belowSetting.Value, 2);
+
+  // Above-range writes clamp down to Max.
+  const [aboveErr, aboveSetting] = await Manager.Set('COLUMN_COUNT', 42);
+  assert.equal(aboveErr, null);
+  assert.equal(aboveSetting.Value, 6);
+
+  // In-range writes pass through untouched.
+  const [inErr, inSetting] = await Manager.Set('COLUMN_COUNT', 4);
+  assert.equal(inErr, null);
+  assert.equal(inSetting.Value, 4);
+});
+

@@ -1,4 +1,16 @@
 const DefaultSettings = [
+  {
+    Group: 'Layout',
+    Key: 'UI_GROUP_COLUMN_COUNT',
+    Title: 'Group Columns',
+    Description:
+      'Number of columns used to lay out groups. Groups set to Full Width span every column; other groups take a single column.',
+    Type: 'INTEGER',
+    DefaultValue: 2,
+    Min: 2,
+    Max: 6,
+    OnUpdateEvent: 'GroupListChanged',
+  },
   // {
   //     Group: "UI",
   //     Key: "UI_DISPLAY_CLIENTS_IN_TABLE",
@@ -126,6 +138,7 @@ const DefaultSettings = [
 
 const Groups = [
   // { Name: "UI", Title: "User Interface" },
+  { Name: 'Layout', Title: 'Layout' },
   { Name: 'Features', Title: 'Features' },
   { Name: 'Web UI', Title: 'Web UI' },
   { Name: 'System', Title: 'System Settings' },

@@ -504,6 +504,26 @@ function BindGroupManagerEditorHandlers(Groups = []) {
       await DeleteGroup(GroupID);
     });
 
+  $('#GROUP_MANAGER_EDITOR_FULL_WIDTH')
+    .off('change')
+    .on('change', async function () {
+      const GroupID = Number(GroupManagerEditingGroupID);
+      if (!Number.isFinite(GroupID)) return;
+      const NextFullWidth = $(this).is(':checked');
+      const [Err] = await window.API.SetGroupFullWidth(GroupID, NextFullWidth);
+      if (Err) {
+        $(this).prop('checked', !NextFullWidth);
+        await Notify(String(Err), 'error');
+        return;
+      }
+      const LocalGroup = Groups.find((Group) => Number(Group.GroupID) === GroupID);
+      if (LocalGroup) LocalGroup.isFullWidth = NextFullWidth;
+      await Notify(
+        `Group set to ${NextFullWidth ? 'full width' : 'single column'}.`,
+        'success'
+      );
+    });
+
   $('#GROUP_MANAGER_EDITOR_CLIENT_LIST')
     .off('click', '.GROUP_MANAGER_MEMBER_REMOVE')
     .on('click', '.GROUP_MANAGER_MEMBER_REMOVE', async function () {
@@ -552,6 +572,7 @@ async function OpenGroupManagerEditor(GroupID, Relaunching = false, PrefetchedGr
 
   $('#GROUP_MANAGER_EDITOR_NAME').val(Group.Title || '');
   $('#GROUP_MANAGER_EDITOR_GROUPID').val(String(Group.GroupID));
+  $('#GROUP_MANAGER_EDITOR_FULL_WIDTH').prop('checked', Group.isFullWidth !== false);
 
   const Clients = await ResolveGroupManagerEntities(Group.GroupID);
   $('#GROUP_MANAGER_EDITOR_CLIENT_LIST').html(

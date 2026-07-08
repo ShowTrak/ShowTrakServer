@@ -203,14 +203,20 @@ window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
           );
         });
       } else if (Setting.Type === 'INTEGER') {
+        const hasMin = typeof Setting.Min === 'number';
+        const hasMax = typeof Setting.Max === 'number';
+        const minAttr = hasMin ? `min="${Setting.Min}"` : '';
+        const maxAttr = hasMax ? `max="${Setting.Max}"` : '';
+        const rangeHint =
+          hasMin && hasMax ? ` <span class="text-sm text-muted">(${Setting.Min}–${Setting.Max})</span>` : '';
         $(`#SETTINGS`).append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
-						<span>${Setting.Title}</span>
+						<span>${Setting.Title}${rangeHint}</span>
 						<span class="text-sm mb-0">${Setting.Description}</span>
 					</div>
 					<input type="number" class="form-control form-control-sm bg-ghost-light text-light border-0" id="SETTING_${
             Setting.Key
-          }" value="${Safe(Setting.Value)}" step="1" />
+          }" value="${Safe(Setting.Value)}" step="1" ${minAttr} ${maxAttr} />
 				</div>`);
         $(`#SETTING_${Setting.Key}`)
           .off('input')
@@ -224,6 +230,8 @@ window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
               setTimeout(async () => {
                 let NewValue = parseInt(Raw, 10);
                 if (isNaN(NewValue)) NewValue = Setting.Value; // keep previous until valid
+                if (hasMin && NewValue < Setting.Min) NewValue = Setting.Min;
+                if (hasMax && NewValue > Setting.Max) NewValue = Setting.Max;
                 if (NewValue === Setting.Value) return;
                 let Set = Settings.find((s) => s.Key === Setting.Key);
                 Set.Value = NewValue;

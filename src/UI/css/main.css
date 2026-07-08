@@ -941,6 +941,40 @@ input[type='range']::-moz-range-progress,
   width: 100%;
   text-align: center;
 }
+
+/* Group column layout: groups flow left-to-right across a fixed column grid.
+   Full-width groups span every column; narrow groups take a single column.
+   Default (non-dense) auto-flow keeps groups in strict order and leaves a blank
+   slot when a wide group cannot fit in the columns left on the current row.
+
+   The inter-column gap is driven by the grid so it matches the 1rem gap between
+   a group's name button and its client container (the group title's `m-3`
+   left/container's `m-3` right margins are removed and replaced by grid
+   column-gap + side padding so the spacing is not doubled between columns). */
+.group-column-grid {
+  display: grid;
+  align-items: start;
+  column-gap: 1rem;
+  padding-inline: 1rem;
+}
+
+body.compact-mode .group-column-grid {
+  column-gap: 0;
+  padding-inline: 0.25rem;
+}
+
+.group-column-item {
+  min-width: 0;
+}
+
+.group-column-item > .GROUP_TITLE_CLICKABLE {
+  margin-left: 0 !important;
+}
+
+.group-column-item > .group-drop-zone {
+  margin-right: 0 !important;
+}
+
 .GROUP_TITLE_CLICKABLE {
   background-color: rgba(255, 255, 255, 0.1) !important;
   cursor: pointer !important;
@@ -2659,11 +2693,11 @@ button.btn:focus {
 body.compact-mode .group-drop-zone {
   padding: 0.5rem !important;
   gap: 0.5rem !important;
-  margin: 0.5rem 0.5rem 0 0.5rem !important;
+  margin: 0.5rem 0.25rem 0 0.25rem !important;
 }
 
 body.compact-mode .GROUP_TITLE_CLICKABLE {
-  margin: 0.5rem 0 0 0.5rem !important;
+  margin: 0.5rem 0 0 0.25rem !important;
   padding: 0 0.5rem;
   min-height: 2rem;
   width: 120px;

@@ -66,6 +66,7 @@ const INVOKE_CHANNELS = [
   'RenameGroup',
   'DeleteGroup',
   'Groups:SetOrder',
+  'Groups:SetFullWidth',
   'SetGroupOrder',
 
   // Show files

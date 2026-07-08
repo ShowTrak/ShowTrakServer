@@ -17,11 +17,20 @@ const { Ok, Fail } = require('../Utils');
 
 const Manager = {};
 
+// Groups default to full width (span every column) so existing and migrated
+// groups keep filling the row until an operator explicitly narrows them.
+function NormalizeFullWidth(Value) {
+  if (Value === null || Value === undefined) return true;
+  if (typeof Value === 'boolean') return Value;
+  return Value === 1 || Value === '1' || Value === 'true';
+}
+
 class Group {
   constructor(Data) {
     this.GroupID = Data.GroupID;
     this.Title = Data.Title || null;
     this.Weight = Data.Weight || 0;
+    this.isFullWidth = NormalizeFullWidth(Data.FullWidth);
   }
 
   // Persistent fields (DB-backed)
@@ -49,6 +58,21 @@ class Group {
     if (Err) return Logger.error('Failed to update group Weight');
     Logger.debug(`Group ${this.GroupID} Weight updated to ${Weight}`);
   }
+  async SetFullWidth(FullWidth) {
+    const Next = NormalizeFullWidth(FullWidth);
+    if (this.isFullWidth === Next) return Ok(true);
+    this.isFullWidth = Next;
+    const [Err, _Res] = await DB.Run('UPDATE Groups SET FullWidth = ? WHERE GroupID = ?', [
+      Next ? 1 : 0,
+      this.GroupID,
+    ]);
+    if (Err) {
+      Logger.error('Failed to update group FullWidth');
+      return Fail('Failed to update group full width');
+    }
+    Logger.debug(`Group ${this.GroupID} FullWidth updated to ${Next}`);
+    return Ok(true);
+  }
 }
 
 Manager.Create = async (Title = 'New Group') => {
@@ -74,6 +98,20 @@ Manager.Rename = async (GroupID, Title) => {
   if (!Group) return Fail('Group not found');
 
   const [SetErr] = await Group.SetTitle(Title);
+  if (SetErr) return Fail(SetErr);
+
+  BroadcastManager.emit('GroupListChanged');
+  return Ok(true);
+};
+
+Manager.SetFullWidth = async (GroupID, FullWidth) => {
+  if (!GroupID) return Fail('GroupID is required');
+
+  const [GetErr, Group] = await Manager.Get(GroupID);
+  if (GetErr) return Fail(GetErr);
+  if (!Group) return Fail('Group not found');
+
+  const [SetErr] = await Group.SetFullWidth(FullWidth);
   if (SetErr) return Fail(SetErr);
 
   BroadcastManager.emit('GroupListChanged');

@@ -129,3 +129,29 @@ test('GroupManager.ReconcileOrphanedGroups delegates to entity managers', async 
   assert.equal(err, null);
   assert.equal(ok, true);
 });
+
+test('GroupManager groups default to full width and can be toggled', async () => {
+  const { Manager, events } = await loadGroupManager();
+  await Manager.Create('Front of House');
+  const [, groups] = await Manager.GetAll();
+  const groupId = groups[0].GroupID;
+
+  // New groups are full width by default.
+  assert.equal(groups[0].isFullWidth, true);
+
+  // Missing GroupID is rejected.
+  assert.match(String((await Manager.SetFullWidth())[0]), /required/i);
+
+  events.length = 0;
+  const [setErr] = await Manager.SetFullWidth(groupId, false);
+  assert.equal(setErr, null);
+  assert.ok(events.includes('GroupListChanged'));
+
+  const [, afterOff] = await Manager.Get(groupId);
+  assert.equal(afterOff.isFullWidth, false);
+
+  const [reOnErr] = await Manager.SetFullWidth(groupId, true);
+  assert.equal(reOnErr, null);
+  const [, afterOn] = await Manager.Get(groupId);
+  assert.equal(afterOn.isFullWidth, true);
+});

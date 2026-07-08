@@ -364,6 +364,20 @@ window.API.SetFullClientList(async (Clients, Groups) => {
   RenderFullClientAndMonitorList();
 });
 
+// Read the configured number of group layout columns (clamped 2-6, default 2).
+function GetGroupColumnCount() {
+  try {
+    const Setting = Array.isArray(Settings)
+      ? Settings.find((s) => s && s.Key === 'UI_GROUP_COLUMN_COUNT')
+      : null;
+    let Count = Setting ? parseInt(Setting.Value, 10) : 2;
+    if (!Number.isFinite(Count)) Count = 2;
+    return Math.min(6, Math.max(2, Count));
+  } catch (_e) {
+    return 2;
+  }
+}
+
 function RenderFullClientAndMonitorList() {
   const Clients = Array.isArray(__LastClients) ? __LastClients.slice() : [];
   let Groups = Array.isArray(__LastGroups) ? __LastGroups.slice() : [];
@@ -375,7 +389,10 @@ function RenderFullClientAndMonitorList() {
     GroupID: null,
     Title: 'No Group',
     Weight: 100000,
+    isFullWidth: true,
   });
+
+  const ColumnCount = GetGroupColumnCount();
 
   // Keep the synthetic no-group bucket pinned to the bottom.
   Groups = Groups.sort((a, b) => {
@@ -396,7 +413,15 @@ function RenderFullClientAndMonitorList() {
         </div>`;
   }
 
-  for (const { GroupID, Title } of Groups) {
+  // Groups are laid out on a fixed column grid. Full-width groups span every
+  // column; narrow groups take one column. Grid auto-flow (non-dense) preserves
+  // strict group order and leaves a blank slot when a wide group cannot fit in
+  // the columns remaining on the current row.
+  Filler += `<div class="group-column-grid" style="grid-template-columns: repeat(${ColumnCount}, minmax(0, 1fr));">`;
+
+  for (const Group of Groups) {
+    const { GroupID, Title } = Group;
+    const GroupSpan = Group.isFullWidth === false ? 1 : ColumnCount;
     let GroupClients = Clients.filter((Client) => Client.GroupID === GroupID).sort(
       (a, b) => (a.Weight || 0) - (b.Weight || 0)
     );
@@ -426,7 +451,7 @@ function RenderFullClientAndMonitorList() {
       )
       .sort((a, b) => a.weight - b.weight);
 
-    Filler += `<div class="d-flex justify-content-start">
+    Filler += `<div class="d-flex justify-content-start group-column-item" style="grid-column: span ${GroupSpan};">
     <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" data-groupid="${GroupID}">
 			<div class="d-flex align-items-center text-center h-100">
 				<span class="GROUP_TITLE py-2">
@@ -505,6 +530,9 @@ function RenderFullClientAndMonitorList() {
 
     Filler += `</div></div>`;
   }
+
+  // Close the group column grid before appending non-group sections.
+  Filler += `</div>`;
 
   // Append Pending Adoption section after groups, if any
   Filler += RenderPendingAdoptionSection();

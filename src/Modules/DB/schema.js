@@ -5,7 +5,8 @@ Schema.push({
   SQL: 'CREATE TABLE IF NOT EXISTS `Groups` ( \
         GroupID INTEGER PRIMARY KEY AUTOINCREMENT, \
         Title TEXT, \
-        Weight INTEGER \
+        Weight INTEGER, \
+        FullWidth INTEGER NOT NULL DEFAULT 1 \
     )',
 });
 
@@ -166,6 +167,7 @@ Schema.Migrations = [
   'ALTER TABLE `MonitoringTargets` ADD COLUMN DegradedThresholdMs INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE `Clients` ADD COLUMN OperatingSystem TEXT',
   'ALTER TABLE `DummyClients` ADD COLUMN IP TEXT',
+  'ALTER TABLE `Groups` ADD COLUMN FullWidth INTEGER NOT NULL DEFAULT 1',
 ];
 
 module.exports = Schema;

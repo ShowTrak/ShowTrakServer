@@ -1032,6 +1032,17 @@ app.whenReady().then(async () => {
     )
   );
 
+  RPC.handle(
+    'Groups:SetFullWidth',
+    createTupleHandler(
+      (GroupID, FullWidth) => [
+        IPCValidation.GroupID(GroupID),
+        IPCValidation.Boolean(FullWidth, 'FullWidth'),
+      ],
+      (GroupID, FullWidth) => GroupManager.SetFullWidth(GroupID, FullWidth)
+    )
+  );
+
   RPC.handle('Groups:SetOrder', async (_Event, OrderedGroupIDs) => {
     if (!Array.isArray(OrderedGroupIDs)) return ['Invalid order', null];
 
