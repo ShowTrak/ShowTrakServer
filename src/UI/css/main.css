@@ -182,6 +182,8 @@ body.macos-native-fullscreen #APPLICATION {
   --client-online-bg: var(--status-online);
   --tile-name-font-size: 1rem;
   --tile-hostname-font-size: 0.72rem;
+  --tile-expanded-width: 220px;
+  --tile-compact-width: 244px;
   --tile-expanded-height: 100px;
   --tile-status-height: 20px;
 }
@@ -333,6 +335,29 @@ body.macos-native-fullscreen #APPLICATION {
 #ADD_MONITORING_TARGET_DROPDOWN .dropdown-toggle::after,
 #SETTINGS_MENU_DROPDOWN .dropdown-toggle::after {
   display: none;
+}
+/* Only show add-target controls while in edit mode, with 300ms fade. */
+#ADD_MONITORING_TARGET_DROPDOWN {
+  flex: 0 0 auto;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    width 300ms ease,
+    opacity 300ms ease,
+    visibility 0s linear 300ms;
+}
+body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
+  width: 28px;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    width 300ms ease,
+    opacity 300ms ease,
+    visibility 0s linear 0s;
 }
 #ADD_MONITORING_TARGET_MENU.dropdown-menu,
 #SETTINGS_MENU.dropdown-menu {
@@ -2555,7 +2580,7 @@ button.btn:focus {
 }
 
 .SHOWTRAK_PC {
-  width: 218px;
+  width: var(--tile-expanded-width);
   height: var(--tile-expanded-height);
   min-height: var(--tile-expanded-height);
   box-sizing: border-box;
@@ -2763,7 +2788,7 @@ body.compact-mode .GROUP_TITLE_CLICKABLE {
 
 body.compact-mode .SHOWTRAK_PC,
 body.compact-mode .SHOWTRAK_PC_PLACEHOLDER {
-  width: 254px;
+  width: var(--tile-compact-width);
   height: 36px;
   min-height: 36px;
   box-sizing: border-box;
