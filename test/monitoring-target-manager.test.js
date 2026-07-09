@@ -105,7 +105,7 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
     const modulePath = path.join(
       __dirname,
       '..',
-      'src',
+      'dist',
       'Modules',
       'MonitoringTargetManager',
       'index.js'
@@ -115,7 +115,7 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
       '../DB': dbMock,
       '../Broadcast': { Manager: { emit: (event, payload) => events.push([event, payload]) } },
       '../MonitoringMethods': monitoringMethodsMock,
-      '../Utils': require('../src/Modules/Utils'),
+      '../Utils': require('../dist/Modules/Utils'),
     });
 
     await Manager.Init();
@@ -299,7 +299,7 @@ test('MonitoringTargetManager reload replaces runtime list from latest DB rows',
     const modulePath = path.join(
       __dirname,
       '..',
-      'src',
+      'dist',
       'Modules',
       'MonitoringTargetManager',
       'index.js'
@@ -315,7 +315,7 @@ test('MonitoringTargetManager reload replaces runtime list from latest DB rows',
           Run: async () => ({ Success: true, LatencyMs: 10 }),
         },
       },
-      '../Utils': require('../src/Modules/Utils'),
+      '../Utils': require('../dist/Modules/Utils'),
     });
 
     await Manager.Init();
@@ -380,7 +380,7 @@ test('MonitoringTargetManager moves group members and orphaned targets to no gro
     const modulePath = path.join(
       __dirname,
       '..',
-      'src',
+      'dist',
       'Modules',
       'MonitoringTargetManager',
       'index.js'
@@ -396,7 +396,7 @@ test('MonitoringTargetManager moves group members and orphaned targets to no gro
           Run: async () => ({ Success: true, LatencyMs: 10 }),
         },
       },
-      '../Utils': require('../src/Modules/Utils'),
+      '../Utils': require('../dist/Modules/Utils'),
     });
 
     await Manager.Init();
@@ -495,7 +495,7 @@ test('MonitoringTargetManager.RunCheckNow runs a check, broadcasts, and returns 
     const modulePath = path.join(
       __dirname,
       '..',
-      'src',
+      'dist',
       'Modules',
       'MonitoringTargetManager',
       'index.js'
@@ -505,7 +505,7 @@ test('MonitoringTargetManager.RunCheckNow runs a check, broadcasts, and returns 
       '../DB': dbMock,
       '../Broadcast': { Manager: { emit: (event, payload) => events.push([event, payload]) } },
       '../MonitoringMethods': monitoringMethodsMock,
-      '../Utils': require('../src/Modules/Utils'),
+      '../Utils': require('../dist/Modules/Utils'),
     });
 
     await Manager.Init();

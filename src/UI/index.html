@@ -2,6 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <!-- <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'"
@@ -67,9 +68,28 @@
           </button>
         </div>
         <div class="bar-section center">
+          <button
+            type="button"
+            id="MOBILE_CLEAR_SELECTION_BTN"
+            class="mobile-clear-selection-btn no-drag"
+            title="Clear Selection"
+            aria-label="Clear Selection"
+          >
+            <i class="bi bi-x-circle"></i>
+          </button>
           <span id="SELECTION_STATUS" class="cursor-pointer">0 Clients Selected</span>
         </div>
         <div class="bar-section right">
+          <button
+            type="button"
+            id="MOBILE_ACTIONS_BTN"
+            class="mobile-actions-btn no-drag"
+            title="Actions"
+            aria-label="Actions"
+          >
+            <i class="bi bi-list-ul"></i>
+            <span>Actions</span>
+          </button>
           <div class="dropdown no-drag" id="ADD_MONITORING_TARGET_DROPDOWN">
             <button
               type="button"
@@ -133,7 +153,7 @@
             title="Toggle Alerts Panel (Ctrl/Cmd+Y)"
             aria-label="Alerts"
           >
-            <i class="bi bi-exclamation-triangle-fill"></i>
+            <i class="bi bi-exclamation-circle-fill"></i>
             <span class="alerts-count d-none">0</span>
           </button>
           <div class="dropdown no-drag" id="SETTINGS_MENU_DROPDOWN">
@@ -897,8 +917,18 @@
                 </div>
 
                 <div class="bg-ghost p-2 rounded d-grid gap-2">
-                  <span class="text-sm">Colour</span>
-                  <div id="SCRIPT_MANAGER_COLOUR_SWATCHES" class="d-flex gap-2 flex-wrap"></div>
+                  <span class="text-sm">Colour / Icon</span>
+                  <div class="d-flex align-items-center justify-content-between gap-2">
+                    <div id="SCRIPT_MANAGER_COLOUR_SWATCHES" class="d-flex gap-2 flex-wrap"></div>
+                    <button
+                      type="button"
+                      id="SCRIPT_MANAGER_ICON_PREVIEW"
+                      class="script-manager-icon-preview d-flex align-items-center justify-content-center"
+                      title="Click to choose an icon"
+                    >
+                      <i class="bi bi-terminal"></i>
+                    </button>
+                  </div>
                 </div>
 
                 <div class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center">
@@ -976,6 +1006,45 @@
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reusable Bootstrap Icons picker (see 18-icon-picker.ts) -->
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_ICONPICKER"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_ICONPICKER_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-start d-grid gap-2">
+            <div class="d-flex justify-content-between align-items-center gap-2">
+              <button type="button" id="ICON_PICKER_CANCEL" class="btn btn-sm btn-outline-light">
+                <i class="bi bi-arrow-left"></i> Back
+              </button>
+              <strong id="SHOWTRAK_MODAL_ICONPICKER_Label">Choose an Icon</strong>
+              <span class="btn btn-sm invisible" aria-hidden="true">
+                <i class="bi bi-arrow-left"></i> Back
+              </span>
+            </div>
+
+            <div class="form-floating bg-ghost rounded">
+              <input
+                type="text"
+                id="ICON_PICKER_SEARCH"
+                class="form-control bg-transparent text-light border-0"
+                placeholder="Search icons"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <label for="ICON_PICKER_SEARCH">Search icons</label>
+            </div>
+
+            <div id="ICON_PICKER_GRID" class="icon-picker-grid"></div>
           </div>
         </div>
       </div>
@@ -1984,6 +2053,87 @@
         </div>
       </div>
     </div>
+
+    <!-- Web UI overlays. Inert on the desktop (hidden via `body:not(.is-web)`);
+         driven by the web bootstrap (web-main.ts) on the browser surface. The
+         splash overlays mirror the service worker's offline splash (WebUI/sw.js). -->
+    <div id="WEB_LOADING_OVERLAY" class="web-overlay web-splash">
+      <img src="./img/icon-filled.png" alt="ShowTrak" class="web-splash-logo" />
+      <div class="web-splash-body" role="status" aria-live="polite">
+        <div class="spinner-border text-light" aria-hidden="true"></div>
+        <div class="web-overlay-text">Connecting…</div>
+      </div>
+    </div>
+    <div id="WEB_LOGIN_OVERLAY" class="web-overlay d-none">
+      <div class="web-overlay-card web-login-card">
+        <img src="./img/icon.png" alt="ShowTrak" class="web-login-logo" />
+        <div class="web-overlay-title">ShowTrak</div>
+        <div class="web-overlay-text">Enter the passcode to continue.</div>
+        <div
+          id="WEB_LOGIN_DOTS"
+          class="web-pin-dots"
+          role="status"
+          aria-live="polite"
+          aria-label="Passcode digits entered"
+        ></div>
+        <input
+          id="WEB_LOGIN_INPUT"
+          type="password"
+          class="web-pin-hidden-input"
+          autocomplete="current-password"
+          inputmode="none"
+          tabindex="-1"
+          aria-hidden="true"
+        />
+        <div id="WEB_LOGIN_ERROR" class="web-login-error d-none"></div>
+        <div id="WEB_LOGIN_PAD" class="web-pin-pad">
+          <button type="button" class="web-pin-key" data-key="1">1</button>
+          <button type="button" class="web-pin-key" data-key="2">2</button>
+          <button type="button" class="web-pin-key" data-key="3">3</button>
+          <button type="button" class="web-pin-key" data-key="4">4</button>
+          <button type="button" class="web-pin-key" data-key="5">5</button>
+          <button type="button" class="web-pin-key" data-key="6">6</button>
+          <button type="button" class="web-pin-key" data-key="7">7</button>
+          <button type="button" class="web-pin-key" data-key="8">8</button>
+          <button type="button" class="web-pin-key" data-key="9">9</button>
+          <button
+            type="button"
+            class="web-pin-key web-pin-key-icon"
+            data-action="backspace"
+            aria-label="Delete last digit"
+          >
+            <i class="bi bi-backspace"></i>
+          </button>
+          <button type="button" class="web-pin-key" data-key="0">0</button>
+          <button
+            type="button"
+            id="WEB_LOGIN_BUTTON"
+            class="web-pin-key web-pin-key-enter"
+            data-action="submit"
+            aria-label="Unlock"
+          >
+            <i class="bi bi-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="WEB_DISABLED_NOTICE" class="web-overlay d-none">
+      <div class="web-overlay-card">
+        <div class="web-overlay-title">Web UI Disabled</div>
+        <div class="web-overlay-text">The ShowTrak Web UI is currently disabled.</div>
+      </div>
+    </div>
+    <!-- Last of the overlays so it paints above the login screen too: when the
+         connection drops mid-login the splash takes over, and the reconnect
+         flow (hello -> auto re-auth) decides what shows next. -->
+    <div id="WEB_DISCONNECTED_OVERLAY" class="web-overlay web-splash d-none">
+      <img src="./img/icon-filled.png" alt="ShowTrak" class="web-splash-logo" />
+      <div class="web-splash-body" role="alert">
+        <div class="spinner-border text-light" aria-hidden="true"></div>
+        <div class="web-overlay-title">Connection Lost</div>
+        <div class="web-overlay-text">Reconnecting to ShowTrak Server…</div>
+      </div>
+    </div>
   </body>
   <footer>
     <script src="./vendors/jquery/index.js" defer></script>
@@ -1991,26 +2141,9 @@
     <script src="./vendors/toastify/index.js" defer></script>
     <script src="./vendors/howler/index.min.js"></script>
     <script src="./vendors/qrcode/qrcode.min.js"></script>
-    <!-- app.js was split into ordered topical modules. They are classic scripts
-         that share global scope and MUST load in this order (defer preserves
-         document order). Concatenated, they are identical to the original app.js. -->
-    <script src="./js/app/00-animations.js" defer></script>
-    <script src="./js/app/01-state.js" defer></script>
-    <script src="./js/app/02-mode.js" defer></script>
-    <script src="./js/app/03-settings.js" defer></script>
-    <script src="./js/app/04-utils.js" defer></script>
-    <script src="./js/app/05-keyboard.js" defer></script>
-    <script src="./js/app/06-client-list.js" defer></script>
-    <script src="./js/app/07-monitoring.js" defer></script>
-    <script src="./js/app/08-dnd.js" defer></script>
-    <script src="./js/app/09-osc-feeds.js" defer></script>
-    <script src="./js/app/10-alerts-tray.js" defer></script>
-    <script src="./js/app/11-modals.js" defer></script>
-    <script src="./js/app/12-monitoring-editor.js" defer></script>
-    <script src="./js/app/13-alert-rules.js" defer></script>
-    <script src="./js/app/14-selection-init.js" defer></script>
-    <script src="./js/app/15-script-manager.js" defer></script>
-    <script src="./js/app/16-dummy-clients.js" defer></script>
-    <script src="./js/app/17-audio-assets.js" defer></script>
+    <!-- The renderer is authored as TypeScript ES modules under js/app and
+         bundled by esbuild (scripts/build-renderer.js) into a single classic
+         script. Entry point: js/app/main.ts (imports modules in load order). -->
+    <script src="./js/app/bundle.js" defer></script>
   </footer>
 </html>

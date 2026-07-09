@@ -6,7 +6,7 @@ const path = require('node:path');
 const { loadWithMocks } = require('../test-support/load-with-mocks');
 
 function modulePath(...parts) {
-  return path.join(__dirname, '..', 'src', 'Modules', ...parts);
+  return path.join(__dirname, '..', 'dist', 'Modules', ...parts);
 }
 
 test('AppData initializes folders and resolves directory paths', async () => {
@@ -28,7 +28,7 @@ test('AppData initializes folders and resolves directory paths', async () => {
   };
   const osMock = { homedir: () => '/home/test' };
 
-  const { Manager } = loadWithMocks(modulePath('AppData', 'index.js'), {
+  const { Manager } = loadWithMocks(modulePath('AppData', 'index'), {
     fs: fsMock,
     os: osMock,
     child_process: childMock,
@@ -60,7 +60,7 @@ test('AppData initializes folders and resolves directory paths', async () => {
 });
 
 test('Broadcast manager is a shared event emitter', () => {
-  const { Manager } = loadWithMocks(modulePath('Broadcast', 'index.js'), {});
+  const { Manager } = loadWithMocks(modulePath('Broadcast', 'index'), {});
   let received = null;
   Manager.on('Ping', (payload) => (received = payload));
   Manager.emit('Ping', 42);
@@ -68,7 +68,7 @@ test('Broadcast manager is a shared event emitter', () => {
 });
 
 test('OS manager exposes the hostname', () => {
-  const { Manager } = loadWithMocks(modulePath('OS', 'index.js'), {
+  const { Manager } = loadWithMocks(modulePath('OS', 'index'), {
     os: { hostname: () => 'unit-test-host' },
   });
   assert.equal(Manager.Hostname, 'unit-test-host');
@@ -127,8 +127,17 @@ test('Server serializers project safe public shapes', () => {
   assert.deepEqual(client.NetworkInterfaces, []);
   assert.equal(Object.prototype.hasOwnProperty.call(client, 'Secret'), false);
 
-  const group = ToPublicGroup({ GroupID: 3, Title: 'A', Weight: 1, Extra: 'x' });
-  assert.deepEqual(group, { GroupID: 3, Title: 'A', Weight: 1 });
+  const group = ToPublicGroup({
+    GroupID: 3,
+    Title: 'A',
+    Weight: 1,
+    isFullWidth: false,
+    Extra: 'x',
+  });
+  assert.deepEqual(group, { GroupID: 3, Title: 'A', Weight: 1, isFullWidth: false });
+
+  const defaultGroup = ToPublicGroup({ GroupID: 4, Title: 'B', Weight: 2 });
+  assert.deepEqual(defaultGroup, { GroupID: 4, Title: 'B', Weight: 2, isFullWidth: true });
 });
 
 test('NetworkDiscovery network-utils convert IPs and probe ports', async () => {

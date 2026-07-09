@@ -16,7 +16,7 @@ test('AdoptionManager tracks, updates, and removes pending clients', async () =>
   const events = [];
   const existingUUIDs = new Set(['already-adopted']);
 
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'AdoptionManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AdoptionManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => createLoggerStub() },
     '../Broadcast': { Manager: { emit: (...args) => events.push(args) } },
@@ -70,7 +70,7 @@ test('GroupManager creates, fetches, updates, and deletes groups', async () => {
 
   const clients = [{ SetGroupID: async () => {} }, { SetGroupID: async () => {} }];
 
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'GroupManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'GroupManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => createLoggerStub() },
     '../DB': dbMock,
@@ -100,7 +100,7 @@ test('GroupManager creates, fetches, updates, and deletes groups', async () => {
         },
       },
     },
-    '../Utils': require('../src/Modules/Utils'),
+    '../Utils': require('../dist/Modules/Utils'),
   });
 
   const [createErr] = await Manager.Create('New Group');

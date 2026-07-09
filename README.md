@@ -140,6 +140,9 @@ npm ci
 npm run start
 ```
 
+`npm run start` now runs with file watching and automatic rebuild/restart.
+You can also type `rs` in the terminal to force a manual restart.
+
 ### Useful Scripts
 
 ```bash
@@ -149,10 +152,7 @@ npm run start
 # Build distributables for current platform
 npm run make
 
-# Package without makers
-npm run package
-
-# Run test suite
+# Run test suite (builds first, then runs all tests)
 npm run test
 
 # Run tests with coverage report

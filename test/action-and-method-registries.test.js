@@ -30,7 +30,7 @@ test('AlertActions manager normalizes, validates, and executes actions', async (
     Execute: async () => ({ Success: true }),
   };
 
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'AlertActions', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AlertActions', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => createLoggerStub() },
     './osc-trigger': actionA,
@@ -82,7 +82,7 @@ test('MonitoringMethods manager normalizes and wraps execution errors', async ()
     },
   };
 
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'MonitoringMethods', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'MonitoringMethods', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => createLoggerStub() },
     './ping': pingMethod,

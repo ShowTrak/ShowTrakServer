@@ -1,0 +1,931 @@
+/* Group column layout: groups flow left-to-right across a fixed column grid.
+   Full-width groups span every column; narrow groups take a single column.
+   Default (non-dense) auto-flow keeps groups in strict order and leaves a blank
+   slot when a wide group cannot fit in the columns left on the current row.
+
+   The inter-column gap is driven by the grid so it matches the 1rem gap between
+   a group's name button and its client container (the group title's `m-3`
+   left/container's `m-3` right margins are removed and replaced by grid
+   column-gap + side padding so the spacing is not doubled between columns). */
+.group-column-grid {
+  display: grid;
+  align-items: stretch;
+  column-gap: 1rem;
+  padding-inline: 1rem;
+}
+
+body.compact-mode .group-column-grid {
+  column-gap: 0;
+  padding-inline: 0.25rem;
+}
+
+.group-column-item {
+  min-width: 0;
+}
+
+.group-column-item > .GROUP_TITLE_CLICKABLE {
+  margin-left: 0 !important;
+}
+
+.group-column-item > .group-drop-zone {
+  margin-right: 0 !important;
+}
+
+.GROUP_TITLE_CLICKABLE {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  cursor: pointer !important;
+  width: 26px;
+  min-width: 26px;
+  max-width: 26px;
+  flex: 0 0 38px;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.GROUP_TITLE_CLICKABLE > div {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+}
+
+.GROUP_TITLE_CLICKABLE:hover {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  border-radius: 0.3rem;
+}
+
+.GROUP_CREATE_BUTTON {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-weight: 700;
+  /* letter-spacing: 0.1rem; */
+  color: rgba(255, 255, 255, 0.6);
+  /* overflow: hidden; */
+  /* text-overflow: ellipsis; */
+  /* white-space: nowrap; */
+  text-transform: uppercase;
+}
+
+.GROUP_CREATE_BUTTON:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 0.3rem;
+}
+
+/* Show the "+" add-group tile only in EDIT mode with a fade */
+/* Target the wrapper that specifically contains the create button */
+.GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
+  opacity: 0;
+  pointer-events: none; /* prevent clicks when hidden */
+  transition: opacity 200ms ease-in-out;
+}
+body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.SHOWTRAK_CLIENT_PENDING_ADOPTION {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.text-bold {
+  font-weight: 600 !important;
+}
+
+.progress {
+  height: 3px !important;
+  border-radius: 5px;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.SHOWTRAK_BTN_ROUNDED {
+  font-weight: 600;
+}
+
+/* removed old floating cog styles */
+
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+#APPLICATION_NAVBAR_STATUS {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+#APPLICATION_NAVBAR_STATUS:empty {
+  display: none;
+}
+
+#APPLICATION_NAVBAR_FILE {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+}
+
+/* Hide entirely when no file is open so the flex gap does not leave a space. */
+#APPLICATION_NAVBAR_FILE:empty {
+  display: none;
+}
+
+#APPLICATION_NAVBAR_FILE:not(:empty)::before {
+  content: '•';
+  margin-right: 0.75rem;
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+}
+
+#SHOWTRAK_CONTEXT_MENU {
+  display: none;
+  position: fixed;
+  z-index: 100000;
+  background: linear-gradient(180deg, #1d1a35 0%, #17142c 100%) !important;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 0.6rem;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  padding: 0.35rem;
+  max-height: min(70vh, 460px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+#SHOWTRAK_CONTEXT_MENU::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Flat rows (no per-item card/background) — only hover/focus lift them,
+   matching a minimal filter-menu look rather than a stack of buttons. */
+#SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON {
+  color: rgba(255, 255, 255, 0.88);
+  text-decoration: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background-color: transparent;
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.92rem;
+}
+#SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON[aria-disabled='true'] {
+  color: rgba(255, 255, 255, 0.45);
+}
+#SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON:hover {
+  background-color: rgba(120, 95, 200, 0.16) !important;
+}
+#SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON:focus {
+  outline: none;
+  background-color: rgba(120, 95, 200, 0.24) !important;
+}
+
+.SHOWTRAK_CONTEXTMENU_BUTTON {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+/* Right-aligned shortcut hint in context menu */
+#SHOWTRAK_CONTEXT_MENU .context-title {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#SHOWTRAK_CONTEXT_MENU .context-shortcut {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8em;
+  margin-left: 1rem;
+}
+
+/* Thin, muted divider between flat rows. Bootstrap paints <hr> via its
+   background-color (currentColor) with opacity, not a border, so we override
+   the background directly and neutralise the border/opacity to hit the exact
+   colour. */
+#SHOWTRAK_CONTEXT_MENU hr {
+  margin: 0.3rem 0.2rem;
+  height: 1px;
+  border: 0;
+  background-color: rgba(255, 255, 255, 0.06);
+  color: transparent;
+  opacity: 1;
+}
+
+/* Close button header only appears in the mobile action-sheet layout. */
+#SHOWTRAK_CONTEXT_MENU .context-menu-header {
+  display: none;
+}
+
+#APPLICATION_NAVBAR_LOGO {
+  width: 18px;
+  height: 18px;
+}
+
+.modal-dialog {
+  padding-top: 2rem !important;
+}
+
+.modal-content {
+  border: 0 !important;
+  background: linear-gradient(180deg, #160f35 0%, #0f0b23 100%) !important;
+  color: white;
+  border-radius: 1rem !important;
+}
+
+.modal-body {
+  /* background-color: #0c091c !important; */
+  color: white;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.SHOWTRAK_MODEL_CORE_LOGO {
+  width: 256px;
+  height: 256px;
+  border-radius: 1.5rem;
+}
+
+.SHOWTRAK_ABOUT_MODAL_CONTENT {
+  border: 0 !important;
+  background: linear-gradient(180deg, #160f35 0%, #0f0b23 100%) !important;
+}
+
+.SHOWTRAK_ABOUT_MODAL_BODY {
+  gap: 0.75rem;
+  padding: 1.2rem;
+}
+
+.SHOWTRAK_ABOUT_TITLE {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.SHOWTRAK_ABOUT_VERSION {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.SHOWTRAK_ABOUT_CARD {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  border: 0 !important;
+}
+
+.SHOWTRAK_ABOUT_CARD .card-body {
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.SHOWTRAK_ABOUT_WEBSITE_BTN {
+  font-size: 0.96rem;
+  font-weight: 700;
+  padding: 0.55rem 0.9rem;
+}
+
+.SHOWTRAK_ABOUT_UPDATE_BODY {
+  font-size: 0.94rem;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCIES_LIST {
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 0.5rem;
+  padding: 0.6rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCIES_SECTION_TITLE {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_ITEM {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.15rem 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_ITEM:last-child {
+  border-bottom: 0;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_NAME {
+  color: rgba(255, 255, 255, 0.92);
+  word-break: break-word;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_LINK {
+  color: rgba(126, 205, 255, 0.95) !important;
+  text-decoration: none;
+  font-size: 0.92rem;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_LINK:hover,
+.SHOWTRAK_ABOUT_DEPENDENCY_LINK:focus {
+  color: #a9e2ff !important;
+  text-decoration: underline;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_VERSION {
+  color: rgba(255, 255, 255, 0.68);
+  white-space: nowrap;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_GROUP {
+  margin-bottom: 0.65rem;
+}
+
+.SHOWTRAK_ABOUT_DEPENDENCY_GROUP:last-child {
+  margin-bottom: 0;
+}
+
+.UPDATE_MANAGER_CLIENT_ITEM {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.55rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.UPDATE_MANAGER_CLIENT_ITEM.OFFLINE {
+  opacity: 0.72;
+}
+
+.UPDATE_MANAGER_CLIENT_HEADER {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.UPDATE_MANAGER_CLIENT_SELECT_WRAP {
+  padding-top: 0;
+}
+
+.UPDATE_MANAGER_CLIENT_MAIN {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.UPDATE_MANAGER_CLIENT_RIGHT {
+  flex: 0 0 118px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.22rem;
+}
+
+.UPDATE_MANAGER_CLIENT_SELECT {
+  cursor: pointer;
+}
+
+.UPDATE_MANAGER_CLIENT_SELECT:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.UPDATE_MANAGER_CLIENT_NAME {
+  font-weight: 700;
+  line-height: 1.05;
+  margin-bottom: 1px;
+}
+
+.UPDATE_MANAGER_CLIENT_META {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 11px;
+}
+
+.UPDATE_MANAGER_CLIENT_HINT {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.UPDATE_MANAGER_CLIENT_HINT.SUCCESS {
+  color: #d7ffe8;
+  border-color: rgba(66, 196, 126, 0.55);
+  background: rgba(66, 196, 126, 0.2);
+}
+
+.UPDATE_MANAGER_CLIENT_HINT.WARNING {
+  color: #ffe6b8;
+  border-color: rgba(255, 189, 89, 0.6);
+  background: rgba(255, 189, 89, 0.2);
+}
+
+.UPDATE_MANAGER_CLIENT_HINT.INFO {
+  color: #d9f1ff;
+  border-color: rgba(88, 187, 245, 0.58);
+  background: rgba(88, 187, 245, 0.2);
+}
+
+.UPDATE_MANAGER_CLIENT_HINT.MUTED {
+  color: rgba(255, 255, 255, 0.72);
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.UPDATE_MANAGER_CLIENT_STATUS {
+  text-align: right;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.UPDATE_MANAGER_CLIENT_PROGRESS {
+  height: 0.45rem;
+  width: 118px;
+  margin: 0;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.UPDATE_MANAGER_CLIENT_STATUS_TEXT {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  min-height: 14px;
+  margin-top: 0.18rem;
+}
+
+.UPDATE_MANAGER_WARNING {
+  border: 1px solid rgba(255, 189, 89, 0.45);
+  background: rgba(255, 189, 89, 0.12);
+  border-radius: 0.6rem;
+  padding: 0.65rem;
+}
+
+.UPDATE_MANAGER_WARNING_TITLE {
+  color: #ffd58a;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 0.2rem;
+}
+
+.UPDATE_MANAGER_WARNING_TEXT {
+  color: rgba(255, 237, 204, 0.9);
+  font-size: 11px;
+}
+
+.UPDATE_MANAGER_WARNING_LIST {
+  margin: 0.45rem 0 0;
+  padding-left: 1rem;
+  color: rgba(255, 237, 204, 0.92);
+  font-size: 11px;
+}
+
+.UPDATE_MANAGER_DOWNLOAD_PROGRESS {
+  height: 0.55rem;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.UPDATE_MANAGER_RELEASE_BADGE {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.UPDATE_MANAGER_RELEASE_BADGE.DOWNLOADED {
+  color: #d7ffe8;
+  border-color: rgba(66, 196, 126, 0.55);
+  background: rgba(66, 196, 126, 0.2);
+}
+
+.UPDATE_MANAGER_RELEASE_BADGE.NOT_DOWNLOADED {
+  color: #ffe5e5;
+  border-color: rgba(220, 84, 84, 0.55);
+  background: rgba(220, 84, 84, 0.2);
+}
+
+@media (max-width: 576px) {
+  .SHOWTRAK_ABOUT_MODAL_BODY {
+    padding: 1rem;
+  }
+
+  .SHOWTRAK_ABOUT_TITLE {
+    font-size: 1.2rem;
+  }
+
+  .SHOWTRAK_ABOUT_VERSION {
+    font-size: 0.88rem;
+  }
+
+  .SHOWTRAK_ABOUT_CARD .card-body {
+    font-size: 0.92rem;
+  }
+
+  .SHOWTRAK_ABOUT_DEPENDENCIES_LIST {
+    max-height: 180px;
+    font-size: 0.84rem;
+  }
+}
+
+small,
+.text-sm {
+  font-size: 10px;
+}
+
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 8px;
+  background: #18181b;
+  border-radius: 1rem;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #35353a;
+  border-radius: 12px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #505055;
+}
+
+::-webkit-scrollbar-corner {
+  background: #18181b;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #35353a #18181b;
+}
+
+/* No visual overlay change for EDIT mode */
+body.mode-edit #APPLICATION_CONTAINER {
+  background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
+}
+
+#STATUS_BAR {
+  display: none;
+}
+
+.form-control,
+.form-select {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 0.5rem !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+  color: white !important;
+  background-color: #ffffff1d !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+/* 3D keyboard key styling for <kbd> elements */
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0.12rem 0.4rem;
+  margin: 0 0.05rem;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.85em;
+  line-height: 1.1;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 1px 0 rgba(255, 255, 255, 0.05),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+}
+.key-plus,
+.key-sep {
+  color: rgba(255, 255, 255, 0.65);
+  padding: 0 0.15rem;
+}
+
+/* Enhanced select styling to match dark UI and increase padding */
+.form-select {
+  -webkit-appearance: none;
+  appearance: none;
+  /* keep Bootstrap's default vertical/left padding to avoid clipping; only expand right for the arrow */
+  padding-right: 2rem !important;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23ffffff' viewBox='0 0 16 16'><path d='M1.5 5.5 8 12l6.5-6.5-1-1L8 10 2.5 4.5z'/></svg>");
+  background-repeat: no-repeat !important;
+  background-position: right 0.6rem center !important;
+  background-size: 0.9rem !important;
+}
+.form-select.form-select-sm {
+  /* small size: only reserve arrow space on the right */
+  padding-right: 1.8rem !important;
+  background-position: right 0.5rem center !important;
+  background-size: 0.85rem !important;
+}
+
+/* Dropdown list colors (Chromium/Electron supports styling option background) */
+select.form-select option,
+select.form-select optgroup {
+  background-color: #1e1643;
+  color: #ffffff;
+}
+
+/* Remove outlines/shadows from buttons everywhere (including Bootstrap btn-check patterns) */
+.btn,
+.btn:hover,
+.btn:focus,
+.btn:focus-visible,
+.btn:active,
+.btn:active:focus,
+.modal .btn,
+.modal .btn:hover,
+.modal .btn:focus,
+.modal .btn:focus-visible,
+.modal .btn:active,
+.modal .btn:active:focus,
+.btn-check:focus + .btn,
+.btn-check:active + .btn,
+.btn-check:checked + .btn,
+.btn-check:checked + .btn:focus,
+a.btn,
+a.btn:focus,
+button.btn,
+button.btn:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Confirmation modal: restore clear keyboard focus rings */
+#SHOWTRAL_MODAL_CONFIRMATION .btn:focus,
+#SHOWTRAL_MODAL_CONFIRMATION .btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18) !important;
+}
+#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CONFIRM:focus,
+#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CONFIRM:focus-visible {
+  outline-color: rgba(220, 53, 69, 0.95) !important; /* match .btn-danger */
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.35) !important;
+}
+#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CANCEL:focus,
+#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CANCEL:focus-visible {
+  outline-color: rgba(108, 117, 125, 0.95) !important; /* match .btn-secondary */
+  box-shadow: 0 0 0 3px rgba(108, 117, 125, 0.35) !important;
+}
+
+/* Copy buttons inside form-floating fields */
+.form-floating.has-copy {
+  position: relative;
+}
+.form-floating.has-copy .copy-field-btn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+}
+.form-floating.has-copy .copy-field-btn:hover {
+  color: rgba(255, 255, 255, 0.92);
+}
+.form-floating.has-copy .copy-field-btn i {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.SHOWTRAK_CLIENT_USB_DEVICE_CARD {
+  position: relative;
+  padding-right: 6.9rem !important;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 98px;
+  height: 30px;
+  padding: 0 0.65rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(220, 220, 220, 0.6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB .bi {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB:hover {
+  color: rgba(255, 214, 102, 0.9);
+  background-color: rgba(255, 193, 7, 0.12);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-critical {
+  color: #ffc107;
+  background-color: rgba(255, 193, 7, 0.2);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-critical:hover {
+  color: #ffd54a;
+  background-color: rgba(255, 193, 7, 0.24);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:focus {
+  color: #ff6b6b;
+  background-color: rgba(220, 53, 69, 0.24);
+  cursor: pointer;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:hover {
+  background-color: rgba(220, 53, 69, 0.28);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-unavailable,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-unavailable:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-unavailable:focus,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-unavailable:active {
+  cursor: not-allowed;
+  color: rgba(190, 190, 190, 0.5);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 98px;
+  height: 30px;
+  padding: 0 0.65rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(220, 220, 220, 0.6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.SHOWTRAK_DISPLAY_NUMBER {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 0.35rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY .bi {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY:hover {
+  color: rgba(255, 214, 102, 0.9);
+  background-color: rgba(255, 193, 7, 0.12);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-critical {
+  color: #ffc107;
+  background-color: rgba(255, 193, 7, 0.2);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-critical:hover {
+  color: #ffd54a;
+  background-color: rgba(255, 193, 7, 0.24);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical:focus {
+  color: #ff9f40;
+  background-color: rgba(253, 126, 20, 0.24);
+  cursor: pointer;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical:hover {
+  background-color: rgba(253, 126, 20, 0.3);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical:focus {
+  color: #ff6b6b;
+  background-color: rgba(220, 53, 69, 0.24);
+  cursor: pointer;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical:hover {
+  background-color: rgba(220, 53, 69, 0.28);
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:focus,
+.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:active {
+  cursor: not-allowed;
+  color: rgba(190, 190, 190, 0.5);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.SHOWTRAK_NET_IFACE_CARD {
+  position: relative;
+  text-align: left;
+}
+
+.SHOWTRAK_NET_IFACE_CARD.is-inactive {
+  opacity: 0.5;
+  filter: grayscale(0.45);
+}
+
+.SHOWTRAK_NET_IFACE_NAME {
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: left;
+}
+
+.SHOWTRAK_NET_IFACE_IP {
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: left;
+  word-break: break-all;
+}
+
+.SHOWTRAK_NET_IFACE_META {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.56);
+  text-align: left;
+}
+
+.SHOWTRAK_NET_IFACE_KIND_BADGE {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffe08a;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+}
+

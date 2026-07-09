@@ -26,6 +26,11 @@ body.macos-native-fullscreen #APPLICATION {
   padding-top: 0 !important;
 }
 
+/* No dragbar on the web surface, so drop the space reserved for it */
+body.is-web #APPLICATION {
+  padding-top: 0 !important;
+}
+
 #APPLICATION_NAVBAR_TITLE {
   color: rgba(255, 255, 255, 0.95);
 }
@@ -35,13 +40,23 @@ body.macos-native-fullscreen #APPLICATION {
   width: 100%;
   height: calc(100% - 2rem);
   overflow: auto;
-  display: grid;
-  grid-template-rows: auto 1fr;
+  /* Block flow, NOT grid: as a grid item #APPLICATION gets pinned to the
+     container's height instead of growing with an overflowing client list, so
+     its content spills past its bottom edge and the padding-bottom reserved
+     for the fixed bottom bar lands mid-list instead of below it — the end of
+     the list then scrolls to rest underneath the bar, unreachable. In block
+     flow #APPLICATION grows with its content and the padding counts toward
+     the scrollable overflow. (#APPLICATION's min-height still fills the
+     viewport when the list is short.) */
   background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
 }
 
 #APPLICATION {
-  height: max(100%, 100vh);
+  /* min-height (not height): fill the viewport when content is sparse so the
+     gradient covers the screen, but GROW past it when the group/client list is
+     tall — a fixed height here clips the overflow and kills scrolling on mobile,
+     where the list is a single tall column. */
+  min-height: max(100%, 100vh);
   padding-top: 2rem !important;
   padding-bottom: 36px !important; /* space for bottom bar */
   user-select: none !important;
@@ -351,6 +366,7 @@ body.macos-native-fullscreen #APPLICATION {
 }
 body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   width: 28px;
+  overflow: visible;
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -1111,12 +1127,12 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   display: none;
   position: fixed;
   z-index: 100000;
-  background-color: #2a273b !important;
+  background: linear-gradient(180deg, #1d1a35 0%, #17142c 100%) !important;
   color: white;
-  border: none !important;
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 0.6rem;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  padding: 0.35rem;
   max-height: min(70vh, 460px);
   overflow-y: auto;
   overflow-x: hidden;
@@ -1133,8 +1149,10 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   display: none;
 }
 
-#SHOWTRAK_CONTEXT_MENU > a {
-  color: white;
+/* Flat rows (no per-item card/background) — only hover/focus lift them,
+   matching a minimal filter-menu look rather than a stack of buttons. */
+#SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON {
+  color: rgba(255, 255, 255, 0.88);
   text-decoration: none !important;
   user-select: none !important;
   -webkit-user-select: none !important;
@@ -1144,15 +1162,20 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  background-color: transparent;
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.92rem;
 }
-#SHOWTRAK_CONTEXT_MENU > a:hover {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  border-radius: 0.3rem;
+#SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON[aria-disabled='true'] {
+  color: rgba(255, 255, 255, 0.45);
 }
-#SHOWTRAK_CONTEXT_MENU > a:focus {
+#SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON:hover {
+  background-color: rgba(120, 95, 200, 0.16) !important;
+}
+#SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON:focus {
   outline: none;
-  background-color: rgba(255, 255, 255, 0.14) !important;
-  border-radius: 0.3rem;
+  background-color: rgba(120, 95, 200, 0.24) !important;
 }
 
 .SHOWTRAK_CONTEXTMENU_BUTTON {
@@ -1170,9 +1193,27 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 #SHOWTRAK_CONTEXT_MENU .context-shortcut {
   flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.85em;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8em;
   margin-left: 1rem;
+}
+
+/* Thin, muted divider between flat rows. Bootstrap paints <hr> via its
+   background-color (currentColor) with opacity, not a border, so we override
+   the background directly and neutralise the border/opacity to hit the exact
+   colour. */
+#SHOWTRAK_CONTEXT_MENU hr {
+  margin: 0.3rem 0.2rem;
+  height: 1px;
+  border: 0;
+  background-color: rgba(255, 255, 255, 0.06);
+  color: transparent;
+  opacity: 1;
+}
+
+/* Close button header only appears in the mobile action-sheet layout. */
+#SHOWTRAK_CONTEXT_MENU .context-menu-header {
+  display: none;
 }
 
 #APPLICATION_NAVBAR_LOGO {
@@ -3609,6 +3650,20 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 .script-manager-grip:active {
   cursor: grabbing;
 }
+/* Script icon badge, tinted with the script's accent colour */
+.script-manager-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 1.05rem;
+  color: var(--script-accent, rgba(255, 255, 255, 0.75));
+  background: color-mix(in srgb, var(--script-accent, #7f8c8d) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--script-accent, #7f8c8d) 32%, transparent);
+}
 .script-manager-os-list {
   display: flex;
   flex-wrap: wrap;
@@ -3832,6 +3887,80 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   border-color: #fff;
   transform: scale(1.1);
 }
+/* Script editor icon field preview swatch (clickable to open the picker) */
+.script-manager-icon-preview {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 0;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    transform 120ms ease;
+}
+.script-manager-icon-preview:hover {
+  background-color: rgba(255, 255, 255, 0.18);
+  transform: scale(1.05);
+}
+/* Reusable icon picker grid + tiles */
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  grid-auto-rows: 84px;
+  gap: 8px;
+  max-height: 52vh;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px;
+  align-content: start;
+}
+.icon-picker-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  min-height: 0;
+  padding: 8px 4px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+.icon-picker-tile i {
+  font-size: 1.7rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.icon-picker-tile-label {
+  font-size: 0.68rem;
+  line-height: 1.1;
+  max-width: 100%;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+.icon-picker-tile:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+.icon-picker-tile.selected {
+  border-color: #fff;
+  background-color: rgba(255, 255, 255, 0.12);
+}
 /* Floating textarea label fix */
 .script-manager-textarea-float textarea.form-control {
   height: auto;
@@ -3841,17 +3970,133 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 .script-manager-textarea-float label {
   top: 0;
 }
-/* Colour dot in context menu script entries */
-.context-colour-dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex: 0 0 10px;
-  margin-right: 8px;
-  vertical-align: middle;
-  flex-shrink: 0;
+/* Leading icon slot in context menu rows. Fixed width so every title starts at
+   the same x-position no matter how wide the glyph is; the icon itself is
+   centred within the slot so differently-sized icons stay visually aligned. */
+.context-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.1rem;
+  width: 1.1rem;
+  margin-right: 4px;
+  font-size: 1rem;
+  line-height: 1;
+  text-align: center;
 }
+.context-icon > i {
+  display: inline-block;
+  line-height: 1;
+}
+
+/* --- Mobile context menu ---
+   On mobile the menu is inset from the screen edges (not full-bleed) and
+   floats above the bottom bar, reading as a rounded action sheet. Rows are
+   taller for easier tapping, shaded so they read as buttons, and each row
+   can enter a "Tap to confirm" state. A close button sits in a sticky header
+   above the scrollable option list. */
+body.mobile-view #SHOWTRAK_CONTEXT_MENU {
+  left: 12px !important;
+  right: 12px !important;
+  width: auto !important;
+  max-width: none !important;
+  border-radius: 0.9rem;
+  padding: 0.4rem 0.5rem 0.6rem;
+  /* NB: do NOT set `display` here. The base rule keeps the menu `display: none`
+     until JS opens it (which sets inline `display: flex`); forcing flex here
+     would override that and leave an empty menu floating on load. The
+     flex-direction/layout below still applies once JS makes it visible. */
+  flex-direction: column;
+  /* Scrolling happens inside .context-menu-options so the header (with the
+     close button) stays fixed at the top instead of scrolling away. */
+  overflow-y: hidden;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-header {
+  display: flex;
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.25rem;
+  background-color: #2a273b;
+  z-index: 1;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  height: 42px;
+  border-radius: 0.55rem;
+  background-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-close:active {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-options {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-options::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.SHOWTRAK_CONTEXTMENU_BUTTON {
+  padding: 0.85rem 0.75rem;
+  font-size: 1.05rem;
+  background-color: rgba(255, 255, 255, 0.06);
+  border-radius: 0.55rem;
+  margin-bottom: 0.4rem;
+}
+body.mobile-view
+  #SHOWTRAK_CONTEXT_MENU
+  > .context-menu-options
+  > a.SHOWTRAK_CONTEXTMENU_BUTTON:last-child {
+  margin-bottom: 0;
+}
+body.mobile-view
+  #SHOWTRAK_CONTEXT_MENU
+  > .context-menu-options
+  > a.SHOWTRAK_CONTEXTMENU_BUTTON[aria-disabled='true'] {
+  background-color: transparent;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
+  display: none;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending {
+  background-color: rgba(255, 193, 7, 0.18) !important;
+}
+body.mobile-view
+  #SHOWTRAK_CONTEXT_MENU
+  > .context-menu-options
+  > a.context-confirm-pending
+  .context-title {
+  color: #ffc107 !important;
+}
+body.mobile-view
+  #SHOWTRAK_CONTEXT_MENU
+  > .context-menu-options
+  > a.context-confirm-pending
+  .context-shortcut,
+body.mobile-view
+  #SHOWTRAK_CONTEXT_MENU
+  > .context-menu-options
+  > a.context-confirm-pending
+  .context-icon {
+  display: none !important;
+}
+
 /* Collapse toggles in the monitoring check editor (Advanced / Last Response) */
 .monitoring-collapse-toggle .bi-chevron-down {
   transition: transform 0.15s ease;
@@ -3867,4 +4112,523 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .monitoring-spin {
   animation: monitoring-spin 0.7s linear infinite;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Web UI capability chrome                                                   */
+/* The shared renderer runs on both the Electron desktop app and the browser  */
+/* Web UI. `body.is-web` is set only on the browser surface (by web-main.ts). */
+/* ------------------------------------------------------------------------- */
+
+/* Web-only overlays are completely inert on the desktop. */
+body:not(.is-web) .web-overlay {
+  display: none !important;
+}
+
+/* Safari (desktop toolbar + mobile status bar) tints its chrome to the page's
+   root background colour, NOT to <meta name="theme-color"> (that only applies to
+   an installed PWA). With no colour set on html/body the root defaults to white,
+   so the logged-in toolbar reads white. The login overlay avoids this because it
+   is a fixed full-viewport dark element. Paint the web surface's root purple so
+   Safari samples the accent; the app's own dark gradient (#APPLICATION_CONTAINER)
+   still fills the content area on top of it. */
+body.is-web,
+html:has(body.is-web) {
+  background: #160f35 !important;
+}
+
+/* Desktop-only chrome hidden on the web: navbar/dragbar and the cogs
+   (settings) menu. Mode/alerts toggles stay visible as read-only state. */
+body.is-web .dragbar,
+body.is-web #SETTINGS_MENU_DROPDOWN {
+  display: none !important;
+}
+
+/* Web surface shows current SHOW/EDIT + ALERTS state, but cannot change it. */
+body.is-web .mode-group .btn:disabled,
+body.is-web #ALERT_ACTIONS_TOGGLE_BTN:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+  opacity: 1;
+}
+
+/* The add (+) button follows the server mode on the web: only shown in EDIT. */
+body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
+  display: none !important;
+}
+
+.web-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  /* Match the app shell backdrop: the same dark-indigo radial gradient. */
+  background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%);
+}
+
+.web-overlay-card {
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 24px;
+  border-radius: 16px;
+  background: #1d1a2f;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  color: #f2f4f7;
+  text-align: center;
+}
+
+.web-login-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+}
+
+/* Splash variant of the overlay (loading + disconnected screens): brand mark
+   pinned small top-center, status content centered on the backdrop. Mirrors
+   the service worker's offline splash (WebUI/sw.js) so the two look alike. */
+.web-overlay.web-splash {
+  flex-direction: column;
+}
+
+.web-splash-logo {
+  position: absolute;
+  top: calc(20px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+}
+
+.web-splash-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  color: #f2f4f7;
+}
+
+.web-overlay-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.web-overlay-text {
+  font-size: 0.9rem;
+  color: #aab2bd;
+}
+
+.web-login-error {
+  font-size: 0.85rem;
+  color: #ff6b6b;
+  width: 100%;
+  min-height: 1.1em;
+}
+
+/* -------------------------------------------------------------------------
+   Web passcode screen: dot indicators + numeric keypad
+   ------------------------------------------------------------------------- */
+
+/* The login screen sits directly on the overlay's purple gradient — no card
+   backdrop, border, or shadow (unlike the loading / disabled overlays). */
+.web-login-card {
+  width: min(320px, 100%);
+  gap: 16px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 24px;
+}
+
+/* The real value lives here (autofill target + submitLogin() read path), but
+   it is visually removed — entry happens via the keypad and the dots below. */
+.web-pin-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.web-pin-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 16px;
+  margin: 4px 0 2px;
+}
+
+.web-pin-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  transition:
+    transform 0.12s ease,
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.web-pin-dot.is-filled {
+  background: #f2f4f7;
+  border-color: #f2f4f7;
+  transform: scale(1.05);
+}
+
+/* Placeholder ring shown when no digits have been entered yet. */
+.web-pin-dots.is-empty .web-pin-dot {
+  animation: none;
+}
+
+.web-pin-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.web-pin-key {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f2f4f7;
+  font-size: 1.35rem;
+  font-weight: 500;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  /* Disable double-tap-to-zoom on the keys (mobile): a fast second tap should
+     enter another digit, not zoom the viewport. */
+  touch-action: manipulation;
+  transition:
+    background-color 0.12s ease,
+    transform 0.06s ease,
+    border-color 0.12s ease;
+}
+
+.web-pin-key:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.web-pin-key:active {
+  transform: scale(0.94);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.web-pin-key:focus-visible {
+  outline: 2px solid rgba(140, 120, 255, 0.8);
+  outline-offset: 2px;
+}
+
+/* Icon keys (backspace) share the number-key surface; only the glyph is a touch
+   smaller than the digits. */
+.web-pin-key-icon {
+  font-size: 1.1rem;
+}
+
+.web-pin-key-enter {
+  color: #ffffff;
+  background: linear-gradient(180deg, #6d5bd0, #5942b8);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.web-pin-key-enter:hover {
+  background: linear-gradient(180deg, #7a68dd, #6650c8);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.web-pin-key-enter:active {
+  background: linear-gradient(180deg, #5942b8, #4a37a0);
+}
+
+/* Mobile bottom-bar controls (clear-selection + Actions). Hidden everywhere by
+   default; only revealed by the mobile-view rules below, and only while a
+   selection exists (body.mobile-view.has-selection). */
+#MOBILE_CLEAR_SELECTION_BTN,
+#MOBILE_ACTIONS_BTN {
+  display: none;
+}
+
+/* =========================================================================
+   Mobile / narrow-viewport layout (body.mobile-view)
+   -------------------------------------------------------------------------
+   `body.mobile-view` is toggled from JS (see InitMobileView in 02-mode.ts) in
+   lockstep with the `(max-width: 768px)` media query, and mobile is *locked* to
+   compact mode — so `body.compact-mode` is always present too and the compact
+   tile/font styling is inherited as-is (no re-declaration needed, which keeps
+   the sizing identical to a normal compact toggle).
+
+   The mobile-only structural changes are:
+     - a single full-width column of groups,
+     - each group's title reflowed into a horizontal header ABOVE its clients
+       (normally a thin vertical rail to the left, hidden in compact mode),
+     - hidden mode/alert/compact toggles,
+     - a taller, more touch-friendly bottom bar with larger buttons,
+     - left-aligned selection status.
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* Single column: every group takes the full width, no multi-column grid.
+     Overrides both the inline `grid-template-columns: repeat(N, ...)` and each
+     item's inline `grid-column: span N`. */
+  body.mobile-view .group-column-grid {
+    grid-template-columns: 1fr !important;
+    column-gap: 0 !important;
+    padding-inline: 0.5rem !important;
+  }
+
+  body.mobile-view .group-column-item {
+    grid-column: span 1 !important;
+    /* Stack the group title header above the client list instead of beside it. */
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  /* Bring the group title back as a full-width horizontal header above the list.
+     compact-mode hides it and the base rules render it as a narrow vertical rail;
+     both are undone here. */
+  body.mobile-view .GROUP_TITLE_CLICKABLE {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 2.25rem !important;
+    margin: 0.5rem 0 0 0 !important;
+    overflow: visible !important;
+  }
+
+  /* The base rule absolutely-positions the inner wrapper to fill the vertical
+     rail; on mobile it should just be a normal-flow horizontal bar. */
+  body.mobile-view .GROUP_TITLE_CLICKABLE > div {
+    position: static !important;
+    inset: auto !important;
+    justify-content: center;
+    padding: 0.35rem 0.6rem;
+  }
+
+  /* De-rotate the group label so it reads left-to-right in the header bar. */
+  body.mobile-view .GROUP_TITLE {
+    writing-mode: horizontal-tb !important;
+    transform: none !important;
+    width: auto !important;
+    height: auto !important;
+    inline-size: auto !important;
+    max-inline-size: 100% !important;
+    padding: 0 !important;
+    text-align: center;
+  }
+
+  /* Hide the add-group ("+") tile on mobile — its vertical-rail styling has no
+     place in the stacked header layout and group creation lives in the menu. */
+  body.mobile-view .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
+    display: none !important;
+  }
+
+  /* Full-width, single-per-row tiles so nothing overflows a thin screen. The
+     compact height/padding/typography are inherited from body.compact-mode. */
+  body.mobile-view .SHOWTRAK_PC,
+  body.mobile-view .SHOWTRAK_PC_PLACEHOLDER {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* The drop zone carries `w-100` (width:100%) plus the compact-mode horizontal
+     margin (0.25rem each side). 100% width + those margins overflow the single
+     column by 0.5rem, pushing the whole list off-centre to the right. The grid's
+     own padding-inline already supplies the edge gutter, so drop the side
+     margins here and let the box fit its column exactly. */
+  body.mobile-view .group-drop-zone {
+    margin-inline: 0 !important;
+  }
+
+  /* --- Hide desktop-only toggles in the bottom bar on mobile --- */
+  body.mobile-view #APP_BOTTOM_BAR .mode-group,
+  body.mobile-view #ALERT_ACTIONS_TOGGLE_BTN,
+  body.mobile-view #COMPACT_MODE_BTN {
+    display: none !important;
+  }
+
+  /* --- Taller, touch-friendly bottom bar --- */
+  /* Installed as a PWA (viewport-fit=cover) the page extends under the rounded
+     screen corners / home indicator, which clipped the bar's icon and
+     "N Clients Selected" text. Grow the bar by the device's safe-area inset and
+     pad its content up above the unsafe region. */
+  :root {
+    --bottom-bar-height-mobile: 60px;
+    --bottom-bar-total-mobile: calc(
+      var(--bottom-bar-height-mobile) + env(safe-area-inset-bottom, 0px)
+    );
+  }
+
+  body.mobile-view #APP_BOTTOM_BAR {
+    height: var(--bottom-bar-total-mobile) !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Keep the application content clear of the taller bar, with a little
+     breathing room so the last client tile isn't flush against its edge. */
+  body.mobile-view #APPLICATION {
+    padding-bottom: calc(var(--bottom-bar-total-mobile) + 0.75rem) !important;
+  }
+
+  /* Bottom-anchored overlays tuck 8px over the bar's top edge; keep that
+     relationship as the bar grows with the safe-area inset. */
+  body.mobile-view #SHOWTRAK_CONFIRM_TOAST.confirm-toast,
+  body.mobile-view #ALERTS_TRAY.alerts-tray,
+  body.mobile-view #IDENTIFY_STATUS_BANNER {
+    bottom: calc(var(--bottom-bar-total-mobile) - 8px);
+  }
+
+  /* Preserve the identify banner's 74px lift when stacked above the confirm
+     toast (desktop: 118px vs 44px anchors). */
+  body.mobile-view #IDENTIFY_STATUS_BANNER.stacked-above-confirm {
+    bottom: calc(var(--bottom-bar-total-mobile) + 66px);
+  }
+
+  /* iOS Safari scroll fix.
+     The scroll container's `height: calc(100% - 2rem)` resolves `100%` against
+     the initial containing block, which on iOS Safari is the *large* viewport
+     (URL bar collapsed). That makes the container taller than the visible area,
+     so tall content still fits inside it and there is nothing to scroll — the
+     bottom of the client list ends up unreachable behind the URL/bottom bar.
+     Size the scrollport to the *dynamic* viewport (`dvh`, tracking the visible
+     area) so it becomes shorter than the content and scrolls. `vh` is the
+     fallback for engines without `dvh`; there is no dragbar on the web surface,
+     so no 2rem needs subtracting here. `!important` is required to beat the
+     container's Bootstrap `h-100` utility (`height: 100% !important`), which
+     otherwise re-imposes the oversized large-viewport height. */
+  body.mobile-view #APPLICATION_CONTAINER {
+    height: 100vh !important;
+    height: 100dvh !important;
+    -webkit-overflow-scrolling: touch; /* momentum scrolling on iOS */
+  }
+
+  /* Match the app's min-height to the visible viewport too, so a sparse list
+     still fills the screen without forcing the oversized-large-viewport height
+     that reintroduces the clipping. */
+  body.mobile-view #APPLICATION {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Left-align the "N Clients Selected" status. The left section only held the
+     now-hidden toggles, so drop it and collapse the bar to two columns:
+     selection status at the start, action buttons pinned to the right. */
+  body.mobile-view #APP_BOTTOM_BAR .bar-section.left {
+    display: none !important;
+  }
+
+  body.mobile-view #APP_BOTTOM_BAR .bar-content {
+    grid-template-columns: 1fr auto !important;
+    padding: 0 12px !important;
+  }
+
+  body.mobile-view #APP_BOTTOM_BAR .bar-section.center {
+    grid-column: 1 !important;
+    justify-self: start !important;
+    text-align: left !important;
+    font-size: 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+  }
+
+  body.mobile-view #APP_BOTTOM_BAR .bar-section.right {
+    grid-column: 2 !important;
+    gap: 10px !important;
+  }
+
+  /* On mobile the right side shows the desktop Add + Alerts controls by default;
+     once a selection exists they give way to the Actions button. Settings is
+     already hidden on the Web UI (body.is-web), which is the only surface that
+     ever enters mobile view. */
+  body.mobile-view.has-selection #ADD_MONITORING_TARGET_DROPDOWN,
+  body.mobile-view.has-selection #ALERTS_BUTTON {
+    display: none !important;
+  }
+
+  /* --- Clear-selection button (left of the "N Clients Selected" text) --- */
+  body.mobile-view.has-selection #MOBILE_CLEAR_SELECTION_BTN {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+  }
+
+  body.mobile-view #MOBILE_CLEAR_SELECTION_BTN .bi {
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  body.mobile-view #MOBILE_CLEAR_SELECTION_BTN:active {
+    opacity: 0.6;
+  }
+
+  /* --- Actions button (replaces Add/Alerts on the bottom-right when selected).
+     Matches the bottom-bar ghost-button language: transparent fill, translucent
+     white border/text, subtle hover/active states. --- */
+  body.mobile-view.has-selection #MOBILE_ACTIONS_BTN {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 16px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 8px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease,
+      border-color 120ms ease;
+  }
+
+  body.mobile-view #MOBILE_ACTIONS_BTN .bi {
+    font-size: 20px;
+  }
+
+  body.mobile-view #MOBILE_ACTIONS_BTN:hover,
+  body.mobile-view #MOBILE_ACTIONS_BTN:focus {
+    background-color: rgba(255, 255, 255, 0.06);
+  }
+
+  body.mobile-view #MOBILE_ACTIONS_BTN:active {
+    background-color: rgba(255, 255, 255, 0.12);
+  }
 }

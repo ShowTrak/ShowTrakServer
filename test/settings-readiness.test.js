@@ -64,7 +64,7 @@ test('SettingsManager waits for DB readiness before reading settings', async () 
     },
   };
 
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'SettingsManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'SettingsManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../DB': dbMock,
     '../Logger': loggerMock,

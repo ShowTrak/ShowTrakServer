@@ -28,7 +28,7 @@ function wavBuffer(extraBytes = 64) {
 function loadManager(audioDir, idSequence) {
   let counter = 0;
   return loadWithMocks(
-    path.join(__dirname, '..', 'src', 'Modules', 'AudioAssetManager', 'index.js'),
+    path.join(__dirname, '..', 'dist', 'Modules', 'AudioAssetManager', 'index.js'),
     {
       '../Logger': { CreateLogger: () => createLoggerStub() },
       '../AppData': { Manager: { GetAudioDirectory: () => audioDir } },

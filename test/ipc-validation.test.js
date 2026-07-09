@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { Manager: IPCValidation } = require('../src/Modules/IPCValidation');
+const { Manager: IPCValidation } = require('../dist/Modules/IPCValidation');
 
 test('IPCValidation.UUID trims and validates non-empty UUID strings', () => {
   assert.equal(IPCValidation.UUID('  abc-123  '), 'abc-123');

@@ -28,7 +28,7 @@ function loggerStub() {
 // so ClientManager exercises genuine persistence rather than a hand-rolled stub.
 async function buildRealDB() {
   const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-cm-db-'));
-  const dbModule = loadWithMocks(path.join(__dirname, '..', 'src', 'Modules', 'DB', 'index.js'), {
+  const dbModule = loadWithMocks(path.join(__dirname, '..', 'dist', 'Modules', 'DB', 'index.js'), {
     '../Logger': loggerStub(),
     '../AppData': { Manager: { GetStorageDirectory: () => storageDir } },
   });
@@ -41,7 +41,7 @@ async function loadClientManager(settings = {}) {
   const events = [];
   const sounds = [];
   const clientManager = loadWithMocks(
-    path.join(__dirname, '..', 'src', 'Modules', 'ClientManager', 'index.js'),
+    path.join(__dirname, '..', 'dist', 'Modules', 'ClientManager', 'index.js'),
     {
       '../Logger': loggerStub(),
       '../DB': dbModule,

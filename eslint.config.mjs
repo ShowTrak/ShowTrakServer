@@ -2,6 +2,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 import markdown from '@eslint/markdown';
 import prettier from 'eslint-config-prettier';
+import tseslint from 'typescript-eslint';
 
 import { defineConfig } from 'eslint/config';
 
@@ -13,6 +14,7 @@ export default defineConfig([
       'coverage/**',
       'node_modules/**',
       'out/**',
+      'dist/**',
       'forge.config.mjs',
       '.vscode/**',
     ],
@@ -41,7 +43,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/UI/js/app/**/*.js', 'src/WebUI/main.js'],
+    files: ['src/UI/js/app/**/*.js'],
     rules: {
       // Classic renderer scripts share globals across many files.
       // Keep lint coverage enabled while avoiding false positives.
@@ -53,7 +55,7 @@ export default defineConfig([
   {
     // Non-renderer source (main process, modules, bridges, tests, scripts).
     // Renderer files intentionally keep var/globals, so these rules are scoped
-    // away from src/UI/js/app and src/WebUI/main.js.
+    // away from src/UI/js/app.
     files: [
       'src/Modules/**/*.js',
       'src/main.js',
@@ -68,6 +70,34 @@ export default defineConfig([
       eqeqeq: ['error', 'smart'],
       'no-var': 'error',
       'prefer-const': ['error', { destructuring: 'all' }],
+    },
+  },
+  {
+    // TypeScript source (main process, modules, renderer, shared types).
+    files: ['**/*.ts'],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended, prettier],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node },
+    },
+    rules: {
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      // The JS→TS migration is complete: the whole tree (server + renderer) is
+      // free of explicit `any`, so this is now enforced as an error to prevent
+      // regressions. If you truly need a dynamic value, use `unknown` and narrow.
+      '@typescript-eslint/no-explicit-any': 'error',
+      // Inline `require('../X')` is the documented workaround for not-yet-
+      // migrated managers with circular deps; removed in Phase 4.
+      '@typescript-eslint/no-require-imports': 'off',
+      // jQuery handler patterns legitimately alias `this` (e.g. into rAF closures).
+      '@typescript-eslint/no-this-alias': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          caughtErrors: 'none',
+          argsIgnorePattern: '^_[^_].*$|^_$',
+          varsIgnorePattern: '^_[^_].*$|^_$',
+        },
+      ],
     },
   },
   {

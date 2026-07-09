@@ -1,10 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const Utils = require('../src/Modules/Utils');
-const { Config } = require('../src/Modules/Config');
-const { Manager: UUID } = require('../src/Modules/UUID');
-const { Manager: ModeManager } = require('../src/Modules/ModeManager');
+const Utils = require('../dist/Modules/Utils');
+const { Config } = require('../dist/Modules/Config');
+const { Manager: UUID } = require('../dist/Modules/UUID');
+const { Manager: ModeManager } = require('../dist/Modules/ModeManager');
 
 test('Utils.Ok and Utils.Fail return stable tuple shapes', () => {
   assert.deepEqual(Utils.Ok('value'), [null, 'value']);

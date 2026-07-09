@@ -26,7 +26,7 @@ function loggerStub() {
 }
 
 function loadDB(storageDir) {
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'DB', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'DB', 'index.js');
   return loadWithMocks(modulePath, {
     '../Logger': loggerStub(),
     '../AppData': { Manager: { GetStorageDirectory: () => storageDir } },
@@ -86,6 +86,50 @@ test('DB initializes schema, runs queries, and tracks dirty state', async () => 
   );
   assert.equal(silentErr, null);
   assert.equal(await DB.HasUnsavedChanges(), false);
+
+  await DB.Shutdown();
+});
+
+test('DB records schema migration versions and keeps a fresh database clean', async () => {
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const { Manager: DB } = loadDB(storageDir);
+  await DB.Ready();
+
+  // Every declared migration is recorded (columns pre-exist on a fresh schema,
+  // so the PRAGMA probe skips the ALTER but still records the version).
+  const schema = require('../dist/Modules/DB/schema');
+  const declared = (schema.Migrations || []).map((m) => m.Version).sort((a, b) => a - b);
+  assert.ok(declared.length > 0, 'expected declared migrations');
+  const [err, rows] = await DB.All('SELECT Version FROM SchemaMigrations ORDER BY Version');
+  assert.equal(err, null);
+  assert.deepEqual(
+    rows.map((r) => r.Version),
+    declared
+  );
+
+  // Migration bookkeeping must not mark a fresh database as having unsaved changes.
+  assert.equal(await DB.HasUnsavedChanges(), false);
+
+  // WithTransaction commits on success and rolls back on throw.
+  const [txErr, txValue] = await DB.WithTransaction(async (run) => {
+    const [insErr] = await run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', ['Tx', 1]);
+    if (insErr) throw insErr;
+    return 'committed';
+  });
+  assert.equal(txErr, null);
+  assert.equal(txValue, 'committed');
+  const [, committedRow] = await DB.Get('SELECT COUNT(*) AS N FROM Groups WHERE Title = ?', ['Tx']);
+  assert.equal(committedRow.N, 1);
+
+  const [rollbackErr] = await DB.WithTransaction(async (run) => {
+    await run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', ['Doomed', 2]);
+    throw new Error('boom');
+  });
+  assert.ok(rollbackErr instanceof Error);
+  const [, doomedRow] = await DB.Get('SELECT COUNT(*) AS N FROM Groups WHERE Title = ?', [
+    'Doomed',
+  ]);
+  assert.equal(doomedRow.N, 0);
 
   await DB.Shutdown();
 });

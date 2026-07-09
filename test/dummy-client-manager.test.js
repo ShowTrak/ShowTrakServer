@@ -58,12 +58,19 @@ function createDbStub(rows = []) {
 }
 
 function loadManager(dbStub, events) {
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'DummyClientManager', 'index.js');
+  const modulePath = path.join(
+    __dirname,
+    '..',
+    'dist',
+    'Modules',
+    'DummyClientManager',
+    'index.js'
+  );
   return loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => createLoggerStub() },
     '../DB': dbStub,
     '../Broadcast': { Manager: { emit: (...args) => events.push(args) } },
-    '../Utils': require('../src/Modules/Utils'),
+    '../Utils': require('../dist/Modules/Utils'),
   }).Manager;
 }
 
@@ -161,7 +168,7 @@ test('DummyClientManager records and persists the heartbeat source IP', async ()
 });
 
 test('DummyClient state machine: Idle -> Online -> Degraded -> Offline', async () => {
-  const { DummyClient } = require('../src/Modules/DummyClientManager/dummy');
+  const { DummyClient } = require('../dist/Modules/DummyClientManager/dummy');
   const dummy = new DummyClient({
     UUID: 'u',
     DummyID: 'D1',

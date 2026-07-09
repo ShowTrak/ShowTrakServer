@@ -1,0 +1,1111 @@
+// Client
+// In-memory representation of a connected ShowTrak client.
+import { CreateLogger } from '../Logger';
+import { Manager as DB } from '../DB';
+import { CreateClientsRepository } from '../DB/repositories/clients';
+import { Manager as BroadcastManager } from '../Broadcast';
+import type {
+  USBDevice,
+  ClientDisplay,
+  RunningApplicationItem,
+  IntegratedAction,
+} from '@showtrak/protocol';
+
+const Logger = CreateLogger('ClientManager');
+
+const ClientsRepo = CreateClientsRepository(DB);
+
+// Narrow an unknown value to a plain-object view for defensive field reads.
+// Non-objects (including null) collapse to `{}`, mirroring the historical
+// `Value && typeof Value === 'object' ? Value : {}` / `Value && Value.Field`
+// guards these normalizers relied on.
+type UnknownRecord = Record<string, unknown>;
+function AsRecord(Value: unknown): UnknownRecord {
+  return typeof Value === 'object' && Value !== null ? (Value as UnknownRecord) : {};
+}
+// `parseInt` ToString-coerces its argument, so `String()` wrapping is
+// behaviour-identical to the historical `parseInt(x, 10)` on dynamic values.
+function ParseIntOrNull(Value: unknown): number | null {
+  return parseInt(String(Value), 10) || null;
+}
+// Preserve the historical `Value ? Value : null` timestamp passthrough while
+// satisfying the `number | null` field type (timestamps are always numeric).
+function TimestampOrNull(Value: unknown): number | null {
+  return (Value || null) as number | null;
+}
+
+function normalizeSerialNumber(SerialNumber: unknown): string | null {
+  if (typeof SerialNumber !== 'string') return null;
+  const Value = SerialNumber.trim();
+  if (!Value) return null;
+  return Value.toUpperCase();
+}
+
+function normalizeApplicationName(Name: unknown): string | null {
+  if (typeof Name !== 'string') return null;
+  const Value = Name.trim();
+  if (!Value) return null;
+  return Value;
+}
+
+function normalizeApplicationKey(Name: unknown): string | null {
+  const Value = normalizeApplicationName(Name);
+  if (!Value) return null;
+  return Value.toLowerCase();
+}
+
+function normalizeDisplayID(DisplayID: unknown): string | null {
+  if (DisplayID === null || DisplayID === undefined) return null;
+  const Value = String(DisplayID).trim();
+  if (!Value) return null;
+  return Value;
+}
+
+// A display "signature" captures the operator-visible configuration we guard.
+function buildDisplaySignature(Display: unknown): string {
+  const D = AsRecord(Display);
+  const Width = parseInt(String(D.Width), 10) || 0;
+  const Height = parseInt(String(D.Height), 10) || 0;
+  const RefreshRate =
+    D.RefreshRate != null && Number.isFinite(Number(D.RefreshRate))
+      ? Math.round(Number(D.RefreshRate))
+      : 0;
+  return `${Width}x${Height}@${RefreshRate}`;
+}
+
+// --- Local domain shapes ---------------------------------------------------
+// The persisted "critical" entries we guard, as normalized by the SetCritical*
+// methods and mirrored (minus UUID) by the DB rows in ../DB/rows.ts.
+interface CriticalUSBEntry {
+  SerialNumber: string;
+  ManufacturerName: string | null;
+  ProductName: string | null;
+  Timestamp: number | null;
+}
+interface CriticalDisplayEntry {
+  DisplayID: string;
+  Label: string | null;
+  Width: number | null;
+  Height: number | null;
+  RefreshRate: number | null;
+  ScaleFactor: number | null;
+  Timestamp: number | null;
+}
+interface CriticalApplicationEntry {
+  Name: string;
+  Key: string;
+  Timestamp: number | null;
+}
+
+// The augmented per-entity view entries the _rebuild* methods emit for the
+// renderer: connected devices merged with their critical/missing status. The
+// index signatures carry forward the spread of the raw telemetry payload.
+interface USBDeviceViewEntry {
+  SerialNumber: string | null;
+  ManufacturerName: string | null;
+  ProductName: string | null;
+  IsConnected: boolean;
+  IsCritical: boolean;
+  Missing: boolean;
+  [key: string]: unknown;
+}
+interface DisplayViewEntry {
+  DisplayID: string | null;
+  Label: string | null;
+  IsConnected: boolean;
+  IsCritical: boolean;
+  Missing: boolean;
+  Mismatch: boolean;
+  CurrentSignature: string | null;
+  ExpectedSignature: string | null;
+  [key: string]: unknown;
+}
+interface RunningApplicationViewEntry {
+  Name: string;
+  Count: number;
+  Key: string | null;
+  IsRunning: boolean;
+  IsCritical: boolean;
+  Missing: boolean;
+}
+
+// Vitals as held in RAM: the last heartbeat's payload, or empty objects before
+// the first heartbeat arrives. Kept structurally loose (the renderer reads the
+// concrete @showtrak/protocol Vitals fields off the serialized projection).
+interface ClientVitals {
+  CPU: Record<string, unknown>;
+  Ram: Record<string, unknown>;
+  Uptime: Record<string, unknown>;
+}
+
+// Network interfaces as normalized by SetNetworkInterfaces (a superset of the
+// wire shape; the raw address fields are copied through verbatim).
+interface NormalizedNetworkAddress {
+  family: unknown;
+  address: unknown;
+  netmask: unknown;
+  cidr: unknown;
+  mac: unknown;
+  internal: boolean;
+  scopeid: unknown;
+}
+interface NormalizedNetworkInterface {
+  name: string;
+  addresses: NormalizedNetworkAddress[];
+}
+
+// Running-applications status/snapshot as normalized in RAM. Distinct from the
+// wire RunningApplicationsSnapshot: Platform is always present (nullable), and
+// the *view* variant carries the augmented RunningApplicationViewEntry items.
+interface RunningAppStatus {
+  State: string;
+  Message: string | null;
+  Platform: string | null;
+}
+interface ObservedRunningApplicationsState {
+  SampledAt: number | null;
+  TotalCount: number;
+  Truncated: boolean;
+  Items: RunningApplicationItem[];
+  Status: RunningAppStatus;
+}
+interface RunningApplicationsView {
+  SampledAt: number | null;
+  TotalCount: number;
+  Truncated: boolean;
+  Items: RunningApplicationViewEntry[];
+  Status: RunningAppStatus;
+}
+
+// Options accepted by the DB-backed setters: `markUnsaved: false` suppresses
+// dirty-tracking for telemetry-driven writes (heartbeat/system-info).
+interface PersistOptions {
+  markUnsaved?: boolean;
+}
+
+// The de-duplicated `{ Name, Count }` pair tracked while diffing running-app
+// snapshots (both the previous-by-key map and the freshly de-duped map).
+interface DedupedRunningApplication {
+  Name: string;
+  Count: number;
+}
+
+// Seed accepted by the constructor: a persisted `ClientRow` (mirrored in
+// DB/rows.ts) or the partial literal `ClientManager.Create` builds for a freshly
+// adopted client, which omits the ordering/identity columns defaulted below.
+interface ClientConstructorInput {
+  UUID: string;
+  Timestamp: number;
+  Hostname: string | null;
+  OperatingSystem: string | null;
+  Version: string | null;
+  IP: string | null;
+  Nickname?: string | null;
+  GroupID?: number | null;
+  Weight?: number | null;
+  MacAddress?: string | null;
+}
+
+class Client {
+  // Persisted identity + ordering (mirrors DB/rows.ts ClientRow).
+  UUID: string;
+  Nickname: string | null;
+  Hostname: string | null;
+  OperatingSystem: string | null;
+  GroupID: number | null;
+  Weight: number;
+  MacAddress: string | null;
+  Version: string | null;
+  IP: string | null;
+  Timestamp: number;
+
+  // Connection + health (RAM-only, not persisted).
+  Online: boolean;
+  LastSeen: number;
+  Vitals: ClientVitals;
+  Degraded: boolean;
+  DegradedWarnings: string[];
+  Identifying: boolean;
+  ScriptsFingerprint: string | null;
+  NetworkInterfaces: NormalizedNetworkInterface[];
+
+  // Integrated (SDK) client surface.
+  Integrated: boolean;
+  IntegratedActions: IntegratedAction[];
+  IntegratedDegradedReason: string | null;
+
+  // USB devices: raw connected list, critical guards, and the rendered view
+  // (connected ∪ missing) produced by _rebuildUSBDeviceView.
+  ConnectedUSBDeviceList: USBDevice[];
+  USBDeviceList: USBDeviceViewEntry[];
+  CriticalUSBDevices: CriticalUSBEntry[];
+  CriticalUSBSerials: string[];
+  MissingCriticalUSBDevices: USBDeviceViewEntry[];
+
+  // Displays: raw connected list, critical guards, and the rendered view.
+  ConnectedDisplayList: ClientDisplay[];
+  DisplayList: DisplayViewEntry[];
+  CriticalDisplays: CriticalDisplayEntry[];
+  CriticalDisplayIDs: string[];
+  MissingCriticalDisplays: DisplayViewEntry[];
+  MismatchedCriticalDisplays: DisplayViewEntry[];
+
+  // Running applications: critical guards, the raw observed snapshot, and the
+  // augmented view (observed ∪ missing-critical) with its change signatures.
+  CriticalApplications: CriticalApplicationEntry[];
+  CriticalApplicationKeys: string[];
+  MissingCriticalApplications: RunningApplicationViewEntry[];
+  ObservedRunningApplications: ObservedRunningApplicationsState;
+  RunningApplications: RunningApplicationsView;
+  RunningApplicationsSignature: string | null;
+  ObservedRunningApplicationsSignature: string | null;
+
+  constructor(Data: ClientConstructorInput) {
+    this.UUID = Data.UUID;
+    this.Nickname = Data.Nickname ? Data.Nickname : Data.Hostname;
+    this.Hostname = Data.Hostname || null;
+    this.OperatingSystem = Data.OperatingSystem || null;
+    this.GroupID = Data.GroupID || null;
+    // Weight supports manual ordering within groups; defaults to 100 if unspecified
+    this.Weight = typeof Data.Weight === 'number' ? Data.Weight : 100;
+    this.MacAddress = Data.MacAddress || null;
+    this.Version = Data.Version || null;
+    this.IP = Data.IP || null;
+    this.Timestamp = Data.Timestamp;
+
+    this.Online = false;
+    this.LastSeen = Date.now();
+    this.Vitals = {
+      CPU: {},
+      Ram: {},
+      Uptime: {},
+    };
+    this.ConnectedUSBDeviceList = [];
+    this.USBDeviceList = [];
+    this.CriticalUSBDevices = [];
+    this.CriticalUSBSerials = [];
+    this.MissingCriticalUSBDevices = [];
+    this.CriticalApplications = [];
+    this.CriticalApplicationKeys = [];
+    this.MissingCriticalApplications = [];
+    this.ConnectedDisplayList = [];
+    this.DisplayList = [];
+    this.CriticalDisplays = [];
+    this.CriticalDisplayIDs = [];
+    this.MissingCriticalDisplays = [];
+    this.MismatchedCriticalDisplays = [];
+    this.Degraded = false;
+    this.DegradedWarnings = [];
+    this.NetworkInterfaces = [];
+    this.ScriptsFingerprint = null;
+    this.Identifying = false;
+    this.Integrated = false;
+    this.IntegratedActions = [];
+    this.IntegratedDegradedReason = null;
+    this.ObservedRunningApplications = {
+      SampledAt: null,
+      TotalCount: 0,
+      Truncated: false,
+      Items: [],
+      Status: {
+        State: 'unknown',
+        Message: null,
+        Platform: null,
+      },
+    };
+    this.RunningApplications = {
+      SampledAt: null,
+      TotalCount: 0,
+      Truncated: false,
+      Items: [],
+      Status: {
+        State: 'unknown',
+        Message: null,
+        Platform: null,
+      },
+    };
+    this.RunningApplicationsSignature = null;
+    this.ObservedRunningApplicationsSignature = null;
+  }
+
+  // RAM-only fields and notifications
+  SetOnline(Online: boolean) {
+    if (this.Online === Online) return;
+    this.Online = Online;
+    this._refreshClientHealthState();
+    Logger.debug(`Client ${this.UUID} Online updated to ${Online}`);
+    BroadcastManager.emit('ClientUpdated', this);
+    return;
+  }
+  SetLastSeen(LastSeen: number) {
+    if (this.LastSeen === LastSeen) return;
+    this.LastSeen = LastSeen;
+    return;
+  }
+  SetIdentifying(Identifying: unknown) {
+    const Next = !!Identifying;
+    if (this.Identifying === Next) return;
+    this.Identifying = Next;
+    Logger.debug(`Client ${this.UUID} Identifying updated to ${Next}`);
+    BroadcastManager.emit('ClientUpdated', this);
+    return;
+  }
+  SetVitals(Vitals: unknown) {
+    const Source = AsRecord(Vitals);
+    this.Vitals = {
+      CPU: AsRecord(Source.CPU),
+      Ram: AsRecord(Source.Ram),
+      Uptime: AsRecord(Source.Uptime),
+    };
+    BroadcastManager.emit('ClientUpdated', this);
+  }
+  SetIntegratedState(State: unknown, Message: unknown) {
+    const Normalized = String(State || '')
+      .trim()
+      .toUpperCase();
+    if (Normalized === 'DEGRADED') {
+      const Reason = typeof Message === 'string' && Message.trim() ? Message.trim() : 'Degraded';
+      this.IntegratedDegradedReason = Reason.slice(0, 120);
+    } else if (Normalized === 'ONLINE') {
+      this.IntegratedDegradedReason = null;
+    } else {
+      return false;
+    }
+    this._refreshClientHealthState();
+    BroadcastManager.emit('ClientUpdated', this);
+    return true;
+  }
+  SetUSBDeviceList(USBDeviceList: unknown) {
+    this.ConnectedUSBDeviceList = Array.isArray(USBDeviceList) ? USBDeviceList : [];
+    this._rebuildUSBDeviceView();
+    Logger.debug(`Client ${this.UUID} USB Device List updated`);
+    BroadcastManager.emit('ClientUpdated', this);
+    return;
+  }
+  SetCriticalUSBDevices(Devices: unknown) {
+    const List: unknown[] = Array.isArray(Devices) ? Devices : [];
+    const Normalized: CriticalUSBEntry[] = [];
+    const Seen = new Set<string>();
+    for (const Raw of List) {
+      const Entry = AsRecord(Raw);
+      const SerialNumber = normalizeSerialNumber(Entry.SerialNumber);
+      if (!SerialNumber || Seen.has(SerialNumber)) continue;
+      Seen.add(SerialNumber);
+      Normalized.push({
+        SerialNumber,
+        ManufacturerName: Entry.ManufacturerName ? String(Entry.ManufacturerName) : null,
+        ProductName: Entry.ProductName ? String(Entry.ProductName) : null,
+        Timestamp: TimestampOrNull(Entry.Timestamp),
+      });
+    }
+    this.CriticalUSBDevices = Normalized;
+    this.CriticalUSBSerials = Normalized.map((Entry) => Entry.SerialNumber);
+    this._rebuildUSBDeviceView();
+    return;
+  }
+  IsUSBDeviceCritical(SerialNumber: unknown) {
+    const Normalized = normalizeSerialNumber(SerialNumber);
+    if (!Normalized) return false;
+    return this.CriticalUSBSerials.includes(Normalized);
+  }
+  MarkCriticalUSBDevice(Device: unknown) {
+    const D = AsRecord(Device);
+    const Normalized = normalizeSerialNumber(D.SerialNumber);
+    if (!Normalized) return false;
+    const Existing = this.CriticalUSBDevices.find(
+      (Entry: CriticalUSBEntry) => Entry.SerialNumber === Normalized
+    );
+    if (Existing) {
+      if (!Existing.ManufacturerName && D.ManufacturerName) {
+        Existing.ManufacturerName = String(D.ManufacturerName);
+      }
+      if (!Existing.ProductName && D.ProductName) {
+        Existing.ProductName = String(D.ProductName);
+      }
+      if (!Existing.Timestamp && D.Timestamp) {
+        Existing.Timestamp = TimestampOrNull(D.Timestamp);
+      }
+      this._rebuildUSBDeviceView();
+      return false;
+    }
+
+    this.CriticalUSBDevices.push({
+      SerialNumber: Normalized,
+      ManufacturerName: D.ManufacturerName ? String(D.ManufacturerName) : null,
+      ProductName: D.ProductName ? String(D.ProductName) : null,
+      Timestamp: TimestampOrNull(D.Timestamp),
+    });
+    this.CriticalUSBSerials = this.CriticalUSBDevices.map(
+      (Entry: CriticalUSBEntry) => Entry.SerialNumber
+    );
+    this._rebuildUSBDeviceView();
+    return true;
+  }
+  UnmarkCriticalUSBSerial(SerialNumber: unknown) {
+    const Normalized = normalizeSerialNumber(SerialNumber);
+    if (!Normalized) return false;
+    const PrevLength = this.CriticalUSBDevices.length;
+    this.CriticalUSBDevices = this.CriticalUSBDevices.filter(
+      (Entry: CriticalUSBEntry) => Entry.SerialNumber !== Normalized
+    );
+    if (this.CriticalUSBDevices.length === PrevLength) return false;
+    this.CriticalUSBSerials = this.CriticalUSBDevices.map(
+      (Entry: CriticalUSBEntry) => Entry.SerialNumber
+    );
+    this._rebuildUSBDeviceView();
+    return true;
+  }
+  SetDisplayList(DisplayList: unknown) {
+    this.ConnectedDisplayList = Array.isArray(DisplayList) ? DisplayList : [];
+    this._rebuildDisplayView();
+    Logger.debug(`Client ${this.UUID} Display List updated`);
+    BroadcastManager.emit('ClientUpdated', this);
+    return;
+  }
+  SetCriticalDisplays(Displays: unknown) {
+    const List: unknown[] = Array.isArray(Displays) ? Displays : [];
+    const Normalized: CriticalDisplayEntry[] = [];
+    const Seen = new Set<string>();
+    for (const Raw of List) {
+      const Entry = AsRecord(Raw);
+      const DisplayID = normalizeDisplayID(Entry.DisplayID);
+      if (!DisplayID || Seen.has(DisplayID)) continue;
+      Seen.add(DisplayID);
+      Normalized.push({
+        DisplayID,
+        Label: Entry.Label ? String(Entry.Label) : null,
+        Width: ParseIntOrNull(Entry.Width),
+        Height: ParseIntOrNull(Entry.Height),
+        RefreshRate:
+          Entry.RefreshRate != null && Number.isFinite(Number(Entry.RefreshRate))
+            ? Math.round(Number(Entry.RefreshRate))
+            : null,
+        ScaleFactor:
+          Entry.ScaleFactor != null && Number.isFinite(Number(Entry.ScaleFactor))
+            ? Number(Entry.ScaleFactor)
+            : null,
+        Timestamp: TimestampOrNull(Entry.Timestamp),
+      });
+    }
+    this.CriticalDisplays = Normalized;
+    this.CriticalDisplayIDs = Normalized.map((Entry) => Entry.DisplayID);
+    this._rebuildDisplayView();
+    return;
+  }
+  IsDisplayCritical(DisplayID: unknown) {
+    const Normalized = normalizeDisplayID(DisplayID);
+    if (!Normalized) return false;
+    return this.CriticalDisplayIDs.includes(Normalized);
+  }
+  MarkCriticalDisplay(Display: unknown) {
+    const D = AsRecord(Display);
+    const DisplayID = normalizeDisplayID(D.DisplayID);
+    if (!DisplayID) return false;
+    const Existing = this.CriticalDisplays.find(
+      (Entry: CriticalDisplayEntry) => Entry.DisplayID === DisplayID
+    );
+    if (Existing) {
+      if (D.Label) Existing.Label = String(D.Label);
+      if (D.Width != null) Existing.Width = ParseIntOrNull(D.Width);
+      if (D.Height != null) Existing.Height = ParseIntOrNull(D.Height);
+      if (D.RefreshRate != null) {
+        Existing.RefreshRate = Number.isFinite(Number(D.RefreshRate))
+          ? Math.round(Number(D.RefreshRate))
+          : null;
+      }
+      if (D.ScaleFactor != null) {
+        Existing.ScaleFactor = Number.isFinite(Number(D.ScaleFactor))
+          ? Number(D.ScaleFactor)
+          : null;
+      }
+      if (D.Timestamp) Existing.Timestamp = TimestampOrNull(D.Timestamp);
+      this._rebuildDisplayView();
+      return false;
+    }
+    this.CriticalDisplays.push({
+      DisplayID,
+      Label: D.Label ? String(D.Label) : null,
+      Width: ParseIntOrNull(D.Width),
+      Height: ParseIntOrNull(D.Height),
+      RefreshRate:
+        D.RefreshRate != null && Number.isFinite(Number(D.RefreshRate))
+          ? Math.round(Number(D.RefreshRate))
+          : null,
+      ScaleFactor:
+        D.ScaleFactor != null && Number.isFinite(Number(D.ScaleFactor))
+          ? Number(D.ScaleFactor)
+          : null,
+      Timestamp: TimestampOrNull(D.Timestamp),
+    });
+    this.CriticalDisplayIDs = this.CriticalDisplays.map(
+      (Entry: CriticalDisplayEntry) => Entry.DisplayID
+    );
+    this._rebuildDisplayView();
+    return true;
+  }
+  UnmarkCriticalDisplay(DisplayID: unknown) {
+    const Normalized = normalizeDisplayID(DisplayID);
+    if (!Normalized) return false;
+    const PrevLength = this.CriticalDisplays.length;
+    this.CriticalDisplays = this.CriticalDisplays.filter(
+      (Entry: CriticalDisplayEntry) => Entry.DisplayID !== Normalized
+    );
+    if (this.CriticalDisplays.length === PrevLength) return false;
+    this.CriticalDisplayIDs = this.CriticalDisplays.map(
+      (Entry: CriticalDisplayEntry) => Entry.DisplayID
+    );
+    this._rebuildDisplayView();
+    return true;
+  }
+  SetCriticalApplications(Applications: unknown) {
+    const List: unknown[] = Array.isArray(Applications) ? Applications : [];
+    const Normalized: CriticalApplicationEntry[] = [];
+    const Seen = new Set<string>();
+    for (const Raw of List) {
+      const Entry = AsRecord(Raw);
+      const Name = normalizeApplicationName(Entry.Name);
+      const Key = normalizeApplicationKey(Name);
+      if (!Name || !Key || Seen.has(Key)) continue;
+      Seen.add(Key);
+      Normalized.push({
+        Name,
+        Key,
+        Timestamp: TimestampOrNull(Entry.Timestamp),
+      });
+    }
+    this.CriticalApplications = Normalized;
+    this.CriticalApplicationKeys = Normalized.map((Entry) => Entry.Key);
+    this._rebuildRunningApplicationsView();
+    return;
+  }
+  IsApplicationCritical(Name: unknown) {
+    const Key = normalizeApplicationKey(Name);
+    if (!Key) return false;
+    return this.CriticalApplicationKeys.includes(Key);
+  }
+  MarkCriticalApplication(Application: unknown) {
+    const A = AsRecord(Application);
+    const Name = normalizeApplicationName(A.Name);
+    const Key = normalizeApplicationKey(Name);
+    if (!Name || !Key) return false;
+    const Existing = this.CriticalApplications.find(
+      (Entry: CriticalApplicationEntry) => Entry.Key === Key
+    );
+    if (Existing) {
+      if (!Existing.Name) Existing.Name = Name;
+      if (!Existing.Timestamp && A.Timestamp) {
+        Existing.Timestamp = TimestampOrNull(A.Timestamp);
+      }
+      this._rebuildRunningApplicationsView();
+      return false;
+    }
+    this.CriticalApplications.push({
+      Name,
+      Key,
+      Timestamp: TimestampOrNull(A.Timestamp),
+    });
+    this.CriticalApplicationKeys = this.CriticalApplications.map(
+      (Entry: CriticalApplicationEntry) => Entry.Key
+    );
+    this._rebuildRunningApplicationsView();
+    return true;
+  }
+  UnmarkCriticalApplication(Name: unknown) {
+    const Key = normalizeApplicationKey(Name);
+    if (!Key) return false;
+    const PrevLength = this.CriticalApplications.length;
+    this.CriticalApplications = this.CriticalApplications.filter(
+      (Entry: CriticalApplicationEntry) => Entry.Key !== Key
+    );
+    if (this.CriticalApplications.length === PrevLength) return false;
+    this.CriticalApplicationKeys = this.CriticalApplications.map(
+      (Entry: CriticalApplicationEntry) => Entry.Key
+    );
+    this._rebuildRunningApplicationsView();
+    return true;
+  }
+  _refreshClientHealthState() {
+    const MissingUSBCount = Array.isArray(this.MissingCriticalUSBDevices)
+      ? this.MissingCriticalUSBDevices.length
+      : 0;
+    const ProcessStatusState = String(
+      this.RunningApplications &&
+        this.RunningApplications.Status &&
+        this.RunningApplications.Status.State
+        ? this.RunningApplications.Status.State
+        : 'unknown'
+    ).toLowerCase();
+    const CanEvaluateCriticalApplications = ProcessStatusState === 'ok';
+    const MissingApplicationCount =
+      CanEvaluateCriticalApplications && Array.isArray(this.MissingCriticalApplications)
+        ? this.MissingCriticalApplications.length
+        : 0;
+    const Warnings: string[] = [];
+    if (MissingApplicationCount > 0) Warnings.push('Critical Application Issue');
+    if (MissingUSBCount > 0) Warnings.push('Missing USB Device');
+    const MissingDisplayCount = Array.isArray(this.MissingCriticalDisplays)
+      ? this.MissingCriticalDisplays.length
+      : 0;
+    const MismatchedDisplayCount = Array.isArray(this.MismatchedCriticalDisplays)
+      ? this.MismatchedCriticalDisplays.length
+      : 0;
+    if (MissingDisplayCount > 0) Warnings.push('Missing Display');
+    if (MismatchedDisplayCount > 0) Warnings.push('Display Configuration Changed');
+    if (this.IntegratedDegradedReason) Warnings.push(this.IntegratedDegradedReason);
+    this.Degraded = !!this.Online && Warnings.length > 0;
+    this.DegradedWarnings = this.Degraded ? Warnings : [];
+  }
+  _rebuildUSBDeviceView() {
+    const CriticalBySerial = new Map<string, CriticalUSBEntry>(
+      (Array.isArray(this.CriticalUSBDevices) ? this.CriticalUSBDevices : [])
+        .map((Entry: CriticalUSBEntry) => {
+          const SerialNumber = normalizeSerialNumber(Entry && Entry.SerialNumber);
+          if (!SerialNumber) return null;
+          return [SerialNumber, Entry];
+        })
+        .filter((Entry): Entry is [string, CriticalUSBEntry] => !!Entry)
+    );
+
+    const Connected: USBDeviceViewEntry[] = (
+      Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : []
+    ).map((Device) => {
+      const SerialNumber = normalizeSerialNumber(Device && Device.SerialNumber);
+      const CriticalEntry = SerialNumber ? CriticalBySerial.get(SerialNumber) : null;
+      return {
+        ...(Device || {}),
+        SerialNumber: Device && Device.SerialNumber ? String(Device.SerialNumber) : null,
+        IsConnected: true,
+        IsCritical: !!CriticalEntry,
+        Missing: false,
+        ManufacturerName:
+          (Device && Device.ManufacturerName) ||
+          (CriticalEntry && CriticalEntry.ManufacturerName) ||
+          null,
+        ProductName:
+          (Device && Device.ProductName) || (CriticalEntry && CriticalEntry.ProductName) || null,
+      };
+    });
+
+    const ConnectedSerials = new Set(
+      Connected.map((Device) => normalizeSerialNumber(Device && Device.SerialNumber)).filter(
+        Boolean
+      )
+    );
+
+    const Missing: USBDeviceViewEntry[] = [];
+    for (const Entry of this.CriticalUSBDevices) {
+      if (!Entry || !Entry.SerialNumber) continue;
+      if (ConnectedSerials.has(Entry.SerialNumber)) continue;
+      Missing.push({
+        ManufacturerName: Entry.ManufacturerName,
+        ProductName: Entry.ProductName,
+        SerialNumber: Entry.SerialNumber,
+        IsConnected: false,
+        IsCritical: true,
+        Missing: true,
+      });
+    }
+
+    this.MissingCriticalUSBDevices = Missing;
+    this.USBDeviceList = Connected.concat(Missing);
+    this._refreshClientHealthState();
+  }
+  _rebuildDisplayView() {
+    const CriticalByID = new Map<string, CriticalDisplayEntry>(
+      (Array.isArray(this.CriticalDisplays) ? this.CriticalDisplays : [])
+        .map((Entry: CriticalDisplayEntry) => {
+          const DisplayID = normalizeDisplayID(Entry && Entry.DisplayID);
+          if (!DisplayID) return null;
+          return [DisplayID, Entry];
+        })
+        .filter((Entry): Entry is [string, CriticalDisplayEntry] => !!Entry)
+    );
+
+    const Connected: DisplayViewEntry[] = (
+      Array.isArray(this.ConnectedDisplayList) ? this.ConnectedDisplayList : []
+    ).map((Display) => {
+      const DisplayID = normalizeDisplayID(Display && Display.DisplayID);
+      const CriticalEntry = DisplayID ? CriticalByID.get(DisplayID) : null;
+      const CurrentSignature = buildDisplaySignature(Display);
+      const ExpectedSignature = CriticalEntry ? buildDisplaySignature(CriticalEntry) : null;
+      const Mismatch = !!CriticalEntry && ExpectedSignature !== CurrentSignature;
+      return {
+        ...(Display || {}),
+        DisplayID,
+        IsConnected: true,
+        IsCritical: !!CriticalEntry,
+        Missing: false,
+        Mismatch,
+        CurrentSignature,
+        ExpectedSignature,
+        Label: (Display && Display.Label) || (CriticalEntry && CriticalEntry.Label) || null,
+      };
+    });
+
+    const ConnectedIDs = new Set(
+      Connected.map((Display) => normalizeDisplayID(Display && Display.DisplayID)).filter(Boolean)
+    );
+
+    const Missing: DisplayViewEntry[] = [];
+    for (const Entry of this.CriticalDisplays) {
+      if (!Entry || !Entry.DisplayID) continue;
+      if (ConnectedIDs.has(normalizeDisplayID(Entry.DisplayID))) continue;
+      Missing.push({
+        DisplayID: Entry.DisplayID,
+        Label: Entry.Label || null,
+        Width: Entry.Width || null,
+        Height: Entry.Height || null,
+        RefreshRate: Entry.RefreshRate || null,
+        ScaleFactor: Entry.ScaleFactor || null,
+        IsConnected: false,
+        IsCritical: true,
+        Missing: true,
+        Mismatch: false,
+        CurrentSignature: null,
+        ExpectedSignature: buildDisplaySignature(Entry),
+      });
+    }
+
+    this.MissingCriticalDisplays = Missing;
+    this.MismatchedCriticalDisplays = Connected.filter((Display) => Display.Mismatch);
+    this.DisplayList = Connected.concat(Missing);
+    this._refreshClientHealthState();
+  }
+  _rebuildRunningApplicationsView() {
+    const Observed = Array.isArray(this.ObservedRunningApplications?.Items)
+      ? this.ObservedRunningApplications.Items
+      : [];
+    const CriticalByKey = new Map<string, CriticalApplicationEntry>(
+      (Array.isArray(this.CriticalApplications) ? this.CriticalApplications : [])
+        .map((Entry: CriticalApplicationEntry) => {
+          if (!Entry || !Entry.Key) return null;
+          return [Entry.Key, Entry] as [string, CriticalApplicationEntry];
+        })
+        .filter((Entry): Entry is [string, CriticalApplicationEntry] => !!Entry)
+    );
+
+    const Running: RunningApplicationViewEntry[] = Observed.map((Entry) => {
+      const Name = normalizeApplicationName(Entry && Entry.Name) || 'Unknown Application';
+      const Key = normalizeApplicationKey(Name);
+      const CriticalEntry = Key ? CriticalByKey.get(Key) : null;
+      return {
+        Name,
+        Count: Math.max(1, parseInt(String(Entry.Count), 10) || 1),
+        Key,
+        IsRunning: true,
+        IsCritical: !!CriticalEntry,
+        Missing: false,
+      };
+    });
+
+    const RunningKeys = new Set(Running.map((Entry) => Entry.Key).filter(Boolean));
+    const Missing: RunningApplicationViewEntry[] = [];
+    for (const Entry of this.CriticalApplications) {
+      if (!Entry || !Entry.Key) continue;
+      if (RunningKeys.has(Entry.Key)) continue;
+      Missing.push({
+        Name: Entry.Name,
+        Count: 0,
+        Key: Entry.Key,
+        IsRunning: false,
+        IsCritical: true,
+        Missing: true,
+      });
+    }
+
+    this.MissingCriticalApplications = Missing;
+    this.RunningApplications = {
+      SampledAt: this.ObservedRunningApplications?.SampledAt || null,
+      TotalCount: this.ObservedRunningApplications?.TotalCount || Running.length,
+      Truncated: !!this.ObservedRunningApplications?.Truncated,
+      Items: Running.concat(Missing),
+      Status: this.ObservedRunningApplications?.Status || {
+        State: 'unknown',
+        Message: null,
+        Platform: null,
+      },
+    };
+    this.RunningApplicationsSignature = `${this.RunningApplications.TotalCount}|${
+      this.RunningApplications.Truncated ? '1' : '0'
+    }|${this.RunningApplications.Items.map(
+      (Entry) => `${Entry.Name}:${Entry.IsRunning ? '1' : '0'}:${Entry.IsCritical ? '1' : '0'}`
+    ).join('|')}`;
+    this._refreshClientHealthState();
+  }
+  SetNetworkInterfaces(Interfaces: unknown) {
+    try {
+      const List: unknown[] = Array.isArray(Interfaces) ? Interfaces : [];
+      const normalized: NormalizedNetworkInterface[] = List.map((rawIface) => {
+        const iface = AsRecord(rawIface);
+        return {
+          name: iface.name ? String(iface.name) : 'unknown',
+          addresses: Array.isArray(iface.addresses)
+            ? iface.addresses.map((rawAddr: unknown) => {
+                const a = AsRecord(rawAddr);
+                return {
+                  family: a.family,
+                  address: a.address,
+                  netmask: a.netmask,
+                  cidr: a.cidr || null,
+                  mac: a.mac,
+                  internal: !!a.internal,
+                  scopeid: typeof a.scopeid !== 'undefined' ? a.scopeid : null,
+                };
+              })
+            : [],
+        };
+      });
+      this.NetworkInterfaces = normalized;
+      Logger.debug(`Client ${this.UUID} Network Interfaces updated (${normalized.length})`);
+      BroadcastManager.emit('ClientUpdated', this);
+    } catch (e) {
+      Logger.error('Failed to set network interfaces for', this.UUID, e);
+    }
+  }
+  SetScriptsFingerprint(ScriptsFingerprint: unknown) {
+    const NextValue =
+      typeof ScriptsFingerprint === 'string' && ScriptsFingerprint.trim().length > 0
+        ? ScriptsFingerprint.trim()
+        : null;
+    if (this.ScriptsFingerprint === NextValue) return;
+    this.ScriptsFingerprint = NextValue;
+    BroadcastManager.emit('ClientUpdated', this);
+  }
+  SetIntegratedActions(Actions: unknown) {
+    this.Integrated = true;
+    this.IntegratedActions = Array.isArray(Actions) ? Actions : [];
+    BroadcastManager.emit('ClientUpdated', this);
+  }
+  SetRunningApplications(Snapshot: unknown) {
+    const S = AsRecord(Snapshot);
+    const PreviousItems = Array.isArray(this.ObservedRunningApplications?.Items)
+      ? this.ObservedRunningApplications.Items
+      : [];
+    const PreviousByKey = new Map<string, DedupedRunningApplication>(
+      PreviousItems.map((Entry): [string, DedupedRunningApplication] | null => {
+        const Name = normalizeApplicationName(Entry && Entry.Name);
+        const Key = normalizeApplicationKey(Name);
+        if (!Name || !Key) return null;
+        return [Key, { Name, Count: Math.max(1, parseInt(String(Entry.Count), 10) || 1) }];
+      }).filter((Pair): Pair is [string, DedupedRunningApplication] => Pair !== null)
+    );
+    const RawItems: unknown[] = Array.isArray(S.Items) ? S.Items : [];
+    const RawStatus = AsRecord(S.Status);
+    const NextStatus = {
+      State:
+        typeof RawStatus.State === 'string' && RawStatus.State.trim().length > 0
+          ? RawStatus.State.trim().toLowerCase()
+          : 'ok',
+      Message:
+        typeof RawStatus.Message === 'string' && RawStatus.Message.trim().length > 0
+          ? RawStatus.Message.trim()
+          : null,
+      Platform:
+        typeof RawStatus.Platform === 'string' && RawStatus.Platform.trim().length > 0
+          ? RawStatus.Platform.trim()
+          : null,
+    };
+    const PreviousStatus = this.ObservedRunningApplications?.Status || {
+      State: 'unknown',
+      Message: null,
+      Platform: null,
+    };
+    const StatusChanged =
+      PreviousStatus.State !== NextStatus.State ||
+      PreviousStatus.Message !== NextStatus.Message ||
+      PreviousStatus.Platform !== NextStatus.Platform;
+    const Deduped = new Map<string, DedupedRunningApplication>();
+
+    for (const Raw of RawItems) {
+      const Entry = AsRecord(Raw);
+      const Name = normalizeApplicationName(Entry.Name);
+      const Key = normalizeApplicationKey(Name);
+      if (!Name || !Key) continue;
+      const Count = Math.max(1, parseInt(String(Entry.Count), 10) || 1);
+      const Existing = Deduped.get(Key);
+      if (Existing) {
+        Existing.Count += Count;
+        continue;
+      }
+      Deduped.set(Key, { Name, Count });
+    }
+
+    const Items = Array.from(Deduped.values()).sort((left, right) => {
+      if (right.Count !== left.Count) return right.Count - left.Count;
+      return left.Name.localeCompare(right.Name);
+    });
+    const TotalCount = Math.max(0, parseInt(String(S.TotalCount), 10) || Items.length);
+    const Truncated = !!S.Truncated;
+    const SampledAt = Number.isFinite(Number(S.SampledAt)) ? Number(S.SampledAt) : Date.now();
+    const Signature = `${TotalCount}|${Truncated ? '1' : '0'}|${Items.map(
+      (Entry) => `${Entry.Name}:${Entry.Count}`
+    ).join('|')}`;
+
+    const ShouldSkipItems = !!S.NoChanges;
+    if (
+      !ShouldSkipItems &&
+      this.ObservedRunningApplicationsSignature === Signature &&
+      !StatusChanged
+    )
+      return;
+
+    if (!ShouldSkipItems) {
+      this.ObservedRunningApplications = {
+        SampledAt,
+        TotalCount,
+        Truncated,
+        Items,
+        Status: NextStatus,
+      };
+      this.ObservedRunningApplicationsSignature = Signature;
+    } else {
+      this.ObservedRunningApplications = {
+        ...this.ObservedRunningApplications,
+        SampledAt,
+        TotalCount: Math.max(
+          0,
+          parseInt(String(S.TotalCount), 10) || this.ObservedRunningApplications.TotalCount || 0
+        ),
+        Truncated:
+          typeof S.Truncated === 'boolean'
+            ? S.Truncated
+            : !!this.ObservedRunningApplications.Truncated,
+        Status: NextStatus,
+      };
+    }
+
+    if (ShouldSkipItems) {
+      this._rebuildRunningApplicationsView();
+      BroadcastManager.emit('ClientUpdated', this);
+      return;
+    }
+
+    const NextKeys = new Set(
+      Items.map((Entry) => normalizeApplicationKey(Entry.Name)).filter(Boolean)
+    );
+    for (const Entry of Items) {
+      const Key = normalizeApplicationKey(Entry.Name);
+      if (!Key || PreviousByKey.has(Key)) continue;
+      BroadcastManager.emit('ApplicationStarted', this, {
+        Name: Entry.Name,
+        Count: Entry.Count,
+      });
+    }
+    for (const [Key, Entry] of PreviousByKey.entries()) {
+      if (NextKeys.has(Key)) continue;
+      BroadcastManager.emit('ApplicationStopped', this, {
+        Name: Entry.Name,
+        Count: Entry.Count,
+      });
+    }
+
+    this._rebuildRunningApplicationsView();
+    BroadcastManager.emit('ClientUpdated', this);
+  }
+  async USBDeviceAdded(Device: USBDevice) {
+    const AddedSerial = normalizeSerialNumber(Device && Device.SerialNumber);
+    this.ConnectedUSBDeviceList = (
+      Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : []
+    ).filter((Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) !== AddedSerial);
+    this.ConnectedUSBDeviceList.push(Device || {});
+    this._rebuildUSBDeviceView();
+    BroadcastManager.emit('ClientUpdated', this);
+    BroadcastManager.emit('USBDeviceAdded', this, Device);
+    return;
+  }
+  async USBDeviceRemoved(Device: USBDevice) {
+    const RemovedSerial = normalizeSerialNumber(Device && Device.SerialNumber);
+    this.ConnectedUSBDeviceList = (
+      Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : []
+    ).filter((Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) !== RemovedSerial);
+    this._rebuildUSBDeviceView();
+    BroadcastManager.emit('ClientUpdated', this);
+    BroadcastManager.emit('USBDeviceRemoved', this, Device);
+    return;
+  }
+
+  async _persistColumn(Column: string, Value: unknown, Options: PersistOptions = {}) {
+    const [Err] = await ClientsRepo.UpdateColumn(this.UUID, Column, Value, {
+      markUnsaved: Options.markUnsaved,
+    });
+    return !Err;
+  }
+
+  // Persistent fields (DB-backed)
+  async SetNickname(Nickname: string | null) {
+    if (this.Nickname === Nickname) return;
+    this.Nickname = Nickname;
+    if (!(await this._persistColumn('Nickname', Nickname))) {
+      return Logger.error('Failed to update client nickname');
+    }
+    BroadcastManager.emit('ClientUpdated', this);
+    Logger.debug(`Client ${this.UUID} nickname updated to ${Nickname}`);
+  }
+  async SetGroupID(GroupID: number | string | null) {
+    if (this.GroupID === GroupID) return;
+    if (GroupID === 'null') GroupID = null;
+    this.GroupID = GroupID as number | null;
+    if (!(await this._persistColumn('GroupID', GroupID))) {
+      return Logger.error('Failed to update client GroupID');
+    }
+    BroadcastManager.emit('ClientListChanged');
+    BroadcastManager.emit('ClientUpdated', this);
+    Logger.debug(`Client ${this.UUID} GroupID updated to ${GroupID}`);
+  }
+  async SetHostname(Hostname: string | null, Options: PersistOptions = {}) {
+    if (this.Hostname === Hostname) return;
+    this.Hostname = Hostname;
+    if (!(await this._persistColumn('Hostname', Hostname, Options))) {
+      return Logger.error('Failed to update client hostname');
+    }
+    BroadcastManager.emit('ClientUpdated', this);
+    Logger.debug(`Client ${this.UUID} hostname updated to ${Hostname}`);
+  }
+  async SetOperatingSystem(OperatingSystem: string | null, Options: PersistOptions = {}) {
+    if (this.OperatingSystem === OperatingSystem) return;
+    this.OperatingSystem = OperatingSystem;
+    if (!(await this._persistColumn('OperatingSystem', OperatingSystem, Options))) {
+      return Logger.error('Failed to update client operating system');
+    }
+    BroadcastManager.emit('ClientUpdated', this);
+    Logger.debug(`Client ${this.UUID} operating system updated to ${OperatingSystem}`);
+  }
+  async SetMacAddress(MacAddress: string | null, Options: PersistOptions = {}) {
+    if (this.MacAddress === MacAddress) return;
+    this.MacAddress = MacAddress;
+    if (!(await this._persistColumn('MacAddress', MacAddress, Options))) {
+      return Logger.error('Failed to update client mac address');
+    }
+    BroadcastManager.emit('ClientUpdated', this);
+    Logger.debug(`Client ${this.UUID} mac address updated to ${MacAddress}`);
+  }
+  async SetVersion(Version: string | null, Options: PersistOptions = {}) {
+    if (this.Version === Version) return;
+    this.Version = Version;
+    if (!(await this._persistColumn('Version', Version, Options))) {
+      return Logger.error('Failed to update client version');
+    }
+    BroadcastManager.emit('ClientUpdated', this);
+    Logger.debug(`Client ${this.UUID} version updated to ${Version}`);
+  }
+  async SetWeight(Weight: number) {
+    if (this.Weight === Weight) return;
+    this.Weight = Weight;
+    if (!(await this._persistColumn('Weight', Weight))) {
+      return Logger.error('Failed to update client weight');
+    }
+    BroadcastManager.emit('ClientUpdated', this);
+    Logger.debug(`Client ${this.UUID} weight updated to ${Weight}`);
+  }
+  async SetIP(IP: string | null, Options: PersistOptions = {}) {
+    if (this.IP === IP) return;
+    this.IP = IP;
+    if (!(await this._persistColumn('IP', IP, Options))) {
+      return Logger.error('Failed to update client IP');
+    }
+    BroadcastManager.emit('ClientUpdated', this);
+    Logger.debug(`Client ${this.UUID} IP updated to ${IP}`);
+  }
+}
+
+export { Client };

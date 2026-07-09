@@ -6,7 +6,7 @@ const path = require('node:path');
 const { loadWithMocks } = require('../test-support/load-with-mocks');
 
 function actionPath(name) {
-  return path.join(__dirname, '..', 'src', 'Modules', 'AlertActions', name);
+  return path.join(__dirname, '..', 'dist', 'Modules', 'AlertActions', name);
 }
 
 function loggerStub() {

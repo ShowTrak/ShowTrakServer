@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createGroupOrdering } = require('../src/Modules/Shared/group-ordering');
+const { createGroupOrdering } = require('../dist/Modules/Shared/group-ordering');
 
 function makeHarness(entities) {
   const runCalls = [];

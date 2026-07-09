@@ -26,7 +26,7 @@ function loggerStub() {
 
 async function buildRealDB() {
   const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-group-db-'));
-  const dbModule = loadWithMocks(path.join(__dirname, '..', 'src', 'Modules', 'DB', 'index.js'), {
+  const dbModule = loadWithMocks(path.join(__dirname, '..', 'dist', 'Modules', 'DB', 'index.js'), {
     '../Logger': loggerStub(),
     '../AppData': { Manager: { GetStorageDirectory: () => storageDir } },
   });
@@ -40,7 +40,7 @@ async function loadGroupManager() {
   const movedTargets = [];
   const events = [];
   const groupManager = loadWithMocks(
-    path.join(__dirname, '..', 'src', 'Modules', 'GroupManager', 'index.js'),
+    path.join(__dirname, '..', 'dist', 'Modules', 'GroupManager', 'index.js'),
     {
       '../Logger': loggerStub(),
       '../DB': dbModule,

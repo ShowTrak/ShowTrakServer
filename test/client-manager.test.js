@@ -29,7 +29,7 @@ test('ClientManager ignores dirty tracking for automatic heartbeat and system in
     Timestamp: Date.now(),
   };
 
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'ClientManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'ClientManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => createLoggerStub() },
     '../DB': {
@@ -56,7 +56,7 @@ test('ClientManager ignores dirty tracking for automatic heartbeat and system in
     },
     '../Broadcast': { Manager: { emit: (...args) => events.push(args) } },
     '../SettingsManager': { Manager: { GetValue: async () => false } },
-    '../Utils': require('../src/Modules/Utils'),
+    '../Utils': require('../dist/Modules/Utils'),
   });
 
   const [heartbeatErr] = await Manager.Heartbeat(
@@ -95,7 +95,7 @@ test('ClientManager ignores dirty tracking for automatic heartbeat and system in
 
 test('ClientManager manual updates still use dirty-tracked writes', async () => {
   const trackedRuns = [];
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'ClientManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'ClientManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => createLoggerStub() },
     '../DB': {
@@ -126,7 +126,7 @@ test('ClientManager manual updates still use dirty-tracked writes', async () => 
     },
     '../Broadcast': { Manager: { emit: () => {} } },
     '../SettingsManager': { Manager: { GetValue: async () => false } },
-    '../Utils': require('../src/Modules/Utils'),
+    '../Utils': require('../dist/Modules/Utils'),
   });
 
   const [updateErr] = await Manager.Update('client-2', { Nickname: 'Renamed' });
@@ -140,7 +140,7 @@ test('ClientManager stores running applications as runtime-only state', async ()
   const trackedRuns = [];
   const untrackedRuns = [];
   const events = [];
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'ClientManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'ClientManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => createLoggerStub() },
     '../DB': {
@@ -173,7 +173,7 @@ test('ClientManager stores running applications as runtime-only state', async ()
     },
     '../Broadcast': { Manager: { emit: (...args) => events.push(args) } },
     '../SettingsManager': { Manager: { GetValue: async () => false } },
-    '../Utils': require('../src/Modules/Utils'),
+    '../Utils': require('../dist/Modules/Utils'),
   });
 
   const [setErr] = await Manager.SetRunningApplications('client-3', {
@@ -226,7 +226,7 @@ test('ClientManager stores running applications as runtime-only state', async ()
 test('ClientManager tracks critical applications and emits started/stopped transitions', async () => {
   const trackedRuns = [];
   const events = [];
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'ClientManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'ClientManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => createLoggerStub() },
     '../DB': {
@@ -264,7 +264,7 @@ test('ClientManager tracks critical applications and emits started/stopped trans
     },
     '../Broadcast': { Manager: { emit: (...args) => events.push(args) } },
     '../SettingsManager': { Manager: { GetValue: async () => false } },
-    '../Utils': require('../src/Modules/Utils'),
+    '../Utils': require('../dist/Modules/Utils'),
   });
 
   const [markErr] = await Manager.MarkApplicationCritical('client-4', { Name: 'Spotify' });

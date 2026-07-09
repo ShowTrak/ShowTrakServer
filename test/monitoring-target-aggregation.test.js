@@ -7,7 +7,7 @@ const { loadWithMocks } = require('../test-support/load-with-mocks');
 const modulePath = path.join(
   __dirname,
   '..',
-  'src',
+  'dist',
   'Modules',
   'MonitoringTargetManager',
   'target.js'

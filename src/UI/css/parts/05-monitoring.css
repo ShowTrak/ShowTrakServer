@@ -1,0 +1,1935 @@
+/* Monitoring target above its DegradedThresholdMs setting. Listed after ONLINE
+ * so it wins when both classes are toggled mid-update. */
+.SHOWTRAK_PC.DEGRADED {
+  background-color: var(--status-degraded) !important;
+}
+
+/* Pending adoption tile style: blue tint */
+.SHOWTRAK_PC.PENDING {
+  background-color: rgba(0, 123, 255, 0.25) !important;
+}
+
+/* Identify mode: pulse the tile blue while the client shows its overlay.
+ * Listed after ONLINE/DEGRADED/PENDING so it wins whichever base state the
+ * tile is in. */
+@keyframes showtrak-identify-pulse {
+  0% {
+    background-color: rgba(52, 152, 219, 0.26);
+    box-shadow: 0 0 0 0 rgba(64, 180, 255, 0.68);
+  }
+  40% {
+    background-color: rgba(52, 152, 219, 0.78);
+    box-shadow: 0 0 0 11px rgba(64, 180, 255, 0.06);
+  }
+  70% {
+    background-color: rgba(52, 152, 219, 0.54);
+    box-shadow: 0 0 0 16px rgba(64, 180, 255, 0);
+  }
+  100% {
+    background-color: rgba(52, 152, 219, 0.26);
+    box-shadow: 0 0 0 0 rgba(64, 180, 255, 0);
+  }
+}
+
+.SHOWTRAK_PC.IDENTIFYING {
+  background-color: rgba(52, 152, 219, 0.58) !important;
+  animation: showtrak-identify-pulse 1.25s ease-in-out infinite;
+}
+
+.SHOWTRAK_PC_STATUS {
+  height: var(--tile-status-height) !important;
+  min-height: var(--tile-status-height);
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.6);
+  align-items: center;
+}
+
+.SHOWTRAK_PC_STATUS h7,
+.SHOWTRAK_PC_STATUS [data-type='DEGRADED_WARNING'],
+.SHOWTRAK_PC_STATUS [data-type='DUMMY_IDLE_LABEL'],
+.SHOWTRAK_PC_STATUS [data-type='DUMMY_ONLINE_LABEL'] {
+  display: block;
+  line-height: 1.25;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] {
+  height: var(--tile-status-height) !important;
+  min-height: var(--tile-status-height);
+  line-height: 1.2;
+  justify-items: center;
+}
+
+.SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] > [data-type='OFFLINE_SINCE'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] .badge {
+  line-height: 1.1;
+}
+
+.SHOWTRAK_PC_STATUS > .progress:first-of-type {
+  margin-top: 0.2rem;
+}
+
+.SHOWTRAK_PC_STATUS[data-type='INDICATOR_ONLINE'] {
+  row-gap: 0.35rem !important;
+}
+
+.SHOWTRAK_PC_PLACEHOLDER {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  align-self: stretch;
+  flex: 1 1 auto;
+  min-height: var(--tile-expanded-height);
+  border-radius: 0.5rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 2rem;
+  border: transparent 2px solid;
+  background-color: rgba(255, 255, 255, 0.03);
+  cursor: no-drop;
+  transition:
+    padding 180ms ease,
+    opacity 180ms ease;
+}
+
+.group-drop-zone {
+  transition:
+    padding 180ms ease,
+    gap 180ms ease,
+    margin 180ms ease;
+}
+
+.GROUP_TITLE_CLICKABLE {
+  transition: margin 180ms ease;
+}
+
+body.compact-mode .group-drop-zone {
+  padding: 0.5rem !important;
+  gap: 0.5rem !important;
+  margin: 0.5rem 0.25rem 0 0.25rem !important;
+}
+
+body.compact-mode .GROUP_TITLE_CLICKABLE {
+  display: none;
+}
+
+body.compact-mode .SHOWTRAK_PC,
+body.compact-mode .SHOWTRAK_PC_PLACEHOLDER {
+  width: var(--tile-compact-width);
+  height: 36px;
+  min-height: 36px;
+  box-sizing: border-box;
+}
+
+body.compact-mode .SHOWTRAK_PC {
+  padding: 0.35rem 0.45rem;
+  gap: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+body.compact-mode .SHOWTRAK_PC > [data-type='Hostname'],
+body.compact-mode .SHOWTRAK_PC > [data-type='IP'],
+body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS {
+  max-height: 0;
+  opacity: 0;
+  margin: 0 !important;
+}
+
+body.compact-mode .SHOWTRAK_PC > [data-type='Hostname'],
+body.compact-mode .SHOWTRAK_PC > [data-type='IP'],
+body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS {
+  display: none !important;
+}
+
+body.compact-mode .SHOWTRAK_PC > [data-type='Nickname'],
+body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
+  font-size: var(--tile-name-font-size);
+  line-height: 1.2;
+  margin: 0;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.SHOWTRAK_PC > .CLIENT_TILE_COMPACT_STATUS {
+  display: none;
+}
+
+body.compact-mode .SHOWTRAK_PC > .CLIENT_TILE_COMPACT_STATUS:not(.d-none) {
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  margin: 0 0 0 auto !important;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+body.compact-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_HOSTNAME'] {
+  display: none !important;
+}
+
+body.compact-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_IP'] {
+  display: block !important;
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  font-size: 1rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.compact-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_ACTION'] {
+  display: block !important;
+  flex: 0 0 auto;
+  margin-left: 0.5rem;
+}
+
+body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']:not(.d-none) {
+  max-height: none;
+  opacity: 1;
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  margin: 0 0 0 0.5rem !important;
+  min-height: 0;
+  align-items: center;
+}
+
+body.compact-mode
+  .SHOWTRAK_PC
+  > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']
+  > [data-type='OFFLINE_SINCE'] {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0;
+  line-height: 1;
+}
+
+body.compact-mode
+  .SHOWTRAK_PC
+  > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']
+  > [data-type='OFFLINE_SINCE']
+  .badge {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+body.compact-mode .SHOWTRAK_PC_PLACEHOLDER {
+  flex: none;
+  align-self: auto;
+  padding: 0.35rem 0.45rem !important;
+  gap: 0;
+  min-height: 36px;
+  align-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.compact-mode .SHOWTRAK_PC_PLACEHOLDER h5 {
+  font-size: 1rem;
+  line-height: 1.2;
+  margin: 0 !important;
+}
+
+body.compact-mode .SHOWTRAK_PC_PLACEHOLDER p {
+  display: none;
+}
+
+/* --- Monitoring target tiles --- */
+/* Status text uses a slightly smaller font so values like "1234 ms" don't
+ * get truncated by the fixed tile width. */
+.SHOWTRAK_PC.MONITOR .SHOWTRAK_PC_STATUS[data-type='MONITOR_STATUS'] {
+  font-size: 11px !important;
+}
+
+/* Keep the expanded offline indicator on the shared client typography. */
+.SHOWTRAK_PC.MONITOR .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] {
+  font-size: inherit;
+}
+
+/* The monitoring method label should always read clearly in white,
+ * regardless of online/offline state. */
+.SHOWTRAK_PC.MONITOR > [data-type='Method'] {
+  color: #fff !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04rem;
+}
+
+/* Inline latency badge used only in compact mode; hidden by default. */
+.SHOWTRAK_PC.MONITOR > .MONITOR_COMPACT_LATENCY {
+  display: none;
+}
+
+body.compact-mode .SHOWTRAK_PC.MONITOR {
+  justify-content: space-between;
+}
+
+/* Hide the verbose monitor fields in compact mode; show just Name + latency. */
+body.compact-mode .SHOWTRAK_PC.MONITOR > [data-type='Method'],
+body.compact-mode .SHOWTRAK_PC.MONITOR > [data-type='Address'],
+body.compact-mode .SHOWTRAK_PC.MONITOR > .SHOWTRAK_PC_STATUS {
+  display: none !important;
+}
+
+body.compact-mode .SHOWTRAK_PC.MONITOR > [data-type='Nickname'],
+body.compact-mode .SHOWTRAK_PC.MONITOR > [data-type='Name'] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  text-align: left;
+  font-size: 1rem;
+  line-height: 1.2;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.compact-mode .SHOWTRAK_PC.MONITOR > .MONITOR_COMPACT_LATENCY {
+  display: inline-block;
+  flex: 0 0 auto;
+  margin-left: 0.5rem;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* --- Dummy client tiles --- */
+/* In compact mode only the name + a short status badge should remain; hide the
+ * "Dummy" type label (the IP line and status indicator rows are already hidden
+ * by the shared compact rules above, and the offline timer is re-shown). */
+body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='DummyLabel'] {
+  display: none !important;
+}
+
+/* Ensure dummy names stay left aligned in compact mode. */
+body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  text-align: left !important;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#CLIENT_INFO_HISTORY_SECTION {
+  text-align: left;
+}
+
+/* Window label + legend share one row above the timelines. */
+.monitor-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.monitor-history-window-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* --- Status timelines (blocks over the past hour) ----------------------- */
+.monitor-history-timelines {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.monitor-history-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.status-timeline-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.status-timeline-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.status-timeline-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-timeline-sub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-timeline {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 28px;
+  border-radius: 6px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.status-timeline-block {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 2px;
+  background-color: var(--status-graph-idle);
+  transition: filter 90ms ease;
+}
+
+.status-timeline-block:hover {
+  filter: brightness(1.25);
+}
+
+.status-timeline-block.state-ONLINE {
+  background-color: var(--status-graph-online);
+}
+.status-timeline-block.state-DEGRADED {
+  background-color: var(--status-graph-degraded);
+}
+.status-timeline-block.state-OFFLINE {
+  background-color: var(--status-graph-offline);
+}
+.status-timeline-block.state-IDLE {
+  background-color: var(--status-graph-idle);
+}
+.status-timeline-block.state-UNAVAILABLE {
+  background-color: var(--status-graph-idle);
+}
+
+.status-timeline-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+/* --- Hover tooltip for timeline blocks ---------------------------------- */
+.monitor-history-tooltip {
+  position: fixed;
+  z-index: 2000;
+  min-width: 150px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(17, 22, 29, 0.96);
+  color: rgba(255, 255, 255, 0.94);
+  padding: 0.45rem 0.55rem;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+  pointer-events: none;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.42);
+}
+
+.status-tt-time {
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+
+.status-tt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.status-tt-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.status-tt-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.status-tt-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--status-graph-idle);
+}
+.status-tt-dot.state-ONLINE {
+  background: var(--status-graph-online);
+}
+.status-tt-dot.state-DEGRADED {
+  background: var(--status-graph-degraded);
+}
+.status-tt-dot.state-OFFLINE {
+  background: var(--status-graph-offline);
+}
+
+/* --- Current status cards (mirrors how each check is listed) ------------- */
+.monitor-status-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem 0.55rem 0.85rem;
+  border-radius: 8px;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    rgba(17, 14, 31, 0.55);
+  overflow: visible;
+}
+
+/* Notification-style accent bar carrying the status colour. */
+.monitor-status-card::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: 6px;
+  bottom: 6px;
+  width: 6px;
+  border-radius: 999px;
+  background: var(--status-graph-idle);
+}
+.monitor-status-card.state-ONLINE::before {
+  background: var(--status-graph-online);
+}
+.monitor-status-card.state-DEGRADED::before {
+  background: var(--status-graph-degraded);
+}
+.monitor-status-card.state-OFFLINE::before {
+  background: var(--status-graph-offline);
+}
+.monitor-status-card.state-IDLE::before {
+  background: var(--status-graph-idle);
+}
+.monitor-status-card.state-UNAVAILABLE::before {
+  background: var(--status-graph-idle);
+}
+
+.monitor-status-card-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.monitor-status-card-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitor-status-card-sub {
+  display: inline-block;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitor-status-card-meta {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.monitor-status-card-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 10px;
+}
+
+.monitor-status-card-state {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitor-history-legend {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.9rem;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.monitor-history-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.status-dot-online {
+  background: var(--status-graph-online);
+}
+
+.status-dot-degraded {
+  background: var(--status-graph-degraded);
+}
+
+.status-dot-offline {
+  background: var(--status-graph-offline);
+}
+
+.status-dot-idle {
+  background: var(--status-graph-idle);
+}
+
+/* Drag-and-drop visuals */
+.group-drop-zone.dnd-over {
+  outline: 2px dashed rgba(255, 255, 255, 0.18);
+  outline-offset: -6px;
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+.dnd-ghost {
+  box-sizing: border-box;
+  border: 0;
+  outline: 2px dashed rgba(255, 255, 255, 0.7);
+  outline-offset: -2px;
+  border-radius: 8px;
+  background: transparent;
+  opacity: 0.9;
+  margin: 0;
+}
+.dnd-ghost.dnd-ghost--online {
+  background-color: var(--client-online-bg);
+}
+.dnd-ghost.dnd-ghost--idle {
+  background-color: rgba(64, 64, 64, 0.5);
+}
+.dnd-ghost.dnd-ghost--degraded {
+  background-color: rgba(255, 140, 0, 0.32);
+}
+.dnd-ghost.dnd-ghost--pending {
+  background-color: rgba(0, 123, 255, 0.25);
+}
+.dnd-ghost.dnd-ghost--monitor {
+  outline-style: dashed;
+}
+.dnd-ghost.dnd-ghost--dummy {
+  outline-style: dotted;
+}
+.SHOWTRAK_PC.dragging {
+  display: none !important;
+}
+
+/* Edit cog overlay for client tiles (visible only in EDIT mode) */
+.CLIENT_TILE_COG {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: none;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  opacity: 0; /* hidden by default (SHOW mode) */
+  pointer-events: none; /* do not intercept clicks when hidden */
+  transform: scale(0.96);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    color 160ms ease;
+  z-index: 2;
+}
+.CLIENT_TILE_COG i {
+  font-size: 14px;
+  line-height: 1;
+}
+/* In compact mode, vertically center the cog instead of anchoring to top */
+body.compact-mode .CLIENT_TILE_COG {
+  top: 50%;
+  transform: translateY(-50%) scale(0.96);
+}
+body.compact-mode.mode-edit .SHOWTRAK_PC:hover > .CLIENT_TILE_COG {
+  transform: translateY(-50%) scale(1);
+}
+body.compact-mode.mode-edit .CLIENT_TILE_COG:focus-visible {
+  transform: translateY(-50%) scale(1);
+}
+
+/* In compact EDIT mode, hide the right-side status/latency text while the cog is
+ * shown (on hover or keyboard focus) so it isn't layered over anything. */
+body.compact-mode.mode-edit .SHOWTRAK_PC:hover > .CLIENT_TILE_COMPACT_STATUS,
+body.compact-mode.mode-edit .SHOWTRAK_PC:hover > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'],
+body.compact-mode.mode-edit .SHOWTRAK_PC:hover > .MONITOR_COMPACT_LATENCY,
+body.compact-mode.mode-edit
+  .SHOWTRAK_PC:has(> .CLIENT_TILE_COG:focus-visible)
+  > .CLIENT_TILE_COMPACT_STATUS,
+body.compact-mode.mode-edit
+  .SHOWTRAK_PC:has(> .CLIENT_TILE_COG:focus-visible)
+  > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'],
+body.compact-mode.mode-edit
+  .SHOWTRAK_PC:has(> .CLIENT_TILE_COG:focus-visible)
+  > .MONITOR_COMPACT_LATENCY {
+  opacity: 0;
+}
+
+/* Show cog only while hovering a tile in EDIT mode (no layout shift) */
+body.mode-edit .SHOWTRAK_PC:hover > .CLIENT_TILE_COG {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+/* Also show when cog is keyboard focused in EDIT mode */
+body.mode-edit .CLIENT_TILE_COG:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+.CLIENT_TILE_COG:hover {
+  color: #ffffff;
+}
+
+/* No standalone #MODE_SWITCH positioning; switch sits in bottom bar */
+/* removed old toggle styles (.mode-switch ...) */
+
+/* ------------------------------------------------------------------ */
+/* Group Manager modal                                                */
+/* ------------------------------------------------------------------ */
+.GROUP_MANAGER_GROUP_ITEM {
+  transition: background-color 140ms ease;
+}
+.GROUP_MANAGER_GROUP_ITEM[draggable='true'] {
+  cursor: grab;
+}
+.GROUP_MANAGER_GROUP_ITEM.dragging {
+  opacity: 0.5;
+}
+.GROUP_MANAGER_GROUP_ITEM:hover {
+  background-color: rgba(255, 255, 255, 0.09) !important;
+}
+.GROUP_MANAGER_GROUP_TOGGLE {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.GROUP_MANAGER_GROUP_OPEN {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.group-manager-grip {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: grab;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.group-manager-grip i {
+  pointer-events: none;
+}
+.GROUP_MANAGER_GROUP_BODY {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 10px;
+}
+.group-manager-chevron {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.3);
+  transition: transform 140ms ease;
+}
+.group-manager-chevron.expanded {
+  transform: rotate(90deg);
+}
+.group-manager-member-list {
+  max-height: 180px;
+  overflow-y: auto;
+}
+.group-manager-member-row {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.group-manager-member-remove {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 1rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
+}
+.group-manager-member-remove:hover {
+  color: #dc3545;
+  background: rgba(220, 53, 69, 0.12);
+}
+.GROUP_MANAGER_GROUP_ITEM_DEFAULT {
+  cursor: default;
+}
+.showtrak-group-manager-dialog {
+  max-width: min(920px, calc(100vw - 24px));
+}
+.group-manager-keybind-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.9rem;
+  height: 1.35rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.group-manager-editor-id-field {
+  position: relative;
+}
+.group-manager-client-header {
+  padding: 0 8px;
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.group-manager-client-row {
+  padding: 7px 8px;
+}
+.group-manager-client-col {
+  min-width: 0;
+  display: inline-block;
+}
+.group-manager-client-col-name {
+  flex: 2 1 0;
+  text-align: left;
+}
+.group-manager-client-col-hostname {
+  flex: 2 1 0;
+}
+.group-manager-client-col-ip {
+  flex: 1.5 1 0;
+}
+.group-manager-client-col-action {
+  flex: 0 0 42px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Script Manager modal                                               */
+/* ------------------------------------------------------------------ */
+.script-manager-item {
+  transition: background-color 140ms ease;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+}
+.script-manager-item:hover {
+  background-color: rgba(255, 255, 255, 0.09) !important;
+}
+.script-manager-item.dragging {
+  opacity: 0.5;
+}
+.script-manager-item-invalid {
+  border: 1px solid rgba(220, 53, 69, 0.5);
+  background-color: rgba(220, 53, 69, 0.1) !important;
+}
+.script-manager-item-disabled {
+  opacity: 0.45;
+}
+.script-manager-item-id {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+  line-height: 1.2;
+  margin-bottom: 1px;
+}
+.script-manager-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.script-manager-item-desc {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.script-manager-chevron {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+}
+/* Coloured left-edge accent strip driven by --script-accent CSS var */
+.script-manager-accent-strip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--script-accent, transparent);
+  border-radius: 6px 0 0 6px;
+}
+.script-manager-grip {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: grab;
+  font-size: 1.1rem;
+  padding-top: 1px;
+}
+.script-manager-grip:active {
+  cursor: grabbing;
+}
+/* Script icon badge, tinted with the script's accent colour */
+.script-manager-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 1.05rem;
+  color: var(--script-accent, rgba(255, 255, 255, 0.75));
+  background: color-mix(in srgb, var(--script-accent, #7f8c8d) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--script-accent, #7f8c8d) 32%, transparent);
+}
+.script-manager-os-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.script-manager-os-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.55);
+}
+.script-manager-os-chip i {
+  font-size: 0.85rem;
+}
+.script-manager-os-chip.compatible {
+  background: rgba(40, 209, 124, 0.16);
+  border-color: rgba(40, 209, 124, 0.4);
+  color: #9af0c4;
+}
+.script-manager-os-chip.broken {
+  background: rgba(255, 193, 7, 0.14);
+  border-color: rgba(255, 193, 7, 0.4);
+  color: #ffe08a;
+}
+.script-manager-os-chip.missing {
+  background: rgba(220, 53, 69, 0.14);
+  border-color: rgba(220, 53, 69, 0.4);
+  color: #ffb3bc;
+}
+.script-manager-os-empty {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+.script-manager-platform-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 90px;
+  flex: 0 0 90px;
+  font-size: 0.85rem;
+}
+.script-manager-platform-label i {
+  opacity: 0.8;
+}
+.script-manager-platform-select {
+  flex: 1 1 auto;
+}
+.script-manager-platform-args {
+  flex: 1 1 240px;
+  min-width: 180px;
+}
+@media (max-width: 768px) {
+  .script-manager-platform-row {
+    flex-wrap: wrap;
+  }
+  .script-manager-platform-label {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  .script-manager-platform-select,
+  .script-manager-platform-args {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
+.script-manager-file-row {
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.script-manager-file-row i {
+  opacity: 0.75;
+}
+.script-manager-file-edit-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.82rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition:
+    color 150ms ease,
+    background 150ms ease;
+}
+.script-manager-file-edit-btn:hover {
+  color: #4aa3ff;
+  background: rgba(74, 163, 255, 0.12);
+}
+.script-manager-file-run-btn {
+  background: transparent;
+  border: none;
+  color: rgba(106, 217, 138, 0.8);
+  font-size: 0.82rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition:
+    color 150ms ease,
+    background 150ms ease,
+    opacity 150ms ease;
+}
+.script-manager-file-run-btn:hover {
+  color: #8ce6a8;
+  background: rgba(46, 204, 113, 0.12);
+}
+.script-manager-file-run-btn:disabled {
+  color: rgba(255, 255, 255, 0.35);
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.script-manager-issues {
+  display: grid;
+  gap: 6px;
+  border-radius: 10px;
+  padding: 11px 13px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.script-manager-issues.info {
+  background: rgba(74, 163, 255, 0.12);
+  border: 1px solid rgba(74, 163, 255, 0.35);
+  color: #bcd9ff;
+}
+.script-manager-issues.error {
+  background: rgba(220, 53, 69, 0.14);
+  border: 1px solid rgba(220, 53, 69, 0.4);
+  color: #ffb3bc;
+}
+.script-manager-issues ul {
+  padding-left: 18px;
+}
+/* Delete button in the Script Manager editor header */
+.script-manager-delete-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition:
+    color 150ms ease,
+    background 150ms ease;
+}
+.script-manager-delete-btn:hover {
+  color: #dc3545;
+  background: rgba(220, 53, 69, 0.12);
+}
+.script-manager-folder-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition:
+    color 150ms ease,
+    background 150ms ease;
+}
+.script-manager-folder-btn:hover {
+  color: #4aa3ff;
+  background: rgba(74, 163, 255, 0.12);
+}
+.script-manager-create-btn {
+  background: transparent;
+  border: none;
+  color: rgba(105, 214, 125, 0.78);
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition:
+    color 150ms ease,
+    background 150ms ease;
+}
+.script-manager-create-btn:hover {
+  color: #69d67d;
+  background: rgba(105, 214, 125, 0.14);
+}
+.script-manager-template-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.85rem;
+  padding: 5px 10px;
+  border-radius: 6px;
+  transition:
+    color 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease;
+}
+.script-manager-template-btn:hover {
+  color: #ffffff;
+  background: rgba(74, 163, 255, 0.12);
+}
+/* Colour swatch picker */
+.script-manager-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  flex: 0 0 30px;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease;
+}
+.script-manager-swatch:hover {
+  transform: scale(1.15);
+}
+.script-manager-swatch.selected {
+  border-color: #fff;
+  transform: scale(1.1);
+}
+/* Script editor icon field preview swatch (clickable to open the picker) */
+.script-manager-icon-preview {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 0;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    transform 120ms ease;
+}
+.script-manager-icon-preview:hover {
+  background-color: rgba(255, 255, 255, 0.18);
+  transform: scale(1.05);
+}
+/* Reusable icon picker grid + tiles */
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  grid-auto-rows: 84px;
+  gap: 8px;
+  max-height: 52vh;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px;
+  align-content: start;
+}
+.icon-picker-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  min-height: 0;
+  padding: 8px 4px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+.icon-picker-tile i {
+  font-size: 1.7rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.icon-picker-tile-label {
+  font-size: 0.68rem;
+  line-height: 1.1;
+  max-width: 100%;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+.icon-picker-tile:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+.icon-picker-tile.selected {
+  border-color: #fff;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+/* Floating textarea label fix */
+.script-manager-textarea-float textarea.form-control {
+  height: auto;
+  padding-top: 1.625rem;
+  padding-bottom: 0.625rem;
+}
+.script-manager-textarea-float label {
+  top: 0;
+}
+/* Leading icon slot in context menu rows. Fixed width so every title starts at
+   the same x-position no matter how wide the glyph is; the icon itself is
+   centred within the slot so differently-sized icons stay visually aligned. */
+.context-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.1rem;
+  width: 1.1rem;
+  margin-right: 4px;
+  font-size: 1rem;
+  line-height: 1;
+  text-align: center;
+}
+.context-icon > i {
+  display: inline-block;
+  line-height: 1;
+}
+
+/* --- Mobile context menu ---
+   On mobile the menu is inset from the screen edges (not full-bleed) and
+   floats above the bottom bar, reading as a rounded action sheet. Rows are
+   taller for easier tapping, shaded so they read as buttons, and each row
+   can enter a "Tap to confirm" state. A close button sits in a sticky header
+   above the scrollable option list. */
+body.mobile-view #SHOWTRAK_CONTEXT_MENU {
+  left: 12px !important;
+  right: 12px !important;
+  width: auto !important;
+  max-width: none !important;
+  border-radius: 0.9rem;
+  padding: 0.4rem 0.5rem 0.6rem;
+  /* NB: do NOT set `display` here. The base rule keeps the menu `display: none`
+     until JS opens it (which sets inline `display: flex`); forcing flex here
+     would override that and leave an empty menu floating on load. The
+     flex-direction/layout below still applies once JS makes it visible. */
+  flex-direction: column;
+  /* Scrolling happens inside .context-menu-options so the header (with the
+     close button) stays fixed at the top instead of scrolling away. */
+  overflow-y: hidden;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-header {
+  display: flex;
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.25rem;
+  background-color: #2a273b;
+  z-index: 1;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  height: 42px;
+  border-radius: 0.55rem;
+  background-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-close:active {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-options {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-options::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.SHOWTRAK_CONTEXTMENU_BUTTON {
+  padding: 0.85rem 0.75rem;
+  font-size: 1.05rem;
+  background-color: rgba(255, 255, 255, 0.06);
+  border-radius: 0.55rem;
+  margin-bottom: 0.4rem;
+}
+body.mobile-view
+  #SHOWTRAK_CONTEXT_MENU
+  > .context-menu-options
+  > a.SHOWTRAK_CONTEXTMENU_BUTTON:last-child {
+  margin-bottom: 0;
+}
+body.mobile-view
+  #SHOWTRAK_CONTEXT_MENU
+  > .context-menu-options
+  > a.SHOWTRAK_CONTEXTMENU_BUTTON[aria-disabled='true'] {
+  background-color: transparent;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
+  display: none;
+}
+body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending {
+  background-color: rgba(255, 193, 7, 0.18) !important;
+}
+body.mobile-view
+  #SHOWTRAK_CONTEXT_MENU
+  > .context-menu-options
+  > a.context-confirm-pending
+  .context-title {
+  color: #ffc107 !important;
+}
+body.mobile-view
+  #SHOWTRAK_CONTEXT_MENU
+  > .context-menu-options
+  > a.context-confirm-pending
+  .context-shortcut,
+body.mobile-view
+  #SHOWTRAK_CONTEXT_MENU
+  > .context-menu-options
+  > a.context-confirm-pending
+  .context-icon {
+  display: none !important;
+}
+
+/* Collapse toggles in the monitoring check editor (Advanced / Last Response) */
+.monitoring-collapse-toggle .bi-chevron-down {
+  transition: transform 0.15s ease;
+}
+.monitoring-collapse-toggle[aria-expanded='true'] .bi-chevron-down {
+  transform: rotate(180deg);
+}
+/* Spinner for the monitoring "Check Now" button icon while a probe runs */
+@keyframes monitoring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.monitoring-spin {
+  animation: monitoring-spin 0.7s linear infinite;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Web UI capability chrome                                                   */
+/* The shared renderer runs on both the Electron desktop app and the browser  */
+/* Web UI. `body.is-web` is set only on the browser surface (by web-main.ts). */
+/* ------------------------------------------------------------------------- */
+
+/* Web-only overlays are completely inert on the desktop. */
+body:not(.is-web) .web-overlay {
+  display: none !important;
+}
+
+/* Safari (desktop toolbar + mobile status bar) tints its chrome to the page's
+   root background colour, NOT to <meta name="theme-color"> (that only applies to
+   an installed PWA). With no colour set on html/body the root defaults to white,
+   so the logged-in toolbar reads white. The login overlay avoids this because it
+   is a fixed full-viewport dark element. Paint the web surface's root purple so
+   Safari samples the accent; the app's own dark gradient (#APPLICATION_CONTAINER)
+   still fills the content area on top of it. */
+body.is-web,
+html:has(body.is-web) {
+  background: #160f35 !important;
+}
+
+/* Desktop-only chrome hidden on the web: navbar/dragbar and the cogs
+   (settings) menu. Mode/alerts toggles stay visible as read-only state. */
+body.is-web .dragbar,
+body.is-web #SETTINGS_MENU_DROPDOWN {
+  display: none !important;
+}
+
+/* Web surface shows current SHOW/EDIT + ALERTS state, but cannot change it. */
+body.is-web .mode-group .btn:disabled,
+body.is-web #ALERT_ACTIONS_TOGGLE_BTN:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+  opacity: 1;
+}
+
+/* The add (+) button follows the server mode on the web: only shown in EDIT. */
+body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
+  display: none !important;
+}
+
+.web-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  /* Match the app shell backdrop: the same dark-indigo radial gradient. */
+  background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%);
+}
+
+.web-overlay-card {
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 24px;
+  border-radius: 16px;
+  background: #1d1a2f;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  color: #f2f4f7;
+  text-align: center;
+}
+
+.web-login-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+}
+
+/* Splash variant of the overlay (loading + disconnected screens): brand mark
+   pinned small top-center, status content centered on the backdrop. Mirrors
+   the service worker's offline splash (WebUI/sw.js) so the two look alike. */
+.web-overlay.web-splash {
+  flex-direction: column;
+}
+
+.web-splash-logo {
+  position: absolute;
+  top: calc(20px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+}
+
+.web-splash-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  color: #f2f4f7;
+}
+
+.web-overlay-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.web-overlay-text {
+  font-size: 0.9rem;
+  color: #aab2bd;
+}
+
+.web-login-error {
+  font-size: 0.85rem;
+  color: #ff6b6b;
+  width: 100%;
+  min-height: 1.1em;
+}
+
+/* -------------------------------------------------------------------------
+   Web passcode screen: dot indicators + numeric keypad
+   ------------------------------------------------------------------------- */
+
+/* The login screen sits directly on the overlay's purple gradient — no card
+   backdrop, border, or shadow (unlike the loading / disabled overlays). */
+.web-login-card {
+  width: min(320px, 100%);
+  gap: 16px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 24px;
+}
+
+/* The real value lives here (autofill target + submitLogin() read path), but
+   it is visually removed — entry happens via the keypad and the dots below. */
+.web-pin-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.web-pin-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 16px;
+  margin: 4px 0 2px;
+}
+
+.web-pin-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  transition:
+    transform 0.12s ease,
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.web-pin-dot.is-filled {
+  background: #f2f4f7;
+  border-color: #f2f4f7;
+  transform: scale(1.05);
+}
+
+/* Placeholder ring shown when no digits have been entered yet. */
+.web-pin-dots.is-empty .web-pin-dot {
+  animation: none;
+}
+
+.web-pin-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.web-pin-key {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f2f4f7;
+  font-size: 1.35rem;
+  font-weight: 500;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  /* Disable double-tap-to-zoom on the keys (mobile): a fast second tap should
+     enter another digit, not zoom the viewport. */
+  touch-action: manipulation;
+  transition:
+    background-color 0.12s ease,
+    transform 0.06s ease,
+    border-color 0.12s ease;
+}
+
+.web-pin-key:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.web-pin-key:active {
+  transform: scale(0.94);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.web-pin-key:focus-visible {
+  outline: 2px solid rgba(140, 120, 255, 0.8);
+  outline-offset: 2px;
+}
+
+/* Icon keys (backspace) share the number-key surface; only the glyph is a touch
+   smaller than the digits. */
+.web-pin-key-icon {
+  font-size: 1.1rem;
+}
+
+.web-pin-key-enter {
+  color: #ffffff;
+  background: linear-gradient(180deg, #6d5bd0, #5942b8);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.web-pin-key-enter:hover {
+  background: linear-gradient(180deg, #7a68dd, #6650c8);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.web-pin-key-enter:active {
+  background: linear-gradient(180deg, #5942b8, #4a37a0);
+}
+
+/* Mobile bottom-bar controls (clear-selection + Actions). Hidden everywhere by
+   default; only revealed by the mobile-view rules below, and only while a
+   selection exists (body.mobile-view.has-selection). */
+#MOBILE_CLEAR_SELECTION_BTN,
+#MOBILE_ACTIONS_BTN {
+  display: none;
+}
+
+/* =========================================================================
+   Mobile / narrow-viewport layout (body.mobile-view)
+   -------------------------------------------------------------------------
+   `body.mobile-view` is toggled from JS (see InitMobileView in 02-mode.ts) in
+   lockstep with the `(max-width: 768px)` media query, and mobile is *locked* to
+   compact mode — so `body.compact-mode` is always present too and the compact
+   tile/font styling is inherited as-is (no re-declaration needed, which keeps
+   the sizing identical to a normal compact toggle).
+
+   The mobile-only structural changes are:
+     - a single full-width column of groups,
+     - each group's title reflowed into a horizontal header ABOVE its clients
+       (normally a thin vertical rail to the left, hidden in compact mode),
+     - hidden mode/alert/compact toggles,
+     - a taller, more touch-friendly bottom bar with larger buttons,
+     - left-aligned selection status.
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* Single column: every group takes the full width, no multi-column grid.
+     Overrides both the inline `grid-template-columns: repeat(N, ...)` and each
+     item's inline `grid-column: span N`. */
+  body.mobile-view .group-column-grid {
+    grid-template-columns: 1fr !important;
+    column-gap: 0 !important;
+    padding-inline: 0.5rem !important;
+  }
+
+  body.mobile-view .group-column-item {
+    grid-column: span 1 !important;
+    /* Stack the group title header above the client list instead of beside it. */
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  /* Bring the group title back as a full-width horizontal header above the list.
+     compact-mode hides it and the base rules render it as a narrow vertical rail;
+     both are undone here. */
+  body.mobile-view .GROUP_TITLE_CLICKABLE {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 2.25rem !important;
+    margin: 0.5rem 0 0 0 !important;
+    overflow: visible !important;
+  }
+
+  /* The base rule absolutely-positions the inner wrapper to fill the vertical
+     rail; on mobile it should just be a normal-flow horizontal bar. */
+  body.mobile-view .GROUP_TITLE_CLICKABLE > div {
+    position: static !important;
+    inset: auto !important;
+    justify-content: center;
+    padding: 0.35rem 0.6rem;
+  }
+
+  /* De-rotate the group label so it reads left-to-right in the header bar. */
+  body.mobile-view .GROUP_TITLE {
+    writing-mode: horizontal-tb !important;
+    transform: none !important;
+    width: auto !important;
+    height: auto !important;
+    inline-size: auto !important;
+    max-inline-size: 100% !important;
+    padding: 0 !important;
+    text-align: center;
+  }
+
+  /* Hide the add-group ("+") tile on mobile — its vertical-rail styling has no
+     place in the stacked header layout and group creation lives in the menu. */
+  body.mobile-view .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
+    display: none !important;
+  }
+
+  /* Full-width, single-per-row tiles so nothing overflows a thin screen. The
+     compact height/padding/typography are inherited from body.compact-mode. */
+  body.mobile-view .SHOWTRAK_PC,
+  body.mobile-view .SHOWTRAK_PC_PLACEHOLDER {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* The drop zone carries `w-100` (width:100%) plus the compact-mode horizontal
+     margin (0.25rem each side). 100% width + those margins overflow the single
+     column by 0.5rem, pushing the whole list off-centre to the right. The grid's
+     own padding-inline already supplies the edge gutter, so drop the side
+     margins here and let the box fit its column exactly. */
+  body.mobile-view .group-drop-zone {
+    margin-inline: 0 !important;
+  }
+
+  /* --- Hide desktop-only toggles in the bottom bar on mobile --- */
+  body.mobile-view #APP_BOTTOM_BAR .mode-group,
+  body.mobile-view #ALERT_ACTIONS_TOGGLE_BTN,
+  body.mobile-view #COMPACT_MODE_BTN {
+    display: none !important;
+  }
+
+  /* --- Taller, touch-friendly bottom bar --- */
+  /* Installed as a PWA (viewport-fit=cover) the page extends under the rounded
+     screen corners / home indicator, which clipped the bar's icon and
+     "N Clients Selected" text. Grow the bar by the device's safe-area inset and
+     pad its content up above the unsafe region. */
+  :root {
+    --bottom-bar-height-mobile: 60px;
+    --bottom-bar-total-mobile: calc(
+      var(--bottom-bar-height-mobile) + env(safe-area-inset-bottom, 0px)
+    );
+  }
+
+  body.mobile-view #APP_BOTTOM_BAR {
+    height: var(--bottom-bar-total-mobile) !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Keep the application content clear of the taller bar, with a little
+     breathing room so the last client tile isn't flush against its edge. */
+  body.mobile-view #APPLICATION {
+    padding-bottom: calc(var(--bottom-bar-total-mobile) + 0.75rem) !important;
+  }
+
+  /* Bottom-anchored overlays tuck 8px over the bar's top edge; keep that
+     relationship as the bar grows with the safe-area inset. */
+  body.mobile-view #SHOWTRAK_CONFIRM_TOAST.confirm-toast,
+  body.mobile-view #ALERTS_TRAY.alerts-tray,
+  body.mobile-view #IDENTIFY_STATUS_BANNER {
+    bottom: calc(var(--bottom-bar-total-mobile) - 8px);
+  }
+
+  /* Preserve the identify banner's 74px lift when stacked above the confirm
+     toast (desktop: 118px vs 44px anchors). */
+  body.mobile-view #IDENTIFY_STATUS_BANNER.stacked-above-confirm {
+    bottom: calc(var(--bottom-bar-total-mobile) + 66px);
+  }
+
+  /* iOS Safari scroll fix.
+     The scroll container's `height: calc(100% - 2rem)` resolves `100%` against
+     the initial containing block, which on iOS Safari is the *large* viewport
+     (URL bar collapsed). That makes the container taller than the visible area,
+     so tall content still fits inside it and there is nothing to scroll — the
+     bottom of the client list ends up unreachable behind the URL/bottom bar.
+     Size the scrollport to the *dynamic* viewport (`dvh`, tracking the visible
+     area) so it becomes shorter than the content and scrolls. `vh` is the
+     fallback for engines without `dvh`; there is no dragbar on the web surface,
+     so no 2rem needs subtracting here. `!important` is required to beat the
+     container's Bootstrap `h-100` utility (`height: 100% !important`), which
+     otherwise re-imposes the oversized large-viewport height. */
+  body.mobile-view #APPLICATION_CONTAINER {
+    height: 100vh !important;
+    height: 100dvh !important;
+    -webkit-overflow-scrolling: touch; /* momentum scrolling on iOS */
+  }
+
+  /* Match the app's min-height to the visible viewport too, so a sparse list
+     still fills the screen without forcing the oversized-large-viewport height
+     that reintroduces the clipping. */
+  body.mobile-view #APPLICATION {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Left-align the "N Clients Selected" status. The left section only held the
+     now-hidden toggles, so drop it and collapse the bar to two columns:
+     selection status at the start, action buttons pinned to the right. */
+  body.mobile-view #APP_BOTTOM_BAR .bar-section.left {
+    display: none !important;
+  }
+
+  body.mobile-view #APP_BOTTOM_BAR .bar-content {
+    grid-template-columns: 1fr auto !important;
+    padding: 0 12px !important;
+  }
+
+  body.mobile-view #APP_BOTTOM_BAR .bar-section.center {
+    grid-column: 1 !important;
+    justify-self: start !important;
+    text-align: left !important;
+    font-size: 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+  }
+
+  body.mobile-view #APP_BOTTOM_BAR .bar-section.right {
+    grid-column: 2 !important;
+    gap: 10px !important;
+  }
+
+  /* On mobile the right side shows the desktop Add + Alerts controls by default;
+     once a selection exists they give way to the Actions button. Settings is
+     already hidden on the Web UI (body.is-web), which is the only surface that
+     ever enters mobile view. */
+  body.mobile-view.has-selection #ADD_MONITORING_TARGET_DROPDOWN,
+  body.mobile-view.has-selection #ALERTS_BUTTON {
+    display: none !important;
+  }
+
+  /* --- Clear-selection button (left of the "N Clients Selected" text) --- */
+  body.mobile-view.has-selection #MOBILE_CLEAR_SELECTION_BTN {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+  }
+
+  body.mobile-view #MOBILE_CLEAR_SELECTION_BTN .bi {
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  body.mobile-view #MOBILE_CLEAR_SELECTION_BTN:active {
+    opacity: 0.6;
+  }
+
+  /* --- Actions button (replaces Add/Alerts on the bottom-right when selected).
+     Matches the bottom-bar ghost-button language: transparent fill, translucent
+     white border/text, subtle hover/active states. --- */
+  body.mobile-view.has-selection #MOBILE_ACTIONS_BTN {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 16px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 8px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease,
+      border-color 120ms ease;
+  }
+
+  body.mobile-view #MOBILE_ACTIONS_BTN .bi {
+    font-size: 20px;
+  }
+
+  body.mobile-view #MOBILE_ACTIONS_BTN:hover,
+  body.mobile-view #MOBILE_ACTIONS_BTN:focus {
+    background-color: rgba(255, 255, 255, 0.06);
+  }
+
+  body.mobile-view #MOBILE_ACTIONS_BTN:active {
+    background-color: rgba(255, 255, 255, 0.12);
+  }
+}

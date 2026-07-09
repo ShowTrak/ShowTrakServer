@@ -6,7 +6,7 @@ const { loadWithMocks } = require('../test-support/load-with-mocks');
 
 function load(mocks) {
   return loadWithMocks(
-    path.join(__dirname, '..', 'src', 'Modules', 'ScriptExecutionManager', 'index.js'),
+    path.join(__dirname, '..', 'dist', 'Modules', 'ScriptExecutionManager', 'index.js'),
     mocks
   );
 }

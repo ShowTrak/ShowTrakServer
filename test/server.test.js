@@ -6,7 +6,7 @@ const path = require('node:path');
 const { loadWithMocks } = require('../test-support/load-with-mocks');
 
 function serverPath(name) {
-  return path.join(__dirname, '..', 'src', 'Modules', 'Server', name);
+  return path.join(__dirname, '..', 'dist', 'Modules', 'Server', name);
 }
 
 const loggerStub = {
@@ -24,8 +24,16 @@ const loggerStub = {
 
 // Minimal fake socket that records emitted events and exposes a trigger() to
 // invoke registered handlers, mimicking the Socket.IO socket surface.
+//
+// IMPORTANT: inbound handlers are stored on `this` (`this._handlers`), NOT in a
+// closure. Real Socket.IO's `socket.on` delegates to an EventEmitter that reads
+// `this._events`, so calling `on` with `this` detached (e.g. `const register =
+// socket.on; register(...)`) throws `Cannot read properties of undefined`. If
+// the mock stored handlers in a closure it would silently accept such unbound
+// calls and hide that whole class of regression (it did — see the `.bind(socket)`
+// fix in client-namespace.ts). Keying off `this` reproduces the real crash so
+// any unbound extraction fails the suite here instead of only in production.
 function makeSocket(handshake) {
-  const handlers = {};
   const emitted = [];
   return {
     id: 'sock-1',
@@ -33,6 +41,7 @@ function makeSocket(handshake) {
     joined: [],
     emitted,
     disconnected: null,
+    _handlers: {},
     join(room) {
       this.joined.push(room);
     },
@@ -43,16 +52,30 @@ function makeSocket(handshake) {
       this.disconnected = flag;
     },
     on(event, handler) {
-      handlers[event] = handler;
+      // Throws if `this` is undefined/global — matching Socket.IO's `this._events`.
+      this._handlers[event] = handler;
     },
     async trigger(event, ...args) {
-      if (handlers[event]) return handlers[event](...args);
+      if (this._handlers[event]) return this._handlers[event](...args);
     },
     hasHandler(event) {
-      return typeof handlers[event] === 'function';
+      return typeof this._handlers[event] === 'function';
     },
   };
 }
+
+test('makeSocket.on requires its `this` binding (models Socket.IO)', () => {
+  // Guards the whole test file: if `on` ever accepts a detached call, an unbound
+  // `socket.on` extraction in server code (the bug the `.bind(socket)` fix in
+  // client-namespace.ts addresses) would slip past every wiring test below.
+  const socket = makeSocket({ query: {}, address: '127.0.0.1', headers: {} });
+  socket.on('Bound', () => {});
+  assert.equal(socket.hasHandler('Bound'), true);
+
+  const detached = socket.on;
+  assert.throws(() => detached('Unbound', () => {}));
+  assert.equal(socket.hasHandler('Unbound'), false);
+});
 
 test('Server client namespace rejects sockets without a UUID', async () => {
   const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
@@ -266,7 +289,11 @@ test('Server client namespace keeps unadopted clients visible for pending adopti
 });
 
 // Helpers to drive the Web UI namespace.
-function loadWebUi(settings, broadcast) {
+// options: { mode: 'SHOW'|'EDIT', handlers: { [channel]: fn }, sinks: [] }
+function loadWebUi(settings, options = {}) {
+  const mode = options.mode || 'SHOW';
+  const handlers = options.handlers || {};
+  const sinks = options.sinks || [];
   const managers = {
     '../Logger': loggerStub,
     '../Config': { Config: { Application: { Version: '9.9.9' } } },
@@ -282,12 +309,25 @@ function loadWebUi(settings, broadcast) {
     },
     '../MonitoringTargetManager': { Manager: { GetAll: async () => [null, []] } },
     '../DummyClientManager': { Manager: { GetAll: async () => [null, []] } },
+    '../AlertsManager': { Manager: { GetAll: async () => [null, []] } },
     '../SettingsManager': { Manager: { GetValue: async (key) => settings[key] } },
     '../WOLManager': { Manager: { Wake: async () => [null, 'magic packet sent'] } },
     '../ScriptManager': {
       Manager: { GetScripts: async () => [{ ID: 's1', Name: 'Deploy', Weight: 1 }] },
     },
-    '../Broadcast': { Manager: broadcast },
+    '../ModeManager': { Manager: { Get: () => mode } },
+    '../../main/renderer-bus': {
+      RegisterRendererSink: (fn) => {
+        sinks.push(fn);
+        return () => {};
+      },
+      PushToRenderers: () => {},
+    },
+    '../../main/handler-registry': {
+      GetHandler: (channel) => handlers[channel],
+      HasHandler: (channel) => typeof handlers[channel] === 'function',
+      RegisterHandler: () => {},
+    },
   };
   return loadWithMocks(serverPath('webui-namespace.js'), managers);
 }
@@ -297,6 +337,7 @@ function makeUiIo() {
   ns.middlewares = [];
   ns.use = (fn) => ns.middlewares.push(fn);
   ns._connection = null;
+  ns.sockets = new Map();
   const realOn = ns.on.bind(ns);
   ns.on = (event, handler) => {
     if (event === 'connection') ns._connection = handler;
@@ -305,9 +346,19 @@ function makeUiIo() {
   return { of: () => ns, _ns: ns };
 }
 
+// Connect a fake socket through the middleware + connection handler.
+async function connectUiSocket(io) {
+  const socket = makeSocket({ auth: {}, query: {}, address: '127.0.0.1' });
+  io._ns.sockets.set(socket.id, socket);
+  await new Promise((resolve) => io._ns.middlewares[0](socket, resolve));
+  await io._ns._connection(socket);
+  return socket;
+}
+
 test('Web UI namespace gates data behind authentication', async () => {
-  const broadcast = new EventEmitter();
-  broadcast.off = broadcast.removeListener.bind(broadcast);
+  const handlers = {
+    GetClient: async (_e, uuid) => (uuid === 'u1' ? [null, { UUID: 'u1' }] : ['not_found', null]),
+  };
   const { SetupWebUiNamespace } = loadWebUi(
     {
       WEBUI_ENABLED: true,
@@ -316,49 +367,48 @@ test('Web UI namespace gates data behind authentication', async () => {
       WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true,
       SYSTEM_ALLOW_WOL: true,
     },
-    broadcast
+    { handlers }
   );
 
-  const ServerManager = { ExecuteScripts: async () => {} };
   const io = makeUiIo();
-  SetupWebUiNamespace(io, ServerManager);
+  SetupWebUiNamespace(io, {});
 
   // Run the auth middleware with no token -> not authed.
   const socket = makeSocket({ auth: {}, query: {}, address: '127.0.0.1' });
+  io._ns.sockets.set(socket.id, socket);
   await new Promise((resolve) => io._ns.middlewares[0](socket, resolve));
   assert.equal(socket.Authed, false);
 
   await io._ns._connection(socket);
-  // hello is always emitted; bootstrap is withheld until authed.
+  // hello is always emitted; initial state is withheld until authed.
   assert.ok(socket.emitted.some((e) => e.event === 'hello'));
   assert.equal(
-    socket.emitted.some((e) => e.event === 'bootstrap'),
+    socket.emitted.some((e) => e.event === 'SetFullClientList'),
     false
   );
 
-  // Unauthed data request is rejected.
+  // Unauthed rpc is rejected.
   let resp;
-  await socket.trigger('clients:get', (r) => (resp = r));
+  await socket.trigger('rpc', 'GetClient', ['u1'], (r) => (resp = r));
   assert.deepEqual(resp, { error: 'unauthorized' });
 
   // Wrong password is rejected.
   await socket.trigger('auth:login', { password: 'nope' }, (r) => (resp = r));
   assert.deepEqual(resp, { error: 'invalid_password' });
 
-  // Correct password authenticates and returns a token + bootstrap.
+  // Correct password authenticates and pushes initial state.
   await socket.trigger('auth:login', { password: 'secret' }, (r) => (resp = r));
   assert.equal(resp.ok, true);
   assert.equal(typeof resp.token, 'string');
-  assert.ok(socket.emitted.some((e) => e.event === 'bootstrap'));
+  assert.ok(socket.emitted.some((e) => e.event === 'SetFullClientList'));
 
-  // Now authed: data requests succeed.
-  await socket.trigger('clients:get', (r) => (resp = r));
-  assert.equal(resp.data[0].UUID, 'u1');
+  // Now authed: a read rpc dispatches to the shared handler.
+  await socket.trigger('rpc', 'GetClient', ['u1'], (r) => (resp = r));
+  assert.deepEqual(resp, { result: [null, { UUID: 'u1' }] });
 
-  await socket.trigger('client:get', 'u1', (r) => (resp = r));
-  assert.equal(resp.data.UUID, 'u1');
-  await socket.trigger('client:get', 'missing', (r) => (resp = r));
-  assert.equal(resp.error, 'not_found');
+  // A channel outside the allowlist is denied.
+  await socket.trigger('rpc', 'Mode:Set', ['EDIT'], (r) => (resp = r));
+  assert.equal(resp.error, 'forbidden');
 
   // Logout clears the session.
   await socket.trigger('auth:logout', (r) => (resp = r));
@@ -366,9 +416,18 @@ test('Web UI namespace gates data behind authentication', async () => {
 });
 
 test('Web UI namespace dispatches script and WOL actions when permitted', async () => {
-  const broadcast = new EventEmitter();
-  broadcast.off = broadcast.removeListener.bind(broadcast);
   const dispatched = [];
+  const waked = [];
+  const handlers = {
+    ExecuteScript: async (_e, scriptId, targets) => {
+      dispatched.push({ scriptId, targets });
+      return [null, { queued: targets.length }];
+    },
+    WakeOnLan: async (_e, targets) => {
+      waked.push(targets);
+      return [null, 'ok'];
+    },
+  };
   const { SetupWebUiNamespace } = loadWebUi(
     {
       WEBUI_ENABLED: true,
@@ -376,54 +435,60 @@ test('Web UI namespace dispatches script and WOL actions when permitted', async 
       WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true,
       SYSTEM_ALLOW_WOL: true,
     },
-    broadcast
+    { handlers }
   );
 
-  const ServerManager = {
-    ExecuteScripts: async (scriptId, targets) => dispatched.push({ scriptId, targets }),
-  };
   const io = makeUiIo();
-  SetupWebUiNamespace(io, ServerManager);
+  SetupWebUiNamespace(io, {});
 
-  const socket = makeSocket({ auth: {}, query: {}, address: '127.0.0.1' });
-  await new Promise((resolve) => io._ns.middlewares[0](socket, resolve));
-  await io._ns._connection(socket);
-  // No password required -> already authed, bootstrap sent.
-  assert.ok(socket.emitted.some((e) => e.event === 'bootstrap'));
+  // No password required -> already authed, initial state sent.
+  const socket = await connectUiSocket(io);
+  assert.ok(socket.emitted.some((e) => e.event === 'SetFullClientList'));
 
   let resp;
-  await socket.trigger('scripts:run', { uuid: 'u1', scriptId: 's1' }, (r) => (resp = r));
-  assert.deepEqual(resp, { ok: true });
+  await socket.trigger('rpc', 'ExecuteScript', ['s1', ['u1'], true], (r) => (resp = r));
+  assert.deepEqual(resp, { result: [null, { queued: 1 }] });
   assert.deepEqual(dispatched[0], { scriptId: 's1', targets: ['u1'] });
 
-  // Invalid args.
-  await socket.trigger('scripts:run', {}, (r) => (resp = r));
-  assert.deepEqual(resp, { error: 'invalid_args' });
-
-  // WOL wake succeeds for a client with a MAC.
-  await socket.trigger('wol:wake', { uuid: 'u1' }, (r) => (resp = r));
-  assert.equal(resp.ok, true);
-  assert.match(resp.message, /magic packet/);
+  await socket.trigger('rpc', 'WakeOnLan', [['u1']], (r) => (resp = r));
+  assert.deepEqual(resp, { result: [null, 'ok'] });
+  assert.deepEqual(waked[0], ['u1']);
 
   // config:get returns the public config.
   await socket.trigger('config:get', (r) => (resp = r));
   assert.equal(resp.data.Version, '9.9.9');
+});
 
-  // Live push wiring reacts to broadcast events without throwing.
-  broadcast.emit('ClientListChanged');
-  broadcast.emit('GroupListChanged');
-  broadcast.emit('SettingsUpdated');
-  await new Promise((r) => setTimeout(r, 10));
-  assert.ok(socket.emitted.some((e) => e.event === 'clients:list'));
+test('Web UI namespace blocks script + WOL actions when the settings forbid them', async () => {
+  const handlers = { ExecuteScript: async () => [null, {}], WakeOnLan: async () => [null, 'ok'] };
+  const { SetupWebUiNamespace } = loadWebUi(
+    {
+      WEBUI_ENABLED: true,
+      WEBUI_PASSWORD_PROTECTION_ENABLED: false,
+      WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: false,
+      SYSTEM_ALLOW_WOL: false,
+    },
+    { handlers }
+  );
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
 
-  // Disconnect detaches broadcast listeners.
-  await socket.trigger('disconnect');
-  assert.equal(broadcast.listenerCount('ClientListChanged'), 0);
+  let resp;
+  await socket.trigger('rpc', 'ExecuteScript', ['s1', ['u1']], (r) => (resp = r));
+  assert.equal(resp.error, 'forbidden');
+  await socket.trigger('rpc', 'WakeOnLan', [['u1']], (r) => (resp = r));
+  assert.equal(resp.error, 'forbidden');
 });
 
 test('Web UI namespace dispatches integrated events when permitted', async () => {
-  const broadcast = new EventEmitter();
-  broadcast.off = broadcast.removeListener.bind(broadcast);
+  const triggered = [];
+  const handlers = {
+    TriggerIntegratedEvent: async (_e, eventId, targets) => {
+      triggered.push({ eventId, targets });
+      return [null, { failed: [] }];
+    },
+  };
   const { SetupWebUiNamespace } = loadWebUi(
     {
       WEBUI_ENABLED: true,
@@ -431,35 +496,102 @@ test('Web UI namespace dispatches integrated events when permitted', async () =>
       WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true,
       SYSTEM_ALLOW_WOL: false,
     },
-    broadcast
+    { handlers }
   );
 
-  const triggered = [];
-  const ServerManager = {
-    ExecuteScripts: async () => ({ failed: [] }),
-    TriggerIntegratedEvent: async (eventId, targets) => {
-      triggered.push({ eventId, targets });
-      return { failed: [] };
-    },
-  };
   const io = makeUiIo();
-  SetupWebUiNamespace(io, ServerManager);
-
-  const socket = makeSocket({ auth: {}, query: {}, address: '127.0.0.1' });
-  await new Promise((resolve) => io._ns.middlewares[0](socket, resolve));
-  await io._ns._connection(socket);
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
 
   const result = await new Promise((resolve) => {
-    socket.trigger('integrated:trigger', { uuid: 'u1', eventId: 'SetBoxBlue' }, resolve);
+    socket.trigger('rpc', 'TriggerIntegratedEvent', ['SetBoxBlue', ['u1']], resolve);
   });
 
-  assert.equal(result && result.ok, true);
+  assert.deepEqual(result, { result: [null, { failed: [] }] });
   assert.deepEqual(triggered, [{ eventId: 'SetBoxBlue', targets: ['u1'] }]);
 });
 
+test('Web UI namespace enforces edit-mode and never allows mode/alert toggles', async () => {
+  const handlers = {
+    CreateGroup: async (_e, title) => [null, { GroupID: 2, Title: title }],
+    'Mode:Set': async () => 'EDIT',
+    'AlertActionsEnabled:Set': async () => false,
+  };
+
+  // SHOW mode: edit mutations are blocked; mode/alert toggles are never allowed.
+  const showIo = makeUiIo();
+  const { SetupWebUiNamespace: SetupShow } = loadWebUi(
+    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false },
+    { mode: 'SHOW', handlers }
+  );
+  SetupShow(showIo, {});
+  const s1 = await connectUiSocket(showIo);
+
+  let resp;
+  await s1.trigger('rpc', 'CreateGroup', ['G'], (r) => (resp = r));
+  assert.equal(resp.error, 'edit_mode_required');
+  await s1.trigger('rpc', 'Mode:Set', ['EDIT'], (r) => (resp = r));
+  assert.equal(resp.error, 'forbidden');
+  await s1.trigger('rpc', 'AlertActionsEnabled:Set', [false], (r) => (resp = r));
+  assert.equal(resp.error, 'forbidden');
+
+  // EDIT mode: the same mutation is now permitted.
+  const editIo = makeUiIo();
+  const { SetupWebUiNamespace: SetupEdit } = loadWebUi(
+    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false },
+    { mode: 'EDIT', handlers }
+  );
+  SetupEdit(editIo, {});
+  const s2 = await connectUiSocket(editIo);
+  await s2.trigger('rpc', 'CreateGroup', ['G'], (r) => (resp = r));
+  assert.deepEqual(resp, { result: [null, { GroupID: 2, Title: 'G' }] });
+});
+
+test('Web UI namespace allows Identify in SHOW mode', async () => {
+  const handlers = {
+    IdentifyClient: async (_e, uuid) => [null, { UUID: uuid }],
+    StopIdentifyingClient: async (_e, uuid) => [null, { UUID: uuid }],
+  };
+  const { SetupWebUiNamespace } = loadWebUi(
+    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false },
+    { mode: 'SHOW', handlers }
+  );
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
+
+  let resp;
+  await socket.trigger('rpc', 'IdentifyClient', ['u1'], (r) => (resp = r));
+  assert.deepEqual(resp, { result: [null, { UUID: 'u1' }] });
+  await socket.trigger('rpc', 'StopIdentifyingClient', ['u1'], (r) => (resp = r));
+  assert.deepEqual(resp, { result: [null, { UUID: 'u1' }] });
+});
+
+test('Web UI namespace forwards allowlisted pushes with serialization, dropping the rest', async () => {
+  const sinks = [];
+  const { SetupWebUiNamespace } = loadWebUi(
+    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false },
+    { sinks }
+  );
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
+  assert.equal(typeof sinks[0], 'function');
+
+  // A client-bearing push is serialized via ToPublicClient before delivery.
+  socket.emitted.length = 0;
+  sinks[0]('ClientUpdated', { UUID: 'u1', Nickname: 'PC' });
+  const pushed = socket.emitted.find((e) => e.event === 'ClientUpdated');
+  assert.ok(pushed);
+  assert.equal(pushed.args[0].UUID, 'u1');
+
+  // A non-allowlisted (desktop-only / secret-bearing) push is dropped.
+  socket.emitted.length = 0;
+  sinks[0]('UpdateSettings', { WEBUI_PASSWORD: 'secret' });
+  assert.equal(socket.emitted.length, 0);
+});
+
 test('Web UI namespace disables access when the master toggle is off', async () => {
-  const broadcast = new EventEmitter();
-  broadcast.off = broadcast.removeListener.bind(broadcast);
   const { SetupWebUiNamespace } = loadWebUi(
     {
       WEBUI_ENABLED: false,
@@ -467,21 +599,17 @@ test('Web UI namespace disables access when the master toggle is off', async () 
       WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: true,
       SYSTEM_ALLOW_WOL: true,
     },
-    broadcast
+    {}
   );
 
-  const ServerManager = { ExecuteScripts: async () => {} };
   const io = makeUiIo();
-  SetupWebUiNamespace(io, ServerManager);
-
-  const socket = makeSocket({ auth: {}, query: {}, address: '127.0.0.1' });
-  await new Promise((resolve) => io._ns.middlewares[0](socket, resolve));
-  await io._ns._connection(socket);
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
 
   const hello = socket.emitted.find((e) => e.event === 'hello');
   assert.equal(hello.args[0].Enabled, false);
   assert.equal(
-    socket.emitted.some((e) => e.event === 'bootstrap'),
+    socket.emitted.some((e) => e.event === 'SetFullClientList'),
     false
   );
 
@@ -489,7 +617,7 @@ test('Web UI namespace disables access when the master toggle is off', async () 
   await socket.trigger('auth:login', { password: '1234' }, (r) => (resp = r));
   assert.deepEqual(resp, { error: 'disabled' });
 
-  await socket.trigger('clients:get', (r) => (resp = r));
+  await socket.trigger('rpc', 'GetClient', ['u1'], (r) => (resp = r));
   assert.deepEqual(resp, { error: 'unauthorized' });
 });
 

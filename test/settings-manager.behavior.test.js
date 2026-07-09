@@ -72,7 +72,7 @@ test('SettingsManager coerces values, persists updates, and emits events', async
     },
   };
 
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'SettingsManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'SettingsManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => ({ log: () => {}, error: () => {} }) },
     '../Broadcast': { Manager: { emit: (event) => events.push(event) } },
@@ -151,7 +151,7 @@ test('SettingsManager clamps INTEGER settings to Min/Max on read and write', asy
     },
   };
 
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'SettingsManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'SettingsManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => ({ log: () => {}, error: () => {} }) },
     '../Broadcast': { Manager: { emit: () => {} } },

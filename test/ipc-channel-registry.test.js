@@ -3,9 +3,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { INVOKE_CHANNELS, SUBSCRIBE_CHANNELS } = require('../src/Modules/IPCRegistry/channels');
+const { INVOKE_CHANNELS, SUBSCRIBE_CHANNELS } = require('../dist/Modules/IPCRegistry/channels');
 
-const SRC_DIR = path.join(__dirname, '..', 'src');
+const SRC_DIR = path.join(__dirname, '..', 'dist');
 
 // Recursively collect .js files under a directory.
 function collectJsFiles(dir) {
@@ -97,24 +97,26 @@ test('preload bridge only invokes/subscribes channels declared in the registry',
 });
 
 // The preload bridge is sandboxed and cannot require the registry at runtime, so
-// it inlines the allowlists. These assertions ensure the inline copies stay
-// byte-for-set identical to the registry (drift in either direction fails CI).
-function extractInlineSet(source, varName) {
-  const block = source.match(new RegExp(`${varName} = new Set\\(\\[([\\s\\S]*?)\\]\\)`));
+// it inlines the allowlists (as `<NAME>_LIST` arrays that feed Sets; drift is
+// also a compile error via the type-only registry imports in bridge_main.ts).
+// These assertions re-check at runtime that the inline copies stay
+// byte-for-set identical to the registry.
+function extractInlineList(source, varName) {
+  const block = source.match(new RegExp(`${varName}_LIST = \\[([\\s\\S]*?)\\]`));
   if (!block) return null;
   return [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
 }
 
 test('bridge inline INVOKE allowlist matches the registry exactly', () => {
   const bridge = fs.readFileSync(path.join(SRC_DIR, 'bridge_main.js'), 'utf8');
-  const inline = extractInlineSet(bridge, 'INVOKE_CHANNELS');
-  assert.ok(inline, 'could not find inline INVOKE_CHANNELS Set in bridge_main.js');
+  const inline = extractInlineList(bridge, 'INVOKE_CHANNEL');
+  assert.ok(inline, 'could not find inline INVOKE_CHANNEL_LIST array in bridge_main.js');
   assert.deepEqual([...inline].sort(), [...INVOKE_CHANNELS].sort());
 });
 
 test('bridge inline SUBSCRIBE allowlist matches the registry exactly', () => {
   const bridge = fs.readFileSync(path.join(SRC_DIR, 'bridge_main.js'), 'utf8');
-  const inline = extractInlineSet(bridge, 'SUBSCRIBE_CHANNELS');
-  assert.ok(inline, 'could not find inline SUBSCRIBE_CHANNELS Set in bridge_main.js');
+  const inline = extractInlineList(bridge, 'SUBSCRIBE_CHANNEL');
+  assert.ok(inline, 'could not find inline SUBSCRIBE_CHANNEL_LIST array in bridge_main.js');
   assert.deepEqual([...inline].sort(), [...SUBSCRIBE_CHANNELS].sort());
 });

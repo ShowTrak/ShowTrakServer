@@ -8,7 +8,7 @@ const {
   parseArgumentString,
   normalizeVersionToken,
   resolveLocalScriptLauncher,
-} = require('../src/main/local-scripts');
+} = require('../dist/main/local-scripts');
 
 test('normalizeRelativePathForCompare normalizes slashes and leading ./', () => {
   assert.equal(normalizeRelativePathForCompare('.\\sub\\file.sh'), 'sub/file.sh');

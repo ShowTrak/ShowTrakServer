@@ -5,7 +5,7 @@ const {
   recordClientApplicationHistorySamples,
   syncClientApplicationHistoryStore,
   getClientApplicationHistorySamples,
-} = require('../src/main/monitoring-history');
+} = require('../dist/main/monitoring-history');
 
 function makeClient(overrides = {}) {
   return {

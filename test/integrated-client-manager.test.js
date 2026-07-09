@@ -7,7 +7,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
-const { NormalizeIntegratedActions } = require('../src/Modules/ClientManager/integrated-actions');
+const { NormalizeIntegratedActions } = require('../dist/Modules/ClientManager/integrated-actions');
 
 test('NormalizeIntegratedActions keeps valid actions and clamps colour index', () => {
   const result = NormalizeIntegratedActions([
@@ -88,11 +88,11 @@ function loadClientManager(clientRows, events) {
     },
   };
 
-  return loadWithMocks('../src/Modules/ClientManager', {
+  return loadWithMocks('../dist/Modules/ClientManager', {
     '../DB': dbStub,
     '../Broadcast': broadcastStub,
     '../Logger': createLoggerStub(),
-    '../Utils': require('../src/Modules/Utils'),
+    '../Utils': require('../dist/Modules/Utils'),
   });
 }
 

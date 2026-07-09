@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "allowJs": true,
+    "checkJs": false,
+    "types": ["node"],
+    "paths": {
+      "@showtrak/protocol": ["./shared/src/index.d.ts"],
+      "@showtrak/protocol/*": ["./shared/src/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "src/UI/**", "src/WebUI/**", "test", "test-support"]
+}

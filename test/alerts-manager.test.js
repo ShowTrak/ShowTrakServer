@@ -41,13 +41,13 @@ test('AlertsManager supports CRUD and action type metadata', async () => {
     },
   };
 
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'AlertsManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AlertsManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => ({ error: () => {} }) },
     '../DB': dbMock,
     '../AlertActions': actionsMock,
     '../Broadcast': { Manager: { emit: (event, payload) => events.push([event, payload]) } },
-    '../Utils': require('../src/Modules/Utils'),
+    '../Utils': require('../dist/Modules/Utils'),
   });
 
   const [allErr, allRules] = await Manager.GetAll();
@@ -213,13 +213,13 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
     },
   };
 
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'AlertsManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AlertsManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => ({ error: () => {} }) },
     '../DB': dbMock,
     '../AlertActions': actionsMock,
     '../Broadcast': { Manager: { emit: (event, payload) => events.push([event, payload]) } },
-    '../Utils': require('../src/Modules/Utils'),
+    '../Utils': require('../dist/Modules/Utils'),
   });
 
   await Manager.Init();
@@ -377,13 +377,13 @@ test('AlertsManager fires client degraded only on state transitions', async () =
     },
   };
 
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'AlertsManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AlertsManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => ({ error: () => {} }) },
     '../DB': dbMock,
     '../AlertActions': actionsMock,
     '../Broadcast': { Manager: { emit: () => {} } },
-    '../Utils': require('../src/Modules/Utils'),
+    '../Utils': require('../dist/Modules/Utils'),
   });
 
   await Manager.Init();

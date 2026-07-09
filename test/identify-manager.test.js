@@ -30,9 +30,9 @@ function loadIdentifyManager({
     }),
   };
 
-  const module = loadWithMocks('../src/Modules/IdentifyManager', {
+  const module = loadWithMocks('../dist/Modules/IdentifyManager', {
     '../Logger': createLoggerStub(),
-    '../Utils': require('../src/Modules/Utils'),
+    '../Utils': require('../dist/Modules/Utils'),
     '../ClientManager': {
       Manager: {
         Exists: exists,

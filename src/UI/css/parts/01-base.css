@@ -1,0 +1,332 @@
+.dragbar {
+  z-index: 1000000;
+  position: fixed;
+  width: 100vw;
+  height: 2rem;
+  -webkit-app-region: drag; /* allow window dragging on Electron */
+  background-color: #1d1a2ffc !important;
+  padding: 0.3rem 0.8rem !important;
+  color: #ffffff !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  font-weight: 700;
+}
+
+body.macos-native-fullscreen .dragbar {
+  display: none !important;
+}
+
+body.macos-native-fullscreen #APPLICATION_CONTAINER {
+  height: 100% !important;
+}
+
+body.macos-native-fullscreen #APPLICATION {
+  padding-top: 0 !important;
+}
+
+/* No dragbar on the web surface, so drop the space reserved for it */
+body.is-web #APPLICATION {
+  padding-top: 0 !important;
+}
+
+#APPLICATION_NAVBAR_TITLE {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+#APPLICATION_CONTAINER {
+  position: absolute;
+  width: 100%;
+  height: calc(100% - 2rem);
+  overflow: auto;
+  /* Block flow, NOT grid: as a grid item #APPLICATION gets pinned to the
+     container's height instead of growing with an overflowing client list, so
+     its content spills past its bottom edge and the padding-bottom reserved
+     for the fixed bottom bar lands mid-list instead of below it — the end of
+     the list then scrolls to rest underneath the bar, unreachable. In block
+     flow #APPLICATION grows with its content and the padding counts toward
+     the scrollable overflow. (#APPLICATION's min-height still fills the
+     viewport when the list is short.) */
+  background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
+}
+
+#APPLICATION {
+  /* min-height (not height): fill the viewport when content is sparse so the
+     gradient covers the screen, but GROW past it when the group/client list is
+     tall — a fixed height here clips the overflow and kills scrolling on mobile,
+     where the list is a single tall column. */
+  min-height: max(100%, 100vh);
+  padding-top: 2rem !important;
+  padding-bottom: 36px !important; /* space for bottom bar */
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  background: transparent !important;
+}
+
+/* Deprecated old floating status bar */
+#STATUS_BAR {
+  display: none;
+}
+
+/* Bottom thin bar */
+#APP_BOTTOM_BAR {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  background: #1d1a2f; /* solid, not transparent */
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  z-index: 1000;
+}
+
+#IDENTIFY_STATUS_BANNER {
+  position: fixed;
+  left: 50%;
+  bottom: 44px;
+  transform: translateX(-50%);
+  z-index: 1200;
+  width: min(560px, calc(100vw - 20px));
+  background:
+    radial-gradient(circle at 20% -70%, rgba(72, 171, 255, 0.28), transparent 70%),
+    linear-gradient(160deg, rgba(20, 51, 88, 0.98), rgba(14, 35, 64, 0.98));
+  border: 1px solid rgba(110, 193, 255, 0.34);
+  border-radius: 12px;
+  box-shadow:
+    0 14px 30px rgba(4, 24, 48, 0.5),
+    inset 0 1px 0 rgba(187, 228, 255, 0.12);
+  color: #fff;
+}
+
+#IDENTIFY_STATUS_BANNER .identify-status-content {
+  width: 100%;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: rgba(225, 244, 255, 0.96);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+#IDENTIFY_STOP_ALL_BUTTON {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: rgba(222, 244, 255, 0.98) !important;
+  border-color: rgba(130, 204, 255, 0.55) !important;
+  background: linear-gradient(
+    160deg,
+    rgba(53, 143, 212, 0.24),
+    rgba(39, 108, 160, 0.18)
+  ) !important;
+  box-shadow: inset 0 0 0 1px rgba(172, 224, 255, 0.12);
+}
+
+#IDENTIFY_STOP_ALL_BUTTON:hover {
+  background: linear-gradient(
+    160deg,
+    rgba(72, 171, 255, 0.32),
+    rgba(46, 128, 189, 0.26)
+  ) !important;
+  border-color: rgba(154, 216, 255, 0.72) !important;
+}
+
+#IDENTIFY_STATUS_BANNER.stacked-above-confirm {
+  bottom: 118px;
+}
+
+#APP_BOTTOM_BAR .bar-content {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 8px;
+}
+
+#APP_BOTTOM_BAR .bar-section.left {
+  justify-self: start;
+}
+#APP_BOTTOM_BAR .bar-section.center {
+  justify-self: center;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 700;
+  font-size: 12px;
+}
+#APP_BOTTOM_BAR .bar-section.right {
+  justify-self: end;
+}
+#APP_BOTTOM_BAR .bar-section.right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Ensure left section content is vertically centered in the bar */
+#APP_BOTTOM_BAR .bar-section.left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Compact mode button group */
+:root {
+  --bottom-bar-toggle-height: 26px;
+  /* Shared status palette. Client tile backgrounds AND history timeline blocks
+   * both read from these variables so the colour scheme lives in one place.
+   *   IDLE / UNAVAILABLE -> grey, OFFLINE -> red, DEGRADED -> orange, ONLINE -> green */
+  --status-idle: rgba(64, 64, 64, 0.5);
+  --status-unavailable: rgba(64, 64, 64, 0.5);
+  --status-offline: rgba(255, 0, 0, 0.24);
+  --status-degraded: rgba(255, 140, 0, 0.32);
+  --status-online: rgba(18, 255, 0, 0.32);
+  /* More saturated variants used only for the history status timeline blocks. */
+  --status-graph-idle: rgba(120, 126, 134, 0.9);
+  --status-graph-offline: rgba(224, 36, 36, 0.98);
+  --status-graph-degraded: rgba(255, 149, 0, 0.98);
+  --status-graph-online: rgba(38, 214, 44, 0.98);
+  /* Backwards-compatible alias kept for existing references. */
+  --client-online-bg: var(--status-online);
+  --tile-name-font-size: 1rem;
+  --tile-hostname-font-size: 0.72rem;
+  --tile-expanded-width: 220px;
+  --tile-compact-width: 244px;
+  --tile-expanded-height: 100px;
+  --tile-status-height: 20px;
+}
+
+.mode-group.btn-group {
+  gap: 0;
+}
+.mode-group .btn {
+  height: var(--bottom-bar-toggle-height);
+  padding: 4px 10px; /* slightly taller */
+  line-height: 1.2;
+  font-size: 12px;
+  border-width: 1px;
+  font-weight: 700; /* consistent weight to avoid width shift */
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+.mode-group.btn-group {
+  align-items: center;
+}
+.mode-group .btn + .btn {
+  margin-left: 2px;
+}
+
+/* Softer hover for inactive, stronger look for active */
+.mode-group .btn.btn-outline-light {
+  color: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  background-color: transparent !important;
+}
+.mode-group .btn.btn-outline-light:hover,
+.mode-group .btn.btn-outline-light:focus {
+  background-color: rgba(255, 255, 255, 0.04) !important; /* softer hover */
+}
+.mode-group .btn.btn-light {
+  background-color: rgba(255, 255, 255, 0.32) !important; /* stronger active background */
+  color: #111 !important;
+  border-color: rgba(255, 255, 255, 0.85) !important;
+}
+.mode-group .btn.btn-light:hover,
+.mode-group .btn.btn-light:focus {
+  background-color: rgba(255, 255, 255, 0.36) !important; /* subtle hover for active */
+}
+
+#COMPACT_MODE_BTN.compact-mode-btn {
+  width: 30px;
+  height: var(--bottom-bar-toggle-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-width: 1px;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+#ALERT_ACTIONS_TOGGLE_BTN.alert-actions-toggle-btn {
+  height: var(--bottom-bar-toggle-height);
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-width: 1px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+#ALERT_ACTIONS_TOGGLE_BTN.alert-actions-toggle-btn:hover {
+  transform: none;
+}
+
+#ALERT_ACTIONS_TOGGLE_BTN.alert-actions-toggle-btn.alerts-enabled {
+  background-color: var(--client-online-bg) !important;
+  color: #fff !important;
+  border-color: var(--client-online-bg) !important;
+}
+
+#ALERT_ACTIONS_TOGGLE_BTN.alert-actions-toggle-btn.alerts-disabled {
+  background-color: #dc3545 !important;
+  color: #fff !important;
+  border-color: #dc3545 !important;
+}
+
+#COMPACT_MODE_BTN.compact-mode-btn:hover {
+  transform: none;
+}
+
+#COMPACT_MODE_BTN.compact-mode-btn.btn-outline-light:hover,
+#COMPACT_MODE_BTN.compact-mode-btn.btn-outline-light:focus {
+  background-color: rgba(255, 255, 255, 0.028) !important;
+  border-color: rgba(255, 255, 255, 0.32) !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+#COMPACT_MODE_BTN.compact-mode-btn .bi {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.btn {
+  border: none;
+}
+
+.btn-ghost {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.btn-ghost:hover {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+.btn-light {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+}
+
+.btn-light:hover {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+

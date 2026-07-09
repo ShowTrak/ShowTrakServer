@@ -25,7 +25,7 @@ function loggerStub() {
 }
 
 function methodPath(name) {
-  return path.join(__dirname, '..', 'src', 'Modules', 'MonitoringMethods', name);
+  return path.join(__dirname, '..', 'dist', 'Modules', 'MonitoringMethods', name);
 }
 
 function loadHttpMethod(name) {

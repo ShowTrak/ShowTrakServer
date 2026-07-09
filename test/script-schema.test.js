@@ -5,7 +5,7 @@ const {
   PLATFORM_KEYS,
   SCRIPT_COLOURS,
   NormalizeScriptConfig,
-} = require('../src/Modules/ScriptManager/schema');
+} = require('../dist/Modules/ScriptManager/schema');
 
 test('NormalizeScriptConfig fills in every required key with defaults', () => {
   const { config, changed, errors } = NormalizeScriptConfig({}, 'MyScript');
@@ -140,6 +140,7 @@ test('NormalizeScriptConfig leaves an already-valid config untouched', () => {
     Confirmation: false,
     Timeout: 15000,
     Enabled: false,
+    Icon: 'terminal',
     Platforms: { Windows: 'win.bat', macOS: '', Linux: '' },
     Arguments: { Windows: '', macOS: '', Linux: '' },
   };

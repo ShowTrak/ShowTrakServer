@@ -1,0 +1,16 @@
+{
+  "name": "@showtrak/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared ShowTrak wire-protocol type definitions (client <-> server <-> SDK). Authored as ambient .d.ts declarations so they can be reused across TypeScript projects and extracted into a standalone git submodule.",
+  "license": "AGPL-3.0-only",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createTupleHandler, validationErrorTuple } = require('../src/main/ipc/create-handler');
+const { createTupleHandler, validationErrorTuple } = require('../dist/main/ipc/create-handler');
 
 test('validationErrorTuple extracts message and applies fallback', () => {
   assert.deepEqual(validationErrorTuple(new Error('bad')), ['bad', null]);

@@ -7,7 +7,7 @@ const path = require('node:path');
 const { loadWithMocks } = require('../test-support/load-with-mocks');
 
 function loadLogger(logsDir) {
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'Logger', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'Logger', 'index');
   return loadWithMocks(modulePath, {
     '../AppData': { Manager: { GetLogsDirectory: () => logsDir } },
   });

@@ -49,7 +49,7 @@ test('BackupManager saves, opens, and creates new ShowTrak files', async () => {
   };
 
   const statePath = path.join(tmpDir, 'state.json');
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'BackupManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'BackupManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => createLoggerStub() },
     '../DB': dbMock,
@@ -116,7 +116,7 @@ test('BackupManager saves, opens, and creates new ShowTrak files', async () => {
 });
 
 test('WOLManager returns success and error tuples from wakeonlan', async () => {
-  const wolModulePath = path.join(__dirname, '..', 'src', 'Modules', 'WOLManager', 'index.js');
+  const wolModulePath = path.join(__dirname, '..', 'dist', 'Modules', 'WOLManager', 'index');
 
   const { Manager: SuccessManager } = loadWithMocks(wolModulePath, {
     wakeonlan: () => Promise.resolve(),
@@ -133,23 +133,32 @@ test('WOLManager returns success and error tuples from wakeonlan', async () => {
   assert.match(String(failErr), /network down/i);
 });
 
-test('ChecksumManager delegates to checksum.file and returns the digest', async () => {
+test('ChecksumManager returns the SHA-1 hex digest of the file contents', async () => {
+  const crypto = require('node:crypto');
   const checksumModulePath = path.join(
     __dirname,
     '..',
-    'src',
+    'dist',
     'Modules',
     'ChecksumManager',
-    'index.js'
+    'index'
   );
   const { Manager } = loadWithMocks(checksumModulePath, {
-    checksum: {
-      file: (_filePath, cb) => cb(null, 'deadbeef'),
-    },
+    '../Logger': { CreateLogger: () => createLoggerStub() },
   });
 
-  const result = await Manager.Checksum('/tmp/file.txt');
-  assert.equal(result, 'deadbeef');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-checksum-'));
+  const filePath = path.join(tmpDir, 'file.txt');
+  const contents = 'ShowTrak checksum test contents';
+  fs.writeFileSync(filePath, contents);
+
+  // Must match the `checksum` package's historical default (SHA-1), which the
+  // ShowTrakClient still uses to compare script files during sync.
+  const expected = crypto.createHash('sha1').update(contents).digest('hex');
+  assert.equal(await Manager.Checksum(filePath), expected);
+
+  // Unreadable path resolves null instead of rejecting or hanging.
+  assert.equal(await Manager.Checksum(path.join(tmpDir, 'missing.txt')), null);
 });
 
 test('ScriptManager loads script folders and computes file checksums', async () => {
@@ -179,7 +188,7 @@ test('ScriptManager loads script folders and computes file checksums', async () 
 
   const events = [];
 
-  const modulePath = path.join(__dirname, '..', 'src', 'Modules', 'ScriptManager', 'index.js');
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'ScriptManager', 'index.js');
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => createLoggerStub() },
     '../AppData': { Manager: { GetScriptsDirectory: () => tmpDir } },

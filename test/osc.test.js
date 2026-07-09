@@ -64,7 +64,7 @@ function loadOSC(overrides = {}) {
   };
 
   const { OSC } = loadWithMocks(
-    path.join(__dirname, '..', 'src', 'Modules', 'OSC', 'index.js'),
+    path.join(__dirname, '..', 'dist', 'Modules', 'OSC', 'index.js'),
     mocks
   );
   return { OSC, handlers, broadcastEvents };

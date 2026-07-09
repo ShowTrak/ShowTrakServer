@@ -6,7 +6,7 @@ const path = require('node:path');
 const { loadWithMocks } = require('../test-support/load-with-mocks');
 
 function methodPath(name) {
-  return path.join(__dirname, '..', 'src', 'Modules', 'MonitoringMethods', name);
+  return path.join(__dirname, '..', 'dist', 'Modules', 'MonitoringMethods', name);
 }
 
 function loadQlab() {

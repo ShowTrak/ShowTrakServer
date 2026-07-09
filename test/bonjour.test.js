@@ -56,7 +56,7 @@ function loadBonjour() {
   };
 
   const { Manager } = loadWithMocks(
-    path.join(__dirname, '..', 'src', 'Modules', 'Bonjour', 'index.js'),
+    path.join(__dirname, '..', 'dist', 'Modules', 'Bonjour', 'index.js'),
     mocks
   );
   return { Manager, published, browsers };

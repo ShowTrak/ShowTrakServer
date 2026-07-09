@@ -1,6 +1,7 @@
 node_modules/
 out/
 build/
+dist/
 coverage/
 logs/
 **/*.lock
