@@ -10,6 +10,7 @@
 // capabilities MUST be in place first.
 import { createWebApi } from './web-api-shim';
 import type { WebUiSocket } from './web-api-shim';
+import type { CapabilityProfile } from './01-state';
 
 // Socket.IO connect options actually passed below (the client is a vendored
 // browser global with no bundled types).
@@ -161,6 +162,13 @@ function applyWebChrome() {
   }
 }
 
+// The `satisfies CapabilityProfile` keeps the web capability profile
+// structurally in lock-step with the desktop one: adding a field to
+// CapabilityProfile becomes a compile error here until the web surface decides
+// its value (and a typo'd/extra field is rejected too). `satisfies` — rather
+// than a return-type annotation — preserves the inferred object type so the
+// result still assigns to the `Record<string, unknown>`-typed window global.
+// This is the one capability-drift vector the WebUI parity tests don't cover.
 function buildCapabilities(config: WebConfig) {
   return {
     isWeb: true,
@@ -171,7 +179,7 @@ function buildCapabilities(config: WebConfig) {
     requiresPasscode: !!config.PasswordProtection,
     allowRemoteScripts: !!config.AllowRemoteScripts,
     wolEnabled: !!config.WOLEnabled,
-  };
+  } satisfies CapabilityProfile;
 }
 
 // Install the shim + capabilities, hide the login/loading overlays, then load

@@ -1,5 +1,5 @@
 import { openModal } from './lib/modal';
-import { AllClients, ClientInfoOpenUUID, DummyClients, MonitorHistoryModalContext, MonitoringTargets, __LastClients, setAlertRulesCache, setDummyClients, setMonitoringTargets } from './01-state';
+import { AllClients, ClientInfoOpenUUID, ClientOnlineState, DummyClients, MonitorHistoryModalContext, MonitoringTargets, __LastClients, setAlertRulesCache, setDummyClients, setMonitoringTargets } from './01-state';
 import { HandleNonFatalError, Safe } from './04-utils';
 import { RenderFullClientAndMonitorList, UpdateClientTile } from './06-client-list';
 import { IsMonitorHistoryContextFor, LoadHistorySamplesForContext, RenderMonitoringHistoryModal, UpdateMonitoringTargetTile } from './07-monitoring';
@@ -408,8 +408,7 @@ window.API.ClientUpdated(async (Data) => {
   // client comes back online. Offline transitions intentionally do not raise a
   // UI notification.
   try {
-    if (!window.__CLIENT_ONLINE_STATE) window.__CLIENT_ONLINE_STATE = new Map();
-    const prev = window.__CLIENT_ONLINE_STATE.get(Data.UUID);
+    const prev = ClientOnlineState.get(Data.UUID);
     if (typeof prev === 'boolean' && prev !== Data.Online && Data.Online) {
       try {
         let changed = false;
@@ -427,7 +426,7 @@ window.API.ClientUpdated(async (Data) => {
         HandleNonFatalError('ClientUpdated:DismissOfflineAlert', err);
       }
     }
-    window.__CLIENT_ONLINE_STATE.set(Data.UUID, !!Data.Online);
+    ClientOnlineState.set(Data.UUID, !!Data.Online);
   } catch (err) {
     HandleNonFatalError('ClientUpdated:TransitionAlerts', err);
   }

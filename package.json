@@ -24,7 +24,7 @@
     "pretest": "npm run build",
     "test": "node --test --test-force-exit --test-concurrency=1",
     "pretest:coverage": "npm run build",
-    "test:coverage": "c8 --all --include=dist/Modules/**/*.js --reporter=text --reporter=lcov node --test --test-force-exit --test-concurrency=1",
+    "test:coverage": "c8 --all --include=dist/Modules/**/*.js --include=dist/main/**/*.js --reporter=text --reporter=lcov node --test --test-force-exit --test-concurrency=1",
     "prepare": "husky",
     "postinstall": "node scripts/copy-bootstrap-icons.js"
   },

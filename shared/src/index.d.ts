@@ -9,4 +9,5 @@ export * from './adoption';
 export * from './integrated';
 export * from './execution';
 export * from './events';
+export * from './views';
 export * from './preload';

@@ -1,4 +1,4 @@
-import { AlertActionsEnabled, Capabilities, CompactMode } from './01-state';
+import { AlertActionsEnabled, Capabilities, CompactMode, ConfirmDialogActive } from './01-state';
 import { SetAlertActionsEnabled, SetCompactMode } from './02-mode';
 import { HandleNonFatalError } from './04-utils';
 import { ShowShortcutsModal } from './08-dnd';
@@ -8,7 +8,7 @@ import { ClearSelection, GetIdentifyingUUIDs, SelectAll, StopIdentifyingForUUIDs
 export function InitKeyboard() {
   document.addEventListener('keydown', function (e) {
   // Suppress global shortcuts while a confirmation prompt is active
-  if (window.__SHOWTRAK_CONFIRM_ACTIVE) {
+  if (ConfirmDialogActive) {
     return;
   }
 

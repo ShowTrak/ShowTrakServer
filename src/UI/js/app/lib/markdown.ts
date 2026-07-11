@@ -8,7 +8,7 @@
 import { HandleNonFatalError, Safe } from '../04-utils';
 
 // Allow only http(s)/mailto links through; everything else collapses to '#'.
-function sanitizeHref(href: string): string {
+export function sanitizeHref(href: string): string {
   try {
     const h = String(href || '').trim();
     if (/^(https?:|mailto:)/i.test(h)) return h;
@@ -78,4 +78,73 @@ function renderMarkdownSafe(md: unknown): string {
   });
 }
 
-export { renderMarkdownSafe };
+// --- Release-notes HTML sanitizer -------------------------------------------
+//
+// GitHub (via electron-updater's GitHub provider) delivers release notes as
+// already-rendered HTML. That HTML is vendor-controlled, but injecting it raw
+// with `.html()` is still an unguarded sink, so we run it through an allowlist
+// sanitizer before it reaches the DOM. Rather than regex-scrubbing the string
+// (which misses parser-based mutation XSS), we parse it with the browser's own
+// HTML parser into a DETACHED document — nothing loads or executes — then walk
+// the tree and rebuild it from a fixed allowlist of formatting tags. Anything
+// not on the list is unwrapped (its text kept) or, for known-dangerous
+// containers, dropped whole.
+
+// Formatting tags we keep. Everything is rebuilt fresh, so no attributes
+// survive except the ones we explicitly re-add below.
+const ALLOWED_TAGS = new Set([
+  'A', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'DEL', 'CODE', 'PRE', 'KBD', 'SAMP',
+  'P', 'BR', 'HR', 'SPAN', 'DIV', 'BLOCKQUOTE',
+  'UL', 'OL', 'LI',
+  'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+  'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TD', 'TH', 'CAPTION',
+]);
+
+// Elements whose entire subtree is discarded (script/style carry executable or
+// active content; the rest can load resources or nest browsing contexts).
+const DROP_SUBTREE = new Set([
+  'SCRIPT', 'STYLE', 'TEMPLATE', 'IFRAME', 'OBJECT', 'EMBED', 'NOSCRIPT',
+  'SVG', 'MATH', 'LINK', 'META', 'BASE', 'FORM', 'HEAD', 'TITLE', 'IMG',
+]);
+
+function sanitizeInto(source: Node, target: Node, doc: Document): void {
+  source.childNodes.forEach((child) => {
+    if (child.nodeType === Node.TEXT_NODE) {
+      target.appendChild(doc.createTextNode(child.nodeValue || ''));
+      return;
+    }
+    if (child.nodeType !== Node.ELEMENT_NODE) return; // comments, etc. dropped
+    const el = child as Element;
+    const tag = el.tagName;
+    if (DROP_SUBTREE.has(tag)) return; // discard element AND its children
+    if (!ALLOWED_TAGS.has(tag)) {
+      // Unknown-but-harmless wrapper: keep its (sanitized) contents, drop the tag.
+      sanitizeInto(el, target, doc);
+      return;
+    }
+    const clean = doc.createElement(tag.toLowerCase());
+    if (tag === 'A') {
+      clean.setAttribute('href', sanitizeHref(el.getAttribute('href') || ''));
+      clean.setAttribute('target', '_blank');
+      clean.setAttribute('rel', 'noopener noreferrer');
+    }
+    sanitizeInto(el, clean, doc);
+    target.appendChild(clean);
+  });
+}
+
+function sanitizeUpdateNotesHtml(html: unknown): string {
+  const input = typeof html === 'string' ? html : '';
+  try {
+    const doc = new DOMParser().parseFromString(input, 'text/html');
+    const container = doc.createElement('div');
+    sanitizeInto(doc.body, container, doc);
+    return container.innerHTML;
+  } catch (err) {
+    HandleNonFatalError('UpdateNotes:Sanitize', err);
+    // Last resort: show the notes as escaped text rather than nothing at all.
+    return Safe(input);
+  }
+}
+
+export { renderMarkdownSafe, sanitizeUpdateNotesHtml };

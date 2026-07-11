@@ -7,7 +7,7 @@
 import type { AppUpdateStatus } from "@showtrak/protocol";
 import { HandleNonFatalError } from "./04-utils";
 import { OpenAboutModal } from "./11-modals";
-import { renderMarkdownSafe } from "./lib/markdown";
+import { renderMarkdownSafe, sanitizeUpdateNotesHtml } from "./lib/markdown";
 
 export function wireAppUpdates() {
   // --- App Updates (manual check) ---
@@ -74,10 +74,13 @@ export function wireAppUpdates() {
         const showNotes = (info: AppUpdateStatus['info']) => {
           const notes = extractNotes(info);
           if (notes && typeof notes === 'string') {
-            // Allow basic HTML if present from GitHub; otherwise escape text
+            // GitHub ships pre-rendered HTML; other providers ship Markdown.
+            // Either way the content never reaches the DOM un-sanitized: HTML
+            // goes through the allowlist sanitizer, Markdown through the safe
+            // renderer (which escapes before emitting any markup).
             const looksHtml = /<\w+[^>]*>/.test(notes);
             if (looksHtml) {
-              $notes.html(notes);
+              $notes.html(sanitizeUpdateNotesHtml(notes));
             } else {
               $notes.html(renderMarkdownSafe(notes));
             }

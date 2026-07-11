@@ -128,10 +128,9 @@ interface Window {
   // caches). Previously a blanket `[key: \`__${string}\`]: any` index signature.
   /** Web UI capability profile injected by the browser bootstrap. */
   __SHOWTRAK_CAPS__?: Record<string, unknown>;
-  /** Guard flag: a confirm dialog is currently open (blocks re-entry). */
-  __SHOWTRAK_CONFIRM_ACTIVE?: boolean;
-  /** Per-client online-state cache used for transition detection. */
-  __CLIENT_ONLINE_STATE?: Map<string, unknown>;
+  // __SHOWTRAK_CONFIRM_ACTIVE and __CLIENT_ONLINE_STATE were folded into the
+  // 01-state module (ConfirmDialogActive / ClientOnlineState) and are no longer
+  // window globals.
   /** Selected address family in the open client-info modal. */
   __ClientInfoNetFamily?: 'IPv4' | 'IPv6';
   /** Auto-dismiss timer handle for the execution toast. */
