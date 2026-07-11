@@ -378,11 +378,14 @@ wireLogin();
 // Server greeting: decides whether to prompt for a passcode or start directly.
 socket.on('hello', (config: WebConfig) => {
   if (started) {
-    // Reconnected after the app already booted. If the session token survived,
-    // just re-hydrate. If it did not (server restarts clear its in-memory
-    // sessions), re-authenticate with the stored passcode — without this the
-    // server never pushes live updates to this socket again and the UI silently
-    // goes stale. No stored/valid passcode -> back to the login screen.
+    // Reconnected after the app already booted, OR re-greeted because the Web UI
+    // settings changed under a live session. If access was revoked, eject to the
+    // disabled notice. If the session token survived, just re-hydrate. If it did
+    // not (server restart, or the passcode/protection just changed), re-auth with
+    // the stored passcode — without this the server never pushes live updates to
+    // this socket again and the UI silently goes stale. No stored/valid passcode
+    // -> back to the login screen.
+    if (!config.Enabled) return showDisabled();
     if (config.Authed || !config.PasswordProtection) {
       socket.emit('bootstrap:get');
     } else {

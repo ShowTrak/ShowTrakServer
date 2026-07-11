@@ -21,6 +21,7 @@ import type { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/protocol';
 import { CreateLogger } from '../Logger';
 import { Config } from '../Config';
+import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as ClientManager } from '../ClientManager';
 import { Manager as GroupManager } from '../GroupManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
@@ -299,6 +300,45 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
         }
       }
     }
+  });
+
+  // Re-evaluate every live session whenever the Web UI enable/protection/passcode
+  // settings change. Without this, enabling protection (or changing the passcode)
+  // would never re-prompt already-connected browsers, and disabling the Web UI
+  // would not eject in-flight sessions — the reported bug.
+  const HandleWebUiSettingsChanged = async () => {
+    // Drop every token: reconnects and the re-greeting below must pass the NEW
+    // gate. A session that is still valid simply re-authenticates seamlessly
+    // (its stored passcode still matches); one that isn't is forced to log in.
+    WebSessions.clear();
+    let Cfg;
+    try {
+      Cfg = await GetWebConfig();
+    } catch {
+      return;
+    }
+    // Only sessions that need no passcode (enabled + protection off/unset) stay
+    // implicitly authed; everyone else is dropped to unauthed. This also stops
+    // the renderer sink (which reads socket.Authed) from pushing to them.
+    const ImplicitlyAuthed = Cfg.Enabled && !Cfg.RequireAuth;
+    const sockets =
+      ui.sockets && typeof ui.sockets.values === 'function' ? Array.from(ui.sockets.values()) : [];
+    for (const socket of sockets) {
+      try {
+        socket.Authed = ImplicitlyAuthed;
+        socket.SessionToken = null;
+        // Re-greet so the client re-runs its auth decision: show the passcode
+        // keypad, the disabled notice, or silently re-hydrate as appropriate.
+        socket.emit('hello', await GetPublicConfig(socket));
+      } catch {
+        /* one bad socket must not block re-evaluation of the rest */
+      }
+    }
+  };
+  BroadcastManager.on('WebUiSettingsChanged', () => {
+    HandleWebUiSettingsChanged().catch((e) =>
+      Logger.error('Web UI settings change handling failed:', e)
+    );
   });
 
   // Validate any token presented in the handshake so reconnects stay logged in.

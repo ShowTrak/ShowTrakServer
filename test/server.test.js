@@ -294,9 +294,13 @@ function loadWebUi(settings, options = {}) {
   const mode = options.mode || 'SHOW';
   const handlers = options.handlers || {};
   const sinks = options.sinks || [];
+  // A fresh event bus per load so the namespace's `WebUiSettingsChanged`
+  // listener is isolated from other tests (and controllable via `__broadcast`).
+  const broadcast = options.broadcast || new EventEmitter();
   const managers = {
     '../Logger': loggerStub,
     '../Config': { Config: { Application: { Version: '9.9.9' } } },
+    '../Broadcast': { Manager: broadcast },
     '../ClientManager': {
       Manager: {
         GetAll: async () => [null, [{ UUID: 'u1', Nickname: 'PC' }]],
@@ -329,7 +333,9 @@ function loadWebUi(settings, options = {}) {
       RegisterHandler: () => {},
     },
   };
-  return loadWithMocks(serverPath('webui-namespace.js'), managers);
+  const mod = loadWithMocks(serverPath('webui-namespace.js'), managers);
+  mod.__broadcast = broadcast;
+  return mod;
 }
 
 function makeUiIo() {
@@ -413,6 +419,83 @@ test('Web UI namespace gates data behind authentication', async () => {
   // Logout clears the session.
   await socket.trigger('auth:logout', (r) => (resp = r));
   assert.deepEqual(resp, { ok: true });
+});
+
+// Regression: changing the passcode / protection / enabled settings must eject
+// or re-prompt live sessions instead of leaving them silently authenticated.
+const flush = () => new Promise((resolve) => setTimeout(resolve, 10));
+
+test('Web UI namespace re-prompts live sessions when the passcode changes', async () => {
+  const settings = {
+    WEBUI_ENABLED: true,
+    WEBUI_PASSWORD_PROTECTION_ENABLED: true,
+    WEBUI_PASSWORD: 'secret',
+  };
+  const { SetupWebUiNamespace, __broadcast } = loadWebUi(settings);
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+
+  // Establish an authenticated live session.
+  const socket = await connectUiSocket(io);
+  let resp;
+  await socket.trigger('auth:login', { password: 'secret' }, (r) => (resp = r));
+  assert.equal(resp.ok, true);
+  assert.equal(socket.Authed, true);
+  socket.emitted.length = 0;
+
+  // Operator changes the passcode -> the settings-change event fires.
+  settings.WEBUI_PASSWORD = '1234';
+  __broadcast.emit('WebUiSettingsChanged');
+  await flush();
+
+  // The live session is dropped and re-greeted so the client re-prompts.
+  assert.equal(socket.Authed, false);
+  assert.equal(socket.SessionToken, null);
+  const hello = socket.emitted.find((e) => e.event === 'hello');
+  assert.ok(hello, 'socket was re-greeted with hello');
+  assert.equal(hello.args[0].Authed, false);
+  assert.equal(hello.args[0].PasswordProtection, true);
+
+  // The previously-issued token is now worthless: reads are unauthorized, and
+  // the stale (old) passcode is rejected on re-auth.
+  await socket.trigger('rpc', 'GetClient', ['u1'], (r) => (resp = r));
+  assert.deepEqual(resp, { error: 'unauthorized' });
+  await socket.trigger('auth:login', { password: 'secret' }, (r) => (resp = r));
+  assert.deepEqual(resp, { error: 'invalid_password' });
+  await socket.trigger('auth:login', { password: '1234' }, (r) => (resp = r));
+  assert.equal(resp.ok, true);
+});
+
+test('Web UI namespace ejects live sessions when the Web UI is disabled', async () => {
+  const settings = {
+    WEBUI_ENABLED: true,
+    WEBUI_PASSWORD_PROTECTION_ENABLED: false,
+  };
+  const { SetupWebUiNamespace, __broadcast } = loadWebUi(settings);
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+
+  // No passcode -> implicitly authed live session receiving pushes.
+  const socket = await connectUiSocket(io);
+  assert.equal(socket.Authed, true);
+  socket.emitted.length = 0;
+
+  // Operator disables the Web UI entirely.
+  settings.WEBUI_ENABLED = false;
+  __broadcast.emit('WebUiSettingsChanged');
+  await flush();
+
+  // The session is de-authed (so the renderer sink stops pushing to it) and
+  // re-greeted with Enabled=false so the client shows the disabled notice.
+  assert.equal(socket.Authed, false);
+  const hello = socket.emitted.find((e) => e.event === 'hello');
+  assert.ok(hello, 'socket was re-greeted with hello');
+  assert.equal(hello.args[0].Enabled, false);
+
+  // Nothing works while disabled, even reads.
+  let resp;
+  await socket.trigger('rpc', 'GetClient', ['u1'], (r) => (resp = r));
+  assert.deepEqual(resp, { error: 'unauthorized' });
 });
 
 test('Web UI namespace dispatches script and WOL actions when permitted', async () => {

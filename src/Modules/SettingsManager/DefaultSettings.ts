@@ -48,6 +48,9 @@ export const DefaultSettings: SettingDefinition[] = [
     Description: 'Enable access to the Web UI.',
     Type: 'BOOLEAN',
     DefaultValue: true,
+    // Re-evaluate live Web UI sessions when access is toggled: disabling must
+    // eject connected browsers, re-enabling must re-greet them.
+    OnUpdateEvent: 'WebUiSettingsChanged',
   },
   {
     Group: 'Web UI',
@@ -57,6 +60,9 @@ export const DefaultSettings: SettingDefinition[] = [
       'Require a password to access the Web UI. Sessions are remembered per browser tab and can be ended with the Logout button.',
     Type: 'BOOLEAN',
     DefaultValue: false,
+    // Toggling protection must invalidate existing sessions so already-connected
+    // browsers are re-prompted (or let straight in when protection is removed).
+    OnUpdateEvent: 'WebUiSettingsChanged',
   },
   {
     Group: 'Web UI',
@@ -66,6 +72,9 @@ export const DefaultSettings: SettingDefinition[] = [
       'Optional 4 digit numeric passcode used to access the Web UI when password protection is enabled.',
     Type: 'STRING',
     DefaultValue: '',
+    // Changing the passcode must invalidate every existing session so live
+    // browsers are forced to re-authenticate with the new code.
+    OnUpdateEvent: 'WebUiSettingsChanged',
   },
   {
     Group: 'Web UI',
