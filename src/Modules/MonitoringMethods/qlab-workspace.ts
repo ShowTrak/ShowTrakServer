@@ -13,6 +13,7 @@
 import net from 'net';
 import { Manager as CacheManager } from '../CacheManager';
 import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
+import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const ID = 'qlab-workspace';
@@ -426,7 +427,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 export const Name = 'QLab Workspace';
 export const Description =
   'Connects to QLab over TCP (OSC) and confirms a specific workspace is open by name/filename or unique ID.';
-export const DefaultInterval = 30000;
+export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 // Exported for unit tests.
 export const _internal = {
   EncodeOscMessageTcp,

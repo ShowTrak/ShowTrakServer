@@ -2,7 +2,7 @@
 // Extracted verbatim from main.ts.
 
 import { RPC } from '../rpc';
-import { createTupleHandler, validationErrorTuple } from '../ipc/create-handler';
+import { createTupleHandler } from '../ipc/create-handler';
 import {
   getMonitoringCheckHistory,
   getDummyHistorySamples,
@@ -144,16 +144,13 @@ function register(): void {
     )
   );
 
-  RPC.handle('DeleteMonitoringTarget', async (_Event: unknown, TargetID: unknown) => {
-    try {
-      TargetID = IPCValidation.MonitoringTargetID(TargetID);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    const [Err, Result] = await MonitoringTargetManager.Delete(TargetID);
-    if (Err) return [Err, null];
-    return [null, Result];
-  });
+  RPC.handle(
+    'DeleteMonitoringTarget',
+    createTupleHandler<[number], unknown>(
+      (TargetID: unknown) => IPCValidation.MonitoringTargetID(TargetID),
+      (TargetID: number) => MonitoringTargetManager.Delete(TargetID)
+    )
+  );
 }
 
 export { register };

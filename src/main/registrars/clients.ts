@@ -104,84 +104,91 @@ function register(): void {
 
   // Start identify mode on a single client (adopted or pending adoption).
   // Rejected for integrated (SDK) clients which cannot render the overlay.
-  RPC.handle('IdentifyClient', async (_Event: unknown, UUID: unknown) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    return IdentifyManager.Identify(UUID);
-  });
+  RPC.handle(
+    'IdentifyClient',
+    createTupleHandler<[string], boolean>(
+      (UUID: unknown) => IPCValidation.UUID(UUID),
+      (UUID: string) => IdentifyManager.Identify(UUID)
+    )
+  );
 
-  RPC.handle('StopIdentifyingClient', async (_Event: unknown, UUID: unknown) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-    } catch (error) {
-      return validationErrorTuple(error);
-    }
-    return IdentifyManager.Stop(UUID);
-  });
+  RPC.handle(
+    'StopIdentifyingClient',
+    createTupleHandler<[string], boolean>(
+      (UUID: unknown) => IPCValidation.UUID(UUID),
+      (UUID: string) => IdentifyManager.Stop(UUID)
+    )
+  );
 
-  RPC.handle('AdoptDevice', async (_event: unknown, UUID: unknown) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-    } catch (error) {
-      return validationErrorTuple(error, false);
-    }
-    Logger.log('Adopting device:', UUID);
-    const [CreateErr, _CreateResult] = await ClientManager.Create(UUID);
-    if (CreateErr && CreateErr !== 'Client already exists') return [CreateErr, null];
-    await AdoptionManager.SetState(UUID, 'Adopting');
-    await ServerManager.SendMessageByGroup(UUID, 'Adopt');
-    await TriggerScriptDeployment([UUID], 'client-adopted');
-    return [null, true];
-  });
+  RPC.handle(
+    'AdoptDevice',
+    createTupleHandler<[string], boolean>(
+      (UUID: unknown) => IPCValidation.UUID(UUID),
+      async (UUID: string) => {
+        Logger.log('Adopting device:', UUID);
+        const [CreateErr] = await ClientManager.Create(UUID);
+        if (CreateErr && CreateErr !== 'Client already exists') return [CreateErr, null];
+        await AdoptionManager.SetState(UUID, 'Adopting');
+        await ServerManager.SendMessageByGroup(UUID, 'Adopt');
+        await TriggerScriptDeployment([UUID], 'client-adopted');
+        return [null, true];
+      },
+      { invalidFallback: false }
+    )
+  );
 
-  RPC.handle('UnadoptClient', async (_event: unknown, UUID: unknown) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-    } catch (error) {
-      return validationErrorTuple(error, false);
-    }
-    Logger.log('Unadopting device:', UUID);
-    await ServerManager.SendMessageByGroup(UUID, 'Unadopt');
-    const [DeleteErr, _DeleteResult] = await ClientManager.Delete(UUID);
-    if (DeleteErr) return [DeleteErr, null];
-    await UpdateFullClientList();
-    return [null, true];
-  });
+  RPC.handle(
+    'UnadoptClient',
+    createTupleHandler<[string], boolean>(
+      (UUID: unknown) => IPCValidation.UUID(UUID),
+      async (UUID: string) => {
+        Logger.log('Unadopting device:', UUID);
+        await ServerManager.SendMessageByGroup(UUID, 'Unadopt');
+        const [DeleteErr] = await ClientManager.Delete(UUID);
+        if (DeleteErr) return [DeleteErr, null];
+        await UpdateFullClientList();
+        return [null, true];
+      },
+      { invalidFallback: false }
+    )
+  );
 
-  RPC.handle('ReplaceClient', async (_event: unknown, CurrentUUID: unknown, ReplacementUUID: unknown) => {
-    try {
-      CurrentUUID = IPCValidation.UUID(CurrentUUID, 'CurrentUUID');
-      ReplacementUUID = IPCValidation.UUID(ReplacementUUID, 'ReplacementUUID');
-    } catch (error) {
-      return validationErrorTuple(error, false);
-    }
+  RPC.handle(
+    'ReplaceClient',
+    createTupleHandler<[string, string], boolean>(
+      (CurrentUUID: unknown, ReplacementUUID: unknown) => [
+        IPCValidation.UUID(CurrentUUID, 'CurrentUUID'),
+        IPCValidation.UUID(ReplacementUUID, 'ReplacementUUID'),
+      ],
+      async (CurrentUUID: string, ReplacementUUID: string) => {
+        if (CurrentUUID === ReplacementUUID) {
+          return ['Replacement client must be different', null];
+        }
 
-    if (CurrentUUID === ReplacementUUID) {
-      return ['Replacement client must be different', null];
-    }
+        const Pending = AdoptionManager.GetClientsPendingAdoption();
+        const ReplacementPending = Array.isArray(Pending)
+          ? Pending.find(
+              (Device: { UUID?: unknown } | null) => String(Device && Device.UUID) === ReplacementUUID
+            )
+          : null;
+        if (!ReplacementPending) {
+          return ['Replacement device is no longer pending adoption', null];
+        }
 
-    const Pending = AdoptionManager.GetClientsPendingAdoption();
-    const ReplacementPending = Array.isArray(Pending)
-      ? Pending.find((Device: { UUID?: unknown } | null) => String(Device && Device.UUID) === ReplacementUUID)
-      : null;
-    if (!ReplacementPending) {
-      return ['Replacement device is no longer pending adoption', null];
-    }
+        const [ReplaceErr] = await ClientManager.ReplaceClient(CurrentUUID, ReplacementUUID);
+        if (ReplaceErr) return [ReplaceErr, null];
 
-    const [ReplaceErr] = await ClientManager.ReplaceClient(CurrentUUID, ReplacementUUID);
-    if (ReplaceErr) return [ReplaceErr, null];
+        await AlertsManager.Reload();
 
-    await AlertsManager.Reload();
+        await AdoptionManager.SetState(ReplacementUUID, 'Adopting');
+        await ServerManager.SendMessageByGroup(ReplacementUUID, 'Adopt');
+        await TriggerScriptDeployment([ReplacementUUID], 'client-replaced');
 
-    await AdoptionManager.SetState(ReplacementUUID, 'Adopting');
-    await ServerManager.SendMessageByGroup(ReplacementUUID, 'Adopt');
-    await TriggerScriptDeployment([ReplacementUUID], 'client-replaced');
-
-    return [null, true];
-  });
+        return [null, true];
+      },
+      { invalidFallback: false }
+    )
+  );
 
   RPC.handle('WakeOnLan', async (_Event: unknown, List: unknown) => {
     let Targets: string[];

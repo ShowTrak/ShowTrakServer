@@ -6,6 +6,8 @@
 import { isDeepStrictEqual } from 'util';
 import path from 'path';
 
+import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
+
 // The platforms a script can target. Order is meaningful for display.
 const PLATFORM_KEYS = ['Windows', 'macOS', 'Linux'];
 
@@ -212,11 +214,13 @@ function NormalizeScriptConfig(
   if (TimeoutMs !== null) {
     config.Timeout = TimeoutMs;
   } else {
-    config.Timeout = 15000;
+    config.Timeout = SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS;
     if (data.Timeout !== undefined) {
-      errors.push('"Timeout" was invalid (minimum 5000ms); defaulted to 15000ms.');
+      errors.push(
+        `"Timeout" was invalid (minimum 5000ms); defaulted to ${SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS}ms.`
+      );
     } else {
-      errors.push('"Timeout" was missing; defaulted to 15000ms.');
+      errors.push(`"Timeout" was missing; defaulted to ${SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS}ms.`);
     }
   }
 

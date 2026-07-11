@@ -72,22 +72,14 @@ interface ClientHardwareTelemetryLike {
   DisplayList?: unknown;
 }
 
-// Resolved critical-entity states produced by the extractors below.
-interface CriticalApplicationState {
+// Resolved critical-entity state produced by the per-domain extractors below and
+// consumed by the shared NamedHistoryStore: an online/degraded reading for one
+// named entity (application, USB device, or display) at sample time.
+interface NamedEntityState {
   key: string;
   name: string;
-  isRunning: boolean;
-}
-interface CriticalUSBState {
-  key: string;
-  name: string;
-  isConnected: boolean;
-}
-interface CriticalDisplayState {
-  key: string;
-  name: string;
-  isConnected: boolean;
-  isMismatch: boolean;
+  online: boolean;
+  degraded: boolean;
 }
 
 const MonitoringHistoryStores: Record<string, EntityHistoryStore> = Object.freeze({
@@ -307,15 +299,121 @@ function getClientHistorySamples(uuid: unknown): HistorySample[] {
   return getEntityHistorySamples(ENTITY_CLIENT, uuid);
 }
 
-// Per-critical-application status history for real ShowTrak clients. Each
-// critical application gets its own online (running) / offline (not running)
-// timeline so the client info modal can render them the same way monitoring
-// targets render individual checks. This data is RAM-only (never persisted to
-// the DB or show file) and is sampled on a fixed cadence that mirrors the
-// ShowTrakClient application poll interval (20s).
+// Per-critical-entity status history for real ShowTrak clients. Each critical
+// application / USB device / display gets its own online / offline timeline so
+// the client info modal can render them the same way monitoring targets render
+// individual checks. This data is RAM-only (never persisted to the DB or show
+// file) and is sampled on a fixed cadence that mirrors the ShowTrakClient
+// telemetry poll interval (20s).
 //
-// Store shape: Map<UUID, Map<ApplicationKey, { Name, samples: [] }>>
-const ClientApplicationHistoryStore = new Map<string, Map<string, NamedHistoryEntry>>();
+// Store shape: Map<UUID, Map<entityKey, { Name, Points: [] }>>. The three
+// domains differ only in how the current state is extracted from client
+// telemetry and which stable identifier field the getter emits, so a single
+// factory drives all three.
+interface NamedHistoryStore {
+  record(client: ClientHardwareTelemetryLike | null | undefined, sampledAt?: number | null): void;
+  sync(list: unknown): void;
+  get(uuid: unknown): Array<Record<string, string | HistorySample[]>>;
+}
+
+function createNamedHistoryStore(
+  extract: (client: ClientHardwareTelemetryLike | null | undefined) => NamedEntityState[] | null,
+  outputKeyField: string
+): NamedHistoryStore {
+  const store = new Map<string, Map<string, NamedHistoryEntry>>();
+
+  function record(
+    client: ClientHardwareTelemetryLike | null | undefined,
+    sampledAt: number | null = null
+  ): void {
+    const uuid = normalizeDummyUUID(client && client.UUID);
+    if (!uuid) return;
+    const states = extract(client);
+    if (!states) return; // Not evaluable right now; leave an idle gap.
+
+    const now =
+      sampledAt != null && Number.isFinite(Number(sampledAt)) ? Number(sampledAt) : Date.now();
+    const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
+    let perEntity = store.get(uuid);
+    if (!perEntity) {
+      perEntity = new Map<string, NamedHistoryEntry>();
+      store.set(uuid, perEntity);
+    }
+
+    const seenKeys = new Set<string>();
+    for (const state of states) {
+      seenKeys.add(state.key);
+      const existing = perEntity.get(state.key);
+      const previousSamples = Array.isArray(existing && existing.Points) ? existing!.Points : [];
+      const sample: HistorySample = {
+        ts: now,
+        online: !!state.online,
+        degraded: !!state.degraded,
+        latencyMs: null,
+      };
+      const last = previousSamples.length ? previousSamples[previousSamples.length - 1] : null;
+      // Collapse a rapid repeat of the same reading into the latest timestamp.
+      // The degraded comparison is a no-op for domains that never set it (USB /
+      // applications), and correctly separates matched/mismatched display bars.
+      let nextSamples: HistorySample[];
+      if (
+        last &&
+        now - last.ts < 900 &&
+        last.online === sample.online &&
+        last.degraded === sample.degraded
+      ) {
+        nextSamples = previousSamples.slice(0, -1).concat({ ...last, ts: now });
+      } else {
+        nextSamples = previousSamples.concat(sample);
+      }
+      while (nextSamples.length && nextSamples[0].ts < cutoff) nextSamples.shift();
+      perEntity.set(state.key, {
+        Name: state.name || (existing && existing.Name) || state.key,
+        Points: nextSamples,
+      });
+    }
+
+    // Drop history for entities that are no longer marked critical so the modal
+    // only shows currently-tracked entities.
+    for (const key of Array.from(perEntity.keys())) {
+      if (!seenKeys.has(key)) perEntity.delete(key);
+    }
+    if (!perEntity.size) store.delete(uuid);
+  }
+
+  function sync(list: unknown): void {
+    const safeList = Array.isArray(list) ? list : [];
+    const validUUIDs = new Set<string>();
+    for (const client of safeList) {
+      const uuid = normalizeDummyUUID(client && client.UUID);
+      if (!uuid) continue;
+      validUUIDs.add(uuid);
+      record(client);
+    }
+    for (const uuid of Array.from(store.keys())) {
+      if (!validUUIDs.has(uuid)) store.delete(uuid);
+    }
+  }
+
+  function get(uuid: unknown): Array<Record<string, string | HistorySample[]>> {
+    const key = normalizeDummyUUID(uuid);
+    if (!key) return [];
+    const perEntity = store.get(key);
+    if (!perEntity) return [];
+    const now = Date.now();
+    const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
+    const out: Array<Record<string, string | HistorySample[]>> = [];
+    for (const [entityKey, entry] of perEntity.entries()) {
+      const samples = (Array.isArray(entry.Points) ? entry.Points : []).filter(
+        (s: HistorySample) => s && Number(s.ts) >= cutoff
+      );
+      out.push({ [outputKeyField]: entityKey, Name: entry.Name || entityKey, samples });
+    }
+    return out;
+  }
+
+  return { record, sync, get };
+}
 
 // Resolve the current running/not-running state for every critical application
 // on a client, but only when the state can be trusted. Returns null (skip this
@@ -324,7 +422,7 @@ const ClientApplicationHistoryStore = new Map<string, Map<string, NamedHistoryEn
 // we never paint "not running" red bars for data we could not actually read.
 function extractCriticalApplicationStates(
   client: ClientHardwareTelemetryLike | null | undefined
-): CriticalApplicationState[] | null {
+): NamedEntityState[] | null {
   if (!client || !client.Online) return null;
   const running =
     client.RunningApplications && typeof client.RunningApplications === 'object'
@@ -337,106 +435,39 @@ function extractCriticalApplicationStates(
   const state = String(status.State || 'unknown').toLowerCase();
   if (state !== 'ok') return null;
   const items = Array.isArray(running.Items) ? running.Items : [];
-  const states: CriticalApplicationState[] = [];
+  const states: NamedEntityState[] = [];
   for (const item of items) {
     if (!item || !item.IsCritical) continue;
     const name = typeof item.Name === 'string' && item.Name.trim() ? item.Name.trim() : null;
     const key = typeof item.Key === 'string' && item.Key.trim() ? item.Key.trim() : name;
     if (!key) continue;
-    states.push({ key, name: name || key, isRunning: item.IsRunning !== false });
+    states.push({ key, name: name || key, online: item.IsRunning !== false, degraded: false });
   }
   return states;
 }
+
+const ClientApplicationHistory = createNamedHistoryStore(extractCriticalApplicationStates, 'Key');
 
 function recordClientApplicationHistorySamples(
   client: ClientHardwareTelemetryLike | null | undefined,
   sampledAt: number | null = null
 ): void {
-  const uuid = normalizeDummyUUID(client && client.UUID);
-  if (!uuid) return;
-  const states = extractCriticalApplicationStates(client);
-  if (!states) return; // Not evaluable right now; leave an idle gap.
-
-  const now =
-    sampledAt != null && Number.isFinite(Number(sampledAt)) ? Number(sampledAt) : Date.now();
-  const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
-  let perApp = ClientApplicationHistoryStore.get(uuid);
-  if (!perApp) {
-    perApp = new Map<string, NamedHistoryEntry>();
-    ClientApplicationHistoryStore.set(uuid, perApp);
-  }
-
-  const seenKeys = new Set<string>();
-  for (const state of states) {
-    seenKeys.add(state.key);
-    const existing = perApp.get(state.key);
-    const previousSamples = Array.isArray(existing && existing.Points) ? existing!.Points : [];
-    const sample: HistorySample = {
-      ts: now,
-      online: !!state.isRunning,
-      degraded: false,
-      latencyMs: null,
-    };
-    const last = previousSamples.length ? previousSamples[previousSamples.length - 1] : null;
-    let nextSamples: HistorySample[];
-    if (last && now - last.ts < 900 && last.online === sample.online) {
-      nextSamples = previousSamples.slice(0, -1).concat({ ...last, ts: now });
-    } else {
-      nextSamples = previousSamples.concat(sample);
-    }
-    while (nextSamples.length && nextSamples[0].ts < cutoff) nextSamples.shift();
-    perApp.set(state.key, {
-      Name: state.name || (existing && existing.Name) || state.key,
-      Points: nextSamples,
-    });
-  }
-
-  // Drop history for applications that are no longer marked critical so the
-  // modal only shows currently-tracked applications.
-  for (const key of Array.from(perApp.keys())) {
-    if (!seenKeys.has(key)) perApp.delete(key);
-  }
-  if (!perApp.size) ClientApplicationHistoryStore.delete(uuid);
+  ClientApplicationHistory.record(client, sampledAt);
 }
 
 function syncClientApplicationHistoryStore(list: unknown): void {
-  const safeList = Array.isArray(list) ? list : [];
-  const validUUIDs = new Set<string>();
-  for (const client of safeList) {
-    const uuid = normalizeDummyUUID(client && client.UUID);
-    if (!uuid) continue;
-    validUUIDs.add(uuid);
-    recordClientApplicationHistorySamples(client);
-  }
-  for (const uuid of Array.from(ClientApplicationHistoryStore.keys())) {
-    if (!validUUIDs.has(uuid)) ClientApplicationHistoryStore.delete(uuid);
-  }
+  ClientApplicationHistory.sync(list);
 }
 
 function getClientApplicationHistorySamples(
   uuid: unknown
 ): Array<{ Key: string; Name: string; samples: HistorySample[] }> {
-  const key = normalizeDummyUUID(uuid);
-  if (!key) return [];
-  const perApp = ClientApplicationHistoryStore.get(key);
-  if (!perApp) return [];
-  const now = Date.now();
-  const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
-  const out: Array<{ Key: string; Name: string; samples: HistorySample[] }> = [];
-  for (const [appKey, entry] of perApp.entries()) {
-    const samples = (Array.isArray(entry.Points) ? entry.Points : []).filter(
-      (s: HistorySample) => s && Number(s.ts) >= cutoff
-    );
-    out.push({ Key: appKey, Name: entry.Name || appKey, samples });
-  }
-  return out;
+  return ClientApplicationHistory.get(uuid) as Array<{
+    Key: string;
+    Name: string;
+    samples: HistorySample[];
+  }>;
 }
-
-// Per-critical-USB-device connected/disconnected history. Mirrors the critical
-// application history above: RAM-only, keyed by device serial number, and
-// rendered in the client info modal the same way individual monitoring checks
-// are. Store shape: Map<UUID, Map<SerialNumber, { Name, Points: [] }>>
-const ClientUSBHistoryStore = new Map<string, Map<string, NamedHistoryEntry>>();
 
 // Resolve the current connected/disconnected state for every critical USB
 // device on a client. Returns null (skip this sample, leaving an idle gap) when
@@ -444,10 +475,10 @@ const ClientUSBHistoryStore = new Map<string, Map<string, NamedHistoryEntry>>();
 // whose real state we could not observe.
 function extractCriticalUSBStates(
   client: ClientHardwareTelemetryLike | null | undefined
-): CriticalUSBState[] | null {
+): NamedEntityState[] | null {
   if (!client || !client.Online) return null;
   const devices = Array.isArray(client.USBDeviceList) ? client.USBDeviceList : [];
-  const states: CriticalUSBState[] = [];
+  const states: NamedEntityState[] = [];
   for (const device of devices) {
     if (!device || !device.IsCritical) continue;
     const serial =
@@ -460,114 +491,46 @@ function extractCriticalUSBStates(
     const product = typeof device.ProductName === 'string' ? device.ProductName.trim() : '';
     const name = [manufacturer, product].filter(Boolean).join(' ') || 'USB Device';
     const isConnected = device.IsConnected !== false && !device.Missing;
-    states.push({ key: serial, name, isConnected });
+    states.push({ key: serial, name, online: isConnected, degraded: false });
   }
   return states;
 }
+
+const ClientUSBHistory = createNamedHistoryStore(extractCriticalUSBStates, 'Serial');
 
 function recordClientUSBHistorySamples(
   client: ClientHardwareTelemetryLike | null | undefined,
   sampledAt: number | null = null
 ): void {
-  const uuid = normalizeDummyUUID(client && client.UUID);
-  if (!uuid) return;
-  const states = extractCriticalUSBStates(client);
-  if (!states) return; // Not evaluable right now; leave an idle gap.
-
-  const now =
-    sampledAt != null && Number.isFinite(Number(sampledAt)) ? Number(sampledAt) : Date.now();
-  const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
-  let perDevice = ClientUSBHistoryStore.get(uuid);
-  if (!perDevice) {
-    perDevice = new Map<string, NamedHistoryEntry>();
-    ClientUSBHistoryStore.set(uuid, perDevice);
-  }
-
-  const seenKeys = new Set<string>();
-  for (const state of states) {
-    seenKeys.add(state.key);
-    const existing = perDevice.get(state.key);
-    const previousSamples = Array.isArray(existing && existing.Points) ? existing!.Points : [];
-    const sample: HistorySample = {
-      ts: now,
-      online: !!state.isConnected,
-      degraded: false,
-      latencyMs: null,
-    };
-    const last = previousSamples.length ? previousSamples[previousSamples.length - 1] : null;
-    let nextSamples: HistorySample[];
-    if (last && now - last.ts < 900 && last.online === sample.online) {
-      nextSamples = previousSamples.slice(0, -1).concat({ ...last, ts: now });
-    } else {
-      nextSamples = previousSamples.concat(sample);
-    }
-    while (nextSamples.length && nextSamples[0].ts < cutoff) nextSamples.shift();
-    perDevice.set(state.key, {
-      Name: state.name || (existing && existing.Name) || state.key,
-      Points: nextSamples,
-    });
-  }
-
-  // Drop history for devices that are no longer marked critical so the modal
-  // only shows currently-tracked devices.
-  for (const key of Array.from(perDevice.keys())) {
-    if (!seenKeys.has(key)) perDevice.delete(key);
-  }
-  if (!perDevice.size) ClientUSBHistoryStore.delete(uuid);
+  ClientUSBHistory.record(client, sampledAt);
 }
 
 function syncClientUSBHistoryStore(list: unknown): void {
-  const safeList = Array.isArray(list) ? list : [];
-  const validUUIDs = new Set<string>();
-  for (const client of safeList) {
-    const uuid = normalizeDummyUUID(client && client.UUID);
-    if (!uuid) continue;
-    validUUIDs.add(uuid);
-    recordClientUSBHistorySamples(client);
-  }
-  for (const uuid of Array.from(ClientUSBHistoryStore.keys())) {
-    if (!validUUIDs.has(uuid)) ClientUSBHistoryStore.delete(uuid);
-  }
+  ClientUSBHistory.sync(list);
 }
 
 function getClientUSBHistorySamples(
   uuid: unknown
 ): Array<{ Serial: string; Name: string; samples: HistorySample[] }> {
-  const key = normalizeDummyUUID(uuid);
-  if (!key) return [];
-  const perDevice = ClientUSBHistoryStore.get(key);
-  if (!perDevice) return [];
-  const now = Date.now();
-  const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
-  const out: Array<{ Serial: string; Name: string; samples: HistorySample[] }> = [];
-  for (const [serial, entry] of perDevice.entries()) {
-    const samples = (Array.isArray(entry.Points) ? entry.Points : []).filter(
-      (s: HistorySample) => s && Number(s.ts) >= cutoff
-    );
-    out.push({ Serial: serial, Name: entry.Name || serial, samples });
-  }
-  return out;
+  return ClientUSBHistory.get(uuid) as Array<{
+    Serial: string;
+    Name: string;
+    samples: HistorySample[];
+  }>;
 }
-
-// Per-critical-display connected / mismatched / missing history. Mirrors the
-// critical USB history above: RAM-only, keyed by the stable DisplayID, and
-// rendered in the client info modal the same way individual monitoring checks
-// are. A connected display whose resolution/refresh matches its captured
-// baseline is "online" (green); a connected-but-changed display is "online but
-// degraded" (orange); a missing display is "offline" (red).
-// Store shape: Map<UUID, Map<DisplayID, { Name, Points: [] }>>
-const ClientDisplayHistoryStore = new Map<string, Map<string, NamedHistoryEntry>>();
 
 // Resolve the current state for every critical display on a client. Returns
 // null (skip this sample, leaving an idle gap) when the client is offline so we
 // never paint "missing" red bars for a display whose real state we could not
-// observe.
+// observe. A connected display whose resolution/refresh matches its captured
+// baseline is "online" (green); a connected-but-changed display is "online but
+// degraded" (orange); a missing display is "offline" (red).
 function extractCriticalDisplayStates(
   client: ClientHardwareTelemetryLike | null | undefined
-): CriticalDisplayState[] | null {
+): NamedEntityState[] | null {
   if (!client || !client.Online) return null;
   const displays = Array.isArray(client.DisplayList) ? client.DisplayList : [];
-  const states: CriticalDisplayState[] = [];
+  const states: NamedEntityState[] = [];
   for (const display of displays) {
     if (!display || !display.IsCritical) continue;
     const id =
@@ -579,98 +542,37 @@ function extractCriticalDisplayStates(
       typeof display.Label === 'string' && display.Label.trim() ? display.Label.trim() : null;
     const isConnected = display.IsConnected !== false && !display.Missing;
     const isMismatch = !!display.Mismatch;
-    states.push({ key: id, name: label || 'Display', isConnected, isMismatch });
+    states.push({
+      key: id,
+      name: label || 'Display',
+      online: isConnected,
+      degraded: isConnected && isMismatch,
+    });
   }
   return states;
 }
+
+const ClientDisplayHistory = createNamedHistoryStore(extractCriticalDisplayStates, 'DisplayID');
 
 function recordClientDisplayHistorySamples(
   client: ClientHardwareTelemetryLike | null | undefined,
   sampledAt: number | null = null
 ): void {
-  const uuid = normalizeDummyUUID(client && client.UUID);
-  if (!uuid) return;
-  const states = extractCriticalDisplayStates(client);
-  if (!states) return; // Not evaluable right now; leave an idle gap.
-
-  const now =
-    sampledAt != null && Number.isFinite(Number(sampledAt)) ? Number(sampledAt) : Date.now();
-  const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
-  let perDisplay = ClientDisplayHistoryStore.get(uuid);
-  if (!perDisplay) {
-    perDisplay = new Map<string, NamedHistoryEntry>();
-    ClientDisplayHistoryStore.set(uuid, perDisplay);
-  }
-
-  const seenKeys = new Set<string>();
-  for (const state of states) {
-    seenKeys.add(state.key);
-    const existing = perDisplay.get(state.key);
-    const previousSamples = Array.isArray(existing && existing.Points) ? existing!.Points : [];
-    const sample: HistorySample = {
-      ts: now,
-      online: !!state.isConnected,
-      degraded: !!state.isConnected && !!state.isMismatch,
-      latencyMs: null,
-    };
-    const last = previousSamples.length ? previousSamples[previousSamples.length - 1] : null;
-    let nextSamples: HistorySample[];
-    if (
-      last &&
-      now - last.ts < 900 &&
-      last.online === sample.online &&
-      last.degraded === sample.degraded
-    ) {
-      nextSamples = previousSamples.slice(0, -1).concat({ ...last, ts: now });
-    } else {
-      nextSamples = previousSamples.concat(sample);
-    }
-    while (nextSamples.length && nextSamples[0].ts < cutoff) nextSamples.shift();
-    perDisplay.set(state.key, {
-      Name: state.name || (existing && existing.Name) || state.key,
-      Points: nextSamples,
-    });
-  }
-
-  // Drop history for displays that are no longer marked critical so the modal
-  // only shows currently-tracked displays.
-  for (const key of Array.from(perDisplay.keys())) {
-    if (!seenKeys.has(key)) perDisplay.delete(key);
-  }
-  if (!perDisplay.size) ClientDisplayHistoryStore.delete(uuid);
+  ClientDisplayHistory.record(client, sampledAt);
 }
 
 function syncClientDisplayHistoryStore(list: unknown): void {
-  const safeList = Array.isArray(list) ? list : [];
-  const validUUIDs = new Set<string>();
-  for (const client of safeList) {
-    const uuid = normalizeDummyUUID(client && client.UUID);
-    if (!uuid) continue;
-    validUUIDs.add(uuid);
-    recordClientDisplayHistorySamples(client);
-  }
-  for (const uuid of Array.from(ClientDisplayHistoryStore.keys())) {
-    if (!validUUIDs.has(uuid)) ClientDisplayHistoryStore.delete(uuid);
-  }
+  ClientDisplayHistory.sync(list);
 }
 
 function getClientDisplayHistorySamples(
   uuid: unknown
 ): Array<{ DisplayID: string; Name: string; samples: HistorySample[] }> {
-  const key = normalizeDummyUUID(uuid);
-  if (!key) return [];
-  const perDisplay = ClientDisplayHistoryStore.get(key);
-  if (!perDisplay) return [];
-  const now = Date.now();
-  const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
-  const out: Array<{ DisplayID: string; Name: string; samples: HistorySample[] }> = [];
-  for (const [displayID, entry] of perDisplay.entries()) {
-    const samples = (Array.isArray(entry.Points) ? entry.Points : []).filter(
-      (s: HistorySample) => s && Number(s.ts) >= cutoff
-    );
-    out.push({ DisplayID: displayID, Name: entry.Name || displayID, samples });
-  }
-  return out;
+  return ClientDisplayHistory.get(uuid) as Array<{
+    DisplayID: string;
+    Name: string;
+    samples: HistorySample[];
+  }>;
 }
 
 export {

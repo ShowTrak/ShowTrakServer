@@ -1,5 +1,6 @@
 // Live "Offline HH:MM:SS" counter ticking on every client tile's offline
 // indicator. Extracted from 14-selection-init.ts (REFACTOR_PLAN.md Phase 7).
+import { OfflineBadgeContent } from './lib/status-badges';
 
 export async function UpdateOfflineIndicators() {
   const CurrentTime = new Date().getTime();
@@ -15,7 +16,7 @@ export async function UpdateOfflineIndicators() {
       const HH = String(Hours).padStart(2, '0');
       const MM = String(Minutes).padStart(2, '0');
       const SS = String(Seconds).padStart(2, '0');
-      $(this).html(`Offline <span class="badge bg-ghost">${HH}:${MM}:${SS}</span>`);
+      $(this).html(OfflineBadgeContent(`${HH}:${MM}:${SS}`));
     }
   );
 }

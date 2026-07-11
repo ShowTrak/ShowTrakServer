@@ -45,5 +45,90 @@ export function CreateClientsRepository(DB: DBManager) {
           : DB.Run.bind(DB);
       return Run(`UPDATE Clients SET ${Column} = ? WHERE UUID = ?`, [Value, UUID]);
     },
+
+    // Atomically re-key a client from OldUUID to NewUUID across the clients row,
+    // all three critical-entity tables, and any AlertRules whose Scope/Actions
+    // JSON references the old UUID. The whole change runs in one transaction so a
+    // partial rename can never persist. `rewriteRuleUUID` rewrites one parsed
+    // JSON value (a rule's Scope or Actions) — ClientManager owns the recursive
+    // UUID-swap logic; this repository owns the multi-table SQL. Returns [Err].
+    ReplaceClientUUID(
+      OldUUID: string,
+      NewUUID: string,
+      rewriteRuleUUID: (value: unknown) => unknown
+    ): Promise<DBResult<void>> {
+      return DB.WithTransaction(async (run) => {
+        const [clientUpdateErr] = await run('UPDATE Clients SET UUID = ? WHERE UUID = ?', [
+          NewUUID,
+          OldUUID,
+        ]);
+        if (clientUpdateErr) throw clientUpdateErr;
+
+        const [criticalUSBErr] = await run('UPDATE CriticalUSBDevices SET UUID = ? WHERE UUID = ?', [
+          NewUUID,
+          OldUUID,
+        ]);
+        if (criticalUSBErr) throw criticalUSBErr;
+
+        const [criticalAppErr] = await run('UPDATE CriticalApplications SET UUID = ? WHERE UUID = ?', [
+          NewUUID,
+          OldUUID,
+        ]);
+        if (criticalAppErr) throw criticalAppErr;
+
+        const [criticalDisplayErr] = await run('UPDATE CriticalDisplays SET UUID = ? WHERE UUID = ?', [
+          NewUUID,
+          OldUUID,
+        ]);
+        if (criticalDisplayErr) throw criticalDisplayErr;
+
+        const [rulesErr, RuleRows] = await DB.All<{
+          RuleID: number;
+          Scope: string | null;
+          Actions: string | null;
+        }>('SELECT RuleID, Scope, Actions FROM AlertRules', []);
+        if (rulesErr) throw rulesErr;
+
+        for (const Row of RuleRows || []) {
+          const RuleID = Number(Row && Row.RuleID);
+          if (!Number.isFinite(RuleID)) continue;
+
+          let ParsedScope: unknown = null;
+          let ParsedActions: unknown = null;
+
+          try {
+            ParsedScope = JSON.parse(Row && Row.Scope ? Row.Scope : '{}');
+          } catch {
+            ParsedScope = null;
+          }
+          try {
+            ParsedActions = JSON.parse(Row && Row.Actions ? Row.Actions : '[]');
+          } catch {
+            ParsedActions = null;
+          }
+
+          const NextScope = ParsedScope ? rewriteRuleUUID(ParsedScope) : ParsedScope;
+          const NextActions = ParsedActions ? rewriteRuleUUID(ParsedActions) : ParsedActions;
+
+          const ScopeChanged =
+            ParsedScope != null && JSON.stringify(NextScope) !== JSON.stringify(ParsedScope);
+          const ActionsChanged =
+            ParsedActions != null && JSON.stringify(NextActions) !== JSON.stringify(ParsedActions);
+
+          if (!ScopeChanged && !ActionsChanged) continue;
+
+          const [ruleUpdateErr] = await run(
+            'UPDATE AlertRules SET Scope = ?, Actions = ?, UpdatedAt = ? WHERE RuleID = ?',
+            [
+              ScopeChanged ? JSON.stringify(NextScope) : Row.Scope,
+              ActionsChanged ? JSON.stringify(NextActions) : Row.Actions,
+              Date.now(),
+              RuleID,
+            ]
+          );
+          if (ruleUpdateErr) throw ruleUpdateErr;
+        }
+      });
+    },
   };
 }

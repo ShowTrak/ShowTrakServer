@@ -1,4 +1,5 @@
 import { AppMode, ClientInfoOpenUUID, Config, DummyClients, FormatClientHostnameVersionLabel, GroupUUIDCache, MonitoringTargets, PendingAdoption, Selected, Settings, __LastClients, __LastGroups, setAllClients, setPendingAdoption, setScriptList, set__LastClients, set__LastGroups } from './01-state';
+import { OfflineBadgeContent } from './lib/status-badges';
 import type {
   ClientView,
   DummyClientView,
@@ -487,7 +488,7 @@ export function RenderClientTile(Client: ClientView): string {
         </div>
 				<div class="SHOWTRAK_PC_STATUS ${Online ? 'd-none' : 'd-grid'}" data-type="INDICATOR_OFFLINE">
 					<h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${LastSeen}">
-            Offline <span class="badge bg-ghost">00:00:00</span>
+            ${OfflineBadgeContent()}
 					</h7>
 				</div>
 			</div>`;

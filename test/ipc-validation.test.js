@@ -152,6 +152,36 @@ test('IPCValidation.ScriptID accepts strings and numbers', () => {
   assert.throws(() => IPCValidation.ScriptID(''), /at least 1 character/i);
 });
 
+test('IPCValidation.ScriptFolderID rejects path-traversal segments', () => {
+  assert.equal(IPCValidation.ScriptFolderID('  MyScript  '), 'MyScript');
+  assert.throws(() => IPCValidation.ScriptFolderID('..'), /not a valid script ID/i);
+  assert.throws(() => IPCValidation.ScriptFolderID('../secrets'), /not a valid script ID/i);
+  assert.throws(() => IPCValidation.ScriptFolderID('a/b'), /not a valid script ID/i);
+  assert.throws(() => IPCValidation.ScriptFolderID('a\\b'), /not a valid script ID/i);
+  assert.throws(() => IPCValidation.ScriptFolderID(''), /must be a string|at least 1 character/i);
+  assert.throws(() => IPCValidation.ScriptFolderID(null), /must be a string/i);
+});
+
+test('IPCValidation.ScriptSampleID requires a non-empty string', () => {
+  assert.equal(IPCValidation.ScriptSampleID('  sample-1  '), 'sample-1');
+  assert.throws(() => IPCValidation.ScriptSampleID('   '), /at least 1 character/i);
+  assert.throws(() => IPCValidation.ScriptSampleID(7), /must be a string/i);
+});
+
+test('IPCValidation.ScriptFieldsPayload requires a plain object', () => {
+  assert.deepEqual(IPCValidation.ScriptFieldsPayload({ Name: 'x' }), { Name: 'x' });
+  assert.throws(() => IPCValidation.ScriptFieldsPayload(null), /Invalid script fields/i);
+  assert.throws(() => IPCValidation.ScriptFieldsPayload([]), /Invalid script fields/i);
+  assert.throws(() => IPCValidation.ScriptFieldsPayload('x'), /Invalid script fields/i);
+});
+
+test('IPCValidation.ScriptOrderList validates each entry as a safe folder ID', () => {
+  assert.deepEqual(IPCValidation.ScriptOrderList(['a', ' b ']), ['a', 'b']);
+  assert.deepEqual(IPCValidation.ScriptOrderList([]), []);
+  assert.throws(() => IPCValidation.ScriptOrderList('nope'), /must be an array/i);
+  assert.throws(() => IPCValidation.ScriptOrderList(['ok', '../evil']), /not a valid script ID/i);
+});
+
 test('IPCValidation.MonitoringTargetID validates numeric identifiers', () => {
   assert.equal(IPCValidation.MonitoringTargetID(3), 3);
   assert.equal(IPCValidation.MonitoringTargetID(' 12 '), 12);

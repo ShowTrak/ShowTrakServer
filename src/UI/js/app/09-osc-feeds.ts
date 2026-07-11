@@ -69,10 +69,6 @@ export function FormatDebugTime(timestamp: number) {
   return `${hours}:${minutes}:${seconds}`;
 }
 
-export function EscapeHtml(value: unknown) {
-  return Safe(value == null ? '' : String(value));
-}
-
 export function RenderOscHttpDebugTerminal() {
   const $terminal = $('#OSC_HTTP_DEBUG_TERMINAL');
   if (!$terminal.length) return;
@@ -88,15 +84,15 @@ export function RenderOscHttpDebugTerminal() {
     OscHttpDebugEntries.map((entry) => {
       const stateClass = entry.valid ? 'is-valid' : 'is-invalid';
       const icon = entry.valid ? '&#10003;' : '&#10005;';
-      const protocol = EscapeHtml(String(entry.protocol || '').toUpperCase());
-      const summary = EscapeHtml(entry.summary || 'Unknown request');
+      const protocol = Safe(String(entry.protocol || '').toUpperCase());
+      const summary = Safe(entry.summary || 'Unknown request');
       const detail = entry.detail
-        ? `<span class="osc-http-debug-detail">${EscapeHtml(entry.detail)}</span>`
+        ? `<span class="osc-http-debug-detail">${Safe(entry.detail)}</span>`
         : '';
       return `
 		<div class="osc-http-debug-line ${stateClass}">
 			<div class="osc-http-debug-status">${icon}</div>
-			<div class="osc-http-debug-meta">[${EscapeHtml(FormatDebugTime(entry.timestamp))}] ${protocol}</div>
+			<div class="osc-http-debug-meta">[${Safe(FormatDebugTime(entry.timestamp))}] ${protocol}</div>
 			<div class="osc-http-debug-text"><span class="osc-http-debug-summary">${summary}</span>${detail}</div>
 		</div>
 	`;

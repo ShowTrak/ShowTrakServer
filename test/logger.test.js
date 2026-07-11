@@ -65,7 +65,7 @@ test('Logger.configure toggles level gating', async () => {
   try {
     const Logger = loadLogger(logsDir);
     // Raise the level so debug/trace are suppressed; functions must not throw.
-    Logger.configure({ level: 'error', toFile: true, toConsole: false, retentionDays: 7 });
+    Logger.configure({ level: 'error', toFile: true, toConsole: false });
     const log = Logger.CreateLogger('Cfg');
     log.debug('should be gated');
     log.trace('should be gated');

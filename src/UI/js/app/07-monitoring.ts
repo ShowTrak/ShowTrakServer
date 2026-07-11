@@ -13,6 +13,8 @@ import type {
   USBDeviceView,
 } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './04-utils';
+import { openModal } from './lib/modal';
+import { OfflineBadgeContent } from './lib/status-badges';
 
 // Discriminated view-model for the currently-open monitor history modal.
 type MonitorHistoryEntity =
@@ -246,7 +248,7 @@ export function RenderMonitoringTargetTile(T: MonitoringTargetView) {
       </div>
       <div class="SHOWTRAK_PC_STATUS ${!Online && !IsIdle ? 'd-grid' : 'd-none'}" data-type="INDICATOR_OFFLINE">
         <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${Safe(OfflineSince)}">
-          Offline <span class="badge bg-ghost">00:00:00</span>
+          ${OfflineBadgeContent()}
         </h7>
       </div>
       <span class="MONITOR_COMPACT_LATENCY ${CompactStatus.color}" data-type="MONITOR_COMPACT_LATENCY">${Safe(CompactStatus.text)}</span>
@@ -1026,7 +1028,7 @@ export async function OpenMonitoringTargetHistory(TargetID: number) {
         setMonitorHistoryTooltipHover(null);
     HideStatusTimelineTooltip();
   });
-  $modal.modal('show');
+  openModal('SHOWTRAK_CLIENT_INFO');
   RenderMonitoringHistoryModal();
 }
 
@@ -1053,6 +1055,6 @@ export async function OpenDummyClientHistory(UUID: string) {
         setMonitorHistoryTooltipHover(null);
     HideStatusTimelineTooltip();
   });
-  $modal.modal('show');
+  openModal('SHOWTRAK_CLIENT_INFO');
   RenderMonitoringHistoryModal();
 }

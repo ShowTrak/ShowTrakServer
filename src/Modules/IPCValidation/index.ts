@@ -35,6 +35,12 @@ export interface IPCValidationManager {
   GroupKeyBind(value: unknown, fieldName?: string): string | null;
   ScriptID(value: unknown): string;
   IntegratedEventID(value: unknown): string;
+
+  // Script catalog (script-validators.ts)
+  ScriptFolderID(value: unknown, fieldName?: string): string;
+  ScriptSampleID(value: unknown, fieldName?: string): string;
+  ScriptFieldsPayload(value: unknown): Record<string, unknown>;
+  ScriptOrderList(value: unknown, fieldName?: string): string[];
   Boolean(value: unknown, fieldName?: string): boolean;
   USBSerialNumber(value: unknown, fieldName?: string): string;
   CriticalUSBDevicePayload(value: unknown): CriticalUSBDevicePayloadResult;
@@ -72,6 +78,7 @@ export interface IPCValidationManager {
 const Manager = {} as IPCValidationManager;
 
 require('./client-validators')(Manager);
+require('./script-validators')(Manager);
 require('./monitoring-validators')(Manager);
 require('./dummy-validators')(Manager);
 require('./alert-validators')(Manager);

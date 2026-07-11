@@ -1,11 +1,12 @@
 // Console + file logger with colored tags; writes to daily log file under AppData.
-// Improvements: leveled logging, async file writes, midnight rollover, retention cleanup.
+// Provides leveled logging, async (queued) file writes, and daily (midnight)
+// file rollover.
 import fs from 'fs';
 import path from 'path';
 
 import { Manager as AppDataManager } from '../AppData';
 
-const colors = require('colors');
+const pc = require('picocolors');
 
 const fsp = fs.promises;
 
@@ -27,13 +28,13 @@ function Pad(Text: string, Length = 17): string {
 }
 
 const Types: Record<string, string> = {
-  Info: colors.cyan(Pad('INFO')),
-  Warn: colors.magenta(Pad('WARN')),
-  Error: colors.red(Pad('ERROR')),
-  Trace: colors.magenta(Pad('TRACE')),
-  Debug: colors.grey(Pad('DEBUG')),
-  Success: colors.green(Pad('SUCCESS')),
-  Database: colors.grey(Pad('DATABASE')),
+  Info: pc.cyan(Pad('INFO')),
+  Warn: pc.magenta(Pad('WARN')),
+  Error: pc.red(Pad('ERROR')),
+  Trace: pc.magenta(Pad('TRACE')),
+  Debug: pc.gray(Pad('DEBUG')),
+  Success: pc.green(Pad('SUCCESS')),
+  Database: pc.gray(Pad('DATABASE')),
 };
 
 // Plain (non-colored) labels for file output
@@ -54,7 +55,6 @@ const Settings = {
   level: (process.env.LOG_LEVEL || DefaultLevel).toLowerCase(),
   toConsole: (process.env.LOG_TO_CONSOLE || 'true').toLowerCase() !== 'false',
   toFile: (process.env.LOG_TO_FILE || 'true').toLowerCase() !== 'false',
-  retentionDays: Number.parseInt(process.env.LOG_RETENTION_DAYS || '30', 10),
 };
 
 function isLevelEnabled(level: string): boolean {
@@ -64,7 +64,7 @@ function isLevelEnabled(level: string): boolean {
 }
 
 function Tag(Text: string, Type: string): string {
-  return `[${colors.cyan('ShowTrakServer')}] [${colors.cyan(Pad(Text))}] [${
+  return `[${pc.cyan('ShowTrakServer')}] [${pc.cyan(Pad(Text))}] [${
     Object.prototype.hasOwnProperty.call(Types, Type) ? Types[Type] : Types['Info']
   }]`;
 }
@@ -141,12 +141,16 @@ function stripAnsi(s: string): string {
   return s.replace(ANSI_REGEX, '');
 }
 
+// The log level gates emission uniformly: a message below the active level is
+// written neither to the console nor to the file. (`silent()` bypasses this on
+// purpose — it is always persisted to the file.)
 function writeLine(alias: string, type: string, arg: unknown, levelKey: string): void {
+  if (!isLevelEnabled(levelKey)) return;
   const msg = serializeArg(arg);
   const consoleTag = Tag(alias, type);
   const fileTag = TagPlain(alias, type);
   const line = `${GetDateTimeStamp()} ${fileTag} ${stripAnsi(msg)}`;
-  if (Settings.toConsole && isLevelEnabled(levelKey)) console.log(consoleTag, msg);
+  if (Settings.toConsole) console.log(consoleTag, msg);
   enqueueWrite(line);
 }
 
@@ -159,8 +163,9 @@ class Logger {
   log(...args: unknown[]): void {
     args.forEach((arg) => writeLine(this.Alias, 'Info', arg, 'info'));
   }
+  // Alias of log(); kept because both names are used across the codebase.
   info(...args: unknown[]): void {
-    args.forEach((arg) => writeLine(this.Alias, 'Info', arg, 'info'));
+    this.log(...args);
   }
   silent(...args: unknown[]): void {
     args.forEach((arg) =>
@@ -176,11 +181,9 @@ class Logger {
     );
   }
   debug(...args: unknown[]): void {
-    if (!isLevelEnabled('debug')) return;
     args.forEach((arg) => writeLine(this.Alias, 'Debug', arg, 'debug'));
   }
   trace(...args: unknown[]): void {
-    if (!isLevelEnabled('trace')) return;
     args.forEach((arg) => writeLine(this.Alias, 'Trace', arg, 'trace'));
   }
   success(...args: unknown[]): void {
@@ -191,7 +194,7 @@ class Logger {
   }
   databaseError(...args: unknown[]): void {
     args.forEach((arg) =>
-      writeLine(this.Alias, 'Database', arg instanceof Error ? arg : colors.red(arg), 'error')
+      writeLine(this.Alias, 'Database', arg instanceof Error ? arg : pc.red(arg), 'error')
     );
   }
   child(suffix: string): Logger {
@@ -207,12 +210,10 @@ interface LoggerConfigureOptions {
   level?: string;
   toConsole?: boolean;
   toFile?: boolean;
-  retentionDays?: number;
 }
 
 export function configure(options: LoggerConfigureOptions = {}): void {
   if (options.level) Settings.level = String(options.level).toLowerCase();
   if (typeof options.toConsole === 'boolean') Settings.toConsole = options.toConsole;
   if (typeof options.toFile === 'boolean') Settings.toFile = options.toFile;
-  if (typeof options.retentionDays === 'number') Settings.retentionDays = options.retentionDays;
 }

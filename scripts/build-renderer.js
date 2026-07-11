@@ -15,7 +15,6 @@
 // Vendor libraries (jQuery, Bootstrap, Toastify, Howler, QRCode, socket.io) stay
 // as external <script> globals for offline use, so they are NOT imported/bundled.
 const esbuild = require('esbuild');
-const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -35,11 +34,6 @@ const BUNDLES = [
 ];
 
 async function buildBundle({ name, entry, outfile }) {
-  if (!fs.existsSync(entry)) {
-    // Entry not migrated to TypeScript yet; copy-assets still ships the .js.
-    console.log(`[build-renderer] Skipping ${name} (no TS entry at ${path.relative(ROOT, entry)})`);
-    return false;
-  }
   await esbuild.build({
     entryPoints: [entry],
     outfile,
@@ -52,15 +46,13 @@ async function buildBundle({ name, entry, outfile }) {
     logLevel: 'info',
   });
   console.log(`[build-renderer] Bundled ${name} -> ${path.relative(ROOT, outfile)}`);
-  return true;
 }
 
 async function main() {
-  let built = 0;
   for (const bundle of BUNDLES) {
-    if (await buildBundle(bundle)) built += 1;
+    await buildBundle(bundle);
   }
-  console.log(`[build-renderer] Completed (${built} bundle${built === 1 ? '' : 's'})`);
+  console.log(`[build-renderer] Completed (${BUNDLES.length} bundles)`);
 }
 
 main().catch((err) => {

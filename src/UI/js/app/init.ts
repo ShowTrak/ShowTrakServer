@@ -7,7 +7,7 @@
 // main.ts calls WireGlobalUI() then Init(), after every module's Init*()
 // subscriptions are registered — Loaded() must stay last so the main process
 // pushes initial state only once every subscriber is listening.
-import type { AppUpdateStatus, ClientView } from '@showtrak/protocol';
+import type { ClientView } from '@showtrak/protocol';
 import { closeModal, openModal } from './lib/modal';
 import { AllClients, AppMode, Capabilities, Config, NetworkDiscoveryResults, NetworkDiscoveryScanning, ScriptList, Selected, __LastGroups, setConfig, setMonitorHistoryTooltipHover, setScriptList, setUpdateManagerDownloadInProgress } from './01-state';
 import { RenderMode } from './02-mode';
@@ -23,6 +23,7 @@ import { OpenClientInfo } from './client-info-modal';
 import { OpenScriptManager } from './15-script-manager';
 import { OpenDummyClientEditor } from './16-dummy-clients';
 import { ClearSelection, Select, SelectAll, SelectByGroup, ToggleSelection } from './selection';
+import { wireAppUpdates } from './wire-app-updates';
 
 // One row in the right-click / mobile context menu. `Type` selects how the row
 // renders (informational label, divider, or actionable item); the remaining
@@ -139,193 +140,7 @@ export async function WireGlobalUI() {
     SelectByGroup(Match.GroupID);
   });
 
-  // --- App Updates (manual check) ---
-  try {
-    // Bind Check for Updates button in core modal
-    $('#SHOWTRAK_MODEL_CORE_CHECKUPDATES')
-      .off('click')
-      .on('click', async () => {
-        await OpenAboutModal();
-        // Ensure section visible while checking
-        $('#UPDATE_SECTION').removeClass('d-none');
-        $('#UPDATE_STATUS').text('Checking for updates...');
-        $('#UPDATE_INSTALL_BTN').addClass('d-none');
-        $('#UPDATE_LATER_BTN').addClass('d-none');
-        try {
-          await window.API.CheckForAppUpdates();
-        } catch (err) {
-          HandleNonFatalError('SelectionInit:NonFatal', err);
-        }
-      });
-    // Bind Install and Later buttons
-    $('#UPDATE_INSTALL_BTN')
-      .off('click')
-      .on('click', async () => {
-        try {
-          await window.API.InstallAppUpdate();
-        } catch (err) {
-          HandleNonFatalError('SelectionInit:NonFatal', err);
-        }
-      });
-    $('#UPDATE_LATER_BTN')
-      .off('click')
-      .on('click', async () => {
-        // Hide the section but keep state if needed later
-        $('#UPDATE_SECTION').addClass('d-none');
-      });
-
-    // Listen for updater status from main
-    window.API.OnAppUpdateStatus((payload) => {
-      try {
-        $('#UPDATE_SECTION').removeClass('d-none');
-        const st = (payload && payload.state) || 'none';
-        const $status = $('#UPDATE_STATUS');
-        const $install = $('#UPDATE_INSTALL_BTN');
-        const $later = $('#UPDATE_LATER_BTN');
-        const $notesWrap = $('#UPDATE_NOTES_WRAPPER');
-        const $notes = $('#UPDATE_CHANGELOG');
-        $install.addClass('d-none');
-        $later.addClass('d-none');
-        $notesWrap.addClass('d-none');
-        $notes.empty();
-        const escapeHtml = (s: string) =>
-          String(s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-        const sanitizeHref = (href: string) => {
-          try {
-            const h = String(href || '').trim();
-            if (/^(https?:|mailto:)/i.test(h)) return h;
-          } catch (err) {
-            HandleNonFatalError('SelectionInit:NonFatal', err);
-          }
-          return '#';
-        };
-        const renderMarkdownSafe = (md: unknown) => {
-          if (!md || typeof md !== 'string') return '';
-          let text = md.replace(/\r\n/g, '\n');
-          // Escape HTML first
-          text = escapeHtml(text);
-          // Extract fenced code blocks
-          const codeBlocks: string[] = [];
-          text = text.replace(/```([\s\S]*?)```/g, (_m, code) => {
-            const idx = codeBlocks.push(code) - 1;
-            return `%%CODEBLOCK_${idx}%%`;
-          });
-          // Headings
-          text = text.replace(/^#{1,6}\s+(.+)$/gm, (m) => {
-            const hashes = m.match(/^#+/)![0].length;
-            const content = m.replace(/^#{1,6}\s+/, '');
-            const level = Math.min(6, Math.max(1, hashes));
-            return `<h${level} class="h${level + 2}">${content}</h${level}>`;
-          });
-          // Inline code (after fences are removed)
-          text = text.replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`);
-          // Links
-          text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
-            const url = sanitizeHref(href);
-            return `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
-          });
-          // Unordered lists (group contiguous items)
-          text = text.replace(/(?:^|\n)((?:[-*+]\s+.*(?:\n|$))+)/g, (_m, block: string) => {
-            const items = block
-              .trim()
-              .split(/\n/)
-              .map((line) => line.replace(/^[-*+]\s+/, '').trim())
-              .filter((x) => x.length > 0)
-              .map((x) => `<li>${x}</li>`)
-              .join('');
-            return `\n<ul>${items}</ul>`;
-          });
-          // Bold and italic (do after lists so we don't break bullets)
-          text = text
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            .replace(/__(.+?)__/g, '<strong>$1</strong>')
-            .replace(/(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)/g, '<em>$1</em>')
-            .replace(/_(?!\s)(.+?)(?<!\s)_/g, '<em>$1</em>');
-          // Paragraphs: wrap blocks that are not already block-level tags
-          const blocks = text
-            .split(/\n{2,}/)
-            .map((b) => b.trim())
-            .filter(Boolean);
-          const html = blocks
-            .map((b) => {
-              if (/^<\/?(h\d|ul|ol|li|pre|blockquote|table|p|code)/i.test(b)) return b;
-              return `<p>${b.replace(/\n/g, '<br/>')}</p>`;
-            })
-            .join('\n');
-          // Restore fenced code blocks
-          return html.replace(/%%CODEBLOCK_(\d+)%%/g, (_m, i) => {
-            const code = codeBlocks[Number(i)] || '';
-            return `<pre class="mb-2"><code>${code}</code></pre>`;
-          });
-        };
-        const extractNotes = (info: AppUpdateStatus['info']) => {
-          if (!info) return '';
-          // electron-updater passes release notes in different shapes across platforms
-          // Prefer html: info.releaseNotes or markdown: info.notes
-          const raw = info.releaseNotes || info.notes || info.body || '';
-          if (Array.isArray(raw)) {
-            // mac: array of releases, take the first entry's notes
-            const first = raw.find(Boolean);
-            return (first && (first.releaseNotes || first.notes || first.body)) || '';
-          }
-          return raw || '';
-        };
-        const showNotes = (info: AppUpdateStatus['info']) => {
-          const notes = extractNotes(info);
-          if (notes && typeof notes === 'string') {
-            // Allow basic HTML if present from GitHub; otherwise escape text
-            const looksHtml = /<\w+[^>]*>/.test(notes);
-            if (looksHtml) {
-              $notes.html(notes);
-            } else {
-              $notes.html(renderMarkdownSafe(notes));
-            }
-            $notesWrap.removeClass('d-none');
-          }
-        };
-        if (st === 'checking') {
-          $status.text('Checking for updates...');
-        } else if (st === 'available') {
-          const v =
-            payload.info && (payload.info.version || payload.info.tag || 'Update available');
-          $status.text(`Update available: ${v}. Downloading...`);
-          showNotes(payload.info);
-        } else if (st === 'downloading') {
-          const pct = payload.percent ? Math.floor(payload.percent) : 0;
-          $status.text(`Downloading update... ${pct}%`);
-        } else if (st === 'downloaded') {
-          const v = payload.info && (payload.info.version || 'pending');
-          $status.text(`Update ready to install: ${v}`);
-          showNotes(payload.info);
-          $install.removeClass('d-none');
-          $later.removeClass('d-none');
-        } else if (st === 'installing') {
-          $status.text('Installing update...');
-        } else if (st === 'installed') {
-          if (payload.simulated) {
-            $status.text('Update installed (simulated). Restart the app to finish.');
-          } else {
-            $status.text('Update installed. Restart the app to finish.');
-          }
-          $later.removeClass('d-none');
-        } else if (st === 'none') {
-          $status.text('No updates available');
-        } else if (st === 'error') {
-          $status.text(`Update error: ${payload.error || 'Unknown error'}`);
-          $later.removeClass('d-none');
-        }
-      } catch (err) {
-        HandleNonFatalError('SelectionInit:NonFatal', err);
-      }
-    });
-  } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+  wireAppUpdates();
 
   // Open client editor from cog without affecting selection
   $(document).on('click', '.CLIENT_TILE_COG', function (e) {
@@ -1400,7 +1215,6 @@ export async function Init() {
   } catch (_) {
     RenderMode('SHOW');
   }
-  // legacy toggle binding removed
 
   await window.API.Loaded();
   UpdateIdentifyStatusBanner();

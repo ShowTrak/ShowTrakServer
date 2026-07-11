@@ -1,5 +1,6 @@
 import type { DummyClientView } from '@showtrak/protocol';
 import { openModal } from './lib/modal';
+import { OfflineBadgeContent } from './lib/status-badges';
 import { AppMode, DummyClientEditorUUID, setDummyClientEditorUUID } from './01-state';
 import { ErrorMessage, Safe } from './04-utils';
 import { FormatInterval } from './07-monitoring';
@@ -100,7 +101,7 @@ export function RenderDummyClientTile(D: DummyClientView) {
         State === 'OFFLINE' ? 'd-grid' : 'd-none'
       }" data-type="INDICATOR_OFFLINE">
         <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${D.LastSeen || ''}">
-          Offline <span class="badge bg-ghost">00:00:00</span>
+          ${OfflineBadgeContent()}
         </h7>
       </div>
     </div>`;

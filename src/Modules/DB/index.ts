@@ -307,12 +307,6 @@ Manager.All = async <T = DefaultRow>(Query: string, Params?: unknown): Promise<D
   });
 };
 
-interface RunOptions {
-  // Pass false for writes that must not flip the "unsaved changes" flag
-  // (schema bookkeeping, telemetry-driven cache refreshes, snapshot plumbing).
-  markDirty?: boolean;
-}
-
 // Wrapper returning [err, stmt] for INSERT/UPDATE/DELETE/DDL
 Manager.Run = async (
   Query: string,

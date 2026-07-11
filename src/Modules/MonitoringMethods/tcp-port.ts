@@ -3,6 +3,7 @@
 // timeout. No data is sent or read, so this is safe against arbitrary services.
 import net from 'net';
 import { Pill, Rows, TextRow, Row, FormatLatency } from './debug';
+import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const ID = 'tcp-port';
@@ -108,5 +109,5 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
 export const Name = 'TCP Port';
 export const Description = 'Attempts a TCP handshake against the configured host and port.';
-export const DefaultInterval = 30000;
+export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export { ID, Settings, Run, Debug };

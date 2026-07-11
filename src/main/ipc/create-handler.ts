@@ -1,11 +1,26 @@
-// IPC handler factory — standardizes the dominant main-process handler shape:
+// IPC handler factory — standardizes the dominant main-process handler shape.
 //
-//   1. Validate/normalize raw renderer args (may throw -> validation error tuple)
-//   2. Call a manager method that returns an [Err, Result] tuple
-//   3. Normalize the response to [Err, null] on failure / [null, Result] on success
+// There are two handler contracts in the registrars; keep new handlers on the
+// matching one instead of inventing a third:
+//
+//   1. MUTATION handlers return the `[Err, Result]` tuple. Use `createTupleHandler`:
+//        - validate/normalize raw renderer args (may throw -> validation tuple)
+//        - call a manager method that returns `[Err, Result]`
+//        - normalize to `[Err, null]` on failure / `[null, Result]` on success
+//      On invalid input the handler resolves to `[message, invalidFallback]`
+//      (`invalidFallback` defaults to `null`; pass `false` when the renderer
+//      treats the payload slot as a boolean success flag — e.g. the Delete/*
+//      and Adopt/Replace handlers).
+//
+//   2. READER handlers return a RAW value (an object, list, or `null`) rather
+//      than a tuple, because the renderer consumes the value directly. These
+//      stay hand-rolled: validate in a `try`, and on invalid input OR a manager
+//      error resolve to the type's empty fallback — `null` for a single object,
+//      `[]` for a list. Do NOT route them through `createTupleHandler` (it would
+//      wrap the value in a tuple and break the renderer contract).
 //
 // This removes the repeated try/catch + tuple boilerplate that was copy-pasted
-// across ~70 RPC.handle registrations in src/main.ts. Behavior is identical to
+// across the RPC.handle registrations in src/main.ts. Behavior is identical to
 // the original inline handlers; only the wrapping is shared.
 import type { Result } from '../../types/result';
 

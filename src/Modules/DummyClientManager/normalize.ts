@@ -1,8 +1,10 @@
 // Pure normalization helpers and interval bounds shared across the
 // DummyClientManager modules.
+import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
+
 const MIN_INTERVAL_MS = 5000;
 const MAX_INTERVAL_MS = 5 * 60 * 1000;
-const DEFAULT_INTERVAL_MS = 30000;
+const DEFAULT_INTERVAL_MS = DEFAULT_MONITORING_INTERVAL_MS;
 
 // Clamp a requested heartbeat interval into the supported slider range.
 function ClampInterval(Value: unknown): number {

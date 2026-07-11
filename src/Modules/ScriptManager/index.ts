@@ -13,6 +13,7 @@ import { Manager as AppDataManager } from '../AppData';
 import { Manager as ChecksumManager } from '../ChecksumManager';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Ok, Fail } from '../Utils';
+import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
 import type { Result } from '../../types/result';
 
 import { PLATFORM_KEYS, SCRIPT_COLOURS, NormalizeScriptConfig } from './schema';
@@ -149,7 +150,7 @@ class Script {
     this.Timeout =
       typeof Config.Timeout === 'number' && Number.isInteger(Config.Timeout) && Config.Timeout > 0
         ? Config.Timeout
-        : 15000;
+        : SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS;
 
     // Cross-platform launch map ({ Windows, macOS, Linux }).
     this.Platforms = Config.Platforms || {};
@@ -268,7 +269,10 @@ function BuildDeploymentFingerprint(ScriptList: ScriptCatalogEntry[]): string {
         Icon: typeof Script.Icon === 'string' && Script.Icon ? Script.Icon : 'terminal',
         Weight: typeof Script.Weight === 'number' ? Script.Weight : 0,
         Confirmation: !!Script.Confirmation,
-        Timeout: 'Timeout' in Script && typeof Script.Timeout === 'number' ? Script.Timeout : 15000,
+        Timeout:
+          'Timeout' in Script && typeof Script.Timeout === 'number'
+            ? Script.Timeout
+            : SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS,
         Enabled: !!Script.isEnabled,
         Platforms: Script.Platforms || {},
         Arguments: Script.Arguments || {},
@@ -547,7 +551,10 @@ Manager.GetEditable = async (ID: string): Promise<Result<ScriptEditable>> => {
     .map((f) => f.Path);
 
   // InvalidScript has no Timeout; fall back to the default for its editor view.
-  const Timeout = 'Timeout' in Script && typeof Script.Timeout === 'number' ? Script.Timeout : 15000;
+  const Timeout =
+    'Timeout' in Script && typeof Script.Timeout === 'number'
+      ? Script.Timeout
+      : SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS;
 
   return Ok({
     id: Script.ID,
@@ -719,7 +726,7 @@ Manager.CreateBlank = async (): Promise<Result<{ id: string }>> => {
     Colour: 6,
     Weight,
     Confirmation: false,
-    Timeout: 15000,
+    Timeout: SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS,
     // Not runnable until the author maps platforms and enables it.
     Enabled: false,
     Platforms: { Windows: '', macOS: '', Linux: '' },

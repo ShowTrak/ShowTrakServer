@@ -1,14 +1,13 @@
 import { ensureQRCodeLib } from './lib/qrcode-loader';
 import { openModal } from './lib/modal';
-// Side-effect import kept to preserve the historical module evaluation order
-// (14-selection-init runs Init() and subscription wiring at import time until
-// Phase 7 of REFACTOR_PLAN.md).
-import './14-selection-init';
 
-// Escape a value for interpolation into HTML. Escapes all five significant
+// The single HTML escaper for the renderer. Escapes all five significant
 // entities (ampersand first), so the result is safe in text content AND in
-// double- or single-quoted attribute values.
-export function Safe(Input: unknown): string | boolean | null | undefined | unknown[] {
+// double- or single-quoted attribute values. Always returns a string:
+// null/undefined collapse to '' (never the literal "null"/"undefined"), and
+// arrays are escaped element-wise and comma-joined to match how an array would
+// otherwise stringify inside a template literal.
+export function Safe(Input: unknown): string {
   if (typeof Input === 'string') {
     return Input.replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -16,17 +15,14 @@ export function Safe(Input: unknown): string | boolean | null | undefined | unkn
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
   }
-  if (typeof Input === 'number') {
-    return Input.toString();
-  }
   if (Array.isArray(Input)) {
-    return Input.map(Safe);
+    return Input.map(Safe).join(',');
   }
-  if (Input === null || Input === undefined || typeof Input === 'boolean') {
-    return Input;
+  if (Input === null || Input === undefined) {
+    return '';
   }
-  // Objects/functions have no meaningful HTML form; stringify defensively so
-  // they can never carry markup through an interpolation.
+  // Numbers, booleans, and any object/function are coerced to their string form
+  // and then escaped, so nothing can carry markup through an interpolation.
   return Safe(String(Input));
 }
 

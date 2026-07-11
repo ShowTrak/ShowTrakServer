@@ -12,6 +12,37 @@ import { CreateLogger } from '../Modules/Logger';
 
 const Logger = CreateLogger('LocalScripts');
 
+// Resolve a script-relative file path to an absolute path while enforcing that
+// it stays inside the script's own folder. This is the single traversal guard
+// shared by Scripts:OpenFile and Scripts:RunLocalFile. It rejects folder IDs
+// that contain a path separator or "..", absolute relative paths, and any
+// resolved path that escapes the script folder. Returns the standard
+// `[Err, TargetFilePath]` tuple; existence/stat checks stay with the caller.
+function resolveContainedScriptFile(
+  scriptsDirectory: string,
+  ID: unknown,
+  RelativeFilePath: unknown
+): [string, null] | [null, string] {
+  if (typeof ID !== 'string' || !ID.trim()) return ['Invalid script ID', null];
+  if (typeof RelativeFilePath !== 'string' || !RelativeFilePath.trim()) {
+    return ['Invalid file path', null];
+  }
+  if (ID.includes('..') || ID.includes('/') || ID.includes('\\')) {
+    return ['Invalid script ID', null];
+  }
+  if (path.isAbsolute(RelativeFilePath)) return ['Invalid file path', null];
+
+  const ScriptFolderPath = path.resolve(scriptsDirectory, ID);
+  const TargetFilePath = path.resolve(ScriptFolderPath, RelativeFilePath);
+  const ScriptFolderPrefix = ScriptFolderPath.endsWith(path.sep)
+    ? ScriptFolderPath
+    : `${ScriptFolderPath}${path.sep}`;
+  if (TargetFilePath !== ScriptFolderPath && !TargetFilePath.startsWith(ScriptFolderPrefix)) {
+    return ['Invalid file path', null];
+  }
+  return [null, TargetFilePath];
+}
+
 // Normalize a relative path for comparison (forward slashes, no leading "./").
 function normalizeRelativePathForCompare(value: unknown) {
   return String(value || '')
@@ -179,6 +210,7 @@ function runLocalScriptFile(scriptPath: string, extraArgs: string[] = []) {
 }
 
 export {
+  resolveContainedScriptFile,
   normalizeRelativePathForCompare,
   getLocalPlatformKey,
   parseArgumentString,

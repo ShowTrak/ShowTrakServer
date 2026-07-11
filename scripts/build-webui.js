@@ -9,26 +9,12 @@
 // serves dist/WebUI at `/`.
 const fs = require('node:fs');
 const path = require('node:path');
+const { copyDir } = require('./lib/copy-dir');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC_UI = path.join(ROOT, 'src', 'UI');
 const SRC_WEBUI = path.join(ROOT, 'src', 'WebUI');
 const DIST_WEBUI = path.join(ROOT, 'dist', 'WebUI');
-
-// Copy a directory recursively, never shipping TypeScript sources.
-function copyDir(srcDir, destDir) {
-  if (!fs.existsSync(srcDir)) return;
-  fs.mkdirSync(destDir, { recursive: true });
-  for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
-    const source = path.join(srcDir, entry.name);
-    const destination = path.join(destDir, entry.name);
-    if (entry.isDirectory()) {
-      copyDir(source, destination);
-    } else if (entry.isFile() && !entry.name.endsWith('.ts')) {
-      fs.copyFileSync(source, destination);
-    }
-  }
-}
 
 // The desktop bundle <script> tag (single source of truth in src/UI/index.html).
 const DESKTOP_BUNDLE_TAG = '<script src="./js/app/bundle.js" defer></script>';

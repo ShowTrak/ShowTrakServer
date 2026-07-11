@@ -5,6 +5,7 @@ import type {
   AlertActionSettingField,
   AlertContext,
 } from './types';
+import { OSC_PORT } from '../Config/constants';
 
 const { Client, Message } = require('node-osc');
 
@@ -18,7 +19,7 @@ const ID = 'osc-trigger';
 
 const Settings: AlertActionSettingField[] = [
   { Key: 'TargetIP', Label: 'Target IP / Hostname', Type: 'string', Default: '127.0.0.1' },
-  { Key: 'Port', Label: 'Port', Type: 'number', Default: 3333, Min: 1, Max: 65535 },
+  { Key: 'Port', Label: 'Port', Type: 'number', Default: OSC_PORT, Min: 1, Max: 65535 },
   { Key: 'Message', Label: 'OSC Message Path', Type: 'string', Default: '/API/Alert' },
 ];
 
@@ -43,7 +44,7 @@ function NormalizeSettings(Input: unknown): { TargetIP: string; Port: number; Me
   const Port = Number(Next.Port);
   return {
     TargetIP: String(Next.TargetIP || '127.0.0.1').trim(),
-    Port: Number.isFinite(Port) ? Math.max(1, Math.min(65535, Math.round(Port))) : 3333,
+    Port: Number.isFinite(Port) ? Math.max(1, Math.min(65535, Math.round(Port))) : OSC_PORT,
     Message: String(Next.Message || '/API/Alert').trim() || '/API/Alert',
   };
 }

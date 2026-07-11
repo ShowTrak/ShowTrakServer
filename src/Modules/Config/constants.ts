@@ -26,5 +26,9 @@ export const BULK_DISPATCH_DELAY_MS = 150;
 // Interval between monitoring target check ticks.
 export const MONITORING_TICK_INTERVAL_MS = 1500;
 
+// Default polling interval applied to a monitoring target / dummy client / check
+// method when none is configured (or the configured value is invalid).
+export const DEFAULT_MONITORING_INTERVAL_MS = 30000;
+
 // How long DB shutdown waits for in-flight SQLite operations to drain.
 export const DB_PENDING_OPERATION_TIMEOUT_MS = 15000;

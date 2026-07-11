@@ -4,10 +4,12 @@
 // Scripts:OpenFile uses.
 
 import { CreateLogger } from '../../Modules/Logger';
+import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../../Modules/Config/constants';
 import { RPC } from '../rpc';
 import { validationErrorTuple } from '../ipc/create-handler';
 import { TriggerScriptDeployment } from '../deployment';
 import {
+  resolveContainedScriptFile,
   normalizeRelativePathForCompare,
   getLocalPlatformKey,
   parseArgumentString,
@@ -97,6 +99,11 @@ function register(): void {
   });
 
   RPC.handle('DeleteScripts', async (_Event: unknown, List: unknown) => {
+    try {
+      List = IPCValidation.UUIDList(List || [], 'Targets');
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
     await ServerManager.ExecuteBulkRequest('DeleteScripts', List, 'Delete Scripts');
     return;
   });
@@ -122,7 +129,7 @@ function register(): void {
       icon: typeof s.Icon === 'string' && s.Icon ? s.Icon : 'terminal',
       weight: s.Weight || 0,
       confirm: !!s.Confirmation,
-      timeoutMs: typeof s.Timeout === 'number' ? s.Timeout : 15000,
+      timeoutMs: typeof s.Timeout === 'number' ? s.Timeout : SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS,
       enabled: !!s.isEnabled,
       valid: !!s.isValid,
       parseError: s.ParseError || null,
@@ -134,6 +141,11 @@ function register(): void {
 
   // Script Manager: read the editable fields + folder file list for one script.
   RPC.handle('Scripts:GetConfig', async (_Event: unknown, ID: unknown) => {
+    try {
+      ID = IPCValidation.ScriptFolderID(ID);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
     const [Err, Data] = await ScriptManager.GetEditable(ID);
     if (Err) return [Err, null];
     return [null, Data];
@@ -142,7 +154,12 @@ function register(): void {
   // Script Manager: validate, normalize and persist structured field edits
   // (optionally renaming the script folder/ID).
   RPC.handle('Scripts:SaveConfig', async (_Event: unknown, ID: unknown, Fields: unknown) => {
-    if (!Fields || typeof Fields !== 'object') return ['Invalid script fields', null];
+    try {
+      ID = IPCValidation.ScriptFolderID(ID);
+      Fields = IPCValidation.ScriptFieldsPayload(Fields);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
     const [Err, Data] = await ScriptManager.SaveFields(ID, Fields);
     if (Err) return [Err, null];
     return [null, Data];
@@ -150,7 +167,11 @@ function register(): void {
 
   // Script Manager: persist a new display order (drag-and-drop reordering).
   RPC.handle('Scripts:SetOrder', async (_Event: unknown, OrderedIDs: unknown) => {
-    if (!Array.isArray(OrderedIDs)) return ['Invalid order', null];
+    try {
+      OrderedIDs = IPCValidation.ScriptOrderList(OrderedIDs);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
     const [Err] = await ScriptManager.SetOrder(OrderedIDs);
     if (Err) return [Err, null];
     return [null, true];
@@ -158,7 +179,11 @@ function register(): void {
 
   // Script Manager: delete a script folder from disk.
   RPC.handle('Scripts:Delete', async (_Event: unknown, ID: unknown) => {
-    if (typeof ID !== 'string') return ['Invalid script ID', null];
+    try {
+      ID = IPCValidation.ScriptFolderID(ID);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
     const [Err] = await ScriptManager.Delete(ID);
     if (Err) return [Err, null];
     return [null, true];
@@ -195,7 +220,11 @@ function register(): void {
   // Script Manager: create a new script from a sample template. Requires a
   // DesiredID that does not collide with an existing script.
   RPC.handle('Scripts:CreateFromTemplate', async (_Event: unknown, SampleID: unknown, DesiredID: unknown) => {
-    if (typeof SampleID !== 'string' || !SampleID.trim()) return ['Invalid template', null];
+    try {
+      SampleID = IPCValidation.ScriptSampleID(SampleID);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
     const Sample = await SampleScriptsManager.GetSample(SampleID);
     if (!Sample) return ['Template not found', null];
     const Result = await ScriptManager.CreateFromTemplate(Sample, DesiredID);
@@ -216,32 +245,27 @@ function register(): void {
   });
 
   RPC.handle('Scripts:OpenFolder', async (_event: unknown, ID: unknown) => {
-    if (typeof ID !== 'string' || !ID.trim()) return;
+    let FolderID: string;
+    try {
+      // ScriptFolderID rejects path separators and "..", so the join below can
+      // never escape the scripts directory.
+      FolderID = IPCValidation.ScriptFolderID(ID);
+    } catch {
+      return;
+    }
     const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
-    const ScriptFolderPath = require('path').join(ScriptsDirectory, ID);
+    const ScriptFolderPath = path.join(ScriptsDirectory, FolderID);
     Logger.log('Opening script folder:', ScriptFolderPath);
     await shell.openPath(ScriptFolderPath);
   });
 
   RPC.handle('Scripts:OpenFile', async (_event: unknown, ID: unknown, RelativeFilePath: unknown) => {
-    if (typeof ID !== 'string' || !ID.trim()) return ['Invalid script ID', null];
-    if (typeof RelativeFilePath !== 'string' || !RelativeFilePath.trim()) {
-      return ['Invalid file path', null];
-    }
-    if (ID.includes('..') || ID.includes('/') || ID.includes('\\')) {
-      return ['Invalid script ID', null];
-    }
-    if (path.isAbsolute(RelativeFilePath)) return ['Invalid file path', null];
-
-    const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
-    const ScriptFolderPath = path.resolve(ScriptsDirectory, ID);
-    const TargetFilePath = path.resolve(ScriptFolderPath, RelativeFilePath);
-    const ScriptFolderPrefix = ScriptFolderPath.endsWith(path.sep)
-      ? ScriptFolderPath
-      : `${ScriptFolderPath}${path.sep}`;
-    if (TargetFilePath !== ScriptFolderPath && !TargetFilePath.startsWith(ScriptFolderPrefix)) {
-      return ['Invalid file path', null];
-    }
+    const [PathErr, TargetFilePath] = resolveContainedScriptFile(
+      AppDataManager.GetScriptsDirectory(),
+      ID,
+      RelativeFilePath
+    );
+    if (PathErr || !TargetFilePath) return [PathErr || 'Invalid file path', null];
 
     if (!fs.existsSync(TargetFilePath)) return ['File not found', null];
     const stat = fs.statSync(TargetFilePath);
@@ -254,14 +278,12 @@ function register(): void {
   });
 
   RPC.handle('Scripts:RunLocalFile', async (_event: unknown, ID: unknown, RelativeFilePath: unknown) => {
-    if (typeof ID !== 'string' || !ID.trim()) return ['Invalid script ID', null];
-    if (typeof RelativeFilePath !== 'string' || !RelativeFilePath.trim()) {
-      return ['Invalid file path', null];
-    }
-    if (ID.includes('..') || ID.includes('/') || ID.includes('\\')) {
-      return ['Invalid script ID', null];
-    }
-    if (path.isAbsolute(RelativeFilePath)) return ['Invalid file path', null];
+    const [PathErr, TargetFilePath] = resolveContainedScriptFile(
+      AppDataManager.GetScriptsDirectory(),
+      ID,
+      RelativeFilePath
+    );
+    if (PathErr || !TargetFilePath) return [PathErr || 'Invalid file path', null];
 
     const Script = await ScriptManager.Get(ID);
     if (!Script || !Script.Platforms) return ['Script not found', null];
@@ -279,16 +301,6 @@ function register(): void {
     }
     if (RequestedFile !== MappedFile) {
       return [`Only the mapped ${PlatformKey} executable can be run locally`, null];
-    }
-
-    const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
-    const ScriptFolderPath = path.resolve(ScriptsDirectory, ID);
-    const TargetFilePath = path.resolve(ScriptFolderPath, RelativeFilePath);
-    const ScriptFolderPrefix = ScriptFolderPath.endsWith(path.sep)
-      ? ScriptFolderPath
-      : `${ScriptFolderPath}${path.sep}`;
-    if (TargetFilePath !== ScriptFolderPath && !TargetFilePath.startsWith(ScriptFolderPrefix)) {
-      return ['Invalid file path', null];
     }
 
     if (!fs.existsSync(TargetFilePath)) return ['File not found', null];

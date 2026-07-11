@@ -10,6 +10,13 @@ import { Manager as BroadcastManager } from '../Broadcast';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import { Client } from './client';
+import {
+  AsRecord,
+  normalizeSerialNumber,
+  normalizeApplicationName,
+  normalizeApplicationKey,
+  normalizeDisplayID,
+} from './normalizers';
 import { NormalizeIntegratedActions } from './integrated-actions';
 import { makeCriticalIndex } from './critical-index';
 import type {
@@ -23,14 +30,6 @@ import type {
   CriticalApplicationPayloadResult,
   CriticalDisplayPayloadResult,
 } from '../IPCValidation';
-
-// Narrow an unknown value to a plain-object view for defensive field reads.
-// Non-objects (including null) collapse to `{}`, mirroring the historical
-// `Value && Value.Field` guards.
-type UnknownRecord = Record<string, unknown>;
-function AsRecord(Value: unknown): UnknownRecord {
-  return typeof Value === 'object' && Value !== null ? (Value as UnknownRecord) : {};
-}
 
 // One entry of the `SystemInfo` MAC-address map: the client reports each
 // interface as `{ ipv4, mac }` (the wire values consumed by the MAC-for-active-IP
@@ -157,20 +156,6 @@ function replaceUUIDInValue(Value: unknown, OldUUID: string, NewUUID: string): u
   return Value;
 }
 
-function normalizeSerialNumber(SerialNumber: unknown): string | null {
-  if (typeof SerialNumber !== 'string') return null;
-  const Value = SerialNumber.trim();
-  if (!Value) return null;
-  return Value.toUpperCase();
-}
-
-function normalizeDisplayID(DisplayID: unknown): string | null {
-  if (DisplayID === null || DisplayID === undefined) return null;
-  const Value = String(DisplayID).trim();
-  if (!Value) return null;
-  return Value;
-}
-
 // Per-client critical-entity indexes. The entry shape stored per kind mirrors
 // what the matching Client.SetCritical* sink consumes (the USB entry carries a
 // redundant UUID for parity with the historical index; the sink ignores it).
@@ -278,10 +263,10 @@ Manager.Heartbeat = async (UUID: string, Data: HeartbeatPayload, IP: string) => 
     const [Err, FetchedClient] = await ClientsRepo.GetByUUID(UUID);
     if (Err) {
       Logger.error('Failed to fetch client from database:', Err);
-      return ['Failed to fetch client', null];
+      return Fail('Failed to fetch client');
     }
     if (!FetchedClient) {
-      return ['Client Not Valid', null];
+      return Fail('Client Not Valid');
     } else {
       CachedClient = new Client(FetchedClient);
       CriticalUSB.applyState(CachedClient);
@@ -302,15 +287,15 @@ Manager.Heartbeat = async (UUID: string, Data: HeartbeatPayload, IP: string) => 
   CachedClient.SetLastSeen(Date.now());
   CachedClient.SetVitals(Data.Vitals);
 
-  return [null, 'Heartbeat processed successfully'];
+  return Ok('Heartbeat processed successfully');
 };
 
 Manager.SetUSBDeviceList = async (UUID: string, DeviceList: unknown) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
   Target.SetUSBDeviceList(DeviceList);
-  return [null, 'USB Device List updated successfully'];
+  return Ok('USB Device List updated successfully');
 };
 
 // Register/replace the integrated action (event) catalog declared by an
@@ -318,54 +303,54 @@ Manager.SetUSBDeviceList = async (UUID: string, DeviceList: unknown) => {
 // being stored on the cached Client instance.
 Manager.SetIntegratedActions = async (UUID: string, Actions: unknown) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
   const Normalized = NormalizeIntegratedActions(Actions);
   Target.SetIntegratedActions(Normalized);
-  return [null, Normalized];
+  return Ok(Normalized);
 };
 
 // Apply a manual health state (ONLINE / DEGRADED) reported by an integrated
 // client over the SDK. OFFLINE is rejected (driven by the connection only).
 Manager.SetIntegratedState = async (UUID: string, State: unknown, Message: unknown) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
   const Applied = Target.SetIntegratedState(State, Message);
-  if (!Applied) return ['Invalid integrated state', null];
-  return [null, true];
+  if (!Applied) return Fail('Invalid integrated state');
+  return Ok(true);
 };
 
 // Toggle identify mode on a client. Ensures the client is cached so the
 // runtime flag survives until the next heartbeat re-render.
 Manager.SetIdentifying = async (UUID: string, Identifying: unknown) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
   if (addClientToCache(Target)) {
     BroadcastManager.emit('ClientListChanged');
   }
   Target.SetIdentifying(Identifying);
-  return [null, true];
+  return Ok(true);
 };
 
 Manager.SetNetworkInterfaces = async (UUID: string, Interfaces: unknown) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
   Target.SetNetworkInterfaces(Interfaces);
-  return [null, 'Network Interfaces updated successfully'];
+  return Ok('Network Interfaces updated successfully');
 };
 
 Manager.SetRunningApplications = async (UUID: string, Snapshot: unknown) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
   if (addClientToCache(Target)) {
     BroadcastManager.emit('ClientListChanged');
   }
   Target.SetRunningApplications(Snapshot || {});
-  return [null, 'Running applications updated successfully'];
+  return Ok('Running applications updated successfully');
 };
 
 Manager.MarkApplicationCritical = async (
@@ -373,14 +358,11 @@ Manager.MarkApplicationCritical = async (
   Application: CriticalApplicationPayloadResult
 ) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
 
-  const ApplicationName =
-    typeof Application?.Name === 'string' && Application.Name.trim().length > 0
-      ? Application.Name.trim()
-      : null;
-  if (!ApplicationName) return ['Application name is required', null];
+  const ApplicationName = normalizeApplicationName(Application?.Name);
+  if (!ApplicationName) return Fail('Application name is required');
 
   const ApplicationKey = ApplicationName.toLowerCase();
   const Timestamp = Date.now();
@@ -392,8 +374,7 @@ Manager.MarkApplicationCritical = async (
   );
   if (WriteErr) return Fail('Failed to save critical application');
 
-  const PerClient = CriticalApplications.getForClient(UUID, true);
-  PerClient.set(ApplicationKey, {
+  CriticalApplications.setForClient(UUID, ApplicationKey, {
     Name: ApplicationName,
     Key: ApplicationKey,
     Timestamp,
@@ -405,24 +386,17 @@ Manager.MarkApplicationCritical = async (
 
 Manager.RemoveApplicationCritical = async (UUID: string, ApplicationName: unknown) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
 
-  const NormalizedName =
-    typeof ApplicationName === 'string' && ApplicationName.trim().length > 0
-      ? ApplicationName.trim()
-      : null;
-  if (!NormalizedName) return ['Application name is required', null];
+  const NormalizedName = normalizeApplicationName(ApplicationName);
+  if (!NormalizedName) return Fail('Application name is required');
   const ApplicationKey = NormalizedName.toLowerCase();
 
   const [WriteErr] = await CriticalRepo.RemoveApplication(UUID, ApplicationKey);
   if (WriteErr) return Fail('Failed to remove critical application');
 
-  const PerClient = CriticalApplications.getForClient(UUID, false);
-  if (PerClient) {
-    PerClient.delete(ApplicationKey);
-    if (PerClient.size === 0) CriticalApplications.index.delete(String(UUID || ''));
-  }
+  CriticalApplications.removeForClient(UUID, ApplicationKey);
 
   Target.UnmarkCriticalApplication(NormalizedName);
   BroadcastManager.emit('ClientUpdated', Target);
@@ -430,43 +404,40 @@ Manager.RemoveApplicationCritical = async (UUID: string, ApplicationName: unknow
 };
 
 Manager.IsApplicationCritical = async (UUID: string, ApplicationName: unknown) => {
-  const NormalizedName =
-    typeof ApplicationName === 'string' && ApplicationName.trim().length > 0
-      ? ApplicationName.trim().toLowerCase()
-      : null;
-  if (!NormalizedName) return [null, false];
+  const NormalizedName = normalizeApplicationKey(ApplicationName);
+  if (!NormalizedName) return Ok(false);
 
   const Cached = CriticalApplications.getForClient(UUID, false);
-  if (Cached) return [null, Cached.has(NormalizedName)];
+  if (Cached) return Ok(Cached.has(NormalizedName));
 
   const [Err, Row] = await CriticalRepo.IsApplicationCritical(UUID, NormalizedName);
-  if (Err) return ['Failed to determine critical application status', null];
-  return [null, !!Row];
+  if (Err) return Fail('Failed to determine critical application status');
+  return Ok(!!Row);
 };
 
 Manager.USBDeviceAdded = async (UUID: string, Device: USBDevice) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
   Target.USBDeviceAdded(Device);
-  return [null, 'Updated'];
+  return Ok('Updated');
 };
 
 Manager.USBDeviceRemoved = async (UUID: string, Device: USBDevice) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
   Target.USBDeviceRemoved(Device);
-  return [null, 'Updated'];
+  return Ok('Updated');
 };
 
 Manager.MarkUSBDeviceCritical = async (UUID: string, Device: CriticalUSBDevicePayloadResult) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
 
   const SerialNumber = normalizeSerialNumber(Device && Device.SerialNumber);
-  if (!SerialNumber) return ['Device serial number is required', null];
+  if (!SerialNumber) return Fail('Device serial number is required');
 
   const KnownDevice = (
     Array.isArray(Target.ConnectedUSBDeviceList) ? Target.ConnectedUSBDeviceList : []
@@ -485,8 +456,7 @@ Manager.MarkUSBDeviceCritical = async (UUID: string, Device: CriticalUSBDevicePa
   );
   if (WriteErr) return Fail('Failed to save critical USB device');
 
-  const PerClient = CriticalUSB.getForClient(UUID, true);
-  PerClient.set(SerialNumber, {
+  CriticalUSB.setForClient(UUID, SerialNumber, {
     UUID,
     SerialNumber,
     ManufacturerName,
@@ -505,20 +475,16 @@ Manager.MarkUSBDeviceCritical = async (UUID: string, Device: CriticalUSBDevicePa
 
 Manager.RemoveUSBDeviceCritical = async (UUID: string, SerialNumber: unknown) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
 
   const NormalizedSerial = normalizeSerialNumber(SerialNumber);
-  if (!NormalizedSerial) return ['Device serial number is required', null];
+  if (!NormalizedSerial) return Fail('Device serial number is required');
 
   const [WriteErr] = await CriticalRepo.RemoveUSB(UUID, NormalizedSerial);
   if (WriteErr) return Fail('Failed to remove critical USB device');
 
-  const PerClient = CriticalUSB.getForClient(UUID, false);
-  if (PerClient) {
-    PerClient.delete(NormalizedSerial);
-    if (PerClient.size === 0) CriticalUSB.index.delete(String(UUID || ''));
-  }
+  CriticalUSB.removeForClient(UUID, NormalizedSerial);
 
   Target.UnmarkCriticalUSBSerial(NormalizedSerial);
   BroadcastManager.emit('ClientUpdated', Target);
@@ -527,34 +493,34 @@ Manager.RemoveUSBDeviceCritical = async (UUID: string, SerialNumber: unknown) =>
 
 Manager.IsUSBDeviceCritical = async (UUID: string, SerialNumber: unknown) => {
   const Normalized = normalizeSerialNumber(SerialNumber);
-  if (!Normalized) return [null, false];
+  if (!Normalized) return Ok(false);
 
   const Cached = CriticalUSB.getForClient(UUID, false);
-  if (Cached) return [null, Cached.has(Normalized)];
+  if (Cached) return Ok(Cached.has(Normalized));
 
   const [Err, Row] = await CriticalRepo.IsUSBCritical(UUID, Normalized);
-  if (Err) return ['Failed to determine critical USB status', null];
-  return [null, !!Row];
+  if (Err) return Fail('Failed to determine critical USB status');
+  return Ok(!!Row);
 };
 
 Manager.SetDisplayList = async (UUID: string, DisplayList: unknown) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
   if (addClientToCache(Target)) {
     BroadcastManager.emit('ClientListChanged');
   }
   Target.SetDisplayList(DisplayList);
-  return [null, 'Display List updated successfully'];
+  return Ok('Display List updated successfully');
 };
 
 Manager.MarkDisplayCritical = async (UUID: string, Display: CriticalDisplayPayloadResult) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
 
   const DisplayID = normalizeDisplayID(Display && Display.DisplayID);
-  if (!DisplayID) return ['Display identifier is required', null];
+  if (!DisplayID) return Fail('Display identifier is required');
 
   // Prefer the live values reported by the client so the captured baseline
   // (resolution + refresh rate) reflects the current, known-good state.
@@ -588,8 +554,7 @@ Manager.MarkDisplayCritical = async (UUID: string, Display: CriticalDisplayPaylo
   );
   if (WriteErr) return Fail('Failed to save critical display');
 
-  const PerClient = CriticalDisplays.getForClient(UUID, true);
-  PerClient.set(DisplayID, {
+  CriticalDisplays.setForClient(UUID, DisplayID, {
     DisplayID,
     Label,
     Width,
@@ -613,20 +578,16 @@ Manager.MarkDisplayCritical = async (UUID: string, Display: CriticalDisplayPaylo
 
 Manager.RemoveDisplayCritical = async (UUID: string, DisplayID: unknown) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
 
   const NormalizedID = normalizeDisplayID(DisplayID);
-  if (!NormalizedID) return ['Display identifier is required', null];
+  if (!NormalizedID) return Fail('Display identifier is required');
 
   const [WriteErr] = await CriticalRepo.RemoveDisplay(UUID, NormalizedID);
   if (WriteErr) return Fail('Failed to remove critical display');
 
-  const PerClient = CriticalDisplays.getForClient(UUID, false);
-  if (PerClient) {
-    PerClient.delete(NormalizedID);
-    if (PerClient.size === 0) CriticalDisplays.index.delete(String(UUID || ''));
-  }
+  CriticalDisplays.removeForClient(UUID, NormalizedID);
 
   Target.UnmarkCriticalDisplay(NormalizedID);
   BroadcastManager.emit('ClientUpdated', Target);
@@ -635,21 +596,21 @@ Manager.RemoveDisplayCritical = async (UUID: string, DisplayID: unknown) => {
 
 Manager.IsDisplayCritical = async (UUID: string, DisplayID: unknown) => {
   const Normalized = normalizeDisplayID(DisplayID);
-  if (!Normalized) return [null, false];
+  if (!Normalized) return Ok(false);
 
   const Cached = CriticalDisplays.getForClient(UUID, false);
-  if (Cached) return [null, Cached.has(Normalized)];
+  if (Cached) return Ok(Cached.has(Normalized));
 
   const [Err, Row] = await CriticalRepo.IsDisplayCritical(UUID, Normalized);
-  if (Err) return ['Failed to determine critical display status', null];
-  return [null, !!Row];
+  if (Err) return Fail('Failed to determine critical display status');
+  return Ok(!!Row);
 };
 
 // One-shot richer payload: hostname + NICs -> derive MAC for the active IP
 Manager.SystemInfo = async (UUID: string, Data: SystemInfoData, IP: string) => {
   const [Err, Target] = await Manager.Get(UUID);
-  if (Err) return [Err, null];
-  if (!Target) return ['Client Not Found', null];
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
 
   await Target.SetHostname(Data.Hostname || null, { markUnsaved: false });
   await Target.SetOperatingSystem(Data.OperatingSystem || null, { markUnsaved: false });
@@ -658,7 +619,7 @@ Manager.SystemInfo = async (UUID: string, Data: SystemInfoData, IP: string) => {
     if (Interface.ipv4 === IP) await Target.SetMacAddress(Interface.mac, { markUnsaved: false });
   }
 
-  return [null, 'Heartbeat processed successfully'];
+  return Ok('Heartbeat processed successfully');
 };
 
 Manager.Update = async (UUID: string, Data: unknown) => {
@@ -714,9 +675,9 @@ Manager.Delete = async (UUID: string) => {
   if (Err) return Fail('Failed to delete client');
   // Remove from in-memory list
   removeClientFromCache(UUID);
-  CriticalUSB.index.delete(String(UUID || ''));
-  CriticalApplications.index.delete(String(UUID || ''));
-  CriticalDisplays.index.delete(String(UUID || ''));
+  CriticalUSB.clearForClient(UUID);
+  CriticalApplications.clearForClient(UUID);
+  CriticalDisplays.clearForClient(UUID);
   Logger.success(`Client ${UUID} deleted successfully`);
   return Ok(true);
 };
@@ -734,87 +695,11 @@ Manager.ReplaceClient = async (CurrentUUID: unknown, ReplacementUUID: unknown) =
   const NewExists = await Manager.Exists(NewUUID);
   if (NewExists) return Fail('Replacement client is already adopted');
 
-  const oldCriticalUSB = CriticalUSB.getForClient(OldUUID, false);
-  const oldCriticalApps = CriticalApplications.getForClient(OldUUID, false);
-  const oldCriticalDisplays = CriticalDisplays.getForClient(OldUUID, false);
   const oldClientRows = ClientList.slice();
 
-  const [TxErr] = await DB.WithTransaction(async (run) => {
-    const [clientUpdateErr] = await run('UPDATE Clients SET UUID = ? WHERE UUID = ?', [
-      NewUUID,
-      OldUUID,
-    ]);
-    if (clientUpdateErr) throw clientUpdateErr;
-
-    const [criticalUSBErr] = await run('UPDATE CriticalUSBDevices SET UUID = ? WHERE UUID = ?', [
-      NewUUID,
-      OldUUID,
-    ]);
-    if (criticalUSBErr) throw criticalUSBErr;
-
-    const [criticalAppErr] = await run('UPDATE CriticalApplications SET UUID = ? WHERE UUID = ?', [
-      NewUUID,
-      OldUUID,
-    ]);
-    if (criticalAppErr) throw criticalAppErr;
-
-    const [criticalDisplayErr] = await run('UPDATE CriticalDisplays SET UUID = ? WHERE UUID = ?', [
-      NewUUID,
-      OldUUID,
-    ]);
-    if (criticalDisplayErr) throw criticalDisplayErr;
-
-    const [rulesErr, RuleRows] = await DB.All<{
-      RuleID: number;
-      Scope: string | null;
-      Actions: string | null;
-    }>('SELECT RuleID, Scope, Actions FROM AlertRules', []);
-    if (rulesErr) throw rulesErr;
-
-    for (const Row of RuleRows || []) {
-      const RuleID = Number(Row && Row.RuleID);
-      if (!Number.isFinite(RuleID)) continue;
-
-      let ParsedScope: unknown = null;
-      let ParsedActions: unknown = null;
-
-      try {
-        ParsedScope = JSON.parse(Row && Row.Scope ? Row.Scope : '{}');
-      } catch {
-        ParsedScope = null;
-      }
-      try {
-        ParsedActions = JSON.parse(Row && Row.Actions ? Row.Actions : '[]');
-      } catch {
-        ParsedActions = null;
-      }
-
-      const NextScope = ParsedScope
-        ? replaceUUIDInValue(ParsedScope, OldUUID, NewUUID)
-        : ParsedScope;
-      const NextActions = ParsedActions
-        ? replaceUUIDInValue(ParsedActions, OldUUID, NewUUID)
-        : ParsedActions;
-
-      const ScopeChanged =
-        ParsedScope != null && JSON.stringify(NextScope) !== JSON.stringify(ParsedScope);
-      const ActionsChanged =
-        ParsedActions != null && JSON.stringify(NextActions) !== JSON.stringify(ParsedActions);
-
-      if (!ScopeChanged && !ActionsChanged) continue;
-
-      const [ruleUpdateErr] = await run(
-        'UPDATE AlertRules SET Scope = ?, Actions = ?, UpdatedAt = ? WHERE RuleID = ?',
-        [
-          ScopeChanged ? JSON.stringify(NextScope) : Row.Scope,
-          ActionsChanged ? JSON.stringify(NextActions) : Row.Actions,
-          Date.now(),
-          RuleID,
-        ]
-      );
-      if (ruleUpdateErr) throw ruleUpdateErr;
-    }
-  });
+  const [TxErr] = await ClientsRepo.ReplaceClientUUID(OldUUID, NewUUID, (Value) =>
+    replaceUUIDInValue(Value, OldUUID, NewUUID)
+  );
 
   if (TxErr) {
     Logger.error('Failed to replace client UUID', TxErr);
@@ -828,18 +713,9 @@ Manager.ReplaceClient = async (CurrentUUID: unknown, ReplacementUUID: unknown) =
   ClientList.push(ExistingClient);
   rebuildClientIndex();
 
-  if (oldCriticalUSB) {
-    CriticalUSB.index.set(NewUUID, oldCriticalUSB);
-    CriticalUSB.index.delete(OldUUID);
-  }
-  if (oldCriticalApps) {
-    CriticalApplications.index.set(NewUUID, oldCriticalApps);
-    CriticalApplications.index.delete(OldUUID);
-  }
-  if (oldCriticalDisplays) {
-    CriticalDisplays.index.set(NewUUID, oldCriticalDisplays);
-    CriticalDisplays.index.delete(OldUUID);
-  }
+  CriticalUSB.rekeyClient(OldUUID, NewUUID);
+  CriticalApplications.rekeyClient(OldUUID, NewUUID);
+  CriticalDisplays.rekeyClient(OldUUID, NewUUID);
 
   CriticalUSB.applyState(ExistingClient);
   CriticalApplications.applyState(ExistingClient);
@@ -868,17 +744,17 @@ Manager.Get = async (UUID: string) => {
   // Check in memory first
   const CachedClient = ClientIndex.get(UUID);
   if (CachedClient) {
-    return [null, CachedClient];
+    return Ok(CachedClient);
   }
   // If not found in memory, check in database
   const [Err, Row] = await ClientsRepo.GetByUUID(UUID);
-  if (Err) return ['Failed to fetch client', null];
-  if (!Row) return ['Client Not Found', null];
+  if (Err) return Fail('Failed to fetch client');
+  if (!Row) return Fail('Client Not Found');
   const ClientRow = new Client(Row);
   CriticalUSB.applyState(ClientRow);
   CriticalApplications.applyState(ClientRow);
   CriticalDisplays.applyState(ClientRow);
-  return [null, ClientRow];
+  return Ok(ClientRow);
 };
 
 Manager.Initialized = false;
@@ -910,7 +786,7 @@ Manager.Init = async () => {
 // Snapshot the current list; ensures cache is initialized first
 Manager.GetAll = async () => {
   if (!Manager.Initialized) await Manager.Init();
-  return [null, ClientList];
+  return Ok(ClientList);
 };
 
 Manager.GetClientsInGroup = async (GroupID: unknown) => {
@@ -921,10 +797,10 @@ Manager.GetClientsInGroup = async (GroupID: unknown) => {
 Manager.MoveGroupToNoGroup = async (GroupID: unknown) => {
   if (!Manager.Initialized) await Manager.Init();
   const TargetGroupID = Number(GroupID);
-  if (!Number.isFinite(TargetGroupID)) return ['Invalid GroupID', null];
+  if (!Number.isFinite(TargetGroupID)) return Fail('Invalid GroupID');
 
   const [Err] = await ClientsRepo.MoveGroupToNoGroup(TargetGroupID);
-  if (Err) return ['Failed to move clients to no group', null];
+  if (Err) return Fail('Failed to move clients to no group');
 
   let Changed = 0;
   for (const Client of ClientList) {
@@ -935,7 +811,7 @@ Manager.MoveGroupToNoGroup = async (GroupID: unknown) => {
   }
 
   if (Changed > 0) BroadcastManager.emit('ClientListChanged');
-  return [null, Changed];
+  return Ok(Changed);
 };
 
 // Ensure all clients reference an existing group; unknown groups are reassigned to null.
@@ -956,13 +832,13 @@ Manager.ReconcileOrphanedGroups = async (ValidGroupIDs: unknown) => {
     Changed += 1;
   }
 
-  return [null, Changed];
+  return Ok(Changed);
 };
 
 // Persist a specific order of clients in a group and optionally move clients into that group
 // orderedUUIDs: string[] in the desired order. Any client not in orderedUUIDs will retain existing weight.
 Manager.SetGroupOrder = async (GroupID: unknown, orderedUUIDs: unknown) => {
-  if (!Array.isArray(orderedUUIDs)) return ['Invalid orderedUUIDs', null];
+  if (!Array.isArray(orderedUUIDs)) return Fail('Invalid orderedUUIDs');
   // normalize GroupID null
   const TargetGroupID = (GroupID === undefined ? null : GroupID) as number | string | null;
   let weight = 10;
@@ -979,7 +855,7 @@ Manager.SetGroupOrder = async (GroupID: unknown, orderedUUIDs: unknown) => {
   }
   // Emit a single list changed after batch
   BroadcastManager.emit('ClientListChanged');
-  return [null, true];
+  return Ok(true);
 };
 
 // Like SetGroupOrder but accepts an explicit weight per UUID. Used when ordering
@@ -989,8 +865,8 @@ Manager.SetGroupOrderWithWeights = async (
   orderedUUIDs: unknown,
   weights: unknown
 ) => {
-  if (!Array.isArray(orderedUUIDs) || !Array.isArray(weights)) return ['Invalid input', null];
-  if (orderedUUIDs.length !== weights.length) return ['Length mismatch', null];
+  if (!Array.isArray(orderedUUIDs) || !Array.isArray(weights)) return Fail('Invalid input');
+  if (orderedUUIDs.length !== weights.length) return Fail('Length mismatch');
   const TargetGroupID = (GroupID === undefined ? null : GroupID) as number | string | null;
   for (let i = 0; i < orderedUUIDs.length; i++) {
     const uuid = orderedUUIDs[i];
@@ -1001,7 +877,7 @@ Manager.SetGroupOrderWithWeights = async (
     await client.SetWeight(w);
   }
   BroadcastManager.emit('ClientListChanged');
-  return [null, true];
+  return Ok(true);
 };
 
 Manager.ClearCache = async () => {

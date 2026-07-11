@@ -4,6 +4,13 @@ import { CreateLogger } from '../Logger';
 import { Manager as DB } from '../DB';
 import { CreateClientsRepository } from '../DB/repositories/clients';
 import { Manager as BroadcastManager } from '../Broadcast';
+import {
+  AsRecord,
+  normalizeSerialNumber,
+  normalizeApplicationName,
+  normalizeApplicationKey,
+  normalizeDisplayID,
+} from './normalizers';
 import type {
   USBDevice,
   ClientDisplay,
@@ -15,14 +22,6 @@ const Logger = CreateLogger('ClientManager');
 
 const ClientsRepo = CreateClientsRepository(DB);
 
-// Narrow an unknown value to a plain-object view for defensive field reads.
-// Non-objects (including null) collapse to `{}`, mirroring the historical
-// `Value && typeof Value === 'object' ? Value : {}` / `Value && Value.Field`
-// guards these normalizers relied on.
-type UnknownRecord = Record<string, unknown>;
-function AsRecord(Value: unknown): UnknownRecord {
-  return typeof Value === 'object' && Value !== null ? (Value as UnknownRecord) : {};
-}
 // `parseInt` ToString-coerces its argument, so `String()` wrapping is
 // behaviour-identical to the historical `parseInt(x, 10)` on dynamic values.
 function ParseIntOrNull(Value: unknown): number | null {
@@ -32,33 +31,6 @@ function ParseIntOrNull(Value: unknown): number | null {
 // satisfying the `number | null` field type (timestamps are always numeric).
 function TimestampOrNull(Value: unknown): number | null {
   return (Value || null) as number | null;
-}
-
-function normalizeSerialNumber(SerialNumber: unknown): string | null {
-  if (typeof SerialNumber !== 'string') return null;
-  const Value = SerialNumber.trim();
-  if (!Value) return null;
-  return Value.toUpperCase();
-}
-
-function normalizeApplicationName(Name: unknown): string | null {
-  if (typeof Name !== 'string') return null;
-  const Value = Name.trim();
-  if (!Value) return null;
-  return Value;
-}
-
-function normalizeApplicationKey(Name: unknown): string | null {
-  const Value = normalizeApplicationName(Name);
-  if (!Value) return null;
-  return Value.toLowerCase();
-}
-
-function normalizeDisplayID(DisplayID: unknown): string | null {
-  if (DisplayID === null || DisplayID === undefined) return null;
-  const Value = String(DisplayID).trim();
-  if (!Value) return null;
-  return Value;
 }
 
 // A display "signature" captures the operator-visible configuration we guard.
