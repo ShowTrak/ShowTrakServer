@@ -7,6 +7,10 @@ export const APP_PORT = 3000;
 // UDP port the inbound OSC control server listens on.
 export const OSC_PORT = 3333;
 
+// UDP port sACN (ANSI E1.31) streaming DMX is transmitted on. A single shared
+// receiver binds here and joins the multicast group for each monitored universe.
+export const SACN_PORT = 5568;
+
 // Fallback timeout for a queued script execution when the script does not
 // declare its own `Timeout`.
 export const SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS = 15000;

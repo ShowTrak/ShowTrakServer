@@ -20,6 +20,8 @@ const MethodModules: MonitoringMethod[] = [
   require('./http-json'),
   require('./dns'),
   require('./qlab-workspace'),
+  require('./sacn-universe'),
+  require('./sacn-universe-priority'),
 ];
 
 const Methods = new Map<string, MonitoringMethod>();
