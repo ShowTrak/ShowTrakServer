@@ -1,4 +1,5 @@
 import { closeModal, openModal } from './lib/modal';
+import { buildModalHeader } from './lib/modal-header';
 import { HandleNonFatalError } from './04-utils';
 import { Wait } from './14-selection-init';
 
@@ -70,7 +71,11 @@ function RenderIconGrid(Filter: string) {
   const Grid = document.getElementById('ICON_PICKER_GRID');
   if (!Grid) return;
 
-  const Needle = NormalizeIconName(Filter) || String(Filter || '').trim().toLowerCase();
+  const Needle =
+    NormalizeIconName(Filter) ||
+    String(Filter || '')
+      .trim()
+      .toLowerCase();
   const Matches = Needle
     ? IconPickerAllIcons.filter((Name) => Name.includes(Needle))
     : IconPickerAllIcons;
@@ -155,18 +160,27 @@ export function InitIconPicker() {
   if (Grid) {
     Grid.addEventListener('click', (Event) => {
       const Target = Event.target as Element | null;
-      const Tile = Target && Target.closest
-        ? (Target.closest('.icon-picker-tile') as HTMLElement | null)
-        : null;
+      const Tile =
+        Target && Target.closest
+          ? (Target.closest('.icon-picker-tile') as HTMLElement | null)
+          : null;
       if (!Tile) return;
       const Name = Tile.getAttribute('data-icon-name');
       if (Name) CloseIconPicker(Name);
     });
   }
 
-  $('#ICON_PICKER_CANCEL')
-    .off('click')
-    .on('click', () => CloseIconPicker(null));
+  // Back and close both cancel the picker (and restore the previous screen).
+  $('#ICON_PICKER_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'Choose an Icon',
+        titleId: 'SHOWTRAK_MODAL_ICONPICKER_Label',
+        onBack: () => CloseIconPicker(null),
+        onClose: () => CloseIconPicker(null),
+      }).$el
+    );
 
   // Bootstrap fires this when the modal is dismissed via the backdrop / Esc key;
   // treat that as a cancel and restore the previous screen. Guard on an active

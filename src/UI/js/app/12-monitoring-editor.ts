@@ -1,4 +1,5 @@
-import { openModal } from './lib/modal';
+import { closeModal, openModal } from './lib/modal';
+import { buildModalHeader } from './lib/modal-header';
 import type {
   MonitoringSettingField,
   MonitoringCheckDebug,
@@ -483,6 +484,14 @@ export async function StartNetworkDiscoveryScan() {
 export async function OpenNetworkDiscoveryModal() {
   await CloseAllModals();
   ResetNetworkDiscoveryState();
+  $('#NETWORK_DISCOVERY_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'LAN Discovery',
+        onClose: () => closeModal('SHOWTRAK_MODAL_NETWORK_DISCOVERY'),
+      }).$el
+    );
   openModal('SHOWTRAK_MODAL_NETWORK_DISCOVERY');
   await StartNetworkDiscoveryScan();
 }
@@ -952,6 +961,32 @@ export async function OpenMonitoringTargetEditor(
   }
   setMonitoringEditorTargetID(MonitoringEditorState!.TargetID);
 
+  // The list view is the modal's top level (title + close). The per-check view
+  // adds a Back that commits the check and returns to the list. Title elements
+  // keep their ids so the text is still updated below and on autosave.
+  $('#MONITORING_TARGET_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'Add Monitoring Target',
+        titleId: 'MONITORING_TARGET_MODAL_TITLE',
+        onClose: () => closeModal('SHOWTRAK_MODAL_MONITORING_TARGET'),
+      }).$el
+    );
+  $('#MONITORING_CHECK_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'Edit Check',
+        titleId: 'MONITORING_CHECK_VIEW_TITLE',
+        onBack: () => {
+          CommitMonitoringCheckView();
+          ShowMonitoringListView();
+        },
+        onClose: () => closeModal('SHOWTRAK_MODAL_MONITORING_TARGET'),
+      }).$el
+    );
+
   $('#MONITORING_TARGET_MODAL_TITLE').text(
     Existing ? 'Edit Monitoring Target' : 'Add Monitoring Target'
   );
@@ -1028,13 +1063,6 @@ export async function OpenMonitoringTargetEditor(
     .off('click.moncheck')
     .on('click.moncheck', function () {
       RunMonitoringCheckNow();
-    });
-
-  $('#MONITORING_CHECK_BACK')
-    .off('click.moncheck')
-    .on('click.moncheck', function () {
-      CommitMonitoringCheckView();
-      ShowMonitoringListView();
     });
 
   $('#MONITORING_CHECK_DELETE')

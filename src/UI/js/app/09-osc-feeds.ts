@@ -1,11 +1,37 @@
-import { openModal } from './lib/modal';
-import { AllClients, ClientInfoOpenUUID, ClientOnlineState, DummyClients, MonitorHistoryModalContext, MonitoringTargets, __LastClients, setAlertRulesCache, setDummyClients, setMonitoringTargets } from './01-state';
+import { closeModal, openModal } from './lib/modal';
+import { buildModalHeader } from './lib/modal-header';
+import {
+  AllClients,
+  ClientInfoOpenUUID,
+  ClientOnlineState,
+  DummyClients,
+  MonitorHistoryModalContext,
+  MonitoringTargets,
+  __LastClients,
+  setAlertRulesCache,
+  setDummyClients,
+  setMonitoringTargets,
+} from './01-state';
 import { HandleNonFatalError, Safe } from './04-utils';
 import { RenderFullClientAndMonitorList, UpdateClientTile } from './06-client-list';
-import { IsMonitorHistoryContextFor, LoadHistorySamplesForContext, RenderMonitoringHistoryModal, UpdateMonitoringTargetTile } from './07-monitoring';
-import { AddAlert, Alerts, AlertsVisible, RenderAlerts, UpdateAlertsIndicator } from './10-alerts-tray';
+import {
+  IsMonitorHistoryContextFor,
+  LoadHistorySamplesForContext,
+  RenderMonitoringHistoryModal,
+  UpdateMonitoringTargetTile,
+} from './07-monitoring';
+import {
+  AddAlert,
+  Alerts,
+  AlertsVisible,
+  RenderAlerts,
+  UpdateAlertsIndicator,
+} from './10-alerts-tray';
 import { CloseAllModals, RenderUpdateManagerClientList } from './11-modals';
-import { RefreshMonitoringCheckDebugIfOpen, RefreshMonitoringEditorIfOpen } from './12-monitoring-editor';
+import {
+  RefreshMonitoringCheckDebugIfOpen,
+  RefreshMonitoringEditorIfOpen,
+} from './12-monitoring-editor';
 import { RenderAlertRuleManagerList } from './13-alert-rules';
 import { Notify, RenderClientInfoDetails, UpdateIdentifyStatusBanner } from './14-selection-init';
 import { UpdateDummyClientTile } from './16-dummy-clients';
@@ -274,265 +300,286 @@ export async function OpenOscHttpDebugTerminal() {
 // Wires the OSC/HTTP debug modal and registers every OSC-feed push handler;
 // bodies unchanged from the former import-time subscriptions.
 export function InitOscFeeds() {
+  // Both OSC modals are top-level (title + close). Titles are static, so the
+  // headers are built once here; the title ids are kept for aria-labelledby.
+  $('#OSC_ROUTE_LIST_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'OSC/API Reference',
+        titleId: 'OSC_ROUTE_LIST_MODAL_Label',
+        onClose: () => closeModal('OSC_ROUTE_LIST_MODAL'),
+      }).$el
+    );
+  $('#OSC_HTTP_DEBUG_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'OSC/API Debug Terminal',
+        titleId: 'OSC_HTTP_DEBUG_MODAL_Label',
+        onClose: () => closeModal('OSC_HTTP_DEBUG_MODAL'),
+      }).$el
+    );
+
   $('#OSC_HTTP_DEBUG_MODAL')
-  .off('shown.bs.modal.oschttpdebug hidden.bs.modal.oschttpdebug')
-  .on('shown.bs.modal.oschttpdebug', () => {
-    OscHttpDebugEntries = [];
-    OscHttpDebugModalOpen = true;
-    RenderOscHttpDebugTerminal();
-  })
-  .on('hidden.bs.modal.oschttpdebug', () => {
-    OscHttpDebugModalOpen = false;
-    OscHttpDebugEntries = [];
-    RenderOscHttpDebugTerminal();
+    .off('shown.bs.modal.oschttpdebug hidden.bs.modal.oschttpdebug')
+    .on('shown.bs.modal.oschttpdebug', () => {
+      OscHttpDebugEntries = [];
+      OscHttpDebugModalOpen = true;
+      RenderOscHttpDebugTerminal();
+    })
+    .on('hidden.bs.modal.oschttpdebug', () => {
+      OscHttpDebugModalOpen = false;
+      OscHttpDebugEntries = [];
+      RenderOscHttpDebugTerminal();
+    });
+
+  window.API.Notify(async (Message, Type, Duration) => {
+    Notify(Message, Type, Duration);
   });
 
-window.API.Notify(async (Message, Type, Duration) => {
-  Notify(Message, Type, Duration);
-});
-
-window.API.DebugTrafficEntry(async (Entry) => {
-  AppendOscHttpDebugEntry({
-    protocol: Entry && Entry.protocol ? Entry.protocol : 'unknown',
-    timestamp: Entry && Entry.timestamp ? Entry.timestamp : Date.now(),
-    valid: !!(Entry && Entry.valid),
-    summary: Entry && Entry.summary ? Entry.summary : 'Unknown request',
-    detail: Entry && Entry.detail ? Entry.detail : '',
-  });
-});
-
-window.API.SetOSCList(async (Routes) => {
-  const MirroredHttpRoutes = (Array.isArray(Routes) ? Routes : []).map((Route) => {
-    // Keep OSC labels unchanged, but mirror HTTP paths without OSC namespace prefixes.
-    const NormalizedPath =
-      String((Route && Route.Path) || '').replace(/^\/(?:ShowTrak|API)(?=\/|$)/i, '') || '/';
-    const ApiPath = `/API${NormalizedPath === '/' ? '' : NormalizedPath}`;
-    return {
-      Protocol: 'HTTP',
-      Methods: ['GET', 'POST'],
-      Path: ApiPath,
-      Title: Route.Title || `HTTP mirror for ${Route.Path}`,
-    };
+  window.API.DebugTrafficEntry(async (Entry) => {
+    AppendOscHttpDebugEntry({
+      protocol: Entry && Entry.protocol ? Entry.protocol : 'unknown',
+      timestamp: Entry && Entry.timestamp ? Entry.timestamp : Date.now(),
+      valid: !!(Entry && Entry.valid),
+      summary: Entry && Entry.summary ? Entry.summary : 'Unknown request',
+      detail: Entry && Entry.detail ? Entry.detail : '',
+    });
   });
 
-  const OscRoutes = (Array.isArray(Routes) ? Routes : []).map((Route) => ({
-    Protocol: 'OSC',
-    Methods: ['OSC'],
-    Path: Route.Path,
-    Title: Route.Title || Route.Path,
-  }));
+  window.API.SetOSCList(async (Routes) => {
+    const MirroredHttpRoutes = (Array.isArray(Routes) ? Routes : []).map((Route) => {
+      // Keep OSC labels unchanged, but mirror HTTP paths without OSC namespace prefixes.
+      const NormalizedPath =
+        String((Route && Route.Path) || '').replace(/^\/(?:ShowTrak|API)(?=\/|$)/i, '') || '/';
+      const ApiPath = `/API${NormalizedPath === '/' ? '' : NormalizedPath}`;
+      return {
+        Protocol: 'HTTP',
+        Methods: ['GET', 'POST'],
+        Path: ApiPath,
+        Title: Route.Title || `HTTP mirror for ${Route.Path}`,
+      };
+    });
 
-  const UnifiedRoutes = [...HttpApiRoutes, ...MirroredHttpRoutes, ...OscRoutes];
-  const ActionGroups = new Map<string, OscActionGroup>();
+    const OscRoutes = (Array.isArray(Routes) ? Routes : []).map((Route) => ({
+      Protocol: 'OSC',
+      Methods: ['OSC'],
+      Path: Route.Path,
+      Title: Route.Title || Route.Path,
+    }));
 
-  for (const Route of UnifiedRoutes) {
-    const Key = String(Route.Title || Route.Path || '')
-      .trim()
-      .toLowerCase();
-    if (!ActionGroups.has(Key)) {
-      ActionGroups.set(Key, {
-        Title: Route.Title || Route.Path,
-        OSC: [],
-        HTTP: [],
-      });
+    const UnifiedRoutes = [...HttpApiRoutes, ...MirroredHttpRoutes, ...OscRoutes];
+    const ActionGroups = new Map<string, OscActionGroup>();
+
+    for (const Route of UnifiedRoutes) {
+      const Key = String(Route.Title || Route.Path || '')
+        .trim()
+        .toLowerCase();
+      if (!ActionGroups.has(Key)) {
+        ActionGroups.set(Key, {
+          Title: Route.Title || Route.Path,
+          OSC: [],
+          HTTP: [],
+        });
+      }
+      const Group = ActionGroups.get(Key)!;
+      if (String(Route.Protocol || '').toUpperCase() === 'OSC') {
+        Group.OSC.push(Route);
+      } else {
+        Group.HTTP.push(Route);
+      }
     }
-    const Group = ActionGroups.get(Key)!;
-    if (String(Route.Protocol || '').toUpperCase() === 'OSC') {
-      Group.OSC.push(Route);
-    } else {
-      Group.HTTP.push(Route);
+
+    const SortedGroups = Array.from(ActionGroups.values()).sort((A, B) => {
+      const APath = (A.HTTP[0] && A.HTTP[0].Path) || (A.OSC[0] && A.OSC[0].Path) || '';
+      const BPath = (B.HTTP[0] && B.HTTP[0].Path) || (B.OSC[0] && B.OSC[0].Path) || '';
+      const AOrder = getLogicalRouteOrder(APath);
+      const BOrder = getLogicalRouteOrder(BPath);
+      if (AOrder !== BOrder) return AOrder - BOrder;
+      return normalizeRouteForOrdering(APath).localeCompare(normalizeRouteForOrdering(BPath));
+    });
+
+    for (const Group of SortedGroups) {
+      Group.OSC.sort((A, B) => String(A.Path || '').localeCompare(String(B.Path || '')));
+      Group.HTTP.sort((A, B) => String(A.Path || '').localeCompare(String(B.Path || '')));
     }
-  }
 
-  const SortedGroups = Array.from(ActionGroups.values()).sort((A, B) => {
-    const APath = (A.HTTP[0] && A.HTTP[0].Path) || (A.OSC[0] && A.OSC[0].Path) || '';
-    const BPath = (B.HTTP[0] && B.HTTP[0].Path) || (B.OSC[0] && B.OSC[0].Path) || '';
-    const AOrder = getLogicalRouteOrder(APath);
-    const BOrder = getLogicalRouteOrder(BPath);
-    if (AOrder !== BOrder) return AOrder - BOrder;
-    return normalizeRouteForOrdering(APath).localeCompare(normalizeRouteForOrdering(BPath));
-  });
-
-  for (const Group of SortedGroups) {
-    Group.OSC.sort((A, B) => String(A.Path || '').localeCompare(String(B.Path || '')));
-    Group.HTTP.sort((A, B) => String(A.Path || '').localeCompare(String(B.Path || '')));
-  }
-
-  $('#OSC_ROUTE_LIST').html('');
-  $('#OSC_ROUTE_LIST').append(`
+    $('#OSC_ROUTE_LIST').html('');
+    $('#OSC_ROUTE_LIST').append(`
 		<div class="d-grid gap-2 p-2 rounded bg-ghost-light rounded-3">
 			<div class="fw-semibold">OSC/API Reference</div>
 			<div class="text-muted small">Grouped by action. Each action shows OSC and HTTP availability.</div>
 		</div>
 	`);
-  for (const Group of SortedGroups) {
-    renderActionGroup($('#OSC_ROUTE_LIST'), Group);
-  }
-  return;
-});
+    for (const Group of SortedGroups) {
+      renderActionGroup($('#OSC_ROUTE_LIST'), Group);
+    }
+    return;
+  });
 
-window.API.ClientUpdated(async (Data) => {
-  // Keep cached full-client list in sync with live heartbeat updates so
-  // secondary views (e.g. Update Manager) reflect current Online state.
-  try {
-    if (Array.isArray(__LastClients) && Data && Data.UUID) {
-      const idx = __LastClients.findIndex((client) => client && client.UUID === Data.UUID);
-      if (idx >= 0) {
-        __LastClients[idx] = {
-          ...__LastClients[idx],
-          ...Data,
-        };
-      }
-    }
-
-    // Keep AllClients (used by the right-click action menu) in sync too, so the
-    // intersection logic sees live OperatingSystem / IntegratedActions / Online.
-    if (Array.isArray(AllClients) && Data && Data.UUID) {
-      const aidx = AllClients.findIndex((client) => client && client.UUID === Data.UUID);
-      if (aidx >= 0) {
-        AllClients[aidx] = {
-          ...AllClients[aidx],
-          ...Data,
-        };
-      }
-    }
-
-    if ($('#SHOWTRAK_MODAL_UPDATE_MANAGER').hasClass('show')) {
-      RenderUpdateManagerClientList();
-    }
-  } catch (err) {
-    HandleNonFatalError('ClientUpdated:UpdateManagerCacheSync', err);
-  }
-
-  // Online transition handling: auto-dismiss any pending offline alerts when a
-  // client comes back online. Offline transitions intentionally do not raise a
-  // UI notification.
-  try {
-    const prev = ClientOnlineState.get(Data.UUID);
-    if (typeof prev === 'boolean' && prev !== Data.Online && Data.Online) {
-      try {
-        let changed = false;
-        for (const a of Alerts) {
-          if (!a.dismissed && a.type === 'offline' && a.clientUUID === Data.UUID) {
-            a.dismissed = true;
-            changed = true;
-          }
-        }
-        if (changed) {
-          UpdateAlertsIndicator();
-          if (AlertsVisible) RenderAlerts();
-        }
-      } catch (err) {
-        HandleNonFatalError('ClientUpdated:DismissOfflineAlert', err);
-      }
-    }
-    ClientOnlineState.set(Data.UUID, !!Data.Online);
-  } catch (err) {
-    HandleNonFatalError('ClientUpdated:TransitionAlerts', err);
-  }
-  const { UUID } = Data;
-  UpdateClientTile(Data);
-  // If Client Info modal is open for this client, refresh network interfaces (and USB if present)
-  try {
-    const $modal = $('#SHOWTRAK_CLIENT_INFO');
-    if (ClientInfoOpenUUID && ClientInfoOpenUUID === UUID && $modal.hasClass('show')) {
-      RenderClientInfoDetails(Data);
-    }
-  } catch (err) {
-    HandleNonFatalError('ClientUpdated:RenderClientInfoDetails', err);
-  }
-  // If the shared status-timeline graph is showing this client, reload its
-  // series live so the timeline and status card stay current.
-  if (IsMonitorHistoryContextFor('client', UUID)) {
+  window.API.ClientUpdated(async (Data) => {
+    // Keep cached full-client list in sync with live heartbeat updates so
+    // secondary views (e.g. Update Manager) reflect current Online state.
     try {
+      if (Array.isArray(__LastClients) && Data && Data.UUID) {
+        const idx = __LastClients.findIndex((client) => client && client.UUID === Data.UUID);
+        if (idx >= 0) {
+          __LastClients[idx] = {
+            ...__LastClients[idx],
+            ...Data,
+          };
+        }
+      }
+
+      // Keep AllClients (used by the right-click action menu) in sync too, so the
+      // intersection logic sees live OperatingSystem / IntegratedActions / Online.
+      if (Array.isArray(AllClients) && Data && Data.UUID) {
+        const aidx = AllClients.findIndex((client) => client && client.UUID === Data.UUID);
+        if (aidx >= 0) {
+          AllClients[aidx] = {
+            ...AllClients[aidx],
+            ...Data,
+          };
+        }
+      }
+
+      if ($('#SHOWTRAK_MODAL_UPDATE_MANAGER').hasClass('show')) {
+        RenderUpdateManagerClientList();
+      }
+    } catch (err) {
+      HandleNonFatalError('ClientUpdated:UpdateManagerCacheSync', err);
+    }
+
+    // Online transition handling: auto-dismiss any pending offline alerts when a
+    // client comes back online. Offline transitions intentionally do not raise a
+    // UI notification.
+    try {
+      const prev = ClientOnlineState.get(Data.UUID);
+      if (typeof prev === 'boolean' && prev !== Data.Online && Data.Online) {
+        try {
+          let changed = false;
+          for (const a of Alerts) {
+            if (!a.dismissed && a.type === 'offline' && a.clientUUID === Data.UUID) {
+              a.dismissed = true;
+              changed = true;
+            }
+          }
+          if (changed) {
+            UpdateAlertsIndicator();
+            if (AlertsVisible) RenderAlerts();
+          }
+        } catch (err) {
+          HandleNonFatalError('ClientUpdated:DismissOfflineAlert', err);
+        }
+      }
+      ClientOnlineState.set(Data.UUID, !!Data.Online);
+    } catch (err) {
+      HandleNonFatalError('ClientUpdated:TransitionAlerts', err);
+    }
+    const { UUID } = Data;
+    UpdateClientTile(Data);
+    // If Client Info modal is open for this client, refresh network interfaces (and USB if present)
+    try {
+      const $modal = $('#SHOWTRAK_CLIENT_INFO');
+      if (ClientInfoOpenUUID && ClientInfoOpenUUID === UUID && $modal.hasClass('show')) {
+        RenderClientInfoDetails(Data);
+      }
+    } catch (err) {
+      HandleNonFatalError('ClientUpdated:RenderClientInfoDetails', err);
+    }
+    // If the shared status-timeline graph is showing this client, reload its
+    // series live so the timeline and status card stay current.
+    if (IsMonitorHistoryContextFor('client', UUID)) {
+      try {
+        await LoadHistorySamplesForContext();
+        RenderMonitoringHistoryModal();
+      } catch (err) {
+        HandleNonFatalError('ClientUpdated:RefreshClientHistory', err);
+      }
+    }
+    return;
+  });
+
+  // --- Monitoring Targets ---
+  window.API.SetFullMonitoringTargetList(async (List) => {
+    setMonitoringTargets(Array.isArray(List) ? List : []);
+    // Re-render the full client+monitor view so monitors slot back into their groups.
+    RenderFullClientAndMonitorList();
+    UpdateIdentifyStatusBanner();
+  });
+
+  window.API.MonitoringTargetUpdated(async (Target) => {
+    if (!Target || !Target.TargetID) return;
+    const idx = MonitoringTargets.findIndex((t) => t.TargetID === Target.TargetID);
+    const prev = idx === -1 ? null : MonitoringTargets[idx];
+    if (idx === -1) {
+      MonitoringTargets.push(Target);
+    } else {
+      MonitoringTargets[idx] = Target;
+    }
+    // If a monitor changed groups, re-render. Otherwise update in place.
+    if (!prev || (prev.GroupID || null) !== (Target.GroupID || null)) {
+      RenderFullClientAndMonitorList();
+    } else {
+      UpdateMonitoringTargetTile(Target);
+    }
+    // Keep the open editor's per-check status list fresh.
+    RefreshMonitoringEditorIfOpen(Target.TargetID);
+    // Keep the open check editor's "last response" debug panel fresh.
+    RefreshMonitoringCheckDebugIfOpen(Target.TargetID);
+    // If the history modal is showing this target, reload its series live.
+    if (
+      MonitorHistoryModalContext &&
+      MonitorHistoryModalContext.type === 'target' &&
+      Number(MonitorHistoryModalContext.id) === Number(Target.TargetID)
+    ) {
       await LoadHistorySamplesForContext();
       RenderMonitoringHistoryModal();
-    } catch (err) {
-      HandleNonFatalError('ClientUpdated:RefreshClientHistory', err);
     }
-  }
-  return;
-});
-
-// --- Monitoring Targets ---
-window.API.SetFullMonitoringTargetList(async (List) => {
-    setMonitoringTargets(Array.isArray(List) ? List : []);
-  // Re-render the full client+monitor view so monitors slot back into their groups.
-  RenderFullClientAndMonitorList();
-  UpdateIdentifyStatusBanner();
-});
-
-window.API.MonitoringTargetUpdated(async (Target) => {
-  if (!Target || !Target.TargetID) return;
-  const idx = MonitoringTargets.findIndex((t) => t.TargetID === Target.TargetID);
-  const prev = idx === -1 ? null : MonitoringTargets[idx];
-  if (idx === -1) {
-    MonitoringTargets.push(Target);
-  } else {
-    MonitoringTargets[idx] = Target;
-  }
-  // If a monitor changed groups, re-render. Otherwise update in place.
-  if (!prev || (prev.GroupID || null) !== (Target.GroupID || null)) {
-    RenderFullClientAndMonitorList();
-  } else {
-    UpdateMonitoringTargetTile(Target);
-  }
-  // Keep the open editor's per-check status list fresh.
-  RefreshMonitoringEditorIfOpen(Target.TargetID);
-  // Keep the open check editor's "last response" debug panel fresh.
-  RefreshMonitoringCheckDebugIfOpen(Target.TargetID);
-  // If the history modal is showing this target, reload its series live.
-  if (
-    MonitorHistoryModalContext &&
-    MonitorHistoryModalContext.type === 'target' &&
-    Number(MonitorHistoryModalContext.id) === Number(Target.TargetID)
-  ) {
-    await LoadHistorySamplesForContext();
-    RenderMonitoringHistoryModal();
-  }
-});
-
-window.API.SetFullAlertRuleList(async (List) => {
-    setAlertRulesCache(Array.isArray(List) ? List : []);
-  RenderAlertRuleManagerList();
-});
-
-// --- Dummy Clients ---
-window.API.SetFullDummyClientList(async (List) => {
-    setDummyClients(Array.isArray(List) ? List : []);
-  // Re-render the full client+monitor view so dummies slot back into groups.
-  RenderFullClientAndMonitorList();
-});
-
-window.API.DummyClientUpdated(async (Dummy) => {
-  if (!Dummy || !Dummy.UUID) return;
-  const idx = DummyClients.findIndex((d) => d.UUID === Dummy.UUID);
-  const prev = idx === -1 ? null : DummyClients[idx];
-  if (idx === -1) {
-    DummyClients.push(Dummy);
-  } else {
-    DummyClients[idx] = Dummy;
-  }
-  // If a dummy changed groups (or is new), re-render. Otherwise update in place.
-  if (!prev || (prev.GroupID || null) !== (Dummy.GroupID || null)) {
-    RenderFullClientAndMonitorList();
-  } else {
-    UpdateDummyClientTile(Dummy);
-  }
-  if (IsMonitorHistoryContextFor('dummy', Dummy.UUID)) {
-    await LoadHistorySamplesForContext();
-    RenderMonitoringHistoryModal();
-  }
-});
-
-window.API.CreateShowTrakAlert(async (Payload) => {
-  if (!Payload) return;
-  AddAlert({
-    type: 'warning',
-    severity: Payload.Severity || 'info',
-    title: Payload.Title || 'ShowTrak Alert',
-    message: Payload.Message || '',
-    clientUUID: Payload.UUID || null,
   });
-});
+
+  window.API.SetFullAlertRuleList(async (List) => {
+    setAlertRulesCache(Array.isArray(List) ? List : []);
+    RenderAlertRuleManagerList();
+  });
+
+  // --- Dummy Clients ---
+  window.API.SetFullDummyClientList(async (List) => {
+    setDummyClients(Array.isArray(List) ? List : []);
+    // Re-render the full client+monitor view so dummies slot back into groups.
+    RenderFullClientAndMonitorList();
+  });
+
+  window.API.DummyClientUpdated(async (Dummy) => {
+    if (!Dummy || !Dummy.UUID) return;
+    const idx = DummyClients.findIndex((d) => d.UUID === Dummy.UUID);
+    const prev = idx === -1 ? null : DummyClients[idx];
+    if (idx === -1) {
+      DummyClients.push(Dummy);
+    } else {
+      DummyClients[idx] = Dummy;
+    }
+    // If a dummy changed groups (or is new), re-render. Otherwise update in place.
+    if (!prev || (prev.GroupID || null) !== (Dummy.GroupID || null)) {
+      RenderFullClientAndMonitorList();
+    } else {
+      UpdateDummyClientTile(Dummy);
+    }
+    if (IsMonitorHistoryContextFor('dummy', Dummy.UUID)) {
+      await LoadHistorySamplesForContext();
+      RenderMonitoringHistoryModal();
+    }
+  });
+
+  window.API.CreateShowTrakAlert(async (Payload) => {
+    if (!Payload) return;
+    AddAlert({
+      type: 'warning',
+      severity: Payload.Severity || 'info',
+      title: Payload.Title || 'ShowTrak Alert',
+      message: Payload.Message || '',
+      clientUUID: Payload.UUID || null,
+    });
+  });
 }

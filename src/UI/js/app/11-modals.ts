@@ -1,15 +1,28 @@
-import { closeAllModals, openModal } from './lib/modal';
+import { closeAllModals, closeModal, openModal } from './lib/modal';
+import { buildModalHeader } from './lib/modal-header';
 import { Config, PendingAdoption, ScriptList } from './01-state';
 import { Safe } from './04-utils';
-import { ClearSelection, ConfirmationDialog, Deselect, Notify, Select, ShowExecutionToast, Wait } from './14-selection-init';
+import {
+  ClearSelection,
+  ConfirmationDialog,
+  Deselect,
+  Notify,
+  Select,
+  ShowExecutionToast,
+  Wait,
+} from './14-selection-init';
 import type { ClientView } from '@showtrak/protocol';
 
 // The former Update Manager and Group Manager god-sections now live in their own
 // modules; re-export them so existing `./11-modals` importers keep working.
-export * from "./11-group-manager";
-export * from "./11-update-manager";
+export * from './11-group-manager';
+export * from './11-update-manager';
 
-export async function ExecuteScript(Script: string | null, Targets: string[], _ResetList?: unknown) {
+export async function ExecuteScript(
+  Script: string | null,
+  Targets: string[],
+  _ResetList?: unknown
+) {
   const ScriptTarget = ScriptList.find((s) => s.ID === Script);
   if (!ScriptTarget) return Notify('Script not found', 'error');
   await window.API.ExecuteScript(Script, Targets, true);
@@ -23,8 +36,63 @@ export async function TriggerIntegratedEvent(EventID: string, Targets: string[])
   ShowExecutionToast('Integrated Events');
 }
 
+// Build the shared header (title + close) for the simpler single-panel modals.
+// Titles that change at runtime keep their id via `titleId` so the existing
+// `$('#id').text(...)` calls still update them. Run once at boot: the modals'
+// placeholder divs are static markup, and every open path runs after this.
+export function InitSimpleModalHeaders() {
+  const dismiss = (ModalID: string) => () => closeModal(ModalID);
+  const build = (PlaceholderID: string, opts: Parameters<typeof buildModalHeader>[0]) =>
+    $('#' + PlaceholderID)
+      .empty()
+      .append(buildModalHeader(opts).$el);
+
+  build('SHORTCUTS_HEADER', {
+    title: 'Keyboard Shortcuts',
+    onClose: dismiss('SHOWTRAK_MODAL_SHORTCUTS'),
+  });
+  build('ABOUT_HEADER', { title: 'About', onClose: dismiss('SHOWTRAK_MODAL_ABOUT') });
+  build('GROUP_MANAGER_HEADER', {
+    title: 'Group Manager',
+    onClose: dismiss('SHOWTRAK_MODAL_GROUPMANAGER'),
+  });
+  build('UPDATE_MANAGER_HEADER', {
+    title: 'Update Manager',
+    onClose: dismiss('SHOWTRAK_MODAL_UPDATE_MANAGER'),
+  });
+  build('SETTINGS_HEADER', { title: 'Settings', onClose: dismiss('SHOWTRAK_MODAL_SETTINGS') });
+  build('EXECUTIONQUEUE_HEADER', {
+    title: 'Executing Scripts',
+    onClose: dismiss('SHOWTRAK_MODEL_EXECUTIONQUEUE'),
+  });
+  build('CLIENT_EDITOR_HEADER', {
+    title: 'Client Settings',
+    onClose: dismiss('SHOWTRAK_CLIENT_EDITOR'),
+  });
+  build('CLIENT_REPLACE_HEADER', {
+    title: 'Replace Client',
+    titleId: 'CLIENT_REPLACE_MODAL_TITLE',
+    onClose: dismiss('SHOWTRAK_MODAL_CLIENT_REPLACE'),
+  });
+  build('CLIENT_INFO_HEADER', {
+    title: 'Client Info',
+    titleId: 'CLIENT_INFO_TITLE',
+    onClose: dismiss('SHOWTRAK_CLIENT_INFO'),
+  });
+  build('GROUP_CREATION_HEADER', {
+    title: 'Create New Group',
+    onClose: dismiss('SHOWTRAL_MODAL_GROUPCREATION'),
+  });
+
+  // No-Show and Migrate are intentionally left out: they are static-backdrop
+  // prompts that must be answered, and the shared title bar reads as a
+  // dismissible/manageable panel, so they keep their plain centred titles.
+}
+
 // Called by the bootstrap orchestrator in main.ts — never at import time.
 export function InitModals() {
+  InitSimpleModalHeaders();
+
   window.API.OSCBulkAction(async (Type, Targets, Args = null) => {
     if (Type == 'ExecuteScript') return await ExecuteScript(Args, Targets);
     if (Type == 'WOL') {
@@ -170,7 +238,6 @@ export async function NewShow() {
   }
   await Notify('Created new show.', 'success');
 }
-
 
 export async function OpenClientEditor(UUID: string) {
   const Client = await window.API.GetClient(UUID);
@@ -338,4 +405,3 @@ export async function OpenClientReplacementModal(Client: ClientView) {
 export async function AdoptDevice(UUID: string) {
   await window.API.AdoptDevice(UUID);
 }
-

@@ -4,11 +4,12 @@
 // drag-reorder persistence, inline rename, and delete. Depends only on shared
 // renderer modules (no back-reference into 11-modals), so it carries the
 // group-manager editing state that was previously module-level in 11-modals.
-import { closeAllModals, closeModal, openModal } from "./lib/modal";
-import { Safe } from "./04-utils";
-import { Notify, Wait } from "./14-selection-init";
-import { DummyClients, GroupUUIDCache, MonitoringTargets, __LastClients } from "./01-state";
-import type { ClientView, GroupView } from "@showtrak/protocol";
+import { closeAllModals, closeModal, openModal } from './lib/modal';
+import { buildModalHeader } from './lib/modal-header';
+import { Safe } from './04-utils';
+import { Notify, Wait } from './14-selection-init';
+import { DummyClients, GroupUUIDCache, MonitoringTargets, __LastClients } from './01-state';
+import type { ClientView, GroupView } from '@showtrak/protocol';
 
 // Close every open modal, then wait for the CSS transition to settle. Inlined
 // from 11-modals' CloseAllModals so this module has no back-reference into it.
@@ -351,12 +352,20 @@ export async function SaveGroupManagerName(
 }
 
 export function BindGroupManagerEditorHandlers(Groups: GroupView[] = []) {
-  $('#GROUP_MANAGER_EDITOR_BACK')
-    .off('click')
-    .on('click', async function () {
-      closeModal('SHOWTRAK_MODAL_GROUP_EDITOR');
-      await OpenGroupManager(true);
-    });
+  // Back returns to the Group manager (its parent); the close X dismisses the
+  // editor. Delete moved to the toolbar row beneath this header.
+  $('#GROUP_EDITOR_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'Edit Group',
+        onBack: async () => {
+          closeModal('SHOWTRAK_MODAL_GROUP_EDITOR');
+          await OpenGroupManager(true);
+        },
+        onClose: () => closeModal('SHOWTRAK_MODAL_GROUP_EDITOR'),
+      }).$el
+    );
 
   $('#GROUP_MANAGER_EDITOR_NAME')
     .off('input blur keydown')

@@ -1,4 +1,5 @@
 import { closeModal, openModal } from './lib/modal';
+import { buildModalHeader } from './lib/modal-header';
 import type { AudioAssetInspection } from '@showtrak/protocol';
 import { AudioAssetsCache, setAudioAssetsCache } from './01-state';
 import { ErrorMessage, HandleNonFatalError, Safe } from './04-utils';
@@ -163,22 +164,30 @@ export function InitAudioAssets() {
     .off('click.audioAssets')
     .on('click.audioAssets', () => SelectAndImportAudioAssets());
 
-  $('#AUDIO_ASSETS_BACK_BUTTON')
-    .off('click.audioAssets')
-    .on('click.audioAssets', async () => {
-      closeModal('SHOWTRAK_MODAL_AUDIO_ASSETS');
-      await Wait(200);
-      await OpenAlertRuleManager();
-    });
+  // Back returns to the Alert Rule manager (its parent); the close X just
+  // dismisses the Audio Assets modal.
+  $('#AUDIO_ASSETS_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'Audio Assets',
+        onBack: async () => {
+          closeModal('SHOWTRAK_MODAL_AUDIO_ASSETS');
+          await Wait(200);
+          await OpenAlertRuleManager();
+        },
+        onClose: () => closeModal('SHOWTRAK_MODAL_AUDIO_ASSETS'),
+      }).$el
+    );
 }
 
 export async function LoadAudioAssets() {
   try {
     const List = await window.API.GetAudioAssets();
-        setAudioAssetsCache(Array.isArray(List) ? List : []);
+    setAudioAssetsCache(Array.isArray(List) ? List : []);
   } catch (Err) {
     HandleNonFatalError('AudioAssets:Load', Err);
-        setAudioAssetsCache([]);
+    setAudioAssetsCache([]);
   }
   return AudioAssetsCache;
 }
@@ -475,4 +484,3 @@ export async function OpenAudioAssetsManager() {
   await Wait(200);
   openModal('SHOWTRAK_MODAL_AUDIO_ASSETS');
 }
-

@@ -284,11 +284,7 @@
               <li class="debug-menu-item" hidden><hr class="dropdown-divider" /></li>
               <li class="debug-menu-item" hidden><h6 class="dropdown-header">Debug</h6></li>
               <li class="debug-menu-item" hidden>
-                <button
-                  type="button"
-                  class="dropdown-item"
-                  id="SHOWTRAK_DEBUG_TEST_NOTIFICATIONS"
-                >
+                <button type="button" class="dropdown-item" id="SHOWTRAK_DEBUG_TEST_NOTIFICATIONS">
                   Test Notifications
                 </button>
               </li>
@@ -329,15 +325,9 @@
       >
         <div class="modal-content">
           <div class="modal-body text-center">
-            <strong class="mb-0"> Keyboard Shortcuts </strong>
+            <div id="SHORTCUTS_HEADER"></div>
 
             <div id="KEYBOARD_SHORTCUTS_LIST" class="d-grid gap-2 text-start mt-2"></div>
-
-            <div class="row g-2 mt-2">
-              <div class="col-12 d-grid">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -413,6 +403,7 @@
       <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content SHOWTRAK_ABOUT_MODAL_CONTENT">
           <div class="modal-body text-center SHOWTRAK_ABOUT_MODAL_BODY">
+            <div id="ABOUT_HEADER"></div>
             <div class="d-flex justify-content-center my-5">
               <img
                 class="SHOWTRAK_MODEL_CORE_LOGO"
@@ -536,9 +527,9 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <strong class="mb-0"> Group Manager </strong>
+            <div id="GROUP_MANAGER_HEADER"></div>
 
-            <div id="GROUP_MANAGER_GROUP_LIST" class="d-grid gap-2"></div>
+            <div id="GROUP_MANAGER_GROUP_LIST" class="d-grid gap-2 mt-2"></div>
           </div>
         </div>
       </div>
@@ -554,21 +545,15 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-start">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <button
-                type="button"
-                id="GROUP_MANAGER_EDITOR_BACK"
-                class="btn btn-sm btn-ghost-light text-light border-0 ps-0"
-              >
-                <i class="bi bi-chevron-left"></i> Back to list
-              </button>
+            <div id="GROUP_EDITOR_HEADER" class="mb-2"></div>
+            <div class="d-flex justify-content-end mb-2">
               <button
                 type="button"
                 id="GROUP_MANAGER_EDITOR_DELETE"
                 class="btn btn-sm script-manager-delete-btn"
                 title="Delete group"
               >
-                <i class="bi bi-trash"></i>
+                <i class="bi bi-trash"></i> Delete Group
               </button>
             </div>
 
@@ -697,10 +682,10 @@
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-start">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <strong class="mb-0">Update Manager</strong>
+            <div id="UPDATE_MANAGER_HEADER" class="mb-2"></div>
+            <div class="d-flex justify-content-end mb-2">
               <button type="button" class="btn btn-sm btn-light" id="UPDATE_MANAGER_REFRESH">
-                Refresh
+                <i class="bi bi-arrow-clockwise"></i> Refresh
               </button>
             </div>
             <p id="UPDATE_MANAGER_RELEASE" class="text-light mb-1">Release: loading...</p>
@@ -763,8 +748,8 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable modal-lg">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <strong id="OSC_ROUTE_LIST_MODAL_Label" class="mb-0">OSC/API Reference</strong>
-            <div id="OSC_ROUTE_LIST" class="d-grid gap-2 text-start"></div>
+            <div id="OSC_ROUTE_LIST_HEADER"></div>
+            <div id="OSC_ROUTE_LIST" class="d-grid gap-2 text-start mt-2"></div>
           </div>
         </div>
       </div>
@@ -780,14 +765,7 @@
       <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content osc-http-debug-modal-content">
           <div class="modal-body osc-http-debug-modal-body">
-            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-              <div>
-                <strong id="OSC_HTTP_DEBUG_MODAL_Label" class="mb-0">OSC/API Debug Terminal</strong>
-              </div>
-              <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">
-                Close
-              </button>
-            </div>
+            <div id="OSC_HTTP_DEBUG_HEADER"></div>
             <div
               id="OSC_HTTP_DEBUG_TERMINAL"
               class="osc-http-debug-terminal"
@@ -813,50 +791,41 @@
           <div class="modal-body text-start">
             <!-- List view -->
             <div id="SCRIPT_MANAGER_LIST_VIEW">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <strong class="mb-2">Script Manager</strong>
-                <div class="d-flex gap-2">
-                  <button
-                    type="button"
-                    id="SCRIPT_MANAGER_CREATE_TEMPLATE"
-                    class="btn btn-sm script-manager-template-btn"
-                    title="Browse the ShowTrak sample scripts and use one as a template"
-                  >
-                    <i class="bi bi-collection"></i> New from template
-                  </button>
-                  <button
-                    type="button"
-                    id="SCRIPT_MANAGER_CREATE"
-                    class="btn btn-sm script-manager-create-btn"
-                    title="Create a new blank script"
-                  >
-                    <i class="bi bi-plus-lg"></i>
-                  </button>
-                </div>
+              <div id="SCRIPT_MANAGER_LIST_HEADER" class="mb-2"></div>
+              <div class="d-flex justify-content-end gap-2 mb-2">
+                <button
+                  type="button"
+                  id="SCRIPT_MANAGER_CREATE_TEMPLATE"
+                  class="btn btn-sm script-manager-template-btn"
+                  title="Browse the ShowTrak sample scripts and use one as a template"
+                >
+                  <i class="bi bi-collection"></i> New from template
+                </button>
+                <button
+                  type="button"
+                  id="SCRIPT_MANAGER_CREATE"
+                  class="btn btn-sm script-manager-create-btn"
+                  title="Create a new blank script"
+                >
+                  <i class="bi bi-plus-lg"></i> New
+                </button>
               </div>
               <div id="SCRIPT_MANAGER_LIST" class="d-grid gap-2"></div>
             </div>
 
             <!-- Templates (sample scripts) view -->
             <div id="SCRIPT_MANAGER_TEMPLATES_VIEW" class="d-none">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <button
-                  type="button"
-                  id="SCRIPT_MANAGER_TEMPLATES_BACK"
-                  class="btn btn-sm btn-ghost-light text-light border-0 ps-0"
-                >
-                  <i class="bi bi-chevron-left"></i> Back to list
-                </button>
+              <div id="SCRIPT_MANAGER_TEMPLATES_HEADER" class="mb-2"></div>
+              <div class="d-flex justify-content-end mb-2">
                 <button
                   type="button"
                   id="SCRIPT_MANAGER_TEMPLATES_REFRESH"
                   class="btn btn-sm script-manager-folder-btn"
                   title="Check for updated sample scripts"
                 >
-                  <i class="bi bi-arrow-clockwise"></i>
+                  <i class="bi bi-arrow-clockwise"></i> Refresh
                 </button>
               </div>
-              <strong class="d-block mb-1">Create From Template</strong>
               <span class="text-sm text-muted d-block mb-2"
                 >Pick an approved ShowTrak sample script to use as a starting point.</span
               >
@@ -865,32 +834,24 @@
 
             <!-- Editor view -->
             <div id="SCRIPT_MANAGER_EDITOR_VIEW" class="d-none">
-              <div class="d-flex justify-content-between align-items-center mb-2">
+              <div id="SCRIPT_MANAGER_EDITOR_HEADER" class="mb-2"></div>
+              <div class="d-flex justify-content-end gap-2 mb-2">
                 <button
                   type="button"
-                  id="SCRIPT_MANAGER_BACK"
-                  class="btn btn-sm btn-ghost-light text-light border-0 ps-0"
+                  id="SCRIPT_MANAGER_OPEN_FOLDER"
+                  class="btn btn-sm script-manager-folder-btn"
+                  title="Open script folder"
                 >
-                  <i class="bi bi-chevron-left"></i> Back to list
+                  <i class="bi bi-folder2-open"></i> Open Folder
                 </button>
-                <div class="d-flex gap-2">
-                  <button
-                    type="button"
-                    id="SCRIPT_MANAGER_OPEN_FOLDER"
-                    class="btn btn-sm script-manager-folder-btn"
-                    title="Open script folder"
-                  >
-                    <i class="bi bi-folder2-open"></i>
-                  </button>
-                  <button
-                    type="button"
-                    id="SCRIPT_MANAGER_DELETE"
-                    class="btn btn-sm script-manager-delete-btn"
-                    title="Delete script"
-                  >
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  id="SCRIPT_MANAGER_DELETE"
+                  class="btn btn-sm script-manager-delete-btn"
+                  title="Delete script"
+                >
+                  <i class="bi bi-trash"></i> Delete
+                </button>
               </div>
 
               <div id="SCRIPT_MANAGER_ISSUES" class="script-manager-issues d-none mb-2"></div>
@@ -1008,9 +969,9 @@
                 <div class="bg-ghost p-2 rounded d-grid gap-2">
                   <span class="text-sm">Whitelist</span>
                   <span class="text-sm text-muted mb-0"
-                    >Choose which clients and groups may run this script. All clients can
-                    run it by default; new clients are added automatically unless you
-                    restrict it here. Stored in the show file.</span
+                    >Choose which clients and groups may run this script. All clients can run it by
+                    default; new clients are added automatically unless you restrict it here. Stored
+                    in the show file.</span
                   >
                   <div class="alert-multiselect" id="SCRIPT_WHITELIST_DROPDOWN">
                     <button
@@ -1055,15 +1016,7 @@
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-start d-grid gap-2">
-            <div class="d-flex justify-content-between align-items-center gap-2">
-              <button type="button" id="ICON_PICKER_CANCEL" class="btn btn-sm btn-outline-light">
-                <i class="bi bi-arrow-left"></i> Back
-              </button>
-              <strong id="SHOWTRAK_MODAL_ICONPICKER_Label">Choose an Icon</strong>
-              <span class="btn btn-sm invisible" aria-hidden="true">
-                <i class="bi bi-arrow-left"></i> Back
-              </span>
-            </div>
+            <div id="ICON_PICKER_HEADER"></div>
 
             <div class="form-floating bg-ghost rounded">
               <input
@@ -1093,6 +1046,7 @@
       <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
+            <div id="SETTINGS_HEADER" class="mb-2"></div>
             <div id="SETTINGS" class="d-grid gap-2"></div>
             <div id="REMOTE_ACCESS_SECTION" class="d-grid gap-2 mt-2"></div>
           </div>
@@ -1110,9 +1064,9 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <h6 class="mb-0">Executing Scripts</h6>
+            <div id="EXECUTIONQUEUE_HEADER"></div>
 
-            <div id="SHOWTRAK_EXECUTIONQUEUE" class="d-grid gap-2"></div>
+            <div id="SHOWTRAK_EXECUTIONQUEUE" class="d-grid gap-2 mt-2"></div>
           </div>
         </div>
       </div>
@@ -1128,9 +1082,7 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="rounded-3 p-2 bg-ghost-light">
-              <h6 class="mb-0">Client Settings</h6>
-            </div>
+            <div id="CLIENT_EDITOR_HEADER"></div>
 
             <div class="d-grid gap-2">
               <div class="form-floating">
@@ -1221,15 +1173,10 @@
               </div>
             </div>
 
-            <div class="row g-2">
-              <div class="col-6 d-grid">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-              </div>
-              <div class="col-6 d-grid">
-                <button type="button" class="btn btn-success" id="SHOWTRAK_CLIENT_EDITOR_SAVE">
-                  Save
-                </button>
-              </div>
+            <div class="d-grid">
+              <button type="button" class="btn btn-success" id="SHOWTRAK_CLIENT_EDITOR_SAVE">
+                Save
+              </button>
             </div>
 
             <button
@@ -1268,21 +1215,13 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="rounded-3 p-2 bg-ghost-light">
-              <h6 class="mb-0" id="CLIENT_REPLACE_MODAL_TITLE">Replace Client</h6>
-            </div>
+            <div id="CLIENT_REPLACE_HEADER"></div>
 
-            <p class="text-muted text-sm mb-2">
+            <p class="text-muted text-sm mb-2 mt-2">
               Choose a pending adoption device to take over this client identity.
             </p>
 
             <div id="CLIENT_REPLACE_LIST" class="d-grid gap-2"></div>
-
-            <div class="row g-2 mt-1">
-              <div class="col-12 d-grid">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -1298,7 +1237,7 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <h6 class="mb-0">Create New Group</h6>
+            <div id="GROUP_CREATION_HEADER" class="mb-2"></div>
 
             <div class="form-floating">
               <input
@@ -1333,9 +1272,7 @@
           <div class="modal-body text-center">
             <!-- LIST VIEW: global settings + per-check rows -->
             <div id="MONITORING_TARGET_LIST_VIEW">
-              <div class="rounded-3 p-2 bg-ghost-light">
-                <h6 class="mb-0" id="MONITORING_TARGET_MODAL_TITLE">Add Monitoring Target</h6>
-              </div>
+              <div id="MONITORING_TARGET_HEADER"></div>
 
               <div class="d-grid gap-2 text-start mt-2">
                 <div class="form-floating">
@@ -1393,29 +1330,17 @@
 
             <!-- CHECK EDIT VIEW: configure a single check -->
             <div id="MONITORING_TARGET_CHECK_VIEW" class="d-none">
-              <div class="d-flex align-items-center gap-2">
-                <button
-                  type="button"
-                  class="btn btn-light rounded-3 px-3 d-flex align-items-center justify-content-center"
-                  id="MONITORING_CHECK_BACK"
-                  aria-label="Back"
-                  title="Back"
-                >
-                  <i class="bi bi-arrow-left"></i>
-                </button>
-                <div
-                  class="rounded-3 p-2 bg-ghost-light flex-grow-1 d-flex align-items-center justify-content-center"
-                >
-                  <h6 class="mb-0" id="MONITORING_CHECK_VIEW_TITLE">Edit Check</h6>
-                </div>
-              </div>
+              <div id="MONITORING_CHECK_HEADER"></div>
 
               <div class="d-grid gap-2 text-start mt-2">
                 <div class="form-floating">
                   <select class="form-select" id="MONITORING_CHECK_METHOD"></select>
                   <label for="MONITORING_CHECK_METHOD">Monitoring Method</label>
                 </div>
-                <div id="MONITORING_CHECK_INFO" class="monitoring-check-info bg-ghost rounded p-2 d-none"></div>
+                <div
+                  id="MONITORING_CHECK_INFO"
+                  class="monitoring-check-info bg-ghost rounded p-2 d-none"
+                ></div>
                 <div class="form-floating">
                   <input
                     type="text"
@@ -1614,20 +1539,14 @@
         <div class="modal-content">
           <div class="modal-body text-center">
             <div id="ALERT_MANAGER_LIST_PANEL" class="d-grid gap-2 text-start mt-1">
-              <div class="d-flex justify-content-between align-items-center">
-                <strong>Alerts</strong>
-                <div class="d-flex gap-2">
-                  <button type="button" class="btn btn-sm btn-light" id="AUDIO_ASSETS_OPEN_BUTTON">
-                    Audio Assets
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-success"
-                    id="ALERT_RULE_CREATE_BUTTON"
-                  >
-                    New Alert
-                  </button>
-                </div>
+              <div id="ALERT_MANAGER_LIST_HEADER"></div>
+              <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-sm btn-light" id="AUDIO_ASSETS_OPEN_BUTTON">
+                  Audio Assets
+                </button>
+                <button type="button" class="btn btn-sm btn-success" id="ALERT_RULE_CREATE_BUTTON">
+                  New Alert
+                </button>
               </div>
               <div id="ALERT_RULE_MANAGER_LIST" class="d-grid gap-2"></div>
             </div>
@@ -1720,14 +1639,7 @@
         <div class="modal-content">
           <div class="modal-body text-center">
             <div class="d-grid gap-2 text-start mt-1">
-              <div class="d-flex justify-content-between align-items-center gap-2">
-                <button type="button" class="btn btn-sm btn-light" id="AUDIO_ASSETS_BACK_BUTTON">
-                  <i class="bi bi-chevron-left me-1" aria-hidden="true"></i>Back
-                </button>
-                <div class="rounded-3 p-2 bg-ghost flex-grow-1 text-center">
-                  <h6 class="mb-0">Audio Assets</h6>
-                </div>
-              </div>
+              <div id="AUDIO_ASSETS_HEADER"></div>
 
               <div id="AUDIO_ASSETS_LIST" class="d-grid gap-2"></div>
 
@@ -1750,9 +1662,7 @@
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="rounded-3 p-2 bg-ghost-light">
-              <h6 class="mb-0">LAN Discovery</h6>
-            </div>
+            <div id="NETWORK_DISCOVERY_HEADER"></div>
 
             <div id="NETWORK_DISCOVERY_RESULTS" class="text-start mt-2">
               <div class="table-responsive NETWORK_DISCOVERY_TABLE_WRAP">
@@ -1836,11 +1746,9 @@
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div class="rounded-3 p-2 bg-ghost-light">
-              <h6 class="mb-0" id="CLIENT_INFO_TITLE">Client Info</h6>
-            </div>
+            <div id="CLIENT_INFO_HEADER"></div>
 
-            <div id="CLIENT_INFO_HISTORY_SECTION" class="mt-1">
+            <div id="CLIENT_INFO_HISTORY_SECTION" class="mt-2">
               <div class="monitor-history-header">
                 <span class="monitor-history-window-label">Status over the past hour</span>
                 <div class="monitor-history-legend" aria-hidden="true">

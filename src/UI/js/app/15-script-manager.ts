@@ -1,5 +1,6 @@
 import type { GroupView, ScriptEditable, ScriptManagerEntry } from '@showtrak/protocol';
-import { openModal } from './lib/modal';
+import { closeModal, openModal } from './lib/modal';
+import { buildModalHeader } from './lib/modal-header';
 import { HandleNonFatalError, Safe } from './04-utils';
 import { CloseAllModals } from './11-modals';
 import { ConfirmationDialog, Notify } from './14-selection-init';
@@ -244,7 +245,9 @@ export function GenerateTemplatePlaceholderID() {
 
 export async function CreateScriptFromTemplateWithGeneratedID(
   SampleID: string
-): Promise<[string | null, { id?: string; conflict?: boolean; ok?: boolean; errors?: string[] } | null]> {
+): Promise<
+  [string | null, { id?: string; conflict?: boolean; ok?: boolean; errors?: string[] } | null]
+> {
   const MaxAttempts = 10;
   for (let Attempt = 0; Attempt < MaxAttempts; Attempt += 1) {
     const DesiredID = GenerateTemplatePlaceholderID();
@@ -516,8 +519,7 @@ export async function OpenScriptManagerEditor(ID: string) {
   ScriptWhitelistGroups = Array.isArray(Groups) ? Groups : [];
   const [WhitelistErr, Scope] = await window.API.GetScriptWhitelist(ID);
   if (ScriptManagerEditingId !== ID) return;
-  ScriptWhitelistSelected =
-    !WhitelistErr && Scope ? scopeToSelectedValues(Scope) : ['workspace:*'];
+  ScriptWhitelistSelected = !WhitelistErr && Scope ? scopeToSelectedValues(Scope) : ['workspace:*'];
   ScriptWhitelistOriginal = ScriptWhitelistSelected.slice();
 
   PopulateScriptManagerEditor(Data);
@@ -697,7 +699,9 @@ export function CollectScriptManagerFields() {
     Platforms[Key] = String($(this).find('.script-manager-platform-select').val() || '');
     Arguments[Key] = String($(this).find('.script-manager-platform-args').val() || '').trim();
   });
-  const SwatchContainer = document.getElementById('SCRIPT_MANAGER_COLOUR_SWATCHES') as HTMLElement | null;
+  const SwatchContainer = document.getElementById(
+    'SCRIPT_MANAGER_COLOUR_SWATCHES'
+  ) as HTMLElement | null;
   const selectedSwatch = SwatchContainer
     ? SwatchContainer.querySelector('.script-manager-swatch.selected')
     : null;
@@ -783,9 +787,36 @@ export async function SaveScriptManagerConfig() {
 // Formerly a DOMContentLoaded handler; called by the bootstrap orchestrator in
 // main.ts once the DOM is parsed — never at import time.
 export function InitScriptManager() {
-  $('#SCRIPT_MANAGER_BACK')
-    .off('click')
-    .on('click', () => ShowScriptManagerList());
+  // Each view carries the shared modal header. The list is top-level (title +
+  // close); the templates and editor views add a Back to the list. Per-view
+  // action buttons (New, Refresh, Open folder, Delete) live in the toolbar row
+  // beneath each header and keep their own handlers below.
+  $('#SCRIPT_MANAGER_LIST_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'Script Manager',
+        onClose: () => closeModal('SHOWTRAK_MODAL_SCRIPTMANAGER'),
+      }).$el
+    );
+  $('#SCRIPT_MANAGER_TEMPLATES_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'Create From Template',
+        onBack: () => ShowScriptManagerList(),
+        onClose: () => closeModal('SHOWTRAK_MODAL_SCRIPTMANAGER'),
+      }).$el
+    );
+  $('#SCRIPT_MANAGER_EDITOR_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'Script Editor',
+        onBack: () => ShowScriptManagerList(),
+        onClose: () => closeModal('SHOWTRAK_MODAL_SCRIPTMANAGER'),
+      }).$el
+    );
 
   $('#SCRIPT_MANAGER_CREATE')
     .off('click')
@@ -794,10 +825,6 @@ export function InitScriptManager() {
   $('#SCRIPT_MANAGER_CREATE_TEMPLATE')
     .off('click')
     .on('click', () => OpenScriptManagerTemplates());
-
-  $('#SCRIPT_MANAGER_TEMPLATES_BACK')
-    .off('click')
-    .on('click', () => ShowScriptManagerList());
 
   $('#SCRIPT_MANAGER_TEMPLATES_REFRESH')
     .off('click')

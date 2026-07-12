@@ -1,6 +1,30 @@
 import { openModal, closeModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
-import { ALERT_TRIGGER_ALLOWLIST, AlertActionEditorIsCreating, AlertActionTypesCache, AlertEditingActionIndex, AlertRuleDraftActions, AlertRuleEditorRuleID, AlertRulesCache, AlertScopeGroups, AlertScopeSelected, AlertTriggerTypesCache, AllClients, AudioAssetsCache, DummyClients, MonitoringTargets, setAlertActionEditorIsCreating, setAlertActionTypesCache, setAlertEditingActionIndex, setAlertRuleDraftActions, setAlertRuleEditorRuleID, setAlertScopeGroups, setAlertScopeOptions, setAlertScopeSelected, setAlertTriggerTypesCache } from './01-state';
+import {
+  ALERT_TRIGGER_ALLOWLIST,
+  AlertActionEditorIsCreating,
+  AlertActionTypesCache,
+  AlertEditingActionIndex,
+  AlertRuleDraftActions,
+  AlertRuleEditorRuleID,
+  AlertRulesCache,
+  AlertScopeGroups,
+  AlertScopeSelected,
+  AlertTriggerTypesCache,
+  AllClients,
+  AudioAssetsCache,
+  DummyClients,
+  MonitoringTargets,
+  setAlertActionEditorIsCreating,
+  setAlertActionTypesCache,
+  setAlertEditingActionIndex,
+  setAlertRuleDraftActions,
+  setAlertRuleEditorRuleID,
+  setAlertScopeGroups,
+  setAlertScopeOptions,
+  setAlertScopeSelected,
+  setAlertTriggerTypesCache,
+} from './01-state';
 import type { AlertScopeModel } from './01-state';
 import type { AlertRuleActionView, AlertRuleScope, AlertRuleView } from '@showtrak/protocol';
 import { PreviewSound } from './03-settings';
@@ -36,10 +60,10 @@ type AlertScopeInput = {
 };
 export async function EnsureAlertCatalogsLoaded() {
   if (!AlertTriggerTypesCache.length) {
-        setAlertTriggerTypesCache(await window.API.GetAlertTriggers());
+    setAlertTriggerTypesCache(await window.API.GetAlertTriggers());
   }
   if (!AlertActionTypesCache.length) {
-        setAlertActionTypesCache(await window.API.GetAlertActionTypes());
+    setAlertActionTypesCache(await window.API.GetAlertActionTypes());
   }
 }
 
@@ -376,16 +400,16 @@ export function CloseAlertActionEditor() {
   if (!Committed && AlertActionEditorIsCreating && Number.isFinite(AlertEditingActionIndex)) {
     AlertRuleDraftActions.splice(AlertEditingActionIndex!, 1);
   }
-    setAlertActionEditorIsCreating(false);
-    setAlertEditingActionIndex(null);
+  setAlertActionEditorIsCreating(false);
+  setAlertEditingActionIndex(null);
   RenderAlertActionsList();
   ShowAlertRuleMainContent();
 }
 
 export function OpenAlertActionEditor(Index: number, IsCreating = false) {
   if (!Array.isArray(AlertRuleDraftActions) || !AlertRuleDraftActions[Index]) return;
-    setAlertEditingActionIndex(Index);
-    setAlertActionEditorIsCreating(!!IsCreating);
+  setAlertEditingActionIndex(Index);
+  setAlertActionEditorIsCreating(!!IsCreating);
   const Action = AlertRuleDraftActions[Index];
   const TypeID = Action.Type || (AlertActionTypesCache[0] && AlertActionTypesCache[0].ID) || '';
 
@@ -415,24 +439,24 @@ export function AddAlertActionAndEdit() {
 export async function PopulateAlertScopeOptions(Rule: AlertRuleView | null = null) {
   let Groups = await window.API.GetAllGroups();
   if (!Array.isArray(Groups)) Groups = [];
-    setAlertScopeGroups(Groups);
-    setAlertScopeOptions(buildAlertScopeModel());
+  setAlertScopeGroups(Groups);
+  setAlertScopeOptions(buildAlertScopeModel());
 
   const Scope: AlertRuleScope =
     Rule && Rule.Scope ? Rule.Scope : { Workspace: false, Groups: [], Clients: [] };
-    setAlertScopeSelected(alertScopeToSelectedValues(Scope));
+  setAlertScopeSelected(alertScopeToSelectedValues(Scope));
   RenderScopeDropdowns();
 }
 
 export function ResetAlertRuleEditor() {
-    setAlertRuleEditorRuleID(null);
-    setAlertEditingActionIndex(null);
-    setAlertActionEditorIsCreating(false);
-    setAlertRuleDraftActions([]);
+  setAlertRuleEditorRuleID(null);
+  setAlertEditingActionIndex(null);
+  setAlertActionEditorIsCreating(false);
+  setAlertRuleDraftActions([]);
   $('#ALERT_RULE_EDITOR_TITLE').text('Create Alert Rule');
   $('#ALERT_RULE_TITLE').val('');
   $('#ALERT_RULE_DELETE').addClass('d-none');
-    setAlertScopeSelected([]);
+  setAlertScopeSelected([]);
   RenderScopeDropdowns();
 
   const DefaultTrigger = AlertTriggerTypesCache.length
@@ -451,9 +475,9 @@ export function OpenAlertRuleEditor(Rule: AlertRuleView | null) {
     return;
   }
 
-    setAlertRuleEditorRuleID(Rule.RuleID);
-    setAlertEditingActionIndex(null);
-    setAlertActionEditorIsCreating(false);
+  setAlertRuleEditorRuleID(Rule.RuleID);
+  setAlertEditingActionIndex(null);
+  setAlertActionEditorIsCreating(false);
   $('#ALERT_RULE_EDITOR_TITLE').text(`Edit Rule #${Rule.RuleID}`);
   $('#ALERT_RULE_TITLE').val(Rule.Title || '');
   $('#ALERT_RULE_DELETE').removeClass('d-none');
@@ -465,10 +489,12 @@ export function OpenAlertRuleEditor(Rule: AlertRuleView | null) {
   RenderAlertRuleTriggerConfig(TriggerType, Rule.TriggerConfig || {});
 
   const Actions = Array.isArray(Rule.Actions) ? Rule.Actions : [];
-    setAlertRuleDraftActions(Actions.map((Action) => ({
-    Type: Action.Type,
-    Settings: Action.Settings || {},
-  })));
+  setAlertRuleDraftActions(
+    Actions.map((Action) => ({
+      Type: Action.Type,
+      Settings: Action.Settings || {},
+    }))
+  );
   RenderAlertActionsList();
   ShowAlertRuleMainContent();
   ShowAlertEditorPanel();
@@ -713,8 +739,8 @@ export async function AutoSaveAlertRuleFromEditor() {
 export async function BackToAlertRuleList() {
   await AutoSaveAlertRuleFromEditor();
   ShowAlertListPanel();
-    setAlertActionEditorIsCreating(false);
-    setAlertEditingActionIndex(null);
+  setAlertActionEditorIsCreating(false);
+  setAlertEditingActionIndex(null);
   ShowAlertRuleMainContent();
 }
 
@@ -733,6 +759,17 @@ export async function CloseAlertRuleManagerFromEditor() {
 // The title elements keep their historical ids so the rest of this file can
 // still update them with $('#...TITLE').text(...).
 export function RenderAlertModalHeaders() {
+  // Top-level list panel: title + close (the New Alert / Audio Assets buttons
+  // sit in the toolbar row beneath this header).
+  $('#ALERT_MANAGER_LIST_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'Alerts',
+        onClose: () => closeModal('SHOWTRAK_MODAL_ALERT_MANAGER'),
+      }).$el
+    );
+
   $('#ALERT_RULE_EDITOR_HEADER')
     .empty()
     .append(
@@ -847,9 +884,9 @@ export async function OpenAlertRuleManager() {
     .on('click.alertRule', () => {
       if (!Number.isFinite(AlertEditingActionIndex)) return;
       AlertRuleDraftActions.splice(AlertEditingActionIndex!, 1);
-            setAlertActionEditorIsCreating(false);
+      setAlertActionEditorIsCreating(false);
       RenderAlertActionsList();
-            setAlertEditingActionIndex(null);
+      setAlertEditingActionIndex(null);
       ShowAlertRuleMainContent();
     });
 

@@ -18,7 +18,7 @@ export interface ModalHeaderConfig {
    * `$('#id').text(...)` without holding onto the returned handle.
    */
   titleId?: string;
-  /** Label for the back button (default "Back"). */
+  /** Accessible label for the back button (default "Back"). Shown as an arrow only. */
   backLabel?: string;
   /** Accessible label for the close button (default "Close"). */
   closeLabel?: string;
@@ -51,10 +51,7 @@ export function buildModalHeader(config: ModalHeaderConfig): ModalHeaderHandle {
   const TitleIdAttr = config.titleId ? ` id="${Safe(config.titleId)}"` : '';
 
   const BackButton = config.onBack
-    ? buildButton(
-        'back',
-        `<i class="bi bi-chevron-left" aria-hidden="true"></i><span class="ms-1">${Safe(BackLabel)}</span>`
-      )
+    ? buildButton('back', '<i class="bi bi-chevron-left" aria-hidden="true"></i>', BackLabel)
     : '';
 
   const CloseButton = config.onClose
@@ -64,7 +61,7 @@ export function buildModalHeader(config: ModalHeaderConfig): ModalHeaderHandle {
   const Html = `
     <div class="st-modal-header d-flex align-items-stretch gap-2">
       ${BackButton}
-      <div class="st-modal-header-title rounded-3 p-2 bg-ghost flex-grow-1 d-flex align-items-center justify-content-center">
+      <div class="st-modal-header-title rounded-3 p-2 bg-ghost-light flex-grow-1 d-flex align-items-center justify-content-center">
         <h6${TitleIdAttr} class="mb-0 text-center">${Safe(config.title)}</h6>
       </div>
       ${CloseButton}

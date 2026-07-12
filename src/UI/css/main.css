@@ -993,7 +993,6 @@ input[type='range']::-moz-range-progress,
   max-inline-size: 100%;
   text-align: center;
 }
-
 /* Group column layout: groups flow left-to-right across a fixed column grid.
    Full-width groups span every column; narrow groups take a single column.
    Default (non-dense) auto-flow keeps groups in strict order and leaves a blank
