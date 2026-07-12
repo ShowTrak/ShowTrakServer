@@ -22,6 +22,7 @@ const MethodModules: MonitoringMethod[] = [
   require('./qlab-workspace'),
   require('./sacn-universe'),
   require('./sacn-universe-priority'),
+  require('./artnet-universe'),
 ];
 
 const Methods = new Map<string, MonitoringMethod>();

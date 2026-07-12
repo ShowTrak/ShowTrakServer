@@ -11,6 +11,10 @@ export const OSC_PORT = 3333;
 // receiver binds here and joins the multicast group for each monitored universe.
 export const SACN_PORT = 5568;
 
+// UDP port Art-Net is transmitted on. Unlike sACN, Art-Net is broadcast/unicast
+// (no multicast), so a single shared receiver binds here and simply listens.
+export const ARTNET_PORT = 6454;
+
 // Fallback timeout for a queued script execution when the script does not
 // declare its own `Timeout`.
 export const SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS = 15000;
