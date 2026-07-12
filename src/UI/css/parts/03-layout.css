@@ -301,6 +301,155 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   font-size: 0.94rem;
 }
 
+/* ---- Software Update modal ---------------------------------------------- */
+
+.SHOWTRAK_APP_UPDATE_HERO {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Icon area: a tinted circle with a determinate progress ring sitting on its
+   border. The ring is always in the DOM (absolutely positioned) so toggling it
+   never shifts layout; it just fades in while a download is in progress. */
+.SHOWTRAK_APP_UPDATE_ICON_WRAP {
+  position: relative;
+  flex: 0 0 auto;
+  width: 3rem;
+  height: 3rem;
+}
+
+.SHOWTRAK_APP_UPDATE_ICON {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(13, 202, 240, 0.14);
+  color: #3dd5f3;
+  font-size: 1.4rem;
+}
+
+.SHOWTRAK_APP_UPDATE_RING {
+  position: absolute;
+  inset: 0;
+  width: 3rem;
+  height: 3rem;
+  transform: rotate(-90deg);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 1;
+}
+
+.SHOWTRAK_APP_UPDATE_ICON_WRAP.has-progress .SHOWTRAK_APP_UPDATE_RING {
+  opacity: 1;
+}
+
+.SHOWTRAK_APP_UPDATE_RING_TRACK {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 3;
+}
+
+.SHOWTRAK_APP_UPDATE_RING_BAR {
+  fill: none;
+  stroke: #3dd5f3;
+  stroke-width: 3;
+  stroke-linecap: round;
+  /* dasharray = circumference (2·π·r, r=22). Offset is driven from JS. */
+  stroke-dasharray: 138.23;
+  stroke-dashoffset: 138.23;
+  transition: stroke-dashoffset 0.25s ease;
+}
+
+.SHOWTRAK_APP_UPDATE_STATUS {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.SHOWTRAK_APP_UPDATE_VERSION_BADGE {
+  background: rgba(13, 202, 240, 0.18);
+  color: #3dd5f3;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.SHOWTRAK_APP_UPDATE_SPIN {
+  animation: spin 1.4s linear infinite;
+}
+
+/* Changelog: rendered release notes styled as readable prose rather than the
+   old pre-wrapped raw block. */
+.SHOWTRAK_APP_UPDATE_CHANGELOG {
+  max-height: 320px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.SHOWTRAK_APP_UPDATE_CHANGELOG > *:first-child {
+  margin-top: 0;
+}
+
+.SHOWTRAK_APP_UPDATE_CHANGELOG > *:last-child {
+  margin-bottom: 0;
+}
+
+.SHOWTRAK_APP_UPDATE_CHANGELOG h1,
+.SHOWTRAK_APP_UPDATE_CHANGELOG h2,
+.SHOWTRAK_APP_UPDATE_CHANGELOG h3,
+.SHOWTRAK_APP_UPDATE_CHANGELOG h4,
+.SHOWTRAK_APP_UPDATE_CHANGELOG h5,
+.SHOWTRAK_APP_UPDATE_CHANGELOG h6 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 1rem 0 0.4rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.SHOWTRAK_APP_UPDATE_CHANGELOG p {
+  margin: 0 0 0.6rem;
+}
+
+.SHOWTRAK_APP_UPDATE_CHANGELOG ul,
+.SHOWTRAK_APP_UPDATE_CHANGELOG ol {
+  margin: 0 0 0.6rem;
+  padding-left: 1.25rem;
+}
+
+.SHOWTRAK_APP_UPDATE_CHANGELOG li {
+  margin-bottom: 0.25rem;
+}
+
+.SHOWTRAK_APP_UPDATE_CHANGELOG a {
+  color: #3dd5f3;
+}
+
+.SHOWTRAK_APP_UPDATE_CHANGELOG code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.3rem;
+  font-size: 0.82rem;
+}
+
+.SHOWTRAK_APP_UPDATE_CHANGELOG pre {
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  overflow: auto;
+}
+
+.SHOWTRAK_APP_UPDATE_CHANGELOG pre code {
+  background: none;
+  padding: 0;
+}
+
 .SHOWTRAK_ABOUT_DEPENDENCIES_LIST {
   overflow: auto;
   background: rgba(0, 0, 0, 0.22);
@@ -931,4 +1080,3 @@ button.btn:focus {
   text-transform: uppercase;
   padding: 0.2rem 0.5rem;
 }
-

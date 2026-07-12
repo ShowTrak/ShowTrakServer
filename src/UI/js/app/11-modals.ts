@@ -52,6 +52,10 @@ export function InitSimpleModalHeaders() {
     onClose: dismiss('SHOWTRAK_MODAL_SHORTCUTS'),
   });
   build('ABOUT_HEADER', { title: 'About', onClose: dismiss('SHOWTRAK_MODAL_ABOUT') });
+  build('APP_UPDATE_HEADER', {
+    title: 'Software Update',
+    onClose: dismiss('SHOWTRAK_MODAL_APP_UPDATE'),
+  });
   build('GROUP_MANAGER_HEADER', {
     title: 'Group Manager',
     onClose: dismiss('SHOWTRAK_MODAL_GROUPMANAGER'),

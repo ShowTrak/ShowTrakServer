@@ -464,38 +464,14 @@
               </div>
             </div>
 
-            <div
-              id="UPDATE_SECTION"
-              class="card bg-ghost-light border-0 rounded d-none mt-2 SHOWTRAK_ABOUT_CARD"
-            >
-              <div class="card-body p-3 text-start SHOWTRAK_ABOUT_UPDATE_BODY">
-                <div class="d-flex justify-content-between align-items-center">
-                  <div>
-                    <strong>Update</strong>
-                    <div id="UPDATE_STATUS" class="text-muted">No pending update</div>
-                  </div>
-                  <div class="d-flex gap-2">
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-success d-none"
-                      id="UPDATE_INSTALL_BTN"
-                    >
-                      Install
-                    </button>
-                    <button type="button" class="btn btn-sm btn-light d-none" id="UPDATE_LATER_BTN">
-                      Later
-                    </button>
-                  </div>
-                </div>
-                <div id="UPDATE_NOTES_WRAPPER" class="mt-2 d-none">
-                  <div class="fw-semibold small mb-1">Changelog</div>
-                  <div
-                    id="UPDATE_CHANGELOG"
-                    class="rounded bg-ghost-light p-2 small"
-                    style="max-height: 180px; overflow: auto; white-space: pre-wrap"
-                  ></div>
-                </div>
-              </div>
+            <div class="d-grid gap-2 mt-2">
+              <button
+                type="button"
+                class="btn btn-light SHOWTRAK_ABOUT_WEBSITE_BTN"
+                id="SHOWTRAK_ABOUT_CHECK_UPDATES"
+              >
+                <i class="bi bi-arrow-repeat me-1"></i> Check for Updates
+              </button>
             </div>
 
             <div class="card border-0 rounded mt-2 SHOWTRAK_ABOUT_CARD">
@@ -532,8 +508,80 @@
                   id="SHOWTRAK_ABOUT_LICENSE"
                   class="SHOWTRAK_ABOUT_LICENSE_TEXT rounded bg-ghost-light p-2 small d-none mb-0"
                   style="max-height: 260px; overflow: auto; white-space: pre-wrap"
-                >Loading licence...</pre>
+                >
+Loading licence...</pre
+                >
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_APP_UPDATE"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_APP_UPDATE_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-start">
+            <div id="APP_UPDATE_HEADER" class="mb-2"></div>
+
+            <div class="SHOWTRAK_APP_UPDATE_HERO d-flex align-items-center gap-3 rounded p-3 mb-3">
+              <div id="APP_UPDATE_ICON_WRAP" class="SHOWTRAK_APP_UPDATE_ICON_WRAP">
+                <svg class="SHOWTRAK_APP_UPDATE_RING" viewBox="0 0 48 48" aria-hidden="true">
+                  <circle class="SHOWTRAK_APP_UPDATE_RING_TRACK" cx="24" cy="24" r="22"></circle>
+                  <circle
+                    id="APP_UPDATE_RING_BAR"
+                    class="SHOWTRAK_APP_UPDATE_RING_BAR"
+                    cx="24"
+                    cy="24"
+                    r="22"
+                  ></circle>
+                </svg>
+                <div class="SHOWTRAK_APP_UPDATE_ICON">
+                  <i id="APP_UPDATE_ICON" class="bi bi-arrow-repeat"></i>
+                </div>
+              </div>
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <strong id="APP_UPDATE_STATUS" class="SHOWTRAK_APP_UPDATE_STATUS">
+                    Checking for updates...
+                  </strong>
+                  <span
+                    id="APP_UPDATE_VERSION"
+                    class="badge SHOWTRAK_APP_UPDATE_VERSION_BADGE d-none"
+                  ></span>
+                </div>
+                <div id="APP_UPDATE_SUBTEXT" class="text-muted small mt-1">
+                  Contacting the update server.
+                </div>
+              </div>
+            </div>
+
+            <div id="APP_UPDATE_NOTES_WRAPPER" class="d-none">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <strong class="SHOWTRAK_APP_UPDATE_NOTES_TITLE">What's New</strong>
+                <span id="APP_UPDATE_NOTES_VERSION" class="text-muted small"></span>
+              </div>
+              <div
+                id="APP_UPDATE_CHANGELOG"
+                class="SHOWTRAK_APP_UPDATE_CHANGELOG rounded p-3"
+              ></div>
+            </div>
+
+            <div class="d-flex gap-2 mt-3">
+              <button type="button" class="btn btn-light" id="APP_UPDATE_CHECK_BTN">
+                <i class="bi bi-arrow-clockwise me-1"></i> Check Again
+              </button>
+              <div class="flex-grow-1"></div>
+              <button type="button" class="btn btn-light" id="APP_UPDATE_LATER_BTN">Close</button>
+              <button type="button" class="btn btn-success d-none" id="APP_UPDATE_INSTALL_BTN">
+                Install &amp; Restart
+              </button>
             </div>
           </div>
         </div>
