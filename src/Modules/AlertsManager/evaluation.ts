@@ -169,7 +169,7 @@ function describeContext(Context: AlertContext): string {
     return `${Context.ScriptName || 'Script'} failed on ${Context.EntityName || 'Unknown Client'}`;
   }
   if (Context.TriggerType === TRIGGERS.CLIENT_DEGRADED) {
-    if (Context.EntityType === 'monitor') {
+    if (Context.EntityType === 'monitor' || Context.EntityType === 'monitor-check') {
       return `${Context.EntityName || 'Monitor'} degraded (${describeMonitorReason(Context)})`;
     }
     return `${Context.EntityName || 'Client'} is degraded`;
