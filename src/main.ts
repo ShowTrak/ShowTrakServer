@@ -53,6 +53,7 @@ const { Manager: DummyClientManager } = require('./Modules/DummyClientManager');
 const { Manager: AlertsManager } = require('./Modules/AlertsManager');
 const { Manager: AudioAssetManager } = require('./Modules/AudioAssetManager');
 const { Manager: BroadcastManager } = require('./Modules/Broadcast');
+const { Manager: NetworkInterfaces } = require('./Modules/NetworkInterfaces');
 const { Manager: SettingsManager } = require('./Modules/SettingsManager');
 const { Manager: ModeManager } = require('./Modules/ModeManager');
 const { Wait } = require('./Modules/Utils');
@@ -82,6 +83,19 @@ const {
 RegisterRendererSink((channel: string, ...args: unknown[]) => {
   if (hasMainWindow()) {
     getMainWindow().webContents.send(channel, ...args);
+  }
+});
+
+// Start watching network interfaces for the whole app (multicast checks, the
+// discovery scanner and the Web UI address list all read from this authority).
+// Push the live external-IPv4 list to renderers whenever the set changes so any
+// open UI (e.g. the Remote Access panel) stays current without a manual refresh.
+NetworkInterfaces.Init();
+NetworkInterfaces.OnChange((Change: { Current: unknown }) => {
+  try {
+    PushToRenderers('NetworkInterfacesChanged', Change.Current);
+  } catch (Err) {
+    Logger.error('Failed to push NetworkInterfacesChanged:', Err);
   }
 });
 

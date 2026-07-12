@@ -123,6 +123,11 @@ export function InitSettings() {
     sound.play();
   });
   InitSettingsPush();
+  // Keep the Remote Access address list current when the host gains or loses a
+  // network interface (VLAN NIC up/down, adapter plugged in, VPN, …).
+  window.API.OnNetworkInterfacesChanged(() => {
+    void RenderRemoteAccessSection();
+  });
 }
 
 export function PreviewSound(SoundName: string) {
@@ -340,12 +345,23 @@ function InitSettingsPush() {
     }
   }
 
-  // Remote Access section: enumerate Web UI addresses and render list with QR
+  // Remote Access section: enumerate Web UI addresses and render list with QR.
+  await RenderRemoteAccessSection();
+
+  return;
+  });
+}
+
+// Render (or re-render) the Remote Access address list. Extracted so it can be
+// refreshed on its own when the host's network interfaces change, without
+// re-running the whole settings render.
+async function RenderRemoteAccessSection() {
   try {
     const info = await window.API.GetWebUIAddresses();
     const urls = (info && info.urls) || [];
+    const $container = $('#REMOTE_ACCESS_SECTION');
+    $container.html('');
     if (urls.length) {
-      const $container = $('#REMOTE_ACCESS_SECTION');
       $container.append(`
         <div class="bg-ghost-light p-2 rounded text-start">
           <strong>Remote Access</strong>
@@ -377,7 +393,4 @@ function InitSettingsPush() {
   } catch (err) {
     HandleNonFatalError('Settings:RenderRemoteAccessSection', err);
   }
-
-  return;
-  });
 }

@@ -339,6 +339,7 @@ test('MonitoringMethods registry exposes public shapes and normalizes settings',
   const all = Manager.GetAll();
   const ids = all.map((m) => m.ID).sort();
   assert.deepEqual(ids, [
+    'artnet-universe',
     'dns',
     'http',
     'http-json',

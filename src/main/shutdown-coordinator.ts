@@ -26,6 +26,7 @@ const { Manager: SettingsManager } = require('../Modules/SettingsManager');
 const { Manager: FileSelectorManager } = require('../Modules/FileSelectorManager');
 const { Manager: MonitoringTargetManager } = require('../Modules/MonitoringTargetManager');
 const { Manager: DummyClientManager } = require('../Modules/DummyClientManager');
+const { Manager: NetworkInterfaces } = require('../Modules/NetworkInterfaces');
 const { Manager: DBManager } = require('../Modules/DB');
 
 const Logger = CreateLogger('Main');
@@ -233,6 +234,12 @@ async function runShutdownCleanup(): Promise<void> {
     stopAutosave();
   } catch {
     /* intentional: clearing the autosave timer during shutdown is best-effort */
+  }
+
+  try {
+    NetworkInterfaces.Stop();
+  } catch {
+    /* intentional: stopping the interface poll timer during shutdown is best-effort */
   }
 
   try {

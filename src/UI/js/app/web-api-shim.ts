@@ -96,6 +96,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     GetProjectDependencies: nullTuple,
     GetConfig: async () => rpc('Config:Get'),
     GetWebUIAddresses: nullTuple,
+    OnNetworkInterfacesChanged: noSub,
     GetSettings: async () => rpc('Settings:Get'),
 
     // ---- Adoption / updates ----------------------------------------------

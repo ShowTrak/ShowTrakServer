@@ -184,6 +184,7 @@ const SUBSCRIBE_CHANNELS = [
   'UpdateManager:DownloadProgress',
   'ShowFileUpdated',
   'MainWindowFullscreenChanged',
+  'NetworkInterfacesChanged',
 ] as const;
 
 // Union types derived from the arrays above — the compile-time contract for

@@ -16,6 +16,7 @@ const { Config } = require('../../Modules/Config');
 const { Manager: ModeManager } = require('../../Modules/ModeManager');
 const { Manager: SettingsManager } = require('../../Modules/SettingsManager');
 const { Manager: AppDataManager } = require('../../Modules/AppData');
+const { Manager: NetworkInterfaces } = require('../../Modules/NetworkInterfaces');
 const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
 
 const Logger = CreateLogger('Main');
@@ -30,7 +31,6 @@ function register(): void {
     try {
       const port = Config.Application.Port;
       const hostname = os.hostname();
-      const net = os.networkInterfaces() || {};
       const hosts = new Set();
       const push = (h: unknown) => {
         if (!h) return;
@@ -45,16 +45,10 @@ function register(): void {
       push('localhost');
       push('127.0.0.1');
       push(hostname);
-      for (const key of Object.keys(net)) {
-        const list = net[key] || [];
-        for (const addr of list) {
-          if (!addr) continue;
-          const family =
-            addr.family || (addr.address && addr.address.includes(':')) ? 'IPv6' : 'IPv4';
-          if (family !== 'IPv4') continue;
-          if (addr.internal) continue;
-          push(addr.address);
-        }
+      // Live external IPv4 addresses from the central authority, so the list is
+      // current even after interfaces have been added or removed since boot.
+      for (const iface of NetworkInterfaces.List(false)) {
+        push(iface.Address);
       }
       const urls = Array.from(hosts).map((host) => ({ host, url: `http://${host}:${port}/` }));
       return { port, hostname, urls };

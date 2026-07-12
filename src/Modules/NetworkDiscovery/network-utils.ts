@@ -1,8 +1,8 @@
 // Pure network/IP helpers for the LAN discovery scanner: subnet enumeration,
 // IPv4 <-> integer conversion, and low-level TCP port probing. These functions
 // hold no scan state (any per-scan flags are passed in as arguments).
-import os from 'os';
 import net from 'net';
+import { Manager as NetworkInterfaces } from '../NetworkInterfaces';
 
 export interface Subnet {
   Interface: string;
@@ -40,30 +40,27 @@ export function intToIPv4(intValue: number): string {
 }
 
 export function getLocalSubnets(maxHostsPerSubnet: number): Subnet[] {
-  const interfaces = os.networkInterfaces() || {};
+  // Read the current external IPv4 interfaces from the central authority so a
+  // scan always reflects the live interface set (NICs added/removed since boot).
   const out: Subnet[] = [];
-  for (const [ifaceName, addresses] of Object.entries(interfaces)) {
-    if (!Array.isArray(addresses)) continue;
-    for (const addr of addresses) {
-      if (!addr || addr.family !== 'IPv4' || addr.internal) continue;
-      const ipInt = ipv4ToInt(addr.address);
-      const cidr = String(addr.cidr || '').trim();
-      const prefix = parseInt(cidr.split('/')[1], 10);
-      if (ipInt == null || !Number.isInteger(prefix) || prefix < 8 || prefix > 30) continue;
-      const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
-      const base = (ipInt & mask) >>> 0;
-      const broadcast = (base | (~mask >>> 0)) >>> 0;
-      const hostCount = Math.max(0, broadcast - base - 1);
-      const cappedHostCount = Math.min(hostCount, maxHostsPerSubnet);
-      if (cappedHostCount <= 0) continue;
-      out.push({
-        Interface: ifaceName,
-        CIDR: cidr,
-        Base: base,
-        FirstHost: base + 1,
-        HostCount: cappedHostCount,
-      });
-    }
+  for (const iface of NetworkInterfaces.List(false)) {
+    const ipInt = ipv4ToInt(iface.Address);
+    const cidr = String(iface.CIDR || '').trim();
+    const prefix = parseInt(cidr.split('/')[1], 10);
+    if (ipInt == null || !Number.isInteger(prefix) || prefix < 8 || prefix > 30) continue;
+    const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+    const base = (ipInt & mask) >>> 0;
+    const broadcast = (base | (~mask >>> 0)) >>> 0;
+    const hostCount = Math.max(0, broadcast - base - 1);
+    const cappedHostCount = Math.min(hostCount, maxHostsPerSubnet);
+    if (cappedHostCount <= 0) continue;
+    out.push({
+      Interface: iface.Name,
+      CIDR: cidr,
+      Base: base,
+      FirstHost: base + 1,
+      HostCount: cappedHostCount,
+    });
   }
   return out;
 }

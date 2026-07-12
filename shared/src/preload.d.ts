@@ -80,6 +80,7 @@ export interface ShowTrakAPI {
   GetProjectDependencies(): Promise<ResultTuple<{ dependencies?: unknown[] }>>;
   GetConfig(): Promise<AppConfig>;
   GetWebUIAddresses(): Promise<WebUIAddresses>;
+  OnNetworkInterfacesChanged(callback: (payload: unknown) => void): Unsubscribe;
   GetSettings(): Promise<SettingView[]>;
 
   // ---- Adoption / updates -----------------------------------------------

@@ -8,7 +8,11 @@
 //   - A single UDP socket bound to port 6454 (shared with SO_REUSEADDR).
 //   - Unlike sACN, Art-Net is delivered by directed broadcast or unicast, NOT
 //     multicast, so there are no groups to join — binding the socket is enough
-//     to receive every universe on the wire.
+//     to receive every universe on the wire. Because the socket is bound to the
+//     wildcard address (0.0.0.0), the kernel delivers broadcast/unicast arriving
+//     on ANY interface, including VLAN NICs that appear or disappear at runtime;
+//     there are no per-interface memberships to reconcile (contrast sACN, which
+//     must re-join its multicast groups when interfaces change).
 //   - Inbound ArtDmx packets are parsed and the latest state per (universe,
 //     source IP) is cached in memory. A check's Run() merely reads that cache.
 //

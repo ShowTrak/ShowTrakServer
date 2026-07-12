@@ -172,6 +172,7 @@ const SUBSCRIBE_CHANNEL_LIST = [
   'UpdateManager:DownloadProgress',
   'ShowFileUpdated',
   'MainWindowFullscreenChanged',
+  'NetworkInterfacesChanged',
 ] as const satisfies readonly SubscribeChannel[];
 type _MissingSubscribeChannels = AssertAllChannelsListed<
   Exclude<SubscribeChannel, (typeof SUBSCRIBE_CHANNEL_LIST)[number]>
@@ -214,6 +215,7 @@ const API: ShowTrakAPI = {
   GetProjectDependencies: async () => invoke('GetProjectDependencies'),
   GetConfig: async () => invoke('Config:Get'),
   GetWebUIAddresses: async () => invoke('WebUI:GetAddresses'),
+  OnNetworkInterfacesChanged: (Callback) => subscribe('NetworkInterfacesChanged', Callback),
   GetSettings: async () => invoke('Settings:Get'),
   AdoptDevice: async (UUID) => invoke('AdoptDevice', UUID),
   CheckForUpdatesOnClient: async (UUID) => invoke('CheckForUpdatesOnClient', UUID),
