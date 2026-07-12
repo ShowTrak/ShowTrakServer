@@ -31,18 +31,6 @@ interface HowlConstructor {
 declare const Howl: HowlConstructor;
 declare const Howler: { volume(value?: number): number; mute(muted: boolean): void };
 
-// ---- QRCode ---------------------------------------------------------------
-
-interface QRCodeInstance {
-  createDataURL(cellSize?: number, margin?: number): string;
-}
-
-interface QRCodeConstructor {
-  new (element: Element | null, options: { text: string }): QRCodeInstance;
-}
-
-declare const QRCode: QRCodeConstructor;
-
 // ---- Toastify -------------------------------------------------------------
 
 interface ToastifyInstance {
@@ -119,8 +107,6 @@ interface ShowTrakDeploymentUiState {
 interface Window {
   /** FLIP animation helper attached by 00-animations. */
   ShowTrakFlip?: ShowTrakFlipApi;
-  /** QR code constructor (vendored, optionally lazy-loaded). */
-  QRCode?: QRCodeConstructor;
   /** Safari/legacy AudioContext constructor. */
   webkitAudioContext?: typeof AudioContext;
 

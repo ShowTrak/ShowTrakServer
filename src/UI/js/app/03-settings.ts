@@ -16,7 +16,7 @@ import {
   SetAlertActionsEnabled,
   SetCompactMode,
 } from './02-mode';
-import { HandleNonFatalError, Safe, ShowQRModal } from './04-utils';
+import { GetAlertVolume, HandleNonFatalError, Safe, ShowQRModal } from './04-utils';
 import { Notify } from './14-selection-init';
 // Wires the mode/compact/alert-action buttons and fetches initial settings +
 // mode state. Formerly a DOMContentLoaded handler; InitSettings() calls it
@@ -120,6 +120,7 @@ export function InitSettings() {
   void WireSettingsControls();
   window.API.PlaySound(async (SoundName) => {
     const sound = Sounds[SoundName] || Sounds.Notification;
+    sound.volume(GetAlertVolume());
     sound.play();
   });
   InitSettingsPush();
@@ -132,6 +133,7 @@ export function InitSettings() {
 
 export function PreviewSound(SoundName: string) {
   const sound = Sounds[SoundName] || Sounds.Notification;
+  sound.volume(GetAlertVolume());
   sound.play();
 }
 // Registers the settings push handler (settings modal + remote-access section
@@ -320,6 +322,45 @@ function InitSettingsPush() {
               }, 600)
             );
           });
+      } else if (Setting.Type === 'SLIDER') {
+        const min = typeof Setting.Min === 'number' ? Setting.Min : 0;
+        const max = typeof Setting.Max === 'number' ? Setting.Max : 100;
+        const unit = Setting.Unit ? Safe(Setting.Unit) : '';
+        $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
+					<div class="d-flex justify-content-between align-items-center">
+						<span>${Setting.Title}</span>
+						<span class="text-sm text-muted" id="SETTING_${Setting.Key}_VALUE">${Safe(Setting.Value)}${unit}</span>
+					</div>
+					<span class="text-sm mb-0">${Setting.Description}</span>
+					<input type="range" class="form-range" id="SETTING_${
+            Setting.Key
+          }" min="${min}" max="${max}" step="1" value="${Safe(Setting.Value)}" />
+				</div>`);
+        $(`#SETTING_${Setting.Key}`)
+          .off('input')
+          .on('input', function () {
+            const el = $(this);
+            let NewValue = parseInt(String(el.val()), 10);
+            if (isNaN(NewValue)) NewValue = Number(Setting.Value);
+            if (NewValue < min) NewValue = min;
+            if (NewValue > max) NewValue = max;
+            // Update the readout immediately; persistence is debounced so we
+            // don't hammer the DB while the user drags the handle.
+            $(`#SETTING_${Setting.Key}_VALUE`).text(`${NewValue}${unit}`);
+            if (SettingDebounceTimers.has(Setting.Key))
+              clearTimeout(SettingDebounceTimers.get(Setting.Key));
+            SettingDebounceTimers.set(
+              Setting.Key,
+              setTimeout(async () => {
+                if (NewValue === Setting.Value) return;
+                const Set = Settings.find((s) => s.Key === Setting.Key);
+                if (Set) Set.Value = NewValue;
+                Setting.Value = NewValue;
+                await window.API.SetSetting(Setting.Key, NewValue);
+                Notify(`[${Setting.Title}] Saved (${NewValue}${unit})`, 'success', 1200);
+              }, 400)
+            );
+          });
       } else if (Setting.Type === 'OPTION') {
         let optionsHtml = '';
         if (Array.isArray(Setting.Options)) {
@@ -389,6 +430,9 @@ async function RenderRemoteAccessSection() {
                 <span>${safe}</span>
                 <span class="text-sm text-muted">${Safe(u.host)}</span>
               </div>
+              <button type="button" class="btn btn-sm bg-ghost-light text-white flex-shrink-0 ms-2" data-qr-url="${safe}" title="Show QR code" aria-label="Show QR code for ${safe}">
+                <i class="bi bi-qr-code"></i>
+              </button>
             </div>`;
         })
         .join('');

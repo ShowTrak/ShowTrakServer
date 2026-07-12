@@ -1,5 +1,19 @@
-import { ensureQRCodeLib } from './lib/qrcode-loader';
+import { QrToSvg } from './lib/qr-svg';
 import { openModal } from './lib/modal';
+import { Settings } from './01-state';
+
+// Master alert volume as a 0..1 multiplier, read live from the current settings
+// snapshot (ALERT_SOUND_VOLUME — a 0-100 slider). Defaults to full volume when
+// the setting is absent or malformed so alerts are never silently muted.
+export function GetAlertVolume(): number {
+  const Setting = Array.isArray(Settings)
+    ? Settings.find((s) => s && s.Key === 'ALERT_SOUND_VOLUME')
+    : null;
+  if (!Setting) return 1;
+  const Pct = Number(Setting.Value);
+  if (!Number.isFinite(Pct)) return 1;
+  return Math.min(1, Math.max(0, Pct / 100));
+}
 
 // The single HTML escaper for the renderer. Escapes all five significant
 // entities (ampersand first), so the result is safe in text content AND in
@@ -66,8 +80,6 @@ export async function WithNonFatal<T>(
 // Show QR modal for a given URL
 export async function ShowQRModal(url: string | undefined) {
   try {
-    // Ensure QRCode library is present (load dynamically if needed)
-    await ensureQRCodeLib();
     const modalId = 'SHOWTRAK_QR_MODAL';
     let $modal = $('#' + modalId);
     if ($modal.length === 0) {
@@ -76,7 +88,6 @@ export async function ShowQRModal(url: string | undefined) {
           <div class="modal-dialog modal-sm modal-dialog-centered">
             <div class="modal-content">
               <div class="modal-body text-center">
-                <div class="d-flex justify-content-center"><img class="SHOWTRAK_MODEL_CORE_LOGO" src="./img/icon.png" alt="ShowTrak Logo" /></div>
                 <strong class="mb-1">Scan to Open</strong>
                 <div id="SHOWTRAK_QR_CANVAS" class="d-flex justify-content-center my-2"></div>
                 <div class="small text-muted" id="SHOWTRAK_QR_URL"></div>
@@ -91,37 +102,17 @@ export async function ShowQRModal(url: string | undefined) {
     }
     // Set URL text
     $('#SHOWTRAK_QR_URL').text(url ?? '');
-    // Render QR
+    // Render QR as an inline SVG. This is pure in-process computation (no
+    // external library, no dynamic script load, no canvas), so it works offline
+    // and has no runtime dependencies to fail.
     const $canvas = $('#SHOWTRAK_QR_CANVAS');
     $canvas.html('');
     try {
-      // Resolve QRCode constructor from global
-      let QR = null;
-      if (typeof window !== 'undefined' && typeof window.QRCode !== 'undefined') QR = window.QRCode;
-      else if (typeof QRCode !== 'undefined') QR = QRCode;
-      if (!QR) throw new Error('qr-lib-missing');
-      // Preferred: let the library append an <img> to the container element
-      const el = $canvas.get(0);
-      if (!el) throw new Error('qr-container-missing');
-      // Append QR image
-      new QR(el, { text: String(url) });
-      // Force size for consistency
-      const img = $canvas.find('img').get(0);
-      if (img) {
-        img.width = 220;
-        img.height = 220;
-        img.alt = 'QR code';
-      } else {
-        // Fallback: generate data URL manually if no image was appended
-        const gen = new QR(null, { text: String(url) });
-        const dataUrl = gen.createDataURL(4, 4);
-        const im2 = document.createElement('img');
-        im2.src = dataUrl;
-        im2.alt = 'QR code';
-        im2.width = 220;
-        im2.height = 220;
-        $canvas.append(im2);
-      }
+      if (!url) throw new Error('qr-url-missing');
+      // Set the SVG via innerHTML (not jQuery's $(string), which mis-namespaces
+      // SVG elements so they don't render). The container is sized in CSS.
+      const svg = QrToSvg(String(url), { border: 2, size: 220 });
+      $canvas.html(svg);
     } catch (e) {
       // Hard failure: show a short notice (no clickable link)
       HandleNonFatalError('ShowQRModal:Render', e);

@@ -2,7 +2,7 @@ import { closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
 import type { AudioAssetInspection } from '@showtrak/protocol';
 import { AudioAssetsCache, setAudioAssetsCache } from './01-state';
-import { ErrorMessage, HandleNonFatalError, Safe } from './04-utils';
+import { ErrorMessage, GetAlertVolume, HandleNonFatalError, Safe } from './04-utils';
 import { OpenAlertRuleManager, RenderAlertActionsList } from './13-alert-rules';
 import { ConfirmationDialog, Notify, Wait } from './14-selection-init';
 // Custom Audio Assets manager (renderer).
@@ -142,10 +142,11 @@ export function setPreviewButtonState(ID: string, IsPlaying: boolean) {
 
 // Called by the bootstrap orchestrator in main.ts — never at import time.
 export function InitAudioAssets() {
-  // Alert action -> server -> renderer: play a custom asset at its saved volume.
+  // Alert action -> server -> renderer: play a custom asset at its saved volume,
+  // scaled by the master alert volume setting.
   window.API.PlayCustomAudio(async (Payload) => {
     if (!Payload || !Payload.DataURL) return;
-    playAudioDataURL(Payload.DataURL, Payload.Volume);
+    playAudioDataURL(Payload.DataURL, Number(Payload.Volume) * GetAlertVolume());
   });
 
   // Refresh the local cache whenever the store changes (import/update/delete from

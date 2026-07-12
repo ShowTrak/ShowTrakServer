@@ -650,6 +650,79 @@ test('Web UI namespace allows Identify in SHOW mode', async () => {
   assert.deepEqual(resp, { result: [null, { UUID: 'u1' }] });
 });
 
+test('Web UI namespace denies a management category when its permission is off', async () => {
+  const handlers = { CreateGroup: async (_e, title) => [null, { GroupID: 2, Title: title }] };
+  // EDIT mode satisfies the master gate, but group management is explicitly denied.
+  const { SetupWebUiNamespace } = loadWebUi(
+    {
+      WEBUI_ENABLED: true,
+      WEBUI_PASSWORD_PROTECTION_ENABLED: false,
+      WEBUI_ALLOW_GROUP_MANAGEMENT: false,
+    },
+    { mode: 'EDIT', handlers }
+  );
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
+
+  let resp;
+  await socket.trigger('rpc', 'CreateGroup', ['G'], (r) => (resp = r));
+  assert.equal(resp.error, 'forbidden');
+});
+
+test('Web UI namespace denies Identify when the identify permission is off', async () => {
+  const handlers = { IdentifyClient: async (_e, uuid) => [null, { UUID: uuid }] };
+  const { SetupWebUiNamespace } = loadWebUi(
+    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false, WEBUI_ALLOW_IDENTIFY: false },
+    { mode: 'SHOW', handlers }
+  );
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
+
+  let resp;
+  await socket.trigger('rpc', 'IdentifyClient', ['u1'], (r) => (resp = r));
+  assert.equal(resp.error, 'forbidden');
+});
+
+test('Web UI namespace gates WOL on the dedicated Web UI WOL permission', async () => {
+  const handlers = { WakeOnLan: async () => [null, 'ok'] };
+  // Global WOL is on and scripts are OFF: WOL must still be allowed because it no
+  // longer depends on script execution, only on the dedicated Web UI WOL toggle.
+  const allowed = loadWebUi(
+    {
+      WEBUI_ENABLED: true,
+      WEBUI_PASSWORD_PROTECTION_ENABLED: false,
+      WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION: false,
+      SYSTEM_ALLOW_WOL: true,
+      WEBUI_ALLOW_WOL: true,
+    },
+    { handlers }
+  );
+  const io1 = makeUiIo();
+  allowed.SetupWebUiNamespace(io1, {});
+  const s1 = await connectUiSocket(io1);
+  let resp;
+  await s1.trigger('rpc', 'WakeOnLan', [['u1']], (r) => (resp = r));
+  assert.deepEqual(resp, { result: [null, 'ok'] });
+
+  // Web UI WOL permission off: denied even though the global feature is enabled.
+  const denied = loadWebUi(
+    {
+      WEBUI_ENABLED: true,
+      WEBUI_PASSWORD_PROTECTION_ENABLED: false,
+      SYSTEM_ALLOW_WOL: true,
+      WEBUI_ALLOW_WOL: false,
+    },
+    { handlers }
+  );
+  const io2 = makeUiIo();
+  denied.SetupWebUiNamespace(io2, {});
+  const s2 = await connectUiSocket(io2);
+  await s2.trigger('rpc', 'WakeOnLan', [['u1']], (r) => (resp = r));
+  assert.equal(resp.error, 'forbidden');
+});
+
 test('Web UI namespace forwards allowlisted pushes with serialization, dropping the rest', async () => {
   const sinks = [];
   const { SetupWebUiNamespace } = loadWebUi(

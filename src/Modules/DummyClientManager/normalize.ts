@@ -4,7 +4,17 @@ import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 
 const MIN_INTERVAL_MS = 5000;
 const MAX_INTERVAL_MS = 5 * 60 * 1000;
-const DEFAULT_INTERVAL_MS = DEFAULT_MONITORING_INTERVAL_MS;
+
+// Fallback heartbeat interval, seeded from the compiled-in default and
+// overridable at runtime by the MONITORING_DEFAULT_INTERVAL_MS setting
+// (see main/live-settings).
+let DEFAULT_INTERVAL_MS = DEFAULT_MONITORING_INTERVAL_MS;
+
+function SetDefaultInterval(Value: unknown): void {
+  const n = Number(Value);
+  if (!Number.isFinite(n)) return;
+  DEFAULT_INTERVAL_MS = Math.min(MAX_INTERVAL_MS, Math.max(MIN_INTERVAL_MS, Math.round(n)));
+}
 
 // Clamp a requested heartbeat interval into the supported slider range.
 function ClampInterval(Value: unknown): number {
@@ -45,6 +55,7 @@ export {
   MIN_INTERVAL_MS,
   MAX_INTERVAL_MS,
   DEFAULT_INTERVAL_MS,
+  SetDefaultInterval,
   ClampInterval,
   SanitizeDummyID,
   IsValidDummyID,

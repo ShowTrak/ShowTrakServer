@@ -563,7 +563,7 @@ export interface SettingView {
   Key: string;
   Title: string;
   Description: string;
-  Type: 'BOOLEAN' | 'INTEGER' | 'STRING' | 'OPTION';
+  Type: 'BOOLEAN' | 'INTEGER' | 'STRING' | 'OPTION' | 'SLIDER';
   Value: boolean | number | string;
   isDefault: boolean;
   DefaultValue: boolean | number | string;
@@ -571,6 +571,7 @@ export interface SettingView {
   Options: string[] | null;
   Min: number | null;
   Max: number | null;
+  Unit: string | null;
 }
 
 export interface SettingGroupView {

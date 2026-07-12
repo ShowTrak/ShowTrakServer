@@ -11,11 +11,7 @@
 // src/main/ (registrars/, broadcast-bridge.ts, deployment.ts, initial-state.ts).
 import type { BrowserWindow as ElectronBrowserWindow } from 'electron';
 const { app, BrowserWindow } = require('electron/main');
-const {
-  powerMonitor,
-  powerSaveBlocker,
-  autoUpdater: nativeAutoUpdater,
-} = require('electron');
+const { powerMonitor, autoUpdater: nativeAutoUpdater } = require('electron');
 if (require('electron-squirrel-startup')) app.quit();
 
 const { Manager: AppDataManager } = require('./Modules/AppData');
@@ -278,6 +274,12 @@ RegisterBroadcastBridge();
 BroadcastManager.on('AutosaveSettingsChanged', scheduleAutosave);
 scheduleAutosave().catch((Err: unknown) => Logger.error('Failed to schedule autosave:', Err));
 
+// --- Live-applied settings ---------------------------------------------------
+// Log level, default monitoring interval, and shutdown protection are applied
+// at boot and re-applied on change (no restart required). See ./main/live-settings.
+const { initLiveSettings } = require('./main/live-settings');
+initLiveSettings().catch((Err: unknown) => Logger.error('Failed to init live settings:', Err));
+
 // --- Remote/OS shutdown hooks ------------------------------------------------
 BroadcastManager.on('Shutdown', handleBroadcastShutdown);
 BroadcastManager.on('ShutdownForce', handleBroadcastShutdownForce);
@@ -288,19 +290,8 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', handleBeforeQuit);
 
-// Feature toggles controlled by Settings: power-save blocker and auto-update.
-async function StartOptionalFeatures() {
-  const SYSTEM_PREVENT_DISPLAY_SLEEP = await SettingsManager.GetValue(
-    'SYSTEM_PREVENT_DISPLAY_SLEEP'
-  );
-  if (SYSTEM_PREVENT_DISPLAY_SLEEP) {
-    Logger.log('Prevent Display Sleep is enabled, starting powerSaveBlocker.');
-    powerSaveBlocker.start('prevent-display-sleep');
-  } else {
-    Logger.log('Prevent Display Sleep is disabled in settings, not starting powerSaveBlocker.');
-  }
-}
-StartOptionalFeatures();
+// The power-save blocker (Prevent Display Sleep) is applied — and kept in sync
+// on change — by ./main/live-settings (initLiveSettings, wired above).
 
 powerMonitor.on('shutdown', handlePowerMonitorShutdown);
 

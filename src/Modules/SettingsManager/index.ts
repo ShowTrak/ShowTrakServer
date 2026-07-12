@@ -27,6 +27,7 @@ interface Setting {
   Options: string[] | null;
   Min: number | null;
   Max: number | null;
+  Unit: string | null;
 }
 
 interface SettingsManagerShape {
@@ -104,7 +105,8 @@ const Manager: SettingsManagerShape = {
               if (val === 0 || val === '0' || val === 'false') return false;
               return !!val;
             }
-            case 'INTEGER': {
+            case 'INTEGER':
+            case 'SLIDER': {
               if (val === null || val === undefined || val === '') return Setting.DefaultValue;
               const n = parseInt(val as string, 10);
               return isNaN(n) ? Setting.DefaultValue : ClampInteger(Setting, n);
@@ -149,6 +151,7 @@ const Manager: SettingsManagerShape = {
           Options: Setting.Options || null,
           Min: typeof Setting.Min === 'number' ? Setting.Min : null,
           Max: typeof Setting.Max === 'number' ? Setting.Max : null,
+          Unit: Setting.Unit || null,
         };
 
         Settings.set(NewSetting.Key, NewSetting);
@@ -205,7 +208,8 @@ const Manager: SettingsManagerShape = {
           if (val === 0 || val === '0' || val === 'false') return false;
           return !!val;
         }
-        case 'INTEGER': {
+        case 'INTEGER':
+        case 'SLIDER': {
           if (val === null || val === undefined || val === '') return Setting.DefaultValue;
           const n = parseInt(val as string, 10);
           return isNaN(n) ? Setting.DefaultValue : ClampInteger(Setting, n);

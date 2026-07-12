@@ -10,12 +10,65 @@ const Logger = CreateLogger('OSC');
 
 const { Server } = require('node-osc');
 
+// Minimal shape of the node-osc Server we use, so the mutable handle stays typed.
+interface OSCServerInstance {
+  on(event: 'message', handler: (route: unknown, info?: OSCRemoteInfo) => void): void;
+  close(cb?: () => void): void;
+}
+
 // Not-yet-migrated JS manager — typed loosely until its own migration.
 const { Manager: ClientManager } = require('../ClientManager') as { Manager: ClientManagerType };
 
-const OSCServer = new Server(OSC_PORT, '0.0.0.0', () => {
-  Logger.log('OSC Server is listening');
-});
+// The live OSC server. Recreated when the OSC port setting changes (driven by
+// main/live-settings via OSC.RestartServer), so the binding moves to the new
+// port without an app restart. Settings/DB are intentionally not imported here
+// to keep this module decoupled and testable.
+let OSCServer: OSCServerInstance | null = null;
+let CurrentOSCPort: number | null = null;
+
+// Clamp a requested port to a valid range, falling back to the compiled-in
+// default when unset or out of range.
+function NormalizeOSCPort(Value: unknown): number {
+  const Port = Number(Value);
+  if (!Number.isFinite(Port) || Port < 1 || Port > 65535) return OSC_PORT;
+  return Math.round(Port);
+}
+
+function StartOSCServer(Port: number): void {
+  try {
+    OSCServer = new Server(Port, '0.0.0.0', () => {
+      Logger.log(`OSC Server is listening on port ${Port}`);
+    });
+    OSCServer!.on('message', HandleOSCMessage);
+    CurrentOSCPort = Port;
+  } catch (Err) {
+    OSCServer = null;
+    Logger.error(`Failed to start OSC server on port ${Port}:`, Err);
+    Broadcast.emit('Notify', `Failed to start OSC server on port ${Port}`, 'error');
+  }
+}
+
+// Stop the OSC listener entirely (OSC control disabled). Safe to call when
+// already stopped.
+function StopOSCServer(): void {
+  if (!OSCServer) return;
+  try {
+    OSCServer.close();
+  } catch (Err) {
+    Logger.error('Failed to close OSC server:', Err);
+  }
+  OSCServer = null;
+  CurrentOSCPort = null;
+}
+
+// Rebind the OSC listener to the given port. No-op-safe when the port is
+// unchanged so redundant setting broadcasts don't churn the socket.
+function RestartOSCServer(Port: unknown): void {
+  const Next = NormalizeOSCPort(Port);
+  if (OSCServer && Next === CurrentOSCPort) return;
+  StopOSCServer();
+  StartOSCServer(Next);
+}
 
 interface RouteResult {
   ok: boolean;
@@ -125,7 +178,7 @@ async function getGroupClients(
   return [null, Group, GroupClients];
 }
 
-OSCServer.on('message', async function (Route: unknown, Info: OSCRemoteInfo | undefined) {
+async function HandleOSCMessage(Route: unknown, Info: OSCRemoteInfo | undefined) {
   const RawPath = Array.isArray(Route) && Route.length > 0 ? String(Route[0] || '') : '';
   const ValidRoutes: OSCRoute[] = [];
 
@@ -195,7 +248,7 @@ OSCServer.on('message', async function (Route: unknown, Info: OSCRemoteInfo | un
     return Logger.success(`OSC Complete: ${RawPath}`);
   }
   return Logger.warn(`OSC Incomplete but has matching path: ${RawPath}`);
-});
+}
 
 const OSC = {
   GetRoutes(): OSCRoute[] {
@@ -212,6 +265,17 @@ const OSC = {
       Path,
       Callback,
     });
+  },
+
+  // Rebind the OSC listener to the given port. Called by main/live-settings with
+  // the configured port at boot and whenever the OSC port setting changes.
+  RestartServer(Port: unknown): void {
+    RestartOSCServer(Port);
+  },
+
+  // Stop the OSC listener (OSC control disabled). Called by main/live-settings.
+  StopServer(): void {
+    StopOSCServer();
   },
 };
 
@@ -507,5 +571,10 @@ OSC.CreateRoute(
   },
   'Execute a script on currently selected clients by Script ID'
 );
+
+// Bind the listener on load using the compiled-in default port so OSC control
+// works immediately. main/live-settings applies the configured port (and any
+// later change) via OSC.RestartServer — keeping this module free of settings/DB.
+StartOSCServer(OSC_PORT);
 
 export { OSC };
