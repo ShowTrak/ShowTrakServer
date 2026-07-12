@@ -383,12 +383,8 @@
   min-height: 0;
 }
 
-.osc-http-debug-modal-content {
-  background:
-    radial-gradient(circle at top right, rgba(91, 204, 255, 0.1), transparent 30%),
-    linear-gradient(180deg, #140f25 0%, #0a0d18 100%) !important;
-}
-
+/* OSC/HTTP debug modal inherits the shared .modal-content surface; only its
+   body needs a flex column layout. */
 .osc-http-debug-modal-body {
   display: flex;
   flex-direction: column;

@@ -1299,11 +1299,17 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   padding-top: 2rem !important;
 }
 
+/* Single shared modal surface for every modal in the app. A flat elevated
+   panel (no gradient) with a hairline border and soft shadow so it lifts off
+   the radial page background. Sizes still vary per modal via .modal-dialog. */
 .modal-content {
-  border: 0 !important;
-  background: linear-gradient(180deg, #160f35 0%, #0f0b23 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: #171331 !important;
   color: white;
   border-radius: 1rem !important;
+  box-shadow:
+    0 24px 60px -20px rgba(0, 0, 0, 0.65),
+    0 2px 8px rgba(0, 0, 0, 0.4) !important;
 }
 
 .modal-body {
@@ -1319,11 +1325,8 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   border-radius: 1.5rem;
 }
 
-.SHOWTRAK_ABOUT_MODAL_CONTENT {
-  border: 0 !important;
-  background: linear-gradient(180deg, #160f35 0%, #0f0b23 100%) !important;
-}
-
+/* About modal inherits the shared .modal-content surface; only its body needs
+   custom spacing. */
 .SHOWTRAK_ABOUT_MODAL_BODY {
   gap: 0.75rem;
   padding: 1.2rem;
@@ -2377,12 +2380,8 @@ button.btn:focus {
   min-height: 0;
 }
 
-.osc-http-debug-modal-content {
-  background:
-    radial-gradient(circle at top right, rgba(91, 204, 255, 0.1), transparent 30%),
-    linear-gradient(180deg, #140f25 0%, #0a0d18 100%) !important;
-}
-
+/* OSC/HTTP debug modal inherits the shared .modal-content surface; only its
+   body needs a flex column layout. */
 .osc-http-debug-modal-body {
   display: flex;
   flex-direction: column;
