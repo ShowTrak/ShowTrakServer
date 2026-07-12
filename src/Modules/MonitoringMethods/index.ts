@@ -5,6 +5,7 @@
 import { CreateLogger } from '../Logger';
 import { Manager as CacheManager } from '../CacheManager';
 import { MethodInfo } from './info';
+import { MethodGroups, DEFAULT_GROUP } from './groups';
 import type { MonitoringMethod, MonitoringResult, MonitoringTargetLike } from './types';
 
 const Logger = CreateLogger('MonitoringMethods');
@@ -14,24 +15,37 @@ const RUN_CACHE = CacheManager.GetBucket('MonitoringMethods:Run', {
   maxEntries: 2000,
 });
 
+// Ordered so methods sharing a Group (see ./groups) are contiguous, which keeps
+// the editor's grouped method picker tidy.
 const MethodModules: MonitoringMethod[] = [
+  // General
   require('./ping'),
   require('./tcp-port'),
   require('./http'),
   require('./http-json'),
   require('./dns'),
-  require('./qlab-workspace'),
+  // Lighting (DMX)
   require('./sacn-universe'),
   require('./sacn-universe-priority'),
   require('./artnet-universe'),
+  // Video
   require('./ndi-source'),
-  require('./mqtt-topic'),
-  require('./nut-ups'),
+  // Media Servers
+  require('./qlab-workspace'),
   require('./watchout-status'),
   require('./resolume-status'),
-  require('./companion-status'),
   require('./disguise-status'),
   require('./millumin-status'),
+  // Control & Messaging
+  require('./companion-status'),
+  require('./mqtt-topic'),
+  // Power (UPS)
+  require('./nut-ups'),
+  require('./nut-ups-status'),
+  require('./nut-ups-charge'),
+  require('./nut-ups-load'),
+  require('./nut-ups-temperature'),
+  require('./nut-ups-voltage'),
 ];
 
 const Methods = new Map<string, MonitoringMethod>();
@@ -51,6 +65,9 @@ function PublicShape(Method: MonitoringMethod) {
     Name: Method.Name,
     Description: Method.Description || '',
     Info: Method.Info || MethodInfo[Method.ID] || null,
+    // Grouping label for the editor's method picker. A method may export its own
+    // Group; otherwise the central map decides, falling back to "Other".
+    Group: Method.Group || MethodGroups[Method.ID] || DEFAULT_GROUP,
     Settings: Array.isArray(Method.Settings) ? Method.Settings : [],
     DefaultInterval: Method.DefaultInterval || 30000,
     // Capability flags default to true; a method opts out by exporting `false`.

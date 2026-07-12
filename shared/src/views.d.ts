@@ -360,6 +360,8 @@ export interface MonitoringMethodView {
   Name: string;
   Description: string;
   Info?: MonitoringMethodInfo | null;
+  // Grouping label for the editor's method picker (e.g. "Power (UPS)").
+  Group: string;
   DefaultInterval: number;
   // True when the method uses the per-check Address field. When false, the editor
   // hides the Address input and does not require one. Defaults to true.

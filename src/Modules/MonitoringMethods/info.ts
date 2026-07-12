@@ -109,12 +109,60 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
   },
   'nut-ups': {
     Summary:
-      'Queries a Network UPS Tools (NUT) server for a UPS status. Online on mains power; Degraded on battery, low battery, or replace-battery; Offline if unreachable.',
+      'Combined UPS health via Network UPS Tools (NUT). Reads status, battery charge, load, temperature and input voltage in one probe and reports a single healthy / degraded verdict using informed defaults. Use this when you just want to know the UPS is OK.',
     Setup: [
       'Point Address at the machine running upsd; default port is 3493.',
       "Set the UPS name exactly as configured in upsd (e.g. 'ups').",
       "upsd must allow queries from ShowTrak's IP — check the ACLs in upsd.conf.",
+      'Defaults: on mains, charge ≥ 50%, load ≤ 90%, temp ≤ 45°C, voltage within 15% of nominal. Tune the thresholds to taste; variables the UPS does not report are skipped.',
       'Add a NUT username/password under Advanced if your server requires them.',
+    ],
+    Docs: [{ Label: 'Network UPS Tools', Url: 'https://networkupstools.org/' }],
+  },
+  'nut-ups-status': {
+    Summary:
+      'Reads only ups.status from a NUT server. Online on mains (OL); Degraded on battery / low battery / replace-battery / overload / alarm; Offline if unreachable.',
+    Setup: [
+      'Point Address at the machine running upsd; default port is 3493.',
+      "Set the UPS name exactly as configured in upsd (e.g. 'ups').",
+      'Use this when you want to alert purely on the power state and ignore charge/load/etc.',
+    ],
+    Docs: [{ Label: 'Network UPS Tools', Url: 'https://networkupstools.org/' }],
+  },
+  'nut-ups-charge': {
+    Summary:
+      'Reads battery.charge (percent) from a NUT server and goes Degraded below a minimum charge — catching a UPS too depleted to ride out an outage even while on mains.',
+    Setup: [
+      'Point Address at the machine running upsd; default port is 3493, and set the UPS name.',
+      'Set Minimum charge (%) — default 50. Below it the check reports Degraded.',
+    ],
+    Docs: [{ Label: 'Network UPS Tools', Url: 'https://networkupstools.org/' }],
+  },
+  'nut-ups-load': {
+    Summary:
+      'Reads ups.load (percent of rated capacity) from a NUT server and goes Degraded above a maximum — an early warning of overload and shrinking runtime.',
+    Setup: [
+      'Point Address at the machine running upsd; default port is 3493, and set the UPS name.',
+      'Set Maximum load (%) — default 80. Above it the check reports Degraded.',
+    ],
+    Docs: [{ Label: 'Network UPS Tools', Url: 'https://networkupstools.org/' }],
+  },
+  'nut-ups-temperature': {
+    Summary:
+      'Reads ups.temperature (or battery.temperature) from a NUT server and goes Degraded above a maximum in degrees Celsius.',
+    Setup: [
+      'Point Address at the machine running upsd; default port is 3493, and set the UPS name.',
+      'Set Maximum temperature (°C) — default 40. Not all UPS models report temperature.',
+    ],
+    Docs: [{ Label: 'Network UPS Tools', Url: 'https://networkupstools.org/' }],
+  },
+  'nut-ups-voltage': {
+    Summary:
+      'Reads input.voltage from a NUT server and goes Degraded when incoming mains voltage falls outside an accepted band — catching brownouts and surges before the UPS switches to battery.',
+    Setup: [
+      'Point Address at the machine running upsd; default port is 3493, and set the UPS name.',
+      'By default the band is the UPS reported nominal ± the Auto tolerance % (default 10%), so it works on 120 V and 230 V supplies alike.',
+      'Set explicit Minimum / Maximum voltage (non-zero) to override the automatic band.',
     ],
     Docs: [{ Label: 'Network UPS Tools', Url: 'https://networkupstools.org/' }],
   },

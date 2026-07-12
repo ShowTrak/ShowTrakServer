@@ -50,6 +50,46 @@ export async function EnsureMonitoringMethodsLoaded() {
   }
 }
 
+// Preferred display order for the method-picker <optgroup>s. Groups the server
+// reports that aren't listed here are appended in first-seen order, so a new
+// group still shows up without a client change.
+const METHOD_GROUP_ORDER = [
+  'General',
+  'Lighting (DMX)',
+  'Video',
+  'Media Servers',
+  'Control & Messaging',
+  'Power (UPS)',
+];
+
+// Populate the method <select> with methods grouped into <optgroup>s by their
+// server-declared Group, ordered by METHOD_GROUP_ORDER. Methods keep their
+// registration order within each group.
+export function RenderMonitoringMethodOptions($select: JQuery) {
+  const Grouped = new Map<string, typeof MonitoringMethodsCache>();
+  for (const M of MonitoringMethodsCache) {
+    const Group = (M as { Group?: string }).Group || 'Other';
+    if (!Grouped.has(Group)) Grouped.set(Group, []);
+    Grouped.get(Group)!.push(M);
+  }
+  const Ordered = [
+    ...METHOD_GROUP_ORDER.filter((g) => Grouped.has(g)),
+    ...Array.from(Grouped.keys()).filter((g) => !METHOD_GROUP_ORDER.includes(g)),
+  ];
+  for (const Group of Ordered) {
+    const Methods = Grouped.get(Group) || [];
+    const Options = Methods.map(
+      (M) => `<option value="${Safe(M.ID)}">${Safe(M.Name)}</option>`
+    ).join('');
+    // A single ungrouped bucket ("Other") renders flat, without an optgroup.
+    if (Group === 'Other' && Ordered.length === 1) {
+      $select.append(Options);
+    } else {
+      $select.append(`<optgroup label="${Safe(Group)}">${Options}</optgroup>`);
+    }
+  }
+}
+
 export function BuildMonitoringCheckFieldHtml(Field: MonitoringSettingField, Val: unknown) {
   if (Field.Type === 'boolean') {
     return `
@@ -568,9 +608,7 @@ export function OpenMonitoringCheckView(index: number) {
 
   const $method = $('#MONITORING_CHECK_METHOD');
   $method.empty();
-  for (const M of MonitoringMethodsCache) {
-    $method.append(`<option value="${Safe(M.ID)}">${Safe(M.Name)}</option>`);
-  }
+  RenderMonitoringMethodOptions($method);
   $method.val(check.Method || (MonitoringMethodsCache[0] && MonitoringMethodsCache[0].ID) || '');
 
   $('#MONITORING_CHECK_DEGRADED_THRESHOLD').val(

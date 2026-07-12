@@ -40,6 +40,9 @@ export interface MonitoringMethod {
   Name: string;
   Description?: string;
   Info?: MonitoringMethodInfo;
+  // Optional grouping label for the editor's method picker. When omitted the
+  // registry falls back to the central map in ./groups (then "Other").
+  Group?: string;
   DefaultInterval?: number;
   // Whether this method uses the per-check Address (target IP / hostname / domain)
   // field. Defaults to true. Presence/discovery methods that ignore Address (e.g.
