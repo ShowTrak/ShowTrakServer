@@ -5,8 +5,9 @@ import { Manager as ServerIdentityManager } from '../ServerIdentity';
 
 const Logger = CreateLogger('Bonjour');
 
-// Minimal structural types for the classic `bonjour` package (no @types published).
-// Only the surface this module actually touches is described here.
+// Minimal structural types for the `bonjour-service` package. Its own typings are
+// class-based; we describe only the surface this module actually touches so the
+// call sites below stay factory-style.
 interface BonjourTxtRecord {
   [key: string]: unknown;
 }
@@ -55,13 +56,22 @@ interface BonjourFindOptions {
 interface BonjourInstance {
   publish(options: BonjourPublishOptions): BonjourPublishedService;
   find(options: BonjourFindOptions): BonjourBrowser;
-  findOne(options: BonjourFindOptions, callback: (service: BonjourService) => void): BonjourBrowser;
+  findOne(
+    options: BonjourFindOptions,
+    timeout: number,
+    callback: (service: BonjourService) => void
+  ): BonjourBrowser;
   destroy(): void;
 }
 
 type BonjourFactory = (options?: { reuseAddr?: boolean; loopback?: boolean }) => BonjourInstance;
 
-const bonjour = require('bonjour') as BonjourFactory;
+// bonjour-service exports a class; wrap it so the existing factory-style call
+// sites (`bonjour({...})`) below remain unchanged.
+const { Bonjour } = require('bonjour-service') as {
+  Bonjour: new (options?: { reuseAddr?: boolean; loopback?: boolean }) => BonjourInstance;
+};
+const bonjour: BonjourFactory = (options) => new Bonjour(options);
 
 // Use classic 'bonjour' with multicast-dns under the hood; prefer IPv4 and enable loopback for localhost testing
 const instance = bonjour({ reuseAddr: true, loopback: true });
@@ -116,7 +126,7 @@ const Manager = {
 
     // Self-check: browse for our own service to validate publication in local testing
     try {
-      const selfBrowser = instance.findOne({ type: 'showtrak' }, (svc: BonjourService) => {
+      const selfBrowser = instance.findOne({ type: 'showtrak' }, 10000, (svc: BonjourService) => {
         try {
           Logger.log('Bonjour self-check found service', {
             host: svc && svc.host,

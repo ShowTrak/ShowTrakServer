@@ -27,8 +27,10 @@ function loadBonjour() {
     return b;
   }
 
-  const bonjourMock = () => ({
-    publish: (opts) => {
+  // Regular function (not arrow) so the production wrapper's `new Bonjour(...)` works.
+  function bonjourMock() {
+    return {
+      publish: (opts) => {
       const service = { opts, handlers: {}, started: false };
       service.on = (event, cb) => {
         service.handlers[event] = cb;
@@ -39,16 +41,17 @@ function loadBonjour() {
       published.push(service);
       return service;
     },
-    find: () => makeBrowser(),
-    findOne: (_opts, cb) => {
-      const b = makeBrowser();
-      b._foundCb = cb;
-      return b;
-    },
-  });
+      find: () => makeBrowser(),
+      findOne: (_opts, _timeout, cb) => {
+        const b = makeBrowser();
+        b._foundCb = cb;
+        return b;
+      },
+    };
+  }
 
   const mocks = {
-    bonjour: bonjourMock,
+    'bonjour-service': { Bonjour: bonjourMock },
     '../Logger': noopLogger,
     '../OS': { Manager: { Hostname: 'TestHost' } },
     '../Config': { Config: { Application: { Port: 1234 }, Shared: { Version: '3.0.0' } } },

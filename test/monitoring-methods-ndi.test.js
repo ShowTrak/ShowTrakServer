@@ -23,10 +23,10 @@ function loggerStub() {
   return { CreateLogger: () => logger };
 }
 
-// A controllable fake `bonjour` factory: no real network is touched. The test can
-// drive the mDNS browser by emitting synthetic `up`/`down` service events, and the
-// raw multicast-dns `response` stream (exposed at `instance._server.mdns`) that the
-// shared browser taps for per-announcement freshness.
+// A controllable fake `bonjour-service` factory: no real network is touched. The
+// test can drive the mDNS browser by emitting synthetic `up`/`down` service events,
+// and the raw multicast-dns `response` stream (exposed at `instance.server.mdns`)
+// that the shared browser taps for per-announcement freshness.
 function fakeBonjour() {
   let upHandler = null;
   let downHandler = null;
@@ -49,13 +49,16 @@ function fakeBonjour() {
     },
   };
   const instance = {
-    _server: { mdns },
+    server: { mdns },
     find() {
       return browser;
     },
     destroy() {},
   };
-  const factory = () => instance;
+  // Regular function (not arrow) so the production wrapper's `new Bonjour(...)` works.
+  function factory() {
+    return instance;
+  }
   factory.emitUp = (svc) => upHandler && upHandler(svc);
   factory.emitDown = (svc) => downHandler && downHandler(svc);
   factory.emitResponse = (packet) => responseHandler && responseHandler(packet);
@@ -69,7 +72,7 @@ function ndiPtrResponse(fqdn) {
 
 function loadNdi(bonjour) {
   return loadWithMocks(methodPath('_ndi-shared.js'), {
-    bonjour: bonjour || fakeBonjour(),
+    'bonjour-service': { Bonjour: bonjour || fakeBonjour() },
     '../Logger': loggerStub(),
   });
 }

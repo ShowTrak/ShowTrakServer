@@ -7,7 +7,7 @@
 // up as one service instance whose name looks like "MACHINE-NAME (Source Name)".
 //
 // So instead of opening a socket per check we run ONE process-wide mDNS browser
-// (built on the existing `bonjour` dependency) that:
+// (built on the existing `bonjour-service` dependency) that:
 //
 //   - Browses `_ndi._tcp` once for the whole process.
 //   - Caches the set of currently-seen source (service instance) names, each with
@@ -110,11 +110,11 @@ interface MdnsLike {
   removeListener(event: 'response', listener: MdnsResponseHandler): void;
 }
 
-// Recover the raw multicast-dns emitter bonjour builds its Browser on. `_server`
-// is an internal of the classic `bonjour` package (stable through 3.5.x); we
-// degrade gracefully to null if a future version reshapes it.
+// Recover the raw multicast-dns emitter bonjour builds its Browser on. `server`
+// is a private field of bonjour-service's Bonjour class holding the mDNS server;
+// we degrade gracefully to null if a future version reshapes it.
 function ExtractMdns(Instance: BonjourInstance): MdnsLike | null {
-  const Server = (Instance as unknown as { _server?: { mdns?: unknown } })._server;
+  const Server = (Instance as unknown as { server?: { mdns?: unknown } }).server;
   const Mdns = Server && Server.mdns;
   if (Mdns && typeof (Mdns as MdnsLike).on === 'function') return Mdns as MdnsLike;
   return null;
@@ -132,7 +132,11 @@ function DeriveNameFromFqdn(Fqdn: string): string {
 
 type BonjourFactory = (options?: Record<string, unknown>) => BonjourInstance;
 
-const bonjour = require('bonjour') as BonjourFactory;
+// bonjour-service exports a class; wrap it so the `bonjour({...})` call sites stay factory-style.
+const { Bonjour } = require('bonjour-service') as {
+  Bonjour: new (options?: Record<string, unknown>) => BonjourInstance;
+};
+const bonjour: BonjourFactory = (options) => new Bonjour(options);
 
 export interface NdiSource {
   Name: string;

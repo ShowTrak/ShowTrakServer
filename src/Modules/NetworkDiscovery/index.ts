@@ -4,7 +4,8 @@ import { CreateLogger } from '../Logger';
 
 import { clampInt, buildProbeTargets, probeHost } from './network-utils';
 
-// Minimal structural types for the untyped `bonjour` mDNS library (no @types package).
+// Minimal structural types for the `bonjour-service` mDNS library, describing only
+// the surface this module touches so the factory-style call sites stay unchanged.
 interface BonjourService {
   addresses?: string[];
   type?: string;
@@ -30,7 +31,11 @@ interface BonjourInstance {
 
 type BonjourFactory = (options?: Record<string, unknown>) => BonjourInstance;
 
-const bonjour: BonjourFactory = require('bonjour');
+// bonjour-service exports a class; wrap it so the `bonjour({...})` call below stays factory-style.
+const { Bonjour } = require('bonjour-service') as {
+  Bonjour: new (options?: Record<string, unknown>) => BonjourInstance;
+};
+const bonjour: BonjourFactory = (options) => new Bonjour(options);
 
 const Logger = CreateLogger('NetworkDiscovery');
 
