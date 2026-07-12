@@ -108,7 +108,6 @@
     "node-osc": "^9.1.7",
     "picocolors": "^1.1.1",
     "socket.io": "^4.8.1",
-    "sqlite3": "^5.1.7",
-    "wakeonlan": "^0.1.0"
+    "sqlite3": "^5.1.7"
   }
 }

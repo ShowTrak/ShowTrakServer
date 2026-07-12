@@ -115,24 +115,6 @@ test('BackupManager saves, opens, and creates new ShowTrak files', async () => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-test('WOLManager returns success and error tuples from wakeonlan', async () => {
-  const wolModulePath = path.join(__dirname, '..', 'dist', 'Modules', 'WOLManager', 'index');
-
-  const { Manager: SuccessManager } = loadWithMocks(wolModulePath, {
-    wakeonlan: () => Promise.resolve(),
-  });
-  const [okErr, okMsg] = await SuccessManager.Wake('aa:bb:cc:dd:ee:ff', 2, 5);
-  assert.equal(okErr, null);
-  assert.match(okMsg, /successfully/i);
-
-  const { Manager: ErrorManager } = loadWithMocks(wolModulePath, {
-    wakeonlan: () => Promise.reject(new Error('network down')),
-  });
-  const [failErr, failMsg] = await ErrorManager.Wake('aa:bb:cc:dd:ee:ff');
-  assert.equal(failMsg, null);
-  assert.match(String(failErr), /network down/i);
-});
-
 test('ChecksumManager returns the SHA-1 hex digest of the file contents', async () => {
   const crypto = require('node:crypto');
   const checksumModulePath = path.join(
