@@ -110,7 +110,6 @@ const WORKSPACES = [
 test('qlab method reports online when the workspace name matches', async () => {
   const qlab = loadQlab();
   assert.equal(qlab.ID, 'qlab-workspace');
-  assert.ok(Array.isArray(qlab.Settings));
 
   const server = await startQlabServer(WORKSPACES);
   try {

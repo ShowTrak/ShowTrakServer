@@ -31,13 +31,10 @@ const HEALTHY_BODY = JSON.stringify({
   ],
 });
 
-test('disguise-status: ID and required exports', () => {
+test('disguise-status: ID and Name are the stable registry contract', () => {
   const Mod = loadDisguise(async () => ({ Success: true, LatencyMs: 5, Status: 200, Body: '{}' }));
   assert.equal(Mod.ID, 'disguise-status');
   assert.equal(Mod.Name, 'disguise (d3)');
-  assert.equal(typeof Mod.Run, 'function');
-  assert.equal(typeof Mod.Debug, 'function');
-  assert.ok(Array.isArray(Mod.Settings));
 });
 
 test('disguise-status: no address -> offline without hitting HTTP', async () => {

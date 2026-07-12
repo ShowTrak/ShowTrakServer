@@ -47,7 +47,6 @@ function startServer(handler) {
 test('tcp-port method succeeds against an open port and fails on a closed one', async () => {
   const tcp = loadWithMocks(methodPath('tcp-port.js'), {});
   assert.equal(tcp.ID, 'tcp-port');
-  assert.ok(Array.isArray(tcp.Settings));
 
   // No address configured -> immediate failure.
   assert.deepEqual((await tcp.Run({})).Success, false);

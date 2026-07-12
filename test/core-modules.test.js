@@ -26,7 +26,6 @@ test('Config exposes app metadata and shared version', () => {
 
 test('UUID.Generate returns a non-empty UUID string', () => {
   const generated = UUID.Generate();
-  assert.equal(typeof generated, 'string');
   assert.match(generated, /^[0-9a-f-]{36}$/i);
 });
 

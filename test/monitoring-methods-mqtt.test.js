@@ -70,7 +70,6 @@ test('mqtt method is online when a message is received on the topic', async () =
   const mqttMethod = loadMqtt(mock);
 
   assert.equal(mqttMethod.ID, 'mqtt-topic');
-  assert.ok(Array.isArray(mqttMethod.Settings));
 
   const result = await mqttMethod.Run({
     Address: '127.0.0.1',

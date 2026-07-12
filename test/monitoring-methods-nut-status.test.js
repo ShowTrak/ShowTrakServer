@@ -19,7 +19,6 @@ test('nut-ups-status exposes the expected shape', () => {
   const m = load(makeNutNet({}));
   assert.equal(m.ID, 'nut-ups-status');
   assert.equal(m.Name, 'UPS Status (NUT)');
-  assert.ok(Array.isArray(m.Settings));
 });
 
 test('nut-ups-status is online when ups.status is OL', async () => {

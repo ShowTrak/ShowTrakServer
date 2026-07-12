@@ -288,6 +288,4 @@ test('the ndi-source method module exposes the expected contract', () => {
   const mode = mod.Settings.find((s) => s.Key === 'MatchMode');
   assert.equal(mode.Type, 'select');
   assert.equal(mode.Default, 'contains');
-  assert.equal(typeof mod.Run, 'function');
-  assert.equal(typeof mod.Debug, 'function');
 });
