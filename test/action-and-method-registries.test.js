@@ -39,6 +39,9 @@ test('AlertActions manager normalizes, validates, and executes actions', async (
     './play-sound': { Name: 'invalid-no-id' },
     './play-custom-audio': { Name: 'invalid-no-id' },
     './showtrak-alert': { Name: 'invalid-no-id' },
+    './slack-webhook': { Name: 'invalid-no-id' },
+    './teams-webhook': { Name: 'invalid-no-id' },
+    './telegram-bot': { Name: 'invalid-no-id' },
   });
 
   assert.equal(Manager.Has('alpha'), true);

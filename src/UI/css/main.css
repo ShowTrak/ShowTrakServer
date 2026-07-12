@@ -961,6 +961,15 @@ input[type='range']::-moz-range-progress,
   background-color: rgba(255, 255, 255, 0.03) !important;
 }
 
+/* Shared modal titlebar: back button + centred title + close button. The row
+   stretches its children, so the back/close buttons automatically match the
+   height of the (taller) title box without any per-panel sizing. */
+.st-modal-header-btn {
+  flex: 0 0 auto;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 /* Light ghost background, used for modal section headings */
 .bg-ghost-light {
   background-color: rgba(255, 255, 255, 0.1) !important;

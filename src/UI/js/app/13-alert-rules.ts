@@ -1,4 +1,5 @@
-import { openModal } from './lib/modal';
+import { openModal, closeModal } from './lib/modal';
+import { buildModalHeader } from './lib/modal-header';
 import { ALERT_TRIGGER_ALLOWLIST, AlertActionEditorIsCreating, AlertActionTypesCache, AlertEditingActionIndex, AlertRuleDraftActions, AlertRuleEditorRuleID, AlertRulesCache, AlertScopeGroups, AlertScopeSelected, AlertTriggerTypesCache, AllClients, AudioAssetsCache, DummyClients, MonitoringTargets, setAlertActionEditorIsCreating, setAlertActionTypesCache, setAlertEditingActionIndex, setAlertRuleDraftActions, setAlertRuleEditorRuleID, setAlertScopeGroups, setAlertScopeOptions, setAlertScopeSelected, setAlertTriggerTypesCache } from './01-state';
 import type { AlertScopeModel } from './01-state';
 import type { AlertRuleActionView, AlertRuleScope, AlertRuleView } from '@showtrak/protocol';
@@ -113,13 +114,16 @@ export function summarizeAlertScopeSelection(
   return summarizeScopeSelection(Model, Scope, Placeholder);
 }
 
+// The action editor is a full-screen view: it replaces the entire rule-editor
+// body (title, scope, trigger, actions list) rather than sitting beneath it, so
+// only the action being edited is visible.
 export function ShowAlertRuleMainContent() {
-  $('#ALERT_RULE_MAIN_CONTENT').removeClass('d-none');
+  $('#ALERT_RULE_EDITOR_BODY').removeClass('d-none');
   $('#ALERT_ACTION_EDITOR_PANEL').addClass('d-none');
 }
 
 export function ShowAlertActionEditorPanel() {
-  $('#ALERT_RULE_MAIN_CONTENT').addClass('d-none');
+  $('#ALERT_RULE_EDITOR_BODY').addClass('d-none');
   $('#ALERT_ACTION_EDITOR_PANEL').removeClass('d-none');
 }
 
@@ -350,13 +354,31 @@ export function CollectActionSettingsFromEditorHost() {
   return Settings;
 }
 
+// Commit the action editor's current type + settings into the draft at the
+// index being edited. Returns false when there is nothing to commit (no action
+// type selected), leaving the draft untouched.
+export function CommitAlertActionFromEditor() {
+  if (!Number.isFinite(AlertEditingActionIndex)) return false;
+  const Type = ($('#ALERT_ACTION_EDITOR_TYPE').val() || '').toString();
+  if (!Type) return false;
+  AlertRuleDraftActions[AlertEditingActionIndex!] = {
+    Type,
+    Settings: CollectActionSettingsFromEditorHost(),
+  };
+  return true;
+}
+
 export function CloseAlertActionEditor() {
-  if (AlertActionEditorIsCreating && Number.isFinite(AlertEditingActionIndex)) {
+  // "Back to Actions" commits the in-progress settings just like Save, so filling
+  // in an action and clicking back no longer silently discards it. A freshly-added
+  // action with no type selected has nothing to keep, so it is removed.
+  const Committed = CommitAlertActionFromEditor();
+  if (!Committed && AlertActionEditorIsCreating && Number.isFinite(AlertEditingActionIndex)) {
     AlertRuleDraftActions.splice(AlertEditingActionIndex!, 1);
-    RenderAlertActionsList();
   }
     setAlertActionEditorIsCreating(false);
     setAlertEditingActionIndex(null);
+  RenderAlertActionsList();
   ShowAlertRuleMainContent();
 }
 
@@ -371,9 +393,9 @@ export function OpenAlertActionEditor(Index: number, IsCreating = false) {
   $('#ALERT_ACTION_EDITOR_TITLE').text(
     AlertActionEditorIsCreating ? `Create Action #${Index + 1}` : `Edit Action #${Index + 1}`
   );
-  $('#ALERT_ACTION_EDITOR_CLOSE').text(
-    AlertActionEditorIsCreating ? 'Cancel New Action' : 'Back to Actions'
-  );
+  // There is no separate save button: the back button commits the action on the
+  // way out (see CloseAlertActionEditor), and the red "Delete Action" button is the
+  // explicit way to remove one. The back button's label/markup is static.
   $('#ALERT_ACTION_EDITOR_TYPE').html(RenderAlertActionTypeOptions(TypeID));
   $('#ALERT_ACTION_EDITOR_SETTINGS').html(
     RenderAlertActionSettingsFields(TypeID, Action.Settings || {})
@@ -493,6 +515,15 @@ export function summarizeActionType(Type: string, Count: number) {
   }
   if (Type === 'discord-webhook') {
     return Count > 1 ? `send ${Count} messages on Discord` : 'send a message on Discord';
+  }
+  if (Type === 'slack-webhook') {
+    return Count > 1 ? `send ${Count} messages on Slack` : 'send a message on Slack';
+  }
+  if (Type === 'teams-webhook') {
+    return Count > 1 ? `send ${Count} messages on Teams` : 'send a message on Teams';
+  }
+  if (Type === 'telegram-bot') {
+    return Count > 1 ? `send ${Count} messages on Telegram` : 'send a message on Telegram';
   }
   if (Type === 'http-api') {
     return Count > 1 ? `send ${Count} HTTP requests` : 'send an HTTP request';
@@ -639,6 +670,99 @@ export function BuildAlertRulePayloadFromEditor() {
   };
 }
 
+// The rule editor has no explicit save button: leaving it (Back) persists the
+// current draft automatically. A brand-new rule the user never filled in is
+// discarded, and an incomplete rule is left unsaved with an explanation rather
+// than blocking navigation. The rules list refreshes itself via the server's
+// SetFullAlertRuleList push, so no manual re-render is needed here.
+export async function AutoSaveAlertRuleFromEditor() {
+  const Payload = BuildAlertRulePayloadFromEditor();
+  const IsExisting = !!AlertRuleEditorRuleID;
+  const HasContent =
+    !!Payload.Title || (Array.isArray(Payload.Actions) && Payload.Actions.length > 0);
+
+  // Nothing entered for a new rule — don't create an empty record.
+  if (!IsExisting && !HasContent) return;
+
+  const Problem = !Payload.Title
+    ? 'Rule not saved — a title is required'
+    : !Payload.TriggerType
+      ? 'Rule not saved — a trigger is required'
+      : !Array.isArray(Payload.Actions) || !Payload.Actions.length
+        ? 'Rule not saved — add at least one action'
+        : null;
+
+  if (Problem) {
+    Notify(Problem, 'error', 3000);
+    return;
+  }
+
+  if (IsExisting) {
+    const [Err] = await window.API.UpdateAlertRule(String(AlertRuleEditorRuleID), Payload);
+    if (Err) return Notify(Err, 'error');
+    Notify('Alert rule saved', 'success', 1200);
+  } else {
+    const [Err] = await window.API.CreateAlertRule(Payload);
+    if (Err) return Notify(Err, 'error');
+    Notify('Alert rule created', 'success', 1200);
+  }
+}
+
+// Leaving the rule editor (Back) autosaves the draft and returns to the list;
+// see AutoSaveAlertRuleFromEditor for why there is no explicit save button.
+export async function BackToAlertRuleList() {
+  await AutoSaveAlertRuleFromEditor();
+  ShowAlertListPanel();
+    setAlertActionEditorIsCreating(false);
+    setAlertEditingActionIndex(null);
+  ShowAlertRuleMainContent();
+}
+
+// The header close (X) dismisses the whole modal. Whatever panel is showing, the
+// in-progress work is committed first: an open action editor commits its action,
+// then the rule autosaves, matching the Back-button semantics.
+export async function CloseAlertRuleManagerFromEditor() {
+  if (!$('#ALERT_ACTION_EDITOR_PANEL').hasClass('d-none')) {
+    CloseAlertActionEditor();
+  }
+  await AutoSaveAlertRuleFromEditor();
+  closeModal('SHOWTRAK_MODAL_ALERT_MANAGER');
+}
+
+// Both editor panels share the standard modal titlebar (back + title + close).
+// The title elements keep their historical ids so the rest of this file can
+// still update them with $('#...TITLE').text(...).
+export function RenderAlertModalHeaders() {
+  $('#ALERT_RULE_EDITOR_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'Create Alert Rule',
+        titleId: 'ALERT_RULE_EDITOR_TITLE',
+        onBack: () => {
+          void BackToAlertRuleList();
+        },
+        onClose: () => {
+          void CloseAlertRuleManagerFromEditor();
+        },
+      }).$el
+    );
+
+  $('#ALERT_ACTION_EDITOR_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'Edit Action',
+        titleId: 'ALERT_ACTION_EDITOR_TITLE',
+        backLabel: 'Back',
+        onBack: () => CloseAlertActionEditor(),
+        onClose: () => {
+          void CloseAlertRuleManagerFromEditor();
+        },
+      }).$el
+    );
+}
+
 export async function OpenAlertRuleManager() {
   await CloseAllModals();
   await EnsureAlertCatalogsLoaded();
@@ -651,6 +775,7 @@ export async function OpenAlertRuleManager() {
     .join('');
   $('#ALERT_RULE_TRIGGER_TYPE').html(TriggerOptions);
 
+  RenderAlertModalHeaders();
   BindScopeDropdownHandlers();
   ResetAlertRuleEditor();
   RenderAlertRuleManagerList();
@@ -660,15 +785,6 @@ export async function OpenAlertRuleManager() {
     .off('change.alertRule')
     .on('change.alertRule', function () {
       RenderAlertRuleTriggerConfig($(this).val(), {});
-    });
-
-  $('#ALERT_RULE_BACK_TO_LIST')
-    .off('click.alertRule')
-    .on('click.alertRule', () => {
-      ShowAlertListPanel();
-            setAlertActionEditorIsCreating(false);
-            setAlertEditingActionIndex(null);
-      ShowAlertRuleMainContent();
     });
 
   $('#ALERT_RULE_CREATE_BUTTON')
@@ -726,31 +842,11 @@ export async function OpenAlertRuleManager() {
       $('#ALERT_ACTION_EDITOR_SETTINGS [data-key="AssetLabel"]').val(Asset ? Asset.Label : '');
     });
 
-  $('#ALERT_ACTION_EDITOR_CLOSE')
-    .off('click.alertRule')
-    .on('click.alertRule', () => CloseAlertActionEditor());
-
   $('#ALERT_ACTION_EDITOR_DELETE')
     .off('click.alertRule')
     .on('click.alertRule', () => {
       if (!Number.isFinite(AlertEditingActionIndex)) return;
       AlertRuleDraftActions.splice(AlertEditingActionIndex!, 1);
-            setAlertActionEditorIsCreating(false);
-      RenderAlertActionsList();
-            setAlertEditingActionIndex(null);
-      ShowAlertRuleMainContent();
-    });
-
-  $('#ALERT_ACTION_EDITOR_SAVE')
-    .off('click.alertRule')
-    .on('click.alertRule', () => {
-      if (!Number.isFinite(AlertEditingActionIndex)) return;
-      const Type = ($('#ALERT_ACTION_EDITOR_TYPE').val() || '').toString();
-      if (!Type) return Notify('Please choose an action type', 'error');
-      AlertRuleDraftActions[AlertEditingActionIndex!] = {
-        Type,
-        Settings: CollectActionSettingsFromEditorHost(),
-      };
             setAlertActionEditorIsCreating(false);
       RenderAlertActionsList();
             setAlertEditingActionIndex(null);
@@ -767,28 +863,6 @@ export async function OpenAlertRuleManager() {
       if (Err) return Notify(Err, 'error');
       Notify('Alert rule deleted', 'success', 1500);
       ResetAlertRuleEditor();
-      ShowAlertListPanel();
-    });
-
-  $('#ALERT_RULE_SAVE')
-    .off('click.alertRule')
-    .on('click.alertRule', async () => {
-      const Payload = BuildAlertRulePayloadFromEditor();
-      if (!Payload.Title) return Notify('Please enter a rule title', 'error');
-      if (!Payload.TriggerType) return Notify('Please choose a trigger', 'error');
-      if (!Array.isArray(Payload.Actions) || !Payload.Actions.length) {
-        return Notify('Please add at least one action', 'error');
-      }
-
-      if (AlertRuleEditorRuleID) {
-        const [Err] = await window.API.UpdateAlertRule(String(AlertRuleEditorRuleID), Payload);
-        if (Err) return Notify(Err, 'error');
-        Notify('Alert rule updated', 'success', 1500);
-      } else {
-        const [Err] = await window.API.CreateAlertRule(Payload);
-        if (Err) return Notify(Err, 'error');
-        Notify('Alert rule created', 'success', 1500);
-      }
       ShowAlertListPanel();
     });
 

@@ -184,6 +184,111 @@ test('discord-webhook action builds an embed and validates the URL', async () =>
   }
 });
 
+test('slack-webhook action builds an attachment and validates the URL', async () => {
+  const action = loadWithMocks(actionPath('slack-webhook.js'), {});
+  assert.equal(action.ID, 'slack-webhook');
+
+  assert.throws(() => action.ValidateSettings({}), /WebhookURL is required/);
+  assert.throws(() => action.ValidateSettings({ WebhookURL: 'not-a-url' }), /valid URL/);
+  assert.equal(action.ValidateSettings({ WebhookURL: 'https://hooks.slack.com/services/x' }), true);
+
+  let captured = null;
+  const server = await startServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => (body += c));
+    req.on('end', () => {
+      captured = JSON.parse(body);
+      res.writeHead(200);
+      res.end('ok');
+    });
+  });
+
+  try {
+    const result = await action.Execute(
+      { Settings: { WebhookURL: `http://127.0.0.1:${server.port}/webhook` } },
+      { TriggerType: 'CLIENT_OFFLINE', EntityName: 'PC1', Severity: 'critical', Description: 'down' },
+      loggerStub()
+    );
+    assert.equal(result.Success, true);
+    assert.equal(captured.attachments[0].color, 'danger'); // critical -> danger
+    assert.equal(captured.attachments[0].fields[0].value, 'PC1');
+  } finally {
+    await server.close();
+  }
+});
+
+test('teams-webhook action builds an adaptive card and validates the URL', async () => {
+  const action = loadWithMocks(actionPath('teams-webhook.js'), {});
+  assert.equal(action.ID, 'teams-webhook');
+
+  assert.throws(() => action.ValidateSettings({}), /WebhookURL is required/);
+  assert.equal(
+    action.ValidateSettings({ WebhookURL: 'https://example.webhook.office.com/x' }),
+    true
+  );
+
+  let captured = null;
+  const server = await startServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => (body += c));
+    req.on('end', () => {
+      captured = JSON.parse(body);
+      res.writeHead(200);
+      res.end('1');
+    });
+  });
+
+  try {
+    const result = await action.Execute(
+      { Settings: { WebhookURL: `http://127.0.0.1:${server.port}/webhook` } },
+      { TriggerType: 'CLIENT_OFFLINE', EntityName: 'PC1', Severity: 'critical', Description: 'down' },
+      loggerStub()
+    );
+    assert.equal(result.Success, true);
+    const card = captured.attachments[0].content;
+    assert.equal(card.type, 'AdaptiveCard');
+    assert.equal(card.body[0].color, 'attention'); // critical -> attention
+  } finally {
+    await server.close();
+  }
+});
+
+test('telegram-bot action validates token/chat and posts to the Bot API', async () => {
+  // Execute targets the fixed api.telegram.org host, so mock the HTTP transport
+  // to capture the request instead of hitting the network.
+  let captured = null;
+  const httpMock = {
+    requestJson: async (opts) => {
+      captured = opts;
+      return { Success: true, StatusCode: 200, BodyText: '{"ok":true}', Error: null };
+    },
+  };
+  const action = loadWithMocks(actionPath('telegram-bot.js'), { './_http-shared': httpMock });
+  assert.equal(action.ID, 'telegram-bot');
+
+  assert.throws(() => action.ValidateSettings({ ChatID: '1' }), /BotToken is required/);
+  assert.throws(
+    () => action.ValidateSettings({ BotToken: 'bogus', ChatID: '1' }),
+    /BotToken format is invalid/
+  );
+  assert.throws(
+    () => action.ValidateSettings({ BotToken: '123:ABC-def_1', ChatID: '' }),
+    /ChatID is required/
+  );
+  assert.equal(action.ValidateSettings({ BotToken: '123:ABC-def_1', ChatID: '99' }), true);
+
+  const result = await action.Execute(
+    { Settings: { BotToken: '123:ABC-def_1', ChatID: '99' } },
+    { TriggerType: 'CLIENT_OFFLINE', EntityName: 'PC1', Severity: 'critical', Description: 'down' },
+    loggerStub()
+  );
+  assert.equal(result.Success, true);
+  assert.equal(captured.Url, 'https://api.telegram.org/bot123:ABC-def_1/sendMessage');
+  assert.equal(captured.Body.chat_id, '99');
+  assert.equal(captured.Body.parse_mode, 'HTML');
+  assert.match(captured.Body.text, /ShowTrak Alert/);
+});
+
 test('osc-trigger action interpolates message tokens and sends via node-osc', async () => {
   const sent = [];
   let closed = false;

@@ -1633,73 +1633,62 @@
             </div>
 
             <div id="ALERT_MANAGER_EDITOR_PANEL" class="d-none d-grid gap-2 text-start mt-1">
-              <div class="d-flex justify-content-between align-items-center gap-2">
-                <button type="button" class="btn btn-sm btn-light" id="ALERT_RULE_BACK_TO_LIST">
-                  <i class="bi bi-chevron-left me-1" aria-hidden="true"></i>Back
-                </button>
-                <div class="rounded-3 p-2 bg-ghost flex-grow-1 text-center">
-                  <h6 id="ALERT_RULE_EDITOR_TITLE" class="mb-0">Create Alert Rule</h6>
+              <div id="ALERT_RULE_EDITOR_BODY" class="d-grid gap-2">
+                <div id="ALERT_RULE_EDITOR_HEADER"></div>
+
+                <div class="form-floating">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="ALERT_RULE_TITLE"
+                    placeholder="Rule Title"
+                  />
+                  <label for="ALERT_RULE_TITLE">Rule Title</label>
+                </div>
+
+                <div>
+                  <div class="alert-multiselect" id="ALERT_SCOPE_DROPDOWN">
+                    <button
+                      type="button"
+                      class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center"
+                      id="ALERT_SCOPE_TOGGLE"
+                    >
+                      <span>Select targets</span>
+                      <i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>
+                    </button>
+                    <div class="alert-multiselect-menu d-none" id="ALERT_SCOPE_MENU"></div>
+                  </div>
+                </div>
+
+                <div class="form-floating">
+                  <select class="form-select" id="ALERT_RULE_TRIGGER_TYPE"></select>
+                  <label for="ALERT_RULE_TRIGGER_TYPE">Trigger</label>
+                </div>
+
+                <div id="ALERT_RULE_MAIN_CONTENT" class="d-grid gap-2">
+                  <div
+                    id="ALERT_RULE_TRIGGER_CONFIG"
+                    class="d-none d-grid gap-2 bg-ghost rounded p-2"
+                  ></div>
+
+                  <div class="d-flex justify-content-between align-items-center">
+                    <strong>Actions</strong>
+                    <button type="button" class="btn btn-sm btn-light" id="ALERT_RULE_ADD_ACTION">
+                      Add Action
+                    </button>
+                  </div>
+                  <div id="ALERT_RULE_ACTIONS_LIST" class="d-grid gap-2"></div>
+
+                  <div class="d-grid gap-2 mt-1" id="ALERT_RULE_EDITOR_ACTIONS">
+                    <button type="button" class="btn btn-danger d-none" id="ALERT_RULE_DELETE">
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div class="form-floating">
-                <input
-                  type="text"
-                  class="form-control"
-                  id="ALERT_RULE_TITLE"
-                  placeholder="Rule Title"
-                />
-                <label for="ALERT_RULE_TITLE">Rule Title</label>
-              </div>
-
-              <div>
-                <div class="alert-multiselect" id="ALERT_SCOPE_DROPDOWN">
-                  <button
-                    type="button"
-                    class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center"
-                    id="ALERT_SCOPE_TOGGLE"
-                  >
-                    <span>Select targets</span>
-                    <i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>
-                  </button>
-                  <div class="alert-multiselect-menu d-none" id="ALERT_SCOPE_MENU"></div>
-                </div>
-              </div>
-
-              <div class="form-floating">
-                <select class="form-select" id="ALERT_RULE_TRIGGER_TYPE"></select>
-                <label for="ALERT_RULE_TRIGGER_TYPE">Trigger</label>
-              </div>
-
-              <div id="ALERT_RULE_MAIN_CONTENT" class="d-grid gap-2">
-                <div
-                  id="ALERT_RULE_TRIGGER_CONFIG"
-                  class="d-none d-grid gap-2 bg-ghost rounded p-2"
-                ></div>
-
-                <div class="d-flex justify-content-between align-items-center">
-                  <strong>Actions</strong>
-                  <button type="button" class="btn btn-sm btn-light" id="ALERT_RULE_ADD_ACTION">
-                    Add Action
-                  </button>
-                </div>
-                <div id="ALERT_RULE_ACTIONS_LIST" class="d-grid gap-2"></div>
-
-                <div class="d-grid gap-2 mt-1" id="ALERT_RULE_EDITOR_ACTIONS">
-                  <button type="button" class="btn btn-danger d-none" id="ALERT_RULE_DELETE">
-                    Delete
-                  </button>
-                  <button type="button" class="btn btn-success" id="ALERT_RULE_SAVE">Save</button>
-                </div>
-              </div>
-
-              <div id="ALERT_ACTION_EDITOR_PANEL" class="d-none rounded bg-ghost p-2 d-grid gap-2">
-                <div class="d-flex justify-content-between align-items-center">
-                  <strong id="ALERT_ACTION_EDITOR_TITLE">Edit Action</strong>
-                  <button type="button" class="btn btn-sm btn-light" id="ALERT_ACTION_EDITOR_CLOSE">
-                    Back to Actions
-                  </button>
-                </div>
+              <div id="ALERT_ACTION_EDITOR_PANEL" class="d-none d-grid gap-2">
+                <div id="ALERT_ACTION_EDITOR_HEADER"></div>
 
                 <div class="form-floating">
                   <select class="form-select" id="ALERT_ACTION_EDITOR_TYPE"></select>
@@ -1708,17 +1697,10 @@
 
                 <div id="ALERT_ACTION_EDITOR_SETTINGS" class="d-grid gap-2"></div>
 
-                <div class="row g-2">
-                  <div class="col-6 d-grid">
-                    <button type="button" class="btn btn-danger" id="ALERT_ACTION_EDITOR_DELETE">
-                      Delete Action
-                    </button>
-                  </div>
-                  <div class="col-6 d-grid">
-                    <button type="button" class="btn btn-success" id="ALERT_ACTION_EDITOR_SAVE">
-                      Save Action
-                    </button>
-                  </div>
+                <div class="d-grid">
+                  <button type="button" class="btn btn-danger" id="ALERT_ACTION_EDITOR_DELETE">
+                    Delete Action
+                  </button>
                 </div>
               </div>
             </div>

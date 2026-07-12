@@ -10,6 +10,9 @@ const ActionModules: AlertAction[] = [
   require('./osc-trigger'),
   require('./http-api'),
   require('./discord-webhook'),
+  require('./slack-webhook'),
+  require('./teams-webhook'),
+  require('./telegram-bot'),
 ];
 
 const Actions = new Map<string, AlertAction>();
