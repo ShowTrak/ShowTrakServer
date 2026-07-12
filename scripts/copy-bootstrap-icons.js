@@ -1,4 +1,6 @@
-// Copies Bootstrap Icons font and CSS from node_modules into src/UI/vendors for local serving
+// Copies Bootstrap Icons font and CSS from node_modules into src/UI/vendors for local serving.
+// bootstrap-icons is a devDependency (build-time only; the copied font/CSS ships in dist/), so
+// this postinstall hook requires a full install — it will fail under `npm ci --omit=dev`.
 const fs = require('fs');
 const path = require('path');
 

@@ -85,6 +85,7 @@
     "@types/express": "^5.0.6",
     "@types/jquery": "^4.0.1",
     "@types/node": "^26.1.1",
+    "bootstrap-icons": "^1.11.3",
     "c8": "^11.0.0",
     "electron": "^35.7.0",
     "esbuild": "^0.28.1",
@@ -99,9 +100,7 @@
     "typescript-eslint": "^8.63.0"
   },
   "dependencies": {
-    "@fontsource/inter": "^5.2.8",
     "bonjour": "^3.5.0",
-    "bootstrap-icons": "^1.11.3",
     "electron-squirrel-startup": "^1.0.1",
     "electron-updater": "^6.3.9",
     "express": "^5.1.0",
