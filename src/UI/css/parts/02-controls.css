@@ -643,6 +643,74 @@ input[type='range']::-moz-range-progress,
   background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
+/* Settings modal: two-pane layout with a category nav on the left and the
+   settings for each category on the right. The header stays pinned at the top;
+   the nav and content each scroll independently within the modal. */
+#SHOWTRAK_MODAL_SETTINGS .modal-body {
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  overflow: hidden;
+}
+
+.settings-layout {
+  display: flex;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  text-align: left;
+}
+
+.settings-nav {
+  flex: 0 0 12rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.settings-nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.65);
+  background-color: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.settings-nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.settings-nav-item.active {
+  background-color: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.settings-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.5rem;
+  padding-right: 0.25rem;
+  scroll-behavior: smooth;
+}
+
+.settings-section {
+  scroll-margin-top: 0.25rem;
+}
+
 .GROUP_TITLE {
   writing-mode: vertical-rl;
   transform: rotate(180deg);

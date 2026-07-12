@@ -1043,12 +1043,17 @@
       aria-labelledby="SHOWTRAK_MODAL_SETTINGS_Label"
       aria-hidden="true"
     >
-      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-body text-center">
             <div id="SETTINGS_HEADER" class="mb-2"></div>
-            <div id="SETTINGS" class="d-grid gap-2"></div>
-            <div id="REMOTE_ACCESS_SECTION" class="d-grid gap-2 mt-2"></div>
+            <div id="SETTINGS_LAYOUT" class="settings-layout">
+              <nav id="SETTINGS_NAV" class="settings-nav" aria-label="Settings categories"></nav>
+              <div id="SETTINGS_CONTENT" class="settings-content">
+                <div id="SETTINGS" class="d-grid gap-2"></div>
+                <div id="REMOTE_ACCESS_SECTION" class="d-grid gap-2 mt-2"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

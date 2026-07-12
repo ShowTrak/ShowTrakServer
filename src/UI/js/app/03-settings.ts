@@ -155,15 +155,22 @@ function InitSettingsPush() {
   $('#REMOTE_ACCESS_SECTION').html('');
 
   for (const Group of SettingsGroups) {
-    $(`#SETTINGS`).append(`<div class="bg-ghost-light p-2 rounded">
+    const GroupSettings = Settings.filter((s) => s.Group == Group.Name);
+    if (!GroupSettings.length) continue;
+    const $target = $(
+      `<div class="settings-section d-grid gap-2" id="SETTINGS_SECTION_${Group.Name}" data-nav-key="${Group.Name}" data-nav-title="${Safe(
+        Group.Title
+      )}"></div>`
+    );
+    $target.append(`<div class="bg-ghost-light p-2 rounded">
 			<strong class="text-start">
 				${Group.Title}
 			</strong>
 		</div>`);
-    const GroupSettings = Settings.filter((s) => s.Group == Group.Name);
+    $(`#SETTINGS`).append($target);
     for (const Setting of GroupSettings) {
       if (Setting.Type === 'BOOLEAN') {
-        $(`#SETTINGS`)
+        $target
           .append(`<div class="bg-ghost p-2 rounded d-flex justify-content-between text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}</span>
@@ -201,7 +208,7 @@ function InitSettingsPush() {
               .slice(0, 4)
           : Safe(Setting.Value);
 
-        $(`#SETTINGS`).append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
+        $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}</span>
 						<span class="text-sm mb-0">${Setting.Description}</span>
@@ -281,7 +288,7 @@ function InitSettingsPush() {
           hasMin && hasMax
             ? ` <span class="text-sm text-muted">(${Setting.Min}–${Setting.Max})</span>`
             : '';
-        $(`#SETTINGS`).append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
+        $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}${rangeHint}</span>
 						<span class="text-sm mb-0">${Setting.Description}</span>
@@ -322,7 +329,7 @@ function InitSettingsPush() {
             )}</option>`;
           }
         }
-        $(`#SETTINGS`).append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
+        $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}</span>
 						<span class="text-sm mb-0">${Setting.Description}</span>
@@ -362,6 +369,11 @@ async function RenderRemoteAccessSection() {
     const $container = $('#REMOTE_ACCESS_SECTION');
     $container.html('');
     if (urls.length) {
+      // Expose this block as a jump target so it appears in the category nav.
+      $container
+        .addClass('settings-section')
+        .attr('data-nav-key', '__REMOTE_ACCESS__')
+        .attr('data-nav-title', 'Remote Access');
       $container.append(`
         <div class="bg-ghost-light p-2 rounded text-start">
           <strong>Remote Access</strong>
@@ -389,8 +401,100 @@ async function RenderRemoteAccessSection() {
           const url = $(this).attr('data-qr-url');
           ShowQRModal(url);
         });
+    } else {
+      // No addresses to show — drop the nav metadata so it is left out of the
+      // category list on rebuild.
+      $container
+        .removeClass('settings-section')
+        .removeAttr('data-nav-key')
+        .removeAttr('data-nav-title');
     }
   } catch (err) {
     HandleNonFatalError('Settings:RenderRemoteAccessSection', err);
   }
+  // Rebuild the left-hand category nav now that the section set is final. Runs
+  // for both the full settings render and standalone network-interface refreshes.
+  BuildSettingsNav();
+}
+
+// (Re)build the left-hand category rail from the sections currently in the
+// content column, then wire up the scroll-spy that highlights the section the
+// user is scrolled to. Each section carries `data-nav-key` / `data-nav-title`.
+function BuildSettingsNav() {
+  const $content = $('#SETTINGS_CONTENT');
+  const $nav = $('#SETTINGS_NAV');
+  if (!$nav.length || !$content.length) return;
+
+  const sections = $content.find('.settings-section[data-nav-title]').toArray();
+  $nav.empty();
+
+  // A single (or no) category needs no navigation — reclaim the space.
+  if (sections.length <= 1) {
+    $nav.hide();
+    return;
+  }
+  $nav.show();
+
+  for (const section of sections) {
+    const key = section.getAttribute('data-nav-key') || '';
+    const title = section.getAttribute('data-nav-title') || '';
+    const $btn = $(
+      `<button type="button" class="settings-nav-item" data-nav-target="${Safe(key)}">${Safe(title)}</button>`
+    );
+    $btn.on('click', () => {
+      section.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      SetActiveNav(key);
+    });
+    $nav.append($btn);
+  }
+
+  // Default the first category active until a real scroll position is known.
+  SetActiveNav(sections[0].getAttribute('data-nav-key') || '');
+
+  // Namespaced so repeated rebuilds replace rather than stack the handlers. The
+  // shown-handler recomputes once the modal is visible: while it is hidden the
+  // content has no height and scroll positions cannot be measured.
+  $content.off('scroll.settingsspy').on('scroll.settingsspy', UpdateActiveNavFromScroll);
+  $('#SHOWTRAK_MODAL_SETTINGS')
+    .off('shown.bs.modal.settingsspy')
+    .on('shown.bs.modal.settingsspy', UpdateActiveNavFromScroll);
+  UpdateActiveNavFromScroll();
+}
+
+function SetActiveNav(key: string) {
+  $('#SETTINGS_NAV .settings-nav-item').each(function () {
+    $(this).toggleClass('active', this.getAttribute('data-nav-target') === key);
+  });
+}
+
+// Highlight the nav item for the last section whose heading has scrolled to (or
+// past) the top of the content viewport. Positions are measured relative to the
+// scroll container so it works regardless of the section's offset parent.
+function UpdateActiveNavFromScroll() {
+  const contentEl = document.getElementById('SETTINGS_CONTENT');
+  if (!contentEl || !contentEl.clientHeight) return; // hidden: nothing measurable yet
+  const sections = Array.from(
+    contentEl.querySelectorAll<HTMLElement>('.settings-section[data-nav-title]')
+  );
+  if (!sections.length) return;
+
+  const contentTop = contentEl.getBoundingClientRect().top;
+  const threshold = 24; // px past the top edge before a section becomes active
+  let activeKey = sections[0].getAttribute('data-nav-key') || '';
+  for (const section of sections) {
+    const relativeTop = section.getBoundingClientRect().top - contentTop;
+    if (relativeTop <= threshold) {
+      activeKey = section.getAttribute('data-nav-key') || '';
+    } else {
+      break;
+    }
+  }
+
+  // At the very bottom, force the last section active — a short final section
+  // may never reach the threshold on its own.
+  if (contentEl.scrollTop + contentEl.clientHeight >= contentEl.scrollHeight - 2) {
+    activeKey = sections[sections.length - 1].getAttribute('data-nav-key') || '';
+  }
+
+  SetActiveNav(activeKey);
 }
