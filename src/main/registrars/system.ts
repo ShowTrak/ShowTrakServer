@@ -23,7 +23,13 @@ const Logger = CreateLogger('Main');
 
 function register(): void {
   RPC.handle('Config:Get', async () => {
-    return Config;
+    // Surface the packaged/dev distinction to the renderer so dev-only UI (the
+    // Settings > Debug section) can reveal itself on uncompiled builds
+    // (electron-forge start), where app.isPackaged is false.
+    return {
+      ...Config,
+      Application: { ...Config.Application, IsPackaged: app.isPackaged },
+    };
   });
 
   // Provide a list of Web UI addresses on the local network with port

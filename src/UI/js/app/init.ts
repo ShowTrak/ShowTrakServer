@@ -18,6 +18,7 @@ import { HandleNetworkDiscoveryEvent, OpenMonitoringTargetEditor, OpenNetworkDis
 import { OpenAlertRuleManager, OpenCreateAlertRuleEditor } from './13-alert-rules';
 import { GetIdentifyingUUIDs, HideExecutionToast, Notify, StopIdentifyingForUUIDs, UpdateIdentifyStatusBanner } from './14-selection-init';
 import { OpenClientInfo } from './client-info-modal';
+import { TestAllNotifications } from './lib/debug-notifications';
 import { OpenScriptManager } from './15-script-manager';
 import { OpenDummyClientEditor } from './16-dummy-clients';
 import { ClearSelection, SelectByGroup, ToggleSelection } from './selection';
@@ -205,6 +206,17 @@ export async function Init() {
     setConfig(await window.API.GetConfig());
   $('#APPLICATION_NAVBAR_TITLE').text(`${Config.Application.Name}`);
   $('#APPLICATION_NAVBAR_STATUS').text('');
+
+  // Reveal dev-only debug tools on uncompiled builds (electron-forge start),
+  // where app.isPackaged is false. Hidden entirely on packaged releases.
+  if (!Config.Application.IsPackaged) {
+    document
+      .querySelectorAll('.debug-menu-item')
+      .forEach((el) => el.removeAttribute('hidden'));
+    $('#SHOWTRAK_DEBUG_TEST_NOTIFICATIONS').on('click', () => {
+      TestAllNotifications();
+    });
+  }
 
   // The Web UI is a live control surface, not a show-file editor. Skip the
   // desktop show-file bootstrap prompts entirely on the browser surface.

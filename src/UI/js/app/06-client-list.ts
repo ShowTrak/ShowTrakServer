@@ -756,7 +756,7 @@ function InitPendingAdoptionPush() {
         title,
         message: msg,
         clientUUID: uuid,
-        iconHtml: '<i class="bi bi-person-plus"></i>',
+        iconHtml: '<i class="bi bi-person-plus-fill"></i>',
       });
       PendingAdoptionAlerts.set(uuid, id);
     }

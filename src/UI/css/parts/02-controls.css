@@ -279,20 +279,18 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   gap: 6px;
 }
 .alert-item .btn-dismiss {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: 0;
+  background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.92);
   padding: 2px 7px;
   border-radius: 6px;
   line-height: 1;
   transition:
     background-color 120ms ease,
-    border-color 120ms ease,
     color 120ms ease;
 }
 .alert-item .btn-dismiss:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .alert-item[data-severity='success'] {

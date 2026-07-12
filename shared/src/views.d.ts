@@ -579,7 +579,7 @@ export interface SettingGroupView {
 }
 
 export interface AppConfig {
-  Application: { Version: string; Name: string; Port: number };
+  Application: { Version: string; Name: string; Port: number; IsPackaged: boolean };
   Shared: { Version: string };
 }
 

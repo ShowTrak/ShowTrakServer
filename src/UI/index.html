@@ -279,6 +279,19 @@
                   Close ShowTrak
                 </button>
               </li>
+              <!-- Debug tools: revealed only on uncompiled builds (npm run start,
+                   app.isPackaged === false) by init.ts. -->
+              <li class="debug-menu-item" hidden><hr class="dropdown-divider" /></li>
+              <li class="debug-menu-item" hidden><h6 class="dropdown-header">Debug</h6></li>
+              <li class="debug-menu-item" hidden>
+                <button
+                  type="button"
+                  class="dropdown-item"
+                  id="SHOWTRAK_DEBUG_TEST_NOTIFICATIONS"
+                >
+                  Test Notifications
+                </button>
+              </li>
             </ul>
           </div>
         </div>

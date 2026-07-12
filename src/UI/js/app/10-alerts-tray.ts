@@ -110,7 +110,7 @@ export function iconForAlert(a: { type?: string; iconHtml?: string | null }) {
   if (a.type === 'usb') return '<i class="bi bi-usb-symbol"></i>';
   if (a.type === 'online') return '<i class="bi bi-wifi"></i>';
   if (a.type === 'offline') return '<i class="bi bi-wifi-off"></i>';
-  return '<i class="bi bi-exclamation-circle"></i>';
+  return '<i class="bi bi-exclamation-circle-fill"></i>';
 }
 
 export function timeAgo(ts: number) {
