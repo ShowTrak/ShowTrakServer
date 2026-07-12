@@ -165,6 +165,34 @@ function register(): void {
     }
   });
 
+  RPC.handle('GetLicense', async (_event: unknown) => {
+    try {
+      const CandidatePaths = [
+        path.join(app.getAppPath(), 'LICENSE'),
+        path.resolve(app.getAppPath(), '..', 'LICENSE'),
+      ];
+
+      let LicensePath = null;
+      for (const CandidatePath of CandidatePaths) {
+        if (fs.existsSync(CandidatePath)) {
+          LicensePath = CandidatePath;
+          break;
+        }
+      }
+
+      if (!LicensePath) {
+        return ['Could not locate LICENSE file', null];
+      }
+
+      const License = fs.readFileSync(LicensePath, 'utf8');
+
+      return [null, { license: License }];
+    } catch (error) {
+      Logger.error('GetLicense failed', error);
+      return [String(error), null];
+    }
+  });
+
   RPC.handle('SetSetting', async (_event: unknown, Key: unknown, Value: unknown) => {
     try {
       [Key, Value] = IPCValidation.SettingUpdatePayload(Key, Value);

@@ -20,6 +20,7 @@ const INVOKE_CHANNELS = [
   'OpenShowTrakGithubInBrowser',
   'OpenNpmPackageInBrowser',
   'GetProjectDependencies',
+  'GetLicense',
 
   // Core / lifecycle
   'Config:Get',

@@ -78,6 +78,7 @@ export interface ShowTrakAPI {
   OpenShowTrakGithubInBrowser(): Promise<unknown>;
   OpenNpmPackageInBrowser(PackageName: string): Promise<unknown>;
   GetProjectDependencies(): Promise<ResultTuple<{ dependencies?: unknown[] }>>;
+  GetLicense(): Promise<ResultTuple<{ license?: string }>>;
   GetConfig(): Promise<AppConfig>;
   GetWebUIAddresses(): Promise<WebUIAddresses>;
   OnNetworkInterfacesChanged(callback: (payload: unknown) => void): Unsubscribe;

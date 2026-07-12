@@ -178,6 +178,29 @@ export async function OpenAboutModal() {
     DependenciesCount.text('Unavailable');
   }
 
+  const LicenseText = $('#SHOWTRAK_ABOUT_LICENSE');
+  const LicenseToggle = $('#SHOWTRAK_ABOUT_LICENSE_TOGGLE');
+  LicenseText.addClass('d-none').text('Loading licence...');
+  LicenseToggle.text('Show full licence');
+  LicenseToggle.off('click').on('click', () => {
+    const Hidden = LicenseText.hasClass('d-none');
+    LicenseText.toggleClass('d-none', !Hidden);
+    LicenseToggle.text(Hidden ? 'Hide full licence' : 'Show full licence');
+  });
+
+  try {
+    const [Err, Payload] = await window.API.GetLicense();
+    if (Err) throw new Error(Err);
+
+    const License =
+      Payload && typeof Payload.license === 'string' ? Payload.license : '';
+    if (!License.trim()) throw new Error('Empty licence');
+
+    LicenseText.text(License);
+  } catch {
+    LicenseText.text('Could not load the licence text.');
+  }
+
   openModal('SHOWTRAK_MODAL_ABOUT');
 }
 

@@ -28,6 +28,7 @@ const INVOKE_CHANNEL_LIST = [
   'OpenShowTrakGithubInBrowser',
   'OpenNpmPackageInBrowser',
   'GetProjectDependencies',
+  'GetLicense',
   'Config:Get',
   'WebUI:GetAddresses',
   'Settings:Get',
@@ -213,6 +214,7 @@ const API: ShowTrakAPI = {
   OpenNpmPackageInBrowser: async (PackageName) =>
     invoke('OpenNpmPackageInBrowser', PackageName),
   GetProjectDependencies: async () => invoke('GetProjectDependencies'),
+  GetLicense: async () => invoke('GetLicense'),
   GetConfig: async () => invoke('Config:Get'),
   GetWebUIAddresses: async () => invoke('WebUI:GetAddresses'),
   OnNetworkInterfacesChanged: (Callback) => subscribe('NetworkInterfacesChanged', Callback),

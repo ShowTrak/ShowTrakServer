@@ -94,6 +94,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     OpenNpmPackageInBrowser: async (PackageName) =>
       window.open(`https://www.npmjs.com/package/${PackageName}`, '_blank'),
     GetProjectDependencies: nullTuple,
+    GetLicense: nullTuple,
     GetConfig: async () => rpc('Config:Get'),
     GetWebUIAddresses: nullTuple,
     OnNetworkInterfacesChanged: noSub,
