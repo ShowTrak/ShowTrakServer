@@ -1,4 +1,11 @@
 import { requestJson } from './_http-shared';
+import {
+  AlertTitle,
+  ModeSettingField,
+  NormalizeMode,
+  OneLineSummary,
+  type WebhookMode,
+} from './_webhook-format';
 import type {
   ActionLogger,
   AlertActionInput,
@@ -11,14 +18,20 @@ const ID = 'teams-webhook';
 
 const Settings: AlertActionSettingField[] = [
   { Key: 'WebhookURL', Label: 'Webhook URL', Type: 'string', Default: '' },
+  ModeSettingField,
   { Key: 'Timeout', Label: 'Timeout (ms)', Type: 'number', Default: 5000, Min: 250, Max: 60000 },
 ];
 
-function NormalizeSettings(Input: unknown): { WebhookURL: string; Timeout: number } {
+function NormalizeSettings(Input: unknown): {
+  WebhookURL: string;
+  Mode: WebhookMode;
+  Timeout: number;
+} {
   const Next = (Input && typeof Input === 'object' ? Input : {}) as Record<string, unknown>;
   const Timeout = Number(Next.Timeout);
   return {
     WebhookURL: String(Next.WebhookURL || '').trim(),
+    Mode: NormalizeMode(Next.Mode),
     Timeout: Number.isFinite(Timeout) ? Math.max(250, Math.min(60000, Math.round(Timeout))) : 5000,
   };
 }
@@ -53,37 +66,42 @@ async function Execute(
 ): Promise<AlertActionResult> {
   const S = NormalizeSettings(Action && Action.Settings ? Action.Settings : {});
 
-  const Facts = [
-    { title: 'Entity', value: String(Context.EntityName || 'Unknown') },
-    { title: 'Type', value: String(Context.EntityType || 'Unknown') },
-    { title: 'Severity', value: String(Context.Severity || 'info') },
-    { title: 'IP', value: String(Context.IP || 'N/A') },
-    { title: 'Group', value: Context.GroupID == null ? 'No Group' : String(Context.GroupID) },
-    { title: 'UUID', value: String(Context.UUID || 'N/A') },
-  ];
-
   // Adaptive Card delivered via a Power Automate "Workflows" incoming webhook.
+  // Even "text" mode must be an Adaptive Card here — Teams workflows do not accept
+  // a bare text payload — so it collapses to a single-line TextBlock.
+  const Body =
+    S.Mode === 'text'
+      ? [{ type: 'TextBlock', text: OneLineSummary(Context), wrap: true }]
+      : [
+          {
+            type: 'TextBlock',
+            text: AlertTitle(Context),
+            weight: 'Bolder',
+            size: 'Large',
+            color: colorForSeverity(Context.Severity),
+            wrap: true,
+          },
+          {
+            type: 'FactSet',
+            facts: [
+              { title: 'Entity', value: String(Context.EntityName || 'Unknown') },
+              { title: 'IP', value: String(Context.IP || 'N/A') },
+            ],
+          },
+          {
+            type: 'TextBlock',
+            text: `Trigger: ${String(Context.TriggerType || 'Unknown')}`,
+            wrap: true,
+            isSubtle: true,
+            spacing: 'Small',
+          },
+        ];
+
   const Card = {
     type: 'AdaptiveCard',
     $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
     version: '1.4',
-    body: [
-      {
-        type: 'TextBlock',
-        text: `ShowTrak Alert: ${(Context.TriggerType as string) || 'Unknown'}`,
-        weight: 'Bolder',
-        size: 'Large',
-        color: colorForSeverity(Context.Severity),
-        wrap: true,
-      },
-      { type: 'FactSet', facts: Facts },
-      {
-        type: 'TextBlock',
-        text: String(Context.Description || 'No additional details were provided.'),
-        wrap: true,
-        isSubtle: true,
-      },
-    ],
+    body: Body,
   };
 
   const Response = await requestJson({

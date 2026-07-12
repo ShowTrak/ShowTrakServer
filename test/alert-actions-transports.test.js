@@ -179,6 +179,48 @@ test('discord-webhook action builds an embed and validates the URL', async () =>
     assert.equal(result.Success, true);
     assert.equal(captured.username, 'ShowTrak Alerts');
     assert.equal(captured.embeds[0].color, 15158332); // critical -> red
+    // Details become the title; trigger type moves to the footer.
+    assert.equal(captured.embeds[0].title, 'down');
+    assert.match(captured.embeds[0].footer.text, /CLIENT_OFFLINE/);
+    // Only Entity + IP remain as fields (no Severity / Group / UUID / Type).
+    const fieldNames = captured.embeds[0].fields.map((f) => f.name);
+    assert.deepEqual(fieldNames, ['Entity', 'IP']);
+  } finally {
+    await server.close();
+  }
+});
+
+test('discord-webhook text mode posts a single-line content string', async () => {
+  const action = loadWithMocks(actionPath('discord-webhook.js'), {});
+
+  let captured = null;
+  const server = await startServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => (body += c));
+    req.on('end', () => {
+      captured = JSON.parse(body);
+      res.writeHead(200);
+      res.end('{}');
+    });
+  });
+
+  try {
+    const result = await action.Execute(
+      { Settings: { WebhookURL: `http://127.0.0.1:${server.port}/webhook`, Mode: 'text' } },
+      {
+        TriggerType: 'CLIENT_OFFLINE',
+        EntityName: 'PC1',
+        IP: '10.0.0.5',
+        Description: 'PC1 is offline',
+      },
+      loggerStub()
+    );
+    assert.equal(result.Success, true);
+    assert.equal(captured.embeds, undefined);
+    assert.equal(typeof captured.content, 'string');
+    assert.doesNotMatch(captured.content, /\n/); // single line
+    // Format: "ShowTrak hh:mm:ss > <hostname> (<ip>) is offline"
+    assert.match(captured.content, /^ShowTrak \d{2}:\d{2}:\d{2} > PC1 \(10\.0\.0\.5\) is offline$/);
   } finally {
     await server.close();
   }

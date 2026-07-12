@@ -1,4 +1,11 @@
 import { requestJson } from './_http-shared';
+import {
+  AlertTitle,
+  ModeSettingField,
+  NormalizeMode,
+  OneLineSummary,
+  type WebhookMode,
+} from './_webhook-format';
 import type {
   ActionLogger,
   AlertActionInput,
@@ -11,14 +18,20 @@ const ID = 'slack-webhook';
 
 const Settings: AlertActionSettingField[] = [
   { Key: 'WebhookURL', Label: 'Webhook URL', Type: 'string', Default: '' },
+  ModeSettingField,
   { Key: 'Timeout', Label: 'Timeout (ms)', Type: 'number', Default: 5000, Min: 250, Max: 60000 },
 ];
 
-function NormalizeSettings(Input: unknown): { WebhookURL: string; Timeout: number } {
+function NormalizeSettings(Input: unknown): {
+  WebhookURL: string;
+  Mode: WebhookMode;
+  Timeout: number;
+} {
   const Next = (Input && typeof Input === 'object' ? Input : {}) as Record<string, unknown>;
   const Timeout = Number(Next.Timeout);
   return {
     WebhookURL: String(Next.WebhookURL || '').trim(),
+    Mode: NormalizeMode(Next.Mode),
     Timeout: Number.isFinite(Timeout) ? Math.max(250, Math.min(60000, Math.round(Timeout))) : 5000,
   };
 }
@@ -53,38 +66,29 @@ async function Execute(
 ): Promise<AlertActionResult> {
   const S = NormalizeSettings(Action && Action.Settings ? Action.Settings : {});
 
-  const Attachment = {
-    color: colorForSeverity(Context.Severity),
-    title: `ShowTrak Alert: ${(Context.TriggerType as string) || 'Unknown'}`,
-    fields: [
-      { title: 'Entity', value: String(Context.EntityName || 'Unknown'), short: true },
-      { title: 'Type', value: String(Context.EntityType || 'Unknown'), short: true },
-      { title: 'Severity', value: String(Context.Severity || 'info'), short: true },
-      { title: 'IP', value: String(Context.IP || 'N/A'), short: true },
-      {
-        title: 'Group',
-        value: Context.GroupID == null ? 'No Group' : String(Context.GroupID),
-        short: true,
-      },
-      { title: 'UUID', value: String(Context.UUID || 'N/A'), short: true },
-      {
-        title: 'Details',
-        value: String(Context.Description || 'No additional details were provided.'),
-        short: false,
-      },
-    ],
-    footer: 'ShowTrak Alerts',
-    ts: Math.floor(Date.now() / 1000),
-  };
+  const Body =
+    S.Mode === 'text'
+      ? { text: OneLineSummary(Context) }
+      : {
+          attachments: [
+            {
+              color: colorForSeverity(Context.Severity),
+              title: AlertTitle(Context),
+              fields: [
+                { title: 'Entity', value: String(Context.EntityName || 'Unknown'), short: true },
+                { title: 'IP', value: String(Context.IP || 'N/A'), short: true },
+              ],
+              footer: `ShowTrak Alerts · ${String(Context.TriggerType || 'Unknown')}`,
+              ts: Math.floor(Date.now() / 1000),
+            },
+          ],
+        };
 
   const Response = await requestJson({
     Url: S.WebhookURL,
     Method: 'POST',
     Timeout: S.Timeout,
-    Body: {
-      text: `ShowTrak Alert: ${String(Context.EntityName || 'Unknown')}`,
-      attachments: [Attachment],
-    },
+    Body,
   });
 
   if (!Response.Success) {

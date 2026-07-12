@@ -1,4 +1,11 @@
 import { requestJson } from './_http-shared';
+import {
+  AlertTitle,
+  ModeSettingField,
+  NormalizeMode,
+  OneLineSummary,
+  type WebhookMode,
+} from './_webhook-format';
 import type {
   ActionLogger,
   AlertActionInput,
@@ -11,14 +18,20 @@ const ID = 'discord-webhook';
 
 const Settings: AlertActionSettingField[] = [
   { Key: 'WebhookURL', Label: 'Webhook URL', Type: 'string', Default: '' },
+  ModeSettingField,
   { Key: 'Timeout', Label: 'Timeout (ms)', Type: 'number', Default: 5000, Min: 250, Max: 60000 },
 ];
 
-function NormalizeSettings(Input: unknown): { WebhookURL: string; Timeout: number } {
+function NormalizeSettings(Input: unknown): {
+  WebhookURL: string;
+  Mode: WebhookMode;
+  Timeout: number;
+} {
   const Next = (Input && typeof Input === 'object' ? Input : {}) as Record<string, unknown>;
   const Timeout = Number(Next.Timeout);
   return {
     WebhookURL: String(Next.WebhookURL || '').trim(),
+    Mode: NormalizeMode(Next.Mode),
     Timeout: Number.isFinite(Timeout) ? Math.max(250, Math.min(60000, Math.round(Timeout))) : 5000,
   };
 }
@@ -52,39 +65,35 @@ async function Execute(
 ): Promise<AlertActionResult> {
   const S = NormalizeSettings(Action && Action.Settings ? Action.Settings : {});
 
-  const Embed = {
-    title: `ShowTrak Alert: ${(Context.TriggerType as string) || 'Unknown'}`,
-    color: colorForSeverity(Context.Severity),
-    fields: [
-      { name: 'Entity', value: String(Context.EntityName || 'Unknown'), inline: true },
-      { name: 'Type', value: String(Context.EntityType || 'Unknown'), inline: true },
-      { name: 'Severity', value: String(Context.Severity || 'info'), inline: true },
-      { name: 'IP', value: String(Context.IP || 'N/A'), inline: true },
-      {
-        name: 'Group',
-        value: Context.GroupID == null ? 'No Group' : String(Context.GroupID),
-        inline: true,
-      },
-      { name: 'UUID', value: String(Context.UUID || 'N/A'), inline: true },
-      {
-        name: 'Details',
-        value: String(Context.Description || 'No additional details were provided.'),
-      },
-    ],
-    timestamp: new Date().toISOString(),
-    footer: {
-      text: 'ShowTrak Alerts',
-    },
-  };
+  const Body =
+    S.Mode === 'text'
+      ? {
+          username: 'ShowTrak Alerts',
+          content: OneLineSummary(Context),
+        }
+      : {
+          username: 'ShowTrak Alerts',
+          embeds: [
+            {
+              title: AlertTitle(Context),
+              color: colorForSeverity(Context.Severity),
+              fields: [
+                { name: 'Entity', value: String(Context.EntityName || 'Unknown'), inline: true },
+                { name: 'IP', value: String(Context.IP || 'N/A'), inline: true },
+              ],
+              timestamp: new Date().toISOString(),
+              footer: {
+                text: `ShowTrak Alerts · ${String(Context.TriggerType || 'Unknown')}`,
+              },
+            },
+          ],
+        };
 
   const Response = await requestJson({
     Url: S.WebhookURL,
     Method: 'POST',
     Timeout: S.Timeout,
-    Body: {
-      username: 'ShowTrak Alerts',
-      embeds: [Embed],
-    },
+    Body,
   });
 
   if (!Response.Success) {
