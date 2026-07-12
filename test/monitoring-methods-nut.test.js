@@ -1,181 +1,113 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { EventEmitter } = require('node:events');
 const path = require('node:path');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
+const { makeNutNet } = require('../test-support/nut-net-mock');
 
 function methodPath(name) {
   return path.join(__dirname, '..', 'dist', 'Modules', 'MonitoringMethods', name);
-}
-
-// A fake `net` whose Socket speaks NUT: it answers each written command line
-// with a scripted reply, so nothing touches the real network.
-//
-// `script` maps the command keyword(s) -> reply string. `behaviour` can force
-// a connection refusal (never emits 'connect', emits ECONNREFUSED) or silence
-// (connects but never replies).
-function makeNetMock({ replies = {}, refuse = false, silent = false } = {}) {
-  class FakeSocket extends EventEmitter {
-    constructor() {
-      super();
-      this.destroyed = false;
-    }
-    setTimeout() {}
-    connect() {
-      process.nextTick(() => {
-        if (refuse) {
-          const err = new Error('connect ECONNREFUSED 127.0.0.1:3493');
-          err.code = 'ECONNREFUSED';
-          this.emit('error', err);
-          this.emit('close');
-          return;
-        }
-        this.emit('connect');
-      });
-      return this;
-    }
-    write(data) {
-      if (silent || refuse) return true;
-      const line = String(data).trim();
-      // Resolve the reply for this command.
-      let reply = null;
-      if (/^USERNAME\b/.test(line)) reply = replies.USERNAME;
-      else if (/^PASSWORD\b/.test(line)) reply = replies.PASSWORD;
-      else if (/^LIST UPS\b/.test(line)) reply = replies.LIST;
-      else if (/ups\.status\b/.test(line)) reply = replies.STATUS;
-      else if (/battery\.charge\b/.test(line)) reply = replies.CHARGE;
-      else if (/^LOGOUT\b/.test(line)) reply = replies.LOGOUT || '';
-      if (reply != null && reply !== '') {
-        process.nextTick(() => {
-          if (!this.destroyed) this.emit('data', Buffer.from(reply, 'utf8'));
-        });
-      }
-      return true;
-    }
-    destroy() {
-      this.destroyed = true;
-      process.nextTick(() => this.emit('close'));
-      return this;
-    }
-  }
-  return { Socket: FakeSocket, default: { Socket: FakeSocket } };
 }
 
 function loadNut(netMock) {
   return loadWithMocks(methodPath('nut-ups.js'), { net: netMock });
 }
 
-const LIST_OK = 'BEGIN LIST UPS\nUPS ups "Server Room UPS"\nUPS backup "Rack B"\nEND LIST UPS\n';
-
 const BASE_SETTINGS = { Port: 3493, UPSName: 'ups', Timeout: 2000 };
 
-test('nut-ups module exposes the expected shape', () => {
-  const nut = loadNut(makeNetMock({ replies: {} }));
+// A UPS reporting a perfectly healthy state on all fronts.
+const HEALTHY_VARS = {
+  'ups.status': 'OL',
+  'battery.charge': '100',
+  'ups.load': '35',
+  'ups.temperature': '28',
+  'input.voltage': '231',
+  'input.voltage.nominal': '230',
+};
+
+test('nut-ups (health) module exposes the expected shape', () => {
+  const nut = loadNut(makeNutNet({}));
   assert.equal(nut.ID, 'nut-ups');
-  assert.equal(nut.Name, 'Network UPS Tools (NUT)');
+  assert.equal(nut.Name, 'UPS Health (NUT)');
   assert.ok(Array.isArray(nut.Settings));
   const keys = nut.Settings.map((s) => s.Key);
-  assert.deepEqual(keys, ['Port', 'UPSName', 'Username', 'Password', 'Timeout']);
+  // Connection settings plus the health thresholds.
+  assert.ok(keys.includes('Port'));
+  assert.ok(keys.includes('UPSName'));
+  assert.ok(keys.includes('MinCharge'));
+  assert.ok(keys.includes('MaxLoad'));
+  assert.ok(keys.includes('MaxTemperature'));
+  assert.ok(keys.includes('VoltageTolerancePercent'));
 });
 
-test('nut-ups reports online when ups.status is OL', async () => {
-  const nut = loadNut(
-    makeNetMock({
-      replies: {
-        LIST: LIST_OK,
-        STATUS: 'VAR ups ups.status "OL"\n',
-        CHARGE: 'VAR ups battery.charge "100"\n',
-      },
-    })
-  );
-  const result = await nut.Run({ Address: '127.0.0.1', Settings: BASE_SETTINGS });
-  assert.equal(result.Success, true);
-  assert.ok(!result.Degraded);
-  assert.equal(result.Status, 'OL');
-  assert.equal(result.BatteryCharge, '100');
-  assert.equal(typeof result.LatencyMs, 'number');
+test('nut-ups (health) is online when every factor is within limits', async () => {
+  const nut = loadNut(makeNutNet({ vars: HEALTHY_VARS }));
+  const r = await nut.Run({ Address: '127.0.0.1', Settings: BASE_SETTINGS });
+  assert.equal(r.Success, true);
+  assert.ok(!r.Degraded);
+  assert.equal(r.Status, 'OL');
+  assert.equal(r.BatteryCharge, 100);
+  assert.equal(r.Load, 35);
 });
 
-test('nut-ups is degraded (On battery) when status is OB', async () => {
-  const nut = loadNut(
-    makeNetMock({
-      replies: {
-        LIST: LIST_OK,
-        STATUS: 'VAR ups ups.status "OB DISCHRG"\n',
-        CHARGE: 'VAR ups battery.charge "87"\n',
-      },
-    })
-  );
-  const result = await nut.Run({ Address: '127.0.0.1', Settings: BASE_SETTINGS });
-  assert.equal(result.Success, true);
-  assert.equal(result.Degraded, true);
-  assert.equal(result.DegradedReason, 'On battery');
-  assert.equal(result.BatteryCharge, '87');
+test('nut-ups (health) is degraded on battery', async () => {
+  const nut = loadNut(makeNutNet({ vars: { ...HEALTHY_VARS, 'ups.status': 'OB DISCHRG' } }));
+  const r = await nut.Run({ Address: '127.0.0.1', Settings: BASE_SETTINGS });
+  assert.equal(r.Degraded, true);
+  assert.match(r.DegradedReason, /battery/i);
 });
 
-test('nut-ups is degraded (Low battery) when status contains LB', async () => {
+test('nut-ups (health) combines multiple breached factors into one reason', async () => {
   const nut = loadNut(
-    makeNetMock({
-      replies: {
-        LIST: LIST_OK,
-        STATUS: 'VAR ups ups.status "OB LB"\n',
-        CHARGE: 'VAR ups battery.charge "8"\n',
-      },
+    makeNutNet({
+      vars: { ...HEALTHY_VARS, 'battery.charge': '20', 'ups.load': '99' },
     })
   );
-  const result = await nut.Run({ Address: '127.0.0.1', Settings: BASE_SETTINGS });
-  assert.equal(result.Success, true);
-  assert.equal(result.Degraded, true);
-  assert.equal(result.DegradedReason, 'Low battery');
+  const r = await nut.Run({ Address: '127.0.0.1', Settings: BASE_SETTINGS });
+  assert.equal(r.Degraded, true);
+  assert.match(r.DegradedReason, /Charge/);
+  assert.match(r.DegradedReason, /Load/);
+  assert.match(r.DegradedReason, /;/); // multiple reasons joined
 });
 
-test('nut-ups is degraded (UPS not found) when the named UPS is absent', async () => {
-  const nut = loadNut(
-    makeNetMock({
-      replies: {
-        LIST: LIST_OK,
-        STATUS: 'VAR ups ups.status "OL"\n',
-        CHARGE: 'VAR ups battery.charge "100"\n',
-      },
-    })
-  );
-  const result = await nut.Run({
+test('nut-ups (health) skips variables the UPS does not report', async () => {
+  // Only status + charge available; no load/temp/voltage. Should still be online.
+  const nut = loadNut(makeNutNet({ vars: { 'ups.status': 'OL', 'battery.charge': '90' } }));
+  const r = await nut.Run({ Address: '127.0.0.1', Settings: BASE_SETTINGS });
+  assert.equal(r.Success, true);
+  assert.ok(!r.Degraded);
+});
+
+test('nut-ups (health) is degraded (UPS not found) when the named UPS is absent', async () => {
+  const nut = loadNut(makeNutNet({ vars: HEALTHY_VARS }));
+  const r = await nut.Run({
     Address: '127.0.0.1',
     Settings: { ...BASE_SETTINGS, UPSName: 'missing' },
   });
-  assert.equal(result.Success, true);
-  assert.equal(result.Degraded, true);
-  assert.equal(result.DegradedReason, 'UPS not found');
+  assert.equal(r.Success, true);
+  assert.equal(r.Degraded, true);
+  assert.equal(r.DegradedReason, 'UPS not found');
 });
 
-test('nut-ups is offline when the connection is refused', async () => {
-  const nut = loadNut(makeNetMock({ refuse: true }));
-  const result = await nut.Run({ Address: '127.0.0.1', Settings: BASE_SETTINGS });
-  assert.equal(result.Success, false);
-  assert.match(result.Error, /ECONNREFUSED/);
+test('nut-ups (health) is offline when the connection is refused', async () => {
+  const nut = loadNut(makeNutNet({ refuse: true }));
+  const r = await nut.Run({ Address: '127.0.0.1', Settings: BASE_SETTINGS });
+  assert.equal(r.Success, false);
+  assert.match(r.Error, /ECONNREFUSED/);
 });
 
-test('nut-ups is offline on ERR ACCESS-DENIED during auth', async () => {
-  const nut = loadNut(
-    makeNetMock({
-      replies: {
-        USERNAME: 'OK\n',
-        PASSWORD: 'ERR ACCESS-DENIED\n',
-        LIST: LIST_OK,
-      },
-    })
-  );
-  const result = await nut.Run({
+test('nut-ups (health) is offline on ERR ACCESS-DENIED during auth', async () => {
+  const nut = loadNut(makeNutNet({ auth: { PASSWORD: 'ERR ACCESS-DENIED\n' } }));
+  const r = await nut.Run({
     Address: '127.0.0.1',
     Settings: { ...BASE_SETTINGS, Username: 'admin', Password: 'wrong' },
   });
-  assert.equal(result.Success, false);
-  assert.match(result.Error, /ACCESS-DENIED/i);
+  assert.equal(r.Success, false);
+  assert.match(r.Error, /ACCESS-DENIED/i);
 });
 
-test('nut-ups validates address and UPS name before probing', async () => {
-  const nut = loadNut(makeNetMock({ replies: {} }));
+test('nut-ups (health) validates address and UPS name before probing', async () => {
+  const nut = loadNut(makeNutNet({}));
   assert.equal((await nut.Run({})).Success, false);
   assert.equal(
     (await nut.Run({ Address: '127.0.0.1', Settings: { Port: 3493, UPSName: '' } })).Success,
@@ -187,24 +119,23 @@ test('nut-ups validates address and UPS name before probing', async () => {
   );
 });
 
-test('nut-ups internal parse + classify helpers behave correctly', () => {
-  const nut = loadNut(makeNetMock({ replies: {} }));
-  const { ParseListUps, ParseVarValue, ParseErr, ClassifyStatus, UpsNameMatches } = nut._internal;
+test('nut-ups EvaluateHealth flags each factor correctly', () => {
+  const nut = loadNut(makeNutNet({}));
+  const { EvaluateHealth } = nut._internal;
+  const T = { MinCharge: 50, MaxLoad: 90, MaxTemperature: 45, VoltageTolerancePercent: 15 };
 
-  assert.deepEqual(ParseListUps(LIST_OK), ['ups', 'backup']);
-  assert.equal(ParseVarValue('VAR ups ups.status "OL CHRG"'), 'OL CHRG');
-  assert.equal(ParseVarValue('ERR VAR-NOT-SUPPORTED'), null);
-  assert.equal(ParseErr('ERR ACCESS-DENIED'), 'ACCESS-DENIED');
-  assert.equal(ParseErr('OK'), null);
-
-  assert.equal(ClassifyStatus('OL').Online, true);
-  assert.equal(ClassifyStatus('OL CHRG').Online, true);
-  assert.equal(ClassifyStatus('OB DISCHRG').DegradedReason, 'On battery');
-  assert.equal(ClassifyStatus('OB LB').DegradedReason, 'Low battery');
-  assert.equal(ClassifyStatus('RB').DegradedReason, 'Replace battery');
-  assert.equal(ClassifyStatus('OVER').DegradedReason, 'Overload');
-  assert.equal(ClassifyStatus('').DegradedReason, 'Unknown status');
-
-  assert.equal(UpsNameMatches(['ups', 'backup'], 'UPS'), true);
-  assert.equal(UpsNameMatches(['ups'], 'missing'), false);
+  assert.deepEqual(
+    EvaluateHealth(
+      { Status: 'OL', Charge: 100, Load: 20, Temperature: 25, Voltage: 230, Nominal: 230 },
+      T
+    ),
+    []
+  );
+  assert.equal(EvaluateHealth({ Status: 'OB' }, T).length, 1);
+  assert.match(EvaluateHealth({ Charge: 10 }, T)[0], /Charge/);
+  assert.match(EvaluateHealth({ Load: 99 }, T)[0], /Load/);
+  assert.match(EvaluateHealth({ Temperature: 60 }, T)[0], /Temp/);
+  assert.match(EvaluateHealth({ Voltage: 180, Nominal: 230 }, T)[0], /Voltage/);
+  // Unreported factors (null) are skipped.
+  assert.deepEqual(EvaluateHealth({ Status: 'OL' }, T), []);
 });
