@@ -70,7 +70,7 @@ export interface AlertRuleRow {
   RuleID: number;
   Title: string;
   Scope: string; // JSON
-  TriggerType: string;
+  TriggerType: string; // JSON array of trigger type IDs (legacy rows store a bare string)
   TriggerConfig: string | null; // JSON
   Actions: string; // JSON
   Enabled: number; // 0 | 1

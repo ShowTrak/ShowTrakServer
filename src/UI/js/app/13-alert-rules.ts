@@ -10,6 +10,7 @@ import {
   AlertRulesCache,
   AlertScopeGroups,
   AlertScopeSelected,
+  AlertTriggerSelected,
   AlertTriggerTypesCache,
   AllClients,
   AudioAssetsCache,
@@ -23,6 +24,7 @@ import {
   setAlertScopeGroups,
   setAlertScopeOptions,
   setAlertScopeSelected,
+  setAlertTriggerSelected,
   setAlertTriggerTypesCache,
 } from './01-state';
 import type { AlertScopeModel } from './01-state';
@@ -102,10 +104,110 @@ export function ParseAlertScopeSelection(): ParsedAlertScope {
   return parseScopeSelection(AlertScopeSelected);
 }
 
-export function NormalizeAlertTriggerType(TriggerType: string) {
-  const Normalized = `${TriggerType || ''}`.trim().toUpperCase();
-  if (ALERT_TRIGGER_ALLOWLIST.has(Normalized)) return Normalized;
-  return 'CLIENT_OFFLINE';
+// Keep only allowed, deduped trigger IDs. Empty input yields an empty list; the
+// editor supplies a sensible default separately (see DefaultAlertTriggerTypes).
+export function NormalizeAlertTriggerTypes(TriggerTypes: unknown): string[] {
+  const List = Array.isArray(TriggerTypes)
+    ? TriggerTypes
+    : TriggerTypes == null
+      ? []
+      : [TriggerTypes];
+  const Out: string[] = [];
+  const Seen = new Set<string>();
+  for (const Raw of List) {
+    const Normalized = `${Raw == null ? '' : Raw}`.trim().toUpperCase();
+    if (!ALERT_TRIGGER_ALLOWLIST.has(Normalized) || Seen.has(Normalized)) continue;
+    Seen.add(Normalized);
+    Out.push(Normalized);
+  }
+  return Out;
+}
+
+// First allowed trigger from the catalog, falling back to CLIENT_OFFLINE. Used
+// as the default selection for a brand-new rule so a trigger is always chosen.
+export function DefaultAlertTriggerTypes(): string[] {
+  const First = (AlertTriggerTypesCache || []).find((T) =>
+    ALERT_TRIGGER_ALLOWLIST.has(`${T.ID || ''}`.toUpperCase())
+  );
+  return [First ? `${First.ID}`.toUpperCase() : 'CLIENT_OFFLINE'];
+}
+
+// Human-readable trigger names (from the loaded catalog) for a list of IDs.
+function triggerNamesByIDs(TriggerTypes: string[]): string[] {
+  return TriggerTypes.map((ID) => {
+    const Match = (AlertTriggerTypesCache || []).find(
+      (T) => `${T.ID || ''}`.toUpperCase() === ID
+    );
+    return Match ? Match.Name : ID;
+  });
+}
+
+export function CloseAlertTriggerDropdown() {
+  $('#ALERT_RULE_TRIGGER_MENU').addClass('d-none');
+}
+
+// Render the trigger multiselect toggle text + checkbox menu from the current
+// AlertTriggerSelected state, offering every allowlisted trigger in the catalog.
+export function RenderAlertTriggerDropdown() {
+  const Selected = new Set(NormalizeAlertTriggerTypes(AlertTriggerSelected));
+  const SelectedNames = triggerNamesByIDs(Array.from(Selected));
+  let ToggleText: string;
+  if (!SelectedNames.length) ToggleText = 'Select triggers';
+  else if (SelectedNames.length === 1) ToggleText = SelectedNames[0];
+  else ToggleText = `${SelectedNames[0]} +${SelectedNames.length - 1}`;
+
+  $('#ALERT_RULE_TRIGGER_TOGGLE').html(
+    `<span>${Safe(ToggleText)}</span><i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>`
+  );
+
+  const OptionsHtml = (AlertTriggerTypesCache || [])
+    .filter((T) => ALERT_TRIGGER_ALLOWLIST.has(`${T.ID || ''}`.toUpperCase()))
+    .map((T) => {
+      const ID = `${T.ID}`.toUpperCase();
+      const Checked = Selected.has(ID) ? 'checked' : '';
+      return `
+        <label class="alert-multiselect-option">
+          <input type="checkbox" value="${Safe(ID)}" ${Checked} />
+          <span>${Safe(T.Name)}</span>
+        </label>
+      `;
+    })
+    .join('');
+
+  $('#ALERT_RULE_TRIGGER_MENU').html(
+    OptionsHtml || '<div class="text-muted text-sm p-2">No triggers available.</div>'
+  );
+}
+
+export function BindAlertTriggerDropdown() {
+  $('#ALERT_RULE_TRIGGER_TOGGLE')
+    .off('click.alertTrigger')
+    .on('click.alertTrigger', function (Event) {
+      Event.preventDefault();
+      Event.stopPropagation();
+      const $menu = $('#ALERT_RULE_TRIGGER_MENU');
+      $menu.toggleClass('d-none');
+    });
+
+  $('#ALERT_RULE_TRIGGER_MENU')
+    .off('change.alertTrigger')
+    .on('change.alertTrigger', 'input[type="checkbox"]', function () {
+      const Value = `${$(this).val() || ''}`.toUpperCase();
+      const Checked = $(this).is(':checked');
+      const Next = new Set(NormalizeAlertTriggerTypes(AlertTriggerSelected));
+      if (Checked) Next.add(Value);
+      else Next.delete(Value);
+      setAlertTriggerSelected(NormalizeAlertTriggerTypes(Array.from(Next)));
+      RenderAlertTriggerDropdown();
+      $('#ALERT_RULE_TRIGGER_MENU').removeClass('d-none');
+    });
+
+  $(document)
+    .off('mousedown.alertTrigger touchstart.alertTrigger')
+    .on('mousedown.alertTrigger touchstart.alertTrigger', function (Event) {
+      const Inside = $(Event.target).closest('#ALERT_RULE_TRIGGER_DROPDOWN').length > 0;
+      if (!Inside) CloseAlertTriggerDropdown();
+    });
 }
 
 // The scope model/resolution/rendering now live in the shared ./scope-dropdown
@@ -459,11 +561,10 @@ export function ResetAlertRuleEditor() {
   setAlertScopeSelected([]);
   RenderScopeDropdowns();
 
-  const DefaultTrigger = AlertTriggerTypesCache.length
-    ? NormalizeAlertTriggerType(AlertTriggerTypesCache[0].ID)
-    : 'CLIENT_OFFLINE';
-  $('#ALERT_RULE_TRIGGER_TYPE').val(DefaultTrigger);
-  RenderAlertRuleTriggerConfig(DefaultTrigger, {});
+  const DefaultTriggers = DefaultAlertTriggerTypes();
+  setAlertTriggerSelected(DefaultTriggers);
+  RenderAlertTriggerDropdown();
+  RenderAlertRuleTriggerConfig(DefaultTriggers[0], {});
 
   RenderAlertActionsList();
   ShowAlertRuleMainContent();
@@ -484,9 +585,10 @@ export function OpenAlertRuleEditor(Rule: AlertRuleView | null) {
 
   PopulateAlertScopeOptions(Rule);
 
-  const TriggerType = NormalizeAlertTriggerType(Rule.TriggerType || 'CLIENT_OFFLINE');
-  $('#ALERT_RULE_TRIGGER_TYPE').val(TriggerType);
-  RenderAlertRuleTriggerConfig(TriggerType, Rule.TriggerConfig || {});
+  const TriggerTypes = NormalizeAlertTriggerTypes(Rule.TriggerTypes);
+  setAlertTriggerSelected(TriggerTypes.length ? TriggerTypes : DefaultAlertTriggerTypes());
+  RenderAlertTriggerDropdown();
+  RenderAlertRuleTriggerConfig(AlertTriggerSelected[0], Rule.TriggerConfig || {});
 
   const Actions = Array.isArray(Rule.Actions) ? Rule.Actions : [];
   setAlertRuleDraftActions(
@@ -533,6 +635,17 @@ export function triggerSummaryText(TriggerType: string) {
     return 'has a non-critical application stopped';
   }
   return 'triggers';
+}
+
+// Join several trigger phrases with "or" so a multi-trigger rule reads naturally
+// (e.g. "is offline or is online"). Falls back to a generic phrase when empty.
+export function triggersSummaryText(TriggerTypes: string[]) {
+  const List = NormalizeAlertTriggerTypes(TriggerTypes);
+  if (!List.length) return 'triggers';
+  const Phrases = List.map((Type) => triggerSummaryText(Type));
+  if (Phrases.length === 1) return Phrases[0];
+  if (Phrases.length === 2) return `${Phrases[0]} or ${Phrases[1]}`;
+  return `${Phrases.slice(0, -1).join(', ')}, or ${Phrases[Phrases.length - 1]}`;
 }
 
 export function summarizeActionType(Type: string, Count: number) {
@@ -616,7 +729,7 @@ export function scopedTargetsInfo(Rule: AlertRuleView) {
 }
 
 export function buildRuleSummary(Rule: AlertRuleView) {
-  const TriggerText = triggerSummaryText(Rule && Rule.TriggerType ? Rule.TriggerType : '');
+  const TriggerText = triggersSummaryText(Rule && Rule.TriggerTypes ? Rule.TriggerTypes : []);
   const ScopeInfo = scopedTargetsInfo(Rule);
   const Actions = Array.isArray(Rule && Rule.Actions) ? Rule.Actions : [];
 
@@ -681,15 +794,13 @@ export function RenderAlertRuleManagerList() {
 
 export function BuildAlertRulePayloadFromEditor() {
   const Title = ($('#ALERT_RULE_TITLE').val() || '').toString().trim();
-  const TriggerType = NormalizeAlertTriggerType(
-    ($('#ALERT_RULE_TRIGGER_TYPE').val() || '').toString().trim()
-  );
+  const TriggerTypes = NormalizeAlertTriggerTypes(AlertTriggerSelected);
   const Scope = ParseAlertScopeSelection();
 
   return {
     Title,
     Scope,
-    TriggerType,
+    TriggerTypes,
     TriggerConfig: CollectAlertTriggerConfig(),
     Actions: AlertRuleDraftActions,
     Enabled: true,
@@ -712,8 +823,8 @@ export async function AutoSaveAlertRuleFromEditor() {
 
   const Problem = !Payload.Title
     ? 'Rule not saved — a title is required'
-    : !Payload.TriggerType
-      ? 'Rule not saved — a trigger is required'
+    : !Array.isArray(Payload.TriggerTypes) || !Payload.TriggerTypes.length
+      ? 'Rule not saved — select at least one trigger'
       : !Array.isArray(Payload.Actions) || !Payload.Actions.length
         ? 'Rule not saved — add at least one action'
         : null;
@@ -806,23 +917,12 @@ export async function OpenAlertRuleManager() {
   await LoadAudioAssets();
   await PopulateAlertScopeOptions();
 
-  const TriggerOptions = (AlertTriggerTypesCache || [])
-    .filter((T) => ALERT_TRIGGER_ALLOWLIST.has(`${T.ID || ''}`.toUpperCase()))
-    .map((T) => `<option value="${Safe(T.ID)}">${Safe(T.Name)}</option>`)
-    .join('');
-  $('#ALERT_RULE_TRIGGER_TYPE').html(TriggerOptions);
-
   RenderAlertModalHeaders();
   BindScopeDropdownHandlers();
+  BindAlertTriggerDropdown();
   ResetAlertRuleEditor();
   RenderAlertRuleManagerList();
   ShowAlertListPanel();
-
-  $('#ALERT_RULE_TRIGGER_TYPE')
-    .off('change.alertRule')
-    .on('change.alertRule', function () {
-      RenderAlertRuleTriggerConfig($(this).val(), {});
-    });
 
   $('#ALERT_RULE_CREATE_BUTTON')
     .off('click.alertRule')

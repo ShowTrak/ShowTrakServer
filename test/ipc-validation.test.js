@@ -319,7 +319,7 @@ test('IPCValidation.AlertRuleCreatePayload normalizes scope, trigger, and action
   assert.equal(payload.Scope.Workspace, true);
   assert.deepEqual(payload.Scope.Groups, [1, 2]);
   assert.deepEqual(payload.Scope.Clients, ['abc', 'monitor:5']);
-  assert.equal(payload.TriggerType, 'CLIENT_OFFLINE');
+  assert.deepEqual(payload.TriggerTypes, ['CLIENT_OFFLINE']);
   assert.deepEqual(payload.TriggerConfig, { Threshold: 3 });
   assert.equal(payload.Actions.length, 1);
   assert.equal(payload.Actions[0].Type, 'discord-webhook');
@@ -375,13 +375,46 @@ test('IPCValidation.AlertRuleUpdatePayload validates partial alert updates', () 
   });
   assert.equal(payload.Title, 'Renamed rule');
   assert.equal(payload.Enabled, true);
-  assert.equal(payload.TriggerType, 'CLIENT_DEGRADED');
+  assert.deepEqual(payload.TriggerTypes, ['CLIENT_DEGRADED']);
 
   assert.throws(
     () => IPCValidation.AlertRuleUpdatePayload({ TriggerType: 'BOGUS' }),
     /Unsupported TriggerType/i
   );
   assert.throws(() => IPCValidation.AlertRuleUpdatePayload('nope'), /must be an object/i);
+});
+
+test('IPCValidation alert payloads accept multiple trigger types', () => {
+  const created = IPCValidation.AlertRuleCreatePayload({
+    Title: 'Online or offline',
+    Scope: {},
+    TriggerTypes: ['CLIENT_ONLINE', 'CLIENT_OFFLINE', 'CLIENT_ONLINE'],
+    Actions: [{ Type: 'http-api', Settings: {} }],
+    Enabled: true,
+  });
+  // Duplicates are collapsed, order preserved.
+  assert.deepEqual(created.TriggerTypes, ['CLIENT_ONLINE', 'CLIENT_OFFLINE']);
+
+  const updated = IPCValidation.AlertRuleUpdatePayload({
+    TriggerTypes: ['APPLICATION_STARTED', 'APPLICATION_STOPPED'],
+  });
+  assert.deepEqual(updated.TriggerTypes, ['APPLICATION_STARTED', 'APPLICATION_STOPPED']);
+
+  // An empty selection is rejected, as is a bad entry within an otherwise-valid list.
+  assert.throws(
+    () =>
+      IPCValidation.AlertRuleCreatePayload({
+        Title: 'Empty triggers',
+        Scope: {},
+        TriggerTypes: [],
+        Actions: [{ Type: 'http-api', Settings: {} }],
+      }),
+    /At least one TriggerType is required/i
+  );
+  assert.throws(
+    () => IPCValidation.AlertRuleUpdatePayload({ TriggerTypes: ['CLIENT_ONLINE', 'NOPE'] }),
+    /Unsupported TriggerType/i
+  );
 });
 
 test('IPCValidation alert payloads accept critical USB trigger types', () => {
@@ -392,12 +425,12 @@ test('IPCValidation alert payloads accept critical USB trigger types', () => {
     Actions: [{ Type: 'http-api', Settings: {} }],
     Enabled: true,
   });
-  assert.equal(created.TriggerType, 'CRITICAL_USB_DEVICE_CONNECTED');
+  assert.deepEqual(created.TriggerTypes, ['CRITICAL_USB_DEVICE_CONNECTED']);
 
   const updated = IPCValidation.AlertRuleUpdatePayload({
     TriggerType: 'CRITICAL_USB_DEVICE_DISCONNECTED',
   });
-  assert.equal(updated.TriggerType, 'CRITICAL_USB_DEVICE_DISCONNECTED');
+  assert.deepEqual(updated.TriggerTypes, ['CRITICAL_USB_DEVICE_DISCONNECTED']);
 });
 
 test('IPCValidation alert payloads accept non-critical USB trigger types', () => {
@@ -408,12 +441,12 @@ test('IPCValidation alert payloads accept non-critical USB trigger types', () =>
     Actions: [{ Type: 'http-api', Settings: {} }],
     Enabled: true,
   });
-  assert.equal(created.TriggerType, 'NON_CRITICAL_USB_DEVICE_CONNECTED');
+  assert.deepEqual(created.TriggerTypes, ['NON_CRITICAL_USB_DEVICE_CONNECTED']);
 
   const updated = IPCValidation.AlertRuleUpdatePayload({
     TriggerType: 'NON_CRITICAL_USB_DEVICE_DISCONNECTED',
   });
-  assert.equal(updated.TriggerType, 'NON_CRITICAL_USB_DEVICE_DISCONNECTED');
+  assert.deepEqual(updated.TriggerTypes, ['NON_CRITICAL_USB_DEVICE_DISCONNECTED']);
 });
 
 test('IPCValidation alert payloads accept application trigger types', () => {
@@ -424,10 +457,10 @@ test('IPCValidation alert payloads accept application trigger types', () => {
     Actions: [{ Type: 'http-api', Settings: {} }],
     Enabled: true,
   });
-  assert.equal(created.TriggerType, 'APPLICATION_STARTED');
+  assert.deepEqual(created.TriggerTypes, ['APPLICATION_STARTED']);
 
   const updated = IPCValidation.AlertRuleUpdatePayload({
     TriggerType: 'CRITICAL_APPLICATION_STOPPED',
   });
-  assert.equal(updated.TriggerType, 'CRITICAL_APPLICATION_STOPPED');
+  assert.deepEqual(updated.TriggerTypes, ['CRITICAL_APPLICATION_STOPPED']);
 });

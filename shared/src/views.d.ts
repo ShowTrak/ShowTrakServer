@@ -475,7 +475,8 @@ export interface AlertRuleView {
   RuleID: number;
   Title: string;
   Scope: AlertRuleScope;
-  TriggerType: string;
+  /** One or more stimuli that fire this rule; the rule runs when ANY of them matches. */
+  TriggerTypes: string[];
   TriggerConfig: Record<string, unknown>;
   Actions: AlertRuleActionView[];
   Enabled: boolean;

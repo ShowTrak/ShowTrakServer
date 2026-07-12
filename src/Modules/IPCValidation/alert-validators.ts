@@ -95,15 +95,26 @@ export = function registerAlertValidators(Manager: IPCValidationManager): void {
     return out;
   }
 
-  function normalizeAlertTriggerType(value: unknown) {
-    const TriggerType = normalizeNonEmptyString(value, 'TriggerType', {
-      minLength: 2,
-      maxLength: 64,
-    });
-    if (!ALERT_TRIGGER_TYPES.has(TriggerType)) {
-      fail(`Unsupported TriggerType: ${TriggerType}`);
+  // Accepts an array of trigger IDs (preferred) or a single legacy string, and
+  // returns a deduped, validated, non-empty array.
+  function normalizeAlertTriggerTypes(value: unknown): string[] {
+    const list = Array.isArray(value) ? value : value == null ? [] : [value];
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const raw of list) {
+      const TriggerType = normalizeNonEmptyString(raw, 'TriggerType', {
+        minLength: 2,
+        maxLength: 64,
+      });
+      if (!ALERT_TRIGGER_TYPES.has(TriggerType)) {
+        fail(`Unsupported TriggerType: ${TriggerType}`);
+      }
+      if (seen.has(TriggerType)) continue;
+      seen.add(TriggerType);
+      out.push(TriggerType);
     }
-    return TriggerType;
+    if (!out.length) fail('At least one TriggerType is required');
+    return out;
   }
 
   function normalizeAlertTriggerConfig(value: unknown): Record<string, unknown> {
@@ -130,7 +141,11 @@ export = function registerAlertValidators(Manager: IPCValidationManager): void {
     const out: Record<string, unknown> = {};
     out.Title = normalizeNonEmptyString(value.Title, 'Title', { minLength: 2, maxLength: 120 });
     out.Scope = normalizeAlertScope(value.Scope);
-    out.TriggerType = normalizeAlertTriggerType(value.TriggerType);
+    out.TriggerTypes = normalizeAlertTriggerTypes(
+      Object.prototype.hasOwnProperty.call(value, 'TriggerTypes')
+        ? value.TriggerTypes
+        : value.TriggerType
+    );
     out.TriggerConfig = normalizeAlertTriggerConfig(value.TriggerConfig);
     out.Actions = normalizeAlertActions(value.Actions);
     out.Enabled = Object.prototype.hasOwnProperty.call(value, 'Enabled') ? !!value.Enabled : true;
@@ -147,8 +162,10 @@ export = function registerAlertValidators(Manager: IPCValidationManager): void {
     if (Object.prototype.hasOwnProperty.call(value, 'Scope')) {
       out.Scope = normalizeAlertScope(value.Scope);
     }
-    if (Object.prototype.hasOwnProperty.call(value, 'TriggerType')) {
-      out.TriggerType = normalizeAlertTriggerType(value.TriggerType);
+    if (Object.prototype.hasOwnProperty.call(value, 'TriggerTypes')) {
+      out.TriggerTypes = normalizeAlertTriggerTypes(value.TriggerTypes);
+    } else if (Object.prototype.hasOwnProperty.call(value, 'TriggerType')) {
+      out.TriggerTypes = normalizeAlertTriggerTypes(value.TriggerType);
     }
     if (Object.prototype.hasOwnProperty.call(value, 'TriggerConfig')) {
       out.TriggerConfig = normalizeAlertTriggerConfig(value.TriggerConfig);

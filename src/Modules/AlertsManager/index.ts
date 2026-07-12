@@ -10,7 +10,13 @@ import type { AlertTriggerType } from '@showtrak/protocol';
 import type { AlertRuleWriteRow } from '../DB/repositories/alert-rules';
 
 import { TRIGGERS } from './triggers';
-import { normalizeRuleRow, toRowScope, toRowActions, toRowTriggerConfig } from './serialization';
+import {
+  normalizeRuleRow,
+  toRowScope,
+  toRowActions,
+  toRowTriggerConfig,
+  toRowTriggerTypes,
+} from './serialization';
 import { isScopeMatch, triggerMatches, describeContext } from './evaluation';
 import type { AlertContext, AlertRule } from './evaluation';
 
@@ -48,7 +54,7 @@ interface AlertTargetLike {
 interface AlertRuleCreatePayload {
   Title: string;
   Scope?: { Workspace?: unknown; Groups?: unknown; Clients?: unknown };
-  TriggerType: string;
+  TriggerTypes: string[];
   TriggerConfig?: Record<string, unknown>;
   Actions?: unknown[];
   Enabled?: unknown;
@@ -119,7 +125,8 @@ async function writeHistory(
   };
   const [Err] = await HistoryRepo.Insert({
     RuleID: Rule.RuleID,
-    TriggerType: Rule.TriggerType,
+    // Record the specific stimulus that fired, not the rule's whole trigger list.
+    TriggerType: Context.TriggerType,
     TriggerSource: Context.EntityType,
     Context: JSON.stringify(Context),
     Result: JSON.stringify(ResultPayload),
@@ -169,7 +176,7 @@ async function executeRule(Rule: AlertRule, Context: AlertContext) {
   BroadcastManager.emit('AlertTriggered', {
     RuleID: Rule.RuleID,
     RuleTitle: Rule.Title,
-    TriggerType: Rule.TriggerType,
+    TriggerType: Context.TriggerType,
     Context: EventContext,
     Results,
     Timestamp: Date.now(),
@@ -257,7 +264,7 @@ Manager.Create = async (Payload: AlertRuleCreatePayload) => {
   const Row: AlertRuleWriteRow = {
     Title: Payload.Title,
     Scope: toRowScope(Payload.Scope || {}),
-    TriggerType: Payload.TriggerType,
+    TriggerType: toRowTriggerTypes(Payload.TriggerTypes),
     TriggerConfig: toRowTriggerConfig(Payload.TriggerConfig || {}),
     Actions: toRowActions(Payload.Actions || []),
     Enabled: Payload.Enabled ? 1 : 0,
@@ -287,9 +294,9 @@ Manager.Update = async (RuleID: unknown, Payload: AlertRuleUpdatePayload) => {
   const Next = {
     Title: Object.prototype.hasOwnProperty.call(Payload, 'Title') ? Payload.Title : Existing.Title,
     Scope: Object.prototype.hasOwnProperty.call(Payload, 'Scope') ? Payload.Scope : Existing.Scope,
-    TriggerType: Object.prototype.hasOwnProperty.call(Payload, 'TriggerType')
-      ? Payload.TriggerType
-      : Existing.TriggerType,
+    TriggerTypes: Object.prototype.hasOwnProperty.call(Payload, 'TriggerTypes')
+      ? Payload.TriggerTypes
+      : Existing.TriggerTypes,
     TriggerConfig: Object.prototype.hasOwnProperty.call(Payload, 'TriggerConfig')
       ? Payload.TriggerConfig
       : Existing.TriggerConfig,
@@ -303,12 +310,12 @@ Manager.Update = async (RuleID: unknown, Payload: AlertRuleUpdatePayload) => {
 
   const UpdatedAt = Date.now();
 
-  // Title/TriggerType are never absent at runtime (the ternary falls back to the
+  // Title/TriggerTypes are never absent at runtime (the ternary falls back to the
   // Existing rule's values), so the persisted row satisfies AlertRuleWriteRow.
   const [Err] = await RulesRepo.Update(ID, {
     Title: Next.Title,
     Scope: toRowScope(Next.Scope as { Workspace?: unknown; Groups?: unknown; Clients?: unknown }),
-    TriggerType: Next.TriggerType,
+    TriggerType: toRowTriggerTypes(Next.TriggerTypes),
     TriggerConfig: toRowTriggerConfig(Next.TriggerConfig),
     Actions: toRowActions(Next.Actions),
     Enabled: Next.Enabled ? 1 : 0,

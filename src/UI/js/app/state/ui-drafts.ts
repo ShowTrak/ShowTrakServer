@@ -96,6 +96,12 @@ export function setAlertScopeSelected(value: string[]): void {
   AlertScopeSelected = value;
 }
 
+// Trigger types currently selected in the alert-rule editor's trigger multiselect.
+export let AlertTriggerSelected: string[] = [];
+export function setAlertTriggerSelected(value: string[]): void {
+  AlertTriggerSelected = value;
+}
+
 export let AlertActionEditorIsCreating = false;
 export function setAlertActionEditorIsCreating(value: boolean): void {
   AlertActionEditorIsCreating = value;

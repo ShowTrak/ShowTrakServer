@@ -53,17 +53,25 @@ test('AlertsManager supports CRUD and action type metadata', async () => {
   const [allErr, allRules] = await Manager.GetAll();
   assert.equal(allErr, null);
   assert.equal(allRules.length, 1);
+  // Legacy rows storing a bare trigger string normalize to a one-item list.
+  assert.deepEqual(allRules[0].TriggerTypes, ['CLIENT_OFFLINE']);
 
   const [createErr, created] = await Manager.Create({
     Title: 'Rule 2',
     Scope: { Workspace: true, Groups: [], Clients: [] },
-    TriggerType: 'CLIENT_ONLINE',
+    TriggerTypes: ['CLIENT_ONLINE', 'CLIENT_OFFLINE'],
     TriggerConfig: {},
     Actions: [{ Type: 'http-api', Settings: {} }],
     Enabled: true,
   });
   assert.equal(createErr, null);
   assert.equal(created.RuleID, 9);
+  assert.deepEqual(created.TriggerTypes, ['CLIENT_ONLINE', 'CLIENT_OFFLINE']);
+
+  // The TriggerType column persists a JSON array of the selected trigger IDs.
+  const insertCall = runCalls.find(([sql]) => sql.includes('INSERT INTO AlertRules'));
+  assert.ok(insertCall);
+  assert.equal(insertCall[1][2], JSON.stringify(['CLIENT_ONLINE', 'CLIENT_OFFLINE']));
 
   const [updateErr, updated] = await Manager.Update(9, { Enabled: false, Title: 'Rule 2 Updated' });
   assert.equal(updateErr, null);
@@ -441,4 +449,64 @@ test('AlertsManager fires client degraded only on state transitions', async () =
     (c) => c.context.TriggerType === 'CLIENT_DEGRADED' && c.context.EntityType === 'client'
   );
   assert.equal(degradedCalls.length, 3);
+});
+
+test('AlertsManager fires a rule when ANY of its multiple triggers matches', async () => {
+  const executeCalls = [];
+
+  const rules = [
+    {
+      RuleID: 1,
+      Title: 'Client Online or Offline',
+      Scope: JSON.stringify({ Workspace: true, Groups: [], Clients: [] }),
+      // TriggerType column now holds a JSON array of trigger IDs.
+      TriggerType: JSON.stringify(['CLIENT_ONLINE', 'CLIENT_OFFLINE']),
+      TriggerConfig: JSON.stringify({}),
+      Actions: JSON.stringify([{ Type: 'http-api', Settings: { Route: '/on-off' } }]),
+      Enabled: 1,
+      Timestamp: 1,
+      UpdatedAt: 1,
+    },
+  ];
+
+  const dbMock = {
+    Manager: {
+      All: async () => [null, rules],
+      Run: async () => [null, { changes: 1 }],
+      RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
+    },
+  };
+
+  const actionsMock = {
+    Manager: {
+      GetAll: () => [],
+      Execute: async (action, context) => {
+        executeCalls.push({ action, context });
+        return { Success: true };
+      },
+    },
+  };
+
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AlertsManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => ({ error: () => {} }) },
+    '../DB': dbMock,
+    '../AlertActions': actionsMock,
+    '../Broadcast': { Manager: { emit: () => {} } },
+    '../Utils': require('../dist/Modules/Utils'),
+  });
+
+  await Manager.Init();
+
+  const [, rulesList] = await Manager.GetAll();
+  assert.deepEqual(rulesList[0].TriggerTypes, ['CLIENT_ONLINE', 'CLIENT_OFFLINE']);
+
+  const base = { UUID: 'client-20', Nickname: 'Client 20', GroupID: 1, IP: '10.0.0.30' };
+  // Seed the online baseline (no transition), then toggle offline then online.
+  await Manager.HandleClientUpdated({ ...base, Online: true });
+  await Manager.HandleClientUpdated({ ...base, Online: false }); // matches CLIENT_OFFLINE
+  await Manager.HandleClientUpdated({ ...base, Online: true }); // matches CLIENT_ONLINE
+
+  const fired = executeCalls.map((c) => c.context.TriggerType);
+  assert.deepEqual(fired.sort(), ['CLIENT_OFFLINE', 'CLIENT_ONLINE']);
 });

@@ -835,9 +835,47 @@ input[type='range']::-moz-range-progress,
   position: relative;
 }
 
-#ALERT_SCOPE_TOGGLE {
+/* Toggle styled to match the .form-control/.form-select fields (same dark fill,
+   no border) and sized for a permanently-floated label like form-floating. */
+.alert-multiselect-toggle {
+  position: relative;
+  min-height: calc(3.5rem + 2px);
+  padding: 1.625rem 2rem 0.5rem 0.75rem !important;
   background-color: rgba(255, 255, 255, 0.03) !important;
+  color: #fff !important;
   border: none !important;
+  border-radius: 0.5rem !important;
+}
+
+/* Center the chevron on the full toggle height (the label/value use asymmetric
+   padding, so flex alignment alone would leave it sitting low). */
+.alert-multiselect-toggle .bi-chevron-down {
+  position: absolute;
+  top: 50%;
+  right: 0.75rem;
+  margin: 0;
+  transform: translateY(-50%);
+}
+
+.alert-multiselect-toggle:hover,
+.alert-multiselect-toggle:focus {
+  background-color: #ffffff1d !important;
+  color: #fff !important;
+}
+
+/* Permanently-floated label, mirroring Bootstrap's floated form-floating label
+   (these controls always show a value/placeholder, like a select). */
+.alert-multiselect-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 1rem 0.75rem;
+  color: rgba(255, 255, 255, 0.65);
+  pointer-events: none;
+  transform-origin: 0 0;
+  transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+  white-space: nowrap;
+  z-index: 3;
 }
 
 .alert-multiselect-menu {

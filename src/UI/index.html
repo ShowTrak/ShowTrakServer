@@ -1574,19 +1574,32 @@
                   <div class="alert-multiselect" id="ALERT_SCOPE_DROPDOWN">
                     <button
                       type="button"
-                      class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center"
+                      class="btn alert-multiselect-toggle w-100 text-start d-flex justify-content-between align-items-center"
                       id="ALERT_SCOPE_TOGGLE"
                     >
                       <span>Select targets</span>
                       <i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>
                     </button>
+                    <label class="alert-multiselect-label" for="ALERT_SCOPE_TOGGLE">Targets</label>
                     <div class="alert-multiselect-menu d-none" id="ALERT_SCOPE_MENU"></div>
                   </div>
                 </div>
 
-                <div class="form-floating">
-                  <select class="form-select" id="ALERT_RULE_TRIGGER_TYPE"></select>
-                  <label for="ALERT_RULE_TRIGGER_TYPE">Trigger</label>
+                <div>
+                  <div class="alert-multiselect" id="ALERT_RULE_TRIGGER_DROPDOWN">
+                    <button
+                      type="button"
+                      class="btn alert-multiselect-toggle w-100 text-start d-flex justify-content-between align-items-center"
+                      id="ALERT_RULE_TRIGGER_TOGGLE"
+                    >
+                      <span>Select triggers</span>
+                      <i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>
+                    </button>
+                    <label class="alert-multiselect-label" for="ALERT_RULE_TRIGGER_TOGGLE"
+                      >Triggers</label
+                    >
+                    <div class="alert-multiselect-menu d-none" id="ALERT_RULE_TRIGGER_MENU"></div>
+                  </div>
                 </div>
 
                 <div id="ALERT_RULE_MAIN_CONTENT" class="d-grid gap-2">

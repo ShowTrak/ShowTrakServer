@@ -62,8 +62,14 @@ function isScopeMatch(Rule: AlertRule, Context: AlertContext): boolean {
   return false;
 }
 
-function triggerMatches(Rule: AlertRule, Context: AlertContext): boolean {
-  switch (Rule.TriggerType) {
+// Whether a single trigger type on the rule matches the runtime context. The
+// CLIENT_DEGRADED case additionally consults the rule's TriggerConfig.Source.
+function singleTriggerMatches(
+  TriggerType: string,
+  Rule: AlertRule,
+  Context: AlertContext
+): boolean {
+  switch (TriggerType) {
     case TRIGGERS.CLIENT_OFFLINE:
       return Context.TriggerType === TRIGGERS.CLIENT_OFFLINE;
     case TRIGGERS.CLIENT_ONLINE:
@@ -123,6 +129,15 @@ function triggerMatches(Rule: AlertRule, Context: AlertContext): boolean {
     default:
       return false;
   }
+}
+
+// A rule fires when ANY of its configured trigger types matches the context.
+function triggerMatches(Rule: AlertRule, Context: AlertContext): boolean {
+  const Types = Array.isArray(Rule.TriggerTypes) ? Rule.TriggerTypes : [];
+  for (const TriggerType of Types) {
+    if (singleTriggerMatches(TriggerType, Rule, Context)) return true;
+  }
+  return false;
 }
 
 function describeMonitorReason(Context: AlertContext): string {
