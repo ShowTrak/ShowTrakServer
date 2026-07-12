@@ -1402,6 +1402,7 @@
                   <select class="form-select" id="MONITORING_CHECK_METHOD"></select>
                   <label for="MONITORING_CHECK_METHOD">Monitoring Method</label>
                 </div>
+                <div id="MONITORING_CHECK_INFO" class="monitoring-check-info bg-ghost rounded p-2 d-none"></div>
                 <div class="form-floating">
                   <input
                     type="text"
@@ -1411,7 +1412,7 @@
                   />
                   <label for="MONITORING_CHECK_NAME">Label</label>
                 </div>
-                <div class="form-floating">
+                <div class="form-floating" id="MONITORING_CHECK_ADDRESS_FIELD">
                   <input
                     type="text"
                     class="form-control"
@@ -1439,7 +1440,7 @@
                 <div class="collapse" id="MONITORING_CHECK_ADVANCED">
                   <div class="d-grid gap-2 pb-1 mb-0">
                     <div id="MONITORING_CHECK_ADVANCED_SETTINGS" class="d-grid gap-2"></div>
-                    <div class="form-floating">
+                    <div class="form-floating" id="MONITORING_CHECK_DEGRADED_THRESHOLD_FIELD">
                       <input
                         type="number"
                         class="form-control"

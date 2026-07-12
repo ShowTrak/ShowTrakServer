@@ -7,7 +7,22 @@ import type {
   NetworkScanResult,
 } from '@showtrak/protocol';
 import type { MonitoringEditorCheck } from './01-state';
-import { MonitoringEditorState, MonitoringMethodsCache, MonitoringTargets, NetworkDiscoveryProgress, NetworkDiscoveryResults, NetworkDiscoveryScanID, NetworkDiscoveryScanning, setMonitoringEditorState, setMonitoringEditorTargetID, setMonitoringMethodsCache, setNetworkDiscoveryProgress, setNetworkDiscoveryResults, setNetworkDiscoveryScanID, setNetworkDiscoveryScanning } from './01-state';
+import {
+  MonitoringEditorState,
+  MonitoringMethodsCache,
+  MonitoringTargets,
+  NetworkDiscoveryProgress,
+  NetworkDiscoveryResults,
+  NetworkDiscoveryScanID,
+  NetworkDiscoveryScanning,
+  setMonitoringEditorState,
+  setMonitoringEditorTargetID,
+  setMonitoringMethodsCache,
+  setNetworkDiscoveryProgress,
+  setNetworkDiscoveryResults,
+  setNetworkDiscoveryScanID,
+  setNetworkDiscoveryScanning,
+} from './01-state';
 import { ErrorMessage, HandleNonFatalError, Safe } from './04-utils';
 import { FormatInterval } from './07-monitoring';
 import { CloseAllModals } from './11-modals';
@@ -29,9 +44,9 @@ interface DiscoveredDevice {
 export async function EnsureMonitoringMethodsLoaded() {
   if (Array.isArray(MonitoringMethodsCache) && MonitoringMethodsCache.length) return;
   try {
-        setMonitoringMethodsCache((await window.API.GetMonitoringMethods()) || []);
+    setMonitoringMethodsCache((await window.API.GetMonitoringMethods()) || []);
   } catch {
-        setMonitoringMethodsCache([]);
+    setMonitoringMethodsCache([]);
   }
 }
 
@@ -108,6 +123,59 @@ export function RenderMonitoringCheckDynamicSettings(
   }
 }
 
+// Show or hide the static Address and Degraded Threshold fields based on the
+// selected method's declared capabilities (server-defined on each method module).
+// Methods that ignore the target Address (e.g. network-wide NDI discovery) hide
+// the Address input; passive presence checks with no round-trip latency hide the
+// latency-based Degraded Threshold. Both default to shown for unknown methods.
+export function ApplyMonitoringMethodCapabilities(MethodID: unknown) {
+  const Method = MonitoringMethodsCache.find((m) => m.ID === MethodID);
+  const UsesAddress = !Method || Method.UsesAddress !== false;
+  const SupportsLatency = !Method || Method.SupportsLatencyThreshold !== false;
+  $('#MONITORING_CHECK_ADDRESS_FIELD').toggleClass('d-none', !UsesAddress);
+  $('#MONITORING_CHECK_DEGRADED_THRESHOLD_FIELD').toggleClass('d-none', !SupportsLatency);
+}
+
+// Render the "how to set this up" panel below the method picker for the selected
+// check type. Content comes from the method's public Info shape (server-defined);
+// every value is escaped before display. Hidden when the method has no Info.
+export function RenderMonitoringCheckInfo(MethodID: unknown) {
+  const $host = $('#MONITORING_CHECK_INFO');
+  if (!$host.length) return;
+  const Method = MonitoringMethodsCache.find((m) => m.ID === MethodID);
+  const Info = Method && Method.Info;
+  if (!Info || !Info.Summary) {
+    $host.addClass('d-none').empty();
+    return;
+  }
+
+  let html =
+    '<div class="d-flex gap-2 align-items-start">' +
+    '<i class="bi bi-info-circle text-info" style="margin-top: 2px;"></i>' +
+    '<div class="flex-grow-1">' +
+    `<div class="text-light small">${Safe(Info.Summary)}</div>`;
+
+  if (Array.isArray(Info.Setup) && Info.Setup.length) {
+    html +=
+      '<ul class="text-muted small mb-0 mt-2 ps-3 d-grid gap-1">' +
+      Info.Setup.map((step) => `<li>${Safe(step)}</li>`).join('') +
+      '</ul>';
+  }
+
+  if (Array.isArray(Info.Docs) && Info.Docs.length) {
+    html +=
+      '<div class="text-muted small mt-2">' +
+      Info.Docs.map(
+        (doc) =>
+          `${Safe(doc.Label)}: <span class="font-monospace text-break">${Safe(doc.Url)}</span>`
+      ).join('<br />') +
+      '</div>';
+  }
+
+  html += '</div></div>';
+  $host.html(html).removeClass('d-none');
+}
+
 export function CollectMonitoringCheckDynamicSettings(): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   $('#MONITORING_CHECK_DYNAMIC_SETTINGS, #MONITORING_CHECK_ADVANCED_SETTINGS')
@@ -174,7 +242,7 @@ export function SetNetworkDiscoveryProgress(percent: number, current = 0, total 
   const p = Math.max(0, Math.min(100, Number.isFinite(Number(percent)) ? Number(percent) : 0));
   const cur = Number.isFinite(Number(current)) ? Number(current) : 0;
   const tot = Number.isFinite(Number(total)) ? Number(total) : 0;
-    setNetworkDiscoveryProgress({
+  setNetworkDiscoveryProgress({
     percent: p,
     current: cur,
     total: tot,
@@ -248,9 +316,9 @@ export function RenderNetworkDiscoveryResults() {
 }
 
 export function ResetNetworkDiscoveryState() {
-    setNetworkDiscoveryScanID(null);
-    setNetworkDiscoveryScanning(false);
-    setNetworkDiscoveryResults(new Map());
+  setNetworkDiscoveryScanID(null);
+  setNetworkDiscoveryScanning(false);
+  setNetworkDiscoveryResults(new Map());
   RenderNetworkDiscoveryScanButton();
   SetNetworkDiscoveryStatus('Idle');
   SetNetworkDiscoveryProgress(0, 0, 0);
@@ -310,7 +378,7 @@ export function HandleNetworkDiscoveryEvent(event: NetworkScanEvent) {
     return;
   }
   if (event.Type === 'done') {
-        setNetworkDiscoveryScanning(false);
+    setNetworkDiscoveryScanning(false);
     RenderNetworkDiscoveryScanButton();
     SetNetworkDiscoveryStatus(event.Status || 'Completed');
     SetNetworkDiscoveryProgress(
@@ -323,13 +391,13 @@ export function HandleNetworkDiscoveryEvent(event: NetworkScanEvent) {
 
 export async function StopNetworkDiscoveryScan() {
   if (!NetworkDiscoveryScanID) {
-        setNetworkDiscoveryScanning(false);
+    setNetworkDiscoveryScanning(false);
     RenderNetworkDiscoveryScanButton();
     return;
   }
   const scanID = NetworkDiscoveryScanID;
-    setNetworkDiscoveryScanID(null);
-    setNetworkDiscoveryScanning(false);
+  setNetworkDiscoveryScanID(null);
+  setNetworkDiscoveryScanning(false);
   RenderNetworkDiscoveryScanButton();
   try {
     await window.API.StopNetworkDeviceScan(scanID);
@@ -341,10 +409,10 @@ export async function StopNetworkDiscoveryScan() {
 export async function StartNetworkDiscoveryScan() {
   if (NetworkDiscoveryScanning) return;
   await EnsureMonitoringMethodsLoaded();
-    setNetworkDiscoveryResults(new Map());
+  setNetworkDiscoveryResults(new Map());
   SetNetworkDiscoveryProgress(0, 0, 0);
   RenderNetworkDiscoveryResults();
-    setNetworkDiscoveryScanning(true);
+  setNetworkDiscoveryScanning(true);
   RenderNetworkDiscoveryScanButton();
   SetNetworkDiscoveryStatus('Starting...');
 
@@ -357,15 +425,15 @@ export async function StartNetworkDiscoveryScan() {
       ProbePorts: [80, 443, 22, 445, 3389, 8080],
     });
     if (Err) {
-            setNetworkDiscoveryScanning(false);
+      setNetworkDiscoveryScanning(false);
       RenderNetworkDiscoveryScanButton();
       SetNetworkDiscoveryStatus('Failed');
       return Notify(Err, 'error');
     }
-        setNetworkDiscoveryScanID(Result && Result.ScanID ? Result.ScanID : null);
+    setNetworkDiscoveryScanID(Result && Result.ScanID ? Result.ScanID : null);
     SetNetworkDiscoveryStatus('Scanning...');
   } catch (e) {
-        setNetworkDiscoveryScanning(false);
+    setNetworkDiscoveryScanning(false);
     RenderNetworkDiscoveryScanButton();
     SetNetworkDiscoveryStatus('Failed');
     Notify(ErrorMessage(e, 'Failed to start scan'), 'error');
@@ -386,9 +454,7 @@ export async function OpenNetworkDiscoveryModal() {
 export function GetLiveMonitoringTarget() {
   const State = MonitoringEditorState;
   if (!State || State.TargetID == null) return null;
-  return (
-    MonitoringTargets.find((t) => Number(t.TargetID) === Number(State.TargetID)) || null
-  );
+  return MonitoringTargets.find((t) => Number(t.TargetID) === Number(State.TargetID)) || null;
 }
 
 export function FindLiveMonitoringCheck(check: MonitoringEditorCheck) {
@@ -511,6 +577,8 @@ export function OpenMonitoringCheckView(index: number) {
     Number.isFinite(Number(check.DegradedThresholdMs)) ? Number(check.DegradedThresholdMs) : 0
   );
 
+  RenderMonitoringCheckInfo($method.val());
+  ApplyMonitoringMethodCapabilities($method.val());
   RenderMonitoringCheckDynamicSettings($method.val(), check.Settings || {});
 
   $('#MONITORING_TARGET_LIST_VIEW').addClass('d-none');
@@ -708,9 +776,14 @@ export function BuildMonitoringPayload() {
 export function MonitoringPayloadIsValid(payload: ReturnType<typeof BuildMonitoringPayload>) {
   if (!payload.Nickname) return false;
   // A target may legitimately have zero checks (it renders as degraded). Any
-  // checks that do exist must be fully configured before we save.
+  // checks that do exist must be fully configured before we save. Methods that
+  // don't use the Address field (e.g. network-wide NDI discovery) are exempt from
+  // the address requirement.
   for (const c of payload.Checks) {
-    if (!c.Address || !c.Method) return false;
+    if (!c.Method) return false;
+    const method = MonitoringMethodsCache.find((m) => m.ID === c.Method);
+    const usesAddress = !method || method.UsesAddress !== false;
+    if (usesAddress && !c.Address) return false;
   }
   return true;
 }
@@ -746,10 +819,11 @@ export async function PerformMonitoringAutoSave() {
       const [Err, Created] = await window.API.CreateMonitoringTarget(payload);
       if (Err || !Created) return SetMonitoringSaveHint(Err || 'Failed to save', 'text-danger');
       MonitoringEditorState.TargetID = Created.TargetID;
-            setMonitoringEditorTargetID(Created.TargetID);
+      setMonitoringEditorTargetID(Created.TargetID);
       if (Array.isArray(Created.Checks)) {
         Created.Checks.forEach((cr, i) => {
-          if (MonitoringEditorState!.Checks[i]) MonitoringEditorState!.Checks[i].CheckID = cr.CheckID;
+          if (MonitoringEditorState!.Checks[i])
+            MonitoringEditorState!.Checks[i].CheckID = cr.CheckID;
         });
       }
       $('#MONITORING_TARGET_MODAL_TITLE').text('Edit Monitoring Target');
@@ -765,7 +839,8 @@ export async function PerformMonitoringAutoSave() {
       // map freshly-inserted CheckIDs back onto the working state by index.
       if (Updated && Array.isArray(Updated.Checks)) {
         Updated.Checks.forEach((cr, i) => {
-          if (MonitoringEditorState!.Checks[i]) MonitoringEditorState!.Checks[i].CheckID = cr.CheckID;
+          if (MonitoringEditorState!.Checks[i])
+            MonitoringEditorState!.Checks[i].CheckID = cr.CheckID;
         });
       }
     }
@@ -804,7 +879,7 @@ export async function OpenMonitoringTargetEditor(
   if (TargetID) Existing = await window.API.GetMonitoringTarget(String(TargetID));
 
   if (Existing) {
-        setMonitoringEditorState({
+    setMonitoringEditorState({
       TargetID: Existing.TargetID,
       Nickname: Existing.Nickname || '',
       Interval: Number(Existing.Interval) || 30000,
@@ -824,7 +899,7 @@ export async function OpenMonitoringTargetEditor(
       pendingSave: false,
     });
   } else {
-        setMonitoringEditorState({
+    setMonitoringEditorState({
       TargetID: null,
       Nickname: (Prefill && Prefill.Nickname) || '',
       Interval: 30000,
@@ -837,7 +912,7 @@ export async function OpenMonitoringTargetEditor(
       pendingSave: false,
     });
   }
-    setMonitoringEditorTargetID(MonitoringEditorState!.TargetID);
+  setMonitoringEditorTargetID(MonitoringEditorState!.TargetID);
 
   $('#MONITORING_TARGET_MODAL_TITLE').text(
     Existing ? 'Edit Monitoring Target' : 'Add Monitoring Target'
@@ -900,6 +975,8 @@ export async function OpenMonitoringTargetEditor(
     .off('change.moncheck')
     .on('change.moncheck', function () {
       CloseMonitoringCheckCollapses();
+      RenderMonitoringCheckInfo($(this).val());
+      ApplyMonitoringMethodCapabilities($(this).val());
       RenderMonitoringCheckDynamicSettings($(this).val(), CollectMonitoringCheckDynamicSettings());
       CommitMonitoringCheckView();
     });

@@ -349,11 +349,24 @@ export interface MonitoringSettingField {
   Advanced?: boolean;
 }
 
+export interface MonitoringMethodInfo {
+  Summary: string;
+  Setup?: string[];
+  Docs?: Array<{ Label: string; Url: string }>;
+}
+
 export interface MonitoringMethodView {
   ID: string;
   Name: string;
   Description: string;
+  Info?: MonitoringMethodInfo | null;
   DefaultInterval: number;
+  // True when the method uses the per-check Address field. When false, the editor
+  // hides the Address input and does not require one. Defaults to true.
+  UsesAddress: boolean;
+  // True when the latency-based Degraded Threshold applies. When false, the editor
+  // hides that Advanced field. Defaults to true.
+  SupportsLatencyThreshold: boolean;
   Settings: MonitoringSettingField[];
 }
 

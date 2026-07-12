@@ -4,6 +4,7 @@
 // file into this folder and adding it to the require list below.
 import { CreateLogger } from '../Logger';
 import { Manager as CacheManager } from '../CacheManager';
+import { MethodInfo } from './info';
 import type { MonitoringMethod, MonitoringResult, MonitoringTargetLike } from './types';
 
 const Logger = CreateLogger('MonitoringMethods');
@@ -23,6 +24,14 @@ const MethodModules: MonitoringMethod[] = [
   require('./sacn-universe'),
   require('./sacn-universe-priority'),
   require('./artnet-universe'),
+  require('./ndi-source'),
+  require('./mqtt-topic'),
+  require('./nut-ups'),
+  require('./watchout-status'),
+  require('./resolume-status'),
+  require('./companion-status'),
+  require('./disguise-status'),
+  require('./millumin-status'),
 ];
 
 const Methods = new Map<string, MonitoringMethod>();
@@ -41,8 +50,13 @@ function PublicShape(Method: MonitoringMethod) {
     ID: Method.ID,
     Name: Method.Name,
     Description: Method.Description || '',
+    Info: Method.Info || MethodInfo[Method.ID] || null,
     Settings: Array.isArray(Method.Settings) ? Method.Settings : [],
     DefaultInterval: Method.DefaultInterval || 30000,
+    // Capability flags default to true; a method opts out by exporting `false`.
+    // The editor uses these to hide the Address / Degraded Threshold fields.
+    UsesAddress: Method.UsesAddress !== false,
+    SupportsLatencyThreshold: Method.SupportsLatencyThreshold !== false,
   };
 }
 

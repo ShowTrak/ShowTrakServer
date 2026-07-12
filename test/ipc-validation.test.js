@@ -249,6 +249,25 @@ test('IPCValidation.MonitoringTargetCreatePayload enforces required fields', () 
       }),
     /Settings must be an object/i
   );
+
+  // Methods that don't use the Address field (network-wide NDI discovery) may be
+  // saved without one; the address is coerced to an empty string.
+  const ndiPayload = IPCValidation.MonitoringTargetCreatePayload({
+    Nickname: 'a',
+    Interval: 1,
+    Checks: [{ Method: 'ndi-source', Settings: { Match: 'CAM (Program)' } }],
+  });
+  assert.equal(ndiPayload.Checks[0].Address, '');
+  // A normal (address-using) method still requires a non-empty address.
+  assert.throws(
+    () =>
+      IPCValidation.MonitoringTargetCreatePayload({
+        Nickname: 'a',
+        Interval: 1,
+        Checks: [{ Method: 'ping', Settings: {} }],
+      }),
+    /address/i
+  );
 });
 
 test('IPCValidation.MonitoringTargetUpdatePayload validates partial updates', () => {

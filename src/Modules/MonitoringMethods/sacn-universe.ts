@@ -20,4 +20,7 @@ export const Name = 'sACN - Receiving universe from target';
 export const Description =
   'Passively listens for sACN (E1.31) data and confirms the configured source IP is transmitting the given universe.';
 export const DefaultInterval = DEFAULT_SACN_INTERVAL_MS;
+// Passive listener: no round-trip latency is measured, so the latency-based
+// Degraded Threshold field is hidden in the editor.
+export const SupportsLatencyThreshold = false;
 export { ID, Settings, Run, Debug };

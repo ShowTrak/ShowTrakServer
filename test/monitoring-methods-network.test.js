@@ -340,14 +340,22 @@ test('MonitoringMethods registry exposes public shapes and normalizes settings',
   const ids = all.map((m) => m.ID).sort();
   assert.deepEqual(ids, [
     'artnet-universe',
+    'companion-status',
+    'disguise-status',
     'dns',
     'http',
     'http-json',
+    'millumin-status',
+    'mqtt-topic',
+    'ndi-source',
+    'nut-ups',
     'ping',
     'qlab-workspace',
+    'resolume-status',
     'sacn-universe',
     'sacn-universe-priority',
     'tcp-port',
+    'watchout-status',
   ]);
   // Public shape strips Run().
   assert.equal(typeof all[0].Run, 'undefined');

@@ -1,5 +1,6 @@
 // Monitoring target identifier and payload validators.
 import { fail, isPlainObject, normalizeNonEmptyString } from './primitives';
+import { Manager as MonitoringMethods } from '../MonitoringMethods';
 import type { IPCValidationManager } from './index';
 
 // Method-specific Settings are validated against the registered schema by
@@ -48,14 +49,22 @@ export = function registerMonitoringValidators(Manager: IPCValidationManager): v
     } else {
       out.Name = '';
     }
-    out.Address = normalizeNonEmptyString(value.Address, `Check ${index + 1} address`, {
-      minLength: 1,
-      maxLength: 253,
-    });
     out.Method = normalizeNonEmptyString(value.Method, `Check ${index + 1} method`, {
       minLength: 1,
       maxLength: 64,
     });
+    // Methods that ignore the Address field (e.g. network-wide NDI discovery) may
+    // be saved without one; every other method requires a non-empty address.
+    const MethodDef = MonitoringMethods.Get(out.Method as string);
+    if (MethodDef && MethodDef.UsesAddress === false) {
+      out.Address =
+        value.Address == null ? '' : String(value.Address).trim().slice(0, 253);
+    } else {
+      out.Address = normalizeNonEmptyString(value.Address, `Check ${index + 1} address`, {
+        minLength: 1,
+        maxLength: 253,
+      });
+    }
     if (Object.prototype.hasOwnProperty.call(value, 'DegradedThresholdMs')) {
       const Threshold = Number(value.DegradedThresholdMs);
       if (!Number.isFinite(Threshold)) {

@@ -452,6 +452,9 @@ export const Name = 'Art-Net - Receiving universe from target';
 export const Description =
   'Passively listens for Art-Net (ArtDmx) data and confirms the configured source IP is transmitting the given universe.';
 export const DefaultInterval = DEFAULT_ARTNET_INTERVAL_MS;
+// Passive listener: no round-trip latency is measured, so the latency-based
+// Degraded Threshold field is hidden in the editor.
+export const SupportsLatencyThreshold = false;
 export { ID, Settings, Run, Debug };
 
 // Exported for unit tests.
