@@ -37,6 +37,8 @@ interface PublicClientSource {
   CriticalUSBDevices?: unknown;
   CriticalUSBSerials?: unknown;
   MissingCriticalUSBDevices?: unknown;
+  CriticalUSBNames?: unknown;
+  MissingCriticalUSBNames?: unknown;
   DegradedWarnings?: unknown;
   NetworkInterfaces?: unknown;
   IntegratedActions?: unknown;
@@ -95,6 +97,10 @@ const ToPublicClient = (c: PublicClientSource): ClientView => ({
   CriticalUSBSerials: Array.isArray(c.CriticalUSBSerials) ? c.CriticalUSBSerials : [],
   MissingCriticalUSBDevices: Array.isArray(c.MissingCriticalUSBDevices)
     ? c.MissingCriticalUSBDevices
+    : [],
+  CriticalUSBNames: Array.isArray(c.CriticalUSBNames) ? c.CriticalUSBNames : [],
+  MissingCriticalUSBNames: Array.isArray(c.MissingCriticalUSBNames)
+    ? c.MissingCriticalUSBNames
     : [],
   Degraded: !!c.Degraded,
   DegradedWarnings: Array.isArray(c.DegradedWarnings) ? c.DegradedWarnings : [],

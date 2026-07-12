@@ -13,6 +13,11 @@ export interface CriticalUSBDevicePayloadResult {
   ProductName: string | null;
 }
 
+export interface CriticalUSBNamePayloadResult {
+  ManufacturerName: string | null;
+  ProductName: string | null;
+}
+
 export interface CriticalApplicationPayloadResult {
   Name: string;
 }
@@ -45,6 +50,7 @@ export interface IPCValidationManager {
   Boolean(value: unknown, fieldName?: string): boolean;
   USBSerialNumber(value: unknown, fieldName?: string): string;
   CriticalUSBDevicePayload(value: unknown): CriticalUSBDevicePayloadResult;
+  CriticalUSBNamePayload(value: unknown): CriticalUSBNamePayloadResult;
   CriticalApplicationPayload(value: unknown): CriticalApplicationPayloadResult;
   DisplayID(value: unknown, fieldName?: string): string;
   CriticalDisplayPayload(value: unknown): CriticalDisplayPayloadResult;

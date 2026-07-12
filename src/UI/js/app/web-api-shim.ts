@@ -122,6 +122,10 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
       rpc('MarkClientUSBDeviceCritical', UUID, Device),
     RemoveClientUSBDeviceCritical: async (UUID, SerialNumber) =>
       rpc('RemoveClientUSBDeviceCritical', UUID, SerialNumber),
+    MarkClientUSBNameCritical: async (UUID, Device) =>
+      rpc('MarkClientUSBNameCritical', UUID, Device),
+    RemoveClientUSBNameCritical: async (UUID, Device) =>
+      rpc('RemoveClientUSBNameCritical', UUID, Device),
     MarkClientApplicationCritical: async (UUID, Application) =>
       rpc('MarkClientApplicationCritical', UUID, Application),
     RemoveClientApplicationCritical: async (UUID, ApplicationName) =>

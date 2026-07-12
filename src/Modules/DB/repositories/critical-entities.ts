@@ -7,7 +7,12 @@
 // The three table shapes are deliberately parallel; Phase 4 of
 // REFACTOR_PLAN.md generalizes the manager-side triplication on top of this.
 import type { DBManager, DBResult } from '../index';
-import type { CriticalApplicationRow, CriticalDisplayRow, CriticalUSBDeviceRow } from '../rows';
+import type {
+  CriticalApplicationRow,
+  CriticalDisplayRow,
+  CriticalUSBDeviceRow,
+  CriticalUSBDeviceNameRow,
+} from '../rows';
 
 export function CreateCriticalEntitiesRepository(DB: DBManager) {
   return {
@@ -43,6 +48,41 @@ export function CreateCriticalEntitiesRepository(DB: DBManager) {
     },
     DeleteAllUSBForClient(UUID: string): Promise<DBResult<unknown>> {
       return DB.Run('DELETE FROM CriticalUSBDevices WHERE UUID = ?', [UUID]);
+    },
+
+    // --- Serial-less USB devices (guarded by name + quantity) ---------------
+    LoadAllUSBNames(): Promise<DBResult<CriticalUSBDeviceNameRow[]>> {
+      return DB.All<CriticalUSBDeviceNameRow>(
+        'SELECT UUID, NameKey, ManufacturerName, ProductName, Quantity, Timestamp FROM CriticalUSBDeviceNames'
+      );
+    },
+    MarkUSBName(
+      UUID: string,
+      NameKey: string,
+      ManufacturerName: string | null,
+      ProductName: string | null,
+      Quantity: number,
+      Timestamp: number
+    ): Promise<DBResult<unknown>> {
+      return DB.Run(
+        'INSERT OR REPLACE INTO CriticalUSBDeviceNames (UUID, NameKey, ManufacturerName, ProductName, Quantity, Timestamp) VALUES (?, ?, ?, ?, ?, ?)',
+        [UUID, NameKey, ManufacturerName, ProductName, Quantity, Timestamp]
+      );
+    },
+    RemoveUSBName(UUID: string, NameKey: string): Promise<DBResult<unknown>> {
+      return DB.Run('DELETE FROM CriticalUSBDeviceNames WHERE UUID = ? AND NameKey = ?', [
+        UUID,
+        NameKey,
+      ]);
+    },
+    IsUSBNameCritical(UUID: string, NameKey: string): Promise<DBResult<{ Found: number }>> {
+      return DB.Get<{ Found: number }>(
+        'SELECT 1 AS Found FROM CriticalUSBDeviceNames WHERE UUID = ? AND NameKey = ? LIMIT 1',
+        [UUID, NameKey]
+      );
+    },
+    DeleteAllUSBNamesForClient(UUID: string): Promise<DBResult<unknown>> {
+      return DB.Run('DELETE FROM CriticalUSBDeviceNames WHERE UUID = ?', [UUID]);
     },
 
     // --- Applications -------------------------------------------------------

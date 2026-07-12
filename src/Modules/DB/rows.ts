@@ -96,6 +96,15 @@ export interface CriticalUSBDeviceRow {
   Timestamp: number;
 }
 
+export interface CriticalUSBDeviceNameRow {
+  UUID: string;
+  NameKey: string;
+  ManufacturerName: string | null;
+  ProductName: string | null;
+  Quantity: number;
+  Timestamp: number;
+}
+
 export interface CriticalApplicationRow {
   UUID: string;
   ApplicationKey: string;

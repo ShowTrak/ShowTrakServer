@@ -469,29 +469,56 @@ function getClientApplicationHistorySamples(
   }>;
 }
 
+// Serial-less critical USB devices are guarded by name + quantity rather than a
+// serial number, so their history is keyed by NameKey. This prefix keeps those
+// synthetic keys from colliding with real serials in the shared USB store; the
+// renderer (07-monitoring.ts) builds the same key to join the samples back in.
+const CRITICAL_USB_NAME_HISTORY_PREFIX = 'usbname:';
+
 // Resolve the current connected/disconnected state for every critical USB
 // device on a client. Returns null (skip this sample, leaving an idle gap) when
 // the client is offline so we never paint "disconnected" red bars for a device
-// whose real state we could not observe.
+// whose real state we could not observe. Devices with a serial are tracked per
+// serial; serial-less devices marked critical-by-name are tracked once per name
+// (the expected quantity being satisfied is what counts as "connected").
 function extractCriticalUSBStates(
   client: ClientHardwareTelemetryLike | null | undefined
 ): NamedEntityState[] | null {
   if (!client || !client.Online) return null;
   const devices = Array.isArray(client.USBDeviceList) ? client.USBDeviceList : [];
   const states: NamedEntityState[] = [];
+  const seenNameKeys = new Set<string>();
   for (const device of devices) {
     if (!device || !device.IsCritical) continue;
-    const serial =
-      device.SerialNumber != null && String(device.SerialNumber).trim()
-        ? String(device.SerialNumber).trim()
-        : null;
-    if (!serial) continue;
     const manufacturer =
       typeof device.ManufacturerName === 'string' ? device.ManufacturerName.trim() : '';
     const product = typeof device.ProductName === 'string' ? device.ProductName.trim() : '';
     const name = [manufacturer, product].filter(Boolean).join(' ') || 'USB Device';
-    const isConnected = device.IsConnected !== false && !device.Missing;
-    states.push({ key: serial, name, online: isConnected, degraded: false });
+    const serial =
+      device.SerialNumber != null && String(device.SerialNumber).trim()
+        ? String(device.SerialNumber).trim()
+        : null;
+    if (serial) {
+      const isConnected = device.IsConnected !== false && !device.Missing;
+      states.push({ key: serial, name, online: isConnected, degraded: false });
+      continue;
+    }
+    // Serial-less, name-guarded: one series per distinct name. "Online" only
+    // when the expected quantity is met (not short, not fully missing).
+    if (!device.IsCriticalByName) continue;
+    const nameKey =
+      typeof device.NameKey === 'string' && device.NameKey.trim()
+        ? device.NameKey.trim().toLowerCase()
+        : '';
+    if (!nameKey || seenNameKeys.has(nameKey)) continue;
+    seenNameKeys.add(nameKey);
+    const satisfied = device.IsConnected !== false && !device.Missing && !device.Shortfall;
+    states.push({
+      key: `${CRITICAL_USB_NAME_HISTORY_PREFIX}${nameKey}`,
+      name,
+      online: satisfied,
+      degraded: false,
+    });
   }
   return states;
 }

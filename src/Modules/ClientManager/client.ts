@@ -7,6 +7,7 @@ import { Manager as BroadcastManager } from '../Broadcast';
 import {
   AsRecord,
   normalizeSerialNumber,
+  normalizeUSBNameKey,
   normalizeApplicationName,
   normalizeApplicationKey,
   normalizeDisplayID,
@@ -54,6 +55,15 @@ interface CriticalUSBEntry {
   ProductName: string | null;
   Timestamp: number | null;
 }
+// Serial-less critical device: guarded by its visible name and an expected
+// Quantity, since no serial number is available to track it individually.
+interface CriticalUSBNameEntry {
+  NameKey: string;
+  ManufacturerName: string | null;
+  ProductName: string | null;
+  Quantity: number;
+  Timestamp: number | null;
+}
 interface CriticalDisplayEntry {
   DisplayID: string;
   Label: string | null;
@@ -79,6 +89,16 @@ interface USBDeviceViewEntry {
   IsConnected: boolean;
   IsCritical: boolean;
   Missing: boolean;
+  // Serial-less name-based guarding: set when this entry is (or matches) a
+  // device marked critical by name. Quantity/ConnectedCount describe the
+  // expected-vs-observed count for that name.
+  IsCriticalByName?: boolean;
+  NameKey?: string;
+  Quantity?: number;
+  ConnectedCount?: number;
+  // Set on a connected/missing name-guarded entry when fewer devices of this
+  // name are connected than the expected Quantity.
+  Shortfall?: boolean;
   [key: string]: unknown;
 }
 interface DisplayViewEntry {
@@ -213,6 +233,10 @@ class Client {
   CriticalUSBDevices: CriticalUSBEntry[];
   CriticalUSBSerials: string[];
   MissingCriticalUSBDevices: USBDeviceViewEntry[];
+  // Serial-less critical devices (guarded by name + quantity) and the subset
+  // whose connected count currently falls short of the expected quantity.
+  CriticalUSBNames: CriticalUSBNameEntry[];
+  MissingCriticalUSBNames: USBDeviceViewEntry[];
 
   // Displays: raw connected list, critical guards, and the rendered view.
   ConnectedDisplayList: ClientDisplay[];
@@ -257,6 +281,8 @@ class Client {
     this.CriticalUSBDevices = [];
     this.CriticalUSBSerials = [];
     this.MissingCriticalUSBDevices = [];
+    this.CriticalUSBNames = [];
+    this.MissingCriticalUSBNames = [];
     this.CriticalApplications = [];
     this.CriticalApplicationKeys = [];
     this.MissingCriticalApplications = [];
@@ -424,6 +450,73 @@ class Client {
     this.CriticalUSBSerials = this.CriticalUSBDevices.map(
       (Entry: CriticalUSBEntry) => Entry.SerialNumber
     );
+    this._rebuildUSBDeviceView();
+    return true;
+  }
+  SetCriticalUSBNames(Devices: unknown) {
+    const List: unknown[] = Array.isArray(Devices) ? Devices : [];
+    const Normalized: CriticalUSBNameEntry[] = [];
+    const Seen = new Set<string>();
+    for (const Raw of List) {
+      const Entry = AsRecord(Raw);
+      const ManufacturerName = Entry.ManufacturerName ? String(Entry.ManufacturerName) : null;
+      const ProductName = Entry.ProductName ? String(Entry.ProductName) : null;
+      const NameKey = Entry.NameKey
+        ? String(Entry.NameKey)
+        : normalizeUSBNameKey(ManufacturerName, ProductName);
+      if (!NameKey || Seen.has(NameKey)) continue;
+      Seen.add(NameKey);
+      Normalized.push({
+        NameKey,
+        ManufacturerName,
+        ProductName,
+        Quantity: Math.max(1, parseInt(String(Entry.Quantity), 10) || 1),
+        Timestamp: TimestampOrNull(Entry.Timestamp),
+      });
+    }
+    this.CriticalUSBNames = Normalized;
+    this._rebuildUSBDeviceView();
+    return;
+  }
+  IsUSBNameCritical(NameKey: unknown) {
+    const Normalized = typeof NameKey === 'string' ? NameKey.trim().toLowerCase() : '';
+    if (!Normalized) return false;
+    return this.CriticalUSBNames.some((Entry) => Entry.NameKey === Normalized);
+  }
+  MarkCriticalUSBName(Device: unknown) {
+    const D = AsRecord(Device);
+    const ManufacturerName = D.ManufacturerName ? String(D.ManufacturerName) : null;
+    const ProductName = D.ProductName ? String(D.ProductName) : null;
+    const NameKey = D.NameKey
+      ? String(D.NameKey)
+      : normalizeUSBNameKey(ManufacturerName, ProductName);
+    if (!NameKey) return false;
+    const Quantity = Math.max(1, parseInt(String(D.Quantity), 10) || 1);
+    const Existing = this.CriticalUSBNames.find((Entry) => Entry.NameKey === NameKey);
+    if (Existing) {
+      Existing.Quantity = Quantity;
+      if (!Existing.ManufacturerName && ManufacturerName) Existing.ManufacturerName = ManufacturerName;
+      if (!Existing.ProductName && ProductName) Existing.ProductName = ProductName;
+      if (!Existing.Timestamp && D.Timestamp) Existing.Timestamp = TimestampOrNull(D.Timestamp);
+      this._rebuildUSBDeviceView();
+      return false;
+    }
+    this.CriticalUSBNames.push({
+      NameKey,
+      ManufacturerName,
+      ProductName,
+      Quantity,
+      Timestamp: TimestampOrNull(D.Timestamp),
+    });
+    this._rebuildUSBDeviceView();
+    return true;
+  }
+  UnmarkCriticalUSBName(NameKey: unknown) {
+    const Normalized = typeof NameKey === 'string' ? NameKey.trim().toLowerCase() : '';
+    if (!Normalized) return false;
+    const PrevLength = this.CriticalUSBNames.length;
+    this.CriticalUSBNames = this.CriticalUSBNames.filter((Entry) => Entry.NameKey !== Normalized);
+    if (this.CriticalUSBNames.length === PrevLength) return false;
     this._rebuildUSBDeviceView();
     return true;
   }
@@ -597,9 +690,9 @@ class Client {
     return true;
   }
   _refreshClientHealthState() {
-    const MissingUSBCount = Array.isArray(this.MissingCriticalUSBDevices)
-      ? this.MissingCriticalUSBDevices.length
-      : 0;
+    const MissingUSBCount =
+      (Array.isArray(this.MissingCriticalUSBDevices) ? this.MissingCriticalUSBDevices.length : 0) +
+      (Array.isArray(this.MissingCriticalUSBNames) ? this.MissingCriticalUSBNames.length : 0);
     const ProcessStatusState = String(
       this.RunningApplications &&
         this.RunningApplications.Status &&
@@ -638,16 +731,55 @@ class Client {
         .filter((Entry): Entry is [string, CriticalUSBEntry] => !!Entry)
     );
 
+    const CriticalByName = new Map<string, CriticalUSBNameEntry>(
+      (Array.isArray(this.CriticalUSBNames) ? this.CriticalUSBNames : [])
+        .map((Entry: CriticalUSBNameEntry): [string, CriticalUSBNameEntry] | null => {
+          if (!Entry || !Entry.NameKey) return null;
+          return [Entry.NameKey, Entry];
+        })
+        .filter((Entry): Entry is [string, CriticalUSBNameEntry] => !!Entry)
+    );
+
+    // Count connected devices per name key (serial-less guarding matches by
+    // name, so every connected device of a name contributes to its count).
+    const ConnectedCountByName = new Map<string, number>();
+    for (const Device of Array.isArray(this.ConnectedUSBDeviceList)
+      ? this.ConnectedUSBDeviceList
+      : []) {
+      const NameKey = normalizeUSBNameKey(
+        Device && Device.ManufacturerName,
+        Device && Device.ProductName
+      );
+      ConnectedCountByName.set(NameKey, (ConnectedCountByName.get(NameKey) || 0) + 1);
+    }
+
     const Connected: USBDeviceViewEntry[] = (
       Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : []
     ).map((Device) => {
       const SerialNumber = normalizeSerialNumber(Device && Device.SerialNumber);
       const CriticalEntry = SerialNumber ? CriticalBySerial.get(SerialNumber) : null;
+      const NameKey = normalizeUSBNameKey(
+        Device && Device.ManufacturerName,
+        Device && Device.ProductName
+      );
+      // Name-based guarding only applies to devices without a serial (those are
+      // the ones the serial-based path cannot track).
+      const NameCriticalEntry = !SerialNumber ? CriticalByName.get(NameKey) || null : null;
+      const NameConnectedCount = NameCriticalEntry
+        ? ConnectedCountByName.get(NameKey) || 0
+        : undefined;
       return {
         ...(Device || {}),
         SerialNumber: Device && Device.SerialNumber ? String(Device.SerialNumber) : null,
         IsConnected: true,
-        IsCritical: !!CriticalEntry,
+        IsCritical: !!CriticalEntry || !!NameCriticalEntry,
+        IsCriticalByName: !!NameCriticalEntry,
+        NameKey,
+        Quantity: NameCriticalEntry ? NameCriticalEntry.Quantity : undefined,
+        ConnectedCount: NameConnectedCount,
+        Shortfall: NameCriticalEntry
+          ? (NameConnectedCount as number) < NameCriticalEntry.Quantity
+          : undefined,
         Missing: false,
         ManufacturerName:
           (Device && Device.ManufacturerName) ||
@@ -678,8 +810,38 @@ class Client {
       });
     }
 
+    // Name-based shortfalls: a serial-less critical device is degraded when
+    // fewer than its expected Quantity are connected. `MissingNames` records
+    // every shortfall (drives the degraded state); `MissingNameCards` are only
+    // the fully-absent ones (0 connected) that need their own list card —
+    // partially-connected names are already represented by their connected
+    // cards, which carry the Shortfall flag.
+    const MissingNames: USBDeviceViewEntry[] = [];
+    const MissingNameCards: USBDeviceViewEntry[] = [];
+    for (const Entry of Array.isArray(this.CriticalUSBNames) ? this.CriticalUSBNames : []) {
+      if (!Entry || !Entry.NameKey) continue;
+      const ConnectedCount = ConnectedCountByName.get(Entry.NameKey) || 0;
+      if (ConnectedCount >= Entry.Quantity) continue;
+      const Record: USBDeviceViewEntry = {
+        ManufacturerName: Entry.ManufacturerName,
+        ProductName: Entry.ProductName,
+        SerialNumber: null,
+        NameKey: Entry.NameKey,
+        Quantity: Entry.Quantity,
+        ConnectedCount,
+        IsConnected: false,
+        IsCritical: true,
+        IsCriticalByName: true,
+        Shortfall: true,
+        Missing: true,
+      };
+      MissingNames.push(Record);
+      if (ConnectedCount === 0) MissingNameCards.push(Record);
+    }
+
     this.MissingCriticalUSBDevices = Missing;
-    this.USBDeviceList = Connected.concat(Missing);
+    this.MissingCriticalUSBNames = MissingNames;
+    this.USBDeviceList = Connected.concat(Missing).concat(MissingNameCards);
     this._refreshClientHealthState();
   }
   _rebuildDisplayView() {

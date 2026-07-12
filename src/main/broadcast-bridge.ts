@@ -17,6 +17,7 @@ import { CreateLogger } from '../Modules/Logger';
 import { ONLINE_DEPLOY_COOLDOWN_MS } from '../Modules/Config/constants';
 import { Manager as SettingsManager } from '../Modules/SettingsManager';
 import { Manager as ClientManager } from '../Modules/ClientManager';
+import { normalizeUSBNameKey } from '../Modules/ClientManager/normalizers';
 import { Manager as GroupManager } from '../Modules/GroupManager';
 import { Manager as MonitoringTargetManager } from '../Modules/MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../Modules/DummyClientManager';
@@ -91,6 +92,30 @@ async function UpdateSettings(): Promise<void> {
   PushToRenderers('UpdateSettings', Settings, SettingGroups);
 }
 
+// A device counts as critical for alerting if it's guarded by serial number, or
+// — for serial-less devices — if its name is guarded (name + quantity path).
+async function ResolveUSBDeviceCritical(
+  UUID: string,
+  Device: USBDevice
+): Promise<[unknown, boolean]> {
+  const [serialErr, isSerialCritical] = await ClientManager.IsUSBDeviceCritical(
+    UUID,
+    Device && Device.SerialNumber
+  );
+  if (serialErr) return [serialErr, false];
+  if (isSerialCritical) return [null, true];
+  const Serial = Device && Device.SerialNumber;
+  const HasSerial = typeof Serial === 'string' && Serial.trim().length > 0;
+  if (HasSerial) return [null, false];
+  const NameKey = normalizeUSBNameKey(
+    Device && Device.ManufacturerName,
+    Device && Device.ProductName
+  );
+  const [nameErr, isNameCritical] = await ClientManager.IsUSBNameCritical(UUID, NameKey);
+  if (nameErr) return [nameErr, false];
+  return [null, !!isNameCritical];
+}
+
 async function USBDeviceAdded(Client: BroadcastClient, Device: USBDevice): Promise<void> {
   if (!hasMainWindow()) return;
   Logger.log(
@@ -100,10 +125,7 @@ async function USBDeviceAdded(Client: BroadcastClient, Device: USBDevice): Promi
   AlertsManager.HandleUSBDeviceConnected(Client, Device).catch((Err: unknown) =>
     Logger.error('AlertsManager.HandleUSBDeviceConnected failed', Err)
   );
-  const [criticalErr, isCritical] = await ClientManager.IsUSBDeviceCritical(
-    Client.UUID,
-    Device && Device.SerialNumber
-  );
+  const [criticalErr, isCritical] = await ResolveUSBDeviceCritical(Client.UUID, Device);
   if (criticalErr) {
     Logger.error('ClientManager.IsUSBDeviceCritical failed', criticalErr);
   } else if (isCritical) {
@@ -127,10 +149,7 @@ async function USBDeviceRemoved(Client: BroadcastClient, Device: USBDevice): Pro
   AlertsManager.HandleUSBDeviceDisconnected(Client, Device).catch((Err: unknown) =>
     Logger.error('AlertsManager.HandleUSBDeviceDisconnected failed', Err)
   );
-  const [criticalErr, isCritical] = await ClientManager.IsUSBDeviceCritical(
-    Client.UUID,
-    Device && Device.SerialNumber
-  );
+  const [criticalErr, isCritical] = await ResolveUSBDeviceCritical(Client.UUID, Device);
   if (criticalErr) {
     Logger.error('ClientManager.IsUSBDeviceCritical failed', criticalErr);
   } else if (isCritical) {

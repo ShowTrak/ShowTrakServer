@@ -10,6 +10,7 @@ import { TriggerScriptDeployment } from '../deployment';
 import type {
   IPCValidationManager,
   CriticalUSBDevicePayloadResult,
+  CriticalUSBNamePayloadResult,
   CriticalApplicationPayloadResult,
   CriticalDisplayPayloadResult,
 } from '../../Modules/IPCValidation';
@@ -61,6 +62,22 @@ function register(): void {
         IPCValidation.USBSerialNumber(SerialNumber),
       ],
       (UUID: string, SerialNumber: string) => ClientManager.RemoveUSBDeviceCritical(UUID, SerialNumber)
+    )
+  );
+
+  RPC.handle(
+    'MarkClientUSBNameCritical',
+    createTupleHandler<[string, CriticalUSBNamePayloadResult], unknown>(
+      (UUID: unknown, Device: unknown) => [IPCValidation.UUID(UUID), IPCValidation.CriticalUSBNamePayload(Device)],
+      (UUID: string, Device: CriticalUSBNamePayloadResult) => ClientManager.MarkUSBNameCritical(UUID, Device)
+    )
+  );
+
+  RPC.handle(
+    'RemoveClientUSBNameCritical',
+    createTupleHandler<[string, CriticalUSBNamePayloadResult], unknown>(
+      (UUID: unknown, Device: unknown) => [IPCValidation.UUID(UUID), IPCValidation.CriticalUSBNamePayload(Device)],
+      (UUID: string, Device: CriticalUSBNamePayloadResult) => ClientManager.RemoveUSBNameCritical(UUID, Device)
     )
   );
 

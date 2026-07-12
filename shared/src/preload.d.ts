@@ -105,6 +105,8 @@ export interface ShowTrakAPI {
   UpdateClient(UUID: string, Data: Record<string, unknown>): Promise<ResultTuple<unknown>>;
   MarkClientUSBDeviceCritical(UUID: string, Device: unknown): Promise<ResultTuple<unknown>>;
   RemoveClientUSBDeviceCritical(UUID: string, SerialNumber: string): Promise<ResultTuple<unknown>>;
+  MarkClientUSBNameCritical(UUID: string, Device: unknown): Promise<ResultTuple<unknown>>;
+  RemoveClientUSBNameCritical(UUID: string, Device: unknown): Promise<ResultTuple<unknown>>;
   MarkClientApplicationCritical(UUID: string, Application: unknown): Promise<ResultTuple<unknown>>;
   RemoveClientApplicationCritical(UUID: string, ApplicationName: string): Promise<ResultTuple<unknown>>;
   MarkClientDisplayCritical(UUID: string, Display: unknown): Promise<ResultTuple<unknown>>;

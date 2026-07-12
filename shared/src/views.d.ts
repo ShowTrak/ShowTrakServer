@@ -42,6 +42,37 @@ export interface MissingCriticalUSBDevice {
 }
 
 /**
+ * A user-marked serial-less critical USB device, guarded by its visible name
+ * (Manufacturer + Product) and an expected Quantity rather than a serial number.
+ * Emitted in `ClientView.CriticalUSBNames`.
+ */
+export interface CriticalUSBName {
+  NameKey: string;
+  ManufacturerName: string | null;
+  ProductName: string | null;
+  Quantity: number;
+  Timestamp: number | null;
+}
+
+/**
+ * A serial-less critical USB device whose connected count currently falls short
+ * of its expected Quantity. Emitted in `ClientView.MissingCriticalUSBNames`.
+ */
+export interface MissingCriticalUSBName {
+  ManufacturerName: string | null;
+  ProductName: string | null;
+  SerialNumber: null;
+  NameKey: string;
+  Quantity: number;
+  ConnectedCount: number;
+  IsConnected: false;
+  IsCritical: true;
+  IsCriticalByName: true;
+  Shortfall: true;
+  Missing: true;
+}
+
+/**
  * A user-marked critical application.
  * Emitted in `ClientView.CriticalApplications`.
  */
@@ -118,6 +149,13 @@ export interface MismatchedCriticalDisplay extends ClientDisplay {
 export interface USBDeviceView extends USBDevice {
   IsCritical?: boolean;
   IsConnected?: boolean;
+  // Serial-less name-based guarding annotations (see CriticalUSBName).
+  IsCriticalByName?: boolean;
+  NameKey?: string;
+  Quantity?: number;
+  ConnectedCount?: number;
+  Shortfall?: boolean;
+  Missing?: boolean;
 }
 
 export interface ClientDisplayView extends ClientDisplay {
@@ -159,6 +197,8 @@ export interface ClientView {
   CriticalUSBDevices?: CriticalUSBDevice[];
   CriticalUSBSerials?: string[];
   MissingCriticalUSBDevices?: MissingCriticalUSBDevice[];
+  CriticalUSBNames?: CriticalUSBName[];
+  MissingCriticalUSBNames?: MissingCriticalUSBName[];
   Degraded?: boolean;
   DegradedWarnings?: string[];
   NetworkInterfaces?: NetworkInterface[];

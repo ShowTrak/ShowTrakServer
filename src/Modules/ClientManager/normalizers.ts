@@ -21,6 +21,22 @@ export function normalizeSerialNumber(SerialNumber: unknown): string | null {
   return Value.toUpperCase();
 }
 
+// The visible label for a USB device, mirroring how the renderer composes the
+// card heading: manufacturer falls back to "Generic", product to "USB Device".
+// Serial-less critical devices are identified by this label (see below).
+export function buildUSBDeviceLabel(manufacturer: unknown, product: unknown): string {
+  const M =
+    typeof manufacturer === 'string' && manufacturer.trim() ? manufacturer.trim() : 'Generic';
+  const P = typeof product === 'string' && product.trim() ? product.trim() : 'USB Device';
+  return `${M} ${P}`;
+}
+
+// Lookup key for a serial-less critical USB device: the visible label, lower
+// cased for case-insensitive matching against the critical-name index.
+export function normalizeUSBNameKey(manufacturer: unknown, product: unknown): string {
+  return buildUSBDeviceLabel(manufacturer, product).toLowerCase();
+}
+
 // Application display name: trimmed, case preserved (null when empty/non-string).
 export function normalizeApplicationName(Name: unknown): string | null {
   if (typeof Name !== 'string') return null;

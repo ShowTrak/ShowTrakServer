@@ -13,6 +13,7 @@ import { Client } from './client';
 import {
   AsRecord,
   normalizeSerialNumber,
+  normalizeUSBNameKey,
   normalizeApplicationName,
   normalizeApplicationKey,
   normalizeDisplayID,
@@ -21,12 +22,14 @@ import { NormalizeIntegratedActions } from './integrated-actions';
 import { makeCriticalIndex } from './critical-index';
 import type {
   CriticalUSBDeviceRow,
+  CriticalUSBDeviceNameRow,
   CriticalApplicationRow,
   CriticalDisplayRow,
 } from '../DB/rows';
 import type { HeartbeatPayload, USBDevice } from '@showtrak/protocol';
 import type {
   CriticalUSBDevicePayloadResult,
+  CriticalUSBNamePayloadResult,
   CriticalApplicationPayloadResult,
   CriticalDisplayPayloadResult,
 } from '../IPCValidation';
@@ -82,6 +85,15 @@ export interface ClientManagerType {
   ): Promise<Result<boolean>>;
   RemoveUSBDeviceCritical(UUID: string, SerialNumber: unknown): Promise<Result<boolean>>;
   IsUSBDeviceCritical(UUID: string, SerialNumber: unknown): Promise<Result<boolean>>;
+  MarkUSBNameCritical(
+    UUID: string,
+    Device: CriticalUSBNamePayloadResult
+  ): Promise<Result<boolean>>;
+  RemoveUSBNameCritical(
+    UUID: string,
+    Device: CriticalUSBNamePayloadResult
+  ): Promise<Result<boolean>>;
+  IsUSBNameCritical(UUID: string, NameKey: unknown): Promise<Result<boolean>>;
   MarkDisplayCritical(
     UUID: string,
     Display: CriticalDisplayPayloadResult
@@ -166,6 +178,13 @@ interface USBIndexEntry {
   ProductName: string | null;
   Timestamp: number | null;
 }
+interface USBNameIndexEntry {
+  NameKey: string;
+  ManufacturerName: string | null;
+  ProductName: string | null;
+  Quantity: number;
+  Timestamp: number | null;
+}
 interface ApplicationIndexEntry {
   Name: string;
   Key: string;
@@ -200,6 +219,27 @@ const CriticalUSB = makeCriticalIndex<CriticalUSBDeviceRow, USBIndexEntry>({
     };
   },
   apply: (client, entries) => client.SetCriticalUSBDevices(entries),
+});
+
+const CriticalUSBNames = makeCriticalIndex<CriticalUSBDeviceNameRow, USBNameIndexEntry>({
+  loadAll: () => CriticalRepo.LoadAllUSBNames(),
+  fromRow: (Row) => {
+    const UUID = Row && Row.UUID ? String(Row.UUID) : '';
+    const NameKey = Row && Row.NameKey ? String(Row.NameKey).trim().toLowerCase() : '';
+    if (!UUID || !NameKey) return null;
+    return {
+      UUID,
+      Key: NameKey,
+      Entry: {
+        NameKey,
+        ManufacturerName: Row.ManufacturerName || null,
+        ProductName: Row.ProductName || null,
+        Quantity: Math.max(1, parseInt(String(Row.Quantity), 10) || 1),
+        Timestamp: Row.Timestamp || null,
+      },
+    };
+  },
+  apply: (client, entries) => client.SetCriticalUSBNames(entries),
 });
 
 const CriticalApplications = makeCriticalIndex<CriticalApplicationRow, ApplicationIndexEntry>({
@@ -270,6 +310,7 @@ Manager.Heartbeat = async (UUID: string, Data: HeartbeatPayload, IP: string) => 
     } else {
       CachedClient = new Client(FetchedClient);
       CriticalUSB.applyState(CachedClient);
+      CriticalUSBNames.applyState(CachedClient);
       CriticalApplications.applyState(CachedClient);
       CriticalDisplays.applyState(CachedClient);
       if (addClientToCache(CachedClient)) {
@@ -503,6 +544,85 @@ Manager.IsUSBDeviceCritical = async (UUID: string, SerialNumber: unknown) => {
   return Ok(!!Row);
 };
 
+Manager.MarkUSBNameCritical = async (UUID: string, Device: CriticalUSBNamePayloadResult) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+
+  const ManufacturerName = (Device && Device.ManufacturerName) || null;
+  const ProductName = (Device && Device.ProductName) || null;
+  const NameKey = normalizeUSBNameKey(ManufacturerName, ProductName);
+  if (!NameKey) return Fail('Device name is required');
+
+  // Auto-capture the expected quantity from how many devices of this name are
+  // currently connected (at least one, so the guard is meaningful).
+  const ConnectedCount = (
+    Array.isArray(Target.ConnectedUSBDeviceList) ? Target.ConnectedUSBDeviceList : []
+  ).filter(
+    (Entry) => normalizeUSBNameKey(Entry && Entry.ManufacturerName, Entry && Entry.ProductName) === NameKey
+  ).length;
+  const Quantity = Math.max(1, ConnectedCount);
+
+  const [WriteErr] = await CriticalRepo.MarkUSBName(
+    UUID,
+    NameKey,
+    ManufacturerName,
+    ProductName,
+    Quantity,
+    Date.now()
+  );
+  if (WriteErr) return Fail('Failed to save critical USB device');
+
+  CriticalUSBNames.setForClient(UUID, NameKey, {
+    NameKey,
+    ManufacturerName,
+    ProductName,
+    Quantity,
+    Timestamp: Date.now(),
+  });
+  Target.MarkCriticalUSBName({
+    NameKey,
+    ManufacturerName,
+    ProductName,
+    Quantity,
+    Timestamp: Date.now(),
+  });
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(true);
+};
+
+Manager.RemoveUSBNameCritical = async (UUID: string, Device: CriticalUSBNamePayloadResult) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+
+  const NameKey = normalizeUSBNameKey(
+    Device && Device.ManufacturerName,
+    Device && Device.ProductName
+  );
+  if (!NameKey) return Fail('Device name is required');
+
+  const [WriteErr] = await CriticalRepo.RemoveUSBName(UUID, NameKey);
+  if (WriteErr) return Fail('Failed to remove critical USB device');
+
+  CriticalUSBNames.removeForClient(UUID, NameKey);
+  Target.UnmarkCriticalUSBName(NameKey);
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(true);
+};
+
+Manager.IsUSBNameCritical = async (UUID: string, NameKey: unknown) => {
+  const Normalized = typeof NameKey === 'string' ? NameKey.trim().toLowerCase() : '';
+  if (!Normalized) return Ok(false);
+
+  const Cached = CriticalUSBNames.getForClient(UUID, false);
+  if (Cached) return Ok(Cached.has(Normalized));
+
+  const [Err, Row] = await CriticalRepo.IsUSBNameCritical(UUID, Normalized);
+  if (Err) return Fail('Failed to determine critical USB status');
+  return Ok(!!Row);
+};
+
 Manager.SetDisplayList = async (UUID: string, DisplayList: unknown) => {
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
@@ -654,6 +774,7 @@ Manager.Create = async (UUID: string) => {
     Timestamp: Date.now(),
   });
   CriticalUSB.applyState(Created);
+  CriticalUSBNames.applyState(Created);
   CriticalApplications.applyState(Created);
   CriticalDisplays.applyState(Created);
   if (addClientToCache(Created)) {
@@ -666,6 +787,8 @@ Manager.Create = async (UUID: string) => {
 Manager.Delete = async (UUID: string) => {
   const [criticalErr] = await CriticalRepo.DeleteAllUSBForClient(UUID);
   if (criticalErr) return Fail('Failed to delete critical USB devices for client');
+  const [criticalNameErr] = await CriticalRepo.DeleteAllUSBNamesForClient(UUID);
+  if (criticalNameErr) return Fail('Failed to delete critical USB devices for client');
   const [criticalAppErr] = await CriticalRepo.DeleteAllApplicationsForClient(UUID);
   if (criticalAppErr) return Fail('Failed to delete critical applications for client');
   const [criticalDisplayErr] = await CriticalRepo.DeleteAllDisplaysForClient(UUID);
@@ -676,6 +799,7 @@ Manager.Delete = async (UUID: string) => {
   // Remove from in-memory list
   removeClientFromCache(UUID);
   CriticalUSB.clearForClient(UUID);
+  CriticalUSBNames.clearForClient(UUID);
   CriticalApplications.clearForClient(UUID);
   CriticalDisplays.clearForClient(UUID);
   Logger.success(`Client ${UUID} deleted successfully`);
@@ -714,10 +838,12 @@ Manager.ReplaceClient = async (CurrentUUID: unknown, ReplacementUUID: unknown) =
   rebuildClientIndex();
 
   CriticalUSB.rekeyClient(OldUUID, NewUUID);
+  CriticalUSBNames.rekeyClient(OldUUID, NewUUID);
   CriticalApplications.rekeyClient(OldUUID, NewUUID);
   CriticalDisplays.rekeyClient(OldUUID, NewUUID);
 
   CriticalUSB.applyState(ExistingClient);
+  CriticalUSBNames.applyState(ExistingClient);
   CriticalApplications.applyState(ExistingClient);
   CriticalDisplays.applyState(ExistingClient);
 
@@ -752,6 +878,7 @@ Manager.Get = async (UUID: string) => {
   if (!Row) return Fail('Client Not Found');
   const ClientRow = new Client(Row);
   CriticalUSB.applyState(ClientRow);
+  CriticalUSBNames.applyState(ClientRow);
   CriticalApplications.applyState(ClientRow);
   CriticalDisplays.applyState(ClientRow);
   return Ok(ClientRow);
@@ -761,6 +888,7 @@ Manager.Initialized = false;
 // Warm the cache from DB so early UI renders have data
 Manager.Init = async () => {
   await CriticalUSB.load();
+  await CriticalUSBNames.load();
   await CriticalApplications.load();
   await CriticalDisplays.load();
   const [Err, Clients] = await ClientsRepo.GetAll();
@@ -773,6 +901,7 @@ Manager.Init = async () => {
   ClientList = Clients.map((row) => {
     const ClientEntity = new Client(row);
     CriticalUSB.applyState(ClientEntity);
+    CriticalUSBNames.applyState(ClientEntity);
     CriticalApplications.applyState(ClientEntity);
     CriticalDisplays.applyState(ClientEntity);
     return ClientEntity;
@@ -884,6 +1013,7 @@ Manager.ClearCache = async () => {
   ClientList = [];
   rebuildClientIndex();
   CriticalUSB.clear();
+  CriticalUSBNames.clear();
   CriticalApplications.clear();
   CriticalDisplays.clear();
   Manager.Initialized = false;

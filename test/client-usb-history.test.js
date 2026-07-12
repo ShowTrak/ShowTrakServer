@@ -55,6 +55,70 @@ test('records a connected/disconnected sample per critical USB device only', () 
   assert.strictEqual(byKey.get('AAA111').Name, 'Focusrite Scarlett');
 });
 
+test('tracks serial-less critical devices by name, keyed with the usbname prefix', () => {
+  const client = {
+    UUID: 'usbhist-name',
+    Online: true,
+    USBDeviceList: [
+      // Two connected dongles of the same name, quantity satisfied (2 of 2).
+      {
+        SerialNumber: null,
+        ManufacturerName: 'Acme',
+        ProductName: 'Dongle',
+        NameKey: 'acme dongle',
+        IsCritical: true,
+        IsCriticalByName: true,
+        IsConnected: true,
+        Missing: false,
+        Shortfall: false,
+        Quantity: 2,
+        ConnectedCount: 2,
+      },
+      {
+        SerialNumber: null,
+        ManufacturerName: 'Acme',
+        ProductName: 'Dongle',
+        NameKey: 'acme dongle',
+        IsCritical: true,
+        IsCriticalByName: true,
+        IsConnected: true,
+        Missing: false,
+        Shortfall: false,
+        Quantity: 2,
+        ConnectedCount: 2,
+      },
+    ],
+  };
+  recordClientUSBHistorySamples(client);
+  let series = getClientUSBHistorySamples('usbhist-name');
+  // One series for the whole name group, not one per connected device.
+  assert.strictEqual(series.length, 1);
+  assert.strictEqual(series[0].Serial, 'usbname:acme dongle');
+  assert.strictEqual(series[0].Name, 'Acme Dongle');
+  assert.strictEqual(series[0].samples.at(-1).online, true, 'quantity satisfied reads online');
+
+  // Drop to a shortfall (1 of 2) → the name series reads offline.
+  client.USBDeviceList = [
+    {
+      SerialNumber: null,
+      ManufacturerName: 'Acme',
+      ProductName: 'Dongle',
+      NameKey: 'acme dongle',
+      IsCritical: true,
+      IsCriticalByName: true,
+      IsConnected: true,
+      Missing: false,
+      Shortfall: true,
+      Quantity: 2,
+      ConnectedCount: 1,
+    },
+  ];
+  recordClientUSBHistorySamples(client);
+  series = getClientUSBHistorySamples('usbhist-name');
+  assert.strictEqual(series.length, 1);
+  assert.strictEqual(series[0].samples.at(-1).online, false, 'shortfall reads offline');
+});
+
 test('uses the pushed sampled-at time when recording history', () => {
   const sampledAt = Date.now() - 1000;
   recordClientUSBHistorySamples(makeClient({ UUID: 'usbhist-ts' }), sampledAt);

@@ -68,6 +68,8 @@ const INVOKE_CHANNEL_LIST = [
   'UpdateClient',
   'MarkClientUSBDeviceCritical',
   'RemoveClientUSBDeviceCritical',
+  'MarkClientUSBNameCritical',
+  'RemoveClientUSBNameCritical',
   'MarkClientApplicationCritical',
   'RemoveClientApplicationCritical',
   'MarkClientDisplayCritical',
@@ -316,6 +318,10 @@ const API: ShowTrakAPI = {
     invoke('MarkClientUSBDeviceCritical', UUID, Device),
   RemoveClientUSBDeviceCritical: async (UUID, SerialNumber) =>
     invoke('RemoveClientUSBDeviceCritical', UUID, SerialNumber),
+  MarkClientUSBNameCritical: async (UUID, Device) =>
+    invoke('MarkClientUSBNameCritical', UUID, Device),
+  RemoveClientUSBNameCritical: async (UUID, Device) =>
+    invoke('RemoveClientUSBNameCritical', UUID, Device),
   MarkClientApplicationCritical: async (UUID, Application) =>
     invoke('MarkClientApplicationCritical', UUID, Application),
   RemoveClientApplicationCritical: async (UUID, ApplicationName) =>

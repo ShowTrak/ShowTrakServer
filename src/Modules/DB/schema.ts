@@ -151,6 +151,24 @@ Schema.push({
     )',
 });
 
+// Serial-less critical USB devices. WebUSB cannot always read a device serial,
+// so these devices are guarded by their visible name (Manufacturer + Product)
+// and an expected Quantity instead: the client is degraded when fewer than
+// Quantity devices matching NameKey are connected. NameKey is the lower-cased
+// visible label; ManufacturerName/ProductName are kept for display.
+Schema.push({
+  Name: 'CriticalUSBDeviceNames',
+  SQL: 'CREATE TABLE IF NOT EXISTS `CriticalUSBDeviceNames` ( \
+            UUID TEXT NOT NULL, \
+            NameKey TEXT NOT NULL, \
+            ManufacturerName TEXT, \
+            ProductName TEXT, \
+            Quantity INTEGER NOT NULL DEFAULT 1, \
+            Timestamp BIGINT(11) NOT NULL, \
+            PRIMARY KEY (UUID, NameKey) \
+    )',
+});
+
 Schema.push({
   Name: 'CriticalApplications',
   SQL: 'CREATE TABLE IF NOT EXISTS `CriticalApplications` ( \

@@ -46,6 +46,8 @@ const INVOKE_CHANNELS = [
   'WakeOnLan',
   'MarkClientUSBDeviceCritical',
   'RemoveClientUSBDeviceCritical',
+  'MarkClientUSBNameCritical',
+  'RemoveClientUSBNameCritical',
   'MarkClientApplicationCritical',
   'RemoveClientApplicationCritical',
   'MarkClientDisplayCritical',

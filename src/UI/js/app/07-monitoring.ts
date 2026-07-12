@@ -925,6 +925,50 @@ export function RenderMonitoringHistoryModal() {
       );
     }
 
+    // Per-critical serial-less USB-device timelines. These are guarded by name +
+    // quantity, so there is one timeline per distinct name (keyed by NameKey with
+    // the same `usbname:` prefix the recorder uses). "Connected" here means the
+    // expected quantity is satisfied; a shortfall or full absence reads as
+    // "Disconnected".
+    const CriticalUSBNames: { NameKey: string; Device: CriticalUSBItem }[] = [];
+    const SeenNameKeys = new Set<string>();
+    for (const Device of USBItems) {
+      if (!Device || !Device.IsCriticalByName) continue;
+      const NameKey =
+        Device.NameKey != null && String(Device.NameKey).trim()
+          ? String(Device.NameKey).trim().toLowerCase()
+          : '';
+      if (!NameKey || SeenNameKeys.has(NameKey)) continue;
+      SeenNameKeys.add(NameKey);
+      CriticalUSBNames.push({ NameKey, Device });
+    }
+    for (const { NameKey, Device } of CriticalUSBNames) {
+      const Blocks = BuildStatusBlocksFromSamples(
+        SamplesByUSBSerial.get(`usbname:${NameKey}`) || []
+      );
+      const Manufacturer = Device.ManufacturerName ? String(Device.ManufacturerName).trim() : '';
+      const Product = Device.ProductName ? String(Device.ProductName).trim() : '';
+      const Name = [Manufacturer, Product].filter(Boolean).join(' ') || 'USB Device';
+      const Satisfied = Device.IsConnected !== false && !Device.Missing && !Device.Shortfall;
+      let LiveState = 'IDLE';
+      let StatusLabel = 'Idle';
+      if (Client.Online) {
+        LiveState = Satisfied ? 'ONLINE' : 'OFFLINE';
+        StatusLabel = Satisfied ? 'Connected' : 'Disconnected';
+      }
+      $timelines.append(
+        RenderMonitorHistorySection(
+          {
+            state: LiveState,
+            name: Name,
+            sub: 'Critical USB Device',
+            statusText: StatusLabel,
+          },
+          Blocks
+        )
+      );
+    }
+
     // Per-critical-display timelines (connected / configuration-changed /
     // missing over the past hour). Rendered the same way individual monitoring
     // checks are, and driven by the client's CURRENT critical displays so

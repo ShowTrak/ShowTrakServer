@@ -198,6 +198,70 @@ test('ClientManager updates system info, USB devices, and network interfaces', a
   assert.match(String((await Manager.SystemInfo('missing', {}, '0'))[0]), /not found/i);
 });
 
+test('ClientManager guards serial-less USB devices by name and quantity', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.Create('kiosk-1');
+
+  // Two identical serial-less dongles are connected.
+  await Manager.SetUSBDeviceList('kiosk-1', [
+    { ManufacturerName: 'Acme', ProductName: 'Dongle' },
+    { ManufacturerName: 'Acme', ProductName: 'Dongle' },
+  ]);
+
+  // Marking one captures the current connected count (2) as the expected qty.
+  const [markErr] = await Manager.MarkUSBNameCritical('kiosk-1', {
+    ManufacturerName: 'Acme',
+    ProductName: 'Dongle',
+  });
+  assert.equal(markErr, null);
+
+  let [, client] = await Manager.Get('kiosk-1');
+  assert.equal(client.CriticalUSBNames.length, 1);
+  assert.equal(client.CriticalUSBNames[0].Quantity, 2);
+  // Both connected cards are flagged critical-by-name, none in shortfall.
+  const connectedCards = client.USBDeviceList.filter((d) => d.IsCriticalByName);
+  assert.equal(connectedCards.length, 2);
+  assert.equal(connectedCards.every((d) => d.Shortfall === false), true);
+  assert.equal(client.MissingCriticalUSBNames.length, 0);
+  assert.equal(client.Degraded === true, false);
+
+  // Case-insensitive name lookup works.
+  assert.deepEqual(await Manager.IsUSBNameCritical('kiosk-1', 'acme dongle'), [null, true]);
+
+  // Unplug one → shortfall (1 of 2). Client is degraded; the surviving card is
+  // flagged Shortfall, and no duplicate "missing" card is emitted.
+  client.SetOnline(true);
+  await Manager.SetUSBDeviceList('kiosk-1', [{ ManufacturerName: 'Acme', ProductName: 'Dongle' }]);
+  [, client] = await Manager.Get('kiosk-1');
+  assert.equal(client.MissingCriticalUSBNames.length, 1);
+  assert.equal(client.USBDeviceList.filter((d) => d.IsCriticalByName).length, 1);
+  const short = client.USBDeviceList.find((d) => d.IsCriticalByName);
+  assert.equal(short.Shortfall, true);
+  assert.equal(short.ConnectedCount, 1);
+  assert.equal(short.Quantity, 2);
+  assert.equal(client.Degraded, true);
+  assert.ok(client.DegradedWarnings.includes('Missing USB Device'));
+
+  // Unplug the last one → a single fully-absent card (0 of 2).
+  await Manager.SetUSBDeviceList('kiosk-1', []);
+  [, client] = await Manager.Get('kiosk-1');
+  const absent = client.USBDeviceList.filter((d) => d.IsCriticalByName);
+  assert.equal(absent.length, 1);
+  assert.equal(absent[0].IsConnected, false);
+  assert.equal(absent[0].ConnectedCount, 0);
+
+  // Removing critical status clears the guard entirely.
+  const [removeErr] = await Manager.RemoveUSBNameCritical('kiosk-1', {
+    ManufacturerName: 'Acme',
+    ProductName: 'Dongle',
+  });
+  assert.equal(removeErr, null);
+  [, client] = await Manager.Get('kiosk-1');
+  assert.equal(client.CriticalUSBNames.length, 0);
+  assert.equal(client.MissingCriticalUSBNames.length, 0);
+  assert.deepEqual(await Manager.IsUSBNameCritical('kiosk-1', 'acme dongle'), [null, false]);
+});
+
 test('ClientManager tracks critical displays and flags resolution/refresh changes', async () => {
   const { Manager } = await loadClientManager();
   await Manager.Create('disp-1');

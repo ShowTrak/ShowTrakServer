@@ -136,18 +136,31 @@ export async function OpenClientInfo(UUID: string) {
     .off('click.critical-usb-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_USB')
     .on('click.critical-usb-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_USB', async function () {
       try {
-        const IsUnavailable = String($(this).attr('data-unavailable') || '0') === '1';
-        if (IsUnavailable) return;
-        const SerialToken = ($(this).attr('data-serial') || '').toString();
-        const SerialNumber = decodeURIComponent(SerialToken);
+        const Mode = ($(this).attr('data-mode') || 'serial').toString();
         const IsCritical = String($(this).attr('data-critical') || '0') === '1';
-        if (!ClientInfoOpenUUID || !SerialNumber) return;
+        if (!ClientInfoOpenUUID) return;
 
-        const [Err] = IsCritical
-          ? await window.API.RemoveClientUSBDeviceCritical(ClientInfoOpenUUID, SerialNumber)
-          : await window.API.MarkClientUSBDeviceCritical(ClientInfoOpenUUID, {
-              SerialNumber,
-            });
+        let Err: unknown;
+        if (Mode === 'name') {
+          // Serial-less device: guarded by its visible name + connected count.
+          const ManufacturerToken = ($(this).attr('data-manufacturer') || '').toString();
+          const ProductToken = ($(this).attr('data-product') || '').toString();
+          const Payload: { ManufacturerName?: string; ProductName?: string } = {};
+          if (ManufacturerToken) Payload.ManufacturerName = decodeURIComponent(ManufacturerToken);
+          if (ProductToken) Payload.ProductName = decodeURIComponent(ProductToken);
+          [Err] = IsCritical
+            ? await window.API.RemoveClientUSBNameCritical(ClientInfoOpenUUID, Payload)
+            : await window.API.MarkClientUSBNameCritical(ClientInfoOpenUUID, Payload);
+        } else {
+          const SerialToken = ($(this).attr('data-serial') || '').toString();
+          const SerialNumber = decodeURIComponent(SerialToken);
+          if (!SerialNumber) return;
+          [Err] = IsCritical
+            ? await window.API.RemoveClientUSBDeviceCritical(ClientInfoOpenUUID, SerialNumber)
+            : await window.API.MarkClientUSBDeviceCritical(ClientInfoOpenUUID, {
+                SerialNumber,
+              });
+        }
         if (Err) return Notify(String(Err), 'error');
 
         await Notify(
@@ -377,7 +390,9 @@ export function RenderClientInfoDetails(Client: ClientView) {
     const renderKey = `${clientKey}::${list
       .map(
         (d) =>
-          `${d.SerialNumber || ''}|${d.IsCritical ? '1' : '0'}|${d.IsConnected === false ? '0' : '1'}`
+          `${d.SerialNumber || d.NameKey || ''}|${d.IsCritical ? '1' : '0'}|${
+            d.IsConnected === false ? '0' : '1'
+          }|${d.IsCriticalByName ? '1' : '0'}|${d.ConnectedCount ?? ''}/${d.Quantity ?? ''}`
       )
       .join(';;')}`;
     const previousRenderKey = $usbList.attr('data-render-key') || '';
@@ -407,8 +422,43 @@ export function RenderClientInfoDetails(Client: ClientView) {
           const SerialNumber = dev.SerialNumber;
           const IsCritical = !!dev.IsCritical;
           const IsConnected = dev.IsConnected !== false;
+          const IsCriticalByName = !!dev.IsCriticalByName;
+          const Shortfall = !!dev.Shortfall;
           const HasSerial = typeof SerialNumber === 'string' && SerialNumber.trim().length > 0;
+          // Serial-less devices are guarded by their visible name + a connected
+          // count; devices with a serial keep the per-serial guarantee.
+          const Mode = HasSerial ? 'serial' : 'name';
           const SerialToken = HasSerial ? encodeURIComponent(SerialNumber!.trim()) : '';
+          const ManufacturerToken = ManufacturerName
+            ? encodeURIComponent(String(ManufacturerName))
+            : '';
+          const ProductToken = ProductName ? encodeURIComponent(String(ProductName)) : '';
+          const Quantity = typeof dev.Quantity === 'number' ? dev.Quantity : null;
+          const ConnectedCount = typeof dev.ConnectedCount === 'number' ? dev.ConnectedCount : null;
+
+          // Subtitle: the serial when present, otherwise the connected-vs-expected
+          // count for a name-guarded device, else a plain "no serial" note.
+          let Subtitle: string;
+          if (HasSerial) {
+            Subtitle = Safe(SerialNumber);
+          } else if (IsCriticalByName && Quantity !== null) {
+            Subtitle = `${ConnectedCount ?? 0} of ${Quantity} connected`;
+          } else {
+            Subtitle = 'No serial number';
+          }
+
+          // A critical device needs attention when it's disconnected, or when a
+          // name-guarded device has fewer connected than expected (shortfall).
+          const NeedsAttention = IsCritical && (!IsConnected || Shortfall);
+          const StatusLabel = !IsConnected ? 'Disconnected' : Shortfall ? 'Short' : 'Critical';
+          const ActionLabel = !IsConnected
+            ? 'Remove critical status (device disconnected)'
+            : Shortfall
+              ? 'Remove critical status (fewer connected than expected)'
+              : IsCritical
+                ? 'Remove critical status'
+                : 'Mark as critical';
+
           $usbList.append(`
             <div class="rounded-3 p-2 bg-ghost SHOWTRAK_CLIENT_USB_DEVICE_CARD">
               <div class="d-flex align-items-center gap-2">
@@ -416,46 +466,30 @@ export function RenderClientInfoDetails(Client: ClientView) {
                   ProductName ? Safe(ProductName) : 'USB Device'
                 }</h6>
               </div>
-              <small class="text-light d-block mb-0 text-start">${
-                HasSerial ? Safe(SerialNumber) : 'Unavailable'
-              }</small>
+              <small class="text-light d-block mb-0 text-start">${Subtitle}</small>
               <button
                 type="button"
                 class="SHOWTRAK_TOGGLE_CRITICAL_USB ${IsCritical ? 'is-critical' : ''} ${
-                  IsCritical && !IsConnected ? 'is-disconnected-critical' : ''
-                } ${HasSerial ? '' : 'is-unavailable'}"
-                data-serial="${SerialToken}"
-                data-critical="${IsCritical ? '1' : '0'}"
-                data-unavailable="${HasSerial ? '0' : '1'}"
-                ${
-                  HasSerial
-                    ? `title="${
-                        IsCritical && !IsConnected
-                          ? 'Remove critical status (device disconnected)'
-                          : IsCritical
-                            ? 'Remove critical status'
-                            : 'Mark as critical'
-                      }"`
-                    : ''
-                }
-                aria-label="${
-                  HasSerial
-                    ? IsCritical && !IsConnected
-                      ? 'Remove critical status (device disconnected)'
-                      : IsCritical
-                        ? 'Remove critical status'
-                        : 'Mark as critical'
-                    : 'Unavailble due to missing serial number'
+                  NeedsAttention ? 'is-disconnected-critical' : ''
                 }"
-                ${
-                  HasSerial
-                    ? ''
-                    : 'data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-placement="left" data-bs-custom-class="SHOWTRAK_USB_POPOVER" data-bs-content="Unavailble due to missing serial number"'
-                }
+                data-mode="${Mode}"
+                data-serial="${SerialToken}"
+                data-manufacturer="${ManufacturerToken}"
+                data-product="${ProductToken}"
+                data-critical="${IsCritical ? '1' : '0'}"
+                title="${ActionLabel}"
+                aria-label="${ActionLabel}"
               >
-                <i class="bi ${IsCritical && !IsConnected ? 'bi-x-circle-fill' : IsCritical ? 'bi-check-circle-fill' : 'bi-check-circle'}"></i>
-                <span>${IsCritical && !IsConnected ? 'Disconnected' : 'Critical'}</span>
+                <i class="bi ${NeedsAttention ? 'bi-x-circle-fill' : IsCritical ? 'bi-check-circle-fill' : 'bi-check-circle'}"></i>
+                <span>${StatusLabel}</span>
               </button>
+              ${
+                IsCriticalByName
+                  ? `<small class="d-block mt-2 mb-0 text-start text-warning SHOWTRAK_USB_NAME_WARNING"><i class="bi bi-exclamation-triangle-fill me-1"></i>ShowTrak can only monitor this device by name (expects ${
+                      Quantity ?? 1
+                    }), so identical devices can't be told apart.</small>`
+                  : ''
+              }
             </div>
           `);
         }

@@ -118,6 +118,8 @@ const WEB_EDIT_CHANNELS = new Set([
   'UpdateClient',
   'MarkClientUSBDeviceCritical',
   'RemoveClientUSBDeviceCritical',
+  'MarkClientUSBNameCritical',
+  'RemoveClientUSBNameCritical',
   'MarkClientApplicationCritical',
   'RemoveClientApplicationCritical',
   'MarkClientDisplayCritical',

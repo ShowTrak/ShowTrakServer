@@ -113,6 +113,26 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     };
   };
 
+  Manager.CriticalUSBNamePayload = (value: unknown) => {
+    if (!isPlainObject(value)) {
+      fail('Critical USB payload must be an object');
+    }
+    return {
+      ManufacturerName: Object.prototype.hasOwnProperty.call(value, 'ManufacturerName')
+        ? normalizeNonEmptyString(value.ManufacturerName, 'ManufacturerName', {
+            minLength: 1,
+            maxLength: 256,
+          })
+        : null,
+      ProductName: Object.prototype.hasOwnProperty.call(value, 'ProductName')
+        ? normalizeNonEmptyString(value.ProductName, 'ProductName', {
+            minLength: 1,
+            maxLength: 256,
+          })
+        : null,
+    };
+  };
+
   Manager.CriticalApplicationPayload = (value: unknown) => {
     if (!isPlainObject(value)) {
       fail('Critical application payload must be an object');
