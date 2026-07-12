@@ -41,6 +41,7 @@ export interface IPCValidationManager {
   ScriptSampleID(value: unknown, fieldName?: string): string;
   ScriptFieldsPayload(value: unknown): Record<string, unknown>;
   ScriptOrderList(value: unknown, fieldName?: string): string[];
+  ScriptWhitelistScope(value: unknown): { Workspace: boolean; Groups: number[]; Clients: string[] };
   Boolean(value: unknown, fieldName?: string): boolean;
   USBSerialNumber(value: unknown, fieldName?: string): string;
   CriticalUSBDevicePayload(value: unknown): CriticalUSBDevicePayloadResult;

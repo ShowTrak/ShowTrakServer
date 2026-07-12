@@ -22,9 +22,11 @@ const fs = require('fs');
 const { execFile } = require('child_process');
 const { Manager: ServerManager } = require('../../Modules/Server');
 const { Manager: ScriptManager } = require('../../Modules/ScriptManager');
+const { Manager: ScriptWhitelistManager } = require('../../Modules/ScriptWhitelistManager');
 const { Manager: SampleScriptsManager } = require('../../Modules/SampleScripts');
 const { Manager: SettingsManager } = require('../../Modules/SettingsManager');
 const { Manager: AppDataManager } = require('../../Modules/AppData');
+const { Manager: BroadcastManager } = require('../../Modules/Broadcast');
 const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
 
 const Logger = CreateLogger('Main');
@@ -162,7 +164,39 @@ function register(): void {
     }
     const [Err, Data] = await ScriptManager.SaveFields(ID, Fields);
     if (Err) return [Err, null];
+    // A rename changes the folder ID; carry the whitelist across so a restricted
+    // script does not silently revert to "all clients" under its new ID.
+    if (Data && Data.id && Data.id !== ID) {
+      await ScriptWhitelistManager.RenameScript(ID, Data.id);
+    }
     return [null, Data];
+  });
+
+  // Script Manager: read the per-show whitelist scope for one script. Returns
+  // null when unrestricted (all clients) — the default for every script.
+  RPC.handle('Scripts:GetWhitelist', async (_Event: unknown, ID: unknown) => {
+    try {
+      ID = IPCValidation.ScriptFolderID(ID);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const Scope = await ScriptWhitelistManager.GetScope(ID);
+    return [null, Scope];
+  });
+
+  // Script Manager: persist the per-show whitelist scope for one script.
+  RPC.handle('Scripts:SetWhitelist', async (_Event: unknown, ID: unknown, Scope: unknown) => {
+    try {
+      ID = IPCValidation.ScriptFolderID(ID);
+      Scope = IPCValidation.ScriptWhitelistScope(Scope);
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    await ScriptWhitelistManager.SetScope(ID as string, Scope);
+    // Re-push the catalog (from cache — no disk reload, fingerprint unchanged so
+    // no redundant deployment) so every UI immediately reflects the restriction.
+    BroadcastManager.emit('ScriptsUpdated');
+    return [null, true];
   });
 
   // Script Manager: persist a new display order (drag-and-drop reordering).
@@ -186,6 +220,8 @@ function register(): void {
     }
     const [Err] = await ScriptManager.Delete(ID);
     if (Err) return [Err, null];
+    // Drop any whitelist row for the now-deleted script (no-op if unrestricted).
+    await ScriptWhitelistManager.DeleteForScript(ID as string);
     return [null, true];
   });
 

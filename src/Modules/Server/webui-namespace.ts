@@ -29,6 +29,7 @@ import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as AlertsManager } from '../AlertsManager';
 import { Manager as SettingsManager } from '../SettingsManager';
 import { Manager as ScriptManager } from '../ScriptManager';
+import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
 import { Manager as ModeManager } from '../ModeManager';
 import { ToPublicClient, ToPublicGroup } from './serializers';
 import { RegisterRendererSink } from '../../main/renderer-bus';
@@ -397,7 +398,12 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
 
         let scripts: unknown[] = [];
         try {
-          scripts = (await ScriptManager.GetScripts()) || [];
+          // Decorate with per-show whitelist scopes (Whitelist: null when
+          // unrestricted) so the browser context menu can hide a script for
+          // non-whitelisted clients, matching the desktop push.
+          scripts = await ScriptWhitelistManager.DecorateCatalog(
+            (await ScriptManager.GetScripts()) || []
+          );
         } catch {
           /* intentional: fall back to an empty script list if the read fails */
         }

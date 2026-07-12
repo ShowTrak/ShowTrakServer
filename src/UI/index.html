@@ -991,6 +991,26 @@
                   <span class="text-sm">Files in this script</span>
                   <div id="SCRIPT_MANAGER_FILE_LIST" class="d-grid gap-1"></div>
                 </div>
+
+                <div class="bg-ghost p-2 rounded d-grid gap-2">
+                  <span class="text-sm">Whitelist</span>
+                  <span class="text-sm text-muted mb-0"
+                    >Choose which clients and groups may run this script. All clients can
+                    run it by default; new clients are added automatically unless you
+                    restrict it here. Stored in the show file.</span
+                  >
+                  <div class="alert-multiselect" id="SCRIPT_WHITELIST_DROPDOWN">
+                    <button
+                      type="button"
+                      class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center"
+                      id="SCRIPT_WHITELIST_TOGGLE"
+                    >
+                      <span>All Clients</span>
+                      <i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>
+                    </button>
+                    <div class="alert-multiselect-menu d-none" id="SCRIPT_WHITELIST_MENU"></div>
+                  </div>
+                </div>
               </div>
 
               <div class="d-flex justify-content-end gap-2 mt-2">

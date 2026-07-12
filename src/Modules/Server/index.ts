@@ -12,6 +12,7 @@ import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/proto
 import { Manager as AppDataManager } from '../AppData';
 import { Manager as ScriptExecutionManager } from '../ScriptExecutionManager';
 import { Manager as ClientManager } from '../ClientManager';
+import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
 import { Manager as UpdateManager } from '../UpdateManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
@@ -350,6 +351,25 @@ Manager.ExecuteScripts = async (ScriptID: string, Targets: string[], ResetList?:
     failed: [],
   };
   if (ResetList) await ScriptExecutionManager.ClearQueue();
+
+  // Authoritative whitelist gate. The UI already hides a script for
+  // non-whitelisted clients, but re-enforce here so a stale/tampered renderer
+  // can never dispatch a script to a client outside its whitelist. Clients not
+  // permitted are silently dropped (not queued, not reported as failures) — the
+  // remaining permitted subset still runs. An unrestricted script (no scope, or
+  // Workspace) skips the per-client resolves entirely.
+  const Scope = await ScriptWhitelistManager.GetScope(ScriptID);
+  if (Scope && !Scope.Workspace) {
+    const Allowed: string[] = [];
+    for (const UUID of Targets) {
+      const [ClientErr, Client] = await ClientManager.Get(UUID);
+      if (!ClientErr && Client && ScriptWhitelistManager.IsClientAllowed(Scope, Client)) {
+        Allowed.push(UUID);
+      }
+    }
+    Targets = Allowed;
+  }
+
   for (const UUID of Targets) {
     const RequestID = await ScriptExecutionManager.AddToQueue(UUID, ScriptID);
     if (!RequestID) {

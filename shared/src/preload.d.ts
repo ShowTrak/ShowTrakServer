@@ -43,6 +43,7 @@ import type {
   ScriptEditable,
   ScriptExecutionView,
   ScriptManagerEntry,
+  ScriptWhitelistScope,
   SettingGroupView,
   SettingView,
   ShowTrakAlert,
@@ -183,6 +184,8 @@ export interface ShowTrakAPI {
     ID: string,
     Fields: unknown
   ): Promise<ResultTuple<{ id?: string; errors?: string[] }>>;
+  GetScriptWhitelist(ID: string): Promise<ResultTuple<ScriptWhitelistScope | null>>;
+  SetScriptWhitelist(ID: string, Scope: ScriptWhitelistScope): Promise<ResultTuple<boolean>>;
   SetScriptOrder(OrderedIDs: string[]): Promise<ResultTuple<unknown>>;
   DeleteScript(ID: string): Promise<ResultTuple<unknown>>;
   CreateScript(): Promise<ResultTuple<{ id: string }>>;

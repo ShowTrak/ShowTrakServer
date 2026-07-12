@@ -214,6 +214,19 @@ export interface ScriptManagerEntry {
   issues: string[];
 }
 
+/**
+ * Per-script client/group whitelist scope (same shape as AlertRuleScope).
+ * `Workspace: true` OR a null/absent scope both mean "all clients" (the
+ * unrestricted default). `Workspace: false` restricts to the listed groups
+ * (by GroupID) and clients (by UUID); an empty list therefore means "no
+ * clients may run this script".
+ */
+export interface ScriptWhitelistScope {
+  Workspace: boolean;
+  Groups: number[];
+  Clients: string[];
+}
+
 /** `GetScriptConfig` editable form (ScriptManager `GetEditable`). */
 export interface ScriptEditable {
   id: string;
@@ -256,6 +269,12 @@ export interface ScriptCatalogEntry {
   Files: ScriptFileEntry[];
   ParseError?: string;
   RawText?: string;
+  /**
+   * Per-show whitelist scope. `null`/absent means unrestricted (all clients) —
+   * the default. Attached to the catalog push from the ScriptWhitelistManager;
+   * consumed by the context menu to hide the script for non-whitelisted clients.
+   */
+  Whitelist?: ScriptWhitelistScope | null;
 }
 
 export interface ScriptExecutionTimer {

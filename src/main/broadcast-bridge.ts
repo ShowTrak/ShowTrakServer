@@ -23,6 +23,7 @@ import { Manager as DummyClientManager } from '../Modules/DummyClientManager';
 import { Manager as AlertsManager } from '../Modules/AlertsManager';
 import { Manager as AudioAssetManager } from '../Modules/AudioAssetManager';
 import { Manager as ScriptManager } from '../Modules/ScriptManager';
+import { Manager as ScriptWhitelistManager } from '../Modules/ScriptWhitelistManager';
 import { Manager as AdoptionManager } from '../Modules/AdoptionManager';
 import { Manager as ServerManager } from '../Modules/Server';
 import { Manager as ModeManager } from '../Modules/ModeManager';
@@ -278,7 +279,11 @@ async function UpdateOSCList(): Promise<void> {
 async function UpdateScriptList(): Promise<void> {
   if (!hasMainWindow()) return;
   const ScriptList = await ScriptManager.GetScripts();
-  PushToRenderers('SetScriptList', ScriptList);
+  // Decorate with each script's per-show whitelist scope so the UI (desktop and,
+  // via the web push sink, the browser) can hide a script for non-whitelisted
+  // clients. Unrestricted scripts get Whitelist: null.
+  const DecoratedList = await ScriptWhitelistManager.DecorateCatalog(ScriptList);
+  PushToRenderers('SetScriptList', DecoratedList);
 }
 
 // Clients + Groups form the primary topology data model used by the UI.

@@ -114,6 +114,12 @@ export interface CriticalDisplayRow {
   Timestamp: number;
 }
 
+export interface ScriptWhitelistRow {
+  ScriptID: string;
+  Scope: string; // JSON: { Workspace, Groups[], Clients[] }
+  UpdatedAt: number;
+}
+
 export interface SchemaMigrationRow {
   Version: number;
   AppliedAt: number;

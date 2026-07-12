@@ -202,6 +202,8 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     GetScriptManagerList: emptyArray,
     GetScriptConfig: nullTuple,
     SaveScriptConfig: nullTuple,
+    GetScriptWhitelist: nullTuple,
+    SetScriptWhitelist: nullTuple,
     SetScriptOrder: nullTuple,
     DeleteScript: nullTuple,
     CreateScript: nullTuple,

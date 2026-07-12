@@ -177,6 +177,22 @@ Schema.push({
     )',
 });
 
+// Per-show whitelist of which clients/groups may run a given script. Scripts
+// themselves live on disk (machine-global), but *who* may run each one is
+// show-specific, so it belongs in the DB (and therefore the .ShowTrak file).
+// A script with NO row here is unrestricted (all clients) — this is the default
+// for every script, and is what lets brand-new clients automatically inherit
+// access to any script that has not been explicitly restricted. Scope is the
+// same JSON shape as AlertRules.Scope: { Workspace, Groups[], Clients[] }.
+Schema.push({
+  Name: 'ScriptWhitelists',
+  SQL: 'CREATE TABLE IF NOT EXISTS `ScriptWhitelists` ( \
+            ScriptID TEXT PRIMARY KEY, \
+            Scope TEXT NOT NULL, \
+            UpdatedAt BIGINT(11) NOT NULL \
+    )',
+});
+
 // Versioned migrations for existing installs. Applied versions are recorded in
 // the SchemaMigrations table; only versions above the recorded maximum run.
 // Installs that predate the version table are back-filled by probing

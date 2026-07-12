@@ -4,7 +4,7 @@
 // construction, positioning, keyboard/type-ahead navigation, the mobile
 // tap-to-confirm arming, and the outside-click / Escape close paths. init.ts
 // calls wireContextMenu() from WireGlobalUI in place of the old inline block.
-import type { ClientView } from '@showtrak/protocol';
+import type { ClientView, ScriptWhitelistScope } from '@showtrak/protocol';
 import { AllClients, ScriptList, Selected, setScriptList } from './01-state';
 import { GetSettingValue } from './03-settings';
 import { HandleNonFatalError, Safe } from './04-utils';
@@ -23,6 +23,29 @@ interface ContextMenuOption {
   Icon?: string;
   IconColour?: string;
   Action?: () => unknown;
+}
+
+// True when a client is permitted to run a script under that script's per-show
+// whitelist. A null/absent scope or Workspace:true means unrestricted (all
+// clients) — the default. Otherwise the client must be a whitelisted UUID or
+// belong to a whitelisted group. Mirrors the server-side gate in
+// ScriptWhitelistManager.IsClientAllowed (the authoritative check); this copy
+// just keeps non-whitelisted clients out of the menu in the first place.
+function IsClientWhitelisted(
+  Scope: ScriptWhitelistScope | null | undefined,
+  Client: ClientView
+): boolean {
+  if (!Scope || Scope.Workspace) return true;
+  if (!Client || !Client.UUID) return false;
+  if (Array.isArray(Scope.Clients) && Scope.Clients.includes(Client.UUID)) return true;
+  if (
+    Client.GroupID != null &&
+    Array.isArray(Scope.Groups) &&
+    Scope.Groups.includes(Number(Client.GroupID))
+  ) {
+    return true;
+  }
+  return false;
 }
 
 // True when the UI is in the compact mobile layout (see InitMobileView in
@@ -140,8 +163,15 @@ export function wireContextMenu() {
           const Compatible = Array.isArray(Script.CompatiblePlatforms)
             ? Script.CompatiblePlatforms
             : [];
+          // A client is a valid target only if the script supports its OS AND
+          // the script's whitelist admits it. A script with zero admitted
+          // clients in the current selection is skipped entirely (not shown);
+          // with a mix, it shows once and runs only for the admitted subset.
           const Targets = RemoteClients.filter(
-            (Client) => Client.OperatingSystem && Compatible.includes(Client.OperatingSystem)
+            (Client) =>
+              Client.OperatingSystem &&
+              Compatible.includes(Client.OperatingSystem) &&
+              IsClientWhitelisted(Script.Whitelist, Client)
           ).map((Client) => Client.UUID);
           if (!Targets.length) continue;
           // Each script carries a chosen Bootstrap Icons name (bare, no "bi-"),

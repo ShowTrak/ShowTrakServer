@@ -87,6 +87,8 @@ const INVOKE_CHANNELS = [
   'Scripts:GetManagerList',
   'Scripts:GetConfig',
   'Scripts:SaveConfig',
+  'Scripts:GetWhitelist',
+  'Scripts:SetWhitelist',
   'Scripts:SetOrder',
   'Scripts:Delete',
   'Scripts:Create',

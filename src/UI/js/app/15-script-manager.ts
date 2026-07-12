@@ -1,9 +1,17 @@
-import type { ScriptEditable, ScriptManagerEntry } from '@showtrak/protocol';
+import type { GroupView, ScriptEditable, ScriptManagerEntry } from '@showtrak/protocol';
 import { openModal } from './lib/modal';
 import { HandleNonFatalError, Safe } from './04-utils';
 import { CloseAllModals } from './11-modals';
 import { ConfirmationDialog, Notify } from './14-selection-init';
 import { NormalizeIconName, OpenIconPicker } from './18-icon-picker';
+import {
+  buildScopeModel,
+  parseScopeSelection,
+  scopeToSelectedValues,
+  renderScopeDropdown,
+  bindScopeDropdown,
+} from './scope-dropdown';
+import type { ScopeDropdownConfig } from './scope-dropdown';
 // Script Manager (desktop UI)
 // - Lists every script discovered in the scripts folder, showing its ID,
 //   validity, and the operating systems it has scripts configured for.
@@ -60,6 +68,39 @@ export let ScriptManagerEditingFiles: string[] = [];
 export let ScriptManagerSampleCache: SampleScriptEntry[] = [];
 // Currently-selected icon in the editor (bare Bootstrap Icons name, no "bi-").
 export let ScriptManagerEditingIcon: string = 'terminal';
+
+// --- Script whitelist editor state -----------------------------------------
+// The per-script whitelist reuses the shared scope-dropdown engine, restricted
+// to real remote clients (scripts never run on integrated/dummy/monitoring
+// targets). Selection is the flat value list; groups are cached at editor-open
+// so BuildModel stays synchronous for the render/change handlers.
+let ScriptWhitelistSelected: string[] = [];
+let ScriptWhitelistOriginal: string[] = [];
+let ScriptWhitelistGroups: GroupView[] = [];
+
+const ScriptWhitelistConfig: ScopeDropdownConfig = {
+  DropdownSelector: '#SCRIPT_WHITELIST_DROPDOWN',
+  MenuSelector: '#SCRIPT_WHITELIST_MENU',
+  ToggleSelector: '#SCRIPT_WHITELIST_TOGGLE',
+  // Shown only when nothing is selected. The genuine "all clients" state is
+  // Workspace:true, which renders "All Clients" via its own branch — an empty
+  // selection instead means no client may run the script.
+  Namespace: 'scriptWhitelist',
+  Placeholder: 'No clients',
+  GetSelected: () => ScriptWhitelistSelected,
+  SetSelected: (values) => {
+    ScriptWhitelistSelected = values;
+  },
+  // Only real (non-integrated) clients and their groups are valid script
+  // targets, so that is all the dropdown offers.
+  BuildModel: () =>
+    buildScopeModel({
+      Groups: ScriptWhitelistGroups,
+      IncludeKinds: ['showtrak'],
+      ExcludeIntegrated: true,
+    }),
+  ToggleRender: 'html',
+};
 
 // Reflect the given icon name into the editor's preview swatch + label, and
 // track it as the pending value collected on save.
@@ -468,6 +509,17 @@ export async function OpenScriptManagerEditor(ID: string) {
 
   ScriptManagerOriginal = Data;
   ScriptManagerEditingFiles = Array.isArray(Data.files) ? Data.files : [];
+
+  // Load the whitelist picker's data: the current group list (for the tree) and
+  // this script's stored scope. A null scope means unrestricted → "All Clients".
+  const Groups = await window.API.GetAllGroups();
+  ScriptWhitelistGroups = Array.isArray(Groups) ? Groups : [];
+  const [WhitelistErr, Scope] = await window.API.GetScriptWhitelist(ID);
+  if (ScriptManagerEditingId !== ID) return;
+  ScriptWhitelistSelected =
+    !WhitelistErr && Scope ? scopeToSelectedValues(Scope) : ['workspace:*'];
+  ScriptWhitelistOriginal = ScriptWhitelistSelected.slice();
+
   PopulateScriptManagerEditor(Data);
 }
 
@@ -510,6 +562,7 @@ export function PopulateScriptManagerEditor(Data: ScriptEditable) {
 
   RenderScriptManagerPlatforms(Data.platforms || {}, Data.arguments || {});
   RenderScriptManagerFileList(Data.files || []);
+  renderScopeDropdown(ScriptWhitelistConfig);
 }
 
 export function RenderScriptManagerPlatforms(
@@ -703,11 +756,24 @@ export async function SaveScriptManagerConfig() {
     return;
   }
 
-  Notify('Script saved', 'success');
-
   // The folder may have been renamed; track the final ID for further edits.
+  // (The backend has already carried any existing whitelist across the rename,
+  // so persisting the edited scope under FinalID below is correct.)
   const FinalID = (Result && Result.id) || ID;
   ScriptManagerEditingId = FinalID;
+
+  // Persist the whitelist scope. parseScopeSelection collapses "All Clients"
+  // (workspace) to Workspace:true, which the backend stores as the unrestricted
+  // (no-row) default so new clients keep inheriting access.
+  const [WhitelistErr] = await window.API.SetScriptWhitelist(
+    FinalID,
+    parseScopeSelection(ScriptWhitelistSelected)
+  );
+  if (WhitelistErr) {
+    Notify(`Script saved, but the whitelist could not be saved: ${WhitelistErr}`, 'error');
+  } else {
+    Notify('Script saved', 'success');
+  }
 
   await RefreshScriptManagerList();
 
@@ -776,9 +842,16 @@ export function InitScriptManager() {
   $('#SCRIPT_MANAGER_REVERT')
     .off('click')
     .on('click', () => {
+      // Reset the whitelist selection to what it was on open before re-rendering
+      // (PopulateScriptManagerEditor renders the dropdown from ScriptWhitelistSelected).
+      ScriptWhitelistSelected = ScriptWhitelistOriginal.slice();
       if (ScriptManagerOriginal) PopulateScriptManagerEditor(ScriptManagerOriginal);
       HideScriptManagerIssues();
     });
+
+  // Wire the whitelist scope dropdown once; it targets the always-present
+  // editor markup and reads/writes the module-level selection state.
+  bindScopeDropdown(ScriptWhitelistConfig);
 
   // Drag-and-drop reordering within the list container.
   const ListContainer = document.getElementById('SCRIPT_MANAGER_LIST');

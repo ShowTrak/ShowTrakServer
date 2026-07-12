@@ -34,4 +34,32 @@ export = function registerScriptValidators(Manager: IPCValidationManager): void 
     if (!Array.isArray(value)) fail(`${fieldName} must be an array`);
     return value.map((entry, index) => normalizeScriptFolderID(entry, `${fieldName}[${index}]`));
   };
+
+  // A script whitelist scope: which groups/clients may run the script. Unlike
+  // the alert scope, scripts only run on real remote clients, so Clients are
+  // plain UUIDs (no monitor:/check: prefixes). Workspace:true means "all".
+  Manager.ScriptWhitelistScope = (value: unknown) => {
+    if (!isPlainObject(value)) fail('Whitelist must be an object');
+    const Groups: number[] = [];
+    if (Array.isArray(value.Groups)) {
+      for (const g of value.Groups) {
+        const id = Manager.GroupID(g, 'Whitelist group ID');
+        if (id != null) Groups.push(id);
+      }
+    }
+    const Clients: string[] = [];
+    if (Array.isArray(value.Clients)) {
+      for (const c of value.Clients) {
+        if (typeof c !== 'string') fail('Whitelist client entries must be strings');
+        const normalized = c.trim();
+        if (!normalized) continue;
+        Clients.push(Manager.UUID(normalized, 'Whitelist client UUID'));
+      }
+    }
+    return {
+      Workspace: !!value.Workspace,
+      Groups: Array.from(new Set(Groups)),
+      Clients: Array.from(new Set(Clients)),
+    };
+  };
 };
