@@ -20,6 +20,8 @@ export interface ClientRow {
   Weight: number;
   Version: string | null;
   IP: string | null;
+  RunOnLaunchScriptID: string | null;
+  RunOnLaunchDelaySeconds: number | null;
   Timestamp: number;
 }
 

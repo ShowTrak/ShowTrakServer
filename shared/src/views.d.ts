@@ -190,6 +190,8 @@ export interface ClientView {
   VersionLabel?: string;
   IP?: string | null;
   MacAddress?: string | null;
+  RunOnLaunchScriptID?: string | null;
+  RunOnLaunchDelaySeconds?: number | null;
   Online?: boolean;
   LastSeen?: number;
   Vitals?: Vitals | null;

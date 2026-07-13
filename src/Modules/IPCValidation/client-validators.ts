@@ -2,6 +2,11 @@
 import { fail, isPlainObject, normalizeNonEmptyString } from './primitives';
 import type { IPCValidationManager } from './index';
 
+// Minimum delay (seconds) enforced before a run-on-launch script fires. The
+// delay doubles as the abort-window countdown shown on the client, so it must
+// stay long enough for an operator to cancel a destructive launch action.
+const MIN_LAUNCH_DELAY_SECONDS = 10;
+
 export = function registerClientValidators(Manager: IPCValidationManager): void {
   Manager.UUID = (value: unknown, fieldName = 'UUID') => {
     return normalizeNonEmptyString(value, fieldName, { minLength: 2, maxLength: 128 });
@@ -194,6 +199,46 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     if (Object.prototype.hasOwnProperty.call(value, 'GroupID')) {
       hasAnyField = true;
       normalized.GroupID = Manager.GroupID(value.GroupID);
+    }
+
+    // Run-on-launch script id: null/empty clears it ("None"); otherwise it must
+    // be a script-folder-safe id. Existence is not checked here (the client
+    // gracefully skips an unknown/removed script at launch).
+    let LaunchScriptSelected = false;
+    if (Object.prototype.hasOwnProperty.call(value, 'RunOnLaunchScriptID')) {
+      hasAnyField = true;
+      const raw = value.RunOnLaunchScriptID;
+      if (raw === null || raw === undefined || raw === '') {
+        normalized.RunOnLaunchScriptID = null;
+      } else {
+        const id = normalizeNonEmptyString(raw, 'Run-on-launch script', {
+          minLength: 1,
+          maxLength: 128,
+        });
+        if (!/^[A-Za-z0-9]+$/.test(id)) {
+          fail('Run-on-launch script id contains invalid characters');
+        }
+        normalized.RunOnLaunchScriptID = id;
+        LaunchScriptSelected = true;
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(value, 'RunOnLaunchDelaySeconds')) {
+      hasAnyField = true;
+      const raw = value.RunOnLaunchDelaySeconds;
+      if (raw === null || raw === undefined || raw === '') {
+        normalized.RunOnLaunchDelaySeconds = null;
+      } else {
+        const num = Number(raw);
+        if (!Number.isInteger(num) || num < 0) {
+          fail('Run-on-launch delay must be a non-negative integer');
+        }
+        // Enforce the abort-window minimum only when a script is actually set.
+        if (LaunchScriptSelected && num < MIN_LAUNCH_DELAY_SECONDS) {
+          fail(`Run-on-launch delay must be at least ${MIN_LAUNCH_DELAY_SECONDS} seconds`);
+        }
+        normalized.RunOnLaunchDelaySeconds = num;
+      }
     }
 
     if (!hasAnyField) {

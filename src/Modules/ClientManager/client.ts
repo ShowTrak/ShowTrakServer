@@ -196,6 +196,8 @@ interface ClientConstructorInput {
   GroupID?: number | null;
   Weight?: number | null;
   MacAddress?: string | null;
+  RunOnLaunchScriptID?: string | null;
+  RunOnLaunchDelaySeconds?: number | null;
 }
 
 class Client {
@@ -209,6 +211,8 @@ class Client {
   MacAddress: string | null;
   Version: string | null;
   IP: string | null;
+  RunOnLaunchScriptID: string | null;
+  RunOnLaunchDelaySeconds: number | null;
   Timestamp: number;
 
   // Connection + health (RAM-only, not persisted).
@@ -267,6 +271,9 @@ class Client {
     this.MacAddress = Data.MacAddress || null;
     this.Version = Data.Version || null;
     this.IP = Data.IP || null;
+    this.RunOnLaunchScriptID = Data.RunOnLaunchScriptID || null;
+    this.RunOnLaunchDelaySeconds =
+      typeof Data.RunOnLaunchDelaySeconds === 'number' ? Data.RunOnLaunchDelaySeconds : null;
     this.Timestamp = Data.Timestamp;
 
     this.Online = false;
@@ -1239,6 +1246,27 @@ class Client {
     }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} IP updated to ${IP}`);
+  }
+  async SetRunOnLaunchScriptID(RunOnLaunchScriptID: string | null) {
+    if (RunOnLaunchScriptID === '') RunOnLaunchScriptID = null;
+    if (this.RunOnLaunchScriptID === RunOnLaunchScriptID) return;
+    this.RunOnLaunchScriptID = RunOnLaunchScriptID;
+    if (!(await this._persistColumn('RunOnLaunchScriptID', RunOnLaunchScriptID))) {
+      return Logger.error('Failed to update client run-on-launch script');
+    }
+    BroadcastManager.emit('ClientUpdated', this);
+    Logger.debug(`Client ${this.UUID} run-on-launch script updated to ${RunOnLaunchScriptID}`);
+  }
+  async SetRunOnLaunchDelaySeconds(RunOnLaunchDelaySeconds: number | null) {
+    if (this.RunOnLaunchDelaySeconds === RunOnLaunchDelaySeconds) return;
+    this.RunOnLaunchDelaySeconds = RunOnLaunchDelaySeconds;
+    if (!(await this._persistColumn('RunOnLaunchDelaySeconds', RunOnLaunchDelaySeconds))) {
+      return Logger.error('Failed to update client run-on-launch delay');
+    }
+    BroadcastManager.emit('ClientUpdated', this);
+    Logger.debug(
+      `Client ${this.UUID} run-on-launch delay updated to ${RunOnLaunchDelaySeconds}`
+    );
   }
 }
 

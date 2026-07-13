@@ -1194,6 +1194,25 @@ Loading licence...</pre
                 </select>
                 <label for="CLIENT_EDITOR_GROUPID">Group</label>
               </div>
+              <div id="CLIENT_EDITOR_LAUNCH_WRAPPER" class="d-grid gap-2">
+                <div class="form-floating">
+                  <select class="form-select" id="CLIENT_EDITOR_RUNONLAUNCH_SCRIPT">
+                    <option value="">None</option>
+                  </select>
+                  <label for="CLIENT_EDITOR_RUNONLAUNCH_SCRIPT">Run On Launch</label>
+                </div>
+                <div class="form-floating">
+                  <input
+                    type="number"
+                    min="10"
+                    step="1"
+                    class="form-control"
+                    id="CLIENT_EDITOR_RUNONLAUNCH_DELAY"
+                    placeholder="Launch Delay (seconds)"
+                  />
+                  <label for="CLIENT_EDITOR_RUNONLAUNCH_DELAY">Launch Delay (seconds)</label>
+                </div>
+              </div>
               <div class="form-floating has-copy">
                 <input type="text" class="form-control disabled" id="CLIENT_EDITOR_IP" disabled />
                 <label for="CLIENT_EDITOR_IP">IP</label>

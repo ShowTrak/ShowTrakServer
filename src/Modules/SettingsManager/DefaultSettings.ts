@@ -45,6 +45,15 @@ export const DefaultSettings: SettingDefinition[] = [
     DefaultValue: true,
   },
   {
+    Group: 'Features',
+    Key: 'CLIENT_SHOW_LAUNCH_COUNTDOWN',
+    Title: 'Show Auto Launch Countdown',
+    Description:
+      'Show the visible abort countdown on clients before a run-on-launch script fires. When disabled the script still runs after its delay, but without the on-screen countdown or a chance to cancel.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
     Group: 'Network',
     Key: 'SYSTEM_OSC_ENABLED',
     Title: 'OSC Control',

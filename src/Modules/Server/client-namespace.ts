@@ -24,6 +24,7 @@ import { Manager as ScriptExecutionManager } from '../ScriptExecutionManager';
 import { Manager as ServerIdentityManager } from '../ServerIdentity';
 import { Manager as IdentifyManager } from '../IdentifyManager';
 import { Manager as SocketValidation } from '../SocketValidation';
+import { Manager as SettingsManager } from '../SettingsManager';
 import {
   recordClientApplicationHistorySamples,
   recordClientUSBHistorySamples,
@@ -228,6 +229,32 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
         Logger.log(`Client ${socket.UUID} requested scripts.`);
         const Scripts = await ScriptManager.GetScripts();
         Callback(Scripts);
+      }
+    );
+
+    // Per-client run-on-launch config. The client caches the result to disk and
+    // executes it on its NEXT process launch (decoupled from this connection).
+    // Integrated / unadopted clients get a null config.
+    GuardedOn(
+      'GetLaunchConfig',
+      (Callback) => {
+        if (typeof Callback !== 'function')
+          throw new Error('GetLaunchConfig requires an ack callback');
+        return [Callback];
+      },
+      async (Callback: (config: unknown) => void) => {
+        // Global toggle for the on-screen abort countdown, applied to every
+        // client's launch config so the operator controls it from one place.
+        const ShowCountdown = !!(await SettingsManager.GetValue('CLIENT_SHOW_LAUNCH_COUNTDOWN'));
+        const [Err, Client] = await ClientManager.Get(socket.UUID);
+        if (Err || !Client || Client.Integrated === true) {
+          return Callback({ ScriptID: null, DelaySeconds: null, ShowCountdown });
+        }
+        Callback({
+          ScriptID: Client.RunOnLaunchScriptID ?? null,
+          DelaySeconds: Client.RunOnLaunchDelaySeconds ?? null,
+          ShowCountdown,
+        });
       }
     );
 

@@ -1,7 +1,12 @@
 import { closeAllModals, closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
 import { Config, PendingAdoption, ScriptList } from './01-state';
+import { IsIntegratedClientEntity } from './state/client-labels';
 import { Safe } from './04-utils';
+
+// Minimum launch delay (seconds); mirrors MIN_LAUNCH_DELAY_SECONDS enforced by
+// the server-side ClientUpdatePayload validator.
+const MIN_LAUNCH_DELAY_SECONDS = 10;
 import {
   ClearSelection,
   ConfirmationDialog,
@@ -304,6 +309,25 @@ export async function OpenClientEditor(UUID: string) {
   $('#CLIENT_EDITOR_UUID').val(UUID);
   $('#CLIENT_EDITOR_VERSION').val(Version || '');
 
+  // Run-on-launch script + delay. Hidden for integrated clients (they run no
+  // local agent). Populated from the live script catalog; "None" clears it.
+  const IsIntegrated = IsIntegratedClientEntity(Client);
+  $('#CLIENT_EDITOR_LAUNCH_WRAPPER').toggleClass('d-none', IsIntegrated);
+  if (!IsIntegrated) {
+    const LaunchScripts = [...ScriptList].sort(
+      (a, b) => (a.Weight || 0) - (b.Weight || 0) || String(a.Name).localeCompare(String(b.Name))
+    );
+    let LaunchOptions = '<option value="">None</option>';
+    for (const Script of LaunchScripts) {
+      const Selected = Client.RunOnLaunchScriptID === Script.ID ? 'selected' : '';
+      LaunchOptions += `<option value="${Safe(Script.ID)}" ${Selected}>${Safe(Script.Name)}</option>`;
+    }
+    $('#CLIENT_EDITOR_RUNONLAUNCH_SCRIPT').html(LaunchOptions);
+    $('#CLIENT_EDITOR_RUNONLAUNCH_DELAY').val(
+      Client.RunOnLaunchDelaySeconds ?? MIN_LAUNCH_DELAY_SECONDS
+    );
+  }
+
   $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').html('');
   // USB section moved to read-only Client Info modal
   $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').remove();
@@ -354,10 +378,29 @@ export async function OpenClientEditor(UUID: string) {
         GroupID = parseInt(String(GroupIDRaw));
       }
 
-      await window.API.UpdateClient(UUID, {
+      const Payload: Record<string, unknown> = {
         Nickname: Nickname,
         GroupID: GroupID,
-      });
+      };
+
+      // Only send launch fields for non-integrated clients (the server rejects
+      // them for integrated clients regardless).
+      if (!IsIntegrated) {
+        const ScriptIDRaw = String($('#CLIENT_EDITOR_RUNONLAUNCH_SCRIPT').val() || '');
+        const RunOnLaunchScriptID = ScriptIDRaw ? ScriptIDRaw : null;
+        let RunOnLaunchDelaySeconds: number | null = null;
+        if (RunOnLaunchScriptID) {
+          const ParsedDelay = parseInt(String($('#CLIENT_EDITOR_RUNONLAUNCH_DELAY').val()), 10);
+          RunOnLaunchDelaySeconds = Math.max(
+            MIN_LAUNCH_DELAY_SECONDS,
+            Number.isFinite(ParsedDelay) ? ParsedDelay : MIN_LAUNCH_DELAY_SECONDS
+          );
+        }
+        Payload.RunOnLaunchScriptID = RunOnLaunchScriptID;
+        Payload.RunOnLaunchDelaySeconds = RunOnLaunchDelaySeconds;
+      }
+
+      await window.API.UpdateClient(UUID, Payload);
       await CloseAllModals();
     });
 

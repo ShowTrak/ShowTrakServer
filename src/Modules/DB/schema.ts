@@ -38,6 +38,8 @@ Schema.push({
             Weight INTEGER NOT NULL DEFAULT 100, \
             Version TEXT, \
             IP TEXT, \
+            RunOnLaunchScriptID TEXT, \
+            RunOnLaunchDelaySeconds INTEGER, \
             Timestamp BIGINT(11) NOT NULL \
     )',
 });
@@ -226,6 +228,8 @@ Schema.Migrations = [
   { Version: 3, SQL: 'ALTER TABLE `DummyClients` ADD COLUMN IP TEXT' },
   { Version: 4, SQL: 'ALTER TABLE `Groups` ADD COLUMN FullWidth INTEGER NOT NULL DEFAULT 1' },
   { Version: 5, SQL: 'ALTER TABLE `Groups` ADD COLUMN KeyBind TEXT' },
+  { Version: 6, SQL: 'ALTER TABLE `Clients` ADD COLUMN RunOnLaunchScriptID TEXT' },
+  { Version: 7, SQL: 'ALTER TABLE `Clients` ADD COLUMN RunOnLaunchDelaySeconds INTEGER' },
 ];
 
 export = Schema;

@@ -60,13 +60,18 @@ test('Heartbeat rejects non-object payloads', () => {
   }
 });
 
-test('SystemInfo bounds MacAddresses and keeps only string values', () => {
+test('SystemInfo normalizes MacAddresses entries and drops non-object values', () => {
   const normalized = SocketValidation.SystemInfo({
     Hostname: 'HOST-1',
     OperatingSystem: 'Windows 11',
-    MacAddresses: { eth0: 'aa:bb:cc:dd:ee:ff', bogus: 42 },
+    MacAddresses: {
+      eth0: { ipv4: '10.0.0.5', ipv6: 'fe80::1', mac: 'aa:bb:cc:dd:ee:ff' },
+      bogus: 42,
+    },
   });
-  assert.deepEqual(normalized.MacAddresses, { eth0: 'aa:bb:cc:dd:ee:ff' });
+  assert.deepEqual(normalized.MacAddresses, {
+    eth0: { ipv4: '10.0.0.5', ipv6: 'fe80::1', mac: 'aa:bb:cc:dd:ee:ff' },
+  });
   assert.equal(normalized.Hostname, 'HOST-1');
 });
 

@@ -99,19 +99,27 @@ function Heartbeat(data: unknown): {
 function SystemInfo(data: unknown): {
   Hostname: string | null;
   OperatingSystem: string | null;
-  MacAddresses: Record<string, string>;
+  MacAddresses: Record<string, { ipv4: string | null; ipv6: string | null; mac: string | null }>;
 } {
   if (!isPlainObject(data)) fail('SystemInfo payload must be an object');
-  const MacAddresses: Record<string, string> = {};
+  // The client sends `macaddress.all()` output: one entry per network
+  // interface whose VALUE is an object `{ ipv4, ipv6, mac }`. Reconstruct each
+  // entry field-by-field, preserving `ipv4` so the consumer can match the MAC
+  // to the interface serving the active socket IP.
+  const MacAddresses: Record<string, { ipv4: string | null; ipv6: string | null; mac: string | null }> = {};
   if (data.MacAddresses !== undefined && data.MacAddresses !== null) {
     if (!isPlainObject(data.MacAddresses)) fail('MacAddresses must be an object when present');
     const entries = Object.entries(data.MacAddresses);
     if (entries.length > MAX_NETWORK_INTERFACES) {
       fail(`MacAddresses exceeds the maximum of ${MAX_NETWORK_INTERFACES} entries`);
     }
-    for (const [name, mac] of entries) {
-      if (typeof mac !== 'string') continue;
-      MacAddresses[name.slice(0, 128)] = mac.slice(0, 64);
+    for (const [name, iface] of entries) {
+      if (!isPlainObject(iface)) continue;
+      MacAddresses[name.slice(0, 128)] = {
+        ipv4: normalizeOptionalString(iface.ipv4, 'MacAddresses.ipv4', { maxLength: 64 }),
+        ipv6: normalizeOptionalString(iface.ipv6, 'MacAddresses.ipv6', { maxLength: 64 }),
+        mac: normalizeOptionalString(iface.mac, 'MacAddresses.mac', { maxLength: 64 }),
+      };
     }
   }
   return {

@@ -747,11 +747,23 @@ Manager.Update = async (UUID: string, Data: unknown) => {
   if (Err) return Fail(Err);
   if (!Client) return Fail('Client Not Found');
   const Fields = AsRecord(Data);
+  const TouchesLaunch =
+    Object.prototype.hasOwnProperty.call(Fields, 'RunOnLaunchScriptID') ||
+    Object.prototype.hasOwnProperty.call(Fields, 'RunOnLaunchDelaySeconds');
+  if (TouchesLaunch && Client.Integrated === true) {
+    return Fail('Launch actions are not supported for integrated clients');
+  }
   if (Object.prototype.hasOwnProperty.call(Fields, 'Nickname')) {
     await Client.SetNickname(Fields.Nickname as string | null);
   }
   if (Object.prototype.hasOwnProperty.call(Fields, 'GroupID')) {
     await Client.SetGroupID(Fields.GroupID as number | string | null);
+  }
+  if (Object.prototype.hasOwnProperty.call(Fields, 'RunOnLaunchScriptID')) {
+    await Client.SetRunOnLaunchScriptID(Fields.RunOnLaunchScriptID as string | null);
+  }
+  if (Object.prototype.hasOwnProperty.call(Fields, 'RunOnLaunchDelaySeconds')) {
+    await Client.SetRunOnLaunchDelaySeconds(Fields.RunOnLaunchDelaySeconds as number | null);
   }
   return Ok(Client);
 };
