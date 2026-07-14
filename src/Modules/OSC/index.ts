@@ -5,15 +5,23 @@ import { Manager as Broadcast } from '../Broadcast';
 import { Manager as ScriptManager } from '../ScriptManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as GroupManager } from '../GroupManager';
+import { IsTransientNetworkError, DescribeError } from '../NetworkErrors';
 
 const Logger = CreateLogger('OSC');
 
 const { Server } = require('node-osc');
 
 // Minimal shape of the node-osc Server we use, so the mutable handle stays typed.
+// `_sock` is node-osc's internal dgram socket: the library never attaches an
+// 'error' handler to it, so we reach in to add one (see StartOSCServer).
+interface OSCSocketLike {
+  on(event: 'error', handler: (err: Error) => void): void;
+}
 interface OSCServerInstance {
   on(event: 'message', handler: (route: unknown, info?: OSCRemoteInfo) => void): void;
+  on(event: 'error', handler: (err: Error, info?: OSCRemoteInfo) => void): void;
   close(cb?: () => void): void;
+  _sock?: OSCSocketLike;
 }
 
 // Not-yet-migrated JS manager — typed loosely until its own migration.
@@ -40,12 +48,40 @@ function StartOSCServer(Port: number): void {
       Logger.log(`OSC Server is listening on port ${Port}`);
     });
     OSCServer!.on('message', HandleOSCMessage);
+    // node-osc emits 'error' on the Server for undecodable inbound packets. An
+    // EventEmitter with no 'error' listener throws, so a single malformed UDP
+    // datagram would crash the app — absorb them here as a warning instead.
+    OSCServer!.on('error', (Err) => {
+      Logger.warn(`Ignoring malformed OSC packet: ${DescribeError(Err)}`);
+    });
+    // node-osc never attaches an 'error' handler to its underlying dgram socket,
+    // so a bind failure (port already in use) or a transient network error would
+    // surface as an uncaught exception — the constructor's try/catch can't catch
+    // it because the socket error is emitted asynchronously. Guard it directly.
+    const Sock = OSCServer!._sock;
+    if (Sock && typeof Sock.on === 'function') {
+      Sock.on('error', (Err) => HandleOSCSocketError(Port, Err));
+    }
     CurrentOSCPort = Port;
   } catch (Err) {
     OSCServer = null;
     Logger.error(`Failed to start OSC server on port ${Port}:`, Err);
     Broadcast.emit('Notify', `Failed to start OSC server on port ${Port}`, 'error');
   }
+}
+
+// Handle an asynchronous error on the OSC listener's socket. Transient network
+// errors (interface loss) are logged and ignored — a bound 0.0.0.0 listener
+// recovers on its own. A bind failure means the port is unusable, so we tear the
+// dead socket down and surface it to the operator.
+function HandleOSCSocketError(Port: number, Err: Error): void {
+  if (IsTransientNetworkError(Err)) {
+    Logger.warn(`OSC socket transient network error on port ${Port}: ${DescribeError(Err)}`);
+    return;
+  }
+  Logger.error(`OSC socket error on port ${Port}: ${DescribeError(Err)}`);
+  Broadcast.emit('Notify', `OSC server error on port ${Port}: ${DescribeError(Err)}`, 'error');
+  StopOSCServer();
 }
 
 // Stop the OSC listener entirely (OSC control disabled). Safe to call when

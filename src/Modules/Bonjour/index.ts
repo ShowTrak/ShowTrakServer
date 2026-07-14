@@ -2,6 +2,7 @@ import { CreateLogger } from '../Logger';
 import { Manager as OSManager } from '../OS';
 import { Config } from '../Config';
 import { Manager as ServerIdentityManager } from '../ServerIdentity';
+import { CreateBonjourErrorHandler } from '../NetworkErrors';
 
 const Logger = CreateLogger('Bonjour');
 
@@ -66,12 +67,18 @@ interface BonjourInstance {
 
 type BonjourFactory = (options?: { reuseAddr?: boolean; loopback?: boolean }) => BonjourInstance;
 
-// bonjour-service exports a class; wrap it so the existing factory-style call
-// sites (`bonjour({...})`) below remain unchanged.
+// bonjour-service exports a class whose constructor takes an optional second
+// `errorCallback`. Its default is `function (err) { throw err }`, which turns a
+// routine interface drop (mDNS send → EADDRNOTAVAIL) into an uncaught exception.
+// We always supply a logging handler so a network flap never crashes the app.
 const { Bonjour } = require('bonjour-service') as {
-  Bonjour: new (options?: { reuseAddr?: boolean; loopback?: boolean }) => BonjourInstance;
+  Bonjour: new (
+    options?: { reuseAddr?: boolean; loopback?: boolean },
+    errorCallback?: (err: unknown) => void
+  ) => BonjourInstance;
 };
-const bonjour: BonjourFactory = (options) => new Bonjour(options);
+const OnBonjourError = CreateBonjourErrorHandler(Logger);
+const bonjour: BonjourFactory = (options) => new Bonjour(options, OnBonjourError);
 
 // Use classic 'bonjour' with multicast-dns under the hood; prefer IPv4 and enable loopback for localhost testing
 const instance = bonjour({ reuseAddr: true, loopback: true });

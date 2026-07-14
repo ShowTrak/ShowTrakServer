@@ -30,6 +30,7 @@
 // starts until the first Observe() — so importing this module (e.g. from the
 // method registry) has NO side effects.
 import { CreateLogger } from '../Logger';
+import { CreateBonjourErrorHandler } from '../NetworkErrors';
 import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -132,11 +133,18 @@ function DeriveNameFromFqdn(Fqdn: string): string {
 
 type BonjourFactory = (options?: Record<string, unknown>) => BonjourInstance;
 
-// bonjour-service exports a class; wrap it so the `bonjour({...})` call sites stay factory-style.
+// bonjour-service exports a class whose optional second constructor argument is
+// an mDNS `errorCallback`. Its default (`function (err) { throw err }`) turns a
+// routine interface drop (send → EADDRNOTAVAIL) into an uncaught exception, so we
+// always pass a logging handler instead.
 const { Bonjour } = require('bonjour-service') as {
-  Bonjour: new (options?: Record<string, unknown>) => BonjourInstance;
+  Bonjour: new (
+    options?: Record<string, unknown>,
+    errorCallback?: (err: unknown) => void
+  ) => BonjourInstance;
 };
-const bonjour: BonjourFactory = (options) => new Bonjour(options);
+const OnBonjourError = CreateBonjourErrorHandler(Logger);
+const bonjour: BonjourFactory = (options) => new Bonjour(options, OnBonjourError);
 
 export interface NdiSource {
   Name: string;

@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { Result } from '../../types/result';
 import { CreateLogger } from '../Logger';
+import { CreateBonjourErrorHandler } from '../NetworkErrors';
 
 import { clampInt, buildProbeTargets, probeHost } from './network-utils';
 
@@ -31,11 +32,19 @@ interface BonjourInstance {
 
 type BonjourFactory = (options?: Record<string, unknown>) => BonjourInstance;
 
-// bonjour-service exports a class; wrap it so the `bonjour({...})` call below stays factory-style.
+// bonjour-service exports a class whose optional second constructor argument is
+// an mDNS `errorCallback`. Its default (`function (err) { throw err }`) turns a
+// routine interface drop (send → EADDRNOTAVAIL) into an uncaught exception, so we
+// always pass a logging handler instead. The factory is only invoked at scan
+// time, by which point `Logger` (declared just below) is initialised.
 const { Bonjour } = require('bonjour-service') as {
-  Bonjour: new (options?: Record<string, unknown>) => BonjourInstance;
+  Bonjour: new (
+    options?: Record<string, unknown>,
+    errorCallback?: (err: unknown) => void
+  ) => BonjourInstance;
 };
-const bonjour: BonjourFactory = (options) => new Bonjour(options);
+const bonjour: BonjourFactory = (options) =>
+  new Bonjour(options, CreateBonjourErrorHandler(Logger));
 
 const Logger = CreateLogger('NetworkDiscovery');
 

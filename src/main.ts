@@ -18,6 +18,11 @@ const { Manager: AppDataManager } = require('./Modules/AppData');
 AppDataManager.Initialize();
 const { CreateLogger } = require('./Modules/Logger');
 const Logger = CreateLogger('Main');
+// Install the process-wide network fault guards before any socket-binding module
+// loads, so a mid-boot interface drop (mDNS/OSC/etc.) is caught rather than
+// crashing the process. See ./main/process-guards.
+const { installProcessGuards } = require('./main/process-guards');
+installProcessGuards();
 // Gate multiple instances. If another instance is already running, quit early.
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
