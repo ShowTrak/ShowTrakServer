@@ -44,6 +44,7 @@ const INVOKE_CHANNELS = [
   'UpdateClient',
   'UnadoptClient',
   'ReplaceClient',
+  'CreateUnassignedClients',
   'WakeOnLan',
   'MarkClientUSBDeviceCritical',
   'RemoveClientUSBDeviceCritical',

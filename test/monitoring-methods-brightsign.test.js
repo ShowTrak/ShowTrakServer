@@ -29,14 +29,24 @@ const BASE_SETTINGS = {
   Timeout: 2000,
 };
 
-const target = (Settings = {}) => ({ Address: '10.0.0.9', Settings: { ...BASE_SETTINGS, ...Settings } });
+const target = (Settings = {}) => ({
+  Address: '10.0.0.9',
+  Settings: { ...BASE_SETTINGS, ...Settings },
+});
 
 test('brightsign (health) module exposes the expected shape', () => {
   const bs = loadBs(makeBrightSignDws({}));
   assert.equal(bs.ID, 'brightsign');
   assert.equal(bs.Name, 'Player Health (BrightSign)');
   const keys = bs.Settings.map((s) => s.Key);
-  for (const key of ['Protocol', 'Port', 'Username', 'Password', 'ExpectedFirmware', 'IncludeVideo']) {
+  for (const key of [
+    'Protocol',
+    'Port',
+    'Username',
+    'Password',
+    'ExpectedFirmware',
+    'IncludeVideo',
+  ]) {
     assert.ok(keys.includes(key), `missing setting ${key}`);
   }
   // The username is always 'admin' on BrightSignOS, so it should default to it.
@@ -131,7 +141,9 @@ test('the self-signed certificate is tolerated by default', async () => {
 });
 
 test('a non-BrightSign device answering JSON is a clear error, not a silent pass', async () => {
-  const dws = makeBrightSignDws({ routes: { [INFO_PATH]: { Status: 200, Body: '{"hello":"world"}' } } });
+  const dws = makeBrightSignDws({
+    routes: { [INFO_PATH]: { Status: 200, Body: '{"hello":"world"}' } },
+  });
   const bs = loadBs(dws);
   const result = await bs.Run(target({ Password: '' }));
 
@@ -246,7 +258,13 @@ test('EvaluateHealth collects every failing factor at once', () => {
       Firmware: '8.5.33',
       PowerSource: 'battery',
       Battery: 'discharging',
-      Video: { ActiveMode: '1920x1080x60p', OutputPresent: false, Unstable: true, PowerSave: null, Errors: [] },
+      Video: {
+        ActiveMode: '1920x1080x60p',
+        OutputPresent: false,
+        Unstable: true,
+        PowerSave: null,
+        Errors: [],
+      },
     },
     '9.0.218'
   );
@@ -260,13 +278,22 @@ test('EvaluateHealth collects every failing factor at once', () => {
 
 test('EvaluateHealth skips fields the player did not report', () => {
   const bs = loadBs(makeBrightSignDws({}));
-  assert.deepEqual(bs._internal.EvaluateHealth({ Firmware: null, PowerSource: null, Battery: null }, ''), []);
+  assert.deepEqual(
+    bs._internal.EvaluateHealth({ Firmware: null, PowerSource: null, Battery: null }, ''),
+    []
+  );
 });
 
 test('Debug renders the identity rows and escapes player-supplied text', () => {
   const bs = loadBs(makeBrightSignDws({}));
   const html = bs.Debug(
-    { Success: true, LatencyMs: 12, Firmware: '8.5.33', Model: '<script>x</script>', UptimeSeconds: 6561 },
+    {
+      Success: true,
+      LatencyMs: 12,
+      Firmware: '8.5.33',
+      Model: '<script>x</script>',
+      UptimeSeconds: 6561,
+    },
     target()
   );
 

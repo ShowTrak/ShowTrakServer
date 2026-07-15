@@ -31,16 +31,16 @@ function loadBonjour() {
   function bonjourMock() {
     return {
       publish: (opts) => {
-      const service = { opts, handlers: {}, started: false };
-      service.on = (event, cb) => {
-        service.handlers[event] = cb;
-      };
-      service.start = () => {
-        service.started = true;
-      };
-      published.push(service);
-      return service;
-    },
+        const service = { opts, handlers: {}, started: false };
+        service.on = (event, cb) => {
+          service.handlers[event] = cb;
+        };
+        service.start = () => {
+          service.started = true;
+        };
+        published.push(service);
+        return service;
+      },
       find: () => makeBrowser(),
       findOne: (_opts, _timeout, cb) => {
         const b = makeBrowser();

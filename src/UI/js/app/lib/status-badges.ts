@@ -8,3 +8,10 @@
 export function OfflineBadgeContent(time = '00:00:00'): string {
   return `Offline <span class="badge bg-ghost">${time}</span>`;
 }
+
+// Shown in place of the offline counter on a reserved slot. Counting how long
+// an empty slot has been "down" would be meaningless — it has never had a
+// device — so it states what the tile is instead.
+export function UnassignedBadgeContent(): string {
+  return `Unassigned <span class="badge bg-ghost">No Device</span>`;
+}

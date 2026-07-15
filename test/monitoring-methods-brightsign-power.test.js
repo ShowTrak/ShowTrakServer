@@ -3,7 +3,11 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
-const { makeBrightSignDws, INFO_HEALTHY, INFO_PATH } = require('../test-support/brightsign-dws-mock');
+const {
+  makeBrightSignDws,
+  INFO_HEALTHY,
+  INFO_PATH,
+} = require('../test-support/brightsign-dws-mock');
 
 function methodPath(name) {
   return path.join(__dirname, '..', 'dist', 'Modules', 'MonitoringMethods', name);
@@ -20,7 +24,10 @@ const BASE_SETTINGS = {
   IgnoreTlsErrors: true,
   Timeout: 2000,
 };
-const target = (Settings = {}) => ({ Address: '10.0.0.9', Settings: { ...BASE_SETTINGS, ...Settings } });
+const target = (Settings = {}) => ({
+  Address: '10.0.0.9',
+  Settings: { ...BASE_SETTINGS, ...Settings },
+});
 
 function withPower(power) {
   return makeBrightSignDws({

@@ -57,7 +57,10 @@ function buildPacket(opts = {}) {
 
 test('ParseSacnPacket extracts universe, priority, name and source IP', () => {
   const { ParseSacnPacket } = loadSacn();
-  const parsed = ParseSacnPacket(buildPacket({ universe: 42, priority: 150, sourceName: 'Console A' }), '10.0.0.5');
+  const parsed = ParseSacnPacket(
+    buildPacket({ universe: 42, priority: 150, sourceName: 'Console A' }),
+    '10.0.0.5'
+  );
   assert.equal(parsed.Universe, 42);
   assert.equal(parsed.Priority, 150);
   assert.equal(parsed.SourceName, 'Console A');
@@ -74,10 +77,26 @@ test('ParseSacnPacket rejects non-E1.31 and malformed packets', () => {
   const { ParseSacnPacket } = loadSacn();
   assert.equal(ParseSacnPacket(Buffer.alloc(10), '1.2.3.4'), null, 'runt');
   assert.equal(ParseSacnPacket(buildPacket({ validAcnId: false }), '1.2.3.4'), null, 'bad ACN id');
-  assert.equal(ParseSacnPacket(buildPacket({ rootVector: 0x00000008 }), '1.2.3.4'), null, 'sync/other root vector');
-  assert.equal(ParseSacnPacket(buildPacket({ framingVector: 0x00000003 }), '1.2.3.4'), null, 'non-data framing vector');
-  assert.equal(ParseSacnPacket(buildPacket({ universe: 0 }), '1.2.3.4'), null, 'reserved universe 0');
-  assert.equal(ParseSacnPacket(buildPacket({ universe: 64000 }), '1.2.3.4'), null, 'reserved universe 64000');
+  assert.equal(
+    ParseSacnPacket(buildPacket({ rootVector: 0x00000008 }), '1.2.3.4'),
+    null,
+    'sync/other root vector'
+  );
+  assert.equal(
+    ParseSacnPacket(buildPacket({ framingVector: 0x00000003 }), '1.2.3.4'),
+    null,
+    'non-data framing vector'
+  );
+  assert.equal(
+    ParseSacnPacket(buildPacket({ universe: 0 }), '1.2.3.4'),
+    null,
+    'reserved universe 0'
+  );
+  assert.equal(
+    ParseSacnPacket(buildPacket({ universe: 64000 }), '1.2.3.4'),
+    null,
+    'reserved universe 64000'
+  );
 });
 
 // --- multicast address mapping ----------------------------------------------
@@ -118,7 +137,9 @@ function baseParams(overrides = {}) {
 
 test('EvaluateSacn is online when the target source is transmitting the universe', () => {
   const { EvaluateSacn } = loadSacn();
-  const res = EvaluateSacn(baseParams({ Snapshot: { Ready: true, Error: null, Sources: [source()] } }));
+  const res = EvaluateSacn(
+    baseParams({ Snapshot: { Ready: true, Error: null, Sources: [source()] } })
+  );
   assert.equal(res.Success, true);
   assert.equal(res.Matched, true);
   assert.equal(res.LatencyMs, 1000); // Now - LastSeenAt
@@ -142,7 +163,9 @@ test('EvaluateSacn reports listener-starting before the socket is ready', () => 
 test('EvaluateSacn degrades when the universe comes from a different source', () => {
   const { EvaluateSacn } = loadSacn();
   const res = EvaluateSacn(
-    baseParams({ Snapshot: { Ready: true, Error: null, Sources: [source({ Address: '10.0.0.99' })] } })
+    baseParams({
+      Snapshot: { Ready: true, Error: null, Sources: [source({ Address: '10.0.0.99' })] },
+    })
   );
   assert.equal(res.Success, false);
   assert.equal(res.Degraded, true);
@@ -152,7 +175,10 @@ test('EvaluateSacn degrades when the universe comes from a different source', ()
 test('EvaluateSacn ignores sources older than the grace period', () => {
   const { EvaluateSacn } = loadSacn();
   const res = EvaluateSacn(
-    baseParams({ Now: 10000, Snapshot: { Ready: true, Error: null, Sources: [source({ LastSeenAt: 1000 })] } })
+    baseParams({
+      Now: 10000,
+      Snapshot: { Ready: true, Error: null, Sources: [source({ LastSeenAt: 1000 })] },
+    })
   );
   assert.equal(res.Success, false);
   assert.match(res.Error, /No sACN data/);
@@ -187,7 +213,9 @@ test('EvaluateSacn degrades on a priority mismatch from the target', () => {
 
 test('EvaluateSacn surfaces a listener error', () => {
   const { EvaluateSacn } = loadSacn();
-  const res = EvaluateSacn(baseParams({ Snapshot: { Ready: false, Error: 'EADDRINUSE', Sources: [] } }));
+  const res = EvaluateSacn(
+    baseParams({ Snapshot: { Ready: false, Error: 'EADDRINUSE', Sources: [] } })
+  );
   assert.equal(res.Success, false);
   assert.match(res.Error, /EADDRINUSE/);
 });
@@ -196,9 +224,13 @@ test('EvaluateSacn surfaces a listener error', () => {
 
 test('RunSacn rejects a missing source IP and out-of-range universe', () => {
   const { RunSacn } = loadSacn();
-  assert.match(RunSacn({ Address: '', Settings: { Universe: 1 } }, { RequirePriority: false }).Error, /No source IP/);
   assert.match(
-    RunSacn({ Address: '1.2.3.4', Settings: { Universe: 70000 } }, { RequirePriority: false }).Error,
+    RunSacn({ Address: '', Settings: { Universe: 1 } }, { RequirePriority: false }).Error,
+    /No source IP/
+  );
+  assert.match(
+    RunSacn({ Address: '1.2.3.4', Settings: { Universe: 70000 } }, { RequirePriority: false })
+      .Error,
     /Invalid universe/
   );
 });

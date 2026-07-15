@@ -72,7 +72,10 @@ test('Web UI shim methods take the same number of arguments as the desktop bridg
   const shimArities = extractMethodArities(shimSource);
 
   // Sanity: the regex should parse the majority of the surface on both sides.
-  assert.ok(bridgeArities.size > 80, `expected many parsable bridge methods, got ${bridgeArities.size}`);
+  assert.ok(
+    bridgeArities.size > 80,
+    `expected many parsable bridge methods, got ${bridgeArities.size}`
+  );
   assert.ok(shimArities.size > 50, `expected many parsable shim methods, got ${shimArities.size}`);
 
   const mismatches = [];

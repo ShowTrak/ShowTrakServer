@@ -75,9 +75,21 @@ test('ParseArtnetPacket normalizes IPv4-mapped source addresses', () => {
 test('ParseArtnetPacket rejects non-ArtDmx and malformed packets', () => {
   const { ParseArtnetPacket } = loadArtnet();
   assert.equal(ParseArtnetPacket(Buffer.alloc(10), '1.2.3.4'), null, 'runt');
-  assert.equal(ParseArtnetPacket(buildPacket({ validId: false }), '1.2.3.4'), null, 'bad Art-Net id');
-  assert.equal(ParseArtnetPacket(buildPacket({ opcode: 0x2000 }), '1.2.3.4'), null, 'ArtPoll opcode');
-  assert.equal(ParseArtnetPacket(buildPacket({ protver: 13 }), '1.2.3.4'), null, 'old protocol version');
+  assert.equal(
+    ParseArtnetPacket(buildPacket({ validId: false }), '1.2.3.4'),
+    null,
+    'bad Art-Net id'
+  );
+  assert.equal(
+    ParseArtnetPacket(buildPacket({ opcode: 0x2000 }), '1.2.3.4'),
+    null,
+    'ArtPoll opcode'
+  );
+  assert.equal(
+    ParseArtnetPacket(buildPacket({ protver: 13 }), '1.2.3.4'),
+    null,
+    'old protocol version'
+  );
 });
 
 // --- evaluation logic (pure) -------------------------------------------------
@@ -105,7 +117,9 @@ function baseParams(overrides = {}) {
 
 test('EvaluateArtnet is online when the target source is transmitting the universe', () => {
   const { EvaluateArtnet } = loadArtnet();
-  const res = EvaluateArtnet(baseParams({ Snapshot: { Ready: true, Error: null, Sources: [source()] } }));
+  const res = EvaluateArtnet(
+    baseParams({ Snapshot: { Ready: true, Error: null, Sources: [source()] } })
+  );
   assert.equal(res.Success, true);
   assert.equal(res.Matched, true);
   assert.equal(res.LatencyMs, 1000); // Now - LastSeenAt
@@ -129,7 +143,9 @@ test('EvaluateArtnet reports listener-starting before the socket is ready', () =
 test('EvaluateArtnet degrades when the universe comes from a different source', () => {
   const { EvaluateArtnet } = loadArtnet();
   const res = EvaluateArtnet(
-    baseParams({ Snapshot: { Ready: true, Error: null, Sources: [source({ Address: '10.0.0.99' })] } })
+    baseParams({
+      Snapshot: { Ready: true, Error: null, Sources: [source({ Address: '10.0.0.99' })] },
+    })
   );
   assert.equal(res.Success, false);
   assert.equal(res.Degraded, true);
@@ -139,7 +155,10 @@ test('EvaluateArtnet degrades when the universe comes from a different source', 
 test('EvaluateArtnet ignores sources older than the grace period', () => {
   const { EvaluateArtnet } = loadArtnet();
   const res = EvaluateArtnet(
-    baseParams({ Now: 10000, Snapshot: { Ready: true, Error: null, Sources: [source({ LastSeenAt: 1000 })] } })
+    baseParams({
+      Now: 10000,
+      Snapshot: { Ready: true, Error: null, Sources: [source({ LastSeenAt: 1000 })] },
+    })
   );
   assert.equal(res.Success, false);
   assert.match(res.Error, /No Art-Net data/);
@@ -147,7 +166,9 @@ test('EvaluateArtnet ignores sources older than the grace period', () => {
 
 test('EvaluateArtnet surfaces a listener error', () => {
   const { EvaluateArtnet } = loadArtnet();
-  const res = EvaluateArtnet(baseParams({ Snapshot: { Ready: false, Error: 'EADDRINUSE', Sources: [] } }));
+  const res = EvaluateArtnet(
+    baseParams({ Snapshot: { Ready: false, Error: 'EADDRINUSE', Sources: [] } })
+  );
   assert.equal(res.Success, false);
   assert.match(res.Error, /EADDRINUSE/);
 });
@@ -165,7 +186,9 @@ test('ArtnetReceiver ingests a real datagram for an observed universe', async (t
   let snap = ArtnetReceiver.Snapshot(UNIVERSE);
   if (!snap.Ready) {
     ArtnetReceiver.Stop();
-    t.skip(`Art-Net socket not ready (${snap.Error || 'binding'}) — environment cannot bind udp/6454`);
+    t.skip(
+      `Art-Net socket not ready (${snap.Error || 'binding'}) — environment cannot bind udp/6454`
+    );
     return;
   }
 

@@ -3,7 +3,11 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
-const { makeBrightSignDws, INFO_HEALTHY, INFO_PATH } = require('../test-support/brightsign-dws-mock');
+const {
+  makeBrightSignDws,
+  INFO_HEALTHY,
+  INFO_PATH,
+} = require('../test-support/brightsign-dws-mock');
 
 function methodPath(name) {
   return path.join(__dirname, '..', 'dist', 'Modules', 'MonitoringMethods', name);
@@ -20,7 +24,10 @@ const BASE_SETTINGS = {
   IgnoreTlsErrors: true,
   Timeout: 2000,
 };
-const target = (Settings = {}) => ({ Address: '10.0.0.9', Settings: { ...BASE_SETTINGS, ...Settings } });
+const target = (Settings = {}) => ({
+  Address: '10.0.0.9',
+  Settings: { ...BASE_SETTINGS, ...Settings },
+});
 const healthyDws = () => makeBrightSignDws({ auth: CREDS, routes: { [INFO_PATH]: INFO_HEALTHY } });
 
 test('brightsign-firmware module exposes the expected shape', () => {
@@ -88,7 +95,13 @@ test('an unreachable player is offline', async () => {
 test('Debug renders the version rows', () => {
   const m = load(makeBrightSignDws({}));
   const html = m.Debug(
-    { Success: true, LatencyMs: 9, Firmware: '8.5.33', BootVersion: '8.0.152', Expected: '9.0.218' },
+    {
+      Success: true,
+      LatencyMs: 9,
+      Firmware: '8.5.33',
+      BootVersion: '8.0.152',
+      Expected: '9.0.218',
+    },
     target()
   );
   assert.match(html, /8\.5\.33/);

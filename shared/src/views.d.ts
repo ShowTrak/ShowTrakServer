@@ -207,6 +207,9 @@ export interface ClientView {
   Integrated?: boolean;
   IntegratedActions?: IntegratedAction[];
   Identifying?: boolean;
+  // Reserved slot with no hardware behind it yet; permanently offline until a
+  // real device replaces it.
+  Unassigned?: boolean;
   RunningApplications?: RunningApplicationsView;
   CriticalApplications?: CriticalApplication[];
   MissingCriticalApplications?: MissingCriticalApplication[];

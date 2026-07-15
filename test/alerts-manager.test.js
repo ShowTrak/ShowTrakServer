@@ -510,3 +510,99 @@ test('AlertsManager fires a rule when ANY of its multiple triggers matches', asy
   const fired = executeCalls.map((c) => c.context.TriggerType);
   assert.deepEqual(fired.sort(), ['CLIENT_OFFLINE', 'CLIENT_ONLINE']);
 });
+
+// An unassigned client is a reserved slot with no hardware behind it, so it is
+// offline permanently by design. A workspace-scoped CLIENT_OFFLINE rule would
+// otherwise fire on every such slot, which is noise rather than a fault.
+test('AlertsManager suppresses offline alerts for unassigned client slots', async () => {
+  const executeCalls = [];
+
+  const rules = [
+    {
+      RuleID: 1,
+      Title: 'Anything Offline',
+      Scope: JSON.stringify({ Workspace: true, Groups: [], Clients: [] }),
+      TriggerType: 'CLIENT_OFFLINE',
+      TriggerConfig: JSON.stringify({}),
+      Actions: JSON.stringify([{ Type: 'http-api', Settings: { Route: '/offline' } }]),
+      Enabled: 1,
+      Timestamp: 1,
+      UpdatedAt: 1,
+    },
+  ];
+
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AlertsManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => ({ error: () => {} }) },
+    '../DB': {
+      Manager: { All: async () => [null, rules], Run: async () => [null, { changes: 1 }] },
+    },
+    '../AlertActions': {
+      Manager: {
+        GetAll: () => [],
+        Execute: async (action, context) => {
+          executeCalls.push(context.EntityName);
+          return { Success: true };
+        },
+      },
+    },
+    '../Broadcast': { Manager: { emit: () => {} } },
+    '../Utils': require('../dist/Modules/Utils'),
+  });
+
+  await Manager.Init();
+
+  const fired = () => executeCalls.slice();
+
+  // A real client transitioning online -> offline still alerts (control case:
+  // proves the rule and the harness work).
+  await Manager.HandleClientUpdated({ UUID: 'real-1', Online: true, Nickname: 'Real PC' });
+  await Manager.HandleClientUpdated({ UUID: 'real-1', Online: false, Nickname: 'Real PC' });
+  assert.deepEqual(fired(), ['Real PC']);
+
+  // A slot churning while offline stays silent.
+  const slot = { UUID: 'slot-1', Online: false, Nickname: 'Empty Slot', Unassigned: true };
+  await Manager.HandleClientUpdated(slot);
+  await Manager.HandleClientUpdated(slot);
+  assert.deepEqual(fired(), ['Real PC']);
+
+  // Even a flagged slot that somehow reports online then drops stays silent.
+  await Manager.HandleClientUpdated({
+    UUID: 'slot-2',
+    Online: true,
+    Nickname: 'Odd Slot',
+    Unassigned: true,
+  });
+  await Manager.HandleClientUpdated({
+    UUID: 'slot-2',
+    Online: false,
+    Nickname: 'Odd Slot',
+    Unassigned: true,
+  });
+  assert.deepEqual(fired(), ['Real PC']);
+
+  // Filling slot-1 clears the flag. It is still offline, and its tracked
+  // baseline was already false, so no alert fires for the promotion itself...
+  await Manager.HandleClientUpdated({
+    UUID: 'slot-1',
+    Online: false,
+    Nickname: 'Now Real',
+    Unassigned: false,
+  });
+  assert.deepEqual(fired(), ['Real PC']);
+
+  // ...but once it is an ordinary client, a genuine drop alerts as normal.
+  await Manager.HandleClientUpdated({
+    UUID: 'slot-1',
+    Online: true,
+    Nickname: 'Now Real',
+    Unassigned: false,
+  });
+  await Manager.HandleClientUpdated({
+    UUID: 'slot-1',
+    Online: false,
+    Nickname: 'Now Real',
+    Unassigned: false,
+  });
+  assert.deepEqual(fired(), ['Real PC', 'Now Real']);
+});

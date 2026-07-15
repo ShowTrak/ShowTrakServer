@@ -57,7 +57,11 @@ test('IsClientAllowed: unrestricted (null scope or Workspace) admits everyone', 
 test('IsClientAllowed: restricted scope matches by client UUID or group', () => {
   const { Manager } = load();
   const scope = { Workspace: false, Groups: [7], Clients: ['keep'] };
-  assert.equal(Manager.IsClientAllowed(scope, { UUID: 'keep', GroupID: null }), true, 'explicit client');
+  assert.equal(
+    Manager.IsClientAllowed(scope, { UUID: 'keep', GroupID: null }),
+    true,
+    'explicit client'
+  );
   assert.equal(Manager.IsClientAllowed(scope, { UUID: 'other', GroupID: 7 }), true, 'group member');
   assert.equal(Manager.IsClientAllowed(scope, { UUID: 'other', GroupID: 9 }), false, 'wrong group');
   assert.equal(Manager.IsClientAllowed(scope, { UUID: 'other', GroupID: null }), false, 'no match');
@@ -88,7 +92,11 @@ test('SetScope: Workspace collapses to the no-row unrestricted default', async (
 
 test('SetScope: normalizes group/client entries', async () => {
   const { Manager } = load();
-  await Manager.SetScope('s2', { Workspace: false, Groups: ['3', 3, 'bad'], Clients: [' u1 ', ''] });
+  await Manager.SetScope('s2', {
+    Workspace: false,
+    Groups: ['3', 3, 'bad'],
+    Clients: [' u1 ', ''],
+  });
   const scope = await Manager.GetScope('s2');
   assert.deepEqual(scope.Groups, [3], 'dedupes + coerces numeric groups, drops NaN');
   assert.deepEqual(scope.Clients, ['u1'], 'trims and drops empty client entries');
@@ -114,7 +122,10 @@ test('GetScope: malformed stored JSON fails open (unrestricted)', async () => {
 test('DecorateCatalog attaches Whitelist (null when unrestricted)', async () => {
   const { Manager } = load();
   await Manager.SetScope('restricted', { Workspace: false, Groups: [2], Clients: [] });
-  const catalog = [{ ID: 'restricted', Name: 'R' }, { ID: 'free', Name: 'F' }];
+  const catalog = [
+    { ID: 'restricted', Name: 'R' },
+    { ID: 'free', Name: 'F' },
+  ];
   const decorated = await Manager.DecorateCatalog(catalog);
   assert.deepEqual(decorated[0].Whitelist, { Workspace: false, Groups: [2], Clients: [] });
   assert.equal(decorated[1].Whitelist, null);

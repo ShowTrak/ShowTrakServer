@@ -48,7 +48,9 @@ test('bonjour error handler never throws and routes by severity', () => {
 
   // The exact failure that used to crash the app must be swallowed as a warning.
   assert.doesNotThrow(() =>
-    Handler(Object.assign(new Error('send EADDRNOTAVAIL 224.0.0.251:5353'), { code: 'EADDRNOTAVAIL' }))
+    Handler(
+      Object.assign(new Error('send EADDRNOTAVAIL 224.0.0.251:5353'), { code: 'EADDRNOTAVAIL' })
+    )
   );
   assert.equal(warns.length, 1);
   assert.equal(errors.length, 0);

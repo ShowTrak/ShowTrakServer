@@ -21,6 +21,10 @@ import { OpenClientInfo } from './client-info-modal';
 import { TestAllNotifications } from './lib/debug-notifications';
 import { OpenScriptManager } from './15-script-manager';
 import { OpenDummyClientEditor } from './16-dummy-clients';
+import {
+  OpenUnassignedClientCreationModal,
+  RefreshUnassignedClientMenuVisibility,
+} from './17-unassigned-clients';
 import { ClearSelection, SelectByGroup, ToggleSelection } from './selection';
 import { wireAppUpdates } from './wire-app-updates';
 import { wireContextMenu } from './wire-context-menu';
@@ -323,6 +327,11 @@ export async function Init() {
   $('#ADD_DUMMY_CLIENT_ACTION').on('click', async () => {
     await OpenDummyClientEditor(null);
   });
+
+  $('#ADD_UNASSIGNED_CLIENT_ACTION').on('click', async () => {
+    await OpenUnassignedClientCreationModal();
+  });
+  await RefreshUnassignedClientMenuVisibility();
 
   $('#ADD_TARGET_BROWSE_ACTION').on('click', async () => {
     await OpenNetworkDiscoveryModal();

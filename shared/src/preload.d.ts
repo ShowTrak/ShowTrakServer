@@ -117,6 +117,10 @@ export interface ShowTrakAPI {
   StopIdentifyingClient(UUID: string): Promise<unknown>;
   UnadoptClient(UUID: string): Promise<unknown>;
   ReplaceClient(CurrentUUID: string, ReplacementUUID: string): Promise<ResultTuple<unknown>>;
+  CreateUnassignedClients(Payload: {
+    Name: string;
+    Count: number;
+  }): Promise<ResultTuple<number>>;
   WakeOnLan(Targets: string[]): Promise<unknown>;
 
   // ---- Groups -----------------------------------------------------------

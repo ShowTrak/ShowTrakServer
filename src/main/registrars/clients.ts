@@ -21,6 +21,7 @@ const { Manager: AlertsManager } = require('../../Modules/AlertsManager');
 const { Manager: IdentifyManager } = require('../../Modules/IdentifyManager');
 const { Manager: WOLManager } = require('../../Modules/WOLManager');
 const { Manager: ScriptExecutionManager } = require('../../Modules/ScriptExecutionManager');
+const { Manager: SettingsManager } = require('../../Modules/SettingsManager');
 const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
 
 const Logger = CreateLogger('Main');
@@ -167,6 +168,37 @@ function register(): void {
         return [null, true];
       },
       { invalidFallback: false }
+    )
+  );
+
+  RPC.handle(
+    'CreateUnassignedClients',
+    createTupleHandler<[{ Name: string; Count: number }], unknown>(
+      (Payload: unknown) => IPCValidation.UnassignedClientCreatePayload(Payload),
+      async (Payload: { Name: string; Count: number }) => {
+        // The renderer hides the entry point when the feature is off, but the
+        // setting is re-read here because that is the only authoritative gate —
+        // a stale or bypassed renderer must not be able to create slots. Fails
+        // closed if the read throws.
+        let Allowed = false;
+        try {
+          Allowed = !!(await SettingsManager.GetValue('SYSTEM_ALLOW_UNASSIGNED_CLIENTS'));
+        } catch (error) {
+          Logger.error('Failed to read unassigned client setting', error);
+          return ['Unable to verify that unassigned clients are enabled', null];
+        }
+        if (!Allowed) return ['Unassigned clients are disabled', null];
+
+        const [CreateErr, Created] = await ClientManager.CreateUnassigned(
+          Payload.Name,
+          Payload.Count
+        );
+        if (CreateErr) return [CreateErr, null];
+
+        await UpdateFullClientList();
+        return [null, Created.length];
+      },
+      { invalidFallback: null }
     )
   );
 

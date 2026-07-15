@@ -40,6 +40,7 @@ export interface IPCValidationManager {
   GroupKeyBind(value: unknown, fieldName?: string): string | null;
   ScriptID(value: unknown): string;
   IntegratedEventID(value: unknown): string;
+  UnassignedClientCreatePayload(value: unknown): { Name: string; Count: number };
 
   // Script catalog (script-validators.ts)
   ScriptFolderID(value: unknown, fieldName?: string): string;

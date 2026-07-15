@@ -25,7 +25,10 @@ const BASE_SETTINGS = {
   Timeout: 2000,
   VideoOutput: 0,
 };
-const target = (Settings = {}) => ({ Address: '10.0.0.9', Settings: { ...BASE_SETTINGS, ...Settings } });
+const target = (Settings = {}) => ({
+  Address: '10.0.0.9',
+  Settings: { ...BASE_SETTINGS, ...Settings },
+});
 
 function withVideo(payload, routePath = VIDEO_PATH) {
   return makeBrightSignDws({ auth: CREDS, routes: { [routePath]: payload } });

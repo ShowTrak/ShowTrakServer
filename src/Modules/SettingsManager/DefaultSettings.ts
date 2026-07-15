@@ -54,6 +54,15 @@ export const DefaultSettings: SettingDefinition[] = [
     DefaultValue: true,
   },
   {
+    Group: 'Features',
+    Key: 'SYSTEM_ALLOW_UNASSIGNED_CLIENTS',
+    Title: 'Unassigned Clients',
+    Description:
+      'Allow empty client slots to be created ahead of time and filled in later by replacing them with a real device. Disabled by default.',
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+  },
+  {
     Group: 'Network',
     Key: 'SYSTEM_OSC_ENABLED',
     Title: 'OSC Control',

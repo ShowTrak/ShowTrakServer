@@ -20,7 +20,10 @@ test('resolveContainedScriptFile resolves paths inside the script folder', () =>
 
 test('resolveContainedScriptFile rejects traversal in the folder ID', () => {
   const root = path.resolve('/tmp/showtrak-scripts');
-  assert.deepEqual(resolveContainedScriptFile(root, '../evil', 'x.sh'), ['Invalid script ID', null]);
+  assert.deepEqual(resolveContainedScriptFile(root, '../evil', 'x.sh'), [
+    'Invalid script ID',
+    null,
+  ]);
   assert.deepEqual(resolveContainedScriptFile(root, 'a/b', 'x.sh'), ['Invalid script ID', null]);
   assert.deepEqual(resolveContainedScriptFile(root, '', 'x.sh'), ['Invalid script ID', null]);
   assert.deepEqual(resolveContainedScriptFile(root, 42, 'x.sh'), ['Invalid script ID', null]);

@@ -7,6 +7,11 @@ import type { IPCValidationManager } from './index';
 // stay long enough for an operator to cancel a destructive launch action.
 const MIN_LAUNCH_DELAY_SECONDS = 10;
 
+// Upper bound on how many reserved slots one request may create. Generous for
+// the intended use (pre-building a rig's worth of slots) while keeping a
+// malformed or hostile count from flooding the client list.
+const MAX_UNASSIGNED_CLIENTS_PER_REQUEST = 64;
+
 export = function registerClientValidators(Manager: IPCValidationManager): void {
   Manager.UUID = (value: unknown, fieldName = 'UUID') => {
     return normalizeNonEmptyString(value, fieldName, { minLength: 2, maxLength: 128 });
@@ -26,6 +31,24 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     }
 
     return Array.from(new Set(normalized));
+  };
+
+  Manager.UnassignedClientCreatePayload = (value: unknown) => {
+    if (!isPlainObject(value)) {
+      fail('Unassigned client payload must be an object');
+    }
+
+    const Name = normalizeNonEmptyString(value.Name, 'Name', { minLength: 1, maxLength: 64 });
+
+    const Count = Number(value.Count);
+    if (!Number.isInteger(Count) || Count < 1) {
+      fail('Count must be a positive integer');
+    }
+    if (Count > MAX_UNASSIGNED_CLIENTS_PER_REQUEST) {
+      fail(`Count cannot exceed ${MAX_UNASSIGNED_CLIENTS_PER_REQUEST}`);
+    }
+
+    return { Name, Count };
   };
 
   Manager.GroupID = (value: unknown, fieldName = 'GroupID') => {

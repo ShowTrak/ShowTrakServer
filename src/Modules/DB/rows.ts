@@ -22,6 +22,9 @@ export interface ClientRow {
   IP: string | null;
   RunOnLaunchScriptID: string | null;
   RunOnLaunchDelaySeconds: number | null;
+  // Reserved slot standing in for hardware that has not arrived yet. Cleared
+  // when the slot is filled via ReplaceClientUUID.
+  Unassigned: number; // 0 | 1
   Timestamp: number;
 }
 

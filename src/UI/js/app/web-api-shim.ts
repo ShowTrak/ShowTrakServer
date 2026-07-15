@@ -141,6 +141,10 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     UnadoptClient: async (UUID) => rpc('UnadoptClient', UUID),
     ReplaceClient: async (CurrentUUID, ReplacementUUID) =>
       rpc('ReplaceClient', CurrentUUID, ReplacementUUID),
+    // Desktop-only: creating slots is gated on a setting the web surface cannot
+    // read (Settings:Get is not web-allowlisted), so the entry point never
+    // appears in a browser and the channel is deliberately not exposed.
+    CreateUnassignedClients: nullTuple,
     WakeOnLan: async (Targets) => rpc('WakeOnLan', Targets),
 
     // ---- Groups -----------------------------------------------------------

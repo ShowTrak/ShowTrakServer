@@ -150,7 +150,10 @@ test('RunningApplications normalizes items and status', () => {
     SampledAt: 1700000000000,
     TotalCount: 2,
     Truncated: false,
-    Items: [{ Name: 'QLab', Count: 1 }, { Name: '', Count: 3 }],
+    Items: [
+      { Name: 'QLab', Count: 1 },
+      { Name: '', Count: 3 },
+    ],
     Status: { State: 'ok', Message: null },
   });
   assert.deepEqual(snapshot.Items, [{ Name: 'QLab', Count: 1 }]);

@@ -92,6 +92,10 @@ export function InitSimpleModalHeaders() {
     title: 'Create New Group',
     onClose: dismiss('SHOWTRAL_MODAL_GROUPCREATION'),
   });
+  build('UNASSIGNED_CLIENT_CREATION_HEADER', {
+    title: 'Create Unassigned Clients',
+    onClose: dismiss('SHOWTRAK_MODAL_UNASSIGNED_CLIENT_CREATION'),
+  });
 
   // No-Show and Migrate are intentionally left out: they are static-backdrop
   // prompts that must be answered, and the shared title bar reads as a

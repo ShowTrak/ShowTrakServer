@@ -1,5 +1,5 @@
 import { AppMode, ClientInfoOpenUUID, Config, DummyClients, FormatClientHostnameVersionLabel, GroupUUIDCache, MonitoringTargets, PendingAdoption, Selected, Settings, __LastClients, __LastGroups, setAllClients, setPendingAdoption, setScriptList, set__LastClients, set__LastGroups } from './01-state';
-import { OfflineBadgeContent } from './lib/status-badges';
+import { OfflineBadgeContent, UnassignedBadgeContent } from './lib/status-badges';
 import type {
   ClientView,
   DummyClientView,
@@ -87,6 +87,9 @@ export function GetClientStatusDisplayText(Client: Partial<ClientView> | null | 
 export function GetClientCompactStatusLabel(Client: Partial<ClientView> | null | undefined) {
   if (Client && Client.Identifying) return 'Identifying';
   if (Client && Client.Online) return Client.Degraded ? 'Degraded' : 'Online';
+  // Checked after Online so that a slot which somehow has a device reporting in
+  // still shows its real state rather than a stale reservation label.
+  if (Client && Client.Unassigned) return 'Unassigned';
   return 'Offline';
 }
 
@@ -450,7 +453,7 @@ export function TruncateGroupLabel(value: string, maxLen = 16) {
 // builders (RenderMonitoringTargetTile / RenderDummyClientTile); the live
 // in-place counterpart is UpdateClientTile below.
 export function RenderClientTile(Client: ClientView): string {
-  const { Nickname, Hostname, IP, UUID, Online, LastSeen, Degraded } = Client;
+  const { Nickname, Hostname, IP, UUID, Online, LastSeen, Degraded, Unassigned } = Client;
   const HostnameVersionLabel = FormatClientHostnameVersionLabel(Client);
   const CompactStatusLabel = GetClientCompactStatusLabel(Client);
   const WarningText =
@@ -487,9 +490,18 @@ export function RenderClientTile(Client: ClientView): string {
           <h7 class="mb-0 text-warning" data-type="DEGRADED_WARNING">${Safe(WarningText)}</h7>
         </div>
 				<div class="SHOWTRAK_PC_STATUS ${Online ? 'd-none' : 'd-grid'}" data-type="INDICATOR_OFFLINE">
-					<h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${LastSeen}">
+					${
+            Unassigned
+              ? // Deliberately not [data-type="OFFLINE_SINCE"]: that is the
+                // selector the per-second offline counter ticks, and it would
+                // overwrite this label within a second.
+                `<h7 class="mb-0" data-type="UNASSIGNED_LABEL">
+            ${UnassignedBadgeContent()}
+					</h7>`
+              : `<h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${LastSeen}">
             ${OfflineBadgeContent()}
-					</h7>
+					</h7>`
+          }
 				</div>
 			</div>`;
 }

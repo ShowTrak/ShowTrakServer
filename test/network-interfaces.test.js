@@ -33,7 +33,14 @@ function loadWithFakeOs(initial) {
 }
 
 function iface(name, address, cidr, internal = false) {
-  return { family: 'IPv4', address, netmask: '255.255.255.0', cidr, mac: '00:00:00:00:00:00', internal };
+  return {
+    family: 'IPv4',
+    address,
+    netmask: '255.255.255.0',
+    cidr,
+    mac: '00:00:00:00:00:00',
+    internal,
+  };
 }
 
 // --- pure diff ---------------------------------------------------------------
@@ -41,16 +48,50 @@ function iface(name, address, cidr, internal = false) {
 test('ComputeChange reports added and removed interfaces by address', () => {
   const { mod } = loadWithFakeOs({});
   const prev = [
-    { Name: 'en0', Address: '10.0.0.5', CIDR: '10.0.0.5/24', Netmask: '', MAC: null, Internal: false },
-    { Name: 'en1', Address: '10.0.1.5', CIDR: '10.0.1.5/24', Netmask: '', MAC: null, Internal: false },
+    {
+      Name: 'en0',
+      Address: '10.0.0.5',
+      CIDR: '10.0.0.5/24',
+      Netmask: '',
+      MAC: null,
+      Internal: false,
+    },
+    {
+      Name: 'en1',
+      Address: '10.0.1.5',
+      CIDR: '10.0.1.5/24',
+      Netmask: '',
+      MAC: null,
+      Internal: false,
+    },
   ];
   const current = [
-    { Name: 'en0', Address: '10.0.0.5', CIDR: '10.0.0.5/24', Netmask: '', MAC: null, Internal: false },
-    { Name: 'en2', Address: '10.0.2.9', CIDR: '10.0.2.9/24', Netmask: '', MAC: null, Internal: false },
+    {
+      Name: 'en0',
+      Address: '10.0.0.5',
+      CIDR: '10.0.0.5/24',
+      Netmask: '',
+      MAC: null,
+      Internal: false,
+    },
+    {
+      Name: 'en2',
+      Address: '10.0.2.9',
+      CIDR: '10.0.2.9/24',
+      Netmask: '',
+      MAC: null,
+      Internal: false,
+    },
   ];
   const { Added, Removed } = mod.ComputeChange(prev, current);
-  assert.deepEqual(Added.map((i) => i.Address), ['10.0.2.9']);
-  assert.deepEqual(Removed.map((i) => i.Address), ['10.0.1.5']);
+  assert.deepEqual(
+    Added.map((i) => i.Address),
+    ['10.0.2.9']
+  );
+  assert.deepEqual(
+    Removed.map((i) => i.Address),
+    ['10.0.1.5']
+  );
 });
 
 // --- accessors ---------------------------------------------------------------
@@ -63,10 +104,16 @@ test('List excludes internal interfaces and Addresses maps to strings', () => {
   });
   const list = mod.Manager.List(false);
   assert.deepEqual(list.map((i) => i.Address).sort(), ['10.0.0.5', '192.168.5.9']);
-  assert.equal(list.every((i) => !i.Internal), true);
+  assert.equal(
+    list.every((i) => !i.Internal),
+    true
+  );
   assert.deepEqual(mod.Manager.Addresses().sort(), ['10.0.0.5', '192.168.5.9']);
   // Internal is available on request.
-  assert.equal(mod.Manager.List(true).some((i) => i.Address === '127.0.0.1'), true);
+  assert.equal(
+    mod.Manager.List(true).some((i) => i.Address === '127.0.0.1'),
+    true
+  );
 });
 
 // --- change notification -----------------------------------------------------
@@ -88,15 +135,24 @@ test('Poll emits a change with added/removed once the interface set changes', ()
   };
   mod._internal.Poll();
   assert.equal(events.length, 1);
-  assert.deepEqual(events[0].Added.map((i) => i.Address), ['10.0.9.9']);
-  assert.deepEqual(events[0].Removed.map((i) => i.Address), []);
+  assert.deepEqual(
+    events[0].Added.map((i) => i.Address),
+    ['10.0.9.9']
+  );
+  assert.deepEqual(
+    events[0].Removed.map((i) => i.Address),
+    []
+  );
   assert.deepEqual(events[0].Current.map((i) => i.Address).sort(), ['10.0.0.5', '10.0.9.9']);
 
   // The original NIC goes away.
   state.ifaces = { en1: [iface('en1', '10.0.9.9', '10.0.9.9/24')] };
   mod._internal.Poll();
   assert.equal(events.length, 2);
-  assert.deepEqual(events[1].Removed.map((i) => i.Address), ['10.0.0.5']);
+  assert.deepEqual(
+    events[1].Removed.map((i) => i.Address),
+    ['10.0.0.5']
+  );
 
   // Unsubscribe stops delivery.
   unsub();

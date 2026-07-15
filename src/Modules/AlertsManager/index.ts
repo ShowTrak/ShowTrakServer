@@ -32,6 +32,7 @@ interface AlertEntityLike {
   IP?: string | null;
   Online?: boolean;
   Degraded?: boolean;
+  Unassigned?: boolean;
   [key: string]: unknown;
 }
 
@@ -459,6 +460,15 @@ Manager.HandleClientUpdated = async (Client: AlertEntityLike) => {
   const Prev = EntityOnlineState.get(Key);
   const Current = !!Client.Online;
   EntityOnlineState.set(Key, Current);
+
+  // A reserved slot has no hardware behind it, so being offline is its normal
+  // state rather than a fault worth alerting on. The tracked state above is
+  // still updated so that filling the slot (which clears the flag) compares
+  // against a truthful baseline instead of firing on a stale transition.
+  if (Client.Unassigned) {
+    EntityDegradedState.set(Key, false);
+    return;
+  }
 
   if (typeof Prev === 'boolean' && Prev !== Current) {
     if (!Current) {

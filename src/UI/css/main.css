@@ -329,7 +329,6 @@ body.is-web #APPLICATION {
 .btn-light:hover {
   background-color: rgba(255, 255, 255, 0.2) !important;
 }
-
 /* Settings button (cog icon) */
 #NAVBAR_CORE_BUTTON.settings-btn,
 #ADD_MONITORING_TARGET_BTN.settings-btn {
@@ -2947,7 +2946,6 @@ button.btn:focus {
 .SHOWTRAK_PC.IDLE {
   background-color: var(--status-idle) !important;
 }
-
 /* Monitoring target above its DegradedThresholdMs setting. Listed after ONLINE
  * so it wins when both classes are toggled mid-update. */
 .SHOWTRAK_PC.DEGRADED {

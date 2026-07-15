@@ -512,14 +512,14 @@ export function InitOscFeeds() {
   window.API.MonitoringTargetUpdated(async (Target) => {
     if (!Target || !Target.TargetID) return;
     const idx = MonitoringTargets.findIndex((t) => t.TargetID === Target.TargetID);
-    const prev = idx === -1 ? null : MonitoringTargets[idx];
-    if (idx === -1) {
-      MonitoringTargets.push(Target);
-    } else {
-      MonitoringTargets[idx] = Target;
-    }
+    // A status update for a target we don't know about is not grounds to add it:
+    // creation always follows up with a full list push, and a late update for a
+    // deleted target would otherwise resurrect its tile until the next restart.
+    if (idx === -1) return;
+    const prev = MonitoringTargets[idx];
+    MonitoringTargets[idx] = Target;
     // If a monitor changed groups, re-render. Otherwise update in place.
-    if (!prev || (prev.GroupID || null) !== (Target.GroupID || null)) {
+    if ((prev.GroupID || null) !== (Target.GroupID || null)) {
       RenderFullClientAndMonitorList();
     } else {
       UpdateMonitoringTargetTile(Target);

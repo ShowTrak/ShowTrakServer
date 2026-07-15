@@ -53,7 +53,15 @@ function makeNetworkInterfacesMock(initialAddrs) {
   return {
     Manager: {
       Addresses: () => addrs.slice(),
-      List: () => addrs.map((a) => ({ Name: 'x', Address: a, CIDR: null, Netmask: '', MAC: null, Internal: false })),
+      List: () =>
+        addrs.map((a) => ({
+          Name: 'x',
+          Address: a,
+          CIDR: null,
+          Netmask: '',
+          MAC: null,
+          Internal: false,
+        })),
       OnChange: (l) => {
         listener = l;
         return () => {
@@ -74,11 +82,14 @@ function makeNetworkInterfacesMock(initialAddrs) {
 
 function loadReceiver(fakeSocket, netMock) {
   const dgram = { createSocket: () => fakeSocket };
-  return loadWithMocks(path.join(__dirname, '..', 'dist', 'Modules', 'MonitoringMethods', '_sacn-shared.js'), {
-    dgram,
-    '../NetworkInterfaces': netMock,
-    '../Logger': loggerStub(),
-  });
+  return loadWithMocks(
+    path.join(__dirname, '..', 'dist', 'Modules', 'MonitoringMethods', '_sacn-shared.js'),
+    {
+      dgram,
+      '../NetworkInterfaces': netMock,
+      '../Logger': loggerStub(),
+    }
+  );
 }
 
 test('sACN receiver joins the multicast group on every current interface', () => {

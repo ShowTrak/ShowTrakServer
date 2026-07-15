@@ -81,6 +81,7 @@ const INVOKE_CHANNEL_LIST = [
   'TriggerIntegratedEvent',
   'UnadoptClient',
   'ReplaceClient',
+  'CreateUnassignedClients',
   'DeleteScripts',
   'UpdateScripts',
   'Scripts:GetManagerList',
@@ -341,6 +342,7 @@ const API: ShowTrakAPI = {
   UnadoptClient: async (UUID) => invoke('UnadoptClient', UUID),
   ReplaceClient: async (CurrentUUID, ReplacementUUID) =>
     invoke('ReplaceClient', CurrentUUID, ReplacementUUID),
+  CreateUnassignedClients: async (Payload) => invoke('CreateUnassignedClients', Payload),
   DeleteScripts: async (List) => invoke('DeleteScripts', List),
   UpdateScripts: async (List) => invoke('UpdateScripts', List),
   // Script Manager (config editing)

@@ -40,6 +40,7 @@ Schema.push({
             IP TEXT, \
             RunOnLaunchScriptID TEXT, \
             RunOnLaunchDelaySeconds INTEGER, \
+            Unassigned INTEGER NOT NULL DEFAULT 0, \
             Timestamp BIGINT(11) NOT NULL \
     )',
 });
@@ -230,6 +231,10 @@ Schema.Migrations = [
   { Version: 5, SQL: 'ALTER TABLE `Groups` ADD COLUMN KeyBind TEXT' },
   { Version: 6, SQL: 'ALTER TABLE `Clients` ADD COLUMN RunOnLaunchScriptID TEXT' },
   { Version: 7, SQL: 'ALTER TABLE `Clients` ADD COLUMN RunOnLaunchDelaySeconds INTEGER' },
+  {
+    Version: 8,
+    SQL: 'ALTER TABLE `Clients` ADD COLUMN Unassigned INTEGER NOT NULL DEFAULT 0',
+  },
 ];
 
 export = Schema;

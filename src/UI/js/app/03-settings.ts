@@ -154,6 +154,16 @@ function InitSettingsPush() {
   } catch (err) {
     HandleNonFatalError('Settings:RefreshAfterUpdate', err);
   }
+
+  // Keep the gated + menu entry in step with its setting. Imported lazily
+  // because that module reads back through GetSettingValue below, and a static
+  // import either way would make the two modules circular.
+  try {
+    const { RefreshUnassignedClientMenuVisibility } = await import('./17-unassigned-clients');
+    await RefreshUnassignedClientMenuVisibility();
+  } catch (err) {
+    HandleNonFatalError('Settings:RefreshUnassignedClientMenu', err);
+  }
   $('#REMOTE_ACCESS_SECTION').html('');
 
   for (const Group of SettingsGroups) {

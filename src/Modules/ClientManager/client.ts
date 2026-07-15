@@ -198,6 +198,7 @@ interface ClientConstructorInput {
   MacAddress?: string | null;
   RunOnLaunchScriptID?: string | null;
   RunOnLaunchDelaySeconds?: number | null;
+  Unassigned?: unknown;
 }
 
 class Client {
@@ -213,6 +214,10 @@ class Client {
   IP: string | null;
   RunOnLaunchScriptID: string | null;
   RunOnLaunchDelaySeconds: number | null;
+  // A reserved slot with no hardware behind it yet. Such a client is offline
+  // forever by definition, so the UI labels it rather than counting how long
+  // it has been down, and offline alerts skip it.
+  Unassigned: boolean;
   Timestamp: number;
 
   // Connection + health (RAM-only, not persisted).
@@ -274,6 +279,8 @@ class Client {
     this.RunOnLaunchScriptID = Data.RunOnLaunchScriptID || null;
     this.RunOnLaunchDelaySeconds =
       typeof Data.RunOnLaunchDelaySeconds === 'number' ? Data.RunOnLaunchDelaySeconds : null;
+    // Stored as sqlite 0/1, so coerce rather than trust the raw row value.
+    this.Unassigned = !!Data.Unassigned;
     this.Timestamp = Data.Timestamp;
 
     this.Online = false;
@@ -1228,6 +1235,11 @@ class Client {
     }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} version updated to ${Version}`);
+  }
+  // In-memory counterpart to the flag ReplaceClientUUID clears in SQL. Replace
+  // persists the change itself, so this only realigns the cached entity.
+  SetUnassigned(Unassigned: boolean) {
+    this.Unassigned = !!Unassigned;
   }
   async SetWeight(Weight: number) {
     if (this.Weight === Weight) return;

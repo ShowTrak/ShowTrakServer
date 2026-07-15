@@ -466,7 +466,11 @@ const Manager = {
     const Target = TargetList[Idx];
     Target.StopLoop();
     const [Err] = await TargetsRepo.Delete(ID);
-    if (Err) return Fail('Failed to delete monitoring target');
+    if (Err) {
+      // The row survived, so the target must keep polling.
+      Target.StartLoop();
+      return Fail('Failed to delete monitoring target');
+    }
     await ChecksRepo.DeleteByTarget(ID);
     TargetList.splice(Idx, 1);
     BroadcastManager.emit('MonitoringTargetListChanged');

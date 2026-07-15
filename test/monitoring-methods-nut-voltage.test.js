@@ -23,9 +23,7 @@ test('nut-ups-voltage exposes the expected shape', () => {
 });
 
 test('nut-ups-voltage is online within the auto band around nominal', async () => {
-  const m = load(
-    makeNutNet({ vars: { 'input.voltage': '232', 'input.voltage.nominal': '230' } })
-  );
+  const m = load(makeNutNet({ vars: { 'input.voltage': '232', 'input.voltage.nominal': '230' } }));
   const r = await m.Run({ Address: '127.0.0.1', Settings: { ...BASE, TolerancePercent: 10 } });
   assert.equal(r.Success, true);
   assert.ok(!r.Degraded);
@@ -33,27 +31,21 @@ test('nut-ups-voltage is online within the auto band around nominal', async () =
 });
 
 test('nut-ups-voltage is degraded on a brownout (below the auto band)', async () => {
-  const m = load(
-    makeNutNet({ vars: { 'input.voltage': '190', 'input.voltage.nominal': '230' } })
-  );
+  const m = load(makeNutNet({ vars: { 'input.voltage': '190', 'input.voltage.nominal': '230' } }));
   const r = await m.Run({ Address: '127.0.0.1', Settings: { ...BASE, TolerancePercent: 10 } });
   assert.equal(r.Degraded, true);
   assert.match(r.DegradedReason, /voltage low/i);
 });
 
 test('nut-ups-voltage is degraded on a surge (above the auto band)', async () => {
-  const m = load(
-    makeNutNet({ vars: { 'input.voltage': '260', 'input.voltage.nominal': '230' } })
-  );
+  const m = load(makeNutNet({ vars: { 'input.voltage': '260', 'input.voltage.nominal': '230' } }));
   const r = await m.Run({ Address: '127.0.0.1', Settings: { ...BASE, TolerancePercent: 10 } });
   assert.equal(r.Degraded, true);
   assert.match(r.DegradedReason, /voltage high/i);
 });
 
 test('nut-ups-voltage explicit Min/Max override the nominal band', async () => {
-  const m = load(
-    makeNutNet({ vars: { 'input.voltage': '120', 'input.voltage.nominal': '230' } })
-  );
+  const m = load(makeNutNet({ vars: { 'input.voltage': '120', 'input.voltage.nominal': '230' } }));
   const r = await m.Run({
     Address: '127.0.0.1',
     Settings: { ...BASE, MinVoltage: 110, MaxVoltage: 130 },

@@ -7,6 +7,7 @@ import { Manager as DB } from '../DB';
 import { CreateClientsRepository } from '../DB/repositories/clients';
 import { CreateCriticalEntitiesRepository } from '../DB/repositories/critical-entities';
 import { Manager as BroadcastManager } from '../Broadcast';
+import { Manager as UUIDManager } from '../UUID';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import { Client } from './client';
@@ -104,6 +105,7 @@ export interface ClientManagerType {
   USBDeviceRemoved(UUID: string, Device: USBDevice): Promise<Result<string>>;
   Update(UUID: string, Data: unknown): Promise<Result<Client>>;
   Create(UUID: string): Promise<Result<boolean>>;
+  CreateUnassigned(Name: string, Count: number): Promise<Result<Client[]>>;
   Delete(UUID: string): Promise<Result<boolean>>;
   ReplaceClient(CurrentUUID: unknown, ReplacementUUID: unknown): Promise<Result<Client>>;
   Exists(UUID: string): Promise<boolean>;
@@ -795,6 +797,64 @@ Manager.Create = async (UUID: string) => {
   return Ok(true);
 };
 
+// Operating system every reserved slot starts as. Matches the canonical value
+// the first-party client reports, so platform-gated scripts resolve the same
+// way they will once real hardware fills the slot.
+const UNASSIGNED_DEFAULT_OS = 'Windows';
+
+// Create one or more reserved slots — client rows with no hardware behind them,
+// standing in for machines that have not arrived yet. Their UUIDs are random
+// (nothing will ever connect with them) and every descriptive field is filler;
+// the operator later points a real device at the slot via ReplaceClient, which
+// clears the Unassigned flag and turns it into an ordinary client.
+Manager.CreateUnassigned = async (Name: string, Count: number) => {
+  if (!Name) return Fail('A name is required');
+  if (!Number.isInteger(Count) || Count < 1) return Fail('Count must be a positive integer');
+
+  const Created: Client[] = [];
+  for (let Index = 0; Index < Count; Index++) {
+    // A single slot keeps the bare name; a batch is numbered so the operator can
+    // tell the slots apart before they are renamed.
+    const Nickname = Count === 1 ? Name : `${Name} ${Index + 1}`;
+    const UUID = UUIDManager.Generate();
+    const Timestamp = Date.now();
+
+    const [InsertErr] = await ClientsRepo.InsertUnassigned(
+      UUID,
+      Nickname,
+      UNASSIGNED_DEFAULT_OS,
+      Timestamp
+    );
+    if (InsertErr) {
+      Logger.error('Failed to insert unassigned client', InsertErr);
+      // Slots already inserted stay — they are independently valid, and the
+      // caller is told how many landed rather than losing the whole batch.
+      break;
+    }
+
+    const Slot = new Client({
+      UUID,
+      Nickname,
+      Hostname: Nickname,
+      OperatingSystem: UNASSIGNED_DEFAULT_OS,
+      Version: 'X.X.X',
+      IP: null,
+      Unassigned: true,
+      Timestamp,
+    });
+    CriticalUSB.applyState(Slot);
+    CriticalUSBNames.applyState(Slot);
+    CriticalApplications.applyState(Slot);
+    CriticalDisplays.applyState(Slot);
+    if (addClientToCache(Slot)) Created.push(Slot);
+  }
+
+  if (!Created.length) return Fail('Failed to create unassigned clients');
+  BroadcastManager.emit('ClientListChanged');
+  Logger.success(`Created ${Created.length} unassigned client(s)`);
+  return Ok(Created);
+};
+
 // Unadopt or purge a client; remove from DB and cache
 Manager.Delete = async (UUID: string) => {
   const [criticalErr] = await CriticalRepo.DeleteAllUSBForClient(UUID);
@@ -843,6 +903,10 @@ Manager.ReplaceClient = async (CurrentUUID: unknown, ReplacementUUID: unknown) =
   }
 
   ExistingClient.UUID = NewUUID;
+  // The transaction above already cleared the column; mirror it in the cached
+  // entity so the slot stops rendering as unassigned without waiting for a
+  // restart to re-hydrate from the row.
+  ExistingClient.SetUnassigned(false);
   ClientList = oldClientRows.filter(
     (Client) => Client.UUID !== OldUUID && Client.UUID !== NewUUID
   );

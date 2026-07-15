@@ -3,7 +3,11 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
-const { makeBrightSignDws, INFO_HEALTHY, INFO_PATH } = require('../test-support/brightsign-dws-mock');
+const {
+  makeBrightSignDws,
+  INFO_HEALTHY,
+  INFO_PATH,
+} = require('../test-support/brightsign-dws-mock');
 
 function methodPath(name) {
   return path.join(__dirname, '..', 'dist', 'Modules', 'MonitoringMethods', name);
@@ -20,7 +24,10 @@ const BASE_SETTINGS = {
   IgnoreTlsErrors: true,
   Timeout: 2000,
 };
-const target = (Settings = {}) => ({ Address: '10.0.0.9', Settings: { ...BASE_SETTINGS, ...Settings } });
+const target = (Settings = {}) => ({
+  Address: '10.0.0.9',
+  Settings: { ...BASE_SETTINGS, ...Settings },
+});
 
 function withPoe(poe) {
   return makeBrightSignDws({
@@ -95,6 +102,9 @@ test('an unreachable player is offline', async () => {
 
 test('Debug renders the PoE rows', () => {
   const m = load(makeBrightSignDws({}));
-  const html = m.Debug({ Success: true, LatencyMs: 5, PoeStatus: 'active', Expected: 'active' }, target());
+  const html = m.Debug(
+    { Success: true, LatencyMs: 5, PoeStatus: 'active', Expected: 'active' },
+    target()
+  );
   assert.match(html, /active/);
 });

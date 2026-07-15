@@ -221,7 +221,10 @@ test('ClientManager guards serial-less USB devices by name and quantity', async 
   // Both connected cards are flagged critical-by-name, none in shortfall.
   const connectedCards = client.USBDeviceList.filter((d) => d.IsCriticalByName);
   assert.equal(connectedCards.length, 2);
-  assert.equal(connectedCards.every((d) => d.Shortfall === false), true);
+  assert.equal(
+    connectedCards.every((d) => d.Shortfall === false),
+    true
+  );
   assert.equal(client.MissingCriticalUSBNames.length, 0);
   assert.equal(client.Degraded === true, false);
 
@@ -496,4 +499,86 @@ test('ClientManager.ReplaceClient rejects replacing an online client', async () 
 
   const [replaceErr] = await Manager.ReplaceClient('online-client', 'replacement-client');
   assert.match(String(replaceErr), /offline/i);
+});
+
+test('ClientManager.CreateUnassigned persists reserved slots with filler details', async () => {
+  const { Manager, DB, events } = await loadClientManager();
+
+  const [err, created] = await Manager.CreateUnassigned('Stage Left', 3);
+  assert.equal(err, null);
+  assert.equal(created.length, 3);
+
+  // A batch is numbered so the slots are tellable apart before being renamed.
+  assert.deepEqual(
+    created.map((c) => c.Nickname),
+    ['Stage Left 1', 'Stage Left 2', 'Stage Left 3']
+  );
+  // Random UUIDs: nothing will ever connect with them.
+  assert.equal(new Set(created.map((c) => c.UUID)).size, 3);
+  for (const slot of created) {
+    assert.equal(slot.Unassigned, true);
+    assert.equal(slot.OperatingSystem, 'Windows');
+    assert.equal(slot.Online, false);
+  }
+
+  const [, rows] = await DB.All('SELECT * FROM Clients ORDER BY Nickname', []);
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0].Unassigned, 1);
+  assert.equal(rows[0].Hostname, 'Stage Left 1');
+  assert.equal(rows[0].Version, 'X.X.X');
+
+  assert.ok(events.includes('ClientListChanged'));
+});
+
+test('ClientManager.CreateUnassigned keeps the bare name for a single slot', async () => {
+  const { Manager } = await loadClientManager();
+
+  const [, created] = await Manager.CreateUnassigned('FOH Mac', 1);
+  assert.equal(created.length, 1);
+  assert.equal(created[0].Nickname, 'FOH Mac');
+});
+
+test('ClientManager.CreateUnassigned rejects a bad name or count', async () => {
+  const { Manager } = await loadClientManager();
+
+  assert.match(String((await Manager.CreateUnassigned('', 1))[0]), /name is required/i);
+  assert.match(String((await Manager.CreateUnassigned('Rig', 0))[0]), /positive integer/i);
+  assert.match(String((await Manager.CreateUnassigned('Rig', 2.5))[0]), /positive integer/i);
+});
+
+test('ClientManager re-hydrates the Unassigned flag as a boolean from sqlite', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.CreateUnassigned('Slot', 1);
+  await Manager.Create('real-client');
+
+  // Force a reload so the entities are rebuilt from the stored 0/1 integers.
+  Manager.Initialized = false;
+  await Manager.Init();
+
+  const [, all] = await Manager.GetAll();
+  const slot = all.find((c) => c.Nickname === 'Slot');
+  const real = all.find((c) => c.UUID === 'real-client');
+  assert.equal(slot.Unassigned, true);
+  assert.equal(real.Unassigned, false);
+});
+
+test('ClientManager.ReplaceClient clears the Unassigned flag when a slot is filled', async () => {
+  const { Manager, DB } = await loadClientManager();
+
+  const [, created] = await Manager.CreateUnassigned('Spare', 1);
+  const slotUUID = created[0].UUID;
+
+  const [replaceErr, filled] = await Manager.ReplaceClient(slotUUID, 'real-device');
+  assert.equal(replaceErr, null);
+  assert.equal(filled.UUID, 'real-device');
+  // Filling the slot promotes it to an ordinary client, in memory...
+  assert.equal(filled.Unassigned, false);
+
+  // ...and in the row, within the same transaction that re-keyed it.
+  const [, row] = await DB.Get('SELECT * FROM Clients WHERE UUID = ?', ['real-device']);
+  assert.equal(row.Unassigned, 0);
+  assert.equal(row.Nickname, 'Spare');
+
+  const [, oldRow] = await DB.Get('SELECT * FROM Clients WHERE UUID = ?', [slotUUID]);
+  assert.equal(oldRow, undefined);
 });

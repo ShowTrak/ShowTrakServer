@@ -107,7 +107,9 @@ test('Wake broadcasts only on external IPv4 interfaces and reports success', asy
   const { Manager } = loadWOL({
     dgram: fakeDgram(sends),
     os: fakeOs({
-      eth0: [{ address: '192.168.1.42', netmask: '255.255.255.0', family: 'IPv4', internal: false }],
+      eth0: [
+        { address: '192.168.1.42', netmask: '255.255.255.0', family: 'IPv4', internal: false },
+      ],
       lo: [{ address: '127.0.0.1', netmask: '255.0.0.0', family: 'IPv4', internal: true }],
       wlan0: [{ address: 'fe80::1', netmask: 'ffff::', family: 'IPv6', internal: false }],
     }),
@@ -119,10 +121,7 @@ test('Wake broadcasts only on external IPv4 interfaces and reports success', asy
 
   // The one external IPv4 interface hits both its directed and the limited
   // broadcast; the loopback and IPv6 interfaces are skipped entirely.
-  assert.deepEqual(
-    sends.map((s) => s.address).sort(),
-    ['192.168.1.255', '255.255.255.255']
-  );
+  assert.deepEqual(sends.map((s) => s.address).sort(), ['192.168.1.255', '255.255.255.255']);
   for (const sent of sends) {
     assert.equal(sent.port, 9);
     assert.equal(sent.length, 102);
@@ -136,7 +135,9 @@ test('Wake broadcasts on every external IPv4 interface', async () => {
   const { Manager } = loadWOL({
     dgram: fakeDgram(sends),
     os: fakeOs({
-      eth0: [{ address: '192.168.1.42', netmask: '255.255.255.0', family: 'IPv4', internal: false }],
+      eth0: [
+        { address: '192.168.1.42', netmask: '255.255.255.0', family: 'IPv4', internal: false },
+      ],
       eth1: [{ address: '10.0.0.5', netmask: '255.255.255.0', family: 'IPv4', internal: false }],
     }),
   });
@@ -144,15 +145,12 @@ test('Wake broadcasts on every external IPv4 interface', async () => {
   await Manager.Wake('AA:BB:CC:DD:EE:FF', 1, 50);
 
   // Both interfaces hit their own directed broadcast plus the limited broadcast.
-  assert.deepEqual(
-    sends.map((s) => `${s.from}->${s.address}`).sort(),
-    [
-      '10.0.0.5->10.0.0.255',
-      '10.0.0.5->255.255.255.255',
-      '192.168.1.42->192.168.1.255',
-      '192.168.1.42->255.255.255.255',
-    ]
-  );
+  assert.deepEqual(sends.map((s) => `${s.from}->${s.address}`).sort(), [
+    '10.0.0.5->10.0.0.255',
+    '10.0.0.5->255.255.255.255',
+    '192.168.1.42->192.168.1.255',
+    '192.168.1.42->255.255.255.255',
+  ]);
 });
 
 test('Wake fails cleanly when there are no external IPv4 interfaces', async () => {

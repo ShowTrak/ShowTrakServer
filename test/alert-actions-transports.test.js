@@ -248,7 +248,12 @@ test('slack-webhook action builds an attachment and validates the URL', async ()
   try {
     const result = await action.Execute(
       { Settings: { WebhookURL: `http://127.0.0.1:${server.port}/webhook` } },
-      { TriggerType: 'CLIENT_OFFLINE', EntityName: 'PC1', Severity: 'critical', Description: 'down' },
+      {
+        TriggerType: 'CLIENT_OFFLINE',
+        EntityName: 'PC1',
+        Severity: 'critical',
+        Description: 'down',
+      },
       loggerStub()
     );
     assert.equal(result.Success, true);
@@ -283,7 +288,12 @@ test('teams-webhook action builds an adaptive card and validates the URL', async
   try {
     const result = await action.Execute(
       { Settings: { WebhookURL: `http://127.0.0.1:${server.port}/webhook` } },
-      { TriggerType: 'CLIENT_OFFLINE', EntityName: 'PC1', Severity: 'critical', Description: 'down' },
+      {
+        TriggerType: 'CLIENT_OFFLINE',
+        EntityName: 'PC1',
+        Severity: 'critical',
+        Description: 'down',
+      },
       loggerStub()
     );
     assert.equal(result.Success, true);

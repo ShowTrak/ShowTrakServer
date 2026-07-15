@@ -22,6 +22,23 @@ export function CreateClientsRepository(DB: DBManager) {
       );
     },
 
+    // Insert a reserved slot for hardware that does not exist yet. Unlike
+    // Insert (which describes a real machine mid-adoption), every descriptive
+    // column here is filler the operator is expected to overwrite — either by
+    // editing the client or by replacing it with a real device, which clears
+    // the Unassigned flag.
+    InsertUnassigned(
+      UUID: string,
+      Nickname: string,
+      OperatingSystem: string,
+      Timestamp: number
+    ): Promise<DBResult<unknown>> {
+      return DB.Run(
+        'INSERT INTO Clients (UUID, Nickname, Hostname, OperatingSystem, Version, IP, Unassigned, Timestamp) VALUES (?, ?, ?, ?, ?, ?, 1, ?)',
+        [UUID, Nickname, Nickname, OperatingSystem, 'X.X.X', null, Timestamp]
+      );
+    },
+
     Delete(UUID: string): Promise<DBResult<unknown>> {
       return DB.Run('DELETE FROM Clients WHERE UUID = ?', [UUID]);
     },
@@ -58,10 +75,14 @@ export function CreateClientsRepository(DB: DBManager) {
       rewriteRuleUUID: (value: unknown) => unknown
     ): Promise<DBResult<void>> {
       return DB.WithTransaction(async (run) => {
-        const [clientUpdateErr] = await run('UPDATE Clients SET UUID = ? WHERE UUID = ?', [
-          NewUUID,
-          OldUUID,
-        ]);
+        // Clearing Unassigned here is what "fills" a reserved slot: the row
+        // stops being a placeholder the moment real hardware takes its UUID.
+        // It rides the same transaction so a slot can never be left flagged
+        // against a device that has already claimed it.
+        const [clientUpdateErr] = await run(
+          'UPDATE Clients SET UUID = ?, Unassigned = 0 WHERE UUID = ?',
+          [NewUUID, OldUUID]
+        );
         if (clientUpdateErr) throw clientUpdateErr;
 
         const [criticalUSBErr] = await run('UPDATE CriticalUSBDevices SET UUID = ? WHERE UUID = ?', [

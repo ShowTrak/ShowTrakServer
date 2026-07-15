@@ -115,6 +115,11 @@
                   Create Dummy Client
                 </button>
               </li>
+              <li class="d-none" id="ADD_UNASSIGNED_CLIENT_ACTION_ITEM">
+                <button type="button" class="dropdown-item" id="ADD_UNASSIGNED_CLIENT_ACTION">
+                  Create Unassigned Client
+                </button>
+              </li>
               <li><hr class="dropdown-divider" /></li>
               <li>
                 <button
@@ -1317,6 +1322,54 @@ Loading licence...</pre
             </p>
 
             <div id="CLIENT_REPLACE_LIST" class="d-grid gap-2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_UNASSIGNED_CLIENT_CREATION"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_UNASSIGNED_CLIENT_CREATION_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div id="UNASSIGNED_CLIENT_CREATION_HEADER" class="mb-2"></div>
+
+            <div class="form-floating mb-2">
+              <input
+                type="text"
+                class="form-control"
+                id="UNASSIGNED_CLIENT_CREATION_NAME"
+                placeholder="Name"
+                maxlength="64"
+              />
+              <label for="UNASSIGNED_CLIENT_CREATION_NAME">Name</label>
+            </div>
+
+            <div class="form-floating mb-2">
+              <input
+                type="number"
+                class="form-control"
+                id="UNASSIGNED_CLIENT_CREATION_COUNT"
+                placeholder="How Many"
+                min="1"
+                max="64"
+                value="1"
+              />
+              <label for="UNASSIGNED_CLIENT_CREATION_COUNT">How Many</label>
+            </div>
+
+            <small class="text-light d-block mb-2" id="UNASSIGNED_CLIENT_CREATION_HINT"></small>
+
+            <div class="d-grid">
+              <button type="button" class="btn btn-success" id="UNASSIGNED_CLIENT_CREATION_SUBMIT">
+                Create
+              </button>
+            </div>
           </div>
         </div>
       </div>
