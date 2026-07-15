@@ -460,7 +460,9 @@ export function RenderClientTile(Client: ClientView): string {
     Array.isArray(Client.DegradedWarnings) && Client.DegradedWarnings.length
       ? String(Client.DegradedWarnings[0])
       : 'Missing USB Device';
-  const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : '';
+  // A reserved slot has never had a device, so red "offline" would be alarming
+  // for something that is working as intended. Grey it out like an idle monitor.
+  const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : Unassigned ? 'IDLE' : '';
   const IdentifyingClass = Client && Client.Identifying ? 'IDENTIFYING' : '';
   return `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${TileStateClass} ${IdentifyingClass} ${
     UUID && Selected.includes(UUID) ? 'SELECTED' : ''
@@ -519,6 +521,7 @@ export function UpdateClientTile(Data: ClientView): void {
 
   $(`[data-uuid='${UUID}']`).toggleClass('ONLINE', Online && !Degraded);
   $(`[data-uuid='${UUID}']`).toggleClass('DEGRADED', Degraded);
+  $(`[data-uuid='${UUID}']`).toggleClass('IDLE', !!Data.Unassigned && !Online && !Degraded);
   $(`[data-uuid='${UUID}']`).toggleClass('IDENTIFYING', !!Data.Identifying);
   $(`[data-uuid='${UUID}']>[data-type='INDICATOR_DEGRADED']>[data-type='DEGRADED_WARNING']`).text(
     DegradedWarning
