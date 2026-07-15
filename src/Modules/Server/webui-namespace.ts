@@ -156,6 +156,10 @@ const WEB_ALERT_CHANNELS = new Set([
   'DeleteAlertRule',
   'SetAlertRuleEnabled',
 ]);
+// Creating unassigned slots is its own category because it is additionally
+// gated on the global SYSTEM_ALLOW_UNASSIGNED_CLIENTS feature flag (the main
+// registrar re-checks that flag and remains the authority).
+const WEB_UNASSIGNED_CHANNELS = new Set(['CreateUnassignedClients']);
 
 // Union of every edit-mode-gated channel. Retained for callers/tests that reason
 // about "all management mutations" without caring about the category split.
@@ -164,6 +168,7 @@ const WEB_EDIT_CHANNELS = new Set([
   ...WEB_GROUP_CHANNELS,
   ...WEB_MONITORING_CHANNELS,
   ...WEB_ALERT_CHANNELS,
+  ...WEB_UNASSIGNED_CHANNELS,
 ]);
 
 // Allowed when remote script execution is enabled (SHOW-time actions).
@@ -249,6 +254,8 @@ const GetWebConfig = async () => {
   let AllowMonitoringManagement = true;
   let AllowAlertManagement = true;
   let AllowWebWOL = true;
+  let AllowUnassignedClients = true;
+  let UnassignedClientsEnabled = false;
   try {
     Enabled = !!(await SettingsManager.GetValue('WEBUI_ENABLED'));
     ProtectionEnabled = !!(await SettingsManager.GetValue('WEBUI_PASSWORD_PROTECTION_ENABLED'));
@@ -261,6 +268,10 @@ const GetWebConfig = async () => {
     AllowMonitoringManagement = await ReadBool('WEBUI_ALLOW_MONITORING_MANAGEMENT', true);
     AllowAlertManagement = await ReadBool('WEBUI_ALLOW_ALERT_MANAGEMENT', true);
     AllowWebWOL = await ReadBool('WEBUI_ALLOW_WOL', true);
+    AllowUnassignedClients = await ReadBool('WEBUI_ALLOW_UNASSIGNED_CLIENTS', true);
+    UnassignedClientsEnabled = !!(await SettingsManager.GetValue(
+      'SYSTEM_ALLOW_UNASSIGNED_CLIENTS'
+    ));
   } catch {
     /* intentional: fall back to the safe defaults set above if settings can't be read */
   }
@@ -279,6 +290,8 @@ const GetWebConfig = async () => {
     AllowMonitoringManagement,
     AllowAlertManagement,
     AllowWebWOL,
+    AllowUnassignedClients,
+    UnassignedClientsEnabled,
     RequireAuth,
   };
 };
@@ -294,6 +307,11 @@ const GetPublicConfig = async (socket: WebSocket) => {
     // Effective WOL availability for the browser: the global feature AND the
     // dedicated Web UI WOL permission must both be on.
     WOLEnabled: Cfg.WOLEnabled && Cfg.AllowWebWOL,
+    // Effective availability of unassigned-slot creation for the browser: the
+    // global feature AND the dedicated Web UI permission must both be on. The
+    // browser uses this to show/hide the + menu entry, since it cannot read
+    // settings directly.
+    UnassignedClientsEnabled: Cfg.UnassignedClientsEnabled && Cfg.AllowUnassignedClients,
     Authed: !Cfg.RequireAuth || !!(socket && socket.Authed),
     Mode: ModeManager.Get(),
     Version: Config.Application.Version,
@@ -328,7 +346,9 @@ const AuthorizeWebChannel = async (channel: string) => {
         ? Cfg.AllowMonitoringManagement
         : WEB_ALERT_CHANNELS.has(channel)
           ? Cfg.AllowAlertManagement
-          : null;
+          : WEB_UNASSIGNED_CHANNELS.has(channel)
+            ? Cfg.UnassignedClientsEnabled && Cfg.AllowUnassignedClients
+            : null;
   if (Category !== null) {
     if (ModeManager.Get() !== 'EDIT') return { allowed: false, reason: 'edit_mode_required' };
     if (!Category) return { allowed: false, reason: 'forbidden' };
@@ -579,6 +599,7 @@ export {
   WEB_GROUP_CHANNELS,
   WEB_MONITORING_CHANNELS,
   WEB_ALERT_CHANNELS,
+  WEB_UNASSIGNED_CHANNELS,
   WEB_SCRIPT_CHANNELS,
   WEB_WOL_CHANNELS,
   WEB_PUSH_ALLOWLIST,

@@ -190,6 +190,15 @@ export const DefaultSettings: SettingDefinition[] = [
   },
   {
     Group: 'Web UI Permissions',
+    Key: 'WEBUI_ALLOW_UNASSIGNED_CLIENTS',
+    Title: 'Unassigned Clients',
+    Description:
+      'Allow unassigned client slots to be created from the Web UI. Also requires the global Unassigned Clients feature to be enabled, and the server to be in Edit mode.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
+    Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_WOL',
     Title: 'Wake on LAN',
     Description:

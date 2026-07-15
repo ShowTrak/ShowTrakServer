@@ -91,6 +91,7 @@ interface WebConfig {
   PasswordProtection: boolean;
   AllowRemoteScripts: boolean;
   WOLEnabled: boolean;
+  UnassignedClientsEnabled: boolean;
   Authed: boolean;
   Mode?: string;
   Version?: string;
@@ -179,6 +180,7 @@ function buildCapabilities(config: WebConfig) {
     requiresPasscode: !!config.PasswordProtection,
     allowRemoteScripts: !!config.AllowRemoteScripts,
     wolEnabled: !!config.WOLEnabled,
+    allowUnassignedClients: !!config.UnassignedClientsEnabled,
   } satisfies CapabilityProfile;
 }
 

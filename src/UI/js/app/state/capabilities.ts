@@ -15,6 +15,11 @@ export interface CapabilityProfile {
   requiresPasscode: boolean;
   allowRemoteScripts: boolean;
   wolEnabled: boolean;
+  // Whether unassigned-slot creation is offered on this surface. On the desktop
+  // this stays true and the SYSTEM_ALLOW_UNASSIGNED_CLIENTS setting decides; the
+  // web surface cannot read settings, so the server folds the feature flag and
+  // the WEBUI_ALLOW_UNASSIGNED_CLIENTS permission into this one hint.
+  allowUnassignedClients: boolean;
 }
 
 const DESKTOP_CAPABILITIES: CapabilityProfile = {
@@ -26,6 +31,7 @@ const DESKTOP_CAPABILITIES: CapabilityProfile = {
   requiresPasscode: false,
   allowRemoteScripts: true,
   wolEnabled: true,
+  allowUnassignedClients: true,
 };
 
 export const Capabilities: CapabilityProfile = (() => {

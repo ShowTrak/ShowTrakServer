@@ -11,6 +11,7 @@
 // process re-checks the setting and is the actual authority.
 import { closeAllModals, closeModal, openModal } from './lib/modal';
 import { GetSettingValue } from './03-settings';
+import { Capabilities } from './state/capabilities';
 import { Notify, Wait } from './14-selection-init';
 
 const MAX_UNASSIGNED_CLIENTS_PER_REQUEST = 64;
@@ -27,15 +28,24 @@ async function CloseAllModals(): Promise<void> {
  * setting. Called on boot and whenever settings are pushed, so toggling the
  * setting takes effect without a reload.
  *
- * Fails closed: the Web UI cannot read settings at all, so the entry stays
- * hidden there — which is correct, since the channel is desktop-only.
+ * The two surfaces learn the answer differently. The desktop reads the setting
+ * directly. The browser cannot read settings at all, so it relies on the
+ * capability hint the server sends at connect, which already folds in both
+ * SYSTEM_ALLOW_UNASSIGNED_CLIENTS and WEBUI_ALLOW_UNASSIGNED_CLIENTS. Either
+ * way this is only cosmetic: the server re-checks on every create.
+ *
+ * Fails closed if the setting cannot be read.
  */
 export async function RefreshUnassignedClientMenuVisibility(): Promise<void> {
   let Enabled = false;
-  try {
-    Enabled = !!(await GetSettingValue('SYSTEM_ALLOW_UNASSIGNED_CLIENTS'));
-  } catch {
-    Enabled = false;
+  if (Capabilities.isWeb) {
+    Enabled = Capabilities.allowUnassignedClients;
+  } else {
+    try {
+      Enabled = !!(await GetSettingValue('SYSTEM_ALLOW_UNASSIGNED_CLIENTS'));
+    } catch {
+      Enabled = false;
+    }
   }
   $('#ADD_UNASSIGNED_CLIENT_ACTION_ITEM').toggleClass('d-none', !Enabled);
 }

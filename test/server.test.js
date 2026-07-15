@@ -723,6 +723,93 @@ test('Web UI namespace gates WOL on the dedicated Web UI WOL permission', async 
   assert.equal(resp.error, 'forbidden');
 });
 
+test('Web UI namespace gates unassigned client creation on mode, feature and permission', async () => {
+  const handlers = { CreateUnassignedClients: async () => [null, 2] };
+  const Base = { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false };
+  const Call = async (settings, opts) => {
+    const io = makeUiIo();
+    loadWebUi({ ...Base, ...settings }, { handlers, ...opts }).SetupWebUiNamespace(io, {});
+    const socket = await connectUiSocket(io);
+    let resp;
+    await socket.trigger('rpc', 'CreateUnassignedClients', [{ Name: 'S', Count: 2 }], (r) => {
+      resp = r;
+    });
+    return resp;
+  };
+
+  // EDIT mode + global feature + Web UI permission: allowed.
+  assert.deepEqual(
+    await Call(
+      { SYSTEM_ALLOW_UNASSIGNED_CLIENTS: true, WEBUI_ALLOW_UNASSIGNED_CLIENTS: true },
+      { mode: 'EDIT' }
+    ),
+    { result: [null, 2] }
+  );
+
+  // Web UI permission off: denied even though the global feature is on.
+  assert.equal(
+    (
+      await Call(
+        { SYSTEM_ALLOW_UNASSIGNED_CLIENTS: true, WEBUI_ALLOW_UNASSIGNED_CLIENTS: false },
+        { mode: 'EDIT' }
+      )
+    ).error,
+    'forbidden'
+  );
+
+  // Global feature off: denied even though the Web UI permission is on.
+  assert.equal(
+    (
+      await Call(
+        { SYSTEM_ALLOW_UNASSIGNED_CLIENTS: false, WEBUI_ALLOW_UNASSIGNED_CLIENTS: true },
+        { mode: 'EDIT' }
+      )
+    ).error,
+    'forbidden'
+  );
+
+  // SHOW mode: creating slots is a management mutation, so the mode gate applies.
+  assert.equal(
+    (
+      await Call(
+        { SYSTEM_ALLOW_UNASSIGNED_CLIENTS: true, WEBUI_ALLOW_UNASSIGNED_CLIENTS: true },
+        { mode: 'SHOW' }
+      )
+    ).error,
+    'edit_mode_required'
+  );
+});
+
+test('Web UI hello advertises unassigned clients only when feature and permission are both on', async () => {
+  // The browser cannot read settings, so this hint is the only thing that lets
+  // it decide whether to show the "Create Unassigned Client" entry.
+  const Hint = async (settings) => {
+    const io = makeUiIo();
+    loadWebUi({
+      WEBUI_ENABLED: true,
+      WEBUI_PASSWORD_PROTECTION_ENABLED: false,
+      ...settings,
+    }).SetupWebUiNamespace(io, {});
+    const socket = await connectUiSocket(io);
+    return socket.emitted.find((e) => e.event === 'hello').args[0].UnassignedClientsEnabled;
+  };
+
+  assert.equal(
+    await Hint({ SYSTEM_ALLOW_UNASSIGNED_CLIENTS: true, WEBUI_ALLOW_UNASSIGNED_CLIENTS: true }),
+    true
+  );
+  assert.equal(
+    await Hint({ SYSTEM_ALLOW_UNASSIGNED_CLIENTS: true, WEBUI_ALLOW_UNASSIGNED_CLIENTS: false }),
+    false
+  );
+  assert.equal(
+    await Hint({ SYSTEM_ALLOW_UNASSIGNED_CLIENTS: false, WEBUI_ALLOW_UNASSIGNED_CLIENTS: true }),
+    false
+  );
+  // Feature off by default -> hidden unless deliberately enabled.
+  assert.equal(await Hint({}), false);
+});
+
 test('Web UI namespace forwards allowlisted pushes with serialization, dropping the rest', async () => {
   const sinks = [];
   const { SetupWebUiNamespace } = loadWebUi(
