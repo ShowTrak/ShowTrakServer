@@ -39,6 +39,12 @@ const MethodModules: MonitoringMethod[] = [
   // Control & Messaging
   require('./companion-status'),
   require('./mqtt-topic'),
+  // Digital Signage
+  require('./brightsign'),
+  require('./brightsign-firmware'),
+  require('./brightsign-power'),
+  require('./brightsign-poe'),
+  require('./brightsign-video'),
   // Power (UPS)
   require('./nut-ups'),
   require('./nut-ups-status'),

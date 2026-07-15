@@ -332,6 +332,24 @@ test('http method reports connection errors against a closed port', async () => 
   assert.equal(result.Success, false);
 });
 
+// Registering a method takes three edits in three files (index.ts, info.ts,
+// groups.ts) and nothing but discipline previously enforced the last two — a
+// method missing from info.ts or groups.ts still runs, it just renders with no
+// setup help and lands in the "Other" bucket. Assert the set is complete.
+test('every registered monitoring method has editor help and a group', () => {
+  const { Manager } = loadWithMocks(methodPath('index.js'), { '../Logger': loggerStub() });
+  const { DEFAULT_GROUP, GroupOrder } = require(methodPath('groups.js'));
+
+  for (const method of Manager.GetAll()) {
+    assert.ok(method.Info && method.Info.Summary, `${method.ID} is missing an info.ts entry`);
+    assert.notEqual(method.Group, DEFAULT_GROUP, `${method.ID} is missing a groups.ts entry`);
+    assert.ok(
+      GroupOrder.includes(method.Group),
+      `${method.ID} is in group "${method.Group}", which is missing from GroupOrder`
+    );
+  }
+});
+
 test('MonitoringMethods registry exposes public shapes and normalizes settings', () => {
   const { Manager } = loadWithMocks(methodPath('index.js'), { '../Logger': loggerStub() });
 
@@ -339,6 +357,11 @@ test('MonitoringMethods registry exposes public shapes and normalizes settings',
   const ids = all.map((m) => m.ID).sort();
   assert.deepEqual(ids, [
     'artnet-universe',
+    'brightsign',
+    'brightsign-firmware',
+    'brightsign-poe',
+    'brightsign-power',
+    'brightsign-video',
     'companion-status',
     'disguise-status',
     'dns',

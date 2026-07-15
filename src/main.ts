@@ -66,6 +66,7 @@ const { RegisterRendererSink, PushToRenderers } = require('./main/renderer-bus')
 const { getMainWindow, setMainWindow, hasMainWindow } = require('./main/app-window');
 const { configureApplicationMenu } = require('./main/app-menu');
 const { applyWindowSecurityGuards } = require('./main/window-guards');
+const { applyWindowZoomShortcuts } = require('./main/window-zoom');
 const { scheduleAutosave } = require('./main/autosave');
 const {
   setAccidentalShutdownProtection,
@@ -238,6 +239,7 @@ app.whenReady().then(async () => {
     MainWindow.show();
   });
   applyWindowSecurityGuards(MainWindow);
+  applyWindowZoomShortcuts(MainWindow);
   MainWindow.on('close', (event) => handleMainWindowClose(MainWindow, event));
   MainWindow.on('closed', () => {
     handleMainWindowClosed();

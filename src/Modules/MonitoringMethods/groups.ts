@@ -16,6 +16,7 @@ export const GroupOrder: string[] = [
   'Video',
   'Media Servers',
   'Control & Messaging',
+  'Digital Signage',
   'Power (UPS)',
 ];
 
@@ -41,6 +42,12 @@ export const MethodGroups: Record<string, string> = {
   // Show control & messaging
   'companion-status': 'Control & Messaging',
   'mqtt-topic': 'Control & Messaging',
+  // Digital signage players (BrightSign Local DWS)
+  brightsign: 'Digital Signage',
+  'brightsign-firmware': 'Digital Signage',
+  'brightsign-power': 'Digital Signage',
+  'brightsign-poe': 'Digital Signage',
+  'brightsign-video': 'Digital Signage',
   // Power / UPS (Network UPS Tools)
   'nut-ups': 'Power (UPS)',
   'nut-ups-status': 'Power (UPS)',

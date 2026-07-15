@@ -107,6 +107,53 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'For non-retained topics, a message must be published within the timeout window to count as Online.',
     ],
   },
+  brightsign: {
+    Summary:
+      "Combined BrightSign player health via the player's Local DWS API. Reads firmware, power source and PoE in one request and reports a single healthy / degraded verdict. Use this when you just want to know the player is OK.",
+    Setup: [
+      'The Local DWS must be enabled on the player — it is disabled by default as of BrightSignOS 9.0.218 / 9.1.75. Enable it in BrightAuthor:connected.',
+      "Username is always 'admin'; the default password is the player's serial number.",
+      'Protocol defaults to HTTP. BrightSignOS 9.0.218+ serves HTTPS with a self-signed certificate and redirects HTTP — the redirect is followed automatically, and TLS errors are ignored by default so the self-signed cert does not read as an outage.',
+      'Set an expected firmware version to be alerted on drift; leave it blank to ignore firmware.',
+      'Optionally also check the video output — this costs a second request per interval and is skipped automatically on audio-only players.',
+      'Uptime, model and serial are shown in the debug panel for context but are never alerted on.',
+    ],
+    Docs: [{ Label: 'BrightSign Local DWS APIs', Url: 'https://docs.brightsign.biz/developers/local-dws-apis' }],
+  },
+  'brightsign-firmware': {
+    Summary:
+      "Reads only the firmware version from a BrightSign player's Local DWS API. Degraded when it does not match the expected version. Use this to catch firmware drift across a fleet.",
+    Setup: [
+      'Enter the exact expected version as the player reports it (e.g. 8.5.33).',
+      'Leave the expected version blank to report the running firmware without alerting — the version still shows in the debug panel.',
+    ],
+  },
+  'brightsign-power': {
+    Summary:
+      "Reads only the power source and battery state from a BrightSign player's Local DWS API. Degraded when the player is running on or discharging a battery, or when the source is not the expected one.",
+    Setup: [
+      "Set the expected source (e.g. 'AC') to be alerted when the player switches away from it; leave it blank to alert only on battery use.",
+      'The API reports the power source and battery state only — there are no voltage or current readings available.',
+    ],
+  },
+  'brightsign-poe': {
+    Summary:
+      "Reads only the Power over Ethernet status from a BrightSign player's Local DWS API. Degraded when the hardware does not support PoE or the status is not the expected one.",
+    Setup: [
+      "Players without PoE hardware report 'not_supported', which is treated as Degraded — only add this check to PoE-capable players.",
+      'Leave the expected status blank to accept any status other than not_supported.',
+    ],
+  },
+  'brightsign-video': {
+    Summary:
+      "Reads an HDMI output from a BrightSign player's Local DWS API. Reports the active resolution and Degraded when no display is detected, the signal is unstable, the output is blanked for power save, or the mode is not the expected one.",
+    Setup: [
+      'Enter the expected mode exactly as the player reports it (e.g. 1920x1080x60p); leave it blank to report the active mode without alerting.',
+      'The output index is 0-based — dual-output players (HD/XT/XD) use 0 and 1. Add one check per output.',
+      'Audio-only players have no video API and report Degraded here.',
+    ],
+    Docs: [{ Label: 'BrightSign Local DWS APIs', Url: 'https://docs.brightsign.biz/developers/local-dws-apis' }],
+  },
   'nut-ups': {
     Summary:
       'Combined UPS health via Network UPS Tools (NUT). Reads status, battery charge, load, temperature and input voltage in one probe and reports a single healthy / degraded verdict using informed defaults. Use this when you just want to know the UPS is OK.',
