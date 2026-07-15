@@ -215,7 +215,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
           minLength: 1,
           maxLength: 128,
         });
-        if (!/^[A-Za-z0-9]+$/.test(id)) {
+        if (!/^[A-Za-z0-9_-]+$/.test(id)) {
           fail('Run-on-launch script id contains invalid characters');
         }
         normalized.RunOnLaunchScriptID = id;

@@ -457,7 +457,7 @@ async function LoadScriptFolder(ScriptsDirectory: string, ScriptFolder: string) 
 }
 
 function ListScriptFolders(ScriptsDirectory: string): string[] {
-  const IsValidScriptFolderName = (FolderName: string) => /^[A-Za-z0-9]+$/.test(FolderName);
+  const IsValidScriptFolderName = (FolderName: string) => /^[A-Za-z0-9_-]+$/.test(FolderName);
 
   return fs.readdirSync(ScriptsDirectory).filter((file) => {
     const fullPath = path.join(ScriptsDirectory, file);
@@ -533,8 +533,8 @@ function ValidateNewID(NewID: unknown): string | null {
   if (typeof NewID !== 'string' || !NewID.trim()) return 'ID is required';
   const Trimmed = NewID.trim();
   if (/\s/.test(Trimmed)) return 'ID cannot contain spaces';
-  if (!/^[A-Za-z0-9]+$/.test(Trimmed)) {
-    return 'ID can only contain letters and numbers';
+  if (!/^[A-Za-z0-9_-]+$/.test(Trimmed)) {
+    return 'ID can only contain letters, numbers, hyphens and underscores';
   }
   return null;
 }
@@ -691,7 +691,7 @@ async function GetBottomWeight(): Promise<number> {
 
 // Find an unused, schema-valid script ID derived from Base.
 function GetAvailableID(Base: unknown, ScriptsDirectory: string): string {
-  let Root = String(Base || '').replace(/[^A-Za-z0-9]/g, '');
+  let Root = String(Base || '').replace(/[^A-Za-z0-9_-]/g, '');
   if (!Root) Root = 'NewScript';
   let Candidate = Root;
   let Counter = 1;

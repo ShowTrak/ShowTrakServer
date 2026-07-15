@@ -182,7 +182,8 @@ export function ScriptManagerIDError(ID: unknown) {
   const Trimmed = String(ID || '').trim();
   if (!Trimmed) return 'ID is required';
   if (/\s/.test(Trimmed)) return 'ID cannot contain spaces';
-  if (!/^[A-Za-z0-9]+$/.test(Trimmed)) return 'ID can only contain letters and numbers';
+  if (!/^[A-Za-z0-9_-]+$/.test(Trimmed))
+    return 'ID can only contain letters, numbers, hyphens and underscores';
   const Taken = ScriptManagerCache.some(
     (s) => String(s.id).toLowerCase() === Trimmed.toLowerCase()
   );
