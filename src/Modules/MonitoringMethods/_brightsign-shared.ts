@@ -33,6 +33,10 @@ import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } f
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_REDIRECTS = 3;
 
+// The only username BrightSignOS accepts for the DWS, so it is not exposed as a
+// setting.
+const DWS_USERNAME = 'admin';
+
 export const INFO_PATH = '/api/v1/info';
 
 // The video endpoints are hdmi-only (any other connector is rejected with a 400
@@ -56,11 +60,18 @@ export const CommonBrightSignSettings: MonitoringSettingField[] = [
       { value: 'https', label: 'HTTPS' },
     ],
   },
-  { Key: 'Port', Label: 'Port (0 = protocol default)', Type: 'number', Default: 0, Min: 0, Max: 65535 },
-  { Key: 'Username', Label: 'Username', Type: 'string', Default: 'admin' },
+  {
+    Key: 'Port',
+    Label: 'Port (0 = protocol default)',
+    Type: 'number',
+    Default: 0,
+    Min: 0,
+    Max: 65535,
+    Advanced: true,
+  },
   {
     Key: 'Password',
-    Label: 'Password (default: player serial number)',
+    Label: 'Password',
     Type: 'string',
     Default: '',
   },
@@ -88,7 +99,7 @@ export interface BrightSignConfig {
   Address: string;
   Protocol: 'http' | 'https';
   Port: number; // 0 = protocol default
-  Username: string;
+  Username: string; // always DWS_USERNAME; not user-configurable
   Password: string;
   IgnoreTlsErrors: boolean;
   TimeoutMs: number;
@@ -103,9 +114,7 @@ export function ParseBrightSignConfig(Target: MonitoringTargetLike): BrightSignC
     Address: Target && Target.Address ? String(Target.Address).trim() : '',
     Protocol,
     Port: Number.isFinite(Cfg.Port as number) ? (Cfg.Port as number) | 0 : 0,
-    // "admin" is the only username BrightSignOS accepts, but it stays
-    // configurable in case that ever changes.
-    Username: Cfg.Username == null ? 'admin' : String(Cfg.Username).trim(),
+    Username: DWS_USERNAME,
     // Deliberately not trimmed — trailing whitespace can be part of a password.
     Password: Cfg.Password == null ? '' : String(Cfg.Password),
     IgnoreTlsErrors: Cfg.IgnoreTlsErrors == null ? true : !!Cfg.IgnoreTlsErrors,
@@ -380,12 +389,12 @@ export async function FetchDws(Config: BrightSignConfig, Path: string): Promise<
             Error: 'Player requires authentication but did not offer digest auth',
           };
         }
-        if (!Config.Username && !Config.Password) {
+        if (!Config.Password) {
           return {
             Ok: false,
             Status: 401,
             AuthFailed: true,
-            Error: 'Authentication required — set the DWS username and password',
+            Error: 'Authentication required — set the DWS password (default: player serial number)',
           };
         }
         const Cnonce = crypto.randomBytes(8).toString('hex');
@@ -403,7 +412,7 @@ export async function FetchDws(Config: BrightSignConfig, Path: string): Promise<
             Ok: false,
             Status: 401,
             AuthFailed: true,
-            Error: 'Authentication failed — check the username and password',
+            Error: 'Authentication failed — check the password',
           };
         }
       }

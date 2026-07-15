@@ -50,10 +50,11 @@ const Settings: MonitoringSettingField[] = [
     Label: 'Expected firmware (blank = any)',
     Type: 'string',
     Default: '',
+    Advanced: true,
   },
   {
     Key: 'IncludeVideo',
-    Label: 'Also check video output (extra request)',
+    Label: 'Check video output',
     Type: 'boolean',
     Default: false,
   },

@@ -39,18 +39,11 @@ test('brightsign (health) module exposes the expected shape', () => {
   assert.equal(bs.ID, 'brightsign');
   assert.equal(bs.Name, 'Player Health (BrightSign)');
   const keys = bs.Settings.map((s) => s.Key);
-  for (const key of [
-    'Protocol',
-    'Port',
-    'Username',
-    'Password',
-    'ExpectedFirmware',
-    'IncludeVideo',
-  ]) {
+  for (const key of ['Protocol', 'Port', 'Password', 'ExpectedFirmware', 'IncludeVideo']) {
     assert.ok(keys.includes(key), `missing setting ${key}`);
   }
-  // The username is always 'admin' on BrightSignOS, so it should default to it.
-  assert.equal(bs.Settings.find((s) => s.Key === 'Username').Default, 'admin');
+  // The username is always 'admin' on BrightSignOS, so it is not a setting.
+  assert.ok(!keys.includes('Username'), 'Username should not be configurable');
 });
 
 test('a healthy player is online and reports its identity', async () => {

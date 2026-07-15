@@ -112,7 +112,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       "Combined BrightSign player health via the player's Local DWS API. Reads firmware, power source and PoE in one request and reports a single healthy / degraded verdict. Use this when you just want to know the player is OK.",
     Setup: [
       'The Local DWS must be enabled on the player — it is disabled by default as of BrightSignOS 9.0.218 / 9.1.75. Enable it in BrightAuthor:connected.',
-      "Username is always 'admin'; the default password is the player's serial number.",
+      "The username is always 'admin' so it is not configurable here; the default password is the player's serial number.",
       'Protocol defaults to HTTP. BrightSignOS 9.0.218+ serves HTTPS with a self-signed certificate and redirects HTTP — the redirect is followed automatically, and TLS errors are ignored by default so the self-signed cert does not read as an outage.',
       'Set an expected firmware version to be alerted on drift; leave it blank to ignore firmware.',
       'Optionally also check the video output — this costs a second request per interval and is skipped automatically on audio-only players.',
