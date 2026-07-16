@@ -213,6 +213,36 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
     ],
     Docs: [{ Label: 'Network UPS Tools', Url: 'https://networkupstools.org/' }],
   },
+  'snmp-ups': {
+    Summary:
+      'Combined UPS health via direct SNMP v1/v2c (no NUT server required). Reads status, battery charge, load, temperature, input voltage and active alarms from the standard UPS-MIB (RFC 1628) — implemented by Eaton/MGE Network-M2/M3, Riello NetMan 208/204, APC AP96xx, CyberPower RMCARD and most other network-managed UPS cards, including a Netman 208c.',
+    Setup: [
+      'Point Address at the UPS network card itself (its own IP, not a NUT server) and enable SNMP v1/v2c on the card if it is off by default.',
+      "Set the Community string to match the card's configuration (often 'public' read-only by default — change it if the card requires something else).",
+      'If the card is configured for SNMPv3 (username + auth/priv), use "UPS Health (SNMP v3)" instead.',
+      'Most single-phase UPS units use line index 1 (the default); leave it unless the card documents otherwise.',
+      'Defaults: charge ≥ 50%, load ≤ 90%, battery temp ≤ 45°C. Objects the card does not report (e.g. temperature) are skipped rather than failing the check.',
+      'Degraded also covers on-battery, on-bypass, low/depleted battery and any active alarms reported by the card.',
+    ],
+    Docs: [
+      { Label: 'RFC 1628 — UPS Management Information Base', Url: 'https://datatracker.ietf.org/doc/html/rfc1628' },
+    ],
+  },
+  'snmp-ups-v3': {
+    Summary:
+      'Combined UPS health via authenticated/encrypted SNMPv3. Same UPS-MIB (RFC 1628) health readout as the v1/v2c method, but connects with an SNMPv3 username and auth/priv passwords instead of a community string — for UPS cards (e.g. a Riello NetMan 208 or Eaton NMC) locked down to v3.',
+    Setup: [
+      'Point Address at the UPS network card and enter the SNMPv3 Username exactly as configured on the card.',
+      'The security level follows the protocol choices: set Auth protocol to None for noAuthNoPriv; set an Auth protocol but leave Priv protocol None for authNoPriv; set both for authPriv (recommended).',
+      'When an Auth protocol is set, enter the matching Auth password; when a Priv protocol is set, enter the Priv password too. A mismatch shows as Offline (the card silently drops the request). Privacy needs authentication, so a Priv protocol is ignored while Auth protocol is None.',
+      'Leave Context blank unless the card documents a specific SNMPv3 context name.',
+      'Health thresholds and line index behave exactly as in the v1/v2c method.',
+    ],
+    Docs: [
+      { Label: 'RFC 1628 — UPS Management Information Base', Url: 'https://datatracker.ietf.org/doc/html/rfc1628' },
+      { Label: 'RFC 3414 — SNMPv3 User-based Security Model', Url: 'https://datatracker.ietf.org/doc/html/rfc3414' },
+    ],
+  },
   'watchout-status': {
     Summary:
       'Connects to a Dataton WATCHOUT computer over its legacy TCP protocol and reports whether a show is loaded and running.',

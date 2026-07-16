@@ -381,6 +381,8 @@ test('MonitoringMethods registry exposes public shapes and normalizes settings',
     'resolume-status',
     'sacn-universe',
     'sacn-universe-priority',
+    'snmp-ups',
+    'snmp-ups-v3',
     'tcp-port',
     'watchout-status',
   ]);

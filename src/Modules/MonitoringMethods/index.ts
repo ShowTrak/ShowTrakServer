@@ -52,6 +52,8 @@ const MethodModules: MonitoringMethod[] = [
   require('./nut-ups-load'),
   require('./nut-ups-temperature'),
   require('./nut-ups-voltage'),
+  require('./snmp-ups'),
+  require('./snmp-ups-v3'),
 ];
 
 const Methods = new Map<string, MonitoringMethod>();

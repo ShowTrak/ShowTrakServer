@@ -55,4 +55,7 @@ export const MethodGroups: Record<string, string> = {
   'nut-ups-load': 'Power (UPS)',
   'nut-ups-temperature': 'Power (UPS)',
   'nut-ups-voltage': 'Power (UPS)',
+  // Power / UPS (direct SNMP, e.g. Eaton/MGE, Riello NetMan, APC, CyberPower)
+  'snmp-ups': 'Power (UPS)',
+  'snmp-ups-v3': 'Power (UPS)',
 };
