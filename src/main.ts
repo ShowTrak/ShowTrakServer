@@ -236,6 +236,9 @@ app.whenReady().then(async () => {
       .catch((Err: unknown) => Logger.error('Failed to init AudioAssetManager:', Err));
     await Wait(PRELOADER_MIN_DISPLAY_MS);
     PreloaderWindow.close();
+    if (await SettingsManager.GetValue('SYSTEM_AUTO_MAXIMIZE_ON_BOOT')) {
+      MainWindow.maximize();
+    }
     MainWindow.show();
   });
   applyWindowSecurityGuards(MainWindow);

@@ -226,6 +226,14 @@ export const DefaultSettings: SettingDefinition[] = [
   },
   {
     Group: 'System',
+    Key: 'SYSTEM_AUTO_MAXIMIZE_ON_BOOT',
+    Title: 'Auto Maximize Window on Boot',
+    Description: 'Automatically maximize the ShowTrak window when the app starts.',
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+  },
+  {
+    Group: 'System',
     Key: 'SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4',
     Title: 'Stop Accidental Shutdowns',
     Description: 'Requires confirmation before quitting ShowTrak from system or app quit actions.',
