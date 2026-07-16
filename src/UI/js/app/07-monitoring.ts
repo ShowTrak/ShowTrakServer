@@ -195,15 +195,12 @@ export function FormatMonitorCompactStatus(Online: boolean, LastLatencyMs: numbe
 }
 
 export function GetMonitoringOfflineSince(Target: MonitoringTargetView) {
-  const Candidates = [
-    Target && Target.LastSuccessAt,
-    Target && Target.LastChecked,
-    Target && Target.Timestamp,
-  ];
-  for (const Value of Candidates) {
-    const Ts = Number(Value);
-    if (Number.isFinite(Ts) && Ts > 0) return String(Math.round(Ts));
-  }
+  // Only LastSuccessAt reflects the moment the target was last confirmed
+  // online. LastChecked/Timestamp update on every check cycle (including
+  // failures), so using them here would make the offline timer reset on
+  // every tick instead of counting from when it actually went offline.
+  const Ts = Number(Target && Target.LastSuccessAt);
+  if (Number.isFinite(Ts) && Ts > 0) return String(Math.round(Ts));
   return '';
 }
 
