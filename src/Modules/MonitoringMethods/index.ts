@@ -28,6 +28,18 @@ const MethodModules: MonitoringMethod[] = [
   require('./sacn-universe'),
   require('./sacn-universe-priority'),
   require('./artnet-universe'),
+  // Lighting consoles — ETC Eos (OSC)
+  require('./eos'),
+  require('./eos-show'),
+  // Lighting consoles — MA Lighting grandMA2 (Telnet remote) & grandMA3 (liveness)
+  require('./ma2'),
+  require('./ma2-show'),
+  require('./ma3'),
+  // Lighting consoles — Avolites Titan (WebAPI)
+  require('./avolites'),
+  require('./avolites-show'),
+  // Lighting consoles — ChamSys MagicQ (web server)
+  require('./chamsys'),
   // Video
   require('./ndi-source'),
   // Media Servers

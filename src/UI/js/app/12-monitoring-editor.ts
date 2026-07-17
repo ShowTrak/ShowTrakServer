@@ -55,15 +55,16 @@ export async function EnsureMonitoringMethodsLoaded() {
 // Preferred display order for the method-picker <optgroup>s. Groups the server
 // reports that aren't listed here are appended in first-seen order, so a new
 // group still shows up without a client change.
+// Keep in sync with GroupOrder in src/Modules/MonitoringMethods/groups.ts. Groups
+// the server reports that aren't listed here are appended in first-seen order.
 const METHOD_GROUP_ORDER = [
-  'General',
-  'Lighting (DMX)',
+  'Show Control',
+  'Lighting',
+  'Sound',
   'Video',
-  'Media Servers',
-  'Control & Messaging',
-  'Digital Signage',
-  'Projectors',
-  'Power (UPS)',
+  'Power',
+  'Web Services',
+  'Other',
 ];
 
 // Populate the method <select> with methods grouped into <optgroup>s by their

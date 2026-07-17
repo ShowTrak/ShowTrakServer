@@ -87,6 +87,79 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'Online = ArtDmx seen recently from that source.',
     ],
   },
+  eos: {
+    Summary:
+      'Connects to an ETC Eos-family console (Eos Ti, Gio, Ion Xe, Element, ETCnomad) over OSC, pings it for a round-trip liveness check and reads the software version. Non-intrusive — it acts as background OSC user 0 and never touches the live command line.',
+    Setup: [
+      'On the console enable OSC in Setup → System → Show Control → OSC (RX and TX). OSC is on by default on current software, but confirm it has not been disabled.',
+      'Default OSC port is TCP 3032. Set the OSC TCP framing to match the console’s "OSC TCP Mode": OSC 1.0 (packet length) is the Eos default; choose OSC 1.1 (SLIP) if you point it at port 3037.',
+      'Online = the console answered the OSC ping. Optionally set an expected version prefix to be alerted on version drift.',
+    ],
+  },
+  'eos-show': {
+    Summary:
+      'Reads the cue-list and patch counts from an ETC Eos console over OSC and flags a desk that is online but appears to be running an empty or default show.',
+    Setup: [
+      'Same OSC connection as the Console Health (ETC Eos) check — shares one connection per interval.',
+      'Set the minimum cue lists and minimum patched channels a real show should have (0 disables a check).',
+      'Degraded = reachable but below those minimums (e.g. no cue lists or nothing patched).',
+    ],
+  },
+  ma2: {
+    Summary:
+      'Connects to a grandMA2 console (or onPC) on its Telnet remote (TCP 30000) and confirms it responds as a grandMA2, sending no commands. Optionally logs in to read the software version and loaded show file.',
+    Setup: [
+      'Enable the Telnet remote in Setup → Console → Global Settings → Telnet (Login Enabled). It is off by default.',
+      'Leave the login user/password blank for a pure liveness check (recommended, fully read-only).',
+      'To read software/show details, supply a login user + password. The login occupies a remote user session, so create a dedicated telnet user rather than using a live operator’s.',
+      'Degraded = something answered but it is not a grandMA2, or (when credentials are set) the login failed.',
+    ],
+  },
+  'ma2-show': {
+    Summary:
+      'Logs in to a grandMA2 over the Telnet remote and confirms the expected show file is loaded — catches a desk that is online but running the wrong show.',
+    Setup: [
+      'Requires a login user + password (a dedicated telnet user is recommended).',
+      'Enter the expected show file name, or leave it blank to simply confirm a show is loaded.',
+      'Degraded = login failed, no show file could be read, or the loaded show differs from the expected one.',
+    ],
+  },
+  ma3: {
+    Summary:
+      'Confirms a grandMA3 console (or onPC) is reachable by opening a TCP connection to its Web Remote port and closing it immediately — no data is sent. Liveness only: grandMA3 exposes no safe read-only status API over the network.',
+    Setup: [
+      'Enable the Web Remote on the console (Network menu). The default port is 8080 (HTTP is also served on 80 on some builds).',
+      'This check never opens a full Web Remote session — doing so can crash a live console — so it is a plain, safe connectivity test.',
+      'Online = the port accepted a TCP connection.',
+    ],
+  },
+  avolites: {
+    Summary:
+      'Connects to an Avolites Titan console over the Titan WebAPI (HTTP, TCP 4430) and reads the software version. Read-only — it only ever issues /titan/get requests.',
+    Setup: [
+      'Enable the WebAPI on the console (Titan does not always have it on by default). If the port is refused, the check tells you to enable it.',
+      'Default port is 4430. Optionally set an expected Titan version prefix to be alerted on drift.',
+      'Online = the WebAPI answered. Not available on Titan One / T1.',
+    ],
+  },
+  'avolites-show': {
+    Summary:
+      'Reads the current show file name from an Avolites Titan console over the WebAPI and confirms it matches the show you expect to be loaded.',
+    Setup: [
+      'Same WebAPI (TCP 4430) as the Console Health (Avolites Titan) check.',
+      'Enter the expected show name, or leave it blank to simply confirm a show is loaded.',
+      'Degraded = reachable but the loaded show is not the expected one.',
+    ],
+  },
+  chamsys: {
+    Summary:
+      'Connects to a ChamSys MagicQ console over its built-in web server (HTTP, default TCP 8080) and confirms it responds as a MagicQ system, reading the software version where the page exposes it.',
+    Setup: [
+      'Enable the web server on the console: Setup → Network Settings. It is disabled by default; the default port is 8080.',
+      'MagicQ’s OSC is intentionally not used here — it has no query/echo and a stray message can fire a playback, so the web server is the safe read-only channel.',
+      'Online = a MagicQ web page answered. Optionally set an expected version prefix; Degraded = wrong version, an HTTP error, or a non-MagicQ response.',
+    ],
+  },
   'ndi-source': {
     Summary:
       'Discovers NDI video sources on the network via mDNS and confirms a named source is being advertised. Presence-only: Online when seen, Offline when not.',

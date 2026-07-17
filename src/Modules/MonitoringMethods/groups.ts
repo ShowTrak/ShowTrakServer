@@ -28,6 +28,15 @@ export const MethodGroups: Record<string, string> = {
   'sacn-universe': 'Lighting',
   'sacn-universe-priority': 'Lighting',
   'artnet-universe': 'Lighting',
+  // Lighting consoles (ETC Eos, MA Lighting, Avolites, ChamSys)
+  eos: 'Lighting',
+  'eos-show': 'Lighting',
+  ma2: 'Lighting',
+  'ma2-show': 'Lighting',
+  ma3: 'Lighting',
+  avolites: 'Lighting',
+  'avolites-show': 'Lighting',
+  chamsys: 'Lighting',
   // Sound (cue playback)
   'qlab-workspace': 'Sound',
   // Video sources & media servers
