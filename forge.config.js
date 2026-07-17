@@ -10,8 +10,8 @@ const shouldNotarizeMac =
   shouldSignMac &&
   Boolean(
     process.env.APPLE_API_KEY_PATH &&
-      process.env.APPLE_API_KEY_ID &&
-      process.env.APPLE_API_ISSUER_ID
+    process.env.APPLE_API_KEY_ID &&
+    process.env.APPLE_API_ISSUER_ID
   );
 
 module.exports = {

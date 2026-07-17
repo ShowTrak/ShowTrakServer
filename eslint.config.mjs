@@ -104,4 +104,15 @@ export default defineConfig([
     files: ['**/*.md'],
     extends: [markdown.configs.recommended],
   },
+  {
+    // eslint 10 added `no-useless-assignment` to js.configs.recommended. The
+    // codebase deliberately uses declare-with-default then assign-in-all-branches
+    // (e.g. `let x = null; try { x = ... } catch { x = ... }`) for readability and
+    // safe fallbacks, so the "dead" initializer is intentional. Keep it off to
+    // preserve that style; revisit if we ever want to enforce it and fix the sites.
+    files: ['**/*.{js,mjs,cjs,ts}'],
+    rules: {
+      'no-useless-assignment': 'off',
+    },
+  },
 ]);
