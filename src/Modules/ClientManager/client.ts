@@ -4,6 +4,8 @@ import { CreateLogger } from '../Logger';
 import { Manager as DB } from '../DB';
 import { CreateClientsRepository } from '../DB/repositories/clients';
 import { Manager as BroadcastManager } from '../Broadcast';
+import { Ok, Fail } from '../Utils';
+import type { Result } from '../../types/result';
 import {
   AsRecord,
   normalizeSerialNumber,
@@ -1172,113 +1174,180 @@ class Client {
     return;
   }
 
-  async _persistColumn(Column: string, Value: unknown, Options: PersistOptions = {}) {
+  // Persist one column, translating the DB tuple to a manager Result. A failed
+  // write returns Fail so the calling setter can roll back its RAM mutation and
+  // surface the failure instead of silently diverging from the row.
+  async _persistColumn(
+    Column: string,
+    Value: unknown,
+    Options: PersistOptions = {}
+  ): Promise<Result<void>> {
     const [Err] = await ClientsRepo.UpdateColumn(this.UUID, Column, Value, {
       markUnsaved: Options.markUnsaved,
     });
-    return !Err;
+    if (Err) return Fail(String(Err) || `Failed to persist client column ${Column}`);
+    return Ok<void>();
   }
 
-  // Persistent fields (DB-backed)
-  async SetNickname(Nickname: string | null) {
-    if (this.Nickname === Nickname) return;
+  // Persistent fields (DB-backed). Each setter mutates RAM, persists, and on a
+  // failed write restores the previous RAM value before returning Fail — so the
+  // in-memory entity can never claim a change the row did not accept. A no-op
+  // (value unchanged) is reported as success.
+  async SetNickname(Nickname: string | null): Promise<Result<void>> {
+    if (this.Nickname === Nickname) return Ok<void>();
+    const Previous = this.Nickname;
     this.Nickname = Nickname;
-    if (!(await this._persistColumn('Nickname', Nickname))) {
-      return Logger.error('Failed to update client nickname');
+    const [Err] = await this._persistColumn('Nickname', Nickname);
+    if (Err) {
+      this.Nickname = Previous;
+      Logger.error('Failed to update client nickname');
+      return Fail(Err);
     }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} nickname updated to ${Nickname}`);
+    return Ok<void>();
   }
-  async SetGroupID(GroupID: number | string | null) {
-    if (this.GroupID === GroupID) return;
+  async SetGroupID(GroupID: number | string | null): Promise<Result<void>> {
     if (GroupID === 'null') GroupID = null;
+    if (this.GroupID === GroupID) return Ok<void>();
+    const Previous = this.GroupID;
     this.GroupID = GroupID as number | null;
-    if (!(await this._persistColumn('GroupID', GroupID))) {
-      return Logger.error('Failed to update client GroupID');
+    const [Err] = await this._persistColumn('GroupID', GroupID);
+    if (Err) {
+      this.GroupID = Previous;
+      Logger.error('Failed to update client GroupID');
+      return Fail(Err);
     }
     BroadcastManager.emit('ClientListChanged');
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} GroupID updated to ${GroupID}`);
+    return Ok<void>();
   }
-  async SetHostname(Hostname: string | null, Options: PersistOptions = {}) {
-    if (this.Hostname === Hostname) return;
+  async SetHostname(Hostname: string | null, Options: PersistOptions = {}): Promise<Result<void>> {
+    if (this.Hostname === Hostname) return Ok<void>();
+    const Previous = this.Hostname;
     this.Hostname = Hostname;
-    if (!(await this._persistColumn('Hostname', Hostname, Options))) {
-      return Logger.error('Failed to update client hostname');
+    const [Err] = await this._persistColumn('Hostname', Hostname, Options);
+    if (Err) {
+      this.Hostname = Previous;
+      Logger.error('Failed to update client hostname');
+      return Fail(Err);
     }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} hostname updated to ${Hostname}`);
+    return Ok<void>();
   }
-  async SetOperatingSystem(OperatingSystem: string | null, Options: PersistOptions = {}) {
-    if (this.OperatingSystem === OperatingSystem) return;
+  async SetOperatingSystem(
+    OperatingSystem: string | null,
+    Options: PersistOptions = {}
+  ): Promise<Result<void>> {
+    if (this.OperatingSystem === OperatingSystem) return Ok<void>();
+    const Previous = this.OperatingSystem;
     this.OperatingSystem = OperatingSystem;
-    if (!(await this._persistColumn('OperatingSystem', OperatingSystem, Options))) {
-      return Logger.error('Failed to update client operating system');
+    const [Err] = await this._persistColumn('OperatingSystem', OperatingSystem, Options);
+    if (Err) {
+      this.OperatingSystem = Previous;
+      Logger.error('Failed to update client operating system');
+      return Fail(Err);
     }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} operating system updated to ${OperatingSystem}`);
+    return Ok<void>();
   }
-  async SetMacAddress(MacAddress: string | null, Options: PersistOptions = {}) {
-    if (this.MacAddress === MacAddress) return;
+  async SetMacAddress(
+    MacAddress: string | null,
+    Options: PersistOptions = {}
+  ): Promise<Result<void>> {
+    if (this.MacAddress === MacAddress) return Ok<void>();
+    const Previous = this.MacAddress;
     this.MacAddress = MacAddress;
-    if (!(await this._persistColumn('MacAddress', MacAddress, Options))) {
-      return Logger.error('Failed to update client mac address');
+    const [Err] = await this._persistColumn('MacAddress', MacAddress, Options);
+    if (Err) {
+      this.MacAddress = Previous;
+      Logger.error('Failed to update client mac address');
+      return Fail(Err);
     }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} mac address updated to ${MacAddress}`);
+    return Ok<void>();
   }
-  async SetVersion(Version: string | null, Options: PersistOptions = {}) {
-    if (this.Version === Version) return;
+  async SetVersion(Version: string | null, Options: PersistOptions = {}): Promise<Result<void>> {
+    if (this.Version === Version) return Ok<void>();
+    const Previous = this.Version;
     this.Version = Version;
-    if (!(await this._persistColumn('Version', Version, Options))) {
-      return Logger.error('Failed to update client version');
+    const [Err] = await this._persistColumn('Version', Version, Options);
+    if (Err) {
+      this.Version = Previous;
+      Logger.error('Failed to update client version');
+      return Fail(Err);
     }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} version updated to ${Version}`);
+    return Ok<void>();
   }
   // In-memory counterpart to the flag ReplaceClientUUID clears in SQL. Replace
   // persists the change itself, so this only realigns the cached entity.
   SetUnassigned(Unassigned: boolean) {
     this.Unassigned = !!Unassigned;
   }
-  async SetWeight(Weight: number) {
-    if (this.Weight === Weight) return;
+  async SetWeight(Weight: number): Promise<Result<void>> {
+    if (this.Weight === Weight) return Ok<void>();
+    const Previous = this.Weight;
     this.Weight = Weight;
-    if (!(await this._persistColumn('Weight', Weight))) {
-      return Logger.error('Failed to update client weight');
+    const [Err] = await this._persistColumn('Weight', Weight);
+    if (Err) {
+      this.Weight = Previous;
+      Logger.error('Failed to update client weight');
+      return Fail(Err);
     }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} weight updated to ${Weight}`);
+    return Ok<void>();
   }
-  async SetIP(IP: string | null, Options: PersistOptions = {}) {
-    if (this.IP === IP) return;
+  async SetIP(IP: string | null, Options: PersistOptions = {}): Promise<Result<void>> {
+    if (this.IP === IP) return Ok<void>();
+    const Previous = this.IP;
     this.IP = IP;
-    if (!(await this._persistColumn('IP', IP, Options))) {
-      return Logger.error('Failed to update client IP');
+    const [Err] = await this._persistColumn('IP', IP, Options);
+    if (Err) {
+      this.IP = Previous;
+      Logger.error('Failed to update client IP');
+      return Fail(Err);
     }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} IP updated to ${IP}`);
+    return Ok<void>();
   }
-  async SetRunOnLaunchScriptID(RunOnLaunchScriptID: string | null) {
+  async SetRunOnLaunchScriptID(RunOnLaunchScriptID: string | null): Promise<Result<void>> {
     if (RunOnLaunchScriptID === '') RunOnLaunchScriptID = null;
-    if (this.RunOnLaunchScriptID === RunOnLaunchScriptID) return;
+    if (this.RunOnLaunchScriptID === RunOnLaunchScriptID) return Ok<void>();
+    const Previous = this.RunOnLaunchScriptID;
     this.RunOnLaunchScriptID = RunOnLaunchScriptID;
-    if (!(await this._persistColumn('RunOnLaunchScriptID', RunOnLaunchScriptID))) {
-      return Logger.error('Failed to update client run-on-launch script');
+    const [Err] = await this._persistColumn('RunOnLaunchScriptID', RunOnLaunchScriptID);
+    if (Err) {
+      this.RunOnLaunchScriptID = Previous;
+      Logger.error('Failed to update client run-on-launch script');
+      return Fail(Err);
     }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} run-on-launch script updated to ${RunOnLaunchScriptID}`);
+    return Ok<void>();
   }
-  async SetRunOnLaunchDelaySeconds(RunOnLaunchDelaySeconds: number | null) {
-    if (this.RunOnLaunchDelaySeconds === RunOnLaunchDelaySeconds) return;
+  async SetRunOnLaunchDelaySeconds(
+    RunOnLaunchDelaySeconds: number | null
+  ): Promise<Result<void>> {
+    if (this.RunOnLaunchDelaySeconds === RunOnLaunchDelaySeconds) return Ok<void>();
+    const Previous = this.RunOnLaunchDelaySeconds;
     this.RunOnLaunchDelaySeconds = RunOnLaunchDelaySeconds;
-    if (!(await this._persistColumn('RunOnLaunchDelaySeconds', RunOnLaunchDelaySeconds))) {
-      return Logger.error('Failed to update client run-on-launch delay');
+    const [Err] = await this._persistColumn('RunOnLaunchDelaySeconds', RunOnLaunchDelaySeconds);
+    if (Err) {
+      this.RunOnLaunchDelaySeconds = Previous;
+      Logger.error('Failed to update client run-on-launch delay');
+      return Fail(Err);
     }
     BroadcastManager.emit('ClientUpdated', this);
-    Logger.debug(
-      `Client ${this.UUID} run-on-launch delay updated to ${RunOnLaunchDelaySeconds}`
-    );
+    Logger.debug(`Client ${this.UUID} run-on-launch delay updated to ${RunOnLaunchDelaySeconds}`);
+    return Ok<void>();
   }
 }
 

@@ -135,6 +135,10 @@ class DummyClient {
   _armWatchdog() {
     this._clearTimer();
     this._timer = setTimeout(() => this._onWatchdog(), this.Interval);
+    // Background monitoring timer: it must never, on its own, keep the process
+    // alive (the app's main process always is). unref() lets a clean shutdown —
+    // and the test runner — exit promptly instead of waiting out the watchdog.
+    if (typeof this._timer.unref === 'function') this._timer.unref();
   }
 
   // Called when the watchdog fires (a heartbeat window elapsed without one).

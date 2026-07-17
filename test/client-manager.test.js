@@ -328,3 +328,90 @@ test('ClientManager tracks critical applications and emits started/stopped trans
     trackedRuns.some(([sql]) => sql.includes('INSERT OR REPLACE INTO CriticalApplications'))
   );
 });
+
+// A failed persist must not leave RAM claiming a change the row rejected: the
+// setter rolls its in-memory value back, and Manager.Update surfaces the failure
+// instead of reporting Ok.
+test('ClientManager.Update reports a persist failure and rolls back the in-memory value', async () => {
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'ClientManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => createLoggerStub() },
+    '../DB': {
+      Manager: {
+        Get: async () => [
+          null,
+          {
+            UUID: 'client-rollback',
+            Hostname: 'Original',
+            Nickname: 'Original',
+            Version: '1.0.0',
+            IP: '10.0.0.9',
+            OperatingSystem: null,
+            MacAddress: null,
+            GroupID: null,
+            Weight: 100,
+            Timestamp: Date.now(),
+          },
+        ],
+        // Every dirty-tracked write fails, so the Nickname persist is rejected.
+        Run: async () => ['disk full', null],
+        RunWithoutDirtyTracking: async () => ['disk full', null],
+        All: async () => [null, []],
+      },
+    },
+    '../Broadcast': { Manager: { emit: () => {} } },
+    '../SettingsManager': { Manager: { GetValue: async () => false } },
+    '../Utils': require('../dist/Modules/Utils'),
+  });
+
+  const [updateErr] = await Manager.Update('client-rollback', { Nickname: 'Renamed' });
+  assert.ok(updateErr, 'Update must surface the persist failure');
+
+  // The cached instance must still read as the original name, not the rejected one.
+  const [, client] = await Manager.Get('client-rollback');
+  assert.equal(client.Nickname, 'Original');
+});
+
+// A no-op update (value unchanged) is success, and Update returns the client.
+test('ClientManager.Update returns Ok when a setter persists successfully', async () => {
+  const trackedRuns = [];
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'ClientManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => createLoggerStub() },
+    '../DB': {
+      Manager: {
+        Get: async () => [
+          null,
+          {
+            UUID: 'client-ok',
+            Hostname: 'Original',
+            Nickname: 'Original',
+            Version: '1.0.0',
+            IP: '10.0.0.8',
+            OperatingSystem: null,
+            MacAddress: null,
+            GroupID: null,
+            Weight: 100,
+            Timestamp: Date.now(),
+          },
+        ],
+        Run: async (sql, params) => {
+          trackedRuns.push([sql, params]);
+          return [null, { changes: 1 }];
+        },
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
+        All: async () => [null, []],
+      },
+    },
+    '../Broadcast': { Manager: { emit: () => {} } },
+    '../SettingsManager': { Manager: { GetValue: async () => false } },
+    '../Utils': require('../dist/Modules/Utils'),
+  });
+
+  const [updateErr, updated] = await Manager.Update('client-ok', { Nickname: 'Booth' });
+  assert.equal(updateErr, null);
+  assert.equal(updated.Nickname, 'Booth');
+  assert.deepEqual(trackedRuns, [
+    ['UPDATE Clients SET Nickname = ? WHERE UUID = ?', ['Booth', 'client-ok']],
+  ]);
+});

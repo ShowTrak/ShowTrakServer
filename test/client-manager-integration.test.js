@@ -582,3 +582,87 @@ test('ClientManager.ReplaceClient clears the Unassigned flag when a slot is fill
   const [, oldRow] = await DB.Get('SELECT * FROM Clients WHERE UUID = ?', [slotUUID]);
   assert.equal(oldRow, undefined);
 });
+
+test('ClientManager.ReplaceClient migrates critical USB-name rows in the database', async () => {
+  const { Manager, DB } = await loadClientManager();
+
+  await Manager.Create('legacy-names');
+  await Manager.MarkUSBNameCritical('legacy-names', {
+    ManufacturerName: 'Acme',
+    ProductName: 'Widget',
+  });
+
+  // The row lands under the old UUID.
+  const [, beforeRow] = await DB.Get('SELECT UUID FROM CriticalUSBDeviceNames WHERE UUID = ?', [
+    'legacy-names',
+  ]);
+  assert.ok(beforeRow, 'critical USB-name row should exist under the old UUID');
+
+  const [replaceErr] = await Manager.ReplaceClient('legacy-names', 'replacement-names');
+  assert.equal(replaceErr, null);
+
+  // After the rename it must follow the client to the new UUID — not be orphaned
+  // under the old one, which was the pre-fix behaviour (in-memory rekey only).
+  const [, oldRow] = await DB.Get('SELECT UUID FROM CriticalUSBDeviceNames WHERE UUID = ?', [
+    'legacy-names',
+  ]);
+  assert.equal(oldRow, undefined, 'no critical USB-name row should remain under the old UUID');
+
+  const [, newRow] = await DB.Get('SELECT UUID FROM CriticalUSBDeviceNames WHERE UUID = ?', [
+    'replacement-names',
+  ]);
+  assert.ok(newRow, 'critical USB-name row should be re-keyed to the new UUID');
+});
+
+test('ClientManager.Delete removes the client and every critical row atomically', async () => {
+  const { Manager, DB } = await loadClientManager();
+
+  await Manager.Create('purge-me');
+  await Manager.SetUSBDeviceList('purge-me', [
+    { SerialNumber: 'SER-1', ManufacturerName: 'Acme', ProductName: 'Drive' },
+  ]);
+  await Manager.MarkUSBDeviceCritical('purge-me', { SerialNumber: 'SER-1' });
+  await Manager.MarkUSBNameCritical('purge-me', { ManufacturerName: 'Acme', ProductName: 'Drive' });
+  await Manager.MarkApplicationCritical('purge-me', { Name: 'Spotify' });
+  await Manager.MarkDisplayCritical('purge-me', { DisplayID: 'DISP-1' });
+
+  const [delErr] = await Manager.Delete('purge-me');
+  assert.equal(delErr, null);
+  assert.equal(await Manager.Exists('purge-me'), false);
+
+  // The client row and all four critical tables must be clear for this UUID.
+  for (const table of [
+    'Clients',
+    'CriticalUSBDevices',
+    'CriticalUSBDeviceNames',
+    'CriticalApplications',
+    'CriticalDisplays',
+  ]) {
+    const [, row] = await DB.Get(`SELECT UUID FROM ${table} WHERE UUID = ?`, ['purge-me']);
+    assert.equal(row, undefined, `${table} should have no rows left for the deleted client`);
+  }
+});
+
+test('ClientManager.Get adopts an uncached client into the cache so callers share one instance', async () => {
+  const { Manager, DB } = await loadClientManager();
+
+  // Insert straight into the DB so the client is absent from the cache.
+  await DB.Run('INSERT INTO Clients (UUID, Hostname, Timestamp) VALUES (?, ?, ?)', [
+    'adopt-1',
+    'host',
+    Date.now(),
+  ]);
+
+  const [firstErr, first] = await Manager.Get('adopt-1');
+  assert.equal(firstErr, null);
+
+  // Runtime-only mutation on the hydrated instance.
+  first.SetOnline(true);
+
+  // A second Get must return the same adopted instance, carrying the mutation —
+  // proving Get cached the hydrated client rather than returning a fresh orphan.
+  const [secondErr, second] = await Manager.Get('adopt-1');
+  assert.equal(secondErr, null);
+  assert.equal(second, first);
+  assert.equal(second.Online, true);
+});

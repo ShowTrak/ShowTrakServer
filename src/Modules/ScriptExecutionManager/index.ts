@@ -45,6 +45,9 @@ interface ScriptExecution {
   Client: Client;
   Script: DispatchableScript;
   Error?: string | null;
+  // Handle for the pending timeout watchdog; cleared once the request settles
+  // so a completed execution never leaves a live timer dangling.
+  TimeoutHandle?: ReturnType<typeof setTimeout> | null;
 }
 
 // FIFO-ish list used for UI progress; not a strict job queue
@@ -102,15 +105,29 @@ const Manager = {
 
   // Drop all pending/complete entries and notify the UI
   async ClearQueue(): Promise<void> {
+    for (const Request of ScriptExecutions) Manager.ClearTimeout(Request);
     ScriptExecutions = [];
     BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
   },
 
+  // Clear a request's pending timeout watchdog, if one is armed.
+  ClearTimeout(Request: ScriptExecution): void {
+    if (Request.TimeoutHandle) {
+      clearTimeout(Request.TimeoutHandle);
+      Request.TimeoutHandle = null;
+    }
+  },
+
   // Convert a pending request to Failed after Timeout ms, if still pending
   SetTimeout(RequestID: string, Timeout: number): void {
-    setTimeout(() => {
+    const Target = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
+    if (!Target) return;
+    // Replace any timer already armed for this request (e.g. a re-queue).
+    Manager.ClearTimeout(Target);
+    Target.TimeoutHandle = setTimeout(() => {
       const Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
       if (!Request) return;
+      Request.TimeoutHandle = null;
       if (Request.Status === 'Pending') {
         Request.Status = 'Failed';
         Request.Error = 'Script execution timed out after ' + Timeout + 'ms';
@@ -119,6 +136,8 @@ const Manager = {
       }
       BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
     }, Timeout);
+    // The timeout watchdog must not, by itself, keep the process alive.
+    if (typeof Target.TimeoutHandle.unref === 'function') Target.TimeoutHandle.unref();
     return;
   },
 
@@ -196,6 +215,7 @@ const Manager = {
     if (DispatchBlockReason) {
       const Request = ScriptExecutions.find((Exe) => Exe.RequestID === RequestID);
       if (Request) {
+        Manager.ClearTimeout(Request);
         Request.Status = 'Failed';
         Request.Error = DispatchBlockReason;
         Request.StatusText = 'Failed';
@@ -250,7 +270,9 @@ const Manager = {
     const Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
     if (Err) Logger.error(`Script execution failed for ${Request?.Client?.UUID}`, Err);
     if (!Request) return;
-    if (Err) Request.Error = typeof Err === 'string' ? Err : (Err as Error).message || 'Unknown error';
+    Manager.ClearTimeout(Request);
+    if (Err)
+      Request.Error = typeof Err === 'string' ? Err : (Err as Error).message || 'Unknown error';
     else Request.Error = null;
     Request.Status = Err ? 'Failed' : 'Completed';
     Request.Progress = Err ? Request.Progress || 0 : 100;

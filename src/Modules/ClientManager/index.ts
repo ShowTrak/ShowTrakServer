@@ -138,12 +138,35 @@ function rebuildClientIndex() {
   }
 }
 
-function addClientToCache(TargetClient: Client) {
-  if (!TargetClient || !TargetClient.UUID) return false;
-  if (ClientIndex.has(TargetClient.UUID)) return false;
+// Apply the current critical-entity state (USB serials, USB names, apps,
+// displays) onto a freshly built Client. Every hydration path funnels through
+// here so the four applyState calls stay in one place instead of being copied
+// at each `new Client(...)` site. Returns the same instance for chaining.
+function applyCriticalState(Entity: Client): Client {
+  CriticalUSB.applyState(Entity);
+  CriticalUSBNames.applyState(Entity);
+  CriticalApplications.applyState(Entity);
+  CriticalDisplays.applyState(Entity);
+  return Entity;
+}
+
+// Insert TargetClient into the cache, or — if an instance for its UUID already
+// resides — return that resident instance and discard the newcomer. `added`
+// reports whether an insert happened (drives the ClientListChanged emit);
+// `client` is always the authoritative cached instance. Returning the resident
+// closes the race where two concurrent hydrations of the same UUID would each
+// keep their own detached copy and mutate an orphan.
+function adoptIntoCache(TargetClient: Client): { client: Client; added: boolean } {
+  const Existing = TargetClient && TargetClient.UUID ? ClientIndex.get(TargetClient.UUID) : null;
+  if (Existing) return { client: Existing, added: false };
+  if (!TargetClient || !TargetClient.UUID) return { client: TargetClient, added: false };
   ClientList.push(TargetClient);
   ClientIndex.set(TargetClient.UUID, TargetClient);
-  return true;
+  return { client: TargetClient, added: true };
+}
+
+function addClientToCache(TargetClient: Client) {
+  return adoptIntoCache(TargetClient).added;
 }
 
 function removeClientFromCache(UUID: string) {
@@ -310,12 +333,9 @@ Manager.Heartbeat = async (UUID: string, Data: HeartbeatPayload, IP: string) => 
     if (!FetchedClient) {
       return Fail('Client Not Valid');
     } else {
-      CachedClient = new Client(FetchedClient);
-      CriticalUSB.applyState(CachedClient);
-      CriticalUSBNames.applyState(CachedClient);
-      CriticalApplications.applyState(CachedClient);
-      CriticalDisplays.applyState(CachedClient);
-      if (addClientToCache(CachedClient)) {
+      const { client, added } = adoptIntoCache(applyCriticalState(new Client(FetchedClient)));
+      CachedClient = client;
+      if (added) {
         BroadcastManager.emit('ClientListChanged');
       }
     }
@@ -755,17 +775,26 @@ Manager.Update = async (UUID: string, Data: unknown) => {
   if (TouchesLaunch && Client.Integrated === true) {
     return Fail('Launch actions are not supported for integrated clients');
   }
+  // Surface the first failed persist rather than reporting Ok unconditionally —
+  // the setters roll their own RAM back on failure, so returning Fail here keeps
+  // the UI's view aligned with what actually landed in the row.
   if (Object.prototype.hasOwnProperty.call(Fields, 'Nickname')) {
-    await Client.SetNickname(Fields.Nickname as string | null);
+    const [SetErr] = await Client.SetNickname(Fields.Nickname as string | null);
+    if (SetErr) return Fail(SetErr);
   }
   if (Object.prototype.hasOwnProperty.call(Fields, 'GroupID')) {
-    await Client.SetGroupID(Fields.GroupID as number | string | null);
+    const [SetErr] = await Client.SetGroupID(Fields.GroupID as number | string | null);
+    if (SetErr) return Fail(SetErr);
   }
   if (Object.prototype.hasOwnProperty.call(Fields, 'RunOnLaunchScriptID')) {
-    await Client.SetRunOnLaunchScriptID(Fields.RunOnLaunchScriptID as string | null);
+    const [SetErr] = await Client.SetRunOnLaunchScriptID(Fields.RunOnLaunchScriptID as string | null);
+    if (SetErr) return Fail(SetErr);
   }
   if (Object.prototype.hasOwnProperty.call(Fields, 'RunOnLaunchDelaySeconds')) {
-    await Client.SetRunOnLaunchDelaySeconds(Fields.RunOnLaunchDelaySeconds as number | null);
+    const [SetErr] = await Client.SetRunOnLaunchDelaySeconds(
+      Fields.RunOnLaunchDelaySeconds as number | null
+    );
+    if (SetErr) return Fail(SetErr);
   }
   return Ok(Client);
 };
@@ -779,18 +808,16 @@ Manager.Create = async (UUID: string) => {
   // Insert new client into the database
   const [InsertErr, _Res] = await ClientsRepo.Insert(UUID, Date.now());
   if (InsertErr) return Fail('Failed to insert new client');
-  const Created = new Client({
-    UUID: UUID,
-    Hostname: null,
-    OperatingSystem: null,
-    Version: 'X.X.X',
-    IP: null,
-    Timestamp: Date.now(),
-  });
-  CriticalUSB.applyState(Created);
-  CriticalUSBNames.applyState(Created);
-  CriticalApplications.applyState(Created);
-  CriticalDisplays.applyState(Created);
+  const Created = applyCriticalState(
+    new Client({
+      UUID: UUID,
+      Hostname: null,
+      OperatingSystem: null,
+      Version: 'X.X.X',
+      IP: null,
+      Timestamp: Date.now(),
+    })
+  );
   if (addClientToCache(Created)) {
     BroadcastManager.emit('ClientListChanged');
   }
@@ -832,20 +859,18 @@ Manager.CreateUnassigned = async (Name: string, Count: number) => {
       break;
     }
 
-    const Slot = new Client({
-      UUID,
-      Nickname,
-      Hostname: Nickname,
-      OperatingSystem: UNASSIGNED_DEFAULT_OS,
-      Version: 'X.X.X',
-      IP: null,
-      Unassigned: true,
-      Timestamp,
-    });
-    CriticalUSB.applyState(Slot);
-    CriticalUSBNames.applyState(Slot);
-    CriticalApplications.applyState(Slot);
-    CriticalDisplays.applyState(Slot);
+    const Slot = applyCriticalState(
+      new Client({
+        UUID,
+        Nickname,
+        Hostname: Nickname,
+        OperatingSystem: UNASSIGNED_DEFAULT_OS,
+        Version: 'X.X.X',
+        IP: null,
+        Unassigned: true,
+        Timestamp,
+      })
+    );
     if (addClientToCache(Slot)) Created.push(Slot);
   }
 
@@ -857,16 +882,9 @@ Manager.CreateUnassigned = async (Name: string, Count: number) => {
 
 // Unadopt or purge a client; remove from DB and cache
 Manager.Delete = async (UUID: string) => {
-  const [criticalErr] = await CriticalRepo.DeleteAllUSBForClient(UUID);
-  if (criticalErr) return Fail('Failed to delete critical USB devices for client');
-  const [criticalNameErr] = await CriticalRepo.DeleteAllUSBNamesForClient(UUID);
-  if (criticalNameErr) return Fail('Failed to delete critical USB devices for client');
-  const [criticalAppErr] = await CriticalRepo.DeleteAllApplicationsForClient(UUID);
-  if (criticalAppErr) return Fail('Failed to delete critical applications for client');
-  const [criticalDisplayErr] = await CriticalRepo.DeleteAllDisplaysForClient(UUID);
-  if (criticalDisplayErr) return Fail('Failed to delete critical displays for client');
-  // Remove from database
-  const [Err, _Res] = await ClientsRepo.Delete(UUID);
+  // One transaction across all five tables so a mid-sequence failure can never
+  // leave the client row and its critical rows half-deleted.
+  const [Err] = await ClientsRepo.DeleteClientCascade(UUID);
   if (Err) return Fail('Failed to delete client');
   // Remove from in-memory list
   removeClientFromCache(UUID);
@@ -918,10 +936,7 @@ Manager.ReplaceClient = async (CurrentUUID: unknown, ReplacementUUID: unknown) =
   CriticalApplications.rekeyClient(OldUUID, NewUUID);
   CriticalDisplays.rekeyClient(OldUUID, NewUUID);
 
-  CriticalUSB.applyState(ExistingClient);
-  CriticalUSBNames.applyState(ExistingClient);
-  CriticalApplications.applyState(ExistingClient);
-  CriticalDisplays.applyState(ExistingClient);
+  applyCriticalState(ExistingClient);
 
   BroadcastManager.emit('ClientListChanged');
   BroadcastManager.emit('ClientUpdated', ExistingClient);
@@ -943,21 +958,22 @@ Manager.Exists = async (UUID: string) => {
 
 // Fetch a Client object (cached or hydrated); callers should not mutate DB-only fields directly
 Manager.Get = async (UUID: string) => {
+  // No Init() warm-up here on purpose: unlike GetAll (which must return the
+  // whole list), a single Get is fully served by the cache-then-DB path below,
+  // and Init() rebuilds ClientList from DB rows — which would discard any live
+  // cached instance (and its runtime-only online/vitals state) mid-session.
   // Check in memory first
   const CachedClient = ClientIndex.get(UUID);
   if (CachedClient) {
     return Ok(CachedClient);
   }
-  // If not found in memory, check in database
+  // If not found in memory, hydrate from the database and adopt the instance
+  // into the cache so callers mutate the resident copy, not a detached orphan.
   const [Err, Row] = await ClientsRepo.GetByUUID(UUID);
   if (Err) return Fail('Failed to fetch client');
   if (!Row) return Fail('Client Not Found');
-  const ClientRow = new Client(Row);
-  CriticalUSB.applyState(ClientRow);
-  CriticalUSBNames.applyState(ClientRow);
-  CriticalApplications.applyState(ClientRow);
-  CriticalDisplays.applyState(ClientRow);
-  return Ok(ClientRow);
+  const { client } = adoptIntoCache(applyCriticalState(new Client(Row)));
+  return Ok(client);
 };
 
 Manager.Initialized = false;
@@ -974,14 +990,7 @@ Manager.Init = async () => {
     rebuildClientIndex();
     return;
   }
-  ClientList = Clients.map((row) => {
-    const ClientEntity = new Client(row);
-    CriticalUSB.applyState(ClientEntity);
-    CriticalUSBNames.applyState(ClientEntity);
-    CriticalApplications.applyState(ClientEntity);
-    CriticalDisplays.applyState(ClientEntity);
-    return ClientEntity;
-  }); // Update in-memory list
+  ClientList = Clients.map((row) => applyCriticalState(new Client(row))); // Update in-memory list
   rebuildClientIndex();
   BroadcastManager.emit('ClientListChanged');
   Manager.Initialized = true;

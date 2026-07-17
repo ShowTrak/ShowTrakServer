@@ -5,6 +5,23 @@
 import type { DBManager, DBResult } from '../index';
 import type { ClientRow } from '../rows';
 
+// The only client columns a setter is permitted to persist. `Column` is string-
+// interpolated into the UPDATE (SQLite cannot bind an identifier), so it must be
+// constrained to a fixed set here — this allowlist is that guard, not any
+// entity-level validation. Mirrors the DB-backed setters in ClientManager/client.ts.
+const UPDATABLE_CLIENT_COLUMNS: ReadonlySet<string> = new Set([
+  'Nickname',
+  'GroupID',
+  'Hostname',
+  'OperatingSystem',
+  'MacAddress',
+  'Version',
+  'Weight',
+  'IP',
+  'RunOnLaunchScriptID',
+  'RunOnLaunchDelaySeconds',
+]);
+
 export function CreateClientsRepository(DB: DBManager) {
   return {
     GetByUUID(UUID: string): Promise<DBResult<ClientRow>> {
@@ -48,19 +65,42 @@ export function CreateClientsRepository(DB: DBManager) {
     },
 
     // Persist a single column of a client row. `Column` is interpolated (not
-    // bindable), so callers must pass a known persisted-field name — the Client
-    // entity validates this against its field map before calling.
+    // bindable), so it is checked against UPDATABLE_CLIENT_COLUMNS first — an
+    // unknown name is refused rather than concatenated into the SQL.
     UpdateColumn(
       UUID: string,
       Column: string,
       Value: unknown,
       { markUnsaved = true }: { markUnsaved?: boolean } = {}
     ): Promise<DBResult<unknown>> {
+      if (!UPDATABLE_CLIENT_COLUMNS.has(Column)) {
+        return Promise.resolve([`Refusing to update unknown client column: ${Column}`, null]);
+      }
       const Run =
         markUnsaved === false && typeof DB.RunWithoutDirtyTracking === 'function'
           ? DB.RunWithoutDirtyTracking.bind(DB)
           : DB.Run.bind(DB);
       return Run(`UPDATE Clients SET ${Column} = ? WHERE UUID = ?`, [Value, UUID]);
+    },
+
+    // Delete a client and every critical-entity row keyed to it, atomically.
+    // The five statements ride one transaction so a partial failure can never
+    // leave the client row gone but its critical rows orphaned (or vice versa).
+    // Table SQL is inlined here — matching the ReplaceClientUUID precedent —
+    // because cross-table transactions are owned by this repository. Returns [Err].
+    DeleteClientCascade(UUID: string): Promise<DBResult<void>> {
+      return DB.WithTransaction(async (run) => {
+        const [usbErr] = await run('DELETE FROM CriticalUSBDevices WHERE UUID = ?', [UUID]);
+        if (usbErr) throw usbErr;
+        const [usbNameErr] = await run('DELETE FROM CriticalUSBDeviceNames WHERE UUID = ?', [UUID]);
+        if (usbNameErr) throw usbNameErr;
+        const [appErr] = await run('DELETE FROM CriticalApplications WHERE UUID = ?', [UUID]);
+        if (appErr) throw appErr;
+        const [displayErr] = await run('DELETE FROM CriticalDisplays WHERE UUID = ?', [UUID]);
+        if (displayErr) throw displayErr;
+        const [clientErr] = await run('DELETE FROM Clients WHERE UUID = ?', [UUID]);
+        if (clientErr) throw clientErr;
+      });
     },
 
     // Atomically re-key a client from OldUUID to NewUUID across the clients row,
@@ -90,6 +130,12 @@ export function CreateClientsRepository(DB: DBManager) {
           OldUUID,
         ]);
         if (criticalUSBErr) throw criticalUSBErr;
+
+        const [criticalUSBNameErr] = await run(
+          'UPDATE CriticalUSBDeviceNames SET UUID = ? WHERE UUID = ?',
+          [NewUUID, OldUUID]
+        );
+        if (criticalUSBNameErr) throw criticalUSBNameErr;
 
         const [criticalAppErr] = await run('UPDATE CriticalApplications SET UUID = ? WHERE UUID = ?', [
           NewUUID,
