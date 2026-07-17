@@ -11,59 +11,58 @@ export const DEFAULT_GROUP = 'Other';
 
 // Display order for the groups in the method picker.
 export const GroupOrder: string[] = [
-  'General',
-  'Lighting (DMX)',
+  'Show Control',
+  'Lighting',
+  'Sound',
   'Video',
-  'Media Servers',
-  'Control & Messaging',
-  'Digital Signage',
-  'Projectors',
-  'Power (UPS)',
+  'Power',
+  'Web Services',
+  'Other',
 ];
 
 export const MethodGroups: Record<string, string> = {
-  // General reachability / web
-  ping: 'General',
-  'tcp-port': 'General',
-  http: 'General',
-  'http-json': 'General',
-  dns: 'General',
-  // Lighting control (streaming DMX)
-  'sacn-universe': 'Lighting (DMX)',
-  'sacn-universe-priority': 'Lighting (DMX)',
-  'artnet-universe': 'Lighting (DMX)',
-  // Video
-  'ndi-source': 'Video',
-  // Media / playback servers
-  'qlab-workspace': 'Media Servers',
-  'watchout-status': 'Media Servers',
-  'resolume-status': 'Media Servers',
-  'disguise-status': 'Media Servers',
-  'millumin-status': 'Media Servers',
   // Show control & messaging
-  'companion-status': 'Control & Messaging',
-  'mqtt-topic': 'Control & Messaging',
-  // Digital signage players (BrightSign Local DWS)
-  brightsign: 'Digital Signage',
-  'brightsign-firmware': 'Digital Signage',
-  'brightsign-power': 'Digital Signage',
-  'brightsign-poe': 'Digital Signage',
-  'brightsign-video': 'Digital Signage',
-  // Projectors (PJLink cross-brand protocol + brand-profile SNMP)
-  pjlink: 'Projectors',
-  'pjlink-power': 'Projectors',
-  'pjlink-lamp': 'Projectors',
-  'pjlink-errors': 'Projectors',
-  'pjlink-input': 'Projectors',
-  'snmp-projector': 'Projectors',
+  'companion-status': 'Show Control',
+  'mqtt-topic': 'Show Control',
+  // Lighting control (streaming DMX)
+  'sacn-universe': 'Lighting',
+  'sacn-universe-priority': 'Lighting',
+  'artnet-universe': 'Lighting',
+  // Sound (cue playback)
+  'qlab-workspace': 'Sound',
+  // Video sources & media servers
+  'ndi-source': 'Video',
+  'watchout-status': 'Video',
+  'resolume-status': 'Video',
+  'disguise-status': 'Video',
+  'millumin-status': 'Video',
+  // Video — digital signage players (BrightSign Local DWS)
+  brightsign: 'Video',
+  'brightsign-firmware': 'Video',
+  'brightsign-power': 'Video',
+  'brightsign-poe': 'Video',
+  'brightsign-video': 'Video',
+  // Video — projectors (PJLink cross-brand protocol + brand-profile SNMP)
+  pjlink: 'Video',
+  'pjlink-power': 'Video',
+  'pjlink-lamp': 'Video',
+  'pjlink-errors': 'Video',
+  'pjlink-input': 'Video',
+  'snmp-projector': 'Video',
   // Power / UPS (Network UPS Tools)
-  'nut-ups': 'Power (UPS)',
-  'nut-ups-status': 'Power (UPS)',
-  'nut-ups-charge': 'Power (UPS)',
-  'nut-ups-load': 'Power (UPS)',
-  'nut-ups-temperature': 'Power (UPS)',
-  'nut-ups-voltage': 'Power (UPS)',
+  'nut-ups': 'Power',
+  'nut-ups-status': 'Power',
+  'nut-ups-charge': 'Power',
+  'nut-ups-load': 'Power',
+  'nut-ups-temperature': 'Power',
+  'nut-ups-voltage': 'Power',
   // Power / UPS (direct SNMP, e.g. Eaton/MGE, Riello NetMan, APC, CyberPower)
-  'snmp-ups': 'Power (UPS)',
-  'snmp-ups-v3': 'Power (UPS)',
+  'snmp-ups': 'Power',
+  'snmp-ups-v3': 'Power',
+  // Web / network service reachability
+  ping: 'Web Services',
+  'tcp-port': 'Web Services',
+  http: 'Web Services',
+  'http-json': 'Web Services',
+  dns: 'Web Services',
 };
