@@ -997,10 +997,13 @@ Manager.Init = async () => {
   return;
 };
 
-// Snapshot the current list; ensures cache is initialized first
+// Snapshot the current list; ensures cache is initialized first.
+// Return a shallow copy so callers can sort/splice/filter the result without
+// corrupting the internal ClientList array (the elements are still the live
+// resident client instances, which is intentional).
 Manager.GetAll = async () => {
   if (!Manager.Initialized) await Manager.Init();
-  return Ok(ClientList);
+  return Ok([...ClientList]);
 };
 
 Manager.GetClientsInGroup = async (GroupID: unknown) => {

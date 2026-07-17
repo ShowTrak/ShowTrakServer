@@ -324,8 +324,9 @@ export function wireContextMenu() {
               const Failed: { UUID: string; Error: unknown }[] = [];
               Results.forEach((Result, Index) => {
                 const Err = Array.isArray(Result) ? Result[0] : null;
-                if (Err) Failed.push({ UUID: UUIDs[Index], Error: Err });
-                else Succeeded.push(UUIDs[Index]);
+                // Results is mapped 1:1 from UUIDs, so Index is always in range
+                if (Err) Failed.push({ UUID: UUIDs[Index]!, Error: Err });
+                else Succeeded.push(UUIDs[Index]!);
               });
               if (Succeeded.length) ApplyIdentifyStateLocally(Succeeded, true);
               const Errors = Failed.map((Entry) => Entry.Error).filter(Boolean);
@@ -584,7 +585,8 @@ export function wireContextMenu() {
     if ($focusable.length > 0) {
       setTimeout(() => {
         try {
-          $focusable.first().trigger('focus')[0].scrollIntoView({ block: 'nearest' });
+          // $focusable.length > 0 guarded above, so first() has an element
+          $focusable.first().trigger('focus')[0]!.scrollIntoView({ block: 'nearest' });
         } catch (err) {
           HandleNonFatalError('SelectionInit:NonFatal', err);
         }
@@ -648,7 +650,8 @@ export function wireContextMenu() {
         let found = -1;
         for (let k = 0; k < titles.length; k++) {
           const pos = (start + k) % titles.length;
-          if (titles[pos].startsWith(buf)) {
+          // pos is (start + k) % titles.length, always in range
+          if (titles[pos]!.startsWith(buf)) {
             found = pos;
             break;
           }
@@ -656,7 +659,7 @@ export function wireContextMenu() {
         if (found === -1) {
           for (let k = 0; k < titles.length; k++) {
             const pos = (start + k) % titles.length;
-            if (titles[pos].includes(buf)) {
+            if (titles[pos]!.includes(buf)) {
               found = pos;
               break;
             }
@@ -664,30 +667,33 @@ export function wireContextMenu() {
         }
         if (found !== -1) {
           const $t = $items.eq(found);
-          $t.trigger('focus')[0].scrollIntoView({ block: 'nearest' });
+          // found is a valid index into $items
+          $t.trigger('focus')[0]!.scrollIntoView({ block: 'nearest' });
         }
         return;
       }
       if (key === 'ArrowDown') {
         ev.preventDefault();
         idx = (idx + 1 + $items.length) % $items.length;
-        $items.eq(idx).trigger('focus')[0].scrollIntoView({ block: 'nearest' });
+        // idx wrapped into $items range above
+        $items.eq(idx).trigger('focus')[0]!.scrollIntoView({ block: 'nearest' });
         return;
       }
       if (key === 'ArrowUp') {
         ev.preventDefault();
         idx = (idx - 1 + $items.length) % $items.length;
-        $items.eq(idx).trigger('focus')[0].scrollIntoView({ block: 'nearest' });
+        $items.eq(idx).trigger('focus')[0]!.scrollIntoView({ block: 'nearest' });
         return;
       }
       if (key === 'Home') {
         ev.preventDefault();
-        $items.first().trigger('focus')[0].scrollIntoView({ block: 'nearest' });
+        // $items.length !== 0 guarded above
+        $items.first().trigger('focus')[0]!.scrollIntoView({ block: 'nearest' });
         return;
       }
       if (key === 'End') {
         ev.preventDefault();
-        $items.last().trigger('focus')[0].scrollIntoView({ block: 'nearest' });
+        $items.last().trigger('focus')[0]!.scrollIntoView({ block: 'nearest' });
         return;
       }
       if (key === 'Enter' || key === ' ') {

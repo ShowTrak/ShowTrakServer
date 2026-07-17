@@ -283,7 +283,7 @@ async function startProbeScan(scan: Scan) {
           const current = index;
           index += 1;
           if (current >= targets.length) return;
-          const ip = targets[current];
+          const ip = targets[current]!; // bounds-checked above (current < targets.length)
           const openPort = await probeHost(ip, scan.ProbePorts, 350, scan);
           if (scan.Cancelled || scan.Finished) return;
           if (openPort != null) {

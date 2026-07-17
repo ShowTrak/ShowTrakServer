@@ -169,7 +169,8 @@ async function BuildSamplesFromTree(Tree: unknown[]): Promise<Sample[]> {
     if (!IsRecord(Entry) || Entry.type !== 'blob' || typeof Entry.path !== 'string') continue;
     const Parts = Entry.path.split('/');
     if (Parts.length < 2) continue; // ignore root-level files (.DS_Store, README, ...)
-    const Folder = Parts[0];
+    // Parts.length >= 2 checked above → index 0 is in-bounds.
+    const Folder = Parts[0]!;
     if (!IsSafeSegment(Folder)) continue;
     if (!IsSafeRelativePath(Entry.path)) continue;
     const RelativePath = Parts.slice(1).join('/');

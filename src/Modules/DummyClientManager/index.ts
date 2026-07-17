@@ -199,7 +199,7 @@ const Manager = {
   async Delete(UUID: string): Promise<Result<boolean>> {
     const Idx = DummyList.findIndex((D) => D.UUID === UUID);
     if (Idx === -1) return Fail('Dummy client not found');
-    const Dummy = DummyList[Idx];
+    const Dummy = DummyList[Idx]!; // Idx !== -1 checked above
     Dummy.StopLoop();
     const [Err] = await DummiesRepo.Delete(UUID);
     if (Err) return Fail('Failed to delete dummy client');

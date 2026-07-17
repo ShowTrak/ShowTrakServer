@@ -49,7 +49,7 @@ function register(): void {
       return ['Cancelled By User', null];
     }
     Logger.log('Opening ShowTrak file from:', filePaths[0]);
-    const [Err, Result] = await BackupManager.Open(filePaths[0]);
+    const [Err, Result] = await BackupManager.Open(filePaths[0]!); // non-empty checked above
     if (Err) return [Err, null];
     sendShowFileUpdated(BackupManager.GetCurrentFilePath());
     return [null, Result];

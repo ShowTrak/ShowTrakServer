@@ -73,7 +73,7 @@ function PerformHttpRequest(
   if (!Url) return Promise.resolve({ Success: false, Error: 'Invalid address' });
 
   const Path = Cfg.Path ? String(Cfg.Path) : '/';
-  Url.pathname = Path.startsWith('/') ? Path.split('?')[0] : `/${Path.split('?')[0]}`;
+  Url.pathname = Path.startsWith('/') ? (Path.split('?')[0] ?? '') : `/${Path.split('?')[0] ?? ''}`;
   const QueryFromPath = Path.indexOf('?') >= 0 ? Path.slice(Path.indexOf('?')) : '';
   if (QueryFromPath) Url.search = QueryFromPath;
 

@@ -47,7 +47,7 @@ export function ParseListUps(Reply: unknown): string[] {
   const Names: string[] = [];
   for (const Line of String(Reply == null ? '' : Reply).split('\n')) {
     const Match = Line.trim().match(/^UPS\s+(\S+)\s+"(.*)"\s*$/);
-    if (Match) Names.push(Match[1]);
+    if (Match && Match[1]) Names.push(Match[1]);
   }
   return Names;
 }
@@ -56,7 +56,7 @@ export function ParseListUps(Reply: unknown): string[] {
 // null when there is no quoted value (e.g. an ERR line).
 export function ParseVarValue(Reply: unknown): string | null {
   const Match = String(Reply == null ? '' : Reply).match(/"([^"]*)"/);
-  return Match ? Match[1] : null;
+  return Match ? (Match[1] ?? null) : null;
 }
 
 // Return the ERR reason token (e.g. `ACCESS-DENIED`) from a reply, or null when
@@ -65,7 +65,7 @@ export function ParseErr(Reply: unknown): string | null {
   const Match = String(Reply == null ? '' : Reply)
     .trim()
     .match(/^ERR\s+(\S+)/i);
-  return Match ? Match[1].toUpperCase() : null;
+  return Match && Match[1] ? Match[1].toUpperCase() : null;
 }
 
 // Parse a numeric NUT variable value (e.g. "230.0", "78", "45.5"). Returns null

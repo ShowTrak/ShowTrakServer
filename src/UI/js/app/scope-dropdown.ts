@@ -308,8 +308,9 @@ export function scopeToSelectedValues(Scope: ScopeInput): string[] {
 
 function scopeSummaryText(Selected: Array<{ Label: string }>, Placeholder: string): string {
   if (!Array.isArray(Selected) || !Selected.length) return Placeholder;
-  if (Selected.length === 1) return Selected[0].Label;
-  return `${Selected[0].Label} +${Selected.length - 1}`;
+  // Selected is non-empty here (guarded above), so Selected[0] is present
+  if (Selected.length === 1) return Selected[0]!.Label;
+  return `${Selected[0]!.Label} +${Selected.length - 1}`;
 }
 
 export function summarizeScopeSelection(

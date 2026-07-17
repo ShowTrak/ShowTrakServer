@@ -93,7 +93,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
       // Try to parse latency from the ping output; fall back to wall-clock.
       let LatencyMs: number | null = null;
       const Match = Stdout.match(/time[=<]\s*([\d.]+)\s*ms/i);
-      if (Match) {
+      if (Match && Match[1]) {
         LatencyMs = parseFloat(Match[1]);
       } else {
         LatencyMs = Date.now() - Started;

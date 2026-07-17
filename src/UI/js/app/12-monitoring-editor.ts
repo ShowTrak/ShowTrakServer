@@ -265,7 +265,7 @@ export function ParseIPv4ToNumber(address: unknown) {
   if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
     return null;
   }
-  return (((parts[0] * 256 + parts[1]) * 256 + parts[2]) * 256 + parts[3]) >>> 0;
+  return (((parts[0]! * 256 + parts[1]!) * 256 + parts[2]!) * 256 + parts[3]!) >>> 0; // length === 4 checked above
 }
 
 export function RenderNetworkDiscoveryScanButton() {

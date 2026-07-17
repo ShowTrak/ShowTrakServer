@@ -42,7 +42,7 @@ export const SCRIPT_COLOURS = [
 
 export function ScriptColourHex(Index: number | undefined) {
   const entry = Index === undefined ? undefined : SCRIPT_COLOURS[Index];
-  return entry ? entry.hex : SCRIPT_COLOURS[6].hex;
+  return entry ? entry.hex : SCRIPT_COLOURS[6]!.hex; // index 6 always present (grey fallback)
 }
 
 // Sample script manifest entry as returned by GetSampleScripts /
@@ -366,7 +366,7 @@ export function RenderScriptManagerOSChips(Script: ScriptOSChipsSource) {
   const Platforms = Script.platforms || {};
   const Compatible = new Set(Script.compatiblePlatforms || []);
   return SCRIPT_MANAGER_PLATFORMS.map((p) => {
-    const Path = typeof Platforms[p.key] === 'string' ? Platforms[p.key].trim() : '';
+    const Path = typeof Platforms[p.key] === 'string' ? Platforms[p.key]!.trim() : ''; // typeof guard ensures string
 
     // Always show every platform and mark missing paths in red so authoring
     // gaps are immediately visible.

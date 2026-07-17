@@ -32,7 +32,8 @@ export function ipv4ToInt(ip: unknown): number | null {
   ) {
     return null;
   }
-  return (((parts[0] << 24) >>> 0) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+  // Length checked to be exactly 4 above, so all four octets are present.
+  return (((parts[0]! << 24) >>> 0) | (parts[1]! << 16) | (parts[2]! << 8) | parts[3]!) >>> 0;
 }
 
 export function intToIPv4(intValue: number): string {
@@ -46,7 +47,7 @@ export function getLocalSubnets(maxHostsPerSubnet: number): Subnet[] {
   for (const iface of NetworkInterfaces.List(false)) {
     const ipInt = ipv4ToInt(iface.Address);
     const cidr = String(iface.CIDR || '').trim();
-    const prefix = parseInt(cidr.split('/')[1], 10);
+    const prefix = parseInt(cidr.split('/')[1] ?? '', 10);
     if (ipInt == null || !Number.isInteger(prefix) || prefix < 8 || prefix > 30) continue;
     const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
     const base = (ipInt & mask) >>> 0;

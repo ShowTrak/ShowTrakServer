@@ -153,7 +153,7 @@ export function RenderAlertTriggerDropdown() {
   const SelectedNames = triggerNamesByIDs(Array.from(Selected));
   let ToggleText: string;
   if (!SelectedNames.length) ToggleText = 'Select triggers';
-  else if (SelectedNames.length === 1) ToggleText = SelectedNames[0];
+  else if (SelectedNames.length === 1) ToggleText = SelectedNames[0]!; // length === 1
   else ToggleText = `${SelectedNames[0]} +${SelectedNames.length - 1}`;
 
   $('#ALERT_RULE_TRIGGER_TOGGLE').html(
@@ -724,7 +724,7 @@ export function scopedTargetsInfo(Rule: AlertRuleView) {
   );
   return {
     Count: IDs.length,
-    SingleName: IDs.length === 1 ? targetNameFromScopedID(IDs[0]) : null,
+    SingleName: IDs.length === 1 ? targetNameFromScopedID(IDs[0]!) : null, // length === 1
   };
 }
 
@@ -943,7 +943,7 @@ export async function OpenAlertRuleManager() {
       const TypeID = ($(this).val() || '').toString();
       const Existing =
         Number.isFinite(AlertEditingActionIndex) && AlertRuleDraftActions[AlertEditingActionIndex!]
-          ? AlertRuleDraftActions[AlertEditingActionIndex!].Settings || {}
+          ? AlertRuleDraftActions[AlertEditingActionIndex!]!.Settings || {} // truthiness checked above
           : {};
       $('#ALERT_ACTION_EDITOR_SETTINGS').html(RenderAlertActionSettingsFields(TypeID, Existing));
     });

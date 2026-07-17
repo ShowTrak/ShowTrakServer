@@ -446,7 +446,7 @@ export function EvaluateNdi(P: EvaluateParams): MonitoringResult {
 
   const Matched = Fresh.filter((S) => MatchesSource(S.Name, P.SourceName, P.MatchMode));
   if (Matched.length) {
-    const Src = Matched[0];
+    const Src = Matched[0]!; // non-empty: length checked above
     return {
       Success: true,
       LatencyMs: P.Now - Src.LastSeenAt,

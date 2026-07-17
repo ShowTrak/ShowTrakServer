@@ -376,12 +376,13 @@ export function positionGhostMarker(container: HTMLElement, x: number, y: number
     }
   }
   // Useful group edges
-  const firstRow = rows[0];
-  const lastRow = rows[rows.length - 1];
+  // tiles.length === 0 returned above, so rows/tiles/rects are non-empty here
+  const firstRow = rows[0]!;
+  const lastRow = rows[rows.length - 1]!;
 
   // Start-of-group zone: snap before first
-  const firstTile = tiles[0];
-  const firstRect = rects[0].r;
+  const firstTile = tiles[0]!;
+  const firstRect = rects[0]!.r;
   if (
     (x <= firstRow.left + EDGE_X && y <= firstRow.bottom + EDGE_Y) ||
     y <= firstRect.top - EDGE_Y
@@ -394,7 +395,7 @@ export function positionGhostMarker(container: HTMLElement, x: number, y: number
   }
 
   // End-of-group zone: snap after last
-  const lastRect = rects[rects.length - 1].r;
+  const lastRect = rects[rects.length - 1]!.r;
   if ((x >= lastRow.right - EDGE_X && y >= lastRow.top - EDGE_Y) || y >= lastRow.bottom - 2) {
     if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
     const ghost = DnDState.ghostEl!;
@@ -407,7 +408,8 @@ export function positionGhostMarker(container: HTMLElement, x: number, y: number
   let rowIdx = -1;
   // Keep previous row if cursor still within its sticky band
   if (DnDState.rowIndex !== null && rows[DnDState.rowIndex]) {
-    const prev = rows[DnDState.rowIndex];
+    // guarded by the truthy check above
+    const prev = rows[DnDState.rowIndex]!;
     if (y >= prev.top - ROW_STICKY && y <= prev.bottom + ROW_STICKY) {
       rowIdx = DnDState.rowIndex;
     }
@@ -415,7 +417,8 @@ export function positionGhostMarker(container: HTMLElement, x: number, y: number
   if (rowIdx === -1) {
     // Prefer a row whose band contains the cursor
     for (let i = 0; i < rows.length; i++) {
-      const rw = rows[i];
+      // i is within bounds of rows
+      const rw = rows[i]!;
       if (y >= rw.top - ROW_STICKY && y <= rw.bottom + ROW_STICKY) {
         rowIdx = i;
         break;
@@ -426,7 +429,7 @@ export function positionGhostMarker(container: HTMLElement, x: number, y: number
     // Fallback: closest by vertical distance to row center
     let bestD = Infinity;
     for (let i = 0; i < rows.length; i++) {
-      const rw = rows[i];
+      const rw = rows[i]!;
       const cy = (rw.top + rw.bottom) / 2;
       const d = Math.abs(y - cy);
       if (d < bestD) {
@@ -439,7 +442,8 @@ export function positionGhostMarker(container: HTMLElement, x: number, y: number
   DnDState.rowIndex = rowIdx;
 
   // Place within the selected row
-  const row = rows[rowIdx];
+  // rowIdx is clamped to a valid index above
+  const row = rows[rowIdx]!;
   // Find nearest tile by x within the row
   let nearest: { tile: Element; rect: DOMRect } | null = null;
   let nearestDist = Infinity;
@@ -458,7 +462,7 @@ export function positionGhostMarker(container: HTMLElement, x: number, y: number
     if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
     const ghost = DnDState.ghostEl!;
     applyGhostSize(ghost, nearest.rect);
-    const firstInRow = row.tiles[0].el;
+    const firstInRow = row.tiles[0]!.el;
     firstInRow.parentNode!.insertBefore(ghost, firstInRow);
     return;
   }
@@ -466,7 +470,7 @@ export function positionGhostMarker(container: HTMLElement, x: number, y: number
     if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
     const ghost = DnDState.ghostEl!;
     applyGhostSize(ghost, nearest.rect);
-    const lastInRow = row.tiles[row.tiles.length - 1].el;
+    const lastInRow = row.tiles[row.tiles.length - 1]!.el;
     lastInRow.parentNode!.insertBefore(ghost, lastInRow.nextSibling);
     return;
   }

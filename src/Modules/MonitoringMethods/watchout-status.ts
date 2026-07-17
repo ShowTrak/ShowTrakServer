@@ -112,7 +112,7 @@ function TokenizeLine(Line: string): Array<{ Quoted: boolean; Value: string }> {
   let i = 0;
   const Len = Line.length;
   while (i < Len) {
-    while (i < Len && /\s/.test(Line[i])) i++;
+    while (i < Len && /\s/.test(Line[i]!)) i++; // in range: i < Len
     if (i >= Len) break;
     if (Line[i] === '"') {
       i++;
@@ -130,7 +130,7 @@ function TokenizeLine(Line: string): Array<{ Quoted: boolean; Value: string }> {
       Tokens.push({ Quoted: true, Value });
     } else {
       let Value = '';
-      while (i < Len && !/\s/.test(Line[i])) {
+      while (i < Len && !/\s/.test(Line[i]!)) { // in range: i < Len
         Value += Line[i];
         i++;
       }

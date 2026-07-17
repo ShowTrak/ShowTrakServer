@@ -35,7 +35,7 @@ function interpolate(Input: unknown, Context: AlertContext): string {
   };
 
   return Source.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, (_m, key) =>
-    Object.prototype.hasOwnProperty.call(Tokens, key) ? Tokens[key] : ''
+    Object.prototype.hasOwnProperty.call(Tokens, key) ? (Tokens[key] ?? '') : ''
   );
 }
 

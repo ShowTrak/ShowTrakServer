@@ -406,7 +406,7 @@ export function EvaluateMillumin(P: EvaluateParams): MonitoringResult {
     // Millumin OSC is arriving, but not from the configured machine — the target
     // is not confirmed present, so this is Offline (the aggregator only honours
     // Degraded on a Success:true result). The other source is surfaced as a hint.
-    const Other = FreshSources[0];
+    const Other = FreshSources[0]!; // non-empty: length checked above
     return {
       Success: false,
       Error: `Millumin OSC arriving from ${Other.Source.Address}, not ${P.Address}`,

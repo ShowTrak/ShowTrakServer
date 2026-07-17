@@ -354,7 +354,8 @@ async function runWithConcurrency<T>(
     while (true) {
       const i = index++;
       if (i >= items.length) break;
-      await worker(items[i], i);
+      // i < items.length (checked above) → in-bounds.
+      await worker(items[i]!, i);
     }
   });
   await Promise.all(runners);

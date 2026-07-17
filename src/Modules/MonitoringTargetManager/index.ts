@@ -391,7 +391,7 @@ const Manager = {
     const [TxErr, Created] = await DB.WithTransaction(async (run) => {
       const [Err, Res] = await TargetsRepo.Insert(
         Payload.Nickname,
-        Checks.length ? Checks[0].Method : '',
+        Checks.length ? Checks[0]!.Method : '',
         Interval,
         GroupID,
         Weight,
@@ -476,7 +476,8 @@ const Manager = {
     const ID = Number(TargetID);
     const Idx = TargetList.findIndex((T) => T.TargetID === ID);
     if (Idx === -1) return Fail('Monitoring target not found');
-    const Target = TargetList[Idx];
+    // Idx !== -1 (checked above) → in-bounds.
+    const Target = TargetList[Idx]!;
     Target.StopLoop();
     const [Err] = await TargetsRepo.DeleteTargetCascade(ID);
     if (Err) {

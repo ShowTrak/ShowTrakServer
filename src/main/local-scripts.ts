@@ -78,7 +78,7 @@ function parseArgumentString(value: unknown) {
   };
 
   for (let i = 0; i < input.length; i += 1) {
-    const ch = input[i];
+    const ch = input[i]!; // in-bounds: i < input.length
 
     if (escaping) {
       current += ch;

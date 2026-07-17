@@ -281,7 +281,7 @@ export function getLogicalRouteOrder(PathValue: string) {
 
   const Segment = NormalizedPath.split('/').filter(Boolean)[0] || '';
   const SectionBase = Object.prototype.hasOwnProperty.call(ROUTE_SECTION_ORDER, Segment)
-    ? ROUTE_SECTION_ORDER[Segment] * 100
+    ? ROUTE_SECTION_ORDER[Segment]! * 100 // hasOwnProperty checked above
     : 9000;
   return SectionBase;
 }
@@ -516,7 +516,7 @@ export function InitOscFeeds() {
     // creation always follows up with a full list push, and a late update for a
     // deleted target would otherwise resurrect its tile until the next restart.
     if (idx === -1) return;
-    const prev = MonitoringTargets[idx];
+    const prev = MonitoringTargets[idx]!; // idx !== -1 guaranteed above
     MonitoringTargets[idx] = Target;
     // If a monitor changed groups, re-render. Otherwise update in place.
     if ((prev.GroupID || null) !== (Target.GroupID || null)) {

@@ -176,7 +176,7 @@ function looksLikeAudio(Buf: Buffer | null): boolean {
   // MP4 / M4A / AAC container: bytes 4-7 == "ftyp"
   if (Buf.length >= 8 && ascii(4, 4) === 'ftyp') return true;
   // MPEG/ADTS frame sync: 0xFF followed by 0xEx/0xFx (covers MP3 + raw AAC)
-  if (Buf[0] === 0xff && (Buf[1] & 0xe0) === 0xe0) return true;
+  if (Buf[0] === 0xff && ((Buf[1] ?? 0) & 0xe0) === 0xe0) return true;
 
   return false;
 }
