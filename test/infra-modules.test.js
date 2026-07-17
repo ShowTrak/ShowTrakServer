@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const net = require('node:net');
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
 
@@ -74,29 +76,47 @@ test('OS manager exposes the hostname', () => {
   assert.equal(Manager.Hostname, 'unit-test-host');
 });
 
-test('FileSelectorManager delegates to the electron dialog', async () => {
+test('FileSelectorManager delegates to the electron dialog and remembers the last directory', async () => {
+  // Redirect the last-directory store into a throwaway dir so the test never
+  // touches the real app-data folder.
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-fsm-'));
+  const pickedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-shows-'));
+  const pickedFile = path.join(pickedDir, 'x.ShowTrak');
+
   const calls = [];
   const dialogMock = {
     showOpenDialog: async (opts) => {
       calls.push(['open', opts]);
-      return { canceled: false, filePaths: ['/x.ShowTrak'] };
+      return { canceled: false, filePaths: [pickedFile] };
     },
     showSaveDialog: async (opts) => {
       calls.push(['save', opts]);
-      return { canceled: false, filePath: '/y.ShowTrak' };
+      return { canceled: false, filePath: path.join(pickedDir, 'y.ShowTrak') };
     },
   };
   const { Manager } = loadWithMocks(modulePath('FileSelectorManager', 'index.js'), {
     electron: { dialog: dialogMock },
+    '../AppData': { Manager: { GetStorageDirectory: () => storageDir } },
   });
 
+  // First open: nothing remembered yet, so no defaultPath is forced.
   const open = await Manager.OpenDialog('Open a show');
-  assert.deepEqual(open.filePaths, ['/x.ShowTrak']);
+  assert.deepEqual(open.filePaths, [pickedFile]);
   assert.equal(calls[0][1].title, 'Open a show');
+  assert.equal(calls[0][1].defaultPath, undefined);
 
+  // Save now seats the datestamped filename in the just-used directory.
   const save = await Manager.SaveDialog('Save a show');
-  assert.equal(save.filePath, '/y.ShowTrak');
+  assert.equal(save.filePath, path.join(pickedDir, 'y.ShowTrak'));
+  assert.equal(path.dirname(calls[1][1].defaultPath), pickedDir);
   assert.match(calls[1][1].defaultPath, /\.ShowTrak$/);
+
+  // A later open reopens in the remembered directory (round-trips through disk).
+  await Manager.OpenDialog('Open again');
+  assert.equal(calls[2][1].defaultPath, pickedDir);
+
+  fs.rmSync(storageDir, { recursive: true, force: true });
+  fs.rmSync(pickedDir, { recursive: true, force: true });
 });
 
 test('Server serializers project safe public shapes', () => {
