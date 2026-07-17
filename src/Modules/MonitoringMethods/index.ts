@@ -45,6 +45,13 @@ const MethodModules: MonitoringMethod[] = [
   require('./brightsign-power'),
   require('./brightsign-poe'),
   require('./brightsign-video'),
+  // Projectors
+  require('./pjlink'),
+  require('./pjlink-power'),
+  require('./pjlink-lamp'),
+  require('./pjlink-errors'),
+  require('./pjlink-input'),
+  require('./snmp-projector'),
   // Power (UPS)
   require('./nut-ups'),
   require('./nut-ups-status'),

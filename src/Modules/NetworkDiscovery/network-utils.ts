@@ -66,6 +66,27 @@ export function getLocalSubnets(maxHostsPerSubnet: number): Subnet[] {
   return out;
 }
 
+// The directed-broadcast address of every live IPv4 interface (e.g.
+// 192.168.1.255 for a /24), used to target UDP discovery datagrams at each
+// local subnet. Returns a de-duplicated list; never includes 255.255.255.255
+// (callers add the limited broadcast separately if they want it).
+export function getBroadcastAddresses(): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const iface of NetworkInterfaces.List(false)) {
+    const ipInt = ipv4ToInt(iface.Address);
+    const prefix = parseInt(String(iface.CIDR || '').split('/')[1] ?? '', 10);
+    if (ipInt == null || !Number.isInteger(prefix) || prefix < 8 || prefix > 30) continue;
+    const mask = (0xffffffff << (32 - prefix)) >>> 0;
+    const broadcast = ((ipInt & mask) | (~mask >>> 0)) >>> 0;
+    const address = intToIPv4(broadcast);
+    if (seen.has(address)) continue;
+    seen.add(address);
+    out.push(address);
+  }
+  return out;
+}
+
 export function buildProbeTargets(maxHostsPerSubnet: number): string[] {
   const subnets = getLocalSubnets(maxHostsPerSubnet);
   const targets: string[] = [];

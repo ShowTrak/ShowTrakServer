@@ -17,6 +17,7 @@ export const GroupOrder: string[] = [
   'Media Servers',
   'Control & Messaging',
   'Digital Signage',
+  'Projectors',
   'Power (UPS)',
 ];
 
@@ -48,6 +49,13 @@ export const MethodGroups: Record<string, string> = {
   'brightsign-power': 'Digital Signage',
   'brightsign-poe': 'Digital Signage',
   'brightsign-video': 'Digital Signage',
+  // Projectors (PJLink cross-brand protocol + brand-profile SNMP)
+  pjlink: 'Projectors',
+  'pjlink-power': 'Projectors',
+  'pjlink-lamp': 'Projectors',
+  'pjlink-errors': 'Projectors',
+  'pjlink-input': 'Projectors',
+  'snmp-projector': 'Projectors',
   // Power / UPS (Network UPS Tools)
   'nut-ups': 'Power (UPS)',
   'nut-ups-status': 'Power (UPS)',

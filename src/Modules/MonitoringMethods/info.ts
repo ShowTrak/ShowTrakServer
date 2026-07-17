@@ -289,6 +289,60 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'Optionally filter by an OSC address prefix such as /millumin.',
     ],
   },
+  pjlink: {
+    Summary:
+      'Combined projector health over PJLink (the cross-brand projector control protocol on TCP 4352). One connection reads power state, error status, lamp hours and input, and reports a single healthy / degraded verdict. Works with Epson, NEC/Sharp, Panasonic, Christie, Sony, Barco and most others.',
+    Setup: [
+      'Enable PJLink on the projector (usually under Network / Control settings) — most brands support it on TCP 4352, though some (e.g. Epson) ship with it off.',
+      'If the projector has a PJLink password set, enter it; leave blank when authentication is off.',
+      'By default a projector in standby reports Degraded — switch "When in standby" to Report Online for rigs where standby is normal.',
+      'Set a lamp-hours threshold to be warned before a lamp expires; laser models without lamps are handled automatically.',
+      'Some projectors accept only one PJLink connection at a time — all ShowTrak PJLink checks against the same projector share a single connection per interval automatically.',
+    ],
+    Docs: [{ Label: 'PJLink specification (JBMIA)', Url: 'https://pjlink.jbmia.or.jp/english/' }],
+  },
+  'pjlink-power': {
+    Summary:
+      'Reads the projector power state over PJLink and checks it against the expected state (on / on-or-warming-up / any).',
+    Setup: [
+      'Choose the expected power state; Degraded = reachable but in a different state.',
+      'Standby, cooling and warm-up are reported distinctly in the debug panel.',
+    ],
+  },
+  'pjlink-lamp': {
+    Summary:
+      'Reads lamp usage hours over PJLink and warns when any lamp reaches the configured threshold.',
+    Setup: [
+      "Set the warning threshold to your lamp's rated life (0 = just report the hours).",
+      'Laser projectors without lamps report Online with a note.',
+    ],
+  },
+  'pjlink-errors': {
+    Summary:
+      'Reads the PJLink error status (fan, lamp, temperature, cover, filter, other) and reports Degraded on any error — and on warnings, unless disabled.',
+    Setup: [
+      'Errors always degrade; uncheck "Treat warnings as Degraded" to ignore warnings such as a dirty filter.',
+    ],
+  },
+  'pjlink-input': {
+    Summary:
+      'Reads the active input over PJLink and optionally checks it against an expected input code.',
+    Setup: [
+      'Input codes are two characters: source type (1 RGB, 2 Video, 3 Digital, 4 Storage, 5 Network) + input number — e.g. 31 = Digital 1 (often HDMI 1).',
+      'Leave the expected input blank to just report the current input.',
+      'The projector must be powered on for the input to be readable; standby reports Degraded.',
+    ],
+  },
+  'snmp-projector': {
+    Summary:
+      'Reads projector status over SNMP using a brand profile (Epson, NEC, Panasonic, Christie, Sony, Barco), falling back to generic SNMP reachability and device identity. Custom OID checks are available under Advanced.',
+    Setup: [
+      'Enable SNMP on the projector’s network settings and match the community string (usually "public").',
+      'Pick the brand profile; use Generic for unlisted brands — it still confirms the device answers SNMP and shows its identity.',
+      'Prefer PJLink where available; SNMP support and OIDs vary by brand and model, and several brands expose no useful status over SNMP.',
+      'Under Advanced, up to two custom OIDs can be asserted (equals / not-equals / numeric limits) for model-specific values.',
+    ],
+  },
 };
 
 export { MethodInfo };

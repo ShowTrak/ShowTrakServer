@@ -39,6 +39,7 @@ interface DiscoveredDevice {
   Source?: string;
   ServiceType?: string;
   Port?: number | null;
+  MethodHint?: string;
   Services?: Array<{ type: string; port: number | null }>;
 }
 
@@ -60,6 +61,8 @@ const METHOD_GROUP_ORDER = [
   'Video',
   'Media Servers',
   'Control & Messaging',
+  'Digital Signage',
+  'Projectors',
   'Power (UPS)',
 ];
 
@@ -320,8 +323,9 @@ export function RenderNetworkDiscoveryResults() {
   let html = '';
   for (const item of list) {
     const id = Safe(item.ID);
+    const sourceKey = String(item.Source || 'unknown').toLowerCase();
     const sourceLabel =
-      String(item.Source || 'unknown').toLowerCase() === 'bonjour' ? 'mDNS' : 'Scan';
+      sourceKey === 'bonjour' ? 'mDNS' : sourceKey === 'pjlink' ? 'PJLink' : 'Scan';
     const serviceList = Array.isArray(item.Services) ? item.Services.slice(0, 5) : [];
     const details: string[] = [];
     if (item.Hostname) details.push(`host: ${Safe(item.Hostname)}`);
@@ -390,9 +394,18 @@ export function MergeNetworkDiscoveryResult(result: NetworkScanResult) {
     }
   }
 
+  // A PJLink hint is the most specific we can offer for a projector, so never
+  // let a later plain-probe/mDNS result for the same address downgrade it.
+  const methodHint =
+    existing.MethodHint === 'pjlink' ? 'pjlink' : result.MethodHint || existing.MethodHint;
+  // Likewise keep the richer PJLink source badge once we've seen it.
+  const source = existing.Source === 'pjlink' ? 'pjlink' : result.Source || existing.Source;
+
   NetworkDiscoveryResults.set(addressKey, {
     ...existing,
     ...result,
+    Source: source,
+    MethodHint: methodHint,
     Hostname: result.Hostname || existing.Hostname || null,
     Services: nextServices,
     ID: addressKey,
@@ -461,9 +474,10 @@ export async function StartNetworkDiscoveryScan() {
     const [Err, Result] = await window.API.StartNetworkDeviceScan({
       EnableBonjour: true,
       EnableProbe: true,
+      EnablePJLink: true,
       TimeoutMs: 12000,
       MaxHostsPerSubnet: 512,
-      ProbePorts: [80, 443, 22, 445, 3389, 8080],
+      ProbePorts: [80, 443, 22, 445, 3389, 8080, 4352],
     });
     if (Err) {
       setNetworkDiscoveryScanning(false);
