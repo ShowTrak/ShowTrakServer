@@ -93,7 +93,7 @@
     "c8": "^11.0.0",
     "electron": "^35.7.0",
     "esbuild": "^0.28.1",
-    "eslint": "^9.31.0",
+    "eslint": "^10.7.0",
     "eslint-config-prettier": "^9.1.2",
     "globals": "^16.3.0",
     "husky": "^9.1.7",
