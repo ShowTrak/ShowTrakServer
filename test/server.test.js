@@ -319,6 +319,13 @@ function loadWebUi(settings, options = {}) {
     '../ScriptManager': {
       Manager: { GetScripts: async () => [{ ID: 's1', Name: 'Deploy', Weight: 1 }] },
     },
+    // Mock the whitelist manager so the real one — which requires ../DB and opens
+    // a live sqlite connection at module load — is never pulled in. Without this
+    // the initial-state push touches the real DB, whose load-time async behavior
+    // is environment-dependent and cancels these tests on CI (the event loop
+    // drains mid-test). DecorateCatalog is identity here; scope decoration is
+    // covered by the ScriptWhitelistManager suite.
+    '../ScriptWhitelistManager': { Manager: { DecorateCatalog: async (scripts) => scripts } },
     '../ModeManager': { Manager: { Get: () => mode } },
     '../../main/renderer-bus': {
       RegisterRendererSink: (fn) => {
@@ -924,6 +931,13 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
       },
     },
     '../UpdateManager': { Manager: { RegisterRoutes: () => {} } },
+    // Server/index.js requires the whitelist manager directly; mock it so the
+    // real ../DB (opened at module load) is never pulled into this unit test.
+    // GetScope returns null (no whitelist row) so scripts stay unrestricted,
+    // matching the empty-DB behavior these tests were written against.
+    '../ScriptWhitelistManager': {
+      Manager: { DecorateCatalog: async (scripts) => scripts, GetScope: async () => null },
+    },
     '../ClientManager': {
       Manager: {
         GetAll: async () => [
@@ -1094,6 +1108,13 @@ test('Server Manager integrated event queue reports mixed target outcomes', asyn
       },
     },
     '../UpdateManager': { Manager: { RegisterRoutes: () => {} } },
+    // Server/index.js requires the whitelist manager directly; mock it so the
+    // real ../DB (opened at module load) is never pulled into this unit test.
+    // GetScope returns null (no whitelist row) so scripts stay unrestricted,
+    // matching the empty-DB behavior these tests were written against.
+    '../ScriptWhitelistManager': {
+      Manager: { DecorateCatalog: async (scripts) => scripts, GetScope: async () => null },
+    },
     '../DummyClientManager': { Manager: {} },
     '../MonitoringTargetManager': { Manager: {} },
     '../OSC': { OSC: { GetRoutes: () => [] } },
