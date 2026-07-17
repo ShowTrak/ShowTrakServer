@@ -98,10 +98,10 @@
     "globals": "^16.3.0",
     "husky": "^9.1.7",
     "nodemon": "^3.1.10",
-    "prettier": "^3.6.2",
-    "tsx": "^4.23.0",
+    "prettier": "^3.9.5",
+    "tsx": "^4.23.1",
     "typescript": "~5.7",
-    "typescript-eslint": "^8.63.0"
+    "typescript-eslint": "^8.64.0"
   },
   "dependencies": {
     "bonjour-service": "^1.4.3",
