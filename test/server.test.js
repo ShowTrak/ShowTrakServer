@@ -1172,3 +1172,124 @@ test('Server Manager integrated event queue reports mixed target outcomes', asyn
     )
   );
 });
+
+// --- Web UI auth hardening -------------------------------------------------
+
+test('Web UI login rate-limits an IP after repeated failures and blocks even a correct passcode', async () => {
+  const { SetupWebUiNamespace, LOGIN_MAX_FAILURES } = loadWebUi({
+    WEBUI_ENABLED: true,
+    WEBUI_PASSWORD_PROTECTION_ENABLED: true,
+    WEBUI_PASSWORD: '1234',
+  });
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
+
+  // Exhaust the failure budget; every attempt is a wrong passcode.
+  let resp;
+  for (let i = 0; i < LOGIN_MAX_FAILURES; i += 1) {
+    await socket.trigger('auth:login', { password: '0000' }, (r) => (resp = r));
+    assert.equal(
+      resp.error,
+      'invalid_password',
+      `attempt ${i + 1} should still be a normal reject`
+    );
+  }
+
+  // The next attempt is locked out — and crucially, even the CORRECT passcode is
+  // refused while the lockout is active (the limiter gates before the compare).
+  await socket.trigger('auth:login', { password: '1234' }, (r) => (resp = r));
+  assert.equal(resp.error, 'rate_limited');
+  assert.ok(resp.retryAfterMs > 0, 'a rate-limited response advertises a retry delay');
+  assert.equal(socket.Authed, false, 'a rate-limited login must not authenticate');
+});
+
+test('Web UI login lockout is per-IP: a successful login before the threshold clears the count', async () => {
+  const { SetupWebUiNamespace, LOGIN_MAX_FAILURES } = loadWebUi({
+    WEBUI_ENABLED: true,
+    WEBUI_PASSWORD_PROTECTION_ENABLED: true,
+    WEBUI_PASSWORD: '1234',
+  });
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
+
+  let resp;
+  // One shy of the threshold, then a correct login clears the record.
+  for (let i = 0; i < LOGIN_MAX_FAILURES - 1; i += 1) {
+    await socket.trigger('auth:login', { password: '0000' }, (r) => (resp = r));
+  }
+  await socket.trigger('auth:login', { password: '1234' }, (r) => (resp = r));
+  assert.equal(resp.ok, true);
+
+  // Because the count reset, a fresh batch of failures is judged from zero rather
+  // than immediately tripping the lockout.
+  await socket.trigger('auth:login', { password: '0000' }, (r) => (resp = r));
+  assert.equal(resp.error, 'invalid_password');
+});
+
+test('Web UI session tokens expire after their TTL (sliding) and are swept', () => {
+  const mod = loadWebUi({ WEBUI_ENABLED: true });
+  const { IssueToken, IsValidToken, SweepExpiredSessions, SESSION_TTL_MS } = mod;
+
+  const t0 = 1_000_000;
+  const token = IssueToken(t0);
+
+  // Valid within its lifetime; validating renews it (sliding expiry).
+  assert.equal(IsValidToken(token, t0 + SESSION_TTL_MS - 1), true);
+  // Renewed at t0 + TTL - 1, so it now survives until (t0 + TTL - 1) + TTL.
+  assert.equal(IsValidToken(token, t0 + SESSION_TTL_MS + 1), true);
+
+  // Fresh token left untouched past its TTL is invalid and gets evicted.
+  const stale = IssueToken(t0);
+  assert.equal(IsValidToken(stale, t0 + SESSION_TTL_MS + 1), false);
+  assert.equal(
+    IsValidToken(stale, t0 + 1),
+    false,
+    'an expired token is evicted, not merely lapsed'
+  );
+
+  // Sweep removes lapsed tokens without touching live ones.
+  const live = IssueToken(t0 + SESSION_TTL_MS);
+  const dead = IssueToken(t0);
+  SweepExpiredSessions(t0 + SESSION_TTL_MS + 5);
+  assert.equal(IsValidToken(live, t0 + SESSION_TTL_MS + 6), true);
+  assert.equal(IsValidToken(dead, t0 + SESSION_TTL_MS + 6), false);
+});
+
+test('Web UI passcode comparison is length-agnostic and correct', () => {
+  const { PasscodeMatches } = loadWebUi({ WEBUI_ENABLED: true });
+  assert.equal(PasscodeMatches('1234', '1234'), true);
+  assert.equal(PasscodeMatches('1234', '1235'), false);
+  // Differing lengths must return false, not throw (timingSafeEqual would throw
+  // on unequal buffers — the hash step guards against that).
+  assert.equal(PasscodeMatches('1', '123456'), false);
+  assert.equal(PasscodeMatches('', ''), true);
+});
+
+test('Web UI login lockout releases after the cooldown elapses', () => {
+  const {
+    LoginRetryAfterMs,
+    RecordLoginFailure,
+    ClearLoginFailures,
+    LOGIN_MAX_FAILURES,
+    LOGIN_LOCKOUT_MS,
+  } = loadWebUi({ WEBUI_ENABLED: true });
+
+  const t0 = 5_000_000;
+  const ip = '10.0.0.9';
+  for (let i = 0; i < LOGIN_MAX_FAILURES; i += 1) RecordLoginFailure(ip, t0);
+
+  assert.ok(LoginRetryAfterMs(ip, t0) > 0, 'locked immediately after the threshold');
+  assert.equal(
+    LoginRetryAfterMs(ip, t0 + LOGIN_LOCKOUT_MS + 1),
+    0,
+    'unlocked once the cooldown elapses'
+  );
+
+  // A different IP is unaffected, and clearing resets the offender.
+  assert.equal(LoginRetryAfterMs('10.0.0.10', t0), 0);
+  for (let i = 0; i < LOGIN_MAX_FAILURES; i += 1) RecordLoginFailure(ip, t0 + LOGIN_LOCKOUT_MS + 2);
+  ClearLoginFailures(ip);
+  assert.equal(LoginRetryAfterMs(ip, t0 + LOGIN_LOCKOUT_MS + 2), 0);
+});

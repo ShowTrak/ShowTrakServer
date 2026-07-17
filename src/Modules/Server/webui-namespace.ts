@@ -71,9 +71,107 @@ type AckCallback = (response?: unknown) => void;
 type PublicClientInput = Parameters<typeof ToPublicClient>[0];
 type PublicGroupInput = Parameters<typeof ToPublicGroup>[0];
 
-// In-memory set of currently valid Web UI session tokens. Cleared on restart
-// and on logout, giving us a simple per-session auth model.
-const WebSessions = new Set<string>();
+// In-memory map of currently valid Web UI session tokens to their expiry (epoch
+// ms). Expiry is sliding: a token's lifetime is renewed on each validated use,
+// so an active browser stays logged in while an abandoned token lapses after
+// SESSION_TTL_MS of inactivity. Cleared on restart, on logout, and on a Web UI
+// settings change.
+const WebSessions = new Map<string, number>();
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12h idle lifetime
+const SESSION_SWEEP_INTERVAL_MS = 10 * 60 * 1000; // background eviction cadence
+
+// Mint a new session token valid for SESSION_TTL_MS from `now`.
+function IssueToken(now: number): string {
+  const token = crypto.randomBytes(24).toString('hex');
+  WebSessions.set(token, now + SESSION_TTL_MS);
+  return token;
+}
+
+// Validate a presented token, renewing its lifetime on success (sliding expiry).
+// An expired token is evicted and treated as invalid.
+function IsValidToken(token: string | null | undefined, now: number): boolean {
+  if (!token) return false;
+  const ExpiresAt = WebSessions.get(token);
+  if (ExpiresAt === undefined) return false;
+  if (ExpiresAt <= now) {
+    WebSessions.delete(token);
+    return false;
+  }
+  WebSessions.set(token, now + SESSION_TTL_MS);
+  return true;
+}
+
+// Drop every token whose lifetime has lapsed, keeping the map bounded so
+// abandoned sessions (tabs closed without logging out) cannot accumulate.
+function SweepExpiredSessions(now: number): void {
+  for (const [Token, ExpiresAt] of WebSessions) {
+    if (ExpiresAt <= now) WebSessions.delete(Token);
+  }
+}
+
+// --- Login rate limiting --------------------------------------------------
+// WEBUI_PASSWORD is a 4-digit PIN (10k keyspace), so an unthrottled login
+// handler is trivially brute-forceable. Track failed attempts per client IP and
+// lock that IP out for a cooling-off window once it trips the threshold. State
+// is in-memory (matching the session model) and swept alongside sessions.
+const LOGIN_MAX_FAILURES = 10; // failures allowed within the window before lockout
+const LOGIN_WINDOW_MS = 60 * 1000; // rolling window over which failures are counted
+const LOGIN_LOCKOUT_MS = 5 * 60 * 1000; // lockout duration once the threshold trips
+interface LoginAttemptRecord {
+  failures: number;
+  windowStart: number;
+  lockedUntil: number;
+}
+const LoginAttempts = new Map<string, LoginAttemptRecord>();
+
+// How long this IP must wait before another login attempt (0 = not limited).
+function LoginRetryAfterMs(ip: string, now: number): number {
+  const Rec = LoginAttempts.get(ip);
+  if (Rec && Rec.lockedUntil > now) return Rec.lockedUntil - now;
+  return 0;
+}
+
+// Record a failed attempt, arming a lockout once too many failures land inside
+// the rolling window.
+function RecordLoginFailure(ip: string, now: number): void {
+  let Rec = LoginAttempts.get(ip);
+  if (!Rec || now - Rec.windowStart > LOGIN_WINDOW_MS) {
+    Rec = { failures: 0, windowStart: now, lockedUntil: 0 };
+  }
+  Rec.failures += 1;
+  if (Rec.failures >= LOGIN_MAX_FAILURES) {
+    Rec.lockedUntil = now + LOGIN_LOCKOUT_MS;
+    Rec.failures = 0;
+    Rec.windowStart = now;
+  }
+  LoginAttempts.set(ip, Rec);
+}
+
+// Clear an IP's failure record after a successful login.
+function ClearLoginFailures(ip: string): void {
+  LoginAttempts.delete(ip);
+}
+
+// Evict attempt records that are neither locked nor inside their counting
+// window, keeping the map bounded to currently-active clients.
+function SweepLoginAttempts(now: number): void {
+  for (const [Ip, Rec] of LoginAttempts) {
+    if (Rec.lockedUntil <= now && now - Rec.windowStart > LOGIN_WINDOW_MS) {
+      LoginAttempts.delete(Ip);
+    }
+  }
+}
+
+// Constant-time passcode comparison. Hashing both sides to a fixed-width digest
+// before timingSafeEqual keeps the comparison independent of both content and
+// length (timingSafeEqual itself requires equal-length buffers). NOTE: the
+// passcode is still stored in plaintext settings — hashing at rest is a separate,
+// larger change; this only removes the compare-time timing side channel.
+function PasscodeMatches(input: string, expected: string): boolean {
+  const A = crypto.createHash('sha256').update(input, 'utf8').digest();
+  const B = crypto.createHash('sha256').update(expected, 'utf8').digest();
+  return crypto.timingSafeEqual(A, B);
+}
 
 // --- Capability model -----------------------------------------------------
 // Which invoke channels the web surface may reach, and under what conditions.
@@ -371,6 +469,16 @@ const AuthorizeWebChannel = async (channel: string) => {
 function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
   const ui = io.of('/ui') as WebNamespace;
 
+  // Periodically evict lapsed sessions and stale login-attempt records so neither
+  // map grows unbounded over a long-running server. Unref'd so it never keeps the
+  // process alive on its own.
+  const SweepTimer = setInterval(() => {
+    const Now = Date.now();
+    SweepExpiredSessions(Now);
+    SweepLoginAttempts(Now);
+  }, SESSION_SWEEP_INTERVAL_MS);
+  if (SweepTimer && typeof SweepTimer.unref === 'function') SweepTimer.unref();
+
   // Renderer sink: forward allowlisted pushes to every authed web socket. One
   // sink services the whole namespace (not per-socket) so it stays in lockstep
   // with the desktop window sink.
@@ -441,7 +549,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
         (socket.handshake.auth && socket.handshake.auth.token) ||
         (socket.handshake.query && socket.handshake.query.token) ||
         null;
-      socket.Authed = Token ? WebSessions.has(Token) : false;
+      socket.Authed = IsValidToken(Token, Date.now());
       socket.SessionToken = socket.Authed ? Token : null;
     } catch {
       socket.Authed = false;
@@ -518,20 +626,28 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
         if (!Cfg.Enabled) {
           return cb && cb({ error: 'disabled' });
         }
+        const Now = Date.now();
         if (!Cfg.RequireAuth) {
           socket.Authed = true;
-          const token = crypto.randomBytes(24).toString('hex');
-          WebSessions.add(token);
+          const token = IssueToken(Now);
           socket.SessionToken = token;
           await SendInitialState();
           return cb && cb({ ok: true, token });
         }
+        // Throttle brute force against the 4-digit PIN: an IP that has tripped
+        // the failure threshold is refused outright until its lockout elapses.
+        const IP = (socket.handshake && socket.handshake.address) || 'unknown';
+        const RetryAfterMs = LoginRetryAfterMs(IP, Now);
+        if (RetryAfterMs > 0) {
+          return cb && cb({ error: 'rate_limited', retryAfterMs: RetryAfterMs });
+        }
         const Passcode = String((payload && payload.password) || '').trim();
-        if (Passcode !== Cfg.Password) {
+        if (!PasscodeMatches(Passcode, Cfg.Password)) {
+          RecordLoginFailure(IP, Now);
           return cb && cb({ error: 'invalid_password' });
         }
-        const token = crypto.randomBytes(24).toString('hex');
-        WebSessions.add(token);
+        ClearLoginFailures(IP);
+        const token = IssueToken(Now);
         socket.Authed = true;
         socket.SessionToken = token;
         await SendInitialState();
@@ -604,4 +720,15 @@ export {
   WEB_WOL_CHANNELS,
   WEB_PUSH_ALLOWLIST,
   AuthorizeWebChannel,
+  IssueToken,
+  IsValidToken,
+  SweepExpiredSessions,
+  LoginRetryAfterMs,
+  RecordLoginFailure,
+  ClearLoginFailures,
+  SweepLoginAttempts,
+  PasscodeMatches,
+  SESSION_TTL_MS,
+  LOGIN_MAX_FAILURES,
+  LOGIN_LOCKOUT_MS,
 };
