@@ -2,7 +2,6 @@
 // - Tracks execution requests (internal tasks or client scripts)
 // - Provides queue semantics with timeouts and progress updates
 import { CreateLogger } from '../Logger';
-import type { ClientManagerType } from '../ClientManager';
 import type { Client } from '../ClientManager/client';
 import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
 import { Manager as BroadcastManager } from '../Broadcast';
@@ -21,13 +20,8 @@ interface DispatchableScript {
   CompatiblePlatforms?: string[];
 }
 
-// The slice of the (require-loaded) ScriptManager surface used here.
-interface ScriptManagerSurface {
-  Get(ScriptID: string): Promise<DispatchableScript | null>;
-}
-
-const { Manager: ScriptManager } = require('../ScriptManager') as { Manager: ScriptManagerSurface };
-const { Manager: ClientManager } = require('../ClientManager') as { Manager: ClientManagerType };
+import { Manager as ScriptManager } from '../ScriptManager';
+import { Manager as ClientManager } from '../ClientManager';
 
 interface ExecutionTimer {
   Start: number;
@@ -271,8 +265,14 @@ const Manager = {
       return RequestID;
     }
 
+    // Invalid (unparseable) scripts have no Timeout field; `in` narrows the
+    // union to the valid variant before reading it, and they fall back to the
+    // default timeout (dispatch of invalid scripts is already blocked above).
     const Timeout =
-      typeof Script.Timeout === 'number' && Number.isInteger(Script.Timeout) && Script.Timeout > 0
+      'Timeout' in Script &&
+      typeof Script.Timeout === 'number' &&
+      Number.isInteger(Script.Timeout) &&
+      Script.Timeout > 0
         ? Script.Timeout
         : SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS;
     Manager.SetTimeout(RequestID, Timeout);

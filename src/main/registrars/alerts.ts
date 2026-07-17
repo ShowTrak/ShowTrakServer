@@ -3,8 +3,8 @@
 
 import { RPC } from '../rpc';
 import { createTupleHandler } from '../ipc/create-handler';
-const { Manager: AlertsManager } = require('../../Modules/AlertsManager') as typeof import('../../Modules/AlertsManager');
-const { Manager: IPCValidation } = require('../../Modules/IPCValidation') as typeof import('../../Modules/IPCValidation');
+import { Manager as AlertsManager } from '../../Modules/AlertsManager';
+import { Manager as IPCValidation } from '../../Modules/IPCValidation';
 
 function register(): void {
   RPC.handle('GetAlertTriggers', async () => {

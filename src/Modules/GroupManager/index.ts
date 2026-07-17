@@ -8,27 +8,15 @@ import { Manager as BroadcastManager } from '../Broadcast';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import type { GroupRow } from '../DB/rows';
-import type { ClientManagerType } from '../ClientManager';
 
 const Logger = CreateLogger('GroupManager');
 
 const GroupsRepo = CreateGroupsRepository(DB);
 
 // Group-reconciliation surface GroupManager depends on from the entity managers.
-// Only the two methods used here are described; both managers implement more.
-interface GroupReconcilableManager {
-  MoveGroupToNoGroup(GroupID: unknown): Promise<Result<number>>;
-  ReconcileOrphanedGroups(ValidGroupIDs: unknown): Promise<Result<number>>;
-}
-
-// Not-yet-migrated JS managers — typed loosely until their own migration.
-const { Manager: ClientManager } = require('../ClientManager') as { Manager: ClientManagerType };
-const { Manager: MonitoringTargetManager } = require('../MonitoringTargetManager') as {
-  Manager: GroupReconcilableManager;
-};
-const { Manager: DummyClientManager } = require('../DummyClientManager') as {
-  Manager: GroupReconcilableManager;
-};
+import { Manager as ClientManager } from '../ClientManager';
+import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
+import { Manager as DummyClientManager } from '../DummyClientManager';
 
 // Groups default to full width (span every column) so existing and migrated
 // groups keep filling the row until an operator explicitly narrows them.

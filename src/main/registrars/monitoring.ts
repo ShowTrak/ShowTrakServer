@@ -11,9 +11,9 @@ import {
   getClientUSBHistorySamples,
   getClientDisplayHistorySamples,
 } from '../monitoring-history';
-const { Manager: MonitoringMethods } = require('../../Modules/MonitoringMethods') as typeof import('../../Modules/MonitoringMethods');
-const { Manager: MonitoringTargetManager } = require('../../Modules/MonitoringTargetManager') as typeof import('../../Modules/MonitoringTargetManager');
-const { Manager: IPCValidation } = require('../../Modules/IPCValidation') as typeof import('../../Modules/IPCValidation');
+import { Manager as MonitoringMethods } from '../../Modules/MonitoringMethods';
+import { Manager as MonitoringTargetManager } from '../../Modules/MonitoringTargetManager';
+import { Manager as IPCValidation } from '../../Modules/IPCValidation';
 
 function register(): void {
   RPC.handle('GetMonitoringMethods', async () => {

@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { Manager as AppDataManager } from '../AppData';
-const { dialog } = require('electron') as typeof import('electron');
+import { dialog } from 'electron';
 
 const SHOWTRAK_FILE_FILTER = {
   name: 'ShowTrak File',

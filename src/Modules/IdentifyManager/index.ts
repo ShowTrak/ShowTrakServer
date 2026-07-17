@@ -8,12 +8,11 @@ import { Ok, Fail } from '../Utils';
 import { Manager as AdoptionManager } from '../AdoptionManager';
 import { Manager as BroadcastManager } from '../Broadcast';
 import type { Result } from '../../types/result';
-import type { ClientManagerType } from '../ClientManager';
 
 const Logger = CreateLogger('IdentifyManager');
 
 // Not-yet-migrated JS manager — typed loosely until its own migration.
-const { Manager: ClientManager } = require('../ClientManager') as { Manager: ClientManagerType };
+import { Manager as ClientManager } from '../ClientManager';
 
 // Minimal shape of the Socket.IO server surface IdentifyManager drives: it only
 // needs room-scoped emits for the identify overlay. Kept structural (rather than

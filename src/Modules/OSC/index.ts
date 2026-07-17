@@ -25,7 +25,7 @@ interface OSCServerInstance {
 }
 
 // Not-yet-migrated JS manager — typed loosely until its own migration.
-const { Manager: ClientManager } = require('../ClientManager') as { Manager: ClientManagerType };
+import { Manager as ClientManager } from '../ClientManager';
 
 // The live OSC server. Recreated when the OSC port setting changes (driven by
 // main/live-settings via OSC.RestartServer), so the binding moves to the new

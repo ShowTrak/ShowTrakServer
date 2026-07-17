@@ -4,8 +4,8 @@
 import { CreateLogger } from '../../Modules/Logger';
 import { RPC } from '../rpc';
 import { sendShowFileUpdated } from '../app-window';
-const { Manager: BackupManager } = require('../../Modules/BackupManager') as typeof import('../../Modules/BackupManager');
-const { Manager: FileSelectorManager } = require('../../Modules/FileSelectorManager') as typeof import('../../Modules/FileSelectorManager');
+import { Manager as BackupManager } from '../../Modules/BackupManager';
+import { Manager as FileSelectorManager } from '../../Modules/FileSelectorManager';
 
 const Logger = CreateLogger('Main');
 

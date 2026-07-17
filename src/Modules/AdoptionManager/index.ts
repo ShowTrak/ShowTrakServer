@@ -2,14 +2,13 @@
 // - Tracks devices that are discoverable but not yet adopted into the DB
 // - Provides a small in-memory list for the UI and transitions to adopted
 import { CreateLogger } from '../Logger';
-import type { ClientManagerType } from '../ClientManager';
 import { Manager as BroadcastManager } from '../Broadcast';
 import type { AdoptionHeartbeatPayload } from '@showtrak/protocol';
 
 const Logger = CreateLogger('AdoptionManager');
 
 // Not-yet-migrated JS manager — typed loosely until its own migration.
-const { Manager: ClientManager } = require('../ClientManager') as { Manager: ClientManagerType };
+import { Manager as ClientManager } from '../ClientManager';
 
 // Ephemeral list of discoverable, not-yet-adopted clients
 let ClientsPendingAdoption: ClientPendingAdoption[] = [];

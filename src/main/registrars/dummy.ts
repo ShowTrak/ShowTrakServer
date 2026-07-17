@@ -2,8 +2,8 @@
 
 import { RPC } from '../rpc';
 import { createTupleHandler } from '../ipc/create-handler';
-const { Manager: DummyClientManager } = require('../../Modules/DummyClientManager') as typeof import('../../Modules/DummyClientManager');
-const { Manager: IPCValidation } = require('../../Modules/IPCValidation') as typeof import('../../Modules/IPCValidation');
+import { Manager as DummyClientManager } from '../../Modules/DummyClientManager';
+import { Manager as IPCValidation } from '../../Modules/IPCValidation';
 
 function register(): void {
   RPC.handle('GetAllDummyClients', async () => {

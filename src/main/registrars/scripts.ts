@@ -19,14 +19,14 @@ const { shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
-const { Manager: ServerManager } = require('../../Modules/Server') as typeof import('../../Modules/Server');
-const { Manager: ScriptManager } = require('../../Modules/ScriptManager') as typeof import('../../Modules/ScriptManager');
-const { Manager: ScriptWhitelistManager } = require('../../Modules/ScriptWhitelistManager') as typeof import('../../Modules/ScriptWhitelistManager');
-const { Manager: SampleScriptsManager } = require('../../Modules/SampleScripts') as typeof import('../../Modules/SampleScripts');
-const { Manager: SettingsManager } = require('../../Modules/SettingsManager') as typeof import('../../Modules/SettingsManager');
-const { Manager: AppDataManager } = require('../../Modules/AppData') as typeof import('../../Modules/AppData');
-const { Manager: BroadcastManager } = require('../../Modules/Broadcast') as typeof import('../../Modules/Broadcast');
-const { Manager: IPCValidation } = require('../../Modules/IPCValidation') as typeof import('../../Modules/IPCValidation');
+import { Manager as ServerManager } from '../../Modules/Server';
+import { Manager as ScriptManager } from '../../Modules/ScriptManager';
+import { Manager as ScriptWhitelistManager } from '../../Modules/ScriptWhitelistManager';
+import { Manager as SampleScriptsManager } from '../../Modules/SampleScripts';
+import { Manager as SettingsManager } from '../../Modules/SettingsManager';
+import { Manager as AppDataManager } from '../../Modules/AppData';
+import { Manager as BroadcastManager } from '../../Modules/Broadcast';
+import { Manager as IPCValidation } from '../../Modules/IPCValidation';
 
 const Logger = CreateLogger('Main');
 
