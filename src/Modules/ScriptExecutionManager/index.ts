@@ -50,6 +50,51 @@ interface ScriptExecution {
   TimeoutHandle?: ReturnType<typeof setTimeout> | null;
 }
 
+// The renderer-safe projection of an execution. A live ScriptExecution carries a
+// Client CLASS INSTANCE and a Node timer handle (TimeoutHandle) — neither
+// survives Electron's structured-clone IPC (or the Web UI socket) — so anything
+// pushed to a renderer MUST go through this plain-object projection instead of
+// the raw entry.
+interface PublicScriptExecution {
+  Internal: boolean;
+  RequestID: string;
+  Status: 'Pending' | 'Failed' | 'Completed';
+  Progress: number;
+  StatusText: string;
+  Timer: ExecutionTimer;
+  Client: { UUID: string | null; Nickname: string | null; Hostname: string | null };
+  Script: { ID: string; Name: string };
+  Error: string | null;
+}
+
+// Project a live execution to its renderer-safe shape. Reads defensively because
+// the value arrives at the push boundary through the untyped broadcast bus.
+function ToPublicScriptExecution(Exec: ScriptExecution): PublicScriptExecution {
+  const C = Exec.Client;
+  return {
+    Internal: !!Exec.Internal,
+    RequestID: String(Exec.RequestID),
+    Status: Exec.Status,
+    Progress: Exec.Progress,
+    StatusText: Exec.StatusText,
+    Timer: {
+      Start: Exec.Timer ? Exec.Timer.Start : 0,
+      End: Exec.Timer ? Exec.Timer.End : null,
+      Duration: Exec.Timer ? Exec.Timer.Duration : null,
+    },
+    Client: {
+      UUID: C ? C.UUID : null,
+      Nickname: C ? C.Nickname ?? null : null,
+      Hostname: C ? C.Hostname ?? null : null,
+    },
+    Script: {
+      ID: Exec.Script ? String(Exec.Script.ID ?? '') : '',
+      Name: Exec.Script ? String(Exec.Script.Name ?? '') : '',
+    },
+    Error: Exec.Error ?? null,
+  };
+}
+
 // FIFO-ish list used for UI progress; not a strict job queue
 let ScriptExecutions: ScriptExecution[] = [];
 
@@ -283,4 +328,5 @@ const Manager = {
   },
 };
 
-export { Manager };
+export { Manager, ToPublicScriptExecution };
+export type { PublicScriptExecution, ScriptExecution };
