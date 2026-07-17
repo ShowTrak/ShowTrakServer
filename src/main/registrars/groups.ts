@@ -4,11 +4,11 @@
 import { RPC } from '../rpc';
 import { createTupleHandler, validationErrorTuple } from '../ipc/create-handler';
 import type { IPCValidationManager } from '../../Modules/IPCValidation';
-const { Manager: GroupManager } = require('../../Modules/GroupManager');
-const { Manager: MonitoringTargetManager } = require('../../Modules/MonitoringTargetManager');
-const { Manager: DummyClientManager } = require('../../Modules/DummyClientManager');
-const { Manager: ClientManager } = require('../../Modules/ClientManager');
-const { Manager: BroadcastManager } = require('../../Modules/Broadcast');
+const { Manager: GroupManager } = require('../../Modules/GroupManager') as typeof import('../../Modules/GroupManager');
+const { Manager: MonitoringTargetManager } = require('../../Modules/MonitoringTargetManager') as typeof import('../../Modules/MonitoringTargetManager');
+const { Manager: DummyClientManager } = require('../../Modules/DummyClientManager') as typeof import('../../Modules/DummyClientManager');
+const { Manager: ClientManager } = require('../../Modules/ClientManager') as typeof import('../../Modules/ClientManager');
+const { Manager: BroadcastManager } = require('../../Modules/Broadcast') as typeof import('../../Modules/Broadcast');
 const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
 
 function register(): void {
@@ -31,7 +31,8 @@ function register(): void {
     'RenameGroup',
     createTupleHandler<[number | null, string], unknown>(
       (GroupID: unknown, Title: unknown) => [IPCValidation.GroupID(GroupID), IPCValidation.GroupTitle(Title)],
-      (GroupID: number | null, Title: string) => GroupManager.Rename(GroupID, Title)
+      (GroupID: number | null, Title: string) =>
+        GroupID == null ? ['No group selected', null] : GroupManager.Rename(GroupID, Title)
     )
   );
 
@@ -39,7 +40,8 @@ function register(): void {
     'DeleteGroup',
     createTupleHandler<[number | null], unknown>(
       (GroupID: unknown) => IPCValidation.GroupID(GroupID),
-      (GroupID: number | null) => GroupManager.Delete(GroupID)
+      (GroupID: number | null) =>
+        GroupID == null ? ['No group selected', null] : GroupManager.Delete(GroupID)
     )
   );
 
@@ -50,7 +52,8 @@ function register(): void {
         IPCValidation.GroupID(GroupID),
         IPCValidation.Boolean(FullWidth, 'FullWidth'),
       ],
-      (GroupID: number | null, FullWidth: boolean) => GroupManager.SetFullWidth(GroupID, FullWidth)
+      (GroupID: number | null, FullWidth: boolean) =>
+        GroupID == null ? ['No group selected', null] : GroupManager.SetFullWidth(GroupID, FullWidth)
     )
   );
 
@@ -58,7 +61,8 @@ function register(): void {
     'Groups:SetKeyBind',
     createTupleHandler<[number | null, string | null], unknown>(
       (GroupID: unknown, KeyBind: unknown) => [IPCValidation.GroupID(GroupID), IPCValidation.GroupKeyBind(KeyBind)],
-      (GroupID: number | null, KeyBind: string | null) => GroupManager.SetKeyBind(GroupID, KeyBind)
+      (GroupID: number | null, KeyBind: string | null) =>
+        GroupID == null ? ['No group selected', null] : GroupManager.SetKeyBind(GroupID, KeyBind)
     )
   );
 

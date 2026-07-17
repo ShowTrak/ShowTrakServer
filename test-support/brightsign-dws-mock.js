@@ -59,6 +59,9 @@ function envelope(Payload) {
  * @param {boolean} options.refuse     emit ECONNREFUSED instead of replying
  * @param {boolean} options.silent     never reply (drives the timeout path)
  * @param {boolean} options.redirectToHttps  answer plain HTTP with a 302 to HTTPS
+ * @param {number} options.delayMs     delay each reply by this many ms (real
+ *   timer) so a redirect + auth handshake accrues wall-clock time — used to
+ *   prove the whole-probe timeout budget caps the total across every round trip.
  */
 function makeBrightSignDws(options = {}) {
   const {
@@ -69,6 +72,7 @@ function makeBrightSignDws(options = {}) {
     refuse = false,
     silent = false,
     redirectToHttps = false,
+    delayMs = 0,
   } = options;
 
   const calls = [];
@@ -140,7 +144,8 @@ function makeBrightSignDws(options = {}) {
     request(Opts) {
       const Req = new EventEmitter();
       Req.end = () => {
-        setImmediate(() => serve(Scheme, Opts, Req));
+        if (delayMs > 0) setTimeout(() => serve(Scheme, Opts, Req), delayMs);
+        else setImmediate(() => serve(Scheme, Opts, Req));
       };
       Req.destroy = (Err) => {
         if (Err) setImmediate(() => Req.emit('error', Err));

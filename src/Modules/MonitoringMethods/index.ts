@@ -96,19 +96,20 @@ function stableStringify(Value: unknown): string {
   return `{${Keys.map((Key) => `${JSON.stringify(Key)}:${stableStringify(Obj[Key])}`).join(',')}}`;
 }
 
-function normalizeAddress(Target: MonitoringTargetLike | undefined): string {
-  return String((Target && Target.Address) || '')
-    .trim()
-    .toLowerCase();
-}
-
 function getMethodRunCacheKey(
   ID: string,
   Method: MonitoringMethod,
   Target: MonitoringTargetLike
 ): string {
-  const Address = normalizeAddress(Target);
-  const Settings = Manager.NormalizeSettings(ID, (Target && Target.Settings) || {});
+  // The key MUST be a pure function of exactly what Method.Run() receives, so a
+  // cache hit only ever replays a probe computed from identical inputs. Run()
+  // reads Address and Settings straight off the target (raw), so we key on those
+  // raw values — NOT a normalized/clamped view. Keying on a normalized view was
+  // unsound: two targets that merely normalize alike (a timeout past the same
+  // clamp bound, or an address differing only in case) would collide onto one
+  // cached result even though Run() would probe them differently.
+  const Address = String((Target && Target.Address) != null ? Target.Address : '');
+  const Settings = (Target && Target.Settings) || {};
 
   // Allow methods to contribute additional key parts when they use extra
   // target properties beyond Address/Settings.
@@ -219,4 +220,4 @@ const Manager = {
   },
 };
 
-export { Manager };
+export { Manager, getMethodRunCacheKey };

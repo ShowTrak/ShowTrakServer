@@ -18,16 +18,16 @@ const {
   getMainWindow,
   hasMainWindow,
   sendShowFileUpdated,
-} = require('./app-window');
-const { PushToRenderers } = require('./renderer-bus');
-const { Manager: ModeManager } = require('../Modules/ModeManager');
-const { Manager: BackupManager } = require('../Modules/BackupManager');
-const { Manager: SettingsManager } = require('../Modules/SettingsManager');
-const { Manager: FileSelectorManager } = require('../Modules/FileSelectorManager');
-const { Manager: MonitoringTargetManager } = require('../Modules/MonitoringTargetManager');
-const { Manager: DummyClientManager } = require('../Modules/DummyClientManager');
-const { Manager: NetworkInterfaces } = require('../Modules/NetworkInterfaces');
-const { Manager: DBManager } = require('../Modules/DB');
+} = require('./app-window') as typeof import('./app-window');
+const { PushToRenderers } = require('./renderer-bus') as typeof import('./renderer-bus');
+const { Manager: ModeManager } = require('../Modules/ModeManager') as typeof import('../Modules/ModeManager');
+const { Manager: BackupManager } = require('../Modules/BackupManager') as typeof import('../Modules/BackupManager');
+const { Manager: SettingsManager } = require('../Modules/SettingsManager') as typeof import('../Modules/SettingsManager');
+const { Manager: FileSelectorManager } = require('../Modules/FileSelectorManager') as typeof import('../Modules/FileSelectorManager');
+const { Manager: MonitoringTargetManager } = require('../Modules/MonitoringTargetManager') as typeof import('../Modules/MonitoringTargetManager');
+const { Manager: DummyClientManager } = require('../Modules/DummyClientManager') as typeof import('../Modules/DummyClientManager');
+const { Manager: NetworkInterfaces } = require('../Modules/NetworkInterfaces') as typeof import('../Modules/NetworkInterfaces');
+const { Manager: DBManager } = require('../Modules/DB') as typeof import('../Modules/DB');
 
 const Logger = CreateLogger('Main');
 
@@ -137,6 +137,7 @@ async function promptSaveBeforeClose(): Promise<boolean> {
     if (canceled || !filePath) return false;
     SavePath = filePath;
   }
+  if (!SavePath) return false;
 
   const [Err] = await BackupManager.Save(SavePath);
   if (Err) {
@@ -274,9 +275,10 @@ function handleBeforeQuit(event: CancelableEvent): void {
     return;
   }
 
-  if (!mainWindowCloseApproved && hasMainWindow()) {
+  const Window = getMainWindow();
+  if (!mainWindowCloseApproved && Window) {
     event.preventDefault();
-    getMainWindow().close();
+    Window.close();
     return;
   }
 

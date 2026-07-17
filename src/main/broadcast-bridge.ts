@@ -24,6 +24,8 @@ import { Manager as DummyClientManager } from '../Modules/DummyClientManager';
 import { Manager as AlertsManager } from '../Modules/AlertsManager';
 import { Manager as AudioAssetManager } from '../Modules/AudioAssetManager';
 import { Manager as ScriptManager } from '../Modules/ScriptManager';
+import { ToPublicScriptExecution } from '../Modules/ScriptExecutionManager';
+import type { ScriptExecution } from '../Modules/ScriptExecutionManager';
 import { Manager as ScriptWhitelistManager } from '../Modules/ScriptWhitelistManager';
 import { Manager as AdoptionManager } from '../Modules/AdoptionManager';
 import { Manager as ServerManager } from '../Modules/Server';
@@ -367,7 +369,14 @@ async function UpdateAdoptionList(): Promise<void> {
 // Execution queue status updates (progress, completion, errors).
 async function UpdateScriptExecutions(Executions: ScriptExecutionInfo[]): Promise<void> {
   if (!hasMainWindow()) return;
-  PushToRenderers('UpdateScriptExecutions', Executions);
+  // Push a structured-clone-safe projection: the raw entries carry a Client class
+  // instance and a Node timer handle that Electron's IPC cannot serialize (the
+  // "Failed to serialize arguments" crash). In-process consumers below still get
+  // the raw entries, which retain the fields they need (e.g. Client.GroupID/IP).
+  PushToRenderers(
+    'UpdateScriptExecutions',
+    (Executions as unknown as ScriptExecution[]).map(ToPublicScriptExecution)
+  );
 
   ReconcileDeploymentQueueAfterExecutions(Executions);
 

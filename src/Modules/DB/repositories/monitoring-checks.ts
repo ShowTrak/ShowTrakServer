@@ -2,7 +2,7 @@
 // importing it so test DB mocks injected into MonitoringTargetManager
 // propagate through unchanged. SQL strings are byte-identical to the
 // historical inline statements — tests match on them.
-import type { DBManager, DBResult } from '../index';
+import type { DBManager, DBResult, TxRun } from '../index';
 import type { MonitoringCheckRow } from '../rows';
 
 export function CreateMonitoringChecksRepository(DB: DBManager) {
@@ -11,6 +11,9 @@ export function CreateMonitoringChecksRepository(DB: DBManager) {
       return DB.All<MonitoringCheckRow>('SELECT * FROM MonitoringChecks');
     },
 
+    // `run`, when supplied, enlists this insert in a caller-owned transaction so
+    // a target and its checks commit (or roll back) as one unit; omitted, the
+    // insert autocommits on its own (e.g. legacy-target migration during Init).
     Insert(
       TargetID: number,
       Name: string,
@@ -20,9 +23,11 @@ export function CreateMonitoringChecksRepository(DB: DBManager) {
       DegradedThresholdMs: number,
       Weight: number,
       LastSuccessAt: number | null,
-      Timestamp: number
+      Timestamp: number,
+      run?: TxRun
     ): Promise<DBResult<{ lastID: number }>> {
-      return DB.Run(
+      const Exec: TxRun = run ?? ((Query, Params) => DB.Run(Query, Params));
+      return Exec(
         'INSERT INTO MonitoringChecks (TargetID, Name, Address, Method, Settings, DegradedThresholdMs, Weight, LastSuccessAt, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           TargetID,
@@ -55,10 +60,6 @@ export function CreateMonitoringChecksRepository(DB: DBManager) {
 
     Delete(CheckID: number): Promise<DBResult<unknown>> {
       return DB.Run('DELETE FROM MonitoringChecks WHERE CheckID = ?', [CheckID]);
-    },
-
-    DeleteByTarget(TargetID: number): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM MonitoringChecks WHERE TargetID = ?', [TargetID]);
     },
 
     // Normalize persisted checks that use a renamed monitoring method ID.

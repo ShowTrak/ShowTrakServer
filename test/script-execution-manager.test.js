@@ -167,3 +167,53 @@ test('ScriptExecutionManager fails early when no script exists for client OS', a
   assert.equal(entry.Status, 'Failed');
   assert.match(entry.Error, /(not sent|no\s+macos\s+script\s+is\s+configured)/i);
 });
+
+// Regression: pushing raw executions to a renderer crashed with "Failed to
+// serialize arguments" because each entry carries a Client CLASS INSTANCE (has
+// methods) and a live Node timer handle — neither survives structured clone.
+test('ToPublicScriptExecution yields a renderer-safe (structured-clone-able) projection', async () => {
+  const { Manager, ToPublicScriptExecution } = load(
+    baseMocks({
+      '../ClientManager': {
+        Manager: {
+          // Model the real Client instance: plain fields plus a method.
+          Get: async (uuid) => [
+            null,
+            {
+              UUID: uuid,
+              Nickname: 'Booth PC',
+              Hostname: 'booth-01',
+              OperatingSystem: 'Windows',
+              GroupID: 3,
+              IP: '10.0.0.5',
+              SetOnline() {},
+            },
+          ],
+        },
+      },
+    })
+  );
+
+  // AddInternalTaskToQueue arms a timeout watchdog, so the raw entry also carries
+  // a live TimeoutHandle.
+  await Manager.AddInternalTaskToQueue('uuid-1', 'Wake On LAN');
+  const [raw] = await Manager.GetAllExecutions();
+
+  // The raw entry is exactly what used to be pushed — and it is not cloneable.
+  assert.throws(() => structuredClone(raw));
+
+  const pub = ToPublicScriptExecution(raw);
+  // The projection survives the same structured clone the Electron/web push uses.
+  assert.doesNotThrow(() => structuredClone(pub));
+
+  assert.equal(pub.Client.UUID, 'uuid-1');
+  assert.equal(pub.Client.Nickname, 'Booth PC');
+  assert.equal(pub.Client.Hostname, 'booth-01');
+  assert.equal(pub.Script.Name, 'Wake On LAN');
+  assert.equal(pub.Status, 'Pending');
+  // The non-cloneable fields must not leak into the projection.
+  assert.equal('TimeoutHandle' in pub, false);
+  assert.equal(typeof pub.Client.SetOnline, 'undefined');
+
+  await Manager.ClearQueue();
+});

@@ -20,13 +20,13 @@ const { shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
-const { Manager: ServerManager } = require('../../Modules/Server');
-const { Manager: ScriptManager } = require('../../Modules/ScriptManager');
-const { Manager: ScriptWhitelistManager } = require('../../Modules/ScriptWhitelistManager');
-const { Manager: SampleScriptsManager } = require('../../Modules/SampleScripts');
-const { Manager: SettingsManager } = require('../../Modules/SettingsManager');
-const { Manager: AppDataManager } = require('../../Modules/AppData');
-const { Manager: BroadcastManager } = require('../../Modules/Broadcast');
+const { Manager: ServerManager } = require('../../Modules/Server') as typeof import('../../Modules/Server');
+const { Manager: ScriptManager } = require('../../Modules/ScriptManager') as typeof import('../../Modules/ScriptManager');
+const { Manager: ScriptWhitelistManager } = require('../../Modules/ScriptWhitelistManager') as typeof import('../../Modules/ScriptWhitelistManager');
+const { Manager: SampleScriptsManager } = require('../../Modules/SampleScripts') as typeof import('../../Modules/SampleScripts');
+const { Manager: SettingsManager } = require('../../Modules/SettingsManager') as typeof import('../../Modules/SettingsManager');
+const { Manager: AppDataManager } = require('../../Modules/AppData') as typeof import('../../Modules/AppData');
+const { Manager: BroadcastManager } = require('../../Modules/Broadcast') as typeof import('../../Modules/Broadcast');
 const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
 
 const Logger = CreateLogger('Main');
@@ -75,14 +75,15 @@ async function openFileWithWorkspaceEditor(filePath: string) {
 
 function register(): void {
   RPC.handle('ExecuteScript', async (_Event: unknown, Scripts: unknown, Targets: unknown, ResetList: unknown) => {
+    let ValidScripts, ValidTargets, ValidResetList;
     try {
-      Scripts = IPCValidation.ScriptID(Scripts);
-      Targets = IPCValidation.UUIDList(Targets || [], 'Targets');
-      ResetList = IPCValidation.Boolean(ResetList, 'ResetList');
+      ValidScripts = IPCValidation.ScriptID(Scripts);
+      ValidTargets = IPCValidation.UUIDList(Targets || [], 'Targets');
+      ValidResetList = IPCValidation.Boolean(ResetList, 'ResetList');
     } catch (error) {
       return validationErrorTuple(error);
     }
-    await ServerManager.ExecuteScripts(Scripts, Targets, ResetList);
+    await ServerManager.ExecuteScripts(ValidScripts, ValidTargets, ValidResetList);
     return [null, true];
   });
 
@@ -90,23 +91,25 @@ function register(): void {
   // clients. Validated like ExecuteScript but routed through the integrated
   // event protocol.
   RPC.handle('TriggerIntegratedEvent', async (_Event: unknown, EventID: unknown, Targets: unknown) => {
+    let ValidEventID, ValidTargets;
     try {
-      EventID = IPCValidation.IntegratedEventID(EventID);
-      Targets = IPCValidation.UUIDList(Targets || [], 'Targets');
+      ValidEventID = IPCValidation.IntegratedEventID(EventID);
+      ValidTargets = IPCValidation.UUIDList(Targets || [], 'Targets');
     } catch (error) {
       return validationErrorTuple(error);
     }
-    await ServerManager.TriggerIntegratedEvent(EventID, Targets);
+    await ServerManager.TriggerIntegratedEvent(ValidEventID, ValidTargets);
     return [null, true];
   });
 
   RPC.handle('DeleteScripts', async (_Event: unknown, List: unknown) => {
+    let ValidList;
     try {
-      List = IPCValidation.UUIDList(List || [], 'Targets');
+      ValidList = IPCValidation.UUIDList(List || [], 'Targets');
     } catch (error) {
       return validationErrorTuple(error);
     }
-    await ServerManager.ExecuteBulkRequest('DeleteScripts', List, 'Delete Scripts');
+    await ServerManager.ExecuteBulkRequest('DeleteScripts', ValidList, 'Delete Scripts');
     return;
   });
 
@@ -123,7 +126,7 @@ function register(): void {
   // Script Manager: return the catalog (including invalid scripts) for editing.
   RPC.handle('Scripts:GetManagerList', async () => {
     const Scripts = (await ScriptManager.GetScripts()) || [];
-    return Scripts.map((s: Record<string, unknown>) => ({
+    return Scripts.map((s) => ({
       id: s.ID,
       name: s.Name,
       description: s.Description || '',
@@ -131,10 +134,13 @@ function register(): void {
       icon: typeof s.Icon === 'string' && s.Icon ? s.Icon : 'terminal',
       weight: s.Weight || 0,
       confirm: !!s.Confirmation,
-      timeoutMs: typeof s.Timeout === 'number' ? s.Timeout : SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS,
+      timeoutMs:
+        'Timeout' in s && typeof s.Timeout === 'number'
+          ? s.Timeout
+          : SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS,
       enabled: !!s.isEnabled,
       valid: !!s.isValid,
-      parseError: s.ParseError || null,
+      parseError: 'ParseError' in s ? s.ParseError || null : null,
       platforms: s.Platforms || {},
       compatiblePlatforms: s.CompatiblePlatforms || [],
       issues: s.ValidationErrors || [],
@@ -143,12 +149,13 @@ function register(): void {
 
   // Script Manager: read the editable fields + folder file list for one script.
   RPC.handle('Scripts:GetConfig', async (_Event: unknown, ID: unknown) => {
+    let ValidID;
     try {
-      ID = IPCValidation.ScriptFolderID(ID);
+      ValidID = IPCValidation.ScriptFolderID(ID);
     } catch (error) {
       return validationErrorTuple(error);
     }
-    const [Err, Data] = await ScriptManager.GetEditable(ID);
+    const [Err, Data] = await ScriptManager.GetEditable(ValidID);
     if (Err) return [Err, null];
     return [null, Data];
   });
@@ -156,18 +163,19 @@ function register(): void {
   // Script Manager: validate, normalize and persist structured field edits
   // (optionally renaming the script folder/ID).
   RPC.handle('Scripts:SaveConfig', async (_Event: unknown, ID: unknown, Fields: unknown) => {
+    let ValidID, ValidFields;
     try {
-      ID = IPCValidation.ScriptFolderID(ID);
-      Fields = IPCValidation.ScriptFieldsPayload(Fields);
+      ValidID = IPCValidation.ScriptFolderID(ID);
+      ValidFields = IPCValidation.ScriptFieldsPayload(Fields);
     } catch (error) {
       return validationErrorTuple(error);
     }
-    const [Err, Data] = await ScriptManager.SaveFields(ID, Fields);
+    const [Err, Data] = await ScriptManager.SaveFields(ValidID, ValidFields);
     if (Err) return [Err, null];
     // A rename changes the folder ID; carry the whitelist across so a restricted
     // script does not silently revert to "all clients" under its new ID.
-    if (Data && Data.id && Data.id !== ID) {
-      await ScriptWhitelistManager.RenameScript(ID, Data.id);
+    if (Data && Data.id && Data.id !== ValidID) {
+      await ScriptWhitelistManager.RenameScript(ValidID, Data.id);
     }
     return [null, Data];
   });
@@ -175,24 +183,26 @@ function register(): void {
   // Script Manager: read the per-show whitelist scope for one script. Returns
   // null when unrestricted (all clients) — the default for every script.
   RPC.handle('Scripts:GetWhitelist', async (_Event: unknown, ID: unknown) => {
+    let ValidID;
     try {
-      ID = IPCValidation.ScriptFolderID(ID);
+      ValidID = IPCValidation.ScriptFolderID(ID);
     } catch (error) {
       return validationErrorTuple(error);
     }
-    const Scope = await ScriptWhitelistManager.GetScope(ID);
+    const Scope = await ScriptWhitelistManager.GetScope(ValidID);
     return [null, Scope];
   });
 
   // Script Manager: persist the per-show whitelist scope for one script.
   RPC.handle('Scripts:SetWhitelist', async (_Event: unknown, ID: unknown, Scope: unknown) => {
+    let ValidID, ValidScope;
     try {
-      ID = IPCValidation.ScriptFolderID(ID);
-      Scope = IPCValidation.ScriptWhitelistScope(Scope);
+      ValidID = IPCValidation.ScriptFolderID(ID);
+      ValidScope = IPCValidation.ScriptWhitelistScope(Scope);
     } catch (error) {
       return validationErrorTuple(error);
     }
-    await ScriptWhitelistManager.SetScope(ID as string, Scope);
+    await ScriptWhitelistManager.SetScope(ValidID, ValidScope);
     // Re-push the catalog (from cache — no disk reload, fingerprint unchanged so
     // no redundant deployment) so every UI immediately reflects the restriction.
     BroadcastManager.emit('ScriptsUpdated');
@@ -213,15 +223,16 @@ function register(): void {
 
   // Script Manager: delete a script folder from disk.
   RPC.handle('Scripts:Delete', async (_Event: unknown, ID: unknown) => {
+    let ValidID;
     try {
-      ID = IPCValidation.ScriptFolderID(ID);
+      ValidID = IPCValidation.ScriptFolderID(ID);
     } catch (error) {
       return validationErrorTuple(error);
     }
-    const [Err] = await ScriptManager.Delete(ID);
+    const [Err] = await ScriptManager.Delete(ValidID);
     if (Err) return [Err, null];
     // Drop any whitelist row for the now-deleted script (no-op if unrestricted).
-    await ScriptWhitelistManager.DeleteForScript(ID as string);
+    await ScriptWhitelistManager.DeleteForScript(ValidID);
     return [null, true];
   });
 
@@ -230,6 +241,7 @@ function register(): void {
   RPC.handle('Scripts:Create', async () => {
     const [Err, Data] = await ScriptManager.CreateBlank();
     if (Err) return [Err, null];
+    if (!Data) return ['Failed to create script', null];
     return [null, { id: Data.id }];
   });
 
@@ -256,12 +268,13 @@ function register(): void {
   // Script Manager: create a new script from a sample template. Requires a
   // DesiredID that does not collide with an existing script.
   RPC.handle('Scripts:CreateFromTemplate', async (_Event: unknown, SampleID: unknown, DesiredID: unknown) => {
+    let ValidSampleID;
     try {
-      SampleID = IPCValidation.ScriptSampleID(SampleID);
+      ValidSampleID = IPCValidation.ScriptSampleID(SampleID);
     } catch (error) {
       return validationErrorTuple(error);
     }
-    const Sample = await SampleScriptsManager.GetSample(SampleID);
+    const Sample = await SampleScriptsManager.GetSample(ValidSampleID);
     if (!Sample) return ['Template not found', null];
     const Result = await ScriptManager.CreateFromTemplate(Sample, DesiredID);
     if (!Result.ok) {
@@ -321,7 +334,9 @@ function register(): void {
     );
     if (PathErr || !TargetFilePath) return [PathErr || 'Invalid file path', null];
 
-    const Script = await ScriptManager.Get(ID);
+    // resolveContainedScriptFile above already proved ID resolves to a contained
+    // script folder, so it is a usable folder/script id string here.
+    const Script = await ScriptManager.Get(String(ID));
     if (!Script || !Script.Platforms) return ['Script not found', null];
 
     const PlatformKey = getLocalPlatformKey();

@@ -9,11 +9,23 @@
 //   auth    - { USERNAME, PASSWORD } reply overrides (default 'OK').
 //   refuse  - never connects; emits ECONNREFUSED then close.
 //   silent  - connects but never replies (drives the timeout path).
+//   delayMs - per-reply delay (real timer) instead of an immediate nextTick, so
+//             a multi-round-trip probe accrues wall-clock time. Each individual
+//             gap stays under delayMs, so the (resettable) idle timeout never
+//             fires — only an absolute whole-probe deadline can end it. Used to
+//             prove ProbeNut caps total time rather than idle time.
 const { EventEmitter } = require('node:events');
 
 const LIST_OK = 'BEGIN LIST UPS\nUPS ups "Server Room UPS"\nUPS backup "Rack B"\nEND LIST UPS\n';
 
-function makeNutNet({ vars = {}, list = LIST_OK, auth = {}, refuse = false, silent = false } = {}) {
+function makeNutNet({
+  vars = {},
+  list = LIST_OK,
+  auth = {},
+  refuse = false,
+  silent = false,
+  delayMs = 0,
+} = {}) {
   class FakeSocket extends EventEmitter {
     constructor() {
       super();
@@ -55,9 +67,11 @@ function makeNutNet({ vars = {}, list = LIST_OK, auth = {}, refuse = false, sile
         }
       }
       if (reply != null && reply !== '') {
-        process.nextTick(() => {
+        const deliver = () => {
           if (!this.destroyed) this.emit('data', Buffer.from(reply, 'utf8'));
-        });
+        };
+        if (delayMs > 0) setTimeout(deliver, delayMs);
+        else process.nextTick(deliver);
       }
       return true;
     }

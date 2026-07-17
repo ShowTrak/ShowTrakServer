@@ -14,14 +14,14 @@ const { app, BrowserWindow } = require('electron/main');
 const { powerMonitor, autoUpdater: nativeAutoUpdater } = require('electron');
 if (require('electron-squirrel-startup')) app.quit();
 
-const { Manager: AppDataManager } = require('./Modules/AppData');
+const { Manager: AppDataManager } = require('./Modules/AppData') as typeof import('./Modules/AppData');
 AppDataManager.Initialize();
-const { CreateLogger } = require('./Modules/Logger');
+const { CreateLogger } = require('./Modules/Logger') as typeof import('./Modules/Logger');
 const Logger = CreateLogger('Main');
 // Install the process-wide network fault guards before any socket-binding module
 // loads, so a mid-boot interface drop (mDNS/OSC/etc.) is caught rather than
 // crashing the process. See ./main/process-guards.
-const { installProcessGuards } = require('./main/process-guards');
+const { installProcessGuards } = require('./main/process-guards') as typeof import('./main/process-guards');
 installProcessGuards();
 // Gate multiple instances. If another instance is already running, quit early.
 const gotTheLock = app.requestSingleInstanceLock();
@@ -33,7 +33,7 @@ if (!gotTheLock) {
   Logger.log('Single instance lock acquired');
 }
 
-const { PRELOADER_MIN_DISPLAY_MS } = require('./Modules/Config/constants');
+const { PRELOADER_MIN_DISPLAY_MS } = require('./Modules/Config/constants') as typeof import('./Modules/Config/constants');
 
 // --- Back-end manager boot ---------------------------------------------------
 // Load order is preserved from the original main.ts. `require('./Modules/Server')`
@@ -41,33 +41,33 @@ const { PRELOADER_MIN_DISPLAY_MS } = require('./Modules/Config/constants');
 // here explicitly and early rather than lazily via a registrar. The remaining
 // managers are loaded during this module's evaluation via the registrar and
 // broadcast-bridge requires below (each manager pulls its own dependencies).
-const { Manager: ScriptManager } = require('./Modules/ScriptManager');
+const { Manager: ScriptManager } = require('./Modules/ScriptManager') as typeof import('./Modules/ScriptManager');
 ScriptManager.GetScripts();
-const { Manager: SampleScriptsManager } = require('./Modules/SampleScripts');
+const { Manager: SampleScriptsManager } = require('./Modules/SampleScripts') as typeof import('./Modules/SampleScripts');
 SampleScriptsManager.Initialize();
 require('./Modules/Server'); // binds HTTP + Socket.IO server on load
-const { Manager: BonjourManager } = require('./Modules/Bonjour');
+const { Manager: BonjourManager } = require('./Modules/Bonjour') as typeof import('./Modules/Bonjour');
 BonjourManager.Init();
 require('./Modules/OSC'); // binds the OSC UDP listener on load
-const { Manager: MonitoringTargetManager } = require('./Modules/MonitoringTargetManager');
-const { Manager: DummyClientManager } = require('./Modules/DummyClientManager');
-const { Manager: AlertsManager } = require('./Modules/AlertsManager');
-const { Manager: AudioAssetManager } = require('./Modules/AudioAssetManager');
-const { Manager: BroadcastManager } = require('./Modules/Broadcast');
-const { Manager: NetworkInterfaces } = require('./Modules/NetworkInterfaces');
-const { Manager: SettingsManager } = require('./Modules/SettingsManager');
-const { Manager: ModeManager } = require('./Modules/ModeManager');
-const { Wait } = require('./Modules/Utils');
+const { Manager: MonitoringTargetManager } = require('./Modules/MonitoringTargetManager') as typeof import('./Modules/MonitoringTargetManager');
+const { Manager: DummyClientManager } = require('./Modules/DummyClientManager') as typeof import('./Modules/DummyClientManager');
+const { Manager: AlertsManager } = require('./Modules/AlertsManager') as typeof import('./Modules/AlertsManager');
+const { Manager: AudioAssetManager } = require('./Modules/AudioAssetManager') as typeof import('./Modules/AudioAssetManager');
+const { Manager: BroadcastManager } = require('./Modules/Broadcast') as typeof import('./Modules/Broadcast');
+const { Manager: NetworkInterfaces } = require('./Modules/NetworkInterfaces') as typeof import('./Modules/NetworkInterfaces');
+const { Manager: SettingsManager } = require('./Modules/SettingsManager') as typeof import('./Modules/SettingsManager');
+const { Manager: ModeManager } = require('./Modules/ModeManager') as typeof import('./Modules/ModeManager');
+const { Wait } = require('./Modules/Utils') as typeof import('./Modules/Utils');
 const path = require('path');
 
 // --- Main-process infrastructure (no manager dependencies) -------------------
-const { RPC } = require('./main/rpc');
-const { RegisterRendererSink, PushToRenderers } = require('./main/renderer-bus');
-const { getMainWindow, setMainWindow, hasMainWindow } = require('./main/app-window');
-const { configureApplicationMenu } = require('./main/app-menu');
-const { applyWindowSecurityGuards } = require('./main/window-guards');
-const { applyWindowZoomShortcuts } = require('./main/window-zoom');
-const { scheduleAutosave } = require('./main/autosave');
+const { RPC } = require('./main/rpc') as typeof import('./main/rpc');
+const { RegisterRendererSink, PushToRenderers } = require('./main/renderer-bus') as typeof import('./main/renderer-bus');
+const { getMainWindow, setMainWindow, hasMainWindow } = require('./main/app-window') as typeof import('./main/app-window');
+const { configureApplicationMenu } = require('./main/app-menu') as typeof import('./main/app-menu');
+const { applyWindowSecurityGuards } = require('./main/window-guards') as typeof import('./main/window-guards');
+const { applyWindowZoomShortcuts } = require('./main/window-zoom') as typeof import('./main/window-zoom');
+const { scheduleAutosave } = require('./main/autosave') as typeof import('./main/autosave');
 const {
   setAccidentalShutdownProtection,
   handleMainWindowClose,
@@ -78,13 +78,14 @@ const {
   handleBeforeQuit,
   handlePowerMonitorShutdown,
   handleBeforeQuitForUpdate,
-} = require('./main/shutdown-coordinator');
+} = require('./main/shutdown-coordinator') as typeof import('./main/shutdown-coordinator');
 
 // The Electron desktop window is a renderer sink: forward every pushed channel
 // to it (guarded against teardown). Web sockets register their own sink later.
 RegisterRendererSink((channel: string, ...args: unknown[]) => {
-  if (hasMainWindow()) {
-    getMainWindow().webContents.send(channel, ...args);
+  const Window = getMainWindow();
+  if (Window) {
+    Window.webContents.send(channel, ...args);
   }
 });
 
@@ -168,13 +169,14 @@ app.whenReady().then(async () => {
     setMode: (mode: string) => ModeManager.Set(mode),
   });
 
-  if (getMainWindow()) {
-    getMainWindow().close();
+  const ExistingWindow = getMainWindow();
+  if (ExistingWindow) {
+    ExistingWindow.close();
     setMainWindow(null);
   }
 
   setAccidentalShutdownProtection(
-    await SettingsManager.GetValue('SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4')
+    !!(await SettingsManager.GetValue('SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4'))
   );
 
   // Lightweight splash that keeps the app responsive while heavy init finishes
@@ -257,7 +259,7 @@ app.whenReady().then(async () => {
   // Renderer-invoked shutdown. The coordinator decides whether to quit now or
   // ask the renderer to confirm first (show mode).
   RPC.handle('Shutdown', async (_event: unknown, Confirmed = false) => {
-    await handleRpcShutdown(Confirmed);
+    await handleRpcShutdown(!!Confirmed);
   });
 
   app.on('activate', () => {
@@ -274,8 +276,8 @@ const {
   RegisterBroadcastBridge,
   ValidateAlertAudioAssets,
   UpdateAdoptionList,
-} = require('./main/broadcast-bridge');
-const { RegisterAllHandlers } = require('./main/registrars');
+} = require('./main/broadcast-bridge') as typeof import('./main/broadcast-bridge');
+const { RegisterAllHandlers } = require('./main/registrars') as typeof import('./main/registrars');
 RegisterBroadcastBridge();
 
 // --- Autosave ----------------------------------------------------------------
@@ -287,7 +289,7 @@ scheduleAutosave().catch((Err: unknown) => Logger.error('Failed to schedule auto
 // --- Live-applied settings ---------------------------------------------------
 // Log level, default monitoring interval, and shutdown protection are applied
 // at boot and re-applied on change (no restart required). See ./main/live-settings.
-const { initLiveSettings } = require('./main/live-settings');
+const { initLiveSettings } = require('./main/live-settings') as typeof import('./main/live-settings');
 initLiveSettings().catch((Err: unknown) => Logger.error('Failed to init live settings:', Err));
 
 // --- Remote/OS shutdown hooks ------------------------------------------------

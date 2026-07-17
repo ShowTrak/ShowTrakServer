@@ -8,6 +8,7 @@ import { Manager as MonitoringMethods } from '../MonitoringMethods';
 import { Ok, Fail } from '../Utils';
 import { createGroupOrdering } from '../Shared/group-ordering';
 import type { Result } from '../../types/result';
+import type { TxRun } from '../DB';
 import type { MonitoringTargetView } from '@showtrak/protocol';
 import type { MonitoringTargetRow } from '../DB/rows';
 
@@ -71,11 +72,13 @@ function ToRowSettings(Method: string, Settings: unknown): string {
 }
 
 // Insert a single check row for a target and return the persisted row shape.
+// `run`, when supplied, enlists the insert in a caller-owned transaction.
 async function InsertCheckRow(
   TargetID: number,
   Check: MonitoringCheckPayload,
   Weight: number,
-  Now: number
+  Now: number,
+  run?: TxRun
 ): Promise<MonitoringCheckInput | null> {
   const SettingsJson = ToRowSettings(Check.Method, Check.Settings);
   const Threshold = ClampThreshold(Check.DegradedThresholdMs);
@@ -88,7 +91,8 @@ async function InsertCheckRow(
     Threshold,
     Weight,
     null,
-    Now
+    Now,
+    run
   );
   if (Err || !Res) return null;
   return {
@@ -382,24 +386,33 @@ const Manager = {
     const GroupID = Payload.GroupID == null ? null : Payload.GroupID;
     const Weight = typeof Payload.Weight === 'number' ? Payload.Weight : 100;
 
-    const [Err, Res] = await TargetsRepo.Insert(
-      Payload.Nickname,
-      Checks.length ? Checks[0].Method : '',
-      Interval,
-      GroupID,
-      Weight,
-      Now
-    );
-    if (Err || !Res) return Fail('Failed to create monitoring target');
-    const TargetID = Res.lastID;
+    // The target row and every check row insert together or not at all: a
+    // partial failure must never persist a target whose check set is incomplete.
+    const [TxErr, Created] = await DB.WithTransaction(async (run) => {
+      const [Err, Res] = await TargetsRepo.Insert(
+        Payload.Nickname,
+        Checks.length ? Checks[0].Method : '',
+        Interval,
+        GroupID,
+        Weight,
+        Now,
+        run
+      );
+      if (Err || !Res) throw Err || new Error('Failed to create monitoring target');
+      const TargetID = Res.lastID;
 
-    const CheckRows: MonitoringCheckInput[] = [];
-    let CheckWeight = 100;
-    for (const C of Checks) {
-      const Row = await InsertCheckRow(TargetID, C, CheckWeight, Now);
-      if (Row) CheckRows.push(Row);
-      CheckWeight += 10;
-    }
+      const CheckRows: MonitoringCheckInput[] = [];
+      let CheckWeight = 100;
+      for (const C of Checks) {
+        const Row = await InsertCheckRow(TargetID, C, CheckWeight, Now, run);
+        if (!Row) throw new Error('Failed to create monitoring check');
+        CheckRows.push(Row);
+        CheckWeight += 10;
+      }
+      return { TargetID, CheckRows };
+    });
+    if (TxErr || !Created) return Fail('Failed to create monitoring target');
+    const { TargetID, CheckRows } = Created;
 
     const Target = new MonitoringTarget(
       { TargetID, Nickname: Payload.Nickname, Interval, GroupID, Weight, Timestamp: Now },
@@ -465,13 +478,13 @@ const Manager = {
     if (Idx === -1) return Fail('Monitoring target not found');
     const Target = TargetList[Idx];
     Target.StopLoop();
-    const [Err] = await TargetsRepo.Delete(ID);
+    const [Err] = await TargetsRepo.DeleteTargetCascade(ID);
     if (Err) {
-      // The row survived, so the target must keep polling.
+      // The transaction rolled back, so the row (and its checks) survived —
+      // the target must keep polling.
       Target.StartLoop();
       return Fail('Failed to delete monitoring target');
     }
-    await ChecksRepo.DeleteByTarget(ID);
     TargetList.splice(Idx, 1);
     BroadcastManager.emit('MonitoringTargetListChanged');
     return Ok(true);

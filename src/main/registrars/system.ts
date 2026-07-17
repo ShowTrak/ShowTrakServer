@@ -12,11 +12,11 @@ const { shell } = require('electron');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
-const { Config } = require('../../Modules/Config');
-const { Manager: ModeManager } = require('../../Modules/ModeManager');
-const { Manager: SettingsManager } = require('../../Modules/SettingsManager');
-const { Manager: AppDataManager } = require('../../Modules/AppData');
-const { Manager: NetworkInterfaces } = require('../../Modules/NetworkInterfaces');
+const { Config } = require('../../Modules/Config') as typeof import('../../Modules/Config');
+const { Manager: ModeManager } = require('../../Modules/ModeManager') as typeof import('../../Modules/ModeManager');
+const { Manager: SettingsManager } = require('../../Modules/SettingsManager') as typeof import('../../Modules/SettingsManager');
+const { Manager: AppDataManager } = require('../../Modules/AppData') as typeof import('../../Modules/AppData');
+const { Manager: NetworkInterfaces } = require('../../Modules/NetworkInterfaces') as typeof import('../../Modules/NetworkInterfaces');
 const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
 
 const Logger = CreateLogger('Main');
@@ -194,12 +194,13 @@ function register(): void {
   });
 
   RPC.handle('SetSetting', async (_event: unknown, Key: unknown, Value: unknown) => {
+    let ValidKey, ValidValue;
     try {
-      [Key, Value] = IPCValidation.SettingUpdatePayload(Key, Value);
+      [ValidKey, ValidValue] = IPCValidation.SettingUpdatePayload(Key, Value);
     } catch (error) {
       return validationErrorTuple(error);
     }
-    const [Err, Setting] = await SettingsManager.Set(Key, Value);
+    const [Err, Setting] = await SettingsManager.Set(ValidKey, ValidValue);
     if (Err) return [Err, null];
     return [null, Setting];
   });

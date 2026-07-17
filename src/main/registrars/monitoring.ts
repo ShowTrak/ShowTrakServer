@@ -12,8 +12,8 @@ import {
   getClientDisplayHistorySamples,
 } from '../monitoring-history';
 import type { IPCValidationManager } from '../../Modules/IPCValidation';
-const { Manager: MonitoringMethods } = require('../../Modules/MonitoringMethods');
-const { Manager: MonitoringTargetManager } = require('../../Modules/MonitoringTargetManager');
+const { Manager: MonitoringMethods } = require('../../Modules/MonitoringMethods') as typeof import('../../Modules/MonitoringMethods');
+const { Manager: MonitoringTargetManager } = require('../../Modules/MonitoringTargetManager') as typeof import('../../Modules/MonitoringTargetManager');
 const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
 
 function register(): void {
@@ -129,7 +129,12 @@ function register(): void {
     'CreateMonitoringTarget',
     createTupleHandler<[Record<string, unknown>], unknown>(
       (Payload: unknown) => IPCValidation.MonitoringTargetCreatePayload(Payload),
-      (Payload: Record<string, unknown>) => MonitoringTargetManager.Create(Payload)
+      // The IPC validator has already normalized this into a valid create payload
+      // (runtime-checked shape the type system can't see across the boundary).
+      (Payload: Record<string, unknown>) =>
+        MonitoringTargetManager.Create(
+          Payload as unknown as Parameters<typeof MonitoringTargetManager.Create>[0]
+        )
     )
   );
 

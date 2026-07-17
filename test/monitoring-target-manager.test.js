@@ -86,6 +86,13 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
           untrackedRunCalls.push([sql, params]);
           return [null, { changes: 1 }];
         },
+        WithTransaction: async (fn) => {
+          try {
+            return [null, await fn(dbMock.Manager.Run)];
+          } catch (err) {
+            return [err, null];
+          }
+        },
       },
     };
 

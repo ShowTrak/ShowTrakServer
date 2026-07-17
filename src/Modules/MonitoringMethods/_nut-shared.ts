@@ -162,9 +162,15 @@ export async function ProbeNut(
 ): Promise<NutProbe> {
   return new Promise<NutProbe>((resolve) => {
     const Started = Date.now();
+    // Whole-probe budget. Socket.setTimeout below is only an IDLE timeout — it
+    // resets on every data event, so across the sequential round trips (auth,
+    // LIST UPS, one GET VAR per variable) a slow-but-trickling daemon could keep
+    // the probe alive far beyond TimeoutMs. This absolute deadline caps the total.
+    const BudgetMs = Math.max(500, TimeoutMs | 0);
     const Socket = new net.Socket();
     let Buffer0 = '';
     let Settled = false;
+    let DeadlineTimer: ReturnType<typeof setTimeout> | null = null;
     let Waiter: {
       Predicate: (Buf: string) => number | null;
       Resolve: (Reply: string) => void;
@@ -174,6 +180,10 @@ export async function ProbeNut(
     const Finish = (Result: NutProbe) => {
       if (Settled) return;
       Settled = true;
+      if (DeadlineTimer) {
+        clearTimeout(DeadlineTimer);
+        DeadlineTimer = null;
+      }
       try {
         Socket.destroy();
       } catch {
@@ -214,7 +224,19 @@ export async function ProbeNut(
         Pump();
       });
 
-    Socket.setTimeout(Math.max(500, TimeoutMs | 0));
+    Socket.setTimeout(BudgetMs);
+
+    // Absolute cap on the whole probe, independent of the (resettable) idle
+    // timeout above.
+    DeadlineTimer = setTimeout(() => {
+      FailWaiter(new Error('timeout'));
+      Finish({
+        Reachable: false,
+        Error: `NUT probe exceeded ${BudgetMs}ms`,
+        Vars: {},
+        VarErrors: {},
+      });
+    }, BudgetMs);
 
     Socket.on('data', (Chunk: Buffer) => {
       Buffer0 += Chunk.toString('utf8');
