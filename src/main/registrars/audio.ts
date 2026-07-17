@@ -4,9 +4,9 @@ import { RPC } from '../rpc';
 import { validationErrorTuple } from '../ipc/create-handler';
 import { PushToRenderers } from '../renderer-bus';
 import type { IPCValidationManager } from '../../Modules/IPCValidation';
-const { Manager: AudioAssetManager } = require('../../Modules/AudioAssetManager');
-const { Manager: FileSelectorManager } = require('../../Modules/FileSelectorManager');
-const { Manager: AppDataManager } = require('../../Modules/AppData');
+const { Manager: AudioAssetManager } = require('../../Modules/AudioAssetManager') as typeof import('../../Modules/AudioAssetManager');
+const { Manager: FileSelectorManager } = require('../../Modules/FileSelectorManager') as typeof import('../../Modules/FileSelectorManager');
+const { Manager: AppDataManager } = require('../../Modules/AppData') as typeof import('../../Modules/AppData');
 const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
 
 function register(): void {
@@ -17,12 +17,13 @@ function register(): void {
   });
 
   RPC.handle('Audio:GetData', async (_Event: unknown, ID: unknown) => {
+    let ValidID;
     try {
-      ID = IPCValidation.AudioAssetID(ID);
+      ValidID = IPCValidation.AudioAssetID(ID);
     } catch (error) {
       return validationErrorTuple(error);
     }
-    const [Err, Payload] = AudioAssetManager.GetDataURL(ID);
+    const [Err, Payload] = AudioAssetManager.GetDataURL(ValidID);
     if (Err) return [Err, null];
     return [null, Payload];
   });
@@ -37,37 +38,41 @@ function register(): void {
   });
 
   RPC.handle('Audio:Import', async (_Event: unknown, Payload: unknown) => {
+    let ValidPayload;
     try {
-      Payload = IPCValidation.AudioImportPayload(Payload);
+      ValidPayload = IPCValidation.AudioImportPayload(Payload);
     } catch (error) {
       return validationErrorTuple(error);
     }
-    const [Err, Asset] = await AudioAssetManager.Import(Payload);
+    const [Err, Asset] = await AudioAssetManager.Import(ValidPayload);
     if (Err) return [Err, null];
     PushToRenderers('AudioAssetsUpdated');
     return [null, Asset];
   });
 
   RPC.handle('Audio:Update', async (_Event: unknown, ID: unknown, Payload: unknown) => {
+    let ValidID;
+    let ValidPayload;
     try {
-      ID = IPCValidation.AudioAssetID(ID);
-      Payload = IPCValidation.AudioUpdatePayload(Payload);
+      ValidID = IPCValidation.AudioAssetID(ID);
+      ValidPayload = IPCValidation.AudioUpdatePayload(Payload);
     } catch (error) {
       return validationErrorTuple(error);
     }
-    const [Err, Asset] = await AudioAssetManager.Update(ID, Payload);
+    const [Err, Asset] = await AudioAssetManager.Update(ValidID, ValidPayload);
     if (Err) return [Err, null];
     PushToRenderers('AudioAssetsUpdated');
     return [null, Asset];
   });
 
   RPC.handle('Audio:Delete', async (_Event: unknown, ID: unknown) => {
+    let ValidID;
     try {
-      ID = IPCValidation.AudioAssetID(ID);
+      ValidID = IPCValidation.AudioAssetID(ID);
     } catch (error) {
       return validationErrorTuple(error);
     }
-    const [Err, Result] = await AudioAssetManager.Delete(ID);
+    const [Err, Result] = await AudioAssetManager.Delete(ValidID);
     if (Err) return [Err, null];
     PushToRenderers('AudioAssetsUpdated');
     return [null, Result];

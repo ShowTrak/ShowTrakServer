@@ -4,7 +4,7 @@
 import { RPC } from '../rpc';
 import { createTupleHandler } from '../ipc/create-handler';
 import type { IPCValidationManager } from '../../Modules/IPCValidation';
-const { Manager: AlertsManager } = require('../../Modules/AlertsManager');
+const { Manager: AlertsManager } = require('../../Modules/AlertsManager') as typeof import('../../Modules/AlertsManager');
 const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
 
 function register(): void {
@@ -37,7 +37,10 @@ function register(): void {
     'CreateAlertRule',
     createTupleHandler<[Record<string, unknown>], unknown>(
       (Payload: unknown) => IPCValidation.AlertRuleCreatePayload(Payload),
-      (Payload: Record<string, unknown>) => AlertsManager.Create(Payload)
+      // The IPC validator has already normalized this into a valid create payload
+      // (runtime-checked shape the type system can't see across the boundary).
+      (Payload: Record<string, unknown>) =>
+        AlertsManager.Create(Payload as unknown as Parameters<typeof AlertsManager.Create>[0])
     )
   );
 

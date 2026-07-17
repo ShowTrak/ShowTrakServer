@@ -4,8 +4,8 @@
 import { CreateLogger } from '../../Modules/Logger';
 import { RPC } from '../rpc';
 import { sendShowFileUpdated } from '../app-window';
-const { Manager: BackupManager } = require('../../Modules/BackupManager');
-const { Manager: FileSelectorManager } = require('../../Modules/FileSelectorManager');
+const { Manager: BackupManager } = require('../../Modules/BackupManager') as typeof import('../../Modules/BackupManager');
+const { Manager: FileSelectorManager } = require('../../Modules/FileSelectorManager') as typeof import('../../Modules/FileSelectorManager');
 
 const Logger = CreateLogger('Main');
 
@@ -21,6 +21,7 @@ function register(): void {
       }
       CurrentPath = filePath;
     }
+    if (!CurrentPath) return ['Cancelled By User', null];
     Logger.log('Saving ShowTrak file to:', CurrentPath);
     const [Err, Result] = await BackupManager.Save(CurrentPath);
     if (Err) return [Err, null];

@@ -10,10 +10,10 @@ import { getMainWindow, hasMainWindow } from '../app-window';
 import { normalizeVersionToken } from '../local-scripts';
 import type { ClientManagerType } from '../../Modules/ClientManager';
 import type { IPCValidationManager } from '../../Modules/IPCValidation';
-const { Manager: AppUpdater } = require('../app-updater');
-const { Manager: UpdateManager } = require('../../Modules/UpdateManager');
+const { Manager: AppUpdater } = require('../app-updater') as typeof import('../app-updater');
+const { Manager: UpdateManager } = require('../../Modules/UpdateManager') as typeof import('../../Modules/UpdateManager');
 const { Manager: ClientManager }: { Manager: ClientManagerType } = require('../../Modules/ClientManager');
-const { Manager: ServerManager } = require('../../Modules/Server');
+const { Manager: ServerManager } = require('../../Modules/Server') as typeof import('../../Modules/Server');
 const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
 
 const Logger = CreateLogger('Main');
@@ -24,13 +24,18 @@ function register(): void {
   AppUpdater.Register(RPC, { getMainWindow });
 
   RPC.handle('CheckForUpdatesOnClient', async (_Event: unknown, UUID: unknown) => {
+    let ValidUUID;
     try {
-      UUID = IPCValidation.UUID(UUID);
+      ValidUUID = IPCValidation.UUID(UUID);
     } catch (error) {
       return validationErrorTuple(error);
     }
-    Logger.warn('CheckForUpdatesOnClient called for UUID:', UUID);
-    await ServerManager.ExecuteBulkRequest('UpdateSoftware', [UUID], 'Check For Software Updates');
+    Logger.warn('CheckForUpdatesOnClient called for UUID:', ValidUUID);
+    await ServerManager.ExecuteBulkRequest(
+      'UpdateSoftware',
+      [ValidUUID],
+      'Check For Software Updates'
+    );
     return [null, true];
   });
 

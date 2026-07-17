@@ -14,26 +14,35 @@ import type {
   CriticalApplicationPayloadResult,
   CriticalDisplayPayloadResult,
 } from '../../Modules/IPCValidation';
-const { Manager: ClientManager } = require('../../Modules/ClientManager');
-const { Manager: AdoptionManager } = require('../../Modules/AdoptionManager');
-const { Manager: ServerManager } = require('../../Modules/Server');
-const { Manager: AlertsManager } = require('../../Modules/AlertsManager');
-const { Manager: IdentifyManager } = require('../../Modules/IdentifyManager');
-const { Manager: WOLManager } = require('../../Modules/WOLManager');
-const { Manager: ScriptExecutionManager } = require('../../Modules/ScriptExecutionManager');
-const { Manager: SettingsManager } = require('../../Modules/SettingsManager');
+const { Manager: ClientManager } =
+  require('../../Modules/ClientManager') as typeof import('../../Modules/ClientManager');
+const { Manager: AdoptionManager } =
+  require('../../Modules/AdoptionManager') as typeof import('../../Modules/AdoptionManager');
+const { Manager: ServerManager } =
+  require('../../Modules/Server') as typeof import('../../Modules/Server');
+const { Manager: AlertsManager } =
+  require('../../Modules/AlertsManager') as typeof import('../../Modules/AlertsManager');
+const { Manager: IdentifyManager } =
+  require('../../Modules/IdentifyManager') as typeof import('../../Modules/IdentifyManager');
+const { Manager: WOLManager } =
+  require('../../Modules/WOLManager') as typeof import('../../Modules/WOLManager');
+const { Manager: ScriptExecutionManager } =
+  require('../../Modules/ScriptExecutionManager') as typeof import('../../Modules/ScriptExecutionManager');
+const { Manager: SettingsManager } =
+  require('../../Modules/SettingsManager') as typeof import('../../Modules/SettingsManager');
 const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
 
 const Logger = CreateLogger('Main');
 
 function register(): void {
   RPC.handle('GetClient', async (_Event: unknown, UUID: unknown) => {
+    let ValidUUID: string;
     try {
-      UUID = IPCValidation.UUID(UUID);
+      ValidUUID = IPCValidation.UUID(UUID);
     } catch {
       return null;
     }
-    const [Err, Client] = await ClientManager.Get(UUID);
+    const [Err, Client] = await ClientManager.Get(ValidUUID);
     if (Err) return null;
     if (!Client) return null;
     return Client;
@@ -194,6 +203,7 @@ function register(): void {
           Payload.Count
         );
         if (CreateErr) return [CreateErr, null];
+        if (!Created) return ['Failed to create unassigned clients', null];
 
         await UpdateFullClientList();
         return [null, Created.length];
@@ -249,6 +259,9 @@ function register(): void {
     await ScriptExecutionManager.ClearQueue();
     const tasks = Targets.map(async (UUID: string) => {
       const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, 'Wake On LAN');
+      // No RequestID means the task was never queued (the client vanished between
+      // validation and enqueue) — there is nothing to complete.
+      if (!RequestID) return;
       const [ClientErr, Client] = await ClientManager.Get(UUID);
       if (ClientErr) {
         await ScriptExecutionManager.Complete(RequestID, ClientErr);

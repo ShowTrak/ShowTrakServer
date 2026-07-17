@@ -3,7 +3,7 @@
 import { RPC } from '../rpc';
 import { createTupleHandler } from '../ipc/create-handler';
 import type { IPCValidationManager } from '../../Modules/IPCValidation';
-const { Manager: DummyClientManager } = require('../../Modules/DummyClientManager');
+const { Manager: DummyClientManager } = require('../../Modules/DummyClientManager') as typeof import('../../Modules/DummyClientManager');
 const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
 
 function register(): void {
@@ -14,12 +14,13 @@ function register(): void {
   });
 
   RPC.handle('GetDummyClient', async (_Event: unknown, UUID: unknown) => {
+    let ValidUUID;
     try {
-      UUID = IPCValidation.DummyClientUUID(UUID);
+      ValidUUID = IPCValidation.DummyClientUUID(UUID);
     } catch {
       return null;
     }
-    const [Err, Dummy] = await DummyClientManager.Get(UUID);
+    const [Err, Dummy] = await DummyClientManager.Get(ValidUUID);
     if (Err) return null;
     return Dummy;
   });
