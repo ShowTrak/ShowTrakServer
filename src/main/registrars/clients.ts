@@ -8,7 +8,6 @@ import { createTupleHandler, validationErrorTuple } from '../ipc/create-handler'
 import { UpdateFullClientList } from '../broadcast-bridge';
 import { TriggerScriptDeployment } from '../deployment';
 import type {
-  IPCValidationManager,
   CriticalUSBDevicePayloadResult,
   CriticalUSBNamePayloadResult,
   CriticalApplicationPayloadResult,
@@ -30,7 +29,8 @@ const { Manager: ScriptExecutionManager } =
   require('../../Modules/ScriptExecutionManager') as typeof import('../../Modules/ScriptExecutionManager');
 const { Manager: SettingsManager } =
   require('../../Modules/SettingsManager') as typeof import('../../Modules/SettingsManager');
-const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
+const { Manager: IPCValidation } =
+  require('../../Modules/IPCValidation') as typeof import('../../Modules/IPCValidation');
 
 const Logger = CreateLogger('Main');
 

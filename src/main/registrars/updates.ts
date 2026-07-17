@@ -9,12 +9,11 @@ import { PushToRenderers } from '../renderer-bus';
 import { getMainWindow, hasMainWindow } from '../app-window';
 import { normalizeVersionToken } from '../local-scripts';
 import type { ClientManagerType } from '../../Modules/ClientManager';
-import type { IPCValidationManager } from '../../Modules/IPCValidation';
 const { Manager: AppUpdater } = require('../app-updater') as typeof import('../app-updater');
 const { Manager: UpdateManager } = require('../../Modules/UpdateManager') as typeof import('../../Modules/UpdateManager');
 const { Manager: ClientManager }: { Manager: ClientManagerType } = require('../../Modules/ClientManager');
 const { Manager: ServerManager } = require('../../Modules/Server') as typeof import('../../Modules/Server');
-const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
+const { Manager: IPCValidation } = require('../../Modules/IPCValidation') as typeof import('../../Modules/IPCValidation');
 
 const Logger = CreateLogger('Main');
 

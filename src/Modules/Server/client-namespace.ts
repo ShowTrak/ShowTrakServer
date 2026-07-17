@@ -287,7 +287,9 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       ],
       (RequestID: string, Error: string | null) => {
         Logger.log(`Received Integrated Event Response for RequestID: ${RequestID}`);
-        ScriptExecutionManager.Complete(RequestID, Error);
+        ScriptExecutionManager.Complete(RequestID, Error).catch((err) =>
+          Logger.error('Failed to complete integrated event execution:', err)
+        );
       }
     );
 
@@ -413,7 +415,9 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       Logger.log('Client disconnected', { UUID: socket.UUID, reason });
       await IdentifyManager.HandleDisconnect(socket.UUID);
       AdoptionManager.RemoveClientPendingAdoption(socket.UUID);
-      ClientManager.Timeout(socket.UUID);
+      ClientManager.Timeout(socket.UUID).catch((err) =>
+        Logger.error('Failed to time out client on disconnect:', err)
+      );
     });
 
     // Client-initiated stop of identify mode (esc pressed or overlay clicked).
@@ -429,7 +433,9 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       ],
       (RequestID: string, Error: string | null) => {
         Logger.log(`Received Script Execution Response for RequestID: ${RequestID}`);
-        ScriptExecutionManager.Complete(RequestID, Error);
+        ScriptExecutionManager.Complete(RequestID, Error).catch((err) =>
+          Logger.error('Failed to complete script execution:', err)
+        );
       }
     );
 
@@ -440,7 +446,9 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
         ...SocketValidation.ExecutionProgress(Progress, StatusText),
       ],
       (RequestID: string, Progress: number, StatusText: string | null) => {
-        ScriptExecutionManager.UpdateProgress(RequestID, Progress, StatusText);
+        ScriptExecutionManager.UpdateProgress(RequestID, Progress, StatusText).catch((err) =>
+          Logger.error('Failed to update script execution progress:', err)
+        );
       }
     );
   });

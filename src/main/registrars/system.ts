@@ -6,7 +6,6 @@ import { CreateLogger } from '../../Modules/Logger';
 import { RPC } from '../rpc';
 import { validationErrorTuple } from '../ipc/create-handler';
 import { PushInitialDesktopState } from '../initial-state';
-import type { IPCValidationManager } from '../../Modules/IPCValidation';
 const { app } = require('electron/main');
 const { shell } = require('electron');
 const os = require('os');
@@ -17,7 +16,7 @@ const { Manager: ModeManager } = require('../../Modules/ModeManager') as typeof 
 const { Manager: SettingsManager } = require('../../Modules/SettingsManager') as typeof import('../../Modules/SettingsManager');
 const { Manager: AppDataManager } = require('../../Modules/AppData') as typeof import('../../Modules/AppData');
 const { Manager: NetworkInterfaces } = require('../../Modules/NetworkInterfaces') as typeof import('../../Modules/NetworkInterfaces');
-const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
+const { Manager: IPCValidation } = require('../../Modules/IPCValidation') as typeof import('../../Modules/IPCValidation');
 
 const Logger = CreateLogger('Main');
 

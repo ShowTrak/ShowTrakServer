@@ -116,6 +116,32 @@ const EntityOnlineState = new Map<string, boolean>();
 const EntityDegradedState = new Map<string, boolean>();
 let AlertActionsEnabled = true;
 
+// AlertHistory retention. The table is append-only (a row per rule firing), so
+// without a cap it grows without bound over a long-running show. Keep the newest
+// ALERT_HISTORY_MAX_ROWS entries, pruned on a low-frequency unref'd timer (plus
+// once at Init to bound histories carried over from a previous session).
+const ALERT_HISTORY_MAX_ROWS = 10000;
+const ALERT_HISTORY_PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+let historyPruneTimer: ReturnType<typeof setInterval> | null = null;
+
+async function pruneAlertHistory() {
+  try {
+    const [Err] = await HistoryRepo.PruneToMaxRows(ALERT_HISTORY_MAX_ROWS);
+    if (Err) Logger.error('Failed to prune alert history', Err);
+  } catch (error) {
+    Logger.error('Failed to prune alert history', error);
+  }
+}
+
+function startHistoryPruning() {
+  if (historyPruneTimer) return;
+  historyPruneTimer = setInterval(() => {
+    void pruneAlertHistory();
+  }, ALERT_HISTORY_PRUNE_INTERVAL_MS);
+  if (typeof historyPruneTimer.unref === 'function') historyPruneTimer.unref();
+  void pruneAlertHistory();
+}
+
 async function writeHistory(
   Rule: AlertRule,
   Context: AlertContext,
@@ -204,6 +230,7 @@ Manager.Init = async () => {
   }
   RuleList = (Rows || []).map(normalizeRuleRow);
   Initialized = true;
+  startHistoryPruning();
 };
 
 Manager.GetAll = async () => {

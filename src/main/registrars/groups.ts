@@ -3,13 +3,12 @@
 
 import { RPC } from '../rpc';
 import { createTupleHandler, validationErrorTuple } from '../ipc/create-handler';
-import type { IPCValidationManager } from '../../Modules/IPCValidation';
 const { Manager: GroupManager } = require('../../Modules/GroupManager') as typeof import('../../Modules/GroupManager');
 const { Manager: MonitoringTargetManager } = require('../../Modules/MonitoringTargetManager') as typeof import('../../Modules/MonitoringTargetManager');
 const { Manager: DummyClientManager } = require('../../Modules/DummyClientManager') as typeof import('../../Modules/DummyClientManager');
 const { Manager: ClientManager } = require('../../Modules/ClientManager') as typeof import('../../Modules/ClientManager');
 const { Manager: BroadcastManager } = require('../../Modules/Broadcast') as typeof import('../../Modules/Broadcast');
-const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
+const { Manager: IPCValidation } = require('../../Modules/IPCValidation') as typeof import('../../Modules/IPCValidation');
 
 function register(): void {
   RPC.handle('GetAllGroups', async (_Event: unknown) => {

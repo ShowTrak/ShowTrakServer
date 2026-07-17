@@ -15,7 +15,6 @@ import {
   parseArgumentString,
   runLocalScriptFile,
 } from '../local-scripts';
-import type { IPCValidationManager } from '../../Modules/IPCValidation';
 const { shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -27,7 +26,7 @@ const { Manager: SampleScriptsManager } = require('../../Modules/SampleScripts')
 const { Manager: SettingsManager } = require('../../Modules/SettingsManager') as typeof import('../../Modules/SettingsManager');
 const { Manager: AppDataManager } = require('../../Modules/AppData') as typeof import('../../Modules/AppData');
 const { Manager: BroadcastManager } = require('../../Modules/Broadcast') as typeof import('../../Modules/Broadcast');
-const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
+const { Manager: IPCValidation } = require('../../Modules/IPCValidation') as typeof import('../../Modules/IPCValidation');
 
 const Logger = CreateLogger('Main');
 
