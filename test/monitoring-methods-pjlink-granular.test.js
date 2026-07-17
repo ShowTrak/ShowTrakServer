@@ -37,7 +37,10 @@ test('pjlink-power: expected-state matching', () => {
   assert.equal(_internal.EvaluatePower(snapshot({ Power: 3 }), 'on-or-warmup'), null);
   assert.equal(_internal.EvaluatePower(snapshot({ Power: 0 }), 'any'), null);
   assert.match(_internal.EvaluatePower(snapshot({ PowerErr: 'ERR3', Power: null }), 'on'), /busy/i);
-  assert.match(_internal.EvaluatePower(snapshot({ PowerErr: 'ERR4', Power: null }), 'on'), /failure/i);
+  assert.match(
+    _internal.EvaluatePower(snapshot({ PowerErr: 'ERR4', Power: null }), 'on'),
+    /failure/i
+  );
 });
 
 test('pjlink-lamp: threshold, laser (ERR1) and unavailable', () => {
@@ -61,10 +64,15 @@ test('pjlink-lamp: threshold, laser (ERR1) and unavailable', () => {
 test('pjlink-errors: errors always degrade, warnings gated', () => {
   const { _internal } = require(methodPath('pjlink-errors.js'));
   assert.deepEqual(_internal.EvaluateErrors(snapshot(), true), []);
-  const errSnap = snapshot({ Erst: { Fan: 2, Lamp: 1, Temperature: 0, Cover: 0, Filter: 0, Other: 0 } });
+  const errSnap = snapshot({
+    Erst: { Fan: 2, Lamp: 1, Temperature: 0, Cover: 0, Filter: 0, Other: 0 },
+  });
   assert.deepEqual(_internal.EvaluateErrors(errSnap, false), ['Fan error']);
   assert.deepEqual(_internal.EvaluateErrors(errSnap, true), ['Fan error', 'Lamp warning']);
-  assert.match(_internal.EvaluateErrors(snapshot({ Erst: null, ErstErr: 'ERR3' }), true)[0], /unavailable/i);
+  assert.match(
+    _internal.EvaluateErrors(snapshot({ Erst: null, ErstErr: 'ERR3' }), true)[0],
+    /unavailable/i
+  );
 });
 
 test('pjlink-input: power gating and expected-code matching', () => {

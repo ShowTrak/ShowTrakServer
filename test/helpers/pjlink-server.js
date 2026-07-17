@@ -10,11 +10,7 @@ const crypto = require('node:crypto');
 
 // The digest a client must send: lowercase-hex md5(seed + password).
 function expectedDigest(seed, password) {
-  return crypto
-    .createHash('md5')
-    .update(`${seed}${password}`)
-    .digest('hex')
-    .toLowerCase();
+  return crypto.createHash('md5').update(`${seed}${password}`).digest('hex').toLowerCase();
 }
 
 // startPJLinkServer options:
