@@ -62,6 +62,11 @@ let pendingDrainResolvers: Array<() => void> = [];
 
 type DBResult<T> = [unknown, T | null];
 
+// A statement runner scoped to an open transaction, handed to WithTransaction's
+// callback. Repositories accept it as an optional trailing arg so their writes
+// can enlist in a caller-owned transaction instead of autocommitting each one.
+type TxRun = (Query: string, Params?: unknown) => Promise<DBResult<RunResult>>;
+
 interface RunOptions {
   // Pass false for writes that must not flip the "unsaved changes" flag
   // (schema bookkeeping, telemetry-driven cache refreshes, snapshot plumbing).
@@ -77,10 +82,7 @@ interface DBManager {
   Get<T = DefaultRow>(Query: string, Params?: unknown): Promise<DBResult<T>>;
   All<T = DefaultRow>(Query: string, Params?: unknown): Promise<DBResult<T[]>>;
   Run(Query: string, Params?: unknown, options?: RunOptions): Promise<DBResult<RunResult>>;
-  WithTransaction<T>(
-    fn: (run: (Query: string, Params?: unknown) => Promise<DBResult<RunResult>>) => Promise<T>,
-    options?: RunOptions
-  ): Promise<DBResult<T>>;
+  WithTransaction<T>(fn: (run: TxRun) => Promise<T>, options?: RunOptions): Promise<DBResult<T>>;
   Shutdown(Options?: { TimeoutMs?: number }): Promise<void>;
   RunWithoutDirtyTracking(Query: string, Params?: unknown): Promise<DBResult<RunResult>>;
   HasUnsavedChanges(): Promise<boolean>;
@@ -96,7 +98,7 @@ const Manager = {} as DBManager;
 // Consumed by the repository factories in ./repositories/* (they receive the
 // DB manager as an argument rather than importing it, so test DB mocks
 // injected into managers propagate through them unchanged).
-export type { DBManager, DBResult, RunOptions };
+export type { DBManager, DBResult, RunOptions, TxRun };
 
 function ResolvePendingDrainWaiters(): void {
   if (pendingOperations !== 0) return;
@@ -336,10 +338,10 @@ Manager.Run = async (
 // transaction's dirty-tracking options; any throw (or returned [Err, ...]
 // surfaced as a throw by the caller) rolls the transaction back.
 Manager.WithTransaction = async <T>(
-  fn: (run: (Query: string, Params?: unknown) => Promise<DBResult<RunResult>>) => Promise<T>,
+  fn: (run: TxRun) => Promise<T>,
   { markDirty = true }: RunOptions = {}
 ): Promise<DBResult<T>> => {
-  const run = (Query: string, Params?: unknown) => Manager.Run(Query, Params, { markDirty });
+  const run: TxRun = (Query, Params) => Manager.Run(Query, Params, { markDirty });
   const [beginErr] = await run('BEGIN IMMEDIATE TRANSACTION');
   if (beginErr) return [beginErr, null];
   try {
