@@ -6,8 +6,8 @@
 // when autosave is disabled or no file is currently open. `stopAutosave` is
 // called from the shutdown cleanup path.
 import { CreateLogger } from '../Modules/Logger';
-const { Manager: SettingsManager } = require('../Modules/SettingsManager');
-const { Manager: BackupManager } = require('../Modules/BackupManager');
+const { Manager: SettingsManager } = require('../Modules/SettingsManager') as typeof import('../Modules/SettingsManager');
+const { Manager: BackupManager } = require('../Modules/BackupManager') as typeof import('../Modules/BackupManager');
 
 const Logger = CreateLogger('Main');
 

@@ -166,7 +166,7 @@ Manager.InitializeSchema = async (): Promise<void> => {
   if (schemaInitializationPromise) return schemaInitializationPromise;
 
   schemaInitializationPromise = (async () => {
-    const Tables = require('./schema');
+    const Tables = require('./schema') as typeof import('./schema');
     for (const Table of Tables) {
       Logger.database(`Creating table: ${Table.Name}`);
       const [Err] = await Manager.Run(Table.SQL);
