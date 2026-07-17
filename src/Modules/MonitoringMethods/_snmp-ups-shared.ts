@@ -160,7 +160,9 @@ export function ProbeSnmpVars(
           }
           const Values: Record<string, number | null> = {};
           (Varbinds || []).forEach((Varbind, Idx) => {
-            const Key = Vars[Idx].Key;
+            const Var = Vars[Idx];
+            if (!Var) return; // more varbinds than requested OIDs; skip the extras
+            const Key = Var.Key;
             if (snmp.isVarbindError(Varbind)) {
               Values[Key] = null;
               return;

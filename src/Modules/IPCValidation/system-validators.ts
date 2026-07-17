@@ -19,6 +19,9 @@ export = function registerSystemValidators(Manager: IPCValidationManager): void 
     if (Object.prototype.hasOwnProperty.call(value, 'EnableProbe')) {
       out.EnableProbe = !!value.EnableProbe;
     }
+    if (Object.prototype.hasOwnProperty.call(value, 'EnablePJLink')) {
+      out.EnablePJLink = !!value.EnablePJLink;
+    }
     if (Object.prototype.hasOwnProperty.call(value, 'TimeoutMs')) {
       const timeout = Number(value.TimeoutMs);
       if (!Number.isFinite(timeout)) fail('TimeoutMs must be a number');

@@ -3,11 +3,10 @@
 import { RPC } from '../rpc';
 import { validationErrorTuple } from '../ipc/create-handler';
 import { PushToRenderers } from '../renderer-bus';
-import type { IPCValidationManager } from '../../Modules/IPCValidation';
-const { Manager: AudioAssetManager } = require('../../Modules/AudioAssetManager') as typeof import('../../Modules/AudioAssetManager');
-const { Manager: FileSelectorManager } = require('../../Modules/FileSelectorManager') as typeof import('../../Modules/FileSelectorManager');
-const { Manager: AppDataManager } = require('../../Modules/AppData') as typeof import('../../Modules/AppData');
-const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
+import { Manager as AudioAssetManager } from '../../Modules/AudioAssetManager';
+import { Manager as FileSelectorManager } from '../../Modules/FileSelectorManager';
+import { Manager as AppDataManager } from '../../Modules/AppData';
+import { Manager as IPCValidation } from '../../Modules/IPCValidation';
 
 function register(): void {
   RPC.handle('Audio:GetAll', async () => {

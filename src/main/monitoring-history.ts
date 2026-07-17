@@ -165,7 +165,7 @@ function recordEntityHistorySample(
   }
 
   const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
-  while (samples.length && samples[0].ts < cutoff) samples.shift();
+  while (samples.length && samples[0]!.ts < cutoff) samples.shift();
 
   store.set(key, samples);
 }
@@ -366,7 +366,7 @@ function createNamedHistoryStore(
       } else {
         nextSamples = previousSamples.concat(sample);
       }
-      while (nextSamples.length && nextSamples[0].ts < cutoff) nextSamples.shift();
+      while (nextSamples.length && nextSamples[0]!.ts < cutoff) nextSamples.shift();
       perEntity.set(state.key, {
         Name: state.name || (existing && existing.Name) || state.key,
         Points: nextSamples,

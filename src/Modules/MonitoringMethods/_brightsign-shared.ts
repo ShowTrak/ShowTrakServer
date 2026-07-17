@@ -174,9 +174,9 @@ export function ParseDigestChallenge(Header: unknown): Record<string, string> | 
   const Params: Record<string, string> = {};
   const Re = /([a-z0-9_-]+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|([^,\s]+))/gi;
   let Found: RegExpExecArray | null;
-  while ((Found = Re.exec(Match[1])) !== null) {
-    const Value = Found[2] !== undefined ? Found[2].replace(/\\(.)/g, '$1') : Found[3];
-    Params[Found[1].toLowerCase()] = Value;
+  while ((Found = Re.exec(Match[1] ?? '')) !== null) {
+    const Value = Found[2] !== undefined ? Found[2].replace(/\\(.)/g, '$1') : (Found[3] ?? '');
+    Params[Found[1]!.toLowerCase()] = Value; // group 1 is required, always present when Re matches
   }
   return Params;
 }

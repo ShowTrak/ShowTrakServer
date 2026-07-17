@@ -119,7 +119,7 @@ export const Sounds: Record<string, Howl> = {
 export function InitSettings() {
   void WireSettingsControls();
   window.API.PlaySound(async (SoundName) => {
-    const sound = Sounds[SoundName] || Sounds.Notification;
+    const sound = Sounds[SoundName] || Sounds.Notification!; // Notification always present in Sounds
     sound.volume(GetAlertVolume());
     sound.play();
   });
@@ -132,7 +132,7 @@ export function InitSettings() {
 }
 
 export function PreviewSound(SoundName: string) {
-  const sound = Sounds[SoundName] || Sounds.Notification;
+  const sound = Sounds[SoundName] || Sounds.Notification!; // Notification always present in Sounds
   sound.volume(GetAlertVolume());
   sound.play();
 }
@@ -503,7 +503,7 @@ function BuildSettingsNav() {
   }
 
   // Default the first category active until a real scroll position is known.
-  SetActiveNav(sections[0].getAttribute('data-nav-key') || '');
+  SetActiveNav(sections[0]!.getAttribute('data-nav-key') || ''); // length > 1 guaranteed above
 
   // Namespaced so repeated rebuilds replace rather than stack the handlers. The
   // shown-handler recomputes once the modal is visible: while it is hidden the
@@ -534,7 +534,7 @@ function UpdateActiveNavFromScroll() {
 
   const contentTop = contentEl.getBoundingClientRect().top;
   const threshold = 24; // px past the top edge before a section becomes active
-  let activeKey = sections[0].getAttribute('data-nav-key') || '';
+  let activeKey = sections[0]!.getAttribute('data-nav-key') || ''; // sections.length checked above
   for (const section of sections) {
     const relativeTop = section.getBoundingClientRect().top - contentTop;
     if (relativeTop <= threshold) {
@@ -547,7 +547,7 @@ function UpdateActiveNavFromScroll() {
   // At the very bottom, force the last section active — a short final section
   // may never reach the threshold on its own.
   if (contentEl.scrollTop + contentEl.clientHeight >= contentEl.scrollHeight - 2) {
-    activeKey = sections[sections.length - 1].getAttribute('data-nav-key') || '';
+    activeKey = sections[sections.length - 1]!.getAttribute('data-nav-key') || ''; // non-empty checked above
   }
 
   SetActiveNav(activeKey);

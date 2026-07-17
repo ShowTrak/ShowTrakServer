@@ -650,11 +650,11 @@ export interface NetworkScanResult {
   Name: string;
   Hostname?: string | null;
   Address: string;
-  Source: 'bonjour' | 'probe';
+  Source: 'bonjour' | 'probe' | 'pjlink';
   ServiceType?: string;
   Port: number | null;
   TXT?: Record<string, unknown> | null;
-  MethodHint: 'http' | 'ping';
+  MethodHint: 'http' | 'ping' | 'pjlink';
 }
 
 export type NetworkScanEvent =

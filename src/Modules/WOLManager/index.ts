@@ -41,7 +41,9 @@ function BuildMagicPacket(Mac: string): Buffer {
 function BroadcastAddress(Address: string, Netmask: string): string {
   const Ip = Address.split('.').map((Octet) => parseInt(Octet, 10));
   const Mask = Netmask.split('.').map((Octet) => parseInt(Octet, 10));
-  return Ip.map((Octet, Index) => (Octet & Mask[Index]) | (Mask[Index] ^ 255)).join('.');
+  return Ip.map((Octet, Index) => (Octet & (Mask[Index] ?? 0)) | ((Mask[Index] ?? 0) ^ 255)).join(
+    '.'
+  );
 }
 
 /**

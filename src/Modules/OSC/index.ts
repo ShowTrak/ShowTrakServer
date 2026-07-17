@@ -25,7 +25,7 @@ interface OSCServerInstance {
 }
 
 // Not-yet-migrated JS manager — typed loosely until its own migration.
-const { Manager: ClientManager } = require('../ClientManager') as { Manager: ClientManagerType };
+import { Manager as ClientManager } from '../ClientManager';
 
 // The live OSC server. Recreated when the OSC port setting changes (driven by
 // main/live-settings via OSC.RestartServer), so the binding moves to the new
@@ -223,7 +223,10 @@ async function HandleOSCMessage(Route: unknown, Info: OSCRemoteInfo | undefined)
     const RouteParts = RawPath.split('/');
     if (PRouteParts.length !== RouteParts.length) continue Main;
     Sub: for (let i = 0; i < PRouteParts.length; i++) {
-      if (PRouteParts[i] === RouteParts[i] || PRouteParts[i].startsWith(':')) continue Sub;
+      // Equal-length arrays (checked above) → both indices are in-bounds.
+      const PPart = PRouteParts[i]!;
+      const RPart = RouteParts[i]!;
+      if (PPart === RPart || PPart.startsWith(':')) continue Sub;
       continue Main;
     }
     ValidRoutes.push(PRoute);
@@ -247,8 +250,10 @@ async function HandleOSCMessage(Route: unknown, Info: OSCRemoteInfo | undefined)
     const RouteParts = RawPath.split('/');
 
     for (let i = 0; i < PRouteParts.length; i++) {
-      if (PRouteParts[i].startsWith(':')) {
-        Req[PRouteParts[i].substring(1)] = RouteParts[i];
+      // Matched routes share RawPath's part count → both indices are in-bounds.
+      const PPart = PRouteParts[i]!;
+      if (PPart.startsWith(':')) {
+        Req[PPart.substring(1)] = RouteParts[i]!;
       }
     }
 
@@ -340,7 +345,7 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Client/:UUID/Select',
   async (Req) => {
-    const [Err, Client] = await ClientManager.Get(Req.UUID);
+    const [Err, Client] = await ClientManager.Get(Req.UUID ?? '');
     if (Err || !Client) {
       Broadcast.emit('Notify', `OSC - Invalid UUID "${Req.UUID}"`, 'error');
       return failureResult(`Invalid UUID "${Req.UUID}"`);
@@ -355,7 +360,7 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Client/:UUID/Deselect',
   async (Req) => {
-    const [Err, Client] = await ClientManager.Get(Req.UUID);
+    const [Err, Client] = await ClientManager.Get(Req.UUID ?? '');
     if (Err || !Client) {
       Broadcast.emit('Notify', `OSC - Invalid UUID "${Req.UUID}"`, 'error');
       return failureResult(`Invalid UUID "${Req.UUID}"`);
@@ -370,7 +375,7 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Client/:UUID/WakeOnLAN',
   async (Req) => {
-    const [Err, Client] = await ClientManager.Get(Req.UUID);
+    const [Err, Client] = await ClientManager.Get(Req.UUID ?? '');
     if (Err || !Client) {
       Broadcast.emit('Notify', `OSC - Invalid UUID "${Req.UUID}"`, 'error');
       return failureResult(`Invalid UUID "${Req.UUID}"`);
@@ -384,12 +389,12 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Client/:UUID/RunScript/:ScriptID',
   async (Req) => {
-    const [Err, Client] = await ClientManager.Get(Req.UUID);
+    const [Err, Client] = await ClientManager.Get(Req.UUID ?? '');
     if (Err || !Client) {
       Broadcast.emit('Notify', `OSC - Invalid UUID "${Req.UUID}"`, 'error');
       return failureResult(`Invalid UUID "${Req.UUID}"`);
     }
-    const Script = await ScriptManager.Get(Req.ScriptID);
+    const Script = await ScriptManager.Get(Req.ScriptID ?? '');
     if (!Script) {
       Broadcast.emit('Notify', `OSC - Invalid Script ID "${Req.ScriptID}"`, 'error');
       return failureResult(`Invalid Script ID "${Req.ScriptID}"`);
@@ -404,7 +409,7 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Dummy/:ID/Heartbeat',
   async (Req, Meta) => {
-    const [Err] = await DummyClientManager.Heartbeat(Req.ID, Meta && Meta.IP ? Meta.IP : null);
+    const [Err] = await DummyClientManager.Heartbeat(Req.ID ?? '', Meta && Meta.IP ? Meta.IP : null);
     if (Err) {
       Broadcast.emit('Notify', `OSC - ${Err}`, 'error');
       return failureResult(String(Err));
@@ -418,7 +423,7 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Group/:GroupID/Select',
   async (Req) => {
-    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID);
+    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID ?? '');
     if (GroupErr) {
       Broadcast.emit('Notify', `OSC - ${GroupErr.detail}`, 'error');
       return GroupErr;
@@ -437,7 +442,7 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Group/:GroupID/Deselect',
   async (Req) => {
-    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID);
+    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID ?? '');
     if (GroupErr) {
       Broadcast.emit('Notify', `OSC - ${GroupErr.detail}`, 'error');
       return GroupErr;
@@ -456,7 +461,7 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Group/:GroupID/WakeOnLAN',
   async (Req) => {
-    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID);
+    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID ?? '');
     if (GroupErr) {
       Broadcast.emit('Notify', `OSC - ${GroupErr.detail}`, 'error');
       return GroupErr;
@@ -474,13 +479,13 @@ OSC.CreateRoute(
 OSC.CreateRoute(
   '/API/Group/:GroupID/RunScript/:ScriptID',
   async (Req) => {
-    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID);
+    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.GroupID ?? '');
     if (GroupErr) {
       Broadcast.emit('Notify', `OSC - ${GroupErr.detail}`, 'error');
       return GroupErr;
     }
 
-    const Script = await ScriptManager.Get(Req.ScriptID);
+    const Script = await ScriptManager.Get(Req.ScriptID ?? '');
     if (!Script) {
       Broadcast.emit('Notify', `OSC - Invalid Script ID "${Req.ScriptID}"`, 'error');
       return failureResult(`Invalid Script ID "${Req.ScriptID}"`);
@@ -556,7 +561,7 @@ OSC.CreateRoute(
       Broadcast.emit('Notify', `OSC - Failed to fetch all clients.`, 'error');
       return failureResult('Failed to fetch all clients');
     }
-    const Script = await ScriptManager.Get(Req.ScriptID);
+    const Script = await ScriptManager.Get(Req.ScriptID ?? '');
     if (!Script) {
       Broadcast.emit('Notify', `OSC - Invalid Script ID "${Req.ScriptID}"`, 'error');
       return failureResult(`Invalid Script ID "${Req.ScriptID}"`);
@@ -596,7 +601,7 @@ OSC.CreateRoute(
       return failureResult('No selected clients');
     }
 
-    const Script = await ScriptManager.Get(Req.ScriptID);
+    const Script = await ScriptManager.Get(Req.ScriptID ?? '');
     if (!Script) {
       Broadcast.emit('Notify', `OSC - Invalid Script ID "${Req.ScriptID}"`, 'error');
       return failureResult(`Invalid Script ID "${Req.ScriptID}"`);

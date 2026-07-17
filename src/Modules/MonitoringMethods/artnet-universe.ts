@@ -109,13 +109,13 @@ export function ParseArtnetPacket(
   if (Msg.readUInt16LE(OFFSET_OPCODE) !== OP_ARTDMX) return null;
   if (Msg.readUInt16BE(OFFSET_PROTVER) < MIN_PROTOCOL_VERSION) return null;
 
-  const SubUni = Msg[OFFSET_SUBUNI];
-  const Net = Msg[OFFSET_NET] & 0x7f;
+  const SubUni = Msg[OFFSET_SUBUNI]!; // in range: length checked >= MIN_PACKET_LENGTH above
+  const Net = Msg[OFFSET_NET]! & 0x7f; // in range: length checked >= MIN_PACKET_LENGTH above
   const Universe = (Net << 8) | SubUni;
 
   return {
     Address: NormalizeAddress(SourceAddress),
-    Sequence: Msg[OFFSET_SEQUENCE],
+    Sequence: Msg[OFFSET_SEQUENCE]!, // in range: length checked >= MIN_PACKET_LENGTH above
     Universe,
     LastSeenAt: Date.now(),
   };
@@ -330,7 +330,7 @@ export function EvaluateArtnet(P: EvaluateParams): MonitoringResult {
 
   const FromTarget = Fresh.filter((S) => AddressesEqual(S.Address, P.Address));
   if (FromTarget.length) {
-    const Src = FromTarget[0];
+    const Src = FromTarget[0]!; // non-empty: length checked above
     return {
       Success: true,
       LatencyMs: P.Now - Src.LastSeenAt,
@@ -341,7 +341,7 @@ export function EvaluateArtnet(P: EvaluateParams): MonitoringResult {
   }
 
   if (Fresh.length) {
-    const Other = Fresh[0];
+    const Other = Fresh[0]!; // non-empty: length checked above
     return {
       Success: false,
       Degraded: true,

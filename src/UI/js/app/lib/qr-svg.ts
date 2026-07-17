@@ -40,7 +40,8 @@ export function QrToSvg(
   let path = '';
   for (let y = 0; y < count; y++) {
     for (let x = 0; x < count; x++) {
-      if (qr[y][x]) {
+      // In-bounds: qr is count×count, and x,y are bounded by count.
+      if (qr[y]![x]) {
         if (path) path += ' ';
         path += `M${x + border},${y + border}h1v1h-1z`;
       }
@@ -93,7 +94,8 @@ function encodeText(text: string, ecc: Ecc): boolean[][] {
 
   // Pack bits into data codewords.
   const dataCodewords = new Array<number>(bb.length / 8).fill(0);
-  bb.forEach((bit, i) => (dataCodewords[i >>> 3] |= bit << (7 - (i & 7))));
+  // In-bounds: bb.length === dataCodewords.length * 8, so i >>> 3 < length.
+  bb.forEach((bit, i) => (dataCodewords[i >>> 3]! |= bit << (7 - (i & 7))));
 
   const allCodewords = addEccAndInterleave(dataCodewords, version, ecc);
   return renderMatrix(version, ecc, allCodewords);
@@ -111,8 +113,9 @@ function appendBits(val: number, len: number, out: number[]): void {
 // --- Error correction & interleaving ---------------------------------------
 
 function addEccAndInterleave(data: number[], version: number, ecc: Ecc): number[] {
-  const numBlocks = NUM_ERROR_CORRECTION_BLOCKS[ECC_ORDINAL[ecc]][version];
-  const blockEccLen = ECC_CODEWORDS_PER_BLOCK[ECC_ORDINAL[ecc]][version];
+  // In-bounds: ordinal is 0..3 and version is 1..40, both valid table indices.
+  const numBlocks = NUM_ERROR_CORRECTION_BLOCKS[ECC_ORDINAL[ecc]]![version]!;
+  const blockEccLen = ECC_CODEWORDS_PER_BLOCK[ECC_ORDINAL[ecc]]![version]!;
   const rawCodewords = Math.floor(getNumRawDataModules(version) / 8);
   const numShortBlocks = numBlocks - (rawCodewords % numBlocks);
   const shortBlockLen = Math.floor(rawCodewords / numBlocks);
@@ -137,7 +140,8 @@ function addEccAndInterleave(data: number[], version: number, ecc: Ecc): number[
     blocks.forEach((block, j) => {
       // Skip the padding position of short blocks in the data region.
       if (i !== shortBlockLen - blockEccLen || j >= numShortBlocks) {
-        result.push(block[i]);
+        // In-bounds: i < maxLen and every block has length >= maxLen here.
+        result.push(block[i]!);
       }
     });
   }
@@ -152,8 +156,9 @@ function reedSolomonComputeDivisor(degree: number): number[] {
   let root = 1;
   for (let i = 0; i < degree; i++) {
     for (let j = 0; j < result.length; j++) {
-      result[j] = gfMul(result[j], root);
-      if (j + 1 < result.length) result[j] ^= result[j + 1];
+      // In-bounds: j and j+1 are guarded against result.length below.
+      result[j] = gfMul(result[j]!, root);
+      if (j + 1 < result.length) result[j]! ^= result[j + 1]!;
     }
     root = gfMul(root, 0x02);
   }
@@ -165,7 +170,8 @@ function reedSolomonComputeRemainder(data: number[], divisor: number[]): number[
   for (const b of data) {
     const factor = b ^ (result.shift() as number);
     result.push(0);
-    divisor.forEach((coef, i) => (result[i] ^= gfMul(coef, factor)));
+    // In-bounds: result has length === divisor.length, so i is valid.
+    divisor.forEach((coef, i) => (result[i]! ^= gfMul(coef, factor)));
   }
   return result;
 }
@@ -187,8 +193,9 @@ function renderMatrix(version: number, ecc: Ecc, allCodewords: number[]): boolea
   const isFunction: boolean[][] = Array.from({ length: size }, () => new Array<boolean>(size).fill(false));
 
   const setFunction = (x: number, y: number, dark: boolean) => {
-    modules[y][x] = dark;
-    isFunction[y][x] = true;
+    // In-bounds: callers only pass 0 <= x,y < size (matrix is size×size).
+    modules[y]![x] = dark;
+    isFunction[y]![x] = true;
   };
 
   // Timing patterns.
@@ -214,7 +221,8 @@ function renderMatrix(version: number, ecc: Ecc, allCodewords: number[]): boolea
         (i === numAlign - 1 && j === 0)
       )
         continue;
-      drawAlignment(alignPositions[i], alignPositions[j], setFunction);
+      // In-bounds: i,j are bounded by alignPositions.length (numAlign).
+      drawAlignment(alignPositions[i]!, alignPositions[j]!, setFunction);
     }
   }
 
@@ -230,7 +238,7 @@ function renderMatrix(version: number, ecc: Ecc, allCodewords: number[]): boolea
   let minPenalty = Infinity;
   for (let mask = 0; mask < 8; mask++) {
     applyMask(mask, modules, isFunction, size);
-    drawFormatBits(ecc, mask, size, (x, y, dark) => (modules[y][x] = dark), false);
+    drawFormatBits(ecc, mask, size, (x, y, dark) => (modules[y]![x] = dark), false);
     const penalty = computePenalty(modules, size);
     if (penalty < minPenalty) {
       minPenalty = penalty;
@@ -239,7 +247,7 @@ function renderMatrix(version: number, ecc: Ecc, allCodewords: number[]): boolea
     applyMask(mask, modules, isFunction, size); // undo (XOR is its own inverse)
   }
   applyMask(bestMask, modules, isFunction, size);
-  drawFormatBits(ecc, bestMask, size, (x, y, dark) => (modules[y][x] = dark), false);
+  drawFormatBits(ecc, bestMask, size, (x, y, dark) => (modules[y]![x] = dark), false);
 
   return modules;
 }
@@ -334,8 +342,9 @@ function drawCodewords(
         const x = right - j;
         const upward = ((right + 1) & 2) === 0;
         const y = upward ? size - 1 - vert : vert;
-        if (!isFunction[y][x] && i < codewords.length * 8) {
-          modules[y][x] = ((codewords[i >>> 3] >>> (7 - (i & 7))) & 1) !== 0;
+        // In-bounds: x,y stay within 0..size-1; i < codewords.length*8 guards i>>>3.
+        if (!isFunction[y]![x] && i < codewords.length * 8) {
+          modules[y]![x] = ((codewords[i >>> 3]! >>> (7 - (i & 7))) & 1) !== 0;
           i++;
         }
       }
@@ -346,7 +355,8 @@ function drawCodewords(
 function applyMask(mask: number, modules: boolean[][], isFunction: boolean[][], size: number): void {
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      if (isFunction[y][x]) continue;
+      // In-bounds: x,y iterate 0..size-1 over the size×size matrix.
+      if (isFunction[y]![x]) continue;
       let invert = false;
       switch (mask) {
         case 0: invert = (x + y) % 2 === 0; break;
@@ -358,7 +368,7 @@ function applyMask(mask: number, modules: boolean[][], isFunction: boolean[][], 
         case 6: invert = (((x * y) % 2) + ((x * y) % 3)) % 2 === 0; break;
         case 7: invert = (((x + y) % 2) + ((x * y) % 3)) % 2 === 0; break;
       }
-      if (invert) modules[y][x] = !modules[y][x];
+      if (invert) modules[y]![x] = !modules[y]![x];
     }
   }
 }
@@ -371,12 +381,13 @@ function computePenalty(modules: boolean[][], size: number): number {
     let runColor = false;
     let runLen = 0;
     for (let x = 0; x < size; x++) {
-      if (modules[y][x] === runColor) {
+      // In-bounds: x,y iterate 0..size-1 over the size×size matrix.
+      if (modules[y]![x] === runColor) {
         runLen++;
         if (runLen === 5) penalty += 3;
         else if (runLen > 5) penalty++;
       } else {
-        runColor = modules[y][x];
+        runColor = modules[y]![x]!;
         runLen = 1;
       }
     }
@@ -385,12 +396,12 @@ function computePenalty(modules: boolean[][], size: number): number {
     let runColor = false;
     let runLen = 0;
     for (let y = 0; y < size; y++) {
-      if (modules[y][x] === runColor) {
+      if (modules[y]![x] === runColor) {
         runLen++;
         if (runLen === 5) penalty += 3;
         else if (runLen > 5) penalty++;
       } else {
-        runColor = modules[y][x];
+        runColor = modules[y]![x]!;
         runLen = 1;
       }
     }
@@ -399,8 +410,8 @@ function computePenalty(modules: boolean[][], size: number): number {
   // Rule 2: 2x2 blocks of the same colour.
   for (let y = 0; y < size - 1; y++) {
     for (let x = 0; x < size - 1; x++) {
-      const c = modules[y][x];
-      if (c === modules[y][x + 1] && c === modules[y + 1][x] && c === modules[y + 1][x + 1]) {
+      const c = modules[y]![x];
+      if (c === modules[y]![x + 1] && c === modules[y + 1]![x] && c === modules[y + 1]![x + 1]) {
         penalty += 3;
       }
     }
@@ -415,14 +426,15 @@ function computePenalty(modules: boolean[][], size: number): number {
   };
   for (let y = 0; y < size; y++) {
     for (let x = 0; x <= size - 11; x++) {
-      if (matches((i) => modules[y][i], x, pat1) || matches((i) => modules[y][i], x, pat2)) {
+      // In-bounds: i stays within 0..size-1 (x <= size-11, pat length 11).
+      if (matches((i) => modules[y]![i]!, x, pat1) || matches((i) => modules[y]![i]!, x, pat2)) {
         penalty += 40;
       }
     }
   }
   for (let x = 0; x < size; x++) {
     for (let y = 0; y <= size - 11; y++) {
-      if (matches((i) => modules[i][x], y, pat1) || matches((i) => modules[i][x], y, pat2)) {
+      if (matches((i) => modules[i]![x]!, y, pat1) || matches((i) => modules[i]![x]!, y, pat2)) {
         penalty += 40;
       }
     }
@@ -430,7 +442,7 @@ function computePenalty(modules: boolean[][], size: number): number {
 
   // Rule 4: proportion of dark modules deviating from 50%, in 5% steps.
   let dark = 0;
-  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (modules[y][x]) dark++;
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (modules[y]![x]) dark++;
   const total = size * size;
   const k = Math.abs(Math.ceil(((dark * 100) / total) / 5) - 10);
   penalty += k * 10;
@@ -471,7 +483,8 @@ function getNumRawDataModules(version: number): number {
 function getNumDataCodewords(version: number, ecc: Ecc): number {
   const e = ECC_ORDINAL[ecc];
   return (
+    // In-bounds: e is 0..3 and version is 1..40, both valid table indices.
     Math.floor(getNumRawDataModules(version) / 8) -
-    ECC_CODEWORDS_PER_BLOCK[e][version] * NUM_ERROR_CORRECTION_BLOCKS[e][version]
+    ECC_CODEWORDS_PER_BLOCK[e]![version]! * NUM_ERROR_CORRECTION_BLOCKS[e]![version]!
   );
 }

@@ -2,6 +2,10 @@
 <html>
   <head>
     <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'"
+    />
     <title>ShowTrak Server</title>
   </head>
   <body>
@@ -9,6 +13,7 @@
       <img id="PRELOADER_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
     </div>
     <h1 id="FOOTER"></h1>
+    <script src="./preloader.js"></script>
   </body>
   <style>
     body {
@@ -51,16 +56,4 @@
       -ms-user-select: none;
     }
   </style>
-  <script>
-    async function Init() {
-      Config = await window.API.GetConfig();
-      if (Config && Config.Application && Config.Application.Version && Config.Application.Name) {
-        document.getElementById('FOOTER').innerText =
-          `${Config.Application.Name} v${Config.Application.Version}`;
-      } else {
-        document.getElementById('FOOTER').innerText = 'ShowTrak Server';
-      }
-    }
-    Init();
-  </script>
 </html>

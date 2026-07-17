@@ -4,6 +4,12 @@ import { CreateLogger } from '../Logger';
 import { CreateBonjourErrorHandler } from '../NetworkErrors';
 
 import { clampInt, buildProbeTargets, probeHost } from './network-utils';
+import {
+  StartPJLinkDiscovery,
+  PJLINK_UDP_PORT,
+  type PJLinkDiscoveryHandle,
+} from './pjlink-discovery';
+import { FetchProjectorIdentity } from '../MonitoringMethods/_pjlink-shared';
 
 // Minimal structural types for the `bonjour-service` mDNS library, describing only
 // the surface this module touches so the factory-style call sites stay unchanged.
@@ -52,6 +58,7 @@ const Logger = CreateLogger('NetworkDiscovery');
 interface ScanOptions {
   EnableBonjour?: unknown;
   EnableProbe?: unknown;
+  EnablePJLink?: unknown;
   TimeoutMs?: unknown;
   MaxHostsPerSubnet?: unknown;
   ProbePorts?: unknown;
@@ -92,6 +99,7 @@ interface Scan {
   Finished: boolean;
   EnableBonjour: boolean;
   EnableProbe: boolean;
+  EnablePJLink: boolean;
   TimeoutMs: number;
   MaxHostsPerSubnet: number;
   ProbePorts: number[];
@@ -99,6 +107,7 @@ interface Scan {
   Seen: Set<string>;
   Browsers: BonjourBrowser[];
   BonjourInstance: BonjourInstance | null;
+  PJLinkHandle: PJLinkDiscoveryHandle | null;
   Timer: ReturnType<typeof setTimeout> | null;
   ProbePromise: Promise<void> | null;
   onEvent: (payload: ScanEvent) => void;
@@ -114,6 +123,7 @@ function createScan(options: ScanOptions, onEvent: (payload: ScanEvent) => void)
     Finished: false,
     EnableBonjour: !!options.EnableBonjour,
     EnableProbe: !!options.EnableProbe,
+    EnablePJLink: !!options.EnablePJLink,
     TimeoutMs: clampInt(options.TimeoutMs, 3000, 60000, 12000),
     MaxHostsPerSubnet: clampInt(options.MaxHostsPerSubnet, 32, 2048, 512),
     ProbePorts:
@@ -121,11 +131,12 @@ function createScan(options: ScanOptions, onEvent: (payload: ScanEvent) => void)
         ? options.ProbePorts.filter(
             (p: unknown) => Number.isInteger(Number(p)) && Number(p) > 0 && Number(p) <= 65535
           ).map(Number)
-        : [80, 443, 22, 445, 3389, 8080],
+        : [80, 443, 22, 445, 3389, 8080, PJLINK_UDP_PORT],
     Concurrency: clampInt(options.Concurrency, 4, 96, 32),
     Seen: new Set(),
     Browsers: [],
     BonjourInstance: null,
+    PJLinkHandle: null,
     Timer: null,
     ProbePromise: null,
     onEvent,
@@ -196,8 +207,53 @@ function finalizeScan(scan: Scan, status = 'completed') {
     scan.Timer = null;
   }
   stopBonjour(scan);
+  if (scan.PJLinkHandle) {
+    try {
+      scan.PJLinkHandle.Stop();
+    } catch {
+      /* intentional: PJLink discovery teardown is best-effort during scan cleanup */
+    }
+    scan.PJLinkHandle = null;
+  }
   ACTIVE_SCANS.delete(scan.ScanID);
   emitEvent(scan, { Type: 'done', Status: status, Count: scan.Seen.size });
+}
+
+function startPJLinkScan(scan: Scan) {
+  if (!scan.EnablePJLink) return;
+  try {
+    scan.PJLinkHandle = StartPJLinkDiscovery({
+      DurationMs: scan.TimeoutMs,
+      OnProjector: ({ Address, Mac }) => {
+        if (scan.Cancelled || scan.Finished) return;
+        // Enrich with the projector's own name/model before the single push
+        // (pushResult dedupes by Key, so we only emit once). Auth-protected
+        // projectors return null instantly — we never guess a password.
+        void FetchProjectorIdentity(Address, PJLINK_UDP_PORT, 1500)
+          .catch(() => null)
+          .then((Identity) => {
+            if (scan.Cancelled || scan.Finished) return;
+            const Name =
+              Identity && (Identity.Name || Identity.Model)
+                ? [Identity.Name, Identity.Model].filter(Boolean).join(' · ')
+                : `Projector ${Address}`;
+            pushResult(scan, {
+              Key: `pjlink:${String(Address).toLowerCase()}`,
+              Name,
+              Hostname: null,
+              Address,
+              Source: 'pjlink',
+              ServiceType: 'PJLink',
+              Port: PJLINK_UDP_PORT,
+              TXT: { mac: Mac },
+              MethodHint: 'pjlink',
+            });
+          });
+      },
+    });
+  } catch (error) {
+    Logger.warn('Failed to start PJLink discovery:', error instanceof Error ? error.message : error);
+  }
 }
 
 function startBonjourScan(scan: Scan) {
@@ -283,17 +339,21 @@ async function startProbeScan(scan: Scan) {
           const current = index;
           index += 1;
           if (current >= targets.length) return;
-          const ip = targets[current];
+          const ip = targets[current]!; // bounds-checked above (current < targets.length)
           const openPort = await probeHost(ip, scan.ProbePorts, 350, scan);
           if (scan.Cancelled || scan.Finished) return;
           if (openPort != null) {
             pushResult(scan, {
-              Name: ip,
+              Name: openPort === PJLINK_UDP_PORT ? `Projector ${ip}` : ip,
               Address: ip,
               Source: 'probe',
               Port: openPort,
               MethodHint:
-                openPort === 80 || openPort === 443 || openPort === 8080 ? 'http' : 'ping',
+                openPort === PJLINK_UDP_PORT
+                  ? 'pjlink'
+                  : openPort === 80 || openPort === 443 || openPort === 8080
+                    ? 'http'
+                    : 'ping',
             });
           }
           completed += 1;
@@ -316,6 +376,7 @@ const Manager = {
     emitEvent(scan, { Type: 'status', Status: 'starting' });
 
     startBonjourScan(scan);
+    startPJLinkScan(scan);
 
     scan.ProbePromise = startProbeScan(scan)
       .catch((error) => {
@@ -323,7 +384,9 @@ const Manager = {
         emitEvent(scan, { Type: 'status', Status: 'error', Message: 'Probe scan failed' });
       })
       .finally(() => {
-        if (!scan.EnableBonjour && !scan.Cancelled && !scan.Finished) {
+        // Only the timer can end a scan that is still passively listening for
+        // Bonjour or PJLink replies; otherwise the probe finishing ends it.
+        if (!scan.EnableBonjour && !scan.EnablePJLink && !scan.Cancelled && !scan.Finished) {
           finalizeScan(scan, 'completed');
         }
       });

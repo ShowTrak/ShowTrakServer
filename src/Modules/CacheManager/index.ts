@@ -147,7 +147,7 @@ class CacheBucket {
     );
     const ToRemove = Math.max(0, this.Map.size - this.MaxEntries);
     for (let i = 0; i < ToRemove; i++) {
-      this.Map.delete(Entries[i][0]);
+      this.Map.delete(Entries[i]![0]); // i < ToRemove <= Entries.length
     }
   }
 }

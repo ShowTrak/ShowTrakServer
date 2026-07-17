@@ -28,6 +28,18 @@ const MethodModules: MonitoringMethod[] = [
   require('./sacn-universe'),
   require('./sacn-universe-priority'),
   require('./artnet-universe'),
+  // Lighting consoles — ETC Eos (OSC)
+  require('./eos'),
+  require('./eos-show'),
+  // Lighting consoles — MA Lighting grandMA2 (Telnet remote) & grandMA3 (liveness)
+  require('./ma2'),
+  require('./ma2-show'),
+  require('./ma3'),
+  // Lighting consoles — Avolites Titan (WebAPI)
+  require('./avolites'),
+  require('./avolites-show'),
+  // Lighting consoles — ChamSys MagicQ (web server)
+  require('./chamsys'),
   // Video
   require('./ndi-source'),
   // Media Servers
@@ -45,6 +57,13 @@ const MethodModules: MonitoringMethod[] = [
   require('./brightsign-power'),
   require('./brightsign-poe'),
   require('./brightsign-video'),
+  // Projectors
+  require('./pjlink'),
+  require('./pjlink-power'),
+  require('./pjlink-lamp'),
+  require('./pjlink-errors'),
+  require('./pjlink-input'),
+  require('./snmp-projector'),
   // Power (UPS)
   require('./nut-ups'),
   require('./nut-ups-status'),

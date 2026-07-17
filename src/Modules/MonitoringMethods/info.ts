@@ -87,6 +87,79 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'Online = ArtDmx seen recently from that source.',
     ],
   },
+  eos: {
+    Summary:
+      'Connects to an ETC Eos-family console (Eos Ti, Gio, Ion Xe, Element, ETCnomad) over OSC, pings it for a round-trip liveness check and reads the software version. Non-intrusive — it acts as background OSC user 0 and never touches the live command line.',
+    Setup: [
+      'On the console enable OSC in Setup → System → Show Control → OSC (RX and TX). OSC is on by default on current software, but confirm it has not been disabled.',
+      'Default OSC port is TCP 3032. Set the OSC TCP framing to match the console’s "OSC TCP Mode": OSC 1.0 (packet length) is the Eos default; choose OSC 1.1 (SLIP) if you point it at port 3037.',
+      'Online = the console answered the OSC ping. Optionally set an expected version prefix to be alerted on version drift.',
+    ],
+  },
+  'eos-show': {
+    Summary:
+      'Reads the cue-list and patch counts from an ETC Eos console over OSC and flags a desk that is online but appears to be running an empty or default show.',
+    Setup: [
+      'Same OSC connection as the Console Health (ETC Eos) check — shares one connection per interval.',
+      'Set the minimum cue lists and minimum patched channels a real show should have (0 disables a check).',
+      'Degraded = reachable but below those minimums (e.g. no cue lists or nothing patched).',
+    ],
+  },
+  ma2: {
+    Summary:
+      'Connects to a grandMA2 console (or onPC) on its Telnet remote (TCP 30000) and confirms it responds as a grandMA2, sending no commands. Optionally logs in to read the software version and loaded show file.',
+    Setup: [
+      'Enable the Telnet remote in Setup → Console → Global Settings → Telnet (Login Enabled). It is off by default.',
+      'Leave the login user/password blank for a pure liveness check (recommended, fully read-only).',
+      'To read software/show details, supply a login user + password. The login occupies a remote user session, so create a dedicated telnet user rather than using a live operator’s.',
+      'Degraded = something answered but it is not a grandMA2, or (when credentials are set) the login failed.',
+    ],
+  },
+  'ma2-show': {
+    Summary:
+      'Logs in to a grandMA2 over the Telnet remote and confirms the expected show file is loaded — catches a desk that is online but running the wrong show.',
+    Setup: [
+      'Requires a login user + password (a dedicated telnet user is recommended).',
+      'Enter the expected show file name, or leave it blank to simply confirm a show is loaded.',
+      'Degraded = login failed, no show file could be read, or the loaded show differs from the expected one.',
+    ],
+  },
+  ma3: {
+    Summary:
+      'Confirms a grandMA3 console (or onPC) is reachable by opening a TCP connection to its Web Remote port and closing it immediately — no data is sent. Liveness only: grandMA3 exposes no safe read-only status API over the network.',
+    Setup: [
+      'Enable the Web Remote on the console (Network menu). The default port is 8080 (HTTP is also served on 80 on some builds).',
+      'This check never opens a full Web Remote session — doing so can crash a live console — so it is a plain, safe connectivity test.',
+      'Online = the port accepted a TCP connection.',
+    ],
+  },
+  avolites: {
+    Summary:
+      'Connects to an Avolites Titan console over the Titan WebAPI (HTTP, TCP 4430) and reads the software version. Read-only — it only ever issues /titan/get requests.',
+    Setup: [
+      'Enable the WebAPI on the console (Titan does not always have it on by default). If the port is refused, the check tells you to enable it.',
+      'Default port is 4430. Optionally set an expected Titan version prefix to be alerted on drift.',
+      'Online = the WebAPI answered. Not available on Titan One / T1.',
+    ],
+  },
+  'avolites-show': {
+    Summary:
+      'Reads the current show file name from an Avolites Titan console over the WebAPI and confirms it matches the show you expect to be loaded.',
+    Setup: [
+      'Same WebAPI (TCP 4430) as the Console Health (Avolites Titan) check.',
+      'Enter the expected show name, or leave it blank to simply confirm a show is loaded.',
+      'Degraded = reachable but the loaded show is not the expected one.',
+    ],
+  },
+  chamsys: {
+    Summary:
+      'Connects to a ChamSys MagicQ console over its built-in web server (HTTP, default TCP 8080) and confirms it responds as a MagicQ system, reading the software version where the page exposes it.',
+    Setup: [
+      'Enable the web server on the console: Setup → Network Settings. It is disabled by default; the default port is 8080.',
+      'MagicQ’s OSC is intentionally not used here — it has no query/echo and a stray message can fire a playback, so the web server is the safe read-only channel.',
+      'Online = a MagicQ web page answered. Optionally set an expected version prefix; Degraded = wrong version, an HTTP error, or a non-MagicQ response.',
+    ],
+  },
   'ndi-source': {
     Summary:
       'Discovers NDI video sources on the network via mDNS and confirms a named source is being advertised. Presence-only: Online when seen, Offline when not.',
@@ -287,6 +360,60 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'Set Listen Port to the UDP port Millumin sends to (default 5001).',
       "Set Address to the Millumin machine's IP — it is matched against the OSC source.",
       'Optionally filter by an OSC address prefix such as /millumin.',
+    ],
+  },
+  pjlink: {
+    Summary:
+      'Combined projector health over PJLink (the cross-brand projector control protocol on TCP 4352). One connection reads power state, error status, lamp hours and input, and reports a single healthy / degraded verdict. Works with Epson, NEC/Sharp, Panasonic, Christie, Sony, Barco and most others.',
+    Setup: [
+      'Enable PJLink on the projector (usually under Network / Control settings) — most brands support it on TCP 4352, though some (e.g. Epson) ship with it off.',
+      'If the projector has a PJLink password set, enter it; leave blank when authentication is off.',
+      'By default a projector in standby reports Degraded — switch "When in standby" to Report Online for rigs where standby is normal.',
+      'Set a lamp-hours threshold to be warned before a lamp expires; laser models without lamps are handled automatically.',
+      'Some projectors accept only one PJLink connection at a time — all ShowTrak PJLink checks against the same projector share a single connection per interval automatically.',
+    ],
+    Docs: [{ Label: 'PJLink specification (JBMIA)', Url: 'https://pjlink.jbmia.or.jp/english/' }],
+  },
+  'pjlink-power': {
+    Summary:
+      'Reads the projector power state over PJLink and checks it against the expected state (on / on-or-warming-up / any).',
+    Setup: [
+      'Choose the expected power state; Degraded = reachable but in a different state.',
+      'Standby, cooling and warm-up are reported distinctly in the debug panel.',
+    ],
+  },
+  'pjlink-lamp': {
+    Summary:
+      'Reads lamp usage hours over PJLink and warns when any lamp reaches the configured threshold.',
+    Setup: [
+      "Set the warning threshold to your lamp's rated life (0 = just report the hours).",
+      'Laser projectors without lamps report Online with a note.',
+    ],
+  },
+  'pjlink-errors': {
+    Summary:
+      'Reads the PJLink error status (fan, lamp, temperature, cover, filter, other) and reports Degraded on any error — and on warnings, unless disabled.',
+    Setup: [
+      'Errors always degrade; uncheck "Treat warnings as Degraded" to ignore warnings such as a dirty filter.',
+    ],
+  },
+  'pjlink-input': {
+    Summary:
+      'Reads the active input over PJLink and optionally checks it against an expected input code.',
+    Setup: [
+      'Input codes are two characters: source type (1 RGB, 2 Video, 3 Digital, 4 Storage, 5 Network) + input number — e.g. 31 = Digital 1 (often HDMI 1).',
+      'Leave the expected input blank to just report the current input.',
+      'The projector must be powered on for the input to be readable; standby reports Degraded.',
+    ],
+  },
+  'snmp-projector': {
+    Summary:
+      'Reads projector status over SNMP using a brand profile (Epson, NEC, Panasonic, Christie, Sony, Barco), falling back to generic SNMP reachability and device identity. Custom OID checks are available under Advanced.',
+    Setup: [
+      'Enable SNMP on the projector’s network settings and match the community string (usually "public").',
+      'Pick the brand profile; use Generic for unlisted brands — it still confirms the device answers SNMP and shows its identity.',
+      'Prefer PJLink where available; SNMP support and OIDs vary by brand and model, and several brands expose no useful status over SNMP.',
+      'Under Advanced, up to two custom OIDs can be asserted (equals / not-equals / numeric limits) for model-specific values.',
     ],
   },
 };

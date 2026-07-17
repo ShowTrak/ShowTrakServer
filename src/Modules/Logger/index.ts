@@ -58,8 +58,8 @@ const Settings = {
 };
 
 function isLevelEnabled(level: string): boolean {
-  const want = LevelRank[Settings.level] ?? LevelRank[DefaultLevel];
-  const have = LevelRank[level] ?? LevelRank.info;
+  const want = LevelRank[Settings.level] ?? LevelRank[DefaultLevel] ?? 0;
+  const have = LevelRank[level] ?? LevelRank.info ?? 0;
   return have <= want;
 }
 

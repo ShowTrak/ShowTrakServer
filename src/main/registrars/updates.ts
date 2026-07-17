@@ -8,13 +8,11 @@ import { validationErrorTuple } from '../ipc/create-handler';
 import { PushToRenderers } from '../renderer-bus';
 import { getMainWindow, hasMainWindow } from '../app-window';
 import { normalizeVersionToken } from '../local-scripts';
-import type { ClientManagerType } from '../../Modules/ClientManager';
-import type { IPCValidationManager } from '../../Modules/IPCValidation';
-const { Manager: AppUpdater } = require('../app-updater') as typeof import('../app-updater');
-const { Manager: UpdateManager } = require('../../Modules/UpdateManager') as typeof import('../../Modules/UpdateManager');
-const { Manager: ClientManager }: { Manager: ClientManagerType } = require('../../Modules/ClientManager');
-const { Manager: ServerManager } = require('../../Modules/Server') as typeof import('../../Modules/Server');
-const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
+import { Manager as AppUpdater } from '../app-updater';
+import { Manager as UpdateManager } from '../../Modules/UpdateManager';
+import { Manager as ClientManager } from '../../Modules/ClientManager';
+import { Manager as ServerManager } from '../../Modules/Server';
+import { Manager as IPCValidation } from '../../Modules/IPCValidation';
 
 const Logger = CreateLogger('Main');
 

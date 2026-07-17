@@ -1,7 +1,7 @@
 {
   "name": "showtrak-server",
   "productName": "ShowTrak Server",
-  "version": "3.10.6",
+  "version": "3.11.0",
   "description": "Open source network/device monitoring & control for bulk installations.",
   "main": "dist/main.js",
   "scripts": {
@@ -106,16 +106,17 @@
   "dependencies": {
     "bonjour-service": "^1.4.3",
     "electron-squirrel-startup": "^1.0.1",
-    "electron-updater": "^6.3.9",
-    "express": "^5.1.0",
+    "electron-updater": "^6.8.9",
+    "express": "^5.2.1",
     "mqtt": "^5.15.2",
     "net-snmp": "^3.26.3",
     "node-osc": "^9.1.7",
     "picocolors": "^1.1.1",
-    "socket.io": "^4.8.1",
+    "socket.io": "^4.8.3",
     "sqlite3": "^5.1.7"
   },
   "overrides": {
-    "node-abi": "^3.94.0"
+    "node-abi": "^3.94.0",
+    "ws": "^8.21.0"
   }
 }

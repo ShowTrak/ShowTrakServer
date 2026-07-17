@@ -39,6 +39,7 @@ interface DiscoveredDevice {
   Source?: string;
   ServiceType?: string;
   Port?: number | null;
+  MethodHint?: string;
   Services?: Array<{ type: string; port: number | null }>;
 }
 
@@ -54,13 +55,16 @@ export async function EnsureMonitoringMethodsLoaded() {
 // Preferred display order for the method-picker <optgroup>s. Groups the server
 // reports that aren't listed here are appended in first-seen order, so a new
 // group still shows up without a client change.
+// Keep in sync with GroupOrder in src/Modules/MonitoringMethods/groups.ts. Groups
+// the server reports that aren't listed here are appended in first-seen order.
 const METHOD_GROUP_ORDER = [
-  'General',
-  'Lighting (DMX)',
+  'Show Control',
+  'Lighting',
+  'Sound',
   'Video',
-  'Media Servers',
-  'Control & Messaging',
-  'Power (UPS)',
+  'Power',
+  'Web Services',
+  'Other',
 ];
 
 // Populate the method <select> with methods grouped into <optgroup>s by their
@@ -265,7 +269,7 @@ export function ParseIPv4ToNumber(address: unknown) {
   if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
     return null;
   }
-  return (((parts[0] * 256 + parts[1]) * 256 + parts[2]) * 256 + parts[3]) >>> 0;
+  return (((parts[0]! * 256 + parts[1]!) * 256 + parts[2]!) * 256 + parts[3]!) >>> 0; // length === 4 checked above
 }
 
 export function RenderNetworkDiscoveryScanButton() {
@@ -320,8 +324,9 @@ export function RenderNetworkDiscoveryResults() {
   let html = '';
   for (const item of list) {
     const id = Safe(item.ID);
+    const sourceKey = String(item.Source || 'unknown').toLowerCase();
     const sourceLabel =
-      String(item.Source || 'unknown').toLowerCase() === 'bonjour' ? 'mDNS' : 'Scan';
+      sourceKey === 'bonjour' ? 'mDNS' : sourceKey === 'pjlink' ? 'PJLink' : 'Scan';
     const serviceList = Array.isArray(item.Services) ? item.Services.slice(0, 5) : [];
     const details: string[] = [];
     if (item.Hostname) details.push(`host: ${Safe(item.Hostname)}`);
@@ -390,9 +395,18 @@ export function MergeNetworkDiscoveryResult(result: NetworkScanResult) {
     }
   }
 
+  // A PJLink hint is the most specific we can offer for a projector, so never
+  // let a later plain-probe/mDNS result for the same address downgrade it.
+  const methodHint =
+    existing.MethodHint === 'pjlink' ? 'pjlink' : result.MethodHint || existing.MethodHint;
+  // Likewise keep the richer PJLink source badge once we've seen it.
+  const source = existing.Source === 'pjlink' ? 'pjlink' : result.Source || existing.Source;
+
   NetworkDiscoveryResults.set(addressKey, {
     ...existing,
     ...result,
+    Source: source,
+    MethodHint: methodHint,
     Hostname: result.Hostname || existing.Hostname || null,
     Services: nextServices,
     ID: addressKey,
@@ -461,9 +475,10 @@ export async function StartNetworkDiscoveryScan() {
     const [Err, Result] = await window.API.StartNetworkDeviceScan({
       EnableBonjour: true,
       EnableProbe: true,
+      EnablePJLink: true,
       TimeoutMs: 12000,
       MaxHostsPerSubnet: 512,
-      ProbePorts: [80, 443, 22, 445, 3389, 8080],
+      ProbePorts: [80, 443, 22, 445, 3389, 8080, 4352],
     });
     if (Err) {
       setNetworkDiscoveryScanning(false);

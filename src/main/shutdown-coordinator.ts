@@ -14,20 +14,16 @@ import { DB_PENDING_OPERATION_TIMEOUT_MS } from '../Modules/Config/constants';
 import { stopAutosave } from './autosave';
 const { app } = require('electron/main');
 const { dialog } = require('electron');
-const {
-  getMainWindow,
-  hasMainWindow,
-  sendShowFileUpdated,
-} = require('./app-window') as typeof import('./app-window');
-const { PushToRenderers } = require('./renderer-bus') as typeof import('./renderer-bus');
-const { Manager: ModeManager } = require('../Modules/ModeManager') as typeof import('../Modules/ModeManager');
-const { Manager: BackupManager } = require('../Modules/BackupManager') as typeof import('../Modules/BackupManager');
-const { Manager: SettingsManager } = require('../Modules/SettingsManager') as typeof import('../Modules/SettingsManager');
-const { Manager: FileSelectorManager } = require('../Modules/FileSelectorManager') as typeof import('../Modules/FileSelectorManager');
-const { Manager: MonitoringTargetManager } = require('../Modules/MonitoringTargetManager') as typeof import('../Modules/MonitoringTargetManager');
-const { Manager: DummyClientManager } = require('../Modules/DummyClientManager') as typeof import('../Modules/DummyClientManager');
-const { Manager: NetworkInterfaces } = require('../Modules/NetworkInterfaces') as typeof import('../Modules/NetworkInterfaces');
-const { Manager: DBManager } = require('../Modules/DB') as typeof import('../Modules/DB');
+import { getMainWindow, hasMainWindow, sendShowFileUpdated } from './app-window';
+import { PushToRenderers } from './renderer-bus';
+import { Manager as ModeManager } from '../Modules/ModeManager';
+import { Manager as BackupManager } from '../Modules/BackupManager';
+import { Manager as SettingsManager } from '../Modules/SettingsManager';
+import { Manager as FileSelectorManager } from '../Modules/FileSelectorManager';
+import { Manager as MonitoringTargetManager } from '../Modules/MonitoringTargetManager';
+import { Manager as DummyClientManager } from '../Modules/DummyClientManager';
+import { Manager as NetworkInterfaces } from '../Modules/NetworkInterfaces';
+import { Manager as DBManager } from '../Modules/DB';
 
 const Logger = CreateLogger('Main');
 

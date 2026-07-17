@@ -232,3 +232,75 @@ test('DB rejects queries once shutdown has begun', async () => {
   // Shutdown is idempotent.
   await DB.Shutdown();
 });
+
+test('DB applies the WAL pragma and the declared indexes on open', async () => {
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const { Manager: DB } = loadDB(storageDir);
+  await DB.Ready();
+
+  // Connection tuning: WAL is set on every open.
+  const [modeErr, modeRow] = await DB.Get('PRAGMA journal_mode');
+  assert.equal(modeErr, null);
+  assert.equal(String(modeRow.journal_mode).toLowerCase(), 'wal');
+
+  // The performance indexes are created by the migrations.
+  const [idxErr, indexes] = await DB.All("SELECT name FROM sqlite_master WHERE type = 'index'");
+  assert.equal(idxErr, null);
+  const idxNames = new Set(indexes.map((r) => r.name));
+  for (const expected of [
+    'idx_clients_groupid',
+    'idx_monitoringchecks_targetid',
+    'idx_alerthistory_ruleid',
+    'idx_alerthistory_timestamp',
+  ]) {
+    assert.equal(idxNames.has(expected), true, `expected index ${expected}`);
+  }
+
+  await DB.Shutdown();
+});
+
+test('AlertHistory repository prunes to the newest N rows', async () => {
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const { Manager: DB } = loadDB(storageDir);
+  await DB.Ready();
+
+  const { CreateAlertHistoryRepository } = require('../dist/Modules/DB/repositories/alert-history');
+  const repo = CreateAlertHistoryRepository(DB);
+
+  for (let i = 0; i < 5; i++) {
+    const [err] = await repo.Insert({
+      RuleID: 1,
+      TriggerType: 'CLIENT_OFFLINE',
+      TriggerSource: 'client',
+      Context: JSON.stringify({ n: i }),
+      Result: JSON.stringify({ Actions: [] }),
+      Timestamp: 1000 + i,
+    });
+    assert.equal(err, null);
+  }
+
+  let countRow;
+  [, countRow] = await DB.Get('SELECT COUNT(*) AS N FROM AlertHistory');
+  assert.equal(countRow.N, 5);
+
+  const [pruneErr] = await repo.PruneToMaxRows(2);
+  assert.equal(pruneErr, null);
+
+  [, countRow] = await DB.Get('SELECT COUNT(*) AS N FROM AlertHistory');
+  assert.equal(countRow.N, 2);
+
+  // The survivors are the two newest inserts (highest HistoryID).
+  const [, rows] = await DB.All('SELECT Context FROM AlertHistory ORDER BY HistoryID');
+  assert.deepEqual(
+    rows.map((r) => JSON.parse(r.Context).n),
+    [3, 4]
+  );
+
+  // Pruning is inert once the table already fits under the cap.
+  const [prune2Err] = await repo.PruneToMaxRows(10);
+  assert.equal(prune2Err, null);
+  [, countRow] = await DB.Get('SELECT COUNT(*) AS N FROM AlertHistory');
+  assert.equal(countRow.N, 2);
+
+  await DB.Shutdown();
+});

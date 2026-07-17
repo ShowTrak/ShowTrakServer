@@ -26,7 +26,7 @@ import { Manager as IdentifyManager } from '../IdentifyManager';
 const Logger = CreateLogger('WebServer');
 
 const HTTP = require('http');
-const { Server: WebServer } = require('socket.io') as typeof import('socket.io');
+import { Server as WebServer } from 'socket.io';
 const express = require('express');
 
 // HTTP server backing express + Socket.IO

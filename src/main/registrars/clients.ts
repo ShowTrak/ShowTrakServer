@@ -8,29 +8,20 @@ import { createTupleHandler, validationErrorTuple } from '../ipc/create-handler'
 import { UpdateFullClientList } from '../broadcast-bridge';
 import { TriggerScriptDeployment } from '../deployment';
 import type {
-  IPCValidationManager,
   CriticalUSBDevicePayloadResult,
   CriticalUSBNamePayloadResult,
   CriticalApplicationPayloadResult,
   CriticalDisplayPayloadResult,
 } from '../../Modules/IPCValidation';
-const { Manager: ClientManager } =
-  require('../../Modules/ClientManager') as typeof import('../../Modules/ClientManager');
-const { Manager: AdoptionManager } =
-  require('../../Modules/AdoptionManager') as typeof import('../../Modules/AdoptionManager');
-const { Manager: ServerManager } =
-  require('../../Modules/Server') as typeof import('../../Modules/Server');
-const { Manager: AlertsManager } =
-  require('../../Modules/AlertsManager') as typeof import('../../Modules/AlertsManager');
-const { Manager: IdentifyManager } =
-  require('../../Modules/IdentifyManager') as typeof import('../../Modules/IdentifyManager');
-const { Manager: WOLManager } =
-  require('../../Modules/WOLManager') as typeof import('../../Modules/WOLManager');
-const { Manager: ScriptExecutionManager } =
-  require('../../Modules/ScriptExecutionManager') as typeof import('../../Modules/ScriptExecutionManager');
-const { Manager: SettingsManager } =
-  require('../../Modules/SettingsManager') as typeof import('../../Modules/SettingsManager');
-const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
+import { Manager as ClientManager } from '../../Modules/ClientManager';
+import { Manager as AdoptionManager } from '../../Modules/AdoptionManager';
+import { Manager as ServerManager } from '../../Modules/Server';
+import { Manager as AlertsManager } from '../../Modules/AlertsManager';
+import { Manager as IdentifyManager } from '../../Modules/IdentifyManager';
+import { Manager as WOLManager } from '../../Modules/WOLManager';
+import { Manager as ScriptExecutionManager } from '../../Modules/ScriptExecutionManager';
+import { Manager as SettingsManager } from '../../Modules/SettingsManager';
+import { Manager as IPCValidation } from '../../Modules/IPCValidation';
 
 const Logger = CreateLogger('Main');
 

@@ -363,6 +363,7 @@ function InitClientListPush() {
 
   for (let i = 0; i < renderExecutions.length; i++) {
     const Request = renderExecutions[i];
+    if (!Request) continue; // i is within renderExecutions bounds
     const rawScriptName =
       Request && Request.Script && Request.Script.Name ? String(Request.Script.Name).trim() : '';
     const rawClientName = Request.Client.Nickname

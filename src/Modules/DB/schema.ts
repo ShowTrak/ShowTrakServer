@@ -235,6 +235,25 @@ Schema.Migrations = [
     Version: 8,
     SQL: 'ALTER TABLE `Clients` ADD COLUMN Unassigned INTEGER NOT NULL DEFAULT 0',
   },
+  // Indexes for the non-PK lookups the app runs repeatedly. CREATE INDEX IF NOT
+  // EXISTS is idempotent (and the migration runner only ALTER-probes; anything
+  // else just runs), so these apply cleanly to both new and existing installs.
+  {
+    Version: 9,
+    SQL: 'CREATE INDEX IF NOT EXISTS idx_clients_groupid ON `Clients` (GroupID)',
+  },
+  {
+    Version: 10,
+    SQL: 'CREATE INDEX IF NOT EXISTS idx_monitoringchecks_targetid ON `MonitoringChecks` (TargetID)',
+  },
+  {
+    Version: 11,
+    SQL: 'CREATE INDEX IF NOT EXISTS idx_alerthistory_ruleid ON `AlertHistory` (RuleID)',
+  },
+  {
+    Version: 12,
+    SQL: 'CREATE INDEX IF NOT EXISTS idx_alerthistory_timestamp ON `AlertHistory` (Timestamp)',
+  },
 ];
 
 export = Schema;

@@ -4,9 +4,8 @@ import { RPC } from '../rpc';
 import { validationErrorTuple } from '../ipc/create-handler';
 import { PushToRenderers } from '../renderer-bus';
 import { hasMainWindow } from '../app-window';
-import type { IPCValidationManager } from '../../Modules/IPCValidation';
-const { Manager: NetworkDiscoveryManager } = require('../../Modules/NetworkDiscovery') as typeof import('../../Modules/NetworkDiscovery');
-const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
+import { Manager as NetworkDiscoveryManager } from '../../Modules/NetworkDiscovery';
+import { Manager as IPCValidation } from '../../Modules/IPCValidation';
 
 function register(): void {
   RPC.handle('NetworkDiscovery:Start', async (_Event: unknown, Options: unknown) => {

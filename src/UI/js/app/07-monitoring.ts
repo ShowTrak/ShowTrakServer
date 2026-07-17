@@ -109,7 +109,7 @@ export function FormatMonitoringCheckSummary(T: MonitoringTargetView, MaxLength 
 
   const Visible: string[] = [];
   for (let Index = 0; Index < Labels.length; Index += 1) {
-    const Label = Labels[Index];
+    const Label = Labels[Index]!; // Index < Labels.length: always defined
     const Remaining = Labels.length - (Index + 1);
     const Candidate = FormatVisibleLabels([...Visible, Label]);
     const Suffix = Remaining > 0 ? ` + ${Remaining} More` : '';

@@ -120,9 +120,10 @@ export async function StopIdentifyingForUUIDs(UUIDs: string[]) {
   Results.forEach((Result, Index) => {
     const Err: unknown = Array.isArray(Result) ? Result[0] : null;
     if (Err) {
-      Failed.push({ UUID: List[Index], Error: Err });
+      // Results is mapped 1:1 from List, so Index is always in range
+      Failed.push({ UUID: List[Index]!, Error: Err });
     } else {
-      Succeeded.push(List[Index]);
+      Succeeded.push(List[Index]!);
     }
   });
   if (Succeeded.length) ApplyIdentifyStateLocally(Succeeded, false);

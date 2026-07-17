@@ -6,18 +6,17 @@ import { CreateLogger } from '../../Modules/Logger';
 import { RPC } from '../rpc';
 import { validationErrorTuple } from '../ipc/create-handler';
 import { PushInitialDesktopState } from '../initial-state';
-import type { IPCValidationManager } from '../../Modules/IPCValidation';
 const { app } = require('electron/main');
 const { shell } = require('electron');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
-const { Config } = require('../../Modules/Config') as typeof import('../../Modules/Config');
-const { Manager: ModeManager } = require('../../Modules/ModeManager') as typeof import('../../Modules/ModeManager');
-const { Manager: SettingsManager } = require('../../Modules/SettingsManager') as typeof import('../../Modules/SettingsManager');
-const { Manager: AppDataManager } = require('../../Modules/AppData') as typeof import('../../Modules/AppData');
-const { Manager: NetworkInterfaces } = require('../../Modules/NetworkInterfaces') as typeof import('../../Modules/NetworkInterfaces');
-const { Manager: IPCValidation }: { Manager: IPCValidationManager } = require('../../Modules/IPCValidation');
+import { Config } from '../../Modules/Config';
+import { Manager as ModeManager } from '../../Modules/ModeManager';
+import { Manager as SettingsManager } from '../../Modules/SettingsManager';
+import { Manager as AppDataManager } from '../../Modules/AppData';
+import { Manager as NetworkInterfaces } from '../../Modules/NetworkInterfaces';
+import { Manager as IPCValidation } from '../../Modules/IPCValidation';
 
 const Logger = CreateLogger('Main');
 

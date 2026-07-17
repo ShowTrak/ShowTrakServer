@@ -213,7 +213,7 @@ class MonitoringTarget {
   // The tile UI still references a single Address/Method for the subtitle; we
   // surface the first check's values for backwards compatibility.
   get PrimaryCheck(): MonitoringCheck | null {
-    return this.Checks.length ? this.Checks[0] : null;
+    return this.Checks.length ? this.Checks[0]! : null;
   }
 
   // Snapshot used for IPC + broadcast payloads.
@@ -283,7 +283,7 @@ class MonitoringTarget {
       // is only one check, otherwise a concise summary.
       this.LastError =
         Checks.length === 1
-          ? Checks[0].LastError || 'Check failed'
+          ? Checks[0]!.LastError || 'Check failed'
           : `Multiple faults (${Checks.length} checks down)`;
     } else if (this.Degraded) {
       if (FaultCount > 1) {

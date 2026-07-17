@@ -239,6 +239,21 @@ Manager.InitializeSchema = async (): Promise<void> => {
   return schemaInitializationPromise;
 };
 
+// Connection-level tuning applied on every (re)open, before schema init.
+// WAL lets readers and a writer proceed concurrently instead of blocking one
+// another; synchronous=NORMAL is the safe, durable companion under WAL (a crash
+// can lose only the last transaction, never corrupt the DB); busy_timeout makes
+// a contended write wait-and-retry rather than fail fast with SQLITE_BUSY. These
+// are per-connection PRAGMAs (WAL persists in the file header) and must be set
+// on the raw handle, so they intentionally run outside dirty-change tracking.
+async function ConfigureConnection(): Promise<void> {
+  const Pragmas = ['journal_mode = WAL', 'synchronous = NORMAL', 'busy_timeout = 5000'];
+  for (const Pragma of Pragmas) {
+    const [Err] = await Manager.Run(`PRAGMA ${Pragma}`, undefined, { markDirty: false });
+    if (Err) Logger.databaseError(`Failed to apply PRAGMA ${Pragma}`, Err);
+  }
+}
+
 // Open (or reopen) the SQLite connection and ensure the schema exists before
 // the returned promise resolves. Resets the schema-init state so migrations are
 // re-applied against whatever file is now on disk (e.g. a just-opened .ShowTrak).
@@ -256,6 +271,7 @@ function OpenConnection(): Promise<void> {
       }
       Logger.success('Connected to SQLite database.');
       try {
+        await ConfigureConnection();
         await Manager.InitializeSchema();
         resolve();
       } catch (schemaError) {
