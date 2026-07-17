@@ -239,11 +239,19 @@ interface RawResponse {
 
 // One request, no auth handling, no redirect following. Rejects on transport
 // error / timeout. A hard kill timer guarantees no probe can stall the
-// monitoring loop.
-function SendOnce(Url: URL, Config: BrightSignConfig, AuthHeader: string | null): Promise<RawResponse> {
+// monitoring loop. `BudgetMs` is the time this individual request may take; the
+// caller passes the REMAINING share of the whole-probe budget so the redirect +
+// auth handshake as a whole cannot exceed the configured Timeout.
+function SendOnce(
+  Url: URL,
+  Config: BrightSignConfig,
+  AuthHeader: string | null,
+  BudgetMs?: number
+): Promise<RawResponse> {
   return new Promise<RawResponse>((resolve, reject) => {
     const Lib = Url.protocol === 'https:' ? https : http;
-    const TimeoutMs = Math.max(500, Config.TimeoutMs | 0);
+    const TimeoutMs =
+      BudgetMs != null ? Math.max(1, BudgetMs | 0) : Math.max(500, Config.TimeoutMs | 0);
     let Settled = false;
 
     const Fail = (Err: Error) => {
@@ -371,13 +379,25 @@ export async function FetchDws(Config: BrightSignConfig, Path: string): Promise<
   if (!Url) return { Ok: false, Error: 'Invalid address' };
 
   const Started = Date.now();
+  // The configured Timeout is a budget for the WHOLE probe, not per request.
+  // Without this, the redirect (×MAX_REDIRECTS) and auth-retry round trips each
+  // armed their own full TimeoutMs, so a hung player could stall a probe for up
+  // to 8×TimeoutMs. Each SendOnce instead gets only the time left on this budget.
+  const BudgetMs = Math.max(500, Config.TimeoutMs | 0);
+  const Deadline = Started + BudgetMs;
+  const RemainingMs = () => Deadline - Date.now();
+  const TimedOut = (): DwsResponse => ({
+    Ok: false,
+    Error: `Probe timed out after ${BudgetMs}ms`,
+  });
   let Current = Url;
   let RedirectsLeft = MAX_REDIRECTS;
 
   for (;;) {
     let Res: RawResponse;
     try {
-      Res = await SendOnce(Current, Config, null);
+      if (RemainingMs() <= 0) return TimedOut();
+      Res = await SendOnce(Current, Config, null, RemainingMs());
 
       if (Res.Status === 401) {
         const Challenge = ParseDigestChallenge(Res.Headers['www-authenticate']);
@@ -406,7 +426,8 @@ export async function FetchDws(Config: BrightSignConfig, Path: string): Promise<
           Config.Password,
           Cnonce
         );
-        Res = await SendOnce(Current, Config, Auth);
+        if (RemainingMs() <= 0) return TimedOut();
+        Res = await SendOnce(Current, Config, Auth, RemainingMs());
         if (Res.Status === 401) {
           return {
             Ok: false,
