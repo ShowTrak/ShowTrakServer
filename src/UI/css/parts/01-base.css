@@ -203,46 +203,18 @@ body.is-web #APPLICATION {
   --tile-status-height: 20px;
 }
 
-.mode-group.btn-group {
-  gap: 0;
-}
-.mode-group .btn {
+/* The bottom-bar SHOW/EDIT switch uses the shared `.st-segmented-toggle` look
+   (see 02-controls.css); here it is just sized to the bottom-bar toggle height. */
+.mode-group.st-segmented-toggle {
   height: var(--bottom-bar-toggle-height);
-  padding: 4px 10px; /* slightly taller */
-  line-height: 1.2;
-  font-size: 12px;
-  border-width: 1px;
-  font-weight: 700; /* consistent weight to avoid width shift */
-  transition:
-    background-color 120ms ease,
-    color 120ms ease,
-    border-color 120ms ease;
+  align-items: stretch;
 }
-.mode-group.btn-group {
+.mode-group .st-segmented-toggle-btn {
+  display: inline-flex;
   align-items: center;
-}
-.mode-group .btn + .btn {
-  margin-left: 2px;
-}
-
-/* Softer hover for inactive, stronger look for active */
-.mode-group .btn.btn-outline-light {
-  color: rgba(255, 255, 255, 0.9) !important;
-  border-color: rgba(255, 255, 255, 0.35) !important;
-  background-color: transparent !important;
-}
-.mode-group .btn.btn-outline-light:hover,
-.mode-group .btn.btn-outline-light:focus {
-  background-color: rgba(255, 255, 255, 0.04) !important; /* softer hover */
-}
-.mode-group .btn.btn-light {
-  background-color: rgba(255, 255, 255, 0.32) !important; /* stronger active background */
-  color: #111 !important;
-  border-color: rgba(255, 255, 255, 0.85) !important;
-}
-.mode-group .btn.btn-light:hover,
-.mode-group .btn.btn-light:focus {
-  background-color: rgba(255, 255, 255, 0.36) !important; /* subtle hover for active */
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 12px;
 }
 
 #COMPACT_MODE_BTN.compact-mode-btn {

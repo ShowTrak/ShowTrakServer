@@ -1579,7 +1579,7 @@ body.is-web #SETTINGS_MENU_DROPDOWN {
 }
 
 /* Web surface shows current SHOW/EDIT + ALERTS state, but cannot change it. */
-body.is-web .mode-group .btn:disabled,
+body.is-web .mode-group .st-segmented-toggle-btn:disabled,
 body.is-web #ALERT_ACTIONS_TOGGLE_BTN:disabled {
   cursor: not-allowed;
   pointer-events: none;

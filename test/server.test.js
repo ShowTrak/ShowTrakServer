@@ -1066,6 +1066,146 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
   assert.deepEqual(emits[0], { room: 'group-1', event: 'Notify', args: [{ text: 'hi' }] });
 });
 
+test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve end-to-end', async () => {
+  // Loads the real Server AND the real OSC module together (OSC is NOT mocked),
+  // so this proves the actual shipped tag OSC routes materialize as HTTP routes
+  // and that a request flows through to the real tag scope-expansion logic.
+  const broadcastEvents = [];
+  const getRoutes = [];
+  const postRoutes = [];
+  const getHandlers = {};
+  const ioMock = {
+    to: () => ({ emit: () => {} }),
+    on: () => {},
+    of: () => ({ use: () => {}, on: () => {} }),
+  };
+
+  loadWithMocks(serverPath('index.js'), {
+    '../Logger': loggerStub,
+    http: { createServer: () => ({ on: () => {}, listen: (_p, cb) => cb && cb() }) },
+    'socket.io': {
+      Server: class {
+        constructor() {
+          return ioMock;
+        }
+      },
+    },
+    'node-osc': {
+      Server: class {
+        constructor(_p, _h, cb) {
+          if (cb) cb();
+        }
+        on() {}
+      },
+    },
+    express: Object.assign(
+      () => {
+        const app = () => {};
+        app.use = () => {};
+        app.get = (routePath, handler) => {
+          getRoutes.push(routePath);
+          if (typeof handler === 'function') getHandlers[routePath] = handler;
+        };
+        app.post = (routePath) => postRoutes.push(routePath);
+        return app;
+      },
+      { static: () => () => {} }
+    ),
+    // OSC is REAL — so are Config/constants + NetworkErrors it pulls in.
+    '../Config': { Config: { Application: { Port: 0, Version: '1.0' } } },
+    '../AppData': {
+      Manager: { GetScriptsDirectory: () => '/tmp/scripts', GetStorageDirectory: () => '/tmp' },
+    },
+    '../UpdateManager': { Manager: { RegisterRoutes: () => {} } },
+    '../Broadcast': { Manager: { emit: (...args) => broadcastEvents.push(args) } },
+    // A tag "foh" whose scope is group 1 — expands to r1 only.
+    '../TagManager': {
+      Manager: {
+        Get: async () => [null, null],
+        GetBySlug: async (slug) =>
+          slug === 'foh'
+            ? { TagID: 5, Slug: 'foh', Scope: { Workspace: false, Groups: [1], Clients: [] } }
+            : null,
+      },
+    },
+    '../ScriptWhitelistManager': {
+      Manager: {
+        DecorateCatalog: async (scripts) => scripts,
+        GetScope: async () => null,
+        IsClientAllowed: (scope, client) => {
+          if (!scope || scope.Workspace) return true;
+          if (!client || !client.UUID) return false;
+          if ((scope.Clients || []).includes(client.UUID)) return true;
+          if (client.GroupID != null && (scope.Groups || []).includes(Number(client.GroupID)))
+            return true;
+          return false;
+        },
+      },
+    },
+    '../ClientManager': {
+      Manager: {
+        GetAll: async () => [
+          null,
+          [
+            { UUID: 'r1', GroupID: 1 },
+            { UUID: 'r2', GroupID: 2 },
+          ],
+        ],
+        Get: async () => ['not found', null],
+        GetBySlug: async () => null,
+      },
+    },
+    '../GroupManager': { Manager: { Get: async () => [null, null], GetBySlug: async () => null } },
+    '../ScriptManager': { Manager: { Get: async () => null } },
+    '../MonitoringTargetManager': { Manager: { GetAll: async () => [null, []] } },
+    '../DummyClientManager': {
+      Manager: { GetAll: async () => [null, []], Heartbeat: async () => [null] },
+    },
+    '../ScriptExecutionManager': {
+      Manager: {
+        ClearQueue: async () => {},
+        AddToQueue: async () => 'req',
+        AddInternalTaskToQueue: async () => 'req',
+      },
+    },
+    '../Utils': { Wait: async () => {} },
+    './client-namespace': { SetupClientNamespace: () => {} },
+    './webui-namespace': { SetupWebUiNamespace: () => {} },
+    path: require('path'),
+  });
+
+  // All four tag actions are mounted for both verbs.
+  for (const action of ['Select', 'Deselect', 'WakeOnLAN', 'RunScript/:ScriptID']) {
+    const p = `/API/Tag/:Slug/${action}`;
+    assert.ok(getRoutes.includes(p), `GET ${p} registered`);
+    assert.ok(postRoutes.includes(p), `POST ${p} registered`);
+  }
+
+  // Drive /API/Tag/:Slug/Select end-to-end through the real handler.
+  const handler = getHandlers['/API/Tag/:Slug/Select'];
+  assert.equal(typeof handler, 'function');
+  let statusCode = 200;
+  let payload = null;
+  const res = {
+    locals: {},
+    status(code) {
+      statusCode = code;
+      return this;
+    },
+    json(body) {
+      payload = body;
+      return this;
+    },
+  };
+  await handler({ params: { Slug: 'foh' }, ip: '127.0.0.1', socket: {} }, res);
+  assert.equal(statusCode, 200);
+  assert.equal(payload.Error, false);
+  // The tag's scope (group 1) expanded to exactly r1, dispatched as a Select.
+  const bulk = broadcastEvents.find(([e, a]) => e === 'OSCBulkAction' && a === 'Select');
+  assert.ok(bulk, 'expected a Select bulk action');
+  assert.deepEqual(bulk[2], ['r1']);
+});
+
 test('Server Manager integrated event queue reports mixed target outcomes', async () => {
   const emits = [];
   const queueEntries = [];

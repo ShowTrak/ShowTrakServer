@@ -100,20 +100,9 @@ export function RenderMode(mode: AppModeValue) {
   const btnShow = document.getElementById('MODE_BTN_SHOW') as HTMLButtonElement | null;
   const btnEdit = document.getElementById('MODE_BTN_EDIT') as HTMLButtonElement | null;
   if (btnShow && btnEdit) {
-    const activeClasses = ['btn-light', 'text-dark'];
-    const inactiveClasses = ['btn-outline-light', 'text-light'];
-
-    // reset
-    btnShow.classList.remove(...activeClasses, ...inactiveClasses);
-    btnEdit.classList.remove(...activeClasses, ...inactiveClasses);
-
-    if (AppMode === 'SHOW') {
-      btnShow.classList.add(...activeClasses);
-      btnEdit.classList.add(...inactiveClasses);
-    } else {
-      btnEdit.classList.add(...activeClasses);
-      btnShow.classList.add(...inactiveClasses);
-    }
+    // Segmented toggle: the active mode's button carries `.is-active`.
+    btnShow.classList.toggle('is-active', AppMode === 'SHOW');
+    btnEdit.classList.toggle('is-active', AppMode === 'EDIT');
 
     const IsReadOnly = !Capabilities.showModeToggle;
     btnShow.disabled = IsReadOnly;

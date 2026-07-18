@@ -203,46 +203,18 @@ body.is-web #APPLICATION {
   --tile-status-height: 20px;
 }
 
-.mode-group.btn-group {
-  gap: 0;
-}
-.mode-group .btn {
+/* The bottom-bar SHOW/EDIT switch uses the shared `.st-segmented-toggle` look
+   (see 02-controls.css); here it is just sized to the bottom-bar toggle height. */
+.mode-group.st-segmented-toggle {
   height: var(--bottom-bar-toggle-height);
-  padding: 4px 10px; /* slightly taller */
-  line-height: 1.2;
-  font-size: 12px;
-  border-width: 1px;
-  font-weight: 700; /* consistent weight to avoid width shift */
-  transition:
-    background-color 120ms ease,
-    color 120ms ease,
-    border-color 120ms ease;
+  align-items: stretch;
 }
-.mode-group.btn-group {
+.mode-group .st-segmented-toggle-btn {
+  display: inline-flex;
   align-items: center;
-}
-.mode-group .btn + .btn {
-  margin-left: 2px;
-}
-
-/* Softer hover for inactive, stronger look for active */
-.mode-group .btn.btn-outline-light {
-  color: rgba(255, 255, 255, 0.9) !important;
-  border-color: rgba(255, 255, 255, 0.35) !important;
-  background-color: transparent !important;
-}
-.mode-group .btn.btn-outline-light:hover,
-.mode-group .btn.btn-outline-light:focus {
-  background-color: rgba(255, 255, 255, 0.04) !important; /* softer hover */
-}
-.mode-group .btn.btn-light {
-  background-color: rgba(255, 255, 255, 0.32) !important; /* stronger active background */
-  color: #111 !important;
-  border-color: rgba(255, 255, 255, 0.85) !important;
-}
-.mode-group .btn.btn-light:hover,
-.mode-group .btn.btn-light:focus {
-  background-color: rgba(255, 255, 255, 0.36) !important; /* subtle hover for active */
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 12px;
 }
 
 #COMPACT_MODE_BTN.compact-mode-btn {
@@ -1010,6 +982,49 @@ input[type='range']::-moz-range-progress,
 /* Light ghost background, used for modal section headings */
 .bg-ghost-light {
   background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Reusable segmented toggle: a pill container with an inset dark track and a
+   raised, brighter "active" segment. Used by the OSC/HTTP reference switch and
+   the bottom-bar SHOW/EDIT switch. Mark the selected button with `.is-active`. */
+.st-segmented-toggle {
+  display: inline-flex;
+  padding: 0.15rem;
+  border-radius: 0.6rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.st-segmented-toggle-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.85rem;
+  border-radius: 0.45rem;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.st-segmented-toggle-btn:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.st-segmented-toggle-btn.is-active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.st-segmented-toggle-btn:disabled {
+  cursor: default;
+  opacity: 0.65;
 }
 
 /* Settings modal: two-pane layout with a category nav on the left and the
@@ -2664,6 +2679,33 @@ button.btn:focus {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
+.osc-route-section-header {
+  margin-top: 0.5rem;
+  padding: 0.1rem 0.15rem 0.35rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.55);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.osc-route-section-header:first-child {
+  margin-top: 0;
+}
+
+.osc-action-title {
+  line-height: 1.2;
+}
+
+.osc-reference-intro-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .osc-action-protocol-block {
   display: grid;
   gap: 0.45rem;
@@ -2679,15 +2721,6 @@ button.btn:focus {
 .osc-action-protocol-content {
   display: grid;
   gap: 0.45rem;
-}
-
-.osc-action-route-row {
-  display: grid;
-  gap: 0.35rem;
-  padding: 0.55rem;
-  border-radius: 0.55rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .osc-action-route-methods {
@@ -2711,6 +2744,9 @@ button.btn:focus {
   display: block;
   overflow-x: auto;
   white-space: nowrap;
+  padding: 0.55rem;
+  border-radius: 0.55rem;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .osc-route-query-wrap {
@@ -4532,7 +4568,7 @@ body.is-web #SETTINGS_MENU_DROPDOWN {
 }
 
 /* Web surface shows current SHOW/EDIT + ALERTS state, but cannot change it. */
-body.is-web .mode-group .btn:disabled,
+body.is-web .mode-group .st-segmented-toggle-btn:disabled,
 body.is-web #ALERT_ACTIONS_TOGGLE_BTN:disabled {
   cursor: not-allowed;
   pointer-events: none;

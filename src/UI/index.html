@@ -44,9 +44,9 @@
     <div id="APP_BOTTOM_BAR">
       <div class="bar-content">
         <div class="bar-section left">
-          <div class="mode-group btn-group btn-group-sm" role="group" aria-label="Mode Switch">
-            <button type="button" id="MODE_BTN_SHOW" class="btn btn-outline-light">SHOW</button>
-            <button type="button" id="MODE_BTN_EDIT" class="btn btn-outline-light">EDIT</button>
+          <div class="mode-group st-segmented-toggle" role="group" aria-label="Mode Switch">
+            <button type="button" id="MODE_BTN_SHOW" class="st-segmented-toggle-btn">SHOW</button>
+            <button type="button" id="MODE_BTN_EDIT" class="st-segmented-toggle-btn">EDIT</button>
           </div>
           <button
             type="button"
@@ -860,12 +860,6 @@ Loading licence...</pre>
         <div class="modal-content">
           <div class="modal-body text-center">
             <div id="OSC_ROUTE_LIST_HEADER"></div>
-            <div class="text-sm text-muted text-start bg-ghost rounded p-2 mt-2">
-              Address clients and groups by their <strong>slug</strong> &mdash; the editable
-              identifier shown in each client/group's edit panel. Slugs are stable and
-              human-readable, so they're the recommended way to build OSC/HTTP commands. Raw UUIDs
-              and numeric group IDs still work for now, but may be retired later.
-            </div>
             <div id="OSC_ROUTE_LIST" class="d-grid gap-2 text-start mt-2"></div>
           </div>
         </div>

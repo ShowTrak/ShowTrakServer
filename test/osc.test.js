@@ -15,6 +15,9 @@ const noopLogger = {
   }),
 };
 
+// A tag whose membership scope is "group 1", so it expands to clients a + b.
+const FOH_SCOPE = { Workspace: false, Groups: [1], Clients: [] };
+
 function loadOSC(overrides = {}) {
   const handlers = {};
   const oscMock = {
@@ -66,6 +69,28 @@ function loadOSC(overrides = {}) {
         Heartbeat: async () => [null, true],
       },
     },
+    '../TagManager': {
+      Manager: {
+        Get: async (id) =>
+          Number(id) === 5 ? [null, { TagID: 5, Slug: 'foh', Scope: FOH_SCOPE }] : [null, null],
+        // Tags are addressed by slug; a numeric TagID resolves via Get above.
+        GetBySlug: async (slug) =>
+          slug === 'foh' ? { TagID: 5, Slug: 'foh', Scope: FOH_SCOPE } : null,
+      },
+    },
+    '../ScriptWhitelistManager': {
+      // Real predicate: Workspace = all, else by explicit UUID or matching group.
+      Manager: {
+        IsClientAllowed: (scope, client) => {
+          if (!scope || scope.Workspace) return true;
+          if (!client || !client.UUID) return false;
+          if ((scope.Clients || []).includes(client.UUID)) return true;
+          if (client.GroupID != null && (scope.Groups || []).includes(Number(client.GroupID)))
+            return true;
+          return false;
+        },
+      },
+    },
     ...overrides,
   };
 
@@ -87,6 +112,11 @@ test('OSC registers the built-in routes', () => {
   assert.ok(routes.includes('/API/Client/:Slug/RunScript/:ScriptID'));
   assert.ok(routes.includes('/API/Group/:Slug/Select'));
   assert.ok(routes.includes('/API/Group/:Slug/RunScript/:ScriptID'));
+  // Tags mirror the group actions, addressed by slug (TagID resolves as a fallback).
+  assert.ok(routes.includes('/API/Tag/:Slug/Select'));
+  assert.ok(routes.includes('/API/Tag/:Slug/Deselect'));
+  assert.ok(routes.includes('/API/Tag/:Slug/WakeOnLAN'));
+  assert.ok(routes.includes('/API/Tag/:Slug/RunScript/:ScriptID'));
   assert.ok(routes.includes('/API/All/Select'));
   assert.ok(routes.includes('/API/All/Deselect'));
   assert.ok(routes.includes('/API/Selection/WakeOnLAN'));
@@ -127,6 +157,34 @@ test('OSC dispatches a client select route addressed by slug', async () => {
         event === 'OSCBulkAction' && action === 'Select' && uuids[0] === 'good'
     )
   );
+});
+
+test('OSC dispatches a tag select route addressed by slug', async () => {
+  const { handlers, broadcastEvents } = loadOSC();
+  // "foh" resolves via the tag slug; its scope (group 1) expands to clients a + b.
+  await handlers.message(['/API/Tag/foh/Select']);
+  const bulk = broadcastEvents.find(
+    ([event, action]) => event === 'OSCBulkAction' && action === 'Select'
+  );
+  assert.ok(bulk, 'expected an OSCBulkAction Select for the tag');
+  assert.deepEqual(bulk[2], ['a', 'b']);
+});
+
+test('OSC reports an error notification for an invalid tag', async () => {
+  const { handlers, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/Tag/nope/Select']);
+  assert.ok(broadcastEvents.some(([event, , level]) => event === 'Notify' && level === 'error'));
+});
+
+test('OSC Tag/RunScript validates script and tag membership', async () => {
+  const { handlers, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/Tag/foh/RunScript/script1']);
+  const bulk = broadcastEvents.find(
+    ([event, action]) => event === 'OSCBulkAction' && action === 'ExecuteScript'
+  );
+  assert.ok(bulk, 'expected an ExecuteScript bulk action');
+  assert.deepEqual(bulk[2], ['a', 'b']);
+  assert.equal(bulk[3], 'script1');
 });
 
 test('OSC dispatches a group select route addressed by slug', async () => {

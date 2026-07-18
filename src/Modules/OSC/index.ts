@@ -5,6 +5,8 @@ import { Manager as Broadcast } from '../Broadcast';
 import { Manager as ScriptManager } from '../ScriptManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as GroupManager } from '../GroupManager';
+import { Manager as TagManager } from '../TagManager';
+import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
 import { IsTransientNetworkError, DescribeError } from '../NetworkErrors';
 
 const Logger = CreateLogger('OSC');
@@ -140,6 +142,7 @@ type OSCRouteCallback = (Req: OSCRequest, Meta?: OSCMeta) => RouteResult | Promi
 // Entity types reused from the (not-yet-migrated) managers via their typed public APIs.
 type OSCGroup = NonNullable<Awaited<ReturnType<typeof GroupManager.Get>>[1]>;
 type OSCClient = NonNullable<Awaited<ReturnType<ClientManagerType['GetAll']>>[1]>[number];
+type OSCTag = NonNullable<Awaited<ReturnType<typeof TagManager.GetBySlug>>>;
 
 interface OSCRoute {
   Title: string;
@@ -233,6 +236,42 @@ async function getGroupClients(
     (Client) => Number(Client.GroupID) === Number(Group.GroupID)
   );
   return [null, Group, GroupClients];
+}
+
+// Resolve a tag addressed over OSC by either its numeric TagID or its slug.
+async function resolveTagByKey(Key: string): Promise<OSCTag | null> {
+  const Trimmed = String(Key ?? '').trim();
+  if (/^\d+$/.test(Trimmed)) {
+    const [TagErr, Tag] = await TagManager.Get(Number(Trimmed));
+    if (!TagErr && Tag) return Tag;
+  }
+  if (typeof TagManager.GetBySlug === 'function') {
+    return await TagManager.GetBySlug(Trimmed);
+  }
+  return null;
+}
+
+// Expand a tag into its member clients. Unlike a group (a single GroupID FK),
+// tag membership is the dynamic Scope { Workspace, Groups[], Clients[] }, so a
+// client belongs when it matches that scope — reusing the same predicate the
+// script whitelist uses (Workspace = all, else by explicit UUID or group).
+async function getTagClients(
+  TagKeyRaw: string
+): Promise<[RouteResult, null, null] | [null, OSCTag, OSCClient[]]> {
+  const Tag = await resolveTagByKey(TagKeyRaw);
+  if (!Tag) {
+    return [failureResult(`Invalid Tag "${TagKeyRaw}"`), null, null];
+  }
+
+  const [ClientsErr, Clients] = await ClientManager.GetAll();
+  if (ClientsErr) {
+    return [failureResult('Failed to fetch all clients'), null, null];
+  }
+
+  const TagClients = (Clients || []).filter((Client) =>
+    ScriptWhitelistManager.IsClientAllowed(Tag.Scope, Client)
+  );
+  return [null, Tag, TagClients];
 }
 
 async function HandleOSCMessage(Route: unknown, Info: OSCRemoteInfo | undefined) {
@@ -530,6 +569,90 @@ OSC.CreateRoute(
     );
   },
   'Execute a script on all online members of a Group by its slug and Script ID'
+);
+
+// Tag routes mirror the Group routes exactly, but membership is the tag's
+// dynamic scope rather than a single GroupID (see getTagClients). A tag is
+// addressed by its slug (which doubles as its label) or, transitionally, its
+// numeric TagID.
+OSC.CreateRoute(
+  '/API/Tag/:Slug/Select',
+  async (Req) => {
+    const [TagErr, Tag, TagClients] = await getTagClients(Req.Slug ?? '');
+    if (TagErr) {
+      Broadcast.emit('Notify', `OSC - ${TagErr.detail}`, 'error');
+      return TagErr;
+    }
+
+    const UUIDs = TagClients.map((Client) => Client.UUID);
+    addSelectedUUIDs(UUIDs);
+    Broadcast.emit('OSCBulkAction', 'Select', UUIDs, null);
+    return successResult(
+      `Selected ${UUIDs.length} clients with tag "${Tag.Slug || Tag.TagID}"`
+    );
+  },
+  'Select all clients carrying a Tag by its slug'
+);
+
+OSC.CreateRoute(
+  '/API/Tag/:Slug/Deselect',
+  async (Req) => {
+    const [TagErr, Tag, TagClients] = await getTagClients(Req.Slug ?? '');
+    if (TagErr) {
+      Broadcast.emit('Notify', `OSC - ${TagErr.detail}`, 'error');
+      return TagErr;
+    }
+
+    const UUIDs = TagClients.map((Client) => Client.UUID);
+    removeSelectedUUIDs(UUIDs);
+    Broadcast.emit('OSCBulkAction', 'Deselect', UUIDs, null);
+    return successResult(
+      `Deselected ${UUIDs.length} clients with tag "${Tag.Slug || Tag.TagID}"`
+    );
+  },
+  'Deselect all clients carrying a Tag by its slug'
+);
+
+OSC.CreateRoute(
+  '/API/Tag/:Slug/WakeOnLAN',
+  async (Req) => {
+    const [TagErr, Tag, TagClients] = await getTagClients(Req.Slug ?? '');
+    if (TagErr) {
+      Broadcast.emit('Notify', `OSC - ${TagErr.detail}`, 'error');
+      return TagErr;
+    }
+
+    const UUIDs = TagClients.map((Client) => Client.UUID);
+    Broadcast.emit('OSCBulkAction', 'WOL', UUIDs, null);
+    return successResult(
+      `Wake-on-LAN queued for ${UUIDs.length} clients with tag "${Tag.Slug || Tag.TagID}"`
+    );
+  },
+  'Send a WOL packet to all offline clients carrying a Tag by its slug'
+);
+
+OSC.CreateRoute(
+  '/API/Tag/:Slug/RunScript/:ScriptID',
+  async (Req) => {
+    const [TagErr, Tag, TagClients] = await getTagClients(Req.Slug ?? '');
+    if (TagErr) {
+      Broadcast.emit('Notify', `OSC - ${TagErr.detail}`, 'error');
+      return TagErr;
+    }
+
+    const Script = await ScriptManager.Get(Req.ScriptID ?? '');
+    if (!Script) {
+      Broadcast.emit('Notify', `OSC - Invalid Script ID "${Req.ScriptID}"`, 'error');
+      return failureResult(`Invalid Script ID "${Req.ScriptID}"`);
+    }
+
+    const UUIDs = TagClients.map((Client) => Client.UUID);
+    Broadcast.emit('OSCBulkAction', 'ExecuteScript', UUIDs, Req.ScriptID);
+    return successResult(
+      `Script "${Req.ScriptID}" queued for ${UUIDs.length} clients with tag "${Tag.Slug || Tag.TagID}"`
+    );
+  },
+  'Execute a script on all online clients carrying a Tag by its slug and Script ID'
 );
 
 // Bulk All Operations

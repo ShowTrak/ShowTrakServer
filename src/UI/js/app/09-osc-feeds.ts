@@ -87,6 +87,20 @@ export const OSC_HTTP_DEBUG_MAX_LINES = 300;
 export let OscHttpDebugEntries: OscHttpDebugEntry[] = [];
 export let OscHttpDebugModalOpen = false;
 
+// Which protocol the reference is currently showing, and the last set of action
+// groups pushed from the backend — cached so the toggle can re-render without a
+// fresh push.
+export let OscReferenceProtocol: 'OSC' | 'HTTP' = 'OSC';
+export let OscReferenceGroups: OscActionGroup[] = [];
+
+export function setOscReferenceProtocol(Protocol: 'OSC' | 'HTTP') {
+  OscReferenceProtocol = Protocol;
+}
+
+export function setOscReferenceGroups(Groups: OscActionGroup[]) {
+  OscReferenceGroups = Array.isArray(Groups) ? Groups : [];
+}
+
 export function FormatDebugTime(timestamp: number) {
   const date = new Date(Number(timestamp) || Date.now());
   const hours = String(date.getHours()).padStart(2, '0');
@@ -210,32 +224,82 @@ export function renderProtocolRows(Protocol: string, Routes: RouteDefinition[]) 
         : '';
     const QueryRows = Protocol === 'HTTP' ? renderQueryRows(Route) : '';
     return `
-        <div class="osc-action-route-row">
-          ${MethodLabel}
-          <code class="bg-ghost rounded p-2 osc-route-path">${formatRoutePath(Route.Path)}</code>
-          ${QueryRows}
-        </div>
+        ${MethodLabel}
+        <code class="osc-route-path">${formatRoutePath(Route.Path)}</code>
+        ${QueryRows}
       `;
   }).join('');
 }
 
-export function renderActionGroup($Container: JQuery, Group: OscActionGroup) {
-  const OscRows = renderProtocolRows('OSC', Group.OSC);
-  const HttpRows = renderProtocolRows('HTTP', Group.HTTP);
+/** Renders one action card for the selected protocol, or nothing if the action
+ *  has no route for that protocol. */
+export function renderActionGroup(
+  $Container: JQuery,
+  Group: OscActionGroup,
+  Protocol: 'OSC' | 'HTTP'
+) {
+  const Routes = Protocol === 'OSC' ? Group.OSC : Group.HTTP;
+  if (!Array.isArray(Routes) || Routes.length === 0) return;
 
   $Container.append(`
 		<div class="d-grid gap-2 p-2 rounded bg-ghost rounded-3 osc-action-card">
-			<div class="fw-semibold">${Safe(Group.Title || 'Untitled Route')}</div>
-			<div class="osc-action-protocol-block">
-				<div class="osc-action-protocol-label text-warning">OSC</div>
-				<div class="osc-action-protocol-content">${OscRows}</div>
-			</div>
-			<div class="osc-action-protocol-block">
-				<div class="osc-action-protocol-label text-info">HTTP</div>
-				<div class="osc-action-protocol-content">${HttpRows}</div>
-			</div>
+			<div class="fw-semibold osc-action-title">${Safe(Group.Title || 'Untitled Route')}</div>
+			${renderProtocolRows(Protocol, Routes)}
 		</div>
 	`);
+}
+
+/** Renders the OSC/HTTP segmented toggle shown at the top of the reference.
+ *  Uses the shared `.st-segmented-toggle` look; `.osc-protocol-toggle-btn` is the
+ *  click hook wired in InitOscFeeds. */
+export function renderProtocolToggle(Active: 'OSC' | 'HTTP') {
+  const Button = (Protocol: 'OSC' | 'HTTP') => {
+    const IsActive = Active === Protocol;
+    return `<button type="button" class="st-segmented-toggle-btn osc-protocol-toggle-btn${
+      IsActive ? ' is-active' : ''
+    }" data-protocol="${Protocol}" aria-pressed="${IsActive ? 'true' : 'false'}">${Protocol}</button>`;
+  };
+  return `<div class="st-segmented-toggle osc-protocol-toggle" role="group" aria-label="Protocol">${Button(
+    'OSC'
+  )}${Button('HTTP')}</div>`;
+}
+
+/** (Re)renders the reference list for the currently-selected protocol from the
+ *  cached action groups. Called on each backend push and on every toggle. */
+export function RenderOscReference() {
+  const $List = $('#OSC_ROUTE_LIST');
+  if (!$List.length) return;
+
+  const IntroNote =
+    OscReferenceProtocol === 'OSC'
+      ? 'Showing OSC message addresses. Use the toggle to view the HTTP API.'
+      : 'Showing HTTP routes, served under the <code>/API</code> prefix. Use the toggle to view OSC addresses.';
+
+  $List.html('');
+  $List.append(`
+		<div class="d-grid gap-2 p-2 rounded bg-ghost-light rounded-3">
+			<div class="osc-reference-intro-head">
+				<div class="fw-semibold">OSC/API Reference</div>
+				${renderProtocolToggle(OscReferenceProtocol)}
+			</div>
+			<div class="text-muted small">${IntroNote}</div>
+		</div>
+	`);
+
+  let CurrentSection = -1;
+  for (const Group of OscReferenceGroups) {
+    const Routes = OscReferenceProtocol === 'OSC' ? Group.OSC : Group.HTTP;
+    if (!Array.isArray(Routes) || Routes.length === 0) continue;
+    const GroupPath = (Routes[0] && Routes[0].Path) || '';
+    const SectionIndex = getRouteSectionIndex(GroupPath);
+    if (SectionIndex !== CurrentSection) {
+      CurrentSection = SectionIndex;
+      $List.append(
+        `<div class="osc-route-section-header">${Safe(getRouteSectionTitle(GroupPath))}</div>`
+      );
+    }
+    renderActionGroup($List, Group, OscReferenceProtocol);
+  }
 }
 
 export function normalizeRouteForOrdering(PathValue: string | undefined) {
@@ -256,6 +320,10 @@ export const ROUTE_DISPLAY_ORDER = [
   '/Group/:Slug/Deselect',
   '/Group/:Slug/WakeOnLAN',
   '/Group/:Slug/RunScript/:ScriptID',
+  '/Tag/:Slug/Select',
+  '/Tag/:Slug/Deselect',
+  '/Tag/:Slug/WakeOnLAN',
+  '/Tag/:Slug/RunScript/:ScriptID',
   '/All/Select',
   '/All/Deselect',
   '/All/WakeOnLAN',
@@ -270,6 +338,7 @@ export const ROUTE_SECTION_ORDER: Record<string, number> = {
   Client: 20,
   Dummy: 30,
   Group: 40,
+  Tag: 45,
   All: 50,
   Selection: 60,
 };
@@ -284,6 +353,35 @@ export function getLogicalRouteOrder(PathValue: string) {
     ? ROUTE_SECTION_ORDER[Segment]! * 100 // hasOwnProperty checked above
     : 9000;
   return SectionBase;
+}
+
+/**
+ * Display sections for the reference, in render order. Each section owns one or
+ * more leading path segments; anything unmatched falls through to "Other".
+ */
+export const ROUTE_SECTIONS: { Title: string; Segments: string[] }[] = [
+  { Title: 'Control', Segments: ['Shutdown'] },
+  { Title: 'Clients', Segments: ['Clients', 'Client', 'Dummy'] },
+  { Title: 'Tags', Segments: ['Tag'] },
+  { Title: 'Groups', Segments: ['Group'] },
+  { Title: 'All', Segments: ['All'] },
+  { Title: 'Selections', Segments: ['Selection'] },
+];
+
+/** Section index for a route path; ROUTE_SECTIONS.length means "Other". */
+export function getRouteSectionIndex(PathValue: string) {
+  const Segment = (normalizeRouteForOrdering(PathValue).split('/').filter(Boolean)[0] || '')
+    .trim()
+    .toLowerCase();
+  const Index = ROUTE_SECTIONS.findIndex((Section) =>
+    Section.Segments.some((Owned) => Owned.toLowerCase() === Segment)
+  );
+  return Index === -1 ? ROUTE_SECTIONS.length : Index;
+}
+
+export function getRouteSectionTitle(PathValue: string) {
+  const Index = getRouteSectionIndex(PathValue);
+  return ROUTE_SECTIONS[Index] ? ROUTE_SECTIONS[Index].Title : 'Other';
 }
 
 export async function OpenOSCDictionary() {
@@ -332,6 +430,16 @@ export function InitOscFeeds() {
       OscHttpDebugModalOpen = false;
       OscHttpDebugEntries = [];
       RenderOscHttpDebugTerminal();
+    });
+
+  // Delegated so it survives the list being re-rendered on each toggle/push.
+  $('#OSC_ROUTE_LIST')
+    .off('click.oscprotocol')
+    .on('click.oscprotocol', '.osc-protocol-toggle-btn', function () {
+      const Protocol = $(this).attr('data-protocol') === 'HTTP' ? 'HTTP' : 'OSC';
+      if (Protocol === OscReferenceProtocol) return;
+      setOscReferenceProtocol(Protocol);
+      RenderOscReference();
     });
 
   window.API.Notify(async (Message, Type, Duration) => {
@@ -394,6 +502,10 @@ export function InitOscFeeds() {
     const SortedGroups = Array.from(ActionGroups.values()).sort((A, B) => {
       const APath = (A.HTTP[0] && A.HTTP[0].Path) || (A.OSC[0] && A.OSC[0].Path) || '';
       const BPath = (B.HTTP[0] && B.HTTP[0].Path) || (B.OSC[0] && B.OSC[0].Path) || '';
+      // Section first (Control, Clients, Tags, …), then the intra-section order.
+      const ASection = getRouteSectionIndex(APath);
+      const BSection = getRouteSectionIndex(BPath);
+      if (ASection !== BSection) return ASection - BSection;
       const AOrder = getLogicalRouteOrder(APath);
       const BOrder = getLogicalRouteOrder(BPath);
       if (AOrder !== BOrder) return AOrder - BOrder;
@@ -405,16 +517,8 @@ export function InitOscFeeds() {
       Group.HTTP.sort((A, B) => String(A.Path || '').localeCompare(String(B.Path || '')));
     }
 
-    $('#OSC_ROUTE_LIST').html('');
-    $('#OSC_ROUTE_LIST').append(`
-		<div class="d-grid gap-2 p-2 rounded bg-ghost-light rounded-3">
-			<div class="fw-semibold">OSC/API Reference</div>
-			<div class="text-muted small">Grouped by action. Each action shows OSC and HTTP availability.</div>
-		</div>
-	`);
-    for (const Group of SortedGroups) {
-      renderActionGroup($('#OSC_ROUTE_LIST'), Group);
-    }
+    setOscReferenceGroups(SortedGroups);
+    RenderOscReference();
     return;
   });
 
