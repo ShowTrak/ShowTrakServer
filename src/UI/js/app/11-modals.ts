@@ -1,6 +1,9 @@
 import { closeAllModals, closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
-import { Config, PendingAdoption, ScriptList } from './01-state';
+import { Config, PendingAdoption, ScriptList, CompactMode } from './01-state';
+import { SetCompactMode } from './02-mode';
+import { OpenClientInfo } from './client-info-modal';
+import { OpenMonitoringTargetHistory, OpenDummyClientHistory } from './07-monitoring';
 import { IsIntegratedClientEntity } from './state/client-labels';
 import { Safe } from './04-utils';
 
@@ -116,6 +119,20 @@ export function InitModals() {
     if (Type == 'InternalScript') return;
     if (Type == 'Select') return Targets.map((UUID) => Select(UUID));
     if (Type == 'Deselect') return Targets.map((UUID) => Deselect(UUID));
+    // SDK control API: open the view modal for a client, monitor or dummy. The
+    // entity type rides in Args (set by ControlService.OpenClientModal); each
+    // type has its own renderer view. Missing/unknown Args defaults to a client
+    // for backward compatibility with older callers.
+    if (Type == 'OpenClientModal') {
+      const Id = Array.isArray(Targets) ? Targets[0] : null;
+      if (!Id) return;
+      if (Args === 'monitor') return await OpenMonitoringTargetHistory(Number(Id));
+      if (Args === 'dummy') return await OpenDummyClientHistory(String(Id));
+      return await OpenClientInfo(String(Id));
+    }
+    // SDK control API: drive the compact/expanded view (persisted, like the UI).
+    if (Type == 'SetCompactView') return SetCompactMode(!!Args, { persist: true });
+    if (Type == 'ToggleCompactView') return SetCompactMode(!CompactMode, { persist: true });
   });
 }
 

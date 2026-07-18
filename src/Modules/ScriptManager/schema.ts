@@ -11,6 +11,13 @@ import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
 // The platforms a script can target. Order is meaningful for display.
 const PLATFORM_KEYS = ['Windows', 'macOS', 'Linux'];
 
+// Console filter match modes. The filter is applied CLIENT-SIDE while a script
+// runs: only console lines that match are surfaced as the live status tail.
+// "none" disables filtering (every line is surfaced — the historical default).
+// Order is meaningful for display in the Script Manager UI.
+const CONSOLE_FILTER_MODES = ['none', 'startsWith', 'includes', 'regex'];
+const DEFAULT_CONSOLE_FILTER_MODE = 'none';
+
 const WINDOWS_SCRIPT_EXTENSIONS = new Set(['.bat', '.cmd', '.ps1', '.exe']);
 const POSIX_SCRIPT_EXTENSIONS = new Set(['.sh', '.bash', '.zsh', '.command']);
 
@@ -55,6 +62,57 @@ function NormalizeRelativePath(value: unknown): string {
 function NormalizeArgumentString(value: unknown): string {
   if (typeof value !== 'string') return '';
   return value.trim();
+}
+
+// A console filter ({ Mode, Pattern, Strip }). Mode "none" (or an empty Pattern)
+// means "no filter" — every console line is surfaced, the historical behaviour.
+// When Strip is true the matched text is removed from the surfaced line (only
+// the remainder is shown as the live status tail). Parsing/matching/stripping
+// happens on the ShowTrakClient; this only validates shape.
+interface ConsoleFilterConfig {
+  Mode: string;
+  Pattern: string;
+  Strip: boolean;
+}
+
+// Normalize the optional ConsoleFilter object. Coerces Mode to a known mode
+// (defaulting to "includes") and Pattern to a trimmed string. For regex mode a
+// pattern that fails to compile is kept as-authored but reported as a warning
+// so the author can fix it; the client disables an uncompilable filter.
+function NormalizeConsoleFilter(value: unknown): { filter: ConsoleFilterConfig; errors: string[] } {
+  const errors: string[] = [];
+  const raw = IsPlainObject(value) ? value : {};
+  if (value !== undefined && !IsPlainObject(value)) {
+    errors.push('"ConsoleFilter" was not an object; reset to an empty filter.');
+  }
+
+  let Mode = typeof raw.Mode === 'string' ? raw.Mode.trim() : '';
+  if (!CONSOLE_FILTER_MODES.includes(Mode)) {
+    if (Mode) errors.push(`ConsoleFilter "Mode" was invalid; defaulted to "${DEFAULT_CONSOLE_FILTER_MODE}".`);
+    Mode = DEFAULT_CONSOLE_FILTER_MODE;
+  }
+
+  const Pattern = typeof raw.Pattern === 'string' ? raw.Pattern.trim() : '';
+  if (raw.Pattern !== undefined && typeof raw.Pattern !== 'string') {
+    errors.push('ConsoleFilter "Pattern" was not a string; reset to empty.');
+  }
+
+  const Strip = raw.Strip === true;
+  if (raw.Strip !== undefined && typeof raw.Strip !== 'boolean') {
+    errors.push('ConsoleFilter "Strip" was not a boolean; reset to false.');
+  }
+
+  if (Mode === 'regex' && Pattern) {
+    try {
+      // Validate only; the compiled instance is discarded (the client compiles
+      // its own at run time).
+      new RegExp(Pattern);
+    } catch (err) {
+      errors.push(`ConsoleFilter regex "${Pattern}" is invalid: ${(err as Error).message}`);
+    }
+  }
+
+  return { filter: { Mode, Pattern, Strip }, errors };
 }
 
 // Normalize a Bootstrap Icons reference into a bare icon name (no "bi-"
@@ -104,6 +162,7 @@ interface NormalizedScriptConfig {
   Timeout: number;
   Platforms: Record<string, string>;
   Arguments: Record<string, string>;
+  ConsoleFilter: ConsoleFilterConfig;
   [key: string]: unknown;
 }
 
@@ -303,6 +362,13 @@ function NormalizeScriptConfig(
 
   config.Arguments = argumentsByPlatform;
 
+  // ConsoleFilter ---------------------------------------------------------
+  const { filter: consoleFilter, errors: consoleFilterErrors } = NormalizeConsoleFilter(
+    data.ConsoleFilter
+  );
+  config.ConsoleFilter = consoleFilter;
+  errors.push(...consoleFilterErrors);
+
   // The legacy top-level "Path" is superseded by Platforms; drop it.
   if ('Path' in config) delete config.Path;
   // "Type" is no longer part of the schema; drop it.
@@ -315,5 +381,14 @@ function NormalizeScriptConfig(
   return { config: config as NormalizedScriptConfig, changed, errors };
 }
 
-export { PLATFORM_KEYS, SCRIPT_COLOURS, BOOTSTRAP_TO_COLOUR_INDEX, NormalizeScriptConfig, NormalizeIconName };
-export type { NormalizedScriptConfig };
+export {
+  PLATFORM_KEYS,
+  SCRIPT_COLOURS,
+  BOOTSTRAP_TO_COLOUR_INDEX,
+  CONSOLE_FILTER_MODES,
+  DEFAULT_CONSOLE_FILTER_MODE,
+  NormalizeScriptConfig,
+  NormalizeConsoleFilter,
+  NormalizeIconName,
+};
+export type { NormalizedScriptConfig, ConsoleFilterConfig };

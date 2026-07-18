@@ -1065,6 +1065,46 @@ Loading licence...</pre>
                 </div>
 
                 <div class="bg-ghost p-2 rounded d-grid gap-2">
+                  <span class="text-sm">Console Filter</span>
+                  <span class="text-sm text-muted mb-0"
+                    >Only surface console lines that match. Parsed on the client as the script
+                    runs.</span
+                  >
+                  <div class="d-flex gap-2">
+                    <select
+                      id="SCRIPT_MANAGER_FIELD_CONSOLE_FILTER_MODE"
+                      class="form-select form-select-sm bg-ghost-light text-light border-0"
+                      style="max-width: 10rem"
+                    >
+                      <option value="none">None</option>
+                      <option value="startsWith">Starts with</option>
+                      <option value="includes">Includes</option>
+                      <option value="regex">Regex</option>
+                    </select>
+                    <input
+                      type="text"
+                      id="SCRIPT_MANAGER_FIELD_CONSOLE_FILTER_PATTERN"
+                      class="form-control form-control-sm bg-ghost-light text-light border-0"
+                      placeholder="Pattern"
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                  </div>
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="SCRIPT_MANAGER_FIELD_CONSOLE_FILTER_STRIP"
+                    />
+                    <label
+                      class="form-check-label text-sm text-muted mb-0"
+                      for="SCRIPT_MANAGER_FIELD_CONSOLE_FILTER_STRIP"
+                      >Remove the matched text from the surfaced line.</label
+                    >
+                  </div>
+                </div>
+
+                <div class="bg-ghost p-2 rounded d-grid gap-2">
                   <span class="text-sm">Platforms</span>
                   <span class="text-sm text-muted mb-0"
                     >Choose the file and optional arguments for each operating system.</span

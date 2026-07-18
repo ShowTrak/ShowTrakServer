@@ -874,6 +874,10 @@ test('Web UI namespace disables access when the master toggle is off', async () 
 test('Server Manager dispatches scripts, bulk requests, and group messages', async () => {
   const emits = [];
   const queue = [];
+  // The manager now dispatches via an injected handler (per-client sequential
+  // queue); capture it so the AddToQueue mock can simulate an idle-client
+  // dispatch the way the real PumpClient would.
+  let dispatchHandler = null;
   const getRoutes = [];
   const postRoutes = [];
   const getHandlers = {};
@@ -987,9 +991,19 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
     },
     '../ScriptExecutionManager': {
       Manager: {
+        ClearSettled: async () => queue.push('clear'),
         ClearQueue: async () => queue.push('clear'),
-        AddToQueue: async (uuid, scriptId) => `req-${uuid}-${scriptId}`,
+        AddToQueue: async (uuid, scriptId) => {
+          const requestId = `req-${uuid}-${scriptId}`;
+          // Idle client → the real PumpClient would dispatch immediately.
+          if (dispatchHandler) dispatchHandler(uuid, requestId, scriptId);
+          return requestId;
+        },
+        GetExecution: async () => null,
         AddInternalTaskToQueue: async (uuid, name) => `req-${uuid}-${name}`,
+      },
+      SetDispatchHandler: (fn) => {
+        dispatchHandler = fn;
       },
     },
     '../Utils': { Wait: async () => {} },
@@ -1163,10 +1177,13 @@ test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve
     },
     '../ScriptExecutionManager': {
       Manager: {
+        ClearSettled: async () => {},
         ClearQueue: async () => {},
         AddToQueue: async () => 'req',
+        GetExecution: async () => null,
         AddInternalTaskToQueue: async () => 'req',
       },
+      SetDispatchHandler: () => {},
     },
     '../Utils': { Wait: async () => {} },
     './client-namespace': { SetupClientNamespace: () => {} },
@@ -1234,6 +1251,7 @@ test('Server Manager integrated event queue reports mixed target outcomes', asyn
         ShouldDispatch: async () => true,
         GetExecution: async () => null,
         Complete: async (requestId, err) => completions.push({ requestId, err }),
+        ClearSettled: async () => {},
         ClearQueue: async () => {},
         AddInternalTaskToQueue: async (_uuid, taskName) => {
           const id = `req-${queueEntries.length + 1}`;
@@ -1241,6 +1259,7 @@ test('Server Manager integrated event queue reports mixed target outcomes', asyn
           return id;
         },
       },
+      SetDispatchHandler: () => {},
     },
     '../ClientManager': {
       Manager: {

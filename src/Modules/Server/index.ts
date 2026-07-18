@@ -10,7 +10,10 @@ import { Config } from '../Config';
 import { BULK_DISPATCH_DELAY_MS } from '../Config/constants';
 import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/protocol';
 import { Manager as AppDataManager } from '../AppData';
-import { Manager as ScriptExecutionManager } from '../ScriptExecutionManager';
+import {
+  Manager as ScriptExecutionManager,
+  SetDispatchHandler as SetScriptDispatchHandler,
+} from '../ScriptExecutionManager';
 import { Manager as ClientManager } from '../ClientManager';
 import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
 import { Manager as UpdateManager } from '../UpdateManager';
@@ -21,6 +24,7 @@ import { FormatClientVersionLabel } from './serializers';
 import { Wait } from '../Utils';
 import { SetupClientNamespace } from './client-namespace';
 import { SetupWebUiNamespace } from './webui-namespace';
+import { SetupSdkNamespace } from './sdk-namespace';
 import { Manager as IdentifyManager } from '../IdentifyManager';
 
 const Logger = CreateLogger('WebServer');
@@ -299,6 +303,14 @@ const io = new WebServer<ClientToServerEvents, ServerToClientEvents>(Server, {
   pingInterval: 5000,
 });
 
+// The ScriptExecutionManager owns the per-client sequential queue and decides
+// which script to start next; this is the seam it uses to actually emit the
+// dispatch to the client socket (on enqueue, completion, or timeout).
+SetScriptDispatchHandler((UUID: string, RequestID: string, ScriptID: string) => {
+  Logger.log('ExecuteScript dispatch', { ScriptID, UUID, RequestID });
+  io.to(UUID).emit('ExecuteScript', RequestID, ScriptID);
+});
+
 // Outcome of dispatching a queued action to a single target.
 interface DispatchFailure {
   UUID: string;
@@ -351,7 +363,9 @@ Manager.ExecuteScripts = async (ScriptID: string, Targets: string[], ResetList?:
     dispatched: 0,
     failed: [],
   };
-  if (ResetList) await ScriptExecutionManager.ClearQueue();
+  // "Reset" a new batch by clearing only the finished rows from the last run;
+  // anything still queued or running is preserved so new work appends beneath it.
+  if (ResetList) await ScriptExecutionManager.ClearSettled();
 
   // Authoritative whitelist gate. The UI already hides a script for
   // non-whitelisted clients, but re-enforce here so a stale/tampered renderer
@@ -372,6 +386,10 @@ Manager.ExecuteScripts = async (ScriptID: string, Targets: string[], ResetList?:
   }
 
   for (const UUID of Targets) {
+    // AddToQueue appends the request and, via the manager's per-client pump,
+    // dispatches it immediately if the client is idle or queues it behind the
+    // client's in-flight script otherwise. Offline/incompatible targets are
+    // failed synchronously inside AddToQueue.
     const RequestID = await ScriptExecutionManager.AddToQueue(UUID, ScriptID);
     if (!RequestID) {
       Summary.failed.push({ UUID, message: 'Failed to queue script execution request' });
@@ -379,24 +397,18 @@ Manager.ExecuteScripts = async (ScriptID: string, Targets: string[], ResetList?:
     }
     Summary.queued += 1;
 
-    const CanDispatch =
-      typeof ScriptExecutionManager.ShouldDispatch === 'function'
-        ? await ScriptExecutionManager.ShouldDispatch(RequestID)
-        : true;
-
-    Logger.log('ExecuteScript dispatch', { ScriptID, UUID, RequestID });
-    if (!CanDispatch) {
-      const Request =
-        typeof ScriptExecutionManager.GetExecution === 'function'
-          ? await ScriptExecutionManager.GetExecution(RequestID)
-          : null;
+    const Request =
+      typeof ScriptExecutionManager.GetExecution === 'function'
+        ? await ScriptExecutionManager.GetExecution(RequestID)
+        : null;
+    if (Request && Request.Status === 'Failed') {
       Summary.failed.push({
         UUID,
         message: (Request && Request.Error) || 'Script was blocked before dispatch',
       });
       continue;
     }
-    io.to(UUID).emit('ExecuteScript', RequestID, ScriptID);
+    // Accepted into the client's queue (dispatched now or waiting its turn).
     Summary.dispatched += 1;
   }
   return Summary;
@@ -477,7 +489,8 @@ Manager.ExecuteBulkRequest = async (
     Options && Object.prototype.hasOwnProperty.call(Options, 'payload')
       ? Options.payload
       : undefined;
-  if (ResetQueue) await ScriptExecutionManager.ClearQueue();
+  // Preserve any scripts still queued/running; only clear finished rows.
+  if (ResetQueue) await ScriptExecutionManager.ClearSettled();
   for (const UUID of Targets) {
     await Wait(BULK_DISPATCH_DELAY_MS);
     const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, ReadableName);
@@ -514,9 +527,10 @@ Manager.SendMessageByGroup = async (Group: string, Message: string, Data?: unkno
   return (io.to(Group) as unknown as DynamicEmitter).emit(Message, Data);
 };
 
-// Wire both Socket.IO namespaces (client agents + Web UI).
+// Wire the Socket.IO namespaces (client agents + Web UI + SDK control API).
 SetupClientNamespace(io);
 SetupWebUiNamespace(io, Manager);
+SetupSdkNamespace(io);
 
 // Give the IdentifyManager the Socket.IO server so it can dispatch identify
 // commands to specific client rooms.

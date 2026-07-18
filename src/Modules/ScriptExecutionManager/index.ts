@@ -39,6 +39,13 @@ interface ScriptExecution {
   Client: Client;
   Script: DispatchableScript;
   Error?: string | null;
+  // Per-client sequential queue bookkeeping. A script execution stays queued
+  // (Dispatched=false, Status=Pending, StatusText='Queued') until the client is
+  // idle, at which point it is dispatched. Internal tasks dispatch immediately
+  // and are excluded from the per-client gate.
+  Dispatched: boolean;
+  // Timeout to arm when this entry is dispatched (not while it waits in queue).
+  Timeout?: number;
   // Handle for the pending timeout watchdog; cleared once the request settles
   // so a completed execution never leaves a live timer dangling.
   TimeoutHandle?: ReturnType<typeof setTimeout> | null;
@@ -133,6 +140,75 @@ function ResolveDispatchBlockReason(Script: DispatchableScript, Client: Client):
   return null;
 }
 
+// Injected by the Server layer: performs the actual socket emit that starts a
+// script on a client. Kept as a seam so this manager can own every queue and
+// dispatch decision (enqueue, completion, timeout) in one place rather than
+// scattering the "dispatch the next queued script" logic across call sites.
+let DispatchHandler: ((UUID: string, RequestID: string, ScriptID: string) => void) | null = null;
+
+function SetDispatchHandler(
+  Handler: (UUID: string, RequestID: string, ScriptID: string) => void
+): void {
+  DispatchHandler = Handler;
+}
+
+// Per-client sequential dispatch. Each client runs one script at a time: if the
+// client already has a dispatched-but-unsettled script, do nothing; otherwise
+// dispatch the oldest queued (not-yet-dispatched) script for that client. Called
+// on enqueue and whenever an in-flight script settles (completion or timeout),
+// so a client steadily works through its queue top-to-bottom.
+function PumpClient(UUID: string | null | undefined): void {
+  if (!UUID) return;
+  const Busy = ScriptExecutions.some(
+    (e) =>
+      !e.Internal && e.Client && e.Client.UUID === UUID && e.Dispatched && e.Status === 'Pending'
+  );
+  if (Busy) return;
+  const Next = ScriptExecutions.find(
+    (e) =>
+      !e.Internal && e.Client && e.Client.UUID === UUID && !e.Dispatched && e.Status === 'Pending'
+  );
+  if (!Next) return;
+
+  // Re-validate eligibility at dispatch time, not just at enqueue. A script can
+  // wait in this queue behind an in-flight one for a long time, and the client
+  // may go offline (or otherwise become ineligible) in the meantime — the
+  // enqueue-time fast-fail only covers the instant of enqueue. Without this,
+  // dispatching to a now-dead client parks a live entry that holds the client's
+  // whole queue hostage until its full timeout elapses. Client is the live
+  // cached instance (ClientManager mutates it in place), so `.Online` is current.
+  const BlockReason = !Next.Client.Online
+    ? 'Client is offline'
+    : ResolveDispatchBlockReason(Next.Script, Next.Client);
+  if (BlockReason) {
+    Next.Dispatched = true;
+    Next.Status = 'Failed';
+    Next.Error = BlockReason;
+    Next.StatusText = 'Failed';
+    Next.Timer.End = Date.now();
+    Next.Timer.Duration = 0;
+    BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
+    // This entry is settled and no longer blocks the client — try the next
+    // queued script (which is re-validated the same way). Failed/settled entries
+    // are excluded from both checks above, so this recursion terminates.
+    PumpClient(UUID);
+    return;
+  }
+
+  Next.Dispatched = true;
+  // Start the clock (and arm the timeout watchdog) at real dispatch time so the
+  // time a script spent waiting in the queue is not counted against it.
+  Next.Timer.Start = Date.now();
+  Next.StatusText = 'Pending';
+  Manager.SetTimeout(Next.RequestID, Next.Timeout || SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS);
+  if (DispatchHandler) {
+    DispatchHandler(UUID, Next.RequestID, String(Next.Script ? Next.Script.ID : ''));
+  } else {
+    Logger.warn('No dispatch handler registered; queued script will not start');
+  }
+  BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
+}
+
 const Manager = {
   async GetAllExecutions(): Promise<ScriptExecution[]> {
     return ScriptExecutions;
@@ -146,6 +222,23 @@ const Manager = {
   async ClearQueue(): Promise<void> {
     for (const Request of ScriptExecutions) Manager.ClearTimeout(Request);
     ScriptExecutions = [];
+    BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
+  },
+
+  // Drop only settled (Completed/Failed) entries, preserving anything still
+  // Pending — queued or in flight. Used as the "reset" when a new batch starts
+  // so a fresh run clears the finished rows from the last batch but never
+  // disturbs scripts that are still queued or running.
+  async ClearSettled(): Promise<void> {
+    const Remaining: ScriptExecution[] = [];
+    for (const Request of ScriptExecutions) {
+      if (Request.Status === 'Pending') {
+        Remaining.push(Request);
+      } else {
+        Manager.ClearTimeout(Request);
+      }
+    }
+    ScriptExecutions = Remaining;
     BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
   },
 
@@ -169,11 +262,14 @@ const Manager = {
       Request.TimeoutHandle = null;
       if (Request.Status === 'Pending') {
         Request.Status = 'Failed';
+        Request.StatusText = 'Failed';
         Request.Error = 'Script execution timed out after ' + Timeout + 'ms';
         Request.Timer.End = Date.now();
         Request.Timer.Duration = Request.Timer.End - Request.Timer.Start;
       }
       BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
+      // The client is free again — dispatch its next queued script.
+      if (!Request.Internal) PumpClient(Request.Client ? Request.Client.UUID : null);
     }, Timeout);
     // The timeout watchdog must not, by itself, keep the process alive.
     if (typeof Target.TimeoutHandle.unref === 'function') Target.TimeoutHandle.unref();
@@ -191,6 +287,9 @@ const Manager = {
       Internal: true,
       RequestID: RequestID,
       Status: 'Pending',
+      // Internal tasks are emitted immediately by the caller and are not part of
+      // the per-client script queue, so they are marked dispatched up front.
+      Dispatched: true,
       Progress: 0,
       StatusText: 'Pending',
       Timer: {
@@ -212,7 +311,10 @@ const Manager = {
     return RequestID;
   },
 
-  // Enqueue a script for a client. Replace existing entry if one exists for this client.
+  // Enqueue a script for a client. Always appends to the bottom of the queue —
+  // never replaces an existing entry — so starting a new run while one is in
+  // flight leaves the running/queued work untouched and the new script simply
+  // waits its turn (per-client sequential execution, driven by PumpClient).
   async AddToQueue(UUID: string, ScriptID: string): Promise<string | undefined> {
     const Script = await ScriptManager.Get(ScriptID);
     if (!Script) return;
@@ -222,52 +324,9 @@ const Manager = {
 
     const RequestID = UUIDManager.Generate();
 
-    const ExistingCommand = ScriptExecutions.find((Exe) => Exe.Client.UUID === UUID);
-    if (ExistingCommand) {
-      ExistingCommand.RequestID = RequestID;
-      ExistingCommand.Timer = {
-        Start: Date.now(),
-        End: null,
-        Duration: null,
-      };
-      ExistingCommand.Status = 'Pending';
-      ExistingCommand.Progress = 0;
-      ExistingCommand.StatusText = 'Pending';
-    } else {
-      ScriptExecutions.push({
-        Internal: false,
-        RequestID: RequestID,
-        Status: 'Pending',
-        Progress: 0,
-        StatusText: 'Pending',
-        Timer: {
-          Start: Date.now(),
-          End: null,
-          Duration: null,
-        },
-        Client: Client,
-        Script: Script,
-      });
-    }
-
-    const DispatchBlockReason = ResolveDispatchBlockReason(Script, Client);
-    if (DispatchBlockReason) {
-      const Request = ScriptExecutions.find((Exe) => Exe.RequestID === RequestID);
-      if (Request) {
-        Manager.ClearTimeout(Request);
-        Request.Status = 'Failed';
-        Request.Error = DispatchBlockReason;
-        Request.StatusText = 'Failed';
-        Request.Timer.End = Date.now();
-        Request.Timer.Duration = Request.Timer.End - Request.Timer.Start;
-      }
-      BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
-      return RequestID;
-    }
-
     // Invalid (unparseable) scripts have no Timeout field; `in` narrows the
     // union to the valid variant before reading it, and they fall back to the
-    // default timeout (dispatch of invalid scripts is already blocked above).
+    // default timeout (dispatch of invalid scripts is blocked below).
     const Timeout =
       'Timeout' in Script &&
       typeof Script.Timeout === 'number' &&
@@ -275,9 +334,45 @@ const Manager = {
       Script.Timeout > 0
         ? Script.Timeout
         : SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS;
-    Manager.SetTimeout(RequestID, Timeout);
+
+    const Entry: ScriptExecution = {
+      Internal: false,
+      RequestID: RequestID,
+      Status: 'Pending',
+      Dispatched: false,
+      Progress: 0,
+      StatusText: 'Queued',
+      Timer: {
+        Start: Date.now(),
+        End: null,
+        Duration: null,
+      },
+      Client: Client,
+      Script: Script,
+      Timeout: Timeout,
+    };
+    ScriptExecutions.push(Entry);
+
+    // An offline or incompatible client can never receive the dispatch, so fail
+    // the request now rather than leaving it queued and blocking the client.
+    const DispatchBlockReason = Client.Online
+      ? ResolveDispatchBlockReason(Script, Client)
+      : 'Client is offline';
+    if (DispatchBlockReason) {
+      Entry.Status = 'Failed';
+      Entry.Error = DispatchBlockReason;
+      Entry.StatusText = 'Failed';
+      Entry.Dispatched = true;
+      Entry.Timer.End = Date.now();
+      Entry.Timer.Duration = 0;
+      BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
+      return RequestID;
+    }
 
     BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
+    // Dispatch now if the client is idle; otherwise this entry waits behind the
+    // client's in-flight script and is dispatched when that one settles.
+    PumpClient(UUID);
 
     return RequestID;
   },
@@ -325,8 +420,10 @@ const Manager = {
     Request.Timer.End = Date.now();
     Request.Timer.Duration = Request.Timer.End - Request.Timer.Start;
     BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
+    // The client is free again — dispatch its next queued script (if any).
+    if (!Request.Internal) PumpClient(Request.Client ? Request.Client.UUID : null);
   },
 };
 
-export { Manager, ToPublicScriptExecution };
+export { Manager, ToPublicScriptExecution, SetDispatchHandler };
 export type { PublicScriptExecution, ScriptExecution };

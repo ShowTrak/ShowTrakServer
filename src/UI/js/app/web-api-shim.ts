@@ -183,6 +183,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     GetMode: async () => rpc('Mode:Get'),
     SetMode: resolveNull,
     OnModeUpdated: (cb) => sub('ModeUpdated', cb),
+    OnAlertActionsUpdated: (cb) => sub('AlertActionsUpdated', cb),
 
     // ---- Settings (read blocked / mutation desktop-only) -----------------
     SetSetting: nullTuple,

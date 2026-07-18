@@ -141,4 +141,74 @@ const ToPublicGroup = (g: PublicGroupSource): GroupView => ({
   Slug: g.Slug ?? null,
 });
 
-export { FormatClientVersionLabel, ToPublicClient, ToPublicGroup };
+// Structural view of a MonitoringTarget snapshot read by ToPublicMonitor.
+interface PublicMonitorSource {
+  TargetID: number;
+  Nickname?: string | null;
+  Slug?: string | null;
+  GroupID?: number | null;
+  Online?: boolean;
+  Degraded?: boolean;
+}
+
+// Structural view of a DummyClient snapshot read by ToPublicDummy.
+interface PublicDummySource {
+  UUID: string;
+  DummyID?: string | null;
+  Nickname?: string | null;
+  Hostname?: string | null;
+  GroupID?: number | null;
+  Online?: boolean;
+  Degraded?: boolean;
+  DegradedWarnings?: unknown;
+}
+
+// Monitors and dummies are surfaced to the SDK as CLIENT-shaped views so external
+// integrations (Companion, etc.) treat them uniformly with real clients — they
+// appear in the client list, carry status + label, and are addressable by slug.
+// They reuse ToPublicClient to fill the full ClientView shape (empty telemetry),
+// then override two things:
+//   - Type — the wire discriminator ('monitor' / 'dummy' instead of 'client').
+//   - UUID — a synthetic scoped id (`monitor:<TargetID>` / `dummy:<UUID>`) matching
+//     the shared slug-namespace owner convention, so tag-scope membership (which
+//     stores these scoped ids) resolves for them too.
+// The Type override is not expressible against ClientView's 'client' literal, so
+// each projection casts once at its boundary.
+const ToPublicMonitor = (m: PublicMonitorSource): ClientView =>
+  ({
+    ...ToPublicClient({
+      UUID: `monitor:${m.TargetID}`,
+      Nickname: m.Nickname,
+      Hostname: m.Nickname,
+      Slug: m.Slug ?? null,
+      GroupID: m.GroupID,
+      Online: m.Online,
+      Degraded: m.Degraded,
+      Version: 'Monitor',
+    }),
+    Type: 'monitor',
+  }) as unknown as ClientView;
+
+const ToPublicDummy = (d: PublicDummySource): ClientView =>
+  ({
+    ...ToPublicClient({
+      UUID: `dummy:${d.UUID}`,
+      Nickname: d.Nickname,
+      Hostname: d.Hostname ?? d.Nickname,
+      Slug: d.DummyID ?? null,
+      GroupID: d.GroupID,
+      Online: d.Online,
+      Degraded: d.Degraded,
+      DegradedWarnings: Array.isArray(d.DegradedWarnings) ? d.DegradedWarnings : [],
+      Version: 'Dummy',
+    }),
+    Type: 'dummy',
+  }) as unknown as ClientView;
+
+export {
+  FormatClientVersionLabel,
+  ToPublicClient,
+  ToPublicGroup,
+  ToPublicMonitor,
+  ToPublicDummy,
+};

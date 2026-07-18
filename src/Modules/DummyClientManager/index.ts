@@ -96,6 +96,16 @@ const Manager = {
     return [null, Cached.ToJSON()];
   },
 
+  // Resolve a dummy by slug (its DummyID, case-insensitive), for OSC/API/SDK
+  // addressing — mirrors MonitoringTargetManager.GetBySlug.
+  async GetBySlug(Slug: string): Promise<DummyClientSnapshot | null> {
+    if (!Slug) return null;
+    if (!Manager.Initialized) await Manager.Init();
+    const Lower = String(Slug).toLowerCase();
+    const Found = DummyList.find((D) => String(D.DummyID || '').toLowerCase() === Lower);
+    return Found ? Found.ToJSON() : null;
+  },
+
   async Create(Payload: Record<string, unknown> = {}): Promise<Result<DummyClientSnapshot>> {
     if (!Manager.Initialized) await Manager.Init();
     const Now = Date.now();

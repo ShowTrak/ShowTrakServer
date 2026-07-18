@@ -16,8 +16,13 @@ import { Ok, Fail } from '../Utils';
 import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
 import type { Result } from '../../types/result';
 
-import { PLATFORM_KEYS, SCRIPT_COLOURS, NormalizeScriptConfig } from './schema';
-import type { NormalizedScriptConfig } from './schema';
+import {
+  PLATFORM_KEYS,
+  SCRIPT_COLOURS,
+  DEFAULT_CONSOLE_FILTER_MODE,
+  NormalizeScriptConfig,
+} from './schema';
+import type { NormalizedScriptConfig, ConsoleFilterConfig } from './schema';
 
 const Logger = CreateLogger('ScriptManager');
 
@@ -43,6 +48,7 @@ interface ScriptEditable {
   enabled: boolean;
   platforms: PlatformMap;
   arguments: PlatformMap;
+  consoleFilter: ConsoleFilterConfig;
   files: string[];
   valid: boolean;
 }
@@ -60,6 +66,7 @@ interface ScriptEditableInput {
   enabled?: unknown;
   platforms?: unknown;
   arguments?: unknown;
+  consoleFilter?: unknown;
 }
 
 // A single file inside a sample template (base64-encoded content).
@@ -124,6 +131,7 @@ class Script {
   Timeout: number;
   Platforms: PlatformMap;
   Arguments: PlatformMap;
+  ConsoleFilter: ConsoleFilterConfig;
   CompatiblePlatforms: string[];
   Files: ScriptFileEntry[];
   isEnabled: boolean;
@@ -156,6 +164,12 @@ class Script {
     this.Platforms = Config.Platforms || {};
     // Optional per-platform argument string ({ Windows, macOS, Linux }).
     this.Arguments = Config.Arguments || {};
+    // Optional console filter ({ Mode, Pattern }) applied client-side to the
+    // live console tail. Mode "none" (the default) surfaces every line.
+    this.ConsoleFilter =
+      Config.ConsoleFilter && typeof Config.ConsoleFilter === 'object'
+        ? Config.ConsoleFilter
+        : { Mode: DEFAULT_CONSOLE_FILTER_MODE, Pattern: '', Strip: false };
     // Platforms that have a non-empty path pointing at an existing file.
     this.CompatiblePlatforms = CompatiblePlatforms || [];
 
@@ -235,6 +249,7 @@ interface FingerprintScriptEntry {
   Enabled: boolean;
   Platforms: PlatformMap;
   Arguments: PlatformMap;
+  ConsoleFilter: ConsoleFilterConfig;
   isValid: boolean;
   ParseError: string;
   Files: FingerprintFileEntry[];
@@ -276,6 +291,16 @@ function BuildDeploymentFingerprint(ScriptList: ScriptCatalogEntry[]): string {
         Enabled: !!Script.isEnabled,
         Platforms: Script.Platforms || {},
         Arguments: Script.Arguments || {},
+        ConsoleFilter:
+          'ConsoleFilter' in Script &&
+          Script.ConsoleFilter &&
+          typeof Script.ConsoleFilter === 'object'
+            ? {
+                Mode: String(Script.ConsoleFilter.Mode || DEFAULT_CONSOLE_FILTER_MODE),
+                Pattern: String(Script.ConsoleFilter.Pattern || ''),
+                Strip: Script.ConsoleFilter.Strip === true,
+              }
+            : { Mode: DEFAULT_CONSOLE_FILTER_MODE, Pattern: '', Strip: false },
         isValid: Script.isValid !== false,
         ParseError: 'ParseError' in Script && Script.ParseError ? String(Script.ParseError) : '',
         Files,
@@ -568,6 +593,16 @@ Manager.GetEditable = async (ID: string): Promise<Result<ScriptEditable>> => {
     enabled: !!Script.isEnabled,
     platforms: Script.Platforms || {},
     arguments: Script.Arguments || {},
+    consoleFilter:
+      'ConsoleFilter' in Script &&
+      Script.ConsoleFilter &&
+      typeof Script.ConsoleFilter === 'object'
+        ? {
+            Mode: String(Script.ConsoleFilter.Mode || DEFAULT_CONSOLE_FILTER_MODE),
+            Pattern: String(Script.ConsoleFilter.Pattern || ''),
+            Strip: Script.ConsoleFilter.Strip === true,
+          }
+        : { Mode: DEFAULT_CONSOLE_FILTER_MODE, Pattern: '', Strip: false },
     files: Files,
     valid: !!Script.isValid,
   });
@@ -631,6 +666,8 @@ Manager.SaveFields = async (
       macOS: Arguments.macOS,
       Linux: Arguments.Linux,
     },
+    // Normalized (validated against the mode enum) inside NormalizeScriptConfig.
+    ConsoleFilter: Fields.consoleFilter,
   };
 
   const { config, errors } = NormalizeScriptConfig(RawConfig, DesiredID);

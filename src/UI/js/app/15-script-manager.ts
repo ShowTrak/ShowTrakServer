@@ -563,6 +563,14 @@ export function PopulateScriptManagerEditor(Data: ScriptEditable) {
   const timeoutSeconds = Math.max(5, Math.round(timeoutMs / 1000));
   $('#SCRIPT_MANAGER_FIELD_TIMEOUT_SECONDS').val(timeoutSeconds);
 
+  const ConsoleFilter = Data.consoleFilter || { Mode: 'none', Pattern: '', Strip: false };
+  const FilterMode = ['none', 'startsWith', 'includes', 'regex'].includes(ConsoleFilter.Mode)
+    ? ConsoleFilter.Mode
+    : 'none';
+  $('#SCRIPT_MANAGER_FIELD_CONSOLE_FILTER_MODE').val(FilterMode);
+  $('#SCRIPT_MANAGER_FIELD_CONSOLE_FILTER_PATTERN').val(ConsoleFilter.Pattern || '');
+  $('#SCRIPT_MANAGER_FIELD_CONSOLE_FILTER_STRIP').prop('checked', !!ConsoleFilter.Strip);
+
   RenderScriptManagerPlatforms(Data.platforms || {}, Data.arguments || {});
   RenderScriptManagerFileList(Data.files || []);
   renderScopeDropdown(ScriptWhitelistConfig);
@@ -716,6 +724,10 @@ export function CollectScriptManagerFields() {
     timeoutSecondsRaw >= 5
       ? timeoutSecondsRaw
       : 15;
+  const filterModeRaw = String($('#SCRIPT_MANAGER_FIELD_CONSOLE_FILTER_MODE').val() || 'none');
+  const filterMode = (
+    ['none', 'startsWith', 'includes', 'regex'].includes(filterModeRaw) ? filterModeRaw : 'none'
+  ) as ScriptEditable['consoleFilter']['Mode'];
   return {
     id: String($('#SCRIPT_MANAGER_FIELD_ID').val() || '').trim(),
     name: $('#SCRIPT_MANAGER_FIELD_NAME').val(),
@@ -727,6 +739,11 @@ export function CollectScriptManagerFields() {
     enabled: $('#SCRIPT_MANAGER_FIELD_ENABLED').is(':checked'),
     platforms: Platforms,
     arguments: Arguments,
+    consoleFilter: {
+      Mode: filterMode,
+      Pattern: String($('#SCRIPT_MANAGER_FIELD_CONSOLE_FILTER_PATTERN').val() || '').trim(),
+      Strip: $('#SCRIPT_MANAGER_FIELD_CONSOLE_FILTER_STRIP').is(':checked'),
+    },
   };
 }
 

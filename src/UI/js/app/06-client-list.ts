@@ -109,7 +109,8 @@ function InitClientListPush() {
   } catch (e) {
     HandleNonFatalError('UpdateScriptExecutions:ClosePopovers', e);
   }
-  Executions = Executions.reverse();
+  // Keep the manager's insertion order so newly-started executions append at the
+  // bottom of the list and each client visibly works down its own queue.
 
   // Determine if all executions are for the same action/script
   const names = Array.from(
@@ -141,18 +142,21 @@ function InitClientListPush() {
     return;
   }
 
+  // Auto-dismiss the execution panel 5 seconds after every execution has SETTLED
+  // — whether it succeeded or failed. Queued and running executions are both
+  // Status='Pending', so the panel stays open while any work remains, and if a
+  // new batch is started within the 5s window the else-branch below cancels the
+  // countdown — the panel only closes 5s after the LAST script finishes.
   const shouldAutoDismissNonDeployment =
     nonDeploymentExecutions.length > 0 &&
-    nonDeploymentExecutions.every(
-      (Request) => Request && Request.Status === 'Completed' && !Request.Error
-    );
+    nonDeploymentExecutions.every((Request) => Request && Request.Status !== 'Pending');
 
   if (shouldAutoDismissNonDeployment) {
     if (!window.__ShowTrakExecutionAutoDismissTimer) {
       window.__ShowTrakExecutionAutoDismissTimer = setTimeout(() => {
         window.__ShowTrakExecutionAutoDismissTimer = null;
         HideExecutionToast();
-      }, 1000);
+      }, 5000);
     }
   } else if (window.__ShowTrakExecutionAutoDismissTimer) {
     clearTimeout(window.__ShowTrakExecutionAutoDismissTimer);
@@ -295,11 +299,34 @@ function InitClientListPush() {
   }
 
   const $list = $('#SHOWTRAK_EXECUTION_LIST');
-  if ($list.length === 0) return;
+  const listEl = $list[0] as HTMLElement | undefined;
+  if (!listEl) return;
 
-  let Filler = '';
+  function durationText(ms: number) {
+    let cls = 'text-success';
+    if (ms > 2000) cls = 'text-danger';
+    else if (ms > 800) cls = 'text-warning';
+    return `<small class="exec-duration ${cls}">${Safe(ms)}ms</small>`;
+  }
 
+  function truncateExecutionLabel(value: string | null | undefined, maxLen = 34) {
+    const text = value == null ? '' : String(value).trim();
+    if (!text) return '';
+    if (text.length <= maxLen) return text;
+    return `${text.substring(0, Math.max(1, maxLen - 1))}…`;
+  }
+
+  // The execution list is patched IN PLACE (keyed by RequestID) rather than
+  // rebuilt with innerHTML on every push. Wholesale rebuilds recreate the
+  // spinner and progress-fill DOM nodes, restarting their CSS animations — with
+  // console-tail updates arriving several times a second that reads as glitchy
+  // flicker. Reusing each row's nodes and touching only the volatile bits keeps
+  // the spinner spinning and the gradient/width transition smooth.
+  const desiredKeys = new Set<string>();
+
+  // Deployment summary is a single keyed node pinned to the top of the list.
   if (hasRenderableDeploymentToast) {
+    desiredKeys.add('__deploy__');
     const ExpandFailures = deploymentSummary.finished && deploymentSummary.failed.length > 0;
     const FailedItems = deploymentSummary.failed
       .map((Request) => {
@@ -318,8 +345,14 @@ function InitClientListPush() {
       })
       .join('');
 
-    Filler += `
-      <div class="exec-deploy-summary ${ExpandFailures ? 'open' : ''}">
+    let deployEl = listEl.querySelector<HTMLElement>('[data-exec-key="__deploy__"]');
+    if (!deployEl) {
+      deployEl = document.createElement('div');
+      deployEl.setAttribute('data-exec-key', '__deploy__');
+      listEl.insertBefore(deployEl, listEl.firstChild);
+    }
+    deployEl.className = `exec-deploy-summary ${ExpandFailures ? 'open' : ''}`;
+    deployEl.innerHTML = `
         <div class="exec-deploy-title-row">
           <strong>Deploying Scripts</strong>
           <span class="badge bg-ghost-light text-light">${deploymentSummary.successful}/${deploymentSummary.total} Updated</span>
@@ -339,22 +372,7 @@ function InitClientListPush() {
           <span>${deploymentSummary.pending} pending</span>
           <span>${deploymentSummary.failed.length} failed</span>
         </div>
-        ${deploymentSummary.failed.length > 0 ? `<div class="exec-deploy-failures ${ExpandFailures ? '' : 'd-none'}"><div class="exec-deploy-failures-title">Failed Clients</div><ul>${FailedItems}</ul></div>` : ''}
-      </div>`;
-  }
-
-  function durationText(ms: number) {
-    let cls = 'text-success';
-    if (ms > 2000) cls = 'text-danger';
-    else if (ms > 800) cls = 'text-warning';
-    return `<small class="exec-duration ${cls}">${Safe(ms)}ms</small>`;
-  }
-
-  function truncateExecutionLabel(value: string | null | undefined, maxLen = 34) {
-    const text = value == null ? '' : String(value).trim();
-    if (!text) return '';
-    if (text.length <= maxLen) return text;
-    return `${text.substring(0, Math.max(1, maxLen - 1))}…`;
+        ${deploymentSummary.failed.length > 0 ? `<div class="exec-deploy-failures ${ExpandFailures ? '' : 'd-none'}"><div class="exec-deploy-failures-title">Failed Clients</div><ul>${FailedItems}</ul></div>` : ''}`;
   }
 
   const renderExecutions = hasRenderableDeploymentToast
@@ -364,54 +382,150 @@ function InitClientListPush() {
   for (let i = 0; i < renderExecutions.length; i++) {
     const Request = renderExecutions[i];
     if (!Request) continue; // i is within renderExecutions bounds
+    const key = String(Request.RequestID);
+    desiredKeys.add(key);
+
     const rawScriptName =
       Request && Request.Script && Request.Script.Name ? String(Request.Script.Name).trim() : '';
     const rawClientName = Request.Client.Nickname
       ? Request.Client.Nickname
       : Request.Client.Hostname;
-    const clientName = Safe(truncateExecutionLabel(rawClientName, 40));
-    const scriptName = rawScriptName ? Safe(truncateExecutionLabel(rawScriptName, 28)) : '';
-    const fullClientName = Safe(rawClientName || 'Unknown Client');
-    const fullScriptName = Safe(rawScriptName || '');
-    const statusBadge = ''; // Remove visual badges; use icon instead
-    let timeBadge = '';
-    let actionsHtml = ''; // right-side icon area (only rendered if non-empty)
-    let errorBlock = ''; // error details below the row
+    const fullClientName = rawClientName || 'Unknown Client';
 
+    let timeBadge = '';
     if (Request.Timer && typeof Request.Timer.Duration === 'number') {
       timeBadge = durationText(Request.Timer.Duration);
     }
 
-    if (Request.Status === 'Completed') {
-      // Success check icon in the actions area
-      actionsHtml = `<span class="exec-btn-icon exec-success" role="img" aria-label="Completed"><i class="bi bi-check-circle-fill"></i></span>`;
-    } else if (Request.Status === 'Failed') {
-      // Passive info icon (no click behavior)
-      actionsHtml = `<span class="exec-btn-icon" role="img" aria-label="Failed"><i class="bi bi-info-circle"></i></span>`;
-      if (Request.Error && rawScriptName !== 'Deploying Scripts') {
-        const err = Safe(Request.Error);
-        errorBlock = `<pre class="exec-error">${err}</pre>`;
-      }
+    // Progress fill width. Completed always reads full; failed shows however far
+    // it got (full if unknown) in red; pending/running follow the reported value
+    // with a small floor so the row never looks empty.
+    const reportedProgress =
+      typeof Request.Progress === 'number' && Number.isFinite(Request.Progress)
+        ? Math.max(0, Math.min(100, Request.Progress))
+        : 0;
+
+    // Classify the execution into one visual state that drives the row's
+    // background progress fill, the right-side indicator, and (on failure) the
+    // inline error. Once the client reports the process has spawned (progress
+    // reaches the Running stage), the row gets a spinner; StatusText from that
+    // point is live console output, so the spinner keys off progress, not text.
+    const rawStatusText = Request.StatusText ? String(Request.StatusText).trim() : '';
+    const isRunning = Request.Status === 'Pending' && reportedProgress >= 50;
+    const state =
+      Request.Status === 'Completed'
+        ? 'completed'
+        : Request.Status === 'Failed'
+          ? 'failed'
+          : isRunning
+            ? 'running'
+            : 'pending';
+    let fillPercent: number;
+    if (state === 'completed') fillPercent = 100;
+    else if (state === 'failed') fillPercent = reportedProgress > 0 ? reportedProgress : 100;
+    else if (state === 'running') fillPercent = reportedProgress > 0 ? reportedProgress : 65;
+    else fillPercent = reportedProgress > 0 ? reportedProgress : 8;
+
+    // Right-side indicator: check / spinner / info icon / queued dot. Swapped
+    // only when the state changes, so the spinner element survives (and keeps
+    // spinning) across the rapid console-tail updates while running.
+    let indicatorHtml = '';
+    if (state === 'completed') {
+      indicatorHtml = `<span class="exec-btn-icon exec-success" role="img" aria-label="Completed"><i class="bi bi-check-circle-fill"></i></span>`;
+    } else if (state === 'failed') {
+      indicatorHtml = `<span class="exec-btn-icon exec-fail" role="img" aria-label="Failed"><i class="bi bi-exclamation-triangle-fill"></i></span>`;
+    } else if (state === 'running') {
+      indicatorHtml = `<span class="exec-spinner" role="img" aria-label="Running"></span>`;
+    } else {
+      indicatorHtml = `<span class="exec-btn-icon exec-queued" role="img" aria-label="Queued"><i class="bi bi-hourglass-split"></i></span>`;
     }
 
-    Filler += `
-			<div class="exec-item">
+    // Inline status/error text (sits on the same row — never a block below).
+    // Returned as data so it can be applied to a persistent span via textContent.
+    let inlineClass = '';
+    let inlineText = '';
+    let inlineTitle = '';
+    if (state === 'failed' && Request.Error && rawScriptName !== 'Deploying Scripts') {
+      inlineClass = 'exec-inline exec-inline-error';
+      inlineText = truncateExecutionLabel(Request.Error, 60);
+      inlineTitle = String(Request.Error);
+    } else if (state === 'running') {
+      // While running, StatusText carries the live tail of the script's console
+      // output. Show it monospace so it reads as terminal output; fall back to a
+      // generic label until the first line arrives.
+      const isConsole = !!rawStatusText && rawStatusText !== 'Running';
+      inlineClass = `exec-inline exec-inline-stage${isConsole ? ' exec-inline-console' : ''}`;
+      inlineText = isConsole ? truncateExecutionLabel(rawStatusText, 64) : 'Running…';
+      inlineTitle = rawStatusText;
+    } else if (state === 'pending') {
+      inlineClass = 'exec-inline exec-inline-stage';
+      inlineText = rawStatusText && rawStatusText !== 'Pending' ? rawStatusText : 'Queued';
+      inlineTitle = '';
+    }
+
+    // --- upsert the row ------------------------------------------------------
+    let el = listEl.querySelector<HTMLElement>(`.exec-item[data-request-id="${key}"]`);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = `exec-item state-${state}`;
+      el.setAttribute('data-request-id', key);
+      el.dataset.state = state;
+      el.dataset.indicator = state;
+      el.style.setProperty('--exec-progress', `${fillPercent}%`);
+      const scriptChip =
+        uniformScriptName || !rawScriptName
+          ? ''
+          : `<span class="badge bg-ghost-light text-light exec-chip" title="${Safe(rawScriptName)}">${Safe(truncateExecutionLabel(rawScriptName, 28))}</span>`;
+      el.innerHTML = `
+				<div class="exec-fill"></div>
 				<div class="exec-row">
 					<div class="exec-left">
-            <span class="badge bg-ghost-light text-light exec-chip" title="${fullClientName}">${clientName}</span>
-            ${uniformScriptName ? '' : `<span class="badge bg-ghost-light text-light exec-chip" title="${fullScriptName}">${scriptName}</span>`}
+            <span class="badge bg-ghost-light text-light exec-chip" title="${Safe(fullClientName)}">${Safe(truncateExecutionLabel(rawClientName, 40))}</span>
+            ${scriptChip}
+            <span class="exec-inline-slot" data-inline></span>
 					</div>
 					<div class="exec-right">
-						${timeBadge}
-						${statusBadge}
-						${actionsHtml ? `<div class="exec-actions">${actionsHtml}</div>` : ''}
+						<span class="exec-time"></span>
+						<div class="exec-actions">${indicatorHtml}</div>
 					</div>
-				</div>
-				${errorBlock}
-			</div>`;
+				</div>`;
+      listEl.appendChild(el);
+    }
+
+    // Volatile updates only — the .exec-fill and spinner nodes are never replaced
+    // unless the state changes, so their animations run uninterrupted.
+    el.style.setProperty('--exec-progress', `${fillPercent}%`);
+    if (el.dataset.state !== state) {
+      el.classList.remove('state-pending', 'state-running', 'state-completed', 'state-failed');
+      el.classList.add(`state-${state}`);
+      el.dataset.state = state;
+    }
+    if (el.dataset.indicator !== state) {
+      const actions = el.querySelector('.exec-actions');
+      if (actions) actions.innerHTML = indicatorHtml;
+      el.dataset.indicator = state;
+    }
+    const timeEl = el.querySelector<HTMLElement>('.exec-time');
+    if (timeEl) {
+      if (timeEl.innerHTML !== timeBadge) timeEl.innerHTML = timeBadge;
+      timeEl.style.display = timeBadge ? '' : 'none';
+    }
+    const inlineEl = el.querySelector<HTMLElement>('[data-inline]');
+    if (inlineEl) {
+      const nextClass = `exec-inline-slot${inlineClass ? ` ${inlineClass}` : ''}`;
+      if (inlineEl.className !== nextClass) inlineEl.className = nextClass;
+      if (inlineEl.textContent !== inlineText) inlineEl.textContent = inlineText;
+      if (inlineEl.title !== inlineTitle) inlineEl.title = inlineTitle;
+      inlineEl.style.display = inlineText ? '' : 'none';
+    }
   }
 
-  $list.html(Filler);
+  // Drop rows whose executions are no longer present (e.g. after ClearSettled).
+  for (const child of Array.from(listEl.children)) {
+    const childKey =
+      child.getAttribute('data-request-id') || child.getAttribute('data-exec-key') || '';
+    if (!desiredKeys.has(childKey)) child.remove();
+  }
   return;
   });
 

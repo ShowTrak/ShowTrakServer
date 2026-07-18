@@ -764,7 +764,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   transition: background-color 140ms ease;
 }
 .GROUP_MANAGER_GROUP_ITEM[draggable='true'] {
-  cursor: grab;
+  cursor: pointer;
 }
 .GROUP_MANAGER_GROUP_ITEM.dragging {
   opacity: 0.5;

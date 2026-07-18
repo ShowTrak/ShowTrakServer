@@ -29,7 +29,9 @@ function baseMocks(overrides = {}) {
       },
     },
     '../ClientManager': {
-      Manager: { Get: async (uuid) => [null, { UUID: uuid, OperatingSystem: 'Windows' }] },
+      Manager: {
+        Get: async (uuid) => [null, { UUID: uuid, OperatingSystem: 'Windows', Online: true }],
+      },
     },
     '../Broadcast': { Manager: { emit: () => {} } },
     '../UUID': { Manager: { Generate: () => `req-${++counter}` } },
@@ -37,35 +39,55 @@ function baseMocks(overrides = {}) {
   };
 }
 
-test('ScriptExecutionManager queues, replaces, and completes script executions', async () => {
+test("ScriptExecutionManager appends and runs each client's scripts sequentially", async () => {
   const emitted = [];
+  const dispatched = [];
   const mocks = baseMocks({
     '../Broadcast': { Manager: { emit: (event, data) => emitted.push({ event, data }) } },
   });
-  const { Manager } = load(mocks);
+  const { Manager, SetDispatchHandler } = load(mocks);
+  // The manager dispatches the next script for an idle client through this seam.
+  SetDispatchHandler((uuid, requestId, scriptId) => dispatched.push({ uuid, requestId, scriptId }));
 
   assert.deepEqual(await Manager.GetAllExecutions(), []);
 
-  const requestId = await Manager.AddToQueue('uuid-1', 'script-a');
-  assert.ok(requestId);
+  const firstId = await Manager.AddToQueue('uuid-1', 'script-a');
+  assert.ok(firstId);
   let all = await Manager.GetAllExecutions();
   assert.equal(all.length, 1);
   assert.equal(all[0].Status, 'Pending');
   assert.equal(all[0].Client.UUID, 'uuid-1');
+  // The client was idle, so script-a dispatched immediately.
+  assert.deepEqual(
+    dispatched.map((d) => d.scriptId),
+    ['script-a']
+  );
 
-  // Re-queuing the same client replaces the existing entry (still one row).
+  // Re-queuing the SAME client APPENDS a second row that waits its turn — it is
+  // not dispatched while script-a is still running.
   const secondId = await Manager.AddToQueue('uuid-1', 'script-b');
   all = await Manager.GetAllExecutions();
-  assert.equal(all.length, 1);
-  assert.equal(all[0].RequestID, secondId);
+  assert.equal(all.length, 2);
+  assert.equal(all[1].RequestID, secondId);
+  assert.deepEqual(
+    dispatched.map((d) => d.scriptId),
+    ['script-a']
+  );
 
-  // Completing marks the entry as completed and records duration.
-  await Manager.Complete(secondId, null);
+  // Completing script-a records its duration and frees the client to dispatch
+  // the next queued script (script-b).
+  await Manager.Complete(firstId, null);
   all = await Manager.GetAllExecutions();
-  assert.equal(all[0].Status, 'Completed');
-  assert.equal(typeof all[0].Timer.Duration, 'number');
+  const completedFirst = all.find((e) => e.RequestID === firstId);
+  assert.equal(completedFirst.Status, 'Completed');
+  assert.equal(typeof completedFirst.Timer.Duration, 'number');
+  assert.deepEqual(
+    dispatched.map((d) => d.scriptId),
+    ['script-a', 'script-b']
+  );
+  await Manager.Complete(secondId, null);
 
-  // Completing with an error marks failure.
+  // A different client runs in parallel; error completion marks failure.
   const thirdId = await Manager.AddToQueue('uuid-2', 'script-c');
   await Manager.Complete(thirdId, new Error('script blew up'));
   all = await Manager.GetAllExecutions();
@@ -77,6 +99,54 @@ test('ScriptExecutionManager queues, replaces, and completes script executions',
   await Manager.ClearQueue();
   assert.deepEqual(await Manager.GetAllExecutions(), []);
   assert.ok(emitted.some((e) => e.event === 'ScriptExecutionUpdated'));
+});
+
+test('ScriptExecutionManager ClearSettled preserves queued and running executions', async () => {
+  const { Manager, SetDispatchHandler } = load(baseMocks());
+  SetDispatchHandler(() => {});
+
+  const runningId = await Manager.AddToQueue('uuid-1', 'script-a'); // dispatched, running
+  const queuedId = await Manager.AddToQueue('uuid-1', 'script-b'); // waiting its turn
+  const doneId = await Manager.AddToQueue('uuid-2', 'script-c');
+  await Manager.Complete(doneId, null); // settled
+
+  await Manager.ClearSettled();
+  const remaining = await Manager.GetAllExecutions();
+  const ids = remaining.map((e) => e.RequestID).sort();
+  assert.deepEqual(ids, [runningId, queuedId].sort());
+});
+
+test('ScriptExecutionManager fails a queued script if its client goes offline before its turn', async () => {
+  const dispatched = [];
+  const { Manager, SetDispatchHandler } = load(baseMocks());
+  SetDispatchHandler((uuid, requestId, scriptId) => dispatched.push({ uuid, requestId, scriptId }));
+
+  const runningId = await Manager.AddToQueue('uuid-1', 'script-a'); // dispatched, running
+  const queuedId = await Manager.AddToQueue('uuid-1', 'script-b'); // waiting its turn
+  // Only script-a has been dispatched so far.
+  assert.deepEqual(
+    dispatched.map((d) => d.scriptId),
+    ['script-a']
+  );
+
+  // The client disconnects while script-b waits. The stored Client is the live
+  // instance the manager captured at enqueue, so flipping Online here mirrors
+  // ClientManager marking the client offline mid-session.
+  const all = await Manager.GetAllExecutions();
+  const queued = all.find((e) => e.RequestID === queuedId);
+  queued.Client.Online = false;
+
+  // script-a finishes and frees the client. PumpClient must NOT dispatch script-b
+  // into the void — it should fail it as offline and leave the client idle.
+  await Manager.Complete(runningId, null);
+
+  const settled = (await Manager.GetAllExecutions()).find((e) => e.RequestID === queuedId);
+  assert.equal(settled.Status, 'Failed');
+  assert.match(settled.Error, /offline/i);
+  assert.deepEqual(
+    dispatched.map((d) => d.scriptId),
+    ['script-a'] // script-b was never dispatched
+  );
 });
 
 test('ScriptExecutionManager ignores unknown scripts and clients', async () => {
@@ -144,7 +214,9 @@ test('ScriptExecutionManager fails early when no script exists for client OS', a
   const { Manager } = load(
     baseMocks({
       '../ClientManager': {
-        Manager: { Get: async (uuid) => [null, { UUID: uuid, OperatingSystem: 'macOS' }] },
+        Manager: {
+          Get: async (uuid) => [null, { UUID: uuid, OperatingSystem: 'macOS', Online: true }],
+        },
       },
       '../ScriptManager': {
         Manager: {

@@ -678,21 +678,24 @@ export async function OpenGroupManager(Relaunching = false) {
       this.dataset.dragged = '1';
       await PersistGroupManagerOrder();
     })
-    .off('click', '.GROUP_MANAGER_GROUP_OPEN')
-    .on('click', '.GROUP_MANAGER_GROUP_OPEN', async function () {
-      const Row = $(this).closest('.GROUP_MANAGER_GROUP_ITEM').get(0);
-      if (Row && Row.dataset.dragged === '1') {
-        Row.dataset.dragged = '';
-        return;
-      }
+    // Clicking anywhere on a (non-default) group row opens its editor, not just
+    // the chevron button. A drag leaves dataset.dragged==='1' so the click that
+    // ends a reorder does not also open the editor.
+    .off('click', '.GROUP_MANAGER_GROUP_ITEM:not(.GROUP_MANAGER_GROUP_ITEM_DEFAULT)')
+    .on(
+      'click',
+      '.GROUP_MANAGER_GROUP_ITEM:not(.GROUP_MANAGER_GROUP_ITEM_DEFAULT)',
+      async function () {
+        if (this.dataset.dragged === '1') {
+          this.dataset.dragged = '';
+          return;
+        }
 
-      const GroupID = parseInt(
-        $(this).closest('.GROUP_MANAGER_GROUP_ITEM').attr('data-groupid') || '',
-        10
-      );
-      if (!Number.isFinite(GroupID)) return;
-      await OpenGroupManagerEditor(GroupID, false, Groups);
-    });
+        const GroupID = parseInt(this.getAttribute('data-groupid') || '', 10);
+        if (!Number.isFinite(GroupID)) return;
+        await OpenGroupManagerEditor(GroupID, false, Groups);
+      }
+    );
 
   $('#GROUP_MANAGER_GROUP_LIST')
     .off('click', '#GROUP_MANAGER_NEW_GROUP')

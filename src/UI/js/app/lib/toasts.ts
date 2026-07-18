@@ -249,7 +249,18 @@ export async function ConfirmationDialog(Message: unknown) {
 
 // --- 3. Execution toast -----------------------------------------------------
 
+// HideExecutionToast keeps the element in the DOM for 150ms so a quick reopen
+// is instant, then removes it. That pending removal is tracked here so a Show
+// arriving inside the window can cancel it — otherwise the timer would delete
+// a toast we just re-showed (a transient empty executions push hides it, the
+// next push shows it, then the stale timer fires), which reads as a flash.
+let execToastRemoveTimer: ReturnType<typeof setTimeout> | null = null;
+
 export function ShowExecutionToast(title?: string) {
+  if (execToastRemoveTimer) {
+    clearTimeout(execToastRemoveTimer);
+    execToastRemoveTimer = null;
+  }
   const $existing = $('#EXECUTION_TOAST');
   if ($existing.length) {
     $existing.addClass('show');
@@ -292,8 +303,11 @@ export function HideExecutionToast() {
     $t.removeClass('show');
     // Remove outside-click handler when closing
     $(document).off('mousedown.execToastOutside touchstart.execToastOutside');
-    // keep in DOM for quick reopen; remove after short delay
-    setTimeout(() => {
+    // keep in DOM for quick reopen; remove after short delay. Tracked so a Show
+    // inside this window cancels the removal instead of losing the toast.
+    if (execToastRemoveTimer) clearTimeout(execToastRemoveTimer);
+    execToastRemoveTimer = setTimeout(() => {
+      execToastRemoveTimer = null;
       try {
         $t.remove();
       } catch (err) {

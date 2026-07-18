@@ -5,6 +5,7 @@ const {
   PLATFORM_KEYS,
   SCRIPT_COLOURS,
   NormalizeScriptConfig,
+  NormalizeConsoleFilter,
 } = require('../dist/Modules/ScriptManager/schema');
 
 test('NormalizeScriptConfig fills in every required key with defaults', () => {
@@ -22,6 +23,7 @@ test('NormalizeScriptConfig fills in every required key with defaults', () => {
   assert.equal(config.Enabled, false);
   assert.deepEqual(Object.keys(config.Platforms), PLATFORM_KEYS);
   for (const key of PLATFORM_KEYS) assert.equal(config.Platforms[key], '');
+  assert.deepEqual(config.ConsoleFilter, { Mode: 'none', Pattern: '', Strip: false });
   assert.ok(errors.length > 0);
 });
 
@@ -143,10 +145,72 @@ test('NormalizeScriptConfig leaves an already-valid config untouched', () => {
     Icon: 'terminal',
     Platforms: { Windows: 'win.bat', macOS: '', Linux: '' },
     Arguments: { Windows: '', macOS: '', Linux: '' },
+    ConsoleFilter: { Mode: 'none', Pattern: '', Strip: false },
   };
   const { changed, errors } = NormalizeScriptConfig(valid, 'Deploy');
   assert.equal(changed, false);
   assert.equal(errors.length, 0);
+});
+
+test('NormalizeScriptConfig normalizes a valid ConsoleFilter', () => {
+  const { config, errors } = NormalizeScriptConfig(
+    { Name: 'Tail', ConsoleFilter: { Mode: 'startsWith', Pattern: '  [ERR] ' } },
+    'Tail'
+  );
+  // Pattern is trimmed; a known mode is preserved.
+  assert.deepEqual(config.ConsoleFilter, { Mode: 'startsWith', Pattern: '[ERR]', Strip: false });
+  assert.equal(
+    errors.some((e) => e.includes('ConsoleFilter')),
+    false
+  );
+});
+
+test('NormalizeScriptConfig preserves a ConsoleFilter Strip flag', () => {
+  const { config, errors } = NormalizeScriptConfig(
+    { Name: 'Tail', ConsoleFilter: { Mode: 'includes', Pattern: 'PROGRESS:', Strip: true } },
+    'Tail'
+  );
+  assert.deepEqual(config.ConsoleFilter, { Mode: 'includes', Pattern: 'PROGRESS:', Strip: true });
+  assert.equal(
+    errors.some((e) => e.includes('ConsoleFilter')),
+    false
+  );
+});
+
+test('NormalizeScriptConfig defaults an invalid ConsoleFilter Strip to false', () => {
+  const { config, errors } = NormalizeScriptConfig(
+    { Name: 'X', ConsoleFilter: { Mode: 'includes', Pattern: 'hi', Strip: 'yes' } },
+    'X'
+  );
+  assert.equal(config.ConsoleFilter.Strip, false);
+  assert.ok(errors.some((e) => e.includes('Strip')));
+});
+
+test('NormalizeScriptConfig defaults an invalid ConsoleFilter mode to none', () => {
+  const { config, errors } = NormalizeScriptConfig(
+    { Name: 'X', ConsoleFilter: { Mode: 'bogus', Pattern: 'hi' } },
+    'X'
+  );
+  assert.equal(config.ConsoleFilter.Mode, 'none');
+  assert.equal(config.ConsoleFilter.Pattern, 'hi');
+  assert.ok(errors.some((e) => e.includes('ConsoleFilter')));
+});
+
+test('NormalizeScriptConfig flags an uncompilable ConsoleFilter regex', () => {
+  const { config, errors } = NormalizeScriptConfig(
+    { Name: 'X', ConsoleFilter: { Mode: 'regex', Pattern: '([unterminated' } },
+    'X'
+  );
+  // Pattern is retained as-authored so the author can fix it.
+  assert.equal(config.ConsoleFilter.Mode, 'regex');
+  assert.equal(config.ConsoleFilter.Pattern, '([unterminated');
+  assert.ok(errors.some((e) => e.includes('invalid')));
+});
+
+test('NormalizeConsoleFilter treats a non-object as an empty filter', () => {
+  const { filter, errors } = NormalizeConsoleFilter('nope');
+  assert.deepEqual(filter, { Mode: 'none', Pattern: '', Strip: false });
+  assert.ok(errors.length > 0);
 });
 
 test('NormalizeScriptConfig handles a non-object root', () => {

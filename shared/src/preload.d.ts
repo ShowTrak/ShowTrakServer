@@ -259,6 +259,7 @@ export interface ShowTrakAPI {
   SetAlertRuleEnabled(RuleID: string, Enabled: boolean): Promise<unknown>;
   GetAlertActionsEnabled(): Promise<boolean>;
   SetAlertActionsEnabled(Enabled: boolean): Promise<boolean>;
+  OnAlertActionsUpdated(callback: (enabled: boolean) => void): Unsubscribe;
   SetFullAlertRuleList(callback: (rules: AlertRuleView[]) => void): Unsubscribe;
   AlertTriggered(callback: (alert: AlertTriggeredEvent) => void): Unsubscribe;
   CreateShowTrakAlert(callback: (alert: ShowTrakAlert) => void): Unsubscribe;

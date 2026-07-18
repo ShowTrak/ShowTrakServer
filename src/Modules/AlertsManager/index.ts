@@ -383,6 +383,9 @@ Manager.GetActionsEnabled = () => {
 
 Manager.SetActionsEnabled = (Enabled: unknown) => {
   AlertActionsEnabled = !!Enabled;
+  // Notify integrations (e.g. the SDK control API) of the new global state so
+  // their alert-actions feedback stays live regardless of who toggled it.
+  BroadcastManager.emit('AlertActionsUpdated', AlertActionsEnabled);
   return AlertActionsEnabled;
 };
 

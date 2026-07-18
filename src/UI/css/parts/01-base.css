@@ -281,6 +281,15 @@ body.is-web #APPLICATION {
   line-height: 1;
 }
 
+/* Flex utility: allow a flex child to shrink below its content's intrinsic
+   width so overflow/ellipsis rules on its descendants can take effect. Bootstrap
+   ships no min-width utilities, and flex items default to min-width:auto, which
+   otherwise lets a long nowrap label (e.g. a script description) force its
+   siblings off-screen. */
+.min-w-0 {
+  min-width: 0;
+}
+
 .btn {
   border: none;
 }

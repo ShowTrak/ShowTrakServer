@@ -478,6 +478,8 @@ const PASSTHROUGH: Array<[string, string]> = [
   ['CreateShowTrakAlert', 'CreateShowTrakAlert'],
   ['PlayCustomAudio', 'PlayCustomAudio'],
   ['DebugTrafficEntry', 'DebugTrafficEntry'],
+  // Global alert-actions toggle state, consumed by the SDK control API sink.
+  ['AlertActionsUpdated', 'AlertActionsUpdated'],
 ];
 
 // Wire every BroadcastManager subscriber and the ModeManager relay. Called once

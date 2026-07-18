@@ -312,8 +312,21 @@ export interface ScriptEditable {
   enabled: boolean;
   platforms: Record<string, string>;
   arguments: Record<string, string>;
+  consoleFilter: ScriptConsoleFilter;
   files: string[];
   valid: boolean;
+}
+
+/**
+ * Console filter applied CLIENT-SIDE while a script runs: only console lines
+ * matching `Pattern` under `Mode` are surfaced as the live status tail. Mode
+ * `none` (or an empty `Pattern`) disables filtering. When `Strip` is true the
+ * matched text is removed from the surfaced line, leaving only the remainder.
+ */
+export interface ScriptConsoleFilter {
+  Mode: 'none' | 'startsWith' | 'includes' | 'regex';
+  Pattern: string;
+  Strip: boolean;
 }
 
 export interface ScriptFileEntry {
@@ -335,6 +348,7 @@ export interface ScriptCatalogEntry {
   Platforms: Record<string, string>;
   Arguments: Record<string, string>;
   CompatiblePlatforms: string[];
+  ConsoleFilter?: ScriptConsoleFilter;
   isEnabled: boolean;
   isValid: boolean;
   ValidationErrors: string[];

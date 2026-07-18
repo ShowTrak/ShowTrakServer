@@ -147,4 +147,10 @@ export function InitMode() {
       HandleNonFatalError('Mode:RenderPendingAdoptionSection', err);
     }
   });
+
+  // Reflect alert-actions state whenever it changes anywhere (desktop click,
+  // OSC, or the SDK control API) so the toggle never goes stale.
+  window.API.OnAlertActionsUpdated((enabled) => {
+    RenderAlertActionsToggle(!!enabled);
+  });
 }

@@ -249,30 +249,21 @@ function register(): void {
     }
     await ScriptExecutionManager.ClearQueue();
     const tasks = Targets.map(async (UUID: string) => {
+      // Resolve the client and its eligibility BEFORE queueing anything so the
+      // no-op cases below never create a task (and therefore never surface a UI
+      // notification). Only clients we will actually wake get an entry.
+      const [ClientErr, Client] = await ClientManager.Get(UUID);
+      // The client vanished between validation and now — nothing to wake, and no
+      // task was queued, so stay silent.
+      if (ClientErr || !Client) return;
+      // WOL isn't possible/needed here: no MAC on record (unsupported) or the
+      // client is already online. Silently skip — don't spam with notifications.
+      if (!Client.MacAddress || Client.Online) return;
+
       const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, 'Wake On LAN');
       // No RequestID means the task was never queued (the client vanished between
-      // validation and enqueue) — there is nothing to complete.
+      // the check above and enqueue) — there is nothing to complete.
       if (!RequestID) return;
-      const [ClientErr, Client] = await ClientManager.Get(UUID);
-      if (ClientErr) {
-        await ScriptExecutionManager.Complete(RequestID, ClientErr);
-        return;
-      }
-      if (!Client) {
-        await ScriptExecutionManager.Complete(RequestID, 'Client not found');
-        return;
-      }
-      if (!Client.MacAddress) {
-        await ScriptExecutionManager.Complete(
-          RequestID,
-          'Client does not have a valid MAC address in internal database.'
-        );
-        return;
-      }
-      if (Client.Online) {
-        await ScriptExecutionManager.Complete(RequestID, 'Client is already online');
-        return;
-      }
       const [WOLErr, _Result] = await WOLManager.Wake(Client.MacAddress);
       await ScriptExecutionManager.Complete(RequestID, WOLErr);
     });

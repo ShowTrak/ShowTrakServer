@@ -306,6 +306,7 @@ const WEB_PUSH_CHANNELS = [
   'OSCBulkAction',
   'DebugTrafficEntry',
   'ModeUpdated',
+  'AlertActionsUpdated',
   'AudioAssetsUpdated',
 ] as const satisfies readonly SubscribeChannel[];
 const WEB_PUSH_ALLOWLIST = new Set<string>(WEB_PUSH_CHANNELS);
@@ -611,6 +612,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
         socket.emit('SetScriptList', scripts);
 
         socket.emit('ModeUpdated', ModeManager.Get());
+        socket.emit('AlertActionsUpdated', AlertsManager.GetActionsEnabled());
       } catch (e) {
         Logger.error('Web UI initial state failed:', e);
       }

@@ -281,6 +281,15 @@ body.is-web #APPLICATION {
   line-height: 1;
 }
 
+/* Flex utility: allow a flex child to shrink below its content's intrinsic
+   width so overflow/ellipsis rules on its descendants can take effect. Bootstrap
+   ships no min-width utilities, and flex items default to min-width:auto, which
+   otherwise lets a long nowrap label (e.g. a script description) force its
+   siblings off-screen. */
+.min-w-0 {
+  min-width: 0;
+}
+
 .btn {
   border: none;
 }
@@ -2303,20 +2312,33 @@ button.btn:focus {
   box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.35) !important;
 }
 
-/* Right-side script execution toast */
+/* Centered script execution panel */
 #EXECUTION_TOAST.exec-toast {
   position: fixed;
-  right: 10px;
-  top: 56px; /* below top dragbar */
-  width: min(560px, calc(100vw - 20px));
-  max-height: calc(100vh - 80px);
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.98);
+  width: min(600px, calc(100vw - 40px));
+  max-height: min(78vh, calc(100vh - 96px));
   overflow: auto;
   z-index: 1100;
   background: rgba(29, 26, 47, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  border-radius: 12px;
+  /* The huge spread ring acts as a click-through dim backdrop so the panel
+     reads as a centered modal without a separate backdrop element. */
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.5),
+    0 0 0 100vmax rgba(0, 0, 0, 0.45);
   color: #fff;
+  opacity: 0;
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease;
+}
+#EXECUTION_TOAST.exec-toast.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
 }
 #EXECUTION_TOAST .exec-toast-header {
   display: flex;
@@ -2392,16 +2414,106 @@ button.btn:focus {
 }
 
 .exec-item {
+  position: relative;
+  overflow: hidden;
   background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 8px;
 }
+/* The per-client progress bar IS the row background. Width tracks the reported
+   stage (--exec-progress); colour is driven by the state-* class. */
+.exec-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--exec-progress, 0%);
+  pointer-events: none;
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  background: rgba(90, 140, 235, 0.28);
+}
+.exec-item.state-pending .exec-fill {
+  background: rgba(150, 160, 190, 0.22);
+}
+.exec-item.state-running .exec-fill {
+  background: linear-gradient(
+    90deg,
+    rgba(90, 140, 235, 0.32),
+    rgba(120, 165, 245, 0.42),
+    rgba(90, 140, 235, 0.32)
+  );
+  background-size: 200% 100%;
+  animation: exec-fill-shimmer 1.3s linear infinite;
+}
+.exec-item.state-completed .exec-fill {
+  background: rgba(40, 167, 69, 0.32);
+}
+.exec-item.state-failed .exec-fill {
+  background: rgba(220, 53, 69, 0.3);
+}
+@keyframes exec-fill-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
 .exec-row {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   min-height: 2.2rem;
   justify-content: space-between;
   gap: 8px;
   padding: 6px 8px;
+}
+/* Inline status / error text — stays on the row, never a block below it. */
+.exec-inline {
+  font-size: 11px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.exec-inline-stage {
+  color: rgba(255, 255, 255, 0.72);
+}
+/* Live tail of the script's console output while it runs. Pushed to the right
+   edge of the row and vertically centred so it reads as a status trailer. */
+.exec-inline-console {
+  font-family:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 10.5px;
+  color: rgba(205, 216, 255, 0.85);
+  flex: 1 1 auto;
+  text-align: right;
+  align-self: center;
+}
+.exec-inline-error {
+  color: #ffb4bc;
+  flex: 1 1 auto;
+}
+/* Running spinner shown in place of the status icon. */
+.exec-spinner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #cdd8ff;
+  animation: exec-spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes exec-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.exec-btn-icon.exec-fail {
+  color: #ff6b78;
+}
+.exec-btn-icon.exec-queued {
+  color: rgba(255, 255, 255, 0.55);
 }
 .exec-left {
   display: flex;
@@ -3753,7 +3865,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   transition: background-color 140ms ease;
 }
 .GROUP_MANAGER_GROUP_ITEM[draggable='true'] {
-  cursor: grab;
+  cursor: pointer;
 }
 .GROUP_MANAGER_GROUP_ITEM.dragging {
   opacity: 0.5;

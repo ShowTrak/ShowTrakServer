@@ -156,6 +156,7 @@ const INVOKE_CHANNELS = new Set<string>(INVOKE_CHANNEL_LIST);
 const SUBSCRIBE_CHANNEL_LIST = [
   'AppMenuAction',
   'ModeUpdated',
+  'AlertActionsUpdated',
   'OSCBulkAction',
   'PlaySound',
   'PlayCustomAudio',
@@ -276,6 +277,7 @@ const API: ShowTrakAPI = {
   GetMode: async () => invoke('Mode:Get'),
   SetMode: async (Mode) => invoke('Mode:Set', Mode),
   OnModeUpdated: (Callback) => subscribe('ModeUpdated', Callback),
+  OnAlertActionsUpdated: (Callback) => subscribe('AlertActionsUpdated', Callback),
   OSCBulkAction: (Callback) =>
     subscribe(
       'OSCBulkAction',

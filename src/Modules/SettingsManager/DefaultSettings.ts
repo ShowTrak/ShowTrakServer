@@ -85,6 +85,24 @@ export const DefaultSettings: SettingDefinition[] = [
     OnUpdateEvent: 'OscSettingsChanged',
   },
   {
+    Group: 'SDK / Integration API',
+    Key: 'SDK_API_ENABLED',
+    Title: 'SDK Control API',
+    Description:
+      'Enable the WebSocket control API (the /sdk namespace) used by the ShowTrak Server SDK and integrations such as the Bitfocus Companion module. Connections require the API key below.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
+    Group: 'SDK / Integration API',
+    Key: 'SDK_API_KEY',
+    Title: 'SDK API Key',
+    Description:
+      'Required key integrations must present to connect to the control API. Auto-generated on first boot — copy it into your integration (e.g. the Companion connection settings). Change it to revoke existing integrations.',
+    Type: 'STRING',
+    DefaultValue: '',
+  },
+  {
     Group: 'Monitoring',
     Key: 'MONITORING_DEFAULT_INTERVAL_MS',
     Title: 'Default Monitoring Interval',
@@ -287,6 +305,7 @@ export const Groups: SettingGroup[] = [
   { Name: 'Features', Title: 'Features' },
   { Name: 'Network', Title: 'Network' },
   { Name: 'Monitoring', Title: 'Monitoring' },
+  { Name: 'SDK / Integration API', Title: 'SDK / Integration API' },
   { Name: 'Alerts', Title: 'Alerts' },
   { Name: 'Web UI', Title: 'Web UI' },
   { Name: 'Web UI Permissions', Title: 'Web UI Permissions' },

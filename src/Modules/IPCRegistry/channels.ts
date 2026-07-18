@@ -170,6 +170,7 @@ const INVOKE_CHANNELS = [
 const SUBSCRIBE_CHANNELS = [
   'AppMenuAction',
   'ModeUpdated',
+  'AlertActionsUpdated',
   'OSCBulkAction',
   'PlaySound',
   'PlayCustomAudio',
