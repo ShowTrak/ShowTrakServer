@@ -24,8 +24,8 @@ export const DEFAULT_NUT_PORT = 3493;
 // The editor Settings every NUT method shares (connection + auth). Individual
 // methods spread this and append their own threshold field(s).
 export const CommonNutSettings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'Port', Type: 'number', Default: DEFAULT_NUT_PORT, Min: 1, Max: 65535 },
-  { Key: 'UPSName', Label: 'UPS name', Type: 'string', Default: '' },
+  { Key: 'Port', Label: 'Port', Type: 'number', Default: DEFAULT_NUT_PORT, Min: 1, Max: 65535, Required: true },
+  { Key: 'UPSName', Label: 'UPS name', Type: 'string', Default: '', Required: true },
   { Key: 'Username', Label: 'Username', Type: 'string', Default: '', Advanced: true },
   { Key: 'Password', Label: 'Password', Type: 'string', Default: '', Advanced: true },
   {

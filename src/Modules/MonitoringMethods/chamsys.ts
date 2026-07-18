@@ -27,13 +27,22 @@ const Settings: MonitoringSettingField[] = [
     Default: DEFAULT_CHAMSYS_PORT,
     Min: 1,
     Max: 65535,
+    Required: true,
+  },
+  {
+    Key: 'CheckVersion',
+    Label: 'Check software version',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Enable to report Degraded when the console reports an unexpected software version.',
   },
   {
     Key: 'ExpectedVersion',
-    Label: 'Expected software version prefix (blank = any, e.g. 1.9)',
+    Label: 'Expected software version prefix',
     Type: 'string',
     Default: '',
-    Advanced: true,
+    VisibleWhen: { Key: 'CheckVersion', Equals: true },
+    Note: 'Matches on a prefix, e.g. 1.9.',
   },
   {
     Key: 'Timeout',
@@ -65,6 +74,7 @@ export function ExtractMagicQVersion(Body: unknown): string | null {
 interface ChamsysConfig {
   Address: string;
   Port: number;
+  CheckVersion: boolean;
   ExpectedVersion: string;
   TimeoutMs: number;
 }
@@ -74,6 +84,7 @@ function ParseConfig(Target: MonitoringTargetLike): ChamsysConfig {
   return {
     Address: Target && Target.Address ? String(Target.Address).trim() : '',
     Port: Number.isFinite(Cfg.Port as number) ? (Cfg.Port as number) | 0 : DEFAULT_CHAMSYS_PORT,
+    CheckVersion: !!Cfg.CheckVersion,
     ExpectedVersion: String(Cfg.ExpectedVersion || '').trim(),
     TimeoutMs: Number.isFinite(Cfg.Timeout as number) ? (Cfg.Timeout as number) : 4000,
   };
@@ -138,7 +149,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     };
   }
 
-  if (Config.ExpectedVersion && Version && !Version.startsWith(Config.ExpectedVersion)) {
+  if (Config.CheckVersion && Config.ExpectedVersion && Version && !Version.startsWith(Config.ExpectedVersion)) {
     return {
       Success: true,
       Degraded: true,
@@ -171,7 +182,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const ExtraRows: Array<string | false | null | undefined> = [];
   if (Reachable) {
     ExtraRows.push(TextRow('Software', String(Result.MagicQVersion || 'Unknown')));
-    if (Config.ExpectedVersion) ExtraRows.push(TextRow('Expected', `${Config.ExpectedVersion}…`));
+    if (Config.CheckVersion && Config.ExpectedVersion) {
+      ExtraRows.push(TextRow('Expected', `${Config.ExpectedVersion}…`));
+    }
   }
 
   const Head = Rows([
@@ -188,7 +201,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   return Head;
 }
 
-export const Name = 'Console Health (ChamSys MagicQ)';
+export const Name = 'ChamSys MagicQ';
 export const Description =
   'Connects to a ChamSys MagicQ console (MQ series, MagicQ PC/Mac, MagicQ Go) over its built-in web server (HTTP, default TCP 8080) and confirms it responds as a MagicQ system, reading the software version where the page exposes it. Requires the MagicQ web server to be enabled (Setup → Network Settings).';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;

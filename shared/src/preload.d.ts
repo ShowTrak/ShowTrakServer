@@ -77,6 +77,8 @@ export interface ShowTrakAPI {
   OpenShowTrakWebsiteInBrowser(): Promise<unknown>;
   OpenShowTrakGithubInBrowser(): Promise<unknown>;
   OpenNpmPackageInBrowser(PackageName: string): Promise<unknown>;
+  /** Open an http(s) URL in the default browser. Non-http(s) URLs are ignored. */
+  OpenExternalUrl(URL: string): Promise<unknown>;
   GetProjectDependencies(): Promise<ResultTuple<{ dependencies?: unknown[] }>>;
   GetLicense(): Promise<ResultTuple<{ license?: string }>>;
   GetConfig(): Promise<AppConfig>;

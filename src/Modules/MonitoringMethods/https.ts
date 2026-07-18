@@ -7,7 +7,7 @@ import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } f
 const ID = 'https';
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'Port', Type: 'number', Default: 443, Min: 1, Max: 65535 },
+  { Key: 'Port', Label: 'Port', Type: 'number', Default: 443, Min: 1, Max: 65535, Required: true },
   { Key: 'Path', Label: 'Path', Type: 'string', Default: '/' },
   { Key: 'Method', Label: 'HTTP Method', Type: 'string', Default: 'GET' },
   {

@@ -66,7 +66,7 @@ test('MonitoringTarget aggregate reports multiple faults for mixed degraded/offl
       TargetID: 1,
       Name: 'QLab',
       Address: 'b.local',
-      Method: 'qlab-workspace',
+      Method: 'qlab5',
       Settings: '{}',
       DegradedThresholdMs: 1000,
       Weight: 100,

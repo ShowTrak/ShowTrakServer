@@ -30,15 +30,13 @@ export const MethodGroups: Record<string, string> = {
   'artnet-universe': 'Lighting',
   // Lighting consoles (ETC Eos, MA Lighting, Avolites, ChamSys)
   eos: 'Lighting',
-  'eos-show': 'Lighting',
   ma2: 'Lighting',
-  'ma2-show': 'Lighting',
   ma3: 'Lighting',
   avolites: 'Lighting',
-  'avolites-show': 'Lighting',
   chamsys: 'Lighting',
   // Sound (cue playback)
-  'qlab-workspace': 'Sound',
+  qlab5: 'Sound',
+  qlab4: 'Sound',
   // Video sources & media servers
   'ndi-source': 'Video',
   'watchout-status': 'Video',
@@ -47,24 +45,11 @@ export const MethodGroups: Record<string, string> = {
   'millumin-status': 'Video',
   // Video — digital signage players (BrightSign Local DWS)
   brightsign: 'Video',
-  'brightsign-firmware': 'Video',
-  'brightsign-power': 'Video',
-  'brightsign-poe': 'Video',
-  'brightsign-video': 'Video',
   // Video — projectors (PJLink cross-brand protocol + brand-profile SNMP)
   pjlink: 'Video',
-  'pjlink-power': 'Video',
-  'pjlink-lamp': 'Video',
-  'pjlink-errors': 'Video',
-  'pjlink-input': 'Video',
   'snmp-projector': 'Video',
   // Power / UPS (Network UPS Tools)
   'nut-ups': 'Power',
-  'nut-ups-status': 'Power',
-  'nut-ups-charge': 'Power',
-  'nut-ups-load': 'Power',
-  'nut-ups-temperature': 'Power',
-  'nut-ups-voltage': 'Power',
   // Power / UPS (direct SNMP, e.g. Eaton/MGE, Riello NetMan, APC, CyberPower)
   'snmp-ups': 'Power',
   'snmp-ups-v3': 'Power',

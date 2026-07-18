@@ -26,7 +26,7 @@
 import dgram from 'dgram';
 import { CreateLogger } from '../Logger';
 import { ARTNET_PORT } from '../Config/constants';
-import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
+import { Pill, Rows, TextRow, Row, Note, FormatLatency, Card } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const Logger = CreateLogger('Art-Net');
@@ -288,6 +288,7 @@ const Settings: MonitoringSettingField[] = [
     Default: 0,
     Min: MIN_UNIVERSE,
     Max: MAX_UNIVERSE,
+    Required: true,
   },
   {
     Key: 'Timeout',
@@ -430,15 +431,12 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
   const List = Sources.map((S) => {
     const IsTarget = AddressesEqual(S.Address, Address);
-    const RowCls = IsTarget ? 'border border-success' : 'border border-transparent';
-    return (
-      `<div class="bg-ghost rounded p-2 ${RowCls}">` +
-      '<div class="d-flex justify-content-between align-items-center gap-2">' +
-      `<span class="text-light small font-monospace text-break">${Esc(S.Address)}</span>` +
-      (IsTarget ? Pill('success', 'Target') : Pill('muted', 'Other')) +
-      '</div>' +
-      '</div>'
-    );
+    return Card({
+      Title: S.Address,
+      TitleClass: 'font-monospace',
+      Badge: IsTarget ? Pill('success', 'Target') : Pill('muted', 'Other'),
+      Highlight: IsTarget,
+    });
   }).join('');
 
   return (

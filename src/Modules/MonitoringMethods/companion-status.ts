@@ -25,7 +25,7 @@ import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } f
 const ID = 'companion-status';
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'Port', Type: 'number', Default: 8000, Min: 1, Max: 65535 },
+  { Key: 'Port', Label: 'Port', Type: 'number', Default: 8000, Min: 1, Max: 65535, Required: true },
   // Path defaults to the web admin root, which is always served with no operator
   // configuration. Kept behind Advanced so the default editor experience is
   // Address-only; operators who have enabled Companion's HTTP API can still point

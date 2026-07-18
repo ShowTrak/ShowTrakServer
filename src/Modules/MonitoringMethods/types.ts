@@ -14,15 +14,39 @@ export interface MonitoringTargetLike {
   Settings?: Record<string, unknown>;
 }
 
+// Conditional visibility for a setting field. The field only renders (and is only
+// collected) when the sibling field named by Key currently equals Equals. Used to
+// gate attribute-specific thresholds behind an "enable this check" toggle.
+export interface MonitoringSettingVisibleWhen {
+  Key: string;
+  Equals: unknown;
+}
+
 export interface MonitoringSettingField {
   Key: string;
   Label: string;
+  // 'string' (default) | 'number' | 'boolean' | 'select' | 'list'. A 'list' field
+  // collects multiple values as a string[] (chip/tag input) — see ItemType.
   Type: string;
   Default?: unknown;
   Min?: number;
   Max?: number;
   Options?: Array<string | { value: string; label?: string }>;
+  // For Type 'list': hints how each entry is validated/coerced. 'number' keeps only
+  // entries that parse as finite numbers; 'string' (default) trims and keeps text.
+  ItemType?: 'string' | 'number';
   Advanced?: boolean;
+  // Marks a setting the check cannot run without. The editor appends a red
+  // asterisk to the label. Purely a display hint — server-side validation in the
+  // method's Run() remains the source of truth.
+  Required?: boolean;
+  // Optional per-input hint. Rendered as a hover popover on a small info icon to
+  // the right of the input — keep it to a sentence or two. Escaped before display.
+  Note?: string;
+  // When set, the field is shown only while the referenced sibling setting equals
+  // the given value. Its value is still retained while hidden so toggling the
+  // controlling field back on restores it.
+  VisibleWhen?: MonitoringSettingVisibleWhen;
   [key: string]: unknown;
 }
 
@@ -32,7 +56,9 @@ export interface MonitoringSettingField {
 export interface MonitoringMethodInfo {
   Summary: string;
   Setup?: string[];
-  Docs?: Array<{ Label: string; Url: string }>;
+  // External references (protocol specs, vendor docs, API references). Rendered
+  // as buttons at the bottom of the info panel that open in the default browser.
+  Links?: Array<{ Label: string; Url: string }>;
 }
 
 export interface MonitoringMethod {

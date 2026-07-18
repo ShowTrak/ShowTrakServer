@@ -181,19 +181,6 @@ test('tcp-port handles a synchronous throw from Socket.connect', async () => {
 
 // --- qlab debug branches -----------------------------------------------------
 
-test('qlab Debug renders the unreachable and not-found branches', () => {
-  const qlab = loadWithMocks(methodPath('qlab-workspace.js'), {});
-  const target = { Address: '10.0.0.5', Settings: { Port: 53000, Workspace: 'Main Show' } };
-
-  const unreachable = qlab.Debug({ Success: false, Error: 'No reply from QLab' }, target);
-  assert.match(unreachable, /No reply/);
-  assert.match(unreachable, /Could not reach QLab/);
-
-  const notFound = qlab.Debug({ Success: true, Matched: false, Workspaces: [] }, target);
-  assert.match(notFound, /Not found/);
-  assert.match(notFound, /QLab reported no open workspaces/);
-});
-
 // --- registry (index.ts) branches -------------------------------------------
 
 test('registry NormalizeSettings handles select and boolean field types', () => {
@@ -211,6 +198,34 @@ test('registry NormalizeSettings handles select and boolean field types', () => 
 
   // A valid select value is preserved.
   assert.equal(Manager.NormalizeSettings('http', { Protocol: 'http' }).Protocol, 'http');
+});
+
+test("registry NormalizeSettings coerces the 'list' field type (trim, drop empties, dedupe)", () => {
+  const { Manager } = loadWithMocks(methodPath('index.js'), { '../Logger': loggerStub() });
+
+  // qlab5's RunningCues is a Type:'list' field (ItemType 'string').
+  const normalized = Manager.NormalizeSettings('qlab5', {
+    Port: 53000,
+    Workspace: 'Hamlet',
+    RunningCues: [' 1 ', '1', 2, '', '  ', 'q10'],
+  });
+  // Trimmed, de-duplicated, empties removed; numbers stringified.
+  assert.deepEqual(normalized.RunningCues, ['1', '2', 'q10']);
+
+  // A missing list falls back to the schema default (empty array).
+  const missing = Manager.NormalizeSettings('qlab5', {
+    Port: 53000,
+    Workspace: 'Hamlet',
+  });
+  assert.deepEqual(missing.RunningCues, []);
+
+  // A single scalar is accepted and wrapped into a one-element list.
+  const scalar = Manager.NormalizeSettings('qlab5', {
+    Port: 53000,
+    Workspace: 'Hamlet',
+    RunningCues: 'solo',
+  });
+  assert.deepEqual(scalar.RunningCues, ['solo']);
 });
 
 test('registry Run returns a failure result when the method throws', async () => {
@@ -231,10 +246,12 @@ test('registry Run returns a failure result when the method throws', async () =>
   assert.equal(result.Success, false);
   assert.match(result.Error, /method exploded/);
 
-  // Unknown method id -> descriptive failure.
+  // Unknown method id -> Degraded (not Offline) so a stale saved check alerts the
+  // operator to fix it rather than silently reading as an outage.
   const unknown = await Manager.Run('nope', { Address: 'x' });
-  assert.equal(unknown.Success, false);
-  assert.match(unknown.Error, /Unknown monitoring method/);
+  assert.equal(unknown.Success, true);
+  assert.equal(unknown.Degraded, true);
+  assert.match(unknown.DegradedReason, /Unknown method/);
 });
 
 test('registry BuildDebug swallows a throwing Debug renderer and returns null', () => {

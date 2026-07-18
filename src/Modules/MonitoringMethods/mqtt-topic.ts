@@ -30,12 +30,14 @@ const MAX_TIMEOUT_MS = 60000;
 const MAX_PAYLOAD_CHARS = 256;
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'Port', Type: 'number', Default: DEFAULT_PORT, Min: 1, Max: 65535 },
+  { Key: 'Port', Label: 'Port', Type: 'number', Default: DEFAULT_PORT, Min: 1, Max: 65535, Required: true },
   {
     Key: 'Topic',
-    Label: 'Topic filter (supports + and /# wildcards)',
+    Label: 'Topic filter',
     Type: 'string',
     Default: '',
+    Required: true,
+    Note: 'MQTT wildcards are supported: + matches one level, /# matches the rest.',
   },
   {
     Key: 'Protocol',
@@ -47,21 +49,29 @@ const Settings: MonitoringSettingField[] = [
       { value: 'mqtts', label: 'mqtts (TLS)' },
     ],
   },
-  { Key: 'Username', Label: 'Username', Type: 'string', Default: '' },
+  {
+    Key: 'Username',
+    Label: 'Username',
+    Type: 'string',
+    Default: '',
+    Note: 'Only needed if the broker requires authentication.',
+  },
   { Key: 'Password', Label: 'Password', Type: 'string', Default: '', Advanced: true },
   {
     Key: 'ExpectedPayload',
-    Label: 'Expected payload contains (optional)',
+    Label: 'Expected payload contains',
     Type: 'string',
     Default: '',
     Advanced: true,
+    Note: 'Degraded when the received payload does not contain this substring. Leave blank to accept any payload.',
   },
   {
     Key: 'IgnoreTlsErrors',
-    Label: 'Ignore TLS certificate errors (mqtts only)',
+    Label: 'Ignore TLS certificate errors',
     Type: 'boolean',
     Default: false,
     Advanced: true,
+    Note: 'Applies to mqtts connections only.',
   },
   {
     Key: 'Timeout',

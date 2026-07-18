@@ -1,8 +1,10 @@
-// Combined projector health over PJLink: one connection reads power state,
-// error status (ERST), lamp hours and active input, and reports a single
-// healthy / degraded verdict. Protocol client, snapshot cache and shared
-// semantics live in ./_pjlink-shared — this file only judges the combined
-// result and renders its debug panel.
+// Projector health over PJLink: one connection reads power state, error status
+// (ERST), lamp hours and active input. Reachability and protocol-level device
+// failures (ERR3 busy / ERR4 failure) are always evaluated; the power-state,
+// error-status, lamp-hours and input factors are opt-in via their toggles (all
+// off by default), so a fresh check is a plain reachability probe until you
+// enable the readings you care about. Protocol client, snapshot cache and shared
+// semantics live in ./_pjlink-shared.
 import {
   CommonPJLinkSettings,
   ParsePJLinkConfig,
@@ -28,61 +30,104 @@ const ID = 'pjlink';
 const Settings: MonitoringSettingField[] = [
   ...CommonPJLinkSettings,
   {
-    Key: 'TreatStandbyAs',
-    Label: 'When in standby / cooling',
-    Type: 'select',
-    Default: 'degraded',
-    Options: [
-      { value: 'degraded', label: 'Report Degraded' },
-      { value: 'ok', label: 'Report Online' },
-    ],
-    Advanced: true,
+    Key: 'CheckPower',
+    Label: 'Check power state',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Enable to report Degraded when the projector is not in the expected power state.',
   },
   {
-    Key: 'LampWarnHours',
-    Label: 'Lamp hours warning threshold (0 = off)',
-    Type: 'number',
-    Default: 0,
-    Min: 0,
-    Max: 100000,
-    Advanced: true,
+    Key: 'ExpectedPower',
+    Label: 'Expected power state',
+    Type: 'select',
+    Default: 'on-or-warmup',
+    Options: [
+      { value: 'on', label: 'On' },
+      { value: 'on-or-warmup', label: 'On or warming up' },
+      { value: 'any', label: 'Any (just reachable)' },
+    ],
+    VisibleWhen: { Key: 'CheckPower', Equals: true },
+    Note: 'Standby and cooling report Degraded unless set to Any.',
+  },
+  {
+    Key: 'CheckErrors',
+    Label: 'Check error status',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Enable to report Degraded on the PJLink error status (fan, lamp, temperature, cover, filter, other).',
   },
   {
     Key: 'WarningsDegrade',
     Label: 'Treat warnings as Degraded',
     Type: 'boolean',
     Default: false,
-    Advanced: true,
+    VisibleWhen: { Key: 'CheckErrors', Equals: true },
+    Note: 'When off, only errors degrade. When on, warnings such as a dirty filter degrade too.',
+  },
+  {
+    Key: 'CheckLamp',
+    Label: 'Check lamp hours',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Enable to report Degraded when a lamp reaches the warning threshold. Laser models without lamps are handled automatically.',
+  },
+  {
+    Key: 'LampWarnHours',
+    Label: 'Lamp hours warning threshold',
+    Type: 'number',
+    Default: 0,
+    Min: 0,
+    Max: 100000,
+    VisibleWhen: { Key: 'CheckLamp', Equals: true },
+    Note: "Degraded once any lamp reaches this many hours. Set to the lamp's rated life.",
+  },
+  {
+    Key: 'CheckInput',
+    Label: 'Check active input',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Enable to report Degraded when the active input is not the expected one (only while the projector is on).',
   },
   {
     Key: 'ExpectedInput',
-    Label: 'Expected input code (blank = any, e.g. 31)',
+    Label: 'Expected input code',
     Type: 'string',
     Default: '',
-    Advanced: true,
+    VisibleWhen: { Key: 'CheckInput', Equals: true },
+    Note: 'Two characters: source type (1 RGB, 2 Video, 3 Digital, 4 Storage, 5 Network) + input number, e.g. 31.',
   },
 ];
 
 interface HealthOptions {
-  TreatStandbyAs: 'degraded' | 'ok';
-  LampWarnHours: number;
+  CheckPower: boolean;
+  ExpectedPower: 'on' | 'on-or-warmup' | 'any';
+  CheckErrors: boolean;
   WarningsDegrade: boolean;
+  CheckLamp: boolean;
+  LampWarnHours: number;
+  CheckInput: boolean;
   ExpectedInput: string;
 }
 
 function ParseHealthOptions(Target: MonitoringTargetLike): HealthOptions {
   const Cfg = (Target && Target.Settings) || {};
   const WarnHours = Number(Cfg.LampWarnHours);
+  const ExpectedPower = String(Cfg.ExpectedPower);
   return {
-    TreatStandbyAs: String(Cfg.TreatStandbyAs) === 'ok' ? 'ok' : 'degraded',
-    LampWarnHours: Number.isFinite(WarnHours) ? Math.max(0, WarnHours | 0) : 0,
+    CheckPower: !!Cfg.CheckPower,
+    ExpectedPower: ExpectedPower === 'on' || ExpectedPower === 'any' ? ExpectedPower : 'on-or-warmup',
+    CheckErrors: !!Cfg.CheckErrors,
     WarningsDegrade: !!Cfg.WarningsDegrade,
+    CheckLamp: !!Cfg.CheckLamp,
+    LampWarnHours: Number.isFinite(WarnHours) ? Math.max(0, WarnHours | 0) : 0,
+    CheckInput: !!Cfg.CheckInput,
     ExpectedInput: NormalizeInputCode(Cfg.ExpectedInput),
   };
 }
 
-// All the reasons a reachable projector is unhealthy, per the combined-health
-// semantics. Pure — exported via _internal for unit tests.
+// All the reasons a reachable projector is unhealthy. Reachability-level device
+// failures are always reported; every other factor is gated by its toggle. Pure
+// — exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: PJLinkSnapshot, Options: HealthOptions): string[] {
   const Reasons: string[] = [];
 
@@ -97,20 +142,22 @@ function EvaluateHealth(Snapshot: PJLinkSnapshot, Options: HealthOptions): strin
     Reasons.push('Projector failure (ERR4)');
   }
 
-  if (
-    Options.TreatStandbyAs === 'degraded' &&
-    (Snapshot.Power === 0 || Snapshot.Power === 2)
-  ) {
-    Reasons.push(Snapshot.Power === 0 ? 'In standby' : 'Cooling down');
+  // Power state (opt-in). 'any' means reachable is enough; 'on' accepts only On;
+  // 'on-or-warmup' also accepts warm-up — so standby and cooling degrade.
+  if (Options.CheckPower && Options.ExpectedPower !== 'any' && Snapshot.Power != null) {
+    const Accepted = Options.ExpectedPower === 'on' ? [1] : [1, 3];
+    if (!Accepted.includes(Snapshot.Power)) {
+      Reasons.push(`Power: ${PowerLabel(Snapshot.Power)} (expected On)`);
+    }
   }
 
-  // ERST errors always degrade; warnings only when configured. ERR1/ERR3 on
-  // ERST (unsupported / busy) are ignored here.
-  if (Snapshot.Erst) {
+  // ERST errors degrade; warnings only when configured. ERR1/ERR3 on ERST
+  // (unsupported / busy) are ignored.
+  if (Options.CheckErrors && Snapshot.Erst) {
     Reasons.push(...ErstReasons(Snapshot.Erst, Options.WarningsDegrade));
   }
 
-  if (Options.LampWarnHours > 0 && Array.isArray(Snapshot.Lamps)) {
+  if (Options.CheckLamp && Options.LampWarnHours > 0 && Array.isArray(Snapshot.Lamps)) {
     Snapshot.Lamps.forEach((Lamp, Index) => {
       if (Lamp.Hours >= Options.LampWarnHours) {
         Reasons.push(`Lamp ${Index + 1}: ${Lamp.Hours} h ≥ ${Options.LampWarnHours} h`);
@@ -120,6 +167,7 @@ function EvaluateHealth(Snapshot: PJLinkSnapshot, Options: HealthOptions): strin
 
   // Input is only meaningful while the projector is on.
   if (
+    Options.CheckInput &&
     Options.ExpectedInput &&
     Snapshot.Power === 1 &&
     Snapshot.Input &&

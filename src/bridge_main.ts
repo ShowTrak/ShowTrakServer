@@ -27,6 +27,7 @@ const INVOKE_CHANNEL_LIST = [
   'OpenShowTrakWebsiteInBrowser',
   'OpenShowTrakGithubInBrowser',
   'OpenNpmPackageInBrowser',
+  'OpenExternalUrl',
   'GetProjectDependencies',
   'GetLicense',
   'Config:Get',
@@ -214,6 +215,7 @@ const API: ShowTrakAPI = {
   OpenShowTrakGithubInBrowser: async () => invoke('OpenShowTrakGithubInBrowser'),
   OpenNpmPackageInBrowser: async (PackageName) =>
     invoke('OpenNpmPackageInBrowser', PackageName),
+  OpenExternalUrl: async (URL) => invoke('OpenExternalUrl', URL),
   GetProjectDependencies: async () => invoke('GetProjectDependencies'),
   GetLicense: async () => invoke('GetLicense'),
   GetConfig: async () => invoke('Config:Get'),

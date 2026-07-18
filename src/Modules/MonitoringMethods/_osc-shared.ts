@@ -9,9 +9,8 @@
 // framings on the main port depending on the console's "OSC TCP Mode" setting —
 // so the encode/decode here is framing-parameterised rather than hard-coded.
 //
-// This intentionally duplicates the tiny inline OSC helpers in qlab-workspace.ts
-// rather than refactoring that proven file; the console family needs typed
-// argument encoding and length-prefix framing that the QLab check never did.
+// The QLab check (via _qlab-shared) uses this same codec with SLIP framing; the
+// console family additionally needs the OSC 1.0 length-prefix framing below.
 
 // --- SLIP (RFC 1055) framing ------------------------------------------------
 

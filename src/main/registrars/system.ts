@@ -115,6 +115,27 @@ function register(): void {
     return;
   });
 
+  // Open an arbitrary external URL supplied by the renderer (e.g. a monitoring
+  // method's documentation link). Restricted to http/https so a crafted value
+  // can never launch a file:// path or a custom protocol handler.
+  RPC.handle('OpenExternalUrl', async (_event: unknown, URL: unknown) => {
+    const Raw = String(URL || '').trim();
+    if (!Raw) return;
+    let Parsed;
+    try {
+      Parsed = new (require('url').URL)(Raw);
+    } catch {
+      Logger.warn(`Refusing to open malformed external URL: ${Raw}`);
+      return;
+    }
+    if (Parsed.protocol !== 'http:' && Parsed.protocol !== 'https:') {
+      Logger.warn(`Refusing to open non-http(s) external URL: ${Raw}`);
+      return;
+    }
+    await shell.openExternal(Parsed.href);
+    return;
+  });
+
   RPC.handle('OpenNpmPackageInBrowser', async (_event: unknown, PackageName: unknown) => {
     const Name = String(PackageName || '').trim();
     if (!Name) return;

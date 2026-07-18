@@ -32,12 +32,14 @@ export const CommonMa2Settings: MonitoringSettingField[] = [
     Default: DEFAULT_MA2_PORT,
     Min: 1,
     Max: 65535,
+    Required: true,
   },
   {
     Key: 'User',
-    Label: 'Login user (blank = liveness only, no login)',
+    Label: 'Login user',
     Type: 'string',
     Default: '',
+    Note: 'Leave blank for a read-only liveness check with no login. Set a user and password to read software and show details.',
   },
   {
     Key: 'Password',

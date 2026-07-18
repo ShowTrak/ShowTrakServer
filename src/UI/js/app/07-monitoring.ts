@@ -85,7 +85,8 @@ export function FormatMonitoringCheckSummary(T: MonitoringTargetView, MaxLength 
     'http-json': 'HTTP',
     'tcp-port': 'TCP',
     qlab: 'QLAB',
-    'qlab-workspace': 'QLAB',
+    qlab5: 'QLAB5',
+    qlab4: 'QLAB4',
   };
 
   for (const Check of Checks) {

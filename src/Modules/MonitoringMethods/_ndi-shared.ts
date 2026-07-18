@@ -31,7 +31,7 @@
 // method registry) has NO side effects.
 import { CreateLogger } from '../Logger';
 import { CreateBonjourErrorHandler } from '../NetworkErrors';
-import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
+import { Pill, Rows, TextRow, Row, Note, FormatLatency, Card } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const Logger = CreateLogger('NDI');
@@ -394,6 +394,8 @@ export const Settings: MonitoringSettingField[] = [
     Label: 'NDI source name',
     Type: 'string',
     Default: '',
+    Required: true,
+    Note: 'The name or a substring to match. NDI source names take the form "MACHINE (Source Name)".',
   },
   {
     Key: 'MatchMode',
@@ -404,6 +406,7 @@ export const Settings: MonitoringSettingField[] = [
       { value: 'contains', label: 'Contains' },
       { value: 'exact', label: 'Exact' },
     ],
+    Note: 'Contains matches any source name that includes the text; Exact requires the full name.',
   },
   {
     Key: 'GracePeriodMs',
@@ -413,6 +416,7 @@ export const Settings: MonitoringSettingField[] = [
     Min: MIN_GRACE_PERIOD_MS,
     Max: MAX_GRACE_PERIOD_MS,
     Advanced: true,
+    Note: 'How long a source may go unseen before the check reports Offline.',
   },
 ];
 
@@ -520,15 +524,11 @@ export function BuildNdiDebug(Result: MonitoringResult, Target: MonitoringTarget
 
   const List = Sources.map((S) => {
     const IsMatch = MatchedName ? S.Name === MatchedName : MatchesSource(S.Name, SourceName, MatchMode);
-    const RowCls = IsMatch ? 'border border-success' : 'border border-transparent';
-    return (
-      `<div class="bg-ghost rounded p-2 ${RowCls}">` +
-      '<div class="d-flex justify-content-between align-items-center gap-2">' +
-      `<span class="text-light small text-break">${Esc(S.Name)}</span>` +
-      (IsMatch ? Pill('success', 'Match') : '') +
-      '</div>' +
-      '</div>'
-    );
+    return Card({
+      Title: S.Name,
+      Badge: IsMatch ? Pill('success', 'Match') : null,
+      Highlight: IsMatch,
+    });
   }).join('');
 
   return (

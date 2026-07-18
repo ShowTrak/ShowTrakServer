@@ -66,8 +66,8 @@ function CustomFields(N: number): MonitoringSettingField[] {
 }
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'Port', Type: 'number', Default: DEFAULT_PORT, Min: 1, Max: 65535 },
-  { Key: 'Community', Label: 'Community string', Type: 'string', Default: 'public' },
+  { Key: 'Port', Label: 'Port', Type: 'number', Default: DEFAULT_PORT, Min: 1, Max: 65535, Required: true },
+  { Key: 'Community', Label: 'Community string', Type: 'string', Default: 'public', Required: true },
   {
     Key: 'Profile',
     Label: 'Brand profile',

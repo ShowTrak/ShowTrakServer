@@ -16,6 +16,7 @@ const Settings: MonitoringSettingField[] = [
     Default: 80,
     Min: 1,
     Max: 65535,
+    Required: true,
   },
   {
     Key: 'Timeout',

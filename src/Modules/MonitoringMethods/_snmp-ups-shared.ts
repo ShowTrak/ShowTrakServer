@@ -64,6 +64,12 @@ export interface HealthThresholds {
   MinCharge: number;
   MaxLoad: number;
   MaxTemperature: number;
+  // Per-factor enable flags. Absent (undefined) counts as enabled so a bare
+  // thresholds object — and checks saved before the toggles existed — keep
+  // evaluating every factor.
+  CheckCharge?: boolean;
+  CheckLoad?: boolean;
+  CheckTemperature?: boolean;
 }
 
 // Evaluate the readings against the thresholds and return the list of failing
@@ -83,13 +89,17 @@ export function EvaluateHealth(Readings: HealthReadings, T: HealthThresholds): s
   if (Readings.AlarmsPresent != null && Readings.AlarmsPresent > 0) {
     Reasons.push(`${Readings.AlarmsPresent} active alarm${Readings.AlarmsPresent === 1 ? '' : 's'}`);
   }
-  if (Readings.Charge != null && Readings.Charge < T.MinCharge) {
+  if (T.CheckCharge !== false && Readings.Charge != null && Readings.Charge < T.MinCharge) {
     Reasons.push(`Charge ${Readings.Charge}% < ${T.MinCharge}%`);
   }
-  if (Readings.Load != null && Readings.Load > T.MaxLoad) {
+  if (T.CheckLoad !== false && Readings.Load != null && Readings.Load > T.MaxLoad) {
     Reasons.push(`Load ${Readings.Load}% > ${T.MaxLoad}%`);
   }
-  if (Readings.Temperature != null && Readings.Temperature > T.MaxTemperature) {
+  if (
+    T.CheckTemperature !== false &&
+    Readings.Temperature != null &&
+    Readings.Temperature > T.MaxTemperature
+  ) {
     Reasons.push(`Temp ${Readings.Temperature}°C > ${T.MaxTemperature}°C`);
   }
   return Reasons;
@@ -254,6 +264,9 @@ export function ParseThresholds(Cfg: Record<string, unknown>): HealthThresholds 
     MinCharge: Math.max(0, Math.min(100, Num(Cfg.MinCharge, HEALTH_DEFAULTS.MinCharge))),
     MaxLoad: Positive(Cfg.MaxLoad, HEALTH_DEFAULTS.MaxLoad),
     MaxTemperature: Positive(Cfg.MaxTemperature, HEALTH_DEFAULTS.MaxTemperature),
+    CheckCharge: Cfg.CheckCharge !== false,
+    CheckLoad: Cfg.CheckLoad !== false,
+    CheckTemperature: Cfg.CheckTemperature !== false,
   };
 }
 

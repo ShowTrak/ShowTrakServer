@@ -50,6 +50,41 @@ export function Note(Text: unknown): string {
   return `<div class="text-muted small fst-italic">${Esc(Text)}</div>`;
 }
 
+export interface CardOptions {
+  // The card's left-hand title. Escaped for you.
+  Title: unknown;
+  // Extra class(es) appended to the title span (e.g. 'font-monospace').
+  TitleClass?: string;
+  // Pre-built badge/pill HTML shown at the card's right edge (already safe).
+  Badge?: string | null;
+  // Pre-built HTML placed beneath the header row (already safe — escape your own
+  // untrusted values before passing them in).
+  BodyHtml?: string;
+  // Marks the matched/primary item with a subtle success-tinted background. Status
+  // is otherwise conveyed by the badge — never a border or a fully-coloured card.
+  Highlight?: boolean;
+}
+
+// A single card in the "last response" debug panels: a borderless, background-shaded
+// row with a title on the left, an optional status badge on the right, and optional
+// body content beneath. Fail/error states are conveyed by the badge colour, not by
+// tinting the whole card; only a positive match gets the subtle Highlight tint. This
+// keeps every method's debug panel consistent with the app's borderless, background-
+// shade theme (see .monitoring-debug-card in 05-monitoring.css).
+export function Card(Options: CardOptions): string {
+  const Cls = 'monitoring-debug-card' + (Options.Highlight ? ' monitoring-debug-card--match' : '');
+  const TitleCls = 'text-light small text-break' + (Options.TitleClass ? ` ${Options.TitleClass}` : '');
+  return (
+    `<div class="${Cls}">` +
+    '<div class="d-flex justify-content-between align-items-center gap-2">' +
+    `<span class="${TitleCls}">${Esc(Options.Title)}</span>` +
+    (Options.Badge || '') +
+    '</div>' +
+    (Options.BodyHtml || '') +
+    '</div>'
+  );
+}
+
 export function FormatLatency(Ms: unknown): string {
   const N = Number(Ms);
   if (!Number.isFinite(N)) return '—';

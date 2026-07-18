@@ -93,6 +93,11 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
       window.open('https://github.com/ShowTrak', '_blank'),
     OpenNpmPackageInBrowser: async (PackageName) =>
       window.open(`https://www.npmjs.com/package/${PackageName}`, '_blank'),
+    OpenExternalUrl: async (URL) => {
+      const Raw = String(URL || '').trim();
+      if (/^https?:\/\//i.test(Raw)) window.open(Raw, '_blank', 'noopener');
+      return undefined;
+    },
     GetProjectDependencies: nullTuple,
     GetLicense: nullTuple,
     GetConfig: async () => rpc('Config:Get'),

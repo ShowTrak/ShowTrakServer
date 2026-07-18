@@ -157,7 +157,7 @@ test('a missing address fails before any request is made', async () => {
 test('firmware drift degrades the player', async () => {
   const dws = makeBrightSignDws({ auth: CREDS, routes: { [INFO_PATH]: INFO_HEALTHY } });
   const bs = loadBs(dws);
-  const result = await bs.Run(target({ ExpectedFirmware: '9.0.218' }));
+  const result = await bs.Run(target({ CheckFirmware: true, ExpectedFirmware: '9.0.218' }));
 
   assert.equal(result.Success, true, 'the player is reachable, so it stays online');
   assert.equal(result.Degraded, true);
@@ -171,7 +171,7 @@ test('running on battery degrades the player', async () => {
   };
   const dws = makeBrightSignDws({ auth: CREDS, routes: { [INFO_PATH]: onBattery } });
   const bs = loadBs(dws);
-  const result = await bs.Run(target());
+  const result = await bs.Run(target({ CheckPower: true }));
 
   assert.equal(result.Success, true);
   assert.equal(result.Degraded, true);
@@ -259,7 +259,7 @@ test('EvaluateHealth collects every failing factor at once', () => {
         Errors: [],
       },
     },
-    '9.0.218'
+    { CheckFirmware: true, ExpectedFirmware: '9.0.218', CheckPower: true }
   );
 
   assert.equal(reasons.length, 4);
@@ -269,10 +269,32 @@ test('EvaluateHealth collects every failing factor at once', () => {
   assert.match(reasons.join('; '), /unstable/);
 });
 
-test('EvaluateHealth skips fields the player did not report', () => {
+test('EvaluateHealth only judges enabled factors', () => {
   const bs = loadBs(makeBrightSignDws({}));
+  // Toggles off -> nothing judged even when readings would fail.
   assert.deepEqual(
-    bs._internal.EvaluateHealth({ Firmware: null, PowerSource: null, Battery: null }, ''),
+    bs._internal.EvaluateHealth(
+      {
+        Firmware: '8.5.33',
+        PowerSource: 'battery',
+        Battery: 'discharging',
+        PoeStatus: 'not_supported',
+      },
+      {}
+    ),
+    []
+  );
+  // PoE toggle on -> not_supported degrades.
+  assert.match(
+    bs._internal.EvaluateHealth({ PoeStatus: 'not_supported' }, { CheckPoe: true })[0],
+    /not supported/i
+  );
+  // Enabled factors with nothing to report stay clean.
+  assert.deepEqual(
+    bs._internal.EvaluateHealth(
+      { Firmware: null, PowerSource: null, Battery: null },
+      { CheckFirmware: true, CheckPower: true }
+    ),
     []
   );
 });

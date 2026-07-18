@@ -60,7 +60,7 @@ test('avolites health degrades on an unexpected version', async () => {
   try {
     const result = await av.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Timeout: 1500, ExpectedVersion: '17' },
+      Settings: { Port: server.port, Timeout: 1500, CheckVersion: true, ExpectedVersion: '17' },
     });
     assert.equal(result.Success, true);
     assert.equal(result.Degraded, true);
@@ -80,21 +80,25 @@ test('avolites is offline (with an enable hint) when the WebAPI port is refused'
   assert.match(String(result.Error), /WebAPI/i);
 });
 
-test('avolites-show confirms the expected show and degrades on a mismatch', async () => {
-  const avShow = loadWithMocks(methodPath('avolites-show.js'), {});
-  assert.equal(avShow.ID, 'avolites-show');
+test('avolites CheckShow confirms the expected show and degrades on a mismatch', async () => {
+  const av = loadWithMocks(methodPath('avolites.js'), {});
   const server = await startTitanServer({ show: 'Panto 2026' });
   try {
-    const ok = await avShow.Run({
+    const ok = await av.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Timeout: 1500, ExpectedShow: 'Panto 2026' },
+      Settings: { Port: server.port, Timeout: 1500, CheckShow: true, ExpectedShow: 'Panto 2026' },
     });
     assert.equal(ok.Success, true);
     assert.ok(!ok.Degraded);
 
-    const wrong = await avShow.Run({
+    const wrong = await av.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Timeout: 1500, ExpectedShow: 'Different Show' },
+      Settings: {
+        Port: server.port,
+        Timeout: 1500,
+        CheckShow: true,
+        ExpectedShow: 'Different Show',
+      },
     });
     assert.equal(wrong.Success, true);
     assert.equal(wrong.Degraded, true);

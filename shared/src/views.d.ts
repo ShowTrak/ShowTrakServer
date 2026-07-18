@@ -343,21 +343,37 @@ export interface ScriptExecutionView {
 
 // ---- Monitoring -----------------------------------------------------------
 
+/** Conditional visibility: field shows only while sibling `Key` equals `Equals`. */
+export interface MonitoringSettingVisibleWhen {
+  Key: string;
+  Equals: unknown;
+}
+
 export interface MonitoringSettingField {
   Key: string;
   Label: string;
+  /** 'string' (default) | 'number' | 'boolean' | 'select' | 'list'. */
   Type: string;
   Default?: unknown;
   Min?: number;
   Max?: number;
   Options?: Array<string | { value: string; label?: string }>;
+  /** For Type 'list': how each entry is validated/coerced ('string' | 'number'). */
+  ItemType?: 'string' | 'number';
   Advanced?: boolean;
+  /** Marks a setting the check cannot run without; the editor shows a red asterisk. */
+  Required?: boolean;
+  /** Per-input hint shown as a hover popover on an info icon beside the input. */
+  Note?: string;
+  /** When set, the field renders only while the referenced sibling setting equals the value. */
+  VisibleWhen?: MonitoringSettingVisibleWhen;
 }
 
 export interface MonitoringMethodInfo {
   Summary: string;
   Setup?: string[];
-  Docs?: Array<{ Label: string; Url: string }>;
+  /** External references rendered as browser-opening buttons at the panel's foot. */
+  Links?: Array<{ Label: string; Url: string }>;
 }
 
 export interface MonitoringMethodView {

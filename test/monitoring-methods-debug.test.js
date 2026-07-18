@@ -79,26 +79,20 @@ test('http-json Debug reports the resolved JSON value', () => {
   assert.match(html, />ok</);
 });
 
-test('qlab Debug renders a row per workspace with name, id and passcode, escaping names', () => {
-  const qlab = load('qlab-workspace.js');
+test('qlab Debug renders per-sub-check rows and escapes untrusted values', () => {
+  const qlab = load('qlab5.js');
   const html = qlab.Debug(
     {
       Success: true,
-      LatencyMs: 15,
-      Matched: true,
-      Wanted: 'Main Show',
-      Workspaces: [
-        { uniqueID: 'ABC-123', displayName: 'Main Show', hasPasscode: true },
-        { uniqueID: 'DEF-456', displayName: '<script>bad</script>', hasPasscode: false },
-      ],
+      Degraded: true,
+      DegradedReason: 'x',
+      WorkspaceName: '<script>bad</script>',
+      SubChecks: [{ Key: 'name', Label: 'Workspace name', Ok: false, Detail: 'nope' }],
     },
     { Address: '10.0.0.5', Settings: { Port: 53000, Workspace: 'Main Show' } }
   );
-  assert.match(html, /Main Show/);
-  assert.match(html, /ABC-123/);
-  assert.match(html, /DEF-456/);
-  assert.match(html, /Passcode/);
-  assert.match(html, /No passcode/);
+  assert.match(html, /Workspace name/);
+  assert.match(html, /Degraded/);
   // Untrusted workspace name is escaped.
   assert.doesNotMatch(html, /<script>bad<\/script>/);
   assert.match(html, /&lt;script&gt;bad/);
@@ -125,13 +119,13 @@ function normalKeys(method) {
     .sort();
 }
 
-test('ping / tcp-port / qlab mark Timeout as an advanced setting', () => {
+test('ping / tcp-port mark Timeout as an advanced setting; qlab keeps Passcode advanced', () => {
   assert.deepEqual(advancedKeys(load('ping.js')), ['Timeout']);
   assert.deepEqual(advancedKeys(load('tcp-port.js')), ['Timeout']);
-  assert.deepEqual(advancedKeys(load('qlab-workspace.js')), ['Timeout']);
+  assert.deepEqual(advancedKeys(load('qlab5.js')), ['Passcode']);
   // Core fields stay inline.
   assert.ok(normalKeys(load('tcp-port.js')).includes('Port'));
-  assert.ok(normalKeys(load('qlab-workspace.js')).includes('Workspace'));
+  assert.ok(normalKeys(load('qlab5.js')).includes('Workspace'));
 });
 
 test('dns marks record type, resolver port and timeout advanced but keeps resolver + expected value inline', () => {

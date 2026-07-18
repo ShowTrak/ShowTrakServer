@@ -39,12 +39,14 @@ export const CommonPJLinkSettings: MonitoringSettingField[] = [
     Default: DEFAULT_PJLINK_PORT,
     Min: 1,
     Max: 65535,
+    Required: true,
   },
   {
     Key: 'Password',
-    Label: 'PJLink password (blank if authentication is off)',
+    Label: 'PJLink password',
     Type: 'string',
     Default: '',
+    Note: 'Enter the projector\'s PJLink password. Leave blank when authentication is off.',
   },
   {
     Key: 'Timeout',

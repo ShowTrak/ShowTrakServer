@@ -1,4 +1,4 @@
-import { AppMode, ClientInfoOpenUUID, Config, DummyClients, FormatClientHostnameVersionLabel, GroupUUIDCache, MonitoringTargets, PendingAdoption, Selected, Settings, __LastClients, __LastGroups, setAllClients, setPendingAdoption, setScriptList, set__LastClients, set__LastGroups } from './01-state';
+import { AppMode, ClientInfoOpenUUID, Config, DummyClients, FormatClientHostnameVersionLabel, GroupSelectableUUIDCache, GroupUUIDCache, MonitoringTargets, PendingAdoption, Selected, Settings, __LastClients, __LastGroups, setAllClients, setPendingAdoption, setScriptList, set__LastClients, set__LastGroups } from './01-state';
 import { OfflineBadgeContent, UnassignedBadgeContent } from './lib/status-badges';
 import type {
   ClientView,
@@ -665,6 +665,15 @@ export function RenderFullClientAndMonitorList() {
       `${GroupID}`,
       GroupClients.map((c) => c.UUID)
     );
+
+    // Selection cache mirrors the tile data-uuid values so the group-title
+    // button toggles every client type in the group (ShowTrak clients plus
+    // prefixed monitor:/dummy: tiles), not just ShowTrak clients.
+    GroupSelectableUUIDCache.set(`${GroupID}`, [
+      ...GroupClients.map((c) => c.UUID),
+      ...GroupMonitors.map((m) => `monitor:${m.TargetID}`),
+      ...GroupDummies.map((d) => `dummy:${d.UUID}`),
+    ]);
 
     if (
       GroupClients.length == 0 &&

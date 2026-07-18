@@ -2,7 +2,7 @@
 // Extracted from 14-selection-init.ts (REFACTOR_PLAN.md Phase 7). This is a
 // leaf module: it depends only on shared state + utils, so the ~6 modules that
 // import these keep working via the 14-selection-init barrel re-export.
-import { AlertActionsEnabled, GroupUUIDCache, Selected, setSelected } from './01-state';
+import { AlertActionsEnabled, GroupSelectableUUIDCache, Selected, setSelected } from './01-state';
 import { HandleNonFatalError } from './04-utils';
 
 export function IsSelected(UUID: string) {
@@ -93,8 +93,8 @@ export function ToggleSelection(UUID: string | undefined) {
 }
 
 export function SelectByGroup(GroupID: string | number | undefined) {
-  if (!GroupUUIDCache.has(`${GroupID}`)) return;
-  const UUIDs: string[] = GroupUUIDCache.get(`${GroupID}`);
+  if (!GroupSelectableUUIDCache.has(`${GroupID}`)) return;
+  const UUIDs: string[] = GroupSelectableUUIDCache.get(`${GroupID}`);
 
   if (UUIDs.every((UUID) => IsSelected(UUID))) {
     UUIDs.forEach((UUID) => Deselect(UUID));

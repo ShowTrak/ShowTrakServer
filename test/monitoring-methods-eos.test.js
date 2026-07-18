@@ -92,7 +92,13 @@ test('eos health degrades on an unexpected version prefix', async () => {
   try {
     const result = await eos.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Framing: 'length', Timeout: 1500, ExpectedVersion: '3.2' },
+      Settings: {
+        Port: server.port,
+        Framing: 'length',
+        Timeout: 1500,
+        CheckVersion: true,
+        ExpectedVersion: '3.2',
+      },
     });
     assert.equal(result.Success, true);
     assert.equal(result.Degraded, true);
@@ -128,17 +134,17 @@ test('eos health is offline when the connection is refused', async () => {
   assert.equal(result.Success, false);
 });
 
-test('eos-show is online when cue lists and patch are present', async () => {
-  const eosShow = loadWithMocks(methodPath('eos-show.js'), {});
-  assert.equal(eosShow.ID, 'eos-show');
+test('eos CheckShow is online when cue lists and patch are present', async () => {
+  const eos = loadWithMocks(methodPath('eos.js'), {});
   const server = await startEosServer({ cuelists: 3, patch: 96 });
   try {
-    const result = await eosShow.Run({
+    const result = await eos.Run({
       Address: '127.0.0.1',
       Settings: {
         Port: server.port,
         Framing: 'length',
         Timeout: 1500,
+        CheckShow: true,
         MinCueLists: 1,
         MinPatch: 1,
       },
@@ -152,16 +158,17 @@ test('eos-show is online when cue lists and patch are present', async () => {
   }
 });
 
-test('eos-show degrades on an empty / default show', async () => {
-  const eosShow = loadWithMocks(methodPath('eos-show.js'), {});
+test('eos CheckShow degrades on an empty / default show', async () => {
+  const eos = loadWithMocks(methodPath('eos.js'), {});
   const server = await startEosServer({ cuelists: 0, patch: 0 });
   try {
-    const result = await eosShow.Run({
+    const result = await eos.Run({
       Address: '127.0.0.1',
       Settings: {
         Port: server.port,
         Framing: 'length',
         Timeout: 1500,
+        CheckShow: true,
         MinCueLists: 1,
         MinPatch: 1,
       },
@@ -174,16 +181,16 @@ test('eos-show degrades on an empty / default show', async () => {
   }
 });
 
-test('eos health and eos-show share one snapshot query per tick', async () => {
+test('eos CheckShow off ignores an empty show', async () => {
   const eos = loadWithMocks(methodPath('eos.js'), {});
-  const eosShow = loadWithMocks(methodPath('eos-show.js'), {});
-  const server = await startEosServer();
+  const server = await startEosServer({ cuelists: 0, patch: 0 });
   try {
-    const settings = { Port: server.port, Framing: 'length', Timeout: 1500 };
-    await eos.Run({ Address: '127.0.0.1', Settings: settings });
-    await eosShow.Run({ Address: '127.0.0.1', Settings: settings });
-    // Both methods hit the same cached snapshot: one connection/request.
-    assert.equal(server.getRequestCount(), 1);
+    const result = await eos.Run({
+      Address: '127.0.0.1',
+      Settings: { Port: server.port, Framing: 'length', Timeout: 1500 },
+    });
+    assert.equal(result.Success, true);
+    assert.ok(!result.Degraded, 'show is not judged unless CheckShow is enabled');
   } finally {
     await server.close();
   }

@@ -48,7 +48,7 @@ test('chamsys degrades on an unexpected version prefix', async () => {
   try {
     const result = await cq.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Timeout: 1500, ExpectedVersion: '1.8' },
+      Settings: { Port: server.port, Timeout: 1500, CheckVersion: true, ExpectedVersion: '1.8' },
     });
     assert.equal(result.Success, true);
     assert.equal(result.Degraded, true);

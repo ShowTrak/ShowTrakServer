@@ -31,7 +31,7 @@
 //   Success:false            -> offline  (no matching OSC in the grace window)
 import dgram from 'dgram';
 import { CreateLogger } from '../Logger';
-import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
+import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency, Card } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const Logger = CreateLogger('Millumin');
@@ -328,17 +328,20 @@ export function BuildMilluminSettings(): MonitoringSettingField[] {
   return [
     {
       Key: 'ListenPort',
-      Label: 'Listen port (Millumin OSC output destination)',
+      Label: 'Listen port',
       Type: 'number',
       Default: DEFAULT_LISTEN_PORT,
       Min: MIN_PORT,
       Max: MAX_PORT,
+      Required: true,
+      Note: 'The UDP port Millumin sends OSC feedback to (its OSC output destination).',
     },
     {
       Key: 'AddressFilter',
-      Label: 'OSC address prefix (optional, e.g. /millumin)',
+      Label: 'OSC address prefix',
       Type: 'string',
       Default: '',
+      Note: 'Only count OSC messages whose address starts with this prefix, e.g. /millumin. Leave blank to accept any.',
     },
     {
       Key: 'GracePeriodMs',
@@ -502,21 +505,18 @@ export function BuildMilluminDebug(Result: MonitoringResult, Target: MonitoringT
 
   const List = Sources.map((S) => {
     const IsTarget = AddressesEqual(S.Address, Address);
-    const RowCls = IsTarget ? 'border border-success' : 'border border-transparent';
     const Recent = Array.isArray(S.Recent) ? S.Recent : [];
     const Latest = Recent.slice(-4).reverse();
     const Msgs = Latest.map(
       (M) => `<div class="text-muted small font-monospace text-break">${Esc(M.OscAddress)}</div>`
     ).join('');
-    return (
-      `<div class="bg-ghost rounded p-2 ${RowCls}">` +
-      '<div class="d-flex justify-content-between align-items-center gap-2">' +
-      `<span class="text-light small font-monospace text-break">${Esc(S.Address)}</span>` +
-      Pill('muted', `${S.Count} msg`) +
-      '</div>' +
-      Msgs +
-      '</div>'
-    );
+    return Card({
+      Title: S.Address,
+      TitleClass: 'font-monospace',
+      Badge: Pill('muted', `${S.Count} msg`),
+      Highlight: IsTarget,
+      BodyHtml: Msgs,
+    });
   }).join('');
 
   return (

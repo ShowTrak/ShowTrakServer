@@ -95,28 +95,152 @@ export function RenderMonitoringMethodOptions($select: JQuery) {
   }
 }
 
+// A small info icon carrying the field's Note. Hovering (or focusing) it reveals
+// a Bootstrap popover with the hint text. Escaped before display — the Note is
+// plain text, never markup. ExtraClass positions it (overlay / select variant).
+function BuildMonitoringNoteIconHtml(Field: MonitoringSettingField, ExtraClass = '') {
+  const Note = typeof Field.Note === 'string' ? Field.Note.trim() : '';
+  if (!Note) return '';
+  return `<span class="monitoring-note ${ExtraClass}" tabindex="0" role="button" aria-label="More information"
+    data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-placement="left"
+    data-bs-content="${Safe(Note)}"><i class="bi bi-info-circle"></i></span>`;
+}
+
+// The escaped field label, with a trailing red asterisk appended when the field
+// is Required. Used inside <label> elements only (never placeholders).
+function BuildMonitoringLabelHtml(Field: MonitoringSettingField) {
+  const Label = Safe(Field.Label || Field.Key);
+  if (!Field.Required) return Label;
+  return `${Label}<span class="monitoring-required" title="Required" aria-label="required">*</span>`;
+}
+
+// Opening tag for a field wrapper. Carries the field key and, when the field is
+// conditional, the sibling key/value it depends on so ApplyMonitoringConditional-
+// Visibility() can show or hide it as that sibling changes.
+function BuildMonitoringFieldWrapOpen(Field: MonitoringSettingField, ExtraClass: string) {
+  const VW = Field.VisibleWhen;
+  const VWAttrs =
+    VW && VW.Key != null
+      ? ` data-visible-when-key="${Safe(String(VW.Key))}" data-visible-when-value="${Safe(
+          String(VW.Equals)
+        )}"`
+      : '';
+  return `<div class="monitoring-field-wrap ${ExtraClass}" data-field-key="${Safe(
+    Field.Key
+  )}"${VWAttrs}>`;
+}
+
+// A single removable chip for a 'list' field. The value is retained on a data
+// attribute (escaped) so CollectMonitoringCheckDynamicSettings() can read it back.
+function BuildMonitoringListChipHtml(Value: string) {
+  const V = String(Value == null ? '' : Value);
+  return (
+    `<span class="monitoring-list-chip badge bg-ghost-light text-light d-inline-flex align-items-center gap-1" data-chip-value="${Safe(
+      V
+    )}">` +
+    `<span class="text-break">${Safe(V)}</span>` +
+    '<i class="bi bi-x monitoring-list-chip-remove" role="button" aria-label="Remove"></i>' +
+    '</span>'
+  );
+}
+
+// Append the current text-input value to a 'list' field as a chip: validate
+// against the field's item type, dedupe, then re-run conditional visibility +
+// commit so the change auto-saves. Called from the Add button / Enter handlers.
+function AddMonitoringListChip($list: JQuery) {
+  const $input = $list.find('.monitoring-list-input');
+  let value = String($input.val() ?? '').trim();
+  if (!value) return;
+  if ($list.attr('data-item-type') === 'number') {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return;
+    value = String(n);
+  }
+  const exists = $list
+    .find('[data-chip-value]')
+    .map((_, e) => $(e).attr('data-chip-value') || '')
+    .get()
+    .includes(value);
+  if (!exists) $list.find('.monitoring-list-chips').append(BuildMonitoringListChipHtml(value));
+  $input.val('');
+  ApplyMonitoringConditionalVisibility();
+  ValidateMonitoringRequiredFields();
+  CommitMonitoringCheckView();
+}
+
 export function BuildMonitoringCheckFieldHtml(Field: MonitoringSettingField, Val: unknown) {
+  const HasNote = typeof Field.Note === 'string' && Field.Note.trim().length > 0;
   if (Field.Type === 'boolean') {
-    return `
-      <div class="form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost rounded p-2">
-        <label class="form-check-label mb-0 ms-2" for="MON_DYN_${Safe(Field.Key)}">${Safe(
-          Field.Label || Field.Key
-        )}</label>
-        <input class="form-check-input ms-2 me-2" type="checkbox" role="switch" id="MON_DYN_${Safe(
-          Field.Key
-        )}" data-key="${Safe(Field.Key)}" data-type="boolean" ${Val ? 'checked' : ''} />
-      </div>`;
-  } else if (Field.Type === 'number') {
-    return `
+    // The switch already sits at the row's right edge, so the note icon goes just
+    // left of it rather than overlaying anything.
+    const Note = BuildMonitoringNoteIconHtml(Field);
+    return (
+      BuildMonitoringFieldWrapOpen(
+        Field,
+        'form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost rounded p-2'
+      ) +
+      `<label class="form-check-label mb-0 ms-2" for="MON_DYN_${Safe(
+        Field.Key
+      )}">${BuildMonitoringLabelHtml(Field)}</label>
+        <div class="d-flex align-items-center gap-2 me-2">
+          ${Note}
+          <input class="form-check-input ms-2" type="checkbox" role="switch" id="MON_DYN_${Safe(
+            Field.Key
+          )}" data-key="${Safe(Field.Key)}" data-type="boolean" ${Val ? 'checked' : ''} />
+        </div>
+      </div>`
+    );
+  }
+  if (Field.Type === 'list') {
+    // A multi-value chip/tag input. The container carries data-key/data-type so
+    // CollectMonitoringCheckDynamicSettings() can read the chips as a string[].
+    const Items: string[] = Array.isArray(Val)
+      ? (Val as unknown[]).map((V) => String(V == null ? '' : V))
+      : Val == null || Val === ''
+        ? []
+        : [String(Val)];
+    const ItemType = Field.ItemType === 'number' ? 'number' : 'string';
+    const Chips = Items.map((Item) => BuildMonitoringListChipHtml(Item)).join('');
+    const NoteIcon = BuildMonitoringNoteIconHtml(Field);
+    return (
+      BuildMonitoringFieldWrapOpen(Field, 'monitoring-list-field') +
+      `<div class="monitoring-list" data-key="${Safe(Field.Key)}" data-type="list" data-item-type="${Safe(
+        ItemType
+      )}">
+        <div class="d-flex align-items-center justify-content-between mb-1">
+          <label class="form-label mb-0 small text-muted">${BuildMonitoringLabelHtml(Field)}</label>
+          ${NoteIcon}
+        </div>
+        <div class="monitoring-list-chips d-flex flex-wrap gap-1 mb-1">${Chips}</div>
+        <div class="input-group input-group-sm monitoring-list-add">
+          <input type="${ItemType === 'number' ? 'number' : 'text'}" class="form-control monitoring-list-input"
+            placeholder="Add ${Safe(Field.Label || Field.Key)}…" aria-label="Add ${Safe(
+              Field.Label || Field.Key
+            )}" />
+          <button type="button" class="btn btn-ghost text-light monitoring-list-add-btn">Add</button>
+        </div>
+      </div></div>`
+    );
+  }
+  // For text/number/select the icon overlays the input's right edge (centered),
+  // so it never shortens the field. On selects it sits left of the caret.
+  const IsSelect = Field.Type === 'select';
+  const Note = BuildMonitoringNoteIconHtml(
+    Field,
+    `monitoring-note--overlay${IsSelect ? ' monitoring-note--select' : ''}`
+  );
+  let Control: string;
+  if (Field.Type === 'number') {
+    Control = `
       <div class="form-floating">
         <input type="number" class="form-control" id="MON_DYN_${Safe(Field.Key)}"
-          data-key="${Safe(Field.Key)}" data-type="number"
+          data-key="${Safe(Field.Key)}" data-type="number"${Field.Required ? ' data-required="true"' : ''}
           ${typeof Field.Min === 'number' ? `min="${Field.Min}"` : ''}
           ${typeof Field.Max === 'number' ? `max="${Field.Max}"` : ''}
           value="${Safe(String(Val))}" placeholder="${Safe(Field.Label || Field.Key)}" />
-        <label for="MON_DYN_${Safe(Field.Key)}">${Safe(Field.Label || Field.Key)}</label>
+        <label for="MON_DYN_${Safe(Field.Key)}">${BuildMonitoringLabelHtml(Field)}</label>
       </div>`;
-  } else if (Field.Type === 'select') {
+  } else if (IsSelect) {
     const Options = Array.isArray(Field.Options) ? Field.Options : [];
     const OptionsHtml = Options.map((Opt) => {
       const OptLabel = typeof Opt === 'object' ? Opt.label : String(Opt);
@@ -124,24 +248,105 @@ export function BuildMonitoringCheckFieldHtml(Field: MonitoringSettingField, Val
       const Selected = String(OptValue) === String(Val) ? 'selected' : '';
       return `<option value="${Safe(String(OptValue))}" ${Selected}>${Safe(OptLabel)}</option>`;
     }).join('');
-    return `
+    Control = `
       <div class="form-floating">
         <select class="form-select" id="MON_DYN_${Safe(Field.Key)}"
           data-key="${Safe(Field.Key)}" data-type="string">
           ${OptionsHtml}
         </select>
-        <label for="MON_DYN_${Safe(Field.Key)}">${Safe(Field.Label || Field.Key)}</label>
+        <label for="MON_DYN_${Safe(Field.Key)}">${BuildMonitoringLabelHtml(Field)}</label>
+      </div>`;
+  } else {
+    Control = `
+      <div class="form-floating">
+        <input type="text" class="form-control" id="MON_DYN_${Safe(Field.Key)}"
+          data-key="${Safe(Field.Key)}" data-type="string"${Field.Required ? ' data-required="true"' : ''}
+          value="${Safe(String(Val == null ? '' : Val))}" placeholder="${Safe(
+            Field.Label || Field.Key
+          )}" />
+        <label for="MON_DYN_${Safe(Field.Key)}">${BuildMonitoringLabelHtml(Field)}</label>
       </div>`;
   }
-  return `
-    <div class="form-floating">
-      <input type="text" class="form-control" id="MON_DYN_${Safe(Field.Key)}"
-        data-key="${Safe(Field.Key)}" data-type="string"
-        value="${Safe(String(Val == null ? '' : Val))}" placeholder="${Safe(
-          Field.Label || Field.Key
-        )}" />
-      <label for="MON_DYN_${Safe(Field.Key)}">${Safe(Field.Label || Field.Key)}</label>
-    </div>`;
+  return (
+    BuildMonitoringFieldWrapOpen(Field, HasNote ? 'has-note' : '') + Control + Note + '</div>'
+  );
+}
+
+// Attach a Bootstrap popover to every note icon in the settings area. Idempotent
+// (getOrCreateInstance) so it is safe to call after each re-render.
+export function InitMonitoringNotePopovers() {
+  if (typeof bootstrap === 'undefined' || !bootstrap.Popover) return;
+  $('#MONITORING_CHECK_DYNAMIC_SETTINGS, #MONITORING_CHECK_ADVANCED_SETTINGS')
+    .find('.monitoring-note')
+    .each(function () {
+      bootstrap.Popover.getOrCreateInstance(this, {
+        container: 'body',
+        html: false,
+        customClass: 'SHOWTRAK_MON_POPOVER',
+      });
+    });
+}
+
+// Read a settings field's current value from the DOM as a comparable string.
+// Booleans normalise to 'true' / 'false' to match how VisibleWhen values are
+// serialised into the wrapper's data attribute.
+function ReadMonitoringFieldValue(Key: string): string | null {
+  const $el = $(`#MON_DYN_${Key.replace(/"/g, '\\"')}`);
+  if (!$el.length) {
+    // 'list' fields aren't keyed by MON_DYN_ id; locate the container by data-key.
+    const $list = $(`.monitoring-list[data-key="${Key.replace(/"/g, '\\"')}"]`);
+    if ($list.length) {
+      return $list
+        .find('[data-chip-value]')
+        .map((_, e) => $(e).attr('data-chip-value') || '')
+        .get()
+        .join(',');
+    }
+    return null;
+  }
+  if ($el.attr('data-type') === 'boolean') return $el.is(':checked') ? 'true' : 'false';
+  return String($el.val());
+}
+
+// Validate a single required field: flag it invalid (red outline) only once the
+// user has touched it (standard practice — never outline a pristine field) and it
+// is empty. Non-required fields, and hidden conditional fields, are left alone.
+export function ValidateMonitoringField(El: HTMLElement) {
+  const $el = $(El);
+  if ($el.attr('data-required') == null) return;
+  // A conditionally-hidden field is not currently in play, so never flag it.
+  if ($el.closest('.monitoring-field-wrap').hasClass('d-none')) {
+    $el.removeClass('is-invalid');
+    return;
+  }
+  const Touched = $el.hasClass('mon-touched');
+  const Empty = String($el.val() ?? '').trim() === '';
+  $el.toggleClass('is-invalid', Touched && Empty);
+}
+
+// Re-validate every required field currently rendered (used after a change so a
+// field that gates another's visibility can settle first).
+export function ValidateMonitoringRequiredFields() {
+  $('#MONITORING_CHECK_DYNAMIC_SETTINGS, #MONITORING_CHECK_ADVANCED_SETTINGS')
+    .find('[data-required]')
+    .each(function () {
+      ValidateMonitoringField(this);
+    });
+}
+
+// Show/hide conditional fields based on the current value of the field each one
+// depends on. Called after render and on every settings change so gated inputs
+// (e.g. a threshold behind an "enable" toggle) appear and disappear live.
+export function ApplyMonitoringConditionalVisibility() {
+  $('#MONITORING_CHECK_DYNAMIC_SETTINGS, #MONITORING_CHECK_ADVANCED_SETTINGS')
+    .find('.monitoring-field-wrap[data-visible-when-key]')
+    .each(function () {
+      const $wrap = $(this);
+      const Key = $wrap.attr('data-visible-when-key') || '';
+      const Expected = $wrap.attr('data-visible-when-value');
+      const Actual = ReadMonitoringFieldValue(Key);
+      $wrap.toggleClass('d-none', String(Expected) !== String(Actual));
+    });
 }
 
 export function RenderMonitoringCheckDynamicSettings(
@@ -166,6 +371,8 @@ export function RenderMonitoringCheckDynamicSettings(
       $host.append(Html);
     }
   }
+  InitMonitoringNotePopovers();
+  ApplyMonitoringConditionalVisibility();
 }
 
 // Show or hide the static Address and Degraded Threshold fields based on the
@@ -194,11 +401,10 @@ export function RenderMonitoringCheckInfo(MethodID: unknown) {
     return;
   }
 
+  const Title = (Method && Method.Name) || 'About this check';
   let html =
-    '<div class="d-flex gap-2 align-items-start">' +
-    '<i class="bi bi-info-circle text-info" style="margin-top: 2px;"></i>' +
-    '<div class="flex-grow-1">' +
-    `<div class="text-light small">${Safe(Info.Summary)}</div>`;
+    `<div class="monitoring-check-info-title">${Safe(Title)}</div>` +
+    `<div class="text-light small mt-1">${Safe(Info.Summary)}</div>`;
 
   if (Array.isArray(Info.Setup) && Info.Setup.length) {
     html +=
@@ -207,17 +413,20 @@ export function RenderMonitoringCheckInfo(MethodID: unknown) {
       '</ul>';
   }
 
-  if (Array.isArray(Info.Docs) && Info.Docs.length) {
+  // Documentation / reference links render as buttons that open in the default
+  // browser (via the OpenExternalUrl IPC handler, which enforces http/https).
+  if (Array.isArray(Info.Links) && Info.Links.length) {
     html +=
-      '<div class="text-muted small mt-2">' +
-      Info.Docs.map(
-        (doc) =>
-          `${Safe(doc.Label)}: <span class="font-monospace text-break">${Safe(doc.Url)}</span>`
-      ).join('<br />') +
+      '<div class="monitoring-check-info-links d-flex flex-wrap gap-2 mt-3">' +
+      Info.Links.map(
+        (link) =>
+          `<button type="button" class="btn btn-sm btn-ghost text-light MONITORING_INFO_LINK" data-url="${Safe(
+            link.Url
+          )}"><i class="bi bi-box-arrow-up-right me-1"></i>${Safe(link.Label)}</button>`
+      ).join('') +
       '</div>';
   }
 
-  html += '</div></div>';
   $host.html(html).removeClass('d-none');
 }
 
@@ -234,6 +443,12 @@ export function CollectMonitoringCheckDynamicSettings(): Record<string, unknown>
       } else if (type === 'number') {
         const n = Number($el.val());
         out[key] = Number.isFinite(n) ? n : null;
+      } else if (type === 'list') {
+        out[key] = $el
+          .find('[data-chip-value]')
+          .map((_, e) => $(e).attr('data-chip-value') || '')
+          .get()
+          .filter((v) => v !== '');
       } else {
         out[key] = $el.val();
       }
@@ -653,6 +868,9 @@ export function OpenMonitoringCheckView(index: number) {
     '<div class="text-muted small fst-italic">Loading latest response…</div>'
   );
   LoadMonitoringCheckDebug();
+  // Populate the live status card with the current known status (no re-probe).
+  $('#MONITORING_CHECK_STATUS').addClass('d-none').empty();
+  RefreshMonitoringCheckStatus({ run: false });
 }
 
 // Render the memory-only per-check debug payload returned by the server. The
@@ -734,6 +952,186 @@ export function RefreshMonitoringCheckDebugIfOpen(TargetID: number) {
   if (MonitoringEditorState.TargetID == null) return;
   if (Number(MonitoringEditorState.TargetID) !== Number(TargetID)) return;
   LoadMonitoringCheckDebug();
+  // Reflect the fresh live status in the status card too (without re-probing).
+  RefreshMonitoringCheckStatus({ run: false });
+}
+
+// --- Live status card (below the info panel) --------------------------------
+// A compact card that shows the open check's current status. It re-runs the check
+// on a 500ms debounce after each edit (see CommitMonitoringCheckView) IF the
+// settings are valid; when they're invalid it lists which fields need fixing
+// instead of running.
+
+let MonitoringStatusRunTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Status kinds map to the client-status background tints (see 05-monitoring.css).
+const MON_STATUS_KINDS = ['online', 'degraded', 'offline', 'idle'] as const;
+
+// Schedule a debounced (500ms) live re-run of the open check's status card.
+export function ScheduleMonitoringCheckStatusRun() {
+  if (MonitoringStatusRunTimer) clearTimeout(MonitoringStatusRunTimer);
+  MonitoringStatusRunTimer = setTimeout(() => {
+    MonitoringStatusRunTimer = null;
+    RefreshMonitoringCheckStatus({ run: true });
+  }, 500);
+}
+
+// Paint the status card: the card's background carries the status colour
+// (online / degraded / offline / idle) and the text is centred.
+function SetMonitoringCheckStatusCard(TitleText: string, Kind: string, DetailHtml: string) {
+  const $host = $('#MONITORING_CHECK_STATUS');
+  if (!$host.length) return;
+  for (const K of MON_STATUS_KINDS) $host.removeClass(`monitoring-check-status--${K}`);
+  $host
+    .removeClass('d-none')
+    .addClass(`monitoring-check-status--${Kind}`)
+    .html(
+      `<div class="text-light fw-semibold">${Safe(TitleText)}</div>` +
+        (DetailHtml ? `<div class="text-light small mt-1">${DetailHtml}</div>` : '')
+    );
+}
+
+// Collect human-readable reasons the open check's settings are invalid (so it
+// cannot be run). Empty array => settings are valid. Mirrors the server-side
+// requirements: an address (for methods that use one) and every visible required
+// setting must be filled.
+function CollectMonitoringCheckValidationErrors(): string[] {
+  const errors: string[] = [];
+  const methodID = String($('#MONITORING_CHECK_METHOD').val() || '');
+  const method = MonitoringMethodsCache.find((m) => m.ID === methodID);
+  if (!method) {
+    errors.push('Select a monitoring method.');
+    return errors;
+  }
+  const usesAddress = method.UsesAddress !== false;
+  if (usesAddress && String($('#MONITORING_CHECK_ADDRESS').val() || '').trim() === '') {
+    errors.push('Address is required.');
+  }
+  const labelByKey = new Map<string, string>();
+  for (const f of method.Settings || []) labelByKey.set(f.Key, f.Label || f.Key);
+  $('#MONITORING_CHECK_DYNAMIC_SETTINGS, #MONITORING_CHECK_ADVANCED_SETTINGS')
+    .find('[data-required]')
+    .each(function () {
+      const $el = $(this);
+      // A conditionally-hidden field is not in play, so it can't be "missing".
+      if ($el.closest('.monitoring-field-wrap').hasClass('d-none')) return;
+      if (String($el.val() ?? '').trim() !== '') return;
+      const key = $el.attr('data-key') || '';
+      errors.push(`${labelByKey.get(key) || key} is required.`);
+    });
+  return errors;
+}
+
+function RenderMonitoringCheckStatusFromPayload(payload: MonitoringCheckDebug | null) {
+  if (!payload || (payload.LastChecked == null && !payload.Html)) {
+    SetMonitoringCheckStatusCard('Pending', 'idle', 'Waiting for the first check to run…');
+    return;
+  }
+  let title = 'Online';
+  let kind = 'online';
+  if (!payload.Online) {
+    title = 'Offline';
+    kind = 'offline';
+  } else if (payload.Degraded) {
+    title = 'Degraded';
+    kind = 'degraded';
+  }
+  const parts: string[] = [];
+  if (payload.LastError) {
+    parts.push(`<div class="text-break">${Safe(payload.LastError)}</div>`);
+  } else if (payload.Online && !payload.Degraded) {
+    parts.push('<div>All checks healthy.</div>');
+  }
+  const latency = Number(payload.LastLatencyMs);
+  if (payload.LastLatencyMs != null && Number.isFinite(latency)) {
+    parts.push(`<div>Latency ${Math.round(latency)} ms</div>`);
+  }
+  SetMonitoringCheckStatusCard(title, kind, parts.join(''));
+}
+
+// Persist the working state and wait for the save (and any chained pending save)
+// to fully settle, so a subsequent run probes the just-saved configuration.
+async function FlushMonitoringCheckSave() {
+  if (!MonitoringEditorState) return;
+  if (MonitoringEditorState.saveTimer) {
+    clearTimeout(MonitoringEditorState.saveTimer);
+    MonitoringEditorState.saveTimer = null;
+  }
+  let guard = 0;
+  while (MonitoringEditorState.saving && guard++ < 100) {
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  await PerformMonitoringAutoSave();
+  guard = 0;
+  while ((MonitoringEditorState.saving || MonitoringEditorState.pendingSave) && guard++ < 100) {
+    await new Promise((r) => setTimeout(r, 50));
+  }
+}
+
+// Render the status card for the open check. With { run: true } the check is
+// (re-)probed after flushing a save; otherwise the latest known response is shown.
+// Invalid settings short-circuit to an "Invalid Settings" card listing the fixes.
+export async function RefreshMonitoringCheckStatus(opts: { run?: boolean } = {}) {
+  const $host = $('#MONITORING_CHECK_STATUS');
+  if (!$host.length) return;
+  if (!MonitoringEditorState || MonitoringEditorState.View !== 'check') return;
+  const index = MonitoringEditorState.EditingIndex;
+  const check = index == null ? null : MonitoringEditorState.Checks[index];
+  if (!check) {
+    $host.addClass('d-none').empty();
+    return;
+  }
+
+  const errors = CollectMonitoringCheckValidationErrors();
+  if (errors.length) {
+    const list = errors.map((e) => `<li>${Safe(e)}</li>`).join('');
+    SetMonitoringCheckStatusCard(
+      'Invalid Settings',
+      'offline',
+      `<ul class="list-unstyled mb-0 d-grid gap-1">${list}</ul>`
+    );
+    return;
+  }
+
+  if (opts.run) {
+    SetMonitoringCheckStatusCard('Checking…', 'idle', '');
+    await FlushMonitoringCheckSave();
+    if (!MonitoringEditorState || MonitoringEditorState.View !== 'check') return;
+  }
+
+  const curIndex = MonitoringEditorState.EditingIndex;
+  const cur = curIndex == null ? null : MonitoringEditorState.Checks[curIndex];
+  if (!cur) return;
+  if (cur.CheckID == null) {
+    SetMonitoringCheckStatusCard(
+      'Not saved',
+      'idle',
+      'Give the target a name to save and run this check.'
+    );
+    return;
+  }
+
+  const requestedCheckID = cur.CheckID;
+  let payload: MonitoringCheckDebug | null = null;
+  try {
+    payload = opts.run
+      ? await window.API.RunMonitoringCheckNow(requestedCheckID)
+      : await window.API.GetMonitoringCheckDebug(requestedCheckID);
+  } catch (err) {
+    HandleNonFatalError('MonitoringEditor:RefreshMonitoringCheckStatus', err);
+    SetMonitoringCheckStatusCard('Error', 'offline', '');
+    return;
+  }
+
+  // The user may have navigated away or switched checks while we awaited.
+  if (!MonitoringEditorState || MonitoringEditorState.View !== 'check') return;
+  const stillIndex = MonitoringEditorState.EditingIndex;
+  const still = stillIndex == null ? null : MonitoringEditorState.Checks[stillIndex];
+  if (!still || Number(still.CheckID) !== Number(requestedCheckID)) return;
+
+  RenderMonitoringCheckStatusFromPayload(payload);
+  // Keep the collapsible "Last Response" panel in sync on a fresh probe.
+  if (opts.run) RenderMonitoringCheckDebug(payload);
 }
 
 // Manually run the check currently open in the editor and refresh its debug
@@ -788,6 +1186,7 @@ export async function RunMonitoringCheckNow() {
   const stillCheck = stillIndex == null ? null : MonitoringEditorState.Checks[stillIndex];
   if (!stillCheck || Number(stillCheck.CheckID) !== Number(requestedCheckID)) return;
   RenderMonitoringCheckDebug(payload);
+  RenderMonitoringCheckStatusFromPayload(payload);
 }
 
 // Pull the check-edit view fields back into the working state + schedule a save.
@@ -806,6 +1205,9 @@ export function CommitMonitoringCheckView() {
   );
   check.Settings = CollectMonitoringCheckDynamicSettings();
   ScheduleMonitoringAutoSave();
+  // Every edit also debounce-refreshes the live status card (re-runs the check
+  // when valid, or shows which settings are invalid).
+  ScheduleMonitoringCheckStatusRun();
 }
 
 export function BuildMonitoringPayload() {
@@ -1069,9 +1471,44 @@ export async function OpenMonitoringTargetEditor(
       CommitMonitoringCheckView();
     });
   $('#MONITORING_CHECK_DYNAMIC_SETTINGS, #MONITORING_CHECK_ADVANCED_SETTINGS')
-    .off('input.moncheck change.moncheck')
+    .off('input.moncheck change.moncheck focusout.moncheck')
     .on('input.moncheck change.moncheck', '[data-key]', function () {
+      // Editing a field counts as touching it, so required validation can engage.
+      if ($(this).attr('data-required') != null) $(this).addClass('mon-touched');
+      // Re-evaluate conditional fields first so a toggle change reveals/hides its
+      // dependent inputs before we snapshot the settings.
+      ApplyMonitoringConditionalVisibility();
+      ValidateMonitoringRequiredFields();
       CommitMonitoringCheckView();
+    })
+    // Leaving a required field marks it touched so tabbing past an empty required
+    // input reveals the red outline, matching common form behaviour.
+    .on('focusout.moncheck', '[data-required]', function () {
+      $(this).addClass('mon-touched');
+      ValidateMonitoringField(this);
+    })
+    // 'list' field chip interactions: Add button, Enter to add, click × to remove.
+    .on('click.moncheck', '.monitoring-list-add-btn', function () {
+      AddMonitoringListChip($(this).closest('.monitoring-list'));
+    })
+    .on('keydown.moncheck', '.monitoring-list-input', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      AddMonitoringListChip($(this).closest('.monitoring-list'));
+    })
+    .on('click.moncheck', '.monitoring-list-chip-remove', function () {
+      $(this).closest('.monitoring-list-chip').remove();
+      ApplyMonitoringConditionalVisibility();
+      ValidateMonitoringRequiredFields();
+      CommitMonitoringCheckView();
+    });
+
+  // Info-panel documentation links open in the default browser.
+  $('#MONITORING_CHECK_INFO')
+    .off('click.moninfo')
+    .on('click.moninfo', '.MONITORING_INFO_LINK', function () {
+      const Url = $(this).attr('data-url');
+      if (Url) window.API.OpenExternalUrl(Url);
     });
 
   $('#MONITORING_CHECK_RUN_NOW')

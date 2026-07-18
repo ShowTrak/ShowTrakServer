@@ -1,23 +1,26 @@
-/* Dark-themed USB critical-state popover */
-.SHOWTRAK_USB_POPOVER {
+/* Dark-themed hint popovers (USB critical-state + monitoring field notes) */
+.SHOWTRAK_USB_POPOVER,
+.SHOWTRAK_MON_POPOVER {
   --bs-popover-bg: #0c091c;
   --bs-popover-border-color: rgba(255, 255, 255, 0.14);
   --bs-popover-header-bg: transparent;
   --bs-popover-header-border-color: rgba(255, 255, 255, 0.14);
   --bs-popover-body-padding-y: 0.35rem;
   --bs-popover-body-padding-x: 0.55rem;
-  --bs-popover-max-width: 200px;
+  --bs-popover-max-width: 240px;
   background-color: #0c091c !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-.SHOWTRAK_USB_POPOVER .popover-header {
+.SHOWTRAK_USB_POPOVER .popover-header,
+.SHOWTRAK_MON_POPOVER .popover-header {
   display: none;
 }
 
-.SHOWTRAK_USB_POPOVER .popover-body {
+.SHOWTRAK_USB_POPOVER .popover-body,
+.SHOWTRAK_MON_POPOVER .popover-body {
   color: rgba(255, 255, 255, 0.9) !important;
   background-color: transparent !important;
   font-size: 0.78rem;
@@ -25,14 +28,16 @@
   padding: 0.35rem 0.55rem;
 }
 
-.SHOWTRAK_USB_POPOVER .popover-arrow::before {
+.SHOWTRAK_USB_POPOVER .popover-arrow::before,
+.SHOWTRAK_MON_POPOVER .popover-arrow::before {
   border-left-color: rgba(255, 255, 255, 0.14);
   border-right-color: rgba(255, 255, 255, 0.14);
   border-top-color: rgba(255, 255, 255, 0.14);
   border-bottom-color: rgba(255, 255, 255, 0.14);
 }
 
-.SHOWTRAK_USB_POPOVER .popover-arrow::after {
+.SHOWTRAK_USB_POPOVER .popover-arrow::after,
+.SHOWTRAK_MON_POPOVER .popover-arrow::after {
   border-left-color: #0c091c;
   border-right-color: #0c091c;
   border-top-color: #0c091c;

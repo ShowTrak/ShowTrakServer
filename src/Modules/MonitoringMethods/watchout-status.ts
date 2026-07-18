@@ -50,7 +50,7 @@ import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } f
 const ID = 'watchout-status';
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'Control Port', Type: 'number', Default: 3040, Min: 1, Max: 65535 },
+  { Key: 'Port', Label: 'Control Port', Type: 'number', Default: 3040, Min: 1, Max: 65535, Required: true },
   {
     Key: 'Mode',
     Label: 'Mode',
@@ -63,9 +63,10 @@ const Settings: MonitoringSettingField[] = [
   },
   {
     Key: 'ExpectedShow',
-    Label: 'Expected show name (optional)',
+    Label: 'Expected show name',
     Type: 'string',
     Default: '',
+    Note: 'Degraded when a different show is loaded. Leave blank to confirm only that a show is loaded and running.',
   },
   {
     Key: 'Timeout',

@@ -37,12 +37,13 @@ const PRODUCT_PATH = '/api/v1/product';
 const COMPOSITION_PATH = '/api/v1/composition';
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'Port', Type: 'number', Default: 8080, Min: 1, Max: 65535 },
+  { Key: 'Port', Label: 'Port', Type: 'number', Default: 8080, Min: 1, Max: 65535, Required: true },
   {
     Key: 'ExpectedComposition',
-    Label: 'Expected Composition (optional)',
+    Label: 'Expected Composition',
     Type: 'string',
     Default: '',
+    Note: 'Degraded when a different composition is open. Leave blank to confirm only that Resolume is reachable.',
   },
   {
     Key: 'Timeout',

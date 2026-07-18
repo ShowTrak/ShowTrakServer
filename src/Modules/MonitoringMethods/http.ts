@@ -17,9 +17,26 @@ const Settings: MonitoringSettingField[] = [
       { value: 'https', label: 'HTTPS' },
     ],
   },
-  { Key: 'Port', Label: 'Port', Type: 'number', Default: 0, Min: 0, Max: 65535 },
+  {
+    Key: 'Port',
+    Label: 'Port',
+    Type: 'number',
+    Default: 0,
+    Min: 0,
+    Max: 65535,
+    Note: 'Leave at 0 to use the protocol default: 80 for HTTP, 443 for HTTPS.',
+  },
   { Key: 'Path', Label: 'Path', Type: 'string', Default: '/' },
-  { Key: 'Method', Label: 'HTTP Method', Type: 'string', Default: 'GET' },
+  {
+    Key: 'Method',
+    Label: 'HTTP Method',
+    Type: 'select',
+    Default: 'GET',
+    Options: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].map((M) => ({
+      value: M,
+      label: M,
+    })),
+  },
   {
     Key: 'ExpectedStatusMin',
     Label: 'Expected Status Min',
@@ -44,6 +61,7 @@ const Settings: MonitoringSettingField[] = [
     Type: 'boolean',
     Default: false,
     Advanced: true,
+    Note: 'When off, a 3xx redirect is checked against the expected status range as-is rather than followed.',
   },
   {
     Key: 'IgnoreTlsErrors',
@@ -51,6 +69,7 @@ const Settings: MonitoringSettingField[] = [
     Type: 'boolean',
     Default: false,
     Advanced: true,
+    Note: 'Accept self-signed or expired certificates on HTTPS. Applies to HTTPS only.',
   },
   {
     Key: 'Timeout',

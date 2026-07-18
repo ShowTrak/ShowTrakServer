@@ -71,8 +71,8 @@ function LevelLabel(AuthProtocol: string, PrivProtocol: string): string {
 }
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'Port', Type: 'number', Default: DEFAULT_PORT, Min: 1, Max: 65535 },
-  { Key: 'Username', Label: 'Username', Type: 'string', Default: '' },
+  { Key: 'Port', Label: 'Port', Type: 'number', Default: DEFAULT_PORT, Min: 1, Max: 65535, Required: true },
+  { Key: 'Username', Label: 'Username', Type: 'string', Default: '', Required: true },
   {
     Key: 'AuthProtocol',
     Label: 'Auth protocol',
@@ -120,12 +120,27 @@ const Settings: MonitoringSettingField[] = [
     Advanced: true,
   },
   {
+    Key: 'CheckCharge',
+    Label: 'Check battery charge',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Enable to report Degraded when the card reports a charge below the minimum.',
+  },
+  {
     Key: 'MinCharge',
     Label: 'Minimum charge (%)',
     Type: 'number',
     Default: HEALTH_DEFAULTS.MinCharge,
     Min: 0,
     Max: 100,
+    VisibleWhen: { Key: 'CheckCharge', Equals: true },
+  },
+  {
+    Key: 'CheckLoad',
+    Label: 'Check load',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Enable to report Degraded when output load exceeds the maximum percentage of rated capacity.',
   },
   {
     Key: 'MaxLoad',
@@ -134,6 +149,14 @@ const Settings: MonitoringSettingField[] = [
     Default: HEALTH_DEFAULTS.MaxLoad,
     Min: 1,
     Max: 100,
+    VisibleWhen: { Key: 'CheckLoad', Equals: true },
+  },
+  {
+    Key: 'CheckTemperature',
+    Label: 'Check battery temperature',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Enable to threshold battery temperature; skipped when the card does not report one.',
   },
   {
     Key: 'MaxTemperature',
@@ -142,7 +165,7 @@ const Settings: MonitoringSettingField[] = [
     Default: HEALTH_DEFAULTS.MaxTemperature,
     Min: 0,
     Max: 100,
-    Advanced: true,
+    VisibleWhen: { Key: 'CheckTemperature', Equals: true },
   },
   {
     Key: 'Timeout',

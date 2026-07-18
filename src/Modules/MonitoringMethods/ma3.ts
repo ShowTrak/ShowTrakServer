@@ -23,11 +23,13 @@ export const DEFAULT_MA3_PORT = 8080;
 const Settings: MonitoringSettingField[] = [
   {
     Key: 'Port',
-    Label: 'Web Remote port (8080 by default; 80 on some builds)',
+    Label: 'Web Remote port',
     Type: 'number',
     Default: DEFAULT_MA3_PORT,
     Min: 1,
     Max: 65535,
+    Required: true,
+    Note: '8080 by default; 80 on some builds.',
   },
   {
     Key: 'Timeout',
@@ -107,7 +109,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   ]);
 }
 
-export const Name = 'Console Liveness (grandMA3)';
+export const Name = 'grandMA3';
 export const Description =
   'Confirms a grandMA3 console (or onPC) is reachable by opening a TCP connection to its Web Remote port (default 8080) and closing it immediately — no data is sent, so it is safe against a live console. grandMA3 exposes no safe read-only status API over the network, so this is a liveness check only. The Web Remote must be enabled on the console.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;

@@ -19,6 +19,7 @@ const INVOKE_CHANNELS = [
   'OpenShowTrakWebsiteInBrowser',
   'OpenShowTrakGithubInBrowser',
   'OpenNpmPackageInBrowser',
+  'OpenExternalUrl',
   'GetProjectDependencies',
   'GetLicense',
 

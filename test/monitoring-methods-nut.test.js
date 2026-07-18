@@ -135,7 +135,13 @@ test('nut-ups EvaluateHealth flags each factor correctly', () => {
   assert.match(EvaluateHealth({ Charge: 10 }, T)[0], /Charge/);
   assert.match(EvaluateHealth({ Load: 99 }, T)[0], /Load/);
   assert.match(EvaluateHealth({ Temperature: 60 }, T)[0], /Temp/);
-  assert.match(EvaluateHealth({ Voltage: 180, Nominal: 230 }, T)[0], /Voltage/);
+  // Voltage: no explicit band -> tolerance around nominal (230 ± 15%).
+  assert.match(EvaluateHealth({ Voltage: 180, Nominal: 230 }, T)[0], /voltage/i);
+  // Explicit Min/Max override the nominal band.
+  const withBand = { ...T, MinVoltage: 220, MaxVoltage: 240 };
+  assert.match(EvaluateHealth({ Voltage: 210, Nominal: 230 }, withBand)[0], /low/i);
+  assert.match(EvaluateHealth({ Voltage: 250, Nominal: 230 }, withBand)[0], /high/i);
+  assert.deepEqual(EvaluateHealth({ Voltage: 230, Nominal: 230 }, withBand), []);
   // Unreported factors (null) are skipped.
   assert.deepEqual(EvaluateHealth({ Status: 'OL' }, T), []);
 });

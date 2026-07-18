@@ -2180,26 +2180,29 @@ button.btn:focus {
   text-transform: uppercase;
   padding: 0.2rem 0.5rem;
 }
-/* Dark-themed USB critical-state popover */
-.SHOWTRAK_USB_POPOVER {
+/* Dark-themed hint popovers (USB critical-state + monitoring field notes) */
+.SHOWTRAK_USB_POPOVER,
+.SHOWTRAK_MON_POPOVER {
   --bs-popover-bg: #0c091c;
   --bs-popover-border-color: rgba(255, 255, 255, 0.14);
   --bs-popover-header-bg: transparent;
   --bs-popover-header-border-color: rgba(255, 255, 255, 0.14);
   --bs-popover-body-padding-y: 0.35rem;
   --bs-popover-body-padding-x: 0.55rem;
-  --bs-popover-max-width: 200px;
+  --bs-popover-max-width: 240px;
   background-color: #0c091c !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-.SHOWTRAK_USB_POPOVER .popover-header {
+.SHOWTRAK_USB_POPOVER .popover-header,
+.SHOWTRAK_MON_POPOVER .popover-header {
   display: none;
 }
 
-.SHOWTRAK_USB_POPOVER .popover-body {
+.SHOWTRAK_USB_POPOVER .popover-body,
+.SHOWTRAK_MON_POPOVER .popover-body {
   color: rgba(255, 255, 255, 0.9) !important;
   background-color: transparent !important;
   font-size: 0.78rem;
@@ -2207,14 +2210,16 @@ button.btn:focus {
   padding: 0.35rem 0.55rem;
 }
 
-.SHOWTRAK_USB_POPOVER .popover-arrow::before {
+.SHOWTRAK_USB_POPOVER .popover-arrow::before,
+.SHOWTRAK_MON_POPOVER .popover-arrow::before {
   border-left-color: rgba(255, 255, 255, 0.14);
   border-right-color: rgba(255, 255, 255, 0.14);
   border-top-color: rgba(255, 255, 255, 0.14);
   border-bottom-color: rgba(255, 255, 255, 0.14);
 }
 
-.SHOWTRAK_USB_POPOVER .popover-arrow::after {
+.SHOWTRAK_USB_POPOVER .popover-arrow::after,
+.SHOWTRAK_MON_POPOVER .popover-arrow::after {
   border-left-color: #0c091c;
   border-right-color: #0c091c;
   border-top-color: #0c091c;
@@ -4344,6 +4349,139 @@ body.mobile-view
   > a.context-confirm-pending
   .context-icon {
   display: none !important;
+}
+
+/* Header + documentation links in the monitoring method info panel */
+.monitoring-check-info-title {
+  font-weight: 600;
+  color: var(--bs-light, #f8f9fa);
+  font-size: 0.95rem;
+}
+.monitoring-check-info-links .btn {
+  font-size: 0.8rem;
+}
+
+/* Red asterisk marking a required setting, appended after its label. */
+.monitoring-required {
+  color: var(--bs-danger, #dc3545);
+  margin-left: 0.15rem;
+  font-weight: 600;
+}
+
+/* Required-field validation: keep Bootstrap's red outline on an empty required
+   field, but drop its inline validation icon so it never collides with the note
+   icon, the dropdown caret, or a number field. */
+.monitoring-field-wrap .form-control.is-invalid,
+.monitoring-field-wrap .form-select.is-invalid {
+  background-image: none;
+}
+
+/* Per-input note icon. It overlays the right edge of the input (vertically
+   centered) rather than sitting beside it, so it never shortens the field. */
+.monitoring-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bs-secondary-color, #9aa0a6);
+  cursor: help;
+  font-size: 0.95rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.monitoring-note:hover,
+.monitoring-note:focus-visible {
+  color: var(--bs-info, #6edff6);
+  outline: none;
+}
+
+/* Overlay variant: absolutely positioned over the input's right edge. */
+.monitoring-field-wrap {
+  position: relative;
+  /* The settings list is a `d-grid gap-2`, so the grid gap is the only source of
+     spacing between fields. Zero any per-wrapper margin (notably Bootstrap's
+     .form-check margin-bottom on boolean toggles) so every gap is identical. */
+  margin: 0;
+}
+.monitoring-note--overlay {
+  position: absolute;
+  top: 50%;
+  right: 0.85rem;
+  transform: translateY(-50%);
+  z-index: 3;
+}
+/* On selects, sit to the left of the dropdown caret so it stays clickable. */
+.monitoring-note--select {
+  right: 2.5rem;
+}
+/* Reserve room so the field's value never runs under the icon. */
+.monitoring-field-wrap.has-note .form-control {
+  padding-right: 2.4rem;
+}
+.monitoring-field-wrap.has-note .form-select {
+  padding-right: 4rem;
+}
+/* Drop the number spinners on noted fields so they don't collide with the icon. */
+.monitoring-field-wrap.has-note input[type='number']::-webkit-outer-spin-button,
+.monitoring-field-wrap.has-note input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* 'list' settings field: a chip/tag input with an add row. The wrapper is a plain
+   block (no overlay note), so it sits inside the standard .monitoring-field-wrap. */
+.monitoring-list {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.6rem;
+}
+.monitoring-list-chip {
+  font-weight: 500;
+  padding: 0.3rem 0.5rem;
+}
+.monitoring-list-chip-remove {
+  cursor: pointer;
+  opacity: 0.7;
+}
+.monitoring-list-chip-remove:hover {
+  opacity: 1;
+}
+/* Hide number spinners on the add-input to match the other monitoring inputs. */
+.monitoring-list-input[type='number']::-webkit-outer-spin-button,
+.monitoring-list-input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Live status card in the check editor (below the info panel). Its background is
+   tinted with the same client-status colours (online / degraded / offline / idle)
+   and the text is centred; status is conveyed by the fill, not a badge. */
+.monitoring-check-status {
+  text-align: center;
+  background-color: var(--status-idle);
+}
+.monitoring-check-status--online {
+  background-color: var(--status-online) !important;
+}
+.monitoring-check-status--degraded {
+  background-color: var(--status-degraded) !important;
+}
+.monitoring-check-status--offline {
+  background-color: var(--status-offline) !important;
+}
+.monitoring-check-status--idle {
+  background-color: var(--status-idle) !important;
+}
+
+/* "Last response" debug cards (built by debug.ts Card()): borderless rows shaded
+   with a background, matching the app's no-borders / background-shade theme. Status
+   is shown by the badge inside; a matched/primary item gets a subtle success tint. */
+.monitoring-debug-card {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+}
+.monitoring-debug-card--match {
+  background-color: rgba(25, 135, 84, 0.18);
 }
 
 /* Collapse toggles in the monitoring check editor (Advanced / Last Response) */

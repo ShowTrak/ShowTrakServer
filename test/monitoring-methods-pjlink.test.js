@@ -167,7 +167,7 @@ test('pjlink degrades in standby by default but can report Online', async () => 
   try {
     const degraded = await pjlink.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Timeout: 2000 },
+      Settings: { Port: server.port, Timeout: 2000, CheckPower: true },
     });
     assert.equal(degraded.Success, true);
     assert.equal(degraded.Degraded, true);
@@ -175,7 +175,7 @@ test('pjlink degrades in standby by default but can report Online', async () => 
 
     const online = await pjlink.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Timeout: 2000, TreatStandbyAs: 'ok' },
+      Settings: { Port: server.port, Timeout: 2000, CheckPower: true, ExpectedPower: 'any' },
     });
     assert.equal(online.Success, true);
     assert.ok(!online.Degraded);
@@ -192,7 +192,7 @@ test('pjlink degrades on an ERST error and warns only when configured', async ()
   try {
     const dflt = await pjlink.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Timeout: 2000 },
+      Settings: { Port: server.port, Timeout: 2000, CheckErrors: true },
     });
     assert.equal(dflt.Degraded, true);
     assert.match(String(dflt.DegradedReason), /Fan error/);
@@ -200,7 +200,7 @@ test('pjlink degrades on an ERST error and warns only when configured', async ()
 
     const warn = await pjlink.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Timeout: 2000, WarningsDegrade: true },
+      Settings: { Port: server.port, Timeout: 2000, CheckErrors: true, WarningsDegrade: true },
     });
     assert.match(String(warn.DegradedReason), /Cover warning/);
   } finally {
@@ -233,10 +233,25 @@ test('pjlink warns when a lamp passes the hour threshold', async () => {
   try {
     const result = await pjlink.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Timeout: 2000, LampWarnHours: 4000 },
+      Settings: { Port: server.port, Timeout: 2000, CheckLamp: true, LampWarnHours: 4000 },
     });
     assert.equal(result.Degraded, true);
     assert.match(String(result.DegradedReason), /Lamp 1/);
+  } finally {
+    await server.close();
+  }
+});
+
+test('pjlink degrades when the active input is not the expected one', async () => {
+  const pjlink = loadPjlink();
+  const server = await startPJLinkServer({ responses: HEALTHY_RESPONSES }); // INPT=31, POWR=1
+  try {
+    const result = await pjlink.Run({
+      Address: '127.0.0.1',
+      Settings: { Port: server.port, Timeout: 2000, CheckInput: true, ExpectedInput: '32' },
+    });
+    assert.equal(result.Degraded, true);
+    assert.match(String(result.DegradedReason), /Input/);
   } finally {
     await server.close();
   }
@@ -258,15 +273,17 @@ test('pjlink is Offline when the projector never answers', async () => {
 
 test('the pjlink family shares one connection per projector per tick', async () => {
   const pjlink = loadPjlink();
-  const pjlinkPower = require(methodPath('pjlink-power.js'));
   const server = await startPJLinkServer({ responses: HEALTHY_RESPONSES });
   try {
-    const settings = { Port: server.port, Timeout: 2000 };
-    // Two different checks against the same projector within the cache TTL must
-    // reuse the single snapshot connection, not open a second session.
+    // Two checks against the same projector within the cache TTL must reuse the
+    // single snapshot connection, not open a second session. The snapshot cache
+    // is keyed per projector, so differing toggles still share one connection.
     const [a, b] = await Promise.all([
-      pjlink.Run({ Address: '127.0.0.1', Settings: settings }),
-      pjlinkPower.Run({ Address: '127.0.0.1', Settings: settings }),
+      pjlink.Run({ Address: '127.0.0.1', Settings: { Port: server.port, Timeout: 2000 } }),
+      pjlink.Run({
+        Address: '127.0.0.1',
+        Settings: { Port: server.port, Timeout: 2000, CheckPower: true, CheckLamp: true },
+      }),
     ]);
     assert.equal(a.Success, true);
     assert.equal(b.Success, true);

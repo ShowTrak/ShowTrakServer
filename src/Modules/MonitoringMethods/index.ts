@@ -30,20 +30,18 @@ const MethodModules: MonitoringMethod[] = [
   require('./artnet-universe'),
   // Lighting consoles — ETC Eos (OSC)
   require('./eos'),
-  require('./eos-show'),
   // Lighting consoles — MA Lighting grandMA2 (Telnet remote) & grandMA3 (liveness)
   require('./ma2'),
-  require('./ma2-show'),
   require('./ma3'),
   // Lighting consoles — Avolites Titan (WebAPI)
   require('./avolites'),
-  require('./avolites-show'),
   // Lighting consoles — ChamSys MagicQ (web server)
   require('./chamsys'),
   // Video
   require('./ndi-source'),
   // Media Servers
-  require('./qlab-workspace'),
+  require('./qlab5'),
+  require('./qlab4'),
   require('./watchout-status'),
   require('./resolume-status'),
   require('./disguise-status'),
@@ -53,24 +51,11 @@ const MethodModules: MonitoringMethod[] = [
   require('./mqtt-topic'),
   // Digital Signage
   require('./brightsign'),
-  require('./brightsign-firmware'),
-  require('./brightsign-power'),
-  require('./brightsign-poe'),
-  require('./brightsign-video'),
   // Projectors
   require('./pjlink'),
-  require('./pjlink-power'),
-  require('./pjlink-lamp'),
-  require('./pjlink-errors'),
-  require('./pjlink-input'),
   require('./snmp-projector'),
   // Power (UPS)
   require('./nut-ups'),
-  require('./nut-ups-status'),
-  require('./nut-ups-charge'),
-  require('./nut-ups-load'),
-  require('./nut-ups-temperature'),
-  require('./nut-ups-voltage'),
   require('./snmp-ups'),
   require('./snmp-ups-v3'),
 ];
@@ -181,6 +166,32 @@ const Manager = {
       const Key = Field.Key;
       if (!Key) continue;
       let Value: unknown = Source[Key];
+      // A 'list' field is an array; only fall back to the default when it is truly
+      // absent (not for a legitimately empty array the user cleared).
+      if (Field.Type === 'list') {
+        const Raw = Array.isArray(Value)
+          ? Value
+          : Value === undefined || Value === null || Value === ''
+            ? Array.isArray(Field.Default)
+              ? Field.Default
+              : []
+            : [Value];
+        const Seen = new Set<string>();
+        const List: string[] = [];
+        for (const Item of Raw as unknown[]) {
+          let Entry = String(Item == null ? '' : Item).trim();
+          if (Field.ItemType === 'number') {
+            const N = Number(Entry);
+            if (!Number.isFinite(N)) continue;
+            Entry = String(N);
+          }
+          if (!Entry || Seen.has(Entry)) continue;
+          Seen.add(Entry);
+          List.push(Entry);
+        }
+        out[Key] = List;
+        continue;
+      }
       if (Value === undefined || Value === null || Value === '') {
         Value = Field.Default;
       }
@@ -207,7 +218,17 @@ const Manager = {
 
   Run: async (ID: string, Target: MonitoringTargetLike): Promise<MonitoringResult> => {
     const Method = Methods.get(ID);
-    if (!Method) return { Success: false, Error: `Unknown monitoring method: ${ID}` };
+    // A saved check whose method no longer exists (e.g. a removed/renamed method)
+    // surfaces as Degraded rather than Offline, so the operator is alerted to fix
+    // it instead of it silently reading as an outage.
+    if (!Method) {
+      return {
+        Success: true,
+        Degraded: true,
+        DegradedReason: `Unknown method: ${ID}`,
+        LatencyMs: null,
+      };
+    }
 
     const CacheKey = getMethodRunCacheKey(ID, Method, Target);
     const CacheTtlMs = getMethodRunCacheTtlMs(Method, Target);

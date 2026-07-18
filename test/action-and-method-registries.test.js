@@ -112,7 +112,10 @@ test('MonitoringMethods manager normalizes and wraps execution errors', async ()
   assert.equal(failResult.Success, false);
   assert.match(failResult.Error, /kaboom/i);
 
+  // A removed/unknown method surfaces as Degraded (not Offline) so a stale saved
+  // check alerts the operator instead of reading as an outage.
   const missingResult = await Manager.Run('missing', {});
-  assert.equal(missingResult.Success, false);
-  assert.match(missingResult.Error, /Unknown monitoring method/i);
+  assert.equal(missingResult.Success, true);
+  assert.equal(missingResult.Degraded, true);
+  assert.match(missingResult.DegradedReason, /Unknown method/i);
 });

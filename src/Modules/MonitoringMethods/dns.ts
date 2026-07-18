@@ -11,12 +11,21 @@ const ID = 'dns';
 const SUPPORTED_TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'NS', 'PTR', 'SOA', 'SRV', 'TXT'];
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'RecordType', Label: 'Record type', Type: 'string', Default: 'A', Advanced: true },
+  {
+    Key: 'RecordType',
+    Label: 'Record type',
+    Type: 'select',
+    Default: 'A',
+    Options: SUPPORTED_TYPES.map((Type) => ({ value: Type, label: Type })),
+    Advanced: true,
+    Note: 'The DNS record type to resolve.',
+  },
   {
     Key: 'Resolver',
-    Label: 'Resolver IP (optional, e.g. 1.1.1.1)',
+    Label: 'Resolver IP',
     Type: 'string',
     Default: '',
+    Note: 'Query a specific DNS server, e.g. 1.1.1.1. Leave blank to use the system resolver.',
   },
   {
     Key: 'ResolverPort',
@@ -29,9 +38,10 @@ const Settings: MonitoringSettingField[] = [
   },
   {
     Key: 'ExpectedValue',
-    Label: 'Expected value (optional substring match)',
+    Label: 'Expected value',
     Type: 'string',
     Default: '',
+    Note: 'Degraded when no answer contains this substring. Leave blank to confirm only that the name resolves.',
   },
   {
     Key: 'Timeout',

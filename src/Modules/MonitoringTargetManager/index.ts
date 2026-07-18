@@ -111,8 +111,15 @@ async function InsertCheckRow(
 
 // Monitoring method IDs that have been renamed. Persisted checks and legacy
 // migrations are normalized to the current ID so previously-created probes keep
-// running after a rename (e.g. 'qlab' -> 'qlab-workspace').
-const RENAMED_METHODS: Record<string, string> = { qlab: 'qlab-workspace' };
+// running after a rename (e.g. 'qlab-workspace' -> 'qlab5').
+const RENAMED_METHODS: Record<string, string> = {
+  // The QLab workspace check evolved and was renamed 'qlab-workspace' -> 'qlab5';
+  // the earlier 'qlab' and interim health id map to the same current method.
+  qlab: 'qlab5',
+  'qlab-workspace': 'qlab5',
+  'qlab-workspace-health': 'qlab5',
+  'qlab4-workspace': 'qlab4',
+};
 
 function NormalizeMethod(Method: string): string {
   return RENAMED_METHODS[Method] || Method;

@@ -41,6 +41,7 @@ export const CommonEosSettings: MonitoringSettingField[] = [
     Default: DEFAULT_EOS_PORT,
     Min: 1,
     Max: 65535,
+    Required: true,
   },
   {
     Key: 'Framing',
@@ -55,7 +56,8 @@ export const CommonEosSettings: MonitoringSettingField[] = [
   },
   {
     Key: 'OscUser',
-    Label: 'OSC user id (0 = background user, never touches the live command line)',
+    Label: 'OSC user ID',
+    Note: '0 is a background user that never touches the live command line. Change only if that user ID is already in use.',
     Type: 'number',
     Default: 0,
     Min: 0,

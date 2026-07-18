@@ -144,31 +144,32 @@ test('ma2 is offline when the port is refused', async () => {
   assert.equal(result.Success, false);
 });
 
-test('ma2-show confirms the expected show and degrades on a mismatch', async () => {
-  const ma2Show = loadWithMocks(methodPath('ma2-show.js'), {});
-  assert.equal(ma2Show.ID, 'ma2-show');
+test('ma2 CheckShow confirms the expected show and degrades on a mismatch', async () => {
+  const ma2 = loadWithMocks(methodPath('ma2.js'), {});
   const server = await startMa2Server({ creds: 'admin secret' });
   try {
-    const ok = await ma2Show.Run({
+    const ok = await ma2.Run({
       Address: '127.0.0.1',
       Settings: {
         Port: server.port,
         User: 'admin',
         Password: 'secret',
         Timeout: 2000,
+        CheckShow: true,
         ExpectedShow: 'PantoNight',
       },
     });
     assert.equal(ok.Success, true);
     assert.ok(!ok.Degraded);
 
-    const wrong = await ma2Show.Run({
+    const wrong = await ma2.Run({
       Address: '127.0.0.1',
       Settings: {
         Port: server.port,
         User: 'admin',
         Password: 'secret',
         Timeout: 2000,
+        CheckShow: true,
         ExpectedShow: 'OtherShow',
       },
     });
@@ -180,13 +181,13 @@ test('ma2-show confirms the expected show and degrades on a mismatch', async () 
   }
 });
 
-test('ma2-show reports missing credentials as degraded', async () => {
-  const ma2Show = loadWithMocks(methodPath('ma2-show.js'), {});
+test('ma2 CheckShow reports missing credentials as degraded', async () => {
+  const ma2 = loadWithMocks(methodPath('ma2.js'), {});
   const server = await startMa2Server();
   try {
-    const result = await ma2Show.Run({
+    const result = await ma2.Run({
       Address: '127.0.0.1',
-      Settings: { Port: server.port, Timeout: 1500 },
+      Settings: { Port: server.port, Timeout: 1500, CheckShow: true },
     });
     assert.equal(result.Success, true);
     assert.equal(result.Degraded, true);

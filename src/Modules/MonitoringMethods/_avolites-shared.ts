@@ -34,6 +34,7 @@ export const CommonAvolitesSettings: MonitoringSettingField[] = [
     Default: DEFAULT_AVOLITES_PORT,
     Min: 1,
     Max: 65535,
+    Required: true,
   },
   {
     Key: 'Timeout',

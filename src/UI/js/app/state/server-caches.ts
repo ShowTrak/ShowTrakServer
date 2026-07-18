@@ -35,7 +35,15 @@ export function setScriptList(value: ScriptCatalogEntry[]): void {
   ScriptList = value;
 }
 
+// Maps GroupID -> ShowTrak client UUIDs only. Consumed by the group manager,
+// which feeds these into window.API.GetClient(), so it must hold real client
+// UUIDs (no monitor:/dummy: prefixes).
 export const GroupUUIDCache = new Map();
+
+// Maps GroupID -> every selectable tile's data-uuid in that group: ShowTrak
+// clients plus prefixed monitor:/dummy: values. Used by SelectByGroup so the
+// group-title button selects all client types, not just ShowTrak clients.
+export const GroupSelectableUUIDCache = new Map();
 
 // Pending adoption devices (unadopted clients discovered by the server)
 export let PendingAdoption: ClientView[] = [];
