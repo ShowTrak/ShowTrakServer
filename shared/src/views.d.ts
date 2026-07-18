@@ -188,6 +188,9 @@ export interface ClientView {
   Weight?: number;
   Version?: string | null;
   VersionLabel?: string;
+  // Stable, human-friendly OSC/API identifier; unique across the shared client
+  // namespace (real clients + monitors + dummies).
+  Slug?: string | null;
   IP?: string | null;
   MacAddress?: string | null;
   RunOnLaunchScriptID?: string | null;
@@ -231,6 +234,8 @@ export interface GroupView {
   // entity as `isFullWidth`. KeyBind is emitted by the desktop entity only.
   isFullWidth?: boolean;
   KeyBind?: string | null;
+  // Stable, human-friendly OSC/API identifier; unique among groups.
+  Slug?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -416,6 +421,9 @@ export interface MonitoringTargetView {
   Interval: number;
   GroupID: number | null;
   Weight: number;
+  // Stable, human-friendly OSC/API identifier; unique across the shared client
+  // namespace. Nullable only in the window before first-boot back-fill.
+  Slug: string | null;
   Timestamp: number;
   Address: string;
   Method: string;

@@ -45,6 +45,7 @@ interface MonitoringTargetInput {
   Interval?: unknown;
   GroupID?: number | null;
   Weight?: unknown;
+  Slug?: string | null;
   Timestamp: number;
 }
 
@@ -174,6 +175,9 @@ class MonitoringTarget {
   Interval: number;
   GroupID: number | null;
   Weight: number;
+  // Stable, human-friendly OSC/API identifier; unique across the shared client
+  // namespace. Back-filled non-null on boot.
+  Slug: string | null;
   Timestamp: number;
   Checks: MonitoringCheck[];
   Online: boolean;
@@ -191,6 +195,7 @@ class MonitoringTarget {
     this.Interval = ClampInterval(Row.Interval);
     this.GroupID = Row.GroupID == null ? null : Row.GroupID;
     this.Weight = typeof Row.Weight === 'number' ? Row.Weight : 100;
+    this.Slug = Row.Slug || null;
     this.Timestamp = Row.Timestamp;
 
     this.Checks = Array.isArray(Checks) ? Checks.map((C) => new MonitoringCheck(C)) : [];
@@ -225,6 +230,7 @@ class MonitoringTarget {
       Interval: this.Interval,
       GroupID: this.GroupID,
       Weight: this.Weight,
+      Slug: this.Slug,
       Timestamp: this.Timestamp,
       // Legacy single-check fields (derived) so existing tiles / WebUI / alerts
       // that read Address/Method keep working.

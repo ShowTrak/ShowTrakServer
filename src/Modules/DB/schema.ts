@@ -22,7 +22,8 @@ Schema.push({
         Title TEXT, \
         Weight INTEGER, \
         FullWidth INTEGER NOT NULL DEFAULT 1, \
-        KeyBind TEXT \
+        KeyBind TEXT, \
+        Slug TEXT \
     )',
 });
 
@@ -41,6 +42,7 @@ Schema.push({
             RunOnLaunchScriptID TEXT, \
             RunOnLaunchDelaySeconds INTEGER, \
             Unassigned INTEGER NOT NULL DEFAULT 0, \
+            Slug TEXT, \
             Timestamp BIGINT(11) NOT NULL \
     )',
 });
@@ -70,6 +72,7 @@ Schema.push({
             Weight INTEGER NOT NULL DEFAULT 100, \
             LastSuccessAt BIGINT(11), \
             DegradedThresholdMs INTEGER NOT NULL DEFAULT 0, \
+            Slug TEXT, \
             Timestamp BIGINT(11) NOT NULL \
     )',
 });
@@ -253,6 +256,27 @@ Schema.Migrations = [
   {
     Version: 12,
     SQL: 'CREATE INDEX IF NOT EXISTS idx_alerthistory_timestamp ON `AlertHistory` (Timestamp)',
+  },
+  // Slugs: stable, human-friendly, OSC-addressable identifiers. Real clients,
+  // monitoring targets and groups gain a Slug column; dummy clients reuse their
+  // existing DummyID as their slug. Columns are added nullable and back-filled
+  // with generated unique values on first boot (see SlugBackfill); the NOCASE
+  // unique indexes are the in-table safety net (the shared client namespace that
+  // also spans DummyClients is enforced in the Slug service).
+  { Version: 13, SQL: 'ALTER TABLE `Clients` ADD COLUMN Slug TEXT' },
+  { Version: 14, SQL: 'ALTER TABLE `MonitoringTargets` ADD COLUMN Slug TEXT' },
+  { Version: 15, SQL: 'ALTER TABLE `Groups` ADD COLUMN Slug TEXT' },
+  {
+    Version: 16,
+    SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_slug ON `Clients` (Slug COLLATE NOCASE)',
+  },
+  {
+    Version: 17,
+    SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_monitoringtargets_slug ON `MonitoringTargets` (Slug COLLATE NOCASE)',
+  },
+  {
+    Version: 18,
+    SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_slug ON `Groups` (Slug COLLATE NOCASE)',
   },
 ];
 

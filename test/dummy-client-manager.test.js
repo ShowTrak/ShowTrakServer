@@ -66,6 +66,11 @@ function loadManager(dbStub, events) {
     'DummyClientManager',
     'index.js'
   );
+  // The shared Slug service (used for cross-namespace DummyID uniqueness) lives
+  // in a sibling module, so loadWithMocks — which only clears the target
+  // module's own directory — won't reset it. Clear it here so it re-binds to
+  // THIS test's DB stub instead of a stale one captured by an earlier test.
+  delete require.cache[require.resolve('../dist/Modules/Slug/index.js')];
   return loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => createLoggerStub() },
     '../DB': dbStub,
@@ -74,14 +79,16 @@ function loadManager(dbStub, events) {
   }).Manager;
 }
 
-test('DummyClientManager generates unique alphanumeric IDs with matching defaults', async () => {
+test('DummyClientManager generates unique slug IDs with matching defaults', async () => {
   const db = createDbStub();
   const Manager = loadManager(db, []);
   await Manager.Init();
 
-  const defaults = Manager.GenerateDefaults();
-  assert.match(defaults.DummyID, /^DummyClient\d{6}$/);
-  const suffix = defaults.DummyID.replace(/^DummyClient/, '');
+  // GenerateDefaults is async now — it derives the DummyID (which doubles as the
+  // dummy's slug) through the shared slug service.
+  const defaults = await Manager.GenerateDefaults();
+  assert.match(defaults.DummyID, /^Dummy-\d{6}$/);
+  const suffix = defaults.DummyID.replace(/^Dummy-/, '');
   assert.equal(defaults.Nickname, `Dummy ${suffix}`);
   assert.equal(defaults.Interval, 30000);
 });
@@ -94,7 +101,7 @@ test('DummyClientManager creates with defaults and enforces unique IDs', async (
 
   const [createErr, created] = await Manager.Create({});
   assert.equal(createErr, null);
-  assert.match(created.DummyID, /^DummyClient\d{6}$/);
+  assert.match(created.DummyID, /^Dummy-\d{6}$/);
   assert.equal(created.State, 'IDLE');
   assert.equal(created.Online, false);
   assert.equal(created.Version, 'Dummy');
@@ -103,9 +110,9 @@ test('DummyClientManager creates with defaults and enforces unique IDs', async (
   const [dupErr] = await Manager.Create({ DummyID: created.DummyID });
   assert.match(String(dupErr), /already in use/);
 
-  // An ID that sanitizes to empty (no alphanumeric characters) is rejected.
+  // An ID that sanitizes to empty (no slug-safe characters) is rejected.
   const [badErr] = await Manager.Create({ DummyID: '!!!' });
-  assert.match(String(badErr), /alphanumeric/);
+  assert.match(String(badErr), /at least one letter/);
 });
 
 test('DummyClientManager clamps interval to the 5s..5m range', async () => {

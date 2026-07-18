@@ -73,6 +73,7 @@ const INVOKE_CHANNELS = [
   'Groups:SetOrder',
   'Groups:SetFullWidth',
   'Groups:SetKeyBind',
+  'Groups:SetSlug',
   'SetGroupOrder',
 
   // Show files

@@ -235,6 +235,7 @@ const WEB_GROUP_CHANNELS = new Set([
   'Groups:SetOrder',
   'Groups:SetFullWidth',
   'Groups:SetKeyBind',
+  'Groups:SetSlug',
   'SetGroupOrder',
 ]);
 const WEB_MONITORING_CHANNELS = new Set([

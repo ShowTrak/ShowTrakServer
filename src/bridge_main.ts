@@ -53,6 +53,7 @@ const INVOKE_CHANNEL_LIST = [
   'Groups:SetOrder',
   'Groups:SetFullWidth',
   'Groups:SetKeyBind',
+  'Groups:SetSlug',
   'OpenLogsFolder',
   'OpenScriptsFolder',
   'Show:New',
@@ -247,6 +248,7 @@ const API: ShowTrakAPI = {
     invoke('Groups:SetFullWidth', GroupID, FullWidth),
   SetGroupKeyBind: async (GroupID, KeyBind) =>
     invoke('Groups:SetKeyBind', GroupID, KeyBind),
+  SetGroupSlug: async (GroupID, Slug) => invoke('Groups:SetSlug', GroupID, Slug),
   OpenLogsFolder: async () => invoke('OpenLogsFolder'),
   OpenScriptsFolder: async () => invoke('OpenScriptsFolder'),
   NewShow: async () => invoke('Show:New'),

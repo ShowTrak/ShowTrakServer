@@ -152,12 +152,28 @@ test('Server serializers project safe public shapes', () => {
     Title: 'A',
     Weight: 1,
     isFullWidth: false,
+    KeyBind: 'Digit1',
+    Slug: 'stage-left',
     Extra: 'x',
   });
-  assert.deepEqual(group, { GroupID: 3, Title: 'A', Weight: 1, isFullWidth: false });
+  assert.deepEqual(group, {
+    GroupID: 3,
+    Title: 'A',
+    Weight: 1,
+    isFullWidth: false,
+    KeyBind: 'Digit1',
+    Slug: 'stage-left',
+  });
 
   const defaultGroup = ToPublicGroup({ GroupID: 4, Title: 'B', Weight: 2 });
-  assert.deepEqual(defaultGroup, { GroupID: 4, Title: 'B', Weight: 2, isFullWidth: true });
+  assert.deepEqual(defaultGroup, {
+    GroupID: 4,
+    Title: 'B',
+    Weight: 2,
+    isFullWidth: true,
+    KeyBind: null,
+    Slug: null,
+  });
 });
 
 test('NetworkDiscovery network-utils convert IPs and probe ports', async () => {

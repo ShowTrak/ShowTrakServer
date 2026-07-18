@@ -58,6 +58,10 @@ export function CreateMonitoringTargetsRepository(DB: DBManager) {
       });
     },
 
+    UpdateSlug(Slug: string, TargetID: number): Promise<DBResult<unknown>> {
+      return DB.Run('UPDATE MonitoringTargets SET Slug = ? WHERE TargetID = ?', [Slug, TargetID]);
+    },
+
     // Group-ordering statements consumed via the Shared/group-ordering helper.
     SetGroupAndWeight(
       GroupID: number | null,

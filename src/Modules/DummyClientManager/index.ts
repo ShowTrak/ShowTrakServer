@@ -15,11 +15,10 @@ import {
   MAX_INTERVAL_MS,
   DEFAULT_INTERVAL_MS,
   ClampInterval,
-  SanitizeDummyID,
-  IsValidDummyID,
   RandomSuffix,
   NormalizeIP,
 } from './normalize';
+import * as SlugService from '../Slug';
 import { DummyClient } from './dummy';
 import type { DummyClientSnapshot } from './dummy';
 
@@ -34,29 +33,17 @@ function GenerateUUID(): string {
   return require('crypto').randomUUID();
 }
 
-function IsDummyIDTaken(DummyID: string): boolean {
-  return DummyList.some((D) => D.DummyID === DummyID);
-}
-
 const Manager = {
   Initialized: false,
   MIN_INTERVAL_MS,
   MAX_INTERVAL_MS,
 
-  // Produce a unique "DummyClient######" identifier that is not already in use.
-  GenerateUniqueDummyID(): string {
-    for (let Attempt = 0; Attempt < 50; Attempt++) {
-      const Candidate = `DummyClient${RandomSuffix()}`;
-      if (!IsDummyIDTaken(Candidate)) return Candidate;
-    }
-    // Extremely unlikely fallback: append more entropy.
-    return `DummyClient${RandomSuffix()}${RandomSuffix()}`;
-  },
-
-  // Defaults for a brand new dummy: matching random suffix in both ID and title.
-  GenerateDefaults() {
-    const DummyID = Manager.GenerateUniqueDummyID();
-    const Suffix = DummyID.replace(/^DummyClient/, '');
+  // Defaults for a brand new dummy. A dummy's DummyID IS its slug, so it is
+  // generated through the shared client-namespace slug service (unique across
+  // real clients, monitors and dummies alike).
+  async GenerateDefaults() {
+    const Suffix = RandomSuffix();
+    const DummyID = await SlugService.GenerateUniqueClientSlug(`Dummy-${Suffix}`, undefined, 'dummy');
     return {
       DummyID,
       Nickname: `Dummy ${Suffix}`,
@@ -112,13 +99,15 @@ const Manager = {
   async Create(Payload: Record<string, unknown> = {}): Promise<Result<DummyClientSnapshot>> {
     if (!Manager.Initialized) await Manager.Init();
     const Now = Date.now();
-    const Defaults = Manager.GenerateDefaults();
+    const Defaults = await Manager.GenerateDefaults();
 
     const DummyID = Object.prototype.hasOwnProperty.call(Payload, 'DummyID')
-      ? SanitizeDummyID(Payload.DummyID)
+      ? SlugService.Slugify(Payload.DummyID)
       : Defaults.DummyID;
-    if (!IsValidDummyID(DummyID)) return Fail('Dummy ID must be alphanumeric with no spaces');
-    if (IsDummyIDTaken(DummyID)) return Fail(`Dummy ID "${DummyID}" is already in use`);
+    if (!SlugService.IsValidSlug(DummyID))
+      return Fail('Slug must contain at least one letter, number, - or _');
+    if (await SlugService.IsClientSlugTaken(DummyID))
+      return Fail(`Dummy ID "${DummyID}" is already in use`);
 
     const Nickname =
       Object.prototype.hasOwnProperty.call(Payload, 'Nickname') && String(Payload.Nickname).trim()
@@ -159,9 +148,11 @@ const Manager = {
 
     let NextDummyID = Dummy.DummyID;
     if (Object.prototype.hasOwnProperty.call(Payload, 'DummyID')) {
-      NextDummyID = SanitizeDummyID(Payload.DummyID);
-      if (!IsValidDummyID(NextDummyID)) return Fail('Dummy ID must be alphanumeric with no spaces');
-      if (NextDummyID !== Dummy.DummyID && DummyList.some((D) => D.DummyID === NextDummyID)) {
+      NextDummyID = SlugService.Slugify(Payload.DummyID);
+      if (!SlugService.IsValidSlug(NextDummyID))
+        return Fail('Slug must contain at least one letter, number, - or _');
+      // IsClientSlugTaken excludes this dummy's own slot, so a no-op rename passes.
+      if (await SlugService.IsClientSlugTaken(NextDummyID, SlugService.DummyOwner(UUID))) {
         return Fail(`Dummy ID "${NextDummyID}" is already in use`);
       }
     }
@@ -221,8 +212,10 @@ const Manager = {
   // the UI can display where the dummy last reported from.
   async Heartbeat(DummyID: string, IP: string | null = null): Promise<Result<boolean>> {
     if (!Manager.Initialized) await Manager.Init();
-    const Sanitized = SanitizeDummyID(DummyID);
-    const Dummy = DummyList.find((D) => D.DummyID === Sanitized);
+    // Slugs are matched case-insensitively (uniqueness is enforced that way), so
+    // an external heartbeat can address a dummy regardless of the case it uses.
+    const Sanitized = SlugService.Slugify(DummyID).toLowerCase();
+    const Dummy = DummyList.find((D) => (D.DummyID || '').toLowerCase() === Sanitized);
     if (!Dummy) return Fail(`Unknown Dummy ID "${DummyID}"`);
     const NormalizedIP = NormalizeIP(IP);
     const IPChanged = NormalizedIP && NormalizedIP !== Dummy.IP;

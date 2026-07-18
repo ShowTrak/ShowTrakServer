@@ -33,6 +33,9 @@ export function CreateGroupsRepository(DB: DBManager) {
     UpdateKeyBind(GroupID: number, KeyBind: string | null): Promise<DBResult<unknown>> {
       return DB.Run('UPDATE Groups SET KeyBind = ? WHERE GroupID = ?', [KeyBind, GroupID]);
     },
+    UpdateSlug(GroupID: number, Slug: string): Promise<DBResult<unknown>> {
+      return DB.Run('UPDATE Groups SET Slug = ? WHERE GroupID = ?', [Slug, GroupID]);
+    },
     Delete(GroupID: number): Promise<DBResult<unknown>> {
       return DB.Run('DELETE FROM Groups WHERE GroupID = ?', [GroupID]);
     },

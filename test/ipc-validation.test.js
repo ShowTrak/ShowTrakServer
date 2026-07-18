@@ -30,7 +30,7 @@ test('IPCValidation.DummyClientCreatePayload validates ID, title, and interval',
   // IDs with spaces or symbols are rejected at the IPC boundary.
   assert.throws(
     () => IPCValidation.DummyClientCreatePayload({ DummyID: 'has space' }),
-    /alphanumeric/i
+    /letters, numbers/i
   );
   assert.throws(
     () => IPCValidation.DummyClientUpdatePayload({ Interval: 'soon' }),

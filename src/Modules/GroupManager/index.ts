@@ -5,6 +5,7 @@ import { CreateLogger } from '../Logger';
 import { Manager as DB } from '../DB';
 import { CreateGroupsRepository } from '../DB/repositories/groups';
 import { Manager as BroadcastManager } from '../Broadcast';
+import * as SlugService from '../Slug';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import type { GroupRow } from '../DB/rows';
@@ -65,6 +66,9 @@ class Group {
   Weight: number;
   isFullWidth: boolean;
   KeyBind: string | null;
+  // Stable, human-friendly OSC/API identifier; unique among groups. Back-filled
+  // non-null on boot.
+  Slug: string | null;
 
   constructor(Data: GroupRow) {
     this.GroupID = Data.GroupID;
@@ -72,6 +76,21 @@ class Group {
     this.Weight = Data.Weight || 0;
     this.isFullWidth = NormalizeFullWidth(Data.FullWidth);
     this.KeyBind = NormalizeKeyBind(Data.KeyBind);
+    this.Slug = Data.Slug || null;
+  }
+
+  // Persist an already-validated/de-collided slug (GroupManager.SetSlug owns the
+  // validation against the group namespace).
+  async SetSlug(Slug: string): Promise<Result<boolean>> {
+    if (this.Slug === Slug) return Ok(true);
+    this.Slug = Slug;
+    const [Err] = await GroupsRepo.UpdateSlug(this.GroupID, Slug);
+    if (Err) {
+      Logger.error('Failed to update group Slug');
+      return Fail('Failed to update group slug');
+    }
+    Logger.debug(`Group ${this.GroupID} Slug updated to ${Slug}`);
+    return Ok(true);
   }
 
   // Persistent fields (DB-backed)
@@ -125,13 +144,71 @@ class Group {
 const Manager = {
   async Create(Title: string = 'New Group'): Promise<Result<boolean>> {
     if (!Title) return Fail('Group title is required');
-    const [Err] = await GroupsRepo.Insert(Title, 100);
+    const [Err, Res] = await GroupsRepo.Insert(Title, 100);
     if (Err) {
       Logger.error('Failed to create group:', Err);
       return Fail('Failed to create group');
     }
+    // Seed a unique non-null slug from the title. Best-effort: a failure here
+    // leaves the slug null to be back-filled on next boot rather than failing
+    // the whole create.
+    const GroupID = Number((Res as { lastID?: number } | null)?.lastID);
+    if (Number.isFinite(GroupID) && GroupID > 0) {
+      const Slug = await SlugService.GenerateUniqueGroupSlug(
+        Title,
+        `group:${GroupID}`
+      );
+      const [SlugErr] = await GroupsRepo.UpdateSlug(GroupID, Slug);
+      if (SlugErr) Logger.error('Failed to persist new group slug:', SlugErr);
+    }
     BroadcastManager.emit('GroupListChanged');
     return Ok(true);
+  },
+
+  // Set a group's slug (validated + de-collided against the group namespace).
+  async SetSlug(GroupID: number, Slug: unknown): Promise<Result<boolean>> {
+    if (!GroupID) return Fail('GroupID is required');
+
+    const [GetErr, Group] = await Manager.Get(GroupID);
+    if (GetErr) return Fail(GetErr);
+    if (!Group) return Fail('Group not found');
+
+    const [SlugErr, Resolved] = await SlugService.ResolveGroupSlugEdit(Slug, `group:${GroupID}`);
+    if (SlugErr) return Fail(SlugErr);
+
+    // SlugErr falsy => Resolved is the resolved string (tuple union isn't narrowed).
+    const [SetErr] = await Group.SetSlug(Resolved as string);
+    if (SetErr) return Fail(SetErr);
+
+    BroadcastManager.emit('GroupListChanged');
+    return Ok(true);
+  },
+
+  // Resolve a group by slug (case-insensitive), for OSC/API addressing.
+  async GetBySlug(Slug: string): Promise<Group | null> {
+    if (!Slug) return null;
+    const [Err, Groups] = await Manager.GetAll();
+    if (Err) return null;
+    const Lower = String(Slug).toLowerCase();
+    return (Groups || []).find((G) => (G.Slug || '').toLowerCase() === Lower) || null;
+  },
+
+  // Assign generated unique slugs to any group still lacking one. Idempotent.
+  async BackfillSlugs(): Promise<number> {
+    const [Err, Groups] = await Manager.GetAll();
+    if (Err) return 0;
+    let Count = 0;
+    for (const Group of Groups || []) {
+      if (Group.Slug) continue;
+      const Slug = await SlugService.GenerateUniqueGroupSlug(
+        Group.Title || 'group',
+        `group:${Group.GroupID}`
+      );
+      const [SetErr] = await Group.SetSlug(Slug);
+      if (!SetErr) Count++;
+    }
+    if (Count) Logger.log(`Back-filled slugs for ${Count} group(s)`);
+    return Count;
   },
 
   async Rename(GroupID: number, Title: string): Promise<Result<boolean>> {

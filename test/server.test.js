@@ -911,7 +911,7 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
         GetRoutes: () => [
           { Path: '/API/Shutdown', Title: 'Shutdown', Callback: async () => ({ ok: true }) },
           {
-            Path: '/API/Client/:UUID/Select',
+            Path: '/API/Client/:Slug/Select',
             Title: 'Client Select',
             Callback: async () => ({ ok: true }),
           },
@@ -999,8 +999,8 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
 
   assert.ok(getRoutes.includes('/API/Shutdown'));
   assert.ok(postRoutes.includes('/API/Shutdown'));
-  assert.ok(getRoutes.includes('/API/Client/:UUID/Select'));
-  assert.ok(postRoutes.includes('/API/Client/:UUID/Select'));
+  assert.ok(getRoutes.includes('/API/Client/:Slug/Select'));
+  assert.ok(postRoutes.includes('/API/Client/:Slug/Select'));
   assert.ok(getRoutes.includes('/API/All/Select'));
   assert.ok(postRoutes.includes('/API/All/Select'));
   assert.ok(!getRoutes.includes('/API/Dummy/:id/Heartbeat'));

@@ -301,6 +301,7 @@ export async function OpenClientEditor(UUID: string) {
   const { Nickname, Hostname, IP, Version, MacAddress } = Client;
 
   $('#CLIENT_EDITOR_NICKNAME').val((Nickname ? Nickname : Hostname) || '');
+  $('#CLIENT_EDITOR_SLUG').val(Client.Slug || '');
   $('#CLIENT_EDITOR_HOSTNAME').val(Hostname || '');
   $('#CLIENT_EDITOR_IP').val(IP || '');
   if (MacAddress && String(MacAddress).trim().length > 0) {
@@ -386,6 +387,14 @@ export async function OpenClientEditor(UUID: string) {
         Nickname: Nickname,
         GroupID: GroupID,
       };
+
+      // Slug: only send when the operator actually changed it (a slug never
+      // auto-changes once set). Empty input is ignored so the existing slug
+      // stands.
+      const SlugRaw = String($('#CLIENT_EDITOR_SLUG').val() || '').trim();
+      if (SlugRaw && SlugRaw !== (Client.Slug || '')) {
+        Payload.Slug = SlugRaw;
+      }
 
       // Only send launch fields for non-integrated clients (the server rejects
       // them for integrated clients regardless).

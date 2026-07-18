@@ -89,6 +89,18 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     return normalized;
   };
 
+  // Human-friendly OSC/API identifier. Enforces the slug charset (letters,
+  // digits, `-`, `_`; no spaces) so a manually-entered slug is always route-safe.
+  // Auto-generated slugs (derived from a name) are slugified server-side; this
+  // guards the manual-entry path.
+  Manager.Slug = (value: unknown, fieldName = 'Slug') => {
+    const normalized = normalizeNonEmptyString(value, fieldName, { minLength: 1, maxLength: 64 });
+    if (!/^[A-Za-z0-9_-]+$/.test(normalized)) {
+      fail(`${fieldName} may only contain letters, numbers, - and _`);
+    }
+    return normalized;
+  };
+
   Manager.ScriptID = (value: unknown) => {
     if (typeof value === 'number') {
       if (!Number.isFinite(value)) fail('Script ID is invalid');
@@ -222,6 +234,11 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     if (Object.prototype.hasOwnProperty.call(value, 'GroupID')) {
       hasAnyField = true;
       normalized.GroupID = Manager.GroupID(value.GroupID);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(value, 'Slug')) {
+      hasAnyField = true;
+      normalized.Slug = Manager.Slug(value.Slug);
     }
 
     // Run-on-launch script id: null/empty clears it ("None"); otherwise it must

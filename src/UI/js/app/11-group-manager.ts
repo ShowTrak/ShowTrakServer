@@ -438,6 +438,36 @@ export function BindGroupManagerEditorHandlers(Groups: GroupView[] = []) {
       );
     });
 
+  // Slug: saved on blur / Enter. A slug never auto-changes from a rename, so it
+  // is edited independently here. Reverts to the last-saved value on error or an
+  // empty box.
+  $('#GROUP_MANAGER_EDITOR_SLUG')
+    .off('blur keydown')
+    .on('blur', async function () {
+      const GroupID = Number(GroupManagerEditingGroupID);
+      if (!Number.isFinite(GroupID)) return;
+      const LocalGroup = Groups.find((Group) => Number(Group.GroupID) === GroupID);
+      const PreviousSlug = LocalGroup ? LocalGroup.Slug || '' : '';
+      const NextSlug = String($(this).val() || '').trim();
+      if (!NextSlug || NextSlug === PreviousSlug) {
+        $(this).val(PreviousSlug);
+        return;
+      }
+      const [Err] = await window.API.SetGroupSlug(GroupID, NextSlug);
+      if (Err) {
+        $(this).val(PreviousSlug);
+        await Notify(String(Err), 'error');
+        return;
+      }
+      if (LocalGroup) LocalGroup.Slug = NextSlug;
+      await Notify('Group slug updated.', 'success');
+    })
+    .on('keydown', function (Event) {
+      if (Event.key !== 'Enter') return;
+      Event.preventDefault();
+      this.blur();
+    });
+
   $('#GROUP_MANAGER_EDITOR_CLIENT_LIST')
     .off('click', '.GROUP_MANAGER_MEMBER_REMOVE')
     .on('click', '.GROUP_MANAGER_MEMBER_REMOVE', async function () {
@@ -490,6 +520,7 @@ export async function OpenGroupManagerEditor(
 
   $('#GROUP_MANAGER_EDITOR_NAME').val(Group.Title || '');
   $('#GROUP_MANAGER_EDITOR_GROUPID').val(String(Group.GroupID));
+  $('#GROUP_MANAGER_EDITOR_SLUG').val(Group.Slug || '');
   $('#GROUP_MANAGER_EDITOR_FULL_WIDTH').prop('checked', Group.isFullWidth !== false);
   $('#GROUP_MANAGER_EDITOR_KEYBIND').val(Group.KeyBind || '');
 

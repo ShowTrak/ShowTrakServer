@@ -1212,7 +1212,20 @@ export function CommitMonitoringCheckView() {
 
 export function BuildMonitoringPayload() {
   const s = MonitoringEditorState!;
-  return {
+  const payload: {
+    Nickname: string;
+    Interval: number;
+    GroupID: number | null;
+    Slug?: string;
+    Checks: Array<{
+      Name: string;
+      Address: string;
+      Method: string;
+      Settings: Record<string, unknown>;
+      DegradedThresholdMs: number;
+      CheckID?: number | null;
+    }>;
+  } = {
     Nickname: (s.Nickname || '').trim(),
     Interval: s.Interval,
     GroupID: s.GroupID == null ? null : s.GroupID,
@@ -1235,6 +1248,13 @@ export function BuildMonitoringPayload() {
       return out;
     }),
   };
+  // Only send Slug when it was actually changed from the loaded value (a slug
+  // never auto-changes) and is non-empty.
+  const NextSlug = (s.Slug || '').trim();
+  if (NextSlug && NextSlug !== (s.OriginalSlug || '')) {
+    payload.Slug = NextSlug;
+  }
+  return payload;
 }
 
 export function MonitoringPayloadIsValid(payload: ReturnType<typeof BuildMonitoringPayload>) {
@@ -1348,6 +1368,8 @@ export async function OpenMonitoringTargetEditor(
       Nickname: Existing.Nickname || '',
       Interval: Number(Existing.Interval) || 30000,
       GroupID: Existing.GroupID == null ? null : Existing.GroupID,
+      Slug: Existing.Slug || '',
+      OriginalSlug: Existing.Slug || '',
       Checks: (Existing.Checks || []).map((c) => ({
         CheckID: c.CheckID,
         Name: c.Name || '',
@@ -1368,6 +1390,8 @@ export async function OpenMonitoringTargetEditor(
       Nickname: (Prefill && Prefill.Nickname) || '',
       Interval: 30000,
       GroupID: null,
+      Slug: '',
+      OriginalSlug: '',
       Checks: [],
       View: 'list',
       EditingIndex: null,
@@ -1408,6 +1432,10 @@ export async function OpenMonitoringTargetEditor(
     Existing ? 'Edit Monitoring Target' : 'Add Monitoring Target'
   );
   $('#MONITORING_TARGET_DANGER_ZONE').toggleClass('d-none', !Existing);
+  // Slug is only shown for an existing target — a new target's slug is generated
+  // server-side on create, then editable on the next open.
+  $('#MONITORING_TARGET_SLUG_WRAPPER').toggleClass('d-none', !Existing);
+  $('#MONITORING_TARGET_SLUG').val(MonitoringEditorState!.Slug);
   $('#MONITORING_TARGET_NICKNAME').val(MonitoringEditorState!.Nickname);
   $('#MONITORING_TARGET_INTERVAL').val(MonitoringEditorState!.Interval);
   $('#MONITORING_TARGET_INTERVAL_LABEL').text(FormatInterval(MonitoringEditorState!.Interval));
@@ -1418,6 +1446,12 @@ export async function OpenMonitoringTargetEditor(
     .off('input.mon')
     .on('input.mon', function () {
       MonitoringEditorState!.Nickname = String($(this).val() || '');
+      ScheduleMonitoringAutoSave();
+    });
+  $('#MONITORING_TARGET_SLUG')
+    .off('input.mon')
+    .on('input.mon', function () {
+      MonitoringEditorState!.Slug = String($(this).val() || '');
       ScheduleMonitoringAutoSave();
     });
   $('#MONITORING_TARGET_INTERVAL')

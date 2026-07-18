@@ -35,6 +35,8 @@ function loadOSC(overrides = {}) {
     '../ClientManager': {
       Manager: {
         Get: async (uuid) => (uuid === 'good' ? [null, { UUID: 'good' }] : ['not found', null]),
+        // Slug is the encouraged addressing key; UUID resolves only via Get above.
+        GetBySlug: async (slug) => (slug === 'stage-left' ? { UUID: 'good', Slug: 'stage-left' } : null),
         GetAll: async () => [
           null,
           [
@@ -53,6 +55,8 @@ function loadOSC(overrides = {}) {
       Manager: {
         Get: async (id) =>
           Number(id) === 1 ? [null, { GroupID: 1, Title: 'Main' }] : [null, null],
+        // Groups are addressed by slug; a numeric GroupID resolves via Get above.
+        GetBySlug: async (slug) => (slug === 'main' ? { GroupID: 1, Title: 'Main', Slug: 'main' } : null),
       },
     },
     '../DummyClientManager': {
@@ -75,10 +79,12 @@ test('OSC registers the built-in routes', () => {
   const routes = OSC.GetRoutes().map((r) => r.Path);
   assert.ok(routes.includes('/API/Shutdown'));
   assert.ok(routes.includes('/API/Shutdown/Force'));
-  assert.ok(routes.includes('/API/Client/:UUID/Select'));
-  assert.ok(routes.includes('/API/Client/:UUID/RunScript/:ScriptID'));
-  assert.ok(routes.includes('/API/Group/:GroupID/Select'));
-  assert.ok(routes.includes('/API/Group/:GroupID/RunScript/:ScriptID'));
+  // Clients and groups are addressed by slug (UUID/GroupID still resolve as a
+  // fallback, but the route param leads with the slug).
+  assert.ok(routes.includes('/API/Client/:Slug/Select'));
+  assert.ok(routes.includes('/API/Client/:Slug/RunScript/:ScriptID'));
+  assert.ok(routes.includes('/API/Group/:Slug/Select'));
+  assert.ok(routes.includes('/API/Group/:Slug/RunScript/:ScriptID'));
   assert.ok(routes.includes('/API/All/Select'));
   assert.ok(routes.includes('/API/All/Deselect'));
   assert.ok(routes.includes('/API/Selection/WakeOnLAN'));
@@ -107,6 +113,27 @@ test('OSC reports an error notification for an invalid UUID', async () => {
   const { handlers, broadcastEvents } = loadOSC();
   await handlers.message(['/API/Client/bad/Select']);
   assert.ok(broadcastEvents.some(([event, , level]) => event === 'Notify' && level === 'error'));
+});
+
+test('OSC dispatches a client select route addressed by slug', async () => {
+  const { handlers, broadcastEvents } = loadOSC();
+  // "stage-left" is not a UUID (Get fails); it resolves via GetBySlug.
+  await handlers.message(['/API/Client/stage-left/Select']);
+  assert.ok(
+    broadcastEvents.some(
+      ([event, action, uuids]) =>
+        event === 'OSCBulkAction' && action === 'Select' && uuids[0] === 'good'
+    )
+  );
+});
+
+test('OSC dispatches a group select route addressed by slug', async () => {
+  const { handlers, broadcastEvents } = loadOSC();
+  // "main" is non-numeric, so it resolves via the group slug, not GroupID.
+  await handlers.message(['/API/Group/main/Select']);
+  assert.ok(
+    broadcastEvents.some(([event, action]) => event === 'OSCBulkAction' && action === 'Select')
+  );
 });
 
 test('OSC RunScript route validates both UUID and script', async () => {

@@ -217,8 +217,9 @@ export async function OpenDummyClientEditor(UUID: string | null | undefined = nu
       const Interval = parseInt(String($('#DUMMY_CLIENT_INTERVAL').val() || ''), 10);
 
       if (!DummyID) return Notify('Please enter an ID', 'error');
-      if (!/^[A-Za-z0-9]+$/.test(DummyID))
-        return Notify('ID must be alphanumeric with no spaces', 'error');
+      // DummyID doubles as the dummy's slug: letters, digits, - and _; no spaces.
+      if (!/^[A-Za-z0-9_-]+$/.test(DummyID))
+        return Notify('ID may only contain letters, numbers, - and _', 'error');
 
       const Payload = {
         DummyID,

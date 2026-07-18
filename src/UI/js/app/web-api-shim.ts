@@ -159,6 +159,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
       rpc('Groups:SetFullWidth', GroupID, FullWidth),
     SetGroupKeyBind: async (GroupID, KeyBind) =>
       rpc('Groups:SetKeyBind', GroupID, KeyBind),
+    SetGroupSlug: async (GroupID, Slug) => rpc('Groups:SetSlug', GroupID, Slug),
     SetGroupOrder: async (GroupID, OrderedUUIDs) =>
       rpc('SetGroupOrder', GroupID, OrderedUUIDs),
 

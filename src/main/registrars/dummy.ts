@@ -25,7 +25,7 @@ function register(): void {
   });
 
   RPC.handle('GenerateDummyClientDefaults', async () => {
-    return DummyClientManager.GenerateDefaults();
+    return await DummyClientManager.GenerateDefaults();
   });
 
   RPC.handle(

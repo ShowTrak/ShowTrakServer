@@ -65,6 +65,15 @@ function register(): void {
     )
   );
 
+  RPC.handle(
+    'Groups:SetSlug',
+    createTupleHandler<[number | null, string], unknown>(
+      (GroupID: unknown, Slug: unknown) => [IPCValidation.GroupID(GroupID), IPCValidation.Slug(Slug)],
+      (GroupID: number | null, Slug: string) =>
+        GroupID == null ? ['No group selected', null] : GroupManager.SetSlug(GroupID, Slug)
+    )
+  );
+
   RPC.handle('Groups:SetOrder', async (_Event: unknown, OrderedGroupIDs: unknown) => {
     if (!Array.isArray(OrderedGroupIDs)) return ['Invalid order', null];
 

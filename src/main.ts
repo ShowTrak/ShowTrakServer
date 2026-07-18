@@ -50,6 +50,8 @@ import { Manager as BonjourManager } from './Modules/Bonjour';
 BonjourManager.Init();
 import './Modules/OSC'; // binds the OSC UDP listener on load
 import { Manager as MonitoringTargetManager } from './Modules/MonitoringTargetManager';
+import { Manager as ClientManager } from './Modules/ClientManager';
+import { Manager as GroupManager } from './Modules/GroupManager';
 import { Manager as DummyClientManager } from './Modules/DummyClientManager';
 import { Manager as AlertsManager } from './Modules/AlertsManager';
 import { Manager as AudioAssetManager } from './Modules/AudioAssetManager';
@@ -233,6 +235,19 @@ app.whenReady().then(async () => {
       Logger.error('Failed to init DummyClientManager:', Err)
     );
     AlertsManager.Init().catch((Err: unknown) => Logger.error('Failed to init AlertsManager:', Err));
+    // Ensure every client / monitoring target / group has a non-null slug. Rows
+    // created before slugs existed are back-filled with generated unique values.
+    // Run sequentially so the shared client namespace never hands out the same
+    // slug to two entities in the same pass.
+    (async () => {
+      try {
+        await ClientManager.BackfillSlugs();
+        await MonitoringTargetManager.BackfillSlugs();
+        await GroupManager.BackfillSlugs();
+      } catch (Err: unknown) {
+        Logger.error('Failed to back-fill slugs:', Err);
+      }
+    })();
     AudioAssetManager.Init()
       .then(() => ValidateAlertAudioAssets())
       .catch((Err: unknown) => Logger.error('Failed to init AudioAssetManager:', Err));

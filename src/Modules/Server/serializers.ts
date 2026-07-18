@@ -19,6 +19,7 @@ interface PublicClientSource {
   GroupID?: number | null;
   Weight?: number;
   Version?: string | null;
+  Slug?: string | null;
   IP?: string | null;
   MacAddress?: string | null;
   Online?: boolean;
@@ -58,6 +59,8 @@ interface PublicGroupSource {
   Title: string | null;
   Weight: number;
   isFullWidth?: boolean;
+  KeyBind?: string | null;
+  Slug?: string | null;
 }
 
 function IsIntegratedClient(c: PublicClientSource): boolean {
@@ -88,6 +91,7 @@ const ToPublicClient = (c: PublicClientSource): ClientView => ({
   Weight: c.Weight,
   Version: c.Version,
   VersionLabel: FormatClientVersionLabel(c),
+  Slug: c.Slug ?? null,
   IP: c.IP,
   MacAddress: c.MacAddress,
   Online: c.Online,
@@ -133,6 +137,8 @@ const ToPublicGroup = (g: PublicGroupSource): GroupView => ({
   Title: g.Title,
   Weight: g.Weight,
   isFullWidth: g.isFullWidth !== false,
+  KeyBind: g.KeyBind ?? null,
+  Slug: g.Slug ?? null,
 });
 
 export { FormatClientVersionLabel, ToPublicClient, ToPublicGroup };

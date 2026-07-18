@@ -1,11 +1,13 @@
 // MonitoringTargetManager
 // Owns the lifecycle of monitoring targets and their checks.
 import { Manager as DB } from '../DB';
+import { CreateLogger } from '../Logger';
 import { CreateMonitoringTargetsRepository } from '../DB/repositories/monitoring-targets';
 import { CreateMonitoringChecksRepository } from '../DB/repositories/monitoring-checks';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as MonitoringMethods } from '../MonitoringMethods';
 import { Ok, Fail } from '../Utils';
+import * as SlugService from '../Slug';
 import { createGroupOrdering } from '../Shared/group-ordering';
 import type { Result } from '../../types/result';
 import type { TxRun } from '../DB';
@@ -24,6 +26,8 @@ import type { MonitoringCheckInput } from './target';
 
 const TargetsRepo = CreateMonitoringTargetsRepository(DB);
 const ChecksRepo = CreateMonitoringChecksRepository(DB);
+
+const Logger = CreateLogger('MonitoringTargetManager');
 
 let TargetList: MonitoringTarget[] = [];
 
@@ -51,6 +55,7 @@ interface MonitoringTargetUpdatePayload {
   Checks?: unknown;
   Interval?: unknown;
   GroupID?: number | null;
+  Slug?: unknown;
 }
 
 // RAM-only debug snapshot returned by GetCheckDebug / RunCheckNow.
@@ -328,6 +333,36 @@ const Manager = {
     return [null, Cached.ToJSON()];
   },
 
+  // Resolve a monitoring target by slug (case-insensitive), for OSC/API addressing.
+  async GetBySlug(Slug: string): Promise<MonitoringTargetView | null> {
+    if (!Slug) return null;
+    if (!Manager.Initialized) await Manager.Init();
+    const Lower = String(Slug).toLowerCase();
+    const Found = TargetList.find((T) => (T.Slug || '').toLowerCase() === Lower);
+    return Found ? Found.ToJSON() : null;
+  },
+
+  // Assign generated unique slugs to any target row still lacking one. Idempotent.
+  async BackfillSlugs(): Promise<number> {
+    if (!Manager.Initialized) await Manager.Init();
+    let Count = 0;
+    for (const Target of TargetList) {
+      if (Target.Slug) continue;
+      const Slug = await SlugService.GenerateUniqueClientSlug(
+        Target.Nickname,
+        SlugService.MonitorOwner(Target.TargetID),
+        'monitor'
+      );
+      const [Err] = await TargetsRepo.UpdateSlug(Slug, Target.TargetID);
+      if (!Err) {
+        Target.Slug = Slug;
+        Count++;
+      }
+    }
+    if (Count) Logger.log(`Back-filled slugs for ${Count} monitoring target(s)`);
+    return Count;
+  },
+
   // Return the most recent (RAM-only) debug panel for a single check.
   async GetCheckDebug(CheckID: unknown): Promise<[string | null, MonitoringCheckDebug | null]> {
     const ID = Number(CheckID);
@@ -421,8 +456,18 @@ const Manager = {
     if (TxErr || !Created) return Fail('Failed to create monitoring target');
     const { TargetID, CheckRows } = Created;
 
+    // Every target must carry a non-null slug for OSC/API addressing. Generate a
+    // unique one from its nickname; the operator can rename it later.
+    const Slug = await SlugService.GenerateUniqueClientSlug(
+      Payload.Nickname,
+      SlugService.MonitorOwner(TargetID),
+      'monitor'
+    );
+    const [SlugErr] = await TargetsRepo.UpdateSlug(Slug, TargetID);
+    if (SlugErr) Logger.error('Failed to persist monitoring target slug', SlugErr);
+
     const Target = new MonitoringTarget(
-      { TargetID, Nickname: Payload.Nickname, Interval, GroupID, Weight, Timestamp: Now },
+      { TargetID, Nickname: Payload.Nickname, Interval, GroupID, Weight, Slug, Timestamp: Now },
       CheckRows
     );
     TargetList.push(Target);
@@ -464,8 +509,26 @@ const Manager = {
       NextChecks = Incoming;
     }
 
+    // Resolve/validate a slug edit before persisting anything else so a bad slug
+    // rejects the whole update rather than half-applying it.
+    let NextSlug: string | null = null;
+    if (Object.prototype.hasOwnProperty.call(Payload, 'Slug')) {
+      const [SlugErr, Resolved] = await SlugService.ResolveClientSlugEdit(
+        Payload.Slug,
+        SlugService.MonitorOwner(ID)
+      );
+      if (SlugErr) return Fail(SlugErr);
+      NextSlug = Resolved;
+    }
+
     const [Err] = await TargetsRepo.UpdateDetails(NextNickname, NextInterval, NextGroupID, ID);
     if (Err) return Fail('Failed to update monitoring target');
+
+    if (NextSlug !== null) {
+      const [SlugErr] = await TargetsRepo.UpdateSlug(NextSlug, ID);
+      if (SlugErr) return Fail('Failed to update monitoring target slug');
+      Target.Slug = NextSlug;
+    }
 
     Target.Nickname = NextNickname;
     Target.Interval = NextInterval;

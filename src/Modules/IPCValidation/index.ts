@@ -38,6 +38,8 @@ export interface IPCValidationManager {
   GroupID(value: unknown, fieldName?: string): number | null;
   GroupTitle(value: unknown): string;
   GroupKeyBind(value: unknown, fieldName?: string): string | null;
+  // Human-friendly OSC/API identifier: letters, digits, `-`, `_`; no spaces.
+  Slug(value: unknown, fieldName?: string): string;
   ScriptID(value: unknown): string;
   IntegratedEventID(value: unknown): string;
   UnassignedClientCreatePayload(value: unknown): { Name: string; Count: number };

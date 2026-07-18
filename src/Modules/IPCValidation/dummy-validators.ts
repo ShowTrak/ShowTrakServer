@@ -2,11 +2,12 @@
 import { fail, isPlainObject, normalizeNonEmptyString } from './primitives';
 import type { IPCValidationManager } from './index';
 
-// User-facing DummyID: alphanumeric, no spaces.
+// User-facing DummyID doubles as the dummy's slug: letters, digits, `-`, `_`;
+// no spaces. (Kept route-safe for the OSC /API/Dummy/:ID heartbeat endpoint.)
 function normalizeDummyID(value: unknown, fieldName = 'Dummy ID'): string {
   const normalized = normalizeNonEmptyString(value, fieldName, { minLength: 1, maxLength: 64 });
-  if (!/^[A-Za-z0-9]+$/.test(normalized)) {
-    fail(`${fieldName} must be alphanumeric with no spaces`);
+  if (!/^[A-Za-z0-9_-]+$/.test(normalized)) {
+    fail(`${fieldName} may only contain letters, numbers, - and _`);
   }
   return normalized;
 }

@@ -20,6 +20,7 @@ const UPDATABLE_CLIENT_COLUMNS: ReadonlySet<string> = new Set([
   'IP',
   'RunOnLaunchScriptID',
   'RunOnLaunchDelaySeconds',
+  'Slug',
 ]);
 
 export function CreateClientsRepository(DB: DBManager) {

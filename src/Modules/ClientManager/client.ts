@@ -201,6 +201,7 @@ interface ClientConstructorInput {
   RunOnLaunchScriptID?: string | null;
   RunOnLaunchDelaySeconds?: number | null;
   Unassigned?: unknown;
+  Slug?: string | null;
 }
 
 class Client {
@@ -216,6 +217,9 @@ class Client {
   IP: string | null;
   RunOnLaunchScriptID: string | null;
   RunOnLaunchDelaySeconds: number | null;
+  // Stable, human-friendly OSC/API identifier. Unique across the shared client
+  // namespace (real clients + monitors + dummies). Back-filled non-null on boot.
+  Slug: string | null;
   // A reserved slot with no hardware behind it yet. Such a client is offline
   // forever by definition, so the UI labels it rather than counting how long
   // it has been down, and offline alerts skip it.
@@ -281,6 +285,7 @@ class Client {
     this.RunOnLaunchScriptID = Data.RunOnLaunchScriptID || null;
     this.RunOnLaunchDelaySeconds =
       typeof Data.RunOnLaunchDelaySeconds === 'number' ? Data.RunOnLaunchDelaySeconds : null;
+    this.Slug = Data.Slug || null;
     // Stored as sqlite 0/1, so coerce rather than trust the raw row value.
     this.Unassigned = !!Data.Unassigned;
     this.Timestamp = Data.Timestamp;
@@ -1221,6 +1226,23 @@ class Client {
     BroadcastManager.emit('ClientListChanged');
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} GroupID updated to ${GroupID}`);
+    return Ok<void>();
+  }
+  // Set the client's slug. The caller (ClientManager.Update) is responsible for
+  // validating/de-colliding the value against the shared client namespace first;
+  // this setter only persists the already-resolved slug.
+  async SetSlug(Slug: string): Promise<Result<void>> {
+    if (this.Slug === Slug) return Ok<void>();
+    const Previous = this.Slug;
+    this.Slug = Slug;
+    const [Err] = await this._persistColumn('Slug', Slug);
+    if (Err) {
+      this.Slug = Previous;
+      Logger.error('Failed to update client slug');
+      return Fail(Err);
+    }
+    BroadcastManager.emit('ClientUpdated', this);
+    Logger.debug(`Client ${this.UUID} slug updated to ${Slug}`);
     return Ok<void>();
   }
   async SetHostname(Hostname: string | null, Options: PersistOptions = {}): Promise<Result<void>> {

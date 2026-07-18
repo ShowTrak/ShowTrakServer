@@ -133,6 +133,7 @@ export interface ShowTrakAPI {
   SetGroupListOrder(OrderedGroupIDs: number[]): Promise<ResultTuple<unknown>>;
   SetGroupFullWidth(GroupID: number, FullWidth: boolean): Promise<ResultTuple<unknown>>;
   SetGroupKeyBind(GroupID: number, KeyBind: string | null): Promise<ResultTuple<unknown>>;
+  SetGroupSlug(GroupID: number, Slug: string): Promise<ResultTuple<unknown>>;
   SetGroupOrder(GroupID: number, OrderedUUIDs: string[]): Promise<unknown>;
 
   // ---- Show file --------------------------------------------------------

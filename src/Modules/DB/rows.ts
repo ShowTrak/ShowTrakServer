@@ -8,6 +8,7 @@ export interface GroupRow {
   Weight: number | null;
   FullWidth: number; // 0 | 1
   KeyBind: string | null;
+  Slug: string | null; // back-filled non-null on first boot; nullable pre-migration
 }
 
 export interface ClientRow {
@@ -25,6 +26,7 @@ export interface ClientRow {
   // Reserved slot standing in for hardware that has not arrived yet. Cleared
   // when the slot is filled via ReplaceClientUUID.
   Unassigned: number; // 0 | 1
+  Slug: string | null; // back-filled non-null on first boot; nullable pre-migration
   Timestamp: number;
 }
 
@@ -44,6 +46,7 @@ export interface MonitoringTargetRow {
   Weight: number;
   LastSuccessAt: number | null;
   DegradedThresholdMs: number;
+  Slug: string | null; // back-filled non-null on first boot; nullable pre-migration
   Timestamp: number;
 }
 

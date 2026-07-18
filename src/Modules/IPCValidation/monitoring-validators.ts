@@ -117,6 +117,9 @@ export = function registerMonitoringValidators(Manager: IPCValidationManager): v
     if (Object.prototype.hasOwnProperty.call(value, 'GroupID')) {
       out.GroupID = Manager.GroupID(value.GroupID);
     }
+    if (Object.prototype.hasOwnProperty.call(value, 'Slug')) {
+      out.Slug = Manager.Slug(value.Slug);
+    }
     if (Object.prototype.hasOwnProperty.call(value, 'Checks')) {
       out.Checks = normalizeChecks(value.Checks, true);
     }

@@ -8,6 +8,7 @@ import { CreateClientsRepository } from '../DB/repositories/clients';
 import { CreateCriticalEntitiesRepository } from '../DB/repositories/critical-entities';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as UUIDManager } from '../UUID';
+import * as SlugService from '../Slug';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import { Client } from './client';
@@ -110,7 +111,12 @@ export interface ClientManagerType {
   ReplaceClient(CurrentUUID: unknown, ReplacementUUID: unknown): Promise<Result<Client>>;
   Exists(UUID: string): Promise<boolean>;
   Get(UUID: string): Promise<Result<Client>>;
+  // Resolve a real client by its slug (case-insensitive), for OSC/API addressing.
+  GetBySlug(Slug: string): Promise<Client | null>;
   GetAll(): Promise<Result<Client[]>>;
+  // Assign generated unique slugs to any client row still missing one. Returns
+  // how many were back-filled. Idempotent.
+  BackfillSlugs(): Promise<number>;
   GetClientsInGroup(GroupID: unknown): Promise<Client[]>;
   MoveGroupToNoGroup(GroupID: unknown): Promise<Result<number>>;
   ReconcileOrphanedGroups(ValidGroupIDs: unknown): Promise<Result<number>>;
@@ -786,6 +792,16 @@ Manager.Update = async (UUID: string, Data: unknown) => {
     const [SetErr] = await Client.SetGroupID(Fields.GroupID as number | string | null);
     if (SetErr) return Fail(SetErr);
   }
+  if (Object.prototype.hasOwnProperty.call(Fields, 'Slug')) {
+    const [SlugErr, Slug] = await SlugService.ResolveClientSlugEdit(
+      Fields.Slug,
+      SlugService.ClientOwner(UUID)
+    );
+    if (SlugErr) return Fail(SlugErr);
+    // SlugErr falsy => Slug is the resolved string (tuple union isn't narrowed).
+    const [SetErr] = await Client.SetSlug(Slug as string);
+    if (SetErr) return Fail(SetErr);
+  }
   if (Object.prototype.hasOwnProperty.call(Fields, 'RunOnLaunchScriptID')) {
     const [SetErr] = await Client.SetRunOnLaunchScriptID(Fields.RunOnLaunchScriptID as string | null);
     if (SetErr) return Fail(SetErr);
@@ -818,6 +834,14 @@ Manager.Create = async (UUID: string) => {
       Timestamp: Date.now(),
     })
   );
+  // Every client must have a non-null slug. A freshly adopted client has no
+  // hostname/nickname yet, so seed from a generic base; the operator can rename
+  // the slug later and it will never auto-change on its own.
+  const NewSlug = await SlugService.GenerateUniqueClientSlug(
+    Created.Hostname || Created.Nickname || 'client',
+    SlugService.ClientOwner(UUID)
+  );
+  await Created.SetSlug(NewSlug);
   if (addClientToCache(Created)) {
     BroadcastManager.emit('ClientListChanged');
   }
@@ -871,6 +895,11 @@ Manager.CreateUnassigned = async (Name: string, Count: number) => {
         Timestamp,
       })
     );
+    const SlotSlug = await SlugService.GenerateUniqueClientSlug(
+      Nickname,
+      SlugService.ClientOwner(UUID)
+    );
+    await Slot.SetSlug(SlotSlug);
     if (addClientToCache(Slot)) Created.push(Slot);
   }
 
@@ -974,6 +1003,33 @@ Manager.Get = async (UUID: string) => {
   if (!Row) return Fail('Client Not Found');
   const { client } = adoptIntoCache(applyCriticalState(new Client(Row)));
   return Ok(client);
+};
+
+// Resolve a real client by slug (case-insensitive). Ensures the cache is warm so
+// OSC lookups made before any UI has rendered still resolve.
+Manager.GetBySlug = async (Slug: string): Promise<Client | null> => {
+  if (!Slug) return null;
+  if (!Manager.Initialized) await Manager.Init();
+  const Lower = String(Slug).toLowerCase();
+  return ClientList.find((C) => (C.Slug || '').toLowerCase() === Lower) || null;
+};
+
+// Assign generated unique slugs to any client row still lacking one (e.g. rows
+// created before slugs existed). Idempotent; run once on boot.
+Manager.BackfillSlugs = async (): Promise<number> => {
+  if (!Manager.Initialized) await Manager.Init();
+  let Count = 0;
+  for (const Client of ClientList) {
+    if (Client.Slug) continue;
+    const Slug = await SlugService.GenerateUniqueClientSlug(
+      Client.Hostname || Client.Nickname || 'client',
+      SlugService.ClientOwner(Client.UUID)
+    );
+    const [Err] = await Client.SetSlug(Slug);
+    if (!Err) Count++;
+  }
+  if (Count) Logger.log(`Back-filled slugs for ${Count} client(s)`);
+  return Count;
 };
 
 Manager.Initialized = false;

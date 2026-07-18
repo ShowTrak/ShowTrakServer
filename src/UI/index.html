@@ -647,7 +647,11 @@ Loading licence...</pre>
                 <label for="GROUP_MANAGER_EDITOR_NAME">Group Name</label>
               </div>
 
-              <div class="form-floating bg-ghost rounded has-copy group-manager-editor-id-field">
+              <div
+                id="GROUP_MANAGER_EDITOR_GROUPID_WRAPPER"
+                class="form-floating bg-ghost rounded has-copy group-manager-editor-id-field"
+                style="display: none"
+              >
                 <input
                   type="text"
                   id="GROUP_MANAGER_EDITOR_GROUPID"
@@ -662,6 +666,27 @@ Loading licence...</pre>
                   data-target="#GROUP_MANAGER_EDITOR_GROUPID"
                   title="Copy Group ID"
                   aria-label="Copy Group ID"
+                >
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+
+              <div class="form-floating bg-ghost rounded has-copy group-manager-editor-id-field">
+                <input
+                  type="text"
+                  id="GROUP_MANAGER_EDITOR_SLUG"
+                  class="form-control bg-transparent text-light border-0"
+                  placeholder="Slug"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <label for="GROUP_MANAGER_EDITOR_SLUG">Slug (API / OSC address)</label>
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#GROUP_MANAGER_EDITOR_SLUG"
+                  title="Copy Slug"
+                  aria-label="Copy Slug"
                 >
                   <i class="bi bi-clipboard"></i>
                 </button>
@@ -826,6 +851,13 @@ Loading licence...</pre>
         <div class="modal-content">
           <div class="modal-body text-center">
             <div id="OSC_ROUTE_LIST_HEADER"></div>
+            <div class="text-sm text-muted text-start bg-ghost rounded p-2 mt-2">
+              Address clients and groups by their <strong>slug</strong> &mdash; the
+              editable identifier shown in each client/group's edit panel. Slugs are
+              stable and human-readable, so they're the recommended way to build OSC/HTTP
+              commands. Raw UUIDs and numeric group IDs still work for now, but may be
+              retired later.
+            </div>
             <div id="OSC_ROUTE_LIST" class="d-grid gap-2 text-start mt-2"></div>
           </div>
         </div>
@@ -1167,6 +1199,25 @@ Loading licence...</pre>
             <div id="CLIENT_EDITOR_HEADER"></div>
 
             <div class="d-grid gap-2">
+              <div class="form-floating has-copy">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="CLIENT_EDITOR_SLUG"
+                  placeholder="Slug"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <label for="CLIENT_EDITOR_SLUG">Slug (API / OSC address)</label>
+                <button
+                  type="button"
+                  class="copy-field-btn"
+                  data-target="#CLIENT_EDITOR_SLUG"
+                  title="Copy"
+                >
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
               <div class="form-floating">
                 <input
                   type="text"
@@ -1243,7 +1294,11 @@ Loading licence...</pre>
                   <i class="bi bi-clipboard"></i>
                 </button>
               </div>
-              <div class="form-floating has-copy">
+              <div
+                id="CLIENT_EDITOR_UUID_WRAPPER"
+                class="form-floating has-copy"
+                style="display: none"
+              >
                 <input type="text" class="form-control disabled" id="CLIENT_EDITOR_UUID" disabled />
                 <label for="CLIENT_EDITOR_UUID">Client ID</label>
                 <button
@@ -1424,6 +1479,27 @@ Loading licence...</pre>
               <div id="MONITORING_TARGET_HEADER"></div>
 
               <div class="d-grid gap-2 text-start mt-2">
+                <div id="MONITORING_TARGET_SLUG_WRAPPER" class="form-floating has-copy d-none">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="MONITORING_TARGET_SLUG"
+                    placeholder="Slug"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <label for="MONITORING_TARGET_SLUG">Slug (API / OSC address)</label>
+                  <button
+                    type="button"
+                    class="copy-field-btn"
+                    data-target="#MONITORING_TARGET_SLUG"
+                    title="Copy Slug"
+                    aria-label="Copy Slug"
+                  >
+                    <i class="bi bi-clipboard"></i>
+                  </button>
+                </div>
+
                 <div class="form-floating">
                   <input
                     type="text"
@@ -1613,21 +1689,21 @@ Loading licence...</pre>
                 <input
                   type="text"
                   class="form-control"
-                  id="DUMMY_CLIENT_TITLE"
-                  placeholder="Title"
-                />
-                <label for="DUMMY_CLIENT_TITLE">Title</label>
-              </div>
-              <div class="form-floating">
-                <input
-                  type="text"
-                  class="form-control"
                   id="DUMMY_CLIENT_ID"
                   placeholder="ID"
                   autocomplete="off"
                   spellcheck="false"
                 />
-                <label for="DUMMY_CLIENT_ID">ID (alphanumeric, no spaces)</label>
+                <label for="DUMMY_CLIENT_ID">Slug / ID (API / OSC address)</label>
+              </div>
+              <div class="form-floating">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="DUMMY_CLIENT_TITLE"
+                  placeholder="Title"
+                />
+                <label for="DUMMY_CLIENT_TITLE">Title</label>
               </div>
               <div class="form-floating">
                 <select class="form-select" id="DUMMY_CLIENT_GROUPID">

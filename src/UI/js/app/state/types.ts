@@ -20,6 +20,11 @@ export interface MonitoringEditorStateShape {
   Nickname: string;
   Interval: number;
   GroupID: number | null;
+  // Current slug in the editor plus the slug loaded from the target, so autosave
+  // only sends Slug when the operator actually changed it. Empty for a new target
+  // (the server generates one on create).
+  Slug: string;
+  OriginalSlug: string;
   Checks: MonitoringEditorCheck[];
   View: string;
   EditingIndex: number | null;
