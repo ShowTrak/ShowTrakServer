@@ -14,6 +14,8 @@
 //                column. Because the namespace spans three tables it cannot be a
 //                DB UNIQUE constraint, so uniqueness is enforced here in the app.
 //   * groups   — the Groups table's Slug column.
+//   * tags     — the Tags table's Slug column (its own independent namespace;
+//                the tag slug doubles as the tag's display label).
 //
 // Scripts have their own slug (the on-disk folder name) owned by ScriptManager
 // and are intentionally not modelled here.
@@ -37,6 +39,9 @@ export function MonitorOwner(TargetID: number | string): string {
 }
 export function DummyOwner(UUID: string): string {
   return `dummy:${UUID}`;
+}
+export function TagOwner(TagID: number | string): string {
+  return `tag:${TagID}`;
 }
 
 // Turn an arbitrary label into a valid slug. Case is preserved (mixed case is
@@ -122,6 +127,18 @@ async function CollectGroupSlugs(): Promise<SlugEntry[]> {
   return Entries;
 }
 
+async function CollectTagSlugs(): Promise<SlugEntry[]> {
+  const [Err, Rows] = await DB.All<{ TagID: number; Slug: string | null }>(
+    'SELECT TagID, Slug FROM Tags'
+  );
+  if (Err) Logger.error('Failed to read tag slugs', Err);
+  const Entries: SlugEntry[] = [];
+  for (const Row of Rows || []) {
+    if (Row && Row.Slug) Entries.push({ slug: String(Row.Slug).toLowerCase(), owner: TagOwner(Row.TagID) });
+  }
+  return Entries;
+}
+
 // True when Candidate is already used in the client namespace by an owner other
 // than ExceptOwner (pass the editing entity's own owner tag on updates).
 export async function IsClientSlugTaken(Candidate: string, ExceptOwner?: string): Promise<boolean> {
@@ -133,6 +150,12 @@ export async function IsClientSlugTaken(Candidate: string, ExceptOwner?: string)
 export async function IsGroupSlugTaken(Candidate: string, ExceptOwner?: string): Promise<boolean> {
   const Lower = String(Candidate).toLowerCase();
   const All = await CollectGroupSlugs();
+  return All.some((e) => e.slug === Lower && e.owner !== ExceptOwner);
+}
+
+export async function IsTagSlugTaken(Candidate: string, ExceptOwner?: string): Promise<boolean> {
+  const Lower = String(Candidate).toLowerCase();
+  const All = await CollectTagSlugs();
   return All.some((e) => e.slug === Lower && e.owner !== ExceptOwner);
 }
 
@@ -158,6 +181,16 @@ export async function GenerateUniqueGroupSlug(
   return Dedupe(Slugify(Base) || Fallback, Taken);
 }
 
+export async function GenerateUniqueTagSlug(
+  Base: unknown,
+  ExceptOwner?: string,
+  Fallback = 'tag'
+): Promise<string> {
+  const All = await CollectTagSlugs();
+  const Taken = new Set(All.filter((e) => e.owner !== ExceptOwner).map((e) => e.slug));
+  return Dedupe(Slugify(Base) || Fallback, Taken);
+}
+
 // Validate + de-collide a user-supplied slug for the client namespace. Sanitizes
 // friendly input (e.g. "Front of House" -> "Front-of-House"); returns an error
 // string if nothing usable remains. Does NOT auto-suffix on collision — a manual
@@ -179,5 +212,15 @@ export async function ResolveGroupSlugEdit(
   const Slug = Slugify(Raw);
   if (!Slug) return ['Slug must contain at least one letter, number, - or _', null];
   if (await IsGroupSlugTaken(Slug, ExceptOwner)) return [`Slug "${Slug}" is already in use`, null];
+  return [null, Slug];
+}
+
+export async function ResolveTagSlugEdit(
+  Raw: unknown,
+  ExceptOwner: string
+): Promise<[string, null] | [null, string]> {
+  const Slug = Slugify(Raw);
+  if (!Slug) return ['Slug must contain at least one letter, number, - or _', null];
+  if (await IsTagSlugTaken(Slug, ExceptOwner)) return [`Slug "${Slug}" is already in use`, null];
   return [null, Slug];
 }

@@ -29,6 +29,7 @@ import { InitScriptManager } from './15-script-manager';
 import './16-dummy-clients';
 import { InitAudioAssets } from './17-audio-assets';
 import { InitIconPicker } from './18-icon-picker';
+import { InitTagManager } from './19-tag-manager';
 import { InitOfflineIndicators } from './offline-indicators';
 import { Init, WireGlobalUI } from './init';
 
@@ -43,6 +44,7 @@ InitModals();
 InitScriptManager();
 InitAudioAssets();
 InitIconPicker();
+InitTagManager();
 InitOfflineIndicators();
 void WireGlobalUI();
 void Init();

@@ -235,6 +235,15 @@
                 <button
                   type="button"
                   class="dropdown-item"
+                  id="SHOWTRAK_MODEL_CORE_TAG_MANAGER_BUTTON"
+                >
+                  Tag Manager
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item"
                   id="SHOWTRAK_MODEL_CORE_UPDATE_MANAGER_BUTTON"
                 >
                   Update Manager
@@ -1104,6 +1113,114 @@ Loading licence...</pre>
                   <i class="bi bi-arrow-clockwise"></i> Revert
                 </button>
                 <button type="button" id="SCRIPT_MANAGER_SAVE" class="btn btn-sm btn-success">
+                  <i class="bi bi-save"></i> Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_TAGMANAGER"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_TAGMANAGER_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-start">
+            <!-- List view -->
+            <div id="TAG_MANAGER_LIST_VIEW">
+              <div id="TAG_MANAGER_LIST_HEADER" class="mb-2"></div>
+              <div class="d-flex justify-content-end gap-2 mb-2">
+                <button
+                  type="button"
+                  id="TAG_MANAGER_CREATE"
+                  class="btn btn-sm script-manager-create-btn"
+                  title="Create a new tag"
+                >
+                  <i class="bi bi-plus-lg"></i> New
+                </button>
+              </div>
+              <div id="TAG_MANAGER_LIST" class="d-grid gap-2"></div>
+            </div>
+
+            <!-- Editor view -->
+            <div id="TAG_MANAGER_EDITOR_VIEW" class="d-none">
+              <div id="TAG_MANAGER_EDITOR_HEADER" class="mb-2"></div>
+              <div class="d-flex justify-content-end gap-2 mb-2">
+                <button
+                  type="button"
+                  id="TAG_MANAGER_DELETE"
+                  class="btn btn-sm script-manager-delete-btn"
+                  title="Delete tag"
+                >
+                  <i class="bi bi-trash"></i> Delete
+                </button>
+              </div>
+
+              <div id="TAG_MANAGER_ISSUES" class="script-manager-issues d-none mb-2"></div>
+
+              <div class="d-grid gap-2">
+                <div class="form-floating bg-ghost rounded">
+                  <input
+                    type="text"
+                    id="TAG_MANAGER_FIELD_SLUG"
+                    class="form-control bg-transparent text-light border-0"
+                    placeholder="Tag name"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <label for="TAG_MANAGER_FIELD_SLUG">Tag name</label>
+                </div>
+                <span class="text-sm text-muted mb-0"
+                  >Letters, numbers, <code>-</code> and <code>_</code> only; no spaces. Doubles as
+                  the tag's label and OSC/API identifier.</span
+                >
+
+                <div class="bg-ghost p-2 rounded d-grid gap-2">
+                  <span class="text-sm">Colour / Icon</span>
+                  <div class="d-flex align-items-center justify-content-between gap-2">
+                    <div id="TAG_MANAGER_COLOUR_SWATCHES" class="d-flex gap-2 flex-wrap"></div>
+                    <button
+                      type="button"
+                      id="TAG_MANAGER_ICON_PREVIEW"
+                      class="script-manager-icon-preview d-flex align-items-center justify-content-center"
+                      title="Click to choose an icon"
+                    >
+                      <i class="bi bi-tag"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="bg-ghost p-2 rounded d-grid gap-2">
+                  <span class="text-sm">Clients</span>
+                  <span class="text-sm text-muted mb-0"
+                    >Choose which clients and groups carry this tag. Selecting a group tags its
+                    current and future members.</span
+                  >
+                  <div class="alert-multiselect" id="TAG_SCOPE_DROPDOWN">
+                    <button
+                      type="button"
+                      class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center"
+                      id="TAG_SCOPE_TOGGLE"
+                    >
+                      <span>No clients</span>
+                      <i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>
+                    </button>
+                    <div class="alert-multiselect-menu d-none" id="TAG_SCOPE_MENU"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="d-flex justify-content-end gap-2 mt-2">
+                <button type="button" id="TAG_MANAGER_REVERT" class="btn btn-sm btn-outline-light">
+                  <i class="bi bi-arrow-clockwise"></i> Revert
+                </button>
+                <button type="button" id="TAG_MANAGER_SAVE" class="btn btn-sm btn-success">
                   <i class="bi bi-save"></i> Save
                 </button>
               </div>

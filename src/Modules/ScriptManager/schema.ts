@@ -315,5 +315,5 @@ function NormalizeScriptConfig(
   return { config: config as NormalizedScriptConfig, changed, errors };
 }
 
-export { PLATFORM_KEYS, SCRIPT_COLOURS, BOOTSTRAP_TO_COLOUR_INDEX, NormalizeScriptConfig };
+export { PLATFORM_KEYS, SCRIPT_COLOURS, BOOTSTRAP_TO_COLOUR_INDEX, NormalizeScriptConfig, NormalizeIconName };
 export type { NormalizedScriptConfig };

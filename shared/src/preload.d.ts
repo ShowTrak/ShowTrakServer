@@ -47,6 +47,8 @@ import type {
   SettingGroupView,
   SettingView,
   ShowTrakAlert,
+  TagScope,
+  TagView,
   UpdateDeployResult,
   UpdateDownloadProgress,
   UpdateDownloadResult,
@@ -260,6 +262,17 @@ export interface ShowTrakAPI {
   SetFullAlertRuleList(callback: (rules: AlertRuleView[]) => void): Unsubscribe;
   AlertTriggered(callback: (alert: AlertTriggeredEvent) => void): Unsubscribe;
   CreateShowTrakAlert(callback: (alert: ShowTrakAlert) => void): Unsubscribe;
+
+  // ---- Tags -------------------------------------------------------------
+  GetAllTags(): Promise<TagView[]>;
+  CreateTag(Label?: string): Promise<ResultTuple<TagView>>;
+  SetTagSlug(TagID: number, Slug: string): Promise<ResultTuple<boolean>>;
+  SetTagColour(TagID: number, Colour: number): Promise<ResultTuple<boolean>>;
+  SetTagIcon(TagID: number, Icon: string): Promise<ResultTuple<boolean>>;
+  SetTagScope(TagID: number, Scope: TagScope): Promise<ResultTuple<boolean>>;
+  SetTagOrder(OrderedTagIDs: number[]): Promise<ResultTuple<boolean>>;
+  DeleteTag(TagID: number): Promise<ResultTuple<unknown>>;
+  OnSetTagList(callback: (tags: TagView[]) => void): Unsubscribe;
 
   // ---- Custom audio assets ----------------------------------------------
   GetAudioAssets(): Promise<AudioAssetView[]>;

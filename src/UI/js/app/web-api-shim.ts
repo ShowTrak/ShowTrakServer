@@ -282,6 +282,17 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     AlertTriggered: (cb) => sub('AlertTriggered', cb),
     CreateShowTrakAlert: (cb) => sub('CreateShowTrakAlert', cb),
 
+    // ---- Tags (management desktop-only; no-op on web) --------------------
+    GetAllTags: emptyArray,
+    CreateTag: nullTuple,
+    SetTagSlug: nullTuple,
+    SetTagColour: nullTuple,
+    SetTagIcon: nullTuple,
+    SetTagScope: nullTuple,
+    SetTagOrder: nullTuple,
+    DeleteTag: nullTuple,
+    OnSetTagList: noSub,
+
     // ---- Custom audio assets (read allowed; management desktop-only) -----
     GetAudioAssets: async () => rpc('Audio:GetAll'),
     GetAudioAssetData: async (ID) => rpc('Audio:GetData', ID),

@@ -22,6 +22,7 @@ import { Manager as GroupManager } from '../Modules/GroupManager';
 import { Manager as MonitoringTargetManager } from '../Modules/MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../Modules/DummyClientManager';
 import { Manager as AlertsManager } from '../Modules/AlertsManager';
+import { Manager as TagManager } from '../Modules/TagManager';
 import { Manager as AudioAssetManager } from '../Modules/AudioAssetManager';
 import { Manager as ScriptManager } from '../Modules/ScriptManager';
 import { ToPublicScriptExecution } from '../Modules/ScriptExecutionManager';
@@ -392,6 +393,12 @@ async function UpdateAlertRuleList(): Promise<void> {
   PushToRenderers('SetFullAlertRuleList', Rules || []);
 }
 
+async function UpdateTagList(): Promise<void> {
+  if (!hasMainWindow()) return;
+  const Tags = await TagManager.GetAllViews();
+  PushToRenderers('SetTagList', Tags || []);
+}
+
 // Thin wrapper to surface system notifications in the renderer.
 async function Notify(Message: unknown, Type = 'info', Duration = 5000): Promise<void> {
   if (!hasMainWindow()) return;
@@ -494,6 +501,7 @@ function RegisterBroadcastBridge(): void {
   BroadcastManager.on('AdoptionListUpdated', UpdateAdoptionList);
   BroadcastManager.on('ScriptExecutionUpdated', UpdateScriptExecutions);
   BroadcastManager.on('AlertRuleListChanged', UpdateAlertRuleList);
+  BroadcastManager.on('TagListChanged', UpdateTagList);
   BroadcastManager.on('Notify', Notify);
   BroadcastManager.on('PlaySound', PlaySound);
   BroadcastManager.on('OSCBulkAction', HandleOSCBulkAction);

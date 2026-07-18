@@ -52,6 +52,7 @@ import './Modules/OSC'; // binds the OSC UDP listener on load
 import { Manager as MonitoringTargetManager } from './Modules/MonitoringTargetManager';
 import { Manager as ClientManager } from './Modules/ClientManager';
 import { Manager as GroupManager } from './Modules/GroupManager';
+import { Manager as TagManager } from './Modules/TagManager';
 import { Manager as DummyClientManager } from './Modules/DummyClientManager';
 import { Manager as AlertsManager } from './Modules/AlertsManager';
 import { Manager as AudioAssetManager } from './Modules/AudioAssetManager';
@@ -244,6 +245,7 @@ app.whenReady().then(async () => {
         await ClientManager.BackfillSlugs();
         await MonitoringTargetManager.BackfillSlugs();
         await GroupManager.BackfillSlugs();
+        await TagManager.BackfillSlugs();
       } catch (Err: unknown) {
         Logger.error('Failed to back-fill slugs:', Err);
       }

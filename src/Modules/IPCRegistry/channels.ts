@@ -146,6 +146,16 @@ const INVOKE_CHANNELS = [
   'AlertActionsEnabled:Get',
   'AlertActionsEnabled:Set',
 
+  // Tags
+  'Tags:GetAll',
+  'Tags:Create',
+  'Tags:SetSlug',
+  'Tags:SetColour',
+  'Tags:SetIcon',
+  'Tags:SetScope',
+  'Tags:SetOrder',
+  'Tags:Delete',
+
   // Audio assets
   'Audio:GetAll',
   'Audio:GetData',
@@ -182,6 +192,7 @@ const SUBSCRIBE_CHANNELS = [
   'DummyClientUpdated',
   'NetworkDeviceScanEvent',
   'SetFullAlertRuleList',
+  'SetTagList',
   'AlertTriggered',
   'CreateShowTrakAlert',
   'AudioAssetsUpdated',

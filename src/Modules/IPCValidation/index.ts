@@ -74,6 +74,11 @@ export interface IPCValidationManager {
   AlertRuleCreatePayload(value: unknown): Record<string, unknown>;
   AlertRuleUpdatePayload(value: unknown): Record<string, unknown>;
 
+  // Tags (tag-validators.ts)
+  TagID(value: unknown, fieldName?: string): number;
+  TagColour(value: unknown, fieldName?: string): number;
+  TagScope(value: unknown): { Workspace: boolean; Groups: number[]; Clients: string[] };
+
   // Audio assets (audio-validators.ts)
   AudioAssetID(value: unknown, fieldName?: string): string;
   AudioImportPayload(value: unknown): Record<string, unknown>;
@@ -92,6 +97,7 @@ require('./script-validators')(Manager);
 require('./monitoring-validators')(Manager);
 require('./dummy-validators')(Manager);
 require('./alert-validators')(Manager);
+require('./tag-validators')(Manager);
 require('./audio-validators')(Manager);
 require('./system-validators')(Manager);
 

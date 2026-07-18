@@ -137,6 +137,15 @@ export interface ScriptWhitelistRow {
   UpdatedAt: number;
 }
 
+export interface TagRow {
+  TagID: number;
+  Slug: string | null; // back-filled non-null on first boot; nullable pre-migration
+  Colour: number; // index into the shared Scripts colour palette
+  Icon: string; // bare Bootstrap Icons name (no "bi-" prefix)
+  Scope: string; // JSON: { Workspace, Groups[], Clients[] }
+  Weight: number;
+}
+
 export interface SchemaMigrationRow {
   Version: number;
   AppliedAt: number;

@@ -238,6 +238,29 @@ export interface GroupView {
   Slug?: string | null;
 }
 
+/**
+ * Tag membership scope (same shape as ScriptWhitelistScope / AlertRuleScope).
+ * `Workspace: true` means every client carries the tag; otherwise membership is
+ * the union of the listed groups (by GroupID, dynamic — current AND future
+ * members) and clients (by scoped ID: plain UUID, or `monitor:`/`check:`…).
+ */
+export interface TagScope {
+  Workspace: boolean;
+  Groups: number[];
+  Clients: string[];
+}
+
+/** Renderer-facing tag. Colour is an index into the shared Scripts palette. */
+export interface TagView {
+  TagID: number;
+  // The slug doubles as the tag's display label; unique among tags. Back-filled
+  // non-null on boot but typed nullable for pre-back-fill rows.
+  Slug: string | null;
+  Colour: number;
+  Icon: string; // bare Bootstrap Icons name (no "bi-" prefix)
+  Scope: TagScope;
+}
+
 // ---------------------------------------------------------------------------
 // Domain view types (serialized shapes as they cross the IPC boundary).
 // Field casing intentionally mirrors each producer: some handlers emit

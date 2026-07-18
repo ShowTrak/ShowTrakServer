@@ -20,6 +20,7 @@ import { GetIdentifyingUUIDs, HideExecutionToast, Notify, StopIdentifyingForUUID
 import { OpenClientInfo } from './client-info-modal';
 import { TestAllNotifications } from './lib/debug-notifications';
 import { OpenScriptManager } from './15-script-manager';
+import { OpenTagManager } from './19-tag-manager';
 import { OpenDummyClientEditor } from './16-dummy-clients';
 import {
   OpenUnassignedClientCreationModal,
@@ -441,6 +442,10 @@ export async function Init() {
 
   $('#SHOWTRAK_MODEL_CORE_GROUP_MANAGER_BUTTON').on('click', async () => {
     await OpenGroupManager();
+  });
+
+  $('#SHOWTRAK_MODEL_CORE_TAG_MANAGER_BUTTON').on('click', async () => {
+    await OpenTagManager();
   });
 
   $('#SHOWTRAK_MODEL_CORE_ALERT_MANAGER_BUTTON').on('click', async () => {

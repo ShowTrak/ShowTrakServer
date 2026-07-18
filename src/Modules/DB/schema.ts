@@ -217,6 +217,25 @@ Schema.push({
     )',
 });
 
+// Tags are cross-cutting, colour+icon labelled collections of clients that
+// overlap freely (unlike Groups, where a client belongs to exactly one). The
+// Slug doubles as the tag's display label. Colour is an integer index into the
+// shared Scripts colour palette; Icon is a bare Bootstrap Icons name. Membership
+// is dynamic: Scope is the same JSON shape as AlertRules.Scope /
+// ScriptWhitelists.Scope ({ Workspace, Groups[], Clients[] }), so tagging a group
+// carries the tag to its current and future members.
+Schema.push({
+  Name: 'Tags',
+  SQL: "CREATE TABLE IF NOT EXISTS `Tags` ( \
+            TagID INTEGER PRIMARY KEY AUTOINCREMENT, \
+            Slug TEXT, \
+            Colour INTEGER NOT NULL DEFAULT 6, \
+            Icon TEXT NOT NULL DEFAULT 'tag', \
+            Scope TEXT NOT NULL DEFAULT '{\"Workspace\":false,\"Groups\":[],\"Clients\":[]}', \
+            Weight INTEGER NOT NULL DEFAULT 100 \
+    )",
+});
+
 // Versioned migrations for existing installs. Applied versions are recorded in
 // the SchemaMigrations table; only versions above the recorded maximum run.
 // Installs that predate the version table are back-filled by probing
@@ -277,6 +296,14 @@ Schema.Migrations = [
   {
     Version: 18,
     SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_slug ON `Groups` (Slug COLLATE NOCASE)',
+  },
+  // Tags: a new sluggable entity type in its own `tags` namespace. The NOCASE
+  // unique index is the in-table safety net; app-level uniqueness lives in the
+  // Slug service. The Tags table itself is created by the Schema block above on
+  // both new and existing installs.
+  {
+    Version: 19,
+    SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_tags_slug ON `Tags` (Slug COLLATE NOCASE)',
   },
 ];
 
