@@ -36,7 +36,8 @@ function loadOSC(overrides = {}) {
       Manager: {
         Get: async (uuid) => (uuid === 'good' ? [null, { UUID: 'good' }] : ['not found', null]),
         // Slug is the encouraged addressing key; UUID resolves only via Get above.
-        GetBySlug: async (slug) => (slug === 'stage-left' ? { UUID: 'good', Slug: 'stage-left' } : null),
+        GetBySlug: async (slug) =>
+          slug === 'stage-left' ? { UUID: 'good', Slug: 'stage-left' } : null,
         GetAll: async () => [
           null,
           [
@@ -56,7 +57,8 @@ function loadOSC(overrides = {}) {
         Get: async (id) =>
           Number(id) === 1 ? [null, { GroupID: 1, Title: 'Main' }] : [null, null],
         // Groups are addressed by slug; a numeric GroupID resolves via Get above.
-        GetBySlug: async (slug) => (slug === 'main' ? { GroupID: 1, Title: 'Main', Slug: 'main' } : null),
+        GetBySlug: async (slug) =>
+          slug === 'main' ? { GroupID: 1, Title: 'Main', Slug: 'main' } : null,
       },
     },
     '../DummyClientManager': {
