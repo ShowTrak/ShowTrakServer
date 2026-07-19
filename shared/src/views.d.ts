@@ -741,7 +741,13 @@ export type OSCBulkActionType =
   | 'Deselect'
   | 'WOL'
   | 'ExecuteScript'
-  | 'InternalScript';
+  | 'InternalScript'
+  // SDK control API types. The modal ones are desktop-only (suppressed on the
+  // web push); the view ones apply to whichever renderer receives them.
+  | 'OpenClientModal'
+  | 'CloseModals'
+  | 'SetCompactView'
+  | 'ToggleCompactView';
 
 export interface DebugTrafficEntry {
   protocol: 'osc';

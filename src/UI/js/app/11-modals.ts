@@ -130,6 +130,9 @@ export function InitModals() {
       if (Args === 'dummy') return await OpenDummyClientHistory(String(Id));
       return await OpenClientInfo(String(Id));
     }
+    // SDK control API: dismiss whatever is open. Like OpenClientModal this only
+    // reaches the desktop window — the web namespace suppresses both types.
+    if (Type == 'CloseModals') return closeAllModals();
     // SDK control API: drive the compact/expanded view (persisted, like the UI).
     if (Type == 'SetCompactView') return SetCompactMode(!!Args, { persist: true });
     if (Type == 'ToggleCompactView') return SetCompactMode(!CompactMode, { persist: true });

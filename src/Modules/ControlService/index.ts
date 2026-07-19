@@ -252,12 +252,16 @@ export const ControlService = {
     return ok(`Mode set to ${Next}`);
   },
 
-  // Open the entity view modal (renderer-only) ----------------------------
+  // Open the entity view modal (desktop renderer only) --------------------
   // Slugs share one namespace across clients, monitoring targets and dummies, so
   // resolve across all three and tag the bulk action with the entity type; the
   // renderer routes each to its matching view (client info / monitor history /
   // dummy history). Integrated clients (QLab, etc.) have no host details, so the
   // client info window still refuses to open for them.
+  //
+  // Modal actions are addressed at the operator's own desktop window: the web
+  // namespace drops them (WEB_SUPPRESSED_BULK_ACTIONS) so a Companion press does
+  // not throw a modal up on every logged-in browser as well.
   async OpenClientModal(slug: string): Promise<CommandResult> {
     const c = await resolveClientByKey(slug);
     if (c) {
@@ -285,6 +289,13 @@ export const ControlService = {
     }
 
     return fail(`Invalid Client "${slug}"`);
+  },
+
+  // Dismiss every open modal on the desktop renderer. No targets — the renderer
+  // closes whatever it currently has open.
+  async CloseModals(): Promise<CommandResult> {
+    emitBulk('CloseModals', []);
+    return ok('Closed all modals');
   },
 
   // Save the current show file --------------------------------------------

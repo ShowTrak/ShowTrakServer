@@ -180,6 +180,33 @@ test('OpenClientModal resolves a dummy slug and tags it as a dummy', async () =>
   assert.equal(bulk[3], 'dummy');
 });
 
+test('CloseModals emits a targetless CloseModals bulk action', async () => {
+  const { ControlService, broadcastEvents } = loadControlService();
+  const result = await ControlService.CloseModals();
+  assert.equal(result.ok, true);
+  const bulk = broadcastEvents.find(
+    ([e, action]) => e === 'OSCBulkAction' && action === 'CloseModals'
+  );
+  assert.ok(bulk);
+  assert.deepEqual(bulk[2], []);
+});
+
+// The modal actions drive the operator's own desktop window; the web namespace
+// must drop them so a Companion press does not open/close modals in every
+// logged-in browser as well.
+test('the modal bulk actions are suppressed on the web push', () => {
+  const { WEB_SUPPRESSED_BULK_ACTIONS, WEB_PUSH_ALLOWLIST } = require(
+    path.join(__dirname, '..', 'dist', 'Modules', 'Server', 'webui-namespace.js')
+  );
+  assert.ok(WEB_PUSH_ALLOWLIST.has('OSCBulkAction'));
+  assert.ok(WEB_SUPPRESSED_BULK_ACTIONS.has('OpenClientModal'));
+  assert.ok(WEB_SUPPRESSED_BULK_ACTIONS.has('CloseModals'));
+  // Actions that are legitimate server-wide state stay on the web push.
+  for (const action of ['Select', 'Deselect', 'WOL', 'ExecuteScript']) {
+    assert.ok(!WEB_SUPPRESSED_BULK_ACTIONS.has(action));
+  }
+});
+
 test('RunScriptOnClient validates script and dispatches ExecuteScript', async () => {
   const { ControlService, handlerCalls } = loadControlService();
   const result = await ControlService.RunScriptOnClient('stage-left', 'reboot');

@@ -2490,9 +2490,13 @@ button.btn:focus {
   text-align: right;
   align-self: center;
 }
+/* Failure reason — same trailer treatment as the console tail above so it hugs
+   the right edge and sits centred against the taller client/script chips. */
 .exec-inline-error {
   color: #ffb4bc;
   flex: 1 1 auto;
+  text-align: right;
+  align-self: center;
 }
 /* Running spinner shown in place of the status icon. */
 .exec-spinner {
@@ -2587,6 +2591,16 @@ button.btn:focus {
 /* tiny duration text next to icons */
 .exec-duration {
   opacity: 0.9;
+  color: #fff;
+}
+/* The duration span is an inline box in a flex row, so its line box — not its
+   glyphs — is what gets centred; make it a flex item in its own right so the
+   text lines up with the 22px status indicator beside it. */
+.exec-time {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  line-height: 1;
 }
 
 #NETWORK_DISCOVERY_RESULTS {

@@ -229,6 +229,8 @@ async function DispatchCommand(name: unknown, rawArgs: unknown) {
       return ControlService.ToggleMode();
     case 'modal.openClient':
       return ControlService.OpenClientModal(slug);
+    case 'modal.closeAll':
+      return ControlService.CloseModals();
     case 'show.save':
       return ControlService.SaveShow();
     default:

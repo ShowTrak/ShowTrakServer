@@ -311,6 +311,13 @@ const WEB_PUSH_CHANNELS = [
 ] as const satisfies readonly SubscribeChannel[];
 const WEB_PUSH_ALLOWLIST = new Set<string>(WEB_PUSH_CHANNELS);
 
+// OSCBulkAction is allowlisted as a whole (Select/Deselect/WOL/ExecuteScript are
+// legitimate web actions), but a few of its types drive the operator's own
+// desktop window rather than a shared server state — opening or closing modals on
+// every logged-in browser would yank the UI out from under whoever is using it.
+// These types are dropped from the web push and delivered to the desktop only.
+const WEB_SUPPRESSED_BULK_ACTIONS = new Set<string>(['OpenClientModal', 'CloseModals']);
+
 // Serialize a push payload for the web wire. Most channels already carry plain
 // objects; client-bearing channels must be run through ToPublicClient so the
 // browser receives the same shape the desktop renderer consumes.
@@ -486,6 +493,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
   // with the desktop window sink.
   RegisterRendererSink((channel: string, ...args: unknown[]) => {
     if (!WEB_PUSH_ALLOWLIST.has(channel)) return;
+    if (channel === 'OSCBulkAction' && WEB_SUPPRESSED_BULK_ACTIONS.has(String(args[0]))) return;
     let payload: unknown[];
     try {
       payload = TransformWebPush(channel, args);
@@ -722,6 +730,7 @@ export {
   WEB_SCRIPT_CHANNELS,
   WEB_WOL_CHANNELS,
   WEB_PUSH_ALLOWLIST,
+  WEB_SUPPRESSED_BULK_ACTIONS,
   AuthorizeWebChannel,
   IssueToken,
   IsValidToken,

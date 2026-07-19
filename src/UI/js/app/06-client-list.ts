@@ -302,11 +302,11 @@ function InitClientListPush() {
   const listEl = $list[0] as HTMLElement | undefined;
   if (!listEl) return;
 
+  // Durations render white regardless of how long they took — the row's state
+  // (fill colour + indicator) already carries success/failure, so colouring the
+  // timing on top of it read as a second, conflicting signal.
   function durationText(ms: number) {
-    let cls = 'text-success';
-    if (ms > 2000) cls = 'text-danger';
-    else if (ms > 800) cls = 'text-warning';
-    return `<small class="exec-duration ${cls}">${Safe(ms)}ms</small>`;
+    return `<small class="exec-duration">${Safe(ms)}ms</small>`;
   }
 
   function truncateExecutionLabel(value: string | null | undefined, maxLen = 34) {
