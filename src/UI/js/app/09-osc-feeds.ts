@@ -311,25 +311,15 @@ export const ROUTE_DISPLAY_ORDER = [
   '/Clients',
   '/Shutdown',
   '/Shutdown/Force',
-  '/Client/:Slug/Select',
-  '/Client/:Slug/Deselect',
   '/Client/:Slug/WakeOnLAN',
   '/Client/:Slug/RunScript/:ScriptID',
   '/Dummy/:Slug/Heartbeat',
-  '/Group/:Slug/Select',
-  '/Group/:Slug/Deselect',
   '/Group/:Slug/WakeOnLAN',
   '/Group/:Slug/RunScript/:ScriptID',
-  '/Tag/:Slug/Select',
-  '/Tag/:Slug/Deselect',
   '/Tag/:Slug/WakeOnLAN',
   '/Tag/:Slug/RunScript/:ScriptID',
-  '/All/Select',
-  '/All/Deselect',
   '/All/WakeOnLAN',
   '/All/RunScript/:ScriptID',
-  '/Selection/WakeOnLAN',
-  '/Selection/RunScript/:ScriptID',
 ];
 
 export const ROUTE_SECTION_ORDER: Record<string, number> = {
@@ -340,7 +330,6 @@ export const ROUTE_SECTION_ORDER: Record<string, number> = {
   Group: 40,
   Tag: 45,
   All: 50,
-  Selection: 60,
 };
 
 export function getLogicalRouteOrder(PathValue: string) {

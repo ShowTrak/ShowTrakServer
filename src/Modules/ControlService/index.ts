@@ -314,6 +314,21 @@ export const ControlService = {
       return fail('Save failed');
     }
   },
+
+  // Shutdown ---------------------------------------------------------------
+  // Mirrors the OSC /API/Shutdown routes: the same Broadcast events the desktop
+  // menu raises, so save prompts and show-mode guards behave identically. The
+  // graceful variant may be blocked by those prompts; Force skips them.
+  async Shutdown(): Promise<CommandResult> {
+    Logger.warn('Received shutdown command via SDK');
+    Broadcast.emit('Shutdown');
+    return ok('Shutdown requested');
+  },
+  async ShutdownForce(): Promise<CommandResult> {
+    Logger.warn('Received force shutdown command via SDK');
+    Broadcast.emit('ShutdownForce');
+    return ok('Force shutdown requested');
+  },
 };
 
 export type ControlServiceType = typeof ControlService;

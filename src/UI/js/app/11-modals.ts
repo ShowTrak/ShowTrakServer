@@ -13,9 +13,7 @@ const MIN_LAUNCH_DELAY_SECONDS = 10;
 import {
   ClearSelection,
   ConfirmationDialog,
-  Deselect,
   Notify,
-  Select,
   ShowExecutionToast,
   Wait,
 } from './14-selection-init';
@@ -117,8 +115,6 @@ export function InitModals() {
       return;
     }
     if (Type == 'InternalScript') return;
-    if (Type == 'Select') return Targets.map((UUID) => Select(UUID));
-    if (Type == 'Deselect') return Targets.map((UUID) => Deselect(UUID));
     // SDK control API: open the view modal for a client, monitor or dummy. The
     // entity type rides in Args (set by ControlService.OpenClientModal); each
     // type has its own renderer view. Missing/unknown Args defaults to a client

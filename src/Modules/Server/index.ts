@@ -226,10 +226,10 @@ const ClientsListHandler = async (req: Request, res: Response) => {
 app.get('/API/Clients', ClientsListHandler);
 
 // 2-7. OSC routes mirrored to HTTP (mirrors the logical order defined in OSC/index.js)
-//      System Control → Client → Dummy → Group → All → Selection
+//      System Control → Client → Dummy → Group → Tag → All
 // Mirror all OSC routes to HTTP API routes under /API. Clients/groups are
 // addressed by their slug (a raw UUID/GroupID is still accepted as a fallback).
-// Example: /API/Client/:Slug/Select -> /API/Client/:Slug/Select
+// Example: /API/Client/:Slug/WakeOnLAN -> /API/Client/:Slug/WakeOnLAN
 for (const Route of OSC.GetRoutes()) {
   const NormalizedPath =
     String(Route.Path || '').replace(/^\/(?:ShowTrak|API)(?=\/|$)/i, '') || '/';

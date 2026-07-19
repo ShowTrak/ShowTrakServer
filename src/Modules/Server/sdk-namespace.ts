@@ -233,6 +233,10 @@ async function DispatchCommand(name: unknown, rawArgs: unknown) {
       return ControlService.CloseModals();
     case 'show.save':
       return ControlService.SaveShow();
+    case 'system.shutdown':
+      return ControlService.Shutdown();
+    case 'system.shutdownForce':
+      return ControlService.ShutdownForce();
     default:
       return { ok: false, detail: `Unknown command "${String(name)}"` };
   }

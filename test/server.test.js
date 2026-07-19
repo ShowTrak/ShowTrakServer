@@ -1191,15 +1191,21 @@ test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve
     path: require('path'),
   });
 
-  // All four tag actions are mounted for both verbs.
-  for (const action of ['Select', 'Deselect', 'WakeOnLAN', 'RunScript/:ScriptID']) {
+  // Both surviving tag actions are mounted for both verbs (Select/Deselect were
+  // deprecated and removed).
+  for (const action of ['WakeOnLAN', 'RunScript/:ScriptID']) {
     const p = `/API/Tag/:Slug/${action}`;
     assert.ok(getRoutes.includes(p), `GET ${p} registered`);
     assert.ok(postRoutes.includes(p), `POST ${p} registered`);
   }
+  for (const action of ['Select', 'Deselect']) {
+    const p = `/API/Tag/:Slug/${action}`;
+    assert.ok(!getRoutes.includes(p), `GET ${p} must stay deprecated`);
+    assert.ok(!postRoutes.includes(p), `POST ${p} must stay deprecated`);
+  }
 
-  // Drive /API/Tag/:Slug/Select end-to-end through the real handler.
-  const handler = getHandlers['/API/Tag/:Slug/Select'];
+  // Drive /API/Tag/:Slug/WakeOnLAN end-to-end through the real handler.
+  const handler = getHandlers['/API/Tag/:Slug/WakeOnLAN'];
   assert.equal(typeof handler, 'function');
   let statusCode = 200;
   let payload = null;
@@ -1217,9 +1223,9 @@ test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve
   await handler({ params: { Slug: 'foh' }, ip: '127.0.0.1', socket: {} }, res);
   assert.equal(statusCode, 200);
   assert.equal(payload.Error, false);
-  // The tag's scope (group 1) expanded to exactly r1, dispatched as a Select.
-  const bulk = broadcastEvents.find(([e, a]) => e === 'OSCBulkAction' && a === 'Select');
-  assert.ok(bulk, 'expected a Select bulk action');
+  // The tag's scope (group 1) expanded to exactly r1, dispatched as a WOL.
+  const bulk = broadcastEvents.find(([e, a]) => e === 'OSCBulkAction' && a === 'WOL');
+  assert.ok(bulk, 'expected a WOL bulk action');
   assert.deepEqual(bulk[2], ['r1']);
 });
 

@@ -151,7 +151,6 @@ interface OSCRoute {
 }
 
 const Routes: OSCRoute[] = [];
-const SelectedClientUUIDs = new Set<string>();
 
 function emitDebugEntry(payload: OSCDebugPayload) {
   Broadcast.emit('DebugTrafficEntry', {
@@ -173,24 +172,6 @@ function successResult(detail: unknown = ''): RouteResult {
     ok: true,
     detail: String(detail || ''),
   };
-}
-
-function getSelectedUUIDList(): string[] {
-  return Array.from(SelectedClientUUIDs);
-}
-
-function addSelectedUUIDs(UUIDs: string[]) {
-  for (const UUID of UUIDs || []) {
-    if (!UUID) continue;
-    SelectedClientUUIDs.add(String(UUID));
-  }
-}
-
-function removeSelectedUUIDs(UUIDs: string[]) {
-  for (const UUID of UUIDs || []) {
-    if (!UUID) continue;
-    SelectedClientUUIDs.delete(String(UUID));
-  }
 }
 
 // Resolve a real client addressed over OSC by either its UUID or its slug
@@ -406,36 +387,6 @@ OSC.CreateRoute(
 // resolveClientByKey still resolves a raw UUID as a transitional fallback, but
 // the route param, docs and titles all lead with the slug.
 OSC.CreateRoute(
-  '/API/Client/:Slug/Select',
-  async (Req) => {
-    const Client = await resolveClientByKey(Req.Slug ?? '');
-    if (!Client) {
-      Broadcast.emit('Notify', `OSC - Invalid Client "${Req.Slug}"`, 'error');
-      return failureResult(`Invalid Client "${Req.Slug}"`);
-    }
-    addSelectedUUIDs([Client.UUID]);
-    Broadcast.emit('OSCBulkAction', 'Select', [Client.UUID], null);
-    return successResult(`Selected client "${Client.Slug || Client.UUID}"`);
-  },
-  'Select a Client by its slug'
-);
-
-OSC.CreateRoute(
-  '/API/Client/:Slug/Deselect',
-  async (Req) => {
-    const Client = await resolveClientByKey(Req.Slug ?? '');
-    if (!Client) {
-      Broadcast.emit('Notify', `OSC - Invalid Client "${Req.Slug}"`, 'error');
-      return failureResult(`Invalid Client "${Req.Slug}"`);
-    }
-    removeSelectedUUIDs([Client.UUID]);
-    Broadcast.emit('OSCBulkAction', 'Deselect', [Client.UUID], null);
-    return successResult(`Deselected client "${Client.Slug || Client.UUID}"`);
-  },
-  'Deselect a Client by its slug'
-);
-
-OSC.CreateRoute(
   '/API/Client/:Slug/WakeOnLAN',
   async (Req) => {
     const Client = await resolveClientByKey(Req.Slug ?? '');
@@ -492,44 +443,6 @@ OSC.CreateRoute(
 // getGroupClients/resolveGroupByKey still accept a numeric GroupID as a
 // transitional fallback, but the param, docs and titles lead with the slug.
 OSC.CreateRoute(
-  '/API/Group/:Slug/Select',
-  async (Req) => {
-    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.Slug ?? '');
-    if (GroupErr) {
-      Broadcast.emit('Notify', `OSC - ${GroupErr.detail}`, 'error');
-      return GroupErr;
-    }
-
-    const UUIDs = GroupClients.map((Client) => Client.UUID);
-    addSelectedUUIDs(UUIDs);
-    Broadcast.emit('OSCBulkAction', 'Select', UUIDs, null);
-    return successResult(
-      `Selected ${UUIDs.length} clients in group "${Group.Title}" (${Group.Slug || Group.GroupID})`
-    );
-  },
-  'Select all members of a Group by its slug'
-);
-
-OSC.CreateRoute(
-  '/API/Group/:Slug/Deselect',
-  async (Req) => {
-    const [GroupErr, Group, GroupClients] = await getGroupClients(Req.Slug ?? '');
-    if (GroupErr) {
-      Broadcast.emit('Notify', `OSC - ${GroupErr.detail}`, 'error');
-      return GroupErr;
-    }
-
-    const UUIDs = GroupClients.map((Client) => Client.UUID);
-    removeSelectedUUIDs(UUIDs);
-    Broadcast.emit('OSCBulkAction', 'Deselect', UUIDs, null);
-    return successResult(
-      `Deselected ${UUIDs.length} clients in group "${Group.Title}" (${Group.Slug || Group.GroupID})`
-    );
-  },
-  'Deselect all members of a Group by its slug'
-);
-
-OSC.CreateRoute(
   '/API/Group/:Slug/WakeOnLAN',
   async (Req) => {
     const [GroupErr, Group, GroupClients] = await getGroupClients(Req.Slug ?? '');
@@ -576,44 +489,6 @@ OSC.CreateRoute(
 // addressed by its slug (which doubles as its label) or, transitionally, its
 // numeric TagID.
 OSC.CreateRoute(
-  '/API/Tag/:Slug/Select',
-  async (Req) => {
-    const [TagErr, Tag, TagClients] = await getTagClients(Req.Slug ?? '');
-    if (TagErr) {
-      Broadcast.emit('Notify', `OSC - ${TagErr.detail}`, 'error');
-      return TagErr;
-    }
-
-    const UUIDs = TagClients.map((Client) => Client.UUID);
-    addSelectedUUIDs(UUIDs);
-    Broadcast.emit('OSCBulkAction', 'Select', UUIDs, null);
-    return successResult(
-      `Selected ${UUIDs.length} clients with tag "${Tag.Slug || Tag.TagID}"`
-    );
-  },
-  'Select all clients carrying a Tag by its slug'
-);
-
-OSC.CreateRoute(
-  '/API/Tag/:Slug/Deselect',
-  async (Req) => {
-    const [TagErr, Tag, TagClients] = await getTagClients(Req.Slug ?? '');
-    if (TagErr) {
-      Broadcast.emit('Notify', `OSC - ${TagErr.detail}`, 'error');
-      return TagErr;
-    }
-
-    const UUIDs = TagClients.map((Client) => Client.UUID);
-    removeSelectedUUIDs(UUIDs);
-    Broadcast.emit('OSCBulkAction', 'Deselect', UUIDs, null);
-    return successResult(
-      `Deselected ${UUIDs.length} clients with tag "${Tag.Slug || Tag.TagID}"`
-    );
-  },
-  'Deselect all clients carrying a Tag by its slug'
-);
-
-OSC.CreateRoute(
   '/API/Tag/:Slug/WakeOnLAN',
   async (Req) => {
     const [TagErr, Tag, TagClients] = await getTagClients(Req.Slug ?? '');
@@ -657,39 +532,6 @@ OSC.CreateRoute(
 
 // Bulk All Operations
 OSC.CreateRoute(
-  '/API/All/Select',
-  async (_Req) => {
-    const [Err, AllClients] = await ClientManager.GetAll();
-    if (Err || !AllClients) {
-      Broadcast.emit('Notify', `OSC - Failed to fetch all clients.`, 'error');
-      return failureResult('Failed to fetch all clients');
-    }
-    Broadcast.emit(
-      'OSCBulkAction',
-      'Select',
-      AllClients.map((Client) => Client.UUID),
-      null
-    );
-    addSelectedUUIDs(AllClients.map((Client) => Client.UUID));
-    return successResult(`Selected ${AllClients.length} clients`);
-  },
-  'Select all Clients'
-);
-
-OSC.CreateRoute(
-  '/API/All/Deselect',
-  async (_Req) => {
-    const UUIDs = getSelectedUUIDList();
-    if (UUIDs.length > 0) {
-      Broadcast.emit('OSCBulkAction', 'Deselect', UUIDs, null);
-    }
-    SelectedClientUUIDs.clear();
-    return successResult(`Deselected ${UUIDs.length} selected clients`);
-  },
-  'Clear the selected clients'
-);
-
-OSC.CreateRoute(
   '/API/All/WakeOnLAN',
   async (_Req) => {
     const [Err, AllClients] = await ClientManager.GetAll();
@@ -730,42 +572,6 @@ OSC.CreateRoute(
     return successResult(`Script "${Req.ScriptID}" queued for ${AllClients.length} clients`);
   },
   'Execute a script on all online Clients by Script ID'
-);
-
-// Selection-based Operations
-OSC.CreateRoute(
-  '/API/Selection/WakeOnLAN',
-  async (_Req) => {
-    const UUIDs = getSelectedUUIDList();
-    if (UUIDs.length === 0) {
-      Broadcast.emit('Notify', 'OSC - No selected clients', 'error');
-      return failureResult('No selected clients');
-    }
-    Broadcast.emit('OSCBulkAction', 'WOL', UUIDs, null);
-    return successResult(`Wake-on-LAN queued for ${UUIDs.length} selected clients`);
-  },
-  'Send a WOL packet to currently selected clients'
-);
-
-OSC.CreateRoute(
-  '/API/Selection/RunScript/:ScriptID',
-  async (Req) => {
-    const UUIDs = getSelectedUUIDList();
-    if (UUIDs.length === 0) {
-      Broadcast.emit('Notify', 'OSC - No selected clients', 'error');
-      return failureResult('No selected clients');
-    }
-
-    const Script = await ScriptManager.Get(Req.ScriptID ?? '');
-    if (!Script) {
-      Broadcast.emit('Notify', `OSC - Invalid Script ID "${Req.ScriptID}"`, 'error');
-      return failureResult(`Invalid Script ID "${Req.ScriptID}"`);
-    }
-
-    Broadcast.emit('OSCBulkAction', 'ExecuteScript', UUIDs, Req.ScriptID);
-    return successResult(`Script "${Req.ScriptID}" queued for ${UUIDs.length} selected clients`);
-  },
-  'Execute a script on currently selected clients by Script ID'
 );
 
 // Bind the listener on load using the compiled-in default port so OSC control

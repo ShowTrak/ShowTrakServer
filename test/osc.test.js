@@ -108,20 +108,25 @@ test('OSC registers the built-in routes', () => {
   assert.ok(routes.includes('/API/Shutdown/Force'));
   // Clients and groups are addressed by slug (UUID/GroupID still resolve as a
   // fallback, but the route param leads with the slug).
-  assert.ok(routes.includes('/API/Client/:Slug/Select'));
+  assert.ok(routes.includes('/API/Client/:Slug/WakeOnLAN'));
   assert.ok(routes.includes('/API/Client/:Slug/RunScript/:ScriptID'));
-  assert.ok(routes.includes('/API/Group/:Slug/Select'));
+  assert.ok(routes.includes('/API/Group/:Slug/WakeOnLAN'));
   assert.ok(routes.includes('/API/Group/:Slug/RunScript/:ScriptID'));
   // Tags mirror the group actions, addressed by slug (TagID resolves as a fallback).
-  assert.ok(routes.includes('/API/Tag/:Slug/Select'));
-  assert.ok(routes.includes('/API/Tag/:Slug/Deselect'));
   assert.ok(routes.includes('/API/Tag/:Slug/WakeOnLAN'));
   assert.ok(routes.includes('/API/Tag/:Slug/RunScript/:ScriptID'));
-  assert.ok(routes.includes('/API/All/Select'));
-  assert.ok(routes.includes('/API/All/Deselect'));
-  assert.ok(routes.includes('/API/Selection/WakeOnLAN'));
-  assert.ok(routes.includes('/API/Selection/RunScript/:ScriptID'));
   assert.ok(routes.includes('/API/All/WakeOnLAN'));
+  assert.ok(routes.includes('/API/All/RunScript/:ScriptID'));
+});
+
+// Selection was deprecated and removed: the OSC module no longer keeps a
+// selection set, so no route may reintroduce one. The HTTP surface is generated
+// from this same table (Server/index.ts), so this covers both protocols.
+test('OSC exposes no selection routes', () => {
+  const { OSC } = loadOSC();
+  const routes = OSC.GetRoutes().map((r) => r.Path);
+  const selectionRoutes = routes.filter((p) => /\/(?:De)?Select$|^\/API\/Selection\//i.test(p));
+  assert.deepEqual(selectionRoutes, [], 'selection routes were deprecated and must stay removed');
 });
 
 test('OSC force shutdown route emits ShutdownForce broadcast', async () => {
@@ -130,49 +135,49 @@ test('OSC force shutdown route emits ShutdownForce broadcast', async () => {
   assert.ok(broadcastEvents.some(([event]) => event === 'ShutdownForce'));
 });
 
-test('OSC dispatches a client select route with a valid UUID', async () => {
+test('OSC dispatches a client route with a valid UUID', async () => {
   const { handlers, broadcastEvents } = loadOSC();
-  await handlers.message(['/API/Client/good/Select']);
+  await handlers.message(['/API/Client/good/WakeOnLAN']);
   assert.ok(
     broadcastEvents.some(
       ([event, action, uuids]) =>
-        event === 'OSCBulkAction' && action === 'Select' && uuids[0] === 'good'
+        event === 'OSCBulkAction' && action === 'WOL' && uuids[0] === 'good'
     )
   );
 });
 
 test('OSC reports an error notification for an invalid UUID', async () => {
   const { handlers, broadcastEvents } = loadOSC();
-  await handlers.message(['/API/Client/bad/Select']);
+  await handlers.message(['/API/Client/bad/WakeOnLAN']);
   assert.ok(broadcastEvents.some(([event, , level]) => event === 'Notify' && level === 'error'));
 });
 
-test('OSC dispatches a client select route addressed by slug', async () => {
+test('OSC dispatches a client route addressed by slug', async () => {
   const { handlers, broadcastEvents } = loadOSC();
   // "stage-left" is not a UUID (Get fails); it resolves via GetBySlug.
-  await handlers.message(['/API/Client/stage-left/Select']);
+  await handlers.message(['/API/Client/stage-left/WakeOnLAN']);
   assert.ok(
     broadcastEvents.some(
       ([event, action, uuids]) =>
-        event === 'OSCBulkAction' && action === 'Select' && uuids[0] === 'good'
+        event === 'OSCBulkAction' && action === 'WOL' && uuids[0] === 'good'
     )
   );
 });
 
-test('OSC dispatches a tag select route addressed by slug', async () => {
+test('OSC dispatches a tag route addressed by slug', async () => {
   const { handlers, broadcastEvents } = loadOSC();
   // "foh" resolves via the tag slug; its scope (group 1) expands to clients a + b.
-  await handlers.message(['/API/Tag/foh/Select']);
+  await handlers.message(['/API/Tag/foh/WakeOnLAN']);
   const bulk = broadcastEvents.find(
-    ([event, action]) => event === 'OSCBulkAction' && action === 'Select'
+    ([event, action]) => event === 'OSCBulkAction' && action === 'WOL'
   );
-  assert.ok(bulk, 'expected an OSCBulkAction Select for the tag');
+  assert.ok(bulk, 'expected an OSCBulkAction WOL for the tag');
   assert.deepEqual(bulk[2], ['a', 'b']);
 });
 
 test('OSC reports an error notification for an invalid tag', async () => {
   const { handlers, broadcastEvents } = loadOSC();
-  await handlers.message(['/API/Tag/nope/Select']);
+  await handlers.message(['/API/Tag/nope/WakeOnLAN']);
   assert.ok(broadcastEvents.some(([event, , level]) => event === 'Notify' && level === 'error'));
 });
 
@@ -187,12 +192,12 @@ test('OSC Tag/RunScript validates script and tag membership', async () => {
   assert.equal(bulk[3], 'script1');
 });
 
-test('OSC dispatches a group select route addressed by slug', async () => {
+test('OSC dispatches a group route addressed by slug', async () => {
   const { handlers, broadcastEvents } = loadOSC();
   // "main" is non-numeric, so it resolves via the group slug, not GroupID.
-  await handlers.message(['/API/Group/main/Select']);
+  await handlers.message(['/API/Group/main/WakeOnLAN']);
   assert.ok(
-    broadcastEvents.some(([event, action]) => event === 'OSCBulkAction' && action === 'Select')
+    broadcastEvents.some(([event, action]) => event === 'OSCBulkAction' && action === 'WOL')
   );
 });
 
@@ -224,58 +229,16 @@ test('OSC All/WakeOnLAN broadcasts to every client', async () => {
   assert.deepEqual(wol[2], ['a', 'b', 'c']);
 });
 
-test('OSC All/Select broadcasts to every client', async () => {
+test('OSC Group route broadcasts only matching group clients', async () => {
   const { handlers, broadcastEvents } = loadOSC();
-  await handlers.message(['/API/All/Select']);
-  const select = broadcastEvents.find(
-    ([event, action]) => event === 'OSCBulkAction' && action === 'Select'
-  );
-  assert.ok(select);
-  assert.deepEqual(select[2], ['a', 'b', 'c']);
-});
-
-test('OSC All/Deselect clears selected clients', async () => {
-  const { handlers, broadcastEvents } = loadOSC();
-  await handlers.message(['/API/All/Select']);
-  await handlers.message(['/API/All/Deselect']);
-  const deselect = broadcastEvents.find(
-    ([event, action]) => event === 'OSCBulkAction' && action === 'Deselect'
-  );
-  assert.ok(deselect);
-  assert.deepEqual(deselect[2], ['a', 'b', 'c']);
-});
-
-test('OSC Selection/WakeOnLAN targets currently selected clients', async () => {
-  const { handlers, broadcastEvents } = loadOSC();
-  await handlers.message(['/API/Client/good/Select']);
-  await handlers.message(['/API/Selection/WakeOnLAN']);
+  // Numeric "1" resolves as a GroupID (the transitional fallback) and expands to
+  // just that group's members, not the whole workspace.
+  await handlers.message(['/API/Group/1/WakeOnLAN']);
   const wol = broadcastEvents.find(
     ([event, action]) => event === 'OSCBulkAction' && action === 'WOL'
   );
   assert.ok(wol);
-  assert.deepEqual(wol[2], ['good']);
-});
-
-test('OSC Selection/RunScript targets currently selected clients', async () => {
-  const { handlers, broadcastEvents } = loadOSC();
-  await handlers.message(['/API/Client/good/Select']);
-  await handlers.message(['/API/Selection/RunScript/script1']);
-  const run = broadcastEvents.find(
-    ([event, action]) => event === 'OSCBulkAction' && action === 'ExecuteScript'
-  );
-  assert.ok(run);
-  assert.deepEqual(run[2], ['good']);
-  assert.equal(run[3], 'script1');
-});
-
-test('OSC Group/Select broadcasts only matching group clients', async () => {
-  const { handlers, broadcastEvents } = loadOSC();
-  await handlers.message(['/API/Group/1/Select']);
-  const select = broadcastEvents.find(
-    ([event, action]) => event === 'OSCBulkAction' && action === 'Select'
-  );
-  assert.ok(select);
-  assert.deepEqual(select[2], ['a', 'b']);
+  assert.deepEqual(wol[2], ['a', 'b']);
 });
 
 test('OSC Group/RunScript validates script and group', async () => {
@@ -293,7 +256,7 @@ test('OSC Group/RunScript validates script and group', async () => {
   );
 
   broadcastEvents.length = 0;
-  await handlers.message(['/API/Group/999/Select']);
+  await handlers.message(['/API/Group/999/WakeOnLAN']);
   assert.ok(broadcastEvents.some(([event, , level]) => event === 'Notify' && level === 'error'));
 });
 

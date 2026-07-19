@@ -311,8 +311,8 @@ const WEB_PUSH_CHANNELS = [
 ] as const satisfies readonly SubscribeChannel[];
 const WEB_PUSH_ALLOWLIST = new Set<string>(WEB_PUSH_CHANNELS);
 
-// OSCBulkAction is allowlisted as a whole (Select/Deselect/WOL/ExecuteScript are
-// legitimate web actions), but a few of its types drive the operator's own
+// OSCBulkAction is allowlisted as a whole (WOL/ExecuteScript are legitimate web
+// actions), but a few of its types drive the operator's own
 // desktop window rather than a shared server state — opening or closing modals on
 // every logged-in browser would yank the UI out from under whoever is using it.
 // These types are dropped from the web push and delivered to the desktop only.

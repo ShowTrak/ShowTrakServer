@@ -737,8 +737,6 @@ export interface OSCRoute {
 }
 
 export type OSCBulkActionType =
-  | 'Select'
-  | 'Deselect'
   | 'WOL'
   | 'ExecuteScript'
   | 'InternalScript'
