@@ -7,6 +7,7 @@ import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as GroupManager } from '../GroupManager';
 import { Manager as TagManager } from '../TagManager';
 import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
+import { ControlService } from '../ControlService';
 import { IsTransientNetworkError, DescribeError } from '../NetworkErrors';
 
 const Logger = CreateLogger('OSC');
@@ -572,6 +573,56 @@ OSC.CreateRoute(
     return successResult(`Script "${Req.ScriptID}" queued for ${AllClients.length} clients`);
   },
   'Execute a script on all online Clients by Script ID'
+);
+
+// Integrated Event Operations.
+//
+// Unlike WOL/RunScript — which the renderer applies from an `OSCBulkAction`
+// broadcast — integrated events have no renderer branch, so these delegate to
+// ControlService (the same command surface the SDK uses). That reuses its
+// integrated-client filtering and dispatches through the shared
+// TriggerIntegratedEvent IPC handler, so an event fired over OSC behaves
+// identically to one fired from the SDK or the context menu.
+//
+// ControlService.CommandResult is shape-compatible with RouteResult ({ ok,
+// detail }), so its return value is the route result verbatim.
+async function runEventCommand(Command: Promise<RouteResult>): Promise<RouteResult> {
+  const Result = await Command;
+  if (!Result.ok) {
+    Broadcast.emit('Notify', `OSC - ${Result.detail}`, 'error');
+  }
+  return Result;
+}
+
+OSC.CreateRoute(
+  '/API/Client/:Slug/TriggerEvent/:EventID',
+  async (Req) =>
+    runEventCommand(
+      ControlService.TriggerEventOnClient(Req.Slug ?? '', Req.EventID ?? '')
+    ),
+  'Trigger an integrated event on a Client by its slug and Event ID'
+);
+
+OSC.CreateRoute(
+  '/API/Group/:Slug/TriggerEvent/:EventID',
+  async (Req) =>
+    runEventCommand(
+      ControlService.TriggerEventOnGroup(Req.Slug ?? '', Req.EventID ?? '')
+    ),
+  'Trigger an integrated event on all integrated members of a Group by its slug and Event ID'
+);
+
+OSC.CreateRoute(
+  '/API/Tag/:Slug/TriggerEvent/:EventID',
+  async (Req) =>
+    runEventCommand(ControlService.TriggerEventOnTag(Req.Slug ?? '', Req.EventID ?? '')),
+  'Trigger an integrated event on all integrated clients carrying a Tag by its slug and Event ID'
+);
+
+OSC.CreateRoute(
+  '/API/All/TriggerEvent/:EventID',
+  async (Req) => runEventCommand(ControlService.TriggerEventOnAll(Req.EventID ?? '')),
+  'Trigger an integrated event on all integrated Clients by Event ID'
 );
 
 // Bind the listener on load using the compiled-in default port so OSC control

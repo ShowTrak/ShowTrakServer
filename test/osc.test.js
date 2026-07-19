@@ -32,7 +32,31 @@ function loadOSC(overrides = {}) {
   };
 
   const broadcastEvents = [];
+  // Integrated-event routes delegate to ControlService (the SDK's command
+  // surface) rather than the renderer OSCBulkAction path, so record the calls.
+  const controlCalls = [];
   const mocks = {
+    '../ControlService': {
+      ControlService: {
+        TriggerEventOnAll: async (eventSlug) => {
+          controlCalls.push(['all', eventSlug]);
+          return { ok: true, detail: `Event "${eventSlug}" queued` };
+        },
+        TriggerEventOnClient: async (slug, eventSlug) => {
+          controlCalls.push(['client', slug, eventSlug]);
+          if (slug === 'bad') return { ok: false, detail: `Invalid Client "${slug}"` };
+          return { ok: true, detail: `Event "${eventSlug}" queued` };
+        },
+        TriggerEventOnGroup: async (slug, eventSlug) => {
+          controlCalls.push(['group', slug, eventSlug]);
+          return { ok: true, detail: `Event "${eventSlug}" queued` };
+        },
+        TriggerEventOnTag: async (slug, eventSlug) => {
+          controlCalls.push(['tag', slug, eventSlug]);
+          return { ok: true, detail: `Event "${eventSlug}" queued` };
+        },
+      },
+    },
     'node-osc': oscMock,
     '../Logger': noopLogger,
     '../ClientManager': {
@@ -98,7 +122,7 @@ function loadOSC(overrides = {}) {
     path.join(__dirname, '..', 'dist', 'Modules', 'OSC', 'index.js'),
     mocks
   );
-  return { OSC, handlers, broadcastEvents };
+  return { OSC, handlers, broadcastEvents, controlCalls };
 }
 
 test('OSC registers the built-in routes', () => {
@@ -117,6 +141,32 @@ test('OSC registers the built-in routes', () => {
   assert.ok(routes.includes('/API/Tag/:Slug/RunScript/:ScriptID'));
   assert.ok(routes.includes('/API/All/WakeOnLAN'));
   assert.ok(routes.includes('/API/All/RunScript/:ScriptID'));
+  // Integrated events mirror the script actions across all four scopes.
+  assert.ok(routes.includes('/API/Client/:Slug/TriggerEvent/:EventID'));
+  assert.ok(routes.includes('/API/Group/:Slug/TriggerEvent/:EventID'));
+  assert.ok(routes.includes('/API/Tag/:Slug/TriggerEvent/:EventID'));
+  assert.ok(routes.includes('/API/All/TriggerEvent/:EventID'));
+  assert.ok(routes.includes('/API/Dummy/:Slug/Heartbeat'));
+});
+
+test('OSC TriggerEvent routes delegate to ControlService for every scope', async () => {
+  const { handlers, controlCalls } = loadOSC();
+  await handlers.message(['/API/Client/stage-left/TriggerEvent/go']);
+  await handlers.message(['/API/Group/main/TriggerEvent/go']);
+  await handlers.message(['/API/Tag/foh/TriggerEvent/go']);
+  await handlers.message(['/API/All/TriggerEvent/go']);
+  assert.deepEqual(controlCalls, [
+    ['client', 'stage-left', 'go'],
+    ['group', 'main', 'go'],
+    ['tag', 'foh', 'go'],
+    ['all', 'go'],
+  ]);
+});
+
+test('OSC TriggerEvent surfaces a ControlService failure as an error notification', async () => {
+  const { handlers, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/Client/bad/TriggerEvent/go']);
+  assert.ok(broadcastEvents.some(([event, , level]) => event === 'Notify' && level === 'error'));
 });
 
 // Selection was deprecated and removed: the OSC module no longer keeps a
