@@ -189,6 +189,10 @@ export interface ShowTrakAPI {
   // ---- Scripts (execution + management) ---------------------------------
   ExecuteScript(Script: unknown, Targets: string[], ResetList?: unknown): Promise<unknown>;
   TriggerIntegratedEvent(EventID: string, Targets: string[]): Promise<unknown>;
+  // Drop finished (Completed/Failed) execution rows, leaving anything still
+  // queued or running untouched. Called by the renderer once the execution
+  // panel auto-dismisses so the next run starts from an empty list.
+  ClearSettledScriptExecutions(): Promise<unknown>;
   DeleteScripts(List: unknown): Promise<unknown>;
   UpdateScripts(List: unknown): Promise<unknown>;
   GetScriptManagerList(): Promise<ScriptManagerEntry[]>;

@@ -211,6 +211,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
       rpc('ExecuteScript', Script, Targets, ResetList),
     TriggerIntegratedEvent: async (EventID, Targets) =>
       rpc('TriggerIntegratedEvent', EventID, Targets),
+    ClearSettledScriptExecutions: async () => rpc('Scripts:ClearSettledExecutions'),
     DeleteScripts: nullTuple,
     UpdateScripts: nullTuple,
     GetScriptManagerList: emptyArray,

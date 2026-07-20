@@ -21,6 +21,7 @@ const fs = require('fs');
 const { execFile } = require('child_process');
 import { Manager as ServerManager } from '../../Modules/Server';
 import { Manager as ScriptManager } from '../../Modules/ScriptManager';
+import { Manager as ScriptExecutionManager } from '../../Modules/ScriptExecutionManager';
 import { Manager as ScriptWhitelistManager } from '../../Modules/ScriptWhitelistManager';
 import { Manager as SampleScriptsManager } from '../../Modules/SampleScripts';
 import { Manager as SettingsManager } from '../../Modules/SettingsManager';
@@ -98,6 +99,15 @@ function register(): void {
       return validationErrorTuple(error);
     }
     await ServerManager.TriggerIntegratedEvent(ValidEventID, ValidTargets);
+    return [null, true];
+  });
+
+  // Wipe the finished rows from the execution panel. Fired by the renderer when
+  // the panel auto-dismisses, so the next batch renders into an empty list
+  // instead of stacking on top of the previous run's results. Pending entries
+  // survive — a batch queued during the dismiss window must not be dropped.
+  RPC.handle('Scripts:ClearSettledExecutions', async () => {
+    await ScriptExecutionManager.ClearSettled();
     return [null, true];
   });
 

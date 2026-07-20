@@ -271,7 +271,11 @@ const WEB_EDIT_CHANNELS = new Set([
 ]);
 
 // Allowed when remote script execution is enabled (SHOW-time actions).
-const WEB_SCRIPT_CHANNELS = new Set(['ExecuteScript', 'TriggerIntegratedEvent']);
+const WEB_SCRIPT_CHANNELS = new Set([
+  'ExecuteScript',
+  'TriggerIntegratedEvent',
+  'Scripts:ClearSettledExecutions',
+]);
 
 // Allowed when the global Wake-on-LAN feature AND the Web UI WOL permission are
 // both enabled.

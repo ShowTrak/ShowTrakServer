@@ -81,6 +81,7 @@ const INVOKE_CHANNEL_LIST = [
   'StopIdentifyingClient',
   'ExecuteScript',
   'TriggerIntegratedEvent',
+  'Scripts:ClearSettledExecutions',
   'UnadoptClient',
   'ReplaceClient',
   'CreateUnassignedClients',
@@ -354,6 +355,7 @@ const API: ShowTrakAPI = {
     invoke('ExecuteScript', Script, Targets, ResetList),
   TriggerIntegratedEvent: async (EventID, Targets) =>
     invoke('TriggerIntegratedEvent', EventID, Targets),
+  ClearSettledScriptExecutions: async () => invoke('Scripts:ClearSettledExecutions'),
   UnadoptClient: async (UUID) => invoke('UnadoptClient', UUID),
   ReplaceClient: async (CurrentUUID, ReplacementUUID) =>
     invoke('ReplaceClient', CurrentUUID, ReplacementUUID),

@@ -153,9 +153,18 @@ function InitClientListPush() {
 
   if (shouldAutoDismissNonDeployment) {
     if (!window.__ShowTrakExecutionAutoDismissTimer) {
-      window.__ShowTrakExecutionAutoDismissTimer = setTimeout(() => {
+      window.__ShowTrakExecutionAutoDismissTimer = setTimeout(async () => {
         window.__ShowTrakExecutionAutoDismissTimer = null;
         HideExecutionToast();
+        // Wipe the finished rows now the panel is gone, so the next run renders
+        // into an empty list rather than stacking on the previous batch. Only
+        // settled entries are dropped — anything queued or running in the
+        // meantime survives.
+        try {
+          await window.API.ClearSettledScriptExecutions();
+        } catch (e) {
+          HandleNonFatalError('ClearSettledScriptExecutions', e);
+        }
       }, 5000);
     }
   } else if (window.__ShowTrakExecutionAutoDismissTimer) {
