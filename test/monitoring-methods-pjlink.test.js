@@ -1,4 +1,5 @@
 const test = require('node:test');
+const { beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
@@ -20,6 +21,17 @@ function loadShared() {
 function loadPjlink() {
   return require(methodPath('pjlink.js'));
 }
+
+// The snapshot cache is keyed on address|port|password|timeout, so two tests
+// that happen to be handed the same ephemeral port within the ~1s TTL would
+// share a snapshot — the second test then judges the first test's projector.
+// Rare locally, common on CI where the kernel recycles ports quickly.
+function resetSnapshotCache() {
+  const { Manager } = require(path.join(__dirname, '..', 'dist', 'Modules', 'CacheManager'));
+  Manager.ClearBucket('MonitoringMethods:PJLinkStatus');
+}
+
+beforeEach(resetSnapshotCache);
 
 // --- Pure protocol helpers ---------------------------------------------------
 
