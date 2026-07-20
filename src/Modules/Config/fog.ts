@@ -22,13 +22,17 @@ export interface FogTaskType {
   Destructive: boolean;
   // Type 13 targets one specific snapin and needs its ID passed as `deploySnapins`.
   RequiresSnapinID?: boolean;
+  // Imaging tasks (Deploy/Capture) stream a partclone percentage FOG reports as it
+  // runs, so a progress bar is meaningful. Every other type is effectively opaque —
+  // it flips straight from queued to complete — so the panel shows only its state.
+  SupportsProgress?: boolean;
 }
 
 // Host-schedulable task types only. Type 8 (Multi-Cast) is deliberately absent: it is
 // group-only in the FOG schema and cannot be scheduled against a single host.
 export const FOG_TASK_TYPES: FogTaskType[] = [
-  { TaskTypeID: 1, Name: 'Deploy', Destructive: true },
-  { TaskTypeID: 2, Name: 'Capture', Destructive: true },
+  { TaskTypeID: 1, Name: 'Deploy', Destructive: true, SupportsProgress: true },
+  { TaskTypeID: 2, Name: 'Capture', Destructive: true, SupportsProgress: true },
   { TaskTypeID: 3, Name: 'Debug', Destructive: false },
   { TaskTypeID: 4, Name: 'Memtest86+', Destructive: false },
   { TaskTypeID: 5, Name: 'Test Disk', Destructive: false },
@@ -39,9 +43,9 @@ export const FOG_TASK_TYPES: FogTaskType[] = [
   { TaskTypeID: 12, Name: 'All Snapins', Destructive: false },
   { TaskTypeID: 13, Name: 'Single Snapin', Destructive: false, RequiresSnapinID: true },
   { TaskTypeID: 14, Name: 'Wake-Up', Destructive: false },
-  { TaskTypeID: 15, Name: 'Deploy - Debug', Destructive: true },
-  { TaskTypeID: 16, Name: 'Capture - Debug', Destructive: true },
-  { TaskTypeID: 17, Name: 'Deploy - No Snapins', Destructive: true },
+  { TaskTypeID: 15, Name: 'Deploy - Debug', Destructive: true, SupportsProgress: true },
+  { TaskTypeID: 16, Name: 'Capture - Debug', Destructive: true, SupportsProgress: true },
+  { TaskTypeID: 17, Name: 'Deploy - No Snapins', Destructive: true, SupportsProgress: true },
   { TaskTypeID: 18, Name: 'Fast Wipe', Destructive: true },
   { TaskTypeID: 19, Name: 'Normal Wipe', Destructive: true },
   { TaskTypeID: 20, Name: 'Full Wipe', Destructive: true },
@@ -51,6 +55,11 @@ export const FOG_TASK_TYPES: FogTaskType[] = [
 
 export function GetFogTaskType(TaskTypeID: number): FogTaskType | null {
   return FOG_TASK_TYPES.find((Type) => Type.TaskTypeID === TaskTypeID) || null;
+}
+
+// Whether the panel should render a progress bar for a task of this type.
+export function FogTaskSupportsProgress(TaskTypeID: number): boolean {
+  return !!GetFogTaskType(TaskTypeID)?.SupportsProgress;
 }
 
 // Settings key granting permission to schedule one task type. Keyed by ID rather than

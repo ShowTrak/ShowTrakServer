@@ -38,6 +38,9 @@ export = function registerFogValidators(Manager: IPCValidationManager): void {
   Manager.FogTaskTypeID = (value: unknown, fieldName = 'TaskTypeID') =>
     toPositiveInt(value, fieldName);
 
+  Manager.FogTaskRecordID = (value: unknown, fieldName = 'FogTaskRecordID') =>
+    toPositiveInt(value, fieldName);
+
   // Only Single Snapin (type 13) supplies this; everything else omits it.
   Manager.FogSnapinID = (value: unknown, fieldName = 'SnapinID') => {
     if (value == null || value === '') return null;

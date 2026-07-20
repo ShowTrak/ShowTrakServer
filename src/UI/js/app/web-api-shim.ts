@@ -203,6 +203,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     GetFogTaskTypes: emptyArray,
     GetFogTasks: nullTuple,
     ScheduleFogTask: nullTuple,
+    CancelFogTask: nullTuple,
     OnFogStatusUpdated: noSub,
     OnSetFogTaskList: noSub,
 

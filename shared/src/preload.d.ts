@@ -298,6 +298,8 @@ export interface ShowTrakAPI {
     TaskTypeID: number,
     SnapinID?: number | null
   ): Promise<ResultTuple<boolean>>;
+  /** Cancel a running FOG task by its ShowTrak record ID. */
+  CancelFogTask(FogTaskRecordID: number): Promise<ResultTuple<boolean>>;
   OnFogStatusUpdated(callback: (status: FogStatusView) => void): Unsubscribe;
   OnSetFogTaskList(callback: (tasks: FogTaskView[]) => void): Unsubscribe;
 

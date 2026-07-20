@@ -149,6 +149,7 @@ const INVOKE_CHANNEL_LIST = [
   'Fog:GetTaskTypes',
   'Fog:GetTasks',
   'Fog:ScheduleTask',
+  'Fog:CancelTask',
   'Audio:GetAll',
   'Audio:GetData',
   'Audio:Select',
@@ -459,6 +460,7 @@ const API: ShowTrakAPI = {
   GetFogTasks: async () => invoke('Fog:GetTasks'),
   ScheduleFogTask: async (UUID, TaskTypeID, SnapinID) =>
     invoke('Fog:ScheduleTask', UUID, TaskTypeID, SnapinID),
+  CancelFogTask: async (FogTaskRecordID) => invoke('Fog:CancelTask', FogTaskRecordID),
   OnFogStatusUpdated: (Callback) => subscribe('FogStatusUpdated', Callback),
   OnSetFogTaskList: (Callback) => subscribe('SetFogTaskList', Callback),
   // Custom Audio Assets

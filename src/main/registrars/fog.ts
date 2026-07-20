@@ -76,6 +76,17 @@ function register(): void {
       { invalidFallback: false }
     )
   );
+
+  // Cancellation re-checks health and the task's current state inside the manager;
+  // the validation here is shape-only.
+  RPC.handle(
+    'Fog:CancelTask',
+    createTupleHandler<[number], void>(
+      (FogTaskRecordID: unknown) => IPCValidation.FogTaskRecordID(FogTaskRecordID),
+      (FogTaskRecordID: number) => FogManager.CancelTask(FogTaskRecordID),
+      { invalidFallback: false }
+    )
+  );
 }
 
 export { register };

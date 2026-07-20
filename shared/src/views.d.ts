@@ -670,6 +670,8 @@ export interface FogTaskView {
   FogTaskID: number | null;
   TaskTypeID: number;
   TaskTypeName: string | null;
+  /** True for Deploy/Capture types, which report a partclone percentage worth showing as a bar. */
+  SupportsProgress: boolean;
   StateID: number;
   StateName: string;
   /** FOG reports progress as display text, not a number. */

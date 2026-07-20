@@ -624,6 +624,44 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   background: #4d9fff;
   transition: width 0.4s ease;
 }
+/* Running but no percentage yet: a segment slides across so it reads as "working"
+   rather than parked at 0%. */
+.fog-task-item .fog-task-bar.is-indeterminate span {
+  width: 40%;
+  transition: none;
+  animation: fog-task-indeterminate 1.2s ease-in-out infinite;
+}
+@keyframes fog-task-indeterminate {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(310%);
+  }
+}
+.fog-task-item .fog-task-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.fog-task-item .fog-task-cancel {
+  appearance: none;
+  border: 1px solid rgba(255, 128, 128, 0.35);
+  background: rgba(255, 128, 128, 0.12);
+  color: #ffb0a8;
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.fog-task-item .fog-task-cancel:hover {
+  background: rgba(255, 128, 128, 0.22);
+  border-color: rgba(255, 128, 128, 0.55);
+}
+.fog-task-item .fog-task-cancel:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .fog-empty {
   padding: 18px 10px;
   text-align: center;

@@ -88,6 +88,7 @@ export interface IPCValidationManager {
   FogHostID(value: unknown, fieldName?: string): number;
   FogHostIDOrNull(value: unknown, fieldName?: string): number | null;
   FogTaskTypeID(value: unknown, fieldName?: string): number;
+  FogTaskRecordID(value: unknown, fieldName?: string): number;
   FogSnapinID(value: unknown, fieldName?: string): number | null;
 
   // Network discovery / settings (system-validators.ts)

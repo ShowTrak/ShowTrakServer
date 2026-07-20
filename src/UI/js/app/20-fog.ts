@@ -88,13 +88,22 @@ function RenderFogTasks(): void {
 
   let Html = '';
   for (const Task of FogTasks) {
-    // Percent is only meaningful once FOG reports the task as in progress; before
-    // that FOG's value is stale or zero and a progress bar would be misleading.
     const InProgress = Task.StateID === STATE_IN_PROGRESS;
-    const PercentNumber = InProgress ? parseInt(String(Task.Percent || '0'), 10) : 0;
+    const IsOpen = OPEN_STATE_IDS.includes(Task.StateID);
+
+    // Only Deploy/Capture stream a percentage worth bar-charting; every other type
+    // flips straight from queued to complete, so a bar would just sit at 0%.
+    const ShowBar = InProgress && Task.SupportsProgress;
+
+    // FOG serialises progress as display text ("45%"). A supported task that is
+    // running but has not reported a figure yet (partclone still spinning up) gets an
+    // indeterminate bar so it reads as working rather than stalled at zero.
+    const HasPercent = !!(Task.Percent && /\d/.test(Task.Percent));
+    const PercentNumber = HasPercent ? parseInt(String(Task.Percent), 10) : 0;
     const SafePercent = Number.isFinite(PercentNumber)
       ? Math.max(0, Math.min(100, PercentNumber))
       : 0;
+    const Indeterminate = ShowBar && !HasPercent;
 
     const StateLabel = InProgress && Task.Percent ? `${Safe(Task.Percent)}` : Safe(Task.StateName);
 
@@ -107,11 +116,18 @@ function RenderFogTasks(): void {
         Task.ClientName || Task.FogHostName || `FOG host ${Task.FogHostID}`
       )}</div>
       ${
-        InProgress
-          ? `<div class="fog-task-bar"><span style="width: ${SafePercent}%"></span></div>`
+        ShowBar
+          ? `<div class="fog-task-bar${Indeterminate ? ' is-indeterminate' : ''}"><span${
+              Indeterminate ? '' : ` style="width: ${SafePercent}%"`
+            }></span></div>`
           : ''
       }
       ${Task.LastError ? `<div class="fog-task-client">${Safe(Task.LastError)}</div>` : ''}
+      ${
+        IsOpen
+          ? `<div class="fog-task-actions"><button type="button" class="fog-task-cancel" data-record-id="${Task.FogTaskRecordID}">Cancel task</button></div>`
+          : ''
+      }
     </div>`;
   }
   List.innerHTML = Html;
@@ -131,7 +147,10 @@ export function ToggleFogTray(force?: boolean): void {
     $(document)
       .off('mousedown.fogTray touchstart.fogTray')
       .on('mousedown.fogTray touchstart.fogTray', function (Event) {
-        const Inside = $(Event.target).closest('#FOG_TRAY, #FOG_BUTTON').length > 0;
+        // The confirm dialog is appended to <body>, outside the tray — treat it as
+        // "inside" so cancelling a task does not dismiss the tray behind the prompt.
+        const Inside =
+          $(Event.target).closest('#FOG_TRAY, #FOG_BUTTON, #SHOWTRAK_CONFIRM_TOAST').length > 0;
         if (!Inside) ToggleFogTray(false);
       });
   } else {
@@ -159,7 +178,7 @@ function SyncTaskTypeUI(): void {
   $('#FOG_TASK_WARNING').toggleClass('d-none', !Destructive);
   if (Destructive && Type) {
     $('#FOG_TASK_WARNING_TEXT').text(
-      `"${Type.Name}" is destructive and can cause data loss on the target machine.`
+      `"${Type.Name}" is a destructive action and may cause data loss.`
     );
   }
 }
@@ -233,6 +252,10 @@ export async function OpenFogTaskModal(
       ToggleFogTray(true);
     });
 
+  // Close the client editor first so the two modals don't stack — the FOG task
+  // modal is launched from inside it, and leaving it open would leave the editor
+  // orphaned behind the task modal.
+  closeModal('SHOWTRAK_CLIENT_EDITOR');
   openModal('SHOWTRAK_MODAL_FOG_TASK');
 }
 
@@ -244,6 +267,34 @@ export function InitFog(): void {
     Button.dataset.bound = '1';
     Button.addEventListener('click', () => ToggleFogTray());
   }
+
+  // Delegated so it survives the list being re-rendered on every push.
+  $('#FOG_TASK_LIST')
+    .off('click.fogCancel', '.fog-task-cancel')
+    .on('click.fogCancel', '.fog-task-cancel', async function () {
+      const RecordID = parseInt(String($(this).data('recordId')), 10);
+      if (!Number.isFinite(RecordID)) return;
+
+      const Task = FogTasks.find((Candidate) => Candidate.FogTaskRecordID === RecordID) || null;
+      const Label = Task ? Task.TaskTypeName || `Task ${Task.TaskTypeID}` : 'this task';
+      const Target = Task ? Task.ClientName || Task.FogHostName || '' : '';
+
+      const Confirmed = await ConfirmationDialog(
+        `Cancel "${Label}"${Target ? ` on ${Target}` : ''}? The task will be stopped in FOG.`
+      );
+      if (!Confirmed) return;
+
+      const $Btn = $(this);
+      $Btn.prop('disabled', true);
+      const [Err] = await window.API.CancelFogTask(RecordID);
+      if (Err) {
+        $Btn.prop('disabled', false);
+        await Notify(String(Err), 'error');
+        return;
+      }
+      // The backend pushes the updated task list, which re-renders this row.
+      await Notify(`Cancelled "${Label}".`, 'success');
+    });
 
   window.API.OnFogStatusUpdated((Status: FogStatusView) => {
     FogStatus = Status;

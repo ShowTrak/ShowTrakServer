@@ -28,6 +28,7 @@ import type {
 import {
   FOG_TASK_TYPES,
   GetFogTaskType,
+  FogTaskSupportsProgress,
   FogTaskPermissionKey,
   GetFogTaskStateName,
   FOG_TASK_POLL_INTERVAL_MS,
@@ -50,6 +51,7 @@ const FogRepo = CreateFogRepository(DB);
 // FOG states 0-3 are non-terminal; 4 (Complete) and 5 (Cancelled) are terminal.
 const OPEN_STATE_IDS = [0, 1, 2, 3];
 const STATE_COMPLETE = 4;
+const STATE_CANCELLED = 5;
 
 // A task that never appears in FOG's active list within this window is assumed to
 // have finished before we first looked. This is not paranoia: fast task types such
@@ -312,6 +314,7 @@ async function TaskRowToView(Row: FogTaskRow): Promise<FogTaskView> {
     FogTaskID: Row.FogTaskID,
     TaskTypeID: Row.TaskTypeID,
     TaskTypeName: Row.TaskTypeName,
+    SupportsProgress: FogTaskSupportsProgress(Row.TaskTypeID),
     StateID: Row.StateID,
     StateName: GetFogTaskStateName(Row.StateID),
     Percent: Row.Percent,
@@ -518,6 +521,50 @@ const Manager = {
     setTimeout(() => {
       void PollOnce();
     }, 2000);
+
+    return Ok<void>();
+  },
+
+  // Cancel a running FOG task from the panel.
+  //
+  // FOG cancels an active task via DELETE on the task resource — the mirror of the
+  // GET /task/{id} used to read a task's terminal state. A task we have not yet
+  // paired to a FOG task ID cannot be cancelled: FOG's create endpoint returns no ID,
+  // so until the poller adopts a live task there is nothing to address. That window
+  // is short (the follow-up poll runs 2s after scheduling), so the operator just
+  // retries in a moment.
+  async CancelTask(FogTaskRecordID: number): Promise<Result<void>> {
+    if (!(await IsEnabled())) return Fail('FOG integration is not enabled');
+    if (!Healthy) return Fail(StatusMessage || 'FOG server is not reachable');
+
+    const [ReadErr, Row] = await FogRepo.GetTask(FogTaskRecordID);
+    if (ReadErr) return Fail(String(ReadErr));
+    if (!Row) return Fail('That task no longer exists');
+    if (!OPEN_STATE_IDS.includes(Row.StateID)) return Fail('That task has already finished');
+    if (Row.FogTaskID == null) {
+      return Fail('FOG has not picked this task up yet — try again in a moment');
+    }
+
+    const Config = await LoadConfig();
+    const Response = await FogRequest(Config, `/task/${Row.FogTaskID}`, 'DELETE');
+    // A 404 means FOG already dropped the task (it finished or was cancelled there);
+    // treat that as success rather than blocking the operator on a stale record.
+    if (!Response.Success && Response.StatusCode !== 404) {
+      return Fail(Response.Error || 'FOG refused to cancel the task');
+    }
+
+    await FogRepo.UpdateTaskProgress(
+      Row.FogTaskRecordID,
+      Row.FogTaskID,
+      STATE_CANCELLED,
+      null,
+      Now()
+    );
+    Logger.log(`Cancelled FOG task ${Row.FogTaskID} on host ${Row.FogHostID}`);
+
+    // Cancelled is terminal, so the poller will leave this row alone from here — push
+    // now so the panel reflects it immediately rather than at the next 30s tick.
+    BroadcastManager.emit('FogTasksUpdated');
 
     return Ok<void>();
   },
