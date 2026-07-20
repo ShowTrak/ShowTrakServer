@@ -208,12 +208,23 @@ function InitSettingsPush() {
               NewValue ? 'success' : 'error'
             );
           });
-      } else if (Setting.Type === 'STRING') {
+      } else if (Setting.Type === 'STRING' || Setting.Type === 'PASSWORD') {
         const isWebUiPassword = Setting.Key === 'WEBUI_PASSWORD';
-        const inputType = 'text';
+        // PASSWORD only changes how the field is rendered — it is a plain string
+        // everywhere else, so it shares the whole STRING code path below.
+        const isMasked = Setting.Type === 'PASSWORD';
+        const inputType = isMasked ? 'password' : 'text';
         const inputMode = isWebUiPassword ? 'numeric' : 'text';
-        const inputPattern = isWebUiPassword ? 'pattern="[0-9]{4}" maxlength="4"' : '';
-        const inputPlaceholder = isWebUiPassword ? '4 digit code' : 'Enter text...';
+        const inputPattern = isWebUiPassword
+          ? 'pattern="[0-9]{4}" maxlength="4"'
+          : isMasked
+            ? 'autocomplete="off" spellcheck="false"'
+            : '';
+        const inputPlaceholder = isWebUiPassword
+          ? '4 digit code'
+          : isMasked
+            ? 'Paste token...'
+            : 'Enter text...';
         const initialValue = isWebUiPassword
           ? String(Setting.Value == null ? '' : Setting.Value)
               .replace(/\D/g, '')

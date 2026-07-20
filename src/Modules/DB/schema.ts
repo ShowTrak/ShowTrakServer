@@ -236,6 +236,50 @@ Schema.push({
     )",
 });
 
+// FOG Project integration. All FOG state lives in its own tables rather than as
+// columns on Clients, so the integration can be enabled, disabled or removed
+// wholesale without touching core client data.
+//
+// FogHosts links a ShowTrak client to a FOG host. One row per client (UUID is the
+// PK), so a client maps to at most one FOG host. FogHostName is cached at link time
+// purely so the client editor can still show which host is linked when the FOG
+// server is unreachable.
+Schema.push({
+  Name: 'FogHosts',
+  SQL: 'CREATE TABLE IF NOT EXISTS `FogHosts` ( \
+            UUID TEXT PRIMARY KEY, \
+            FogHostID INTEGER NOT NULL, \
+            FogHostName TEXT, \
+            Timestamp BIGINT(11) NOT NULL DEFAULT 0 \
+    )',
+});
+
+// FogTasks records tasks ShowTrak scheduled, and is reconciled against
+// /fog/task/active by the poller.
+//
+// FogTaskID is nullable by necessity: FOG's task creation endpoint returns the
+// literal body `null` and does not hand back an ID, so a freshly scheduled task has
+// no FOG-side identifier until the next poll matches it up by host. Rows are kept
+// after completion so the panel can show recently-finished tasks, and are pruned by
+// age rather than on completion.
+Schema.push({
+  Name: 'FogTasks',
+  SQL: 'CREATE TABLE IF NOT EXISTS `FogTasks` ( \
+            FogTaskRecordID INTEGER PRIMARY KEY AUTOINCREMENT, \
+            UUID TEXT, \
+            FogHostID INTEGER NOT NULL, \
+            FogHostName TEXT, \
+            FogTaskID INTEGER, \
+            TaskTypeID INTEGER NOT NULL, \
+            TaskTypeName TEXT, \
+            StateID INTEGER NOT NULL DEFAULT 0, \
+            Percent TEXT, \
+            LastError TEXT, \
+            CreatedAt BIGINT(11) NOT NULL DEFAULT 0, \
+            UpdatedAt BIGINT(11) NOT NULL DEFAULT 0 \
+    )',
+});
+
 // Versioned migrations for existing installs. Applied versions are recorded in
 // the SchemaMigrations table; only versions above the recorded maximum run.
 // Installs that predate the version table are back-filled by probing
@@ -304,6 +348,22 @@ Schema.Migrations = [
   {
     Version: 19,
     SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_tags_slug ON `Tags` (Slug COLLATE NOCASE)',
+  },
+  // FOG integration lookups. The tables themselves are created by the Schema blocks
+  // above on both new and existing installs; only the indexes need versioning.
+  // FogHosts is indexed on FogHostID for the reverse lookup the task poller does
+  // (FOG reports tasks by host ID, and we need the owning ShowTrak client).
+  {
+    Version: 20,
+    SQL: 'CREATE INDEX IF NOT EXISTS idx_foghosts_foghostid ON `FogHosts` (FogHostID)',
+  },
+  {
+    Version: 21,
+    SQL: 'CREATE INDEX IF NOT EXISTS idx_fogtasks_foghostid ON `FogTasks` (FogHostID)',
+  },
+  {
+    Version: 22,
+    SQL: 'CREATE INDEX IF NOT EXISTS idx_fogtasks_uuid ON `FogTasks` (UUID)',
   },
 ];
 

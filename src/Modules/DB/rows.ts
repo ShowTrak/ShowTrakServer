@@ -146,6 +146,28 @@ export interface TagRow {
   Weight: number;
 }
 
+export interface FogHostRow {
+  UUID: string; // ShowTrak client UUID
+  FogHostID: number;
+  FogHostName: string | null; // cached at link time so the editor reads offline
+  Timestamp: number;
+}
+
+export interface FogTaskRow {
+  FogTaskRecordID: number;
+  UUID: string | null; // owning ShowTrak client; null if the link was since removed
+  FogHostID: number;
+  FogHostName: string | null;
+  FogTaskID: number | null; // null until the poller matches the task up by host
+  TaskTypeID: number;
+  TaskTypeName: string | null;
+  StateID: number; // see FOG_TASK_STATES in Modules/Config/fog
+  Percent: string | null; // FOG returns percent as display text, not a number
+  LastError: string | null;
+  CreatedAt: number;
+  UpdatedAt: number;
+}
+
 export interface SchemaMigrationRow {
   Version: number;
   AppliedAt: number;

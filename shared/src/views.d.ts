@@ -623,6 +623,62 @@ export interface AudioAssetInspection {
   Error: string | null;
 }
 
+// ---- FOG Project integration ----------------------------------------------
+
+/**
+ * Current state of the FOG integration. `Enabled` reflects the setting; `Healthy`
+ * reflects whether the last probe of /fog/system/info actually succeeded. The UI
+ * only treats FOG as available when both are true.
+ */
+export interface FogStatusView {
+  Enabled: boolean;
+  Healthy: boolean;
+  /** Human-readable reason when unhealthy; null when healthy. */
+  Message: string | null;
+  /** Epoch ms of the last health probe, or null if never probed. */
+  LastCheckedAt: number | null;
+}
+
+/** A host as reported by FOG, used to populate the client editor dropdown. */
+export interface FogHostView {
+  FogHostID: number;
+  Name: string;
+  /** Primary MAC, used to pre-select the likely match for a ShowTrak client. */
+  MacAddress: string | null;
+  /** Currently assigned image name, if any. Deploy fails without one. */
+  ImageName: string | null;
+}
+
+/** A schedulable FOG task type that the operator has permitted in settings. */
+export interface FogTaskTypeView {
+  TaskTypeID: number;
+  Name: string;
+  Destructive: boolean;
+  /** Type 13 (Single Snapin) needs a snapin ID supplied alongside it. */
+  RequiresSnapinID: boolean;
+}
+
+/** A task ShowTrak scheduled, reconciled against FOG's active task list. */
+export interface FogTaskView {
+  FogTaskRecordID: number;
+  UUID: string | null;
+  /** Resolved ShowTrak client name, falling back to the FOG host name. */
+  ClientName: string | null;
+  FogHostID: number;
+  FogHostName: string | null;
+  /** Null until the poller matches this record to a live FOG task. */
+  FogTaskID: number | null;
+  TaskTypeID: number;
+  TaskTypeName: string | null;
+  StateID: number;
+  StateName: string;
+  /** FOG reports progress as display text, not a number. */
+  Percent: string | null;
+  LastError: string | null;
+  CreatedAt: number;
+  UpdatedAt: number;
+}
+
 // ---- Settings / config ----------------------------------------------------
 
 export interface SettingView {
@@ -630,7 +686,7 @@ export interface SettingView {
   Key: string;
   Title: string;
   Description: string;
-  Type: 'BOOLEAN' | 'INTEGER' | 'STRING' | 'OPTION' | 'SLIDER';
+  Type: 'BOOLEAN' | 'INTEGER' | 'STRING' | 'PASSWORD' | 'OPTION' | 'SLIDER';
   Value: boolean | number | string;
   isDefault: boolean;
   DefaultValue: boolean | number | string;

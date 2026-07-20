@@ -111,7 +111,8 @@ const Manager: SettingsManagerShape = {
               const n = parseInt(val as string, 10);
               return isNaN(n) ? Setting.DefaultValue : ClampInteger(Setting, n);
             }
-            case 'STRING': {
+            case 'STRING':
+            case 'PASSWORD': {
               return val == null ? '' : String(val);
             }
             case 'OPTION': {
@@ -214,7 +215,8 @@ const Manager: SettingsManagerShape = {
           const n = parseInt(val as string, 10);
           return isNaN(n) ? Setting.DefaultValue : ClampInteger(Setting, n);
         }
-        case 'STRING': {
+        case 'STRING':
+        case 'PASSWORD': {
           return val == null ? '' : String(val);
         }
         case 'OPTION': {

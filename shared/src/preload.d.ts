@@ -31,6 +31,10 @@ import type {
   DebugTrafficEntry,
   DummyClientDefaults,
   DummyClientView,
+  FogHostView,
+  FogStatusView,
+  FogTaskTypeView,
+  FogTaskView,
   GroupView,
   HistorySample,
   MonitoringCheckDebug,
@@ -278,6 +282,24 @@ export interface ShowTrakAPI {
   SetTagOrder(OrderedTagIDs: number[]): Promise<ResultTuple<boolean>>;
   DeleteTag(TagID: number): Promise<ResultTuple<unknown>>;
   OnSetTagList(callback: (tags: TagView[]) => void): Unsubscribe;
+
+  // ---- FOG Project integration ------------------------------------------
+  GetFogStatus(): Promise<FogStatusView>;
+  TestFogConnection(): Promise<FogStatusView>;
+  /** Never rejects when FOG is down — returns the last known list instead. */
+  GetFogHosts(): Promise<ResultTuple<FogHostView[]>>;
+  GetFogHostLink(UUID: string): Promise<ResultTuple<{ FogHostID: number; FogHostName: string | null } | null>>;
+  /** Pass null (or 0) as FogHostID to unlink the client. */
+  SetFogHostLink(UUID: string, FogHostID: number | null): Promise<ResultTuple<boolean>>;
+  GetFogTaskTypes(): Promise<FogTaskTypeView[]>;
+  GetFogTasks(): Promise<ResultTuple<FogTaskView[]>>;
+  ScheduleFogTask(
+    UUID: string,
+    TaskTypeID: number,
+    SnapinID?: number | null
+  ): Promise<ResultTuple<boolean>>;
+  OnFogStatusUpdated(callback: (status: FogStatusView) => void): Unsubscribe;
+  OnSetFogTaskList(callback: (tasks: FogTaskView[]) => void): Unsubscribe;
 
   // ---- Custom audio assets ----------------------------------------------
   GetAudioAssets(): Promise<AudioAssetView[]>;

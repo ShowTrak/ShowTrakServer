@@ -84,6 +84,12 @@ export interface IPCValidationManager {
   AudioImportPayload(value: unknown): Record<string, unknown>;
   AudioUpdatePayload(value: unknown): Record<string, unknown>;
 
+  // FOG integration (fog-validators.ts)
+  FogHostID(value: unknown, fieldName?: string): number;
+  FogHostIDOrNull(value: unknown, fieldName?: string): number | null;
+  FogTaskTypeID(value: unknown, fieldName?: string): number;
+  FogSnapinID(value: unknown, fieldName?: string): number | null;
+
   // Network discovery / settings (system-validators.ts)
   NetworkDiscoveryScanID(value: unknown): string;
   NetworkDiscoveryScanOptions(value: unknown): Record<string, unknown>;
@@ -99,6 +105,7 @@ require('./dummy-validators')(Manager);
 require('./alert-validators')(Manager);
 require('./tag-validators')(Manager);
 require('./audio-validators')(Manager);
+require('./fog-validators')(Manager);
 require('./system-validators')(Manager);
 
 export { Manager };

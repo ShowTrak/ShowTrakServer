@@ -85,7 +85,7 @@ export function CreateClientsRepository(DB: DBManager) {
     },
 
     // Delete a client and every critical-entity row keyed to it, atomically.
-    // The five statements ride one transaction so a partial failure can never
+    // The statements ride one transaction so a partial failure can never
     // leave the client row gone but its critical rows orphaned (or vice versa).
     // Table SQL is inlined here — matching the ReplaceClientUUID precedent —
     // because cross-table transactions are owned by this repository. Returns [Err].
@@ -99,6 +99,11 @@ export function CreateClientsRepository(DB: DBManager) {
         if (appErr) throw appErr;
         const [displayErr] = await run('DELETE FROM CriticalDisplays WHERE UUID = ?', [UUID]);
         if (displayErr) throw displayErr;
+        // The FOG host link goes with the client. FogTasks rows are deliberately
+        // left behind (their UUID simply dangles) so in-flight and recently
+        // finished tasks stay visible in the FOG panel after a client is removed.
+        const [fogErr] = await run('DELETE FROM FogHosts WHERE UUID = ?', [UUID]);
+        if (fogErr) throw fogErr;
         const [clientErr] = await run('DELETE FROM Clients WHERE UUID = ?', [UUID]);
         if (clientErr) throw clientErr;
       });

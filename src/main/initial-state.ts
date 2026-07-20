@@ -18,6 +18,8 @@ import {
   UpdateMonitoringTargetList,
   UpdateDummyClientList,
   UpdateAlertRuleList,
+  UpdateFogTaskList,
+  UpdateFogStatus,
 } from './broadcast-bridge';
 
 // Push the full authoritative state to the desktop renderer, in the same order
@@ -31,6 +33,8 @@ async function PushInitialDesktopState(): Promise<void> {
   await UpdateMonitoringTargetList();
   await UpdateDummyClientList();
   await UpdateAlertRuleList();
+  await UpdateFogStatus();
+  await UpdateFogTaskList();
   // Push current application mode to renderer on initial load.
   if (hasMainWindow()) {
     PushToRenderers('ModeUpdated', ModeManager.Get());

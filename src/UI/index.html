@@ -154,6 +154,17 @@
               </li>
             </ul>
           </div>
+          <!-- FOG tasks. Hidden unless the FOG integration is enabled and reachable;
+               shown/hidden by UpdateFogButtonVisibility in 20-fog.ts. -->
+          <button
+            id="FOG_BUTTON"
+            class="fog-btn no-drag d-none"
+            title="Toggle FOG Tasks Panel"
+            aria-label="FOG Tasks"
+          >
+            <i class="bi bi-hdd-network-fill"></i>
+            <span class="fog-count d-none">0</span>
+          </button>
           <button
             id="ALERTS_BUTTON"
             class="alerts-btn no-drag"
@@ -324,6 +335,18 @@
       <div id="ALERTS_LIST" class="alerts-list"></div>
     </div>
     <!-- End Alerts Tray -->
+
+    <!-- FOG Tasks Tray. View-only: task state is reconciled server-side by the
+         FOG poller and pushed here; nothing in this panel mutates FOG. -->
+    <div id="FOG_TRAY" class="fog-tray no-drag" aria-live="polite" aria-label="FOG Tasks" hidden>
+      <div class="fog-header">
+        <strong>FOG Tasks</strong>
+        <div class="fog-status" id="FOG_TRAY_STATUS"></div>
+      </div>
+      <div id="FOG_TASK_LIST" class="fog-list"></div>
+    </div>
+    <!-- End FOG Tasks Tray -->
+
     <!-- Context Menu -->
     <div id="SHOWTRAK_CONTEXT_MENU"></div>
     <!-- End Context Menu -->
@@ -1477,6 +1500,18 @@ Loading licence...</pre>
                   <i class="bi bi-clipboard"></i>
                 </button>
               </div>
+              <!-- FOG host link. The whole wrapper is hidden unless the FOG
+                   integration is enabled; the select is populated from the live FOG
+                   host list, falling back to the cached link when FOG is offline. -->
+              <div class="d-grid gap-1 d-none" id="CLIENT_EDITOR_FOG_WRAPPER">
+                <div class="form-floating">
+                  <select class="form-select" id="CLIENT_EDITOR_FOG_HOST">
+                    <option value="">Not linked to FOG</option>
+                  </select>
+                  <label for="CLIENT_EDITOR_FOG_HOST">FOG Host</label>
+                </div>
+                <span class="text-sm text-secondary" id="CLIENT_EDITOR_FOG_HINT"></span>
+              </div>
             </div>
 
             <div class="d-grid">
@@ -1485,6 +1520,15 @@ Loading licence...</pre>
               </button>
             </div>
 
+            <!-- Only shown when FOG is enabled, reachable, this client is linked to
+                 a host, and at least one task type is permitted in settings. -->
+            <button
+              type="button"
+              class="btn btn-ghost text-info d-none"
+              id="SHOWTRAK_CLIENT_EDITOR_FOG_TASK"
+            >
+              Schedule FOG Task
+            </button>
             <button
               type="button"
               class="btn btn-ghost text-light"
@@ -1506,6 +1550,53 @@ Loading licence...</pre>
             >
               Delete Client
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Schedule FOG Task. Lists only the task types permitted in settings; the
+         backend re-checks that permission regardless of what this modal offers. -->
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_FOG_TASK"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_FOG_TASK_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div id="FOG_TASK_HEADER"></div>
+            <div class="d-grid gap-2 mt-2">
+              <div class="bg-ghost p-2 rounded text-start d-grid gap-1">
+                <span class="text-sm text-secondary">Target</span>
+                <strong id="FOG_TASK_TARGET">—</strong>
+                <span class="text-sm text-secondary" id="FOG_TASK_TARGET_IMAGE"></span>
+              </div>
+              <div class="form-floating">
+                <select class="form-select" id="FOG_TASK_TYPE"></select>
+                <label for="FOG_TASK_TYPE">Task</label>
+              </div>
+              <!-- Single Snapin (task type 13) is the only type needing an extra
+                   parameter; FOG passes it through the deploySnapins field. -->
+              <div class="form-floating d-none" id="FOG_TASK_SNAPIN_WRAPPER">
+                <input
+                  type="number"
+                  min="1"
+                  class="form-control"
+                  id="FOG_TASK_SNAPIN"
+                  placeholder="Snapin ID"
+                />
+                <label for="FOG_TASK_SNAPIN">Snapin ID</label>
+              </div>
+              <div class="bg-ghost p-2 rounded text-start d-none" id="FOG_TASK_WARNING">
+                <span class="text-warning text-sm" id="FOG_TASK_WARNING_TEXT"></span>
+              </div>
+              <button type="button" class="btn btn-success" id="FOG_TASK_SCHEDULE">
+                Schedule Task
+              </button>
+            </div>
           </div>
         </div>
       </div>

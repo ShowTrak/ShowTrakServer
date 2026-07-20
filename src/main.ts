@@ -53,6 +53,7 @@ import { Manager as MonitoringTargetManager } from './Modules/MonitoringTargetMa
 import { Manager as ClientManager } from './Modules/ClientManager';
 import { Manager as GroupManager } from './Modules/GroupManager';
 import { Manager as TagManager } from './Modules/TagManager';
+import { Manager as FogManager } from './Modules/FogManager';
 import { Manager as DummyClientManager } from './Modules/DummyClientManager';
 import { Manager as AlertsManager } from './Modules/AlertsManager';
 import { Manager as AudioAssetManager } from './Modules/AudioAssetManager';
@@ -253,6 +254,11 @@ app.whenReady().then(async () => {
     AudioAssetManager.Init()
       .then(() => ValidateAlertAudioAssets())
       .catch((Err: unknown) => Logger.error('Failed to init AudioAssetManager:', Err));
+    // The FOG poller always starts; it reports "not enabled" until the setting is
+    // turned on, which is what lets the toggle take effect without a restart.
+    // Deliberately not awaited — a slow or unreachable FOG server must not hold up
+    // the main window appearing.
+    FogManager.Start().catch((Err: unknown) => Logger.error('Failed to start FogManager:', Err));
     await Wait(PRELOADER_MIN_DISPLAY_MS);
     PreloaderWindow.close();
     if (await SettingsManager.GetValue('SYSTEM_AUTO_MAXIMIZE_ON_BOOT')) {

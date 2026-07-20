@@ -1933,6 +1933,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
      relationship as the bar grows with the safe-area inset. */
   body.mobile-view #SHOWTRAK_CONFIRM_TOAST.confirm-toast,
   body.mobile-view #ALERTS_TRAY.alerts-tray,
+  body.mobile-view #FOG_TRAY.fog-tray,
   body.mobile-view #IDENTIFY_STATUS_BANNER {
     bottom: calc(var(--bottom-bar-total-mobile) - 8px);
   }

@@ -141,6 +141,14 @@ const INVOKE_CHANNEL_LIST = [
   'Tags:SetScope',
   'Tags:SetOrder',
   'Tags:Delete',
+  'Fog:GetStatus',
+  'Fog:TestConnection',
+  'Fog:GetHosts',
+  'Fog:GetHostLink',
+  'Fog:SetHostLink',
+  'Fog:GetTaskTypes',
+  'Fog:GetTasks',
+  'Fog:ScheduleTask',
   'Audio:GetAll',
   'Audio:GetData',
   'Audio:Select',
@@ -188,6 +196,8 @@ const SUBSCRIBE_CHANNEL_LIST = [
   'ShowFileUpdated',
   'MainWindowFullscreenChanged',
   'NetworkInterfacesChanged',
+  'FogStatusUpdated',
+  'SetFogTaskList',
 ] as const satisfies readonly SubscribeChannel[];
 type _MissingSubscribeChannels = AssertAllChannelsListed<
   Exclude<SubscribeChannel, (typeof SUBSCRIBE_CHANNEL_LIST)[number]>
@@ -439,6 +449,18 @@ const API: ShowTrakAPI = {
   SetTagOrder: async (OrderedTagIDs) => invoke('Tags:SetOrder', OrderedTagIDs),
   DeleteTag: async (TagID) => invoke('Tags:Delete', TagID),
   OnSetTagList: (Callback) => subscribe('SetTagList', Callback),
+  // FOG Project integration
+  GetFogStatus: async () => invoke('Fog:GetStatus'),
+  TestFogConnection: async () => invoke('Fog:TestConnection'),
+  GetFogHosts: async () => invoke('Fog:GetHosts'),
+  GetFogHostLink: async (UUID) => invoke('Fog:GetHostLink', UUID),
+  SetFogHostLink: async (UUID, FogHostID) => invoke('Fog:SetHostLink', UUID, FogHostID),
+  GetFogTaskTypes: async () => invoke('Fog:GetTaskTypes'),
+  GetFogTasks: async () => invoke('Fog:GetTasks'),
+  ScheduleFogTask: async (UUID, TaskTypeID, SnapinID) =>
+    invoke('Fog:ScheduleTask', UUID, TaskTypeID, SnapinID),
+  OnFogStatusUpdated: (Callback) => subscribe('FogStatusUpdated', Callback),
+  OnSetFogTaskList: (Callback) => subscribe('SetFogTaskList', Callback),
   // Custom Audio Assets
   GetAudioAssets: async () => invoke('Audio:GetAll'),
   GetAudioAssetData: async (ID) => invoke('Audio:GetData', ID),

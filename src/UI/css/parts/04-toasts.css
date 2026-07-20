@@ -808,6 +808,17 @@
     max-height: calc(min(68vh, 560px) - 58px);
   }
 
+  #FOG_TRAY.fog-tray {
+    right: 8px;
+    bottom: 44px;
+    width: calc(100vw - 16px);
+    max-height: min(68vh, 560px);
+  }
+
+  #FOG_TRAY .fog-list {
+    max-height: calc(min(68vh, 560px) - 58px);
+  }
+
   #SHOWTRAK_CONFIRM_TOAST.confirm-toast {
     width: calc(100vw - 16px);
     bottom: 44px;

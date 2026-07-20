@@ -1,6 +1,10 @@
 import { DEFAULT_MONITORING_INTERVAL_MS, OSC_PORT } from '../Config/constants';
+import { FOG_TASK_TYPES, FogTaskPermissionKey } from '../Config/fog';
 
-export type SettingType = 'BOOLEAN' | 'INTEGER' | 'STRING' | 'OPTION' | 'SLIDER';
+// PASSWORD behaves exactly like STRING everywhere on the backend; it only tells the
+// settings renderer to mask the field. Used for secrets that would otherwise sit in
+// plain sight in the settings modal.
+export type SettingType = 'BOOLEAN' | 'INTEGER' | 'STRING' | 'PASSWORD' | 'OPTION' | 'SLIDER';
 export type SettingValue = boolean | number | string;
 
 export interface SettingDefinition {
@@ -298,6 +302,84 @@ export const DefaultSettings: SettingDefinition[] = [
     Options: ['error', 'warn', 'info', 'debug', 'trace'],
     OnUpdateEvent: 'LoggingSettingsChanged',
   },
+  {
+    Group: 'FOG Project',
+    Key: 'FOG_ENABLED',
+    Title: 'FOG Project Integration',
+    Description:
+      'Enable integration with a FOG Project server so imaging tasks can be scheduled against clients from ShowTrak. The integration only reports as connected once the details below successfully reach the FOG API.',
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+    OnUpdateEvent: 'FogSettingsChanged',
+  },
+  {
+    Group: 'FOG Project',
+    Key: 'FOG_PROTOCOL',
+    Title: 'Protocol',
+    Description:
+      'Whether to reach the FOG server over http or https. Self-signed certificates are accepted, so https does not guarantee the connection is verified.',
+    Type: 'OPTION',
+    DefaultValue: 'http',
+    Options: ['http', 'https'],
+    OnUpdateEvent: 'FogSettingsChanged',
+  },
+  {
+    Group: 'FOG Project',
+    Key: 'FOG_HOST',
+    Title: 'FOG Server Address',
+    Description:
+      'Hostname or IP address of the FOG server. Do not include the protocol, port or /fog path — just the address, e.g. 10.0.0.10.',
+    Type: 'STRING',
+    DefaultValue: '',
+    OnUpdateEvent: 'FogSettingsChanged',
+  },
+  {
+    Group: 'FOG Project',
+    Key: 'FOG_PORT',
+    Title: 'Port',
+    Description:
+      'Port the FOG web interface listens on. Leave at 0 to use the protocol default (80 for http, 443 for https).',
+    Type: 'INTEGER',
+    DefaultValue: 0,
+    Min: 0,
+    Max: 65535,
+    OnUpdateEvent: 'FogSettingsChanged',
+  },
+  {
+    Group: 'FOG Project',
+    Key: 'FOG_API_TOKEN',
+    Title: 'API Token',
+    Description:
+      'System-wide FOG API token, found under FOG Configuration → FOG Settings → API System. Paste it exactly as shown in the FOG web interface — it is already encoded, and re-encoding it will cause the connection to be rejected.',
+    Type: 'PASSWORD',
+    DefaultValue: '',
+    OnUpdateEvent: 'FogSettingsChanged',
+  },
+  {
+    Group: 'FOG Project',
+    Key: 'FOG_USER_TOKEN',
+    Title: 'User Token',
+    Description:
+      'Per-user FOG API token, found under Users → (your user) → API. The user must have "User API Enable" ticked in FOG, otherwise the connection is rejected.',
+    Type: 'PASSWORD',
+    DefaultValue: '',
+    OnUpdateEvent: 'FogSettingsChanged',
+  },
+  // One permission toggle per host-schedulable FOG task type. Generated from the task
+  // type catalogue so the two cannot drift. Everything defaults to off: enabling the
+  // integration must not, on its own, make it possible to wipe a machine.
+  ...FOG_TASK_TYPES.map(
+    (Type): SettingDefinition => ({
+      Group: 'FOG Permitted Actions',
+      Key: FogTaskPermissionKey(Type.TaskTypeID),
+      Title: Type.Name,
+      Description: Type.Destructive
+        ? `Allow the "${Type.Name}" task to be scheduled from ShowTrak. This task is destructive and can result in data loss on the target machine.`
+        : `Allow the "${Type.Name}" task to be scheduled from ShowTrak.`,
+      Type: 'BOOLEAN',
+      DefaultValue: false,
+    })
+  ),
 ];
 
 export const Groups: SettingGroup[] = [
@@ -309,5 +391,7 @@ export const Groups: SettingGroup[] = [
   { Name: 'Alerts', Title: 'Alerts' },
   { Name: 'Web UI', Title: 'Web UI' },
   { Name: 'Web UI Permissions', Title: 'Web UI Permissions' },
+  { Name: 'FOG Project', Title: 'FOG Project' },
+  { Name: 'FOG Permitted Actions', Title: 'FOG Permitted Actions' },
   { Name: 'System', Title: 'System Settings' },
 ];

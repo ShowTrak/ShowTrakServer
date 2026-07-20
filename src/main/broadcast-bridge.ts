@@ -23,6 +23,7 @@ import { Manager as MonitoringTargetManager } from '../Modules/MonitoringTargetM
 import { Manager as DummyClientManager } from '../Modules/DummyClientManager';
 import { Manager as AlertsManager } from '../Modules/AlertsManager';
 import { Manager as TagManager } from '../Modules/TagManager';
+import { Manager as FogManager } from '../Modules/FogManager';
 import { Manager as AudioAssetManager } from '../Modules/AudioAssetManager';
 import { Manager as ScriptManager } from '../Modules/ScriptManager';
 import { ToPublicScriptExecution } from '../Modules/ScriptExecutionManager';
@@ -399,6 +400,18 @@ async function UpdateTagList(): Promise<void> {
   PushToRenderers('SetTagList', Tags || []);
 }
 
+async function UpdateFogTaskList(): Promise<void> {
+  if (!hasMainWindow()) return;
+  const [Err, Tasks] = await FogManager.GetTasks();
+  if (Err) return Logger.error('Failed to fetch FOG tasks:', Err);
+  PushToRenderers('SetFogTaskList', Tasks || []);
+}
+
+async function UpdateFogStatus(): Promise<void> {
+  if (!hasMainWindow()) return;
+  PushToRenderers('FogStatusUpdated', await FogManager.GetStatus());
+}
+
 // Thin wrapper to surface system notifications in the renderer.
 async function Notify(Message: unknown, Type = 'info', Duration = 5000): Promise<void> {
   if (!hasMainWindow()) return;
@@ -504,6 +517,17 @@ function RegisterBroadcastBridge(): void {
   BroadcastManager.on('ScriptExecutionUpdated', UpdateScriptExecutions);
   BroadcastManager.on('AlertRuleListChanged', UpdateAlertRuleList);
   BroadcastManager.on('TagListChanged', UpdateTagList);
+  // FOG: the poller emits FogTasksUpdated on any state change and FogStatusChanged
+  // when the connection comes up or goes down. Status is pushed alongside the task
+  // list because the panel renders both.
+  BroadcastManager.on('FogTasksUpdated', UpdateFogTaskList);
+  BroadcastManager.on('FogStatusChanged', UpdateFogStatus);
+  BroadcastManager.on('FogStatusChanged', UpdateFogTaskList);
+  // Editing any FOG setting re-probes immediately rather than waiting out the
+  // poll interval, so a corrected token gives instant feedback.
+  BroadcastManager.on('FogSettingsChanged', () => {
+    void FogManager.SettingsChanged();
+  });
   BroadcastManager.on('Notify', Notify);
   BroadcastManager.on('PlaySound', PlaySound);
   BroadcastManager.on('OSCBulkAction', HandleOSCBulkAction);
@@ -532,5 +556,7 @@ export {
   UpdateMonitoringTargetList,
   UpdateDummyClientList,
   UpdateAlertRuleList,
+  UpdateFogTaskList,
+  UpdateFogStatus,
   ValidateAlertAudioAssets,
 };

@@ -30,6 +30,7 @@ import './16-dummy-clients';
 import { InitAudioAssets } from './17-audio-assets';
 import { InitIconPicker } from './18-icon-picker';
 import { InitTagManager } from './19-tag-manager';
+import { InitFog } from './20-fog';
 import { InitOfflineIndicators } from './offline-indicators';
 import { Init, WireGlobalUI } from './init';
 
@@ -45,6 +46,7 @@ InitScriptManager();
 InitAudioAssets();
 InitIconPicker();
 InitTagManager();
+InitFog();
 InitOfflineIndicators();
 void WireGlobalUI();
 void Init();

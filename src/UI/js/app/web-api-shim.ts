@@ -189,6 +189,23 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     SetSetting: nullTuple,
     UpdateSettings: noSub,
 
+    // ---- FOG Project (desktop-only) --------------------------------------
+    // Scheduling imaging tasks is deliberately not exposed to the Web UI: it is
+    // destructive, and the FOG credentials live server-side. The FOG button is
+    // hidden from web chrome, so these stubs are belt-and-braces.
+    GetFogStatus: async () =>
+      ({ Enabled: false, Healthy: false, Message: null, LastCheckedAt: null }) as never,
+    TestFogConnection: async () =>
+      ({ Enabled: false, Healthy: false, Message: null, LastCheckedAt: null }) as never,
+    GetFogHosts: nullTuple,
+    GetFogHostLink: nullTuple,
+    SetFogHostLink: nullTuple,
+    GetFogTaskTypes: emptyArray,
+    GetFogTasks: nullTuple,
+    ScheduleFogTask: nullTuple,
+    OnFogStatusUpdated: noSub,
+    OnSetFogTaskList: noSub,
+
     // ---- OSC / traffic / toasts ------------------------------------------
     OSCBulkAction: (cb) => sub('OSCBulkAction', cb),
     PlaySound: (cb) => sub('PlaySound', cb),

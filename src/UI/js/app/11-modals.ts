@@ -17,6 +17,7 @@ import {
   ShowExecutionToast,
   Wait,
 } from './14-selection-init';
+import { IsFogAvailable, OpenFogTaskModal } from './20-fog';
 import type { ClientView } from '@showtrak/protocol';
 
 // The former Update Manager and Group Manager god-sections now live in their own
@@ -71,6 +72,10 @@ export function InitSimpleModalHeaders() {
     onClose: dismiss('SHOWTRAK_MODAL_UPDATE_MANAGER'),
   });
   build('SETTINGS_HEADER', { title: 'Settings', onClose: dismiss('SHOWTRAK_MODAL_SETTINGS') });
+  build('FOG_TASK_HEADER', {
+    title: 'Schedule FOG Task',
+    onClose: dismiss('SHOWTRAK_MODAL_FOG_TASK'),
+  });
   build('EXECUTIONQUEUE_HEADER', {
     title: 'Executing Scripts',
     onClose: dismiss('SHOWTRAK_MODEL_EXECUTIONQUEUE'),
@@ -291,6 +296,82 @@ export async function NewShow() {
   await Notify('Created new show.', 'success');
 }
 
+// Populate the FOG section of the client editor: the host dropdown and the
+// "Schedule FOG Task" button.
+//
+// Every part of this degrades rather than fails. If FOG is disabled or unreachable
+// the whole section is hidden and the editor behaves exactly as it did before the
+// integration existed — opening a client must never depend on a FOG server being up.
+// If FOG is reachable but the host list request failed, the backend hands back its
+// cached list, and if that is empty too we still show the currently-linked host so
+// the link is visible and clearable.
+async function PopulateFogSection(UUID: string, ClientLabel: string): Promise<void> {
+  const $Wrapper = $('#CLIENT_EDITOR_FOG_WRAPPER');
+  const $Button = $('#SHOWTRAK_CLIENT_EDITOR_FOG_TASK');
+  const $Select = $('#CLIENT_EDITOR_FOG_HOST');
+
+  if (!IsFogAvailable()) {
+    $Wrapper.addClass('d-none');
+    $Button.addClass('d-none');
+    return;
+  }
+  $Wrapper.removeClass('d-none');
+
+  const [LinkErr, Link] = await window.API.GetFogHostLink(UUID);
+  const LinkedID = !LinkErr && Link ? Link.FogHostID : null;
+
+  const [HostsErr, Hosts] = await window.API.GetFogHosts();
+  const HostList = !HostsErr && Array.isArray(Hosts) ? Hosts : [];
+
+  let Options = '<option value="">Not linked to FOG</option>';
+  let Matched = false;
+  for (const Host of HostList) {
+    const Selected = LinkedID === Host.FogHostID ? 'selected' : '';
+    if (Selected) Matched = true;
+    Options += `<option value="${Host.FogHostID}" ${Selected}>${Safe(Host.Name)}</option>`;
+  }
+  // The linked host is missing from the list (FOG unreachable, or the host was
+  // deleted in FOG). Keep it selectable from the cached name so the operator can
+  // see and clear the stale link instead of it silently vanishing.
+  if (LinkedID && !Matched) {
+    const CachedName = Link && Link.FogHostName ? Link.FogHostName : `FOG host ${LinkedID}`;
+    Options += `<option value="${LinkedID}" selected>${Safe(CachedName)} (unavailable)</option>`;
+  }
+  $Select.html(Options);
+
+  const SelectedHost = HostList.find((Host) => Host.FogHostID === LinkedID) || null;
+  $('#CLIENT_EDITOR_FOG_HINT').text(
+    LinkedID
+      ? SelectedHost && SelectedHost.ImageName
+        ? `Assigned image: ${SelectedHost.ImageName}`
+        : 'No image assigned in FOG — Deploy tasks will fail.'
+      : 'Link this client to a FOG host to schedule imaging tasks.'
+  );
+
+  // Persist the link on change rather than folding it into Save: FOG data lives in
+  // its own table and has no business travelling through the client update payload.
+  $Select.off('change').on('change', async function () {
+    const Raw = String($(this).val() || '').trim();
+    const NextID = Raw ? parseInt(Raw, 10) : null;
+    const [Err] = await window.API.SetFogHostLink(UUID, NextID);
+    if (Err) {
+      await Notify(String(Err), 'error');
+      return;
+    }
+    await Notify(NextID ? 'Linked to FOG host.' : 'Unlinked from FOG.', 'success');
+    await PopulateFogSection(UUID, ClientLabel);
+  });
+
+  const TaskTypes = await window.API.GetFogTaskTypes();
+  const CanSchedule = !!LinkedID && TaskTypes.length > 0;
+  $Button.toggleClass('d-none', !CanSchedule);
+  if (CanSchedule) {
+    $Button.off('click').on('click', async () => {
+      await OpenFogTaskModal(UUID, ClientLabel, SelectedHost ? SelectedHost.ImageName : null);
+    });
+  }
+}
+
 export async function OpenClientEditor(UUID: string) {
   const Client = await window.API.GetClient(UUID);
   if (!Client) return console.error('Client not found:', UUID);
@@ -348,6 +429,8 @@ export async function OpenClientEditor(UUID: string) {
       Client.RunOnLaunchDelaySeconds ?? MIN_LAUNCH_DELAY_SECONDS
     );
   }
+
+  await PopulateFogSection(UUID, (Nickname ? Nickname : Hostname) || UUID);
 
   $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').html('');
   // USB section moved to read-only Client Info modal

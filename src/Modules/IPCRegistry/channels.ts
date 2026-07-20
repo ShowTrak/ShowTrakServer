@@ -157,6 +157,16 @@ const INVOKE_CHANNELS = [
   'Tags:SetOrder',
   'Tags:Delete',
 
+  // FOG Project integration
+  'Fog:GetStatus',
+  'Fog:TestConnection',
+  'Fog:GetHosts',
+  'Fog:GetHostLink',
+  'Fog:SetHostLink',
+  'Fog:GetTaskTypes',
+  'Fog:GetTasks',
+  'Fog:ScheduleTask',
+
   // Audio assets
   'Audio:GetAll',
   'Audio:GetData',
@@ -202,6 +212,8 @@ const SUBSCRIBE_CHANNELS = [
   'ShowFileUpdated',
   'MainWindowFullscreenChanged',
   'NetworkInterfacesChanged',
+  'FogStatusUpdated',
+  'SetFogTaskList',
 ] as const;
 
 // Union types derived from the arrays above — the compile-time contract for
