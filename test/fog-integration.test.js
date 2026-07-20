@@ -56,7 +56,11 @@ test('every task type has a permission key and destructive types are flagged', (
     assert.equal(GetFogTaskType(ID).Destructive, true, `task type ${ID} should be destructive`);
   }
   for (const ID of [14, 10, 4]) {
-    assert.equal(GetFogTaskType(ID).Destructive, false, `task type ${ID} should not be destructive`);
+    assert.equal(
+      GetFogTaskType(ID).Destructive,
+      false,
+      `task type ${ID} should not be destructive`
+    );
   }
 });
 
@@ -259,7 +263,7 @@ test('task creation succeeds on a 200 whose body is the literal string null', as
   }
 });
 
-test('a 500 surfaces FOG\'s own error message', async () => {
+test("a 500 surfaces FOG's own error message", async () => {
   const Stub = await startStubFog((Req, Res) => {
     Res.writeHead(500, { 'Content-Type': 'application/json' });
     Res.end(JSON.stringify({ error: 'No image assigned to this host' }));
