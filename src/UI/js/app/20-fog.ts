@@ -39,6 +39,11 @@ function OpenTaskCount(): number {
   return FogTasks.filter((Task) => OPEN_STATE_IDS.includes(Task.StateID)).length;
 }
 
+// Finished (terminal-state) tasks are the history the Clear button discards.
+function FinishedTaskCount(): number {
+  return FogTasks.filter((Task) => !OPEN_STATE_IDS.includes(Task.StateID)).length;
+}
+
 // ---- Bottom bar button -----------------------------------------------------
 
 // The button only exists while FOG is usable. When it disappears the tray must go
@@ -75,8 +80,26 @@ function RenderFogStatus(): void {
   Status.setAttribute('title', FogStatus.Message || '');
 }
 
+// Nothing finished means nothing to clear, so the button stays out of the header
+// rather than sitting there as a no-op.
+function RenderClearButton(): void {
+  const Button = document.getElementById('FOG_CLEAR_FINISHED');
+  if (!Button) return;
+
+  const Count = FinishedTaskCount();
+  Button.classList.toggle('d-none', Count === 0);
+  Button.setAttribute(
+    'title',
+    `Clear ${Count} finished task${Count === 1 ? '' : 's'} from this list`
+  );
+  // A re-render lands while a clear is in flight; re-enable so the button is not
+  // left dead if the operation failed.
+  (Button as HTMLButtonElement).disabled = false;
+}
+
 function RenderFogTasks(): void {
   RenderFogStatus();
+  RenderClearButton();
 
   const List = document.getElementById('FOG_TASK_LIST');
   if (!List) return;
@@ -267,6 +290,32 @@ export function InitFog(): void {
     Button.dataset.bound = '1';
     Button.addEventListener('click', () => ToggleFogTray());
   }
+
+  // Header markup is static, so bind straight to the button. Running tasks are
+  // never cleared — the backend filters by state, and the wording says so, so the
+  // operator cannot mistake this for a bulk cancel.
+  $('#FOG_CLEAR_FINISHED')
+    .off('click.fogClear')
+    .on('click.fogClear', async function () {
+      const Count = FinishedTaskCount();
+      if (!Count) return;
+
+      const Confirmed = await ConfirmationDialog(
+        `Clear ${Count} finished task${Count === 1 ? '' : 's'} from the list? Running tasks are not affected.`
+      );
+      if (!Confirmed) return;
+
+      const $Btn = $(this);
+      $Btn.prop('disabled', true);
+      const [Err] = await window.API.ClearFinishedFogTasks();
+      if (Err) {
+        $Btn.prop('disabled', false);
+        await Notify(String(Err), 'error');
+        return;
+      }
+      // The backend pushes the trimmed task list, which re-renders the tray.
+      await Notify(`Cleared ${Count} finished task${Count === 1 ? '' : 's'}.`, 'success');
+    });
 
   // Delegated so it survives the list being re-rendered on every push.
   $('#FOG_TASK_LIST')

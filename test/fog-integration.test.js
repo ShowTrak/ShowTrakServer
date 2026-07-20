@@ -17,6 +17,7 @@ const {
   DescribeConfigGaps,
 } = require('../dist/Modules/FogManager/client');
 const { Manager: IPCValidation } = require('../dist/Modules/IPCValidation');
+const { CreateFogRepository } = require('../dist/Modules/DB/repositories/fog');
 
 // Covers the FOG Project integration's transport and catalogue.
 //
@@ -323,4 +324,47 @@ test('FogTaskTypeID and FogSnapinID reject non-positive and malformed values', (
   assert.equal(IPCValidation.FogSnapinID(null), null);
   assert.equal(IPCValidation.FogSnapinID('6'), 6);
   assert.throws(() => IPCValidation.FogSnapinID('0'), /positive integer/i);
+});
+
+// ---- Task history pruning --------------------------------------------------
+
+// The Clear button in the tasks tray routes here. Deleting a row for a task that
+// is still running in FOG would orphan it — the poller would have nothing left to
+// reconcile against, so the task would vanish from the panel while continuing to
+// image the machine. Both the age-based pruner and the operator-triggered clear
+// must therefore filter on state, not just on age.
+test('clearing finished tasks leaves open tasks in place', async () => {
+  const runs = [];
+  const Repo = CreateFogRepository({
+    Run: async (sql, params) => {
+      runs.push([sql, params]);
+      return [null, { changes: 0 }];
+    },
+  });
+
+  await Repo.DeleteFinishedTasks();
+  assert.equal(runs.length, 1);
+
+  const [sql, params] = runs[0];
+  assert.equal(params, undefined, 'the clear takes no parameters');
+  // States 0-3 are the non-terminal ones (see FOG_TASK_STATES); every one of them
+  // must be excluded from the delete.
+  assert.match(sql, /^DELETE FROM FogTasks WHERE StateID NOT IN \(0, 1, 2, 3\)$/);
+  assert.doesNotMatch(sql, /UpdatedAt/, 'the operator clear ignores the retention age');
+});
+
+test('age-based pruning also spares open tasks', async () => {
+  const runs = [];
+  const Repo = CreateFogRepository({
+    Run: async (sql, params) => {
+      runs.push([sql, params]);
+      return [null, { changes: 0 }];
+    },
+  });
+
+  await Repo.PruneFinishedTasksBefore(1000);
+  const [sql, params] = runs[0];
+  assert.match(sql, /StateID NOT IN \(0, 1, 2, 3\)/);
+  assert.match(sql, /UpdatedAt < \?/);
+  assert.deepEqual(params, [1000]);
 });

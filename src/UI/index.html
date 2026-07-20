@@ -336,12 +336,15 @@
     </div>
     <!-- End Alerts Tray -->
 
-    <!-- FOG Tasks Tray. View-only: task state is reconciled server-side by the
-         FOG poller and pushed here; nothing in this panel mutates FOG. -->
+    <!-- FOG Tasks Tray. Task state is reconciled server-side by the FOG poller and
+         pushed here; the only mutations offered are cancelling a running task and
+         clearing finished ones from the local history. -->
     <div id="FOG_TRAY" class="fog-tray no-drag" aria-live="polite" aria-label="FOG Tasks" hidden>
       <div class="fog-header">
         <strong>FOG Tasks</strong>
         <div class="fog-status" id="FOG_TRAY_STATUS"></div>
+        <!-- Hidden until there is finished history to clear; see RenderFogTasks. -->
+        <button type="button" class="fog-clear d-none" id="FOG_CLEAR_FINISHED">Clear</button>
       </div>
       <div id="FOG_TASK_LIST" class="fog-list"></div>
     </div>

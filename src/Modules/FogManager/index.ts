@@ -568,6 +568,22 @@ const Manager = {
 
     return Ok<void>();
   },
+
+  // Clear the finished-task history from the panel.
+  //
+  // Purely local: these rows are ShowTrak's own record of tasks FOG has already
+  // finished with, so nothing is sent to FOG and no health check is needed —
+  // tidying up history must work even while the FOG server is unreachable.
+  // Open tasks are deliberately left behind (see DeleteFinishedTasks).
+  async ClearFinishedTasks(): Promise<Result<void>> {
+    const [Err] = await FogRepo.DeleteFinishedTasks();
+    if (Err) return Fail(String(Err));
+
+    Logger.log('Cleared finished FOG tasks');
+    BroadcastManager.emit('FogTasksUpdated');
+
+    return Ok<void>();
+  },
 };
 
 export { Manager };

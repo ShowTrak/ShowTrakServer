@@ -167,6 +167,7 @@ const INVOKE_CHANNELS = [
   'Fog:GetTasks',
   'Fog:ScheduleTask',
   'Fog:CancelTask',
+  'Fog:ClearFinishedTasks',
 
   // Audio assets
   'Audio:GetAll',

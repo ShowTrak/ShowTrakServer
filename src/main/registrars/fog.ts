@@ -87,6 +87,15 @@ function register(): void {
       { invalidFallback: false }
     )
   );
+
+  // Takes no arguments — which rows count as finished is decided by the repository,
+  // never by the renderer, so there is nothing here to validate.
+  RPC.handle(
+    'Fog:ClearFinishedTasks',
+    createTupleHandler<[], void>(null, () => FogManager.ClearFinishedTasks(), {
+      invalidFallback: false,
+    })
+  );
 }
 
 export { register };

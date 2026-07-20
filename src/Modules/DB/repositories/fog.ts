@@ -101,5 +101,11 @@ export function CreateFogRepository(DB: DBManager) {
         Timestamp,
       ]);
     },
+    // Operator-triggered clear of the finished history, ignoring the retention age.
+    // Same state filter as the pruner: open tasks survive, because clearing a row the
+    // poller is still reconciling would orphan a task that is genuinely running in FOG.
+    DeleteFinishedTasks(): Promise<DBResult<unknown>> {
+      return DB.Run('DELETE FROM FogTasks WHERE StateID NOT IN (0, 1, 2, 3)');
+    },
   };
 }

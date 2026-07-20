@@ -300,6 +300,8 @@ export interface ShowTrakAPI {
   ): Promise<ResultTuple<boolean>>;
   /** Cancel a running FOG task by its ShowTrak record ID. */
   CancelFogTask(FogTaskRecordID: number): Promise<ResultTuple<boolean>>;
+  /** Clear finished tasks from the local history. Open tasks are left untouched. */
+  ClearFinishedFogTasks(): Promise<ResultTuple<boolean>>;
   OnFogStatusUpdated(callback: (status: FogStatusView) => void): Unsubscribe;
   OnSetFogTaskList(callback: (tasks: FogTaskView[]) => void): Unsubscribe;
 
