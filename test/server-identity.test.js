@@ -12,6 +12,13 @@ function identityPath() {
   return path.join(__dirname, '..', 'dist', 'Modules', 'ServerIdentity', 'index.js');
 }
 
+// The module derives its storage path with path.join(), so the in-memory file
+// store has to be keyed the same way — a hardcoded '/storage/...' literal misses
+// entirely on platforms whose separator is not '/'.
+function identityFilePath() {
+  return path.join('/storage', 'server-identity.json');
+}
+
 // Builds fs/AppData/UUID mocks over an in-memory file store.
 function loadManager({ files = {}, uuid = 'generated-token' } = {}) {
   const store = new Map(Object.entries(files));
@@ -92,7 +99,7 @@ test('GetIdentity caches within the module and does not re-read or re-generate',
 });
 
 test('GetIdentity loads and trims an existing valid token from disk', () => {
-  const filePath = '/storage/server-identity.json';
+  const filePath = identityFilePath();
   const { module, writes, stats } = loadManager({
     files: { [filePath]: JSON.stringify({ Token: '  existing-token  ', CreatedAt: 12345 }) },
   });
@@ -107,7 +114,7 @@ test('GetIdentity loads and trims an existing valid token from disk', () => {
 });
 
 test('GetIdentity defaults CreatedAt when the stored value is not a number', () => {
-  const filePath = '/storage/server-identity.json';
+  const filePath = identityFilePath();
   const { module } = loadManager({
     files: { [filePath]: JSON.stringify({ Token: 'tok', CreatedAt: 'not-a-number' }) },
   });
@@ -118,7 +125,7 @@ test('GetIdentity defaults CreatedAt when the stored value is not a number', () 
 });
 
 test('GetIdentity regenerates when the stored file is malformed or has an empty token', () => {
-  const filePath = '/storage/server-identity.json';
+  const filePath = identityFilePath();
 
   // Corrupt JSON -> caught, treated as no identity, regenerated.
   const corrupt = loadManager({ files: { [filePath]: '{ not json' }, uuid: 'rebuilt' });

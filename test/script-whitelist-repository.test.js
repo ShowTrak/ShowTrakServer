@@ -93,5 +93,8 @@ test('ScriptWhitelists table exists and the repository round-trips rows', async 
   const [, afterDelete] = await Repo.Get('scriptRenamed');
   assert.ok(afterDelete == null);
 
+  // Release the sqlite file before removing the directory — Windows refuses to
+  // delete a file that still has an open handle (EPERM).
+  await DB.Shutdown();
   fs.rmSync(storageDir, { recursive: true, force: true });
 });

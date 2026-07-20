@@ -68,13 +68,35 @@ test('ping BuildArgs uses -c/-W seconds (rounded up) on linux', async () => {
   assert.deepEqual(capture.args, ['-c', '1', '-W', '3', 'host.lin']);
 });
 
-test('ping falls back to wall-clock latency when stdout has no time= field', async () => {
+test('ping reports the round-trip time parsed from stdout', async () => {
+  const capture = {};
+  const ping = loadPing('darwin', closingSpawn(capture, { code: 0, stdout: 'time=1.23 ms' }));
+  const result = await ping.Run({ Address: '127.0.0.1' });
+  assert.equal(result.Success, true);
+  assert.equal(result.LatencyMs, 1.23);
+});
+
+// A zero exit code is not proof of delivery, so a reply with no round-trip time
+// is a failure rather than a success carrying a wall-clock stand-in — that
+// substitution used to report unreachable hosts as online during boot.
+test('ping fails when stdout has no time= field despite a zero exit code', async () => {
   const capture = {};
   const ping = loadPing('darwin', closingSpawn(capture, { code: 0, stdout: 'no timing here' }));
   const result = await ping.Run({ Address: '127.0.0.1' });
-  assert.equal(result.Success, true);
-  assert.equal(typeof result.LatencyMs, 'number');
-  assert.ok(result.LatencyMs >= 0);
+  assert.equal(result.Success, false);
+  assert.equal(result.Error, 'No echo reply');
+  assert.equal(result.LatencyMs, undefined);
+});
+
+test('ping fails when stdout reports destination host unreachable', async () => {
+  const capture = {};
+  const ping = loadPing(
+    'darwin',
+    closingSpawn(capture, { code: 0, stdout: 'Reply from 10.0.0.1: Destination host unreachable.' })
+  );
+  const result = await ping.Run({ Address: '10.0.0.9' });
+  assert.equal(result.Success, false);
+  assert.match(result.Error, /destination host unreachable/i);
 });
 
 test('ping reports a spawn failure when child_process.spawn throws', async () => {

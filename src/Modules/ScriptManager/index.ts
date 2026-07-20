@@ -333,6 +333,9 @@ function ScheduleScriptDirectoryReload() {
       Logger.error('Failed to reload scripts after filesystem change:', Err);
     }
   }, 350);
+  // Debounce timer for a background reload: it must never, on its own, keep the
+  // process alive (the app's main process always is).
+  if (typeof ScriptDirectoryReloadTimer.unref === 'function') ScriptDirectoryReloadTimer.unref();
 }
 
 function EnsureScriptDirectoryWatcher(ScriptsDirectory: string) {
@@ -357,6 +360,10 @@ function EnsureScriptDirectoryWatcher(ScriptsDirectory: string) {
         ScheduleScriptDirectoryReload();
       }
     );
+    // Background filesystem watcher: like the reload timer above, it must never
+    // be the thing holding the event loop open, or a clean shutdown — and the
+    // test runner — would hang waiting on a watch that never ends on its own.
+    if (typeof ScriptDirectoryWatcher.unref === 'function') ScriptDirectoryWatcher.unref();
     ScriptDirectoryWatcherPath = ScriptsDirectory;
     Logger.log(
       `Watching scripts directory for changes: ${ScriptsDirectory} (${RecursiveWatchSupported ? 'recursive' : 'non-recursive'})`
