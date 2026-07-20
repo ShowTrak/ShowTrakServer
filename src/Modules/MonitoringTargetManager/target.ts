@@ -188,6 +188,7 @@ class MonitoringTarget {
   _timer: ReturnType<typeof setTimeout> | null;
   _running: boolean;
   _stopped: boolean;
+  _gen: number;
 
   constructor(Row: MonitoringTargetInput, Checks: MonitoringCheckInput[] = []) {
     this.TargetID = Row.TargetID;
@@ -209,6 +210,7 @@ class MonitoringTarget {
     this._timer = null;
     this._running = false;
     this._stopped = false;
+    this._gen = 0;
 
     // A target with no checks is idle — it has nothing to probe, so it
     // should not appear online, degraded, or offline.
@@ -316,7 +318,8 @@ class MonitoringTarget {
     this._stopped = false;
     // Run an initial check shortly after boot so the UI doesn't sit "Unknown"
     // for a full interval.
-    this._timer = setTimeout(() => this.Tick(), MONITORING_TICK_INTERVAL_MS);
+    const Gen = this._gen;
+    this._timer = setTimeout(() => this.Tick(Gen), MONITORING_TICK_INTERVAL_MS);
   }
 
   StopLoop() {
@@ -324,23 +327,28 @@ class MonitoringTarget {
     // its checks cannot be cancelled, so it has to observe the flag to know it
     // must not broadcast or re-arm once it lands.
     this._stopped = true;
+    // Bumping the generation retires every timer and in-flight tick belonging to
+    // the previous loop. Without it, a StartLoop() landing while a tick is still
+    // awaiting its checks leaves two live chains: the new timer StartLoop armed,
+    // plus the one the in-flight tick re-arms from its `finally`.
+    this._gen++;
     if (this._timer) {
       clearTimeout(this._timer);
       this._timer = null;
     }
   }
 
-  async Tick() {
-    if (this._stopped) return;
+  async Tick(Gen: number = this._gen) {
+    if (this._stopped || Gen !== this._gen) return;
     if (this._running) {
       // overlap protection — schedule next tick and bail
-      this._timer = setTimeout(() => this.Tick(), this.Interval);
+      this._timer = setTimeout(() => this.Tick(Gen), this.Interval);
       return;
     }
     this._running = true;
     try {
       await Promise.all(this.Checks.map((Check) => Check.Run()));
-      if (this._stopped) return;
+      if (this._stopped || Gen !== this._gen) return;
       this.LastChecked = Date.now();
       this.RecomputeAggregate();
       BroadcastManager.emit('MonitoringTargetUpdated', this.ToJSON());
@@ -348,7 +356,9 @@ class MonitoringTarget {
       Logger.error(`Tick failed for target ${this.TargetID}:`, Err);
     } finally {
       this._running = false;
-      if (!this._stopped) this._timer = setTimeout(() => this.Tick(), this.Interval);
+      if (!this._stopped && Gen === this._gen) {
+        this._timer = setTimeout(() => this.Tick(Gen), this.Interval);
+      }
     }
   }
 }

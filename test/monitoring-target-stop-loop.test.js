@@ -138,6 +138,42 @@ test('A live Tick still broadcasts and re-arms', async () => {
   target.StopLoop();
 });
 
+test('A Tick in flight when StartLoop lands retires instead of re-arming a second chain', async () => {
+  const emitted = [];
+  const errors = [];
+  const gate = createDeferred();
+  const MonitoringTarget = loadTarget({
+    onEmit: (event, payload) => emitted.push({ event, payload }),
+    onError: (...args) => errors.push(args.join(' ')),
+    runImpl: () => gate.promise.then(() => ({ Success: true, LatencyMs: 10 })),
+  });
+
+  const target = buildTarget(MonitoringTarget);
+  const tick = target.Tick();
+
+  // This is the rename path: Update() mutates the target and calls StartLoop()
+  // while the previous tick is still parked on its probe.
+  target.Nickname = 'Renamed Target';
+  target.StartLoop();
+  const revived = target._timer;
+
+  gate.resolve();
+  await tick;
+
+  assert.deepEqual(errors, [], 'the tick must run cleanly for this assertion to mean anything');
+  assert.equal(
+    emitted.length,
+    0,
+    'the superseded tick must not broadcast — its snapshot predates the update'
+  );
+  assert.equal(
+    target._timer,
+    revived,
+    'the superseded tick must not overwrite the timer StartLoop armed — two live chains means duplicate broadcasts per interval'
+  );
+  target.StopLoop();
+});
+
 test('StartLoop revives a target that was previously stopped', async () => {
   const emitted = [];
   const errors = [];

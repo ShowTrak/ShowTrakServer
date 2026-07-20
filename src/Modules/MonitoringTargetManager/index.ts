@@ -31,6 +31,13 @@ const Logger = CreateLogger('MonitoringTargetManager');
 
 let TargetList: MonitoringTarget[] = [];
 
+// In-flight Init(), so concurrent callers share one run instead of each building
+// their own TargetList. `Initialized` only flips at the very end of Init, so
+// every `if (!Initialized) await Init()` call site that fires during boot would
+// otherwise start a competing rebuild — and the losing batch's targets stay in
+// their StartLoop()'d state, broadcasting stale snapshots forever.
+let InitPromise: Promise<void> | null = null;
+
 // Incoming check description from the create/update payloads (already validated
 // upstream; Method is guaranteed present).
 interface MonitoringCheckPayload {
@@ -256,55 +263,79 @@ async function ReconcileChecks(
   Target.RecomputeAggregate();
 }
 
+// Rebuild TargetList from the DB and start every target's polling loop. Always
+// reached through Manager.Init(), which serialises concurrent callers.
+async function RunInit(): Promise<void> {
+  // Retire any loops from a previous TargetList before it is discarded —
+  // an orphaned target keeps ticking and broadcasting a stale snapshot
+  // (old Nickname, old check set) against the same TargetID.
+  for (const T of TargetList) T.StopLoop();
+
+  // Normalize any persisted checks that use a renamed method ID so existing
+  // probes keep resolving to a registered method after a rename.
+  for (const [OldMethod, NewMethod] of Object.entries(RENAMED_METHODS)) {
+    await ChecksRepo.RenameMethod(NewMethod, OldMethod);
+  }
+
+  const [Err, Rows] = await TargetsRepo.GetAll();
+  if (Err) {
+    Manager.Initialized = true;
+    TargetList = [];
+    return;
+  }
+
+  const [CheckErr, CheckRows] = await ChecksRepo.GetAll();
+  const ChecksByTarget = new Map<number, MonitoringCheckInput[]>();
+  if (!CheckErr) {
+    for (const CR of CheckRows || []) {
+      const list = ChecksByTarget.get(CR.TargetID) || [];
+      list.push(CR);
+      ChecksByTarget.set(CR.TargetID, list);
+    }
+  }
+
+  const Next: MonitoringTarget[] = [];
+  for (const Row of Rows || []) {
+    let Checks: MonitoringCheckInput[] = ChecksByTarget.get(Row.TargetID) || [];
+    if (!Checks.length && Row.Method) {
+      const Migrated = await MigrateLegacyTargetToCheck(Row);
+      if (Migrated) Checks = [Migrated];
+    }
+    Checks = Checks.slice().sort(
+      (a, b) => (a.Weight || 0) - (b.Weight || 0) || (a.CheckID || 0) - (b.CheckID || 0)
+    );
+    Next.push(new MonitoringTarget(Row, Checks));
+  }
+
+  // Publish the rebuilt list in one assignment: while the loop above awaits its
+  // DB reads, a GetAll() landing mid-rebuild would otherwise see a half-filled
+  // list and push it to every renderer as the complete set.
+  TargetList = Next;
+
+  for (const T of TargetList) T.StartLoop();
+  Manager.Initialized = true;
+  BroadcastManager.emit('MonitoringTargetListChanged');
+}
+
 const Manager = {
   Initialized: false,
   MIN_INTERVAL_MS,
   MAX_INTERVAL_MS,
 
   async Init(): Promise<void> {
-    // Normalize any persisted checks that use a renamed method ID so existing
-    // probes keep resolving to a registered method after a rename.
-    for (const [OldMethod, NewMethod] of Object.entries(RENAMED_METHODS)) {
-      await ChecksRepo.RenameMethod(NewMethod, OldMethod);
-    }
-
-    const [Err, Rows] = await TargetsRepo.GetAll();
-    if (Err) {
-      Manager.Initialized = true;
-      TargetList = [];
-      return;
-    }
-
-    const [CheckErr, CheckRows] = await ChecksRepo.GetAll();
-    const ChecksByTarget = new Map<number, MonitoringCheckInput[]>();
-    if (!CheckErr) {
-      for (const CR of CheckRows || []) {
-        const list = ChecksByTarget.get(CR.TargetID) || [];
-        list.push(CR);
-        ChecksByTarget.set(CR.TargetID, list);
-      }
-    }
-
-    TargetList = [];
-    for (const Row of Rows || []) {
-      let Checks: MonitoringCheckInput[] = ChecksByTarget.get(Row.TargetID) || [];
-      if (!Checks.length && Row.Method) {
-        const Migrated = await MigrateLegacyTargetToCheck(Row);
-        if (Migrated) Checks = [Migrated];
-      }
-      Checks = Checks.slice().sort(
-        (a, b) => (a.Weight || 0) - (b.Weight || 0) || (a.CheckID || 0) - (b.CheckID || 0)
-      );
-      TargetList.push(new MonitoringTarget(Row, Checks));
-    }
-
-    for (const T of TargetList) T.StartLoop();
-    Manager.Initialized = true;
-    BroadcastManager.emit('MonitoringTargetListChanged');
+    if (Manager.Initialized) return;
+    if (InitPromise) return InitPromise;
+    InitPromise = RunInit().finally(() => {
+      InitPromise = null;
+    });
+    return InitPromise;
   },
 
   // Rebuild runtime state from DB after external bulk changes (e.g., config import).
   async Reload(): Promise<void> {
+    // Let any in-flight Init settle first, otherwise Manager.Init() below just
+    // hands back that older run's promise and the reload reads pre-import rows.
+    if (InitPromise) await InitPromise.catch(() => undefined);
     for (const Target of TargetList) Target.StopLoop();
     TargetList = [];
     Manager.Initialized = false;
