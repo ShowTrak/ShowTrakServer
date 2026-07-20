@@ -50,7 +50,6 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   return new Promise<MonitoringResult>((resolve) => {
     let Stdout = '';
     let Settled = false;
-    const Started = Date.now();
 
     let Child: ReturnType<typeof spawn>;
     try {
@@ -90,15 +89,29 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
       if (Code !== 0) {
         return resolve({ Success: false, Error: 'Host unreachable' });
       }
-      // Try to parse latency from the ping output; fall back to wall-clock.
-      let LatencyMs: number | null = null;
-      const Match = Stdout.match(/time[=<]\s*([\d.]+)\s*ms/i);
-      if (Match && Match[1]) {
-        LatencyMs = parseFloat(Match[1]);
-      } else {
-        LatencyMs = Date.now() - Started;
+
+      // A zero exit code is not on its own proof of delivery. Windows `ping`
+      // exits 0 when the local stack or a router answers with an ICMP
+      // "Destination host unreachable" — that counts as a received packet for
+      // exit-code purposes, and happens routinely while the route/interface is
+      // still coming up during server boot. Trusting the code alone reported
+      // those hosts as online (with a wall-clock latency standing in for the
+      // reply time) until the next interval corrected it.
+      const Failure = Stdout.match(
+        /destination\s+(?:host|net|network|port|protocol)\s+unreachable|transmit\s+failed|general\s+failure|ttl\s+expired|request\s+timed\s+out/i
+      );
+      if (Failure) {
+        return resolve({ Success: false, Error: Failure[0]!.trim() });
       }
-      resolve({ Success: true, LatencyMs });
+
+      // Require a real round-trip time. Every ping implementation prints one for
+      // an actual echo reply ("time=5ms", "time<1ms", "time=1.23 ms"), so its
+      // absence means nothing came back — never substitute wall-clock here.
+      const Match = Stdout.match(/time[=<]\s*([\d.]+)\s*ms/i);
+      if (!Match || !Match[1]) {
+        return resolve({ Success: false, Error: 'No echo reply' });
+      }
+      resolve({ Success: true, LatencyMs: parseFloat(Match[1]) });
     });
   });
 }
