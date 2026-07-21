@@ -70,6 +70,22 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'Leave the Workspace field blank to accept any open workspace, or name one to require it specifically.',
     ],
   },
+  'dante-device': {
+    Summary:
+      'Passively browses mDNS for Audinate Dante devices and confirms one matching the configured name is advertising. Browses both _netaudio-arc._udp (port 4440) and _netaudio-cmc._udp (port 8800), merging them into one device record, so a device stays Online while it answers on either. Reports presence only — Dante does not publish subscription state over mDNS.',
+    Setup: [
+      'Enter the device name exactly as it appears in Dante Controller, or a substring of it with Match mode set to Contains.',
+      'ShowTrak must be on the same network / VLAN as the Dante primary interface. Dante devices do not answer mDNS across a router unless an mDNS reflector is configured.',
+      'On a redundant (primary/secondary) Dante network, devices are discovered on whichever subnet the ShowTrak host is attached to. A device reachable only on the secondary network will read as Offline.',
+      'Dante Via and Dante Virtual Soundcard advertise the same services as hardware and are discovered identically.',
+    ],
+    Links: [
+      {
+        Label: 'Which network ports does Dante use?',
+        Url: 'https://support.getdante.com/hc/en-gb/articles/5508285534239-Which-network-ports-does-Dante-use',
+      },
+    ],
+  },
   'sacn-universe': {
     Summary:
       'Passively listens for sACN (E1.31) streaming DMX and confirms a source is transmitting the given universe (1–63999). Online = packets seen recently from that source; Offline = none within the grace window.',

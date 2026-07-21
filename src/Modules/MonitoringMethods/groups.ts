@@ -37,6 +37,8 @@ export const MethodGroups: Record<string, string> = {
   // Sound (cue playback)
   qlab5: 'Sound',
   qlab4: 'Sound',
+  // Sound (audio-over-IP device presence)
+  'dante-device': 'Sound',
   // Video sources & media servers
   'ndi-source': 'Video',
   'watchout-status': 'Video',

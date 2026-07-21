@@ -39,9 +39,11 @@ const MethodModules: MonitoringMethod[] = [
   require('./chamsys'),
   // Video
   require('./ndi-source'),
-  // Media Servers
+  // Sound — cue playback & audio networking
   require('./qlab5'),
   require('./qlab4'),
+  require('./dante-device'),
+  // Media Servers
   require('./watchout-status'),
   require('./resolume-status'),
   require('./disguise-status'),
