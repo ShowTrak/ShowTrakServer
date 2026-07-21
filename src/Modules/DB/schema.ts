@@ -236,6 +236,38 @@ Schema.push({
     )",
 });
 
+// Every MAC address a client is known by, one row per address. A machine with
+// several external NICs (wired + wireless, or multiple VLANs) has several, and
+// Wake-on-LAN fans a magic packet out to all of them — which NIC is reachable
+// depends on where the server sits, so guessing one is unreliable.
+//
+// Superseded `Clients.MacAddress`, which held only the MAC of the interface
+// serving the active socket IP. That column is still written as the "primary"
+// (most recently active) MAC for display and back-compat; this table is the
+// source of truth for waking.
+//
+// Source records how an address arrived: 'Reported' from the client's own NIC
+// enumeration, 'Manual' from an operator typing it into the client editor. Both
+// are woken identically — Source exists so the UI can label them and so a
+// hand-entered MAC for a machine that has never connected is not mistaken for
+// observed data. Reported addresses re-appear on the next report if deleted;
+// that is deliberate (deletion is for retiring MACs the client no longer has).
+//
+// MacAddress is stored normalized to upper-case colon-separated form so the
+// (UUID, MacAddress) primary key de-duplicates regardless of input formatting.
+Schema.push({
+  Name: 'ClientMacAddresses',
+  SQL: "CREATE TABLE IF NOT EXISTS `ClientMacAddresses` ( \
+            UUID TEXT NOT NULL, \
+            MacAddress TEXT NOT NULL, \
+            Source TEXT NOT NULL DEFAULT 'Reported', \
+            InterfaceName TEXT, \
+            FirstSeen BIGINT(11) NOT NULL DEFAULT 0, \
+            LastSeen BIGINT(11) NOT NULL DEFAULT 0, \
+            PRIMARY KEY (UUID, MacAddress) \
+    )",
+});
+
 // FOG Project integration. All FOG state lives in its own tables rather than as
 // columns on Clients, so the integration can be enabled, disabled or removed
 // wholesale without touching core client data.
@@ -364,6 +396,22 @@ Schema.Migrations = [
   {
     Version: 22,
     SQL: 'CREATE INDEX IF NOT EXISTS idx_fogtasks_uuid ON `FogTasks` (UUID)',
+  },
+  // Multi-MAC support. The ClientMacAddresses table itself is created by the
+  // Schema block above on both new and existing installs; only the index and the
+  // back-fill need versioning. The back-fill seeds the new table from the single
+  // MAC each client already carried, so upgrading installs keep waking the
+  // machines they could wake before. INSERT OR IGNORE makes it a no-op on
+  // re-run, and the UPPER/empty guards mirror the normalization the app applies.
+  {
+    Version: 23,
+    SQL: 'CREATE INDEX IF NOT EXISTS idx_clientmacaddresses_uuid ON `ClientMacAddresses` (UUID)',
+  },
+  {
+    Version: 24,
+    SQL: "INSERT OR IGNORE INTO `ClientMacAddresses` (UUID, MacAddress, Source, InterfaceName, FirstSeen, LastSeen) \
+          SELECT UUID, UPPER(REPLACE(MacAddress, '-', ':')), 'Reported', NULL, Timestamp, Timestamp \
+          FROM `Clients` WHERE MacAddress IS NOT NULL AND TRIM(MacAddress) != ''",
   },
 ];
 

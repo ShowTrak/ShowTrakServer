@@ -1,5 +1,6 @@
 // Client / group / script identifier validators.
 import { fail, isPlainObject, normalizeNonEmptyString } from './primitives';
+import { NormalizeMacAddress } from '../MacAddress';
 import type { IPCValidationManager } from './index';
 
 // Minimum delay (seconds) enforced before a run-on-launch script fires. The
@@ -190,6 +191,13 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
       minLength: 1,
       maxLength: 256,
     });
+  };
+
+  Manager.MacAddress = (value: unknown, fieldName = 'MacAddress') => {
+    const Raw = normalizeNonEmptyString(value, fieldName, { minLength: 1, maxLength: 64 });
+    const Normalized = NormalizeMacAddress(Raw);
+    if (!Normalized) fail(`${fieldName} must be a valid MAC address`);
+    return Normalized as string;
   };
 
   Manager.CriticalDisplayPayload = (value: unknown) => {

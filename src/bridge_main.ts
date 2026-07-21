@@ -77,6 +77,8 @@ const INVOKE_CHANNEL_LIST = [
   'RemoveClientApplicationCritical',
   'MarkClientDisplayCritical',
   'RemoveClientDisplayCritical',
+  'AddClientMacAddress',
+  'RemoveClientMacAddress',
   'IdentifyClient',
   'StopIdentifyingClient',
   'ExecuteScript',
@@ -363,6 +365,10 @@ const API: ShowTrakAPI = {
     invoke('MarkClientDisplayCritical', UUID, Display),
   RemoveClientDisplayCritical: async (UUID, DisplayID) =>
     invoke('RemoveClientDisplayCritical', UUID, DisplayID),
+  AddClientMacAddress: async (UUID, MacAddress) =>
+    invoke('AddClientMacAddress', UUID, MacAddress),
+  RemoveClientMacAddress: async (UUID, MacAddress) =>
+    invoke('RemoveClientMacAddress', UUID, MacAddress),
   ExecuteScript: async (Script, Targets, ResetList) =>
     invoke('ExecuteScript', Script, Targets, ResetList),
   TriggerIntegratedEvent: async (EventID, Targets) =>

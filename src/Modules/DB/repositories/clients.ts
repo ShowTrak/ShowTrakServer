@@ -99,6 +99,8 @@ export function CreateClientsRepository(DB: DBManager) {
         if (appErr) throw appErr;
         const [displayErr] = await run('DELETE FROM CriticalDisplays WHERE UUID = ?', [UUID]);
         if (displayErr) throw displayErr;
+        const [macErr] = await run('DELETE FROM ClientMacAddresses WHERE UUID = ?', [UUID]);
+        if (macErr) throw macErr;
         // The FOG host link goes with the client. FogTasks rows are deliberately
         // left behind (their UUID simply dangles) so in-flight and recently
         // finished tasks stay visible in the FOG panel after a client is removed.
@@ -154,6 +156,26 @@ export function CreateClientsRepository(DB: DBManager) {
           OldUUID,
         ]);
         if (criticalDisplayErr) throw criticalDisplayErr;
+
+        // Replacing a client means real hardware took over the slot, so the old
+        // slot's observed MACs describe a different machine and must not be
+        // inherited — the replacement's own report repopulates them. Manual
+        // entries are kept: an operator who typed a MAC against a reserved slot
+        // did so precisely so the arriving machine could be woken.
+        const [macDeleteErr] = await run(
+          "DELETE FROM ClientMacAddresses WHERE UUID = ? AND Source = 'Reported'",
+          [OldUUID]
+        );
+        if (macDeleteErr) throw macDeleteErr;
+        // OR REPLACE rather than a plain UPDATE: unlike the critical-entity
+        // tables, the replacement machine has very likely already reported this
+        // same MAC under its own UUID, so re-keying would collide with the
+        // (UUID, MacAddress) primary key. Letting the manual row win is correct.
+        const [macErr] = await run('UPDATE OR REPLACE ClientMacAddresses SET UUID = ? WHERE UUID = ?', [
+          NewUUID,
+          OldUUID,
+        ]);
+        if (macErr) throw macErr;
 
         const [rulesErr, RuleRows] = await DB.All<{
           RuleID: number;

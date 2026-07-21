@@ -25,6 +25,15 @@ const Logger = CreateLogger('ClientManager');
 
 const ClientsRepo = CreateClientsRepository(DB);
 
+// One MAC a client is known by, as carried in RAM and serialized to the UI.
+export interface ClientMacAddress {
+  MacAddress: string;
+  Source: 'Reported' | 'Manual';
+  InterfaceName: string | null;
+  FirstSeen: number;
+  LastSeen: number;
+}
+
 // `parseInt` ToString-coerces its argument, so `String()` wrapping is
 // behaviour-identical to the historical `parseInt(x, 10)` on dynamic values.
 function ParseIntOrNull(Value: unknown): number | null {
@@ -198,6 +207,7 @@ interface ClientConstructorInput {
   GroupID?: number | null;
   Weight?: number | null;
   MacAddress?: string | null;
+  MacAddresses?: ClientMacAddress[];
   RunOnLaunchScriptID?: string | null;
   RunOnLaunchDelaySeconds?: number | null;
   Unassigned?: unknown;
@@ -212,7 +222,14 @@ class Client {
   OperatingSystem: string | null;
   GroupID: number | null;
   Weight: number;
+  // The MAC of the interface serving the active socket IP — the "primary"
+  // address, kept for display and back-compat. Waking uses MacAddresses below,
+  // which is the full set; this is only ever one of them.
   MacAddress: string | null;
+  // Every MAC this client is known by, newest-last. Backed by the
+  // ClientMacAddresses table and hydrated on load; see AddMacAddress /
+  // RemoveMacAddress / IngestReportedMacAddresses.
+  MacAddresses: ClientMacAddress[];
   Version: string | null;
   IP: string | null;
   RunOnLaunchScriptID: string | null;
@@ -280,6 +297,10 @@ class Client {
     // Weight supports manual ordering within groups; defaults to 100 if unspecified
     this.Weight = typeof Data.Weight === 'number' ? Data.Weight : 100;
     this.MacAddress = Data.MacAddress || null;
+    // Populated by the manager's MacAddresses index immediately after
+    // construction (the rows live in a second table, so they cannot ride the
+    // constructor input) — see applyCriticalState in ClientManager/index.ts.
+    this.MacAddresses = Array.isArray(Data.MacAddresses) ? Data.MacAddresses : [];
     this.Version = Data.Version || null;
     this.IP = Data.IP || null;
     this.RunOnLaunchScriptID = Data.RunOnLaunchScriptID || null;
@@ -1293,6 +1314,21 @@ class Client {
     Logger.debug(`Client ${this.UUID} mac address updated to ${MacAddress}`);
     return Ok<void>();
   }
+  /** Project the client's MAC set onto the instance. Called by the manager's
+   *  MacAddresses index (see applyCriticalState); performs no writes — every
+   *  mutation goes through Manager.AddClientMacAddress / RemoveClientMacAddress,
+   *  which keep the index and the DB in step. */
+  SetMacAddresses(MacAddresses: ClientMacAddress[]) {
+    this.MacAddresses = (Array.isArray(MacAddresses) ? MacAddresses : [])
+      .slice()
+      .sort((A, B) => A.FirstSeen - B.FirstSeen || A.MacAddress.localeCompare(B.MacAddress));
+  }
+
+  /** Every stored MAC — the full target list for Wake-on-LAN. */
+  GetWakeableMacAddresses(): string[] {
+    return this.MacAddresses.map((Entry) => Entry.MacAddress).filter(Boolean);
+  }
+
   async SetVersion(Version: string | null, Options: PersistOptions = {}): Promise<Result<void>> {
     if (this.Version === Version) return Ok<void>();
     const Previous = this.Version;

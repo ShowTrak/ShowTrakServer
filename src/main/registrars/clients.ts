@@ -120,6 +120,34 @@ function register(): void {
     )
   );
 
+  // Manually record an extra MAC for a client — for machines whose NIC the
+  // server has never observed (never yet connected, or a card only used on a
+  // network the server cannot see) but which still need waking.
+  RPC.handle(
+    'AddClientMacAddress',
+    createTupleHandler<[string, string], boolean>(
+      (UUID: unknown, MacAddress: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.MacAddress(MacAddress),
+      ],
+      (UUID: string, MacAddress: string) =>
+        ClientManager.AddMacAddress(UUID, MacAddress, { Source: 'Manual' })
+    )
+  );
+
+  // Forget a MAC. A still-live reported address returns on the client's next NIC
+  // report by design; removal is for retiring addresses the machine no longer has.
+  RPC.handle(
+    'RemoveClientMacAddress',
+    createTupleHandler<[string, string], boolean>(
+      (UUID: unknown, MacAddress: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.MacAddress(MacAddress),
+      ],
+      (UUID: string, MacAddress: string) => ClientManager.RemoveMacAddress(UUID, MacAddress)
+    )
+  );
+
   // Start identify mode on a single client (adopted or pending adoption).
   // Rejected for integrated (SDK) clients which cannot render the overlay.
   RPC.handle(
@@ -258,13 +286,27 @@ function register(): void {
       if (ClientErr || !Client) return;
       // WOL isn't possible/needed here: no MAC on record (unsupported) or the
       // client is already online. Silently skip — don't spam with notifications.
-      if (!Client.MacAddress || Client.Online) return;
+      const MacAddresses = Client.GetWakeableMacAddresses();
+      if (!MacAddresses.length || Client.Online) return;
 
       const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, 'Wake On LAN');
       // No RequestID means the task was never queued (the client vanished between
       // the check above and enqueue) — there is nothing to complete.
       if (!RequestID) return;
-      const [WOLErr, _Result] = await WOLManager.Wake(Client.MacAddress);
+      // A machine with several NICs can only be woken via whichever one the
+      // server can actually reach, and we cannot know which that is, so wake all
+      // of them. Sent sequentially rather than in parallel because each Wake
+      // already floods every local interface with 20 packets.
+      const Failures: string[] = [];
+      for (const MacAddress of MacAddresses) {
+        const [WOLErr] = await WOLManager.Wake(MacAddress);
+        if (WOLErr) Failures.push(`${MacAddress}: ${WOLErr}`);
+      }
+      // Only a total failure is worth surfacing: if any address got a packet out,
+      // the machine has been woken as well as we can manage, and a partial error
+      // would just be noise (a retired NIC's MAC failing is expected).
+      const WOLErr =
+        Failures.length === MacAddresses.length ? Failures.join('; ') || 'Wake On LAN failed' : null;
       await ScriptExecutionManager.Complete(RequestID, WOLErr);
     });
     await Promise.allSettled(tasks);

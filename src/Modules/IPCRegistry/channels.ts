@@ -55,6 +55,8 @@ const INVOKE_CHANNELS = [
   'RemoveClientApplicationCritical',
   'MarkClientDisplayCritical',
   'RemoveClientDisplayCritical',
+  'AddClientMacAddress',
+  'RemoveClientMacAddress',
   'IdentifyClient',
   'StopIdentifyingClient',
 

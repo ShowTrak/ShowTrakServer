@@ -213,7 +213,11 @@ Manager.InitializeSchema = async (): Promise<void> => {
         alreadyApplied = (Cols || []).some((c) => c && c.name === Column);
       }
       if (!alreadyApplied) {
-        const [Err] = await Manager.Run(SQL);
+        // markDirty: false — a migration is schema maintenance, never a user
+        // edit, so applying one must not leave a freshly opened workspace
+        // looking unsaved. Matters for data-carrying migrations (back-fills);
+        // pure ALTER/CREATE INDEX statements never marked the DB dirty anyway.
+        const [Err] = await Manager.Run(SQL, [], { markDirty: false });
         if (Err) {
           Logger.databaseError(`Migration ${Migration.Version} failed: ${SQL}`, Err);
           continue;

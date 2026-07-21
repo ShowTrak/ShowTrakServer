@@ -141,6 +141,10 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
       rpc('MarkClientDisplayCritical', UUID, Display),
     RemoveClientDisplayCritical: async (UUID, DisplayID) =>
       rpc('RemoveClientDisplayCritical', UUID, DisplayID),
+    AddClientMacAddress: async (UUID, MacAddress) =>
+      rpc('AddClientMacAddress', UUID, MacAddress),
+    RemoveClientMacAddress: async (UUID, MacAddress) =>
+      rpc('RemoveClientMacAddress', UUID, MacAddress),
     IdentifyClient: async (UUID) => rpc('IdentifyClient', UUID),
     StopIdentifyingClient: async (UUID) => rpc('StopIdentifyingClient', UUID),
     UnadoptClient: async (UUID) => rpc('UnadoptClient', UUID),

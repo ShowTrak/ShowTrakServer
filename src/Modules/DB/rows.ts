@@ -30,6 +30,20 @@ export interface ClientRow {
   Timestamp: number;
 }
 
+// One MAC address a client is known by. `MacAddress` is stored normalized
+// (upper-case, colon-separated) so the composite PK de-duplicates regardless of
+// how the address was formatted on the way in.
+export interface ClientMacAddressRow {
+  UUID: string;
+  MacAddress: string;
+  Source: 'Reported' | 'Manual';
+  // Interface the address was observed on, when known. Reporting-only metadata:
+  // manual entries and pre-migration back-fills leave it null.
+  InterfaceName: string | null;
+  FirstSeen: number;
+  LastSeen: number;
+}
+
 export interface SettingRow {
   Key: string;
   Value: unknown; // BLOB

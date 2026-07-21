@@ -6,12 +6,15 @@ import { CreateLogger } from '../Logger';
 import { Manager as DB } from '../DB';
 import { CreateClientsRepository } from '../DB/repositories/clients';
 import { CreateCriticalEntitiesRepository } from '../DB/repositories/critical-entities';
+import { CreateClientMacAddressesRepository } from '../DB/repositories/client-mac-addresses';
+import { NormalizeMacAddress, IsExternalMacAddress } from '../MacAddress';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as UUIDManager } from '../UUID';
 import * as SlugService from '../Slug';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import { Client } from './client';
+import type { ClientMacAddress } from './client';
 import {
   AsRecord,
   normalizeSerialNumber,
@@ -27,6 +30,7 @@ import type {
   CriticalUSBDeviceNameRow,
   CriticalApplicationRow,
   CriticalDisplayRow,
+  ClientMacAddressRow,
 } from '../DB/rows';
 import type { HeartbeatPayload, USBDevice } from '@showtrak/protocol';
 import type {
@@ -55,6 +59,13 @@ const Logger = CreateLogger('ClientManager');
 
 const ClientsRepo = CreateClientsRepository(DB);
 const CriticalRepo = CreateCriticalEntitiesRepository(DB);
+const MacAddressesRepo = CreateClientMacAddressesRepository(DB);
+
+// How stale a MAC's LastSeen must be before a client re-reporting it is worth a
+// DB write. SystemInfo arrives every 20s per client; LastSeen is only ever read
+// at minute granularity, so refreshing it on every report would be write
+// amplification for no observable gain.
+const MAC_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 
 // Public surface of the ClientManager. Exported so consumers that must break an
 // import cycle with a lazy `require('../ClientManager')` can type the cast as
@@ -102,6 +113,19 @@ export interface ClientManagerType {
   ): Promise<Result<boolean>>;
   RemoveDisplayCritical(UUID: string, DisplayID: unknown): Promise<Result<boolean>>;
   IsDisplayCritical(UUID: string, DisplayID: unknown): Promise<Result<boolean>>;
+  // Per-client MAC addresses (the Wake-on-LAN target set). Add resolves to
+  // Ok(true) when a new address was stored, Ok(false) when it was already on
+  // file or was a reported address filtered out as non-external.
+  AddMacAddress(
+    UUID: string,
+    MacAddress: unknown,
+    Options?: {
+      Source?: 'Reported' | 'Manual';
+      InterfaceName?: string | null;
+      markUnsaved?: boolean;
+    }
+  ): Promise<Result<boolean>>;
+  RemoveMacAddress(UUID: string, MacAddress: unknown): Promise<Result<boolean>>;
   USBDeviceAdded(UUID: string, Device: USBDevice): Promise<Result<string>>;
   USBDeviceRemoved(UUID: string, Device: USBDevice): Promise<Result<string>>;
   Update(UUID: string, Data: unknown): Promise<Result<Client>>;
@@ -144,15 +168,17 @@ function rebuildClientIndex() {
   }
 }
 
-// Apply the current critical-entity state (USB serials, USB names, apps,
-// displays) onto a freshly built Client. Every hydration path funnels through
-// here so the four applyState calls stay in one place instead of being copied
-// at each `new Client(...)` site. Returns the same instance for chaining.
+// Apply the current per-client side-table state (USB serials, USB names, apps,
+// displays, MAC addresses) onto a freshly built Client. Every hydration path
+// funnels through here so the applyState calls stay in one place instead of
+// being copied at each `new Client(...)` site. Returns the same instance for
+// chaining.
 function applyCriticalState(Entity: Client): Client {
   CriticalUSB.applyState(Entity);
   CriticalUSBNames.applyState(Entity);
   CriticalApplications.applyState(Entity);
   CriticalDisplays.applyState(Entity);
+  MacAddresses.applyState(Entity);
   return Entity;
 }
 
@@ -289,6 +315,30 @@ const CriticalApplications = makeCriticalIndex<CriticalApplicationRow, Applicati
   apply: (client, entries) => client.SetCriticalApplications(entries),
 });
 
+// Per-client MAC addresses. Structurally identical to the critical-entity
+// indexes (per-client keyed rows in a side table, projected onto the Client on
+// every hydration), so it reuses the same factory. Keyed by the normalized MAC.
+const MacAddresses = makeCriticalIndex<ClientMacAddressRow, ClientMacAddress>({
+  loadAll: () => MacAddressesRepo.LoadAll(),
+  fromRow: (Row) => {
+    const UUID = Row && Row.UUID ? String(Row.UUID) : '';
+    const MacAddress = NormalizeMacAddress(Row && Row.MacAddress);
+    if (!UUID || !MacAddress) return null;
+    return {
+      UUID,
+      Key: MacAddress,
+      Entry: {
+        MacAddress,
+        Source: Row.Source === 'Manual' ? 'Manual' : 'Reported',
+        InterfaceName: Row.InterfaceName || null,
+        FirstSeen: Row.FirstSeen || 0,
+        LastSeen: Row.LastSeen || 0,
+      },
+    };
+  },
+  apply: (client, entries) => client.SetMacAddresses(entries),
+});
+
 const CriticalDisplays = makeCriticalIndex<CriticalDisplayRow, DisplayIndexEntry>({
   loadAll: () => CriticalRepo.LoadAllDisplays(),
   fromRow: (Row) => {
@@ -408,6 +458,11 @@ Manager.SetNetworkInterfaces = async (UUID: string, Interfaces: unknown) => {
   if (Err) return Fail(Err);
   if (!Target) return Fail('Client Not Found');
   Target.SetNetworkInterfaces(Interfaces);
+  // Richer than the SystemInfo MAC map: this payload carries the OS `internal`
+  // flag per address, so loopback is excluded on the OS's own say-so rather than
+  // inferred. The bit-level filter in AddMacAddress still runs on top, since
+  // `internal` does not catch virtual adapters or randomized Wi-Fi addresses.
+  await IngestReportedMacAddresses(UUID, CollectReportedMacAddresses(Target.NetworkInterfaces));
   return Ok('Network Interfaces updated successfully');
 };
 
@@ -754,7 +809,165 @@ Manager.IsDisplayCritical = async (UUID: string, DisplayID: unknown) => {
   return Ok(!!Row);
 };
 
-// One-shot richer payload: hostname + NICs -> derive MAC for the active IP
+// Record one MAC against a client, or refresh it if already on file.
+//
+// 'Reported' addresses come from the client's own NIC enumeration and are
+// filtered to physical, externally-reachable interfaces — loopback, virtual
+// adapters and randomized Wi-Fi addresses cannot wake a machine and would only
+// bloat the table. 'Manual' addresses skip that filter: an operator typing an
+// address has context we don't (a NIC we have never seen, an unusual adapter),
+// so only syntactic validity is enforced.
+//
+// Returns Ok(false) when a reported address was legitimately filtered out, so
+// ingest can tell "rejected" from "stored" without treating it as an error.
+Manager.AddMacAddress = async (
+  UUID: string,
+  MacAddress: unknown,
+  {
+    Source = 'Manual',
+    InterfaceName = null,
+    markUnsaved = Source === 'Manual',
+  }: {
+    Source?: 'Reported' | 'Manual';
+    InterfaceName?: string | null;
+    markUnsaved?: boolean;
+  } = {}
+) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+
+  const Normalized = NormalizeMacAddress(MacAddress);
+  if (!Normalized) return Fail('Invalid MAC address');
+  if (Source === 'Reported' && !IsExternalMacAddress(Normalized)) return Ok(false);
+
+  const Now = Date.now();
+  const Existing = MacAddresses.getForClient(UUID, false)?.get(Normalized) || null;
+  if (Existing) {
+    // Already on file — refresh liveness only. Notably this does NOT relabel a
+    // manual entry as 'Reported' once the client reports it, so the editor keeps
+    // showing how the address got there.
+    //
+    // Throttled: SystemInfo arrives every 20s per client, and LastSeen is only
+    // ever read at minute granularity, so writing on every report would be pure
+    // write amplification (one UPDATE per MAC per client per 20s) for no gain.
+    // The interface-name check is the exception: if the address has moved to a
+    // different adapter that IS worth recording immediately.
+    const InterfaceUnchanged = !InterfaceName || InterfaceName === Existing.InterfaceName;
+    if (Now - (Existing.LastSeen || 0) < MAC_TOUCH_INTERVAL_MS && InterfaceUnchanged) {
+      return Ok(false);
+    }
+    const [TouchErr] = await MacAddressesRepo.Touch(UUID, Normalized, InterfaceName, Now, {
+      markUnsaved,
+    });
+    if (TouchErr) return Fail('Failed to update MAC address');
+    MacAddresses.setForClient(UUID, Normalized, {
+      ...Existing,
+      InterfaceName: InterfaceName || Existing.InterfaceName,
+      LastSeen: Now,
+    });
+    MacAddresses.applyState(Target);
+    return Ok(false);
+  }
+
+  const [WriteErr] = await MacAddressesRepo.Add(
+    UUID,
+    Normalized,
+    Source,
+    InterfaceName || null,
+    Now,
+    { markUnsaved }
+  );
+  if (WriteErr) return Fail('Failed to save MAC address');
+
+  MacAddresses.setForClient(UUID, Normalized, {
+    MacAddress: Normalized,
+    Source,
+    InterfaceName: InterfaceName || null,
+    FirstSeen: Now,
+    LastSeen: Now,
+  });
+  MacAddresses.applyState(Target);
+  BroadcastManager.emit('ClientUpdated', Target);
+  Logger.log(`Client ${UUID} gained ${Source.toLowerCase()} MAC address ${Normalized}`);
+  return Ok(true);
+};
+
+// Forget a MAC. A 'Reported' address the client still has comes back on its next
+// NIC report — removal is for retiring addresses the machine no longer carries,
+// not for permanently suppressing a live one.
+Manager.RemoveMacAddress = async (UUID: string, MacAddress: unknown) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+
+  const Normalized = NormalizeMacAddress(MacAddress);
+  if (!Normalized) return Fail('Invalid MAC address');
+
+  const [WriteErr] = await MacAddressesRepo.Remove(UUID, Normalized);
+  if (WriteErr) return Fail('Failed to remove MAC address');
+
+  MacAddresses.removeForClient(UUID, Normalized);
+  MacAddresses.applyState(Target);
+  // Clients.MacAddress is a denormalized copy of one of these rows, so clear it
+  // when it is the one that just went — otherwise the editor's summary field
+  // outlives the entry it mirrors. The next report repopulates it if live.
+  if (NormalizeMacAddress(Target.MacAddress) === Normalized) {
+    await Target.SetMacAddress(null, { markUnsaved: false });
+  }
+  BroadcastManager.emit('ClientUpdated', Target);
+  Logger.log(`Client ${UUID} lost MAC address ${Normalized}`);
+  return Ok(true);
+};
+
+// Flatten a normalized NetworkInterfaces snapshot into (MAC, interface name)
+// pairs worth storing. Addresses the OS marks `internal` — loopback, and on some
+// platforms tunnel endpoints — are dropped here: they belong to no physical NIC
+// and no magic packet sent to them could ever reach a sleeping machine.
+function CollectReportedMacAddresses(
+  Interfaces: Array<{ name?: string; addresses?: Array<{ mac?: unknown; internal?: boolean }> }>
+): Array<{ MacAddress: unknown; InterfaceName: string | null }> {
+  const Collected: Array<{ MacAddress: unknown; InterfaceName: string | null }> = [];
+  for (const Interface of Array.isArray(Interfaces) ? Interfaces : []) {
+    const Name = Interface && Interface.name ? String(Interface.name) : null;
+    const Addresses = Interface && Array.isArray(Interface.addresses) ? Interface.addresses : [];
+    for (const Address of Addresses) {
+      if (!Address || Address.internal) continue;
+      if (!Address.mac) continue;
+      Collected.push({ MacAddress: Address.mac, InterfaceName: Name });
+    }
+  }
+  return Collected;
+}
+
+// Merge a batch of client-reported addresses. Additive by design: addresses
+// absent from this report are left alone rather than pruned, because a NIC that
+// is merely down (undocked laptop, disabled Wi-Fi) still wakes the machine and
+// its address is worth keeping. Pruning stale entries is the operator's call.
+async function IngestReportedMacAddresses(
+  UUID: string,
+  Entries: Array<{ MacAddress: unknown; InterfaceName?: string | null }>
+): Promise<void> {
+  const Seen = new Set<string>();
+  for (const Entry of Entries) {
+    const Normalized = NormalizeMacAddress(Entry && Entry.MacAddress);
+    if (!Normalized || Seen.has(Normalized)) continue;
+    Seen.add(Normalized);
+    // markUnsaved stays false: a client re-reporting the NICs it has always had
+    // must not dirty the workspace, or every heartbeat would prompt a save.
+    const [Err] = await Manager.AddMacAddress(UUID, Normalized, {
+      Source: 'Reported',
+      InterfaceName: (Entry && Entry.InterfaceName) || null,
+      markUnsaved: false,
+    });
+    if (Err) Logger.error(`Failed to ingest MAC address ${Normalized} for ${UUID}`);
+  }
+}
+
+// One-shot richer payload: hostname + NICs. Every reported interface is stored
+// (Wake-on-LAN fans out across all of them); the interface serving the active
+// socket IP additionally becomes the client's primary MacAddress, which is what
+// the editor shows as the current address.
 Manager.SystemInfo = async (UUID: string, Data: SystemInfoData, IP: string) => {
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
@@ -762,9 +975,25 @@ Manager.SystemInfo = async (UUID: string, Data: SystemInfoData, IP: string) => {
 
   await Target.SetHostname(Data.Hostname || null, { markUnsaved: false });
   await Target.SetOperatingSystem(Data.OperatingSystem || null, { markUnsaved: false });
-  const Macs = Object.values(Data.MacAddresses || {}) as SystemInfoMacEntry[];
-  for (const Interface of Macs) {
-    if (Interface.ipv4 === IP) await Target.SetMacAddress(Interface.mac, { markUnsaved: false });
+
+  const Interfaces = Object.entries(Data.MacAddresses || {}) as Array<
+    [string, SystemInfoMacEntry]
+  >;
+  await IngestReportedMacAddresses(
+    UUID,
+    Interfaces.map(([Name, Interface]) => ({
+      MacAddress: Interface && Interface.mac,
+      InterfaceName: Name,
+    }))
+  );
+  for (const [, Interface] of Interfaces) {
+    if (Interface && Interface.ipv4 === IP) {
+      // Normalized so it compares equal to the matching ClientMacAddresses row
+      // without every reader having to re-massage the format.
+      await Target.SetMacAddress(NormalizeMacAddress(Interface.mac) || Interface.mac, {
+        markUnsaved: false,
+      });
+    }
   }
 
   return Ok('Heartbeat processed successfully');
@@ -921,6 +1150,7 @@ Manager.Delete = async (UUID: string) => {
   CriticalUSBNames.clearForClient(UUID);
   CriticalApplications.clearForClient(UUID);
   CriticalDisplays.clearForClient(UUID);
+  MacAddresses.clearForClient(UUID);
   Logger.success(`Client ${UUID} deleted successfully`);
   return Ok(true);
 };
@@ -964,6 +1194,12 @@ Manager.ReplaceClient = async (CurrentUUID: unknown, ReplacementUUID: unknown) =
   CriticalUSBNames.rekeyClient(OldUUID, NewUUID);
   CriticalApplications.rekeyClient(OldUUID, NewUUID);
   CriticalDisplays.rekeyClient(OldUUID, NewUUID);
+  // MAC addresses cannot be re-keyed in memory the way the critical indexes are:
+  // ReplaceClientUUID drops the old slot's *reported* addresses (they describe
+  // the machine being replaced) while carrying its manual ones across, so the
+  // in-RAM set no longer mirrors a straight move. Reload it from the rows the
+  // transaction actually left behind.
+  await MacAddresses.load();
 
   applyCriticalState(ExistingClient);
 
@@ -1039,6 +1275,7 @@ Manager.Init = async () => {
   await CriticalUSBNames.load();
   await CriticalApplications.load();
   await CriticalDisplays.load();
+  await MacAddresses.load();
   const [Err, Clients] = await ClientsRepo.GetAll();
   if (Err || !Clients) {
     Manager.Initialized = true;
@@ -1160,6 +1397,7 @@ Manager.ClearCache = async () => {
   CriticalUSBNames.clear();
   CriticalApplications.clear();
   CriticalDisplays.clear();
+  MacAddresses.clear();
   Manager.Initialized = false;
   return;
 };

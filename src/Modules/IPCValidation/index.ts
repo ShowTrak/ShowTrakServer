@@ -56,6 +56,11 @@ export interface IPCValidationManager {
   CriticalUSBNamePayload(value: unknown): CriticalUSBNamePayloadResult;
   CriticalApplicationPayload(value: unknown): CriticalApplicationPayloadResult;
   DisplayID(value: unknown, fieldName?: string): string;
+  // A MAC address, normalized to upper-case colon-separated form. Enforces only
+  // syntactic validity: unlike the reported-address ingest path, an operator
+  // typing an address by hand may legitimately enter one for an interface the
+  // server has never observed, so the external/physical filter is not applied.
+  MacAddress(value: unknown, fieldName?: string): string;
   CriticalDisplayPayload(value: unknown): CriticalDisplayPayloadResult;
   ClientUpdatePayload(value: unknown): Record<string, unknown>;
 

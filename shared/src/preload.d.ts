@@ -121,6 +121,12 @@ export interface ShowTrakAPI {
   RemoveClientApplicationCritical(UUID: string, ApplicationName: string): Promise<ResultTuple<unknown>>;
   MarkClientDisplayCritical(UUID: string, Display: unknown): Promise<ResultTuple<unknown>>;
   RemoveClientDisplayCritical(UUID: string, DisplayID: string): Promise<ResultTuple<unknown>>;
+  /** Manually record an extra MAC address against a client. Resolves Ok(true)
+   *  when a new address was stored, Ok(false) when it was already on file. */
+  AddClientMacAddress(UUID: string, MacAddress: string): Promise<ResultTuple<boolean>>;
+  /** Forget a MAC address. A reported address the client still has returns on
+   *  its next NIC report. */
+  RemoveClientMacAddress(UUID: string, MacAddress: string): Promise<ResultTuple<boolean>>;
   IdentifyClient(UUID: string): Promise<unknown>;
   StopIdentifyingClient(UUID: string): Promise<unknown>;
   UnadoptClient(UUID: string): Promise<unknown>;

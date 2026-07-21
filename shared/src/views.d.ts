@@ -192,7 +192,12 @@ export interface ClientView {
   // namespace (real clients + monitors + dummies).
   Slug?: string | null;
   IP?: string | null;
+  /** MAC of the interface serving the active socket IP — the currently-active
+   *  address. One of MacAddresses below; kept as a convenience for display. */
   MacAddress?: string | null;
+  /** Every MAC the client is known by. This, not MacAddress, is the full
+   *  Wake-on-LAN target set. */
+  MacAddresses?: ClientMacAddressView[];
   RunOnLaunchScriptID?: string | null;
   RunOnLaunchDelaySeconds?: number | null;
   Online?: boolean;
@@ -637,6 +642,20 @@ export interface FogStatusView {
   Message: string | null;
   /** Epoch ms of the last health probe, or null if never probed. */
   LastCheckedAt: number | null;
+}
+
+/** One MAC address a client is known by, as shown in the client editor. */
+export interface ClientMacAddressView {
+  /** Normalized upper-case colon-separated form, e.g. `AA:BB:CC:DD:EE:FF`. */
+  MacAddress: string;
+  /** How the address got here: observed in the client's own NIC report, or
+   *  entered by an operator. Manual entries survive a client that never
+   *  reports them; reported ones re-appear after deletion if still present. */
+  Source: 'Reported' | 'Manual';
+  /** Interface the address was observed on, when known. */
+  InterfaceName: string | null;
+  FirstSeen: number;
+  LastSeen: number;
 }
 
 /** A host as reported by FOG, used to populate the client editor dropdown. */

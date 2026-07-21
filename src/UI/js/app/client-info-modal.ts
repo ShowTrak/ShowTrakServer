@@ -79,8 +79,20 @@ export async function OpenClientInfo(UUID: string) {
   $('#CLIENT_INFO_OPERATING_SYSTEM').val(OperatingSystem || '');
   $('#CLIENT_INFO_GROUP').val(groupTitle);
   $('#CLIENT_INFO_IP').val(IP || 'Unknown IP');
-  if (MacAddress && String(MacAddress).trim().length > 0) {
-    $('#CLIENT_INFO_MAC').val(String(MacAddress).toUpperCase());
+  // Every MAC on record, not just the active one — this panel is read-only, so
+  // seeing the full Wake-on-LAN target set is the point. Falls back to the
+  // primary MAC alone if the list has not been populated.
+  const MacList = (Array.isArray(Client.MacAddresses) ? Client.MacAddresses : [])
+    .map((Entry) => String(Entry.MacAddress || '').toUpperCase())
+    .filter(Boolean);
+  if (!MacList.length && MacAddress && String(MacAddress).trim().length > 0) {
+    MacList.push(String(MacAddress).toUpperCase());
+  }
+  if (MacList.length) {
+    $('#CLIENT_INFO_MAC').val(MacList.join(', '));
+    $('label[for="CLIENT_INFO_MAC"]').text(
+      MacList.length === 1 ? 'MAC Address' : `MAC Addresses (${MacList.length})`
+    );
     $('#CLIENT_INFO_MAC_WRAPPER').removeClass('d-none');
   } else {
     $('#CLIENT_INFO_MAC').val('');

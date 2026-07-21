@@ -1458,17 +1458,31 @@ Loading licence...</pre>
                   <i class="bi bi-clipboard"></i>
                 </button>
               </div>
-              <div class="form-floating has-copy d-none" id="CLIENT_EDITOR_MAC_WRAPPER">
-                <input type="text" class="form-control disabled" id="CLIENT_EDITOR_MAC" disabled />
-                <label for="CLIENT_EDITOR_MAC">MAC Address</label>
-                <button
-                  type="button"
-                  class="copy-field-btn"
-                  data-target="#CLIENT_EDITOR_MAC"
-                  title="Copy"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
+              <!-- Every MAC the client is known by. Wake-on-LAN fires at all of
+                   them, since which NIC the server can reach is unknowable from
+                   here. Addresses the client reports arrive automatically;
+                   operators can add ones it has never reported (a machine that
+                   has not yet connected) and retire ones it no longer has. -->
+              <div class="mac-address-editor d-none" id="CLIENT_EDITOR_MAC_WRAPPER">
+                <div class="mac-address-editor-head">
+                  <span class="mac-address-editor-title">MAC Addresses</span>
+                  <span class="mac-address-editor-hint">Used for Wake on LAN</span>
+                </div>
+                <div id="CLIENT_EDITOR_MAC_LIST" class="mac-address-list"></div>
+                <div class="input-group mac-address-add">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="CLIENT_EDITOR_MAC_INPUT"
+                    placeholder="AA:BB:CC:DD:EE:FF"
+                    maxlength="17"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button class="btn btn-secondary" type="button" id="CLIENT_EDITOR_MAC_ADD">
+                    <i class="bi bi-plus-lg"></i>
+                  </button>
+                </div>
               </div>
               <div
                 id="CLIENT_EDITOR_UUID_WRAPPER"

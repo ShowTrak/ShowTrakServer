@@ -372,6 +372,97 @@ async function PopulateFogSection(UUID: string, ClientLabel: string): Promise<vo
   }
 }
 
+// Render the client editor's MAC address list and wire its add/remove controls.
+//
+// Like the FOG section above, edits persist immediately rather than folding into
+// Save: these rows live in their own table and have no business travelling
+// through the client update payload. Re-reads the client after each change so
+// the list reflects what actually landed (a reported address the operator
+// removes will be back the moment the client next reports it, and showing it
+// gone would be a lie).
+async function PopulateMacAddressSection(UUID: string) {
+  const Client = await window.API.GetClient(UUID);
+  const $Wrapper = $('#CLIENT_EDITOR_MAC_WRAPPER');
+  if (!Client) {
+    $Wrapper.addClass('d-none');
+    return;
+  }
+  $Wrapper.removeClass('d-none');
+
+  const Entries = Array.isArray(Client.MacAddresses) ? Client.MacAddresses : [];
+  const ActiveMac = String(Client.MacAddress || '')
+    .toUpperCase()
+    .replace(/-/g, ':');
+
+  if (!Entries.length) {
+    $('#CLIENT_EDITOR_MAC_LIST').html(
+      '<div class="mac-address-empty">No hardware MAC addresses on record.</div>'
+    );
+  } else {
+    let Html = '';
+    for (const Entry of Entries) {
+      const Mac = String(Entry.MacAddress || '');
+      const IsActive = !!ActiveMac && Mac === ActiveMac;
+      // Manual entries are labelled so an operator can tell what they typed from
+      // what the client reported — the two behave differently on deletion.
+      const Tag = IsActive
+        ? '<span class="mac-address-tag is-active">Active</span>'
+        : Entry.Source === 'Manual'
+          ? '<span class="mac-address-tag">Manual</span>'
+          : '';
+      Html += `
+        <div class="mac-address-item">
+          <span class="mac-address-value">${Safe(Mac)}</span>
+          ${Tag}
+          <button
+            type="button"
+            class="mac-address-remove"
+            data-mac="${Safe(Mac)}"
+            title="Remove ${Safe(Mac)}"
+          ><i class="bi bi-x-lg"></i></button>
+        </div>`;
+    }
+    $('#CLIENT_EDITOR_MAC_LIST').html(Html);
+  }
+
+  $('#CLIENT_EDITOR_MAC_LIST .mac-address-remove')
+    .off('click')
+    .on('click', async function () {
+      const Mac = String($(this).data('mac') || '');
+      if (!Mac) return;
+      const [Err] = await window.API.RemoveClientMacAddress(UUID, Mac);
+      if (Err) {
+        await Notify(String(Err), 'error');
+        return;
+      }
+      await PopulateMacAddressSection(UUID);
+    });
+
+  const AddMacAddress = async () => {
+    const $Input = $('#CLIENT_EDITOR_MAC_INPUT');
+    const Raw = String($Input.val() || '').trim();
+    if (!Raw) return;
+    const [Err] = await window.API.AddClientMacAddress(UUID, Raw);
+    if (Err) {
+      await Notify(String(Err), 'error');
+      return;
+    }
+    $Input.val('');
+    await PopulateMacAddressSection(UUID);
+  };
+
+  $('#CLIENT_EDITOR_MAC_ADD').off('click').on('click', AddMacAddress);
+  $('#CLIENT_EDITOR_MAC_INPUT')
+    .off('keydown')
+    .on('keydown', async (Event) => {
+      // Enter adds the address rather than submitting the surrounding editor,
+      // which would close the modal and discard the half-typed entry.
+      if (Event.key !== 'Enter') return;
+      Event.preventDefault();
+      await AddMacAddress();
+    });
+}
+
 export async function OpenClientEditor(UUID: string) {
   const Client = await window.API.GetClient(UUID);
   if (!Client) return console.error('Client not found:', UUID);
@@ -395,19 +486,17 @@ export async function OpenClientEditor(UUID: string) {
 
   ClearSelection();
 
-  const { Nickname, Hostname, IP, Version, MacAddress } = Client;
+  const { Nickname, Hostname, IP, Version } = Client;
 
   $('#CLIENT_EDITOR_NICKNAME').val((Nickname ? Nickname : Hostname) || '');
   $('#CLIENT_EDITOR_SLUG').val(Client.Slug || '');
   $('#CLIENT_EDITOR_HOSTNAME').val(Hostname || '');
   $('#CLIENT_EDITOR_IP').val(IP || '');
-  if (MacAddress && String(MacAddress).trim().length > 0) {
-    $('#CLIENT_EDITOR_MAC').val(MacAddress.toUpperCase());
-    $('#CLIENT_EDITOR_MAC_WRAPPER').removeClass('d-none');
-  } else {
-    $('#CLIENT_EDITOR_MAC').val('');
-    $('#CLIENT_EDITOR_MAC_WRAPPER').addClass('d-none');
-  }
+  // Unlike the old single read-only MAC field, this section always shows — a
+  // client with no MAC on record is exactly the case where an operator needs to
+  // add one by hand.
+  $('#CLIENT_EDITOR_MAC_INPUT').val('');
+  await PopulateMacAddressSection(UUID);
   $('#CLIENT_EDITOR_UUID').val(UUID);
   $('#CLIENT_EDITOR_VERSION').val(Version || '');
 

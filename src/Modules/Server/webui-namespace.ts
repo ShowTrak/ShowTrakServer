@@ -224,6 +224,8 @@ const WEB_CLIENT_CHANNELS = new Set([
   'RemoveClientApplicationCritical',
   'MarkClientDisplayCritical',
   'RemoveClientDisplayCritical',
+  'AddClientMacAddress',
+  'RemoveClientMacAddress',
   'UnadoptClient',
   'ReplaceClient',
   'AdoptDevice',

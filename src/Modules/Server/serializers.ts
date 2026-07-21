@@ -22,6 +22,10 @@ interface PublicClientSource {
   Slug?: string | null;
   IP?: string | null;
   MacAddress?: string | null;
+  // Every MAC the client is known by — the full Wake-on-LAN target set, of which
+  // MacAddress above is the currently-active one. Loose here like the other
+  // array telemetry; re-narrowed on output.
+  MacAddresses?: unknown;
   Online?: boolean;
   LastSeen?: number;
   // Accepted loosely (like the array telemetry below): the internal Client holds
@@ -94,6 +98,7 @@ const ToPublicClient = (c: PublicClientSource): ClientView => ({
   Slug: c.Slug ?? null,
   IP: c.IP,
   MacAddress: c.MacAddress,
+  MacAddresses: Array.isArray(c.MacAddresses) ? c.MacAddresses : [],
   Online: c.Online,
   LastSeen: c.LastSeen,
   Vitals: (c.Vitals ?? null) as Vitals | null,

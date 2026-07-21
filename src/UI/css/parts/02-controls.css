@@ -1033,3 +1033,78 @@ input[type='range']::-moz-range-progress,
   max-inline-size: 100%;
   text-align: center;
 }
+
+/* Client editor — MAC address list. Follows the .fog-task-item surface
+   treatment so the rows read as the same family of inline list entries. */
+.mac-address-editor {
+  display: grid;
+  gap: 8px;
+}
+.mac-address-editor-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.mac-address-editor-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.mac-address-editor-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+.mac-address-list {
+  display: grid;
+  gap: 6px;
+}
+.mac-address-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.mac-address-item .mac-address-value {
+  font-family: var(--bs-font-monospace, monospace);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mac-address-item .mac-address-tag {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+}
+/* The address currently serving the client's active connection. */
+.mac-address-item .mac-address-tag.is-active {
+  background: rgba(80, 200, 120, 0.2);
+  color: #96e6b3;
+}
+.mac-address-item .mac-address-remove {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 1;
+}
+.mac-address-item .mac-address-remove:hover {
+  background: rgba(255, 90, 90, 0.18);
+  color: #ff9d9d;
+}
+.mac-address-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 6px 2px;
+}
