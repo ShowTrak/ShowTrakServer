@@ -16,7 +16,15 @@ import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } f
 const ID = 'qlab4';
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'OSC Port', Type: 'number', Default: DEFAULT_OSC_PORT, Min: 1, Max: 65535, Required: true },
+  {
+    Key: 'Port',
+    Label: 'OSC Port',
+    Type: 'number',
+    Default: DEFAULT_OSC_PORT,
+    Min: 1,
+    Max: 65535,
+    Required: true,
+  },
   {
     Key: 'Workspace',
     Label: 'Workspace name / filename or unique ID (optional)',
@@ -24,7 +32,15 @@ const Settings: MonitoringSettingField[] = [
     Default: '',
     Note: 'Confirm this workspace is open, matched by name, filename, or unique ID. Leave blank to accept any open workspace.',
   },
-  { Key: 'Timeout', Label: 'Timeout (ms)', Type: 'number', Default: 3000, Min: 200, Max: 30000, Advanced: true },
+  {
+    Key: 'Timeout',
+    Label: 'Timeout (ms)',
+    Type: 'number',
+    Default: 3000,
+    Min: 200,
+    Max: 30000,
+    Advanced: true,
+  },
 ];
 
 interface WorkspaceInfo {
@@ -40,7 +56,11 @@ function ErrText(Err: unknown): string {
 
 // Open a short-lived TCP connection, send `/workspaces`, and resolve with the
 // reported workspace list (or a failure).
-function QueryWorkspaces(Address: string, Port: number, TimeoutMs: number): Promise<MonitoringResult> {
+function QueryWorkspaces(
+  Address: string,
+  Port: number,
+  TimeoutMs: number
+): Promise<MonitoringResult> {
   return new Promise<MonitoringResult>((resolve) => {
     const Started = Date.now();
     let Settled = false;
@@ -90,7 +110,9 @@ function QueryWorkspaces(Address: string, Port: number, TimeoutMs: number): Prom
       Extract();
     });
 
-    Socket.once('timeout', () => Finish({ Success: false, Error: `No reply from QLab after ${TimeoutMs}ms` }));
+    Socket.once('timeout', () =>
+      Finish({ Success: false, Error: `No reply from QLab after ${TimeoutMs}ms` })
+    );
     Socket.once('error', (Err: Error) => Finish({ Success: false, Error: ErrText(Err) }));
     Socket.once('close', () => {
       if (!Settled && !Extract()) Finish({ Success: false, Error: 'No reply from QLab' });
@@ -115,7 +137,8 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   if (!IsValidPort(Port)) return { Success: false, Error: `Invalid port: ${Port}` };
 
   const Query = await QueryWorkspaces(Address, Port, TimeoutMs);
-  if (!Query.Success) return { Success: false, Error: (Query.Error as string) || 'No reply from QLab' };
+  if (!Query.Success)
+    return { Success: false, Error: (Query.Error as string) || 'No reply from QLab' };
 
   const Workspaces = Array.isArray(Query.Workspaces) ? Query.Workspaces : [];
 
@@ -156,8 +179,13 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Cfg = (Target && Target.Settings) || {};
   const Port = Number.isFinite(Cfg.Port) ? (Cfg.Port as number) | 0 : DEFAULT_OSC_PORT;
   const Wanted =
-    (Result && (Result.Wanted as string)) || (Cfg.Workspace == null ? '' : String(Cfg.Workspace).trim());
-  const Reachable = !!(Result && (Result.Success || Result.Degraded) && Array.isArray(Result.Workspaces));
+    (Result && (Result.Wanted as string)) ||
+    (Cfg.Workspace == null ? '' : String(Cfg.Workspace).trim());
+  const Reachable = !!(
+    Result &&
+    (Result.Success || Result.Degraded) &&
+    Array.isArray(Result.Workspaces)
+  );
 
   let StatusPill: string;
   if (!Reachable) StatusPill = Pill('danger', 'No reply');

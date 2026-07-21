@@ -45,7 +45,11 @@ const Manager = {
   },
 
   // Register or refresh a device in the pending list; if already adopted, trigger readopt flow
-  async AddClientPendingAdoption(UUID: string, IP: string | null | undefined, Data: AdoptionHeartbeatPayload): Promise<void> {
+  async AddClientPendingAdoption(
+    UUID: string,
+    IP: string | null | undefined,
+    Data: AdoptionHeartbeatPayload
+  ): Promise<void> {
     const IsClientMeantToBeAdopted = await ClientManager.Exists(UUID);
     if (IsClientMeantToBeAdopted) {
       Manager.RemoveClientPendingAdoption(UUID);

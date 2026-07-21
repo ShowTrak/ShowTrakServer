@@ -190,12 +190,18 @@ export interface DanteSnapshot {
 
 // Normalize a name for case-insensitive comparison.
 export function NormalizeName(Value: unknown): string {
-  return String(Value == null ? '' : Value).trim().toLowerCase();
+  return String(Value == null ? '' : Value)
+    .trim()
+    .toLowerCase();
 }
 
 // Does a visible device name satisfy the configured target under the given mode?
 // Comparison is case-insensitive. An empty target never matches.
-export function MatchesDevice(CandidateName: unknown, Target: unknown, Mode: DanteMatchMode): boolean {
+export function MatchesDevice(
+  CandidateName: unknown,
+  Target: unknown,
+  Mode: DanteMatchMode
+): boolean {
   const C = NormalizeName(CandidateName);
   const T = NormalizeName(Target);
   if (!T) return false;
@@ -204,7 +210,10 @@ export function MatchesDevice(CandidateName: unknown, Target: unknown, Mode: Dan
 
 // TXT values arrive as strings from bonjour-service, but can be Buffers if a
 // future version switches to binary mode — coerce defensively.
-function TxtString(Txt: Record<string, unknown> | null | undefined, Key: string): string | undefined {
+function TxtString(
+  Txt: Record<string, unknown> | null | undefined,
+  Key: string
+): string | undefined {
   if (!Txt) return undefined;
   const Raw = Txt[Key] ?? Txt[Key.toLowerCase()];
   if (Raw == null) return undefined;
@@ -213,7 +222,10 @@ function TxtString(Txt: Record<string, unknown> | null | undefined, Key: string)
   return Trimmed ? Trimmed : undefined;
 }
 
-function TxtNumber(Txt: Record<string, unknown> | null | undefined, Key: string): number | undefined {
+function TxtNumber(
+  Txt: Record<string, unknown> | null | undefined,
+  Key: string
+): number | undefined {
   const S = TxtString(Txt, Key);
   if (S == null) return undefined;
   const N = Number(S);
@@ -613,7 +625,12 @@ export function EvaluateDante(P: EvaluateParams): MonitoringResult {
   const Base = { DeviceName: P.DeviceName, MatchMode: P.MatchMode };
 
   if (P.Snapshot.Error) {
-    return { Success: false, Error: `Dante browser error: ${P.Snapshot.Error}`, ...Base, Devices: [] };
+    return {
+      Success: false,
+      Error: `Dante browser error: ${P.Snapshot.Error}`,
+      ...Base,
+      Devices: [],
+    };
   }
 
   const Fresh = P.Snapshot.Devices.filter((D) => P.Now - D.LastSeenAt <= P.GracePeriodMs).sort(
@@ -652,7 +669,10 @@ export function RunDante(Target: MonitoringTargetLike): MonitoringResult {
 
   const MatchMode = NormalizeMatchMode(Cfg.MatchMode);
   const GracePeriodMs = Number.isFinite(Cfg.GracePeriodMs)
-    ? Math.min(MAX_GRACE_PERIOD_MS, Math.max(MIN_GRACE_PERIOD_MS, (Cfg.GracePeriodMs as number) | 0))
+    ? Math.min(
+        MAX_GRACE_PERIOD_MS,
+        Math.max(MIN_GRACE_PERIOD_MS, (Cfg.GracePeriodMs as number) | 0)
+      )
     : DEFAULT_GRACE_PERIOD_MS;
 
   DanteBrowser.Observe();
@@ -686,7 +706,10 @@ export function BuildDanteDebug(Result: MonitoringResult, Target: MonitoringTarg
     TextRow('Match mode', MatchMode === 'exact' ? 'Exact' : 'Contains'),
     Row('Status', StatusPill),
     Online
-      ? Row('Last seen', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)} ago</span>`)
+      ? Row(
+          'Last seen',
+          `<span class="font-monospace">${FormatLatency(Result.LatencyMs)} ago</span>`
+        )
       : Result && Result.Error
         ? TextRow('Detail', Result.Error as string)
         : null,
@@ -694,10 +717,20 @@ export function BuildDanteDebug(Result: MonitoringResult, Target: MonitoringTarg
     Online && Info.Model ? TextRow('Model', Info.Model) : null,
     Online && Info.Firmware ? TextRow('Firmware', Info.Firmware) : null,
     Online && Info.SampleRate ? TextRow('Sample rate', FormatSampleRate(Info.SampleRate)) : null,
-    Online && Info.LatencyNs != null ? TextRow('Device latency', FormatDanteLatency(Info.LatencyNs)) : null,
-    Online && Info.Mac ? Row('MAC / ID', `<span class="font-monospace">${Info.Mac.replace(/[^0-9a-fA-F]/g, '')}</span>`) : null,
+    Online && Info.LatencyNs != null
+      ? TextRow('Device latency', FormatDanteLatency(Info.LatencyNs))
+      : null,
+    Online && Info.Mac
+      ? Row(
+          'MAC / ID',
+          `<span class="font-monospace">${Info.Mac.replace(/[^0-9a-fA-F]/g, '')}</span>`
+        )
+      : null,
     // Discovery is network-wide via mDNS, so the check's Address field is unused.
-    Row('Address', '<span class="text-muted small">Not used — Dante discovery is network-wide</span>'),
+    Row(
+      'Address',
+      '<span class="text-muted small">Not used — Dante discovery is network-wide</span>'
+    ),
   ]);
 
   const Devices: DanteDevice[] = Array.isArray(Result && Result.Devices)
@@ -705,12 +738,17 @@ export function BuildDanteDebug(Result: MonitoringResult, Target: MonitoringTarg
     : [];
   if (!Devices.length) {
     return (
-      Head + '<div class="mt-2">' + Note('No Dante devices currently visible on the network') + '</div>'
+      Head +
+      '<div class="mt-2">' +
+      Note('No Dante devices currently visible on the network') +
+      '</div>'
     );
   }
 
   const List = Devices.map((D) => {
-    const IsMatch = MatchedName ? D.Name === MatchedName : MatchesDevice(D.Name, DeviceName, MatchMode);
+    const IsMatch = MatchedName
+      ? D.Name === MatchedName
+      : MatchesDevice(D.Name, DeviceName, MatchMode);
     const Detail = [
       D.Info && D.Info.Model ? D.Info.Model : null,
       D.Info && D.Info.SampleRate ? FormatSampleRate(D.Info.SampleRate) : null,

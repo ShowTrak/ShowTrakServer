@@ -42,8 +42,7 @@ function makeRpc(socket: WebUiSocket) {
     new Promise<T>((resolve) => {
       try {
         socket.emit('rpc', channel, args, (res: Ack) => {
-          if (res && Object.prototype.hasOwnProperty.call(res, 'result'))
-            resolve(res.result as T);
+          if (res && Object.prototype.hasOwnProperty.call(res, 'result')) resolve(res.result as T);
           else resolve([res && res.error ? res.error : 'forbidden', null] as unknown as T);
         });
       } catch (e) {
@@ -89,8 +88,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     OpenDiscordInviteLinkInBrowser: async () =>
       window.open('https://discord.gg/showtrak', '_blank'),
     OpenShowTrakWebsiteInBrowser: async () => window.open('https://showtrak.io', '_blank'),
-    OpenShowTrakGithubInBrowser: async () =>
-      window.open('https://github.com/ShowTrak', '_blank'),
+    OpenShowTrakGithubInBrowser: async () => window.open('https://github.com/ShowTrak', '_blank'),
     OpenNpmPackageInBrowser: async (PackageName) =>
       window.open(`https://www.npmjs.com/package/${PackageName}`, '_blank'),
     OpenExternalUrl: async (URL) => {
@@ -141,8 +139,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
       rpc('MarkClientDisplayCritical', UUID, Display),
     RemoveClientDisplayCritical: async (UUID, DisplayID) =>
       rpc('RemoveClientDisplayCritical', UUID, DisplayID),
-    AddClientMacAddress: async (UUID, MacAddress) =>
-      rpc('AddClientMacAddress', UUID, MacAddress),
+    AddClientMacAddress: async (UUID, MacAddress) => rpc('AddClientMacAddress', UUID, MacAddress),
     RemoveClientMacAddress: async (UUID, MacAddress) =>
       rpc('RemoveClientMacAddress', UUID, MacAddress),
     IdentifyClient: async (UUID) => rpc('IdentifyClient', UUID),
@@ -159,13 +156,10 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     RenameGroup: async (GroupID, Title) => rpc('RenameGroup', GroupID, Title),
     DeleteGroup: async (GroupID) => rpc('DeleteGroup', GroupID),
     SetGroupListOrder: async (OrderedGroupIDs) => rpc('Groups:SetOrder', OrderedGroupIDs),
-    SetGroupFullWidth: async (GroupID, FullWidth) =>
-      rpc('Groups:SetFullWidth', GroupID, FullWidth),
-    SetGroupKeyBind: async (GroupID, KeyBind) =>
-      rpc('Groups:SetKeyBind', GroupID, KeyBind),
+    SetGroupFullWidth: async (GroupID, FullWidth) => rpc('Groups:SetFullWidth', GroupID, FullWidth),
+    SetGroupKeyBind: async (GroupID, KeyBind) => rpc('Groups:SetKeyBind', GroupID, KeyBind),
     SetGroupSlug: async (GroupID, Slug) => rpc('Groups:SetSlug', GroupID, Slug),
-    SetGroupOrder: async (GroupID, OrderedUUIDs) =>
-      rpc('SetGroupOrder', GroupID, OrderedUUIDs),
+    SetGroupOrder: async (GroupID, OrderedUUIDs) => rpc('SetGroupOrder', GroupID, OrderedUUIDs),
 
     // ---- Show file (desktop-only) ----------------------------------------
     NewShow: nullTuple,
@@ -297,8 +291,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     CreateAlertRule: async (Payload) => rpc('CreateAlertRule', Payload),
     UpdateAlertRule: async (RuleID, Payload) => rpc('UpdateAlertRule', RuleID, Payload),
     DeleteAlertRule: async (RuleID) => rpc('DeleteAlertRule', RuleID),
-    SetAlertRuleEnabled: async (RuleID, Enabled) =>
-      rpc('SetAlertRuleEnabled', RuleID, Enabled),
+    SetAlertRuleEnabled: async (RuleID, Enabled) => rpc('SetAlertRuleEnabled', RuleID, Enabled),
     GetAlertActionsEnabled: async () => rpc('AlertActionsEnabled:Get'),
     // Web sessions can never toggle alert actions off; keep the UI's optimistic
     // value by echoing the requested state without hitting the server.

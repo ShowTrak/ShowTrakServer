@@ -537,7 +537,8 @@ class Client {
     const Existing = this.CriticalUSBNames.find((Entry) => Entry.NameKey === NameKey);
     if (Existing) {
       Existing.Quantity = Quantity;
-      if (!Existing.ManufacturerName && ManufacturerName) Existing.ManufacturerName = ManufacturerName;
+      if (!Existing.ManufacturerName && ManufacturerName)
+        Existing.ManufacturerName = ManufacturerName;
       if (!Existing.ProductName && ProductName) Existing.ProductName = ProductName;
       if (!Existing.Timestamp && D.Timestamp) Existing.Timestamp = TimestampOrNull(D.Timestamp);
       this._rebuildUSBDeviceView();
@@ -1391,9 +1392,7 @@ class Client {
     Logger.debug(`Client ${this.UUID} run-on-launch script updated to ${RunOnLaunchScriptID}`);
     return Ok<void>();
   }
-  async SetRunOnLaunchDelaySeconds(
-    RunOnLaunchDelaySeconds: number | null
-  ): Promise<Result<void>> {
+  async SetRunOnLaunchDelaySeconds(RunOnLaunchDelaySeconds: number | null): Promise<Result<void>> {
     if (this.RunOnLaunchDelaySeconds === RunOnLaunchDelaySeconds) return Ok<void>();
     const Previous = this.RunOnLaunchDelaySeconds;
     this.RunOnLaunchDelaySeconds = RunOnLaunchDelaySeconds;

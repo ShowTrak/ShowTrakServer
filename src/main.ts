@@ -236,7 +236,9 @@ app.whenReady().then(async () => {
     DummyClientManager.Init().catch((Err: unknown) =>
       Logger.error('Failed to init DummyClientManager:', Err)
     );
-    AlertsManager.Init().catch((Err: unknown) => Logger.error('Failed to init AlertsManager:', Err));
+    AlertsManager.Init().catch((Err: unknown) =>
+      Logger.error('Failed to init AlertsManager:', Err)
+    );
     // Ensure every client / monitoring target / group has a non-null slug. Rows
     // created before slugs existed are back-filled with generated unique values.
     // Run sequentially so the shared client namespace never hands out the same

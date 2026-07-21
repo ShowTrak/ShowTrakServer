@@ -66,8 +66,22 @@ function CustomFields(N: number): MonitoringSettingField[] {
 }
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'Port', Type: 'number', Default: DEFAULT_PORT, Min: 1, Max: 65535, Required: true },
-  { Key: 'Community', Label: 'Community string', Type: 'string', Default: 'public', Required: true },
+  {
+    Key: 'Port',
+    Label: 'Port',
+    Type: 'number',
+    Default: DEFAULT_PORT,
+    Min: 1,
+    Max: 65535,
+    Required: true,
+  },
+  {
+    Key: 'Community',
+    Label: 'Community string',
+    Type: 'string',
+    Default: 'public',
+    Required: true,
+  },
   {
     Key: 'Profile',
     Label: 'Brand profile',
@@ -388,7 +402,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     Reachable && Result.SysDescr != null && String(Result.SysDescr) !== ''
       ? TextRow('Description', String(Result.SysDescr).slice(0, 120))
       : null,
-    Reachable && Result.SysUpTime != null ? MonoRow('Uptime', FormatUptime(Result.SysUpTime)) : null,
+    Reachable && Result.SysUpTime != null
+      ? MonoRow('Uptime', FormatUptime(Result.SysUpTime))
+      : null,
     Reachable && Result.LampHours != null ? MonoRow('Lamp hours', `${Result.LampHours} h`) : null,
     ...CustomRows,
   ]);
@@ -399,7 +415,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Notes: string[] = [];
   if (Result.ProfileMissing) {
     Notes.push(
-      '<div class="mt-2">' + Note('Brand profile returned no data — wrong profile, or SNMP status not exposed?') + '</div>'
+      '<div class="mt-2">' +
+        Note('Brand profile returned no data — wrong profile, or SNMP status not exposed?') +
+        '</div>'
     );
   }
   if (Profile.Note) {

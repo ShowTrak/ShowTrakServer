@@ -1,4 +1,13 @@
-import { AlertActionsEnabled, AppMode, COMPACT_MODE_STORAGE_KEY, Capabilities, CompactMode, setAlertActionsEnabled, setAppMode, setCompactMode } from './01-state';
+import {
+  AlertActionsEnabled,
+  AppMode,
+  COMPACT_MODE_STORAGE_KEY,
+  Capabilities,
+  CompactMode,
+  setAlertActionsEnabled,
+  setAppMode,
+  setCompactMode,
+} from './01-state';
 import type { AppMode as AppModeValue } from '@showtrak/protocol';
 import { HandleNonFatalError } from './04-utils';
 import { RenderPendingAdoptionSection } from './06-client-list';
@@ -6,7 +15,7 @@ import { UpdateMonitorHistoryEditButtonVisibility } from './07-monitoring';
 import { initializeEditInteractions } from './08-dnd';
 import { UpdateSelectionCount } from './14-selection-init';
 export function RenderCompactMode(isCompact: boolean) {
-    setCompactMode(!!isCompact);
+  setCompactMode(!!isCompact);
   document.body.classList.toggle('compact-mode', CompactMode);
 
   const btn = document.getElementById('COMPACT_MODE_BTN') as HTMLButtonElement | null;
@@ -62,7 +71,7 @@ export function InitMobileView() {
 }
 
 export function RenderAlertActionsToggle(isEnabled: boolean) {
-    setAlertActionsEnabled(!!isEnabled);
+  setAlertActionsEnabled(!!isEnabled);
   const btn = document.getElementById('ALERT_ACTIONS_TOGGLE_BTN') as HTMLButtonElement | null;
   if (btn) {
     btn.classList.toggle('alerts-enabled', AlertActionsEnabled);
@@ -74,8 +83,8 @@ export function RenderAlertActionsToggle(isEnabled: boolean) {
     btn.title = IsReadOnly
       ? `Alert Actions: ${AlertActionsEnabled ? 'Enabled' : 'Disabled'} (Desktop controlled)`
       : AlertActionsEnabled
-      ? 'Disable Alert Actions'
-      : 'Enable Alert Actions';
+        ? 'Disable Alert Actions'
+        : 'Enable Alert Actions';
   }
   UpdateSelectionCount();
 }
@@ -95,7 +104,7 @@ export async function SetAlertActionsEnabled(isEnabled: boolean) {
 }
 
 export function RenderMode(mode: AppModeValue) {
-    setAppMode(String(mode).toUpperCase() === 'EDIT' ? 'EDIT' : 'SHOW');
+  setAppMode(String(mode).toUpperCase() === 'EDIT' ? 'EDIT' : 'SHOW');
   // Highlight the active button
   const btnShow = document.getElementById('MODE_BTN_SHOW') as HTMLButtonElement | null;
   const btnEdit = document.getElementById('MODE_BTN_EDIT') as HTMLButtonElement | null;

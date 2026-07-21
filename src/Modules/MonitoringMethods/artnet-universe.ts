@@ -34,9 +34,7 @@ const Logger = CreateLogger('Art-Net');
 const ID = 'artnet-universe';
 
 // Art-Net packet header (see the Art-Net 4 spec, ArtDmx / OpOutput).
-const ARTNET_PACKET_IDENTIFIER = Buffer.from([
-  0x41, 0x72, 0x74, 0x2d, 0x4e, 0x65, 0x74, 0x00,
-]); // "Art-Net\0"
+const ARTNET_PACKET_IDENTIFIER = Buffer.from([0x41, 0x72, 0x74, 0x2d, 0x4e, 0x65, 0x74, 0x00]); // "Art-Net\0"
 const OP_ARTDMX = 0x5000; // OpCode for an ArtDmx packet (little-endian on the wire)
 const MIN_PROTOCOL_VERSION = 14; // ArtDmx was introduced at protocol revision 14.
 
@@ -90,10 +88,7 @@ export interface ArtnetSource {
 // Parse an inbound datagram as an ArtDmx packet. Returns null for anything that
 // is not a well-formed ArtDmx packet (ArtPoll, ArtPollReply, other protocols,
 // runts).
-export function ParseArtnetPacket(
-  Msg: Buffer,
-  SourceAddress: string
-): ArtnetSource | null {
+export function ParseArtnetPacket(Msg: Buffer, SourceAddress: string): ArtnetSource | null {
   if (!Buffer.isBuffer(Msg) || Msg.length < MIN_PACKET_LENGTH) return null;
   if (
     Msg.compare(
@@ -194,9 +189,7 @@ class ArtnetReceiverImpl {
         // already closing
       }
     });
-    Sock.on('message', (Msg: Buffer, RInfo: dgram.RemoteInfo) =>
-      this.HandleMessage(Msg, RInfo)
-    );
+    Sock.on('message', (Msg: Buffer, RInfo: dgram.RemoteInfo) => this.HandleMessage(Msg, RInfo));
     Sock.on('listening', () => {
       if (this.Socket !== Sock) return;
       this.State = 'ready';
@@ -321,7 +314,12 @@ export function EvaluateArtnet(P: EvaluateParams): MonitoringResult {
   };
 
   if (P.Snapshot.Error) {
-    return { Success: false, Error: `Art-Net listener error: ${P.Snapshot.Error}`, ...Base, Sources: [] };
+    return {
+      Success: false,
+      Error: `Art-Net listener error: ${P.Snapshot.Error}`,
+      ...Base,
+      Sources: [],
+    };
   }
 
   const Fresh = P.Snapshot.Sources.filter((S) => P.Now - S.LastSeenAt <= P.GracePeriodMs).sort(

@@ -151,7 +151,11 @@ export function UpdateDummyClientTile(D: DummyClientView) {
 export async function PopulateDummyGroupSelect(SelectedGroupID: number | null) {
   let Groups = await window.API.GetAllGroups();
   if (!Groups) Groups = [];
-  Groups.push({ GroupID: null, Title: 'No Group', Weight: 100000 } as unknown as (typeof Groups)[number]);
+  Groups.push({
+    GroupID: null,
+    Title: 'No Group',
+    Weight: 100000,
+  } as unknown as (typeof Groups)[number]);
   const $select = $('#DUMMY_CLIENT_GROUPID');
   $select.html('');
   for (const Group of Groups) {
@@ -182,7 +186,7 @@ export async function OpenDummyClientEditor(UUID: string | null | undefined = nu
     }
   }
 
-    setDummyClientEditorUUID(Existing ? Existing.UUID : null);
+  setDummyClientEditorUUID(Existing ? Existing.UUID : null);
   const D = Existing || Defaults;
 
   $('#DUMMY_CLIENT_MODAL_TITLE').text(Existing ? 'Edit Dummy Client' : 'Add Dummy Client');

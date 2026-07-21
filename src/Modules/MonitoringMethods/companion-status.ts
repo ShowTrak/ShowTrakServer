@@ -93,7 +93,11 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   // expected range) is already shaped as an Offline result by the shared
   // helper — pass it straight through without leaking the captured body.
   if (!Result.Success) {
-    return { Success: false, Error: Result.Error || 'Companion not reachable', Status: Result.Status };
+    return {
+      Success: false,
+      Error: Result.Error || 'Companion not reachable',
+      Status: Result.Status,
+    };
   }
 
   const Version = ExtractVersion(Result.Body);

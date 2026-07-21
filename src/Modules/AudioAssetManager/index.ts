@@ -84,7 +84,10 @@ interface AudioAssetManagerType {
   GetDataURL(ID: string): Result<AudioDataURL>;
   InspectCandidate(FilePath: unknown): AudioInspection;
   Import(Payload: AudioImportPayload | null | undefined): Promise<Result<PublicAudioAsset>>;
-  Update(ID: string, Payload: AudioUpdatePayload | null | undefined): Promise<Result<PublicAudioAsset>>;
+  Update(
+    ID: string,
+    Payload: AudioUpdatePayload | null | undefined
+  ): Promise<Result<PublicAudioAsset>>;
   Delete(ID: string): Promise<Result<{ ID: string }>>;
 }
 

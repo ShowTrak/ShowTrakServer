@@ -43,7 +43,11 @@ const Manager = {
   // real clients, monitors and dummies alike).
   async GenerateDefaults() {
     const Suffix = RandomSuffix();
-    const DummyID = await SlugService.GenerateUniqueClientSlug(`Dummy-${Suffix}`, undefined, 'dummy');
+    const DummyID = await SlugService.GenerateUniqueClientSlug(
+      `Dummy-${Suffix}`,
+      undefined,
+      'dummy'
+    );
     return {
       DummyID,
       Nickname: `Dummy ${Suffix}`,
@@ -152,7 +156,10 @@ const Manager = {
     return Ok(Dummy.ToJSON());
   },
 
-  async Update(UUID: string, Payload: Record<string, unknown> = {}): Promise<Result<DummyClientSnapshot>> {
+  async Update(
+    UUID: string,
+    Payload: Record<string, unknown> = {}
+  ): Promise<Result<DummyClientSnapshot>> {
     const Dummy = DummyList.find((D) => D.UUID === UUID);
     if (!Dummy) return Fail('Dummy client not found');
 

@@ -42,7 +42,10 @@ function register(): void {
   RPC.handle(
     'UpdateClient',
     createTupleHandler<[string, Record<string, unknown>], unknown>(
-      (UUID: unknown, Data: unknown) => [IPCValidation.UUID(UUID), IPCValidation.ClientUpdatePayload(Data)],
+      (UUID: unknown, Data: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.ClientUpdatePayload(Data),
+      ],
       (UUID: string, Data: Record<string, unknown>) => ClientManager.Update(UUID, Data)
     )
   );
@@ -50,8 +53,12 @@ function register(): void {
   RPC.handle(
     'MarkClientUSBDeviceCritical',
     createTupleHandler<[string, CriticalUSBDevicePayloadResult], unknown>(
-      (UUID: unknown, Device: unknown) => [IPCValidation.UUID(UUID), IPCValidation.CriticalUSBDevicePayload(Device)],
-      (UUID: string, Device: CriticalUSBDevicePayloadResult) => ClientManager.MarkUSBDeviceCritical(UUID, Device)
+      (UUID: unknown, Device: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.CriticalUSBDevicePayload(Device),
+      ],
+      (UUID: string, Device: CriticalUSBDevicePayloadResult) =>
+        ClientManager.MarkUSBDeviceCritical(UUID, Device)
     )
   );
 
@@ -62,23 +69,32 @@ function register(): void {
         IPCValidation.UUID(UUID),
         IPCValidation.USBSerialNumber(SerialNumber),
       ],
-      (UUID: string, SerialNumber: string) => ClientManager.RemoveUSBDeviceCritical(UUID, SerialNumber)
+      (UUID: string, SerialNumber: string) =>
+        ClientManager.RemoveUSBDeviceCritical(UUID, SerialNumber)
     )
   );
 
   RPC.handle(
     'MarkClientUSBNameCritical',
     createTupleHandler<[string, CriticalUSBNamePayloadResult], unknown>(
-      (UUID: unknown, Device: unknown) => [IPCValidation.UUID(UUID), IPCValidation.CriticalUSBNamePayload(Device)],
-      (UUID: string, Device: CriticalUSBNamePayloadResult) => ClientManager.MarkUSBNameCritical(UUID, Device)
+      (UUID: unknown, Device: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.CriticalUSBNamePayload(Device),
+      ],
+      (UUID: string, Device: CriticalUSBNamePayloadResult) =>
+        ClientManager.MarkUSBNameCritical(UUID, Device)
     )
   );
 
   RPC.handle(
     'RemoveClientUSBNameCritical',
     createTupleHandler<[string, CriticalUSBNamePayloadResult], unknown>(
-      (UUID: unknown, Device: unknown) => [IPCValidation.UUID(UUID), IPCValidation.CriticalUSBNamePayload(Device)],
-      (UUID: string, Device: CriticalUSBNamePayloadResult) => ClientManager.RemoveUSBNameCritical(UUID, Device)
+      (UUID: unknown, Device: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.CriticalUSBNamePayload(Device),
+      ],
+      (UUID: string, Device: CriticalUSBNamePayloadResult) =>
+        ClientManager.RemoveUSBNameCritical(UUID, Device)
     )
   );
 
@@ -89,7 +105,8 @@ function register(): void {
         IPCValidation.UUID(UUID),
         IPCValidation.CriticalApplicationPayload(Application),
       ],
-      (UUID: string, Application: CriticalApplicationPayloadResult) => ClientManager.MarkApplicationCritical(UUID, Application)
+      (UUID: string, Application: CriticalApplicationPayloadResult) =>
+        ClientManager.MarkApplicationCritical(UUID, Application)
     )
   );
 
@@ -100,22 +117,30 @@ function register(): void {
         IPCValidation.UUID(UUID),
         IPCValidation.CriticalApplicationPayload({ Name: ApplicationName }).Name,
       ],
-      (UUID: string, ApplicationName: string) => ClientManager.RemoveApplicationCritical(UUID, ApplicationName)
+      (UUID: string, ApplicationName: string) =>
+        ClientManager.RemoveApplicationCritical(UUID, ApplicationName)
     )
   );
 
   RPC.handle(
     'MarkClientDisplayCritical',
     createTupleHandler<[string, CriticalDisplayPayloadResult], unknown>(
-      (UUID: unknown, Display: unknown) => [IPCValidation.UUID(UUID), IPCValidation.CriticalDisplayPayload(Display)],
-      (UUID: string, Display: CriticalDisplayPayloadResult) => ClientManager.MarkDisplayCritical(UUID, Display)
+      (UUID: unknown, Display: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.CriticalDisplayPayload(Display),
+      ],
+      (UUID: string, Display: CriticalDisplayPayloadResult) =>
+        ClientManager.MarkDisplayCritical(UUID, Display)
     )
   );
 
   RPC.handle(
     'RemoveClientDisplayCritical',
     createTupleHandler<[string, string], unknown>(
-      (UUID: unknown, DisplayID: unknown) => [IPCValidation.UUID(UUID), IPCValidation.DisplayID(DisplayID)],
+      (UUID: unknown, DisplayID: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.DisplayID(DisplayID),
+      ],
       (UUID: string, DisplayID: string) => ClientManager.RemoveDisplayCritical(UUID, DisplayID)
     )
   );
@@ -246,7 +271,8 @@ function register(): void {
         const Pending = AdoptionManager.GetClientsPendingAdoption();
         const ReplacementPending = Array.isArray(Pending)
           ? Pending.find(
-              (Device: { UUID?: unknown } | null) => String(Device && Device.UUID) === ReplacementUUID
+              (Device: { UUID?: unknown } | null) =>
+                String(Device && Device.UUID) === ReplacementUUID
             )
           : null;
         if (!ReplacementPending) {
@@ -306,7 +332,9 @@ function register(): void {
       // the machine has been woken as well as we can manage, and a partial error
       // would just be noise (a retired NIC's MAC failing is expected).
       const WOLErr =
-        Failures.length === MacAddresses.length ? Failures.join('; ') || 'Wake On LAN failed' : null;
+        Failures.length === MacAddresses.length
+          ? Failures.join('; ') || 'Wake On LAN failed'
+          : null;
       await ScriptExecutionManager.Complete(RequestID, WOLErr);
     });
     await Promise.allSettled(tasks);

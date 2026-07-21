@@ -156,7 +156,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       TextRow(
         'Software',
         String(Result.EosVersion || 'Unknown') +
-          (Options.CheckVersion && Options.ExpectedVersion ? ` (expected ${Options.ExpectedVersion}…)` : '')
+          (Options.CheckVersion && Options.ExpectedVersion
+            ? ` (expected ${Options.ExpectedVersion}…)`
+            : '')
       )
     );
     if (Result.ShowName != null && Result.ShowName !== '') {
@@ -170,7 +172,10 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
         MonoRow('Cue lists', Result.CuelistCount != null ? String(Result.CuelistCount) : 'unknown')
       );
       ExtraRows.push(
-        MonoRow('Patched channels', Result.PatchCount != null ? String(Result.PatchCount) : 'unknown')
+        MonoRow(
+          'Patched channels',
+          Result.PatchCount != null ? String(Result.PatchCount) : 'unknown'
+        )
       );
     }
   }

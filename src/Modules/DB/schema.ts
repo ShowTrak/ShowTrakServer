@@ -226,14 +226,14 @@ Schema.push({
 // carries the tag to its current and future members.
 Schema.push({
   Name: 'Tags',
-  SQL: "CREATE TABLE IF NOT EXISTS `Tags` ( \
+  SQL: 'CREATE TABLE IF NOT EXISTS `Tags` ( \
             TagID INTEGER PRIMARY KEY AUTOINCREMENT, \
             Slug TEXT, \
             Colour INTEGER NOT NULL DEFAULT 6, \
-            Icon TEXT NOT NULL DEFAULT 'tag', \
-            Scope TEXT NOT NULL DEFAULT '{\"Workspace\":false,\"Groups\":[],\"Clients\":[]}', \
+            Icon TEXT NOT NULL DEFAULT \'tag\', \
+            Scope TEXT NOT NULL DEFAULT \'{"Workspace":false,"Groups":[],"Clients":[]}\', \
             Weight INTEGER NOT NULL DEFAULT 100 \
-    )",
+    )',
 });
 
 // Every MAC address a client is known by, one row per address. A machine with

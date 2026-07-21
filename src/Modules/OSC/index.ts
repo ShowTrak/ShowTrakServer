@@ -338,11 +338,7 @@ const OSC = {
     return Routes;
   },
 
-  CreateRoute(
-    Path: string,
-    Callback: OSCRouteCallback,
-    Title = 'Default OSC Route'
-  ): void {
+  CreateRoute(Path: string, Callback: OSCRouteCallback, Title = 'Default OSC Route'): void {
     Routes.push({
       Title,
       Path,
@@ -597,18 +593,14 @@ async function runEventCommand(Command: Promise<RouteResult>): Promise<RouteResu
 OSC.CreateRoute(
   '/API/Client/:Slug/TriggerEvent/:EventID',
   async (Req) =>
-    runEventCommand(
-      ControlService.TriggerEventOnClient(Req.Slug ?? '', Req.EventID ?? '')
-    ),
+    runEventCommand(ControlService.TriggerEventOnClient(Req.Slug ?? '', Req.EventID ?? '')),
   'Trigger an integrated event on a Client by its slug and Event ID'
 );
 
 OSC.CreateRoute(
   '/API/Group/:Slug/TriggerEvent/:EventID',
   async (Req) =>
-    runEventCommand(
-      ControlService.TriggerEventOnGroup(Req.Slug ?? '', Req.EventID ?? '')
-    ),
+    runEventCommand(ControlService.TriggerEventOnGroup(Req.Slug ?? '', Req.EventID ?? '')),
   'Trigger an integrated event on all integrated members of a Group by its slug and Event ID'
 );
 

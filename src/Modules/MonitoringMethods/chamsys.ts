@@ -149,7 +149,12 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     };
   }
 
-  if (Config.CheckVersion && Config.ExpectedVersion && Version && !Version.startsWith(Config.ExpectedVersion)) {
+  if (
+    Config.CheckVersion &&
+    Config.ExpectedVersion &&
+    Version &&
+    !Version.startsWith(Config.ExpectedVersion)
+  ) {
     return {
       Success: true,
       Degraded: true,

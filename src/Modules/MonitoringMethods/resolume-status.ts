@@ -213,7 +213,10 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     Extra.push(TextRow('Expected composition', String(Result.ExpectedComposition ?? '—')));
     const Matched = !Result.Degraded;
     Extra.push(
-      Row('Composition', Pill(Matched ? 'success' : 'warning', Matched ? 'Match' : 'Wrong composition'))
+      Row(
+        'Composition',
+        Pill(Matched ? 'success' : 'warning', Matched ? 'Match' : 'Wrong composition')
+      )
     );
   }
 

@@ -252,7 +252,10 @@ function startPJLinkScan(scan: Scan) {
       },
     });
   } catch (error) {
-    Logger.warn('Failed to start PJLink discovery:', error instanceof Error ? error.message : error);
+    Logger.warn(
+      'Failed to start PJLink discovery:',
+      error instanceof Error ? error.message : error
+    );
   }
 }
 
@@ -313,10 +316,7 @@ function startBonjourScan(scan: Scan) {
     }
     scan.Browsers.push(browser);
   } catch (error) {
-    Logger.warn(
-      'Bonjour browser setup failed:',
-      error instanceof Error ? error.message : error
-    );
+    Logger.warn('Bonjour browser setup failed:', error instanceof Error ? error.message : error);
   }
 }
 
@@ -368,7 +368,10 @@ async function startProbeScan(scan: Scan) {
 }
 
 const Manager = {
-  Start: (options: ScanOptions = {}, onEvent: (payload: ScanEvent) => void): Result<{ ScanID: string }> => {
+  Start: (
+    options: ScanOptions = {},
+    onEvent: (payload: ScanEvent) => void
+  ): Result<{ ScanID: string }> => {
     if (typeof onEvent !== 'function') return ['Callback is required', null];
     const scan = createScan(options || {}, onEvent);
     ACTIVE_SCANS.set(scan.ScanID, scan);

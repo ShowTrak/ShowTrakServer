@@ -368,18 +368,16 @@ export const DefaultSettings: SettingDefinition[] = [
   // One permission toggle per host-schedulable FOG task type. Generated from the task
   // type catalogue so the two cannot drift. Everything defaults to off: enabling the
   // integration must not, on its own, make it possible to wipe a machine.
-  ...FOG_TASK_TYPES.map(
-    (Type): SettingDefinition => ({
-      Group: 'FOG Permitted Actions',
-      Key: FogTaskPermissionKey(Type.TaskTypeID),
-      Title: Type.Name,
-      Description: Type.Destructive
-        ? `Allow the "${Type.Name}" task to be scheduled from ShowTrak. This task is destructive and can result in data loss on the target machine.`
-        : `Allow the "${Type.Name}" task to be scheduled from ShowTrak.`,
-      Type: 'BOOLEAN',
-      DefaultValue: false,
-    })
-  ),
+  ...FOG_TASK_TYPES.map((Type): SettingDefinition => ({
+    Group: 'FOG Permitted Actions',
+    Key: FogTaskPermissionKey(Type.TaskTypeID),
+    Title: Type.Name,
+    Description: Type.Destructive
+      ? `Allow the "${Type.Name}" task to be scheduled from ShowTrak. This task is destructive and can result in data loss on the target machine.`
+      : `Allow the "${Type.Name}" task to be scheduled from ShowTrak.`,
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+  })),
 ];
 
 export const Groups: SettingGroup[] = [

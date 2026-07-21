@@ -74,12 +74,7 @@ app.use('/API', (req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-function sendApiError(
-  res: Response,
-  httpStatus: number,
-  code: string | number,
-  message: unknown
-) {
+function sendApiError(res: Response, httpStatus: number, code: string | number, message: unknown) {
   return res.status(httpStatus).json({
     Error: true,
     Code: code || httpStatus,

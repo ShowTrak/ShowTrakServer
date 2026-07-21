@@ -133,10 +133,10 @@ export function CreateClientsRepository(DB: DBManager) {
         );
         if (clientUpdateErr) throw clientUpdateErr;
 
-        const [criticalUSBErr] = await run('UPDATE CriticalUSBDevices SET UUID = ? WHERE UUID = ?', [
-          NewUUID,
-          OldUUID,
-        ]);
+        const [criticalUSBErr] = await run(
+          'UPDATE CriticalUSBDevices SET UUID = ? WHERE UUID = ?',
+          [NewUUID, OldUUID]
+        );
         if (criticalUSBErr) throw criticalUSBErr;
 
         const [criticalUSBNameErr] = await run(
@@ -145,16 +145,16 @@ export function CreateClientsRepository(DB: DBManager) {
         );
         if (criticalUSBNameErr) throw criticalUSBNameErr;
 
-        const [criticalAppErr] = await run('UPDATE CriticalApplications SET UUID = ? WHERE UUID = ?', [
-          NewUUID,
-          OldUUID,
-        ]);
+        const [criticalAppErr] = await run(
+          'UPDATE CriticalApplications SET UUID = ? WHERE UUID = ?',
+          [NewUUID, OldUUID]
+        );
         if (criticalAppErr) throw criticalAppErr;
 
-        const [criticalDisplayErr] = await run('UPDATE CriticalDisplays SET UUID = ? WHERE UUID = ?', [
-          NewUUID,
-          OldUUID,
-        ]);
+        const [criticalDisplayErr] = await run(
+          'UPDATE CriticalDisplays SET UUID = ? WHERE UUID = ?',
+          [NewUUID, OldUUID]
+        );
         if (criticalDisplayErr) throw criticalDisplayErr;
 
         // Replacing a client means real hardware took over the slot, so the old
@@ -171,10 +171,10 @@ export function CreateClientsRepository(DB: DBManager) {
         // tables, the replacement machine has very likely already reported this
         // same MAC under its own UUID, so re-keying would collide with the
         // (UUID, MacAddress) primary key. Letting the manual row win is correct.
-        const [macErr] = await run('UPDATE OR REPLACE ClientMacAddresses SET UUID = ? WHERE UUID = ?', [
-          NewUUID,
-          OldUUID,
-        ]);
+        const [macErr] = await run(
+          'UPDATE OR REPLACE ClientMacAddresses SET UUID = ? WHERE UUID = ?',
+          [NewUUID, OldUUID]
+        );
         if (macErr) throw macErr;
 
         const [rulesErr, RuleRows] = await DB.All<{

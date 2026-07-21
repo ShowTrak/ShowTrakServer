@@ -242,7 +242,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Pill = StatePill(Result, 'Healthy');
 
   return BrightSignDebug(Config, Result, Pill, [
-    Reachable && Result.Model ? MonoRow('Model', `${Result.Model}${Result.Family ? ` (${Result.Family})` : ''}`) : null,
+    Reachable && Result.Model
+      ? MonoRow('Model', `${Result.Model}${Result.Family ? ` (${Result.Family})` : ''}`)
+      : null,
     Reachable && Result.Serial ? MonoRow('Serial', Result.Serial) : null,
     Reachable && Result.Firmware ? MonoRow('Firmware', Result.Firmware) : null,
     Reachable && Result.UptimeSeconds != null
@@ -261,7 +263,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
 export const Name = 'Player Health (BrightSign)';
 export const Description =
-  'Reads firmware, power, PoE and uptime from a BrightSign player\'s Local DWS API and reports a single healthy / degraded verdict. Can optionally also check the video output.';
+  "Reads firmware, power, PoE and uptime from a BrightSign player's Local DWS API and reports a single healthy / degraded verdict. Can optionally also check the video output.";
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = { EvaluateHealth };
 export { ID, Settings, Run, Debug };

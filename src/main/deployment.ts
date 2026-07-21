@@ -61,7 +61,10 @@ async function GetAllAdoptedClientUUIDs(): Promise<string[]> {
   return normalizeDeploymentTargets(Clients.map((Client) => Client.UUID));
 }
 
-async function MarkDeploymentFailedForTargets(Targets: string[], ErrorMessage: string): Promise<void> {
+async function MarkDeploymentFailedForTargets(
+  Targets: string[],
+  ErrorMessage: string
+): Promise<void> {
   await ScriptExecutionManager.ClearQueue();
   for (const UUID of Targets) {
     const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(
@@ -135,7 +138,9 @@ async function TriggerScriptDeployment(TargetUUIDs: unknown, Reason = 'manual'):
   }
 
   const Scripts = (await ScriptManager.GetScripts()) || [];
-  const InvalidScripts = Scripts.filter((Script: DeploymentScriptInfo) => !Script || Script.isValid === false);
+  const InvalidScripts = Scripts.filter(
+    (Script: DeploymentScriptInfo) => !Script || Script.isValid === false
+  );
 
   if (InvalidScripts.length > 0) {
     const InvalidIDs = InvalidScripts.map((Script: DeploymentScriptInfo) => {
@@ -225,14 +230,16 @@ function ScheduleScriptChangeDeployment(): void {
 // tasks remain pending, the in-flight session is complete — clear it and flush
 // any deployment that was queued while it ran.
 function ReconcileDeploymentQueueAfterExecutions(Executions: DeploymentExecutionInfo[]): void {
-  const PendingScriptDeployments = (Executions || []).filter((Execution: DeploymentExecutionInfo) => {
-    return (
-      Execution &&
-      Execution.Script &&
-      Execution.Script.Name === 'Deploying Scripts' &&
-      Execution.Status === 'Pending'
-    );
-  });
+  const PendingScriptDeployments = (Executions || []).filter(
+    (Execution: DeploymentExecutionInfo) => {
+      return (
+        Execution &&
+        Execution.Script &&
+        Execution.Script.Name === 'Deploying Scripts' &&
+        Execution.Status === 'Pending'
+      );
+    }
+  );
 
   if (PendingScriptDeployments.length === 0) {
     const QueuedTargets = [...ActiveScriptDeployment.queuedTargets];

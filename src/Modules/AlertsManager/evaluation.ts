@@ -37,12 +37,8 @@ interface AlertContext {
 function isScopeMatch(Rule: AlertRule, Context: AlertContext): boolean {
   const Scope = Rule.Scope || {};
   const Workspace = !!Scope.Workspace;
-  const GroupIDs = new Set(
-    Array.isArray(Scope.Groups) ? Scope.Groups.map((x) => Number(x)) : []
-  );
-  const Clients = new Set(
-    Array.isArray(Scope.Clients) ? Scope.Clients.map((x) => String(x)) : []
-  );
+  const GroupIDs = new Set(Array.isArray(Scope.Groups) ? Scope.Groups.map((x) => Number(x)) : []);
+  const Clients = new Set(Array.isArray(Scope.Clients) ? Scope.Clients.map((x) => String(x)) : []);
 
   // Per-check alerts are strictly opt-in: they only fire when a rule explicitly
   // targets that check (check:<CheckID>). They intentionally ignore Workspace /

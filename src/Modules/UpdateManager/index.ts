@@ -135,7 +135,10 @@ function readManifest(): UpdateManifest | null {
     if (!parsed || !Array.isArray(parsed.assets)) return null;
     return parsed;
   } catch (err) {
-    Logger.warn('Failed to read update manifest:', err && (err as Error).message ? (err as Error).message : err);
+    Logger.warn(
+      'Failed to read update manifest:',
+      err && (err as Error).message ? (err as Error).message : err
+    );
     return null;
   }
 }
@@ -529,10 +532,13 @@ Manager.RegisterRoutes = (expressApp: ExpressLike) => {
     throw new Error('RegisterRoutes requires an express app instance');
   }
 
-  expressApp.get(`${PUBLIC_BASE_PATH}/status`, async (_req: ExpressRequest, res: ExpressResponse) => {
-    const status = await Manager.GetStatus();
-    res.json(status);
-  });
+  expressApp.get(
+    `${PUBLIC_BASE_PATH}/status`,
+    async (_req: ExpressRequest, res: ExpressResponse) => {
+      const status = await Manager.GetStatus();
+      res.json(status);
+    }
+  );
 
   expressApp.get(`${PUBLIC_BASE_PATH}/:fileName`, (req: ExpressRequest, res: ExpressResponse) => {
     const fileName = path.basename(String(req.params.fileName || ''));

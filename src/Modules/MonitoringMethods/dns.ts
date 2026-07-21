@@ -108,7 +108,10 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   try {
     Records = await Promise.race([Lookup, Timeout]);
   } catch (Err) {
-    return { Success: false, Error: Err && (Err as Error).message ? (Err as Error).message : String(Err) };
+    return {
+      Success: false,
+      Error: Err && (Err as Error).message ? (Err as Error).message : String(Err),
+    };
   }
 
   if (!Array.isArray(Records) || Records.length === 0) {
@@ -139,7 +142,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Address = Target && Target.Address ? String(Target.Address).trim() : '';
   const Cfg = (Target && Target.Settings) || {};
   const RecordType = (Result && Result.RecordType) || String(Cfg.RecordType || 'A').toUpperCase();
-  const Records: unknown[] = Array.isArray(Result && Result.Records) ? (Result.Records as unknown[]) : [];
+  const Records: unknown[] = Array.isArray(Result && Result.Records)
+    ? (Result.Records as unknown[])
+    : [];
   const Success = !!(Result && Result.Success);
   const Expected =
     (Result && Result.Expected) ||

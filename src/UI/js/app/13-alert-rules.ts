@@ -135,9 +135,7 @@ export function DefaultAlertTriggerTypes(): string[] {
 // Human-readable trigger names (from the loaded catalog) for a list of IDs.
 function triggerNamesByIDs(TriggerTypes: string[]): string[] {
   return TriggerTypes.map((ID) => {
-    const Match = (AlertTriggerTypesCache || []).find(
-      (T) => `${T.ID || ''}`.toUpperCase() === ID
-    );
+    const Match = (AlertTriggerTypesCache || []).find((T) => `${T.ID || ''}`.toUpperCase() === ID);
     return Match ? Match.Name : ID;
   });
 }
@@ -153,7 +151,8 @@ export function RenderAlertTriggerDropdown() {
   const SelectedNames = triggerNamesByIDs(Array.from(Selected));
   let ToggleText: string;
   if (!SelectedNames.length) ToggleText = 'Select triggers';
-  else if (SelectedNames.length === 1) ToggleText = SelectedNames[0]!; // length === 1
+  else if (SelectedNames.length === 1)
+    ToggleText = SelectedNames[0]!; // length === 1
   else ToggleText = `${SelectedNames[0]} +${SelectedNames.length - 1}`;
 
   $('#ALERT_RULE_TRIGGER_TOGGLE').html(

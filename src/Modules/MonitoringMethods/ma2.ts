@@ -150,7 +150,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
   const ExtraRows: Array<string | false | null | undefined> = [];
   if (Reachable) {
-    const LoginState = String(Result.LoginState || 'not-attempted') as keyof typeof LOGIN_STATE_LABELS;
+    const LoginState = String(
+      Result.LoginState || 'not-attempted'
+    ) as keyof typeof LOGIN_STATE_LABELS;
     if (LoginState !== 'not-attempted') {
       ExtraRows.push(TextRow('Remote login', LOGIN_STATE_LABELS[LoginState] || String(LoginState)));
     }
@@ -159,7 +161,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
         TextRow(
           'Software',
           String(Result.Ma2Version) +
-            (Options.CheckVersion && Options.ExpectedVersion ? ` (expected ${Options.ExpectedVersion}…)` : '')
+            (Options.CheckVersion && Options.ExpectedVersion
+              ? ` (expected ${Options.ExpectedVersion}…)`
+              : '')
         )
       );
     }
@@ -168,7 +172,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
         TextRow(
           'Show file',
           String(Result.ShowFile) +
-            (Options.CheckShow && Options.ExpectedShow ? ` (expected "${Options.ExpectedShow}")` : '')
+            (Options.CheckShow && Options.ExpectedShow
+              ? ` (expected "${Options.ExpectedShow}")`
+              : '')
         )
       );
     }

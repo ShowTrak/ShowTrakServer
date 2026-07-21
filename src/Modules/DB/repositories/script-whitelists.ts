@@ -11,9 +11,7 @@ import type { ScriptWhitelistRow } from '../rows';
 export function CreateScriptWhitelistRepository(DB: DBManager) {
   return {
     LoadAll(): Promise<DBResult<ScriptWhitelistRow[]>> {
-      return DB.All<ScriptWhitelistRow>(
-        'SELECT ScriptID, Scope, UpdatedAt FROM ScriptWhitelists'
-      );
+      return DB.All<ScriptWhitelistRow>('SELECT ScriptID, Scope, UpdatedAt FROM ScriptWhitelists');
     },
     Get(ScriptID: string): Promise<DBResult<ScriptWhitelistRow>> {
       return DB.Get<ScriptWhitelistRow>(
@@ -34,10 +32,10 @@ export function CreateScriptWhitelistRepository(DB: DBManager) {
     // row already sitting at the destination ID (e.g. a deleted-then-recreated
     // script). Returns without touching anything if the source has no row.
     Rename(OldScriptID: string, NewScriptID: string): Promise<DBResult<unknown>> {
-      return DB.Run(
-        'UPDATE OR REPLACE ScriptWhitelists SET ScriptID = ? WHERE ScriptID = ?',
-        [NewScriptID, OldScriptID]
-      );
+      return DB.Run('UPDATE OR REPLACE ScriptWhitelists SET ScriptID = ? WHERE ScriptID = ?', [
+        NewScriptID,
+        OldScriptID,
+      ]);
     },
   };
 }

@@ -30,7 +30,15 @@ import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } f
 const ID = 'qlab5';
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'OSC Port', Type: 'number', Default: DEFAULT_OSC_PORT, Min: 1, Max: 65535, Required: true },
+  {
+    Key: 'Port',
+    Label: 'OSC Port',
+    Type: 'number',
+    Default: DEFAULT_OSC_PORT,
+    Min: 1,
+    Max: 65535,
+    Required: true,
+  },
   {
     Key: 'Workspace',
     Label: 'Workspace name / filename or unique ID',
@@ -144,7 +152,8 @@ interface HealthOptions {
 }
 
 function AsList(Value: unknown): string[] {
-  if (Array.isArray(Value)) return Value.map((V) => String(V == null ? '' : V).trim()).filter(Boolean);
+  if (Array.isArray(Value))
+    return Value.map((V) => String(V == null ? '' : V).trim()).filter(Boolean);
   if (Value == null || Value === '') return [];
   return [String(Value).trim()].filter(Boolean);
 }
@@ -215,9 +224,7 @@ export function EvaluateHealth(Snapshot: QLabSnapshot, Options: HealthOptions): 
         Key: 'mode',
         Label: 'Workspace mode',
         Ok,
-        Detail: Ok
-          ? `In ${Actual} mode`
-          : `In ${Actual} mode (expected ${Options.ExpectedMode})`,
+        Detail: Ok ? `In ${Actual} mode` : `In ${Actual} mode (expected ${Options.ExpectedMode})`,
       });
     }
   }
@@ -247,7 +254,12 @@ export function EvaluateHealth(Snapshot: QLabSnapshot, Options: HealthOptions): 
   if (Options.CheckOverrides) {
     const Known = OVERRIDE_KEYS.filter((K) => Snapshot.Overrides[K] != null);
     if (!Known.length) {
-      Out.push({ Key: 'overrides', Label: 'Overrides', Ok: null, Detail: 'Override states unknown' });
+      Out.push({
+        Key: 'overrides',
+        Label: 'Overrides',
+        Ok: null,
+        Detail: 'Override states unknown',
+      });
     } else {
       const Engaged = Known.filter((K) => Snapshot.Overrides[K] === false);
       Out.push({
@@ -265,8 +277,7 @@ export function EvaluateHealth(Snapshot: QLabSnapshot, Options: HealthOptions): 
 }
 
 function FriendlyOverride(Key: string): string {
-  return Key
-    .replace(/Enabled$/, '')
+  return Key.replace(/Enabled$/, '')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/^msc/i, 'MSC')
     .replace(/^midi/i, 'MIDI')
@@ -289,7 +300,8 @@ function ResolveConnectionParams(Target: MonitoringTargetLike): {
   const Workspace = Cfg.Workspace == null ? '' : String(Cfg.Workspace).trim();
   const Passcode = Cfg.Passcode == null ? '' : String(Cfg.Passcode);
   if (!Address) return { Address, Port, Workspace, Passcode, Error: 'No address configured' };
-  if (!IsValidPort(Port)) return { Address, Port, Workspace, Passcode, Error: `Invalid port: ${Port}` };
+  if (!IsValidPort(Port))
+    return { Address, Port, Workspace, Passcode, Error: `Invalid port: ${Port}` };
   // Workspace is optional: blank means "use whichever workspace is open".
   return { Address, Port, Workspace, Passcode };
 }
@@ -319,11 +331,16 @@ function Run(Target: MonitoringTargetLike): MonitoringResult {
 
   // Not yet usable: still connecting, unreachable, or the workspace isn't open.
   if (!Snapshot.WorkspaceID) {
-    const Error = Snapshot.Error || (Snapshot.Connected ? 'Workspace not open in QLab' : 'Connecting to QLab…');
+    const Error =
+      Snapshot.Error || (Snapshot.Connected ? 'Workspace not open in QLab' : 'Connecting to QLab…');
     return { Success: false, Error, ...SnapshotExtras(Snapshot, []) };
   }
   if (Snapshot.Stale) {
-    return { Success: false, Error: 'No recent response from QLab', ...SnapshotExtras(Snapshot, []) };
+    return {
+      Success: false,
+      Error: 'No recent response from QLab',
+      ...SnapshotExtras(Snapshot, []),
+    };
   }
 
   const Sub = EvaluateHealth(Snapshot, ParseHealthOptions(Target));
@@ -331,7 +348,9 @@ function Run(Target: MonitoringTargetLike): MonitoringResult {
 
   return {
     Success: true,
-    ...(Failing.length ? { Degraded: true, DegradedReason: Failing.map((S) => S.Detail).join('; ') } : {}),
+    ...(Failing.length
+      ? { Degraded: true, DegradedReason: Failing.map((S) => S.Detail).join('; ') }
+      : {}),
     ...SnapshotExtras(Snapshot, Sub),
   };
 }
@@ -372,7 +391,11 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     return (
       Head +
       '<div class="mt-2">' +
-      Note(Online ? 'No workspace assertions enabled — reporting reachability only' : 'Not connected to the workspace yet') +
+      Note(
+        Online
+          ? 'No workspace assertions enabled — reporting reachability only'
+          : 'Not connected to the workspace yet'
+      ) +
       '</div>'
     );
   }

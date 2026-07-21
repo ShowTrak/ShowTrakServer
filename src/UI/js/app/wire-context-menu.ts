@@ -9,7 +9,14 @@ import { AllClients, ScriptList, Selected, setScriptList } from './01-state';
 import { GetSettingValue } from './03-settings';
 import { HandleNonFatalError, Safe } from './04-utils';
 import { ExecuteScript, TriggerIntegratedEvent } from './11-modals';
-import { ApplyIdentifyStateLocally, ConfirmationDialog, GetIdentifyTargetByUUID, Notify, ShowExecutionToast, StopIdentifyingForUUIDs } from './14-selection-init';
+import {
+  ApplyIdentifyStateLocally,
+  ConfirmationDialog,
+  GetIdentifyTargetByUUID,
+  Notify,
+  ShowExecutionToast,
+  StopIdentifyingForUUIDs,
+} from './14-selection-init';
 import { ClearSelection, Select, SelectAll } from './selection';
 
 // One row in the right-click / mobile context menu. `Type` selects how the row
@@ -286,9 +293,7 @@ export function wireContextMenu() {
               'info'
             );
             try {
-              await Promise.all(
-                DummyUUIDs.map((UUID) => window.API.ResetDummyClientToIdle(UUID))
-              );
+              await Promise.all(DummyUUIDs.map((UUID) => window.API.ResetDummyClientToIdle(UUID)));
             } catch (err) {
               HandleNonFatalError('SelectionInit:ResetDummyToIdle', err);
             }

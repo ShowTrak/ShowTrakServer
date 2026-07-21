@@ -110,7 +110,8 @@ export function ParseQLabReply(Message: OscMessage): QLabReply | null {
   try {
     const Obj = JSON.parse(Arg) as Record<string, unknown>;
     if (!Obj || typeof Obj !== 'object') return null;
-    const Address = typeof Obj.address === 'string' ? Obj.address : Message.Address.replace(/^\/reply/, '');
+    const Address =
+      typeof Obj.address === 'string' ? Obj.address : Message.Address.replace(/^\/reply/, '');
     return {
       Address,
       Status: typeof Obj.status === 'string' ? Obj.status : 'ok',
@@ -255,7 +256,9 @@ class QLabConnectionManagerImpl {
 
     Socket.on('data', (Chunk: Buffer) => this.OnData(Conn, Chunk));
     Socket.once('timeout', () => this.Drop(Conn, 'Connection timed out'));
-    Socket.once('error', (Err: Error) => this.Drop(Conn, Err && Err.message ? Err.message : String(Err)));
+    Socket.once('error', (Err: Error) =>
+      this.Drop(Conn, Err && Err.message ? Err.message : String(Err))
+    );
     Socket.once('close', () => {
       if (Conn.Socket === Socket && Conn.State !== 'failed') this.Drop(Conn, 'Connection closed');
     });
@@ -320,7 +323,9 @@ class QLabConnectionManagerImpl {
       const Match = (
         Wanted
           ? List.find((W) => WorkspaceMatches(W, Wanted))
-          : List.find((W) => W && typeof W === 'object' && (W as QLabWorkspaceInfo).uniqueID != null)
+          : List.find(
+              (W) => W && typeof W === 'object' && (W as QLabWorkspaceInfo).uniqueID != null
+            )
       ) as QLabWorkspaceInfo | undefined;
       if (Match) {
         Snap.WorkspaceFound = true;
@@ -427,7 +432,8 @@ class QLabConnectionManagerImpl {
       }
       Conn.Socket = null;
     }
-    if (WasReady) Logger.warn(`QLab connection to ${Conn.Params.Address}:${Conn.Params.Port} lost: ${Reason}`);
+    if (WasReady)
+      Logger.warn(`QLab connection to ${Conn.Params.Address}:${Conn.Params.Port} lost: ${Reason}`);
     this.ScheduleReconnect(Conn);
   }
 
@@ -435,7 +441,10 @@ class QLabConnectionManagerImpl {
     if (Conn.ReconnectTimer) return;
     // Only reconnect while there is still interest in this target.
     if (Date.now() - Conn.LastInterestAt > INTEREST_TTL_MS) return;
-    const Delay = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** Math.min(6, Conn.ReconnectAttempts));
+    const Delay = Math.min(
+      RECONNECT_MAX_MS,
+      RECONNECT_BASE_MS * 2 ** Math.min(6, Conn.ReconnectAttempts)
+    );
     Conn.ReconnectAttempts += 1;
     Conn.ReconnectTimer = setTimeout(() => {
       Conn.ReconnectTimer = null;

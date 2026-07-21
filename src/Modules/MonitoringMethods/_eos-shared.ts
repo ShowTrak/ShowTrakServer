@@ -139,8 +139,7 @@ export async function QueryEosStatus(
       resolve(Result);
     };
 
-    const Fail = (Error0: string) =>
-      Finish({ Reachable: false, Error: Error0, ...EMPTY_SNAPSHOT });
+    const Fail = (Error0: string) => Finish({ Reachable: false, Error: Error0, ...EMPTY_SNAPSHOT });
 
     // We have what we need once the ping has echoed and the version is known.
     // Counts are best-effort within the window.
@@ -296,8 +295,15 @@ export async function RunEosProbe(
   }
 
   const Snapshot = (await EOS_QUERY_CACHE.GetOrCreate(
-    BuildEosQueryCacheKey(Config.Address, Config.Port, Config.Framing, Config.OscUser, Config.TimeoutMs),
-    () => QueryEosStatus(Config.Address, Config.Port, Config.Framing, Config.OscUser, Config.TimeoutMs),
+    BuildEosQueryCacheKey(
+      Config.Address,
+      Config.Port,
+      Config.Framing,
+      Config.OscUser,
+      Config.TimeoutMs
+    ),
+    () =>
+      QueryEosStatus(Config.Address, Config.Port, Config.Framing, Config.OscUser, Config.TimeoutMs),
     { ttlMs: ResolveEosQueryCacheTtlMs(Config.TimeoutMs) }
   )) as EosSnapshot;
 

@@ -30,7 +30,15 @@ const MAX_TIMEOUT_MS = 60000;
 const MAX_PAYLOAD_CHARS = 256;
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'Port', Type: 'number', Default: DEFAULT_PORT, Min: 1, Max: 65535, Required: true },
+  {
+    Key: 'Port',
+    Label: 'Port',
+    Type: 'number',
+    Default: DEFAULT_PORT,
+    Min: 1,
+    Max: 65535,
+    Required: true,
+  },
   {
     Key: 'Topic',
     Label: 'Topic filter',
@@ -301,7 +309,10 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     TextRow('Protocol', Protocol),
     TextRow('Topic', Topic || '—'),
     Row('Connection', StatePill),
-    Row('Message', Pill(MessageReceived ? 'success' : 'muted', MessageReceived ? 'Received' : 'None')),
+    Row(
+      'Message',
+      Pill(MessageReceived ? 'success' : 'muted', MessageReceived ? 'Received' : 'None')
+    ),
     Result && (Result.Success || Result.Degraded)
       ? Row('Latency', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'Could not connect'),
@@ -312,7 +323,11 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     return (
       Head +
       '<div class="mt-2">' +
-      Note(Connected ? 'Connected to broker but no message arrived on the topic' : 'Could not connect to the broker') +
+      Note(
+        Connected
+          ? 'Connected to broker but no message arrived on the topic'
+          : 'Could not connect to the broker'
+      ) +
       '</div>'
     );
   }

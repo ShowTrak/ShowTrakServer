@@ -24,8 +24,22 @@ import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } f
 const ID = 'snmp-ups';
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'Port', Type: 'number', Default: DEFAULT_PORT, Min: 1, Max: 65535, Required: true },
-  { Key: 'Community', Label: 'Community string', Type: 'string', Default: 'public', Required: true },
+  {
+    Key: 'Port',
+    Label: 'Port',
+    Type: 'number',
+    Default: DEFAULT_PORT,
+    Min: 1,
+    Max: 65535,
+    Required: true,
+  },
+  {
+    Key: 'Community',
+    Label: 'Community string',
+    Type: 'string',
+    Default: 'public',
+    Required: true,
+  },
   {
     Key: 'Version',
     Label: 'SNMP version',
@@ -156,7 +170,11 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
       retries: Config.Retries,
     });
 
-  return RunUpsHealth(CreateSession, Config.OutputIndex, ParseThresholds((Target && Target.Settings) || {}));
+  return RunUpsHealth(
+    CreateSession,
+    Config.OutputIndex,
+    ParseThresholds((Target && Target.Settings) || {})
+  );
 }
 
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {

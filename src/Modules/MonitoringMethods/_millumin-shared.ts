@@ -365,7 +365,12 @@ export interface EvaluateParams {
 }
 
 // Most-recent OSC message from a source that is both fresh and passes the filter.
-function NewestMatching(Src: MilluminSource, Filter: string, GraceMs: number, Now: number): MilluminMessage | null {
+function NewestMatching(
+  Src: MilluminSource,
+  Filter: string,
+  GraceMs: number,
+  Now: number
+): MilluminMessage | null {
   let Best: MilluminMessage | null = null;
   for (const M of Src.Recent) {
     if (Now - M.ReceivedAt > GraceMs) continue;
@@ -385,13 +390,23 @@ export function EvaluateMillumin(P: EvaluateParams): MonitoringResult {
   };
 
   if (P.Snapshot.Error) {
-    return { Success: false, Error: `Millumin OSC listener error: ${P.Snapshot.Error}`, ...Base, Sources: [] };
+    return {
+      Success: false,
+      Error: `Millumin OSC listener error: ${P.Snapshot.Error}`,
+      ...Base,
+      Sources: [],
+    };
   }
 
   // Snapshot of fresh, filter-matching activity per source for Debug().
-  const FreshSources = P.Snapshot.Sources.map((S) => ({ Source: S, Newest: NewestMatching(S, P.AddressFilter, P.GracePeriodMs, P.Now) }))
+  const FreshSources = P.Snapshot.Sources.map((S) => ({
+    Source: S,
+    Newest: NewestMatching(S, P.AddressFilter, P.GracePeriodMs, P.Now),
+  }))
     .filter((X) => X.Newest !== null)
-    .sort((A, B) => (B.Newest as MilluminMessage).ReceivedAt - (A.Newest as MilluminMessage).ReceivedAt);
+    .sort(
+      (A, B) => (B.Newest as MilluminMessage).ReceivedAt - (A.Newest as MilluminMessage).ReceivedAt
+    );
   const WithSources = { ...Base, Sources: P.Snapshot.Sources };
 
   const FromTarget = FreshSources.find((X) => AddressesEqual(X.Source.Address, P.Address));
@@ -434,7 +449,9 @@ export function RunMillumin(Target: MonitoringTargetLike): MonitoringResult {
   if (!Address) return { Success: false, Error: 'No address configured' };
 
   const Cfg = (Target && Target.Settings) || {};
-  const ListenPort = Number.isFinite(Cfg.ListenPort) ? (Cfg.ListenPort as number) | 0 : DEFAULT_LISTEN_PORT;
+  const ListenPort = Number.isFinite(Cfg.ListenPort)
+    ? (Cfg.ListenPort as number) | 0
+    : DEFAULT_LISTEN_PORT;
   if (ListenPort < MIN_PORT || ListenPort > MAX_PORT) {
     return { Success: false, Error: `Invalid listen port: ${ListenPort}` };
   }
@@ -466,8 +483,9 @@ export function BuildMilluminDebug(Result: MonitoringResult, Target: MonitoringT
         ? (Cfg.ListenPort as number) | 0
         : DEFAULT_LISTEN_PORT;
   const AddressFilter =
-    (Result && typeof Result.AddressFilter === 'string' ? (Result.AddressFilter as string) : null) ??
-    (Cfg.AddressFilter == null ? '' : String(Cfg.AddressFilter).trim());
+    (Result && typeof Result.AddressFilter === 'string'
+      ? (Result.AddressFilter as string)
+      : null) ?? (Cfg.AddressFilter == null ? '' : String(Cfg.AddressFilter).trim());
 
   const Online = !!(Result && Result.Success);
   const StatusPill = Online ? Pill('success', 'Receiving') : Pill('danger', 'Not receiving');
@@ -479,7 +497,10 @@ export function BuildMilluminDebug(Result: MonitoringResult, Target: MonitoringT
     AddressFilter ? TextRow('Address filter', AddressFilter) : null,
     Row('Status', StatusPill),
     Online
-      ? Row('Last OSC age', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
+      ? Row(
+          'Last OSC age',
+          `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`
+        )
       : Result && Result.Error
         ? TextRow('Detail', Result.Error as string)
         : null,
@@ -500,7 +521,13 @@ export function BuildMilluminDebug(Result: MonitoringResult, Target: MonitoringT
     ? (Result.Sources as MilluminSource[])
     : [];
   if (!Sources.length) {
-    return Head + '<div class="mt-2">' + Note('No OSC activity observed on this port') + '</div>' + ConfigNote;
+    return (
+      Head +
+      '<div class="mt-2">' +
+      Note('No OSC activity observed on this port') +
+      '</div>' +
+      ConfigNote
+    );
   }
 
   const List = Sources.map((S) => {

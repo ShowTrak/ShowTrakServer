@@ -353,7 +353,8 @@ function renderScopeGroupNode(
   );
   const SelectedCount = Group.ChildValues.filter((Value) => SelectedValues.has(Value)).length;
   const FullySelected =
-    ExplicitlySelected || (Group.ChildValues.length > 0 && SelectedCount === Group.ChildValues.length);
+    ExplicitlySelected ||
+    (Group.ChildValues.length > 0 && SelectedCount === Group.ChildValues.length);
   const Indeterminate = !FullySelected && SelectedCount > 0;
   const ChildrenHtml = Group.Children.map((Entity) =>
     renderScopeClientNode(Entity, SelectedValues)

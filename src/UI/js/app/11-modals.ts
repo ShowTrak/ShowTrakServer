@@ -226,8 +226,7 @@ export async function OpenAboutModal() {
     const [Err, Payload] = await window.API.GetLicense();
     if (Err) throw new Error(Err);
 
-    const License =
-      Payload && typeof Payload.license === 'string' ? Payload.license : '';
+    const License = Payload && typeof Payload.license === 'string' ? Payload.license : '';
     if (!License.trim()) throw new Error('Empty licence');
 
     LicenseText.text(License);

@@ -87,7 +87,9 @@ export function EvaluateHealth(Readings: HealthReadings, T: HealthThresholds): s
   }
 
   if (Readings.AlarmsPresent != null && Readings.AlarmsPresent > 0) {
-    Reasons.push(`${Readings.AlarmsPresent} active alarm${Readings.AlarmsPresent === 1 ? '' : 's'}`);
+    Reasons.push(
+      `${Readings.AlarmsPresent} active alarm${Readings.AlarmsPresent === 1 ? '' : 's'}`
+    );
   }
   if (T.CheckCharge !== false && Readings.Charge != null && Readings.Charge < T.MinCharge) {
     Reasons.push(`Charge ${Readings.Charge}% < ${T.MinCharge}%`);
@@ -294,7 +296,8 @@ export function UpsDebug(
   IdentityRows: Array<string | false | null | undefined>
 ): string {
   const Reachable = !!(Result && Result.Success === true);
-  const Fmt = (Value: unknown, Suffix: string): string => (Value == null ? '—' : `${Value}${Suffix}`);
+  const Fmt = (Value: unknown, Suffix: string): string =>
+    Value == null ? '—' : `${Value}${Suffix}`;
 
   const Head = Rows([
     TextRow('Host', `${Address || '—'}:${Port}`),
@@ -304,17 +307,31 @@ export function UpsDebug(
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'No SNMP reply'),
     Reachable && Result.BatteryStatus != null
-      ? MonoRow('Battery status', BATTERY_STATUS_LABELS[Result.BatteryStatus as number] || String(Result.BatteryStatus))
+      ? MonoRow(
+          'Battery status',
+          BATTERY_STATUS_LABELS[Result.BatteryStatus as number] || String(Result.BatteryStatus)
+        )
       : null,
     Reachable && Result.OutputSource != null
-      ? MonoRow('Output source', OUTPUT_SOURCE_LABELS[Result.OutputSource as number] || String(Result.OutputSource))
+      ? MonoRow(
+          'Output source',
+          OUTPUT_SOURCE_LABELS[Result.OutputSource as number] || String(Result.OutputSource)
+        )
       : null,
     Reachable ? MonoRow('Charge', Fmt(Result.BatteryCharge, '%')) : null,
-    Reachable && Result.MinutesRemaining != null ? MonoRow('Runtime', Fmt(Result.MinutesRemaining, ' min')) : null,
+    Reachable && Result.MinutesRemaining != null
+      ? MonoRow('Runtime', Fmt(Result.MinutesRemaining, ' min'))
+      : null,
     Reachable ? MonoRow('Load', Fmt(Result.Load, '%')) : null,
-    Reachable && Result.Temperature != null ? MonoRow('Battery temp', Fmt(Result.Temperature, '°C')) : null,
-    Reachable && Result.InputVoltage != null ? MonoRow('Input', Fmt(Result.InputVoltage, ' V')) : null,
-    Reachable && Result.AlarmsPresent != null ? MonoRow('Alarms', String(Result.AlarmsPresent)) : null,
+    Reachable && Result.Temperature != null
+      ? MonoRow('Battery temp', Fmt(Result.Temperature, '°C'))
+      : null,
+    Reachable && Result.InputVoltage != null
+      ? MonoRow('Input', Fmt(Result.InputVoltage, ' V'))
+      : null,
+    Reachable && Result.AlarmsPresent != null
+      ? MonoRow('Alarms', String(Result.AlarmsPresent))
+      : null,
   ]);
   if (!Reachable) {
     return Head + '<div class="mt-2">' + Note('Could not reach the UPS over SNMP') + '</div>';

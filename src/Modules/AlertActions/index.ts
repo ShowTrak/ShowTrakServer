@@ -83,7 +83,10 @@ const Manager = {
     return Normalized;
   },
 
-  Execute: async (ActionConfig: AlertActionInput, Context: AlertContext): Promise<AlertActionResult> => {
+  Execute: async (
+    ActionConfig: AlertActionInput,
+    Context: AlertContext
+  ): Promise<AlertActionResult> => {
     const Type = ActionConfig && ActionConfig.Type ? ActionConfig.Type : null;
     const Action = Type ? Actions.get(Type) : null;
     if (!Action || !Type) return { Success: false, Error: `Unknown alert action: ${Type}` };

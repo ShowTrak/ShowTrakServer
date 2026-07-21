@@ -154,10 +154,7 @@ const Manager = {
     // the whole create.
     const GroupID = Number((Res as { lastID?: number } | null)?.lastID);
     if (Number.isFinite(GroupID) && GroupID > 0) {
-      const Slug = await SlugService.GenerateUniqueGroupSlug(
-        Title,
-        `group:${GroupID}`
-      );
+      const Slug = await SlugService.GenerateUniqueGroupSlug(Title, `group:${GroupID}`);
       const [SlugErr] = await GroupsRepo.UpdateSlug(GroupID, Slug);
       if (SlugErr) Logger.error('Failed to persist new group slug:', SlugErr);
     }
@@ -269,9 +266,7 @@ const Manager = {
   },
 
   // Persist a new ordering by reassigning Group.Weight in display order.
-  async SetOrder(
-    OrderedGroupIDs: unknown[] = []
-  ): Promise<{ ok: boolean; errors?: string[] }> {
+  async SetOrder(OrderedGroupIDs: unknown[] = []): Promise<{ ok: boolean; errors?: string[] }> {
     if (!Array.isArray(OrderedGroupIDs)) return { ok: false, errors: ['Invalid order'] };
 
     const [Err, Rows] = await GroupsRepo.GetAllIDs();

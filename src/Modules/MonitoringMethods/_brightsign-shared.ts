@@ -358,7 +358,8 @@ export interface DwsResponse {
 // Unwrap the {"data":{"result": ...}} envelope. Returns undefined when the body
 // is not shaped like a DWS response.
 export function UnwrapResult(Json: unknown): unknown {
-  const Data = (Json as Record<string, unknown> | null)?.data as Record<string, unknown> | undefined;
+  const Data = (Json as Record<string, unknown> | null)?.data as
+    Record<string, unknown> | undefined;
   if (!Data || typeof Data !== 'object') return undefined;
   if (!('result' in Data)) return undefined;
   return Data.result;
@@ -554,8 +555,7 @@ export async function RunBrightSignProbe(
 // answer 404 there, and /info advertises the capability via api_features.video.
 export function HasVideoApi(Payload: unknown): boolean {
   const Features = (Payload as Record<string, unknown> | null)?.api_features as
-    | Record<string, unknown>
-    | undefined;
+    Record<string, unknown> | undefined;
   return !!(Features && Features.video === true);
 }
 
@@ -570,8 +570,7 @@ export function ReadPower(Payload: unknown): PowerState {
   const Node = SubResult(Payload, 'power');
   if (Node.Error) return { Source: null, Battery: null, SwitchMode: null, Error: Node.Error };
   const Value = (Node.Value || {}) as Record<string, unknown>;
-  const Str = (Key: string): string | null =>
-    Value[Key] == null ? null : String(Value[Key]);
+  const Str = (Key: string): string | null => (Value[Key] == null ? null : String(Value[Key]));
   return { Source: Str('source'), Battery: Str('battery'), SwitchMode: Str('switch_mode') };
 }
 
@@ -582,8 +581,12 @@ export function ClassifyPower(
   Source: unknown,
   Battery: unknown
 ): { Degraded: boolean; Reason?: string } {
-  const S = String(Source ?? '').trim().toLowerCase();
-  const B = String(Battery ?? '').trim().toLowerCase();
+  const S = String(Source ?? '')
+    .trim()
+    .toLowerCase();
+  const B = String(Battery ?? '')
+    .trim()
+    .toLowerCase();
 
   if (B.includes('discharg')) return { Degraded: true, Reason: 'Battery discharging' };
   if (B.includes('low')) return { Degraded: true, Reason: 'Battery low' };

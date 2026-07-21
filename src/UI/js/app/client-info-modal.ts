@@ -2,11 +2,7 @@
 // RenderClientInfoDetails (renders every tab/section). Extracted from
 // 14-selection-init.ts (REFACTOR_PLAN.md Phase 7). Imports are added below;
 // cross-references back into 14-selection-init are call-time only (safe cycle).
-import type {
-  ClientView,
-  ClientDisplayView,
-  RunningApplicationsStatus,
-} from '@showtrak/protocol';
+import type { ClientView, ClientDisplayView, RunningApplicationsStatus } from '@showtrak/protocol';
 import { openModal } from './lib/modal';
 import {
   ClientInfoOpenUUID,
@@ -29,12 +25,7 @@ import {
   RenderMonitoringHistoryModal,
 } from './07-monitoring';
 import { CloseAllModals } from './11-modals';
-import {
-  IsVersionAtLeast,
-  MINIMUM_DISPLAY_MONITORING_VERSION,
-  Notify,
-} from './14-selection-init';
-
+import { IsVersionAtLeast, MINIMUM_DISPLAY_MONITORING_VERSION, Notify } from './14-selection-init';
 
 // The renderer-facing DisplayList is enriched in-place by the client's
 // critical-marking machinery with connection/mismatch annotations that the
@@ -108,9 +99,9 @@ export async function OpenClientInfo(UUID: string) {
 
   // Drive the shared status-timeline graph (same modal used by monitoring
   // targets and dummy clients) for this client.
-    setMonitorHistoryModalContext({ type: 'client', id: UUID });
-    setMonitorHistorySeries([]);
-    setMonitorHistoryTooltipHover(null);
+  setMonitorHistoryModalContext({ type: 'client', id: UUID });
+  setMonitorHistorySeries([]);
+  setMonitorHistoryTooltipHover(null);
   try {
     await LoadHistorySamplesForContext();
   } catch (err) {
@@ -258,21 +249,21 @@ export async function OpenClientInfo(UUID: string) {
     });
 
   // mark modal as open for this UUID and clear when hidden
-    setClientInfoOpenUUID(UUID);
+  setClientInfoOpenUUID(UUID);
   try {
     const $modal = $('#SHOWTRAK_CLIENT_INFO');
     $modal.off('hidden.bs.modal.clientinfo').on('hidden.bs.modal.clientinfo', function () {
-            setClientInfoOpenUUID(null);
+      setClientInfoOpenUUID(null);
       if (ClientInfoRefreshTimer) {
         clearInterval(ClientInfoRefreshTimer);
-                setClientInfoRefreshTimer(null);
+        setClientInfoRefreshTimer(null);
       }
-            set__clientInfoRefreshInFlight(false);
+      set__clientInfoRefreshInFlight(false);
 
       // Shared status-timeline modal state teardown.
-            setMonitorHistoryModalContext(null);
-            setMonitorHistorySeries([]);
-            setMonitorHistoryTooltipHover(null);
+      setMonitorHistoryModalContext(null);
+      setMonitorHistorySeries([]);
+      setMonitorHistoryTooltipHover(null);
       HideStatusTimelineTooltip();
 
       // Dispose all popovers to prevent stuck state
@@ -296,20 +287,22 @@ export async function OpenClientInfo(UUID: string) {
   try {
     if (ClientInfoRefreshTimer) {
       clearInterval(ClientInfoRefreshTimer);
-            setClientInfoRefreshTimer(null);
+      setClientInfoRefreshTimer(null);
     }
-        setClientInfoRefreshTimer(setInterval(async () => {
-      if (!ClientInfoOpenUUID) return;
-      if (__clientInfoRefreshInFlight) return;
-            set__clientInfoRefreshInFlight(true);
-      try {
-        const fresh = await window.API.GetClient(ClientInfoOpenUUID);
-        if (fresh) RenderClientInfoDetails(fresh);
-      } catch (err) {
-        HandleNonFatalError('SelectionInit:NonFatal', err);
-      }
-            set__clientInfoRefreshInFlight(false);
-    }, 4000));
+    setClientInfoRefreshTimer(
+      setInterval(async () => {
+        if (!ClientInfoOpenUUID) return;
+        if (__clientInfoRefreshInFlight) return;
+        set__clientInfoRefreshInFlight(true);
+        try {
+          const fresh = await window.API.GetClient(ClientInfoOpenUUID);
+          if (fresh) RenderClientInfoDetails(fresh);
+        } catch (err) {
+          HandleNonFatalError('SelectionInit:NonFatal', err);
+        }
+        set__clientInfoRefreshInFlight(false);
+      }, 4000)
+    );
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
   }
@@ -685,8 +678,7 @@ export function RenderClientInfoDetails(Client: ClientView) {
     const apps = Array.isArray(Client?.RunningApplications?.Items)
       ? Client.RunningApplications.Items
       : [];
-    const appStatus: Partial<RunningApplicationsStatus> =
-      Client?.RunningApplications?.Status || {};
+    const appStatus: Partial<RunningApplicationsStatus> = Client?.RunningApplications?.Status || {};
     const appStatusState =
       typeof appStatus.State === 'string' && appStatus.State.trim().length > 0
         ? appStatus.State.trim().toLowerCase()

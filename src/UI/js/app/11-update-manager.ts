@@ -4,9 +4,9 @@
 // download + deploy orchestration, and the live progress/status rendering. The
 // single former call to 11-modals' CloseAllModals is inlined here as
 // closeAllModals()+Wait so this module has no back-reference into 11-modals.
-import { closeAllModals, openModal } from "./lib/modal";
-import { ErrorMessage, Safe } from "./04-utils";
-import { Notify, ShowExecutionToast, Wait } from "./14-selection-init";
+import { closeAllModals, openModal } from './lib/modal';
+import { ErrorMessage, Safe } from './04-utils';
+import { Notify, ShowExecutionToast, Wait } from './14-selection-init';
 import {
   FormatClientVersionLabel,
   UpdateManagerClientProgress,
@@ -24,8 +24,8 @@ import {
   setUpdateManagerRunning,
   setUpdateManagerSelectedClients,
   setUpdateManagerSelectedReleaseTag,
-} from "./01-state";
-import type { ClientView, ScriptExecutionView } from "@showtrak/protocol";
+} from './01-state';
+import type { ClientView, ScriptExecutionView } from '@showtrak/protocol';
 
 export function FindClientExecutionForUpdate(UUID: string): ScriptExecutionView | null {
   if (!UpdateManagerClientProgress || !(UpdateManagerClientProgress instanceof Map)) return null;
@@ -120,7 +120,7 @@ export function ResetUpdateManagerClientSelectionDefaults() {
     }
   }
 
-    setUpdateManagerSelectedClients(next);
+  setUpdateManagerSelectedClients(next);
 }
 
 export function GetSelectedUpdateManagerDeployTargets() {
@@ -205,7 +205,7 @@ export function RenderUpdateManagerReleaseOptions() {
     UpdateManagerSelectedReleaseTag || downloadedTag || (options[0] && options[0].tag) || '';
   if (targetTag) {
     $select.val(targetTag);
-        setUpdateManagerSelectedReleaseTag(String($select.val() || targetTag));
+    setUpdateManagerSelectedReleaseTag(String($select.val() || targetTag));
   }
 
   RenderUpdateManagerReleaseBadge();
@@ -218,13 +218,13 @@ export async function RefreshUpdateManagerReleaseOptions() {
     return;
   }
 
-    setUpdateManagerReleaseOptions(Array.isArray(List) ? List : []);
+  setUpdateManagerReleaseOptions(Array.isArray(List) ? List : []);
   RenderUpdateManagerReleaseOptions();
 }
 
 export function ApplyUpdateManagerButtonLocks() {
   const selectedTag = GetSelectedUpdateManagerReleaseTag();
-    setUpdateManagerSelectedReleaseTag(selectedTag);
+  setUpdateManagerSelectedReleaseTag(selectedTag);
   const SelectedTargets = GetSelectedUpdateManagerDeployTargets();
   const HasReadyBuild = !!(
     UpdateManagerReleaseStatus &&
@@ -311,7 +311,7 @@ export function RenderUpdateManagerClientList() {
   const selectedTag = GetSelectedUpdateManagerReleaseTag();
   const manualUpdateClients: ReturnType<typeof Safe>[] = [];
   if (!(UpdateManagerSelectedClients instanceof Set)) {
-        setUpdateManagerSelectedClients(new Set(UpdateManagerSelectedClients || []));
+    setUpdateManagerSelectedClients(new Set(UpdateManagerSelectedClients || []));
   }
 
   for (const Client of Clients) {
@@ -389,7 +389,7 @@ export function RenderUpdateManagerClientList() {
 
 export function UpdateManagerHandleExecutions(Executions: ScriptExecutionView[] = []) {
   if (!(UpdateManagerClientProgress instanceof Map)) {
-        setUpdateManagerClientProgress(new Map());
+    setUpdateManagerClientProgress(new Map());
   }
 
   UpdateManagerClientProgress.clear();
@@ -415,7 +415,7 @@ export async function RefreshUpdateManagerStatus() {
     return;
   }
 
-    setUpdateManagerReleaseStatus(Status || null);
+  setUpdateManagerReleaseStatus(Status || null);
   const Version = Status && Status.ReleaseVersion ? Status.ReleaseVersion : 'none downloaded';
   const DownloadedAt =
     Status && Status.DownloadedAt ? new Date(Status.DownloadedAt).toLocaleString() : null;
@@ -447,7 +447,7 @@ export async function RunUpdateManagerDownloadLatest() {
     return;
   }
 
-    setUpdateManagerDownloadInProgress(true);
+  setUpdateManagerDownloadInProgress(true);
   ApplyUpdateManagerButtonLocks();
   SetUpdateManagerDownloadProgress(0, `Preparing download for ${selectedTag}...`);
   $('#UPDATE_MANAGER_STATUS').text(`Downloading ${selectedTag} to ShowTrakServer...`);
@@ -469,7 +469,7 @@ export async function RunUpdateManagerDownloadLatest() {
     $('#UPDATE_MANAGER_STATUS').text(Message);
     await Notify(Message, 'error');
   } finally {
-        setUpdateManagerDownloadInProgress(false);
+    setUpdateManagerDownloadInProgress(false);
     ApplyUpdateManagerButtonLocks();
   }
 }
@@ -489,7 +489,7 @@ export async function RunUpdateManagerDeployAll() {
     return;
   }
 
-    setUpdateManagerRunning(true);
+  setUpdateManagerRunning(true);
   ApplyUpdateManagerButtonLocks();
   $('#UPDATE_MANAGER_STATUS').text(`Deploying ${selectedTag} to online clients...`);
 
@@ -512,7 +512,7 @@ export async function RunUpdateManagerDeployAll() {
     $('#UPDATE_MANAGER_STATUS').text(Message);
     await Notify(Message, 'error');
   } finally {
-        setUpdateManagerRunning(false);
+    setUpdateManagerRunning(false);
     ApplyUpdateManagerButtonLocks();
   }
 }
@@ -547,7 +547,7 @@ export async function OpenUpdateManagerModal() {
   $('#UPDATE_MANAGER_RELEASE_SELECT')
     .off('change')
     .on('change', function () {
-            setUpdateManagerSelectedReleaseTag(String($(this).val() || '').trim());
+      setUpdateManagerSelectedReleaseTag(String($(this).val() || '').trim());
       ResetUpdateManagerClientSelectionDefaults();
       RenderUpdateManagerClientList();
       RenderUpdateManagerReleaseBadge();
@@ -560,7 +560,7 @@ export async function OpenUpdateManagerModal() {
       const uuid = String($(this).attr('data-uuid') || '').trim();
       if (!uuid) return;
       if (!(UpdateManagerSelectedClients instanceof Set)) {
-                setUpdateManagerSelectedClients(new Set(UpdateManagerSelectedClients || []));
+        setUpdateManagerSelectedClients(new Set(UpdateManagerSelectedClients || []));
       }
       if ($(this).is(':checked')) {
         UpdateManagerSelectedClients.add(uuid);

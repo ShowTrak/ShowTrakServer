@@ -267,9 +267,7 @@ export function BuildMonitoringCheckFieldHtml(Field: MonitoringSettingField, Val
         <label for="MON_DYN_${Safe(Field.Key)}">${BuildMonitoringLabelHtml(Field)}</label>
       </div>`;
   }
-  return (
-    BuildMonitoringFieldWrapOpen(Field, HasNote ? 'has-note' : '') + Control + Note + '</div>'
-  );
+  return BuildMonitoringFieldWrapOpen(Field, HasNote ? 'has-note' : '') + Control + Note + '</div>';
 }
 
 // Attach a Bootstrap popover to every note icon in the settings area. Idempotent

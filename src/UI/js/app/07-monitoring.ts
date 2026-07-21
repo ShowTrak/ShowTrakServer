@@ -1,4 +1,18 @@
-import { AllClients, AppMode, DummyClients, MONITOR_HISTORY_BLOCK_COUNT, MONITOR_HISTORY_WINDOW_MS, MonitorHistoryModalContext, MonitorHistorySeries, MonitorHistoryTooltipHover, MonitoringMethodsCache, MonitoringTargets, setMonitorHistoryModalContext, setMonitorHistorySeries, setMonitorHistoryTooltipHover } from './01-state';
+import {
+  AllClients,
+  AppMode,
+  DummyClients,
+  MONITOR_HISTORY_BLOCK_COUNT,
+  MONITOR_HISTORY_WINDOW_MS,
+  MonitorHistoryModalContext,
+  MonitorHistorySeries,
+  MonitorHistoryTooltipHover,
+  MonitoringMethodsCache,
+  MonitoringTargets,
+  setMonitorHistoryModalContext,
+  setMonitorHistorySeries,
+  setMonitorHistoryTooltipHover,
+} from './01-state';
 import type {
   ClientApplicationHistorySeries,
   ClientDisplayHistorySeries,
@@ -152,7 +166,12 @@ export function FormatMonitoringMethodLabel(T: MonitoringTargetView) {
   return String((T && T.Method) || '').toUpperCase();
 }
 
-export function FormatMonitorStatus(Online: boolean, LastLatencyMs: number | null, LastError: string | null, Degraded: boolean) {
+export function FormatMonitorStatus(
+  Online: boolean,
+  LastLatencyMs: number | null,
+  LastError: string | null,
+  Degraded: boolean
+) {
   if (Online) {
     if (Degraded) {
       const Reason = typeof LastError === 'string' ? LastError.trim() : '';
@@ -184,7 +203,12 @@ export function FormatMonitorStatus(Online: boolean, LastLatencyMs: number | nul
   return ErrorText;
 }
 
-export function FormatMonitorCompactStatus(Online: boolean, LastLatencyMs: number | null, Degraded: boolean, IsIdle: boolean) {
+export function FormatMonitorCompactStatus(
+  Online: boolean,
+  LastLatencyMs: number | null,
+  Degraded: boolean,
+  IsIdle: boolean
+) {
   // Compact view keeps labels short and deterministic. Prefer latency when it
   // exists, otherwise show a stable state label.
   const Latency = Online ? FormatLatency(LastLatencyMs) : '';
@@ -294,9 +318,7 @@ export function ResolveMonitorHistoryContextEntity(): MonitorHistoryEntity | nul
   const Context = MonitorHistoryModalContext;
   if (!Context || !Context.type) return null;
   if (Context.type === 'target') {
-    const target = MonitoringTargets.find(
-      (T) => Number(T.TargetID) === Number(Context.id)
-    );
+    const target = MonitoringTargets.find((T) => Number(T.TargetID) === Number(Context.id));
     if (!target) return null;
     return {
       type: 'target',
@@ -344,7 +366,7 @@ export function IsMonitorHistoryContextFor(entityType: string, id: string | numb
 // this pulls one series per check; for a dummy client it pulls its single
 // uptime series.
 export async function LoadHistorySamplesForContext() {
-    setMonitorHistorySeries([]);
+  setMonitorHistorySeries([]);
   const entity = ResolveMonitorHistoryContextEntity();
   if (!entity) return;
   if (entity.type === 'target') {
@@ -438,7 +460,13 @@ export async function LoadHistorySamplesForContext() {
 // Possible timeline/status states. All resolve to a CSS variable driven colour
 // (see main.css :root --status-*) so the palette lives in one place:
 //   IDLE / UNAVAILABLE -> grey, OFFLINE -> red, DEGRADED -> orange, ONLINE -> green.
-export const MONITOR_STATE_SEVERITY = { IDLE: -1, UNAVAILABLE: -1, ONLINE: 0, DEGRADED: 1, OFFLINE: 2 };
+export const MONITOR_STATE_SEVERITY = {
+  IDLE: -1,
+  UNAVAILABLE: -1,
+  ONLINE: 0,
+  DEGRADED: 1,
+  OFFLINE: 2,
+};
 
 export function MonitorStateLabel(State: string) {
   switch (State) {
@@ -583,7 +611,11 @@ export function HideStatusTimelineTooltip() {
   if (El) El.classList.add('d-none');
 }
 
-export function ShowStatusTimelineTooltip(BlockEl: Element | null, ClientX: number, ClientY: number) {
+export function ShowStatusTimelineTooltip(
+  BlockEl: Element | null,
+  ClientX: number,
+  ClientY: number
+) {
   const Tooltip = document.getElementById('MONITOR_HISTORY_TOOLTIP');
   if (!Tooltip || !BlockEl) return;
   const Ts = Number(BlockEl.getAttribute('data-ts'));
@@ -622,14 +654,14 @@ export function RestoreStatusTimelineTooltipAfterRender() {
   if (!MonitorHistoryTooltipHover) return;
   if (!$('#SHOWTRAK_CLIENT_INFO').hasClass('show')) {
     HideStatusTimelineTooltip();
-        setMonitorHistoryTooltipHover(null);
+    setMonitorHistoryTooltipHover(null);
     return;
   }
   const X = Number(MonitorHistoryTooltipHover.x);
   const Y = Number(MonitorHistoryTooltipHover.y);
   if (!Number.isFinite(X) || !Number.isFinite(Y)) {
     HideStatusTimelineTooltip();
-        setMonitorHistoryTooltipHover(null);
+    setMonitorHistoryTooltipHover(null);
     return;
   }
   const Hit = document.elementFromPoint(X, Y);
@@ -637,7 +669,7 @@ export function RestoreStatusTimelineTooltipAfterRender() {
     Hit && typeof Hit.closest === 'function' ? Hit.closest('.status-timeline-block') : null;
   if (!Block) {
     HideStatusTimelineTooltip();
-        setMonitorHistoryTooltipHover(null);
+    setMonitorHistoryTooltipHover(null);
     return;
   }
   ShowStatusTimelineTooltip(Block, X, Y);
@@ -646,7 +678,10 @@ export function RestoreStatusTimelineTooltipAfterRender() {
 // A history section now leads with the current-status card (which acts as the
 // heading, carrying the label + address/type + live state on a single line) and
 // places the status timeline directly beneath it.
-export function RenderMonitorHistorySection(CardOptions: MonitorStatusCardOptions, Blocks: StatusBlock[]) {
+export function RenderMonitorHistorySection(
+  CardOptions: MonitorStatusCardOptions,
+  Blocks: StatusBlock[]
+) {
   return (
     `<div class="monitor-history-section">` +
     RenderMonitorStatusCard(CardOptions) +
@@ -700,7 +735,9 @@ export function RenderMonitorStatusCard(Options: MonitorStatusCardOptions) {
     </div>`;
 }
 
-export function UpdateMonitorHistoryEditButtonVisibility(Options: { requireModalOpen?: boolean } = {}) {
+export function UpdateMonitorHistoryEditButtonVisibility(
+  Options: { requireModalOpen?: boolean } = {}
+) {
   const RequireModalOpen = Options.requireModalOpen !== false;
   const Btn = document.getElementById('MONITOR_HISTORY_EDIT_BUTTON') as HTMLButtonElement | null;
   if (!Btn) return;
@@ -1058,16 +1095,16 @@ export async function OpenMonitoringTargetHistory(TargetID: number) {
     HandleNonFatalError('Monitoring:OpenMonitoringTargetHistory:CloseAllModals', err);
   }
 
-    setMonitorHistoryModalContext({ type: 'target', id: Number(Target.TargetID) });
-    setMonitorHistorySeries([]);
+  setMonitorHistoryModalContext({ type: 'target', id: Number(Target.TargetID) });
+  setMonitorHistorySeries([]);
   await LoadHistorySamplesForContext();
   UpdateMonitorHistoryEditButtonVisibility({ requireModalOpen: false });
 
   const $modal = $('#SHOWTRAK_CLIENT_INFO');
   $modal.off('hidden.bs.modal.monitorhistory').on('hidden.bs.modal.monitorhistory', function () {
-        setMonitorHistoryModalContext(null);
-        setMonitorHistorySeries([]);
-        setMonitorHistoryTooltipHover(null);
+    setMonitorHistoryModalContext(null);
+    setMonitorHistorySeries([]);
+    setMonitorHistoryTooltipHover(null);
     HideStatusTimelineTooltip();
   });
   openModal('SHOWTRAK_CLIENT_INFO');
@@ -1085,16 +1122,16 @@ export async function OpenDummyClientHistory(UUID: string) {
     HandleNonFatalError('Monitoring:OpenDummyClientHistory:CloseAllModals', err);
   }
 
-    setMonitorHistoryModalContext({ type: 'dummy', id: DummyUUID });
-    setMonitorHistorySeries([]);
+  setMonitorHistoryModalContext({ type: 'dummy', id: DummyUUID });
+  setMonitorHistorySeries([]);
   await LoadHistorySamplesForContext();
   UpdateMonitorHistoryEditButtonVisibility({ requireModalOpen: false });
 
   const $modal = $('#SHOWTRAK_CLIENT_INFO');
   $modal.off('hidden.bs.modal.monitorhistory').on('hidden.bs.modal.monitorhistory', function () {
-        setMonitorHistoryModalContext(null);
-        setMonitorHistorySeries([]);
-        setMonitorHistoryTooltipHover(null);
+    setMonitorHistoryModalContext(null);
+    setMonitorHistorySeries([]);
+    setMonitorHistoryTooltipHover(null);
     HideStatusTimelineTooltip();
   });
   openModal('SHOWTRAK_CLIENT_INFO');

@@ -239,8 +239,7 @@ const API: ShowTrakAPI = {
   OpenDiscordInviteLinkInBrowser: async () => invoke('OpenDiscordInviteLinkInBrowser'),
   OpenShowTrakWebsiteInBrowser: async () => invoke('OpenShowTrakWebsiteInBrowser'),
   OpenShowTrakGithubInBrowser: async () => invoke('OpenShowTrakGithubInBrowser'),
-  OpenNpmPackageInBrowser: async (PackageName) =>
-    invoke('OpenNpmPackageInBrowser', PackageName),
+  OpenNpmPackageInBrowser: async (PackageName) => invoke('OpenNpmPackageInBrowser', PackageName),
   OpenExternalUrl: async (URL) => invoke('OpenExternalUrl', URL),
   GetProjectDependencies: async () => invoke('GetProjectDependencies'),
   GetLicense: async () => invoke('GetLicense'),
@@ -271,8 +270,7 @@ const API: ShowTrakAPI = {
   SetGroupListOrder: async (OrderedGroupIDs) => invoke('Groups:SetOrder', OrderedGroupIDs),
   SetGroupFullWidth: async (GroupID, FullWidth) =>
     invoke('Groups:SetFullWidth', GroupID, FullWidth),
-  SetGroupKeyBind: async (GroupID, KeyBind) =>
-    invoke('Groups:SetKeyBind', GroupID, KeyBind),
+  SetGroupKeyBind: async (GroupID, KeyBind) => invoke('Groups:SetKeyBind', GroupID, KeyBind),
   SetGroupSlug: async (GroupID, Slug) => invoke('Groups:SetSlug', GroupID, Slug),
   OpenLogsFolder: async () => invoke('OpenLogsFolder'),
   OpenScriptsFolder: async () => invoke('OpenScriptsFolder'),
@@ -286,8 +284,7 @@ const API: ShowTrakAPI = {
   OnShowFileUpdated: (Callback) => subscribe('ShowFileUpdated', Callback),
   OnAppMenuAction: (Callback) => subscribe('AppMenuAction', Callback),
   OnWindowFullscreenChanged: (Callback) => subscribe('MainWindowFullscreenChanged', Callback),
-  SetGroupOrder: async (GroupID, OrderedUUIDs) =>
-    invoke('SetGroupOrder', GroupID, OrderedUUIDs),
+  SetGroupOrder: async (GroupID, OrderedUUIDs) => invoke('SetGroupOrder', GroupID, OrderedUUIDs),
   // Application Mode API
   GetMode: async () => invoke('Mode:Get'),
   SetMode: async (Mode) => invoke('Mode:Set', Mode),
@@ -297,7 +294,11 @@ const API: ShowTrakAPI = {
     subscribe(
       'OSCBulkAction',
       Callback,
-      (Type: OSCBulkActionType, Targets: string[], Args: string | null = null): [OSCBulkActionType, string[], string | null] => [Type, Targets, Args]
+      (
+        Type: OSCBulkActionType,
+        Targets: string[],
+        Args: string | null = null
+      ): [OSCBulkActionType, string[], string | null] => [Type, Targets, Args]
     ),
   PlaySound: (Callback) => subscribe('PlaySound', Callback),
   Notify: (Callback) =>
@@ -317,10 +318,7 @@ const API: ShowTrakAPI = {
     subscribe(
       'SetFullClientList',
       Callback,
-      (Clients: ClientView[], Groups: GroupView[]): [ClientView[], GroupView[]] => [
-        Clients,
-        Groups,
-      ]
+      (Clients: ClientView[], Groups: GroupView[]): [ClientView[], GroupView[]] => [Clients, Groups]
     ),
   SetScriptList: (Callback) => subscribe('SetScriptList', Callback),
   ClientUpdated: (Callback) => subscribe('ClientUpdated', Callback),
@@ -342,7 +340,10 @@ const API: ShowTrakAPI = {
     subscribe(
       'UpdateSettings',
       Callback,
-      (Settings: SettingView[], SettingsGroups: SettingGroupView[]): [SettingView[], SettingGroupView[]] => [Settings, SettingsGroups]
+      (
+        Settings: SettingView[],
+        SettingsGroups: SettingGroupView[]
+      ): [SettingView[], SettingGroupView[]] => [Settings, SettingsGroups]
     ),
   SetSetting: async (Key, Value) => invoke('SetSetting', Key, Value),
   WakeOnLan: async (Targets) => invoke('WakeOnLan', Targets),
@@ -365,8 +366,7 @@ const API: ShowTrakAPI = {
     invoke('MarkClientDisplayCritical', UUID, Display),
   RemoveClientDisplayCritical: async (UUID, DisplayID) =>
     invoke('RemoveClientDisplayCritical', UUID, DisplayID),
-  AddClientMacAddress: async (UUID, MacAddress) =>
-    invoke('AddClientMacAddress', UUID, MacAddress),
+  AddClientMacAddress: async (UUID, MacAddress) => invoke('AddClientMacAddress', UUID, MacAddress),
   RemoveClientMacAddress: async (UUID, MacAddress) =>
     invoke('RemoveClientMacAddress', UUID, MacAddress),
   ExecuteScript: async (Script, Targets, ResetList) =>
@@ -394,8 +394,7 @@ const API: ShowTrakAPI = {
   CreateScriptFromTemplate: async (SampleID, DesiredID) =>
     invoke('Scripts:CreateFromTemplate', SampleID, DesiredID),
   OpenScriptFolder: async (ID) => invoke('Scripts:OpenFolder', ID),
-  OpenScriptFile: async (ID, RelativeFilePath) =>
-    invoke('Scripts:OpenFile', ID, RelativeFilePath),
+  OpenScriptFile: async (ID, RelativeFilePath) => invoke('Scripts:OpenFile', ID, RelativeFilePath),
   RunScriptFileLocal: async (ID, RelativeFilePath) =>
     invoke('Scripts:RunLocalFile', ID, RelativeFilePath),
   // App update APIs
@@ -409,14 +408,12 @@ const API: ShowTrakAPI = {
   GetMonitoringCheckHistory: async (CheckID) => invoke('GetMonitoringCheckHistory', CheckID),
   GetMonitoringCheckDebug: async (CheckID) => invoke('GetMonitoringCheckDebug', CheckID),
   RunMonitoringCheckNow: async (CheckID) => invoke('RunMonitoringCheckNow', CheckID),
-  RunAllMonitoringChecksNow: async (TargetID) =>
-    invoke('RunAllMonitoringChecksNow', TargetID),
+  RunAllMonitoringChecksNow: async (TargetID) => invoke('RunAllMonitoringChecksNow', TargetID),
   CreateMonitoringTarget: async (Payload) => invoke('CreateMonitoringTarget', Payload),
   UpdateMonitoringTarget: async (TargetID, Payload) =>
     invoke('UpdateMonitoringTarget', TargetID, Payload),
   DeleteMonitoringTarget: async (TargetID) => invoke('DeleteMonitoringTarget', TargetID),
-  SetFullMonitoringTargetList: (Callback) =>
-    subscribe('SetFullMonitoringTargetList', Callback),
+  SetFullMonitoringTargetList: (Callback) => subscribe('SetFullMonitoringTargetList', Callback),
   MonitoringTargetUpdated: (Callback) => subscribe('MonitoringTargetUpdated', Callback),
   // Dummy Clients
   GetAllDummyClients: async () => invoke('GetAllDummyClients'),
@@ -440,8 +437,7 @@ const API: ShowTrakAPI = {
   CreateAlertRule: async (Payload) => invoke('CreateAlertRule', Payload),
   UpdateAlertRule: async (RuleID, Payload) => invoke('UpdateAlertRule', RuleID, Payload),
   DeleteAlertRule: async (RuleID) => invoke('DeleteAlertRule', RuleID),
-  SetAlertRuleEnabled: async (RuleID, Enabled) =>
-    invoke('SetAlertRuleEnabled', RuleID, Enabled),
+  SetAlertRuleEnabled: async (RuleID, Enabled) => invoke('SetAlertRuleEnabled', RuleID, Enabled),
   GetAlertActionsEnabled: async () => invoke('AlertActionsEnabled:Get'),
   SetAlertActionsEnabled: async (Enabled) => invoke('AlertActionsEnabled:Set', Enabled),
   SetFullAlertRuleList: (Callback) => subscribe('SetFullAlertRuleList', Callback),

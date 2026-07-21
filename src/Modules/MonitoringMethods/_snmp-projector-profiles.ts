@@ -96,6 +96,8 @@ export const PROFILES: Record<string, ProjectorProfile> = {
 };
 
 export function GetProfile(ID: unknown): ProjectorProfile {
-  const Key = String(ID == null ? '' : ID).trim().toLowerCase();
+  const Key = String(ID == null ? '' : ID)
+    .trim()
+    .toLowerCase();
   return PROFILES[Key] || PROFILES[DEFAULT_PROFILE]!;
 }

@@ -210,7 +210,9 @@ export async function OpenTagManagerEditor(TagID: number) {
   const Groups = await window.API.GetAllGroups();
   if (TagManagerEditingId !== TagID) return;
   TagScopeGroups = Array.isArray(Groups) ? Groups : [];
-  TagScopeSelected = scopeToSelectedValues(Tag.Scope || { Workspace: false, Groups: [], Clients: [] });
+  TagScopeSelected = scopeToSelectedValues(
+    Tag.Scope || { Workspace: false, Groups: [], Clients: [] }
+  );
   TagScopeOriginal = TagScopeSelected.slice();
 
   PopulateTagManagerEditor(Tag);

@@ -144,7 +144,8 @@ function register(): void {
         IPCValidation.MonitoringTargetID(TargetID),
         IPCValidation.MonitoringTargetUpdatePayload(Payload),
       ],
-      (TargetID: number, Payload: Record<string, unknown>) => MonitoringTargetManager.Update(TargetID, Payload)
+      (TargetID: number, Payload: Record<string, unknown>) =>
+        MonitoringTargetManager.Update(TargetID, Payload)
     )
   );
 

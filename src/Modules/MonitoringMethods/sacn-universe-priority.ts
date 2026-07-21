@@ -3,7 +3,12 @@
 // configured value. Reachable-but-wrong-priority reports as degraded (amber).
 // Shares the single-socket receiver in _sacn-shared.ts with the sacn-universe
 // method, so watching the same universe from both never opens a second listener.
-import { BuildSacnSettings, RunSacn, BuildSacnDebug, DEFAULT_SACN_INTERVAL_MS } from './_sacn-shared';
+import {
+  BuildSacnSettings,
+  RunSacn,
+  BuildSacnDebug,
+  DEFAULT_SACN_INTERVAL_MS,
+} from './_sacn-shared';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const ID = 'sacn-universe-priority';

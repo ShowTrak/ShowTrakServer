@@ -74,33 +74,39 @@ async function openFileWithWorkspaceEditor(filePath: string) {
 }
 
 function register(): void {
-  RPC.handle('ExecuteScript', async (_Event: unknown, Scripts: unknown, Targets: unknown, ResetList: unknown) => {
-    let ValidScripts, ValidTargets, ValidResetList;
-    try {
-      ValidScripts = IPCValidation.ScriptID(Scripts);
-      ValidTargets = IPCValidation.UUIDList(Targets || [], 'Targets');
-      ValidResetList = IPCValidation.Boolean(ResetList, 'ResetList');
-    } catch (error) {
-      return validationErrorTuple(error);
+  RPC.handle(
+    'ExecuteScript',
+    async (_Event: unknown, Scripts: unknown, Targets: unknown, ResetList: unknown) => {
+      let ValidScripts, ValidTargets, ValidResetList;
+      try {
+        ValidScripts = IPCValidation.ScriptID(Scripts);
+        ValidTargets = IPCValidation.UUIDList(Targets || [], 'Targets');
+        ValidResetList = IPCValidation.Boolean(ResetList, 'ResetList');
+      } catch (error) {
+        return validationErrorTuple(error);
+      }
+      await ServerManager.ExecuteScripts(ValidScripts, ValidTargets, ValidResetList);
+      return [null, true];
     }
-    await ServerManager.ExecuteScripts(ValidScripts, ValidTargets, ValidResetList);
-    return [null, true];
-  });
+  );
 
   // Trigger an integrated client action (event) on the selected integrated
   // clients. Validated like ExecuteScript but routed through the integrated
   // event protocol.
-  RPC.handle('TriggerIntegratedEvent', async (_Event: unknown, EventID: unknown, Targets: unknown) => {
-    let ValidEventID, ValidTargets;
-    try {
-      ValidEventID = IPCValidation.IntegratedEventID(EventID);
-      ValidTargets = IPCValidation.UUIDList(Targets || [], 'Targets');
-    } catch (error) {
-      return validationErrorTuple(error);
+  RPC.handle(
+    'TriggerIntegratedEvent',
+    async (_Event: unknown, EventID: unknown, Targets: unknown) => {
+      let ValidEventID, ValidTargets;
+      try {
+        ValidEventID = IPCValidation.IntegratedEventID(EventID);
+        ValidTargets = IPCValidation.UUIDList(Targets || [], 'Targets');
+      } catch (error) {
+        return validationErrorTuple(error);
+      }
+      await ServerManager.TriggerIntegratedEvent(ValidEventID, ValidTargets);
+      return [null, true];
     }
-    await ServerManager.TriggerIntegratedEvent(ValidEventID, ValidTargets);
-    return [null, true];
-  });
+  );
 
   // Wipe the finished rows from the execution panel. Fired by the renderer when
   // the panel auto-dismisses, so the next batch renders into an empty list
@@ -276,23 +282,26 @@ function register(): void {
 
   // Script Manager: create a new script from a sample template. Requires a
   // DesiredID that does not collide with an existing script.
-  RPC.handle('Scripts:CreateFromTemplate', async (_Event: unknown, SampleID: unknown, DesiredID: unknown) => {
-    let ValidSampleID;
-    try {
-      ValidSampleID = IPCValidation.ScriptSampleID(SampleID);
-    } catch (error) {
-      return validationErrorTuple(error);
+  RPC.handle(
+    'Scripts:CreateFromTemplate',
+    async (_Event: unknown, SampleID: unknown, DesiredID: unknown) => {
+      let ValidSampleID;
+      try {
+        ValidSampleID = IPCValidation.ScriptSampleID(SampleID);
+      } catch (error) {
+        return validationErrorTuple(error);
+      }
+      const Sample = await SampleScriptsManager.GetSample(ValidSampleID);
+      if (!Sample) return ['Template not found', null];
+      const Result = await ScriptManager.CreateFromTemplate(Sample, DesiredID);
+      if (!Result.ok) {
+        const Message =
+          Result.errors && Result.errors[0] ? Result.errors[0] : 'Failed to create script';
+        return [Message, Result];
+      }
+      return [null, Result];
     }
-    const Sample = await SampleScriptsManager.GetSample(ValidSampleID);
-    if (!Sample) return ['Template not found', null];
-    const Result = await ScriptManager.CreateFromTemplate(Sample, DesiredID);
-    if (!Result.ok) {
-      const Message =
-        Result.errors && Result.errors[0] ? Result.errors[0] : 'Failed to create script';
-      return [Message, Result];
-    }
-    return [null, Result];
-  });
+  );
 
   RPC.handle('OpenScriptsFolder', async (_event: unknown) => {
     const LogsPath = AppDataManager.GetScriptsDirectory();
@@ -317,61 +326,67 @@ function register(): void {
     await shell.openPath(ScriptFolderPath);
   });
 
-  RPC.handle('Scripts:OpenFile', async (_event: unknown, ID: unknown, RelativeFilePath: unknown) => {
-    const [PathErr, TargetFilePath] = resolveContainedScriptFile(
-      AppDataManager.GetScriptsDirectory(),
-      ID,
-      RelativeFilePath
-    );
-    if (PathErr || !TargetFilePath) return [PathErr || 'Invalid file path', null];
+  RPC.handle(
+    'Scripts:OpenFile',
+    async (_event: unknown, ID: unknown, RelativeFilePath: unknown) => {
+      const [PathErr, TargetFilePath] = resolveContainedScriptFile(
+        AppDataManager.GetScriptsDirectory(),
+        ID,
+        RelativeFilePath
+      );
+      if (PathErr || !TargetFilePath) return [PathErr || 'Invalid file path', null];
 
-    if (!fs.existsSync(TargetFilePath)) return ['File not found', null];
-    const stat = fs.statSync(TargetFilePath);
-    if (!stat.isFile()) return ['Path is not a file', null];
+      if (!fs.existsSync(TargetFilePath)) return ['File not found', null];
+      const stat = fs.statSync(TargetFilePath);
+      if (!stat.isFile()) return ['Path is not a file', null];
 
-    Logger.log('Opening script file:', TargetFilePath);
-    const OpenErr = await openFileWithWorkspaceEditor(TargetFilePath);
-    if (OpenErr) return [OpenErr, null];
-    return [null, true];
-  });
-
-  RPC.handle('Scripts:RunLocalFile', async (_event: unknown, ID: unknown, RelativeFilePath: unknown) => {
-    const [PathErr, TargetFilePath] = resolveContainedScriptFile(
-      AppDataManager.GetScriptsDirectory(),
-      ID,
-      RelativeFilePath
-    );
-    if (PathErr || !TargetFilePath) return [PathErr || 'Invalid file path', null];
-
-    // resolveContainedScriptFile above already proved ID resolves to a contained
-    // script folder, so it is a usable folder/script id string here.
-    const Script = await ScriptManager.Get(String(ID));
-    if (!Script || !Script.Platforms) return ['Script not found', null];
-
-    const PlatformKey = getLocalPlatformKey();
-    const MappedFile = normalizeRelativePathForCompare(Script.Platforms[PlatformKey]);
-    const PlatformArgumentString =
-      Script && Script.Arguments && typeof Script.Arguments[PlatformKey] === 'string'
-        ? Script.Arguments[PlatformKey]
-        : '';
-    const PlatformArgs = parseArgumentString(PlatformArgumentString);
-    const RequestedFile = normalizeRelativePathForCompare(RelativeFilePath);
-    if (!MappedFile) {
-      return [`No ${PlatformKey} executable is configured for this script`, null];
+      Logger.log('Opening script file:', TargetFilePath);
+      const OpenErr = await openFileWithWorkspaceEditor(TargetFilePath);
+      if (OpenErr) return [OpenErr, null];
+      return [null, true];
     }
-    if (RequestedFile !== MappedFile) {
-      return [`Only the mapped ${PlatformKey} executable can be run locally`, null];
+  );
+
+  RPC.handle(
+    'Scripts:RunLocalFile',
+    async (_event: unknown, ID: unknown, RelativeFilePath: unknown) => {
+      const [PathErr, TargetFilePath] = resolveContainedScriptFile(
+        AppDataManager.GetScriptsDirectory(),
+        ID,
+        RelativeFilePath
+      );
+      if (PathErr || !TargetFilePath) return [PathErr || 'Invalid file path', null];
+
+      // resolveContainedScriptFile above already proved ID resolves to a contained
+      // script folder, so it is a usable folder/script id string here.
+      const Script = await ScriptManager.Get(String(ID));
+      if (!Script || !Script.Platforms) return ['Script not found', null];
+
+      const PlatformKey = getLocalPlatformKey();
+      const MappedFile = normalizeRelativePathForCompare(Script.Platforms[PlatformKey]);
+      const PlatformArgumentString =
+        Script && Script.Arguments && typeof Script.Arguments[PlatformKey] === 'string'
+          ? Script.Arguments[PlatformKey]
+          : '';
+      const PlatformArgs = parseArgumentString(PlatformArgumentString);
+      const RequestedFile = normalizeRelativePathForCompare(RelativeFilePath);
+      if (!MappedFile) {
+        return [`No ${PlatformKey} executable is configured for this script`, null];
+      }
+      if (RequestedFile !== MappedFile) {
+        return [`Only the mapped ${PlatformKey} executable can be run locally`, null];
+      }
+
+      if (!fs.existsSync(TargetFilePath)) return ['File not found', null];
+      const stat = fs.statSync(TargetFilePath);
+      if (!stat.isFile()) return ['Path is not a file', null];
+
+      Logger.log(`Running local script (${PlatformKey}):`, TargetFilePath);
+      const RunErr = await runLocalScriptFile(TargetFilePath, PlatformArgs);
+      if (RunErr) return [RunErr, null];
+      return [null, true];
     }
-
-    if (!fs.existsSync(TargetFilePath)) return ['File not found', null];
-    const stat = fs.statSync(TargetFilePath);
-    if (!stat.isFile()) return ['Path is not a file', null];
-
-    Logger.log(`Running local script (${PlatformKey}):`, TargetFilePath);
-    const RunErr = await runLocalScriptFile(TargetFilePath, PlatformArgs);
-    if (RunErr) return [RunErr, null];
-    return [null, true];
-  });
+  );
 }
 
 export { register };

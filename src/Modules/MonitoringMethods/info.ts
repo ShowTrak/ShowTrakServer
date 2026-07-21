@@ -60,7 +60,12 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'Leave the Workspace field blank to inspect whichever workspace is currently open, or name one to target it specifically.',
       'The overrides check flags any engaged override (MIDI, MSC, SysEx, timecode, DMX, or network I/O turned off in QLab’s Overrides window).',
     ],
-    Links: [{ Label: 'QLab OSC Dictionary', Url: 'https://qlab.app/docs/v5/scripting/osc-dictionary-v5/' }],
+    Links: [
+      {
+        Label: 'QLab OSC Dictionary',
+        Url: 'https://qlab.app/docs/v5/scripting/osc-dictionary-v5/',
+      },
+    ],
   },
   qlab4: {
     Summary:
@@ -97,7 +102,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
   'sacn-universe-priority': {
     Summary:
       'As the sACN universe check, but also asserts the stream arrives at a specific per-packet priority (0–200). Degraded = the universe is present but at a different priority than expected.',
-    Setup: ["Enter the source IP, universe, and expected priority."],
+    Setup: ['Enter the source IP, universe, and expected priority.'],
   },
   'artnet-universe': {
     Summary:
@@ -138,9 +143,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
   chamsys: {
     Summary:
       'Connects to a ChamSys MagicQ console over its built-in web server (HTTP, default TCP 8080), confirms it responds as MagicQ, and reads the software version where the page exposes it. The web server is used rather than OSC because MagicQ OSC has no query/echo and a stray message can fire a playback. Enable the version toggle to flag an unexpected software version.',
-    Setup: [
-      'Enable the web server under Setup → Network Settings. It is disabled by default.',
-    ],
+    Setup: ['Enable the web server under Setup → Network Settings. It is disabled by default.'],
   },
   'ndi-source': {
     Summary:
@@ -166,7 +169,12 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'BrightSignOS 9.0.218+ serves HTTPS with a self-signed certificate and redirects HTTP. The redirect is followed and TLS errors are ignored by default so the self-signed certificate does not read as an outage.',
       'Enable a factor toggle to check it. PoE reports Degraded on hardware that does not support it, so only enable PoE on PoE-capable players. The video output index is 0-based; dual-output players use 0 and 1.',
     ],
-    Links: [{ Label: 'BrightSign Local DWS APIs', Url: 'https://docs.brightsign.biz/developers/local-dws-apis' }],
+    Links: [
+      {
+        Label: 'BrightSign Local DWS APIs',
+        Url: 'https://docs.brightsign.biz/developers/local-dws-apis',
+      },
+    ],
   },
   'nut-ups': {
     Summary:
@@ -187,7 +195,10 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'Objects the card does not report are skipped rather than failing the check.',
     ],
     Links: [
-      { Label: 'RFC 1628 — UPS Management Information Base', Url: 'https://datatracker.ietf.org/doc/html/rfc1628' },
+      {
+        Label: 'RFC 1628 — UPS Management Information Base',
+        Url: 'https://datatracker.ietf.org/doc/html/rfc1628',
+      },
     ],
   },
   'snmp-ups-v3': {
@@ -199,8 +210,14 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'Enter the auth password when an Auth protocol is set, and the priv password when a Priv protocol is set. A credential mismatch is reported as Offline because the card silently drops the request.',
     ],
     Links: [
-      { Label: 'RFC 1628 — UPS Management Information Base', Url: 'https://datatracker.ietf.org/doc/html/rfc1628' },
-      { Label: 'RFC 3414 — SNMPv3 User-based Security Model', Url: 'https://datatracker.ietf.org/doc/html/rfc3414' },
+      {
+        Label: 'RFC 1628 — UPS Management Information Base',
+        Url: 'https://datatracker.ietf.org/doc/html/rfc1628',
+      },
+      {
+        Label: 'RFC 3414 — SNMPv3 User-based Security Model',
+        Url: 'https://datatracker.ietf.org/doc/html/rfc3414',
+      },
     ],
   },
   'watchout-status': {
@@ -260,7 +277,10 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'Under Advanced, up to two custom OIDs can be asserted (equals / not-equals / numeric limits) for model-specific values.',
     ],
     Links: [
-      { Label: 'RFC 1157 — Simple Network Management Protocol', Url: 'https://datatracker.ietf.org/doc/html/rfc1157' },
+      {
+        Label: 'RFC 1157 — Simple Network Management Protocol',
+        Url: 'https://datatracker.ietf.org/doc/html/rfc1157',
+      },
     ],
   },
 };

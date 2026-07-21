@@ -98,10 +98,7 @@ export interface ClientManagerType {
   ): Promise<Result<boolean>>;
   RemoveUSBDeviceCritical(UUID: string, SerialNumber: unknown): Promise<Result<boolean>>;
   IsUSBDeviceCritical(UUID: string, SerialNumber: unknown): Promise<Result<boolean>>;
-  MarkUSBNameCritical(
-    UUID: string,
-    Device: CriticalUSBNamePayloadResult
-  ): Promise<Result<boolean>>;
+  MarkUSBNameCritical(UUID: string, Device: CriticalUSBNamePayloadResult): Promise<Result<boolean>>;
   RemoveUSBNameCritical(
     UUID: string,
     Device: CriticalUSBNamePayloadResult
@@ -353,8 +350,7 @@ const CriticalDisplays = makeCriticalIndex<CriticalDisplayRow, DisplayIndexEntry
         Label: Row.Label || null,
         Width: Row.Width != null ? parseInt(String(Row.Width), 10) || null : null,
         Height: Row.Height != null ? parseInt(String(Row.Height), 10) || null : null,
-        RefreshRate:
-          Row.RefreshRate != null ? parseInt(String(Row.RefreshRate), 10) || null : null,
+        RefreshRate: Row.RefreshRate != null ? parseInt(String(Row.RefreshRate), 10) || null : null,
         ScaleFactor:
           Row.ScaleFactor != null && Number.isFinite(Number(Row.ScaleFactor))
             ? Number(Row.ScaleFactor)
@@ -642,7 +638,8 @@ Manager.MarkUSBNameCritical = async (UUID: string, Device: CriticalUSBNamePayloa
   const ConnectedCount = (
     Array.isArray(Target.ConnectedUSBDeviceList) ? Target.ConnectedUSBDeviceList : []
   ).filter(
-    (Entry) => normalizeUSBNameKey(Entry && Entry.ManufacturerName, Entry && Entry.ProductName) === NameKey
+    (Entry) =>
+      normalizeUSBNameKey(Entry && Entry.ManufacturerName, Entry && Entry.ProductName) === NameKey
   ).length;
   const Quantity = Math.max(1, ConnectedCount);
 
@@ -976,9 +973,7 @@ Manager.SystemInfo = async (UUID: string, Data: SystemInfoData, IP: string) => {
   await Target.SetHostname(Data.Hostname || null, { markUnsaved: false });
   await Target.SetOperatingSystem(Data.OperatingSystem || null, { markUnsaved: false });
 
-  const Interfaces = Object.entries(Data.MacAddresses || {}) as Array<
-    [string, SystemInfoMacEntry]
-  >;
+  const Interfaces = Object.entries(Data.MacAddresses || {}) as Array<[string, SystemInfoMacEntry]>;
   await IngestReportedMacAddresses(
     UUID,
     Interfaces.map(([Name, Interface]) => ({
@@ -1032,7 +1027,9 @@ Manager.Update = async (UUID: string, Data: unknown) => {
     if (SetErr) return Fail(SetErr);
   }
   if (Object.prototype.hasOwnProperty.call(Fields, 'RunOnLaunchScriptID')) {
-    const [SetErr] = await Client.SetRunOnLaunchScriptID(Fields.RunOnLaunchScriptID as string | null);
+    const [SetErr] = await Client.SetRunOnLaunchScriptID(
+      Fields.RunOnLaunchScriptID as string | null
+    );
     if (SetErr) return Fail(SetErr);
   }
   if (Object.prototype.hasOwnProperty.call(Fields, 'RunOnLaunchDelaySeconds')) {
@@ -1184,9 +1181,7 @@ Manager.ReplaceClient = async (CurrentUUID: unknown, ReplacementUUID: unknown) =
   // entity so the slot stops rendering as unassigned without waiting for a
   // restart to re-hydrate from the row.
   ExistingClient.SetUnassigned(false);
-  ClientList = oldClientRows.filter(
-    (Client) => Client.UUID !== OldUUID && Client.UUID !== NewUUID
-  );
+  ClientList = oldClientRows.filter((Client) => Client.UUID !== OldUUID && Client.UUID !== NewUUID);
   ClientList.push(ExistingClient);
   rebuildClientIndex();
 

@@ -239,7 +239,10 @@ const Manager = {
         ttlMs: CacheTtlMs,
       })) as MonitoringResult;
     } catch (Err) {
-      return { Success: false, Error: Err && (Err as Error).message ? (Err as Error).message : String(Err) };
+      return {
+        Success: false,
+        Error: Err && (Err as Error).message ? (Err as Error).message : String(Err),
+      };
     }
   },
 
@@ -247,7 +250,11 @@ const Manager = {
   // expose an optional Debug(Result, Target) returning an HTML string; the method
   // is responsible for escaping any untrusted values it embeds. Returns null when
   // the method provides no debug view or rendering fails.
-  BuildDebug: (ID: string, Result: MonitoringResult, Target: MonitoringTargetLike): string | null => {
+  BuildDebug: (
+    ID: string,
+    Result: MonitoringResult,
+    Target: MonitoringTargetLike
+  ): string | null => {
     const Method = Methods.get(ID);
     if (!Method || typeof Method.Debug !== 'function') return null;
     try {

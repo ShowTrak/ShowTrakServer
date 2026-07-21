@@ -521,19 +521,17 @@ const Manager = {
     // The hasOwnProperty guard guarantees a defined value at runtime; the
     // optional payload field only widens the type with `undefined`.
     const NextNickname = (
-      Object.prototype.hasOwnProperty.call(Payload, 'Nickname')
-        ? Payload.Nickname
-        : Target.Nickname
+      Object.prototype.hasOwnProperty.call(Payload, 'Nickname') ? Payload.Nickname : Target.Nickname
     ) as string;
     const NextGroupID = (
-      Object.prototype.hasOwnProperty.call(Payload, 'GroupID')
-        ? Payload.GroupID
-        : Target.GroupID
+      Object.prototype.hasOwnProperty.call(Payload, 'GroupID') ? Payload.GroupID : Target.GroupID
     ) as number | null;
 
     let NextChecks: MonitoringCheckPayload[] | null = null;
     if (Object.prototype.hasOwnProperty.call(Payload, 'Checks')) {
-      const Incoming: MonitoringCheckPayload[] = Array.isArray(Payload.Checks) ? Payload.Checks : [];
+      const Incoming: MonitoringCheckPayload[] = Array.isArray(Payload.Checks)
+        ? Payload.Checks
+        : [];
       for (const C of Incoming) {
         if (!MonitoringMethods.Has(C.Method)) return Fail(`Unknown monitoring method: ${C.Method}`);
       }

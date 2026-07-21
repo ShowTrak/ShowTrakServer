@@ -39,12 +39,7 @@ function EncodeOscString(Str: unknown): Buffer {
 // An OSC argument to send. Numbers encode as int32 when integral, float32
 // otherwise; booleans encode as the payload-free T/F tags; strings as OSC
 // strings. Explicit { Int } / { Float } wrappers force a numeric encoding.
-export type OscArg =
-  | string
-  | number
-  | boolean
-  | { Int: number }
-  | { Float: number };
+export type OscArg = string | number | boolean | { Int: number } | { Float: number };
 
 function EncodeArg(Arg: OscArg): { Tag: string; Bytes: Buffer } {
   if (typeof Arg === 'string') return { Tag: 's', Bytes: EncodeOscString(Arg) };
@@ -101,11 +96,7 @@ export function FrameOscPacket(Packet: Buffer, Framing: OscFraming): Buffer {
 }
 
 // Encode + frame an OSC message for TCP transport in one step.
-export function EncodeOscTcp(
-  Address: string,
-  Args: OscArg[],
-  Framing: OscFraming
-): Buffer {
+export function EncodeOscTcp(Address: string, Args: OscArg[], Framing: OscFraming): Buffer {
   return FrameOscPacket(EncodeOscMessage(Address, Args), Framing);
 }
 

@@ -61,7 +61,10 @@ const Manager = {
   // Otherwise the client must match a whitelisted UUID or belong to a
   // whitelisted group. Exposed static so callers can resolve a batch against a
   // single fetched scope without re-reading the DB per client.
-  IsClientAllowed(Scope: ScriptWhitelistScope | null | undefined, Client: WhitelistClient): boolean {
+  IsClientAllowed(
+    Scope: ScriptWhitelistScope | null | undefined,
+    Client: WhitelistClient
+  ): boolean {
     if (!Scope || Scope.Workspace) return true;
     if (!Client || !Client.UUID) return false;
     if (Scope.Clients.includes(Client.UUID)) return true;

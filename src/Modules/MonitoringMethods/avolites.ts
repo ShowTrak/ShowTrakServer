@@ -133,7 +133,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       TextRow(
         'Titan',
         String(Result.TitanVersion || 'Unknown') +
-          (Options.CheckVersion && Options.ExpectedVersion ? ` (expected ${Options.ExpectedVersion}…)` : '')
+          (Options.CheckVersion && Options.ExpectedVersion
+            ? ` (expected ${Options.ExpectedVersion}…)`
+            : '')
       )
     );
     if (Result.ShowName != null && Result.ShowName !== '') {
@@ -141,7 +143,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
         TextRow(
           'Show',
           String(Result.ShowName) +
-            (Options.CheckShow && Options.ExpectedShow ? ` (expected "${Options.ExpectedShow}")` : '')
+            (Options.CheckShow && Options.ExpectedShow
+              ? ` (expected "${Options.ExpectedShow}")`
+              : '')
         )
       );
     }

@@ -8,15 +8,59 @@
 // subscriptions are registered — Loaded() must stay last so the main process
 // pushes initial state only once every subscriber is listening.
 import { closeModal, openModal } from './lib/modal';
-import { AppMode, Capabilities, Config, NetworkDiscoveryResults, NetworkDiscoveryScanning, __LastGroups, setConfig, setMonitorHistoryTooltipHover, setUpdateManagerDownloadInProgress } from './01-state';
+import {
+  AppMode,
+  Capabilities,
+  Config,
+  NetworkDiscoveryResults,
+  NetworkDiscoveryScanning,
+  __LastGroups,
+  setConfig,
+  setMonitorHistoryTooltipHover,
+  setUpdateManagerDownloadInProgress,
+} from './01-state';
 import { RenderMode } from './02-mode';
 import { HandleNonFatalError } from './04-utils';
-import { HideStatusTimelineTooltip, OpenDummyClientHistory, OpenMonitoringTargetHistory, RenderMonitoringHistoryModal, ShowStatusTimelineTooltip } from './07-monitoring';
+import {
+  HideStatusTimelineTooltip,
+  OpenDummyClientHistory,
+  OpenMonitoringTargetHistory,
+  RenderMonitoringHistoryModal,
+  ShowStatusTimelineTooltip,
+} from './07-monitoring';
 import { OpenOSCDictionary, OpenOscHttpDebugTerminal } from './09-osc-feeds';
-import { ApplyUpdateManagerButtonLocks, CloseAllModals, NewShow, OpenAboutModal, OpenClientEditor, OpenGroupCreationModal, OpenGroupManager, OpenShow, OpenUpdateManagerModal, RenderShowFileName, SaveShow, SaveShowAs, SetUpdateManagerDownloadProgress } from './11-modals';
-import { HandleNetworkDiscoveryEvent, OpenMonitoringTargetEditor, OpenNetworkDiscoveryModal, ResetNetworkDiscoveryState, SetNetworkDiscoveryStatus, StartNetworkDiscoveryScan, StopNetworkDiscoveryScan } from './12-monitoring-editor';
+import {
+  ApplyUpdateManagerButtonLocks,
+  CloseAllModals,
+  NewShow,
+  OpenAboutModal,
+  OpenClientEditor,
+  OpenGroupCreationModal,
+  OpenGroupManager,
+  OpenShow,
+  OpenUpdateManagerModal,
+  RenderShowFileName,
+  SaveShow,
+  SaveShowAs,
+  SetUpdateManagerDownloadProgress,
+} from './11-modals';
+import {
+  HandleNetworkDiscoveryEvent,
+  OpenMonitoringTargetEditor,
+  OpenNetworkDiscoveryModal,
+  ResetNetworkDiscoveryState,
+  SetNetworkDiscoveryStatus,
+  StartNetworkDiscoveryScan,
+  StopNetworkDiscoveryScan,
+} from './12-monitoring-editor';
 import { OpenAlertRuleManager, OpenCreateAlertRuleEditor } from './13-alert-rules';
-import { GetIdentifyingUUIDs, HideExecutionToast, Notify, StopIdentifyingForUUIDs, UpdateIdentifyStatusBanner } from './14-selection-init';
+import {
+  GetIdentifyingUUIDs,
+  HideExecutionToast,
+  Notify,
+  StopIdentifyingForUUIDs,
+  UpdateIdentifyStatusBanner,
+} from './14-selection-init';
 import { OpenClientInfo } from './client-info-modal';
 import { TestAllNotifications } from './lib/debug-notifications';
 import { OpenScriptManager } from './15-script-manager';
@@ -34,7 +78,6 @@ import { wireContextMenu } from './wire-context-menu';
 // modal and the identify banner. Body unchanged from the former jQuery
 // document-ready IIFE.
 export async function WireGlobalUI() {
-
   // Copy-to-clipboard for readonly editor fields and inline values
   $(document).on('click', '.copy-field-btn', async function (e) {
     e.preventDefault();
@@ -208,16 +251,14 @@ export async function Init() {
     });
   }
 
-    setConfig(await window.API.GetConfig());
+  setConfig(await window.API.GetConfig());
   $('#APPLICATION_NAVBAR_TITLE').text(`${Config.Application.Name}`);
   $('#APPLICATION_NAVBAR_STATUS').text('');
 
   // Reveal dev-only debug tools on uncompiled builds (electron-forge start),
   // where app.isPackaged is false. Hidden entirely on packaged releases.
   if (!Config.Application.IsPackaged) {
-    document
-      .querySelectorAll('.debug-menu-item')
-      .forEach((el) => el.removeAttribute('hidden'));
+    document.querySelectorAll('.debug-menu-item').forEach((el) => el.removeAttribute('hidden'));
     $('#SHOWTRAK_DEBUG_TEST_NOTIFICATIONS').on('click', () => {
       TestAllNotifications();
     });
@@ -416,11 +457,11 @@ export async function Init() {
   $('#MONITOR_HISTORY_TIMELINES')
     .off('mousemove.statusTt mouseleave.statusTt')
     .on('mousemove.statusTt', '.status-timeline-block', function (e) {
-            setMonitorHistoryTooltipHover({ x: e.clientX, y: e.clientY });
+      setMonitorHistoryTooltipHover({ x: e.clientX, y: e.clientY });
       ShowStatusTimelineTooltip(this, e.clientX, e.clientY);
     })
     .on('mouseleave.statusTt', function () {
-            setMonitorHistoryTooltipHover(null);
+      setMonitorHistoryTooltipHover(null);
       HideStatusTimelineTooltip();
     });
 
@@ -512,4 +553,3 @@ export async function Init() {
   await window.API.Loaded();
   UpdateIdentifyStatusBanner();
 }
-

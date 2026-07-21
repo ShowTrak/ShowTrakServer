@@ -192,7 +192,8 @@ Manager.InitializeSchema = async (): Promise<void> => {
     const [VersionErr, VersionRow] = await Manager.Get<{ MaxVersion: number | null }>(
       'SELECT MAX(Version) AS MaxVersion FROM SchemaMigrations'
     );
-    const AppliedVersion = !VersionErr && VersionRow && VersionRow.MaxVersion ? VersionRow.MaxVersion : 0;
+    const AppliedVersion =
+      !VersionErr && VersionRow && VersionRow.MaxVersion ? VersionRow.MaxVersion : 0;
 
     const Migrations = Array.isArray(Tables.Migrations) ? Tables.Migrations : [];
     for (const Migration of Migrations) {
@@ -458,35 +459,38 @@ function ValidateDatabaseFile(SourcePath: string): Promise<DBResult<boolean>> {
       if (err) {
         return resolve([new Error('Selected file is not a valid ShowTrak file'), null]);
       }
-      Probe.get('PRAGMA application_id', (idErr: Error | null, idRow: { application_id?: number } | undefined) => {
-        const ApplicationId =
-          idRow && typeof idRow.application_id === 'number' ? idRow.application_id : null;
-        if (!idErr && ApplicationId === SHOWTRAK_APPLICATION_ID) {
-          Probe.close(() => {});
-          return resolve([null, true]);
-        }
-        Probe.all(
-          "SELECT name FROM sqlite_master WHERE type = 'table'",
-          (qErr: Error | null, rows: Array<{ name?: string }> | undefined) => {
+      Probe.get(
+        'PRAGMA application_id',
+        (idErr: Error | null, idRow: { application_id?: number } | undefined) => {
+          const ApplicationId =
+            idRow && typeof idRow.application_id === 'number' ? idRow.application_id : null;
+          if (!idErr && ApplicationId === SHOWTRAK_APPLICATION_ID) {
             Probe.close(() => {});
-            if (qErr) {
-              return resolve([new Error('Selected file is not a valid ShowTrak file'), null]);
-            }
-            const Names = new Set((rows || []).map((r) => r && r.name));
-            const Required = ['Groups', 'Clients', 'Settings', 'MonitoringTargets'];
-            const Missing = Required.filter((name) => !Names.has(name));
-            if (Missing.length) {
-              return resolve([
-                new Error(
-                  `Selected file is not a valid ShowTrak file (missing: ${Missing.join(', ')})`
-                ),
-                null,
-              ]);
-            }
-            resolve([null, true]);
+            return resolve([null, true]);
           }
-        );
-      });
+          Probe.all(
+            "SELECT name FROM sqlite_master WHERE type = 'table'",
+            (qErr: Error | null, rows: Array<{ name?: string }> | undefined) => {
+              Probe.close(() => {});
+              if (qErr) {
+                return resolve([new Error('Selected file is not a valid ShowTrak file'), null]);
+              }
+              const Names = new Set((rows || []).map((r) => r && r.name));
+              const Required = ['Groups', 'Clients', 'Settings', 'MonitoringTargets'];
+              const Missing = Required.filter((name) => !Names.has(name));
+              if (Missing.length) {
+                return resolve([
+                  new Error(
+                    `Selected file is not a valid ShowTrak file (missing: ${Missing.join(', ')})`
+                  ),
+                  null,
+                ]);
+              }
+              resolve([null, true]);
+            }
+          );
+        }
+      );
     });
   });
 }

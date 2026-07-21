@@ -20,13 +20,16 @@ function applyWindowSecurityGuards(windowInstance: ElectronBrowserWindow): void 
     return { action: 'deny' };
   });
 
-  windowInstance.webContents.on('will-navigate', (event: { preventDefault(): void }, url: string) => {
-    const currentURL = windowInstance.webContents.getURL();
-    if (!currentURL || !url) return;
-    if (url !== currentURL) {
-      event.preventDefault();
+  windowInstance.webContents.on(
+    'will-navigate',
+    (event: { preventDefault(): void }, url: string) => {
+      const currentURL = windowInstance.webContents.getURL();
+      if (!currentURL || !url) return;
+      if (url !== currentURL) {
+        event.preventDefault();
+      }
     }
-  });
+  );
 }
 
 export { applyWindowSecurityGuards };

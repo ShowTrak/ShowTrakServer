@@ -25,8 +25,7 @@ function toPositiveInt(value: unknown, fieldName: string): number {
 }
 
 export = function registerFogValidators(Manager: IPCValidationManager): void {
-  Manager.FogHostID = (value: unknown, fieldName = 'FogHostID') =>
-    toPositiveInt(value, fieldName);
+  Manager.FogHostID = (value: unknown, fieldName = 'FogHostID') => toPositiveInt(value, fieldName);
 
   // Null/0/empty means "unlink", which is a legitimate value here rather than an
   // error — hence a separate validator from FogHostID.

@@ -29,7 +29,10 @@ function register(): void {
   RPC.handle(
     'RenameGroup',
     createTupleHandler<[number | null, string], unknown>(
-      (GroupID: unknown, Title: unknown) => [IPCValidation.GroupID(GroupID), IPCValidation.GroupTitle(Title)],
+      (GroupID: unknown, Title: unknown) => [
+        IPCValidation.GroupID(GroupID),
+        IPCValidation.GroupTitle(Title),
+      ],
       (GroupID: number | null, Title: string) =>
         GroupID == null ? ['No group selected', null] : GroupManager.Rename(GroupID, Title)
     )
@@ -52,14 +55,19 @@ function register(): void {
         IPCValidation.Boolean(FullWidth, 'FullWidth'),
       ],
       (GroupID: number | null, FullWidth: boolean) =>
-        GroupID == null ? ['No group selected', null] : GroupManager.SetFullWidth(GroupID, FullWidth)
+        GroupID == null
+          ? ['No group selected', null]
+          : GroupManager.SetFullWidth(GroupID, FullWidth)
     )
   );
 
   RPC.handle(
     'Groups:SetKeyBind',
     createTupleHandler<[number | null, string | null], unknown>(
-      (GroupID: unknown, KeyBind: unknown) => [IPCValidation.GroupID(GroupID), IPCValidation.GroupKeyBind(KeyBind)],
+      (GroupID: unknown, KeyBind: unknown) => [
+        IPCValidation.GroupID(GroupID),
+        IPCValidation.GroupKeyBind(KeyBind),
+      ],
       (GroupID: number | null, KeyBind: string | null) =>
         GroupID == null ? ['No group selected', null] : GroupManager.SetKeyBind(GroupID, KeyBind)
     )
@@ -68,7 +76,10 @@ function register(): void {
   RPC.handle(
     'Groups:SetSlug',
     createTupleHandler<[number | null, string], unknown>(
-      (GroupID: unknown, Slug: unknown) => [IPCValidation.GroupID(GroupID), IPCValidation.Slug(Slug)],
+      (GroupID: unknown, Slug: unknown) => [
+        IPCValidation.GroupID(GroupID),
+        IPCValidation.Slug(Slug),
+      ],
       (GroupID: number | null, Slug: string) =>
         GroupID == null ? ['No group selected', null] : GroupManager.SetSlug(GroupID, Slug)
     )

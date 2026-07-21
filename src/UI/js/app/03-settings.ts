@@ -141,49 +141,48 @@ export function PreviewSound(SoundName: string) {
 // PreviewSound; body unchanged from the former import-time subscription.
 function InitSettingsPush() {
   window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
-  setSettings(NewSettings);
-  setSettingsGroups(NewSettingsGroups);
+    setSettings(NewSettings);
+    setSettingsGroups(NewSettingsGroups);
 
-  $('#SETTINGS').html('');
+    $('#SETTINGS').html('');
 
-  // Re-render after settings arrive so layout-dependent controls like the group
-  // column count pick up UI_GROUP_COLUMN_COUNT on the browser surface.
-  try {
-    const { RenderFullClientAndMonitorList } = await import('./06-client-list');
-    RenderFullClientAndMonitorList();
-  } catch (err) {
-    HandleNonFatalError('Settings:RefreshAfterUpdate', err);
-  }
+    // Re-render after settings arrive so layout-dependent controls like the group
+    // column count pick up UI_GROUP_COLUMN_COUNT on the browser surface.
+    try {
+      const { RenderFullClientAndMonitorList } = await import('./06-client-list');
+      RenderFullClientAndMonitorList();
+    } catch (err) {
+      HandleNonFatalError('Settings:RefreshAfterUpdate', err);
+    }
 
-  // Keep the gated + menu entry in step with its setting. Imported lazily
-  // because that module reads back through GetSettingValue below, and a static
-  // import either way would make the two modules circular.
-  try {
-    const { RefreshUnassignedClientMenuVisibility } = await import('./17-unassigned-clients');
-    await RefreshUnassignedClientMenuVisibility();
-  } catch (err) {
-    HandleNonFatalError('Settings:RefreshUnassignedClientMenu', err);
-  }
-  $('#REMOTE_ACCESS_SECTION').html('');
+    // Keep the gated + menu entry in step with its setting. Imported lazily
+    // because that module reads back through GetSettingValue below, and a static
+    // import either way would make the two modules circular.
+    try {
+      const { RefreshUnassignedClientMenuVisibility } = await import('./17-unassigned-clients');
+      await RefreshUnassignedClientMenuVisibility();
+    } catch (err) {
+      HandleNonFatalError('Settings:RefreshUnassignedClientMenu', err);
+    }
+    $('#REMOTE_ACCESS_SECTION').html('');
 
-  for (const Group of SettingsGroups) {
-    const GroupSettings = Settings.filter((s) => s.Group == Group.Name);
-    if (!GroupSettings.length) continue;
-    const $target = $(
-      `<div class="settings-section d-grid gap-2" id="SETTINGS_SECTION_${Group.Name}" data-nav-key="${Group.Name}" data-nav-title="${Safe(
-        Group.Title
-      )}"></div>`
-    );
-    $target.append(`<div class="bg-ghost-light p-2 rounded">
+    for (const Group of SettingsGroups) {
+      const GroupSettings = Settings.filter((s) => s.Group == Group.Name);
+      if (!GroupSettings.length) continue;
+      const $target = $(
+        `<div class="settings-section d-grid gap-2" id="SETTINGS_SECTION_${Group.Name}" data-nav-key="${Group.Name}" data-nav-title="${Safe(
+          Group.Title
+        )}"></div>`
+      );
+      $target.append(`<div class="bg-ghost-light p-2 rounded">
 			<strong class="text-start">
 				${Group.Title}
 			</strong>
 		</div>`);
-    $(`#SETTINGS`).append($target);
-    for (const Setting of GroupSettings) {
-      if (Setting.Type === 'BOOLEAN') {
-        $target
-          .append(`<div class="bg-ghost p-2 rounded d-flex justify-content-between text-start">
+      $(`#SETTINGS`).append($target);
+      for (const Setting of GroupSettings) {
+        if (Setting.Type === 'BOOLEAN') {
+          $target.append(`<div class="bg-ghost p-2 rounded d-flex justify-content-between text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}</span>
 						<span class="text-sm mb-0">${Setting.Description}</span>
@@ -194,44 +193,44 @@ function InitSettingsPush() {
             }>
 					</div>
 				</div>`);
-        $(`#SETTING_${Setting.Key}`)
-          .off('change')
-          .on('change', async function () {
-            const NewValue = $(this).is(':checked');
-            if (NewValue === Setting.Value) return;
-            const Set = Settings.find((s) => s.Key === Setting.Key);
-            if (Set) Set.Value = NewValue;
-            Setting.Value = NewValue;
-            await window.API.SetSetting(Setting.Key, NewValue);
-            Notify(
-              `[${Setting.Title}] ${NewValue ? 'Enabled' : 'Disabled'}`,
-              NewValue ? 'success' : 'error'
-            );
-          });
-      } else if (Setting.Type === 'STRING' || Setting.Type === 'PASSWORD') {
-        const isWebUiPassword = Setting.Key === 'WEBUI_PASSWORD';
-        // PASSWORD only changes how the field is rendered — it is a plain string
-        // everywhere else, so it shares the whole STRING code path below.
-        const isMasked = Setting.Type === 'PASSWORD';
-        const inputType = isMasked ? 'password' : 'text';
-        const inputMode = isWebUiPassword ? 'numeric' : 'text';
-        const inputPattern = isWebUiPassword
-          ? 'pattern="[0-9]{4}" maxlength="4"'
-          : isMasked
-            ? 'autocomplete="off" spellcheck="false"'
-            : '';
-        const inputPlaceholder = isWebUiPassword
-          ? '4 digit code'
-          : isMasked
-            ? 'Paste token...'
-            : 'Enter text...';
-        const initialValue = isWebUiPassword
-          ? String(Setting.Value == null ? '' : Setting.Value)
-              .replace(/\D/g, '')
-              .slice(0, 4)
-          : Safe(Setting.Value);
+          $(`#SETTING_${Setting.Key}`)
+            .off('change')
+            .on('change', async function () {
+              const NewValue = $(this).is(':checked');
+              if (NewValue === Setting.Value) return;
+              const Set = Settings.find((s) => s.Key === Setting.Key);
+              if (Set) Set.Value = NewValue;
+              Setting.Value = NewValue;
+              await window.API.SetSetting(Setting.Key, NewValue);
+              Notify(
+                `[${Setting.Title}] ${NewValue ? 'Enabled' : 'Disabled'}`,
+                NewValue ? 'success' : 'error'
+              );
+            });
+        } else if (Setting.Type === 'STRING' || Setting.Type === 'PASSWORD') {
+          const isWebUiPassword = Setting.Key === 'WEBUI_PASSWORD';
+          // PASSWORD only changes how the field is rendered — it is a plain string
+          // everywhere else, so it shares the whole STRING code path below.
+          const isMasked = Setting.Type === 'PASSWORD';
+          const inputType = isMasked ? 'password' : 'text';
+          const inputMode = isWebUiPassword ? 'numeric' : 'text';
+          const inputPattern = isWebUiPassword
+            ? 'pattern="[0-9]{4}" maxlength="4"'
+            : isMasked
+              ? 'autocomplete="off" spellcheck="false"'
+              : '';
+          const inputPlaceholder = isWebUiPassword
+            ? '4 digit code'
+            : isMasked
+              ? 'Paste token...'
+              : 'Enter text...';
+          const initialValue = isWebUiPassword
+            ? String(Setting.Value == null ? '' : Setting.Value)
+                .replace(/\D/g, '')
+                .slice(0, 4)
+            : Safe(Setting.Value);
 
-        $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
+          $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}</span>
 						<span class="text-sm mb-0">${Setting.Description}</span>
@@ -242,76 +241,76 @@ function InitSettingsPush() {
 					<div class="invalid-feedback" id="SETTING_${Setting.Key}_ERROR">Must be exactly 4 digits (0-9).</div>
 				</div>`);
 
-        const inputEl = $(`#SETTING_${Setting.Key}`);
-        const errorEl = $(`#SETTING_${Setting.Key}_ERROR`);
+          const inputEl = $(`#SETTING_${Setting.Key}`);
+          const errorEl = $(`#SETTING_${Setting.Key}_ERROR`);
 
-        const applyWebUiPasswordValidation = (value: string | number | string[] | undefined) => {
-          if (!isWebUiPassword) return { normalized: value, valid: true, saveable: true };
-          const normalized = String(value == null ? '' : value)
-            .replace(/\D/g, '')
-            .slice(0, 4);
-          const isEmpty = normalized.length === 0;
-          const isValid = isEmpty || /^\d{4}$/.test(normalized);
-          return { normalized, valid: isValid, saveable: isEmpty || normalized.length === 4 };
-        };
+          const applyWebUiPasswordValidation = (value: string | number | string[] | undefined) => {
+            if (!isWebUiPassword) return { normalized: value, valid: true, saveable: true };
+            const normalized = String(value == null ? '' : value)
+              .replace(/\D/g, '')
+              .slice(0, 4);
+            const isEmpty = normalized.length === 0;
+            const isValid = isEmpty || /^\d{4}$/.test(normalized);
+            return { normalized, valid: isValid, saveable: isEmpty || normalized.length === 4 };
+          };
 
-        const initialValidation = applyWebUiPasswordValidation(inputEl.val());
-        if (isWebUiPassword) {
-          inputEl.val(initialValidation.normalized ?? '');
-          inputEl.toggleClass('is-invalid', !initialValidation.valid);
-          errorEl.toggle(!initialValidation.valid);
-        } else {
-          errorEl.hide();
-        }
-
-        inputEl.off('input').on('input', function () {
-          const el = $(this);
-          let NewValue = el.val();
-          const validation = applyWebUiPasswordValidation(NewValue);
-
+          const initialValidation = applyWebUiPasswordValidation(inputEl.val());
           if (isWebUiPassword) {
-            if (validation.normalized !== NewValue) {
-              el.val(validation.normalized ?? '');
-            }
-            NewValue = validation.normalized;
-            el.toggleClass('is-invalid', !validation.valid);
-            errorEl.toggle(!validation.valid);
+            inputEl.val(initialValidation.normalized ?? '');
+            inputEl.toggleClass('is-invalid', !initialValidation.valid);
+            errorEl.toggle(!initialValidation.valid);
+          } else {
+            errorEl.hide();
           }
 
-          if (SettingDebounceTimers.has(Setting.Key))
-            clearTimeout(SettingDebounceTimers.get(Setting.Key));
-          SettingDebounceTimers.set(
-            Setting.Key,
-            setTimeout(async () => {
-              if (isWebUiPassword && !validation.saveable) return;
-              if (NewValue === Setting.Value) return;
-              const Set = Settings.find((s) => s.Key === Setting.Key);
-              const SettingValue = String(NewValue ?? '');
-              if (Set) Set.Value = SettingValue;
-              Setting.Value = SettingValue;
-              const [Err] = await window.API.SetSetting(Setting.Key, NewValue);
-              if (Err) {
-                if (isWebUiPassword) {
-                  el.addClass('is-invalid');
-                  errorEl.text('Must be exactly 4 digits (0-9).').show();
-                }
-                Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
-                return;
+          inputEl.off('input').on('input', function () {
+            const el = $(this);
+            let NewValue = el.val();
+            const validation = applyWebUiPasswordValidation(NewValue);
+
+            if (isWebUiPassword) {
+              if (validation.normalized !== NewValue) {
+                el.val(validation.normalized ?? '');
               }
-              Notify(`[${Setting.Title}] Saved`, 'success', 1200);
-            }, 600)
-          );
-        });
-      } else if (Setting.Type === 'INTEGER') {
-        const hasMin = typeof Setting.Min === 'number';
-        const hasMax = typeof Setting.Max === 'number';
-        const minAttr = hasMin ? `min="${Setting.Min}"` : '';
-        const maxAttr = hasMax ? `max="${Setting.Max}"` : '';
-        const rangeHint =
-          hasMin && hasMax
-            ? ` <span class="text-sm text-muted">(${Setting.Min}–${Setting.Max})</span>`
-            : '';
-        $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
+              NewValue = validation.normalized;
+              el.toggleClass('is-invalid', !validation.valid);
+              errorEl.toggle(!validation.valid);
+            }
+
+            if (SettingDebounceTimers.has(Setting.Key))
+              clearTimeout(SettingDebounceTimers.get(Setting.Key));
+            SettingDebounceTimers.set(
+              Setting.Key,
+              setTimeout(async () => {
+                if (isWebUiPassword && !validation.saveable) return;
+                if (NewValue === Setting.Value) return;
+                const Set = Settings.find((s) => s.Key === Setting.Key);
+                const SettingValue = String(NewValue ?? '');
+                if (Set) Set.Value = SettingValue;
+                Setting.Value = SettingValue;
+                const [Err] = await window.API.SetSetting(Setting.Key, NewValue);
+                if (Err) {
+                  if (isWebUiPassword) {
+                    el.addClass('is-invalid');
+                    errorEl.text('Must be exactly 4 digits (0-9).').show();
+                  }
+                  Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
+                  return;
+                }
+                Notify(`[${Setting.Title}] Saved`, 'success', 1200);
+              }, 600)
+            );
+          });
+        } else if (Setting.Type === 'INTEGER') {
+          const hasMin = typeof Setting.Min === 'number';
+          const hasMax = typeof Setting.Max === 'number';
+          const minAttr = hasMin ? `min="${Setting.Min}"` : '';
+          const maxAttr = hasMax ? `max="${Setting.Max}"` : '';
+          const rangeHint =
+            hasMin && hasMax
+              ? ` <span class="text-sm text-muted">(${Setting.Min}–${Setting.Max})</span>`
+              : '';
+          $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}${rangeHint}</span>
 						<span class="text-sm mb-0">${Setting.Description}</span>
@@ -320,34 +319,34 @@ function InitSettingsPush() {
             Setting.Key
           }" value="${Safe(Setting.Value)}" step="1" ${minAttr} ${maxAttr} />
 				</div>`);
-        $(`#SETTING_${Setting.Key}`)
-          .off('input')
-          .on('input', function () {
-            const el = $(this);
-            const Raw = el.val();
-            if (SettingDebounceTimers.has(Setting.Key))
-              clearTimeout(SettingDebounceTimers.get(Setting.Key));
-            SettingDebounceTimers.set(
-              Setting.Key,
-              setTimeout(async () => {
-                let NewValue = parseInt(String(Raw), 10);
-                if (isNaN(NewValue)) NewValue = Number(Setting.Value); // keep previous until valid
-                if (hasMin && NewValue < Setting.Min!) NewValue = Setting.Min!;
-                if (hasMax && NewValue > Setting.Max!) NewValue = Setting.Max!;
-                if (NewValue === Setting.Value) return;
-                const Set = Settings.find((s) => s.Key === Setting.Key);
-                if (Set) Set.Value = NewValue;
-                Setting.Value = NewValue;
-                await window.API.SetSetting(Setting.Key, NewValue);
-                Notify(`[${Setting.Title}] Saved (${NewValue})`, 'success', 1200);
-              }, 600)
-            );
-          });
-      } else if (Setting.Type === 'SLIDER') {
-        const min = typeof Setting.Min === 'number' ? Setting.Min : 0;
-        const max = typeof Setting.Max === 'number' ? Setting.Max : 100;
-        const unit = Setting.Unit ? Safe(Setting.Unit) : '';
-        $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
+          $(`#SETTING_${Setting.Key}`)
+            .off('input')
+            .on('input', function () {
+              const el = $(this);
+              const Raw = el.val();
+              if (SettingDebounceTimers.has(Setting.Key))
+                clearTimeout(SettingDebounceTimers.get(Setting.Key));
+              SettingDebounceTimers.set(
+                Setting.Key,
+                setTimeout(async () => {
+                  let NewValue = parseInt(String(Raw), 10);
+                  if (isNaN(NewValue)) NewValue = Number(Setting.Value); // keep previous until valid
+                  if (hasMin && NewValue < Setting.Min!) NewValue = Setting.Min!;
+                  if (hasMax && NewValue > Setting.Max!) NewValue = Setting.Max!;
+                  if (NewValue === Setting.Value) return;
+                  const Set = Settings.find((s) => s.Key === Setting.Key);
+                  if (Set) Set.Value = NewValue;
+                  Setting.Value = NewValue;
+                  await window.API.SetSetting(Setting.Key, NewValue);
+                  Notify(`[${Setting.Title}] Saved (${NewValue})`, 'success', 1200);
+                }, 600)
+              );
+            });
+        } else if (Setting.Type === 'SLIDER') {
+          const min = typeof Setting.Min === 'number' ? Setting.Min : 0;
+          const max = typeof Setting.Max === 'number' ? Setting.Max : 100;
+          const unit = Setting.Unit ? Safe(Setting.Unit) : '';
+          $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-flex justify-content-between align-items-center">
 						<span>${Setting.Title}</span>
 						<span class="text-sm text-muted" id="SETTING_${Setting.Key}_VALUE">${Safe(Setting.Value)}${unit}</span>
@@ -357,67 +356,67 @@ function InitSettingsPush() {
             Setting.Key
           }" min="${min}" max="${max}" step="1" value="${Safe(Setting.Value)}" />
 				</div>`);
-        $(`#SETTING_${Setting.Key}`)
-          .off('input')
-          .on('input', function () {
-            const el = $(this);
-            let NewValue = parseInt(String(el.val()), 10);
-            if (isNaN(NewValue)) NewValue = Number(Setting.Value);
-            if (NewValue < min) NewValue = min;
-            if (NewValue > max) NewValue = max;
-            // Update the readout immediately; persistence is debounced so we
-            // don't hammer the DB while the user drags the handle.
-            $(`#SETTING_${Setting.Key}_VALUE`).text(`${NewValue}${unit}`);
-            if (SettingDebounceTimers.has(Setting.Key))
-              clearTimeout(SettingDebounceTimers.get(Setting.Key));
-            SettingDebounceTimers.set(
-              Setting.Key,
-              setTimeout(async () => {
-                if (NewValue === Setting.Value) return;
-                const Set = Settings.find((s) => s.Key === Setting.Key);
-                if (Set) Set.Value = NewValue;
-                Setting.Value = NewValue;
-                await window.API.SetSetting(Setting.Key, NewValue);
-                Notify(`[${Setting.Title}] Saved (${NewValue}${unit})`, 'success', 1200);
-              }, 400)
-            );
-          });
-      } else if (Setting.Type === 'OPTION') {
-        let optionsHtml = '';
-        if (Array.isArray(Setting.Options)) {
-          for (const opt of Setting.Options) {
-            optionsHtml += `<option value="${Safe(opt)}" ${Setting.Value === opt ? 'selected' : ''}>${Safe(
-              opt
-            )}</option>`;
+          $(`#SETTING_${Setting.Key}`)
+            .off('input')
+            .on('input', function () {
+              const el = $(this);
+              let NewValue = parseInt(String(el.val()), 10);
+              if (isNaN(NewValue)) NewValue = Number(Setting.Value);
+              if (NewValue < min) NewValue = min;
+              if (NewValue > max) NewValue = max;
+              // Update the readout immediately; persistence is debounced so we
+              // don't hammer the DB while the user drags the handle.
+              $(`#SETTING_${Setting.Key}_VALUE`).text(`${NewValue}${unit}`);
+              if (SettingDebounceTimers.has(Setting.Key))
+                clearTimeout(SettingDebounceTimers.get(Setting.Key));
+              SettingDebounceTimers.set(
+                Setting.Key,
+                setTimeout(async () => {
+                  if (NewValue === Setting.Value) return;
+                  const Set = Settings.find((s) => s.Key === Setting.Key);
+                  if (Set) Set.Value = NewValue;
+                  Setting.Value = NewValue;
+                  await window.API.SetSetting(Setting.Key, NewValue);
+                  Notify(`[${Setting.Title}] Saved (${NewValue}${unit})`, 'success', 1200);
+                }, 400)
+              );
+            });
+        } else if (Setting.Type === 'OPTION') {
+          let optionsHtml = '';
+          if (Array.isArray(Setting.Options)) {
+            for (const opt of Setting.Options) {
+              optionsHtml += `<option value="${Safe(opt)}" ${Setting.Value === opt ? 'selected' : ''}>${Safe(
+                opt
+              )}</option>`;
+            }
           }
-        }
-        $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
+          $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}</span>
 						<span class="text-sm mb-0">${Setting.Description}</span>
 					</div>
 					<select class="form-select form-select-sm bg-ghost-light text-light border-0" id="SETTING_${Setting.Key}">${optionsHtml}</select>
 				</div>`);
-        $(`#SETTING_${Setting.Key}`)
-          .off('change')
-          .on('change', async function () {
-            const NewValue = $(this).val();
-            if (NewValue === Setting.Value) return;
-            const Set = Settings.find((s) => s.Key === Setting.Key);
-            const SettingValue = String(NewValue ?? '');
-            if (Set) Set.Value = SettingValue;
-            Setting.Value = SettingValue;
-            await window.API.SetSetting(Setting.Key, NewValue);
-            Notify(`[${Setting.Title}] ${NewValue}`, 'success', 1200);
-          });
+          $(`#SETTING_${Setting.Key}`)
+            .off('change')
+            .on('change', async function () {
+              const NewValue = $(this).val();
+              if (NewValue === Setting.Value) return;
+              const Set = Settings.find((s) => s.Key === Setting.Key);
+              const SettingValue = String(NewValue ?? '');
+              if (Set) Set.Value = SettingValue;
+              Setting.Value = SettingValue;
+              await window.API.SetSetting(Setting.Key, NewValue);
+              Notify(`[${Setting.Title}] ${NewValue}`, 'success', 1200);
+            });
+        }
       }
     }
-  }
 
-  // Remote Access section: enumerate Web UI addresses and render list with QR.
-  await RenderRemoteAccessSection();
+    // Remote Access section: enumerate Web UI addresses and render list with QR.
+    await RenderRemoteAccessSection();
 
-  return;
+    return;
   });
 }
 

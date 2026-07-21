@@ -189,8 +189,12 @@ function gfMul(x: number, y: number): number {
 
 function renderMatrix(version: number, ecc: Ecc, allCodewords: number[]): boolean[][] {
   const size = version * 4 + 17;
-  const modules: boolean[][] = Array.from({ length: size }, () => new Array<boolean>(size).fill(false));
-  const isFunction: boolean[][] = Array.from({ length: size }, () => new Array<boolean>(size).fill(false));
+  const modules: boolean[][] = Array.from({ length: size }, () =>
+    new Array<boolean>(size).fill(false)
+  );
+  const isFunction: boolean[][] = Array.from({ length: size }, () =>
+    new Array<boolean>(size).fill(false)
+  );
 
   const setFunction = (x: number, y: number, dark: boolean) => {
     // In-bounds: callers only pass 0 <= x,y < size (matrix is size×size).
@@ -352,21 +356,42 @@ function drawCodewords(
   }
 }
 
-function applyMask(mask: number, modules: boolean[][], isFunction: boolean[][], size: number): void {
+function applyMask(
+  mask: number,
+  modules: boolean[][],
+  isFunction: boolean[][],
+  size: number
+): void {
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       // In-bounds: x,y iterate 0..size-1 over the size×size matrix.
       if (isFunction[y]![x]) continue;
       let invert = false;
       switch (mask) {
-        case 0: invert = (x + y) % 2 === 0; break;
-        case 1: invert = y % 2 === 0; break;
-        case 2: invert = x % 3 === 0; break;
-        case 3: invert = (x + y) % 3 === 0; break;
-        case 4: invert = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0; break;
-        case 5: invert = ((x * y) % 2) + ((x * y) % 3) === 0; break;
-        case 6: invert = (((x * y) % 2) + ((x * y) % 3)) % 2 === 0; break;
-        case 7: invert = (((x + y) % 2) + ((x * y) % 3)) % 2 === 0; break;
+        case 0:
+          invert = (x + y) % 2 === 0;
+          break;
+        case 1:
+          invert = y % 2 === 0;
+          break;
+        case 2:
+          invert = x % 3 === 0;
+          break;
+        case 3:
+          invert = (x + y) % 3 === 0;
+          break;
+        case 4:
+          invert = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0;
+          break;
+        case 5:
+          invert = ((x * y) % 2) + ((x * y) % 3) === 0;
+          break;
+        case 6:
+          invert = (((x * y) % 2) + ((x * y) % 3)) % 2 === 0;
+          break;
+        case 7:
+          invert = (((x + y) % 2) + ((x * y) % 3)) % 2 === 0;
+          break;
       }
       if (invert) modules[y]![x] = !modules[y]![x];
     }
@@ -444,7 +469,7 @@ function computePenalty(modules: boolean[][], size: number): number {
   let dark = 0;
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (modules[y]![x]) dark++;
   const total = size * size;
-  const k = Math.abs(Math.ceil(((dark * 100) / total) / 5) - 10);
+  const k = Math.abs(Math.ceil((dark * 100) / total / 5) - 10);
   penalty += k * 10;
 
   return penalty;

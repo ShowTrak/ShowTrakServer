@@ -73,7 +73,8 @@ export interface CardOptions {
 // shade theme (see .monitoring-debug-card in 05-monitoring.css).
 export function Card(Options: CardOptions): string {
   const Cls = 'monitoring-debug-card' + (Options.Highlight ? ' monitoring-debug-card--match' : '');
-  const TitleCls = 'text-light small text-break' + (Options.TitleClass ? ` ${Options.TitleClass}` : '');
+  const TitleCls =
+    'text-light small text-break' + (Options.TitleClass ? ` ${Options.TitleClass}` : '');
   return (
     `<div class="${Cls}">` +
     '<div class="d-flex justify-content-between align-items-center gap-2">' +

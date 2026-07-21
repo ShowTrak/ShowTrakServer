@@ -637,42 +637,45 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
     await SendInitialState();
 
     // --- Authentication handlers -------------------------------------------
-    socket.on('auth:login', async (payload: { password?: unknown } | undefined, cb: AckCallback) => {
-      try {
-        const Cfg = await GetWebConfig();
-        if (!Cfg.Enabled) {
-          return cb && cb({ error: 'disabled' });
-        }
-        const Now = Date.now();
-        if (!Cfg.RequireAuth) {
-          socket.Authed = true;
+    socket.on(
+      'auth:login',
+      async (payload: { password?: unknown } | undefined, cb: AckCallback) => {
+        try {
+          const Cfg = await GetWebConfig();
+          if (!Cfg.Enabled) {
+            return cb && cb({ error: 'disabled' });
+          }
+          const Now = Date.now();
+          if (!Cfg.RequireAuth) {
+            socket.Authed = true;
+            const token = IssueToken(Now);
+            socket.SessionToken = token;
+            await SendInitialState();
+            return cb && cb({ ok: true, token });
+          }
+          // Throttle brute force against the 4-digit PIN: an IP that has tripped
+          // the failure threshold is refused outright until its lockout elapses.
+          const IP = (socket.handshake && socket.handshake.address) || 'unknown';
+          const RetryAfterMs = LoginRetryAfterMs(IP, Now);
+          if (RetryAfterMs > 0) {
+            return cb && cb({ error: 'rate_limited', retryAfterMs: RetryAfterMs });
+          }
+          const Passcode = String((payload && payload.password) || '').trim();
+          if (!PasscodeMatches(Passcode, Cfg.Password)) {
+            RecordLoginFailure(IP, Now);
+            return cb && cb({ error: 'invalid_password' });
+          }
+          ClearLoginFailures(IP);
           const token = IssueToken(Now);
+          socket.Authed = true;
           socket.SessionToken = token;
           await SendInitialState();
-          return cb && cb({ ok: true, token });
+          if (cb) cb({ ok: true, token });
+        } catch (e) {
+          if (cb) cb({ error: 'failed' });
         }
-        // Throttle brute force against the 4-digit PIN: an IP that has tripped
-        // the failure threshold is refused outright until its lockout elapses.
-        const IP = (socket.handshake && socket.handshake.address) || 'unknown';
-        const RetryAfterMs = LoginRetryAfterMs(IP, Now);
-        if (RetryAfterMs > 0) {
-          return cb && cb({ error: 'rate_limited', retryAfterMs: RetryAfterMs });
-        }
-        const Passcode = String((payload && payload.password) || '').trim();
-        if (!PasscodeMatches(Passcode, Cfg.Password)) {
-          RecordLoginFailure(IP, Now);
-          return cb && cb({ error: 'invalid_password' });
-        }
-        ClearLoginFailures(IP);
-        const token = IssueToken(Now);
-        socket.Authed = true;
-        socket.SessionToken = token;
-        await SendInitialState();
-        if (cb) cb({ ok: true, token });
-      } catch (e) {
-        if (cb) cb({ error: 'failed' });
       }
-    });
+    );
 
     socket.on('auth:logout', async (cb: AckCallback) => {
       try {

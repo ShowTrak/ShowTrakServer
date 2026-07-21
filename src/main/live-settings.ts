@@ -83,7 +83,9 @@ export async function initLiveSettings(): Promise<void> {
   await ApplyDisplaySleep();
   await ApplyOsc();
 
-  BroadcastManager.on('LoggingSettingsChanged', () => RunGuarded('log level', () => ApplyLogLevel(true)));
+  BroadcastManager.on('LoggingSettingsChanged', () =>
+    RunGuarded('log level', () => ApplyLogLevel(true))
+  );
   BroadcastManager.on('MonitoringSettingsChanged', () =>
     RunGuarded('monitoring defaults', ApplyMonitoringDefaults)
   );

@@ -81,12 +81,7 @@ export function IsGrandMa2Banner(Clean: unknown): boolean {
 }
 
 export type Ma2LoginState =
-  | 'not-attempted'
-  | 'ok'
-  | 'bad-credentials'
-  | 'disabled'
-  | 'timeout'
-  | 'error';
+  'not-attempted' | 'ok' | 'bad-credentials' | 'disabled' | 'timeout' | 'error';
 
 // Classify the console's response to a `login` command. Returns null while the
 // response is still incomplete (keep reading).
@@ -100,7 +95,10 @@ export function ClassifyLogin(Segment: string): Ma2LoginState | null {
 // Best-effort parse of the read-only `Version` command feedback. The exact
 // column layout is not published, so both fields are matched loosely and may be
 // null on an unrecognised layout.
-export function ParseVersionReply(Segment: string): { Version: string | null; ShowFile: string | null } {
+export function ParseVersionReply(Segment: string): {
+  Version: string | null;
+  ShowFile: string | null;
+} {
   const VersionMatch = Segment.match(/(\d+\.\d+\.\d+(?:\.\d+)?)/);
   const ShowMatch =
     Segment.match(/show\s*file\s*[:=]?\s*([^\r\n]+)/i) ||
@@ -162,7 +160,10 @@ export async function QueryMa2Status(
       resolve(Result);
     };
 
-    const FinishReachable = (LoginState: Ma2LoginState, Extra?: { Version?: string | null; ShowFile?: string | null }) =>
+    const FinishReachable = (
+      LoginState: Ma2LoginState,
+      Extra?: { Version?: string | null; ShowFile?: string | null }
+    ) =>
       Finish({
         Reachable: true,
         LatencyMs: Date.now() - Started,
@@ -332,8 +333,15 @@ export async function RunMa2Probe(
   }
 
   const Snapshot = (await MA2_QUERY_CACHE.GetOrCreate(
-    BuildMa2QueryCacheKey(Config.Address, Config.Port, Config.User, Config.Password, Config.TimeoutMs),
-    () => QueryMa2Status(Config.Address, Config.Port, Config.User, Config.Password, Config.TimeoutMs),
+    BuildMa2QueryCacheKey(
+      Config.Address,
+      Config.Port,
+      Config.User,
+      Config.Password,
+      Config.TimeoutMs
+    ),
+    () =>
+      QueryMa2Status(Config.Address, Config.Port, Config.User, Config.Password, Config.TimeoutMs),
     { ttlMs: ResolveMa2QueryCacheTtlMs(Config.TimeoutMs) }
   )) as Ma2Snapshot;
 
@@ -391,7 +399,12 @@ export function Ma2DebugHead(
     ...ExtraRows,
   ]);
   if (!Reachable) {
-    return Head + '<div class="mt-2">' + Note('Could not reach the grandMA2 telnet remote (TCP 30000)') + '</div>';
+    return (
+      Head +
+      '<div class="mt-2">' +
+      Note('Could not reach the grandMA2 telnet remote (TCP 30000)') +
+      '</div>'
+    );
   }
   return Head;
 }

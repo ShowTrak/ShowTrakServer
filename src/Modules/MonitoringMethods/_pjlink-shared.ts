@@ -46,7 +46,7 @@ export const CommonPJLinkSettings: MonitoringSettingField[] = [
     Label: 'PJLink password',
     Type: 'string',
     Default: '',
-    Note: 'Enter the projector\'s PJLink password. Leave blank when authentication is off.',
+    Note: "Enter the projector's PJLink password. Leave blank when authentication is off.",
   },
   {
     Key: 'Timeout',
@@ -94,11 +94,7 @@ export function ParseGreeting(
 // that order, no separator). Spec test vector: seed 498e4a67 with password
 // JBMIAProjectorLink -> 5d8409bc1c3fa39749434aa3a5c38682.
 export function BuildAuthDigest(Seed: string, Password: string): string {
-  return crypto
-    .createHash('md5')
-    .update(`${Seed}${Password}`)
-    .digest('hex')
-    .toLowerCase();
+  return crypto.createHash('md5').update(`${Seed}${Password}`).digest('hex').toLowerCase();
 }
 
 // Build a query line, e.g. BuildCommand('POWR') -> '%1POWR ?\r'. The auth digest
@@ -603,7 +599,9 @@ export function PJLinkDebugHead(
     ...ExtraRows,
   ]);
   if (!Reachable) {
-    return Head + '<div class="mt-2">' + Note('Could not reach the projector over PJLink') + '</div>';
+    return (
+      Head + '<div class="mt-2">' + Note('Could not reach the projector over PJLink') + '</div>'
+    );
   }
   return Head;
 }

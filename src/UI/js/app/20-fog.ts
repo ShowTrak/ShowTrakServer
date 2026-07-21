@@ -250,7 +250,10 @@ export async function OpenFogTaskModal(
 
       const SnapinRaw = String($('#FOG_TASK_SNAPIN').val() || '').trim();
       const SnapinID = Type.RequiresSnapinID ? parseInt(SnapinRaw, 10) : null;
-      if (Type.RequiresSnapinID && (!Number.isFinite(SnapinID as number) || (SnapinID as number) <= 0)) {
+      if (
+        Type.RequiresSnapinID &&
+        (!Number.isFinite(SnapinID as number) || (SnapinID as number) <= 0)
+      ) {
         await Notify('Enter the snapin ID to deploy.', 'error');
         return;
       }

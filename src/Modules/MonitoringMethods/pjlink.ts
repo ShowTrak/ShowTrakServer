@@ -115,7 +115,8 @@ function ParseHealthOptions(Target: MonitoringTargetLike): HealthOptions {
   const ExpectedPower = String(Cfg.ExpectedPower);
   return {
     CheckPower: !!Cfg.CheckPower,
-    ExpectedPower: ExpectedPower === 'on' || ExpectedPower === 'any' ? ExpectedPower : 'on-or-warmup',
+    ExpectedPower:
+      ExpectedPower === 'on' || ExpectedPower === 'any' ? ExpectedPower : 'on-or-warmup',
     CheckErrors: !!Cfg.CheckErrors,
     WarningsDegrade: !!Cfg.WarningsDegrade,
     CheckLamp: !!Cfg.CheckLamp,
@@ -207,13 +208,16 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   if (Reachable) {
     ExtraRows.push(TextRow('Power', String(Result.PowerLabel || PowerLabel(null))));
 
-    const Erst = Result.Erst && typeof Result.Erst === 'object' ? (Result.Erst as ErstStatus) : null;
+    const Erst =
+      Result.Erst && typeof Result.Erst === 'object' ? (Result.Erst as ErstStatus) : null;
     if (Erst) {
       const ErrorReasons = ErstReasons(Erst, true);
       ExtraRows.push(
         Row(
           'Error status',
-          ErrorReasons.length ? Pill('warning', ErrorReasons.join(', ')) : Pill('success', 'No errors')
+          ErrorReasons.length
+            ? Pill('warning', ErrorReasons.join(', '))
+            : Pill('success', 'No errors')
         )
       );
     }
@@ -231,7 +235,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     }
 
     if (Result.Input != null && Result.Input !== '') {
-      const Wanted = Options.ExpectedInput ? ` (expected ${InputLabel(Options.ExpectedInput)})` : '';
+      const Wanted = Options.ExpectedInput
+        ? ` (expected ${InputLabel(Options.ExpectedInput)})`
+        : '';
       ExtraRows.push(TextRow('Input', `${InputLabel(Result.Input)}${Wanted}`));
     }
     if (Result.Class != null && Result.Class !== '') {

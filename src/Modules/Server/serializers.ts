@@ -210,10 +210,4 @@ const ToPublicDummy = (d: PublicDummySource): ClientView =>
     Type: 'dummy',
   }) as unknown as ClientView;
 
-export {
-  FormatClientVersionLabel,
-  ToPublicClient,
-  ToPublicGroup,
-  ToPublicMonitor,
-  ToPublicDummy,
-};
+export { FormatClientVersionLabel, ToPublicClient, ToPublicGroup, ToPublicMonitor, ToPublicDummy };

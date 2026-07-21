@@ -88,7 +88,10 @@ function NormalizeConsoleFilter(value: unknown): { filter: ConsoleFilterConfig; 
 
   let Mode = typeof raw.Mode === 'string' ? raw.Mode.trim() : '';
   if (!CONSOLE_FILTER_MODES.includes(Mode)) {
-    if (Mode) errors.push(`ConsoleFilter "Mode" was invalid; defaulted to "${DEFAULT_CONSOLE_FILTER_MODE}".`);
+    if (Mode)
+      errors.push(
+        `ConsoleFilter "Mode" was invalid; defaulted to "${DEFAULT_CONSOLE_FILTER_MODE}".`
+      );
     Mode = DEFAULT_CONSOLE_FILTER_MODE;
   }
 

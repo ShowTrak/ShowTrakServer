@@ -85,8 +85,8 @@ function ToPublicScriptExecution(Exec: ScriptExecution): PublicScriptExecution {
     },
     Client: {
       UUID: C ? C.UUID : null,
-      Nickname: C ? C.Nickname ?? null : null,
-      Hostname: C ? C.Hostname ?? null : null,
+      Nickname: C ? (C.Nickname ?? null) : null,
+      Hostname: C ? (C.Hostname ?? null) : null,
     },
     Script: {
       ID: Exec.Script ? String(Exec.Script.ID ?? '') : '',

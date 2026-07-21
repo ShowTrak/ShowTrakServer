@@ -6,37 +6,37 @@ import { DismissAlert, PendingAdoptionAlerts } from './10-alerts-tray';
 // Called by the bootstrap orchestrator in main.ts — never at import time.
 export function InitDnd() {
   document.addEventListener('click', async (e) => {
-  const target = e.target as HTMLButtonElement | null;
-  if (!(target && target.classList && target.classList.contains('ADOPT_BTN'))) return;
-  // Prevent bubbling to tile click handler (which toggles selection)
-  try {
-    e.preventDefault();
-    e.stopPropagation();
-  } catch (err) {
-    HandleNonFatalError('DnD:AdoptButtonPreventDefault', err);
-  }
-  const btn = target;
-  const UUID = btn.getAttribute('data-uuid');
-  if (!UUID) return;
-  try {
-    btn.disabled = true;
-    btn.textContent = 'Adopting…';
-    // Auto-dismiss any existing adoption alert for this UUID immediately
+    const target = e.target as HTMLButtonElement | null;
+    if (!(target && target.classList && target.classList.contains('ADOPT_BTN'))) return;
+    // Prevent bubbling to tile click handler (which toggles selection)
     try {
-      const id = PendingAdoptionAlerts.get(UUID);
-      if (id) {
-        DismissAlert(id);
-        PendingAdoptionAlerts.delete(UUID);
-      }
+      e.preventDefault();
+      e.stopPropagation();
     } catch (err) {
-      HandleNonFatalError('DnD:DismissPendingAdoptionAlert', err);
+      HandleNonFatalError('DnD:AdoptButtonPreventDefault', err);
     }
-    await window.API.AdoptDevice(UUID);
-  } catch (err) {
-    HandleNonFatalError('DnD:AdoptDevice', err);
-    btn.disabled = false;
-    btn.textContent = 'Adopt';
-  }
+    const btn = target;
+    const UUID = btn.getAttribute('data-uuid');
+    if (!UUID) return;
+    try {
+      btn.disabled = true;
+      btn.textContent = 'Adopting…';
+      // Auto-dismiss any existing adoption alert for this UUID immediately
+      try {
+        const id = PendingAdoptionAlerts.get(UUID);
+        if (id) {
+          DismissAlert(id);
+          PendingAdoptionAlerts.delete(UUID);
+        }
+      } catch (err) {
+        HandleNonFatalError('DnD:DismissPendingAdoptionAlert', err);
+      }
+      await window.API.AdoptDevice(UUID);
+    } catch (err) {
+      HandleNonFatalError('DnD:AdoptDevice', err);
+      btn.disabled = false;
+      btn.textContent = 'Adopt';
+    }
   });
 }
 

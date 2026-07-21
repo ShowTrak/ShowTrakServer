@@ -182,7 +182,10 @@ const Manager = {
     if (GetErr) return Fail(GetErr);
     if (!Tag) return Fail('Tag not found');
 
-    const [SlugErr, Resolved] = await SlugService.ResolveTagSlugEdit(Slug, SlugService.TagOwner(TagID));
+    const [SlugErr, Resolved] = await SlugService.ResolveTagSlugEdit(
+      Slug,
+      SlugService.TagOwner(TagID)
+    );
     if (SlugErr) return Fail(SlugErr);
 
     const [SetErr] = await Tag.SetSlug(Resolved as string);

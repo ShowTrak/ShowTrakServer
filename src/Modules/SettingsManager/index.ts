@@ -46,7 +46,10 @@ interface SettingsManagerShape {
 const Settings = new Map<string, Setting>();
 
 // Clamp an integer into a setting's optional [Min, Max] bounds.
-function ClampInteger(Setting: { Min?: number | null; Max?: number | null }, Value: number): number {
+function ClampInteger(
+  Setting: { Min?: number | null; Max?: number | null },
+  Value: number
+): number {
   let Result = Value;
   if (typeof Setting.Min === 'number' && Number.isFinite(Setting.Min) && Result < Setting.Min) {
     Result = Setting.Min;

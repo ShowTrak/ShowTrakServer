@@ -33,11 +33,7 @@ interface PerformHttpOpts {
   Scheme?: string;
 }
 
-function ParseAddress(
-  Address: unknown,
-  DefaultProtocol: string,
-  DefaultPort: number
-): URL | null {
+function ParseAddress(Address: unknown, DefaultProtocol: string, DefaultPort: number): URL | null {
   const Trimmed = String(Address || '').trim();
   if (!Trimmed) return null;
 
@@ -82,11 +78,17 @@ function PerformHttpRequest(
     return Promise.resolve({ Success: false, Error: `HTTP method not allowed: ${Method}` });
   }
 
-  const StatusMin = Number.isFinite(Cfg.ExpectedStatusMin) ? (Cfg.ExpectedStatusMin as number) | 0 : 200;
-  const StatusMax = Number.isFinite(Cfg.ExpectedStatusMax) ? (Cfg.ExpectedStatusMax as number) | 0 : 399;
+  const StatusMin = Number.isFinite(Cfg.ExpectedStatusMin)
+    ? (Cfg.ExpectedStatusMin as number) | 0
+    : 200;
+  const StatusMax = Number.isFinite(Cfg.ExpectedStatusMax)
+    ? (Cfg.ExpectedStatusMax as number) | 0
+    : 399;
   const FollowRedirects = !!Cfg.FollowRedirects;
   const IgnoreTlsErrors = !!Cfg.IgnoreTlsErrors;
-  const TimeoutMs = Number.isFinite(Cfg.Timeout) ? Math.max(500, (Cfg.Timeout as number) | 0) : 5000;
+  const TimeoutMs = Number.isFinite(Cfg.Timeout)
+    ? Math.max(500, (Cfg.Timeout as number) | 0)
+    : 5000;
   const CaptureBody = !!(Opts && Opts.CaptureBody);
 
   return DoRequest(Url, {

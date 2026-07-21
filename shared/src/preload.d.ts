@@ -98,7 +98,10 @@ export interface ShowTrakAPI {
   GetUpdateManagerStatus(): Promise<ResultTuple<UpdateManagerStatus>>;
   GetUpdateManagerReleases(): Promise<ResultTuple<UpdateReleaseOption[]>>;
   DownloadUpdateManagerRelease(Tag: string): Promise<ResultTuple<UpdateDownloadResult>>;
-  DeployUpdateManagerRelease(Tag: string, Targets: string[]): Promise<ResultTuple<UpdateDeployResult>>;
+  DeployUpdateManagerRelease(
+    Tag: string,
+    Targets: string[]
+  ): Promise<ResultTuple<UpdateDeployResult>>;
   OnUpdateManagerDownloadProgress(callback: (payload: UpdateDownloadProgress) => void): Unsubscribe;
 
   // ---- Lifecycle --------------------------------------------------------
@@ -118,7 +121,10 @@ export interface ShowTrakAPI {
   MarkClientUSBNameCritical(UUID: string, Device: unknown): Promise<ResultTuple<unknown>>;
   RemoveClientUSBNameCritical(UUID: string, Device: unknown): Promise<ResultTuple<unknown>>;
   MarkClientApplicationCritical(UUID: string, Application: unknown): Promise<ResultTuple<unknown>>;
-  RemoveClientApplicationCritical(UUID: string, ApplicationName: string): Promise<ResultTuple<unknown>>;
+  RemoveClientApplicationCritical(
+    UUID: string,
+    ApplicationName: string
+  ): Promise<ResultTuple<unknown>>;
   MarkClientDisplayCritical(UUID: string, Display: unknown): Promise<ResultTuple<unknown>>;
   RemoveClientDisplayCritical(UUID: string, DisplayID: string): Promise<ResultTuple<unknown>>;
   /** Manually record an extra MAC address against a client. Resolves Ok(true)
@@ -131,10 +137,7 @@ export interface ShowTrakAPI {
   StopIdentifyingClient(UUID: string): Promise<unknown>;
   UnadoptClient(UUID: string): Promise<unknown>;
   ReplaceClient(CurrentUUID: string, ReplacementUUID: string): Promise<ResultTuple<unknown>>;
-  CreateUnassignedClients(Payload: {
-    Name: string;
-    Count: number;
-  }): Promise<ResultTuple<number>>;
+  CreateUnassignedClients(Payload: { Name: string; Count: number }): Promise<ResultTuple<number>>;
   WakeOnLan(Targets: string[]): Promise<unknown>;
 
   // ---- Groups -----------------------------------------------------------
@@ -240,7 +243,10 @@ export interface ShowTrakAPI {
   RunMonitoringCheckNow(CheckID: number): Promise<MonitoringCheckDebug | null>;
   RunAllMonitoringChecksNow(TargetID: string): Promise<unknown>;
   CreateMonitoringTarget(Payload: unknown): Promise<ResultTuple<MonitoringTargetView>>;
-  UpdateMonitoringTarget(TargetID: number, Payload: unknown): Promise<ResultTuple<MonitoringTargetView>>;
+  UpdateMonitoringTarget(
+    TargetID: number,
+    Payload: unknown
+  ): Promise<ResultTuple<MonitoringTargetView>>;
   DeleteMonitoringTarget(TargetID: number): Promise<ResultTuple<unknown>>;
   SetFullMonitoringTargetList(callback: (targets: MonitoringTargetView[]) => void): Unsubscribe;
   MonitoringTargetUpdated(callback: (target: MonitoringTargetView) => void): Unsubscribe;
@@ -294,7 +300,9 @@ export interface ShowTrakAPI {
   TestFogConnection(): Promise<FogStatusView>;
   /** Never rejects when FOG is down — returns the last known list instead. */
   GetFogHosts(): Promise<ResultTuple<FogHostView[]>>;
-  GetFogHostLink(UUID: string): Promise<ResultTuple<{ FogHostID: number; FogHostName: string | null } | null>>;
+  GetFogHostLink(
+    UUID: string
+  ): Promise<ResultTuple<{ FogHostID: number; FogHostName: string | null } | null>>;
   /** Pass null (or 0) as FogHostID to unlink the client. */
   SetFogHostLink(UUID: string, FogHostID: number | null): Promise<ResultTuple<boolean>>;
   GetFogTaskTypes(): Promise<FogTaskTypeView[]>;

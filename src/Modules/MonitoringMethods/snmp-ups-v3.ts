@@ -12,7 +12,12 @@
 //   - noAuthNoPriv : username only, no signing or encryption
 //   - authNoPriv   : messages signed with the auth password
 //   - authPriv     : messages signed AND encrypted (recommended)
-import snmp, { type User, type AuthProtocols, type PrivProtocols, type SecurityLevel } from 'net-snmp';
+import snmp, {
+  type User,
+  type AuthProtocols,
+  type PrivProtocols,
+  type SecurityLevel,
+} from 'net-snmp';
 import {
   DEFAULT_PORT,
   HEALTH_DEFAULTS,
@@ -71,7 +76,15 @@ function LevelLabel(AuthProtocol: string, PrivProtocol: string): string {
 }
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'Port', Type: 'number', Default: DEFAULT_PORT, Min: 1, Max: 65535, Required: true },
+  {
+    Key: 'Port',
+    Label: 'Port',
+    Type: 'number',
+    Default: DEFAULT_PORT,
+    Min: 1,
+    Max: 65535,
+    Required: true,
+  },
   { Key: 'Username', Label: 'Username', Type: 'string', Default: '', Required: true },
   {
     Key: 'AuthProtocol',
@@ -276,7 +289,11 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const CreateSession = (): SnmpSession =>
     snmp.createV3Session(Config.Address, BuildUser(Config), Options);
 
-  return RunUpsHealth(CreateSession, Config.OutputIndex, ParseThresholds((Target && Target.Settings) || {}));
+  return RunUpsHealth(
+    CreateSession,
+    Config.OutputIndex,
+    ParseThresholds((Target && Target.Settings) || {})
+  );
 }
 
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {

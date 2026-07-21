@@ -50,7 +50,15 @@ import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } f
 const ID = 'watchout-status';
 
 const Settings: MonitoringSettingField[] = [
-  { Key: 'Port', Label: 'Control Port', Type: 'number', Default: 3040, Min: 1, Max: 65535, Required: true },
+  {
+    Key: 'Port',
+    Label: 'Control Port',
+    Type: 'number',
+    Default: 3040,
+    Min: 1,
+    Max: 65535,
+    Required: true,
+  },
   {
     Key: 'Mode',
     Label: 'Mode',
@@ -131,7 +139,8 @@ function TokenizeLine(Line: string): Array<{ Quoted: boolean; Value: string }> {
       Tokens.push({ Quoted: true, Value });
     } else {
       let Value = '';
-      while (i < Len && !/\s/.test(Line[i]!)) { // in range: i < Len
+      while (i < Len && !/\s/.test(Line[i]!)) {
+        // in range: i < Len
         Value += Line[i];
         i++;
       }
@@ -161,7 +170,8 @@ function ParseStatusLine(Line: string): WatchoutStatus {
   const Tokens = TokenizeLine(Line);
   // Tokens[0] is the "Reply" keyword; the show filename follows (quoted).
   const ShowToken = Tokens[1];
-  const ShowName = ShowToken && ShowToken.Quoted ? ShowToken.Value : ShowToken ? ShowToken.Value : '';
+  const ShowName =
+    ShowToken && ShowToken.Quoted ? ShowToken.Value : ShowToken ? ShowToken.Value : '';
   return {
     ShowName,
     Busy: AsBool(Tokens[2]),
@@ -227,7 +237,12 @@ function IsReady(Status: WatchoutStatus): boolean {
   return Status.ShowActive === true || Status.Online === true;
 }
 
-function Probe(Address: string, Port: number, Mode: string, TimeoutMs: number): Promise<WatchoutReply | null> {
+function Probe(
+  Address: string,
+  Port: number,
+  Mode: string,
+  TimeoutMs: number
+): Promise<WatchoutReply | null> {
   return new Promise<WatchoutReply | null>((resolve) => {
     let Settled = false;
     let Text = '';
@@ -404,7 +419,10 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
           'Expected show',
           `${Esc(Expected)} ` +
             (Replied
-              ? Pill(ShowMatches(ShowName, Expected) ? 'success' : 'warning', ShowMatches(ShowName, Expected) ? 'Match' : 'Mismatch')
+              ? Pill(
+                  ShowMatches(ShowName, Expected) ? 'success' : 'warning',
+                  ShowMatches(ShowName, Expected) ? 'Match' : 'Mismatch'
+                )
               : Pill('muted', '—'))
         )
       : null,

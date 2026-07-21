@@ -15,14 +15,24 @@ function readSrc(relative) {
 
 // Extract capitalised object keys of the form `  Name:` (all ShowTrakAPI methods
 // are PascalCase). Local helpers in the shim are lowercase and thus excluded.
+//
+// Anchored to indentation depth: both API surfaces are one flat object literal,
+// so every method key sits at the same (shallowest) indent — 2 spaces in
+// bridge_main.ts, 4 in the shim where the object is nested inside a function.
+// Anything deeper is a wrapped function parameter, not a method. Those are also
+// PascalCase here (`Type:`, `Targets:`, `Settings:`), so without this filter
+// Prettier splitting a long signature across lines would silently inject phantom
+// "methods" and fail the drift guard for a purely cosmetic change.
 function extractMethodNames(source) {
-  const names = new Set();
-  const re = /^\s+([A-Z]\w+):/gm;
+  const re = /^([ \t]+)([A-Z]\w+):/gm;
+  const matches = [];
   let match;
   while ((match = re.exec(source)) !== null) {
-    names.add(match[1]);
+    matches.push({ indent: match[1].length, name: match[2] });
   }
-  return names;
+  if (!matches.length) return new Set();
+  const KeyIndent = Math.min(...matches.map((Entry) => Entry.indent));
+  return new Set(matches.filter((Entry) => Entry.indent === KeyIndent).map((Entry) => Entry.name));
 }
 
 // Extract per-method arity where the method is defined inline as an (async)

@@ -33,7 +33,10 @@ function register(): void {
   RPC.handle(
     'Tags:SetColour',
     createTupleHandler<[number, number], unknown>(
-      (TagID: unknown, Colour: unknown) => [IPCValidation.TagID(TagID), IPCValidation.TagColour(Colour)],
+      (TagID: unknown, Colour: unknown) => [
+        IPCValidation.TagID(TagID),
+        IPCValidation.TagColour(Colour),
+      ],
       (TagID: number, Colour: number) => TagManager.SetColour(TagID, Colour)
     )
   );
@@ -43,15 +46,24 @@ function register(): void {
     createTupleHandler<[number, string], unknown>(
       // The manager normalizes/validates the icon name (strips "bi-", defaults);
       // here we only enforce it is a string.
-      (TagID: unknown, Icon: unknown) => [IPCValidation.TagID(TagID), typeof Icon === 'string' ? Icon : ''],
+      (TagID: unknown, Icon: unknown) => [
+        IPCValidation.TagID(TagID),
+        typeof Icon === 'string' ? Icon : '',
+      ],
       (TagID: number, Icon: string) => TagManager.SetIcon(TagID, Icon)
     )
   );
 
   RPC.handle(
     'Tags:SetScope',
-    createTupleHandler<[number, { Workspace: boolean; Groups: number[]; Clients: string[] }], unknown>(
-      (TagID: unknown, Scope: unknown) => [IPCValidation.TagID(TagID), IPCValidation.TagScope(Scope)],
+    createTupleHandler<
+      [number, { Workspace: boolean; Groups: number[]; Clients: string[] }],
+      unknown
+    >(
+      (TagID: unknown, Scope: unknown) => [
+        IPCValidation.TagID(TagID),
+        IPCValidation.TagScope(Scope),
+      ],
       (TagID: number, Scope: { Workspace: boolean; Groups: number[]; Clients: string[] }) =>
         TagManager.SetScope(TagID, Scope)
     )
@@ -69,7 +81,10 @@ function register(): void {
 
     const Result = await TagManager.SetOrder(Array.from(new Set(ParsedTagIDs)));
     if (!Result.ok) {
-      return [Result.errors && Result.errors[0] ? Result.errors[0] : 'Failed to reorder tags', null];
+      return [
+        Result.errors && Result.errors[0] ? Result.errors[0] : 'Failed to reorder tags',
+        null,
+      ];
     }
     return [null, true];
   });

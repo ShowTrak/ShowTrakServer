@@ -115,9 +115,7 @@ const Manager = {
         Nickname = Client.Nickname;
       }
     } else {
-      const Pending = AdoptionManager.GetClientsPendingAdoption().find(
-        (d) => d && d.UUID === UUID
-      );
+      const Pending = AdoptionManager.GetClientsPendingAdoption().find((d) => d && d.UUID === UUID);
       if (!Pending) return Fail('Client not found.');
       if (!IsVersionAtLeast(Pending.Version, MINIMUM_IDENTIFY_VERSION)) {
         return Fail('Identify requires client version 3.7.0 or newer.');

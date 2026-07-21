@@ -69,7 +69,12 @@ function Heartbeat(data: unknown): {
     Vitals = {};
     if (raw.CPU !== undefined) {
       if (!isPlainObject(raw.CPU)) fail('Vitals.CPU must be an object');
-      Vitals.CPU = { UsagePercentage: normalizeOptionalFiniteNumber(raw.CPU.UsagePercentage, 'Vitals.CPU.UsagePercentage') };
+      Vitals.CPU = {
+        UsagePercentage: normalizeOptionalFiniteNumber(
+          raw.CPU.UsagePercentage,
+          'Vitals.CPU.UsagePercentage'
+        ),
+      };
     }
     if (raw.Ram !== undefined) {
       if (!isPlainObject(raw.Ram)) fail('Vitals.Ram must be an object');
@@ -77,13 +82,19 @@ function Heartbeat(data: unknown): {
         Total: normalizeOptionalFiniteNumber(raw.Ram.Total, 'Vitals.Ram.Total'),
         Used: normalizeOptionalFiniteNumber(raw.Ram.Used, 'Vitals.Ram.Used'),
         // Transmitted as a string (Number#toFixed) per shared/src/vitals.d.ts.
-        UsagePercentage: normalizeOptionalString(raw.Ram.UsagePercentage, 'Vitals.Ram.UsagePercentage', { maxLength: 16 }),
+        UsagePercentage: normalizeOptionalString(
+          raw.Ram.UsagePercentage,
+          'Vitals.Ram.UsagePercentage',
+          { maxLength: 16 }
+        ),
       };
     }
     if (raw.Uptime !== undefined) {
       if (!isPlainObject(raw.Uptime)) fail('Vitals.Uptime must be an object');
       Vitals.Uptime = {
-        Formatted: normalizeOptionalString(raw.Uptime.Formatted, 'Vitals.Uptime.Formatted', { maxLength: 32 }),
+        Formatted: normalizeOptionalString(raw.Uptime.Formatted, 'Vitals.Uptime.Formatted', {
+          maxLength: 32,
+        }),
       };
     }
   }
@@ -106,7 +117,10 @@ function SystemInfo(data: unknown): {
   // interface whose VALUE is an object `{ ipv4, ipv6, mac }`. Reconstruct each
   // entry field-by-field, preserving `ipv4` so the consumer can match the MAC
   // to the interface serving the active socket IP.
-  const MacAddresses: Record<string, { ipv4: string | null; ipv6: string | null; mac: string | null }> = {};
+  const MacAddresses: Record<
+    string,
+    { ipv4: string | null; ipv6: string | null; mac: string | null }
+  > = {};
   if (data.MacAddresses !== undefined && data.MacAddresses !== null) {
     if (!isPlainObject(data.MacAddresses)) fail('MacAddresses must be an object when present');
     const entries = Object.entries(data.MacAddresses);
@@ -131,7 +145,10 @@ function SystemInfo(data: unknown): {
   };
 }
 
-function USBDevice(value: unknown, fieldName = 'USBDevice'): {
+function USBDevice(
+  value: unknown,
+  fieldName = 'USBDevice'
+): {
   VendorID: number | null;
   ProductID: number | null;
   ManufacturerName: string | null;
@@ -142,7 +159,10 @@ function USBDevice(value: unknown, fieldName = 'USBDevice'): {
   return {
     VendorID: normalizeOptionalFiniteNumber(value.VendorID, `${fieldName}.VendorID`),
     ProductID: normalizeOptionalFiniteNumber(value.ProductID, `${fieldName}.ProductID`),
-    ManufacturerName: normalizeOptionalString(value.ManufacturerName, `${fieldName}.ManufacturerName`),
+    ManufacturerName: normalizeOptionalString(
+      value.ManufacturerName,
+      `${fieldName}.ManufacturerName`
+    ),
     ProductName: normalizeOptionalString(value.ProductName, `${fieldName}.ProductName`),
     SerialNumber: normalizeOptionalString(value.SerialNumber, `${fieldName}.SerialNumber`),
   };
@@ -164,12 +184,20 @@ function Display(value: unknown, fieldName = 'Display'): Record<string, unknown>
       }
     : null;
   return {
-    SessionID: normalizeOptionalString(value.SessionID, `${fieldName}.SessionID`, { maxLength: 128 }),
+    SessionID: normalizeOptionalString(value.SessionID, `${fieldName}.SessionID`, {
+      maxLength: 128,
+    }),
     ScreenNumber: normalizeOptionalFiniteNumber(value.ScreenNumber, `${fieldName}.ScreenNumber`),
-    DisplayID: normalizeOptionalString(value.DisplayID, `${fieldName}.DisplayID`, { maxLength: 256 }),
-    HardwareID: normalizeOptionalString(value.HardwareID, `${fieldName}.HardwareID`, { maxLength: 256 }),
+    DisplayID: normalizeOptionalString(value.DisplayID, `${fieldName}.DisplayID`, {
+      maxLength: 256,
+    }),
+    HardwareID: normalizeOptionalString(value.HardwareID, `${fieldName}.HardwareID`, {
+      maxLength: 256,
+    }),
     IsStableIdentity: value.IsStableIdentity === true,
-    IdentitySource: normalizeOptionalString(value.IdentitySource, `${fieldName}.IdentitySource`, { maxLength: 32 }),
+    IdentitySource: normalizeOptionalString(value.IdentitySource, `${fieldName}.IdentitySource`, {
+      maxLength: 32,
+    }),
     Label: normalizeOptionalString(value.Label, `${fieldName}.Label`),
     Width: normalizeOptionalFiniteNumber(value.Width, `${fieldName}.Width`),
     Height: normalizeOptionalFiniteNumber(value.Height, `${fieldName}.Height`),
@@ -221,9 +249,14 @@ function RunningApplications(value: unknown): Record<string, unknown> {
   }
   const Status = isPlainObject(value.Status)
     ? {
-        State: normalizeOptionalString(value.Status.State, 'Status.State', { maxLength: 32 }) || 'ok',
-        Message: normalizeOptionalString(value.Status.Message, 'Status.Message', { maxLength: 512 }),
-        Platform: normalizeOptionalString(value.Status.Platform, 'Status.Platform', { maxLength: 32 }),
+        State:
+          normalizeOptionalString(value.Status.State, 'Status.State', { maxLength: 32 }) || 'ok',
+        Message: normalizeOptionalString(value.Status.Message, 'Status.Message', {
+          maxLength: 512,
+        }),
+        Platform: normalizeOptionalString(value.Status.Platform, 'Status.Platform', {
+          maxLength: 32,
+        }),
       }
     : null;
   return {

@@ -1,4 +1,23 @@
-import { AppMode, ClientInfoOpenUUID, Config, DummyClients, FormatClientHostnameVersionLabel, GroupSelectableUUIDCache, GroupUUIDCache, MonitoringTargets, PendingAdoption, Selected, Settings, __LastClients, __LastGroups, setAllClients, setPendingAdoption, setScriptList, set__LastClients, set__LastGroups } from './01-state';
+import {
+  AppMode,
+  ClientInfoOpenUUID,
+  Config,
+  DummyClients,
+  FormatClientHostnameVersionLabel,
+  GroupSelectableUUIDCache,
+  GroupUUIDCache,
+  MonitoringTargets,
+  PendingAdoption,
+  Selected,
+  Settings,
+  __LastClients,
+  __LastGroups,
+  setAllClients,
+  setPendingAdoption,
+  setScriptList,
+  set__LastClients,
+  set__LastGroups,
+} from './01-state';
 import { OfflineBadgeContent, UnassignedBadgeContent } from './lib/status-badges';
 import type {
   ClientView,
@@ -11,7 +30,13 @@ import { RenderMonitoringTargetTile } from './07-monitoring';
 import { initializeEditInteractions } from './08-dnd';
 import { AddAlert, DismissAlert, PendingAdoptionAlerts } from './10-alerts-tray';
 import { CloseAllModals, UpdateManagerHandleExecutions } from './11-modals';
-import { ConfirmationDialog, HideExecutionToast, RenderClientInfoDetails, ShowExecutionToast, UpdateIdentifyStatusBanner } from './14-selection-init';
+import {
+  ConfirmationDialog,
+  HideExecutionToast,
+  RenderClientInfoDetails,
+  ShowExecutionToast,
+  UpdateIdentifyStatusBanner,
+} from './14-selection-init';
 import { RenderDummyClientTile } from './16-dummy-clients';
 
 // Deployment-toast working state. This mirrors the runtime shape used below and
@@ -53,28 +78,28 @@ export function InitClientList() {
   InitPendingAdoptionPush();
 
   window.API.USBDeviceAdded(async (Client, _Device) => {
-  // If Client Info modal is open for this client, refresh its details
-  try {
-    const $modal = $('#SHOWTRAK_CLIENT_INFO');
-    if (ClientInfoOpenUUID && ClientInfoOpenUUID === Client.UUID && $modal.hasClass('show')) {
-      const fresh = await window.API.GetClient(Client.UUID);
-      if (fresh) RenderClientInfoDetails(fresh);
+    // If Client Info modal is open for this client, refresh its details
+    try {
+      const $modal = $('#SHOWTRAK_CLIENT_INFO');
+      if (ClientInfoOpenUUID && ClientInfoOpenUUID === Client.UUID && $modal.hasClass('show')) {
+        const fresh = await window.API.GetClient(Client.UUID);
+        if (fresh) RenderClientInfoDetails(fresh);
+      }
+    } catch (e) {
+      HandleNonFatalError('USBDeviceAdded:RefreshClientInfo', e);
     }
-  } catch (e) {
-    HandleNonFatalError('USBDeviceAdded:RefreshClientInfo', e);
-  }
   });
   window.API.USBDeviceRemoved(async (Client, _Device) => {
-  // If Client Info modal is open for this client, refresh its details
-  try {
-    const $modal = $('#SHOWTRAK_CLIENT_INFO');
-    if (ClientInfoOpenUUID && ClientInfoOpenUUID === Client.UUID && $modal.hasClass('show')) {
-      const fresh = await window.API.GetClient(Client.UUID);
-      if (fresh) RenderClientInfoDetails(fresh);
+    // If Client Info modal is open for this client, refresh its details
+    try {
+      const $modal = $('#SHOWTRAK_CLIENT_INFO');
+      if (ClientInfoOpenUUID && ClientInfoOpenUUID === Client.UUID && $modal.hasClass('show')) {
+        const fresh = await window.API.GetClient(Client.UUID);
+        if (fresh) RenderClientInfoDetails(fresh);
+      }
+    } catch (e) {
+      HandleNonFatalError('USBDeviceRemoved:RefreshClientInfo', e);
     }
-  } catch (e) {
-    HandleNonFatalError('USBDeviceRemoved:RefreshClientInfo', e);
-  }
   });
 }
 
@@ -97,271 +122,271 @@ export function GetClientCompactStatusLabel(Client: Partial<ClientView> | null |
 // handlers. Bodies unchanged from the former import-time subscriptions.
 function InitClientListPush() {
   window.API.UpdateScriptExecutions(async (Executions) => {
-  try {
-    UpdateManagerHandleExecutions(Executions || []);
-  } catch (e) {
-    HandleNonFatalError('UpdateManagerHandleExecutions', e);
-  }
+    try {
+      UpdateManagerHandleExecutions(Executions || []);
+    } catch (e) {
+      HandleNonFatalError('UpdateManagerHandleExecutions', e);
+    }
 
-  // Close any open popovers before re-render to prevent duplicates
-  try {
-    $('.exec-info.open').removeClass('open');
-  } catch (e) {
-    HandleNonFatalError('UpdateScriptExecutions:ClosePopovers', e);
-  }
-  // Keep the manager's insertion order so newly-started executions append at the
-  // bottom of the list and each client visibly works down its own queue.
+    // Close any open popovers before re-render to prevent duplicates
+    try {
+      $('.exec-info.open').removeClass('open');
+    } catch (e) {
+      HandleNonFatalError('UpdateScriptExecutions:ClosePopovers', e);
+    }
+    // Keep the manager's insertion order so newly-started executions append at the
+    // bottom of the list and each client visibly works down its own queue.
 
-  // Determine if all executions are for the same action/script
-  const names = Array.from(
-    new Set(
-      Executions.map((r) =>
-        r && r.Script && r.Script.Name ? String(r.Script.Name).trim() : null
-      ).filter(Boolean)
-    )
-  );
-  const uniformScriptName = names.length === 1 ? names[0] : null;
-  const nonDeploymentExecutions = Executions.filter((Request) => {
-    const Name =
-      Request && Request.Script && Request.Script.Name ? String(Request.Script.Name).trim() : '';
-    return Name !== 'Deploying Scripts';
-  });
+    // Determine if all executions are for the same action/script
+    const names = Array.from(
+      new Set(
+        Executions.map((r) =>
+          r && r.Script && r.Script.Name ? String(r.Script.Name).trim() : null
+        ).filter(Boolean)
+      )
+    );
+    const uniformScriptName = names.length === 1 ? names[0] : null;
+    const nonDeploymentExecutions = Executions.filter((Request) => {
+      const Name =
+        Request && Request.Script && Request.Script.Name ? String(Request.Script.Name).trim() : '';
+      return Name !== 'Deploying Scripts';
+    });
 
-  if (!window.__ShowTrakExecutionAutoDismissTimer) {
-    window.__ShowTrakExecutionAutoDismissTimer = null;
-  }
+    if (!window.__ShowTrakExecutionAutoDismissTimer) {
+      window.__ShowTrakExecutionAutoDismissTimer = null;
+    }
 
-  // Suppress deployment-only execution toasts. Deployments still run server-side,
-  // but they should not hijack the execution UI on app load or integrated actions.
-  if (nonDeploymentExecutions.length === 0) {
-    if (window.__ShowTrakExecutionAutoDismissTimer) {
+    // Suppress deployment-only execution toasts. Deployments still run server-side,
+    // but they should not hijack the execution UI on app load or integrated actions.
+    if (nonDeploymentExecutions.length === 0) {
+      if (window.__ShowTrakExecutionAutoDismissTimer) {
+        clearTimeout(window.__ShowTrakExecutionAutoDismissTimer);
+        window.__ShowTrakExecutionAutoDismissTimer = null;
+      }
+      HideExecutionToast();
+      return;
+    }
+
+    // Auto-dismiss the execution panel 5 seconds after every execution has SETTLED
+    // — whether it succeeded or failed. Queued and running executions are both
+    // Status='Pending', so the panel stays open while any work remains, and if a
+    // new batch is started within the 5s window the else-branch below cancels the
+    // countdown — the panel only closes 5s after the LAST script finishes.
+    const shouldAutoDismissNonDeployment =
+      nonDeploymentExecutions.length > 0 &&
+      nonDeploymentExecutions.every((Request) => Request && Request.Status !== 'Pending');
+
+    if (shouldAutoDismissNonDeployment) {
+      if (!window.__ShowTrakExecutionAutoDismissTimer) {
+        window.__ShowTrakExecutionAutoDismissTimer = setTimeout(async () => {
+          window.__ShowTrakExecutionAutoDismissTimer = null;
+          HideExecutionToast();
+          // Wipe the finished rows now the panel is gone, so the next run renders
+          // into an empty list rather than stacking on the previous batch. Only
+          // settled entries are dropped — anything queued or running in the
+          // meantime survives.
+          try {
+            await window.API.ClearSettledScriptExecutions();
+          } catch (e) {
+            HandleNonFatalError('ClearSettledScriptExecutions', e);
+          }
+        }, 5000);
+      }
+    } else if (window.__ShowTrakExecutionAutoDismissTimer) {
       clearTimeout(window.__ShowTrakExecutionAutoDismissTimer);
       window.__ShowTrakExecutionAutoDismissTimer = null;
     }
-    HideExecutionToast();
-    return;
-  }
 
-  // Auto-dismiss the execution panel 5 seconds after every execution has SETTLED
-  // — whether it succeeded or failed. Queued and running executions are both
-  // Status='Pending', so the panel stays open while any work remains, and if a
-  // new batch is started within the 5s window the else-branch below cancels the
-  // countdown — the panel only closes 5s after the LAST script finishes.
-  const shouldAutoDismissNonDeployment =
-    nonDeploymentExecutions.length > 0 &&
-    nonDeploymentExecutions.every((Request) => Request && Request.Status !== 'Pending');
+    let deploymentRequests = Executions.filter(
+      (Request) =>
+        Request &&
+        Request.Script &&
+        typeof Request.Script.Name === 'string' &&
+        Request.Script.Name.trim() === 'Deploying Scripts'
+    );
+    const hasFreshDeploymentData = deploymentRequests.length > 0;
 
-  if (shouldAutoDismissNonDeployment) {
-    if (!window.__ShowTrakExecutionAutoDismissTimer) {
-      window.__ShowTrakExecutionAutoDismissTimer = setTimeout(async () => {
-        window.__ShowTrakExecutionAutoDismissTimer = null;
-        HideExecutionToast();
-        // Wipe the finished rows now the panel is gone, so the next run renders
-        // into an empty list rather than stacking on the previous batch. Only
-        // settled entries are dropped — anything queued or running in the
-        // meantime survives.
-        try {
-          await window.API.ClearSettledScriptExecutions();
-        } catch (e) {
-          HandleNonFatalError('ClearSettledScriptExecutions', e);
-        }
-      }, 5000);
-    }
-  } else if (window.__ShowTrakExecutionAutoDismissTimer) {
-    clearTimeout(window.__ShowTrakExecutionAutoDismissTimer);
-    window.__ShowTrakExecutionAutoDismissTimer = null;
-  }
-
-  let deploymentRequests = Executions.filter(
-    (Request) =>
-      Request &&
-      Request.Script &&
-      typeof Request.Script.Name === 'string' &&
-      Request.Script.Name.trim() === 'Deploying Scripts'
-  );
-  const hasFreshDeploymentData = deploymentRequests.length > 0;
-
-  let deploymentSummary: DeploymentSummary = {
-    total: deploymentRequests.length,
-    successful: deploymentRequests.filter((Request) => Request.Status === 'Completed').length,
-    failed: deploymentRequests.filter((Request) => Request.Status === 'Failed'),
-    finished: false,
-    pending: 0,
-    percent: 0,
-  };
-  deploymentSummary.finished =
-    deploymentSummary.total > 0 &&
-    deploymentSummary.successful + deploymentSummary.failed.length === deploymentSummary.total;
-  deploymentSummary.pending =
-    deploymentSummary.total - deploymentSummary.successful - deploymentSummary.failed.length;
-  deploymentSummary.percent =
-    deploymentSummary.total > 0
-      ? Math.round(
-          ((deploymentSummary.successful + deploymentSummary.failed.length) /
-            deploymentSummary.total) *
-            100
-        )
-      : 0;
-
-  if (!window.__ShowTrakDeploymentUiState) {
-    window.__ShowTrakDeploymentUiState = {
-      summary: null,
-      requests: [],
-      holdUntil: 0,
-      hadRenderableDeployment: false,
+    let deploymentSummary: DeploymentSummary = {
+      total: deploymentRequests.length,
+      successful: deploymentRequests.filter((Request) => Request.Status === 'Completed').length,
+      failed: deploymentRequests.filter((Request) => Request.Status === 'Failed'),
+      finished: false,
+      pending: 0,
+      percent: 0,
     };
-  }
-  // Bridge the ambient window type (which models `summary.failed` as a count and
-  // `requests` as unknown[]) to the richer runtime shape actually stored here.
-  const deploymentUiState = window.__ShowTrakDeploymentUiState as unknown as DeploymentUiState;
-  const now = Date.now();
+    deploymentSummary.finished =
+      deploymentSummary.total > 0 &&
+      deploymentSummary.successful + deploymentSummary.failed.length === deploymentSummary.total;
+    deploymentSummary.pending =
+      deploymentSummary.total - deploymentSummary.successful - deploymentSummary.failed.length;
+    deploymentSummary.percent =
+      deploymentSummary.total > 0
+        ? Math.round(
+            ((deploymentSummary.successful + deploymentSummary.failed.length) /
+              deploymentSummary.total) *
+              100
+          )
+        : 0;
 
-  if (deploymentSummary.total > 0) {
-    deploymentUiState.summary = {
-      total: deploymentSummary.total,
-      successful: deploymentSummary.successful,
-      failed: deploymentSummary.failed,
-      finished: deploymentSummary.finished,
-      pending: deploymentSummary.pending,
-      percent: deploymentSummary.percent,
-    };
-    deploymentUiState.requests = deploymentRequests;
-    // Hold briefly so queue reset/reenqueue does not cause visible flicker.
-    deploymentUiState.holdUntil = deploymentSummary.finished ? now + 3200 : now + 15000;
-  } else if (
-    !hasFreshDeploymentData &&
-    deploymentUiState.summary &&
-    deploymentUiState.summary.finished === false &&
-    now < (deploymentUiState.holdUntil || 0)
-  ) {
-    deploymentSummary = deploymentUiState.summary;
-    deploymentRequests = Array.isArray(deploymentUiState.requests)
-      ? (deploymentUiState.requests as typeof deploymentRequests)
-      : [];
-  }
-
-  const hasActiveDeployment = deploymentSummary.total > 0 && !deploymentSummary.finished;
-  const hasDeploymentIssues = deploymentSummary.finished && deploymentSummary.failed.length > 0;
-  const hasDeploymentSuccess =
-    deploymentSummary.total > 0 &&
-    deploymentSummary.finished &&
-    deploymentSummary.failed.length === 0;
-  const hasOnlyDeploymentExecutions = nonDeploymentExecutions.length === 0;
-  const shouldDisplayDeploymentToast =
-    hasActiveDeployment ||
-    hasDeploymentIssues ||
-    (hasDeploymentSuccess && hasOnlyDeploymentExecutions);
-  const hasRenderableDeploymentToast =
-    shouldDisplayDeploymentToast &&
-    Array.isArray(deploymentRequests) &&
-    deploymentRequests.length > 0;
-
-  if (hasRenderableDeploymentToast) {
-    deploymentUiState.hadRenderableDeployment = true;
-  }
-
-  if (!window.__ShowTrakDeploymentAutoDismissTimer) {
-    window.__ShowTrakDeploymentAutoDismissTimer = null;
-  }
-
-  if (
-    deploymentSummary.total > 0 &&
-    deploymentSummary.finished &&
-    deploymentSummary.failed.length === 0 &&
-    nonDeploymentExecutions.length === 0
-  ) {
-    if (!window.__ShowTrakDeploymentAutoDismissTimer) {
-      window.__ShowTrakDeploymentAutoDismissTimer = setTimeout(() => {
-        window.__ShowTrakDeploymentAutoDismissTimer = null;
-        HideExecutionToast();
-      }, 3000);
+    if (!window.__ShowTrakDeploymentUiState) {
+      window.__ShowTrakDeploymentUiState = {
+        summary: null,
+        requests: [],
+        holdUntil: 0,
+        hadRenderableDeployment: false,
+      };
     }
-  } else if (window.__ShowTrakDeploymentAutoDismissTimer) {
-    clearTimeout(window.__ShowTrakDeploymentAutoDismissTimer);
-    window.__ShowTrakDeploymentAutoDismissTimer = null;
-  }
+    // Bridge the ambient window type (which models `summary.failed` as a count and
+    // `requests` as unknown[]) to the richer runtime shape actually stored here.
+    const deploymentUiState = window.__ShowTrakDeploymentUiState as unknown as DeploymentUiState;
+    const now = Date.now();
 
-  // Ensure toast exists and is visible with dynamic title
-  if (hasRenderableDeploymentToast || nonDeploymentExecutions.length > 0) {
-    const ToastTitle = hasRenderableDeploymentToast
-      ? 'Deploying Scripts'
-      : uniformScriptName || 'Script Executions';
-    ShowExecutionToast(ToastTitle);
-  }
-
-  // Ignore transient empty updates so we don't flash an empty deployment toast.
-  if (!hasRenderableDeploymentToast && nonDeploymentExecutions.length === 0) {
-    // Ignore empty transient updates while deployment has recently been visible.
-    if (
+    if (deploymentSummary.total > 0) {
+      deploymentUiState.summary = {
+        total: deploymentSummary.total,
+        successful: deploymentSummary.successful,
+        failed: deploymentSummary.failed,
+        finished: deploymentSummary.finished,
+        pending: deploymentSummary.pending,
+        percent: deploymentSummary.percent,
+      };
+      deploymentUiState.requests = deploymentRequests;
+      // Hold briefly so queue reset/reenqueue does not cause visible flicker.
+      deploymentUiState.holdUntil = deploymentSummary.finished ? now + 3200 : now + 15000;
+    } else if (
       !hasFreshDeploymentData &&
-      deploymentUiState.hadRenderableDeployment &&
       deploymentUiState.summary &&
+      deploymentUiState.summary.finished === false &&
       now < (deploymentUiState.holdUntil || 0)
     ) {
+      deploymentSummary = deploymentUiState.summary;
+      deploymentRequests = Array.isArray(deploymentUiState.requests)
+        ? (deploymentUiState.requests as typeof deploymentRequests)
+        : [];
+    }
+
+    const hasActiveDeployment = deploymentSummary.total > 0 && !deploymentSummary.finished;
+    const hasDeploymentIssues = deploymentSummary.finished && deploymentSummary.failed.length > 0;
+    const hasDeploymentSuccess =
+      deploymentSummary.total > 0 &&
+      deploymentSummary.finished &&
+      deploymentSummary.failed.length === 0;
+    const hasOnlyDeploymentExecutions = nonDeploymentExecutions.length === 0;
+    const shouldDisplayDeploymentToast =
+      hasActiveDeployment ||
+      hasDeploymentIssues ||
+      (hasDeploymentSuccess && hasOnlyDeploymentExecutions);
+    const hasRenderableDeploymentToast =
+      shouldDisplayDeploymentToast &&
+      Array.isArray(deploymentRequests) &&
+      deploymentRequests.length > 0;
+
+    if (hasRenderableDeploymentToast) {
+      deploymentUiState.hadRenderableDeployment = true;
+    }
+
+    if (!window.__ShowTrakDeploymentAutoDismissTimer) {
+      window.__ShowTrakDeploymentAutoDismissTimer = null;
+    }
+
+    if (
+      deploymentSummary.total > 0 &&
+      deploymentSummary.finished &&
+      deploymentSummary.failed.length === 0 &&
+      nonDeploymentExecutions.length === 0
+    ) {
+      if (!window.__ShowTrakDeploymentAutoDismissTimer) {
+        window.__ShowTrakDeploymentAutoDismissTimer = setTimeout(() => {
+          window.__ShowTrakDeploymentAutoDismissTimer = null;
+          HideExecutionToast();
+        }, 3000);
+      }
+    } else if (window.__ShowTrakDeploymentAutoDismissTimer) {
+      clearTimeout(window.__ShowTrakDeploymentAutoDismissTimer);
+      window.__ShowTrakDeploymentAutoDismissTimer = null;
+    }
+
+    // Ensure toast exists and is visible with dynamic title
+    if (hasRenderableDeploymentToast || nonDeploymentExecutions.length > 0) {
+      const ToastTitle = hasRenderableDeploymentToast
+        ? 'Deploying Scripts'
+        : uniformScriptName || 'Script Executions';
+      ShowExecutionToast(ToastTitle);
+    }
+
+    // Ignore transient empty updates so we don't flash an empty deployment toast.
+    if (!hasRenderableDeploymentToast && nonDeploymentExecutions.length === 0) {
+      // Ignore empty transient updates while deployment has recently been visible.
+      if (
+        !hasFreshDeploymentData &&
+        deploymentUiState.hadRenderableDeployment &&
+        deploymentUiState.summary &&
+        now < (deploymentUiState.holdUntil || 0)
+      ) {
+        return;
+      }
+      if (!window.__ShowTrakDeploymentAutoDismissTimer) {
+        deploymentUiState.hadRenderableDeployment = false;
+        HideExecutionToast();
+      }
       return;
     }
-    if (!window.__ShowTrakDeploymentAutoDismissTimer) {
-      deploymentUiState.hadRenderableDeployment = false;
-      HideExecutionToast();
+
+    const $list = $('#SHOWTRAK_EXECUTION_LIST');
+    const listEl = $list[0] as HTMLElement | undefined;
+    if (!listEl) return;
+
+    // Durations render white regardless of how long they took — the row's state
+    // (fill colour + indicator) already carries success/failure, so colouring the
+    // timing on top of it read as a second, conflicting signal.
+    function durationText(ms: number) {
+      return `<small class="exec-duration">${Safe(ms)}ms</small>`;
     }
-    return;
-  }
 
-  const $list = $('#SHOWTRAK_EXECUTION_LIST');
-  const listEl = $list[0] as HTMLElement | undefined;
-  if (!listEl) return;
-
-  // Durations render white regardless of how long they took — the row's state
-  // (fill colour + indicator) already carries success/failure, so colouring the
-  // timing on top of it read as a second, conflicting signal.
-  function durationText(ms: number) {
-    return `<small class="exec-duration">${Safe(ms)}ms</small>`;
-  }
-
-  function truncateExecutionLabel(value: string | null | undefined, maxLen = 34) {
-    const text = value == null ? '' : String(value).trim();
-    if (!text) return '';
-    if (text.length <= maxLen) return text;
-    return `${text.substring(0, Math.max(1, maxLen - 1))}…`;
-  }
-
-  // The execution list is patched IN PLACE (keyed by RequestID) rather than
-  // rebuilt with innerHTML on every push. Wholesale rebuilds recreate the
-  // spinner and progress-fill DOM nodes, restarting their CSS animations — with
-  // console-tail updates arriving several times a second that reads as glitchy
-  // flicker. Reusing each row's nodes and touching only the volatile bits keeps
-  // the spinner spinning and the gradient/width transition smooth.
-  const desiredKeys = new Set<string>();
-
-  // Deployment summary is a single keyed node pinned to the top of the list.
-  if (hasRenderableDeploymentToast) {
-    desiredKeys.add('__deploy__');
-    const ExpandFailures = deploymentSummary.finished && deploymentSummary.failed.length > 0;
-    const FailedItems = deploymentSummary.failed
-      .map((Request) => {
-        const Name =
-          Request && Request.Client
-            ? Request.Client.Nickname ||
-              Request.Client.Hostname ||
-              Request.Client.UUID ||
-              'Unknown Client'
-            : 'Unknown Client';
-        const Reason =
-          Request && Request.Error ? String(Request.Error) : 'Unknown deployment error';
-        return `<li><span class="badge bg-ghost-light text-light">${Safe(
-          Name
-        )}</span><span class="exec-deploy-fail-reason">${Safe(Reason)}</span></li>`;
-      })
-      .join('');
-
-    let deployEl = listEl.querySelector<HTMLElement>('[data-exec-key="__deploy__"]');
-    if (!deployEl) {
-      deployEl = document.createElement('div');
-      deployEl.setAttribute('data-exec-key', '__deploy__');
-      listEl.insertBefore(deployEl, listEl.firstChild);
+    function truncateExecutionLabel(value: string | null | undefined, maxLen = 34) {
+      const text = value == null ? '' : String(value).trim();
+      if (!text) return '';
+      if (text.length <= maxLen) return text;
+      return `${text.substring(0, Math.max(1, maxLen - 1))}…`;
     }
-    deployEl.className = `exec-deploy-summary ${ExpandFailures ? 'open' : ''}`;
-    deployEl.innerHTML = `
+
+    // The execution list is patched IN PLACE (keyed by RequestID) rather than
+    // rebuilt with innerHTML on every push. Wholesale rebuilds recreate the
+    // spinner and progress-fill DOM nodes, restarting their CSS animations — with
+    // console-tail updates arriving several times a second that reads as glitchy
+    // flicker. Reusing each row's nodes and touching only the volatile bits keeps
+    // the spinner spinning and the gradient/width transition smooth.
+    const desiredKeys = new Set<string>();
+
+    // Deployment summary is a single keyed node pinned to the top of the list.
+    if (hasRenderableDeploymentToast) {
+      desiredKeys.add('__deploy__');
+      const ExpandFailures = deploymentSummary.finished && deploymentSummary.failed.length > 0;
+      const FailedItems = deploymentSummary.failed
+        .map((Request) => {
+          const Name =
+            Request && Request.Client
+              ? Request.Client.Nickname ||
+                Request.Client.Hostname ||
+                Request.Client.UUID ||
+                'Unknown Client'
+              : 'Unknown Client';
+          const Reason =
+            Request && Request.Error ? String(Request.Error) : 'Unknown deployment error';
+          return `<li><span class="badge bg-ghost-light text-light">${Safe(
+            Name
+          )}</span><span class="exec-deploy-fail-reason">${Safe(Reason)}</span></li>`;
+        })
+        .join('');
+
+      let deployEl = listEl.querySelector<HTMLElement>('[data-exec-key="__deploy__"]');
+      if (!deployEl) {
+        deployEl = document.createElement('div');
+        deployEl.setAttribute('data-exec-key', '__deploy__');
+        listEl.insertBefore(deployEl, listEl.firstChild);
+      }
+      deployEl.className = `exec-deploy-summary ${ExpandFailures ? 'open' : ''}`;
+      deployEl.innerHTML = `
         <div class="exec-deploy-title-row">
           <strong>Deploying Scripts</strong>
           <span class="badge bg-ghost-light text-light">${deploymentSummary.successful}/${deploymentSummary.total} Updated</span>
@@ -382,110 +407,110 @@ function InitClientListPush() {
           <span>${deploymentSummary.failed.length} failed</span>
         </div>
         ${deploymentSummary.failed.length > 0 ? `<div class="exec-deploy-failures ${ExpandFailures ? '' : 'd-none'}"><div class="exec-deploy-failures-title">Failed Clients</div><ul>${FailedItems}</ul></div>` : ''}`;
-  }
-
-  const renderExecutions = hasRenderableDeploymentToast
-    ? deploymentRequests
-    : nonDeploymentExecutions;
-
-  for (let i = 0; i < renderExecutions.length; i++) {
-    const Request = renderExecutions[i];
-    if (!Request) continue; // i is within renderExecutions bounds
-    const key = String(Request.RequestID);
-    desiredKeys.add(key);
-
-    const rawScriptName =
-      Request && Request.Script && Request.Script.Name ? String(Request.Script.Name).trim() : '';
-    const rawClientName = Request.Client.Nickname
-      ? Request.Client.Nickname
-      : Request.Client.Hostname;
-    const fullClientName = rawClientName || 'Unknown Client';
-
-    let timeBadge = '';
-    if (Request.Timer && typeof Request.Timer.Duration === 'number') {
-      timeBadge = durationText(Request.Timer.Duration);
     }
 
-    // Progress fill width. Completed always reads full; failed shows however far
-    // it got (full if unknown) in red; pending/running follow the reported value
-    // with a small floor so the row never looks empty.
-    const reportedProgress =
-      typeof Request.Progress === 'number' && Number.isFinite(Request.Progress)
-        ? Math.max(0, Math.min(100, Request.Progress))
-        : 0;
+    const renderExecutions = hasRenderableDeploymentToast
+      ? deploymentRequests
+      : nonDeploymentExecutions;
 
-    // Classify the execution into one visual state that drives the row's
-    // background progress fill, the right-side indicator, and (on failure) the
-    // inline error. Once the client reports the process has spawned (progress
-    // reaches the Running stage), the row gets a spinner; StatusText from that
-    // point is live console output, so the spinner keys off progress, not text.
-    const rawStatusText = Request.StatusText ? String(Request.StatusText).trim() : '';
-    const isRunning = Request.Status === 'Pending' && reportedProgress >= 50;
-    const state =
-      Request.Status === 'Completed'
-        ? 'completed'
-        : Request.Status === 'Failed'
-          ? 'failed'
-          : isRunning
-            ? 'running'
-            : 'pending';
-    let fillPercent: number;
-    if (state === 'completed') fillPercent = 100;
-    else if (state === 'failed') fillPercent = reportedProgress > 0 ? reportedProgress : 100;
-    else if (state === 'running') fillPercent = reportedProgress > 0 ? reportedProgress : 65;
-    else fillPercent = reportedProgress > 0 ? reportedProgress : 8;
+    for (let i = 0; i < renderExecutions.length; i++) {
+      const Request = renderExecutions[i];
+      if (!Request) continue; // i is within renderExecutions bounds
+      const key = String(Request.RequestID);
+      desiredKeys.add(key);
 
-    // Right-side indicator: check / spinner / info icon / queued dot. Swapped
-    // only when the state changes, so the spinner element survives (and keeps
-    // spinning) across the rapid console-tail updates while running.
-    let indicatorHtml = '';
-    if (state === 'completed') {
-      indicatorHtml = `<span class="exec-btn-icon exec-success" role="img" aria-label="Completed"><i class="bi bi-check-circle-fill"></i></span>`;
-    } else if (state === 'failed') {
-      indicatorHtml = `<span class="exec-btn-icon exec-fail" role="img" aria-label="Failed"><i class="bi bi-exclamation-triangle-fill"></i></span>`;
-    } else if (state === 'running') {
-      indicatorHtml = `<span class="exec-spinner" role="img" aria-label="Running"></span>`;
-    } else {
-      indicatorHtml = `<span class="exec-btn-icon exec-queued" role="img" aria-label="Queued"><i class="bi bi-hourglass-split"></i></span>`;
-    }
+      const rawScriptName =
+        Request && Request.Script && Request.Script.Name ? String(Request.Script.Name).trim() : '';
+      const rawClientName = Request.Client.Nickname
+        ? Request.Client.Nickname
+        : Request.Client.Hostname;
+      const fullClientName = rawClientName || 'Unknown Client';
 
-    // Inline status/error text (sits on the same row — never a block below).
-    // Returned as data so it can be applied to a persistent span via textContent.
-    let inlineClass = '';
-    let inlineText = '';
-    let inlineTitle = '';
-    if (state === 'failed' && Request.Error && rawScriptName !== 'Deploying Scripts') {
-      inlineClass = 'exec-inline exec-inline-error';
-      inlineText = truncateExecutionLabel(Request.Error, 60);
-      inlineTitle = String(Request.Error);
-    } else if (state === 'running') {
-      // While running, StatusText carries the live tail of the script's console
-      // output. Show it monospace so it reads as terminal output; fall back to a
-      // generic label until the first line arrives.
-      const isConsole = !!rawStatusText && rawStatusText !== 'Running';
-      inlineClass = `exec-inline exec-inline-stage${isConsole ? ' exec-inline-console' : ''}`;
-      inlineText = isConsole ? truncateExecutionLabel(rawStatusText, 64) : 'Running…';
-      inlineTitle = rawStatusText;
-    } else if (state === 'pending') {
-      inlineClass = 'exec-inline exec-inline-stage';
-      inlineText = rawStatusText && rawStatusText !== 'Pending' ? rawStatusText : 'Queued';
-      inlineTitle = '';
-    }
+      let timeBadge = '';
+      if (Request.Timer && typeof Request.Timer.Duration === 'number') {
+        timeBadge = durationText(Request.Timer.Duration);
+      }
 
-    // --- upsert the row ------------------------------------------------------
-    let el = listEl.querySelector<HTMLElement>(`.exec-item[data-request-id="${key}"]`);
-    if (!el) {
-      el = document.createElement('div');
-      el.className = `exec-item state-${state}`;
-      el.setAttribute('data-request-id', key);
-      el.dataset.state = state;
-      el.dataset.indicator = state;
-      el.style.setProperty('--exec-progress', `${fillPercent}%`);
-      const scriptChip =
-        uniformScriptName || !rawScriptName
-          ? ''
-          : `<span class="badge bg-ghost-light text-light exec-chip" title="${Safe(rawScriptName)}">${Safe(truncateExecutionLabel(rawScriptName, 28))}</span>`;
-      el.innerHTML = `
+      // Progress fill width. Completed always reads full; failed shows however far
+      // it got (full if unknown) in red; pending/running follow the reported value
+      // with a small floor so the row never looks empty.
+      const reportedProgress =
+        typeof Request.Progress === 'number' && Number.isFinite(Request.Progress)
+          ? Math.max(0, Math.min(100, Request.Progress))
+          : 0;
+
+      // Classify the execution into one visual state that drives the row's
+      // background progress fill, the right-side indicator, and (on failure) the
+      // inline error. Once the client reports the process has spawned (progress
+      // reaches the Running stage), the row gets a spinner; StatusText from that
+      // point is live console output, so the spinner keys off progress, not text.
+      const rawStatusText = Request.StatusText ? String(Request.StatusText).trim() : '';
+      const isRunning = Request.Status === 'Pending' && reportedProgress >= 50;
+      const state =
+        Request.Status === 'Completed'
+          ? 'completed'
+          : Request.Status === 'Failed'
+            ? 'failed'
+            : isRunning
+              ? 'running'
+              : 'pending';
+      let fillPercent: number;
+      if (state === 'completed') fillPercent = 100;
+      else if (state === 'failed') fillPercent = reportedProgress > 0 ? reportedProgress : 100;
+      else if (state === 'running') fillPercent = reportedProgress > 0 ? reportedProgress : 65;
+      else fillPercent = reportedProgress > 0 ? reportedProgress : 8;
+
+      // Right-side indicator: check / spinner / info icon / queued dot. Swapped
+      // only when the state changes, so the spinner element survives (and keeps
+      // spinning) across the rapid console-tail updates while running.
+      let indicatorHtml = '';
+      if (state === 'completed') {
+        indicatorHtml = `<span class="exec-btn-icon exec-success" role="img" aria-label="Completed"><i class="bi bi-check-circle-fill"></i></span>`;
+      } else if (state === 'failed') {
+        indicatorHtml = `<span class="exec-btn-icon exec-fail" role="img" aria-label="Failed"><i class="bi bi-exclamation-triangle-fill"></i></span>`;
+      } else if (state === 'running') {
+        indicatorHtml = `<span class="exec-spinner" role="img" aria-label="Running"></span>`;
+      } else {
+        indicatorHtml = `<span class="exec-btn-icon exec-queued" role="img" aria-label="Queued"><i class="bi bi-hourglass-split"></i></span>`;
+      }
+
+      // Inline status/error text (sits on the same row — never a block below).
+      // Returned as data so it can be applied to a persistent span via textContent.
+      let inlineClass = '';
+      let inlineText = '';
+      let inlineTitle = '';
+      if (state === 'failed' && Request.Error && rawScriptName !== 'Deploying Scripts') {
+        inlineClass = 'exec-inline exec-inline-error';
+        inlineText = truncateExecutionLabel(Request.Error, 60);
+        inlineTitle = String(Request.Error);
+      } else if (state === 'running') {
+        // While running, StatusText carries the live tail of the script's console
+        // output. Show it monospace so it reads as terminal output; fall back to a
+        // generic label until the first line arrives.
+        const isConsole = !!rawStatusText && rawStatusText !== 'Running';
+        inlineClass = `exec-inline exec-inline-stage${isConsole ? ' exec-inline-console' : ''}`;
+        inlineText = isConsole ? truncateExecutionLabel(rawStatusText, 64) : 'Running…';
+        inlineTitle = rawStatusText;
+      } else if (state === 'pending') {
+        inlineClass = 'exec-inline exec-inline-stage';
+        inlineText = rawStatusText && rawStatusText !== 'Pending' ? rawStatusText : 'Queued';
+        inlineTitle = '';
+      }
+
+      // --- upsert the row ------------------------------------------------------
+      let el = listEl.querySelector<HTMLElement>(`.exec-item[data-request-id="${key}"]`);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = `exec-item state-${state}`;
+        el.setAttribute('data-request-id', key);
+        el.dataset.state = state;
+        el.dataset.indicator = state;
+        el.style.setProperty('--exec-progress', `${fillPercent}%`);
+        const scriptChip =
+          uniformScriptName || !rawScriptName
+            ? ''
+            : `<span class="badge bg-ghost-light text-light exec-chip" title="${Safe(rawScriptName)}">${Safe(truncateExecutionLabel(rawScriptName, 28))}</span>`;
+        el.innerHTML = `
 				<div class="exec-fill"></div>
 				<div class="exec-row">
 					<div class="exec-left">
@@ -498,44 +523,44 @@ function InitClientListPush() {
 						<div class="exec-actions">${indicatorHtml}</div>
 					</div>
 				</div>`;
-      listEl.appendChild(el);
+        listEl.appendChild(el);
+      }
+
+      // Volatile updates only — the .exec-fill and spinner nodes are never replaced
+      // unless the state changes, so their animations run uninterrupted.
+      el.style.setProperty('--exec-progress', `${fillPercent}%`);
+      if (el.dataset.state !== state) {
+        el.classList.remove('state-pending', 'state-running', 'state-completed', 'state-failed');
+        el.classList.add(`state-${state}`);
+        el.dataset.state = state;
+      }
+      if (el.dataset.indicator !== state) {
+        const actions = el.querySelector('.exec-actions');
+        if (actions) actions.innerHTML = indicatorHtml;
+        el.dataset.indicator = state;
+      }
+      const timeEl = el.querySelector<HTMLElement>('.exec-time');
+      if (timeEl) {
+        if (timeEl.innerHTML !== timeBadge) timeEl.innerHTML = timeBadge;
+        timeEl.style.display = timeBadge ? '' : 'none';
+      }
+      const inlineEl = el.querySelector<HTMLElement>('[data-inline]');
+      if (inlineEl) {
+        const nextClass = `exec-inline-slot${inlineClass ? ` ${inlineClass}` : ''}`;
+        if (inlineEl.className !== nextClass) inlineEl.className = nextClass;
+        if (inlineEl.textContent !== inlineText) inlineEl.textContent = inlineText;
+        if (inlineEl.title !== inlineTitle) inlineEl.title = inlineTitle;
+        inlineEl.style.display = inlineText ? '' : 'none';
+      }
     }
 
-    // Volatile updates only — the .exec-fill and spinner nodes are never replaced
-    // unless the state changes, so their animations run uninterrupted.
-    el.style.setProperty('--exec-progress', `${fillPercent}%`);
-    if (el.dataset.state !== state) {
-      el.classList.remove('state-pending', 'state-running', 'state-completed', 'state-failed');
-      el.classList.add(`state-${state}`);
-      el.dataset.state = state;
+    // Drop rows whose executions are no longer present (e.g. after ClearSettled).
+    for (const child of Array.from(listEl.children)) {
+      const childKey =
+        child.getAttribute('data-request-id') || child.getAttribute('data-exec-key') || '';
+      if (!desiredKeys.has(childKey)) child.remove();
     }
-    if (el.dataset.indicator !== state) {
-      const actions = el.querySelector('.exec-actions');
-      if (actions) actions.innerHTML = indicatorHtml;
-      el.dataset.indicator = state;
-    }
-    const timeEl = el.querySelector<HTMLElement>('.exec-time');
-    if (timeEl) {
-      if (timeEl.innerHTML !== timeBadge) timeEl.innerHTML = timeBadge;
-      timeEl.style.display = timeBadge ? '' : 'none';
-    }
-    const inlineEl = el.querySelector<HTMLElement>('[data-inline]');
-    if (inlineEl) {
-      const nextClass = `exec-inline-slot${inlineClass ? ` ${inlineClass}` : ''}`;
-      if (inlineEl.className !== nextClass) inlineEl.className = nextClass;
-      if (inlineEl.textContent !== inlineText) inlineEl.textContent = inlineText;
-      if (inlineEl.title !== inlineTitle) inlineEl.title = inlineTitle;
-      inlineEl.style.display = inlineText ? '' : 'none';
-    }
-  }
-
-  // Drop rows whose executions are no longer present (e.g. after ClearSettled).
-  for (const child of Array.from(listEl.children)) {
-    const childKey =
-      child.getAttribute('data-request-id') || child.getAttribute('data-exec-key') || '';
-    if (!desiredKeys.has(childKey)) child.remove();
-  }
-  return;
+    return;
   });
 
   window.API.SetScriptList(async (Scripts) => {
@@ -885,71 +910,70 @@ export function RenderFullClientAndMonitorList() {
 // from the former import-time subscription.
 function InitPendingAdoptionPush() {
   window.API.SetDevicesPendingAdoption(async (Devices) => {
-  const previous = Array.isArray(PendingAdoption) ? PendingAdoption : [];
-  const next = Array.isArray(Devices) ? Devices : [];
-  // Build fast lookup maps
-  const prevMap = new Map(previous.map((d) => [d.UUID, d]));
-  const nextMap = new Map(next.map((d) => [d.UUID, d]));
+    const previous = Array.isArray(PendingAdoption) ? PendingAdoption : [];
+    const next = Array.isArray(Devices) ? Devices : [];
+    // Build fast lookup maps
+    const prevMap = new Map(previous.map((d) => [d.UUID, d]));
+    const nextMap = new Map(next.map((d) => [d.UUID, d]));
 
-  // 1) Add alerts for newly available devices
-  for (const dev of next) {
-    const uuid = dev && dev.UUID;
-    if (!uuid) continue;
-    if (!prevMap.has(uuid) && !PendingAdoptionAlerts.has(uuid)) {
-      const title = 'Device available for adoption';
-      const msg = `${Safe(dev.Hostname || 'Unknown Host')} (${Safe(dev.IP || 'Unknown IP')})`;
-      const id = AddAlert({
-        type: 'adoption',
-        severity: 'info',
-        title,
-        message: msg,
-        clientUUID: uuid,
-        iconHtml: '<i class="bi bi-person-plus-fill"></i>',
-      });
-      PendingAdoptionAlerts.set(uuid, id);
-    }
-  }
-
-  // 2) Auto-dismiss alerts for devices that are no longer pending (adopted/removed) or state changed to Adopting
-  for (const dev of previous) {
-    const uuid = dev && dev.UUID;
-    if (!uuid) continue;
-    const stillPending = nextMap.has(uuid);
-    const now = nextMap.get(uuid) as
-      | { State?: string; status?: string; state?: string }
-      | undefined;
-    const status = now && (now.State || now.status || now.state);
-    const shouldDismiss = !stillPending || String(status).toLowerCase() === 'adopting';
-    if (shouldDismiss && PendingAdoptionAlerts.has(uuid)) {
-      const alertId = PendingAdoptionAlerts.get(uuid);
-      DismissAlert(alertId);
-      PendingAdoptionAlerts.delete(uuid);
-    }
-  }
-
-    setPendingAdoption(next);
-  // If main content already rendered, update/insert the section in place
-  try {
-    if (AppMode !== 'EDIT') {
-      const $existing = $('#PENDING_ADOPTION_SECTION');
-      if ($existing.length) $existing.replaceWith('<div id="PENDING_ADOPTION_SECTION"></div>');
-      UpdateIdentifyStatusBanner();
-      return;
-    }
-    const html = RenderPendingAdoptionSection();
-    const $existing = $('#PENDING_ADOPTION_SECTION');
-    if ($existing.length) {
-      $existing.replaceWith(html);
-    } else {
-      // If no section yet (e.g., first update before full list), append to content if present
-      if ($('#APPLICATION_CONTENT').length) {
-        $('#APPLICATION_CONTENT').append(html);
+    // 1) Add alerts for newly available devices
+    for (const dev of next) {
+      const uuid = dev && dev.UUID;
+      if (!uuid) continue;
+      if (!prevMap.has(uuid) && !PendingAdoptionAlerts.has(uuid)) {
+        const title = 'Device available for adoption';
+        const msg = `${Safe(dev.Hostname || 'Unknown Host')} (${Safe(dev.IP || 'Unknown IP')})`;
+        const id = AddAlert({
+          type: 'adoption',
+          severity: 'info',
+          title,
+          message: msg,
+          clientUUID: uuid,
+          iconHtml: '<i class="bi bi-person-plus-fill"></i>',
+        });
+        PendingAdoptionAlerts.set(uuid, id);
       }
     }
-  } catch (e) {
-    HandleNonFatalError('SetDevicesPendingAdoption:Render', e);
-  }
-  UpdateIdentifyStatusBanner();
+
+    // 2) Auto-dismiss alerts for devices that are no longer pending (adopted/removed) or state changed to Adopting
+    for (const dev of previous) {
+      const uuid = dev && dev.UUID;
+      if (!uuid) continue;
+      const stillPending = nextMap.has(uuid);
+      const now = nextMap.get(uuid) as
+        { State?: string; status?: string; state?: string } | undefined;
+      const status = now && (now.State || now.status || now.state);
+      const shouldDismiss = !stillPending || String(status).toLowerCase() === 'adopting';
+      if (shouldDismiss && PendingAdoptionAlerts.has(uuid)) {
+        const alertId = PendingAdoptionAlerts.get(uuid);
+        DismissAlert(alertId);
+        PendingAdoptionAlerts.delete(uuid);
+      }
+    }
+
+    setPendingAdoption(next);
+    // If main content already rendered, update/insert the section in place
+    try {
+      if (AppMode !== 'EDIT') {
+        const $existing = $('#PENDING_ADOPTION_SECTION');
+        if ($existing.length) $existing.replaceWith('<div id="PENDING_ADOPTION_SECTION"></div>');
+        UpdateIdentifyStatusBanner();
+        return;
+      }
+      const html = RenderPendingAdoptionSection();
+      const $existing = $('#PENDING_ADOPTION_SECTION');
+      if ($existing.length) {
+        $existing.replaceWith(html);
+      } else {
+        // If no section yet (e.g., first update before full list), append to content if present
+        if ($('#APPLICATION_CONTENT').length) {
+          $('#APPLICATION_CONTENT').append(html);
+        }
+      }
+    } catch (e) {
+      HandleNonFatalError('SetDevicesPendingAdoption:Render', e);
+    }
+    UpdateIdentifyStatusBanner();
   });
 }
 

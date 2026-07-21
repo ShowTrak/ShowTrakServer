@@ -16,9 +16,7 @@ export function CreateTagsRepository(DB: DBManager) {
       return DB.Get<TagRow>('SELECT * FROM Tags WHERE TagID = ?', [TagID]);
     },
     GetAllIDs(): Promise<DBResult<Pick<TagRow, 'TagID'>[]>> {
-      return DB.All<Pick<TagRow, 'TagID'>>(
-        'SELECT TagID FROM Tags ORDER BY Weight ASC, TagID ASC'
-      );
+      return DB.All<Pick<TagRow, 'TagID'>>('SELECT TagID FROM Tags ORDER BY Weight ASC, TagID ASC');
     },
     Insert(
       Slug: string,

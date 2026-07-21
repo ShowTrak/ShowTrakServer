@@ -159,12 +159,18 @@ export interface NdiSnapshot {
 
 // Normalize a name for case-insensitive comparison.
 export function NormalizeName(Value: unknown): string {
-  return String(Value == null ? '' : Value).trim().toLowerCase();
+  return String(Value == null ? '' : Value)
+    .trim()
+    .toLowerCase();
 }
 
 // Does a visible source name satisfy the configured target under the given mode?
 // Comparison is case-insensitive. An empty target never matches.
-export function MatchesSource(CandidateName: unknown, Target: unknown, Mode: NdiMatchMode): boolean {
+export function MatchesSource(
+  CandidateName: unknown,
+  Target: unknown,
+  Mode: NdiMatchMode
+): boolean {
   const C = NormalizeName(CandidateName);
   const T = NormalizeName(Target);
   if (!T) return false;
@@ -246,7 +252,9 @@ class NdiBrowserImpl {
       this.Mdns = Mdns;
       this.ResponseHandler = Handler;
     } else {
-      Logger.warn('NDI: could not tap multicast-dns responses; presence may go stale between re-announcements');
+      Logger.warn(
+        'NDI: could not tap multicast-dns responses; presence may go stale between re-announcements'
+      );
     }
 
     try {
@@ -440,7 +448,12 @@ export function EvaluateNdi(P: EvaluateParams): MonitoringResult {
   const Base = { SourceName: P.SourceName, MatchMode: P.MatchMode };
 
   if (P.Snapshot.Error) {
-    return { Success: false, Error: `NDI browser error: ${P.Snapshot.Error}`, ...Base, Sources: [] };
+    return {
+      Success: false,
+      Error: `NDI browser error: ${P.Snapshot.Error}`,
+      ...Base,
+      Sources: [],
+    };
   }
 
   const Fresh = P.Snapshot.Sources.filter((S) => P.Now - S.LastSeenAt <= P.GracePeriodMs).sort(
@@ -477,7 +490,10 @@ export function RunNdi(Target: MonitoringTargetLike): MonitoringResult {
 
   const MatchMode = NormalizeMatchMode(Cfg.MatchMode);
   const GracePeriodMs = Number.isFinite(Cfg.GracePeriodMs)
-    ? Math.min(MAX_GRACE_PERIOD_MS, Math.max(MIN_GRACE_PERIOD_MS, (Cfg.GracePeriodMs as number) | 0))
+    ? Math.min(
+        MAX_GRACE_PERIOD_MS,
+        Math.max(MIN_GRACE_PERIOD_MS, (Cfg.GracePeriodMs as number) | 0)
+      )
     : DEFAULT_GRACE_PERIOD_MS;
 
   NdiBrowser.Observe();
@@ -507,23 +523,36 @@ export function BuildNdiDebug(Result: MonitoringResult, Target: MonitoringTarget
     TextRow('Match mode', MatchMode === 'exact' ? 'Exact' : 'Contains'),
     Row('Status', StatusPill),
     Online
-      ? Row('Last seen', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)} ago</span>`)
+      ? Row(
+          'Last seen',
+          `<span class="font-monospace">${FormatLatency(Result.LatencyMs)} ago</span>`
+        )
       : Result && Result.Error
         ? TextRow('Detail', Result.Error as string)
         : null,
     // Discovery is network-wide via mDNS, so the check's Address field is unused.
-    Row('Address', '<span class="text-muted small">Not used — NDI discovery is network-wide</span>'),
+    Row(
+      'Address',
+      '<span class="text-muted small">Not used — NDI discovery is network-wide</span>'
+    ),
   ]);
 
   const Sources: NdiSource[] = Array.isArray(Result && Result.Sources)
     ? (Result.Sources as NdiSource[])
     : [];
   if (!Sources.length) {
-    return Head + '<div class="mt-2">' + Note('No NDI sources currently visible on the network') + '</div>';
+    return (
+      Head +
+      '<div class="mt-2">' +
+      Note('No NDI sources currently visible on the network') +
+      '</div>'
+    );
   }
 
   const List = Sources.map((S) => {
-    const IsMatch = MatchedName ? S.Name === MatchedName : MatchesSource(S.Name, SourceName, MatchMode);
+    const IsMatch = MatchedName
+      ? S.Name === MatchedName
+      : MatchesSource(S.Name, SourceName, MatchMode);
     return Card({
       Title: S.Name,
       Badge: IsMatch ? Pill('success', 'Match') : null,

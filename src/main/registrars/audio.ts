@@ -32,7 +32,9 @@ function register(): void {
   RPC.handle('Audio:Select', async () => {
     const { canceled, filePaths } = await FileSelectorManager.OpenAudioDialog('Select Audio Files');
     if (canceled || !filePaths || !filePaths.length) return [null, []];
-    const Candidates = filePaths.map((FilePath: string) => AudioAssetManager.InspectCandidate(FilePath));
+    const Candidates = filePaths.map((FilePath: string) =>
+      AudioAssetManager.InspectCandidate(FilePath)
+    );
     return [null, Candidates];
   });
 

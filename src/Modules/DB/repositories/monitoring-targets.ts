@@ -51,9 +51,13 @@ export function CreateMonitoringTargetsRepository(DB: DBManager) {
     // the target repository owns the target→checks cascade. Returns [Err].
     DeleteTargetCascade(TargetID: number): Promise<DBResult<void>> {
       return DB.WithTransaction(async (run) => {
-        const [checksErr] = await run('DELETE FROM MonitoringChecks WHERE TargetID = ?', [TargetID]);
+        const [checksErr] = await run('DELETE FROM MonitoringChecks WHERE TargetID = ?', [
+          TargetID,
+        ]);
         if (checksErr) throw checksErr;
-        const [targetErr] = await run('DELETE FROM MonitoringTargets WHERE TargetID = ?', [TargetID]);
+        const [targetErr] = await run('DELETE FROM MonitoringTargets WHERE TargetID = ?', [
+          TargetID,
+        ]);
         if (targetErr) throw targetErr;
       });
     },

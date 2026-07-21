@@ -19,12 +19,7 @@ import { Manager as ClientManager } from '../ClientManager';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import type { FogTaskRow } from '../DB/rows';
-import type {
-  FogStatusView,
-  FogHostView,
-  FogTaskTypeView,
-  FogTaskView,
-} from '@showtrak/protocol';
+import type { FogStatusView, FogHostView, FogTaskTypeView, FogTaskView } from '@showtrak/protocol';
 import {
   FOG_TASK_TYPES,
   GetFogTaskType,
@@ -194,8 +189,7 @@ async function ReconcileTasks(Config: FogConfig): Promise<boolean> {
       // FOG exposes both `percent` (display text) and `pct` (numeric). Prefer the
       // text, fall back to the number, and only show it once actually in progress —
       // percent is meaningless while a task is still queued.
-      const Percent =
-        StateID === 3 ? ToText(Match.percent) || `${ToNumber(Match.pct, 0)}%` : null;
+      const Percent = StateID === 3 ? ToText(Match.percent) || `${ToNumber(Match.pct, 0)}%` : null;
 
       if (Row.FogTaskID !== TaskID || Row.StateID !== StateID || Row.Percent !== Percent) {
         await FogRepo.UpdateTaskProgress(Row.FogTaskRecordID, TaskID, StateID, Percent, Timestamp);
@@ -222,13 +216,7 @@ async function ReconcileTasks(Config: FogConfig): Promise<boolean> {
     // Never seen active and never given an ID. Past the grace window, assume it ran
     // and finished between polls rather than leaving it pending forever.
     if (Timestamp - Row.CreatedAt > UNSEEN_TASK_GRACE_MS) {
-      await FogRepo.UpdateTaskProgress(
-        Row.FogTaskRecordID,
-        null,
-        STATE_COMPLETE,
-        null,
-        Timestamp
-      );
+      await FogRepo.UpdateTaskProgress(Row.FogTaskRecordID, null, STATE_COMPLETE, null, Timestamp);
       Changed = true;
     }
   }
@@ -419,7 +407,9 @@ const Manager = {
     return Ok<FogHostView[]>(HostCache);
   },
 
-  async GetHostLink(UUID: string): Promise<Result<{ FogHostID: number; FogHostName: string | null } | null>> {
+  async GetHostLink(
+    UUID: string
+  ): Promise<Result<{ FogHostID: number; FogHostName: string | null } | null>> {
     const [Err, Row] = await FogRepo.GetHostLink(UUID);
     if (Err) return Fail(String(Err));
     if (!Row) return Ok<{ FogHostID: number; FogHostName: string | null } | null>(null);

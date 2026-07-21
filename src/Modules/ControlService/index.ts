@@ -101,14 +101,22 @@ async function resolveTagClients(
 
 function isIntegrated(client: ResolvedClient): boolean {
   if (client.Integrated === true) return true;
-  return String(client.OperatingSystem || '').trim().toLowerCase() === 'integrated';
+  return (
+    String(client.OperatingSystem || '')
+      .trim()
+      .toLowerCase() === 'integrated'
+  );
 }
 
 // --- Dispatch helpers ----------------------------------------------------
 
 // Call a shared IPC handler by channel; treat a tuple [Err, _] with a truthy
 // Err as failure. Returns a CommandResult.
-async function dispatchHandler(channel: string, args: unknown[], detail: string): Promise<CommandResult> {
+async function dispatchHandler(
+  channel: string,
+  args: unknown[],
+  detail: string
+): Promise<CommandResult> {
   const Handler = GetHandler(channel);
   if (typeof Handler !== 'function') return fail(`Handler "${channel}" unavailable`);
   const Result = await Handler(null, ...args);

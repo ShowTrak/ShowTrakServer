@@ -57,8 +57,7 @@ export = function registerMonitoringValidators(Manager: IPCValidationManager): v
     // be saved without one; every other method requires a non-empty address.
     const MethodDef = MonitoringMethods.Get(out.Method as string);
     if (MethodDef && MethodDef.UsesAddress === false) {
-      out.Address =
-        value.Address == null ? '' : String(value.Address).trim().slice(0, 253);
+      out.Address = value.Address == null ? '' : String(value.Address).trim().slice(0, 253);
     } else {
       out.Address = normalizeNonEmptyString(value.Address, `Check ${index + 1} address`, {
         minLength: 1,

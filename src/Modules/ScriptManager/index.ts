@@ -369,7 +369,9 @@ function EnsureScriptDirectoryWatcher(ScriptsDirectory: string) {
       `Watching scripts directory for changes: ${ScriptsDirectory} (${RecursiveWatchSupported ? 'recursive' : 'non-recursive'})`
     );
   } catch (Err) {
-    Logger.warn(`Unable to watch scripts directory (${ScriptsDirectory}): ${(Err as Error).message}`);
+    Logger.warn(
+      `Unable to watch scripts directory (${ScriptsDirectory}): ${(Err as Error).message}`
+    );
   }
 }
 
@@ -601,9 +603,7 @@ Manager.GetEditable = async (ID: string): Promise<Result<ScriptEditable>> => {
     platforms: Script.Platforms || {},
     arguments: Script.Arguments || {},
     consoleFilter:
-      'ConsoleFilter' in Script &&
-      Script.ConsoleFilter &&
-      typeof Script.ConsoleFilter === 'object'
+      'ConsoleFilter' in Script && Script.ConsoleFilter && typeof Script.ConsoleFilter === 'object'
         ? {
             Mode: String(Script.ConsoleFilter.Mode || DEFAULT_CONSOLE_FILTER_MODE),
             Pattern: String(Script.ConsoleFilter.Pattern || ''),

@@ -91,7 +91,8 @@ async function CollectClientSlugs(): Promise<SlugEntry[]> {
   );
   if (ClientErr) Logger.error('Failed to read client slugs', ClientErr);
   for (const Row of ClientRows || []) {
-    if (Row && Row.Slug) Entries.push({ slug: String(Row.Slug).toLowerCase(), owner: ClientOwner(Row.UUID) });
+    if (Row && Row.Slug)
+      Entries.push({ slug: String(Row.Slug).toLowerCase(), owner: ClientOwner(Row.UUID) });
   }
 
   const [MonErr, MonRows] = await DB.All<{ TargetID: number; Slug: string | null }>(
@@ -122,7 +123,8 @@ async function CollectGroupSlugs(): Promise<SlugEntry[]> {
   if (Err) Logger.error('Failed to read group slugs', Err);
   const Entries: SlugEntry[] = [];
   for (const Row of Rows || []) {
-    if (Row && Row.Slug) Entries.push({ slug: String(Row.Slug).toLowerCase(), owner: `group:${Row.GroupID}` });
+    if (Row && Row.Slug)
+      Entries.push({ slug: String(Row.Slug).toLowerCase(), owner: `group:${Row.GroupID}` });
   }
   return Entries;
 }
@@ -134,7 +136,8 @@ async function CollectTagSlugs(): Promise<SlugEntry[]> {
   if (Err) Logger.error('Failed to read tag slugs', Err);
   const Entries: SlugEntry[] = [];
   for (const Row of Rows || []) {
-    if (Row && Row.Slug) Entries.push({ slug: String(Row.Slug).toLowerCase(), owner: TagOwner(Row.TagID) });
+    if (Row && Row.Slug)
+      Entries.push({ slug: String(Row.Slug).toLowerCase(), owner: TagOwner(Row.TagID) });
   }
   return Entries;
 }

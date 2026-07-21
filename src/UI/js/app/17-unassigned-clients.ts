@@ -73,16 +73,16 @@ export async function OpenUnassignedClientCreationModal(): Promise<void> {
         return Notify('How many must be a whole number of at least 1', 'error');
       }
       if (Count > MAX_UNASSIGNED_CLIENTS_PER_REQUEST) {
-        return Notify(`You can create at most ${MAX_UNASSIGNED_CLIENTS_PER_REQUEST} at once`, 'error');
+        return Notify(
+          `You can create at most ${MAX_UNASSIGNED_CLIENTS_PER_REQUEST} at once`,
+          'error'
+        );
       }
 
       const [Err, Created] = await window.API.CreateUnassignedClients({ Name, Count });
       if (Err) return Notify(String(Err), 'error');
 
       closeModal('SHOWTRAK_MODAL_UNASSIGNED_CLIENT_CREATION');
-      Notify(
-        `Created ${Created} unassigned client${Created === 1 ? '' : 's'}`,
-        'success'
-      );
+      Notify(`Created ${Created} unassigned client${Created === 1 ? '' : 's'}`, 'success');
     });
 }
