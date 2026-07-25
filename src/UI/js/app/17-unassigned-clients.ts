@@ -13,8 +13,11 @@ import { closeAllModals, closeModal, openModal } from './lib/modal';
 import { GetSettingValue } from './03-settings';
 import { Capabilities } from './state/capabilities';
 import { Notify, Wait } from './14-selection-init';
-
-const MAX_UNASSIGNED_CLIENTS_PER_REQUEST = 64;
+import {
+  FormatUnassignedClientsCreated,
+  ResolveUnassignedClientsEnabled,
+  ValidateUnassignedClientRequest,
+} from './lib/unassigned-clients';
 
 // Mirrors 11-group-manager's local helper: close everything, then let the CSS
 // transition settle before opening the next modal.
@@ -37,16 +40,15 @@ async function CloseAllModals(): Promise<void> {
  * Fails closed if the setting cannot be read.
  */
 export async function RefreshUnassignedClientMenuVisibility(): Promise<void> {
-  let Enabled = false;
-  if (Capabilities.isWeb) {
-    Enabled = Capabilities.allowUnassignedClients;
-  } else {
+  let SettingValue: unknown = false;
+  if (!Capabilities.isWeb) {
     try {
-      Enabled = !!(await GetSettingValue('SYSTEM_ALLOW_UNASSIGNED_CLIENTS'));
+      SettingValue = await GetSettingValue('SYSTEM_ALLOW_UNASSIGNED_CLIENTS');
     } catch {
-      Enabled = false;
+      SettingValue = false;
     }
   }
+  const Enabled = ResolveUnassignedClientsEnabled(Capabilities, SettingValue);
   $('#ADD_UNASSIGNED_CLIENT_ACTION_ITEM').toggleClass('d-none', !Enabled);
 }
 
@@ -64,25 +66,18 @@ export async function OpenUnassignedClientCreationModal(): Promise<void> {
   $('#UNASSIGNED_CLIENT_CREATION_SUBMIT')
     .off('click')
     .on('click', async () => {
-      const Name = String($('#UNASSIGNED_CLIENT_CREATION_NAME').val() || '').trim();
-      if (!Name) return Notify('Please enter a name', 'error');
-      if (Name.length > 64) return Notify('Name must be 64 characters or less', 'error');
+      // Rules live in ./lib/unassigned-clients (pure and tested). The main
+      // process re-validates and is the authority; this is for the message.
+      const Validation = ValidateUnassignedClientRequest(
+        $('#UNASSIGNED_CLIENT_CREATION_NAME').val(),
+        $('#UNASSIGNED_CLIENT_CREATION_COUNT').val()
+      );
+      if (!Validation.ok) return Notify(Validation.error, 'error');
 
-      const Count = Number($('#UNASSIGNED_CLIENT_CREATION_COUNT').val());
-      if (!Number.isInteger(Count) || Count < 1) {
-        return Notify('How many must be a whole number of at least 1', 'error');
-      }
-      if (Count > MAX_UNASSIGNED_CLIENTS_PER_REQUEST) {
-        return Notify(
-          `You can create at most ${MAX_UNASSIGNED_CLIENTS_PER_REQUEST} at once`,
-          'error'
-        );
-      }
-
-      const [Err, Created] = await window.API.CreateUnassignedClients({ Name, Count });
+      const [Err, Created] = await window.API.CreateUnassignedClients(Validation.payload);
       if (Err) return Notify(String(Err), 'error');
 
       closeModal('SHOWTRAK_MODAL_UNASSIGNED_CLIENT_CREATION');
-      Notify(`Created ${Created} unassigned client${Created === 1 ? '' : 's'}`, 'success');
+      Notify(FormatUnassignedClientsCreated(Created), 'success');
     });
 }

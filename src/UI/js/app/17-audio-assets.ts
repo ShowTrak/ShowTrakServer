@@ -43,6 +43,11 @@ export function getAudioPlaybackContext() {
 }
 
 export function toBackendVolume(Value: unknown) {
+  // null and '' both coerce to a finite 0, so without this they would fall
+  // through the clamp as SILENCE rather than reaching the 100 fallback below.
+  // An alert asset exists to be heard; a missing or blank stored volume must
+  // never be the thing that silently mutes it.
+  if (Value == null || Value === '') return 100;
   const Raw = Number(Value);
   if (!Number.isFinite(Raw)) return 100;
   return Math.min(200, Math.max(0, Math.round(Raw)));

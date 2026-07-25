@@ -181,18 +181,20 @@ test('a non-numeric volume falls back to 100%', () => {
   }
 });
 
-test('null and empty-string volumes resolve to SILENCE — documented, not endorsed', () => {
-  // Number(null) and Number('') are both 0, which is finite, so these take the
-  // clamp path rather than the fallback and an alert configured this way plays
-  // at zero. The other unusable values above correctly fall back to 100.
-  //
-  // Pinned rather than changed because it is not currently reachable: the only
-  // callers pass an editor field value or a stored Asset.Volume, and an absent
-  // asset volume arrives as undefined (which does fall back to 100). Worth
-  // knowing about if a code path ever starts passing null — an alert that
-  // silently does not sound is the worst failure this module has.
-  assert.equal(toBackendVolume(null), 0);
-  assert.equal(toBackendVolume(''), 0);
+test('a null or blank volume falls back to 100%, not to silence', () => {
+  // These need their own guard: Number(null) and Number('') are both a FINITE
+  // zero, so without it they fall through the clamp as silence rather than
+  // reaching the non-numeric fallback. An alert asset exists to be heard, so a
+  // missing or blank stored volume must never be what mutes it.
+  assert.equal(toBackendVolume(null), 100);
+  assert.equal(toBackendVolume(''), 100);
+});
+
+test('an explicit zero is still honoured as silence', () => {
+  // The guard above must not swallow a deliberate mute: 0 is a legitimate
+  // setting an operator can choose on the slider.
+  assert.equal(toBackendVolume(0), 0);
+  assert.equal(toBackendVolume('0'), 0);
 });
 
 test('the slider position is half the stored volume', () => {

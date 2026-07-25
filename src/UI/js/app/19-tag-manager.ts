@@ -15,6 +15,7 @@ import {
   renderScopeDropdown,
   bindScopeDropdown,
 } from './scope-dropdown';
+import { SummarizeTagScope } from './lib/tag-summary';
 import type { ScopeDropdownConfig } from './scope-dropdown';
 
 // Tag Manager (desktop UI)
@@ -154,17 +155,6 @@ export function RenderTagManagerList() {
 }
 
 // Short human description of a tag's membership scope for the list row.
-function SummarizeTagScope(Tag: TagView): string {
-  const Scope = Tag.Scope || { Workspace: false, Groups: [], Clients: [] };
-  if (Scope.Workspace) return 'All clients';
-  const Parts: string[] = [];
-  const GroupCount = Array.isArray(Scope.Groups) ? Scope.Groups.length : 0;
-  const ClientCount = Array.isArray(Scope.Clients) ? Scope.Clients.length : 0;
-  if (GroupCount) Parts.push(`${GroupCount} group${GroupCount === 1 ? '' : 's'}`);
-  if (ClientCount) Parts.push(`${ClientCount} client${ClientCount === 1 ? '' : 's'}`);
-  return Parts.length ? Parts.join(' + ') : 'No clients';
-}
-
 export async function CreateTag() {
   const Btn = $('#TAG_MANAGER_CREATE');
   Btn.prop('disabled', true);
