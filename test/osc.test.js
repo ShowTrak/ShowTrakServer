@@ -18,16 +18,28 @@ const noopLogger = {
 // A tag whose membership scope is "group 1", so it expands to clients a + b.
 const FOH_SCOPE = { Workspace: false, Groups: [1], Clients: [] };
 
-function loadOSC(overrides = {}) {
+// `WithSocket` mirrors node-osc exposing its dgram socket as `_sock`; pass false
+// to model a build where that internal is gone and the Server is the only place
+// a socket error can surface.
+function loadOSC(overrides = {}, { WithSocket = true } = {}) {
   const handlers = {};
+  const socketHandlers = {};
   const oscMock = {
     Server: class {
       constructor(_port, _host, cb) {
+        if (WithSocket) {
+          this._sock = {
+            on(event, handler) {
+              socketHandlers[event] = handler;
+            },
+          };
+        }
         if (typeof cb === 'function') cb();
       }
       on(event, handler) {
         handlers[event] = handler;
       }
+      close() {}
     },
   };
 
@@ -122,7 +134,7 @@ function loadOSC(overrides = {}) {
     path.join(__dirname, '..', 'dist', 'Modules', 'OSC', 'index.js'),
     mocks
   );
-  return { OSC, handlers, broadcastEvents, controlCalls };
+  return { OSC, handlers, socketHandlers, broadcastEvents, controlCalls };
 }
 
 test('OSC registers the built-in routes', () => {
@@ -177,6 +189,43 @@ test('OSC exposes no selection routes', () => {
   const routes = OSC.GetRoutes().map((r) => r.Path);
   const selectionRoutes = routes.filter((p) => /\/(?:De)?Select$|^\/API\/Selection\//i.test(p));
   assert.deepEqual(selectionRoutes, [], 'selection routes were deprecated and must stay removed');
+});
+
+// node-osc reports an undecodable datagram as an 'error' on the Server, always
+// carrying the sender's remote-info. It must stay a warning: one malformed UDP
+// packet from anywhere on the network cannot be allowed to take OSC down.
+test('OSC absorbs a malformed inbound packet without tearing the server down', () => {
+  const { broadcastEvents, handlers } = loadOSC();
+  handlers.error(new Error("can't decode incoming message"), { address: '10.0.0.9', port: 5000 });
+  assert.deepEqual(
+    broadcastEvents.filter(([event]) => event === 'Notify'),
+    []
+  );
+});
+
+// Since node-osc 11 the Server re-emits underlying socket errors too, with no
+// remote-info. The `_sock` listener already reports those, so the Server handler
+// must not also mislabel them as a bad packet — one socket error, one report.
+test('OSC reports a socket error once when the dgram socket is reachable', () => {
+  const { broadcastEvents, handlers, socketHandlers } = loadOSC();
+  const Err = Object.assign(new Error('bind EADDRINUSE 0.0.0.0:57121'), { code: 'EADDRINUSE' });
+  socketHandlers.error(Err);
+  handlers.error(Err);
+  assert.equal(
+    broadcastEvents.filter(([event, , level]) => event === 'Notify' && level === 'error').length,
+    1
+  );
+});
+
+// ...and if a future node-osc drops `_sock`, the Server handler is the only path
+// left, so it has to take over rather than swallow the error silently.
+test('OSC falls back to the Server error event when the dgram socket is hidden', () => {
+  const { broadcastEvents, handlers } = loadOSC({}, { WithSocket: false });
+  handlers.error(Object.assign(new Error('bind EADDRINUSE 0.0.0.0:57121'), { code: 'EADDRINUSE' }));
+  assert.equal(
+    broadcastEvents.filter(([event, , level]) => event === 'Notify' && level === 'error').length,
+    1
+  );
 });
 
 test('OSC force shutdown route emits ShutdownForce broadcast', async () => {
