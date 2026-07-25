@@ -51,7 +51,11 @@ function register(): void {
     'DeleteDummyClient',
     createTupleHandler<[string], unknown>(
       (UUID: unknown) => IPCValidation.DummyClientUUID(UUID),
-      (UUID: string) => DummyClientManager.Delete(UUID)
+      (UUID: string) => DummyClientManager.Delete(UUID),
+      // Matches the other Delete/* handlers: the renderer reads the payload slot
+      // as a boolean success flag, so an invalid UUID pairs the message with
+      // `false` rather than `null`.
+      { invalidFallback: false }
     )
   );
 

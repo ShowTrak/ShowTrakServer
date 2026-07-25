@@ -1,0 +1,36 @@
+// Test-only compilation of the renderer sources.
+//
+// The shipped renderer is bundled by esbuild into a single IIFE
+// (dist/UI/js/app/bundle.js), which is neither loadable by `require()` nor
+// meaningful to measure per-file. This config emits the SAME sources as
+// individual CommonJS modules under dist-test/ so that:
+//   - `node:test` files can require them like any other compiled module, and
+//   - c8 can report per-file coverage for all ~18k lines of renderer code
+//     (with --all, files with no tests still show up at 0%).
+//
+// dist-test/ is build output only: gitignored, excluded from the asar, and
+// never shipped. It is rebuilt by `pretest`.
+//
+// Note the deliberate module settings: CommonJS + classic node resolution, so
+// the renderer's extensionless relative imports ('./lib/qr-svg') resolve
+// without rewriting a single source file. Type-checking of the renderer still
+// happens against tsconfig.renderer.json (bundler resolution), which is what
+// the real build uses.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node10",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "rootDir": "./src",
+    "outDir": "./dist-test",
+    "allowJs": true,
+    "checkJs": false,
+    "types": ["jquery", "node"],
+    "paths": {
+      "@showtrak/protocol": ["./shared/src/index.d.ts"],
+      "@showtrak/protocol/*": ["./shared/src/*"]
+    }
+  },
+  "include": ["src/UI/js/app/**/*", "src/UI/types/**/*"]
+}

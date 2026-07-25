@@ -15,6 +15,7 @@ export default defineConfig([
       'node_modules/**',
       'out/**',
       'dist/**',
+      'dist-test/**',
       'forge.config.mjs',
       '.vscode/**',
     ],

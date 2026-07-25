@@ -323,11 +323,18 @@ function downloadFile(
 
 function buildPublicAssetList(manifest: UpdateManifest | null): PublicUpdateAsset[] {
   if (!manifest || !Array.isArray(manifest.assets)) return [];
-  return manifest.assets.map((asset) => ({
-    name: asset.name,
-    size: Number(asset.size) || 0,
-    url: `${PUBLIC_BASE_PATH}/${encodeURIComponent(asset.name)}`,
-  }));
+  // Skip unusable entries rather than dereferencing them. isManifestReady
+  // already guards `!asset || !asset.name` and reports the manifest as not
+  // ready; without the same guard here GetStatus would throw instead of
+  // returning that answer, turning a recoverable "not ready" into a failure of
+  // the whole status call.
+  return manifest.assets
+    .filter((asset) => asset && asset.name)
+    .map((asset) => ({
+      name: asset.name,
+      size: Number(asset.size) || 0,
+      url: `${PUBLIC_BASE_PATH}/${encodeURIComponent(asset.name)}`,
+    }));
 }
 
 Manager.GetPublicFeedURLPath = () => `${PUBLIC_BASE_PATH}/`;

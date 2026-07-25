@@ -19,12 +19,21 @@ import {
   set__LastGroups,
 } from './01-state';
 import { OfflineBadgeContent, UnassignedBadgeContent } from './lib/status-badges';
-import type {
-  ClientView,
-  DummyClientView,
-  MonitoringTargetView,
-  ScriptExecutionView,
-} from '@showtrak/protocol';
+import {
+  BuildGroupRenderOrder,
+  BuildGroupSelectableIDs,
+  BuildMergedTiles,
+  GetClientCompactStatusLabel,
+  GetClientTileStateClass,
+  GetGroupSpan,
+  GetTileWarningText,
+  ParseGroupColumnCount,
+  SelectGroupMembers,
+  ShouldRenderGroup,
+  ShouldShowWelcomePanel,
+  TruncateGroupLabel,
+} from './lib/client-list-layout';
+import type { ClientView, ScriptExecutionView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './04-utils';
 import { RenderMonitoringTargetTile } from './07-monitoring';
 import { initializeEditInteractions } from './08-dnd';
@@ -58,12 +67,6 @@ interface DeploymentUiState {
   holdUntil: number;
   hadRenderableDeployment: boolean;
 }
-
-// A single tile in a group's merged (clients + monitors + dummies) render order.
-type MergedTileEntry =
-  | { kind: 'client'; weight: number; data: ClientView }
-  | { kind: 'monitor'; weight: number; data: MonitoringTargetView }
-  | { kind: 'dummy'; weight: number; data: DummyClientView };
 
 // Called by the bootstrap orchestrator in main.ts — never at import time.
 export function InitClientList() {
@@ -103,20 +106,14 @@ export function InitClientList() {
   });
 }
 
-export function GetClientStatusDisplayText(Client: Partial<ClientView> | null | undefined) {
-  if (Client && Client.Identifying) return 'Identifying';
-  if (Client && Client.Online) return Client.Degraded ? 'Degraded' : 'Online';
-  return 'Offline';
-}
-
-export function GetClientCompactStatusLabel(Client: Partial<ClientView> | null | undefined) {
-  if (Client && Client.Identifying) return 'Identifying';
-  if (Client && Client.Online) return Client.Degraded ? 'Degraded' : 'Online';
-  // Checked after Online so that a slot which somehow has a device reporting in
-  // still shows its real state rather than a stale reservation label.
-  if (Client && Client.Unassigned) return 'Unassigned';
-  return 'Offline';
-}
+// The status/layout rules now live in ./lib/client-list-layout (pure, tested).
+// Re-exported here because the rest of the renderer imports them from this
+// module; the definitions moved, the public surface did not.
+export {
+  GetClientStatusDisplayText,
+  GetClientCompactStatusLabel,
+  TruncateGroupLabel,
+} from './lib/client-list-layout';
 
 // Registers the script-execution / script-list / full-client-list push
 // handlers. Bodies unchanged from the former import-time subscriptions.
@@ -579,23 +576,7 @@ function InitClientListPush() {
 
 // Read the configured number of group layout columns (clamped 2-6, default 2).
 export function GetGroupColumnCount() {
-  try {
-    const Setting = Array.isArray(Settings)
-      ? Settings.find((s) => s && s.Key === 'UI_GROUP_COLUMN_COUNT')
-      : null;
-    let Count = Setting ? parseInt(String(Setting.Value), 10) : 2;
-    if (!Number.isFinite(Count)) Count = 2;
-    return Math.min(6, Math.max(2, Count));
-  } catch (_e) {
-    return 2;
-  }
-}
-
-export function TruncateGroupLabel(value: string, maxLen = 16) {
-  const text = value == null ? '' : String(value).trim();
-  if (!text) return '';
-  if (text.length <= maxLen) return text;
-  return `${text.substring(0, Math.max(1, maxLen - 3))}...`;
+  return ParseGroupColumnCount(Settings);
 }
 
 // Build the HTML for a single client tile. Mirrors the monitor/dummy tile
@@ -605,13 +586,8 @@ export function RenderClientTile(Client: ClientView): string {
   const { Nickname, Hostname, IP, UUID, Online, LastSeen, Degraded, Unassigned } = Client;
   const HostnameVersionLabel = FormatClientHostnameVersionLabel(Client);
   const CompactStatusLabel = GetClientCompactStatusLabel(Client);
-  const WarningText =
-    Array.isArray(Client.DegradedWarnings) && Client.DegradedWarnings.length
-      ? String(Client.DegradedWarnings[0])
-      : 'Missing USB Device';
-  // A reserved slot has never had a device, so red "offline" would be alarming
-  // for something that is working as intended. Grey it out like an idle monitor.
-  const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : Unassigned ? 'IDLE' : '';
+  const WarningText = GetTileWarningText(Client);
+  const TileStateClass = GetClientTileStateClass(Client);
   const IdentifyingClass = Client && Client.Identifying ? 'IDENTIFYING' : '';
   return `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${TileStateClass} ${IdentifyingClass} ${
     UUID && Selected.includes(UUID) ? 'SELECTED' : ''
@@ -759,29 +735,15 @@ export function UpdateClientTile(Data: ClientView): void {
 
 export function RenderFullClientAndMonitorList() {
   const Clients = Array.isArray(__LastClients) ? __LastClients.slice() : [];
-  let Groups = Array.isArray(__LastGroups) ? __LastGroups.slice() : [];
   const Monitors = Array.isArray(MonitoringTargets) ? MonitoringTargets.slice() : [];
   const Dummies = Array.isArray(DummyClients) ? DummyClients.slice() : [];
   let Filler = '';
 
-  Groups.push({
-    GroupID: null as unknown as number,
-    Title: 'No Group',
-    Weight: 100000,
-    isFullWidth: true,
-  });
-
+  // Appends the synthetic "No Group" bucket and pins it to the bottom.
+  const Groups = BuildGroupRenderOrder(__LastGroups);
   const ColumnCount = GetGroupColumnCount();
 
-  // Keep the synthetic no-group bucket pinned to the bottom.
-  Groups = Groups.sort((a, b) => {
-    const ADefault = a && a.GroupID == null;
-    const BDefault = b && b.GroupID == null;
-    if (ADefault !== BDefault) return ADefault ? 1 : -1;
-    return (a.Weight || 0) - (b.Weight || 0);
-  });
-
-  if (Groups.length == 1 && Clients.length == 0 && Monitors.length == 0 && Dummies.length == 0) {
+  if (ShouldShowWelcomePanel(Groups.length, Clients, Monitors, Dummies)) {
     Filler += `<div class="bg-ghost rounded m-3 mb-0 d-grid gap-0 gap-3 p-3">
             <h5 class="text-light mb-0">
                 Welcome to ShowTrak Server v${Safe(Config.Application.Version)}
@@ -802,44 +764,24 @@ export function RenderFullClientAndMonitorList() {
     const { GroupID, Title } = Group;
     const FullGroupTitle = Title == null ? '' : String(Title);
     const GroupLabel = TruncateGroupLabel(FullGroupTitle);
-    const GroupSpan = Group.isFullWidth === false ? 1 : ColumnCount;
-    const GroupClients = Clients.filter((Client) => Client.GroupID === GroupID).sort(
-      (a, b) => (a.Weight || 0) - (b.Weight || 0)
-    );
-    const GroupMonitors = Monitors.filter((M) => (M.GroupID || null) === GroupID);
-    const GroupDummies = Dummies.filter((D) => (D.GroupID || null) === GroupID);
+    const GroupSpan = GetGroupSpan(Group, ColumnCount);
+    const Members = SelectGroupMembers(GroupID, Clients, Monitors, Dummies);
 
     GroupUUIDCache.set(
       `${GroupID}`,
-      GroupClients.map((c) => c.UUID)
+      Members.Clients.map((c) => c.UUID)
     );
 
     // Selection cache mirrors the tile data-uuid values so the group-title
     // button toggles every client type in the group (ShowTrak clients plus
     // prefixed monitor:/dummy: tiles), not just ShowTrak clients.
-    GroupSelectableUUIDCache.set(`${GroupID}`, [
-      ...GroupClients.map((c) => c.UUID),
-      ...GroupMonitors.map((m) => `monitor:${m.TargetID}`),
-      ...GroupDummies.map((d) => `dummy:${d.UUID}`),
-    ]);
+    GroupSelectableUUIDCache.set(`${GroupID}`, BuildGroupSelectableIDs(Members));
 
-    if (
-      GroupClients.length == 0 &&
-      GroupMonitors.length == 0 &&
-      GroupDummies.length == 0 &&
-      GroupID == null
-    )
-      continue;
+    if (!ShouldRenderGroup(GroupID, Members)) continue;
 
-    // Merge clients + monitors and sort by Weight so a unified ordering set
-    // by drag/drop is preserved.
-    const Merged = ([] as MergedTileEntry[])
-      .concat(
-        GroupClients.map((c) => ({ kind: 'client' as const, weight: c.Weight || 0, data: c })),
-        GroupMonitors.map((m) => ({ kind: 'monitor' as const, weight: m.Weight || 0, data: m })),
-        GroupDummies.map((d) => ({ kind: 'dummy' as const, weight: d.Weight || 0, data: d }))
-      )
-      .sort((a, b) => a.weight - b.weight);
+    // Merged and weight-ordered so a unified ordering set by drag/drop across
+    // clients, monitors and dummies is preserved.
+    const Merged = BuildMergedTiles(Members);
 
     Filler += `<div class="d-flex justify-content-start group-column-item" data-flip-key="group:${GroupID}" style="grid-column: span ${GroupSpan};">
     <div class="GROUP_TITLE_CLICKABLE m-3 me-0 mb-0 rounded" data-groupid="${GroupID}" title="${Safe(FullGroupTitle)}" aria-label="${Safe(FullGroupTitle)}">

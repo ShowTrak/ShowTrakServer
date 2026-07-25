@@ -52,6 +52,9 @@ web_modules/
 # Compiled TypeScript output
 dist/
 
+# Test-only renderer compile (see tsconfig.renderer.test.json)
+dist-test/
+
 # Optional npm cache directory
 .npm
 
