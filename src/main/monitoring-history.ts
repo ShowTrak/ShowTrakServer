@@ -110,6 +110,13 @@ function resolveEntityKey(entityType: string, id: unknown): EntityHistoryKey | n
 }
 
 function normalizeLatency(latencyMs: unknown): number | null {
+  // null and '' both coerce to a finite 0, so without this guard they would be
+  // stored as "answered in 0ms" rather than "no timing". That is not academic:
+  // a check sets LastLatencyMs to null on EVERY failure, so every offline
+  // sample would record a zero, and the timeline averages latency per block —
+  // dragging the mean toward zero for any block containing an outage, which is
+  // precisely the block an operator inspects.
+  if (latencyMs == null || latencyMs === '') return null;
   const parsed = Number(latencyMs);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
