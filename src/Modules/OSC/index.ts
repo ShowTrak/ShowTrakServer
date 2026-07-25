@@ -51,20 +51,31 @@ function StartOSCServer(Port: number): void {
       Logger.log(`OSC Server is listening on port ${Port}`);
     });
     OSCServer!.on('message', HandleOSCMessage);
+    // A bind failure (port already in use) or a transient network error is
+    // emitted asynchronously on the underlying dgram socket, so the constructor's
+    // try/catch can't catch it. Listen on the socket directly; node-osc exposes
+    // it as `_sock`.
+    const Sock = OSCServer!._sock;
+    const SocketGuarded = Boolean(Sock && typeof Sock.on === 'function');
+    if (SocketGuarded) {
+      Sock!.on('error', (Err) => HandleOSCSocketError(Port, Err));
+    }
     // node-osc emits 'error' on the Server for undecodable inbound packets. An
     // EventEmitter with no 'error' listener throws, so a single malformed UDP
     // datagram would crash the app — absorb them here as a warning instead.
-    OSCServer!.on('error', (Err) => {
+    //
+    // Since node-osc 11 the Server also re-emits socket errors, without the
+    // remote-info argument that every decode failure carries. Those are already
+    // covered by the `_sock` listener above, so only the rinfo-bearing case is a
+    // bad packet — anything else falls through to the socket handling (which the
+    // `_sock` listener does directly when it is available).
+    OSCServer!.on('error', (Err, Info) => {
+      if (!Info) {
+        if (!SocketGuarded) HandleOSCSocketError(Port, Err);
+        return;
+      }
       Logger.warn(`Ignoring malformed OSC packet: ${DescribeError(Err)}`);
     });
-    // node-osc never attaches an 'error' handler to its underlying dgram socket,
-    // so a bind failure (port already in use) or a transient network error would
-    // surface as an uncaught exception — the constructor's try/catch can't catch
-    // it because the socket error is emitted asynchronously. Guard it directly.
-    const Sock = OSCServer!._sock;
-    if (Sock && typeof Sock.on === 'function') {
-      Sock.on('error', (Err) => HandleOSCSocketError(Port, Err));
-    }
     CurrentOSCPort = Port;
   } catch (Err) {
     OSCServer = null;
