@@ -2,7 +2,12 @@
 // RenderClientInfoDetails (renders every tab/section). Extracted from
 // 14-selection-init.ts (REFACTOR_PLAN.md Phase 7). Imports are added below;
 // cross-references back into 14-selection-init are call-time only (safe cycle).
-import type { ClientView, ClientDisplayView, RunningApplicationsStatus } from '@showtrak/protocol';
+import type {
+  ClientView,
+  ClientDisplayView,
+  NetworkInterfaceAddress,
+  RunningApplicationsStatus,
+} from '@showtrak/protocol';
 import { openModal } from './lib/modal';
 import {
   ClientInfoOpenUUID,
@@ -797,7 +802,7 @@ export function RenderClientInfoDetails(Client: ClientView) {
       if (value === '6' || value === 'IPV6') return 'IPv6';
       return value;
     };
-    const isAddressActive = (address: Record<string, unknown> | null | undefined) => {
+    const isAddressActive = (address: NetworkInterfaceAddress | null | undefined) => {
       if (!address || typeof address !== 'object') return false;
       if (typeof address.active === 'boolean') return address.active;
       const ip = String(address.address || '').trim();

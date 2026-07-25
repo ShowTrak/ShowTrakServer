@@ -8,6 +8,7 @@ import { Ok, Fail } from '../Utils';
 import { Manager as AdoptionManager } from '../AdoptionManager';
 import { Manager as BroadcastManager } from '../Broadcast';
 import type { Result } from '../../types/result';
+import type { ServerToClientEvents } from '@showtrak/protocol';
 
 const Logger = CreateLogger('IdentifyManager');
 
@@ -16,10 +17,15 @@ import { Manager as ClientManager } from '../ClientManager';
 
 // Minimal shape of the Socket.IO server surface IdentifyManager drives: it only
 // needs room-scoped emits for the identify overlay. Kept structural (rather than
-// the fully typed server) so events not present in the shared events map — e.g.
-// StopIdentify — can still be emitted without coupling to the typed event union.
+// the fully typed server) to avoid depending on the whole Socket.IO generic
+// surface, but the emit signature is checked against the shared events map.
 interface IdentifyIOServer {
-  to(room: string): { emit(event: string, ...args: unknown[]): unknown };
+  to(room: string): {
+    emit<E extends keyof ServerToClientEvents>(
+      event: E,
+      ...args: Parameters<ServerToClientEvents[E]>
+    ): unknown;
+  };
 }
 
 // A client shape sufficient to decide identify eligibility.
