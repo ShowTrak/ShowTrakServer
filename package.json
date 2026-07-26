@@ -15,7 +15,7 @@
     "copy:assets": "node scripts/copy-assets.js",
     "build": "npm run clean && npm run build:shared && npm run build:ts && npm run typecheck:renderer && npm run build:renderer && npm run build:css && npm run copy:assets && npm run build:webui",
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck:renderer",
-    "start": "nodemon --watch src --watch shared --watch scripts --ignore \"src/UI/css/main.css\" --ext ts,js,mjs,cjs,json,css,html,svg,png,ico --exec \"npm run build && electron-forge start\"",
+    "start": "nodemon --watch src --watch shared --watch scripts --ignore \"src/UI/css/main.css\" --ignore \"shared/dist/**\" --ext ts,js,mjs,cjs,json,css,html,svg,png,ico --exec \"npm run build && electron-forge start\"",
     "premake": "npm run build",
     "make": "electron-forge make",
     "lint": "eslint",

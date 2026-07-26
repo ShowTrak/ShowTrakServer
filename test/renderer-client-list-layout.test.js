@@ -71,6 +71,23 @@ test('an unassigned slot reads as Unassigned only on the tile, and only when off
   );
 });
 
+test('a client still starting up says so rather than claiming to be Online', () => {
+  // The machine is connected but its show software is still launching, so a
+  // guard is outstanding. "Online" would claim a health we have not confirmed;
+  // "Degraded" would assert a fault we have not established.
+  const Starting = { Online: true, Initialising: true };
+  assert.equal(Layout.GetClientStatusDisplayText(Starting), 'Starting Up');
+  assert.equal(Layout.GetClientCompactStatusLabel(Starting), 'Starting Up');
+  // Grey, like an idle monitor — not the green of a machine that is ready.
+  assert.equal(Layout.GetClientTileStateClass(Starting), 'IDLE');
+
+  // A published fault outranks it: once something is genuinely degraded, that
+  // is what the operator needs to see.
+  const Degraded = { Online: true, Initialising: true, Degraded: true };
+  assert.equal(Layout.GetClientStatusDisplayText(Degraded), 'Degraded');
+  assert.equal(Layout.GetClientTileStateClass(Degraded), 'DEGRADED');
+});
+
 test('a missing client is Offline rather than blank or a crash', () => {
   for (const Value of [null, undefined, {}]) {
     assert.equal(Layout.GetClientStatusDisplayText(Value), 'Offline');

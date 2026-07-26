@@ -299,11 +299,16 @@ app.whenReady().then(async () => {
 // fires) matches the original registration timing.
 import {
   RegisterBroadcastBridge,
+  StartAlertBaselineSweep,
   ValidateAlertAudioAssets,
   UpdateAdoptionList,
 } from './main/broadcast-bridge';
 import { RegisterAllHandlers } from './main/registrars';
 RegisterBroadcastBridge();
+// Faults that were already true at start-up are held rather than announced as
+// fresh outages; this slow sweep is what raises the ones that turn out to be
+// real once the rig has had time to finish coming up.
+StartAlertBaselineSweep();
 
 // --- Autosave ----------------------------------------------------------------
 // The autosave timer lives in ./main/autosave; reschedule it on settings change

@@ -4,6 +4,7 @@ import { CreateLogger } from '../Logger';
 import { Manager as DB } from '../DB';
 import { CreateClientsRepository } from '../DB/repositories/clients';
 import { Manager as BroadcastManager } from '../Broadcast';
+import { CLIENT_STARTUP_GRACE_MS } from '../Config/constants';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import {
@@ -264,6 +265,15 @@ interface ClientConstructorInput {
   Slug?: string | null;
 }
 
+// Start-up window timers, held OFF the client objects on purpose.
+//
+// A Client instance is broadcast as-is: it crosses Electron's IPC to the
+// renderer (structured clone) and is JSON-stringified into alert history. A
+// Node timer handle survives neither — it is circular, so stringify throws, and
+// it is not cloneable, so the IPC send fails. Keeping the handles in a WeakMap
+// leaves the client itself plain data, and entries disappear with the client.
+const StartupGraceTimers = new WeakMap<Client, ReturnType<typeof setTimeout>>();
+
 class Client {
   // Persisted identity + ordering (mirrors DB/rows.ts ClientRow).
   UUID: string;
@@ -299,6 +309,39 @@ class Client {
   Vitals: ClientVitals;
   Degraded: boolean;
   DegradedWarnings: string[];
+  // Online, inside the start-up window, and holding at least one inferred fault
+  // (see CLIENT_STARTUP_GRACE_MS). Distinct from Degraded on purpose: the tile
+  // reads "Starting Up" rather than claiming either health or a fault.
+  Initialising: boolean;
+  // When the current connection was established, or null while offline. The
+  // start-up window is measured from here rather than from server start, so a
+  // machine that joins the show late gets the same allowance as the rest.
+  OnlineSince: number | null;
+
+  // Telemetry evidence gates (RAM-only).
+  //
+  // Every critical-hardware guard works by comparing what the client HAS
+  // reported against what it is expected to have. A client reports nothing at
+  // the instant it connects: its heartbeat lands first and the USB, display and
+  // application reports follow one second apart (see the client's on-connect
+  // sequence). Treating that gap as "the devices are gone" marked every client
+  // degraded for the first few seconds of every connection — and at server
+  // start, with the whole rig connecting at once, that arrived as a wave of
+  // alerts for faults that never existed.
+  //
+  // These flags record whether each domain has actually been observed on THIS
+  // connection, so an unreported domain is skipped rather than assumed faulty.
+  // They are deliberately not a timer: the moment real data lands, a genuine
+  // fault is evaluated and alerted on, so a device that was already missing
+  // when the client connected is still caught a second later.
+  //
+  // They reset on disconnect, so a reconnecting client re-proves each domain
+  // rather than being judged on the previous session's data.
+  HasUSBTelemetry: boolean;
+  HasDisplayTelemetry: boolean;
+  // Applications additionally carry their own sampler status, so this tracks
+  // whether the stored snapshot came from a sample that actually succeeded.
+  HasApplicationTelemetry: boolean;
   Identifying: boolean;
   ScriptsFingerprint: string | null;
   NetworkInterfaces: NormalizedNetworkInterface[];
@@ -386,6 +429,11 @@ class Client {
     this.MismatchedCriticalDisplays = [];
     this.Degraded = false;
     this.DegradedWarnings = [];
+    this.Initialising = false;
+    this.OnlineSince = null;
+    this.HasUSBTelemetry = false;
+    this.HasDisplayTelemetry = false;
+    this.HasApplicationTelemetry = false;
     this.NetworkInterfaces = [];
     this.ScriptsFingerprint = null;
     this.Identifying = false;
@@ -422,6 +470,19 @@ class Client {
   SetOnline(Online: boolean) {
     if (this.Online === Online) return;
     this.Online = Online;
+    // Going offline retires the evidence: whatever the client last told us
+    // about its hardware describes a session that has ended, and the next
+    // connection re-reports everything. Holding it would let a client that
+    // rebooted with a dongle removed read as healthy until its first report.
+    if (Online) {
+      this.OnlineSince = Date.now();
+    } else {
+      this.OnlineSince = null;
+      this._clearStartupGraceTimer();
+      this.HasUSBTelemetry = false;
+      this.HasDisplayTelemetry = false;
+      this.HasApplicationTelemetry = false;
+    }
     this._refreshClientHealthState();
     Logger.debug(`Client ${this.UUID} Online updated to ${Online}`);
     BroadcastManager.emit('ClientUpdated', this);
@@ -467,6 +528,7 @@ class Client {
   }
   SetUSBDeviceList(USBDeviceList: unknown) {
     this.ConnectedUSBDeviceList = Array.isArray(USBDeviceList) ? USBDeviceList : [];
+    this.HasUSBTelemetry = true;
     this._rebuildUSBDeviceView();
     Logger.debug(`Client ${this.UUID} USB Device List updated`);
     BroadcastManager.emit('ClientUpdated', this);
@@ -615,6 +677,7 @@ class Client {
   }
   SetDisplayList(DisplayList: unknown) {
     this.ConnectedDisplayList = Array.isArray(DisplayList) ? DisplayList : [];
+    this.HasDisplayTelemetry = true;
     this._rebuildDisplayView();
     Logger.debug(`Client ${this.UUID} Display List updated`);
     BroadcastManager.emit('ClientUpdated', this);
@@ -653,6 +716,9 @@ class Client {
     }
 
     this.ConnectedDisplayList = Array.from(byID.values());
+    // A delta only ever follows the full list this connection opened with, so
+    // by the time one lands the topology has been reported at least once.
+    this.HasDisplayTelemetry = true;
     this._rebuildDisplayView();
     Logger.debug(
       `Client ${this.UUID} Display delta applied (${this.ConnectedDisplayList.length} displays)`
@@ -822,9 +888,15 @@ class Client {
     return true;
   }
   _refreshClientHealthState() {
-    const MissingUSBCount =
-      (Array.isArray(this.MissingCriticalUSBDevices) ? this.MissingCriticalUSBDevices.length : 0) +
-      (Array.isArray(this.MissingCriticalUSBNames) ? this.MissingCriticalUSBNames.length : 0);
+    // Each domain is only judged once the client has reported it on this
+    // connection. Until then its "missing" list is an artefact of having no
+    // data rather than a fault — see HasUSBTelemetry above.
+    const MissingUSBCount = this.HasUSBTelemetry
+      ? (Array.isArray(this.MissingCriticalUSBDevices)
+          ? this.MissingCriticalUSBDevices.length
+          : 0) +
+        (Array.isArray(this.MissingCriticalUSBNames) ? this.MissingCriticalUSBNames.length : 0)
+      : 0;
     const ProcessStatusState = String(
       this.RunningApplications &&
         this.RunningApplications.Status &&
@@ -840,17 +912,78 @@ class Client {
     const Warnings: string[] = [];
     if (MissingApplicationCount > 0) Warnings.push('Critical Application Issue');
     if (MissingUSBCount > 0) Warnings.push('Missing USB Device');
-    const MissingDisplayCount = Array.isArray(this.MissingCriticalDisplays)
-      ? this.MissingCriticalDisplays.length
-      : 0;
-    const MismatchedDisplayCount = Array.isArray(this.MismatchedCriticalDisplays)
-      ? this.MismatchedCriticalDisplays.length
-      : 0;
+    const MissingDisplayCount =
+      this.HasDisplayTelemetry && Array.isArray(this.MissingCriticalDisplays)
+        ? this.MissingCriticalDisplays.length
+        : 0;
+    const MismatchedDisplayCount =
+      this.HasDisplayTelemetry && Array.isArray(this.MismatchedCriticalDisplays)
+        ? this.MismatchedCriticalDisplays.length
+        : 0;
     if (MissingDisplayCount > 0) Warnings.push('Missing Display');
     if (MismatchedDisplayCount > 0) Warnings.push('Display Configuration Changed');
-    if (this.IntegratedDegradedReason) Warnings.push(this.IntegratedDegradedReason);
-    this.Degraded = !!this.Online && Warnings.length > 0;
-    this.DegradedWarnings = this.Degraded ? Warnings : [];
+
+    // Everything above is INFERRED: the client reported what it has, and we
+    // concluded something expected is absent. That conclusion is sound but
+    // premature on a machine that is still booting, so inside the start-up
+    // window it is held rather than published (see CLIENT_STARTUP_GRACE_MS).
+    //
+    // The integrated reason below is not inferred — an SDK client saying "I am
+    // degraded, here is why" is a statement of fact from the thing itself, so
+    // it is never held and a self-reporting client stays instantly alertable.
+    const HoldingStartupWarnings = Warnings.length > 0 && this._isWithinStartupGrace();
+    const Published = HoldingStartupWarnings ? [] : [...Warnings];
+    if (this.IntegratedDegradedReason) Published.push(this.IntegratedDegradedReason);
+
+    this.Initialising = !!this.Online && HoldingStartupWarnings;
+    this.Degraded = !!this.Online && Published.length > 0;
+    this.DegradedWarnings = this.Degraded ? Published : [];
+    // Arm (or stand down) the timer that publishes whatever is still missing
+    // when the window closes.
+    this._syncStartupGraceTimer();
+  }
+
+  // Whether this connection is still inside its start-up allowance.
+  _isWithinStartupGrace(): boolean {
+    if (!this.Online || this.OnlineSince == null) return false;
+    return Date.now() - this.OnlineSince < CLIENT_STARTUP_GRACE_MS;
+  }
+
+  _clearStartupGraceTimer() {
+    const Timer = StartupGraceTimers.get(this);
+    if (!Timer) return;
+    clearTimeout(Timer);
+    StartupGraceTimers.delete(this);
+  }
+
+  // Keep exactly one timer alive while warnings are being held, firing when the
+  // window closes. Re-running the health state then either publishes the fault
+  // (and broadcasts it, so the tile and the alert rules both see it) or finds it
+  // resolved itself, which is the whole point of waiting.
+  _syncStartupGraceTimer() {
+    if (!this.Initialising) {
+      this._clearStartupGraceTimer();
+      return;
+    }
+    if (StartupGraceTimers.has(this)) return;
+    const Remaining = Math.max(
+      0,
+      CLIENT_STARTUP_GRACE_MS - (Date.now() - (this.OnlineSince ?? Date.now()))
+    );
+    const Timer = setTimeout(() => {
+      StartupGraceTimers.delete(this);
+      const WasDegraded = this.Degraded;
+      const WasInitialising = this.Initialising;
+      this._refreshClientHealthState();
+      // Only speak up if the verdict actually moved: this timer can outlive a
+      // client dropped from the cache, and a redundant broadcast would re-render
+      // every tile for nothing.
+      if (this.Degraded !== WasDegraded || this.Initialising !== WasInitialising) {
+        BroadcastManager.emit('ClientUpdated', this);
+      }
+    }, Remaining);
+    if (typeof Timer.unref === 'function') Timer.unref();
+    StartupGraceTimers.set(this, Timer);
   }
   _rebuildUSBDeviceView() {
     const CriticalBySerial = new Map<string, CriticalUSBEntry>(
@@ -1201,6 +1334,28 @@ class Client {
       PreviousStatus.State !== NextStatus.State ||
       PreviousStatus.Message !== NextStatus.Message ||
       PreviousStatus.Platform !== NextStatus.Platform;
+
+    // Started/stopped are DIFFS, and a diff is only meaningful against a
+    // snapshot we trust. Two cases produce a baseline we do not:
+    //
+    //   - the first snapshot of a connection, where the stored list is empty
+    //     because this server process has never seen the client. Diffing
+    //     against it announces every application on the machine as freshly
+    //     started, so restarting the server used to fire a start alert for
+    //     every application on every client at once;
+    //   - a snapshot whose sampler failed. The client reports an EMPTY list
+    //     with a non-ok status in that case (macOS automation permission being
+    //     the common one at client start-up), and diffing against it announces
+    //     every application as stopped when nothing stopped at all.
+    //
+    // Either way the snapshot is still stored — the UI shows the sampler
+    // status, and the critical-application health check already ignores a
+    // non-ok state — but no transition is derived from it. The next trusted
+    // sample diffs against a trusted baseline and reports real changes.
+    const SampleTrusted = NextStatus.State === 'ok';
+    const BaselineTrusted = this.HasApplicationTelemetry;
+    this.HasApplicationTelemetry = SampleTrusted;
+
     const Deduped = new Map<string, DedupedRunningApplication>();
 
     for (const Raw of RawItems) {
@@ -1262,23 +1417,25 @@ class Client {
       return;
     }
 
-    const NextKeys = new Set(
-      Items.map((Entry) => normalizeApplicationKey(Entry.Name)).filter(Boolean)
-    );
-    for (const Entry of Items) {
-      const Key = normalizeApplicationKey(Entry.Name);
-      if (!Key || PreviousByKey.has(Key)) continue;
-      BroadcastManager.emit('ApplicationStarted', this, {
-        Name: Entry.Name,
-        Count: Entry.Count,
-      });
-    }
-    for (const [Key, Entry] of PreviousByKey.entries()) {
-      if (NextKeys.has(Key)) continue;
-      BroadcastManager.emit('ApplicationStopped', this, {
-        Name: Entry.Name,
-        Count: Entry.Count,
-      });
+    if (SampleTrusted && BaselineTrusted) {
+      const NextKeys = new Set(
+        Items.map((Entry) => normalizeApplicationKey(Entry.Name)).filter(Boolean)
+      );
+      for (const Entry of Items) {
+        const Key = normalizeApplicationKey(Entry.Name);
+        if (!Key || PreviousByKey.has(Key)) continue;
+        BroadcastManager.emit('ApplicationStarted', this, {
+          Name: Entry.Name,
+          Count: Entry.Count,
+        });
+      }
+      for (const [Key, Entry] of PreviousByKey.entries()) {
+        if (NextKeys.has(Key)) continue;
+        BroadcastManager.emit('ApplicationStopped', this, {
+          Name: Entry.Name,
+          Count: Entry.Count,
+        });
+      }
     }
 
     this._rebuildRunningApplicationsView();
@@ -1363,11 +1520,20 @@ class Client {
       Items
     );
 
-    for (const Entry of Started) {
-      BroadcastManager.emit('ApplicationStarted', this, { Name: Entry.Name, Count: Entry.Count });
-    }
-    for (const Entry of Stopped) {
-      BroadcastManager.emit('ApplicationStopped', this, { Name: Entry.Name, Count: Entry.Count });
+    // Same rule as the full snapshot: a delta describes a step away from the
+    // stored list, so it only carries meaning when that list came from a
+    // sample we trust. A client always sends a full snapshot before its first
+    // delta, so this only ever suppresses a delta racing a reconnect.
+    const BaselineTrusted = this.HasApplicationTelemetry;
+    this.HasApplicationTelemetry = Status.State === 'ok';
+
+    if (BaselineTrusted && Status.State === 'ok') {
+      for (const Entry of Started) {
+        BroadcastManager.emit('ApplicationStarted', this, { Name: Entry.Name, Count: Entry.Count });
+      }
+      for (const Entry of Stopped) {
+        BroadcastManager.emit('ApplicationStopped', this, { Name: Entry.Name, Count: Entry.Count });
+      }
     }
 
     this._rebuildRunningApplicationsView();

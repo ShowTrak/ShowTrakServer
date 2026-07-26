@@ -36,6 +36,7 @@ interface PublicClientSource {
   Identifying?: unknown;
   Unassigned?: unknown;
   Degraded?: unknown;
+  Initialising?: unknown;
   // Loose for the same reason as Vitals: the internal view carries a nullable
   // SampledAt and augmented items the wire snapshot type doesn't model.
   RunningApplications?: unknown;
@@ -114,6 +115,7 @@ const ToPublicClient = (c: PublicClientSource): ClientView => ({
     : [],
   Degraded: !!c.Degraded,
   DegradedWarnings: Array.isArray(c.DegradedWarnings) ? c.DegradedWarnings : [],
+  Initialising: !!c.Initialising,
   NetworkInterfaces: Array.isArray(c.NetworkInterfaces) ? c.NetworkInterfaces : [],
   Integrated: !!c.Integrated,
   IntegratedActions: Array.isArray(c.IntegratedActions) ? c.IntegratedActions : [],

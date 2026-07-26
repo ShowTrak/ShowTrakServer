@@ -203,17 +203,39 @@ export function FormatMonitorStatus(
   return ErrorText;
 }
 
+/**
+ * Whether a target has checks configured but has not completed one yet.
+ *
+ * A target's runtime state is RAM-only and starts at Online: false, and its
+ * first check does not run until a moment after the loop starts. Rendering that
+ * gap as offline paints every monitor on the page red for the first check cycle
+ * after the server starts — an outage the operator can see is not real, which
+ * is the fastest way to teach them to ignore a red tile.
+ *
+ * It is deliberately not rendered as online either. Until a probe has answered
+ * we do not know, and assuming "up" would hide a device that really is dead
+ * when the server comes up. The tile shows the same neutral state a target with
+ * no checks gets, labelled so it reads as "not yet", not as "nothing here".
+ */
+export function IsMonitorAwaitingFirstCheck(T: MonitoringTargetView | null | undefined): boolean {
+  if (!T) return false;
+  if (!Number(T.CheckCount)) return false;
+  return T.LastChecked == null;
+}
+
 export function FormatMonitorCompactStatus(
   Online: boolean,
   LastLatencyMs: number | null,
   Degraded: boolean,
-  IsIdle: boolean
+  IsIdle: boolean,
+  AwaitingFirstCheck = false
 ) {
   // Compact view keeps labels short and deterministic. Prefer latency when it
   // exists, otherwise show a stable state label.
   const Latency = Online ? FormatLatency(LastLatencyMs) : '';
   if (Latency) return { text: Latency, color: 'text-light' };
   if (IsIdle) return { text: 'Idle', color: 'text-light' };
+  if (AwaitingFirstCheck) return { text: 'Checking', color: 'text-light' };
   if (Online && Degraded) return { text: 'Degraded', color: 'text-warning' };
   if (Online) return { text: 'Online', color: 'text-light' };
   return { text: 'Offline', color: 'text-light' };
@@ -239,16 +261,28 @@ export function RenderMonitoringTargetTile(T: MonitoringTargetView) {
   const Online = !!T.Online;
   const Degraded = !!T.Degraded;
   const IsIdle = !T.CheckCount;
+  const AwaitingFirstCheck = IsMonitorAwaitingFirstCheck(T);
+  // A target with no checks and one whose first check has not landed both hold
+  // no verdict, so they share the neutral indicator; only the label differs.
+  const NoVerdict = IsIdle || AwaitingFirstCheck;
   const Name = T.Nickname || T.Address || 'Unnamed';
   const Sub = FormatMonitoringAddressSub(T);
-  const Status = IsIdle
-    ? 'Idle'
+  const Status = NoVerdict
+    ? IsIdle
+      ? 'Idle'
+      : 'Checking'
     : FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
-  const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, Degraded, IsIdle);
+  const CompactStatus = FormatMonitorCompactStatus(
+    Online,
+    T.LastLatencyMs,
+    Degraded,
+    IsIdle,
+    AwaitingFirstCheck
+  );
   const OfflineSince = GetMonitoringOfflineSince(T);
   const MethodLabel = FormatMonitoringMethodLabel(T);
   const DragUUID = `monitor:${T.TargetID}`;
-  const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : IsIdle ? 'IDLE' : '';
+  const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : NoVerdict ? 'IDLE' : '';
   const TextClass = 'text-light';
   return `
     <div id="MONITOR_TILE_${T.TargetID}" class="SHOWTRAK_PC MONITOR ${TileStateClass}" data-target-id="${T.TargetID}" data-uuid="${DragUUID}" data-flip-key="${DragUUID}" draggable="${
@@ -262,13 +296,13 @@ export function RenderMonitoringTargetTile(T: MonitoringTargetView) {
       )}</label>
       <h5 class="mb-0" data-type="Name">${Safe(Name)}</h5>
       <small class="text-sm text-light" data-type="Address">${Safe(Sub)}</small>
-      <div class="SHOWTRAK_PC_STATUS ${IsIdle ? 'd-grid' : 'd-none'}" data-type="INDICATOR_IDLE">
-        <h7 class="mb-0 text-light" data-type="MONITOR_IDLE_LABEL">Idle</h7>
+      <div class="SHOWTRAK_PC_STATUS ${NoVerdict ? 'd-grid' : 'd-none'}" data-type="INDICATOR_IDLE">
+        <h7 class="mb-0 text-light" data-type="MONITOR_IDLE_LABEL">${IsIdle ? 'Idle' : 'Checking'}</h7>
       </div>
-      <div class="SHOWTRAK_PC_STATUS ${Online ? 'd-grid' : 'd-none'}" data-type="MONITOR_STATUS">
+      <div class="SHOWTRAK_PC_STATUS ${Online && !NoVerdict ? 'd-grid' : 'd-none'}" data-type="MONITOR_STATUS">
         <h7 class="mb-0 ${TextClass}" data-type="MONITOR_STATUS_LABEL">${Safe(Status)}</h7>
       </div>
-      <div class="SHOWTRAK_PC_STATUS ${!Online && !IsIdle ? 'd-grid' : 'd-none'}" data-type="INDICATOR_OFFLINE">
+      <div class="SHOWTRAK_PC_STATUS ${!Online && !NoVerdict ? 'd-grid' : 'd-none'}" data-type="INDICATOR_OFFLINE">
         <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${Safe(OfflineSince)}">
           ${OfflineBadgeContent()}
         </h7>
@@ -283,17 +317,26 @@ export function UpdateMonitoringTargetTile(T: MonitoringTargetView) {
   const Online = !!T.Online;
   const Degraded = !!T.Degraded;
   const IsIdle = !T.CheckCount;
+  const AwaitingFirstCheck = IsMonitorAwaitingFirstCheck(T);
+  const NoVerdict = IsIdle || AwaitingFirstCheck;
   $tile.toggleClass('ONLINE', Online && !Degraded);
   $tile.toggleClass('DEGRADED', Degraded);
-  $tile.toggleClass('IDLE', IsIdle);
+  $tile.toggleClass('IDLE', NoVerdict);
   const Name = T.Nickname || T.Address || 'Unnamed';
   $tile.find('[data-type="Name"]').text(Name);
   $tile.find('[data-type="Address"]').text(FormatMonitoringAddressSub(T));
   $tile
     .find('[data-type="Method"]')
     .text(`${FormatMonitoringMethodLabel(T)} · ${FormatInterval(T.Interval)}`);
+  $tile.find('[data-type="MONITOR_IDLE_LABEL"]').text(IsIdle ? 'Idle' : 'Checking');
   const Status = FormatMonitorStatus(Online, T.LastLatencyMs, T.LastError, Degraded);
-  const CompactStatus = FormatMonitorCompactStatus(Online, T.LastLatencyMs, Degraded, IsIdle);
+  const CompactStatus = FormatMonitorCompactStatus(
+    Online,
+    T.LastLatencyMs,
+    Degraded,
+    IsIdle,
+    AwaitingFirstCheck
+  );
   const $label = $tile.find('[data-type="MONITOR_STATUS_LABEL"]');
   $label.text(Status);
   $label.removeClass('text-success text-warning').addClass('text-light');
@@ -306,9 +349,9 @@ export function UpdateMonitoringTargetTile(T: MonitoringTargetView) {
       .toggleClass('d-grid', Show)
       .toggleClass('d-none', !Show);
   };
-  ToggleIndicator('INDICATOR_IDLE', IsIdle);
-  ToggleIndicator('MONITOR_STATUS', Online);
-  ToggleIndicator('INDICATOR_OFFLINE', !Online && !IsIdle);
+  ToggleIndicator('INDICATOR_IDLE', NoVerdict);
+  ToggleIndicator('MONITOR_STATUS', Online && !NoVerdict);
+  ToggleIndicator('INDICATOR_OFFLINE', !Online && !NoVerdict);
   $tile.find('[data-type="OFFLINE_SINCE"]').attr('data-offlinesince', GetMonitoringOfflineSince(T));
 }
 
@@ -818,20 +861,27 @@ export function RenderMonitoringHistoryModal() {
     const OverallBlocks = PerCheckBlocks.length
       ? BuildOverallStatusBlocks(PerCheckBlocks)
       : BuildStatusBlocksFromSamples([]);
-    const OverallState = Target.Online
-      ? Target.Degraded
-        ? 'DEGRADED'
-        : 'ONLINE'
-      : Checks.length
-        ? 'OFFLINE'
-        : 'UNAVAILABLE';
+    // A target whose first check has not landed yet has no verdict to report,
+    // so it reads as pending rather than as an outage (see the tile above).
+    const AwaitingFirstCheck = IsMonitorAwaitingFirstCheck(Target);
+    const OverallState = AwaitingFirstCheck
+      ? 'IDLE'
+      : Target.Online
+        ? Target.Degraded
+          ? 'DEGRADED'
+          : 'ONLINE'
+        : Checks.length
+          ? 'OFFLINE'
+          : 'UNAVAILABLE';
     $timelines.append(
       RenderMonitorHistorySection(
         {
           state: OverallState,
           name: 'Overall Status',
           sub: `${Checks.length} check${Checks.length === 1 ? '' : 's'}`,
-          statusText: BuildLiveStatusText(OverallState, Target.LastLatencyMs, Target.LastError),
+          statusText: AwaitingFirstCheck
+            ? 'Checking'
+            : BuildLiveStatusText(OverallState, Target.LastLatencyMs, Target.LastError),
         },
         OverallBlocks
       )

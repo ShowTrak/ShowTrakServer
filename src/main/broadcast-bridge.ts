@@ -14,7 +14,11 @@
 
 import type { USBDevice } from '@showtrak/protocol';
 import { CreateLogger } from '../Modules/Logger';
-import { ONLINE_DEPLOY_COOLDOWN_MS } from '../Modules/Config/constants';
+import {
+  ALERT_BASELINE_SETTLE_MS,
+  ALERT_BASELINE_SWEEP_INTERVAL_MS,
+  ONLINE_DEPLOY_COOLDOWN_MS,
+} from '../Modules/Config/constants';
 import { Manager as SettingsManager } from '../Modules/SettingsManager';
 import { Manager as ClientManager } from '../Modules/ClientManager';
 import { normalizeUSBNameKey } from '../Modules/ClientManager/normalizers';
@@ -598,6 +602,51 @@ async function OnScriptsUpdated(): Promise<void> {
   }
 }
 
+// --- Start-up fault sweep ----------------------------------------------------
+//
+// AlertsManager holds any fault that was already true the first time it saw an
+// entity, because at server start that is a rig coming up rather than an outage
+// happening. This sweep is what eventually announces the ones that were real:
+// it runs on a slow timer and asks the manager to raise anything still faulty
+// after ALERT_BASELINE_SETTLE_MS, handing it the client list so machines that
+// never connected at all (which produce no events to hold) are included.
+let AlertBaselineSweepTimer: ReturnType<typeof setInterval> | null = null;
+
+async function SweepSettledAlertBaseline(): Promise<void> {
+  try {
+    const [ClientsErr, Clients] = await ClientManager.GetAll();
+    if (ClientsErr) Logger.error('Failed to fetch clients for alert baseline sweep:', ClientsErr);
+    // Projected rather than passed whole: the alert context is serialized into
+    // history and posted by webhook actions, so it carries plain data only.
+    const Snapshot = (ClientsErr ? [] : Clients || []).map((Client) => ({
+      UUID: Client.UUID,
+      Nickname: Client.Nickname,
+      Hostname: Client.Hostname,
+      GroupID: Client.GroupID,
+      IP: Client.IP,
+      Online: Client.Online,
+      Unassigned: Client.Unassigned,
+    }));
+    const Raised = await AlertsManager.FlushSettledBaselineFaults(
+      ALERT_BASELINE_SETTLE_MS,
+      Snapshot
+    );
+    if (Raised > 0) {
+      Logger.log(`Raised ${Raised} alert(s) for faults present since start-up`);
+    }
+  } catch (Err) {
+    Logger.error('Alert baseline sweep failed', Err);
+  }
+}
+
+function StartAlertBaselineSweep(): void {
+  if (AlertBaselineSweepTimer) return;
+  AlertBaselineSweepTimer = setInterval(() => {
+    void SweepSettledAlertBaseline();
+  }, ALERT_BASELINE_SWEEP_INTERVAL_MS);
+  if (typeof AlertBaselineSweepTimer.unref === 'function') AlertBaselineSweepTimer.unref();
+}
+
 // Pure-indirection push subscribers: guard against window teardown, then forward
 // the emitted payload verbatim to the renderers. `[event, channel]` pairs.
 const PASSTHROUGH: Array<[string, string]> = [
@@ -662,6 +711,7 @@ function RegisterBroadcastBridge(): void {
 
 export {
   RegisterBroadcastBridge,
+  StartAlertBaselineSweep,
   UpdateSettings,
   UpdateAdoptionList,
   UpdateFullClientList,

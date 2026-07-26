@@ -247,6 +247,16 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
     IP: '10.0.0.8',
   });
 
+  // Both entities are seen healthy first: a degraded alert is a transition
+  // between two observed states, so the first snapshot only sets the baseline.
+  await Manager.HandleClientUpdated({
+    UUID: 'client-5',
+    Online: true,
+    Degraded: false,
+    Nickname: 'Player PC 5',
+    GroupID: 9,
+    IP: '10.0.0.12',
+  });
   await Manager.HandleClientUpdated({
     UUID: 'client-5',
     Online: true,
@@ -256,6 +266,14 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
     IP: '10.0.0.12',
   });
 
+  await Manager.HandleMonitoringTargetUpdated({
+    TargetID: 42,
+    Online: true,
+    Degraded: false,
+    Nickname: 'Web Check',
+    Address: 'web.local',
+    GroupID: 2,
+  });
   await Manager.HandleMonitoringTargetUpdated({
     TargetID: 42,
     Online: true,
@@ -396,6 +414,9 @@ test('AlertsManager fires client degraded only on state transitions', async () =
 
   await Manager.Init();
 
+  // First sighting: already degraded. This is what a server restart looks like
+  // to the alert engine, and it must NOT alert — the fault predates us, so
+  // announcing it as fresh would bury the real ones under a start-up wave.
   await Manager.HandleClientUpdated({
     UUID: 'client-10',
     Online: true,
@@ -404,6 +425,8 @@ test('AlertsManager fires client degraded only on state transitions', async () =
     GroupID: 1,
     IP: '10.0.0.20',
   });
+  assert.equal(executeCalls.length, 0);
+
   await Manager.HandleClientUpdated({
     UUID: 'client-10',
     Online: true,
@@ -445,10 +468,261 @@ test('AlertsManager fires client degraded only on state transitions', async () =
     IP: '10.0.0.20',
   });
 
+  // Two: the recovery-then-degrade, and the reconnect-still-degraded. The
+  // opening snapshot seeded the baseline and the repeat of it changed nothing.
   const degradedCalls = executeCalls.filter(
     (c) => c.context.TriggerType === 'CLIENT_DEGRADED' && c.context.EntityType === 'client'
   );
-  assert.equal(degradedCalls.length, 3);
+  assert.equal(degradedCalls.length, 2);
+});
+
+// The start-up case that made monitors the loudest source of false alerts: the
+// rig is still coming up, so the first tick of a multi-check target finds the
+// projector answering and the show-control app not yet listening. That is a
+// state we inherited, not an event — the tile shows it, and the alert waits for
+// something to actually change.
+test('AlertsManager treats a monitor found degraded on its first tick as a baseline', async () => {
+  const executeCalls = [];
+
+  const rules = [
+    {
+      RuleID: 1,
+      Title: 'Monitor Degraded Workspace',
+      Scope: JSON.stringify({ Workspace: true, Groups: [], Clients: ['check:7'] }),
+      TriggerType: 'CLIENT_DEGRADED',
+      TriggerConfig: JSON.stringify({ Source: 'monitor' }),
+      Actions: JSON.stringify([{ Type: 'http-api', Settings: { Route: '/degraded' } }]),
+      Enabled: 1,
+      Timestamp: 1,
+      UpdatedAt: 1,
+    },
+  ];
+
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AlertsManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => ({ error: () => {} }) },
+    '../DB': {
+      Manager: {
+        All: async () => [null, rules],
+        Run: async () => [null, { changes: 1 }],
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
+      },
+    },
+    '../AlertActions': {
+      Manager: {
+        GetAll: () => [],
+        Execute: async (action, context) => {
+          executeCalls.push({ action, context });
+          return { Success: true };
+        },
+      },
+    },
+    '../Broadcast': { Manager: { emit: () => {} } },
+    '../Utils': require('../dist/Modules/Utils'),
+  });
+
+  await Manager.Init();
+
+  const target = (degraded) => ({
+    TargetID: 3,
+    Online: true,
+    Degraded: degraded,
+    Nickname: 'Stage Rack',
+    Address: '10.0.0.30',
+    GroupID: null,
+    LastError: degraded ? 'Check down' : null,
+    Checks: [
+      { CheckID: 7, Name: 'QLab', Method: 'qlab', Online: true, Degraded: degraded },
+      { CheckID: 8, Name: 'Ping', Method: 'ping', Online: true, Degraded: false },
+    ],
+  });
+
+  await Manager.HandleMonitoringTargetUpdated(target(true));
+  assert.equal(
+    executeCalls.length,
+    0,
+    'the first tick establishes the baseline, it does not alert'
+  );
+
+  // Still degraded on the next tick: nothing changed, so nothing new to say.
+  await Manager.HandleMonitoringTargetUpdated(target(true));
+  assert.equal(executeCalls.length, 0);
+
+  // It recovers as the rig finishes booting, then genuinely fails later in the
+  // show. That transition is a real fault and alerts at both levels.
+  await Manager.HandleMonitoringTargetUpdated(target(false));
+  await Manager.HandleMonitoringTargetUpdated(target(true));
+  const entityTypes = executeCalls.map((c) => c.context.EntityType).sort();
+  assert.deepEqual(entityTypes, ['monitor', 'monitor-check']);
+});
+
+// The other side of the baseline rule: a fault that predates the server is not
+// announced as it is found, but it is not forgotten either. Anything still
+// faulty once the settle period has passed gets exactly one alert, so a device
+// that was genuinely dead at start-up is not discoverable only by looking at
+// the screen.
+test('AlertsManager announces start-up faults that outlast the settle period', async () => {
+  const executeCalls = [];
+
+  const rules = [
+    {
+      RuleID: 1,
+      Title: 'Anything Offline Or Degraded',
+      Scope: JSON.stringify({ Workspace: true, Groups: [], Clients: [] }),
+      TriggerType: JSON.stringify(['CLIENT_OFFLINE', 'CLIENT_DEGRADED']),
+      TriggerConfig: JSON.stringify({ Source: 'any' }),
+      Actions: JSON.stringify([{ Type: 'http-api', Settings: { Route: '/fault' } }]),
+      Enabled: 1,
+      Timestamp: 1,
+      UpdatedAt: 1,
+    },
+  ];
+
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AlertsManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => ({ error: () => {} }) },
+    '../DB': {
+      Manager: {
+        All: async () => [null, rules],
+        Run: async () => [null, { changes: 1 }],
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
+      },
+    },
+    '../AlertActions': {
+      Manager: {
+        GetAll: () => [],
+        Execute: async (action, context) => {
+          executeCalls.push({ action, context });
+          return { Success: true };
+        },
+      },
+    },
+    '../Broadcast': { Manager: { emit: () => {} } },
+    '../Utils': require('../dist/Modules/Utils'),
+  });
+
+  await Manager.Init();
+
+  // Target 1 is dead when we first look and stays dead. Target 2 is down on its
+  // first tick because its device is mid-boot, and comes up.
+  await Manager.HandleMonitoringTargetUpdated({
+    TargetID: 1,
+    Online: false,
+    Nickname: 'Dead Projector',
+    Address: '10.0.0.1',
+    LastError: 'Timed out',
+  });
+  await Manager.HandleMonitoringTargetUpdated({
+    TargetID: 2,
+    Online: false,
+    Nickname: 'Booting Rack',
+    Address: '10.0.0.2',
+  });
+  await Manager.HandleMonitoringTargetUpdated({
+    TargetID: 2,
+    Online: true,
+    Nickname: 'Booting Rack',
+    Address: '10.0.0.2',
+  });
+  assert.equal(executeCalls.length, 0, 'nothing is announced while the rig comes up');
+
+  // MinAge 0: everything still pending has outlasted the period.
+  const Raised = await Manager.FlushSettledBaselineFaults(0, [
+    // Never reported at all — a machine that was off when the server started.
+    { UUID: 'client-off', Nickname: 'Booth 3', Online: false },
+    // A reserved slot is offline by definition and is never a fault.
+    { UUID: 'client-slot', Nickname: 'Spare', Online: false, Unassigned: true },
+    { UUID: 'client-up', Nickname: 'Booth 1', Online: true },
+  ]);
+
+  assert.equal(Raised, 2);
+  const announced = executeCalls.map((c) => c.context.EntityName).sort();
+  assert.deepEqual(announced, ['Booth 3', 'Dead Projector']);
+  assert.ok(
+    executeCalls.every((c) => c.context.TriggerType === 'CLIENT_OFFLINE'),
+    'both are offline faults, not degraded ones'
+  );
+
+  // Announced once and once only, however often the sweep runs.
+  const Again = await Manager.FlushSettledBaselineFaults(0, [
+    { UUID: 'client-off', Nickname: 'Booth 3', Online: false },
+  ]);
+  assert.equal(Again, 0);
+  assert.equal(executeCalls.length, 2);
+
+  // And the entity is now tracked, so its recovery is a normal transition.
+  await Manager.HandleMonitoringTargetUpdated({
+    TargetID: 1,
+    Online: true,
+    Nickname: 'Dead Projector',
+    Address: '10.0.0.1',
+  });
+  await Manager.HandleMonitoringTargetUpdated({
+    TargetID: 1,
+    Online: false,
+    Nickname: 'Dead Projector',
+    Address: '10.0.0.1',
+    LastError: 'Timed out',
+  });
+  assert.equal(executeCalls.length, 3, 'a genuine outage after start-up still alerts immediately');
+});
+
+test('AlertsManager holds a start-up fault until the settle period has actually passed', async () => {
+  const executeCalls = [];
+
+  const rules = [
+    {
+      RuleID: 1,
+      Title: 'Offline Workspace',
+      Scope: JSON.stringify({ Workspace: true, Groups: [], Clients: [] }),
+      TriggerType: 'CLIENT_OFFLINE',
+      TriggerConfig: JSON.stringify({}),
+      Actions: JSON.stringify([{ Type: 'http-api', Settings: { Route: '/offline' } }]),
+      Enabled: 1,
+      Timestamp: 1,
+      UpdatedAt: 1,
+    },
+  ];
+
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AlertsManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => ({ error: () => {} }) },
+    '../DB': {
+      Manager: {
+        All: async () => [null, rules],
+        Run: async () => [null, { changes: 1 }],
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
+      },
+    },
+    '../AlertActions': {
+      Manager: {
+        GetAll: () => [],
+        Execute: async (action, context) => {
+          executeCalls.push({ action, context });
+          return { Success: true };
+        },
+      },
+    },
+    '../Broadcast': { Manager: { emit: () => {} } },
+    '../Utils': require('../dist/Modules/Utils'),
+  });
+
+  await Manager.Init();
+  await Manager.HandleMonitoringTargetUpdated({
+    TargetID: 9,
+    Online: false,
+    Nickname: 'Rack',
+    Address: '10.0.0.9',
+  });
+
+  // A sweep that runs before the period is up announces nothing — including for
+  // clients that never reported, which is what stops a sweep landing seconds
+  // after boot from alerting for every machine still powering on.
+  const Early = await Manager.FlushSettledBaselineFaults(60_000, [
+    { UUID: 'client-off', Nickname: 'Booth 3', Online: false },
+  ]);
+  assert.equal(Early, 0);
+  assert.equal(executeCalls.length, 0);
 });
 
 test('AlertsManager fires a rule when ANY of its multiple triggers matches', async () => {

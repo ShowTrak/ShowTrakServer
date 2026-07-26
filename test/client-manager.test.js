@@ -278,8 +278,23 @@ test('ClientManager tracks critical applications and emits started/stopped trans
   });
   assert.equal(runningErr, null);
 
+  // The first snapshot of a connection is a baseline, not a set of transitions.
+  // Diffing it against the empty list this process started with would announce
+  // every application on the machine as freshly started — which is what every
+  // client did at once whenever the server restarted.
+  assert.equal(
+    events.filter(([event]) => event === 'ApplicationStarted').length,
+    0,
+    'the opening snapshot must not report applications as started'
+  );
+
   const [, clientAfterFirstSnapshot] = await Manager.Get('client-4');
   clientAfterFirstSnapshot.SetOnline(true);
+  // Backdated past the start-up window (CLIENT_STARTUP_GRACE_MS): a machine
+  // that has finished booting has its missing critical application published
+  // rather than held. The window itself is covered in the integration tests.
+  clientAfterFirstSnapshot.OnlineSince = 0;
+  clientAfterFirstSnapshot._refreshClientHealthState();
   assert.equal(clientAfterFirstSnapshot.Degraded, true);
   assert.deepEqual(clientAfterFirstSnapshot.DegradedWarnings, ['Critical Application Issue']);
   assert.ok(
@@ -299,12 +314,15 @@ test('ClientManager tracks critical applications and emits started/stopped trans
   });
   assert.equal(secondRunningErr, null);
 
-  assert.ok(
-    events.some(([event, _client, app]) => event === 'ApplicationStarted' && app?.Name === 'Chrome')
-  );
+  // Chrome was already in the baseline, so only Spotify actually started.
   assert.ok(
     events.some(
       ([event, _client, app]) => event === 'ApplicationStarted' && app?.Name === 'Spotify'
+    )
+  );
+  assert.ok(
+    !events.some(
+      ([event, _client, app]) => event === 'ApplicationStarted' && app?.Name === 'Chrome'
     )
   );
 
@@ -326,6 +344,130 @@ test('ClientManager tracks critical applications and emits started/stopped trans
 
   assert.ok(
     trackedRuns.some(([sql]) => sql.includes('INSERT OR REPLACE INTO CriticalApplications'))
+  );
+});
+
+// The client reports an EMPTY list with a non-ok status when its sampler fails —
+// macOS withholding automation permission at start-up being the common one.
+// Diffing against that used to announce every application on the machine as
+// stopped, firing a critical-application alert for software that never stopped,
+// and then announcing them all as started again when the sampler recovered.
+test('ClientManager ignores a failed application sample instead of reporting everything stopped', async () => {
+  const events = [];
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'ClientManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => createLoggerStub() },
+    '../DB': {
+      Manager: {
+        Get: async (sql, params) => {
+          if (
+            String(sql).includes('SELECT * FROM Clients WHERE UUID = ?') &&
+            params[0] === 'client-9'
+          ) {
+            return [
+              null,
+              {
+                UUID: 'client-9',
+                Hostname: 'Booth PC',
+                Nickname: 'Booth PC',
+                Version: '1.0.0',
+                IP: '10.0.0.9',
+                OperatingSystem: 'macOS',
+                MacAddress: null,
+                GroupID: null,
+                Weight: 100,
+                Timestamp: Date.now(),
+              },
+            ];
+          }
+          return [null, null];
+        },
+        Run: async () => [null, { changes: 1 }],
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
+        All: async () => [null, []],
+      },
+    },
+    '../Broadcast': { Manager: { emit: (...args) => events.push(args) } },
+    '../SettingsManager': { Manager: { GetValue: async () => false } },
+    '../Utils': require('../dist/Modules/Utils'),
+  });
+
+  const ok = { State: 'ok', Message: null, Platform: 'darwin' };
+
+  // Baseline, then a second sample so the baseline is an observed one.
+  await Manager.SetRunningApplications('client-9', {
+    SampledAt: 100,
+    TotalCount: 1,
+    Truncated: false,
+    Items: [{ Name: 'QLab', Count: 1 }],
+    Status: ok,
+  });
+  await Manager.SetRunningApplications('client-9', {
+    SampledAt: 200,
+    TotalCount: 2,
+    Truncated: false,
+    Items: [
+      { Name: 'QLab', Count: 1 },
+      { Name: 'Finder', Count: 1 },
+    ],
+    Status: ok,
+  });
+  assert.ok(
+    events.some(([event, , app]) => event === 'ApplicationStarted' && app?.Name === 'Finder'),
+    'a genuine start is still reported'
+  );
+
+  const before = events.length;
+  await Manager.SetRunningApplications('client-9', {
+    SampledAt: 300,
+    TotalCount: 0,
+    Truncated: false,
+    Items: [],
+    Status: {
+      State: 'permission_denied',
+      Message: 'macOS denied access to System Events.',
+      Platform: 'darwin',
+    },
+  });
+  const duringFailure = events.slice(before);
+  assert.equal(
+    duringFailure.filter(([event]) => event === 'ApplicationStopped').length,
+    0,
+    'a sample that failed is not evidence that anything stopped'
+  );
+  // The status itself is still stored, so the UI can explain the gap.
+  const [, client] = await Manager.Get('client-9');
+  assert.equal(client.RunningApplications.Status.State, 'permission_denied');
+
+  // Recovery does not replay the whole machine as freshly started either: the
+  // failed sample left no baseline worth diffing, so the next one becomes it.
+  const beforeRecovery = events.length;
+  await Manager.SetRunningApplications('client-9', {
+    SampledAt: 400,
+    TotalCount: 2,
+    Truncated: false,
+    Items: [
+      { Name: 'QLab', Count: 1 },
+      { Name: 'Finder', Count: 1 },
+    ],
+    Status: ok,
+  });
+  assert.equal(
+    events.slice(beforeRecovery).filter(([event]) => event === 'ApplicationStarted').length,
+    0,
+    'recovering the sampler is not a start event for everything it can see'
+  );
+
+  // From there, real transitions report again.
+  await Manager.SetRunningApplications('client-9', {
+    SampledAt: 500,
+    TotalCount: 1,
+    Truncated: false,
+    Items: [{ Name: 'QLab', Count: 1 }],
+    Status: ok,
+  });
+  assert.ok(
+    events.some(([event, , app]) => event === 'ApplicationStopped' && app?.Name === 'Finder')
   );
 });
 

@@ -100,6 +100,7 @@ interface AlertsManagerType {
   HandleClientUpdated(Client: AlertEntityLike): Promise<void>;
   HandleMonitoringTargetUpdated(Target: AlertTargetLike): Promise<void>;
   HandleScriptExecutionUpdated(Executions: unknown): Promise<void>;
+  FlushSettledBaselineFaults(MinAgeMs: number, Clients?: AlertEntityLike[]): Promise<number>;
   Reload(): Promise<void>;
 }
 
@@ -112,9 +113,60 @@ const Manager = {} as AlertsManagerType;
 
 let Initialized = false;
 let RuleList: AlertRule[] = [];
+// Last known online/degraded state per entity. Alerts fire on TRANSITIONS
+// between two observed states, so the absence of a key is meaningful: it means
+// this process has never seen the entity, and the first snapshot establishes
+// the baseline instead of firing.
+//
+// That is what keeps a server restart quiet. A rig that is still coming up has
+// monitors failing and half its machines absent, and every one of those is a
+// state that predates us rather than something that just happened — announcing
+// them as fresh outages buries the one alert that matters. Anything that
+// changes after that first observation is a real transition and alerts
+// immediately, so an outage seconds into a show is still caught.
 const EntityOnlineState = new Map<string, boolean>();
 const EntityDegradedState = new Map<string, boolean>();
 let AlertActionsEnabled = true;
+
+// A fault that was already true the first time we looked at an entity.
+//
+// It is not announced as it is found — at server start that would fire for
+// every monitor whose device is mid-boot — but it is not thrown away either,
+// because a device that is genuinely dead would then only ever be discoverable
+// by looking at the screen. Each one is held here and announced ONCE if it is
+// still true when the settle period has passed (see FlushSettledBaselineFaults,
+// driven by the main process). A fault that fixes itself while the rig comes up
+// is dropped and never heard of.
+interface BaselineFault {
+  FirstSeenAt: number;
+  // Refreshed on every snapshot that still shows the fault, so the alert
+  // reports the current error/latency rather than the first one seen.
+  Context: AlertContext;
+}
+const PendingBaselineFaults = new Map<string, BaselineFault>();
+let StartedAt = Date.now();
+
+function noteBaselineFault(FaultKey: string, Context: AlertContext) {
+  const Existing = PendingBaselineFaults.get(FaultKey);
+  if (Existing) {
+    Existing.Context = Context;
+    return;
+  }
+  PendingBaselineFaults.set(FaultKey, { FirstSeenAt: Date.now(), Context });
+}
+
+// Update a held fault's details without creating one. A fault that persists
+// between snapshots must not become "pending" if it was announced the moment it
+// happened — that would announce the same outage a second time when the settle
+// sweep runs.
+function refreshBaselineFault(FaultKey: string, Context: AlertContext) {
+  const Existing = PendingBaselineFaults.get(FaultKey);
+  if (Existing) Existing.Context = Context;
+}
+
+function clearBaselineFault(FaultKey: string) {
+  PendingBaselineFaults.delete(FaultKey);
+}
 
 // AlertHistory retention. The table is append-only (a row per rule firing), so
 // without a cap it grows without bound over a long-running show. Keep the newest
@@ -230,6 +282,7 @@ Manager.Init = async () => {
   }
   RuleList = (Rows || []).map(normalizeRuleRow);
   Initialized = true;
+  StartedAt = Date.now();
   startHistoryPruning();
 };
 
@@ -486,7 +539,8 @@ Manager.HandleNonCriticalApplicationStopped = makeClientEventHandler(
 Manager.HandleClientUpdated = async (Client: AlertEntityLike) => {
   if (!Client || !Client.UUID) return;
 
-  const Key = `client:${Client.UUID}`;
+  const UUID = Client.UUID;
+  const Key = `client:${UUID}`;
   const Prev = EntityOnlineState.get(Key);
   const Current = !!Client.Online;
   EntityOnlineState.set(Key, Current);
@@ -500,48 +554,59 @@ Manager.HandleClientUpdated = async (Client: AlertEntityLike) => {
     return;
   }
 
-  if (typeof Prev === 'boolean' && Prev !== Current) {
+  const ClientBase = {
+    EntityType: 'client',
+    EntityName: Client.Nickname || Client.Hostname || UUID,
+    UUID,
+    GroupID: Client.GroupID == null ? null : Client.GroupID,
+    IP: Client.IP || null,
+  };
+  const OfflineContext = (): AlertContext => ({
+    ...ClientBase,
+    TriggerType: TRIGGERS.CLIENT_OFFLINE,
+    Severity: 'warning',
+    RawData: Client,
+  });
+
+  if (typeof Prev !== 'boolean') {
+    if (!Current) noteBaselineFault(`offline:${Key}`, OfflineContext());
+  } else if (Prev !== Current) {
     if (!Current) {
-      await evaluateAgainstRules({
-        TriggerType: TRIGGERS.CLIENT_OFFLINE,
-        EntityType: 'client',
-        EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-        UUID: Client.UUID,
-        GroupID: Client.GroupID == null ? null : Client.GroupID,
-        IP: Client.IP || null,
-        Severity: 'warning',
-        RawData: Client,
-      });
+      await evaluateAgainstRules(OfflineContext());
     } else {
+      clearBaselineFault(`offline:${Key}`);
       await evaluateAgainstRules({
+        ...ClientBase,
         TriggerType: TRIGGERS.CLIENT_ONLINE,
-        EntityType: 'client',
-        EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-        UUID: Client.UUID,
-        GroupID: Client.GroupID == null ? null : Client.GroupID,
-        IP: Client.IP || null,
         Severity: 'success',
         RawData: Client,
       });
     }
+  } else if (!Current) {
+    refreshBaselineFault(`offline:${Key}`, OfflineContext());
   }
 
+  const SeenDegradedBefore = EntityDegradedState.has(Key);
   const PrevDegraded = EntityDegradedState.get(Key) === true;
   const CurrentDegraded = Current && !!Client.Degraded;
   EntityDegradedState.set(Key, CurrentDegraded);
 
-  if (CurrentDegraded && !PrevDegraded) {
-    await evaluateAgainstRules({
-      TriggerType: TRIGGERS.CLIENT_DEGRADED,
-      EntityType: 'client',
-      EntityName: Client.Nickname || Client.Hostname || Client.UUID,
-      UUID: Client.UUID,
-      GroupID: Client.GroupID == null ? null : Client.GroupID,
-      IP: Client.IP || null,
-      Severity: 'warning',
-      Degraded: true,
-      RawData: Client,
-    });
+  const DegradedContext = (): AlertContext => ({
+    ...ClientBase,
+    TriggerType: TRIGGERS.CLIENT_DEGRADED,
+    Severity: 'warning',
+    Degraded: true,
+    RawData: Client,
+  });
+
+  if (!CurrentDegraded) {
+    clearBaselineFault(`degraded:${Key}`);
+  } else if (!SeenDegradedBefore) {
+    noteBaselineFault(`degraded:${Key}`, DegradedContext());
+  } else if (!PrevDegraded) {
+    await evaluateAgainstRules(DegradedContext());
+  } else {
+    refreshBaselineFault(`degraded:${Key}`, DegradedContext());
   }
 };
 
@@ -553,53 +618,63 @@ Manager.HandleMonitoringTargetUpdated = async (Target: AlertTargetLike) => {
   const Current = !!Target.Online;
   EntityOnlineState.set(Key, Current);
 
-  if (typeof Prev === 'boolean' && Prev !== Current) {
+  const TargetBase = {
+    EntityType: 'monitor',
+    EntityName: Target.Nickname || Target.Address || `Target ${Target.TargetID}`,
+    UUID: `monitor:${Target.TargetID}`,
+    TargetID: Target.TargetID,
+    GroupID: Target.GroupID == null ? null : Target.GroupID,
+    IP: Target.Address || null,
+  };
+  const TargetOfflineContext = (): AlertContext => ({
+    ...TargetBase,
+    TriggerType: TRIGGERS.CLIENT_OFFLINE,
+    Severity: 'warning',
+    LastError: Target.LastError || null,
+    RawData: Target,
+  });
+
+  if (typeof Prev !== 'boolean') {
+    if (!Current) noteBaselineFault(`offline:${Key}`, TargetOfflineContext());
+  } else if (Prev !== Current) {
     if (!Current) {
-      await evaluateAgainstRules({
-        TriggerType: TRIGGERS.CLIENT_OFFLINE,
-        EntityType: 'monitor',
-        EntityName: Target.Nickname || Target.Address || `Target ${Target.TargetID}`,
-        UUID: `monitor:${Target.TargetID}`,
-        TargetID: Target.TargetID,
-        GroupID: Target.GroupID == null ? null : Target.GroupID,
-        IP: Target.Address || null,
-        Severity: 'warning',
-        RawData: Target,
-      });
+      await evaluateAgainstRules(TargetOfflineContext());
     } else {
+      clearBaselineFault(`offline:${Key}`);
       await evaluateAgainstRules({
+        ...TargetBase,
         TriggerType: TRIGGERS.CLIENT_ONLINE,
-        EntityType: 'monitor',
-        EntityName: Target.Nickname || Target.Address || `Target ${Target.TargetID}`,
-        UUID: `monitor:${Target.TargetID}`,
-        TargetID: Target.TargetID,
-        GroupID: Target.GroupID == null ? null : Target.GroupID,
-        IP: Target.Address || null,
         Severity: 'success',
         RawData: Target,
       });
     }
+  } else if (!Current) {
+    refreshBaselineFault(`offline:${Key}`, TargetOfflineContext());
   }
 
+  const SeenDegradedBefore = EntityDegradedState.has(Key);
   const PrevDegraded = EntityDegradedState.get(Key) === true;
   const CurrentDegraded = Current && !!Target.Degraded;
   EntityDegradedState.set(Key, CurrentDegraded);
 
-  if (CurrentDegraded && !PrevDegraded) {
-    await evaluateAgainstRules({
-      TriggerType: TRIGGERS.CLIENT_DEGRADED,
-      EntityType: 'monitor',
-      EntityName: Target.Nickname || Target.Address || `Target ${Target.TargetID}`,
-      UUID: `monitor:${Target.TargetID}`,
-      TargetID: Target.TargetID,
-      GroupID: Target.GroupID == null ? null : Target.GroupID,
-      IP: Target.Address || null,
-      Severity: 'warning',
-      Degraded: true,
-      LastLatencyMs: Target.LastLatencyMs == null ? null : Target.LastLatencyMs,
-      LastError: Target.LastError || null,
-      RawData: Target,
-    });
+  const TargetDegradedContext = (): AlertContext => ({
+    ...TargetBase,
+    TriggerType: TRIGGERS.CLIENT_DEGRADED,
+    Severity: 'warning',
+    Degraded: true,
+    LastLatencyMs: Target.LastLatencyMs == null ? null : Target.LastLatencyMs,
+    LastError: Target.LastError || null,
+    RawData: Target,
+  });
+
+  if (!CurrentDegraded) {
+    clearBaselineFault(`degraded:${Key}`);
+  } else if (!SeenDegradedBefore) {
+    noteBaselineFault(`degraded:${Key}`, TargetDegradedContext());
+  } else if (!PrevDegraded) {
+    await evaluateAgainstRules(TargetDegradedContext());
+  } else {
+    refreshBaselineFault(`degraded:${Key}`, TargetDegradedContext());
   }
 
   // Per-check alerts (opt-in via check:<CheckID> scope).
@@ -625,29 +700,55 @@ Manager.HandleMonitoringTargetUpdated = async (Target: AlertTargetLike) => {
     const CurrentCheck = !!Check.Online;
     EntityOnlineState.set(CheckKey, CurrentCheck);
 
-    if (typeof PrevCheck === 'boolean' && PrevCheck !== CurrentCheck) {
-      await evaluateAgainstRules({
-        ...BaseContext,
-        TriggerType: CurrentCheck ? TRIGGERS.CLIENT_ONLINE : TRIGGERS.CLIENT_OFFLINE,
-        Severity: CurrentCheck ? 'success' : 'warning',
-        RawData: Check,
-      });
+    const CheckOfflineContext = (): AlertContext => ({
+      ...BaseContext,
+      TriggerType: TRIGGERS.CLIENT_OFFLINE,
+      Severity: 'warning',
+      LastError: Check.LastError || null,
+      RawData: Check,
+    });
+
+    if (typeof PrevCheck !== 'boolean') {
+      if (!CurrentCheck) noteBaselineFault(`offline:${CheckKey}`, CheckOfflineContext());
+    } else if (PrevCheck !== CurrentCheck) {
+      if (!CurrentCheck) {
+        await evaluateAgainstRules(CheckOfflineContext());
+      } else {
+        clearBaselineFault(`offline:${CheckKey}`);
+        await evaluateAgainstRules({
+          ...BaseContext,
+          TriggerType: TRIGGERS.CLIENT_ONLINE,
+          Severity: 'success',
+          RawData: Check,
+        });
+      }
+    } else if (!CurrentCheck) {
+      refreshBaselineFault(`offline:${CheckKey}`, CheckOfflineContext());
     }
 
+    const SeenCheckDegradedBefore = EntityDegradedState.has(CheckKey);
     const PrevCheckDegraded = EntityDegradedState.get(CheckKey) === true;
     const CurrentCheckDegraded = CurrentCheck && !!Check.Degraded;
     EntityDegradedState.set(CheckKey, CurrentCheckDegraded);
 
-    if (CurrentCheckDegraded && !PrevCheckDegraded) {
-      await evaluateAgainstRules({
-        ...BaseContext,
-        TriggerType: TRIGGERS.CLIENT_DEGRADED,
-        Severity: 'warning',
-        Degraded: true,
-        LastLatencyMs: Check.LastLatencyMs == null ? null : Check.LastLatencyMs,
-        LastError: Check.LastError || null,
-        RawData: Check,
-      });
+    const CheckDegradedContext = (): AlertContext => ({
+      ...BaseContext,
+      TriggerType: TRIGGERS.CLIENT_DEGRADED,
+      Severity: 'warning',
+      Degraded: true,
+      LastLatencyMs: Check.LastLatencyMs == null ? null : Check.LastLatencyMs,
+      LastError: Check.LastError || null,
+      RawData: Check,
+    });
+
+    if (!CurrentCheckDegraded) {
+      clearBaselineFault(`degraded:${CheckKey}`);
+    } else if (!SeenCheckDegradedBefore) {
+      noteBaselineFault(`degraded:${CheckKey}`, CheckDegradedContext());
+    } else if (!PrevCheckDegraded) {
+      await evaluateAgainstRules(CheckDegradedContext());
+    } else {
+      refreshBaselineFault(`degraded:${CheckKey}`, CheckDegradedContext());
     }
   }
 };
@@ -673,12 +774,78 @@ Manager.HandleScriptExecutionUpdated = async (Executions: unknown) => {
   }
 };
 
+/**
+ * Announce the faults that were already true when we first looked, once they
+ * have outlasted the settle period.
+ *
+ * Called on a low-frequency sweep by the main process (which owns the schedule
+ * and the entity lists). Two kinds of fault qualify:
+ *
+ *   - one held by a handler above, because the entity's first snapshot already
+ *     showed it offline or degraded. If the rig was simply still coming up, it
+ *     has recovered by now and was dropped; if it is still faulty, it is real
+ *     and gets announced once;
+ *   - a client that never reported at all, which no handler can have seen. A
+ *     machine that is off when the server starts produces no events whatsoever,
+ *     so without this it would be discoverable only by looking at the screen.
+ *
+ * Reserved (unassigned) slots are skipped for the same reason they are skipped
+ * everywhere else: being offline is what they are for.
+ *
+ * Returns how many alerts were raised, so the caller can log a summary.
+ */
+Manager.FlushSettledBaselineFaults = async (MinAgeMs: number, Clients: AlertEntityLike[] = []) => {
+  if (!Initialized) await Manager.Init();
+
+  const Now = Date.now();
+  // The server's own start counts as the beginning of the settle period, so a
+  // sweep that runs early (a fault seen seconds after boot) waits its turn.
+  if (Now - StartedAt < MinAgeMs) return 0;
+
+  let Raised = 0;
+
+  for (const [FaultKey, Fault] of Array.from(PendingBaselineFaults.entries())) {
+    if (Now - Fault.FirstSeenAt < MinAgeMs) continue;
+    PendingBaselineFaults.delete(FaultKey);
+    Raised += 1;
+    await evaluateAgainstRules(Fault.Context);
+  }
+
+  for (const Client of Clients) {
+    if (!Client || !Client.UUID) continue;
+    if (Client.Unassigned) continue;
+    if (Client.Online) continue;
+    const Key = `client:${Client.UUID}`;
+    // A tracked state means a handler has seen this client, so its offline was
+    // either announced as a transition or is already held above.
+    if (EntityOnlineState.has(Key)) continue;
+    EntityOnlineState.set(Key, false);
+    Raised += 1;
+    await evaluateAgainstRules({
+      TriggerType: TRIGGERS.CLIENT_OFFLINE,
+      EntityType: 'client',
+      EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+      UUID: Client.UUID,
+      GroupID: Client.GroupID == null ? null : Client.GroupID,
+      IP: Client.IP || null,
+      Severity: 'warning',
+      RawData: Client,
+    });
+  }
+
+  return Raised;
+};
+
 // Rebuild in-memory rules after external bulk writes (e.g., config import).
 Manager.Reload = async () => {
   Initialized = false;
   RuleList = [];
   EntityOnlineState.clear();
   EntityDegradedState.clear();
+  PendingBaselineFaults.clear();
+  // The reloaded state is as fresh as a boot, so give it the same settle period
+  // rather than announcing everything the first sweep finds.
+  StartedAt = Date.now();
   await Manager.Init();
   BroadcastManager.emit('AlertRuleListChanged');
 };

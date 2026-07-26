@@ -32,6 +32,7 @@ const {
   FormatMonitoringMethodLabel,
   FormatMonitorStatus,
   FormatMonitorCompactStatus,
+  IsMonitorAwaitingFirstCheck,
   GetMonitoringOfflineSince,
   MonitorStateLabel,
   DeriveSampleState,
@@ -255,6 +256,42 @@ test('idle outranks degraded, because an idle target has not been measured', () 
   // a state nobody observed.
   assert.equal(FormatMonitorCompactStatus(true, null, true, true).text, 'Idle');
   assert.equal(FormatMonitorCompactStatus(false, null, false, true).text, 'Idle');
+});
+
+// --- Awaiting the first check ----------------------------------------------
+
+test('a target with checks that has never run one is awaiting its first check', () => {
+  assert.equal(IsMonitorAwaitingFirstCheck({ CheckCount: 2, LastChecked: null }), true);
+  // Once a check has landed the target has a real verdict, however bad.
+  assert.equal(IsMonitorAwaitingFirstCheck({ CheckCount: 2, LastChecked: 1700000000000 }), false);
+  // No checks configured is idle, which is a different thing entirely: there is
+  // nothing to wait for.
+  assert.equal(IsMonitorAwaitingFirstCheck({ CheckCount: 0, LastChecked: null }), false);
+  assert.equal(IsMonitorAwaitingFirstCheck(null), false);
+});
+
+test('a target awaiting its first check reads as Checking, not Offline', () => {
+  // Runtime monitor state is RAM-only and starts at Online: false, so for the
+  // first check cycle after the server starts every target on the page would
+  // otherwise paint red — an outage the operator can see is not real, which is
+  // the fastest way to teach them to ignore a red tile.
+  assert.deepEqual(FormatMonitorCompactStatus(false, null, false, false, true), {
+    text: 'Checking',
+    color: 'text-light',
+  });
+});
+
+test('awaiting a first check never reads as Online either', () => {
+  // The opposite failure matters just as much: a device that is genuinely dead
+  // when the server comes up must not be papered over with a green tile while
+  // its first probe is outstanding.
+  const Pending = FormatMonitorCompactStatus(false, null, false, false, true);
+  assert.notEqual(Pending.text, 'Online');
+  // A latency reading means a probe answered, so it outranks the pending label.
+  assert.deepEqual(FormatMonitorCompactStatus(true, 12, false, false, true), {
+    text: '12ms',
+    color: 'text-light',
+  });
 });
 
 // --- Offline-since ----------------------------------------------------------

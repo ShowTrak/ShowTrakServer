@@ -5,6 +5,20 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
+const { CLIENT_STARTUP_GRACE_MS } = require('../dist/Modules/Config/constants');
+
+// Bring a client online as a machine that has already finished booting.
+//
+// A freshly-connected client holds its critical-hardware guards for
+// CLIENT_STARTUP_GRACE_MS (the show software is still launching), which is not
+// what the guard tests below are about — they are about what happens once the
+// machine is up. Backdating the connection puts them past that window; the
+// window itself has its own tests.
+function markStarted(client) {
+  client.SetOnline(true);
+  client.OnlineSince = Date.now() - CLIENT_STARTUP_GRACE_MS - 1;
+  client._refreshClientHealthState();
+}
 
 function loggerStub() {
   const noop = () => {};
@@ -294,7 +308,7 @@ test('ClientManager guards serial-less USB devices by name and quantity', async 
 
   // Unplug one → shortfall (1 of 2). Client is degraded; the surviving card is
   // flagged Shortfall, and no duplicate "missing" card is emitted.
-  client.SetOnline(true);
+  markStarted(client);
   await Manager.SetUSBDeviceList('kiosk-1', [{ ManufacturerName: 'Acme', ProductName: 'Dongle' }]);
   [, client] = await Manager.Get('kiosk-1');
   assert.equal(client.MissingCriticalUSBNames.length, 1);
@@ -359,7 +373,7 @@ test('ClientManager tracks critical displays and flags resolution/refresh change
   assert.equal(client.Degraded, false);
 
   // Same display, changed resolution/refresh -> mismatch + degraded.
-  client.SetOnline(true);
+  markStarted(client);
   await Manager.SetDisplayList('disp-1', [
     { DisplayID: '100', Label: 'Primary', Width: 1280, Height: 720, RefreshRate: 30 },
     { DisplayID: '200', Label: 'Secondary', Width: 2560, Height: 1440, RefreshRate: 144 },
@@ -408,6 +422,164 @@ test('ClientManager tracks critical displays and flags resolution/refresh change
     String((await Manager.MarkDisplayCritical('nope', { DisplayID: '1' }))[0]),
     /not found/i
   );
+});
+
+// The window this covers is the first few seconds of a connection. The client's
+// heartbeat lands immediately and its USB, display and application reports
+// follow a second apart, so between them the server holds guards for hardware
+// it has been told nothing about. Judging that silence as "missing" marked every
+// client degraded on connect — and at server start, with the whole rig
+// connecting at once, that arrived as a wave of alerts for faults that did not
+// exist.
+test('hardware a client has not reported yet is unknown, not missing', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.Create('booth-1');
+
+  // Establish the guards from a live report, the way an operator marks them.
+  await Manager.SetUSBDeviceList('booth-1', [
+    { SerialNumber: 'S1', ManufacturerName: 'Acme', ProductName: 'Dongle' },
+  ]);
+  await Manager.SetDisplayList('booth-1', [
+    { DisplayID: '100', Label: 'Primary', Width: 1920, Height: 1080, RefreshRate: 60 },
+  ]);
+  await Manager.MarkUSBDeviceCritical('booth-1', { SerialNumber: 'S1' });
+  await Manager.MarkDisplayCritical('booth-1', { DisplayID: '100' });
+
+  let [, client] = await Manager.Get('booth-1');
+  markStarted(client);
+  assert.equal(client.Degraded, false);
+
+  // The server restarts (or the client reconnects): the heartbeat arrives, the
+  // hardware reports have not. Started long enough ago that the start-up window
+  // is not what is holding the fault back — only the missing evidence is.
+  client.SetOnline(false);
+  markStarted(client);
+  assert.equal(client.Degraded, false, 'silence about a device is not a report that it is gone');
+  assert.deepEqual(client.DegradedWarnings, []);
+  // Suppressing the fault must not mean lying about the connection: the client
+  // is genuinely connected and still says so.
+  assert.equal(client.Online, true);
+
+  // Reporting displays proves nothing about USB — the gates are per-domain.
+  await Manager.SetDisplayList('booth-1', [
+    { DisplayID: '100', Label: 'Primary', Width: 1920, Height: 1080, RefreshRate: 60 },
+  ]);
+  [, client] = await Manager.Get('booth-1');
+  assert.equal(client.Degraded, false);
+
+  // The first real USB report is judged the moment it lands: the dongle really
+  // is gone, so this is a fault seconds into the connection, not a missed one.
+  await Manager.SetUSBDeviceList('booth-1', []);
+  [, client] = await Manager.Get('booth-1');
+  assert.equal(client.Degraded, true);
+  assert.ok(client.DegradedWarnings.includes('Missing USB Device'));
+});
+
+// The other half of the start-up problem. Once a machine's telemetry DOES
+// arrive, the report is accurate — the show software genuinely is not running
+// yet, because the machine finished booting ten seconds ago. That is a true
+// observation of a state that is about to fix itself, and at rig power-up it
+// arrives from every machine at once.
+test('a critical application missing during the start-up window reads as starting up, not degraded', async () => {
+  const { Manager, events } = await loadClientManager();
+  await Manager.Create('stage-1');
+  await Manager.MarkApplicationCritical('stage-1', { Name: 'QLab' });
+
+  const [, client] = await Manager.Get('stage-1');
+  client.SetOnline(true);
+
+  // First successful sample: QLab is not up yet.
+  await Manager.SetRunningApplications('stage-1', {
+    SampledAt: Date.now(),
+    TotalCount: 1,
+    Truncated: false,
+    Items: [{ Name: 'Finder', Count: 1 }],
+    Status: { State: 'ok', Message: null, Platform: 'darwin' },
+  });
+
+  assert.equal(client.Initialising, true, 'the machine is still coming up');
+  assert.equal(client.Degraded, false, 'so the fault is held rather than published');
+  assert.deepEqual(client.DegradedWarnings, []);
+  // The connection itself is never in doubt, and is never misreported.
+  assert.equal(client.Online, true);
+
+  // QLab launches inside the window: the fault existed, was never announced,
+  // and is now simply gone. This is the alert that used to fire at every show
+  // start-up for every machine on the rig.
+  await Manager.SetRunningApplications('stage-1', {
+    SampledAt: Date.now(),
+    TotalCount: 2,
+    Truncated: false,
+    Items: [
+      { Name: 'Finder', Count: 1 },
+      { Name: 'QLab', Count: 1 },
+    ],
+    Status: { State: 'ok', Message: null, Platform: 'darwin' },
+  });
+  assert.equal(client.Initialising, false);
+  assert.equal(client.Degraded, false);
+
+  // A machine that is still missing it when the window closes is a real fault,
+  // and is published as one — this is the case the window must not swallow.
+  await Manager.SetRunningApplications('stage-1', {
+    SampledAt: Date.now(),
+    TotalCount: 1,
+    Truncated: false,
+    Items: [{ Name: 'Finder', Count: 1 }],
+    Status: { State: 'ok', Message: null, Platform: 'darwin' },
+  });
+  assert.equal(client.Initialising, true);
+  client.OnlineSince = Date.now() - CLIENT_STARTUP_GRACE_MS - 1;
+  client._refreshClientHealthState();
+  assert.equal(client.Initialising, false);
+  assert.equal(client.Degraded, true);
+  assert.ok(client.DegradedWarnings.includes('Critical Application Issue'));
+  assert.ok(events.includes('ClientUpdated'));
+});
+
+test('an SDK client reporting its own degraded state is never held by the start-up window', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.Create('integrated-1');
+
+  const [, client] = await Manager.Get('integrated-1');
+  client.SetOnline(true);
+
+  // Inferred faults are held while a machine boots because we deduced them.
+  // This one is not deduced: the client itself is saying so, and it knows.
+  const [stateErr] = await Manager.SetIntegratedState(
+    'integrated-1',
+    'DEGRADED',
+    'Show file missing'
+  );
+  assert.equal(stateErr, null);
+  assert.equal(client.Degraded, true);
+  assert.equal(client.Initialising, false);
+  assert.ok(client.DegradedWarnings.includes('Show file missing'));
+});
+
+test('a display topology reported before the client dropped is not reused after it returns', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.Create('booth-2');
+
+  await Manager.SetDisplayList('booth-2', [
+    { DisplayID: '100', Label: 'Primary', Width: 1920, Height: 1080, RefreshRate: 60 },
+  ]);
+  await Manager.MarkDisplayCritical('booth-2', { DisplayID: '100' });
+
+  let [, client] = await Manager.Get('booth-2');
+  markStarted(client);
+  client.SetOnline(false);
+  markStarted(client);
+
+  // The stored list still describes the previous session. It is neither trusted
+  // (which would hide a projector unplugged during the reboot) nor treated as
+  // absent (which would alert on hardware that is about to report in fine).
+  assert.equal(client.Degraded, false);
+
+  await Manager.SetDisplayList('booth-2', []);
+  [, client] = await Manager.Get('booth-2');
+  assert.equal(client.Degraded, true);
+  assert.ok(client.DegradedWarnings.includes('Missing Display'));
 });
 
 test('ClientManager manages groups, ordering, and reconciliation', async () => {

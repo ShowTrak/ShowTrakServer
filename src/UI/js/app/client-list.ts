@@ -668,10 +668,14 @@ export function UpdateClientTile(Data: ClientView): void {
   const $IndicatorOffline = $tile.children('.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]');
   const $IndicatorDegraded = $tile.children('.SHOWTRAK_PC_STATUS[data-type="INDICATOR_DEGRADED"]');
 
+  // Mirrors GetClientTileStateClass: a client inside its start-up window is
+  // greyed rather than green, because a guard is still outstanding.
+  const Initialising = !!Data.Initialising && !!Online && !Degraded;
+
   $tile
-    .toggleClass('ONLINE', Online && !Degraded)
+    .toggleClass('ONLINE', Online && !Degraded && !Initialising)
     .toggleClass('DEGRADED', Degraded)
-    .toggleClass('IDLE', !!Data.Unassigned && !Online && !Degraded)
+    .toggleClass('IDLE', Initialising || (!!Data.Unassigned && !Online && !Degraded))
     .toggleClass('IDENTIFYING', !!Data.Identifying);
 
   $IndicatorDegraded.children('[data-type="DEGRADED_WARNING"]').text(DegradedWarning);

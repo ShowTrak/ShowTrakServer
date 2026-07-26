@@ -202,7 +202,11 @@ function addClientToCache(TargetClient: Client) {
 }
 
 function removeClientFromCache(UUID: string) {
-  if (!ClientIndex.has(UUID)) return false;
+  const Cached = ClientIndex.get(UUID);
+  if (!Cached) return false;
+  // Stand down the start-up window timer with the client it belongs to, so a
+  // deleted client cannot broadcast an update seconds after it stopped existing.
+  Cached._clearStartupGraceTimer();
   ClientIndex.delete(UUID);
   ClientList = ClientList.filter((Client) => Client.UUID !== UUID);
   return true;
@@ -1426,6 +1430,7 @@ Manager.SetGroupOrderWithWeights = async (
 };
 
 Manager.ClearCache = async () => {
+  for (const Cached of ClientList) Cached._clearStartupGraceTimer();
   ClientList = [];
   rebuildClientIndex();
   CriticalUSB.clear();
