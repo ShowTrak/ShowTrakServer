@@ -1,7 +1,7 @@
 name: Build
 
 run-name: >-
-  Build (${{ github.event_name == 'workflow_dispatch' && (inputs.draft_release && 'Build + Draft Release' || 'Build Only') || 'Build + Draft Release' }})
+  Build (${{ github.event_name == 'workflow_dispatch' && (inputs.release == 'publish' && 'Build + Publish Release' || (inputs.release == 'draft' && 'Build + Draft Release' || 'Build Only')) || 'Build + Draft Release' }})
 
 on:
   workflow_dispatch:
@@ -15,11 +15,21 @@ on:
           - unsigned
           - signed
           - signed-notarized
-      draft_release:
-        description: Create or update a draft GitHub release
+      release:
+        # One choice rather than a pair of booleans: "draft it" and "publish it"
+        # are points on one scale, and as separate flags they could be set to
+        # contradict each other.
+        description: What to do with the built distributables
         required: true
-        default: false
-        type: boolean
+        default: draft
+        type: choice
+        options:
+          # Build only. Artifacts stay on the workflow run.
+          - none
+          # Create/update the release as a draft and upload the assets to it.
+          - draft
+          # As draft, then publish it once every asset has uploaded.
+          - publish
 
 permissions:
   contents: write
@@ -30,9 +40,11 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
+      product_name: ${{ steps.version.outputs.product_name }}
       macos_variant: ${{ steps.variant.outputs.macos_variant }}
       variant_label: ${{ steps.variant.outputs.variant_label }}
-      should_draft_release: ${{ steps.variant.outputs.should_draft_release }}
+      release_mode: ${{ steps.variant.outputs.release_mode }}
+      should_release: ${{ steps.variant.outputs.should_release }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -42,43 +54,57 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_VARIANT: ${{ inputs.macos_variant }}
-          INPUT_DRAFT_RELEASE: ${{ inputs.draft_release }}
+          INPUT_RELEASE: ${{ inputs.release }}
         run: |
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             VARIANT="$INPUT_VARIANT"
-            SHOULD_DRAFT_RELEASE="$INPUT_DRAFT_RELEASE"
+            RELEASE_MODE="$INPUT_RELEASE"
           else
             VARIANT="signed-notarized"
-            SHOULD_DRAFT_RELEASE="true"
+            RELEASE_MODE="draft"
           fi
 
-          # This label becomes the release title and notes. signed-notarized is
-          # the normal path, so it stays plain -- the label exists to call out a
-          # build that is NOT the usual one, which is the case worth noticing on
-          # a release page.
+          case "$RELEASE_MODE" in
+            publish|draft) ;;
+            *) RELEASE_MODE="none" ;;
+          esac
+
+          # This label calls out a build that is NOT the usual one. It no longer
+          # appears in the title -- that is now just the version and the product
+          # -- so it goes in the notes, and only when there is something to say.
           case "$VARIANT" in
             unsigned)
-              LABEL="Unsigned Build & Release"
+              LABEL="Unsigned build: macOS will refuse to open this without an explicit Gatekeeper override."
               ;;
             signed)
-              LABEL="Signed Build & Release"
+              LABEL="Signed but NOT notarized: macOS may still warn on first launch."
               ;;
             *)
               VARIANT="signed-notarized"
-              LABEL="Release"
+              LABEL=""
               ;;
           esac
 
-          echo "macos_variant=$VARIANT" >> "$GITHUB_OUTPUT"
-          echo "variant_label=$LABEL" >> "$GITHUB_OUTPUT"
-          echo "should_draft_release=$SHOULD_DRAFT_RELEASE" >> "$GITHUB_OUTPUT"
+          {
+            echo "macos_variant=$VARIANT"
+            echo "variant_label=$LABEL"
+            echo "release_mode=$RELEASE_MODE"
+            echo "should_release=$([ "$RELEASE_MODE" = "none" ] && echo false || echo true)"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Read version from package.json
+      - name: Read version and product name from package.json
         id: version
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          # The release title is the same sentence in both repos, so it reads the
+          # product out of package.json ("ShowTrak Server" / "ShowTrak Client")
+          # rather than hardcoding one and drifting from the other.
+          PRODUCT_NAME=$(node -p "require('./package.json').productName || require('./package.json').name")
+          {
+            echo "version=$VERSION"
+            echo "tag=v$VERSION"
+            echo "product_name=$PRODUCT_NAME"
+          } >> "$GITHUB_OUTPUT"
 
   make:
     needs: release-meta
@@ -259,19 +285,25 @@ jobs:
           path: out/make/**
           if-no-files-found: error
 
-  draft-release:
+  release:
     needs: [release-meta, make]
-    if: ${{ needs.release-meta.outputs.should_draft_release == 'true' }}
+    if: ${{ needs.release-meta.outputs.should_release == 'true' }}
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ needs.release-meta.outputs.tag }}
       RELEASE_VERSION: ${{ needs.release-meta.outputs.version }}
+      RELEASE_PRODUCT_NAME: ${{ needs.release-meta.outputs.product_name }}
       RELEASE_VARIANT_LABEL: ${{ needs.release-meta.outputs.variant_label }}
+      RELEASE_MODE: ${{ needs.release-meta.outputs.release_mode }}
       RELEASE_REPO: ${{ github.repository }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # Full history + tags: the changelog below is derived from the commits
+          # since the previous release tag, and a shallow clone has neither.
+          fetch-depth: 0
 
       - name: Download artifacts
         uses: actions/download-artifact@v8
@@ -371,19 +403,72 @@ jobs:
           console.log(`Generated ${outputPath} for ${zipName}`);
           NODE
 
+      # Notes are built from the commits since the previous release rather than
+      # from GitHub's generated notes: those are assembled from merged pull
+      # requests, and this repo commits to main directly, so they would come out
+      # empty. The commit subjects are the changelog.
+      - name: Build release notes
+        run: |
+          # The tag for THIS release is excluded: on a re-run it already exists
+          # and points at HEAD, which would otherwise make the range empty.
+          PREVIOUS_TAG=$(git tag --list 'v*' --sort=-v:refname \
+            | grep -vFx "$RELEASE_TAG" \
+            | head -n 1)
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "Changelog range: ${PREVIOUS_TAG}..HEAD"
+            RANGE="${PREVIOUS_TAG}..HEAD"
+          else
+            echo "No previous tag found; using full history."
+            RANGE="HEAD"
+          fi
+
+          # Subjects only, newest first, minus the merges and the version-bump
+          # commit itself -- "Release 3.16.1" says nothing in the changelog of
+          # release 3.16.1.
+          CHANGES=$(git log --no-merges --pretty=format:'- %s' "$RANGE" \
+            | grep -vE '^- Release [0-9]+\.[0-9]+\.[0-9]+$' \
+            || true)
+
+          {
+            if [ -n "$RELEASE_VARIANT_LABEL" ]; then
+              echo "> [!WARNING]"
+              echo "> ${RELEASE_VARIANT_LABEL}"
+              echo
+            fi
+
+            echo "## Changes"
+            echo
+            if [ -n "$CHANGES" ]; then
+              echo "$CHANGES"
+            else
+              echo "- No changes recorded since ${PREVIOUS_TAG:-the start of the project}."
+            fi
+
+            if [ -n "$PREVIOUS_TAG" ]; then
+              echo
+              echo "**Full changelog**: https://github.com/${RELEASE_REPO}/compare/${PREVIOUS_TAG}...${RELEASE_TAG}"
+            fi
+          } > release-notes.md
+
+          echo "--- release notes ---"
+          cat release-notes.md
+
       - name: Create or update draft release
         run: |
-          TITLE="v${RELEASE_VERSION} - Showtrak Server (${RELEASE_VARIANT_LABEL})"
-          NOTES="${RELEASE_VARIANT_LABEL} for ShowTrak Server v${RELEASE_VERSION}."
+          TITLE="v${RELEASE_VERSION} - ${RELEASE_PRODUCT_NAME}"
 
+          # Always created as a draft, whatever the mode: the assets are uploaded
+          # in the next step, and a release published before them is a release
+          # people can download with nothing in it.
           if gh release view "$RELEASE_TAG" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft --title "$TITLE" --notes "$NOTES"
+            gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft --title "$TITLE" --notes-file release-notes.md
           else
             if git ls-remote --exit-code --tags "https://github.com/${RELEASE_REPO}" "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
-              gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --verify-tag --draft --title "$TITLE" --notes "$NOTES"
+              gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --verify-tag --draft --title "$TITLE" --notes-file release-notes.md
             else
               echo "Tag ${RELEASE_TAG} does not exist yet; creating it from current commit via release creation."
-              gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft --title "$TITLE" --notes "$NOTES"
+              gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft --title "$TITLE" --notes-file release-notes.md
             fi
           fi
 
@@ -418,3 +503,12 @@ jobs:
             gh release delete-asset "$RELEASE_TAG" "$name" --repo "$RELEASE_REPO" --yes >/dev/null 2>&1 || true
             gh release upload "$RELEASE_TAG" "$file" --repo "$RELEASE_REPO"
           done
+
+      # Last step on purpose. Everything above can be re-run against a draft
+      # nobody has seen; this is the one that makes it public, so it only
+      # happens once every asset is actually on the release.
+      - name: Publish release
+        if: ${{ env.RELEASE_MODE == 'publish' }}
+        run: |
+          gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft=false --latest
+          echo "Published https://github.com/${RELEASE_REPO}/releases/tag/${RELEASE_TAG}"
