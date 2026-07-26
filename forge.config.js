@@ -1,6 +1,7 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 const path = require('node:path');
+const fs = require('node:fs');
 // const { Config } = require('./Modules/Config');
 
 const appleSignIdentity = process.env.APPLE_SIGN_IDENTITY;
@@ -17,6 +18,21 @@ const shouldNotarizeMac =
 module.exports = {
   packagerConfig: {
     asar: true,
+    // Copy the *contents* of symlinks rather than the links themselves.
+    //
+    // node_modules/@showtrak/protocol is npm's link for the `file:./shared`
+    // dependency. Left as a link, Electron Packager hands it to @electron/asar,
+    // which stores a `link` entry -- and on Windows npm creates a *junction*
+    // whose readlink is an absolute path, so the recorded target came out as the
+    // nonsense `node_modules\@showtrak\D:\a\ShowTrakServer\ShowTrakServer\shared`
+    // (3.16.2 shipped exactly that). Every
+    // `require('@showtrak/protocol/runtime')` then threw MODULE_NOT_FOUND on
+    // boot, while macOS and Linux worked because their relative symlinks
+    // happened to resolve inside the archive.
+    //
+    // Dereferencing sidesteps the platform difference entirely: the package
+    // lands in the asar as a real directory on all three targets.
+    derefSymlinks: true,
     // Keep the asar lean: only `dist/`, production `node_modules`, and
     // package.json are needed at runtime. Without an ignore list, Electron
     // Packager bundles the entire project tree (src/, coverage/, test/, source
@@ -27,16 +43,15 @@ module.exports = {
       // src/Modules/Server/index.ts resolving __dirname/../../WebUI); the app
       // icon is read from disk at package time, not from the asar.
       /^\/src($|\/)/,
-      // shared/ is the @showtrak/protocol submodule. It is NOT types-only any
-      // more: node_modules/@showtrak/protocol is a `file:` symlink to this
-      // directory, and asar records it as a link rather than dereferencing it,
-      // so the target has to exist inside the package or every
-      // `require('@showtrak/protocol/runtime')` throws at boot.
-      //
-      // Ship exactly what Node needs to resolve that subpath — package.json for
-      // the exports map, and the compiled dist/ — and keep excluding the .d.ts
-      // sources, tsconfigs and the submodule's own node_modules.
-      /^\/shared\/(?!dist(\/|$)|package\.json$)/,
+      // shared/ is the @showtrak/protocol submodule. With derefSymlinks the
+      // package ships as real files under node_modules/@showtrak/protocol, so
+      // this second copy at the top level is dead weight — drop it wholesale.
+      /^\/shared($|\/)/,
+      // ...and inside the dereferenced copy, ship exactly what Node needs to
+      // resolve `@showtrak/protocol/runtime`: package.json for the exports map
+      // and the compiled dist/. The .d.ts sources, tsconfigs, LICENSE and
+      // README are build-time only.
+      /^\/node_modules\/@showtrak\/protocol\/(?!dist(\/|$)|package\.json$)/,
       /^\/scripts($|\/)/,
       /^\/build($|\/)/,
       // Tests & coverage reports. dist-test/ is the test-only per-file compile
@@ -149,4 +164,32 @@ module.exports = {
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
+  hooks: {
+    // 3.16.2 shipped a Windows build whose @showtrak/protocol was an unusable
+    // link (see derefSymlinks above) and nothing caught it until the app failed
+    // to boot on a user's machine. The dependency resolves by bare specifier, so
+    // a broken copy is invisible until runtime — assert the real files are in
+    // the staged tree, on every platform, before it gets sealed into the asar.
+    packageAfterCopy: async (_forgeConfig, buildPath) => {
+      const pkgDir = path.join(buildPath, 'node_modules', '@showtrak', 'protocol');
+      // lstat, not stat: a surviving symlink is the failure we are guarding
+      // against, and it would follow through to the real file on the build host.
+      const linkStat = fs.lstatSync(pkgDir, { throwIfNoEntry: false });
+      if (!linkStat?.isDirectory()) {
+        throw new Error(
+          `Packaging aborted: ${pkgDir} is ${linkStat ? 'a link, not a real directory' : 'missing'}. ` +
+            'The @showtrak/protocol dependency must be dereferenced into the package.'
+        );
+      }
+      for (const rel of [['package.json'], ['dist', 'runtime', 'index.js']]) {
+        const file = path.join(pkgDir, ...rel);
+        if (!fs.lstatSync(file, { throwIfNoEntry: false })?.isFile()) {
+          throw new Error(
+            `Packaging aborted: ${file} is missing from the staged app. ` +
+              'require("@showtrak/protocol/runtime") would throw at boot.'
+          );
+        }
+      }
+    },
+  },
 };
