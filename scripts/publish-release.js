@@ -270,7 +270,16 @@ async function main() {
   console.log(`    branch      ${branch} @ ${run('git', ['rev-parse', '--short', 'HEAD'])}`);
   console.log(`    release     ${tag} - ${productName}`);
   console.log(`    macOS       ${options.variant}`);
-  if (existing) console.log(`    note        ${tag} already exists as a draft and will be updated`);
+  if (existing) {
+    // Stated exactly, because this is the line somebody reads before agreeing
+    // to it: rebuilding a live release is a different act from updating a draft
+    // nobody has seen.
+    console.log(
+      existing.isDraft
+        ? `    note        ${tag} already exists as a draft and will be updated`
+        : `    note        ${tag} is ALREADY PUBLISHED and will be rebuilt in place`
+    );
+  }
   if (options.mode === 'publish') {
     console.log('');
     console.log('    This publishes the release publicly and marks it Latest, which is');
