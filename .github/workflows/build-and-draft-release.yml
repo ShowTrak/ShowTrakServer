@@ -508,11 +508,13 @@ jobs:
           fi
 
           echo "Uploading ${#UPLOAD_FILES[@]} release assets to ${RELEASE_REPO}:${RELEASE_TAG}"
-          for file in "${UPLOAD_FILES[@]}"; do
-            name=$(basename "$file")
-            gh release delete-asset "$RELEASE_TAG" "$name" --repo "$RELEASE_REPO" --yes >/dev/null 2>&1 || true
-            gh release upload "$RELEASE_TAG" "$file" --repo "$RELEASE_REPO"
-          done
+          # --clobber rather than delete-then-upload: GitHub rewrites spaces in
+          # an asset name to dots, so deleting by the file's own basename never
+          # matched what was actually stored ("ShowTrak Server-3.16.1 Setup.exe"
+          # against "ShowTrak.Server-3.16.1.Setup.exe"), and the upload that
+          # followed collided with the asset the delete had just failed to
+          # remove. Only ever hit on a re-run, which is when it matters most.
+          gh release upload "$RELEASE_TAG" "${UPLOAD_FILES[@]}" --repo "$RELEASE_REPO" --clobber
 
       # Last step on purpose. Everything above can be re-run against a draft
       # nobody has seen; this is the one that makes it public, so it only
