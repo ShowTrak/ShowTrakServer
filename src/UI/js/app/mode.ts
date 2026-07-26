@@ -7,13 +7,13 @@ import {
   setAlertActionsEnabled,
   setAppMode,
   setCompactMode,
-} from './01-state';
+} from './state';
 import type { AppMode as AppModeValue } from '@showtrak/protocol';
-import { HandleNonFatalError } from './04-utils';
-import { RenderPendingAdoptionSection } from './06-client-list';
-import { UpdateMonitorHistoryEditButtonVisibility } from './07-monitoring';
-import { initializeEditInteractions } from './08-dnd';
-import { UpdateSelectionCount } from './14-selection-init';
+import { HandleNonFatalError } from './utils';
+import { RenderPendingAdoptionSection } from './client-list';
+import { UpdateMonitorHistoryEditButtonVisibility } from './monitoring';
+import { initializeEditInteractions } from './dnd';
+import { UpdateSelectionCount } from './selection-init';
 export function RenderCompactMode(isCompact: boolean) {
   setCompactMode(!!isCompact);
   document.body.classList.toggle('compact-mode', CompactMode);

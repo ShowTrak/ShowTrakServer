@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const { installJQuery, installHowl } = require('./helpers/renderer-stubs');
 
-// Exercises the OSC/HTTP route reference in src/UI/js/app/09-osc-feeds.ts.
+// Exercises the OSC/HTTP route reference in src/UI/js/app/osc-feeds.ts.
 //
 // This modal is the documentation an integrator reads before wiring a lighting
 // desk, a Companion button or a show-control cue to ShowTrak. If a route is
@@ -19,7 +19,7 @@ installHowl();
 installJQuery();
 
 const APP = path.join(__dirname, '..', 'dist-test', 'UI', 'js', 'app');
-const Osc = require(path.join(APP, '09-osc-feeds.js'));
+const Osc = require(path.join(APP, 'osc-feeds.js'));
 
 const {
   FormatDebugTime,

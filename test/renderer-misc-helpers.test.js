@@ -20,12 +20,12 @@ installDocument();
 
 const APP = path.join(__dirname, '..', 'dist-test', 'UI', 'js', 'app');
 
-const ScriptManager = require(path.join(APP, '15-script-manager.js'));
-const IconPicker = require(path.join(APP, '18-icon-picker.js'));
-const GroupManager = require(path.join(APP, '11-group-manager.js'));
-const AudioAssets = require(path.join(APP, '17-audio-assets.js'));
-const Fog = require(path.join(APP, '20-fog.js'));
-const Modals = require(path.join(APP, '11-modals.js'));
+const ScriptManager = require(path.join(APP, 'script-manager.js'));
+const IconPicker = require(path.join(APP, 'icon-picker.js'));
+const GroupManager = require(path.join(APP, 'group-manager.js'));
+const AudioAssets = require(path.join(APP, 'audio-assets.js'));
+const Fog = require(path.join(APP, 'fog.js'));
+const Modals = require(path.join(APP, 'modals.js'));
 
 // ===========================================================================
 // Script manager: ID and path validation
@@ -33,7 +33,7 @@ const Modals = require(path.join(APP, '11-modals.js'));
 
 const { NormalizeScriptManagerPath, ScriptManagerIDError, ScriptColourHex } = ScriptManager;
 
-// ScriptManagerCache is a module-level array exported by 15-script-manager
+// ScriptManagerCache is a module-level array exported by script-manager
 // itself (no setter), so it is seeded by mutating it in place.
 test.beforeEach(() => {
   ScriptManager.ScriptManagerCache.length = 0;
@@ -228,7 +228,7 @@ test('FOG defaults to unavailable until the server says otherwise', () => {
   assert.equal(IsFogAvailable(), false);
 });
 
-// OpenTaskCount / FinishedTaskCount are module-private in 20-fog.ts and are
+// OpenTaskCount / FinishedTaskCount are module-private in fog.ts and are
 // reachable only through the DOM render path, so they are not covered here.
 // Extracting them would mean moving FogTasks state out of the module for two
 // one-line filters — not worth the churn against the rest of this pass.

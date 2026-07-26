@@ -723,3 +723,171 @@ test('Notify and PlaySound forward to the renderers with their defaults', async 
   await emit('PlaySound', 'alert');
   assert.deepEqual(pushes[0], ['PlaySound', 'alert']);
 });
+
+// --- Monitoring push de-duplication -----------------------------------------
+//
+// Each target re-emits MonitoringTargetUpdated on every tick of its own
+// interval, changed or not. The renderer push is the expensive consumer (an IPC
+// send plus a socket emit per authed Web UI client, each followed by a tile
+// re-render), so it is skipped when the payload would paint identically —
+// while history sampling and alert evaluation still see EVERY tick.
+//
+// The two directions both matter, and they pull against each other: suppress
+// too little and idle targets keep re-painting; suppress too much and the
+// tile's live latency readout freezes.
+//
+// These tests use TargetIDs of their own because the signature map is
+// module-level state that outlives the per-test reset().
+
+/** A minimal target snapshot in the shape ToJSON() produces. */
+function monitorSnapshot(TargetID, overrides = {}) {
+  return {
+    TargetID,
+    Nickname: 'Projector',
+    Interval: 5000,
+    GroupID: null,
+    Weight: 100,
+    Slug: 'projector',
+    Timestamp: 1,
+    Address: '10.0.0.5',
+    Method: 'ping',
+    DegradedThresholdMs: 0,
+    LastSuccessAt: 1000,
+    Online: true,
+    Degraded: false,
+    LastChecked: 1000,
+    LastLatencyMs: 12,
+    LastError: null,
+    CheckCount: 1,
+    Checks: [
+      {
+        CheckID: 1,
+        TargetID,
+        Name: '',
+        Address: '10.0.0.5',
+        Method: 'ping',
+        Settings: {},
+        DegradedThresholdMs: 0,
+        Weight: 100,
+        LastSuccessAt: 1000,
+        Online: true,
+        Degraded: false,
+        LastChecked: 1000,
+        LastLatencyMs: 12,
+        LastError: null,
+      },
+    ],
+    Type: 'monitor',
+    ...overrides,
+  };
+}
+
+test('an unchanged monitoring tick is pushed once, but always recorded and alerted', async () => {
+  const ID = 9001;
+  await emit('MonitoringTargetUpdated', monitorSnapshot(ID));
+  await emit('MonitoringTargetUpdated', monitorSnapshot(ID));
+  await emit('MonitoringTargetUpdated', monitorSnapshot(ID));
+
+  const pushed = pushes.filter(([channel]) => channel === 'MonitoringTargetUpdated');
+  assert.equal(pushed.length, 1, 'an identical payload must not be re-pushed to the renderers');
+
+  // The timeline is a per-tick series — skipping samples would put gaps in the
+  // uptime/latency graph, which is the thing this must never do.
+  assert.equal(
+    history.filter(([kind]) => kind === 'monitoring').length,
+    3,
+    'history must record every tick regardless of whether the push was skipped'
+  );
+  assert.equal(
+    alertsMgr.__callsTo('HandleMonitoringTargetUpdated').length,
+    3,
+    'alert evaluation must see every tick'
+  );
+});
+
+test('only the per-tick timestamps advancing does not re-push', async () => {
+  const ID = 9002;
+  await emit('MonitoringTargetUpdated', monitorSnapshot(ID));
+  // Exactly what a healthy presence check (sACN / NDI / MQTT — no latency)
+  // produces on its next tick: new clock values, nothing renderable changed.
+  await emit(
+    'MonitoringTargetUpdated',
+    monitorSnapshot(ID, { Timestamp: 2, LastChecked: 6000, LastSuccessAt: 6000 })
+  );
+
+  assert.equal(
+    pushes.filter(([channel]) => channel === 'MonitoringTargetUpdated').length,
+    1,
+    'Timestamp / LastChecked / LastSuccessAt are not rendered, so they must not force a push'
+  );
+});
+
+test('a changed latency re-pushes, so the live latency readout cannot freeze', async () => {
+  const ID = 9003;
+  await emit('MonitoringTargetUpdated', monitorSnapshot(ID));
+  await emit('MonitoringTargetUpdated', monitorSnapshot(ID, { LastLatencyMs: 48 }));
+
+  assert.equal(
+    pushes.filter(([channel]) => channel === 'MonitoringTargetUpdated').length,
+    2,
+    'the tile shows live latency, so a changed reading must reach the renderer'
+  );
+});
+
+test('a status change re-pushes', async () => {
+  const ID = 9004;
+  await emit('MonitoringTargetUpdated', monitorSnapshot(ID));
+  await emit(
+    'MonitoringTargetUpdated',
+    monitorSnapshot(ID, { Online: false, LastLatencyMs: null, LastError: 'timed out' })
+  );
+
+  assert.equal(pushes.filter(([channel]) => channel === 'MonitoringTargetUpdated').length, 2);
+});
+
+test('a change confined to a dependent check re-pushes', async () => {
+  const ID = 9005;
+  const first = monitorSnapshot(ID);
+  const second = monitorSnapshot(ID);
+  // The target aggregate is unchanged; only the check's own state moved.
+  second.Checks[0].Degraded = true;
+
+  await emit('MonitoringTargetUpdated', first);
+  await emit('MonitoringTargetUpdated', second);
+
+  assert.equal(
+    pushes.filter(([channel]) => channel === 'MonitoringTargetUpdated').length,
+    2,
+    'per-check state is rendered in the editor and history, so it must not be swallowed'
+  );
+});
+
+test('a target with no usable TargetID is always pushed rather than dropped', async () => {
+  await emit('MonitoringTargetUpdated', { Nickname: 'no id', Checks: [] });
+  await emit('MonitoringTargetUpdated', { Nickname: 'no id', Checks: [] });
+
+  assert.equal(
+    pushes.filter(([channel]) => channel === 'MonitoringTargetUpdated').length,
+    2,
+    'without a key to de-duplicate on, the safe direction is to push'
+  );
+});
+
+test('a deleted target stops occupying the signature map', async () => {
+  const ID = 9006;
+  await emit('MonitoringTargetUpdated', monitorSnapshot(ID));
+  assert.equal(pushes.filter(([channel]) => channel === 'MonitoringTargetUpdated').length, 1);
+
+  // The full-list refresh is where the live set is known, so that is where
+  // signatures for departed targets are dropped.
+  state.targets = [null, []];
+  await emit('MonitoringTargetListChanged');
+
+  pushes.length = 0;
+  await emit('MonitoringTargetUpdated', monitorSnapshot(ID));
+  assert.equal(
+    pushes.filter(([channel]) => channel === 'MonitoringTargetUpdated').length,
+    1,
+    're-created target must push again rather than match a stale signature'
+  );
+});

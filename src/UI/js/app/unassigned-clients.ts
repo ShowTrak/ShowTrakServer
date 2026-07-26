@@ -10,16 +10,16 @@
 // default. This module hides the entry point when the setting is off; the main
 // process re-checks the setting and is the actual authority.
 import { closeAllModals, closeModal, openModal } from './lib/modal';
-import { GetSettingValue } from './03-settings';
+import { GetSettingValue } from './settings';
 import { Capabilities } from './state/capabilities';
-import { Notify, Wait } from './14-selection-init';
+import { Notify, Wait } from './selection-init';
 import {
   FormatUnassignedClientsCreated,
   ResolveUnassignedClientsEnabled,
   ValidateUnassignedClientRequest,
 } from './lib/unassigned-clients';
 
-// Mirrors 11-group-manager's local helper: close everything, then let the CSS
+// Mirrors group-manager's local helper: close everything, then let the CSS
 // transition settle before opening the next modal.
 async function CloseAllModals(): Promise<void> {
   closeAllModals();

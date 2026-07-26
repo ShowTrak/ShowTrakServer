@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { Result } from '../../types/result';
 import { CreateLogger } from '../Logger';
-import { CreateBonjourErrorHandler } from '../NetworkErrors';
+import { CreateBonjourErrorHandler } from '@showtrak/protocol/runtime';
 
 import { clampInt, buildProbeTargets, probeHost } from './network-utils';
 import {

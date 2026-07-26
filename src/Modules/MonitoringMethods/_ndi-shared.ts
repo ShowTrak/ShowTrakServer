@@ -30,7 +30,7 @@
 // starts until the first Observe() — so importing this module (e.g. from the
 // method registry) has NO side effects.
 import { CreateLogger } from '../Logger';
-import { CreateBonjourErrorHandler } from '../NetworkErrors';
+import { CreateBonjourErrorHandler } from '@showtrak/protocol/runtime';
 import { Pill, Rows, TextRow, Row, Note, FormatLatency, Card } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 

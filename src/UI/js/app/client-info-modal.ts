@@ -1,7 +1,7 @@
 // Read-only Client Info modal: OpenClientInfo (opens + live-refresh loop) and
 // RenderClientInfoDetails (renders every tab/section). Extracted from
-// 14-selection-init.ts (REFACTOR_PLAN.md Phase 7). Imports are added below;
-// cross-references back into 14-selection-init are call-time only (safe cycle).
+// selection-init.ts (REFACTOR_PLAN.md Phase 7). Imports are added below;
+// cross-references back into selection-init are call-time only (safe cycle).
 import type {
   ClientView,
   ClientDisplayView,
@@ -21,16 +21,16 @@ import {
   setMonitorHistorySeries,
   setMonitorHistoryTooltipHover,
   set__clientInfoRefreshInFlight,
-} from './01-state';
-import { FormatBytes, HandleNonFatalError, Safe } from './04-utils';
-import { GetClientStatusDisplayText } from './06-client-list';
+} from './state';
+import { FormatBytes, HandleNonFatalError, Safe } from './utils';
+import { GetClientStatusDisplayText } from './client-list';
 import {
   HideStatusTimelineTooltip,
   LoadHistorySamplesForContext,
   RenderMonitoringHistoryModal,
-} from './07-monitoring';
-import { CloseAllModals } from './11-modals';
-import { IsVersionAtLeast, MINIMUM_DISPLAY_MONITORING_VERSION, Notify } from './14-selection-init';
+} from './monitoring';
+import { CloseAllModals } from './modals';
+import { IsVersionAtLeast, MINIMUM_DISPLAY_MONITORING_VERSION, Notify } from './selection-init';
 
 // The renderer-facing DisplayList is enriched in-place by the client's
 // critical-marking machinery with connection/mismatch annotations that the

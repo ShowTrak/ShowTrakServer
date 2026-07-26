@@ -1,9 +1,24 @@
 // Console + file logger with colored tags; writes to daily log file under AppData.
 // Provides leveled logging, async (queued) file writes, and daily (midnight)
 // file rollover.
+//
+// Level ranking, default-level derivation and the formatting helpers come from
+// @showtrak/protocol/runtime, shared with ShowTrakClient. The SINK below does
+// not: this app queues asynchronous appends, while the Client writes
+// synchronously so a crashing unattended agent keeps the lines explaining why.
+// That difference is deliberate, which is why only the pure half is shared.
 import fs from 'fs';
 import path from 'path';
 
+import {
+  GetDatestampLabel,
+  GetDateTimeStamp,
+  IsLevelEnabled as IsLevelEnabledFor,
+  Pad,
+  ResolveDefaultLevel,
+  SerializeArg,
+  StripAnsi,
+} from '@showtrak/protocol/runtime';
 import { Manager as AppDataManager } from '../AppData';
 
 const pc = require('picocolors');
@@ -21,10 +36,6 @@ try {
 const LogDirectory = AppDataManager.GetLogsDirectory();
 if (!fs.existsSync(LogDirectory)) {
   fs.mkdirSync(LogDirectory, { recursive: true });
-}
-
-function Pad(Text: string, Length = 17): string {
-  return Text.padEnd(Length, ' ').toUpperCase();
 }
 
 const Types: Record<string, string> = {
@@ -48,9 +59,30 @@ const PlainTypes: Record<string, string> = {
   Database: Pad('DATABASE'),
 };
 
-// Log level gating
-const LevelRank: Record<string, number> = { error: 0, warn: 1, info: 2, debug: 3, trace: 4 };
-const DefaultLevel = process.env.NODE_ENV === 'production' ? 'info' : 'debug';
+// --- Log level gating -------------------------------------------------------
+//
+// Detecting a shipped build: a packaged Electron app has no NODE_ENV, so that
+// test alone left every shipped server at 'debug' — writing debug chatter to the
+// daily log file for the life of the install. The SYSTEM_LOG_LEVEL setting could
+// not rescue it either: its default is 'info', and main/live-settings.ts
+// deliberately skips applying a still-default setting at boot, so the settings
+// UI read "info" while the logger ran at debug.
+//
+// Electron sets `process.defaultApp` only when the app was launched from a
+// checkout (`electron .`), so its absence is the "this is a shipped build"
+// signal — the same test `app.isPackaged` performs. It is used here in
+// preference to importing `app` because Logger is the lowest module in the tree:
+// everything imports it, and giving it an `electron` dependency would mean it
+// could no longer be loaded outside an Electron main process (the test suite
+// loads it directly). This mirrors ShowTrakClient's Logger, which already
+// carried the fix.
+//
+// LOG_LEVEL overrides both, which is the point: a server misbehaving on site can
+// be relaunched with LOG_LEVEL=debug without a rebuild.
+const DefaultLevel = ResolveDefaultLevel({
+  nodeEnv: process.env.NODE_ENV,
+  isPackagedBuild: !process.defaultApp,
+});
 const Settings = {
   level: (process.env.LOG_LEVEL || DefaultLevel).toLowerCase(),
   toConsole: (process.env.LOG_TO_CONSOLE || 'true').toLowerCase() !== 'false',
@@ -58,9 +90,7 @@ const Settings = {
 };
 
 function isLevelEnabled(level: string): boolean {
-  const want = LevelRank[Settings.level] ?? LevelRank[DefaultLevel] ?? 0;
-  const have = LevelRank[level] ?? LevelRank.info ?? 0;
-  return have <= want;
+  return IsLevelEnabledFor(level, Settings.level, DefaultLevel);
 }
 
 function Tag(Text: string, Type: string): string {
@@ -73,25 +103,6 @@ function TagPlain(Text: string, Type: string): string {
   return `[ShowTrakServer] [${Pad(Text)}] [${
     Object.prototype.hasOwnProperty.call(PlainTypes, Type) ? PlainTypes[Type] : PlainTypes['Info']
   }]`;
-}
-
-function GetDatestampLabel(): string {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-    date.getDate()
-  ).padStart(2, '0')}`;
-}
-
-function GetDateTimeStamp(): string {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-    date.getDate()
-  ).padStart(
-    2,
-    '0'
-  )} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(
-    date.getSeconds()
-  ).padStart(2, '0')}`;
 }
 
 // Daily rollover: compute today's file on each write and ensure it exists.
@@ -123,23 +134,11 @@ function enqueueWrite(line: string): void {
     .catch(() => null);
 }
 
-function serializeArg(arg: unknown): string {
-  if (arg instanceof Error) return arg.stack || String(arg);
-  if (typeof arg === 'string') return arg;
-  try {
-    return JSON.stringify(arg);
-  } catch {
-    return String(arg);
-  }
-}
-
-// Remove ANSI color codes for file output
-// eslint-disable-next-line no-control-regex -- matching the ANSI escape byte is the point
-const ANSI_REGEX = /\x1b\[[0-9;]*m/g;
-function stripAnsi(s: string): string {
-  if (typeof s !== 'string') return s;
-  return s.replace(ANSI_REGEX, '');
-}
+// serializeArg / stripAnsi now come from @showtrak/protocol/runtime (aliased at
+// the import) — both apps formatted log lines identically, and only the sinks
+// they feed differ.
+const serializeArg = SerializeArg;
+const stripAnsi = StripAnsi;
 
 // The log level gates emission uniformly: a message below the active level is
 // written neither to the console nor to the file. (`silent()` bypasses this on

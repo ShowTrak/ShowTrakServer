@@ -11,11 +11,11 @@
 //   3. Execution toast     — persistent region holding a live execution list,
 //      outside-click to dismiss (`ShowExecutionToast` / `HideExecutionToast`).
 //
-// Extracted verbatim from the old 14-selection-init god-module so that file can
+// Extracted verbatim from the old selection-init god-module so that file can
 // become a pure re-export barrel.
-import { setConfirmDialogActive } from '../01-state';
-import { HandleNonFatalError, Safe } from '../04-utils';
-import { DismissAlert, iconForAlert } from '../10-alerts-tray';
+import { setConfirmDialogActive } from '../state';
+import { HandleNonFatalError, Safe } from '../utils';
+import { DismissAlert, iconForAlert } from '../alerts-tray';
 import { UpdateIdentifyStatusBanner } from '../identify';
 
 /** Options accepted by {@link showAlertStyleToast}. */

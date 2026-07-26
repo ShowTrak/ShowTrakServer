@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-// Exercises the pure decision layer of src/UI/js/app/11-update-manager.ts.
+// Exercises the pure decision layer of src/UI/js/app/update-manager.ts.
 //
 // This module decides which machines a client update is pushed to. Two failure
 // directions, both bad and both silent:
@@ -15,18 +15,10 @@ const path = require('node:path');
 //
 // The module loads under plain Node with no DOM (jQuery is only touched inside
 // the render functions), so the decision functions are tested directly. No
-// extraction was needed here -- unlike 06-client-list, the logic was already in
+// extraction was needed here -- unlike client-list, the logic was already in
 // exported top-level functions.
 
-const MODULE_PATH = path.join(
-  __dirname,
-  '..',
-  'dist-test',
-  'UI',
-  'js',
-  'app',
-  '11-update-manager.js'
-);
+const MODULE_PATH = path.join(__dirname, '..', 'dist-test', 'UI', 'js', 'app', 'update-manager.js');
 
 const UpdateManager = require(MODULE_PATH);
 const {

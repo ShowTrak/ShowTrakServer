@@ -12,9 +12,9 @@
 //   group:<GroupID>        → a whole group
 //   client:<ScopedID>      → a single entity (plain UUID, or monitor:/check:…)
 // and the resolved scope object is { Workspace, Groups:number[], Clients:string[] }.
-import { AllClients, DummyClients, MonitoringTargets, IsIntegratedClientEntity } from './01-state';
-import type { AlertScopeEntity, AlertScopeGroupNode, AlertScopeModel } from './01-state';
-import { Safe } from './04-utils';
+import { AllClients, DummyClients, MonitoringTargets, IsIntegratedClientEntity } from './state';
+import type { AlertScopeEntity, AlertScopeGroupNode, AlertScopeModel } from './state';
+import { Safe } from './utils';
 import type { GroupView } from '@showtrak/protocol';
 
 export type ScopeEntityKind = 'showtrak' | 'monitor' | 'monitor-check' | 'dummy';

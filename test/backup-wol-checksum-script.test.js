@@ -115,32 +115,27 @@ test('BackupManager saves, opens, and creates new ShowTrak files', async () => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-test('ChecksumManager returns the SHA-1 hex digest of the file contents', async () => {
+test('ChecksumFile returns the SHA-1 hex digest of the file contents', async () => {
   const crypto = require('node:crypto');
-  const checksumModulePath = path.join(
-    __dirname,
-    '..',
-    'dist',
-    'Modules',
-    'ChecksumManager',
-    'index'
-  );
-  const { Manager } = loadWithMocks(checksumModulePath, {
-    '../Logger': { CreateLogger: () => createLoggerStub() },
-  });
+  // Lives in the shared submodule (@showtrak/protocol/runtime): the Server ships
+  // these digests in the Script.json manifest and the Client compares against
+  // them, so the two sides have to agree on the algorithm exactly. Requiring it
+  // by package name also proves the `file:./shared` symlink resolves.
+  const { ChecksumFile } = require('@showtrak/protocol/runtime');
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-checksum-'));
   const filePath = path.join(tmpDir, 'file.txt');
   const contents = 'ShowTrak checksum test contents';
   fs.writeFileSync(filePath, contents);
 
-  // Must match the `checksum` package's historical default (SHA-1), which the
-  // ShowTrakClient still uses to compare script files during sync.
   const expected = crypto.createHash('sha1').update(contents).digest('hex');
-  assert.equal(await Manager.Checksum(filePath), expected);
+  assert.equal(await ChecksumFile(filePath), expected);
 
-  // Unreadable path resolves null instead of rejecting or hanging.
-  assert.equal(await Manager.Checksum(path.join(tmpDir, 'missing.txt')), null);
+  // Unreadable path resolves null instead of rejecting or hanging, and can still
+  // report why.
+  const reported = [];
+  assert.equal(await ChecksumFile(path.join(tmpDir, 'missing.txt'), (m) => reported.push(m)), null);
+  assert.equal(reported.length, 1);
 });
 
 test('ScriptManager loads script folders and computes file checksums', async () => {
@@ -174,7 +169,7 @@ test('ScriptManager loads script folders and computes file checksums', async () 
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => createLoggerStub() },
     '../AppData': { Manager: { GetScriptsDirectory: () => tmpDir } },
-    '../ChecksumManager': { Manager: { Checksum: async () => 'sum123' } },
+    '@showtrak/protocol/runtime': { ChecksumFile: async () => 'sum123' },
     '../Broadcast': { Manager: { emit: (...args) => events.push(args) } },
   });
 

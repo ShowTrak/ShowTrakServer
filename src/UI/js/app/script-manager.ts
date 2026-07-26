@@ -1,10 +1,10 @@
 import type { GroupView, ScriptEditable, ScriptManagerEntry } from '@showtrak/protocol';
 import { closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
-import { HandleNonFatalError, Safe } from './04-utils';
-import { CloseAllModals } from './11-modals';
-import { ConfirmationDialog, Notify } from './14-selection-init';
-import { NormalizeIconName, OpenIconPicker } from './18-icon-picker';
+import { HandleNonFatalError, Safe } from './utils';
+import { CloseAllModals } from './modals';
+import { ConfirmationDialog, Notify } from './selection-init';
+import { NormalizeIconName, OpenIconPicker } from './icon-picker';
 import {
   buildScopeModel,
   parseScopeSelection,

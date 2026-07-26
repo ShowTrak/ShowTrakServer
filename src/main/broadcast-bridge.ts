@@ -327,13 +327,127 @@ async function UpdateMonitoringTargetList(): Promise<void> {
   if (Err) return Logger.error('Failed to fetch monitoring targets:', Err);
   const SafeList = List || [];
   syncMonitoringHistoryStore(SafeList);
+  PruneMonitoringSignatures(SafeList);
   PushToRenderers('SetFullMonitoringTargetList', SafeList);
+}
+
+// --- Monitoring push de-duplication ----------------------------------------
+//
+// Every target ticks on its own interval and emits MonitoringTargetUpdated each
+// time, whether or not anything changed. Three things consume that event, and
+// they do NOT want the same cadence:
+//
+//   - history sampling  — wants every tick; the latency/uptime timeline is
+//                         literally a per-tick series, so it must never be
+//                         skipped.
+//   - alert evaluation  — transition-driven (it compares against the previous
+//                         online/degraded state), so an unchanged tick costs a
+//                         Map get/set and nothing else. Also cheap to keep.
+//   - the renderer push — the expensive one: an IPC send to the desktop window
+//                         plus a socket emit to every authed Web UI client,
+//                         each followed by a tile re-render.
+//
+// So only the push is gated, and only when the payload would paint identically.
+// The signature below is the renderer-visible projection: it deliberately keeps
+// LastLatencyMs (the tile shows live latency, so a changed reading must be
+// pushed) and drops the three fields that advance every tick without ever being
+// rendered:
+//
+//   Timestamp      — no consumer reads it.
+//   LastChecked    — read only as a null/non-null "has this ever run" test
+//                    (LiveCheckState), so it is folded to a boolean.
+//   LastSuccessAt  — only feeds the offline-since counter, which is hidden
+//                    while a target is online; the moment one goes offline,
+//                    Online flips and that alone forces a push.
+//
+// The win lands on exactly the targets that were pure waste: anything sitting
+// offline (unchanged payload forever), and the presence-style checks — sACN,
+// Art-Net, NDI, Millumin, MQTT — that report no latency at all, so a healthy
+// one is byte-identical tick after tick.
+//
+// The SDK's ToPublicMonitor projection is a strict subset of these fields, so a
+// suppressed push can never leave an SDK consumer stale either.
+const LastPushedMonitoringSignature = new Map<number, string>();
+
+// Loose shape of the per-check entries read when building the signature.
+interface MonitoringCheckSnapshot {
+  CheckID?: unknown;
+  Name?: unknown;
+  Address?: unknown;
+  Method?: unknown;
+  Settings?: unknown;
+  DegradedThresholdMs?: unknown;
+  Weight?: unknown;
+  Online?: unknown;
+  Degraded?: unknown;
+  LastChecked?: unknown;
+  LastLatencyMs?: unknown;
+  LastError?: unknown;
+}
+
+function BuildMonitoringSignature(Target: BroadcastMonitoringTarget): string {
+  const Checks = Array.isArray(Target.Checks) ? (Target.Checks as MonitoringCheckSnapshot[]) : [];
+  return JSON.stringify([
+    Target.Nickname,
+    Target.Interval,
+    Target.GroupID,
+    Target.Weight,
+    Target.Slug,
+    Target.Address,
+    Target.Method,
+    Target.DegradedThresholdMs,
+    Target.Online,
+    Target.Degraded,
+    Target.LastLatencyMs,
+    Target.LastError,
+    Target.CheckCount,
+    Target.LastChecked != null,
+    Checks.map((Check) => [
+      Check && Check.CheckID,
+      Check && Check.Name,
+      Check && Check.Address,
+      Check && Check.Method,
+      Check && Check.Settings,
+      Check && Check.DegradedThresholdMs,
+      Check && Check.Weight,
+      Check && Check.Online,
+      Check && Check.Degraded,
+      Check && Check.LastLatencyMs,
+      Check && Check.LastError,
+      !!(Check && Check.LastChecked != null),
+    ]),
+  ]);
+}
+
+// Drop signatures for targets that no longer exist, so the map tracks the live
+// set rather than everything seen this session.
+function PruneMonitoringSignatures(List: readonly { TargetID?: unknown }[]): void {
+  const Live = new Set<number>();
+  for (const Target of List) {
+    const ID = Number(Target && Target.TargetID);
+    if (Number.isFinite(ID)) Live.add(ID);
+  }
+  for (const ID of LastPushedMonitoringSignature.keys()) {
+    if (!Live.has(ID)) LastPushedMonitoringSignature.delete(ID);
+  }
 }
 
 async function MonitoringTargetUpdated(Target: BroadcastMonitoringTarget): Promise<void> {
   if (!hasMainWindow()) return;
   recordMonitoringHistorySample(Target);
-  PushToRenderers('MonitoringTargetUpdated', Target);
+
+  const TargetID = Number(Target && Target.TargetID);
+  if (Number.isFinite(TargetID)) {
+    const Signature = BuildMonitoringSignature(Target);
+    if (LastPushedMonitoringSignature.get(TargetID) !== Signature) {
+      LastPushedMonitoringSignature.set(TargetID, Signature);
+      PushToRenderers('MonitoringTargetUpdated', Target);
+    }
+  } else {
+    // No usable TargetID to key on — push unconditionally rather than drop it.
+    PushToRenderers('MonitoringTargetUpdated', Target);
+  }
+
   AlertsManager.HandleMonitoringTargetUpdated(Target).catch((Err: unknown) =>
     Logger.error('AlertsManager.HandleMonitoringTargetUpdated failed', Err)
   );

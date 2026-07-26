@@ -81,7 +81,7 @@ interface JQuery<TElement = HTMLElement> {
 
 // ---- Renderer-scoped window globals ---------------------------------------
 
-/** FLIP animation helper attached by 00-animations. */
+/** FLIP animation helper attached by animations.ts. */
 interface ShowTrakFlipApi {
   Enabled: () => boolean;
   Capture: (root: Element | null) => unknown;
@@ -105,7 +105,7 @@ interface ShowTrakDeploymentUiState {
 }
 
 interface Window {
-  /** FLIP animation helper attached by 00-animations. */
+  /** FLIP animation helper attached by animations.ts. */
   ShowTrakFlip?: ShowTrakFlipApi;
   /** Safari/legacy AudioContext constructor. */
   webkitAudioContext?: typeof AudioContext;
@@ -115,7 +115,7 @@ interface Window {
   /** Web UI capability profile injected by the browser bootstrap. */
   __SHOWTRAK_CAPS__?: Record<string, unknown>;
   // __SHOWTRAK_CONFIRM_ACTIVE and __CLIENT_ONLINE_STATE were folded into the
-  // 01-state module (ConfirmDialogActive / ClientOnlineState) and are no longer
+  // state modules (ConfirmDialogActive / ClientOnlineState) and are no longer
   // window globals.
   /** Selected address family in the open client-info modal. */
   __ClientInfoNetFamily?: 'IPv4' | 'IPv6';

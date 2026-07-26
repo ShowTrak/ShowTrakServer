@@ -1,7 +1,7 @@
 // Renderer bootstrap (REFACTOR_PLAN.md Phase 7 item 2).
 //
 // Everything here used to run as import-time side effects in
-// 14-selection-init.ts: a jQuery document-ready IIFE (global context-menu /
+// selection-init.ts: a jQuery document-ready IIFE (global context-menu /
 // tile / keybind wiring) and Init() (show-file bootstrap, cogs-menu wiring and
 // the final window.API.Loaded() handshake). The bootstrap orchestrator in
 // main.ts calls WireGlobalUI() then Init(), after every module's Init*()
@@ -18,17 +18,17 @@ import {
   setConfig,
   setMonitorHistoryTooltipHover,
   setUpdateManagerDownloadInProgress,
-} from './01-state';
-import { RenderMode } from './02-mode';
-import { HandleNonFatalError } from './04-utils';
+} from './state';
+import { RenderMode } from './mode';
+import { HandleNonFatalError } from './utils';
 import {
   HideStatusTimelineTooltip,
   OpenDummyClientHistory,
   OpenMonitoringTargetHistory,
   RenderMonitoringHistoryModal,
   ShowStatusTimelineTooltip,
-} from './07-monitoring';
-import { OpenOSCDictionary, OpenOscHttpDebugTerminal } from './09-osc-feeds';
+} from './monitoring';
+import { OpenOSCDictionary, OpenOscHttpDebugTerminal } from './osc-feeds';
 import {
   ApplyUpdateManagerButtonLocks,
   CloseAllModals,
@@ -43,7 +43,7 @@ import {
   SaveShow,
   SaveShowAs,
   SetUpdateManagerDownloadProgress,
-} from './11-modals';
+} from './modals';
 import {
   HandleNetworkDiscoveryEvent,
   OpenMonitoringTargetEditor,
@@ -52,24 +52,24 @@ import {
   SetNetworkDiscoveryStatus,
   StartNetworkDiscoveryScan,
   StopNetworkDiscoveryScan,
-} from './12-monitoring-editor';
-import { OpenAlertRuleManager, OpenCreateAlertRuleEditor } from './13-alert-rules';
+} from './monitoring-editor';
+import { OpenAlertRuleManager, OpenCreateAlertRuleEditor } from './alert-rules';
 import {
   GetIdentifyingUUIDs,
   HideExecutionToast,
   Notify,
   StopIdentifyingForUUIDs,
   UpdateIdentifyStatusBanner,
-} from './14-selection-init';
+} from './selection-init';
 import { OpenClientInfo } from './client-info-modal';
 import { TestAllNotifications } from './lib/debug-notifications';
-import { OpenScriptManager } from './15-script-manager';
-import { OpenTagManager } from './19-tag-manager';
-import { OpenDummyClientEditor } from './16-dummy-clients';
+import { OpenScriptManager } from './script-manager';
+import { OpenTagManager } from './tag-manager';
+import { OpenDummyClientEditor } from './dummy-clients';
 import {
   OpenUnassignedClientCreationModal,
   RefreshUnassignedClientMenuVisibility,
-} from './17-unassigned-clients';
+} from './unassigned-clients';
 import { ClearSelection, SelectByGroup, ToggleSelection } from './selection';
 import { wireAppUpdates } from './wire-app-updates';
 import { wireContextMenu } from './wire-context-menu';

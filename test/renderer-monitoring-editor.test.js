@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const { installJQuery } = require('./helpers/renderer-stubs');
 
-// Exercises the pure decision layer of src/UI/js/app/12-monitoring-editor.ts.
+// Exercises the pure decision layer of src/UI/js/app/monitoring-editor/.
 //
 // Two things here have consequences beyond the editor window:
 //
@@ -22,8 +22,8 @@ const { installJQuery } = require('./helpers/renderer-stubs');
 installJQuery();
 
 const APP = path.join(__dirname, '..', 'dist-test', 'UI', 'js', 'app');
-const Editor = require(path.join(APP, '12-monitoring-editor.js'));
-const State = require(path.join(APP, '01-state.js'));
+const Editor = require(path.join(APP, 'monitoring-editor', 'index.js'));
+const State = require(path.join(APP, 'state/index.js'));
 
 const {
   ParseIPv4ToNumber,

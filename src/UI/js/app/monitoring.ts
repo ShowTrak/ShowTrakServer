@@ -12,7 +12,7 @@ import {
   setMonitorHistoryModalContext,
   setMonitorHistorySeries,
   setMonitorHistoryTooltipHover,
-} from './01-state';
+} from './state';
 import type {
   ClientApplicationHistorySeries,
   ClientDisplayHistorySeries,
@@ -26,7 +26,7 @@ import type {
   RunningApplicationViewItem,
   USBDeviceView,
 } from '@showtrak/protocol';
-import { HandleNonFatalError, Safe } from './04-utils';
+import { HandleNonFatalError, Safe } from './utils';
 import { openModal } from './lib/modal';
 import { OfflineBadgeContent } from './lib/status-badges';
 
@@ -70,9 +70,9 @@ type CriticalDisplayItem = ClientDisplayView & {
   Mismatch?: boolean;
   IsConnected?: boolean;
 };
-import { GetClientStatusDisplayText } from './06-client-list';
-import { CloseAllModals } from './11-modals';
-import { Notify } from './14-selection-init';
+import { GetClientStatusDisplayText } from './client-list';
+import { CloseAllModals } from './modals';
+import { Notify } from './selection-init';
 export function FormatInterval(ms: unknown) {
   const n = Number(ms) || 0;
   if (n < 60000) return `${Math.round(n / 1000)}s`;

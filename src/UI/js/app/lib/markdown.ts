@@ -5,7 +5,7 @@
 // Markdown (not pre-rendered HTML). Everything is escaped through `Safe` before
 // any markup is emitted, and link hrefs are restricted to http(s)/mailto — so
 // the output is safe to inject with `.html()`.
-import { HandleNonFatalError, Safe } from '../04-utils';
+import { HandleNonFatalError, Safe } from '../utils';
 
 // Allow only http(s)/mailto links through; everything else collapses to '#'.
 export function sanitizeHref(href: string): string {

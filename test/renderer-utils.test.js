@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-// Covers src/UI/js/app/04-utils.ts — the renderer's shared helpers.
+// Covers src/UI/js/app/utils.ts — the renderer's shared helpers.
 //
 // These load from dist-test/ rather than dist/: the shipped renderer is an
 // esbuild IIFE bundle, so tsconfig.renderer.test.json emits the same sources as
@@ -17,7 +17,7 @@ const {
   GetAlertVolume,
   HandleNonFatalError,
   WithNonFatal,
-} = require('../dist-test/UI/js/app/04-utils.js');
+} = require('../dist-test/UI/js/app/utils.js');
 const { setSettings } = require('../dist-test/UI/js/app/state/server-caches.js');
 
 // --- Safe -------------------------------------------------------------------

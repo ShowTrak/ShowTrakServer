@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 // Exercises src/UI/js/app/lib/client-list-layout.ts — the pure layout and
-// status rules extracted from 06-client-list.ts (1018 LOC, previously 0%).
+// status rules extracted from client-list.ts (1018 LOC, previously 0%).
 //
 // This is the first pass of the "extract pure logic" strategy: the decisions
 // move into a leaf module that loads with no DOM, the rendering stays put.

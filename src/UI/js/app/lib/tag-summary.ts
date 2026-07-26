@@ -1,6 +1,6 @@
 // Pure summary of a tag's membership scope.
 //
-// Extracted from 19-tag-manager.ts (which was a private function in an
+// Extracted from tag-manager.ts (which was a private function in an
 // otherwise entirely DOM-bound module) so the one line the operator reads to
 // understand what a tag covers can be tested.
 //

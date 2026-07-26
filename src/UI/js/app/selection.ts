@@ -1,9 +1,9 @@
 // Client selection primitives (select / deselect / toggle / clear / count).
-// Extracted from 14-selection-init.ts (REFACTOR_PLAN.md Phase 7). This is a
+// Extracted from selection-init.ts (REFACTOR_PLAN.md Phase 7). This is a
 // leaf module: it depends only on shared state + utils, so the ~6 modules that
-// import these keep working via the 14-selection-init barrel re-export.
-import { AlertActionsEnabled, GroupSelectableUUIDCache, Selected, setSelected } from './01-state';
-import { HandleNonFatalError } from './04-utils';
+// import these keep working via the selection-init barrel re-export.
+import { AlertActionsEnabled, GroupSelectableUUIDCache, Selected, setSelected } from './state';
+import { HandleNonFatalError } from './utils';
 
 export function IsSelected(UUID: string) {
   return Selected.includes(UUID);

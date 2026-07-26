@@ -1,7 +1,7 @@
 import { openModal } from './lib/modal';
-import { AppMode } from './01-state';
-import { HandleNonFatalError, Safe } from './04-utils';
-import { DismissAlert, PendingAdoptionAlerts } from './10-alerts-tray';
+import { AppMode } from './state';
+import { HandleNonFatalError, Safe } from './utils';
+import { DismissAlert, PendingAdoptionAlerts } from './alerts-tray';
 // Global event delegation for Adopt buttons (works across re-renders).
 // Called by the bootstrap orchestrator in main.ts — never at import time.
 export function InitDnd() {

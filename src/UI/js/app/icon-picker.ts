@@ -1,7 +1,7 @@
 import { closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
-import { HandleNonFatalError } from './04-utils';
-import { Wait } from './14-selection-init';
+import { HandleNonFatalError } from './utils';
+import { Wait } from './selection-init';
 
 // Reusable Bootstrap Icons picker.
 // -----------------------------------------------------------------------------

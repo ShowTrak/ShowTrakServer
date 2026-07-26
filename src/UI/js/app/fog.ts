@@ -9,7 +9,7 @@
 // State is push-driven like everything else in this app: the backend poller
 // reconciles tasks against FOG every 30s (and immediately after one is scheduled)
 // and pushes SetFogTaskList / FogStatusUpdated. Nothing here polls.
-import { Safe } from './04-utils';
+import { Safe } from './utils';
 import { Notify, ConfirmationDialog } from './lib/toasts';
 import { openModal, closeModal } from './lib/modal';
 import type { FogStatusView, FogTaskView, FogTaskTypeView } from '@showtrak/protocol';

@@ -10,7 +10,7 @@ import crypto from 'crypto';
 
 import { CreateLogger } from '../Logger';
 import { Manager as AppDataManager } from '../AppData';
-import { Manager as ChecksumManager } from '../ChecksumManager';
+import { ChecksumFile } from '@showtrak/protocol/runtime';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Ok, Fail } from '../Utils';
 import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
@@ -483,7 +483,7 @@ async function LoadScriptFolder(ScriptsDirectory: string, ScriptFolder: string) 
   const filesNeedingChecksum = AllFilesInFolder.filter((f) => f.Type === 'file');
   // Compute checksums with bounded concurrency to avoid blocking startup
   await runWithConcurrency(filesNeedingChecksum, 8, async (File) => {
-    const sum = await ChecksumManager.Checksum(path.join(ScriptFolderPath, File.Path));
+    const sum = await ChecksumFile(path.join(ScriptFolderPath, File.Path), (m) => Logger.error(m));
     File.Checksum = sum || null;
   });
 

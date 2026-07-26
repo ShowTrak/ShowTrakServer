@@ -1,5 +1,5 @@
 // Live "Offline HH:MM:SS" counter ticking on every client tile's offline
-// indicator. Extracted from 14-selection-init.ts (REFACTOR_PLAN.md Phase 7).
+// indicator. Extracted from selection-init.ts (REFACTOR_PLAN.md Phase 7).
 import { OfflineBadgeContent } from './lib/status-badges';
 
 export async function UpdateOfflineIndicators() {

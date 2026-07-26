@@ -1,6 +1,6 @@
 // Pure client-labelling helpers (integrated-entity detection, version/hostname
 // label formatting). No mutable state; shared by the client list, tiles, and
-// info modal. Extracted from the old monolithic 01-state.ts.
+// info modal. Extracted from the old monolithic state.ts.
 
 /** Minimal structural view of the client-like objects these label helpers accept. */
 type ClientLike =

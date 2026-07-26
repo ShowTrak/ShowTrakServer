@@ -2,7 +2,7 @@ import { CreateLogger } from '../Logger';
 import { Manager as OSManager } from '../OS';
 import { Config } from '../Config';
 import { Manager as ServerIdentityManager } from '../ServerIdentity';
-import { CreateBonjourErrorHandler } from '../NetworkErrors';
+import { CreateBonjourErrorHandler } from '@showtrak/protocol/runtime';
 
 const Logger = CreateLogger('Bonjour');
 

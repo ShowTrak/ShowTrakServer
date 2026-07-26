@@ -26,7 +26,7 @@ const path = require('node:path');
 const APP = path.join(__dirname, '..', 'dist-test', 'UI', 'js', 'app');
 
 const Scope = require(path.join(APP, 'scope-dropdown.js'));
-const State = require(path.join(APP, '01-state.js'));
+const State = require(path.join(APP, 'state/index.js'));
 
 const {
   buildScopeModel,

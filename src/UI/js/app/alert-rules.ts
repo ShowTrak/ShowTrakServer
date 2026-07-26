@@ -26,11 +26,11 @@ import {
   setAlertScopeSelected,
   setAlertTriggerSelected,
   setAlertTriggerTypesCache,
-} from './01-state';
-import type { AlertScopeModel } from './01-state';
+} from './state';
+import type { AlertScopeModel } from './state';
 import type { AlertRuleActionView, AlertRuleScope, AlertRuleView } from '@showtrak/protocol';
-import { PreviewSound } from './03-settings';
-import { Safe } from './04-utils';
+import { PreviewSound } from './settings';
+import { Safe } from './utils';
 import {
   buildScopeModel,
   parseScopeSelection,
@@ -43,9 +43,9 @@ import {
   closeScopeDropdown,
 } from './scope-dropdown';
 import type { ScopeDropdownConfig } from './scope-dropdown';
-import { CloseAllModals } from './11-modals';
-import { ConfirmationDialog, Notify } from './14-selection-init';
-import { LoadAudioAssets, PreviewAudioAsset } from './17-audio-assets';
+import { CloseAllModals } from './modals';
+import { ConfirmationDialog, Notify } from './selection-init';
+import { LoadAudioAssets, PreviewAudioAsset } from './audio-assets';
 
 /** Concrete scope shape produced by the editor (`Groups` numeric, `Clients` string IDs). */
 interface ParsedAlertScope {

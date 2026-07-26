@@ -3,7 +3,7 @@
 // client-info modal bookkeeping, and application mode. None of this mirrors
 // backend truth — it is renderer-local working state (distinct from the
 // authoritative caches in ./server-caches). Each `export let` keeps its setter
-// here; the 01-state barrel re-exports all of it so consumers are unchanged.
+// here; the state barrel re-exports all of it so consumers are unchanged.
 import type {
   GroupView,
   AlertRuleActionView,
@@ -225,7 +225,7 @@ export function setAlertActionsEnabled(value: boolean): void {
 
 // Whether the modal confirmation dialog is currently on screen. Folded in from
 // the former `window.__SHOWTRAK_CONFIRM_ACTIVE` side-channel: set by the toasts
-// module when the dialog opens/closes, read by 05-keyboard to suppress global
+// module when the dialog opens/closes, read by keyboard to suppress global
 // keybinds while a confirm is pending.
 export let ConfirmDialogActive = false;
 export function setConfirmDialogActive(value: boolean): void {

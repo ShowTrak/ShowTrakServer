@@ -1,12 +1,62 @@
 // MonitoringMethods registry.
 // Each method is a self-contained module that describes its UI-facing schema
 // and provides a Run() implementation. New methods are added by dropping a new
-// file into this folder and adding it to the require list below.
+// file into this folder, importing it below, and adding it to MethodModules.
+//
+// The imports are `import * as` rather than `require()` on purpose. `require()`
+// returns `any`, so annotating the array as MonitoringMethod[] checked nothing:
+// a method could rename Debug, change Run's signature or drop Settings entirely
+// and still compile, failing only when a probe ran in production. A namespace
+// import carries the module's real shape, so MethodModules now type-checks all
+// of them against the contract in ./types.
 import { CreateLogger } from '../Logger';
 import { Manager as CacheManager } from '../CacheManager';
 import { MethodInfo } from './info';
 import { MethodGroups, DEFAULT_GROUP } from './groups';
 import type { MonitoringMethod, MonitoringResult, MonitoringTargetLike } from './types';
+
+// General
+import * as ping from './ping';
+import * as tcpPort from './tcp-port';
+import * as http from './http';
+import * as httpJson from './http-json';
+import * as dns from './dns';
+// Lighting (DMX)
+import * as sacnUniverse from './sacn-universe';
+import * as sacnUniversePriority from './sacn-universe-priority';
+import * as artnetUniverse from './artnet-universe';
+// Lighting consoles — ETC Eos (OSC)
+import * as eos from './eos';
+// Lighting consoles — MA Lighting grandMA2 (Telnet remote) & grandMA3 (liveness)
+import * as ma2 from './ma2';
+import * as ma3 from './ma3';
+// Lighting consoles — Avolites Titan (WebAPI)
+import * as avolites from './avolites';
+// Lighting consoles — ChamSys MagicQ (web server)
+import * as chamsys from './chamsys';
+// Video
+import * as ndiSource from './ndi-source';
+// Sound — cue playback & audio networking
+import * as qlab5 from './qlab5';
+import * as qlab4 from './qlab4';
+import * as danteDevice from './dante-device';
+// Media Servers
+import * as watchoutStatus from './watchout-status';
+import * as resolumeStatus from './resolume-status';
+import * as disguiseStatus from './disguise-status';
+import * as milluminStatus from './millumin-status';
+// Control & Messaging
+import * as companionStatus from './companion-status';
+import * as mqttTopic from './mqtt-topic';
+// Digital Signage
+import * as brightsign from './brightsign';
+// Projectors
+import * as pjlink from './pjlink';
+import * as snmpProjector from './snmp-projector';
+// Power (UPS)
+import * as nutUps from './nut-ups';
+import * as snmpUps from './snmp-ups';
+import * as snmpUpsV3 from './snmp-ups-v3';
 
 const Logger = CreateLogger('MonitoringMethods');
 
@@ -19,47 +69,47 @@ const RUN_CACHE = CacheManager.GetBucket('MonitoringMethods:Run', {
 // the editor's grouped method picker tidy.
 const MethodModules: MonitoringMethod[] = [
   // General
-  require('./ping'),
-  require('./tcp-port'),
-  require('./http'),
-  require('./http-json'),
-  require('./dns'),
+  ping,
+  tcpPort,
+  http,
+  httpJson,
+  dns,
   // Lighting (DMX)
-  require('./sacn-universe'),
-  require('./sacn-universe-priority'),
-  require('./artnet-universe'),
+  sacnUniverse,
+  sacnUniversePriority,
+  artnetUniverse,
   // Lighting consoles — ETC Eos (OSC)
-  require('./eos'),
+  eos,
   // Lighting consoles — MA Lighting grandMA2 (Telnet remote) & grandMA3 (liveness)
-  require('./ma2'),
-  require('./ma3'),
+  ma2,
+  ma3,
   // Lighting consoles — Avolites Titan (WebAPI)
-  require('./avolites'),
+  avolites,
   // Lighting consoles — ChamSys MagicQ (web server)
-  require('./chamsys'),
+  chamsys,
   // Video
-  require('./ndi-source'),
+  ndiSource,
   // Sound — cue playback & audio networking
-  require('./qlab5'),
-  require('./qlab4'),
-  require('./dante-device'),
+  qlab5,
+  qlab4,
+  danteDevice,
   // Media Servers
-  require('./watchout-status'),
-  require('./resolume-status'),
-  require('./disguise-status'),
-  require('./millumin-status'),
+  watchoutStatus,
+  resolumeStatus,
+  disguiseStatus,
+  milluminStatus,
   // Control & Messaging
-  require('./companion-status'),
-  require('./mqtt-topic'),
+  companionStatus,
+  mqttTopic,
   // Digital Signage
-  require('./brightsign'),
+  brightsign,
   // Projectors
-  require('./pjlink'),
-  require('./snmp-projector'),
+  pjlink,
+  snmpProjector,
   // Power (UPS)
-  require('./nut-ups'),
-  require('./snmp-ups'),
-  require('./snmp-ups-v3'),
+  nutUps,
+  snmpUps,
+  snmpUpsV3,
 ];
 
 const Methods = new Map<string, MonitoringMethod>();

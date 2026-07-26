@@ -1,18 +1,18 @@
-// Group Manager modal (renderer). Extracted verbatim from 11-modals.ts.
+// Group Manager modal (renderer). Extracted verbatim from modals.ts.
 //
 // Owns the group-manager overview + per-group editor: membership resolution,
 // drag-reorder persistence, inline rename, and delete. Depends only on shared
-// renderer modules (no back-reference into 11-modals), so it carries the
-// group-manager editing state that was previously module-level in 11-modals.
+// renderer modules (no back-reference into modals), so it carries the
+// group-manager editing state that was previously module-level in modals.
 import { closeAllModals, closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
-import { Safe } from './04-utils';
-import { Notify, Wait } from './14-selection-init';
-import { DummyClients, GroupUUIDCache, MonitoringTargets, __LastClients } from './01-state';
+import { Safe } from './utils';
+import { Notify, Wait } from './selection-init';
+import { DummyClients, GroupUUIDCache, MonitoringTargets, __LastClients } from './state';
 import type { ClientView, GroupView } from '@showtrak/protocol';
 
 // Close every open modal, then wait for the CSS transition to settle. Inlined
-// from 11-modals' CloseAllModals so this module has no back-reference into it.
+// from modals' CloseAllModals so this module has no back-reference into it.
 async function CloseAllModals(): Promise<void> {
   closeAllModals();
   await Wait(300);

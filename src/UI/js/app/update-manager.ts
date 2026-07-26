@@ -1,12 +1,12 @@
-// Update Manager modal (renderer). Extracted verbatim from 11-modals.ts.
+// Update Manager modal (renderer). Extracted verbatim from modals.ts.
 //
 // Owns the remote client-update flow: release/version eligibility, selection,
 // download + deploy orchestration, and the live progress/status rendering. The
-// single former call to 11-modals' CloseAllModals is inlined here as
-// closeAllModals()+Wait so this module has no back-reference into 11-modals.
+// single former call to modals' CloseAllModals is inlined here as
+// closeAllModals()+Wait so this module has no back-reference into modals.
 import { closeAllModals, openModal } from './lib/modal';
-import { ErrorMessage, Safe } from './04-utils';
-import { Notify, ShowExecutionToast, Wait } from './14-selection-init';
+import { ErrorMessage, Safe } from './utils';
+import { Notify, ShowExecutionToast, Wait } from './selection-init';
 import {
   FormatClientVersionLabel,
   UpdateManagerClientProgress,
@@ -24,7 +24,7 @@ import {
   setUpdateManagerRunning,
   setUpdateManagerSelectedClients,
   setUpdateManagerSelectedReleaseTag,
-} from './01-state';
+} from './state';
 import type { ClientView, ScriptExecutionView } from '@showtrak/protocol';
 
 export function FindClientExecutionForUpdate(UUID: string): ScriptExecutionView | null {

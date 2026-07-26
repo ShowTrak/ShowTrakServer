@@ -8,7 +8,7 @@
 // optional and each takes its own callback — panels that need to run logic before
 // leaving (autosave, commit-in-progress edits) pass those callbacks here rather
 // than wiring their own click handlers.
-import { Safe } from '../04-utils';
+import { Safe } from '../utils';
 
 export interface ModalHeaderConfig {
   /** Visible title text. Escaped before insertion. */

@@ -1,8 +1,8 @@
-import { Safe } from './04-utils';
+import { Safe } from './utils';
 // Side-effect import kept to preserve the historical module evaluation order
 // (subscription wiring happens at import time until Phase 7 of REFACTOR_PLAN.md).
-import './11-modals';
-import { RemoveAlertToastById, showAlertStyleToast } from './14-selection-init';
+import './modals';
+import { RemoveAlertToastById, showAlertStyleToast } from './selection-init';
 // --- Alerts Manager ---
 /** A single entry in the alerts tray. */
 interface Alert {

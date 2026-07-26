@@ -1,14 +1,14 @@
-import { AlertActionsEnabled, Capabilities, CompactMode, ConfirmDialogActive } from './01-state';
-import { SetAlertActionsEnabled, SetCompactMode } from './02-mode';
-import { HandleNonFatalError } from './04-utils';
-import { ShowShortcutsModal } from './08-dnd';
-import { AlertsVisible, DismissAllAlerts, ToggleAlertsTray } from './10-alerts-tray';
+import { AlertActionsEnabled, Capabilities, CompactMode, ConfirmDialogActive } from './state';
+import { SetAlertActionsEnabled, SetCompactMode } from './mode';
+import { HandleNonFatalError } from './utils';
+import { ShowShortcutsModal } from './dnd';
+import { AlertsVisible, DismissAllAlerts, ToggleAlertsTray } from './alerts-tray';
 import {
   ClearSelection,
   GetIdentifyingUUIDs,
   SelectAll,
   StopIdentifyingForUUIDs,
-} from './14-selection-init';
+} from './selection-init';
 // Called by the bootstrap orchestrator in main.ts — never at import time.
 export function InitKeyboard() {
   document.addEventListener('keydown', function (e) {

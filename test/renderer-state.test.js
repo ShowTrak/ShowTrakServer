@@ -162,12 +162,12 @@ test('Capabilities does not let an injected isWeb:false override the web surface
 
 // --- server-caches ----------------------------------------------------------
 
-test('server-caches setters are visible through the 01-state re-export barrel', () => {
+test('server-caches setters are visible through the state/index re-export barrel', () => {
   // ESM live bindings flow through `export *`, so a setter called on the leaf
-  // module must be observable by the ~20 modules that import from './01-state'.
+  // module must be observable by the ~20 modules that import from './state/index'.
   // This is the property the barrel exists to provide.
   const Leaf = require('../dist-test/UI/js/app/state/server-caches.js');
-  const Barrel = require('../dist-test/UI/js/app/01-state.js');
+  const Barrel = require('../dist-test/UI/js/app/state/index.js');
 
   const Clients = [{ UUID: 'a' }];
   Leaf.setAllClients(Clients);

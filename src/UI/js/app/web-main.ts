@@ -10,7 +10,7 @@
 // capabilities MUST be in place first.
 import { createWebApi } from './web-api-shim';
 import type { WebUiSocket } from './web-api-shim';
-import type { CapabilityProfile } from './01-state';
+import type { CapabilityProfile } from './state';
 
 // Socket.IO connect options actually passed below (the client is a vendored
 // browser global with no bundled types).
@@ -203,7 +203,7 @@ async function startApp(config: WebConfig) {
   window.__SHOWTRAK_CAPS__ = buildCapabilities(config);
   window.API = createWebApi(socket);
   try {
-    const { setSettings } = await import('./01-state');
+    const { setSettings } = await import('./state');
     const initialSettings = await window.API.GetSettings();
     if (Array.isArray(initialSettings)) {
       setSettings(initialSettings);

@@ -24,11 +24,19 @@ module.exports = {
     // with `^/` so we don't accidentally match paths inside node_modules.
     ignore: [
       // Source & build inputs — assets are served from dist/ (see
-      // src/Modules/Server/index.ts resolving __dirname/../../WebUI); shared/
-      // is TypeScript types only; the app icon is read from disk at package
-      // time, not from the asar.
+      // src/Modules/Server/index.ts resolving __dirname/../../WebUI); the app
+      // icon is read from disk at package time, not from the asar.
       /^\/src($|\/)/,
-      /^\/shared($|\/)/,
+      // shared/ is the @showtrak/protocol submodule. It is NOT types-only any
+      // more: node_modules/@showtrak/protocol is a `file:` symlink to this
+      // directory, and asar records it as a link rather than dereferencing it,
+      // so the target has to exist inside the package or every
+      // `require('@showtrak/protocol/runtime')` throws at boot.
+      //
+      // Ship exactly what Node needs to resolve that subpath — package.json for
+      // the exports map, and the compiled dist/ — and keep excluding the .d.ts
+      // sources, tsconfigs and the submodule's own node_modules.
+      /^\/shared\/(?!dist(\/|$)|package\.json$)/,
       /^\/scripts($|\/)/,
       /^\/build($|\/)/,
       // Tests & coverage reports. dist-test/ is the test-only per-file compile

@@ -1,11 +1,11 @@
 import type { DummyClientView } from '@showtrak/protocol';
 import { openModal } from './lib/modal';
 import { OfflineBadgeContent } from './lib/status-badges';
-import { AppMode, DummyClientEditorUUID, setDummyClientEditorUUID } from './01-state';
-import { ErrorMessage, Safe } from './04-utils';
-import { FormatInterval } from './07-monitoring';
-import { CloseAllModals } from './11-modals';
-import { ConfirmationDialog, Notify } from './14-selection-init';
+import { AppMode, DummyClientEditorUUID, setDummyClientEditorUUID } from './state';
+import { ErrorMessage, Safe } from './utils';
+import { FormatInterval } from './monitoring';
+import { CloseAllModals } from './modals';
+import { ConfirmationDialog, Notify } from './selection-init';
 // Dummy Clients (renderer)
 // Renders virtual heartbeat-driven dummy clients inline within their group's
 // drop zone alongside real clients and monitoring targets, and provides the

@@ -15,7 +15,7 @@
 //     NOT exit: for a show-control server, staying up and degraded beats dying
 //     mid-show. Genuine bugs are still visible in the logs at error level.
 import { CreateLogger } from '../Modules/Logger';
-import { IsTransientNetworkError, DescribeError } from '../Modules/NetworkErrors';
+import { IsTransientNetworkError, DescribeError } from '@showtrak/protocol/runtime';
 
 const Logger = CreateLogger('ProcessGuard');
 

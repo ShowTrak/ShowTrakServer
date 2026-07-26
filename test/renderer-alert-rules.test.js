@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-// Exercises the pure trigger/summary layer of src/UI/js/app/13-alert-rules.ts.
+// Exercises the pure trigger/summary layer of src/UI/js/app/alert-rules.ts.
 //
 // An alert rule is "when THESE machines do THIS, do THAT". The summary line is
 // how an operator confirms, at a glance and often minutes before a show, that a
@@ -14,7 +14,7 @@ const path = require('node:path');
 // made to fire on an arbitrary string, and a stale rule referencing a removed
 // trigger degrades to "no triggers" instead of matching everything.
 //
-// 03-settings.ts constructs Howl instances at module scope (a vendor global),
+// settings.ts constructs Howl instances at module scope (a vendor global),
 // which this module transitively imports -- hence the stub before requiring.
 
 global.Howl = function Howl() {
@@ -23,8 +23,8 @@ global.Howl = function Howl() {
 
 const APP = path.join(__dirname, '..', 'dist-test', 'UI', 'js', 'app');
 
-const AlertRules = require(path.join(APP, '13-alert-rules.js'));
-const State = require(path.join(APP, '01-state.js'));
+const AlertRules = require(path.join(APP, 'alert-rules.js'));
+const State = require(path.join(APP, 'state/index.js'));
 
 const {
   NormalizeAlertTriggerTypes,

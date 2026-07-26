@@ -82,9 +82,9 @@ function installDocument() {
 /**
  * Install the `Howl` vendor global.
  *
- * 03-settings.ts constructs Howl instances at MODULE SCOPE, so any module that
+ * settings.ts constructs Howl instances at MODULE SCOPE, so any module that
  * transitively imports it fails to load without this — which is four of them
- * (13-alert-rules, 09-osc-feeds, 17-audio-assets, wire-context-menu).
+ * (alert-rules, osc-feeds, audio-assets, wire-context-menu).
  */
 function installHowl() {
   global.Howl = function Howl() {

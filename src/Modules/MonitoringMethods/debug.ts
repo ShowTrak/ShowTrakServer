@@ -70,7 +70,7 @@ export interface CardOptions {
 // body content beneath. Fail/error states are conveyed by the badge colour, not by
 // tinting the whole card; only a positive match gets the subtle Highlight tint. This
 // keeps every method's debug panel consistent with the app's borderless, background-
-// shade theme (see .monitoring-debug-card in 05-monitoring.css).
+// shade theme (see .monitoring-debug-card in monitoring.css).
 export function Card(Options: CardOptions): string {
   const Cls = 'monitoring-debug-card' + (Options.Highlight ? ' monitoring-debug-card--match' : '');
   const TitleCls =

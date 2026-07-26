@@ -17,7 +17,7 @@ import {
   setScriptList,
   set__LastClients,
   set__LastGroups,
-} from './01-state';
+} from './state';
 import { OfflineBadgeContent, UnassignedBadgeContent } from './lib/status-badges';
 import {
   BuildGroupRenderOrder,
@@ -34,19 +34,19 @@ import {
   TruncateGroupLabel,
 } from './lib/client-list-layout';
 import type { ClientView, ScriptExecutionView } from '@showtrak/protocol';
-import { HandleNonFatalError, Safe } from './04-utils';
-import { RenderMonitoringTargetTile } from './07-monitoring';
-import { initializeEditInteractions } from './08-dnd';
-import { AddAlert, DismissAlert, PendingAdoptionAlerts } from './10-alerts-tray';
-import { CloseAllModals, UpdateManagerHandleExecutions } from './11-modals';
+import { HandleNonFatalError, Safe } from './utils';
+import { RenderMonitoringTargetTile } from './monitoring';
+import { initializeEditInteractions } from './dnd';
+import { AddAlert, DismissAlert, PendingAdoptionAlerts } from './alerts-tray';
+import { CloseAllModals, UpdateManagerHandleExecutions } from './modals';
 import {
   ConfirmationDialog,
   HideExecutionToast,
   RenderClientInfoDetails,
   ShowExecutionToast,
   UpdateIdentifyStatusBanner,
-} from './14-selection-init';
-import { RenderDummyClientTile } from './16-dummy-clients';
+} from './selection-init';
+import { RenderDummyClientTile } from './dummy-clients';
 
 // Deployment-toast working state. This mirrors the runtime shape used below and
 // cached on `window.__ShowTrakDeploymentUiState`; note the ambient window decl
@@ -634,103 +634,83 @@ export function RenderClientTile(Client: ClientView): string {
 }
 
 // Patch an already-rendered client tile in place from a live ClientUpdated
-// payload (called by the 09-osc-feeds subscription). Counterpart to
+// payload (called by the osc-feeds subscription). Counterpart to
 // UpdateMonitoringTargetTile / UpdateDummyClientTile.
+//
+// Everything below is resolved through `$tile` rather than a repeated
+// `[data-uuid='…']` lookup, which fixes two things at once:
+//
+//   Correctness — `[data-uuid='X']` is not tile-scoped. A client UUID also
+//   appears on the Update Manager's row and its checkbox, so the class toggles
+//   below used to land on those too. (Nothing is lost by scoping: the same
+//   ClientUpdated handler re-renders that list from its own state when the
+//   modal is open, which is the authoritative path.)
+//
+//   Cost — attribute selectors take jQuery's slow path, so each one was a
+//   document-wide querySelectorAll. This ran ~29 of them per tile per update,
+//   on every client's heartbeat. The id lookup is a single getElementById and
+//   every child query is scoped to that subtree.
 export function UpdateClientTile(Data: ClientView): void {
   const { UUID, Nickname, Hostname, IP, Online, Vitals } = Data;
+
+  const $tile = $(`#CLIENT_TILE_${UUID}`);
+  // No tile rendered for this client (filtered out, or a push that arrived
+  // mid-rebuild). Every operation below would have been a no-op anyway.
+  if (!$tile.length) return;
+
   const Degraded = !!Data.Degraded;
   const DegradedWarning =
     Array.isArray(Data.DegradedWarnings) && Data.DegradedWarnings.length
       ? String(Data.DegradedWarnings[0])
       : 'Missing USB Device';
 
-  $(`[data-uuid='${UUID}']`).toggleClass('ONLINE', Online && !Degraded);
-  $(`[data-uuid='${UUID}']`).toggleClass('DEGRADED', Degraded);
-  $(`[data-uuid='${UUID}']`).toggleClass('IDLE', !!Data.Unassigned && !Online && !Degraded);
-  $(`[data-uuid='${UUID}']`).toggleClass('IDENTIFYING', !!Data.Identifying);
-  $(`[data-uuid='${UUID}']>[data-type='INDICATOR_DEGRADED']>[data-type='DEGRADED_WARNING']`).text(
-    DegradedWarning
-  );
+  const $IndicatorOnline = $tile.children('.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]');
+  const $IndicatorOffline = $tile.children('.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]');
+  const $IndicatorDegraded = $tile.children('.SHOWTRAK_PC_STATUS[data-type="INDICATOR_DEGRADED"]');
 
+  $tile
+    .toggleClass('ONLINE', Online && !Degraded)
+    .toggleClass('DEGRADED', Degraded)
+    .toggleClass('IDLE', !!Data.Unassigned && !Online && !Degraded)
+    .toggleClass('IDENTIFYING', !!Data.Identifying);
+
+  $IndicatorDegraded.children('[data-type="DEGRADED_WARNING"]').text(DegradedWarning);
+
+  const $Hostname = $tile.children('[data-type="Hostname"]');
   const ComputedHostname = FormatClientHostnameVersionLabel(Data);
-  if ($(`[data-uuid='${UUID}']>[data-type="Hostname"]`).text() !== ComputedHostname) {
-    $(`[data-uuid='${UUID}']>[data-type="Hostname"]`).text(ComputedHostname);
-  }
+  if ($Hostname.text() !== ComputedHostname) $Hostname.text(ComputedHostname);
 
+  const $Nickname = $tile.children('[data-type="Nickname"]');
   const ComputedNickname = (Nickname && Nickname.length ? Nickname : Hostname) || '';
-  if ($(`[data-uuid='${UUID}']>[data-type="Nickname"]`).text() !== ComputedNickname) {
-    $(`[data-uuid='${UUID}']>[data-type="Nickname"]`).text(ComputedNickname);
-  }
+  if ($Nickname.text() !== ComputedNickname) $Nickname.text(ComputedNickname);
 
+  const $IP = $tile.children('[data-type="IP"]');
   const ComputedIP = IP ? IP : 'Unknown IP';
-  if ($(`[data-uuid='${UUID}']>[data-type="IP"]`).text() !== ComputedIP) {
-    $(`[data-uuid='${UUID}']>[data-type="IP"]`).text(ComputedIP);
-  }
+  if ($IP.text() !== ComputedIP) $IP.text(ComputedIP);
 
-  const CompactOnlineStatus = $(`[data-uuid='${UUID}']>[data-type="COMPACT_ONLINE_STATUS"]`);
+  const CompactOnlineStatus = $tile.children('[data-type="COMPACT_ONLINE_STATUS"]');
   if (CompactOnlineStatus.length) {
     CompactOnlineStatus.text(GetClientCompactStatusLabel(Data));
     CompactOnlineStatus.removeClass('d-none');
   }
 
   if (Online && Vitals) {
-    $(`[data-uuid='${UUID}']>div>.progress>[data-type="CPU"]`).css(
-      'width',
-      `${Vitals.CPU.UsagePercentage}%`
-    );
-    $(`[data-uuid='${UUID}']>div>.progress>[data-type="RAM"]`).css(
-      'width',
-      `${Vitals.Ram.UsagePercentage}%`
-    );
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]`).addClass(
-      'd-none'
-    );
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]`).removeClass(
-      'd-grid'
-    );
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).addClass('d-grid');
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).removeClass(
-      'd-none'
-    );
+    const $Progress = $tile.children('div').children('.progress');
+    $Progress.children('[data-type="CPU"]').css('width', `${Vitals.CPU.UsagePercentage}%`);
+    $Progress.children('[data-type="RAM"]').css('width', `${Vitals.Ram.UsagePercentage}%`);
 
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_DEGRADED"]`).toggleClass(
-      'd-grid',
-      Degraded
-    );
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_DEGRADED"]`).toggleClass(
-      'd-none',
-      !Degraded
-    );
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).toggleClass(
-      'd-none',
-      Degraded
-    );
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).toggleClass(
-      'd-grid',
-      !Degraded
-    );
+    $IndicatorOffline.addClass('d-none').removeClass('d-grid');
+    $IndicatorDegraded.toggleClass('d-grid', Degraded).toggleClass('d-none', !Degraded);
+    $IndicatorOnline.toggleClass('d-none', Degraded).toggleClass('d-grid', !Degraded);
   } else {
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]`).addClass(
-      'd-grid'
-    );
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]`).removeClass(
-      'd-none'
-    );
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).addClass('d-none');
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]`).removeClass(
-      'd-grid'
-    );
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_DEGRADED"]`).addClass(
-      'd-none'
-    );
-    $(`[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_DEGRADED"]`).removeClass(
-      'd-grid'
-    );
+    $IndicatorOffline.addClass('d-grid').removeClass('d-none');
+    $IndicatorOnline.addClass('d-none').removeClass('d-grid');
+    $IndicatorDegraded.addClass('d-none').removeClass('d-grid');
   }
 
-  $(
-    `[data-uuid='${UUID}']>.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]>[data-type="OFFLINE_SINCE"]`
-  ).attr('data-offlinesince', Data.LastSeen ?? '');
+  $IndicatorOffline
+    .children('[data-type="OFFLINE_SINCE"]')
+    .attr('data-offlinesince', Data.LastSeen ?? '');
 }
 
 export function RenderFullClientAndMonitorList() {

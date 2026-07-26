@@ -479,7 +479,7 @@ function getClientApplicationHistorySamples(
 // Serial-less critical USB devices are guarded by name + quantity rather than a
 // serial number, so their history is keyed by NameKey. This prefix keeps those
 // synthetic keys from colliding with real serials in the shared USB store; the
-// renderer (07-monitoring.ts) builds the same key to join the samples back in.
+// renderer (monitoring.ts) builds the same key to join the samples back in.
 const CRITICAL_USB_NAME_HISTORY_PREFIX = 'usbname:';
 
 // Resolve the current connected/disconnected state for every critical USB

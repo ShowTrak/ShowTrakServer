@@ -1,6 +1,6 @@
 // Pure rules for creating unassigned (reserved) client slots.
 //
-// Extracted from 17-unassigned-clients.ts, which was otherwise entirely DOM
+// Extracted from unassigned-clients.ts, which was otherwise entirely DOM
 // and event wiring.
 //
 // An unassigned client is a placeholder row standing in for hardware that has

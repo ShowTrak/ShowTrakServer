@@ -10,27 +10,27 @@
 // Hard invariant: Init() (init.ts) calls window.API.Loaded() to request the
 // initial state push, so it MUST stay last — every push subscription above it
 // has to be registered first or that state is silently dropped.
-import './00-animations';
-import './01-state';
-import { InitMode } from './02-mode';
-import { InitSettings } from './03-settings';
-import './04-utils';
-import { InitKeyboard } from './05-keyboard';
-import { InitClientList } from './06-client-list';
-import './07-monitoring';
-import { InitDnd } from './08-dnd';
-import { InitOscFeeds } from './09-osc-feeds';
-import { InitAlertsTray } from './10-alerts-tray';
-import { InitModals } from './11-modals';
-import './12-monitoring-editor';
-import './13-alert-rules';
-import './14-selection-init';
-import { InitScriptManager } from './15-script-manager';
-import './16-dummy-clients';
-import { InitAudioAssets } from './17-audio-assets';
-import { InitIconPicker } from './18-icon-picker';
-import { InitTagManager } from './19-tag-manager';
-import { InitFog } from './20-fog';
+import './animations';
+import './state';
+import { InitMode } from './mode';
+import { InitSettings } from './settings';
+import './utils';
+import { InitKeyboard } from './keyboard';
+import { InitClientList } from './client-list';
+import './monitoring';
+import { InitDnd } from './dnd';
+import { InitOscFeeds } from './osc-feeds';
+import { InitAlertsTray } from './alerts-tray';
+import { InitModals } from './modals';
+import './monitoring-editor';
+import './alert-rules';
+import './selection-init';
+import { InitScriptManager } from './script-manager';
+import './dummy-clients';
+import { InitAudioAssets } from './audio-assets';
+import { InitIconPicker } from './icon-picker';
+import { InitTagManager } from './tag-manager';
+import { InitFog } from './fog';
 import { InitOfflineIndicators } from './offline-indicators';
 import { Init, WireGlobalUI } from './init';
 

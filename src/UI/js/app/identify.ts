@@ -1,10 +1,10 @@
 // Client "identify" flow (renderer): version gating, target eligibility, the
 // set of currently-identifying UUIDs, local state application, bulk stop, and
-// the status banner. Extracted verbatim from the old 14-selection-init
+// the status banner. Extracted verbatim from the old selection-init
 // god-module so that file can become a pure re-export barrel.
-import { AllClients, IsIntegratedClientEntity, PendingAdoption } from './01-state';
-import { HandleNonFatalError } from './04-utils';
-import { RenderFullClientAndMonitorList } from './06-client-list';
+import { AllClients, IsIntegratedClientEntity, PendingAdoption } from './state';
+import { HandleNonFatalError } from './utils';
+import { RenderFullClientAndMonitorList } from './client-list';
 import { Notify } from './lib/toasts';
 
 export const MINIMUM_IDENTIFY_VERSION = [3, 7, 0];

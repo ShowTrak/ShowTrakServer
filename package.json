@@ -13,7 +13,7 @@
     "build:css": "node scripts/build-css.js",
     "build:webui": "node scripts/build-webui.js",
     "copy:assets": "node scripts/copy-assets.js",
-    "build": "npm run clean && npm run build:ts && npm run typecheck:renderer && npm run build:renderer && npm run build:css && npm run copy:assets && npm run build:webui",
+    "build": "npm run clean && npm run build:shared && npm run build:ts && npm run typecheck:renderer && npm run build:renderer && npm run build:css && npm run copy:assets && npm run build:webui",
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck:renderer",
     "start": "nodemon --watch src --watch shared --watch scripts --ignore \"src/UI/css/main.css\" --ext ts,js,mjs,cjs,json,css,html,svg,png,ico --exec \"npm run build && electron-forge start\"",
     "premake": "npm run build",
@@ -27,7 +27,8 @@
     "pretest:coverage": "npm run build && npm run build:test-renderer",
     "test:coverage": "c8 --all --include=dist/Modules/**/*.js --include=dist/main/**/*.js --include=dist-test/UI/js/app/**/*.js --reporter=text --reporter=text-summary --reporter=lcov node --test --test-concurrency=1",
     "prepare": "husky",
-    "postinstall": "node scripts/copy-bootstrap-icons.js"
+    "postinstall": "npm run build:shared && node scripts/copy-bootstrap-icons.js",
+    "build:shared": "tsc -p shared/tsconfig.build.json"
   },
   "keywords": [
     "electron",
@@ -105,6 +106,7 @@
     "typescript-eslint": "^8.65.0"
   },
   "dependencies": {
+    "@showtrak/protocol": "file:./shared",
     "bonjour-service": "^1.4.3",
     "electron-squirrel-startup": "^1.0.1",
     "electron-updater": "^6.8.9",

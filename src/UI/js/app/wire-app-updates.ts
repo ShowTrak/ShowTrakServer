@@ -7,8 +7,8 @@
 // notes arrive as either HTML (run through the allowlist sanitizer) or Markdown
 // (rendered via the shared safe renderer).
 import type { AppUpdateStatus } from '@showtrak/protocol';
-import { HandleNonFatalError } from './04-utils';
-import { CloseAllModals } from './11-modals';
+import { HandleNonFatalError } from './utils';
+import { CloseAllModals } from './modals';
 import { openModal } from './lib/modal';
 import { renderMarkdownSafe, sanitizeUpdateNotesHtml } from './lib/markdown';
 

@@ -2,7 +2,7 @@
 // treatment of each can be eyeballed side by side. Wired to the
 // Settings > Debug > "Test Notifications" item, which is revealed only on
 // uncompiled builds (app.isPackaged === false; see init.ts).
-import { AddAlert } from '../10-alerts-tray';
+import { AddAlert } from '../alerts-tray';
 import { Notify, showAlertStyleToast } from './toasts';
 
 const SEVERITIES = ['info', 'success', 'warning', 'error'] as const;

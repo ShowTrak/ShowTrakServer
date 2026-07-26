@@ -1,1 +1,22 @@
+# Pre-commit gate: the fast half of CI.
+#
+# CI enforces lint + format:check + typecheck + test. This hook used to run lint
+# alone, which meant the two most common CI failures — a stray formatting diff
+# and a type error — were only discovered after pushing.
+#
+# Tests are deliberately NOT here: the suite rebuilds first and takes ~30s,
+# which is too slow to sit in front of every commit. CI remains the gate for
+# those. Everything below runs in roughly 8s combined.
+#
+# Ordered cheapest-signal-first so an obvious break fails fast.
+
+set -e
+
+echo "[pre-commit] lint"
 npx eslint .
+
+echo "[pre-commit] format"
+npm run format:check
+
+echo "[pre-commit] typecheck"
+npm run typecheck

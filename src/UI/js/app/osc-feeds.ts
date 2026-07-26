@@ -11,30 +11,30 @@ import {
   setAlertRulesCache,
   setDummyClients,
   setMonitoringTargets,
-} from './01-state';
-import { HandleNonFatalError, Safe } from './04-utils';
-import { RenderFullClientAndMonitorList, UpdateClientTile } from './06-client-list';
+} from './state';
+import { HandleNonFatalError, Safe } from './utils';
+import { RenderFullClientAndMonitorList, UpdateClientTile } from './client-list';
 import {
   IsMonitorHistoryContextFor,
   LoadHistorySamplesForContext,
   RenderMonitoringHistoryModal,
   UpdateMonitoringTargetTile,
-} from './07-monitoring';
+} from './monitoring';
 import {
   AddAlert,
   Alerts,
   AlertsVisible,
   RenderAlerts,
   UpdateAlertsIndicator,
-} from './10-alerts-tray';
-import { CloseAllModals, RenderUpdateManagerClientList } from './11-modals';
+} from './alerts-tray';
+import { CloseAllModals, RenderUpdateManagerClientList } from './modals';
 import {
   RefreshMonitoringCheckDebugIfOpen,
   RefreshMonitoringEditorIfOpen,
-} from './12-monitoring-editor';
-import { RenderAlertRuleManagerList } from './13-alert-rules';
-import { Notify, RenderClientInfoDetails, UpdateIdentifyStatusBanner } from './14-selection-init';
-import { UpdateDummyClientTile } from './16-dummy-clients';
+} from './monitoring-editor';
+import { RenderAlertRuleManagerList } from './alert-rules';
+import { Notify, RenderClientInfoDetails, UpdateIdentifyStatusBanner } from './selection-init';
+import { UpdateDummyClientTile } from './dummy-clients';
 
 /** One line rendered in the OSC/HTTP debug terminal. */
 interface OscHttpDebugEntry {

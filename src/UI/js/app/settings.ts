@@ -7,7 +7,7 @@ import {
   SettingsGroups,
   setSettings,
   setSettingsGroups,
-} from './01-state';
+} from './state';
 import {
   InitMobileView,
   LoadCompactModePreference,
@@ -15,9 +15,9 @@ import {
   RenderMode,
   SetAlertActionsEnabled,
   SetCompactMode,
-} from './02-mode';
-import { GetAlertVolume, HandleNonFatalError, Safe, ShowQRModal } from './04-utils';
-import { Notify } from './14-selection-init';
+} from './mode';
+import { GetAlertVolume, HandleNonFatalError, Safe, ShowQRModal } from './utils';
+import { Notify } from './selection-init';
 // Wires the mode/compact/alert-action buttons and fetches initial settings +
 // mode state. Formerly a DOMContentLoaded handler; InitSettings() calls it
 // directly (fire-and-forget) once the bootstrap orchestrator runs — the DOM is
@@ -149,7 +149,7 @@ function InitSettingsPush() {
     // Re-render after settings arrive so layout-dependent controls like the group
     // column count pick up UI_GROUP_COLUMN_COUNT on the browser surface.
     try {
-      const { RenderFullClientAndMonitorList } = await import('./06-client-list');
+      const { RenderFullClientAndMonitorList } = await import('./client-list');
       RenderFullClientAndMonitorList();
     } catch (err) {
       HandleNonFatalError('Settings:RefreshAfterUpdate', err);
@@ -159,7 +159,7 @@ function InitSettingsPush() {
     // because that module reads back through GetSettingValue below, and a static
     // import either way would make the two modules circular.
     try {
-      const { RefreshUnassignedClientMenuVisibility } = await import('./17-unassigned-clients');
+      const { RefreshUnassignedClientMenuVisibility } = await import('./unassigned-clients');
       await RefreshUnassignedClientMenuVisibility();
     } catch (err) {
       HandleNonFatalError('Settings:RefreshUnassignedClientMenu', err);

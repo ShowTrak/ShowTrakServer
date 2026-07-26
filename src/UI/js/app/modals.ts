@@ -1,11 +1,11 @@
 import { closeAllModals, closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
-import { Config, PendingAdoption, ScriptList, CompactMode } from './01-state';
-import { SetCompactMode } from './02-mode';
+import { Config, PendingAdoption, ScriptList, CompactMode } from './state';
+import { SetCompactMode } from './mode';
 import { OpenClientInfo } from './client-info-modal';
-import { OpenMonitoringTargetHistory, OpenDummyClientHistory } from './07-monitoring';
+import { OpenMonitoringTargetHistory, OpenDummyClientHistory } from './monitoring';
 import { IsIntegratedClientEntity } from './state/client-labels';
-import { Safe } from './04-utils';
+import { Safe } from './utils';
 
 // Minimum launch delay (seconds); mirrors MIN_LAUNCH_DELAY_SECONDS enforced by
 // the server-side ClientUpdatePayload validator.
@@ -16,14 +16,14 @@ import {
   Notify,
   ShowExecutionToast,
   Wait,
-} from './14-selection-init';
-import { IsFogAvailable, OpenFogTaskModal } from './20-fog';
+} from './selection-init';
+import { IsFogAvailable, OpenFogTaskModal } from './fog';
 import type { ClientView } from '@showtrak/protocol';
 
 // The former Update Manager and Group Manager god-sections now live in their own
-// modules; re-export them so existing `./11-modals` importers keep working.
-export * from './11-group-manager';
-export * from './11-update-manager';
+// modules; re-export them so existing `./modals` importers keep working.
+export * from './group-manager';
+export * from './update-manager';
 
 export async function ExecuteScript(
   Script: string | null,

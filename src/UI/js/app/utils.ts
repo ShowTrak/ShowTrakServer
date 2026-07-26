@@ -1,6 +1,6 @@
 import { QrToSvg } from './lib/qr-svg';
 import { openModal } from './lib/modal';
-import { Settings } from './01-state';
+import { Settings } from './state';
 
 // Master alert volume as a 0..1 multiplier, read live from the current settings
 // snapshot (ALERT_SOUND_VOLUME — a 0-100 slider). Defaults to full volume when

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-// Exercises the pure status/derivation layer of src/UI/js/app/07-monitoring.ts.
+// Exercises the pure status/derivation layer of src/UI/js/app/monitoring.ts.
 //
 // This is what the operator reads to decide whether a UPS, a projector or a
 // QLab machine is healthy. The failure that matters is not a crash but a
@@ -21,7 +21,7 @@ const path = require('node:path');
 //
 // The module loads with no DOM (jQuery is only touched inside render functions).
 
-const MODULE_PATH = path.join(__dirname, '..', 'dist-test', 'UI', 'js', 'app', '07-monitoring.js');
+const MODULE_PATH = path.join(__dirname, '..', 'dist-test', 'UI', 'js', 'app', 'monitoring.js');
 
 const Monitoring = require(MODULE_PATH);
 const {

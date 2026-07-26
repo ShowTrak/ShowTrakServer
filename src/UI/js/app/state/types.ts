@@ -1,7 +1,7 @@
 // Local UI working-state shapes (transient editor/modal state that never crosses
 // the wire, so they live here rather than in the shared protocol package).
-// Extracted from the old monolithic 01-state.ts when it was partitioned into
-// this state/ folder; re-exported through the 01-state barrel unchanged.
+// Extracted from the old monolithic state.ts when it was partitioned into
+// this state/ folder; re-exported through the state barrel unchanged.
 import type { HistorySample } from '@showtrak/protocol';
 
 /** One check row inside the monitoring-target editor draft. */

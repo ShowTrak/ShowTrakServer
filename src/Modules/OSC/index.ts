@@ -8,7 +8,7 @@ import { Manager as GroupManager } from '../GroupManager';
 import { Manager as TagManager } from '../TagManager';
 import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
 import { ControlService } from '../ControlService';
-import { IsTransientNetworkError, DescribeError } from '../NetworkErrors';
+import { IsTransientNetworkError, DescribeError } from '@showtrak/protocol/runtime';
 
 const Logger = CreateLogger('OSC');
 

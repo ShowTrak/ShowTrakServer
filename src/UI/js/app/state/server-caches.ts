@@ -3,7 +3,7 @@
 // partial re-render. These mirror backend truth — distinct from the transient
 // UI/editor drafts in ./ui-drafts. Each `export let` keeps its setter here
 // (a setter can only reassign a binding declared in its own module); the
-// 01-state barrel re-exports all of it so consumers are unchanged.
+// state barrel re-exports all of it so consumers are unchanged.
 import type {
   AppConfig,
   ClientView,
@@ -113,6 +113,6 @@ export function set__LastGroups(value: GroupView[]): void {
 
 // Per-client online/offline snapshot used by the OSC feed bridge to detect
 // transitions. Folded in from the former `window.__CLIENT_ONLINE_STATE`
-// side-channel (single consumer: 09-osc-feeds) so it lives with the other
+// side-channel (single consumer: osc-feeds) so it lives with the other
 // authoritative caches instead of on `window`.
 export const ClientOnlineState = new Map<string, boolean>();

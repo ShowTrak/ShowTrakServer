@@ -8,6 +8,16 @@
     "types": ["node"],
     "paths": {
       "@showtrak/protocol": ["./shared/src/index.d.ts"],
+      // The runtime entry point is real emitted JavaScript, so it resolves to
+      // the BUILT declarations rather than to source. Pointing it at
+      // shared/src/runtime instead would drag those .ts files into this program,
+      // where they sit outside rootDir and fail to compile (TS6059) — and would
+      // typecheck against source while Node loads dist. An exact key outranks
+      // the wildcard below, which still covers the ambient .d.ts protocol types.
+      //
+      // This requires `npm run build:shared` to have run; it is the first step
+      // of `build` and also runs on postinstall.
+      "@showtrak/protocol/runtime": ["./shared/dist/runtime/index.d.ts"],
       "@showtrak/protocol/*": ["./shared/src/*"]
     }
   },

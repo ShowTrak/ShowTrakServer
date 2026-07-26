@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 // Exercises the two rule sets extracted from the last renderer modules that
-// were still at 0%: 19-tag-manager.ts and 17-unassigned-clients.ts. Both were
+// were still at 0%: tag-manager.ts and unassigned-clients.ts. Both were
 // otherwise entirely DOM and event wiring, with their decisions buried inside.
 //
 //   - lib/tag-summary.ts is the one line that tells an operator what a tag

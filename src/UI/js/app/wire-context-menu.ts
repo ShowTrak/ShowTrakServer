@@ -5,10 +5,10 @@
 // tap-to-confirm arming, and the outside-click / Escape close paths. init.ts
 // calls wireContextMenu() from WireGlobalUI in place of the old inline block.
 import type { ClientView } from '@showtrak/protocol';
-import { AllClients, ScriptList, Selected, setScriptList } from './01-state';
-import { GetSettingValue } from './03-settings';
-import { HandleNonFatalError, Safe } from './04-utils';
-import { ExecuteScript, TriggerIntegratedEvent } from './11-modals';
+import { AllClients, ScriptList, Selected, setScriptList } from './state';
+import { GetSettingValue } from './settings';
+import { HandleNonFatalError, Safe } from './utils';
+import { ExecuteScript, TriggerIntegratedEvent } from './modals';
 import {
   ApplyIdentifyStateLocally,
   ConfirmationDialog,
@@ -16,7 +16,7 @@ import {
   Notify,
   ShowExecutionToast,
   StopIdentifyingForUUIDs,
-} from './14-selection-init';
+} from './selection-init';
 import { ClearSelection, Select, SelectAll } from './selection';
 import { ResolveScriptTargets } from './lib/script-targeting';
 
@@ -34,7 +34,7 @@ interface ContextMenuOption {
 }
 
 // True when the UI is in the compact mobile layout (see InitMobileView in
-// 02-mode.ts, which toggles `body.mobile-view`). Used to switch the context
+// mode.ts, which toggles `body.mobile-view`). Used to switch the context
 // menu into its full-width, tap-to-confirm behaviour.
 function IsMobileContextMenu(): boolean {
   return document.body.classList.contains('mobile-view');
@@ -499,7 +499,7 @@ export function wireContextMenu() {
     const menuHeight = Math.min($menu.outerHeight() || 0, maxMenuHeight);
 
     // Resolve the anchor point. A real mouse contextmenu carries clientX/clientY.
-    // Synthetic triggers (keyboard shortcuts in 05-keyboard.ts, long-press on
+    // Synthetic triggers (keyboard shortcuts in keyboard.ts, long-press on
     // touch) may only set pageX/pageY, so fall back to those (converting page ->
     // client for our position:fixed menu) and finally to the viewport centre.
     const scrollX = window.scrollX || window.pageXOffset || 0;

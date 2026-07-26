@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-// Exercises src/UI/js/app/16-dummy-clients.ts and 10-alerts-tray.ts.
+// Exercises src/UI/js/app/dummy-clients.ts and alerts-tray.ts.
 //
 // Dummy clients are stand-ins for gear that cannot run the ShowTrak client but
 // still heartbeats (media servers, bespoke show control). Their status text is
@@ -55,8 +55,8 @@ global.document = {
 };
 global.CSS = { escape: (V) => String(V) };
 
-const Dummy = require(path.join(APP, '16-dummy-clients.js'));
-const Tray = require(path.join(APP, '10-alerts-tray.js'));
+const Dummy = require(path.join(APP, 'dummy-clients.js'));
+const Tray = require(path.join(APP, 'alerts-tray.js'));
 
 const { DummyCompactStatus, DummyDisplayIP, RenderDummyClientTile } = Dummy;
 const { AddAlert, DismissAlert, DismissAllAlerts, UndismissedCount, iconForAlert, timeAgo } = Tray;

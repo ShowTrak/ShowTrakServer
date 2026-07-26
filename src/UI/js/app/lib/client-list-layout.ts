@@ -1,9 +1,9 @@
 // Pure layout and status decisions for the client list.
 //
-// Extracted from 06-client-list.ts so the rules that decide what the operator
+// Extracted from client-list.ts so the rules that decide what the operator
 // sees can be tested without a DOM. Everything here takes plain data and
 // returns plain data — no jQuery, no `document`, no module state. The rendering
-// functions in 06-client-list.ts keep the HTML; these keep the decisions.
+// functions in client-list.ts keep the HTML; these keep the decisions.
 //
 // The point is not coverage for its own sake. These are the rules that decide
 // what colour a tile is mid-show, which clients a group-title click selects,

@@ -1,13 +1,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const path = require('node:path');
 
 const {
   IsTransientNetworkError,
   DescribeError,
   CreateBonjourErrorHandler,
   TRANSIENT_NETWORK_ERROR_CODES,
-} = require(path.join(__dirname, '..', 'dist', 'Modules', 'NetworkErrors', 'index.js'));
+  // Resolved through the package rather than a dist/ path: the classifier moved
+  // into the shared submodule (@showtrak/protocol/runtime), which both apps depend
+  // on via `file:./shared`. Requiring it by name is also what proves the symlink
+  // and the exports map actually work from a test process.
+} = require('@showtrak/protocol/runtime');
 
 test('classifies the reported mDNS interface-loss error as transient', () => {
   const Err = Object.assign(new Error('send EADDRNOTAVAIL 224.0.0.251:5353'), {
