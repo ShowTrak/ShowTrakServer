@@ -27,6 +27,7 @@ import { Manager as GroupManager } from '../GroupManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as AlertsManager } from '../AlertsManager';
+import { Manager as TagManager } from '../TagManager';
 import { Manager as SettingsManager } from '../SettingsManager';
 import { Manager as ScriptManager } from '../ScriptManager';
 import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
@@ -196,6 +197,10 @@ const WEB_READ_CHANNELS = new Set([
   'GetAllDummyClients',
   'GetDummyClient',
   'GenerateDummyClientDefaults',
+  // Reading tags is not tag management: the browser needs the list to render the
+  // badges on its client tiles. Every mutation (Tags:SetScope et al) is absent
+  // from every list below, so a browser can see tags but never edit them.
+  'Tags:GetAll',
   'GetAlertTriggers',
   'GetAlertActionTypes',
   'GetAllAlertRules',
@@ -304,6 +309,7 @@ const WEB_PUSH_CHANNELS = [
   'SetFullDummyClientList',
   'DummyClientUpdated',
   'SetFullAlertRuleList',
+  'SetTagList',
   'AlertTriggered',
   'CreateShowTrakAlert',
   'Notify',
@@ -611,6 +617,10 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
 
         const [aErr, rules] = await AlertsManager.GetAll();
         socket.emit('SetFullAlertRuleList', aErr ? [] : rules || []);
+
+        // Tile tag badges are derived from this list, so it has to arrive with
+        // the first paint just like the client list itself.
+        socket.emit('SetTagList', (await TagManager.GetAllViews()) || []);
 
         let scripts: unknown[] = [];
         try {

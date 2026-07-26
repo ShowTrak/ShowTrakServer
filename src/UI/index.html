@@ -1427,6 +1427,18 @@ Loading licence...</pre>
                 </select>
                 <label for="CLIENT_EDITOR_GROUPID">Group</label>
               </div>
+              <!-- Tags carried by this client. A client belongs to one group but
+                   any number of tags, and membership is stored on the TAG (a
+                   dynamic scope), so toggling a chip rewrites that tag. Chips
+                   inherited from a group or from "all clients" show on but
+                   locked — see tag-picker.ts. -->
+              <div class="tag-picker d-none" id="CLIENT_EDITOR_TAGS_WRAPPER">
+                <div class="tag-picker-head">
+                  <span class="tag-picker-title">Tags</span>
+                  <span class="tag-picker-hint">Create and colour tags in the Tag Manager</span>
+                </div>
+                <div id="CLIENT_EDITOR_TAGS" class="tag-picker-list"></div>
+              </div>
               <div id="CLIENT_EDITOR_LAUNCH_WRAPPER" class="d-grid gap-2">
                 <div class="form-floating">
                   <select class="form-select" id="CLIENT_EDITOR_RUNONLAUNCH_SCRIPT">
@@ -1768,6 +1780,16 @@ Loading licence...</pre>
                   <label for="MONITORING_TARGET_NICKNAME">Name</label>
                 </div>
 
+                <!-- Hidden until the target exists, like the slug field above:
+                     a tag's scope needs a TargetID to reference. -->
+                <div class="tag-picker d-none" id="MONITORING_TARGET_TAGS_WRAPPER">
+                  <div class="tag-picker-head">
+                    <span class="tag-picker-title">Tags</span>
+                    <span class="tag-picker-hint">Create and colour tags in the Tag Manager</span>
+                  </div>
+                  <div id="MONITORING_TARGET_TAGS" class="tag-picker-list"></div>
+                </div>
+
                 <div class="bg-ghost rounded px-3 py-2">
                   <label
                     for="MONITORING_TARGET_INTERVAL"
@@ -1968,6 +1990,16 @@ Loading licence...</pre>
                   <option value="null" selected>No Group</option>
                 </select>
                 <label for="DUMMY_CLIENT_GROUPID">Group</label>
+              </div>
+
+              <!-- Hidden until the dummy exists: there is no ID to put in a
+                   tag's scope before it has been created. -->
+              <div class="tag-picker d-none" id="DUMMY_CLIENT_TAGS_WRAPPER">
+                <div class="tag-picker-head">
+                  <span class="tag-picker-title">Tags</span>
+                  <span class="tag-picker-hint">Create and colour tags in the Tag Manager</span>
+                </div>
+                <div id="DUMMY_CLIENT_TAGS" class="tag-picker-list"></div>
               </div>
 
               <div class="bg-ghost rounded px-3 py-2">
@@ -2414,6 +2446,15 @@ Loading licence...</pre>
                     style="width: 0%"
                   ></div>
                 </div>
+              </div>
+              <!-- Read-only mirror of the tiles' badges. Sits directly under the
+                   usage charts so the operator sees what a machine IS right
+                   after what it is DOING. Hidden when it carries no tags. -->
+              <div id="CLIENT_INFO_TAGS_SECTION" class="d-grid gap-2 d-none">
+                <div class="rounded-3 p-2 bg-ghost-light">
+                  <h6 class="mb-0">Tags</h6>
+                </div>
+                <div id="CLIENT_INFO_TAGS" class="tag-picker-list is-readonly"></div>
               </div>
               <div id="CLIENT_INFO_USB_SECTION" class="d-grid gap-2">
                 <div class="rounded-3 p-2 bg-ghost-light">

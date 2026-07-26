@@ -69,6 +69,7 @@ const restore = installModuleMocks([
       UpdateMonitoringTargetList: bridgeStub('UpdateMonitoringTargetList'),
       UpdateDummyClientList: bridgeStub('UpdateDummyClientList'),
       UpdateAlertRuleList: bridgeStub('UpdateAlertRuleList'),
+      UpdateTagList: bridgeStub('UpdateTagList'),
       UpdateFogTaskList: bridgeStub('UpdateFogTaskList'),
       UpdateFogStatus: bridgeStub('UpdateFogStatus'),
     },
@@ -287,6 +288,9 @@ test('a renderer reload re-hydrates every channel, then the current mode', async
     'UpdateMonitoringTargetList',
     'UpdateDummyClientList',
     'UpdateAlertRuleList',
+    // Tile tag badges are derived from this list, so a reloaded renderer needs
+    // it before its first paint or every tile renders untagged.
+    'UpdateTagList',
     'UpdateFogStatus',
     'UpdateFogTaskList',
   ]);
@@ -303,6 +307,6 @@ test('the mode push is skipped when the window went away mid-hydration', async (
     state.hasWindow = true;
   }
   // The Update* functions guard themselves; only the direct push is gated here.
-  assert.equal(bridgeCalls.length, 10);
+  assert.equal(bridgeCalls.length, 11);
   assert.deepEqual(pushes, []);
 });

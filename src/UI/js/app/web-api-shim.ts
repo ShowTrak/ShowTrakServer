@@ -300,8 +300,13 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     AlertTriggered: (cb) => sub('AlertTriggered', cb),
     CreateShowTrakAlert: (cb) => sub('CreateShowTrakAlert', cb),
 
-    // ---- Tags (management desktop-only; no-op on web) --------------------
-    GetAllTags: emptyArray,
+    // ---- Tags (read allowed; management desktop-only) --------------------
+    // The browser renders the same client tiles as the desktop, and their tag
+    // badges are derived from this list, so reading it is part of drawing the
+    // dashboard. Every mutation below stays a no-op — the server does not
+    // allowlist a single Tags:Set* channel for the web namespace either.
+    GetAllTags: async () => rpc('Tags:GetAll'),
+    OnSetTagList: (cb) => sub('SetTagList', cb),
     CreateTag: nullTuple,
     SetTagSlug: nullTuple,
     SetTagColour: nullTuple,
@@ -309,7 +314,6 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     SetTagScope: nullTuple,
     SetTagOrder: nullTuple,
     DeleteTag: nullTuple,
-    OnSetTagList: noSub,
 
     // ---- Custom audio assets (read allowed; management desktop-only) -----
     GetAudioAssets: async () => rpc('Audio:GetAll'),

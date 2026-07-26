@@ -18,6 +18,7 @@ import type {
   SettingView,
   SettingGroupView,
   GroupView,
+  TagView,
 } from '@showtrak/protocol';
 
 export let Config = {} as AppConfig;
@@ -66,6 +67,15 @@ export function setMonitoringMethodsCache(value: MonitoringMethodView[]): void {
 export let DummyClients: DummyClientView[] = [];
 export function setDummyClients(value: DummyClientView[]): void {
   DummyClients = value;
+}
+
+// Tags, ordered by Weight (the Tag Manager's drag order). Membership is a
+// dynamic scope, so which tags a tile carries is derived at render time from
+// this list — see lib/tag-badges. Kept fresh by the SetTagList push, which the
+// server re-emits on every tag change.
+export let Tags: TagView[] = [];
+export function setTags(value: TagView[]): void {
+  Tags = Array.isArray(value) ? value : [];
 }
 
 export let AlertRulesCache: AlertRuleView[] = [];

@@ -1,11 +1,15 @@
 import type { DummyClientView } from '@showtrak/protocol';
 import { openModal } from './lib/modal';
 import { OfflineBadgeContent } from './lib/status-badges';
-import { AppMode, DummyClientEditorUUID, setDummyClientEditorUUID } from './state';
+import { AppMode, DummyClientEditorUUID, Tags, setDummyClientEditorUUID } from './state';
+import { ResolveEntityTags } from './lib/tag-badges';
+import { RenderTagBadgeRow } from './lib/tag-badge-view';
 import { ErrorMessage, Safe } from './utils';
 import { FormatInterval } from './monitoring';
 import { CloseAllModals } from './modals';
 import { ConfirmationDialog, Notify } from './selection-init';
+import { RenderTagPicker } from './tag-picker';
+import type { TagPickerMount } from './tag-picker';
 // Dummy Clients (renderer)
 // Renders virtual heartbeat-driven dummy clients inline within their group's
 // drop zone alongside real clients and monitoring targets, and provides the
@@ -15,6 +19,12 @@ import { ConfirmationDialog, Notify } from './selection-init';
 // Compute the compact-mode status shown to the right of the dummy's name.
 // Offline dummies hide this label and show the offline timer instead.
 export const DUMMY_TYPE_LABEL = 'DUMMY';
+
+const DUMMY_EDITOR_TAG_PICKER: TagPickerMount = {
+  WrapperSelector: '#DUMMY_CLIENT_TAGS_WRAPPER',
+  ListSelector: '#DUMMY_CLIENT_TAGS',
+  Namespace: 'dummyEditorTags',
+};
 
 export function DummyCompactStatus(D: DummyClientView) {
   const State = String(D.State || 'IDLE');
@@ -69,6 +79,12 @@ export function RenderDummyClientTile(D: DummyClientView) {
   const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : State === 'IDLE' ? 'IDLE' : '';
   const DragUUID = `dummy:${D.UUID}`;
   const Compact = DummyCompactStatus(D);
+  // A dummy is scoped by its bare UUID (the `dummy:` prefix above is a drag/
+  // selection key, not a scope ID) — the scope dropdown stores `client:<UUID>`
+  // for dummies exactly as it does for ShowTrak clients.
+  const TagBadges = RenderTagBadgeRow(
+    ResolveEntityTags(Tags, { ScopedID: String(D.UUID), GroupID: D.GroupID ?? null })
+  );
   return `
     <div id="DUMMY_TILE_${D.UUID}" class="SHOWTRAK_PC DUMMY ${TileStateClass}" data-dummy-uuid="${
       D.UUID
@@ -76,7 +92,8 @@ export function RenderDummyClientTile(D: DummyClientView) {
       <button type="button" class="CLIENT_TILE_COG DUMMY_TILE_COG" aria-label="Edit Dummy Client" title="Edit Dummy Client">
         <i class="bi bi-gear-fill"></i>
       </button>
-      <label class="text-sm" data-type="DummyLabel">${DUMMY_TYPE_LABEL}</label>
+      <label class="text-sm ${TagBadges ? 'd-none' : ''}" data-type="DummyLabel">${DUMMY_TYPE_LABEL}</label>
+      ${TagBadges}
       <h5 class="mb-0" data-type="Name">${Safe(Name)}</h5>
       <span class="CLIENT_TILE_COMPACT_STATUS DUMMY_COMPACT_STATUS ${Compact.color}${
         Compact.offline ? ' d-none' : ''
@@ -199,6 +216,25 @@ export async function OpenDummyClientEditor(UUID: string | null | undefined = nu
   $('#DUMMY_CLIENT_INTERVAL_LABEL').text(FormatInterval(Interval));
 
   await PopulateDummyGroupSelect(Existing ? Existing.GroupID : null);
+
+  // Dummies are scoped by bare UUID, like real clients. A dummy being created
+  // has none yet, so the picker hides until it exists.
+  RenderTagPicker(
+    DUMMY_EDITOR_TAG_PICKER,
+    Existing ? { ScopedID: String(Existing.UUID), GroupID: Existing.GroupID ?? null } : null
+  );
+
+  $('#DUMMY_CLIENT_GROUPID')
+    .off('change.dummyEditorTags')
+    .on('change.dummyEditorTags', function () {
+      if (!Existing) return;
+      const Raw = $(this).val();
+      const Next = Raw == null || Raw === 'null' ? null : parseInt(String(Raw), 10);
+      RenderTagPicker(DUMMY_EDITOR_TAG_PICKER, {
+        ScopedID: String(Existing.UUID),
+        GroupID: Number.isFinite(Next as number) ? (Next as number) : null,
+      });
+    });
 
   $('#DUMMY_CLIENT_INTERVAL')
     .off('input.dummy')

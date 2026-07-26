@@ -10,6 +10,7 @@ import {
   PendingAdoption,
   Selected,
   Settings,
+  Tags,
   __LastClients,
   __LastGroups,
   setAllClients,
@@ -19,6 +20,8 @@ import {
   set__LastGroups,
 } from './state';
 import { OfflineBadgeContent, UnassignedBadgeContent } from './lib/status-badges';
+import { ResolveEntityTags } from './lib/tag-badges';
+import { RenderTagBadgeRow } from './lib/tag-badge-view';
 import {
   BuildGroupRenderOrder,
   BuildGroupSelectableIDs,
@@ -589,15 +592,22 @@ export function RenderClientTile(Client: ClientView): string {
   const WarningText = GetTileWarningText(Client);
   const TileStateClass = GetClientTileStateClass(Client);
   const IdentifyingClass = Client && Client.Identifying ? 'IDENTIFYING' : '';
+  // Tag badges take the type line's place when the client carries any: both
+  // elements are emitted and exactly one is display:none, so the tile keeps its
+  // fixed height either way. See lib/tag-badge-view.
+  const TagBadges = RenderTagBadgeRow(
+    ResolveEntityTags(Tags, { ScopedID: String(UUID), GroupID: Client.GroupID ?? null })
+  );
   return `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${TileStateClass} ${IdentifyingClass} ${
     UUID && Selected.includes(UUID) ? 'SELECTED' : ''
   }" data-uuid="${UUID}" data-flip-key="client:${UUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
 				<button type="button" class="CLIENT_TILE_COG" aria-label="Edit Client" title="Edit Client">
 					<i class="bi bi-gear-fill"></i>
 				</button>
-				<label class="text-sm" data-type="Hostname">
+				<label class="text-sm ${TagBadges ? 'd-none' : ''}" data-type="Hostname">
         ${Safe(HostnameVersionLabel)}
 					</label>
+				${TagBadges}
 				<h5 class="mb-0" data-type="Nickname">
 				${Nickname && Nickname.length ? Safe(Nickname) : Safe(Hostname)}
 				</h5>

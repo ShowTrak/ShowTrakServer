@@ -720,6 +720,7 @@ export {
   UpdateMonitoringTargetList,
   UpdateDummyClientList,
   UpdateAlertRuleList,
+  UpdateTagList,
   UpdateFogTaskList,
   UpdateFogStatus,
   ValidateAlertAudioAssets,

@@ -14,6 +14,7 @@ import {
   ClientInfoRefreshTimer,
   FormatClientVersionLabel,
   IsIntegratedClientEntity,
+  Tags,
   __clientInfoRefreshInFlight,
   setClientInfoOpenUUID,
   setClientInfoRefreshTimer,
@@ -24,6 +25,8 @@ import {
 } from './state';
 import { FormatBytes, HandleNonFatalError, Safe } from './utils';
 import { GetClientStatusDisplayText } from './client-list';
+import { ScriptColourHex } from './lib/script-colours';
+import { GetTagMembershipKind, ResolveEntityTags, TagBadgeLabel } from './lib/tag-badges';
 import {
   HideStatusTimelineTooltip,
   LoadHistorySamplesForContext,
@@ -313,6 +316,38 @@ export async function OpenClientInfo(UUID: string) {
   }
 }
 
+// The tags this client carries, read-only, under the usage charts.
+//
+// Same chip markup as the editor's picker (minus the interaction), so a tag
+// looks the same wherever it appears. Every chip shows its icon here — unlike
+// the tile badges, this panel has the width for it. The section hides entirely
+// when the client has no tags rather than showing an empty box.
+function RenderClientInfoTags(Client: ClientView): void {
+  const Entity = { ScopedID: String(Client.UUID || ''), GroupID: Client.GroupID ?? null };
+  const Applied = ResolveEntityTags(Tags, Entity);
+
+  $('#CLIENT_INFO_TAGS_SECTION').toggleClass('d-none', Applied.length === 0);
+  if (!Applied.length) {
+    $('#CLIENT_INFO_TAGS').html('');
+    return;
+  }
+
+  const Html = Applied.map((Tag) => {
+    const Kind = GetTagMembershipKind(Tag, Entity);
+    // Naming where a tag came from matters here: it explains why a tag cannot
+    // be removed from this client in the editor.
+    const Via = Kind === 'workspace' ? 'ALL' : Kind === 'group' ? 'GROUP' : '';
+    return `
+      <span class="tag-picker-chip is-on" style="--tag-colour: ${Safe(ScriptColourHex(Tag.Colour))}">
+        <i class="bi bi-${Safe(Tag.Icon || 'tag')}" aria-hidden="true"></i>
+        <span class="tag-picker-chip-label">${Safe(TagBadgeLabel(Tag))}</span>
+        ${Via ? `<span class="tag-picker-chip-via">${Safe(Via)}</span>` : ''}
+      </span>`;
+  }).join('');
+
+  $('#CLIENT_INFO_TAGS').html(Html);
+}
+
 export function RenderClientInfoDetails(Client: ClientView) {
   const IsIntegrated = IsIntegratedClientEntity(Client);
 
@@ -337,6 +372,12 @@ export function RenderClientInfoDetails(Client: ClientView) {
     $('#CLIENT_INFO_STATUS').val(GetClientStatusDisplayText(Client));
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
+
+  try {
+    RenderClientInfoTags(Client);
+  } catch (err) {
+    HandleNonFatalError('ClientInfo:RenderTags', err);
   }
 
   // Vitals (CPU/RAM) progress bars

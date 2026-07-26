@@ -10,6 +10,12 @@ import { Safe } from './utils';
 // Minimum launch delay (seconds); mirrors MIN_LAUNCH_DELAY_SECONDS enforced by
 // the server-side ClientUpdatePayload validator.
 const MIN_LAUNCH_DELAY_SECONDS = 10;
+
+const CLIENT_EDITOR_TAG_PICKER: TagPickerMount = {
+  WrapperSelector: '#CLIENT_EDITOR_TAGS_WRAPPER',
+  ListSelector: '#CLIENT_EDITOR_TAGS',
+  Namespace: 'clientEditorTags',
+};
 import {
   ClearSelection,
   ConfirmationDialog,
@@ -18,6 +24,8 @@ import {
   Wait,
 } from './selection-init';
 import { IsFogAvailable, OpenFogTaskModal } from './fog';
+import { ClearTagPicker, RenderTagPicker } from './tag-picker';
+import type { TagPickerMount } from './tag-picker';
 import type { ClientView } from '@showtrak/protocol';
 
 // The former Update Manager and Group Manager god-sections now live in their own
@@ -142,6 +150,9 @@ export function InitModals() {
 
 export async function CloseAllModals() {
   closeAllModals();
+  // Forget which entity the tag picker was editing; a tag push arriving after
+  // the editor closed would otherwise redraw chips into a hidden modal.
+  ClearTagPicker();
   await Wait(300);
   return;
 }
@@ -517,6 +528,28 @@ export async function OpenClientEditor(UUID: string) {
       Client.RunOnLaunchDelaySeconds ?? MIN_LAUNCH_DELAY_SECONDS
     );
   }
+
+  // A ShowTrak client's scope ID is its bare UUID. Rendered from the live tag
+  // cache and refreshed by the SetTagList push, so chips stay correct if a tag
+  // is edited elsewhere while this editor is open.
+  RenderTagPicker(CLIENT_EDITOR_TAG_PICKER, {
+    ScopedID: String(UUID),
+    GroupID: Client.GroupID ?? null,
+  });
+
+  // Moving the client to another group changes which tags it inherits, so the
+  // chips are re-derived as soon as the selection changes rather than only
+  // after save — otherwise the picker would advertise the old group's tags.
+  $('#CLIENT_EDITOR_GROUPID')
+    .off('change.clientEditorTags')
+    .on('change.clientEditorTags', function () {
+      const Raw = $(this).val();
+      const Next = Raw == null || Raw === 'null' ? null : parseInt(String(Raw), 10);
+      RenderTagPicker(CLIENT_EDITOR_TAG_PICKER, {
+        ScopedID: String(UUID),
+        GroupID: Number.isFinite(Next as number) ? (Next as number) : null,
+      });
+    });
 
   await PopulateFogSection(UUID, (Nickname ? Nickname : Hostname) || UUID);
 

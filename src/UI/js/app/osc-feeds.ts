@@ -11,6 +11,7 @@ import {
   setAlertRulesCache,
   setDummyClients,
   setMonitoringTargets,
+  setTags,
 } from './state';
 import { HandleNonFatalError, Safe } from './utils';
 import { RenderFullClientAndMonitorList, UpdateClientTile } from './client-list';
@@ -35,6 +36,7 @@ import {
 import { RenderAlertRuleManagerList } from './alert-rules';
 import { Notify, RenderClientInfoDetails, UpdateIdentifyStatusBanner } from './selection-init';
 import { UpdateDummyClientTile } from './dummy-clients';
+import { RefreshTagPickerIfMounted } from './tag-picker';
 
 /** One line rendered in the OSC/HTTP debug terminal. */
 interface OscHttpDebugEntry {
@@ -635,6 +637,19 @@ export function InitOscFeeds() {
   window.API.SetFullAlertRuleList(async (List) => {
     setAlertRulesCache(Array.isArray(List) ? List : []);
     RenderAlertRuleManagerList();
+  });
+
+  // --- Tags ---
+  // Membership is a dynamic scope, so a tag edit can change the badges on any
+  // tile in the show (a group added to a tag re-badges every machine in it).
+  // There is no per-tile delta to apply, hence the full re-render.
+  window.API.OnSetTagList(async (List) => {
+    setTags(Array.isArray(List) ? List : []);
+    RenderFullClientAndMonitorList();
+    // An editor's tag chips are written by this same push (a toggle round-trips
+    // through the server), so an open picker has to redraw or it keeps showing
+    // the state from before the click.
+    RefreshTagPickerIfMounted();
   });
 
   // --- Dummy Clients ---

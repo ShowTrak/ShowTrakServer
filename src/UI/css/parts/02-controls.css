@@ -1036,6 +1036,105 @@ input[type='range']::-moz-range-progress,
 
 /* Client editor — MAC address list. Follows the .fog-task-item surface
    treatment so the rows read as the same family of inline list entries. */
+/* --- Tag picker ---
+ * Assigning tags from an entity's editor, and the read-only mirror of the same
+ * chips in the Client Info panel. Deliberately shares the mac-address-editor's
+ * head/hint shape: both are "a list you manage inline" inside the same modal.
+ *
+ * A chip is a button in the editor and a span in Client Info; the styling is
+ * driven by class, not element, so the two read identically. --tag-colour is set
+ * per chip from the shared palette. */
+.tag-picker {
+  display: grid;
+  gap: 8px;
+}
+.tag-picker-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.tag-picker-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.tag-picker-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+.tag-picker-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag-picker-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+}
+.tag-picker-chip {
+  --tag-colour: #7f8c8d;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+.tag-picker-chip i {
+  font-size: 12px;
+  line-height: 1;
+  color: var(--tag-colour);
+}
+.tag-picker-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* An applied tag is filled with its own colour so "on" is legible at a glance
+ * without relying on the border alone. */
+.tag-picker-chip.is-on {
+  border-color: var(--tag-colour);
+  background: color-mix(in srgb, var(--tag-colour) 22%, transparent);
+  color: rgba(255, 255, 255, 0.95);
+}
+.tag-picker-chip:hover:not(:disabled) {
+  border-color: var(--tag-colour);
+  color: rgba(255, 255, 255, 0.95);
+}
+/* Inherited from a group or from "all clients": on, but not this client's to
+ * turn off. Not greyed out — it IS applied — just not interactive. */
+.tag-picker-chip.is-locked,
+.tag-picker-chip:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+.tag-picker-chip-via {
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+/* Client Info renders the same chips with no interaction at all. */
+.tag-picker-list.is-readonly .tag-picker-chip {
+  cursor: default;
+}
+
 .mac-address-editor {
   display: grid;
   gap: 8px;

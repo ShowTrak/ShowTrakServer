@@ -5,6 +5,7 @@ import { HandleNonFatalError, Safe } from './utils';
 import { CloseAllModals } from './modals';
 import { ConfirmationDialog, Notify } from './selection-init';
 import { NormalizeIconName, OpenIconPicker } from './icon-picker';
+import { SCRIPT_COLOURS, ScriptColourHex } from './lib/script-colours';
 import {
   buildScopeModel,
   parseScopeSelection,
@@ -27,23 +28,10 @@ export const SCRIPT_MANAGER_PLATFORMS = [
   { key: 'Linux', icon: 'bi-ubuntu', label: 'Linux' },
 ];
 
-// Colour palette – order matches SCRIPT_COLOURS in schema.js.
-// 0-5 rainbow, 6-7 greys.
-export const SCRIPT_COLOURS = [
-  { hex: '#e74c3c', label: 'Red' },
-  { hex: '#e67e22', label: 'Orange' },
-  { hex: '#f1c40f', label: 'Yellow' },
-  { hex: '#2ecc71', label: 'Green' },
-  { hex: '#3498db', label: 'Blue' },
-  { hex: '#9b59b6', label: 'Purple' },
-  { hex: '#bdc3c7', label: 'Light grey' },
-  { hex: '#7f8c8d', label: 'Dark grey' },
-];
-
-export function ScriptColourHex(Index: number | undefined) {
-  const entry = Index === undefined ? undefined : SCRIPT_COLOURS[Index];
-  return entry ? entry.hex : SCRIPT_COLOURS[6]!.hex; // index 6 always present (grey fallback)
-}
+// The colour palette moved to ./lib/script-colours so leaf modules (the tile tag
+// badges) can resolve a colour without importing this module. Re-exported here
+// because the rest of the renderer imports both names from script-manager.
+export { SCRIPT_COLOURS, ScriptColourHex };
 
 // Sample script manifest entry as returned by GetSampleScripts /
 // RefreshSampleScripts (opaque `unknown[]` on the wire; narrowed here).

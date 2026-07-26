@@ -31,6 +31,8 @@ import { ErrorMessage, HandleNonFatalError, Safe } from '../utils';
 import { FormatInterval } from '../monitoring';
 import { CloseAllModals } from '../modals';
 import { ConfirmationDialog, Notify } from '../selection-init';
+import { RenderTagPicker } from '../tag-picker';
+import type { TagPickerMount } from '../tag-picker';
 import {
   AddMonitoringListChip,
   ApplyMonitoringConditionalVisibility,
@@ -674,6 +676,12 @@ export function RefreshMonitoringEditorIfOpen(TargetID: number) {
   RenderMonitoringCheckList();
 }
 
+const MONITORING_TARGET_TAG_PICKER: TagPickerMount = {
+  WrapperSelector: '#MONITORING_TARGET_TAGS_WRAPPER',
+  ListSelector: '#MONITORING_TARGET_TAGS',
+  Namespace: 'monitorEditorTags',
+};
+
 export async function OpenMonitoringTargetEditor(
   TargetID: number | null,
   Prefill: { Nickname?: string; Address?: string; Method?: string | null } | null = null
@@ -759,6 +767,14 @@ export async function OpenMonitoringTargetEditor(
   // Slug is only shown for an existing target — a new target's slug is generated
   // server-side on create, then editable on the next open.
   $('#MONITORING_TARGET_SLUG_WRAPPER').toggleClass('d-none', !Existing);
+  // Same rule as the slug above: a target that does not exist yet has no
+  // `monitor:<TargetID>` for a tag scope to reference.
+  RenderTagPicker(
+    MONITORING_TARGET_TAG_PICKER,
+    Existing
+      ? { ScopedID: `monitor:${Existing.TargetID}`, GroupID: Existing.GroupID ?? null }
+      : null
+  );
   $('#MONITORING_TARGET_SLUG').val(MonitoringEditorState!.Slug);
   $('#MONITORING_TARGET_NICKNAME').val(MonitoringEditorState!.Nickname);
   $('#MONITORING_TARGET_INTERVAL').val(MonitoringEditorState!.Interval);

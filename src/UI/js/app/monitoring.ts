@@ -9,6 +9,7 @@ import {
   MonitorHistoryTooltipHover,
   MonitoringMethodsCache,
   MonitoringTargets,
+  Tags,
   setMonitorHistoryModalContext,
   setMonitorHistorySeries,
   setMonitorHistoryTooltipHover,
@@ -29,6 +30,8 @@ import type {
 import { HandleNonFatalError, Safe } from './utils';
 import { openModal } from './lib/modal';
 import { OfflineBadgeContent } from './lib/status-badges';
+import { ResolveEntityTags } from './lib/tag-badges';
+import { RenderTagBadgeRow } from './lib/tag-badge-view';
 
 // Discriminated view-model for the currently-open monitor history modal.
 type MonitorHistoryEntity =
@@ -282,6 +285,11 @@ export function RenderMonitoringTargetTile(T: MonitoringTargetView) {
   const OfflineSince = GetMonitoringOfflineSince(T);
   const MethodLabel = FormatMonitoringMethodLabel(T);
   const DragUUID = `monitor:${T.TargetID}`;
+  // A monitoring target's scope ID is the same `monitor:<TargetID>` string used
+  // as its drag key, so the drag key doubles as the scope lookup here.
+  const TagBadges = RenderTagBadgeRow(
+    ResolveEntityTags(Tags, { ScopedID: DragUUID, GroupID: T.GroupID ?? null })
+  );
   const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : NoVerdict ? 'IDLE' : '';
   const TextClass = 'text-light';
   return `
@@ -291,9 +299,10 @@ export function RenderMonitoringTargetTile(T: MonitoringTargetView) {
       <button type="button" class="CLIENT_TILE_COG MONITOR_TILE_COG" aria-label="Edit Monitor" title="Edit Monitor">
         <i class="bi bi-gear-fill"></i>
       </button>
-      <label class="text-sm" data-type="Method">${Safe(MethodLabel)} · ${Safe(
+      <label class="text-sm ${TagBadges ? 'd-none' : ''}" data-type="Method">${Safe(MethodLabel)} · ${Safe(
         FormatInterval(T.Interval)
       )}</label>
+      ${TagBadges}
       <h5 class="mb-0" data-type="Name">${Safe(Name)}</h5>
       <small class="text-sm text-light" data-type="Address">${Safe(Sub)}</small>
       <div class="SHOWTRAK_PC_STATUS ${NoVerdict ? 'd-grid' : 'd-none'}" data-type="INDICATOR_IDLE">
