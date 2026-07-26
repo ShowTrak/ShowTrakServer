@@ -232,37 +232,46 @@ body.is-web #APPLICATION {
     transform 140ms ease;
 }
 
+/* The ALERTS toggle wears the same `.st-segmented-toggle` track as the SHOW/EDIT
+   switch (see 02-controls.css), but as a single-segment button: the segment
+   lights green while alert actions are armed and red while they are suppressed. */
 #ALERT_ACTIONS_TOGGLE_BTN.alert-actions-toggle-btn {
+  appearance: none;
   height: var(--bottom-bar-toggle-height);
-  padding: 0 10px;
+  align-items: stretch;
+  cursor: pointer;
+}
+
+#ALERT_ACTIONS_TOGGLE_BTN .alert-actions-toggle-segment {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border-width: 1px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  transition:
-    background-color 140ms ease,
-    color 140ms ease,
-    border-color 140ms ease,
-    transform 140ms ease;
+  padding: 0 0.85rem;
+  font-size: 12px;
 }
 
-#ALERT_ACTIONS_TOGGLE_BTN.alert-actions-toggle-btn:hover {
-  transform: none;
+#ALERT_ACTIONS_TOGGLE_BTN.alerts-enabled .alert-actions-toggle-segment {
+  background: var(--client-online-bg);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
-#ALERT_ACTIONS_TOGGLE_BTN.alert-actions-toggle-btn.alerts-enabled {
-  background-color: var(--client-online-bg) !important;
-  color: #fff !important;
-  border-color: var(--client-online-bg) !important;
+#ALERT_ACTIONS_TOGGLE_BTN.alerts-disabled .alert-actions-toggle-segment {
+  background: rgba(220, 53, 69, 0.92);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
-#ALERT_ACTIONS_TOGGLE_BTN.alert-actions-toggle-btn.alerts-disabled {
-  background-color: #dc3545 !important;
-  color: #fff !important;
-  border-color: #dc3545 !important;
+#ALERT_ACTIONS_TOGGLE_BTN:not(:disabled):hover.alerts-enabled .alert-actions-toggle-segment {
+  background: rgba(18, 255, 0, 0.45);
+}
+
+#ALERT_ACTIONS_TOGGLE_BTN:not(:disabled):hover.alerts-disabled .alert-actions-toggle-segment {
+  background: rgb(220, 53, 69);
+}
+
+#ALERT_ACTIONS_TOGGLE_BTN:disabled {
+  cursor: default;
+  opacity: 0.65;
 }
 
 #COMPACT_MODE_BTN.compact-mode-btn:hover {
