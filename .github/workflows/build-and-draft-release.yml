@@ -490,15 +490,25 @@ jobs:
             exit 1
           fi
 
+          # De-duplicated by the name the asset will have ONCE UPLOADED, not by
+          # its filename: GitHub rewrites spaces to dots, so "ShowTrak
+          # Server-darwin-arm64-3.16.1.zip" (what forge produces) and
+          # "ShowTrak.Server-darwin-arm64-3.16.1.zip" (the legacy-name alias the
+          # manifest step copies alongside it) are two files that land on one
+          # asset. Uploading both means the second either collides with the
+          # first or, under --clobber, deletes an asset the first one had
+          # already deleted and 404s. They are byte-identical copies, so the
+          # first one through wins and the other is skipped.
           declare -A SEEN
           UPLOAD_FILES=()
           for file in "${FILES[@]}"; do
             name=$(basename "$file")
-            if [[ -n "${SEEN[$name]:-}" ]]; then
-              echo "Skipping duplicate asset basename: $name ($file)"
+            asset_name="${name// /.}"
+            if [[ -n "${SEEN[$asset_name]:-}" ]]; then
+              echo "Skipping duplicate asset name: $asset_name ($file)"
               continue
             fi
-            SEEN[$name]=1
+            SEEN[$asset_name]=1
             UPLOAD_FILES+=("$file")
           done
 
