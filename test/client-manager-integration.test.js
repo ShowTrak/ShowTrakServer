@@ -121,6 +121,67 @@ test('ClientManager hydrates a heartbeat from the database when uncached', async
   assert.equal(invalidMsg, null);
 });
 
+// Hotplug events are the real-time USB signal — the client sends one per plug
+// and the server applies it to the connected list incrementally. That only works
+// if applying an event is correct on its own; it used to be papered over by a
+// full device list arriving immediately afterwards, which no longer happens.
+test('adding a serial-less USB device leaves the other serial-less devices connected', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.Create('dev-1');
+
+  const keyboard = { VendorID: 1, ProductID: 2, ManufacturerName: 'Generic', ProductName: 'Kbd' };
+  const hub = { VendorID: 3, ProductID: 4, ManufacturerName: 'Generic', ProductName: 'Hub' };
+  const mouse = { VendorID: 5, ProductID: 6, ManufacturerName: 'Logitech', ProductName: 'Mouse' };
+  await Manager.SetUSBDeviceList('dev-1', [keyboard, hub]);
+
+  await Manager.USBDeviceAdded('dev-1', mouse);
+  const [, afterAdd] = await Manager.Get('dev-1');
+  // Matching on a normalised serial number treated every absent serial as equal,
+  // so plugging in one unserialised device filtered out every other one — the
+  // keyboard and hub simply vanished from the server's view until the next full
+  // list arrived.
+  assert.equal(afterAdd.ConnectedUSBDeviceList.length, 3);
+  assert.deepEqual(afterAdd.ConnectedUSBDeviceList.map((d) => d.ProductName).sort(), [
+    'Hub',
+    'Kbd',
+    'Mouse',
+  ]);
+
+  await Manager.USBDeviceRemoved('dev-1', mouse);
+  const [, afterRemove] = await Manager.Get('dev-1');
+  assert.deepEqual(
+    afterRemove.ConnectedUSBDeviceList.map((d) => d.ProductName).sort(),
+    ['Hub', 'Kbd'],
+    'unplugging one serial-less device must not remove the rest'
+  );
+});
+
+test('removing one of two identical serial-less devices leaves the other', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.Create('dev-1');
+
+  const adapter = { VendorID: 9, ProductID: 9, ManufacturerName: 'Generic', ProductName: 'DAC' };
+  await Manager.SetUSBDeviceList('dev-1', [{ ...adapter }, { ...adapter }]);
+
+  await Manager.USBDeviceRemoved('dev-1', { ...adapter });
+  const [, after] = await Manager.Get('dev-1');
+  // Nothing distinguishes the two, so exactly one entry is dropped rather than
+  // every matching entry.
+  assert.equal(after.ConnectedUSBDeviceList.length, 1);
+});
+
+test('re-announcing a serialised USB device replaces it rather than duplicating it', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.Create('dev-1');
+
+  await Manager.USBDeviceAdded('dev-1', { SerialNumber: 'S1', ProductName: 'Drive' });
+  await Manager.USBDeviceAdded('dev-1', { SerialNumber: 's1', ProductName: 'Drive' });
+  const [, after] = await Manager.Get('dev-1');
+  // A serial number identifies one physical device, and is matched
+  // case-insensitively.
+  assert.equal(after.ConnectedUSBDeviceList.length, 1);
+});
+
 test('ClientManager updates system info, USB devices, and network interfaces', async () => {
   const { Manager, events } = await loadClientManager();
   await Manager.Create('dev-1');
@@ -665,4 +726,206 @@ test('ClientManager.Get adopts an uncached client into the cache so callers shar
   assert.equal(secondErr, null);
   assert.equal(second, first);
   assert.equal(second.Online, true);
+});
+
+// --- Incremental telemetry -------------------------------------------------
+// A delta amends state that the corresponding full list replaces outright. The
+// full list stays the authority, so the property that matters most here is that
+// applying a delta leaves the client in exactly the state the equivalent full
+// list would have produced — otherwise the next resync would report a spurious
+// change and the two paths would fight each other forever.
+
+test('a network interface delta adds, changes and removes interfaces', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.Create('dev-1');
+
+  const wifi = {
+    name: 'en0',
+    addresses: [{ family: 'IPv4', address: '10.0.0.5', mac: 'aa:bb', internal: false }],
+  };
+  const vpn = { name: 'utun0', addresses: [] };
+  await Manager.SetNetworkInterfaces('dev-1', [wifi]);
+
+  await Manager.ApplyNetworkInterfaceDelta('dev-1', { Added: [vpn], Removed: [], Changed: [] });
+  let [, client] = await Manager.Get('dev-1');
+  assert.deepEqual(client.NetworkInterfaces.map((i) => i.name).sort(), ['en0', 'utun0']);
+
+  const moved = {
+    name: 'en0',
+    addresses: [{ family: 'IPv4', address: '10.0.0.99', mac: 'aa:bb', internal: false }],
+  };
+  await Manager.ApplyNetworkInterfaceDelta('dev-1', { Added: [], Removed: [], Changed: [moved] });
+  [, client] = await Manager.Get('dev-1');
+  assert.equal(
+    client.NetworkInterfaces.find((i) => i.name === 'en0').addresses[0].address,
+    '10.0.0.99'
+  );
+
+  await Manager.ApplyNetworkInterfaceDelta('dev-1', { Added: [], Removed: ['utun0'], Changed: [] });
+  [, client] = await Manager.Get('dev-1');
+  assert.deepEqual(
+    client.NetworkInterfaces.map((i) => i.name),
+    ['en0']
+  );
+});
+
+test('a network delta and the equivalent full list leave identical state', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.Create('dev-1');
+  await Manager.Create('dev-2');
+
+  const wifi = {
+    name: 'en0',
+    addresses: [{ family: 'IPv4', address: '10.0.0.5', mac: 'aa:bb', internal: false }],
+  };
+  const vpn = { name: 'utun0', addresses: [] };
+
+  await Manager.SetNetworkInterfaces('dev-1', [wifi]);
+  await Manager.ApplyNetworkInterfaceDelta('dev-1', { Added: [vpn], Removed: [], Changed: [] });
+  await Manager.SetNetworkInterfaces('dev-2', [wifi, vpn]);
+
+  const [, viaDelta] = await Manager.Get('dev-1');
+  const [, viaFullList] = await Manager.Get('dev-2');
+  // Both paths normalise through the same helper precisely so this holds; if it
+  // ever stopped holding, every resync would look like a change.
+  assert.deepEqual(viaDelta.NetworkInterfaces, viaFullList.NetworkInterfaces);
+});
+
+test('a display delta merges by DisplayID', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.Create('dev-1');
+
+  await Manager.SetDisplayList('dev-1', [{ DisplayID: 'edid:A', Width: 1920 }]);
+  await Manager.ApplyDisplayDelta('dev-1', {
+    Added: [{ DisplayID: 'edid:B', Width: 2560 }],
+    Removed: [],
+    Changed: [],
+  });
+  let [, client] = await Manager.Get('dev-1');
+  assert.deepEqual(client.ConnectedDisplayList.map((d) => d.DisplayID).sort(), [
+    'edid:A',
+    'edid:B',
+  ]);
+
+  await Manager.ApplyDisplayDelta('dev-1', { Added: [], Removed: ['edid:A'], Changed: [] });
+  [, client] = await Manager.Get('dev-1');
+  assert.deepEqual(
+    client.ConnectedDisplayList.map((d) => d.DisplayID),
+    ['edid:B']
+  );
+});
+
+test('an application delta raises the same start and stop events as a full snapshot', async () => {
+  const { Manager, events } = await loadClientManager();
+  await Manager.Create('dev-1');
+
+  await Manager.SetRunningApplications('dev-1', {
+    SampledAt: 1,
+    TotalCount: 2,
+    Truncated: false,
+    Items: [
+      { Name: 'Safari', Count: 1 },
+      { Name: 'Code', Count: 1 },
+    ],
+    Status: { State: 'ok', Message: null, Platform: 'darwin' },
+  });
+  const before = events.filter((e) => e === 'ApplicationStarted').length;
+
+  await Manager.ApplyApplicationDelta('dev-1', {
+    Started: [{ Name: 'QLab', Count: 1 }],
+    Stopped: ['code'],
+    Changed: [],
+    SampledAt: 2,
+    TotalCount: 2,
+    Truncated: false,
+    Status: { State: 'ok', Message: null, Platform: 'darwin' },
+  });
+
+  // These are the events the alert rules hang off, so a delta has to raise them
+  // just as the snapshot diff does.
+  assert.equal(events.filter((e) => e === 'ApplicationStarted').length, before + 1);
+  assert.ok(events.includes('ApplicationStopped'));
+
+  const [, client] = await Manager.Get('dev-1');
+  assert.deepEqual(client.ObservedRunningApplications.Items.map((i) => i.Name).sort(), [
+    'QLab',
+    'Safari',
+  ]);
+  // Stopped is matched case-insensitively: the client sends the lower-cased key.
+  assert.equal(
+    client.ObservedRunningApplications.Items.some((i) => i.Name === 'Code'),
+    false
+  );
+});
+
+test('a full snapshot after an applied delta reports no further changes', async () => {
+  const { Manager, events } = await loadClientManager();
+  await Manager.Create('dev-1');
+
+  const status = { State: 'ok', Message: null, Platform: 'darwin' };
+  await Manager.SetRunningApplications('dev-1', {
+    SampledAt: 1,
+    TotalCount: 1,
+    Truncated: false,
+    Items: [{ Name: 'Safari', Count: 1 }],
+    Status: status,
+  });
+  await Manager.ApplyApplicationDelta('dev-1', {
+    Started: [{ Name: 'QLab', Count: 1 }],
+    Stopped: [],
+    Changed: [],
+    SampledAt: 2,
+    TotalCount: 2,
+    Truncated: false,
+    Status: status,
+  });
+  const afterDelta = events.filter((e) => e === 'ApplicationStarted').length;
+
+  // The 60s resync carries the same state the delta already produced. If the
+  // delta path stored a different signature or ordering, this would re-fire
+  // every alert once a minute forever.
+  await Manager.SetRunningApplications('dev-1', {
+    SampledAt: 3,
+    TotalCount: 2,
+    Truncated: false,
+    Items: [
+      { Name: 'QLab', Count: 1 },
+      { Name: 'Safari', Count: 1 },
+    ],
+    Status: status,
+  });
+  assert.equal(events.filter((e) => e === 'ApplicationStarted').length, afterDelta);
+});
+
+test('an application count change is applied without raising a start', async () => {
+  const { Manager, events } = await loadClientManager();
+  await Manager.Create('dev-1');
+
+  const status = { State: 'ok', Message: null, Platform: 'darwin' };
+  await Manager.SetRunningApplications('dev-1', {
+    SampledAt: 1,
+    TotalCount: 1,
+    Truncated: false,
+    Items: [{ Name: 'Safari', Count: 1 }],
+    Status: status,
+  });
+  const before = events.filter((e) => e === 'ApplicationStarted').length;
+
+  await Manager.ApplyApplicationDelta('dev-1', {
+    Started: [],
+    Stopped: [],
+    Changed: [{ Name: 'Safari', Count: 3 }],
+    SampledAt: 2,
+    TotalCount: 1,
+    Truncated: false,
+    Status: status,
+  });
+
+  const [, client] = await Manager.Get('dev-1');
+  assert.equal(client.ObservedRunningApplications.Items[0].Count, 3);
+  assert.equal(
+    events.filter((e) => e === 'ApplicationStarted').length,
+    before,
+    'a second window of an already-running app is not a start'
+  );
 });

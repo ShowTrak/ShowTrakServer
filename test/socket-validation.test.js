@@ -131,18 +131,58 @@ test('DisplayList validates entries and rejects non-arrays', () => {
   assert.deepEqual(display.Bounds, { x: 0, y: 0, width: 3840, height: 2160 });
 });
 
-test('NetworkInterfaces prunes to known fields and requires an array', () => {
+test('NetworkInterfaces preserves the nested payload the client actually sends', () => {
   assert.throws(() => SocketValidation.NetworkInterfaces(null));
+
+  // Copied from the client's NetworkMonitor.normalize() output. This validator
+  // used to reconstruct a flat PascalCase shape that neither side produced, so
+  // every field read as undefined and the whole payload was rewritten to nulls
+  // — the client record ended up storing `{ name: 'unknown', addresses: [] }`
+  // for every interface. The previous version of this test asserted that flat
+  // shape, so it passed while the feature was broken end to end.
   const [iface] = SocketValidation.NetworkInterfaces([
-    { Name: 'en0', Address: '10.0.0.5', MAC: 'aa:bb', Family: 'IPv4', Internal: false, X: 1 },
+    {
+      name: 'en0',
+      addresses: [
+        {
+          family: 'IPv4',
+          address: '10.0.0.5',
+          netmask: '255.255.255.0',
+          cidr: '10.0.0.5/24',
+          mac: 'aa:bb',
+          internal: false,
+          scopeid: null,
+        },
+        {
+          family: 'IPv6',
+          address: 'fe80::1',
+          netmask: 'ffff::',
+          cidr: 'fe80::1/64',
+          mac: 'aa:bb',
+          internal: false,
+          scopeid: 5,
+        },
+      ],
+      Rogue: 'dropped',
+    },
   ]);
-  assert.deepEqual(iface, {
-    Name: 'en0',
-    Address: '10.0.0.5',
-    MAC: 'aa:bb',
-    Family: 'IPv4',
-    Internal: false,
-  });
+
+  assert.equal(iface.name, 'en0');
+  assert.equal(iface.Rogue, undefined, 'unexpected keys are still pruned');
+  assert.equal(iface.addresses.length, 2);
+  // The MAC has to survive: CollectReportedMacAddresses reads it from here, and
+  // it is the only path a Wi-Fi adapter's MAC reaches the server on.
+  assert.equal(iface.addresses[0].mac, 'aa:bb');
+  assert.equal(iface.addresses[0].address, '10.0.0.5');
+  assert.equal(iface.addresses[0].cidr, '10.0.0.5/24');
+  assert.equal(iface.addresses[0].internal, false);
+  assert.equal(iface.addresses[1].family, 'IPv6');
+  assert.equal(iface.addresses[1].scopeid, 5);
+});
+
+test('NetworkInterfaces tolerates an interface reporting no addresses', () => {
+  const [iface] = SocketValidation.NetworkInterfaces([{ name: 'utun0' }]);
+  assert.deepEqual(iface, { name: 'utun0', addresses: [] });
 });
 
 test('RunningApplications normalizes items and status', () => {

@@ -86,6 +86,9 @@ export interface ClientManagerType {
   SetNetworkInterfaces(UUID: string, Interfaces: unknown): Promise<Result<string>>;
   SetRunningApplications(UUID: string, Snapshot: unknown): Promise<Result<string>>;
   SetDisplayList(UUID: string, DisplayList: unknown): Promise<Result<string>>;
+  ApplyNetworkInterfaceDelta(UUID: string, Delta: unknown): Promise<Result<string>>;
+  ApplyDisplayDelta(UUID: string, Delta: unknown): Promise<Result<string>>;
+  ApplyApplicationDelta(UUID: string, Delta: unknown): Promise<Result<string>>;
   MarkApplicationCritical(
     UUID: string,
     Application: CriticalApplicationPayloadResult
@@ -460,6 +463,43 @@ Manager.SetNetworkInterfaces = async (UUID: string, Interfaces: unknown) => {
   // `internal` does not catch virtual adapters or randomized Wi-Fi addresses.
   await IngestReportedMacAddresses(UUID, CollectReportedMacAddresses(Target.NetworkInterfaces));
   return Ok('Network Interfaces updated successfully');
+};
+
+// --- Incremental telemetry -------------------------------------------------
+// Each of these merges a client-reported change into the cached client. The
+// corresponding Set* method above remains the authority and replaces the state
+// outright on connect and on the periodic resync, so a delta that lands against
+// a stale baseline self-corrects within one resync interval.
+
+Manager.ApplyNetworkInterfaceDelta = async (UUID: string, Delta: unknown) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+  Target.ApplyNetworkInterfaceDelta(Delta);
+  // Same reason as SetNetworkInterfaces: this payload carries the per-address
+  // `internal` flag, and a newly appeared interface may be the only place a
+  // usable MAC (a Wi-Fi adapter's, typically) is ever reported.
+  await IngestReportedMacAddresses(UUID, CollectReportedMacAddresses(Target.NetworkInterfaces));
+  return Ok('Network interface delta applied successfully');
+};
+
+Manager.ApplyDisplayDelta = async (UUID: string, Delta: unknown) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+  Target.ApplyDisplayDelta(Delta);
+  return Ok('Display delta applied successfully');
+};
+
+Manager.ApplyApplicationDelta = async (UUID: string, Delta: unknown) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+  if (addClientToCache(Target)) {
+    BroadcastManager.emit('ClientListChanged');
+  }
+  Target.ApplyApplicationDelta(Delta);
+  return Ok('Application delta applied successfully');
 };
 
 Manager.SetRunningApplications = async (UUID: string, Snapshot: unknown) => {

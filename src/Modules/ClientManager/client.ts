@@ -9,6 +9,7 @@ import type { Result } from '../../types/result';
 import {
   AsRecord,
   normalizeSerialNumber,
+  usbDeviceModelKey,
   normalizeUSBNameKey,
   normalizeApplicationName,
   normalizeApplicationKey,
@@ -43,6 +44,55 @@ function ParseIntOrNull(Value: unknown): number | null {
 // satisfying the `number | null` field type (timestamps are always numeric).
 function TimestampOrNull(Value: unknown): number | null {
   return (Value || null) as number | null;
+}
+
+// Normalize a reported interface list into the shape carried in RAM. Shared by
+// the full-list setter and the delta applier so both paths store identical
+// records — a delta that normalized differently would make an interface look
+// changed on the next full list and flap forever.
+function normalizeNetworkInterfaces(Interfaces: unknown): NormalizedNetworkInterface[] {
+  const List: unknown[] = Array.isArray(Interfaces) ? Interfaces : [];
+  return List.map((rawIface) => {
+    const iface = AsRecord(rawIface);
+    return {
+      name: iface.name ? String(iface.name) : 'unknown',
+      addresses: Array.isArray(iface.addresses)
+        ? iface.addresses.map((rawAddr: unknown) => {
+            const a = AsRecord(rawAddr);
+            return {
+              family: a.family,
+              address: a.address,
+              netmask: a.netmask,
+              cidr: a.cidr || null,
+              mac: a.mac,
+              internal: !!a.internal,
+              scopeid: typeof a.scopeid !== 'undefined' ? a.scopeid : null,
+            };
+          })
+        : [],
+    };
+  });
+}
+
+// Running applications are ordered busiest-first, then alphabetically. Shared by
+// the snapshot setter and the delta applier: the stored signature is derived
+// from this order, so the two paths must sort identically or an applied delta
+// would look like a change to the very next full snapshot.
+function sortRunningApplications(Items: DedupedRunningApplication[]): DedupedRunningApplication[] {
+  return Items.sort((left, right) => {
+    if (right.Count !== left.Count) return right.Count - left.Count;
+    return left.Name.localeCompare(right.Name);
+  });
+}
+
+function runningApplicationsSignature(
+  TotalCount: number,
+  Truncated: boolean,
+  Items: DedupedRunningApplication[]
+): string {
+  return `${TotalCount}|${Truncated ? '1' : '0'}|${Items.map(
+    (Entry) => `${Entry.Name}:${Entry.Count}`
+  ).join('|')}`;
 }
 
 // A display "signature" captures the operator-visible configuration we guard.
@@ -570,6 +620,45 @@ class Client {
     BroadcastManager.emit('ClientUpdated', this);
     return;
   }
+
+  /**
+   * Merge an incremental display change into the connected list.
+   *
+   * Keyed by DisplayID, which is the client's most durable identifier for a
+   * panel (EDID fingerprint where available, falling back through port and
+   * attribute composites). A display whose resolution or refresh rate changed
+   * keeps its DisplayID only when identified by EDID or port — an
+   * attribute-derived id bakes the configuration in, so such a change arrives
+   * as a Removed plus an Added, which merges correctly either way.
+   */
+  ApplyDisplayDelta(Delta: unknown) {
+    const D = AsRecord(Delta);
+    const current = Array.isArray(this.ConnectedDisplayList) ? this.ConnectedDisplayList : [];
+    const byID = new Map<string, ClientDisplay>();
+    for (const display of current) {
+      const ID = normalizeDisplayID(AsRecord(display).DisplayID);
+      if (ID) byID.set(ID, display);
+    }
+
+    for (const rawID of Array.isArray(D.Removed) ? D.Removed : []) {
+      const ID = normalizeDisplayID(rawID);
+      if (ID) byID.delete(ID);
+    }
+    for (const key of ['Added', 'Changed'] as const) {
+      for (const raw of Array.isArray(D[key]) ? (D[key] as unknown[]) : []) {
+        const display = raw as ClientDisplay;
+        const ID = normalizeDisplayID(AsRecord(display).DisplayID);
+        if (ID) byID.set(ID, display);
+      }
+    }
+
+    this.ConnectedDisplayList = Array.from(byID.values());
+    this._rebuildDisplayView();
+    Logger.debug(
+      `Client ${this.UUID} Display delta applied (${this.ConnectedDisplayList.length} displays)`
+    );
+    BroadcastManager.emit('ClientUpdated', this);
+  }
   SetCriticalDisplays(Displays: unknown) {
     const List: unknown[] = Array.isArray(Displays) ? Displays : [];
     const Normalized: CriticalDisplayEntry[] = [];
@@ -1011,32 +1100,53 @@ class Client {
   }
   SetNetworkInterfaces(Interfaces: unknown) {
     try {
-      const List: unknown[] = Array.isArray(Interfaces) ? Interfaces : [];
-      const normalized: NormalizedNetworkInterface[] = List.map((rawIface) => {
-        const iface = AsRecord(rawIface);
-        return {
-          name: iface.name ? String(iface.name) : 'unknown',
-          addresses: Array.isArray(iface.addresses)
-            ? iface.addresses.map((rawAddr: unknown) => {
-                const a = AsRecord(rawAddr);
-                return {
-                  family: a.family,
-                  address: a.address,
-                  netmask: a.netmask,
-                  cidr: a.cidr || null,
-                  mac: a.mac,
-                  internal: !!a.internal,
-                  scopeid: typeof a.scopeid !== 'undefined' ? a.scopeid : null,
-                };
-              })
-            : [],
-        };
-      });
+      const normalized = normalizeNetworkInterfaces(Interfaces);
       this.NetworkInterfaces = normalized;
       Logger.debug(`Client ${this.UUID} Network Interfaces updated (${normalized.length})`);
       BroadcastManager.emit('ClientUpdated', this);
     } catch (e) {
       Logger.error('Failed to set network interfaces for', this.UUID, e);
+    }
+  }
+
+  /**
+   * Merge an incremental interface change into the stored list.
+   *
+   * The full list stays the authority — it arrives on connect and on the
+   * periodic resync and REPLACES this state — so a delta only has to describe
+   * the step between two samples. Anything it gets wrong is corrected within a
+   * resync interval rather than persisting.
+   */
+  ApplyNetworkInterfaceDelta(Delta: unknown) {
+    try {
+      const D = AsRecord(Delta);
+      const byName = new Map<string, NormalizedNetworkInterface>(
+        (Array.isArray(this.NetworkInterfaces) ? this.NetworkInterfaces : []).map((iface) => [
+          iface.name,
+          iface,
+        ])
+      );
+
+      for (const name of Array.isArray(D.Removed) ? D.Removed : []) {
+        if (typeof name === 'string') byName.delete(name);
+      }
+      // Added and Changed are applied identically: both mean "this is the
+      // current state of this interface". Distinguishing them would only matter
+      // if we rejected an add for something already present, and re-announcing
+      // an interface is not an error worth dropping telemetry over.
+      for (const key of ['Added', 'Changed'] as const) {
+        for (const iface of normalizeNetworkInterfaces(D[key])) {
+          byName.set(iface.name, iface);
+        }
+      }
+
+      this.NetworkInterfaces = Array.from(byName.values());
+      Logger.debug(
+        `Client ${this.UUID} Network Interfaces delta applied (${this.NetworkInterfaces.length} interfaces)`
+      );
+      BroadcastManager.emit('ClientUpdated', this);
+    } catch (e) {
+      Logger.error('Failed to apply network interface delta for', this.UUID, e);
     }
   }
   SetScriptsFingerprint(ScriptsFingerprint: unknown) {
@@ -1107,16 +1217,11 @@ class Client {
       Deduped.set(Key, { Name, Count });
     }
 
-    const Items = Array.from(Deduped.values()).sort((left, right) => {
-      if (right.Count !== left.Count) return right.Count - left.Count;
-      return left.Name.localeCompare(right.Name);
-    });
+    const Items = sortRunningApplications(Array.from(Deduped.values()));
     const TotalCount = Math.max(0, parseInt(String(S.TotalCount), 10) || Items.length);
     const Truncated = !!S.Truncated;
     const SampledAt = Number.isFinite(Number(S.SampledAt)) ? Number(S.SampledAt) : Date.now();
-    const Signature = `${TotalCount}|${Truncated ? '1' : '0'}|${Items.map(
-      (Entry) => `${Entry.Name}:${Entry.Count}`
-    ).join('|')}`;
+    const Signature = runningApplicationsSignature(TotalCount, Truncated, Items);
 
     const ShouldSkipItems = !!S.NoChanges;
     if (
@@ -1179,11 +1284,110 @@ class Client {
     this._rebuildRunningApplicationsView();
     BroadcastManager.emit('ClientUpdated', this);
   }
+  /**
+   * Merge an incremental running-application change into the observed snapshot.
+   *
+   * The `ApplicationStarted` / `ApplicationStopped` broadcasts this emits are the
+   * same ones SetRunningApplications derives by diffing consecutive snapshots,
+   * and they drive the alert rules. There is no double-firing risk: once a delta
+   * has been applied, the next full snapshot matches the stored state and its
+   * own diff finds nothing to report.
+   */
+  ApplyApplicationDelta(Delta: unknown) {
+    const D = AsRecord(Delta);
+    const byKey = new Map<string, DedupedRunningApplication>();
+    for (const Entry of Array.isArray(this.ObservedRunningApplications?.Items)
+      ? this.ObservedRunningApplications.Items
+      : []) {
+      const Name = normalizeApplicationName(Entry && Entry.Name);
+      const Key = normalizeApplicationKey(Name);
+      if (!Name || !Key) continue;
+      byKey.set(Key, { Name, Count: Math.max(1, parseInt(String(Entry.Count), 10) || 1) });
+    }
+
+    const Started: DedupedRunningApplication[] = [];
+    const Stopped: DedupedRunningApplication[] = [];
+
+    for (const raw of Array.isArray(D.Stopped) ? D.Stopped : []) {
+      // Stopped carries bare names; the started/changed lists carry entries.
+      const Name = normalizeApplicationName(typeof raw === 'string' ? raw : AsRecord(raw).Name);
+      const Key = normalizeApplicationKey(Name);
+      if (!Key) continue;
+      const Existing = byKey.get(Key);
+      if (!Existing) continue;
+      byKey.delete(Key);
+      Stopped.push(Existing);
+    }
+
+    for (const key of ['Started', 'Changed'] as const) {
+      for (const raw of Array.isArray(D[key]) ? (D[key] as unknown[]) : []) {
+        const Entry = AsRecord(raw);
+        const Name = normalizeApplicationName(Entry.Name);
+        const AppKey = normalizeApplicationKey(Name);
+        if (!Name || !AppKey) continue;
+        const Count = Math.max(1, parseInt(String(Entry.Count), 10) || 1);
+        // Only a genuinely new key is a start. A "Changed" entry for something
+        // we had not seen still counts as one, which keeps the alert correct
+        // when a delta arrives against a stale baseline.
+        if (!byKey.has(AppKey)) Started.push({ Name, Count });
+        byKey.set(AppKey, { Name, Count });
+      }
+    }
+
+    const Items = sortRunningApplications(Array.from(byKey.values()));
+    const TotalCount = Number.isFinite(Number(D.TotalCount))
+      ? Math.max(0, Number(D.TotalCount))
+      : Items.length;
+    const Truncated = !!D.Truncated;
+    const SampledAt = Number.isFinite(Number(D.SampledAt)) ? Number(D.SampledAt) : Date.now();
+    const RawStatus = AsRecord(D.Status);
+    const Status = {
+      State:
+        typeof RawStatus.State === 'string' && RawStatus.State.trim().length > 0
+          ? RawStatus.State.trim().toLowerCase()
+          : this.ObservedRunningApplications?.Status?.State || 'ok',
+      Message:
+        typeof RawStatus.Message === 'string' && RawStatus.Message.trim().length > 0
+          ? RawStatus.Message.trim()
+          : null,
+      Platform:
+        typeof RawStatus.Platform === 'string' && RawStatus.Platform.trim().length > 0
+          ? RawStatus.Platform.trim()
+          : this.ObservedRunningApplications?.Status?.Platform || null,
+    };
+
+    this.ObservedRunningApplications = { SampledAt, TotalCount, Truncated, Items, Status };
+    this.ObservedRunningApplicationsSignature = runningApplicationsSignature(
+      TotalCount,
+      Truncated,
+      Items
+    );
+
+    for (const Entry of Started) {
+      BroadcastManager.emit('ApplicationStarted', this, { Name: Entry.Name, Count: Entry.Count });
+    }
+    for (const Entry of Stopped) {
+      BroadcastManager.emit('ApplicationStopped', this, { Name: Entry.Name, Count: Entry.Count });
+    }
+
+    this._rebuildRunningApplicationsView();
+    BroadcastManager.emit('ClientUpdated', this);
+  }
+
   async USBDeviceAdded(Device: USBDevice) {
     const AddedSerial = normalizeSerialNumber(Device && Device.SerialNumber);
-    this.ConnectedUSBDeviceList = (
-      Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : []
-    ).filter((Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) !== AddedSerial);
+    const Current = Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : [];
+    // A serial number identifies one physical device, so re-announcing it
+    // replaces the existing entry rather than duplicating it. Without one there
+    // is nothing to match on: matching by serial anyway meant every OTHER
+    // serial-less device (null === null) was filtered out, so plugging in one
+    // unserialised device erased the rest from the list. Nothing distinguishes
+    // two identical serial-less devices, so an add is simply an add.
+    this.ConnectedUSBDeviceList = AddedSerial
+      ? Current.filter(
+          (Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) !== AddedSerial
+        )
+      : Current.slice();
     this.ConnectedUSBDeviceList.push(Device || {});
     this._rebuildUSBDeviceView();
     BroadcastManager.emit('ClientUpdated', this);
@@ -1192,9 +1396,23 @@ class Client {
   }
   async USBDeviceRemoved(Device: USBDevice) {
     const RemovedSerial = normalizeSerialNumber(Device && Device.SerialNumber);
-    this.ConnectedUSBDeviceList = (
-      Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : []
-    ).filter((Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) !== RemovedSerial);
+    const Current = Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : [];
+    if (RemovedSerial) {
+      this.ConnectedUSBDeviceList = Current.filter(
+        (Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) !== RemovedSerial
+      );
+    } else {
+      // Unplugging one serial-less device used to remove every serial-less
+      // device. Drop a single entry matching this device's make/model instead,
+      // leaving any identical siblings connected.
+      const Index = Current.findIndex(
+        (Entry) =>
+          !normalizeSerialNumber(Entry && Entry.SerialNumber) &&
+          usbDeviceModelKey(Entry) === usbDeviceModelKey(Device)
+      );
+      this.ConnectedUSBDeviceList =
+        Index === -1 ? Current.slice() : Current.slice(0, Index).concat(Current.slice(Index + 1));
+    }
     this._rebuildUSBDeviceView();
     BroadcastManager.emit('ClientUpdated', this);
     BroadcastManager.emit('USBDeviceRemoved', this, Device);

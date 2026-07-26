@@ -1458,3 +1458,124 @@ test('Web UI login lockout releases after the cooldown elapses', () => {
   ClearLoginFailures(ip);
   assert.equal(LoginRetryAfterMs(ip, t0 + LOGIN_LOCKOUT_MS + 2), 0);
 });
+
+// Incremental telemetry at the namespace boundary: the capability handshake, the
+// delta handlers, and the ordering guarantee they depend on.
+function setupDeltaNamespace({ applyDelay = 0 } = {}) {
+  const applied = [];
+  const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
+    '../Logger': loggerStub,
+    '../AdoptionManager': {
+      Manager: { AddClientPendingAdoption: async () => {}, RemoveClientPendingAdoption: () => {} },
+    },
+    '../ClientManager': {
+      Manager: {
+        Exists: async () => true,
+        Get: async (uuid) => [null, { UUID: uuid, Online: true }],
+        Heartbeat: async () => [null, 'ok'],
+        SetDisplayList: async (_uuid, list) => {
+          // A deliberate suspension point, so an unserialised handler would
+          // interleave here and let a later event finish first.
+          if (applyDelay) await new Promise((resolve) => setTimeout(resolve, applyDelay));
+          applied.push(['SetDisplayList', list]);
+        },
+        ApplyDisplayDelta: async (_uuid, delta) => {
+          applied.push(['ApplyDisplayDelta', delta]);
+        },
+        ApplyNetworkInterfaceDelta: async (_uuid, delta) => {
+          applied.push(['ApplyNetworkInterfaceDelta', delta]);
+        },
+        ApplyApplicationDelta: async (_uuid, delta) => {
+          applied.push(['ApplyApplicationDelta', delta]);
+        },
+        Timeout: async () => {},
+      },
+    },
+    '../ScriptManager': { Manager: { GetScripts: async () => [] } },
+    '../ScriptExecutionManager': { Manager: { Complete: async () => {} } },
+    '../ServerIdentity': { Manager: { GetIdentityToken: () => 'server-token-1' } },
+  });
+
+  let connectionHandler;
+  SetupClientNamespace({ on: (_e, h) => (connectionHandler = h) });
+  const socket = makeSocket({
+    query: { UUID: 'client-1', Adopted: 'true' },
+    address: '127.0.0.1',
+    headers: {},
+  });
+  return { connectionHandler, socket, applied };
+}
+
+test('the server advertises delta support to a client that asks', async () => {
+  const H = setupDeltaNamespace();
+  await H.connectionHandler(H.socket);
+
+  let capabilities = null;
+  await H.socket.trigger('GetServerCapabilities', (caps) => (capabilities = caps));
+  // The client treats a missing reply as "no deltas", so this acknowledgement is
+  // the entire opt-in mechanism.
+  assert.deepEqual(capabilities, { Deltas: true });
+});
+
+test('delta events reach their ClientManager appliers', async () => {
+  const H = setupDeltaNamespace();
+  await H.connectionHandler(H.socket);
+
+  await H.socket.trigger('NetworkInterfaceDelta', {
+    Added: [{ name: 'utun0', addresses: [] }],
+    Removed: [],
+    Changed: [],
+  });
+  await H.socket.trigger('DisplayDelta', {
+    Added: [],
+    Removed: ['edid:A'],
+    Changed: [],
+  });
+  await H.socket.trigger('ApplicationDelta', {
+    Started: [{ Name: 'QLab', Count: 1 }],
+    Stopped: [],
+    Changed: [],
+    SampledAt: 1,
+    TotalCount: 1,
+    Truncated: false,
+    Status: { State: 'ok' },
+  });
+
+  assert.deepEqual(
+    H.applied.map(([method]) => method),
+    ['ApplyNetworkInterfaceDelta', 'ApplyDisplayDelta', 'ApplyApplicationDelta']
+  );
+  assert.equal(H.applied[0][1].Added[0].name, 'utun0');
+  assert.deepEqual(H.applied[1][1].Removed, ['edid:A']);
+  assert.equal(H.applied[2][1].Started[0].Name, 'QLab');
+});
+
+test('a malformed delta is dropped rather than applied', async () => {
+  const H = setupDeltaNamespace();
+  await H.connectionHandler(H.socket);
+  await H.socket.trigger('DisplayDelta', 'not an object');
+  await H.socket.trigger('NetworkInterfaceDelta', null);
+  assert.deepEqual(H.applied, []);
+});
+
+test('a slow full list cannot be overtaken by the delta that followed it', async () => {
+  // Socket.IO dispatches in order but does not await the listener, so without
+  // the serial chain both handlers start, the fast delta finishes first, and the
+  // resync then lands on top and silently undoes the newer change.
+  const H = setupDeltaNamespace({ applyDelay: 20 });
+  await H.connectionHandler(H.socket);
+
+  const slow = H.socket.trigger('DisplayList', [{ DisplayID: 'edid:A' }]);
+  const fast = H.socket.trigger('DisplayDelta', {
+    Added: [{ DisplayID: 'edid:B' }],
+    Removed: [],
+    Changed: [],
+  });
+  await Promise.all([slow, fast]);
+
+  assert.deepEqual(
+    H.applied.map(([method]) => method),
+    ['SetDisplayList', 'ApplyDisplayDelta'],
+    'the resync must be applied before the delta that was sent after it'
+  );
+});

@@ -78,10 +78,28 @@ function makeGuardedOn(
   socket: ClientSocket,
   logValidationFailure: (event: string, error: unknown) => void
 ) {
+  /**
+   * Tail of the serialized telemetry chain for this socket.
+   *
+   * Socket.IO dispatches a connection's events in arrival order, but it does not
+   * await the listener — so two async handlers dispatched back to back can both
+   * begin, suspend at their first `await ClientManager.Get(...)`, and then apply
+   * their mutations in either order. That is harmless while every event replaces
+   * the whole list, and not harmless at all once incremental deltas are in play:
+   * a full-list resync overtaking the delta that followed it would silently undo
+   * the newer change until the next resync.
+   *
+   * Handlers registered with `{ serial: true }` are chained here so their bodies
+   * run strictly in the order the events arrived. Everything else (script
+   * responses, identify, launch config) is unaffected.
+   */
+  let telemetryTail: Promise<unknown> = Promise.resolve();
+
   return function GuardedOn(
     event: string,
     validate: ((...args: unknown[]) => unknown[]) | null,
-    handler: (...args: never[]) => unknown
+    handler: (...args: never[]) => unknown,
+    options: { serial?: boolean } = {}
   ) {
     // Events are registered dynamically by name (some are reserved, e.g.
     // 'disconnect'), so the strictly-typed `on` is widened to a string-keyed
@@ -102,11 +120,18 @@ function makeGuardedOn(
           return;
         }
       }
-      try {
-        await (handler as (...args: unknown[]) => unknown)(...normalized);
-      } catch (e) {
-        Logger.error(`${event} handler error for`, socket.UUID || socket.id, e);
-      }
+      const run = async () => {
+        try {
+          await (handler as (...args: unknown[]) => unknown)(...normalized);
+        } catch (e) {
+          Logger.error(`${event} handler error for`, socket.UUID || socket.id, e);
+        }
+      };
+      if (!options.serial) return run();
+      // `run` swallows its own failures, so the chain can never be poisoned;
+      // the second argument is belt-and-braces against an unexpected rejection.
+      telemetryTail = telemetryTail.then(run, run);
+      await telemetryTail;
     });
   };
 }
@@ -334,7 +359,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
         await ClientManager.SetUSBDeviceList(socket.UUID, DeviceList);
         const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
         if (!ClientErr && Client) recordClientUSBHistorySamples(Client);
-      }
+      },
+      { serial: true }
     );
 
     GuardedOn(
@@ -347,7 +373,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
         await ClientManager.USBDeviceAdded(socket.UUID, Device);
         const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
         if (!ClientErr && Client) recordClientUSBHistorySamples(Client);
-      }
+      },
+      { serial: true }
     );
 
     GuardedOn(
@@ -360,7 +387,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
         await ClientManager.USBDeviceRemoved(socket.UUID, Device);
         const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
         if (!ClientErr && Client) recordClientUSBHistorySamples(Client);
-      }
+      },
+      { serial: true }
     );
 
     GuardedOn(
@@ -375,7 +403,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
         await ClientManager.SetDisplayList(socket.UUID, DisplayList);
         const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
         if (!ClientErr && Client) recordClientDisplayHistorySamples(Client);
-      }
+      },
+      { serial: true }
     );
 
     GuardedOn(
@@ -386,7 +415,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
           `Network interfaces received from ${socket.UUID} (${Interfaces.length} interfaces)`
         );
         await ClientManager.SetNetworkInterfaces(socket.UUID, Interfaces);
-      }
+      },
+      { serial: true }
     );
 
     GuardedOn(
@@ -403,7 +433,76 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
           recordClientUSBHistorySamples(Client, Snapshot.SampledAt);
           recordClientDisplayHistorySamples(Client, Snapshot.SampledAt);
         }
+      },
+      { serial: true }
+    );
+
+    /**
+     * Capability handshake.
+     *
+     * A client asks once per connection what this server understands, and only
+     * starts sending `*Delta` events if the reply says so. A server that predates
+     * this event simply never invokes the acknowledgement, and the client stays on
+     * full-list reporting — which is why the client must treat "no reply" as
+     * "no deltas" rather than applying a default.
+     */
+    GuardedOn(
+      'GetServerCapabilities',
+      (Callback) => {
+        if (typeof Callback !== 'function')
+          throw new Error('GetServerCapabilities requires an ack callback');
+        return [Callback];
+      },
+      async (Callback: (capabilities: { Deltas: boolean }) => void) => {
+        Callback({ Deltas: true });
       }
+    );
+
+    // --- Incremental telemetry ---------------------------------------------
+    // Each delta amends the state its full-list counterpart above replaces. They
+    // are serialized with those handlers so a resync can never be overtaken by a
+    // delta that was sent after it.
+
+    GuardedOn(
+      'NetworkInterfaceDelta',
+      (Delta) => [SocketValidation.NetworkInterfaceDelta(Delta)],
+      async (Delta: ReturnType<typeof SocketValidation.NetworkInterfaceDelta>) => {
+        Logger.debug(
+          `Network interface delta from ${socket.UUID} (+${Delta.Added.length} -${Delta.Removed.length} ~${Delta.Changed.length})`
+        );
+        await ClientManager.ApplyNetworkInterfaceDelta(socket.UUID, Delta);
+      },
+      { serial: true }
+    );
+
+    GuardedOn(
+      'DisplayDelta',
+      (Delta) => [SocketValidation.DisplayDelta(Delta)],
+      async (Delta: ReturnType<typeof SocketValidation.DisplayDelta>) => {
+        Logger.log(
+          `Display delta from ${socket.UUID} (+${Delta.Added.length} -${Delta.Removed.length} ~${Delta.Changed.length})`
+        );
+        await ClientManager.ApplyDisplayDelta(socket.UUID, Delta);
+        const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
+        if (!ClientErr && Client) recordClientDisplayHistorySamples(Client);
+      },
+      { serial: true }
+    );
+
+    GuardedOn(
+      'ApplicationDelta',
+      (Delta) => [SocketValidation.ApplicationDelta(Delta)],
+      async (Delta: ReturnType<typeof SocketValidation.ApplicationDelta>) => {
+        Logger.debug(
+          `Application delta from ${socket.UUID} (+${Delta.Started.length} -${Delta.Stopped.length} ~${Delta.Changed.length})`
+        );
+        await ClientManager.ApplyApplicationDelta(socket.UUID, Delta);
+        const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
+        if (!ClientErr && Client) {
+          recordClientApplicationHistorySamples(Client, Delta.SampledAt);
+        }
+      },
+      { serial: true }
     );
 
     // Cleanup on disconnect: clear adoption entry and mark offline

@@ -23,6 +23,9 @@ import {
 const MAX_USB_DEVICES = 512;
 const MAX_DISPLAYS = 64;
 const MAX_NETWORK_INTERFACES = 64;
+// A dual-stack NIC reports an IPv4 address plus a link-local and any number of
+// global IPv6 addresses; a generous cap still bounds the payload.
+const MAX_ADDRESSES_PER_INTERFACE = 64;
 const MAX_RUNNING_APPLICATIONS = 4096;
 const MAX_INTEGRATED_ACTIONS = 256;
 
@@ -215,6 +218,37 @@ function DisplayList(value: unknown) {
   return list.map((display, index) => Display(display, `DisplayList[${index}]`));
 }
 
+// One address on a reported interface. A single NIC carries several — IPv4 plus
+// one or more IPv6 — which is why the wire shape nests them.
+function NetworkInterfaceAddress(value: unknown, fieldName: string) {
+  if (!isPlainObject(value)) fail(`${fieldName} must be an object`);
+  return {
+    family: normalizeOptionalString(value.family, `${fieldName}.family`, { maxLength: 16 }),
+    address: normalizeOptionalString(value.address, `${fieldName}.address`, { maxLength: 64 }),
+    netmask: normalizeOptionalString(value.netmask, `${fieldName}.netmask`, { maxLength: 64 }),
+    cidr: normalizeOptionalString(value.cidr, `${fieldName}.cidr`, { maxLength: 64 }),
+    mac: normalizeOptionalString(value.mac, `${fieldName}.mac`, { maxLength: 64 }),
+    internal: value.internal === true,
+    scopeid: normalizeOptionalFiniteNumber(value.scopeid, `${fieldName}.scopeid`),
+  };
+}
+
+/**
+ * The client's `NetworkInterfaces` payload: `[{ name, addresses[] }]`.
+ *
+ * This validator previously reconstructed a FLAT, PascalCase shape
+ * (`{ Name, Address, MAC, Family, Internal }`) that nothing on either side ever
+ * produced or consumed. Because the reconstruction reads named fields off the
+ * incoming object, every one of them resolved to undefined and the whole
+ * payload was rewritten to nulls before any manager saw it — the client record
+ * then stored `{ name: 'unknown', addresses: [] }` for every interface, and
+ * CollectReportedMacAddresses found no MACs to ingest. The visible symptom was
+ * Wi-Fi never appearing on a client, since a wired NIC still arrives separately
+ * through SystemInfo's MacAddresses map while Wi-Fi only reaches the server here.
+ *
+ * The shape below is the one documented on `NetworkInterface` in the protocol
+ * package, and the one the client-info modal reads.
+ */
 function NetworkInterfaces(value: unknown) {
   const list = normalizeBoundedArray(value, 'NetworkInterfaces', {
     maxItems: MAX_NETWORK_INTERFACES,
@@ -222,14 +256,86 @@ function NetworkInterfaces(value: unknown) {
   return list.map((item, index) => {
     const fieldName = `NetworkInterfaces[${index}]`;
     if (!isPlainObject(item)) fail(`${fieldName} must be an object`);
+    const addresses = normalizeBoundedArray(item.addresses ?? [], `${fieldName}.addresses`, {
+      maxItems: MAX_ADDRESSES_PER_INTERFACE,
+    });
     return {
-      Name: normalizeOptionalString(item.Name, `${fieldName}.Name`, { maxLength: 128 }),
-      Address: normalizeOptionalString(item.Address, `${fieldName}.Address`, { maxLength: 64 }),
-      MAC: normalizeOptionalString(item.MAC, `${fieldName}.MAC`, { maxLength: 64 }),
-      Family: normalizeOptionalString(item.Family, `${fieldName}.Family`, { maxLength: 16 }),
-      Internal: item.Internal === true,
+      name: normalizeOptionalString(item.name, `${fieldName}.name`, { maxLength: 128 }),
+      addresses: addresses.map((address, addressIndex) =>
+        NetworkInterfaceAddress(address, `${fieldName}.addresses[${addressIndex}]`)
+      ),
     };
   });
+}
+
+// Health of the client's application collector. Shared by the full snapshot and
+// the delta, which both carry it — a permission failure has to reach the UI
+// whichever path the client is reporting on.
+function RunningApplicationsStatus(value: unknown) {
+  if (!isPlainObject(value)) return null;
+  return {
+    State: normalizeOptionalString(value.State, 'Status.State', { maxLength: 32 }) || 'ok',
+    Message: normalizeOptionalString(value.Message, 'Status.Message', { maxLength: 512 }),
+    Platform: normalizeOptionalString(value.Platform, 'Status.Platform', { maxLength: 32 }),
+  };
+}
+
+// --- Incremental telemetry -------------------------------------------------
+// A delta is untrusted input like everything else here, and is bounded by the
+// same per-domain caps as the full list it amends: a client cannot use a delta
+// to smuggle in a larger payload than a snapshot would allow.
+
+function RemovedKeys(value: unknown, fieldName: string, maxItems: number): string[] {
+  const list = normalizeBoundedArray(value ?? [], fieldName, { maxItems });
+  return list.flatMap((entry, index) => {
+    const name = normalizeOptionalString(entry, `${fieldName}[${index}]`, { maxLength: 128 });
+    return name ? [name] : [];
+  });
+}
+
+function NetworkInterfaceDelta(value: unknown) {
+  if (!isPlainObject(value)) fail('NetworkInterfaceDelta payload must be an object');
+  return {
+    Added: NetworkInterfaces(value.Added ?? []),
+    Changed: NetworkInterfaces(value.Changed ?? []),
+    Removed: RemovedKeys(value.Removed, 'NetworkInterfaceDelta.Removed', MAX_NETWORK_INTERFACES),
+  };
+}
+
+function DisplayDelta(value: unknown) {
+  if (!isPlainObject(value)) fail('DisplayDelta payload must be an object');
+  return {
+    Added: DisplayList(value.Added ?? []),
+    Changed: DisplayList(value.Changed ?? []),
+    Removed: RemovedKeys(value.Removed, 'DisplayDelta.Removed', MAX_DISPLAYS),
+  };
+}
+
+function ApplicationDelta(value: unknown) {
+  if (!isPlainObject(value)) fail('ApplicationDelta payload must be an object');
+  const entries = (raw: unknown, fieldName: string) => {
+    const list = normalizeBoundedArray(raw ?? [], fieldName, {
+      maxItems: MAX_RUNNING_APPLICATIONS,
+    });
+    return list.flatMap((item, index) => {
+      if (!isPlainObject(item)) fail(`${fieldName}[${index}] must be an object`);
+      const Name = normalizeOptionalString(item.Name, `${fieldName}[${index}].Name`, {
+        maxLength: 256,
+      });
+      if (!Name) return [];
+      const Count = normalizeOptionalFiniteNumber(item.Count, `${fieldName}[${index}].Count`);
+      return [{ Name, Count: Count && Count > 0 ? Math.floor(Count) : 1 }];
+    });
+  };
+  return {
+    Started: entries(value.Started, 'ApplicationDelta.Started'),
+    Changed: entries(value.Changed, 'ApplicationDelta.Changed'),
+    Stopped: RemovedKeys(value.Stopped, 'ApplicationDelta.Stopped', MAX_RUNNING_APPLICATIONS),
+    SampledAt: normalizeOptionalFiniteNumber(value.SampledAt, 'ApplicationDelta.SampledAt'),
+    TotalCount: normalizeOptionalFiniteNumber(value.TotalCount, 'ApplicationDelta.TotalCount'),
+    Truncated: value.Truncated === true,
+    Status: RunningApplicationsStatus(value.Status),
+  };
 }
 
 function RunningApplications(value: unknown): Record<string, unknown> {
@@ -247,18 +353,7 @@ function RunningApplications(value: unknown): Record<string, unknown> {
       return [{ Name, Count: Count === null ? 1 : Count }];
     });
   }
-  const Status = isPlainObject(value.Status)
-    ? {
-        State:
-          normalizeOptionalString(value.Status.State, 'Status.State', { maxLength: 32 }) || 'ok',
-        Message: normalizeOptionalString(value.Status.Message, 'Status.Message', {
-          maxLength: 512,
-        }),
-        Platform: normalizeOptionalString(value.Status.Platform, 'Status.Platform', {
-          maxLength: 32,
-        }),
-      }
-    : null;
+  const Status = RunningApplicationsStatus(value.Status);
   return {
     SampledAt: normalizeOptionalFiniteNumber(value.SampledAt, 'SampledAt'),
     TotalCount: normalizeOptionalFiniteNumber(value.TotalCount, 'TotalCount'),
@@ -314,6 +409,9 @@ export const Manager = {
   DisplayList,
   NetworkInterfaces,
   RunningApplications,
+  NetworkInterfaceDelta,
+  DisplayDelta,
+  ApplicationDelta,
   RegisterActions,
   IntegratedState,
   RequestID,
