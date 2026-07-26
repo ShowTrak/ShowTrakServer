@@ -1,6 +1,7 @@
 {
   "name": "showtrak-server",
   "productName": "ShowTrak Server",
+  "private": true,
   "version": "3.16.1",
   "description": "Open source network/device monitoring & control for bulk installations.",
   "main": "dist/main.js",
@@ -18,6 +19,7 @@
     "start": "nodemon --watch src --watch shared --watch scripts --ignore \"src/UI/css/main.css\" --ignore \"shared/dist/**\" --ext ts,js,mjs,cjs,json,css,html,svg,png,ico --exec \"npm run build && electron-forge start\"",
     "premake": "npm run build",
     "make": "electron-forge make",
+    "publish": "node scripts/publish-release.js",
     "lint": "eslint",
     "lint:fix": "eslint . --fix",
     "format": "prettier \"**/*.{js,mjs,cjs,ts,css,md,json,html}\" --write",
