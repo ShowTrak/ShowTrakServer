@@ -52,6 +52,10 @@ jobs:
             SHOULD_DRAFT_RELEASE="true"
           fi
 
+          # This label becomes the release title and notes. signed-notarized is
+          # the normal path, so it stays plain -- the label exists to call out a
+          # build that is NOT the usual one, which is the case worth noticing on
+          # a release page.
           case "$VARIANT" in
             unsigned)
               LABEL="Unsigned Build & Release"
@@ -61,7 +65,7 @@ jobs:
               ;;
             *)
               VARIANT="signed-notarized"
-              LABEL="Signed + Notarized Build & Release"
+              LABEL="Release"
               ;;
           esac
 
