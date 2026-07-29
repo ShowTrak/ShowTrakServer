@@ -250,8 +250,9 @@ const Manager = {
     }
   },
 
-  // Convert a pending request to Failed after Timeout ms, if still pending
-  SetTimeout(RequestID: string, Timeout: number): void {
+  // Convert a pending request to Failed after Timeout ms, if still pending.
+  // Label names what timed out in the error shown to the operator.
+  SetTimeout(RequestID: string, Timeout: number, Label = 'Script execution'): void {
     const Target = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
     if (!Target) return;
     // Replace any timer already armed for this request (e.g. a re-queue).
@@ -263,7 +264,7 @@ const Manager = {
       if (Request.Status === 'Pending') {
         Request.Status = 'Failed';
         Request.StatusText = 'Failed';
-        Request.Error = 'Script execution timed out after ' + Timeout + 'ms';
+        Request.Error = Label + ' timed out after ' + Timeout + 'ms';
         Request.Timer.End = Date.now();
         Request.Timer.Duration = Request.Timer.End - Request.Timer.Start;
       }
@@ -382,7 +383,10 @@ const Manager = {
     return !!(Request && Request.Status === 'Pending');
   },
 
-  // Update request progress without completing the task.
+  // Update request progress without completing the task. Passing null for
+  // Progress leaves the current value alone, which is how a caller that only
+  // has a status line to report (an integrated event's feedback) updates the
+  // text without knocking the bar back to zero.
   async UpdateProgress(
     RequestID: string,
     Progress: unknown = 0,
@@ -392,12 +396,14 @@ const Manager = {
     if (!Request) return;
     if (Request.Status !== 'Pending') return;
 
-    let NormalizedProgress = Number(Progress);
-    if (!Number.isFinite(NormalizedProgress)) NormalizedProgress = 0;
-    if (NormalizedProgress < 0) NormalizedProgress = 0;
-    if (NormalizedProgress > 100) NormalizedProgress = 100;
+    if (Progress !== null) {
+      let NormalizedProgress = Number(Progress);
+      if (!Number.isFinite(NormalizedProgress)) NormalizedProgress = 0;
+      if (NormalizedProgress < 0) NormalizedProgress = 0;
+      if (NormalizedProgress > 100) NormalizedProgress = 100;
 
-    Request.Progress = Math.round(NormalizedProgress);
+      Request.Progress = Math.round(NormalizedProgress);
+    }
     if (typeof StatusText === 'string' && StatusText.trim().length > 0) {
       Request.StatusText = StatusText.trim();
     }

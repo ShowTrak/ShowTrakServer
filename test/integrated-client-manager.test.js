@@ -7,11 +7,20 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
-const { NormalizeIntegratedActions } = require('../dist/Modules/ClientManager/integrated-actions');
+const {
+  NormalizeIntegratedActions,
+  DEFAULT_ACTION_ICON,
+} = require('../dist/Modules/ClientManager/integrated-actions');
 
 test('NormalizeIntegratedActions keeps valid actions and clamps colour index', () => {
   const result = NormalizeIntegratedActions([
-    { ID: 'SetBoxRed', Label: 'Set Box Red', ColourIndex: 0, HasFeedback: true },
+    {
+      ID: 'SetBoxRed',
+      Label: 'Set Box Red',
+      ColourIndex: 0,
+      Icon: 'circle-fill',
+      HasFeedback: true,
+    },
     { ID: 'SetBoxBlue', Label: 'Set Box Blue', ColourIndex: 99, HasFeedback: false },
   ]);
   assert.equal(result.length, 2);
@@ -19,7 +28,9 @@ test('NormalizeIntegratedActions keeps valid actions and clamps colour index', (
     ID: 'SetBoxRed',
     Label: 'Set Box Red',
     ColourIndex: 0,
+    Icon: 'circle-fill',
     HasFeedback: true,
+    TimeoutMs: 15000,
   });
   // Out-of-range colour index is clamped to the neutral dark grey (7).
   assert.equal(result[1].ColourIndex, 7);
@@ -41,6 +52,30 @@ test('NormalizeIntegratedActions drops invalid entries and deduplicates by ID', 
   assert.equal(result[0].Label, 'Good');
   assert.equal(result[0].ColourIndex, 7);
   assert.equal(result[0].HasFeedback, false);
+  // An SDK that predates icons sends none; the default glyph stands in.
+  assert.equal(result[0].Icon, DEFAULT_ACTION_ICON);
+});
+
+test('NormalizeIntegratedActions normalizes icons and defaults unusable ones', () => {
+  const result = NormalizeIntegratedActions([
+    { ID: 'Bare', Icon: 'lightning-charge-fill' },
+    { ID: 'Prefixed', Icon: 'bi-terminal' },
+    { ID: 'FullClass', Icon: 'bi bi-droplet-fill' },
+    { ID: 'Padded', Icon: '  Circle-Fill  ' },
+    { ID: 'Blank', Icon: '   ' },
+    { ID: 'Illegal', Icon: 'terminal<script>' },
+    { ID: 'WrongType', Icon: 42 },
+    { ID: 'TooLong', Icon: 'a'.repeat(65) },
+  ]);
+  const ByID = Object.fromEntries(result.map((Action) => [Action.ID, Action.Icon]));
+  assert.equal(ByID.Bare, 'lightning-charge-fill');
+  assert.equal(ByID.Prefixed, 'terminal');
+  assert.equal(ByID.FullClass, 'droplet-fill');
+  assert.equal(ByID.Padded, 'circle-fill');
+  assert.equal(ByID.Blank, DEFAULT_ACTION_ICON);
+  assert.equal(ByID.Illegal, DEFAULT_ACTION_ICON);
+  assert.equal(ByID.WrongType, DEFAULT_ACTION_ICON);
+  assert.equal(ByID.TooLong, DEFAULT_ACTION_ICON);
 });
 
 test('NormalizeIntegratedActions returns empty array for non-array input', () => {
@@ -188,4 +223,23 @@ test('Client.SetVitals normalizes partial vitals to a safe shape', async () => {
   assert.equal(typeof Client.Vitals.CPU, 'object');
   assert.equal(typeof Client.Vitals.Uptime, 'object');
   assert.equal(Client.Vitals.Ram.UsagePercentage, 42);
+});
+
+test('NormalizeIntegratedActions clamps the declared handler timeout', () => {
+  const result = NormalizeIntegratedActions([
+    { ID: 'Default' },
+    { ID: 'Explicit', TimeoutMs: 20000 },
+    { ID: 'Stringy', TimeoutMs: '30000' },
+    { ID: 'TooSmall', TimeoutMs: 5 },
+    { ID: 'TooBig', TimeoutMs: 99999999 },
+    { ID: 'Nonsense', TimeoutMs: 'soon' },
+  ]);
+  const ByID = Object.fromEntries(result.map((Action) => [Action.ID, Action.TimeoutMs]));
+  // An SDK that predates the field gets the server's default.
+  assert.equal(ByID.Default, 15000);
+  assert.equal(ByID.Explicit, 20000);
+  assert.equal(ByID.Stringy, 30000);
+  assert.equal(ByID.TooSmall, 1000);
+  assert.equal(ByID.TooBig, 600000);
+  assert.equal(ByID.Nonsense, 15000);
 });

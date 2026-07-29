@@ -19,6 +19,7 @@ import {
   normalizeOptionalFiniteNumber,
   normalizeOptionalString,
 } from '../Validation/primitives';
+import { INTEGRATED_EVENT_MAX_FEEDBACK_LENGTH } from '../Config/constants';
 
 const MAX_USB_DEVICES = 512;
 const MAX_DISPLAYS = 64;
@@ -57,9 +58,26 @@ function AdoptionHeartbeat(data: unknown): {
   };
 }
 
+// Vitals are display-only telemetry. A malformed one is dropped and reported
+// rather than failing the whole heartbeat, because failing the heartbeat stops
+// the client being marked online — so a cosmetic value in the wrong type would
+// make a healthy device read as offline indefinitely. Everything that survives
+// is still normalized and bounded exactly as before.
+function Tolerate<T>(compute: () => T, onWarn?: (message: string) => void): T | null {
+  try {
+    return compute();
+  } catch (error) {
+    if (onWarn) onWarn(error instanceof Error ? error.message : String(error));
+    return null;
+  }
+}
+
 // Heartbeat payloads arrive every second per client; validate structure and
 // bound the strings, passing vitals through with only known fields.
-function Heartbeat(data: unknown): {
+function Heartbeat(
+  data: unknown,
+  onWarn?: (message: string) => void
+): {
   Version: string | null;
   Vitals: Record<string, unknown> | null;
   ScriptsFingerprint: string | null;
@@ -70,35 +88,58 @@ function Heartbeat(data: unknown): {
     if (!isPlainObject(data.Vitals)) fail('Vitals must be an object when present');
     const raw = data.Vitals;
     Vitals = {};
-    if (raw.CPU !== undefined) {
-      if (!isPlainObject(raw.CPU)) fail('Vitals.CPU must be an object');
-      Vitals.CPU = {
-        UsagePercentage: normalizeOptionalFiniteNumber(
-          raw.CPU.UsagePercentage,
-          'Vitals.CPU.UsagePercentage'
-        ),
-      };
+    const CPU = raw.CPU;
+    if (CPU !== undefined) {
+      const Normalized = Tolerate(() => {
+        if (!isPlainObject(CPU)) fail('Vitals.CPU must be an object');
+        return {
+          UsagePercentage: normalizeOptionalFiniteNumber(
+            CPU.UsagePercentage,
+            'Vitals.CPU.UsagePercentage'
+          ),
+        };
+      }, onWarn);
+      if (Normalized) Vitals.CPU = Normalized;
     }
-    if (raw.Ram !== undefined) {
-      if (!isPlainObject(raw.Ram)) fail('Vitals.Ram must be an object');
-      Vitals.Ram = {
-        Total: normalizeOptionalFiniteNumber(raw.Ram.Total, 'Vitals.Ram.Total'),
-        Used: normalizeOptionalFiniteNumber(raw.Ram.Used, 'Vitals.Ram.Used'),
-        // Transmitted as a string (Number#toFixed) per shared/src/vitals.d.ts.
-        UsagePercentage: normalizeOptionalString(
-          raw.Ram.UsagePercentage,
-          'Vitals.Ram.UsagePercentage',
-          { maxLength: 16 }
-        ),
-      };
+    const Ram = raw.Ram;
+    if (Ram !== undefined) {
+      const Normalized = Tolerate(() => {
+        if (!isPlainObject(Ram)) fail('Vitals.Ram must be an object');
+        // Each field is tolerated on its own so one bad value does not cost
+        // the other two.
+        return {
+          Total: Tolerate(
+            () => normalizeOptionalFiniteNumber(Ram.Total, 'Vitals.Ram.Total'),
+            onWarn
+          ),
+          Used: Tolerate(() => normalizeOptionalFiniteNumber(Ram.Used, 'Vitals.Ram.Used'), onWarn),
+          // Transmitted as a string (Number#toFixed) per shared/src/vitals.d.ts.
+          UsagePercentage: Tolerate(
+            () =>
+              normalizeOptionalString(Ram.UsagePercentage, 'Vitals.Ram.UsagePercentage', {
+                maxLength: 16,
+              }),
+            onWarn
+          ),
+        };
+      }, onWarn);
+      if (Normalized) Vitals.Ram = Normalized;
     }
-    if (raw.Uptime !== undefined) {
-      if (!isPlainObject(raw.Uptime)) fail('Vitals.Uptime must be an object');
-      Vitals.Uptime = {
-        Formatted: normalizeOptionalString(raw.Uptime.Formatted, 'Vitals.Uptime.Formatted', {
-          maxLength: 32,
-        }),
-      };
+    const Uptime = raw.Uptime;
+    if (Uptime !== undefined) {
+      const Normalized = Tolerate(() => {
+        if (!isPlainObject(Uptime)) fail('Vitals.Uptime must be an object');
+        return {
+          Formatted: Tolerate(
+            () =>
+              normalizeOptionalString(Uptime.Formatted, 'Vitals.Uptime.Formatted', {
+                maxLength: 32,
+              }),
+            onWarn
+          ),
+        };
+      }, onWarn);
+      if (Normalized) Vitals.Uptime = Normalized;
     }
   }
   return {
@@ -379,6 +420,16 @@ function IntegratedState(state: unknown, message: unknown): [string, string | nu
   ];
 }
 
+// Progress line for an in-flight integrated event. Over-long messages are
+// trimmed to the cap rather than rejected: a chatty handler should not have its
+// event torn down over a status string.
+function IntegratedEventFeedback(value: unknown): string {
+  if (typeof value !== 'string') fail('Message must be a string');
+  const Trimmed = value.trim();
+  if (!Trimmed) fail('Message cannot be empty');
+  return Trimmed.slice(0, INTEGRATED_EVENT_MAX_FEEDBACK_LENGTH);
+}
+
 // Execution request ids are server-generated UUIDs echoed back by the client.
 function RequestID(value: unknown): string {
   return normalizeIdentifier(value, 'RequestID');
@@ -413,6 +464,7 @@ export const Manager = {
   DisplayDelta,
   ApplicationDelta,
   RegisterActions,
+  IntegratedEventFeedback,
   IntegratedState,
   RequestID,
   ExecutionError,

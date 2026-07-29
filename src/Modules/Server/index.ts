@@ -7,7 +7,11 @@ import path from 'path';
 import type { Request, Response, NextFunction } from 'express';
 import { CreateLogger } from '../Logger';
 import { Config } from '../Config';
-import { BULK_DISPATCH_DELAY_MS } from '../Config/constants';
+import {
+  BULK_DISPATCH_DELAY_MS,
+  INTEGRATED_EVENT_DEFAULT_TIMEOUT_MS,
+  INTEGRATED_EVENT_TIMEOUT_GRACE_MS,
+} from '../Config/constants';
 import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/protocol';
 import { Manager as AppDataManager } from '../AppData';
 import {
@@ -469,7 +473,27 @@ Manager.TriggerIntegratedEvent = async (EventID: string, Targets: string[]) => {
     // Fire-and-forget actions complete as soon as they are dispatched.
     if (!Action.HasFeedback) {
       await ScriptExecutionManager.Complete(RequestID, null);
+      continue;
     }
+
+    // The client self-resolves its handler at TimeoutMs and reports that
+    // outcome, so the watchdog waits a grace period beyond it and only fires
+    // for a device that has gone silent entirely.
+    const HandlerTimeout =
+      typeof Action.TimeoutMs === 'number' && Number.isFinite(Action.TimeoutMs)
+        ? Action.TimeoutMs
+        : INTEGRATED_EVENT_DEFAULT_TIMEOUT_MS;
+    ScriptExecutionManager.SetTimeout(
+      RequestID,
+      HandlerTimeout + INTEGRATED_EVENT_TIMEOUT_GRACE_MS,
+      'Integrated event'
+    );
+
+    // Unlike a script, which waits its turn in the client's queue, an event is
+    // executing on the device the moment it is dispatched. Move the row to the
+    // running stage so it shows a spinner rather than a queued hourglass, and
+    // so any feedback the handler sends lands on a row that reads as live.
+    await ScriptExecutionManager.UpdateProgress(RequestID, 50, 'Running');
   }
   return Summary;
 };

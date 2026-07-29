@@ -19,6 +19,20 @@ export const ARTNET_PORT = 6454;
 // declare its own `Timeout`.
 export const SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS = 15000;
 
+// Fallback handler timeout for an integrated event when the client's SDK does
+// not declare its own `TimeoutMs`, plus the bounds a declared one is clamped to.
+export const INTEGRATED_EVENT_DEFAULT_TIMEOUT_MS = 15000;
+export const INTEGRATED_EVENT_MIN_TIMEOUT_MS = 1000;
+export const INTEGRATED_EVENT_MAX_TIMEOUT_MS = 600000;
+
+// Grace added to a client's own timeout before the server's watchdog fires.
+// The client is the better reporter — it knows why its handler stalled — so the
+// server only steps in once the client has clearly gone silent.
+export const INTEGRATED_EVENT_TIMEOUT_GRACE_MS = 5000;
+
+// Longest progress line an integrated event may push into the execution UI.
+export const INTEGRATED_EVENT_MAX_FEEDBACK_LENGTH = 255;
+
 // Debounce between a script-folder change and redeploying to adopted clients.
 export const SCRIPT_DEPLOY_DEBOUNCE_MS = 450;
 

@@ -289,3 +289,41 @@ test('ToPublicScriptExecution yields a renderer-safe (structured-clone-able) pro
 
   await Manager.ClearQueue();
 });
+
+test('UpdateProgress with a null progress moves only the status text', async () => {
+  const { Manager } = load(baseMocks());
+  const id = await Manager.AddInternalTaskToQueue('uuid-9', 'Integrated Event: RunDiagnostics');
+
+  // A percentage-bearing update behaves as before.
+  await Manager.UpdateProgress(id, 40, 'Working');
+  let entry = (await Manager.GetAllExecutions()).find((e) => e.RequestID === id);
+  assert.equal(entry.Progress, 40);
+  assert.equal(entry.StatusText, 'Working');
+
+  // Integrated event feedback carries no percentage: the bar must hold its
+  // place rather than snapping back to zero.
+  await Manager.UpdateProgress(id, null, 'Step 2 of 5 complete');
+  entry = (await Manager.GetAllExecutions()).find((e) => e.RequestID === id);
+  assert.equal(entry.Progress, 40);
+  assert.equal(entry.StatusText, 'Step 2 of 5 complete');
+
+  // Settled rows ignore late feedback entirely.
+  await Manager.Complete(id, null);
+  await Manager.UpdateProgress(id, null, 'Too late');
+  entry = (await Manager.GetAllExecutions()).find((e) => e.RequestID === id);
+  assert.equal(entry.StatusText, 'Completed');
+
+  await Manager.ClearQueue();
+});
+
+test('SetTimeout labels what timed out', async () => {
+  const { Manager } = load(baseMocks());
+  const id = await Manager.AddInternalTaskToQueue('uuid-9', 'Integrated Event: RunDiagnostics');
+  Manager.SetTimeout(id, 20, 'Integrated event');
+  await new Promise((r) => setTimeout(r, 60));
+  const entry = (await Manager.GetAllExecutions()).find((e) => e.RequestID === id);
+  assert.equal(entry.Status, 'Failed');
+  assert.equal(entry.Error, 'Integrated event timed out after 20ms');
+
+  await Manager.ClearQueue();
+});

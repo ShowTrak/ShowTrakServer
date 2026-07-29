@@ -206,9 +206,13 @@ export function wireContextMenu() {
             Type: 'Action',
             Title: `${Event.Label || Event.ID}`,
             Class: '',
-            // Events mirror scripts: a terminal icon tinted with the event's
-            // colour, replacing the old colour dot.
-            Icon: 'bi-terminal',
+            // Events mirror scripts: the icon the integrated client declared,
+            // tinted with the event's colour. Clients on an SDK that predates
+            // icons send none, and the server defaults them to the terminal
+            // glyph; the fallback here covers anything that slipped through.
+            Icon: `bi-${
+              typeof Event.Icon === 'string' && Event.Icon.trim() ? Event.Icon.trim() : 'terminal'
+            }`,
             IconColour: ColourFromIndex(Event.ColourIndex),
             Action: async function () {
               await TriggerIntegratedEvent(Event.ID, EventTargets.get(Event.ID) || []);

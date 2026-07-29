@@ -188,6 +188,16 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
     const logValidationFailure = makeValidationFailureLogger(socket);
     const GuardedOn = makeGuardedOn(socket, logValidationFailure);
 
+    // A malformed vital is dropped rather than failing the heartbeat, but the
+    // client is still wrong and we want to know. Heartbeats arrive every
+    // second, so each distinct problem is reported once per connection.
+    const WarnedVitals = new Set<string>();
+    const WarnVitals = (Message: string) => {
+      if (WarnedVitals.has(Message)) return;
+      WarnedVitals.add(Message);
+      Logger.warn(`Dropped vitals from ${socket.UUID}: ${Message}`);
+    };
+
     // If the client claims adoption, verify against our DB to prevent drift
     if (socket.Adopted) {
       if (
@@ -318,6 +328,29 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       }
     );
 
+    // Optional progress line pushed by an integrated event while it runs. It
+    // only moves the row's status text — the bar keeps whatever progress it
+    // had — and is dropped once the event settles.
+    GuardedOn(
+      'IntegratedEventFeedback',
+      (RequestID, Message) => [
+        SocketValidation.RequestID(RequestID),
+        SocketValidation.IntegratedEventFeedback(Message),
+      ],
+      async (RequestID: string, Message: string) => {
+        // Unlike the response path, feedback is unsolicited and repeatable, so
+        // check the row belongs to the client sending it before trusting it.
+        const Execution = await ScriptExecutionManager.GetExecution(RequestID);
+        if (!Execution || !Execution.Client || Execution.Client.UUID !== socket.UUID) {
+          Logger.warn(`IntegratedEventFeedback for a foreign RequestID from ${socket.UUID}`);
+          return;
+        }
+        ScriptExecutionManager.UpdateProgress(RequestID, null, Message).catch((err) =>
+          Logger.error('Failed to update integrated event feedback:', err)
+        );
+      }
+    );
+
     // Integrated clients can self-report a health state via the SDK
     // (ShowTrak.SetState). ONLINE clears any degraded reason; DEGRADED records an
     // optional reason. OFFLINE is not accepted from the client.
@@ -332,7 +365,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
 
     GuardedOn(
       'Heartbeat',
-      (Data) => [SocketValidation.Heartbeat(Data)],
+      (Data) => [SocketValidation.Heartbeat(Data, WarnVitals)],
       async (Data: HeartbeatPayload) => {
         const [Err] = await ClientManager.Heartbeat(socket.UUID, Data, socket.IP);
         if (Err) Logger.error('Heartbeat failed for', socket.UUID, Err);

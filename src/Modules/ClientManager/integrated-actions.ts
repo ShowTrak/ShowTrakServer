@@ -1,11 +1,22 @@
 // Integrated client action (event) normalization.
 import type { IntegratedAction } from '@showtrak/protocol';
+import { NormalizeIconName } from '../ScriptManager/schema';
+import {
+  INTEGRATED_EVENT_DEFAULT_TIMEOUT_MS,
+  INTEGRATED_EVENT_MIN_TIMEOUT_MS,
+  INTEGRATED_EVENT_MAX_TIMEOUT_MS,
+} from '../Config/constants';
 
 const MAX_ACTIONS = 100;
 const MAX_ID_LENGTH = 128;
 const MAX_LABEL_LENGTH = 64;
+const MAX_ICON_LENGTH = 64;
 const MIN_COLOUR_INDEX = 0;
 const MAX_COLOUR_INDEX = 7;
+
+// Glyph used when an integrated client declares no icon — which is every client
+// built against an SDK from before icons existed.
+const DEFAULT_ACTION_ICON = 'terminal';
 
 // IDs are restricted to a safe, portable character set.
 const ID_PATTERN = /^[A-Za-z0-9_.-]+$/;
@@ -23,6 +34,25 @@ function NormalizeLabel(Value: unknown, Fallback: string): string {
   const Trimmed = Value.trim();
   if (!Trimmed) return Fallback;
   return Trimmed.slice(0, MAX_LABEL_LENGTH);
+}
+
+// Icons arrive as a bare Bootstrap Icons name; "bi-terminal" and "bi bi-terminal"
+// are tolerated and reduced to "terminal" by the shared normalizer. Anything
+// unusable (wrong type, absent, hostile length, illegal characters) falls back
+// to the default glyph rather than rejecting the action.
+function NormalizeActionIcon(Value: unknown): string {
+  if (typeof Value !== 'string' || Value.length > MAX_ICON_LENGTH) return DEFAULT_ACTION_ICON;
+  return NormalizeIconName(Value) || DEFAULT_ACTION_ICON;
+}
+
+// The client's own handler timeout, used to size the server's watchdog. An
+// SDK that predates the field, or sends nonsense, gets the default.
+function NormalizeTimeoutMs(Value: unknown): number {
+  const Parsed = typeof Value === 'number' ? Value : parseInt(String(Value), 10);
+  if (!Number.isFinite(Parsed)) return INTEGRATED_EVENT_DEFAULT_TIMEOUT_MS;
+  if (Parsed < INTEGRATED_EVENT_MIN_TIMEOUT_MS) return INTEGRATED_EVENT_MIN_TIMEOUT_MS;
+  if (Parsed > INTEGRATED_EVENT_MAX_TIMEOUT_MS) return INTEGRATED_EVENT_MAX_TIMEOUT_MS;
+  return Math.round(Parsed);
 }
 
 function NormalizeColourIndex(Value: unknown): number {
@@ -48,11 +78,13 @@ function NormalizeIntegratedActions(Raw: unknown): IntegratedAction[] {
       ID,
       Label: NormalizeLabel(Item.Label, ID),
       ColourIndex: NormalizeColourIndex(Item.ColourIndex),
+      Icon: NormalizeActionIcon(Item.Icon),
       HasFeedback: Item.HasFeedback === true,
+      TimeoutMs: NormalizeTimeoutMs(Item.TimeoutMs),
     });
     if (Result.length >= MAX_ACTIONS) break;
   }
   return Result;
 }
 
-export { NormalizeIntegratedActions, MAX_COLOUR_INDEX };
+export { NormalizeIntegratedActions, MAX_COLOUR_INDEX, DEFAULT_ACTION_ICON };

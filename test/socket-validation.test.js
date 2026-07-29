@@ -233,3 +233,63 @@ test('IPCValidation primitives remain available from their historical path', () 
   assert.equal(typeof primitives.isPlainObject, 'function');
   assert.equal(typeof primitives.normalizeNonEmptyString, 'function');
 });
+
+test('IntegratedEventFeedback trims, caps and rejects empty messages', () => {
+  assert.equal(SocketValidation.IntegratedEventFeedback('  Step 2 of 5  '), 'Step 2 of 5');
+
+  // Over-long messages are cut to the cap rather than rejected, so a chatty
+  // handler never has its event torn down over a status string.
+  const capped = SocketValidation.IntegratedEventFeedback('x'.repeat(400));
+  assert.equal(capped.length, 255);
+
+  for (const bad of ['', '   ', null, undefined, 42, {}]) {
+    assert.throws(() => SocketValidation.IntegratedEventFeedback(bad), /Message/);
+  }
+});
+
+test('Heartbeat drops a malformed vital instead of failing the whole beat', () => {
+  // Exactly what the Android SDK sent before 1.2.1: a numeric Ram percentage
+  // and no Total/Used. Rejecting this cost the client its online mark, so the
+  // device read as offline while it was connected and heartbeating.
+  const warnings = [];
+  const result = SocketValidation.Heartbeat(
+    {
+      Version: '1.2.0',
+      Vitals: {
+        CPU: { UsagePercentage: 3 },
+        Ram: { UsagePercentage: 55, TotalBytes: 2087780352 },
+        Uptime: { Seconds: 1234 },
+      },
+    },
+    (message) => warnings.push(message)
+  );
+
+  // The beat survives, so the client still gets marked online.
+  assert.equal(result.Version, '1.2.0');
+  // Good vitals are kept; only the offending field is dropped.
+  assert.deepEqual(result.Vitals.CPU, { UsagePercentage: 3 });
+  assert.equal(result.Vitals.Ram.UsagePercentage, null);
+  assert.equal(result.Vitals.Ram.Total, null);
+  // The drift is reported rather than swallowed.
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /Vitals\.Ram\.UsagePercentage must be a string/);
+});
+
+test('Heartbeat drops a whole vitals section that is the wrong type', () => {
+  const warnings = [];
+  const result = SocketValidation.Heartbeat(
+    { Version: '1.0.0', Vitals: { CPU: 'nonsense', Uptime: { Formatted: '00:01:02' } } },
+    (message) => warnings.push(message)
+  );
+  assert.equal('CPU' in result.Vitals, false);
+  assert.deepEqual(result.Vitals.Uptime, { Formatted: '00:01:02' });
+  assert.match(warnings[0], /Vitals\.CPU must be an object/);
+});
+
+test('Heartbeat stays strict about the payload envelope', () => {
+  // Tolerance is scoped to display-only vitals: a payload that is not an
+  // object, or a Version of the wrong type, is still rejected outright.
+  assert.throws(() => SocketValidation.Heartbeat('nope'), /Heartbeat payload must be an object/);
+  assert.throws(() => SocketValidation.Heartbeat({ Vitals: 'nope' }), /Vitals must be an object/);
+  assert.throws(() => SocketValidation.Heartbeat({ Version: 42 }), /Version must be a string/);
+});
