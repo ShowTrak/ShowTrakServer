@@ -326,6 +326,11 @@ function loadWebUi(settings, options = {}) {
     // drains mid-test). DecorateCatalog is identity here; scope decoration is
     // covered by the ScriptWhitelistManager suite.
     '../ScriptWhitelistManager': { Manager: { DecorateCatalog: async (scripts) => scripts } },
+    // Same reason: TagManager also requires ../DB at module load. Leaving it
+    // unmocked opened the real sqlite connection here and hung the whole run on
+    // Linux CI (the file's process never exited; the job burned until it was
+    // killed). Any manager added to webui-namespace.ts needs a stub here.
+    '../TagManager': { Manager: { GetAllViews: async () => [] } },
     '../ModeManager': { Manager: { Get: () => mode } },
     '../../main/renderer-bus': {
       RegisterRendererSink: (fn) => {

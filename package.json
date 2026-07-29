@@ -25,9 +25,9 @@
     "format": "prettier \"**/*.{js,mjs,cjs,ts,css,md,json,html}\" --write",
     "format:check": "prettier \"**/*.{js,mjs,cjs,ts,css,md,json,html}\" --check",
     "pretest": "npm run build && npm run build:test-renderer",
-    "test": "node --test --test-concurrency=1",
+    "test": "node --test --test-concurrency=1 --test-timeout=30000 --test-force-exit",
     "pretest:coverage": "npm run build && npm run build:test-renderer",
-    "test:coverage": "c8 --all --include=dist/Modules/**/*.js --include=dist/main/**/*.js --include=dist-test/UI/js/app/**/*.js --reporter=text --reporter=text-summary --reporter=lcov node --test --test-concurrency=1",
+    "test:coverage": "c8 --all --include=dist/Modules/**/*.js --include=dist/main/**/*.js --include=dist-test/UI/js/app/**/*.js --reporter=text --reporter=text-summary --reporter=lcov node --test --test-concurrency=1 --test-timeout=30000",
     "prepare": "husky",
     "postinstall": "npm run build:shared && node scripts/copy-bootstrap-icons.js",
     "build:shared": "tsc -p shared/tsconfig.build.json"

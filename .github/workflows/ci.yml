@@ -15,6 +15,10 @@ jobs:
   quality:
     name: Lint, typecheck & test
     runs-on: ubuntu-latest
+    # The whole job normally finishes in under two minutes. A leaked handle in a
+    # test used to hang `npm test` until GitHub's 6-hour default killed it, so
+    # cap the job well below that: a stuck run should be a red X in minutes.
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
