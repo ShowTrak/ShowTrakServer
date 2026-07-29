@@ -28,6 +28,7 @@ const {
   TagShowsLabel,
   TagBadgeIconName,
   FilterDisplayableTags,
+  SetTagBadgeLabelMeasurer,
   TILE_BADGE_ROW_WIDTH,
 } = require(path.join(LIB, 'tag-badges.js'));
 const { RenderTagBadgeRow } = require(path.join(LIB, 'tag-badge-view.js'));
@@ -233,6 +234,86 @@ test('at least one badge is always shown, even when nothing fits', () => {
 test('no tags means no row at all', () => {
   assert.deepEqual(SelectVisibleTagBadges([], 200), { Visible: [], Overflow: 0 });
   assert.deepEqual(SelectVisibleTagBadges(null, 200), { Visible: [], Overflow: 0 });
+});
+
+// --- The installed measurer -------------------------------------------------
+// The renderer replaces the per-character table with real canvas measurement of
+// the row's own font (lib/tag-badge-metrics). The table alone ran under the UI
+// stack's uppercase metrics, so rows that it called a perfect fit rendered over
+// the tile and were cropped by `overflow: hidden` — no "+N", just a sliced
+// badge. These cover the seam, which is the part that can be tested off-DOM.
+
+/** Runs `Body` with `Measure` installed, and always uninstalls it after. */
+const withMeasurer = (Measure, Body) => {
+  SetTagBadgeLabelMeasurer(Measure);
+  try {
+    Body();
+  } finally {
+    SetTagBadgeLabelMeasurer(null);
+  }
+};
+
+test('an installed measurer replaces the character table', () => {
+  withMeasurer(
+    (Label) => Label.length * 20,
+    () => {
+      assert.equal(EstimateLabelWidth('FOH'), 60);
+    }
+  );
+  assert.notEqual(EstimateLabelWidth('FOH'), 60, 'measurer outlived its install');
+});
+
+test('a real measurement wider than the table shows a +N instead of cropping', () => {
+  // The bug: five badges the table thought fitted, drawn against a font whose
+  // glyphs are wider than the table assumed. With real widths the fit has to
+  // give a badge back to the chip rather than let the row run off the tile.
+  const Tags = Array.from({ length: 5 }, (_, i) => tag(i + 1, `tag-${i}`, { Workspace: true }));
+
+  const Table = SelectVisibleTagBadges(Tags, TILE_BADGE_ROW_WIDTH);
+  // Snapshot the table's answers up front: an installed measurer that called
+  // EstimateLabelWidth would re-enter itself.
+  const Estimated = new Map(
+    Tags.map((T) => [TagBadgeLabel(T), EstimateLabelWidth(TagBadgeLabel(T))])
+  );
+  withMeasurer(
+    (Label) => (Estimated.get(Label) ?? Label.length * 7.2) * 1.4,
+    () => {
+      const Measured = SelectVisibleTagBadges(Tags, TILE_BADGE_ROW_WIDTH);
+      assert.ok(
+        Measured.Visible.length < Table.Visible.length,
+        'wider real text must cost the row a badge'
+      );
+      assert.ok(Measured.Overflow > 0, 'the badges that no longer fit must become a +N');
+      assert.equal(Measured.Visible.length + Measured.Overflow, Tags.length);
+
+      const Used =
+        Measured.Visible.reduce((Sum, T) => Sum + EstimateTagBadgeWidth(T) + 4, 0) +
+        EstimateOverflowChipWidth(Measured.Overflow);
+      assert.ok(Used <= TILE_BADGE_ROW_WIDTH, `row plus chip measured at ${Used}px`);
+    }
+  );
+});
+
+test('a measurer that cannot measure falls back to the table, not to zero', () => {
+  // tag-badge-metrics returns NaN when there is no 2D context. Trusting it would
+  // fit every badge in the show onto one row.
+  const Expected = EstimateLabelWidth('RECORDING');
+  for (const Junk of [NaN, -1, Infinity, undefined, 'wide']) {
+    withMeasurer(
+      () => Junk,
+      () => {
+        assert.equal(EstimateLabelWidth('RECORDING'), Expected, `accepted ${String(Junk)}`);
+      }
+    );
+  }
+});
+
+test('the fallback table costs digits as full-width characters', () => {
+  // `1` and `J` were listed as narrow glyphs and are not, so a slug like `LX-1`
+  // was costed a third under what it drew — enough on its own to crop a row.
+  assert.equal(EstimateLabelWidth('1'), EstimateLabelWidth('0'));
+  assert.equal(EstimateLabelWidth('J'), EstimateLabelWidth('K'));
+  assert.ok(EstimateLabelWidth('I') < EstimateLabelWidth('1'));
 });
 
 // ===========================================================================

@@ -3719,6 +3719,11 @@ button.btn:focus {
 }
 
 .group-drop-zone {
+  /* Groups in the column grid stretch to the tallest group on the row, so the
+     single wrapped line of a short group would otherwise stretch with it and
+     `align-items: center` would float the tiles down to the middle. Packing the
+     lines to the top keeps every group's tiles anchored at the top left. */
+  align-content: flex-start;
   transition:
     padding 180ms ease,
     gap 180ms ease,
@@ -3827,7 +3832,16 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  flex: 0 0 auto;
+  /* Shrinkable, unlike the icon and the chip. A badge only ever shrinks when the
+   * row is over its 200px anyway — the fit in lib/tag-badges measures the real
+   * font, so a row it accepted does not reach this — and the one case that
+   * always overflows is a single tag longer than the whole tile, which the fit
+   * shows regardless (a bare "+2" would name none of the tags). Fixed-width
+   * there, the badge would push the "+N" past the row's clip and the tile would
+   * read as if it had one tag. Shrinking ellipsises that badge instead and the
+   * count survives. */
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 100%;
   padding: 1px 7px;
   border-radius: 4px;
@@ -3841,7 +3855,11 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
   overflow: hidden;
 }
 
+/* min-width:0 is what lets the ellipsis happen: as a flex item the label's
+ * automatic minimum size is its full text, which would keep the badge at its
+ * natural width no matter what the badge above is willing to shrink to. */
 .SHOWTRAK_PC > .TILE_TAG_ROW .TILE_TAG_LABEL {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3871,8 +3889,14 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
 }
 
 /* The "+N" chip stands for several tags at once, so it takes no single tag's
- * colour — same surface, neutral text. */
+ * colour — same surface, neutral text.
+ *
+ * It is the one thing in the row that must never shrink or be clipped: it is
+ * the only signal that the tile has tags it is not showing, so a row that drops
+ * it is indistinguishable from a complete one. Everything beside it gives way
+ * first. */
 .SHOWTRAK_PC > .TILE_TAG_ROW > .TILE_TAG_MORE {
+  flex: 0 0 auto;
   color: rgba(255, 255, 255, 0.7);
 }
 

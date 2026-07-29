@@ -153,14 +153,27 @@ export function FilterDisplayableTags(Tags: TagView[] | null | undefined): TagVi
 // --- Width model -------------------------------------------------------------
 // Badges must never wrap (a second line would push the tile's own content out of
 // a fixed-height tile), so the count has to be decided BEFORE the row is in the
-// DOM. Measuring for real would mean a forced layout per tile on every client
-// list render — hundreds per show — so the row is fitted from a character-width
-// estimate instead. The estimate is deliberately slightly generous; the row is
-// also `overflow: hidden` in CSS, so an underestimate clips a badge rather than
-// wrapping the line.
+// DOM. Laying the row out for real would mean a forced reflow per tile on every
+// client list render — hundreds per show — so the row is fitted from a width
+// MODEL instead, and the row is `overflow: hidden` in CSS so that a model that
+// is wrong low clips a badge rather than wrapping the line.
+//
+// The model has two sources, in order:
+//
+//  1. A measurer installed by ./tag-badge-metrics, which asks a canvas for the
+//     real advance width of the label in the row's own computed font. Text
+//     measurement on a canvas costs no layout, so this is exact AND free.
+//  2. The per-character table below, used when no measurer is installed (Node,
+//     the tests, and the first render if it somehow beats the install).
+//
+// The table is why "+N" used to be skipped on rows that then clipped: a
+// per-character average cannot know the font, and one that runs even a few
+// percent under across a row of badges loses a whole badge's worth of width.
+// It is now deliberately biased HIGH — over-reserving shows a "+N" one badge
+// early, which is a readable row; under-reserving is a cropped one.
 //
 // Constants below are for the badge row's type: 10px, weight 600, uppercase,
-// 0.04em tracking.
+// 0.04em tracking (0.4px per character, trailing one included).
 
 /** Usable width inside an expanded tile: 220px less its 8px padding and 2px border. */
 export const TILE_BADGE_ROW_WIDTH = 200;
@@ -172,16 +185,54 @@ const BADGE_SPACING = 4;
 const ICON_WIDTH = 12;
 // Space between icon and label on a `both` badge.
 const ICON_LABEL_GAP = 4;
-const CHAR_WIDTH_DEFAULT = 6.4;
-const CHAR_WIDTH_NARROW = 3.6;
-const CHAR_WIDTH_WIDE = 9.2;
-const NARROW_CHARS = new Set("IJl1|.,:;'!-_ ".split(''));
+// Measured against the row's real font (system-ui at 600/10px, 0.4px tracking),
+// uppercase labels average 6.6-7.7px per character depending on the letters.
+// The table takes the TOP of that range, so a fallback fit is never the reason a
+// row crops: the old 6.4 costed `RECORDING` at 54.8px against a real 65.1px, and
+// losing 10px on one badge is what dropped the "+N" and cropped the row.
+const CHAR_WIDTH_DEFAULT = 7.7;
+const CHAR_WIDTH_NARROW = 4.2;
+const CHAR_WIDTH_WIDE = 10;
+// Only genuinely thin glyphs belong here. Digits and `J` were listed as narrow
+// and are not — a slug like `LX-1` was costed a third under its real width.
+const NARROW_CHARS = new Set("Il|.,:;'!-_ ".split(''));
 const WIDE_CHARS = new Set('MW@%'.split(''));
+
+/**
+ * Measures a label at the badge row's type, in px. Installed by the renderer.
+ *
+ * Returning a non-finite or negative number is the documented way to say "I
+ * could not measure this" — the table below takes over for that label.
+ */
+export type TagBadgeLabelMeasurer = (Label: string) => number;
+
+let InstalledMeasurer: TagBadgeLabelMeasurer | null = null;
+
+/**
+ * Install (or, with null, remove) the real text measurer.
+ *
+ * Kept as an injection rather than an import so this module stays free of the
+ * DOM: it is loaded straight into Node by the tests, and the tile builders that
+ * depend on it must not drag a canvas in with them.
+ */
+export function SetTagBadgeLabelMeasurer(Measurer: TagBadgeLabelMeasurer | null): void {
+  InstalledMeasurer = typeof Measurer === 'function' ? Measurer : null;
+}
 
 /** Rendered width of a label at the badge row's type, in px. */
 export function EstimateLabelWidth(Label: string): number {
+  const Text = String(Label || '');
+  if (!Text) return 0;
+
+  if (InstalledMeasurer) {
+    const Measured = InstalledMeasurer(Text);
+    // A measurer that throws would take the whole client list down with it, and
+    // one that returns junk would be worse than the table it replaced.
+    if (typeof Measured === 'number' && Number.isFinite(Measured) && Measured >= 0) return Measured;
+  }
+
   let Width = 0;
-  for (const Char of String(Label || '')) {
+  for (const Char of Text) {
     if (NARROW_CHARS.has(Char)) Width += CHAR_WIDTH_NARROW;
     else if (WIDE_CHARS.has(Char)) Width += CHAR_WIDTH_WIDE;
     else Width += CHAR_WIDTH_DEFAULT;
@@ -196,6 +247,9 @@ export function EstimateLabelWidth(Label: string): number {
  * A `hidden` tag is never passed here (FilterDisplayableTags removes it first);
  * were it to slip through it would still measure as a normal badge, which is
  * the safe direction — over-reserving width clips, it does not wrap.
+ *
+ * Rounded up to whole pixels: a row holds several badges, and a third of a
+ * pixel conceded on each is how a row that "fits" ends up a glyph over.
  */
 export function EstimateTagBadgeWidth(Tag: TagView | null | undefined): number {
   const ShowIcon = TagShowsIcon(Tag);
@@ -204,12 +258,12 @@ export function EstimateTagBadgeWidth(Tag: TagView | null | undefined): number {
   if (ShowIcon) Width += ICON_WIDTH;
   if (ShowLabel) Width += EstimateLabelWidth(TagBadgeLabel(Tag));
   if (ShowIcon && ShowLabel) Width += ICON_LABEL_GAP;
-  return Width;
+  return Math.ceil(Width);
 }
 
 /** Width of the "+N" overflow chip, which is padded like any other badge. */
 export function EstimateOverflowChipWidth(Count: number): number {
-  return BADGE_PADDING + EstimateLabelWidth(`+${Math.max(0, Math.trunc(Count))}`);
+  return Math.ceil(BADGE_PADDING + EstimateLabelWidth(`+${Math.max(0, Math.trunc(Count))}`));
 }
 
 export interface TagBadgeFit {

@@ -16,6 +16,7 @@ import { InitMode } from './mode';
 import { InitSettings } from './settings';
 import './utils';
 import { InitKeyboard } from './keyboard';
+import { InitTagBadgeMetrics } from './lib/tag-badge-metrics';
 import { InitClientList } from './client-list';
 import './monitoring';
 import { InitDnd } from './dnd';
@@ -38,6 +39,10 @@ import { Init, WireGlobalUI } from './init';
 InitMode();
 InitSettings();
 InitKeyboard();
+// Ahead of InitClientList: tile tag rows are fitted from a width model, and the
+// real measurer has to be in place before the first row is fitted or that row
+// gets the coarse fallback and can crop instead of showing its "+N".
+InitTagBadgeMetrics();
 InitClientList();
 InitDnd();
 InitOscFeeds();
