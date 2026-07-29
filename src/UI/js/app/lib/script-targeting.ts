@@ -11,30 +11,32 @@
 // still matters: a script offered against the wrong machine is a script an
 // operator will run on the wrong machine.
 
-import type { ClientView, ScriptWhitelistScope } from '@showtrak/protocol';
+import type { ClientView, ScriptWhitelistScope, TagView } from '@showtrak/protocol';
+import { ScopeCoversEntity } from './scope-matching';
 
 /**
  * Whether a client is admitted by a script's per-show whitelist.
  *
  * An absent scope, or `Workspace: true`, means unrestricted — that is the
  * default for a script nobody has narrowed. Otherwise the client must be named
- * directly or belong to a whitelisted group.
+ * directly, belong to a whitelisted group, or carry a whitelisted tag.
+ *
+ * `Tags` is the full tag list, needed only to expand a tag-based whitelist
+ * (tags nest). Omitting it under-matches such a whitelist, which here hides a
+ * script the client may in fact run — so callers pass it.
  */
 export function IsClientWhitelisted(
   Scope: ScriptWhitelistScope | null | undefined,
-  Client: Pick<ClientView, 'UUID' | 'GroupID'> | null | undefined
+  Client: Pick<ClientView, 'UUID' | 'GroupID'> | null | undefined,
+  Tags?: TagView[] | null
 ): boolean {
   if (!Scope || Scope.Workspace) return true;
   if (!Client || !Client.UUID) return false;
-  if (Array.isArray(Scope.Clients) && Scope.Clients.includes(Client.UUID)) return true;
-  if (
-    Client.GroupID != null &&
-    Array.isArray(Scope.Groups) &&
-    Scope.Groups.includes(Number(Client.GroupID))
-  ) {
-    return true;
-  }
-  return false;
+  return ScopeCoversEntity(
+    Scope,
+    { ScopedID: String(Client.UUID), GroupID: Client.GroupID ?? null },
+    Tags
+  );
 }
 
 /**
@@ -47,14 +49,15 @@ export function IsClientWhitelisted(
  */
 export function IsScriptTargetable(
   Script: { CompatiblePlatforms?: unknown; Whitelist?: ScriptWhitelistScope | null },
-  Client: Pick<ClientView, 'UUID' | 'GroupID' | 'OperatingSystem'> | null | undefined
+  Client: Pick<ClientView, 'UUID' | 'GroupID' | 'OperatingSystem'> | null | undefined,
+  Tags?: TagView[] | null
 ): boolean {
   if (!Client || !Client.OperatingSystem) return false;
   const Compatible = Array.isArray(Script && Script.CompatiblePlatforms)
     ? (Script.CompatiblePlatforms as string[])
     : [];
   if (!Compatible.includes(Client.OperatingSystem)) return false;
-  return IsClientWhitelisted(Script && Script.Whitelist, Client);
+  return IsClientWhitelisted(Script && Script.Whitelist, Client, Tags);
 }
 
 /**
@@ -65,9 +68,10 @@ export function IsScriptTargetable(
  */
 export function ResolveScriptTargets(
   Script: { CompatiblePlatforms?: unknown; Whitelist?: ScriptWhitelistScope | null },
-  Clients: Array<Pick<ClientView, 'UUID' | 'GroupID' | 'OperatingSystem'>> | null | undefined
+  Clients: Array<Pick<ClientView, 'UUID' | 'GroupID' | 'OperatingSystem'>> | null | undefined,
+  Tags?: TagView[] | null
 ): string[] {
   return (Array.isArray(Clients) ? Clients : [])
-    .filter((Client) => IsScriptTargetable(Script, Client))
+    .filter((Client) => IsScriptTargetable(Script, Client, Tags))
     .map((Client) => Client.UUID);
 }

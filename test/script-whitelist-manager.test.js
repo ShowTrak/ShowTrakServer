@@ -82,7 +82,12 @@ test('SetScope: Workspace collapses to the no-row unrestricted default', async (
   const { Manager, store } = load();
   await Manager.SetScope('s1', { Workspace: false, Groups: [1], Clients: ['x'] });
   assert.ok(store.has('s1'), 'restricted scope is stored');
-  assert.deepEqual(await Manager.GetScope('s1'), { Workspace: false, Groups: [1], Clients: ['x'] });
+  assert.deepEqual(await Manager.GetScope('s1'), {
+    Workspace: false,
+    Groups: [1],
+    Clients: ['x'],
+    Tags: [],
+  });
 
   // Re-selecting "All Clients" must delete the row so new clients keep access.
   await Manager.SetScope('s1', { Workspace: true, Groups: [], Clients: [] });
@@ -107,7 +112,12 @@ test('DeleteForScript and RenameScript', async () => {
   await Manager.SetScope('old', { Workspace: false, Groups: [1], Clients: [] });
   await Manager.RenameScript('old', 'new');
   assert.equal(store.has('old'), false);
-  assert.deepEqual(await Manager.GetScope('new'), { Workspace: false, Groups: [1], Clients: [] });
+  assert.deepEqual(await Manager.GetScope('new'), {
+    Workspace: false,
+    Groups: [1],
+    Clients: [],
+    Tags: [],
+  });
 
   await Manager.DeleteForScript('new');
   assert.equal(await Manager.GetScope('new'), null);
@@ -119,6 +129,47 @@ test('GetScope: malformed stored JSON fails open (unrestricted)', async () => {
   assert.equal(await Manager.GetScope('corrupt'), null);
 });
 
+test('IsClientAllowed: a whitelisted tag admits its members, through nesting', () => {
+  const { Manager } = load();
+  // "all-foh" absorbs "foh", which names one client outright and one by group.
+  const tags = [
+    { TagID: 1, Scope: { Workspace: false, Groups: [], Clients: [], Tags: [2] } },
+    { TagID: 2, Scope: { Workspace: false, Groups: [7], Clients: ['named'], Tags: [] } },
+  ];
+  const scope = { Workspace: false, Groups: [], Clients: [], Tags: [1] };
+
+  assert.equal(Manager.IsClientAllowed(scope, { UUID: 'named', GroupID: null }, tags), true);
+  assert.equal(Manager.IsClientAllowed(scope, { UUID: 'other', GroupID: 7 }, tags), true);
+  assert.equal(Manager.IsClientAllowed(scope, { UUID: 'other', GroupID: 9 }, tags), false);
+  // Without the tag list the reference cannot be expanded, so nobody matches.
+  assert.equal(Manager.IsClientAllowed(scope, { UUID: 'named', GroupID: null }), false);
+});
+
+test('IsClientAllowed: a cycle between tags terminates instead of hanging', () => {
+  const { Manager } = load();
+  // Two tags that name each other — reachable by editing each in turn, so it
+  // has to resolve, not spin.
+  const tags = [
+    { TagID: 1, Scope: { Workspace: false, Groups: [], Clients: [], Tags: [2] } },
+    { TagID: 2, Scope: { Workspace: false, Groups: [], Clients: ['in'], Tags: [1] } },
+  ];
+  const scope = { Workspace: false, Groups: [], Clients: [], Tags: [1] };
+  assert.equal(Manager.IsClientAllowed(scope, { UUID: 'in', GroupID: null }, tags), true);
+  assert.equal(Manager.IsClientAllowed(scope, { UUID: 'out', GroupID: null }, tags), false);
+});
+
+test('SetScope: normalizes tag entries', async () => {
+  const { Manager } = load();
+  await Manager.SetScope('s3', {
+    Workspace: false,
+    Groups: [],
+    Clients: [],
+    Tags: ['4', 4, 0, -1, 'bad'],
+  });
+  const scope = await Manager.GetScope('s3');
+  assert.deepEqual(scope.Tags, [4], 'dedupes + coerces numeric tags, drops junk');
+});
+
 test('DecorateCatalog attaches Whitelist (null when unrestricted)', async () => {
   const { Manager } = load();
   await Manager.SetScope('restricted', { Workspace: false, Groups: [2], Clients: [] });
@@ -127,7 +178,12 @@ test('DecorateCatalog attaches Whitelist (null when unrestricted)', async () => 
     { ID: 'free', Name: 'F' },
   ];
   const decorated = await Manager.DecorateCatalog(catalog);
-  assert.deepEqual(decorated[0].Whitelist, { Workspace: false, Groups: [2], Clients: [] });
+  assert.deepEqual(decorated[0].Whitelist, {
+    Workspace: false,
+    Groups: [2],
+    Clients: [],
+    Tags: [],
+  });
   assert.equal(decorated[1].Whitelist, null);
   // Must not mutate the source catalog entries.
   assert.equal('Whitelist' in catalog[0], false);

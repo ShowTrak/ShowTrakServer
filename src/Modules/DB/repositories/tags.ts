@@ -22,16 +22,14 @@ export function CreateTagsRepository(DB: DBManager) {
       Slug: string,
       Colour: number,
       Icon: string,
+      Display: string,
       Scope: string,
       Weight: number
     ): Promise<DBResult<unknown>> {
-      return DB.Run('INSERT INTO Tags (Slug, Colour, Icon, Scope, Weight) VALUES (?, ?, ?, ?, ?)', [
-        Slug,
-        Colour,
-        Icon,
-        Scope,
-        Weight,
-      ]);
+      return DB.Run(
+        'INSERT INTO Tags (Slug, Colour, Icon, Display, Scope, Weight) VALUES (?, ?, ?, ?, ?, ?)',
+        [Slug, Colour, Icon, Display, Scope, Weight]
+      );
     },
     UpdateSlug(TagID: number, Slug: string): Promise<DBResult<unknown>> {
       return DB.Run('UPDATE Tags SET Slug = ? WHERE TagID = ?', [Slug, TagID]);
@@ -41,6 +39,9 @@ export function CreateTagsRepository(DB: DBManager) {
     },
     UpdateIcon(TagID: number, Icon: string): Promise<DBResult<unknown>> {
       return DB.Run('UPDATE Tags SET Icon = ? WHERE TagID = ?', [Icon, TagID]);
+    },
+    UpdateDisplay(TagID: number, Display: string): Promise<DBResult<unknown>> {
+      return DB.Run('UPDATE Tags SET Display = ? WHERE TagID = ?', [Display, TagID]);
     },
     UpdateScope(TagID: number, Scope: string): Promise<DBResult<unknown>> {
       return DB.Run('UPDATE Tags SET Scope = ? WHERE TagID = ?', [Scope, TagID]);

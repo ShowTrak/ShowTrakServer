@@ -3,19 +3,25 @@
 //   Unlike Groups (a client belongs to exactly one), a client can fall under any
 //   number of tags. The Slug doubles as the tag's display label.
 // - Membership is dynamic: each tag stores a Scope ({ Workspace, Groups[],
-//   Clients[] }), the same JSON shape as AlertRules / ScriptWhitelists, edited
-//   with the shared scope-dropdown. Colour is an integer index into the shared
-//   Scripts palette; Icon is a bare Bootstrap Icons name.
+//   Clients[], Tags[] }), the same JSON shape as AlertRules / ScriptWhitelists,
+//   edited with the shared scope picker. Colour is an integer index into the
+//   shared Scripts palette; Icon is a bare Bootstrap Icons name; Display is how
+//   the tag draws on a client tile ('hidden' | 'icon' | 'name' | 'both') and is
+//   presentation only — a hidden tag targets scripts/alerts/OSC as ever.
+// - Scope.Tags lets a tag absorb OTHER tags, so a tag can be a superset of
+//   several others. Membership is therefore a graph walk, not a lookup; see
+//   ../ScopeMatching, which owns the walk and its cycle guard.
 import { CreateLogger } from '../Logger';
 import { Manager as DB } from '../DB';
 import { CreateTagsRepository } from '../DB/repositories/tags';
 import { Manager as BroadcastManager } from '../Broadcast';
 import * as SlugService from '../Slug';
 import { SCRIPT_COLOURS, NormalizeIconName } from '../ScriptManager/schema';
+import { NormalizeScopeTags } from '../ScopeMatching';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import type { TagRow } from '../DB/rows';
-import type { TagView, TagScope } from '@showtrak/protocol';
+import type { TagView, TagScope, TagDisplayMode } from '@showtrak/protocol';
 
 const Logger = CreateLogger('TagManager');
 
@@ -25,9 +31,15 @@ const TagsRepo = CreateTagsRepository(DB);
 const DEFAULT_COLOUR = 6;
 // A tag-shaped Bootstrap icon; overridable via the icon picker.
 const DEFAULT_ICON = 'tag';
+// How a tag draws on a client tile. Presentation only: a 'hidden' tag still
+// targets scripts, alerts and OSC exactly as a shown one does.
+const TAG_DISPLAY_MODES: TagDisplayMode[] = ['hidden', 'icon', 'name', 'both'];
+// 'name' is what every tag did before the setting existed, so it is the default
+// for new tags AND the value the migration back-fills onto existing rows.
+const DEFAULT_DISPLAY: TagDisplayMode = 'name';
 
 function CloneEmptyScope(): TagScope {
-  return { Workspace: false, Groups: [], Clients: [] };
+  return { Workspace: false, Groups: [], Clients: [], Tags: [] };
 }
 
 // Clamp a colour to a valid palette index, falling back to the neutral default.
@@ -41,10 +53,22 @@ function NormalizeIcon(Value: unknown): string {
   return NormalizeIconName(Value) || DEFAULT_ICON;
 }
 
+// Coerce a stored/incoming display mode to a known one. An unrecognised value
+// falls back to 'name' rather than 'hidden': a tag the operator can no longer
+// see is far harder to diagnose than one drawn more loudly than intended.
+function NormalizeDisplay(Value: unknown): TagDisplayMode {
+  const Text = String(Value == null ? '' : Value)
+    .trim()
+    .toLowerCase();
+  const Match = TAG_DISPLAY_MODES.find((Mode) => Mode === Text);
+  return Match || DEFAULT_DISPLAY;
+}
+
 // Coerce arbitrary parsed JSON into a well-formed scope. Groups are numeric
-// (GroupID); Clients are scoped-ID strings (plain UUID, or monitor:/check:…).
-// Anything malformed is dropped rather than throwing.
-function NormalizeScope(Raw: unknown): TagScope {
+// (GroupID); Clients are scoped-ID strings (plain UUID, or monitor:/check:…);
+// Tags are numeric TagIDs of other tags this one absorbs. Anything malformed is
+// dropped rather than throwing.
+function NormalizeScope(Raw: unknown, SelfTagID?: number): TagScope {
   const Obj = Raw && typeof Raw === 'object' ? (Raw as Record<string, unknown>) : {};
   const Groups: number[] = [];
   for (const Value of Array.isArray(Obj.Groups) ? Obj.Groups : []) {
@@ -56,15 +80,21 @@ function NormalizeScope(Raw: unknown): TagScope {
     const S = String(Value == null ? '' : Value).trim();
     if (S && !Clients.includes(S)) Clients.push(S);
   }
-  return { Workspace: !!Obj.Workspace, Groups, Clients };
+  // A tag can absorb other tags, but never itself: a self-reference is the one
+  // cycle that is unambiguously a mistake, and dropping it here keeps the
+  // stored data clean (deeper cycles are tolerated at resolve time instead —
+  // they can be authored across two edits, so refusing them here would just
+  // move the problem).
+  const Tags = NormalizeScopeTags(Obj.Tags).filter((TagID) => TagID !== SelfTagID);
+  return { Workspace: !!Obj.Workspace, Groups, Clients, Tags };
 }
 
 // Parse a stored Scope JSON string. Returns an empty scope when unusable so a
 // single bad row can never break the tag list.
-function ParseScopeText(Text: string | null | undefined): TagScope {
+function ParseScopeText(Text: string | null | undefined, SelfTagID?: number): TagScope {
   if (typeof Text !== 'string' || !Text.trim()) return CloneEmptyScope();
   try {
-    return NormalizeScope(JSON.parse(Text));
+    return NormalizeScope(JSON.parse(Text), SelfTagID);
   } catch (Err) {
     Logger.warn('Failed to parse stored tag scope; treating as empty', Err);
     return CloneEmptyScope();
@@ -78,6 +108,7 @@ class Tag {
   Slug: string | null;
   Colour: number;
   Icon: string;
+  Display: TagDisplayMode;
   Scope: TagScope;
 
   constructor(Data: TagRow) {
@@ -85,7 +116,8 @@ class Tag {
     this.Slug = Data.Slug || null;
     this.Colour = NormalizeColour(Data.Colour);
     this.Icon = NormalizeIcon(Data.Icon);
-    this.Scope = ParseScopeText(Data.Scope);
+    this.Display = NormalizeDisplay(Data.Display);
+    this.Scope = ParseScopeText(Data.Scope, Data.TagID);
   }
 
   ToView(): TagView {
@@ -94,6 +126,7 @@ class Tag {
       Slug: this.Slug,
       Colour: this.Colour,
       Icon: this.Icon,
+      Display: this.Display,
       Scope: this.Scope,
     };
   }
@@ -138,8 +171,21 @@ class Tag {
     return Ok(true);
   }
 
+  async SetDisplay(Display: unknown): Promise<Result<boolean>> {
+    const Next = NormalizeDisplay(Display);
+    if (this.Display === Next) return Ok(true);
+    this.Display = Next;
+    const [Err] = await TagsRepo.UpdateDisplay(this.TagID, Next);
+    if (Err) {
+      Logger.error('Failed to update tag Display');
+      return Fail('Failed to update tag display mode');
+    }
+    Logger.debug(`Tag ${this.TagID} Display updated to ${Next}`);
+    return Ok(true);
+  }
+
   async SetScope(Scope: unknown): Promise<Result<boolean>> {
-    const Next = NormalizeScope(Scope);
+    const Next = NormalizeScope(Scope, this.TagID);
     this.Scope = Next;
     const [Err] = await TagsRepo.UpdateScope(this.TagID, JSON.stringify(Next));
     if (Err) {
@@ -160,6 +206,7 @@ const Manager = {
       Slug,
       DEFAULT_COLOUR,
       DEFAULT_ICON,
+      DEFAULT_DISPLAY,
       JSON.stringify(CloneEmptyScope()),
       100
     );
@@ -212,6 +259,17 @@ const Manager = {
     if (GetErr) return Fail(GetErr);
     if (!Tag) return Fail('Tag not found');
     const [SetErr] = await Tag.SetIcon(Icon);
+    if (SetErr) return Fail(SetErr);
+    BroadcastManager.emit('TagListChanged');
+    return Ok(true);
+  },
+
+  async SetDisplay(TagID: number, Display: unknown): Promise<Result<boolean>> {
+    if (!TagID) return Fail('TagID is required');
+    const [GetErr, Tag] = await Manager.Get(TagID);
+    if (GetErr) return Fail(GetErr);
+    if (!Tag) return Fail('Tag not found');
+    const [SetErr] = await Tag.SetDisplay(Display);
     if (SetErr) return Fail(SetErr);
     BroadcastManager.emit('TagListChanged');
     return Ok(true);
@@ -335,4 +393,4 @@ const Manager = {
   },
 };
 
-export { Manager };
+export { Manager, TAG_DISPLAY_MODES, DEFAULT_DISPLAY };

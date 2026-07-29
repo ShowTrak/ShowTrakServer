@@ -112,6 +112,8 @@ function loadOSC(overrides = {}, { WithSocket = true } = {}) {
         // Tags are addressed by slug; a numeric TagID resolves via Get above.
         GetBySlug: async (slug) =>
           slug === 'foh' ? { TagID: 5, Slug: 'foh', Scope: FOH_SCOPE } : null,
+        // The whole list, so a tag that absorbs other tags can be expanded.
+        GetAllViews: async () => [{ TagID: 5, Slug: 'foh', Scope: FOH_SCOPE }],
       },
     },
     '../ScriptWhitelistManager': {

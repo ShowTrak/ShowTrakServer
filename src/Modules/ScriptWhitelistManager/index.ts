@@ -12,6 +12,8 @@
 import { CreateLogger } from '../Logger';
 import { Manager as DB } from '../DB';
 import { CreateScriptWhitelistRepository } from '../DB/repositories/script-whitelists';
+import { NormalizeScopeTags, ScopeCoversEntity } from '../ScopeMatching';
+import type { ScopeTag } from '../ScopeMatching';
 import type { ScriptWhitelistScope } from '@showtrak/protocol';
 
 const Logger = CreateLogger('ScriptWhitelistManager');
@@ -26,8 +28,9 @@ interface WhitelistClient {
 }
 
 // Coerce arbitrary parsed JSON into a well-formed scope. Groups are numeric
-// (GroupID); Clients are string UUIDs. Anything malformed is dropped rather
-// than throwing so a single bad row can never break script dispatch.
+// (GroupID); Clients are string UUIDs; Tags are numeric TagIDs. Anything
+// malformed is dropped rather than throwing so a single bad row can never break
+// script dispatch.
 function NormalizeScope(Raw: unknown): ScriptWhitelistScope {
   const Obj = Raw && typeof Raw === 'object' ? (Raw as Record<string, unknown>) : {};
   const Groups: number[] = [];
@@ -40,7 +43,7 @@ function NormalizeScope(Raw: unknown): ScriptWhitelistScope {
     const S = String(Value == null ? '' : Value).trim();
     if (S && !Clients.includes(S)) Clients.push(S);
   }
-  return { Workspace: !!Obj.Workspace, Groups, Clients };
+  return { Workspace: !!Obj.Workspace, Groups, Clients, Tags: NormalizeScopeTags(Obj.Tags) };
 }
 
 // Parse a stored Scope JSON string. Returns a normalized scope, or null when the
@@ -58,18 +61,26 @@ function ParseScopeText(Text: string | null | undefined): ScriptWhitelistScope |
 
 const Manager = {
   // Pure access decision. `Scope` null/undefined OR Workspace:true → allowed.
-  // Otherwise the client must match a whitelisted UUID or belong to a
-  // whitelisted group. Exposed static so callers can resolve a batch against a
-  // single fetched scope without re-reading the DB per client.
+  // Otherwise the client must match a whitelisted UUID, belong to a whitelisted
+  // group, or carry a whitelisted tag. Exposed static so callers can resolve a
+  // batch against a single fetched scope without re-reading the DB per client.
+  //
+  // `Tags` is the full tag list, needed only to expand `Scope.Tags` (tags nest,
+  // so the expansion is a graph walk — see ../ScopeMatching). Omitting it is
+  // safe for scopes that name no tags and silently under-matches for scopes
+  // that do, so every caller handling operator-authored scopes passes it.
   IsClientAllowed(
     Scope: ScriptWhitelistScope | null | undefined,
-    Client: WhitelistClient
+    Client: WhitelistClient,
+    Tags?: readonly ScopeTag[] | null
   ): boolean {
     if (!Scope || Scope.Workspace) return true;
     if (!Client || !Client.UUID) return false;
-    if (Scope.Clients.includes(Client.UUID)) return true;
-    if (Client.GroupID != null && Scope.Groups.includes(Number(Client.GroupID))) return true;
-    return false;
+    return ScopeCoversEntity(
+      Scope,
+      { ScopedID: String(Client.UUID), GroupID: Client.GroupID ?? null },
+      Tags
+    );
   },
 
   // Fetch the effective scope for a script, or null when unrestricted (no row).

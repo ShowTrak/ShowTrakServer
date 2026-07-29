@@ -72,19 +72,18 @@ export function GetClientCompactStatusLabel(
 /**
  * The CSS state class for a client tile.
  *
- * A reserved (unassigned) slot has never had a device, so a red "offline" tile
- * would read as a fault for something that is working exactly as intended — it
- * greys out like an idle monitor instead. A client still inside its start-up
- * window greys out for the mirror-image reason: it has a guard outstanding, so
- * green would be a claim we cannot yet make, and amber would be a fault we have
- * not established.
+ * A reserved (unassigned) slot takes the same offline colour as any other
+ * client without a device on it: an empty slot is something still to be filled,
+ * and greying it out let it fade into the layout. A client still inside its
+ * start-up window does grey out: it has a guard outstanding, so green would be
+ * a claim we cannot yet make, and amber would be a fault we have not
+ * established.
  */
 export function GetClientTileStateClass(Client: Partial<ClientView> | null | undefined): string {
   if (!Client) return '';
   if (Client.Degraded) return 'DEGRADED';
   if (Client.Initialising) return 'IDLE';
   if (Client.Online) return 'ONLINE';
-  if (Client.Unassigned) return 'IDLE';
   return '';
 }
 

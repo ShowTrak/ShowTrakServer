@@ -18,6 +18,7 @@ const state = {
   setSlug: [null, true],
   setColour: [null, true],
   setIcon: [null, true],
+  setDisplay: [null, true],
   setScope: [null, true],
   setOrder: { ok: true },
   del: [null, true],
@@ -29,6 +30,7 @@ const tagMgr = recordingManager({
   SetSlug: () => state.setSlug,
   SetColour: () => state.setColour,
   SetIcon: () => state.setIcon,
+  SetDisplay: () => state.setDisplay,
   SetScope: () => state.setScope,
   SetOrder: () => state.setOrder,
   Delete: () => state.del,
@@ -50,6 +52,7 @@ test.beforeEach(() => {
   state.setSlug = [null, true];
   state.setColour = [null, true];
   state.setIcon = [null, true];
+  state.setDisplay = [null, true];
   state.setScope = [null, true];
   state.setOrder = { ok: true };
   state.del = [null, true];
@@ -63,6 +66,7 @@ test('registers a handler for every tags channel', () => {
     'Tags:SetSlug',
     'Tags:SetColour',
     'Tags:SetIcon',
+    'Tags:SetDisplay',
     'Tags:SetScope',
     'Tags:SetOrder',
     'Tags:Delete',
@@ -165,6 +169,35 @@ test('Tags:SetIcon coerces a non-string icon to empty and lets the manager defau
   assert.deepEqual(tagMgr.__callsTo('SetIcon')[0].args, [1, '']);
 });
 
+// --- Tags:SetDisplay --------------------------------------------------------
+// Display is presentation only (how the tag draws on a client tile), but an
+// unrecognised value must still be rejected rather than coerced: silently
+// storing 'name' for a typo'd 'hidden' would leave a tag the operator believes
+// is hidden drawing on every tile in the show.
+
+test('Tags:SetDisplay accepts each of the four modes', async () => {
+  for (const Mode of ['hidden', 'icon', 'name', 'both']) {
+    tagMgr.__calls.length = 0;
+    const [Err] = await GetHandler('Tags:SetDisplay')(null, 1, Mode);
+    assert.equal(Err, null);
+    assert.deepEqual(tagMgr.__callsTo('SetDisplay')[0].args, [1, Mode]);
+  }
+});
+
+test('Tags:SetDisplay normalizes case and surrounding whitespace', async () => {
+  await GetHandler('Tags:SetDisplay')(null, 1, '  Hidden ');
+  assert.deepEqual(tagMgr.__callsTo('SetDisplay')[0].args, [1, 'hidden']);
+});
+
+test('Tags:SetDisplay rejects an unknown mode without touching the manager', async () => {
+  for (const Bad of ['invisible', '', null, 42, {}, ['icon']]) {
+    tagMgr.__calls.length = 0;
+    const [Err] = await GetHandler('Tags:SetDisplay')(null, 1, Bad);
+    assert.ok(Err, `expected ${JSON.stringify(Bad)} to be rejected`);
+    assert.equal(tagMgr.__callsTo('SetDisplay').length, 0);
+  }
+});
+
 // --- Tags:SetScope ----------------------------------------------------------
 
 test('Tags:SetScope normalizes the scope and dedupes its members', async () => {
@@ -172,6 +205,7 @@ test('Tags:SetScope normalizes the scope and dedupes its members', async () => {
     Workspace: 1,
     Groups: [2, 2, '3'],
     Clients: ['uuid-a', 'uuid-a', 'monitor:12', 'check:3'],
+    Tags: [7, 7, '8'],
   });
   assert.equal(Err, null);
 
@@ -179,16 +213,25 @@ test('Tags:SetScope normalizes the scope and dedupes its members', async () => {
     Workspace: true, // coerced from 1
     Groups: [2, 3], // deduped, numeric string coerced
     Clients: ['uuid-a', 'monitor:12', 'check:3'],
+    Tags: [7, 8], // a tag may absorb other tags, making it a superset
   });
 });
 
-test('Tags:SetScope defaults absent Groups/Clients to empty arrays', async () => {
+test('Tags:SetScope defaults absent Groups/Clients/Tags to empty arrays', async () => {
   await GetHandler('Tags:SetScope')(null, 1, { Workspace: false });
   assert.deepEqual(tagMgr.__callsTo('SetScope')[0].args[1], {
     Workspace: false,
     Groups: [],
     Clients: [],
+    Tags: [],
   });
+});
+
+test('Tags:SetScope rejects a malformed tag reference', async () => {
+  for (const Bad of [[0], [-1], ['nope'], [{}]]) {
+    const [Err] = await GetHandler('Tags:SetScope')(null, 1, { Tags: Bad });
+    assert.equal(typeof Err, 'string', `tags ${JSON.stringify(Bad)}`);
+  }
 });
 
 test('Tags:SetScope drops blank client entries but rejects malformed ones', async () => {

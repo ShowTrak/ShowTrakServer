@@ -333,10 +333,11 @@ function RenderClientInfoTags(Client: ClientView): void {
   }
 
   const Html = Applied.map((Tag) => {
-    const Kind = GetTagMembershipKind(Tag, Entity);
+    const Kind = GetTagMembershipKind(Tag, Entity, Tags);
     // Naming where a tag came from matters here: it explains why a tag cannot
     // be removed from this client in the editor.
-    const Via = Kind === 'workspace' ? 'ALL' : Kind === 'group' ? 'GROUP' : '';
+    const Via =
+      Kind === 'workspace' ? 'ALL' : Kind === 'group' ? 'GROUP' : Kind === 'tag' ? 'TAG' : '';
     return `
       <span class="tag-picker-chip is-on" style="--tag-colour: ${Safe(ScriptColourHex(Tag.Colour))}">
         <i class="bi bi-${Safe(Tag.Icon || 'tag')}" aria-hidden="true"></i>

@@ -11,7 +11,8 @@ export function OfflineBadgeContent(time = '00:00:00'): string {
 
 // Shown in place of the offline counter on a reserved slot. Counting how long
 // an empty slot has been "down" would be meaningless — it has never had a
-// device — so it states what the tile is instead.
+// device — so it states what the tile is instead. No badge: the slot being
+// empty is what "Unassigned" already says.
 export function UnassignedBadgeContent(): string {
-  return `Unassigned <span class="badge bg-ghost">No Device</span>`;
+  return `Unassigned`;
 }

@@ -1,4 +1,4 @@
-// IPC registrar: client tags (create/slug/colour/icon/scope/order/delete).
+// IPC registrar: client tags (create/slug/colour/icon/display/scope/order/delete).
 // Tags are cross-cutting, colour+icon labelled collections of clients; the slug
 // doubles as the label. Membership is a dynamic scope ({ Workspace, Groups[],
 // Clients[] }) edited with the shared scope-dropdown.
@@ -51,6 +51,19 @@ function register(): void {
         typeof Icon === 'string' ? Icon : '',
       ],
       (TagID: number, Icon: string) => TagManager.SetIcon(TagID, Icon)
+    )
+  );
+
+  // Tile presentation only ('hidden' | 'icon' | 'name' | 'both'); membership and
+  // every targeting path are unaffected by it.
+  RPC.handle(
+    'Tags:SetDisplay',
+    createTupleHandler<[number, string], unknown>(
+      (TagID: unknown, Display: unknown) => [
+        IPCValidation.TagID(TagID),
+        IPCValidation.TagDisplay(Display),
+      ],
+      (TagID: number, Display: string) => TagManager.SetDisplay(TagID, Display)
     )
   );
 

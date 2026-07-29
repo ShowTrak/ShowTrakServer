@@ -1,4 +1,4 @@
-import type { GroupView, TagView } from '@showtrak/protocol';
+import type { GroupView, TagDisplayMode, TagView } from '@showtrak/protocol';
 import { closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
 import { HandleNonFatalError, Safe } from './utils';
@@ -8,54 +8,67 @@ import { NormalizeIconName, OpenIconPicker } from './icon-picker';
 // Tags reuse the Scripts colour palette (index-based) and its swatch/icon CSS,
 // so the palette + hex helper are imported rather than duplicated.
 import { SCRIPT_COLOURS, ScriptColourHex } from './script-manager';
-import {
-  buildScopeModel,
-  parseScopeSelection,
-  scopeToSelectedValues,
-  renderScopeDropdown,
-  bindScopeDropdown,
-} from './scope-dropdown';
+import { buildScopeModel, parseScopeSelection, scopeToSelectedValues } from './lib/scope-model';
+import { bindScopeButton, renderScopeButton } from './scope-picker';
+import type { ScopePickerConfig } from './scope-picker';
 import { SummarizeTagScope } from './lib/tag-summary';
-import type { ScopeDropdownConfig } from './scope-dropdown';
+import { Tags as AllTags } from './state';
 
 // Tag Manager (desktop UI)
 // - Lists every tag: a cross-cutting, colour+icon labelled collection of
 //   clients (the slug doubles as the label). Unlike groups, a client may carry
 //   any number of tags.
-// - The editor edits the slug, colour, icon and — via the shared scope-dropdown
-//   ("client selector") — the tag's dynamic membership scope. All client kinds
-//   (real clients, monitoring targets, dummy clients) are taggable.
+// - The editor edits the slug, colour, icon, how the tag draws on client tiles
+//   (hidden / icon / name / icon+name — presentation only, targeting is
+//   unaffected) and — via the shared scope picker ("client selector") — the
+//   tag's dynamic membership scope. All client kinds
+//   (real clients, monitoring targets, dummy clients) are taggable, and a tag
+//   may also absorb other tags, making it a superset of them.
 
 const DEFAULT_TAG_ICON = 'tag';
+// Tile presentation modes, in the order the segmented toggle shows them.
+const TAG_DISPLAY_MODES: TagDisplayMode[] = ['hidden', 'icon', 'name', 'both'];
+// What every tag did before the setting existed, and what a tag from an older
+// server (no Display on the wire) must be shown as.
+const DEFAULT_TAG_DISPLAY: TagDisplayMode = 'name';
 
 let TagManagerCache: TagView[] = [];
 let TagManagerEditingId: number | null = null;
 // Currently-selected icon in the editor (bare Bootstrap Icons name, no "bi-").
 let TagManagerEditingIcon: string = DEFAULT_TAG_ICON;
+// Currently-selected tile display mode in the editor. Held in module state like
+// the icon (rather than read back off the DOM) because the toggle is a set of
+// buttons, not a form control.
+let TagManagerEditingDisplay: TagDisplayMode = DEFAULT_TAG_DISPLAY;
 
 // --- Tag scope ("client selector") editor state ----------------------------
-// The membership picker reuses the shared scope-dropdown engine across every
-// client kind. Selection is the flat value list; groups are cached at
-// editor-open so BuildModel stays synchronous for the render/change handlers.
+// The membership picker reuses the shared scope picker across every client
+// kind. Selection is the flat value list; groups are cached at editor-open so
+// BuildModel stays synchronous for the render/change handlers.
 let TagScopeSelected: string[] = [];
 let TagScopeOriginal: string[] = [];
 let TagScopeGroups: GroupView[] = [];
 
-const TagScopeConfig: ScopeDropdownConfig = {
-  DropdownSelector: '#TAG_SCOPE_DROPDOWN',
-  MenuSelector: '#TAG_SCOPE_MENU',
-  ToggleSelector: '#TAG_SCOPE_TOGGLE',
+const TagScopeConfig: ScopePickerConfig = {
+  ButtonSelector: '#TAG_SCOPE_TOGGLE',
   Namespace: 'tagScope',
+  Title: 'Tag Members',
   Placeholder: 'No clients',
+  Hint: 'Members are resolved live — a group or tag you pick keeps covering machines added to it later.',
   GetSelected: () => TagScopeSelected,
   SetSelected: (values) => {
     TagScopeSelected = values;
   },
+  GetTags: () => AllTags,
   // Tags apply to every client kind (integrated clients included); only
   // monitoring *checks* are excluded since a check is not itself a client.
+  // A tag may absorb other tags — but never itself, so the tag being edited is
+  // withheld from its own tag list.
   BuildModel: () =>
     buildScopeModel({
       Groups: TagScopeGroups,
+      Tags: AllTags,
+      ExcludeTagID: TagManagerEditingId,
       IncludeKinds: ['showtrak', 'monitor', 'dummy'],
     }),
   ToggleRender: 'html',
@@ -102,7 +115,10 @@ export function RenderTagManagerList() {
   for (const Tag of TagManagerCache) {
     const IconName = NormalizeIconName(Tag.Icon) || DEFAULT_TAG_ICON;
     const Label = Tag.Slug || `Tag ${Tag.TagID}`;
-    const MemberSummary = SummarizeTagScope(Tag);
+    // A hidden tag draws nothing on tiles, so the list is the only place its
+    // existence is visible — say so here or it looks like a broken tag.
+    const HiddenNote = NormalizeTagDisplay(Tag.Display) === 'hidden' ? ' · Hidden on tiles' : '';
+    const MemberSummary = `${SummarizeTagScope(Tag)}${HiddenNote}`;
 
     const Item = document.createElement('div');
     Item.className = 'script-manager-item p-3 rounded bg-ghost';
@@ -234,7 +250,29 @@ export function PopulateTagManagerEditor(Tag: TagView) {
   // Icon field.
   SetTagManagerEditorIcon(Tag.Icon);
 
-  renderScopeDropdown(TagScopeConfig);
+  // Tile display mode.
+  SetTagManagerEditorDisplay(Tag.Display);
+
+  renderScopeButton(TagScopeConfig);
+}
+
+/** Coerce anything to a known display mode; unknown/absent means 'name'. */
+export function NormalizeTagDisplay(Value: unknown): TagDisplayMode {
+  const Text = String(Value == null ? '' : Value)
+    .trim()
+    .toLowerCase();
+  return TAG_DISPLAY_MODES.find((Mode) => Mode === Text) || DEFAULT_TAG_DISPLAY;
+}
+
+// Reflect the given display mode into the segmented toggle + track it for save.
+export function SetTagManagerEditorDisplay(Display: unknown) {
+  const Mode = NormalizeTagDisplay(Display);
+  TagManagerEditingDisplay = Mode;
+  const Toggle = document.getElementById('TAG_MANAGER_DISPLAY_TOGGLE');
+  if (!Toggle) return;
+  Toggle.querySelectorAll<HTMLElement>('.st-segmented-toggle-btn').forEach((Btn) => {
+    Btn.classList.toggle('is-active', Btn.getAttribute('data-display') === Mode);
+  });
 }
 
 // Reflect the given icon name into the editor's preview + track it for save.
@@ -294,12 +332,16 @@ export async function SaveTagManagerConfig() {
     TagID,
     NormalizeIconName(TagManagerEditingIcon) || DEFAULT_TAG_ICON
   );
+  const [DisplayErr] = await window.API.SetTagDisplay(
+    TagID,
+    NormalizeTagDisplay(TagManagerEditingDisplay)
+  );
   const [ScopeErr] = await window.API.SetTagScope(TagID, parseScopeSelection(TagScopeSelected));
 
   SaveBtn.prop('disabled', false);
   if (TagManagerEditingId !== TagID) return;
 
-  const Errors = [ColourErr, IconErr, ScopeErr].filter(Boolean) as string[];
+  const Errors = [ColourErr, IconErr, DisplayErr, ScopeErr].filter(Boolean) as string[];
   if (Errors.length) {
     RenderTagManagerIssues('Tag partially saved — the following failed:', Errors);
     Notify('Tag could not be fully saved', 'error');
@@ -363,6 +405,15 @@ export function InitTagManager() {
       if (Chosen !== null) SetTagManagerEditorIcon(Chosen);
     });
 
+  // Tile display mode. Delegated off the container so the four segments need no
+  // individual handlers; selection is local until Save, like every other field
+  // in this editor.
+  $('#TAG_MANAGER_DISPLAY_TOGGLE')
+    .off('click')
+    .on('click', '.st-segmented-toggle-btn', function () {
+      SetTagManagerEditorDisplay($(this).attr('data-display'));
+    });
+
   $('#TAG_MANAGER_SAVE')
     .off('click')
     .on('click', () => SaveTagManagerConfig());
@@ -378,9 +429,9 @@ export function InitTagManager() {
       HideTagManagerIssues();
     });
 
-  // Wire the client-selector dropdown once; it targets the always-present
-  // editor markup and reads/writes the module-level selection state.
-  bindScopeDropdown(TagScopeConfig);
+  // Wire the client-selector button once; it targets the always-present editor
+  // markup and reads/writes the module-level selection state.
+  bindScopeButton(TagScopeConfig);
 
   // Drag-and-drop reordering within the list container.
   const ListContainer = document.getElementById('TAG_MANAGER_LIST');

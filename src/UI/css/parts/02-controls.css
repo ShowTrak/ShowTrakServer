@@ -739,8 +739,10 @@ input[type='range']::-moz-range-progress,
 }
 
 /* Center the chevron on the full toggle height (the label/value use asymmetric
-   padding, so flex alignment alone would leave it sitting low). */
-.alert-multiselect-toggle .bi-chevron-down {
+   padding, so flex alignment alone would leave it sitting low). The scope
+   targets button opens a screen rather than a dropdown, so it points right. */
+.alert-multiselect-toggle .bi-chevron-down,
+.alert-multiselect-toggle .bi-chevron-right {
   position: absolute;
   top: 50%;
   right: 0.75rem;
@@ -866,11 +868,9 @@ input[type='range']::-moz-range-progress,
   width: 0.2rem;
 }
 
-#SHOWTRAK_MODAL_ALERT_MANAGER .modal-dialog,
-#SHOWTRAK_MODAL_ALERT_MANAGER .modal-content,
-#SHOWTRAK_MODAL_ALERT_MANAGER .modal-body {
-  overflow: visible;
-}
+/* The Alert Manager used to force `overflow: visible` on its dialog so the old
+   inline scope dropdown could escape the modal box. The scope picker is its own
+   screen now, so the override is gone and the modal scrolls normally again. */
 
 .alert-scope-label-wrap {
   display: inline-flex;
@@ -884,6 +884,65 @@ input[type='range']::-moz-range-progress,
   color: rgba(255, 255, 255, 0.72);
   font-size: 0.95rem;
   line-height: 1;
+}
+
+/* --- Scope picker ---------------------------------------------------------
+   The full-screen replacement for the old inline scope dropdown. The list is
+   the scrolling region (the modal itself must not grow with the client count,
+   which is what made the dropdown unusable on a large show), so it carries its
+   own max-height and the search box above it stays put. */
+.scope-picker-list {
+  max-height: min(60vh, 30rem);
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.scope-picker-section {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.scope-picker-section-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 0.35rem 0.25rem 0;
+}
+
+/* A tag row wears its own colour so it reads as the same object as the badge
+   on a client tile. */
+.scope-picker-tag .scope-picker-tag-icon {
+  flex: 0 0 auto;
+  color: var(--scope-tag-colour, rgba(255, 255, 255, 0.72));
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+/* A machine pulled in by a selected tag: shown so the operator can see the real
+   reach of the selection, but not tickable — the only way to exclude it is to
+   edit the tag, which would change every other scope using that tag. */
+.scope-picker-implied {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.scope-picker-via {
+  flex: 0 0 auto;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.09);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 10rem;
 }
 
 .bg-ghost {
@@ -945,6 +1004,26 @@ input[type='range']::-moz-range-progress,
 .st-segmented-toggle-btn:disabled {
   cursor: default;
   opacity: 0.65;
+}
+
+/* Full-width variant: segments share the row equally instead of sizing to their
+   own text, so a four-option switch (the tag display mode) still lines up
+   inside a modal field. Padding is tightened and the labels forced onto one
+   line — the longest ("Icon + Name") would otherwise wrap and make its segment
+   taller than the other three. */
+.st-segmented-toggle.st-segmented-toggle-fill {
+  display: flex;
+  width: 100%;
+}
+
+.st-segmented-toggle.st-segmented-toggle-fill > .st-segmented-toggle-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Settings modal: two-pane layout with a category nav on the left and the

@@ -141,7 +141,7 @@ test('CreateAlertRule normalizes the payload then delegates', async () => {
   const Sent = alertsMgr.__callsTo('Create')[0].args[0];
   assert.deepEqual(Sent.TriggerTypes, ['CLIENT_OFFLINE']);
   assert.equal(Sent.Enabled, true);
-  assert.deepEqual(Sent.Scope, { Workspace: true, Groups: [], Clients: [] });
+  assert.deepEqual(Sent.Scope, { Workspace: true, Groups: [], Clients: [], Tags: [] });
 });
 
 test('CreateAlertRule rejects a non-object payload before the manager', async () => {

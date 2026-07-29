@@ -1140,6 +1140,11 @@ test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve
           slug === 'foh'
             ? { TagID: 5, Slug: 'foh', Scope: { Workspace: false, Groups: [1], Clients: [] } }
             : null,
+        // Read whenever a scope has to be resolved, so tags that absorb other
+        // tags can be expanded.
+        GetAllViews: async () => [
+          { TagID: 5, Slug: 'foh', Scope: { Workspace: false, Groups: [1], Clients: [] } },
+        ],
       },
     },
     '../ScriptWhitelistManager': {

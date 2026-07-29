@@ -53,18 +53,23 @@ function MembershipTitle(Kind: TagMembershipKind, Label: string): string {
   if (Kind === 'workspace') return `${Label} applies to all clients — edit it in the Tag Manager`;
   if (Kind === 'group')
     return `${Label} applies to this client's group — edit it in the Tag Manager`;
+  if (Kind === 'tag')
+    return `${Label} covers another tag this client carries — edit it in the Tag Manager`;
   if (Kind === 'direct') return `Remove ${Label}`;
   return `Add ${Label}`;
 }
 
-function RenderTagPickerChip(Tag: TagView, Entity: TagBadgeEntity): string {
-  const Kind = GetTagMembershipKind(Tag, Entity);
+function RenderTagPickerChip(Tag: TagView, Entity: TagBadgeEntity, AllTags: TagView[]): string {
+  const Kind = GetTagMembershipKind(Tag, Entity, AllTags);
   const Label = TagBadgeLabel(Tag);
-  const Locked = Kind === 'group' || Kind === 'workspace';
+  // Inherited membership of any kind is read-only here: dropping it would mean
+  // rewriting the tag for every other client it covers.
+  const Locked = Kind === 'group' || Kind === 'workspace' || Kind === 'tag';
   const Classes = ['tag-picker-chip', Kind ? 'is-on' : '', Locked ? 'is-locked' : '']
     .filter(Boolean)
     .join(' ');
-  const Inherited = Kind === 'workspace' ? 'ALL' : Kind === 'group' ? 'GROUP' : '';
+  const Inherited =
+    Kind === 'workspace' ? 'ALL' : Kind === 'group' ? 'GROUP' : Kind === 'tag' ? 'TAG' : '';
 
   return `
     <button
@@ -112,7 +117,7 @@ export function RenderTagPicker(Mount: TagPickerMount, Entity: TagBadgeEntity | 
     return;
   }
 
-  $(Mount.ListSelector).html(List.map((Tag) => RenderTagPickerChip(Tag, Entity)).join(''));
+  $(Mount.ListSelector).html(List.map((Tag) => RenderTagPickerChip(Tag, Entity, List)).join(''));
 
   $(Mount.ListSelector)
     .off(`click.${Mount.Namespace}`)
@@ -135,16 +140,20 @@ async function ToggleTagMembership(TagID: number, Entity: TagBadgeEntity): Promi
   const Tag = (Array.isArray(Tags) ? Tags : []).find((T) => T && T.TagID === TagID);
   if (!Tag) return;
 
-  const Scope = Tag.Scope || { Workspace: false, Groups: [], Clients: [] };
+  const Scope = Tag.Scope || { Workspace: false, Groups: [], Clients: [], Tags: [] };
   const Clients = Array.isArray(Scope.Clients) ? Scope.Clients.slice() : [];
   const Index = Clients.indexOf(Entity.ScopedID);
   if (Index === -1) Clients.push(Entity.ScopedID);
   else Clients.splice(Index, 1);
 
+  // Every other arm of the scope is carried through verbatim. Dropping Tags
+  // here would silently un-nest a superset tag the moment anyone toggled a
+  // single client's chip.
   const NextScope = {
     Workspace: !!Scope.Workspace,
     Groups: Array.isArray(Scope.Groups) ? Scope.Groups.slice() : [],
     Clients,
+    Tags: Array.isArray(Scope.Tags) ? Scope.Tags.slice() : [],
   };
 
   try {

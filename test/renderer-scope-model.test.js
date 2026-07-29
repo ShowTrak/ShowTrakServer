@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-// Exercises the scope engine in src/UI/js/app/scope-dropdown.ts.
+// Exercises the scope engine in src/UI/js/app/lib/scope-model.ts.
 //
 // A "scope" answers one question: WHICH machines does this apply to. It backs
 // both the alert-rule targets and the per-script whitelist, so a wrong answer
@@ -10,7 +10,7 @@ const path = require('node:path');
 // that failed, or a destructive script offered to a machine it was explicitly
 // restricted away from.
 //
-// The single most important property is the ROUND TRIP. The dropdown converts
+// The single most important property is the ROUND TRIP. The picker converts
 //   stored scope -> selected values -> stored scope
 // every time an editor opens and saves. If that is not stable, merely opening a
 // rule and pressing save silently changes who it covers, with nothing on screen
@@ -22,10 +22,15 @@ const path = require('node:path');
 //     the rule;
 //   - selecting all of a group's members collapses to that group, for the same
 //     reason at group level.
+//
+// Tags are the third category and behave differently on purpose: a tag's own
+// membership is a scope (which may name further tags), so a tag selection is an
+// explicit token that is NEVER inferred from, or collapsed into, the machines it
+// happens to cover today.
 
 const APP = path.join(__dirname, '..', 'dist-test', 'UI', 'js', 'app');
 
-const Scope = require(path.join(APP, 'scope-dropdown.js'));
+const Scope = require(path.join(APP, 'lib', 'scope-model.js'));
 const State = require(path.join(APP, 'state/index.js'));
 
 const {
@@ -36,8 +41,11 @@ const {
   scopeToSelectedValues,
   summarizeScopeSelection,
   scopeClientValueToScopedID,
+  scopeTagValueToTagID,
   buildScopeEntityLabel,
   scopeIconClass,
+  resolveTagCoverage,
+  resolveTagCoveredValues,
 } = Scope;
 
 const GROUPS = [
@@ -139,7 +147,7 @@ test('individual monitor checks are selectable in their own right', () => {
   assert.match(Model.LabelByValue.get('client:check:7'), /UPS · Battery/);
 });
 
-test('IncludeKinds restricts what the dropdown will offer', () => {
+test('IncludeKinds restricts what the picker will offer', () => {
   seed({ clients: [client()], monitors: [monitor()], dummies: [dummy()] });
 
   const OnlyClients = model({ IncludeKinds: ['showtrak'] });
@@ -205,16 +213,18 @@ test('malformed entities are skipped rather than producing unselectable rows', (
 
 // --- Selection parsing ------------------------------------------------------
 
-test('a selection parses into its three buckets', () => {
+test('a selection parses into its four buckets', () => {
   assert.deepEqual(parseScopeSelection(['workspace:*']), {
     Workspace: true,
     Groups: [],
     Clients: [],
+    Tags: [],
   });
-  assert.deepEqual(parseScopeSelection(['group:1', 'group:2', 'client:c1']), {
+  assert.deepEqual(parseScopeSelection(['group:1', 'group:2', 'client:c1', 'tag:4']), {
     Workspace: false,
     Groups: [1, 2],
     Clients: ['c1'],
+    Tags: [4],
   });
 });
 
@@ -235,7 +245,12 @@ test('unparseable selection entries are dropped, not coerced', () => {
 
 test('an absent selection parses to an empty scope', () => {
   for (const Value of [[], null, undefined]) {
-    assert.deepEqual(parseScopeSelection(Value), { Workspace: false, Groups: [], Clients: [] });
+    assert.deepEqual(parseScopeSelection(Value), {
+      Workspace: false,
+      Groups: [],
+      Clients: [],
+      Tags: [],
+    });
   }
 });
 
@@ -282,7 +297,7 @@ test('selecting everything collapses to Workspace, not an exhaustive list', () =
   const Model = model();
 
   const Built = buildScopeFromTargetValues(Model.AllClientValues, Model);
-  assert.deepEqual(Built, { Workspace: true, Groups: [], Clients: [] });
+  assert.deepEqual(Built, { Workspace: true, Groups: [], Clients: [], Tags: [] });
 });
 
 test('selecting a whole group collapses to that group', () => {
@@ -338,6 +353,7 @@ test('selecting nothing produces an empty scope, not workspace', () => {
     Workspace: false,
     Groups: [],
     Clients: [],
+    Tags: [],
   });
 });
 
@@ -349,6 +365,7 @@ test('an empty model does not collapse an empty selection to workspace', () => {
     Workspace: false,
     Groups: [],
     Clients: [],
+    Tags: [],
   });
 });
 
@@ -369,18 +386,21 @@ test('every scope shape survives resolve -> rebuild unchanged', () => {
   const Model = model();
 
   const Cases = [
-    { Workspace: true, Groups: [], Clients: [] },
-    { Workspace: false, Groups: [1], Clients: [] },
-    { Workspace: false, Groups: [], Clients: ['c1'] },
-    { Workspace: false, Groups: [1], Clients: ['c3'] },
-    { Workspace: false, Groups: [], Clients: ['monitor:5'] },
-    { Workspace: false, Groups: [], Clients: ['loose', 'd1'] },
-    { Workspace: false, Groups: [], Clients: [] },
+    { Workspace: true, Groups: [], Clients: [], Tags: [] },
+    { Workspace: false, Groups: [1], Clients: [], Tags: [] },
+    { Workspace: false, Groups: [], Clients: ['c1'], Tags: [] },
+    { Workspace: false, Groups: [1], Clients: ['c3'], Tags: [] },
+    { Workspace: false, Groups: [], Clients: ['monitor:5'], Tags: [] },
+    { Workspace: false, Groups: [], Clients: ['loose', 'd1'], Tags: [] },
+    { Workspace: false, Groups: [], Clients: [], Tags: [] },
+    // A tag rides through the collapse untouched, alongside anything else.
+    { Workspace: false, Groups: [], Clients: [], Tags: [9] },
+    { Workspace: false, Groups: [1], Clients: ['c3'], Tags: [9, 10] },
   ];
 
   for (const Original of Cases) {
     const Values = resolveScopeTargetValues(Original, Model);
-    const RoundTripped = buildScopeFromTargetValues([...Values], Model);
+    const RoundTripped = buildScopeFromTargetValues([...Values], Model, Original.Tags);
     assert.deepEqual(
       RoundTripped,
       Original,
@@ -390,11 +410,12 @@ test('every scope shape survives resolve -> rebuild unchanged', () => {
 });
 
 test('the selection-value round trip is stable too', () => {
-  // scope -> selected values -> scope, which is what the dropdown itself does.
+  // scope -> selected values -> scope, which is what the picker itself does.
   const Cases = [
-    { Workspace: true, Groups: [], Clients: [] },
-    { Workspace: false, Groups: [1, 2], Clients: ['c1', 'monitor:5'] },
-    { Workspace: false, Groups: [], Clients: [] },
+    { Workspace: true, Groups: [], Clients: [], Tags: [] },
+    { Workspace: false, Groups: [1, 2], Clients: ['c1', 'monitor:5'], Tags: [] },
+    { Workspace: false, Groups: [], Clients: [], Tags: [] },
+    { Workspace: false, Groups: [1], Clients: ['c1'], Tags: [3, 4] },
   ];
   for (const Original of Cases) {
     assert.deepEqual(
@@ -407,7 +428,8 @@ test('the selection-value round trip is stable too', () => {
 
 test('a scope encodes to the stable persisted value format', () => {
   assert.deepEqual(scopeToSelectedValues({ Workspace: true }), ['workspace:*']);
-  assert.deepEqual(scopeToSelectedValues({ Groups: [1], Clients: ['c1'] }), [
+  assert.deepEqual(scopeToSelectedValues({ Groups: [1], Clients: ['c1'], Tags: [8] }), [
+    'tag:8',
     'group:1',
     'client:c1',
   ]);
@@ -439,4 +461,104 @@ test('a selected entity the model no longer knows still summarises readably', ()
   const Model = model();
   assert.equal(summarizeScopeSelection(Model, { Clients: ['gone-uuid'] }, 'None'), 'gone-uuid');
   assert.equal(summarizeScopeSelection(Model, { Groups: [42] }, 'None'), 'Group 42');
+});
+
+// --- Tags as a scope category ----------------------------------------------
+// A tag can be picked alongside groups and machines, and a tag's own membership
+// may name further tags. Both directions matter: the model has to OFFER tags,
+// and a selected tag has to resolve to the machines it actually covers.
+
+const tag = (TagID, Slug, Scope = {}) => ({
+  TagID,
+  Slug,
+  Colour: 6,
+  Icon: 'tag',
+  Scope: { Workspace: false, Groups: [], Clients: [], Tags: [], ...Scope },
+});
+
+test('a tag value decodes back to its id, and nothing else does', () => {
+  assert.equal(scopeTagValueToTagID('tag:12'), 12);
+  for (const Value of ['group:1', 'client:c1', 'workspace:*', 'tag:0', 'tag:abc', '', null]) {
+    assert.equal(scopeTagValueToTagID(Value), 0, `value ${JSON.stringify(Value)}`);
+  }
+});
+
+test('tags are offered as their own category, in the operator’s order', () => {
+  const Model = model({ Tags: [tag(2, 'sound'), tag(1, 'video')] });
+  assert.deepEqual(
+    Model.Tags.map((T) => T.Value),
+    ['tag:2', 'tag:1'],
+    'the Tag Manager drag order is preserved, not re-sorted'
+  );
+  assert.equal(Model.LabelByValue.get('tag:1'), 'video');
+});
+
+test('the tag being edited is withheld from its own list', () => {
+  // Offering it would let a tag be made a member of itself: a cycle the
+  // operator can see no reason for and cannot undo from the machine list.
+  const Model = model({ Tags: [tag(1, 'video'), tag(2, 'sound')], ExcludeTagID: 1 });
+  assert.deepEqual(
+    Model.Tags.map((T) => T.TagID),
+    [2]
+  );
+});
+
+test('a tag selection is never collapsed into the machines it covers', () => {
+  // This is what makes "everything tagged CORE" mean the tag rather than
+  // today's snapshot of it — a machine tagged tomorrow stays covered.
+  seed({ clients: [client({ UUID: 'c1', GroupID: 1 })] });
+  const Model = model({ Tags: [tag(3, 'core', { Clients: ['c1'] })] });
+
+  const Direct = resolveScopeTargetValues({ Tags: [3] }, Model);
+  assert.equal(Direct.size, 0, 'a tag contributes nothing to the DIRECT selection');
+
+  const Built = buildScopeFromTargetValues([], Model, [3]);
+  assert.deepEqual(Built, { Workspace: false, Groups: [], Clients: [], Tags: [3] });
+});
+
+test('tag coverage names the tag responsible for each machine', () => {
+  seed({
+    clients: [
+      client({ UUID: 'c1', GroupID: 1 }),
+      client({ UUID: 'c2', GroupID: 2 }),
+      client({ UUID: 'c3', GroupID: 2 }),
+    ],
+  });
+  const Tags = [tag(1, 'core', { Clients: ['c1'] }), tag(2, 'stage', { Groups: [2] })];
+  const Model = model({ Tags });
+
+  const Coverage = resolveTagCoverage({ Tags: [1, 2] }, Model, Tags);
+  assert.deepEqual(Coverage.get('client:c1'), ['core']);
+  assert.deepEqual(Coverage.get('client:c2'), ['stage']);
+  assert.deepEqual([...resolveTagCoveredValues({ Tags: [1] }, Model, Tags)], ['client:c1']);
+});
+
+test('a tag that absorbs another tag covers everything that one covers', () => {
+  // The superset case: "all-av" names "video", which names the machines.
+  seed({ clients: [client({ UUID: 'c1', GroupID: 1 }), client({ UUID: 'c2', GroupID: 2 })] });
+  const Tags = [tag(1, 'all-av', { Tags: [2] }), tag(2, 'video', { Clients: ['c2'] })];
+  const Model = model({ Tags });
+
+  const Coverage = resolveTagCoverage({ Tags: [1] }, Model, Tags);
+  assert.deepEqual([...Coverage.keys()], ['client:c2']);
+  assert.deepEqual(Coverage.get('client:c2'), ['all-av'], 'attributed to the tag that was picked');
+});
+
+test('a cycle between tags resolves instead of hanging the picker', () => {
+  seed({ clients: [client({ UUID: 'c1', GroupID: 1 }), client({ UUID: 'c2', GroupID: 2 })] });
+  const Tags = [tag(1, 'a', { Tags: [2] }), tag(2, 'b', { Tags: [1], Clients: ['c2'] })];
+  const Model = model({ Tags });
+
+  const Coverage = resolveTagCoverage({ Tags: [1] }, Model, Tags);
+  assert.deepEqual([...Coverage.keys()], ['client:c2']);
+});
+
+test('the summary counts tags alongside groups and clients', () => {
+  seed({ clients: [client({ UUID: 'c1', GroupID: 1 })] });
+  const Model = model({ Tags: [tag(4, 'core')] });
+
+  assert.equal(summarizeScopeSelection(Model, { Tags: [4] }, 'None'), 'core');
+  assert.equal(summarizeScopeSelection(Model, { Tags: [4], Groups: [1] }, 'None'), 'core +1');
+  // A tag deleted after the scope was saved still reads as something.
+  assert.equal(summarizeScopeSelection(Model, { Tags: [99] }, 'None'), 'Tag 99');
 });

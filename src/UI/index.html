@@ -1146,21 +1146,18 @@ Loading licence...</pre>
                 <div class="bg-ghost p-2 rounded d-grid gap-2">
                   <span class="text-sm">Whitelist</span>
                   <span class="text-sm text-muted mb-0"
-                    >Choose which clients and groups may run this script. All clients can run it by
-                    default; new clients are added automatically unless you restrict it here. Stored
-                    in the show file.</span
+                    >Choose which clients, groups and tags may run this script. All clients can run
+                    it by default; new clients are added automatically unless you restrict it here.
+                    Stored in the show file.</span
                   >
-                  <div class="alert-multiselect" id="SCRIPT_WHITELIST_DROPDOWN">
-                    <button
-                      type="button"
-                      class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center"
-                      id="SCRIPT_WHITELIST_TOGGLE"
-                    >
-                      <span>All Clients</span>
-                      <i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>
-                    </button>
-                    <div class="alert-multiselect-menu d-none" id="SCRIPT_WHITELIST_MENU"></div>
-                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center"
+                    id="SCRIPT_WHITELIST_TOGGLE"
+                  >
+                    <span>All Clients</span>
+                    <i class="bi bi-chevron-right ms-2" aria-hidden="true"></i>
+                  </button>
                 </div>
               </div>
 
@@ -1257,22 +1254,47 @@ Loading licence...</pre>
                 </div>
 
                 <div class="bg-ghost p-2 rounded d-grid gap-2">
+                  <span class="text-sm">Tile display</span>
+                  <div
+                    id="TAG_MANAGER_DISPLAY_TOGGLE"
+                    class="st-segmented-toggle st-segmented-toggle-fill"
+                    role="group"
+                    aria-label="How this tag appears on client tiles"
+                  >
+                    <button type="button" class="st-segmented-toggle-btn" data-display="hidden">
+                      Hidden
+                    </button>
+                    <button type="button" class="st-segmented-toggle-btn" data-display="icon">
+                      Icon
+                    </button>
+                    <button type="button" class="st-segmented-toggle-btn" data-display="name">
+                      Name
+                    </button>
+                    <button type="button" class="st-segmented-toggle-btn" data-display="both">
+                      Icon + Name
+                    </button>
+                  </div>
+                  <span class="text-sm text-muted mb-0"
+                    >How this tag draws on client tiles. Hidden is presentation only — the tag still
+                    targets scripts, alerts and OSC exactly as before.</span
+                  >
+                </div>
+
+                <div class="bg-ghost p-2 rounded d-grid gap-2">
                   <span class="text-sm">Clients</span>
                   <span class="text-sm text-muted mb-0"
-                    >Choose which clients and groups carry this tag. Selecting a group tags its
-                    current and future members.</span
+                    >Choose which clients, groups and tags carry this tag. Selecting a group tags
+                    its current and future members; selecting another tag makes this one a superset
+                    of it.</span
                   >
-                  <div class="alert-multiselect" id="TAG_SCOPE_DROPDOWN">
-                    <button
-                      type="button"
-                      class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center"
-                      id="TAG_SCOPE_TOGGLE"
-                    >
-                      <span>No clients</span>
-                      <i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>
-                    </button>
-                    <div class="alert-multiselect-menu d-none" id="TAG_SCOPE_MENU"></div>
-                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center"
+                    id="TAG_SCOPE_TOGGLE"
+                  >
+                    <span>No clients</span>
+                    <i class="bi bi-chevron-right ms-2" aria-hidden="true"></i>
+                  </button>
                 </div>
               </div>
 
@@ -1316,6 +1338,45 @@ Loading licence...</pre>
             </div>
 
             <div id="ICON_PICKER_GRID" class="icon-picker-grid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!--
+      Reusable client/group/tag scope picker (see scope-picker.ts). Opened from
+      the alert-rule targets, script whitelist and tag membership editors; it
+      hides the modal it was opened from and restores it on the way back. Every
+      tick is written straight through to the editor's draft, so leaving by any
+      route keeps the selection.
+    -->
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_SCOPEPICKER"
+      tabindex="-1"
+      aria-labelledby="SCOPE_PICKER_TITLE"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-start d-grid gap-2">
+            <div id="SCOPE_PICKER_HEADER"></div>
+
+            <span id="SCOPE_PICKER_HINT" class="text-sm text-muted d-none"></span>
+
+            <div class="form-floating bg-ghost rounded">
+              <input
+                type="text"
+                id="SCOPE_PICKER_SEARCH"
+                class="form-control bg-transparent text-light border-0"
+                placeholder="Search clients, groups and tags"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <label for="SCOPE_PICKER_SEARCH">Search clients, groups and tags</label>
+            </div>
+
+            <div id="SCOPE_PICKER_LIST" class="scope-picker-list d-grid gap-2"></div>
           </div>
         </div>
       </div>
@@ -2085,17 +2146,16 @@ Loading licence...</pre>
                 </div>
 
                 <div>
-                  <div class="alert-multiselect" id="ALERT_SCOPE_DROPDOWN">
+                  <div class="alert-multiselect">
                     <button
                       type="button"
                       class="btn alert-multiselect-toggle w-100 text-start d-flex justify-content-between align-items-center"
                       id="ALERT_SCOPE_TOGGLE"
                     >
                       <span>Select targets</span>
-                      <i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>
+                      <i class="bi bi-chevron-right ms-2" aria-hidden="true"></i>
                     </button>
                     <label class="alert-multiselect-label" for="ALERT_SCOPE_TOGGLE">Targets</label>
-                    <div class="alert-multiselect-menu d-none" id="ALERT_SCOPE_MENU"></div>
                   </div>
                 </div>
 

@@ -53,6 +53,13 @@ test('groups and clients are counted and pluralised', () => {
 
 test('a mixed scope reports both halves', () => {
   assert.equal(SummarizeTagScope(scope({ Groups: [1, 2], Clients: ['a'] })), '2 groups + 1 client');
+  // Tags lead: a tag that absorbs other tags is defined more by them than by
+  // whatever extra machines were added alongside.
+  assert.equal(
+    SummarizeTagScope(scope({ Tags: [7], Groups: [1], Clients: ['a'] })),
+    '1 tag + 1 group + 1 client'
+  );
+  assert.equal(SummarizeTagScope(scope({ Tags: [7, 8] })), '2 tags');
 });
 
 test('a tag that targets nothing says so rather than rendering blank', () => {

@@ -109,10 +109,10 @@ test('a degraded client shows DEGRADED even while offline', () => {
   assert.equal(Layout.GetClientTileStateClass({ Online: false, Degraded: true }), 'DEGRADED');
 });
 
-test('a reserved slot greys out instead of alarming red', () => {
-  // An unassigned slot has never had a device. Rendering it as offline would
-  // read as a fault for something working exactly as intended.
-  assert.equal(Layout.GetClientTileStateClass({ Unassigned: true }), 'IDLE');
+test('a reserved slot takes the same offline colour as any other empty client', () => {
+  // An unassigned slot is a machine still to be plugged in, so it reads the
+  // same as a client with nothing on it rather than fading into the layout.
+  assert.equal(Layout.GetClientTileStateClass({ Unassigned: true }), '');
   assert.equal(Layout.GetClientTileStateClass({ Unassigned: true, Online: true }), 'ONLINE');
   assert.equal(Layout.GetClientTileStateClass({ Unassigned: true, Degraded: true }), 'DEGRADED');
 });

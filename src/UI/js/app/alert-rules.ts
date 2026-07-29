@@ -16,6 +16,7 @@ import {
   AudioAssetsCache,
   DummyClients,
   MonitoringTargets,
+  Tags,
   setAlertActionEditorIsCreating,
   setAlertActionTypesCache,
   setAlertEditingActionIndex,
@@ -38,11 +39,9 @@ import {
   scopeToSelectedValues,
   scopeClientValueToScopedID,
   summarizeScopeSelection,
-  renderScopeDropdown,
-  bindScopeDropdown,
-  closeScopeDropdown,
-} from './scope-dropdown';
-import type { ScopeDropdownConfig } from './scope-dropdown';
+} from './lib/scope-model';
+import { bindScopeButton, renderScopeButton } from './scope-picker';
+import type { ScopePickerConfig } from './scope-picker';
 import { CloseAllModals } from './modals';
 import { ConfirmationDialog, Notify } from './selection-init';
 import { LoadAudioAssets, PreviewAudioAsset } from './audio-assets';
@@ -79,26 +78,23 @@ export function ShowAlertEditorPanel() {
   $('#ALERT_MANAGER_EDITOR_PANEL').removeClass('d-none');
 }
 
-// The Alert Rules scope picker is one instance of the shared scope-dropdown
-// engine (see ./scope-dropdown). It shows every entity kind (clients, monitors,
-// per-check, dummies) and stores its flat selection in the AlertScopeSelected
-// global. The script-whitelist editor is a second instance with different
-// options.
-const AlertScopeConfig: ScopeDropdownConfig = {
-  DropdownSelector: '#ALERT_SCOPE_DROPDOWN',
-  MenuSelector: '#ALERT_SCOPE_MENU',
-  ToggleSelector: '#ALERT_SCOPE_TOGGLE',
+// The Alert Rules target picker is one instance of the shared scope picker (see
+// ./scope-picker). It shows every entity kind (clients, monitors, per-check,
+// dummies) plus tags, and stores its flat selection in the AlertScopeSelected
+// global. The script-whitelist and tag-membership editors are further instances
+// with different options.
+const AlertScopeConfig: ScopePickerConfig = {
+  ButtonSelector: '#ALERT_SCOPE_TOGGLE',
   Namespace: 'alertScope',
+  Title: 'Alert Targets',
   Placeholder: 'Select targets',
+  Hint: 'The rule fires for anything covered here. Groups and tags are resolved when the event happens, so machines added to them later are covered too.',
   GetSelected: () => AlertScopeSelected,
   SetSelected: (values) => setAlertScopeSelected(values),
-  BuildModel: () => buildScopeModel({ Groups: AlertScopeGroups }),
+  GetTags: () => Tags,
+  BuildModel: () => buildScopeModel({ Groups: AlertScopeGroups, Tags }),
   ToggleRender: 'html',
 };
-
-export function CloseAllScopeDropdowns() {
-  closeScopeDropdown(AlertScopeConfig);
-}
 
 export function ParseAlertScopeSelection(): ParsedAlertScope {
   return parseScopeSelection(AlertScopeSelected);
@@ -209,8 +205,8 @@ export function BindAlertTriggerDropdown() {
     });
 }
 
-// The scope model/resolution/rendering now live in the shared ./scope-dropdown
-// engine; these keep their historical names as thin adapters over it so the rest
+// The scope model/resolution/rendering now live in the shared ./lib/scope-model
+// module; these keep their historical names as thin adapters over it so the rest
 // of this file (and its editor flow) is unchanged.
 export function buildAlertScopeModel(): AlertScopeModel {
   return buildScopeModel({ Groups: AlertScopeGroups });
@@ -253,11 +249,11 @@ export function ShowAlertActionEditorPanel() {
 }
 
 export function RenderScopeDropdowns() {
-  renderScopeDropdown(AlertScopeConfig);
+  renderScopeButton(AlertScopeConfig);
 }
 
 export function BindScopeDropdownHandlers() {
-  bindScopeDropdown(AlertScopeConfig);
+  bindScopeButton(AlertScopeConfig);
 }
 
 export function RenderAlertRuleTriggerConfig(

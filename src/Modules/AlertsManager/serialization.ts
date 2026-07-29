@@ -72,6 +72,7 @@ function normalizeRuleRow(Row: AlertRuleRowInput): AlertRuleView {
       Workspace: false,
       Groups: [],
       Clients: [],
+      Tags: [],
     }),
     TriggerTypes: parseTriggerTypes(Row.TriggerType),
     TriggerConfig: parseJson<Record<string, unknown>>(Row.TriggerConfig, {}),
@@ -82,11 +83,17 @@ function normalizeRuleRow(Row: AlertRuleRowInput): AlertRuleView {
   };
 }
 
-function toRowScope(Scope: { Workspace?: unknown; Groups?: unknown; Clients?: unknown }): string {
+function toRowScope(Scope: {
+  Workspace?: unknown;
+  Groups?: unknown;
+  Clients?: unknown;
+  Tags?: unknown;
+}): string {
   return JSON.stringify({
     Workspace: !!Scope.Workspace,
     Groups: Array.isArray(Scope.Groups) ? Scope.Groups : [],
     Clients: Array.isArray(Scope.Clients) ? Scope.Clients : [],
+    Tags: Array.isArray(Scope.Tags) ? Scope.Tags : [],
   });
 }
 

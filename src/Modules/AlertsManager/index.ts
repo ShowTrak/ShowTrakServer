@@ -4,9 +4,11 @@ import { CreateAlertRulesRepository } from '../DB/repositories/alert-rules';
 import { CreateAlertHistoryRepository } from '../DB/repositories/alert-history';
 import { Manager as AlertActions } from '../AlertActions';
 import { Manager as BroadcastManager } from '../Broadcast';
+import { Manager as TagManager } from '../TagManager';
+import { ScopeReferencesTags } from '../ScopeMatching';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
-import type { AlertTriggerType } from '@showtrak/protocol';
+import type { AlertTriggerType, TagView } from '@showtrak/protocol';
 import type { AlertRuleWriteRow } from '../DB/repositories/alert-rules';
 
 import { TRIGGERS } from './triggers';
@@ -54,7 +56,7 @@ interface AlertTargetLike {
 // on create; update is a partial patch).
 interface AlertRuleCreatePayload {
   Title: string;
-  Scope?: { Workspace?: unknown; Groups?: unknown; Clients?: unknown };
+  Scope?: { Workspace?: unknown; Groups?: unknown; Clients?: unknown; Tags?: unknown };
   TriggerTypes: string[];
   TriggerConfig?: Record<string, unknown>;
   Actions?: unknown[];
@@ -263,9 +265,18 @@ async function executeRule(Rule: AlertRule, Context: AlertContext) {
 }
 
 async function evaluateAgainstRules(Context: AlertContext) {
+  // Rules that target tags need the tag list to resolve membership. Reading it
+  // costs a query, so it is fetched once per event and only when some enabled
+  // rule actually names a tag — the common case (no tag-targeted rules) still
+  // evaluates without touching the DB.
+  let Tags: TagView[] | undefined;
+  if (RuleList.some((Rule) => Rule.Enabled && ScopeReferencesTags(Rule.Scope))) {
+    Tags = await TagManager.GetAllViews();
+  }
+
   for (const Rule of RuleList) {
     if (!Rule.Enabled) continue;
-    if (!isScopeMatch(Rule, Context)) continue;
+    if (!isScopeMatch(Rule, Context, Tags)) continue;
     if (!triggerMatches(Rule, Context)) continue;
     await executeRule(Rule, Context);
   }
@@ -395,7 +406,9 @@ Manager.Update = async (RuleID: unknown, Payload: AlertRuleUpdatePayload) => {
   // Existing rule's values), so the persisted row satisfies AlertRuleWriteRow.
   const [Err] = await RulesRepo.Update(ID, {
     Title: Next.Title,
-    Scope: toRowScope(Next.Scope as { Workspace?: unknown; Groups?: unknown; Clients?: unknown }),
+    Scope: toRowScope(
+      Next.Scope as { Workspace?: unknown; Groups?: unknown; Clients?: unknown; Tags?: unknown }
+    ),
     TriggerType: toRowTriggerTypes(Next.TriggerTypes),
     TriggerConfig: toRowTriggerConfig(Next.TriggerConfig),
     Actions: toRowActions(Next.Actions),

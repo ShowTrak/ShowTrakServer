@@ -207,7 +207,7 @@ Schema.push({
 // A script with NO row here is unrestricted (all clients) — this is the default
 // for every script, and is what lets brand-new clients automatically inherit
 // access to any script that has not been explicitly restricted. Scope is the
-// same JSON shape as AlertRules.Scope: { Workspace, Groups[], Clients[] }.
+// same JSON shape as AlertRules.Scope: { Workspace, Groups[], Clients[], Tags[] }.
 Schema.push({
   Name: 'ScriptWhitelists',
   SQL: 'CREATE TABLE IF NOT EXISTS `ScriptWhitelists` ( \
@@ -222,8 +222,14 @@ Schema.push({
 // Slug doubles as the tag's display label. Colour is an integer index into the
 // shared Scripts colour palette; Icon is a bare Bootstrap Icons name. Membership
 // is dynamic: Scope is the same JSON shape as AlertRules.Scope /
-// ScriptWhitelists.Scope ({ Workspace, Groups[], Clients[] }), so tagging a group
-// carries the tag to its current and future members.
+// ScriptWhitelists.Scope ({ Workspace, Groups[], Clients[], Tags[] }), so tagging a
+// group carries the tag to its current and future members, and listing another
+// tag makes this one a superset of it.
+//
+// Display is how the tag draws on a client tile: 'hidden' | 'icon' | 'name' |
+// 'both'. It is presentation only — a hidden tag still targets scripts, alerts
+// and OSC exactly as a shown one does. The default is 'name', which is what
+// every tag did before the column existed.
 Schema.push({
   Name: 'Tags',
   SQL: 'CREATE TABLE IF NOT EXISTS `Tags` ( \
@@ -231,7 +237,8 @@ Schema.push({
             Slug TEXT, \
             Colour INTEGER NOT NULL DEFAULT 6, \
             Icon TEXT NOT NULL DEFAULT \'tag\', \
-            Scope TEXT NOT NULL DEFAULT \'{"Workspace":false,"Groups":[],"Clients":[]}\', \
+            Display TEXT NOT NULL DEFAULT \'name\', \
+            Scope TEXT NOT NULL DEFAULT \'{"Workspace":false,"Groups":[],"Clients":[],"Tags":[]}\', \
             Weight INTEGER NOT NULL DEFAULT 100 \
     )',
 });
@@ -412,6 +419,13 @@ Schema.Migrations = [
     SQL: "INSERT OR IGNORE INTO `ClientMacAddresses` (UUID, MacAddress, Source, InterfaceName, FirstSeen, LastSeen) \
           SELECT UUID, UPPER(REPLACE(MacAddress, '-', ':')), 'Reported', NULL, Timestamp, Timestamp \
           FROM `Clients` WHERE MacAddress IS NOT NULL AND TRIM(MacAddress) != ''",
+  },
+  // Per-tag tile presentation. Existing tags all drew their name, so 'name' is
+  // both the column default and the upgrade value — nobody's tiles change
+  // appearance on upgrade.
+  {
+    Version: 25,
+    SQL: "ALTER TABLE `Tags` ADD COLUMN Display TEXT NOT NULL DEFAULT 'name'",
   },
 ];
 

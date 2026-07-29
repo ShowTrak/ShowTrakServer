@@ -155,6 +155,7 @@ const INVOKE_CHANNELS = [
   'Tags:SetSlug',
   'Tags:SetColour',
   'Tags:SetIcon',
+  'Tags:SetDisplay',
   'Tags:SetScope',
   'Tags:SetOrder',
   'Tags:Delete',

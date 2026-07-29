@@ -31,6 +31,7 @@ export = function registerAlertValidators(Manager: IPCValidationManager): void {
       Workspace: !!value.Workspace,
       Groups: [],
       Clients: [],
+      Tags: [],
     };
 
     if (Array.isArray(value.Groups)) {
@@ -60,6 +61,16 @@ export = function registerAlertValidators(Manager: IPCValidationManager): void {
         }
       }
       out.Clients = Array.from(new Set(next));
+    }
+
+    // Tags the rule watches. Membership resolves when the event fires, so a
+    // machine tagged later is covered without touching the rule.
+    if (Array.isArray(value.Tags)) {
+      const next: number[] = [];
+      for (const t of value.Tags) {
+        next.push(Manager.TagID(t, 'Scope tag ID'));
+      }
+      out.Tags = Array.from(new Set(next));
     }
 
     return out;

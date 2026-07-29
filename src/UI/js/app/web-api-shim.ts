@@ -311,6 +311,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     SetTagSlug: nullTuple,
     SetTagColour: nullTuple,
     SetTagIcon: nullTuple,
+    SetTagDisplay: nullTuple,
     SetTagScope: nullTuple,
     SetTagOrder: nullTuple,
     DeleteTag: nullTuple,

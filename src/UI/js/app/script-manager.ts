@@ -6,14 +6,10 @@ import { CloseAllModals } from './modals';
 import { ConfirmationDialog, Notify } from './selection-init';
 import { NormalizeIconName, OpenIconPicker } from './icon-picker';
 import { SCRIPT_COLOURS, ScriptColourHex } from './lib/script-colours';
-import {
-  buildScopeModel,
-  parseScopeSelection,
-  scopeToSelectedValues,
-  renderScopeDropdown,
-  bindScopeDropdown,
-} from './scope-dropdown';
-import type { ScopeDropdownConfig } from './scope-dropdown';
+import { buildScopeModel, parseScopeSelection, scopeToSelectedValues } from './lib/scope-model';
+import { bindScopeButton, renderScopeButton } from './scope-picker';
+import type { ScopePickerConfig } from './scope-picker';
+import { Tags as AllTags } from './state';
 // Script Manager (desktop UI)
 // - Lists every script discovered in the scripts folder, showing its ID,
 //   validity, and the operating systems it has scripts configured for.
@@ -59,32 +55,34 @@ export let ScriptManagerSampleCache: SampleScriptEntry[] = [];
 export let ScriptManagerEditingIcon: string = 'terminal';
 
 // --- Script whitelist editor state -----------------------------------------
-// The per-script whitelist reuses the shared scope-dropdown engine, restricted
-// to real remote clients (scripts never run on integrated/dummy/monitoring
-// targets). Selection is the flat value list; groups are cached at editor-open
-// so BuildModel stays synchronous for the render/change handlers.
+// The per-script whitelist reuses the shared scope picker, restricted to real
+// remote clients (scripts never run on integrated/dummy/monitoring targets).
+// Selection is the flat value list; groups are cached at editor-open so
+// BuildModel stays synchronous for the render/change handlers.
 let ScriptWhitelistSelected: string[] = [];
 let ScriptWhitelistOriginal: string[] = [];
 let ScriptWhitelistGroups: GroupView[] = [];
 
-const ScriptWhitelistConfig: ScopeDropdownConfig = {
-  DropdownSelector: '#SCRIPT_WHITELIST_DROPDOWN',
-  MenuSelector: '#SCRIPT_WHITELIST_MENU',
-  ToggleSelector: '#SCRIPT_WHITELIST_TOGGLE',
+const ScriptWhitelistConfig: ScopePickerConfig = {
+  ButtonSelector: '#SCRIPT_WHITELIST_TOGGLE',
+  Namespace: 'scriptWhitelist',
+  Title: 'Script Whitelist',
   // Shown only when nothing is selected. The genuine "all clients" state is
   // Workspace:true, which renders "All Clients" via its own branch — an empty
   // selection instead means no client may run the script.
-  Namespace: 'scriptWhitelist',
   Placeholder: 'No clients',
+  Hint: 'Only these machines may run the script. Groups and tags are resolved at dispatch, so machines added to them later are covered too.',
   GetSelected: () => ScriptWhitelistSelected,
   SetSelected: (values) => {
     ScriptWhitelistSelected = values;
   },
-  // Only real (non-integrated) clients and their groups are valid script
-  // targets, so that is all the dropdown offers.
+  GetTags: () => AllTags,
+  // Only real (non-integrated) clients, their groups and tags are valid script
+  // targets, so that is all the picker offers.
   BuildModel: () =>
     buildScopeModel({
       Groups: ScriptWhitelistGroups,
+      Tags: AllTags,
       IncludeKinds: ['showtrak'],
       ExcludeIntegrated: true,
     }),
@@ -561,7 +559,7 @@ export function PopulateScriptManagerEditor(Data: ScriptEditable) {
 
   RenderScriptManagerPlatforms(Data.platforms || {}, Data.arguments || {});
   RenderScriptManagerFileList(Data.files || []);
-  renderScopeDropdown(ScriptWhitelistConfig);
+  renderScopeButton(ScriptWhitelistConfig);
 }
 
 export function RenderScriptManagerPlatforms(
@@ -876,15 +874,15 @@ export function InitScriptManager() {
     .off('click')
     .on('click', () => {
       // Reset the whitelist selection to what it was on open before re-rendering
-      // (PopulateScriptManagerEditor renders the dropdown from ScriptWhitelistSelected).
+      // (PopulateScriptManagerEditor renders the button from ScriptWhitelistSelected).
       ScriptWhitelistSelected = ScriptWhitelistOriginal.slice();
       if (ScriptManagerOriginal) PopulateScriptManagerEditor(ScriptManagerOriginal);
       HideScriptManagerIssues();
     });
 
-  // Wire the whitelist scope dropdown once; it targets the always-present
-  // editor markup and reads/writes the module-level selection state.
-  bindScopeDropdown(ScriptWhitelistConfig);
+  // Wire the whitelist scope button once; it targets the always-present editor
+  // markup and reads/writes the module-level selection state.
+  bindScopeButton(ScriptWhitelistConfig);
 
   // Drag-and-drop reordering within the list container.
   const ListContainer = document.getElementById('SCRIPT_MANAGER_LIST');

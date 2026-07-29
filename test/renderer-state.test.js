@@ -198,10 +198,8 @@ test('OfflineBadgeContent renders the shared offline markup with a placeholder',
 });
 
 test('UnassignedBadgeContent states the slot is empty instead of counting downtime', () => {
-  assert.equal(
-    UnassignedBadgeContent(),
-    'Unassigned <span class="badge bg-ghost">No Device</span>'
-  );
+  // No badge alongside it: "Unassigned" already says the slot has no device.
+  assert.equal(UnassignedBadgeContent(), 'Unassigned');
 });
 
 // --- wait -------------------------------------------------------------------

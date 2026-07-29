@@ -226,3 +226,42 @@ test('selection order is preserved, so the menu matches the tile order', () => {
   ]);
   assert.deepEqual(Targets, ['third', 'first', 'second']);
 });
+
+// --- Tag-based whitelists ----------------------------------------------------
+// A whitelist may admit machines by tag, and tags nest. Getting this wrong here
+// hides a script from a machine that is in fact permitted — the operator sees
+// no entry in the menu and no reason why.
+
+const wlTag = (TagID, Scope) => ({
+  TagID,
+  Scope: { Workspace: false, Groups: [], Clients: [], Tags: [], ...Scope },
+});
+
+test('a whitelisted tag admits the machines it covers', () => {
+  const Tags = [wlTag(1, { Clients: ['c1'], Groups: [4] })];
+  const Scope = { Workspace: false, Groups: [], Clients: [], Tags: [1] };
+
+  assert.equal(IsClientWhitelisted(Scope, client({ UUID: 'c1' }), Tags), true, 'named by the tag');
+  assert.equal(IsClientWhitelisted(Scope, client({ UUID: 'c9', GroupID: 4 }), Tags), true);
+  assert.equal(IsClientWhitelisted(Scope, client({ UUID: 'c9', GroupID: 5 }), Tags), false);
+});
+
+test('a whitelisted tag reaches through the tags it absorbs', () => {
+  const Tags = [wlTag(1, { Tags: [2] }), wlTag(2, { Clients: ['deep'] })];
+  const Scope = { Workspace: false, Groups: [], Clients: [], Tags: [1] };
+  assert.equal(IsClientWhitelisted(Scope, client({ UUID: 'deep' }), Tags), true);
+  assert.equal(IsClientWhitelisted(Scope, client({ UUID: 'other' }), Tags), false);
+});
+
+test('a tag-restricted script is offered on the machines the tag covers', () => {
+  const Tags = [wlTag(1, { Clients: ['c1'] })];
+  const Script = {
+    CompatiblePlatforms: ['Windows'],
+    Whitelist: { Workspace: false, Groups: [], Clients: [], Tags: [1] },
+  };
+  const Windows = (UUID) => client({ UUID, OperatingSystem: 'Windows' });
+
+  assert.equal(IsScriptTargetable(Script, Windows('c1'), Tags), true);
+  assert.equal(IsScriptTargetable(Script, Windows('c2'), Tags), false);
+  assert.deepEqual(ResolveScriptTargets(Script, [Windows('c1'), Windows('c2')], Tags), ['c1']);
+});

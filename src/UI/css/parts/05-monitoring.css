@@ -215,6 +215,7 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
   --tag-colour: #bdc3c7;
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   flex: 0 0 auto;
   max-width: 100%;
   padding: 1px 7px;
@@ -233,6 +234,29 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Per-tag display mode (hidden / icon / name / icon+name) changes what a badge
+ * CONTAINS but must never change how tall it is — every tile is a fixed height
+ * and the row is a fixed 20px, so a taller badge in one mode would show up as
+ * uneven rows across the show.
+ *
+ * The icon is therefore boxed to exactly the label's line box: 14px tall (the
+ * label's 10px x 1.4 line-height) and a fixed 12px wide. The glyph is scaled to
+ * fit that box rather than the box growing to fit the glyph — 12px reads
+ * clearly at tile distance while still sitting inside 14px. The fixed width
+ * also keeps icon-only badges a uniform size instead of jittering with each
+ * glyph's natural advance, which is what the width estimate in
+ * lib/tag-badges assumes. */
+.SHOWTRAK_PC > .TILE_TAG_ROW .TILE_TAG_ICON {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 12px;
+  height: 14px;
+  font-size: 12px;
+  line-height: 1;
 }
 
 /* The "+N" chip stands for several tags at once, so it takes no single tag's

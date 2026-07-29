@@ -17,13 +17,17 @@ import type { TagView } from '@showtrak/protocol';
  * adopted later, so listing counts alongside it would understate its reach.
  */
 export function SummarizeTagScope(Tag: TagView | null | undefined): string {
-  const Scope = (Tag && Tag.Scope) || { Workspace: false, Groups: [], Clients: [] };
+  const Scope = (Tag && Tag.Scope) || { Workspace: false, Groups: [], Clients: [], Tags: [] };
   if (Scope.Workspace) return 'All clients';
 
   const Parts: string[] = [];
+  const TagCount = Array.isArray(Scope.Tags) ? Scope.Tags.length : 0;
   const GroupCount = Array.isArray(Scope.Groups) ? Scope.Groups.length : 0;
   const ClientCount = Array.isArray(Scope.Clients) ? Scope.Clients.length : 0;
 
+  // Tags first: a tag that absorbs other tags is defined more by them than by
+  // whatever extra machines were added alongside.
+  if (TagCount) Parts.push(`${TagCount} tag${TagCount === 1 ? '' : 's'}`);
   if (GroupCount) Parts.push(`${GroupCount} group${GroupCount === 1 ? '' : 's'}`);
   if (ClientCount) Parts.push(`${ClientCount} client${ClientCount === 1 ? '' : 's'}`);
 

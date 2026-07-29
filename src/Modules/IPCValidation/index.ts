@@ -49,7 +49,12 @@ export interface IPCValidationManager {
   ScriptSampleID(value: unknown, fieldName?: string): string;
   ScriptFieldsPayload(value: unknown): Record<string, unknown>;
   ScriptOrderList(value: unknown, fieldName?: string): string[];
-  ScriptWhitelistScope(value: unknown): { Workspace: boolean; Groups: number[]; Clients: string[] };
+  ScriptWhitelistScope(value: unknown): {
+    Workspace: boolean;
+    Groups: number[];
+    Clients: string[];
+    Tags: number[];
+  };
   Boolean(value: unknown, fieldName?: string): boolean;
   USBSerialNumber(value: unknown, fieldName?: string): string;
   CriticalUSBDevicePayload(value: unknown): CriticalUSBDevicePayloadResult;
@@ -82,7 +87,13 @@ export interface IPCValidationManager {
   // Tags (tag-validators.ts)
   TagID(value: unknown, fieldName?: string): number;
   TagColour(value: unknown, fieldName?: string): number;
-  TagScope(value: unknown): { Workspace: boolean; Groups: number[]; Clients: string[] };
+  TagDisplay(value: unknown, fieldName?: string): string;
+  TagScope(value: unknown): {
+    Workspace: boolean;
+    Groups: number[];
+    Clients: string[];
+    Tags: number[];
+  };
 
   // Audio assets (audio-validators.ts)
   AudioAssetID(value: unknown, fieldName?: string): string;

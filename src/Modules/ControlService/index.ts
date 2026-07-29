@@ -96,7 +96,12 @@ async function resolveTagClients(
   }
   if (!Tag) return [fail(`Invalid Tag "${Key}"`), null];
   const Clients = await getAllClients();
-  return [null, Clients.filter((c) => ScriptWhitelistManager.IsClientAllowed(Tag.Scope, c))];
+  // The full tag list expands any tags this one absorbs (tags can nest).
+  const AllTags = await TagManager.GetAllViews();
+  return [
+    null,
+    Clients.filter((c) => ScriptWhitelistManager.IsClientAllowed(Tag.Scope, c, AllTags)),
+  ];
 }
 
 function isIntegrated(client: ResolvedClient): boolean {

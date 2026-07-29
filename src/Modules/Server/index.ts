@@ -16,6 +16,7 @@ import {
 } from '../ScriptExecutionManager';
 import { Manager as ClientManager } from '../ClientManager';
 import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
+import { Manager as TagManager } from '../TagManager';
 import { Manager as UpdateManager } from '../UpdateManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
@@ -370,10 +371,13 @@ Manager.ExecuteScripts = async (ScriptID: string, Targets: string[], ResetList?:
   // Workspace) skips the per-client resolves entirely.
   const Scope = await ScriptWhitelistManager.GetScope(ScriptID);
   if (Scope && !Scope.Workspace) {
+    // A whitelist may admit clients by tag, and tags nest, so the resolve needs
+    // the whole tag list — fetched once for the batch.
+    const AllTags = await TagManager.GetAllViews();
     const Allowed: string[] = [];
     for (const UUID of Targets) {
       const [ClientErr, Client] = await ClientManager.Get(UUID);
-      if (!ClientErr && Client && ScriptWhitelistManager.IsClientAllowed(Scope, Client)) {
+      if (!ClientErr && Client && ScriptWhitelistManager.IsClientAllowed(Scope, Client, AllTags)) {
         Allowed.push(UUID);
       }
     }

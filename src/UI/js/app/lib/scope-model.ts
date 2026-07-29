@@ -1,35 +1,58 @@
-// Reusable client/group multiselect ("scope") dropdown.
+// The scope model: WHICH machines does this apply to.
 //
-// This is the generic engine extracted from the Alert Rules scope picker so the
-// same tree UI can be reused elsewhere (e.g. the per-script whitelist editor).
-// Callers drive it entirely through an options object describing WHICH entities
-// may be displayed — so a consumer can show only real clients, hide
-// dummy/integrated/monitoring targets, restrict to a specific group, filter by
-// client type, etc. The UI therefore only ever offers valid choices.
-//
-// The persisted/selection value formats are stable and shared with alerts:
+// A "scope" backs three editors — alert-rule targets, the per-script whitelist,
+// and tag membership — and is persisted as
+//   { Workspace: boolean, Groups: number[], Clients: string[], Tags: number[] }
+// The editor works in a flat list of selection VALUES, which is what these
+// helpers convert to and from:
 //   workspace:*            → all clients
-//   group:<GroupID>        → a whole group
+//   tag:<TagID>            → everything carrying that tag (dynamic, may nest)
+//   group:<GroupID>        → a whole group (dynamic: current AND future members)
 //   client:<ScopedID>      → a single entity (plain UUID, or monitor:/check:…)
-// and the resolved scope object is { Workspace, Groups:number[], Clients:string[] }.
-import { AllClients, DummyClients, MonitoringTargets, IsIntegratedClientEntity } from './state';
-import type { AlertScopeEntity, AlertScopeGroupNode, AlertScopeModel } from './state';
-import { Safe } from './utils';
-import type { GroupView } from '@showtrak/protocol';
+//
+// This module is pure: no DOM, no modal. The UI that renders it lives in
+// ../scope-picker.ts. The split exists because the round trip
+//   stored scope -> selection values -> stored scope
+// runs every time an editor opens and saves, and if it is not stable then
+// merely opening a rule and pressing save silently changes who it covers.
+//
+// Groups and tags differ in one important way. A GROUP has a fixed child list,
+// so selecting every member collapses back to the group (and an operator who
+// unticks one member gets the remaining members listed individually). A TAG
+// does not: its membership is another scope which may itself name tags, so a
+// tag is only ever an explicit token — never inferred from, and never collapsed
+// into, the entities it happens to cover today.
+import { AllClients, DummyClients, MonitoringTargets, IsIntegratedClientEntity } from '../state';
+import type {
+  AlertScopeEntity,
+  AlertScopeGroupNode,
+  AlertScopeModel,
+  AlertScopeTagNode,
+} from '../state';
+import { ScriptColourHex } from './script-colours';
+import { ScopeCoversEntity } from './scope-matching';
+import type { GroupView, TagView } from '@showtrak/protocol';
 
 export type ScopeEntityKind = 'showtrak' | 'monitor' | 'monitor-check' | 'dummy';
 
-// Which entities the dropdown may display. Every field is optional; the
-// defaults reproduce the original alert behaviour (all kinds, grouped).
+// Which entities the picker may display. Every field is optional bar Groups;
+// the defaults reproduce the original alert behaviour (all kinds, grouped).
 export interface ScopeSourceOptions {
   /** Groups to nest entities under (usually from window.API.GetAllGroups()). */
   Groups: GroupView[];
+  /** Tags offered as selectable categories. Omit/empty to hide the section. */
+  Tags?: TagView[];
   /** Entity kinds to include. Defaults to all four. */
   IncludeKinds?: ScopeEntityKind[];
   /** Drop integrated (SDK) clients from the 'showtrak' set. */
   ExcludeIntegrated?: boolean;
   /** Render group headers (true) or a single flat list (false). Default true. */
   ShowGroups?: boolean;
+  /**
+   * Hide one tag from the tag section — the tag currently being edited, which
+   * must never be offered as a member of itself.
+   */
+  ExcludeTagID?: number | null;
   /** Extra predicate applied to real (showtrak) clients. */
   ClientFilter?: (Client: (typeof AllClients)[number]) => boolean;
   /** Restrict which groups appear as nodes; excluded groups' members fall to the flat list. */
@@ -41,6 +64,7 @@ export interface ParsedScope {
   Workspace: boolean;
   Groups: number[];
   Clients: string[];
+  Tags: number[];
 }
 
 // Permissive scope shape accepted by read-only helpers.
@@ -48,6 +72,7 @@ export type ScopeInput = {
   Workspace?: boolean;
   Groups?: unknown[];
   Clients?: unknown[];
+  Tags?: unknown[];
 };
 
 export function scopeIconClass(Kind: string): string {
@@ -80,6 +105,14 @@ export function scopeClientValueToScopedID(Value: string): string {
   const Text = String(Value || '');
   if (!Text.startsWith('client:')) return '';
   return Text.slice(7);
+}
+
+/** Decode a `tag:<TagID>` value, or 0 when the value is not a tag. */
+export function scopeTagValueToTagID(Value: string): number {
+  const Text = String(Value || '');
+  if (!Text.startsWith('tag:')) return 0;
+  const TagID = parseInt(Text.slice(4), 10);
+  return Number.isInteger(TagID) && TagID > 0 ? TagID : 0;
 }
 
 function sortedGroups(Groups: GroupView[]): GroupView[] {
@@ -118,6 +151,22 @@ export function buildScopeModel(Options: ScopeSourceOptions): AlertScopeModel {
   );
   const Ungrouped: AlertScopeEntity[] = [];
   const Entities: AlertScopeEntity[] = [];
+
+  // Tags arrive already ordered by Weight (the Tag Manager's drag order), which
+  // is the operator's own priority, so it is preserved rather than re-sorted.
+  const TagNodes: AlertScopeTagNode[] = (Array.isArray(Options.Tags) ? Options.Tags : [])
+    .filter((Tag) => Tag && Tag.TagID != null)
+    .filter(
+      (Tag) => Options.ExcludeTagID == null || Number(Tag.TagID) !== Number(Options.ExcludeTagID)
+    )
+    .map((Tag) => ({
+      Kind: 'tag' as const,
+      Value: `tag:${Tag.TagID}`,
+      TagID: Number(Tag.TagID),
+      Label: Tag.Slug || `Tag ${Tag.TagID}`,
+      IconClass: `bi-${Tag.Icon || 'tag'}`,
+      ColourHex: ScriptColourHex(Tag.Colour),
+    }));
 
   if (IncludeKinds.has('showtrak')) {
     for (const Client of AllClients || []) {
@@ -219,6 +268,9 @@ export function buildScopeModel(Options: ScopeSourceOptions): AlertScopeModel {
   for (const Group of GroupNodes) {
     LabelByValue.set(Group.Value, Group.Label);
   }
+  for (const Tag of TagNodes) {
+    LabelByValue.set(Tag.Value, Tag.Label);
+  }
   LabelByValue.set('workspace:*', 'All Clients');
 
   const AllClientValues: string[] = [];
@@ -227,6 +279,7 @@ export function buildScopeModel(Options: ScopeSourceOptions): AlertScopeModel {
 
   return {
     Workspace: { Kind: 'workspace', Value: 'workspace:*', Label: 'All Clients' },
+    Tags: TagNodes,
     Groups: GroupNodes,
     Ungrouped,
     AllClientValues,
@@ -236,7 +289,7 @@ export function buildScopeModel(Options: ScopeSourceOptions): AlertScopeModel {
 }
 
 export function parseScopeSelection(Selected: string[]): ParsedScope {
-  const Scope: ParsedScope = { Workspace: false, Groups: [], Clients: [] };
+  const Scope: ParsedScope = { Workspace: false, Groups: [], Clients: [], Tags: [] };
   for (const RawValue of Selected || []) {
     const Value = `${RawValue}`;
     if (Value === 'workspace:*') {
@@ -248,6 +301,11 @@ export function parseScopeSelection(Selected: string[]): ParsedScope {
       if (Number.isFinite(GroupID)) Scope.Groups.push(GroupID);
       continue;
     }
+    if (Value.startsWith('tag:')) {
+      const TagID = scopeTagValueToTagID(Value);
+      if (TagID && !Scope.Tags.includes(TagID)) Scope.Tags.push(TagID);
+      continue;
+    }
     if (Value.startsWith('client:')) {
       Scope.Clients.push(Value.slice(7));
     }
@@ -255,6 +313,14 @@ export function parseScopeSelection(Selected: string[]): ParsedScope {
   return Scope;
 }
 
+/**
+ * The entity values a scope names DIRECTLY (workspace, groups, clients).
+ *
+ * Tags are deliberately excluded: their membership is dynamic and may nest, so
+ * folding it in here would let the group-collapse logic below rewrite a tag
+ * selection into whichever machines happen to carry the tag right now. See
+ * {@link resolveTagCoveredValues} for the display-only counterpart.
+ */
 export function resolveScopeTargetValues(Scope: ScopeInput, Model: AlertScopeModel): Set<string> {
   const Selected = new Set<string>();
   if (!Scope || !Model) return Selected;
@@ -274,15 +340,81 @@ export function resolveScopeTargetValues(Scope: ScopeInput, Model: AlertScopeMod
   return Selected;
 }
 
+/** Every entity node in the model, groups flattened, in display order. */
+export function scopeModelEntities(Model: AlertScopeModel): AlertScopeEntity[] {
+  const Entities: AlertScopeEntity[] = [];
+  for (const Group of Model.Groups || []) Entities.push(...Group.Children);
+  Entities.push(...(Model.Ungrouped || []));
+  return Entities;
+}
+
+/**
+ * Which of the scope's TAGS cover each entity: value → covering tag labels.
+ *
+ * For display only. The picker shows these as covered-but-not-selected, because
+ * unticking one would be a lie: the only way to exclude it would be to rewrite
+ * the tag, which changes every other scope that uses that tag. Naming the tag
+ * responsible is the point — "covered" without "by what" leaves the operator
+ * hunting for why a machine they never picked is in the list.
+ */
+export function resolveTagCoverage(
+  Scope: ScopeInput,
+  Model: AlertScopeModel,
+  Tags: TagView[] | null | undefined
+): Map<string, string[]> {
+  const Coverage = new Map<string, string[]>();
+  const TagIDs = (Scope && Scope.Tags) || [];
+  if (!Model || !TagIDs.length) return Coverage;
+
+  const Entities = scopeModelEntities(Model);
+  const TagList = Array.isArray(Tags) ? Tags : [];
+
+  for (const RawTagID of TagIDs) {
+    const TagID = Number(RawTagID);
+    if (!Number.isInteger(TagID)) continue;
+    const Label =
+      Model.LabelByValue.get(`tag:${TagID}`) ||
+      (TagList.find((Tag) => Number(Tag.TagID) === TagID) || {}).Slug ||
+      `Tag ${TagID}`;
+    // Each tag is resolved on its own so the entity can be attributed to it,
+    // expanding any tags it in turn absorbs.
+    for (const Entity of Entities) {
+      if (!ScopeCoversEntity({ Tags: [TagID] }, Entity, TagList)) continue;
+      const Existing = Coverage.get(Entity.Value);
+      if (Existing) Existing.push(String(Label));
+      else Coverage.set(Entity.Value, [String(Label)]);
+    }
+  }
+  return Coverage;
+}
+
+/** The entity values covered by the scope's tags, without attribution. */
+export function resolveTagCoveredValues(
+  Scope: ScopeInput,
+  Model: AlertScopeModel,
+  Tags: TagView[] | null | undefined
+): Set<string> {
+  return new Set(resolveTagCoverage(Scope, Model, Tags).keys());
+}
+
+/**
+ * Collapse a set of directly-selected entity values back into a stored scope.
+ *
+ * `ExistingTags` is carried through untouched — tag selections are explicit
+ * tokens and are never re-derived from the entities they cover (see the note at
+ * the top of this file).
+ */
 export function buildScopeFromTargetValues(
   TargetValues: string[],
-  Model: AlertScopeModel
+  Model: AlertScopeModel,
+  ExistingTags: number[] = []
 ): ParsedScope {
+  const Tags = (Array.isArray(ExistingTags) ? ExistingTags : []).slice();
   const Selected = new Set((TargetValues || []).map((Value) => String(Value)));
   if (Model.AllClientValues.length && Model.AllClientValues.every((Value) => Selected.has(Value))) {
-    return { Workspace: true, Groups: [], Clients: [] };
+    return { Workspace: true, Groups: [], Clients: [], Tags };
   }
-  const Scope: ParsedScope = { Workspace: false, Groups: [], Clients: [] };
+  const Scope: ParsedScope = { Workspace: false, Groups: [], Clients: [], Tags };
   const Covered = new Set<string>();
   for (const Group of Model.Groups || []) {
     if (!Group.ChildValues.length) continue;
@@ -301,6 +433,7 @@ export function buildScopeFromTargetValues(
 export function scopeToSelectedValues(Scope: ScopeInput): string[] {
   const Selected: string[] = [];
   if (Scope && Scope.Workspace) Selected.push('workspace:*');
+  for (const TagID of (Scope && Scope.Tags) || []) Selected.push(`tag:${TagID}`);
   for (const GroupID of (Scope && Scope.Groups) || []) Selected.push(`group:${GroupID}`);
   for (const ClientID of (Scope && Scope.Clients) || []) Selected.push(`client:${ClientID}`);
   return Selected;
@@ -321,6 +454,10 @@ export function summarizeScopeSelection(
   if (!Scope) return Placeholder;
   if (Scope.Workspace) return 'All Clients';
   const Selected: Array<{ Label: string }> = [];
+  for (const TagID of Scope.Tags || []) {
+    const Value = `tag:${TagID}`;
+    Selected.push({ Label: Model.LabelByValue.get(Value) || `Tag ${TagID}` });
+  }
   for (const GroupID of Scope.Groups || []) {
     const Value = `group:${GroupID}`;
     Selected.push({ Label: Model.LabelByValue.get(Value) || `Group ${GroupID}` });
@@ -330,181 +467,4 @@ export function summarizeScopeSelection(
     Selected.push({ Label: Model.LabelByValue.get(Value) || String(ClientID) });
   }
   return scopeSummaryText(Selected, Placeholder);
-}
-
-function renderScopeClientNode(Entity: AlertScopeEntity, SelectedValues: Set<string>): string {
-  const Checked = SelectedValues.has(Entity.Value);
-  return `
-    <label class="alert-multiselect-option alert-scope-node alert-scope-node-client">
-      <input type="checkbox" data-kind="client" value="${Safe(Entity.Value)}" ${Checked ? 'checked' : ''} />
-      <span class="alert-scope-prefix" aria-hidden="true"></span>
-      <span class="alert-scope-label-wrap"><i class="bi ${Safe(Entity.IconClass || '')} alert-scope-entity-icon" aria-hidden="true"></i><span>${Safe(Entity.Label)}</span></span>
-    </label>
-  `;
-}
-
-function renderScopeGroupNode(
-  Group: AlertScopeGroupNode,
-  SelectedValues: Set<string>,
-  Scope: ScopeInput
-): string {
-  const ExplicitlySelected = (Scope.Groups || []).some(
-    (GroupID) => Number(GroupID) === Number(Group.GroupID)
-  );
-  const SelectedCount = Group.ChildValues.filter((Value) => SelectedValues.has(Value)).length;
-  const FullySelected =
-    ExplicitlySelected ||
-    (Group.ChildValues.length > 0 && SelectedCount === Group.ChildValues.length);
-  const Indeterminate = !FullySelected && SelectedCount > 0;
-  const ChildrenHtml = Group.Children.map((Entity) =>
-    renderScopeClientNode(Entity, SelectedValues)
-  ).join('');
-
-  return `
-    <div class="alert-scope-branch">
-      <label class="alert-multiselect-option alert-scope-node alert-scope-node-group">
-        <input
-          type="checkbox"
-          data-kind="group"
-          value="${Safe(Group.Value)}"
-          ${FullySelected ? 'checked' : ''}
-          ${Indeterminate ? 'data-indeterminate="true"' : ''}
-        />
-        <span class="alert-scope-prefix" aria-hidden="true"></span>
-        <span>${Safe(Group.Label)}</span>
-      </label>
-      ${ChildrenHtml ? `<div class="alert-scope-children">${ChildrenHtml}</div>` : ''}
-    </div>
-  `;
-}
-
-// Per-instance wiring. GetSelected/SetSelected own the flat selection-value
-// array; BuildModel rebuilds the (option-filtered) tree; the selectors point at
-// this instance's DOM. Namespace keeps jQuery event bindings isolated between
-// instances (alerts vs. the script whitelist).
-export interface ScopeDropdownConfig {
-  DropdownSelector: string;
-  MenuSelector: string;
-  ToggleSelector: string;
-  Namespace: string;
-  Placeholder: string;
-  GetSelected: () => string[];
-  SetSelected: (values: string[]) => void;
-  BuildModel: () => AlertScopeModel;
-  /** Alert toggle renders a chevron via HTML; others just get text. Default 'text'. */
-  ToggleRender?: 'html' | 'text';
-}
-
-export function renderScopeDropdown(Config: ScopeDropdownConfig): void {
-  const Model = Config.BuildModel();
-  const Scope = parseScopeSelection(Config.GetSelected());
-  const EffectiveSelectedValues = resolveScopeTargetValues(Scope, Model);
-  const ToggleText = summarizeScopeSelection(Model, Scope, Config.Placeholder);
-
-  if (Config.ToggleRender === 'html') {
-    $(Config.ToggleSelector).html(
-      `<span>${Safe(ToggleText)}</span><i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>`
-    );
-  } else {
-    $(Config.ToggleSelector).text(ToggleText);
-  }
-
-  const WorkspaceChecked =
-    !!Scope.Workspace ||
-    (Model.AllClientValues.length > 0 &&
-      EffectiveSelectedValues.size === Model.AllClientValues.length);
-  const WorkspaceIndeterminate = !WorkspaceChecked && EffectiveSelectedValues.size > 0;
-  const GroupHtml = Model.Groups.map((Group) =>
-    renderScopeGroupNode(Group, EffectiveSelectedValues, Scope)
-  ).join('');
-  const UngroupedHtml = Model.Ungrouped.map((Entity) =>
-    renderScopeClientNode(Entity, EffectiveSelectedValues)
-  ).join('');
-  const Html = `
-    <div class="alert-scope-tree">
-      <label class="alert-multiselect-option alert-scope-node alert-scope-node-root">
-        <input
-          type="checkbox"
-          data-kind="workspace"
-          value="workspace:*"
-          ${WorkspaceChecked ? 'checked' : ''}
-          ${WorkspaceIndeterminate ? 'data-indeterminate="true"' : ''}
-        />
-        <span class="alert-scope-prefix" aria-hidden="true"></span>
-        <span>All Clients</span>
-      </label>
-      <div class="alert-scope-children">
-        ${GroupHtml}
-        ${UngroupedHtml}
-      </div>
-    </div>
-  `;
-
-  $(Config.MenuSelector).html(
-    Html || '<div class="text-muted text-sm p-2">No options available.</div>'
-  );
-  $(Config.MenuSelector)
-    .find('input[data-indeterminate="true"]')
-    .each(function () {
-      (this as HTMLInputElement).indeterminate = true;
-    });
-}
-
-export function closeScopeDropdown(Config: ScopeDropdownConfig): void {
-  $(Config.MenuSelector).addClass('d-none');
-}
-
-export function bindScopeDropdown(Config: ScopeDropdownConfig): void {
-  const NS = Config.Namespace;
-
-  $(Config.ToggleSelector)
-    .off(`click.${NS}`)
-    .on(`click.${NS}`, function (Event) {
-      Event.preventDefault();
-      Event.stopPropagation();
-      const $menu = $(Config.MenuSelector);
-      const isOpen = !$menu.hasClass('d-none');
-      $menu.addClass('d-none');
-      if (!isOpen) $menu.removeClass('d-none');
-    });
-
-  $(Config.MenuSelector)
-    .off(`change.${NS}`)
-    .on(`change.${NS}`, 'input[type="checkbox"]', function () {
-      const Kind = String($(this).attr('data-kind') || '');
-      const Value = String($(this).val() || '');
-      const Checked = $(this).is(':checked');
-      const Model = Config.BuildModel();
-
-      if (Kind === 'workspace') {
-        Config.SetSelected(Checked ? ['workspace:*'] : []);
-      } else {
-        const Scope = parseScopeSelection(Config.GetSelected());
-        const SelectedTargets = resolveScopeTargetValues(Scope, Model);
-        if (Kind === 'group') {
-          const Group = Model.Groups.find((Entry) => Entry.Value === Value);
-          if (Group) {
-            for (const ChildValue of Group.ChildValues) {
-              if (Checked) SelectedTargets.add(ChildValue);
-              else SelectedTargets.delete(ChildValue);
-            }
-          }
-        } else if (Kind === 'client') {
-          if (Checked) SelectedTargets.add(Value);
-          else SelectedTargets.delete(Value);
-        }
-        Config.SetSelected(
-          scopeToSelectedValues(buildScopeFromTargetValues(Array.from(SelectedTargets), Model))
-        );
-      }
-      renderScopeDropdown(Config);
-      $(Config.MenuSelector).removeClass('d-none');
-    });
-
-  $(document)
-    .off(`mousedown.${NS} touchstart.${NS}`)
-    .on(`mousedown.${NS} touchstart.${NS}`, function (Event) {
-      const inside = $(Event.target).closest(Config.DropdownSelector).length > 0;
-      if (!inside) $(Config.MenuSelector).addClass('d-none');
-    });
 }

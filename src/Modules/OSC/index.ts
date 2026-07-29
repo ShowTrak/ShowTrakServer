@@ -245,9 +245,10 @@ async function resolveTagByKey(Key: string): Promise<OSCTag | null> {
 }
 
 // Expand a tag into its member clients. Unlike a group (a single GroupID FK),
-// tag membership is the dynamic Scope { Workspace, Groups[], Clients[] }, so a
-// client belongs when it matches that scope — reusing the same predicate the
-// script whitelist uses (Workspace = all, else by explicit UUID or group).
+// tag membership is the dynamic Scope { Workspace, Groups[], Clients[], Tags[] },
+// so a client belongs when it matches that scope — reusing the same predicate
+// the script whitelist uses (Workspace = all, else by explicit UUID, group, or
+// membership of another tag this one absorbs).
 async function getTagClients(
   TagKeyRaw: string
 ): Promise<[RouteResult, null, null] | [null, OSCTag, OSCClient[]]> {
@@ -261,8 +262,10 @@ async function getTagClients(
     return [failureResult('Failed to fetch all clients'), null, null];
   }
 
+  // The tag list is needed to expand any tags this one absorbs.
+  const AllTags = await TagManager.GetAllViews();
   const TagClients = (Clients || []).filter((Client) =>
-    ScriptWhitelistManager.IsClientAllowed(Tag.Scope, Client)
+    ScriptWhitelistManager.IsClientAllowed(Tag.Scope, Client, AllTags)
   );
   return [null, Tag, TagClients];
 }

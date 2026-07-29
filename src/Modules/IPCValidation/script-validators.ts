@@ -56,10 +56,19 @@ export = function registerScriptValidators(Manager: IPCValidationManager): void 
         Clients.push(Manager.UUID(normalized, 'Whitelist client UUID'));
       }
     }
+    // Tags admitted by the whitelist; membership is resolved when the script is
+    // dispatched, so a tag added to later stays covered.
+    const Tags: number[] = [];
+    if (Array.isArray(value.Tags)) {
+      for (const t of value.Tags) {
+        Tags.push(Manager.TagID(t, 'Whitelist tag ID'));
+      }
+    }
     return {
       Workspace: !!value.Workspace,
       Groups: Array.from(new Set(Groups)),
       Clients: Array.from(new Set(Clients)),
+      Tags: Array.from(new Set(Tags)),
     };
   };
 };

@@ -685,7 +685,7 @@ export function UpdateClientTile(Data: ClientView): void {
   $tile
     .toggleClass('ONLINE', Online && !Degraded && !Initialising)
     .toggleClass('DEGRADED', Degraded)
-    .toggleClass('IDLE', Initialising || (!!Data.Unassigned && !Online && !Degraded))
+    .toggleClass('IDLE', Initialising)
     .toggleClass('IDENTIFYING', !!Data.Identifying);
 
   $IndicatorDegraded.children('[data-type="DEGRADED_WARNING"]').text(DegradedWarning);

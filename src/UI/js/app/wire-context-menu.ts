@@ -5,7 +5,7 @@
 // tap-to-confirm arming, and the outside-click / Escape close paths. init.ts
 // calls wireContextMenu() from WireGlobalUI in place of the old inline block.
 import type { ClientView } from '@showtrak/protocol';
-import { AllClients, ScriptList, Selected, setScriptList } from './state';
+import { AllClients, ScriptList, Selected, Tags, setScriptList } from './state';
 import { GetSettingValue } from './settings';
 import { HandleNonFatalError, Safe } from './utils';
 import { ExecuteScript, TriggerIntegratedEvent } from './modals';
@@ -150,7 +150,9 @@ export function wireContextMenu() {
           // clients in the current selection is skipped entirely (not shown);
           // with a mix, it shows once and runs only for the admitted subset.
           // (Rules live in ./lib/script-targeting, which is pure and tested.)
-          const Targets = ResolveScriptTargets(Script, RemoteClients);
+          // Tags are passed so a tag-restricted script is offered on the
+          // machines that tag covers, not just the ones named outright.
+          const Targets = ResolveScriptTargets(Script, RemoteClients, Tags);
           if (!Targets.length) continue;
           // Each script carries a chosen Bootstrap Icons name (bare, no "bi-"),
           // set via the Script Manager's icon picker; fall back to the generic

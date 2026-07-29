@@ -2,6 +2,8 @@
 // whether an alert rule fires for a given runtime context.
 import type { AlertRuleView } from '@showtrak/protocol';
 import { TRIGGERS } from './triggers';
+import { ScopeCoversEntity } from '../ScopeMatching';
+import type { ScopeTag } from '../ScopeMatching';
 
 // The in-memory alert rule (as produced by normalizeRuleRow) matches the wire
 // AlertRuleView shape.
@@ -34,7 +36,10 @@ interface AlertContext {
   [key: string]: unknown;
 }
 
-function isScopeMatch(Rule: AlertRule, Context: AlertContext): boolean {
+// `Tags` is the full tag list, needed only to expand a rule that targets tags
+// (tags nest, so expansion is a graph walk — see ../ScopeMatching). Omitting it
+// silently under-matches such rules, so the evaluator always supplies it.
+function isScopeMatch(Rule: AlertRule, Context: AlertContext, Tags?: readonly ScopeTag[]): boolean {
   const Scope = Rule.Scope || {};
   const Workspace = !!Scope.Workspace;
   const GroupIDs = new Set(Array.isArray(Scope.Groups) ? Scope.Groups.map((x) => Number(x)) : []);
@@ -42,8 +47,8 @@ function isScopeMatch(Rule: AlertRule, Context: AlertContext): boolean {
 
   // Per-check alerts are strictly opt-in: they only fire when a rule explicitly
   // targets that check (check:<CheckID>). They intentionally ignore Workspace /
-  // Group scopes so that a broad rule doesn't fire once per check on top of the
-  // aggregated target-level alert.
+  // Group / Tag scopes so that a broad rule doesn't fire once per check on top
+  // of the aggregated target-level alert.
   if (Context.EntityType === 'monitor-check') {
     return Context.CheckID != null && Clients.has(`check:${Context.CheckID}`);
   }
@@ -51,11 +56,21 @@ function isScopeMatch(Rule: AlertRule, Context: AlertContext): boolean {
   if (Workspace) return true;
   if (Context.GroupID != null && GroupIDs.has(Number(Context.GroupID))) return true;
 
-  if (Context.UUID && Clients.has(String(Context.UUID))) return true;
-  if (Context.EntityType === 'monitor' && Context.TargetID != null) {
-    if (Clients.has(`monitor:${Context.TargetID}`)) return true;
-  }
-  return false;
+  // The scoped id this event's entity is named by in a scope's Clients list —
+  // also what a targeted tag's own membership is resolved against.
+  const ScopedID =
+    Context.EntityType === 'monitor' && Context.TargetID != null
+      ? `monitor:${Context.TargetID}`
+      : Context.UUID
+        ? String(Context.UUID)
+        : '';
+  if (!ScopedID) return false;
+
+  return ScopeCoversEntity(
+    Scope,
+    { ScopedID, GroupID: Context.GroupID ?? null },
+    Tags as readonly ScopeTag[] | undefined
+  );
 }
 
 // Whether a single trigger type on the rule matches the runtime context. The
