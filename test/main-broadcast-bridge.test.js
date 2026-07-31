@@ -181,6 +181,13 @@ const restore = installModuleMocks([
   { match: matchesModule('/Modules/GroupManager'), value: { Manager: groupMgr } },
   { match: matchesModule('/Modules/MonitoringTargetManager'), value: { Manager: targetMgr } },
   { match: matchesModule('/Modules/DummyClientManager'), value: { Manager: dummyMgr } },
+  // Unstubbed, the real manager requires ../DB and opens a live sqlite
+  // connection at module load: green locally, fails on CI where there is no
+  // database. broadcast-bridge calls GetAll and Reload.
+  {
+    match: matchesModule('/Modules/FreeKioskManager'),
+    value: { Manager: { GetAll: async () => [null, []], Reload: async () => [null, []] } },
+  },
   { match: matchesModule('/Modules/AlertsManager'), value: { Manager: alertsMgr } },
   { match: matchesModule('/Modules/TagManager'), value: { Manager: tagMgr } },
   { match: matchesModule('/Modules/FogManager'), value: { Manager: fogMgr } },

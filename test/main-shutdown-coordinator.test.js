@@ -188,6 +188,11 @@ const restore = installModuleMocks([
     value: { Manager: monitoringTargetManager },
   },
   { match: matchesModule('/Modules/DummyClientManager'), value: { Manager: dummyClientManager } },
+  // See the note in main-broadcast-bridge.test.js. This module calls Shutdown.
+  {
+    match: matchesModule('/Modules/FreeKioskManager'),
+    value: { Manager: { Shutdown: async () => {} } },
+  },
   {
     match: matchesModule('/Modules/NetworkInterfaces'),
     value: {

@@ -31,6 +31,12 @@ const restore = installModuleMocks([
   { match: matchesModule('electron'), value: electronStub },
   { match: matchesModule('/Modules/GroupManager'), value: { Manager: groupMgr } },
   { match: matchesModule('/Modules/MonitoringTargetManager'), value: { Manager: monitorMgr } },
+  // See the note in main-broadcast-bridge.test.js. This registrar reorders
+  // terminals alongside the other types, so it calls SetGroupAndWeight.
+  {
+    match: matchesModule('/Modules/FreeKioskManager'),
+    value: { Manager: { SetGroupAndWeight: async () => [null, true] } },
+  },
   { match: matchesModule('/Modules/DummyClientManager'), value: { Manager: dummyMgr } },
   { match: matchesModule('/Modules/ClientManager'), value: { Manager: clientMgr } },
   { match: matchesModule('/Modules/Broadcast'), value: { Manager: broadcastMgr } },

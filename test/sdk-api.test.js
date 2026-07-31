@@ -120,6 +120,15 @@ function loadControlService(overrides = {}) {
           slug === 'spare-1' ? { UUID: 'dummy-uuid-1', DummyID: 'spare-1' } : null,
       },
     },
+    // Unstubbed, the real manager requires ../DB and opens a live sqlite
+    // connection at module load: green locally, fails on CI where there is no
+    // database. ControlService resolves terminals by slug.
+    '../FreeKioskManager': {
+      Manager: {
+        GetBySlug: async (slug) =>
+          slug === 'lobby' ? { UUID: 'kiosk-uuid-1', Slug: 'lobby' } : null,
+      },
+    },
     '../../main/handler-registry': { GetHandler: (channel) => handlers[channel] },
     ...overrides,
   };

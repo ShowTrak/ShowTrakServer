@@ -30,7 +30,8 @@
     "test:coverage": "c8 --all --include=dist/Modules/**/*.js --include=dist/main/**/*.js --include=dist-test/UI/js/app/**/*.js --reporter=text --reporter=text-summary --reporter=lcov node --test --test-concurrency=1 --test-timeout=30000",
     "prepare": "husky",
     "postinstall": "npm run build:shared && node scripts/copy-bootstrap-icons.js",
-    "build:shared": "tsc -p shared/tsconfig.build.json"
+    "build:shared": "tsc -p shared/tsconfig.build.json",
+    "test:isolated": "npm run pretest && node scripts/test-isolated.js"
   },
   "keywords": [
     "electron",
