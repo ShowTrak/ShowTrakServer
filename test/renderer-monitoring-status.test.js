@@ -355,13 +355,25 @@ test('a sample is classified offline first, then degraded', () => {
 
 // --- Timeline blocks --------------------------------------------------------
 
-/** A sample placed a given number of minutes before now. */
-const sample = (minutesAgo, extra = {}) => ({
-  ts: Date.now() - minutesAgo * 60 * 1000,
+/** A sample placed a given number of minutes before a given instant. */
+const sampleAt = (Now, minutesAgo, extra = {}) => ({
+  ts: Now - minutesAgo * 60 * 1000,
   online: true,
   degraded: false,
   ...extra,
 });
+
+/** A sample placed a given number of minutes before now. */
+const sample = (minutesAgo, extra = {}) => sampleAt(Date.now(), minutesAgo, extra);
+
+// Samples that a test needs to land in the SAME one-minute block must share one
+// Date.now() snapshot. Reading the clock per sample lets a group straddle a
+// block boundary whenever the test happens to run across the turn of a minute,
+// which is exactly how these tests failed in CI roughly once an hour.
+const sameBlock = (minutesAgo, ...extras) => {
+  const Now = Date.now();
+  return extras.map((Extra) => sampleAt(Now, minutesAgo, Extra));
+};
 
 test('the timeline is always a fixed grid, however many samples arrived', () => {
   // A fixed grid is what makes two targets visually comparable.
@@ -386,11 +398,9 @@ test('a block with no samples stays IDLE rather than inheriting a neighbour', ()
 test('the worst state in a block wins', () => {
   // One failed check inside a minute must colour that minute, or a flapping
   // target looks perfectly healthy at a glance.
-  const Blocks = BuildStatusBlocksFromSamples([
-    sample(5, { online: true }),
-    sample(5, { online: true, degraded: true }),
-    sample(5, { online: false }),
-  ]);
+  const Blocks = BuildStatusBlocksFromSamples(
+    sameBlock(5, { online: true }, { online: true, degraded: true }, { online: false })
+  );
   const Block = Blocks.find((B) => B.count === 3);
   assert.ok(Block, 'the samples did not land in one block');
   assert.equal(Block.state, 'OFFLINE');
@@ -398,12 +408,11 @@ test('the worst state in a block wins', () => {
 });
 
 test('a block averages the latency of its samples', () => {
-  const Blocks = BuildStatusBlocksFromSamples([
-    sample(5, { latencyMs: 10 }),
-    sample(5, { latencyMs: 20 }),
-    sample(5, { latencyMs: null }),
-  ]);
+  const Blocks = BuildStatusBlocksFromSamples(
+    sameBlock(5, { latencyMs: 10 }, { latencyMs: 20 }, { latencyMs: null })
+  );
   const Block = Blocks.find((B) => B.count === 3);
+  assert.ok(Block, 'the samples did not land in one block');
   assert.equal(Block.latencyMs, 15, 'the null sample should not drag the mean to 10');
 });
 
