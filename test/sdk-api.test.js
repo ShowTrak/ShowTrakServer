@@ -42,6 +42,10 @@ function loadControlService(overrides = {}) {
       handlerCalls.push(['Show:Save', ...args]);
       return [null, true];
     },
+    'Workflows:Run': (...args) => {
+      handlerCalls.push(['Workflows:Run', ...args]);
+      return [null, true];
+    },
   };
 
   const mocks = {
@@ -107,6 +111,20 @@ function loadControlService(overrides = {}) {
           alertCalls.push(!!enabled);
           return !!enabled;
         },
+      },
+    },
+    '../WorkflowManager': {
+      Manager: {
+        GetBySlug: async (slug) =>
+          slug === 'projector-recovery'
+            ? {
+                WorkflowID: 3,
+                Name: 'Projector Recovery',
+                Triggers: { Callable: true },
+              }
+            : slug === 'internal-only'
+              ? { WorkflowID: 4, Name: 'Internal Only', Triggers: { Callable: false } }
+              : null,
       },
     },
     '../MonitoringTargetManager': {
@@ -285,4 +303,59 @@ test('SaveShow dispatches the Show:Save handler and notifies', async () => {
       ([e, msg, type]) => e === 'Notify' && type === 'success' && /saved/i.test(String(msg))
     )
   );
+});
+
+// --- Workflows ---------------------------------------------------------------
+
+test('RunWorkflow resolves the slug and dispatches through the shared handler', async () => {
+  // Going through the IPC handler rather than the manager is what reuses the
+  // validation and gating instead of re-implementing them on this path.
+  const { ControlService, handlerCalls } = loadControlService();
+  const result = await ControlService.RunWorkflow('projector-recovery');
+  assert.equal(result.ok, true);
+
+  const call = handlerCalls.find(([channel]) => channel === 'Workflows:Run');
+  assert.ok(call, 'the run must go through Workflows:Run');
+  // [channel, event, WorkflowID, ScopedID, Mode]
+  assert.equal(call[2], 3);
+  assert.equal(call[3], null, 'no target given means no context');
+  assert.equal(call[4], 'normal');
+});
+
+test('RunWorkflow resolves a target slug into its ScopedID', async () => {
+  // The slug namespace is shared across clients, monitors, dummies and kiosks,
+  // so the resolution has to produce the right prefixed form for each.
+  const { ControlService, handlerCalls } = loadControlService();
+
+  const monitor = await ControlService.RunWorkflow('projector-recovery', 'ping-foh');
+  assert.equal(monitor.ok, true);
+  assert.equal(handlerCalls.find(([c]) => c === 'Workflows:Run')[3], 'monitor:7');
+
+  handlerCalls.length = 0;
+  const client = await ControlService.RunWorkflow('projector-recovery', 'good');
+  assert.equal(client.ok, true);
+  assert.equal(handlerCalls.find(([c]) => c === 'Workflows:Run')[3], 'good');
+});
+
+test('RunWorkflow refuses an unknown workflow or target without dispatching', async () => {
+  const { ControlService, handlerCalls } = loadControlService();
+
+  const noWorkflow = await ControlService.RunWorkflow('nope');
+  assert.equal(noWorkflow.ok, false);
+  assert.match(noWorkflow.detail, /Unknown workflow/);
+
+  const noTarget = await ControlService.RunWorkflow('projector-recovery', 'nope');
+  assert.equal(noTarget.ok, false);
+  assert.match(noTarget.detail, /Unknown target/);
+
+  assert.equal(handlerCalls.length, 0, 'nothing should have been dispatched');
+});
+
+test('RunWorkflow refuses a workflow whose Triggers say it is not callable', async () => {
+  // Not an omission to route around — the operator turned external calling off.
+  const { ControlService, handlerCalls } = loadControlService();
+  const result = await ControlService.RunWorkflow('internal-only');
+  assert.equal(result.ok, false);
+  assert.match(result.detail, /not callable/);
+  assert.equal(handlerCalls.length, 0);
 });

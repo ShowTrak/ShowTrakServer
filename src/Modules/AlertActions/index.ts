@@ -13,6 +13,7 @@ const ActionModules: AlertAction[] = [
   require('./slack-webhook'),
   require('./teams-webhook'),
   require('./telegram-bot'),
+  require('./run-workflow'),
 ];
 
 const Actions = new Map<string, AlertAction>();

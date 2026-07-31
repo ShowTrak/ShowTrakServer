@@ -22,6 +22,7 @@ import { Manager as ScriptManager } from '../ScriptManager';
 import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
 import { Manager as ModeManager } from '../ModeManager';
 import { Manager as AlertsManager } from '../AlertsManager';
+import { Manager as WorkflowManager } from '../WorkflowManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as FreeKioskManager } from '../FreeKioskManager';
@@ -115,6 +116,47 @@ function isIntegrated(client: ResolvedClient): boolean {
 }
 
 // --- Dispatch helpers ----------------------------------------------------
+
+// Resolve a slug across the shared client namespace into the ScopedID the
+// scope/workflow layer speaks. Clients, monitoring targets, dummies and
+// FreeKiosk terminals all share one slug namespace, so the walk has to try each
+// in turn — the same order OpenClientModal uses.
+async function resolveScopedEntity(
+  Key: string
+): Promise<{ Type: string; ScopedID: string; Name: string } | null> {
+  const Client = await resolveClientByKey(Key);
+  if (Client) {
+    return { Type: 'client', ScopedID: String(Client.UUID), Name: Client.Slug || Client.UUID };
+  }
+
+  const Monitor =
+    typeof MonitoringTargetManager.GetBySlug === 'function'
+      ? await MonitoringTargetManager.GetBySlug(Key)
+      : null;
+  if (Monitor) {
+    return {
+      Type: 'monitor',
+      ScopedID: `monitor:${Monitor.TargetID}`,
+      Name: Monitor.Slug || String(Monitor.TargetID),
+    };
+  }
+
+  const Dummy =
+    typeof DummyClientManager.GetBySlug === 'function'
+      ? await DummyClientManager.GetBySlug(Key)
+      : null;
+  if (Dummy) {
+    return { Type: 'dummy', ScopedID: String(Dummy.UUID), Name: Dummy.DummyID || Dummy.UUID };
+  }
+
+  const Kiosk =
+    typeof FreeKioskManager.GetBySlug === 'function' ? await FreeKioskManager.GetBySlug(Key) : null;
+  if (Kiosk) {
+    return { Type: 'freekiosk', ScopedID: String(Kiosk.UUID), Name: Kiosk.Slug || Kiosk.UUID };
+  }
+
+  return null;
+}
 
 // Call a shared IPC handler by channel; treat a tuple [Err, _] with a truthy
 // Err as failure. Returns a CommandResult.
@@ -242,6 +284,39 @@ export const ControlService = {
       [eventSlug, uuids],
       `Event "${eventSlug}" queued for tag "${slug}"`
     );
+  },
+
+  // Workflows ---------------------------------------------------------------
+  //
+  // Dispatched through the shared IPC handler rather than the manager directly,
+  // like every other real action here, so validation and gating are reused
+  // verbatim rather than re-implemented on this path.
+  async RunWorkflow(workflowSlug: string, targetKey?: string | null): Promise<CommandResult> {
+    const Workflow = await WorkflowManager.GetBySlug(workflowSlug);
+    if (!Workflow) return fail(`Unknown workflow "${workflowSlug}"`);
+    if (!Workflow.Triggers.Callable) {
+      // A workflow whose Triggers say it may not be called externally is not a
+      // missing feature to route around — the operator turned it off.
+      return fail(`Workflow "${Workflow.Name}" is not callable`);
+    }
+
+    let ScopedID: string | null = null;
+    if (targetKey) {
+      const Entity = await resolveScopedEntity(targetKey);
+      if (!Entity) return fail(`Unknown target "${targetKey}"`);
+      ScopedID = Entity.ScopedID;
+    }
+
+    return dispatchHandler(
+      'Workflows:Run',
+      [Workflow.WorkflowID, ScopedID, 'normal'],
+      `Workflow "${Workflow.Name}" started${targetKey ? ` on "${targetKey}"` : ''}`
+    );
+  },
+
+  async AbortWorkflowRun(runKey: string): Promise<CommandResult> {
+    if (!runKey) return fail('No run specified');
+    return dispatchHandler('Workflows:Abort', [runKey], `Run "${runKey}" aborted`);
   },
 
   // Alerts (authoritative server state) -----------------------------------

@@ -233,6 +233,15 @@ async function DispatchCommand(name: unknown, rawArgs: unknown) {
       return ControlService.TriggerEventOnGroup(slug, eventSlug);
     case 'event.tag':
       return ControlService.TriggerEventOnTag(slug, eventSlug);
+    // Unlike OSC, the SDK carries a structured payload, so a target can be
+    // named separately from the workflow rather than encoded into a path.
+    case 'workflow.run':
+      return ControlService.RunWorkflow(
+        String(args.workflowSlug ?? ''),
+        args.target == null ? null : String(args.target)
+      );
+    case 'workflow.abort':
+      return ControlService.AbortWorkflowRun(String(args.runKey ?? ''));
     case 'alerts.set':
       return ControlService.SetAlertsEnabled(!!args.enabled);
     case 'alerts.toggle':

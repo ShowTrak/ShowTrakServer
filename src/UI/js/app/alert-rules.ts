@@ -14,6 +14,7 @@ import {
   AlertTriggerTypesCache,
   AllClients,
   AudioAssetsCache,
+  WorkflowsCache,
   DummyClients,
   MonitoringTargets,
   Tags,
@@ -349,6 +350,16 @@ export function RenderAlertActionSettingsFields(
           AudioOptions = [{ Value: '', Label: 'No audio assets — import some first' }];
         }
         Options = AudioOptions;
+      } else if (Field.Source === 'workflows') {
+        // The "Run Workflow" action picks from the live workflow list. Only
+        // callable workflows are offered: one whose Triggers say it may not be
+        // called externally is not an omission to route around.
+        const WorkflowOptions = (WorkflowsCache || [])
+          .filter((W) => W.Triggers && W.Triggers.Callable)
+          .map<{ Value: unknown; Label: unknown }>((W) => ({ Value: W.WorkflowID, Label: W.Name }));
+        Options = WorkflowOptions.length
+          ? WorkflowOptions
+          : [{ Value: '', Label: 'No callable workflows — create one first' }];
       } else {
         Options = Array.isArray(Field.Options) ? Field.Options : [];
       }

@@ -631,6 +631,30 @@ OSC.CreateRoute(
   'Trigger an integrated event on all integrated Clients by Event ID'
 );
 
+// Workflows.
+//
+// Two constraints are worth stating rather than rediscovering:
+//
+//  - The router is positional and discards OSC arguments (only Route[0], the
+//    address, is read), so no route here can supply step parameters. Parameters
+//    live baked into the saved workflow. That is precisely the argument for
+//    workflows existing: the OSC surface stays a flat list of verbs while the
+//    parameterisation moves into the show file.
+//  - Checks have no slug, so there is deliberately no /API/Check/... route.
+//    Per-check control goes through a workflow whose step names the check —
+//    which is also the only form that survives the check being renamed.
+OSC.CreateRoute(
+  '/API/Workflow/:Slug/Run',
+  async (Req) => runEventCommand(ControlService.RunWorkflow(Req.Slug ?? '')),
+  'Run a Workflow by its slug, with no target'
+);
+
+OSC.CreateRoute(
+  '/API/Workflow/:Slug/RunOn/:TargetSlug',
+  async (Req) => runEventCommand(ControlService.RunWorkflow(Req.Slug ?? '', Req.TargetSlug ?? '')),
+  'Run a Workflow by its slug against a client, monitor, dummy or FreeKiosk terminal slug'
+);
+
 // Bind the listener on load using the compiled-in default port so OSC control
 // works immediately. main/live-settings applies the configured port (and any
 // later change) via OSC.RestartServer — keeping this module free of settings/DB.

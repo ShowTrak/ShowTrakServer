@@ -42,6 +42,7 @@ test('AlertActions manager normalizes, validates, and executes actions', async (
     './slack-webhook': { Name: 'invalid-no-id' },
     './teams-webhook': { Name: 'invalid-no-id' },
     './telegram-bot': { Name: 'invalid-no-id' },
+    './run-workflow': { Name: 'invalid-no-id' },
   });
 
   assert.equal(Manager.Has('alpha'), true);
