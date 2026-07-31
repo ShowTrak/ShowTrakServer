@@ -53,12 +53,14 @@ function freshState() {
     groups: [null, [{ GroupID: 1, Title: 'Front', Weight: 0, Slug: 'front' }]],
     monitors: [null, [{ TargetID: 7, Nickname: 'UPS', Slug: 'ups', Online: true }]],
     dummies: [null, [{ UUID: 'd-1', DummyID: 'proj', Nickname: 'Projector' }]],
+    kiosks: [null, [{ UUID: 'k-1', Slug: 'lobby', Nickname: 'Lobby Tablet', Online: true }]],
     tags: [{ TagID: 1, Slug: 'foh' }],
     scripts: [{ ID: 'restart', Name: 'Restart' }],
     mode: 'SHOW',
     alertsEnabled: true,
     monitorsThrow: false,
     dummiesThrow: false,
+    kiosksThrow: false,
     tagsThrow: false,
     scriptsThrow: false,
     controlCalls: [],
@@ -147,6 +149,14 @@ function loadSdk() {
         GetAll: async () => {
           if (state.dummiesThrow) throw new Error('dummies unavailable');
           return state.dummies;
+        },
+      },
+    },
+    '../FreeKioskManager': {
+      Manager: {
+        GetAll: async () => {
+          if (state.kiosksThrow) throw new Error('terminals unavailable');
+          return state.kiosks;
         },
       },
     },

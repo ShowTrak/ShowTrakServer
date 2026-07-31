@@ -312,6 +312,7 @@ function loadWebUi(settings, options = {}) {
       Manager: { GetAll: async () => [null, [{ GroupID: 1, Title: 'G', Weight: 1 }]] },
     },
     '../MonitoringTargetManager': { Manager: { GetAll: async () => [null, []] } },
+    '../FreeKioskManager': { Manager: { GetAll: async () => [null, []] } },
     '../DummyClientManager': { Manager: { GetAll: async () => [null, []] } },
     '../AlertsManager': { Manager: { GetAll: async () => [null, []] } },
     '../SettingsManager': { Manager: { GetValue: async (key) => settings[key] } },
@@ -976,6 +977,7 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
         ],
       },
     },
+    '../FreeKioskManager': { Manager: { GetAll: async () => [null, []] } },
     '../DummyClientManager': {
       Manager: {
         GetAll: async () => [
@@ -1182,6 +1184,7 @@ test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve
     '../GroupManager': { Manager: { Get: async () => [null, null], GetBySlug: async () => null } },
     '../ScriptManager': { Manager: { Get: async () => null } },
     '../MonitoringTargetManager': { Manager: { GetAll: async () => [null, []] } },
+    '../FreeKioskManager': { Manager: { GetAll: async () => [null, []] } },
     '../DummyClientManager': {
       Manager: { GetAll: async () => [null, []], Heartbeat: async () => [null] },
     },
@@ -1290,6 +1293,7 @@ test('Server Manager integrated event queue reports mixed target outcomes', asyn
     '../ScriptWhitelistManager': {
       Manager: { DecorateCatalog: async (scripts) => scripts, GetScope: async () => null },
     },
+    '../FreeKioskManager': { Manager: { GetAll: async () => [null, []] } },
     '../DummyClientManager': { Manager: {} },
     '../MonitoringTargetManager': { Manager: {} },
     '../OSC': { OSC: { GetRoutes: () => [] } },
