@@ -5,7 +5,16 @@
 // tap-to-confirm arming, and the outside-click / Escape close paths. init.ts
 // calls wireContextMenu() from WireGlobalUI in place of the old inline block.
 import type { ClientView } from '@showtrak/protocol';
-import { AllClients, ScriptList, Selected, Tags, setScriptList } from './state';
+import {
+  AllClients,
+  FreeKioskCommandsCache,
+  FreeKioskTerminals,
+  ScriptList,
+  Selected,
+  Tags,
+  setScriptList,
+} from './state';
+import { GetFreeKioskDisplayMode } from './freekiosk';
 import { GetSettingValue } from './settings';
 import { HandleNonFatalError, Safe } from './utils';
 import { ExecuteScript, TriggerIntegratedEvent } from './modals';
@@ -112,16 +121,18 @@ export function wireContextMenu() {
       const IsIntegratedClient = (Client: ClientView) =>
         !!(Client && (Client.Integrated || Client.OperatingSystem === 'Integrated'));
 
-      // Partition the selection by entity type. Monitoring and dummy tiles carry
-      // prefixed selection UUIDs (monitor:<TargetID> / dummy:<UUID>); everything
-      // else is a plain adopted-client UUID.
+      // Partition the selection by entity type. Monitoring, dummy and FreeKiosk
+      // tiles carry prefixed selection UUIDs (monitor:<TargetID>, dummy:<UUID>,
+      // kiosk:<UUID>); everything else is a plain adopted-client UUID.
       const MonitorTargetIDs: string[] = [];
       const DummyUUIDs: string[] = [];
+      const KioskUUIDs: string[] = [];
       const ClientUUIDs: string[] = [];
       for (const UUID of Selected) {
         const Value = String(UUID);
         if (Value.startsWith('monitor:')) MonitorTargetIDs.push(Value.slice('monitor:'.length));
         else if (Value.startsWith('dummy:')) DummyUUIDs.push(Value.slice('dummy:'.length));
+        else if (Value.startsWith('kiosk:')) KioskUUIDs.push(Value.slice('kiosk:'.length));
         else ClientUUIDs.push(UUID);
       }
 
@@ -278,6 +289,72 @@ export function wireContextMenu() {
         });
       }
 
+      // --- FreeKiosk terminals ---------------------------------------------
+      if (KioskUUIDs.length > 0) {
+        PushSection('FreeKiosk Terminals');
+
+        const Plural = KioskUUIDs.length === 1 ? 'terminal' : `${KioskUUIDs.length} terminals`;
+
+        Options.push({
+          Type: 'Action',
+          Title: 'Poll Now',
+          Class: 'text-light',
+          Icon: 'bi-arrow-repeat',
+          IconColour: '#3498db',
+          Action: async function () {
+            const [Err, Summary] = await window.API.RunFreeKioskTerminalsNow(KioskUUIDs);
+            if (Err) return Notify(Err, 'error');
+            Notify(`Polled ${Summary?.Succeeded ?? 0}/${Summary?.Total ?? 0} ${Plural}`, 'info');
+          },
+        });
+
+        // Every bulk-capable command the server declares. Sourcing the list from
+        // the server's command map means a command added there appears here
+        // with no renderer change — and, more importantly, that nothing appears
+        // here which the server would refuse.
+        // A selection can span terminals in different display modes, so a
+        // mode-specific command is offered only when it applies to EVERY one of
+        // them. Offering it for the majority would put an action on the menu
+        // that silently does nothing on the rest — and the server refuses those
+        // anyway, so the menu would be promising a partial failure.
+        const KioskModes = KioskUUIDs.map((UUID) =>
+          GetFreeKioskDisplayMode(
+            FreeKioskTerminals.find((Entry) => String(Entry.UUID) === UUID)?.Settings
+          )
+        );
+
+        for (const Command of FreeKioskCommandsCache) {
+          if (!Command.Bulk) continue;
+          if (Command.Params && Command.Params.length) continue; // needs a form
+          if (Command.Modes && !KioskModes.every((Mode) => Command.Modes!.includes(Mode))) continue;
+          Options.push({
+            Type: 'Action',
+            Title: Command.Label,
+            Class: Command.Destructive ? 'text-warning' : 'text-light',
+            Icon: `bi-${Command.Icon}`,
+            IconColour: Command.Destructive ? '#e74c3c' : '#9b59b6',
+            Action: async function () {
+              if (Command.Destructive) {
+                const Confirmed = await ConfirmationDialog(
+                  `${Command.Label} on ${KioskUUIDs.length === 1 ? 'this terminal' : Plural}?`
+                );
+                if (!Confirmed) return;
+              }
+              const [Err, Summary] = await window.API.SendFreeKioskCommand(KioskUUIDs, Command.ID);
+              if (Err) return Notify(Err, 'error');
+              if (Summary && Summary.Failed) {
+                const Reason = Summary.Results.find((Entry) => !Entry.Success)?.Error;
+                return Notify(
+                  `${Command.Label}: ${Summary.Succeeded}/${Summary.Total} — ${Reason || 'failed'}`,
+                  'error'
+                );
+              }
+              Notify(`${Command.Label} sent to ${Plural}`, 'success');
+            },
+          });
+        }
+      }
+
       if (SectionsRendered > 0) {
         Options.push({ Type: 'Divider' });
       }
@@ -344,10 +421,13 @@ export function wireContextMenu() {
     }
 
     if (Selected.length > 0) {
-      // Wake On LAN only applies to real adopted clients; monitoring and dummy
-      // tiles carry prefixed selection UUIDs and are excluded.
+      // Wake On LAN only applies to real adopted clients; monitoring, dummy and
+      // FreeKiosk tiles carry prefixed selection UUIDs and are excluded.
       const WolTargets = Selected.filter(
-        (UUID) => !String(UUID).startsWith('monitor:') && !String(UUID).startsWith('dummy:')
+        (UUID) =>
+          !String(UUID).startsWith('monitor:') &&
+          !String(UUID).startsWith('dummy:') &&
+          !String(UUID).startsWith('kiosk:')
       );
       const SYSTEM_ALLOW_WOL = await GetSettingValue('SYSTEM_ALLOW_WOL');
       if (SYSTEM_ALLOW_WOL && WolTargets.length > 0) {

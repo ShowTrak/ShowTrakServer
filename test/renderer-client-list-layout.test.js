@@ -35,6 +35,7 @@ const Layout = require(LAYOUT_PATH);
 const client = (O = {}) => ({ UUID: 'c1', GroupID: 1, Weight: 0, ...O });
 const monitor = (O = {}) => ({ TargetID: 1, GroupID: 1, Weight: 0, ...O });
 const dummy = (O = {}) => ({ UUID: 'd1', GroupID: 1, Weight: 0, ...O });
+const kiosk = (O = {}) => ({ UUID: 'k1', GroupID: 1, Weight: 0, ...O });
 const group = (O = {}) => ({ GroupID: 1, Title: 'FOH', Weight: 0, ...O });
 
 // --- Status text ------------------------------------------------------------
@@ -335,7 +336,7 @@ test('a monitor or dummy with a falsy GroupID lands in the ungrouped bucket', ()
 
 test('an absent entity list is empty, not a crash', () => {
   const Members = Layout.SelectGroupMembers(1, null, undefined, 'nope');
-  assert.deepEqual(Members, { Clients: [], Monitors: [], Dummies: [] });
+  assert.deepEqual(Members, { Clients: [], Monitors: [], Dummies: [], Kiosks: [] });
 });
 
 test('selecting a group does not reorder the source array', () => {
@@ -447,4 +448,89 @@ test('the welcome panel is hidden as soon as anything exists', () => {
   assert.equal(Layout.ShouldShowWelcomePanel(1, [client()], [], []), false);
   assert.equal(Layout.ShouldShowWelcomePanel(1, [], [monitor()], []), false);
   assert.equal(Layout.ShouldShowWelcomePanel(1, [], [], [dummy()]), false);
+});
+
+// ---- FreeKiosk terminals ---------------------------------------------------
+//
+// Terminals join the same weight scale as every other client-like type, so a
+// drag can interleave all four. Getting this wrong does not throw — the tiles
+// simply appear in the wrong order, or not at all.
+
+test('a group collects its FreeKiosk terminals too', () => {
+  const Members = Layout.SelectGroupMembers(
+    1,
+    [client()],
+    [monitor()],
+    [dummy()],
+    [kiosk({ UUID: 'k1' }), kiosk({ UUID: 'k2', GroupID: 2 })]
+  );
+  assert.deepEqual(
+    Members.Kiosks.map((K) => K.UUID),
+    ['k1']
+  );
+});
+
+test('a terminal with a falsy GroupID lands in the ungrouped bucket', () => {
+  // Same trap as monitors and dummies: the database can hand back 0.
+  const Members = Layout.SelectGroupMembers(
+    null,
+    [],
+    [],
+    [],
+    [kiosk({ UUID: 'k1', GroupID: 0 }), kiosk({ UUID: 'k2', GroupID: undefined })]
+  );
+  assert.equal(Members.Kiosks.length, 2);
+});
+
+test('omitting the terminal list entirely still yields a usable member set', () => {
+  // The parameter is trailing and optional so existing three-argument callers
+  // keep working; it must not produce an undefined the renderer then indexes.
+  const Members = Layout.SelectGroupMembers(1, [client()], [], []);
+  assert.deepEqual(Members.Kiosks, []);
+  assert.doesNotThrow(() => Layout.BuildMergedTiles(Members));
+  assert.doesNotThrow(() => Layout.BuildGroupSelectableIDs(Members));
+});
+
+test('a group-title click selects terminals by their kiosk-prefixed id', () => {
+  // Must mirror the tile data-uuid exactly, or a "select the whole group"
+  // action silently skips every terminal in it.
+  const Members = Layout.SelectGroupMembers(
+    1,
+    [client({ UUID: 'c1' })],
+    [monitor({ TargetID: 7 })],
+    [dummy({ UUID: 'd1' })],
+    [kiosk({ UUID: 'k1' })]
+  );
+  assert.deepEqual(Layout.BuildGroupSelectableIDs(Members), [
+    'c1',
+    'monitor:7',
+    'dummy:d1',
+    'kiosk:k1',
+  ]);
+});
+
+test('all four entity types share one weight-ordered tile sequence', () => {
+  const Members = Layout.SelectGroupMembers(
+    1,
+    [client({ UUID: 'c1', Weight: 20 })],
+    [monitor({ TargetID: 7, Weight: 10 })],
+    [dummy({ UUID: 'd1', Weight: 40 })],
+    [kiosk({ UUID: 'k1', Weight: 30 })]
+  );
+  assert.deepEqual(
+    Layout.BuildMergedTiles(Members).map((T) => T.kind),
+    ['monitor', 'client', 'freekiosk', 'dummy']
+  );
+});
+
+test('a group holding only terminals is still rendered', () => {
+  const Members = Layout.SelectGroupMembers(null, [], [], [], [kiosk({ GroupID: null })]);
+  assert.equal(Layout.ShouldRenderGroup(null, Members), true);
+});
+
+test('the welcome panel is hidden once a terminal exists', () => {
+  assert.equal(Layout.ShouldShowWelcomePanel(1, [], [], [], [kiosk()]), false);
+  assert.equal(Layout.ShouldShowWelcomePanel(1, [], [], [], []), true);
+  // Omitted entirely: still a genuinely empty install.
+  assert.equal(Layout.ShouldShowWelcomePanel(1, [], [], []), true);
 });

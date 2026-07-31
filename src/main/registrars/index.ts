@@ -13,6 +13,7 @@ import { register as registerGroups } from './groups';
 import { register as registerClients } from './clients';
 import { register as registerMonitoring } from './monitoring';
 import { register as registerDummy } from './dummy';
+import { register as registerFreeKiosk } from './freekiosk';
 import { register as registerAlerts } from './alerts';
 import { register as registerTags } from './tags';
 import { register as registerFog } from './fog';
@@ -28,6 +29,7 @@ function RegisterAllHandlers(): void {
   registerClients();
   registerMonitoring();
   registerDummy();
+  registerFreeKiosk();
   registerAlerts();
   registerTags();
   registerFog();

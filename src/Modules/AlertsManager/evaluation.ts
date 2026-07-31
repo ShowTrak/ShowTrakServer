@@ -111,6 +111,15 @@ function singleTriggerMatches(
       return Context.TriggerType === TRIGGERS.NON_CRITICAL_APPLICATION_STOPPED;
     case TRIGGERS.SCRIPT_EXECUTION_FAILED:
       return Context.TriggerType === TRIGGERS.SCRIPT_EXECUTION_FAILED;
+    case TRIGGERS.FREEKIOSK_METRIC_ALARM: {
+      if (Context.TriggerType !== TRIGGERS.FREEKIOSK_METRIC_ALARM) return false;
+      // The metric filter. Mirrors the TriggerConfig.Source gating below: an
+      // unset list means "any", so a rule saved before the filter existed keeps
+      // matching everything rather than silently going quiet.
+      const Metrics = Rule.TriggerConfig && Rule.TriggerConfig.Metrics;
+      if (!Array.isArray(Metrics) || !Metrics.length) return true;
+      return Metrics.map(String).includes(String(Context.MetricKey));
+    }
     case TRIGGERS.CLIENT_DEGRADED: {
       if (Context.EntityType === 'monitor') {
         const Source = String(
@@ -190,7 +199,19 @@ function describeApplication(Context: AlertContext): string {
   return Name || 'application';
 }
 
+// "Lobby Kiosk — Battery Level 12% is below 20%". The reason is worded by the
+// alarm evaluator, which is the only thing that knows the metric's unit and
+// precision, so it is used verbatim rather than rebuilt here.
+function describeFreeKioskAlarm(Context: AlertContext): string {
+  const Name = Context.EntityName || 'FreeKiosk terminal';
+  const Reason = Context.Reason ? String(Context.Reason) : String(Context.MetricLabel || 'alarm');
+  return `${Name} — ${Reason}`;
+}
+
 function describeContext(Context: AlertContext): string {
+  if (Context.TriggerType === TRIGGERS.FREEKIOSK_METRIC_ALARM) {
+    return describeFreeKioskAlarm(Context);
+  }
   if (Context.TriggerType === TRIGGERS.SCRIPT_EXECUTION_FAILED) {
     return `${Context.ScriptName || 'Script'} failed on ${Context.EntityName || 'Unknown Client'}`;
   }
@@ -245,5 +266,11 @@ function describeContext(Context: AlertContext): string {
   return 'Alert triggered';
 }
 
-export { isScopeMatch, triggerMatches, describeMonitorReason, describeContext };
+export {
+  isScopeMatch,
+  triggerMatches,
+  describeMonitorReason,
+  describeFreeKioskAlarm,
+  describeContext,
+};
 export type { AlertContext, AlertRule };

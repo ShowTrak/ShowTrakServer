@@ -277,6 +277,23 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     ResetDummyClientToIdle: async (UUID) => rpc('ResetDummyClientToIdle', UUID),
     SetFullDummyClientList: (cb) => sub('SetFullDummyClientList', cb),
     DummyClientUpdated: (cb) => sub('DummyClientUpdated', cb),
+    GetFreeKioskMetrics: async () => rpc('FreeKiosk:GetMetrics'),
+    GetFreeKioskCommands: async () => rpc('FreeKiosk:GetCommands'),
+    GetAllFreeKioskTerminals: async () => rpc('GetAllFreeKioskTerminals'),
+    GetFreeKioskTerminal: async (UUID) => rpc('GetFreeKioskTerminal', UUID),
+    GetFreeKioskHistory: async (UUID, MetricKeys) => rpc('FreeKiosk:GetHistory', UUID, MetricKeys),
+    GenerateFreeKioskTerminalDefaults: async () => rpc('GenerateFreeKioskTerminalDefaults'),
+    CreateFreeKioskTerminal: async (Payload) => rpc('CreateFreeKioskTerminal', Payload),
+    UpdateFreeKioskTerminal: async (UUID, Payload) => rpc('UpdateFreeKioskTerminal', UUID, Payload),
+    DeleteFreeKioskTerminal: async (UUID) => rpc('DeleteFreeKioskTerminal', UUID),
+    RunFreeKioskTerminalsNow: async (UUIDs) => rpc('FreeKiosk:RunNow', UUIDs),
+    SendFreeKioskCommand: async (UUIDs, Command, Params) =>
+      rpc('FreeKiosk:Command', UUIDs, Command, Params),
+    CaptureFreeKioskScreenshot: async (UUID) => rpc('FreeKiosk:CaptureScreenshot', UUID),
+    CaptureFreeKioskCamera: async (UUID, Options) => rpc('FreeKiosk:CaptureCamera', UUID, Options),
+    GetFreeKioskCameraList: async (UUID) => rpc('FreeKiosk:GetCameraList', UUID),
+    SetFullFreeKioskTerminalList: (cb) => sub('SetFullFreeKioskTerminalList', cb),
+    FreeKioskTerminalUpdated: (cb) => sub('FreeKioskTerminalUpdated', cb),
 
     // ---- Network discovery (desktop-only) --------------------------------
     StartNetworkDeviceScan: nullTuple,

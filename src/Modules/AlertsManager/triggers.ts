@@ -16,6 +16,10 @@ const TRIGGERS = {
   CRITICAL_APPLICATION_STOPPED: 'CRITICAL_APPLICATION_STOPPED',
   NON_CRITICAL_APPLICATION_STARTED: 'NON_CRITICAL_APPLICATION_STARTED',
   NON_CRITICAL_APPLICATION_STOPPED: 'NON_CRITICAL_APPLICATION_STOPPED',
+  // Fires on the false->true edge of one FreeKiosk metric alarm. A rule may
+  // narrow it to specific metrics via TriggerConfig.Metrics; an empty or
+  // absent list means every metric.
+  FREEKIOSK_METRIC_ALARM: 'FREEKIOSK_METRIC_ALARM',
 };
 
 export { TRIGGERS };

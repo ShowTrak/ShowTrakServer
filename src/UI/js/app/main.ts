@@ -35,6 +35,9 @@ import { InitTagManager } from './tag-manager';
 import { InitFog } from './fog';
 import { InitOfflineIndicators } from './offline-indicators';
 import { Init, WireGlobalUI } from './init';
+import { LoadFreeKioskCatalogues } from './freekiosk';
+import { WireFreeKioskModal } from './freekiosk-modal';
+import { RenderMonitoringHistoryModal } from './monitoring';
 
 InitMode();
 InitSettings();
@@ -55,5 +58,10 @@ InitScopePicker();
 InitTagManager();
 InitFog();
 InitOfflineIndicators();
+// The metric registry and command map are static for the session and every
+// FreeKiosk surface needs them, so they are fetched once up front rather than
+// per render. Not awaited: a tile renders fine before they land.
+void LoadFreeKioskCatalogues();
+WireFreeKioskModal(() => RenderMonitoringHistoryModal());
 void WireGlobalUI();
 void Init();

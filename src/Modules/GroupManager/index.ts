@@ -18,6 +18,7 @@ const GroupsRepo = CreateGroupsRepository(DB);
 import { Manager as ClientManager } from '../ClientManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
+import { Manager as FreeKioskManager } from '../FreeKioskManager';
 
 // Groups default to full width (span every column) so existing and migrated
 // groups keep filling the row until an operator explicitly narrows them.
@@ -343,6 +344,17 @@ const Manager = {
       }
     }
 
+    if (typeof FreeKioskManager.MoveGroupToNoGroup === 'function') {
+      const [KioskErr] = await FreeKioskManager.MoveGroupToNoGroup(GroupID);
+      if (KioskErr) {
+        Logger.error(
+          'Failed to move FreeKiosk terminals to no group while deleting group:',
+          KioskErr
+        );
+        return Fail('Failed to move FreeKiosk terminals to no group');
+      }
+    }
+
     const [Err] = await GroupsRepo.Delete(GroupID);
     if (Err) {
       Logger.error('Failed to delete group:', Err);
@@ -381,6 +393,14 @@ const Manager = {
       if (DummyErr) {
         Logger.error('Failed to reconcile orphaned dummy clients:', DummyErr);
         return Fail('Failed to reconcile orphaned dummy clients');
+      }
+    }
+
+    if (typeof FreeKioskManager.ReconcileOrphanedGroups === 'function') {
+      const [KioskErr] = await FreeKioskManager.ReconcileOrphanedGroups(GroupIDs);
+      if (KioskErr) {
+        Logger.error('Failed to reconcile orphaned FreeKiosk terminals:', KioskErr);
+        return Fail('Failed to reconcile orphaned FreeKiosk terminals');
       }
     }
 

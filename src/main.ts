@@ -55,6 +55,7 @@ import { Manager as GroupManager } from './Modules/GroupManager';
 import { Manager as TagManager } from './Modules/TagManager';
 import { Manager as FogManager } from './Modules/FogManager';
 import { Manager as DummyClientManager } from './Modules/DummyClientManager';
+import { Manager as FreeKioskManager } from './Modules/FreeKioskManager';
 import { Manager as AlertsManager } from './Modules/AlertsManager';
 import { Manager as AudioAssetManager } from './Modules/AudioAssetManager';
 import { Manager as BroadcastManager } from './Modules/Broadcast';
@@ -236,6 +237,9 @@ app.whenReady().then(async () => {
     DummyClientManager.Init().catch((Err: unknown) =>
       Logger.error('Failed to init DummyClientManager:', Err)
     );
+    FreeKioskManager.Init().catch((Err: unknown) =>
+      Logger.error('Failed to init FreeKioskManager:', Err)
+    );
     AlertsManager.Init().catch((Err: unknown) =>
       Logger.error('Failed to init AlertsManager:', Err)
     );
@@ -247,6 +251,7 @@ app.whenReady().then(async () => {
       try {
         await ClientManager.BackfillSlugs();
         await MonitoringTargetManager.BackfillSlugs();
+        await FreeKioskManager.BackfillSlugs();
         await GroupManager.BackfillSlugs();
         await TagManager.BackfillSlugs();
       } catch (Err: unknown) {

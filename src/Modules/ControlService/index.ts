@@ -24,6 +24,7 @@ import { Manager as ModeManager } from '../ModeManager';
 import { Manager as AlertsManager } from '../AlertsManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
+import { Manager as FreeKioskManager } from '../FreeKioskManager';
 import { GetHandler } from '../../main/handler-registry';
 
 const Logger = CreateLogger('ControlService');
@@ -266,8 +267,9 @@ export const ControlService = {
   },
 
   // Open the entity view modal (desktop renderer only) --------------------
-  // Slugs share one namespace across clients, monitoring targets and dummies, so
-  // resolve across all three and tag the bulk action with the entity type; the
+  // Slugs share one namespace across clients, monitoring targets, dummies and
+  // FreeKiosk terminals, so resolve across all of them and tag the bulk action
+  // with the entity type; the
   // renderer routes each to its matching view (client info / monitor history /
   // dummy history). Integrated clients (QLab, etc.) have no host details, so the
   // client info window still refuses to open for them.
@@ -299,6 +301,15 @@ export const ControlService = {
     if (dummy) {
       emitBulk('OpenClientModal', [dummy.UUID], 'dummy');
       return ok(`Opened dummy modal for "${dummy.DummyID || dummy.UUID}"`);
+    }
+
+    const kiosk =
+      typeof FreeKioskManager.GetBySlug === 'function'
+        ? await FreeKioskManager.GetBySlug(slug)
+        : null;
+    if (kiosk) {
+      emitBulk('OpenClientModal', [kiosk.UUID], 'freekiosk');
+      return ok(`Opened FreeKiosk modal for "${kiosk.Slug || kiosk.UUID}"`);
     }
 
     return fail(`Invalid Client "${slug}"`);

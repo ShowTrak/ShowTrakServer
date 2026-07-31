@@ -241,11 +241,13 @@ test('the push allowlist is exactly the channels the SDK publishes', () => {
     'AlertActionsUpdated',
     'ClientUpdated',
     'DummyClientUpdated',
+    'FreeKioskTerminalUpdated',
     'ModeUpdated',
     'MonitoringTargetUpdated',
     'Notify',
     'SetFullClientList',
     'SetFullDummyClientList',
+    'SetFullFreeKioskTerminalList',
     'SetFullMonitoringTargetList',
     'SetScriptList',
     'SetTagList',
@@ -588,13 +590,14 @@ test('a connecting socket is sent the full current state', async () => {
     'SetFullClientList',
     'SetFullMonitoringTargetList',
     'SetFullDummyClientList',
+    'SetFullFreeKioskTerminalList',
     'SetTagList',
     'SetScriptList',
     'ModeUpdated',
     'AlertActionsUpdated',
   ]);
-  assert.equal(Socket.emitted[5][1], 'SHOW');
-  assert.equal(Socket.emitted[6][1], true);
+  assert.equal(Socket.emitted[6][1], 'SHOW');
+  assert.equal(Socket.emitted[7][1], true);
 });
 
 test('a manager error yields an empty list rather than a missing channel', async () => {

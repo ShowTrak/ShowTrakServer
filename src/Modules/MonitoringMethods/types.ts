@@ -15,11 +15,17 @@ export interface MonitoringTargetLike {
 }
 
 // Conditional visibility for a setting field. The field only renders (and is only
-// collected) when the sibling field named by Key currently equals Equals. Used to
-// gate attribute-specific thresholds behind an "enable this check" toggle.
+// collected) when the sibling field named by Key currently matches. Used to gate
+// attribute-specific thresholds behind an "enable this check" toggle.
+//
+// Give either Equals (exact match) or In (membership). In exists because some
+// gates cannot be written as an equality — the FreeKiosk alarm schema hides its
+// threshold input whenever the chosen operator is one of the value-less edge
+// detectors, which is a set test, not a comparison against one value.
 export interface MonitoringSettingVisibleWhen {
   Key: string;
-  Equals: unknown;
+  Equals?: unknown;
+  In?: unknown[];
 }
 
 export interface MonitoringSettingField {
@@ -43,10 +49,10 @@ export interface MonitoringSettingField {
   // Optional per-input hint. Rendered as a hover popover on a small info icon to
   // the right of the input — keep it to a sentence or two. Escaped before display.
   Note?: string;
-  // When set, the field is shown only while the referenced sibling setting equals
-  // the given value. Its value is still retained while hidden so toggling the
-  // controlling field back on restores it.
-  VisibleWhen?: MonitoringSettingVisibleWhen;
+  // When set, the field is shown only while the referenced sibling setting
+  // matches. An array is ANDed: every condition must hold. Its value is still
+  // retained while hidden so toggling the controlling field back on restores it.
+  VisibleWhen?: MonitoringSettingVisibleWhen | MonitoringSettingVisibleWhen[];
   [key: string]: unknown;
 }
 

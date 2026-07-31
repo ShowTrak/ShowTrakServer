@@ -5800,3 +5800,472 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
     background-color: rgba(255, 255, 255, 0.12);
   }
 }
+/* FreeKiosk terminals: tiles, metric charts, the view modal and the editor's
+   alarm section.
+
+   Appended after 05-monitoring.css by the build (scripts/build-css.js globs
+   parts/*.css in filename order), so it can lean on the monitoring timeline
+   styles it sits beside — the metric chart deliberately reuses the same
+   --status-graph-* palette so a chart and a timeline in one modal read as one
+   system. */
+
+/* ---- Tile ---------------------------------------------------------------- */
+
+/* The battery and brightness bars are plain `.progress` elements, styled by
+   03-layout.css exactly as a client's CPU/RAM pair, and nothing is added here.
+
+   Charging once animated the battery bar with a moving stripe. It was removed:
+   a tile wall is scanned for the one thing that is wrong, and the only moving
+   element on it drew the eye to a terminal that was perfectly healthy. The state
+   is still in the bar's hover title. */
+
+/* ---- Metric chart -------------------------------------------------------- */
+
+/* No horizontal padding: .status-timeline has no gutters either, so a chart
+   stacked above one lines up column-for-column. The y-axis labels are overlaid
+   inside the plot rather than occupying a left column, for the same reason. */
+.metric-chart {
+  display: block;
+  width: 100%;
+  height: 90px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: visible;
+}
+
+.metric-chart-line {
+  fill: none;
+  stroke: var(--status-graph-online);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.metric-chart-area {
+  fill: var(--status-graph-online);
+  opacity: 0.12;
+  stroke: none;
+}
+
+.metric-chart-band {
+  fill: var(--status-graph-degraded);
+  opacity: 0.1;
+}
+
+.metric-chart-threshold {
+  stroke: var(--status-graph-degraded);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  opacity: 0.7;
+  vector-effect: non-scaling-stroke;
+}
+
+/* A bucket with no reading. Same grey as an IDLE timeline block, because it
+   means the same thing: not enough data, rather than a value of zero. */
+.metric-chart-gap {
+  fill: var(--status-graph-idle);
+  opacity: 0.18;
+}
+
+.metric-chart-grid {
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.metric-chart-label {
+  fill: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.65);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.metric-chart-empty {
+  fill: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
+  text-anchor: middle;
+}
+
+.metric-chart-hit {
+  fill: transparent;
+  cursor: crosshair;
+}
+
+.metric-chart-cursor {
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 1;
+  opacity: 0;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.metric-chart-col:hover .metric-chart-cursor {
+  opacity: 1;
+}
+
+/* ---- View modal ---------------------------------------------------------- */
+
+.freekiosk-panel,
+.freekiosk-section {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.freekiosk-section-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* Explains rows that a display mode removed, so the gap reads as deliberate. */
+.freekiosk-section-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0 0 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.freekiosk-section-note .bi {
+  margin-top: 0.1rem;
+  flex: 0 0 auto;
+}
+
+.freekiosk-metric-row {
+  padding: 0.4rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.freekiosk-metric-row:first-of-type {
+  border-top: none;
+}
+
+.freekiosk-metric-row.is-breaching .freekiosk-metric-value {
+  color: var(--status-graph-degraded);
+  font-weight: 600;
+}
+
+.freekiosk-metric-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.freekiosk-metric-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.75);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sits on .monitoring-note, which supplies the colour, the help cursor and the
+   hover state. Only the inline placement next to a label is FreeKiosk's. */
+.freekiosk-metric-note {
+  margin-left: 0.35rem;
+  font-size: 0.75rem;
+  vertical-align: baseline;
+}
+
+.freekiosk-metric-value {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: #fff;
+}
+
+/* Only rendered while the alarm is breaching, so it can afford the degraded
+   colour: a row wearing it is a row that needs attention. */
+.freekiosk-metric-expected {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  color: var(--status-graph-degraded);
+}
+
+.freekiosk-alarm-badge {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.freekiosk-alarm-badge.is-breaching {
+  color: var(--status-graph-degraded);
+}
+
+/* ---- Capture ------------------------------------------------------------- */
+
+.freekiosk-capture-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.freekiosk-camera-select {
+  width: auto;
+  min-width: 9rem;
+}
+
+.freekiosk-capture-spinner {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* Inline rather than a toast: a 503 "camera in use by another app" is
+   diagnostic information the operator needs to keep reading. */
+.freekiosk-capture-error {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--status-graph-degraded);
+  background: rgba(255, 149, 0, 0.1);
+}
+
+.freekiosk-control-banner {
+  margin-bottom: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.35rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.freekiosk-capture-frame {
+  margin-top: 0.6rem;
+  border-radius: 0.4rem;
+  overflow: hidden;
+  background: #000;
+  cursor: zoom-in;
+  max-width: 320px;
+}
+
+.freekiosk-capture-frame.expanded {
+  max-width: 100%;
+  cursor: zoom-out;
+}
+
+.freekiosk-capture-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.freekiosk-capture-caption {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* ---- Controls ------------------------------------------------------------ */
+
+.freekiosk-control-group {
+  margin-bottom: 0.6rem;
+}
+
+.freekiosk-control-group-title {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.freekiosk-control-group-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+/* Bootstrap's bare `.btn` inherits --bs-body-color — near-black text on no
+   background, which is all but invisible on this theme. Every FreeKiosk action
+   button therefore carries its own tint: a translucent wash of its own text
+   colour, the same treatment the badges and chips elsewhere in the app use.
+   Loaded after bootstrap.min.css, so equal-specificity rules win on order. */
+.freekiosk-btn {
+  display: inline-flex;
+  align-items: center;
+  /* Centred so the same class works for a full-width button inside a d-grid
+     (Test Connection) as well as the content-sized ones in the view modal. */
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.4rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.freekiosk-btn:hover:not(:disabled),
+.freekiosk-btn:focus-visible {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.freekiosk-btn:disabled {
+  opacity: 0.45;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Destructive actions get the same treatment in the degraded colour, so the
+   tint and the text always agree rather than the text alone carrying it. */
+.freekiosk-command-btn.is-destructive {
+  color: var(--status-graph-degraded);
+  border-color: rgba(255, 149, 0, 0.32);
+  background: rgba(255, 149, 0, 0.14);
+}
+
+.freekiosk-command-btn.is-destructive:hover:not(:disabled),
+.freekiosk-command-btn.is-destructive:focus-visible {
+  color: var(--status-graph-degraded);
+  background: rgba(255, 149, 0, 0.24);
+}
+
+.freekiosk-slider {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 220px;
+  min-width: 200px;
+}
+
+.freekiosk-slider label {
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+}
+
+.freekiosk-slider-input {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.freekiosk-slider-value {
+  flex: 0 0 3rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ---- Editor alarms ------------------------------------------------------- */
+
+.freekiosk-alarms {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Configuration, not monitoring — it decides what the terminal shows and what
+   Start Kiosk Mode sends. It shares the alarms panel's shape so the editor reads
+   as one column, and takes an accent edge so it is not mistaken for a second
+   block of checks. */
+.freekiosk-setup {
+  border-left: 2px solid var(--bs-primary, #0d6efd);
+  background: rgba(13, 110, 253, 0.06);
+}
+
+.freekiosk-alarms-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.freekiosk-alarms-title {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.freekiosk-alarms-hint {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* The monitoring editor spaces its generated fields with `d-grid gap-2` on the
+   hosts in index.html. These hosts hold sections built in TS, so the same
+   spacing is declared here instead — without it every field wrap sits flush
+   against the next and sixty alarm rows read as one undifferentiated block. */
+.freekiosk-alarms-body,
+.freekiosk-alarm-section {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.freekiosk-alarm-section {
+  margin-bottom: 0.6rem;
+}
+
+/* Bootstrap 5.0 has no rules for a .form-floating inside an .input-group — that
+   arrived in 5.2, and this build is 5.0.2 — so the field neither flexes to fill
+   the row nor drops its right-hand rounding under the copy button. Scoped to the
+   modal rather than declared globally, since it is patching a gap in a vendored
+   version rather than stating a rule of the design. */
+#SHOWTRAK_MODAL_FREEKIOSK_TERMINAL .input-group > .form-floating {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#SHOWTRAK_MODAL_FREEKIOSK_TERMINAL .input-group > .form-floating > .form-control {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* The section's master switch. Set apart from the checks it governs, so the
+   hierarchy is visible rather than implied by ordering alone. */
+.freekiosk-alarm-master {
+  margin-bottom: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.freekiosk-alarm-section-title {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.freekiosk-test-result {
+  margin-top: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.35rem;
+  font-size: 0.8rem;
+}
+
+.freekiosk-test-result.is-ok {
+  color: var(--status-graph-online);
+  background: rgba(38, 214, 44, 0.1);
+}
+
+.freekiosk-test-result.is-error {
+  color: var(--status-graph-offline);
+  background: rgba(224, 36, 36, 0.1);
+}

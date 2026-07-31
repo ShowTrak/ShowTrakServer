@@ -2,6 +2,7 @@ import {
   AllClients,
   AppMode,
   DummyClients,
+  FreeKioskTerminals,
   MONITOR_HISTORY_BLOCK_COUNT,
   MONITOR_HISTORY_WINDOW_MS,
   MonitorHistoryModalContext,
@@ -21,6 +22,7 @@ import type {
   ClientUSBHistorySeries,
   ClientView,
   DummyClientView,
+  FreeKioskTerminalView,
   HistorySample,
   MonitoringCheckView,
   MonitoringTargetView,
@@ -29,6 +31,12 @@ import type {
 } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
 import { openModal } from './lib/modal';
+import {
+  LoadFreeKioskCameras,
+  RenderFreeKioskModal,
+  ResetFreeKioskModalState,
+  SetFreeKioskSeries,
+} from './freekiosk-modal';
 import { OfflineBadgeContent } from './lib/status-badges';
 import { ResolveEntityTags } from './lib/tag-badges';
 import { RenderTagBadgeRow } from './lib/tag-badge-view';
@@ -37,6 +45,7 @@ import { RenderTagBadgeRow } from './lib/tag-badge-view';
 type MonitorHistoryEntity =
   | { type: 'target'; id: number; title: string; target: MonitoringTargetView }
   | { type: 'dummy'; id: string; title: string; dummy: DummyClientView }
+  | { type: 'freekiosk'; id: string; title: string; terminal: FreeKioskTerminalView }
   | { type: 'client'; id: string; title: string; client: ClientView | null };
 
 // Per-state sample tallies inside a single timeline block.
@@ -390,6 +399,17 @@ export function ResolveMonitorHistoryContextEntity(): MonitorHistoryEntity | nul
       dummy,
     };
   }
+  if (Context.type === 'freekiosk') {
+    const id = String(Context.id || '').trim();
+    const terminal = FreeKioskTerminals.find((K) => String(K.UUID) === id);
+    if (!terminal) return null;
+    return {
+      type: 'freekiosk',
+      id,
+      title: terminal.Nickname || terminal.Address || 'FreeKiosk Terminal',
+      terminal,
+    };
+  }
   if (Context.type === 'client') {
     const id = String(Context.id || '').trim();
     const client = AllClients.find((C) => C && String(C.UUID) === id);
@@ -411,6 +431,8 @@ export function IsMonitorHistoryContextFor(entityType: string, id: string | numb
     return String(MonitorHistoryModalContext.id || '') === String(id || '');
   if (entityType === 'client')
     return String(MonitorHistoryModalContext.id || '') === String(id || '');
+  if (entityType === 'freekiosk')
+    return String(MonitorHistoryModalContext.id || '') === String(id || '');
   return false;
 }
 
@@ -421,6 +443,16 @@ export async function LoadHistorySamplesForContext() {
   setMonitorHistorySeries([]);
   const entity = ResolveMonitorHistoryContextEntity();
   if (!entity) return;
+  if (entity.type === 'freekiosk') {
+    // A terminal has ~60 series and this reloads on every push while the modal
+    // is open, so they come back in one call rather than one call per metric.
+    try {
+      SetFreeKioskSeries(await window.API.GetFreeKioskHistory(entity.id));
+    } catch {
+      SetFreeKioskSeries([]);
+    }
+    return;
+  }
   if (entity.type === 'target') {
     const checks = Array.isArray(entity.target.Checks) ? entity.target.Checks : [];
     for (const check of checks) {
@@ -691,8 +723,12 @@ export function ShowStatusTimelineTooltip(
   Tooltip.innerHTML = `<div class="status-tt-time">${Safe(FormatBlockTime(Ts))}</div>${RowsHtml}`;
   Tooltip.classList.remove('d-none');
 
-  // Position (fixed / viewport-relative) near the cursor, flipping left when it
-  // would overflow the right edge.
+  PositionHistoryTooltip(Tooltip, ClientX, ClientY);
+}
+
+// Position (fixed / viewport-relative) near the cursor, flipping when it would
+// overflow an edge. Shared by the timeline and the metric charts.
+function PositionHistoryTooltip(Tooltip: HTMLElement, ClientX: number, ClientY: number) {
   const TipRect = Tooltip.getBoundingClientRect();
   let Left = ClientX + 14;
   let Top = ClientY + 14;
@@ -702,6 +738,91 @@ export function ShowStatusTimelineTooltip(
   Tooltip.style.top = `${Math.max(6, Top)}px`;
 }
 
+// The chart's equivalent, filling the same tooltip host with the same classes
+// so hovering a chart and hovering a timeline feel like one control.
+export function ShowMetricChartTooltip(HitEl: Element | null, ClientX: number, ClientY: number) {
+  const Tooltip = document.getElementById('MONITOR_HISTORY_TOOLTIP');
+  if (!Tooltip || !HitEl) return;
+  const Ts = Number(HitEl.getAttribute('data-ts'));
+  const Ok = HitEl.getAttribute('data-ok') === '1';
+  const Breach = HitEl.getAttribute('data-breach') === '1';
+  const Unit = HitEl.getAttribute('data-unit') || '';
+  const Decimals = Number(HitEl.getAttribute('data-decimals')) || 0;
+
+  const Show = (Raw: string | null) => {
+    if (Raw == null || Raw === '') return '—';
+    const Value = Number(Raw);
+    if (!Number.isFinite(Value)) return '—';
+    const Text = Value.toFixed(Decimals);
+    return Unit ? (Unit === '%' ? `${Text}%` : `${Text} ${Unit}`) : Text;
+  };
+
+  const Rows: string[] = [];
+  if (!Ok) {
+    Rows.push(
+      `<div class="status-tt-row"><span class="status-tt-label"><i class="status-tt-dot state-IDLE"></i>No reading</span></div>`
+    );
+  } else {
+    Rows.push(
+      `<div class="status-tt-row"><span class="status-tt-label">Average</span><span class="status-tt-count">${Safe(
+        Show(HitEl.getAttribute('data-avg'))
+      )}</span></div>`,
+      `<div class="status-tt-row"><span class="status-tt-label">Min</span><span class="status-tt-count">${Safe(
+        Show(HitEl.getAttribute('data-min'))
+      )}</span></div>`,
+      `<div class="status-tt-row"><span class="status-tt-label">Max</span><span class="status-tt-count">${Safe(
+        Show(HitEl.getAttribute('data-max'))
+      )}</span></div>`,
+      `<div class="status-tt-row"><span class="status-tt-label">Samples</span><span class="status-tt-count">${Safe(
+        HitEl.getAttribute('data-count') || '0'
+      )}</span></div>`
+    );
+    if (Breach) {
+      Rows.push(
+        `<div class="status-tt-row"><span class="status-tt-label"><i class="status-tt-dot state-DEGRADED"></i>Alarm breaching</span></div>`
+      );
+    }
+  }
+
+  Tooltip.innerHTML = `<div class="status-tt-time">${Safe(FormatBlockTime(Ts))}</div>${Rows.join('')}`;
+  Tooltip.classList.remove('d-none');
+  PositionHistoryTooltip(Tooltip, ClientX, ClientY);
+}
+
+/** Anything the history tooltip may describe. */
+const HISTORY_TOOLTIP_TARGETS = '.status-timeline-block, .metric-chart-hit';
+
+/**
+ * Point the tooltip at whatever is under (X, Y), or hide it if that is nothing.
+ *
+ * The single decision point for the tooltip, and it HIDES as readily as it
+ * shows. Every way the tooltip used to get stranded was a path that could only
+ * ever show it: hovering a chart and then moving onto the gap between charts
+ * fired no per-target handler at all, so the last bucket's readings stayed on
+ * screen describing something the pointer had long left.
+ */
+export function SyncHistoryTooltipToPointer(Hit: Element | null, X: number, Y: number) {
+  const Target =
+    Hit && typeof Hit.closest === 'function' ? Hit.closest(HISTORY_TOOLTIP_TARGETS) : null;
+  if (!Target) {
+    setMonitorHistoryTooltipHover(null);
+    return HideStatusTimelineTooltip();
+  }
+  setMonitorHistoryTooltipHover({ x: X, y: Y });
+  // The modal re-renders on every push while it is open, so the element under
+  // the pointer is a fresh one; dispatch on what it actually is.
+  if (Target.classList.contains('metric-chart-hit')) ShowMetricChartTooltip(Target, X, Y);
+  else ShowStatusTimelineTooltip(Target, X, Y);
+}
+
+/**
+ * Re-resolve the tooltip against the last known pointer position.
+ *
+ * Called after a re-render, and on scroll. Scrolling is the case worth naming:
+ * the content moves out from under a pointer that never moved, so NO mouse
+ * event fires and nothing would otherwise reconsider the tooltip — it just
+ * hangs there over whatever scrolled into its place.
+ */
 export function RestoreStatusTimelineTooltipAfterRender() {
   if (!MonitorHistoryTooltipHover) return;
   if (!$('#SHOWTRAK_CLIENT_INFO').hasClass('show')) {
@@ -716,15 +837,7 @@ export function RestoreStatusTimelineTooltipAfterRender() {
     setMonitorHistoryTooltipHover(null);
     return;
   }
-  const Hit = document.elementFromPoint(X, Y);
-  const Block =
-    Hit && typeof Hit.closest === 'function' ? Hit.closest('.status-timeline-block') : null;
-  if (!Block) {
-    HideStatusTimelineTooltip();
-    setMonitorHistoryTooltipHover(null);
-    return;
-  }
-  ShowStatusTimelineTooltip(Block, X, Y);
+  SyncHistoryTooltipToPointer(document.elementFromPoint(X, Y), X, Y);
 }
 
 // A history section now leads with the current-status card (which acts as the
@@ -806,6 +919,28 @@ export function UpdateMonitorHistoryEditButtonVisibility(
   Btn.classList.toggle('d-none', !CanEditTarget);
   Btn.disabled = !CanEditTarget;
   Btn.setAttribute('data-target-id', CanEditTarget ? String(Entity.target.TargetID) : '');
+}
+
+// Open the view modal for a FreeKiosk terminal.
+export async function OpenFreeKioskTerminalHistory(UUID: string) {
+  await CloseAllModals();
+  ResetFreeKioskModalState();
+  setMonitorHistoryModalContext({ type: 'freekiosk', id: String(UUID) });
+  await LoadHistorySamplesForContext();
+  // The camera list decides whether a picker is offered at all, so it is
+  // fetched before the first render rather than causing a second one.
+  await LoadFreeKioskCameras();
+  RenderMonitoringHistoryModal();
+  const Modal = document.getElementById('SHOWTRAK_CLIENT_INFO');
+  if (Modal) {
+    $(Modal).off('hidden.bs.modal.freekiosk');
+    $(Modal).on('hidden.bs.modal.freekiosk', () => {
+      // Drop the capture data URL rather than holding megabytes for the session.
+      ResetFreeKioskModalState();
+      setMonitorHistoryModalContext(null);
+    });
+  }
+  openModal('SHOWTRAK_CLIENT_INFO');
 }
 
 export function RenderMonitoringHistoryModal() {
@@ -1116,6 +1251,13 @@ export function RenderMonitoringHistoryModal() {
       );
     }
 
+    RestoreStatusTimelineTooltipAfterRender();
+    return;
+  }
+
+  if (Entity.type === 'freekiosk') {
+    // Every metric with its own chart, plus the capture and control panels.
+    RenderFreeKioskModal($timelines);
     RestoreStatusTimelineTooltipAfterRender();
     return;
   }

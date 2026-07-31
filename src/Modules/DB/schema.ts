@@ -117,6 +117,37 @@ Schema.push({
     )',
 });
 
+// FreeKiosk Terminals are Android tablets running the FreeKiosk MDM app, polled
+// over its local REST API. Like Monitoring Targets they have no installed agent;
+// unlike them they are also controllable (brightness, screen, URL, reboot).
+//
+// Settings holds the per-metric alarm configuration as JSON, keyed by the
+// generated A_<MetricKey>_On/_Op/_V/_V2 fields, so adding a metric to the
+// registry needs no schema change. Every reading itself is runtime-only and
+// never persisted.
+//
+// ApiKey is stored in the clear, matching the FOG token. It therefore travels
+// inside exported show files, and is deliberately never included in the
+// broadcast snapshot (which crosses to the Web UI and into alert history).
+Schema.push({
+  Name: 'FreeKioskTerminals',
+  SQL: 'CREATE TABLE IF NOT EXISTS `FreeKioskTerminals` ( \
+            UUID TEXT PRIMARY KEY, \
+            Nickname TEXT, \
+            Address TEXT NOT NULL, \
+            Port INTEGER NOT NULL DEFAULT 8080, \
+            ApiKey TEXT, \
+            Interval INTEGER NOT NULL DEFAULT 30000, \
+            TimeoutMs INTEGER NOT NULL DEFAULT 5000, \
+            Settings TEXT, \
+            GroupID INTEGER, \
+            Weight INTEGER NOT NULL DEFAULT 100, \
+            LastSuccessAt BIGINT(11), \
+            Slug TEXT, \
+            Timestamp BIGINT(11) NOT NULL \
+    )',
+});
+
 Schema.push({
   Name: 'AlertRules',
   SQL: 'CREATE TABLE IF NOT EXISTS `AlertRules` ( \
@@ -426,6 +457,20 @@ Schema.Migrations = [
   {
     Version: 25,
     SQL: "ALTER TABLE `Tags` ADD COLUMN Display TEXT NOT NULL DEFAULT 'name'",
+  },
+  // FreeKiosk terminals. The table itself is created by the Schema block above on
+  // both new and existing installs, so only its indexes need versioning. The slug
+  // index is the same in-table safety net the other sluggable entities have —
+  // note the client slug namespace is shared across Clients, MonitoringTargets,
+  // DummyClients and now FreeKioskTerminals, which no single-table constraint can
+  // express; that uniqueness is enforced in the Slug service.
+  {
+    Version: 26,
+    SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_freekioskterminals_slug ON `FreeKioskTerminals` (Slug COLLATE NOCASE)',
+  },
+  {
+    Version: 27,
+    SQL: 'CREATE INDEX IF NOT EXISTS idx_freekioskterminals_groupid ON `FreeKioskTerminals` (GroupID)',
   },
 ];
 

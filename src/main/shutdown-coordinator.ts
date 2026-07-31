@@ -22,6 +22,7 @@ import { Manager as SettingsManager } from '../Modules/SettingsManager';
 import { Manager as FileSelectorManager } from '../Modules/FileSelectorManager';
 import { Manager as MonitoringTargetManager } from '../Modules/MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../Modules/DummyClientManager';
+import { Manager as FreeKioskManager } from '../Modules/FreeKioskManager';
 import { Manager as NetworkInterfaces } from '../Modules/NetworkInterfaces';
 import { Manager as DBManager } from '../Modules/DB';
 
@@ -253,6 +254,14 @@ async function runShutdownCleanup(): Promise<void> {
     }
   } catch (Err) {
     Logger.error('Dummy client shutdown cleanup failed:', Err);
+  }
+
+  try {
+    if (typeof FreeKioskManager.Shutdown === 'function') {
+      await FreeKioskManager.Shutdown();
+    }
+  } catch (Err) {
+    Logger.error('FreeKiosk terminal shutdown cleanup failed:', Err);
   }
 
   try {

@@ -595,6 +595,7 @@ test('ReinitializeSystem reloads caches then pushes the full topology', async ()
     'UpdateSettings',
     'SetFullMonitoringTargetList',
     'SetFullDummyClientList',
+    'SetFullFreeKioskTerminalList',
     'SetFullAlertRuleList',
     'SetFullClientList',
   ]);

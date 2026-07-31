@@ -88,6 +88,23 @@ export interface DummyClientRow {
   Timestamp: number;
 }
 
+export interface FreeKioskTerminalRow {
+  UUID: string;
+  Nickname: string | null;
+  Address: string;
+  Port: number;
+  ApiKey: string | null;
+  Interval: number;
+  TimeoutMs: number;
+  /** JSON: per-metric alarm configuration, keyed A_<MetricKey>_On/_Op/_V/_V2. */
+  Settings: string | null;
+  GroupID: number | null;
+  Weight: number;
+  LastSuccessAt: number | null;
+  Slug: string | null;
+  Timestamp: number;
+}
+
 export interface AlertRuleRow {
   RuleID: number;
   Title: string;

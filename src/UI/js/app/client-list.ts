@@ -3,6 +3,7 @@ import {
   ClientInfoOpenUUID,
   Config,
   DummyClients,
+  FreeKioskTerminals,
   FormatClientHostnameVersionLabel,
   GroupSelectableUUIDCache,
   GroupUUIDCache,
@@ -50,6 +51,7 @@ import {
   UpdateIdentifyStatusBanner,
 } from './selection-init';
 import { RenderDummyClientTile } from './dummy-clients';
+import { RenderFreeKioskTile } from './freekiosk';
 
 // Deployment-toast working state. This mirrors the runtime shape used below and
 // cached on `window.__ShowTrakDeploymentUiState`; note the ambient window decl
@@ -731,13 +733,14 @@ export function RenderFullClientAndMonitorList() {
   const Clients = Array.isArray(__LastClients) ? __LastClients.slice() : [];
   const Monitors = Array.isArray(MonitoringTargets) ? MonitoringTargets.slice() : [];
   const Dummies = Array.isArray(DummyClients) ? DummyClients.slice() : [];
+  const Kiosks = Array.isArray(FreeKioskTerminals) ? FreeKioskTerminals.slice() : [];
   let Filler = '';
 
   // Appends the synthetic "No Group" bucket and pins it to the bottom.
   const Groups = BuildGroupRenderOrder(__LastGroups);
   const ColumnCount = GetGroupColumnCount();
 
-  if (ShouldShowWelcomePanel(Groups.length, Clients, Monitors, Dummies)) {
+  if (ShouldShowWelcomePanel(Groups.length, Clients, Monitors, Dummies, Kiosks)) {
     Filler += `<div class="bg-ghost rounded m-3 mb-0 d-grid gap-0 gap-3 p-3">
             <h5 class="text-light mb-0">
                 Welcome to ShowTrak Server v${Safe(Config.Application.Version)}
@@ -759,7 +762,7 @@ export function RenderFullClientAndMonitorList() {
     const FullGroupTitle = Title == null ? '' : String(Title);
     const GroupLabel = TruncateGroupLabel(FullGroupTitle);
     const GroupSpan = GetGroupSpan(Group, ColumnCount);
-    const Members = SelectGroupMembers(GroupID, Clients, Monitors, Dummies);
+    const Members = SelectGroupMembers(GroupID, Clients, Monitors, Dummies, Kiosks);
 
     GroupUUIDCache.set(
       `${GroupID}`,
@@ -768,13 +771,13 @@ export function RenderFullClientAndMonitorList() {
 
     // Selection cache mirrors the tile data-uuid values so the group-title
     // button toggles every client type in the group (ShowTrak clients plus
-    // prefixed monitor:/dummy: tiles), not just ShowTrak clients.
+    // prefixed monitor:/dummy:/kiosk: tiles), not just ShowTrak clients.
     GroupSelectableUUIDCache.set(`${GroupID}`, BuildGroupSelectableIDs(Members));
 
     if (!ShouldRenderGroup(GroupID, Members)) continue;
 
     // Merged and weight-ordered so a unified ordering set by drag/drop across
-    // clients, monitors and dummies is preserved.
+    // clients, monitors, dummies and FreeKiosk terminals is preserved.
     const Merged = BuildMergedTiles(Members);
 
     Filler += `<div class="d-flex justify-content-start group-column-item" data-flip-key="group:${GroupID}" style="grid-column: span ${GroupSpan};">
@@ -802,6 +805,8 @@ export function RenderFullClientAndMonitorList() {
           Filler += RenderClientTile(Item.data);
         } else if (Item.kind === 'dummy') {
           Filler += RenderDummyClientTile(Item.data);
+        } else if (Item.kind === 'freekiosk') {
+          Filler += RenderFreeKioskTile(Item.data);
         } else {
           Filler += RenderMonitoringTargetTile(Item.data);
         }

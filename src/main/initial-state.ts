@@ -17,6 +17,7 @@ import {
   UpdateOSCList,
   UpdateMonitoringTargetList,
   UpdateDummyClientList,
+  UpdateFreeKioskTerminalList,
   UpdateAlertRuleList,
   UpdateTagList,
   UpdateFogTaskList,
@@ -33,6 +34,7 @@ async function PushInitialDesktopState(): Promise<void> {
   await UpdateOSCList();
   await UpdateMonitoringTargetList();
   await UpdateDummyClientList();
+  await UpdateFreeKioskTerminalList();
   await UpdateAlertRuleList();
   // Tags were previously fetched on demand by the Tag Manager alone. The client
   // tiles now derive their badges from this list, so a fresh renderer needs it

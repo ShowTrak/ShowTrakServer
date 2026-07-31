@@ -6,6 +6,7 @@ import { createTupleHandler, validationErrorTuple } from '../ipc/create-handler'
 import { Manager as GroupManager } from '../../Modules/GroupManager';
 import { Manager as MonitoringTargetManager } from '../../Modules/MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../../Modules/DummyClientManager';
+import { Manager as FreeKioskManager } from '../../Modules/FreeKioskManager';
 import { Manager as ClientManager } from '../../Modules/ClientManager';
 import { Manager as BroadcastManager } from '../../Modules/Broadcast';
 import { Manager as IPCValidation } from '../../Modules/IPCValidation';
@@ -116,13 +117,15 @@ function register(): void {
     } catch (error) {
       return validationErrorTuple(error, false);
     }
-    // Mixed list: client UUIDs, "monitor:<TargetID>" and "dummy:<UUID>" entries.
+    // Mixed list: client UUIDs plus "monitor:<TargetID>", "dummy:<UUID>" and
+    // "kiosk:<UUID>" entries.
     // Walk in order assigning a single shared weight counter so visual order
     // is preserved across all entity types when rendered together.
     let Weight = 10;
     const ClientOrder = [];
     const MonitorAssignments = [];
     const DummyAssignments = [];
+    const KioskAssignments = [];
     for (const ID of ParsedOrderedUUIDs) {
       if (typeof ID === 'string' && ID.startsWith('monitor:')) {
         const TargetID = parseInt(ID.slice('monitor:'.length), 10);
@@ -133,6 +136,11 @@ function register(): void {
         const DummyUUID = ID.slice('dummy:'.length);
         if (DummyUUID) {
           DummyAssignments.push({ UUID: DummyUUID, Weight });
+        }
+      } else if (typeof ID === 'string' && ID.startsWith('kiosk:')) {
+        const KioskUUID = ID.slice('kiosk:'.length);
+        if (KioskUUID) {
+          KioskAssignments.push({ UUID: KioskUUID, Weight });
         }
       } else {
         ClientOrder.push({ UUID: ID, Weight });
@@ -146,6 +154,10 @@ function register(): void {
     // Apply dummy client moves (also silent until the coalesced refresh below).
     for (const { UUID, Weight: W } of DummyAssignments) {
       await DummyClientManager.SetGroupAndWeight(UUID, ParsedGroupID, W);
+    }
+    // Apply FreeKiosk terminal moves (also silent until the coalesced refresh).
+    for (const { UUID, Weight: W } of KioskAssignments) {
+      await FreeKioskManager.SetGroupAndWeight(UUID, ParsedGroupID, W);
     }
     // Apply client ordering. ClientManager.SetGroupOrder reassigns weights
     // sequentially starting at 10, so feed it just the UUIDs in order — but
@@ -163,6 +175,9 @@ function register(): void {
     }
     if (DummyAssignments.length) {
       BroadcastManager.emit('DummyClientListChanged');
+    }
+    if (KioskAssignments.length) {
+      BroadcastManager.emit('FreeKioskTerminalListChanged');
     }
     return true;
   });

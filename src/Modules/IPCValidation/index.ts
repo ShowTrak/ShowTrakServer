@@ -79,6 +79,16 @@ export interface IPCValidationManager {
   DummyClientCreatePayload(value: unknown): Record<string, unknown>;
   DummyClientUpdatePayload(value: unknown): Record<string, unknown>;
 
+  // FreeKiosk terminals (freekiosk-validators.ts)
+  FreeKioskUUID(value: unknown, fieldName?: string): string;
+  FreeKioskUUIDList(value: unknown, fieldName?: string): string[];
+  FreeKioskCommand(value: unknown): string;
+  FreeKioskCommandParams(command: unknown, value: unknown): Record<string, unknown>;
+  FreeKioskCapturePayload(value: unknown): { Camera: 'front' | 'back'; Quality: number };
+  FreeKioskMetricKeys(value: unknown): string[];
+  FreeKioskCreatePayload(value: unknown): Record<string, unknown>;
+  FreeKioskUpdatePayload(value: unknown): Record<string, unknown>;
+
   // Alert rules (alert-validators.ts)
   AlertRuleID(value: unknown, fieldName?: string): number;
   AlertRuleCreatePayload(value: unknown): Record<string, unknown>;
@@ -119,6 +129,7 @@ require('./client-validators')(Manager);
 require('./script-validators')(Manager);
 require('./monitoring-validators')(Manager);
 require('./dummy-validators')(Manager);
+require('./freekiosk-validators')(Manager);
 require('./alert-validators')(Manager);
 require('./tag-validators')(Manager);
 require('./audio-validators')(Manager);

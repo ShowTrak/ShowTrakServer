@@ -29,7 +29,14 @@ import { Manager as ModeManager } from '../ModeManager';
 import { Manager as AlertsManager } from '../AlertsManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
-import { ToPublicClient, ToPublicGroup, ToPublicMonitor, ToPublicDummy } from './serializers';
+import { Manager as FreeKioskManager } from '../FreeKioskManager';
+import {
+  ToPublicClient,
+  ToPublicGroup,
+  ToPublicMonitor,
+  ToPublicDummy,
+  ToPublicFreeKiosk,
+} from './serializers';
 import { PasscodeMatches } from './webui-namespace';
 import { RegisterRendererSink } from '../../main/renderer-bus';
 import { ControlService } from '../ControlService';
@@ -112,6 +119,7 @@ type PublicClientInput = Parameters<typeof ToPublicClient>[0];
 type PublicGroupInput = Parameters<typeof ToPublicGroup>[0];
 type PublicMonitorInput = Parameters<typeof ToPublicMonitor>[0];
 type PublicDummyInput = Parameters<typeof ToPublicDummy>[0];
+type PublicFreeKioskInput = Parameters<typeof ToPublicFreeKiosk>[0];
 
 // Channels forwarded to every connected SDK socket (raw PushToRenderers names).
 // Monitors and dummies ride their own list/update channels (as the Web UI does);
@@ -124,6 +132,8 @@ const SDK_PUSH_ALLOWLIST = new Set<string>([
   'MonitoringTargetUpdated',
   'SetFullDummyClientList',
   'DummyClientUpdated',
+  'SetFullFreeKioskTerminalList',
+  'FreeKioskTerminalUpdated',
   'SetScriptList',
   'SetTagList',
   'ModeUpdated',
@@ -151,6 +161,10 @@ function TransformSdkPush(channel: string, args: unknown[]): unknown[] {
       return [((args[0] as PublicDummyInput[]) || []).map(ToPublicDummy)];
     case 'DummyClientUpdated':
       return [ToPublicDummy(args[0] as PublicDummyInput)];
+    case 'SetFullFreeKioskTerminalList':
+      return [((args[0] as PublicFreeKioskInput[]) || []).map(ToPublicFreeKiosk)];
+    case 'FreeKioskTerminalUpdated':
+      return [ToPublicFreeKiosk(args[0] as PublicFreeKioskInput)];
     default:
       return args;
   }
@@ -323,6 +337,13 @@ function SetupSdkNamespace(io: SdkIOServer) {
         socket.emit('SetFullDummyClientList', (dummies || []).map(ToPublicDummy));
       } catch {
         socket.emit('SetFullDummyClientList', []);
+      }
+
+      try {
+        const [, kiosks] = await FreeKioskManager.GetAll();
+        socket.emit('SetFullFreeKioskTerminalList', (kiosks || []).map(ToPublicFreeKiosk));
+      } catch {
+        socket.emit('SetFullFreeKioskTerminalList', []);
       }
 
       try {

@@ -24,9 +24,11 @@ import { HandleNonFatalError } from './utils';
 import {
   HideStatusTimelineTooltip,
   OpenDummyClientHistory,
+  OpenFreeKioskTerminalHistory,
   OpenMonitoringTargetHistory,
   RenderMonitoringHistoryModal,
-  ShowStatusTimelineTooltip,
+  RestoreStatusTimelineTooltipAfterRender,
+  SyncHistoryTooltipToPointer,
 } from './monitoring';
 import { OpenOSCDictionary, OpenOscHttpDebugTerminal } from './osc-feeds';
 import {
@@ -66,6 +68,7 @@ import { TestAllNotifications } from './lib/debug-notifications';
 import { OpenScriptManager } from './script-manager';
 import { OpenTagManager } from './tag-manager';
 import { OpenDummyClientEditor } from './dummy-clients';
+import { OpenFreeKioskEditor } from './freekiosk-editor';
 import {
   OpenUnassignedClientCreationModal,
   RefreshUnassignedClientMenuVisibility,
@@ -73,6 +76,15 @@ import {
 import { ClearSelection, SelectByGroup, ToggleSelection } from './selection';
 import { wireAppUpdates } from './wire-app-updates';
 import { wireContextMenu } from './wire-context-menu';
+
+/**
+ * Guards the history tooltip's document-level dismiss listeners.
+ *
+ * They are native (scroll has to be captured, and does not bubble) so jQuery's
+ * `.off()` namespacing cannot clear them. WireGlobalUI may run again, and a
+ * second set of listeners would be silent but permanent.
+ */
+let HistoryTooltipDismissBound = false;
 
 // Global UI wiring: context menu, tile clicks, group keybinds, app-update
 // modal and the identify banner. Body unchanged from the former jQuery
@@ -170,6 +182,12 @@ export async function WireGlobalUI() {
       if (duid) OpenDummyClientEditor(duid);
       return false;
     }
+    // FreeKiosk terminals use their own editor
+    if ($(this).hasClass('FREEKIOSK_TILE_COG')) {
+      const kuid = $(this).closest('.SHOWTRAK_PC').attr('data-kiosk-uuid');
+      if (kuid) OpenFreeKioskEditor(kuid);
+      return false;
+    }
     const uuid = $(this).closest('.SHOWTRAK_PC').attr('data-uuid');
     if (uuid) {
       OpenClientEditor(uuid);
@@ -178,9 +196,10 @@ export async function WireGlobalUI() {
   });
   $(document).on('click', '.SHOWTRAK_PC', function (e) {
     e.preventDefault();
-    // Monitoring and dummy tiles are selectable via their prefixed data-uuid
-    // (monitor:/dummy:), so the context menu can offer per-type actions.
-    if ($(this).hasClass('MONITOR') || $(this).hasClass('DUMMY')) {
+    // Monitoring, dummy and FreeKiosk tiles are selectable via their prefixed
+    // data-uuid (monitor:/dummy:/kiosk:), so the context menu can offer
+    // per-type actions.
+    if ($(this).hasClass('MONITOR') || $(this).hasClass('DUMMY') || $(this).hasClass('FREEKIOSK')) {
       const TileUUID = $(this).attr('data-uuid');
       if (TileUUID) ToggleSelection(TileUUID);
       return false;
@@ -215,6 +234,12 @@ export async function WireGlobalUI() {
     if ($(this).hasClass('DUMMY')) {
       const duid = $(this).attr('data-dummy-uuid');
       if (duid) OpenDummyClientHistory(duid);
+      return false;
+    }
+    // FreeKiosk tiles open the full metric view on dblclick
+    if ($(this).hasClass('FREEKIOSK')) {
+      const kuid = $(this).attr('data-kiosk-uuid');
+      if (kuid) OpenFreeKioskTerminalHistory(kuid);
       return false;
     }
     const uuid = $(this).attr('data-uuid');
@@ -366,6 +391,9 @@ export async function Init() {
     await OpenMonitoringTargetEditor(null);
   });
 
+  $('#ADD_FREEKIOSK_TERMINAL_ACTION').on('click', async () => {
+    await OpenFreeKioskEditor(null);
+  });
   $('#ADD_DUMMY_CLIENT_ACTION').on('click', async () => {
     await OpenDummyClientEditor(null);
   });
@@ -453,17 +481,42 @@ export async function Init() {
       await OpenMonitoringTargetEditor(TargetID);
     });
 
-  // Hover tooltip for status-timeline blocks (delegated; container persists).
+  // Hover tooltip for status-timeline blocks and metric charts.
+  //
+  // ONE handler on the container rather than one per target type. Delegated
+  // handlers only ever fired while the pointer was over a block or a chart
+  // column, so moving onto a section heading, a metric label, or the gap between
+  // two charts fired nothing and left the tooltip up describing a bucket the
+  // pointer had left. Every mousemove now decides afresh, and deciding includes
+  // hiding.
   $('#MONITOR_HISTORY_TIMELINES')
     .off('mousemove.statusTt mouseleave.statusTt')
-    .on('mousemove.statusTt', '.status-timeline-block', function (e) {
-      setMonitorHistoryTooltipHover({ x: e.clientX, y: e.clientY });
-      ShowStatusTimelineTooltip(this, e.clientX, e.clientY);
+    .on('mousemove.statusTt', function (e) {
+      SyncHistoryTooltipToPointer(e.target as Element, e.clientX, e.clientY);
     })
     .on('mouseleave.statusTt', function () {
       setMonitorHistoryTooltipHover(null);
       HideStatusTimelineTooltip();
     });
+
+  // Scrolling and leaving the window both move the content out from under a
+  // pointer that never moved, so no mouse event fires on the container at all.
+  // Capture phase because scroll does not bubble, and once because this runs on
+  // every re-init while the listener outlives them.
+  if (!HistoryTooltipDismissBound) {
+    HistoryTooltipDismissBound = true;
+    document.addEventListener('scroll', () => RestoreStatusTimelineTooltipAfterRender(), true);
+    document.addEventListener('mouseleave', () => {
+      setMonitorHistoryTooltipHover(null);
+      HideStatusTimelineTooltip();
+    });
+    // A drag, an alt-tab or a context menu can steal the pointer without ever
+    // sending a leave event to the page.
+    window.addEventListener('blur', () => {
+      setMonitorHistoryTooltipHover(null);
+      HideStatusTimelineTooltip();
+    });
+  }
 
   window.API.OnNetworkDeviceScanEvent((Event) => {
     HandleNetworkDiscoveryEvent(Event);

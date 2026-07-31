@@ -117,6 +117,11 @@
                   Create Dummy Client
                 </button>
               </li>
+              <li>
+                <button type="button" class="dropdown-item" id="ADD_FREEKIOSK_TERMINAL_ACTION">
+                  Add FreeKiosk Terminal
+                </button>
+              </li>
               <li class="d-none" id="ADD_UNASSIGNED_CLIENT_ACTION_ITEM">
                 <button type="button" class="dropdown-item" id="ADD_UNASSIGNED_CLIENT_ACTION">
                   Create Unassigned Client
@@ -2005,6 +2010,233 @@ Loading licence...</pre>
                   Remove Check
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_FREEKIOSK_TERMINAL"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_FREEKIOSK_TERMINAL_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="rounded-3 p-2 bg-ghost-light">
+              <h6 class="mb-0" id="FREEKIOSK_MODAL_TITLE">Add FreeKiosk Terminal</h6>
+            </div>
+
+            <div class="d-grid gap-2 text-start mt-2">
+              <div class="form-floating">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="FREEKIOSK_TITLE"
+                  placeholder="Title"
+                  autocomplete="off"
+                />
+                <label for="FREEKIOSK_TITLE">Title</label>
+              </div>
+              <div class="row g-2">
+                <div class="col-8">
+                  <div class="form-floating">
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="FREEKIOSK_ADDRESS"
+                      placeholder="192.168.1.50"
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                    <label for="FREEKIOSK_ADDRESS">IP address or hostname</label>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <div class="form-floating">
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="FREEKIOSK_PORT"
+                      placeholder="8080"
+                      min="1"
+                      max="65535"
+                      value="8080"
+                    />
+                    <label for="FREEKIOSK_PORT">Port</label>
+                  </div>
+                </div>
+              </div>
+              <!-- Shown in plain text on purpose: the key is stored and exported
+                   in plain text anyway, and hiding it only stopped an operator
+                   checking the one thing a failing terminal usually gets wrong. -->
+              <div>
+                <div class="input-group">
+                  <div class="form-floating">
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="FREEKIOSK_API_KEY"
+                      placeholder="API key"
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                    <label for="FREEKIOSK_API_KEY">API key (optional)</label>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn freekiosk-btn copy-field-btn"
+                    data-target="#FREEKIOSK_API_KEY"
+                    title="Copy API key"
+                    aria-label="Copy API key"
+                  >
+                    <i class="bi bi-clipboard"></i>
+                  </button>
+                </div>
+                <small class="text-muted d-block mt-1">
+                  Leave blank if the device has no key set. Stored and exported in plain text.
+                </small>
+              </div>
+
+              <div class="form-floating d-none" id="FREEKIOSK_SLUG_FIELD">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="FREEKIOSK_SLUG"
+                  placeholder="Slug"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <label for="FREEKIOSK_SLUG">Slug (API / OSC address)</label>
+              </div>
+
+              <div class="form-floating">
+                <select class="form-select" id="FREEKIOSK_GROUPID">
+                  <option value="null" selected>No Group</option>
+                </select>
+                <label for="FREEKIOSK_GROUPID">Group</label>
+              </div>
+
+              <!-- Hidden until the terminal exists: there is no ID to put in a
+                   tag's scope before it has been created. -->
+              <div class="tag-picker d-none" id="FREEKIOSK_TAGS_WRAPPER">
+                <div class="tag-picker-head">
+                  <span class="tag-picker-title">Tags</span>
+                  <span class="tag-picker-hint">Create and colour tags in the Tag Manager</span>
+                </div>
+                <div id="FREEKIOSK_TAGS" class="tag-picker-list"></div>
+              </div>
+
+              <div class="bg-ghost rounded px-3 py-2">
+                <label
+                  for="FREEKIOSK_INTERVAL"
+                  class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
+                >
+                  <span>Poll Interval</span>
+                  <span id="FREEKIOSK_INTERVAL_LABEL" class="badge bg-ghost-light text-light"
+                    >30s</span
+                  >
+                </label>
+                <input
+                  type="range"
+                  class="form-range"
+                  id="FREEKIOSK_INTERVAL"
+                  min="5000"
+                  max="300000"
+                  step="1000"
+                  value="30000"
+                />
+              </div>
+
+              <div class="bg-ghost rounded px-3 py-2">
+                <label
+                  for="FREEKIOSK_TIMEOUT"
+                  class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
+                >
+                  <span>Request Timeout</span>
+                  <span id="FREEKIOSK_TIMEOUT_LABEL" class="badge bg-ghost-light text-light"
+                    >5s</span
+                  >
+                </label>
+                <input
+                  type="range"
+                  class="form-range"
+                  id="FREEKIOSK_TIMEOUT"
+                  min="1000"
+                  max="30000"
+                  step="500"
+                  value="5000"
+                />
+              </div>
+
+              <div class="d-grid">
+                <button type="button" class="btn freekiosk-btn" id="FREEKIOSK_TEST_CONNECTION">
+                  <i class="bi bi-broadcast"></i> Test Connection
+                </button>
+                <div id="FREEKIOSK_TEST_RESULT" class="freekiosk-test-result d-none"></div>
+              </div>
+
+              <div class="freekiosk-alarms freekiosk-setup">
+                <div class="freekiosk-alarms-head">
+                  <span class="freekiosk-alarms-title">Display Mode</span>
+                  <span class="freekiosk-alarms-hint">
+                    Set on the tablet; tell ShowTrak so it reads the right values
+                  </span>
+                </div>
+                <div id="FREEKIOSK_SETUP_SETTINGS" class="freekiosk-alarms-body"></div>
+              </div>
+
+              <div class="freekiosk-alarms">
+                <div class="freekiosk-alarms-head">
+                  <span class="freekiosk-alarms-title">Monitoring &amp; Alarms</span>
+                  <span class="freekiosk-alarms-hint">
+                    Turn on any value to alert when it goes wrong
+                  </span>
+                </div>
+                <div id="FREEKIOSK_ALARM_SETTINGS" class="freekiosk-alarms-body"></div>
+                <div class="accordion accordion-flush" id="FREEKIOSK_ALARM_ADVANCED_WRAP">
+                  <div class="accordion-item bg-transparent">
+                    <h2 class="accordion-header">
+                      <button
+                        class="accordion-button collapsed bg-transparent text-light px-0"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#FREEKIOSK_ALARM_ADVANCED_COLLAPSE"
+                      >
+                        Advanced values
+                      </button>
+                    </h2>
+                    <div id="FREEKIOSK_ALARM_ADVANCED_COLLAPSE" class="accordion-collapse collapse">
+                      <div
+                        id="FREEKIOSK_ALARM_ADVANCED"
+                        class="accordion-body px-0 freekiosk-alarms-body"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-2 mt-2">
+              <div class="col-6 d-grid">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+              </div>
+              <div class="col-6 d-grid">
+                <button type="button" class="btn btn-success" id="FREEKIOSK_SAVE">Save</button>
+              </div>
+            </div>
+
+            <div id="FREEKIOSK_DANGER_ZONE" class="d-none">
+              <button
+                type="button"
+                class="btn btn-ghost text-danger w-100 mt-2"
+                id="FREEKIOSK_DELETE"
+              >
+                Delete FreeKiosk Terminal
+              </button>
             </div>
           </div>
         </div>

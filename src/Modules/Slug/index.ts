@@ -9,9 +9,9 @@
 //
 // There are two namespaces:
 //   * clients  — shared across ALL client-like entities (real Clients,
-//                MonitoringTargets and DummyClients). A dummy's slug IS its
-//                existing DummyID column; real clients and monitors use a Slug
-//                column. Because the namespace spans three tables it cannot be a
+//                MonitoringTargets, DummyClients and FreeKioskTerminals). A
+//                dummy's slug IS its existing DummyID column; the rest use a Slug
+//                column. Because the namespace spans four tables it cannot be a
 //                DB UNIQUE constraint, so uniqueness is enforced here in the app.
 //   * groups   — the Groups table's Slug column.
 //   * tags     — the Tags table's Slug column (its own independent namespace;
@@ -39,6 +39,9 @@ export function MonitorOwner(TargetID: number | string): string {
 }
 export function DummyOwner(UUID: string): string {
   return `dummy:${UUID}`;
+}
+export function KioskOwner(UUID: string): string {
+  return `kiosk:${UUID}`;
 }
 export function TagOwner(TagID: number | string): string {
   return `tag:${TagID}`;
@@ -111,6 +114,15 @@ async function CollectClientSlugs(): Promise<SlugEntry[]> {
   for (const Row of DummyRows || []) {
     if (Row && Row.DummyID)
       Entries.push({ slug: String(Row.DummyID).toLowerCase(), owner: DummyOwner(Row.UUID) });
+  }
+
+  const [KioskErr, KioskRows] = await DB.All<{ UUID: string; Slug: string | null }>(
+    'SELECT UUID, Slug FROM FreeKioskTerminals'
+  );
+  if (KioskErr) Logger.error('Failed to read FreeKiosk terminal slugs', KioskErr);
+  for (const Row of KioskRows || []) {
+    if (Row && Row.Slug)
+      Entries.push({ slug: String(Row.Slug).toLowerCase(), owner: KioskOwner(Row.UUID) });
   }
 
   return Entries;

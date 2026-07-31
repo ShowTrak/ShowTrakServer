@@ -10,6 +10,8 @@ import {
   __LastClients,
   setAlertRulesCache,
   setDummyClients,
+  setFreeKioskTerminals,
+  FreeKioskTerminals,
   setMonitoringTargets,
   setTags,
 } from './state';
@@ -36,6 +38,7 @@ import {
 import { RenderAlertRuleManagerList } from './alert-rules';
 import { Notify, RenderClientInfoDetails, UpdateIdentifyStatusBanner } from './selection-init';
 import { UpdateDummyClientTile } from './dummy-clients';
+import { UpdateFreeKioskTile } from './freekiosk';
 import { RefreshTagPickerIfMounted } from './tag-picker';
 
 /** One line rendered in the OSC/HTTP debug terminal. */
@@ -675,6 +678,34 @@ export function InitOscFeeds() {
       UpdateDummyClientTile(Dummy);
     }
     if (IsMonitorHistoryContextFor('dummy', Dummy.UUID)) {
+      await LoadHistorySamplesForContext();
+      RenderMonitoringHistoryModal();
+    }
+  });
+
+  window.API.SetFullFreeKioskTerminalList(async (List) => {
+    setFreeKioskTerminals(Array.isArray(List) ? List : []);
+    // Re-render the full list so terminals slot back into their groups.
+    RenderFullClientAndMonitorList();
+  });
+
+  window.API.FreeKioskTerminalUpdated(async (Terminal) => {
+    if (!Terminal || !Terminal.UUID) return;
+    const idx = FreeKioskTerminals.findIndex((k) => k.UUID === Terminal.UUID);
+    const prev = idx === -1 ? null : FreeKioskTerminals[idx];
+    if (idx === -1) {
+      FreeKioskTerminals.push(Terminal);
+    } else {
+      FreeKioskTerminals[idx] = Terminal;
+    }
+    // A group change (or a new terminal) needs a full re-render; anything else
+    // is an in-place patch, so a 30s poll does not rebuild the whole list.
+    if (!prev || (prev.GroupID || null) !== (Terminal.GroupID || null)) {
+      RenderFullClientAndMonitorList();
+    } else {
+      UpdateFreeKioskTile(Terminal);
+    }
+    if (IsMonitorHistoryContextFor('freekiosk', Terminal.UUID)) {
       await LoadHistorySamplesForContext();
       RenderMonitoringHistoryModal();
     }

@@ -22,6 +22,12 @@ import { Safe } from '../utils';
 let onFieldEdited: () => void = () => {};
 
 /** Register the editor's commit function. See the note above. */
+// The monitoring editor's two field hosts. Exposed as the default for the
+// helpers below so another editor can reuse this renderer by passing its own
+// hosts — the emitted HTML and every existing call site are unchanged.
+export const MONITORING_FIELD_HOSTS =
+  '#MONITORING_CHECK_DYNAMIC_SETTINGS, #MONITORING_CHECK_ADVANCED_SETTINGS';
+
 export function setFieldEditedHandler(handler: () => void): void {
   onFieldEdited = handler;
 }
@@ -100,14 +106,28 @@ function BuildMonitoringLabelHtml(Field: MonitoringSettingField) {
 // Opening tag for a field wrapper. Carries the field key and, when the field is
 // conditional, the sibling key/value it depends on so ApplyMonitoringConditional-
 // Visibility() can show or hide it as that sibling changes.
+//
+// A single Equals condition still emits the original two attributes, unchanged.
+// Anything richer — several conditions ANDed, or a set-membership test — is
+// serialised as JSON into one attribute instead. Keeping the simple case
+// byte-identical means every existing monitoring method renders exactly as
+// before; the JSON form only appears where a method actually needs it.
 function BuildMonitoringFieldWrapOpen(Field: MonitoringSettingField, ExtraClass: string) {
   const VW = Field.VisibleWhen;
-  const VWAttrs =
-    VW && VW.Key != null
-      ? ` data-visible-when-key="${Safe(String(VW.Key))}" data-visible-when-value="${Safe(
-          String(VW.Equals)
-        )}"`
-      : '';
+  const Conditions = Array.isArray(VW) ? VW : VW ? [VW] : [];
+  const Simple =
+    Conditions.length === 1 && Conditions[0]!.Key != null && !Array.isArray(Conditions[0]!.In);
+
+  let VWAttrs = '';
+  if (Simple) {
+    const One = Conditions[0]!;
+    VWAttrs = ` data-visible-when-key="${Safe(String(One.Key))}" data-visible-when-value="${Safe(
+      String(One.Equals)
+    )}"`;
+  } else if (Conditions.length) {
+    VWAttrs = ` data-visible-when="${Safe(JSON.stringify(Conditions))}"`;
+  }
+
   return `<div class="monitoring-field-wrap ${ExtraClass}" data-field-key="${Safe(
     Field.Key
   )}"${VWAttrs}>`;
@@ -255,9 +275,9 @@ export function BuildMonitoringCheckFieldHtml(Field: MonitoringSettingField, Val
 
 // Attach a Bootstrap popover to every note icon in the settings area. Idempotent
 // (getOrCreateInstance) so it is safe to call after each re-render.
-export function InitMonitoringNotePopovers() {
+export function InitMonitoringNotePopovers(HostSelector = MONITORING_FIELD_HOSTS) {
   if (typeof bootstrap === 'undefined' || !bootstrap.Popover) return;
-  $('#MONITORING_CHECK_DYNAMIC_SETTINGS, #MONITORING_CHECK_ADVANCED_SETTINGS')
+  $(HostSelector)
     .find('.monitoring-note')
     .each(function () {
       bootstrap.Popover.getOrCreateInstance(this, {
@@ -307,8 +327,8 @@ export function ValidateMonitoringField(El: HTMLElement) {
 
 // Re-validate every required field currently rendered (used after a change so a
 // field that gates another's visibility can settle first).
-export function ValidateMonitoringRequiredFields() {
-  $('#MONITORING_CHECK_DYNAMIC_SETTINGS, #MONITORING_CHECK_ADVANCED_SETTINGS')
+export function ValidateMonitoringRequiredFields(HostSelector = MONITORING_FIELD_HOSTS) {
+  $(HostSelector)
     .find('[data-required]')
     .each(function () {
       ValidateMonitoringField(this);
@@ -318,16 +338,39 @@ export function ValidateMonitoringRequiredFields() {
 // Show/hide conditional fields based on the current value of the field each one
 // depends on. Called after render and on every settings change so gated inputs
 // (e.g. a threshold behind an "enable" toggle) appear and disappear live.
-export function ApplyMonitoringConditionalVisibility() {
-  $('#MONITORING_CHECK_DYNAMIC_SETTINGS, #MONITORING_CHECK_ADVANCED_SETTINGS')
-    .find('.monitoring-field-wrap[data-visible-when-key]')
-    .each(function () {
-      const $wrap = $(this);
-      const Key = $wrap.attr('data-visible-when-key') || '';
-      const Expected = $wrap.attr('data-visible-when-value');
-      const Actual = ReadMonitoringFieldValue(Key);
-      $wrap.toggleClass('d-none', String(Expected) !== String(Actual));
+export function ApplyMonitoringConditionalVisibility(HostSelector = MONITORING_FIELD_HOSTS) {
+  const $hosts = $(HostSelector);
+
+  $hosts.find('.monitoring-field-wrap[data-visible-when-key]').each(function () {
+    const $wrap = $(this);
+    const Key = $wrap.attr('data-visible-when-key') || '';
+    const Expected = $wrap.attr('data-visible-when-value');
+    const Actual = ReadMonitoringFieldValue(Key);
+    $wrap.toggleClass('d-none', String(Expected) !== String(Actual));
+  });
+
+  // The multi-condition form: every condition must hold for the field to show.
+  $hosts.find('.monitoring-field-wrap[data-visible-when]').each(function () {
+    const $wrap = $(this);
+    let Conditions: Array<{ Key?: string; Equals?: unknown; In?: unknown[] }> = [];
+    try {
+      const Parsed = JSON.parse($wrap.attr('data-visible-when') || '[]');
+      if (Array.isArray(Parsed)) Conditions = Parsed;
+    } catch {
+      // A malformed attribute should leave the field visible rather than hide a
+      // control the operator needs with no way to get it back.
+      return;
+    }
+    const Visible = Conditions.every((Condition) => {
+      if (!Condition || !Condition.Key) return true;
+      const Actual = String(ReadMonitoringFieldValue(Condition.Key));
+      if (Array.isArray(Condition.In)) {
+        return Condition.In.some((Candidate) => String(Candidate) === Actual);
+      }
+      return String(Condition.Equals) === Actual;
     });
+    $wrap.toggleClass('d-none', !Visible);
+  });
 }
 
 export function RenderMonitoringCheckDynamicSettings(
@@ -411,9 +454,11 @@ export function RenderMonitoringCheckInfo(MethodID: unknown) {
   $host.html(html).removeClass('d-none');
 }
 
-export function CollectMonitoringCheckDynamicSettings(): Record<string, unknown> {
+export function CollectMonitoringCheckDynamicSettings(
+  HostSelector = MONITORING_FIELD_HOSTS
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  $('#MONITORING_CHECK_DYNAMIC_SETTINGS, #MONITORING_CHECK_ADVANCED_SETTINGS')
+  $(HostSelector)
     .find('[data-key]')
     .each(function () {
       const $el = $(this);

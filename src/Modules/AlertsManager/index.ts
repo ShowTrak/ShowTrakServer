@@ -101,6 +101,7 @@ interface AlertsManagerType {
   HandleNonCriticalApplicationStopped: ClientEventHandler;
   HandleClientUpdated(Client: AlertEntityLike): Promise<void>;
   HandleMonitoringTargetUpdated(Target: AlertTargetLike): Promise<void>;
+  HandleFreeKioskTerminalUpdated(Terminal: AlertEntityLike): Promise<void>;
   HandleScriptExecutionUpdated(Executions: unknown): Promise<void>;
   FlushSettledBaselineFaults(MinAgeMs: number, Clients?: AlertEntityLike[]): Promise<number>;
   Reload(): Promise<void>;
@@ -128,6 +129,13 @@ let RuleList: AlertRule[] = [];
 // immediately, so an outage seconds into a show is still caught.
 const EntityOnlineState = new Map<string, boolean>();
 const EntityDegradedState = new Map<string, boolean>();
+// Which metrics were breaching on a FreeKiosk terminal's previous poll, so an
+// alarm fires once when it starts rather than on every poll while it persists.
+const FreeKioskAlarmState = new Map<string, Set<string>>();
+// Terminals seen at least once since boot. The first sighting establishes a
+// baseline instead of alerting: a terminal that was already over threshold when
+// ShowTrak started has not just gone wrong.
+const FreeKioskSeenState = new Set<string>();
 let AlertActionsEnabled = true;
 
 // A fault that was already true the first time we looked at an entity.
@@ -315,6 +323,7 @@ Manager.GetTriggers = () => {
     { ID: TRIGGERS.CLIENT_DEGRADED, Name: 'Client Degraded' },
     { ID: TRIGGERS.CLIENT_ONLINE, Name: 'Client Online' },
     { ID: TRIGGERS.SCRIPT_EXECUTION_FAILED, Name: 'Script Execution Failed' },
+    { ID: TRIGGERS.FREEKIOSK_METRIC_ALARM, Name: 'FreeKiosk Metric Alarm' },
     { ID: TRIGGERS.USB_DEVICE_CONNECTED, Name: 'USB Device Connected' },
     { ID: TRIGGERS.USB_DEVICE_DISCONNECTED, Name: 'USB Device Disconnected' },
     {
@@ -621,6 +630,70 @@ Manager.HandleClientUpdated = async (Client: AlertEntityLike) => {
   } else {
     refreshBaselineFault(`degraded:${Key}`, DegradedContext());
   }
+};
+
+// Per-metric alarms for a FreeKiosk terminal.
+//
+// The terminal's online/offline/degraded lifecycle is NOT handled here: its
+// snapshot is client-shaped, so broadcast-bridge routes it through
+// HandleClientUpdated exactly as it does a dummy client, and CLIENT_OFFLINE /
+// CLIENT_ONLINE / CLIENT_DEGRADED work unchanged. This adds only the finer
+// signal — which specific metric started breaching.
+Manager.HandleFreeKioskTerminalUpdated = async (Terminal: AlertEntityLike) => {
+  if (!Terminal || !Terminal.UUID) return;
+
+  const UUID = Terminal.UUID;
+  const Alarms = Array.isArray(Terminal.Alarms)
+    ? (Terminal.Alarms as Array<Record<string, unknown>>)
+    : [];
+  const Breaching = new Map<string, Record<string, unknown>>();
+  for (const Alarm of Alarms) {
+    const Key = Alarm && typeof Alarm.Key === 'string' ? Alarm.Key : null;
+    if (Key) Breaching.set(Key, Alarm);
+  }
+
+  const Base = {
+    EntityType: 'freekiosk',
+    EntityName: Terminal.Nickname || Terminal.Hostname || UUID,
+    UUID,
+    GroupID: Terminal.GroupID == null ? null : Terminal.GroupID,
+    IP: Terminal.IP || null,
+  };
+
+  const Tracked = FreeKioskAlarmState.get(UUID) || new Set<string>();
+
+  for (const [MetricKey, Alarm] of Breaching) {
+    const FaultKey = `metric:fk:${UUID}:${MetricKey}`;
+    const Context = (): AlertContext => ({
+      ...Base,
+      TriggerType: TRIGGERS.FREEKIOSK_METRIC_ALARM,
+      Severity: 'warning',
+      Degraded: true,
+      MetricKey,
+      MetricLabel: Alarm.Label == null ? MetricKey : String(Alarm.Label),
+      MetricValue: Alarm.Value == null ? null : Alarm.Value,
+      Reason: Alarm.Reason == null ? null : String(Alarm.Reason),
+      RawData: Terminal,
+    });
+
+    if (!FreeKioskSeenState.has(UUID)) {
+      // First sighting of this terminal since boot. Something already breaching
+      // is a pre-existing condition, not an event — suppress it the same way a
+      // client that was already offline at start-up is suppressed.
+      noteBaselineFault(FaultKey, Context());
+    } else if (!Tracked.has(MetricKey)) {
+      await evaluateAgainstRules(Context());
+    } else {
+      refreshBaselineFault(FaultKey, Context());
+    }
+  }
+
+  for (const MetricKey of Tracked) {
+    if (!Breaching.has(MetricKey)) clearBaselineFault(`metric:fk:${UUID}:${MetricKey}`);
+  }
+
+  FreeKioskAlarmState.set(UUID, new Set(Breaching.keys()));
+  FreeKioskSeenState.add(UUID);
 };
 
 Manager.HandleMonitoringTargetUpdated = async (Target: AlertTargetLike) => {

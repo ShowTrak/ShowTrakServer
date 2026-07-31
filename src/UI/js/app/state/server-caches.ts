@@ -11,6 +11,9 @@ import type {
   MonitoringTargetView,
   MonitoringMethodView,
   DummyClientView,
+  FreeKioskCommandDef,
+  FreeKioskMetricCatalog,
+  FreeKioskTerminalView,
   AlertRuleView,
   AlertActionType,
   AlertTriggerType,
@@ -67,6 +70,25 @@ export function setMonitoringMethodsCache(value: MonitoringMethodView[]): void {
 export let DummyClients: DummyClientView[] = [];
 export function setDummyClients(value: DummyClientView[]): void {
   DummyClients = value;
+}
+
+// FreeKiosk terminals (Android kiosk tablets polled over their local REST API)
+export let FreeKioskTerminals: FreeKioskTerminalView[] = [];
+export function setFreeKioskTerminals(value: FreeKioskTerminalView[]): void {
+  FreeKioskTerminals = Array.isArray(value) ? value : [];
+}
+
+// The server-declared metric registry and command map. Delivered over IPC
+// rather than mirrored here, because the renderer cannot import from
+// src/Modules and a hand-kept copy of ~60 metrics would drift.
+export let FreeKioskMetricCatalogCache: FreeKioskMetricCatalog | null = null;
+export function setFreeKioskMetricCatalogCache(value: FreeKioskMetricCatalog | null): void {
+  FreeKioskMetricCatalogCache = value;
+}
+
+export let FreeKioskCommandsCache: FreeKioskCommandDef[] = [];
+export function setFreeKioskCommandsCache(value: FreeKioskCommandDef[]): void {
+  FreeKioskCommandsCache = Array.isArray(value) ? value : [];
 }
 
 // Tags, ordered by Weight (the Tag Manager's drag order). Membership is a

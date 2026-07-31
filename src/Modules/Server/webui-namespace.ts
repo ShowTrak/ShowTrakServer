@@ -26,6 +26,7 @@ import { Manager as ClientManager } from '../ClientManager';
 import { Manager as GroupManager } from '../GroupManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
+import { Manager as FreeKioskManager } from '../FreeKioskManager';
 import { Manager as AlertsManager } from '../AlertsManager';
 import { Manager as TagManager } from '../TagManager';
 import { Manager as SettingsManager } from '../SettingsManager';
@@ -197,6 +198,13 @@ const WEB_READ_CHANNELS = new Set([
   'GetAllDummyClients',
   'GetDummyClient',
   'GenerateDummyClientDefaults',
+  'FreeKiosk:GetMetrics',
+  'FreeKiosk:GetCommands',
+  'GetAllFreeKioskTerminals',
+  'GetFreeKioskTerminal',
+  'FreeKiosk:GetHistory',
+  'GenerateFreeKioskTerminalDefaults',
+  'FreeKiosk:GetCameraList',
   // Reading tags is not tag management: the browser needs the list to render the
   // badges on its client tiles. Every mutation (Tags:SetScope et al) is absent
   // from every list below, so a browser can see tags but never edit them.
@@ -255,6 +263,16 @@ const WEB_MONITORING_CHANNELS = new Set([
   'UpdateDummyClient',
   'DeleteDummyClient',
   'ResetDummyClientToIdle',
+  'CreateFreeKioskTerminal',
+  'UpdateFreeKioskTerminal',
+  'DeleteFreeKioskTerminal',
+  'FreeKiosk:RunNow',
+  // Sending a command and taking a capture both act on the device, so they sit
+  // with the other mutations rather than the readers. The command name is still
+  // validated against the fixed FREEKIOSK_COMMANDS allowlist in the registrar.
+  'FreeKiosk:Command',
+  'FreeKiosk:CaptureScreenshot',
+  'FreeKiosk:CaptureCamera',
 ]);
 const WEB_ALERT_CHANNELS = new Set([
   'CreateAlertRule',
@@ -308,6 +326,8 @@ const WEB_PUSH_CHANNELS = [
   'MonitoringTargetUpdated',
   'SetFullDummyClientList',
   'DummyClientUpdated',
+  'SetFullFreeKioskTerminalList',
+  'FreeKioskTerminalUpdated',
   'SetFullAlertRuleList',
   'SetTagList',
   'AlertTriggered',
@@ -614,6 +634,9 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
 
         const [dErr, dummies] = await DummyClientManager.GetAll();
         socket.emit('SetFullDummyClientList', dErr ? [] : dummies || []);
+
+        const [kErr, kiosks] = await FreeKioskManager.GetAll();
+        socket.emit('SetFullFreeKioskTerminalList', kErr ? [] : kiosks || []);
 
         const [aErr, rules] = await AlertsManager.GetAll();
         socket.emit('SetFullAlertRuleList', aErr ? [] : rules || []);

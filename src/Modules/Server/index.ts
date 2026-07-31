@@ -23,6 +23,7 @@ import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
 import { Manager as TagManager } from '../TagManager';
 import { Manager as UpdateManager } from '../UpdateManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
+import { Manager as FreeKioskManager } from '../FreeKioskManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
 import { OSC } from '../OSC';
 import { FormatClientVersionLabel } from './serializers';
@@ -125,6 +126,7 @@ function canonicalizeTypeFilter(Value: unknown) {
   if (Normalized === 'REMOTE') return 'Remote';
   if (Normalized === 'MONITORING' || Normalized === 'MONITOR') return 'Monitoring';
   if (Normalized === 'DUMMY') return 'Dummy';
+  if (Normalized === 'FREEKIOSK' || Normalized === 'KIOSK') return 'FreeKiosk';
   return null;
 }
 
@@ -181,6 +183,17 @@ const ClientsListHandler = async (req: Request, res: Response) => {
     return sendApiError(res, 500, 'DUMMY_CLIENTS_FETCH_FAILED', 'Failed to fetch dummy clients');
   }
 
+  const [KiosksErr, Kiosks] = await FreeKioskManager.GetAll();
+  if (KiosksErr) {
+    res.locals.debugTrafficDetail = 'Failed to fetch FreeKiosk terminals';
+    return sendApiError(
+      res,
+      500,
+      'FREEKIOSK_TERMINALS_FETCH_FAILED',
+      'Failed to fetch FreeKiosk terminals'
+    );
+  }
+
   const RemoteEntities = (Clients || []).map((Client) => ({
     ...Client,
     Type: 'Remote',
@@ -202,20 +215,32 @@ const ClientsListHandler = async (req: Request, res: Response) => {
     Status: computeStatus(Dummy),
   }));
 
-  const Results = [...RemoteEntities, ...MonitoringEntities, ...DummyEntities].filter(
-    (Entity: ListedEntity) => {
-      if (TypeFilter && Entity.Type !== TypeFilter) return false;
-      if (HasGroupIDFilter && Number(Entity.GroupID) !== GroupIDFilter) return false;
-      if (
-        OperatingSystemFilter &&
-        String(Entity.OperatingSystem || '').toLowerCase() !== OperatingSystemFilter
-      ) {
-        return false;
-      }
-      if (HasStatusFilter && Entity.Status !== RawStatusFilter) return false;
-      return true;
+  // Read-only by design: terminals are listed here, but no control command is
+  // reachable over HTTP, OSC or the SDK.
+  const FreeKioskEntities = (Kiosks || []).map((Kiosk) => ({
+    ...Kiosk,
+    Type: 'FreeKiosk',
+    OperatingSystem: '',
+    Status: computeStatus(Kiosk),
+  }));
+
+  const Results = [
+    ...RemoteEntities,
+    ...MonitoringEntities,
+    ...DummyEntities,
+    ...FreeKioskEntities,
+  ].filter((Entity: ListedEntity) => {
+    if (TypeFilter && Entity.Type !== TypeFilter) return false;
+    if (HasGroupIDFilter && Number(Entity.GroupID) !== GroupIDFilter) return false;
+    if (
+      OperatingSystemFilter &&
+      String(Entity.OperatingSystem || '').toLowerCase() !== OperatingSystemFilter
+    ) {
+      return false;
     }
-  );
+    if (HasStatusFilter && Entity.Status !== RawStatusFilter) return false;
+    return true;
+  });
 
   res.locals.debugTrafficDetail = `Returned ${Results.length} entities`;
   return sendApiSuccess(res, { Data: Results, Count: Results.length });

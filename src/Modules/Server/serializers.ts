@@ -158,6 +158,19 @@ interface PublicMonitorSource {
   Degraded?: boolean;
 }
 
+// Structural view of a FreeKioskTerminal snapshot read by ToPublicFreeKiosk.
+interface PublicFreeKioskSource {
+  UUID: string;
+  Nickname?: string | null;
+  Hostname?: string | null;
+  Slug?: string | null;
+  GroupID?: number | null;
+  IP?: string | null;
+  Online?: boolean;
+  Degraded?: boolean;
+  DegradedWarnings?: unknown;
+}
+
 // Structural view of a DummyClient snapshot read by ToPublicDummy.
 interface PublicDummySource {
   UUID: string;
@@ -212,4 +225,31 @@ const ToPublicDummy = (d: PublicDummySource): ClientView =>
     Type: 'dummy',
   }) as unknown as ClientView;
 
-export { FormatClientVersionLabel, ToPublicClient, ToPublicGroup, ToPublicMonitor, ToPublicDummy };
+// FreeKiosk terminals follow the same projection. Deliberately read-only: the
+// SDK and HTTP API can see a terminal's status but cannot command it — control
+// stays on the desktop and Web UI surfaces.
+const ToPublicFreeKiosk = (k: PublicFreeKioskSource): ClientView =>
+  ({
+    ...ToPublicClient({
+      UUID: `kiosk:${k.UUID}`,
+      Nickname: k.Nickname,
+      Hostname: k.Hostname ?? k.Nickname,
+      Slug: k.Slug ?? null,
+      GroupID: k.GroupID,
+      IP: k.IP ?? null,
+      Online: k.Online,
+      Degraded: k.Degraded,
+      DegradedWarnings: Array.isArray(k.DegradedWarnings) ? k.DegradedWarnings : [],
+      Version: 'FreeKiosk',
+    }),
+    Type: 'freekiosk',
+  }) as unknown as ClientView;
+
+export {
+  FormatClientVersionLabel,
+  ToPublicClient,
+  ToPublicGroup,
+  ToPublicMonitor,
+  ToPublicDummy,
+  ToPublicFreeKiosk,
+};

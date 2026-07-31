@@ -44,8 +44,11 @@ export function setDummyClientEditorUUID(value: string | null): void {
 // --- History modal ---
 // History timeline: always show the past hour of checks as a fixed block
 // timeline (no user-selectable range). One block per minute.
-export const MONITOR_HISTORY_WINDOW_MS = 60 * 60 * 1000;
-export const MONITOR_HISTORY_BLOCK_COUNT = 60;
+//
+// Defined in lib/history-window so the FreeKiosk metric charts bucket with the
+// exact same arithmetic and line up column-for-column with the block timeline.
+// Re-exported here so every existing consumer keeps importing it from ./state.
+export { MONITOR_HISTORY_WINDOW_MS, MONITOR_HISTORY_BLOCK_COUNT } from '../lib/history-window';
 
 // Live-fetched per-series samples backing the currently open history modal.
 export let MonitorHistorySeries: MonitorHistorySeriesEntry[] = [];

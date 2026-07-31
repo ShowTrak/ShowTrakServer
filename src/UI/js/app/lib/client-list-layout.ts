@@ -13,15 +13,17 @@
 import type {
   ClientView,
   DummyClientView,
+  FreeKioskTerminalView,
   GroupView,
   MonitoringTargetView,
 } from '@showtrak/protocol';
 
-/** A single tile in a group's merged (clients + monitors + dummies) order. */
+/** A single tile in a group's merged order, across every client-like type. */
 export type MergedTileEntry =
   | { kind: 'client'; weight: number; data: ClientView }
   | { kind: 'monitor'; weight: number; data: MonitoringTargetView }
-  | { kind: 'dummy'; weight: number; data: DummyClientView };
+  | { kind: 'dummy'; weight: number; data: DummyClientView }
+  | { kind: 'freekiosk'; weight: number; data: FreeKioskTerminalView };
 
 /** The subset of a settings row this module reads. */
 interface SettingRow {
@@ -183,6 +185,7 @@ export interface GroupMembers {
   Clients: ClientView[];
   Monitors: MonitoringTargetView[];
   Dummies: DummyClientView[];
+  Kiosks: FreeKioskTerminalView[];
 }
 
 /**
@@ -196,7 +199,8 @@ export function SelectGroupMembers(
   GroupID: number | null,
   Clients: ClientView[] | null | undefined,
   Monitors: MonitoringTargetView[] | null | undefined,
-  Dummies: DummyClientView[] | null | undefined
+  Dummies: DummyClientView[] | null | undefined,
+  Kiosks?: FreeKioskTerminalView[] | null
 ): GroupMembers {
   return {
     Clients: (Array.isArray(Clients) ? Clients : [])
@@ -207,6 +211,9 @@ export function SelectGroupMembers(
     ),
     Dummies: (Array.isArray(Dummies) ? Dummies : []).filter(
       (D) => D && (D.GroupID || null) === GroupID
+    ),
+    Kiosks: (Array.isArray(Kiosks) ? Kiosks : []).filter(
+      (K) => K && (K.GroupID || null) === GroupID
     ),
   };
 }
@@ -224,6 +231,7 @@ export function BuildGroupSelectableIDs(Members: GroupMembers): string[] {
     ...Members.Clients.map((C) => C.UUID),
     ...Members.Monitors.map((M) => `monitor:${M.TargetID}`),
     ...Members.Dummies.map((D) => `dummy:${D.UUID}`),
+    ...(Members.Kiosks || []).map((K) => `kiosk:${K.UUID}`),
   ];
 }
 
@@ -236,7 +244,12 @@ export function BuildMergedTiles(Members: GroupMembers): MergedTileEntry[] {
     .concat(
       Members.Clients.map((c) => ({ kind: 'client' as const, weight: c.Weight || 0, data: c })),
       Members.Monitors.map((m) => ({ kind: 'monitor' as const, weight: m.Weight || 0, data: m })),
-      Members.Dummies.map((d) => ({ kind: 'dummy' as const, weight: d.Weight || 0, data: d }))
+      Members.Dummies.map((d) => ({ kind: 'dummy' as const, weight: d.Weight || 0, data: d })),
+      (Members.Kiosks || []).map((k) => ({
+        kind: 'freekiosk' as const,
+        weight: k.Weight || 0,
+        data: k,
+      }))
     )
     .sort((a, b) => a.weight - b.weight);
 }
@@ -249,7 +262,12 @@ export function BuildMergedTiles(Members: GroupMembers): MergedTileEntry[] {
  */
 export function ShouldRenderGroup(GroupID: number | null, Members: GroupMembers): boolean {
   if (GroupID != null) return true;
-  return Members.Clients.length > 0 || Members.Monitors.length > 0 || Members.Dummies.length > 0;
+  return (
+    Members.Clients.length > 0 ||
+    Members.Monitors.length > 0 ||
+    Members.Dummies.length > 0 ||
+    (Members.Kiosks || []).length > 0
+  );
 }
 
 /**
@@ -260,12 +278,14 @@ export function ShouldShowWelcomePanel(
   GroupCount: number,
   Clients: unknown[] | null | undefined,
   Monitors: unknown[] | null | undefined,
-  Dummies: unknown[] | null | undefined
+  Dummies: unknown[] | null | undefined,
+  Kiosks?: unknown[] | null
 ): boolean {
   return (
     GroupCount === 1 &&
     (Clients || []).length === 0 &&
     (Monitors || []).length === 0 &&
-    (Dummies || []).length === 0
+    (Dummies || []).length === 0 &&
+    (Kiosks || []).length === 0
   );
 }

@@ -25,6 +25,8 @@ import { normalizeUSBNameKey } from '../Modules/ClientManager/normalizers';
 import { Manager as GroupManager } from '../Modules/GroupManager';
 import { Manager as MonitoringTargetManager } from '../Modules/MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../Modules/DummyClientManager';
+import { Manager as FreeKioskManager } from '../Modules/FreeKioskManager';
+import { recordFreeKioskHistorySamples, syncFreeKioskHistoryStore } from './freekiosk-history';
 import { Manager as AlertsManager } from '../Modules/AlertsManager';
 import { Manager as TagManager } from '../Modules/TagManager';
 import { Manager as FogManager } from '../Modules/FogManager';
@@ -83,6 +85,14 @@ interface BroadcastDummyClient {
   UUID?: string | null;
   Online?: boolean;
   Degraded?: boolean;
+  [key: string]: unknown;
+}
+interface BroadcastFreeKioskTerminal {
+  UUID?: string | null;
+  Online?: boolean;
+  Degraded?: boolean;
+  Metrics?: unknown;
+  Alarms?: unknown;
   [key: string]: unknown;
 }
 // Mirrors deployment.ts's (unexported) DeploymentExecutionInfo; structurally
@@ -242,6 +252,9 @@ async function ReinitializeSystem(): Promise<void> {
     await MonitoringTargetManager.Reload();
   }
 
+  if (typeof FreeKioskManager.Reload === 'function') {
+    await FreeKioskManager.Reload();
+  }
   if (typeof DummyClientManager.Reload === 'function') {
     await DummyClientManager.Reload();
   }
@@ -261,6 +274,7 @@ async function ReinitializeSystem(): Promise<void> {
   await UpdateSettings();
   await UpdateMonitoringTargetList();
   await UpdateDummyClientList();
+  await UpdateFreeKioskTerminalList();
   await UpdateAlertRuleList();
 
   PushToRenderers('SetFullClientList', Clients, Groups);
@@ -479,6 +493,32 @@ async function DummyClientUpdated(Dummy: BroadcastDummyClient): Promise<void> {
   );
 }
 
+// FreeKiosk terminal fan-out
+async function UpdateFreeKioskTerminalList(): Promise<void> {
+  if (!hasMainWindow()) return;
+  const [Err, List] = await FreeKioskManager.GetAll();
+  if (Err) return Logger.error('Failed to fetch FreeKiosk terminals:', Err);
+  const SafeList = List || [];
+  syncFreeKioskHistoryStore(SafeList);
+  PushToRenderers('SetFullFreeKioskTerminalList', SafeList);
+}
+
+async function FreeKioskTerminalUpdated(Terminal: BroadcastFreeKioskTerminal): Promise<void> {
+  recordFreeKioskHistorySamples(Terminal);
+  if (hasMainWindow()) {
+    PushToRenderers('FreeKioskTerminalUpdated', Terminal);
+  }
+  // A terminal snapshot is client-shaped (UUID, Nickname, Online, Degraded,
+  // GroupID, IP, DegradedWarnings), exactly as a dummy client's is, so the
+  // online/degraded/offline lifecycle reuses the client handler unchanged.
+  AlertsManager.HandleClientUpdated(Terminal).catch((Err: unknown) =>
+    Logger.error('AlertsManager.HandleClientUpdated (FreeKiosk) failed', Err)
+  );
+  AlertsManager.HandleFreeKioskTerminalUpdated(Terminal).catch((Err: unknown) =>
+    Logger.error('AlertsManager.HandleFreeKioskTerminalUpdated failed', Err)
+  );
+}
+
 // Pending adoption list is ephemeral; pull from manager and push to UI.
 async function UpdateAdoptionList(): Promise<void> {
   if (!hasMainWindow()) return;
@@ -676,6 +716,8 @@ function RegisterBroadcastBridge(): void {
   BroadcastManager.on('MonitoringTargetUpdated', MonitoringTargetUpdated);
   BroadcastManager.on('DummyClientListChanged', UpdateDummyClientList);
   BroadcastManager.on('DummyClientUpdated', DummyClientUpdated);
+  BroadcastManager.on('FreeKioskTerminalListChanged', UpdateFreeKioskTerminalList);
+  BroadcastManager.on('FreeKioskTerminalUpdated', FreeKioskTerminalUpdated);
   BroadcastManager.on('AdoptionListUpdated', UpdateAdoptionList);
   BroadcastManager.on('ScriptExecutionUpdated', UpdateScriptExecutions);
   BroadcastManager.on('AlertRuleListChanged', UpdateAlertRuleList);
@@ -719,6 +761,7 @@ export {
   UpdateOSCList,
   UpdateMonitoringTargetList,
   UpdateDummyClientList,
+  UpdateFreeKioskTerminalList,
   UpdateAlertRuleList,
   UpdateTagList,
   UpdateFogTaskList,
