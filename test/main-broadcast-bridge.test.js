@@ -189,6 +189,12 @@ const restore = installModuleMocks([
     value: { Manager: { GetAll: async () => [null, []], Reload: async () => [null, []] } },
   },
   { match: matchesModule('/Modules/AlertsManager'), value: { Manager: alertsMgr } },
+  // Same reason as FreeKioskManager above: the real WorkflowManager requires
+  // ../DB at module load. broadcast-bridge calls GetAll and Reload.
+  {
+    match: matchesModule('/Modules/WorkflowManager'),
+    value: { Manager: { GetAll: async () => [null, []], Reload: async () => undefined } },
+  },
   { match: matchesModule('/Modules/TagManager'), value: { Manager: tagMgr } },
   { match: matchesModule('/Modules/FogManager'), value: { Manager: fogMgr } },
   { match: matchesModule('/Modules/AudioAssetManager'), value: { Manager: audioMgr } },

@@ -165,6 +165,30 @@ const INVOKE_CHANNELS = [
   'AlertActionsEnabled:Get',
   'AlertActionsEnabled:Set',
 
+  // Workflows
+  'Workflows:GetAll',
+  'Workflows:Get',
+  'Workflows:GetForContext',
+  'Workflows:GetStepKinds',
+  'Workflows:GetTriggerTypes',
+  'Workflows:GetHistory',
+  'Workflows:Create',
+  'Workflows:Update',
+  'Workflows:Delete',
+  'Workflows:SetEnabled',
+  'Workflows:SetOrder',
+  'Workflows:SetSlug',
+  'Workflows:Run',
+  'Workflows:Abort',
+  'Workflows:Step',
+  'Workflows:Continue',
+  'Workflows:AnswerPrompt',
+  // Control actions a monitoring check can perform. There is deliberately no
+  // parallel "get method actions" channel — GetMonitoringMethods already returns
+  // each method's published shape, which now carries its Actions.
+  'Monitoring:GetCheckActions',
+  'Monitoring:RunCheckAction',
+
   // Tags
   'Tags:GetAll',
   'Tags:Create',
@@ -227,6 +251,9 @@ const SUBSCRIBE_CHANNELS = [
   'FreeKioskTerminalUpdated',
   'NetworkDeviceScanEvent',
   'SetFullAlertRuleList',
+  'SetFullWorkflowList',
+  'WorkflowRunUpdated',
+  'WorkflowPromptRequested',
   'SetTagList',
   'AlertTriggered',
   'CreateShowTrakAlert',

@@ -57,6 +57,7 @@ import { Manager as FogManager } from './Modules/FogManager';
 import { Manager as DummyClientManager } from './Modules/DummyClientManager';
 import { Manager as FreeKioskManager } from './Modules/FreeKioskManager';
 import { Manager as AlertsManager } from './Modules/AlertsManager';
+import { Manager as WorkflowManager } from './Modules/WorkflowManager';
 import { Manager as AudioAssetManager } from './Modules/AudioAssetManager';
 import { Manager as BroadcastManager } from './Modules/Broadcast';
 import { Manager as NetworkInterfaces } from './Modules/NetworkInterfaces';
@@ -240,6 +241,9 @@ app.whenReady().then(async () => {
     FreeKioskManager.Init().catch((Err: unknown) =>
       Logger.error('Failed to init FreeKioskManager:', Err)
     );
+    WorkflowManager.Init().catch((Err: unknown) =>
+      Logger.error('Failed to initialise WorkflowManager', Err)
+    );
     AlertsManager.Init().catch((Err: unknown) =>
       Logger.error('Failed to init AlertsManager:', Err)
     );
@@ -254,6 +258,7 @@ app.whenReady().then(async () => {
         await FreeKioskManager.BackfillSlugs();
         await GroupManager.BackfillSlugs();
         await TagManager.BackfillSlugs();
+        await WorkflowManager.BackfillSlugs();
       } catch (Err: unknown) {
         Logger.error('Failed to back-fill slugs:', Err);
       }

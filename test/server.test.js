@@ -315,6 +315,7 @@ function loadWebUi(settings, options = {}) {
     '../FreeKioskManager': { Manager: { GetAll: async () => [null, []] } },
     '../DummyClientManager': { Manager: { GetAll: async () => [null, []] } },
     '../AlertsManager': { Manager: { GetAll: async () => [null, []] } },
+    '../WorkflowManager': { Manager: { GetAll: async () => [null, []] } },
     '../SettingsManager': { Manager: { GetValue: async (key) => settings[key] } },
     '../WOLManager': { Manager: { Wake: async () => [null, 'magic packet sent'] } },
     '../ScriptManager': {

@@ -461,7 +461,7 @@ const Manager = {
     CheckID: unknown,
     ActionID: unknown,
     Params: unknown
-  ): Promise<[string | null, MonitoringActionResult | null]> {
+  ): Promise<Result<MonitoringActionResult>> {
     const ID = Number(CheckID);
     for (const Target of TargetList) {
       const Check = Target.Checks.find((C) => Number(C.CheckID) === ID);

@@ -28,6 +28,7 @@ import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as FreeKioskManager } from '../FreeKioskManager';
 import { Manager as AlertsManager } from '../AlertsManager';
+import { Manager as WorkflowManager } from '../WorkflowManager';
 import { Manager as TagManager } from '../TagManager';
 import { Manager as SettingsManager } from '../SettingsManager';
 import { Manager as ScriptManager } from '../ScriptManager';
@@ -273,6 +274,13 @@ const WEB_MONITORING_CHANNELS = new Set([
   'FreeKiosk:Command',
   'FreeKiosk:CaptureScreenshot',
   'FreeKiosk:CaptureCamera',
+  'Workflows:GetAll',
+  'Workflows:Get',
+  'Workflows:GetForContext',
+  'Workflows:GetStepKinds',
+  'Workflows:GetTriggerTypes',
+  'Workflows:GetHistory',
+  'Monitoring:GetCheckActions',
 ]);
 const WEB_ALERT_CHANNELS = new Set([
   'CreateAlertRule',
@@ -280,6 +288,31 @@ const WEB_ALERT_CHANNELS = new Set([
   'DeleteAlertRule',
   'SetAlertRuleEnabled',
 ]);
+const WEB_WORKFLOW_CHANNELS = new Set([
+  'Workflows:Create',
+  'Workflows:Update',
+  'Workflows:Delete',
+  'Workflows:SetEnabled',
+  'Workflows:SetOrder',
+  'Workflows:SetSlug',
+]);
+
+// Running a workflow is a SHOW-time action, not an edit, so it sits alongside
+// script execution rather than under the edit-mode gate.
+//
+// It defaults to OFF, unlike workflow management. One press can reach "run
+// script" and "power off the projector" in a single sequence, so its blast
+// radius is strictly larger than remote script execution — which is itself
+// default-off. Turning this on has to be a decision someone made.
+const WEB_WORKFLOW_RUN_CHANNELS = new Set([
+  'Workflows:Run',
+  'Workflows:Abort',
+  'Workflows:Step',
+  'Workflows:Continue',
+  'Workflows:AnswerPrompt',
+  'Monitoring:RunCheckAction',
+]);
+
 // Creating unassigned slots is its own category because it is additionally
 // gated on the global SYSTEM_ALLOW_UNASSIGNED_CLIENTS feature flag (the main
 // registrar re-checks that flag and remains the authority).
@@ -292,6 +325,7 @@ const WEB_EDIT_CHANNELS = new Set([
   ...WEB_GROUP_CHANNELS,
   ...WEB_MONITORING_CHANNELS,
   ...WEB_ALERT_CHANNELS,
+  ...WEB_WORKFLOW_CHANNELS,
   ...WEB_UNASSIGNED_CHANNELS,
 ]);
 
@@ -329,6 +363,8 @@ const WEB_PUSH_CHANNELS = [
   'SetFullFreeKioskTerminalList',
   'FreeKioskTerminalUpdated',
   'SetFullAlertRuleList',
+  'SetFullWorkflowList',
+  'WorkflowRunUpdated',
   'SetTagList',
   'AlertTriggered',
   'CreateShowTrakAlert',
@@ -392,6 +428,9 @@ const GetWebConfig = async () => {
   let AllowGroupManagement = true;
   let AllowMonitoringManagement = true;
   let AllowAlertManagement = true;
+  let AllowWorkflowManagement = true;
+  // Default OFF — see WEB_WORKFLOW_RUN_CHANNELS.
+  let AllowWorkflowExecution = false;
   let AllowWebWOL = true;
   let AllowUnassignedClients = true;
   let UnassignedClientsEnabled = false;
@@ -406,6 +445,8 @@ const GetWebConfig = async () => {
     AllowGroupManagement = await ReadBool('WEBUI_ALLOW_GROUP_MANAGEMENT', true);
     AllowMonitoringManagement = await ReadBool('WEBUI_ALLOW_MONITORING_MANAGEMENT', true);
     AllowAlertManagement = await ReadBool('WEBUI_ALLOW_ALERT_MANAGEMENT', true);
+    AllowWorkflowManagement = await ReadBool('WEBUI_ALLOW_WORKFLOW_MANAGEMENT', true);
+    AllowWorkflowExecution = await ReadBool('WEBUI_ALLOW_WORKFLOW_EXECUTION', false);
     AllowWebWOL = await ReadBool('WEBUI_ALLOW_WOL', true);
     AllowUnassignedClients = await ReadBool('WEBUI_ALLOW_UNASSIGNED_CLIENTS', true);
     UnassignedClientsEnabled = !!(await SettingsManager.GetValue(
@@ -428,6 +469,8 @@ const GetWebConfig = async () => {
     AllowGroupManagement,
     AllowMonitoringManagement,
     AllowAlertManagement,
+    AllowWorkflowManagement,
+    AllowWorkflowExecution,
     AllowWebWOL,
     AllowUnassignedClients,
     UnassignedClientsEnabled,
@@ -485,12 +528,18 @@ const AuthorizeWebChannel = async (channel: string) => {
         ? Cfg.AllowMonitoringManagement
         : WEB_ALERT_CHANNELS.has(channel)
           ? Cfg.AllowAlertManagement
-          : WEB_UNASSIGNED_CHANNELS.has(channel)
-            ? Cfg.UnassignedClientsEnabled && Cfg.AllowUnassignedClients
-            : null;
+          : WEB_WORKFLOW_CHANNELS.has(channel)
+            ? Cfg.AllowWorkflowManagement
+            : WEB_UNASSIGNED_CHANNELS.has(channel)
+              ? Cfg.UnassignedClientsEnabled && Cfg.AllowUnassignedClients
+              : null;
   if (Category !== null) {
     if (ModeManager.Get() !== 'EDIT') return { allowed: false, reason: 'edit_mode_required' };
     if (!Category) return { allowed: false, reason: 'forbidden' };
+    return { allowed: true, reason: null };
+  }
+  if (WEB_WORKFLOW_RUN_CHANNELS.has(channel)) {
+    if (!Cfg.AllowWorkflowExecution) return { allowed: false, reason: 'forbidden' };
     return { allowed: true, reason: null };
   }
   if (WEB_SCRIPT_CHANNELS.has(channel)) {
@@ -641,6 +690,9 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
         const [aErr, rules] = await AlertsManager.GetAll();
         socket.emit('SetFullAlertRuleList', aErr ? [] : rules || []);
 
+        const [wErr, workflows] = await WorkflowManager.GetAll();
+        socket.emit('SetFullWorkflowList', wErr ? [] : workflows || []);
+
         // Tile tag badges are derived from this list, so it has to arrive with
         // the first paint just like the client list itself.
         socket.emit('SetTagList', (await TagManager.GetAllViews()) || []);
@@ -768,6 +820,8 @@ export {
   WEB_GROUP_CHANNELS,
   WEB_MONITORING_CHANNELS,
   WEB_ALERT_CHANNELS,
+  WEB_WORKFLOW_CHANNELS,
+  WEB_WORKFLOW_RUN_CHANNELS,
   WEB_UNASSIGNED_CHANNELS,
   WEB_SCRIPT_CHANNELS,
   WEB_WOL_CHANNELS,

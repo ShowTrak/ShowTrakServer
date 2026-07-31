@@ -15,6 +15,7 @@ import { register as registerMonitoring } from './monitoring';
 import { register as registerDummy } from './dummy';
 import { register as registerFreeKiosk } from './freekiosk';
 import { register as registerAlerts } from './alerts';
+import { register as registerWorkflows } from './workflows';
 import { register as registerTags } from './tags';
 import { register as registerFog } from './fog';
 import { register as registerAudio } from './audio';
@@ -31,6 +32,7 @@ function RegisterAllHandlers(): void {
   registerDummy();
   registerFreeKiosk();
   registerAlerts();
+  registerWorkflows();
   registerTags();
   registerFog();
   registerAudio();

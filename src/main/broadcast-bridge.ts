@@ -28,6 +28,7 @@ import { Manager as DummyClientManager } from '../Modules/DummyClientManager';
 import { Manager as FreeKioskManager } from '../Modules/FreeKioskManager';
 import { recordFreeKioskHistorySamples, syncFreeKioskHistoryStore } from './freekiosk-history';
 import { Manager as AlertsManager } from '../Modules/AlertsManager';
+import { Manager as WorkflowManager } from '../Modules/WorkflowManager';
 import { Manager as TagManager } from '../Modules/TagManager';
 import { Manager as FogManager } from '../Modules/FogManager';
 import { Manager as AudioAssetManager } from '../Modules/AudioAssetManager';
@@ -244,6 +245,9 @@ async function ReinitializeSystem(): Promise<void> {
   // Refresh manager caches that hold DB-backed state in memory.
   if (typeof SettingsManager.Reload === 'function') {
     await SettingsManager.Reload();
+  }
+  if (typeof WorkflowManager.Reload === 'function') {
+    await WorkflowManager.Reload();
   }
   if (typeof AlertsManager.Reload === 'function') {
     await AlertsManager.Reload();
@@ -552,6 +556,13 @@ async function UpdateAlertRuleList(): Promise<void> {
   PushToRenderers('SetFullAlertRuleList', Rules || []);
 }
 
+async function UpdateWorkflowList(): Promise<void> {
+  if (!hasMainWindow()) return;
+  const [Err, List] = await WorkflowManager.GetAll();
+  if (Err) return Logger.error('Failed to fetch workflows:', Err);
+  PushToRenderers('SetFullWorkflowList', List || []);
+}
+
 async function UpdateTagList(): Promise<void> {
   if (!hasMainWindow()) return;
   const Tags = await TagManager.GetAllViews();
@@ -696,6 +707,10 @@ const PASSTHROUGH: Array<[string, string]> = [
   ['DebugTrafficEntry', 'DebugTrafficEntry'],
   // Global alert-actions toggle state, consumed by the SDK control API sink.
   ['AlertActionsUpdated', 'AlertActionsUpdated'],
+  // Live workflow run state — this is what draws the step debugger's position
+  // indicator, so it fires on every step transition.
+  ['WorkflowRunUpdated', 'WorkflowRunUpdated'],
+  ['WorkflowPromptRequested', 'WorkflowPromptRequested'],
 ];
 
 // Wire every BroadcastManager subscriber and the ModeManager relay. Called once
@@ -721,6 +736,7 @@ function RegisterBroadcastBridge(): void {
   BroadcastManager.on('AdoptionListUpdated', UpdateAdoptionList);
   BroadcastManager.on('ScriptExecutionUpdated', UpdateScriptExecutions);
   BroadcastManager.on('AlertRuleListChanged', UpdateAlertRuleList);
+  BroadcastManager.on('WorkflowListChanged', UpdateWorkflowList);
   BroadcastManager.on('TagListChanged', UpdateTagList);
   // FOG: the poller emits FogTasksUpdated on any state change and FogStatusChanged
   // when the connection comes up or goes down. Status is pushed alongside the task
@@ -763,6 +779,7 @@ export {
   UpdateDummyClientList,
   UpdateFreeKioskTerminalList,
   UpdateAlertRuleList,
+  UpdateWorkflowList,
   UpdateTagList,
   UpdateFogTaskList,
   UpdateFogStatus,

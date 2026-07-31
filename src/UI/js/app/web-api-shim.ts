@@ -317,6 +317,40 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     AlertTriggered: (cb) => sub('AlertTriggered', cb),
     CreateShowTrakAlert: (cb) => sub('CreateShowTrakAlert', cb),
 
+    // ---- Workflows --------------------------------------------------------
+    // Real rpc calls throughout, including the run family: the server decides
+    // what a web session may do (WEBUI_ALLOW_WORKFLOW_* plus Edit mode), and a
+    // denial comes back as ['forbidden', null], which is the correct answer.
+    // Stubbing them here would hide the permission from the UI instead.
+    GetAllWorkflows: async () => rpc('Workflows:GetAll'),
+    GetWorkflow: async (WorkflowID) => rpc('Workflows:Get', WorkflowID),
+    GetWorkflowsForContext: async (ScopedID) => rpc('Workflows:GetForContext', ScopedID),
+    GetWorkflowStepKinds: async () => rpc('Workflows:GetStepKinds'),
+    GetWorkflowTriggerTypes: async () => rpc('Workflows:GetTriggerTypes'),
+    GetWorkflowHistory: async (WorkflowID) => rpc('Workflows:GetHistory', WorkflowID),
+    CreateWorkflow: async (Payload) => rpc('Workflows:Create', Payload),
+    UpdateWorkflow: async (WorkflowID, Payload) => rpc('Workflows:Update', WorkflowID, Payload),
+    DeleteWorkflow: async (WorkflowID) => rpc('Workflows:Delete', WorkflowID),
+    SetWorkflowEnabled: async (WorkflowID, Enabled) =>
+      rpc('Workflows:SetEnabled', WorkflowID, Enabled),
+    SetWorkflowOrder: async (OrderedWorkflowIDs) => rpc('Workflows:SetOrder', OrderedWorkflowIDs),
+    SetWorkflowSlug: async (WorkflowID, Slug) => rpc('Workflows:SetSlug', WorkflowID, Slug),
+    RunWorkflow: async (WorkflowID, ScopedID, Mode) =>
+      rpc('Workflows:Run', WorkflowID, ScopedID, Mode),
+    AbortWorkflowRun: async (RunKey) => rpc('Workflows:Abort', RunKey),
+    StepWorkflowRun: async (RunKey) => rpc('Workflows:Step', RunKey),
+    ContinueWorkflowRun: async (RunKey) => rpc('Workflows:Continue', RunKey),
+    AnswerWorkflowPrompt: async (Answer) => rpc('Workflows:AnswerPrompt', Answer),
+    GetMonitoringCheckActions: async (CheckID) => rpc('Monitoring:GetCheckActions', CheckID),
+    RunMonitoringCheckAction: async (CheckID, ActionID, Params) =>
+      rpc('Monitoring:RunCheckAction', CheckID, ActionID, Params),
+    SetFullWorkflowList: (cb) => sub('SetFullWorkflowList', cb),
+    OnWorkflowRunUpdated: (cb) => sub('WorkflowRunUpdated', cb),
+    // Subscribed for arity parity; the server deliberately keeps prompts off the
+    // web push allowlist, since a prompt is addressed at the operator who
+    // started the run rather than every open browser.
+    OnWorkflowPromptRequested: (cb) => sub('WorkflowPromptRequested', cb),
+
     // ---- Tags (read allowed; management desktop-only) --------------------
     // The browser renders the same client tiles as the desktop, and their tag
     // badges are derived from this list, so reading it is part of drawing the

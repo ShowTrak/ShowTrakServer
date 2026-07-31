@@ -212,6 +212,24 @@ export const DefaultSettings: SettingDefinition[] = [
   },
   {
     Group: 'Web UI Permissions',
+    Key: 'WEBUI_ALLOW_WORKFLOW_MANAGEMENT',
+    Title: 'Workflow Management',
+    Description:
+      'Allow the Web UI to create, edit, delete and enable/disable workflows. Still requires the server to be in Edit mode.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
+    Group: 'Web UI Permissions',
+    Key: 'WEBUI_ALLOW_WORKFLOW_EXECUTION',
+    Title: 'Workflow Execution',
+    Description:
+      'Allow the Web UI to run workflows and send control commands to monitoring checks. This does NOT require Edit mode, and a workflow can run scripts and power devices on or off — so its reach is wider than remote script execution. Off by default.',
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+  },
+  {
+    Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_UNASSIGNED_CLIENTS',
     Title: 'Unassigned Clients',
     Description:

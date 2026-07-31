@@ -94,6 +94,27 @@ export interface IPCValidationManager {
   AlertRuleCreatePayload(value: unknown): Record<string, unknown>;
   AlertRuleUpdatePayload(value: unknown): Record<string, unknown>;
 
+  // Workflows (workflow-validators.ts)
+  WorkflowID(value: unknown, fieldName?: string): number;
+  WorkflowScopedID(value: unknown, fieldName?: string): string;
+  WorkflowRunKey(value: unknown, fieldName?: string): string;
+  WorkflowRunMode(value: unknown, fieldName?: string): string;
+  WorkflowParams(value: unknown): Record<string, unknown>;
+  WorkflowScope(value: unknown): {
+    Workspace: boolean;
+    Groups: number[];
+    Clients: string[];
+    Tags: number[];
+  };
+  WorkflowTriggers(value: unknown): Record<string, unknown>;
+  WorkflowReturn(value: unknown): Record<string, unknown>;
+  WorkflowSteps(value: unknown): Record<string, unknown>[];
+  WorkflowCreatePayload(value: unknown): Record<string, unknown>;
+  WorkflowUpdatePayload(value: unknown): Record<string, unknown>;
+  WorkflowOrderList(value: unknown, fieldName?: string): number[];
+  WorkflowPromptAnswer(value: unknown): { RunKey: string; StepID: string; Value: string };
+  MonitoringCheckActionID(value: unknown, fieldName?: string): string;
+
   // Tags (tag-validators.ts)
   TagID(value: unknown, fieldName?: string): number;
   TagColour(value: unknown, fieldName?: string): number;
@@ -132,6 +153,8 @@ require('./dummy-validators')(Manager);
 require('./freekiosk-validators')(Manager);
 require('./alert-validators')(Manager);
 require('./tag-validators')(Manager);
+// After tags: workflow scope validation reuses Manager.TagID and TagColour.
+require('./workflow-validators')(Manager);
 require('./audio-validators')(Manager);
 require('./fog-validators')(Manager);
 require('./system-validators')(Manager);

@@ -19,6 +19,7 @@ import {
   UpdateDummyClientList,
   UpdateFreeKioskTerminalList,
   UpdateAlertRuleList,
+  UpdateWorkflowList,
   UpdateTagList,
   UpdateFogTaskList,
   UpdateFogStatus,
@@ -36,6 +37,7 @@ async function PushInitialDesktopState(): Promise<void> {
   await UpdateDummyClientList();
   await UpdateFreeKioskTerminalList();
   await UpdateAlertRuleList();
+  await UpdateWorkflowList();
   // Tags were previously fetched on demand by the Tag Manager alone. The client
   // tiles now derive their badges from this list, so a fresh renderer needs it
   // before its first paint or every tile renders untagged until the next edit.
