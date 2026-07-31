@@ -53,6 +53,7 @@ const RUN_HISTORY_PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 let Initialized = false;
 let WorkflowList: WorkflowView[] = [];
 let PruneTimer: ReturnType<typeof setInterval> | null = null;
+let LastAnnouncedPrompt: string | null = null;
 
 export interface WorkflowCreatePayload {
   Name: string;
@@ -225,7 +226,19 @@ function buildDeps(): WorkflowRunnerDeps {
       };
     },
 
-    Emit: (Run) => BroadcastManager.emit('WorkflowRunUpdated', Run),
+    Emit: (Run) => {
+      BroadcastManager.emit('WorkflowRunUpdated', Run);
+      // Announce a prompt once, on the transition into waiting. The run view
+      // carries the prompt on every subsequent emit too, so without this guard
+      // the renderer would be told about the same question repeatedly.
+      const Key = Run.Prompt ? `${Run.RunKey}:${Run.Prompt.StepID}` : null;
+      if (Key && Key !== LastAnnouncedPrompt) {
+        LastAnnouncedPrompt = Key;
+        BroadcastManager.emit('WorkflowPromptRequested', Run.Prompt);
+      } else if (!Run.Prompt && LastAnnouncedPrompt?.startsWith(`${Run.RunKey}:`)) {
+        LastAnnouncedPrompt = null;
+      }
+    },
 
     Persist: (Run) => {
       void RunsRepo.Insert({

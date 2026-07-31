@@ -22,6 +22,9 @@ import type {
   SettingGroupView,
   GroupView,
   TagView,
+  WorkflowView,
+  WorkflowRunView,
+  WorkflowStepKindDescriptor,
 } from '@showtrak/protocol';
 
 export let Config = {} as AppConfig;
@@ -103,6 +106,24 @@ export function setTags(value: TagView[]): void {
 export let AlertRulesCache: AlertRuleView[] = [];
 export function setAlertRulesCache(value: AlertRuleView[]): void {
   AlertRulesCache = value;
+}
+
+// Workflows, pushed whole on every change like alert rules.
+export let WorkflowsCache: WorkflowView[] = [];
+export function setWorkflowsCache(value: WorkflowView[]): void {
+  WorkflowsCache = value;
+}
+
+export let WorkflowStepKindsCache: WorkflowStepKindDescriptor[] = [];
+export function setWorkflowStepKindsCache(value: WorkflowStepKindDescriptor[]): void {
+  WorkflowStepKindsCache = value;
+}
+
+// The run currently being watched in the debugger, if any. One at a time: the
+// panel shows a single run, and a second would have nowhere to draw.
+export let ActiveWorkflowRun: WorkflowRunView | null = null;
+export function setActiveWorkflowRun(value: WorkflowRunView | null): void {
+  ActiveWorkflowRun = value;
 }
 
 export let AlertActionTypesCache: AlertActionType[] = [];

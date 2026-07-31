@@ -157,6 +157,16 @@
                   Create Alert
                 </button>
               </li>
+              <li><hr class="dropdown-divider" /></li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item"
+                  id="SHOWTRAK_MODEL_CORE_WORKFLOW_MANAGER_BUTTON"
+                >
+                  Manage Workflows
+                </button>
+              </li>
             </ul>
           </div>
           <!-- FOG tasks. Hidden unless the FOG integration is enabled and reachable;
@@ -2446,6 +2456,215 @@ Loading licence...</pre>
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!--
+      Workflow Manager. Four stacked panels swapped by toggling d-none, exactly
+      as the Alert Manager does: List -> Workflow editor -> Step editor -> Run.
+      Titlebars are injected into the empty header divs at open time.
+    -->
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_WORKFLOW_MANAGER"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_WORKFLOW_MANAGER_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div id="WORKFLOW_MANAGER_LIST_PANEL" class="d-grid gap-2 text-start mt-1">
+              <div id="WORKFLOW_MANAGER_LIST_HEADER"></div>
+              <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-sm btn-success" id="WORKFLOW_CREATE_BUTTON">
+                  New Workflow
+                </button>
+              </div>
+              <div id="WORKFLOW_MANAGER_LIST" class="d-grid gap-2"></div>
+            </div>
+
+            <div id="WORKFLOW_MANAGER_EDITOR_PANEL" class="d-none d-grid gap-2 text-start mt-1">
+              <div id="WORKFLOW_EDITOR_BODY" class="d-grid gap-2">
+                <div id="WORKFLOW_EDITOR_HEADER"></div>
+
+                <div class="form-floating">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="WORKFLOW_NAME"
+                    placeholder="Workflow name"
+                  />
+                  <label for="WORKFLOW_NAME">Workflow name</label>
+                </div>
+
+                <div class="form-floating">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="WORKFLOW_DESCRIPTION"
+                    placeholder="Description"
+                  />
+                  <label for="WORKFLOW_DESCRIPTION">Description (optional)</label>
+                </div>
+
+                <!-- Section 1: Triggers -->
+                <div class="bg-ghost rounded p-2 d-grid gap-2">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <strong><i class="bi bi-lightning me-1"></i>Triggers</strong>
+                    <small class="text-muted">What starts this workflow</small>
+                  </div>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="WORKFLOW_TRIGGER_MANUAL" />
+                    <label class="form-check-label" for="WORKFLOW_TRIGGER_MANUAL">
+                      Offer in context menus
+                    </label>
+                  </div>
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="WORKFLOW_TRIGGER_CALLABLE"
+                    />
+                    <label class="form-check-label" for="WORKFLOW_TRIGGER_CALLABLE">
+                      Allow other workflows, alerts, OSC and the SDK to run it
+                    </label>
+                  </div>
+                  <div class="alert-multiselect">
+                    <button
+                      type="button"
+                      class="btn alert-multiselect-toggle w-100 text-start d-flex justify-content-between align-items-center"
+                      id="WORKFLOW_SCOPE_TOGGLE"
+                    >
+                      <span>Select targets</span>
+                      <i class="bi bi-chevron-right ms-2" aria-hidden="true"></i>
+                    </button>
+                    <label class="alert-multiselect-label" for="WORKFLOW_SCOPE_TOGGLE">
+                      Targets
+                    </label>
+                  </div>
+                  <div class="alert-multiselect" id="WORKFLOW_EVENT_DROPDOWN">
+                    <button
+                      type="button"
+                      class="btn alert-multiselect-toggle w-100 text-start d-flex justify-content-between align-items-center"
+                      id="WORKFLOW_EVENT_TOGGLE"
+                    >
+                      <span id="WORKFLOW_EVENT_SUMMARY">No events</span>
+                      <i class="bi bi-chevron-down ms-2" aria-hidden="true"></i>
+                    </button>
+                    <label class="alert-multiselect-label" for="WORKFLOW_EVENT_TOGGLE">
+                      Also run on these events
+                    </label>
+                    <div
+                      class="alert-multiselect-menu d-none"
+                      id="WORKFLOW_EVENT_MENU"
+                      role="listbox"
+                    ></div>
+                  </div>
+                </div>
+
+                <!-- Section 2: Steps -->
+                <div class="bg-ghost rounded p-2 d-grid gap-2">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <strong><i class="bi bi-list-ol me-1"></i>Steps</strong>
+                    <button type="button" class="btn btn-sm btn-light" id="WORKFLOW_ADD_STEP">
+                      Add Step
+                    </button>
+                  </div>
+                  <div id="WORKFLOW_STEP_LIST" class="d-grid gap-1"></div>
+                </div>
+
+                <!-- Section 3: Return -->
+                <div class="bg-ghost rounded p-2 d-grid gap-2">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <strong><i class="bi bi-box-arrow-left me-1"></i>Return</strong>
+                    <small class="text-muted">Handed back when another workflow calls this</small>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <div class="form-floating flex-grow-1">
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="WORKFLOW_RETURN_NAME"
+                        placeholder="Name"
+                      />
+                      <label for="WORKFLOW_RETURN_NAME">Name</label>
+                    </div>
+                    <div class="form-floating" style="width: 10rem">
+                      <select class="form-select" id="WORKFLOW_RETURN_TYPE">
+                        <option value="boolean">Yes / No</option>
+                        <option value="string">Text</option>
+                        <option value="number">Number</option>
+                      </select>
+                      <label for="WORKFLOW_RETURN_TYPE">Type</label>
+                    </div>
+                  </div>
+                  <div class="form-floating">
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="WORKFLOW_RETURN_FROM"
+                      placeholder="vars.answer"
+                    />
+                    <label for="WORKFLOW_RETURN_FROM">Take the value from</label>
+                  </div>
+                  <div class="form-floating">
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="WORKFLOW_RETURN_FALLBACK"
+                      placeholder="Fallback"
+                    />
+                    <label for="WORKFLOW_RETURN_FALLBACK">
+                      Fallback (used if the run stops early or aborts)
+                    </label>
+                  </div>
+                </div>
+
+                <div class="d-flex justify-content-between gap-2">
+                  <button type="button" class="btn btn-sm btn-danger" id="WORKFLOW_DELETE_BUTTON">
+                    Delete Workflow
+                  </button>
+                  <button type="button" class="btn btn-sm btn-primary" id="WORKFLOW_TEST_BUTTON">
+                    Test / Step Through
+                  </button>
+                </div>
+              </div>
+
+              <!-- Step editor -->
+              <div id="WORKFLOW_STEP_EDITOR_PANEL" class="d-none d-grid gap-2">
+                <div id="WORKFLOW_STEP_EDITOR_HEADER"></div>
+                <div class="form-floating">
+                  <select class="form-select" id="WORKFLOW_STEP_KIND"></select>
+                  <label for="WORKFLOW_STEP_KIND">Step type</label>
+                </div>
+                <div id="WORKFLOW_STEP_KIND_NOTE" class="text-muted small"></div>
+                <div id="WORKFLOW_STEP_EDITOR_FIELDS" class="d-grid gap-2"></div>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="WORKFLOW_STEP_CONTINUE_ON_ERROR"
+                  />
+                  <label class="form-check-label" for="WORKFLOW_STEP_CONTINUE_ON_ERROR">
+                    Carry on if this step fails
+                  </label>
+                </div>
+                <button type="button" class="btn btn-sm btn-danger" id="WORKFLOW_STEP_DELETE">
+                  Delete Step
+                </button>
+              </div>
+            </div>
+
+            <!-- Run / step debugger -->
+            <div id="WORKFLOW_RUN_PANEL" class="d-none d-grid gap-2 text-start mt-1">
+              <div id="WORKFLOW_RUN_HEADER"></div>
+              <div id="WORKFLOW_RUN_STATUS" class="bg-ghost rounded p-2"></div>
+              <div id="WORKFLOW_RUN_STEPS" class="d-grid gap-1"></div>
+              <div class="d-flex gap-2 justify-content-end" id="WORKFLOW_RUN_CONTROLS"></div>
             </div>
           </div>
         </div>

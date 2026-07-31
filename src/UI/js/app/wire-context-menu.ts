@@ -4,7 +4,7 @@
 // construction, positioning, keyboard/type-ahead navigation, the mobile
 // tap-to-confirm arming, and the outside-click / Escape close paths. init.ts
 // calls wireContextMenu() from WireGlobalUI in place of the old inline block.
-import type { ClientView } from '@showtrak/protocol';
+import type { ClientView, WorkflowView } from '@showtrak/protocol';
 import {
   AllClients,
   FreeKioskCommandsCache,
@@ -28,6 +28,7 @@ import {
 } from './selection-init';
 import { ClearSelection, Select, SelectAll } from './selection';
 import { ResolveScriptTargets } from './lib/script-targeting';
+import { RunWorkflowForEntity } from './workflows';
 
 // One row in the right-click / mobile context menu. `Type` selects how the row
 // renders (informational label, divider, or actionable item); the remaining
@@ -262,6 +263,42 @@ export function wireContextMenu() {
             }
           },
         });
+      }
+
+      // --- Workflows ------------------------------------------------------
+      //
+      // Offered only for a single selection. A workflow runs against ONE
+      // context — its steps read `check.Online` and the like — so firing it at
+      // a fuzzy multi-selection would either mean something arbitrary or
+      // silently pick one. Asking the operator to select one machine is the
+      // honest option.
+      //
+      // The server decides which workflows apply (Workflows:GetForContext), not
+      // the renderer's scope-matching mirror: the context menu and the check
+      // row must never disagree, and that only holds if one place decides.
+      if (Selected.length === 1) {
+        const ScopedID = String(Selected[0]);
+        let Workflows: WorkflowView[] = [];
+        try {
+          Workflows = await window.API.GetWorkflowsForContext(ScopedID);
+        } catch (err) {
+          HandleNonFatalError('SelectionInit:GetWorkflowsForContext', err);
+        }
+        if (Workflows.length > 0) {
+          PushSection('Workflows');
+          for (const Workflow of Workflows) {
+            Options.push({
+              Type: 'Action',
+              Title: Workflow.Name,
+              Class: 'text-light',
+              Icon: `bi-${Workflow.Icon || 'diagram-3'}`,
+              IconColour: '#9b59b6',
+              Action: async function () {
+                await RunWorkflowForEntity(Workflow.WorkflowID, ScopedID);
+              },
+            });
+          }
+        }
       }
 
       // --- Dummy clients --------------------------------------------------

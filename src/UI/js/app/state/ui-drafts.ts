@@ -7,6 +7,7 @@
 import type {
   GroupView,
   AlertRuleActionView,
+  WorkflowView,
   UpdateManagerStatus,
   UpdateReleaseOption,
 } from '@showtrak/protocol';
@@ -66,6 +67,28 @@ export function setMonitorHistoryModalContext(value: MonitorHistoryModalContextS
 export let MonitorHistoryTooltipHover: MonitorHistoryTooltipHoverShape | null = null;
 export function setMonitorHistoryTooltipHover(value: MonitorHistoryTooltipHoverShape | null): void {
   MonitorHistoryTooltipHover = value;
+}
+
+// --- Workflow editor drafts ---
+//
+// The whole workflow is edited as one draft object and saved wholesale, the way
+// the alert editor treats its actions — there is no partial-field save, so the
+// draft IS the editor state.
+export let WorkflowEditorID: number | null = null;
+export function setWorkflowEditorID(value: number | null): void {
+  WorkflowEditorID = value;
+}
+
+export let WorkflowDraft: WorkflowView | null = null;
+export function setWorkflowDraft(value: WorkflowView | null): void {
+  WorkflowDraft = value;
+}
+
+// Which step is open in the step editor, addressed by its stable StepID rather
+// than a position — reordering must not move the editor onto a different step.
+export let WorkflowEditingStepID: string | null = null;
+export function setWorkflowEditingStepID(value: string | null): void {
+  WorkflowEditingStepID = value;
 }
 
 // --- Alert rule editor drafts ---

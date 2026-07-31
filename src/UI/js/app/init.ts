@@ -56,6 +56,7 @@ import {
   StopNetworkDiscoveryScan,
 } from './monitoring-editor';
 import { OpenAlertRuleManager, OpenCreateAlertRuleEditor } from './alert-rules';
+import { OpenWorkflowManager } from './workflows';
 import {
   GetIdentifyingUUIDs,
   HideExecutionToast,
@@ -413,6 +414,10 @@ export async function Init() {
 
   $('#ADD_ALERT_ACTION').on('click', async () => {
     await OpenCreateAlertRuleEditor();
+  });
+
+  $('#SHOWTRAK_MODEL_CORE_WORKFLOW_MANAGER_BUTTON').on('click', async () => {
+    await OpenWorkflowManager();
   });
 
   const addTargetMenu = document.getElementById('ADD_MONITORING_TARGET_MENU');

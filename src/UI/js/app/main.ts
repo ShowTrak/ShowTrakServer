@@ -18,6 +18,7 @@ import './utils';
 import { InitKeyboard } from './keyboard';
 import { InitTagBadgeMetrics } from './lib/tag-badge-metrics';
 import { InitClientList } from './client-list';
+import { InitWorkflows } from './workflows';
 import './monitoring';
 import { InitDnd } from './dnd';
 import { InitOscFeeds } from './osc-feeds';
@@ -49,6 +50,8 @@ InitTagBadgeMetrics();
 InitClientList();
 InitDnd();
 InitOscFeeds();
+// Must precede Init(): SetFullWorkflowList arrives in the initial state push.
+InitWorkflows();
 InitAlertsTray();
 InitModals();
 InitScriptManager();
