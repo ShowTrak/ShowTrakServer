@@ -1948,6 +1948,36 @@ Loading licence...</pre>
                 </div>
                 <div id="MONITORING_CHECK_DYNAMIC_SETTINGS" class="d-grid gap-2"></div>
 
+                <!--
+                  Control actions and workflows for this check. Only rendered
+                  for a SAVED check — both need a CheckID, and an unsaved check
+                  has nothing to act on yet.
+                -->
+                <div id="MONITORING_CHECK_CONTROL" class="d-none bg-ghost rounded p-2 d-grid gap-2">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <strong><i class="bi bi-lightning-charge me-1"></i>Control</strong>
+                    <small class="text-muted">Send a command to this device</small>
+                  </div>
+                  <div id="MONITORING_CHECK_ACTIONS" class="d-flex flex-wrap gap-2"></div>
+                </div>
+
+                <div
+                  id="MONITORING_CHECK_WORKFLOWS_BLOCK"
+                  class="d-none bg-ghost rounded p-2 d-grid gap-2"
+                >
+                  <div class="d-flex justify-content-between align-items-center">
+                    <strong><i class="bi bi-diagram-3 me-1"></i>Workflows</strong>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-light"
+                      id="MONITORING_CHECK_WORKFLOWS_MANAGE"
+                    >
+                      Manage
+                    </button>
+                  </div>
+                  <div id="MONITORING_CHECK_WORKFLOWS" class="d-grid gap-1"></div>
+                </div>
+
                 <!-- ADVANCED: less-common per-check settings -->
                 <button
                   type="button"

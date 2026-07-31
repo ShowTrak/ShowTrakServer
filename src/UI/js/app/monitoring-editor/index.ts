@@ -17,6 +17,7 @@
 // schedules a status re-run, so separating them would trade one large module for
 // two that import each other.
 import { closeModal, openModal } from '../lib/modal';
+import { HideCheckControl, RenderCheckControl } from './check-control';
 import { buildModalHeader } from '../lib/modal-header';
 import type { MonitoringCheckDebug, MonitoringTargetView } from '@showtrak/protocol';
 import type { MonitoringEditorCheck } from '../state';
@@ -197,6 +198,11 @@ export function OpenMonitoringCheckView(index: number) {
   // Populate the live status card with the current known status (no re-probe).
   $('#MONITORING_CHECK_STATUS').addClass('d-none').empty();
   RefreshMonitoringCheckStatus({ run: false });
+
+  // Control commands and workflows both need a saved CheckID. Hidden first so a
+  // previously-open check's buttons never linger while this one loads.
+  HideCheckControl();
+  if (check.CheckID != null) void RenderCheckControl(check.CheckID);
 }
 
 // Render the memory-only per-check debug payload returned by the server. The
