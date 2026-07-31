@@ -16,6 +16,11 @@
 //   * groups   — the Groups table's Slug column.
 //   * tags     — the Tags table's Slug column (its own independent namespace;
 //                the tag slug doubles as the tag's display label).
+//   * workflows— the Workflows table's Slug column. Its own namespace, not the
+//                client one: a workflow called "projector" and a monitoring
+//                target called "projector" must be able to coexist, and OSC
+//                already disambiguates them by path (/API/Workflow/... vs
+//                /API/Monitor/...).
 //
 // Scripts have their own slug (the on-disk folder name) owned by ScriptManager
 // and are intentionally not modelled here.
@@ -45,6 +50,9 @@ export function KioskOwner(UUID: string): string {
 }
 export function TagOwner(TagID: number | string): string {
   return `tag:${TagID}`;
+}
+export function WorkflowOwner(WorkflowID: number | string): string {
+  return `workflow:${WorkflowID}`;
 }
 
 // Turn an arbitrary label into a valid slug. Case is preserved (mixed case is
@@ -154,6 +162,19 @@ async function CollectTagSlugs(): Promise<SlugEntry[]> {
   return Entries;
 }
 
+async function CollectWorkflowSlugs(): Promise<SlugEntry[]> {
+  const [Err, Rows] = await DB.All<{ WorkflowID: number; Slug: string | null }>(
+    'SELECT WorkflowID, Slug FROM Workflows'
+  );
+  if (Err) Logger.error('Failed to read workflow slugs', Err);
+  const Entries: SlugEntry[] = [];
+  for (const Row of Rows || []) {
+    if (Row && Row.Slug)
+      Entries.push({ slug: String(Row.Slug).toLowerCase(), owner: WorkflowOwner(Row.WorkflowID) });
+  }
+  return Entries;
+}
+
 // True when Candidate is already used in the client namespace by an owner other
 // than ExceptOwner (pass the editing entity's own owner tag on updates).
 export async function IsClientSlugTaken(Candidate: string, ExceptOwner?: string): Promise<boolean> {
@@ -171,6 +192,15 @@ export async function IsGroupSlugTaken(Candidate: string, ExceptOwner?: string):
 export async function IsTagSlugTaken(Candidate: string, ExceptOwner?: string): Promise<boolean> {
   const Lower = String(Candidate).toLowerCase();
   const All = await CollectTagSlugs();
+  return All.some((e) => e.slug === Lower && e.owner !== ExceptOwner);
+}
+
+export async function IsWorkflowSlugTaken(
+  Candidate: string,
+  ExceptOwner?: string
+): Promise<boolean> {
+  const Lower = String(Candidate).toLowerCase();
+  const All = await CollectWorkflowSlugs();
   return All.some((e) => e.slug === Lower && e.owner !== ExceptOwner);
 }
 
@@ -206,6 +236,16 @@ export async function GenerateUniqueTagSlug(
   return Dedupe(Slugify(Base) || Fallback, Taken);
 }
 
+export async function GenerateUniqueWorkflowSlug(
+  Base: unknown,
+  ExceptOwner?: string,
+  Fallback = 'workflow'
+): Promise<string> {
+  const All = await CollectWorkflowSlugs();
+  const Taken = new Set(All.filter((e) => e.owner !== ExceptOwner).map((e) => e.slug));
+  return Dedupe(Slugify(Base) || Fallback, Taken);
+}
+
 // Validate + de-collide a user-supplied slug for the client namespace. Sanitizes
 // friendly input (e.g. "Front of House" -> "Front-of-House"); returns an error
 // string if nothing usable remains. Does NOT auto-suffix on collision — a manual
@@ -237,5 +277,16 @@ export async function ResolveTagSlugEdit(
   const Slug = Slugify(Raw);
   if (!Slug) return ['Slug must contain at least one letter, number, - or _', null];
   if (await IsTagSlugTaken(Slug, ExceptOwner)) return [`Slug "${Slug}" is already in use`, null];
+  return [null, Slug];
+}
+
+export async function ResolveWorkflowSlugEdit(
+  Raw: unknown,
+  ExceptOwner: string
+): Promise<[string, null] | [null, string]> {
+  const Slug = Slugify(Raw);
+  if (!Slug) return ['Slug must contain at least one letter, number, - or _', null];
+  if (await IsWorkflowSlugTaken(Slug, ExceptOwner))
+    return [`Slug "${Slug}" is already in use`, null];
   return [null, Slug];
 }

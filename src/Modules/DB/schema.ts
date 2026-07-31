@@ -176,6 +176,73 @@ Schema.push({
     )',
 });
 
+// A Workflow is a named, reusable, callable unit of logic in three sections.
+//
+// Each section is its own JSON column so it can be parsed and evolved
+// independently, and so a malformed Steps tree cannot cost you the triggers:
+//
+//   Triggers — what starts it: manual, an event stimulus (the same vocabulary
+//              AlertRules uses), or a call from another workflow. Carries the
+//              Scope, in the same shape as AlertRules.Scope / Tags.Scope, which
+//              decides where the workflow is OFFERED — not what it acts on.
+//   Steps    — the ordered program. A JSON tree rather than a child table
+//              because steps are only ever read and written as a whole program,
+//              their order is intrinsic to the array, and If steps NEST other
+//              steps — a shape a flat child table could only fake with parent
+//              IDs. This mirrors AlertRules.Actions.
+//   Return   — the single value handed back to a caller, which is what lets one
+//              workflow call another and lets shared logic be extracted.
+//
+// Slug is this table's own namespace, deliberately separate from the shared
+// client namespace: a workflow and a monitoring target may share a name, and
+// OSC disambiguates by path (/API/Workflow/... vs /API/Monitor/...).
+Schema.push({
+  Name: 'Workflows',
+  SQL: "CREATE TABLE IF NOT EXISTS `Workflows` ( \
+            WorkflowID INTEGER PRIMARY KEY AUTOINCREMENT, \
+            Slug TEXT, \
+            Name TEXT NOT NULL, \
+            Description TEXT NOT NULL DEFAULT '', \
+            Icon TEXT NOT NULL DEFAULT 'diagram-3', \
+            Colour INTEGER NOT NULL DEFAULT 6, \
+            Triggers TEXT NOT NULL DEFAULT '{}', \
+            Steps TEXT NOT NULL DEFAULT '[]', \
+            Return TEXT NOT NULL DEFAULT '{}', \
+            Enabled INTEGER NOT NULL DEFAULT 1, \
+            Weight INTEGER NOT NULL DEFAULT 100, \
+            Timestamp BIGINT(11) NOT NULL, \
+            UpdatedAt BIGINT(11) NOT NULL \
+    )",
+});
+
+// One row per finished run, pruned on a low-frequency timer like AlertHistory.
+//
+// This earns its own table rather than riding in AlertHistory: a workflow that
+// powered a projector off at 19:58 is exactly what you want at the post-mortem,
+// and AlertHistory would only record that an alert dispatched a run-workflow
+// action, not what the workflow then did. Steps holds the per-step outcome
+// array, which has no home in AlertHistory's Result shape.
+//
+// ContextScopedID records what the run was aimed at (a UUID, monitor:<id> or
+// check:<id>) so the check view can list runs against one check without parsing
+// the Context JSON.
+Schema.push({
+  Name: 'WorkflowRuns',
+  SQL: 'CREATE TABLE IF NOT EXISTS `WorkflowRuns` ( \
+            RunID INTEGER PRIMARY KEY AUTOINCREMENT, \
+            WorkflowID INTEGER NOT NULL, \
+            RunKey TEXT NOT NULL, \
+            TriggerSource TEXT NOT NULL, \
+            ContextScopedID TEXT, \
+            Status TEXT NOT NULL, \
+            Context TEXT, \
+            Steps TEXT, \
+            ReturnValue TEXT, \
+            StartedAt BIGINT(11) NOT NULL, \
+            FinishedAt BIGINT(11) NOT NULL \
+    )',
+});
+
 Schema.push({
   Name: 'CriticalUSBDevices',
   SQL: 'CREATE TABLE IF NOT EXISTS `CriticalUSBDevices` ( \
@@ -471,6 +538,22 @@ Schema.Migrations = [
   {
     Version: 27,
     SQL: 'CREATE INDEX IF NOT EXISTS idx_freekioskterminals_groupid ON `FreeKioskTerminals` (GroupID)',
+  },
+  // Workflows. The tables themselves are created by the Schema blocks above on
+  // both new and existing installs, so only the indexes need versioning. Unlike
+  // the client slug namespace, workflow slugs live in one table, so a unique
+  // index actually expresses the whole constraint here.
+  {
+    Version: 28,
+    SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_workflows_slug ON `Workflows` (Slug COLLATE NOCASE)',
+  },
+  {
+    Version: 29,
+    SQL: 'CREATE INDEX IF NOT EXISTS idx_workflowruns_workflowid ON `WorkflowRuns` (WorkflowID)',
+  },
+  {
+    Version: 30,
+    SQL: 'CREATE INDEX IF NOT EXISTS idx_workflowruns_context ON `WorkflowRuns` (ContextScopedID)',
   },
 ];
 

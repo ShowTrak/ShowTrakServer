@@ -127,6 +127,36 @@ export interface AlertHistoryRow {
   Timestamp: number;
 }
 
+export interface WorkflowRow {
+  WorkflowID: number;
+  Slug: string | null;
+  Name: string;
+  Description: string;
+  Icon: string;
+  Colour: number;
+  Triggers: string; // JSON
+  Steps: string; // JSON — nested step tree
+  Return: string; // JSON
+  Enabled: number; // 0 | 1
+  Weight: number;
+  Timestamp: number;
+  UpdatedAt: number;
+}
+
+export interface WorkflowRunRow {
+  RunID: number;
+  WorkflowID: number;
+  RunKey: string;
+  TriggerSource: string;
+  ContextScopedID: string | null;
+  Status: string;
+  Context: string | null; // JSON
+  Steps: string | null; // JSON — per-step results
+  ReturnValue: string | null; // JSON
+  StartedAt: number;
+  FinishedAt: number;
+}
+
 export interface CriticalUSBDeviceRow {
   UUID: string;
   SerialNumber: string;

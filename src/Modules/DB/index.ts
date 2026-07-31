@@ -582,6 +582,7 @@ Manager.HasData = async (): Promise<boolean> => {
     'FreeKioskTerminals',
     'AlertRules',
     'AlertHistory',
+    'Workflows',
     'CriticalUSBDevices',
     'CriticalApplications',
     'Settings',

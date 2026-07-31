@@ -23,6 +23,7 @@ import {
 } from './normalize';
 import { MonitoringTarget, MonitoringCheck } from './target';
 import type { MonitoringCheckInput } from './target';
+import type { MonitoringActionResult } from '../MonitoringMethods/types';
 
 const TargetsRepo = CreateMonitoringTargetsRepository(DB);
 const ChecksRepo = CreateMonitoringChecksRepository(DB);
@@ -430,6 +431,54 @@ const Manager = {
       Target.RecomputeAggregate();
       BroadcastManager.emit('MonitoringTargetUpdated', Target.ToJSON());
       return Manager.GetCheckDebug(ID);
+    }
+    return ['Monitoring check not found', null];
+  },
+
+  // The control actions the check's method exposes, for the step editor and the
+  // check's actions row.
+  GetCheckActions(CheckID: unknown): [string | null, unknown[] | null] {
+    const ID = Number(CheckID);
+    for (const Target of TargetList) {
+      const Check = Target.Checks.find((C) => Number(C.CheckID) === ID);
+      if (!Check) continue;
+      const Method = MonitoringMethods.GetAll().find((M) => M.ID === Check.Method);
+      return [null, Method ? Method.Actions : []];
+    }
+    return ['Monitoring check not found', null];
+  },
+
+  // Send a control command through one check, then re-probe so the tile shows
+  // the post-command state.
+  //
+  // The live MonitoringCheck instance IS a valid MonitoringTargetLike (it
+  // carries Address and parsed Settings), so it goes straight to the method with
+  // no adaptor — which is why this is the right home for the seam: callers never
+  // reach into check internals, and the re-probe has exactly one place to live.
+  // It is only correct because RunAction invalidates the method's caches first;
+  // without that the re-probe would replay the pre-command snapshot.
+  async RunCheckAction(
+    CheckID: unknown,
+    ActionID: unknown,
+    Params: unknown
+  ): Promise<[string | null, MonitoringActionResult | null]> {
+    const ID = Number(CheckID);
+    for (const Target of TargetList) {
+      const Check = Target.Checks.find((C) => Number(C.CheckID) === ID);
+      if (!Check) continue;
+
+      const Result = await MonitoringMethods.RunAction(
+        Check.Method,
+        String(ActionID),
+        Check,
+        Params
+      );
+
+      await Check.Run();
+      Target.LastChecked = Date.now();
+      Target.RecomputeAggregate();
+      BroadcastManager.emit('MonitoringTargetUpdated', Target.ToJSON());
+      return [null, Result];
     }
     return ['Monitoring check not found', null];
   },
