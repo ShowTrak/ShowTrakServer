@@ -12,11 +12,18 @@ import {
   EosStatePill,
   EosDebugHead,
   MonoRow,
+  SendEosCommand,
   type EosSnapshot,
 } from './_eos-shared';
 import { TextRow } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
-import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import type {
+  MonitoringActionResult,
+  MonitoringMethodAction,
+  MonitoringResult,
+  MonitoringSettingField,
+  MonitoringTargetLike,
+} from './types';
 
 const ID = 'eos';
 
@@ -183,9 +190,103 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   return EosDebugHead(Config, Result, EosStatePill(Result, 'Online'), ExtraRows);
 }
 
+// --- Control actions ---------------------------------------------------------
+
+// Cue and macro numbers become OSC address components. Eos numbers are digits
+// and dots (12, 12.5) and cue lists are addressed as list/number, so allow only
+// those — anything else would either change the address structure or hit OSC's
+// pattern-matching wildcards.
+const EOS_NUMBER = /^[0-9]+(\.[0-9]+)?$/;
+
+// Firing as the operator's user is a visible action on the console; firing as
+// the background user 0 is invisible to whoever is sitting at the desk. Neither
+// is universally right, so the choice is an explicit parameter rather than a
+// default inherited from the probe.
+const OSC_USER_PARAM: MonitoringSettingField = {
+  Key: 'OscUser',
+  Label: 'OSC user ID',
+  Type: 'number',
+  Default: 1,
+  Min: 0,
+  Max: 99,
+  Note: 'The console user this command acts as. 0 is a background user — the command fires but never appears on the operator’s command line. Use a real user number if the desk operator should see it.',
+};
+
+function FireEos(
+  Target: MonitoringTargetLike,
+  Params: Record<string, unknown>,
+  Build: (Number0: string) => string,
+  What: string
+): Promise<MonitoringActionResult> | MonitoringActionResult {
+  const Number0 = String(Params.Number ?? '').trim();
+  if (!Number0) return { Success: false, Error: `No ${What} number given` };
+  if (!EOS_NUMBER.test(Number0)) {
+    return { Success: false, Error: `"${Number0}" is not an Eos ${What} number` };
+  }
+  const OscUser = Number(Params.OscUser);
+  return SendEosCommand(
+    ParseEosConfig(Target),
+    Number.isFinite(OscUser) ? Math.max(0, OscUser | 0) : 1,
+    Build(Number0)
+  ).then((Result) => (Result.Success ? { ...Result, Detail: `Fired ${What} ${Number0}` } : Result));
+}
+
+const Actions: MonitoringMethodAction[] = [
+  {
+    ID: 'cue.fire',
+    Label: 'Fire Cue',
+    Icon: 'play-circle',
+    Group: 'Playback',
+    // Eos sends no acknowledgement for a fire.
+    FireAndForget: true,
+    Params: [
+      {
+        Key: 'Number',
+        Label: 'Cue number',
+        Type: 'string',
+        Default: '',
+        Required: true,
+        Note: 'Cue number within the list below, e.g. 12 or 12.5.',
+      },
+      {
+        Key: 'List',
+        Label: 'Cue list',
+        Type: 'number',
+        Default: 1,
+        Min: 1,
+        Max: 999,
+      },
+      OSC_USER_PARAM,
+    ],
+    Run: (Target, Params) => {
+      const List = Number(Params.List);
+      const Safe = Number.isFinite(List) && List >= 1 ? List | 0 : 1;
+      return FireEos(Target, Params, (N) => `/eos/cue/${Safe}/${N}/fire`, 'cue');
+    },
+  },
+  {
+    ID: 'macro.fire',
+    Label: 'Fire Macro',
+    Icon: 'lightning',
+    Group: 'Playback',
+    FireAndForget: true,
+    Params: [
+      {
+        Key: 'Number',
+        Label: 'Macro number',
+        Type: 'string',
+        Default: '',
+        Required: true,
+      },
+      OSC_USER_PARAM,
+    ],
+    Run: (Target, Params) => FireEos(Target, Params, (N) => `/eos/macro/${N}/fire`, 'macro'),
+  },
+];
+
 export const Name = 'ETC Eos';
 export const Description =
   'Connects to an ETC Eos-family console (Eos Ti, Gio, Ion Xe, Element, ETCnomad) over OSC (default TCP 3032), pings it for a round-trip liveness check and reads the software version, cue-list count and patch count in one connection. Online when the console answers; optionally flags an unexpected software version or an empty/default show.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = { ParseHealthOptions, EvaluateHealth };
-export { ID, Settings, Run, Debug };
+export { ID, Settings, Actions, Run, Debug };

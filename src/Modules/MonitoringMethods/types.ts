@@ -67,11 +67,69 @@ export interface MonitoringMethodInfo {
   Links?: Array<{ Label: string; Url: string }>;
 }
 
+// The outcome of a control action. Distinct from MonitoringResult because a
+// probe answers "what state is the device in" while an action answers "did the
+// thing I asked for happen".
+export interface MonitoringActionResult {
+  Success: boolean;
+  Error?: string;
+  // Human-readable outcome for the workflow run log, e.g. "Power on acknowledged".
+  Detail?: string;
+  LatencyMs?: number | null;
+  // Whether the DEVICE confirmed it acted, as opposed to the command merely
+  // reaching a live socket. False for fire-and-forget transports (QLab OSC).
+  // The run log must not present an unconfirmed send as a confirmed one — that
+  // is the difference between "QLab fired cue 5" and "we posted cue 5 at QLab".
+  Confirmed?: boolean;
+  Data?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+// A command a method can SEND to its device, as opposed to Run() which only
+// reads. Declaring one here is what makes it available as a workflow step, so
+// this registry is the allowlist — the same discipline as FreeKiosk commands.
+export interface MonitoringMethodAction {
+  ID: string;
+  Label: string;
+  // Bootstrap Icons name without the `bi-` prefix.
+  Icon?: string;
+  // Grouping label for the step picker (e.g. 'Power', 'Playback').
+  Group?: string;
+  // Parameter schema. Reuses MonitoringSettingField so an action's parameter
+  // form renders through the same field renderer as check settings do.
+  //
+  // NOTE the deliberate departure: on check Settings, `Required` is documented
+  // as a display hint only. On action params it is ENFORCED by RunAction. A
+  // check missing a setting reads as unhealthy and the operator investigates; a
+  // QLab GO with an empty cue number fires the wrong cue in front of an
+  // audience. Refusing is the only safe reading.
+  Params?: MonitoringSettingField[];
+  // Needs a confirmation dialog before running from the UI.
+  Destructive?: boolean;
+  // No reply is possible on this transport, so Success means "written to a live
+  // connection" and nothing more. Forces Confirmed: false on the result.
+  FireAndForget?: boolean;
+  // The device is expected to drop the connection carrying this out. A PJLink
+  // power-off tears down the session mid-command, so the socket dies before an
+  // answer arrives — that is the command WORKING. Without this flag ShowTrak
+  // reports a hang-up as failure on exactly the commands most likely to have
+  // succeeded.
+  ExpectDisconnect?: boolean;
+  Note?: string;
+  Run(
+    Target: MonitoringTargetLike,
+    Params: Record<string, unknown>
+  ): Promise<MonitoringActionResult> | MonitoringActionResult;
+}
+
 export interface MonitoringMethod {
   ID: string;
   Name: string;
   Description?: string;
   Info?: MonitoringMethodInfo;
+  // Control actions this method can send. Absent means the method is read-only,
+  // which is the default for every presence/status probe.
+  Actions?: MonitoringMethodAction[];
   // Optional grouping label for the editor's method picker. When omitted the
   // registry falls back to the central map in ./groups (then "Other").
   Group?: string;
@@ -89,6 +147,15 @@ export interface MonitoringMethod {
   Run(Target: MonitoringTargetLike): Promise<MonitoringResult> | MonitoringResult;
   Debug?(Result: MonitoringResult, Target: MonitoringTargetLike): string;
   NormalizeSettings?(Input: unknown): Record<string, unknown>;
+  // Drop any method-private cached read state for this target. Called after a
+  // control action so the next probe re-reads the device instead of replaying a
+  // snapshot taken BEFORE the command.
+  //
+  // The registry can only evict its own per-check RUN_CACHE key. Methods that
+  // share a family-level cache across several checks pointed at one device
+  // (PJLink) must invalidate the whole device here, or a second check on the
+  // same projector keeps serving the pre-command state.
+  InvalidateCaches?(Target: MonitoringTargetLike): void;
   GetRunCacheKeyExtra?(Target: MonitoringTargetLike, Settings: Record<string, unknown>): unknown;
   GetRunCacheTtlMs?(Target: MonitoringTargetLike): number;
   RunCacheTtlMs?: number;

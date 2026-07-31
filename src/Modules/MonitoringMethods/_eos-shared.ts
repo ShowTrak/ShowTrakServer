@@ -26,9 +26,14 @@
 // connection.
 import net from 'net';
 import { Manager as CacheManager } from '../CacheManager';
-import { EncodeOscTcp, DecodeOscStream, type OscFraming } from './_osc-shared';
+import { EncodeOscTcp, DecodeOscStream, type OscArg, type OscFraming } from './_osc-shared';
 import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
-import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import type {
+  MonitoringActionResult,
+  MonitoringResult,
+  MonitoringSettingField,
+  MonitoringTargetLike,
+} from './types';
 
 export const DEFAULT_EOS_PORT = 3032;
 
@@ -275,6 +280,91 @@ export function ParseEosConfig(Target: MonitoringTargetLike): EosConfig {
     OscUser: Number.isFinite(OscUser) ? Math.max(0, OscUser | 0) : 0,
     TimeoutMs: Number.isFinite(Cfg.Timeout as number) ? (Cfg.Timeout as number) : 3000,
   };
+}
+
+// Send one OSC command to the console over a short-lived TCP connection.
+//
+// The OSC user is deliberately a parameter rather than inherited from the probe
+// config. The probe pins itself to user 0 — a BACKGROUND user, which is exactly
+// right for reading state without disturbing whoever is sitting at the desk.
+// For a control action that same default is a trap in the other direction: a
+// command issued as a background user does not appear on the operator's command
+// line, so a cue fired by ShowTrak leaves no trace on the console the operator
+// is watching. Making the caller state the user forces that decision to be made
+// once, visibly, in the action's parameters.
+//
+// Eos does not acknowledge these, so success here means "written to the socket"
+// and the caller must report it as unconfirmed.
+export async function SendEosCommand(
+  Config: EosConfig,
+  OscUser: number,
+  Address: string,
+  Args: OscArg[] = []
+): Promise<MonitoringActionResult> {
+  if (!Config.Address) return { Success: false, Error: 'No address configured' };
+  if (Config.Port < 1 || Config.Port > 65535) {
+    return { Success: false, Error: `Invalid port: ${Config.Port}` };
+  }
+
+  return new Promise<MonitoringActionResult>((resolve) => {
+    const Started = Date.now();
+    const BudgetMs = Math.max(300, Config.TimeoutMs | 0);
+    const Socket = new net.Socket();
+    let Settled = false;
+    let Timer: ReturnType<typeof setTimeout> | null = null;
+
+    const Finish = (Result: MonitoringActionResult) => {
+      if (Settled) return;
+      Settled = true;
+      if (Timer) {
+        clearTimeout(Timer);
+        Timer = null;
+      }
+      try {
+        Socket.destroy();
+      } catch {
+        // ignore
+      }
+      resolve(Result);
+    };
+
+    Socket.setNoDelay(true);
+    Socket.setTimeout(BudgetMs);
+
+    Timer = setTimeout(
+      () =>
+        Finish({ Success: false, Error: `Eos did not accept a connection within ${BudgetMs}ms` }),
+      BudgetMs
+    );
+
+    Socket.once('timeout', () =>
+      Finish({ Success: false, Error: `Eos did not accept a connection within ${BudgetMs}ms` })
+    );
+    Socket.once('error', (Err: Error) =>
+      Finish({ Success: false, Error: Err && Err.message ? Err.message : String(Err) })
+    );
+
+    Socket.once('connect', () => {
+      try {
+        Socket.write(EncodeOscTcp('/eos/user', [{ Int: OscUser }], Config.Framing));
+        Socket.write(EncodeOscTcp(Address, Args, Config.Framing));
+      } catch (Err) {
+        Finish({ Success: false, Error: Err instanceof Error ? Err.message : String(Err) });
+        return;
+      }
+      // Flush before tearing the socket down; a destroy() racing the write
+      // would drop the command silently.
+      Socket.end(() =>
+        Finish({ Success: true, Confirmed: false, LatencyMs: Date.now() - Started })
+      );
+    });
+
+    try {
+      Socket.connect(Config.Port, Config.Address);
+    } catch (Err) {
+      Finish({ Success: false, Error: Err instanceof Error ? Err.message : String(Err) });
+    }
+  });
 }
 
 export interface EosContext {

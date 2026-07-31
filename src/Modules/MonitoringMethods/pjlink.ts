@@ -17,13 +17,20 @@ import {
   PJLinkStatePill,
   PJLinkDebugHead,
   MonoRow,
+  SendPJLinkCommand,
+  InvalidatePJLinkSnapshotsForDevice,
   type ErstStatus,
   type LampReading,
   type PJLinkSnapshot,
 } from './_pjlink-shared';
 import { Pill, Row, TextRow } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
-import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import type {
+  MonitoringMethodAction,
+  MonitoringResult,
+  MonitoringSettingField,
+  MonitoringTargetLike,
+} from './types';
 
 const ID = 'pjlink';
 
@@ -248,9 +255,96 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   return PJLinkDebugHead(Config, Result, PJLinkStatePill(Result, 'Healthy'), ExtraRows);
 }
 
+// --- Control actions ---------------------------------------------------------
+
+// PJLink AVMT parameters. 31 mutes both audio and video (the "shutter" every
+// operator means); 30 clears it.
+const AVMT_ON = '31';
+const AVMT_OFF = '30';
+
+function Send(
+  Target: MonitoringTargetLike,
+  Command: string,
+  Param: string,
+  Label: string,
+  ExpectDisconnect = false
+) {
+  return SendPJLinkCommand(ParsePJLinkConfig(Target), Command, Param, { Label, ExpectDisconnect });
+}
+
+const Actions: MonitoringMethodAction[] = [
+  {
+    ID: 'power.on',
+    Label: 'Power On',
+    Icon: 'power',
+    Group: 'Power',
+    Run: (Target) => Send(Target, 'POWR', '1', 'Power on'),
+  },
+  {
+    ID: 'power.off',
+    Label: 'Power Off',
+    Icon: 'power',
+    Group: 'Power',
+    Destructive: true,
+    // Entering cooling, many projectors drop the session instead of replying.
+    ExpectDisconnect: true,
+    Run: (Target) => Send(Target, 'POWR', '0', 'Power off', true),
+  },
+  {
+    ID: 'mute.on',
+    Label: 'Shutter On (mute A/V)',
+    Icon: 'eye-slash',
+    Group: 'Display',
+    Run: (Target) => Send(Target, 'AVMT', AVMT_ON, 'Shutter on'),
+  },
+  {
+    ID: 'mute.off',
+    Label: 'Shutter Off (unmute A/V)',
+    Icon: 'eye',
+    Group: 'Display',
+    Run: (Target) => Send(Target, 'AVMT', AVMT_OFF, 'Shutter off'),
+  },
+  {
+    ID: 'input.select',
+    Label: 'Select Input',
+    Icon: 'box-arrow-in-right',
+    Group: 'Display',
+    Params: [
+      {
+        Key: 'Code',
+        Label: 'Input code',
+        Type: 'string',
+        Default: '',
+        Required: true,
+        Note: 'Two-character PJLink input code — first character is the type (1 RGB, 2 Video, 3 Digital, 4 Storage, 5 Network), second is the number. For example 31 is Digital 1 (usually HDMI 1).',
+      },
+    ],
+    Run: (Target, Params) => {
+      const Code = NormalizeInputCode(Params.Code);
+      // The code goes straight onto the wire; anything malformed would be a
+      // command the projector answers ERR2 to at best.
+      if (!/^[0-9A-Z]{2}$/.test(Code)) {
+        return {
+          Success: false,
+          Error: `"${String(Params.Code ?? '')}" is not a PJLink input code`,
+        };
+      }
+      return Send(Target, 'INPT', Code, `Select input ${InputLabel(Code)}`);
+    },
+  },
+];
+
+// The registry can only evict this check's own cached probe. Snapshots are
+// shared across every check pointed at the same projector, so drop the whole
+// device or a sibling check keeps serving the pre-command state.
+function InvalidateCaches(Target: MonitoringTargetLike): void {
+  const Config = ParsePJLinkConfig(Target);
+  InvalidatePJLinkSnapshotsForDevice(Config.Address, Config.Port);
+}
+
 export const Name = 'Projector Health (PJLink)';
 export const Description =
   'Connects to the projector over PJLink (the cross-brand projector protocol, TCP 4352) and reads power state, error status, lamp hours and input in one pass, reporting a single healthy / degraded verdict. Works with Epson, NEC/Sharp, Panasonic, Christie, Sony, Barco and most other network projectors.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = { ParseHealthOptions, EvaluateHealth };
-export { ID, Settings, Run, Debug };
+export { ID, Settings, Actions, Run, Debug, InvalidateCaches };

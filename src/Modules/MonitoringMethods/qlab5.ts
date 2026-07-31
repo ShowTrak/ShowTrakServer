@@ -25,7 +25,13 @@ import {
 } from './_qlab-shared';
 import { Esc, Pill, Rows, TextRow, Row, Note, Card } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
-import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import type {
+  MonitoringActionResult,
+  MonitoringMethodAction,
+  MonitoringResult,
+  MonitoringSettingField,
+  MonitoringTargetLike,
+} from './types';
 
 const ID = 'qlab5';
 
@@ -427,4 +433,130 @@ export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const SupportsLatencyThreshold = false;
 export const RunCacheTtlMs = 0;
 export const _internal = { ParseHealthOptions, EvaluateHealth, CueMatches, FriendlyOverride };
-export { ID, Settings, Run, Debug };
+// --- Control actions ---------------------------------------------------------
+
+// A cue number becomes an OSC address component, so anything that would change
+// the address structure has to be refused. An unescaped '/' turns
+// /cue/12/start into an entirely different address, and OSC treats ? * [ ] { }
+// as pattern-matching wildcards — a cue number of '*' would address EVERY cue.
+const UNSAFE_CUE_NUMBER = /[\s/#*,?[\]{}]/;
+
+const CUE_NUMBER_PARAM: MonitoringSettingField[] = [
+  {
+    Key: 'Number',
+    Label: 'Cue number',
+    Type: 'string',
+    Default: '',
+    Required: true,
+    Note: 'The cue number as shown in QLab, e.g. 5 or 12.3.',
+  },
+];
+
+// Resolve the same connection this method's probe uses, so an action rides the
+// warm session rather than opening its own. Observe() is idempotent and also
+// refreshes the interest TTL.
+function SendCue(
+  Target: MonitoringTargetLike,
+  Suffix: string,
+  Label: string
+): MonitoringActionResult {
+  const P = ResolveConnectionParams(Target);
+  if (P.Error) return { Success: false, Error: P.Error };
+
+  const Key = QLabConnectionManager.Observe({
+    Address: P.Address,
+    Port: P.Port,
+    Workspace: P.Workspace,
+    Passcode: P.Passcode,
+  });
+
+  if (!QLabConnectionManager.SendToWorkspace(Key, Suffix)) {
+    const Snapshot = QLabConnectionManager.Snapshot(Key);
+    return {
+      Success: false,
+      Error: Snapshot.Connected
+        ? 'QLab is connected but no workspace has been resolved yet'
+        : 'Not connected to QLab',
+    };
+  }
+
+  return { Success: true, Detail: `${Label} sent to QLab` };
+}
+
+function WithCueNumber(
+  Target: MonitoringTargetLike,
+  Params: Record<string, unknown>,
+  Suffix: (Number0: string) => string,
+  Label: (Number0: string) => string
+): MonitoringActionResult {
+  const Number0 = String(Params.Number ?? '').trim();
+  if (!Number0) return { Success: false, Error: 'No cue number given' };
+  if (UNSAFE_CUE_NUMBER.test(Number0)) {
+    return { Success: false, Error: `"${Number0}" is not a usable cue number` };
+  }
+  return SendCue(Target, Suffix(Number0), Label(Number0));
+}
+
+// Every QLab action is fire-and-forget: the connection sends /alwaysReply, but
+// nothing here correlates the reply yet, so a success means "written to a live
+// socket" and the result must not claim more. Reply correlation via
+// ParseQLabReply is the natural next step if confirmation is ever needed.
+const Actions: MonitoringMethodAction[] = [
+  {
+    ID: 'workspace.go',
+    Label: 'Go',
+    Icon: 'play-fill',
+    Group: 'Playback',
+    FireAndForget: true,
+    Run: (Target) => SendCue(Target, '/go', 'Go'),
+  },
+  {
+    ID: 'workspace.stop',
+    Label: 'Stop',
+    Icon: 'stop-fill',
+    Group: 'Playback',
+    FireAndForget: true,
+    Run: (Target) => SendCue(Target, '/stop', 'Stop'),
+  },
+  {
+    ID: 'workspace.panic',
+    Label: 'Panic (fade everything out)',
+    Icon: 'exclamation-octagon',
+    Group: 'Playback',
+    Destructive: true,
+    FireAndForget: true,
+    Run: (Target) => SendCue(Target, '/panic', 'Panic'),
+  },
+  {
+    ID: 'cue.start',
+    Label: 'Start Cue',
+    Icon: 'play-circle',
+    Group: 'Playback',
+    Params: CUE_NUMBER_PARAM,
+    FireAndForget: true,
+    Run: (Target, Params) =>
+      WithCueNumber(
+        Target,
+        Params,
+        (N) => `/cue/${N}/start`,
+        (N) => `Start cue ${N}`
+      ),
+  },
+  {
+    ID: 'cue.stop',
+    Label: 'Stop Cue',
+    Icon: 'stop-circle',
+    Group: 'Playback',
+    Params: CUE_NUMBER_PARAM,
+    FireAndForget: true,
+    Run: (Target, Params) =>
+      WithCueNumber(
+        Target,
+        Params,
+        (N) => `/cue/${N}/stop`,
+        (N) => `Stop cue ${N}`
+      ),
+  },
+];
+
+export { ID, Settings, Actions, Run, Debug };

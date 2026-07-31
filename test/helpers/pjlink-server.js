@@ -14,13 +14,21 @@ function expectedDigest(seed, password) {
 }
 
 // startPJLinkServer options:
-//   responses: { POWR: '1', ERST: '000000', LAMP: '8262 1', ... }
-//   auth:      { seed: '498e4a67', password: 'secret' }  (omit for no auth)
+//   responses:    { POWR: '1', ERST: '000000', LAMP: '8262 1', ... }  — query replies
+//   setResponses: { POWR: 'ERR3' }  — replies to SET commands (default 'OK').
+//                 The sentinel '__drop__' makes the projector hang up instead of
+//                 replying, which is what many do when a power-off starts cooling.
+//   auth:         { seed: '498e4a67', password: 'secret' }  (omit for no auth)
+//
+// getSetCommands() returns the SET commands received, so a test can assert the
+// exact wire parameter (POWR 1 vs POWR 0) rather than only the outcome.
 function startPJLinkServer(options = {}) {
   const responses = options.responses || {};
+  const setResponses = options.setResponses || {};
   const auth = options.auth || null;
   return new Promise((resolve) => {
     const sockets = new Set();
+    const setCommands = [];
     let connectionCount = 0;
 
     const server = net.createServer((socket) => {
@@ -54,9 +62,29 @@ function startPJLinkServer(options = {}) {
           }
           firstCommand = false;
 
-          const match = line.match(/^%[12]([A-Z0-9]{4})\s+\?/i);
+          const match = line.match(/^%[12]([A-Z0-9]{4})\s+(\S+)/i);
           if (!match) continue;
           const command = match[1].toUpperCase();
+          const param = match[2];
+
+          // A SET command (any parameter other than '?'). Answered from the
+          // setResponses map, defaulting to OK — real projectors reply OK, or an
+          // ERR token when they refuse.
+          if (param !== '?') {
+            setCommands.push({ Command: command, Param: param });
+            const reply = Object.prototype.hasOwnProperty.call(setResponses, command)
+              ? setResponses[command]
+              : 'OK';
+            if (reply === '__drop__') {
+              // The projector hangs up instead of replying — what many do when a
+              // power-off puts them into cooling.
+              socket.destroy();
+              return;
+            }
+            socket.write(`%1${command}=${reply}\r`);
+            continue;
+          }
+
           const value = Object.prototype.hasOwnProperty.call(responses, command)
             ? responses[command]
             : 'ERR1';
@@ -69,6 +97,7 @@ function startPJLinkServer(options = {}) {
       resolve({
         port: server.address().port,
         getConnectionCount: () => connectionCount,
+        getSetCommands: () => setCommands.slice(),
         close: () =>
           new Promise((r) => {
             for (const s of sockets) s.destroy();

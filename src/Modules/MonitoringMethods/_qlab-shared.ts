@@ -22,7 +22,7 @@
 // Observe().
 import net from 'net';
 import { CreateLogger } from '../Logger';
-import { EncodeOscTcp, DecodeOscStream, type OscMessage } from './_osc-shared';
+import { EncodeOscTcp, DecodeOscStream, type OscArg, type OscMessage } from './_osc-shared';
 import type { MonitoringResult } from './types';
 
 const Logger = CreateLogger('QLab');
@@ -229,6 +229,26 @@ class QLabConnectionManagerImpl {
     // Derive freshness on read so a silently-dead socket surfaces as stale.
     const Stale = !Conn.LastContactAt || Date.now() - Conn.LastContactAt > STALE_AFTER_MS;
     return { ...Snap, Connected: Conn.State === 'ready', Stale };
+  }
+
+  // Send a workspace-scoped message on an already-observed connection, e.g.
+  // SendToWorkspace(Key, '/cue/5/start'). Returns false when the connection is
+  // unknown, not ready, its socket is gone, or the workspace has not resolved.
+  //
+  // A false return MUST be surfaced as a failure by the caller. "Wrote nothing
+  // because the socket was down" is the QLab form of the reports-success-but-
+  // did-nothing trap, and it is the likely case during a show — QLab quit, the
+  // workspace closed, the passcode changed. Refusing on an unresolved workspace
+  // matters just as much: QLab silently ignores `/workspace/null/...`, which
+  // would otherwise read as a cue that fired.
+  SendToWorkspace(Key: string, Suffix: string, Args: OscArg[] = []): boolean {
+    const Conn = this.Connections.get(Key);
+    if (!Conn || Conn.State !== 'ready') return false;
+    if (!Conn.Snapshot.WorkspaceID) return false;
+    const Socket = Conn.Socket;
+    if (!Socket || Socket.destroyed) return false;
+    this.Send(Conn, this.Ws(Conn, Suffix), Args);
+    return true;
   }
 
   private EnsureConnected(Conn: Connection): void {

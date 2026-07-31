@@ -13,7 +13,14 @@ import { CreateLogger } from '../Logger';
 import { Manager as CacheManager } from '../CacheManager';
 import { MethodInfo } from './info';
 import { MethodGroups, DEFAULT_GROUP } from './groups';
-import type { MonitoringMethod, MonitoringResult, MonitoringTargetLike } from './types';
+import type {
+  MonitoringActionResult,
+  MonitoringMethod,
+  MonitoringMethodAction,
+  MonitoringResult,
+  MonitoringSettingField,
+  MonitoringTargetLike,
+} from './types';
 
 // General
 import * as ping from './ping';
@@ -122,6 +129,23 @@ for (const Mod of MethodModules) {
   Methods.set(Mod.ID, Mod);
 }
 
+// Strip the Run() implementation off a control action; the renderer only needs
+// the label and the parameter schema.
+function PublicActionShape(Action: MonitoringMethodAction) {
+  return {
+    ID: Action.ID,
+    Label: Action.Label,
+    Icon: Action.Icon || '',
+    Group: Action.Group || '',
+    Params: Array.isArray(Action.Params) ? Action.Params : [],
+    Destructive: !!Action.Destructive,
+    // Published so the editor and run log can say "sent" rather than "done" for
+    // transports that never answer.
+    FireAndForget: !!Action.FireAndForget,
+    Note: Action.Note || '',
+  };
+}
+
 // Strip the Run() implementation; the renderer only needs the schema.
 function PublicShape(Method: MonitoringMethod) {
   return {
@@ -129,6 +153,7 @@ function PublicShape(Method: MonitoringMethod) {
     Name: Method.Name,
     Description: Method.Description || '',
     Info: Method.Info || MethodInfo[Method.ID] || null,
+    Actions: Array.isArray(Method.Actions) ? Method.Actions.map(PublicActionShape) : [],
     // Grouping label for the editor's method picker. A method may export its own
     // Group; otherwise the central map decides, falling back to "Other".
     Group: Method.Group || MethodGroups[Method.ID] || DEFAULT_GROUP,
@@ -139,6 +164,75 @@ function PublicShape(Method: MonitoringMethod) {
     UsesAddress: Method.UsesAddress !== false,
     SupportsLatencyThreshold: Method.SupportsLatencyThreshold !== false,
   };
+}
+
+// Coerce an arbitrary input bag against a MonitoringSettingField schema.
+//
+// Shared by check settings and control-action parameters on purpose: both are
+// described by the same schema vocabulary and rendered by the same editor, so
+// two coercion implementations would eventually disagree about what a blank
+// number field or an out-of-range select means.
+function CoerceAgainstSchema(
+  Schema: MonitoringSettingField[] | undefined,
+  Input: unknown
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const Fields = Array.isArray(Schema) ? Schema : [];
+  const Source: Record<string, unknown> =
+    Input && typeof Input === 'object' ? (Input as Record<string, unknown>) : {};
+
+  for (const Field of Fields) {
+    const Key = Field.Key;
+    if (!Key) continue;
+    let Value: unknown = Source[Key];
+    // A 'list' field is an array; only fall back to the default when it is truly
+    // absent (not for a legitimately empty array the user cleared).
+    if (Field.Type === 'list') {
+      const Raw = Array.isArray(Value)
+        ? Value
+        : Value === undefined || Value === null || Value === ''
+          ? Array.isArray(Field.Default)
+            ? Field.Default
+            : []
+          : [Value];
+      const Seen = new Set<string>();
+      const List: string[] = [];
+      for (const Item of Raw as unknown[]) {
+        let Entry = String(Item == null ? '' : Item).trim();
+        if (Field.ItemType === 'number') {
+          const N = Number(Entry);
+          if (!Number.isFinite(N)) continue;
+          Entry = String(N);
+        }
+        if (!Entry || Seen.has(Entry)) continue;
+        Seen.add(Entry);
+        List.push(Entry);
+      }
+      out[Key] = List;
+      continue;
+    }
+    if (Value === undefined || Value === null || Value === '') {
+      Value = Field.Default;
+    }
+    if (Field.Type === 'number') {
+      Value = Number(Value);
+      if (!Number.isFinite(Value)) Value = Field.Default;
+      if (typeof Field.Min === 'number' && (Value as number) < Field.Min) Value = Field.Min;
+      if (typeof Field.Max === 'number' && (Value as number) > Field.Max) Value = Field.Max;
+    } else if (Field.Type === 'boolean') {
+      Value = !!Value;
+    } else if (Field.Type === 'select') {
+      // For select fields, validate against options
+      const Options = Field.Options || [];
+      const ValidValues = Options.map((o) => (typeof o === 'object' ? o.value : o));
+      Value = ValidValues.includes(Value as string) ? Value : Field.Default;
+      Value = String(Value);
+    } else {
+      Value = String(Value == null ? '' : Value);
+    }
+    out[Key] = Value;
+  }
+  return out;
 }
 
 function stableStringify(Value: unknown): string {
@@ -208,64 +302,7 @@ const Manager = {
       MethodNormalized = Method.NormalizeSettings(Input);
     }
 
-    const out: Record<string, unknown> = {};
-    const Schema = Array.isArray(Method.Settings) ? Method.Settings : [];
-    const Source: Record<string, unknown> =
-      MethodNormalized && typeof MethodNormalized === 'object'
-        ? (MethodNormalized as Record<string, unknown>)
-        : {};
-    for (const Field of Schema) {
-      const Key = Field.Key;
-      if (!Key) continue;
-      let Value: unknown = Source[Key];
-      // A 'list' field is an array; only fall back to the default when it is truly
-      // absent (not for a legitimately empty array the user cleared).
-      if (Field.Type === 'list') {
-        const Raw = Array.isArray(Value)
-          ? Value
-          : Value === undefined || Value === null || Value === ''
-            ? Array.isArray(Field.Default)
-              ? Field.Default
-              : []
-            : [Value];
-        const Seen = new Set<string>();
-        const List: string[] = [];
-        for (const Item of Raw as unknown[]) {
-          let Entry = String(Item == null ? '' : Item).trim();
-          if (Field.ItemType === 'number') {
-            const N = Number(Entry);
-            if (!Number.isFinite(N)) continue;
-            Entry = String(N);
-          }
-          if (!Entry || Seen.has(Entry)) continue;
-          Seen.add(Entry);
-          List.push(Entry);
-        }
-        out[Key] = List;
-        continue;
-      }
-      if (Value === undefined || Value === null || Value === '') {
-        Value = Field.Default;
-      }
-      if (Field.Type === 'number') {
-        Value = Number(Value);
-        if (!Number.isFinite(Value)) Value = Field.Default;
-        if (typeof Field.Min === 'number' && (Value as number) < Field.Min) Value = Field.Min;
-        if (typeof Field.Max === 'number' && (Value as number) > Field.Max) Value = Field.Max;
-      } else if (Field.Type === 'boolean') {
-        Value = !!Value;
-      } else if (Field.Type === 'select') {
-        // For select fields, validate against options
-        const Options = Field.Options || [];
-        const ValidValues = Options.map((o) => (typeof o === 'object' ? o.value : o));
-        Value = ValidValues.includes(Value as string) ? Value : Field.Default;
-        Value = String(Value);
-      } else {
-        Value = String(Value == null ? '' : Value);
-      }
-      out[Key] = Value;
-    }
-    return out;
+    return CoerceAgainstSchema(Method.Settings, MethodNormalized);
   },
 
   Run: async (ID: string, Target: MonitoringTargetLike): Promise<MonitoringResult> => {
@@ -294,6 +331,100 @@ const Manager = {
         Error: Err && (Err as Error).message ? (Err as Error).message : String(Err),
       };
     }
+  },
+
+  GetAction: (MethodID: string, ActionID: string): MonitoringMethodAction | null => {
+    const Method = Methods.get(MethodID);
+    if (!Method || !Array.isArray(Method.Actions)) return null;
+    return Method.Actions.find((Action) => Action.ID === ActionID) || null;
+  },
+
+  HasAction: (MethodID: string, ActionID: string): boolean =>
+    !!Manager.GetAction(MethodID, ActionID),
+
+  NormalizeActionParams: (
+    MethodID: string,
+    ActionID: string,
+    Input: unknown
+  ): Record<string, unknown> => {
+    const Action = Manager.GetAction(MethodID, ActionID);
+    if (!Action) return {};
+    return CoerceAgainstSchema(Action.Params, Input);
+  },
+
+  // Send a control command to a device.
+  //
+  // Note the deliberate asymmetry with Run() above: an unknown method there
+  // reads as Degraded so a stale saved check isn't reported as an outage. Here
+  // it is a hard failure, because the inverse mistake — reporting success for a
+  // command that was never sent — is the worst outcome a control path has.
+  RunAction: async (
+    MethodID: string,
+    ActionID: string,
+    Target: MonitoringTargetLike,
+    Params: unknown
+  ): Promise<MonitoringActionResult> => {
+    const Method = Methods.get(MethodID);
+    if (!Method) return { Success: false, Error: `Unknown method: ${MethodID}` };
+
+    // The Actions array IS the allowlist, exactly as FREEKIOSK_COMMANDS is.
+    // Anything absent is refused, so there is no blocklist to keep current.
+    const Action = Manager.GetAction(MethodID, ActionID);
+    if (!Action) {
+      return { Success: false, Error: `Unknown action "${ActionID}" for method ${MethodID}` };
+    }
+
+    const Normalized = CoerceAgainstSchema(Action.Params, Params);
+
+    // Enforce Required. See the note on MonitoringMethodAction.Params for why
+    // this departs from the display-hint meaning the flag carries elsewhere.
+    for (const Field of Action.Params || []) {
+      if (!Field.Required || !Field.Key) continue;
+      if (Field.Type === 'boolean') continue;
+      const Value = Normalized[Field.Key];
+      const Missing =
+        Value === undefined ||
+        Value === null ||
+        Value === '' ||
+        (Array.isArray(Value) && !Value.length);
+      if (Missing) {
+        return { Success: false, Error: `${Action.Label} requires "${Field.Label}"` };
+      }
+    }
+
+    let Result: MonitoringActionResult;
+    try {
+      Result = await Action.Run(Target, Normalized);
+    } catch (Err) {
+      Result = {
+        Success: false,
+        Error: Err && (Err as Error).message ? (Err as Error).message : String(Err),
+      };
+    }
+
+    // Drop cached reads even when the action failed. A refused command can still
+    // have changed the device (a projector answering ERR3 is mid-warm-up), and
+    // serving a one-second-old pre-command snapshot to the very next probe is
+    // exactly the confusion a control action introduces.
+    try {
+      RUN_CACHE.Delete(getMethodRunCacheKey(MethodID, Method, Target));
+      if (typeof Method.InvalidateCaches === 'function') Method.InvalidateCaches(Target);
+    } catch (Err) {
+      Logger.warn(
+        `Cache invalidation failed after ${MethodID}/${ActionID}: ${Err && (Err as Error).message ? (Err as Error).message : Err}`
+      );
+    }
+
+    if (!Result || typeof Result !== 'object') {
+      return { Success: false, Error: `${Action.Label} returned no result` };
+    }
+    return {
+      ...Result,
+      Detail: Result.Detail || Action.Label,
+      // A fire-and-forget transport cannot know the device acted, whatever its
+      // Run() claims.
+      Confirmed: Action.FireAndForget ? false : Result.Confirmed !== false,
+    };
   },
 
   // Build the HTML "last response" debug panel for a check. Each method may
