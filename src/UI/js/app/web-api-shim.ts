@@ -103,6 +103,15 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     OnNetworkInterfacesChanged: noSub,
     GetSettings: async () => rpc('Settings:Get'),
 
+    // Paired-device management is desktop only. The browser gets the same inert
+    // stubs every other desktop-only call gets, so the shared renderer runs
+    // unchanged rather than needing to know which surface it is on.
+    GetRemoteDevices: nullTuple,
+    RevokeRemoteDevice: nullTuple,
+    RevokeAllRemoteDevices: nullTuple,
+    IssueRemotePairingCode: nullTuple,
+    ClearRemotePairingCode: nullTuple,
+
     // ---- Adoption / updates ----------------------------------------------
     AdoptDevice: async (UUID) => rpc('AdoptDevice', UUID),
     CheckForUpdatesOnClient: nullTuple,

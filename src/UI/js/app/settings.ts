@@ -18,7 +18,8 @@ import {
 } from './mode';
 import { GetAlertVolume, HandleNonFatalError, Safe, ShowQRModal } from './utils';
 import { Notify } from './selection-init';
-import type { SettingGroupView, SettingView } from '@showtrak/protocol';
+import { ConfirmationDialog } from './lib/toasts';
+import type { RemoteDeviceView, SettingGroupView, SettingView } from '@showtrak/protocol';
 // Wires the mode/compact/alert-action buttons and fetches initial settings +
 // mode state. Formerly a DOMContentLoaded handler; InitSettings() calls it
 // directly (fire-and-forget) once the bootstrap orchestrator runs — the DOM is
@@ -179,6 +180,10 @@ function InitSettingsPush() {
 
     // Remote Access section: enumerate Web UI addresses and render list with QR.
     await RenderRemoteAccessSection();
+    // Paired devices last, so BuildSettingsNav inside RenderRemoteAccessSection
+    // is followed by one final rebuild that sees both sections.
+    await RenderPairedDevicesSection();
+    BuildSettingsNav();
 
     RestoreViewState();
   });
@@ -619,6 +624,179 @@ async function RenderRemoteAccessSection() {
   // Rebuild the left-hand category nav now that the section set is final. Runs
   // for both the full settings render and standalone network-interface refreshes.
   BuildSettingsNav();
+}
+
+// Paired-device list currently rendered into #PAIRED_DEVICES_SECTION.
+let RenderedPairedDevices: string | null = null;
+
+// Absolute date-time for a paired/last-seen stamp. Deliberately not "3 days ago":
+// the operator is deciding whether a device they no longer recognise should keep
+// its access, and "last Tuesday" answers that better than a relative phrase they
+// then have to convert.
+function FormatDeviceTimestamp(Value: number | null): string {
+  if (!Value) return 'Never';
+  try {
+    return new Date(Value).toLocaleString();
+  } catch {
+    return 'Unknown';
+  }
+}
+
+function DeviceIcon(Platform: string | null): string {
+  if (Platform === 'ios') return 'bi-apple';
+  if (Platform === 'android') return 'bi-android2';
+  return 'bi-phone';
+}
+
+// Show a QR carrying a fresh single-use pairing code, so a phone can pair
+// without anyone typing an address or a PIN. The code is minted per display and
+// discarded when the modal closes — a QR left on a screen after the operator
+// walks away must not still be redeemable.
+async function ShowPairingQR() {
+  try {
+    const Config = await window.API.GetConfig();
+    const [Err, Issued] = await window.API.IssueRemotePairingCode();
+    if (Err || !Issued) {
+      Notify('Could not create a pairing code', 'error');
+      return;
+    }
+    // A URL rather than bare JSON: a phone without the app installed still gets
+    // something its camera can act on, and the app registers the scheme.
+    const Port = Config?.Application?.Port ?? 3000;
+    await ShowQRModal(`showtrak://pair?port=${Port}&code=${encodeURIComponent(Issued.Code)}`);
+
+    // Invalidate the code when the QR leaves the screen. ShowQRModal resolves as
+    // soon as the modal OPENS, not when it closes, so clearing on that promise
+    // would kill the code before anyone could scan it. The 60s expiry is the
+    // backstop; this closes the gap where a dismissed modal's code stays live.
+    $('#SHOWTRAK_QR_MODAL').one('hidden.bs.modal', () => {
+      void window.API.ClearRemotePairingCode();
+    });
+  } catch (err) {
+    HandleNonFatalError('Settings:ShowPairingQR', err);
+  }
+}
+
+// Render (or re-render) the paired ShowTrak Remote devices list. Follows the
+// Remote Access section above: signature-guarded so an unrelated settings edit
+// does not churn the DOM (and the nav rebuilt from it) under the user.
+async function RenderPairedDevicesSection() {
+  const $container = $('#PAIRED_DEVICES_SECTION');
+  if (!$container.length) return;
+  try {
+    const [Err, Devices] = await window.API.GetRemoteDevices();
+    // The browser surface stubs this call out — paired-device management is
+    // desktop only — so an empty result there is expected, not an error.
+    const List: RemoteDeviceView[] = Err || !Devices ? [] : Devices;
+
+    const Signature = JSON.stringify(List.map((D) => [D.DeviceID, D.DeviceName, D.LastSeenAt]));
+    if (Signature === RenderedPairedDevices) return;
+    RenderedPairedDevices = Signature;
+
+    $container.html('');
+    if (!List.length) {
+      // Nothing paired: drop the nav metadata so an empty section is left out of
+      // the category rail entirely.
+      $container
+        .removeClass('settings-section')
+        .removeAttr('data-nav-key')
+        .removeAttr('data-nav-title');
+      return;
+    }
+
+    $container
+      .addClass('settings-section')
+      .attr('data-nav-key', '__PAIRED_DEVICES__')
+      .attr('data-nav-title', 'Paired Devices');
+    $container.append(`
+      <div class="bg-ghost-light p-2 rounded text-start d-flex justify-content-between align-items-center">
+        <div class="d-grid">
+          <strong>Paired Devices</strong>
+          <div class="text-sm text-muted">Phones and tablets running ShowTrak Remote.</div>
+        </div>
+        <div class="d-flex gap-1 flex-shrink-0 ms-2">
+          <button type="button" class="btn btn-sm bg-ghost text-white" id="PAIRED_DEVICES_QR" title="Show a pairing code" aria-label="Show a pairing code">
+            <i class="bi bi-qr-code"></i>
+          </button>
+          <button type="button" class="btn btn-sm bg-ghost text-white" id="PAIRED_DEVICES_REVOKE_ALL" title="Revoke every device" aria-label="Revoke every paired device">
+            <i class="bi bi-x-octagon"></i>
+          </button>
+        </div>
+      </div>
+    `);
+
+    $container.append(
+      List.map(
+        (Device) => `
+          <div class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center text-start">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi ${DeviceIcon(Device.Platform)} fs-5"></i>
+              <div class="d-grid">
+                <span>${Safe(Device.DeviceName)}</span>
+                <span class="text-sm text-muted">Paired ${Safe(
+                  FormatDeviceTimestamp(Device.PairedAt)
+                )} &middot; Last seen ${Safe(FormatDeviceTimestamp(Device.LastSeenAt))}</span>
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm bg-ghost-light text-white flex-shrink-0 ms-2" data-revoke-device="${Safe(
+              Device.DeviceID
+            )}" title="Revoke this device" aria-label="Revoke ${Safe(Device.DeviceName)}">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>`
+      ).join('')
+    );
+
+    $container
+      .find('#PAIRED_DEVICES_QR')
+      .off('click')
+      .on('click', () => void ShowPairingQR());
+
+    // Revocation is confirmed because it is not undoable: the device has to be
+    // physically present with someone who knows the PIN to get back in.
+    $container
+      .find('[data-revoke-device]')
+      .off('click')
+      .on('click', async function () {
+        const DeviceID = $(this).attr('data-revoke-device');
+        if (!DeviceID) return;
+        const Device = List.find((D) => D.DeviceID === DeviceID);
+        const Confirmed = await ConfirmationDialog(
+          `Revoke "${Device ? Device.DeviceName : 'this device'}"? It will be disconnected immediately and must pair again.`
+        );
+        if (!Confirmed) return;
+        const [RevokeErr] = await window.API.RevokeRemoteDevice(DeviceID);
+        if (RevokeErr) {
+          Notify('Could not revoke that device', 'error');
+          return;
+        }
+        Notify('Device revoked', 'success');
+        RenderedPairedDevices = null;
+        await RenderPairedDevicesSection();
+        BuildSettingsNav();
+      });
+
+    $container
+      .find('#PAIRED_DEVICES_REVOKE_ALL')
+      .off('click')
+      .on('click', async () => {
+        const Confirmed = await ConfirmationDialog(
+          `Revoke all ${List.length} paired device${List.length === 1 ? '' : 's'}? Every one will be disconnected immediately and must pair again.`
+        );
+        if (!Confirmed) return;
+        const [RevokeErr] = await window.API.RevokeAllRemoteDevices();
+        if (RevokeErr) {
+          Notify('Could not revoke those devices', 'error');
+          return;
+        }
+        Notify('All devices revoked', 'success');
+        RenderedPairedDevices = null;
+        await RenderPairedDevicesSection();
+        BuildSettingsNav();
+      });
+  } catch (err) {
+    HandleNonFatalError('Settings:RenderPairedDevicesSection', err);
+  }
 }
 
 // (Re)build the left-hand category rail from the sections currently in the
