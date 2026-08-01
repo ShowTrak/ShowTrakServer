@@ -350,6 +350,28 @@ Schema.push({
     )',
 });
 
+// Paired ShowTrak Remote devices (phones/tablets on the `/sdk` control API).
+//
+// Unlike the Web UI's session tokens, which live in a Map and die with the
+// process, these are persisted: the server gets restarted between shows and
+// occasionally during one, and re-typing the workspace PIN because the desk
+// rebooted mid-show is precisely the failure this table exists to prevent.
+//
+// Only the SHA-256 of each token is stored. A leaked database therefore does not
+// hand an attacker a working credential, and there is no path that needs the
+// plaintext back — it is returned once, at pairing, and never again.
+Schema.push({
+  Name: 'RemoteDevices',
+  SQL: 'CREATE TABLE IF NOT EXISTS `RemoteDevices` ( \
+            DeviceID TEXT PRIMARY KEY, \
+            TokenHash TEXT NOT NULL, \
+            DeviceName TEXT, \
+            Platform TEXT, \
+            PairedAt BIGINT(11) NOT NULL, \
+            LastSeenAt BIGINT(11) \
+    )',
+});
+
 // Versioned migrations for existing installs. Applied versions are recorded in
 // the SchemaMigrations table; only versions above the recorded maximum run.
 // Installs that predate the version table are back-filled by probing
@@ -471,6 +493,14 @@ Schema.Migrations = [
   {
     Version: 27,
     SQL: 'CREATE INDEX IF NOT EXISTS idx_freekioskterminals_groupid ON `FreeKioskTerminals` (GroupID)',
+  },
+  // Paired Remote devices. The table is created by the Schema block above on both
+  // new and existing installs, so only the index needs versioning. Every
+  // handshake looks a device up by token hash, so that lookup — not the DeviceID
+  // primary key — is the one on the hot path.
+  {
+    Version: 28,
+    SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_remotedevices_tokenhash ON `RemoteDevices` (TokenHash)',
   },
 ];
 

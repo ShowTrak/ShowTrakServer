@@ -20,6 +20,7 @@ import { register as registerFog } from './fog';
 import { register as registerAudio } from './audio';
 import { register as registerNetwork } from './network';
 import { register as registerScripts } from './scripts';
+import { register as registerRemoteDevices } from './remote-devices';
 
 function RegisterAllHandlers(): void {
   registerSystem();
@@ -36,6 +37,7 @@ function RegisterAllHandlers(): void {
   registerAudio();
   registerNetwork();
   registerScripts();
+  registerRemoteDevices();
 }
 
 export { RegisterAllHandlers };

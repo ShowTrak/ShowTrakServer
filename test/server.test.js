@@ -1138,7 +1138,11 @@ test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve
       Manager: { GetScriptsDirectory: () => '/tmp/scripts', GetStorageDirectory: () => '/tmp' },
     },
     '../UpdateManager': { Manager: { RegisterRoutes: () => {} } },
-    '../Broadcast': { Manager: { emit: (...args) => broadcastEvents.push(args) } },
+    // `on` as well as `emit`: this boots the whole Server module, which wires the
+    // /sdk namespace's revoked-device listener onto the same bus.
+    '../Broadcast': {
+      Manager: { emit: (...args) => broadcastEvents.push(args), on: () => {} },
+    },
     // A tag "foh" whose scope is group 1 — expands to r1 only.
     '../TagManager': {
       Manager: {

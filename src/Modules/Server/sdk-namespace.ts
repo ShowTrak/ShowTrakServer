@@ -1,24 +1,42 @@
 // SDK control API (`/sdk`) Socket.IO namespace.
 //
 // The external-integration surface: the ShowTrak Server SDK (and anything built
-// on it — the Companion module, future apps) connects here to drive the instance
-// in real time and receive live status pushes. Supports multiple concurrent
-// clients natively (Socket.IO fan-out).
+// on it — the Companion module, the ShowTrak Remote app) connects here to drive
+// the instance in real time and receive live status pushes. Supports multiple
+// concurrent clients natively (Socket.IO fan-out).
 //
 // Two mechanisms, mirroring the Web UI namespace but purpose-built and simpler:
 //   1. PUSH — one renderer sink (shared RendererBus) forwards an allowlist of
 //      state channels to every connected socket, serialized for the wire.
 //   2. COMMAND — a single `command` event dispatches to the transport-agnostic
-//      ControlService after API-key auth.
+//      ControlService once the handshake has authenticated.
 //
-// Auth is a REQUIRED API key (constant-time compared), read from settings and
-// auto-generated on first boot. No key configured / disabled feature / wrong key
-// → the connection is refused at the handshake.
+// Auth is REQUIRED, and comes in two flavours that are NOT interchangeable:
+//
+//   API key    — a 48-hex secret, auto-generated on first boot, presented on
+//                every handshake. This is how integrations connect. It is copied
+//                into a config file by hand, so it is long and never typed.
+//
+//   Device token — issued when a ShowTrak Remote device pairs (with the
+//                workspace PIN, a scanned pairing code, or nothing when PIN
+//                protection is off) and persisted in the RemoteDevices table.
+//                Revocable per device from Settings.
+//
+// The distinction matters beyond bookkeeping: a device session is stamped with
+// AuthMode 'device', which is what the management bridge will gate on. An API key
+// must never inherit privileges its holder did not ask for — a Companion install
+// wants to fire cues, not delete groups.
+//
+// No key configured / disabled feature / wrong credential → refused at the
+// handshake. Every branch that reaches next() without an error hands out control
+// of a live show, so there is no default-allow path.
 
 import crypto from 'crypto';
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/protocol';
 import { CreateLogger } from '../Logger';
+import { Manager as BroadcastManager } from '../Broadcast';
+import { Manager as RemoteDeviceManager } from '../RemoteDeviceManager';
 import { Manager as SettingsManager } from '../SettingsManager';
 import { Manager as ClientManager } from '../ClientManager';
 import { Manager as GroupManager } from '../GroupManager';
@@ -44,74 +62,134 @@ import { ControlService } from '../ControlService';
 const Logger = CreateLogger('SdkServer');
 
 // --- Handshake rate limiting ---------------------------------------------
+// Per-IP failures are counted over a rolling window; tripping the threshold arms
+// a short cool-off. State is in-memory and swept lazily on each handshake, so the
+// map stays bounded to currently-active IPs without a lingering timer. Mirrors
+// the Web UI login throttle in webui-namespace.ts (kept separate to avoid
+// coupling the two).
+//
+// There are TWO instances below, with deliberately different thresholds, because
+// the two credentials this namespace accepts are not remotely comparable in
+// strength. Sharing one counter would force a single threshold that is either
+// uselessly loose for the PIN or needlessly tight for the API key.
+const SDK_AUTH_WINDOW_MS = 60 * 1000; // rolling window over which failures are counted
+const SDK_AUTH_LOCKOUT_MS = 5 * 60 * 1000; // cool-off once a threshold trips
+
 // The API key is a 192-bit random secret (24 random bytes), so this is NOT a
 // brute-force defence — that keyspace is far out of reach. It is a deliberately
 // GENEROUS abuse backstop: it only stops a broken or hostile client from
-// hammering the handshake indefinitely. Per-IP failures are counted over a
-// rolling window; tripping the (high) threshold arms a short cool-off. State is
-// in-memory and swept lazily on each handshake, so the map stays bounded to
-// currently-active IPs without a lingering timer. Mirrors the Web UI login
-// throttle in webui-namespace.ts (kept separate to avoid coupling the two).
-const SDK_AUTH_MAX_FAILURES = 100; // very generous: failures per window before lockout
-const SDK_AUTH_WINDOW_MS = 60 * 1000; // rolling window over which failures are counted
-const SDK_AUTH_LOCKOUT_MS = 5 * 60 * 1000; // cool-off once the threshold trips
+// hammering the handshake indefinitely.
+const SDK_AUTH_MAX_FAILURES = 100;
+
+// The workspace PIN is 4 digits — a 10,000-key space. This threshold IS the
+// brute-force defence, so it matches the Web UI login throttle rather than the
+// generous API-key figure above. At 100 failures/minute a 4-digit PIN falls in
+// well under two hours; at 10 with a five-minute lockout it does not.
+const SDK_PAIRING_MAX_FAILURES = 10;
+
 interface SdkAuthRecord {
   failures: number;
   windowStart: number;
   lockedUntil: number;
 }
-const SdkAuthAttempts = new Map<string, SdkAuthRecord>();
 
-// How long this IP must wait before another handshake attempt (0 = not limited).
-function AuthRetryAfterMs(ip: string, now: number): number {
-  const Rec = SdkAuthAttempts.get(ip);
-  if (Rec && Rec.lockedUntil > now) return Rec.lockedUntil - now;
-  return 0;
+/**
+ * A per-IP failure counter with its own threshold. Each returned throttle owns a
+ * private Map, so a device fumbling its PIN can never contribute to locking out
+ * an integration presenting an API key, or vice versa.
+ */
+function CreateAuthThrottle(MaxFailures: number) {
+  const Attempts = new Map<string, SdkAuthRecord>();
+  return {
+    // How long this IP must wait before another attempt (0 = not limited).
+    RetryAfterMs(ip: string, now: number): number {
+      const Rec = Attempts.get(ip);
+      if (Rec && Rec.lockedUntil > now) return Rec.lockedUntil - now;
+      return 0;
+    },
+    // Record a failure, arming a lockout once too many land inside the window.
+    RecordFailure(ip: string, now: number): void {
+      let Rec = Attempts.get(ip);
+      if (!Rec || now - Rec.windowStart > SDK_AUTH_WINDOW_MS) {
+        Rec = { failures: 0, windowStart: now, lockedUntil: 0 };
+      }
+      Rec.failures += 1;
+      if (Rec.failures >= MaxFailures) {
+        Rec.lockedUntil = now + SDK_AUTH_LOCKOUT_MS;
+        Rec.failures = 0;
+        Rec.windowStart = now;
+      }
+      Attempts.set(ip, Rec);
+    },
+    // Clear an IP's failure record after a success.
+    Clear(ip: string): void {
+      Attempts.delete(ip);
+    },
+    // Evict records that are neither locked nor inside their counting window.
+    Sweep(now: number): void {
+      for (const [Ip, Rec] of Attempts) {
+        if (Rec.lockedUntil <= now && now - Rec.windowStart > SDK_AUTH_WINDOW_MS) {
+          Attempts.delete(Ip);
+        }
+      }
+    },
+  };
 }
 
-// Record a failed handshake, arming a lockout once too many failures land inside
-// the rolling window.
-function RecordAuthFailure(ip: string, now: number): void {
-  let Rec = SdkAuthAttempts.get(ip);
-  if (!Rec || now - Rec.windowStart > SDK_AUTH_WINDOW_MS) {
-    Rec = { failures: 0, windowStart: now, lockedUntil: 0 };
-  }
-  Rec.failures += 1;
-  if (Rec.failures >= SDK_AUTH_MAX_FAILURES) {
-    Rec.lockedUntil = now + SDK_AUTH_LOCKOUT_MS;
-    Rec.failures = 0;
-    Rec.windowStart = now;
-  }
-  SdkAuthAttempts.set(ip, Rec);
-}
-
-// Clear an IP's failure record after a successful handshake.
-function ClearAuthFailures(ip: string): void {
-  SdkAuthAttempts.delete(ip);
-}
-
-// Evict records that are neither locked nor inside their counting window.
-function SweepAuthFailures(now: number): void {
-  for (const [Ip, Rec] of SdkAuthAttempts) {
-    if (Rec.lockedUntil <= now && now - Rec.windowStart > SDK_AUTH_WINDOW_MS) {
-      SdkAuthAttempts.delete(Ip);
-    }
-  }
-}
+const ApiKeyThrottle = CreateAuthThrottle(SDK_AUTH_MAX_FAILURES);
+const PairingThrottle = CreateAuthThrottle(SDK_PAIRING_MAX_FAILURES);
 
 // Structural socket/namespace types — the `/sdk` namespace speaks its own
 // string-keyed command/push protocol, not the client wire contract.
 interface SdkSocket {
   id: string;
-  handshake: { address: string; auth: { apiKey?: string; [k: string]: unknown } };
+  handshake: {
+    address: string;
+    auth: {
+      apiKey?: string;
+      /**
+       * Explicit pairing intent. Required rather than inferred from the presence
+       * of a PIN, because pairing with protection off carries no credential at
+       * all — without an explicit flag, "pair me" and "I forgot my API key" would
+       * be the same handshake.
+       */
+      pair?: boolean;
+      pin?: string;
+      pairingCode?: string;
+      deviceToken?: string;
+      deviceName?: string;
+      platform?: string;
+      [k: string]: unknown;
+    };
+  };
+  /**
+   * How this socket authenticated. Stamped by the handshake middleware and read
+   * wherever privilege differs between an integration and a paired device — most
+   * importantly by the Phase 0b `rpc` bridge, which is device-only.
+   */
+  AuthMode?: SdkAuthMode;
+  /** Set for device sessions, so a revoked device can be found and ejected. */
+  DeviceID?: string | null;
+  /**
+   * A freshly minted token, held between the middleware and the connection
+   * handler. Socket.IO middleware cannot return a payload with next(), so a
+   * successful pairing parks the plaintext token here and the connection handler
+   * emits it. Cleared immediately after — this is the only moment it exists in
+   * memory, and it must not outlive the emit.
+   */
+  PendingDeviceToken?: string | null;
   emit(event: string, ...args: unknown[]): boolean;
   on(event: string, listener: (...args: never[]) => void): void;
+  disconnect(close?: boolean): void;
 }
 interface SdkNamespace {
   use(fn: (socket: SdkSocket, next: (err?: Error) => void) => void): void;
   on(event: 'connection', listener: (socket: SdkSocket) => void | Promise<void>): void;
   sockets: { values(): IterableIterator<SdkSocket> };
 }
+
+/** Which credential a connected socket presented at the handshake. */
+type SdkAuthMode = 'apikey' | 'device';
 type SdkIOServer = Server<ClientToServerEvents, ServerToClientEvents>;
 type AckCallback = (response?: unknown) => void;
 
@@ -173,21 +251,43 @@ function TransformSdkPush(channel: string, args: unknown[]): unknown[] {
 interface SdkConfig {
   Enabled: boolean;
   ApiKey: string;
+  /** Whether phones/tablets may pair at all (SDK_ALLOW_REMOTE_PAIRING). */
+  PairingEnabled: boolean;
+  /**
+   * Whether pairing must present the workspace PIN. Protection is only
+   * meaningful when a passcode is actually set — the same rule the Web UI
+   * applies, so "protection on, passcode blank" does not lock everyone out.
+   */
+  RequirePin: boolean;
+  /** The workspace PIN itself (WEBUI_PASSWORD), shared with the Web UI. */
+  Pin: string;
 }
 
 // Read SDK API settings, generating and persisting a key on first use so the
 // operator always has one to copy into an integration.
+//
+// Pairing deliberately reads the WEB UI passcode rather than a second setting of
+// its own: to an operator there is one "workspace PIN", and two PINs to keep
+// straight would be worse than one. The Web UI's own settings remain the single
+// place it is configured.
 async function GetSdkConfig(): Promise<SdkConfig> {
   let Enabled = true;
   let ApiKey = '';
+  let PairingEnabled = true;
+  let ProtectionEnabled = false;
+  let Pin = '';
   try {
     const EnabledValue = await SettingsManager.GetValue('SDK_API_ENABLED');
     Enabled = EnabledValue == null ? true : !!EnabledValue;
     ApiKey = String((await SettingsManager.GetValue('SDK_API_KEY')) || '').trim();
+    const PairingValue = await SettingsManager.GetValue('SDK_ALLOW_REMOTE_PAIRING');
+    PairingEnabled = PairingValue == null ? true : !!PairingValue;
+    ProtectionEnabled = !!(await SettingsManager.GetValue('WEBUI_PASSWORD_PROTECTION_ENABLED'));
+    Pin = String((await SettingsManager.GetValue('WEBUI_PASSWORD')) || '').trim();
   } catch {
     /* fall back to safe defaults */
   }
-  return { Enabled, ApiKey };
+  return { Enabled, ApiKey, PairingEnabled, RequirePin: ProtectionEnabled && Pin.length > 0, Pin };
 }
 
 async function EnsureApiKey(): Promise<void> {
@@ -241,6 +341,10 @@ async function DispatchCommand(name: unknown, rawArgs: unknown) {
       return ControlService.SetMode(String(args.mode ?? 'SHOW'));
     case 'mode.toggle':
       return ControlService.ToggleMode();
+    case 'identify.client':
+      return ControlService.Identify(slug);
+    case 'identify.stop':
+      return ControlService.StopIdentify(slug);
     case 'modal.openClient':
       return ControlService.OpenClientModal(slug);
     case 'modal.closeAll':
@@ -283,31 +387,118 @@ function SetupSdkNamespace(io: SdkIOServer) {
     }
   });
 
-  // Required-API-key gate at the handshake, behind a generous per-IP throttle.
+  // Handshake gate. Three credentials are accepted, in a fixed order so a socket
+  // presenting more than one cannot shop for the most permissive:
+  //
+  //   1. deviceToken  — an already-paired ShowTrak Remote device.
+  //   2. pair: true   — a device asking to pair, with the workspace PIN, a
+  //                     scanned pairing code, or nothing when PIN protection is
+  //                     off. Succeeds by minting a token, never by admitting an
+  //                     unauthenticated socket.
+  //   3. apiKey       — an integration (the SDK, Companion). Unchanged.
+  //
+  // Anything else is refused. Every path that reaches next() without an error is
+  // a path that hands out control of a live show, so there is no default-allow
+  // branch anywhere below.
   sdk.use((socket, next) => {
     void (async () => {
       const IP = String((socket.handshake && socket.handshake.address) || 'unknown');
       const Now = Date.now();
       try {
-        SweepAuthFailures(Now);
-        const RetryAfter = AuthRetryAfterMs(IP, Now);
+        ApiKeyThrottle.Sweep(Now);
+        PairingThrottle.Sweep(Now);
+
+        const Cfg = await GetSdkConfig();
+        if (!Cfg.Enabled) return next(new Error('SDK API is disabled'));
+
+        const Auth = (socket.handshake && socket.handshake.auth) || {};
+        const PresentedToken = String(Auth.deviceToken || '').trim();
+        const PresentedKey = String(Auth.apiKey || '');
+
+        // --- 1. Paired device reconnecting ---------------------------------
+        if (PresentedToken) {
+          // Throttled as an abuse backstop only: a device token is 256 bits, so
+          // this is the API-key threshold's job, not the PIN's.
+          const RetryAfter = ApiKeyThrottle.RetryAfterMs(IP, Now);
+          if (RetryAfter > 0) {
+            Logger.warn('SDK handshake throttled', { ip: IP, retryAfterMs: RetryAfter });
+            return next(
+              new Error(`Too many failed attempts. Try again in ${Math.ceil(RetryAfter / 1000)}s`)
+            );
+          }
+          const Device = await RemoteDeviceManager.Verify(PresentedToken);
+          if (!Device) {
+            ApiKeyThrottle.RecordFailure(IP, Now);
+            // Distinct from 'Unauthorized' on purpose: the app must be able to
+            // tell "this credential is dead, forget it and re-pair" from "the
+            // server refused me", or it will retry a revoked token forever.
+            return next(new Error('Device revoked'));
+          }
+          ApiKeyThrottle.Clear(IP);
+          socket.AuthMode = 'device';
+          socket.DeviceID = Device.DeviceID;
+          return next();
+        }
+
+        // --- 2. Pairing request --------------------------------------------
+        if (Auth.pair === true) {
+          if (!Cfg.PairingEnabled) return next(new Error('Remote pairing is disabled'));
+
+          const RetryAfter = PairingThrottle.RetryAfterMs(IP, Now);
+          if (RetryAfter > 0) {
+            Logger.warn('Remote pairing throttled', { ip: IP, retryAfterMs: RetryAfter });
+            return next(
+              new Error(`Too many failed attempts. Try again in ${Math.ceil(RetryAfter / 1000)}s`)
+            );
+          }
+
+          const PresentedCode = String(Auth.pairingCode || '').trim();
+          if (PresentedCode) {
+            // A scanned code stands in for the PIN entirely — it is single-use
+            // and expires in a minute, which makes it the stronger of the two.
+            if (!RemoteDeviceManager.RedeemPairingCode(PresentedCode)) {
+              PairingThrottle.RecordFailure(IP, Now);
+              return next(new Error('Invalid or expired pairing code'));
+            }
+          } else if (Cfg.RequirePin) {
+            const PresentedPin = String(Auth.pin || '').trim();
+            if (!PresentedPin || !PasscodeMatches(PresentedPin, Cfg.Pin)) {
+              PairingThrottle.RecordFailure(IP, Now);
+              return next(new Error('Unauthorized'));
+            }
+          }
+          // else: protection is off, so the workspace has no PIN to present.
+          // This mirrors the Web UI, which lets a browser straight in under the
+          // same setting — the operator has chosen an open workspace.
+
+          const [PairErr, Paired] = await RemoteDeviceManager.Pair(Auth.deviceName, Auth.platform);
+          if (PairErr || !Paired) return next(new Error('Pairing failed'));
+
+          PairingThrottle.Clear(IP);
+          socket.AuthMode = 'device';
+          socket.DeviceID = Paired.DeviceID;
+          socket.PendingDeviceToken = Paired.DeviceToken;
+          return next();
+        }
+
+        // --- 3. Integration API key ----------------------------------------
+        const RetryAfter = ApiKeyThrottle.RetryAfterMs(IP, Now);
         if (RetryAfter > 0) {
           Logger.warn('SDK handshake throttled', { ip: IP, retryAfterMs: RetryAfter });
           return next(
             new Error(`Too many failed attempts. Try again in ${Math.ceil(RetryAfter / 1000)}s`)
           );
         }
-        const Cfg = await GetSdkConfig();
-        if (!Cfg.Enabled) return next(new Error('SDK API is disabled'));
         if (!Cfg.ApiKey) return next(new Error('SDK API key not configured'));
-        const Presented = String((socket.handshake.auth && socket.handshake.auth.apiKey) || '');
-        if (!Presented || !PasscodeMatches(Presented, Cfg.ApiKey)) {
-          RecordAuthFailure(IP, Now);
+        if (!PresentedKey || !PasscodeMatches(PresentedKey, Cfg.ApiKey)) {
+          ApiKeyThrottle.RecordFailure(IP, Now);
           return next(new Error('Unauthorized'));
         }
         // A valid key clears the IP's failure record so a legitimate client is
         // never penalised for earlier misconfiguration.
-        ClearAuthFailures(IP);
+        ApiKeyThrottle.Clear(IP);
+        socket.AuthMode = 'apikey';
+        socket.DeviceID = null;
         next();
       } catch {
         next(new Error('Auth failed'));
@@ -369,8 +560,45 @@ function SetupSdkNamespace(io: SdkIOServer) {
     }
   };
 
+  // Eject the sockets belonging to a revoked device. Revocation has to reach a
+  // LIVE session, not just the next handshake: the reason an operator revokes is
+  // usually a phone that is out of their hands right now, and a connected socket
+  // never re-presents its credential.
+  BroadcastManager.on('RemoteDeviceRevoked', (DeviceID: unknown) => {
+    const Target = typeof DeviceID === 'string' ? DeviceID : null;
+    const Sockets =
+      sdk.sockets && typeof sdk.sockets.values === 'function'
+        ? Array.from(sdk.sockets.values())
+        : [];
+    for (const Socket of Sockets) {
+      // A null DeviceID means "revoke all", so every device session goes.
+      if (Socket.AuthMode !== 'device') continue;
+      if (Target && Socket.DeviceID !== Target) continue;
+      try {
+        Socket.emit('revoked');
+        Socket.disconnect(true);
+      } catch {
+        /* intentional: one dead socket must not block ejecting the rest */
+      }
+    }
+  });
+
   sdk.on('connection', async (socket) => {
-    Logger.log('SDK client connected', { id: socket.id, ip: socket.handshake.address });
+    Logger.log('SDK client connected', {
+      id: socket.id,
+      ip: socket.handshake.address,
+      mode: socket.AuthMode,
+    });
+
+    // Hand back a token minted during this handshake. This is the only time the
+    // plaintext exists outside the device — only its hash was persisted — so it
+    // is emitted before any state and cleared immediately afterwards.
+    if (socket.PendingDeviceToken) {
+      const DeviceToken = socket.PendingDeviceToken;
+      socket.PendingDeviceToken = null;
+      socket.emit('paired', { deviceId: socket.DeviceID, deviceToken: DeviceToken });
+    }
+
     await SendInitialState(socket);
 
     socket.on('command', (name: unknown, args: unknown, ack: AckCallback) => {

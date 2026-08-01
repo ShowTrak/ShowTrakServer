@@ -2,6 +2,7 @@ import { CreateLogger } from '../Logger';
 import { Manager as OSManager } from '../OS';
 import { Config } from '../Config';
 import { Manager as ServerIdentityManager } from '../ServerIdentity';
+import { Manager as SettingsManager } from '../SettingsManager';
 import { CreateBonjourErrorHandler } from '@showtrak/protocol/runtime';
 
 const Logger = CreateLogger('Bonjour');
@@ -84,14 +85,51 @@ const bonjour: BonjourFactory = (options) => new Bonjour(options, OnBonjourError
 const instance = bonjour({ reuseAddr: true, loopback: true });
 let publishedService: BonjourPublishedService | null = null;
 
+// Advisory hints published in the TXT record so ShowTrak Remote's discovery list
+// can describe a server before anyone taps it — "PIN required", or greyed out
+// because it will refuse the connection anyway. They are HINTS ONLY: mDNS is
+// unauthenticated and trivially spoofed on a hostile network, so the handshake in
+// sdk-namespace.ts re-reads every one of these from settings and remains the sole
+// authority. Read once at publish time; a settings change is picked up on the
+// next restart, which is acceptable for a list-screen affordance.
+async function ReadDiscoveryHints(): Promise<Record<string, string>> {
+  const Bool = (Value: unknown, Default: boolean): string => {
+    const Resolved = Value == null ? Default : !!Value;
+    return Resolved ? '1' : '0';
+  };
+  try {
+    const SdkEnabled = await SettingsManager.GetValue('SDK_API_ENABLED');
+    const PairingEnabled = await SettingsManager.GetValue('SDK_ALLOW_REMOTE_PAIRING');
+    const ProtectionEnabled = await SettingsManager.GetValue('WEBUI_PASSWORD_PROTECTION_ENABLED');
+    const Pin = String((await SettingsManager.GetValue('WEBUI_PASSWORD')) || '').trim();
+    return {
+      SdkEnabled: Bool(SdkEnabled, true),
+      Pairing: Bool(PairingEnabled, true),
+      // Matches the handshake's own rule: protection with a blank passcode is not
+      // protection, so advertising "PIN required" there would make the app prompt
+      // for something the server will not check.
+      PinRequired: ProtectionEnabled && Pin.length > 0 ? '1' : '0',
+    };
+  } catch {
+    // A settings read failure must not stop the server advertising itself at all.
+    // Omitting the hints degrades the list to "tap and find out", which is what
+    // an older server does anyway.
+    return {};
+  }
+}
+
 const Manager = {
-  Init: () => {
+  Init: async () => {
     const Hostname = OSManager.Hostname || 'Unknown PC';
     const port = Config?.Application?.Port;
     const serverIdentityToken = ServerIdentityManager.GetIdentityToken();
     const txtPayload = {
       ...(Config.Shared || {}),
       ServerIdentity: serverIdentityToken,
+      // The service name is "<Hostname> - ShowTrak Server V3"; publishing the bare
+      // hostname separately saves every consumer parsing that suffix back off.
+      Name: Hostname,
+      ...(await ReadDiscoveryHints()),
     };
     try {
       Logger.log('Bonjour.Init start', {

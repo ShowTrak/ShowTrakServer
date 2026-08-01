@@ -18,11 +18,15 @@ const noopLogger = {
 // A tag whose scope is "group 1", expanding to clients a + b (b is integrated).
 const FOH_SCOPE = { Workspace: false, Groups: [1], Clients: [] };
 
-function loadControlService(overrides = {}) {
+function loadControlService({ __identifyResult, ...overrides } = {}) {
   const broadcastEvents = [];
   const handlerCalls = [];
   const modeCalls = [];
   const alertCalls = [];
+  const identifyCalls = [];
+  // Overridable per test so the failure path (offline client, too-old agent) can
+  // be exercised as well as the happy one.
+  const identifyResult = __identifyResult || [null, true];
 
   // Shared IPC handlers the ControlService dispatches real actions through.
   const handlers = {
@@ -129,6 +133,21 @@ function loadControlService(overrides = {}) {
           slug === 'lobby' ? { UUID: 'kiosk-uuid-1', Slug: 'lobby' } : null,
       },
     },
+    // Identify is the one ControlService command that reaches a manager rather
+    // than the handler registry, because it is addressed at a specific client's
+    // own screen. Stubbed for the usual reason: the real manager pulls in ../DB.
+    '../IdentifyManager': {
+      Manager: {
+        Identify: async (uuid) => {
+          identifyCalls.push(['Identify', uuid]);
+          return identifyResult;
+        },
+        Stop: async (uuid) => {
+          identifyCalls.push(['Stop', uuid]);
+          return identifyResult;
+        },
+      },
+    },
     '../../main/handler-registry': { GetHandler: (channel) => handlers[channel] },
     ...overrides,
   };
@@ -137,8 +156,43 @@ function loadControlService(overrides = {}) {
     path.join(__dirname, '..', 'dist', 'Modules', 'ControlService', 'index.js'),
     mocks
   );
-  return { ControlService, broadcastEvents, handlerCalls, modeCalls, alertCalls };
+  return { ControlService, broadcastEvents, handlerCalls, modeCalls, alertCalls, identifyCalls };
 }
+
+// Identify is the one command here that is safe in SHOW mode and mutates
+// nothing — it exists for the operator standing at a rack with a phone, working
+// out which machine is which. It resolves a slug to a UUID because that is what
+// IdentifyManager addresses.
+test('Identify resolves a client slug and identifies by UUID', async () => {
+  const { ControlService, identifyCalls } = loadControlService();
+  const result = await ControlService.Identify('stage-left');
+  assert.equal(result.ok, true);
+  assert.deepEqual(identifyCalls, [['Identify', 'good']]);
+});
+
+test('StopIdentify resolves a client slug and stops by UUID', async () => {
+  const { ControlService, identifyCalls } = loadControlService();
+  const result = await ControlService.StopIdentify('stage-left');
+  assert.equal(result.ok, true);
+  assert.deepEqual(identifyCalls, [['Stop', 'good']]);
+});
+
+test('Identify with an unknown slug fails without touching the manager', async () => {
+  const { ControlService, identifyCalls } = loadControlService();
+  const result = await ControlService.Identify('nope');
+  assert.equal(result.ok, false);
+  assert.match(result.detail, /Invalid Client/);
+  assert.deepEqual(identifyCalls, []);
+});
+
+// A manager refusal (offline client, agent too old, integrated client) has to
+// surface as a failed command with the manager's own reason, not a bare "ok".
+test('Identify surfaces the manager error', async () => {
+  const { ControlService } = loadControlService({ __identifyResult: ['Client is offline.', null] });
+  const result = await ControlService.Identify('stage-left');
+  assert.equal(result.ok, false);
+  assert.equal(result.detail, 'Client is offline.');
+});
 
 test('OpenClientModal resolves a client slug and emits OpenClientModal', async () => {
   const { ControlService, broadcastEvents } = loadControlService();

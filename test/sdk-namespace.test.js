@@ -3,6 +3,8 @@ const { mock } = test;
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
+const { EventEmitter } = require('node:events');
+
 const { loadWithMocks } = require('../test-support/load-with-mocks');
 
 // Exercises src/Modules/Server/sdk-namespace.ts — the `/sdk` Socket.IO namespace.
@@ -66,6 +68,13 @@ function freshState() {
     controlCalls: [],
     controlResult: { ok: true, detail: 'done' },
     controlThrows: false,
+    // Pairing: what RemoteDeviceManager was asked, and what it should answer.
+    verifyCalls: [],
+    redeemCalls: [],
+    pairCalls: [],
+    devicesByToken: {},
+    validPairingCodes: new Set(),
+    pairResult: [null, { DeviceID: 'device-1', DeviceToken: 'minted-token' }],
   };
 }
 
@@ -94,6 +103,8 @@ const CONTROL_METHODS = [
   'ToggleAlerts',
   'SetMode',
   'ToggleMode',
+  'Identify',
+  'StopIdentify',
   'OpenClientModal',
   'CloseModals',
   'SaveShow',
@@ -111,6 +122,9 @@ function loadSdk() {
   const sinks = [];
   const ControlService = {};
   for (const Name of CONTROL_METHODS) ControlService[Name] = control(Name);
+  // A real emitter, so the revocation-ejection listener the namespace registers
+  // can actually be fired by a test.
+  const broadcast = new EventEmitter();
 
   const Mod = loadWithMocks(SDK_PATH, {
     '../Logger': loggerStub,
@@ -118,7 +132,26 @@ function loadSdk() {
     // webui-namespace loads for real (we want its PasscodeMatches); these are
     // the extra siblings it pulls in.
     '../../main/handler-registry': { GetHandler: () => undefined },
-    '../Broadcast': { Manager: { on: () => {}, emit: () => {} } },
+    '../Broadcast': { Manager: broadcast },
+    // Pairing state. Stubbed for the usual reason (the real manager pulls in
+    // ../DB), and kept in `state` so a test can assert what the handshake did:
+    // whether it verified a token, minted one, or redeemed a pairing code.
+    '../RemoteDeviceManager': {
+      Manager: {
+        Verify: async (Token) => {
+          state.verifyCalls.push(Token);
+          return state.devicesByToken[Token] || null;
+        },
+        RedeemPairingCode: (Code) => {
+          state.redeemCalls.push(Code);
+          return state.validPairingCodes.has(Code);
+        },
+        Pair: async (DeviceName, Platform) => {
+          state.pairCalls.push([DeviceName, Platform]);
+          return state.pairResult;
+        },
+      },
+    },
     '../Config': { Config: { Production: false } },
     '../ControlService': { ControlService },
     '../SettingsManager': {
@@ -181,7 +214,7 @@ function loadSdk() {
     '../AlertsManager': { Manager: { GetActionsEnabled: () => state.alertsEnabled } },
   });
 
-  return { Mod, sinks, ControlService };
+  return { Mod, sinks, ControlService, broadcast };
 }
 
 /** A fake `/sdk` namespace, capturing what SetupSdkNamespace wires onto it. */
@@ -203,12 +236,21 @@ function fakeNamespace() {
   return NS;
 }
 
-function fakeSocket({ id = 'sock-1', address = '10.0.0.5', apiKey, emitThrows = false } = {}) {
+function fakeSocket({
+  id = 'sock-1',
+  address = '10.0.0.5',
+  apiKey,
+  auth,
+  emitThrows = false,
+} = {}) {
   const Socket = {
     id,
-    handshake: { address, auth: apiKey === undefined ? {} : { apiKey } },
+    // `auth` wins when given, so pairing/device handshakes can be built directly;
+    // `apiKey` remains the shorthand every pre-existing test uses.
+    handshake: { address, auth: auth || (apiKey === undefined ? {} : { apiKey }) },
     emitted: [],
     handlers: {},
+    disconnected: false,
     emit(event, ...args) {
       if (emitThrows) throw new Error('socket is dead');
       Socket.emitted.push([event, ...args]);
@@ -217,16 +259,25 @@ function fakeSocket({ id = 'sock-1', address = '10.0.0.5', apiKey, emitThrows = 
     on(event, fn) {
       Socket.handlers[event] = fn;
     },
+    disconnect() {
+      Socket.disconnected = true;
+    },
   };
   return Socket;
 }
 
 /** Boot the namespace and hand back everything a test needs to drive it. */
 function boot() {
-  const { Mod, sinks, ControlService } = loadSdk();
+  const { Mod, sinks, ControlService, broadcast } = loadSdk();
   const NS = fakeNamespace();
   Mod.SetupSdkNamespace({ of: () => NS });
-  return { Mod, NS, ControlService, push: (...args) => sinks.forEach((S) => S(...args)) };
+  return {
+    Mod,
+    NS,
+    ControlService,
+    broadcast,
+    push: (...args) => sinks.forEach((S) => S(...args)),
+  };
 }
 
 /** Run the handshake middleware and resolve with the error it passed (or null). */
@@ -558,6 +609,255 @@ test('a refused connection never runs the throttle for a disabled or unconfigure
   }
 });
 
+// --- ShowTrak Remote pairing -------------------------------------------------
+//
+// The second credential this namespace accepts. Unlike the API key — which is
+// copied into a config file once and never typed — a device pairs against the
+// 4-digit workspace PIN, so the tests below care as much about what is REFUSED,
+// and how fast, as about what succeeds.
+
+test('a device pairs with the correct workspace PIN and is handed a token', async () => {
+  state = freshState();
+  state.settings.WEBUI_PASSWORD_PROTECTION_ENABLED = 1;
+  state.settings.WEBUI_PASSWORD = '4321';
+  const { NS } = boot();
+
+  const Socket = fakeSocket({
+    auth: { pair: true, pin: '4321', deviceName: "Tom's iPhone", platform: 'ios' },
+  });
+  assert.equal(await handshake(NS, Socket), null);
+  assert.equal(Socket.AuthMode, 'device');
+  assert.deepEqual(state.pairCalls, [["Tom's iPhone", 'ios']]);
+
+  // The plaintext token exists in exactly one place, for exactly one moment: it
+  // is emitted on connection and cleared. Only its hash was persisted, so if this
+  // emit is lost the device can never authenticate again.
+  await NS.connectionHandler(Socket);
+  const Paired = Socket.emitted.find(([Event]) => Event === 'paired');
+  assert.ok(Paired, 'the minted token was never handed to the device');
+  assert.deepEqual(Paired[1], { deviceId: 'device-1', deviceToken: 'minted-token' });
+  assert.equal(Socket.PendingDeviceToken, null, 'the token outlived its emit');
+});
+
+test('a device pairing with the wrong PIN is refused and never reaches the manager', async () => {
+  state = freshState();
+  state.settings.WEBUI_PASSWORD_PROTECTION_ENABLED = 1;
+  state.settings.WEBUI_PASSWORD = '4321';
+  const { NS } = boot();
+
+  const Err = await handshake(NS, fakeSocket({ auth: { pair: true, pin: '0000' } }));
+  assert.match(String(Err.message), /Unauthorized/);
+  assert.deepEqual(state.pairCalls, [], 'a device was paired despite a wrong PIN');
+});
+
+test('a device pairs with no PIN when passcode protection is off', async () => {
+  // Mirrors the Web UI, which lets a browser straight in under the same setting.
+  // The operator has chosen an open workspace; Remote must not invent a second
+  // rule the rest of the product does not enforce.
+  state = freshState();
+  state.settings.WEBUI_PASSWORD_PROTECTION_ENABLED = 0;
+  const { NS } = boot();
+
+  const Socket = fakeSocket({ auth: { pair: true, deviceName: 'Stage Tablet' } });
+  assert.equal(await handshake(NS, Socket), null);
+  assert.equal(Socket.AuthMode, 'device');
+});
+
+test('protection enabled with a blank passcode is not protection', async () => {
+  // The Web UI applies exactly this rule (RequireAuth = enabled && length > 0).
+  // Diverging would mean prompting for a PIN the server never checks.
+  state = freshState();
+  state.settings.WEBUI_PASSWORD_PROTECTION_ENABLED = 1;
+  state.settings.WEBUI_PASSWORD = '   ';
+  const { NS } = boot();
+
+  assert.equal(await handshake(NS, fakeSocket({ auth: { pair: true } })), null);
+});
+
+test('PIN attempts lock out an order of magnitude sooner than API key attempts', async () => {
+  // This is the whole reason the two throttles are separate instances. A 4-digit
+  // PIN is a 10,000-key space: at the API key's 100-failures-per-minute it falls
+  // in under two hours. The pairing threshold has to be the Web UI's 10.
+  state = freshState();
+  state.settings.WEBUI_PASSWORD_PROTECTION_ENABLED = 1;
+  state.settings.WEBUI_PASSWORD = '4321';
+  const { NS } = boot();
+
+  let PairingLocked = 0;
+  for (let i = 0; i < 20; i++) {
+    const Err = await handshake(NS, fakeSocket({ auth: { pair: true, pin: '0000' } }));
+    if (/Try again in/.test(String(Err.message))) PairingLocked++;
+  }
+  assert.ok(PairingLocked > 0, 'pairing was never throttled');
+
+  // 20 wrong API keys from the same IP is nowhere near that threshold, and the
+  // pairing lockout must not have leaked across into it.
+  const Err = await handshake(NS, fakeSocket({ apiKey: 'a'.repeat(48) }));
+  assert.equal(Err, null, 'the pairing lockout leaked into the API key throttle');
+});
+
+test('a paired device reconnects with its token', async () => {
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1', DeviceName: 'iPhone' };
+  const { NS } = boot();
+
+  const Socket = fakeSocket({ auth: { deviceToken: 'good-token' } });
+  assert.equal(await handshake(NS, Socket), null);
+  assert.equal(Socket.AuthMode, 'device');
+  assert.equal(Socket.DeviceID, 'device-1');
+  assert.deepEqual(state.verifyCalls, ['good-token']);
+});
+
+test('a revoked token is refused with a reason the app can act on', async () => {
+  // Distinct from 'Unauthorized' on purpose: the app has to be able to tell
+  // "forget this credential and re-pair" from "the server refused me", or it
+  // retries a dead token forever.
+  const { NS } = boot();
+  const Err = await handshake(NS, fakeSocket({ auth: { deviceToken: 'revoked' } }));
+  assert.match(String(Err.message), /Device revoked/);
+});
+
+test('a valid pairing code stands in for the PIN, and is only good once', async () => {
+  state = freshState();
+  state.settings.WEBUI_PASSWORD_PROTECTION_ENABLED = 1;
+  state.settings.WEBUI_PASSWORD = '4321';
+  state.validPairingCodes.add('scanned-code');
+  const { NS } = boot();
+
+  assert.equal(
+    await handshake(NS, fakeSocket({ auth: { pair: true, pairingCode: 'scanned-code' } })),
+    null
+  );
+
+  // The manager consumes the code on redemption; a photograph of the QR is
+  // therefore worthless the moment the first device uses it.
+  state.validPairingCodes.delete('scanned-code');
+  const Err = await handshake(
+    NS,
+    fakeSocket({ auth: { pair: true, pairingCode: 'scanned-code' } })
+  );
+  assert.match(String(Err.message), /Invalid or expired pairing code/);
+});
+
+test('pairing can be disabled without affecting integrations', async () => {
+  // The point of the switch: an operator turning off phone pairing must not take
+  // Companion down with it.
+  state = freshState();
+  state.settings.SDK_ALLOW_REMOTE_PAIRING = 0;
+  const { NS } = boot();
+
+  const Err = await handshake(NS, fakeSocket({ auth: { pair: true } }));
+  assert.match(String(Err.message), /pairing is disabled/i);
+  assert.equal(await handshake(NS, fakeSocket({ apiKey: 'a'.repeat(48) })), null);
+});
+
+test('an already-paired device keeps working after pairing is disabled', async () => {
+  // "Allow pairing" means new pairings. A setting that also silently kicked out
+  // every paired phone would do more than its name says; Revoke is the tool for
+  // that, and it is per device.
+  state = freshState();
+  state.settings.SDK_ALLOW_REMOTE_PAIRING = 0;
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1', DeviceName: 'iPhone' };
+  const { NS } = boot();
+
+  assert.equal(await handshake(NS, fakeSocket({ auth: { deviceToken: 'good-token' } })), null);
+});
+
+test('a handshake presenting both a token and an API key is resolved as a device', async () => {
+  // Fixed precedence, so a socket carrying more than one credential cannot shop
+  // for whichever the server treats most generously.
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  const { NS } = boot();
+
+  const Socket = fakeSocket({
+    auth: { deviceToken: 'good-token', apiKey: 'a'.repeat(48) },
+  });
+  assert.equal(await handshake(NS, Socket), null);
+  assert.equal(Socket.AuthMode, 'device');
+});
+
+test('an API key session is stamped as an integration, not a device', async () => {
+  // Phase 0b gates the management bridge on this stamp. A Companion install
+  // wants to fire cues, not delete groups, and must never inherit privileges its
+  // holder never asked for.
+  const { NS } = boot();
+  const Socket = fakeSocket({ apiKey: 'a'.repeat(48) });
+  assert.equal(await handshake(NS, Socket), null);
+  assert.equal(Socket.AuthMode, 'apikey');
+  assert.equal(Socket.DeviceID, null);
+});
+
+test('a socket presenting nothing at all is refused', async () => {
+  const { NS } = boot();
+  const Err = await handshake(NS, fakeSocket({ auth: {} }));
+  assert.match(String(Err.message), /Unauthorized/);
+});
+
+// --- Revocation --------------------------------------------------------------
+
+test('revoking a device ejects its live socket, not just its next handshake', async () => {
+  // The reason an operator revokes is usually a phone that is out of their hands
+  // RIGHT NOW. A connected socket never re-presents its credential, so without
+  // this it would keep full control until it happened to reconnect.
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  const { NS, broadcast } = boot();
+
+  const Device = fakeSocket({ id: 'device-sock', auth: { deviceToken: 'good-token' } });
+  await handshake(NS, Device);
+  const Integration = fakeSocket({ id: 'api-sock', apiKey: 'a'.repeat(48) });
+  await handshake(NS, Integration);
+  NS.socketSet.add(Device);
+  NS.socketSet.add(Integration);
+
+  broadcast.emit('RemoteDeviceRevoked', 'device-1');
+
+  assert.equal(Device.disconnected, true, 'the revoked device kept its session');
+  assert.ok(Device.emitted.some(([Event]) => Event === 'revoked'));
+  assert.equal(Integration.disconnected, false, 'an integration was caught by a device revoke');
+});
+
+test('revoking every device leaves integrations connected', async () => {
+  state = freshState();
+  state.devicesByToken['t1'] = { DeviceID: 'device-1' };
+  state.devicesByToken['t2'] = { DeviceID: 'device-2' };
+  const { NS, broadcast } = boot();
+
+  const A = fakeSocket({ id: 'a', auth: { deviceToken: 't1' } });
+  const B = fakeSocket({ id: 'b', auth: { deviceToken: 't2' } });
+  const Api = fakeSocket({ id: 'c', apiKey: 'a'.repeat(48) });
+  for (const S of [A, B, Api]) {
+    await handshake(NS, S);
+    NS.socketSet.add(S);
+  }
+
+  // A null target is "revoke all", not "one unnamed device".
+  broadcast.emit('RemoteDeviceRevoked', null);
+
+  assert.equal(A.disconnected, true);
+  assert.equal(B.disconnected, true);
+  assert.equal(Api.disconnected, false);
+});
+
+test('one dead socket does not block ejecting the rest', async () => {
+  state = freshState();
+  state.devicesByToken['t1'] = { DeviceID: 'device-1' };
+  state.devicesByToken['t2'] = { DeviceID: 'device-2' };
+  const { NS, broadcast } = boot();
+
+  const Dead = fakeSocket({ id: 'dead', auth: { deviceToken: 't1' }, emitThrows: true });
+  const Live = fakeSocket({ id: 'live', auth: { deviceToken: 't2' } });
+  for (const S of [Dead, Live]) {
+    await handshake(NS, S);
+    NS.socketSet.add(S);
+  }
+
+  broadcast.emit('RemoteDeviceRevoked', null);
+
+  assert.equal(Live.disconnected, true, 'a throwing socket stopped the sweep');
+});
+
 // --- Key generation ---------------------------------------------------------
 
 test('a key is generated and persisted on first boot', async () => {
@@ -681,6 +981,8 @@ test('every published command maps to its ControlService call', async () => {
     ['alerts.toggle', {}, ['ToggleAlerts']],
     ['mode.set', { mode: 'EDIT' }, ['SetMode', 'EDIT']],
     ['mode.toggle', {}, ['ToggleMode']],
+    ['identify.client', { slug: 'foh' }, ['Identify', 'foh']],
+    ['identify.stop', { slug: 'foh' }, ['StopIdentify', 'foh']],
     ['modal.openClient', { slug: 'foh' }, ['OpenClientModal', 'foh']],
     ['modal.closeAll', {}, ['CloseModals']],
     ['show.save', {}, ['SaveShow']],

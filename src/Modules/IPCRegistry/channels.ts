@@ -176,6 +176,14 @@ const INVOKE_CHANNELS = [
   'Tags:SetOrder',
   'Tags:Delete',
 
+  // Paired ShowTrak Remote devices. Desktop only — never allowlisted for the web
+  // or remote surfaces (see src/main/registrars/remote-devices.ts).
+  'Remote:GetDevices',
+  'Remote:RevokeDevice',
+  'Remote:RevokeAllDevices',
+  'Remote:IssuePairingCode',
+  'Remote:ClearPairingCode',
+
   // FOG Project integration
   'Fog:GetStatus',
   'Fog:TestConnection',

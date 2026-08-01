@@ -64,6 +64,7 @@ const CASES = [
   ['dist/main/shutdown-coordinator.js', 'test/main-shutdown-coordinator.test.js'],
   ['dist/main/registrars/groups.js', 'test/main-registrar-groups.test.js'],
   ['dist/Modules/ControlService/index.js', 'test/sdk-api.test.js'],
+  ['dist/Modules/Bonjour/index.js', 'test/bonjour.test.js'],
 ];
 
 for (const [Module, Test] of CASES) {

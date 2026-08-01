@@ -107,6 +107,15 @@ export const DefaultSettings: SettingDefinition[] = [
     DefaultValue: '',
   },
   {
+    Group: 'SDK / Integration API',
+    Key: 'SDK_ALLOW_REMOTE_PAIRING',
+    Title: 'Allow ShowTrak Remote Pairing',
+    Description:
+      'Allow new phones and tablets running ShowTrak Remote to pair with this server. Pairing uses the Web UI passcode (or a scanned pairing code), not the API key above — so this can be turned off without affecting integrations such as Companion. Devices that are already paired keep working; use Revoke on the paired devices list to remove one.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
     Group: 'Monitoring',
     Key: 'MONITORING_DEFAULT_INTERVAL_MS',
     Title: 'Default Monitoring Interval',

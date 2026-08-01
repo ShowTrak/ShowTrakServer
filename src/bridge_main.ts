@@ -175,6 +175,11 @@ const INVOKE_CHANNEL_LIST = [
   'FreeKiosk:CaptureScreenshot',
   'FreeKiosk:CaptureCamera',
   'FreeKiosk:GetCameraList',
+  'Remote:GetDevices',
+  'Remote:RevokeDevice',
+  'Remote:RevokeAllDevices',
+  'Remote:IssuePairingCode',
+  'Remote:ClearPairingCode',
 ] as const satisfies readonly InvokeChannel[];
 type _MissingInvokeChannels = AssertAllChannelsListed<
   Exclude<InvokeChannel, (typeof INVOKE_CHANNEL_LIST)[number]>

@@ -22,6 +22,7 @@ import { Manager as ScriptManager } from '../ScriptManager';
 import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
 import { Manager as ModeManager } from '../ModeManager';
 import { Manager as AlertsManager } from '../AlertsManager';
+import { Manager as IdentifyManager } from '../IdentifyManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as FreeKioskManager } from '../FreeKioskManager';
@@ -313,6 +314,31 @@ export const ControlService = {
     }
 
     return fail(`Invalid Client "${slug}"`);
+  },
+
+  // Identify ---------------------------------------------------------------
+  // Flash the identify overlay on a client's own screen. Unlike every other
+  // command here this mutates nothing and is safe in SHOW mode — which is the
+  // point: it exists for the operator standing in front of a rack trying to work
+  // out which machine is which, and that is a job done from a phone.
+  //
+  // Identify is addressed by UUID at the manager, so resolve the slug first. Only
+  // real clients can be identified: monitors, dummies and FreeKiosk terminals
+  // have no ShowTrak agent to draw the overlay, so they never resolve here.
+  async Identify(slug: string): Promise<CommandResult> {
+    const c = await resolveClientByKey(slug);
+    if (!c) return fail(`Invalid Client "${slug}"`);
+    const [Err] = await IdentifyManager.Identify(c.UUID);
+    if (Err) return fail(Err);
+    return ok(`Identifying "${c.Slug || c.UUID}"`);
+  },
+
+  async StopIdentify(slug: string): Promise<CommandResult> {
+    const c = await resolveClientByKey(slug);
+    if (!c) return fail(`Invalid Client "${slug}"`);
+    const [Err] = await IdentifyManager.Stop(c.UUID);
+    if (Err) return fail(Err);
+    return ok(`Stopped identifying "${c.Slug || c.UUID}"`);
   },
 
   // Dismiss every open modal on the desktop renderer. No targets — the renderer

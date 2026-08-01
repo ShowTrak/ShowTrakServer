@@ -47,7 +47,10 @@ import { Manager as SampleScriptsManager } from './Modules/SampleScripts';
 SampleScriptsManager.Initialize();
 import './Modules/Server'; // binds HTTP + Socket.IO server on load
 import { Manager as BonjourManager } from './Modules/Bonjour';
-BonjourManager.Init();
+// Init reads settings to build its TXT record, so it is async. Nothing here waits
+// on the announcement — publishing is fire-and-forget, and a failure inside is
+// already logged rather than thrown.
+void BonjourManager.Init();
 import './Modules/OSC'; // binds the OSC UDP listener on load
 import { Manager as MonitoringTargetManager } from './Modules/MonitoringTargetManager';
 import { Manager as ClientManager } from './Modules/ClientManager';
