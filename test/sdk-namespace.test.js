@@ -75,6 +75,27 @@ function freshState() {
     devicesByToken: {},
     validPairingCodes: new Set(),
     pairResult: [null, { DeviceID: 'device-1', DeviceToken: 'minted-token' }],
+    // The shared IPC handlers the rpc bridge dispatches to — the SAME registry
+    // the desktop uses, which is the whole point of the bridge.
+    rpcCalls: [],
+    handlers: {
+      GetClient: (...args) => {
+        state.rpcCalls.push(['GetClient', ...args]);
+        return [null, { UUID: 'client-1' }];
+      },
+      UpdateClient: (...args) => {
+        state.rpcCalls.push(['UpdateClient', ...args]);
+        return [null, true];
+      },
+      CreateGroup: (...args) => {
+        state.rpcCalls.push(['CreateGroup', ...args]);
+        return [null, { GroupID: 3 }];
+      },
+      ExecuteScript: (...args) => {
+        state.rpcCalls.push(['ExecuteScript', ...args]);
+        return [null, true];
+      },
+    },
   };
 }
 
@@ -126,93 +147,104 @@ function loadSdk() {
   // can actually be fired by a test.
   const broadcast = new EventEmitter();
 
-  const Mod = loadWithMocks(SDK_PATH, {
-    '../Logger': loggerStub,
-    '../../main/renderer-bus': { RegisterRendererSink: (fn) => sinks.push(fn) },
-    // webui-namespace loads for real (we want its PasscodeMatches); these are
-    // the extra siblings it pulls in.
-    '../../main/handler-registry': { GetHandler: () => undefined },
-    '../Broadcast': { Manager: broadcast },
-    // Pairing state. Stubbed for the usual reason (the real manager pulls in
-    // ../DB), and kept in `state` so a test can assert what the handshake did:
-    // whether it verified a token, minted one, or redeemed a pairing code.
-    '../RemoteDeviceManager': {
-      Manager: {
-        Verify: async (Token) => {
-          state.verifyCalls.push(Token);
-          return state.devicesByToken[Token] || null;
-        },
-        RedeemPairingCode: (Code) => {
-          state.redeemCalls.push(Code);
-          return state.validPairingCodes.has(Code);
-        },
-        Pair: async (DeviceName, Platform) => {
-          state.pairCalls.push([DeviceName, Platform]);
-          return state.pairResult;
-        },
-      },
-    },
-    '../Config': { Config: { Production: false } },
-    '../ControlService': { ControlService },
-    '../SettingsManager': {
-      Manager: {
-        GetValue: async (Key) => {
-          if (state.settingsGetThrows) throw new Error('settings unavailable');
-          return state.settings[Key];
-        },
-        Set: async (Key, Value) => {
-          state.settingsSet.push([Key, Value]);
-          if (state.settingsSetThrows) throw new Error('settings are read-only');
-          state.settings[Key] = Value;
+  const Mod = loadWithMocks(
+    SDK_PATH,
+    {
+      '../Logger': loggerStub,
+      '../../main/renderer-bus': { RegisterRendererSink: (fn) => sinks.push(fn) },
+      // webui-namespace loads for real (we want its PasscodeMatches); these are
+      // the extra siblings it pulls in.
+      '../../main/handler-registry': { GetHandler: (channel) => state.handlers[channel] },
+      '../Broadcast': { Manager: broadcast },
+      // Pairing state. Stubbed for the usual reason (the real manager pulls in
+      // ../DB), and kept in `state` so a test can assert what the handshake did:
+      // whether it verified a token, minted one, or redeemed a pairing code.
+      '../RemoteDeviceManager': {
+        Manager: {
+          Verify: async (Token) => {
+            state.verifyCalls.push(Token);
+            return state.devicesByToken[Token] || null;
+          },
+          RedeemPairingCode: (Code) => {
+            state.redeemCalls.push(Code);
+            return state.validPairingCodes.has(Code);
+          },
+          Pair: async (DeviceName, Platform) => {
+            state.pairCalls.push([DeviceName, Platform]);
+            return state.pairResult;
+          },
         },
       },
-    },
-    '../ClientManager': { Manager: { GetAll: async () => state.clients } },
-    '../GroupManager': { Manager: { GetAll: async () => state.groups } },
-    '../MonitoringTargetManager': {
-      Manager: {
-        GetAll: async () => {
-          if (state.monitorsThrow) throw new Error('monitors unavailable');
-          return state.monitors;
+      '../Config': { Config: { Production: false } },
+      '../ControlService': { ControlService },
+      '../SettingsManager': {
+        Manager: {
+          GetValue: async (Key) => {
+            if (state.settingsGetThrows) throw new Error('settings unavailable');
+            return state.settings[Key];
+          },
+          Set: async (Key, Value) => {
+            state.settingsSet.push([Key, Value]);
+            if (state.settingsSetThrows) throw new Error('settings are read-only');
+            state.settings[Key] = Value;
+          },
         },
       },
-    },
-    '../DummyClientManager': {
-      Manager: {
-        GetAll: async () => {
-          if (state.dummiesThrow) throw new Error('dummies unavailable');
-          return state.dummies;
+      '../ClientManager': { Manager: { GetAll: async () => state.clients } },
+      '../GroupManager': { Manager: { GetAll: async () => state.groups } },
+      '../MonitoringTargetManager': {
+        Manager: {
+          GetAll: async () => {
+            if (state.monitorsThrow) throw new Error('monitors unavailable');
+            return state.monitors;
+          },
         },
       },
-    },
-    '../FreeKioskManager': {
-      Manager: {
-        GetAll: async () => {
-          if (state.kiosksThrow) throw new Error('terminals unavailable');
-          return state.kiosks;
+      '../DummyClientManager': {
+        Manager: {
+          GetAll: async () => {
+            if (state.dummiesThrow) throw new Error('dummies unavailable');
+            return state.dummies;
+          },
         },
       },
-    },
-    '../TagManager': {
-      Manager: {
-        GetAllViews: async () => {
-          if (state.tagsThrow) throw new Error('tags unavailable');
-          return state.tags;
+      '../FreeKioskManager': {
+        Manager: {
+          GetAll: async () => {
+            if (state.kiosksThrow) throw new Error('terminals unavailable');
+            return state.kiosks;
+          },
         },
       },
-    },
-    '../ScriptManager': {
-      Manager: {
-        GetScripts: async () => {
-          if (state.scriptsThrow) throw new Error('scripts unavailable');
-          return state.scripts;
+      '../TagManager': {
+        Manager: {
+          GetAllViews: async () => {
+            if (state.tagsThrow) throw new Error('tags unavailable');
+            return state.tags;
+          },
         },
       },
+      '../ScriptManager': {
+        Manager: {
+          GetScripts: async () => {
+            if (state.scriptsThrow) throw new Error('scripts unavailable');
+            return state.scripts;
+          },
+        },
+      },
+      '../ScriptWhitelistManager': { Manager: { DecorateCatalog: async (C) => C } },
+      '../ModeManager': { Manager: { Get: () => state.mode } },
+      '../AlertsManager': { Manager: { GetActionsEnabled: () => state.alertsEnabled } },
     },
-    '../ScriptWhitelistManager': { Manager: { DecorateCatalog: async (C) => C } },
-    '../ModeManager': { Manager: { Get: () => state.mode } },
-    '../AlertsManager': { Manager: { GetActionsEnabled: () => state.alertsEnabled } },
-  });
+    // RemoteAccess owns the capability model the rpc bridge authorises against.
+    // It reads the same mocked SettingsManager/ModeManager, so a cached copy
+    // would serve the first load's mocks to every later one.
+    {
+      alsoEvict: [
+        require('node:path').join(__dirname, '..', 'dist', 'Modules', 'RemoteAccess', 'index.js'),
+      ],
+    }
+  );
 
   return { Mod, sinks, ControlService, broadcast };
 }
@@ -306,12 +338,17 @@ test('the push allowlist is exactly the channels the SDK publishes', () => {
     'ModeUpdated',
     'MonitoringTargetUpdated',
     'Notify',
+    'SetDevicesPendingAdoption',
+    'SetFullAlertRuleList',
     'SetFullClientList',
     'SetFullDummyClientList',
     'SetFullFreeKioskTerminalList',
     'SetFullMonitoringTargetList',
+    'SetOSCList',
     'SetScriptList',
     'SetTagList',
+    'USBDeviceAdded',
+    'USBDeviceRemoved',
     'UpdateScriptExecutions',
   ]);
 });
@@ -856,6 +893,210 @@ test('one dead socket does not block ejecting the rest', async () => {
   broadcast.emit('RemoteDeviceRevoked', null);
 
   assert.equal(Live.disconnected, true, 'a throwing socket stopped the sweep');
+});
+
+// --- The management bridge (`rpc`) ------------------------------------------
+//
+// Dispatches to the SAME shared IPC handlers the desktop uses, behind the SAME
+// capability model as the Web UI. The security-relevant half is who may reach
+// it at all: an API key was handed out to fire cues and sits in plaintext in a
+// Companion config file, so widening every existing key to "can delete every
+// group" would be privilege escalation for integrations that never asked for it.
+
+/** Connect a socket, run an rpc through it, and hand back the ack payload. */
+async function rpc(NS, Socket, channel, args) {
+  await handshake(NS, Socket);
+  await NS.connectionHandler(Socket);
+  return new Promise((resolve) => {
+    Socket.handlers.rpc(channel, args, resolve);
+  });
+}
+
+function deviceSocket(overrides = {}) {
+  return fakeSocket({ auth: { deviceToken: 'good-token' }, ...overrides });
+}
+
+test('a paired device reaches the shared IPC handler', async () => {
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  state.settings.SYSTEM_ALLOW_WOL = 1;
+  state.mode = 'EDIT';
+  const { NS } = boot();
+
+  const Ack = await rpc(NS, deviceSocket(), 'UpdateClient', ['client-1', { Nickname: 'FOH' }]);
+
+  assert.deepEqual(Ack, { result: [null, true] });
+  // The leading null is the IPC event placeholder the desktop handlers expect —
+  // the same shape the Web UI's rpc bridge passes, because it is the same
+  // handler being called.
+  assert.deepEqual(state.rpcCalls, [['UpdateClient', null, 'client-1', { Nickname: 'FOH' }]]);
+});
+
+test('an API key session cannot use rpc at all', async () => {
+  // The Companion regression guard. If this ever passes, every deployed API key
+  // silently gained the ability to mutate the workspace.
+  state = freshState();
+  state.mode = 'EDIT';
+  const { NS } = boot();
+
+  const Ack = await rpc(NS, fakeSocket({ apiKey: 'a'.repeat(48) }), 'UpdateClient', ['client-1']);
+
+  assert.deepEqual(Ack, { error: 'forbidden' });
+  assert.deepEqual(state.rpcCalls, [], 'an API key session reached a handler');
+});
+
+test('an API key session keeps every ControlService command', async () => {
+  // The other half of the same guard: locking API keys out of rpc must not cost
+  // Companion the surface it already had.
+  state = freshState();
+  const { NS } = boot();
+  const Socket = fakeSocket({ apiKey: 'a'.repeat(48) });
+  await handshake(NS, Socket);
+  await NS.connectionHandler(Socket);
+
+  const Ack = await new Promise((resolve) => {
+    Socket.handlers.command('wol.all', {}, resolve);
+  });
+  assert.equal(Ack.ok, true);
+  assert.deepEqual(state.controlCalls, [['WakeAll']]);
+});
+
+test('rpc refuses a channel outside the allowlist', async () => {
+  // Settings are the case that matters: they hold the SDK API key and the
+  // workspace PIN, so a surface that could read them could mint its own access.
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  state.mode = 'EDIT';
+  const { NS } = boot();
+
+  const Ack = await rpc(NS, deviceSocket(), 'SetSetting', ['SDK_API_KEY', 'mine-now']);
+
+  assert.deepEqual(Ack, { error: 'forbidden' });
+  assert.deepEqual(state.rpcCalls, []);
+});
+
+test('rpc reports the edit-mode requirement distinctly from a permission refusal', async () => {
+  // One the operator can fix in a tap; the other needs someone at the desk.
+  // Collapsing them into "forbidden" sends them to the wrong place.
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  state.mode = 'SHOW';
+  const { NS } = boot();
+
+  const Ack = await rpc(NS, deviceSocket(), 'CreateGroup', ['Front of House']);
+
+  assert.deepEqual(Ack, { error: 'edit_mode_required' });
+  assert.deepEqual(state.rpcCalls, []);
+});
+
+test('rpc refuses a category whose permission is off', async () => {
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  state.settings.REMOTE_ALLOW_GROUP_MANAGEMENT = 0;
+  state.mode = 'EDIT';
+  const { NS } = boot();
+
+  const Ack = await rpc(NS, deviceSocket(), 'CreateGroup', ['Front of House']);
+
+  assert.deepEqual(Ack, { error: 'forbidden' });
+});
+
+test('a device with no permissions can still read', async () => {
+  // Reads sit above the permission model: a session that may connect may look.
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  for (const Key of [
+    'REMOTE_ALLOW_IDENTIFY',
+    'REMOTE_ALLOW_CLIENT_MANAGEMENT',
+    'REMOTE_ALLOW_GROUP_MANAGEMENT',
+    'REMOTE_ALLOW_MONITORING_MANAGEMENT',
+    'REMOTE_ALLOW_ALERT_MANAGEMENT',
+    'REMOTE_ALLOW_WOL',
+  ]) {
+    state.settings[Key] = 0;
+  }
+  const { NS } = boot();
+
+  const Ack = await rpc(NS, deviceSocket(), 'GetClient', ['client-1']);
+  assert.deepEqual(Ack, { result: [null, { UUID: 'client-1' }] });
+});
+
+test('a device with no permissions still gets ControlService commands', async () => {
+  // ControlService is the show-time surface and is not part of the rpc
+  // capability model. Revoking management must not take the show controls away.
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  state.settings.REMOTE_ALLOW_CLIENT_MANAGEMENT = 0;
+  const { NS } = boot();
+  const Socket = deviceSocket();
+  await handshake(NS, Socket);
+  await NS.connectionHandler(Socket);
+
+  const Ack = await new Promise((resolve) => {
+    Socket.handlers.command('mode.toggle', {}, resolve);
+  });
+  assert.equal(Ack.ok, true);
+});
+
+test('a non-string channel is rejected before anything is resolved', async () => {
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  const { NS } = boot();
+
+  assert.deepEqual(await rpc(NS, deviceSocket(), { evil: true }, []), {
+    error: 'invalid_channel',
+  });
+  assert.deepEqual(state.rpcCalls, []);
+});
+
+test('an allowlisted channel with no registered handler is reported, not silently ok', async () => {
+  // Reachable if a channel is allowlisted before its registrar exists. Acking a
+  // success for a mutation that never ran is the worst possible answer.
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  state.mode = 'EDIT';
+  delete state.handlers.CreateGroup;
+  const { NS } = boot();
+
+  assert.deepEqual(await rpc(NS, deviceSocket(), 'CreateGroup', []), {
+    error: 'unknown_channel',
+  });
+});
+
+test('a throwing handler acknowledges a failure rather than hanging the caller', async () => {
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  state.mode = 'EDIT';
+  state.handlers.UpdateClient = () => {
+    throw new Error('sqlite is on fire');
+  };
+  const { NS } = boot();
+
+  const Ack = await rpc(NS, deviceSocket(), 'UpdateClient', ['client-1']);
+  assert.deepEqual(Ack, { error: 'failed' });
+});
+
+test('the internal error detail is not leaked through rpc', async () => {
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  state.mode = 'EDIT';
+  state.handlers.UpdateClient = () => {
+    throw new Error('/Users/tom/secret/path leaked');
+  };
+  const { NS } = boot();
+
+  const Ack = await rpc(NS, deviceSocket(), 'UpdateClient', ['client-1']);
+  assert.equal(JSON.stringify(Ack).includes('secret'), false);
+});
+
+test('a non-array args payload becomes an empty argument list', async () => {
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  state.mode = 'EDIT';
+  const { NS } = boot();
+
+  await rpc(NS, deviceSocket(), 'UpdateClient', { nope: true });
+  assert.deepEqual(state.rpcCalls, [['UpdateClient', null]]);
 });
 
 // --- Key generation ---------------------------------------------------------

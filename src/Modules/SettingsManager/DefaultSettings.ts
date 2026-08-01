@@ -246,6 +246,83 @@ export const DefaultSettings: SettingDefinition[] = [
     Type: 'BOOLEAN',
     DefaultValue: false,
   },
+  // ShowTrak Remote permissions. Deliberately the SAME categories and the SAME
+  // defaults as the Web UI above: both are remote surfaces reading one shared
+  // capability model (Modules/RemoteAccess), and a divergence here would have to
+  // be re-explained every time an operator compared the two panes. EDIT mode
+  // remains the master gate for every management category regardless.
+  {
+    Group: 'ShowTrak Remote Permissions',
+    Key: 'REMOTE_ALLOW_IDENTIFY',
+    Title: 'Identify Clients',
+    Description:
+      'Allow ShowTrak Remote to flash the identify overlay on a client screen. Mutates nothing, and is the reason to hold a phone in the first place: working out which machine in a rack is which.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
+    Group: 'ShowTrak Remote Permissions',
+    Key: 'REMOTE_ALLOW_CLIENT_MANAGEMENT',
+    Title: 'Client Management',
+    Description:
+      'Allow ShowTrak Remote to edit clients (nickname, group, MAC addresses, critical entities). Also requires the server to be in Edit mode.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
+    Group: 'ShowTrak Remote Permissions',
+    Key: 'REMOTE_ALLOW_GROUP_MANAGEMENT',
+    Title: 'Group Management',
+    Description:
+      'Allow ShowTrak Remote to create, rename, reorder and delete groups. Also requires the server to be in Edit mode.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
+    Group: 'ShowTrak Remote Permissions',
+    Key: 'REMOTE_ALLOW_MONITORING_MANAGEMENT',
+    Title: 'Monitoring Management',
+    Description:
+      'Allow ShowTrak Remote to manage monitoring targets, dummy clients and FreeKiosk terminals. Also requires the server to be in Edit mode.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
+    Group: 'ShowTrak Remote Permissions',
+    Key: 'REMOTE_ALLOW_ALERT_MANAGEMENT',
+    Title: 'Alert Management',
+    Description:
+      'Allow ShowTrak Remote to create, edit and delete alert rules. Also requires the server to be in Edit mode.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
+    Group: 'ShowTrak Remote Permissions',
+    Key: 'REMOTE_ALLOW_UNASSIGNED_CLIENTS',
+    Title: 'Create Unassigned Clients',
+    Description:
+      'Allow ShowTrak Remote to create unassigned client slots. Also requires the global unassigned clients feature and Edit mode.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
+    Group: 'ShowTrak Remote Permissions',
+    Key: 'REMOTE_ALLOW_WOL',
+    Title: 'Wake on LAN',
+    Description:
+      'Allow Wake on LAN to be triggered from ShowTrak Remote. Also requires the global Wake on LAN feature to be enabled.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
+    Group: 'ShowTrak Remote Permissions',
+    Key: 'REMOTE_ALLOW_REMOTE_SCRIPT_EXECUTION',
+    Title: 'Script Execution',
+    Description:
+      'Allow scripts and integrated events to be triggered from ShowTrak Remote. Disabled by default for safety.',
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+  },
   {
     Group: 'System',
     Key: 'SYSTEM_PREVENT_DISPLAY_SLEEP',

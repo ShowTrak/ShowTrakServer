@@ -36,7 +36,22 @@ import { Manager as ModeManager } from '../ModeManager';
 import { ToPublicClient, ToPublicGroup } from './serializers';
 import { RegisterRendererSink } from '../../main/renderer-bus';
 import { GetHandler } from '../../main/handler-registry';
-import type { SubscribeChannel } from '../IPCRegistry/channels';
+import {
+  AuthorizeChannel,
+  ReadSurfacePermissions,
+  READ_CHANNELS,
+  IDENTIFY_CHANNELS,
+  CLIENT_CHANNELS,
+  GROUP_CHANNELS,
+  MONITORING_CHANNELS,
+  ALERT_CHANNELS,
+  UNASSIGNED_CHANNELS,
+  EDIT_CHANNELS,
+  SCRIPT_CHANNELS,
+  WOL_CHANNELS,
+  PUSH_ALLOWLIST,
+  SUPPRESSED_BULK_ACTIONS,
+} from '../RemoteAccess';
 
 const Logger = CreateLogger('WebServer');
 
@@ -176,180 +191,26 @@ function PasscodeMatches(input: string, expected: string): boolean {
 }
 
 // --- Capability model -----------------------------------------------------
-// Which invoke channels the web surface may reach, and under what conditions.
-// Anything not listed here is denied. Grouped by the gate that governs it.
-
-// Always allowed for an authed session (read-only / non-mutating).
-const WEB_READ_CHANNELS = new Set([
-  'Config:Get',
-  'GetClient',
-  'GetClientHistory',
-  'GetClientApplicationHistory',
-  'GetClientUSBHistory',
-  'GetClientDisplayHistory',
-  'GetAllGroups',
-  'Mode:Get',
-  'GetMonitoringMethods',
-  'GetAllMonitoringTargets',
-  'GetMonitoringTarget',
-  'GetMonitoringCheckHistory',
-  'GetMonitoringCheckDebug',
-  'GetDummyClientHistory',
-  'GetAllDummyClients',
-  'GetDummyClient',
-  'GenerateDummyClientDefaults',
-  'FreeKiosk:GetMetrics',
-  'FreeKiosk:GetCommands',
-  'GetAllFreeKioskTerminals',
-  'GetFreeKioskTerminal',
-  'FreeKiosk:GetHistory',
-  'GenerateFreeKioskTerminalDefaults',
-  'FreeKiosk:GetCameraList',
-  // Reading tags is not tag management: the browser needs the list to render the
-  // badges on its client tiles. Every mutation (Tags:SetScope et al) is absent
-  // from every list below, so a browser can see tags but never edit them.
-  'Tags:GetAll',
-  'GetAlertTriggers',
-  'GetAlertActionTypes',
-  'GetAllAlertRules',
-  'GetAlertRule',
-  'AlertActionsEnabled:Get',
-  'Audio:GetAll',
-  'Audio:GetData',
-]);
-
-// Allowed regardless of mode: non-destructive, show-time actions (identifying
-// a client just flashes an overlay on its screen — no state is mutated).
-const WEB_IDENTIFY_CHANNELS = new Set(['IdentifyClient', 'StopIdentifyingClient']);
-
-// Management mutations, split into finite capability categories so each can be
-// permitted/denied independently from the Web UI Permissions settings. Every
-// category ALSO requires the server to be in EDIT mode — edit-mode is
-// authoritative on the desktop and the web merely mirrors it, so the per-category
-// toggles further restrict (never widen) what a browser may mutate.
-const WEB_CLIENT_CHANNELS = new Set([
-  'UpdateClient',
-  'MarkClientUSBDeviceCritical',
-  'RemoveClientUSBDeviceCritical',
-  'MarkClientUSBNameCritical',
-  'RemoveClientUSBNameCritical',
-  'MarkClientApplicationCritical',
-  'RemoveClientApplicationCritical',
-  'MarkClientDisplayCritical',
-  'RemoveClientDisplayCritical',
-  'AddClientMacAddress',
-  'RemoveClientMacAddress',
-  'UnadoptClient',
-  'ReplaceClient',
-  'AdoptDevice',
-]);
-const WEB_GROUP_CHANNELS = new Set([
-  'CreateGroup',
-  'RenameGroup',
-  'DeleteGroup',
-  'Groups:SetOrder',
-  'Groups:SetFullWidth',
-  'Groups:SetKeyBind',
-  'Groups:SetSlug',
-  'SetGroupOrder',
-]);
-const WEB_MONITORING_CHANNELS = new Set([
-  'CreateMonitoringTarget',
-  'UpdateMonitoringTarget',
-  'DeleteMonitoringTarget',
-  'RunMonitoringCheckNow',
-  'RunAllMonitoringChecksNow',
-  'CreateDummyClient',
-  'UpdateDummyClient',
-  'DeleteDummyClient',
-  'ResetDummyClientToIdle',
-  'CreateFreeKioskTerminal',
-  'UpdateFreeKioskTerminal',
-  'DeleteFreeKioskTerminal',
-  'FreeKiosk:RunNow',
-  // Sending a command and taking a capture both act on the device, so they sit
-  // with the other mutations rather than the readers. The command name is still
-  // validated against the fixed FREEKIOSK_COMMANDS allowlist in the registrar.
-  'FreeKiosk:Command',
-  'FreeKiosk:CaptureScreenshot',
-  'FreeKiosk:CaptureCamera',
-]);
-const WEB_ALERT_CHANNELS = new Set([
-  'CreateAlertRule',
-  'UpdateAlertRule',
-  'DeleteAlertRule',
-  'SetAlertRuleEnabled',
-]);
-// Creating unassigned slots is its own category because it is additionally
-// gated on the global SYSTEM_ALLOW_UNASSIGNED_CLIENTS feature flag (the main
-// registrar re-checks that flag and remains the authority).
-const WEB_UNASSIGNED_CHANNELS = new Set(['CreateUnassignedClients']);
-
-// Union of every edit-mode-gated channel. Retained for callers/tests that reason
-// about "all management mutations" without caring about the category split.
-const WEB_EDIT_CHANNELS = new Set([
-  ...WEB_CLIENT_CHANNELS,
-  ...WEB_GROUP_CHANNELS,
-  ...WEB_MONITORING_CHANNELS,
-  ...WEB_ALERT_CHANNELS,
-  ...WEB_UNASSIGNED_CHANNELS,
-]);
-
-// Allowed when remote script execution is enabled (SHOW-time actions).
-const WEB_SCRIPT_CHANNELS = new Set([
-  'ExecuteScript',
-  'TriggerIntegratedEvent',
-  'Scripts:ClearSettledExecutions',
-]);
-
-// Allowed when the global Wake-on-LAN feature AND the Web UI WOL permission are
-// both enabled.
-const WEB_WOL_CHANNELS = new Set(['WakeOnLan']);
-
-// Push channels the web surface receives. Desktop-only channels (menu actions,
-// show-file, fullscreen, native/app updates, network-discovery, and settings
-// that may contain secrets) are intentionally excluded.
-// `satisfies` guarantees every entry is a real registry SubscribeChannel at
-// compile time (a typo or a channel removed from the registry fails the build).
-// The Set stays `Set<string>` so the hot-path `.has(channel: string)` lookup
-// keeps its plain-string signature.
-const WEB_PUSH_CHANNELS = [
-  'SetFullClientList',
-  'ClientUpdated',
-  'SetScriptList',
-  'SetOSCList',
-  'SetDevicesPendingAdoption',
-  'UpdateScriptExecutions',
-  'USBDeviceAdded',
-  'USBDeviceRemoved',
-  'SetFullMonitoringTargetList',
-  'MonitoringTargetUpdated',
-  'SetFullDummyClientList',
-  'DummyClientUpdated',
-  'SetFullFreeKioskTerminalList',
-  'FreeKioskTerminalUpdated',
-  'SetFullAlertRuleList',
-  'SetTagList',
-  'AlertTriggered',
-  'CreateShowTrakAlert',
-  'Notify',
-  'PlaySound',
-  'PlayCustomAudio',
-  'OSCBulkAction',
-  'DebugTrafficEntry',
-  'ModeUpdated',
-  'AlertActionsUpdated',
-  'AudioAssetsUpdated',
-] as const satisfies readonly SubscribeChannel[];
-const WEB_PUSH_ALLOWLIST = new Set<string>(WEB_PUSH_CHANNELS);
-
-// OSCBulkAction is allowlisted as a whole (WOL/ExecuteScript are legitimate web
-// actions), but a few of its types drive the operator's own
-// desktop window rather than a shared server state — opening or closing modals on
-// every logged-in browser would yank the UI out from under whoever is using it.
-// These types are dropped from the web push and delivered to the desktop only.
-const WEB_SUPPRESSED_BULK_ACTIONS = new Set<string>(['OpenClientModal', 'CloseModals']);
-
+// Lives in ../RemoteAccess, shared with the ShowTrak Remote surface on `/sdk`.
+// Two hand-maintained copies of a security allowlist is precisely the drift that
+// becomes a vulnerability, so both surfaces read ONE definition and differ only
+// in the settings prefix their permissions come from.
+//
+// The WEB_* aliases below are kept because they are the names this namespace,
+// its tests, and anything reasoning about "what the browser may reach" have
+// always used. They are aliases, not copies.
+const WEB_READ_CHANNELS = READ_CHANNELS;
+const WEB_IDENTIFY_CHANNELS = IDENTIFY_CHANNELS;
+const WEB_CLIENT_CHANNELS = CLIENT_CHANNELS;
+const WEB_GROUP_CHANNELS = GROUP_CHANNELS;
+const WEB_MONITORING_CHANNELS = MONITORING_CHANNELS;
+const WEB_ALERT_CHANNELS = ALERT_CHANNELS;
+const WEB_UNASSIGNED_CHANNELS = UNASSIGNED_CHANNELS;
+const WEB_EDIT_CHANNELS = EDIT_CHANNELS;
+const WEB_SCRIPT_CHANNELS = SCRIPT_CHANNELS;
+const WEB_WOL_CHANNELS = WOL_CHANNELS;
+const WEB_PUSH_ALLOWLIST = PUSH_ALLOWLIST;
+const WEB_SUPPRESSED_BULK_ACTIONS = SUPPRESSED_BULK_ACTIONS;
 // Serialize a push payload for the web wire. Most channels already carry plain
 // objects; client-bearing channels must be run through ToPublicClient so the
 // browser receives the same shape the desktop renderer consumes.
@@ -373,64 +234,41 @@ function TransformWebPush(channel: string, args: unknown[]): unknown[] {
 // Read a boolean setting, treating an unset value (null/undefined) as the
 // supplied default so the permission model matches DefaultSettings even if a key
 // has never been persisted.
-const ReadBool = async (Key: string, Default: boolean): Promise<boolean> => {
-  const Value = await SettingsManager.GetValue(Key);
-  return Value == null ? Default : !!Value;
-};
-
-// Snapshot of the relevant Web UI settings used for permissions.
+// Snapshot of the Web UI settings used for auth and permissions.
+//
+// The per-category permissions come from the shared capability model, so the
+// browser and ShowTrak Remote can never drift apart on what a category means.
+// Only the auth half — enabled, protection, passcode — is genuinely Web-UI
+// specific and stays here.
 const GetWebConfig = async () => {
   let Enabled = true;
   let ProtectionEnabled = false;
   let Password = '';
-  let AllowRemoteScripts = false;
-  let WOLEnabled = false;
-  // Finite Web UI action permissions. Management categories default ON (matching
-  // the historical "allowed while in Edit mode" behavior); scripts default OFF.
-  let AllowIdentify = true;
-  let AllowClientManagement = true;
-  let AllowGroupManagement = true;
-  let AllowMonitoringManagement = true;
-  let AllowAlertManagement = true;
-  let AllowWebWOL = true;
-  let AllowUnassignedClients = true;
-  let UnassignedClientsEnabled = false;
   try {
     Enabled = !!(await SettingsManager.GetValue('WEBUI_ENABLED'));
     ProtectionEnabled = !!(await SettingsManager.GetValue('WEBUI_PASSWORD_PROTECTION_ENABLED'));
     Password = String((await SettingsManager.GetValue('WEBUI_PASSWORD')) || '').trim();
-    AllowRemoteScripts = await ReadBool('WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION', false);
-    WOLEnabled = !!(await SettingsManager.GetValue('SYSTEM_ALLOW_WOL'));
-    AllowIdentify = await ReadBool('WEBUI_ALLOW_IDENTIFY', true);
-    AllowClientManagement = await ReadBool('WEBUI_ALLOW_CLIENT_MANAGEMENT', true);
-    AllowGroupManagement = await ReadBool('WEBUI_ALLOW_GROUP_MANAGEMENT', true);
-    AllowMonitoringManagement = await ReadBool('WEBUI_ALLOW_MONITORING_MANAGEMENT', true);
-    AllowAlertManagement = await ReadBool('WEBUI_ALLOW_ALERT_MANAGEMENT', true);
-    AllowWebWOL = await ReadBool('WEBUI_ALLOW_WOL', true);
-    AllowUnassignedClients = await ReadBool('WEBUI_ALLOW_UNASSIGNED_CLIENTS', true);
-    UnassignedClientsEnabled = !!(await SettingsManager.GetValue(
-      'SYSTEM_ALLOW_UNASSIGNED_CLIENTS'
-    ));
   } catch {
     /* intentional: fall back to the safe defaults set above if settings can't be read */
   }
   if (Enabled === undefined) Enabled = true;
+  const Permissions = await ReadSurfacePermissions('WEBUI');
   // Protection is only meaningful when a passcode is actually set.
   const RequireAuth = ProtectionEnabled && Password.length > 0;
   return {
     Enabled,
     ProtectionEnabled,
     Password,
-    AllowRemoteScripts,
-    WOLEnabled,
-    AllowIdentify,
-    AllowClientManagement,
-    AllowGroupManagement,
-    AllowMonitoringManagement,
-    AllowAlertManagement,
-    AllowWebWOL,
-    AllowUnassignedClients,
-    UnassignedClientsEnabled,
+    AllowRemoteScripts: Permissions.AllowRemoteScripts,
+    WOLEnabled: Permissions.WOLEnabled,
+    AllowIdentify: Permissions.AllowIdentify,
+    AllowClientManagement: Permissions.AllowClientManagement,
+    AllowGroupManagement: Permissions.AllowGroupManagement,
+    AllowMonitoringManagement: Permissions.AllowMonitoringManagement,
+    AllowAlertManagement: Permissions.AllowAlertManagement,
+    AllowWebWOL: Permissions.AllowWOL,
+    AllowUnassignedClients: Permissions.AllowUnassignedClients,
+    UnassignedClientsEnabled: Permissions.UnassignedClientsEnabled,
     RequireAuth,
   };
 };
@@ -466,43 +304,9 @@ const IsAuthed = async (socket: WebSocket) => {
 };
 
 // Decide whether an authed web session may invoke a given channel. Deny by
-// default; only the explicitly allowlisted channels pass, subject to the
-// governing capability gate.
-const AuthorizeWebChannel = async (channel: string) => {
-  if (WEB_READ_CHANNELS.has(channel)) return { allowed: true, reason: null };
-  const Cfg = await GetWebConfig();
-  if (WEB_IDENTIFY_CHANNELS.has(channel)) {
-    if (!Cfg.AllowIdentify) return { allowed: false, reason: 'forbidden' };
-    return { allowed: true, reason: null };
-  }
-  // Management categories: EDIT mode is the master gate, then the per-category
-  // permission. Report the mode requirement first so the UX message is accurate.
-  const Category = WEB_CLIENT_CHANNELS.has(channel)
-    ? Cfg.AllowClientManagement
-    : WEB_GROUP_CHANNELS.has(channel)
-      ? Cfg.AllowGroupManagement
-      : WEB_MONITORING_CHANNELS.has(channel)
-        ? Cfg.AllowMonitoringManagement
-        : WEB_ALERT_CHANNELS.has(channel)
-          ? Cfg.AllowAlertManagement
-          : WEB_UNASSIGNED_CHANNELS.has(channel)
-            ? Cfg.UnassignedClientsEnabled && Cfg.AllowUnassignedClients
-            : null;
-  if (Category !== null) {
-    if (ModeManager.Get() !== 'EDIT') return { allowed: false, reason: 'edit_mode_required' };
-    if (!Category) return { allowed: false, reason: 'forbidden' };
-    return { allowed: true, reason: null };
-  }
-  if (WEB_SCRIPT_CHANNELS.has(channel)) {
-    if (!Cfg.AllowRemoteScripts) return { allowed: false, reason: 'forbidden' };
-    return { allowed: true, reason: null };
-  }
-  if (WEB_WOL_CHANNELS.has(channel)) {
-    if (!Cfg.WOLEnabled || !Cfg.AllowWebWOL) return { allowed: false, reason: 'forbidden' };
-    return { allowed: true, reason: null };
-  }
-  return { allowed: false, reason: 'forbidden' };
-};
+// default; the shared capability model owns the decision so the browser and
+// ShowTrak Remote cannot diverge on what any single channel costs.
+const AuthorizeWebChannel = (channel: string) => AuthorizeChannel('WEBUI', channel);
 
 // Wire the `/ui` namespace onto the provided Socket.IO server. `_ServerManager`
 // is retained for signature compatibility; script dispatch now flows through the

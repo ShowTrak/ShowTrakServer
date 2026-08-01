@@ -65,6 +65,7 @@ const CASES = [
   ['dist/main/registrars/groups.js', 'test/main-registrar-groups.test.js'],
   ['dist/Modules/ControlService/index.js', 'test/sdk-api.test.js'],
   ['dist/Modules/Bonjour/index.js', 'test/bonjour.test.js'],
+  ['dist/Modules/RemoteAccess/index.js', 'test/remote-access-capabilities.test.js'],
 ];
 
 for (const [Module, Test] of CASES) {

@@ -346,7 +346,12 @@ function loadWebUi(settings, options = {}) {
       RegisterHandler: () => {},
     },
   };
-  const mod = loadWithMocks(serverPath('webui-namespace.js'), managers);
+  // RemoteAccess owns the capability model both remote surfaces share, and it
+  // reads the same mocked SettingsManager/ModeManager. Cached, it would serve
+  // the FIRST test's settings to every later load.
+  const mod = loadWithMocks(serverPath('webui-namespace.js'), managers, {
+    alsoEvict: [path.join(__dirname, '..', 'dist', 'Modules', 'RemoteAccess', 'index.js')],
+  });
   mod.__broadcast = broadcast;
   return mod;
 }

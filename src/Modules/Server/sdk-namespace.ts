@@ -10,6 +10,9 @@
 //      state channels to every connected socket, serialized for the wire.
 //   2. COMMAND — a single `command` event dispatches to the transport-agnostic
 //      ControlService once the handshake has authenticated.
+//   3. RPC — a single `rpc` event dispatches to the SAME shared IPC handlers the
+//      desktop uses, behind the SAME capability model as the Web UI (see
+//      ../RemoteAccess). Deny by default, and available to PAIRED DEVICES ONLY.
 //
 // Auth is REQUIRED, and comes in two flavours that are NOT interchangeable:
 //
@@ -57,6 +60,8 @@ import {
 } from './serializers';
 import { PasscodeMatches } from './webui-namespace';
 import { RegisterRendererSink } from '../../main/renderer-bus';
+import { GetHandler } from '../../main/handler-registry';
+import { AuthorizeChannel } from '../RemoteAccess';
 import { ControlService } from '../ControlService';
 
 const Logger = CreateLogger('SdkServer');
@@ -218,6 +223,19 @@ const SDK_PUSH_ALLOWLIST = new Set<string>([
   'AlertActionsUpdated',
   'UpdateScriptExecutions',
   'Notify',
+  // Management screens need more than a status grid does. These carry the state
+  // a device editing the workspace has to see change under it — pending
+  // adoptions appearing, an alert rule being edited at the desk, a USB device
+  // plugged into a machine someone is standing at.
+  'SetDevicesPendingAdoption',
+  'SetFullAlertRuleList',
+  'USBDeviceAdded',
+  'USBDeviceRemoved',
+  'SetOSCList',
+  // Deliberately still excluded, matching the Web UI: desktop-only channels
+  // (menu actions, show-file, fullscreen, native/app updates, network discovery)
+  // and ANYTHING carrying settings — settings hold the SDK API key and the
+  // workspace PIN, so a surface that could read them could mint its own access.
 ]);
 
 // Serialize a push payload for the SDK wire (same client projection the Web UI
@@ -609,6 +627,36 @@ function SetupSdkNamespace(io: SdkIOServer) {
         } catch (e) {
           Logger.error('SDK command failed:', e);
           if (typeof ack === 'function') ack({ ok: false, detail: 'Command failed' });
+        }
+      })();
+    });
+
+    // Management bridge. Dispatches to the SAME shared IPC handlers the desktop
+    // and Web UI use, behind the SAME deny-by-default capability model — so a
+    // mutation has exactly one implementation and one authorisation rule no
+    // matter which surface asked for it.
+    //
+    // DEVICE SESSIONS ONLY. An API key lives in plaintext in a Companion config
+    // file and was handed out to fire cues; silently widening every existing key
+    // to "can delete every group" is privilege escalation for integrations that
+    // never asked for it. Companion keeps the command surface it already had.
+    socket.on('rpc', (channel: unknown, args: unknown, ack: AckCallback) => {
+      void (async () => {
+        try {
+          if (socket.AuthMode !== 'device') {
+            return ack && ack({ error: 'forbidden' });
+          }
+          if (typeof channel !== 'string') return ack && ack({ error: 'invalid_channel' });
+          const Decision = await AuthorizeChannel('REMOTE', channel);
+          if (!Decision.allowed) return ack && ack({ error: Decision.reason || 'forbidden' });
+          const Handler = GetHandler(channel);
+          if (typeof Handler !== 'function') return ack && ack({ error: 'unknown_channel' });
+          const Args = Array.isArray(args) ? args : [];
+          const Result = await Handler(null, ...Args);
+          if (ack) ack({ result: Result });
+        } catch (e) {
+          Logger.error('SDK rpc failed:', e);
+          if (ack) ack({ error: 'failed' });
         }
       })();
     });
