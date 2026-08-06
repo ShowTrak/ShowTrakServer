@@ -5,6 +5,13 @@ const path = require('node:path');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
 
+// Let a dispatched ExecuteScript emit settle. The dispatch handler resolves the
+// target's show variables (async) before emitting, so the emit is one turn of the
+// event loop behind the handler call.
+function flushDispatch() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 function serverPath(name) {
   return path.join(__dirname, '..', 'dist', 'Modules', 'Server', name);
 }
@@ -79,6 +86,12 @@ test('makeSocket.on requires its `this` binding (models Socket.IO)', () => {
 
 test('Server client namespace rejects sockets without a UUID', async () => {
   const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
+    '../VariableManager': {
+      Manager: {
+        GetPayload: async () => ({ Environment: {}, Exported: [] }),
+        GetEnvironment: async () => ({}),
+      },
+    },
     '../Logger': loggerStub,
     '../AdoptionManager': { Manager: {} },
     '../ClientManager': { Manager: {} },
@@ -110,6 +123,12 @@ test('Server client namespace wires telemetry handlers and disconnect cleanup', 
   };
 
   const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
+    '../VariableManager': {
+      Manager: {
+        GetPayload: async () => ({ Environment: {}, Exported: [] }),
+        GetEnvironment: async () => ({}),
+      },
+    },
     '../Logger': loggerStub,
     '../AdoptionManager': {
       Manager: {
@@ -191,6 +210,12 @@ test('Server client namespace re-adopts stale unadopted handshake without adding
   };
 
   const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
+    '../VariableManager': {
+      Manager: {
+        GetPayload: async () => ({ Environment: {}, Exported: [] }),
+        GetEnvironment: async () => ({}),
+      },
+    },
     '../Logger': loggerStub,
     '../AdoptionManager': {
       Manager: {
@@ -242,6 +267,12 @@ test('Server client namespace keeps unadopted clients visible for pending adopti
   };
 
   const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
+    '../VariableManager': {
+      Manager: {
+        GetPayload: async () => ({ Environment: {}, Exported: [] }),
+        GetEnvironment: async () => ({}),
+      },
+    },
     '../Logger': loggerStub,
     '../AdoptionManager': {
       Manager: {
@@ -899,6 +930,12 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
   };
 
   const { Manager } = loadWithMocks(serverPath('index.js'), {
+    '../VariableManager': {
+      Manager: {
+        GetPayload: async () => ({ Environment: {}, Exported: [] }),
+        GetEnvironment: async () => ({}),
+      },
+    },
     '../Logger': loggerStub,
     http: { createServer: () => ({ on: () => {}, listen: (_p, cb) => cb && cb() }) },
     'socket.io': {
@@ -1080,8 +1117,15 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
 
   await Manager.ExecuteScripts('deploy', ['a', 'b'], true);
   assert.equal(queue.includes('clear'), true);
+  // The dispatch resolves the client's show variables before emitting, so the
+  // emit lands a tick after the (synchronous) dispatch handler returns. Flush
+  // the queue rather than asserting straight away.
+  await flushDispatch();
   assert.ok(emits.some((e) => e.room === 'a' && e.event === 'ExecuteScript'));
   assert.ok(emits.some((e) => e.room === 'b' && e.event === 'ExecuteScript'));
+  // Variables ride along as the third argument so the client can inject them.
+  const dispatched = emits.find((e) => e.room === 'a' && e.event === 'ExecuteScript');
+  assert.deepEqual(dispatched.args[2], {});
 
   emits.length = 0;
   await Manager.ExecuteBulkRequest('WOL', ['a'], 'Wake On LAN');
@@ -1107,6 +1151,12 @@ test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve
   };
 
   loadWithMocks(serverPath('index.js'), {
+    '../VariableManager': {
+      Manager: {
+        GetPayload: async () => ({ Environment: {}, Exported: [] }),
+        GetEnvironment: async () => ({}),
+      },
+    },
     '../Logger': loggerStub,
     http: { createServer: () => ({ on: () => {}, listen: (_p, cb) => cb && cb() }) },
     'socket.io': {
@@ -1270,6 +1320,12 @@ test('Server Manager integrated event queue reports mixed target outcomes', asyn
   };
 
   const { Manager } = loadWithMocks(serverPath('index.js'), {
+    '../VariableManager': {
+      Manager: {
+        GetPayload: async () => ({ Environment: {}, Exported: [] }),
+        GetEnvironment: async () => ({}),
+      },
+    },
     '../Logger': loggerStub,
     '../Config': { Config: { Application: { Version: '9.9.9' } } },
     '../AppData': { Manager: { GetScriptsDirectory: () => __dirname } },
@@ -1487,6 +1543,12 @@ test('Web UI login lockout releases after the cooldown elapses', () => {
 function setupDeltaNamespace({ applyDelay = 0 } = {}) {
   const applied = [];
   const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
+    '../VariableManager': {
+      Manager: {
+        GetPayload: async () => ({ Environment: {}, Exported: [] }),
+        GetEnvironment: async () => ({}),
+      },
+    },
     '../Logger': loggerStub,
     '../AdoptionManager': {
       Manager: { AddClientPendingAdoption: async () => {}, RemoveClientPendingAdoption: () => {} },

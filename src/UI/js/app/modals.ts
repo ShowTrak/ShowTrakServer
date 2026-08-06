@@ -26,7 +26,13 @@ import {
 import { IsFogAvailable, OpenFogTaskModal } from './fog';
 import { ClearTagPicker, RenderTagPicker } from './tag-picker';
 import type { TagPickerMount } from './tag-picker';
-import type { ClientView } from '@showtrak/protocol';
+import type { ClientVariableView, ClientView } from '@showtrak/protocol';
+
+// UUID of the client whose editor is currently open, or null. Tracked so a
+// SetVariableList push (someone renaming or deleting a variable elsewhere, or on
+// the web UI) can redraw the open editor's variable rows instead of leaving
+// names that no longer resolve to anything.
+let ClientEditorOpenUUID: string | null = null;
 
 // The former Update Manager and Group Manager god-sections now live in their own
 // modules; re-export them so existing `./modals` importers keep working.
@@ -153,6 +159,9 @@ export async function CloseAllModals() {
   // Forget which entity the tag picker was editing; a tag push arriving after
   // the editor closed would otherwise redraw chips into a hidden modal.
   ClearTagPicker();
+  // Same reasoning for the variable rows: a SetVariableList push landing after
+  // the editor closed must not repopulate a hidden form.
+  ClientEditorOpenUUID = null;
   await Wait(300);
   return;
 }
@@ -473,6 +482,106 @@ async function PopulateMacAddressSection(UUID: string) {
     });
 }
 
+/**
+ * Render this client's variable rows: one per variable defined in the show,
+ * each pre-filled with the client's own value or left empty to inherit.
+ *
+ * The placeholder carries the default, so an empty box reads as "uses the
+ * default: TEST_GAME" rather than as an unexplained blank. That distinction is
+ * the whole model — an empty field keeps tracking the default forever, while a
+ * typed value pins this machine to it.
+ */
+async function PopulateVariablesSection(UUID: string, IsIntegrated: boolean): Promise<void> {
+  const Wrapper = $('#CLIENT_EDITOR_VARIABLES_WRAPPER');
+  const List = document.getElementById('CLIENT_EDITOR_VARIABLES_LIST') as HTMLElement | null;
+  if (!List) return;
+
+  // Integrated clients run no local agent and execute no scripts, so there is
+  // nothing to inject into — the server rejects the field for them anyway.
+  if (IsIntegrated) {
+    Wrapper.addClass('d-none');
+    List.innerHTML = '';
+    return;
+  }
+
+  let Variables: ClientVariableView[] = [];
+  try {
+    Variables = (await window.API.GetClientVariables(UUID)) || [];
+  } catch {
+    Variables = [];
+  }
+
+  // Nothing defined yet: hide the section entirely rather than showing an empty
+  // box on every client editor in a show that does not use variables.
+  if (!Variables.length) {
+    Wrapper.addClass('d-none');
+    List.innerHTML = '';
+    return;
+  }
+
+  Wrapper.removeClass('d-none');
+  List.innerHTML = '';
+
+  for (const Variable of Variables) {
+    const Placeholder = Variable.DefaultValue
+      ? `Default: ${Variable.DefaultValue}`
+      : 'No default value';
+    const Row = document.createElement('div');
+    Row.className = 'form-floating';
+    Row.innerHTML = `
+      <input
+        type="text"
+        class="form-control st-client-variable"
+        id="CLIENT_EDITOR_VARIABLE_${Safe(String(Variable.VariableID))}"
+        data-variableid="${Safe(String(Variable.VariableID))}"
+        placeholder="${Safe(Placeholder)}"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <label for="CLIENT_EDITOR_VARIABLE_${Safe(String(Variable.VariableID))}">${Safe(Variable.EnvironmentKey)}</label>
+    `;
+    const Input = Row.querySelector('input') as HTMLInputElement;
+    // Set the value via the property rather than the markup so a value
+    // containing quotes cannot break out of the attribute.
+    Input.value = Variable.Value == null ? '' : Variable.Value;
+    List.appendChild(Row);
+  }
+}
+
+/**
+ * Collect the editor's variable rows into the override map the server expects.
+ *
+ * An empty box means "inherit", which is null — NOT an empty string. Sending ''
+ * would pin the client to an empty value and silently stop it tracking the
+ * default, which is the opposite of what clearing a field looks like it does.
+ */
+function CollectClientVariables(): Record<string, string | null> {
+  const Result: Record<string, string | null> = {};
+  document.querySelectorAll<HTMLInputElement>('.st-client-variable').forEach((Input) => {
+    const VariableID = String(Input.getAttribute('data-variableid') || '').trim();
+    if (!VariableID) return;
+    const Value = Input.value;
+    Result[VariableID] = Value === '' ? null : Value;
+  });
+  return Result;
+}
+
+/**
+ * Redraw the open client editor's variable rows after the variable set changed
+ * elsewhere. A no-op when no editor is open.
+ *
+ * Any value the operator had typed but not yet saved is deliberately discarded:
+ * the row it belonged to may no longer exist, and re-applying half of a stale
+ * form is worse than showing them the current truth.
+ */
+export async function RefreshClientEditorVariablesIfMounted(): Promise<void> {
+  if (!ClientEditorOpenUUID) return;
+  const UUID = ClientEditorOpenUUID;
+  const Client = await window.API.GetClient(UUID);
+  if (!Client || ClientEditorOpenUUID !== UUID) return;
+  await PopulateVariablesSection(UUID, IsIntegratedClientEntity(Client));
+}
+
 export async function OpenClientEditor(UUID: string) {
   const Client = await window.API.GetClient(UUID);
   if (!Client) return console.error('Client not found:', UUID);
@@ -552,6 +661,7 @@ export async function OpenClientEditor(UUID: string) {
     });
 
   await PopulateFogSection(UUID, (Nickname ? Nickname : Hostname) || UUID);
+  await PopulateVariablesSection(UUID, IsIntegrated);
 
   $('#SHOWTRAK_CLIENT_EDITOR_USB_DEVICES').html('');
   // USB section moved to read-only Client Info modal
@@ -633,10 +743,18 @@ export async function OpenClientEditor(UUID: string) {
         Payload.RunOnLaunchDelaySeconds = RunOnLaunchDelaySeconds;
       }
 
+      // Only send variables when the section is actually rendered. An integrated
+      // client (or a show with no variables defined) has no rows, and sending an
+      // empty map would be indistinguishable from "clear every override".
+      if (!IsIntegrated && document.querySelector('.st-client-variable')) {
+        Payload.Variables = CollectClientVariables();
+      }
+
       await window.API.UpdateClient(UUID, Payload);
       await CloseAllModals();
     });
 
+  ClientEditorOpenUUID = UUID;
   openModal('SHOWTRAK_CLIENT_EDITOR');
 }
 

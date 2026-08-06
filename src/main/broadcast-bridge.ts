@@ -29,6 +29,7 @@ import { Manager as FreeKioskManager } from '../Modules/FreeKioskManager';
 import { recordFreeKioskHistorySamples, syncFreeKioskHistoryStore } from './freekiosk-history';
 import { Manager as AlertsManager } from '../Modules/AlertsManager';
 import { Manager as TagManager } from '../Modules/TagManager';
+import { Manager as VariableManager } from '../Modules/VariableManager';
 import { Manager as FogManager } from '../Modules/FogManager';
 import { Manager as AudioAssetManager } from '../Modules/AudioAssetManager';
 import { Manager as ScriptManager } from '../Modules/ScriptManager';
@@ -558,6 +559,12 @@ async function UpdateTagList(): Promise<void> {
   PushToRenderers('SetTagList', Tags || []);
 }
 
+async function UpdateVariableList(): Promise<void> {
+  if (!hasMainWindow()) return;
+  const Variables = await VariableManager.GetAllViews();
+  PushToRenderers('SetVariableList', Variables || []);
+}
+
 async function UpdateFogTaskList(): Promise<void> {
   if (!hasMainWindow()) return;
   const [Err, Tasks] = await FogManager.GetTasks();
@@ -722,6 +729,7 @@ function RegisterBroadcastBridge(): void {
   BroadcastManager.on('ScriptExecutionUpdated', UpdateScriptExecutions);
   BroadcastManager.on('AlertRuleListChanged', UpdateAlertRuleList);
   BroadcastManager.on('TagListChanged', UpdateTagList);
+  BroadcastManager.on('VariableListChanged', UpdateVariableList);
   // FOG: the poller emits FogTasksUpdated on any state change and FogStatusChanged
   // when the connection comes up or goes down. Status is pushed alongside the task
   // list because the panel renders both.
@@ -764,6 +772,7 @@ export {
   UpdateFreeKioskTerminalList,
   UpdateAlertRuleList,
   UpdateTagList,
+  UpdateVariableList,
   UpdateFogTaskList,
   UpdateFogStatus,
   ValidateAlertAudioAssets,

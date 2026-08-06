@@ -22,6 +22,7 @@ import type {
   SettingGroupView,
   GroupView,
   TagView,
+  VariableView,
 } from '@showtrak/protocol';
 
 export let Config = {} as AppConfig;
@@ -98,6 +99,14 @@ export function setFreeKioskCommandsCache(value: FreeKioskCommandDef[]): void {
 export let Tags: TagView[] = [];
 export function setTags(value: TagView[]): void {
   Tags = Array.isArray(value) ? value : [];
+}
+
+// Show variable definitions, ordered by Weight. Kept fresh by the
+// SetVariableList push so the script editor's reference list and an open client
+// editor both stay correct when a variable is renamed or removed elsewhere.
+export let Variables: VariableView[] = [];
+export function setVariables(value: VariableView[]): void {
+  Variables = Array.isArray(value) ? value : [];
 }
 
 export let AlertRulesCache: AlertRuleView[] = [];

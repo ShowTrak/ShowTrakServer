@@ -101,6 +101,10 @@ export function CreateClientsRepository(DB: DBManager) {
         if (displayErr) throw displayErr;
         const [macErr] = await run('DELETE FROM ClientMacAddresses WHERE UUID = ?', [UUID]);
         if (macErr) throw macErr;
+        // Variable overrides describe this client specifically, so they go with
+        // it. The definitions in `Variables` are show-wide and stay put.
+        const [variableErr] = await run('DELETE FROM ClientVariables WHERE UUID = ?', [UUID]);
+        if (variableErr) throw variableErr;
         // The FOG host link goes with the client. FogTasks rows are deliberately
         // left behind (their UUID simply dangles) so in-flight and recently
         // finished tasks stay visible in the FOG panel after a client is removed.
@@ -176,6 +180,19 @@ export function CreateClientsRepository(DB: DBManager) {
           [NewUUID, OldUUID]
         );
         if (macErr) throw macErr;
+
+        // Variable overrides follow the slot, not the hardware: they are
+        // configuration an operator typed against this position in the show
+        // (GAME_VERSION for the machine driving screen 3), so the replacement
+        // machine should inherit them exactly as it inherits the nickname and
+        // group. OR REPLACE because the arriving client may already carry its
+        // own rows for the same variables — the slot's values win, since that is
+        // what the operator configured for this position.
+        const [variableErr] = await run(
+          'UPDATE OR REPLACE ClientVariables SET UUID = ? WHERE UUID = ?',
+          [NewUUID, OldUUID]
+        );
+        if (variableErr) throw variableErr;
 
         const [rulesErr, RuleRows] = await DB.All<{
           RuleID: number;

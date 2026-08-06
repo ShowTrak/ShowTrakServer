@@ -342,6 +342,21 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     SetTagOrder: nullTuple,
     DeleteTag: nullTuple,
 
+    // ---- Show Variables (read allowed; management desktop-only) ----------
+    // The browser can see which variables exist and what a client resolves to —
+    // that is show documentation an operator needs at the desk. Defining and
+    // editing them stays desktop-only, matching tags: no Variables:Set* channel
+    // is allowlisted for the web namespace either.
+    GetAllVariables: async () => rpc('Variables:GetAll'),
+    GetClientVariables: async (UUID) => rpc('Variables:GetForClient', UUID),
+    OnSetVariableList: (cb) => sub('SetVariableList', cb),
+    CreateVariable: nullTuple,
+    SetVariableKey: nullTuple,
+    SetVariableDescription: nullTuple,
+    SetVariableDefault: nullTuple,
+    SetVariableExport: nullTuple,
+    DeleteVariable: nullTuple,
+
     // ---- Custom audio assets (read allowed; management desktop-only) -----
     GetAudioAssets: async () => rpc('Audio:GetAll'),
     GetAudioAssetData: async (ID) => rpc('Audio:GetData', ID),

@@ -25,6 +25,7 @@ import { Manager as ServerIdentityManager } from '../ServerIdentity';
 import { Manager as IdentifyManager } from '../IdentifyManager';
 import { Manager as SocketValidation } from '../SocketValidation';
 import { Manager as SettingsManager } from '../SettingsManager';
+import { Manager as VariableManager } from '../VariableManager';
 import {
   recordClientApplicationHistorySamples,
   recordClientUSBHistorySamples,
@@ -290,6 +291,29 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
           DelaySeconds: Client.RunOnLaunchDelaySeconds ?? null,
           ShowCountdown,
         });
+      }
+    );
+
+    // Resolved show variables for this client. Fetched once per connection,
+    // before the run-on-launch sequence hands off, so an auto-start script sees
+    // exactly what a server-dispatched one would. Subsequent changes arrive as
+    // 'SetVariables' pushes rather than by re-asking.
+    //
+    // Integrated clients run no local agent and execute no scripts, so they get
+    // an empty set rather than the show's variables.
+    GuardedOn(
+      'GetVariables',
+      (Callback) => {
+        if (typeof Callback !== 'function')
+          throw new Error('GetVariables requires an ack callback');
+        return [Callback];
+      },
+      async (Callback: (payload: unknown) => void) => {
+        const [Err, Client] = await ClientManager.Get(socket.UUID);
+        if (Err || !Client || Client.Integrated === true) {
+          return Callback({ Environment: {}, Exported: [] });
+        }
+        Callback(await VariableManager.GetPayload(socket.UUID));
       }
     );
 

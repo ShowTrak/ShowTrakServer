@@ -18,7 +18,9 @@ import {
   Manager as ScriptExecutionManager,
   SetDispatchHandler as SetScriptDispatchHandler,
 } from '../ScriptExecutionManager';
+import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as ClientManager } from '../ClientManager';
+import { Manager as VariableManager } from '../VariableManager';
 import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
 import { Manager as TagManager } from '../TagManager';
 import { Manager as UpdateManager } from '../UpdateManager';
@@ -333,7 +335,50 @@ const io = new WebServer<ClientToServerEvents, ServerToClientEvents>(Server, {
 // dispatch to the client socket (on enqueue, completion, or timeout).
 SetScriptDispatchHandler((UUID: string, RequestID: string, ScriptID: string) => {
   Logger.log('ExecuteScript dispatch', { ScriptID, UUID, RequestID });
-  io.to(UUID).emit('ExecuteScript', RequestID, ScriptID);
+  // Show variables ride along with the dispatch, resolved HERE rather than at
+  // enqueue time: a script that waited its turn behind another must run with the
+  // values that were current when it actually started, not when it was queued.
+  //
+  // The resolve is a cache hit in the steady state, but it is still async, so the
+  // emit moves off this tick. That is deliberate and safe — the client is idle by
+  // definition (PumpClient only dispatches to an idle client) and the timeout
+  // watchdog has already been armed by the caller, so nothing is racing. A
+  // failure must never stop a script from running, so the fallback dispatches
+  // with no variables rather than not at all.
+  void VariableManager.GetEnvironment(UUID)
+    .catch((Err) => {
+      Logger.warn(`Failed to resolve variables for ${UUID}; dispatching without them`, Err);
+      return {};
+    })
+    .then((Variables) => {
+      io.to(UUID).emit('ExecuteScript', RequestID, ScriptID, Variables);
+    });
+});
+
+// Re-push resolved variables when a definition or an override changes.
+//
+// A null UUID means a DEFINITION changed (a default, a rename, an export toggle,
+// a deletion), which moves every client that has not overridden that variable —
+// so it fans out to all of them. A specific UUID means only that client's
+// overrides moved. Both paths matter for the Windows registry export: a client
+// that is not told a variable was deleted will leave the value in HKCU forever.
+BroadcastManager.on('ClientVariablesChanged', (UUID?: string | null) => {
+  void (async () => {
+    try {
+      if (UUID) {
+        io.to(String(UUID)).emit('SetVariables', await VariableManager.GetPayload(String(UUID)));
+        return;
+      }
+      const [Err, Clients] = await ClientManager.GetAll();
+      if (Err || !Clients) return;
+      for (const Client of Clients) {
+        if (!Client || !Client.UUID || Client.Integrated === true) continue;
+        io.to(Client.UUID).emit('SetVariables', await VariableManager.GetPayload(Client.UUID));
+      }
+    } catch (Err) {
+      Logger.warn('Failed to push variable update to clients', Err);
+    }
+  })();
 });
 
 // Outcome of dispatching a queued action to a single target.

@@ -10,6 +10,9 @@ import { CreateClientMacAddressesRepository } from '../DB/repositories/client-ma
 import { NormalizeMacAddress, IsExternalMacAddress } from '../MacAddress';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as UUIDManager } from '../UUID';
+// Safe direction: VariableManager depends only on DB/Broadcast/Utils, never on
+// ClientManager, so this import cannot close a cycle.
+import { Manager as VariableManager } from '../VariableManager';
 import * as SlugService from '../Slug';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
@@ -1049,6 +1052,11 @@ Manager.Update = async (UUID: string, Data: unknown) => {
   if (TouchesLaunch && Client.Integrated === true) {
     return Fail('Launch actions are not supported for integrated clients');
   }
+  // Same reasoning as launch actions: an integrated client runs no local agent
+  // and executes no scripts, so it has nothing to inject variables into.
+  if (Object.prototype.hasOwnProperty.call(Fields, 'Variables') && Client.Integrated === true) {
+    return Fail('Variables are not supported for integrated clients');
+  }
   // Surface the first failed persist rather than reporting Ok unconditionally —
   // the setters roll their own RAM back on failure, so returning Fail here keeps
   // the UI's view aligned with what actually landed in the row.
@@ -1079,6 +1087,16 @@ Manager.Update = async (UUID: string, Data: unknown) => {
   if (Object.prototype.hasOwnProperty.call(Fields, 'RunOnLaunchDelaySeconds')) {
     const [SetErr] = await Client.SetRunOnLaunchDelaySeconds(
       Fields.RunOnLaunchDelaySeconds as number | null
+    );
+    if (SetErr) return Fail(SetErr);
+  }
+  // Variable overrides live in their own table rather than on the client row, so
+  // they are delegated instead of set through a Client setter — the Client entity
+  // stays plain data describing the machine, not a carrier for show config.
+  if (Object.prototype.hasOwnProperty.call(Fields, 'Variables')) {
+    const [SetErr] = await VariableManager.SetClientValues(
+      UUID,
+      Fields.Variables as Record<string, unknown> | null
     );
     if (SetErr) return Fail(SetErr);
   }

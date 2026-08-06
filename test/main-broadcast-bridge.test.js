@@ -41,6 +41,7 @@ const state = {
   dummies: [null, [{ UUID: 'dummy-1' }]],
   rules: [null, [{ AlertRuleID: 1 }]],
   tags: [{ TagID: 1 }],
+  variables: [{ VariableID: 1 }],
   scripts: [{ ID: 'a' }],
   decorated: [{ ID: 'a', Whitelist: null }],
   fingerprint: 'fp-1',
@@ -100,6 +101,7 @@ const groupMgr = recordingManager({
 const targetMgr = recordingManager({ GetAll: () => state.targets });
 const dummyMgr = recordingManager({ GetAll: () => state.dummies });
 const tagMgr = recordingManager({ GetAllViews: () => state.tags });
+const variableMgr = recordingManager({ GetAllViews: () => state.variables });
 const fogMgr = recordingManager({
   GetTasks: () => [null, [{ FogTaskRecordID: 1 }]],
   GetStatus: () => ({ Healthy: true }),
@@ -190,6 +192,7 @@ const restore = installModuleMocks([
   },
   { match: matchesModule('/Modules/AlertsManager'), value: { Manager: alertsMgr } },
   { match: matchesModule('/Modules/TagManager'), value: { Manager: tagMgr } },
+  { match: matchesModule('/Modules/VariableManager'), value: { Manager: variableMgr } },
   { match: matchesModule('/Modules/FogManager'), value: { Manager: fogMgr } },
   { match: matchesModule('/Modules/AudioAssetManager'), value: { Manager: audioMgr } },
   { match: matchesModule('/Modules/ScriptManager'), value: { Manager: scriptMgr } },
@@ -254,6 +257,7 @@ function reset() {
     targetMgr,
     dummyMgr,
     tagMgr,
+    variableMgr,
     fogMgr,
     scriptMgr,
     whitelistMgr,

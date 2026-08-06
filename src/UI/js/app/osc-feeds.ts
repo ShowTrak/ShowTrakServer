@@ -14,6 +14,7 @@ import {
   FreeKioskTerminals,
   setMonitoringTargets,
   setTags,
+  setVariables,
 } from './state';
 import { HandleNonFatalError, Safe } from './utils';
 import { RenderFullClientAndMonitorList, UpdateClientTile } from './client-list';
@@ -40,6 +41,8 @@ import { Notify, RenderClientInfoDetails, UpdateIdentifyStatusBanner } from './s
 import { UpdateDummyClientTile } from './dummy-clients';
 import { UpdateFreeKioskTile } from './freekiosk';
 import { RefreshTagPickerIfMounted } from './tag-picker';
+import { RenderScriptEditorVariableList } from './variable-manager';
+import { RefreshClientEditorVariablesIfMounted } from './modals';
 
 /** One line rendered in the OSC/HTTP debug terminal. */
 interface OscHttpDebugEntry {
@@ -653,6 +656,17 @@ export function InitOscFeeds() {
     // through the server), so an open picker has to redraw or it keeps showing
     // the state from before the click.
     RefreshTagPickerIfMounted();
+  });
+
+  // --- Show Variables ---
+  // The script editor's reference list and any open client editor both read
+  // from this cache, so a rename or deletion made elsewhere (or by another
+  // operator on the web UI) has to redraw them rather than leave stale names
+  // that no longer resolve to anything.
+  window.API.OnSetVariableList(async (List) => {
+    setVariables(Array.isArray(List) ? List : []);
+    RenderScriptEditorVariableList();
+    await RefreshClientEditorVariablesIfMounted();
   });
 
   // --- Dummy Clients ---

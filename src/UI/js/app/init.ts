@@ -67,6 +67,7 @@ import { OpenClientInfo } from './client-info-modal';
 import { TestAllNotifications } from './lib/debug-notifications';
 import { OpenScriptManager } from './script-manager';
 import { OpenTagManager } from './tag-manager';
+import { OpenVariableManager } from './variable-manager';
 import { OpenDummyClientEditor } from './dummy-clients';
 import { OpenFreeKioskEditor } from './freekiosk-editor';
 import {
@@ -540,6 +541,10 @@ export async function Init() {
 
   $('#SHOWTRAK_MODEL_CORE_TAG_MANAGER_BUTTON').on('click', async () => {
     await OpenTagManager();
+  });
+
+  $('#SHOWTRAK_MODEL_CORE_VARIABLE_MANAGER_BUTTON').on('click', async () => {
+    await OpenVariableManager();
   });
 
   $('#SHOWTRAK_MODEL_CORE_ALERT_MANAGER_BUTTON').on('click', async () => {

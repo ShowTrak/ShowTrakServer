@@ -105,6 +105,11 @@ export interface IPCValidationManager {
     Tags: number[];
   };
 
+  // Show Variables (variable-validators.ts)
+  VariableID(value: unknown, fieldName?: string): number;
+  VariableText(value: unknown, fieldName?: string): string;
+  ClientVariableMap(value: unknown): Record<string, string | null>;
+
   // Audio assets (audio-validators.ts)
   AudioAssetID(value: unknown, fieldName?: string): string;
   AudioImportPayload(value: unknown): Record<string, unknown>;
@@ -132,6 +137,7 @@ require('./dummy-validators')(Manager);
 require('./freekiosk-validators')(Manager);
 require('./alert-validators')(Manager);
 require('./tag-validators')(Manager);
+require('./variable-validators')(Manager);
 require('./audio-validators')(Manager);
 require('./fog-validators')(Manager);
 require('./system-validators')(Manager);

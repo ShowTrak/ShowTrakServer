@@ -289,6 +289,15 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
       }
     }
 
+    // Show variable overrides: VariableID -> value, null to go back to
+    // inheriting the default. Only the shape is checked here; VariableManager
+    // owns value sanitization and silently skips IDs it does not recognise, so
+    // an editor left open while a variable was deleted elsewhere still saves.
+    if (Object.prototype.hasOwnProperty.call(value, 'Variables')) {
+      hasAnyField = true;
+      normalized.Variables = Manager.ClientVariableMap(value.Variables);
+    }
+
     if (!hasAnyField) {
       fail('Client update payload does not include supported fields');
     }

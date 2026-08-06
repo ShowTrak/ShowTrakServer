@@ -62,6 +62,12 @@ const READ_CHANNELS = new Set([
   // badges on its client tiles. Every mutation (Tags:SetScope et al) is absent
   // from every list below, so a browser can see tags but never edit them.
   'Tags:GetAll',
+  // Same reasoning as tags: reading variables is show documentation the browser
+  // needs to explain what a client will do, not variable management. Every
+  // Variables:Set*/Create/Delete channel is absent from every list below, so a
+  // browser can see variables but never edit them.
+  'Variables:GetAll',
+  'Variables:GetForClient',
   'GetAlertTriggers',
   'GetAlertActionTypes',
   'GetAllAlertRules',

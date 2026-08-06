@@ -144,6 +144,14 @@ const INVOKE_CHANNEL_LIST = [
   'Tags:SetScope',
   'Tags:SetOrder',
   'Tags:Delete',
+  'Variables:GetAll',
+  'Variables:Create',
+  'Variables:SetKey',
+  'Variables:SetDescription',
+  'Variables:SetDefault',
+  'Variables:SetExport',
+  'Variables:Delete',
+  'Variables:GetForClient',
   'Fog:GetStatus',
   'Fog:TestConnection',
   'Fog:GetHosts',
@@ -215,6 +223,7 @@ const SUBSCRIBE_CHANNEL_LIST = [
   'NetworkDeviceScanEvent',
   'SetFullAlertRuleList',
   'SetTagList',
+  'SetVariableList',
   'AlertTriggered',
   'CreateShowTrakAlert',
   'AudioAssetsUpdated',
@@ -500,6 +509,20 @@ const API: ShowTrakAPI = {
   SetTagOrder: async (OrderedTagIDs) => invoke('Tags:SetOrder', OrderedTagIDs),
   DeleteTag: async (TagID) => invoke('Tags:Delete', TagID),
   OnSetTagList: (Callback) => subscribe('SetTagList', Callback),
+  // Show Variables. Writing a client's overrides is not here — it rides the
+  // UpdateClient payload as a `Variables` field so the editor saves in one go.
+  GetAllVariables: async () => invoke('Variables:GetAll'),
+  CreateVariable: async (Key) => invoke('Variables:Create', Key),
+  SetVariableKey: async (VariableID, Key) => invoke('Variables:SetKey', VariableID, Key),
+  SetVariableDescription: async (VariableID, Description) =>
+    invoke('Variables:SetDescription', VariableID, Description),
+  SetVariableDefault: async (VariableID, DefaultValue) =>
+    invoke('Variables:SetDefault', VariableID, DefaultValue),
+  SetVariableExport: async (VariableID, ExportToSystem) =>
+    invoke('Variables:SetExport', VariableID, ExportToSystem),
+  DeleteVariable: async (VariableID) => invoke('Variables:Delete', VariableID),
+  GetClientVariables: async (UUID) => invoke('Variables:GetForClient', UUID),
+  OnSetVariableList: (Callback) => subscribe('SetVariableList', Callback),
   // FOG Project integration
   GetFogStatus: async () => invoke('Fog:GetStatus'),
   TestFogConnection: async () => invoke('Fog:TestConnection'),

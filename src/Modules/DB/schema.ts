@@ -372,6 +372,54 @@ Schema.push({
     )',
 });
 
+// Show Variables — operator-defined values a client's scripts read as
+// environment variables (`GAME_VERSION` reaches a batch file as
+// `%SHOWTRAK_VAR_GAME_VERSION%`).
+//
+// Key holds the BARE name; the `SHOWTRAK_VAR_` prefix is applied when the
+// environment is built, never stored, so the prefix can never be typed twice or
+// half-applied. It is normalized to upper snake case on write because the
+// Windows environment is case-insensitive — `Game_Version` and `GAME_VERSION`
+// are one variable there and two on POSIX, so only one spelling may exist. The
+// NOCASE unique index is the in-table safety net for that.
+//
+// ExportToSystem mirrors the value into the Windows user environment (HKCU) so
+// applications outside ShowTrak can read it. It is per-variable because that
+// export outlives the process and has to be reconciled and cleaned up; a
+// variable only ever needed inside a ShowTrak script should not be in there.
+//
+// Values are stored and travel in the clear — they ride inside exported show
+// files, and on Windows exported ones land in the registry of every client.
+// They are configuration, not secrets, and the UI says so.
+Schema.push({
+  Name: 'Variables',
+  SQL: "CREATE TABLE IF NOT EXISTS `Variables` ( \
+            VariableID INTEGER PRIMARY KEY AUTOINCREMENT, \
+            Key TEXT NOT NULL, \
+            Description TEXT, \
+            DefaultValue TEXT NOT NULL DEFAULT '', \
+            ExportToSystem INTEGER NOT NULL DEFAULT 1, \
+            Weight INTEGER NOT NULL DEFAULT 100, \
+            Timestamp BIGINT(11) NOT NULL \
+    )",
+});
+
+// Per-client overrides of a variable's default.
+//
+// Keyed on VariableID rather than on the key text so renaming a variable in the
+// manager keeps every client's value — a rename is a display change, not a data
+// migration. A client with no row here inherits Variables.DefaultValue.
+Schema.push({
+  Name: 'ClientVariables',
+  SQL: 'CREATE TABLE IF NOT EXISTS `ClientVariables` ( \
+            UUID TEXT NOT NULL, \
+            VariableID INTEGER NOT NULL, \
+            Value TEXT NOT NULL, \
+            UpdatedAt BIGINT(11) NOT NULL, \
+            PRIMARY KEY (UUID, VariableID) \
+    )',
+});
+
 // Versioned migrations for existing installs. Applied versions are recorded in
 // the SchemaMigrations table; only versions above the recorded maximum run.
 // Installs that predate the version table are back-filled by probing
@@ -501,6 +549,20 @@ Schema.Migrations = [
   {
     Version: 28,
     SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_remotedevices_tokenhash ON `RemoteDevices` (TokenHash)',
+  },
+  // Show Variables. Both tables are created by the Schema blocks above on new
+  // and existing installs, so only the indexes need versioning. The NOCASE
+  // unique index on Key enforces the single-spelling rule the Windows
+  // environment requires; ClientVariables is indexed on UUID because resolving
+  // one client's environment — the hot path, hit on every connect and every
+  // dispatch — looks up by client, not by variable.
+  {
+    Version: 29,
+    SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_variables_key ON `Variables` (Key COLLATE NOCASE)',
+  },
+  {
+    Version: 30,
+    SQL: 'CREATE INDEX IF NOT EXISTS idx_clientvariables_uuid ON `ClientVariables` (UUID)',
   },
 ];
 

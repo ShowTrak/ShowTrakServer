@@ -260,6 +260,15 @@
                 <button
                   type="button"
                   class="dropdown-item"
+                  id="SHOWTRAK_MODEL_CORE_VARIABLE_MANAGER_BUTTON"
+                >
+                  Variable Manager
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item"
                   id="SHOWTRAK_MODEL_CORE_UPDATE_MANAGER_BUTTON"
                 >
                   Update Manager
@@ -1149,6 +1158,16 @@ Loading licence...</pre>
                 </div>
 
                 <div class="bg-ghost p-2 rounded d-grid gap-2">
+                  <span class="text-sm">Available variables</span>
+                  <span class="text-sm text-muted mb-0"
+                    >Show variables are set in the environment before this script runs. Click a name
+                    to copy it. Values are per-client — set them in each client's editor, or change
+                    the default in the Variable Manager.</span
+                  >
+                  <div id="SCRIPT_MANAGER_VARIABLE_LIST" class="d-grid gap-1"></div>
+                </div>
+
+                <div class="bg-ghost p-2 rounded d-grid gap-2">
                   <span class="text-sm">Whitelist</span>
                   <span class="text-sm text-muted mb-0"
                     >Choose which clients, groups and tags may run this script. All clients can run
@@ -1308,6 +1327,150 @@ Loading licence...</pre>
                   <i class="bi bi-arrow-clockwise"></i> Revert
                 </button>
                 <button type="button" id="TAG_MANAGER_SAVE" class="btn btn-sm btn-success">
+                  <i class="bi bi-save"></i> Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_VARIABLEMANAGER"
+      tabindex="-1"
+      aria-labelledby="SHOWTRAK_MODAL_VARIABLEMANAGER_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-start">
+            <!-- List view -->
+            <div id="VARIABLE_MANAGER_LIST_VIEW">
+              <div id="VARIABLE_MANAGER_LIST_HEADER" class="mb-2"></div>
+              <div class="d-flex justify-content-end gap-2 mb-2">
+                <button
+                  type="button"
+                  id="VARIABLE_MANAGER_CREATE"
+                  class="btn btn-sm script-manager-create-btn"
+                  title="Create a new variable"
+                >
+                  <i class="bi bi-plus-lg"></i> New
+                </button>
+              </div>
+              <div id="VARIABLE_MANAGER_LIST" class="d-grid gap-2"></div>
+            </div>
+
+            <!-- Editor view -->
+            <div id="VARIABLE_MANAGER_EDITOR_VIEW" class="d-none">
+              <div id="VARIABLE_MANAGER_EDITOR_HEADER" class="mb-2"></div>
+              <div class="d-flex justify-content-end gap-2 mb-2">
+                <button
+                  type="button"
+                  id="VARIABLE_MANAGER_DELETE"
+                  class="btn btn-sm script-manager-delete-btn"
+                  title="Delete variable"
+                >
+                  <i class="bi bi-trash"></i> Delete
+                </button>
+              </div>
+
+              <div id="VARIABLE_MANAGER_ISSUES" class="script-manager-issues d-none mb-2"></div>
+
+              <div class="d-grid gap-2">
+                <div class="form-floating bg-ghost rounded">
+                  <input
+                    type="text"
+                    id="VARIABLE_MANAGER_FIELD_KEY"
+                    class="form-control bg-transparent text-light border-0"
+                    placeholder="Variable name"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <label for="VARIABLE_MANAGER_FIELD_KEY">Variable name</label>
+                </div>
+                <span class="text-sm text-muted mb-0"
+                  >Letters, numbers and <code>_</code> only. Forced to upper case, because the
+                  Windows environment does not distinguish case. Scripts reference it as
+                  <code id="VARIABLE_MANAGER_USAGE_HINT">%SHOWTRAK_VAR_NAME%</code>.</span
+                >
+
+                <div class="form-floating bg-ghost rounded">
+                  <input
+                    type="text"
+                    id="VARIABLE_MANAGER_FIELD_DEFAULT"
+                    class="form-control bg-transparent text-light border-0"
+                    placeholder="Default value"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <label for="VARIABLE_MANAGER_FIELD_DEFAULT">Default value</label>
+                </div>
+                <span class="text-sm text-muted mb-0"
+                  >Used by every client that has not been given its own value. Setting one is
+                  recommended: on Windows an empty variable may not be defined at all, which makes
+                  <code>%SHOWTRAK_VAR_NAME%</code> appear in a batch file as literal text rather
+                  than as nothing.</span
+                >
+
+                <div class="form-floating bg-ghost rounded">
+                  <input
+                    type="text"
+                    id="VARIABLE_MANAGER_FIELD_DESCRIPTION"
+                    class="form-control bg-transparent text-light border-0"
+                    placeholder="Description"
+                    autocomplete="off"
+                  />
+                  <label for="VARIABLE_MANAGER_FIELD_DESCRIPTION">Description (optional)</label>
+                </div>
+
+                <div class="bg-ghost p-2 rounded d-grid gap-2">
+                  <span class="text-sm">Windows system environment</span>
+                  <div class="form-check form-switch mb-0">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      id="VARIABLE_MANAGER_FIELD_EXPORT"
+                    />
+                    <label
+                      class="form-check-label text-sm text-muted mb-0"
+                      for="VARIABLE_MANAGER_FIELD_EXPORT"
+                      >Also make this readable by other applications on Windows clients.</label
+                    >
+                  </div>
+                  <span class="text-sm text-muted mb-0"
+                    >Writes the value into each Windows client's user environment, so programs
+                    started after the change can read it. Applications already running will not see
+                    it until they are restarted. macOS and Linux clients ignore this — scripts on
+                    those machines still get the variable, but nothing else does.</span
+                  >
+                </div>
+
+                <div class="bg-ghost p-2 rounded d-grid gap-2">
+                  <span class="text-sm">Per-client values</span>
+                  <span
+                    class="text-sm text-muted mb-0"
+                    id="VARIABLE_MANAGER_OVERRIDE_SUMMARY"
+                  ></span>
+                  <span class="text-sm text-muted mb-0"
+                    >Give a specific machine its own value from that client's editor. Variables are
+                    stored in the show file and travel with it — treat them as configuration, not as
+                    secrets.</span
+                  >
+                </div>
+              </div>
+
+              <div class="d-flex justify-content-end gap-2 mt-2">
+                <button
+                  type="button"
+                  id="VARIABLE_MANAGER_REVERT"
+                  class="btn btn-sm btn-outline-light"
+                >
+                  <i class="bi bi-arrow-clockwise"></i> Revert
+                </button>
+                <button type="button" id="VARIABLE_MANAGER_SAVE" class="btn btn-sm btn-success">
                   <i class="bi bi-save"></i> Save
                 </button>
               </div>
@@ -1524,6 +1687,19 @@ Loading licence...</pre>
                   />
                   <label for="CLIENT_EDITOR_RUNONLAUNCH_DELAY">Launch Delay (seconds)</label>
                 </div>
+              </div>
+              <!-- Show variables for this client. One row per variable defined in
+                   the Variable Manager; leaving a field empty inherits the
+                   default. Hidden for integrated clients, which run no local
+                   agent and execute no scripts. -->
+              <div id="CLIENT_EDITOR_VARIABLES_WRAPPER" class="mac-address-editor d-none">
+                <div class="mac-address-editor-head">
+                  <span class="mac-address-editor-title">Variables</span>
+                  <span class="mac-address-editor-hint" id="CLIENT_EDITOR_VARIABLES_HINT"
+                    >Available to this client's scripts</span
+                  >
+                </div>
+                <div id="CLIENT_EDITOR_VARIABLES_LIST" class="d-grid gap-2"></div>
               </div>
               <div class="form-floating has-copy">
                 <input type="text" class="form-control disabled" id="CLIENT_EDITOR_IP" disabled />

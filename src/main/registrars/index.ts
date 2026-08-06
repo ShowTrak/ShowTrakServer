@@ -16,6 +16,7 @@ import { register as registerDummy } from './dummy';
 import { register as registerFreeKiosk } from './freekiosk';
 import { register as registerAlerts } from './alerts';
 import { register as registerTags } from './tags';
+import { register as registerVariables } from './variables';
 import { register as registerFog } from './fog';
 import { register as registerAudio } from './audio';
 import { register as registerNetwork } from './network';
@@ -33,6 +34,7 @@ function RegisterAllHandlers(): void {
   registerFreeKiosk();
   registerAlerts();
   registerTags();
+  registerVariables();
   registerFog();
   registerAudio();
   registerNetwork();

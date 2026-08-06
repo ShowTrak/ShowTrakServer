@@ -32,6 +32,7 @@ import { InitAudioAssets } from './audio-assets';
 import { InitIconPicker } from './icon-picker';
 import { InitScopePicker } from './scope-picker';
 import { InitTagManager } from './tag-manager';
+import { InitVariableManager } from './variable-manager';
 import { InitFog } from './fog';
 import { InitOfflineIndicators } from './offline-indicators';
 import { Init, WireGlobalUI } from './init';
@@ -56,6 +57,7 @@ InitAudioAssets();
 InitIconPicker();
 InitScopePicker();
 InitTagManager();
+InitVariableManager();
 InitFog();
 InitOfflineIndicators();
 // The metric registry and command map are static for the session and every

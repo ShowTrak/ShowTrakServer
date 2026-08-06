@@ -176,6 +176,16 @@ const INVOKE_CHANNELS = [
   'Tags:SetOrder',
   'Tags:Delete',
 
+  // Show Variables
+  'Variables:GetAll',
+  'Variables:Create',
+  'Variables:SetKey',
+  'Variables:SetDescription',
+  'Variables:SetDefault',
+  'Variables:SetExport',
+  'Variables:Delete',
+  'Variables:GetForClient',
+
   // Paired ShowTrak Remote devices. Desktop only — never allowlisted for the web
   // or remote surfaces (see src/main/registrars/remote-devices.ts).
   'Remote:GetDevices',
@@ -236,6 +246,7 @@ const SUBSCRIBE_CHANNELS = [
   'NetworkDeviceScanEvent',
   'SetFullAlertRuleList',
   'SetTagList',
+  'SetVariableList',
   'AlertTriggered',
   'CreateShowTrakAlert',
   'AudioAssetsUpdated',

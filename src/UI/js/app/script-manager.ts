@@ -10,6 +10,7 @@ import { buildScopeModel, parseScopeSelection, scopeToSelectedValues } from './l
 import { bindScopeButton, renderScopeButton } from './scope-picker';
 import type { ScopePickerConfig } from './scope-picker';
 import { Tags as AllTags } from './state';
+import { RenderScriptEditorVariableList } from './variable-manager';
 // Script Manager (desktop UI)
 // - Lists every script discovered in the scripts folder, showing its ID,
 //   validity, and the operating systems it has scripts configured for.
@@ -514,6 +515,10 @@ export async function OpenScriptManagerEditor(ID: string) {
 
 export function PopulateScriptManagerEditor(Data: ScriptEditable) {
   $('#SCRIPT_MANAGER_FIELD_ID').val(Data.id || '');
+  // Read-only reference: the exact environment variable names this script can
+  // read. Rendered on every open so a variable added since the last open shows
+  // up without reloading the app.
+  RenderScriptEditorVariableList();
   $('#SCRIPT_MANAGER_FIELD_NAME').val(Data.name || '');
   $('#SCRIPT_MANAGER_FIELD_DESCRIPTION').val(Data.description || '');
 

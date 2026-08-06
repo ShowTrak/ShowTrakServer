@@ -178,6 +178,29 @@ export interface TagRow {
   Weight: number;
 }
 
+export interface VariableRow {
+  VariableID: number;
+  Key: string; // bare name, upper snake case; the SHOWTRAK_VAR_ prefix is not stored
+  Description: string | null;
+  DefaultValue: string;
+  ExportToSystem: number; // sqlite boolean: mirror into the Windows user environment
+  Weight: number;
+  Timestamp: number;
+}
+
+export interface ClientVariableRow {
+  UUID: string;
+  VariableID: number;
+  Value: string;
+  UpdatedAt: number;
+}
+
+/** Row shape of the definition-plus-override join used by the client editor. */
+export interface ClientVariableJoinRow extends VariableRow {
+  /** NULL when this client inherits the default. */
+  Value: string | null;
+}
+
 export interface FogHostRow {
   UUID: string; // ShowTrak client UUID
   FogHostID: number;
