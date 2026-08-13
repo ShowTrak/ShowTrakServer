@@ -1,4 +1,9 @@
-import { DEFAULT_MONITORING_INTERVAL_MS, OSC_PORT } from '../Config/constants';
+import {
+  ALERT_AUDIO_DEDUPE_DEFAULT_MS,
+  ALERT_AUDIO_DEDUPE_MAX_MS,
+  DEFAULT_MONITORING_INTERVAL_MS,
+  OSC_PORT,
+} from '../Config/constants';
 import { FOG_TASK_TYPES, FogTaskPermissionKey } from '../Config/fog';
 
 // PASSWORD behaves exactly like STRING everywhere on the backend; it only tells the
@@ -138,6 +143,19 @@ export const DefaultSettings: SettingDefinition[] = [
     Min: 0,
     Max: 100,
     Unit: '%',
+  },
+  {
+    Group: 'Alerts',
+    Key: 'ALERT_SOUND_DEDUPE_WINDOW_MS',
+    Title: 'Alert Sound Repeat Window',
+    Description:
+      'When several alerts ask for the SAME sound within this window, only the first one is played and the rest are dropped silently — so one fault matching a client, a group and a tag rule is a single clear cue rather than a smear. Different sounds are unaffected: two built-in tones, or two different custom assets, still play together. Set to 0 to play every alert sound.',
+    Type: 'INTEGER',
+    DefaultValue: ALERT_AUDIO_DEDUPE_DEFAULT_MS,
+    Min: 0,
+    Max: ALERT_AUDIO_DEDUPE_MAX_MS,
+    Unit: 'ms',
+    OnUpdateEvent: 'AlertAudioSettingsChanged',
   },
 
   {

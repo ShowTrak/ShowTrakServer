@@ -52,6 +52,12 @@ export const ONLINE_DEPLOY_COOLDOWN_MS = 10000;
 // genuine fault and is reported as one.
 export const CLIENT_STARTUP_GRACE_MS = 20000;
 
+// Window within which repeat requests to play the SAME alert sound (built-in
+// tone or custom asset) collapse to a single audible playback. Overridable at
+// runtime by the ALERT_SOUND_DEDUPE_WINDOW_MS setting; 0 disables the collapse.
+export const ALERT_AUDIO_DEDUPE_DEFAULT_MS = 500;
+export const ALERT_AUDIO_DEDUPE_MAX_MS = 10000;
+
 // Minimum time the preloader window stays visible before the main window swaps in.
 export const PRELOADER_MIN_DISPLAY_MS = 800;
 

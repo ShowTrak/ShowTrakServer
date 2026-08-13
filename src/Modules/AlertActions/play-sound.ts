@@ -1,4 +1,5 @@
 import { Manager as BroadcastManager } from '../Broadcast';
+import { ClaimAudioPlayback, GetAudioDedupeWindow, SoundPlaybackKey } from './_audio-dedupe';
 import type {
   ActionLogger,
   AlertActionInput,
@@ -47,6 +48,16 @@ async function Execute(
   Logger: ActionLogger
 ): Promise<AlertActionResult> {
   const S = NormalizeSettings(Action && Action.Settings ? Action.Settings : {});
+
+  // Several rules firing the same tone at once is one cue, not many: the first
+  // claim plays and the rest drop silently (see ./_audio-dedupe).
+  if (!ClaimAudioPlayback(SoundPlaybackKey(S.Sound))) {
+    Logger.info(
+      `Play sound alert action suppressed (${S.Sound} already played within ${GetAudioDedupeWindow()}ms)`
+    );
+    return { Success: true, Suppressed: true };
+  }
+
   BroadcastManager.emit('PlaySound', S.Sound);
   Logger.info(`Play sound alert action queued (${S.Sound})`);
   return { Success: true };

@@ -30,6 +30,7 @@ const state = {
   oscEnabled: true,
   oscPort: 9000,
   monitoringIntervalMs: 5000,
+  alertAudioDedupeMs: 500,
   confirmShutdown: true,
   preventDisplaySleep: false,
   getValueThrows: false,
@@ -43,6 +44,7 @@ const settingsMgr = recordingManager({
     if (key === 'SYSTEM_OSC_ENABLED') return state.oscEnabled;
     if (key === 'SYSTEM_OSC_PORT') return state.oscPort;
     if (key === 'MONITORING_DEFAULT_INTERVAL_MS') return state.monitoringIntervalMs;
+    if (key === 'ALERT_SOUND_DEDUPE_WINDOW_MS') return state.alertAudioDedupeMs;
     if (key === 'SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4') return state.confirmShutdown;
     if (key === 'SYSTEM_PREVENT_DISPLAY_SLEEP') return state.preventDisplaySleep;
     return null;
@@ -65,6 +67,7 @@ const loggerStub = {
 };
 
 const intervals = { monitoring: [], dummy: [] };
+const audioDedupeWindows = [];
 const shutdownProtection = [];
 
 const restore = installModuleMocks([
@@ -98,6 +101,10 @@ const restore = installModuleMocks([
     match: matchesModule('/Modules/DummyClientManager/normalize'),
     value: { SetDefaultInterval: (v) => intervals.dummy.push(v) },
   },
+  {
+    match: matchesModule('/Modules/AlertActions/_audio-dedupe'),
+    value: { SetAudioDedupeWindow: (v) => audioDedupeWindows.push(v) },
+  },
   { match: matchesModule('/Modules/OSC'), value: { OSC: osc } },
   {
     match: matchesModule('./shutdown-coordinator'),
@@ -123,6 +130,7 @@ function resetRecorders() {
   configured.length = 0;
   intervals.monitoring.length = 0;
   intervals.dummy.length = 0;
+  audioDedupeWindows.length = 0;
   shutdownProtection.length = 0;
   blocker.started.length = 0;
   blocker.stopped.length = 0;
@@ -198,6 +206,20 @@ test('a monitoring-settings change re-applies the interval to both managers', as
   await emit('MonitoringSettingsChanged');
   assert.deepEqual(intervals.monitoring, [12000]);
   assert.deepEqual(intervals.dummy, [12000]);
+});
+
+test('the alert sound de-duplication window is applied at boot and on change', async () => {
+  state.alertAudioDedupeMs = 750;
+  await initLiveSettings();
+  assert.deepEqual(audioDedupeWindows, [750]);
+
+  // Turning it off must reach the actions live — an operator silencing a smear
+  // mid-show cannot be asked to restart the server.
+  audioDedupeWindows.length = 0;
+  state.alertAudioDedupeMs = 0;
+  await emit('AlertAudioSettingsChanged');
+  assert.deepEqual(audioDedupeWindows, [0]);
+  state.alertAudioDedupeMs = 500;
 });
 
 test('an OSC settings change rebinds the listener on the new port', async () => {

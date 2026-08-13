@@ -1,5 +1,11 @@
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as AudioAssetManager } from '../AudioAssetManager';
+import {
+  AssetPlaybackKey,
+  ClaimAudioPlayback,
+  GetAudioDedupeWindow,
+  SoundPlaybackKey,
+} from './_audio-dedupe';
 import type {
   ActionLogger,
   AlertActionInput,
@@ -60,10 +66,26 @@ async function Execute(
   const [Err, Payload] = AudioAssetManager.GetDataURL(S.AssetID);
   if (Err || !Payload) {
     // Asset was deleted: skip the missing file but still cue the operator with
-    // a built-in placeholder sound.
+    // a built-in placeholder sound. Claimed under the fallback's own key so it
+    // de-dupes against the identical tone coming from a play-sound action.
+    if (!ClaimAudioPlayback(SoundPlaybackKey(FALLBACK_SOUND))) {
+      Logger.warn(
+        `Custom audio asset missing (${S.AssetLabel || S.AssetID}); fallback sound suppressed (already played within ${GetAudioDedupeWindow()}ms)`
+      );
+      return { Success: true, Suppressed: true, Warning: 'Audio asset missing' };
+    }
     BroadcastManager.emit('PlaySound', FALLBACK_SOUND);
     Logger.warn(`Custom audio asset missing (${S.AssetLabel || S.AssetID}); played fallback sound`);
     return { Success: true, Warning: 'Audio asset missing; played fallback sound' };
+  }
+
+  // One asset triggered by several rules at once is one cue: first claim wins,
+  // but a DIFFERENT asset keeps its own window and still plays alongside.
+  if (!ClaimAudioPlayback(AssetPlaybackKey(Payload.ID))) {
+    Logger.info(
+      `Play custom audio asset suppressed (${Payload.Label} already played within ${GetAudioDedupeWindow()}ms)`
+    );
+    return { Success: true, Suppressed: true };
   }
 
   BroadcastManager.emit('PlayCustomAudio', {

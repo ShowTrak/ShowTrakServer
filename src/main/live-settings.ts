@@ -9,6 +9,7 @@ import { Manager as BroadcastManager } from '../Modules/Broadcast';
 import { Manager as SettingsManager } from '../Modules/SettingsManager';
 import { SetDefaultInterval as SetMonitoringDefaultInterval } from '../Modules/MonitoringTargetManager/normalize';
 import { SetDefaultInterval as SetDummyDefaultInterval } from '../Modules/DummyClientManager/normalize';
+import { SetAudioDedupeWindow } from '../Modules/AlertActions/_audio-dedupe';
 import { OSC } from '../Modules/OSC';
 import { setAccidentalShutdownProtection } from './shutdown-coordinator';
 
@@ -46,6 +47,14 @@ async function ApplyMonitoringDefaults(): Promise<void> {
   SetDummyDefaultInterval(Ms);
 }
 
+// Window within which repeat requests for the same alert sound collapse to one
+// audible playback. Owned by the alert actions; applied here so a change lands
+// on the next alert without a restart.
+async function ApplyAlertAudioDedupe(): Promise<void> {
+  const Ms = await SettingsManager.GetValue('ALERT_SOUND_DEDUPE_WINDOW_MS');
+  SetAudioDedupeWindow(Ms);
+}
+
 // Accidental-shutdown confirmation guard (Alt+F4 / window close in show mode).
 async function ApplyShutdownProtection(): Promise<void> {
   const Enabled = await SettingsManager.GetValue('SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4');
@@ -80,6 +89,7 @@ function RunGuarded(Label: string, Fn: () => Promise<void>): void {
 export async function initLiveSettings(): Promise<void> {
   await ApplyLogLevel(false);
   await ApplyMonitoringDefaults();
+  await ApplyAlertAudioDedupe();
   await ApplyDisplaySleep();
   await ApplyOsc();
 
@@ -88,6 +98,9 @@ export async function initLiveSettings(): Promise<void> {
   );
   BroadcastManager.on('MonitoringSettingsChanged', () =>
     RunGuarded('monitoring defaults', ApplyMonitoringDefaults)
+  );
+  BroadcastManager.on('AlertAudioSettingsChanged', () =>
+    RunGuarded('alert audio de-duplication', ApplyAlertAudioDedupe)
   );
   BroadcastManager.on('OscSettingsChanged', () => RunGuarded('OSC', ApplyOsc));
   BroadcastManager.on('ShutdownProtectionChanged', () =>
