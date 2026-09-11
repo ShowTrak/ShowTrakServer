@@ -37,6 +37,7 @@ import {
   ResetFreeKioskModalState,
   SetFreeKioskSeries,
 } from './freekiosk-modal';
+import { RenderCheckActionsPanel, ResetActionParamDrafts } from './monitoring-actions';
 import { OfflineBadgeContent } from './lib/status-badges';
 import { ResolveEntityTags } from './lib/tag-badges';
 import { RenderTagBadgeRow } from './lib/tag-badge-view';
@@ -987,8 +988,9 @@ export function RenderMonitoringHistoryModal() {
         (MethodMeta && MethodMeta.Name) || String(Check.Method || '').toUpperCase();
       const Label = Check.Name || MethodName || 'Check';
       const LiveState = LiveCheckState(Check);
-      // Each check: its current-status card acts as the heading, with its
-      // timeline directly beneath.
+      // Each check: its current-status card acts as the heading, its timeline
+      // directly beneath, then the controls its method offers (nothing at all
+      // for a read-only check type).
       CheckSections.push(
         RenderMonitorStatusCard({
           state: LiveState,
@@ -996,7 +998,9 @@ export function RenderMonitoringHistoryModal() {
           sub: Check.Address || '',
           badge: String(Check.Method || '').toUpperCase(),
           statusText: BuildLiveStatusText(LiveState, Check.LastLatencyMs, Check.LastError),
-        }) + RenderStatusTimeline(Blocks)
+        }) +
+          RenderStatusTimeline(Blocks) +
+          RenderCheckActionsPanel(Check)
       );
     }
 
@@ -1307,6 +1311,9 @@ export async function OpenMonitoringTargetHistory(TargetID: number) {
     setMonitorHistorySeries([]);
     setMonitorHistoryTooltipHover(null);
     HideStatusTimelineTooltip();
+    // A half-typed control parameter belongs to the panel that was open, not to
+    // the next monitor the operator looks at.
+    ResetActionParamDrafts();
   });
   openModal('SHOWTRAK_CLIENT_INFO');
   RenderMonitoringHistoryModal();
@@ -1334,6 +1341,9 @@ export async function OpenDummyClientHistory(UUID: string) {
     setMonitorHistorySeries([]);
     setMonitorHistoryTooltipHover(null);
     HideStatusTimelineTooltip();
+    // A half-typed control parameter belongs to the panel that was open, not to
+    // the next monitor the operator looks at.
+    ResetActionParamDrafts();
   });
   openModal('SHOWTRAK_CLIENT_INFO');
   RenderMonitoringHistoryModal();

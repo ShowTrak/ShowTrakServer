@@ -16,6 +16,7 @@ import {
   UpdateScriptList,
   UpdateOSCList,
   UpdateMonitoringTargetList,
+  UpdateMonitoringActionFavouriteList,
   UpdateDummyClientList,
   UpdateFreeKioskTerminalList,
   UpdateAlertRuleList,
@@ -34,6 +35,7 @@ async function PushInitialDesktopState(): Promise<void> {
   await UpdateScriptList();
   await UpdateOSCList();
   await UpdateMonitoringTargetList();
+  await UpdateMonitoringActionFavouriteList();
   await UpdateDummyClientList();
   await UpdateFreeKioskTerminalList();
   await UpdateAlertRuleList();

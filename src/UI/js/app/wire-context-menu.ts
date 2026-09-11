@@ -27,6 +27,11 @@ import {
   StopIdentifyingForUUIDs,
 } from './selection-init';
 import { ClearSelection, Select, SelectAll } from './selection';
+import {
+  GetFavouritesForSelection,
+  GetMethodAction,
+  RunMonitoringAction,
+} from './monitoring-actions';
 import { ResolveScriptTargets } from './lib/script-targeting';
 
 // One row in the right-click / mobile context menu. `Type` selects how the row
@@ -238,6 +243,40 @@ export function wireContextMenu() {
       // --- Monitoring targets --------------------------------------------
       if (MonitorTargetIDs.length > 0) {
         PushSection('Monitoring');
+
+        // Starred check actions first: they are the things an operator reaches
+        // for mid-show (power a row of projectors on, close their shutters),
+        // whereas Run Checks Now is a diagnostic. A favourite is offered when
+        // ANY selected monitor has a check of its method and runs only on those
+        // — the same rule the script and remote-event sections above follow.
+        for (const { Favourite, TargetIDs } of GetFavouritesForSelection(MonitorTargetIDs)) {
+          const Action = GetMethodAction(Favourite.Method, Favourite.ActionID);
+          Options.push({
+            Type: 'Action',
+            Title: Favourite.Label,
+            Class: Action && Action.Destructive ? 'text-warning' : 'text-light',
+            Icon: `bi-${Favourite.Icon || 'lightning'}`,
+            IconColour: Action && Action.Destructive ? '#e74c3c' : '#9b59b6',
+            Action: async function () {
+              if (Action && Action.Destructive) {
+                const Confirmed = await ConfirmationDialog(
+                  `${Favourite.Label} on ${
+                    TargetIDs.length === 1 ? 'this monitor' : `${TargetIDs.length} monitors`
+                  }?`
+                );
+                if (!Confirmed) return;
+              }
+              await RunMonitoringAction(
+                TargetIDs,
+                Favourite.Method,
+                Favourite.ActionID,
+                Favourite.Params || {},
+                Favourite.Label
+              );
+            },
+          });
+        }
+
         Options.push({
           Type: 'Action',
           Title: 'Run Checks Now',

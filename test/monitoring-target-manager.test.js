@@ -496,6 +496,7 @@ test('MonitoringTargetManager.RunCheckNow runs a check, broadcasts, and returns 
           return { Success: true, LatencyMs: 7 };
         },
         BuildDebug: () => '<div>debug-panel</div>',
+        GetActionOptions: () => ({}),
       },
     };
 
@@ -534,5 +535,156 @@ test('MonitoringTargetManager.RunCheckNow runs a check, broadcasts, and returns 
     const [missingErr, missingValue] = await Manager.RunCheckNow(999);
     assert.match(missingErr, /not found/i);
     assert.equal(missingValue, null);
+  });
+});
+
+test('MonitoringTargetManager.RunAction fans one action across a mixed selection', async () => {
+  await withFakeTimers(async () => {
+    const events = [];
+    let runInvocations = 0;
+    const actionCalls = [];
+
+    // Two targets: a projector with a pjlink check, and a plain ping monitor
+    // that has nothing the action could act on.
+    const dbMock = {
+      Manager: {
+        All: async (sql) => {
+          if (String(sql).includes('MonitoringChecks')) {
+            return [
+              null,
+              [
+                {
+                  CheckID: 1,
+                  TargetID: 1,
+                  Name: 'PJLink',
+                  Address: '10.0.0.1',
+                  Method: 'pjlink',
+                  Settings: JSON.stringify({}),
+                  DegradedThresholdMs: 0,
+                  Weight: 100,
+                  LastSuccessAt: null,
+                  Timestamp: 1,
+                },
+                {
+                  CheckID: 2,
+                  TargetID: 2,
+                  Name: 'Ping',
+                  Address: '10.0.0.2',
+                  Method: 'ping',
+                  Settings: JSON.stringify({}),
+                  DegradedThresholdMs: 0,
+                  Weight: 100,
+                  LastSuccessAt: null,
+                  Timestamp: 1,
+                },
+              ],
+            ];
+          }
+          return [
+            null,
+            [
+              {
+                TargetID: 1,
+                Nickname: 'Projector SL',
+                Method: 'pjlink',
+                Interval: 5000,
+                Settings: JSON.stringify({}),
+                GroupID: null,
+                Weight: 100,
+                Timestamp: 1,
+              },
+              {
+                TargetID: 2,
+                Nickname: 'Switch',
+                Method: 'ping',
+                Interval: 5000,
+                Settings: JSON.stringify({}),
+                GroupID: null,
+                Weight: 100,
+                Timestamp: 1,
+              },
+            ],
+          ];
+        },
+        Run: async () => [null, { changes: 1 }],
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
+      },
+    };
+
+    const monitoringMethodsMock = {
+      Manager: {
+        Has: (id) => id === 'pjlink' || id === 'ping',
+        NormalizeSettings: (_id, settings) => settings,
+        Run: async () => {
+          runInvocations += 1;
+          return { Success: true, LatencyMs: 7 };
+        },
+        BuildDebug: () => '',
+        GetActionOptions: () => ({}),
+        GetAction: (method, actionID) =>
+          method === 'pjlink' && actionID === 'power.on'
+            ? { ID: 'power.on', Label: 'Power On', Icon: 'power', Group: 'Power' }
+            : null,
+        RunAction: async (method, check, actionID, params) => {
+          actionCalls.push({ method, checkID: check.CheckID, actionID, params });
+          return { Success: true, Detail: 'Power on sent' };
+        },
+      },
+    };
+
+    const modulePath = path.join(
+      __dirname,
+      '..',
+      'dist',
+      'Modules',
+      'MonitoringTargetManager',
+      'index.js'
+    );
+    const { Manager } = loadWithMocks(modulePath, {
+      '../Logger': { CreateLogger: () => ({ error: () => {}, warn: () => {}, log: () => {} }) },
+      '../DB': dbMock,
+      '../Broadcast': { Manager: { emit: (event, payload) => events.push([event, payload]) } },
+      '../MonitoringMethods': monitoringMethodsMock,
+      '../Utils': require('../dist/Modules/Utils'),
+    });
+
+    await Manager.Init();
+
+    const before = runInvocations;
+    const [err, summary] = await Manager.RunAction([1, 2, 999], 'pjlink', 'power.on', {});
+    assert.equal(err, null);
+    assert.equal(summary.Total, 3);
+    assert.equal(summary.Succeeded, 1);
+    assert.equal(summary.Failed, 2);
+
+    // Only the projector actually took it.
+    assert.deepEqual(actionCalls, [
+      { method: 'pjlink', checkID: 1, actionID: 'power.on', params: {} },
+    ]);
+
+    // A target with no matching check is reported rather than silently skipped:
+    // a selection that quietly did less than expected still has to say so.
+    const byTarget = new Map(summary.Results.map((entry) => [entry.TargetID, entry]));
+    assert.equal(byTarget.get(1).Success, true);
+    assert.equal(byTarget.get(1).Nickname, 'Projector SL');
+    assert.equal(byTarget.get(1).Detail, 'Power on sent');
+    assert.equal(byTarget.get(2).Success, false);
+    assert.match(byTarget.get(2).Error, /No pjlink check/);
+    assert.equal(byTarget.get(999).Success, false);
+    assert.match(byTarget.get(999).Error, /not found/i);
+
+    // The projector is re-probed so its tile shows the new state at once; the
+    // untouched target is left alone.
+    assert.ok(runInvocations > before, 'the acted-on target should be re-probed');
+    const updates = events.filter(([event]) => event === 'MonitoringTargetUpdated');
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0][1].TargetID, 1);
+
+    // Unknown method / unknown action never reach a device.
+    const [badMethod] = await Manager.RunAction([1], 'nope', 'power.on', {});
+    assert.match(badMethod, /Unknown monitoring method/);
+    const [badAction] = await Manager.RunAction([1], 'pjlink', 'nope', {});
+    assert.match(badAction, /Unknown action/);
+    assert.equal(actionCalls.length, 1);
   });
 });

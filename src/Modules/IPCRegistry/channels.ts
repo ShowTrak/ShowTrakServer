@@ -123,6 +123,13 @@ const INVOKE_CHANNELS = [
   'CreateMonitoringTarget',
   'UpdateMonitoringTarget',
   'DeleteMonitoringTarget',
+  // Check actions: one channel for every action of every method. The method +
+  // action pair is validated against the registry in the registrar, so a
+  // per-action channel would add registry/bridge/shim entries without adding
+  // any safety — the same reasoning as FreeKiosk:Command.
+  'RunMonitoringAction',
+  'GetMonitoringActionFavourites',
+  'SetMonitoringActionFavourite',
 
   // Dummy clients
   'GetAllDummyClients',
@@ -239,6 +246,7 @@ const SUBSCRIBE_CHANNELS = [
   'AppUpdate:Status',
   'SetFullMonitoringTargetList',
   'MonitoringTargetUpdated',
+  'SetFullMonitoringActionFavouriteList',
   'SetFullDummyClientList',
   'DummyClientUpdated',
   'SetFullFreeKioskTerminalList',

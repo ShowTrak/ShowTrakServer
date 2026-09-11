@@ -77,6 +77,15 @@ export interface MonitoringCheckRow {
   Timestamp: number;
 }
 
+export interface MonitoringActionFavouriteRow {
+  FavouriteID: number;
+  Method: string;
+  ActionID: string;
+  Params: string | null; // JSON object of the action's parameters
+  Weight: number;
+  Timestamp: number;
+}
+
 export interface DummyClientRow {
   UUID: string;
   DummyID: string;

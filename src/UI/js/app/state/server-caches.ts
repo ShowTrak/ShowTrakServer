@@ -10,6 +10,7 @@ import type {
   ScriptCatalogEntry,
   MonitoringTargetView,
   MonitoringMethodView,
+  MonitoringActionFavouriteView,
   DummyClientView,
   FreeKioskCommandDef,
   FreeKioskMetricCatalog,
@@ -65,6 +66,14 @@ export function setMonitoringTargets(value: MonitoringTargetView[]): void {
 export let MonitoringMethodsCache: MonitoringMethodView[] = [];
 export function setMonitoringMethodsCache(value: MonitoringMethodView[]): void {
   MonitoringMethodsCache = value;
+}
+
+// Starred check actions, in menu order. Server-owned: the star in the monitor
+// modal round-trips through SetMonitoringActionFavourite and this list arrives
+// back as the authoritative answer, so the two surfaces can never disagree.
+export let MonitoringActionFavourites: MonitoringActionFavouriteView[] = [];
+export function setMonitoringActionFavourites(value: MonitoringActionFavouriteView[]): void {
+  MonitoringActionFavourites = Array.isArray(value) ? value : [];
 }
 
 // Dummy clients (virtual heartbeat-driven clients)

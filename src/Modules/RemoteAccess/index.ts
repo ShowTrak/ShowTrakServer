@@ -47,6 +47,10 @@ const READ_CHANNELS = new Set([
   'GetMonitoringTarget',
   'GetMonitoringCheckHistory',
   'GetMonitoringCheckDebug',
+  // The favourite list is what the browser's context menu is built from, so it
+  // is a read like the method catalogue. Starring is a mutation and lives with
+  // the other monitoring edits below.
+  'GetMonitoringActionFavourites',
   'GetDummyClientHistory',
   'GetAllDummyClients',
   'GetDummyClient',
@@ -118,6 +122,11 @@ const MONITORING_CHANNELS = new Set([
   'DeleteMonitoringTarget',
   'RunMonitoringCheckNow',
   'RunAllMonitoringChecksNow',
+  // Running a check action acts on a real device, so it sits with the other
+  // mutations rather than the readers. The method + action pair is still
+  // resolved against the MonitoringMethods registry in the registrar.
+  'RunMonitoringAction',
+  'SetMonitoringActionFavourite',
   'CreateDummyClient',
   'UpdateDummyClient',
   'DeleteDummyClient',
@@ -183,6 +192,7 @@ const PUSH_CHANNELS = [
   'USBDeviceRemoved',
   'SetFullMonitoringTargetList',
   'MonitoringTargetUpdated',
+  'SetFullMonitoringActionFavouriteList',
   'SetFullDummyClientList',
   'DummyClientUpdated',
   'SetFullFreeKioskTerminalList',

@@ -18,9 +18,10 @@
 // PJLINK_QUERY_CACHE below): one short-lived connection reads everything, each
 // method then judges its own slice.
 //
-// This pass sends only Class 1 (`%1`) commands, which every PJLink device must
-// answer. The device class is still captured via CLSS — any future Class 2
-// command (FILT, RLMP, ...) must gate on it.
+// Reads send only Class 1 (`%1`) commands, which every PJLink device must
+// answer. The device class is still captured via CLSS — any Class 2 command
+// (FREZ, SVOL, FILT, RLMP, ...) must gate on it; SendProjectorCommand's callers
+// are responsible for that gate.
 import net from 'net';
 import crypto from 'crypto';
 import { Manager as CacheManager } from '../CacheManager';
@@ -101,6 +102,23 @@ export function BuildAuthDigest(Seed: string, Password: string): string {
 // is prefixed only on the first command of a connection.
 export function BuildCommand(Body: string, Digest: string | null): Buffer {
   return Buffer.from(`${Digest || ''}%1${Body} ?\r`, 'utf8');
+}
+
+// Build a control line, e.g. BuildSetCommand('POWR', '1') -> '%1POWR 1\r'. Same
+// framing as a query, with the parameter in place of the '?'.
+//
+// Class selects the `%1` / `%2` prefix. Class 2 commands (FREZ, SVOL) carry `%2`
+// per the spec; a Class 1 projector answers them ERR1, which SendProjectorCommand
+// reports as "the projector does not support this command" — so the device's own
+// refusal is the capability gate, and no extra round trip is spent asking CLSS
+// before every button press.
+export function BuildSetCommand(
+  Body: string,
+  Param: string,
+  Digest: string | null,
+  Class: 1 | 2 = 1
+): Buffer {
+  return Buffer.from(`${Digest || ''}%${Class}${Body} ${Param}\r`, 'utf8');
 }
 
 // Parse a single response line: either the auth-failure line `PJLINK ERRA` or a
@@ -222,6 +240,23 @@ export function InputLabel(Code: unknown): string {
   return Type ? `${Type} ${Normalized[1]}` : Normalized;
 }
 
+// INST value: the input codes this projector actually has, space separated —
+// e.g. '11 31 32 51'. Deduplicated and order-preserving; entries that are not
+// 2-character codes are dropped rather than offered as a switchable input.
+export function ParseInputList(Value: unknown): string[] {
+  const Seen = new Set<string>();
+  const Codes: string[] = [];
+  for (const Part of String(Value == null ? '' : Value)
+    .trim()
+    .split(/\s+/)) {
+    const Code = NormalizeInputCode(Part);
+    if (Code.length !== 2 || Seen.has(Code)) continue;
+    Seen.add(Code);
+    Codes.push(Code);
+  }
+  return Codes;
+}
+
 // --- One-connection status snapshot ------------------------------------------
 
 export interface PJLinkSnapshot {
@@ -240,6 +275,9 @@ export interface PJLinkSnapshot {
   LampErr: PJLinkErr | null;
   Input: string | null;
   InputErr: PJLinkErr | null;
+  // Input codes the projector reports as available (INST), or null when it
+  // would not say. Drives the Set Input control's choices.
+  Inputs: string[] | null;
   Mute: string | null;
   Name: string | null;
   Manufacturer: string | null;
@@ -256,6 +294,7 @@ const EMPTY_SNAPSHOT: Omit<PJLinkSnapshot, 'Reachable' | 'Error' | 'AuthFailed'>
   LampErr: null,
   Input: null,
   InputErr: null,
+  Inputs: null,
   Mute: null,
   Name: null,
   Manufacturer: null,
@@ -265,7 +304,23 @@ const EMPTY_SNAPSHOT: Omit<PJLinkSnapshot, 'Reachable' | 'Error' | 'AuthFailed'>
 // Everything the family needs, fetched over ONE connection. All commands are
 // Class 1 and sent sequentially (PJLink allows one outstanding command at a
 // time); ERR tokens are recorded per command, never fatal.
-const SNAPSHOT_COMMANDS = ['POWR', 'ERST', 'LAMP', 'INPT', 'AVMT', 'CLSS', 'NAME', 'INF1', 'INF2'];
+//
+// INST rides along so the control panel can offer the input sources THIS
+// projector reports instead of asking the operator to guess a two-character
+// code. It is mandatory Class 1, so a device that will not answer it replies
+// ERR1 like any other unsupported command.
+const SNAPSHOT_COMMANDS = [
+  'POWR',
+  'ERST',
+  'LAMP',
+  'INPT',
+  'INST',
+  'AVMT',
+  'CLSS',
+  'NAME',
+  'INF1',
+  'INF2',
+];
 
 // Predicate: consume a single CR (or LF) terminated line.
 function ReadLine(Buf: string): number | null {
@@ -277,17 +332,38 @@ function ReadLine(Buf: string): number | null {
   return End;
 }
 
-export async function QueryProjectorStatus(
+// --- Session plumbing --------------------------------------------------------
+
+// Thrown from inside a session body so an ERRA aborts the whole session with the
+// AuthFailed flag set, rather than being mistaken for an ordinary failure.
+class PJLinkAuthError extends Error {}
+
+// Send one command and await its single reply line. A null `Param` builds a
+// query (`%1POWR ?`); a string builds a set (`%1POWR 1`). The auth digest is
+// attached to the first command of the session automatically.
+export type PJLinkSend = (Command: string, Param?: string | null, Class?: 1 | 2) => Promise<string>;
+
+export type SessionOutcome<T> =
+  { Ok: true; Value: T; LatencyMs: number } | { Ok: false; Error: string; AuthFailed?: boolean };
+
+// Connect, read the greeting, authenticate if asked, then hand a sequential
+// `Send` to the caller's body and tear the socket down the moment it settles.
+//
+// Both the status snapshot and the control commands run through here, so the
+// greeting/auth/framing rules — and the prompt close that matters to
+// single-session projectors — exist exactly once.
+async function OpenProjectorSession<T>(
   Address: string,
   Port: number,
   Password: string,
-  TimeoutMs: number
-): Promise<PJLinkSnapshot> {
-  return new Promise<PJLinkSnapshot>((resolve) => {
+  TimeoutMs: number,
+  Body: (Send: PJLinkSend) => Promise<T>
+): Promise<SessionOutcome<T>> {
+  return new Promise<SessionOutcome<T>>((resolve) => {
     const Started = Date.now();
-    // Whole-probe budget. Socket.setTimeout below is only an IDLE timeout — it
+    // Whole-session budget. Socket.setTimeout below is only an IDLE timeout — it
     // resets on every data event, so across the sequential round trips a
-    // slow-but-trickling device could keep the probe alive far beyond
+    // slow-but-trickling device could keep the session alive far beyond
     // TimeoutMs. This absolute deadline caps the total.
     const BudgetMs = Math.max(500, TimeoutMs | 0);
     const Socket = new net.Socket();
@@ -299,7 +375,7 @@ export async function QueryProjectorStatus(
       Reject: (Err: Error) => void;
     } | null = null;
 
-    const Finish = (Result: PJLinkSnapshot) => {
+    const Finish = (Result: SessionOutcome<T>) => {
       if (Settled) return;
       Settled = true;
       if (DeadlineTimer) {
@@ -316,12 +392,7 @@ export async function QueryProjectorStatus(
     };
 
     const Fail = (Error0: string, AuthFailed?: boolean) =>
-      Finish({
-        Reachable: false,
-        Error: Error0,
-        ...(AuthFailed ? { AuthFailed: true } : {}),
-        ...EMPTY_SNAPSHOT,
-      });
+      Finish({ Ok: false, Error: Error0, ...(AuthFailed ? { AuthFailed: true } : {}) });
 
     const Pump = () => {
       while (Waiter) {
@@ -413,43 +484,23 @@ export async function QueryProjectorStatus(
             Digest = BuildAuthDigest(Greeting.Seed, Password);
           }
 
-          const Values: Record<string, string> = {};
-          const Errors: Record<string, PJLinkErr | null> = {};
-          for (const Command of SNAPSHOT_COMMANDS) {
-            const Line = await NextLine(BuildCommand(Command, Digest));
-            Digest = null; // first command only
-            const Parsed = ParseResponseLine(Line);
-            if (Parsed && Parsed.Kind === 'auth-fail') {
-              Fail('Authentication failed (ERRA) — check the PJLink password', true);
-              return;
-            }
-            // Tolerate replies for a different command (out-of-spec devices) by
-            // recording them under their own echoed command name.
-            if (Parsed && Parsed.Kind === 'reply') {
-              const Err = ParseErrToken(Parsed.Value);
-              if (Err) Errors[Parsed.Command] = Err;
-              else Values[Parsed.Command] = Parsed.Value;
-            }
-          }
+          // The digest belongs to the first command only, so Send consumes it.
+          const Send: PJLinkSend = (Command, Param = null, Class = 1) => {
+            const Payload =
+              Param == null
+                ? BuildCommand(Command, Digest)
+                : BuildSetCommand(Command, Param, Digest, Class);
+            Digest = null;
+            return NextLine(Payload);
+          };
 
-          Finish({
-            Reachable: true,
-            LatencyMs: Date.now() - Started,
-            Class: Values.CLSS != null ? Values.CLSS.trim() : null,
-            Power: Values.POWR != null ? ParsePower(Values.POWR) : null,
-            PowerErr: Errors.POWR || null,
-            Erst: Values.ERST != null ? ParseErst(Values.ERST) : null,
-            ErstErr: Errors.ERST || null,
-            Lamps: Values.LAMP != null ? ParseLamps(Values.LAMP) : null,
-            LampErr: Errors.LAMP || null,
-            Input: Values.INPT != null ? NormalizeInputCode(Values.INPT) : null,
-            InputErr: Errors.INPT || null,
-            Mute: Values.AVMT != null ? Values.AVMT.trim() : null,
-            Name: Values.NAME != null ? Values.NAME : null,
-            Manufacturer: Values.INF1 != null ? Values.INF1 : null,
-            Model: Values.INF2 != null ? Values.INF2 : null,
-          });
+          const Value = await Body(Send);
+          Finish({ Ok: true, Value, LatencyMs: Date.now() - Started });
         } catch (Err) {
+          if (Err instanceof PJLinkAuthError) {
+            Fail(Err.message, true);
+            return;
+          }
           Fail(Err instanceof Error ? Err.message : String(Err));
         }
       })();
@@ -461,6 +512,170 @@ export async function QueryProjectorStatus(
       Fail(Err instanceof Error ? Err.message : String(Err));
     }
   });
+}
+
+// --- Per-projector serialization ---------------------------------------------
+
+// Many projectors accept exactly ONE PJLink session at a time and refuse (or
+// reset) a second connection. The snapshot cache already collapses identical
+// checks, but two checks configured with different passwords or timeouts hash to
+// different cache keys — and a control command is never cached at all — so
+// nothing otherwise stops two sockets racing at the same projector.
+//
+// Every socket this module opens therefore queues behind the previous one for
+// the same address:port. Each queued operation carries its own absolute
+// deadline, so the chain always drains.
+const PROJECTOR_LOCKS = new Map<string, Promise<unknown>>();
+
+function ProjectorLockKey(Address: string, Port: number): string {
+  return `${String(Address || '')
+    .trim()
+    .toLowerCase()}|${Port}`;
+}
+
+async function WithProjectorLock<T>(
+  Address: string,
+  Port: number,
+  Work: () => Promise<T>
+): Promise<T> {
+  const Key = ProjectorLockKey(Address, Port);
+  const Previous = PROJECTOR_LOCKS.get(Key) || Promise.resolve();
+  // `.catch` rather than `.then`: a failed predecessor must not poison the
+  // queue, it only has to have FINISHED.
+  const Current = Previous.catch(() => undefined).then(Work);
+  PROJECTOR_LOCKS.set(Key, Current);
+  try {
+    return await Current;
+  } finally {
+    // Only the tail clears the entry, so releasing a lock mid-queue cannot let a
+    // new arrival jump ahead of the operations already waiting behind it.
+    if (PROJECTOR_LOCKS.get(Key) === Current) PROJECTOR_LOCKS.delete(Key);
+  }
+}
+
+export async function QueryProjectorStatus(
+  Address: string,
+  Port: number,
+  Password: string,
+  TimeoutMs: number
+): Promise<PJLinkSnapshot> {
+  const Outcome = await WithProjectorLock(Address, Port, () =>
+    OpenProjectorSession(Address, Port, Password, TimeoutMs, async (Send) => {
+      const Values: Record<string, string> = {};
+      const Errors: Record<string, PJLinkErr | null> = {};
+      for (const Command of SNAPSHOT_COMMANDS) {
+        const Parsed = ParseResponseLine(await Send(Command));
+        if (Parsed && Parsed.Kind === 'auth-fail') {
+          throw new PJLinkAuthError('Authentication failed (ERRA) — check the PJLink password');
+        }
+        // Tolerate replies for a different command (out-of-spec devices) by
+        // recording them under their own echoed command name.
+        if (Parsed && Parsed.Kind === 'reply') {
+          const Err = ParseErrToken(Parsed.Value);
+          if (Err) Errors[Parsed.Command] = Err;
+          else Values[Parsed.Command] = Parsed.Value;
+        }
+      }
+      return { Values, Errors };
+    })
+  );
+
+  if (!Outcome.Ok) {
+    return {
+      Reachable: false,
+      Error: Outcome.Error,
+      ...(Outcome.AuthFailed ? { AuthFailed: true } : {}),
+      ...EMPTY_SNAPSHOT,
+    };
+  }
+
+  const { Values, Errors } = Outcome.Value;
+  return {
+    Reachable: true,
+    LatencyMs: Outcome.LatencyMs,
+    Class: Values.CLSS != null ? Values.CLSS.trim() : null,
+    Power: Values.POWR != null ? ParsePower(Values.POWR) : null,
+    PowerErr: Errors.POWR || null,
+    Erst: Values.ERST != null ? ParseErst(Values.ERST) : null,
+    ErstErr: Errors.ERST || null,
+    Lamps: Values.LAMP != null ? ParseLamps(Values.LAMP) : null,
+    LampErr: Errors.LAMP || null,
+    Input: Values.INPT != null ? NormalizeInputCode(Values.INPT) : null,
+    InputErr: Errors.INPT || null,
+    Inputs: Values.INST != null ? ParseInputList(Values.INST) : null,
+    Mute: Values.AVMT != null ? Values.AVMT.trim() : null,
+    Name: Values.NAME != null ? Values.NAME : null,
+    Manufacturer: Values.INF1 != null ? Values.INF1 : null,
+    Model: Values.INF2 != null ? Values.INF2 : null,
+  };
+}
+
+// --- Control commands --------------------------------------------------------
+
+// What each error token means in reply to a SET command, phrased for an operator
+// rather than a protocol reader. ERR1 on a set is the projector saying it has no
+// such feature; ERR2 that it rejected the value (an input the device does not
+// have); ERR3 that it is mid-transition — warming up, cooling down or in standby
+// — which is both the one an operator hits most often and the one a bare code
+// explains worst.
+const SET_ERROR_REASONS: Record<PJLinkErr, string> = {
+  ERR1: 'the projector does not support this command',
+  ERR2: 'the projector rejected that value',
+  ERR3: 'the projector is busy (warming up, cooling down, or in standby)',
+  ERR4: 'the projector reports a hardware failure',
+};
+
+export interface PJLinkCommandOutcome {
+  Success: boolean;
+  Error?: string;
+  AuthFailed?: boolean;
+}
+
+// Send a single PJLink SET command (`%1POWR 1`) and interpret the reply.
+//
+// Anything that is not an error token counts as accepted: the spec's success
+// token is `OK`, but devices exist that echo the value back instead, and
+// reporting a projector that did as it was told as a failure would be worse than
+// the reverse.
+export async function SendProjectorCommand(
+  Address: string,
+  Port: number,
+  Password: string,
+  TimeoutMs: number,
+  Command: string,
+  Param: string,
+  Class: 1 | 2 = 1
+): Promise<PJLinkCommandOutcome> {
+  const Outcome = await WithProjectorLock(Address, Port, () =>
+    OpenProjectorSession(
+      Address,
+      Port,
+      Password,
+      TimeoutMs,
+      async (Send): Promise<PJLinkCommandOutcome> => {
+        const Line = await Send(Command, Param, Class);
+        const Parsed = ParseResponseLine(Line);
+        if (Parsed && Parsed.Kind === 'auth-fail') {
+          throw new PJLinkAuthError('Authentication failed (ERRA) — check the PJLink password');
+        }
+        if (!Parsed || Parsed.Kind !== 'reply') {
+          return { Success: false, Error: `Unexpected reply from projector: ${Line}` };
+        }
+        const Err = ParseErrToken(Parsed.Value);
+        if (Err) return { Success: false, Error: `${Err} — ${SET_ERROR_REASONS[Err]}` };
+        return { Success: true };
+      }
+    )
+  );
+
+  if (!Outcome.Ok) {
+    return {
+      Success: false,
+      Error: Outcome.Error,
+      ...(Outcome.AuthFailed ? { AuthFailed: true } : {}),
+    };
+  }
+  return Outcome.Value;
 }
 
 // --- Shared per-family snapshot cache ----------------------------------------
@@ -489,6 +704,15 @@ export function BuildQueryCacheKey(
 export function ResolveQueryCacheTtlMs(TimeoutMs: number): number {
   const Base = Number.isFinite(TimeoutMs) ? TimeoutMs : 4000;
   return Math.max(300, Math.min(1500, (Base / 2) | 0));
+}
+
+// Forget the cached snapshot for one projector. Called after a control command
+// lands: the device's power/input/mute state has just changed, so a snapshot
+// taken up to 1.5s earlier would report the state the operator just replaced.
+export function InvalidateProjectorSnapshot(Config: PJLinkConfig): void {
+  PJLINK_QUERY_CACHE.Delete(
+    BuildQueryCacheKey(Config.Address, Config.Port, Config.Password, Config.TimeoutMs)
+  );
 }
 
 // --- Shared Run/Debug scaffolding -------------------------------------------
@@ -701,6 +925,7 @@ export const _internal = {
   ParseGreeting,
   BuildAuthDigest,
   BuildCommand,
+  BuildSetCommand,
   ParseResponseLine,
   ParseErrToken,
   ParseErst,
@@ -709,7 +934,9 @@ export const _internal = {
   ParsePower,
   NormalizeInputCode,
   InputLabel,
+  ParseInputList,
   QueryProjectorStatus,
+  SendProjectorCommand,
   ParsePJLinkConfig,
   BuildQueryCacheKey,
   ResolveQueryCacheTtlMs,

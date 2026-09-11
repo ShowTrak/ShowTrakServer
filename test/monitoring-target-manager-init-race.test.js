@@ -105,6 +105,7 @@ function loadManager({ events, onTargetsRead }) {
         NormalizeSettings: (_id, settings) => ({ ...settings }),
         Run: async () => ({ Success: true, LatencyMs: 25 }),
         BuildDebug: () => '<div>debug</div>',
+        GetActionOptions: () => ({}),
       },
     },
     '../Utils': require('../dist/Modules/Utils'),

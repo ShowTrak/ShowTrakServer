@@ -274,6 +274,12 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     DeleteMonitoringTarget: async (TargetID) => rpc('DeleteMonitoringTarget', TargetID),
     SetFullMonitoringTargetList: (cb) => sub('SetFullMonitoringTargetList', cb),
     MonitoringTargetUpdated: (cb) => sub('MonitoringTargetUpdated', cb),
+    RunMonitoringAction: async (TargetIDs, Method, ActionID, Params) =>
+      rpc('RunMonitoringAction', TargetIDs, Method, ActionID, Params),
+    GetMonitoringActionFavourites: async () => rpc('GetMonitoringActionFavourites'),
+    SetMonitoringActionFavourite: async (Method, ActionID, Params, Favourite) =>
+      rpc('SetMonitoringActionFavourite', Method, ActionID, Params, Favourite),
+    SetFullMonitoringActionFavouriteList: (cb) => sub('SetFullMonitoringActionFavouriteList', cb),
 
     // ---- Dummy clients ----------------------------------------------------
     GetAllDummyClients: async () => rpc('GetAllDummyClients'),

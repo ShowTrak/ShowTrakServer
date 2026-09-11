@@ -67,6 +67,49 @@ export interface MonitoringMethodInfo {
   Links?: Array<{ Label: string; Url: string }>;
 }
 
+// --- Controllable actions ----------------------------------------------------
+//
+// A check READS a device; an action DOES something to it. A method opts in by
+// exporting `Actions` plus a `RunAction` implementation — nothing else in the
+// stack needs to know the method exists. Actions are addressed as
+// `<Method>/<ActionID>` in the UI, over IPC and over OSC, so each method owns a
+// private action namespace and a new check type gains a control surface without
+// a transport change.
+
+export interface MonitoringActionDef {
+  /** Stable and OSC-safe within its method (no slashes/spaces), e.g. `power.on`. */
+  ID: string;
+  Label: string;
+  /** Bootstrap Icons name without the `bi-` prefix. */
+  Icon: string;
+  /** Grouping label for the monitor modal's control panel (e.g. "Power"). */
+  Group: string;
+  /**
+   * Parameter schema, reusing MonitoringSettingField so an action's form renders
+   * through the same schema-driven renderer as check settings, and normalizes
+   * through the same defaults/clamping.
+   */
+  Params?: MonitoringSettingField[];
+  /** Needs a confirmation dialog before it is sent. */
+  Destructive?: boolean;
+  Note?: string;
+}
+
+export interface MonitoringActionResult {
+  Success: boolean;
+  /** Why it failed. Shown to the operator verbatim, so make it specific. */
+  Error?: string;
+  /** Human confirmation of what happened, e.g. 'Input set to Digital 1'. */
+  Detail?: string;
+}
+
+/**
+ * Per-check choices for an action parameter, keyed by the parameter's Key.
+ * Derived from the check's most recent result so a method can offer what THIS
+ * device reported (a projector's actual input sources) instead of free text.
+ */
+export type MonitoringActionOptions = Record<string, Array<{ value: string; label: string }>>;
+
 export interface MonitoringMethod {
   ID: string;
   Name: string;
@@ -86,7 +129,37 @@ export interface MonitoringMethod {
   // NDI, Millumin, MQTT) set this false so the editor hides the field.
   SupportsLatencyThreshold?: boolean;
   Settings: MonitoringSettingField[];
+  // Controllable actions. Declaring any obliges the method to export RunAction.
+  Actions?: MonitoringActionDef[];
   Run(Target: MonitoringTargetLike): Promise<MonitoringResult> | MonitoringResult;
+  /**
+   * Perform one declared action. Params arrive already normalized against the
+   * action's own schema. Must resolve rather than throw for an expected refusal
+   * (device busy, unsupported command) so the operator gets the reason.
+   */
+  RunAction?(
+    Target: MonitoringTargetLike,
+    ActionID: string,
+    Params: Record<string, unknown>
+  ): Promise<MonitoringActionResult> | MonitoringActionResult;
+  /**
+   * Dynamic parameter choices derived from a probe result (see
+   * MonitoringActionOptions). Called after every successful run; must be pure
+   * and must never throw.
+   */
+  GetActionOptions?(Result: MonitoringResult): MonitoringActionOptions;
+  /**
+   * One-line description of an action WITH its parameters bound, used to label
+   * a starred favourite — 'Set Input - Digital 1 (31)' rather than 'Set Input'.
+   * Return null to fall back to the action's plain label. Must be pure.
+   */
+  DescribeAction?(ActionID: string, Params: Record<string, unknown>): string | null;
+  /**
+   * Drop any method-private cached state for this target. Called after a
+   * successful action so the follow-up probe reads the device's NEW state
+   * rather than a snapshot taken moments before the action landed.
+   */
+  InvalidateCaches?(Target: MonitoringTargetLike): void;
   Debug?(Result: MonitoringResult, Target: MonitoringTargetLike): string;
   NormalizeSettings?(Input: unknown): Record<string, unknown>;
   GetRunCacheKeyExtra?(Target: MonitoringTargetLike, Settings: Record<string, unknown>): unknown;

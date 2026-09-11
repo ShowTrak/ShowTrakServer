@@ -68,6 +68,9 @@ ShowTrak Server includes all of the following in a single app/runtime:
   - DNS check
 - Monitoring target CRUD and live status updates
 - Monitoring history collection and retrieval APIs
+- Check actions: methods that can control their device (PJLink projector power,
+  shutter, input) expose buttons in the monitor view, starred favourites in the
+  right-click menu, and `/API/Monitor/<slug>/<method>/<action>` over OSC and HTTP
 
 ### Alerts and Actions
 

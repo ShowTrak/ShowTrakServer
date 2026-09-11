@@ -47,6 +47,8 @@ function loadOSC(overrides = {}, { WithSocket = true } = {}) {
   // Integrated-event routes delegate to ControlService (the SDK's command
   // surface) rather than the renderer OSCBulkAction path, so record the calls.
   const controlCalls = [];
+  // Monitoring check actions go through MonitoringTargetManager.RunAction.
+  const actionCalls = [];
   const mocks = {
     '../ControlService': {
       ControlService: {
@@ -116,6 +118,44 @@ function loadOSC(overrides = {}, { WithSocket = true } = {}) {
         GetAllViews: async () => [{ TagID: 5, Slug: 'foh', Scope: FOH_SCOPE }],
       },
     },
+    '../MonitoringTargetManager': {
+      Manager: {
+        GetBySlug: async (slug) =>
+          slug === 'proj-sl' ? { TargetID: 4, Slug: 'proj-sl', Nickname: 'Projector SL' } : null,
+        RunAction: async (targetIDs, method, actionID, params) => {
+          actionCalls.push([targetIDs, method, actionID, params]);
+          if (actionID === 'power.off') {
+            return [
+              null,
+              {
+                Total: 1,
+                Succeeded: 0,
+                Failed: 1,
+                Results: [{ Success: false, Error: 'ERR3 — the projector is busy' }],
+              },
+            ];
+          }
+          return [null, { Total: 1, Succeeded: 1, Failed: 0, Results: [{ Success: true }] }];
+        },
+      },
+    },
+    '../MonitoringMethods': {
+      Manager: {
+        GetAction: (method, actionID) => {
+          if (method !== 'pjlink') return null;
+          if (actionID === 'power.on') return { ID: 'power.on', Label: 'Power On' };
+          if (actionID === 'power.off') return { ID: 'power.off', Label: 'Power Off' };
+          if (actionID === 'input.set') {
+            return {
+              ID: 'input.set',
+              Label: 'Set Input',
+              Params: [{ Key: 'Input', Label: 'Input', Type: 'string', Default: '' }],
+            };
+          }
+          return null;
+        },
+      },
+    },
     '../ScriptWhitelistManager': {
       // Real predicate: Workspace = all, else by explicit UUID or matching group.
       Manager: {
@@ -136,7 +176,7 @@ function loadOSC(overrides = {}, { WithSocket = true } = {}) {
     path.join(__dirname, '..', 'dist', 'Modules', 'OSC', 'index.js'),
     mocks
   );
-  return { OSC, handlers, socketHandlers, broadcastEvents, controlCalls };
+  return { OSC, handlers, socketHandlers, broadcastEvents, controlCalls, actionCalls };
 }
 
 test('OSC registers the built-in routes', () => {
@@ -161,6 +201,10 @@ test('OSC registers the built-in routes', () => {
   assert.ok(routes.includes('/API/Tag/:Slug/TriggerEvent/:EventID'));
   assert.ok(routes.includes('/API/All/TriggerEvent/:EventID'));
   assert.ok(routes.includes('/API/Dummy/:Slug/Heartbeat'));
+  // Check actions name the method that owns them, so every check type shares
+  // one route shape and a new one needs no route of its own.
+  assert.ok(routes.includes('/API/Monitor/:Slug/:Method/:ActionID'));
+  assert.ok(routes.includes('/API/Monitor/:Slug/:Method/:ActionID/:Value'));
 });
 
 test('OSC TriggerEvent routes delegate to ControlService for every scope', async () => {
@@ -376,4 +420,48 @@ test('OSC.CreateRoute registers custom routes', () => {
   const before = OSC.GetRoutes().length;
   OSC.CreateRoute('/Custom/:Value', async () => true, 'Custom route');
   assert.equal(OSC.GetRoutes().length, before + 1);
+});
+
+test('OSC runs a check action on a monitoring target addressed by slug', async () => {
+  const { handlers, actionCalls, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/power.on']);
+  assert.deepEqual(actionCalls, [[[4], 'pjlink', 'power.on', {}]]);
+  assert.ok(broadcastEvents.some(([event, , level]) => event === 'Notify' && level === 'success'));
+});
+
+test('OSC fills an action parameter from the trailing path value', async () => {
+  const { handlers, actionCalls } = loadOSC();
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/input.set/31']);
+  // The value lands on the action's FIRST declared parameter — the only one a
+  // single-value route can address unambiguously.
+  assert.deepEqual(actionCalls, [[[4], 'pjlink', 'input.set', { Input: '31' }]]);
+});
+
+test('OSC rejects a value sent to an action that takes none', async () => {
+  const { handlers, actionCalls, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/power.on/31']);
+  assert.deepEqual(actionCalls, [], 'nothing should reach the device');
+  assert.ok(
+    broadcastEvents.every(([event, , level]) => !(event === 'Notify' && level === 'success'))
+  );
+});
+
+test('OSC reports an unknown target or action without touching a device', async () => {
+  const { handlers, actionCalls, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/Monitor/nope/pjlink/power.on']);
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/not-an-action']);
+  await handlers.message(['/API/Monitor/proj-sl/not-a-method/power.on']);
+  assert.deepEqual(actionCalls, []);
+  const errors = broadcastEvents.filter(
+    ([event, , level]) => event === 'Notify' && level === 'error'
+  );
+  assert.equal(errors.length, 3);
+});
+
+test("OSC surfaces the projector's own refusal rather than a bare failure", async () => {
+  const { handlers, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/power.off']);
+  const error = broadcastEvents.find(([event, , level]) => event === 'Notify' && level === 'error');
+  assert.ok(error, 'a refusal must be reported');
+  assert.match(String(error[1]), /busy/i);
 });

@@ -98,6 +98,27 @@ Schema.push({
     )',
 });
 
+// Starred check actions. A favourite is one (Method, ActionID, Params) triple —
+// the parameters are part of the identity, so "Set Input -> Digital 1" and
+// "Set Input -> HDMI 2" are two separate favourites rather than one entry whose
+// value the operator has to re-type at the moment they need it.
+//
+// Favourites are global rather than per-check: a rig with eight projectors wants
+// "Power On" on the right-click menu once, not eight times. Which targets a
+// favourite applies to is decided at menu time by what the selection actually
+// runs (see MonitoringTargetManager.RunAction).
+Schema.push({
+  Name: 'MonitoringActionFavourites',
+  SQL: 'CREATE TABLE IF NOT EXISTS `MonitoringActionFavourites` ( \
+            FavouriteID INTEGER PRIMARY KEY AUTOINCREMENT, \
+            Method TEXT NOT NULL, \
+            ActionID TEXT NOT NULL, \
+            Params TEXT, \
+            Weight INTEGER NOT NULL DEFAULT 100, \
+            Timestamp BIGINT(11) NOT NULL \
+    )',
+});
+
 // Dummy Clients are a virtual class of "client": there is no installed agent.
 // Instead they are kept alive by external heartbeats delivered over OSC or
 // HTTP. They carry a stable, user-editable DummyID (distinct from the auto
@@ -563,6 +584,15 @@ Schema.Migrations = [
   {
     Version: 30,
     SQL: 'CREATE INDEX IF NOT EXISTS idx_clientvariables_uuid ON `ClientVariables` (UUID)',
+  },
+  // Starred check actions. The table is created by the Schema block above on both
+  // new and existing installs, so only the index needs versioning. The unique
+  // index is what makes starring idempotent: a favourite's identity IS its
+  // method + action + parameters, so re-starring the same combination updates
+  // the existing row instead of growing a duplicate menu entry.
+  {
+    Version: 31,
+    SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_monitoringactionfavourites_identity ON `MonitoringActionFavourites` (Method, ActionID, Params)',
   },
 ];
 

@@ -119,3 +119,171 @@ test('MonitoringMethods manager normalizes and wraps execution errors', async ()
   assert.equal(missingResult.Degraded, true);
   assert.match(missingResult.DegradedReason, /Unknown method/i);
 });
+
+test('MonitoringMethods manager exposes, normalizes and dispatches check actions', async () => {
+  const calls = [];
+  const invalidated = [];
+  const actionMethod = {
+    ID: 'ping',
+    Name: 'Projector',
+    Settings: [],
+    Actions: [
+      { ID: 'power.on', Label: 'Power On', Icon: 'power', Group: 'Power' },
+      {
+        ID: 'input.set',
+        Label: 'Set Input',
+        Icon: 'box-arrow-in-right',
+        Group: 'Input',
+        Params: [{ Key: 'Input', Label: 'Input', Type: 'string', Default: '' }],
+      },
+      {
+        ID: 'level.set',
+        Label: 'Set Level',
+        Icon: 'sliders',
+        Group: 'Display',
+        Params: [{ Key: 'Level', Label: 'Level', Type: 'number', Default: 50, Min: 0, Max: 100 }],
+      },
+    ],
+    Run: async () => ({ Success: true, Inputs: ['11', '31'] }),
+    RunAction: async (target, actionID, params) => {
+      calls.push({ actionID, params, address: target.Address });
+      if (actionID === 'power.on') return { Success: true, Detail: 'Power on sent' };
+      return { Success: false, Error: 'refused' };
+    },
+    GetActionOptions: (result) => ({
+      Input: (result.Inputs || []).map((code) => ({ value: code, label: code })),
+    }),
+    DescribeAction: (actionID, params) =>
+      actionID === 'input.set' ? `Set Input - ${params.Input}` : null,
+    InvalidateCaches: (target) => invalidated.push(target.Address),
+  };
+  // A method with no action surface at all: the registry must report an empty
+  // list rather than undefined, and refuse to dispatch to it.
+  const readOnlyMethod = {
+    ID: 'dns',
+    Name: 'DNS',
+    Settings: [],
+    Run: async () => ({ Success: true }),
+  };
+  // Declaring actions obliges a method to implement RunAction. One that forgets
+  // is a coding error, and the registry has to say so rather than throw.
+  const halfBuiltMethod = {
+    ID: 'http',
+    Name: 'Half Built',
+    Settings: [],
+    Actions: [{ ID: 'power.on', Label: 'Power On', Icon: 'power', Group: 'Power' }],
+    Run: async () => ({ Success: true }),
+  };
+
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'MonitoringMethods', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => createLoggerStub() },
+    './ping': actionMethod,
+    './dns': readOnlyMethod,
+    './http': halfBuiltMethod,
+    './tcp-port': { Name: 'invalid-no-id' },
+    './https': { Name: 'invalid-no-id' },
+    './http-json': { Name: 'invalid-no-id' },
+  });
+
+  // The catalogue carries the actions, so the renderer draws its control panel
+  // from the same payload it already loads for the editor.
+  const published = Manager.GetAll().find((entry) => entry.ID === 'ping');
+  assert.equal(published.Actions.length, 3);
+  assert.deepEqual(Manager.GetAll().find((entry) => entry.ID === 'dns').Actions, []);
+
+  assert.equal(Manager.GetAction('ping', 'power.on').Label, 'Power On');
+  assert.equal(Manager.GetAction('ping', 'nope'), null);
+  assert.equal(Manager.GetAction('dns', 'power.on'), null);
+
+  // Parameters normalize against the ACTION's schema: unknown keys are dropped
+  // rather than handed to the method, and numbers clamp to their declared range.
+  assert.deepEqual(Manager.NormalizeActionParams('ping', 'input.set', { Input: '31', Evil: 'x' }), {
+    Input: '31',
+  });
+  assert.deepEqual(Manager.NormalizeActionParams('ping', 'level.set', { Level: 900 }), {
+    Level: 100,
+  });
+  assert.deepEqual(Manager.NormalizeActionParams('ping', 'power.on', { Input: '31' }), {});
+  assert.deepEqual(Manager.NormalizeActionParams('ping', 'nope', {}), {});
+
+  const target = { Address: '10.0.0.5', Settings: {} };
+  const ran = await Manager.RunAction('ping', target, 'power.on', { Evil: 'x' });
+  assert.equal(ran.Success, true);
+  assert.deepEqual(calls, [{ actionID: 'power.on', params: {}, address: '10.0.0.5' }]);
+  // A successful action means the device changed, so its cached reading is now
+  // a lie and the method is told to drop it.
+  assert.deepEqual(invalidated, ['10.0.0.5']);
+
+  // A refusal is reported, and nothing is invalidated on the way out.
+  const refused = await Manager.RunAction('ping', target, 'input.set', { Input: '31' });
+  assert.equal(refused.Success, false);
+  assert.equal(refused.Error, 'refused');
+  assert.deepEqual(invalidated, ['10.0.0.5']);
+
+  // Unknown method / unknown action / method that cannot act at all.
+  assert.match(
+    (await Manager.RunAction('missing', target, 'power.on', {})).Error,
+    /Unknown method/
+  );
+  assert.match((await Manager.RunAction('ping', target, 'nope', {})).Error, /no action "nope"/);
+  assert.match((await Manager.RunAction('dns', target, 'power.on', {})).Error, /no action/);
+  assert.match(
+    (await Manager.RunAction('http', target, 'power.on', {})).Error,
+    /cannot perform actions/
+  );
+
+  // Dynamic parameter choices come from the probe result, so Set Input offers
+  // the inputs this device reported rather than a fixed list.
+  assert.deepEqual(Manager.GetActionOptions('ping', { Inputs: ['11', '31'] }).Input, [
+    { value: '11', label: '11' },
+    { value: '31', label: '31' },
+  ]);
+  assert.deepEqual(Manager.GetActionOptions('dns', {}), {});
+
+  // Favourite labels bind the parameters; a method describing nothing falls
+  // back to the plain action label, then to the raw id.
+  assert.equal(Manager.DescribeAction('ping', 'input.set', { Input: '31' }), 'Set Input - 31');
+  assert.equal(Manager.DescribeAction('ping', 'power.on', {}), 'Power On');
+  assert.equal(Manager.DescribeAction('ping', 'nope', {}), 'nope');
+});
+
+test('a throwing action implementation is reported, never propagated', async () => {
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'MonitoringMethods', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => createLoggerStub() },
+    './ping': {
+      ID: 'ping',
+      Name: 'Ping',
+      Settings: [],
+      Actions: [{ ID: 'boom', Label: 'Boom', Icon: 'x', Group: 'Power' }],
+      Run: async () => ({ Success: true }),
+      RunAction: async () => {
+        throw new Error('socket exploded');
+      },
+      // A method whose optional hooks throw must not take the caller down with
+      // them: the operator still needs the panel and the verdict.
+      GetActionOptions: () => {
+        throw new Error('bad options');
+      },
+      DescribeAction: () => {
+        throw new Error('bad label');
+      },
+      InvalidateCaches: () => {
+        throw new Error('bad invalidate');
+      },
+    },
+    './tcp-port': { Name: 'invalid-no-id' },
+    './http': { Name: 'invalid-no-id' },
+    './https': { Name: 'invalid-no-id' },
+    './http-json': { Name: 'invalid-no-id' },
+    './dns': { Name: 'invalid-no-id' },
+  });
+
+  const result = await Manager.RunAction('ping', { Address: 'x', Settings: {} }, 'boom', {});
+  assert.equal(result.Success, false);
+  assert.match(result.Error, /socket exploded/);
+  assert.deepEqual(Manager.GetActionOptions('ping', {}), {});
+  assert.equal(Manager.DescribeAction('ping', 'boom', {}), 'Boom');
+  assert.doesNotThrow(() => Manager.InvalidateRun('ping', { Address: 'x', Settings: {} }));
+});

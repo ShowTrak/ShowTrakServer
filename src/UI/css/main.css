@@ -5800,6 +5800,62 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
     background-color: rgba(255, 255, 255, 0.12);
   }
 }
+
+/* ---- Check actions -------------------------------------------------------- */
+
+/* One action: its parameter inputs (if any), its button, and its star. Laid out
+   as a single unit so a parameterised action reads as one control rather than a
+   stray dropdown floating beside an unrelated button. The buttons themselves
+   reuse .freekiosk-btn — same panel, same treatment. */
+.monitor-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Parameterised actions get their own line's worth of room: an input plus a
+   button plus a star will not sit comfortably beside three bare buttons. */
+.monitor-action.has-params {
+  flex: 1 1 320px;
+  min-width: 260px;
+}
+
+.monitor-action-param {
+  flex: 1 1 auto;
+  min-width: 7rem;
+  max-width: 16rem;
+  font-size: 0.78rem;
+}
+
+/* The star sits flush against its button and stays dim until it is on, so a
+   panel of unstarred actions does not read as a row of decorations. */
+.monitor-action-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.3);
+  background: transparent;
+}
+
+.monitor-action-star:hover,
+.monitor-action-star:focus-visible {
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.monitor-action-star.is-on {
+  color: #f1c40f;
+}
+
+.monitor-action-star.is-on:hover,
+.monitor-action-star.is-on:focus-visible {
+  color: #f5d547;
+  background: rgba(241, 196, 15, 0.14);
+}
 /* FreeKiosk terminals: tiles, metric charts, the view modal and the editor's
    alarm section.
 
@@ -6075,6 +6131,11 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 }
 
 /* ---- Controls ------------------------------------------------------------ */
+
+/* The panel / section-title / control-group / button rules below are shared with
+   the monitoring check-action panel (see 05-monitoring.css), which renders into
+   the same modal and should not look like a different product. Keep them
+   generic; anything genuinely FreeKiosk-specific belongs above. */
 
 .freekiosk-control-group {
   margin-bottom: 0.6rem;

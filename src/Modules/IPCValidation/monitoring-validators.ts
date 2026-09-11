@@ -1,7 +1,16 @@
 // Monitoring target identifier and payload validators.
+//
+// The action validators are the security boundary for check actions: a method +
+// action pair is resolved against the MonitoringMethods registry and anything
+// absent is rejected, so the set of things a monitored device can be told to do
+// is exactly what the methods declare. Parameters are then normalized against
+// the ACTION's own schema, which means a parameter meant for one action cannot
+// ride along with another.
 import { fail, isPlainObject, normalizeNonEmptyString } from './primitives';
 import { Manager as MonitoringMethods } from '../MonitoringMethods';
 import type { IPCValidationManager } from './index';
+
+const MAX_TARGET_BATCH = 500;
 
 // Method-specific Settings are validated against the registered schema by
 // the MonitoringMethods module; here we only enforce the shape.
@@ -23,6 +32,46 @@ export = function registerMonitoringValidators(Manager: IPCValidationManager): v
       return parseInt(normalized, 10);
     }
     fail(`${fieldName} is invalid`);
+  };
+
+  Manager.MonitoringTargetIDList = (value: unknown, fieldName = 'TargetIDs') => {
+    const list = Array.isArray(value) ? (value as unknown[]) : [value];
+    if (!list.length) fail(`${fieldName} must not be empty`);
+    if (list.length > MAX_TARGET_BATCH) {
+      fail(`${fieldName} must contain at most ${MAX_TARGET_BATCH} targets`);
+    }
+    // De-duplicated so a repeated id cannot make one device take an action twice.
+    const seen = new Set<number>();
+    for (const entry of list) {
+      seen.add(Manager.MonitoringTargetID(entry, 'TargetID'));
+    }
+    return Array.from(seen);
+  };
+
+  Manager.MonitoringMethodID = (value: unknown, fieldName = 'Method') => {
+    const id = normalizeNonEmptyString(value, fieldName, { minLength: 1, maxLength: 64 });
+    if (!MonitoringMethods.Has(id)) fail(`Unknown monitoring method "${id}"`);
+    return id;
+  };
+
+  Manager.MonitoringActionID = (method: unknown, value: unknown) => {
+    const methodID = Manager.MonitoringMethodID(method);
+    const id = normalizeNonEmptyString(value, 'ActionID', { minLength: 1, maxLength: 64 });
+    // The method's declared action list IS the allowlist.
+    if (!MonitoringMethods.GetAction(methodID, id)) {
+      fail(`Unknown action "${id}" for monitoring method "${methodID}"`);
+    }
+    return id;
+  };
+
+  Manager.MonitoringActionParams = (method: unknown, action: unknown, value: unknown) => {
+    const methodID = Manager.MonitoringMethodID(method);
+    const actionID = Manager.MonitoringActionID(methodID, action);
+    if (value != null && !isPlainObject(value)) fail('Action parameters must be an object');
+    // Normalizing against the action's own schema drops anything it did not ask
+    // for and clamps what it did, so the registrar hands the method a parameter
+    // set it has already agreed to.
+    return MonitoringMethods.NormalizeActionParams(methodID, actionID, value ?? {});
   };
 
   // Normalize a single check within a monitoring target. `allowCheckID` permits

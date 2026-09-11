@@ -12,6 +12,7 @@ import {
   setDummyClients,
   setFreeKioskTerminals,
   FreeKioskTerminals,
+  setMonitoringActionFavourites,
   setMonitoringTargets,
   setTags,
   setVariables,
@@ -638,6 +639,16 @@ export function InitOscFeeds() {
       await LoadHistorySamplesForContext();
       RenderMonitoringHistoryModal();
     }
+  });
+
+  // Starred check actions. The list is small and changes only when the operator
+  // stars one, so it is replaced wholesale; both surfaces that read it (the
+  // monitor modal's stars and the right-click menu) rebuild from it on demand.
+  window.API.SetFullMonitoringActionFavouriteList(async (List) => {
+    setMonitoringActionFavourites(Array.isArray(List) ? List : []);
+    // The open monitor modal draws a lit or unlit star per action, so it has to
+    // redraw for the star the operator just pressed to change.
+    RenderMonitoringHistoryModal();
   });
 
   window.API.SetFullAlertRuleList(async (List) => {

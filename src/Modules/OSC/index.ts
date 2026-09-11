@@ -7,6 +7,8 @@ import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as GroupManager } from '../GroupManager';
 import { Manager as TagManager } from '../TagManager';
 import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
+import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
+import { Manager as MonitoringMethods } from '../MonitoringMethods';
 import { ControlService } from '../ControlService';
 import { IsTransientNetworkError, DescribeError } from '@showtrak/protocol/runtime';
 
@@ -629,6 +631,90 @@ OSC.CreateRoute(
   '/API/All/TriggerEvent/:EventID',
   async (Req) => runEventCommand(ControlService.TriggerEventOnAll(Req.EventID ?? '')),
   'Trigger an integrated event on all integrated Clients by Event ID'
+);
+
+// Monitoring Check Actions.
+//
+// A monitoring check reads a device; an action DOES something to it — power a
+// projector on, close its shutter, select an input. The route names the method
+// that owns the action, so every check type shares one shape and a new one
+// becomes OSC-addressable the moment it declares actions, with no route here:
+//
+//   /API/Monitor/<target-slug>/<method>/<action>
+//   /API/Monitor/<target-slug>/<method>/<action>/<value>
+//
+// e.g. /API/Monitor/proj-sl/pjlink/power.on
+//      /API/Monitor/proj-sl/pjlink/input.set/31
+//
+// The trailing value form exists because node-osc arguments are not consulted by
+// this router (it dispatches purely on the address pattern), so a parameter has
+// to travel in the path. It fills the action's FIRST declared parameter, which
+// is the only one any single-value route could unambiguously address; an action
+// needing more than one is UI/SDK territory.
+async function runMonitorAction(
+  Slug: string,
+  Method: string,
+  ActionID: string,
+  Value: string | null
+): Promise<RouteResult> {
+  const Target =
+    typeof MonitoringTargetManager.GetBySlug === 'function'
+      ? await MonitoringTargetManager.GetBySlug(Slug)
+      : null;
+  if (!Target) {
+    Broadcast.emit('Notify', `OSC - Invalid Monitoring Target "${Slug}"`, 'error');
+    return failureResult(`Invalid Monitoring Target "${Slug}"`);
+  }
+
+  const Action = MonitoringMethods.GetAction(Method, ActionID);
+  if (!Action) {
+    Broadcast.emit('Notify', `OSC - Unknown action "${Method}/${ActionID}"`, 'error');
+    return failureResult(`Unknown action "${Method}/${ActionID}"`);
+  }
+
+  const Params: Record<string, unknown> = {};
+  if (Value != null) {
+    const First = Array.isArray(Action.Params) ? Action.Params[0] : null;
+    if (!First) {
+      return failureResult(`Action "${Method}/${ActionID}" takes no value`);
+    }
+    Params[First.Key] = Value;
+  }
+
+  const [Err, Summary] = await MonitoringTargetManager.RunAction(
+    [Target.TargetID],
+    Method,
+    ActionID,
+    Params
+  );
+  if (Err || !Summary) {
+    Broadcast.emit('Notify', `OSC - ${Err || 'Action failed'}`, 'error');
+    return failureResult(Err || 'Action failed');
+  }
+  if (Summary.Failed > 0) {
+    // The projector's own refusal ("warming up", "wrong password") is the only
+    // useful thing to report here, so it is surfaced verbatim rather than
+    // flattened into a count.
+    const Reason = Summary.Results.find((Entry) => !Entry.Success)?.Error || 'Action failed';
+    Broadcast.emit('Notify', `OSC - ${Action.Label}: ${Reason}`, 'error');
+    return failureResult(`${Action.Label} on "${Target.Slug || Target.TargetID}": ${Reason}`);
+  }
+  return successResult(
+    `${Action.Label} sent to "${Target.Slug || Target.TargetID}"${Value != null ? ` (${Value})` : ''}`
+  );
+}
+
+OSC.CreateRoute(
+  '/API/Monitor/:Slug/:Method/:ActionID',
+  async (Req) => runMonitorAction(Req.Slug ?? '', Req.Method ?? '', Req.ActionID ?? '', null),
+  'Run a check action on a Monitoring Target by its slug, method and action ID'
+);
+
+OSC.CreateRoute(
+  '/API/Monitor/:Slug/:Method/:ActionID/:Value',
+  async (Req) =>
+    runMonitorAction(Req.Slug ?? '', Req.Method ?? '', Req.ActionID ?? '', Req.Value ?? ''),
+  'Run a check action that takes a value (e.g. pjlink/input.set/31) on a Monitoring Target'
 );
 
 // Bind the listener on load using the compiled-in default port so OSC control

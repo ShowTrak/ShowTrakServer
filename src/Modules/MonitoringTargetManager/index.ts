@@ -11,7 +11,11 @@ import * as SlugService from '../Slug';
 import { createGroupOrdering } from '../Shared/group-ordering';
 import type { Result } from '../../types/result';
 import type { TxRun } from '../DB';
-import type { MonitoringTargetView } from '@showtrak/protocol';
+import type {
+  MonitoringActionOutcome,
+  MonitoringActionSummary,
+  MonitoringTargetView,
+} from '@showtrak/protocol';
 import type { MonitoringTargetRow } from '../DB/rows';
 
 import {
@@ -446,6 +450,101 @@ const Manager = {
     Target.RecomputeAggregate();
     BroadcastManager.emit('MonitoringTargetUpdated', Target.ToJSON());
     return [null, Target.ToJSON()];
+  },
+
+  /**
+   * Fan one check action out across the named targets.
+   *
+   * A target runs the action once per check that declares it, so a selection
+   * mixing a projector with a DNS probe simply does nothing on the probe — the
+   * same "offer it where it applies, run it where it applies" rule the script
+   * and integrated-event menus already follow. A target with no matching check
+   * is reported as a failure rather than skipped silently, so a selection that
+   * quietly did less than the operator expected still says so.
+   *
+   * Failures are per-check and never fatal to the batch: one projector refusing
+   * (warming up, wrong password) must not stop the other five from taking it.
+   */
+  async RunAction(
+    TargetIDs: unknown,
+    Method: string,
+    ActionID: string,
+    Params: Record<string, unknown> = {}
+  ): Promise<Result<MonitoringActionSummary>> {
+    if (!MonitoringMethods.Has(Method)) return Fail(`Unknown monitoring method: ${Method}`);
+    const Action = MonitoringMethods.GetAction(Method, ActionID);
+    if (!Action) return Fail(`Unknown action "${ActionID}" for method "${Method}"`);
+
+    const IDs = Array.isArray(TargetIDs) ? TargetIDs : [TargetIDs];
+    const Results: MonitoringActionOutcome[] = [];
+    // Targets are handled in parallel but each target's checks in series: two
+    // checks on one target may well address the same device, and a method whose
+    // device takes a single session at a time (PJLink) would otherwise race.
+    const Touched = new Set<MonitoringTarget>();
+
+    await Promise.all(
+      IDs.map(async (RawID) => {
+        const ID = Number(RawID);
+        const Target = TargetList.find((T) => Number(T.TargetID) === ID);
+        if (!Target) {
+          Results.push({
+            TargetID: ID,
+            CheckID: 0,
+            Nickname: '',
+            Success: false,
+            Error: 'Monitoring target not found',
+            Detail: null,
+          });
+          return;
+        }
+
+        const Checks = Target.Checks.filter((Check) => Check.Method === Method);
+        if (!Checks.length) {
+          Results.push({
+            TargetID: ID,
+            CheckID: 0,
+            Nickname: Target.Nickname,
+            Success: false,
+            Error: `No ${Method} check on this target`,
+            Detail: null,
+          });
+          return;
+        }
+
+        for (const Check of Checks) {
+          const Outcome = await MonitoringMethods.RunAction(Method, Check, ActionID, Params);
+          Results.push({
+            TargetID: ID,
+            CheckID: Check.CheckID,
+            Nickname: Target.Nickname,
+            Success: !!Outcome.Success,
+            Error: Outcome.Success ? null : Outcome.Error || 'Action failed',
+            Detail: Outcome.Detail || null,
+          });
+          if (Outcome.Success) Touched.add(Target);
+        }
+      })
+    );
+
+    // Re-probe whatever we just changed so the tiles reflect the new state
+    // immediately instead of after up to a full interval. RunAction has already
+    // dropped the caches that would otherwise replay the pre-action reading.
+    await Promise.all(
+      [...Touched].map(async (Target) => {
+        await Promise.all(Target.Checks.map((Check) => Check.Run()));
+        Target.LastChecked = Date.now();
+        Target.RecomputeAggregate();
+        BroadcastManager.emit('MonitoringTargetUpdated', Target.ToJSON());
+      })
+    );
+
+    const Succeeded = Results.filter((Entry) => Entry.Success).length;
+    return Ok({
+      Total: Results.length,
+      Succeeded,
+      Failed: Results.length - Succeeded,
+      Results,
+    });
   },
 
   async Create(Payload: MonitoringTargetCreatePayload): Promise<Result<MonitoringTargetView>> {

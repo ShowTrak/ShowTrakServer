@@ -37,7 +37,9 @@ import { InitFog } from './fog';
 import { InitOfflineIndicators } from './offline-indicators';
 import { Init, WireGlobalUI } from './init';
 import { LoadFreeKioskCatalogues } from './freekiosk';
+import { EnsureMonitoringMethodsLoaded } from './monitoring-editor/method-fields';
 import { WireFreeKioskModal } from './freekiosk-modal';
+import { WireMonitoringActions } from './monitoring-actions';
 import { RenderMonitoringHistoryModal } from './monitoring';
 
 InitMode();
@@ -64,6 +66,11 @@ InitOfflineIndicators();
 // FreeKiosk surface needs them, so they are fetched once up front rather than
 // per render. Not awaited: a tile renders fine before they land.
 void LoadFreeKioskCatalogues();
+// The method catalogue carries each check type's declared actions, and the
+// monitor view modal draws its control panel from them — so it can no longer
+// wait until the first time the monitoring editor is opened.
+void EnsureMonitoringMethodsLoaded();
 WireFreeKioskModal(() => RenderMonitoringHistoryModal());
+WireMonitoringActions(() => RenderMonitoringHistoryModal());
 void WireGlobalUI();
 void Init();

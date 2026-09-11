@@ -53,6 +53,7 @@ import { Manager as BonjourManager } from './Modules/Bonjour';
 void BonjourManager.Init();
 import './Modules/OSC'; // binds the OSC UDP listener on load
 import { Manager as MonitoringTargetManager } from './Modules/MonitoringTargetManager';
+import { Manager as MonitoringActionFavourites } from './Modules/MonitoringActionFavourites';
 import { Manager as ClientManager } from './Modules/ClientManager';
 import { Manager as GroupManager } from './Modules/GroupManager';
 import { Manager as TagManager } from './Modules/TagManager';
@@ -236,6 +237,9 @@ app.whenReady().then(async () => {
     // Boot monitoring loops once the DB schema is ready
     MonitoringTargetManager.Init().catch((Err: unknown) =>
       Logger.error('Failed to init MonitoringTargetManager:', Err)
+    );
+    MonitoringActionFavourites.Init().catch((Err: unknown) =>
+      Logger.error('Failed to init MonitoringActionFavourites:', Err)
     );
     DummyClientManager.Init().catch((Err: unknown) =>
       Logger.error('Failed to init DummyClientManager:', Err)

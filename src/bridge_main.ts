@@ -112,6 +112,9 @@ const INVOKE_CHANNEL_LIST = [
   'GetMonitoringCheckDebug',
   'RunMonitoringCheckNow',
   'RunAllMonitoringChecksNow',
+  'RunMonitoringAction',
+  'GetMonitoringActionFavourites',
+  'SetMonitoringActionFavourite',
   'GetDummyClientHistory',
   'CreateMonitoringTarget',
   'UpdateMonitoringTarget',
@@ -216,6 +219,7 @@ const SUBSCRIBE_CHANNEL_LIST = [
   'AppUpdate:Status',
   'SetFullMonitoringTargetList',
   'MonitoringTargetUpdated',
+  'SetFullMonitoringActionFavouriteList',
   'SetFullDummyClientList',
   'DummyClientUpdated',
   'SetFullFreeKioskTerminalList',
@@ -451,6 +455,13 @@ const API: ShowTrakAPI = {
   DeleteMonitoringTarget: async (TargetID) => invoke('DeleteMonitoringTarget', TargetID),
   SetFullMonitoringTargetList: (Callback) => subscribe('SetFullMonitoringTargetList', Callback),
   MonitoringTargetUpdated: (Callback) => subscribe('MonitoringTargetUpdated', Callback),
+  RunMonitoringAction: async (TargetIDs, Method, ActionID, Params) =>
+    invoke('RunMonitoringAction', TargetIDs, Method, ActionID, Params),
+  GetMonitoringActionFavourites: async () => invoke('GetMonitoringActionFavourites'),
+  SetMonitoringActionFavourite: async (Method, ActionID, Params, Favourite) =>
+    invoke('SetMonitoringActionFavourite', Method, ActionID, Params, Favourite),
+  SetFullMonitoringActionFavouriteList: (Callback) =>
+    subscribe('SetFullMonitoringActionFavouriteList', Callback),
   // Dummy Clients
   GetAllDummyClients: async () => invoke('GetAllDummyClients'),
   GetDummyClient: async (UUID) => invoke('GetDummyClient', UUID),

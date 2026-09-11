@@ -24,6 +24,7 @@ import { Manager as ClientManager } from '../Modules/ClientManager';
 import { normalizeUSBNameKey } from '../Modules/ClientManager/normalizers';
 import { Manager as GroupManager } from '../Modules/GroupManager';
 import { Manager as MonitoringTargetManager } from '../Modules/MonitoringTargetManager';
+import { Manager as MonitoringActionFavourites } from '../Modules/MonitoringActionFavourites';
 import { Manager as DummyClientManager } from '../Modules/DummyClientManager';
 import { Manager as FreeKioskManager } from '../Modules/FreeKioskManager';
 import { recordFreeKioskHistorySamples, syncFreeKioskHistoryStore } from './freekiosk-history';
@@ -252,6 +253,9 @@ async function ReinitializeSystem(): Promise<void> {
   if (typeof MonitoringTargetManager.Reload === 'function') {
     await MonitoringTargetManager.Reload();
   }
+  if (typeof MonitoringActionFavourites.Reload === 'function') {
+    await MonitoringActionFavourites.Reload();
+  }
 
   if (typeof FreeKioskManager.Reload === 'function') {
     await FreeKioskManager.Reload();
@@ -348,6 +352,14 @@ async function UpdateMonitoringTargetList(): Promise<void> {
   syncMonitoringHistoryStore(SafeList);
   PruneMonitoringSignatures(SafeList);
   PushToRenderers('SetFullMonitoringTargetList', SafeList);
+}
+
+// Starred check actions fan-out. The list changes only when the operator stars
+// or unstars one, so there is nothing to de-duplicate here.
+async function UpdateMonitoringActionFavouriteList(): Promise<void> {
+  if (!hasMainWindow()) return;
+  await MonitoringActionFavourites.Init();
+  PushToRenderers('SetFullMonitoringActionFavouriteList', MonitoringActionFavourites.GetAll());
 }
 
 // --- Monitoring push de-duplication ----------------------------------------
@@ -768,6 +780,7 @@ export {
   UpdateScriptList,
   UpdateOSCList,
   UpdateMonitoringTargetList,
+  UpdateMonitoringActionFavouriteList,
   UpdateDummyClientList,
   UpdateFreeKioskTerminalList,
   UpdateAlertRuleList,

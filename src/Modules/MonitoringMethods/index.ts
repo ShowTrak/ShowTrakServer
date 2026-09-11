@@ -13,7 +13,15 @@ import { CreateLogger } from '../Logger';
 import { Manager as CacheManager } from '../CacheManager';
 import { MethodInfo } from './info';
 import { MethodGroups, DEFAULT_GROUP } from './groups';
-import type { MonitoringMethod, MonitoringResult, MonitoringTargetLike } from './types';
+import type {
+  MonitoringActionDef,
+  MonitoringActionOptions,
+  MonitoringActionResult,
+  MonitoringMethod,
+  MonitoringResult,
+  MonitoringSettingField,
+  MonitoringTargetLike,
+} from './types';
 
 // General
 import * as ping from './ping';
@@ -138,6 +146,11 @@ function PublicShape(Method: MonitoringMethod) {
     // The editor uses these to hide the Address / Degraded Threshold fields.
     UsesAddress: Method.UsesAddress !== false,
     SupportsLatencyThreshold: Method.SupportsLatencyThreshold !== false,
+    // Controllable actions travel with the schema rather than on a channel of
+    // their own: the renderer already loads the method catalogue to draw the
+    // editor, so a method that gains actions grows a control panel with no
+    // second round trip and no client change.
+    Actions: Array.isArray(Method.Actions) ? Method.Actions : [],
   };
 }
 
@@ -190,6 +203,72 @@ function getMethodRunCacheTtlMs(Method: MonitoringMethod, Target: MonitoringTarg
   return DefaultTtl;
 }
 
+// Coerce a loose object against a MonitoringSettingField schema: fill in
+// defaults for anything absent, clamp numbers to Min/Max, force booleans, and
+// reject select values that are not in Options. Shared by check settings and
+// action parameters so an action's form obeys exactly the same rules as the
+// editor's — a clamp that holds in one place cannot drift in the other.
+function NormalizeFields(
+  Schema: MonitoringSettingField[],
+  Input: unknown
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const Source: Record<string, unknown> =
+    Input && typeof Input === 'object' ? (Input as Record<string, unknown>) : {};
+  for (const Field of Schema) {
+    const Key = Field.Key;
+    if (!Key) continue;
+    let Value: unknown = Source[Key];
+    // A 'list' field is an array; only fall back to the default when it is truly
+    // absent (not for a legitimately empty array the user cleared).
+    if (Field.Type === 'list') {
+      const Raw = Array.isArray(Value)
+        ? Value
+        : Value === undefined || Value === null || Value === ''
+          ? Array.isArray(Field.Default)
+            ? Field.Default
+            : []
+          : [Value];
+      const Seen = new Set<string>();
+      const List: string[] = [];
+      for (const Item of Raw as unknown[]) {
+        let Entry = String(Item == null ? '' : Item).trim();
+        if (Field.ItemType === 'number') {
+          const N = Number(Entry);
+          if (!Number.isFinite(N)) continue;
+          Entry = String(N);
+        }
+        if (!Entry || Seen.has(Entry)) continue;
+        Seen.add(Entry);
+        List.push(Entry);
+      }
+      out[Key] = List;
+      continue;
+    }
+    if (Value === undefined || Value === null || Value === '') {
+      Value = Field.Default;
+    }
+    if (Field.Type === 'number') {
+      Value = Number(Value);
+      if (!Number.isFinite(Value)) Value = Field.Default;
+      if (typeof Field.Min === 'number' && (Value as number) < Field.Min) Value = Field.Min;
+      if (typeof Field.Max === 'number' && (Value as number) > Field.Max) Value = Field.Max;
+    } else if (Field.Type === 'boolean') {
+      Value = !!Value;
+    } else if (Field.Type === 'select') {
+      // For select fields, validate against options
+      const Options = Field.Options || [];
+      const ValidValues = Options.map((o) => (typeof o === 'object' ? o.value : o));
+      Value = ValidValues.includes(Value as string) ? Value : Field.Default;
+      Value = String(Value);
+    } else {
+      Value = String(Value == null ? '' : Value);
+    }
+    out[Key] = Value;
+  }
+  return out;
+}
+
 const Manager = {
   GetAll: () => Array.from(Methods.values()).map(PublicShape),
 
@@ -208,64 +287,125 @@ const Manager = {
       MethodNormalized = Method.NormalizeSettings(Input);
     }
 
-    const out: Record<string, unknown> = {};
-    const Schema = Array.isArray(Method.Settings) ? Method.Settings : [];
-    const Source: Record<string, unknown> =
-      MethodNormalized && typeof MethodNormalized === 'object'
-        ? (MethodNormalized as Record<string, unknown>)
-        : {};
-    for (const Field of Schema) {
-      const Key = Field.Key;
-      if (!Key) continue;
-      let Value: unknown = Source[Key];
-      // A 'list' field is an array; only fall back to the default when it is truly
-      // absent (not for a legitimately empty array the user cleared).
-      if (Field.Type === 'list') {
-        const Raw = Array.isArray(Value)
-          ? Value
-          : Value === undefined || Value === null || Value === ''
-            ? Array.isArray(Field.Default)
-              ? Field.Default
-              : []
-            : [Value];
-        const Seen = new Set<string>();
-        const List: string[] = [];
-        for (const Item of Raw as unknown[]) {
-          let Entry = String(Item == null ? '' : Item).trim();
-          if (Field.ItemType === 'number') {
-            const N = Number(Entry);
-            if (!Number.isFinite(N)) continue;
-            Entry = String(N);
-          }
-          if (!Entry || Seen.has(Entry)) continue;
-          Seen.add(Entry);
-          List.push(Entry);
-        }
-        out[Key] = List;
-        continue;
-      }
-      if (Value === undefined || Value === null || Value === '') {
-        Value = Field.Default;
-      }
-      if (Field.Type === 'number') {
-        Value = Number(Value);
-        if (!Number.isFinite(Value)) Value = Field.Default;
-        if (typeof Field.Min === 'number' && (Value as number) < Field.Min) Value = Field.Min;
-        if (typeof Field.Max === 'number' && (Value as number) > Field.Max) Value = Field.Max;
-      } else if (Field.Type === 'boolean') {
-        Value = !!Value;
-      } else if (Field.Type === 'select') {
-        // For select fields, validate against options
-        const Options = Field.Options || [];
-        const ValidValues = Options.map((o) => (typeof o === 'object' ? o.value : o));
-        Value = ValidValues.includes(Value as string) ? Value : Field.Default;
-        Value = String(Value);
-      } else {
-        Value = String(Value == null ? '' : Value);
-      }
-      out[Key] = Value;
+    return NormalizeFields(Array.isArray(Method.Settings) ? Method.Settings : [], MethodNormalized);
+  },
+
+  // --- Controllable actions ------------------------------------------------
+
+  GetActions: (ID: string): MonitoringActionDef[] => {
+    const Method = Methods.get(ID);
+    return Method && Array.isArray(Method.Actions) ? Method.Actions : [];
+  },
+
+  GetAction: (ID: string, ActionID: string): MonitoringActionDef | null => {
+    const Method = Methods.get(ID);
+    if (!Method || !Array.isArray(Method.Actions)) return null;
+    return Method.Actions.find((Action) => Action.ID === ActionID) || null;
+  },
+
+  // The declared schema IS the allowlist: anything the action did not ask for is
+  // dropped rather than handed to the method, so a parameter meant for one
+  // action can never ride along with another.
+  NormalizeActionParams: (
+    ID: string,
+    ActionID: string,
+    Input: unknown
+  ): Record<string, unknown> => {
+    const Action = Manager.GetAction(ID, ActionID);
+    if (!Action) return {};
+    return NormalizeFields(Array.isArray(Action.Params) ? Action.Params : [], Input);
+  },
+
+  // Dynamic parameter choices for one check, derived from its latest probe
+  // result. A method that offers none (or throws) simply reports nothing —
+  // the renderer then falls back to the action's static field schema.
+  GetActionOptions: (ID: string, Result: MonitoringResult): MonitoringActionOptions => {
+    const Method = Methods.get(ID);
+    if (!Method || typeof Method.GetActionOptions !== 'function') return {};
+    try {
+      const Options = Method.GetActionOptions(Result);
+      return Options && typeof Options === 'object' ? Options : {};
+    } catch (Err) {
+      Logger.warn(
+        `GetActionOptions failed for method ${ID}: ${Err && (Err as Error).message ? (Err as Error).message : Err}`
+      );
+      return {};
     }
-    return out;
+  },
+
+  // Label for one action with its parameters bound, as a starred favourite shows
+  // it. Falls back to the plain action label, then to the raw id, so a method
+  // that describes nothing still produces a usable menu entry.
+  DescribeAction: (ID: string, ActionID: string, Params: Record<string, unknown>): string => {
+    const Action = Manager.GetAction(ID, ActionID);
+    const Method = Methods.get(ID);
+    if (Method && typeof Method.DescribeAction === 'function') {
+      try {
+        const Described = Method.DescribeAction(ActionID, Params || {});
+        if (Described && String(Described).trim()) return String(Described).trim();
+      } catch (Err) {
+        Logger.warn(
+          `DescribeAction failed for method ${ID}: ${Err && (Err as Error).message ? (Err as Error).message : Err}`
+        );
+      }
+    }
+    return (Action && Action.Label) || ActionID;
+  },
+
+  // Perform one action against one target. Unlike Run() this is NEVER cached —
+  // an action is a mutation, and replaying a cached "success" would silently
+  // swallow the second press of a button.
+  RunAction: async (
+    ID: string,
+    Target: MonitoringTargetLike,
+    ActionID: string,
+    Params: unknown
+  ): Promise<MonitoringActionResult> => {
+    const Method = Methods.get(ID);
+    if (!Method) return { Success: false, Error: `Unknown method: ${ID}` };
+    const Action = Manager.GetAction(ID, ActionID);
+    if (!Action) {
+      return { Success: false, Error: `"${Method.Name}" has no action "${ActionID}"` };
+    }
+    if (typeof Method.RunAction !== 'function') {
+      return { Success: false, Error: `"${Method.Name}" cannot perform actions` };
+    }
+
+    const Normalized = NormalizeFields(Array.isArray(Action.Params) ? Action.Params : [], Params);
+
+    let Result: MonitoringActionResult;
+    try {
+      Result = await Method.RunAction(Target, ActionID, Normalized);
+    } catch (Err) {
+      return {
+        Success: false,
+        Error: Err && (Err as Error).message ? (Err as Error).message : String(Err),
+      };
+    }
+
+    // The device's state just changed, so every cached read of it is now a lie.
+    // Drop both the shared run cache and whatever the method caches privately,
+    // so the follow-up probe the caller fires reports the NEW state instead of
+    // a snapshot taken moments before the action landed.
+    if (Result && Result.Success) Manager.InvalidateRun(ID, Target);
+
+    return Result;
+  },
+
+  // Forget the cached probe result for one target, so the next Run() re-probes.
+  InvalidateRun: (ID: string, Target: MonitoringTargetLike): void => {
+    const Method = Methods.get(ID);
+    if (!Method) return;
+    RUN_CACHE.Delete(getMethodRunCacheKey(ID, Method, Target));
+    if (typeof Method.InvalidateCaches === 'function') {
+      try {
+        Method.InvalidateCaches(Target);
+      } catch (Err) {
+        Logger.warn(
+          `InvalidateCaches failed for method ${ID}: ${Err && (Err as Error).message ? (Err as Error).message : Err}`
+        );
+      }
+    }
   },
 
   Run: async (ID: string, Target: MonitoringTargetLike): Promise<MonitoringResult> => {
@@ -319,4 +459,4 @@ const Manager = {
   },
 };
 
-export { Manager, getMethodRunCacheKey };
+export { Manager, getMethodRunCacheKey, stableStringify };

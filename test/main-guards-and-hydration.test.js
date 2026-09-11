@@ -67,6 +67,7 @@ const restore = installModuleMocks([
       UpdateScriptList: bridgeStub('UpdateScriptList'),
       UpdateOSCList: bridgeStub('UpdateOSCList'),
       UpdateMonitoringTargetList: bridgeStub('UpdateMonitoringTargetList'),
+      UpdateMonitoringActionFavouriteList: bridgeStub('UpdateMonitoringActionFavouriteList'),
       UpdateDummyClientList: bridgeStub('UpdateDummyClientList'),
       UpdateFreeKioskTerminalList: bridgeStub('UpdateFreeKioskTerminalList'),
       UpdateAlertRuleList: bridgeStub('UpdateAlertRuleList'),
@@ -288,6 +289,9 @@ test('a renderer reload re-hydrates every channel, then the current mode', async
     'UpdateScriptList',
     'UpdateOSCList',
     'UpdateMonitoringTargetList',
+    // The right-click menu's starred check actions are built from this list, so
+    // a reloaded renderer needs it before the operator right-clicks a monitor.
+    'UpdateMonitoringActionFavouriteList',
     'UpdateDummyClientList',
     'UpdateFreeKioskTerminalList',
     'UpdateAlertRuleList',
@@ -313,6 +317,6 @@ test('the mode push is skipped when the window went away mid-hydration', async (
     state.hasWindow = true;
   }
   // The Update* functions guard themselves; only the direct push is gated here.
-  assert.equal(bridgeCalls.length, 13);
+  assert.equal(bridgeCalls.length, 14);
   assert.deepEqual(pushes, []);
 });

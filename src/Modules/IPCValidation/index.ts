@@ -89,6 +89,12 @@ export interface IPCValidationManager {
   FreeKioskCreatePayload(value: unknown): Record<string, unknown>;
   FreeKioskUpdatePayload(value: unknown): Record<string, unknown>;
 
+  // Monitoring check actions (monitoring-validators.ts)
+  MonitoringTargetIDList(value: unknown, fieldName?: string): number[];
+  MonitoringMethodID(value: unknown, fieldName?: string): string;
+  MonitoringActionID(method: unknown, value: unknown): string;
+  MonitoringActionParams(method: unknown, action: unknown, value: unknown): Record<string, unknown>;
+
   // Alert rules (alert-validators.ts)
   AlertRuleID(value: unknown, fieldName?: string): number;
   AlertRuleCreatePayload(value: unknown): Record<string, unknown>;

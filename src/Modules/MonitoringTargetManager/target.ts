@@ -13,7 +13,11 @@ import { Manager as DB } from '../DB';
 import { CreateMonitoringChecksRepository } from '../DB/repositories/monitoring-checks';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as MonitoringMethods } from '../MonitoringMethods';
-import type { MonitoringCheckView, MonitoringTargetView } from '@showtrak/protocol';
+import type {
+  MonitoringActionOptions,
+  MonitoringCheckView,
+  MonitoringTargetView,
+} from '@showtrak/protocol';
 
 import { ParseSettings, ClampInterval, ClampThreshold } from './normalize';
 
@@ -69,6 +73,7 @@ class MonitoringCheck {
   LastError: string | null;
   LastDebugHtml: string | null;
   LastDebugAt: number | null;
+  LastActionOptions: MonitoringActionOptions;
 
   constructor(Row: MonitoringCheckInput) {
     this.CheckID = Row.CheckID;
@@ -107,6 +112,9 @@ class MonitoringCheck {
     // never persisted — and overwritten on every run.
     this.LastDebugHtml = null;
     this.LastDebugAt = null;
+    // Dynamic choices for this check's action parameters, refreshed on every
+    // run (see MonitoringMethods.GetActionOptions). RAM-only.
+    this.LastActionOptions = {};
   }
 
   ToJSON(): MonitoringCheckView {
@@ -125,6 +133,7 @@ class MonitoringCheck {
       LastChecked: this.LastChecked,
       LastLatencyMs: this.LastLatencyMs,
       LastError: this.LastError,
+      ActionOptions: this.LastActionOptions,
     };
   }
 
@@ -160,6 +169,12 @@ class MonitoringCheck {
     // Cache the rendered debug panel (RAM-only) from this run's raw result.
     this.LastDebugHtml = MonitoringMethods.BuildDebug(this.Method, Result, this);
     this.LastDebugAt = Now;
+    // Refresh the action parameter choices this device reports (e.g. the input
+    // sources a projector lists). A failed probe keeps the last known set rather
+    // than emptying the picker the moment the device blips.
+    if (Result && Result.Success) {
+      this.LastActionOptions = MonitoringMethods.GetActionOptions(this.Method, Result);
+    }
   }
 
   async SetLastSuccessAt(Ts: number) {
