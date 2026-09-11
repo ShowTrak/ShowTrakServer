@@ -190,6 +190,15 @@ const restore = installModuleMocks([
     match: matchesModule('/Modules/FreeKioskManager'),
     value: { Manager: { GetAll: async () => [null, []], Reload: async () => [null, []] } },
   },
+  // Same trap as FreeKioskManager above: the real favourites manager pulls in
+  // ../DB at module load. broadcast-bridge calls Reload (on re-hydrate) and
+  // Init + GetAll (when pushing the list).
+  {
+    match: matchesModule('/Modules/MonitoringActionFavourites'),
+    value: {
+      Manager: { Init: async () => {}, Reload: async () => {}, GetAll: () => [] },
+    },
+  },
   { match: matchesModule('/Modules/AlertsManager'), value: { Manager: alertsMgr } },
   { match: matchesModule('/Modules/TagManager'), value: { Manager: tagMgr } },
   { match: matchesModule('/Modules/VariableManager'), value: { Manager: variableMgr } },
