@@ -274,11 +274,6 @@
 
 /* ---- Controls ------------------------------------------------------------ */
 
-/* The panel / section-title / control-group / button rules below are shared with
-   the monitoring check-action panel (see 05-monitoring.css), which renders into
-   the same modal and should not look like a different product. Keep them
-   generic; anything genuinely FreeKiosk-specific belongs above. */
-
 .freekiosk-control-group {
   margin-bottom: 0.6rem;
 }

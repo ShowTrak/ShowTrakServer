@@ -37,7 +37,11 @@ import {
   ResetFreeKioskModalState,
   SetFreeKioskSeries,
 } from './freekiosk-modal';
-import { RenderCheckActionsPanel, ResetActionParamDrafts } from './monitoring-actions';
+import {
+  PositionOpenActionsMenu,
+  RenderTimelineWithActions,
+  ResetActionParamDrafts,
+} from './monitoring-actions';
 import { OfflineBadgeContent } from './lib/status-badges';
 import { ResolveEntityTags } from './lib/tag-badges';
 import { RenderTagBadgeRow } from './lib/tag-badge-view';
@@ -989,8 +993,8 @@ export function RenderMonitoringHistoryModal() {
       const Label = Check.Name || MethodName || 'Check';
       const LiveState = LiveCheckState(Check);
       // Each check: its current-status card acts as the heading, its timeline
-      // directly beneath, then the controls its method offers (nothing at all
-      // for a read-only check type).
+      // directly beneath, with a ⋯ controls menu on the end of it when its
+      // method offers any (nothing at all for a read-only check type).
       CheckSections.push(
         RenderMonitorStatusCard({
           state: LiveState,
@@ -998,9 +1002,7 @@ export function RenderMonitoringHistoryModal() {
           sub: Check.Address || '',
           badge: String(Check.Method || '').toUpperCase(),
           statusText: BuildLiveStatusText(LiveState, Check.LastLatencyMs, Check.LastError),
-        }) +
-          RenderStatusTimeline(Blocks) +
-          RenderCheckActionsPanel(Check)
+        }) + RenderTimelineWithActions(Check, RenderStatusTimeline(Blocks))
       );
     }
 
@@ -1040,6 +1042,7 @@ export function RenderMonitoringHistoryModal() {
     if (!CheckSections.length) {
       $timelines.append('<div class="status-timeline-empty">This target has no checks yet.</div>');
     }
+    PositionOpenActionsMenu();
     RestoreStatusTimelineTooltipAfterRender();
     return;
   }

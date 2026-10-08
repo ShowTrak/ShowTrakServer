@@ -1,5 +1,5 @@
-// Check-action controls: the panel of buttons under each check in the monitor
-// view modal, and the shared helpers the right-click menu uses to offer starred
+// Check-action controls: the ⋯ menu on the end of each check's timeline in the
+// monitor view modal, and the shared helpers the right-click menu uses to offer starred
 // actions across a selection.
 //
 // Nothing here knows what a projector is. A method declares its actions in the
@@ -8,7 +8,7 @@
 // surface grows one here with no renderer change.
 //
 // Parameter values live in a module-level draft map rather than in the DOM,
-// because this panel is re-rendered from scratch on every target push (once per
+// because this menu is re-rendered from scratch on every target push (once per
 // check interval). Reading them back out of the inputs would mean a half-typed
 // input code vanished the moment the check ticked.
 import type {
@@ -116,6 +116,13 @@ export function IsActionFavourited(
 
 // ---- Rendering --------------------------------------------------------------
 
+/**
+ * Which check's menu is open, if any. Module state rather than DOM state for the
+ * same reason as the drafts above: the whole timeline list is rebuilt on every
+ * target push, and an open menu should not snap shut each time a check ticks.
+ */
+let OpenMenuCheckID: string | null = null;
+
 function RenderParamField(
   Check: MonitoringCheckView,
   Action: MonitoringActionDef,
@@ -151,6 +158,24 @@ function RenderParamField(
     value="${Safe(Value)}" placeholder="${Safe(Field.Label)}" aria-label="${Safe(Field.Label)}" ${Disabled}/>`;
 }
 
+function RenderStar(Ids: string, Favourited: boolean): string {
+  return `<button type="button" class="monitor-action-star${Favourited ? ' is-on' : ''}" ${Ids}
+      aria-pressed="${Favourited ? 'true' : 'false'}"
+      title="${
+        Favourited
+          ? 'Starred — shown in the right-click menu for selected monitors'
+          : 'Star this action so it appears in the right-click menu'
+      }">
+      <i class="bi bi-star${Favourited ? '-fill' : ''}"></i>
+    </button>`;
+}
+
+/**
+ * One menu row. A plain action is a single clickable row with its star at the
+ * end. A parameterised one keeps its label, then its picker, then a small run
+ * button — the row itself can't be the trigger, or choosing an input from the
+ * picker would fire it.
+ */
 function RenderAction(
   Check: MonitoringCheckView,
   Action: MonitoringActionDef,
@@ -161,43 +186,67 @@ function RenderAction(
   const Favourited = IsActionFavourited(Check.Method, Action, Params);
   const Disabled = Blocked ? 'disabled' : '';
   const Ids = `data-check-id="${Safe(String(Check.CheckID))}" data-action-id="${Safe(Action.ID)}"`;
-  const Fields = (Action.Params || [])
-    .map((Field) => RenderParamField(Check, Action, Field, Params, Disabled))
-    .join('');
-
   const Title = Blocked ? BlockedReason : Action.Note || Action.Label;
+  const Destructive = Action.Destructive ? ' is-destructive' : '';
+  const Label = `<i class="bi bi-${Safe(Action.Icon)}"></i><span>${Safe(Action.Label)}</span>`;
+
+  if (Action.Params && Action.Params.length) {
+    const Fields = Action.Params.map((Field) =>
+      RenderParamField(Check, Action, Field, Params, Disabled)
+    ).join('');
+    return `
+      <div class="monitor-action has-params">
+        <span class="monitor-action-label">${Label}</span>
+        ${Fields}
+        <button type="button" class="monitor-action-btn monitor-action-go${Destructive}" ${Ids}
+          title="${Safe(Title)}" aria-label="${Safe(Action.Label)}" ${Disabled}>
+          <i class="bi bi-play-fill"></i>
+        </button>
+        ${RenderStar(Ids, Favourited)}
+      </div>`;
+  }
+
   return `
-    <div class="monitor-action${Action.Params && Action.Params.length ? ' has-params' : ''}">
-      ${Fields}
-      <button type="button" class="freekiosk-btn monitor-action-btn${
-        Action.Destructive ? ' is-destructive' : ''
-      }" ${Ids} title="${Safe(Title)}" ${Disabled}>
-        <i class="bi bi-${Safe(Action.Icon)}"></i> ${Safe(Action.Label)}
-      </button>
-      <button type="button" class="monitor-action-star${Favourited ? ' is-on' : ''}" ${Ids}
-        aria-pressed="${Favourited ? 'true' : 'false'}"
-        title="${
-          Favourited
-            ? 'Starred — shown in the right-click menu for selected monitors'
-            : 'Star this action so it appears in the right-click menu'
-        }">
-        <i class="bi bi-star${Favourited ? '-fill' : ''}"></i>
-      </button>
+    <div class="monitor-action">
+      <button type="button" class="monitor-action-btn monitor-action-label${Destructive}" ${Ids}
+        role="menuitem" title="${Safe(Title)}" ${Disabled}>${Label}</button>
+      ${RenderStar(Ids, Favourited)}
     </div>`;
 }
 
 /**
- * The control panel for one check, or '' when its method declares no actions.
- * Rendered directly beneath that check's status timeline in the view modal.
+ * The status timeline for one check, with a ⋯ button on its end that opens the
+ * check's controls as a compact menu. A method that declares no actions gets the
+ * bare timeline back, unchanged.
  */
-export function RenderCheckActionsPanel(Check: MonitoringCheckView): string {
+export function RenderTimelineWithActions(Check: MonitoringCheckView, Timeline: string): string {
+  const Menu = RenderCheckActionsMenu(Check);
+  if (!Menu) return Timeline;
+  const CheckID = Safe(String(Check.CheckID));
+  const Open = OpenMenuCheckID === String(Check.CheckID);
+  return `<div class="status-timeline-with-actions">
+      ${Timeline}
+      <button type="button" class="monitor-actions-toggle${Open ? ' is-open' : ''}"
+        data-check-id="${CheckID}" title="Controls" aria-label="Controls"
+        aria-haspopup="menu" aria-expanded="${Open ? 'true' : 'false'}">
+        <i class="bi bi-three-dots"></i>
+      </button>
+      ${Menu}
+    </div>`;
+}
+
+/**
+ * The controls menu for one check, or '' when its method declares no actions.
+ * Always rendered (so its contents stay current), shown only while open.
+ */
+export function RenderCheckActionsMenu(Check: MonitoringCheckView): string {
   const Actions = GetMethodActions(Check.Method);
   if (!Actions.length) return '';
 
   // An offline check means ShowTrak cannot reach the device at all, so every
   // button would fail the same way. Degraded is left enabled on purpose: a
   // projector sitting in standby reads as degraded, and powering it on is
-  // exactly what the operator opened this panel to do.
+  // exactly what the operator opened this menu to do.
   const Blocked = Check.LastChecked != null && !Check.Online;
   const BlockedReason = 'This check is offline — ShowTrak cannot reach the device';
 
@@ -211,25 +260,57 @@ export function RenderCheckActionsPanel(Check: MonitoringCheckView): string {
   const Body = [...Groups.entries()]
     .map(
       ([Group, List]) =>
-        `<div class="freekiosk-control-group">
-          <span class="freekiosk-control-group-title">${Safe(Group)}</span>
-          <div class="freekiosk-control-group-body">${List.map((Action) =>
-            RenderAction(Check, Action, Blocked, BlockedReason)
-          ).join('')}</div>
-        </div>`
+        `<div class="monitor-actions-menu-group">${Safe(Group)}</div>${List.map((Action) =>
+          RenderAction(Check, Action, Blocked, BlockedReason)
+        ).join('')}`
     )
     .join('');
 
   const Banner = Blocked
-    ? `<div class="freekiosk-section-note"><i class="bi bi-exclamation-triangle"></i><span>${Safe(
+    ? `<div class="monitor-actions-menu-note"><i class="bi bi-exclamation-triangle"></i><span>${Safe(
         BlockedReason
       )}</span></div>`
     : '';
 
-  return `<div class="freekiosk-panel monitor-actions-panel">
-      <h6 class="freekiosk-section-title">Controls</h6>
-      ${Banner}${Body}
-    </div>`;
+  const Open = OpenMenuCheckID === String(Check.CheckID);
+  return `<div class="monitor-actions-menu${Open ? ' is-open' : ''}" role="menu"
+      data-check-id="${Safe(String(Check.CheckID))}">${Banner}${Body}</div>`;
+}
+
+/**
+ * Pin the open menu under its ⋯ button, flipping above it when there is no room
+ * below. Fixed rather than absolute so the modal's scroll area can't clip it.
+ * Called after every render, since a render replaces the menu element.
+ */
+export function PositionOpenActionsMenu(): void {
+  if (OpenMenuCheckID == null) return;
+  const Selector = `[data-check-id="${CSS.escape(OpenMenuCheckID)}"]`;
+  const Menu = document.querySelector<HTMLElement>(`.monitor-actions-menu${Selector}`);
+  const Toggle = document.querySelector<HTMLElement>(`.monitor-actions-toggle${Selector}`);
+  if (!Menu || !Toggle) {
+    // The check went away (deleted, or the modal moved on) — nothing to anchor to.
+    OpenMenuCheckID = null;
+    return;
+  }
+  const Gap = 4;
+  const Edge = 8;
+  const Anchor = Toggle.getBoundingClientRect();
+  const Width = Menu.offsetWidth;
+  const Height = Menu.offsetHeight;
+  const Left = Math.min(Math.max(Edge, Anchor.right - Width), window.innerWidth - Width - Edge);
+  const Below = Anchor.bottom + Gap;
+  const Top =
+    Below + Height > window.innerHeight - Edge ? Math.max(Edge, Anchor.top - Height - Gap) : Below;
+  Menu.style.left = `${Left}px`;
+  Menu.style.top = `${Top}px`;
+}
+
+/** Close whichever menu is open, without a full re-render. */
+export function CloseActionsMenu(): void {
+  if (OpenMenuCheckID == null) return;
+  OpenMenuCheckID = null;
+  $('.monitor-actions-menu.is-open').removeClass('is-open');
+  $('.monitor-actions-toggle.is-open').removeClass('is-open').attr('aria-expanded', 'false');
 }
 
 // ---- Selection helpers (right-click menu) -----------------------------------
@@ -273,9 +354,10 @@ export function SetActionParamDraft(
   ActionParamDrafts.set(DraftKey(CheckID, ActionID, ParamKey), Value);
 }
 
-/** Drop every draft. Called when the view modal closes. */
+/** Drop every draft and close the menu. Called when the view modal closes. */
 export function ResetActionParamDrafts(): void {
   ActionParamDrafts.clear();
+  OpenMenuCheckID = null;
 }
 
 // ---- Running ----------------------------------------------------------------
@@ -333,12 +415,40 @@ function FindCheck(
 }
 
 /**
- * Delegated handlers for the control panel. Delegated rather than bound because
- * the panel is replaced wholesale on every target push, so anything bound to the
+ * Delegated handlers for the controls menu. Delegated rather than bound because
+ * the menu is replaced wholesale on every target push, so anything bound to the
  * elements themselves would be thrown away with them.
  */
 export function WireMonitoringActions(Rerender: () => void): void {
   const Host = '#MONITOR_HISTORY_TIMELINES';
+
+  $(document).on('click', `${Host} .monitor-actions-toggle`, function (e) {
+    e.stopPropagation();
+    const CheckID = String($(this).attr('data-check-id') || '');
+    OpenMenuCheckID = OpenMenuCheckID === CheckID ? null : CheckID;
+    Rerender();
+  });
+
+  // Clicking anywhere outside the open menu, or Escape, dismisses it — the same
+  // as the right-click menu. Escape is stopped so it doesn't close the modal too.
+  $(document).on('mousedown', (e) => {
+    if (OpenMenuCheckID == null) return;
+    if ($(e.target).closest('.monitor-actions-menu, .monitor-actions-toggle').length) return;
+    CloseActionsMenu();
+  });
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key !== 'Escape' || OpenMenuCheckID == null) return;
+      e.stopPropagation();
+      CloseActionsMenu();
+    },
+    true
+  );
+  // The menu is fixed-position, so it has to follow its button when the modal
+  // scrolls or the window resizes.
+  document.addEventListener('scroll', PositionOpenActionsMenu, true);
+  window.addEventListener('resize', PositionOpenActionsMenu);
 
   // Parameter edits go to the draft map, not the DOM, so they survive the next
   // re-render. The star has to redraw too: which favourite it represents changes
@@ -368,6 +478,8 @@ export function WireMonitoringActions(Rerender: () => void): void {
       if (!Confirmed) return;
     }
 
+    // Like any menu, running an item dismisses it.
+    CloseActionsMenu();
     await RunMonitoringAction(
       [Number(Found.Target.TargetID)],
       Found.Check.Method,

@@ -4119,7 +4119,7 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.45rem;
   min-width: 0;
 }
 
@@ -5803,41 +5803,175 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 
 /* ---- Check actions -------------------------------------------------------- */
 
-/* One action: its parameter inputs (if any), its button, and its star. Laid out
-   as a single unit so a parameterised action reads as one control rather than a
-   stray dropdown floating beside an unrelated button. The buttons themselves
-   reuse .freekiosk-btn — same panel, same treatment. */
-.monitor-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
+/* A check whose method offers controls gets a ⋯ button on the end of its
+   timeline, the same height as the bar so the row stays one line. */
+.status-timeline-with-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
 }
 
-/* Parameterised actions get their own line's worth of room: an input plus a
-   button plus a star will not sit comfortably beside three bare buttons. */
-.monitor-action.has-params {
-  flex: 1 1 320px;
-  min-width: 260px;
+.status-timeline-with-actions > .status-timeline {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.monitor-actions-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.monitor-actions-toggle:hover,
+.monitor-actions-toggle:focus-visible,
+.monitor-actions-toggle.is-open {
+  color: #fff;
+  background: rgba(120, 95, 200, 0.24);
+}
+
+/* The menu itself mirrors the right-click menu (#SHOWTRAK_CONTEXT_MENU): same
+   surface, flat rows that only lift on hover. Fixed-positioned by
+   PositionOpenActionsMenu so the modal's scroll area can't clip it. */
+.monitor-actions-menu {
+  display: none;
+  position: fixed;
+  z-index: 100000;
+  width: max-content;
+  min-width: 170px;
+  max-width: min(320px, calc(100vw - 16px));
+  max-height: min(70vh, 460px);
+  overflow-y: auto;
+  padding: 0.25rem;
+  color: white;
+  background: linear-gradient(180deg, #1d1a35 0%, #17142c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.6rem;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.monitor-actions-menu.is-open {
+  display: block;
+}
+
+.monitor-actions-menu-group:not(:first-child) {
+  margin-top: 0.2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 0.3rem;
+}
+
+.monitor-actions-menu-group {
+  padding: 0.2rem 0.45rem 0.05rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.monitor-actions-menu-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.4rem;
+  font-size: 0.74rem;
+  color: #f5c26b;
+  background: rgba(245, 194, 107, 0.08);
+}
+
+/* One row: the action (or its label + picker + run button) and its star. */
+.monitor-action {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: 0.4rem;
+}
+
+.monitor-action:hover {
+  background-color: rgba(120, 95, 200, 0.16);
+}
+
+.monitor-action-label {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.2rem 0.45rem;
+  border: 0;
+  border-radius: 0.4rem;
+  font-size: 0.78rem;
+  text-align: left;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.88);
+  background: transparent;
+}
+
+.monitor-action.has-params .monitor-action-label {
+  flex: 0 0 auto;
+}
+
+button.monitor-action-label:focus-visible {
+  outline: none;
+  background-color: rgba(120, 95, 200, 0.24);
+}
+
+.monitor-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.monitor-action-btn.is-destructive:not(:disabled) {
+  color: #ff8a80;
 }
 
 .monitor-action-param {
   flex: 1 1 auto;
-  min-width: 7rem;
-  max-width: 16rem;
-  font-size: 0.78rem;
+  min-width: 6rem;
+  width: auto;
+  padding-top: 0.05rem;
+  padding-bottom: 0.05rem;
+  font-size: 0.72rem;
 }
 
-/* The star sits flush against its button and stays dim until it is on, so a
-   panel of unstarred actions does not read as a row of decorations. */
-.monitor-action-star {
+.monitor-action-go {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.25rem 0.35rem;
-  border: 1px solid transparent;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.35rem;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.monitor-action-go:hover:not(:disabled),
+.monitor-action-go:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* The star sits at the row's end and stays dim until it is on, so a menu of
+   unstarred actions does not read as a column of decorations. */
+.monitor-action-star {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.4rem;
+  border: 0;
   border-radius: 0.4rem;
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.25);
   background: transparent;
 }
 
@@ -6131,11 +6265,6 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 }
 
 /* ---- Controls ------------------------------------------------------------ */
-
-/* The panel / section-title / control-group / button rules below are shared with
-   the monitoring check-action panel (see 05-monitoring.css), which renders into
-   the same modal and should not look like a different product. Keep them
-   generic; anything genuinely FreeKiosk-specific belongs above. */
 
 .freekiosk-control-group {
   margin-bottom: 0.6rem;

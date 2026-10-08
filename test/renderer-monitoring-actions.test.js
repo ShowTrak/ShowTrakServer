@@ -149,7 +149,7 @@ test('the star follows the parameters, so one input is starred and another is no
   assert.equal(Actions.IsActionFavourited('pjlink', POWER_ON, {}), false);
 });
 
-test('the control panel renders a method with actions and nothing for one without', () => {
+test('the controls menu renders a method with actions and nothing for one without', () => {
   setMethods();
   State.setMonitoringActionFavourites([]);
 
@@ -160,7 +160,7 @@ test('the control panel renders a method with actions and nothing for one withou
     LastChecked: Date.now(),
     ActionOptions: { Input: [{ value: '31', label: 'Digital 1 (31)' }] },
   };
-  const html = Actions.RenderCheckActionsPanel(online);
+  const html = Actions.RenderCheckActionsMenu(online);
   assert.match(html, /Power On/);
   assert.match(html, /data-action-id="power\.on"/);
   assert.match(html, /monitor-action-star/);
@@ -168,9 +168,9 @@ test('the control panel renders a method with actions and nothing for one withou
   assert.match(html, /Digital 1 \(31\)/);
   assert.doesNotMatch(html, /disabled/);
 
-  // A read-only check type draws no panel at all rather than an empty box.
+  // A read-only check type draws no menu at all rather than an empty one.
   assert.equal(
-    Actions.RenderCheckActionsPanel({ CheckID: 11, Method: 'ping', Online: true, LastChecked: 1 }),
+    Actions.RenderCheckActionsMenu({ CheckID: 11, Method: 'ping', Online: true, LastChecked: 1 }),
     ''
   );
 });
@@ -182,18 +182,18 @@ test('controls are disabled while the check is offline, but not while degraded',
   // Offline means ShowTrak cannot reach the device, so every button would fail
   // the same way.
   const offline = { CheckID: 10, Method: 'pjlink', Online: false, LastChecked: Date.now() };
-  const offlineHtml = Actions.RenderCheckActionsPanel(offline);
+  const offlineHtml = Actions.RenderCheckActionsMenu(offline);
   assert.match(offlineHtml, /disabled/);
   assert.match(offlineHtml, /cannot reach the device/);
 
   // Degraded is left enabled on purpose: a projector in standby reads as
-  // degraded, and powering it on is the whole point of the panel.
+  // degraded, and powering it on is the whole point of the menu.
   const degraded = { CheckID: 10, Method: 'pjlink', Online: true, Degraded: true, LastChecked: 1 };
-  assert.doesNotMatch(Actions.RenderCheckActionsPanel(degraded), /disabled/);
+  assert.doesNotMatch(Actions.RenderCheckActionsMenu(degraded), /disabled/);
 
   // A check that has never run is not yet known to be unreachable.
   const fresh = { CheckID: 10, Method: 'pjlink', Online: false, LastChecked: null };
-  assert.doesNotMatch(Actions.RenderCheckActionsPanel(fresh), /disabled/);
+  assert.doesNotMatch(Actions.RenderCheckActionsMenu(fresh), /disabled/);
 });
 
 test('a starred value the device no longer reports is kept, not silently swapped', () => {
@@ -208,10 +208,33 @@ test('a starred value the device no longer reports is kept, not silently swapped
       LastChecked: 1,
       ActionOptions: { Input: [{ value: '31', label: 'Digital 1 (31)' }] },
     };
-    const html = Actions.RenderCheckActionsPanel(check);
+    const html = Actions.RenderCheckActionsMenu(check);
     assert.match(html, /99 \(not reported\)/);
     assert.match(html, /value="99" selected/);
   } finally {
     Actions.ResetActionParamDrafts();
   }
+});
+
+test('the controls sit behind a ⋯ button on the end of the timeline', () => {
+  setMethods();
+  State.setMonitoringActionFavourites([]);
+
+  const check = { CheckID: 10, Method: 'pjlink', Online: true, LastChecked: 1 };
+  const html = Actions.RenderTimelineWithActions(check, '<div class="status-timeline"></div>');
+  assert.match(html, /monitor-actions-toggle/);
+  assert.match(html, /bi-three-dots/);
+  // Closed until the operator opens it.
+  assert.doesNotMatch(html, /monitor-actions-menu is-open/);
+  assert.match(html, /aria-expanded="false"/);
+
+  // A read-only check type keeps its bare timeline.
+  const timeline = '<div class="status-timeline"></div>';
+  assert.equal(
+    Actions.RenderTimelineWithActions(
+      { CheckID: 11, Method: 'ping', Online: true, LastChecked: 1 },
+      timeline
+    ),
+    timeline
+  );
 });
