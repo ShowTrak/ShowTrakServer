@@ -115,7 +115,7 @@
     "electron-updater": "^6.8.9",
     "express": "^5.2.1",
     "mqtt": "^5.15.2",
-    "net-snmp": "^3.26.3",
+    "net-snmp": "^3.29.1",
     "node-osc": "^11.6.0",
     "picocolors": "^1.1.1",
     "socket.io": "^4.8.3",
