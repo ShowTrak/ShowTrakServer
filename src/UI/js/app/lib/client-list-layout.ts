@@ -17,6 +17,7 @@ import type {
   GroupView,
   MonitoringTargetView,
 } from '@showtrak/protocol';
+import { SCRIPT_COLOURS } from './script-colours';
 
 /** A single tile in a group's merged order, across every client-like type. */
 export type MergedTileEntry =
@@ -216,6 +217,18 @@ export function BuildGroupWidthOptions(
     });
   }
   return Options;
+}
+
+/**
+ * The palette hex a group's box is tinted with, or null for no tint. Unlike
+ * ScriptColourHex there is no grey fallback: a missing or out-of-range index
+ * means the operator never chose a tint, so the box stays plain.
+ */
+export function GetGroupTintHex(Group: Partial<GroupView> | null | undefined): string | null {
+  const Index = Group ? Group.Colour : null;
+  if (typeof Index !== 'number' || !Number.isInteger(Index)) return null;
+  const Entry = SCRIPT_COLOURS[Index];
+  return Entry ? Entry.hex : null;
 }
 
 // --- Group membership -------------------------------------------------------

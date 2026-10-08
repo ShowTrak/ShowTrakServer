@@ -20,6 +20,7 @@ const groupMgr = recordingManager({
   SetOrder: () => state.setOrder,
   SetGroupOrderWithWeights: () => true,
   SetColumnSpan: () => [null, true],
+  SetColour: () => [null, true],
 });
 const monitorMgr = recordingManager({ SetGroupAndWeight: () => true });
 const dummyMgr = recordingManager({ SetGroupAndWeight: () => true });
@@ -60,6 +61,7 @@ test('registers a handler for every groups channel', () => {
     'DeleteGroup',
     'Groups:SetFullWidth',
     'Groups:SetColumnSpan',
+    'Groups:SetColour',
     'Groups:SetKeyBind',
     'Groups:SetOrder',
     'SetGroupOrder',
@@ -118,6 +120,26 @@ test('Groups:SetColumnSpan delegates a valid span and rejects anything outside 1
     assert.equal(Data, null);
   }
   assert.equal(groupMgr.__callsTo('SetColumnSpan').length, 0);
+});
+
+test('Groups:SetColour delegates a palette index or null and rejects anything else', async () => {
+  const handler = GetHandler('Groups:SetColour');
+  resetCalls();
+
+  assert.deepEqual(await handler(null, 3, 4), [null, true]);
+  assert.deepEqual(await handler(null, 3, null), [null, true]);
+  assert.deepEqual(groupMgr.__callsTo('SetColour'), [
+    { method: 'SetColour', args: [3, 4] },
+    { method: 'SetColour', args: [3, null] },
+  ]);
+
+  resetCalls();
+  for (const Bad of [-1, 8, 1.5, '2', 'red']) {
+    const [Err, Data] = await handler(null, 3, Bad);
+    assert.equal(typeof Err, 'string', `colour ${Bad} should be rejected`);
+    assert.equal(Data, null);
+  }
+  assert.equal(groupMgr.__callsTo('SetColour').length, 0);
 });
 
 test('Groups:SetOrder rejects a non-array before touching the manager', async () => {

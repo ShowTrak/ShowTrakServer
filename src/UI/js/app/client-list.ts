@@ -30,6 +30,7 @@ import {
   GetClientCompactStatusLabel,
   GetClientTileStateClass,
   GetGroupSpan,
+  GetGroupTintHex,
   GetTileWarningText,
   ParseGroupColumnCount,
   SelectGroupMembers,
@@ -763,6 +764,9 @@ export function RenderFullClientAndMonitorList() {
     const FullGroupTitle = Title == null ? '' : String(Title);
     const GroupLabel = TruncateGroupLabel(FullGroupTitle);
     const GroupSpan = GetGroupSpan(Group, ColumnCount);
+    const GroupTint = GetGroupTintHex(Group);
+    const TintClass = GroupTint ? ' group-tinted' : '';
+    const TintStyle = GroupTint ? ` style="--group-tint: ${Safe(GroupTint)};"` : '';
     const Members = SelectGroupMembers(GroupID, Clients, Monitors, Dummies, Kiosks);
 
     GroupUUIDCache.set(
@@ -789,7 +793,7 @@ export function RenderFullClientAndMonitorList() {
 				</span>
 			</div>
 		</div>
-	<div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100 group-drop-zone" data-groupid="${GroupID}">`;
+	<div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100 group-drop-zone${TintClass}"${TintStyle} data-groupid="${GroupID}">`;
 
     if (Merged.length == 0) {
       Filler += `<div class="SHOWTRAK_PC_PLACEHOLDER w-100 p-3"

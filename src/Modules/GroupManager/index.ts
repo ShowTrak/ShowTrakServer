@@ -6,6 +6,7 @@ import { Manager as DB } from '../DB';
 import { CreateGroupsRepository } from '../DB/repositories/groups';
 import { Manager as BroadcastManager } from '../Broadcast';
 import * as SlugService from '../Slug';
+import { SCRIPT_COLOURS } from '../ScriptManager/schema';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import type { GroupRow } from '../DB/rows';
@@ -37,6 +38,15 @@ function NormalizeColumnSpan(Value: unknown): number {
   const Span = Math.trunc(Number(Value));
   if (!Number.isFinite(Span) || Span < 1) return 1;
   return Math.min(MAX_GROUP_COLUMN_SPAN, Span);
+}
+
+// Background tint: an index into the shared colour palette, or null for the
+// plain untinted box. Anything outside the palette normalizes to null rather
+// than to a colour the operator never picked.
+function NormalizeColour(Value: unknown): number | null {
+  if (Value === null || Value === undefined || Value === '') return null;
+  const N = Number(Value);
+  return Number.isInteger(N) && N >= 0 && N < SCRIPT_COLOURS.length ? N : null;
 }
 
 // Allowed selection-toggle keybinds: keyboard number row (Digit0-9) and numpad
@@ -78,6 +88,7 @@ class Group {
   Weight: number;
   isFullWidth: boolean;
   ColumnSpan: number;
+  Colour: number | null;
   KeyBind: string | null;
   // Stable, human-friendly OSC/API identifier; unique among groups. Back-filled
   // non-null on boot.
@@ -89,6 +100,7 @@ class Group {
     this.Weight = Data.Weight || 0;
     this.isFullWidth = NormalizeFullWidth(Data.FullWidth);
     this.ColumnSpan = NormalizeColumnSpan(Data.ColumnSpan);
+    this.Colour = NormalizeColour(Data.Colour);
     this.KeyBind = NormalizeKeyBind(Data.KeyBind);
     this.Slug = Data.Slug || null;
   }
@@ -151,6 +163,18 @@ class Group {
       return Fail('Failed to update group column span');
     }
     Logger.debug(`Group ${this.GroupID} ColumnSpan updated to ${Next}`);
+    return Ok(true);
+  }
+  async SetColour(Colour: unknown): Promise<Result<boolean>> {
+    const Next = NormalizeColour(Colour);
+    if (this.Colour === Next) return Ok(true);
+    this.Colour = Next;
+    const [Err] = await GroupsRepo.UpdateColour(this.GroupID, Next);
+    if (Err) {
+      Logger.error('Failed to update group Colour');
+      return Fail('Failed to update group colour');
+    }
+    Logger.debug(`Group ${this.GroupID} Colour updated to ${Next}`);
     return Ok(true);
   }
   async SetKeyBind(KeyBind: unknown): Promise<Result<boolean>> {
@@ -276,6 +300,21 @@ const Manager = {
     if (SpanErr) return Fail(SpanErr);
     const [WidthErr] = await Group.SetFullWidth(false);
     if (WidthErr) return Fail(WidthErr);
+
+    BroadcastManager.emit('GroupListChanged');
+    return Ok(true);
+  },
+
+  // Set (or clear, with null) the background tint of a group's box.
+  async SetColour(GroupID: number, Colour: unknown): Promise<Result<boolean>> {
+    if (!GroupID) return Fail('GroupID is required');
+
+    const [GetErr, Group] = await Manager.Get(GroupID);
+    if (GetErr) return Fail(GetErr);
+    if (!Group) return Fail('Group not found');
+
+    const [SetErr] = await Group.SetColour(Colour);
+    if (SetErr) return Fail(SetErr);
 
     BroadcastManager.emit('GroupListChanged');
     return Ok(true);

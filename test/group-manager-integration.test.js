@@ -188,6 +188,37 @@ test('GroupManager column span defaults to 1, persists, and turns full width off
   assert.equal((await Manager.Get(groupId))[1].ColumnSpan, 1);
 });
 
+test('GroupManager colour defaults to none, persists, clears, and ignores bad indexes', async () => {
+  const { Manager, events } = await loadGroupManager();
+  await Manager.Create('Front of House');
+  const [, groups] = await Manager.GetAll();
+  const groupId = groups[0].GroupID;
+
+  assert.equal(groups[0].Colour, null);
+  assert.match(String((await Manager.SetColour())[0]), /required/i);
+
+  events.length = 0;
+  const [setErr] = await Manager.SetColour(groupId, 4);
+  assert.equal(setErr, null);
+  assert.ok(events.includes('GroupListChanged'));
+
+  // Re-read from the DB, not the cached entity, to prove the column persisted.
+  const [, reloaded] = await Manager.GetAll();
+  assert.equal(reloaded[0].Colour, 4);
+
+  // Index 0 (red) is a real colour, not "unset".
+  await Manager.SetColour(groupId, 0);
+  assert.equal((await Manager.Get(groupId))[1].Colour, 0);
+
+  await Manager.SetColour(groupId, null);
+  assert.equal((await Manager.Get(groupId))[1].Colour, null);
+
+  // Anything outside the palette clears rather than storing a colour nobody chose.
+  await Manager.SetColour(groupId, 3);
+  await Manager.SetColour(groupId, 99);
+  assert.equal((await Manager.Get(groupId))[1].Colour, null);
+});
+
 test('GroupManager keybinds default to null, persist, and stay unique', async () => {
   const { Manager, events } = await loadGroupManager();
   await Manager.Create('Front of House');

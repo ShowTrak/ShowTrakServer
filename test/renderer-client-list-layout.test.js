@@ -305,6 +305,21 @@ test('a span wider than the column count stays selectable and says how it is dra
   assert.match(Last.Label, /shown as 3/);
 });
 
+// --- Group tint -------------------------------------------------------------
+
+test('a group is tinted only with a colour the operator chose from the palette', () => {
+  assert.equal(Layout.GetGroupTintHex({ Colour: 4 }), '#3498db');
+  // Index 0 is red, not "no colour".
+  assert.equal(Layout.GetGroupTintHex({ Colour: 0 }), '#e74c3c');
+  // Unset, cleared, or out-of-range means a plain box — never the grey fallback
+  // scripts and tags use, which would tint every pre-existing group.
+  assert.equal(Layout.GetGroupTintHex({}), null);
+  assert.equal(Layout.GetGroupTintHex({ Colour: null }), null);
+  assert.equal(Layout.GetGroupTintHex({ Colour: 8 }), null);
+  assert.equal(Layout.GetGroupTintHex({ Colour: 1.5 }), null);
+  assert.equal(Layout.GetGroupTintHex(null), null);
+});
+
 // --- Group membership -------------------------------------------------------
 
 test('a group collects its own clients, monitors and dummies', () => {

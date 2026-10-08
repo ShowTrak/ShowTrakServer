@@ -153,6 +153,7 @@ test('Server serializers project safe public shapes', () => {
     Weight: 1,
     isFullWidth: false,
     ColumnSpan: 2,
+    Colour: 4,
     KeyBind: 'Digit1',
     Slug: 'stage-left',
     Extra: 'x',
@@ -163,6 +164,7 @@ test('Server serializers project safe public shapes', () => {
     Weight: 1,
     isFullWidth: false,
     ColumnSpan: 2,
+    Colour: 4,
     KeyBind: 'Digit1',
     Slug: 'stage-left',
   });
@@ -174,6 +176,7 @@ test('Server serializers project safe public shapes', () => {
     Weight: 2,
     isFullWidth: true,
     ColumnSpan: 1,
+    Colour: null,
     KeyBind: null,
     Slug: null,
   });

@@ -75,6 +75,7 @@ const INVOKE_CHANNELS = [
   'Groups:SetOrder',
   'Groups:SetFullWidth',
   'Groups:SetColumnSpan',
+  'Groups:SetColour',
   'Groups:SetKeyBind',
   'Groups:SetSlug',
   'SetGroupOrder',

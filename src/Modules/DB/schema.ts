@@ -23,6 +23,7 @@ Schema.push({
         Weight INTEGER, \
         FullWidth INTEGER NOT NULL DEFAULT 1, \
         ColumnSpan INTEGER NOT NULL DEFAULT 1, \
+        Colour INTEGER, \
         KeyBind TEXT, \
         Slug TEXT \
     )',
@@ -598,6 +599,9 @@ Schema.Migrations = [
   // How many grid columns a group spans when it is not Full Width. Defaults to 1
   // so every existing narrow group keeps its single-column footprint.
   { Version: 32, SQL: 'ALTER TABLE `Groups` ADD COLUMN ColumnSpan INTEGER NOT NULL DEFAULT 1' },
+  // Optional background tint for a group's box: an index into the shared colour
+  // palette (SCRIPT_COLOURS). NULL leaves every existing group untinted.
+  { Version: 33, SQL: 'ALTER TABLE `Groups` ADD COLUMN Colour INTEGER' },
 ];
 
 export = Schema;

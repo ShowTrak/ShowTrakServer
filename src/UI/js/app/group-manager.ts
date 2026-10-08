@@ -7,6 +7,7 @@
 import { closeAllModals, closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
 import { Safe } from './utils';
+import { SCRIPT_COLOURS } from './lib/script-colours';
 import { Notify, Wait } from './selection-init';
 import { DummyClients, GroupUUIDCache, MonitoringTargets, Settings, __LastClients } from './state';
 import {
@@ -511,6 +512,45 @@ export function BindGroupManagerEditorHandlers(Groups: GroupView[] = []) {
     });
 }
 
+// Colour swatches for the group editor: "None" first, then the shared palette.
+// Each click saves immediately (like the other group editor fields) and only
+// moves the selection ring once the server accepts it.
+function RenderGroupManagerEditorColourSwatches(Group: GroupView) {
+  const Container = document.getElementById('GROUP_MANAGER_EDITOR_COLOUR_SWATCHES');
+  if (!Container) return;
+  Container.innerHTML = '';
+  const Current = typeof Group.Colour === 'number' ? Group.Colour : null;
+  const Options: { Index: number | null; Label: string; Hex: string | null }[] = [
+    { Index: null, Label: 'None', Hex: null },
+    ...SCRIPT_COLOURS.map((c, idx) => ({ Index: idx, Label: c.label, Hex: c.hex })),
+  ];
+  for (const Option of Options) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className =
+      'script-manager-swatch' +
+      (Option.Hex ? '' : ' group-colour-none') +
+      (Option.Index === Current ? ' selected' : '');
+    btn.title = Option.Label;
+    btn.setAttribute('aria-label', `${Option.Label} tint`);
+    if (Option.Hex) btn.style.background = Option.Hex;
+    btn.addEventListener('click', async () => {
+      if (btn.classList.contains('selected')) return;
+      const [Err] = await window.API.SetGroupColour(Number(Group.GroupID), Option.Index);
+      if (Err) {
+        await Notify(String(Err), 'error');
+        return;
+      }
+      Group.Colour = Option.Index;
+      Container.querySelectorAll('.script-manager-swatch').forEach((s) =>
+        s.classList.remove('selected')
+      );
+      btn.classList.add('selected');
+    });
+    Container.appendChild(btn);
+  }
+}
+
 export async function OpenGroupManagerEditor(
   GroupID: number,
   Relaunching = false,
@@ -543,6 +583,7 @@ export async function OpenGroupManagerEditor(
     )
     .val(GetGroupWidthValue(Group));
   $('#GROUP_MANAGER_EDITOR_KEYBIND').val(Group.KeyBind || '');
+  RenderGroupManagerEditorColourSwatches(Group);
 
   const Clients = await ResolveGroupManagerEntities(Group.GroupID);
   $('#GROUP_MANAGER_EDITOR_CLIENT_LIST').html(

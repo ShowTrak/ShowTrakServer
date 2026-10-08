@@ -1,4 +1,4 @@
-// IPC registrar: client groups (create/rename/delete/order/keybind/width).
+// IPC registrar: client groups (create/rename/delete/order/keybind/width/colour).
 // Extracted verbatim from main.ts.
 
 import { RPC } from '../rpc';
@@ -73,6 +73,18 @@ function register(): void {
         GroupID == null
           ? ['No group selected', null]
           : GroupManager.SetColumnSpan(GroupID, ColumnSpan)
+    )
+  );
+
+  RPC.handle(
+    'Groups:SetColour',
+    createTupleHandler<[number | null, number | null], unknown>(
+      (GroupID: unknown, Colour: unknown) => [
+        IPCValidation.GroupID(GroupID),
+        IPCValidation.GroupColour(Colour),
+      ],
+      (GroupID: number | null, Colour: number | null) =>
+        GroupID == null ? ['No group selected', null] : GroupManager.SetColour(GroupID, Colour)
     )
   );
 

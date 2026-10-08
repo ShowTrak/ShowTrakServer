@@ -39,6 +39,7 @@ export interface IPCValidationManager {
   GroupTitle(value: unknown): string;
   GroupKeyBind(value: unknown, fieldName?: string): string | null;
   GroupColumnSpan(value: unknown, fieldName?: string): number;
+  GroupColour(value: unknown, fieldName?: string): number | null;
   // Human-friendly OSC/API identifier: letters, digits, `-`, `_`; no spaces.
   Slug(value: unknown, fieldName?: string): string;
   ScriptID(value: unknown): string;

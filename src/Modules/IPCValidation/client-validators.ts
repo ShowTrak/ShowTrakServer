@@ -99,6 +99,16 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     return value as number;
   };
 
+  // Group background tint: an index into the 8-entry shared colour palette
+  // (SCRIPT_COLOURS), or null to clear the tint.
+  Manager.GroupColour = (value: unknown, fieldName = 'Colour') => {
+    if (value === null || value === undefined) return null;
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 7) {
+      fail(`${fieldName} must be a palette index from 0 to 7, or null`);
+    }
+    return value as number;
+  };
+
   // Human-friendly OSC/API identifier. Enforces the slug charset (letters,
   // digits, `-`, `_`; no spaces) so a manually-entered slug is always route-safe.
   // Auto-generated slugs (derived from a name) are slugified server-side; this

@@ -8,6 +8,7 @@ export interface GroupRow {
   Weight: number | null;
   FullWidth: number; // 0 | 1
   ColumnSpan: number; // columns spanned when FullWidth is 0
+  Colour: number | null; // SCRIPT_COLOURS index for the box tint; null = untinted
   KeyBind: string | null;
   Slug: string | null; // back-filled non-null on first boot; nullable pre-migration
 }

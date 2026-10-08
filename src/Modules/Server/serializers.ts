@@ -65,6 +65,7 @@ interface PublicGroupSource {
   Weight: number;
   isFullWidth?: boolean;
   ColumnSpan?: number;
+  Colour?: number | null;
   KeyBind?: string | null;
   Slug?: string | null;
 }
@@ -146,6 +147,7 @@ const ToPublicGroup = (g: PublicGroupSource): GroupView => ({
   Weight: g.Weight,
   isFullWidth: g.isFullWidth !== false,
   ColumnSpan: g.ColumnSpan ?? 1,
+  Colour: g.Colour ?? null,
   KeyBind: g.KeyBind ?? null,
   Slug: g.Slug ?? null,
 });

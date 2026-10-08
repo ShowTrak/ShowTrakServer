@@ -33,6 +33,9 @@ export function CreateGroupsRepository(DB: DBManager) {
     UpdateColumnSpan(GroupID: number, ColumnSpan: number): Promise<DBResult<unknown>> {
       return DB.Run('UPDATE Groups SET ColumnSpan = ? WHERE GroupID = ?', [ColumnSpan, GroupID]);
     },
+    UpdateColour(GroupID: number, Colour: number | null): Promise<DBResult<unknown>> {
+      return DB.Run('UPDATE Groups SET Colour = ? WHERE GroupID = ?', [Colour, GroupID]);
+    },
     UpdateKeyBind(GroupID: number, KeyBind: string | null): Promise<DBResult<unknown>> {
       return DB.Run('UPDATE Groups SET KeyBind = ? WHERE GroupID = ?', [KeyBind, GroupID]);
     },
