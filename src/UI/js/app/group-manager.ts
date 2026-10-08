@@ -8,7 +8,12 @@ import { closeAllModals, closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
 import { Safe } from './utils';
 import { Notify, Wait } from './selection-init';
-import { DummyClients, GroupUUIDCache, MonitoringTargets, __LastClients } from './state';
+import { DummyClients, GroupUUIDCache, MonitoringTargets, Settings, __LastClients } from './state';
+import {
+  BuildGroupWidthOptions,
+  GetGroupWidthValue,
+  ParseGroupColumnCount,
+} from './lib/client-list-layout';
 import type { ClientView, GroupView } from '@showtrak/protocol';
 
 // Close every open modal, then wait for the CSS transition to settle. Inlined
@@ -400,21 +405,30 @@ export function BindGroupManagerEditorHandlers(Groups: GroupView[] = []) {
       await DeleteGroup(GroupID);
     });
 
-  $('#GROUP_MANAGER_EDITOR_FULL_WIDTH')
+  $('#GROUP_MANAGER_EDITOR_WIDTH')
     .off('change')
     .on('change', async function () {
       const GroupID = Number(GroupManagerEditingGroupID);
       if (!Number.isFinite(GroupID)) return;
-      const NextFullWidth = $(this).is(':checked');
-      const [Err] = await window.API.SetGroupFullWidth(GroupID, NextFullWidth);
+      const LocalGroup = Groups.find((Group) => Number(Group.GroupID) === GroupID);
+      const Next = String($(this).val() || 'full');
+      const [Err] =
+        Next === 'full'
+          ? await window.API.SetGroupFullWidth(GroupID, true)
+          : await window.API.SetGroupColumnSpan(GroupID, Number(Next));
       if (Err) {
-        $(this).prop('checked', !NextFullWidth);
+        $(this).val(GetGroupWidthValue(LocalGroup));
         await Notify(String(Err), 'error');
         return;
       }
-      const LocalGroup = Groups.find((Group) => Number(Group.GroupID) === GroupID);
-      if (LocalGroup) LocalGroup.isFullWidth = NextFullWidth;
-      await Notify(`Group set to ${NextFullWidth ? 'full width' : 'single column'}.`, 'success');
+      if (LocalGroup) {
+        LocalGroup.isFullWidth = Next === 'full';
+        if (Next !== 'full') LocalGroup.ColumnSpan = Number(Next);
+      }
+      await Notify(
+        `Group set to ${Next === 'full' ? 'full width' : `${Next} column${Next === '1' ? '' : 's'}`}.`,
+        'success'
+      );
     });
 
   $('#GROUP_MANAGER_EDITOR_KEYBIND')
@@ -521,7 +535,13 @@ export async function OpenGroupManagerEditor(
   $('#GROUP_MANAGER_EDITOR_NAME').val(Group.Title || '');
   $('#GROUP_MANAGER_EDITOR_GROUPID').val(String(Group.GroupID));
   $('#GROUP_MANAGER_EDITOR_SLUG').val(Group.Slug || '');
-  $('#GROUP_MANAGER_EDITOR_FULL_WIDTH').prop('checked', Group.isFullWidth !== false);
+  $('#GROUP_MANAGER_EDITOR_WIDTH')
+    .html(
+      BuildGroupWidthOptions(Group, ParseGroupColumnCount(Settings))
+        .map((Option) => `<option value="${Safe(Option.Value)}">${Safe(Option.Label)}</option>`)
+        .join('')
+    )
+    .val(GetGroupWidthValue(Group));
   $('#GROUP_MANAGER_EDITOR_KEYBIND').val(Group.KeyBind || '');
 
   const Clients = await ResolveGroupManagerEntities(Group.GroupID);

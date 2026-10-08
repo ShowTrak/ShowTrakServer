@@ -52,6 +52,7 @@ const INVOKE_CHANNEL_LIST = [
   'DeleteGroup',
   'Groups:SetOrder',
   'Groups:SetFullWidth',
+  'Groups:SetColumnSpan',
   'Groups:SetKeyBind',
   'Groups:SetSlug',
   'OpenLogsFolder',
@@ -310,6 +311,8 @@ const API: ShowTrakAPI = {
   SetGroupListOrder: async (OrderedGroupIDs) => invoke('Groups:SetOrder', OrderedGroupIDs),
   SetGroupFullWidth: async (GroupID, FullWidth) =>
     invoke('Groups:SetFullWidth', GroupID, FullWidth),
+  SetGroupColumnSpan: async (GroupID, ColumnSpan) =>
+    invoke('Groups:SetColumnSpan', GroupID, ColumnSpan),
   SetGroupKeyBind: async (GroupID, KeyBind) => invoke('Groups:SetKeyBind', GroupID, KeyBind),
   SetGroupSlug: async (GroupID, Slug) => invoke('Groups:SetSlug', GroupID, Slug),
   OpenLogsFolder: async () => invoke('OpenLogsFolder'),

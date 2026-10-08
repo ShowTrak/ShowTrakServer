@@ -171,12 +171,51 @@ export function BuildGroupRenderOrder(
   });
 }
 
-/** How many grid columns a group spans. Only narrow groups take a single one. */
+/**
+ * How many grid columns a group spans. Full-width groups take every column;
+ * the rest take their ColumnSpan, clamped to the columns actually configured so
+ * lowering the column count shrinks a wide group instead of overflowing the
+ * grid. The stored span is left alone, so raising the count restores it.
+ */
 export function GetGroupSpan(
   Group: Partial<GroupView> | null | undefined,
   ColumnCount: number
 ): number {
-  return Group && Group.isFullWidth === false ? 1 : ColumnCount;
+  if (!Group || Group.isFullWidth !== false) return ColumnCount;
+  const Span = Math.trunc(Number(Group.ColumnSpan));
+  if (!Number.isFinite(Span) || Span < 1) return 1;
+  return Math.min(Span, ColumnCount);
+}
+
+/** The group editor's Width select value: 'full', or the stored column span. */
+export function GetGroupWidthValue(Group: Partial<GroupView> | null | undefined): string {
+  if (!Group || Group.isFullWidth !== false) return 'full';
+  const Span = Math.trunc(Number(Group.ColumnSpan));
+  return String(Number.isFinite(Span) && Span >= 1 ? Span : 1);
+}
+
+/**
+ * Options for the group editor's Width select: Full Width, then one entry per
+ * configured column. A stored span wider than the current column count (the
+ * count was lowered after it was set) stays listed so the select can show it,
+ * labelled with the width it is actually drawn at.
+ */
+export function BuildGroupWidthOptions(
+  Group: Partial<GroupView> | null | undefined,
+  ColumnCount: number
+): { Value: string; Label: string }[] {
+  const Options = [{ Value: 'full', Label: 'Full Width' }];
+  for (let Span = 1; Span <= ColumnCount; Span++) {
+    Options.push({ Value: String(Span), Label: `${Span} Column${Span === 1 ? '' : 's'}` });
+  }
+  const Current = GetGroupWidthValue(Group);
+  if (Current !== 'full' && Number(Current) > ColumnCount) {
+    Options.push({
+      Value: Current,
+      Label: `${Current} Columns (shown as ${ColumnCount})`,
+    });
+  }
+  return Options;
 }
 
 // --- Group membership -------------------------------------------------------

@@ -28,6 +28,17 @@ function NormalizeFullWidth(Value: unknown): boolean {
   return Value === 1 || Value === '1' || Value === 'true';
 }
 
+// Columns a non-full-width group spans. Capped at the most columns the layout
+// setting allows (UI_GROUP_COLUMN_COUNT max); the renderer further clamps it to
+// the column count currently configured, so lowering that setting shrinks wide
+// groups without rewriting what the operator chose.
+const MAX_GROUP_COLUMN_SPAN = 6;
+function NormalizeColumnSpan(Value: unknown): number {
+  const Span = Math.trunc(Number(Value));
+  if (!Number.isFinite(Span) || Span < 1) return 1;
+  return Math.min(MAX_GROUP_COLUMN_SPAN, Span);
+}
+
 // Allowed selection-toggle keybinds: keyboard number row (Digit0-9) and numpad
 // numbers (Numpad0-9). Stored as KeyboardEvent.code values. Anything else
 // (including empty selections) normalizes to null (no keybind).
@@ -66,6 +77,7 @@ class Group {
   Title: string | null;
   Weight: number;
   isFullWidth: boolean;
+  ColumnSpan: number;
   KeyBind: string | null;
   // Stable, human-friendly OSC/API identifier; unique among groups. Back-filled
   // non-null on boot.
@@ -76,6 +88,7 @@ class Group {
     this.Title = Data.Title || null;
     this.Weight = Data.Weight || 0;
     this.isFullWidth = NormalizeFullWidth(Data.FullWidth);
+    this.ColumnSpan = NormalizeColumnSpan(Data.ColumnSpan);
     this.KeyBind = NormalizeKeyBind(Data.KeyBind);
     this.Slug = Data.Slug || null;
   }
@@ -126,6 +139,18 @@ class Group {
       return Fail('Failed to update group full width');
     }
     Logger.debug(`Group ${this.GroupID} FullWidth updated to ${Next}`);
+    return Ok(true);
+  }
+  async SetColumnSpan(ColumnSpan: unknown): Promise<Result<boolean>> {
+    const Next = NormalizeColumnSpan(ColumnSpan);
+    if (this.ColumnSpan === Next) return Ok(true);
+    this.ColumnSpan = Next;
+    const [Err] = await GroupsRepo.UpdateColumnSpan(this.GroupID, Next);
+    if (Err) {
+      Logger.error('Failed to update group ColumnSpan');
+      return Fail('Failed to update group column span');
+    }
+    Logger.debug(`Group ${this.GroupID} ColumnSpan updated to ${Next}`);
     return Ok(true);
   }
   async SetKeyBind(KeyBind: unknown): Promise<Result<boolean>> {
@@ -233,6 +258,24 @@ const Manager = {
 
     const [SetErr] = await Group.SetFullWidth(FullWidth);
     if (SetErr) return Fail(SetErr);
+
+    BroadcastManager.emit('GroupListChanged');
+    return Ok(true);
+  },
+
+  // Give a group a fixed column span. A span only means something for a group
+  // that is not Full Width, so choosing one also turns Full Width off.
+  async SetColumnSpan(GroupID: number, ColumnSpan: unknown): Promise<Result<boolean>> {
+    if (!GroupID) return Fail('GroupID is required');
+
+    const [GetErr, Group] = await Manager.Get(GroupID);
+    if (GetErr) return Fail(GetErr);
+    if (!Group) return Fail('Group not found');
+
+    const [SpanErr] = await Group.SetColumnSpan(ColumnSpan);
+    if (SpanErr) return Fail(SpanErr);
+    const [WidthErr] = await Group.SetFullWidth(false);
+    if (WidthErr) return Fail(WidthErr);
 
     BroadcastManager.emit('GroupListChanged');
     return Ok(true);

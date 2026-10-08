@@ -266,13 +266,43 @@ test('a group with no weight sorts as zero rather than dropping out', () => {
 
 // --- Group span -------------------------------------------------------------
 
-test('only an explicitly narrow group takes a single column', () => {
+test('only an explicitly narrow group stops spanning every column', () => {
   assert.equal(Layout.GetGroupSpan({ isFullWidth: false }, 4), 1);
   assert.equal(Layout.GetGroupSpan({ isFullWidth: true }, 4), 4);
   // Absent means full width: groups created before the flag existed must not
   // silently collapse to one column.
   assert.equal(Layout.GetGroupSpan({}, 4), 4);
   assert.equal(Layout.GetGroupSpan(null, 4), 4);
+  // Full width wins over a stored span.
+  assert.equal(Layout.GetGroupSpan({ isFullWidth: true, ColumnSpan: 2 }, 4), 4);
+});
+
+test('a narrow group spans its ColumnSpan, clamped to the configured columns', () => {
+  assert.equal(Layout.GetGroupSpan({ isFullWidth: false, ColumnSpan: 2 }, 4), 2);
+  assert.equal(Layout.GetGroupSpan({ isFullWidth: false, ColumnSpan: 4 }, 4), 4);
+  // Lowering the column count shrinks the group instead of overflowing the grid.
+  assert.equal(Layout.GetGroupSpan({ isFullWidth: false, ColumnSpan: 5 }, 3), 3);
+  // Garbage falls back to one column rather than a zero or NaN span.
+  assert.equal(Layout.GetGroupSpan({ isFullWidth: false, ColumnSpan: 0 }, 4), 1);
+  assert.equal(Layout.GetGroupSpan({ isFullWidth: false, ColumnSpan: 'x' }, 4), 1);
+});
+
+test('the Width select offers full width and one entry per configured column', () => {
+  const Options = Layout.BuildGroupWidthOptions({ isFullWidth: true }, 3);
+  assert.deepEqual(
+    Options.map((O) => O.Value),
+    ['full', '1', '2', '3']
+  );
+  assert.equal(Layout.GetGroupWidthValue({ isFullWidth: true, ColumnSpan: 2 }), 'full');
+  assert.equal(Layout.GetGroupWidthValue({ isFullWidth: false, ColumnSpan: 2 }), '2');
+  assert.equal(Layout.GetGroupWidthValue({ isFullWidth: false }), '1');
+});
+
+test('a span wider than the column count stays selectable and says how it is drawn', () => {
+  const Options = Layout.BuildGroupWidthOptions({ isFullWidth: false, ColumnSpan: 5 }, 3);
+  const Last = Options[Options.length - 1];
+  assert.equal(Last.Value, '5');
+  assert.match(Last.Label, /shown as 3/);
 });
 
 // --- Group membership -------------------------------------------------------

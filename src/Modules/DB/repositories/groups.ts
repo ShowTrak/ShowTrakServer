@@ -30,6 +30,9 @@ export function CreateGroupsRepository(DB: DBManager) {
     UpdateFullWidth(GroupID: number, FullWidth: number): Promise<DBResult<unknown>> {
       return DB.Run('UPDATE Groups SET FullWidth = ? WHERE GroupID = ?', [FullWidth, GroupID]);
     },
+    UpdateColumnSpan(GroupID: number, ColumnSpan: number): Promise<DBResult<unknown>> {
+      return DB.Run('UPDATE Groups SET ColumnSpan = ? WHERE GroupID = ?', [ColumnSpan, GroupID]);
+    },
     UpdateKeyBind(GroupID: number, KeyBind: string | null): Promise<DBResult<unknown>> {
       return DB.Run('UPDATE Groups SET KeyBind = ? WHERE GroupID = ?', [KeyBind, GroupID]);
     },

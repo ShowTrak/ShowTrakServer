@@ -22,6 +22,7 @@ Schema.push({
         Title TEXT, \
         Weight INTEGER, \
         FullWidth INTEGER NOT NULL DEFAULT 1, \
+        ColumnSpan INTEGER NOT NULL DEFAULT 1, \
         KeyBind TEXT, \
         Slug TEXT \
     )',
@@ -594,6 +595,9 @@ Schema.Migrations = [
     Version: 31,
     SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_monitoringactionfavourites_identity ON `MonitoringActionFavourites` (Method, ActionID, Params)',
   },
+  // How many grid columns a group spans when it is not Full Width. Defaults to 1
+  // so every existing narrow group keeps its single-column footprint.
+  { Version: 32, SQL: 'ALTER TABLE `Groups` ADD COLUMN ColumnSpan INTEGER NOT NULL DEFAULT 1' },
 ];
 
 export = Schema;

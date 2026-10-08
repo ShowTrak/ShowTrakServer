@@ -752,9 +752,10 @@ export function RenderFullClientAndMonitorList() {
   }
 
   // Groups are laid out on a fixed column grid. Full-width groups span every
-  // column; narrow groups take one column. Grid auto-flow (non-dense) preserves
-  // strict group order and leaves a blank slot when a wide group cannot fit in
-  // the columns remaining on the current row.
+  // column; the rest span their ColumnSpan (clamped to ColumnCount). Grid
+  // auto-flow (non-dense) preserves strict group order and wraps a group onto a
+  // new row, leaving a blank slot, when it cannot fit in the columns remaining
+  // on the current row.
   Filler += `<div class="group-column-grid" style="grid-template-columns: repeat(${ColumnCount}, minmax(0, 1fr));">`;
 
   for (const Group of Groups) {

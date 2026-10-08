@@ -90,6 +90,15 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     return normalized;
   };
 
+  // Columns a non-full-width group spans: 1 up to the largest column count the
+  // layout setting allows (UI_GROUP_COLUMN_COUNT max).
+  Manager.GroupColumnSpan = (value: unknown, fieldName = 'ColumnSpan') => {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 6) {
+      fail(`${fieldName} must be a whole number from 1 to 6`);
+    }
+    return value as number;
+  };
+
   // Human-friendly OSC/API identifier. Enforces the slug charset (letters,
   // digits, `-`, `_`; no spaces) so a manually-entered slug is always route-safe.
   // Auto-generated slugs (derived from a name) are slugified server-side; this

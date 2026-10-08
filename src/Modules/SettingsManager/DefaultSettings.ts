@@ -38,7 +38,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Key: 'UI_GROUP_COLUMN_COUNT',
     Title: 'Group Columns',
     Description:
-      'Number of columns used to lay out groups. Groups set to Full Width span every column; other groups take a single column.',
+      'Number of columns used to lay out groups. Groups set to Full Width span every column; other groups span the number of columns set in the group editor, capped at this count.',
     Type: 'INTEGER',
     DefaultValue: 2,
     Min: 2,

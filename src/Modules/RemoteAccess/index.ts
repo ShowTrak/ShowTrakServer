@@ -112,6 +112,7 @@ const GROUP_CHANNELS = new Set([
   'DeleteGroup',
   'Groups:SetOrder',
   'Groups:SetFullWidth',
+  'Groups:SetColumnSpan',
   'Groups:SetKeyBind',
   'Groups:SetSlug',
   'SetGroupOrder',

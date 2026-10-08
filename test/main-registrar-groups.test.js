@@ -19,6 +19,7 @@ const groupMgr = recordingManager({
   Create: (title) => [null, { GroupID: 7, Title: title }],
   SetOrder: () => state.setOrder,
   SetGroupOrderWithWeights: () => true,
+  SetColumnSpan: () => [null, true],
 });
 const monitorMgr = recordingManager({ SetGroupAndWeight: () => true });
 const dummyMgr = recordingManager({ SetGroupAndWeight: () => true });
@@ -58,6 +59,7 @@ test('registers a handler for every groups channel', () => {
     'RenameGroup',
     'DeleteGroup',
     'Groups:SetFullWidth',
+    'Groups:SetColumnSpan',
     'Groups:SetKeyBind',
     'Groups:SetOrder',
     'SetGroupOrder',
@@ -98,6 +100,24 @@ test('CreateGroup returns an error tuple and skips the manager on invalid input'
   assert.ok(Err.length > 0);
   assert.equal(Data, null);
   assert.equal(groupMgr.__callsTo('Create').length, 0);
+});
+
+test('Groups:SetColumnSpan delegates a valid span and rejects anything outside 1-6', async () => {
+  const handler = GetHandler('Groups:SetColumnSpan');
+  resetCalls();
+
+  assert.deepEqual(await handler(null, 3, 2), [null, true]);
+  assert.deepEqual(groupMgr.__callsTo('SetColumnSpan'), [
+    { method: 'SetColumnSpan', args: [3, 2] },
+  ]);
+
+  resetCalls();
+  for (const Bad of [0, 7, 1.5, '2', null]) {
+    const [Err, Data] = await handler(null, 3, Bad);
+    assert.equal(typeof Err, 'string', `span ${Bad} should be rejected`);
+    assert.equal(Data, null);
+  }
+  assert.equal(groupMgr.__callsTo('SetColumnSpan').length, 0);
 });
 
 test('Groups:SetOrder rejects a non-array before touching the manager', async () => {

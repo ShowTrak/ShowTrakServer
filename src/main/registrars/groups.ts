@@ -1,4 +1,4 @@
-// IPC registrar: client groups (create/rename/delete/order/keybind/full-width).
+// IPC registrar: client groups (create/rename/delete/order/keybind/width).
 // Extracted verbatim from main.ts.
 
 import { RPC } from '../rpc';
@@ -59,6 +59,20 @@ function register(): void {
         GroupID == null
           ? ['No group selected', null]
           : GroupManager.SetFullWidth(GroupID, FullWidth)
+    )
+  );
+
+  RPC.handle(
+    'Groups:SetColumnSpan',
+    createTupleHandler<[number | null, number], unknown>(
+      (GroupID: unknown, ColumnSpan: unknown) => [
+        IPCValidation.GroupID(GroupID),
+        IPCValidation.GroupColumnSpan(ColumnSpan),
+      ],
+      (GroupID: number | null, ColumnSpan: number) =>
+        GroupID == null
+          ? ['No group selected', null]
+          : GroupManager.SetColumnSpan(GroupID, ColumnSpan)
     )
   );
 

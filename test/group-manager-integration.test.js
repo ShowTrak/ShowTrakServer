@@ -156,6 +156,38 @@ test('GroupManager groups default to full width and can be toggled', async () =>
   assert.equal(afterOn.isFullWidth, true);
 });
 
+test('GroupManager column span defaults to 1, persists, and turns full width off', async () => {
+  const { Manager, events } = await loadGroupManager();
+  await Manager.Create('Front of House');
+  const [, groups] = await Manager.GetAll();
+  const groupId = groups[0].GroupID;
+
+  assert.equal(groups[0].ColumnSpan, 1);
+  assert.match(String((await Manager.SetColumnSpan())[0]), /required/i);
+
+  events.length = 0;
+  const [setErr] = await Manager.SetColumnSpan(groupId, 3);
+  assert.equal(setErr, null);
+  assert.ok(events.includes('GroupListChanged'));
+
+  // Re-read from the DB, not the cached entity, to prove both columns persisted.
+  const [, reloaded] = await Manager.GetAll();
+  assert.equal(reloaded[0].ColumnSpan, 3);
+  assert.equal(reloaded[0].isFullWidth, false);
+
+  // Going back to full width keeps the span, so narrowing again restores it.
+  await Manager.SetFullWidth(groupId, true);
+  const [, wide] = await Manager.Get(groupId);
+  assert.equal(wide.isFullWidth, true);
+  assert.equal(wide.ColumnSpan, 3);
+
+  // Out-of-range spans are clamped rather than stored verbatim.
+  await Manager.SetColumnSpan(groupId, 99);
+  assert.equal((await Manager.Get(groupId))[1].ColumnSpan, 6);
+  await Manager.SetColumnSpan(groupId, -2);
+  assert.equal((await Manager.Get(groupId))[1].ColumnSpan, 1);
+});
+
 test('GroupManager keybinds default to null, persist, and stay unique', async () => {
   const { Manager, events } = await loadGroupManager();
   await Manager.Create('Front of House');

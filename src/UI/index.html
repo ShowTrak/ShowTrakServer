@@ -742,23 +742,19 @@ Loading licence...</pre>
               </div>
 
               <div
-                class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center text-start"
+                class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center text-start gap-3"
               >
                 <div class="d-grid">
-                  <span>Full Width</span>
+                  <span>Width</span>
                   <span class="text-sm mb-0 text-muted"
-                    >When enabled the group spans every column. Disable it to make the group take a
-                    single column.</span
+                    >How many layout columns the group spans. Full Width always spans every column.
+                    A group that does not fit on the current row starts a new one.</span
                   >
                 </div>
-                <div class="form-check form-switch">
-                  <input
-                    class="form-check-input"
-                    style="margin-top: 0.6em !important"
-                    type="checkbox"
-                    id="GROUP_MANAGER_EDITOR_FULL_WIDTH"
-                  />
-                </div>
+                <select
+                  id="GROUP_MANAGER_EDITOR_WIDTH"
+                  class="form-select form-select-sm bg-transparent text-light border-0 w-auto"
+                ></select>
               </div>
 
               <div

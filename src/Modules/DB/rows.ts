@@ -7,6 +7,7 @@ export interface GroupRow {
   Title: string | null;
   Weight: number | null;
   FullWidth: number; // 0 | 1
+  ColumnSpan: number; // columns spanned when FullWidth is 0
   KeyBind: string | null;
   Slug: string | null; // back-filled non-null on first boot; nullable pre-migration
 }

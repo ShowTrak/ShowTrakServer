@@ -74,6 +74,7 @@ const INVOKE_CHANNELS = [
   'DeleteGroup',
   'Groups:SetOrder',
   'Groups:SetFullWidth',
+  'Groups:SetColumnSpan',
   'Groups:SetKeyBind',
   'Groups:SetSlug',
   'SetGroupOrder',

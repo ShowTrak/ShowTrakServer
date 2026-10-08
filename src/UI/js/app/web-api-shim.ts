@@ -166,6 +166,8 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     DeleteGroup: async (GroupID) => rpc('DeleteGroup', GroupID),
     SetGroupListOrder: async (OrderedGroupIDs) => rpc('Groups:SetOrder', OrderedGroupIDs),
     SetGroupFullWidth: async (GroupID, FullWidth) => rpc('Groups:SetFullWidth', GroupID, FullWidth),
+    SetGroupColumnSpan: async (GroupID, ColumnSpan) =>
+      rpc('Groups:SetColumnSpan', GroupID, ColumnSpan),
     SetGroupKeyBind: async (GroupID, KeyBind) => rpc('Groups:SetKeyBind', GroupID, KeyBind),
     SetGroupSlug: async (GroupID, Slug) => rpc('Groups:SetSlug', GroupID, Slug),
     SetGroupOrder: async (GroupID, OrderedUUIDs) => rpc('SetGroupOrder', GroupID, OrderedUUIDs),
