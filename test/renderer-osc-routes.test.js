@@ -31,6 +31,7 @@ const {
   getRouteSectionTitle,
   ROUTE_DISPLAY_ORDER,
   ROUTE_SECTIONS,
+  renderValueRows,
 } = Osc;
 
 // --- HTTP methods -----------------------------------------------------------
@@ -203,6 +204,64 @@ test('every curated route lands in a real section', () => {
   for (const Path of ROUTE_DISPLAY_ORDER) {
     assert.notEqual(getRouteSectionTitle(Path), 'Other', `${Path} has no section`);
   }
+});
+
+test('check actions and FreeKiosk commands get sections of their own', () => {
+  // Filed under "Other" they read as leftovers, which is the wrong signal for
+  // the routes that switch projectors off and reboot tablets.
+  assert.equal(getRouteSectionTitle('/API/Monitor/:Slug/:Method/:ActionID'), 'Monitoring');
+  assert.equal(getRouteSectionTitle('/API/FreeKiosk/:Slug/:CommandID'), 'FreeKiosk');
+  assert.equal(
+    getRouteSectionTitle('/API/FreeKiosk/:Slug/:CommandID/:Value'),
+    getRouteSectionTitle('/FreeKiosk/:Slug/:CommandID')
+  );
+});
+
+// --- Accepted values --------------------------------------------------------
+
+test('a route with a value catalogue lists every entry', () => {
+  // The catalogue is the only place an integrator learns that the command is
+  // spelled `screen.off` and not `ScreenOff`.
+  const Html = renderValueRows([
+    {
+      Path: '/API/FreeKiosk/:Slug/:CommandID',
+      Values: {
+        Param: 'CommandID',
+        Entries: [
+          { Value: 'reboot', Label: 'Reboot', Note: 'Device Owner only.' },
+          { Value: 'wake', Label: 'Wake Screen' },
+        ],
+      },
+    },
+  ]);
+  assert.match(Html, /Accepted \[CommandID\] values/);
+  assert.match(Html, /<code class="osc-route-value">reboot<\/code>/);
+  assert.match(Html, /<code class="osc-route-value">wake<\/code>/);
+  assert.match(Html, /Device Owner only\./);
+  // An entry without a note must not leave an empty note element behind.
+  assert.equal((Html.match(/osc-route-value-note/g) || []).length, 1);
+});
+
+test('a route without a catalogue renders no value list', () => {
+  for (const Routes of [[], [{ Path: '/API/All/WakeOnLAN' }], undefined, null]) {
+    assert.equal(renderValueRows(Routes), '', `routes ${JSON.stringify(Routes)}`);
+  }
+  // An empty catalogue is no catalogue: an empty "Accepted values" box reads as
+  // "this route accepts nothing".
+  assert.equal(renderValueRows([{ Values: { Param: 'CommandID', Entries: [] } }]), '');
+});
+
+test('catalogue entries are escaped before they reach the modal', () => {
+  const Html = renderValueRows([
+    {
+      Values: {
+        Param: '<b>P</b>',
+        Entries: [{ Value: '<img src=x onerror=1>', Label: '<script>', Note: '"&' }],
+      },
+    },
+  ]);
+  assert.doesNotMatch(Html, /<img|<script|<b>/);
+  assert.match(Html, /&lt;img/);
 });
 
 // --- Debug terminal ---------------------------------------------------------

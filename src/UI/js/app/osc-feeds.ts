@@ -68,6 +68,13 @@ interface RouteDefinition {
   Path?: string;
   Title?: string;
   QueryParams?: RouteQueryParam[];
+  Values?: RouteValueList;
+}
+
+/** The fixed catalogue of values a route accepts (check actions, FreeKiosk commands). */
+interface RouteValueList {
+  Param: string;
+  Entries: { Value: string; Label: string; Note?: string }[];
 }
 
 /** A grouped action holding its OSC and HTTP route variants. */
@@ -87,7 +94,7 @@ export const HttpApiRoutes = [
       { Key: 'GroupID', Type: 'number', Example: '1' },
       { Key: 'OperatingSystem', Type: 'string', Example: 'Windows | macOS | Linux' },
       { Key: 'Status', Type: 'enum', Example: 'ONLINE | OFFLINE | DEGRADED | IDLE' },
-      { Key: 'Type', Type: 'enum', Example: 'Remote | Monitoring | Dummy' },
+      { Key: 'Type', Type: 'enum', Example: 'Remote | Monitoring | Dummy | FreeKiosk' },
     ],
   },
 ];
@@ -254,8 +261,35 @@ export function renderActionGroup(
 		<div class="d-grid gap-2 p-2 rounded bg-ghost rounded-3 osc-action-card">
 			<div class="fw-semibold osc-action-title">${Safe(Group.Title || 'Untitled Route')}</div>
 			${renderProtocolRows(Protocol, Routes)}
+			${renderValueRows(Routes)}
 		</div>
 	`);
+}
+
+/** Lists every value a route accepts, when it declares a fixed catalogue. Both
+ *  protocols carry the same list, so the first route that has one speaks for
+ *  the card. */
+export function renderValueRows(Routes: RouteDefinition[]) {
+  const List = (Array.isArray(Routes) ? Routes : []).find(
+    (Route) => Route && Route.Values && Array.isArray(Route.Values.Entries)
+  )?.Values;
+  if (!List || List.Entries.length === 0) return '';
+  const Rows = List.Entries.map(
+    (Entry) => `
+      <div class="osc-route-value-row">
+        <code class="osc-route-value">${Safe(Entry.Value)}</code>
+        <span class="osc-route-value-label">${Safe(Entry.Label)}${
+          Entry.Note ? `<span class="osc-route-value-note">${Safe(Entry.Note)}</span>` : ''
+        }</span>
+      </div>
+    `
+  ).join('');
+  return `
+    <div class="osc-route-query-wrap osc-route-value-wrap">
+      <div class="osc-route-value-header">Accepted [${Safe(List.Param)}] values</div>
+      ${Rows}
+    </div>
+  `;
 }
 
 /** Renders the OSC/HTTP segmented toggle shown at the top of the reference.
@@ -339,6 +373,8 @@ export const ROUTE_SECTION_ORDER: Record<string, number> = {
   Group: 40,
   Tag: 45,
   All: 50,
+  Monitor: 60,
+  FreeKiosk: 70,
 };
 
 export function getLogicalRouteOrder(PathValue: string) {
@@ -363,6 +399,8 @@ export const ROUTE_SECTIONS: { Title: string; Segments: string[] }[] = [
   { Title: 'Tags', Segments: ['Tag'] },
   { Title: 'Groups', Segments: ['Group'] },
   { Title: 'All', Segments: ['All'] },
+  { Title: 'Monitoring', Segments: ['Monitor'] },
+  { Title: 'FreeKiosk', Segments: ['FreeKiosk'] },
   { Title: 'Selections', Segments: ['Selection'] },
 ];
 
@@ -465,6 +503,7 @@ export function InitOscFeeds() {
         Methods: ['GET', 'POST'],
         Path: ApiPath,
         Title: Route.Title || `HTTP mirror for ${Route.Path}`,
+        Values: Route.Values,
       };
     });
 
@@ -473,6 +512,7 @@ export function InitOscFeeds() {
       Methods: ['OSC'],
       Path: Route.Path,
       Title: Route.Title || Route.Path,
+      Values: Route.Values,
     }));
 
     const UnifiedRoutes = [...HttpApiRoutes, ...MirroredHttpRoutes, ...OscRoutes];

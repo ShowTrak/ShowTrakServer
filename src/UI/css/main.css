@@ -3523,8 +3523,41 @@ button.btn:focus {
   font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', monospace;
 }
 
+.osc-route-value-header {
+  color: rgba(255, 255, 255, 0.62);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 0.72rem;
+}
+
+.osc-route-value-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(200px, 2fr);
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.82rem;
+}
+
+.osc-route-value {
+  color: rgba(132, 220, 255, 0.9);
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+.osc-route-value-label {
+  color: rgba(238, 245, 255, 0.92);
+}
+
+.osc-route-value-note {
+  display: block;
+  margin-top: 0.1rem;
+  color: rgba(211, 226, 246, 0.6);
+  font-size: 0.76rem;
+}
+
 @media (max-width: 720px) {
-  .osc-route-query-grid {
+  .osc-route-query-grid,
+  .osc-route-value-row {
     grid-template-columns: 1fr;
     gap: 0.2rem;
   }

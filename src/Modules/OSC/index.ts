@@ -9,6 +9,12 @@ import { Manager as TagManager } from '../TagManager';
 import { Manager as ScriptWhitelistManager } from '../ScriptWhitelistManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
 import { Manager as MonitoringMethods } from '../MonitoringMethods';
+import type { MonitoringSettingField } from '../MonitoringMethods/types';
+import { Manager as FreeKioskManager } from '../FreeKioskManager';
+import { Manager as IPCValidation } from '../IPCValidation';
+import { FREEKIOSK_COMMANDS, GetFreeKioskCommand } from '../FreeKiosk/commands';
+import type { FreeKioskCommandDef } from '../FreeKiosk/commands';
+import { DisplayModeLabel } from '../FreeKiosk/metrics';
 import { ControlService } from '../ControlService';
 import { IsTransientNetworkError, DescribeError } from '@showtrak/protocol/runtime';
 
@@ -158,10 +164,28 @@ type OSCGroup = NonNullable<Awaited<ReturnType<typeof GroupManager.Get>>[1]>;
 type OSCClient = NonNullable<Awaited<ReturnType<ClientManagerType['GetAll']>>[1]>[number];
 type OSCTag = NonNullable<Awaited<ReturnType<typeof TagManager.GetBySlug>>>;
 
+// One accepted value for a route's placeholder(s), as listed in the OSC/API
+// reference — e.g. `pjlink/power.on` for a check action, `reboot` for a
+// FreeKiosk command. Plain data so it survives the JSON clone that pushes the
+// route list to the renderer.
+interface OSCRouteValue {
+  Value: string;
+  Label: string;
+  Note?: string;
+}
+
+interface OSCRouteValueList {
+  /** The placeholder(s) the entries fill, e.g. `Method/ActionID`. */
+  Param: string;
+  Entries: OSCRouteValue[];
+}
+
 interface OSCRoute {
   Title: string;
   Path: string;
   Callback: OSCRouteCallback;
+  /** Every value the route accepts, when they come from a fixed catalogue. */
+  Values?: OSCRouteValueList;
 }
 
 const Routes: OSCRoute[] = [];
@@ -354,11 +378,17 @@ const OSC = {
     return Routes;
   },
 
-  CreateRoute(Path: string, Callback: OSCRouteCallback, Title = 'Default OSC Route'): void {
+  CreateRoute(
+    Path: string,
+    Callback: OSCRouteCallback,
+    Title = 'Default OSC Route',
+    Values?: OSCRouteValueList
+  ): void {
     Routes.push({
       Title,
       Path,
       Callback,
+      ...(Values ? { Values } : {}),
     });
   },
 
@@ -704,17 +734,142 @@ async function runMonitorAction(
   );
 }
 
+// The placeholder a value-taking route shows for its trailing segment: the
+// range when the parameter declares one, else the parameter's name.
+function describeValueParam(Field: MonitoringSettingField): string {
+  if (typeof Field.Min === 'number' && typeof Field.Max === 'number') {
+    return `<${Field.Min}-${Field.Max}>`;
+  }
+  return `<${Field.Label || Field.Key}>`;
+}
+
+// Every action every monitoring method declares, split by whether it takes a
+// value, so each Monitor route lists exactly the paths it will accept. Methods
+// register at import, so the catalogue is complete by the time this runs.
+function monitorActionValues(WithValue: boolean): OSCRouteValueList {
+  const Methods = typeof MonitoringMethods.GetAll === 'function' ? MonitoringMethods.GetAll() : [];
+  const Entries: OSCRouteValue[] = [];
+  for (const Method of Methods) {
+    for (const Action of Method.Actions || []) {
+      const First = Array.isArray(Action.Params) ? Action.Params[0] : undefined;
+      if (WithValue !== Boolean(First)) continue;
+      Entries.push({
+        Value: `${Method.ID}/${Action.ID}${First ? `/${describeValueParam(First)}` : ''}`,
+        Label: `${Method.Name} — ${Action.Label}`,
+        ...(Action.Note ? { Note: Action.Note } : {}),
+      });
+    }
+  }
+  return { Param: WithValue ? 'Method/ActionID/Value' : 'Method/ActionID', Entries };
+}
+
 OSC.CreateRoute(
   '/API/Monitor/:Slug/:Method/:ActionID',
   async (Req) => runMonitorAction(Req.Slug ?? '', Req.Method ?? '', Req.ActionID ?? '', null),
-  'Run a check action on a Monitoring Target by its slug, method and action ID'
+  'Run a check action on a Monitoring Target by its slug, method and action ID',
+  monitorActionValues(false)
 );
 
 OSC.CreateRoute(
   '/API/Monitor/:Slug/:Method/:ActionID/:Value',
   async (Req) =>
     runMonitorAction(Req.Slug ?? '', Req.Method ?? '', Req.ActionID ?? '', Req.Value ?? ''),
-  'Run a check action that takes a value (e.g. pjlink/input.set/31) on a Monitoring Target'
+  'Run a check action that takes a value (e.g. pjlink/input.set/31) on a Monitoring Target',
+  monitorActionValues(true)
+);
+
+// FreeKiosk Terminal Commands.
+//
+//   /API/FreeKiosk/<terminal-slug>/<command>
+//   /API/FreeKiosk/<terminal-slug>/<command>/<value>
+//
+// e.g. /API/FreeKiosk/lobby-tablet/reboot
+//      /API/FreeKiosk/lobby-tablet/brightness/40
+//
+// The command map in FreeKiosk/commands is the allowlist, and the value runs
+// through the same validator as the view modal's FreeKiosk:Command channel, so
+// OSC can send exactly what the UI can and nothing more — /api/js stays
+// unreachable. As with check actions, the trailing value fills the command's
+// one parameter because this router never reads OSC arguments.
+async function runFreeKioskCommand(
+  Slug: string,
+  CommandID: string,
+  Value: string | null
+): Promise<RouteResult> {
+  const fail = (Detail: string): RouteResult => {
+    Broadcast.emit('Notify', `OSC - ${Detail}`, 'error');
+    return failureResult(Detail);
+  };
+
+  const Terminal =
+    typeof FreeKioskManager.GetBySlug === 'function'
+      ? await FreeKioskManager.GetBySlug(Slug)
+      : null;
+  if (!Terminal) return fail(`Invalid FreeKiosk Terminal "${Slug}"`);
+
+  const Command = GetFreeKioskCommand(CommandID);
+  if (!Command) return fail(`Unknown FreeKiosk command "${CommandID}"`);
+
+  const First = Array.isArray(Command.Params) ? Command.Params[0] : undefined;
+  if (Value != null && !First) return fail(`${Command.Label} takes no value`);
+  if (Value == null && First) {
+    return fail(`${Command.Label} needs a value, e.g. ${CommandID}/${describeValueParam(First)}`);
+  }
+
+  let Params: Record<string, unknown>;
+  try {
+    Params = IPCValidation.FreeKioskCommandParams(
+      CommandID,
+      First && Value != null ? { [First.Key]: Value } : {}
+    );
+  } catch (Err) {
+    return fail(`${Command.Label}: ${DescribeError(Err)}`);
+  }
+
+  const [Err, Summary] = await FreeKioskManager.SendCommand([Terminal.UUID], CommandID, Params);
+  if (Err || !Summary) return fail(Err || `${Command.Label} failed`);
+  if (Summary.Failed > 0) {
+    // The device's own refusal ("needs Device Owner", "remote control is
+    // disabled") is the useful part, so it is surfaced verbatim.
+    const Reason = Summary.Results.find((Entry) => !Entry.Success)?.Error || 'Command failed';
+    return fail(`${Command.Label} on "${Terminal.Slug || Terminal.UUID}": ${Reason}`);
+  }
+  return successResult(
+    `${Command.Label} sent to "${Terminal.Slug || Terminal.UUID}"${Value != null ? ` (${Value})` : ''}`
+  );
+}
+
+// The commands each FreeKiosk route accepts, straight from the allowlist.
+function freeKioskCommandValues(WithValue: boolean): OSCRouteValueList {
+  const Entries: OSCRouteValue[] = [];
+  for (const Command of FREEKIOSK_COMMANDS as readonly FreeKioskCommandDef[]) {
+    const First = Array.isArray(Command.Params) ? Command.Params[0] : undefined;
+    if (WithValue !== Boolean(First)) continue;
+    const Notes = [
+      Command.Modes ? `${Command.Modes.map(DisplayModeLabel).join(' / ')} mode only.` : '',
+      Command.Note || '',
+    ].filter(Boolean);
+    Entries.push({
+      Value: `${Command.ID}${First ? `/${describeValueParam(First)}` : ''}`,
+      Label: Command.Label,
+      ...(Notes.length ? { Note: Notes.join(' ') } : {}),
+    });
+  }
+  return { Param: WithValue ? 'CommandID/Value' : 'CommandID', Entries };
+}
+
+OSC.CreateRoute(
+  '/API/FreeKiosk/:Slug/:CommandID',
+  async (Req) => runFreeKioskCommand(Req.Slug ?? '', Req.CommandID ?? '', null),
+  'Send a command (e.g. reboot) to a FreeKiosk Terminal by its slug and command ID',
+  freeKioskCommandValues(false)
+);
+
+OSC.CreateRoute(
+  '/API/FreeKiosk/:Slug/:CommandID/:Value',
+  async (Req) => runFreeKioskCommand(Req.Slug ?? '', Req.CommandID ?? '', Req.Value ?? ''),
+  'Send a command that takes a value (e.g. brightness/40) to a FreeKiosk Terminal',
+  freeKioskCommandValues(true)
 );
 
 // Bind the listener on load using the compiled-in default port so OSC control

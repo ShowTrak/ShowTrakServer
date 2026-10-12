@@ -217,8 +217,9 @@ const ClientsListHandler = async (req: Request, res: Response) => {
     Status: computeStatus(Dummy),
   }));
 
-  // Read-only by design: terminals are listed here, but no control command is
-  // reachable over HTTP, OSC or the SDK.
+  // Listed read-only here. Commands go through /API/FreeKiosk/<slug>/<command>
+  // (the OSC route mirrored below), which is bounded by the FreeKiosk command
+  // allowlist; the SDK still has no FreeKiosk control.
   const FreeKioskEntities = (Kiosks || []).map((Kiosk) => ({
     ...Kiosk,
     Type: 'FreeKiosk',

@@ -49,6 +49,8 @@ function loadOSC(overrides = {}, { WithSocket = true } = {}) {
   const controlCalls = [];
   // Monitoring check actions go through MonitoringTargetManager.RunAction.
   const actionCalls = [];
+  // FreeKiosk commands go through FreeKioskManager.SendCommand.
+  const kioskCalls = [];
   const mocks = {
     '../ControlService': {
       ControlService: {
@@ -139,8 +141,45 @@ function loadOSC(overrides = {}, { WithSocket = true } = {}) {
         },
       },
     },
+    '../FreeKioskManager': {
+      Manager: {
+        GetBySlug: async (slug) =>
+          slug === 'lobby-tablet' ? { UUID: 'kiosk-1', Slug: 'lobby-tablet' } : null,
+        SendCommand: async (uuids, commandID, params) => {
+          kioskCalls.push([uuids, commandID, params]);
+          if (commandID === 'lock') {
+            return [
+              null,
+              {
+                Total: 1,
+                Succeeded: 0,
+                Failed: 1,
+                Results: [{ UUID: 'kiosk-1', Success: false, Error: 'Needs Device Owner' }],
+              },
+            ];
+          }
+          return [null, { Total: 1, Succeeded: 1, Failed: 0, Results: [{ Success: true }] }];
+        },
+      },
+    },
     '../MonitoringMethods': {
       Manager: {
+        // The catalogue the Monitor routes document their accepted values from.
+        GetAll: () => [
+          {
+            ID: 'pjlink',
+            Name: 'PJLink',
+            Actions: [
+              { ID: 'power.on', Label: 'Power On' },
+              {
+                ID: 'input.set',
+                Label: 'Set Input',
+                Params: [{ Key: 'Input', Label: 'Input', Type: 'string', Default: '' }],
+              },
+            ],
+          },
+          { ID: 'ping', Name: 'Ping' },
+        ],
         GetAction: (method, actionID) => {
           if (method !== 'pjlink') return null;
           if (actionID === 'power.on') return { ID: 'power.on', Label: 'Power On' };
@@ -176,7 +215,15 @@ function loadOSC(overrides = {}, { WithSocket = true } = {}) {
     path.join(__dirname, '..', 'dist', 'Modules', 'OSC', 'index.js'),
     mocks
   );
-  return { OSC, handlers, socketHandlers, broadcastEvents, controlCalls, actionCalls };
+  return {
+    OSC,
+    handlers,
+    socketHandlers,
+    broadcastEvents,
+    controlCalls,
+    actionCalls,
+    kioskCalls,
+  };
 }
 
 test('OSC registers the built-in routes', () => {
@@ -205,6 +252,8 @@ test('OSC registers the built-in routes', () => {
   // one route shape and a new one needs no route of its own.
   assert.ok(routes.includes('/API/Monitor/:Slug/:Method/:ActionID'));
   assert.ok(routes.includes('/API/Monitor/:Slug/:Method/:ActionID/:Value'));
+  assert.ok(routes.includes('/API/FreeKiosk/:Slug/:CommandID'));
+  assert.ok(routes.includes('/API/FreeKiosk/:Slug/:CommandID/:Value'));
 });
 
 test('OSC TriggerEvent routes delegate to ControlService for every scope', async () => {
@@ -464,4 +513,104 @@ test("OSC surfaces the projector's own refusal rather than a bare failure", asyn
   const error = broadcastEvents.find(([event, , level]) => event === 'Notify' && level === 'error');
   assert.ok(error, 'a refusal must be reported');
   assert.match(String(error[1]), /busy/i);
+});
+
+// --- FreeKiosk commands -------------------------------------------------------
+
+const successNotified = (events) =>
+  events.some(([event, , level]) => event === 'Notify' && level === 'success');
+const errorNotices = (events) =>
+  events.filter(([event, , level]) => event === 'Notify' && level === 'error');
+
+test('OSC reboots a FreeKiosk terminal addressed by slug', async () => {
+  const { handlers, kioskCalls, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/FreeKiosk/lobby-tablet/reboot']);
+  assert.deepEqual(kioskCalls, [[['kiosk-1'], 'reboot', {}]]);
+  assert.ok(successNotified(broadcastEvents));
+});
+
+test('OSC fills a FreeKiosk level from the trailing value, through the real validator', async () => {
+  const { handlers, kioskCalls } = loadOSC();
+  await handlers.message(['/API/FreeKiosk/lobby-tablet/brightness/40.6']);
+  // The validator rounds and types it exactly as it does for the view modal.
+  assert.deepEqual(kioskCalls, [[['kiosk-1'], 'brightness', { value: 41 }]]);
+});
+
+test('OSC refuses an out-of-range or missing FreeKiosk level without touching the device', async () => {
+  const { handlers, kioskCalls, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/FreeKiosk/lobby-tablet/volume/150']);
+  await handlers.message(['/API/FreeKiosk/lobby-tablet/volume/loud']);
+  await handlers.message(['/API/FreeKiosk/lobby-tablet/volume']);
+  assert.deepEqual(kioskCalls, []);
+  const errors = errorNotices(broadcastEvents);
+  assert.equal(errors.length, 3);
+  assert.match(String(errors[0][1]), /between 0 and 100/);
+  assert.match(String(errors[2][1]), /needs a value/);
+});
+
+test('OSC rejects a value sent to a FreeKiosk command that takes none', async () => {
+  const { handlers, kioskCalls, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/FreeKiosk/lobby-tablet/reboot/now']);
+  assert.deepEqual(kioskCalls, []);
+  assert.match(String(errorNotices(broadcastEvents)[0][1]), /takes no value/);
+});
+
+test('OSC only sends FreeKiosk commands on the allowlist', async () => {
+  // /api/js would run arbitrary JavaScript in the kiosk WebView; it must stay
+  // unreachable by any spelling, exactly as it is from the UI.
+  const { handlers, kioskCalls, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/FreeKiosk/lobby-tablet/js']);
+  await handlers.message(['/API/FreeKiosk/lobby-tablet/api/js']);
+  await handlers.message(['/API/FreeKiosk/nope/reboot']);
+  assert.deepEqual(kioskCalls, []);
+  // `api/js` lands on the value route as command "api", which is refused too.
+  assert.equal(errorNotices(broadcastEvents).length, 3);
+});
+
+test("OSC surfaces the terminal's own refusal of a FreeKiosk command", async () => {
+  const { handlers, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/FreeKiosk/lobby-tablet/lock']);
+  const [error] = errorNotices(broadcastEvents);
+  assert.ok(error, 'a refusal must be reported');
+  assert.match(String(error[1]), /Device Owner/);
+  assert.ok(!successNotified(broadcastEvents));
+});
+
+// --- Documented values --------------------------------------------------------
+
+test('the FreeKiosk routes document every allowlisted command, split by whether it takes a value', () => {
+  const { OSC } = loadOSC();
+  const { FREEKIOSK_COMMANDS } = require('../dist/Modules/FreeKiosk/commands');
+  const byPath = new Map(OSC.GetRoutes().map((r) => [r.Path, r]));
+  const bare = byPath.get('/API/FreeKiosk/:Slug/:CommandID').Values;
+  const valued = byPath.get('/API/FreeKiosk/:Slug/:CommandID/:Value').Values;
+
+  const documented = [...bare.Entries, ...valued.Entries].map((e) => e.Value.split('/')[0]);
+  assert.deepEqual(documented.sort(), FREEKIOSK_COMMANDS.map((c) => c.ID).sort());
+  assert.ok(bare.Entries.some((e) => e.Value === 'reboot'));
+  assert.ok(valued.Entries.some((e) => e.Value === 'brightness/<0-100>'));
+  // A WebView-only command says so, since it is refused in the other modes.
+  assert.match(bare.Entries.find((e) => e.Value === 'reload').Note, /WebView mode only/);
+});
+
+test('the Monitor routes document every declared action from the method catalogue', () => {
+  const { OSC } = loadOSC();
+  const byPath = new Map(OSC.GetRoutes().map((r) => [r.Path, r]));
+  assert.deepEqual(
+    byPath.get('/API/Monitor/:Slug/:Method/:ActionID').Values.Entries.map((e) => e.Value),
+    ['pjlink/power.on']
+  );
+  assert.deepEqual(
+    byPath.get('/API/Monitor/:Slug/:Method/:ActionID/:Value').Values.Entries.map((e) => e.Value),
+    ['pjlink/input.set/<Input>']
+  );
+});
+
+test('route value catalogues survive the JSON clone that ships them to the renderer', () => {
+  const { OSC } = loadOSC();
+  const cloned = JSON.parse(JSON.stringify(OSC.GetRoutes()));
+  const kiosk = cloned.find((r) => r.Path === '/API/FreeKiosk/:Slug/:CommandID');
+  assert.ok(kiosk.Values.Entries.length > 0);
+  // Routes whose values are the operator's own data carry no catalogue.
+  assert.equal(cloned.find((r) => r.Path === '/API/All/WakeOnLAN').Values, undefined);
 });
