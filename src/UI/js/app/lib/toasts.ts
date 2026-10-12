@@ -295,7 +295,6 @@ export function CriticalConfirmationDialog(Options: CriticalConfirmationOptions)
               Options.confirmLabel || 'Continue'
             )}</button>
 					</div>
-					<div class="critical-confirm-hint">Press Esc to cancel</div>
 				</div>
 			</div>`);
 
