@@ -184,13 +184,13 @@ export function wireContextMenu() {
             Icon: `bi-${ScriptIconName}`,
             IconColour: ColourFromIndex(Script.Colour),
             Action: async function () {
-              const TargetCount = `${Targets.length} ${Targets.length == 1 ? 'Client' : 'Clients'}`;
+              const Plural = Targets.length == 1 ? '' : 's';
               // Servers predating levels only send the boolean.
               const Level = Script.ConfirmationLevel || (Script.Confirmation ? 'Standard' : 'None');
               if (Level === 'Critical') {
                 const Confirmation = await CriticalConfirmationDialog({
-                  title: 'Critical Script',
-                  message: `"${Script.Name}" is marked as critical. Run it on ${TargetCount}?`,
+                  title: Script.Name,
+                  message: `Are you sure you want to run "${Script.Name}" on ${Targets.length} client${Plural}?`,
                   items: Targets.map((UUID) => {
                     const Client = RemoteClients.find((c) => c.UUID === UUID);
                     return (Client && (Client.Nickname || Client.Hostname)) || UUID;
@@ -200,7 +200,7 @@ export function wireContextMenu() {
                 if (!Confirmation) return;
               } else if (Level === 'Standard') {
                 const Confirmation = await ConfirmationDialog(
-                  `Are you sure you want to run "${Script.Name}" on ${TargetCount}?`
+                  `Are you sure you want to run "${Script.Name}" on ${Targets.length} Client${Plural}?`
                 );
                 if (!Confirmation) return;
               }
