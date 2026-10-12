@@ -39,19 +39,29 @@ export function IsClientWhitelisted(
   );
 }
 
+/** The script fields the targeting rules read. */
+type TargetableScript = {
+  CompatiblePlatforms?: unknown;
+  Whitelist?: ScriptWhitelistScope | null;
+  isEnabled?: boolean;
+};
+
 /**
- * Whether a script can run on this client at all: its OS must be supported AND
- * the whitelist must admit it.
+ * Whether a script can run on this client at all: it must be enabled, its OS
+ * must be supported AND the whitelist must admit it.
  *
- * Both conditions are required. Dropping either produces a menu entry that
- * either fails on execution (wrong OS) or runs somewhere it was explicitly
- * restricted away from.
+ * All three are required. Dropping any produces a menu entry the author has
+ * switched off, one that fails on execution (wrong OS), or one that runs
+ * somewhere it was explicitly restricted away from. The catalog always sets
+ * isEnabled (false for a script whose Script.json failed to parse), so only an
+ * explicit false hides a script.
  */
 export function IsScriptTargetable(
-  Script: { CompatiblePlatforms?: unknown; Whitelist?: ScriptWhitelistScope | null },
+  Script: TargetableScript,
   Client: Pick<ClientView, 'UUID' | 'GroupID' | 'OperatingSystem'> | null | undefined,
   Tags?: TagView[] | null
 ): boolean {
+  if (Script && Script.isEnabled === false) return false;
   if (!Client || !Client.OperatingSystem) return false;
   const Compatible = Array.isArray(Script && Script.CompatiblePlatforms)
     ? (Script.CompatiblePlatforms as string[])
@@ -67,7 +77,7 @@ export function IsScriptTargetable(
  * and then silently doing nothing.
  */
 export function ResolveScriptTargets(
-  Script: { CompatiblePlatforms?: unknown; Whitelist?: ScriptWhitelistScope | null },
+  Script: TargetableScript,
   Clients: Array<Pick<ClientView, 'UUID' | 'GroupID' | 'OperatingSystem'>> | null | undefined,
   Tags?: TagView[] | null
 ): string[] {

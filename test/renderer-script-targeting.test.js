@@ -133,6 +133,17 @@ test('a script is targetable only when BOTH conditions hold', () => {
   );
 });
 
+// A disabled script is one its author switched off in the Script Manager; it
+// must not be offered in the menu however well it otherwise fits the selection.
+test('a disabled script is never a target', () => {
+  assert.equal(IsScriptTargetable(script({ isEnabled: false }), client()), false);
+  assert.deepEqual(
+    ResolveScriptTargets(script({ isEnabled: false }), [client(), client({ UUID: 'c2' })]),
+    []
+  );
+  assert.equal(IsScriptTargetable(script({ isEnabled: true }), client()), true);
+});
+
 test('a client with no reported OS is never a target', () => {
   // A client that has not reported its platform cannot be matched against
   // CompatiblePlatforms, and guessing would run a Windows script on a Mac.

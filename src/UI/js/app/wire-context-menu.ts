@@ -162,9 +162,9 @@ export function wireContextMenu() {
       if (RemoteClients.length > 0) {
         const ScriptOptions: ContextMenuOption[] = [];
         for (const Script of ScriptList) {
-          // A client is a valid target only if the script supports its OS AND
-          // the script's whitelist admits it. A script with zero admitted
-          // clients in the current selection is skipped entirely (not shown);
+          // A client is a valid target only if the script is enabled, supports
+          // its OS AND the script's whitelist admits it. A script with zero
+          // admitted clients in the current selection is skipped entirely (not shown);
           // with a mix, it shows once and runs only for the admitted subset.
           // (Rules live in ./lib/script-targeting, which is pure and tested.)
           // Tags are passed so a tag-restricted script is offered on the
