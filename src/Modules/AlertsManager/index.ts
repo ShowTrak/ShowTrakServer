@@ -48,6 +48,7 @@ interface AlertTargetLike {
   Degraded?: boolean;
   LastLatencyMs?: number | null;
   LastError?: string | null;
+  LastChecked?: number | null;
   Checks?: unknown;
   [key: string]: unknown;
 }
@@ -698,6 +699,10 @@ Manager.HandleFreeKioskTerminalUpdated = async (Terminal: AlertEntityLike) => {
 
 Manager.HandleMonitoringTargetUpdated = async (Target: AlertTargetLike) => {
   if (!Target || !Target.TargetID) return;
+  // No check has reached a verdict yet (idle, or still inside its failure
+  // threshold on first contact): unknown is not down, so there is nothing to
+  // record — not even as a start-up baseline fault.
+  if (Target.LastChecked == null) return;
 
   const Key = `monitor:${Target.TargetID}`;
   const Prev = EntityOnlineState.get(Key);
@@ -768,6 +773,7 @@ Manager.HandleMonitoringTargetUpdated = async (Target: AlertTargetLike) => {
   const Checks = Array.isArray(Target.Checks) ? Target.Checks : [];
   for (const Check of Checks) {
     if (!Check || Check.CheckID == null) continue;
+    if (Check.LastChecked == null) continue;
     const CheckKey = `check:${Check.CheckID}`;
     const CheckLabel =
       Check.Name || Check.Address || `${String(Check.Method || '').toUpperCase()} check`;

@@ -1062,19 +1062,24 @@ Loading licence...</pre>
                   </div>
                 </div>
 
-                <div class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center">
+                <div
+                  class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center gap-2"
+                >
                   <div class="d-grid">
-                    <span>Confirmation</span>
-                    <span class="text-sm text-muted mb-0">Ask before running this script.</span>
+                    <span>Before Running</span>
+                    <span class="text-sm text-muted mb-0"
+                      >How hard to ask before this script runs from the context menu.</span
+                    >
                   </div>
-                  <div class="form-check form-switch">
-                    <input
-                      class="form-check-input"
-                      style="margin-top: 0.6em !important"
-                      type="checkbox"
-                      id="SCRIPT_MANAGER_FIELD_CONFIRM"
-                    />
-                  </div>
+                  <select
+                    id="SCRIPT_MANAGER_FIELD_CONFIRM"
+                    class="form-select form-select-sm bg-ghost-light text-light border-0"
+                    style="max-width: 13rem"
+                  >
+                    <option value="None">No confirmation</option>
+                    <option value="Standard">Confirmation</option>
+                    <option value="Critical">Critical warning</option>
+                  </select>
                 </div>
 
                 <div class="bg-ghost p-2 rounded d-flex justify-content-between align-items-center">
@@ -2062,6 +2067,14 @@ Loading licence...</pre>
                   />
                 </div>
 
+                <!-- Consecutive failed checks before a check reads offline.
+                     Options are filled by the editor so the "default" entry can
+                     name the server-wide value it inherits. -->
+                <div class="form-floating">
+                  <select class="form-select" id="MONITORING_TARGET_FAILURE_THRESHOLD"></select>
+                  <label for="MONITORING_TARGET_FAILURE_THRESHOLD">Failures Before Offline</label>
+                </div>
+
                 <div id="MONITORING_TARGET_CHECK_LIST" class="d-grid gap-2"></div>
 
                 <button type="button" class="btn btn-light w-100" id="MONITORING_TARGET_ADD_CHECK">
@@ -2149,6 +2162,12 @@ Loading licence...</pre>
                       />
                       <label for="MONITORING_CHECK_DEGRADED_THRESHOLD"
                         >Degraded Threshold (ms, 0 = off)</label
+                      >
+                    </div>
+                    <div class="form-floating">
+                      <select class="form-select" id="MONITORING_CHECK_FAILURE_THRESHOLD"></select>
+                      <label for="MONITORING_CHECK_FAILURE_THRESHOLD"
+                        >Failures Before Offline</label
                       >
                     </div>
                   </div>

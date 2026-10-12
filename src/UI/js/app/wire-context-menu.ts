@@ -21,6 +21,7 @@ import { ExecuteScript, TriggerIntegratedEvent } from './modals';
 import {
   ApplyIdentifyStateLocally,
   ConfirmationDialog,
+  CriticalConfirmationDialog,
   GetIdentifyTargetByUUID,
   Notify,
   ShowExecutionToast,
@@ -183,11 +184,23 @@ export function wireContextMenu() {
             Icon: `bi-${ScriptIconName}`,
             IconColour: ColourFromIndex(Script.Colour),
             Action: async function () {
-              if (Script.Confirmation) {
+              const TargetCount = `${Targets.length} ${Targets.length == 1 ? 'Client' : 'Clients'}`;
+              // Servers predating levels only send the boolean.
+              const Level = Script.ConfirmationLevel || (Script.Confirmation ? 'Standard' : 'None');
+              if (Level === 'Critical') {
+                const Confirmation = await CriticalConfirmationDialog({
+                  title: 'Critical Script',
+                  message: `"${Script.Name}" is marked as critical. Run it on ${TargetCount}?`,
+                  items: Targets.map((UUID) => {
+                    const Client = RemoteClients.find((c) => c.UUID === UUID);
+                    return (Client && (Client.Nickname || Client.Hostname)) || UUID;
+                  }),
+                  confirmLabel: 'Run Script',
+                });
+                if (!Confirmation) return;
+              } else if (Level === 'Standard') {
                 const Confirmation = await ConfirmationDialog(
-                  `Are you sure you want to run "${Script.Name}" on ${Targets.length} ${
-                    Targets.length == 1 ? 'Client' : 'Clients'
-                  }?`
+                  `Are you sure you want to run "${Script.Name}" on ${TargetCount}?`
                 );
                 if (!Confirmation) return;
               }

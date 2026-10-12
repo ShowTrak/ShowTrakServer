@@ -268,6 +268,7 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
 
   await Manager.HandleMonitoringTargetUpdated({
     TargetID: 42,
+    LastChecked: 1,
     Online: true,
     Degraded: false,
     Nickname: 'Web Check',
@@ -276,6 +277,7 @@ test('AlertsManager evaluates client, monitor, and script contexts against match
   });
   await Manager.HandleMonitoringTargetUpdated({
     TargetID: 42,
+    LastChecked: 1,
     Online: true,
     Degraded: true,
     Nickname: 'Web Check',
@@ -525,6 +527,7 @@ test('AlertsManager treats a monitor found degraded on its first tick as a basel
 
   const target = (degraded) => ({
     TargetID: 3,
+    LastChecked: 1,
     Online: true,
     Degraded: degraded,
     Nickname: 'Stage Rack',
@@ -532,8 +535,15 @@ test('AlertsManager treats a monitor found degraded on its first tick as a basel
     GroupID: null,
     LastError: degraded ? 'Check down' : null,
     Checks: [
-      { CheckID: 7, Name: 'QLab', Method: 'qlab', Online: true, Degraded: degraded },
-      { CheckID: 8, Name: 'Ping', Method: 'ping', Online: true, Degraded: false },
+      {
+        CheckID: 7,
+        LastChecked: 1,
+        Name: 'QLab',
+        Method: 'qlab',
+        Online: true,
+        Degraded: degraded,
+      },
+      { CheckID: 8, LastChecked: 1, Name: 'Ping', Method: 'ping', Online: true, Degraded: false },
     ],
   });
 
@@ -607,6 +617,7 @@ test('AlertsManager announces start-up faults that outlast the settle period', a
   // first tick because its device is mid-boot, and comes up.
   await Manager.HandleMonitoringTargetUpdated({
     TargetID: 1,
+    LastChecked: 1,
     Online: false,
     Nickname: 'Dead Projector',
     Address: '10.0.0.1',
@@ -614,12 +625,14 @@ test('AlertsManager announces start-up faults that outlast the settle period', a
   });
   await Manager.HandleMonitoringTargetUpdated({
     TargetID: 2,
+    LastChecked: 1,
     Online: false,
     Nickname: 'Booting Rack',
     Address: '10.0.0.2',
   });
   await Manager.HandleMonitoringTargetUpdated({
     TargetID: 2,
+    LastChecked: 1,
     Online: true,
     Nickname: 'Booting Rack',
     Address: '10.0.0.2',
@@ -653,12 +666,14 @@ test('AlertsManager announces start-up faults that outlast the settle period', a
   // And the entity is now tracked, so its recovery is a normal transition.
   await Manager.HandleMonitoringTargetUpdated({
     TargetID: 1,
+    LastChecked: 1,
     Online: true,
     Nickname: 'Dead Projector',
     Address: '10.0.0.1',
   });
   await Manager.HandleMonitoringTargetUpdated({
     TargetID: 1,
+    LastChecked: 1,
     Online: false,
     Nickname: 'Dead Projector',
     Address: '10.0.0.1',
@@ -710,6 +725,7 @@ test('AlertsManager holds a start-up fault until the settle period has actually 
   await Manager.Init();
   await Manager.HandleMonitoringTargetUpdated({
     TargetID: 9,
+    LastChecked: 1,
     Online: false,
     Nickname: 'Rack',
     Address: '10.0.0.9',
@@ -723,6 +739,78 @@ test('AlertsManager holds a start-up fault until the settle period has actually 
   ]);
   assert.equal(Early, 0);
   assert.equal(executeCalls.length, 0);
+});
+
+// A check inside its failure threshold on first contact has run but has no
+// verdict (LastChecked null). That is "unknown", not "down": it must not be
+// filed as a start-up fault, or a device that drops one packet while the server
+// boots would page someone three minutes later.
+test('AlertsManager ignores a monitor that has not reached a verdict yet', async () => {
+  const executeCalls = [];
+
+  const rules = [
+    {
+      RuleID: 1,
+      Title: 'Offline Workspace',
+      Scope: JSON.stringify({ Workspace: true, Groups: [], Clients: [] }),
+      TriggerType: 'CLIENT_OFFLINE',
+      TriggerConfig: JSON.stringify({}),
+      Actions: JSON.stringify([{ Type: 'http-api', Settings: { Route: '/offline' } }]),
+      Enabled: 1,
+      Timestamp: 1,
+      UpdatedAt: 1,
+    },
+  ];
+
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AlertsManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => ({ error: () => {} }) },
+    '../DB': {
+      Manager: {
+        All: async () => [null, rules],
+        Run: async () => [null, { changes: 1 }],
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
+      },
+    },
+    '../AlertActions': {
+      Manager: {
+        GetAll: () => [],
+        Execute: async (action, context) => {
+          executeCalls.push({ action, context });
+          return { Success: true };
+        },
+      },
+    },
+    '../Broadcast': { Manager: { emit: () => {} } },
+    '../Utils': require('../dist/Modules/Utils'),
+  });
+
+  await Manager.Init();
+
+  const pending = {
+    TargetID: 5,
+    LastChecked: null,
+    Online: false,
+    Nickname: 'Projector',
+    Address: '10.0.0.5',
+    Checks: [{ CheckID: 50, LastChecked: null, Online: false, Degraded: false }],
+  };
+  await Manager.HandleMonitoringTargetUpdated(pending);
+  await Manager.HandleMonitoringTargetUpdated(pending);
+
+  const Raised = await Manager.FlushSettledBaselineFaults(0, []);
+  assert.equal(Raised, 0, 'an unknown monitor is not a start-up fault');
+  assert.equal(executeCalls.length, 0);
+
+  // Its first real verdict is the baseline, exactly as if it had just booted —
+  // so a confirmed outage found that way is filed, not announced on the spot.
+  await Manager.HandleMonitoringTargetUpdated({
+    ...pending,
+    LastChecked: 1,
+    Checks: [{ CheckID: 50, LastChecked: 1, Online: false, Degraded: false }],
+  });
+  assert.equal(executeCalls.length, 0);
+  assert.equal(await Manager.FlushSettledBaselineFaults(0, []), 2, 'target and check');
 });
 
 test('AlertsManager fires a rule when ANY of its multiple triggers matches', async () => {

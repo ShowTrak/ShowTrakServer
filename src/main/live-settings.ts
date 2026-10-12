@@ -7,7 +7,10 @@ import { powerSaveBlocker } from 'electron';
 import { CreateLogger, configure as configureLogger } from '../Modules/Logger';
 import { Manager as BroadcastManager } from '../Modules/Broadcast';
 import { Manager as SettingsManager } from '../Modules/SettingsManager';
-import { SetDefaultInterval as SetMonitoringDefaultInterval } from '../Modules/MonitoringTargetManager/normalize';
+import {
+  SetDefaultInterval as SetMonitoringDefaultInterval,
+  SetDefaultFailureThreshold as SetMonitoringDefaultFailureThreshold,
+} from '../Modules/MonitoringTargetManager/normalize';
 import { SetDefaultInterval as SetDummyDefaultInterval } from '../Modules/DummyClientManager/normalize';
 import { SetAudioDedupeWindow } from '../Modules/AlertActions/_audio-dedupe';
 import { OSC } from '../Modules/OSC';
@@ -40,11 +43,15 @@ async function ApplyOsc(): Promise<void> {
 }
 
 // Default monitoring / dummy-client interval used for entities that don't set
-// their own. Applies to targets created or reloaded after the change.
+// their own. Applies to targets created or reloaded after the change. The
+// failure threshold is resolved on every probe, so it applies from the next one.
 async function ApplyMonitoringDefaults(): Promise<void> {
   const Ms = await SettingsManager.GetValue('MONITORING_DEFAULT_INTERVAL_MS');
   SetMonitoringDefaultInterval(Ms);
   SetDummyDefaultInterval(Ms);
+  SetMonitoringDefaultFailureThreshold(
+    await SettingsManager.GetValue('MONITORING_FAILURE_THRESHOLD')
+  );
 }
 
 // Window within which repeat requests for the same alert sound collapse to one

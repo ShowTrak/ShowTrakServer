@@ -20,9 +20,11 @@ import {
   PLATFORM_KEYS,
   SCRIPT_COLOURS,
   DEFAULT_CONSOLE_FILTER_MODE,
+  IsConfirmationLevel,
   NormalizeScriptConfig,
+  ResolveConfirmationLevel,
 } from './schema';
-import type { NormalizedScriptConfig, ConsoleFilterConfig } from './schema';
+import type { NormalizedScriptConfig, ConsoleFilterConfig, ConfirmationLevel } from './schema';
 
 const Logger = CreateLogger('ScriptManager');
 
@@ -43,7 +45,7 @@ interface ScriptEditable {
   description: string;
   colour: number;
   icon: string;
-  confirm: boolean;
+  confirmation: ConfirmationLevel;
   timeoutMs: number;
   enabled: boolean;
   platforms: PlatformMap;
@@ -61,6 +63,8 @@ interface ScriptEditableInput {
   description?: unknown;
   colour?: unknown;
   icon?: unknown;
+  confirmation?: unknown;
+  /** Legacy boolean form of `confirmation`, honoured when that is absent. */
   confirm?: unknown;
   timeoutMs?: unknown;
   enabled?: unknown;
@@ -128,6 +132,7 @@ class Script {
   Icon: string;
   Weight: number;
   Confirmation: boolean;
+  ConfirmationLevel: ConfirmationLevel;
   Timeout: number;
   Platforms: PlatformMap;
   Arguments: PlatformMap;
@@ -155,6 +160,7 @@ class Script {
     this.Icon = typeof Config.Icon === 'string' && Config.Icon ? Config.Icon : 'terminal';
     this.Weight = Config.Weight || 0;
     this.Confirmation = Config.Confirmation || false;
+    this.ConfirmationLevel = ResolveConfirmationLevel(Config);
     this.Timeout =
       typeof Config.Timeout === 'number' && Number.isInteger(Config.Timeout) && Config.Timeout > 0
         ? Config.Timeout
@@ -193,6 +199,7 @@ class InvalidScript {
   Icon: string;
   Weight: number;
   Confirmation: boolean;
+  ConfirmationLevel: ConfirmationLevel;
   Platforms: PlatformMap;
   Arguments: PlatformMap;
   CompatiblePlatforms: string[];
@@ -212,6 +219,7 @@ class InvalidScript {
     this.Icon = 'terminal';
     this.Weight = 0;
     this.Confirmation = false;
+    this.ConfirmationLevel = 'None';
     this.Platforms = {};
     this.Arguments = {};
     this.CompatiblePlatforms = [];
@@ -597,7 +605,7 @@ Manager.GetEditable = async (ID: string): Promise<Result<ScriptEditable>> => {
     description: Script.Description || '',
     colour: typeof Script.Colour === 'number' ? Script.Colour : 6,
     icon: typeof Script.Icon === 'string' && Script.Icon ? Script.Icon : 'terminal',
-    confirm: !!Script.Confirmation,
+    confirmation: Script.ConfirmationLevel,
     timeoutMs: Timeout,
     enabled: !!Script.isEnabled,
     platforms: Script.Platforms || {},
@@ -654,13 +662,20 @@ Manager.SaveFields = async (
   const Arguments = (
     Fields.arguments && typeof Fields.arguments === 'object' ? Fields.arguments : {}
   ) as Record<string, unknown>;
+  const Confirmation: ConfirmationLevel = IsConfirmationLevel(Fields.confirmation)
+    ? Fields.confirmation
+    : Fields.confirm
+      ? 'Standard'
+      : 'None';
+
   const RawConfig = {
     Name: Fields.name,
     Description: Fields.description,
     Colour: typeof Fields.colour === 'number' ? Fields.colour : 6,
     Icon: typeof Fields.icon === 'string' ? Fields.icon : 'terminal',
     Weight,
-    Confirmation: !!Fields.confirm,
+    Confirmation: Confirmation !== 'None',
+    ...(Confirmation === 'Critical' ? { ConfirmationStyle: 'Critical' } : {}),
     Timeout: Fields.timeoutMs,
     Enabled: !!Fields.enabled,
     Platforms: {

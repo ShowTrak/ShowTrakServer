@@ -19,6 +19,7 @@ export {
 export { Wait } from './lib/wait';
 export {
   ConfirmationDialog,
+  CriticalConfirmationDialog,
   ensureToastHost,
   HideExecutionToast,
   iconForType,

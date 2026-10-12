@@ -134,6 +134,18 @@ export const DefaultSettings: SettingDefinition[] = [
     OnUpdateEvent: 'MonitoringSettingsChanged',
   },
   {
+    Group: 'Monitoring',
+    Key: 'MONITORING_FAILURE_THRESHOLD',
+    Title: 'Failures Before Offline',
+    Description:
+      'How many checks in a row must fail before a monitoring check is marked offline. 1 reacts to the first miss; raise it to ride out the odd dropped packet. Individual targets and checks can override this. Applies from the next check.',
+    Type: 'INTEGER',
+    DefaultValue: 1,
+    Min: 1,
+    Max: 10,
+    OnUpdateEvent: 'MonitoringSettingsChanged',
+  },
+  {
     Group: 'Alerts',
     Key: 'ALERT_SOUND_VOLUME',
     Title: 'Alert Sound Volume',

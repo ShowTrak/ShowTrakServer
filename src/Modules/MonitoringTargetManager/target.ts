@@ -7,6 +7,8 @@
 //   - OFFLINE  only when every check is failing
 //   - DEGRADED when any check is failing or degraded (but not all failing)
 //   - ONLINE   when every check is healthy
+// Checks that have not reached a verdict yet (see MonitoringCheck.Run's failure
+// threshold) are left out of the aggregate: unknown is not the same as down.
 import { CreateLogger } from '../Logger';
 import { MONITORING_TICK_INTERVAL_MS } from '../Config/constants';
 import { Manager as DB } from '../DB';
@@ -19,7 +21,13 @@ import type {
   MonitoringTargetView,
 } from '@showtrak/protocol';
 
-import { ParseSettings, ClampInterval, ClampThreshold } from './normalize';
+import {
+  ParseSettings,
+  ClampInterval,
+  ClampThreshold,
+  ClampFailureThreshold,
+  GetDefaultFailureThreshold,
+} from './normalize';
 
 const Logger = CreateLogger('MonitoringTargetManager');
 
@@ -37,6 +45,7 @@ interface MonitoringCheckInput {
   Method?: string | null;
   Settings?: unknown;
   DegradedThresholdMs?: unknown;
+  FailureThreshold?: unknown;
   Weight?: number;
   LastSuccessAt?: number | null;
   Timestamp: number;
@@ -50,6 +59,7 @@ interface MonitoringTargetInput {
   GroupID?: number | null;
   Weight?: unknown;
   Slug?: string | null;
+  FailureThreshold?: unknown;
   Timestamp: number;
 }
 
@@ -63,9 +73,13 @@ class MonitoringCheck {
   Method: string;
   Settings: Record<string, unknown>;
   DegradedThresholdMs: number;
+  // Consecutive failed probes before this check reads offline; null inherits
+  // the parent target's value (see MonitoringTarget.InheritedFailureThreshold).
+  FailureThreshold: number | null;
   Weight: number;
   LastSuccessAt: number | null;
   Timestamp: number;
+  ConsecutiveFailures: number;
   Online: boolean;
   Degraded: boolean;
   LastChecked: number | null;
@@ -98,11 +112,13 @@ class MonitoringCheck {
     this.Method = Method;
     this.Settings = Settings;
     this.DegradedThresholdMs = ClampThreshold(Row.DegradedThresholdMs);
+    this.FailureThreshold = ClampFailureThreshold(Row.FailureThreshold);
     this.Weight = typeof Row.Weight === 'number' ? Row.Weight : 100;
     this.LastSuccessAt = Row.LastSuccessAt || null;
     this.Timestamp = Row.Timestamp;
 
     // RAM-only runtime state
+    this.ConsecutiveFailures = 0;
     this.Online = false;
     this.Degraded = false;
     this.LastChecked = null;
@@ -117,7 +133,22 @@ class MonitoringCheck {
     this.LastActionOptions = {};
   }
 
-  ToJSON(): MonitoringCheckView {
+  EffectiveFailureThreshold(Inherited: number = GetDefaultFailureThreshold()): number {
+    return this.FailureThreshold ?? Inherited;
+  }
+
+  // Forget any run of misses, e.g. when the check is re-pointed at a different
+  // method and the old failures no longer describe it.
+  ResetRuntimeState() {
+    this.ConsecutiveFailures = 0;
+    this.Online = false;
+    this.Degraded = false;
+    this.LastLatencyMs = null;
+    this.LastError = null;
+    this.LastChecked = null;
+  }
+
+  ToJSON(InheritedFailureThreshold: number = GetDefaultFailureThreshold()): MonitoringCheckView {
     return {
       CheckID: this.CheckID,
       TargetID: this.TargetID,
@@ -126,6 +157,9 @@ class MonitoringCheck {
       Method: this.Method,
       Settings: this.Settings,
       DegradedThresholdMs: this.DegradedThresholdMs,
+      FailureThreshold: this.FailureThreshold,
+      EffectiveFailureThreshold: this.EffectiveFailureThreshold(InheritedFailureThreshold),
+      ConsecutiveFailures: this.ConsecutiveFailures,
       Weight: this.Weight,
       LastSuccessAt: this.LastSuccessAt,
       Online: this.Online,
@@ -140,11 +174,18 @@ class MonitoringCheck {
   // Run this check's probe once and update its own runtime state. The method
   // implementations read `.Address` and `.Settings` off the passed object, so
   // the check instance itself is a valid "target-like" argument.
-  async Run() {
+  //
+  // A failed probe only marks the check offline once it has failed
+  // `EffectiveFailureThreshold` times in a row. Below that the previous verdict
+  // stands — an online check stays online, and a check that has never answered
+  // stays "not checked yet" rather than being called down on a single dropped
+  // packet. Any success resets the run.
+  async Run(InheritedFailureThreshold: number = GetDefaultFailureThreshold()) {
     const Result = await MonitoringMethods.Run(this.Method, this);
     const Now = Date.now();
-    this.LastChecked = Now;
     if (Result && Result.Success) {
+      this.ConsecutiveFailures = 0;
+      this.LastChecked = Now;
       this.Online = true;
       this.LastLatencyMs = typeof Result.LatencyMs === 'number' ? Result.LatencyMs : null;
       if (Result.Degraded) {
@@ -161,10 +202,21 @@ class MonitoringCheck {
       }
       await this.SetLastSuccessAt(Now);
     } else {
-      this.Online = false;
-      this.Degraded = false;
-      this.LastLatencyMs = null;
-      this.LastError = (Result && Result.Error) || 'Check failed';
+      this.ConsecutiveFailures++;
+      const AlreadyDown = this.LastChecked != null && !this.Online;
+      const Confirmed =
+        AlreadyDown ||
+        this.ConsecutiveFailures >= this.EffectiveFailureThreshold(InheritedFailureThreshold);
+      if (Confirmed) {
+        this.LastChecked = Now;
+        this.Online = false;
+        this.Degraded = false;
+        this.LastLatencyMs = null;
+        this.LastError = (Result && Result.Error) || 'Check failed';
+      } else if (this.LastChecked != null) {
+        // Held: keep the last verdict but record that a probe did run.
+        this.LastChecked = Now;
+      }
     }
     // Cache the rendered debug panel (RAM-only) from this run's raw result.
     this.LastDebugHtml = MonitoringMethods.BuildDebug(this.Method, Result, this);
@@ -193,6 +245,9 @@ class MonitoringTarget {
   // Stable, human-friendly OSC/API identifier; unique across the shared client
   // namespace. Back-filled non-null on boot.
   Slug: string | null;
+  // Target-wide failure threshold; null inherits the global setting. Checks
+  // that set their own override this.
+  FailureThreshold: number | null;
   Timestamp: number;
   Checks: MonitoringCheck[];
   Online: boolean;
@@ -212,6 +267,7 @@ class MonitoringTarget {
     this.GroupID = Row.GroupID == null ? null : Row.GroupID;
     this.Weight = typeof Row.Weight === 'number' ? Row.Weight : 100;
     this.Slug = Row.Slug || null;
+    this.FailureThreshold = ClampFailureThreshold(Row.FailureThreshold);
     this.Timestamp = Row.Timestamp;
 
     this.Checks = Array.isArray(Checks) ? Checks.map((C) => new MonitoringCheck(C)) : [];
@@ -238,9 +294,24 @@ class MonitoringTarget {
     return this.Checks.length ? this.Checks[0]! : null;
   }
 
+  // The threshold a check without its own override uses: this target's, or the
+  // global default. Resolved on demand so a settings change applies live.
+  InheritedFailureThreshold(): number {
+    return this.FailureThreshold ?? GetDefaultFailureThreshold();
+  }
+
+  // Probe the given checks (all of them by default) and refresh the aggregate.
+  // Does not broadcast — callers decide whether the result is still wanted.
+  async RunChecks(Checks: MonitoringCheck[] = this.Checks) {
+    const Inherited = this.InheritedFailureThreshold();
+    await Promise.all(Checks.map((Check) => Check.Run(Inherited)));
+    this.RecomputeAggregate();
+  }
+
   // Snapshot used for IPC + broadcast payloads.
   ToJSON(): MonitoringTargetView {
     const Primary = this.PrimaryCheck;
+    const Inherited = this.InheritedFailureThreshold();
     return {
       TargetID: this.TargetID,
       Nickname: this.Nickname,
@@ -248,6 +319,7 @@ class MonitoringTarget {
       GroupID: this.GroupID,
       Weight: this.Weight,
       Slug: this.Slug,
+      FailureThreshold: this.FailureThreshold,
       Timestamp: this.Timestamp,
       // Legacy single-check fields (derived) so existing tiles / WebUI / alerts
       // that read Address/Method keep working.
@@ -262,7 +334,7 @@ class MonitoringTarget {
       LastLatencyMs: this.LastLatencyMs,
       LastError: this.LastError,
       CheckCount: this.Checks.length,
-      Checks: this.Checks.map((C) => C.ToJSON()),
+      Checks: this.Checks.map((C) => C.ToJSON(Inherited)),
       Type: 'monitor',
     };
   }
@@ -276,11 +348,13 @@ class MonitoringTarget {
     return latest;
   }
 
-  // Recompute the aggregated Online/Degraded/Latency/Error from the checks.
+  // Recompute the aggregated Online/Degraded/Latency/Error/LastChecked from the
+  // checks that have reached a verdict.
   RecomputeAggregate() {
-    const Checks = this.Checks;
+    const Checks = this.Checks.filter((C) => C.LastChecked != null);
+    this.LastChecked = Checks.length ? Math.max(...Checks.map((C) => C.LastChecked!)) : null;
     if (!Checks.length) {
-      // A target with no checks is idle — nothing to probe.
+      // No checks (idle) or none answered yet — either way, no verdict.
       this.Online = false;
       this.Degraded = false;
       this.LastLatencyMs = null;
@@ -362,10 +436,8 @@ class MonitoringTarget {
     }
     this._running = true;
     try {
-      await Promise.all(this.Checks.map((Check) => Check.Run()));
+      await this.RunChecks();
       if (this._stopped || Gen !== this._gen) return;
-      this.LastChecked = Date.now();
-      this.RecomputeAggregate();
       BroadcastManager.emit('MonitoringTargetUpdated', this.ToJSON());
     } catch (Err) {
       Logger.error(`Tick failed for target ${this.TargetID}:`, Err);

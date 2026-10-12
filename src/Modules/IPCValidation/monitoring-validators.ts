@@ -11,6 +11,21 @@ import { Manager as MonitoringMethods } from '../MonitoringMethods';
 import type { IPCValidationManager } from './index';
 
 const MAX_TARGET_BATCH = 500;
+const MIN_FAILURE_THRESHOLD = 1;
+const MAX_FAILURE_THRESHOLD = 10;
+
+// Optional failure-threshold override: null/'' clears it (inherit), otherwise a
+// whole number of consecutive failed probes within 1–10.
+function normalizeFailureThreshold(value: unknown, fieldName: string): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < MIN_FAILURE_THRESHOLD || n > MAX_FAILURE_THRESHOLD) {
+    fail(
+      `${fieldName} must be a whole number from ${MIN_FAILURE_THRESHOLD} to ${MAX_FAILURE_THRESHOLD}`
+    );
+  }
+  return n;
+}
 
 // Method-specific Settings are validated against the registered schema by
 // the MonitoringMethods module; here we only enforce the shape.
@@ -120,6 +135,12 @@ export = function registerMonitoringValidators(Manager: IPCValidationManager): v
       }
       out.DegradedThresholdMs = Threshold;
     }
+    if (Object.prototype.hasOwnProperty.call(value, 'FailureThreshold')) {
+      out.FailureThreshold = normalizeFailureThreshold(
+        value.FailureThreshold,
+        `Check ${index + 1} FailureThreshold`
+      );
+    }
     out.Settings = normalizeMonitoringSettings(value.Settings);
     return out;
   }
@@ -144,6 +165,9 @@ export = function registerMonitoringValidators(Manager: IPCValidationManager): v
     out.GroupID = Object.prototype.hasOwnProperty.call(value, 'GroupID')
       ? Manager.GroupID(value.GroupID)
       : null;
+    if (Object.prototype.hasOwnProperty.call(value, 'FailureThreshold')) {
+      out.FailureThreshold = normalizeFailureThreshold(value.FailureThreshold, 'FailureThreshold');
+    }
     out.Checks = normalizeChecks(value.Checks == null ? [] : value.Checks, false);
     return out;
   };
@@ -167,6 +191,9 @@ export = function registerMonitoringValidators(Manager: IPCValidationManager): v
     }
     if (Object.prototype.hasOwnProperty.call(value, 'Slug')) {
       out.Slug = Manager.Slug(value.Slug);
+    }
+    if (Object.prototype.hasOwnProperty.call(value, 'FailureThreshold')) {
+      out.FailureThreshold = normalizeFailureThreshold(value.FailureThreshold, 'FailureThreshold');
     }
     if (Object.prototype.hasOwnProperty.call(value, 'Checks')) {
       out.Checks = normalizeChecks(value.Checks, true);

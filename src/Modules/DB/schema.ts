@@ -75,13 +75,15 @@ Schema.push({
             LastSuccessAt BIGINT(11), \
             DegradedThresholdMs INTEGER NOT NULL DEFAULT 0, \
             Slug TEXT, \
+            FailureThreshold INTEGER, \
             Timestamp BIGINT(11) NOT NULL \
     )',
 });
 
 // Each Monitoring Target can own multiple independent checks (e.g. two DNS
 // probes plus a QLab workspace check). A check carries its own Address,
-// method-specific Settings (JSON) and degraded threshold; the parent target
+// method-specific Settings (JSON), degraded threshold and an optional failure
+// threshold (NULL inherits the target's, which inherits the global setting); the parent target
 // owns the shared check Interval and grouping. Legacy single-method targets are
 // migrated into a single check row on first boot (see MonitoringTargetManager).
 Schema.push({
@@ -94,6 +96,7 @@ Schema.push({
             Method TEXT NOT NULL, \
             Settings TEXT, \
             DegradedThresholdMs INTEGER NOT NULL DEFAULT 0, \
+            FailureThreshold INTEGER, \
             Weight INTEGER NOT NULL DEFAULT 100, \
             LastSuccessAt BIGINT(11), \
             Timestamp BIGINT(11) NOT NULL \
@@ -602,6 +605,12 @@ Schema.Migrations = [
   // Optional background tint for a group's box: an index into the shared colour
   // palette (SCRIPT_COLOURS). NULL leaves every existing group untinted.
   { Version: 33, SQL: 'ALTER TABLE `Groups` ADD COLUMN Colour INTEGER' },
+  // Consecutive failed probes before a check reads offline. NULL means "inherit":
+  // a check falls back to its target, a target to the MONITORING_FAILURE_THRESHOLD
+  // setting (default 1). Every existing row upgrades to NULL, so behaviour is
+  // unchanged until someone raises a threshold.
+  { Version: 34, SQL: 'ALTER TABLE `MonitoringTargets` ADD COLUMN FailureThreshold INTEGER' },
+  { Version: 35, SQL: 'ALTER TABLE `MonitoringChecks` ADD COLUMN FailureThreshold INTEGER' },
 ];
 
 export = Schema;

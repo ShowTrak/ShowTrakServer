@@ -30,6 +30,7 @@ const state = {
   oscEnabled: true,
   oscPort: 9000,
   monitoringIntervalMs: 5000,
+  monitoringFailureThreshold: 1,
   alertAudioDedupeMs: 500,
   confirmShutdown: true,
   preventDisplaySleep: false,
@@ -44,6 +45,7 @@ const settingsMgr = recordingManager({
     if (key === 'SYSTEM_OSC_ENABLED') return state.oscEnabled;
     if (key === 'SYSTEM_OSC_PORT') return state.oscPort;
     if (key === 'MONITORING_DEFAULT_INTERVAL_MS') return state.monitoringIntervalMs;
+    if (key === 'MONITORING_FAILURE_THRESHOLD') return state.monitoringFailureThreshold;
     if (key === 'ALERT_SOUND_DEDUPE_WINDOW_MS') return state.alertAudioDedupeMs;
     if (key === 'SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4') return state.confirmShutdown;
     if (key === 'SYSTEM_PREVENT_DISPLAY_SLEEP') return state.preventDisplaySleep;
@@ -67,6 +69,7 @@ const loggerStub = {
 };
 
 const intervals = { monitoring: [], dummy: [] };
+const failureThresholds = [];
 const audioDedupeWindows = [];
 const shutdownProtection = [];
 
@@ -95,7 +98,10 @@ const restore = installModuleMocks([
   { match: matchesModule('/Modules/SettingsManager'), value: { Manager: settingsMgr } },
   {
     match: matchesModule('/Modules/MonitoringTargetManager/normalize'),
-    value: { SetDefaultInterval: (v) => intervals.monitoring.push(v) },
+    value: {
+      SetDefaultInterval: (v) => intervals.monitoring.push(v),
+      SetDefaultFailureThreshold: (v) => failureThresholds.push(v),
+    },
   },
   {
     match: matchesModule('/Modules/DummyClientManager/normalize'),
@@ -130,6 +136,7 @@ function resetRecorders() {
   configured.length = 0;
   intervals.monitoring.length = 0;
   intervals.dummy.length = 0;
+  failureThresholds.length = 0;
   audioDedupeWindows.length = 0;
   shutdownProtection.length = 0;
   blocker.started.length = 0;
@@ -158,6 +165,7 @@ async function bootThenReset() {
 
 test('boot applies monitoring defaults, display sleep and OSC', async () => {
   state.monitoringIntervalMs = 7500;
+  state.monitoringFailureThreshold = 3;
   state.oscEnabled = true;
   state.oscPort = 9001;
 
@@ -166,6 +174,7 @@ test('boot applies monitoring defaults, display sleep and OSC', async () => {
   // The same default interval drives both monitoring targets and dummy clients.
   assert.deepEqual(intervals.monitoring, [7500]);
   assert.deepEqual(intervals.dummy, [7500]);
+  assert.deepEqual(failureThresholds, [3]);
   assert.deepEqual(osc.__callsTo('RestartServer')[0].args, [9001]);
 });
 
@@ -203,9 +212,12 @@ test('a log-level change is applied even when the value is still the default', a
 test('a monitoring-settings change re-applies the interval to both managers', async () => {
   await bootThenReset();
   state.monitoringIntervalMs = 12000;
+  state.monitoringFailureThreshold = 5;
   await emit('MonitoringSettingsChanged');
   assert.deepEqual(intervals.monitoring, [12000]);
   assert.deepEqual(intervals.dummy, [12000]);
+  // The failure threshold rides the same event — it is a monitoring setting.
+  assert.deepEqual(failureThresholds, [5]);
 });
 
 test('the alert sound de-duplication window is applied at boot and on change', async () => {

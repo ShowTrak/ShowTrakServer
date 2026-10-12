@@ -163,7 +163,7 @@ test('an offline check records no latency at all', () => {
   startClock();
   recordMonitoringHistorySample({
     TargetID: 1,
-    Checks: [{ CheckID: 20, Online: false, LastLatencyMs: null }],
+    Checks: [{ CheckID: 20, Online: false, LastLatencyMs: null, LastChecked: 1 }],
   });
 
   const [Sample] = getMonitoringCheckHistory(20);
@@ -400,14 +400,31 @@ test('a monitoring target records one sample per check', () => {
   recordMonitoringHistorySample({
     TargetID: 1,
     Checks: [
-      { CheckID: 10, Online: true, LastLatencyMs: 5 },
-      { CheckID: 11, Online: false },
+      { CheckID: 10, Online: true, LastLatencyMs: 5, LastChecked: 1 },
+      { CheckID: 11, Online: false, LastChecked: 1 },
     ],
   });
 
   assert.equal(getMonitoringCheckHistory(10)[0].online, true);
   assert.equal(getMonitoringCheckHistory(10)[0].latencyMs, 5);
   assert.equal(getMonitoringCheckHistory(11)[0].online, false);
+});
+
+test('a check with no verdict yet records nothing', () => {
+  // A check still inside its failure threshold on first contact reports
+  // Online false with LastChecked null. That is "unknown", and charting it as
+  // offline would draw an outage that never happened.
+  startClock();
+  recordMonitoringHistorySample({
+    TargetID: 1,
+    Checks: [
+      { CheckID: 13, Online: false, LastChecked: null },
+      { CheckID: 14, Online: true, LastLatencyMs: 4, LastChecked: 1 },
+    ],
+  });
+
+  assert.deepEqual(getMonitoringCheckHistory(13), []);
+  assert.equal(getMonitoringCheckHistory(14).length, 1);
 });
 
 test('a target with no id or no checks records nothing', () => {
@@ -429,7 +446,7 @@ test('a check with no id is skipped without losing its siblings', () => {
   startClock();
   recordMonitoringHistorySample({
     TargetID: 1,
-    Checks: [null, { CheckID: null }, { CheckID: 12, Online: true }],
+    Checks: [null, { CheckID: null }, { CheckID: 12, Online: true, LastChecked: 1 }],
   });
 
   assert.equal(getMonitoringCheckHistory(12).length, 1);

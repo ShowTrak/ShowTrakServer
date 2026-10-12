@@ -63,6 +63,7 @@ export interface MonitoringTargetRow {
   LastSuccessAt: number | null;
   DegradedThresholdMs: number;
   Slug: string | null; // back-filled non-null on first boot; nullable pre-migration
+  FailureThreshold: number | null; // NULL = inherit the global setting
   Timestamp: number;
 }
 
@@ -74,6 +75,7 @@ export interface MonitoringCheckRow {
   Method: string;
   Settings: string | null; // JSON
   DegradedThresholdMs: number;
+  FailureThreshold: number | null; // NULL = inherit the target's threshold
   Weight: number;
   LastSuccessAt: number | null;
   Timestamp: number;

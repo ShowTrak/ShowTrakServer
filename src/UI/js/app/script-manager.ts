@@ -1,4 +1,9 @@
-import type { GroupView, ScriptEditable, ScriptManagerEntry } from '@showtrak/protocol';
+import type {
+  GroupView,
+  ScriptConfirmationLevel,
+  ScriptEditable,
+  ScriptManagerEntry,
+} from '@showtrak/protocol';
 import { closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
 import { HandleNonFatalError, Safe } from './utils';
@@ -545,7 +550,7 @@ export function PopulateScriptManagerEditor(Data: ScriptEditable) {
   // Icon field.
   SetScriptManagerEditorIcon(Data.icon);
 
-  $('#SCRIPT_MANAGER_FIELD_CONFIRM').prop('checked', !!Data.confirm);
+  $('#SCRIPT_MANAGER_FIELD_CONFIRM').val(Data.confirmation || 'None');
   $('#SCRIPT_MANAGER_FIELD_ENABLED').prop('checked', !!Data.enabled);
   const timeoutMs =
     typeof Data.timeoutMs === 'number' && Number.isFinite(Data.timeoutMs) && Data.timeoutMs > 0
@@ -691,6 +696,11 @@ export function RenderScriptManagerFileList(Files: string[]) {
     });
 }
 
+function ReadConfirmationLevel(): ScriptConfirmationLevel {
+  const Value = String($('#SCRIPT_MANAGER_FIELD_CONFIRM').val() || 'None');
+  return Value === 'Standard' || Value === 'Critical' ? Value : 'None';
+}
+
 export function CollectScriptManagerFields() {
   const Platforms: Record<string, string> = {};
   const Arguments: Record<string, string> = {};
@@ -725,7 +735,7 @@ export function CollectScriptManagerFields() {
     description: $('#SCRIPT_MANAGER_FIELD_DESCRIPTION').val(),
     colour: isNaN(colourIndex) ? 6 : colourIndex,
     icon: NormalizeIconName(ScriptManagerEditingIcon) || 'terminal',
-    confirm: $('#SCRIPT_MANAGER_FIELD_CONFIRM').is(':checked'),
+    confirmation: ReadConfirmationLevel(),
     timeoutMs: timeoutSeconds * 1000,
     enabled: $('#SCRIPT_MANAGER_FIELD_ENABLED').is(':checked'),
     platforms: Platforms,

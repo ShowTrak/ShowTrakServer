@@ -35,6 +35,9 @@ function buildTarget(checks) {
 
   target.Checks.forEach((check, index) => {
     const state = checks[index].State || {};
+    // Every fixture describes a check that has reached a verdict unless it says
+    // otherwise; one with no verdict is left out of the aggregate.
+    check.LastChecked = state.LastChecked === undefined ? 1 : state.LastChecked;
     check.Online = !!state.Online;
     check.Degraded = !!state.Degraded;
     check.LastError = state.LastError || null;
@@ -205,5 +208,48 @@ test('MonitoringTarget with no checks is idle (Online=false, Degraded=false, Las
   target.RecomputeAggregate();
   assert.equal(target.Online, false);
   assert.equal(target.Degraded, false);
+  assert.equal(target.LastError, null);
+});
+
+test('MonitoringTarget aggregate leaves checks with no verdict out', () => {
+  // A check still inside its failure threshold on first contact is unknown, not
+  // down, so a sibling that is healthy carries the target on its own.
+  const target = buildTarget([
+    {
+      CheckID: 31,
+      TargetID: 1,
+      Method: 'ping',
+      Timestamp: 1,
+      State: { Online: true, LastLatencyMs: 4 },
+    },
+    {
+      CheckID: 32,
+      TargetID: 1,
+      Method: 'http',
+      Timestamp: 1,
+      State: { Online: false, LastChecked: null },
+    },
+  ]);
+
+  assert.equal(target.Online, true);
+  assert.equal(target.Degraded, false);
+  assert.equal(target.LastError, null);
+});
+
+test('MonitoringTarget with no verdict on any check has no LastChecked', () => {
+  // LastChecked null is what the tile reads as "Checking" and what alerts and
+  // history read as "nothing to record yet".
+  const target = buildTarget([
+    {
+      CheckID: 33,
+      TargetID: 1,
+      Method: 'ping',
+      Timestamp: 1,
+      State: { Online: false, LastChecked: null },
+    },
+  ]);
+
+  assert.equal(target.LastChecked, null);
+  assert.equal(target.Online, false);
   assert.equal(target.LastError, null);
 });

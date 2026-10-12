@@ -24,6 +24,7 @@ import {
   ParseSettings,
   ClampInterval,
   ClampThreshold,
+  ClampFailureThreshold,
 } from './normalize';
 import { MonitoringTarget, MonitoringCheck } from './target';
 import type { MonitoringCheckInput } from './target';
@@ -51,6 +52,7 @@ interface MonitoringCheckPayload {
   Method: string;
   Settings?: unknown;
   DegradedThresholdMs?: unknown;
+  FailureThreshold?: unknown;
 }
 
 // Validated target create/update payloads.
@@ -60,6 +62,7 @@ interface MonitoringTargetCreatePayload {
   Interval?: unknown;
   GroupID?: number | null;
   Weight?: unknown;
+  FailureThreshold?: unknown;
 }
 interface MonitoringTargetUpdatePayload {
   Nickname?: string | null;
@@ -67,6 +70,7 @@ interface MonitoringTargetUpdatePayload {
   Interval?: unknown;
   GroupID?: number | null;
   Slug?: unknown;
+  FailureThreshold?: unknown;
 }
 
 // RAM-only debug snapshot returned by GetCheckDebug / RunCheckNow.
@@ -80,6 +84,8 @@ interface MonitoringCheckDebug {
   LastChecked: number | null;
   LastLatencyMs: number | null;
   LastDebugAt: number | null;
+  ConsecutiveFailures: number;
+  EffectiveFailureThreshold: number;
 }
 
 function ToRowSettings(Method: string, Settings: unknown): string {
@@ -98,6 +104,7 @@ async function InsertCheckRow(
 ): Promise<MonitoringCheckInput | null> {
   const SettingsJson = ToRowSettings(Check.Method, Check.Settings);
   const Threshold = ClampThreshold(Check.DegradedThresholdMs);
+  const FailureThreshold = ClampFailureThreshold(Check.FailureThreshold);
   const [Err, Res] = await ChecksRepo.Insert(
     TargetID,
     Check.Name || '',
@@ -105,6 +112,7 @@ async function InsertCheckRow(
     Check.Method,
     SettingsJson,
     Threshold,
+    FailureThreshold,
     Weight,
     null,
     Now,
@@ -119,6 +127,7 @@ async function InsertCheckRow(
     Method: Check.Method,
     Settings: SettingsJson,
     DegradedThresholdMs: Threshold,
+    FailureThreshold,
     Weight,
     LastSuccessAt: null,
     Timestamp: Now,
@@ -183,6 +192,7 @@ async function MigrateLegacyTargetToCheck(
     Method,
     SettingsJson,
     Threshold,
+    null,
     100,
     Row.LastSuccessAt || null,
     Row.Timestamp || Now
@@ -225,12 +235,14 @@ async function ReconcileChecks(
       const MethodChanged = Instance.Method !== C.Method;
       const SettingsJson = ToRowSettings(C.Method, C.Settings);
       const Threshold = ClampThreshold(C.DegradedThresholdMs);
+      const FailureThreshold = ClampFailureThreshold(C.FailureThreshold);
       await ChecksRepo.UpdateDetails(
         C.Name || '',
         C.Address || '',
         C.Method,
         SettingsJson,
         Threshold,
+        FailureThreshold,
         CheckWeight,
         CID
       );
@@ -239,14 +251,11 @@ async function ReconcileChecks(
       Instance.Method = C.Method;
       Instance.Settings = ParseSettings(SettingsJson);
       Instance.DegradedThresholdMs = Threshold;
+      Instance.FailureThreshold = FailureThreshold;
       Instance.Weight = CheckWeight;
       if (MethodChanged) {
         // Drop stale status so the tile doesn't show the previous method's state
-        Instance.Online = false;
-        Instance.Degraded = false;
-        Instance.LastLatencyMs = null;
-        Instance.LastError = null;
-        Instance.LastChecked = null;
+        Instance.ResetRuntimeState();
       }
       NextChecks.push(Instance);
     } else {
@@ -416,6 +425,10 @@ const Manager = {
           LastChecked: Check.LastChecked,
           LastLatencyMs: Check.LastLatencyMs,
           LastDebugAt: Check.LastDebugAt,
+          ConsecutiveFailures: Check.ConsecutiveFailures,
+          EffectiveFailureThreshold: Check.EffectiveFailureThreshold(
+            Target.InheritedFailureThreshold()
+          ),
         },
       ];
     }
@@ -429,9 +442,7 @@ const Manager = {
     for (const Target of TargetList) {
       const Check = Target.Checks.find((C) => Number(C.CheckID) === ID);
       if (!Check) continue;
-      await Check.Run();
-      Target.LastChecked = Date.now();
-      Target.RecomputeAggregate();
+      await Target.RunChecks([Check]);
       BroadcastManager.emit('MonitoringTargetUpdated', Target.ToJSON());
       return Manager.GetCheckDebug(ID);
     }
@@ -445,9 +456,7 @@ const Manager = {
     const ID = Number(TargetID);
     const Target = TargetList.find((T) => Number(T.TargetID) === ID);
     if (!Target) return ['Monitoring target not found', null];
-    await Promise.all(Target.Checks.map((Check) => Check.Run()));
-    Target.LastChecked = Date.now();
-    Target.RecomputeAggregate();
+    await Target.RunChecks();
     BroadcastManager.emit('MonitoringTargetUpdated', Target.ToJSON());
     return [null, Target.ToJSON()];
   },
@@ -531,9 +540,7 @@ const Manager = {
     // dropped the caches that would otherwise replay the pre-action reading.
     await Promise.all(
       [...Touched].map(async (Target) => {
-        await Promise.all(Target.Checks.map((Check) => Check.Run()));
-        Target.LastChecked = Date.now();
-        Target.RecomputeAggregate();
+        await Target.RunChecks();
         BroadcastManager.emit('MonitoringTargetUpdated', Target.ToJSON());
       })
     );
@@ -557,6 +564,7 @@ const Manager = {
     const Interval = ClampInterval(Payload.Interval);
     const GroupID = Payload.GroupID == null ? null : Payload.GroupID;
     const Weight = typeof Payload.Weight === 'number' ? Payload.Weight : 100;
+    const FailureThreshold = ClampFailureThreshold(Payload.FailureThreshold);
 
     // The target row and every check row insert together or not at all: a
     // partial failure must never persist a target whose check set is incomplete.
@@ -567,6 +575,7 @@ const Manager = {
         Interval,
         GroupID,
         Weight,
+        FailureThreshold,
         Now,
         run
       );
@@ -597,7 +606,16 @@ const Manager = {
     if (SlugErr) Logger.error('Failed to persist monitoring target slug', SlugErr);
 
     const Target = new MonitoringTarget(
-      { TargetID, Nickname: Payload.Nickname, Interval, GroupID, Weight, Slug, Timestamp: Now },
+      {
+        TargetID,
+        Nickname: Payload.Nickname,
+        Interval,
+        GroupID,
+        Weight,
+        Slug,
+        FailureThreshold,
+        Timestamp: Now,
+      },
       CheckRows
     );
     TargetList.push(Target);
@@ -625,6 +643,9 @@ const Manager = {
     const NextGroupID = (
       Object.prototype.hasOwnProperty.call(Payload, 'GroupID') ? Payload.GroupID : Target.GroupID
     ) as number | null;
+    const NextFailureThreshold = Object.prototype.hasOwnProperty.call(Payload, 'FailureThreshold')
+      ? ClampFailureThreshold(Payload.FailureThreshold)
+      : Target.FailureThreshold;
 
     let NextChecks: MonitoringCheckPayload[] | null = null;
     if (Object.prototype.hasOwnProperty.call(Payload, 'Checks')) {
@@ -649,7 +670,13 @@ const Manager = {
       NextSlug = Resolved;
     }
 
-    const [Err] = await TargetsRepo.UpdateDetails(NextNickname, NextInterval, NextGroupID, ID);
+    const [Err] = await TargetsRepo.UpdateDetails(
+      NextNickname,
+      NextInterval,
+      NextGroupID,
+      NextFailureThreshold,
+      ID
+    );
     if (Err) return Fail('Failed to update monitoring target');
 
     if (NextSlug !== null) {
@@ -661,6 +688,7 @@ const Manager = {
     Target.Nickname = NextNickname;
     Target.Interval = NextInterval;
     Target.GroupID = NextGroupID;
+    Target.FailureThreshold = NextFailureThreshold;
 
     if (NextChecks) await ReconcileChecks(Target, NextChecks);
 

@@ -12,6 +12,8 @@ export interface MonitoringEditorCheck {
   Method: string;
   Settings: Record<string, unknown>;
   DegradedThresholdMs: number;
+  // null = inherit the target's failure threshold.
+  FailureThreshold: number | null;
 }
 
 /** Working draft backing the multi-check monitoring-target editor modal. */
@@ -20,6 +22,8 @@ export interface MonitoringEditorStateShape {
   Nickname: string;
   Interval: number;
   GroupID: number | null;
+  // null = inherit the server-wide MONITORING_FAILURE_THRESHOLD setting.
+  FailureThreshold: number | null;
   // Current slug in the editor plus the slug loaded from the target, so autosave
   // only sends Slug when the operator actually changed it. Empty for a new target
   // (the server generates one on create).

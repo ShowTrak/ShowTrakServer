@@ -32,6 +32,9 @@ const {
   ResetNetworkDiscoveryState,
   BuildMonitoringPayload,
   MonitoringPayloadIsValid,
+  ParseFailureThreshold,
+  FailureThresholdOptions,
+  DescribeMissedChecks,
 } = Editor;
 
 const METHODS = [
@@ -376,4 +379,44 @@ test('an unknown method is assumed to need an address', () => {
 test('one bad check invalidates the whole payload', () => {
   editorState({ Checks: [check(), check({ Address: '' })] });
   assert.equal(MonitoringPayloadIsValid(BuildMonitoringPayload()), false);
+});
+
+// --- Failure threshold ------------------------------------------------------
+
+test('the payload carries target and check failure thresholds, null meaning inherit', () => {
+  editorState({
+    FailureThreshold: 3,
+    Checks: [check({ FailureThreshold: 5 }), check({ FailureThreshold: null }), check()],
+  });
+  const Payload = BuildMonitoringPayload();
+  assert.equal(Payload.FailureThreshold, 3);
+  assert.equal(Payload.Checks[0].FailureThreshold, 5);
+  assert.equal(Payload.Checks[1].FailureThreshold, null);
+  // A draft from before the field existed still sends an explicit inherit.
+  assert.equal(Payload.Checks[2].FailureThreshold, null);
+});
+
+test('a threshold select value parses to a whole number or inherit', () => {
+  assert.equal(ParseFailureThreshold(''), null);
+  assert.equal(ParseFailureThreshold(undefined), null);
+  assert.equal(ParseFailureThreshold('4'), 4);
+  assert.equal(ParseFailureThreshold('0'), 1);
+  assert.equal(ParseFailureThreshold('42'), 10);
+});
+
+test('the inherit option names the value it resolves to', () => {
+  const Options = FailureThresholdOptions('Default', 3);
+  assert.deepEqual(Options[0], { value: '', label: 'Default (3 failures in a row)' });
+  assert.deepEqual(Options[1], { value: '1', label: 'First failure' });
+  assert.equal(Options.length, 11);
+});
+
+test('missed checks are only described while the check is holding', () => {
+  assert.equal(DescribeMissedChecks(0, 3, true), '');
+  assert.equal(DescribeMissedChecks(2, 3, true), 'Missed 2 of 3');
+  // Never answered yet: still holding, still worth saying.
+  assert.equal(DescribeMissedChecks(1, 3, false), 'Missed 1 of 3');
+  // Threshold of 1 never holds; an offline check's run is the outage itself.
+  assert.equal(DescribeMissedChecks(1, 1, true), '');
+  assert.equal(DescribeMissedChecks(7, 3, false), '');
 });

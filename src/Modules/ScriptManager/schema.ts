@@ -18,6 +18,28 @@ const PLATFORM_KEYS = ['Windows', 'macOS', 'Linux'];
 const CONSOLE_FILTER_MODES = ['none', 'startsWith', 'includes', 'regex'];
 const DEFAULT_CONSOLE_FILTER_MODE = 'none';
 
+// How hard a script asks before it runs. Script.json stores this as the
+// historical `Confirmation` boolean plus an optional `ConfirmationStyle`, which
+// is written ONLY for "Critical": every pre-existing Script.json stays
+// byte-identical (no checksum churn, no mass redeploy), and older clients and
+// SDK consumers that only read `Confirmation` still see a confirm-worthy script.
+const CONFIRMATION_LEVELS = ['None', 'Standard', 'Critical'] as const;
+type ConfirmationLevel = (typeof CONFIRMATION_LEVELS)[number];
+const CRITICAL_CONFIRMATION_STYLE = 'Critical';
+
+function IsConfirmationLevel(value: unknown): value is ConfirmationLevel {
+  return typeof value === 'string' && (CONFIRMATION_LEVELS as readonly string[]).includes(value);
+}
+
+// Collapse the two Script.json keys into one level.
+function ResolveConfirmationLevel(Config: {
+  Confirmation?: unknown;
+  ConfirmationStyle?: unknown;
+}): ConfirmationLevel {
+  if (Config.Confirmation !== true) return 'None';
+  return Config.ConfirmationStyle === CRITICAL_CONFIRMATION_STYLE ? 'Critical' : 'Standard';
+}
+
 const WINDOWS_SCRIPT_EXTENSIONS = new Set(['.bat', '.cmd', '.ps1', '.exe']);
 const POSIX_SCRIPT_EXTENSIONS = new Set(['.sh', '.bash', '.zsh', '.command']);
 
@@ -161,6 +183,8 @@ interface NormalizedScriptConfig {
   Icon: string;
   Weight: number;
   Confirmation: boolean;
+  /** Present only when "Critical"; see CONFIRMATION_LEVELS. */
+  ConfirmationStyle?: 'Critical';
   Enabled: boolean;
   Timeout: number;
   Platforms: Record<string, string>;
@@ -261,6 +285,16 @@ function NormalizeScriptConfig(
   } else {
     config.Confirmation = false;
     errors.push('"Confirmation" was missing or invalid; defaulted to false.');
+  }
+  // The style only means something on a confirmed script, and only "Critical"
+  // is ever stored; anything else is dropped so the file stays canonical.
+  if (config.Confirmation === true && data.ConfirmationStyle === CRITICAL_CONFIRMATION_STYLE) {
+    config.ConfirmationStyle = CRITICAL_CONFIRMATION_STYLE;
+  } else if ('ConfirmationStyle' in config) {
+    delete config.ConfirmationStyle;
+    if (config.Confirmation === true && data.ConfirmationStyle !== 'Standard') {
+      errors.push('"ConfirmationStyle" was invalid; reset to a standard confirmation.');
+    }
   }
 
   // Enabled --------------------------------------------------------------
@@ -386,6 +420,9 @@ function NormalizeScriptConfig(
 
 export {
   PLATFORM_KEYS,
+  CONFIRMATION_LEVELS,
+  IsConfirmationLevel,
+  ResolveConfirmationLevel,
   SCRIPT_COLOURS,
   BOOTSTRAP_TO_COLOUR_INDEX,
   CONSOLE_FILTER_MODES,
@@ -394,4 +431,4 @@ export {
   NormalizeConsoleFilter,
   NormalizeIconName,
 };
-export type { NormalizedScriptConfig, ConsoleFilterConfig };
+export type { NormalizedScriptConfig, ConsoleFilterConfig, ConfirmationLevel };

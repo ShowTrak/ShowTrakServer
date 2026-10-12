@@ -6,6 +6,7 @@ const {
   SCRIPT_COLOURS,
   NormalizeScriptConfig,
   NormalizeConsoleFilter,
+  ResolveConfirmationLevel,
 } = require('../dist/Modules/ScriptManager/schema');
 
 test('NormalizeScriptConfig fills in every required key with defaults', () => {
@@ -150,6 +151,68 @@ test('NormalizeScriptConfig leaves an already-valid config untouched', () => {
   const { changed, errors } = NormalizeScriptConfig(valid, 'Deploy');
   assert.equal(changed, false);
   assert.equal(errors.length, 0);
+});
+
+const VALID_BASE = {
+  Name: 'Deploy',
+  Description: '',
+  Colour: 3,
+  Weight: 0,
+  Confirmation: false,
+  Timeout: 15000,
+  Enabled: false,
+  Icon: 'terminal',
+  Platforms: { Windows: 'win.bat', macOS: '', Linux: '' },
+  Arguments: { Windows: '', macOS: '', Linux: '' },
+  ConsoleFilter: { Mode: 'none', Pattern: '', Strip: false },
+};
+
+test('NormalizeScriptConfig keeps a critical confirmation untouched', () => {
+  const { config, changed, errors } = NormalizeScriptConfig(
+    { ...VALID_BASE, Confirmation: true, ConfirmationStyle: 'Critical' },
+    'Deploy'
+  );
+  assert.equal(changed, false);
+  assert.equal(errors.length, 0);
+  assert.equal(config.ConfirmationStyle, 'Critical');
+  assert.equal(ResolveConfirmationLevel(config), 'Critical');
+});
+
+test('NormalizeScriptConfig never adds ConfirmationStyle to an existing script', () => {
+  // Pre-existing Script.json files must stay byte-identical (no redeploy churn).
+  for (const Confirmation of [true, false]) {
+    const { config, changed } = NormalizeScriptConfig({ ...VALID_BASE, Confirmation }, 'Deploy');
+    assert.equal(changed, false);
+    assert.equal('ConfirmationStyle' in config, false);
+  }
+});
+
+test('NormalizeScriptConfig drops a style that cannot apply', () => {
+  // Critical without Confirmation means "no confirmation": the style is dropped.
+  const off = NormalizeScriptConfig(
+    { ...VALID_BASE, Confirmation: false, ConfirmationStyle: 'Critical' },
+    'Deploy'
+  );
+  assert.equal('ConfirmationStyle' in off.config, false);
+  assert.equal(ResolveConfirmationLevel(off.config), 'None');
+
+  // An explicit "Standard" is redundant: dropped silently.
+  const standard = NormalizeScriptConfig(
+    { ...VALID_BASE, Confirmation: true, ConfirmationStyle: 'Standard' },
+    'Deploy'
+  );
+  assert.equal('ConfirmationStyle' in standard.config, false);
+  assert.equal(standard.errors.length, 0);
+  assert.equal(ResolveConfirmationLevel(standard.config), 'Standard');
+
+  // Garbage falls back to a standard confirmation, with a warning.
+  const junk = NormalizeScriptConfig(
+    { ...VALID_BASE, Confirmation: true, ConfirmationStyle: 'scary' },
+    'Deploy'
+  );
+  assert.equal('ConfirmationStyle' in junk.config, false);
+  assert.ok(junk.errors.some((e) => e.includes('ConfirmationStyle')));
+  assert.equal(ResolveConfirmationLevel(junk.config), 'Standard');
 });
 
 test('NormalizeScriptConfig normalizes a valid ConsoleFilter', () => {

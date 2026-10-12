@@ -294,6 +294,43 @@ test('IPCValidation.MonitoringTargetUpdatePayload validates partial updates', ()
   );
 });
 
+test('IPCValidation monitoring payloads accept failure thresholds of 1-10 or inherit', () => {
+  const create = IPCValidation.MonitoringTargetCreatePayload({
+    Nickname: 'Projector',
+    Interval: 5000,
+    FailureThreshold: 3,
+    Checks: [{ Address: 'a', Method: 'ping', FailureThreshold: 10 }],
+  });
+  assert.equal(create.FailureThreshold, 3);
+  assert.equal(create.Checks[0].FailureThreshold, 10);
+
+  // null / '' clear an override back to inherit.
+  const update = IPCValidation.MonitoringTargetUpdatePayload({
+    FailureThreshold: null,
+    Checks: [{ Address: 'a', Method: 'ping', FailureThreshold: '' }],
+  });
+  assert.equal(update.FailureThreshold, null);
+  assert.equal(update.Checks[0].FailureThreshold, null);
+
+  // Absent stays absent, so a partial update never clears the stored value.
+  const partial = IPCValidation.MonitoringTargetUpdatePayload({ Interval: 5000 });
+  assert.equal(Object.prototype.hasOwnProperty.call(partial, 'FailureThreshold'), false);
+
+  for (const Bad of [0, 11, 2.5, 'three']) {
+    assert.throws(
+      () => IPCValidation.MonitoringTargetUpdatePayload({ FailureThreshold: Bad }),
+      /FailureThreshold must be a whole number from 1 to 10/
+    );
+  }
+  assert.throws(
+    () =>
+      IPCValidation.MonitoringTargetUpdatePayload({
+        Checks: [{ Address: 'a', Method: 'ping', FailureThreshold: 0 }],
+      }),
+    /Check 1 FailureThreshold/
+  );
+});
+
 test('IPCValidation.AlertRuleID validates numeric rule identifiers', () => {
   assert.equal(IPCValidation.AlertRuleID(8), 8);
   assert.equal(IPCValidation.AlertRuleID(' 9 '), 9);

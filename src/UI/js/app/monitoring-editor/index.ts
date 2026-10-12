@@ -52,6 +52,80 @@ import {
 export * from './method-fields';
 export * from './network-discovery';
 
+// --- Failure threshold ------------------------------------------------------
+//
+// How many failed probes in a row a check needs before it reads offline. Both
+// the target and each check can override it; null means "inherit" (check ->
+// target -> the server-wide MONITORING_FAILURE_THRESHOLD setting).
+
+export const MAX_FAILURE_THRESHOLD = 10;
+
+// Server-wide default, refreshed each time the editor opens. Falls back to 1
+// (the historical behaviour) if the setting cannot be read.
+let GlobalFailureThreshold = 1;
+
+async function LoadGlobalFailureThreshold() {
+  try {
+    // Imported lazily: ../settings pulls in the audio stack at module load, and
+    // a static import here would drag that into every importer of the editor.
+    const { GetSettingValue } = await import('../settings');
+    const Value = Number(await GetSettingValue('MONITORING_FAILURE_THRESHOLD'));
+    if (Number.isInteger(Value) && Value >= 1) GlobalFailureThreshold = Value;
+  } catch (err) {
+    HandleNonFatalError('MonitoringEditor:LoadGlobalFailureThreshold', err);
+  }
+}
+
+// '' (inherit) or a whole number 1–10 from a threshold <select>.
+export function ParseFailureThreshold(Raw: unknown): number | null {
+  const n = parseInt(String(Raw ?? ''), 10);
+  if (!Number.isFinite(n)) return null;
+  return Math.min(MAX_FAILURE_THRESHOLD, Math.max(1, n));
+}
+
+export function FailureThresholdLabel(n: number): string {
+  return n <= 1 ? 'First failure' : `${n} failures in a row`;
+}
+
+// Option list for a threshold <select>: an "inherit" entry naming the value it
+// resolves to, then every explicit value.
+export function FailureThresholdOptions(InheritPrefix: string, Inherited: number) {
+  const Options = [{ value: '', label: `${InheritPrefix} (${FailureThresholdLabel(Inherited)})` }];
+  for (let n = 1; n <= MAX_FAILURE_THRESHOLD; n++) {
+    Options.push({ value: String(n), label: FailureThresholdLabel(n) });
+  }
+  return Options;
+}
+
+function RenderFailureThresholdSelect(
+  Selector: string,
+  InheritPrefix: string,
+  Inherited: number,
+  Value: number | null
+) {
+  const $select = $(Selector);
+  $select.empty();
+  for (const Option of FailureThresholdOptions(InheritPrefix, Inherited)) {
+    $select.append($('<option></option>').attr('value', Option.value).text(Option.label));
+  }
+  $select.val(Value == null ? '' : String(Value));
+}
+
+// "Missed 1 of 3" for a check that has failed but not yet enough times to read
+// offline; empty when there is nothing pending.
+export function DescribeMissedChecks(
+  ConsecutiveFailures: unknown,
+  Threshold: unknown,
+  Online: unknown
+): string {
+  const Missed = Number(ConsecutiveFailures) || 0;
+  const Needed = Number(Threshold) || 1;
+  if (Missed <= 0 || Needed <= 1) return '';
+  // Once a check is offline the run is the outage itself, not a warning.
+  if (Online === false && Missed >= Needed) return '';
+  return `Missed ${Math.min(Missed, Needed)} of ${Needed}`;
+}
+
 // --- Multi-check monitoring target editor ---------------------------------
 
 // Locate the persisted target (if any) in the live cache so we can surface each
@@ -112,7 +186,10 @@ export function RenderMonitoringCheckList() {
     // that haven't run yet keep the neutral badge.
     let badgeClass = 'bg-ghost-light text-light';
     let badgeTitle = 'Not checked yet';
-    if (live) {
+    const missed = live
+      ? DescribeMissedChecks(live.ConsecutiveFailures, live.EffectiveFailureThreshold, live.Online)
+      : '';
+    if (live && live.LastChecked != null) {
       if (!live.Online) {
         badgeClass = 'bg-danger text-light';
         badgeTitle = 'Offline';
@@ -129,6 +206,7 @@ export function RenderMonitoringCheckList() {
         <div class="flex-grow-1 text-start">
           <div class="text-light" data-type="CHECK_NAME">${Safe(name)}</div>
           ${ip ? `<small class="text-muted" data-type="CHECK_IP">${Safe(ip)}</small>` : ''}
+          ${missed ? `<small class="text-warning ms-2" data-type="CHECK_MISSED">${Safe(missed)}</small>` : ''}
         </div>
         <div class="d-flex align-items-center">
           <span class="badge ${badgeClass}" data-type="CHECK_METHOD" title="${Safe(badgeTitle)}">${Safe(method)}</span>
@@ -179,6 +257,12 @@ export function OpenMonitoringCheckView(index: number) {
   $('#MONITORING_CHECK_DEGRADED_THRESHOLD').val(
     Number.isFinite(Number(check.DegradedThresholdMs)) ? Number(check.DegradedThresholdMs) : 0
   );
+  RenderFailureThresholdSelect(
+    '#MONITORING_CHECK_FAILURE_THRESHOLD',
+    'Same as target',
+    MonitoringEditorState.FailureThreshold ?? GlobalFailureThreshold,
+    check.FailureThreshold ?? null
+  );
 
   RenderMonitoringCheckInfo($method.val());
   ApplyMonitoringMethodCapabilities($method.val());
@@ -216,8 +300,15 @@ export function RenderMonitoringCheckDebug(payload: MonitoringCheckDebug | null)
   }
 
   let statusText = 'Online';
-  if (!payload.Online) statusText = 'Offline';
+  if (payload.LastChecked == null) statusText = 'Checking';
+  else if (!payload.Online) statusText = 'Offline';
   else if (payload.Degraded) statusText = 'Degraded';
+  const missed = DescribeMissedChecks(
+    payload.ConsecutiveFailures,
+    payload.EffectiveFailureThreshold,
+    payload.Online
+  );
+  if (missed) statusText += ` · ${missed}`;
 
   let when = '';
   if (payload.LastChecked) {
@@ -355,7 +446,12 @@ function RenderMonitoringCheckStatusFromPayload(payload: MonitoringCheckDebug | 
   }
   let title = 'Online';
   let kind = 'online';
-  if (!payload.Online) {
+  if (payload.LastChecked == null) {
+    // Probes have run but none has produced a verdict yet: still inside the
+    // failure threshold on first contact.
+    title = 'Checking';
+    kind = 'idle';
+  } else if (!payload.Online) {
     title = 'Offline';
     kind = 'offline';
   } else if (payload.Degraded) {
@@ -363,6 +459,16 @@ function RenderMonitoringCheckStatusFromPayload(payload: MonitoringCheckDebug | 
     kind = 'degraded';
   }
   const parts: string[] = [];
+  const missed = DescribeMissedChecks(
+    payload.ConsecutiveFailures,
+    payload.EffectiveFailureThreshold,
+    payload.Online
+  );
+  if (missed) {
+    parts.push(
+      `<div>${Safe(missed)} checks — not marked offline until ${Safe(String(payload.EffectiveFailureThreshold))} in a row fail.</div>`
+    );
+  }
   if (payload.LastError) {
     parts.push(`<div class="text-break">${Safe(payload.LastError)}</div>`);
   } else if (payload.Online && !payload.Degraded) {
@@ -529,6 +635,7 @@ export function CommitMonitoringCheckView() {
     0,
     parseInt(String($('#MONITORING_CHECK_DEGRADED_THRESHOLD').val() || ''), 10) || 0
   );
+  check.FailureThreshold = ParseFailureThreshold($('#MONITORING_CHECK_FAILURE_THRESHOLD').val());
   check.Settings = CollectMonitoringCheckDynamicSettings();
   ScheduleMonitoringAutoSave();
   // Every edit also debounce-refreshes the live status card (re-runs the check
@@ -542,6 +649,7 @@ export function BuildMonitoringPayload() {
     Nickname: string;
     Interval: number;
     GroupID: number | null;
+    FailureThreshold: number | null;
     Slug?: string;
     Checks: Array<{
       Name: string;
@@ -549,12 +657,14 @@ export function BuildMonitoringPayload() {
       Method: string;
       Settings: Record<string, unknown>;
       DegradedThresholdMs: number;
+      FailureThreshold: number | null;
       CheckID?: number | null;
     }>;
   } = {
     Nickname: (s.Nickname || '').trim(),
     Interval: s.Interval,
     GroupID: s.GroupID == null ? null : s.GroupID,
+    FailureThreshold: s.FailureThreshold ?? null,
     Checks: s.Checks.map((c) => {
       const out: {
         Name: string;
@@ -562,6 +672,7 @@ export function BuildMonitoringPayload() {
         Method: string;
         Settings: Record<string, unknown>;
         DegradedThresholdMs: number;
+        FailureThreshold: number | null;
         CheckID?: number | null;
       } = {
         Name: c.Name || '',
@@ -569,6 +680,7 @@ export function BuildMonitoringPayload() {
         Method: c.Method,
         Settings: c.Settings || {},
         DegradedThresholdMs: Math.max(0, Number(c.DegradedThresholdMs) || 0),
+        FailureThreshold: c.FailureThreshold ?? null,
       };
       if (c.CheckID != null) out.CheckID = c.CheckID;
       return out;
@@ -688,6 +800,7 @@ export async function OpenMonitoringTargetEditor(
 ) {
   await CloseAllModals();
   await EnsureMonitoringMethodsLoaded();
+  await LoadGlobalFailureThreshold();
 
   const DefaultMethod = MonitoringMethodsCache[0] && MonitoringMethodsCache[0].ID;
 
@@ -700,6 +813,7 @@ export async function OpenMonitoringTargetEditor(
       Nickname: Existing.Nickname || '',
       Interval: Number(Existing.Interval) || 30000,
       GroupID: Existing.GroupID == null ? null : Existing.GroupID,
+      FailureThreshold: Existing.FailureThreshold ?? null,
       Slug: Existing.Slug || '',
       OriginalSlug: Existing.Slug || '',
       Checks: (Existing.Checks || []).map((c) => ({
@@ -709,6 +823,7 @@ export async function OpenMonitoringTargetEditor(
         Method: c.Method || DefaultMethod || '',
         Settings: c.Settings || {},
         DegradedThresholdMs: Number(c.DegradedThresholdMs) || 0,
+        FailureThreshold: c.FailureThreshold ?? null,
       })),
       View: 'list',
       EditingIndex: null,
@@ -722,6 +837,7 @@ export async function OpenMonitoringTargetEditor(
       Nickname: (Prefill && Prefill.Nickname) || '',
       Interval: 30000,
       GroupID: null,
+      FailureThreshold: null,
       Slug: '',
       OriginalSlug: '',
       Checks: [],
@@ -779,6 +895,12 @@ export async function OpenMonitoringTargetEditor(
   $('#MONITORING_TARGET_NICKNAME').val(MonitoringEditorState!.Nickname);
   $('#MONITORING_TARGET_INTERVAL').val(MonitoringEditorState!.Interval);
   $('#MONITORING_TARGET_INTERVAL_LABEL').text(FormatInterval(MonitoringEditorState!.Interval));
+  RenderFailureThresholdSelect(
+    '#MONITORING_TARGET_FAILURE_THRESHOLD',
+    'Default',
+    GlobalFailureThreshold,
+    MonitoringEditorState!.FailureThreshold
+  );
   SetMonitoringSaveHint('', null);
 
   // Global (target-level) inputs
@@ -801,6 +923,12 @@ export async function OpenMonitoringTargetEditor(
       $('#MONITORING_TARGET_INTERVAL_LABEL').text(FormatInterval(MonitoringEditorState!.Interval));
       ScheduleMonitoringAutoSave();
     });
+  $('#MONITORING_TARGET_FAILURE_THRESHOLD')
+    .off('change.mon')
+    .on('change.mon', function () {
+      MonitoringEditorState!.FailureThreshold = ParseFailureThreshold($(this).val());
+      ScheduleMonitoringAutoSave();
+    });
 
   SyncAddCheckButtonState();
 
@@ -815,6 +943,7 @@ export async function OpenMonitoringTargetEditor(
         Method: DefaultMethod || '',
         Settings: {},
         DegradedThresholdMs: 0,
+        FailureThreshold: null,
       });
       OpenMonitoringCheckView(MonitoringEditorState.Checks.length - 1);
     });
@@ -833,6 +962,11 @@ export async function OpenMonitoringTargetEditor(
   $('#MONITORING_CHECK_NAME, #MONITORING_CHECK_ADDRESS, #MONITORING_CHECK_DEGRADED_THRESHOLD')
     .off('input.moncheck')
     .on('input.moncheck', function () {
+      CommitMonitoringCheckView();
+    });
+  $('#MONITORING_CHECK_FAILURE_THRESHOLD')
+    .off('change.moncheck')
+    .on('change.moncheck', function () {
       CommitMonitoringCheckView();
     });
   $('#MONITORING_CHECK_METHOD')

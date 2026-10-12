@@ -21,6 +21,7 @@ export function CreateMonitoringChecksRepository(DB: DBManager) {
       Method: string,
       Settings: string,
       DegradedThresholdMs: number,
+      FailureThreshold: number | null,
       Weight: number,
       LastSuccessAt: number | null,
       Timestamp: number,
@@ -28,7 +29,7 @@ export function CreateMonitoringChecksRepository(DB: DBManager) {
     ): Promise<DBResult<{ lastID: number }>> {
       const Exec: TxRun = run ?? ((Query, Params) => DB.Run(Query, Params));
       return Exec(
-        'INSERT INTO MonitoringChecks (TargetID, Name, Address, Method, Settings, DegradedThresholdMs, Weight, LastSuccessAt, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO MonitoringChecks (TargetID, Name, Address, Method, Settings, DegradedThresholdMs, FailureThreshold, Weight, LastSuccessAt, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           TargetID,
           Name,
@@ -36,6 +37,7 @@ export function CreateMonitoringChecksRepository(DB: DBManager) {
           Method,
           Settings,
           DegradedThresholdMs,
+          FailureThreshold,
           Weight,
           LastSuccessAt,
           Timestamp,
@@ -49,12 +51,13 @@ export function CreateMonitoringChecksRepository(DB: DBManager) {
       Method: string,
       Settings: string,
       DegradedThresholdMs: number,
+      FailureThreshold: number | null,
       Weight: number,
       CheckID: number
     ): Promise<DBResult<unknown>> {
       return DB.Run(
-        'UPDATE MonitoringChecks SET Name = ?, Address = ?, Method = ?, Settings = ?, DegradedThresholdMs = ?, Weight = ? WHERE CheckID = ?',
-        [Name, Address, Method, Settings, DegradedThresholdMs, Weight, CheckID]
+        'UPDATE MonitoringChecks SET Name = ?, Address = ?, Method = ?, Settings = ?, DegradedThresholdMs = ?, FailureThreshold = ?, Weight = ? WHERE CheckID = ?',
+        [Name, Address, Method, Settings, DegradedThresholdMs, FailureThreshold, Weight, CheckID]
       );
     },
 

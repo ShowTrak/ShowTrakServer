@@ -7,7 +7,8 @@
 //   1. Alert-style toasts  — top-center, stack in a host, hover-pausable
 //      auto-dismiss (`showAlertStyleToast` / `Notify`).
 //   2. Confirmation dialog — single modal toast, promise-based, keyboard-driven
-//      (`ConfirmationDialog`).
+//      (`ConfirmationDialog`), plus a centred red modal for critical actions
+//      that defaults to Cancel (`CriticalConfirmationDialog`).
 //   3. Execution toast     — persistent region holding a live execution list,
 //      outside-click to dismiss (`ShowExecutionToast` / `HideExecutionToast`).
 //
@@ -242,6 +243,112 @@ export async function ConfirmationDialog(Message: unknown) {
         $btnConfirm.trigger('focus');
       } catch (err) {
         HandleNonFatalError('SelectionInit:NonFatal', err);
+      }
+    }, 0);
+  });
+}
+
+// --- 2b. Critical confirmation ----------------------------------------------
+// The loud sibling of ConfirmationDialog for actions that must never fire by
+// accident: a centred red modal over a dimmed screen whose DEFAULT is Cancel.
+// Focus starts on Cancel, Enter/Space only confirm when Confirm itself has
+// focus, and Escape or a click outside both cancel.
+
+interface CriticalConfirmationOptions {
+  title: string;
+  message: string;
+  /** Optional names listed under the message (e.g. the target clients). */
+  items?: string[];
+  confirmLabel?: string;
+}
+
+const CRITICAL_CONFIRM_MAX_ITEMS = 8;
+
+// Settles the open dialog (as cancelled) if another one replaces it, so its
+// caller is never left awaiting a promise that can no longer resolve.
+let settleOpenCriticalConfirm: ((value: boolean) => void) | null = null;
+
+export function CriticalConfirmationDialog(Options: CriticalConfirmationOptions): Promise<boolean> {
+  if (settleOpenCriticalConfirm) settleOpenCriticalConfirm(false);
+
+  return new Promise<boolean>((resolve) => {
+    const Items = Array.isArray(Options.items) ? Options.items : [];
+    const Shown = Items.slice(0, CRITICAL_CONFIRM_MAX_ITEMS);
+    const Hidden = Items.length - Shown.length;
+    const ItemsHtml = Shown.length
+      ? `<ul class="critical-confirm-items">${Shown.map((Item) => `<li>${Safe(Item)}</li>`).join('')}${
+          Hidden > 0 ? `<li class="critical-confirm-more">and ${Hidden} more</li>` : ''
+        }</ul>`
+      : '';
+
+    const $dialog = $(`
+			<div id="SHOWTRAK_CRITICAL_CONFIRM" class="critical-confirm no-drag">
+				<div class="critical-confirm-panel" role="alertdialog" aria-modal="true"
+					aria-labelledby="CRITICAL_CONFIRM_TITLE" aria-describedby="CRITICAL_CONFIRM_MSG">
+					<div class="critical-confirm-icon"><i class="bi bi-exclamation-octagon-fill"></i></div>
+					<h2 class="critical-confirm-title" id="CRITICAL_CONFIRM_TITLE">${Safe(Options.title)}</h2>
+					<div class="critical-confirm-msg" id="CRITICAL_CONFIRM_MSG">${Safe(Options.message)}</div>
+					${ItemsHtml}
+					<div class="critical-confirm-actions">
+						<button type="button" class="btn critical-confirm-cancel" id="CRITICAL_CONFIRM_CANCEL">Cancel</button>
+						<button type="button" class="btn critical-confirm-go" id="CRITICAL_CONFIRM_GO">${Safe(
+              Options.confirmLabel || 'Continue'
+            )}</button>
+					</div>
+					<div class="critical-confirm-hint">Press Esc to cancel</div>
+				</div>
+			</div>`);
+
+    $('body').append($dialog);
+    const $btnCancel = $dialog.find('#CRITICAL_CONFIRM_CANCEL');
+    const $btnGo = $dialog.find('#CRITICAL_CONFIRM_GO');
+
+    setConfirmDialogActive(true);
+
+    const settle = (value: boolean) => {
+      settleOpenCriticalConfirm = null;
+      $(document).off('keydown.criticalConfirm');
+      try {
+        $dialog.remove();
+      } catch (err) {
+        HandleNonFatalError('CriticalConfirm:Remove', err);
+      }
+      setConfirmDialogActive(false);
+      resolve(value);
+    };
+    settleOpenCriticalConfirm = settle;
+
+    $btnCancel.on('click', () => settle(false));
+    $btnGo.on('click', () => settle(true));
+    // A click on the dimmed backdrop (not the panel) cancels.
+    $dialog.on('mousedown', (e) => {
+      if (e.target === $dialog.get(0)) settle(false);
+    });
+
+    $(document).on('keydown.criticalConfirm', (e) => {
+      const key = e.key;
+      const onGo = document.activeElement === $btnGo.get(0);
+      if (key === 'Enter' || key === ' ') {
+        e.preventDefault();
+        return settle(onGo);
+      }
+      if (key === 'Escape') {
+        e.preventDefault();
+        return settle(false);
+      }
+      // Keep focus trapped on the two buttons.
+      if (key === 'Tab' || key === 'ArrowLeft' || key === 'ArrowRight') {
+        e.preventDefault();
+        const toGo = key === 'ArrowRight' || (key === 'Tab' && !onGo);
+        return (toGo ? $btnGo : $btnCancel).trigger('focus');
+      }
+    });
+
+    setTimeout(() => {
+      try {
+        $btnCancel.trigger('focus');
+      } catch (err) {
+        HandleNonFatalError('CriticalConfirm:Focus', err);
       }
     }, 0);
   });

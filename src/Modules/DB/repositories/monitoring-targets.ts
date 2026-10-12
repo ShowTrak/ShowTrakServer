@@ -22,13 +22,26 @@ export function CreateMonitoringTargetsRepository(DB: DBManager) {
       Interval: number,
       GroupID: number | null,
       Weight: number,
+      FailureThreshold: number | null,
       Timestamp: number,
       run?: TxRun
     ): Promise<DBResult<{ lastID: number }>> {
       const Exec: TxRun = run ?? ((Query, Params) => DB.Run(Query, Params));
       return Exec(
-        'INSERT INTO MonitoringTargets (Nickname, Address, Method, Interval, Settings, GroupID, Weight, LastSuccessAt, DegradedThresholdMs, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [Nickname, '', Method, Interval, '{}', GroupID, Weight, null, 0, Timestamp]
+        'INSERT INTO MonitoringTargets (Nickname, Address, Method, Interval, Settings, GroupID, Weight, LastSuccessAt, DegradedThresholdMs, FailureThreshold, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          Nickname,
+          '',
+          Method,
+          Interval,
+          '{}',
+          GroupID,
+          Weight,
+          null,
+          0,
+          FailureThreshold,
+          Timestamp,
+        ]
       );
     },
 
@@ -36,11 +49,12 @@ export function CreateMonitoringTargetsRepository(DB: DBManager) {
       Nickname: string | null,
       Interval: number,
       GroupID: number | null,
+      FailureThreshold: number | null,
       TargetID: number
     ): Promise<DBResult<unknown>> {
       return DB.Run(
-        'UPDATE MonitoringTargets SET Nickname = ?, Interval = ?, GroupID = ? WHERE TargetID = ?',
-        [Nickname, Interval, GroupID, TargetID]
+        'UPDATE MonitoringTargets SET Nickname = ?, Interval = ?, GroupID = ?, FailureThreshold = ? WHERE TargetID = ?',
+        [Nickname, Interval, GroupID, FailureThreshold, TargetID]
       );
     },
 

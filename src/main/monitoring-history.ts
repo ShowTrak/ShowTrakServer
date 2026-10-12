@@ -35,6 +35,7 @@ type EntityHistoryStore = Map<EntityHistoryKey, HistorySample[]>;
 // Loose monitor-target/check shapes consumed by the monitoring history helpers.
 interface MonitoringCheckLike {
   CheckID?: unknown;
+  LastChecked?: unknown;
   Online?: unknown;
   Degraded?: unknown;
   LastLatencyMs?: unknown;
@@ -217,6 +218,9 @@ function recordMonitoringHistorySample(target: MonitoringTargetLike | null | und
   const checks = Array.isArray(target.Checks) ? target.Checks : [];
   for (const check of checks) {
     if (!check || check.CheckID == null) continue;
+    // A check still inside its failure threshold on first contact has no
+    // verdict; charting that gap as offline would draw an outage that never was.
+    if (check.LastChecked == null) continue;
     recordEntityHistorySample(ENTITY_MONITOR_TARGET, check.CheckID, {
       online: !!check.Online,
       degraded: !!check.Degraded,

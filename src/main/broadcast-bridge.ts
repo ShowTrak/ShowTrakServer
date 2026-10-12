@@ -408,6 +408,9 @@ interface MonitoringCheckSnapshot {
   Method?: unknown;
   Settings?: unknown;
   DegradedThresholdMs?: unknown;
+  FailureThreshold?: unknown;
+  EffectiveFailureThreshold?: unknown;
+  ConsecutiveFailures?: unknown;
   Weight?: unknown;
   Online?: unknown;
   Degraded?: unknown;
@@ -424,6 +427,7 @@ function BuildMonitoringSignature(Target: BroadcastMonitoringTarget): string {
     Target.GroupID,
     Target.Weight,
     Target.Slug,
+    Target.FailureThreshold,
     Target.Address,
     Target.Method,
     Target.DegradedThresholdMs,
@@ -440,6 +444,9 @@ function BuildMonitoringSignature(Target: BroadcastMonitoringTarget): string {
       Check && Check.Method,
       Check && Check.Settings,
       Check && Check.DegradedThresholdMs,
+      Check && Check.FailureThreshold,
+      Check && Check.EffectiveFailureThreshold,
+      Check && Check.ConsecutiveFailures,
       Check && Check.Weight,
       Check && Check.Online,
       Check && Check.Degraded,

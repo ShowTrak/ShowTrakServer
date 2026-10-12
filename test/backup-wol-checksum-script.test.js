@@ -189,3 +189,49 @@ test('ScriptManager loads script folders and computes file checksums', async () 
   assert.equal(events.length, 0);
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
+
+test('ScriptManager round-trips the confirmation level through Script.json', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-scripts-'));
+  const scriptDir = path.join(tmpDir, 'Shutdown');
+  fs.mkdirSync(scriptDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(scriptDir, 'Script.json'),
+    JSON.stringify({ Name: 'Shutdown', Confirmation: true, Platforms: { macOS: 'run.sh' } }),
+    'utf8'
+  );
+  fs.writeFileSync(path.join(scriptDir, 'run.sh'), 'echo test', 'utf8');
+
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'ScriptManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => createLoggerStub() },
+    '../AppData': { Manager: { GetScriptsDirectory: () => tmpDir } },
+    '@showtrak/protocol/runtime': { ChecksumFile: async () => 'sum123' },
+    '../Broadcast': { Manager: { emit: () => {} } },
+  });
+  const ReadJson = () => JSON.parse(fs.readFileSync(path.join(scriptDir, 'Script.json'), 'utf8'));
+
+  // A legacy boolean reads as a standard confirmation.
+  assert.equal((await Manager.Get('Shutdown')).ConfirmationLevel, 'Standard');
+  let [, Editable] = await Manager.GetEditable('Shutdown');
+  assert.equal(Editable.confirmation, 'Standard');
+
+  // Critical keeps the boolean (for older clients/SDKs) and adds the style.
+  await Manager.SaveFields('Shutdown', { ...Editable, confirmation: 'Critical' });
+  assert.equal(ReadJson().Confirmation, true);
+  assert.equal(ReadJson().ConfirmationStyle, 'Critical');
+  assert.equal((await Manager.Get('Shutdown')).ConfirmationLevel, 'Critical');
+  [, Editable] = await Manager.GetEditable('Shutdown');
+  assert.equal(Editable.confirmation, 'Critical');
+
+  // None clears both.
+  await Manager.SaveFields('Shutdown', { ...Editable, confirmation: 'None' });
+  assert.equal(ReadJson().Confirmation, false);
+  assert.equal('ConfirmationStyle' in ReadJson(), false);
+  assert.equal((await Manager.Get('Shutdown')).ConfirmationLevel, 'None');
+
+  // The legacy boolean field is still honoured when no level is sent.
+  await Manager.SaveFields('Shutdown', { name: 'Shutdown', confirm: true });
+  assert.equal((await Manager.Get('Shutdown')).ConfirmationLevel, 'Standard');
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
