@@ -103,6 +103,25 @@ test('a channel on no allowlist is denied however permissive the settings', asyn
   }
 });
 
+test('ToPublicSettings passes only the allowlisted keys', () => {
+  const Mod = load();
+  const Rows = [
+    { Key: 'UI_GROUP_COLUMN_COUNT', Value: 3 },
+    { Key: 'WEBUI_PASSWORD', Value: '1234' },
+    { Key: 'SDK_API_KEY', Value: 'k' },
+    { Key: 'FOG_USER_TOKEN', Value: 't' },
+    null,
+    { Value: 'no key' },
+  ];
+  assert.deepEqual(Mod.ToPublicSettings(Rows), [{ Key: 'UI_GROUP_COLUMN_COUNT', Value: 3 }]);
+  assert.deepEqual(Mod.ToPublicSettings(null), []);
+  assert.deepEqual(Mod.ToPublicSettings({ Key: 'UI_GROUP_COLUMN_COUNT' }), []);
+  // Nothing secret-shaped may ever join the allowlist.
+  for (const Key of Mod.PUBLIC_SETTING_KEYS) {
+    assert.doesNotMatch(Key, /PASSWORD|TOKEN|KEY$|SECRET/, `"${Key}" looks like a secret`);
+  }
+});
+
 test('an unknown channel is denied rather than passed through', async () => {
   const Mod = load({ settings: ALL_ON });
   assert.deepEqual(await Mod.AuthorizeChannel('REMOTE', 'DropAllTables'), {

@@ -211,8 +211,26 @@ const PUSH_CHANNELS = [
   'ModeUpdated',
   'AlertActionsUpdated',
   'AudioAssetsUpdated',
+  // Only ever delivered through ToPublicSettings: the raw payload carries the
+  // Web UI passcode, the SDK key and the FOG tokens.
+  'UpdateSettings',
 ] as const satisfies readonly SubscribeChannel[];
 const PUSH_ALLOWLIST = new Set<string>(PUSH_CHANNELS);
+
+// Settings a remote surface may read. Almost everything in the settings table is
+// desktop behaviour or a secret, so this is an allowlist of what the shared
+// renderer needs to draw the same picture as the desktop, never a list of keys
+// to hide. A key added here is visible to anyone the surface lets in.
+const PUBLIC_SETTING_KEYS = new Set<string>(['UI_GROUP_COLUMN_COUNT']);
+
+/** Reduce a settings list to the rows a remote surface may see. */
+export function ToPublicSettings<T>(Settings: readonly T[] | null | undefined): T[] {
+  if (!Array.isArray(Settings)) return [];
+  return Settings.filter((Setting) => {
+    const Key = Setting && (Setting as { Key?: unknown }).Key;
+    return typeof Key === 'string' && PUBLIC_SETTING_KEYS.has(Key);
+  });
+}
 
 // OSCBulkAction is allowlisted as a whole (WOL/ExecuteScript are legitimate web
 // actions), but a few of its types drive the operator's own
@@ -352,5 +370,6 @@ export {
   WOL_CHANNELS,
   PUSH_CHANNELS,
   PUSH_ALLOWLIST,
+  PUBLIC_SETTING_KEYS,
   SUPPRESSED_BULK_ACTIONS,
 };

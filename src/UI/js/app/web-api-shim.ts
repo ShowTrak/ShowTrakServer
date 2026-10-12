@@ -195,9 +195,10 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     OnModeUpdated: (cb) => sub('ModeUpdated', cb),
     OnAlertActionsUpdated: (cb) => sub('AlertActionsUpdated', cb),
 
-    // ---- Settings (read blocked / mutation desktop-only) -----------------
+    // ---- Settings (public subset pushed / mutation desktop-only) ---------
     SetSetting: nullTuple,
-    UpdateSettings: noSub,
+    // Arrives filtered to the public settings (see ToPublicSettings).
+    UpdateSettings: (Callback) => sub('UpdateSettings', Callback),
 
     // ---- FOG Project (desktop-only) --------------------------------------
     // Scheduling imaging tasks is deliberately not exposed to the Web UI: it is

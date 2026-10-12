@@ -51,6 +51,7 @@ import {
   WOL_CHANNELS,
   PUSH_ALLOWLIST,
   SUPPRESSED_BULK_ACTIONS,
+  ToPublicSettings,
 } from '../RemoteAccess';
 
 const Logger = CreateLogger('WebServer');
@@ -226,6 +227,9 @@ function TransformWebPush(channel: string, args: unknown[]): unknown[] {
     case 'USBDeviceAdded':
     case 'USBDeviceRemoved':
       return [ToPublicClient(args[0] as PublicClientInput), args[1]];
+    // The browser has no settings pane, so it gets the public rows and no groups.
+    case 'UpdateSettings':
+      return [ToPublicSettings(args[0] as unknown[]), []];
     default:
       return args;
   }
@@ -403,21 +407,17 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
     next();
   });
 
-  ui.on('connection', async (socket) => {
+  // Every socket.on below MUST be registered before the first `await`. Socket.IO
+  // dispatches an incoming event to whatever listeners exist at that moment and
+  // drops it otherwise, and the browser answers `hello` straight away (rpc
+  // Settings:Get, or auth:login with a stored passcode). When the listeners were
+  // attached after the initial-state reads, a slow first read lost that race and
+  // the ack never came, leaving the browser on "Connecting…" for good.
+  ui.on('connection', (socket) => {
     try {
       Logger.log('Web UI connected', { id: socket.id, ip: socket.handshake.address });
     } catch {
       /* intentional: connection logging is best-effort */
-    }
-
-    // When no passcode is configured, every session is implicitly authed. Mark
-    // the flag so the (synchronous) renderer sink can decide delivery without an
-    // async settings lookup on the hot push path.
-    try {
-      const Cfg = await GetWebConfig();
-      if (!Cfg.RequireAuth) socket.Authed = true;
-    } catch {
-      /* intentional: leave socket.Authed as-is (default false) if config can't be read */
     }
 
     // Emit the full initial state using the SAME channels the desktop renderer
@@ -425,6 +425,14 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
     const SendInitialState = async () => {
       try {
         if (!(await IsAuthed(socket))) return;
+        // Settings go first so the client list below is laid out with the
+        // server's column count rather than the renderer's default.
+        try {
+          socket.emit('UpdateSettings', ToPublicSettings(await SettingsManager.GetAll()), []);
+        } catch {
+          /* intentional: the renderer falls back to its default layout */
+        }
+
         const [cErr, clients] = await ClientManager.GetAll();
         const [gErr, groups] = await GroupManager.GetAll();
         socket.emit(
@@ -468,10 +476,6 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
         Logger.error('Web UI initial state failed:', e);
       }
     };
-
-    // Tell the client whether it must authenticate before anything else.
-    socket.emit('hello', await GetPublicConfig(socket));
-    await SendInitialState();
 
     // --- Authentication handlers -------------------------------------------
     socket.on(
@@ -558,6 +562,23 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
         if (cb) cb({ error: 'failed' });
       }
     });
+
+    // Greet only now that every handler above is listening.
+    return (async () => {
+      // When no passcode is configured, every session is implicitly authed. Mark
+      // the flag so the (synchronous) renderer sink can decide delivery without
+      // an async settings lookup on the hot push path.
+      try {
+        const Cfg = await GetWebConfig();
+        if (!Cfg.RequireAuth) socket.Authed = true;
+      } catch {
+        /* intentional: leave socket.Authed as-is (default false) if config can't be read */
+      }
+
+      // Tell the client whether it must authenticate before anything else.
+      socket.emit('hello', await GetPublicConfig(socket));
+      await SendInitialState();
+    })();
   });
 
   return ui;

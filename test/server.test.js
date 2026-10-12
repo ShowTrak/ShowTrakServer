@@ -346,7 +346,13 @@ function loadWebUi(settings, options = {}) {
     '../FreeKioskManager': { Manager: { GetAll: async () => [null, []] } },
     '../DummyClientManager': { Manager: { GetAll: async () => [null, []] } },
     '../AlertsManager': { Manager: { GetAll: async () => [null, []] } },
-    '../SettingsManager': { Manager: { GetValue: async (key) => settings[key] } },
+    '../SettingsManager': {
+      Manager: {
+        GetValue: async (key) => settings[key],
+        // The full settings rows, as SettingsManager.GetAll returns them.
+        GetAll: async () => options.settingRows || [],
+      },
+    },
     '../WOLManager': { Manager: { Wake: async () => [null, 'magic packet sent'] } },
     '../ScriptManager': {
       Manager: { GetScripts: async () => [{ ID: 's1', Name: 'Deploy', Weight: 1 }] },
@@ -877,10 +883,87 @@ test('Web UI namespace forwards allowlisted pushes with serialization, dropping 
   assert.ok(pushed);
   assert.equal(pushed.args[0].UUID, 'u1');
 
-  // A non-allowlisted (desktop-only / secret-bearing) push is dropped.
+  // A non-allowlisted (desktop-only) push is dropped.
   socket.emitted.length = 0;
-  sinks[0]('UpdateSettings', { WEBUI_PASSWORD: 'secret' });
+  sinks[0]('ShutdownRequested');
   assert.equal(socket.emitted.length, 0);
+});
+
+// The settings push carries the Web UI passcode, the SDK key and the FOG tokens,
+// so it reaches the browser only through the public-settings filter — and must
+// still reach it, or the browser lays groups out on its default column count
+// instead of the one the desktop is set to.
+const SETTING_ROWS = [
+  { Key: 'UI_GROUP_COLUMN_COUNT', Value: 4 },
+  { Key: 'WEBUI_PASSWORD', Value: '1234' },
+  { Key: 'SDK_API_KEY', Value: 'sdk-secret' },
+  { Key: 'FOG_API_TOKEN', Value: 'fog-secret' },
+];
+
+test('Web UI settings push carries only the public settings', async () => {
+  const sinks = [];
+  const { SetupWebUiNamespace } = loadWebUi(
+    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false },
+    { sinks }
+  );
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
+
+  socket.emitted.length = 0;
+  sinks[0]('UpdateSettings', SETTING_ROWS, [{ Name: 'Layout', Title: 'Layout' }]);
+  const pushed = socket.emitted.filter((e) => e.event === 'UpdateSettings');
+  assert.equal(pushed.length, 1);
+  assert.deepEqual(pushed[0].args, [[{ Key: 'UI_GROUP_COLUMN_COUNT', Value: 4 }], []]);
+  assert.doesNotMatch(JSON.stringify(pushed[0].args), /secret|1234/);
+});
+
+test('Web UI initial state sends the public settings before the client list', async () => {
+  const { SetupWebUiNamespace } = loadWebUi(
+    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false },
+    { settingRows: SETTING_ROWS }
+  );
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
+
+  const Events = socket.emitted.map((e) => e.event);
+  const SettingsAt = Events.indexOf('UpdateSettings');
+  assert.ok(SettingsAt >= 0, 'initial state carried no settings');
+  assert.ok(SettingsAt < Events.indexOf('SetFullClientList'));
+  assert.deepEqual(socket.emitted[SettingsAt].args, [
+    [{ Key: 'UI_GROUP_COLUMN_COUNT', Value: 4 }],
+    [],
+  ]);
+});
+
+// The browser answers `hello` at once (rpc Settings:Get, or auth:login with a
+// stored passcode). Socket.IO drops an event that arrives before its listener
+// exists, so a listener attached after the initial-state reads left the browser
+// waiting on an ack that never came — stuck on "Connecting…".
+test('Web UI listeners are attached before the connection handler awaits anything', async () => {
+  const { SetupWebUiNamespace } = loadWebUi({
+    WEBUI_ENABLED: true,
+    WEBUI_PASSWORD_PROTECTION_ENABLED: true,
+    WEBUI_PASSWORD: '1234',
+  });
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+  const socket = makeSocket({ auth: {}, query: {}, address: '127.0.0.1' });
+  io._ns.sockets.set(socket.id, socket);
+  await new Promise((resolve) => io._ns.middlewares[0](socket, resolve));
+
+  const Greeting = io._ns._connection(socket);
+  for (const Event of ['auth:login', 'auth:logout', 'config:get', 'bootstrap:get', 'rpc']) {
+    assert.ok(socket.hasHandler(Event), `"${Event}" was not listening when the socket connected`);
+  }
+  assert.equal(
+    socket.emitted.some((e) => e.event === 'hello'),
+    false,
+    'hello must not go out synchronously before the auth decision'
+  );
+  await Greeting;
+  assert.ok(socket.emitted.some((e) => e.event === 'hello'));
 });
 
 test('Web UI namespace disables access when the master toggle is off', async () => {
