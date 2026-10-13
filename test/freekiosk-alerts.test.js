@@ -94,6 +94,44 @@ test('the metric alarm trigger is offered to the rule editor', async () => {
   assert.ok(ids.includes(TRIGGERS.FREEKIOSK_METRIC_ALARM));
 });
 
+test('a metric alarm rule can actually be saved, metric filter included', () => {
+  // Offering the trigger was not enough: it was missing from the IPC validator's
+  // allowlist, so saving the rule failed with "Unsupported TriggerType" while the
+  // test above stayed green.
+  const { Manager: IPCValidation } = require('../dist/Modules/IPCValidation');
+  const payload = IPCValidation.AlertRuleCreatePayload({
+    Title: 'Kiosk battery',
+    Scope: { Workspace: true },
+    TriggerTypes: [TRIGGERS.FREEKIOSK_METRIC_ALARM],
+    TriggerConfig: { Metrics: ['battery_level'] },
+    Actions: [],
+  });
+  assert.deepEqual(payload.TriggerTypes, [TRIGGERS.FREEKIOSK_METRIC_ALARM]);
+  assert.deepEqual(payload.TriggerConfig, { Metrics: ['battery_level'] });
+});
+
+test('every trigger the server offers is accepted by the validator and the editor', () => {
+  // The guard that would have caught the FreeKiosk gap: three lists name the
+  // triggers (the offered catalogue, the IPC validator, the editor allowlist),
+  // and a trigger missing from either of the last two is offered but unusable.
+  const { Manager } = boot();
+  const { Manager: IPCValidation } = require('../dist/Modules/IPCValidation');
+  const { ALERT_TRIGGER_ALLOWLIST } = require('../dist-test/UI/js/app/state/ui-drafts.js');
+  for (const { ID } of Manager.GetTriggers()) {
+    assert.ok(ALERT_TRIGGER_ALLOWLIST.has(ID), `${ID} is missing from the editor allowlist`);
+    assert.doesNotThrow(
+      () =>
+        IPCValidation.AlertRuleCreatePayload({
+          Title: 'Guard rule',
+          Scope: { Workspace: true },
+          TriggerTypes: [ID],
+          Actions: [],
+        }),
+      `${ID} is rejected by the IPC validator`
+    );
+  }
+});
+
 test('an alarm that starts breaching fires once, not on every poll', async () => {
   const { Manager, executed } = boot();
   await Manager.Init();

@@ -607,6 +607,7 @@ export function triggerSummaryText(TriggerType: string) {
   if (TriggerType === 'CLIENT_ONLINE') return 'is online';
   if (TriggerType === 'CLIENT_DEGRADED') return 'is degraded';
   if (TriggerType === 'SCRIPT_EXECUTION_FAILED') return 'fails to execute a script';
+  if (TriggerType === 'FREEKIOSK_METRIC_ALARM') return 'raises a FreeKiosk metric alarm';
   if (TriggerType === 'USB_DEVICE_CONNECTED') return 'has a USB device connected';
   if (TriggerType === 'USB_DEVICE_DISCONNECTED') return 'has a USB device disconnected';
   if (TriggerType === 'NON_CRITICAL_USB_DEVICE_CONNECTED') {
