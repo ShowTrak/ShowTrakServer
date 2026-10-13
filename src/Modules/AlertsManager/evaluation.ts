@@ -31,6 +31,7 @@ interface AlertContext {
   Error?: string | null;
   Device?: Record<string, unknown> | null;
   Application?: Record<string, unknown> | null;
+  AudioDevice?: Record<string, unknown> | null;
   Description?: string;
   RawData?: unknown;
   [key: string]: unknown;
@@ -111,6 +112,16 @@ function singleTriggerMatches(
       return Context.TriggerType === TRIGGERS.NON_CRITICAL_APPLICATION_STOPPED;
     case TRIGGERS.SCRIPT_EXECUTION_FAILED:
       return Context.TriggerType === TRIGGERS.SCRIPT_EXECUTION_FAILED;
+    case TRIGGERS.AUDIO_DEVICE_CONNECTED:
+    case TRIGGERS.AUDIO_DEVICE_DISCONNECTED:
+    case TRIGGERS.CRITICAL_AUDIO_DEVICE_CONNECTED:
+    case TRIGGERS.CRITICAL_AUDIO_DEVICE_DISCONNECTED:
+    case TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_CONNECTED:
+    case TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_DISCONNECTED:
+    case TRIGGERS.AUDIO_DEFAULT_DEVICE_CHANGED:
+    case TRIGGERS.AUDIO_DEVICE_MUTED:
+    case TRIGGERS.AUDIO_FORMAT_CHANGED:
+      return Context.TriggerType === TriggerType;
     case TRIGGERS.FREEKIOSK_METRIC_ALARM: {
       if (Context.TriggerType !== TRIGGERS.FREEKIOSK_METRIC_ALARM) return false;
       // The metric filter. Mirrors the TriggerConfig.Source gating below: an
@@ -199,6 +210,65 @@ function describeApplication(Context: AlertContext): string {
   return Name || 'application';
 }
 
+// "Scarlett 18i20 (output)". The direction matters: one interface is two
+// endpoints, and "Scarlett disconnected" would not say which half went.
+function describeAudioDevice(Device: Record<string, unknown> | null | undefined): string {
+  const D: Record<string, unknown> = Device || {};
+  const Name = typeof D.Name === 'string' && D.Name.trim() ? D.Name.trim() : 'Audio device';
+  return D.Direction === 'input' || D.Direction === 'output' ? `${Name} (${D.Direction})` : Name;
+}
+
+function describeAudioFormat(Device: Record<string, unknown>): string {
+  const Parts: string[] = [];
+  if (Number.isFinite(Number(Device.Channels))) Parts.push(`${Number(Device.Channels)} ch`);
+  if (Number.isFinite(Number(Device.SampleRate))) {
+    Parts.push(`${Number(Device.SampleRate) / 1000} kHz`);
+  }
+  return Parts.join(' / ') || 'unknown format';
+}
+
+function describeAudioContext(Context: AlertContext): string | null {
+  const Client = Context.EntityName || 'Client';
+  const Device = Context.AudioDevice || {};
+  const Name = describeAudioDevice(Device);
+  switch (Context.TriggerType) {
+    case TRIGGERS.AUDIO_DEVICE_CONNECTED:
+      return `${Name} connected to ${Client}`;
+    case TRIGGERS.AUDIO_DEVICE_DISCONNECTED:
+      return `${Name} disconnected from ${Client}`;
+    case TRIGGERS.CRITICAL_AUDIO_DEVICE_CONNECTED:
+      return `${Name} (critical) connected to ${Client}`;
+    case TRIGGERS.CRITICAL_AUDIO_DEVICE_DISCONNECTED:
+      return `${Name} (critical) disconnected from ${Client}`;
+    case TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_CONNECTED:
+      return `${Name} (non-critical) connected to ${Client}`;
+    case TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_DISCONNECTED:
+      return `${Name} (non-critical) disconnected from ${Client}`;
+    case TRIGGERS.AUDIO_DEVICE_MUTED:
+      return `${Name} was muted on ${Client}`;
+    case TRIGGERS.AUDIO_DEFAULT_DEVICE_CHANGED: {
+      const Direction = Device.Direction === 'input' ? 'input' : 'output';
+      const NewName =
+        typeof Device.Name === 'string' && Device.Name.trim()
+          ? Device.Name.trim()
+          : 'another device';
+      const Previous = Device.PreviousName;
+      return `Default ${Direction} on ${Client} changed to ${NewName}${
+        typeof Previous === 'string' && Previous.trim() ? ` (was ${Previous.trim()})` : ''
+      }`;
+    }
+    case TRIGGERS.AUDIO_FORMAT_CHANGED: {
+      const Before =
+        Device.Previous && typeof Device.Previous === 'object'
+          ? describeAudioFormat(Device.Previous as Record<string, unknown>)
+          : null;
+      return `${Name} on ${Client} changed format${Before ? ` from ${Before}` : ''} to ${describeAudioFormat(Device)}`;
+    }
+    default:
+      return null;
+  }
+}
+
 // "Lobby Kiosk — Battery Level 12% is below 20%". The reason is worded by the
 // alarm evaluator, which is the only thing that knows the metric's unit and
 // precision, so it is used verbatim rather than rebuilt here.
@@ -209,6 +279,8 @@ function describeFreeKioskAlarm(Context: AlertContext): string {
 }
 
 function describeContext(Context: AlertContext): string {
+  const Audio = describeAudioContext(Context);
+  if (Audio) return Audio;
   if (Context.TriggerType === TRIGGERS.FREEKIOSK_METRIC_ALARM) {
     return describeFreeKioskAlarm(Context);
   }
@@ -267,6 +339,7 @@ function describeContext(Context: AlertContext): string {
 }
 
 export {
+  describeAudioDevice,
   isScopeMatch,
   triggerMatches,
   describeMonitorReason,

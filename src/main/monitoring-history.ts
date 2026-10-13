@@ -71,6 +71,7 @@ interface ClientHardwareTelemetryLike {
   RunningApplications?: RunningApplicationsLike | null;
   USBDeviceList?: unknown;
   DisplayList?: unknown;
+  AudioDevices?: { Endpoints?: unknown } | null;
 }
 
 // Resolved critical-entity state produced by the per-domain extractors below and
@@ -613,6 +614,65 @@ function getClientDisplayHistorySamples(
   }>;
 }
 
+// Resolve the current state for every critical audio endpoint on a client.
+// Null (an idle gap) while the client is offline, for the reason the display
+// extractor gives. Connected and healthy is "online"; connected but breaking one
+// of its conditions (not default, muted, wrong format, level out of range) is
+// "online but degraded"; not reported at all is "offline". An endpoint whose
+// state is not yet judged (no trusted sample this connection) is skipped rather
+// than painted, so a reconnect never draws a false red bar.
+function extractCriticalAudioStates(
+  client: ClientHardwareTelemetryLike | null | undefined
+): NamedEntityState[] | null {
+  if (!client || !client.Online) return null;
+  const endpoints = Array.isArray(client.AudioDevices?.Endpoints)
+    ? (client.AudioDevices.Endpoints as Array<Record<string, unknown> | null>)
+    : [];
+  const states: NamedEntityState[] = [];
+  for (const endpoint of endpoints) {
+    if (!endpoint || !endpoint.IsCritical) continue;
+    const id = typeof endpoint.EndpointID === 'string' ? endpoint.EndpointID.trim() : '';
+    if (!id) continue;
+    const isConnected = endpoint.IsConnected !== false;
+    if (!isConnected && !endpoint.Missing) continue;
+    const name =
+      typeof endpoint.Name === 'string' && endpoint.Name.trim()
+        ? endpoint.Name.trim()
+        : 'Audio Device';
+    const issues = Array.isArray(endpoint.Issues) ? endpoint.Issues : [];
+    states.push({
+      key: id,
+      name,
+      online: isConnected,
+      degraded: isConnected && issues.length > 0,
+    });
+  }
+  return states;
+}
+
+const ClientAudioHistory = createNamedHistoryStore(extractCriticalAudioStates, 'EndpointID');
+
+function recordClientAudioHistorySamples(
+  client: ClientHardwareTelemetryLike | null | undefined,
+  sampledAt: number | null = null
+): void {
+  ClientAudioHistory.record(client, sampledAt);
+}
+
+function syncClientAudioHistoryStore(list: unknown): void {
+  ClientAudioHistory.sync(list);
+}
+
+function getClientAudioHistorySamples(
+  uuid: unknown
+): Array<{ EndpointID: string; Name: string; samples: HistorySample[] }> {
+  return ClientAudioHistory.get(uuid) as Array<{
+    EndpointID: string;
+    Name: string;
+    samples: HistorySample[];
+  }>;
+}
+
 export {
   MONITORING_HISTORY_MAX_AGE_MS,
   pruneMonitoringHistoryStore,
@@ -637,4 +697,7 @@ export {
   recordClientDisplayHistorySamples,
   syncClientDisplayHistoryStore,
   getClientDisplayHistorySamples,
+  recordClientAudioHistorySamples,
+  syncClientAudioHistoryStore,
+  getClientAudioHistorySamples,
 };

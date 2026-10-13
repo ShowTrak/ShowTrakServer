@@ -99,6 +99,8 @@ export function CreateClientsRepository(DB: DBManager) {
         if (appErr) throw appErr;
         const [displayErr] = await run('DELETE FROM CriticalDisplays WHERE UUID = ?', [UUID]);
         if (displayErr) throw displayErr;
+        const [audioErr] = await run('DELETE FROM CriticalAudioDevices WHERE UUID = ?', [UUID]);
+        if (audioErr) throw audioErr;
         const [macErr] = await run('DELETE FROM ClientMacAddresses WHERE UUID = ?', [UUID]);
         if (macErr) throw macErr;
         // Variable overrides describe this client specifically, so they go with
@@ -160,6 +162,12 @@ export function CreateClientsRepository(DB: DBManager) {
           [NewUUID, OldUUID]
         );
         if (criticalDisplayErr) throw criticalDisplayErr;
+
+        const [criticalAudioErr] = await run(
+          'UPDATE CriticalAudioDevices SET UUID = ? WHERE UUID = ?',
+          [NewUUID, OldUUID]
+        );
+        if (criticalAudioErr) throw criticalAudioErr;
 
         // Replacing a client means real hardware took over the slot, so the old
         // slot's observed MACs describe a different machine and must not be

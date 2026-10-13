@@ -234,6 +234,16 @@ async function ApplicationStopped(
   }
 }
 
+// An audio transition derived by the Client entity (connect, disconnect, mute,
+// format change, new default). Critical-ness travels with the change, resolved
+// by the entity that owns the baselines, so no second lookup races it here.
+async function AudioDeviceChanged(Client: BroadcastClient, Change: unknown): Promise<void> {
+  if (!hasMainWindow()) return;
+  AlertsManager.HandleAudioDeviceChange(Client, Change).catch((Err: unknown) =>
+    Logger.error('AlertsManager.HandleAudioDeviceChange failed', Err)
+  );
+}
+
 async function ReadoptDevice(UUID: string): Promise<void> {
   await ServerManager.SendMessageByGroup(UUID, 'Adopt');
 }
@@ -732,6 +742,7 @@ function RegisterBroadcastBridge(): void {
   BroadcastManager.on('USBDeviceRemoved', USBDeviceRemoved);
   BroadcastManager.on('ApplicationStarted', ApplicationStarted);
   BroadcastManager.on('ApplicationStopped', ApplicationStopped);
+  BroadcastManager.on('AudioDeviceChanged', AudioDeviceChanged);
   BroadcastManager.on('ReadoptDevice', ReadoptDevice);
   BroadcastManager.on('ReinitializeSystem', ReinitializeSystem);
   BroadcastManager.on('ClientUpdated', ClientUpdated);

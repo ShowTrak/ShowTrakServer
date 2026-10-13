@@ -60,6 +60,8 @@ const clientMgr = recordingManager({
   RemoveApplicationCritical: () => [null, true],
   MarkDisplayCritical: () => [null, true],
   RemoveDisplayCritical: () => [null, true],
+  MarkAudioDeviceCritical: () => [null, true],
+  RemoveAudioDeviceCritical: () => [null, true],
   AddMacAddress: () => [null, true],
   RemoveMacAddress: () => [null, true],
 });
@@ -68,7 +70,10 @@ const adoptionMgr = recordingManager({
   GetClientsPendingAdoption: () => state.pendingAdoption,
   SetState: async () => {},
 });
-const serverMgr = recordingManager({ SendMessageByGroup: async () => {} });
+const serverMgr = recordingManager({
+  SendMessageByGroup: async () => {},
+  SetClientAudioLevel: async () => [null, true],
+});
 const alertsMgr = recordingManager({ Reload: async () => {} });
 const identifyMgr = recordingManager({ Identify: () => [null, true], Stop: () => [null, true] });
 const wolMgr = recordingManager({
@@ -173,6 +178,9 @@ test('every client channel is registered', () => {
     'RemoveClientApplicationCritical',
     'MarkClientDisplayCritical',
     'RemoveClientDisplayCritical',
+    'MarkClientAudioDeviceCritical',
+    'RemoveClientAudioDeviceCritical',
+    'SetClientAudioLevel',
     'AddClientMacAddress',
     'RemoveClientMacAddress',
     'IdentifyClient',
@@ -229,6 +237,9 @@ test('a malformed UUID is refused by every per-client handler', async () => {
     ['RemoveClientApplicationCritical', 'qlab'],
     ['MarkClientDisplayCritical', { DisplayID: 'D1' }],
     ['RemoveClientDisplayCritical', 'D1'],
+    ['MarkClientAudioDeviceCritical', { EndpointID: 'wasapi:{x}' }],
+    ['RemoveClientAudioDeviceCritical', 'wasapi:{x}'],
+    ['SetClientAudioLevel', { EndpointID: 'wasapi:{x}', Volume: 10 }],
     ['AddClientMacAddress', 'AA:BB:CC:DD:EE:FF'],
     ['RemoveClientMacAddress', 'AA:BB:CC:DD:EE:FF'],
     ['IdentifyClient'],
@@ -238,8 +249,10 @@ test('a malformed UUID is refused by every per-client handler', async () => {
   for (const [Channel, ...Rest] of Cases) {
     clientMgr.__calls.length = 0;
     identifyMgr.__calls.length = 0;
+    serverMgr.__calls.length = 0;
     const [Err] = await call(Channel, '', ...Rest);
     assert.ok(Err, `${Channel} accepted an empty UUID`);
+    assert.equal(serverMgr.__calls.length, 0, `${Channel} reached the Server anyway`);
     assert.equal(clientMgr.__calls.length, 0, `${Channel} reached ClientManager anyway`);
     assert.equal(identifyMgr.__calls.length, 0, `${Channel} reached IdentifyManager anyway`);
   }
@@ -278,6 +291,12 @@ test('each critical-entity channel calls its own manager method', async () => {
     ['RemoveClientApplicationCritical', 'qlab', 'RemoveApplicationCritical'],
     ['MarkClientDisplayCritical', { DisplayID: 'D1', Name: 'Main' }, 'MarkDisplayCritical'],
     ['RemoveClientDisplayCritical', 'D1', 'RemoveDisplayCritical'],
+    [
+      'MarkClientAudioDeviceCritical',
+      { EndpointID: 'wasapi:{x}', RequireUnmuted: true },
+      'MarkAudioDeviceCritical',
+    ],
+    ['RemoveClientAudioDeviceCritical', 'wasapi:{x}', 'RemoveAudioDeviceCritical'],
     ['RemoveClientMacAddress', 'aa:bb:cc:dd:ee:ff', 'RemoveMacAddress'],
   ];
 
@@ -612,4 +631,50 @@ test('one client failing to wake does not abandon the rest', async () => {
     wolMgr.__callsTo('Wake').map((C) => C.args[0]),
     ['AA:AA']
   );
+});
+
+// --- Audio --------------------------------------------------------------------
+
+test('SetClientAudioLevel forwards only a validated change to the Server', async () => {
+  serverMgr.__calls.length = 0;
+  const [Err, Result] = await call('SetClientAudioLevel', UUID_A, {
+    EndpointID: ' wasapi:{x} ',
+    Volume: 64.4,
+    Smuggled: 'rm -rf /',
+  });
+  assert.equal(Err, null);
+  assert.equal(Result, true);
+  const [Sent] = serverMgr.__callsTo('SetClientAudioLevel');
+  assert.deepEqual(Sent.args, [UUID_A, { EndpointID: 'wasapi:{x}', Volume: 64 }]);
+
+  for (const Bad of [{}, { EndpointID: 'x' }, { EndpointID: 'x', Volume: 900 }, 'x']) {
+    serverMgr.__calls.length = 0;
+    const [BadErr] = await call('SetClientAudioLevel', UUID_A, Bad);
+    assert.ok(BadErr, `accepted ${JSON.stringify(Bad)}`);
+    assert.equal(serverMgr.__calls.length, 0);
+  }
+});
+
+test('marking audio critical passes the options through, and a bad bound never reaches the manager', async () => {
+  clientMgr.__calls.length = 0;
+  await call('MarkClientAudioDeviceCritical', UUID_A, {
+    EndpointID: 'pulse:output:x',
+    MinVolume: 80,
+    MaxVolume: 100,
+    CheckSampleRate: false,
+  });
+  assert.deepEqual(clientMgr.__callsTo('MarkAudioDeviceCritical')[0].args[1], {
+    EndpointID: 'pulse:output:x',
+    MinVolume: 80,
+    MaxVolume: 100,
+    CheckSampleRate: false,
+  });
+  clientMgr.__calls.length = 0;
+  const [Err] = await call('MarkClientAudioDeviceCritical', UUID_A, {
+    EndpointID: 'pulse:output:x',
+    MinVolume: 90,
+    MaxVolume: 10,
+  });
+  assert.ok(Err);
+  assert.equal(clientMgr.__calls.length, 0);
 });

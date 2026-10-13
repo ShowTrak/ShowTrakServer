@@ -21,7 +21,20 @@ import type {
   ClientDisplay,
   RunningApplicationItem,
   IntegratedAction,
+  AudioDevicesView,
+  AudioEndpointView,
+  CriticalAudioDevice,
 } from '@showtrak/protocol';
+import {
+  EmptyAudioView,
+  EmptyObservedAudio,
+  buildAudioView,
+  diffAudioEndpoints,
+  normalizeAudioSnapshot,
+  normalizeCriticalAudioEntry,
+  normalizeEndpointID,
+  type ObservedAudio,
+} from './audio';
 
 const Logger = CreateLogger('ClientManager');
 
@@ -342,6 +355,10 @@ class Client {
   // Applications additionally carry their own sampler status, so this tracks
   // whether the stored snapshot came from a sample that actually succeeded.
   HasApplicationTelemetry: boolean;
+  // Same rule for audio: only a sample whose collector reported `ok` is evidence.
+  // An `error` or `unsupported` report says nothing about whether a device is
+  // there, so it holds the critical audio checks rather than failing them.
+  HasAudioTelemetry: boolean;
   Identifying: boolean;
   ScriptsFingerprint: string | null;
   NetworkInterfaces: NormalizedNetworkInterface[];
@@ -370,6 +387,14 @@ class Client {
   CriticalDisplayIDs: string[];
   MissingCriticalDisplays: DisplayViewEntry[];
   MismatchedCriticalDisplays: DisplayViewEntry[];
+
+  // Audio endpoints: the last report, the critical baselines, and the rendered
+  // view (observed ∪ missing-critical) produced by _rebuildAudioView.
+  ObservedAudio: ObservedAudio;
+  AudioDevices: AudioDevicesView;
+  CriticalAudioDevices: CriticalAudioDevice[];
+  MissingCriticalAudioDevices: AudioEndpointView[];
+  AudioWarnings: string[];
 
   // Running applications: critical guards, the raw observed snapshot, and the
   // augmented view (observed ∪ missing-critical) with its change signatures.
@@ -434,6 +459,12 @@ class Client {
     this.HasUSBTelemetry = false;
     this.HasDisplayTelemetry = false;
     this.HasApplicationTelemetry = false;
+    this.HasAudioTelemetry = false;
+    this.ObservedAudio = EmptyObservedAudio();
+    this.AudioDevices = EmptyAudioView();
+    this.CriticalAudioDevices = [];
+    this.MissingCriticalAudioDevices = [];
+    this.AudioWarnings = [];
     this.NetworkInterfaces = [];
     this.ScriptsFingerprint = null;
     this.Identifying = false;
@@ -482,6 +513,10 @@ class Client {
       this.HasUSBTelemetry = false;
       this.HasDisplayTelemetry = false;
       this.HasApplicationTelemetry = false;
+      this.HasAudioTelemetry = false;
+      // Rebuild so a critical endpoint stops reading as "missing" now that the
+      // evidence for it has gone; it reads as not reported until the next session.
+      this._rebuildAudioView(false);
     }
     this._refreshClientHealthState();
     Logger.debug(`Client ${this.UUID} Online updated to ${Online}`);
@@ -922,6 +957,9 @@ class Client {
         : 0;
     if (MissingDisplayCount > 0) Warnings.push('Missing Display');
     if (MismatchedDisplayCount > 0) Warnings.push('Display Configuration Changed');
+    if (this.HasAudioTelemetry && Array.isArray(this.AudioWarnings)) {
+      Warnings.push(...this.AudioWarnings);
+    }
 
     // Everything above is INFERRED: the client reported what it has, and we
     // concluded something expected is absent. That conclusion is sound but
@@ -1230,6 +1268,82 @@ class Client {
       (Entry) => `${Entry.Name}:${Entry.IsRunning ? '1' : '0'}:${Entry.IsCritical ? '1' : '0'}`
     ).join('|')}`;
     this._refreshClientHealthState();
+  }
+  /**
+   * Store an audio report and derive what changed since the last one.
+   *
+   * Transitions (a device appearing, going, being muted, changing format, a new
+   * default) are only derived between two TRUSTED samples, for the reason the
+   * application diff gives: the first report of a connection would otherwise
+   * announce every device as freshly connected, and a failed sample (an empty
+   * list) every device as gone.
+   */
+  SetAudioDevices(Snapshot: unknown) {
+    const Previous = this.ObservedAudio;
+    const Next = normalizeAudioSnapshot(Snapshot);
+    const BaselineTrusted = this.HasAudioTelemetry;
+    const SampleTrusted = Next.Status.State === 'ok';
+    this.ObservedAudio = Next;
+    this.HasAudioTelemetry = SampleTrusted;
+    this._rebuildAudioView();
+    if (BaselineTrusted && SampleTrusted) {
+      for (const Change of diffAudioEndpoints(Previous.Endpoints, Next.Endpoints)) {
+        BroadcastManager.emit('AudioDeviceChanged', this, {
+          ...Change,
+          IsCritical: this.IsAudioDeviceCritical(Change.Endpoint.EndpointID),
+        });
+      }
+    }
+    BroadcastManager.emit('ClientUpdated', this);
+  }
+  SetCriticalAudioDevices(Devices: unknown) {
+    const Normalized: CriticalAudioDevice[] = [];
+    const Seen = new Set<string>();
+    for (const Raw of Array.isArray(Devices) ? Devices : []) {
+      const Entry = normalizeCriticalAudioEntry(Raw);
+      if (!Entry || Seen.has(Entry.EndpointID)) continue;
+      Seen.add(Entry.EndpointID);
+      Normalized.push(Entry);
+    }
+    this.CriticalAudioDevices = Normalized;
+    this._rebuildAudioView();
+  }
+  IsAudioDeviceCritical(EndpointID: unknown) {
+    const Normalized = normalizeEndpointID(EndpointID);
+    if (!Normalized) return false;
+    return this.CriticalAudioDevices.some((Entry) => Entry.EndpointID === Normalized);
+  }
+  /** Add or replace one critical entry. Returns whether it was new. */
+  MarkCriticalAudioDevice(Device: unknown) {
+    const Entry = normalizeCriticalAudioEntry(Device);
+    if (!Entry) return false;
+    const Index = this.CriticalAudioDevices.findIndex((E) => E.EndpointID === Entry.EndpointID);
+    if (Index === -1) this.CriticalAudioDevices.push(Entry);
+    else this.CriticalAudioDevices[Index] = Entry;
+    this._rebuildAudioView();
+    return Index === -1;
+  }
+  UnmarkCriticalAudioDevice(EndpointID: unknown) {
+    const Normalized = normalizeEndpointID(EndpointID);
+    if (!Normalized) return false;
+    const PrevLength = this.CriticalAudioDevices.length;
+    this.CriticalAudioDevices = this.CriticalAudioDevices.filter(
+      (Entry) => Entry.EndpointID !== Normalized
+    );
+    if (this.CriticalAudioDevices.length === PrevLength) return false;
+    this._rebuildAudioView();
+    return true;
+  }
+  _rebuildAudioView(Refresh = true) {
+    const Result = buildAudioView(
+      this.ObservedAudio,
+      this.CriticalAudioDevices,
+      this.HasAudioTelemetry
+    );
+    this.AudioDevices = Result.View;
+    this.MissingCriticalAudioDevices = Result.Missing;
+    this.AudioWarnings = Result.Warnings;
+    if (Refresh) this._refreshClientHealthState();
   }
   SetNetworkInterfaces(Interfaces: unknown) {
     try {

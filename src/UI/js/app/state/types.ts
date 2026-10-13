@@ -49,6 +49,8 @@ export interface MonitorHistorySeriesEntry {
   usbName?: string;
   displayID?: string;
   displayName?: string;
+  audioEndpointID?: string;
+  audioName?: string;
 }
 
 /** Identifies which entity the history modal is currently showing. */

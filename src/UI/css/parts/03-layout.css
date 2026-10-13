@@ -1028,6 +1028,232 @@ button.btn:focus {
   background-color: rgba(220, 53, 69, 0.28);
 }
 
+/* --- Audio devices (client info modal) ----------------------------------- */
+/* Taller than a USB card (level row, conditions), so the critical pill sits in
+   the header row rather than floating at the card's vertical centre. */
+.SHOWTRAK_AUDIO_CARD {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.SHOWTRAK_AUDIO_CARD_HEADER {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.SHOWTRAK_AUDIO_TITLE {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.SHOWTRAK_AUDIO_TITLE h6 {
+  overflow-wrap: anywhere;
+}
+
+.SHOWTRAK_AUDIO_CARD .SHOWTRAK_TOGGLE_CRITICAL_AUDIO {
+  position: static;
+  transform: none;
+  flex: 0 0 auto;
+}
+
+.SHOWTRAK_TOGGLE_CRITICAL_AUDIO.is-mismatch-critical,
+.SHOWTRAK_TOGGLE_CRITICAL_AUDIO.is-mismatch-critical:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_AUDIO.is-mismatch-critical:focus {
+  color: #ff9f40;
+  background-color: rgba(253, 126, 20, 0.24);
+}
+
+.SHOWTRAK_AUDIO_DEFAULT_BADGE {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(13, 202, 240, 0.2);
+  color: #6edff6;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.SHOWTRAK_AUDIO_LEVEL_ROW {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+/* A macOS-style level bar: a pill whose filled part IS the control, no knob.
+   The thumb is a fill-coloured circle the height of the track, so the fill
+   ends in a rounded cap; its shadow paints the fill to its left, and the
+   input clips that shadow to the pill. Qualified by type to outrank the
+   app-wide range styling in 02-controls.css. */
+input[type='range'].SHOWTRAK_AUDIO_LEVEL {
+  --st-level-height: 0.6rem;
+  /* Opaque: a translucent fill would show where the cap overlaps it. */
+  --st-level-fill: #e2e2ea;
+  flex: 1 1 auto;
+  height: var(--st-level-height);
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+input[type='range'].SHOWTRAK_AUDIO_LEVEL:hover,
+input[type='range'].SHOWTRAK_AUDIO_LEVEL:focus-visible {
+  --st-level-fill: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+input[type='range'].SHOWTRAK_AUDIO_LEVEL:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
+input[type='range'].SHOWTRAK_AUDIO_LEVEL::-webkit-slider-runnable-track {
+  height: var(--st-level-height);
+  border-radius: 999px;
+  background: transparent;
+}
+
+input[type='range'].SHOWTRAK_AUDIO_LEVEL::-webkit-slider-thumb {
+  width: var(--st-level-height);
+  height: var(--st-level-height);
+  margin-top: 0;
+  border-radius: 50%;
+  background: var(--st-level-fill);
+  box-shadow: calc(-100vw - var(--st-level-height) / 2) 0 0 100vw var(--st-level-fill);
+}
+
+input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-track {
+  height: var(--st-level-height);
+  background: transparent;
+}
+
+input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-progress {
+  height: var(--st-level-height);
+  border-radius: 999px;
+  background: var(--st-level-fill);
+}
+
+input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
+  width: var(--st-level-height);
+  height: var(--st-level-height);
+  border-radius: 50%;
+  background: var(--st-level-fill);
+  box-shadow: none;
+}
+
+.SHOWTRAK_AUDIO_LEVEL_VALUE {
+  flex: 0 0 2.75rem;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.SHOWTRAK_AUDIO_MUTE {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.SHOWTRAK_AUDIO_MUTE:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.SHOWTRAK_AUDIO_MUTE.is-muted {
+  color: #ff6b6b;
+  background: rgba(220, 53, 69, 0.24);
+}
+
+/* Conditions of a critical endpoint: key, value, tick. Rules between rows
+   only, never between columns. */
+.SHOWTRAK_AUDIO_CONDITIONS {
+  width: 100%;
+  /* #APPLICATION centres text, and th inherits it. */
+  text-align: left;
+  margin-top: 0.4rem;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.SHOWTRAK_AUDIO_CONDITIONS tr + tr > * {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.SHOWTRAK_AUDIO_CONDITIONS th,
+.SHOWTRAK_AUDIO_CONDITIONS td {
+  padding: 0.35rem 0.25rem;
+  vertical-align: middle;
+}
+
+.SHOWTRAK_AUDIO_CONDITIONS th {
+  width: 45%;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.SHOWTRAK_AUDIO_CONDITIONS td {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.SHOWTRAK_AUDIO_CONDITIONS .SHOWTRAK_AUDIO_COND_CHECK {
+  width: 1%;
+  text-align: right;
+}
+
+.SHOWTRAK_AUDIO_CONDITIONS .form-check-input {
+  display: block;
+  margin: 0 0 0 auto;
+  float: none;
+  cursor: pointer;
+}
+
+.SHOWTRAK_AUDIO_CONDITIONS tr.is-unsupported td {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.SHOWTRAK_AUDIO_CONDITIONS tr.is-failing td {
+  color: #ff9f40;
+}
+
+.SHOWTRAK_AUDIO_COND_BOUND {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.SHOWTRAK_AUDIO_COND_BOUND input {
+  width: 3.75rem;
+  padding: 0.1rem 0.4rem;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.SHOWTRAK_AUDIO_COND_BOUND input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.SHOWTRAK_AUDIO_COND_BOUND input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
 .SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable,
 .SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:hover,
 .SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:focus,

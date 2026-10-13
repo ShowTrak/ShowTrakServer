@@ -30,6 +30,7 @@ import {
   recordClientApplicationHistorySamples,
   recordClientUSBHistorySamples,
   recordClientDisplayHistorySamples,
+  recordClientAudioHistorySamples,
 } from '../../main/monitoring-history';
 
 // The connection handler stamps per-connection state directly onto the socket.
@@ -489,7 +490,22 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
           recordClientApplicationHistorySamples(Client, Snapshot.SampledAt);
           recordClientUSBHistorySamples(Client, Snapshot.SampledAt);
           recordClientDisplayHistorySamples(Client, Snapshot.SampledAt);
+          recordClientAudioHistorySamples(Client, Snapshot.SampledAt);
         }
+      },
+      { serial: true }
+    );
+
+    GuardedOn(
+      'AudioDevices',
+      (Snapshot) => [SocketValidation.AudioDevices(Snapshot)],
+      async (Snapshot: ReturnType<typeof SocketValidation.AudioDevices>) => {
+        Logger.debug(
+          `Audio devices received from ${socket.UUID} (${Snapshot.Endpoints.length} endpoints)`
+        );
+        await ClientManager.SetAudioDevices(socket.UUID, Snapshot);
+        const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
+        if (!ClientErr && Client) recordClientAudioHistorySamples(Client);
       },
       { serial: true }
     );

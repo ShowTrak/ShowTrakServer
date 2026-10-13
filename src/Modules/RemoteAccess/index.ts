@@ -40,6 +40,7 @@ const READ_CHANNELS = new Set([
   'GetClientApplicationHistory',
   'GetClientUSBHistory',
   'GetClientDisplayHistory',
+  'GetClientAudioHistory',
   'GetAllGroups',
   'Mode:Get',
   'GetMonitoringMethods',
@@ -100,6 +101,8 @@ const CLIENT_CHANNELS = new Set([
   'RemoveClientApplicationCritical',
   'MarkClientDisplayCritical',
   'RemoveClientDisplayCritical',
+  'MarkClientAudioDeviceCritical',
+  'RemoveClientAudioDeviceCritical',
   'AddClientMacAddress',
   'RemoveClientMacAddress',
   'UnadoptClient',
@@ -166,7 +169,13 @@ const EDIT_CHANNELS = new Set([
 ]);
 
 // Allowed when remote script execution is enabled (SHOW-time actions).
+//
+// Setting a client's audio level sits here rather than with client management:
+// it changes what a live machine is doing in the room, exactly like running a
+// script on it, and it must work in SHOW mode — which the management categories
+// deliberately do not. It inherits the script permission's off-by-default stance.
 const SCRIPT_CHANNELS = new Set([
+  'SetClientAudioLevel',
   'ExecuteScript',
   'TriggerIntegratedEvent',
   'Scripts:ClearSettledExecutions',

@@ -17,6 +17,7 @@ import {
 } from './state';
 import type {
   ClientApplicationHistorySeries,
+  ClientAudioHistorySeries,
   ClientDisplayHistorySeries,
   ClientDisplayView,
   ClientUSBHistorySeries,
@@ -30,6 +31,7 @@ import type {
   USBDeviceView,
 } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
+import { AudioTimelineLiveState } from './lib/audio-devices';
 import { openModal } from './lib/modal';
 import {
   LoadFreeKioskCameras,
@@ -541,6 +543,22 @@ export async function LoadHistorySamplesForContext() {
         displayID: String(Display.DisplayID),
         displayName: Display.Name ? String(Display.Name) : String(Display.DisplayID),
         samples: Array.isArray(Display.samples) ? Display.samples : [],
+      });
+    }
+
+    // Per-critical-audio-endpoint series (connected / conditions broken / missing).
+    let audio: ClientAudioHistorySeries[] = [];
+    try {
+      audio = await window.API.GetClientAudioHistory(String(entity.id));
+    } catch {
+      audio = [];
+    }
+    for (const Endpoint of Array.isArray(audio) ? audio : []) {
+      if (!Endpoint || !Endpoint.EndpointID) continue;
+      MonitorHistorySeries.push({
+        audioEndpointID: String(Endpoint.EndpointID),
+        audioName: Endpoint.Name ? String(Endpoint.Name) : String(Endpoint.EndpointID),
+        samples: Array.isArray(Endpoint.samples) ? Endpoint.samples : [],
       });
     }
   }
@@ -1254,6 +1272,33 @@ export function RenderMonitoringHistoryModal() {
             statusText: StatusLabel,
           },
           Blocks
+        )
+      );
+    }
+
+    // Per-critical-audio-endpoint timelines, driven by the client's CURRENT
+    // critical endpoints so marking/unmarking updates the modal at once.
+    const SamplesByAudioEndpoint = new Map<string, HistorySample[]>();
+    for (const Series of MonitorHistorySeries) {
+      if (Series && Series.audioEndpointID) {
+        SamplesByAudioEndpoint.set(String(Series.audioEndpointID), Series.samples);
+      }
+    }
+    const AudioEndpoints = Array.isArray(Client?.AudioDevices?.Endpoints)
+      ? Client.AudioDevices.Endpoints
+      : [];
+    for (const Endpoint of AudioEndpoints) {
+      if (!Endpoint || !Endpoint.IsCritical || !Endpoint.EndpointID) continue;
+      const Live = AudioTimelineLiveState(Endpoint, !!Client.Online);
+      $timelines.append(
+        RenderMonitorHistorySection(
+          {
+            state: Live.State,
+            name: Endpoint.Name || 'Audio Device',
+            sub: Endpoint.Direction === 'input' ? 'Critical Audio Input' : 'Critical Audio Output',
+            statusText: Live.Label,
+          },
+          BuildStatusBlocksFromSamples(SamplesByAudioEndpoint.get(Endpoint.EndpointID) || [])
         )
       );
     }

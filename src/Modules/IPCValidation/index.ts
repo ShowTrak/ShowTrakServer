@@ -31,6 +31,23 @@ export interface CriticalDisplayPayloadResult {
   ScaleFactor: number | null;
 }
 
+export interface CriticalAudioDevicePayloadResult {
+  EndpointID: string;
+  // Present only when the request carried them; absent keeps the current value.
+  RequireDefault?: boolean;
+  RequireUnmuted?: boolean;
+  MinVolume?: number | null;
+  MaxVolume?: number | null;
+  CheckChannels?: boolean;
+  CheckSampleRate?: boolean;
+}
+
+export interface AudioLevelRequestResult {
+  EndpointID: string;
+  Volume?: number;
+  Muted?: boolean;
+}
+
 export interface IPCValidationManager {
   // Client / group / script identifiers (client-validators.ts)
   UUID(value: unknown, fieldName?: string): string;
@@ -69,6 +86,9 @@ export interface IPCValidationManager {
   // server has never observed, so the external/physical filter is not applied.
   MacAddress(value: unknown, fieldName?: string): string;
   CriticalDisplayPayload(value: unknown): CriticalDisplayPayloadResult;
+  AudioEndpointID(value: unknown, fieldName?: string): string;
+  CriticalAudioDevicePayload(value: unknown): CriticalAudioDevicePayloadResult;
+  AudioLevelRequest(value: unknown): AudioLevelRequestResult;
   ClientUpdatePayload(value: unknown): Record<string, unknown>;
 
   // Monitoring targets (monitoring-validators.ts)

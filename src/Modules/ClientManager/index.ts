@@ -28,19 +28,26 @@ import {
 } from './normalizers';
 import { NormalizeIntegratedActions } from './integrated-actions';
 import { makeCriticalIndex } from './critical-index';
+import {
+  normalizeCriticalAudioEntry,
+  normalizeEndpointID,
+  resolveCriticalAudioEntry,
+} from './audio';
 import type {
   CriticalUSBDeviceRow,
   CriticalUSBDeviceNameRow,
   CriticalApplicationRow,
   CriticalDisplayRow,
+  CriticalAudioDeviceRow,
   ClientMacAddressRow,
 } from '../DB/rows';
-import type { HeartbeatPayload, USBDevice } from '@showtrak/protocol';
+import type { CriticalAudioDevice, HeartbeatPayload, USBDevice } from '@showtrak/protocol';
 import type {
   CriticalUSBDevicePayloadResult,
   CriticalUSBNamePayloadResult,
   CriticalApplicationPayloadResult,
   CriticalDisplayPayloadResult,
+  CriticalAudioDevicePayloadResult,
 } from '../IPCValidation';
 
 // One entry of the `SystemInfo` MAC-address map: the client reports each
@@ -116,6 +123,13 @@ export interface ClientManagerType {
   ): Promise<Result<boolean>>;
   RemoveDisplayCritical(UUID: string, DisplayID: unknown): Promise<Result<boolean>>;
   IsDisplayCritical(UUID: string, DisplayID: unknown): Promise<Result<boolean>>;
+  SetAudioDevices(UUID: string, Snapshot: unknown): Promise<Result<string>>;
+  // Mark an endpoint critical or update its conditions; Ok(true) when newly marked.
+  MarkAudioDeviceCritical(
+    UUID: string,
+    Device: CriticalAudioDevicePayloadResult
+  ): Promise<Result<boolean>>;
+  RemoveAudioDeviceCritical(UUID: string, EndpointID: unknown): Promise<Result<boolean>>;
   // Per-client MAC addresses (the Wake-on-LAN target set). Add resolves to
   // Ok(true) when a new address was stored, Ok(false) when it was already on
   // file or was a reported address filtered out as non-external.
@@ -181,6 +195,7 @@ function applyCriticalState(Entity: Client): Client {
   CriticalUSBNames.applyState(Entity);
   CriticalApplications.applyState(Entity);
   CriticalDisplays.applyState(Entity);
+  CriticalAudio.applyState(Entity);
   MacAddresses.applyState(Entity);
   return Entity;
 }
@@ -370,6 +385,17 @@ const CriticalDisplays = makeCriticalIndex<CriticalDisplayRow, DisplayIndexEntry
     };
   },
   apply: (client, entries) => client.SetCriticalDisplays(entries),
+});
+
+const CriticalAudio = makeCriticalIndex<CriticalAudioDeviceRow, CriticalAudioDevice>({
+  loadAll: () => CriticalRepo.LoadAllAudio(),
+  fromRow: (Row) => {
+    const UUID = Row && Row.UUID ? String(Row.UUID) : '';
+    const Entry = normalizeCriticalAudioEntry(Row);
+    if (!UUID || !Entry) return null;
+    return { UUID, Key: Entry.EndpointID, Entry };
+  },
+  apply: (client, entries) => client.SetCriticalAudioDevices(entries),
 });
 
 Manager.Timeout = async (UUID: string) => {
@@ -853,6 +879,73 @@ Manager.IsDisplayCritical = async (UUID: string, DisplayID: unknown) => {
   return Ok(!!Row);
 };
 
+Manager.SetAudioDevices = async (UUID: string, Snapshot: unknown) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+  Target.SetAudioDevices(Snapshot);
+  return Ok('Audio devices updated successfully');
+};
+
+Manager.MarkAudioDeviceCritical = async (
+  UUID: string,
+  Device: CriticalAudioDevicePayloadResult
+) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+  const EndpointID = normalizeEndpointID(Device && Device.EndpointID);
+  if (!EndpointID) return Fail('Audio device identifier is required');
+
+  const Live = Target.ObservedAudio.Endpoints.find((Entry) => Entry.EndpointID === EndpointID);
+  const Existing = CriticalAudio.getForClient(UUID, false)?.get(EndpointID) || null;
+  const [ResolveErr, Entry] = resolveCriticalAudioEntry(
+    EndpointID,
+    Device,
+    Live || null,
+    Existing,
+    Target.ObservedAudio.Capabilities,
+    Date.now()
+  );
+  if (ResolveErr || !Entry) return Fail(ResolveErr || 'Failed to resolve critical audio device');
+
+  const [WriteErr] = await CriticalRepo.MarkAudio({
+    UUID,
+    EndpointID: Entry.EndpointID,
+    Direction: Entry.Direction,
+    Name: Entry.Name,
+    Channels: Entry.Channels,
+    SampleRate: Entry.SampleRate,
+    RequireDefault: Entry.RequireDefault ? 1 : 0,
+    RequireUnmuted: Entry.RequireUnmuted ? 1 : 0,
+    MinVolume: Entry.MinVolume,
+    MaxVolume: Entry.MaxVolume,
+    Timestamp: Entry.Timestamp ?? Date.now(),
+  });
+  if (WriteErr) return Fail('Failed to save critical audio device');
+
+  CriticalAudio.setForClient(UUID, EndpointID, Entry);
+  Target.MarkCriticalAudioDevice(Entry);
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(!Existing);
+};
+
+Manager.RemoveAudioDeviceCritical = async (UUID: string, EndpointID: unknown) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+  const Normalized = normalizeEndpointID(EndpointID);
+  if (!Normalized) return Fail('Audio device identifier is required');
+
+  const [WriteErr] = await CriticalRepo.RemoveAudio(UUID, Normalized);
+  if (WriteErr) return Fail('Failed to remove critical audio device');
+
+  CriticalAudio.removeForClient(UUID, Normalized);
+  Target.UnmarkCriticalAudioDevice(Normalized);
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(true);
+};
+
 // Record one MAC against a client, or refresh it if already on file.
 //
 // 'Reported' addresses come from the client's own NIC enumeration and are
@@ -1209,6 +1302,7 @@ Manager.Delete = async (UUID: string) => {
   CriticalUSBNames.clearForClient(UUID);
   CriticalApplications.clearForClient(UUID);
   CriticalDisplays.clearForClient(UUID);
+  CriticalAudio.clearForClient(UUID);
   MacAddresses.clearForClient(UUID);
   Logger.success(`Client ${UUID} deleted successfully`);
   return Ok(true);
@@ -1251,6 +1345,7 @@ Manager.ReplaceClient = async (CurrentUUID: unknown, ReplacementUUID: unknown) =
   CriticalUSBNames.rekeyClient(OldUUID, NewUUID);
   CriticalApplications.rekeyClient(OldUUID, NewUUID);
   CriticalDisplays.rekeyClient(OldUUID, NewUUID);
+  CriticalAudio.rekeyClient(OldUUID, NewUUID);
   // MAC addresses cannot be re-keyed in memory the way the critical indexes are:
   // ReplaceClientUUID drops the old slot's *reported* addresses (they describe
   // the machine being replaced) while carrying its manual ones across, so the
@@ -1332,6 +1427,7 @@ Manager.Init = async () => {
   await CriticalUSBNames.load();
   await CriticalApplications.load();
   await CriticalDisplays.load();
+  await CriticalAudio.load();
   await MacAddresses.load();
   const [Err, Clients] = await ClientsRepo.GetAll();
   if (Err || !Clients) {
@@ -1455,6 +1551,7 @@ Manager.ClearCache = async () => {
   CriticalUSBNames.clear();
   CriticalApplications.clear();
   CriticalDisplays.clear();
+  CriticalAudio.clear();
   MacAddresses.clear();
   Manager.Initialized = false;
   return;

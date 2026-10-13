@@ -1500,6 +1500,94 @@ test('Server Manager integrated event queue reports mixed target outcomes', asyn
   );
 });
 
+test('Server Manager sends an audio level change to the client room and waits for its answer', async () => {
+  const sent = [];
+  const client = {
+    UUID: 'foh',
+    Online: true,
+    Integrated: false,
+    Version: '3.21.0',
+    ObservedAudio: {
+      SampledAt: 1,
+      Endpoints: [{ EndpointID: 'pulse:output:x', Direction: 'output', IsDefault: true }],
+      Status: { State: 'ok', Platform: 'linux', Backend: 'pulseaudio' },
+      Capabilities: {
+        DefaultDevice: true,
+        Channels: true,
+        SampleRate: true,
+        Transport: true,
+        InputVolume: 'device',
+        OutputVolume: 'device',
+        InputMute: 'device',
+        OutputMute: 'device',
+      },
+    },
+  };
+  const { Manager } = loadWithMocks(serverPath('index.js'), {
+    '../VariableManager': {
+      Manager: { GetPayload: async () => ({}), GetEnvironment: async () => ({}) },
+    },
+    '../Logger': loggerStub,
+    '../Config': { Config: { Application: { Version: '9.9.9' } } },
+    '../AppData': { Manager: { GetScriptsDirectory: () => __dirname } },
+    '../ScriptExecutionManager': { Manager: {}, SetDispatchHandler: () => {} },
+    '../ClientManager': {
+      Manager: { Get: async (uuid) => [null, uuid === 'foh' ? client : null] },
+    },
+    '../UpdateManager': { Manager: { RegisterRoutes: () => {} } },
+    '../ScriptWhitelistManager': { Manager: { GetScope: async () => null } },
+    '../FreeKioskManager': { Manager: { GetAll: async () => [null, []] } },
+    '../DummyClientManager': { Manager: {} },
+    '../MonitoringTargetManager': { Manager: {} },
+    '../OSC': { OSC: { GetRoutes: () => [] } },
+    express: Object.assign(() => ({ use: () => {}, get: () => {}, post: () => {} }), {
+      static: () => (_req, _res, next) => next && next(),
+    }),
+    'socket.io': {
+      Server: function FakeServer() {
+        return {
+          on: () => {},
+          of: () => ({ use: () => {}, on: () => {} }),
+          to: (room) => ({
+            emit: () => {},
+            timeout: (ms) => ({
+              emit: (event, request, callback) => {
+                sent.push({ room, ms, event, request });
+                callback(null, [{ Success: true, Error: null }]);
+              },
+            }),
+          }),
+        };
+      },
+    },
+    './client-namespace': { SetupClientNamespace: () => {} },
+    './webui-namespace': { SetupWebUiNamespace: () => {} },
+    './sdk-namespace': { SetupSdkNamespace: () => {} },
+    '../Utils': require('../dist/Modules/Utils'),
+    http: {
+      createServer: () => ({
+        on: () => {},
+        listen: () => {},
+        close: () => {},
+        address: () => ({ port: 0 }),
+      }),
+    },
+    path: require('path'),
+  });
+
+  const Request = { EndpointID: 'pulse:output:x', Volume: 25 };
+  assert.deepEqual(await Manager.SetClientAudioLevel('foh', Request), [null, true]);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].room, 'foh');
+  assert.equal(sent[0].event, 'SetAudioLevel');
+  assert.deepEqual(sent[0].request, Request);
+  assert.ok(sent[0].ms > 0);
+
+  const [Err] = await Manager.SetClientAudioLevel('nobody', Request);
+  assert.ok(Err);
+  assert.equal(sent.length, 1);
+});
+
 // --- Web UI auth hardening -------------------------------------------------
 
 test('Web UI login rate-limits an IP after repeated failures and blocks even a correct passcode', async () => {
@@ -1656,6 +1744,9 @@ function setupDeltaNamespace({ applyDelay = 0 } = {}) {
         ApplyApplicationDelta: async (_uuid, delta) => {
           applied.push(['ApplyApplicationDelta', delta]);
         },
+        SetAudioDevices: async (_uuid, snapshot) => {
+          applied.push(['SetAudioDevices', snapshot]);
+        },
         Timeout: async () => {},
       },
     },
@@ -1724,6 +1815,29 @@ test('a malformed delta is dropped rather than applied', async () => {
   await H.socket.trigger('DisplayDelta', 'not an object');
   await H.socket.trigger('NetworkInterfaceDelta', null);
   assert.deepEqual(H.applied, []);
+});
+
+test('an audio report reaches ClientManager validated, and a malformed one is dropped', async () => {
+  const H = setupDeltaNamespace();
+  await H.connectionHandler(H.socket);
+
+  await H.socket.trigger('AudioDevices', {
+    SampledAt: 1,
+    Endpoints: [{ EndpointID: 'pulse:output:x', Direction: 'output', Name: 'Out', Injected: 1 }],
+    Status: { State: 'ok', Platform: 'linux', Backend: 'pulseaudio' },
+    Capabilities: { DefaultDevice: true },
+  });
+  await H.socket.trigger('AudioDevices', 'not an object');
+  await H.socket.trigger('AudioDevices', { Endpoints: 'nope' });
+
+  assert.deepEqual(
+    H.applied.map(([method]) => method),
+    ['SetAudioDevices']
+  );
+  const [, snapshot] = H.applied[0];
+  assert.equal(snapshot.Endpoints[0].EndpointID, 'pulse:output:x');
+  assert.equal('Injected' in snapshot.Endpoints[0], false);
+  assert.equal(snapshot.Status.Backend, 'pulseaudio');
 });
 
 test('a slow full list cannot be overtaken by the delta that followed it', async () => {

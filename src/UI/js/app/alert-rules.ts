@@ -620,6 +620,23 @@ export function triggerSummaryText(TriggerType: string) {
   if (TriggerType === 'CRITICAL_USB_DEVICE_DISCONNECTED') {
     return 'has a critical USB device disconnected';
   }
+  if (TriggerType === 'AUDIO_DEVICE_CONNECTED') return 'has an audio device connected';
+  if (TriggerType === 'AUDIO_DEVICE_DISCONNECTED') return 'has an audio device disconnected';
+  if (TriggerType === 'CRITICAL_AUDIO_DEVICE_CONNECTED') {
+    return 'has a critical audio device connected';
+  }
+  if (TriggerType === 'CRITICAL_AUDIO_DEVICE_DISCONNECTED') {
+    return 'has a critical audio device disconnected';
+  }
+  if (TriggerType === 'NON_CRITICAL_AUDIO_DEVICE_CONNECTED') {
+    return 'has a non-critical audio device connected';
+  }
+  if (TriggerType === 'NON_CRITICAL_AUDIO_DEVICE_DISCONNECTED') {
+    return 'has a non-critical audio device disconnected';
+  }
+  if (TriggerType === 'AUDIO_DEFAULT_DEVICE_CHANGED') return 'changes its default audio device';
+  if (TriggerType === 'AUDIO_DEVICE_MUTED') return 'has an audio device muted';
+  if (TriggerType === 'AUDIO_FORMAT_CHANGED') return 'has an audio device change format';
   if (TriggerType === 'APPLICATION_STARTED') return 'has an application started';
   if (TriggerType === 'APPLICATION_STOPPED') return 'has an application stopped';
   if (TriggerType === 'CRITICAL_APPLICATION_STARTED') return 'has a critical application started';

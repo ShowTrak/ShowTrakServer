@@ -1,5 +1,5 @@
-// Repository for the three critical-entity tables (CriticalUSBDevices,
-// CriticalApplications, CriticalDisplays). Receives the DB manager instead of
+// Repository for the critical-entity tables (CriticalUSBDevices,
+// CriticalApplications, CriticalDisplays, CriticalAudioDevices). Receives the DB manager instead of
 // importing it so test DB mocks injected into ClientManager propagate through
 // unchanged. SQL strings are byte-identical to the historical inline
 // statements — tests match on them.
@@ -9,6 +9,7 @@
 import type { DBManager, DBResult } from '../index';
 import type {
   CriticalApplicationRow,
+  CriticalAudioDeviceRow,
   CriticalDisplayRow,
   CriticalUSBDeviceRow,
   CriticalUSBDeviceNameRow,
@@ -156,6 +157,40 @@ export function CreateCriticalEntitiesRepository(DB: DBManager) {
     },
     DeleteAllDisplaysForClient(UUID: string): Promise<DBResult<unknown>> {
       return DB.Run('DELETE FROM CriticalDisplays WHERE UUID = ?', [UUID]);
+    },
+
+    // --- Audio endpoints ----------------------------------------------------
+    LoadAllAudio(): Promise<DBResult<CriticalAudioDeviceRow[]>> {
+      return DB.All<CriticalAudioDeviceRow>(
+        'SELECT UUID, EndpointID, Direction, Name, Channels, SampleRate, RequireDefault, RequireUnmuted, MinVolume, MaxVolume, Timestamp FROM CriticalAudioDevices'
+      );
+    },
+    MarkAudio(Row: CriticalAudioDeviceRow): Promise<DBResult<unknown>> {
+      return DB.Run(
+        'INSERT OR REPLACE INTO CriticalAudioDevices (UUID, EndpointID, Direction, Name, Channels, SampleRate, RequireDefault, RequireUnmuted, MinVolume, MaxVolume, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          Row.UUID,
+          Row.EndpointID,
+          Row.Direction,
+          Row.Name,
+          Row.Channels,
+          Row.SampleRate,
+          Row.RequireDefault,
+          Row.RequireUnmuted,
+          Row.MinVolume,
+          Row.MaxVolume,
+          Row.Timestamp,
+        ]
+      );
+    },
+    RemoveAudio(UUID: string, EndpointID: string): Promise<DBResult<unknown>> {
+      return DB.Run('DELETE FROM CriticalAudioDevices WHERE UUID = ? AND EndpointID = ?', [
+        UUID,
+        EndpointID,
+      ]);
+    },
+    DeleteAllAudioForClient(UUID: string): Promise<DBResult<unknown>> {
+      return DB.Run('DELETE FROM CriticalAudioDevices WHERE UUID = ?', [UUID]);
     },
   };
 }

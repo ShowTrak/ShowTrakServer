@@ -100,6 +100,7 @@ interface AlertsManagerType {
   HandleCriticalApplicationStopped: ClientEventHandler;
   HandleNonCriticalApplicationStarted: ClientEventHandler;
   HandleNonCriticalApplicationStopped: ClientEventHandler;
+  HandleAudioDeviceChange(Client: AlertEntityLike, Change: unknown): Promise<void>;
   HandleClientUpdated(Client: AlertEntityLike): Promise<void>;
   HandleMonitoringTargetUpdated(Target: AlertTargetLike): Promise<void>;
   HandleFreeKioskTerminalUpdated(Terminal: AlertEntityLike): Promise<void>;
@@ -340,6 +341,24 @@ Manager.GetTriggers = () => {
       ID: TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED,
       Name: 'Critical USB Device Disconnected',
     },
+    { ID: TRIGGERS.AUDIO_DEVICE_CONNECTED, Name: 'Audio Device Connected' },
+    { ID: TRIGGERS.AUDIO_DEVICE_DISCONNECTED, Name: 'Audio Device Disconnected' },
+    {
+      ID: TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_CONNECTED,
+      Name: 'Non Critical Audio Device Connected',
+    },
+    {
+      ID: TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_DISCONNECTED,
+      Name: 'Non Critical Audio Device Disconnected',
+    },
+    { ID: TRIGGERS.CRITICAL_AUDIO_DEVICE_CONNECTED, Name: 'Critical Audio Device Connected' },
+    {
+      ID: TRIGGERS.CRITICAL_AUDIO_DEVICE_DISCONNECTED,
+      Name: 'Critical Audio Device Disconnected',
+    },
+    { ID: TRIGGERS.AUDIO_DEFAULT_DEVICE_CHANGED, Name: 'Default Audio Device Changed' },
+    { ID: TRIGGERS.AUDIO_DEVICE_MUTED, Name: 'Audio Device Muted' },
+    { ID: TRIGGERS.AUDIO_FORMAT_CHANGED, Name: 'Audio Format Changed' },
     { ID: TRIGGERS.APPLICATION_STARTED, Name: 'Application Started' },
     { ID: TRIGGERS.APPLICATION_STOPPED, Name: 'Application Stopped' },
     { ID: TRIGGERS.CRITICAL_APPLICATION_STARTED, Name: 'Critical Application Started' },
@@ -522,6 +541,64 @@ Manager.HandleCriticalUSBDeviceDisconnected = makeClientEventHandler(
   'warning',
   'Device'
 );
+
+// One audio transition, as derived by the Client entity, mapped onto every
+// trigger it satisfies: a disconnect is always AUDIO_DEVICE_DISCONNECTED, plus
+// exactly one of its critical / non-critical variants.
+const AUDIO_TRIGGERS_BY_KIND: Record<
+  string,
+  { Base: string; Critical?: string; NonCritical?: string; Severity: string }
+> = {
+  connected: {
+    Base: TRIGGERS.AUDIO_DEVICE_CONNECTED,
+    Critical: TRIGGERS.CRITICAL_AUDIO_DEVICE_CONNECTED,
+    NonCritical: TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_CONNECTED,
+    Severity: 'info',
+  },
+  disconnected: {
+    Base: TRIGGERS.AUDIO_DEVICE_DISCONNECTED,
+    Critical: TRIGGERS.CRITICAL_AUDIO_DEVICE_DISCONNECTED,
+    NonCritical: TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_DISCONNECTED,
+    Severity: 'warning',
+  },
+  default_changed: { Base: TRIGGERS.AUDIO_DEFAULT_DEVICE_CHANGED, Severity: 'warning' },
+  muted: { Base: TRIGGERS.AUDIO_DEVICE_MUTED, Severity: 'warning' },
+  format_changed: { Base: TRIGGERS.AUDIO_FORMAT_CHANGED, Severity: 'warning' },
+};
+
+Manager.HandleAudioDeviceChange = async (Client: AlertEntityLike, Change: unknown) => {
+  if (!Client || !Client.UUID || !Change || typeof Change !== 'object') return;
+  const C = Change as {
+    Kind?: unknown;
+    Endpoint?: Record<string, unknown> | null;
+    Previous?: Record<string, unknown> | null;
+    IsCritical?: unknown;
+  };
+  const Mapping = typeof C.Kind === 'string' ? AUDIO_TRIGGERS_BY_KIND[C.Kind] : undefined;
+  if (!Mapping || !C.Endpoint) return;
+  const AudioDevice: Record<string, unknown> = {
+    ...C.Endpoint,
+    IsCritical: C.IsCritical === true,
+    PreviousName: C.Previous && C.Previous !== C.Endpoint ? (C.Previous.Name ?? null) : null,
+    Previous: C.Previous && C.Previous !== C.Endpoint ? C.Previous : null,
+  };
+  const Triggers = [Mapping.Base];
+  const Variant = C.IsCritical === true ? Mapping.Critical : Mapping.NonCritical;
+  if (Variant) Triggers.push(Variant);
+  for (const TriggerType of Triggers) {
+    await evaluateAgainstRules({
+      TriggerType,
+      EntityType: 'client',
+      EntityName: Client.Nickname || Client.Hostname || Client.UUID,
+      UUID: Client.UUID,
+      GroupID: Client.GroupID == null ? null : Client.GroupID,
+      IP: Client.IP || null,
+      Severity: Mapping.Severity,
+      AudioDevice,
+      RawData: Client,
+    });
+  }
+};
 
 Manager.HandleApplicationStarted = makeClientEventHandler(
   TRIGGERS.APPLICATION_STARTED,

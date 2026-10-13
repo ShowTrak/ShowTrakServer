@@ -77,6 +77,7 @@ const alertsMgr = recordingManager({
   HandleCriticalApplicationStopped: alertHandler('HandleCriticalApplicationStopped'),
   HandleNonCriticalApplicationStarted: alertHandler('HandleNonCriticalApplicationStarted'),
   HandleNonCriticalApplicationStopped: alertHandler('HandleNonCriticalApplicationStopped'),
+  HandleAudioDeviceChange: alertHandler('HandleAudioDeviceChange'),
   HandleClientUpdated: alertHandler('HandleClientUpdated'),
   HandleMonitoringTargetUpdated: alertHandler('HandleMonitoringTargetUpdated'),
   HandleScriptExecutionUpdated: alertHandler('HandleScriptExecutionUpdated'),
@@ -523,6 +524,31 @@ test('USB events are skipped entirely without a window', async () => {
   await emit('USBDeviceRemoved', { UUID: 'client-1' }, { SerialNumber: 'SN123' });
   assert.deepEqual(pushes, []);
   assert.equal(alertsMgr.__calls.length, 0);
+});
+
+// --- Audio transitions --------------------------------------------------------
+
+test('an audio transition reaches the alert pipeline with its client and change', async () => {
+  const Change = { Kind: 'muted', Endpoint: { EndpointID: 'e1' }, IsCritical: true };
+  await emit('AudioDeviceChanged', { UUID: 'client-1' }, Change);
+  const [Call] = alertsMgr.__callsTo('HandleAudioDeviceChange');
+  assert.deepEqual(Call.args, [{ UUID: 'client-1' }, Change]);
+});
+
+test('audio transitions are skipped without a window', async () => {
+  state.hasWindow = false;
+  await emit('AudioDeviceChanged', { UUID: 'client-1' }, { Kind: 'connected' });
+  assert.equal(alertsMgr.__callsTo('HandleAudioDeviceChange').length, 0);
+});
+
+test('a failing audio alert is logged, never thrown into the emitter', async () => {
+  state.alertsReject = true;
+  await emit('AudioDeviceChanged', { UUID: 'client-1' }, { Kind: 'connected' });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(
+    logs.errors.some((Entry) => String(Entry[0]).includes('HandleAudioDeviceChange')),
+    'the rejection was logged'
+  );
 });
 
 // --- Application start/stop -------------------------------------------------

@@ -34,6 +34,11 @@ import {
 } from './monitoring';
 import { CloseAllModals } from './modals';
 import { IsVersionAtLeast, MINIMUM_DISPLAY_MONITORING_VERSION, Notify } from './selection-init';
+import {
+  BindClientInfoAudioHandlers,
+  ClearClientInfoAudio,
+  RenderClientInfoAudio,
+} from './client-info-audio';
 
 // The renderer-facing DisplayList is enriched in-place by the client's
 // critical-marking machinery with connection/mismatch annotations that the
@@ -224,6 +229,19 @@ export async function OpenClientInfo(UUID: string) {
       }
     });
 
+  BindClientInfoAudioHandlers(
+    () => ClientInfoOpenUUID,
+    async () => {
+      if (!ClientInfoOpenUUID) return;
+      const Fresh = await window.API.GetClient(ClientInfoOpenUUID);
+      if (Fresh) {
+        $('#CLIENT_INFO_STATUS').val(GetClientStatusDisplayText(Fresh));
+        RenderClientInfoDetails(Fresh);
+      }
+    },
+    Notify
+  );
+
   $('#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS')
     .off('click.critical-app-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_APP')
     .on('click.critical-app-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_APP', async function () {
@@ -355,6 +373,8 @@ export function RenderClientInfoDetails(Client: ClientView) {
   try {
     $('#CLIENT_INFO_USB_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_DISPLAYS_SECTION').toggleClass('d-none', IsIntegrated);
+    $('#CLIENT_INFO_AUDIO_INPUTS_SECTION').toggleClass('d-none', IsIntegrated);
+    $('#CLIENT_INFO_AUDIO_OUTPUTS_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_NETWORK_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_RUNNING_APPS_SECTION').toggleClass('d-none', IsIntegrated);
   } catch (err) {
@@ -426,6 +446,7 @@ export function RenderClientInfoDetails(Client: ClientView) {
     try {
       $('#SHOWTRAK_CLIENT_INFO_USB_DEVICES').attr('data-render-key', '').html('');
       $('#SHOWTRAK_CLIENT_INFO_DISPLAYS').attr('data-render-key', '').html('');
+      ClearClientInfoAudio();
       $('#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS').attr('data-render-key', '').html('');
       $('#SHOWTRAK_CLIENT_INFO_NET_INTERFACES').html('');
     } catch (err) {
@@ -717,6 +738,13 @@ export function RenderClientInfoDetails(Client: ClientView) {
     }
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
+  }
+
+  // Audio endpoints
+  try {
+    RenderClientInfoAudio(Client);
+  } catch (err) {
+    HandleNonFatalError('ClientInfo:RenderAudio', err);
   }
 
   // Running applications

@@ -29,6 +29,8 @@ const MAX_NETWORK_INTERFACES = 64;
 const MAX_ADDRESSES_PER_INTERFACE = 64;
 const MAX_RUNNING_APPLICATIONS = 4096;
 const MAX_INTEGRATED_ACTIONS = 256;
+// A large Dante/MADI rig still has a few dozen endpoints; this only bounds abuse.
+const MAX_AUDIO_ENDPOINTS = 256;
 
 // Client/device identifier from the socket handshake. Constrained to a
 // selector/room-safe charset — this is the value that ends up in Socket.IO
@@ -405,6 +407,76 @@ function RunningApplications(value: unknown): Record<string, unknown> {
   };
 }
 
+function OptionalBoolean(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
+}
+
+function AudioEndpoint(value: unknown, fieldName: string): Record<string, unknown> {
+  if (!isPlainObject(value)) fail(`${fieldName} must be an object`);
+  return {
+    EndpointID: normalizeOptionalString(value.EndpointID, `${fieldName}.EndpointID`, {
+      maxLength: 512,
+    }),
+    Direction: normalizeOptionalString(value.Direction, `${fieldName}.Direction`, {
+      maxLength: 16,
+    }),
+    Name: normalizeOptionalString(value.Name, `${fieldName}.Name`),
+    Manufacturer: normalizeOptionalString(value.Manufacturer, `${fieldName}.Manufacturer`),
+    Transport: normalizeOptionalString(value.Transport, `${fieldName}.Transport`, {
+      maxLength: 32,
+    }),
+    Channels: normalizeOptionalFiniteNumber(value.Channels, `${fieldName}.Channels`),
+    SampleRate: normalizeOptionalFiniteNumber(value.SampleRate, `${fieldName}.SampleRate`),
+    IsDefault: value.IsDefault === true,
+    Volume: normalizeOptionalFiniteNumber(value.Volume, `${fieldName}.Volume`),
+    Muted: OptionalBoolean(value.Muted),
+  };
+}
+
+function AudioCapabilities(value: unknown): Record<string, unknown> | null {
+  if (!isPlainObject(value)) return null;
+  const Scope = (raw: unknown, name: string) =>
+    normalizeOptionalString(raw, `Capabilities.${name}`, { maxLength: 16 });
+  return {
+    DefaultDevice: value.DefaultDevice === true,
+    Channels: value.Channels === true,
+    SampleRate: value.SampleRate === true,
+    Transport: value.Transport === true,
+    InputVolume: Scope(value.InputVolume, 'InputVolume'),
+    OutputVolume: Scope(value.OutputVolume, 'OutputVolume'),
+    InputMute: Scope(value.InputMute, 'InputMute'),
+    OutputMute: Scope(value.OutputMute, 'OutputMute'),
+  };
+}
+
+/** The client's `AudioDevices` snapshot. Meaning (enums, dedupe) is decided by ClientManager. */
+function AudioDevices(value: unknown): Record<string, unknown> & { Endpoints: unknown[] } {
+  if (!isPlainObject(value)) fail('AudioDevices payload must be an object');
+  const list = normalizeBoundedArray(value.Endpoints ?? [], 'Endpoints', {
+    maxItems: MAX_AUDIO_ENDPOINTS,
+  });
+  const Status = isPlainObject(value.Status)
+    ? {
+        State: normalizeOptionalString(value.Status.State, 'Status.State', { maxLength: 32 }),
+        Message: normalizeOptionalString(value.Status.Message, 'Status.Message', {
+          maxLength: 512,
+        }),
+        Platform: normalizeOptionalString(value.Status.Platform, 'Status.Platform', {
+          maxLength: 32,
+        }),
+        Backend: normalizeOptionalString(value.Status.Backend, 'Status.Backend', {
+          maxLength: 32,
+        }),
+      }
+    : null;
+  return {
+    SampledAt: normalizeOptionalFiniteNumber(value.SampledAt, 'SampledAt'),
+    Endpoints: list.map((endpoint, index) => AudioEndpoint(endpoint, `Endpoints[${index}]`)),
+    Status,
+    Capabilities: AudioCapabilities(value.Capabilities),
+  };
+}
+
 // Integrated action catalogs are normalized again by
 // ClientManager.SetIntegratedActions; here we only enforce the container
 // shape and cap so a hostile payload cannot blow up memory first.
@@ -460,6 +532,7 @@ export const Manager = {
   DisplayList,
   NetworkInterfaces,
   RunningApplications,
+  AudioDevices,
   NetworkInterfaceDelta,
   DisplayDelta,
   ApplicationDelta,

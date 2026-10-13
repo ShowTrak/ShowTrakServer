@@ -33,6 +33,9 @@ import { Wait } from '../Utils';
 import { SetupClientNamespace } from './client-namespace';
 import { SetupWebUiNamespace } from './webui-namespace';
 import { SetupSdkNamespace } from './sdk-namespace';
+import { SendAudioLevel, type AudioControlIO } from './audio-control';
+import type { AudioLevelRequest } from '@showtrak/protocol';
+import type { Result } from '../../types/result';
 import { Manager as IdentifyManager } from '../IdentifyManager';
 
 const Logger = CreateLogger('WebServer');
@@ -418,6 +421,8 @@ interface ServerManagerType {
     Options?: BulkRequestOptions
   ): Promise<void>;
   SendMessageByGroup(Group: string, Message: string, Data?: unknown): Promise<boolean>;
+  // Change one audio endpoint's level/mute on a client; Ok once the client confirms.
+  SetClientAudioLevel(UUID: string, Request: AudioLevelRequest): Promise<Result<boolean>>;
 }
 
 // socket.io binds emit() to the ServerToClientEvents union; the two dispatchers
@@ -620,6 +625,19 @@ Manager.SendMessageByGroup = async (Group: string, Message: string, Data?: unkno
   }
   return (io.to(Group) as unknown as DynamicEmitter).emit(Message, Data);
 };
+
+Manager.SetClientAudioLevel = (UUID: string, Request: AudioLevelRequest) =>
+  SendAudioLevel(
+    {
+      // Socket.IO types a room broadcast with an ack as returning every socket's
+      // answer; the structural type here states exactly that, without the
+      // generic machinery that cannot express it.
+      io: io as unknown as AudioControlIO,
+      GetClient: (ID: string) => ClientManager.Get(ID),
+    },
+    UUID,
+    Request
+  );
 
 // Wire the Socket.IO namespaces (client agents + Web UI + SDK control API).
 SetupClientNamespace(io);

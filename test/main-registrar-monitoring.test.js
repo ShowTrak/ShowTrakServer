@@ -31,6 +31,7 @@ const state = {
     application: [{ At: 4 }],
     usb: [{ At: 5 }],
     display: [{ At: 6 }],
+    audio: [{ At: 7 }],
   },
 };
 
@@ -59,6 +60,10 @@ const monitoringHistoryStub = {
   getClientDisplayHistorySamples: (id) => {
     historyCalls.push(['display', id]);
     return state.history.display;
+  },
+  getClientAudioHistorySamples: (id) => {
+    historyCalls.push(['audio', id]);
+    return state.history.audio;
   },
 };
 
@@ -113,6 +118,7 @@ test('registers a handler for every monitoring channel', () => {
     'GetClientApplicationHistory',
     'GetClientUSBHistory',
     'GetClientDisplayHistory',
+    'GetClientAudioHistory',
     'CreateMonitoringTarget',
     'UpdateMonitoringTarget',
     'DeleteMonitoringTarget',
@@ -182,6 +188,7 @@ test('every history reader returns its samples for valid input', async () => {
   assert.deepEqual(await GetHandler('GetClientApplicationHistory')(null, 'client-1'), [{ At: 4 }]);
   assert.deepEqual(await GetHandler('GetClientUSBHistory')(null, 'client-1'), [{ At: 5 }]);
   assert.deepEqual(await GetHandler('GetClientDisplayHistory')(null, 'client-1'), [{ At: 6 }]);
+  assert.deepEqual(await GetHandler('GetClientAudioHistory')(null, 'client-1'), [{ At: 7 }]);
 
   assert.deepEqual(historyCalls, [
     ['check', 1],
@@ -190,6 +197,7 @@ test('every history reader returns its samples for valid input', async () => {
     ['application', 'client-1'],
     ['usb', 'client-1'],
     ['display', 'client-1'],
+    ['audio', 'client-1'],
   ]);
 });
 
@@ -203,6 +211,7 @@ test('every history reader falls back to [] on invalid input, never null', async
     'GetClientApplicationHistory',
     'GetClientUSBHistory',
     'GetClientDisplayHistory',
+    'GetClientAudioHistory',
   ]) {
     const Handler = GetHandler(Channel);
     for (const Bad of ['', null, undefined]) {

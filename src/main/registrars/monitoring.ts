@@ -10,6 +10,7 @@ import {
   getClientApplicationHistorySamples,
   getClientUSBHistorySamples,
   getClientDisplayHistorySamples,
+  getClientAudioHistorySamples,
 } from '../monitoring-history';
 import { Manager as MonitoringMethods } from '../../Modules/MonitoringMethods';
 import { Manager as MonitoringTargetManager } from '../../Modules/MonitoringTargetManager';
@@ -163,6 +164,15 @@ function register(): void {
       return [];
     }
     return getClientDisplayHistorySamples(UUID);
+  });
+
+  RPC.handle('GetClientAudioHistory', async (_Event: unknown, UUID: unknown) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch {
+      return [];
+    }
+    return getClientAudioHistorySamples(UUID);
   });
 
   RPC.handle(

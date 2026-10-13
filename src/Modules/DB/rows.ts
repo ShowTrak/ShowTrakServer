@@ -175,6 +175,20 @@ export interface CriticalDisplayRow {
   Timestamp: number;
 }
 
+export interface CriticalAudioDeviceRow {
+  UUID: string;
+  EndpointID: string;
+  Direction: string;
+  Name: string;
+  Channels: number | null;
+  SampleRate: number | null;
+  RequireDefault: number; // sqlite 0/1
+  RequireUnmuted: number; // sqlite 0/1
+  MinVolume: number | null;
+  MaxVolume: number | null;
+  Timestamp: number;
+}
+
 export interface ScriptWhitelistRow {
   ScriptID: string;
   Scope: string; // JSON: { Workspace, Groups[], Clients[], Tags[] }

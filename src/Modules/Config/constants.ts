@@ -52,6 +52,17 @@ export const ONLINE_DEPLOY_COOLDOWN_MS = 10000;
 // genuine fault and is reported as one.
 export const CLIENT_STARTUP_GRACE_MS = 20000;
 
+// The first ShowTrak Client release that reports audio endpoints and accepts
+// remote level changes. Anything older has no audio monitor at all: its Audio
+// section reads as unsupported and level changes are refused before anything is
+// sent, rather than waiting out a timeout. MUST match the client version that
+// ships the feature — the renderer has its own copy (lib/audio-devices.ts).
+export const MINIMUM_AUDIO_MONITORING_VERSION: readonly [number, number, number] = [3, 21, 0];
+
+// How long the server waits for a client to apply a level change and say so. The
+// client re-samples before acknowledging (~0.4s on macOS), so this is generous.
+export const AUDIO_LEVEL_TIMEOUT_MS = 10000;
+
 // Window within which repeat requests to play the SAME alert sound (built-in
 // tone or custom asset) collapse to a single audible playback. Overridable at
 // runtime by the ALERT_SOUND_DEDUPE_WINDOW_MS setting; 0 disables the collapse.

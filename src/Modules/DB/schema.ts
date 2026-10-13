@@ -258,6 +258,29 @@ Schema.push({
     )',
 });
 
+// Critical audio endpoints: one row per (client, endpoint) the operator guards,
+// holding the baseline captured when it was marked and the conditions it must
+// keep. Channels/SampleRate/MinVolume/MaxVolume are NULL when that property is
+// not guarded. Created here rather than by a migration, so new and existing
+// installs both get it without a version number.
+Schema.push({
+  Name: 'CriticalAudioDevices',
+  SQL: 'CREATE TABLE IF NOT EXISTS `CriticalAudioDevices` ( \
+            UUID TEXT NOT NULL, \
+            EndpointID TEXT NOT NULL, \
+            Direction TEXT NOT NULL, \
+            Name TEXT NOT NULL, \
+            Channels INTEGER, \
+            SampleRate INTEGER, \
+            RequireDefault INTEGER NOT NULL DEFAULT 0, \
+            RequireUnmuted INTEGER NOT NULL DEFAULT 0, \
+            MinVolume INTEGER, \
+            MaxVolume INTEGER, \
+            Timestamp BIGINT(11) NOT NULL, \
+            PRIMARY KEY (UUID, EndpointID) \
+    )',
+});
+
 // Per-show whitelist of which clients/groups may run a given script. Scripts
 // themselves live on disk (machine-global), but *who* may run each one is
 // show-specific, so it belongs in the DB (and therefore the .ShowTrak file).

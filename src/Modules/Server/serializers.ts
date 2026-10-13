@@ -1,10 +1,12 @@
 // Safe, serializable projections of internal manager objects for the Web UI.
 import type {
+  AudioDevicesView,
   ClientView,
   GroupView,
   Vitals,
   RunningApplicationsSnapshot,
 } from '@showtrak/protocol';
+import { EmptyAudioView } from '../ClientManager/audio';
 
 // Structural view of the internal Client entity — only the fields the public
 // projection reads. The array-shaped telemetry is accepted as `unknown` because
@@ -56,6 +58,8 @@ interface PublicClientSource {
   CriticalDisplayIDs?: unknown;
   MissingCriticalDisplays?: unknown;
   MismatchedCriticalDisplays?: unknown;
+  AudioDevices?: unknown;
+  CriticalAudioDevices?: unknown;
 }
 
 // Structural view of the internal Group entity read by ToPublicGroup.
@@ -139,6 +143,13 @@ const ToPublicClient = (c: PublicClientSource): ClientView => ({
   MismatchedCriticalDisplays: Array.isArray(c.MismatchedCriticalDisplays)
     ? c.MismatchedCriticalDisplays
     : [],
+  // Only the view: the client entity also holds the raw last report
+  // (ObservedAudio), which is an internal baseline, not something to publish.
+  AudioDevices:
+    c.AudioDevices && typeof c.AudioDevices === 'object'
+      ? (c.AudioDevices as AudioDevicesView)
+      : EmptyAudioView(),
+  CriticalAudioDevices: Array.isArray(c.CriticalAudioDevices) ? c.CriticalAudioDevices : [],
 });
 
 const ToPublicGroup = (g: PublicGroupSource): GroupView => ({

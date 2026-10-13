@@ -19,12 +19,14 @@ import { Manager as ClientManager } from '../ClientManager';
 // needs room-scoped emits for the identify overlay. Kept structural (rather than
 // the fully typed server) to avoid depending on the whole Socket.IO generic
 // surface, but the emit signature is checked against the shared events map.
+// Spelled out as the two events sent here rather than generic over the whole
+// event map: Socket.IO rewrites the signature of any event that takes an
+// acknowledgement (SetAudioLevel) for room broadcasts, so a type generic over
+// EVERY event no longer accepts the real server.
 interface IdentifyIOServer {
   to(room: string): {
-    emit<E extends keyof ServerToClientEvents>(
-      event: E,
-      ...args: Parameters<ServerToClientEvents[E]>
-    ): unknown;
+    emit(event: 'Identify', payload: Parameters<ServerToClientEvents['Identify']>[0]): unknown;
+    emit(event: 'StopIdentify'): unknown;
   };
 }
 

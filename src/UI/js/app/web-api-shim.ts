@@ -131,6 +131,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     GetClientApplicationHistory: async (UUID) => rpc('GetClientApplicationHistory', UUID),
     GetClientUSBHistory: async (UUID) => rpc('GetClientUSBHistory', UUID),
     GetClientDisplayHistory: async (UUID) => rpc('GetClientDisplayHistory', UUID),
+    GetClientAudioHistory: async (UUID) => rpc('GetClientAudioHistory', UUID),
     UpdateClient: async (UUID, Data) => rpc('UpdateClient', UUID, Data),
     MarkClientUSBDeviceCritical: async (UUID, Device) =>
       rpc('MarkClientUSBDeviceCritical', UUID, Device),
@@ -148,6 +149,11 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
       rpc('MarkClientDisplayCritical', UUID, Display),
     RemoveClientDisplayCritical: async (UUID, DisplayID) =>
       rpc('RemoveClientDisplayCritical', UUID, DisplayID),
+    MarkClientAudioDeviceCritical: async (UUID, Device) =>
+      rpc('MarkClientAudioDeviceCritical', UUID, Device),
+    RemoveClientAudioDeviceCritical: async (UUID, EndpointID) =>
+      rpc('RemoveClientAudioDeviceCritical', UUID, EndpointID),
+    SetClientAudioLevel: async (UUID, Request) => rpc('SetClientAudioLevel', UUID, Request),
     AddClientMacAddress: async (UUID, MacAddress) => rpc('AddClientMacAddress', UUID, MacAddress),
     RemoveClientMacAddress: async (UUID, MacAddress) =>
       rpc('RemoveClientMacAddress', UUID, MacAddress),

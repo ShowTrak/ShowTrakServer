@@ -1,7 +1,11 @@
 // Client / group / script identifier validators.
 import { fail, isPlainObject, normalizeNonEmptyString } from './primitives';
 import { NormalizeMacAddress } from '../MacAddress';
-import type { IPCValidationManager } from './index';
+import type {
+  AudioLevelRequestResult,
+  CriticalAudioDevicePayloadResult,
+  IPCValidationManager,
+} from './index';
 
 // Minimum delay (seconds) enforced before a run-on-launch script fires. The
 // delay doubles as the abort-window countdown shown on the client, so it must
@@ -240,6 +244,67 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
       RefreshRate: OptionalNumber(value.RefreshRate, 'RefreshRate'),
       ScaleFactor: OptionalNumber(value.ScaleFactor, 'ScaleFactor'),
     };
+  };
+
+  Manager.AudioEndpointID = (value: unknown, fieldName = 'EndpointID') => {
+    return normalizeNonEmptyString(value, fieldName, { minLength: 1, maxLength: 512 });
+  };
+
+  // A 0-100 level for a critical bound: null clears it.
+  const OptionalLevel = (raw: unknown, name: string): number | null => {
+    if (raw === null || raw === '') return null;
+    const num = Number(raw);
+    if (typeof raw === 'boolean' || !Number.isFinite(num)) fail(`${name} must be a number`);
+    if (num < 0 || num > 100) fail(`${name} must be between 0 and 100`);
+    return Math.round(num);
+  };
+
+  Manager.CriticalAudioDevicePayload = (value: unknown) => {
+    if (!isPlainObject(value)) fail('Critical audio device payload must be an object');
+    const out: CriticalAudioDevicePayloadResult = {
+      EndpointID: Manager.AudioEndpointID(value.EndpointID),
+    };
+    const Has = (key: string) =>
+      Object.prototype.hasOwnProperty.call(value, key) && value[key] !== undefined;
+    for (const key of [
+      'RequireDefault',
+      'RequireUnmuted',
+      'CheckChannels',
+      'CheckSampleRate',
+    ] as const) {
+      if (!Has(key)) continue;
+      if (typeof value[key] !== 'boolean') fail(`${key} must be true or false`);
+      out[key] = value[key] as boolean;
+    }
+    if (Has('MinVolume')) out.MinVolume = OptionalLevel(value.MinVolume, 'MinVolume');
+    if (Has('MaxVolume')) out.MaxVolume = OptionalLevel(value.MaxVolume, 'MaxVolume');
+    if (
+      out.MinVolume !== undefined &&
+      out.MaxVolume !== undefined &&
+      out.MinVolume !== null &&
+      out.MaxVolume !== null &&
+      out.MinVolume > out.MaxVolume
+    ) {
+      fail('MinVolume cannot be above MaxVolume');
+    }
+    return out;
+  };
+
+  Manager.AudioLevelRequest = (value: unknown) => {
+    if (!isPlainObject(value)) fail('Audio level request must be an object');
+    const out: AudioLevelRequestResult = { EndpointID: Manager.AudioEndpointID(value.EndpointID) };
+    if (value.Volume !== undefined && value.Volume !== null) {
+      const level = OptionalLevel(value.Volume, 'Volume');
+      if (level !== null) out.Volume = level;
+    }
+    if (value.Muted !== undefined && value.Muted !== null) {
+      if (typeof value.Muted !== 'boolean') fail('Muted must be true or false');
+      out.Muted = value.Muted;
+    }
+    if (out.Volume === undefined && out.Muted === undefined) {
+      fail('Audio level request must set Volume or Muted');
+    }
+    return out;
   };
 
   Manager.ClientUpdatePayload = (value: unknown) => {

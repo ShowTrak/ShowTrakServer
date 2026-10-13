@@ -46,6 +46,7 @@ const INVOKE_CHANNEL_LIST = [
   'GetClientApplicationHistory',
   'GetClientUSBHistory',
   'GetClientDisplayHistory',
+  'GetClientAudioHistory',
   'GetAllGroups',
   'CreateGroup',
   'RenameGroup',
@@ -79,6 +80,9 @@ const INVOKE_CHANNEL_LIST = [
   'RemoveClientApplicationCritical',
   'MarkClientDisplayCritical',
   'RemoveClientDisplayCritical',
+  'MarkClientAudioDeviceCritical',
+  'RemoveClientAudioDeviceCritical',
+  'SetClientAudioLevel',
   'AddClientMacAddress',
   'RemoveClientMacAddress',
   'IdentifyClient',
@@ -305,6 +309,7 @@ const API: ShowTrakAPI = {
   GetClientApplicationHistory: async (UUID) => invoke('GetClientApplicationHistory', UUID),
   GetClientUSBHistory: async (UUID) => invoke('GetClientUSBHistory', UUID),
   GetClientDisplayHistory: async (UUID) => invoke('GetClientDisplayHistory', UUID),
+  GetClientAudioHistory: async (UUID) => invoke('GetClientAudioHistory', UUID),
   GetAllGroups: async () => invoke('GetAllGroups'),
   CreateGroup: async (Title) => invoke('CreateGroup', Title),
   RenameGroup: async (GroupID, Title) => invoke('RenameGroup', GroupID, Title),
@@ -411,6 +416,11 @@ const API: ShowTrakAPI = {
     invoke('MarkClientDisplayCritical', UUID, Display),
   RemoveClientDisplayCritical: async (UUID, DisplayID) =>
     invoke('RemoveClientDisplayCritical', UUID, DisplayID),
+  MarkClientAudioDeviceCritical: async (UUID, Device) =>
+    invoke('MarkClientAudioDeviceCritical', UUID, Device),
+  RemoveClientAudioDeviceCritical: async (UUID, EndpointID) =>
+    invoke('RemoveClientAudioDeviceCritical', UUID, EndpointID),
+  SetClientAudioLevel: async (UUID, Request) => invoke('SetClientAudioLevel', UUID, Request),
   AddClientMacAddress: async (UUID, MacAddress) => invoke('AddClientMacAddress', UUID, MacAddress),
   RemoveClientMacAddress: async (UUID, MacAddress) =>
     invoke('RemoveClientMacAddress', UUID, MacAddress),

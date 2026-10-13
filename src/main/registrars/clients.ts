@@ -12,6 +12,8 @@ import type {
   CriticalUSBNamePayloadResult,
   CriticalApplicationPayloadResult,
   CriticalDisplayPayloadResult,
+  CriticalAudioDevicePayloadResult,
+  AudioLevelRequestResult,
 } from '../../Modules/IPCValidation';
 import { Manager as ClientManager } from '../../Modules/ClientManager';
 import { Manager as AdoptionManager } from '../../Modules/AdoptionManager';
@@ -142,6 +144,44 @@ function register(): void {
         IPCValidation.DisplayID(DisplayID),
       ],
       (UUID: string, DisplayID: string) => ClientManager.RemoveDisplayCritical(UUID, DisplayID)
+    )
+  );
+
+  RPC.handle(
+    'MarkClientAudioDeviceCritical',
+    createTupleHandler<[string, CriticalAudioDevicePayloadResult], unknown>(
+      (UUID: unknown, Device: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.CriticalAudioDevicePayload(Device),
+      ],
+      (UUID: string, Device: CriticalAudioDevicePayloadResult) =>
+        ClientManager.MarkAudioDeviceCritical(UUID, Device)
+    )
+  );
+
+  RPC.handle(
+    'RemoveClientAudioDeviceCritical',
+    createTupleHandler<[string, string], unknown>(
+      (UUID: unknown, EndpointID: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.AudioEndpointID(EndpointID),
+      ],
+      (UUID: string, EndpointID: string) =>
+        ClientManager.RemoveAudioDeviceCritical(UUID, EndpointID)
+    )
+  );
+
+  // Change a live machine's audio level or mute. Not a management mutation: it
+  // works in SHOW mode, and remote surfaces gate it with the script permission.
+  RPC.handle(
+    'SetClientAudioLevel',
+    createTupleHandler<[string, AudioLevelRequestResult], boolean>(
+      (UUID: unknown, Request: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.AudioLevelRequest(Request),
+      ],
+      (UUID: string, Request: AudioLevelRequestResult) =>
+        ServerManager.SetClientAudioLevel(UUID, Request)
     )
   );
 
