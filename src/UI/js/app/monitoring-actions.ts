@@ -20,6 +20,13 @@ import type {
 import { MonitoringActionFavourites, MonitoringMethodsCache, MonitoringTargets } from './state';
 import { ConfirmationDialog, Notify } from './selection-init';
 import { HandleNonFatalError, Safe } from './utils';
+import {
+  GroupTargetActionMethods,
+  IsCheckOffline,
+  MergeActionParamOptions,
+  MethodsWithActions,
+} from './lib/target-actions';
+import type { TargetActionMethod } from './lib/target-actions';
 
 /** Draft parameter values, keyed `<CheckID>|<ActionID>|<ParamKey>`. */
 const ActionParamDrafts = new Map<string, string>();
@@ -313,6 +320,165 @@ export function CloseActionsMenu(): void {
   $('.monitor-actions-toggle.is-open').removeClass('is-open').attr('aria-expanded', 'false');
 }
 
+// ---- A target's Actions tab -------------------------------------------------
+
+/**
+ * Draft owner for a whole target's checks of one method, standing in for a
+ * CheckID in the draft map so the Actions tab's pickers keep their value across
+ * re-renders without colliding with any one check's ⋯ menu.
+ */
+function GroupDraftOwner(TargetID: number | string, Method: string): string {
+  return `target:${TargetID}:${Method}`;
+}
+
+/** Parameter values for an action sent to every check of one method on a target. */
+function GetGroupActionParams(
+  TargetID: number | string,
+  Group: TargetActionMethod,
+  Action: MonitoringActionDef
+): Record<string, unknown> {
+  const Params: Record<string, unknown> = {};
+  for (const Field of Action.Params || []) {
+    const Draft = ActionParamDrafts.get(
+      DraftKey(GroupDraftOwner(TargetID, Group.Method), Action.ID, Field.Key)
+    );
+    if (Draft != null) {
+      Params[Field.Key] = Draft;
+      continue;
+    }
+    const Options = MergeActionParamOptions(Group.Checks, Field);
+    if (Options.length) Params[Field.Key] = Options[0]!.value;
+    else Params[Field.Key] = Field.Default == null ? '' : Field.Default;
+  }
+  return Params;
+}
+
+function RenderGroupAction(
+  TargetID: number,
+  Group: TargetActionMethod,
+  Action: MonitoringActionDef,
+  Disabled: string,
+  BlockedReason: string
+): string {
+  const Ids =
+    `data-target-id="${Safe(String(TargetID))}" data-method="${Safe(Group.Method)}" ` +
+    `data-action-id="${Safe(Action.ID)}"`;
+  const Title = Disabled ? BlockedReason : Action.Note || Action.Label;
+  const Destructive = Action.Destructive ? ' is-destructive' : '';
+  const Button = (Inner: string, Label: string) =>
+    `<button type="button" class="monitor-group-action-btn${Destructive}" ${Ids}
+      title="${Safe(Title)}" aria-label="${Safe(Label)}" ${Disabled}>${Inner}</button>`;
+
+  if (!Action.Params || !Action.Params.length) {
+    return Button(`<i class="bi bi-${Safe(Action.Icon)}"></i> ${Safe(Action.Label)}`, Action.Label);
+  }
+
+  // A parameterised action is its label, its picker(s), then a run button, so
+  // choosing from the picker never fires it by accident.
+  const Params = GetGroupActionParams(TargetID, Group, Action);
+  const Fields = Action.Params.map((Field) => {
+    const Value = String(Params[Field.Key] == null ? '' : Params[Field.Key]);
+    const Attrs = `${Ids} data-param-key="${Safe(Field.Key)}" aria-label="${Safe(Field.Label)}"`;
+    const Options = MergeActionParamOptions(Group.Checks, Field);
+    if (Options.length) {
+      const Rendered = Options.map(
+        (Option) =>
+          `<option value="${Safe(Option.value)}"${Option.value === Value ? ' selected' : ''}>${Safe(
+            Option.label
+          )}</option>`
+      ).join('');
+      return `<select class="form-select form-select-sm monitor-group-action-param" ${Attrs} ${Disabled}>${Rendered}</select>`;
+    }
+    const Type = Field.Type === 'number' ? 'number' : 'text';
+    return `<input type="${Type}" class="form-control form-control-sm monitor-group-action-param" ${Attrs}
+      value="${Safe(Value)}" placeholder="${Safe(Field.Label)}" ${Disabled}/>`;
+  }).join('');
+  return `<span class="monitor-group-action-with-params">
+      <span class="monitor-group-action-label"><i class="bi bi-${Safe(Action.Icon)}"></i> ${Safe(
+        Action.Label
+      )}</span>
+      ${Fields}
+      ${Button('<i class="bi bi-play-fill"></i>', Action.Label)}
+    </span>`;
+}
+
+/**
+ * The Actions tab for a monitoring target: one panel per check type that
+ * declares actions, titled with the type, holding its actions in their declared
+ * groups. A press goes to EVERY check of that type on the target — the server's
+ * RunAction already fans out per check — so a target watching four projectors
+ * powers all four on with one button.
+ */
+export function RenderTargetActionsPane(Target: MonitoringTargetView): string {
+  const Groups = GroupTargetActionMethods(Target.Checks, MonitoringMethodsCache);
+  if (!Groups.length) {
+    const Offering = MethodsWithActions(MonitoringMethodsCache);
+    const Which = Offering.length
+      ? ` Actions are available for ${Offering.join(', ')} checks.`
+      : '';
+    return `<div class="monitor-group-actions-empty"><i class="bi bi-info-circle"></i><span>No actions are available for this target. None of its checks are a type that can control a device.${Safe(
+      Which
+    )}</span></div>`;
+  }
+
+  const TargetID = Number(Target.TargetID);
+  return Groups.map((Group) => {
+    const Count = Group.Checks.length;
+    const Offline = Group.Checks.filter(IsCheckOffline).length;
+    // Every check offline means every press would fail the same way. Some
+    // offline is left enabled: the rest still take it, and the toast reports
+    // which part of the batch refused. Degraded never blocks — a projector in
+    // standby reads as degraded, and powering it on is the point.
+    const Blocked = Offline === Count;
+    const BlockedReason =
+      Count === 1
+        ? 'This check is offline — ShowTrak cannot reach the device'
+        : `All ${Count} ${Group.Name} checks are offline — ShowTrak cannot reach them`;
+    const Disabled = Blocked ? 'disabled' : '';
+
+    const Scope =
+      Count === 1
+        ? `Sent to this target's ${Group.Name} check.`
+        : `Sent to all ${Count} of this target's ${Group.Name} checks.`;
+    const OfflineNote = Blocked
+      ? `<div class="monitor-group-actions-note"><i class="bi bi-exclamation-triangle"></i><span>${Safe(
+          BlockedReason
+        )}</span></div>`
+      : Offline
+        ? `<div class="monitor-group-actions-note"><i class="bi bi-exclamation-triangle"></i><span>${Offline} of ${Count} ${Safe(
+            Group.Name
+          )} checks ${Offline === 1 ? 'is' : 'are'} offline and will not respond.</span></div>`
+        : '';
+
+    const ByGroup = new Map<string, MonitoringActionDef[]>();
+    for (const Action of Group.Actions) {
+      const List = ByGroup.get(Action.Group) || [];
+      List.push(Action);
+      ByGroup.set(Action.Group, List);
+    }
+    const Body = [...ByGroup.entries()]
+      .map(
+        ([Name, List]) =>
+          `<div class="monitor-group-actions-group">
+            <span class="monitor-group-actions-group-title">${Safe(Name)}</span>
+            <div class="monitor-group-actions-group-body">${List.map((Action) =>
+              RenderGroupAction(TargetID, Group, Action, Disabled, BlockedReason)
+            ).join('')}</div>
+          </div>`
+      )
+      .join('');
+
+    return `<div class="monitor-group-actions" data-method="${Safe(Group.Method)}">
+        <div class="monitor-group-actions-head">
+          <h6 class="monitor-group-actions-title">${Safe(Group.Name)}</h6>
+          <span class="monitor-group-actions-scope">${Safe(Scope)}</span>
+        </div>
+        ${OfflineNote}
+        ${Body}
+      </div>`;
+  }).join('');
+}
+
 // ---- Selection helpers (right-click menu) -----------------------------------
 
 /** A starred action paired with the selected targets it can actually run on. */
@@ -485,6 +651,55 @@ export function WireMonitoringActions(Rerender: () => void): void {
       Found.Check.Method,
       ActionID,
       GetActionParams(Found.Check, Action),
+      Action.Label
+    );
+  });
+
+  // ---- A target's Actions tab ----
+
+  // Drafts only, no re-render: there is no star here whose meaning depends on
+  // the value, and redrawing mid-typing would drop focus from a text field.
+  $(document).on('input change', `${Host} .monitor-group-action-param`, function () {
+    const $El = $(this);
+    ActionParamDrafts.set(
+      DraftKey(
+        GroupDraftOwner(
+          String($El.attr('data-target-id') || ''),
+          String($El.attr('data-method') || '')
+        ),
+        String($El.attr('data-action-id') || ''),
+        String($El.attr('data-param-key') || '')
+      ),
+      String($El.val() ?? '')
+    );
+  });
+
+  $(document).on('click', `${Host} .monitor-group-action-btn`, async function () {
+    const TargetID = String($(this).attr('data-target-id') || '');
+    const Method = String($(this).attr('data-method') || '');
+    const ActionID = String($(this).attr('data-action-id') || '');
+    const Target = MonitoringTargets.find((Entry) => String(Entry.TargetID) === TargetID);
+    if (!Target) return;
+    const Group = GroupTargetActionMethods(Target.Checks, MonitoringMethodsCache).find(
+      (Entry) => Entry.Method === Method
+    );
+    const Action = Group?.Actions.find((Entry) => Entry.ID === ActionID);
+    if (!Group || !Action) return;
+
+    if (Action.Destructive) {
+      const Where =
+        Group.Checks.length === 1
+          ? `"${Target.Nickname || Group.Checks[0]!.Address}"`
+          : `all ${Group.Checks.length} ${Group.Name} checks on "${Target.Nickname}"`;
+      const Confirmed = await ConfirmationDialog(`${Action.Label} on ${Where}?`);
+      if (!Confirmed) return;
+    }
+
+    await RunMonitoringAction(
+      [Number(Target.TargetID)],
+      Method,
+      ActionID,
+      GetGroupActionParams(Target.TargetID, Group, Action),
       Action.Label
     );
   });
