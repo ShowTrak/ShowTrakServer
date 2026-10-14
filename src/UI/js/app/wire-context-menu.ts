@@ -11,6 +11,7 @@ import {
   FreeKioskTerminals,
   ScriptList,
   Selected,
+  Settings,
   Tags,
   setScriptList,
 } from './state';
@@ -36,6 +37,11 @@ import {
 import { ResolveScriptTargets } from './lib/script-targeting';
 import { LongPressTracker } from './lib/long-press';
 import { RequiresTapConfirm, ResolveClickPointerType } from './lib/touch-input';
+import {
+  FREEKIOSK_MENU_POLL_SETTING_KEY,
+  FreeKioskMenuSettingKey,
+  IsFreeKioskMenuActionEnabled,
+} from './lib/freekiosk-menu';
 
 // One row in the right-click / mobile context menu. `Type` selects how the row
 // renders (informational label, divider, or actionable item); the remaining
@@ -381,23 +387,26 @@ export function wireContextMenu() {
 
       // --- FreeKiosk terminals ---------------------------------------------
       if (KioskUUIDs.length > 0) {
-        PushSection('FreeKiosk Terminals');
-
         const Plural = KioskUUIDs.length === 1 ? 'terminal' : `${KioskUUIDs.length} terminals`;
+        // Collected first so that with every action switched off in the FreeKiosk
+        // preferences the section, divider included, is left out entirely.
+        const KioskOptions: ContextMenuOption[] = [];
 
-        Options.push({
-          Type: 'Action',
-          Title: 'Poll Now',
-          Class: 'text-light',
-          Icon: 'bi-arrow-repeat',
-          IconColour: '#3498db',
-          ActsOnSelection: true,
-          Action: async function () {
-            const [Err, Summary] = await window.API.RunFreeKioskTerminalsNow(KioskUUIDs);
-            if (Err) return Notify(Err, 'error');
-            Notify(`Polled ${Summary?.Succeeded ?? 0}/${Summary?.Total ?? 0} ${Plural}`, 'info');
-          },
-        });
+        if (IsFreeKioskMenuActionEnabled(Settings, FREEKIOSK_MENU_POLL_SETTING_KEY)) {
+          KioskOptions.push({
+            Type: 'Action',
+            Title: 'Poll Now',
+            Class: 'text-light',
+            Icon: 'bi-arrow-repeat',
+            IconColour: '#3498db',
+            ActsOnSelection: true,
+            Action: async function () {
+              const [Err, Summary] = await window.API.RunFreeKioskTerminalsNow(KioskUUIDs);
+              if (Err) return Notify(Err, 'error');
+              Notify(`Polled ${Summary?.Succeeded ?? 0}/${Summary?.Total ?? 0} ${Plural}`, 'info');
+            },
+          });
+        }
 
         // Every bulk-capable command the server declares. Sourcing the list from
         // the server's command map means a command added there appears here
@@ -418,7 +427,9 @@ export function wireContextMenu() {
           if (!Command.Bulk) continue;
           if (Command.Params && Command.Params.length) continue; // needs a form
           if (Command.Modes && !KioskModes.every((Mode) => Command.Modes!.includes(Mode))) continue;
-          Options.push({
+          if (!IsFreeKioskMenuActionEnabled(Settings, FreeKioskMenuSettingKey(Command.ID)))
+            continue;
+          KioskOptions.push({
             Type: 'Action',
             Title: Command.Label,
             Class: Command.Destructive ? 'text-warning' : 'text-light',
@@ -444,6 +455,11 @@ export function wireContextMenu() {
               Notify(`${Command.Label} sent to ${Plural}`, 'success');
             },
           });
+        }
+
+        if (KioskOptions.length > 0) {
+          PushSection('FreeKiosk Terminals');
+          Options.push(...KioskOptions);
         }
       }
 

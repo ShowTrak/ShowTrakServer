@@ -5,6 +5,13 @@ import {
   OSC_PORT,
 } from '../Config/constants';
 import { FOG_TASK_TYPES, FogTaskPermissionKey } from '../Config/fog';
+import {
+  FREEKIOSK_COMMANDS,
+  FREEKIOSK_MENU_POLL_SETTING_KEY,
+  FreeKioskMenuSettingKey,
+  IsFreeKioskMenuCommand,
+} from '../FreeKiosk/commands';
+import type { FreeKioskCommandDef } from '../FreeKiosk/commands';
 
 // PASSWORD behaves exactly like STRING everywhere on the backend; it only tells the
 // settings renderer to mask the field. Used for secrets that would otherwise sit in
@@ -224,6 +231,24 @@ export const DefaultSettings: SettingDefinition[] = [
   },
   {
     Group: 'Web UI Permissions',
+    Key: 'WEBUI_ALLOW_MODE_CHANGE',
+    Title: 'Switch Show/Edit Mode',
+    Description:
+      'Allow the Web UI to switch the server between Show and Edit mode. Edit mode is what unlocks the management permissions below, for every connected device. Connected browsers pick up a change when they reload.',
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+  },
+  {
+    Group: 'Web UI Permissions',
+    Key: 'WEBUI_ALLOW_ALERT_ACTIONS_TOGGLE',
+    Title: 'Toggle Alert Actions',
+    Description:
+      'Allow the Web UI to turn alert actions on and off for the whole server. Connected browsers pick up a change when they reload.',
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+  },
+  {
+    Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_CLIENT_MANAGEMENT',
     Title: 'Client Management',
     Description:
@@ -280,8 +305,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION',
     Title: 'Script Execution',
-    Description:
-      'Allow scripts and integrated events to be triggered from the Web UI. Disabled by default for safety.',
+    Description: 'Allow scripts and integrated events to be triggered from the Web UI.',
     Type: 'BOOLEAN',
     DefaultValue: false,
   },
@@ -357,8 +381,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'ShowTrak Remote Permissions',
     Key: 'REMOTE_ALLOW_REMOTE_SCRIPT_EXECUTION',
     Title: 'Script Execution',
-    Description:
-      'Allow scripts and integrated events to be triggered from ShowTrak Remote. Disabled by default for safety.',
+    Description: 'Allow scripts and integrated events to be triggered from ShowTrak Remote.',
     Type: 'BOOLEAN',
     DefaultValue: false,
   },
@@ -503,6 +526,28 @@ export const DefaultSettings: SettingDefinition[] = [
     Type: 'BOOLEAN',
     DefaultValue: false,
   })),
+  // One toggle per FreeKiosk context-menu action, generated from the command map
+  // so a command added there gets its preference with no change here. All on by
+  // default, which is what the menu offered before these existed. They only
+  // trim the menu: the view modal and OSC still reach every command.
+  {
+    Group: 'FreeKiosk',
+    Key: FREEKIOSK_MENU_POLL_SETTING_KEY,
+    Title: 'Poll Now',
+    Description: 'Show "Poll Now" in the right-click menu for FreeKiosk terminals.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  ...(FREEKIOSK_COMMANDS as readonly FreeKioskCommandDef[])
+    .filter(IsFreeKioskMenuCommand)
+    .map((Command): SettingDefinition => ({
+      Group: 'FreeKiosk',
+      Key: FreeKioskMenuSettingKey(Command.ID),
+      Title: Command.Label,
+      Description: `Show "${Command.Label}" in the right-click menu for FreeKiosk terminals.`,
+      Type: 'BOOLEAN',
+      DefaultValue: true,
+    })),
 ];
 
 export const Groups: SettingGroup[] = [
@@ -510,6 +555,7 @@ export const Groups: SettingGroup[] = [
   { Name: 'Features', Title: 'Features' },
   { Name: 'Network', Title: 'Network' },
   { Name: 'Monitoring', Title: 'Monitoring' },
+  { Name: 'FreeKiosk', Title: 'FreeKiosk' },
   { Name: 'SDK / Integration API', Title: 'SDK / Integration API' },
   { Name: 'Alerts', Title: 'Alerts' },
   { Name: 'Web UI', Title: 'Web UI' },

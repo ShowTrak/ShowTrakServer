@@ -224,3 +224,24 @@ export function GetFreeKioskCommand(ID: unknown): FreeKioskCommandDef | null {
   if (typeof ID !== 'string') return null;
   return FREEKIOSK_COMMANDS_BY_ID.get(ID) || null;
 }
+
+/**
+ * The commands the multi-select context menu offers: bulk-capable, and runnable
+ * without a parameter form. Each one gets an on/off preference.
+ */
+export function IsFreeKioskMenuCommand(Command: FreeKioskCommandDef): boolean {
+  return !!Command.Bulk && !(Command.Params && Command.Params.length);
+}
+
+/** The Poll Now entry, which is a ShowTrak action rather than a device command. */
+export const FREEKIOSK_MENU_POLL_SETTING_KEY = 'FREEKIOSK_MENU_POLL';
+
+/**
+ * Settings key for a command's context-menu preference. Command IDs carry dots
+ * and hyphens, which the settings renderer cannot use in an element id selector,
+ * so everything outside [A-Za-z0-9] becomes an underscore. Mirrored by the
+ * renderer in src/UI/js/app/lib/freekiosk-menu.ts.
+ */
+export function FreeKioskMenuSettingKey(CommandID: string): string {
+  return `FREEKIOSK_MENU_${CommandID.replace(/[^A-Za-z0-9]/g, '_').toUpperCase()}`;
+}
