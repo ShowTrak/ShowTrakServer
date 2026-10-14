@@ -143,7 +143,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
   chamsys: {
     Summary:
       'Connects to a ChamSys MagicQ console over its built-in web server (HTTP, default TCP 8080), confirms it responds as MagicQ, and reads the software version where the page exposes it. The web server is used rather than OSC because MagicQ OSC has no query/echo and a stray message can fire a playback. Enable the version toggle to flag an unexpected software version.',
-    Setup: ['Enable the web server under Setup → Network Settings. It is disabled by default.'],
+    Setup: ['Enable the web server under Setup → Network Settings.'],
   },
   'ndi-source': {
     Summary:
