@@ -1517,26 +1517,17 @@ body.mobile-view
 body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
   display: none;
 }
-body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending {
+/* Row armed by a first tap, waiting for the confirm tap. Not scoped to
+   body.mobile-view: any finger/pen tap arms a row, whatever the layout
+   (RequiresTapConfirm in lib/touch-input.ts). */
+#SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending {
   background-color: rgba(255, 193, 7, 0.18) !important;
 }
-body.mobile-view
-  #SHOWTRAK_CONTEXT_MENU
-  > .context-menu-options
-  > a.context-confirm-pending
-  .context-title {
+#SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-title {
   color: #ffc107 !important;
 }
-body.mobile-view
-  #SHOWTRAK_CONTEXT_MENU
-  > .context-menu-options
-  > a.context-confirm-pending
-  .context-shortcut,
-body.mobile-view
-  #SHOWTRAK_CONTEXT_MENU
-  > .context-menu-options
-  > a.context-confirm-pending
-  .context-icon {
+#SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-shortcut,
+#SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-icon {
   display: none !important;
 }
 

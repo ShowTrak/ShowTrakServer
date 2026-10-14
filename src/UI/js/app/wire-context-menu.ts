@@ -34,6 +34,8 @@ import {
   RunMonitoringAction,
 } from './monitoring-actions';
 import { ResolveScriptTargets } from './lib/script-targeting';
+import { LongPressTracker } from './lib/long-press';
+import { RequiresTapConfirm, ResolveClickPointerType } from './lib/touch-input';
 
 // One row in the right-click / mobile context menu. `Type` selects how the row
 // renders (informational label, divider, or actionable item); the remaining
@@ -45,12 +47,17 @@ interface ContextMenuOption {
   Shortcut?: string;
   Icon?: string;
   IconColour?: string;
+  // Resolves to `false` when the user backed out of a confirmation.
   Action?: () => unknown;
+  // Runs something against the selected entities, so it may clear the
+  // selection afterwards (see UI_CLEAR_SELECTION_AFTER_ACTION).
+  ActsOnSelection?: boolean;
 }
 
 // True when the UI is in the compact mobile layout (see InitMobileView in
 // mode.ts, which toggles `body.mobile-view`). Used to switch the context
-// menu into its full-width, tap-to-confirm behaviour.
+// menu into its full-width sheet, where every activation needs a confirm tap
+// (finger/pen taps need one in any layout; see RequiresTapConfirm).
 function IsMobileContextMenu(): boolean {
   return document.body.classList.contains('mobile-view');
 }
@@ -70,10 +77,36 @@ function ArmContextMenuRow($menu: JQuery, $row: JQuery) {
   $row.find('.context-title').text('Tap to confirm');
 }
 
+// Run a row's action, then clear the selection when UI_CLEAR_SELECTION_AFTER_ACTION
+// is on. The setting is global, but only the surface whose menu ran the action
+// clears — and only its own selection: selection never leaves the renderer, and
+// OSC/SDK-triggered runs don't come through here. A confirmation the user backed
+// out of resolves to false and keeps the selection.
+async function RunContextMenuOption(option: ContextMenuOption) {
+  const Result = await option.Action!();
+  if (!option.ActsOnSelection || Result === false) return;
+  if (await GetSettingValue('UI_CLEAR_SELECTION_AFTER_ACTION')) ClearSelection();
+}
+
 export function wireContextMenu() {
   const $menu = $('#SHOWTRAK_CONTEXT_MENU');
+  // Input type of the latest press, for tap-to-confirm on browsers whose
+  // click events carry no pointerType. Capture phase so nothing can hide it.
+  let lastPointerDownType: string | null = null;
+  document.addEventListener(
+    'pointerdown',
+    (ev) => {
+      lastPointerDownType = ev.pointerType;
+    },
+    { capture: true, passive: true }
+  );
+  const longPress = wireTouchLongPress();
   $(document).on('contextmenu', 'html', async function (e) {
     e.preventDefault();
+    // A platform-fired contextmenu (originalEvent present; our synthetic
+    // triggers have none) that duplicates a touch long-press we already
+    // opened the menu for is dropped.
+    if (e.originalEvent && longPress.OnNativeContextMenu()) return;
 
     const $tile = $(e.target).closest('.SHOWTRAK_PC');
     if ($tile.length) {
@@ -183,6 +216,7 @@ export function wireContextMenu() {
             // Scripts show their chosen icon tinted with their assigned colour.
             Icon: `bi-${ScriptIconName}`,
             IconColour: ColourFromIndex(Script.Colour),
+            ActsOnSelection: true,
             Action: async function () {
               const Plural = Targets.length == 1 ? '' : 's';
               // Servers predating levels only send the boolean.
@@ -197,12 +231,12 @@ export function wireContextMenu() {
                   }),
                   confirmLabel: 'Run Script',
                 });
-                if (!Confirmation) return;
+                if (!Confirmation) return false;
               } else if (Level === 'Standard') {
                 const Confirmation = await ConfirmationDialog(
                   `Are you sure you want to run "${Script.Name}" on ${Targets.length} Client${Plural}?`
                 );
-                if (!Confirmation) return;
+                if (!Confirmation) return false;
               }
               await ExecuteScript(Script.ID, Targets, true);
             },
@@ -243,6 +277,7 @@ export function wireContextMenu() {
               typeof Event.Icon === 'string' && Event.Icon.trim() ? Event.Icon.trim() : 'terminal'
             }`,
             IconColour: ColourFromIndex(Event.ColourIndex),
+            ActsOnSelection: true,
             Action: async function () {
               await TriggerIntegratedEvent(Event.ID, EventTargets.get(Event.ID) || []);
             },
@@ -270,6 +305,7 @@ export function wireContextMenu() {
             Class: Action && Action.Destructive ? 'text-warning' : 'text-light',
             Icon: `bi-${Favourite.Icon || 'lightning'}`,
             IconColour: Action && Action.Destructive ? '#e74c3c' : '#9b59b6',
+            ActsOnSelection: true,
             Action: async function () {
               if (Action && Action.Destructive) {
                 const Confirmed = await ConfirmationDialog(
@@ -277,7 +313,7 @@ export function wireContextMenu() {
                     TargetIDs.length === 1 ? 'this monitor' : `${TargetIDs.length} monitors`
                   }?`
                 );
-                if (!Confirmed) return;
+                if (!Confirmed) return false;
               }
               await RunMonitoringAction(
                 TargetIDs,
@@ -296,6 +332,7 @@ export function wireContextMenu() {
           Class: 'text-light',
           Icon: 'bi-arrow-repeat',
           IconColour: '#3498db',
+          ActsOnSelection: true,
           Action: async function () {
             Notify(
               MonitorTargetIDs.length === 1
@@ -325,6 +362,7 @@ export function wireContextMenu() {
           Class: 'text-light',
           Icon: 'bi-arrow-counterclockwise',
           IconColour: '#e67e22',
+          ActsOnSelection: true,
           Action: async function () {
             Notify(
               DummyUUIDs.length === 1
@@ -353,6 +391,7 @@ export function wireContextMenu() {
           Class: 'text-light',
           Icon: 'bi-arrow-repeat',
           IconColour: '#3498db',
+          ActsOnSelection: true,
           Action: async function () {
             const [Err, Summary] = await window.API.RunFreeKioskTerminalsNow(KioskUUIDs);
             if (Err) return Notify(Err, 'error');
@@ -385,12 +424,13 @@ export function wireContextMenu() {
             Class: Command.Destructive ? 'text-warning' : 'text-light',
             Icon: `bi-${Command.Icon}`,
             IconColour: Command.Destructive ? '#e74c3c' : '#9b59b6',
+            ActsOnSelection: true,
             Action: async function () {
               if (Command.Destructive) {
                 const Confirmed = await ConfirmationDialog(
                   `${Command.Label} on ${KioskUUIDs.length === 1 ? 'this terminal' : Plural}?`
                 );
-                if (!Confirmed) return;
+                if (!Confirmed) return false;
               }
               const [Err, Summary] = await window.API.SendFreeKioskCommand(KioskUUIDs, Command.ID);
               if (Err) return Notify(Err, 'error');
@@ -425,6 +465,7 @@ export function wireContextMenu() {
           Class: 'text-light',
           Icon: 'bi-broadcast-pin',
           IconColour: '#2ecc71',
+          ActsOnSelection: true,
           Action: async function () {
             try {
               const UUIDs = IdentifyStartTargets.map((Target) => Target.UUID);
@@ -457,6 +498,7 @@ export function wireContextMenu() {
           Class: 'text-light',
           Icon: 'bi-slash-circle',
           IconColour: '#f1c40f',
+          ActsOnSelection: true,
           Action: async function () {
             try {
               await StopIdentifyingForUUIDs(IdentifyStopTargets.map((Target) => Target.UUID));
@@ -489,6 +531,7 @@ export function wireContextMenu() {
           Class: 'text-light',
           Icon: 'bi-power',
           IconColour: '#2ecc71',
+          ActsOnSelection: true,
           Action: async function () {
             window.API.WakeOnLan(WolTargets);
             ShowExecutionToast();
@@ -566,10 +609,17 @@ export function wireContextMenu() {
         // another row is tapped and this one reverts out of its confirm state).
         $option.data('optionTitle', String(option.Title || ''));
         $option.on('click', function (ev) {
-          // On mobile the first tap arms the row ("Tap to confirm"); only the
-          // second tap on the same, already-armed row runs the action. Desktop
-          // (right-click) keeps single-click activation.
-          if (IsMobileContextMenu()) {
+          // A finger/pen tap (any device, any layout) or anything in the
+          // mobile layout: the first tap arms the row ("Tap to confirm"); only
+          // the second tap on the same, already-armed row runs the action.
+          // Mouse/trackpad clicks and keyboard Enter keep single activation.
+          const native = ev.originalEvent as (MouseEvent & { pointerType?: string }) | undefined;
+          const pointerType = ResolveClickPointerType(
+            !!native,
+            native?.pointerType,
+            lastPointerDownType
+          );
+          if (RequiresTapConfirm(IsMobileContextMenu(), pointerType)) {
             const $this = $(this);
             if (!$this.hasClass('context-confirm-pending')) {
               ev.preventDefault();
@@ -578,7 +628,7 @@ export function wireContextMenu() {
               return;
             }
           }
-          option.Action!();
+          void RunContextMenuOption(option);
         });
       }
     });
@@ -896,4 +946,63 @@ export function wireContextMenu() {
     evt.clientY = centerY;
     $('html').trigger(evt);
   });
+}
+
+// Elements where a long-press must keep its native meaning: text fields need
+// the selection/paste callout, the menu itself is already open, and draggable
+// tiles (edit mode) use long-press to start the drag.
+const LONG_PRESS_EXCLUDED =
+  'input, textarea, select, [contenteditable="true"], #SHOWTRAK_CONTEXT_MENU, [draggable="true"]';
+
+// Touch/pen long-press opens the context menu, for iPadOS where WebKit never
+// fires `contextmenu` from a touch (see lib/long-press.ts). The menu is opened
+// by triggering the same synthetic `contextmenu` the Actions button and
+// keyboard shortcuts use, dispatched on whatever is under the finger NOW —
+// tiles re-render on live status updates, so the pointerdown target may have
+// been replaced during the hold.
+function wireTouchLongPress(): LongPressTracker {
+  const tracker = new LongPressTracker(
+    (clientX, clientY) => {
+      const target = document.elementFromPoint(clientX, clientY) || document.documentElement;
+      const evt = $.Event('contextmenu');
+      evt.clientX = clientX;
+      evt.clientY = clientY;
+      evt.pageX = clientX + (window.scrollX || window.pageXOffset || 0);
+      evt.pageY = clientY + (window.scrollY || window.pageYOffset || 0);
+      $(target).trigger(evt);
+    },
+    {
+      now: () => Date.now(),
+      setTimeout: (fn, ms) => window.setTimeout(fn, ms),
+      clearTimeout: (handle) => window.clearTimeout(handle as number),
+    }
+  );
+
+  document.addEventListener(
+    'pointerdown',
+    (ev) => {
+      const target = ev.target instanceof Element ? ev.target : null;
+      if (target && target.closest(LONG_PRESS_EXCLUDED)) return;
+      tracker.PointerDown(ev);
+    },
+    { passive: true }
+  );
+  document.addEventListener('pointermove', (ev) => tracker.PointerMove(ev), { passive: true });
+  document.addEventListener('pointerup', (ev) => tracker.PointerUp(ev), { passive: true });
+  document.addEventListener('pointercancel', () => tracker.Cancel(), { passive: true });
+  document.addEventListener('dragstart', () => tracker.Cancel(), true);
+  window.addEventListener('blur', () => tracker.Cancel());
+  // Capture phase on window so the lift-click is stopped before the tile
+  // selection toggle and the document-level "click anywhere closes the menu"
+  // handler can see it.
+  window.addEventListener(
+    'click',
+    (ev) => {
+      if (!tracker.ShouldSwallowClick()) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+    },
+    true
+  );
+  return tracker;
 }

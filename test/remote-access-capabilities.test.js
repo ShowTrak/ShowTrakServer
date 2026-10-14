@@ -107,13 +107,17 @@ test('ToPublicSettings passes only the allowlisted keys', () => {
   const Mod = load();
   const Rows = [
     { Key: 'UI_GROUP_COLUMN_COUNT', Value: 3 },
+    { Key: 'UI_CLEAR_SELECTION_AFTER_ACTION', Value: true },
     { Key: 'WEBUI_PASSWORD', Value: '1234' },
     { Key: 'SDK_API_KEY', Value: 'k' },
     { Key: 'FOG_USER_TOKEN', Value: 't' },
     null,
     { Value: 'no key' },
   ];
-  assert.deepEqual(Mod.ToPublicSettings(Rows), [{ Key: 'UI_GROUP_COLUMN_COUNT', Value: 3 }]);
+  assert.deepEqual(Mod.ToPublicSettings(Rows), [
+    { Key: 'UI_GROUP_COLUMN_COUNT', Value: 3 },
+    { Key: 'UI_CLEAR_SELECTION_AFTER_ACTION', Value: true },
+  ]);
   assert.deepEqual(Mod.ToPublicSettings(null), []);
   assert.deepEqual(Mod.ToPublicSettings({ Key: 'UI_GROUP_COLUMN_COUNT' }), []);
   // Nothing secret-shaped may ever join the allowlist.

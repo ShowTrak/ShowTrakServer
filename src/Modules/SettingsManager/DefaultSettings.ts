@@ -55,6 +55,15 @@ export const DefaultSettings: SettingDefinition[] = [
   },
   {
     Group: 'Features',
+    Key: 'UI_CLEAR_SELECTION_AFTER_ACTION',
+    Title: 'Clear Selection After Actions',
+    Description:
+      'Deselect clients once a script, Wake on LAN or other action is run from the context menu. Only the screen that ran the action is cleared; other windows and Web UI users keep their selection.',
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+  },
+  {
+    Group: 'Features',
     Key: 'CLIENT_SHOW_LAUNCH_COUNTDOWN',
     Title: 'Show Auto Launch Countdown',
     Description:

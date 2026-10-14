@@ -63,6 +63,9 @@ body.is-web #APPLICATION {
   -webkit-user-select: none !important;
   -moz-user-select: none !important;
   -ms-user-select: none !important;
+  /* iOS: stop long-press raising the link/image callout, so a touch
+     long-press can open the context menu instead (wire-context-menu.ts). */
+  -webkit-touch-callout: none;
   background: transparent !important;
 }
 

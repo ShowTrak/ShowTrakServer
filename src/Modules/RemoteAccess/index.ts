@@ -230,7 +230,11 @@ const PUSH_ALLOWLIST = new Set<string>(PUSH_CHANNELS);
 // desktop behaviour or a secret, so this is an allowlist of what the shared
 // renderer needs to draw the same picture as the desktop, never a list of keys
 // to hide. A key added here is visible to anyone the surface lets in.
-const PUBLIC_SETTING_KEYS = new Set<string>(['UI_GROUP_COLUMN_COUNT']);
+const PUBLIC_SETTING_KEYS = new Set<string>([
+  'UI_GROUP_COLUMN_COUNT',
+  // The Web UI applies this to its own selection after its own actions.
+  'UI_CLEAR_SELECTION_AFTER_ACTION',
+]);
 
 /** Reduce a settings list to the rows a remote surface may see. */
 export function ToPublicSettings<T>(Settings: readonly T[] | null | undefined): T[] {
