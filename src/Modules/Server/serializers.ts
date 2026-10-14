@@ -3,6 +3,7 @@ import type {
   AudioDevicesView,
   ClientView,
   NetworkStatusView,
+  USBCapabilities,
   GroupView,
   Vitals,
   RunningApplicationsSnapshot,
@@ -50,6 +51,7 @@ interface PublicClientSource {
   MissingCriticalUSBDevices?: unknown;
   CriticalUSBNames?: unknown;
   MissingCriticalUSBNames?: unknown;
+  USBCapabilities?: unknown;
   DegradedWarnings?: unknown;
   NetworkInterfaces?: unknown;
   IntegratedActions?: unknown;
@@ -123,6 +125,7 @@ const ToPublicClient = (c: PublicClientSource): ClientView => ({
   MissingCriticalUSBNames: Array.isArray(c.MissingCriticalUSBNames)
     ? c.MissingCriticalUSBNames
     : [],
+  USBCapabilities: (c.USBCapabilities ?? null) as USBCapabilities | null,
   Degraded: !!c.Degraded,
   DegradedWarnings: Array.isArray(c.DegradedWarnings) ? c.DegradedWarnings : [],
   Initialising: !!c.Initialising,

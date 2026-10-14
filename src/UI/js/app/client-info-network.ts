@@ -1,11 +1,17 @@
-// Network section of the client info modal: one card per interface, styled
-// like the audio cards, with a critical toggle and — once critical — an
-// auto-saving conditions table (present, IP address, IP range, subnet mask,
-// router). The decisions live in lib/network-interfaces.
+// IPv4 Interfaces and IPv6 Interfaces sections of the client info modal, built
+// by the same code like the audio inputs/outputs: one card per interface,
+// styled like the audio cards. On the interface's home family (see HomeFamily)
+// the card carries the critical toggle and — once critical — an auto-saving
+// conditions table (present, IP address, IP range, subnet mask, router); in the
+// other family's list it only shows the addresses. The decisions live in
+// lib/network-interfaces.
 import type { ClientView, NetworkCapabilities, NetworkInterfaceView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
 import {
   GetNetworkSectionState,
+  HomeFamily,
+  InterfacesFor,
+  NetworkFamilyTitle,
   NetworkConditionRows,
   NetworkInterfaceBadge,
   NetworkInterfaceSummary,
@@ -13,13 +19,18 @@ import {
   NetworkRenderKey,
   NetworkSectionMessage,
   ParseNetworkRuleFields,
-  VisibleInterfaces,
   type NetworkConditionRow,
   type NetworkFamily,
   type NetworkSectionState,
 } from './lib/network-interfaces';
 
-export const NETWORK_LIST = '#SHOWTRAK_CLIENT_INFO_NET_INTERFACES';
+/** The list element of each family's section. */
+export const NETWORK_LISTS: Record<NetworkFamily, string> = {
+  IPv4: '#SHOWTRAK_CLIENT_INFO_NET_IPV4',
+  IPv6: '#SHOWTRAK_CLIENT_INFO_NET_IPV6',
+};
+const FAMILIES: NetworkFamily[] = ['IPv4', 'IPv6'];
+const ALL_LISTS = FAMILIES.map((Family) => NETWORK_LISTS[Family]).join(', ');
 
 // Saves of each interface's conditions, chained so two quick edits reach the
 // server in the order they were made.
@@ -27,7 +38,7 @@ const SaveChains = new Map<string, Promise<void>>();
 
 // The last client rendered, so a rebuild held back while a condition was being
 // typed into can be applied once the field loses focus.
-let Pending: { Client: ClientView; Family: NetworkFamily } | null = null;
+let Pending: ClientView | null = null;
 
 const Token = (Name: string) => encodeURIComponent(Name);
 
@@ -98,8 +109,13 @@ function InterfaceCard(
   const Badge = NetworkInterfaceBadge(Iface);
   const { Title, Extra } = NetworkInterfaceTitle(Iface, Family);
   const Summary = NetworkInterfaceSummary(Iface, Capabilities, Family);
-  const Toggle =
-    Badge.State === 'internal'
+  // Controlled from its home family's list only; elsewhere it just lists addresses.
+  const Home = HomeFamily(Iface) === Family;
+  const Toggle = !Home
+    ? Badge.State === 'internal'
+      ? `<span class="SHOWTRAK_NET_INTERNAL_BADGE" title="${Badge.Title}">${Badge.Label}</span>`
+      : ''
+    : Badge.State === 'internal'
       ? `<span class="SHOWTRAK_NET_INTERNAL_BADGE" title="${Badge.Title}">${Badge.Label}</span>`
       : `<button type="button" class="${[
           'SHOWTRAK_TOGGLE_CRITICAL_USB',
@@ -110,7 +126,7 @@ function InterfaceCard(
           Badge.State === 'issue' ? 'is-mismatch-critical' : '',
         ]
           .filter(Boolean)
-          .join(' ')}" data-interface="${Token(Iface.Name)}"
+          .join(' ')}" data-interface="${Token(Iface.Name)}" data-family="${Family}"
           data-critical="${Iface.IsCritical ? '1' : '0'}" title="${Badge.Title}" aria-label="${Badge.Title}">
           <i class="bi ${Badge.Icon}"></i>
           <span>${Badge.Label}</span>
@@ -128,15 +144,17 @@ function InterfaceCard(
         </div>
         ${Toggle}
       </div>
-      ${Iface.Issues.map(
-        (Issue) =>
-          `<small class="d-block mt-1 text-start text-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue.Message)}</small>`
-      ).join('')}
-      ${ConditionsTable(Iface, Capabilities)}
+      ${(Home ? Iface.Issues : [])
+        .map(
+          (Issue) =>
+            `<small class="d-block mt-1 text-start text-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue.Message)}</small>`
+        )
+        .join('')}
+      ${Home ? ConditionsTable(Iface, Capabilities) : ''}
     </div>`;
 }
 
-/** The section markup for a client. Pure: a function of the client and the family filter. */
+/** One family's section markup for a client. Pure: a function of the client alone. */
 export function BuildNetworkSectionHtml(
   Client: ClientView,
   State: NetworkSectionState,
@@ -144,41 +162,42 @@ export function BuildNetworkSectionHtml(
 ): string {
   const Html: string[] = [];
   if (State !== 'ok') {
-    const Message = NetworkSectionMessage(State);
+    const Message = NetworkSectionMessage(State, Family);
     Html.push(MessageCard(Message.Title, Message.Body));
   }
-  const Interfaces = VisibleInterfaces(Client);
+  const Interfaces = InterfacesFor(Client, Family);
   if (State === 'ok' && !Interfaces.length) {
-    Html.push(MessageCard('No Interfaces Reported', 'This client reports no network interfaces.'));
+    Html.push(
+      MessageCard(`No ${NetworkFamilyTitle(Family)}`, `This client reports no ${Family} addresses.`)
+    );
   }
   const Capabilities = Client.NetworkStatus?.Capabilities ?? null;
   for (const Iface of Interfaces) Html.push(InterfaceCard(Iface, Capabilities, Family));
   return Html.join('');
 }
 
-/** Render the section, rebuilt only when what it shows changes. */
-export function RenderClientInfoNetwork(Client: ClientView, Family: NetworkFamily): void {
-  const $List = $(NETWORK_LIST);
-  const State = GetNetworkSectionState(Client);
-  const Key = NetworkRenderKey(Client, State, Family);
-  if (($List.attr('data-render-key') || '') === Key) {
-    Pending = null;
-    return;
-  }
+/** Render both sections, each rebuilt only when what it shows changes. */
+export function RenderClientInfoNetwork(Client: ClientView): void {
   // Never rebuild under the operator's typing; catch up when they leave the field.
-  if ($List.find('input[type="text"]:focus').length) {
-    Pending = { Client, Family };
+  if ($(ALL_LISTS).find('input[type="text"]:focus').length) {
+    Pending = Client;
     return;
   }
   Pending = null;
-  $List.html(BuildNetworkSectionHtml(Client, State, Family));
-  $List.attr('data-render-key', Key);
+  const State = GetNetworkSectionState(Client);
+  for (const Family of FAMILIES) {
+    const $List = $(NETWORK_LISTS[Family]);
+    const Key = NetworkRenderKey(Client, State, Family);
+    if (($List.attr('data-render-key') || '') === Key) continue;
+    $List.html(BuildNetworkSectionHtml(Client, State, Family));
+    $List.attr('data-render-key', Key);
+  }
 }
 
-/** Empty the section (an SDK client has no interfaces to show). */
+/** Empty both sections (an SDK client has no interfaces to show). */
 export function ClearClientInfoNetwork(): void {
   Pending = null;
-  $(NETWORK_LIST).attr('data-render-key', '').html('');
+  $(ALL_LISTS).attr('data-render-key', '').html('');
 }
 
 /** Read a conditions table back into a request and save it. */
@@ -215,7 +234,7 @@ function SaveConditions(
         Notify(String(Err), 'error');
       }
       // Put back what is really saved.
-      $(NETWORK_LIST).attr('data-render-key', '');
+      $(ALL_LISTS).attr('data-render-key', '');
       await Refresh();
     } catch (err) {
       HandleNonFatalError('ClientInfo:SaveNetworkConditions', err);
@@ -234,7 +253,7 @@ export function BindClientInfoNetworkHandlers(
   Refresh: () => Promise<void>,
   Notify: (Message: string, Type?: string, Duration?: number) => unknown
 ): void {
-  $(NETWORK_LIST)
+  $(ALL_LISTS)
     .off('.client-network')
     .on('click.client-network', '.SHOWTRAK_TOGGLE_CRITICAL_NETWORK', async function () {
       try {
@@ -242,9 +261,11 @@ export function BindClientInfoNetworkHandlers(
         const Name = decodeURIComponent(String($(this).attr('data-interface') || ''));
         if (!UUID || !Name) return;
         const IsCritical = String($(this).attr('data-critical') || '0') === '1';
+        // Marked under the list it was marked from, so it stays in that list.
+        const Family = $(this).attr('data-family') === 'IPv6' ? 'IPv6' : 'IPv4';
         const [Err] = IsCritical
           ? await window.API.RemoveClientNetworkInterfaceCritical(UUID, Name)
-          : await window.API.MarkClientNetworkInterfaceCritical(UUID, { Name });
+          : await window.API.MarkClientNetworkInterfaceCritical(UUID, { Name, Family });
         if (Err) return void Notify(String(Err), 'error');
         await Notify(
           IsCritical ? 'Critical network status removed' : 'Network interface marked as critical',
@@ -291,9 +312,8 @@ export function BindClientInfoNetworkHandlers(
       // Apply a rebuild that was held back while this field had focus — after
       // the `change` that fires first has had its chance to save.
       setTimeout(() => {
-        if (!Pending || $(NETWORK_LIST).find('input[type="text"]:focus').length) return;
-        const { Client, Family } = Pending;
-        RenderClientInfoNetwork(Client, Family);
+        if (!Pending || $(ALL_LISTS).find('input[type="text"]:focus').length) return;
+        RenderClientInfoNetwork(Pending);
       }, 0);
     });
 }

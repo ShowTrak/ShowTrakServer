@@ -6,6 +6,8 @@ import type {
   AudioLevelRequestResult,
   CriticalAudioDevicePayloadResult,
   CriticalNetworkInterfacePayloadResult,
+  CriticalDisplayPayloadResult,
+  CriticalUSBConditionOptionsResult,
   IPCValidationManager,
 } from './index';
 
@@ -158,11 +160,29 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     }).toUpperCase();
   };
 
+  // The conditions a USB mark request may set. Requests from before conditions
+  // existed carry none of them, which keeps every condition as it is.
+  const USBConditionOptions = (value: Record<string, unknown>) => {
+    const out: CriticalUSBConditionOptionsResult = {};
+    for (const key of [
+      'RequirePresent',
+      'CheckLocation',
+      'CheckFirmware',
+      'RequireNoError',
+    ] as const) {
+      if (!Object.prototype.hasOwnProperty.call(value, key) || value[key] === undefined) continue;
+      if (typeof value[key] !== 'boolean') fail(`${key} must be true or false`);
+      out[key] = value[key] as boolean;
+    }
+    return out;
+  };
+
   Manager.CriticalUSBDevicePayload = (value: unknown) => {
     if (!isPlainObject(value)) {
       fail('Critical USB payload must be an object');
     }
     return {
+      ...USBConditionOptions(value),
       SerialNumber: Manager.USBSerialNumber(value.SerialNumber),
       ManufacturerName: Object.prototype.hasOwnProperty.call(value, 'ManufacturerName')
         ? normalizeNonEmptyString(value.ManufacturerName, 'ManufacturerName', {
@@ -184,6 +204,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
       fail('Critical USB payload must be an object');
     }
     return {
+      ...USBConditionOptions(value),
       ManufacturerName: Object.prototype.hasOwnProperty.call(value, 'ManufacturerName')
         ? normalizeNonEmptyString(value.ManufacturerName, 'ManufacturerName', {
             minLength: 1,
@@ -225,27 +246,30 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     return Normalized as string;
   };
 
+  // The baseline is always captured server-side from what the client reports,
+  // so a request only says which conditions to guard. Older callers also sent
+  // the display's Label/Width/Height/RefreshRate/ScaleFactor; those are ignored.
   Manager.CriticalDisplayPayload = (value: unknown) => {
     if (!isPlainObject(value)) {
       fail('Critical display payload must be an object');
     }
-    const OptionalNumber = (raw: unknown, name: string) => {
-      if (raw === null || raw === undefined || raw === '') return null;
-      const num = Number(raw);
-      if (!Number.isFinite(num)) fail(`${name} must be a number`);
-      return num;
-    };
-    return {
+    const out: CriticalDisplayPayloadResult = {
       DisplayID: Manager.DisplayID(value.DisplayID),
-      Label:
-        Object.prototype.hasOwnProperty.call(value, 'Label') && value.Label
-          ? normalizeNonEmptyString(value.Label, 'Label', { minLength: 1, maxLength: 256 })
-          : null,
-      Width: OptionalNumber(value.Width, 'Width'),
-      Height: OptionalNumber(value.Height, 'Height'),
-      RefreshRate: OptionalNumber(value.RefreshRate, 'RefreshRate'),
-      ScaleFactor: OptionalNumber(value.ScaleFactor, 'ScaleFactor'),
     };
+    for (const key of [
+      'RequirePresent',
+      'RequirePrimary',
+      'CheckResolution',
+      'CheckRefreshRate',
+      'CheckScale',
+      'CheckRotation',
+      'CheckPosition',
+    ] as const) {
+      if (!Object.prototype.hasOwnProperty.call(value, key) || value[key] === undefined) continue;
+      if (typeof value[key] !== 'boolean') fail(`${key} must be true or false`);
+      out[key] = value[key] as boolean;
+    }
+    return out;
   };
 
   Manager.AudioEndpointID = (value: unknown, fieldName = 'EndpointID') => {
@@ -329,6 +353,10 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     };
     const Has = (key: string) =>
       Object.prototype.hasOwnProperty.call(value, key) && value[key] !== undefined;
+    if (Has('Family')) {
+      if (value.Family !== 'IPv4' && value.Family !== 'IPv6') fail('Family must be IPv4 or IPv6');
+      out.Family = value.Family;
+    }
     if (Has('RequirePresent')) {
       if (typeof value.RequirePresent !== 'boolean') fail('RequirePresent must be true or false');
       out.RequirePresent = value.RequirePresent as boolean;

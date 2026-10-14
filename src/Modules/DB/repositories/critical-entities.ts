@@ -22,19 +22,23 @@ export function CreateCriticalEntitiesRepository(DB: DBManager) {
     // --- USB devices --------------------------------------------------------
     LoadAllUSB(): Promise<DBResult<CriticalUSBDeviceRow[]>> {
       return DB.All<CriticalUSBDeviceRow>(
-        'SELECT UUID, SerialNumber, ManufacturerName, ProductName, Timestamp FROM CriticalUSBDevices'
+        'SELECT UUID, SerialNumber, ManufacturerName, ProductName, RequirePresent, Location, FirmwareVersion, RequireNoError, Timestamp FROM CriticalUSBDevices'
       );
     },
-    MarkUSB(
-      UUID: string,
-      SerialNumber: string,
-      ManufacturerName: string | null,
-      ProductName: string | null,
-      Timestamp: number
-    ): Promise<DBResult<unknown>> {
+    MarkUSB(Row: CriticalUSBDeviceRow): Promise<DBResult<unknown>> {
       return DB.Run(
-        'INSERT OR REPLACE INTO CriticalUSBDevices (UUID, SerialNumber, ManufacturerName, ProductName, Timestamp) VALUES (?, ?, ?, ?, ?)',
-        [UUID, SerialNumber, ManufacturerName, ProductName, Timestamp]
+        'INSERT OR REPLACE INTO CriticalUSBDevices (UUID, SerialNumber, ManufacturerName, ProductName, RequirePresent, Location, FirmwareVersion, RequireNoError, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          Row.UUID,
+          Row.SerialNumber,
+          Row.ManufacturerName,
+          Row.ProductName,
+          Row.RequirePresent,
+          Row.Location,
+          Row.FirmwareVersion,
+          Row.RequireNoError,
+          Row.Timestamp,
+        ]
       );
     },
     RemoveUSB(UUID: string, SerialNumber: string): Promise<DBResult<unknown>> {
@@ -56,20 +60,24 @@ export function CreateCriticalEntitiesRepository(DB: DBManager) {
     // --- Serial-less USB devices (guarded by name + quantity) ---------------
     LoadAllUSBNames(): Promise<DBResult<CriticalUSBDeviceNameRow[]>> {
       return DB.All<CriticalUSBDeviceNameRow>(
-        'SELECT UUID, NameKey, ManufacturerName, ProductName, Quantity, Timestamp FROM CriticalUSBDeviceNames'
+        'SELECT UUID, NameKey, ManufacturerName, ProductName, Quantity, RequirePresent, Location, FirmwareVersion, RequireNoError, Timestamp FROM CriticalUSBDeviceNames'
       );
     },
-    MarkUSBName(
-      UUID: string,
-      NameKey: string,
-      ManufacturerName: string | null,
-      ProductName: string | null,
-      Quantity: number,
-      Timestamp: number
-    ): Promise<DBResult<unknown>> {
+    MarkUSBName(Row: CriticalUSBDeviceNameRow): Promise<DBResult<unknown>> {
       return DB.Run(
-        'INSERT OR REPLACE INTO CriticalUSBDeviceNames (UUID, NameKey, ManufacturerName, ProductName, Quantity, Timestamp) VALUES (?, ?, ?, ?, ?, ?)',
-        [UUID, NameKey, ManufacturerName, ProductName, Quantity, Timestamp]
+        'INSERT OR REPLACE INTO CriticalUSBDeviceNames (UUID, NameKey, ManufacturerName, ProductName, Quantity, RequirePresent, Location, FirmwareVersion, RequireNoError, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          Row.UUID,
+          Row.NameKey,
+          Row.ManufacturerName,
+          Row.ProductName,
+          Row.Quantity,
+          Row.RequirePresent,
+          Row.Location,
+          Row.FirmwareVersion,
+          Row.RequireNoError,
+          Row.Timestamp,
+        ]
       );
     },
     RemoveUSBName(UUID: string, NameKey: string): Promise<DBResult<unknown>> {
@@ -127,22 +135,27 @@ export function CreateCriticalEntitiesRepository(DB: DBManager) {
     // --- Displays -----------------------------------------------------------
     LoadAllDisplays(): Promise<DBResult<CriticalDisplayRow[]>> {
       return DB.All<CriticalDisplayRow>(
-        'SELECT UUID, DisplayID, Label, Width, Height, RefreshRate, ScaleFactor, Timestamp FROM CriticalDisplays'
+        'SELECT UUID, DisplayID, Label, RequirePresent, Width, Height, RefreshRate, ScaleFactor, Rotation, RequirePrimary, PositionX, PositionY, Timestamp FROM CriticalDisplays'
       );
     },
-    MarkDisplay(
-      UUID: string,
-      DisplayID: string,
-      Label: string | null,
-      Width: number | null,
-      Height: number | null,
-      RefreshRate: number | null,
-      ScaleFactor: number | null,
-      Timestamp: number
-    ): Promise<DBResult<unknown>> {
+    MarkDisplay(Row: CriticalDisplayRow): Promise<DBResult<unknown>> {
       return DB.Run(
-        'INSERT OR REPLACE INTO CriticalDisplays (UUID, DisplayID, Label, Width, Height, RefreshRate, ScaleFactor, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [UUID, DisplayID, Label, Width, Height, RefreshRate, ScaleFactor, Timestamp]
+        'INSERT OR REPLACE INTO CriticalDisplays (UUID, DisplayID, Label, RequirePresent, Width, Height, RefreshRate, ScaleFactor, Rotation, RequirePrimary, PositionX, PositionY, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          Row.UUID,
+          Row.DisplayID,
+          Row.Label,
+          Row.RequirePresent,
+          Row.Width,
+          Row.Height,
+          Row.RefreshRate,
+          Row.ScaleFactor,
+          Row.Rotation,
+          Row.RequirePrimary,
+          Row.PositionX,
+          Row.PositionY,
+          Row.Timestamp,
+        ]
       );
     },
     RemoveDisplay(UUID: string, DisplayID: string): Promise<DBResult<unknown>> {
@@ -198,16 +211,17 @@ export function CreateCriticalEntitiesRepository(DB: DBManager) {
     // --- Network interfaces -------------------------------------------------
     LoadAllNetwork(): Promise<DBResult<CriticalNetworkInterfaceRow[]>> {
       return DB.All<CriticalNetworkInterfaceRow>(
-        'SELECT UUID, Name, MAC, RequirePresent, Address, RangeStart, RangeEnd, Netmask, Gateway, Timestamp FROM CriticalNetworkInterfaces'
+        'SELECT UUID, Name, MAC, Family, RequirePresent, Address, RangeStart, RangeEnd, Netmask, Gateway, Timestamp FROM CriticalNetworkInterfaces'
       );
     },
     MarkNetwork(Row: CriticalNetworkInterfaceRow): Promise<DBResult<unknown>> {
       return DB.Run(
-        'INSERT OR REPLACE INTO CriticalNetworkInterfaces (UUID, Name, MAC, RequirePresent, Address, RangeStart, RangeEnd, Netmask, Gateway, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT OR REPLACE INTO CriticalNetworkInterfaces (UUID, Name, MAC, Family, RequirePresent, Address, RangeStart, RangeEnd, Netmask, Gateway, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           Row.UUID,
           Row.Name,
           Row.MAC,
+          Row.Family,
           Row.RequirePresent,
           Row.Address,
           Row.RangeStart,

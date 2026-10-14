@@ -140,7 +140,15 @@ export interface AlertHistoryRow {
   Timestamp: number;
 }
 
-export interface CriticalUSBDeviceRow {
+// The conditions both critical USB tables carry (see CriticalUSBConditions).
+export interface CriticalUSBConditionColumns {
+  RequirePresent: number; // sqlite 0/1
+  Location: string | null;
+  FirmwareVersion: string | null;
+  RequireNoError: number; // sqlite 0/1
+}
+
+export interface CriticalUSBDeviceRow extends CriticalUSBConditionColumns {
   UUID: string;
   SerialNumber: string;
   ManufacturerName: string | null;
@@ -148,7 +156,7 @@ export interface CriticalUSBDeviceRow {
   Timestamp: number;
 }
 
-export interface CriticalUSBDeviceNameRow {
+export interface CriticalUSBDeviceNameRow extends CriticalUSBConditionColumns {
   UUID: string;
   NameKey: string;
   ManufacturerName: string | null;
@@ -168,10 +176,15 @@ export interface CriticalDisplayRow {
   UUID: string;
   DisplayID: string;
   Label: string | null;
+  RequirePresent: number; // sqlite 0/1
   Width: number | null;
   Height: number | null;
   RefreshRate: number | null;
   ScaleFactor: number | null;
+  Rotation: number | null;
+  RequirePrimary: number; // sqlite 0/1
+  PositionX: number | null;
+  PositionY: number | null;
   Timestamp: number;
 }
 
@@ -193,6 +206,7 @@ export interface CriticalNetworkInterfaceRow {
   UUID: string;
   Name: string;
   MAC: string | null;
+  Family: string | null;
   RequirePresent: number; // sqlite 0/1
   Address: string | null;
   RangeStart: string | null;

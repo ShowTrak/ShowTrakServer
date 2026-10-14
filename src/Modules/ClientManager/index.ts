@@ -34,6 +34,16 @@ import {
   resolveCriticalAudioEntry,
 } from './audio';
 import {
+  normalizeCriticalUSBEntry,
+  normalizeCriticalUSBNameEntry,
+  resolveUSBConditions,
+} from './usb';
+import {
+  IsWeakDisplayID,
+  normalizeCriticalDisplayEntry,
+  resolveCriticalDisplayEntry,
+} from './display';
+import {
   normalizeCriticalNetworkEntry,
   normalizeInterfaceName,
   resolveCriticalNetworkEntry,
@@ -49,7 +59,11 @@ import type {
 } from '../DB/rows';
 import type {
   CriticalAudioDevice,
+  CriticalDisplay,
   CriticalNetworkInterface,
+  CriticalUSBConditions,
+  CriticalUSBDevice,
+  CriticalUSBName,
   HeartbeatPayload,
   USBDevice,
 } from '@showtrak/protocol';
@@ -267,75 +281,30 @@ function replaceUUIDInValue(Value: unknown, OldUUID: string, NewUUID: string): u
 }
 
 // Per-client critical-entity indexes. The entry shape stored per kind mirrors
-// what the matching Client.SetCritical* sink consumes (the USB entry carries a
-// redundant UUID for parity with the historical index; the sink ignores it).
-interface USBIndexEntry {
-  UUID: string;
-  SerialNumber: string;
-  ManufacturerName: string | null;
-  ProductName: string | null;
-  Timestamp: number | null;
-}
-interface USBNameIndexEntry {
-  NameKey: string;
-  ManufacturerName: string | null;
-  ProductName: string | null;
-  Quantity: number;
-  Timestamp: number | null;
-}
+// what the matching Client.SetCritical* sink consumes.
 interface ApplicationIndexEntry {
   Name: string;
   Key: string;
   Timestamp: number | null;
 }
-interface DisplayIndexEntry {
-  DisplayID: string;
-  Label: string | null;
-  Width: number | null;
-  Height: number | null;
-  RefreshRate: number | null;
-  ScaleFactor: number | null;
-  Timestamp: number | null;
-}
-
-const CriticalUSB = makeCriticalIndex<CriticalUSBDeviceRow, USBIndexEntry>({
+const CriticalUSB = makeCriticalIndex<CriticalUSBDeviceRow, CriticalUSBDevice>({
   loadAll: () => CriticalRepo.LoadAllUSB(),
   fromRow: (Row) => {
     const UUID = Row && Row.UUID ? String(Row.UUID) : '';
-    const SerialNumber = normalizeSerialNumber(Row && Row.SerialNumber);
-    if (!UUID || !SerialNumber) return null;
-    return {
-      UUID,
-      Key: SerialNumber,
-      Entry: {
-        UUID,
-        SerialNumber,
-        ManufacturerName: Row.ManufacturerName || null,
-        ProductName: Row.ProductName || null,
-        Timestamp: Row.Timestamp || null,
-      },
-    };
+    const Entry = normalizeCriticalUSBEntry(Row);
+    if (!UUID || !Entry) return null;
+    return { UUID, Key: Entry.SerialNumber, Entry };
   },
   apply: (client, entries) => client.SetCriticalUSBDevices(entries),
 });
 
-const CriticalUSBNames = makeCriticalIndex<CriticalUSBDeviceNameRow, USBNameIndexEntry>({
+const CriticalUSBNames = makeCriticalIndex<CriticalUSBDeviceNameRow, CriticalUSBName>({
   loadAll: () => CriticalRepo.LoadAllUSBNames(),
   fromRow: (Row) => {
     const UUID = Row && Row.UUID ? String(Row.UUID) : '';
-    const NameKey = Row && Row.NameKey ? String(Row.NameKey).trim().toLowerCase() : '';
-    if (!UUID || !NameKey) return null;
-    return {
-      UUID,
-      Key: NameKey,
-      Entry: {
-        NameKey,
-        ManufacturerName: Row.ManufacturerName || null,
-        ProductName: Row.ProductName || null,
-        Quantity: Math.max(1, parseInt(String(Row.Quantity), 10) || 1),
-        Timestamp: Row.Timestamp || null,
-      },
-    };
+    const Entry = normalizeCriticalUSBNameEntry(Row);
+    if (!UUID || !Entry) return null;
+    return { UUID, Key: Entry.NameKey, Entry };
   },
   apply: (client, entries) => client.SetCriticalUSBNames(entries),
 });
@@ -380,28 +349,13 @@ const MacAddresses = makeCriticalIndex<ClientMacAddressRow, ClientMacAddress>({
   apply: (client, entries) => client.SetMacAddresses(entries),
 });
 
-const CriticalDisplays = makeCriticalIndex<CriticalDisplayRow, DisplayIndexEntry>({
+const CriticalDisplays = makeCriticalIndex<CriticalDisplayRow, CriticalDisplay>({
   loadAll: () => CriticalRepo.LoadAllDisplays(),
   fromRow: (Row) => {
     const UUID = Row && Row.UUID ? String(Row.UUID) : '';
-    const DisplayID = normalizeDisplayID(Row && Row.DisplayID);
-    if (!UUID || !DisplayID) return null;
-    return {
-      UUID,
-      Key: DisplayID,
-      Entry: {
-        DisplayID,
-        Label: Row.Label || null,
-        Width: Row.Width != null ? parseInt(String(Row.Width), 10) || null : null,
-        Height: Row.Height != null ? parseInt(String(Row.Height), 10) || null : null,
-        RefreshRate: Row.RefreshRate != null ? parseInt(String(Row.RefreshRate), 10) || null : null,
-        ScaleFactor:
-          Row.ScaleFactor != null && Number.isFinite(Number(Row.ScaleFactor))
-            ? Number(Row.ScaleFactor)
-            : null,
-        Timestamp: Row.Timestamp || null,
-      },
-    };
+    const Entry = normalizeCriticalDisplayEntry(Row);
+    if (!UUID || !Entry) return null;
+    return { UUID, Key: Entry.DisplayID, Entry };
   },
   apply: (client, entries) => client.SetCriticalDisplays(entries),
 });
@@ -654,6 +608,16 @@ Manager.USBDeviceRemoved = async (UUID: string, Device: USBDevice) => {
   return Ok('Updated');
 };
 
+// The condition columns both critical USB tables share, as sqlite stores them.
+function USBConditionColumns(Entry: CriticalUSBConditions) {
+  return {
+    RequirePresent: Entry.RequirePresent ? 1 : 0,
+    Location: Entry.Location,
+    FirmwareVersion: Entry.FirmwareVersion,
+    RequireNoError: Entry.RequireNoError ? 1 : 0,
+  };
+}
+
 Manager.MarkUSBDeviceCritical = async (UUID: string, Device: CriticalUSBDevicePayloadResult) => {
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
@@ -665,33 +629,37 @@ Manager.MarkUSBDeviceCritical = async (UUID: string, Device: CriticalUSBDevicePa
   const KnownDevice = (
     Array.isArray(Target.ConnectedUSBDeviceList) ? Target.ConnectedUSBDeviceList : []
   ).find((Entry) => normalizeSerialNumber(Entry && Entry.SerialNumber) === SerialNumber);
-  const ManufacturerName =
-    (KnownDevice && KnownDevice.ManufacturerName) || (Device && Device.ManufacturerName) || null;
-  const ProductName =
-    (KnownDevice && KnownDevice.ProductName) || (Device && Device.ProductName) || null;
+  const Existing = CriticalUSB.getForClient(UUID, false)?.get(SerialNumber) || null;
+  const [ResolveErr, Conditions] = resolveUSBConditions(
+    Device,
+    KnownDevice ? [KnownDevice] : [],
+    Existing
+  );
+  if (ResolveErr || !Conditions) return Fail(ResolveErr || 'Failed to resolve critical USB device');
 
-  const [WriteErr] = await CriticalRepo.MarkUSB(
+  const Entry: CriticalUSBDevice = {
+    SerialNumber,
+    ManufacturerName:
+      KnownDevice?.ManufacturerName ||
+      Device.ManufacturerName ||
+      Existing?.ManufacturerName ||
+      null,
+    ProductName: KnownDevice?.ProductName || Device.ProductName || Existing?.ProductName || null,
+    ...Conditions,
+    Timestamp: Existing?.Timestamp ?? Date.now(),
+  };
+  const [WriteErr] = await CriticalRepo.MarkUSB({
     UUID,
     SerialNumber,
-    ManufacturerName,
-    ProductName,
-    Date.now()
-  );
+    ManufacturerName: Entry.ManufacturerName,
+    ProductName: Entry.ProductName,
+    ...USBConditionColumns(Entry),
+    Timestamp: Entry.Timestamp ?? Date.now(),
+  });
   if (WriteErr) return Fail('Failed to save critical USB device');
 
-  CriticalUSB.setForClient(UUID, SerialNumber, {
-    UUID,
-    SerialNumber,
-    ManufacturerName,
-    ProductName,
-    Timestamp: Date.now(),
-  });
-  Target.MarkCriticalUSBDevice({
-    SerialNumber,
-    ManufacturerName,
-    ProductName,
-    Timestamp: Date.now(),
-  });
+  CriticalUSB.setForClient(UUID, SerialNumber, Entry);
+  Target.MarkCriticalUSBDevice(Entry);
   BroadcastManager.emit('ClientUpdated', Target);
   return Ok(true);
 };
@@ -736,40 +704,43 @@ Manager.MarkUSBNameCritical = async (UUID: string, Device: CriticalUSBNamePayloa
   const NameKey = normalizeUSBNameKey(ManufacturerName, ProductName);
   if (!NameKey) return Fail('Device name is required');
 
-  // Auto-capture the expected quantity from how many devices of this name are
-  // currently connected (at least one, so the guard is meaningful).
-  const ConnectedCount = (
+  // Name guarding only covers devices without a serial (see buildUSBView).
+  const Live = (
     Array.isArray(Target.ConnectedUSBDeviceList) ? Target.ConnectedUSBDeviceList : []
   ).filter(
     (Entry) =>
+      !normalizeSerialNumber(Entry && Entry.SerialNumber) &&
       normalizeUSBNameKey(Entry && Entry.ManufacturerName, Entry && Entry.ProductName) === NameKey
-  ).length;
-  const Quantity = Math.max(1, ConnectedCount);
+  );
+  const Existing = CriticalUSBNames.getForClient(UUID, false)?.get(NameKey) || null;
+  const [ResolveErr, Conditions] = resolveUSBConditions(Device, Live, Existing);
+  if (ResolveErr || !Conditions) return Fail(ResolveErr || 'Failed to resolve critical USB device');
 
-  const [WriteErr] = await CriticalRepo.MarkUSBName(
+  // The expected quantity is captured from how many are connected when it is
+  // first marked (at least one, so the guard means something). Editing its
+  // conditions later keeps it: one being unplugged at the time is not a new
+  // expectation.
+  const Entry: CriticalUSBName = {
+    NameKey,
+    ManufacturerName: ManufacturerName ?? Existing?.ManufacturerName ?? null,
+    ProductName: ProductName ?? Existing?.ProductName ?? null,
+    Quantity: Existing?.Quantity ?? Math.max(1, Live.length),
+    ...Conditions,
+    Timestamp: Existing?.Timestamp ?? Date.now(),
+  };
+  const [WriteErr] = await CriticalRepo.MarkUSBName({
     UUID,
     NameKey,
-    ManufacturerName,
-    ProductName,
-    Quantity,
-    Date.now()
-  );
+    ManufacturerName: Entry.ManufacturerName,
+    ProductName: Entry.ProductName,
+    Quantity: Entry.Quantity,
+    ...USBConditionColumns(Entry),
+    Timestamp: Entry.Timestamp ?? Date.now(),
+  });
   if (WriteErr) return Fail('Failed to save critical USB device');
 
-  CriticalUSBNames.setForClient(UUID, NameKey, {
-    NameKey,
-    ManufacturerName,
-    ProductName,
-    Quantity,
-    Timestamp: Date.now(),
-  });
-  Target.MarkCriticalUSBName({
-    NameKey,
-    ManufacturerName,
-    ProductName,
-    Quantity,
-    Timestamp: Date.now(),
-  });
+  CriticalUSBNames.setForClient(UUID, NameKey, Entry);
+  Target.MarkCriticalUSBName(Entry);
   BroadcastManager.emit('ClientUpdated', Target);
   return Ok(true);
 };
@@ -825,58 +796,68 @@ Manager.MarkDisplayCritical = async (UUID: string, Display: CriticalDisplayPaylo
   const DisplayID = normalizeDisplayID(Display && Display.DisplayID);
   if (!DisplayID) return Fail('Display identifier is required');
 
-  // Prefer the live values reported by the client so the captured baseline
-  // (resolution + refresh rate) reflects the current, known-good state.
-  const KnownDisplay = (
-    Array.isArray(Target.ConnectedDisplayList) ? Target.ConnectedDisplayList : []
-  ).find((Entry) => normalizeDisplayID(Entry && Entry.DisplayID) === DisplayID);
-  const Source = AsRecord(KnownDisplay || Display);
+  // The id may be the critical entry's own or the live display's it matched; a
+  // display that is not critical yet is found by its live id.
+  const Found = Target.FindCriticalDisplay(DisplayID);
+  const Existing = Found.Critical
+    ? CriticalDisplays.getForClient(UUID, false)?.get(Found.Critical.DisplayID) || Found.Critical
+    : null;
+  const Live =
+    Found.Live ||
+    (Existing
+      ? null
+      : (Array.isArray(Target.ConnectedDisplayList) ? Target.ConnectedDisplayList : []).find(
+          (Entry) => normalizeDisplayID(Entry && Entry.DisplayID) === DisplayID
+        ) || null);
+  const LiveID = Live ? normalizeDisplayID(Live.DisplayID) : null;
 
-  const Label = (Source.Label as string | null) || Display.Label || null;
-  const Width = parseInt(String(Source.Width), 10) || null;
-  const Height = parseInt(String(Source.Height), 10) || null;
-  const RefreshRate =
-    Source.RefreshRate != null && Number.isFinite(Number(Source.RefreshRate))
-      ? Math.round(Number(Source.RefreshRate))
-      : null;
-  const ScaleFactor =
-    Source.ScaleFactor != null && Number.isFinite(Number(Source.ScaleFactor))
-      ? Number(Source.ScaleFactor)
-      : null;
-  const Timestamp = Date.now();
+  // An entry recognised by a weak id (the display's mode, or a session handle)
+  // takes the durable id its display now reports, so it no longer leans on the
+  // weaker matching tiers.
+  const StoredID =
+    Existing && LiveID && LiveID !== Existing.DisplayID
+      ? IsWeakDisplayID(Existing.DisplayID) && !IsWeakDisplayID(LiveID)
+        ? LiveID
+        : Existing.DisplayID
+      : (Existing?.DisplayID ?? DisplayID);
 
-  const [WriteErr] = await CriticalRepo.MarkDisplay(
-    UUID,
-    DisplayID,
-    Label,
-    Width,
-    Height,
-    RefreshRate,
-    ScaleFactor,
-    Timestamp
+  const [ResolveErr, Entry] = resolveCriticalDisplayEntry(
+    StoredID,
+    Display,
+    Live,
+    Existing,
+    Date.now()
   );
-  if (WriteErr) return Fail('Failed to save critical display');
+  if (ResolveErr || !Entry) return Fail(ResolveErr || 'Failed to resolve critical display');
 
-  CriticalDisplays.setForClient(UUID, DisplayID, {
-    DisplayID,
-    Label,
-    Width,
-    Height,
-    RefreshRate,
-    ScaleFactor,
-    Timestamp,
+  const Rekeyed = !!Existing && Existing.DisplayID !== Entry.DisplayID;
+  const [WriteErr] = await CriticalRepo.MarkDisplay({
+    UUID,
+    DisplayID: Entry.DisplayID,
+    Label: Entry.Label,
+    RequirePresent: Entry.RequirePresent ? 1 : 0,
+    Width: Entry.Width,
+    Height: Entry.Height,
+    RefreshRate: Entry.RefreshRate,
+    ScaleFactor: Entry.ScaleFactor,
+    Rotation: Entry.Rotation,
+    RequirePrimary: Entry.RequirePrimary ? 1 : 0,
+    PositionX: Entry.PositionX,
+    PositionY: Entry.PositionY,
+    Timestamp: Entry.Timestamp ?? Date.now(),
   });
-  Target.MarkCriticalDisplay({
-    DisplayID,
-    Label,
-    Width,
-    Height,
-    RefreshRate,
-    ScaleFactor,
-    Timestamp,
-  });
+  if (WriteErr) return Fail('Failed to save critical display');
+  if (Rekeyed) {
+    const [RemoveErr] = await CriticalRepo.RemoveDisplay(UUID, Existing.DisplayID);
+    if (RemoveErr) Logger.error('Failed to retire a re-keyed critical display', RemoveErr);
+    CriticalDisplays.removeForClient(UUID, Existing.DisplayID);
+    Target.UnmarkCriticalDisplay(Existing.DisplayID);
+  }
+
+  CriticalDisplays.setForClient(UUID, Entry.DisplayID, Entry);
+  Target.MarkCriticalDisplay(Entry);
   BroadcastManager.emit('ClientUpdated', Target);
-  return Ok(true);
+  return Ok(!Existing);
 };
 
 Manager.RemoveDisplayCritical = async (UUID: string, DisplayID: unknown) => {
@@ -884,8 +865,10 @@ Manager.RemoveDisplayCritical = async (UUID: string, DisplayID: unknown) => {
   if (Err) return Fail(Err);
   if (!Target) return Fail('Client Not Found');
 
-  const NormalizedID = normalizeDisplayID(DisplayID);
-  if (!NormalizedID) return Fail('Display identifier is required');
+  const RequestedID = normalizeDisplayID(DisplayID);
+  if (!RequestedID) return Fail('Display identifier is required');
+  // Accept the live id of a display matched to the entry under another id.
+  const NormalizedID = Target.FindCriticalDisplay(RequestedID).Critical?.DisplayID ?? RequestedID;
 
   const [WriteErr] = await CriticalRepo.RemoveDisplay(UUID, NormalizedID);
   if (WriteErr) return Fail('Failed to remove critical display');
@@ -1004,6 +987,7 @@ Manager.MarkNetworkInterfaceCritical = async (
     UUID,
     Name: Entry.Name,
     MAC: Entry.MAC,
+    Family: Entry.Family,
     RequirePresent: Entry.RequirePresent ? 1 : 0,
     Address: Entry.Address,
     RangeStart: Entry.RangeStart,

@@ -488,50 +488,69 @@ function getClientApplicationHistorySamples(
 // renderer (monitoring.ts) builds the same key to join the samples back in.
 const CRITICAL_USB_NAME_HISTORY_PREFIX = 'usbname:';
 
-// Resolve the current connected/disconnected state for every critical USB
-// device on a client. Returns null (skip this sample, leaving an idle gap) when
-// the client is offline so we never paint "disconnected" red bars for a device
-// whose real state we could not observe. Devices with a serial are tracked per
-// serial; serial-less devices marked critical-by-name are tracked once per name
-// (the expected quantity being satisfied is what counts as "connected").
+// Resolve the current state for every critical USB device on a client. Returns
+// null (skip this sample, leaving an idle gap) when the client is offline so we
+// never paint "disconnected" red bars for a device whose real state we could not
+// observe. Devices with a serial are tracked per serial; serial-less devices
+// marked critical-by-name are tracked once per name. Missing (or, by name, short
+// of the expected quantity) is "offline" (red); connected but breaking another
+// condition — port, firmware, a device error — is "online but degraded"
+// (orange). A device absent but allowed to be leaves a gap.
 function extractCriticalUSBStates(
   client: ClientHardwareTelemetryLike | null | undefined
 ): NamedEntityState[] | null {
   if (!client || !client.Online) return null;
   const devices = Array.isArray(client.USBDeviceList) ? client.USBDeviceList : [];
   const states: NamedEntityState[] = [];
-  const seenNameKeys = new Set<string>();
+  const byNameKey = new Map<string, NamedEntityState>();
   for (const device of devices) {
     if (!device || !device.IsCritical) continue;
     const manufacturer =
       typeof device.ManufacturerName === 'string' ? device.ManufacturerName.trim() : '';
     const product = typeof device.ProductName === 'string' ? device.ProductName.trim() : '';
     const name = [manufacturer, product].filter(Boolean).join(' ') || 'USB Device';
+    const issues: Array<{ Kind?: unknown }> = Array.isArray(device.Issues) ? device.Issues : [];
+    const missingIssue = issues.some((issue) => issue && issue.Kind === 'missing');
+    const otherIssue = issues.some((issue) => issue && issue.Kind !== 'missing');
+    const isConnected = device.IsConnected !== false;
     const serial =
       device.SerialNumber != null && String(device.SerialNumber).trim()
         ? String(device.SerialNumber).trim()
         : null;
     if (serial) {
-      const isConnected = device.IsConnected !== false && !device.Missing;
-      states.push({ key: serial, name, online: isConnected, degraded: false });
+      if (!isConnected && !device.Missing) continue;
+      const online = isConnected && !device.Missing;
+      states.push({ key: serial, name, online, degraded: online && otherIssue });
       continue;
     }
-    // Serial-less, name-guarded: one series per distinct name. "Online" only
-    // when the expected quantity is met (not short, not fully missing).
+    // Serial-less, name-guarded: one series per distinct name, folding every
+    // card of the name together. "Online" only when the expected quantity is met.
     if (!device.IsCriticalByName) continue;
     const nameKey =
       typeof device.NameKey === 'string' && device.NameKey.trim()
         ? device.NameKey.trim().toLowerCase()
         : '';
-    if (!nameKey || seenNameKeys.has(nameKey)) continue;
-    seenNameKeys.add(nameKey);
-    const satisfied = device.IsConnected !== false && !device.Missing && !device.Shortfall;
-    states.push({
+    if (!nameKey) continue;
+    // Short of its quantity, unless its presence is not required.
+    const presenceRequired =
+      !device.Critical ||
+      (device.Critical as { RequirePresent?: unknown }).RequirePresent !== false;
+    const short = missingIssue || !!device.Missing || (!!device.Shortfall && presenceRequired);
+    if (!isConnected && !short) continue;
+    const existing = byNameKey.get(nameKey);
+    if (existing) {
+      existing.online = existing.online && !short;
+      existing.degraded = existing.online && (existing.degraded || otherIssue);
+      continue;
+    }
+    const state: NamedEntityState = {
       key: `${CRITICAL_USB_NAME_HISTORY_PREFIX}${nameKey}`,
       name,
-      online: satisfied,
-      degraded: false,
-    });
+      online: !short,
+      degraded: !short && otherIssue,
+    };
+    byNameKey.set(nameKey, state);
+    states.push(state);
   }
   return states;
 }
@@ -562,9 +581,11 @@ function getClientUSBHistorySamples(
 // Resolve the current state for every critical display on a client. Returns
 // null (skip this sample, leaving an idle gap) when the client is offline so we
 // never paint "missing" red bars for a display whose real state we could not
-// observe. A connected display whose resolution/refresh matches its captured
-// baseline is "online" (green); a connected-but-changed display is "online but
-// degraded" (orange); a missing display is "offline" (red).
+// observe. A connected display meeting its conditions is "online" (green); a
+// connected one breaking any is "online but degraded" (orange); a missing one is
+// "offline" (red). One that is absent but allowed to be, or not reported yet,
+// leaves a gap. Keyed by the critical entry's id, which stays put when the
+// display is recognised under another tier of identity.
 function extractCriticalDisplayStates(
   client: ClientHardwareTelemetryLike | null | undefined
 ): NamedEntityState[] | null {
@@ -573,20 +594,23 @@ function extractCriticalDisplayStates(
   const states: NamedEntityState[] = [];
   for (const display of displays) {
     if (!display || !display.IsCritical) continue;
-    const id =
-      display.DisplayID != null && String(display.DisplayID).trim()
-        ? String(display.DisplayID).trim()
+    const critical =
+      display.Critical && typeof display.Critical === 'object'
+        ? (display.Critical as { DisplayID?: unknown })
         : null;
+    const rawID = critical && critical.DisplayID != null ? critical.DisplayID : display.DisplayID;
+    const id = rawID != null && String(rawID).trim() ? String(rawID).trim() : null;
     if (!id) continue;
     const label =
       typeof display.Label === 'string' && display.Label.trim() ? display.Label.trim() : null;
     const isConnected = display.IsConnected !== false && !display.Missing;
-    const isMismatch = !!display.Mismatch;
+    if (!isConnected && !display.Missing) continue;
+    const issues = Array.isArray(display.Issues) ? display.Issues : [];
     states.push({
       key: id,
       name: label || 'Display',
       online: isConnected,
-      degraded: isConnected && isMismatch,
+      degraded: isConnected && (issues.length > 0 || !!display.Mismatch),
     });
   }
   return states;

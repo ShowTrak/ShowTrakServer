@@ -159,3 +159,26 @@ test('unmarking removes the guard and its fault', async () => {
   assert.equal(client.Degraded, false);
   assert.equal(client.IsNetworkInterfaceCritical('en0'), false);
 });
+
+test('the family an interface was marked under is saved and survives a restart', async () => {
+  const { Manager } = await loadClientManager();
+  await Manager.Create('c6');
+  const [, client] = await Manager.Get('c6');
+  markStarted(client);
+  await Manager.SetNetworkInterfaces('c6', [
+    {
+      name: 'utun3',
+      addresses: [{ family: 'IPv6', address: 'fe80::abcd', netmask: 'ffff:ffff:ffff:ffff::' }],
+      gateway: null,
+    },
+  ]);
+  assert.deepEqual(
+    await Manager.MarkNetworkInterfaceCritical('c6', { Name: 'utun3', Family: 'IPv6' }),
+    [null, true]
+  );
+  await Manager.ClearCache();
+  await Manager.Init();
+  const [, again] = await Manager.Get('c6');
+  assert.equal(again.CriticalNetworkInterfaces[0].Family, 'IPv6');
+  assert.equal(again.CriticalNetworkInterfaces[0].Address, null);
+});

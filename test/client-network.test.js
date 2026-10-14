@@ -200,6 +200,7 @@ test('a first mark guards presence, the current address, mask and router', () =>
   assert.deepEqual(entry, {
     Name: 'en0',
     MAC: 'AA:BB:CC:DD:EE:FF',
+    Family: 'IPv4',
     RequirePresent: true,
     Address: '10.0.0.5',
     RangeStart: null,
@@ -267,4 +268,68 @@ test('stored entries are normalised, dropping conditions that cannot be judged',
   assert.equal(entry.Netmask, null);
   assert.equal(entry.Gateway, '10.0.0.1');
   assert.equal(Net.normalizeCriticalNetworkEntry({ Name: '  ' }), null);
+});
+
+// A tunnel (utun, awdl) often carries only an IPv6 link-local address, which a
+// first mark does not guard. Its family is recorded instead, so the card stays
+// in the IPv6 list rather than falling back to IPv4.
+const tunnel = iface({
+  name: 'utun3',
+  addresses: [{ family: 'IPv6', address: 'fe80::abcd', netmask: 'ffff:ffff:ffff:ffff::' }],
+  gateway: null,
+});
+
+test('a first mark records the family it was marked under', () => {
+  const [, marked] = Net.resolveCriticalNetworkEntry(
+    'utun3',
+    { Family: 'IPv6' },
+    tunnel,
+    null,
+    null,
+    1
+  );
+  assert.equal(marked.Family, 'IPv6');
+  assert.equal(marked.Address, null);
+
+  // An update that does not mention it keeps it, even with nothing guarded.
+  const [, updated] = Net.resolveCriticalNetworkEntry(
+    'utun3',
+    { RequirePresent: false },
+    null,
+    marked,
+    null,
+    2
+  );
+  assert.equal(updated.Family, 'IPv6');
+});
+
+test('without a stated family it follows the guarded address, then the addresses it has', () => {
+  assert.equal(
+    Net.resolveCriticalNetworkEntry('utun3', {}, tunnel, null, null, 1)[1].Family,
+    'IPv6'
+  );
+  assert.equal(
+    Net.resolveCriticalNetworkEntry('en0', {}, iface(), null, null, 1)[1].Family,
+    'IPv4'
+  );
+  // An entry saved before the family was recorded gains it on its next save.
+  const legacy = Net.normalizeCriticalNetworkEntry(critical({ Address: '2001:db8::5' }));
+  assert.equal(legacy.Family, null);
+  assert.equal(
+    Net.resolveCriticalNetworkEntry('en0', { RequirePresent: true }, null, legacy, null, 1)[1]
+      .Family,
+    'IPv6'
+  );
+});
+
+test('marking under IPv6 captures the IPv6 address even when there is an IPv4 one', () => {
+  const dual = iface({
+    addresses: [
+      ...iface().addresses,
+      { family: 'IPv6', address: '2001:db8::5', netmask: 'ffff:ffff:ffff:ffff::' },
+    ],
+  });
+  const [, entry] = Net.resolveCriticalNetworkEntry('en0', { Family: 'IPv6' }, dual, null, null, 1);
+  assert.equal(entry.Address, '2001:db8::5');
+  assert.equal(entry.Netmask, 'ffff:ffff:ffff:ffff::');
 });

@@ -1573,11 +1573,16 @@ Loading licence...</pre>
           <div class="modal-body text-center">
             <div id="SETTINGS_HEADER" class="mb-2"></div>
             <div id="SETTINGS_LAYOUT" class="settings-layout">
-              <nav id="SETTINGS_NAV" class="settings-nav" aria-label="Settings categories"></nav>
+              <nav
+                id="SETTINGS_NAV"
+                class="settings-nav"
+                role="tablist"
+                aria-label="Settings categories"
+              ></nav>
               <div id="SETTINGS_CONTENT" class="settings-content">
                 <div id="SETTINGS" class="d-grid gap-2"></div>
-                <div id="REMOTE_ACCESS_SECTION" class="d-grid gap-2 mt-2"></div>
-                <div id="PAIRED_DEVICES_SECTION" class="d-grid gap-2 mt-2"></div>
+                <div id="REMOTE_ACCESS_SECTION" class="d-grid gap-2"></div>
+                <div id="PAIRED_DEVICES_SECTION" class="d-grid gap-2"></div>
               </div>
             </div>
           </div>
@@ -2774,9 +2779,9 @@ Loading licence...</pre>
           <div class="modal-body text-center">
             <div id="CLIENT_INFO_HEADER" class="mb-2"></div>
 
-            <!-- Clients get a left-hand tab rail (one pane visible at a time);
-                 monitors, dummies and FreeKiosk terminals show only the status
-                 pane and no rail. The header and Close stay pinned either way. -->
+            <!-- Every entity gets a left-hand tab rail (one pane visible at a
+                 time); which tabs it offers depends on its kind (see
+                 lib/client-info-tabs.ts). The header and Close stay pinned. -->
             <div id="CLIENT_INFO_LAYOUT" class="client-info-layout">
               <nav
                 id="CLIENT_INFO_NAV"
@@ -2785,8 +2790,11 @@ Loading licence...</pre>
                 aria-label="Client info sections"
               ></nav>
               <div id="CLIENT_INFO_CONTENT" class="client-info-content">
-                <div id="CLIENT_INFO_HISTORY_SECTION" data-client-info-tab="status">
-                  <div class="monitor-history-header">
+                <!-- Not a pane itself: a FreeKiosk render fills the timelines
+                     container with panes for several tabs. Everything else marks
+                     the container as the Status pane (RenderMonitoringHistoryModal). -->
+                <div id="CLIENT_INFO_HISTORY_SECTION">
+                  <div class="monitor-history-header" data-client-info-tab="status">
                     <span class="monitor-history-window-label">Status over the past hour</span>
                     <div class="monitor-history-legend" aria-hidden="true">
                       <span><i class="status-dot status-dot-online"></i>Online</span>
@@ -2796,9 +2804,13 @@ Loading licence...</pre>
                     </div>
                   </div>
 
-                  <div id="MONITOR_HISTORY_TIMELINES" class="monitor-history-timelines mt-2"></div>
+                  <div
+                    id="MONITOR_HISTORY_TIMELINES"
+                    class="monitor-history-timelines mt-2"
+                    data-client-info-tab="status"
+                  ></div>
 
-                  <div class="mt-2">
+                  <div class="mt-2" data-client-info-tab="status">
                     <button
                       type="button"
                       class="btn btn-light w-100 d-none"
@@ -3029,32 +3041,25 @@ Loading licence...</pre>
                   </div>
 
                   <div
-                    id="CLIENT_INFO_NETWORK_SECTION"
+                    id="CLIENT_INFO_NETWORK_V4_SECTION"
                     class="d-grid gap-2"
                     data-client-info-tab="network"
                   >
                     <div class="rounded-3 p-2 bg-ghost-light">
-                      <h6 class="mb-0">Network Interfaces</h6>
+                      <h6 class="mb-0">IPv4 Interfaces</h6>
                     </div>
-                    <div class="btn-group w-100" role="group" aria-label="Network family filter">
-                      <button
-                        type="button"
-                        id="SHOWTRAK_CLIENT_INFO_NET_FAMILY_V4"
-                        class="btn btn-light"
-                        aria-pressed="true"
-                      >
-                        IPv4
-                      </button>
-                      <button
-                        type="button"
-                        id="SHOWTRAK_CLIENT_INFO_NET_FAMILY_V6"
-                        class="btn btn-outline-light"
-                        aria-pressed="false"
-                      >
-                        IPv6
-                      </button>
+                    <div id="SHOWTRAK_CLIENT_INFO_NET_IPV4" class="d-grid gap-2"></div>
+                  </div>
+
+                  <div
+                    id="CLIENT_INFO_NETWORK_V6_SECTION"
+                    class="d-grid gap-2"
+                    data-client-info-tab="network"
+                  >
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">IPv6 Interfaces</h6>
                     </div>
-                    <div id="SHOWTRAK_CLIENT_INFO_NET_INTERFACES" class="d-grid gap-2"></div>
+                    <div id="SHOWTRAK_CLIENT_INFO_NET_IPV6" class="d-grid gap-2"></div>
                   </div>
 
                   <div

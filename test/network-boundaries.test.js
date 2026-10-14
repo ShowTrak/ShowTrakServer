@@ -122,3 +122,17 @@ test('history records critical interfaces, and leaves allowed absences idle', ()
     ]
   );
 });
+
+test('CriticalNetworkInterfacePayload accepts a family, and only a real one', () => {
+  assert.deepEqual(
+    IPCValidation.CriticalNetworkInterfacePayload({ Name: 'utun3', Family: 'IPv6' }),
+    {
+      Name: 'utun3',
+      Family: 'IPv6',
+    }
+  );
+  assert.throws(
+    () => IPCValidation.CriticalNetworkInterfacePayload({ Name: 'en0', Family: 'ipv6' }),
+    /Family must be IPv4 or IPv6/
+  );
+});

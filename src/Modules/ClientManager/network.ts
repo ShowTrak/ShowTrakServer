@@ -166,12 +166,40 @@ function IsLinkLocalV6(Address: unknown): boolean {
 
 /**
  * The address an operator would call "the interface's IP": its first IPv4
- * address, else its first routable IPv6 one. What a first mark guards.
+ * address, else its first routable IPv6 one — or, given a family, that family's.
+ * What a first mark guards.
  */
-export function PrimaryAddress(Iface: ObservedNetworkInterface): ObservedNetworkAddress | null {
-  const V4 = AddressesOf(Iface, 4)[0];
-  if (V4) return V4;
+export function PrimaryAddress(
+  Iface: ObservedNetworkInterface,
+  Family: NetworkFamily | null = null
+): ObservedNetworkAddress | null {
+  const V4 = Family === 'IPv6' ? undefined : AddressesOf(Iface, 4)[0];
+  if (V4 || Family === 'IPv4') return V4 || null;
   return AddressesOf(Iface, 6).find((Address) => !IsLinkLocalV6(Address.address)) || null;
+}
+
+export type NetworkFamily = 'IPv4' | 'IPv6';
+
+export function normalizeNetworkFamily(Value: unknown): NetworkFamily | null {
+  return Value === 'IPv4' || Value === 'IPv6' ? Value : null;
+}
+
+/**
+ * The family an interface is monitored under when nothing says so: the family
+ * of the address it guards, else IPv4 when it has an IPv4 address, else IPv6
+ * when it has any IPv6 one (a tunnel with only a link-local address).
+ */
+export function DefaultNetworkFamily(
+  Live: ObservedNetworkInterface | null,
+  Existing: CriticalNetworkInterface | null
+): NetworkFamily {
+  for (const Guarded of [Existing?.Address, Existing?.RangeStart, Existing?.Netmask]) {
+    const Parsed = ParseIP(Guarded);
+    if (Parsed) return Parsed.Family === 6 ? 'IPv6' : 'IPv4';
+  }
+  if (Live && AddressesOf(Live, 4).length) return 'IPv4';
+  const HasV6 = (Live?.addresses || []).some((Address) => AddressFamily(Address.family) === 6);
+  return HasV6 ? 'IPv6' : 'IPv4';
 }
 
 /** Internal (loopback) when every address it carries says so. */
@@ -220,6 +248,7 @@ export function normalizeCriticalNetworkEntry(Value: unknown): CriticalNetworkIn
   return {
     Name,
     MAC: Mac,
+    Family: normalizeNetworkFamily(E.Family),
     // sqlite hands booleans back as 0/1.
     RequirePresent: E.RequirePresent === true || E.RequirePresent === 1,
     Address: OptionalIP(E.Address),
@@ -410,6 +439,7 @@ export function buildNetworkView(
 
 /** Options a mark/update request may carry; absent ones keep their current value. */
 export interface CriticalNetworkOptions {
+  Family?: NetworkFamily;
   RequirePresent?: boolean;
   Address?: string | null;
   RangeStart?: string | null;
@@ -442,10 +472,18 @@ export function resolveCriticalNetworkEntry(
   if (!Live && !Existing) return ['That network interface is not connected to this client', null];
   const Has = (Key: keyof CriticalNetworkOptions) =>
     Object.prototype.hasOwnProperty.call(Options, Key) && Options[Key] !== undefined;
-  const Pick = (Key: Exclude<keyof CriticalNetworkOptions, 'RequirePresent'>, First: unknown) =>
+  const Pick = (
+    Key: Exclude<keyof CriticalNetworkOptions, 'RequirePresent' | 'Family'>,
+    First: unknown
+  ) =>
     Has(Key) ? NormalizeIPText(Options[Key]) : Existing ? Existing[Key] : NormalizeIPText(First);
 
-  const Primary = Live ? PrimaryAddress(Live) : null;
+  // Recorded on every save, so an entry from before it was stored gains it.
+  const Family =
+    (Has('Family') ? normalizeNetworkFamily(Options.Family) : null) ??
+    Existing?.Family ??
+    DefaultNetworkFamily(Live, Existing);
+  const Primary = Live ? PrimaryAddress(Live, Family) : null;
   const RequirePresent = Has('RequirePresent')
     ? !!Options.RequirePresent
     : Existing
@@ -473,6 +511,7 @@ export function resolveCriticalNetworkEntry(
     {
       Name,
       MAC: (Live ? MacOf(Live) : null) ?? Existing?.MAC ?? null,
+      Family,
       RequirePresent,
       Address,
       RangeStart,

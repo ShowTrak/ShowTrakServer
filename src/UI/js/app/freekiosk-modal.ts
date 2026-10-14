@@ -1,13 +1,15 @@
 // The FreeKiosk terminal view modal.
 //
 // Reuses #SHOWTRAK_CLIENT_INFO (as the monitor and dummy history modals do) and
-// renders, top to bottom:
+// renders one pane per tab of the modal's rail (see lib/client-info-tabs):
 //
-//   overall status card + status timeline
-//   capture panel        — on-demand screenshot / camera photo
-//   controls panel       — buttons and live sliders
-//   one section per registry section, each row showing the metric's label, its
-//   current value, an alarm badge, and its history chart
+//   Status    — overall status card + status timeline, then a status card and
+//               history chart for every reading with a check armed (each one
+//               repeated, as a row, on its own tab)
+//   Controls  — buttons and live sliders, then on-demand screenshot / camera
+//   Content, Screen, Battery, Network, Misc
+//             — the registry sections, each row showing the metric's label, its
+//               current value, an alarm badge, and its history chart
 //
 // EVERY metric in the registry gets a row. That is the point of the feature:
 // whatever the device exposes, the operator can see. The chart kind comes from
@@ -43,9 +45,12 @@ import {
   BuildLiveStatusText,
   BuildStatusBlocksFromSamples,
   RenderMonitorHistorySection,
+  RenderMonitorStatusCard,
   RenderStatusTimeline,
 } from './monitoring';
 import type { HistorySample } from '@showtrak/protocol';
+import { FREEKIOSK_METRIC_TABS, FreeKioskSectionTab } from './lib/client-info-tabs';
+import type { ClientInfoTabKey, FreeKioskMetricTabKey } from './lib/client-info-tabs';
 
 /** Mirrors FREEKIOSK_DISPLAY_MODES in src/Modules/FreeKiosk/metrics. */
 const DISPLAY_MODE_LABELS: Record<string, string> = {
@@ -62,6 +67,11 @@ let LastCapture: { DataUrl: string; Bytes: number; CapturedAt: number; Kind: str
 let CaptureError: string | null = null;
 let CaptureInFlight = false;
 let CameraChoices: Array<{ id: string; facing: string }> = [];
+// The terminal a camera list has been fetched for, and the one being fetched.
+let CamerasLoadedFor: string | null = null;
+let CamerasLoadingFor: string | null = null;
+// Set by WireFreeKioskModal; lets a background fetch redraw the open modal.
+let RerenderModal: (() => void) | null = null;
 
 export function ResetFreeKioskModalState(): void {
   FreeKioskSeries = new Map();
@@ -71,6 +81,8 @@ export function ResetFreeKioskModalState(): void {
   CaptureError = null;
   CaptureInFlight = false;
   CameraChoices = [];
+  CamerasLoadedFor = null;
+  CamerasLoadingFor = null;
 }
 
 export function SetFreeKioskSeries(Series: FreeKioskMetricSeries[] | null | undefined): void {
@@ -234,6 +246,31 @@ export function MetricChartKind(
   return Metric.Chart === 'line' ? 'line' : 'blocks';
 }
 
+/** The history drawn under a reading: a line, a block timeline, or nothing. */
+function RenderMetricChart(
+  Metric: FreeKioskMetricView,
+  Alarm: ArmedAlarm | null,
+  Samples: FreeKioskMetricSample[]
+): string {
+  const Kind = MetricChartKind(Metric, !!Alarm);
+  if (Kind === 'none') return '';
+  if (Kind === 'line') {
+    const Model = BuildMetricChartModel(Samples, {
+      min: Metric.Min ?? null,
+      max: Metric.Max ?? null,
+      decimals: Metric.Decimals ?? 0,
+      threshold: ChartThreshold(Alarm),
+    });
+    return RenderMetricChartSvg(Model, {
+      label: Metric.Label,
+      unit: Metric.Unit,
+      decimals: Metric.Decimals ?? 0,
+      formatted: (Numeric) => FormatMetricValue(Metric, Numeric),
+    });
+  }
+  return RenderStatusTimeline(BuildStatusBlocksFromSamples(ToStatusSamples(Samples)));
+}
+
 // Only ever called for a section that IS being monitored — RenderSection drops
 // the whole section otherwise — so there is always history to draw from and an
 // armed alarm is always a live one.
@@ -244,27 +281,7 @@ function RenderMetricRow(Terminal: FreeKioskTerminalView, Metric: FreeKioskMetri
   const Samples = ExpandMetricSeries(FreeKioskSeries.get(Metric.Key));
   const Breaching = (Terminal.Alarms || []).some((Entry) => Entry && Entry.Key === Metric.Key);
   const Expected = Breaching ? DescribeExpected(Metric, Alarm) : '';
-
-  let Body = '';
-  const Kind = MetricChartKind(Metric, !!Alarm);
-  if (Kind === 'none') {
-    Body = '';
-  } else if (Kind === 'line') {
-    const Model = BuildMetricChartModel(Samples, {
-      min: Metric.Min ?? null,
-      max: Metric.Max ?? null,
-      decimals: Metric.Decimals ?? 0,
-      threshold: ChartThreshold(Alarm),
-    });
-    Body = RenderMetricChartSvg(Model, {
-      label: Metric.Label,
-      unit: Metric.Unit,
-      decimals: Metric.Decimals ?? 0,
-      formatted: (Numeric) => FormatMetricValue(Metric, Numeric),
-    });
-  } else {
-    Body = RenderStatusTimeline(BuildStatusBlocksFromSamples(ToStatusSamples(Samples)));
-  }
+  const Body = RenderMetricChart(Metric, Alarm, Samples);
 
   // The same popover the monitoring editor uses, rather than a bare title
   // attribute. `.monitoring-note` is what InitMonitoringNotePopovers looks for,
@@ -328,6 +345,66 @@ function RenderSection(
       ${ModeNote}
       ${Rows}
     </div>`;
+}
+
+/**
+ * The state a monitored reading's status card shows, matching the client's
+ * critical displays and network interfaces: while the terminal is offline the
+ * reading is unknown, not faulty, so it is Idle; a breaching alarm is Degraded
+ * (as it is on the tile); anything else is Online. The status text is the
+ * reading itself, plus what it should have been while it is breaching.
+ */
+export function FreeKioskMetricLiveState(
+  TerminalOnline: boolean,
+  Breaching: boolean,
+  ValueText: string,
+  Expected: string
+): { State: 'IDLE' | 'ONLINE' | 'DEGRADED'; Label: string } {
+  if (!TerminalOnline) return { State: 'IDLE', Label: 'Idle' };
+  if (Breaching) {
+    return { State: 'DEGRADED', Label: Expected ? `${ValueText} · ${Expected}` : ValueText };
+  }
+  return { State: 'ONLINE', Label: ValueText };
+}
+
+/**
+ * One monitored reading on the Status tab, drawn the way the client's Status
+ * tab draws a critical display or interface: a status card (coloured by the
+ * alarm's verdict) as the heading, its history chart directly beneath. Only
+ * readings with a check armed get one — they are the ones with a history — and
+ * the same section and display-mode rules as RenderSection apply, so Status
+ * never shows a chart its own tab would hide. The full row appears again,
+ * among the section's other readings, on the section's own tab.
+ */
+function RenderMonitoredMetric(
+  Terminal: FreeKioskTerminalView,
+  Metric: FreeKioskMetricView
+): string {
+  if (!IsFreeKioskGroupEnabled(Terminal.Settings, Metric.Section)) return '';
+  if (!IsFreeKioskMetricInMode(Terminal.Settings, Metric)) return '';
+  const Alarm = ReadArmedAlarm(Terminal, Metric);
+  if (!Alarm) return '';
+
+  const Value = (Terminal.Metrics || {})[Metric.Key] ?? null;
+  const Breaching = (Terminal.Alarms || []).some((Entry) => Entry && Entry.Key === Metric.Key);
+  const Live = FreeKioskMetricLiveState(
+    !!Terminal.Online,
+    Breaching,
+    FormatMetricValue(Metric, Value),
+    Breaching ? DescribeExpected(Metric, Alarm) : ''
+  );
+  const Samples = ExpandMetricSeries(FreeKioskSeries.get(Metric.Key));
+  return (
+    `<div class="monitor-history-section" data-metric-key="${Safe(Metric.Key)}">` +
+    RenderMonitorStatusCard({
+      state: Live.State,
+      name: Metric.Label,
+      sub: Metric.Section,
+      statusText: Live.Label,
+    }) +
+    RenderMetricChart(Metric, Alarm, Samples) +
+    `</div>`
+  );
 }
 
 // ---- Capture ---------------------------------------------------------------
@@ -463,6 +540,25 @@ function RenderControlsPanel(Terminal: FreeKioskTerminalView): string {
 
 // ---- The modal -------------------------------------------------------------
 
+function Pane(Tab: ClientInfoTabKey, Html: string): string {
+  return `<div class="freekiosk-tab-pane" data-client-info-tab="${Tab}">${Html}</div>`;
+}
+
+/**
+ * Why a metric tab drew nothing. Sections are hidden when their monitoring is
+ * switched off or when none of their readings apply in this display mode (see
+ * RenderSection); an empty tab has to say which, or it reads as broken.
+ */
+function EmptyMetricTabNote(Terminal: FreeKioskTerminalView, Sections: string[]): string {
+  const Off = Sections.filter((Section) => !IsFreeKioskGroupEnabled(Terminal.Settings, Section));
+  const Message = Off.length
+    ? `Monitoring for ${Off.join(', ')} is switched off for this terminal. Turn it on in the terminal's settings to see ${Off.length === 1 ? 'its' : 'their'} readings here.`
+    : `None of these readings apply to a terminal in ${
+        DISPLAY_MODE_LABELS[GetFreeKioskDisplayMode(Terminal.Settings)] || 'this'
+      } mode.`;
+  return `<div class="freekiosk-panel"><div class="freekiosk-section-note mb-0"><i class="bi bi-info-circle"></i> ${Safe(Message)}</div></div>`;
+}
+
 export function RenderFreeKioskModal($timelines: JQuery<HTMLElement>): void {
   const Terminal = OpenTerminal();
   if (!Terminal) return;
@@ -481,38 +577,67 @@ export function RenderFreeKioskModal($timelines: JQuery<HTMLElement>): void {
     latencyMs: Sample.n,
   }));
 
+  // Status: the terminal's overall status, then the history of every reading
+  // with a check armed — the at-a-glance view of everything being monitored.
+  // Readings nobody is watching have no history to show and stay on their tabs.
+  // In registry section order, then registry order within a section, so the
+  // list reads the same as the tabs do.
+  const MonitoredHtml = Catalogue
+    ? Catalogue.Sections.flatMap((Section) =>
+        Catalogue.Metrics.filter((Metric) => Metric.Section === Section).map((Metric) =>
+          RenderMonitoredMetric(Terminal, Metric)
+        )
+      ).join('')
+    : '';
   $timelines.append(
-    RenderMonitorHistorySection(
-      {
-        state: State,
-        name: Terminal.Nickname || Terminal.Address || 'FreeKiosk Terminal',
-        sub: `${Terminal.Address}:${Terminal.Port}`,
-        badge: 'FreeKiosk',
-        statusText: BuildLiveStatusText(State, Terminal.LastLatencyMs, Terminal.LastError),
-      },
-      BuildStatusBlocksFromSamples(StatusSamples)
+    Pane(
+      'status',
+      RenderMonitorHistorySection(
+        {
+          state: State,
+          name: Terminal.Nickname || Terminal.Address || 'FreeKiosk Terminal',
+          sub: `${Terminal.Address}:${Terminal.Port}`,
+          badge: 'FreeKiosk',
+          statusText: BuildLiveStatusText(State, Terminal.LastLatencyMs, Terminal.LastError),
+        },
+        BuildStatusBlocksFromSamples(StatusSamples)
+      ) +
+        (MonitoredHtml ||
+          (Catalogue
+            ? `<div class="freekiosk-panel"><div class="freekiosk-section-note mb-0"><i class="bi bi-info-circle"></i> No readings are being monitored on this terminal. Arm a check on a reading in the terminal's settings to see its history here.</div></div>`
+            : ''))
     )
   );
 
-  $timelines.append(RenderCapturePanel(Terminal));
-  $timelines.append(RenderControlsPanel(Terminal));
+  $timelines.append(Pane('controls', RenderControlsPanel(Terminal) + RenderCapturePanel(Terminal)));
 
-  if (!Catalogue) {
-    $timelines.append(
-      `<div class="freekiosk-panel"><em class="text-muted">Could not load the metric list.</em></div>`
-    );
-    return;
+  // Each registry section lands on the tab FreeKioskSectionTab names, in
+  // registry order; every metric tab is drawn even when empty, with a note
+  // saying why, so the rail never offers a blank pane.
+  const ByTab = new Map<FreeKioskMetricTabKey, { Sections: string[]; Html: string }>(
+    FREEKIOSK_METRIC_TABS.map((Tab) => [Tab, { Sections: [], Html: '' }])
+  );
+  if (Catalogue) {
+    for (const Section of Catalogue.Sections) {
+      const Metrics = Catalogue.Metrics.filter((Metric) => Metric.Section === Section);
+      if (!Metrics.length) continue;
+      const Entry = ByTab.get(FreeKioskSectionTab(Section))!;
+      Entry.Sections.push(Section);
+      Entry.Html += RenderSection(Terminal, Section, Metrics);
+    }
   }
-
-  for (const Section of Catalogue.Sections) {
-    const Metrics = Catalogue.Metrics.filter((Metric) => Metric.Section === Section);
-    const Html = RenderSection(Terminal, Section, Metrics);
-    if (Html) $timelines.append(Html);
+  for (const [Tab, Entry] of ByTab) {
+    const Body = !Catalogue
+      ? `<div class="freekiosk-panel"><em class="text-muted">Could not load the metric list.</em></div>`
+      : Entry.Html || EmptyMetricTabNote(Terminal, Entry.Sections);
+    $timelines.append(Pane(Tab, Body));
   }
 
   // The rows are appended, not bound, so the popovers have to be attached after
   // every render — including the 30s live refresh, which replaces the DOM.
   InitMonitoringNotePopovers('#MONITOR_HISTORY_TIMELINES');
+
+  EnsureFreeKioskCameras(Terminal);
 }
 
 // ---- Capture actions -------------------------------------------------------
@@ -548,18 +673,41 @@ async function RunCapture(Kind: 'screenshot' | 'camera', Rerender: () => void): 
   }
 }
 
-/** Populate the camera picker, so the UI only offers cameras that exist. */
-export async function LoadFreeKioskCameras(): Promise<void> {
-  const Terminal = OpenTerminal();
-  if (!Terminal) return;
-  try {
-    const Cameras = await window.API.GetFreeKioskCameraList(Terminal.UUID);
-    CameraChoices = Array.isArray(Cameras)
-      ? Cameras.map((Camera) => ({ id: String(Camera.id), facing: String(Camera.facing) }))
-      : [];
-  } catch {
-    CameraChoices = [];
-  }
+/**
+ * Populate the camera picker, so the UI only offers cameras that exist.
+ *
+ * Never awaited by the modal. The list comes from the device itself, so on an
+ * unreachable terminal the request runs to the full connection timeout, and
+ * holding the modal shut for that long made opening an offline terminal look
+ * hung. The modal opens at once without a picker; one appears when the list
+ * lands. An offline terminal is not asked at all (capture is disabled while
+ * offline anyway), and since every live push re-renders, the list is fetched
+ * on the first render after the terminal comes back.
+ */
+function EnsureFreeKioskCameras(Terminal: FreeKioskTerminalView): void {
+  if (!Terminal.Online) return;
+  const UUID = String(Terminal.UUID);
+  if (CamerasLoadedFor === UUID || CamerasLoadingFor === UUID) return;
+  CamerasLoadingFor = UUID;
+  void (async () => {
+    let Choices: Array<{ id: string; facing: string }> = [];
+    try {
+      const Cameras = await window.API.GetFreeKioskCameraList(UUID);
+      Choices = Array.isArray(Cameras)
+        ? Cameras.map((Camera) => ({ id: String(Camera.id), facing: String(Camera.facing) }))
+        : [];
+    } catch {
+      Choices = [];
+    }
+    // The modal was closed, or moved to another terminal, while this was out.
+    if (CamerasLoadingFor !== UUID) return;
+    CamerasLoadingFor = null;
+    CamerasLoadedFor = UUID;
+    if (String(OpenTerminal()?.UUID ?? '') !== UUID) return;
+    CameraChoices = Choices;
+    // A picker is only drawn for more than one camera; otherwise nothing changed.
+    if (Choices.length > 1 && RerenderModal) RerenderModal();
+  })();
 }
 
 // ---- Wiring ----------------------------------------------------------------
@@ -578,6 +726,7 @@ export function IsFreeKioskSliderPending(CommandID: string): boolean {
 }
 
 export function WireFreeKioskModal(Rerender: () => void): void {
+  RerenderModal = Rerender;
   const Host = '#MONITOR_HISTORY_TIMELINES';
 
   $(document).on('click', `${Host} #FREEKIOSK_CAPTURE_SCREENSHOT`, () =>

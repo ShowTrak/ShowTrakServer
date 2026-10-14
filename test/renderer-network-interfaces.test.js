@@ -77,6 +77,16 @@ test('the IP address is the title and the interface name leads the subtitle', ()
     Extra: ['10.0.1.5'],
   });
   assert.equal(Lib.NetworkInterfaceTitle(view({ Addresses: [] }), 'IPv4').Title, 'No IPv4 Address');
+  const mixedV6 = view({
+    Addresses: [
+      { family: 'IPv6', address: 'fe80::1' },
+      { family: 'IPv6', address: '2001:db8::5' },
+    ],
+  });
+  assert.deepEqual(Lib.NetworkInterfaceTitle(mixedV6, 'IPv6'), {
+    Title: '2001:db8::5',
+    Extra: ['fe80::1'],
+  });
   assert.equal(
     Lib.NetworkInterfaceTitle(view({ IsConnected: false, Missing: true }), 'IPv4').Title,
     'Not Connected'
@@ -310,5 +320,152 @@ test('offline and waiting sections say so above whatever is known', () => {
     'waiting',
     'IPv4'
   );
-  assert.match(waiting, /Waiting for Network Interfaces/);
+  assert.match(waiting, /Waiting for IPv4 Interfaces/);
+});
+
+test('each interface is controlled from its home family only', () => {
+  // Mixed: IPv4 is home, so the IPv6 list only shows its addresses.
+  assert.equal(Lib.HomeFamily(view()), 'IPv4');
+  const v6only = view({ Addresses: [{ family: 'IPv6', address: '2001:db8::5' }] });
+  assert.equal(Lib.HomeFamily(v6only), 'IPv6');
+  // A critical interface stays where its guarded address is, even after losing it.
+  const lostV4 = view({
+    Addresses: [{ family: 'IPv6', address: 'fe80::1' }],
+    IsCritical: true,
+    Critical: critical(),
+  });
+  assert.equal(Lib.HomeFamily(lostV4), 'IPv4');
+  const guardsV6 = view({
+    IsCritical: true,
+    Critical: critical({ Address: '2001:db8::5', Netmask: null }),
+  });
+  assert.equal(Lib.HomeFamily(guardsV6), 'IPv6');
+  // Missing with nothing guarded: IPv4.
+  assert.equal(
+    Lib.HomeFamily(
+      view({
+        Addresses: [],
+        IsConnected: false,
+        Critical: critical({ Address: null, Netmask: null }),
+      })
+    ),
+    'IPv4'
+  );
+});
+
+test('each family lists interfaces with an address of it, plus those at home there', () => {
+  const lostV4 = view({
+    Name: 'en7',
+    Addresses: [],
+    IsConnected: false,
+    Missing: true,
+    IsCritical: true,
+    Critical: critical({ Name: 'en7' }),
+  });
+  const v4only = view({ Name: 'en5', Addresses: [{ family: 'IPv4', address: '172.16.0.2' }] });
+  const c = client({
+    NetworkStatus: {
+      SampledAt: 1,
+      Capabilities: { Router: true },
+      Interfaces: [view(), lostV4, v4only],
+    },
+  });
+  assert.deepEqual(
+    Lib.InterfacesFor(c, 'IPv4').map((i) => i.Name),
+    ['en0', 'en7', 'en5']
+  );
+  assert.deepEqual(
+    Lib.InterfacesFor(c, 'IPv6').map((i) => i.Name),
+    ['en0']
+  );
+});
+
+test('the IPv6 list shows addresses without the toggle, conditions or router', () => {
+  const c = client({
+    NetworkStatus: {
+      SampledAt: 1,
+      Capabilities: { Router: true },
+      Interfaces: [
+        view({
+          IsCritical: true,
+          Critical: critical(),
+          Issues: [{ Kind: 'address', Message: 'moved' }],
+        }),
+      ],
+    },
+  });
+  const v6 = Network.BuildNetworkSectionHtml(c, 'ok', 'IPv6');
+  assert.match(v6, />fe80::1</);
+  assert.doesNotMatch(v6, /SHOWTRAK_TOGGLE_CRITICAL_NETWORK/);
+  assert.doesNotMatch(v6, /SHOWTRAK_NET_CONDITIONS/);
+  assert.doesNotMatch(v6, /moved/);
+  assert.doesNotMatch(v6, /Router/);
+  const v4 = Network.BuildNetworkSectionHtml(c, 'ok', 'IPv4');
+  assert.match(v4, /SHOWTRAK_TOGGLE_CRITICAL_NETWORK/);
+  assert.match(v4, /SHOWTRAK_NET_CONDITIONS/);
+  assert.match(v4, /moved/);
+});
+
+test('an empty family says so', () => {
+  const c = client({
+    NetworkStatus: {
+      SampledAt: 1,
+      Capabilities: { Router: true },
+      Interfaces: [view({ Addresses: [{ family: 'IPv4', address: '10.0.0.5' }] })],
+    },
+  });
+  assert.match(Network.BuildNetworkSectionHtml(c, 'ok', 'IPv6'), /No IPv6 Interfaces/);
+});
+
+// --- Home family ------------------------------------------------------------------
+
+test('a critical interface stays in the family it was marked under', () => {
+  const tunnel = view({
+    Name: 'utun3',
+    Addresses: [{ family: 'IPv6', address: 'fe80::abcd', netmask: 'ffff:ffff:ffff:ffff::' }],
+    Gateway: null,
+  });
+  // Nothing guarded (a link-local address is never captured): the recorded family decides.
+  const marked = {
+    ...tunnel,
+    IsCritical: true,
+    Critical: critical({ Name: 'utun3', Address: null, Netmask: null, Family: 'IPv6' }),
+  };
+  assert.equal(Lib.HomeFamily(marked), 'IPv6');
+  // And it does not move when it goes missing.
+  assert.equal(
+    Lib.HomeFamily({ ...marked, IsConnected: false, Missing: true, Addresses: [] }),
+    'IPv6'
+  );
+
+  // An entry saved before the family was recorded falls back to the addresses it has,
+  // not straight to IPv4.
+  const legacy = {
+    ...tunnel,
+    IsCritical: true,
+    Critical: critical({ Name: 'utun3', Address: null, Netmask: null }),
+  };
+  assert.equal(Lib.HomeFamily(legacy), 'IPv6');
+});
+
+test('the toggle says which list it was clicked in', () => {
+  const html = Network.BuildNetworkSectionHtml(
+    client({
+      NetworkStatus: {
+        SampledAt: 1,
+        Capabilities: { Router: true },
+        Interfaces: [
+          view({
+            Name: 'utun3',
+            Addresses: [
+              { family: 'IPv6', address: 'fe80::abcd', netmask: 'ffff:ffff:ffff:ffff::' },
+            ],
+          }),
+        ],
+      },
+    }),
+    'ok',
+    'IPv6'
+  );
+  assert.match(html, /SHOWTRAK_TOGGLE_CRITICAL_NETWORK[^>]*data-family="IPv6"/);
 });

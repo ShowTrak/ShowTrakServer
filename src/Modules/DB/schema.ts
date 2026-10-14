@@ -202,6 +202,10 @@ Schema.push({
     )',
 });
 
+// Critical USB devices, by serial. The condition columns (RequirePresent,
+// Location, FirmwareVersion, RequireNoError) arrived with migrations 43-50 and
+// are shared with CriticalUSBDeviceNames; Location/FirmwareVersion are NULL when
+// not guarded.
 Schema.push({
   Name: 'CriticalUSBDevices',
   SQL: 'CREATE TABLE IF NOT EXISTS `CriticalUSBDevices` ( \
@@ -209,6 +213,10 @@ Schema.push({
             SerialNumber TEXT NOT NULL, \
             ManufacturerName TEXT, \
             ProductName TEXT, \
+            RequirePresent INTEGER NOT NULL DEFAULT 1, \
+            Location TEXT, \
+            FirmwareVersion TEXT, \
+            RequireNoError INTEGER NOT NULL DEFAULT 1, \
             Timestamp BIGINT(11) NOT NULL, \
             PRIMARY KEY (UUID, SerialNumber) \
     )',
@@ -227,6 +235,10 @@ Schema.push({
             ManufacturerName TEXT, \
             ProductName TEXT, \
             Quantity INTEGER NOT NULL DEFAULT 1, \
+            RequirePresent INTEGER NOT NULL DEFAULT 1, \
+            Location TEXT, \
+            FirmwareVersion TEXT, \
+            RequireNoError INTEGER NOT NULL DEFAULT 1, \
             Timestamp BIGINT(11) NOT NULL, \
             PRIMARY KEY (UUID, NameKey) \
     )',
@@ -243,16 +255,26 @@ Schema.push({
     )',
 });
 
+// Critical displays: one row per (client, display) the operator guards, holding
+// the baseline captured when it was marked and the conditions it must keep.
+// Width/Height (physical pixels), RefreshRate, ScaleFactor, Rotation and
+// PositionX/PositionY are NULL when that property is not guarded. The condition
+// columns arrived with migrations 36-41, which also convert rows written before.
 Schema.push({
   Name: 'CriticalDisplays',
   SQL: 'CREATE TABLE IF NOT EXISTS `CriticalDisplays` ( \
             UUID TEXT NOT NULL, \
             DisplayID TEXT NOT NULL, \
             Label TEXT, \
+            RequirePresent INTEGER NOT NULL DEFAULT 1, \
             Width INTEGER, \
             Height INTEGER, \
             RefreshRate INTEGER, \
             ScaleFactor REAL, \
+            Rotation INTEGER, \
+            RequirePrimary INTEGER NOT NULL DEFAULT 0, \
+            PositionX INTEGER, \
+            PositionY INTEGER, \
             Timestamp BIGINT(11) NOT NULL, \
             PRIMARY KEY (UUID, DisplayID) \
     )',
@@ -291,6 +313,7 @@ Schema.push({
             UUID TEXT NOT NULL, \
             Name TEXT NOT NULL, \
             MAC TEXT, \
+            Family TEXT, \
             RequirePresent INTEGER NOT NULL DEFAULT 1, \
             Address TEXT, \
             RangeStart TEXT, \
@@ -655,6 +678,63 @@ Schema.Migrations = [
   // unchanged until someone raises a threshold.
   { Version: 34, SQL: 'ALTER TABLE `MonitoringTargets` ADD COLUMN FailureThreshold INTEGER' },
   { Version: 35, SQL: 'ALTER TABLE `MonitoringChecks` ADD COLUMN FailureThreshold INTEGER' },
+  // Per-condition critical displays. Before these, a critical display was always
+  // required to be present and at its captured resolution + refresh rate, and
+  // nothing else was judged, so the new columns upgrade to exactly that:
+  // presence required, primary not, rotation and position unguarded.
+  {
+    Version: 36,
+    SQL: 'ALTER TABLE `CriticalDisplays` ADD COLUMN RequirePresent INTEGER NOT NULL DEFAULT 1',
+  },
+  { Version: 37, SQL: 'ALTER TABLE `CriticalDisplays` ADD COLUMN Rotation INTEGER' },
+  {
+    Version: 38,
+    SQL: 'ALTER TABLE `CriticalDisplays` ADD COLUMN RequirePrimary INTEGER NOT NULL DEFAULT 0',
+  },
+  { Version: 39, SQL: 'ALTER TABLE `CriticalDisplays` ADD COLUMN PositionX INTEGER' },
+  { Version: 40, SQL: 'ALTER TABLE `CriticalDisplays` ADD COLUMN PositionY INTEGER' },
+  // Rows written before migration 36 hold the resolution in points (the client's
+  // reported size) and a ScaleFactor that was captured but never judged. A
+  // resolution is now physical pixels, so it is scaled up by that factor, and
+  // the factor cleared so scaling stays unguarded, as it was. SQLite evaluates
+  // every SET expression against the row as it was, so one statement does both.
+  {
+    Version: 41,
+    SQL: 'UPDATE `CriticalDisplays` SET \
+          Width = CASE WHEN Width IS NOT NULL AND ScaleFactor > 0 THEN CAST(ROUND(Width * ScaleFactor) AS INTEGER) ELSE Width END, \
+          Height = CASE WHEN Height IS NOT NULL AND ScaleFactor > 0 THEN CAST(ROUND(Height * ScaleFactor) AS INTEGER) ELSE Height END, \
+          ScaleFactor = NULL',
+  },
+  // The address family a critical network interface is monitored under. NULL on
+  // rows saved before it, which take it from the address they guard and gain it
+  // on their next save.
+  { Version: 42, SQL: 'ALTER TABLE `CriticalNetworkInterfaces` ADD COLUMN Family TEXT' },
+  // Per-condition critical USB devices, on both the by-serial and by-name tables.
+  // Before these a critical USB device was only required to be present, so that
+  // is what every existing row upgrades to. RequireNoError also upgrades ON: a
+  // Windows device whose driver failed used to drop out of the list and fault as
+  // missing, and now stays listed with its error, so it must fault on that
+  // instead. It is never judged on a client that cannot report it.
+  {
+    Version: 43,
+    SQL: 'ALTER TABLE `CriticalUSBDevices` ADD COLUMN RequirePresent INTEGER NOT NULL DEFAULT 1',
+  },
+  { Version: 44, SQL: 'ALTER TABLE `CriticalUSBDevices` ADD COLUMN Location TEXT' },
+  { Version: 45, SQL: 'ALTER TABLE `CriticalUSBDevices` ADD COLUMN FirmwareVersion TEXT' },
+  {
+    Version: 46,
+    SQL: 'ALTER TABLE `CriticalUSBDevices` ADD COLUMN RequireNoError INTEGER NOT NULL DEFAULT 1',
+  },
+  {
+    Version: 47,
+    SQL: 'ALTER TABLE `CriticalUSBDeviceNames` ADD COLUMN RequirePresent INTEGER NOT NULL DEFAULT 1',
+  },
+  { Version: 48, SQL: 'ALTER TABLE `CriticalUSBDeviceNames` ADD COLUMN Location TEXT' },
+  { Version: 49, SQL: 'ALTER TABLE `CriticalUSBDeviceNames` ADD COLUMN FirmwareVersion TEXT' },
+  {
+    Version: 50,
+    SQL: 'ALTER TABLE `CriticalUSBDeviceNames` ADD COLUMN RequireNoError INTEGER NOT NULL DEFAULT 1',
+  },
 ];
 
 export = Schema;

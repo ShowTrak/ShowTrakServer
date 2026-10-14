@@ -492,6 +492,151 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   gap: 1rem;
 }
 
+/* View modal panes for entities split across several tabs (monitoring targets,
+   FreeKiosk terminals). The timelines container is then not itself a pane, so
+   its top margin would sit above every tab; only the Status pane needs the gap
+   under the legend header. */
+#MONITOR_HISTORY_TIMELINES:not([data-client-info-tab]) {
+  margin-top: 0 !important;
+}
+
+#MONITOR_HISTORY_TIMELINES:not([data-client-info-tab]) > [data-client-info-tab='status'] {
+  margin-top: 0.5rem;
+}
+
+.monitor-tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* A monitoring target's Actions tab: one panel per check type, its actions in
+   their declared groups. Drawn to match the FreeKiosk Controls tab. */
+.monitor-group-actions {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  text-align: left;
+}
+
+.monitor-group-actions-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.monitor-group-actions-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.monitor-group-actions-scope {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.monitor-group-actions-group {
+  margin-bottom: 0.6rem;
+}
+
+.monitor-group-actions-group:last-child {
+  margin-bottom: 0;
+}
+
+.monitor-group-actions-group-title {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.monitor-group-actions-group-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+/* Bootstrap's bare button colours are near-invisible on this theme, so the
+   buttons carry their own tint, as the FreeKiosk ones do. */
+.monitor-group-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.4rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+
+.monitor-group-action-btn:hover:not(:disabled),
+.monitor-group-action-btn:focus-visible {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.monitor-group-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.monitor-group-action-btn.is-destructive {
+  color: var(--status-graph-degraded);
+  border-color: rgba(255, 149, 0, 0.32);
+  background: rgba(255, 149, 0, 0.14);
+}
+
+.monitor-group-action-with-params {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.monitor-group-action-label {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+}
+
+.monitor-group-action-param {
+  width: auto;
+  min-width: 8rem;
+  max-width: 14rem;
+}
+
+.monitor-group-actions-note,
+.monitor-group-actions-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: left;
+}
+
+.monitor-group-actions-note {
+  margin-bottom: 0.6rem;
+}
+
+.monitor-group-actions-empty {
+  font-size: 0.85rem;
+  padding: 0.75rem;
+}
+
 .monitor-history-section {
   display: flex;
   flex-direction: column;

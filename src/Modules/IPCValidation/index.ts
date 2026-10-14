@@ -7,13 +7,21 @@
 // normalized value. The Manager type below is the composition of every domain's
 // validator surface; each domain file imports it to type its register function.
 
-export interface CriticalUSBDevicePayloadResult {
+// Present only when the request carried them; absent keeps the current value.
+export interface CriticalUSBConditionOptionsResult {
+  RequirePresent?: boolean;
+  CheckLocation?: boolean;
+  CheckFirmware?: boolean;
+  RequireNoError?: boolean;
+}
+
+export interface CriticalUSBDevicePayloadResult extends CriticalUSBConditionOptionsResult {
   SerialNumber: string;
   ManufacturerName: string | null;
   ProductName: string | null;
 }
 
-export interface CriticalUSBNamePayloadResult {
+export interface CriticalUSBNamePayloadResult extends CriticalUSBConditionOptionsResult {
   ManufacturerName: string | null;
   ProductName: string | null;
 }
@@ -24,11 +32,14 @@ export interface CriticalApplicationPayloadResult {
 
 export interface CriticalDisplayPayloadResult {
   DisplayID: string;
-  Label: string | null;
-  Width: number | null;
-  Height: number | null;
-  RefreshRate: number | null;
-  ScaleFactor: number | null;
+  // Present only when the request carried them; absent keeps the current value.
+  RequirePresent?: boolean;
+  RequirePrimary?: boolean;
+  CheckResolution?: boolean;
+  CheckRefreshRate?: boolean;
+  CheckScale?: boolean;
+  CheckRotation?: boolean;
+  CheckPosition?: boolean;
 }
 
 export interface CriticalAudioDevicePayloadResult {
@@ -44,6 +55,7 @@ export interface CriticalAudioDevicePayloadResult {
 
 export interface CriticalNetworkInterfacePayloadResult {
   Name: string;
+  Family?: 'IPv4' | 'IPv6';
   // Present only when the request carried them; absent keeps the current value.
   RequirePresent?: boolean;
   Address?: string | null;

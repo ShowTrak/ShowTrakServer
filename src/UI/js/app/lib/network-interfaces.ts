@@ -27,13 +27,19 @@ export function GetNetworkSectionState(Client: ClientView): NetworkSectionState 
   return 'ok';
 }
 
-export function NetworkSectionMessage(State: Exclude<NetworkSectionState, 'ok'>): {
-  Title: string;
-  Body: string;
-} {
+/** "IPv4 Interfaces" / "IPv6 Interfaces": the heading of each family's section. */
+export function NetworkFamilyTitle(Family: NetworkFamily): string {
+  return `${Family} Interfaces`;
+}
+
+/** The headline + body for every state except `ok`, for one family's section. */
+export function NetworkSectionMessage(
+  State: Exclude<NetworkSectionState, 'ok'>,
+  Family: NetworkFamily
+): { Title: string; Body: string } {
   if (State === 'waiting') {
     return {
-      Title: 'Waiting for Network Interfaces',
+      Title: `Waiting for ${NetworkFamilyTitle(Family)}`,
       Body: 'This client has not reported its network interfaces yet.',
     };
   }
@@ -128,10 +134,19 @@ function IsLinkLocalV6(Address: unknown): boolean {
   return !!Parsed && Parsed.Family === 6 && Parsed.Value >> 118n === 0x3fan;
 }
 
-/** The address a first mark guards: the first IPv4, else the first routable IPv6. */
-export function PrimaryAddress(Iface: NetworkInterfaceView): NetworkInterfaceAddress | null {
-  const V4 = AddressesFor(Iface, 'IPv4').find((Address) => ParseIP(Address.address));
-  if (V4) return V4;
+/**
+ * The address a first mark guards: the first IPv4, else the first routable IPv6
+ * — or, given a family, that family's.
+ */
+export function PrimaryAddress(
+  Iface: NetworkInterfaceView,
+  Family: NetworkFamily | null = null
+): NetworkInterfaceAddress | null {
+  const V4 =
+    Family === 'IPv6'
+      ? undefined
+      : AddressesFor(Iface, 'IPv4').find((Address) => ParseIP(Address.address));
+  if (V4 || Family === 'IPv4') return V4 || null;
   return (
     AddressesFor(Iface, 'IPv6').find(
       (Address) => ParseIP(Address.address) && !IsLinkLocalV6(Address.address)
@@ -161,14 +176,43 @@ export function SubnetHostRange(
 
 // --- Cards ------------------------------------------------------------------------
 
-/** Which interfaces the list shows, in the order the server sent them. */
-export function VisibleInterfaces(Client: ClientView): NetworkInterfaceView[] {
-  return Client.NetworkStatus?.Interfaces || [];
+/**
+ * The family an interface's critical toggle and conditions live under. Most
+ * interfaces carry both (en0 has an IPv4 address and an IPv6 link-local one), so
+ * each is controlled from one list only: a critical interface's from the family
+ * it was marked under (so neither losing its addresses nor unguarding one ever
+ * moves the card), any other from IPv4 when it has an IPv4 address.
+ *
+ * An entry saved before the family was recorded takes the family of the address
+ * it guards; failing that it falls through to the rule for any other interface.
+ */
+export function HomeFamily(Iface: NetworkInterfaceView): NetworkFamily {
+  const Critical = Iface.Critical;
+  if (Critical) {
+    if (Critical.Family === 'IPv4' || Critical.Family === 'IPv6') return Critical.Family;
+    for (const Guarded of [Critical.Address, Critical.RangeStart, Critical.Netmask]) {
+      const Parsed = ParseIP(Guarded);
+      if (Parsed) return Parsed.Family === 6 ? 'IPv6' : 'IPv4';
+    }
+  }
+  if (AddressesFor(Iface, 'IPv4').length) return 'IPv4';
+  return AddressesFor(Iface, 'IPv6').length ? 'IPv6' : 'IPv4';
 }
 
 /**
- * The card's title: the interface's first address of the shown family (other
- * addresses of that family follow as extra lines), or why there is none.
+ * The interfaces one family's list shows, in the order the server sent them:
+ * those with an address of that family, plus those whose home it is (so a
+ * critical interface that lost its address, or is missing, still shows).
+ */
+export function InterfacesFor(Client: ClientView, Family: NetworkFamily): NetworkInterfaceView[] {
+  return (Client.NetworkStatus?.Interfaces || []).filter(
+    (Iface) => HomeFamily(Iface) === Family || AddressesFor(Iface, Family).length > 0
+  );
+}
+
+/**
+ * The card's title: the interface's first address of the shown family, routable
+ * before link-local (the others follow as extra lines), or why there is none.
  */
 export function NetworkInterfaceTitle(
   Iface: NetworkInterfaceView,
@@ -177,8 +221,12 @@ export function NetworkInterfaceTitle(
   if (!Iface.IsConnected) {
     return { Title: Iface.Missing ? 'Not Connected' : 'Not Reported', Extra: [] };
   }
-  const Addresses = AddressesFor(Iface, Family).map((Address) => String(Address.address || ''));
-  const [First, ...Rest] = Addresses.filter(Boolean);
+  // Routable addresses lead: a link-local fe80:: one is rarely the one that matters.
+  const Addresses = AddressesFor(Iface, Family)
+    .map((Address) => String(Address.address || ''))
+    .filter(Boolean)
+    .sort((Left, Right) => Number(IsLinkLocalV6(Left)) - Number(IsLinkLocalV6(Right)));
+  const [First, ...Rest] = Addresses;
   return First ? { Title: First, Extra: Rest } : { Title: `No ${Family} Address`, Extra: [] };
 }
 
@@ -194,7 +242,8 @@ export function NetworkInterfaceSummary(
   const Parts: string[] = [Iface.Name];
   const Mask = AddressesFor(Iface, Family).find((Address) => Address.netmask)?.netmask;
   if (Iface.IsConnected && Mask) Parts.push(String(Mask));
-  if (Iface.IsConnected && Capabilities?.Router) {
+  // The router is an IPv4 default route, so it belongs to the IPv4 list.
+  if (Iface.IsConnected && Capabilities?.Router && Family === 'IPv4') {
     Parts.push(Iface.Gateway ? `Router ${Iface.Gateway}` : 'No router');
   }
   if (Iface.MAC) Parts.push(Iface.MAC);
@@ -290,8 +339,8 @@ export interface NetworkConditionRow {
 
 /**
  * The conditions table of a critical interface, one row per condition. Values
- * describe the interface's primary address (its first IPv4, else IPv6), which is
- * what a first mark captured.
+ * describe the interface's primary address in the family it is monitored under,
+ * which is what a first mark captured.
  */
 export function NetworkConditionRows(
   Iface: NetworkInterfaceView,
@@ -301,7 +350,7 @@ export function NetworkConditionRows(
   if (!Critical) return [];
   const Issue = (Kind: string) =>
     Iface.Issues.find((Candidate) => Candidate.Kind === Kind)?.Message ?? null;
-  const Primary = Iface.IsConnected ? PrimaryAddress(Iface) : null;
+  const Primary = Iface.IsConnected ? PrimaryAddress(Iface, HomeFamily(Iface)) : null;
   const Address = Primary ? String(Primary.address) : '';
   const Netmask = Primary && Primary.netmask ? String(Primary.netmask) : '';
   const Range = Primary ? SubnetHostRange(Primary.address, Primary.netmask) : null;
@@ -369,8 +418,8 @@ export function NetworkConditionRows(
 }
 
 /**
- * Rebuild the list only when what it shows changes. The conditions hold typed
- * values, so the modal also holds a rebuild while one of them has focus.
+ * Rebuild a family's list only when what it shows changes. The conditions hold
+ * typed values, so the modal also holds a rebuild while one of them has focus.
  */
 export function NetworkRenderKey(
   Client: ClientView,
@@ -378,9 +427,10 @@ export function NetworkRenderKey(
   Family: NetworkFamily
 ): string {
   const View = Client.NetworkStatus;
-  const Interfaces = VisibleInterfaces(Client).map((Iface) =>
+  const Interfaces = InterfacesFor(Client, Family).map((Iface) =>
     [
       Iface.Name,
+      HomeFamily(Iface),
       Iface.MAC ?? '',
       Iface.Internal ? 1 : 0,
       Iface.IsConnected ? 1 : 0,
@@ -390,7 +440,7 @@ export function NetworkRenderKey(
         .map((Address) => `${FormatAddress(Address)}/${Address.netmask ?? ''}`)
         .join(','),
       // The primary address feeds the conditions' current values, whatever the filter.
-      PrimaryAddress(Iface)?.address ?? '',
+      PrimaryAddress(Iface, HomeFamily(Iface))?.address ?? '',
       Iface.Issues.map((Issue) => Issue.Message).join(','),
       JSON.stringify(Iface.Critical),
     ].join('|')

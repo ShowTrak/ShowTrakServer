@@ -108,3 +108,38 @@ test('sync prunes clients that are no longer present', () => {
   syncClientDisplayHistoryStore([]);
   assert.deepStrictEqual(getClientDisplayHistorySamples('disphist-e'), []);
 });
+
+test('keys a display by its critical entry, and leaves a gap for one allowed to be absent', () => {
+  recordClientDisplayHistorySamples({
+    UUID: 'disphist-matched',
+    Online: true,
+    DisplayList: [
+      {
+        // Recognised under a stronger id than the one it was marked under.
+        DisplayID: 'edid:DEL:1234:SER9',
+        Label: 'Dell U2721',
+        IsCritical: true,
+        IsConnected: true,
+        Missing: false,
+        Mismatch: false,
+        Issues: [{ Kind: 'rotation', Message: 'Rotation is 90° (expected 0°)' }],
+        Critical: { DisplayID: 'attr:::1920x1080@60:e' },
+      },
+      {
+        DisplayID: 'port:linux:DP-2',
+        Label: 'Spare',
+        IsCritical: true,
+        IsConnected: false,
+        Missing: false,
+        Critical: { DisplayID: 'port:linux:DP-2', RequirePresent: false },
+      },
+    ],
+  });
+  const series = getClientDisplayHistorySamples('disphist-matched');
+  assert.deepStrictEqual(
+    series.map((s) => s.DisplayID),
+    ['attr:::1920x1080@60:e']
+  );
+  assert.strictEqual(series[0].samples.at(-1).online, true);
+  assert.strictEqual(series[0].samples.at(-1).degraded, true);
+});

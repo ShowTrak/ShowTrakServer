@@ -944,29 +944,6 @@ button.btn:focus {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY {
-  position: absolute;
-  right: 0.6rem;
-  top: 50%;
-  transform: translateY(-50%);
-  min-width: 98px;
-  height: 30px;
-  padding: 0 0.65rem;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: rgba(220, 220, 220, 0.6);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  font-size: 12px;
-  font-weight: 700;
-  transition:
-    color 120ms ease,
-    background-color 120ms ease;
-}
-
 .SHOWTRAK_DISPLAY_NUMBER {
   flex: 0 0 auto;
   display: inline-flex;
@@ -982,50 +959,6 @@ button.btn:focus {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY .bi {
-  font-size: 1rem;
-  line-height: 1;
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY:hover {
-  color: rgba(255, 214, 102, 0.9);
-  background-color: rgba(255, 193, 7, 0.12);
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-critical {
-  color: #ffc107;
-  background-color: rgba(255, 193, 7, 0.2);
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-critical:hover {
-  color: #ffd54a;
-  background-color: rgba(255, 193, 7, 0.24);
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical:hover,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical:focus {
-  color: #ff9f40;
-  background-color: rgba(253, 126, 20, 0.24);
-  cursor: pointer;
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical:hover {
-  background-color: rgba(253, 126, 20, 0.3);
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical:hover,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical:focus {
-  color: #ff6b6b;
-  background-color: rgba(220, 53, 69, 0.24);
-  cursor: pointer;
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical:hover {
-  background-color: rgba(220, 53, 69, 0.28);
 }
 
 /* --- Audio devices (client info modal) ----------------------------------- */
@@ -1299,13 +1232,4 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   text-transform: uppercase;
   padding: 0.2rem 0.5rem;
   cursor: default;
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:hover,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:focus,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:active {
-  cursor: not-allowed;
-  color: rgba(190, 190, 190, 0.5);
-  background-color: rgba(255, 255, 255, 0.05);
 }

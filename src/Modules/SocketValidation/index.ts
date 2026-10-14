@@ -20,6 +20,12 @@ import {
   normalizeOptionalString,
 } from '../Validation/primitives';
 import { INTEGRATED_EVENT_MAX_FEEDBACK_LENGTH } from '../Config/constants';
+import {
+  normalizeDeviceState,
+  normalizeFirmwareVersion,
+  normalizeUSBLocation,
+} from '../ClientManager/usb';
+import type { USBDeviceState } from '@showtrak/protocol';
 
 const MAX_USB_DEVICES = 512;
 const MAX_DISPLAYS = 64;
@@ -200,6 +206,9 @@ function USBDevice(
   ManufacturerName: string | null;
   ProductName: string | null;
   SerialNumber: string | null;
+  Location?: string | null;
+  FirmwareVersion?: string | null;
+  DeviceState?: USBDeviceState | null;
 } {
   if (!isPlainObject(value)) fail(`${fieldName} must be an object`);
   return {
@@ -211,6 +220,17 @@ function USBDevice(
     ),
     ProductName: normalizeOptionalString(value.ProductName, `${fieldName}.ProductName`),
     SerialNumber: normalizeOptionalString(value.SerialNumber, `${fieldName}.SerialNumber`),
+    // Reported by clients from 3.22.0. An ABSENT key means the client cannot
+    // report it at all, so it stays absent; a value that does not parse is kept
+    // as null (unknown) rather than refusing the device, whose presence is the
+    // thing that matters most.
+    ...(value.Location !== undefined ? { Location: normalizeUSBLocation(value.Location) } : {}),
+    ...(value.FirmwareVersion !== undefined
+      ? { FirmwareVersion: normalizeFirmwareVersion(value.FirmwareVersion) }
+      : {}),
+    ...(value.DeviceState !== undefined
+      ? { DeviceState: normalizeDeviceState(value.DeviceState) }
+      : {}),
   };
 }
 

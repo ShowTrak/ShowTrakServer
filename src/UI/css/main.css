@@ -1350,14 +1350,20 @@ input[type='range']::-moz-range-progress,
   text-overflow: ellipsis;
 }
 
-/* Settings modal: two-pane layout with a category nav on the left and the
-   settings for each category on the right. The header stays pinned at the top;
-   the nav and content each scroll independently within the modal. */
+/* Settings modal: two-pane layout with a tab rail on the left and the active
+   category's settings on the right, one category shown at a time as in the
+   Client Info modal. The header stays pinned at the top; the rail and content
+   each scroll independently, and a fixed height stops the dialog resizing as
+   tabs are switched. */
 #SHOWTRAK_MODAL_SETTINGS .modal-body {
   display: flex;
   flex-direction: column;
   max-height: 85vh;
   overflow: hidden;
+}
+
+#SHOWTRAK_MODAL_SETTINGS .modal-body.is-tabbed {
+  height: min(85vh, 46rem);
 }
 
 .settings-layout {
@@ -1408,21 +1414,18 @@ input[type='range']::-moz-range-progress,
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  display: grid;
-  gap: 0.5rem;
   padding-right: 0.25rem;
-  scroll-behavior: smooth;
 }
 
-.settings-section {
-  scroll-margin-top: 0.25rem;
+/* The sections are .d-grid, whose display is !important. */
+.settings-content .settings-section.is-inactive-tab {
+  display: none !important;
 }
 
 /* Client Info modal: the header (device name + close) and the Close button stay
-   pinned while the pane between them scrolls. Clients add the settings-style
-   rail on the left, but as true tabs (one pane shown at a time) rather than
-   jump links, and get a fixed height so switching tabs does not resize the
-   dialog. Monitors, dummies and FreeKiosk terminals show no rail. */
+   pinned while the pane between them scrolls. Every entity gets the
+   settings-style tab rail on the left (one pane shown at a time) and a fixed
+   height so switching tabs does not resize the dialog. */
 #SHOWTRAK_CLIENT_INFO .modal-body {
   display: flex;
   flex-direction: column;
@@ -2595,29 +2598,6 @@ button.btn:focus {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY {
-  position: absolute;
-  right: 0.6rem;
-  top: 50%;
-  transform: translateY(-50%);
-  min-width: 98px;
-  height: 30px;
-  padding: 0 0.65rem;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: rgba(220, 220, 220, 0.6);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  font-size: 12px;
-  font-weight: 700;
-  transition:
-    color 120ms ease,
-    background-color 120ms ease;
-}
-
 .SHOWTRAK_DISPLAY_NUMBER {
   flex: 0 0 auto;
   display: inline-flex;
@@ -2633,50 +2613,6 @@ button.btn:focus {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY .bi {
-  font-size: 1rem;
-  line-height: 1;
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY:hover {
-  color: rgba(255, 214, 102, 0.9);
-  background-color: rgba(255, 193, 7, 0.12);
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-critical {
-  color: #ffc107;
-  background-color: rgba(255, 193, 7, 0.2);
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-critical:hover {
-  color: #ffd54a;
-  background-color: rgba(255, 193, 7, 0.24);
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical:hover,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical:focus {
-  color: #ff9f40;
-  background-color: rgba(253, 126, 20, 0.24);
-  cursor: pointer;
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-mismatch-critical:hover {
-  background-color: rgba(253, 126, 20, 0.3);
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical:hover,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical:focus {
-  color: #ff6b6b;
-  background-color: rgba(220, 53, 69, 0.24);
-  cursor: pointer;
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-disconnected-critical:hover {
-  background-color: rgba(220, 53, 69, 0.28);
 }
 
 /* --- Audio devices (client info modal) ----------------------------------- */
@@ -2950,15 +2886,6 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   text-transform: uppercase;
   padding: 0.2rem 0.5rem;
   cursor: default;
-}
-
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:hover,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:focus,
-.SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable:active {
-  cursor: not-allowed;
-  color: rgba(190, 190, 190, 0.5);
-  background-color: rgba(255, 255, 255, 0.05);
 }
 /* Dark-themed hint popovers (USB critical-state + monitoring field notes) */
 .SHOWTRAK_USB_POPOVER,
@@ -4535,6 +4462,151 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+/* View modal panes for entities split across several tabs (monitoring targets,
+   FreeKiosk terminals). The timelines container is then not itself a pane, so
+   its top margin would sit above every tab; only the Status pane needs the gap
+   under the legend header. */
+#MONITOR_HISTORY_TIMELINES:not([data-client-info-tab]) {
+  margin-top: 0 !important;
+}
+
+#MONITOR_HISTORY_TIMELINES:not([data-client-info-tab]) > [data-client-info-tab='status'] {
+  margin-top: 0.5rem;
+}
+
+.monitor-tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* A monitoring target's Actions tab: one panel per check type, its actions in
+   their declared groups. Drawn to match the FreeKiosk Controls tab. */
+.monitor-group-actions {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  text-align: left;
+}
+
+.monitor-group-actions-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.monitor-group-actions-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.monitor-group-actions-scope {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.monitor-group-actions-group {
+  margin-bottom: 0.6rem;
+}
+
+.monitor-group-actions-group:last-child {
+  margin-bottom: 0;
+}
+
+.monitor-group-actions-group-title {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.monitor-group-actions-group-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+/* Bootstrap's bare button colours are near-invisible on this theme, so the
+   buttons carry their own tint, as the FreeKiosk ones do. */
+.monitor-group-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.4rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+
+.monitor-group-action-btn:hover:not(:disabled),
+.monitor-group-action-btn:focus-visible {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.monitor-group-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.monitor-group-action-btn.is-destructive {
+  color: var(--status-graph-degraded);
+  border-color: rgba(255, 149, 0, 0.32);
+  background: rgba(255, 149, 0, 0.14);
+}
+
+.monitor-group-action-with-params {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.monitor-group-action-label {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+}
+
+.monitor-group-action-param {
+  width: auto;
+  min-width: 8rem;
+  max-width: 14rem;
+}
+
+.monitor-group-actions-note,
+.monitor-group-actions-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: left;
+}
+
+.monitor-group-actions-note {
+  margin-bottom: 0.6rem;
+}
+
+.monitor-group-actions-empty {
+  font-size: 0.85rem;
+  padding: 0.75rem;
 }
 
 .monitor-history-section {
@@ -6549,6 +6621,28 @@ button.monitor-action-label:focus-visible {
   padding: 0.75rem;
   border-radius: 0.5rem;
   background: rgba(255, 255, 255, 0.03);
+}
+
+/* View modal panes (one per rail tab). The panels inside space themselves by
+   the pane's gap rather than each carrying a top margin, so the first panel on
+   a tab sits flush with the top of the pane. */
+.freekiosk-tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.freekiosk-tab-pane > .freekiosk-panel,
+.freekiosk-tab-pane > .freekiosk-section {
+  margin-top: 0;
+}
+
+/* The Status pane is a list of status-card + chart sections, spaced as the
+   client's Status tab spaces them (.monitor-history-timelines). The pane's top
+   margin under the legend header is shared with monitoring targets and lives
+   in 05-monitoring.css. */
+.freekiosk-tab-pane[data-client-info-tab='status'] {
+  gap: 1rem;
 }
 
 .freekiosk-section-title {

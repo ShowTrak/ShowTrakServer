@@ -117,8 +117,6 @@ interface Window {
   // __SHOWTRAK_CONFIRM_ACTIVE and __CLIENT_ONLINE_STATE were folded into the
   // state modules (ConfirmDialogActive / ClientOnlineState) and are no longer
   // window globals.
-  /** Selected address family in the open client-info modal. */
-  __ClientInfoNetFamily?: 'IPv4' | 'IPv6';
   /** Auto-dismiss timer handle for the execution toast. */
   __ShowTrakExecutionAutoDismissTimer?: ReturnType<typeof setTimeout> | null;
   /** Auto-dismiss timer handle for the deployment banner. */

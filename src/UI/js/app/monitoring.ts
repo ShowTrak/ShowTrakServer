@@ -33,17 +33,19 @@ import type {
 } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
 import { AudioTimelineLiveState } from './lib/audio-devices';
+import { DisplayKey, DisplayTimelineLiveState } from './lib/displays';
+import { USBTimelineLiveState } from './lib/usb-devices';
 import { NetworkTimelineLiveState } from './lib/network-interfaces';
 import { openModal } from './lib/modal';
-import { SetClientInfoTabbed } from './client-info-nav';
+import { RefreshClientInfoTabs, ResetClientInfoTab, SetClientInfoKind } from './client-info-nav';
 import {
-  LoadFreeKioskCameras,
   RenderFreeKioskModal,
   ResetFreeKioskModalState,
   SetFreeKioskSeries,
 } from './freekiosk-modal';
 import {
   PositionOpenActionsMenu,
+  RenderTargetActionsPane,
   RenderTimelineWithActions,
   ResetActionParamDrafts,
 } from './monitoring-actions';
@@ -87,11 +89,6 @@ interface MonitorStatusCardOptions {
 // Critical telemetry list elements carry runtime-enriched flags beyond their
 // base wire shapes (connection/mismatch state derived on the client entity).
 type CriticalUSBItem = USBDeviceView & { Missing?: boolean };
-type CriticalDisplayItem = ClientDisplayView & {
-  Missing?: boolean;
-  Mismatch?: boolean;
-  IsConnected?: boolean;
-};
 import { GetClientStatusDisplayText } from './client-list';
 import { CloseAllModals } from './modals';
 import { Notify } from './selection-init';
@@ -966,11 +963,12 @@ export function UpdateMonitorHistoryEditButtonVisibility(
 export async function OpenFreeKioskTerminalHistory(UUID: string) {
   await CloseAllModals();
   ResetFreeKioskModalState();
+  ResetClientInfoTab();
   setMonitorHistoryModalContext({ type: 'freekiosk', id: String(UUID) });
   await LoadHistorySamplesForContext();
-  // The camera list decides whether a picker is offered at all, so it is
-  // fetched before the first render rather than causing a second one.
-  await LoadFreeKioskCameras();
+  // The camera list is fetched by the render, in the background: it asks the
+  // device, so awaiting it here held the modal shut for the whole connection
+  // timeout whenever the terminal was offline.
   RenderMonitoringHistoryModal();
   const Modal = document.getElementById('SHOWTRAK_CLIENT_INFO');
   if (Modal) {
@@ -995,15 +993,41 @@ export function RenderMonitoringHistoryModal() {
   // The client detail fields (nickname, vitals, USB, network, apps) only make
   // sense for real clients; monitoring targets and dummy clients show just the
   // status timeline. RenderClientInfoDetails owns the per-section gating for
-  // integrated clients within the details block.
+  // integrated clients within the details block, and picks between the client
+  // and integrated tab sets, so a client's kind is left to it here.
   $('#CLIENT_INFO_DETAILS_SECTION').toggleClass('d-none', Entity.type !== 'client');
-  SetClientInfoTabbed(Entity.type === 'client');
+  if (Entity.type === 'freekiosk') SetClientInfoKind('freekiosk');
+  else if (Entity.type === 'target') SetClientInfoKind('target');
+  else if (Entity.type === 'dummy') SetClientInfoKind('dummy');
   UpdateMonitorHistoryEditButtonVisibility();
 
   const $timelines = $('#MONITOR_HISTORY_TIMELINES');
   if (!$timelines.length) return;
+  // Emptying the pane collapses it, which clamps the scroll position to the top;
+  // live pushes re-render every few seconds, so hold the operator's place.
+  const $content = $('#CLIENT_INFO_CONTENT');
+  const ScrollTop = $content.scrollTop() || 0;
   $timelines.empty();
+  // FreeKiosk terminals and monitoring targets spread themselves across several
+  // tabs, so they wrap each part in its own pane; everything else is the Status
+  // tab as a whole.
+  if (Entity.type === 'freekiosk' || Entity.type === 'target') {
+    $timelines.removeAttr('data-client-info-tab');
+  } else $timelines.attr('data-client-info-tab', 'status');
 
+  RenderMonitoringHistoryEntity(Entity, $timelines);
+
+  RefreshClientInfoTabs();
+  if (($content.scrollTop() || 0) !== ScrollTop) $content.scrollTop(ScrollTop);
+  // Again, now that the inactive panes are hidden and the scroll is back: the
+  // pointer lookup inside depends on the final layout.
+  RestoreStatusTimelineTooltipAfterRender();
+}
+
+function RenderMonitoringHistoryEntity(
+  Entity: MonitorHistoryEntity,
+  $timelines: JQuery<HTMLElement>
+) {
   if (Entity.type === 'target') {
     const Target = Entity.target;
     const Checks = Array.isArray(Target.Checks) ? Target.Checks : [];
@@ -1060,7 +1084,7 @@ export function RenderMonitoringHistoryModal() {
         : Checks.length
           ? 'OFFLINE'
           : 'UNAVAILABLE';
-    $timelines.append(
+    const StatusHtml =
       RenderMonitorHistorySection(
         {
           state: OverallState,
@@ -1071,14 +1095,21 @@ export function RenderMonitoringHistoryModal() {
             : BuildLiveStatusText(OverallState, Target.LastLatencyMs, Target.LastError),
         },
         OverallBlocks
-      )
+      ) +
+      CheckSections.map((Section) => `<div class="monitor-history-section">${Section}</div>`).join(
+        ''
+      ) +
+      (CheckSections.length
+        ? ''
+        : '<div class="status-timeline-empty">This target has no checks yet.</div>');
+    $timelines.append(
+      `<div class="monitor-tab-pane" data-client-info-tab="status">${StatusHtml}</div>`
     );
-    for (const Section of CheckSections) {
-      $timelines.append(`<div class="monitor-history-section">${Section}</div>`);
-    }
-    if (!CheckSections.length) {
-      $timelines.append('<div class="status-timeline-empty">This target has no checks yet.</div>');
-    }
+    $timelines.append(
+      `<div class="monitor-tab-pane" data-client-info-tab="actions">${RenderTargetActionsPane(
+        Target
+      )}</div>`
+    );
     PositionOpenActionsMenu();
     RestoreStatusTimelineTooltipAfterRender();
     return;
@@ -1178,20 +1209,14 @@ export function RenderMonitoringHistoryModal() {
       const Manufacturer = Device.ManufacturerName ? String(Device.ManufacturerName).trim() : '';
       const Product = Device.ProductName ? String(Device.ProductName).trim() : '';
       const Name = [Manufacturer, Product].filter(Boolean).join(' ') || 'USB Device';
-      const IsConnected = Device.IsConnected !== false && !Device.Missing;
-      let LiveState = 'IDLE';
-      let StatusLabel = 'Idle';
-      if (Client.Online) {
-        LiveState = IsConnected ? 'ONLINE' : 'OFFLINE';
-        StatusLabel = IsConnected ? 'Connected' : 'Disconnected';
-      }
+      const Live = USBTimelineLiveState([Device], !!Client.Online);
       $timelines.append(
         RenderMonitorHistorySection(
           {
-            state: LiveState,
+            state: Live.State,
             name: Name,
             sub: 'Critical USB Device',
-            statusText: StatusLabel,
+            statusText: Live.Label,
           },
           Blocks
         )
@@ -1222,20 +1247,22 @@ export function RenderMonitoringHistoryModal() {
       const Manufacturer = Device.ManufacturerName ? String(Device.ManufacturerName).trim() : '';
       const Product = Device.ProductName ? String(Device.ProductName).trim() : '';
       const Name = [Manufacturer, Product].filter(Boolean).join(' ') || 'USB Device';
-      const Satisfied = Device.IsConnected !== false && !Device.Missing && !Device.Shortfall;
-      let LiveState = 'IDLE';
-      let StatusLabel = 'Idle';
-      if (Client.Online) {
-        LiveState = Satisfied ? 'ONLINE' : 'OFFLINE';
-        StatusLabel = Satisfied ? 'Connected' : 'Disconnected';
-      }
+      const Group = USBItems.filter(
+        (Item) =>
+          !!Item &&
+          !!Item.IsCriticalByName &&
+          String(Item.NameKey ?? '')
+            .trim()
+            .toLowerCase() === NameKey
+      );
+      const Live = USBTimelineLiveState(Group, !!Client.Online);
       $timelines.append(
         RenderMonitorHistorySection(
           {
-            state: LiveState,
+            state: Live.State,
             name: Name,
             sub: 'Critical USB Device',
-            statusText: StatusLabel,
+            statusText: Live.Label,
           },
           Blocks
         )
@@ -1252,12 +1279,13 @@ export function RenderMonitoringHistoryModal() {
         SamplesByDisplayID.set(String(Series.displayID), Series.samples);
       }
     }
-    const CriticalDisplays: { DisplayID: string; Display: CriticalDisplayItem }[] = [];
+    const CriticalDisplays: { DisplayID: string; Display: ClientDisplayView }[] = [];
     const SeenDisplayIDs = new Set<string>();
     const DisplayItems = Array.isArray(Client?.DisplayList) ? Client.DisplayList : [];
     for (const Display of DisplayItems) {
       if (!Display || !Display.IsCritical) continue;
-      const DisplayID = Display.DisplayID ? String(Display.DisplayID).trim() : '';
+      // Keyed by the critical entry's own id, as the history store is.
+      const DisplayID = DisplayKey(Display);
       if (!DisplayID || SeenDisplayIDs.has(DisplayID)) continue;
       SeenDisplayIDs.add(DisplayID);
       CriticalDisplays.push({ DisplayID, Display });
@@ -1266,29 +1294,14 @@ export function RenderMonitoringHistoryModal() {
       const Blocks = BuildStatusBlocksFromSamples(SamplesByDisplayID.get(DisplayID) || []);
       const Name =
         Display.Label && String(Display.Label).trim() ? String(Display.Label).trim() : 'Display';
-      const IsConnected = Display.IsConnected !== false && !Display.Missing;
-      const IsMismatch = !!Display.Mismatch;
-      let LiveState = 'IDLE';
-      let StatusLabel = 'Idle';
-      if (Client.Online) {
-        if (!IsConnected) {
-          LiveState = 'OFFLINE';
-          StatusLabel = 'Missing';
-        } else if (IsMismatch) {
-          LiveState = 'DEGRADED';
-          StatusLabel = 'Configuration Changed';
-        } else {
-          LiveState = 'ONLINE';
-          StatusLabel = 'Connected';
-        }
-      }
+      const Live = DisplayTimelineLiveState(Display, !!Client.Online);
       $timelines.append(
         RenderMonitorHistorySection(
           {
-            state: LiveState,
+            state: Live.State,
             name: Name,
             sub: 'Critical Display',
-            statusText: StatusLabel,
+            statusText: Live.Label,
           },
           Blocks
         )
@@ -1394,6 +1407,7 @@ export async function OpenMonitoringTargetHistory(TargetID: number) {
     HandleNonFatalError('Monitoring:OpenMonitoringTargetHistory:CloseAllModals', err);
   }
 
+  ResetClientInfoTab();
   setMonitorHistoryModalContext({ type: 'target', id: Number(Target.TargetID) });
   setMonitorHistorySeries([]);
   await LoadHistorySamplesForContext();
@@ -1424,6 +1438,7 @@ export async function OpenDummyClientHistory(UUID: string) {
     HandleNonFatalError('Monitoring:OpenDummyClientHistory:CloseAllModals', err);
   }
 
+  ResetClientInfoTab();
   setMonitorHistoryModalContext({ type: 'dummy', id: DummyUUID });
   setMonitorHistorySeries([]);
   await LoadHistorySamplesForContext();

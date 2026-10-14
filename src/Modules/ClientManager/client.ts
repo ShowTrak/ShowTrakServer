@@ -11,7 +11,6 @@ import {
   AsRecord,
   normalizeSerialNumber,
   usbDeviceModelKey,
-  normalizeUSBNameKey,
   normalizeApplicationName,
   normalizeApplicationKey,
   normalizeDisplayID,
@@ -24,7 +23,11 @@ import type {
   AudioDevicesView,
   AudioEndpointView,
   CriticalAudioDevice,
+  CriticalDisplay,
   CriticalNetworkInterface,
+  CriticalUSBDevice,
+  CriticalUSBName,
+  USBCapabilities,
   NetworkInterfaceView,
   NetworkStatusView,
 } from '@showtrak/protocol';
@@ -38,6 +41,13 @@ import {
   normalizeEndpointID,
   type ObservedAudio,
 } from './audio';
+import { buildDisplayView, normalizeCriticalDisplayEntry, type DisplayViewEntry } from './display';
+import {
+  buildUSBView,
+  normalizeCriticalUSBEntry,
+  normalizeCriticalUSBNameEntry,
+  type USBDeviceViewEntry,
+} from './usb';
 import {
   EmptyNetworkStatusView,
   buildNetworkView,
@@ -58,11 +68,6 @@ export interface ClientMacAddress {
   LastSeen: number;
 }
 
-// `parseInt` ToString-coerces its argument, so `String()` wrapping is
-// behaviour-identical to the historical `parseInt(x, 10)` on dynamic values.
-function ParseIntOrNull(Value: unknown): number | null {
-  return parseInt(String(Value), 10) || null;
-}
 // Preserve the historical `Value ? Value : null` timestamp passthrough while
 // satisfying the `number | null` field type (timestamps are always numeric).
 function TimestampOrNull(Value: unknown): number | null {
@@ -123,45 +128,9 @@ function runningApplicationsSignature(
   ).join('|')}`;
 }
 
-// A display "signature" captures the operator-visible configuration we guard.
-function buildDisplaySignature(Display: unknown): string {
-  const D = AsRecord(Display);
-  const Width = parseInt(String(D.Width), 10) || 0;
-  const Height = parseInt(String(D.Height), 10) || 0;
-  const RefreshRate =
-    D.RefreshRate != null && Number.isFinite(Number(D.RefreshRate))
-      ? Math.round(Number(D.RefreshRate))
-      : 0;
-  return `${Width}x${Height}@${RefreshRate}`;
-}
-
 // --- Local domain shapes ---------------------------------------------------
 // The persisted "critical" entries we guard, as normalized by the SetCritical*
 // methods and mirrored (minus UUID) by the DB rows in ../DB/rows.ts.
-interface CriticalUSBEntry {
-  SerialNumber: string;
-  ManufacturerName: string | null;
-  ProductName: string | null;
-  Timestamp: number | null;
-}
-// Serial-less critical device: guarded by its visible name and an expected
-// Quantity, since no serial number is available to track it individually.
-interface CriticalUSBNameEntry {
-  NameKey: string;
-  ManufacturerName: string | null;
-  ProductName: string | null;
-  Quantity: number;
-  Timestamp: number | null;
-}
-interface CriticalDisplayEntry {
-  DisplayID: string;
-  Label: string | null;
-  Width: number | null;
-  Height: number | null;
-  RefreshRate: number | null;
-  ScaleFactor: number | null;
-  Timestamp: number | null;
-}
 interface CriticalApplicationEntry {
   Name: string;
   Key: string;
@@ -169,38 +138,7 @@ interface CriticalApplicationEntry {
 }
 
 // The augmented per-entity view entries the _rebuild* methods emit for the
-// renderer: connected devices merged with their critical/missing status. The
-// index signatures carry forward the spread of the raw telemetry payload.
-interface USBDeviceViewEntry {
-  SerialNumber: string | null;
-  ManufacturerName: string | null;
-  ProductName: string | null;
-  IsConnected: boolean;
-  IsCritical: boolean;
-  Missing: boolean;
-  // Serial-less name-based guarding: set when this entry is (or matches) a
-  // device marked critical by name. Quantity/ConnectedCount describe the
-  // expected-vs-observed count for that name.
-  IsCriticalByName?: boolean;
-  NameKey?: string;
-  Quantity?: number;
-  ConnectedCount?: number;
-  // Set on a connected/missing name-guarded entry when fewer devices of this
-  // name are connected than the expected Quantity.
-  Shortfall?: boolean;
-  [key: string]: unknown;
-}
-interface DisplayViewEntry {
-  DisplayID: string | null;
-  Label: string | null;
-  IsConnected: boolean;
-  IsCritical: boolean;
-  Missing: boolean;
-  Mismatch: boolean;
-  CurrentSignature: string | null;
-  ExpectedSignature: string | null;
-  [key: string]: unknown;
-}
+// renderer: connected entities merged with their critical/missing status.
 interface RunningApplicationViewEntry {
   Name: string;
   Count: number;
@@ -391,21 +329,26 @@ class Client {
   // (connected ∪ missing) produced by _rebuildUSBDeviceView.
   ConnectedUSBDeviceList: USBDevice[];
   USBDeviceList: USBDeviceViewEntry[];
-  CriticalUSBDevices: CriticalUSBEntry[];
+  CriticalUSBDevices: CriticalUSBDevice[];
   CriticalUSBSerials: string[];
   MissingCriticalUSBDevices: USBDeviceViewEntry[];
   // Serial-less critical devices (guarded by name + quantity) and the subset
   // whose connected count currently falls short of the expected quantity.
-  CriticalUSBNames: CriticalUSBNameEntry[];
+  CriticalUSBNames: CriticalUSBName[];
   MissingCriticalUSBNames: USBDeviceViewEntry[];
+  // What the connected list says this client can report, and the faults the
+  // critical devices' conditions raise.
+  USBCapabilities: USBCapabilities | null;
+  USBWarnings: string[];
 
   // Displays: raw connected list, critical guards, and the rendered view.
   ConnectedDisplayList: ClientDisplay[];
   DisplayList: DisplayViewEntry[];
-  CriticalDisplays: CriticalDisplayEntry[];
+  CriticalDisplays: CriticalDisplay[];
   CriticalDisplayIDs: string[];
   MissingCriticalDisplays: DisplayViewEntry[];
   MismatchedCriticalDisplays: DisplayViewEntry[];
+  DisplayWarnings: string[];
 
   // Audio endpoints: the last report, the critical baselines, and the rendered
   // view (observed ∪ missing-critical) produced by _rebuildAudioView.
@@ -469,6 +412,8 @@ class Client {
     this.MissingCriticalUSBDevices = [];
     this.CriticalUSBNames = [];
     this.MissingCriticalUSBNames = [];
+    this.USBCapabilities = null;
+    this.USBWarnings = [];
     this.CriticalApplications = [];
     this.CriticalApplicationKeys = [];
     this.MissingCriticalApplications = [];
@@ -478,6 +423,7 @@ class Client {
     this.CriticalDisplayIDs = [];
     this.MissingCriticalDisplays = [];
     this.MismatchedCriticalDisplays = [];
+    this.DisplayWarnings = [];
     this.Degraded = false;
     this.DegradedWarnings = [];
     this.Initialising = false;
@@ -543,7 +489,9 @@ class Client {
       this.OnlineSince = null;
       this._clearStartupGraceTimer();
       this.HasUSBTelemetry = false;
+      this._rebuildUSBDeviceView(false);
       this.HasDisplayTelemetry = false;
+      this._rebuildDisplayView(false);
       this.HasApplicationTelemetry = false;
       this.HasAudioTelemetry = false;
       // Rebuild so a critical endpoint stops reading as "missing" now that the
@@ -604,136 +552,69 @@ class Client {
     return;
   }
   SetCriticalUSBDevices(Devices: unknown) {
-    const List: unknown[] = Array.isArray(Devices) ? Devices : [];
-    const Normalized: CriticalUSBEntry[] = [];
+    const Normalized: CriticalUSBDevice[] = [];
     const Seen = new Set<string>();
-    for (const Raw of List) {
-      const Entry = AsRecord(Raw);
-      const SerialNumber = normalizeSerialNumber(Entry.SerialNumber);
-      if (!SerialNumber || Seen.has(SerialNumber)) continue;
-      Seen.add(SerialNumber);
-      Normalized.push({
-        SerialNumber,
-        ManufacturerName: Entry.ManufacturerName ? String(Entry.ManufacturerName) : null,
-        ProductName: Entry.ProductName ? String(Entry.ProductName) : null,
-        Timestamp: TimestampOrNull(Entry.Timestamp),
-      });
+    for (const Raw of Array.isArray(Devices) ? Devices : []) {
+      const Entry = normalizeCriticalUSBEntry(Raw);
+      if (!Entry || Seen.has(Entry.SerialNumber)) continue;
+      Seen.add(Entry.SerialNumber);
+      Normalized.push(Entry);
     }
     this.CriticalUSBDevices = Normalized;
-    this.CriticalUSBSerials = Normalized.map((Entry) => Entry.SerialNumber);
     this._rebuildUSBDeviceView();
-    return;
   }
   IsUSBDeviceCritical(SerialNumber: unknown) {
     const Normalized = normalizeSerialNumber(SerialNumber);
     if (!Normalized) return false;
     return this.CriticalUSBSerials.includes(Normalized);
   }
+  /** Add or replace one serial-keyed critical entry. Returns whether it was new. */
   MarkCriticalUSBDevice(Device: unknown) {
-    const D = AsRecord(Device);
-    const Normalized = normalizeSerialNumber(D.SerialNumber);
-    if (!Normalized) return false;
-    const Existing = this.CriticalUSBDevices.find(
-      (Entry: CriticalUSBEntry) => Entry.SerialNumber === Normalized
-    );
-    if (Existing) {
-      if (!Existing.ManufacturerName && D.ManufacturerName) {
-        Existing.ManufacturerName = String(D.ManufacturerName);
-      }
-      if (!Existing.ProductName && D.ProductName) {
-        Existing.ProductName = String(D.ProductName);
-      }
-      if (!Existing.Timestamp && D.Timestamp) {
-        Existing.Timestamp = TimestampOrNull(D.Timestamp);
-      }
-      this._rebuildUSBDeviceView();
-      return false;
-    }
-
-    this.CriticalUSBDevices.push({
-      SerialNumber: Normalized,
-      ManufacturerName: D.ManufacturerName ? String(D.ManufacturerName) : null,
-      ProductName: D.ProductName ? String(D.ProductName) : null,
-      Timestamp: TimestampOrNull(D.Timestamp),
-    });
-    this.CriticalUSBSerials = this.CriticalUSBDevices.map(
-      (Entry: CriticalUSBEntry) => Entry.SerialNumber
-    );
+    const Entry = normalizeCriticalUSBEntry(Device);
+    if (!Entry) return false;
+    const Index = this.CriticalUSBDevices.findIndex((E) => E.SerialNumber === Entry.SerialNumber);
+    if (Index === -1) this.CriticalUSBDevices.push(Entry);
+    else this.CriticalUSBDevices[Index] = Entry;
     this._rebuildUSBDeviceView();
-    return true;
+    return Index === -1;
   }
   UnmarkCriticalUSBSerial(SerialNumber: unknown) {
     const Normalized = normalizeSerialNumber(SerialNumber);
     if (!Normalized) return false;
     const PrevLength = this.CriticalUSBDevices.length;
     this.CriticalUSBDevices = this.CriticalUSBDevices.filter(
-      (Entry: CriticalUSBEntry) => Entry.SerialNumber !== Normalized
+      (Entry) => Entry.SerialNumber !== Normalized
     );
     if (this.CriticalUSBDevices.length === PrevLength) return false;
-    this.CriticalUSBSerials = this.CriticalUSBDevices.map(
-      (Entry: CriticalUSBEntry) => Entry.SerialNumber
-    );
     this._rebuildUSBDeviceView();
     return true;
   }
   SetCriticalUSBNames(Devices: unknown) {
-    const List: unknown[] = Array.isArray(Devices) ? Devices : [];
-    const Normalized: CriticalUSBNameEntry[] = [];
+    const Normalized: CriticalUSBName[] = [];
     const Seen = new Set<string>();
-    for (const Raw of List) {
-      const Entry = AsRecord(Raw);
-      const ManufacturerName = Entry.ManufacturerName ? String(Entry.ManufacturerName) : null;
-      const ProductName = Entry.ProductName ? String(Entry.ProductName) : null;
-      const NameKey = Entry.NameKey
-        ? String(Entry.NameKey)
-        : normalizeUSBNameKey(ManufacturerName, ProductName);
-      if (!NameKey || Seen.has(NameKey)) continue;
-      Seen.add(NameKey);
-      Normalized.push({
-        NameKey,
-        ManufacturerName,
-        ProductName,
-        Quantity: Math.max(1, parseInt(String(Entry.Quantity), 10) || 1),
-        Timestamp: TimestampOrNull(Entry.Timestamp),
-      });
+    for (const Raw of Array.isArray(Devices) ? Devices : []) {
+      const Entry = normalizeCriticalUSBNameEntry(Raw);
+      if (!Entry || Seen.has(Entry.NameKey)) continue;
+      Seen.add(Entry.NameKey);
+      Normalized.push(Entry);
     }
     this.CriticalUSBNames = Normalized;
     this._rebuildUSBDeviceView();
-    return;
   }
   IsUSBNameCritical(NameKey: unknown) {
     const Normalized = typeof NameKey === 'string' ? NameKey.trim().toLowerCase() : '';
     if (!Normalized) return false;
     return this.CriticalUSBNames.some((Entry) => Entry.NameKey === Normalized);
   }
+  /** Add or replace one name-keyed critical entry. Returns whether it was new. */
   MarkCriticalUSBName(Device: unknown) {
-    const D = AsRecord(Device);
-    const ManufacturerName = D.ManufacturerName ? String(D.ManufacturerName) : null;
-    const ProductName = D.ProductName ? String(D.ProductName) : null;
-    const NameKey = D.NameKey
-      ? String(D.NameKey)
-      : normalizeUSBNameKey(ManufacturerName, ProductName);
-    if (!NameKey) return false;
-    const Quantity = Math.max(1, parseInt(String(D.Quantity), 10) || 1);
-    const Existing = this.CriticalUSBNames.find((Entry) => Entry.NameKey === NameKey);
-    if (Existing) {
-      Existing.Quantity = Quantity;
-      if (!Existing.ManufacturerName && ManufacturerName)
-        Existing.ManufacturerName = ManufacturerName;
-      if (!Existing.ProductName && ProductName) Existing.ProductName = ProductName;
-      if (!Existing.Timestamp && D.Timestamp) Existing.Timestamp = TimestampOrNull(D.Timestamp);
-      this._rebuildUSBDeviceView();
-      return false;
-    }
-    this.CriticalUSBNames.push({
-      NameKey,
-      ManufacturerName,
-      ProductName,
-      Quantity,
-      Timestamp: TimestampOrNull(D.Timestamp),
-    });
+    const Entry = normalizeCriticalUSBNameEntry(Device);
+    if (!Entry) return false;
+    const Index = this.CriticalUSBNames.findIndex((E) => E.NameKey === Entry.NameKey);
+    if (Index === -1) this.CriticalUSBNames.push(Entry);
+    else this.CriticalUSBNames[Index] = Entry;
     this._rebuildUSBDeviceView();
-    return true;
+    return Index === -1;
   }
   UnmarkCriticalUSBName(NameKey: unknown) {
     const Normalized = typeof NameKey === 'string' ? NameKey.trim().toLowerCase() : '';
@@ -795,97 +676,61 @@ class Client {
     BroadcastManager.emit('ClientUpdated', this);
   }
   SetCriticalDisplays(Displays: unknown) {
-    const List: unknown[] = Array.isArray(Displays) ? Displays : [];
-    const Normalized: CriticalDisplayEntry[] = [];
+    const Normalized: CriticalDisplay[] = [];
     const Seen = new Set<string>();
-    for (const Raw of List) {
-      const Entry = AsRecord(Raw);
-      const DisplayID = normalizeDisplayID(Entry.DisplayID);
-      if (!DisplayID || Seen.has(DisplayID)) continue;
-      Seen.add(DisplayID);
-      Normalized.push({
-        DisplayID,
-        Label: Entry.Label ? String(Entry.Label) : null,
-        Width: ParseIntOrNull(Entry.Width),
-        Height: ParseIntOrNull(Entry.Height),
-        RefreshRate:
-          Entry.RefreshRate != null && Number.isFinite(Number(Entry.RefreshRate))
-            ? Math.round(Number(Entry.RefreshRate))
-            : null,
-        ScaleFactor:
-          Entry.ScaleFactor != null && Number.isFinite(Number(Entry.ScaleFactor))
-            ? Number(Entry.ScaleFactor)
-            : null,
-        Timestamp: TimestampOrNull(Entry.Timestamp),
-      });
+    for (const Raw of Array.isArray(Displays) ? Displays : []) {
+      const Entry = normalizeCriticalDisplayEntry(Raw);
+      if (!Entry || Seen.has(Entry.DisplayID)) continue;
+      Seen.add(Entry.DisplayID);
+      Normalized.push(Entry);
     }
     this.CriticalDisplays = Normalized;
-    this.CriticalDisplayIDs = Normalized.map((Entry) => Entry.DisplayID);
     this._rebuildDisplayView();
-    return;
   }
   IsDisplayCritical(DisplayID: unknown) {
     const Normalized = normalizeDisplayID(DisplayID);
     if (!Normalized) return false;
     return this.CriticalDisplayIDs.includes(Normalized);
   }
+  /**
+   * The critical entry a display id refers to, and the reported display it is
+   * matched to. The id may be the entry's own or that of the display it matched
+   * under another tier of identity; either finds the same pair.
+   */
+  FindCriticalDisplay(DisplayID: unknown): {
+    Critical: CriticalDisplay | null;
+    Live: ClientDisplay | null;
+  } {
+    const Normalized = normalizeDisplayID(DisplayID);
+    if (!Normalized) return { Critical: null, Live: null };
+    const Entry =
+      this.DisplayList.find((View) => View.Critical?.DisplayID === Normalized) ||
+      this.DisplayList.find((View) => View.IsConnected && View.DisplayID === Normalized) ||
+      null;
+    const Live =
+      Entry && Entry.IsConnected
+        ? this.ConnectedDisplayList.find(
+            (Display) => normalizeDisplayID(Display && Display.DisplayID) === Entry.DisplayID
+          ) || null
+        : null;
+    return { Critical: Entry?.Critical ?? null, Live };
+  }
+  /** Add or replace one critical entry. Returns whether it was new. */
   MarkCriticalDisplay(Display: unknown) {
-    const D = AsRecord(Display);
-    const DisplayID = normalizeDisplayID(D.DisplayID);
-    if (!DisplayID) return false;
-    const Existing = this.CriticalDisplays.find(
-      (Entry: CriticalDisplayEntry) => Entry.DisplayID === DisplayID
-    );
-    if (Existing) {
-      if (D.Label) Existing.Label = String(D.Label);
-      if (D.Width != null) Existing.Width = ParseIntOrNull(D.Width);
-      if (D.Height != null) Existing.Height = ParseIntOrNull(D.Height);
-      if (D.RefreshRate != null) {
-        Existing.RefreshRate = Number.isFinite(Number(D.RefreshRate))
-          ? Math.round(Number(D.RefreshRate))
-          : null;
-      }
-      if (D.ScaleFactor != null) {
-        Existing.ScaleFactor = Number.isFinite(Number(D.ScaleFactor))
-          ? Number(D.ScaleFactor)
-          : null;
-      }
-      if (D.Timestamp) Existing.Timestamp = TimestampOrNull(D.Timestamp);
-      this._rebuildDisplayView();
-      return false;
-    }
-    this.CriticalDisplays.push({
-      DisplayID,
-      Label: D.Label ? String(D.Label) : null,
-      Width: ParseIntOrNull(D.Width),
-      Height: ParseIntOrNull(D.Height),
-      RefreshRate:
-        D.RefreshRate != null && Number.isFinite(Number(D.RefreshRate))
-          ? Math.round(Number(D.RefreshRate))
-          : null,
-      ScaleFactor:
-        D.ScaleFactor != null && Number.isFinite(Number(D.ScaleFactor))
-          ? Number(D.ScaleFactor)
-          : null,
-      Timestamp: TimestampOrNull(D.Timestamp),
-    });
-    this.CriticalDisplayIDs = this.CriticalDisplays.map(
-      (Entry: CriticalDisplayEntry) => Entry.DisplayID
-    );
+    const Entry = normalizeCriticalDisplayEntry(Display);
+    if (!Entry) return false;
+    const Index = this.CriticalDisplays.findIndex((E) => E.DisplayID === Entry.DisplayID);
+    if (Index === -1) this.CriticalDisplays.push(Entry);
+    else this.CriticalDisplays[Index] = Entry;
     this._rebuildDisplayView();
-    return true;
+    return Index === -1;
   }
   UnmarkCriticalDisplay(DisplayID: unknown) {
     const Normalized = normalizeDisplayID(DisplayID);
     if (!Normalized) return false;
     const PrevLength = this.CriticalDisplays.length;
-    this.CriticalDisplays = this.CriticalDisplays.filter(
-      (Entry: CriticalDisplayEntry) => Entry.DisplayID !== Normalized
-    );
+    this.CriticalDisplays = this.CriticalDisplays.filter((Entry) => Entry.DisplayID !== Normalized);
     if (this.CriticalDisplays.length === PrevLength) return false;
-    this.CriticalDisplayIDs = this.CriticalDisplays.map(
-      (Entry: CriticalDisplayEntry) => Entry.DisplayID
-    );
     this._rebuildDisplayView();
     return true;
   }
@@ -960,12 +805,6 @@ class Client {
     // Each domain is only judged once the client has reported it on this
     // connection. Until then its "missing" list is an artefact of having no
     // data rather than a fault — see HasUSBTelemetry above.
-    const MissingUSBCount = this.HasUSBTelemetry
-      ? (Array.isArray(this.MissingCriticalUSBDevices)
-          ? this.MissingCriticalUSBDevices.length
-          : 0) +
-        (Array.isArray(this.MissingCriticalUSBNames) ? this.MissingCriticalUSBNames.length : 0)
-      : 0;
     const ProcessStatusState = String(
       this.RunningApplications &&
         this.RunningApplications.Status &&
@@ -980,17 +819,12 @@ class Client {
         : 0;
     const Warnings: string[] = [];
     if (MissingApplicationCount > 0) Warnings.push('Critical Application Issue');
-    if (MissingUSBCount > 0) Warnings.push('Missing USB Device');
-    const MissingDisplayCount =
-      this.HasDisplayTelemetry && Array.isArray(this.MissingCriticalDisplays)
-        ? this.MissingCriticalDisplays.length
-        : 0;
-    const MismatchedDisplayCount =
-      this.HasDisplayTelemetry && Array.isArray(this.MismatchedCriticalDisplays)
-        ? this.MismatchedCriticalDisplays.length
-        : 0;
-    if (MissingDisplayCount > 0) Warnings.push('Missing Display');
-    if (MismatchedDisplayCount > 0) Warnings.push('Display Configuration Changed');
+    if (this.HasUSBTelemetry && Array.isArray(this.USBWarnings)) {
+      Warnings.push(...this.USBWarnings);
+    }
+    if (this.HasDisplayTelemetry && Array.isArray(this.DisplayWarnings)) {
+      Warnings.push(...this.DisplayWarnings);
+    }
     if (this.HasAudioTelemetry && Array.isArray(this.AudioWarnings)) {
       Warnings.push(...this.AudioWarnings);
     }
@@ -1060,190 +894,33 @@ class Client {
     if (typeof Timer.unref === 'function') Timer.unref();
     StartupGraceTimers.set(this, Timer);
   }
-  _rebuildUSBDeviceView() {
-    const CriticalBySerial = new Map<string, CriticalUSBEntry>(
-      (Array.isArray(this.CriticalUSBDevices) ? this.CriticalUSBDevices : [])
-        .map((Entry: CriticalUSBEntry) => {
-          const SerialNumber = normalizeSerialNumber(Entry && Entry.SerialNumber);
-          if (!SerialNumber) return null;
-          return [SerialNumber, Entry];
-        })
-        .filter((Entry): Entry is [string, CriticalUSBEntry] => !!Entry)
+  _rebuildUSBDeviceView(Refresh = true) {
+    const Result = buildUSBView(
+      Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : [],
+      Array.isArray(this.CriticalUSBDevices) ? this.CriticalUSBDevices : [],
+      Array.isArray(this.CriticalUSBNames) ? this.CriticalUSBNames : [],
+      this.HasUSBTelemetry
     );
-
-    const CriticalByName = new Map<string, CriticalUSBNameEntry>(
-      (Array.isArray(this.CriticalUSBNames) ? this.CriticalUSBNames : [])
-        .map((Entry: CriticalUSBNameEntry): [string, CriticalUSBNameEntry] | null => {
-          if (!Entry || !Entry.NameKey) return null;
-          return [Entry.NameKey, Entry];
-        })
-        .filter((Entry): Entry is [string, CriticalUSBNameEntry] => !!Entry)
-    );
-
-    // Count connected devices per name key (serial-less guarding matches by
-    // name, so every connected device of a name contributes to its count).
-    const ConnectedCountByName = new Map<string, number>();
-    for (const Device of Array.isArray(this.ConnectedUSBDeviceList)
-      ? this.ConnectedUSBDeviceList
-      : []) {
-      const NameKey = normalizeUSBNameKey(
-        Device && Device.ManufacturerName,
-        Device && Device.ProductName
-      );
-      ConnectedCountByName.set(NameKey, (ConnectedCountByName.get(NameKey) || 0) + 1);
-    }
-
-    const Connected: USBDeviceViewEntry[] = (
-      Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : []
-    ).map((Device) => {
-      const SerialNumber = normalizeSerialNumber(Device && Device.SerialNumber);
-      const CriticalEntry = SerialNumber ? CriticalBySerial.get(SerialNumber) : null;
-      const NameKey = normalizeUSBNameKey(
-        Device && Device.ManufacturerName,
-        Device && Device.ProductName
-      );
-      // Name-based guarding only applies to devices without a serial (those are
-      // the ones the serial-based path cannot track).
-      const NameCriticalEntry = !SerialNumber ? CriticalByName.get(NameKey) || null : null;
-      const NameConnectedCount = NameCriticalEntry
-        ? ConnectedCountByName.get(NameKey) || 0
-        : undefined;
-      return {
-        ...(Device || {}),
-        SerialNumber: Device && Device.SerialNumber ? String(Device.SerialNumber) : null,
-        IsConnected: true,
-        IsCritical: !!CriticalEntry || !!NameCriticalEntry,
-        IsCriticalByName: !!NameCriticalEntry,
-        NameKey,
-        Quantity: NameCriticalEntry ? NameCriticalEntry.Quantity : undefined,
-        ConnectedCount: NameConnectedCount,
-        Shortfall: NameCriticalEntry
-          ? (NameConnectedCount as number) < NameCriticalEntry.Quantity
-          : undefined,
-        Missing: false,
-        ManufacturerName:
-          (Device && Device.ManufacturerName) ||
-          (CriticalEntry && CriticalEntry.ManufacturerName) ||
-          null,
-        ProductName:
-          (Device && Device.ProductName) || (CriticalEntry && CriticalEntry.ProductName) || null,
-      };
-    });
-
-    const ConnectedSerials = new Set(
-      Connected.map((Device) => normalizeSerialNumber(Device && Device.SerialNumber)).filter(
-        Boolean
-      )
-    );
-
-    const Missing: USBDeviceViewEntry[] = [];
-    for (const Entry of this.CriticalUSBDevices) {
-      if (!Entry || !Entry.SerialNumber) continue;
-      if (ConnectedSerials.has(Entry.SerialNumber)) continue;
-      Missing.push({
-        ManufacturerName: Entry.ManufacturerName,
-        ProductName: Entry.ProductName,
-        SerialNumber: Entry.SerialNumber,
-        IsConnected: false,
-        IsCritical: true,
-        Missing: true,
-      });
-    }
-
-    // Name-based shortfalls: a serial-less critical device is degraded when
-    // fewer than its expected Quantity are connected. `MissingNames` records
-    // every shortfall (drives the degraded state); `MissingNameCards` are only
-    // the fully-absent ones (0 connected) that need their own list card —
-    // partially-connected names are already represented by their connected
-    // cards, which carry the Shortfall flag.
-    const MissingNames: USBDeviceViewEntry[] = [];
-    const MissingNameCards: USBDeviceViewEntry[] = [];
-    for (const Entry of Array.isArray(this.CriticalUSBNames) ? this.CriticalUSBNames : []) {
-      if (!Entry || !Entry.NameKey) continue;
-      const ConnectedCount = ConnectedCountByName.get(Entry.NameKey) || 0;
-      if (ConnectedCount >= Entry.Quantity) continue;
-      const Record: USBDeviceViewEntry = {
-        ManufacturerName: Entry.ManufacturerName,
-        ProductName: Entry.ProductName,
-        SerialNumber: null,
-        NameKey: Entry.NameKey,
-        Quantity: Entry.Quantity,
-        ConnectedCount,
-        IsConnected: false,
-        IsCritical: true,
-        IsCriticalByName: true,
-        Shortfall: true,
-        Missing: true,
-      };
-      MissingNames.push(Record);
-      if (ConnectedCount === 0) MissingNameCards.push(Record);
-    }
-
-    this.MissingCriticalUSBDevices = Missing;
-    this.MissingCriticalUSBNames = MissingNames;
-    this.USBDeviceList = Connected.concat(Missing).concat(MissingNameCards);
-    this._refreshClientHealthState();
+    this.CriticalUSBSerials = this.CriticalUSBDevices.map((Entry) => Entry.SerialNumber);
+    this.USBDeviceList = Result.List;
+    this.MissingCriticalUSBDevices = Result.MissingDevices;
+    this.MissingCriticalUSBNames = Result.MissingNames;
+    this.USBWarnings = Result.Warnings;
+    this.USBCapabilities = Result.Capabilities;
+    if (Refresh) this._refreshClientHealthState();
   }
-  _rebuildDisplayView() {
-    const CriticalByID = new Map<string, CriticalDisplayEntry>(
-      (Array.isArray(this.CriticalDisplays) ? this.CriticalDisplays : [])
-        .map((Entry: CriticalDisplayEntry) => {
-          const DisplayID = normalizeDisplayID(Entry && Entry.DisplayID);
-          if (!DisplayID) return null;
-          return [DisplayID, Entry];
-        })
-        .filter((Entry): Entry is [string, CriticalDisplayEntry] => !!Entry)
+  _rebuildDisplayView(Refresh = true) {
+    const Result = buildDisplayView(
+      Array.isArray(this.ConnectedDisplayList) ? this.ConnectedDisplayList : [],
+      Array.isArray(this.CriticalDisplays) ? this.CriticalDisplays : [],
+      this.HasDisplayTelemetry
     );
-
-    const Connected: DisplayViewEntry[] = (
-      Array.isArray(this.ConnectedDisplayList) ? this.ConnectedDisplayList : []
-    ).map((Display) => {
-      const DisplayID = normalizeDisplayID(Display && Display.DisplayID);
-      const CriticalEntry = DisplayID ? CriticalByID.get(DisplayID) : null;
-      const CurrentSignature = buildDisplaySignature(Display);
-      const ExpectedSignature = CriticalEntry ? buildDisplaySignature(CriticalEntry) : null;
-      const Mismatch = !!CriticalEntry && ExpectedSignature !== CurrentSignature;
-      return {
-        ...(Display || {}),
-        DisplayID,
-        IsConnected: true,
-        IsCritical: !!CriticalEntry,
-        Missing: false,
-        Mismatch,
-        CurrentSignature,
-        ExpectedSignature,
-        Label: (Display && Display.Label) || (CriticalEntry && CriticalEntry.Label) || null,
-      };
-    });
-
-    const ConnectedIDs = new Set(
-      Connected.map((Display) => normalizeDisplayID(Display && Display.DisplayID)).filter(Boolean)
-    );
-
-    const Missing: DisplayViewEntry[] = [];
-    for (const Entry of this.CriticalDisplays) {
-      if (!Entry || !Entry.DisplayID) continue;
-      if (ConnectedIDs.has(normalizeDisplayID(Entry.DisplayID))) continue;
-      Missing.push({
-        DisplayID: Entry.DisplayID,
-        Label: Entry.Label || null,
-        Width: Entry.Width || null,
-        Height: Entry.Height || null,
-        RefreshRate: Entry.RefreshRate || null,
-        ScaleFactor: Entry.ScaleFactor || null,
-        IsConnected: false,
-        IsCritical: true,
-        Missing: true,
-        Mismatch: false,
-        CurrentSignature: null,
-        ExpectedSignature: buildDisplaySignature(Entry),
-      });
-    }
-
-    this.MissingCriticalDisplays = Missing;
-    this.MismatchedCriticalDisplays = Connected.filter((Display) => Display.Mismatch);
-    this.DisplayList = Connected.concat(Missing);
-    this._refreshClientHealthState();
+    this.CriticalDisplayIDs = this.CriticalDisplays.map((Entry) => Entry.DisplayID);
+    this.DisplayList = Result.List;
+    this.MissingCriticalDisplays = Result.Missing;
+    this.MismatchedCriticalDisplays = Result.Mismatched;
+    this.DisplayWarnings = Result.Warnings;
+    if (Refresh) this._refreshClientHealthState();
   }
   _rebuildRunningApplicationsView() {
     const Observed = Array.isArray(this.ObservedRunningApplications?.Items)

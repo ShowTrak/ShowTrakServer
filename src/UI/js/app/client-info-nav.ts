@@ -1,52 +1,58 @@
-// The Client Info modal's left-hand tab rail. #SHOWTRAK_CLIENT_INFO is shared
-// with the monitor, dummy and FreeKiosk views, so the rail is only switched on
-// for real clients (RenderMonitoringHistoryModal decides which); everything else
-// keeps the single status pane. Each pane carries `data-client-info-tab`.
+// The view modal's left-hand tab rail. #SHOWTRAK_CLIENT_INFO is shared by
+// clients, monitoring targets, dummy clients and FreeKiosk terminals; each kind
+// gets its own set of tabs (see lib/client-info-tabs). Each pane carries
+// `data-client-info-tab`. Some panes are static markup and some are rebuilt on
+// every render (the FreeKiosk ones), so RefreshClientInfoTabs is called after a
+// render to hide whatever is not on the active tab.
 import {
+  ClientInfoTabsFor,
   AvailableClientInfoTabs,
-  CLIENT_INFO_TABS,
   DEFAULT_CLIENT_INFO_TAB,
   ResolveClientInfoTab,
 } from './lib/client-info-tabs';
-import type { ClientInfoTabKey } from './lib/client-info-tabs';
+import type { ClientInfoKind, ClientInfoTabKey } from './lib/client-info-tabs';
 import { Safe } from './utils';
 
-let Tabbed = false;
-let Integrated = false;
+let Kind: ClientInfoKind = 'client';
+let RenderedKind: ClientInfoKind | null = null;
 let ActiveTab: ClientInfoTabKey = DEFAULT_CLIENT_INFO_TAB;
 
-// The rail's buttons never change, so they are built once on first use.
+// The rail's buttons only change with the kind, so they are rebuilt on a kind
+// change rather than on every render.
 function EnsureClientInfoNav() {
   const $nav = $('#CLIENT_INFO_NAV');
-  if (!$nav.length || $nav.children().length) return;
-  for (const Tab of CLIENT_INFO_TABS) {
-    $nav.append(
-      `<button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-client-info-tab-target="${Safe(Tab.Key)}">${Safe(Tab.Title)}</button>`
-    );
+  if (!$nav.length) return;
+  if (!$nav.data('bound')) {
+    $nav.on('click', '.settings-nav-item', function () {
+      const Key = this.getAttribute('data-client-info-tab-target');
+      if (Key === ActiveTab) return;
+      ActiveTab = ResolveClientInfoTab(Key, Kind);
+      RefreshClientInfoTabs();
+      // A new pane starts at its top, not wherever the last one was scrolled to.
+      $('#CLIENT_INFO_CONTENT').scrollTop(0);
+    });
+    $nav.data('bound', true);
   }
-  $nav.on('click', '.settings-nav-item', function () {
-    const Key = this.getAttribute('data-client-info-tab-target');
-    if (Key === ActiveTab) return;
-    ActiveTab = ResolveClientInfoTab(Key, Integrated);
-    ApplyClientInfoTabs();
-    // A new pane starts at its top, not wherever the last one was scrolled to.
-    $('#CLIENT_INFO_CONTENT').scrollTop(0);
-  });
+  if (RenderedKind === Kind) return;
+  RenderedKind = Kind;
+  $nav.html(
+    ClientInfoTabsFor(Kind)
+      .map(
+        (Tab) =>
+          `<button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-client-info-tab-target="${Safe(Tab.Key)}">${Safe(Tab.Title)}</button>`
+      )
+      .join('')
+  );
 }
 
-function ApplyClientInfoTabs() {
+/** Show the active tab's panes and mark its rail button. */
+export function RefreshClientInfoTabs() {
   EnsureClientInfoNav();
-  const $panes = $('#CLIENT_INFO_CONTENT [data-client-info-tab]');
-  $('#SHOWTRAK_CLIENT_INFO .modal-body').toggleClass('is-tabbed', Tabbed);
-  $('#CLIENT_INFO_NAV').toggleClass('d-none', !Tabbed);
+  $('#SHOWTRAK_CLIENT_INFO .modal-body').addClass('is-tabbed');
+  $('#CLIENT_INFO_NAV').removeClass('d-none');
 
-  if (!Tabbed) {
-    $panes.removeClass('is-inactive-tab');
-    return;
-  }
-
-  ActiveTab = ResolveClientInfoTab(ActiveTab, Integrated);
-  const Available: string[] = AvailableClientInfoTabs(Integrated);
+  ActiveTab = ResolveClientInfoTab(ActiveTab, Kind);
+  const Available: string[] = AvailableClientInfoTabs(Kind);
   $('#CLIENT_INFO_NAV .settings-nav-item').each(function () {
     const Key = this.getAttribute('data-client-info-tab-target') || '';
     const IsActive = Key === ActiveTab;
@@ -55,24 +61,18 @@ function ApplyClientInfoTabs() {
       .toggleClass('active', IsActive)
       .attr('aria-selected', IsActive ? 'true' : 'false');
   });
-  $panes.each(function () {
+  $('#CLIENT_INFO_CONTENT [data-client-info-tab]').each(function () {
     $(this).toggleClass('is-inactive-tab', this.getAttribute('data-client-info-tab') !== ActiveTab);
   });
 }
 
-/** Rail on for a real client, off for the other entities sharing the modal. */
-export function SetClientInfoTabbed(On: boolean) {
-  Tabbed = On;
-  ApplyClientInfoTabs();
+/** Which entity the modal is showing, and so which tabs the rail offers. */
+export function SetClientInfoKind(Next: ClientInfoKind) {
+  Kind = Next;
+  RefreshClientInfoTabs();
 }
 
-/** Integrated (SDK) clients only have the Status and Info tabs. */
-export function SetClientInfoIntegrated(On: boolean) {
-  Integrated = On;
-  ApplyClientInfoTabs();
-}
-
-/** Each newly opened client starts on the first tab. */
+/** Each newly opened entity starts on the first tab. */
 export function ResetClientInfoTab() {
   ActiveTab = DEFAULT_CLIENT_INFO_TAB;
   $('#CLIENT_INFO_CONTENT').scrollTop(0);
