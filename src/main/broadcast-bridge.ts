@@ -759,6 +759,10 @@ function RegisterBroadcastBridge(): void {
   BroadcastManager.on('ScriptExecutionUpdated', UpdateScriptExecutions);
   BroadcastManager.on('AlertRuleListChanged', UpdateAlertRuleList);
   BroadcastManager.on('TagListChanged', UpdateTagList);
+  // Starring or unstarring a check action. The manager emits on every change;
+  // without this the list only reached the renderers in the start-up state, so
+  // the star and the right-click menu stayed stale until a restart.
+  BroadcastManager.on('SetFullMonitoringActionFavouriteList', UpdateMonitoringActionFavouriteList);
   BroadcastManager.on('VariableListChanged', UpdateVariableList);
   // FOG: the poller emits FogTasksUpdated on any state change and FogStatusChanged
   // when the connection comes up or goes down. Status is pushed alongside the task

@@ -197,7 +197,11 @@ const restore = installModuleMocks([
   {
     match: matchesModule('/Modules/MonitoringActionFavourites'),
     value: {
-      Manager: { Init: async () => {}, Reload: async () => {}, GetAll: () => [] },
+      Manager: {
+        Init: async () => {},
+        Reload: async () => {},
+        GetAll: () => state.favourites || [],
+      },
     },
   },
   { match: matchesModule('/Modules/AlertsManager'), value: { Manager: alertsMgr } },
@@ -253,6 +257,7 @@ function reset() {
   state.alertsReject = false;
   state.deployRejects = false;
   state.orphanResult = [null];
+  state.favourites = [];
   pushes.length = 0;
   logs.errors.length = 0;
   deployments.trigger.length = 0;
@@ -323,6 +328,21 @@ test('every list refresh is a no-op without a main window', async () => {
   assert.deepEqual(pushes, []);
   // And no manager was queried either — the guard is the first statement.
   assert.equal(clientMgr.__callsTo('GetAll').length, 0);
+});
+
+test('starring a check action pushes the favourite list to the renderers', async () => {
+  // The manager emits this on every star/unstar. Before it was subscribed, the
+  // list only arrived in the start-up state: the star and the right-click menu
+  // stayed stale until a restart.
+  state.favourites = [{ FavouriteID: 7, Method: 'pjlink', ActionID: 'power.on' }];
+  await emit('SetFullMonitoringActionFavouriteList', state.favourites);
+  assert.deepEqual(pushes, [['SetFullMonitoringActionFavouriteList', state.favourites]]);
+});
+
+test('a favourite change with no main window pushes nothing', async () => {
+  state.hasWindow = false;
+  await emit('SetFullMonitoringActionFavouriteList', []);
+  assert.deepEqual(pushes, []);
 });
 
 test('UpdateFullClientList pushes clients and groups together and syncs history', async () => {
