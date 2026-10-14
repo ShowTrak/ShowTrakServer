@@ -39,6 +39,7 @@ import {
   ClearClientInfoAudio,
   RenderClientInfoAudio,
 } from './client-info-audio';
+import { ResetClientInfoTab, SetClientInfoIntegrated } from './client-info-nav';
 
 // The renderer-facing DisplayList is enriched in-place by the client's
 // critical-marking machinery with connection/mismatch annotations that the
@@ -108,6 +109,7 @@ export async function OpenClientInfo(UUID: string) {
 
   window.__ClientInfoNetFamily = 'IPv4';
 
+  ResetClientInfoTab();
   RenderClientInfoDetails(Client);
 
   // Drive the shared status-timeline graph (same modal used by monitoring
@@ -377,6 +379,7 @@ export function RenderClientInfoDetails(Client: ClientView) {
     $('#CLIENT_INFO_AUDIO_OUTPUTS_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_NETWORK_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_RUNNING_APPS_SECTION').toggleClass('d-none', IsIntegrated);
+    SetClientInfoIntegrated(IsIntegrated);
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
   }

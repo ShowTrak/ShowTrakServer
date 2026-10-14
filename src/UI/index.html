@@ -2769,249 +2769,309 @@ Loading licence...</pre>
       aria-labelledby="SHOWTRAK_CLIENT_INFO_Label"
       aria-hidden="true"
     >
-      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div id="CLIENT_INFO_HEADER"></div>
+            <div id="CLIENT_INFO_HEADER" class="mb-2"></div>
 
-            <div id="CLIENT_INFO_HISTORY_SECTION" class="mt-2">
-              <div class="monitor-history-header">
-                <span class="monitor-history-window-label">Status over the past hour</span>
-                <div class="monitor-history-legend" aria-hidden="true">
-                  <span><i class="status-dot status-dot-online"></i>Online</span>
-                  <span><i class="status-dot status-dot-degraded"></i>Degraded</span>
-                  <span><i class="status-dot status-dot-offline"></i>Offline</span>
-                  <span><i class="status-dot status-dot-idle"></i>Idle</span>
-                </div>
-              </div>
+            <!-- Clients get a left-hand tab rail (one pane visible at a time);
+                 monitors, dummies and FreeKiosk terminals show only the status
+                 pane and no rail. The header and Close stay pinned either way. -->
+            <div id="CLIENT_INFO_LAYOUT" class="client-info-layout">
+              <nav
+                id="CLIENT_INFO_NAV"
+                class="settings-nav client-info-nav d-none"
+                role="tablist"
+                aria-label="Client info sections"
+              ></nav>
+              <div id="CLIENT_INFO_CONTENT" class="client-info-content">
+                <div id="CLIENT_INFO_HISTORY_SECTION" data-client-info-tab="status">
+                  <div class="monitor-history-header">
+                    <span class="monitor-history-window-label">Status over the past hour</span>
+                    <div class="monitor-history-legend" aria-hidden="true">
+                      <span><i class="status-dot status-dot-online"></i>Online</span>
+                      <span><i class="status-dot status-dot-degraded"></i>Degraded</span>
+                      <span><i class="status-dot status-dot-offline"></i>Offline</span>
+                      <span><i class="status-dot status-dot-idle"></i>Idle</span>
+                    </div>
+                  </div>
 
-              <div id="MONITOR_HISTORY_TIMELINES" class="monitor-history-timelines mt-2"></div>
+                  <div id="MONITOR_HISTORY_TIMELINES" class="monitor-history-timelines mt-2"></div>
 
-              <div class="mt-2">
-                <button
-                  type="button"
-                  class="btn btn-light w-100 d-none"
-                  id="MONITOR_HISTORY_EDIT_BUTTON"
-                  data-target-id=""
-                >
-                  Edit
-                </button>
-              </div>
-            </div>
+                  <div class="mt-2">
+                    <button
+                      type="button"
+                      class="btn btn-light w-100 d-none"
+                      id="MONITOR_HISTORY_EDIT_BUTTON"
+                      data-target-id=""
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
 
-            <div id="CLIENT_INFO_DETAILS_SECTION" class="d-grid gap-2 mt-2">
-              <div class="form-floating has-copy">
-                <input
-                  type="text"
-                  class="form-control disabled"
-                  id="CLIENT_INFO_NICKNAME"
-                  disabled
-                />
-                <label for="CLIENT_INFO_NICKNAME">Nickname</label>
-                <button
-                  type="button"
-                  class="copy-field-btn"
-                  data-target="#CLIENT_INFO_NICKNAME"
-                  title="Copy"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
-              </div>
-              <div class="form-floating has-copy">
-                <input
-                  type="text"
-                  class="form-control disabled"
-                  id="CLIENT_INFO_HOSTNAME"
-                  disabled
-                />
-                <label for="CLIENT_INFO_HOSTNAME">Hostname</label>
-                <button
-                  type="button"
-                  class="copy-field-btn"
-                  data-target="#CLIENT_INFO_HOSTNAME"
-                  title="Copy"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
-              </div>
-              <div class="form-floating has-copy">
-                <input
-                  type="text"
-                  class="form-control disabled"
-                  id="CLIENT_INFO_OPERATING_SYSTEM"
-                  disabled
-                />
-                <label for="CLIENT_INFO_OPERATING_SYSTEM">Operating System</label>
-                <button
-                  type="button"
-                  class="copy-field-btn"
-                  data-target="#CLIENT_INFO_OPERATING_SYSTEM"
-                  title="Copy"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
-              </div>
-              <div class="form-floating">
-                <input type="text" class="form-control disabled" id="CLIENT_INFO_GROUP" disabled />
-                <label for="CLIENT_INFO_GROUP">Group</label>
-              </div>
-              <div class="form-floating has-copy">
-                <input type="text" class="form-control disabled" id="CLIENT_INFO_IP" disabled />
-                <label for="CLIENT_INFO_IP">IP</label>
-                <button
-                  type="button"
-                  class="copy-field-btn"
-                  data-target="#CLIENT_INFO_IP"
-                  title="Copy"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
-              </div>
-              <div class="form-floating has-copy d-none" id="CLIENT_INFO_MAC_WRAPPER">
-                <input type="text" class="form-control disabled" id="CLIENT_INFO_MAC" disabled />
-                <label for="CLIENT_INFO_MAC">MAC Address</label>
-                <button
-                  type="button"
-                  class="copy-field-btn"
-                  data-target="#CLIENT_INFO_MAC"
-                  title="Copy"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
-              </div>
-              <div class="form-floating has-copy">
-                <input type="text" class="form-control disabled" id="CLIENT_INFO_UUID" disabled />
-                <label for="CLIENT_INFO_UUID">Client ID</label>
-                <button
-                  type="button"
-                  class="copy-field-btn"
-                  data-target="#CLIENT_INFO_UUID"
-                  title="Copy"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
-              </div>
-              <div class="form-floating has-copy">
-                <input
-                  type="text"
-                  class="form-control disabled"
-                  id="CLIENT_INFO_VERSION"
-                  disabled
-                />
-                <label for="CLIENT_INFO_VERSION">Client Version</label>
-                <button
-                  type="button"
-                  class="copy-field-btn"
-                  data-target="#CLIENT_INFO_VERSION"
-                  title="Copy"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
-              </div>
-              <div class="form-floating">
-                <input type="text" class="form-control disabled" id="CLIENT_INFO_STATUS" disabled />
-                <label for="CLIENT_INFO_STATUS">Status</label>
-              </div>
-              <div class="rounded-3 p-2 bg-ghost-light">
-                <h6 class="mb-0">Usage</h6>
-              </div>
-              <div id="CLIENT_INFO_VITALS" class="d-grid gap-2">
-                <div class="text-sm d-flex justify-content-between">
-                  <span>CPU</span>
-                  <span id="CLIENT_INFO_CPU_LABEL">0%</span>
-                </div>
-                <div class="progress">
-                  <div
-                    id="CLIENT_INFO_CPU_BAR"
-                    class="progress-bar bg-white"
-                    role="progressbar"
-                    style="width: 0%"
-                  ></div>
-                </div>
-                <div class="text-sm d-flex justify-content-between">
-                  <span>RAM</span>
-                  <span id="CLIENT_INFO_RAM_LABEL">0%</span>
-                </div>
-                <div class="progress">
-                  <div
-                    id="CLIENT_INFO_RAM_BAR"
-                    class="progress-bar bg-white"
-                    role="progressbar"
-                    style="width: 0%"
-                  ></div>
-                </div>
-              </div>
-              <!-- Read-only mirror of the tiles' badges. Sits directly under the
+                <div id="CLIENT_INFO_DETAILS_SECTION" class="d-grid gap-2">
+                  <div class="d-grid gap-2" data-client-info-tab="info">
+                    <div class="form-floating has-copy">
+                      <input
+                        type="text"
+                        class="form-control disabled"
+                        id="CLIENT_INFO_NICKNAME"
+                        disabled
+                      />
+                      <label for="CLIENT_INFO_NICKNAME">Nickname</label>
+                      <button
+                        type="button"
+                        class="copy-field-btn"
+                        data-target="#CLIENT_INFO_NICKNAME"
+                        title="Copy"
+                      >
+                        <i class="bi bi-clipboard"></i>
+                      </button>
+                    </div>
+                    <div class="form-floating has-copy">
+                      <input
+                        type="text"
+                        class="form-control disabled"
+                        id="CLIENT_INFO_HOSTNAME"
+                        disabled
+                      />
+                      <label for="CLIENT_INFO_HOSTNAME">Hostname</label>
+                      <button
+                        type="button"
+                        class="copy-field-btn"
+                        data-target="#CLIENT_INFO_HOSTNAME"
+                        title="Copy"
+                      >
+                        <i class="bi bi-clipboard"></i>
+                      </button>
+                    </div>
+                    <div class="form-floating has-copy">
+                      <input
+                        type="text"
+                        class="form-control disabled"
+                        id="CLIENT_INFO_OPERATING_SYSTEM"
+                        disabled
+                      />
+                      <label for="CLIENT_INFO_OPERATING_SYSTEM">Operating System</label>
+                      <button
+                        type="button"
+                        class="copy-field-btn"
+                        data-target="#CLIENT_INFO_OPERATING_SYSTEM"
+                        title="Copy"
+                      >
+                        <i class="bi bi-clipboard"></i>
+                      </button>
+                    </div>
+                    <div class="form-floating">
+                      <input
+                        type="text"
+                        class="form-control disabled"
+                        id="CLIENT_INFO_GROUP"
+                        disabled
+                      />
+                      <label for="CLIENT_INFO_GROUP">Group</label>
+                    </div>
+                    <div class="form-floating has-copy">
+                      <input
+                        type="text"
+                        class="form-control disabled"
+                        id="CLIENT_INFO_IP"
+                        disabled
+                      />
+                      <label for="CLIENT_INFO_IP">IP</label>
+                      <button
+                        type="button"
+                        class="copy-field-btn"
+                        data-target="#CLIENT_INFO_IP"
+                        title="Copy"
+                      >
+                        <i class="bi bi-clipboard"></i>
+                      </button>
+                    </div>
+                    <div class="form-floating has-copy d-none" id="CLIENT_INFO_MAC_WRAPPER">
+                      <input
+                        type="text"
+                        class="form-control disabled"
+                        id="CLIENT_INFO_MAC"
+                        disabled
+                      />
+                      <label for="CLIENT_INFO_MAC">MAC Address</label>
+                      <button
+                        type="button"
+                        class="copy-field-btn"
+                        data-target="#CLIENT_INFO_MAC"
+                        title="Copy"
+                      >
+                        <i class="bi bi-clipboard"></i>
+                      </button>
+                    </div>
+                    <div class="form-floating has-copy">
+                      <input
+                        type="text"
+                        class="form-control disabled"
+                        id="CLIENT_INFO_UUID"
+                        disabled
+                      />
+                      <label for="CLIENT_INFO_UUID">Client ID</label>
+                      <button
+                        type="button"
+                        class="copy-field-btn"
+                        data-target="#CLIENT_INFO_UUID"
+                        title="Copy"
+                      >
+                        <i class="bi bi-clipboard"></i>
+                      </button>
+                    </div>
+                    <div class="form-floating has-copy">
+                      <input
+                        type="text"
+                        class="form-control disabled"
+                        id="CLIENT_INFO_VERSION"
+                        disabled
+                      />
+                      <label for="CLIENT_INFO_VERSION">Client Version</label>
+                      <button
+                        type="button"
+                        class="copy-field-btn"
+                        data-target="#CLIENT_INFO_VERSION"
+                        title="Copy"
+                      >
+                        <i class="bi bi-clipboard"></i>
+                      </button>
+                    </div>
+                    <div class="form-floating">
+                      <input
+                        type="text"
+                        class="form-control disabled"
+                        id="CLIENT_INFO_STATUS"
+                        disabled
+                      />
+                      <label for="CLIENT_INFO_STATUS">Status</label>
+                    </div>
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Usage</h6>
+                    </div>
+                    <div id="CLIENT_INFO_VITALS" class="d-grid gap-2">
+                      <div class="text-sm d-flex justify-content-between">
+                        <span>CPU</span>
+                        <span id="CLIENT_INFO_CPU_LABEL">0%</span>
+                      </div>
+                      <div class="progress">
+                        <div
+                          id="CLIENT_INFO_CPU_BAR"
+                          class="progress-bar bg-white"
+                          role="progressbar"
+                          style="width: 0%"
+                        ></div>
+                      </div>
+                      <div class="text-sm d-flex justify-content-between">
+                        <span>RAM</span>
+                        <span id="CLIENT_INFO_RAM_LABEL">0%</span>
+                      </div>
+                      <div class="progress">
+                        <div
+                          id="CLIENT_INFO_RAM_BAR"
+                          class="progress-bar bg-white"
+                          role="progressbar"
+                          style="width: 0%"
+                        ></div>
+                      </div>
+                    </div>
+                    <!-- Read-only mirror of the tiles' badges. Sits directly under the
                    usage charts so the operator sees what a machine IS right
                    after what it is DOING. Hidden when it carries no tags. -->
-              <div id="CLIENT_INFO_TAGS_SECTION" class="d-grid gap-2 d-none">
-                <div class="rounded-3 p-2 bg-ghost-light">
-                  <h6 class="mb-0">Tags</h6>
-                </div>
-                <div id="CLIENT_INFO_TAGS" class="tag-picker-list is-readonly"></div>
-              </div>
-              <div id="CLIENT_INFO_USB_SECTION" class="d-grid gap-2">
-                <div class="rounded-3 p-2 bg-ghost-light">
-                  <h6 class="mb-0">Connected USB Devices</h6>
-                </div>
-                <div id="SHOWTRAK_CLIENT_INFO_USB_DEVICES" class="d-grid gap-2"></div>
-              </div>
+                    <div id="CLIENT_INFO_TAGS_SECTION" class="d-grid gap-2 d-none">
+                      <div class="rounded-3 p-2 bg-ghost-light">
+                        <h6 class="mb-0">Tags</h6>
+                      </div>
+                      <div id="CLIENT_INFO_TAGS" class="tag-picker-list is-readonly"></div>
+                    </div>
+                  </div>
+                  <div id="CLIENT_INFO_USB_SECTION" class="d-grid gap-2" data-client-info-tab="usb">
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Connected USB Devices</h6>
+                    </div>
+                    <div id="SHOWTRAK_CLIENT_INFO_USB_DEVICES" class="d-grid gap-2"></div>
+                  </div>
 
-              <div id="CLIENT_INFO_DISPLAYS_SECTION" class="d-grid gap-2">
-                <div class="rounded-3 p-2 bg-ghost-light">
-                  <h6 class="mb-0">Displays</h6>
-                </div>
-                <div id="SHOWTRAK_CLIENT_INFO_DISPLAYS" class="d-grid gap-2"></div>
-              </div>
-
-              <div id="CLIENT_INFO_AUDIO_INPUTS_SECTION" class="d-grid gap-2">
-                <div class="rounded-3 p-2 bg-ghost-light">
-                  <h6 class="mb-0">Audio Inputs</h6>
-                </div>
-                <div id="SHOWTRAK_CLIENT_INFO_AUDIO_INPUTS" class="d-grid gap-2"></div>
-              </div>
-
-              <div id="CLIENT_INFO_AUDIO_OUTPUTS_SECTION" class="d-grid gap-2">
-                <div class="rounded-3 p-2 bg-ghost-light">
-                  <h6 class="mb-0">Audio Outputs</h6>
-                </div>
-                <div id="SHOWTRAK_CLIENT_INFO_AUDIO_OUTPUTS" class="d-grid gap-2"></div>
-              </div>
-
-              <div id="CLIENT_INFO_NETWORK_SECTION" class="d-grid gap-2">
-                <div class="rounded-3 p-2 bg-ghost-light">
-                  <h6 class="mb-0">Network Interfaces</h6>
-                </div>
-                <div class="btn-group w-100" role="group" aria-label="Network family filter">
-                  <button
-                    type="button"
-                    id="SHOWTRAK_CLIENT_INFO_NET_FAMILY_V4"
-                    class="btn btn-light"
-                    aria-pressed="true"
+                  <div
+                    id="CLIENT_INFO_DISPLAYS_SECTION"
+                    class="d-grid gap-2"
+                    data-client-info-tab="video"
                   >
-                    IPv4
-                  </button>
-                  <button
-                    type="button"
-                    id="SHOWTRAK_CLIENT_INFO_NET_FAMILY_V6"
-                    class="btn btn-outline-light"
-                    aria-pressed="false"
-                  >
-                    IPv6
-                  </button>
-                </div>
-                <div id="SHOWTRAK_CLIENT_INFO_NET_INTERFACES" class="d-grid gap-2"></div>
-              </div>
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Displays</h6>
+                    </div>
+                    <div id="SHOWTRAK_CLIENT_INFO_DISPLAYS" class="d-grid gap-2"></div>
+                  </div>
 
-              <div id="CLIENT_INFO_RUNNING_APPS_SECTION" class="d-grid gap-2">
-                <div class="rounded-3 p-2 bg-ghost-light">
-                  <h6 class="mb-0">Running Applications</h6>
+                  <div
+                    id="CLIENT_INFO_AUDIO_INPUTS_SECTION"
+                    class="d-grid gap-2"
+                    data-client-info-tab="audio"
+                  >
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Audio Inputs</h6>
+                    </div>
+                    <div id="SHOWTRAK_CLIENT_INFO_AUDIO_INPUTS" class="d-grid gap-2"></div>
+                  </div>
+
+                  <div
+                    id="CLIENT_INFO_AUDIO_OUTPUTS_SECTION"
+                    class="d-grid gap-2"
+                    data-client-info-tab="audio"
+                  >
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Audio Outputs</h6>
+                    </div>
+                    <div id="SHOWTRAK_CLIENT_INFO_AUDIO_OUTPUTS" class="d-grid gap-2"></div>
+                  </div>
+
+                  <div
+                    id="CLIENT_INFO_NETWORK_SECTION"
+                    class="d-grid gap-2"
+                    data-client-info-tab="network"
+                  >
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Network Interfaces</h6>
+                    </div>
+                    <div class="btn-group w-100" role="group" aria-label="Network family filter">
+                      <button
+                        type="button"
+                        id="SHOWTRAK_CLIENT_INFO_NET_FAMILY_V4"
+                        class="btn btn-light"
+                        aria-pressed="true"
+                      >
+                        IPv4
+                      </button>
+                      <button
+                        type="button"
+                        id="SHOWTRAK_CLIENT_INFO_NET_FAMILY_V6"
+                        class="btn btn-outline-light"
+                        aria-pressed="false"
+                      >
+                        IPv6
+                      </button>
+                    </div>
+                    <div id="SHOWTRAK_CLIENT_INFO_NET_INTERFACES" class="d-grid gap-2"></div>
+                  </div>
+
+                  <div
+                    id="CLIENT_INFO_RUNNING_APPS_SECTION"
+                    class="d-grid gap-2"
+                    data-client-info-tab="apps"
+                  >
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Running Applications</h6>
+                    </div>
+                    <div id="SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS" class="d-grid gap-2"></div>
+                  </div>
                 </div>
-                <div id="SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS" class="d-grid gap-2"></div>
               </div>
             </div>
 
-            <div class="row g-2 mt-0">
+            <div class="row g-2 mt-2">
               <div class="col-12 d-grid">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
               </div>

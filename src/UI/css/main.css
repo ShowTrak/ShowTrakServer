@@ -1415,6 +1415,45 @@ input[type='range']::-moz-range-progress,
   scroll-margin-top: 0.25rem;
 }
 
+/* Client Info modal: the header (device name + close) and the Close button stay
+   pinned while the pane between them scrolls. Clients add the settings-style
+   rail on the left, but as true tabs (one pane shown at a time) rather than
+   jump links, and get a fixed height so switching tabs does not resize the
+   dialog. Monitors, dummies and FreeKiosk terminals show no rail. */
+#SHOWTRAK_CLIENT_INFO .modal-body {
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  overflow: hidden;
+}
+
+#SHOWTRAK_CLIENT_INFO .modal-body.is-tabbed {
+  height: min(85vh, 46rem);
+}
+
+.client-info-layout {
+  display: flex;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.client-info-nav {
+  flex-basis: 10rem;
+}
+
+.client-info-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.client-info-content [data-client-info-tab].is-inactive-tab {
+  display: none !important;
+}
+
 .GROUP_TITLE {
   writing-mode: vertical-rl;
   transform: rotate(180deg);

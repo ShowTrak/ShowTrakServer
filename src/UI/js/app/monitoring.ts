@@ -33,6 +33,7 @@ import type {
 import { HandleNonFatalError, Safe } from './utils';
 import { AudioTimelineLiveState } from './lib/audio-devices';
 import { openModal } from './lib/modal';
+import { SetClientInfoTabbed } from './client-info-nav';
 import {
   LoadFreeKioskCameras,
   RenderFreeKioskModal,
@@ -979,6 +980,7 @@ export function RenderMonitoringHistoryModal() {
   // status timeline. RenderClientInfoDetails owns the per-section gating for
   // integrated clients within the details block.
   $('#CLIENT_INFO_DETAILS_SECTION').toggleClass('d-none', Entity.type !== 'client');
+  SetClientInfoTabbed(Entity.type === 'client');
   UpdateMonitorHistoryEditButtonVisibility();
 
   const $timelines = $('#MONITOR_HISTORY_TIMELINES');
