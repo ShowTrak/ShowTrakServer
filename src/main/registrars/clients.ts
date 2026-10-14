@@ -13,6 +13,7 @@ import type {
   CriticalApplicationPayloadResult,
   CriticalDisplayPayloadResult,
   CriticalAudioDevicePayloadResult,
+  CriticalNetworkInterfacePayloadResult,
   AudioLevelRequestResult,
 } from '../../Modules/IPCValidation';
 import { Manager as ClientManager } from '../../Modules/ClientManager';
@@ -168,6 +169,29 @@ function register(): void {
       ],
       (UUID: string, EndpointID: string) =>
         ClientManager.RemoveAudioDeviceCritical(UUID, EndpointID)
+    )
+  );
+
+  RPC.handle(
+    'MarkClientNetworkInterfaceCritical',
+    createTupleHandler<[string, CriticalNetworkInterfacePayloadResult], unknown>(
+      (UUID: unknown, Interface: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.CriticalNetworkInterfacePayload(Interface),
+      ],
+      (UUID: string, Interface: CriticalNetworkInterfacePayloadResult) =>
+        ClientManager.MarkNetworkInterfaceCritical(UUID, Interface)
+    )
+  );
+
+  RPC.handle(
+    'RemoveClientNetworkInterfaceCritical',
+    createTupleHandler<[string, string], unknown>(
+      (UUID: unknown, Name: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.NetworkInterfaceName(Name),
+      ],
+      (UUID: string, Name: string) => ClientManager.RemoveNetworkInterfaceCritical(UUID, Name)
     )
   );
 

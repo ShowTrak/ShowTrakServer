@@ -33,21 +33,33 @@ import {
   normalizeEndpointID,
   resolveCriticalAudioEntry,
 } from './audio';
+import {
+  normalizeCriticalNetworkEntry,
+  normalizeInterfaceName,
+  resolveCriticalNetworkEntry,
+} from './network';
 import type {
   CriticalUSBDeviceRow,
   CriticalUSBDeviceNameRow,
   CriticalApplicationRow,
   CriticalDisplayRow,
   CriticalAudioDeviceRow,
+  CriticalNetworkInterfaceRow,
   ClientMacAddressRow,
 } from '../DB/rows';
-import type { CriticalAudioDevice, HeartbeatPayload, USBDevice } from '@showtrak/protocol';
+import type {
+  CriticalAudioDevice,
+  CriticalNetworkInterface,
+  HeartbeatPayload,
+  USBDevice,
+} from '@showtrak/protocol';
 import type {
   CriticalUSBDevicePayloadResult,
   CriticalUSBNamePayloadResult,
   CriticalApplicationPayloadResult,
   CriticalDisplayPayloadResult,
   CriticalAudioDevicePayloadResult,
+  CriticalNetworkInterfacePayloadResult,
 } from '../IPCValidation';
 
 // One entry of the `SystemInfo` MAC-address map: the client reports each
@@ -130,6 +142,12 @@ export interface ClientManagerType {
     Device: CriticalAudioDevicePayloadResult
   ): Promise<Result<boolean>>;
   RemoveAudioDeviceCritical(UUID: string, EndpointID: unknown): Promise<Result<boolean>>;
+  // Mark a network interface critical or update its conditions; Ok(true) when newly marked.
+  MarkNetworkInterfaceCritical(
+    UUID: string,
+    Interface: CriticalNetworkInterfacePayloadResult
+  ): Promise<Result<boolean>>;
+  RemoveNetworkInterfaceCritical(UUID: string, Name: unknown): Promise<Result<boolean>>;
   // Per-client MAC addresses (the Wake-on-LAN target set). Add resolves to
   // Ok(true) when a new address was stored, Ok(false) when it was already on
   // file or was a reported address filtered out as non-external.
@@ -196,6 +214,7 @@ function applyCriticalState(Entity: Client): Client {
   CriticalApplications.applyState(Entity);
   CriticalDisplays.applyState(Entity);
   CriticalAudio.applyState(Entity);
+  CriticalNetwork.applyState(Entity);
   MacAddresses.applyState(Entity);
   return Entity;
 }
@@ -396,6 +415,17 @@ const CriticalAudio = makeCriticalIndex<CriticalAudioDeviceRow, CriticalAudioDev
     return { UUID, Key: Entry.EndpointID, Entry };
   },
   apply: (client, entries) => client.SetCriticalAudioDevices(entries),
+});
+
+const CriticalNetwork = makeCriticalIndex<CriticalNetworkInterfaceRow, CriticalNetworkInterface>({
+  loadAll: () => CriticalRepo.LoadAllNetwork(),
+  fromRow: (Row) => {
+    const UUID = Row && Row.UUID ? String(Row.UUID) : '';
+    const Entry = normalizeCriticalNetworkEntry(Row);
+    if (!UUID || !Entry) return null;
+    return { UUID, Key: Entry.Name, Entry };
+  },
+  apply: (client, entries) => client.SetCriticalNetworkInterfaces(entries),
 });
 
 Manager.Timeout = async (UUID: string) => {
@@ -946,6 +976,66 @@ Manager.RemoveAudioDeviceCritical = async (UUID: string, EndpointID: unknown) =>
   return Ok(true);
 };
 
+Manager.MarkNetworkInterfaceCritical = async (
+  UUID: string,
+  Interface: CriticalNetworkInterfacePayloadResult
+) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+  const Name = normalizeInterfaceName(Interface && Interface.Name);
+  if (!Name) return Fail('Network interface name is required');
+
+  const Live = Target.NetworkInterfaces.find((Entry) => Entry.name === Name) || null;
+  const Existing = CriticalNetwork.getForClient(UUID, false)?.get(Name) || null;
+  const [ResolveErr, Entry] = resolveCriticalNetworkEntry(
+    Name,
+    Interface,
+    Live,
+    Existing,
+    Target.NetworkStatus.Capabilities,
+    Date.now()
+  );
+  if (ResolveErr || !Entry) {
+    return Fail(ResolveErr || 'Failed to resolve critical network interface');
+  }
+
+  const [WriteErr] = await CriticalRepo.MarkNetwork({
+    UUID,
+    Name: Entry.Name,
+    MAC: Entry.MAC,
+    RequirePresent: Entry.RequirePresent ? 1 : 0,
+    Address: Entry.Address,
+    RangeStart: Entry.RangeStart,
+    RangeEnd: Entry.RangeEnd,
+    Netmask: Entry.Netmask,
+    Gateway: Entry.Gateway,
+    Timestamp: Entry.Timestamp ?? Date.now(),
+  });
+  if (WriteErr) return Fail('Failed to save critical network interface');
+
+  CriticalNetwork.setForClient(UUID, Name, Entry);
+  Target.MarkCriticalNetworkInterface(Entry);
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(!Existing);
+};
+
+Manager.RemoveNetworkInterfaceCritical = async (UUID: string, Name: unknown) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+  const Normalized = normalizeInterfaceName(Name);
+  if (!Normalized) return Fail('Network interface name is required');
+
+  const [WriteErr] = await CriticalRepo.RemoveNetwork(UUID, Normalized);
+  if (WriteErr) return Fail('Failed to remove critical network interface');
+
+  CriticalNetwork.removeForClient(UUID, Normalized);
+  Target.UnmarkCriticalNetworkInterface(Normalized);
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(true);
+};
+
 // Record one MAC against a client, or refresh it if already on file.
 //
 // 'Reported' addresses come from the client's own NIC enumeration and are
@@ -1303,6 +1393,7 @@ Manager.Delete = async (UUID: string) => {
   CriticalApplications.clearForClient(UUID);
   CriticalDisplays.clearForClient(UUID);
   CriticalAudio.clearForClient(UUID);
+  CriticalNetwork.clearForClient(UUID);
   MacAddresses.clearForClient(UUID);
   Logger.success(`Client ${UUID} deleted successfully`);
   return Ok(true);
@@ -1346,6 +1437,7 @@ Manager.ReplaceClient = async (CurrentUUID: unknown, ReplacementUUID: unknown) =
   CriticalApplications.rekeyClient(OldUUID, NewUUID);
   CriticalDisplays.rekeyClient(OldUUID, NewUUID);
   CriticalAudio.rekeyClient(OldUUID, NewUUID);
+  CriticalNetwork.rekeyClient(OldUUID, NewUUID);
   // MAC addresses cannot be re-keyed in memory the way the critical indexes are:
   // ReplaceClientUUID drops the old slot's *reported* addresses (they describe
   // the machine being replaced) while carrying its manual ones across, so the
@@ -1428,6 +1520,7 @@ Manager.Init = async () => {
   await CriticalApplications.load();
   await CriticalDisplays.load();
   await CriticalAudio.load();
+  await CriticalNetwork.load();
   await MacAddresses.load();
   const [Err, Clients] = await ClientsRepo.GetAll();
   if (Err || !Clients) {
@@ -1552,6 +1645,7 @@ Manager.ClearCache = async () => {
   CriticalApplications.clear();
   CriticalDisplays.clear();
   CriticalAudio.clear();
+  CriticalNetwork.clear();
   MacAddresses.clear();
   Manager.Initialized = false;
   return;

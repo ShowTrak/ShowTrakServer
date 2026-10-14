@@ -101,6 +101,10 @@ export function CreateClientsRepository(DB: DBManager) {
         if (displayErr) throw displayErr;
         const [audioErr] = await run('DELETE FROM CriticalAudioDevices WHERE UUID = ?', [UUID]);
         if (audioErr) throw audioErr;
+        const [networkErr] = await run('DELETE FROM CriticalNetworkInterfaces WHERE UUID = ?', [
+          UUID,
+        ]);
+        if (networkErr) throw networkErr;
         const [macErr] = await run('DELETE FROM ClientMacAddresses WHERE UUID = ?', [UUID]);
         if (macErr) throw macErr;
         // Variable overrides describe this client specifically, so they go with
@@ -168,6 +172,12 @@ export function CreateClientsRepository(DB: DBManager) {
           [NewUUID, OldUUID]
         );
         if (criticalAudioErr) throw criticalAudioErr;
+
+        const [criticalNetworkErr] = await run(
+          'UPDATE CriticalNetworkInterfaces SET UUID = ? WHERE UUID = ?',
+          [NewUUID, OldUUID]
+        );
+        if (criticalNetworkErr) throw criticalNetworkErr;
 
         // Replacing a client means real hardware took over the slot, so the old
         // slot's observed MACs describe a different machine and must not be

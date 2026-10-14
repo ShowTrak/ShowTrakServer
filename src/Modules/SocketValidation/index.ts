@@ -307,6 +307,15 @@ function NetworkInterfaces(value: unknown) {
       addresses: addresses.map((address, addressIndex) =>
         NetworkInterfaceAddress(address, `${fieldName}.addresses[${addressIndex}]`)
       ),
+      // Kept absent when the client did not send it: absent means "cannot
+      // tell", which the critical router check must not read as "no router".
+      ...(item.gateway !== undefined
+        ? {
+            gateway: normalizeOptionalString(item.gateway, `${fieldName}.gateway`, {
+              maxLength: 64,
+            }),
+          }
+        : {}),
     };
   });
 }

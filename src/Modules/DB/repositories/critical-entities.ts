@@ -1,5 +1,6 @@
 // Repository for the critical-entity tables (CriticalUSBDevices,
-// CriticalApplications, CriticalDisplays, CriticalAudioDevices). Receives the DB manager instead of
+// CriticalApplications, CriticalDisplays, CriticalAudioDevices,
+// CriticalNetworkInterfaces). Receives the DB manager instead of
 // importing it so test DB mocks injected into ClientManager propagate through
 // unchanged. SQL strings are byte-identical to the historical inline
 // statements — tests match on them.
@@ -10,6 +11,7 @@ import type { DBManager, DBResult } from '../index';
 import type {
   CriticalApplicationRow,
   CriticalAudioDeviceRow,
+  CriticalNetworkInterfaceRow,
   CriticalDisplayRow,
   CriticalUSBDeviceRow,
   CriticalUSBDeviceNameRow,
@@ -191,6 +193,39 @@ export function CreateCriticalEntitiesRepository(DB: DBManager) {
     },
     DeleteAllAudioForClient(UUID: string): Promise<DBResult<unknown>> {
       return DB.Run('DELETE FROM CriticalAudioDevices WHERE UUID = ?', [UUID]);
+    },
+
+    // --- Network interfaces -------------------------------------------------
+    LoadAllNetwork(): Promise<DBResult<CriticalNetworkInterfaceRow[]>> {
+      return DB.All<CriticalNetworkInterfaceRow>(
+        'SELECT UUID, Name, MAC, RequirePresent, Address, RangeStart, RangeEnd, Netmask, Gateway, Timestamp FROM CriticalNetworkInterfaces'
+      );
+    },
+    MarkNetwork(Row: CriticalNetworkInterfaceRow): Promise<DBResult<unknown>> {
+      return DB.Run(
+        'INSERT OR REPLACE INTO CriticalNetworkInterfaces (UUID, Name, MAC, RequirePresent, Address, RangeStart, RangeEnd, Netmask, Gateway, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          Row.UUID,
+          Row.Name,
+          Row.MAC,
+          Row.RequirePresent,
+          Row.Address,
+          Row.RangeStart,
+          Row.RangeEnd,
+          Row.Netmask,
+          Row.Gateway,
+          Row.Timestamp,
+        ]
+      );
+    },
+    RemoveNetwork(UUID: string, Name: string): Promise<DBResult<unknown>> {
+      return DB.Run('DELETE FROM CriticalNetworkInterfaces WHERE UUID = ? AND Name = ?', [
+        UUID,
+        Name,
+      ]);
+    },
+    DeleteAllNetworkForClient(UUID: string): Promise<DBResult<unknown>> {
+      return DB.Run('DELETE FROM CriticalNetworkInterfaces WHERE UUID = ?', [UUID]);
     },
   };
 }

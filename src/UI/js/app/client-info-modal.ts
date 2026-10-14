@@ -2,12 +2,7 @@
 // RenderClientInfoDetails (renders every tab/section). Extracted from
 // selection-init.ts (REFACTOR_PLAN.md Phase 7). Imports are added below;
 // cross-references back into selection-init are call-time only (safe cycle).
-import type {
-  ClientView,
-  ClientDisplayView,
-  NetworkInterfaceAddress,
-  RunningApplicationsStatus,
-} from '@showtrak/protocol';
+import type { ClientView, ClientDisplayView, RunningApplicationsStatus } from '@showtrak/protocol';
 import { openModal } from './lib/modal';
 import {
   ClientInfoOpenUUID,
@@ -39,6 +34,11 @@ import {
   ClearClientInfoAudio,
   RenderClientInfoAudio,
 } from './client-info-audio';
+import {
+  BindClientInfoNetworkHandlers,
+  ClearClientInfoNetwork,
+  RenderClientInfoNetwork,
+} from './client-info-network';
 import { ResetClientInfoTab, SetClientInfoIntegrated } from './client-info-nav';
 
 // The renderer-facing DisplayList is enriched in-place by the client's
@@ -231,18 +231,16 @@ export async function OpenClientInfo(UUID: string) {
       }
     });
 
-  BindClientInfoAudioHandlers(
-    () => ClientInfoOpenUUID,
-    async () => {
-      if (!ClientInfoOpenUUID) return;
-      const Fresh = await window.API.GetClient(ClientInfoOpenUUID);
-      if (Fresh) {
-        $('#CLIENT_INFO_STATUS').val(GetClientStatusDisplayText(Fresh));
-        RenderClientInfoDetails(Fresh);
-      }
-    },
-    Notify
-  );
+  const RefreshOpenClient = async () => {
+    if (!ClientInfoOpenUUID) return;
+    const Fresh = await window.API.GetClient(ClientInfoOpenUUID);
+    if (Fresh) {
+      $('#CLIENT_INFO_STATUS').val(GetClientStatusDisplayText(Fresh));
+      RenderClientInfoDetails(Fresh);
+    }
+  };
+  BindClientInfoAudioHandlers(() => ClientInfoOpenUUID, RefreshOpenClient, Notify);
+  BindClientInfoNetworkHandlers(() => ClientInfoOpenUUID, RefreshOpenClient, Notify);
 
   $('#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS')
     .off('click.critical-app-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_APP')
@@ -451,7 +449,7 @@ export function RenderClientInfoDetails(Client: ClientView) {
       $('#SHOWTRAK_CLIENT_INFO_DISPLAYS').attr('data-render-key', '').html('');
       ClearClientInfoAudio();
       $('#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS').attr('data-render-key', '').html('');
-      $('#SHOWTRAK_CLIENT_INFO_NET_INTERFACES').html('');
+      ClearClientInfoNetwork();
     } catch (err) {
       HandleNonFatalError('SelectionInit:NonFatal', err);
     }
@@ -851,7 +849,6 @@ export function RenderClientInfoDetails(Client: ClientView) {
 
   // Network Interfaces
   try {
-    const $netList = $('#SHOWTRAK_CLIENT_INFO_NET_INTERFACES');
     const $v4 = $('#SHOWTRAK_CLIENT_INFO_NET_FAMILY_V4');
     const $v6 = $('#SHOWTRAK_CLIENT_INFO_NET_FAMILY_V6');
     const selectedFamily = window.__ClientInfoNetFamily === 'IPv6' ? 'IPv6' : 'IPv4';
@@ -865,69 +862,8 @@ export function RenderClientInfoDetails(Client: ClientView) {
       .toggleClass('btn-light', !isV4)
       .toggleClass('btn-outline-light', isV4)
       .attr('aria-pressed', isV4 ? 'false' : 'true');
-
-    $netList.html('');
-    const ifaces = Array.isArray(Client.NetworkInterfaces) ? Client.NetworkInterfaces : [];
-
-    const normalizeFamily = (family: unknown) => {
-      const value = String(family || '').toUpperCase();
-      if (value === '4' || value === 'IPV4') return 'IPv4';
-      if (value === '6' || value === 'IPV6') return 'IPv6';
-      return value;
-    };
-    const isAddressActive = (address: NetworkInterfaceAddress | null | undefined) => {
-      if (!address || typeof address !== 'object') return false;
-      if (typeof address.active === 'boolean') return address.active;
-      const ip = String(address.address || '').trim();
-      if (!ip) return false;
-      if (ip === '0.0.0.0' || ip === '::') return false;
-      return true;
-    };
-
-    if (ifaces.length === 0) {
-      $netList.html(
-        '<div class="rounded-3 p-2 bg-ghost"><h6 class="mb-0">No Interfaces Reported</h6></div>'
-      );
-    } else {
-      const cards: string[] = [];
-      for (const iface of ifaces) {
-        const nameRaw = iface && iface.name ? String(iface.name) : 'unknown';
-        const name = Safe(nameRaw || 'unknown');
-        const addresses = Array.isArray(iface.addresses) ? iface.addresses : [];
-        const matchingAddresses = addresses.filter(
-          (a) => normalizeFamily(a && a.family) === selectedFamily
-        );
-        if (!matchingAddresses.length) continue;
-
-        for (const address of matchingAddresses) {
-          const ip = Safe(address && address.address ? address.address : 'Unknown address');
-          const mask = Safe(address && address.netmask ? address.netmask : 'Unknown');
-          const mac = Safe(address && address.mac ? String(address.mac).toUpperCase() : 'Unknown');
-          const inactiveClass = isAddressActive(address) ? '' : ' is-inactive';
-          const kindBadge =
-            address && address.internal
-              ? '<span class="SHOWTRAK_NET_IFACE_KIND_BADGE">Internal Only</span>'
-              : '';
-          cards.push(`
-            <div class="rounded-3 p-2 bg-ghost SHOWTRAK_NET_IFACE_CARD${inactiveClass}">
-              ${kindBadge}
-              <div class="SHOWTRAK_NET_IFACE_NAME">${name}</div>
-              <div class="SHOWTRAK_NET_IFACE_IP mt-1">${ip}</div>
-              <div class="SHOWTRAK_NET_IFACE_META mt-1">${mask}</div>
-              <div class="SHOWTRAK_NET_IFACE_META">${mac}</div>
-            </div>`);
-        }
-      }
-
-      if (!cards.length) {
-        $netList.html(
-          `<div class="rounded-3 p-2 bg-ghost"><h6 class="mb-0">No ${selectedFamily} Interfaces Detected</h6></div>`
-        );
-      } else {
-        $netList.html(cards.join(''));
-      }
-    }
+    RenderClientInfoNetwork(Client, selectedFamily);
   } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
+    HandleNonFatalError('ClientInfo:RenderNetwork', err);
   }
 }

@@ -18,6 +18,7 @@ import {
 import type {
   ClientApplicationHistorySeries,
   ClientAudioHistorySeries,
+  ClientNetworkHistorySeries,
   ClientDisplayHistorySeries,
   ClientDisplayView,
   ClientUSBHistorySeries,
@@ -32,6 +33,7 @@ import type {
 } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
 import { AudioTimelineLiveState } from './lib/audio-devices';
+import { NetworkTimelineLiveState } from './lib/network-interfaces';
 import { openModal } from './lib/modal';
 import { SetClientInfoTabbed } from './client-info-nav';
 import {
@@ -560,6 +562,21 @@ export async function LoadHistorySamplesForContext() {
         audioEndpointID: String(Endpoint.EndpointID),
         audioName: Endpoint.Name ? String(Endpoint.Name) : String(Endpoint.EndpointID),
         samples: Array.isArray(Endpoint.samples) ? Endpoint.samples : [],
+      });
+    }
+
+    // Per-critical-network-interface series (connected / conditions broken / missing).
+    let network: ClientNetworkHistorySeries[] = [];
+    try {
+      network = await window.API.GetClientNetworkHistory(String(entity.id));
+    } catch {
+      network = [];
+    }
+    for (const Iface of Array.isArray(network) ? network : []) {
+      if (!Iface || !Iface.InterfaceName) continue;
+      MonitorHistorySeries.push({
+        networkInterfaceName: String(Iface.InterfaceName),
+        samples: Array.isArray(Iface.samples) ? Iface.samples : [],
       });
     }
   }
@@ -1301,6 +1318,33 @@ export function RenderMonitoringHistoryModal() {
             statusText: Live.Label,
           },
           BuildStatusBlocksFromSamples(SamplesByAudioEndpoint.get(Endpoint.EndpointID) || [])
+        )
+      );
+    }
+
+    // Per-critical-network-interface timelines, likewise driven by the client's
+    // CURRENT critical interfaces.
+    const SamplesByInterface = new Map<string, HistorySample[]>();
+    for (const Series of MonitorHistorySeries) {
+      if (Series && Series.networkInterfaceName) {
+        SamplesByInterface.set(String(Series.networkInterfaceName), Series.samples);
+      }
+    }
+    const Interfaces = Array.isArray(Client?.NetworkStatus?.Interfaces)
+      ? Client.NetworkStatus.Interfaces
+      : [];
+    for (const Iface of Interfaces) {
+      if (!Iface || !Iface.IsCritical || !Iface.Name) continue;
+      const Live = NetworkTimelineLiveState(Iface, !!Client.Online);
+      $timelines.append(
+        RenderMonitorHistorySection(
+          {
+            state: Live.State,
+            name: Iface.Name,
+            sub: 'Critical Network Interface',
+            statusText: Live.Label,
+          },
+          BuildStatusBlocksFromSamples(SamplesByInterface.get(Iface.Name) || [])
         )
       );
     }

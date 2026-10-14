@@ -281,6 +281,27 @@ Schema.push({
     )',
 });
 
+// Critical network interfaces: one row per (client, interface name) the operator
+// guards, holding the conditions it must keep. Each address condition is NULL
+// when it is not guarded. Created here rather than by a migration, for the same
+// reason as CriticalAudioDevices.
+Schema.push({
+  Name: 'CriticalNetworkInterfaces',
+  SQL: 'CREATE TABLE IF NOT EXISTS `CriticalNetworkInterfaces` ( \
+            UUID TEXT NOT NULL, \
+            Name TEXT NOT NULL, \
+            MAC TEXT, \
+            RequirePresent INTEGER NOT NULL DEFAULT 1, \
+            Address TEXT, \
+            RangeStart TEXT, \
+            RangeEnd TEXT, \
+            Netmask TEXT, \
+            Gateway TEXT, \
+            Timestamp BIGINT(11) NOT NULL, \
+            PRIMARY KEY (UUID, Name) \
+    )',
+});
+
 // Per-show whitelist of which clients/groups may run a given script. Scripts
 // themselves live on disk (machine-global), but *who* may run each one is
 // show-specific, so it belongs in the DB (and therefore the .ShowTrak file).

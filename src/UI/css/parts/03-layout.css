@@ -1235,7 +1235,8 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   gap: 0.3rem;
 }
 
-.SHOWTRAK_AUDIO_COND_BOUND input {
+.SHOWTRAK_AUDIO_COND_BOUND input,
+.SHOWTRAK_NET_COND_ADDRESS input {
   width: 3.75rem;
   padding: 0.1rem 0.4rem;
   border: 0;
@@ -1245,13 +1246,59 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   font-weight: 700;
 }
 
-.SHOWTRAK_AUDIO_COND_BOUND input:focus {
+.SHOWTRAK_AUDIO_COND_BOUND input:focus,
+.SHOWTRAK_NET_COND_ADDRESS input:focus {
   outline: none;
   background: rgba(255, 255, 255, 0.12);
 }
 
-.SHOWTRAK_AUDIO_COND_BOUND input::placeholder {
+.SHOWTRAK_AUDIO_COND_BOUND input::placeholder,
+.SHOWTRAK_NET_COND_ADDRESS input::placeholder {
   color: rgba(255, 255, 255, 0.3);
+}
+
+/* --- Network interfaces (client info modal) ------------------------------ */
+/* Cards and conditions reuse the audio card's classes; only what an address
+   needs differently lives here. */
+.SHOWTRAK_NET_ADDRESS {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* Addresses need more room than a level, so the key column gives some up. */
+.SHOWTRAK_NET_CONDITIONS th {
+  width: 30%;
+}
+
+.SHOWTRAK_NET_COND_ADDRESS {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.SHOWTRAK_NET_COND_ADDRESS input {
+  width: 9.5rem;
+  max-width: 100%;
+}
+
+.SHOWTRAK_NET_COND_ADDRESS.is-range input {
+  width: 7.75rem;
+}
+
+/* Where the critical pill would be: internal interfaces cannot be monitored. */
+.SHOWTRAK_NET_INTERNAL_BADGE {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffe08a;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  cursor: default;
 }
 
 .SHOWTRAK_TOGGLE_CRITICAL_DISPLAY.is-unavailable,
@@ -1261,48 +1308,4 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   cursor: not-allowed;
   color: rgba(190, 190, 190, 0.5);
   background-color: rgba(255, 255, 255, 0.05);
-}
-
-.SHOWTRAK_NET_IFACE_CARD {
-  position: relative;
-  text-align: left;
-}
-
-.SHOWTRAK_NET_IFACE_CARD.is-inactive {
-  opacity: 0.5;
-  filter: grayscale(0.45);
-}
-
-.SHOWTRAK_NET_IFACE_NAME {
-  font-size: 0.74rem;
-  color: rgba(255, 255, 255, 0.55);
-  text-align: left;
-}
-
-.SHOWTRAK_NET_IFACE_IP {
-  font-size: 1.08rem;
-  font-weight: 700;
-  line-height: 1.25;
-  text-align: left;
-  word-break: break-all;
-}
-
-.SHOWTRAK_NET_IFACE_META {
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.56);
-  text-align: left;
-}
-
-.SHOWTRAK_NET_IFACE_KIND_BADGE {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 193, 7, 0.35);
-  background: rgba(255, 193, 7, 0.15);
-  color: #ffe08a;
-  font-size: 0.68rem;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 0.2rem 0.5rem;
 }

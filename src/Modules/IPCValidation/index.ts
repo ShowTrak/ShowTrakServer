@@ -42,6 +42,17 @@ export interface CriticalAudioDevicePayloadResult {
   CheckSampleRate?: boolean;
 }
 
+export interface CriticalNetworkInterfacePayloadResult {
+  Name: string;
+  // Present only when the request carried them; absent keeps the current value.
+  RequirePresent?: boolean;
+  Address?: string | null;
+  RangeStart?: string | null;
+  RangeEnd?: string | null;
+  Netmask?: string | null;
+  Gateway?: string | null;
+}
+
 export interface AudioLevelRequestResult {
   EndpointID: string;
   Volume?: number;
@@ -89,6 +100,8 @@ export interface IPCValidationManager {
   AudioEndpointID(value: unknown, fieldName?: string): string;
   CriticalAudioDevicePayload(value: unknown): CriticalAudioDevicePayloadResult;
   AudioLevelRequest(value: unknown): AudioLevelRequestResult;
+  NetworkInterfaceName(value: unknown, fieldName?: string): string;
+  CriticalNetworkInterfacePayload(value: unknown): CriticalNetworkInterfacePayloadResult;
   ClientUpdatePayload(value: unknown): Record<string, unknown>;
 
   // Monitoring targets (monitoring-validators.ts)

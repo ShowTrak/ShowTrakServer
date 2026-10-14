@@ -189,6 +189,19 @@ export interface CriticalAudioDeviceRow {
   Timestamp: number;
 }
 
+export interface CriticalNetworkInterfaceRow {
+  UUID: string;
+  Name: string;
+  MAC: string | null;
+  RequirePresent: number; // sqlite 0/1
+  Address: string | null;
+  RangeStart: string | null;
+  RangeEnd: string | null;
+  Netmask: string | null;
+  Gateway: string | null;
+  Timestamp: number;
+}
+
 export interface ScriptWhitelistRow {
   ScriptID: string;
   Scope: string; // JSON: { Workspace, Groups[], Clients[], Tags[] }

@@ -72,6 +72,7 @@ interface ClientHardwareTelemetryLike {
   USBDeviceList?: unknown;
   DisplayList?: unknown;
   AudioDevices?: { Endpoints?: unknown } | null;
+  NetworkStatus?: { Interfaces?: unknown } | null;
 }
 
 // Resolved critical-entity state produced by the per-domain extractors below and
@@ -673,6 +674,59 @@ function getClientAudioHistorySamples(
   }>;
 }
 
+// Resolve the current state for every critical network interface on a client,
+// on the audio extractor's rules: connected and meeting its conditions is
+// "online", connected but not is "online but degraded", missing is "offline".
+// An interface that is absent but allowed to be (presence not required), or not
+// yet judged on this connection, is skipped — an idle gap, never a red bar.
+function extractCriticalNetworkStates(
+  client: ClientHardwareTelemetryLike | null | undefined
+): NamedEntityState[] | null {
+  if (!client || !client.Online) return null;
+  const interfaces = Array.isArray(client.NetworkStatus?.Interfaces)
+    ? (client.NetworkStatus.Interfaces as Array<Record<string, unknown> | null>)
+    : [];
+  const states: NamedEntityState[] = [];
+  for (const iface of interfaces) {
+    if (!iface || !iface.IsCritical) continue;
+    const name = typeof iface.Name === 'string' ? iface.Name.trim() : '';
+    if (!name) continue;
+    const isConnected = iface.IsConnected !== false;
+    if (!isConnected && !iface.Missing) continue;
+    const issues = Array.isArray(iface.Issues) ? iface.Issues : [];
+    states.push({
+      key: name,
+      name,
+      online: isConnected,
+      degraded: isConnected && issues.length > 0,
+    });
+  }
+  return states;
+}
+
+const ClientNetworkHistory = createNamedHistoryStore(extractCriticalNetworkStates, 'InterfaceName');
+
+function recordClientNetworkHistorySamples(
+  client: ClientHardwareTelemetryLike | null | undefined,
+  sampledAt: number | null = null
+): void {
+  ClientNetworkHistory.record(client, sampledAt);
+}
+
+function syncClientNetworkHistoryStore(list: unknown): void {
+  ClientNetworkHistory.sync(list);
+}
+
+function getClientNetworkHistorySamples(
+  uuid: unknown
+): Array<{ InterfaceName: string; Name: string; samples: HistorySample[] }> {
+  return ClientNetworkHistory.get(uuid) as Array<{
+    InterfaceName: string;
+    Name: string;
+    samples: HistorySample[];
+  }>;
+}
+
 export {
   MONITORING_HISTORY_MAX_AGE_MS,
   pruneMonitoringHistoryStore,
@@ -700,4 +754,7 @@ export {
   recordClientAudioHistorySamples,
   syncClientAudioHistoryStore,
   getClientAudioHistorySamples,
+  recordClientNetworkHistorySamples,
+  syncClientNetworkHistoryStore,
+  getClientNetworkHistorySamples,
 };

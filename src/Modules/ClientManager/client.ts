@@ -24,6 +24,9 @@ import type {
   AudioDevicesView,
   AudioEndpointView,
   CriticalAudioDevice,
+  CriticalNetworkInterface,
+  NetworkInterfaceView,
+  NetworkStatusView,
 } from '@showtrak/protocol';
 import {
   EmptyAudioView,
@@ -35,6 +38,12 @@ import {
   normalizeEndpointID,
   type ObservedAudio,
 } from './audio';
+import {
+  EmptyNetworkStatusView,
+  buildNetworkView,
+  normalizeCriticalNetworkEntry,
+  normalizeInterfaceName,
+} from './network';
 
 const Logger = CreateLogger('ClientManager');
 
@@ -84,6 +93,11 @@ function normalizeNetworkInterfaces(Interfaces: unknown): NormalizedNetworkInter
             };
           })
         : [],
+      // Absent stays absent: it means the client cannot say, which is not the
+      // same as null (no router), and the critical router check depends on it.
+      ...(iface.gateway !== undefined
+        ? { gateway: typeof iface.gateway === 'string' && iface.gateway ? iface.gateway : null }
+        : {}),
     };
   });
 }
@@ -219,6 +233,7 @@ interface NormalizedNetworkAddress {
 interface NormalizedNetworkInterface {
   name: string;
   addresses: NormalizedNetworkAddress[];
+  gateway?: string | null;
 }
 
 // Running-applications status/snapshot as normalized in RAM. Distinct from the
@@ -359,6 +374,10 @@ class Client {
   // An `error` or `unsupported` report says nothing about whether a device is
   // there, so it holds the critical audio checks rather than failing them.
   HasAudioTelemetry: boolean;
+  // Network interfaces have no sampler status: a full list reported on this
+  // connection is the evidence, and nothing is judged before one arrives.
+  HasNetworkTelemetry: boolean;
+  NetworkSampledAt: number | null;
   Identifying: boolean;
   ScriptsFingerprint: string | null;
   NetworkInterfaces: NormalizedNetworkInterface[];
@@ -395,6 +414,13 @@ class Client {
   CriticalAudioDevices: CriticalAudioDevice[];
   MissingCriticalAudioDevices: AudioEndpointView[];
   AudioWarnings: string[];
+
+  // Network interfaces: the critical baselines and the judged view of the
+  // reported list (NetworkInterfaces) produced by _rebuildNetworkView.
+  NetworkStatus: NetworkStatusView;
+  CriticalNetworkInterfaces: CriticalNetworkInterface[];
+  MissingCriticalNetworkInterfaces: NetworkInterfaceView[];
+  NetworkWarnings: string[];
 
   // Running applications: critical guards, the raw observed snapshot, and the
   // augmented view (observed ∪ missing-critical) with its change signatures.
@@ -465,6 +491,12 @@ class Client {
     this.CriticalAudioDevices = [];
     this.MissingCriticalAudioDevices = [];
     this.AudioWarnings = [];
+    this.HasNetworkTelemetry = false;
+    this.NetworkSampledAt = null;
+    this.NetworkStatus = EmptyNetworkStatusView();
+    this.CriticalNetworkInterfaces = [];
+    this.MissingCriticalNetworkInterfaces = [];
+    this.NetworkWarnings = [];
     this.NetworkInterfaces = [];
     this.ScriptsFingerprint = null;
     this.Identifying = false;
@@ -517,6 +549,8 @@ class Client {
       // Rebuild so a critical endpoint stops reading as "missing" now that the
       // evidence for it has gone; it reads as not reported until the next session.
       this._rebuildAudioView(false);
+      this.HasNetworkTelemetry = false;
+      this._rebuildNetworkView(false);
     }
     this._refreshClientHealthState();
     Logger.debug(`Client ${this.UUID} Online updated to ${Online}`);
@@ -960,6 +994,9 @@ class Client {
     if (this.HasAudioTelemetry && Array.isArray(this.AudioWarnings)) {
       Warnings.push(...this.AudioWarnings);
     }
+    if (this.HasNetworkTelemetry && Array.isArray(this.NetworkWarnings)) {
+      Warnings.push(...this.NetworkWarnings);
+    }
 
     // Everything above is INFERRED: the client reported what it has, and we
     // concluded something expected is absent. That conclusion is sound but
@@ -1345,10 +1382,65 @@ class Client {
     this.AudioWarnings = Result.Warnings;
     if (Refresh) this._refreshClientHealthState();
   }
+  SetCriticalNetworkInterfaces(Interfaces: unknown) {
+    const Normalized: CriticalNetworkInterface[] = [];
+    const Seen = new Set<string>();
+    for (const Raw of Array.isArray(Interfaces) ? Interfaces : []) {
+      const Entry = normalizeCriticalNetworkEntry(Raw);
+      if (!Entry || Seen.has(Entry.Name)) continue;
+      Seen.add(Entry.Name);
+      Normalized.push(Entry);
+    }
+    this.CriticalNetworkInterfaces = Normalized;
+    this._rebuildNetworkView();
+  }
+  IsNetworkInterfaceCritical(Name: unknown) {
+    const Normalized = normalizeInterfaceName(Name);
+    if (!Normalized) return false;
+    return this.CriticalNetworkInterfaces.some((Entry) => Entry.Name === Normalized);
+  }
+  /** Add or replace one critical entry. Returns whether it was new. */
+  MarkCriticalNetworkInterface(Interface: unknown) {
+    const Entry = normalizeCriticalNetworkEntry(Interface);
+    if (!Entry) return false;
+    const Index = this.CriticalNetworkInterfaces.findIndex((E) => E.Name === Entry.Name);
+    if (Index === -1) this.CriticalNetworkInterfaces.push(Entry);
+    else this.CriticalNetworkInterfaces[Index] = Entry;
+    this._rebuildNetworkView();
+    return Index === -1;
+  }
+  UnmarkCriticalNetworkInterface(Name: unknown) {
+    const Normalized = normalizeInterfaceName(Name);
+    if (!Normalized) return false;
+    const PrevLength = this.CriticalNetworkInterfaces.length;
+    this.CriticalNetworkInterfaces = this.CriticalNetworkInterfaces.filter(
+      (Entry) => Entry.Name !== Normalized
+    );
+    if (this.CriticalNetworkInterfaces.length === PrevLength) return false;
+    this._rebuildNetworkView();
+    return true;
+  }
+  _rebuildNetworkView(Refresh = true) {
+    const Result = buildNetworkView(
+      this.NetworkInterfaces,
+      this.CriticalNetworkInterfaces,
+      this.HasNetworkTelemetry,
+      this.NetworkSampledAt
+    );
+    this.NetworkStatus = Result.View;
+    this.MissingCriticalNetworkInterfaces = Result.Missing;
+    this.NetworkWarnings = Result.Warnings;
+    if (Refresh) this._refreshClientHealthState();
+  }
   SetNetworkInterfaces(Interfaces: unknown) {
     try {
       const normalized = normalizeNetworkInterfaces(Interfaces);
       this.NetworkInterfaces = normalized;
+      // The full list is the authority, so it is what makes the critical checks
+      // trustworthy on this connection; a delta only amends it.
+      this.HasNetworkTelemetry = true;
+      this.NetworkSampledAt = Date.now();
+      this._rebuildNetworkView();
       Logger.debug(`Client ${this.UUID} Network Interfaces updated (${normalized.length})`);
       BroadcastManager.emit('ClientUpdated', this);
     } catch (e) {
@@ -1388,6 +1480,8 @@ class Client {
       }
 
       this.NetworkInterfaces = Array.from(byName.values());
+      if (this.HasNetworkTelemetry) this.NetworkSampledAt = Date.now();
+      this._rebuildNetworkView();
       Logger.debug(
         `Client ${this.UUID} Network Interfaces delta applied (${this.NetworkInterfaces.length} interfaces)`
       );

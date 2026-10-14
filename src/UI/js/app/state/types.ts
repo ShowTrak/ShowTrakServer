@@ -51,6 +51,7 @@ export interface MonitorHistorySeriesEntry {
   displayName?: string;
   audioEndpointID?: string;
   audioName?: string;
+  networkInterfaceName?: string;
 }
 
 /** Identifies which entity the history modal is currently showing. */

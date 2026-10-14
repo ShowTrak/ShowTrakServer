@@ -31,6 +31,7 @@ import {
   recordClientUSBHistorySamples,
   recordClientDisplayHistorySamples,
   recordClientAudioHistorySamples,
+  recordClientNetworkHistorySamples,
 } from '../../main/monitoring-history';
 
 // The connection handler stamps per-connection state directly onto the socket.
@@ -473,6 +474,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
           `Network interfaces received from ${socket.UUID} (${Interfaces.length} interfaces)`
         );
         await ClientManager.SetNetworkInterfaces(socket.UUID, Interfaces);
+        const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
+        if (!ClientErr && Client) recordClientNetworkHistorySamples(Client);
       },
       { serial: true }
     );
@@ -491,6 +494,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
           recordClientUSBHistorySamples(Client, Snapshot.SampledAt);
           recordClientDisplayHistorySamples(Client, Snapshot.SampledAt);
           recordClientAudioHistorySamples(Client, Snapshot.SampledAt);
+          recordClientNetworkHistorySamples(Client, Snapshot.SampledAt);
         }
       },
       { serial: true }
@@ -544,6 +548,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
           `Network interface delta from ${socket.UUID} (+${Delta.Added.length} -${Delta.Removed.length} ~${Delta.Changed.length})`
         );
         await ClientManager.ApplyNetworkInterfaceDelta(socket.UUID, Delta);
+        const [ClientErr, Client] = await ClientManager.Get(socket.UUID);
+        if (!ClientErr && Client) recordClientNetworkHistorySamples(Client);
       },
       { serial: true }
     );

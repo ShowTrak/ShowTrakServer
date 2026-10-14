@@ -1,9 +1,11 @@
 // Client / group / script identifier validators.
 import { fail, isPlainObject, normalizeNonEmptyString } from './primitives';
 import { NormalizeMacAddress } from '../MacAddress';
+import { IsNetmask, NormalizeIPText, ParseIP } from '../ClientManager/network';
 import type {
   AudioLevelRequestResult,
   CriticalAudioDevicePayloadResult,
+  CriticalNetworkInterfacePayloadResult,
   IPCValidationManager,
 } from './index';
 
@@ -303,6 +305,46 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     }
     if (out.Volume === undefined && out.Muted === undefined) {
       fail('Audio level request must set Volume or Muted');
+    }
+    return out;
+  };
+
+  Manager.NetworkInterfaceName = (value: unknown, fieldName = 'Name') => {
+    return normalizeNonEmptyString(value, fieldName, { minLength: 1, maxLength: 128 });
+  };
+
+  // An IP address condition: null (or empty) stops guarding it.
+  const OptionalAddress = (raw: unknown, name: string): string | null => {
+    if (raw === null || (typeof raw === 'string' && raw.trim() === '')) return null;
+    if (typeof raw !== 'string') fail(`${name} must be an IP address`);
+    const normalized = NormalizeIPText(raw);
+    if (!normalized) fail(`${name} must be an IP address`);
+    return normalized as string;
+  };
+
+  Manager.CriticalNetworkInterfacePayload = (value: unknown) => {
+    if (!isPlainObject(value)) fail('Critical network interface payload must be an object');
+    const out: CriticalNetworkInterfacePayloadResult = {
+      Name: Manager.NetworkInterfaceName(value.Name),
+    };
+    const Has = (key: string) =>
+      Object.prototype.hasOwnProperty.call(value, key) && value[key] !== undefined;
+    if (Has('RequirePresent')) {
+      if (typeof value.RequirePresent !== 'boolean') fail('RequirePresent must be true or false');
+      out.RequirePresent = value.RequirePresent as boolean;
+    }
+    for (const key of ['Address', 'RangeStart', 'RangeEnd', 'Netmask', 'Gateway'] as const) {
+      if (Has(key)) out[key] = OptionalAddress(value[key], key);
+    }
+    if (out.Netmask && !IsNetmask(out.Netmask)) fail('Netmask must be a subnet mask');
+    if (Has('RangeStart') !== Has('RangeEnd') || !!out.RangeStart !== !!out.RangeEnd) {
+      fail('RangeStart and RangeEnd must be set together');
+    }
+    if (out.RangeStart && out.RangeEnd) {
+      const start = ParseIP(out.RangeStart)!;
+      const end = ParseIP(out.RangeEnd)!;
+      if (start.Family !== end.Family) fail('RangeStart and RangeEnd must be the same family');
+      if (start.Value > end.Value) fail('RangeStart cannot be after RangeEnd');
     }
     return out;
   };
