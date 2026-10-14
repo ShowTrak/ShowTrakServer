@@ -1026,14 +1026,20 @@ input[type='range']::-moz-range-progress,
   text-overflow: ellipsis;
 }
 
-/* Settings modal: two-pane layout with a category nav on the left and the
-   settings for each category on the right. The header stays pinned at the top;
-   the nav and content each scroll independently within the modal. */
+/* Settings modal: two-pane layout with a tab rail on the left and the active
+   category's settings on the right, one category shown at a time as in the
+   Client Info modal. The header stays pinned at the top; the rail and content
+   each scroll independently, and a fixed height stops the dialog resizing as
+   tabs are switched. */
 #SHOWTRAK_MODAL_SETTINGS .modal-body {
   display: flex;
   flex-direction: column;
   max-height: 85vh;
   overflow: hidden;
+}
+
+#SHOWTRAK_MODAL_SETTINGS .modal-body.is-tabbed {
+  height: min(85vh, 46rem);
 }
 
 .settings-layout {
@@ -1084,21 +1090,18 @@ input[type='range']::-moz-range-progress,
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  display: grid;
-  gap: 0.5rem;
   padding-right: 0.25rem;
-  scroll-behavior: smooth;
 }
 
-.settings-section {
-  scroll-margin-top: 0.25rem;
+/* The sections are .d-grid, whose display is !important. */
+.settings-content .settings-section.is-inactive-tab {
+  display: none !important;
 }
 
 /* Client Info modal: the header (device name + close) and the Close button stay
-   pinned while the pane between them scrolls. Clients add the settings-style
-   rail on the left, but as true tabs (one pane shown at a time) rather than
-   jump links, and get a fixed height so switching tabs does not resize the
-   dialog. Monitors, dummies and FreeKiosk terminals show no rail. */
+   pinned while the pane between them scrolls. Every entity gets the
+   settings-style tab rail on the left (one pane shown at a time) and a fixed
+   height so switching tabs does not resize the dialog. */
 #SHOWTRAK_CLIENT_INFO .modal-body {
   display: flex;
   flex-direction: column;

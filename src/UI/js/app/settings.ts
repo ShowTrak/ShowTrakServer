@@ -19,6 +19,7 @@ import {
 import { GetAlertVolume, HandleNonFatalError, Safe, ShowQRModal } from './utils';
 import { Notify } from './selection-init';
 import { ConfirmationDialog } from './lib/toasts';
+import { ResolveSettingsTab } from './lib/settings-tabs';
 import type { RemoteDeviceView, SettingGroupView, SettingView } from '@showtrak/protocol';
 // Wires the mode/compact/alert-action buttons and fetches initial settings +
 // mode state. Formerly a DOMContentLoaded handler; InitSettings() calls it
@@ -272,11 +273,7 @@ function CaptureSettingsViewState(): () => void {
   }
 
   return () => {
-    if (contentEl.scrollTop !== scrollTop) {
-      contentEl.scrollTop = scrollTop;
-      // The nav rebuild in BuildSettingsNav measured the clamped position.
-      UpdateActiveNavFromScroll();
-    }
+    if (contentEl.scrollTop !== scrollTop) contentEl.scrollTop = scrollTop;
     if (!focusedId) return;
     const el = document.getElementById(focusedId);
     if (!el || document.activeElement === el) return;
@@ -575,7 +572,7 @@ async function RenderRemoteAccessSection() {
     RenderedRemoteAccess = Signature;
     $container.html('');
     if (urls.length) {
-      // Expose this block as a jump target so it appears in the category nav.
+      // Expose this block as a section so it gets its own tab.
       $container
         .addClass('settings-section')
         .attr('data-nav-key', '__REMOTE_ACCESS__')
@@ -799,9 +796,13 @@ async function RenderPairedDevicesSection() {
   }
 }
 
-// (Re)build the left-hand category rail from the sections currently in the
-// content column, then wire up the scroll-spy that highlights the section the
-// user is scrolled to. Each section carries `data-nav-key` / `data-nav-title`.
+// The category whose section is showing. Kept across rebuilds (every settings
+// push can rebuild the rail) and reset to the first category on each open.
+let ActiveSettingsTab: string | null = null;
+
+// (Re)build the left-hand tab rail from the sections currently in the content
+// column. Each section carries `data-nav-key` / `data-nav-title`; only the active
+// one is shown, as in the Client Info modal.
 function BuildSettingsNav() {
   const $content = $('#SETTINGS_CONTENT');
   const $nav = $('#SETTINGS_NAV');
@@ -810,9 +811,12 @@ function BuildSettingsNav() {
   const sections = $content.find('.settings-section[data-nav-title]').toArray();
   $nav.empty();
 
-  // A single (or no) category needs no navigation — reclaim the space.
-  if (sections.length <= 1) {
+  // A single (or no) category needs no tabs — reclaim the space and show it all.
+  const Tabbed = sections.length > 1;
+  $('#SHOWTRAK_MODAL_SETTINGS .modal-body').toggleClass('is-tabbed', Tabbed);
+  if (!Tabbed) {
     $nav.hide();
+    $content.find('.settings-section').removeClass('is-inactive-tab');
     return;
   }
   $nav.show();
@@ -820,63 +824,46 @@ function BuildSettingsNav() {
   for (const section of sections) {
     const key = section.getAttribute('data-nav-key') || '';
     const title = section.getAttribute('data-nav-title') || '';
-    const $btn = $(
-      `<button type="button" class="settings-nav-item" data-nav-target="${Safe(key)}">${Safe(title)}</button>`
+    $nav.append(
+      `<button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-nav-target="${Safe(key)}">${Safe(title)}</button>`
     );
-    $btn.on('click', () => {
-      section.scrollIntoView({ block: 'start', behavior: 'smooth' });
-      SetActiveNav(key);
-    });
-    $nav.append($btn);
   }
 
-  // Default the first category active until a real scroll position is known.
-  SetActiveNav(sections[0]!.getAttribute('data-nav-key') || ''); // length > 1 guaranteed above
+  ActiveSettingsTab = ResolveSettingsTab(
+    ActiveSettingsTab,
+    sections.map((section) => section.getAttribute('data-nav-key') || '')
+  );
+  ApplySettingsTab();
 
-  // Namespaced so repeated rebuilds replace rather than stack the handlers. The
-  // shown-handler recomputes once the modal is visible: while it is hidden the
-  // content has no height and scroll positions cannot be measured.
-  $content.off('scroll.settingsspy').on('scroll.settingsspy', UpdateActiveNavFromScroll);
+  // Namespaced so repeated rebuilds replace rather than stack the handlers.
+  $nav.off('click.settingstabs').on('click.settingstabs', '.settings-nav-item', function () {
+    const Key = this.getAttribute('data-nav-target');
+    if (Key === ActiveSettingsTab) return;
+    ActiveSettingsTab = Key;
+    ApplySettingsTab();
+    // A new pane starts at its top, not wherever the last one was scrolled to.
+    $content.scrollTop(0);
+  });
   $('#SHOWTRAK_MODAL_SETTINGS')
-    .off('shown.bs.modal.settingsspy')
-    .on('shown.bs.modal.settingsspy', UpdateActiveNavFromScroll);
-  UpdateActiveNavFromScroll();
+    .off('show.bs.modal.settingstabs')
+    .on('show.bs.modal.settingstabs', ResetSettingsTab);
 }
 
-function SetActiveNav(key: string) {
+function ApplySettingsTab() {
   $('#SETTINGS_NAV .settings-nav-item').each(function () {
-    $(this).toggleClass('active', this.getAttribute('data-nav-target') === key);
+    const IsActive = this.getAttribute('data-nav-target') === ActiveSettingsTab;
+    $(this)
+      .toggleClass('active', IsActive)
+      .attr('aria-selected', IsActive ? 'true' : 'false');
+  });
+  $('#SETTINGS_CONTENT .settings-section[data-nav-title]').each(function () {
+    $(this).toggleClass('is-inactive-tab', this.getAttribute('data-nav-key') !== ActiveSettingsTab);
   });
 }
 
-// Highlight the nav item for the last section whose heading has scrolled to (or
-// past) the top of the content viewport. Positions are measured relative to the
-// scroll container so it works regardless of the section's offset parent.
-function UpdateActiveNavFromScroll() {
-  const contentEl = document.getElementById('SETTINGS_CONTENT');
-  if (!contentEl || !contentEl.clientHeight) return; // hidden: nothing measurable yet
-  const sections = Array.from(
-    contentEl.querySelectorAll<HTMLElement>('.settings-section[data-nav-title]')
-  );
-  if (!sections.length) return;
-
-  const contentTop = contentEl.getBoundingClientRect().top;
-  const threshold = 24; // px past the top edge before a section becomes active
-  let activeKey = sections[0]!.getAttribute('data-nav-key') || ''; // sections.length checked above
-  for (const section of sections) {
-    const relativeTop = section.getBoundingClientRect().top - contentTop;
-    if (relativeTop <= threshold) {
-      activeKey = section.getAttribute('data-nav-key') || '';
-    } else {
-      break;
-    }
-  }
-
-  // At the very bottom, force the last section active — a short final section
-  // may never reach the threshold on its own.
-  if (contentEl.scrollTop + contentEl.clientHeight >= contentEl.scrollHeight - 2) {
-    activeKey = sections[sections.length - 1]!.getAttribute('data-nav-key') || ''; // non-empty checked above
-  }
-
-  SetActiveNav(activeKey);
+// Each open of Preferences starts on the first category.
+function ResetSettingsTab() {
+  ActiveSettingsTab = $('#SETTINGS_NAV .settings-nav-item').first().attr('data-nav-target') ?? null;
+  ApplySettingsTab();
+  $('#SETTINGS_CONTENT').scrollTop(0);
 }
