@@ -121,6 +121,9 @@ export function RenderMode(mode: AppModeValue) {
     if (IsReadOnly) {
       btnShow.title = 'Show mode is controlled by the desktop app';
       btnEdit.title = 'Edit mode is controlled by the desktop app';
+    } else {
+      btnShow.removeAttribute('title');
+      btnEdit.removeAttribute('title');
     }
   }
   document.body.classList.toggle('mode-edit', AppMode === 'EDIT');

@@ -468,7 +468,7 @@ test('Web UI namespace gates data behind authentication', async () => {
   assert.deepEqual(resp, { result: [null, { UUID: 'u1' }] });
 
   // A channel outside the allowlist is denied.
-  await socket.trigger('rpc', 'Mode:Set', ['EDIT'], (r) => (resp = r));
+  await socket.trigger('rpc', 'Settings:Get', [], (r) => (resp = r));
   assert.equal(resp.error, 'forbidden');
 
   // Logout clears the session.
@@ -649,14 +649,15 @@ test('Web UI namespace dispatches integrated events when permitted', async () =>
   assert.deepEqual(triggered, [{ eventId: 'SetBoxBlue', targets: ['u1'] }]);
 });
 
-test('Web UI namespace enforces edit-mode and never allows mode/alert toggles', async () => {
+test('Web UI namespace enforces edit-mode and refuses mode/alert toggles by default', async () => {
   const handlers = {
     CreateGroup: async (_e, title) => [null, { GroupID: 2, Title: title }],
     'Mode:Set': async () => 'EDIT',
     'AlertActionsEnabled:Set': async () => false,
   };
 
-  // SHOW mode: edit mutations are blocked; mode/alert toggles are never allowed.
+  // SHOW mode: edit mutations are blocked; mode/alert toggles need permissions
+  // that default OFF.
   const showIo = makeUiIo();
   const { SetupWebUiNamespace: SetupShow } = loadWebUi(
     { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false },
@@ -683,6 +684,47 @@ test('Web UI namespace enforces edit-mode and never allows mode/alert toggles', 
   const s2 = await connectUiSocket(editIo);
   await s2.trigger('rpc', 'CreateGroup', ['G'], (r) => (resp = r));
   assert.deepEqual(resp, { result: [null, { GroupID: 2, Title: 'G' }] });
+});
+
+test('Web UI namespace allows mode/alert toggles once permitted, from SHOW mode', async () => {
+  const calls = [];
+  const handlers = {
+    'Mode:Set': async (_e, mode) => {
+      calls.push(['Mode:Set', mode]);
+      return mode;
+    },
+    'AlertActionsEnabled:Set': async (_e, enabled) => {
+      calls.push(['AlertActionsEnabled:Set', enabled]);
+      return enabled;
+    },
+  };
+  const io = makeUiIo();
+  const { SetupWebUiNamespace } = loadWebUi(
+    {
+      WEBUI_ENABLED: true,
+      WEBUI_PASSWORD_PROTECTION_ENABLED: false,
+      WEBUI_ALLOW_MODE_CHANGE: true,
+      WEBUI_ALLOW_ALERT_ACTIONS_TOGGLE: true,
+    },
+    { mode: 'SHOW', handlers }
+  );
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
+
+  // The greeting tells the browser to enable both controls.
+  const hello = socket.emitted.find((e) => e.event === 'hello');
+  assert.equal(hello.args[0].AllowModeChange, true);
+  assert.equal(hello.args[0].AllowAlertActionsToggle, true);
+
+  let resp;
+  await socket.trigger('rpc', 'Mode:Set', ['EDIT'], (r) => (resp = r));
+  assert.deepEqual(resp, { result: 'EDIT' });
+  await socket.trigger('rpc', 'AlertActionsEnabled:Set', [false], (r) => (resp = r));
+  assert.deepEqual(resp, { result: false });
+  assert.deepEqual(calls, [
+    ['Mode:Set', 'EDIT'],
+    ['AlertActionsEnabled:Set', false],
+  ]);
 });
 
 test('Web UI namespace allows Identify in SHOW mode', async () => {

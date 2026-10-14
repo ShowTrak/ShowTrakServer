@@ -87,6 +87,17 @@ const READ_CHANNELS = new Set([
 // a client just flashes an overlay on its screen — no state is mutated).
 const IDENTIFY_CHANNELS = new Set(['IdentifyClient', 'StopIdentifyingClient']);
 
+// Switching between SHOW and EDIT. Not itself gated on mode (it is how you
+// leave SHOW), but EDIT is the master gate for every management category below,
+// so granting this lets a remote surface lift that gate for every connected
+// surface at once. Hence its own permission, OFF by default.
+const MODE_CHANNELS = new Set(['Mode:Set']);
+
+// The global alert-actions switch. A SHOW-time control, so not gated on mode,
+// but switching it off silences every alert rule's actions server-wide. OFF by
+// default for the same reason.
+const ALERT_ACTIONS_CHANNELS = new Set(['AlertActionsEnabled:Set']);
+
 // Management mutations, split into finite capability categories so each can be
 // permitted/denied independently from the Web UI Permissions settings. Every
 // category ALSO requires the server to be in EDIT mode — edit-mode is
@@ -263,6 +274,8 @@ const ReadBool = async (Key: string, Default: boolean): Promise<boolean> => {
 /** The per-category permissions governing one remote surface. */
 export interface SurfacePermissions {
   AllowIdentify: boolean;
+  AllowModeChange: boolean;
+  AllowAlertActionsToggle: boolean;
   AllowRemoteScripts: boolean;
   AllowWOL: boolean;
   AllowClientManagement: boolean;
@@ -281,7 +294,9 @@ export interface SurfacePermissions {
  *
  * Defaults match the historical Web UI behaviour — management categories ON
  * (they were "allowed while in Edit mode" long before the toggles existed),
- * script execution OFF. ShowTrak Remote adopts the same defaults deliberately:
+ * script execution, mode changes and the alert-actions switch OFF (the last two
+ * were denied outright before they had permissions). Only the Web UI has
+ * settings rows for those two, so ShowTrak Remote always reads the default. ShowTrak Remote adopts the same defaults deliberately:
  * one rule for both remote surfaces is easier to hold in your head than two, and
  * the controls that actually carry the weight for a lost phone are the PIN at
  * pairing, the EDIT-mode gate and revocation — not a conservative default.
@@ -289,6 +304,8 @@ export interface SurfacePermissions {
 export async function ReadSurfacePermissions(Prefix: SurfacePrefix): Promise<SurfacePermissions> {
   let Permissions: SurfacePermissions = {
     AllowIdentify: true,
+    AllowModeChange: false,
+    AllowAlertActionsToggle: false,
     AllowRemoteScripts: false,
     AllowWOL: true,
     AllowClientManagement: true,
@@ -302,6 +319,8 @@ export async function ReadSurfacePermissions(Prefix: SurfacePrefix): Promise<Sur
   try {
     Permissions = {
       AllowIdentify: await ReadBool(`${Prefix}_ALLOW_IDENTIFY`, true),
+      AllowModeChange: await ReadBool(`${Prefix}_ALLOW_MODE_CHANGE`, false),
+      AllowAlertActionsToggle: await ReadBool(`${Prefix}_ALLOW_ALERT_ACTIONS_TOGGLE`, false),
       AllowRemoteScripts: await ReadBool(`${Prefix}_ALLOW_REMOTE_SCRIPT_EXECUTION`, false),
       AllowWOL: await ReadBool(`${Prefix}_ALLOW_WOL`, true),
       AllowClientManagement: await ReadBool(`${Prefix}_ALLOW_CLIENT_MANAGEMENT`, true),
@@ -344,6 +363,14 @@ export async function AuthorizeChannel(
     if (!Cfg.AllowIdentify) return { allowed: false, reason: 'forbidden' };
     return { allowed: true, reason: null };
   }
+  if (MODE_CHANNELS.has(channel)) {
+    if (!Cfg.AllowModeChange) return { allowed: false, reason: 'forbidden' };
+    return { allowed: true, reason: null };
+  }
+  if (ALERT_ACTIONS_CHANNELS.has(channel)) {
+    if (!Cfg.AllowAlertActionsToggle) return { allowed: false, reason: 'forbidden' };
+    return { allowed: true, reason: null };
+  }
   // Management categories: EDIT mode is the master gate, then the per-category
   // permission. Report the mode requirement first so the UX message is accurate.
   const Category = CLIENT_CHANNELS.has(channel)
@@ -376,6 +403,8 @@ export async function AuthorizeChannel(
 export {
   READ_CHANNELS,
   IDENTIFY_CHANNELS,
+  MODE_CHANNELS,
+  ALERT_ACTIONS_CHANNELS,
   CLIENT_CHANNELS,
   GROUP_CHANNELS,
   MONITORING_CHANNELS,

@@ -52,6 +52,8 @@ const ALL_ON = {
 for (const Prefix of ['WEBUI', 'REMOTE']) {
   for (const Key of [
     'ALLOW_IDENTIFY',
+    'ALLOW_MODE_CHANGE',
+    'ALLOW_ALERT_ACTIONS_TOGGLE',
     'ALLOW_REMOTE_SCRIPT_EXECUTION',
     'ALLOW_WOL',
     'ALLOW_CLIENT_MANAGEMENT',
@@ -263,6 +265,53 @@ test('unassigned slots need the global feature AND the permission AND edit mode'
   });
 });
 
+// --- Mode and alert-actions switches ----------------------------------------
+
+test('mode changes and the alert-actions switch default OFF', async () => {
+  // Both were denied outright before they had permissions, and switching to
+  // EDIT lifts the master gate for every surface — so unset must mean refused.
+  const Mod = load({ settings: {}, mode: 'SHOW' });
+  for (const Prefix of ['WEBUI', 'REMOTE']) {
+    for (const Channel of ['Mode:Set', 'AlertActionsEnabled:Set']) {
+      assert.deepEqual(
+        await Mod.AuthorizeChannel(Prefix, Channel),
+        { allowed: false, reason: 'forbidden' },
+        `${Prefix} reached "${Channel}" with no permission set`
+      );
+    }
+  }
+});
+
+test('mode changes obey their own permission and work from SHOW mode', async () => {
+  // Gating Mode:Set on EDIT would make it impossible to leave SHOW.
+  const On = load({ settings: { WEBUI_ALLOW_MODE_CHANGE: 1 }, mode: 'SHOW' });
+  assert.deepEqual(await On.AuthorizeChannel('WEBUI', 'Mode:Set'), {
+    allowed: true,
+    reason: null,
+  });
+  // ...and grants nothing else: management still waits for EDIT.
+  assert.equal((await On.AuthorizeChannel('WEBUI', 'AlertActionsEnabled:Set')).allowed, false);
+  assert.deepEqual(await On.AuthorizeChannel('WEBUI', 'CreateGroup'), {
+    allowed: false,
+    reason: 'edit_mode_required',
+  });
+
+  const Off = load({ settings: { ...ALL_ON, WEBUI_ALLOW_MODE_CHANGE: 0 }, mode: 'EDIT' });
+  assert.equal((await Off.AuthorizeChannel('WEBUI', 'Mode:Set')).allowed, false);
+});
+
+test('the alert-actions switch obeys its own permission in either mode', async () => {
+  for (const mode of ['SHOW', 'EDIT']) {
+    const On = load({ settings: { WEBUI_ALLOW_ALERT_ACTIONS_TOGGLE: 1 }, mode });
+    assert.equal((await On.AuthorizeChannel('WEBUI', 'AlertActionsEnabled:Set')).allowed, true);
+    assert.equal((await On.AuthorizeChannel('WEBUI', 'Mode:Set')).allowed, false);
+  }
+  // Alert RULE management is a separate category and unaffected.
+  const Off = load({ settings: { ...ALL_ON, WEBUI_ALLOW_ALERT_ACTIONS_TOGGLE: 0 }, mode: 'EDIT' });
+  assert.equal((await Off.AuthorizeChannel('WEBUI', 'AlertActionsEnabled:Set')).allowed, false);
+  assert.equal((await Off.AuthorizeChannel('WEBUI', 'SetAlertRuleEnabled')).allowed, true);
+});
+
 // --- Failure behaviour -------------------------------------------------------
 
 test('an unreadable settings store falls back to the safe defaults, not to allow-all', async () => {
@@ -274,5 +323,7 @@ test('an unreadable settings store falls back to the safe defaults, not to allow
   assert.equal((await Mod.AuthorizeChannel('REMOTE', 'ExecuteScript')).allowed, false);
   assert.equal((await Mod.AuthorizeChannel('REMOTE', 'WakeOnLan')).allowed, false);
   assert.equal((await Mod.AuthorizeChannel('REMOTE', 'CreateUnassignedClients')).allowed, false);
+  assert.equal((await Mod.AuthorizeChannel('WEBUI', 'Mode:Set')).allowed, false);
+  assert.equal((await Mod.AuthorizeChannel('WEBUI', 'AlertActionsEnabled:Set')).allowed, false);
   assert.equal((await Mod.AuthorizeChannel('REMOTE', 'GetClient')).allowed, true);
 });

@@ -92,6 +92,8 @@ interface WebConfig {
   AllowRemoteScripts: boolean;
   WOLEnabled: boolean;
   UnassignedClientsEnabled: boolean;
+  AllowModeChange: boolean;
+  AllowAlertActionsToggle: boolean;
   Authed: boolean;
   Mode?: string;
   Version?: string;
@@ -131,8 +133,9 @@ function setThemeColor(color: string) {
 }
 
 // Hide the desktop-only chrome. CSS (body.is-web) is the primary mechanism; this
-// is a defensive backup in case markup changes.
-function applyWebChrome() {
+// is a defensive backup in case markup changes. The mode and alert-actions
+// controls stay live only when their Web UI permission is granted.
+function applyWebChrome(config: WebConfig) {
   try {
     setThemeColor('#6d5bd0');
     document.body.classList.add('is-web');
@@ -147,17 +150,17 @@ function applyWebChrome() {
     const modeShow = el('MODE_BTN_SHOW') as HTMLButtonElement | null;
     const modeEdit = el('MODE_BTN_EDIT') as HTMLButtonElement | null;
     const alertToggle = el('ALERT_ACTIONS_TOGGLE_BTN') as HTMLButtonElement | null;
-    if (modeShow) {
+    if (modeShow && !config.AllowModeChange) {
       modeShow.disabled = true;
       modeShow.setAttribute('aria-disabled', 'true');
       modeShow.title = 'Show mode is controlled by the desktop app';
     }
-    if (modeEdit) {
+    if (modeEdit && !config.AllowModeChange) {
       modeEdit.disabled = true;
       modeEdit.setAttribute('aria-disabled', 'true');
       modeEdit.title = 'Edit mode is controlled by the desktop app';
     }
-    if (alertToggle) {
+    if (alertToggle && !config.AllowAlertActionsToggle) {
       alertToggle.disabled = true;
       alertToggle.setAttribute('aria-disabled', 'true');
       alertToggle.title = 'Alert actions are controlled by the desktop app';
@@ -179,8 +182,8 @@ function buildCapabilities(config: WebConfig) {
     isWeb: true,
     showNavbar: false,
     showCogs: false,
-    showModeToggle: false,
-    canToggleAlertActions: false,
+    showModeToggle: !!config.AllowModeChange,
+    canToggleAlertActions: !!config.AllowAlertActionsToggle,
     requiresPasscode: !!config.PasswordProtection,
     allowRemoteScripts: !!config.AllowRemoteScripts,
     wolEnabled: !!config.WOLEnabled,
@@ -223,7 +226,7 @@ async function startApp(config: WebConfig) {
   } catch {
     /* stale caches are best-effort only */
   }
-  applyWebChrome();
+  applyWebChrome(config);
   hide('WEB_LOGIN_OVERLAY');
   hide('WEB_LOADING_OVERLAY');
   // Importing ./main runs the bootstrap orchestrator: every module registers

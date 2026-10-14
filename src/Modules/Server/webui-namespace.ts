@@ -266,6 +266,8 @@ const GetWebConfig = async () => {
     AllowRemoteScripts: Permissions.AllowRemoteScripts,
     WOLEnabled: Permissions.WOLEnabled,
     AllowIdentify: Permissions.AllowIdentify,
+    AllowModeChange: Permissions.AllowModeChange,
+    AllowAlertActionsToggle: Permissions.AllowAlertActionsToggle,
     AllowClientManagement: Permissions.AllowClientManagement,
     AllowGroupManagement: Permissions.AllowGroupManagement,
     AllowMonitoringManagement: Permissions.AllowMonitoringManagement,
@@ -293,6 +295,10 @@ const GetPublicConfig = async (socket: WebSocket) => {
     // browser uses this to show/hide the + menu entry, since it cannot read
     // settings directly.
     UnassignedClientsEnabled: Cfg.UnassignedClientsEnabled && Cfg.AllowUnassignedClients,
+    // Whether the browser may drive the SHOW/EDIT toggle and the alert-actions
+    // switch. The rpc gate enforces both regardless; these only enable the UI.
+    AllowModeChange: Cfg.AllowModeChange,
+    AllowAlertActionsToggle: Cfg.AllowAlertActionsToggle,
     Authed: !Cfg.RequireAuth || !!(socket && socket.Authed),
     Mode: ModeManager.Get(),
     Version: Config.Application.Version,

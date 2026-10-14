@@ -12,9 +12,9 @@
 // Channels/args mirror `src/bridge_main.ts` exactly so both surfaces stay in
 // lock-step (a drift guard test asserts the channel maps match). Desktop-only
 // methods (file dialogs, show-file, script management, native/app updates,
-// network discovery, settings mutation, mode/alert toggles) resolve to safe
-// no-ops on the web — their UI triggers are hidden by the capability layer, and
-// the server denies them regardless.
+// network discovery, settings mutation) resolve to safe no-ops on the web —
+// their UI triggers are hidden by the capability layer, and the server denies
+// them regardless.
 
 import type { ShowTrakAPI } from '@showtrak/protocol';
 
@@ -200,9 +200,13 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     OnAppMenuAction: noSub,
     OnWindowFullscreenChanged: noSub,
 
-    // ---- Mode (read mirrors server; set is desktop-only) -----------------
+    // ---- Mode (set needs the WEBUI_ALLOW_MODE_CHANGE permission) --------
     GetMode: async () => rpc('Mode:Get'),
-    SetMode: resolveNull,
+    // A denial resolves to an error tuple; report the unchanged mode instead.
+    SetMode: async (Mode) => {
+      const Result = await rpc('Mode:Set', Mode);
+      return Result === 'SHOW' || Result === 'EDIT' ? Result : rpc('Mode:Get');
+    },
     OnModeUpdated: (cb) => sub('ModeUpdated', cb),
     OnAlertActionsUpdated: (cb) => sub('AlertActionsUpdated', cb),
 
@@ -340,9 +344,13 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     DeleteAlertRule: async (RuleID) => rpc('DeleteAlertRule', RuleID),
     SetAlertRuleEnabled: async (RuleID, Enabled) => rpc('SetAlertRuleEnabled', RuleID, Enabled),
     GetAlertActionsEnabled: async () => rpc('AlertActionsEnabled:Get'),
-    // Web sessions can never toggle alert actions off; keep the UI's optimistic
-    // value by echoing the requested state without hitting the server.
-    SetAlertActionsEnabled: async (Enabled) => !!Enabled,
+    // Needs the WEBUI_ALLOW_ALERT_ACTIONS_TOGGLE permission. A denial resolves
+    // to an error tuple; report the unchanged state instead so the toggle
+    // snaps back rather than showing the requested one.
+    SetAlertActionsEnabled: async (Enabled) => {
+      const Result = await rpc('AlertActionsEnabled:Set', Enabled);
+      return typeof Result === 'boolean' ? Result : !!(await rpc('AlertActionsEnabled:Get'));
+    },
     SetFullAlertRuleList: (cb) => sub('SetFullAlertRuleList', cb),
     AlertTriggered: (cb) => sub('AlertTriggered', cb),
     CreateShowTrakAlert: (cb) => sub('CreateShowTrakAlert', cb),
