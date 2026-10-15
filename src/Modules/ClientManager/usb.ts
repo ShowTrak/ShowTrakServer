@@ -7,7 +7,7 @@
 // conditions a mark/update request produces. The Client entity (./client.ts)
 // holds the state and calls these.
 //
-// Clients before 3.22.0 report a device's names and serial only. The port it is
+// Clients before 3.27.0 report a device's names and serial only. The port it is
 // plugged into, its firmware version and (on Windows) its Plug and Play problem
 // state came later, so every one of them may be absent — and an absent or
 // unreadable value is never a fault, the principle the display, audio and

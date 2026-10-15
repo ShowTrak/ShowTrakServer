@@ -63,7 +63,7 @@ Each ShowTrak Client reports, and the server judges:
 
 - **Vitals:** CPU and memory usage (every second), operating-system uptime and
   boot time. On macOS, memory reads as Activity Monitor's "Memory Used" from
-  client 3.22.0.
+  client 3.27.0.
 - **Hardware:** USB devices (port, firmware, Windows device errors), displays
   (mode, rotation, position, primary), audio endpoints (format, default, level,
   mute) and network interfaces (addresses, router).
@@ -76,7 +76,7 @@ Each ShowTrak Client reports, and the server judges:
   Linux via sysfs, NVIDIA GPUs via `nvidia-smi`), and macOS thermal pressure.
 
 Anything a platform cannot report is shown as "not available on <OS>" rather
-than treated as a fault, and clients older than 3.22.0 are told which version
+than treated as a fault, and clients older than 3.27.0 are told which version
 they need.
 
 A client reads **degraded** when any of the following holds:

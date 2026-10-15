@@ -137,7 +137,7 @@ function Heartbeat(
     if (Uptime !== undefined) {
       const Normalized = Tolerate(() => {
         if (!isPlainObject(Uptime)) fail('Vitals.Uptime must be an object');
-        // Seconds arrived with client 3.22.0; older clients omit it, and the
+        // Seconds arrived with client 3.27.0; older clients omit it, and the
         // key stays absent so the server falls back to parsing Formatted.
         const Seconds = Tolerate(
           () => normalizeOptionalFiniteNumber(Uptime.Seconds, 'Vitals.Uptime.Seconds'),
@@ -227,7 +227,7 @@ function USBDevice(
     ),
     ProductName: normalizeOptionalString(value.ProductName, `${fieldName}.ProductName`),
     SerialNumber: normalizeOptionalString(value.SerialNumber, `${fieldName}.SerialNumber`),
-    // Reported by clients from 3.22.0. An ABSENT key means the client cannot
+    // Reported by clients from 3.27.0. An ABSENT key means the client cannot
     // report it at all, so it stays absent; a value that does not parse is kept
     // as null (unknown) rather than refusing the device, whose presence is the
     // thing that matters most.

@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-// The socket boundary for client health telemetry (client 3.22.0+): uptime in
+// The socket boundary for client health telemetry (client 3.27.0+): uptime in
 // seconds, hung and foreground applications, and the PowerStatus and
 // Temperatures snapshots. Shape and bounds are enforced here; meaning is decided
 // by ClientManager. What matters most is that ABSENT stays absent — an older

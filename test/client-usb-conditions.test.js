@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 // Critical USB devices, the pure half (ClientManager/usb.ts): reading the
 // optional fields a client reports, judging a device (by serial) or a group (by
 // name) against its conditions, the list the renderer draws, and the conditions
-// a mark request makes. Clients before 3.22.0 send none of the new fields, so
+// a mark request makes. Clients before 3.27.0 send none of the new fields, so
 // much of this is about what happens when they are missing.
 
 const USB = require('../dist/Modules/ClientManager/usb');
@@ -25,7 +25,7 @@ function device(overrides = {}) {
   };
 }
 
-// A device as a client before 3.22.0 reports it.
+// A device as a client before 3.27.0 reports it.
 function legacy(overrides = {}) {
   const {
     Location: _Location,

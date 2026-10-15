@@ -137,7 +137,7 @@ export function PercentReading(Value: unknown): number | null {
 
 /**
  * Operating-system uptime in seconds from a heartbeat's Uptime vitals.
- * Clients from 3.22.0 send `Seconds`; older ones only the `HH:mm:ss` string,
+ * Clients from 3.27.0 send `Seconds`; older ones only the `HH:mm:ss` string,
  * which is parsed so reboot detection and the uptime readout work for them too.
  */
 export function UptimeSecondsOf(Uptime: unknown): number | null {

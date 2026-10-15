@@ -5,7 +5,7 @@
 // back into a request. Mirrors lib/displays and lib/audio-devices.
 //
 // What a device supports is read from what the client reported, never from a
-// version table: a client before 3.22.0 sends no port, firmware or device state
+// version table: a client before 3.27.0 sends no port, firmware or device state
 // at all, so those rows read Unsupported until it is updated.
 import type {
   ClientView,

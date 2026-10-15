@@ -514,7 +514,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       { serial: true }
     );
 
-    // Battery, mains and sleep/resume, and temperatures (clients from 3.22.0).
+    // Battery, mains and sleep/resume, and temperatures (clients from 3.27.0).
     // Serialized so a "going to sleep" report and the one sent on waking are
     // judged in the order the client sent them.
     GuardedOn(

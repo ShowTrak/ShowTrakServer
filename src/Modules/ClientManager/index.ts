@@ -167,7 +167,7 @@ export interface ClientManagerType {
   RemoveDisplayCritical(UUID: string, DisplayID: unknown): Promise<Result<boolean>>;
   IsDisplayCritical(UUID: string, DisplayID: unknown): Promise<Result<boolean>>;
   SetAudioDevices(UUID: string, Snapshot: unknown): Promise<Result<string>>;
-  // Battery / mains / sleep, and temperatures (clients from 3.22.0).
+  // Battery / mains / sleep, and temperatures (clients from 3.27.0).
   SetPowerStatus(UUID: string, Snapshot: unknown): Promise<Result<string>>;
   SetTemperatures(UUID: string, Snapshot: unknown): Promise<Result<string>>;
   // Mark an endpoint critical or update its conditions; Ok(true) when newly marked.

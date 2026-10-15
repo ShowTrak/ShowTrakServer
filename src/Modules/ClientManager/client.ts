@@ -383,7 +383,7 @@ class Client {
   BootTime: number | null;
   UptimeSeconds: number | null;
   // Battery/mains/sleep and temperatures, as last reported. Null until the
-  // client reports them (clients before 3.22.0 never do).
+  // client reports them (clients before 3.27.0 never do).
   PowerStatus: PowerStatusSnapshot | null;
   Temperatures: TemperaturesSnapshot | null;
   // System-check conditions currently failing (see ./health). Empty while offline.
