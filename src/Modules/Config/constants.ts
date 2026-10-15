@@ -94,6 +94,14 @@ export const ALERT_BASELINE_SETTLE_MS = 3 * 60 * 1000;
 // is announced; this just bounds how late that announcement can be.
 export const ALERT_BASELINE_SWEEP_INTERVAL_MS = 30 * 1000;
 
+// How often every client's and dummy client's current status is written to its
+// history, whether or not anything happened. Status samples are otherwise only
+// recorded when an update arrives, and an offline client sends none, so without
+// this its timeline drew one red block at the disconnect and grey after it.
+// Matches the history store's steady-state cadence (one reading per 15s, four
+// per one-minute block); repeats inside that window are absorbed.
+export const STATUS_HISTORY_SAMPLE_INTERVAL_MS = 15 * 1000;
+
 // Default polling interval applied to a monitoring target / dummy client / check
 // method when none is configured (or the configured value is invalid).
 export const DEFAULT_MONITORING_INTERVAL_MS = 30000;
@@ -109,7 +117,7 @@ export const HISTORY_RETENTION_MS = 12 * 60 * 60 * 1000;
 
 // How often the retention sweep runs. Stores are also trimmed when they are
 // read or written; the sweep is what reaches the ones nothing touches any more
-// (a client that went offline stops recording, but its readings still age out).
+// (a deleted client stops recording, but its readings still age out).
 export const HISTORY_RETENTION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
 // The first ShowTrak Client release that reports battery/mains, sleep and

@@ -429,6 +429,36 @@ test('DummyClientUpdated also records and alerts with no window', async () => {
   assert.equal(alertsMgr.__callsTo('HandleClientUpdated').length, 1);
 });
 
+test('the status history sampler records every client and dummy, even offline, with no window', async () => {
+  // An offline client sends no updates, so this timer is the only thing that
+  // keeps its timeline red for the length of an outage.
+  state.hasWindow = false;
+  state.clients = [
+    null,
+    [
+      { UUID: 'client-1', Online: false },
+      { UUID: 'client-2', Online: true },
+    ],
+  ];
+  state.dummies = [null, [{ UUID: 'dummy-1', Online: false }]];
+  await Bridge.SampleStatusHistory();
+
+  assert.deepEqual(history, [
+    ['client', { UUID: 'client-1', Online: false }],
+    ['client', { UUID: 'client-2', Online: true }],
+    ['dummy', { UUID: 'dummy-1', Online: false }],
+  ]);
+  assert.deepEqual(pushes, [], 'sampling pushes nothing');
+});
+
+test('the status history sampler logs a failed fetch and still samples the rest', async () => {
+  state.clients = ['clients unavailable', null];
+  await Bridge.SampleStatusHistory();
+
+  assert.deepEqual(history, [['dummy', { UUID: 'dummy-1' }]]);
+  assert.equal(logs.errors.length, 1);
+});
+
 test('ClientUpdated pushes and records when a window is present', async () => {
   await emit('ClientUpdated', { UUID: 'client-1', Online: false });
   assert.deepEqual(pushes, [['ClientUpdated', { UUID: 'client-1', Online: false }]]);

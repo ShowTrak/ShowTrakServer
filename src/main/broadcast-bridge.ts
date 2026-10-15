@@ -18,6 +18,7 @@ import {
   ALERT_BASELINE_SETTLE_MS,
   ALERT_BASELINE_SWEEP_INTERVAL_MS,
   ONLINE_DEPLOY_COOLDOWN_MS,
+  STATUS_HISTORY_SAMPLE_INTERVAL_MS,
 } from '../Modules/Config/constants';
 import { Manager as SettingsManager } from '../Modules/SettingsManager';
 import { Manager as ClientManager } from '../Modules/ClientManager';
@@ -264,7 +265,7 @@ async function ReadoptDevice(UUID: string): Promise<void> {
 // Full re-hydration: clear caches, re-fetch, and send authoritative lists.
 async function ReinitializeSystem(): Promise<void> {
   if (!hasMainWindow()) return;
-  Logger.log('Reinitializing system...');
+  Logger.log('Reinitialising system…');
 
   // Refresh manager caches that hold DB-backed state in memory.
   if (typeof SettingsManager.Reload === 'function') {
@@ -740,6 +741,36 @@ function StartAlertBaselineSweep(): void {
   if (typeof AlertBaselineSweepTimer.unref === 'function') AlertBaselineSweepTimer.unref();
 }
 
+// Status history is recorded when an update arrives, which a connected client
+// sends every second but an offline one never does — so a client that stayed
+// down showed a single red block at the disconnect and grey for the rest of
+// its outage. This writes every client's and dummy client's current status on
+// a steady cadence so the timeline (list view and the Status tab) keeps
+// drawing the state the tile shows. Both lists are in memory; no DB read.
+let StatusHistorySampleTimer: ReturnType<typeof setInterval> | null = null;
+
+async function SampleStatusHistory(): Promise<void> {
+  try {
+    const [ClientsErr, Clients] = await ClientManager.GetAll();
+    if (ClientsErr) Logger.error('Failed to fetch clients for status history:', ClientsErr);
+    for (const Client of ClientsErr ? [] : Clients || []) recordClientHistorySample(Client);
+
+    const [DummiesErr, Dummies] = await DummyClientManager.GetAll();
+    if (DummiesErr) Logger.error('Failed to fetch dummy clients for status history:', DummiesErr);
+    for (const Dummy of DummiesErr ? [] : Dummies || []) recordDummyHistorySample(Dummy);
+  } catch (Err) {
+    Logger.error('Status history sample failed', Err);
+  }
+}
+
+function StartStatusHistorySampler(): void {
+  if (StatusHistorySampleTimer) return;
+  StatusHistorySampleTimer = setInterval(() => {
+    void SampleStatusHistory();
+  }, STATUS_HISTORY_SAMPLE_INTERVAL_MS);
+  if (typeof StatusHistorySampleTimer.unref === 'function') StatusHistorySampleTimer.unref();
+}
+
 // Pure-indirection push subscribers: guard against window teardown, then forward
 // the emitted payload verbatim to the renderers. `[event, channel]` pairs.
 const PASSTHROUGH: Array<[string, string]> = [
@@ -814,6 +845,8 @@ function RegisterBroadcastBridge(): void {
 export {
   RegisterBroadcastBridge,
   StartAlertBaselineSweep,
+  StartStatusHistorySampler,
+  SampleStatusHistory,
   UpdateSettings,
   UpdateAdoptionList,
   UpdateFullClientList,

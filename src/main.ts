@@ -312,6 +312,7 @@ app.whenReady().then(async () => {
 import {
   RegisterBroadcastBridge,
   StartAlertBaselineSweep,
+  StartStatusHistorySampler,
   ValidateAlertAudioAssets,
   UpdateAdoptionList,
 } from './main/broadcast-bridge';
@@ -322,6 +323,9 @@ RegisterBroadcastBridge();
 // fresh outages; this slow sweep is what raises the ones that turn out to be
 // real once the rig has had time to finish coming up.
 StartAlertBaselineSweep();
+// Offline clients send no updates, so their status history is topped up on a
+// timer or their timelines would go grey mid-outage (see ./main/broadcast-bridge).
+StartStatusHistorySampler();
 // Everything ShowTrak remembers ages out after 12 hours; this reaches the stores
 // nothing writes to any more (see ./main/history-retention).
 StartHistoryRetentionSweep();
