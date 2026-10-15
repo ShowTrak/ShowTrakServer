@@ -35,6 +35,8 @@ import { InitTagManager } from './tag-manager';
 import { InitVariableManager } from './variable-manager';
 import { InitFog } from './fog';
 import { InitOfflineIndicators } from './offline-indicators';
+import { InitLogConsole } from './log-console';
+import { InitRainbowMode } from './rainbow-mode';
 import { Init, WireGlobalUI } from './init';
 import { LoadFreeKioskCatalogues } from './freekiosk';
 import { EnsureMonitoringMethodsLoaded } from './monitoring-editor/method-fields';
@@ -62,6 +64,8 @@ InitTagManager();
 InitVariableManager();
 InitFog();
 InitOfflineIndicators();
+InitLogConsole();
+InitRainbowMode();
 // The metric registry and command map are static for the session and every
 // FreeKiosk surface needs them, so they are fetched once up front rather than
 // per render. Not awaited: a tile renders fine before they land.

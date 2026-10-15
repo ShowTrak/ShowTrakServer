@@ -673,6 +673,154 @@
   margin-left: 0.45rem;
 }
 
+/* Hidden log console: shares the debug terminal surface, one row per log line. */
+.log-console-terminal {
+  min-height: min(70vh, 720px);
+  max-height: min(70vh, 720px);
+}
+
+.log-console-line {
+  display: grid;
+  grid-template-columns: auto 5.5rem minmax(0, 10rem) minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: start;
+  padding: 0.1rem 0;
+  color: rgba(238, 245, 255, 0.92);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+
+.log-console-time {
+  color: rgba(154, 176, 202, 0.78);
+  white-space: nowrap;
+}
+
+.log-console-type {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.log-console-alias {
+  color: rgba(132, 220, 255, 0.82);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-console-message {
+  min-width: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-console-line.is-info .log-console-type {
+  color: rgba(132, 220, 255, 0.9);
+}
+
+.log-console-line.is-success .log-console-type {
+  color: var(--success-text);
+}
+
+.log-console-line.is-warn .log-console-type,
+.log-console-line.is-trace .log-console-type {
+  color: var(--warning-text);
+}
+
+.log-console-line.is-error .log-console-type,
+.log-console-line.is-error .log-console-message {
+  color: var(--danger-text);
+}
+
+.log-console-line.is-debug,
+.log-console-line.is-database {
+  color: rgba(199, 216, 237, 0.62);
+}
+
+.log-console-line.is-debug .log-console-type,
+.log-console-line.is-database .log-console-type {
+  color: rgba(199, 216, 237, 0.62);
+}
+
+/* Rainbow Mode: healthy online tiles and list rows show one rainbow, and
+   nothing else on the page changes. Degraded, offline, idle, pending and
+   identifying tiles keep their normal colours, so a problem still stands out
+   (DEGRADED is excluded by name: a tile can carry ONLINE and DEGRADED together
+   mid-update).
+   - Each tile carries a rainbow overlay in `color` blend mode: only hue and
+     saturation change, each pixel keeps its own brightness, so text keeps its
+     contrast and stays readable. `isolation` on the tile confines the blend to
+     that tile.
+   - The gradient is fixed to the window, not the tile, so the tiles read as
+     windows onto a single rainbow behind them.
+   - The colours cycle through hue-rotate, which the compositor animates without
+     repainting; moving the gradient instead would repaint every tile every
+     frame. rainbow-mode.ts keeps every tile's cycle on one shared clock. */
+body.st-rainbow .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING) {
+  isolation: isolate;
+}
+
+body.st-rainbow .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING)::after {
+  content: '';
+  position: absolute;
+  /* Out over the 2px border, which the tile's background also fills. */
+  inset: -2px;
+  border-radius: inherit;
+  z-index: 100;
+  pointer-events: none;
+  background: fixed
+    repeating-linear-gradient(
+      115deg,
+      #ff4d4d 0,
+      #ffa53d 14vmax,
+      #ffe94d 28vmax,
+      #4dff88 43vmax,
+      #3dd8ff 57vmax,
+      #5a6bff 71vmax,
+      #d65aff 86vmax,
+      #ff4d4d 100vmax
+    );
+  mix-blend-mode: color;
+  opacity: 0.65;
+  transition: opacity 1.2s ease;
+  animation: st-rainbow-hue 12s linear infinite;
+  will-change: filter;
+}
+
+/* Fade in only when the mode is switched on, not every time a tile is
+   re-rendered; the hue animation keeps its place in the list so it carries on
+   when this class is removed. */
+body.st-rainbow-entering .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING)::after {
+  animation:
+    st-rainbow-hue 12s linear infinite,
+    st-rainbow-in 1.2s ease backwards;
+}
+
+body.st-rainbow-leaving .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING)::after {
+  opacity: 0;
+}
+
+@keyframes st-rainbow-hue {
+  from {
+    filter: hue-rotate(0deg);
+  }
+  to {
+    filter: hue-rotate(360deg);
+  }
+}
+
+@keyframes st-rainbow-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.st-rainbow .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING)::after,
+  body.st-rainbow-entering .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING)::after {
+    animation: none;
+  }
+}
+
 .osc-action-card {
   border: 1px solid rgba(255, 255, 255, 0.09);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);

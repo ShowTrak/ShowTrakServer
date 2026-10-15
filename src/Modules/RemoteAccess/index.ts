@@ -239,6 +239,8 @@ const PUSH_CHANNELS = [
   'ModeUpdated',
   'AlertActionsUpdated',
   'AudioAssetsUpdated',
+  // Rainbow Mode is one flag for every surface, so open browsers follow it too.
+  'RainbowModeUpdated',
   // Only ever delivered through ToPublicSettings: the raw payload carries the
   // Web UI passcode, the SDK key and the FOG tokens.
   'UpdateSettings',

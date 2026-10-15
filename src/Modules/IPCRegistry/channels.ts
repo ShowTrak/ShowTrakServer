@@ -34,6 +34,10 @@ const INVOKE_CHANNELS = [
   'Mode:Set',
   'OpenLogsFolder',
   'OpenScriptsFolder',
+  'LogConsole:Open',
+  'LogConsole:Close',
+  'RainbowMode:Get',
+  'RainbowMode:Set',
 
   // Clients
   'GetClient',
@@ -278,6 +282,8 @@ const SUBSCRIBE_CHANNELS = [
   'NetworkInterfacesChanged',
   'FogStatusUpdated',
   'SetFogTaskList',
+  'LogConsole:Entries',
+  'RainbowModeUpdated',
 ] as const;
 
 // Union types derived from the arrays above — the compile-time contract for

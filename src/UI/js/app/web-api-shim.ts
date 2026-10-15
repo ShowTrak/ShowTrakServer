@@ -16,9 +16,12 @@
 // their UI triggers are hidden by the capability layer, and the server denies
 // them regardless.
 
-import type { ShowTrakAPI } from '@showtrak/protocol';
+import type { LogConsoleSnapshot, ShowTrakAPI } from '@showtrak/protocol';
 
 type Ack = { result?: unknown; error?: string };
+
+// How long a hidden-console request (log feed, Rainbow Mode) waits for its ack.
+const CONSOLE_ACK_TIMEOUT_MS = 10_000;
 
 /**
  * Minimal surface of the Socket.IO client socket the shim relies on. The real
@@ -73,6 +76,34 @@ function makeSub(socket: WebUiSocket) {
 function createWebApi(socket: WebUiSocket): ShowTrakAPI {
   const rpc = makeRpc(socket);
   const sub = makeSub(socket);
+
+  // Rainbow Mode rides its own socket events (see webui-namespace.ts). Any
+  // failure or a lost ack reads as "off".
+  const AckOrFalse = (Event: string, ...Args: unknown[]): Promise<boolean> =>
+    new Promise((resolve) => {
+      const Timer = setTimeout(() => resolve(false), CONSOLE_ACK_TIMEOUT_MS);
+      try {
+        socket.emit(Event, ...Args, (res: Ack) => {
+          clearTimeout(Timer);
+          resolve(!!(res && res.result === true));
+        });
+      } catch {
+        clearTimeout(Timer);
+        resolve(false);
+      }
+    });
+
+  // A reconnect is a new socket to the server, so an open log console has to
+  // ask again. Lines logged during the gap are not replayed.
+  let LogConsoleLevel: string | null = null;
+  socket.on('connect', () => {
+    if (LogConsoleLevel === null) return;
+    try {
+      socket.emit('logconsole:open', LogConsoleLevel, () => undefined);
+    } catch {
+      /* intentional: the next reconnect tries again */
+    }
+  });
 
   // Desktop-only no-op resolvers with shapes matching what callers expect.
   // Generic so each assignment adopts the ShowTrakAPI return type it stands in
@@ -401,6 +432,43 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     OpenAudioAssetsFolder: resolveNull,
     PlayCustomAudio: (cb) => sub('PlayCustomAudio', cb),
     OnAudioAssetsUpdated: (cb) => sub('AudioAssetsUpdated', cb),
+
+    // ---- Log console -------------------------------------------------------
+    // Own socket events rather than rpc: the server streams to this socket only
+    // while it is open.
+    // Socket.IO drops an ack whose socket disconnects before replying, so the
+    // request gives up after a while rather than leaving the console waiting
+    // (and holding back live lines) forever.
+    OpenLogConsole: async (Level) => {
+      LogConsoleLevel = Level;
+      return new Promise((resolve) => {
+        const Timer = setTimeout(() => resolve(null), CONSOLE_ACK_TIMEOUT_MS);
+        const Settle = (Snapshot: LogConsoleSnapshot | null) => {
+          clearTimeout(Timer);
+          resolve(Snapshot);
+        };
+        try {
+          socket.emit('logconsole:open', Level, (res: Ack) =>
+            Settle(res && res.result ? (res.result as LogConsoleSnapshot) : null)
+          );
+        } catch {
+          Settle(null);
+        }
+      });
+    },
+    CloseLogConsole: async () => {
+      LogConsoleLevel = null;
+      try {
+        socket.emit('logconsole:close');
+      } catch {
+        /* intentional: the server also stops on disconnect */
+      }
+      return null;
+    },
+    OnLogConsoleEntries: (cb) => sub('LogConsole:Entries', cb),
+    GetRainbowMode: async () => AckOrFalse('rainbow:get'),
+    SetRainbowMode: async (Enabled) => AckOrFalse('rainbow:set', Enabled),
+    OnRainbowModeUpdated: (cb) => sub('RainbowModeUpdated', cb),
   };
 }
 

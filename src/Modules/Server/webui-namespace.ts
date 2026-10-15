@@ -36,6 +36,8 @@ import { Manager as ModeManager } from '../ModeManager';
 import { ToPublicClient, ToPublicGroup } from './serializers';
 import { RegisterRendererSink } from '../../main/renderer-bus';
 import { GetHandler } from '../../main/handler-registry';
+import { CloseLogConsole, OpenLogConsole } from '../../main/log-console';
+import { GetRainbowMode, SetRainbowMode } from '../../main/rainbow-mode';
 import {
   AuthorizeChannel,
   ReadSurfacePermissions,
@@ -478,6 +480,9 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
 
         socket.emit('ModeUpdated', ModeManager.Get());
         socket.emit('AlertActionsUpdated', AlertsManager.GetActionsEnabled());
+        // Sent off as well as on: a browser that reconnects across a restart
+        // must drop a rainbow the new process no longer has.
+        socket.emit('RainbowModeUpdated', GetRainbowMode());
       } catch (e) {
         Logger.error('Web UI initial state failed:', e);
       }
@@ -565,6 +570,46 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
         if (cb) cb({ result: Result });
       } catch (e) {
         Logger.error('Web UI rpc failed:', e);
+        if (cb) cb({ error: 'failed' });
+      }
+    });
+
+    // --- Log console ----------------------------------------------------------
+    // Not on the rpc bridge: lines must stream to THIS socket only, and only
+    // between open and close, so a browser without the console open costs no
+    // bandwidth. Delivery stops on close, disconnect, or losing the session.
+    const LogConsoleKey = `web:${socket.id}`;
+    socket.on('logconsole:open', async (Level: unknown, cb: AckCallback) => {
+      try {
+        if (!(await IsAuthed(socket))) return cb && cb({ error: 'unauthorized' });
+        const Snapshot = OpenLogConsole(LogConsoleKey, Level, (Entries) => {
+          if (!socket.Authed) throw new Error('Session ended');
+          socket.emit('LogConsole:Entries', Entries);
+        });
+        if (cb) cb({ result: Snapshot });
+      } catch {
+        if (cb) cb({ error: 'failed' });
+      }
+    });
+    socket.on('logconsole:close', () => CloseLogConsole(LogConsoleKey));
+    socket.on('disconnect', () => CloseLogConsole(LogConsoleKey));
+
+    // Rainbow Mode, toggled from the console. Same reasoning: kept off the rpc
+    // bridge so it never appears in the documented surface.
+    socket.on('rainbow:get', async (cb: AckCallback) => {
+      try {
+        if (!(await IsAuthed(socket))) return cb && cb({ error: 'unauthorized' });
+        if (cb) cb({ result: GetRainbowMode() });
+      } catch {
+        if (cb) cb({ error: 'failed' });
+      }
+    });
+    socket.on('rainbow:set', async (Enabled: unknown, cb: AckCallback) => {
+      try {
+        if (!(await IsAuthed(socket))) return cb && cb({ error: 'unauthorized' });
+        const Result = SetRainbowMode(Enabled);
+        if (cb) cb({ result: Result });
+      } catch {
         if (cb) cb({ error: 'failed' });
       }
     });

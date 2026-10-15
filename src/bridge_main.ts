@@ -205,6 +205,10 @@ const INVOKE_CHANNEL_LIST = [
   'Remote:RevokeAllDevices',
   'Remote:IssuePairingCode',
   'Remote:ClearPairingCode',
+  'LogConsole:Open',
+  'LogConsole:Close',
+  'RainbowMode:Get',
+  'RainbowMode:Set',
 ] as const satisfies readonly InvokeChannel[];
 type _MissingInvokeChannels = AssertAllChannelsListed<
   Exclude<InvokeChannel, (typeof INVOKE_CHANNEL_LIST)[number]>
@@ -251,6 +255,8 @@ const SUBSCRIBE_CHANNEL_LIST = [
   'NetworkInterfacesChanged',
   'FogStatusUpdated',
   'SetFogTaskList',
+  'LogConsole:Entries',
+  'RainbowModeUpdated',
 ] as const satisfies readonly SubscribeChannel[];
 type _MissingSubscribeChannels = AssertAllChannelsListed<
   Exclude<SubscribeChannel, (typeof SUBSCRIBE_CHANNEL_LIST)[number]>
@@ -591,6 +597,12 @@ const API: ShowTrakAPI = {
   OpenAudioAssetsFolder: async () => invoke('Audio:OpenFolder'),
   PlayCustomAudio: (Callback) => subscribe('PlayCustomAudio', Callback),
   OnAudioAssetsUpdated: (Callback) => subscribe('AudioAssetsUpdated', Callback),
+  OpenLogConsole: async (Level) => invoke('LogConsole:Open', Level),
+  CloseLogConsole: async () => invoke('LogConsole:Close'),
+  OnLogConsoleEntries: (Callback) => subscribe('LogConsole:Entries', Callback),
+  GetRainbowMode: async () => invoke('RainbowMode:Get'),
+  SetRainbowMode: async (Enabled) => invoke('RainbowMode:Set', Enabled),
+  OnRainbowModeUpdated: (Callback) => subscribe('RainbowModeUpdated', Callback),
 };
 
 contextBridge.exposeInMainWorld('API', API);

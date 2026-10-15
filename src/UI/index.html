@@ -964,6 +964,48 @@ Loading licence…</pre>
 
     <div
       class="modal fade"
+      id="LOG_CONSOLE_MODAL"
+      tabindex="-1"
+      aria-labelledby="LOG_CONSOLE_MODAL_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body osc-http-debug-modal-body">
+            <div id="LOG_CONSOLE_HEADER"></div>
+            <div class="bg-ghost p-2 rounded d-flex align-items-center gap-2 text-start">
+              <label for="LOG_CONSOLE_LEVEL" class="mb-0">Minimum Level</label>
+              <select
+                id="LOG_CONSOLE_LEVEL"
+                class="form-select form-select-sm bg-transparent text-light border-0 w-auto"
+              >
+                <option value="error">Error</option>
+                <option value="warn">Warn</option>
+                <option value="info">Info</option>
+                <option value="debug">Debug</option>
+                <option value="trace">Trace</option>
+              </select>
+              <div class="form-check mb-0 ms-auto">
+                <input class="form-check-input" type="checkbox" id="LOG_CONSOLE_RAINBOW" />
+                <label class="form-check-label" for="LOG_CONSOLE_RAINBOW">Rainbow Mode</label>
+              </div>
+              <button type="button" id="LOG_CONSOLE_CLEAR" class="btn btn-sm btn-light">
+                Clear
+              </button>
+            </div>
+            <div
+              id="LOG_CONSOLE_TERMINAL"
+              class="osc-http-debug-terminal log-console-terminal"
+              role="log"
+              aria-live="off"
+            ></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
       id="SHOWTRAK_MODAL_SCRIPTMANAGER"
       tabindex="-1"
       aria-labelledby="SHOWTRAK_MODAL_SCRIPTMANAGER_Label"

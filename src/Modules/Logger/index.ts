@@ -140,12 +140,111 @@ function enqueueWrite(line: string): void {
 const serializeArg = SerializeArg;
 const stripAnsi = StripAnsi;
 
+// --- Live feed --------------------------------------------------------------
+//
+// Every emitted line is also kept in a small in-memory ring and handed to any
+// feed listener (the hidden log console). The feed has its own level, separate
+// from Settings.level: while a console is watching at 'trace', lines below the
+// active level are still produced for the feed — but never written to the
+// console or the file. With no console watching, FeedLevel is null and nothing
+// below the active level is serialised, so the feed costs nothing extra.
+
+export interface LogFeedEntry {
+  Seq: number;
+  Time: number;
+  Level: string;
+  Type: string;
+  Alias: string;
+  Message: string;
+}
+
+type LogFeedListener = (Entry: LogFeedEntry) => void;
+
+// The ring is bounded by lines AND characters, whichever is hit first, so a run
+// of maximum-length lines cannot hold more than a few MB.
+const FEED_RING_SIZE = 1000;
+const FEED_RING_MAX_CHARS = 1_000_000;
+// A console line is for reading, not archiving: a multi-megabyte JSON dump would
+// otherwise be shipped whole to every viewer. The file keeps the full line.
+const FEED_MAX_MESSAGE_LENGTH = 20000;
+
+const FeedRing: LogFeedEntry[] = [];
+let FeedRingChars = 0;
+const FeedListeners = new Set<LogFeedListener>();
+// Seeded from the clock so a restarted server keeps counting upward: a Web UI
+// that reconnects across a restart drops lines at or below the last Seq it saw,
+// and a counter reset to zero would make it drop everything. Room for 1000 lines
+// per millisecond, sustained, before a restart could collide.
+let FeedSeq = Date.now() * 1000;
+let FeedLevel: string | null = null;
+
+function feedWants(levelKey: string): boolean {
+  return FeedLevel !== null && IsLevelEnabledFor(levelKey, FeedLevel, DefaultLevel);
+}
+
+function pushFeed(alias: string, type: string, levelKey: string, msg: string): void {
+  let Message = stripAnsi(msg);
+  if (Message.length > FEED_MAX_MESSAGE_LENGTH) {
+    const Extra = Message.length - FEED_MAX_MESSAGE_LENGTH;
+    Message = `${Message.slice(0, FEED_MAX_MESSAGE_LENGTH)}… (${Extra} more characters in the log file)`;
+  }
+  const Entry: LogFeedEntry = {
+    Seq: ++FeedSeq,
+    Time: Date.now(),
+    Level: levelKey,
+    Type: type,
+    Alias: alias,
+    Message,
+  };
+  FeedRing.push(Entry);
+  FeedRingChars += Message.length;
+  while (
+    FeedRing.length > 1 &&
+    (FeedRing.length > FEED_RING_SIZE || FeedRingChars > FEED_RING_MAX_CHARS)
+  ) {
+    FeedRingChars -= FeedRing.shift()!.Message.length;
+  }
+  for (const Listener of FeedListeners) {
+    try {
+      Listener(Entry);
+    } catch {
+      /* intentional: a broken listener must never break logging */
+    }
+  }
+}
+
+/** Listen to every line the feed produces. Returns an unsubscribe handle. */
+export function SubscribeToLogFeed(Listener: LogFeedListener): () => void {
+  FeedListeners.add(Listener);
+  return () => {
+    FeedListeners.delete(Listener);
+  };
+}
+
+/** The recent lines held in memory, oldest first. */
+export function GetLogFeedBacklog(): LogFeedEntry[] {
+  return FeedRing.slice();
+}
+
+/**
+ * The most verbose level any viewer wants, or null when nobody is watching.
+ * Lines down to this level are produced for the feed even when the active level
+ * would drop them.
+ */
+export function SetLogFeedLevel(Level: string | null): void {
+  FeedLevel = Level ? String(Level).toLowerCase() : null;
+}
+
 // The log level gates emission uniformly: a message below the active level is
 // written neither to the console nor to the file. (`silent()` bypasses this on
-// purpose — it is always persisted to the file.)
+// purpose — it is always persisted to the file.) A watching log console may
+// still receive it through the feed.
 function writeLine(alias: string, type: string, arg: unknown, levelKey: string): void {
-  if (!isLevelEnabled(levelKey)) return;
+  const Enabled = isLevelEnabled(levelKey);
+  if (!Enabled && !feedWants(levelKey)) return;
   const msg = serializeArg(arg);
+  pushFeed(alias, type, levelKey, msg);
+  if (!Enabled) return;
   const consoleTag = Tag(alias, type);
   const fileTag = TagPlain(alias, type);
   const line = `${GetDateTimeStamp()} ${fileTag} ${stripAnsi(msg)}`;
@@ -167,9 +266,11 @@ class Logger {
     this.log(...args);
   }
   silent(...args: unknown[]): void {
-    args.forEach((arg) =>
-      enqueueWrite(`${GetDateTimeStamp()} ${TagPlain(this.Alias, 'Info')} ${serializeArg(arg)}`)
-    );
+    args.forEach((arg) => {
+      const msg = serializeArg(arg);
+      pushFeed(this.Alias, 'Info', 'info', msg);
+      enqueueWrite(`${GetDateTimeStamp()} ${TagPlain(this.Alias, 'Info')} ${msg}`);
+    });
   }
   warn(...args: unknown[]): void {
     args.forEach((arg) => writeLine(this.Alias, 'Warn', arg, 'warn'));
