@@ -10,6 +10,10 @@
 // Pointing HOME (and the Windows/XDG equivalents) at an empty directory moves
 // the app-data path somewhere that does not exist, reproducing CI exactly
 // without needing CI.
+//
+// Not named test-*.js: that matches node --test's default file pattern, so the
+// suite would run this script as a test file of its own (spawning a recursive
+// run that node skips with a warning).
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');

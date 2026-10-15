@@ -31,7 +31,7 @@
     "prepare": "husky",
     "postinstall": "npm run build:shared && node scripts/copy-bootstrap-icons.js",
     "build:shared": "tsc -p shared/tsconfig.build.json",
-    "test:isolated": "npm run pretest && node scripts/test-isolated.js"
+    "test:isolated": "npm run pretest && node scripts/run-isolated-tests.js"
   },
   "keywords": [
     "electron",
