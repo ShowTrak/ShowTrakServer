@@ -43,6 +43,7 @@ const INVOKE_CHANNEL_LIST = [
   'Shutdown',
   'GetClient',
   'GetClientHistory',
+  'GetStatusHistoryOverview',
   'GetClientApplicationHistory',
   'GetClientUSBHistory',
   'GetClientDisplayHistory',
@@ -313,6 +314,7 @@ const API: ShowTrakAPI = {
   Shutdown: async (Confirmed = false) => invoke('Shutdown', Confirmed),
   GetClient: async (UUID) => invoke('GetClient', UUID),
   GetClientHistory: async (UUID) => invoke('GetClientHistory', UUID),
+  GetStatusHistoryOverview: async () => invoke('GetStatusHistoryOverview'),
   GetClientApplicationHistory: async (UUID) => invoke('GetClientApplicationHistory', UUID),
   GetClientUSBHistory: async (UUID) => invoke('GetClientUSBHistory', UUID),
   GetClientDisplayHistory: async (UUID) => invoke('GetClientDisplayHistory', UUID),
@@ -486,8 +488,8 @@ const API: ShowTrakAPI = {
   DeleteMonitoringTarget: async (TargetID) => invoke('DeleteMonitoringTarget', TargetID),
   SetFullMonitoringTargetList: (Callback) => subscribe('SetFullMonitoringTargetList', Callback),
   MonitoringTargetUpdated: (Callback) => subscribe('MonitoringTargetUpdated', Callback),
-  RunMonitoringAction: async (TargetIDs, Method, ActionID, Params) =>
-    invoke('RunMonitoringAction', TargetIDs, Method, ActionID, Params),
+  RunMonitoringAction: async (TargetIDs, Method, ActionID, Params, CheckIDs) =>
+    invoke('RunMonitoringAction', TargetIDs, Method, ActionID, Params, CheckIDs),
   GetMonitoringActionFavourites: async () => invoke('GetMonitoringActionFavourites'),
   SetMonitoringActionFavourite: async (Method, ActionID, Params, Favourite) =>
     invoke('SetMonitoringActionFavourite', Method, ActionID, Params, Favourite),

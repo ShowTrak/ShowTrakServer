@@ -53,6 +53,13 @@ import {
 } from './selection-init';
 import { RenderDummyClientTile } from './dummy-clients';
 import { RenderFreeKioskTile } from './freekiosk';
+import {
+  RenderListGroupHeaderCells,
+  RenderListRowCells,
+  RenderListTableHeader,
+  SyncListView,
+  UpdateListRowState,
+} from './list-view';
 
 // Deployment-toast working state. This mirrors the runtime shape used below and
 // cached on `window.__ShowTrakDeploymentUiState`; note the ambient window decl
@@ -643,6 +650,7 @@ export function RenderClientTile(Client: ClientView): string {
 					</h7>`
           }
 				</div>
+        ${RenderListRowCells(String(UUID), CompactStatusLabel)}
 			</div>`;
 }
 
@@ -705,11 +713,13 @@ export function UpdateClientTile(Data: ClientView): void {
   const ComputedIP = IP ? IP : 'Unknown IP';
   if ($IP.text() !== ComputedIP) $IP.text(ComputedIP);
 
+  const CompactLabel = GetClientCompactStatusLabel(Data);
   const CompactOnlineStatus = $tile.children('[data-type="COMPACT_ONLINE_STATUS"]');
   if (CompactOnlineStatus.length) {
-    CompactOnlineStatus.text(GetClientCompactStatusLabel(Data));
+    CompactOnlineStatus.text(CompactLabel);
     CompactOnlineStatus.removeClass('d-none');
   }
+  UpdateListRowState($tile, CompactLabel);
 
   if (Online && Vitals) {
     const $Progress = $tile.children('div').children('.progress');
@@ -757,6 +767,9 @@ export function RenderFullClientAndMonitorList() {
   // auto-flow (non-dense) preserves strict group order and wraps a group onto a
   // new row, leaving a blank slot, when it cannot fit in the columns remaining
   // on the current row.
+  // The list view's column headings: one row for the whole list, sticky.
+  Filler += RenderListTableHeader();
+
   Filler += `<div class="group-column-grid" style="grid-template-columns: repeat(${ColumnCount}, minmax(0, 1fr));">`;
 
   for (const Group of Groups) {
@@ -791,12 +804,13 @@ export function RenderFullClientAndMonitorList() {
 				<span class="GROUP_TITLE py-2">
           ${Safe(GroupLabel)}
 				</span>
+				${RenderListGroupHeaderCells()}
 			</div>
 		</div>
 	<div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100 group-drop-zone${TintClass}"${TintStyle} data-groupid="${GroupID}">`;
 
     if (Merged.length == 0) {
-      Filler += `<div class="SHOWTRAK_PC_PLACEHOLDER w-100 p-3"
+      Filler += `<div class="SHOWTRAK_PC_PLACEHOLDER w-100 p-3">
 				<h5 class="text-muted mb-0">
 					Empty Group
 				</h5>
@@ -842,6 +856,13 @@ export function RenderFullClientAndMonitorList() {
     });
   } else {
     $('#APPLICATION_CONTENT').html(Filler);
+  }
+  // A row whose history was cached before this render already carries it; this
+  // picks up any that were added or changed since.
+  try {
+    SyncListView();
+  } catch (e) {
+    HandleNonFatalError('RenderFullClientAndMonitorList:SyncListView', e);
   }
   // Initialize or teardown edit-mode interactions after render
   try {
@@ -953,6 +974,7 @@ export function RenderPendingAdoptionSection() {
               UUID
             )}">Adopt</button>
           </div>
+          ${RenderListRowCells(UUID, 'Discovered', { History: false })}
         </div>`;
     }
     html += `  </div>`;

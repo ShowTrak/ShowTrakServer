@@ -18,12 +18,15 @@ import { OfflineBadgeContent } from './lib/status-badges';
 import {
   AppMode,
   FreeKioskMetricCatalogCache,
+  Selected,
   Tags,
   setFreeKioskCommandsCache,
   setFreeKioskMetricCatalogCache,
 } from './state';
 import { ResolveEntityTags } from './lib/tag-badges';
 import { RenderTagBadgeRow } from './lib/tag-badge-view';
+import { FreeKioskListState } from './lib/list-view';
+import { RenderListRowCells, UpdateListRowState } from './list-view';
 import { Safe } from './utils';
 import { FormatMetricCompact } from './lib/metric-format';
 
@@ -215,9 +218,9 @@ export function RenderFreeKioskTile(K: FreeKioskTerminalView): string {
   );
 
   return `
-    <div id="FREEKIOSK_TILE_${K.UUID}" class="SHOWTRAK_PC FREEKIOSK ${TileStateClass(
-      K
-    )}" data-kiosk-uuid="${K.UUID}" data-uuid="${DragUUID}" data-flip-key="${DragUUID}" draggable="${
+    <div id="FREEKIOSK_TILE_${K.UUID}" class="SHOWTRAK_PC FREEKIOSK ${TileStateClass(K)}${
+      Selected.includes(DragUUID) ? ' SELECTED' : ''
+    }" data-kiosk-uuid="${K.UUID}" data-uuid="${DragUUID}" data-flip-key="${DragUUID}" draggable="${
       AppMode === 'EDIT' ? 'true' : 'false'
     }">
       <button type="button" class="CLIENT_TILE_COG FREEKIOSK_TILE_COG" aria-label="Edit FreeKiosk Terminal" title="Edit FreeKiosk Terminal">
@@ -254,6 +257,7 @@ export function RenderFreeKioskTile(K: FreeKioskTerminalView): string {
           ${OfflineBadgeContent()}
         </h7>
       </div>
+      ${RenderListRowCells(DragUUID, FreeKioskListState(K))}
     </div>`;
 }
 
@@ -295,6 +299,7 @@ export function UpdateFreeKioskTile(K: FreeKioskTerminalView): void {
     .removeClass('text-light text-success text-warning')
     .addClass(Compact.color)
     .toggleClass('d-none', Compact.offline);
+  UpdateListRowState($tile, FreeKioskListState(K));
 
   const ToggleIndicator = (Type: string, Show: boolean) => {
     $tile

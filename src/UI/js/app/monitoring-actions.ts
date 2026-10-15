@@ -510,6 +510,38 @@ export function GetFavouritesForSelection(TargetIDs: string[]): FavouriteForSele
   return Out;
 }
 
+export interface FavouriteForChecks {
+  Favourite: MonitoringActionFavouriteView;
+  TargetIDs: number[];
+  CheckIDs: number[];
+}
+
+/**
+ * The starred actions that apply to a selection of check rows, each narrowed to
+ * the selected checks of its method — a favourite for PJLink offered on a
+ * selection holding one PJLink check and one ping check runs on that one check.
+ */
+export function GetFavouritesForChecks(CheckIDs: string[]): FavouriteForChecks[] {
+  const Wanted = new Set(CheckIDs.map(String));
+  const Found: MonitoringCheckView[] = [];
+  for (const Target of MonitoringTargets) {
+    for (const Check of Target.Checks || []) {
+      if (Wanted.has(String(Check.CheckID))) Found.push(Check);
+    }
+  }
+  const Out: FavouriteForChecks[] = [];
+  for (const Favourite of MonitoringActionFavourites) {
+    const Matching = Found.filter((Check) => Check.Method === Favourite.Method);
+    if (!Matching.length) continue;
+    Out.push({
+      Favourite,
+      TargetIDs: [...new Set(Matching.map((Check) => Number(Check.TargetID)))],
+      CheckIDs: Matching.map((Check) => Number(Check.CheckID)),
+    });
+  }
+  return Out;
+}
+
 /** Record a parameter edit so it survives the panel's next re-render. */
 export function SetActionParamDraft(
   CheckID: string,
@@ -540,14 +572,16 @@ export async function RunMonitoringAction(
   Method: string,
   ActionID: string,
   Params: Record<string, unknown>,
-  Label: string
+  Label: string,
+  CheckIDs: number[] | null = null
 ): Promise<void> {
   try {
     const [Err, Summary] = await window.API.RunMonitoringAction(
       TargetIDs,
       Method,
       ActionID,
-      Params
+      Params,
+      CheckIDs
     );
     if (Err) return Notify(String(Err), 'error');
     if (!Summary) return Notify(`${Label}: no response`, 'error');

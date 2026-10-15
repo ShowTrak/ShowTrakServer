@@ -37,6 +37,7 @@ const READ_CHANNELS = new Set([
   'Config:Get',
   'GetClient',
   'GetClientHistory',
+  'GetStatusHistoryOverview',
   'GetClientApplicationHistory',
   'GetClientUSBHistory',
   'GetClientDisplayHistory',

@@ -1,0 +1,655 @@
+/* =========================================================================
+   List view (body.list-mode)
+   -------------------------------------------------------------------------
+   The list is the same tiles, laid out as table rows. Every tile already
+   carries the list-only cells (checkbox, status word, history graph — see
+   list-view.ts); they are hidden in Grid and Compact and placed here.
+
+   The rows and the one sticky heading row share a single column template, so
+   the columns line up down the whole page:
+
+     check | state | expand | name | type | address | detail | cog | history
+
+   A monitoring target can be expanded (the chevron in the expand column) into
+   one indented row per check, each selectable and with its own history.
+
+   Rows are neutral unless something is wrong: only a degraded or offline row
+   takes its status colour, so the problems are what stand out in a long list.
+   ========================================================================= */
+
+/* List-only cells stay out of the tile layouts. */
+.LIST_CHECK,
+.LIST_STATE,
+.LIST_HISTORY,
+.LIST_EXPAND,
+.LIST_TABLE_HEADER {
+  display: none;
+}
+
+/* Check rows exist only in the list, and only while their target is expanded.
+   They are also hidden mid-drag: they move with their target, and leaving them
+   behind while it is in the air would read as the checks being dropped. */
+body:not(.list-mode) .SHOWTRAK_PC.MONITOR_CHECK,
+.SHOWTRAK_PC.MONITOR_CHECK.is-collapsed,
+body:has(.SHOWTRAK_PC.dragging) .SHOWTRAK_PC.MONITOR_CHECK {
+  display: none !important;
+}
+
+body.list-mode {
+  --list-row-height: 30px;
+  --list-column-gap: 10px;
+  --list-row-padding: 8px;
+  --list-cols: 16px 92px 14px minmax(150px, 1.6fr) minmax(110px, 1fr) minmax(100px, 0.8fr)
+    minmax(110px, 1.1fr) 22px clamp(150px, 20vw, 280px);
+  --list-areas: 'check state expand name type address detail cog history';
+  /* Where the heading row pins: just under the window's drag bar. */
+  --list-sticky-top: 2rem;
+  --list-gutter: 0.75rem;
+  /* A healthy row: a faint surface, so the coloured ones are the exceptions. */
+  --list-row-neutral: rgba(255, 255, 255, 0.05);
+}
+
+/* No drag bar on the web surface or in native full screen. */
+body.list-mode.is-web,
+body.list-mode.macos-native-fullscreen {
+  --list-sticky-top: 0px;
+}
+
+/* --- The fade between the tile layouts and the table --------------------- */
+#APPLICATION_CONTENT {
+  transition: opacity 200ms ease;
+}
+
+#APPLICATION_CONTENT.view-fade-out {
+  opacity: 0;
+  transition-duration: 140ms;
+}
+
+/* The layout swap happens while the content is invisible; without this, every
+   tile would visibly stretch into a row as the table faded back in. */
+body.view-switching #APPLICATION_CONTENT *,
+body.view-switching #APPLICATION_CONTENT *::before,
+body.view-switching #APPLICATION_CONTENT *::after {
+  transition: none !important;
+}
+
+/* --- Groups: one full-width column, a header bar above each ------------- */
+body.list-mode .group-column-grid {
+  grid-template-columns: minmax(0, 1fr) !important;
+  column-gap: 0;
+  padding-inline: var(--list-gutter);
+}
+
+body.list-mode .group-column-item {
+  grid-column: 1 / -1 !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+}
+
+body.list-mode #PENDING_ADOPTION_SECTION {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  padding-inline: var(--list-gutter);
+}
+
+/* --- The heading row: one for the whole list, pinned while it scrolls ---- */
+body.list-mode .LIST_TABLE_HEADER {
+  position: sticky;
+  top: var(--list-sticky-top);
+  z-index: 5;
+  display: grid;
+  grid-template-columns: var(--list-cols);
+  grid-template-areas: var(--list-areas);
+  column-gap: var(--list-column-gap);
+  align-items: center;
+  height: 30px;
+  margin: 0.5rem var(--list-gutter) 0;
+  /* Spans the group boxes' full width so rows never show past its ends as
+     they scroll under it; padded to put its labels over the row columns
+     (box padding + row border + row padding). */
+  padding: 0 calc(4px + 2px + var(--list-row-padding));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(14, 11, 32, 0.94);
+  backdrop-filter: blur(6px);
+  text-align: left;
+}
+
+/* The group's vertical rail becomes a header bar on the row columns: its
+   checkbox over the rows' checkboxes, its name running from the Status
+   column on. */
+body.list-mode .GROUP_TITLE_CLICKABLE {
+  display: grid;
+  grid-template-columns: var(--list-cols);
+  grid-template-areas: var(--list-areas);
+  column-gap: var(--list-column-gap);
+  align-items: center;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  flex: 0 0 auto;
+  height: 26px;
+  /* Inset by the drop zone's padding, and padded by a row's padding plus its
+     2px border, so the header's columns sit exactly over the rows'. */
+  margin: 0.85rem 4px 0 4px !important;
+  padding: 0 calc(var(--list-row-padding) + 2px);
+  background-color: transparent !important;
+  border-radius: 6px;
+  overflow: hidden;
+  text-align: left;
+}
+
+body.list-mode .GROUP_TITLE_CLICKABLE:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Flatten the wrapper so its children sit directly on the header's grid. */
+body.list-mode .GROUP_TITLE_CLICKABLE > div {
+  display: contents !important;
+}
+
+body.list-mode .GROUP_TITLE {
+  grid-row: 1;
+  grid-column: state-start / -1;
+  writing-mode: horizontal-tb;
+  transform: none;
+  width: auto;
+  height: auto;
+  inline-size: auto;
+  max-inline-size: 100%;
+  padding: 0 !important;
+  font-size: 12px;
+  letter-spacing: 0.08rem;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: left;
+}
+
+body.list-mode .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
+  display: none !important;
+}
+
+body.list-mode .LIST_COLUMN_LABEL {
+  grid-row: 1;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: left;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+body.list-mode .LIST_COLUMN_LABEL[data-list-column='state'] {
+  grid-area: state;
+}
+body.list-mode .LIST_COLUMN_LABEL[data-list-column='name'] {
+  grid-area: name;
+}
+body.list-mode .LIST_COLUMN_LABEL[data-list-column='type'] {
+  grid-area: type;
+}
+body.list-mode .LIST_COLUMN_LABEL[data-list-column='address'] {
+  grid-area: address;
+}
+body.list-mode .LIST_COLUMN_LABEL[data-list-column='detail'] {
+  grid-area: detail;
+}
+body.list-mode .LIST_COLUMN_LABEL[data-list-column='history'] {
+  grid-area: history;
+}
+
+/* The rows of a group: a tight stack instead of a wrapping tile grid. */
+body.list-mode .group-drop-zone {
+  flex-direction: column !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  gap: 3px !important;
+  padding: 4px !important;
+  margin: 4px 0 0 0 !important;
+  border-radius: 8px !important;
+}
+
+/* A group's colour tint is a Grid/Compact thing: in the list it would fight
+   the degraded/offline rows, which are the colour that matters here. */
+body.list-mode .group-drop-zone.group-tinted {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  box-shadow: none;
+}
+
+body.list-mode .group-drop-zone > .dnd-ghost,
+body.list-mode .group-drop-zone > .dnd-source-spacer {
+  width: 100% !important;
+  height: var(--list-row-height) !important;
+  border-radius: 6px;
+}
+
+/* One row-height line, "Empty Group — This group has no clients.", in place
+   of the tile view's 100px centred block. */
+body.list-mode .SHOWTRAK_PC_PLACEHOLDER {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-height: var(--list-row-height);
+  padding: 0 10px !important;
+  align-content: center;
+  text-align: left;
+}
+
+body.list-mode .SHOWTRAK_PC_PLACEHOLDER h5 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+body.list-mode .SHOWTRAK_PC_PLACEHOLDER p {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* --- Rows ---------------------------------------------------------------- */
+body.list-mode .SHOWTRAK_PC {
+  width: 100%;
+  height: var(--list-row-height);
+  min-height: var(--list-row-height);
+  display: grid;
+  grid-template-columns: var(--list-cols);
+  grid-template-areas: var(--list-areas);
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: var(--list-column-gap);
+  align-items: center;
+  align-content: stretch;
+  padding: 0 var(--list-row-padding);
+  border-radius: 6px;
+  text-align: left;
+}
+
+/* Only degraded and offline rows are coloured. An identifying row keeps its
+   pulse: it is the answer to "which one is this?" while it runs. */
+body.list-mode .SHOWTRAK_PC:is(.ONLINE, .IDLE, .PENDING):not(.DEGRADED):not(.IDENTIFYING) {
+  background-color: var(--list-row-neutral) !important;
+}
+
+/* The compact view's one-line status labels: the State and Detail columns say
+   the same thing better here. */
+body.list-mode .SHOWTRAK_PC > .CLIENT_TILE_COMPACT_STATUS,
+body.list-mode .SHOWTRAK_PC > .MONITOR_COMPACT_LATENCY {
+  display: none !important;
+}
+
+/* Checkbox. Drawn from the tile's SELECTED class, so it can never disagree
+   with the selection; clicking it is a click on the row, which toggles. */
+body.list-mode .SHOWTRAK_PC > .LIST_CHECK,
+body.list-mode .LIST_GROUP_CHECK {
+  grid-area: check;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  background: rgba(0, 0, 0, 0.18);
+  color: transparent;
+  font-size: 12px;
+  line-height: 1;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+body.list-mode .LIST_CHECK .bi {
+  line-height: 1;
+}
+
+/* The checkbox is the selection marker in the list; the tile's white
+   selection border would be a second, much louder one. Hover is unchanged. */
+body.list-mode .SHOWTRAK_PC.SELECTED {
+  border-color: transparent !important;
+}
+
+body.list-mode .SHOWTRAK_PC.SELECTED:hover {
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* A check row is selected through its target while the target is, so it
+   shows the same tick (see MarkCheckRowsOf in selection.ts); clicking it
+   does nothing until the target is deselected. */
+body.list-mode .SHOWTRAK_PC.MONITOR_CHECK.PARENT_SELECTED > .LIST_CHECK,
+body.list-mode .SHOWTRAK_PC.SELECTED > .LIST_CHECK {
+  background: #fff;
+  border-color: #fff;
+  color: #15122b;
+}
+
+/* A group's checkbox: a dash while some of its rows are selected, a tick once
+   all of them are. Clicking the header already selects the whole group. */
+body.list-mode .LIST_GROUP_CHECK .bi {
+  display: none;
+}
+
+body.list-mode
+  .group-column-item:has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK).SELECTED)
+  > .GROUP_TITLE_CLICKABLE
+  .LIST_GROUP_CHECK {
+  background: #fff;
+  border-color: #fff;
+  color: #15122b;
+}
+
+body.list-mode
+  .group-column-item:has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK).SELECTED)
+  > .GROUP_TITLE_CLICKABLE
+  .LIST_GROUP_CHECK
+  .bi-dash-lg {
+  display: inline;
+}
+
+body.list-mode
+  .group-column-item:has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK)):not(
+    :has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK):not(.SELECTED))
+  )
+  > .GROUP_TITLE_CLICKABLE
+  .LIST_GROUP_CHECK
+  .bi-dash-lg {
+  display: none;
+}
+
+body.list-mode
+  .group-column-item:has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK)):not(
+    :has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK):not(.SELECTED))
+  )
+  > .GROUP_TITLE_CLICKABLE
+  .LIST_GROUP_CHECK
+  .bi-check-lg {
+  display: inline;
+}
+
+/* The pending-adoption section has no group to select. */
+body.list-mode #PENDING_ADOPTION_SECTION .LIST_GROUP_CHECK {
+  display: none;
+}
+
+/* Name */
+body.list-mode .SHOWTRAK_PC > [data-type='Nickname'],
+body.list-mode .SHOWTRAK_PC > [data-type='Name'],
+body.list-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_HOSTNAME'] {
+  grid-area: name;
+  display: block;
+  min-width: 0;
+  width: auto;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Type: OS + version / method + interval / "Dummy" / "FreeKiosk" — or the
+   tile's tag badges, which take that line's place exactly as on the tile. */
+body.list-mode .SHOWTRAK_PC > [data-type='Hostname'],
+body.list-mode .SHOWTRAK_PC > [data-type='Method'],
+body.list-mode .SHOWTRAK_PC > [data-type='DummyLabel'],
+body.list-mode .SHOWTRAK_PC > [data-type='FreeKioskLabel'],
+body.list-mode .SHOWTRAK_PC > .TILE_TAG_ROW {
+  grid-area: type;
+  min-width: 0;
+  width: auto;
+  max-height: none;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.72);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.list-mode .SHOWTRAK_PC > .TILE_TAG_ROW {
+  justify-content: flex-start;
+  height: 20px;
+}
+
+/* Address */
+body.list-mode .SHOWTRAK_PC > [data-type='IP'],
+body.list-mode .SHOWTRAK_PC > [data-type='Address'],
+body.list-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_IP'] {
+  grid-area: address;
+  display: block;
+  min-width: 0;
+  max-height: none;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.82) !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* State: the verdict in a word, with a dot in the timeline's colours. */
+body.list-mode .SHOWTRAK_PC > .LIST_STATE {
+  grid-area: state;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.92);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+body.list-mode .SHOWTRAK_PC > .LIST_STATE::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--status-graph-offline);
+}
+
+body.list-mode .SHOWTRAK_PC.ONLINE > .LIST_STATE::before {
+  background: var(--status-graph-online);
+}
+body.list-mode .SHOWTRAK_PC.DEGRADED > .LIST_STATE::before {
+  background: var(--status-graph-degraded);
+}
+body.list-mode .SHOWTRAK_PC.IDLE > .LIST_STATE::before {
+  background: var(--status-graph-idle);
+}
+body.list-mode .SHOWTRAK_PC.PENDING > .LIST_STATE::before,
+body.list-mode .SHOWTRAK_PC.IDENTIFYING > .LIST_STATE::before {
+  background: rgb(64, 180, 255);
+}
+
+/* Details: whichever of the tile's status lines is showing — the degraded
+   warning, a monitor's latency, the offline timer, or the vitals bars. */
+body.list-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS,
+body.list-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_ACTION'] {
+  grid-area: detail;
+  min-width: 0;
+  height: auto !important;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  font-size: 12px !important;
+  line-height: 1.2;
+  text-align: left;
+  overflow: hidden;
+}
+
+body.list-mode .SHOWTRAK_PC.MONITOR .SHOWTRAK_PC_STATUS[data-type='MONITOR_STATUS'] {
+  font-size: 12px !important;
+}
+
+/* The two vitals bars (CPU/RAM, battery/brightness), stacked thin. */
+body.list-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_ONLINE'] {
+  gap: 4px !important;
+  max-width: 180px;
+}
+
+/* A word the State column already says. */
+body.list-mode .SHOWTRAK_PC.MONITOR > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_IDLE'],
+body.list-mode .SHOWTRAK_PC.DUMMY > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_IDLE'],
+body.list-mode .SHOWTRAK_PC.DUMMY > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_ONLINE'],
+body.list-mode .SHOWTRAK_PC [data-type='UNASSIGNED_LABEL'] {
+  display: none !important;
+}
+
+/* The offline timer alone: "Offline" is already in the State column. */
+body.list-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS > [data-type='OFFLINE_SINCE'] {
+  font-size: 0;
+  line-height: 1;
+  text-align: left;
+  justify-self: start;
+  justify-content: flex-start;
+  /* The hidden word is still a flex item; no gap before the badge. */
+  gap: 0;
+}
+
+body.list-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS > [data-type='OFFLINE_SINCE'] .badge {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+body.list-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_ACTION'] {
+  display: flex !important;
+}
+
+body.list-mode .SHOWTRAK_PC.PENDING .ADOPT_BTN {
+  padding: 1px 12px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* Edit cog: its own narrow column rather than floating over the graph. */
+body.list-mode .CLIENT_TILE_COG,
+body.list-mode.mode-edit .SHOWTRAK_PC:hover > .CLIENT_TILE_COG,
+body.list-mode.mode-edit .CLIENT_TILE_COG:focus-visible {
+  grid-area: cog;
+  position: static;
+  width: 22px;
+  height: 22px;
+  transform: none;
+}
+
+/* --- Monitoring checks ----------------------------------------------------- */
+body.list-mode .SHOWTRAK_PC > .LIST_EXPAND {
+  grid-area: expand;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: -2px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+body.list-mode .SHOWTRAK_PC > .LIST_EXPAND:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+body.list-mode .SHOWTRAK_PC > .LIST_EXPAND .bi {
+  transition: transform 140ms ease;
+}
+
+body.list-mode .SHOWTRAK_PC.CHECKS_EXPANDED > .LIST_EXPAND .bi {
+  transform: rotate(90deg);
+}
+
+/* A check sits under its target: indented, with a branch mark, and a step
+   quieter than the rows around it. */
+body.list-mode .SHOWTRAK_PC.MONITOR_CHECK > [data-type='Name'] {
+  padding-left: 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+body.list-mode .SHOWTRAK_PC.MONITOR_CHECK > [data-type='Name']::before {
+  content: '\2514';
+  margin-right: 6px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+body.list-mode .SHOWTRAK_PC.MONITOR_CHECK > [data-type='Method'] {
+  text-transform: uppercase;
+  letter-spacing: 0.04rem;
+}
+
+/* History: the row's overall status over the last hour, far right. */
+body.list-mode .SHOWTRAK_PC > .LIST_HISTORY {
+  grid-area: history;
+  display: block;
+  min-width: 0;
+}
+
+/* Just the blocks: no track, border or padding around them. */
+body.list-mode .LIST_HISTORY .status-timeline {
+  height: 14px;
+  gap: 1px;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+
+body.list-mode .LIST_HISTORY .status-timeline-block {
+  border-radius: 1px;
+}
+
+/* --- Narrower windows drop the least-needed columns ---------------------- */
+@media (max-width: 1150px) {
+  body.list-mode {
+    --list-cols: 16px 92px 14px minmax(140px, 1.6fr) minmax(100px, 0.9fr) minmax(100px, 1fr) 22px
+      clamp(140px, 22vw, 240px);
+    --list-areas: 'check state expand name address detail cog history';
+  }
+
+  body.list-mode .SHOWTRAK_PC > [data-type='Hostname'],
+  body.list-mode .SHOWTRAK_PC > [data-type='Method'],
+  body.list-mode .SHOWTRAK_PC > [data-type='DummyLabel'],
+  body.list-mode .SHOWTRAK_PC > [data-type='FreeKioskLabel'],
+  body.list-mode .SHOWTRAK_PC > .TILE_TAG_ROW,
+  body.list-mode .LIST_COLUMN_LABEL[data-list-column='type'] {
+    display: none !important;
+  }
+}
+
+@media (max-width: 900px) {
+  body.list-mode {
+    --list-cols: 16px 88px 14px minmax(130px, 1.4fr) minmax(90px, 1fr) 22px
+      clamp(120px, 24vw, 200px);
+    --list-areas: 'check state expand name detail cog history';
+  }
+
+  body.list-mode .SHOWTRAK_PC > [data-type='IP'],
+  body.list-mode .SHOWTRAK_PC > [data-type='Address'],
+  body.list-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_IP'],
+  body.list-mode .LIST_COLUMN_LABEL[data-list-column='address'] {
+    display: none !important;
+  }
+}

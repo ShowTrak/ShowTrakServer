@@ -15,6 +15,7 @@ import {
   getClientSystemCheckHistorySamples,
 } from '../monitoring-history';
 import { getClientVitalsHistory } from '../client-vitals-history';
+import { getStatusHistoryOverview } from '../status-history-overview';
 import { Manager as MonitoringMethods } from '../../Modules/MonitoringMethods';
 import { Manager as MonitoringTargetManager } from '../../Modules/MonitoringTargetManager';
 import { Manager as MonitoringActionFavourites } from '../../Modules/MonitoringActionFavourites';
@@ -91,17 +92,34 @@ function register(): void {
   // gets one aggregate result.
   RPC.handle(
     'RunMonitoringAction',
-    createTupleHandler<[number[], string, string, Record<string, unknown>], unknown>(
-      (TargetIDs: unknown, Method: unknown, ActionID: unknown, Params: unknown) => [
+    createTupleHandler<
+      [number[], string, string, Record<string, unknown>, number[] | null],
+      unknown
+    >(
+      (
+        TargetIDs: unknown,
+        Method: unknown,
+        ActionID: unknown,
+        Params: unknown,
+        CheckIDs: unknown
+      ) => [
         IPCValidation.MonitoringTargetIDList(TargetIDs),
         IPCValidation.MonitoringMethodID(Method),
         IPCValidation.MonitoringActionID(Method, ActionID),
         // Parameters are validated against the action that is actually being
         // run, so a value meant for one action cannot smuggle into another.
         IPCValidation.MonitoringActionParams(Method, ActionID, Params),
+        // Optional: narrows the action to these checks (the list view's check
+        // rows). Absent means every check of the method, as before.
+        CheckIDs == null ? null : IPCValidation.MonitoringTargetIDList(CheckIDs, 'CheckIDs'),
       ],
-      (TargetIDs: number[], Method: string, ActionID: string, Params: Record<string, unknown>) =>
-        MonitoringTargetManager.RunAction(TargetIDs, Method, ActionID, Params)
+      (
+        TargetIDs: number[],
+        Method: string,
+        ActionID: string,
+        Params: Record<string, unknown>,
+        CheckIDs: number[] | null
+      ) => MonitoringTargetManager.RunAction(TargetIDs, Method, ActionID, Params, CheckIDs)
     )
   );
 
@@ -140,6 +158,11 @@ function register(): void {
       return [];
     }
     return getClientHistorySamples(UUID);
+  });
+
+  // Takes no input: the list view's history column, every row in one read.
+  RPC.handle('GetStatusHistoryOverview', async () => {
+    return getStatusHistoryOverview();
   });
 
   RPC.handle('GetClientApplicationHistory', async (_Event: unknown, UUID: unknown) => {

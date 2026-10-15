@@ -3,13 +3,12 @@ import {
   AppMode,
   DummyClients,
   FreeKioskTerminals,
-  MONITOR_HISTORY_BLOCK_COUNT,
-  MONITOR_HISTORY_WINDOW_MS,
   MonitorHistoryModalContext,
   MonitorHistorySeries,
   MonitorHistoryTooltipHover,
   MonitoringMethodsCache,
   MonitoringTargets,
+  Selected,
   Tags,
   setMonitorHistoryModalContext,
   setMonitorHistorySeries,
@@ -55,6 +54,34 @@ import {
 import { OfflineBadgeContent } from './lib/status-badges';
 import { ResolveEntityTags } from './lib/tag-badges';
 import { RenderTagBadgeRow } from './lib/tag-badge-view';
+import {
+  CheckRowID,
+  MonitorCheckDetail,
+  MonitorCheckListState,
+  MonitorCheckStateClass,
+  MonitorListState,
+} from './lib/list-view';
+import {
+  IsTargetExpanded,
+  RenderListExpandToggle,
+  RenderListRowCells,
+  UpdateListRowState,
+} from './list-view';
+import {
+  BuildOverallStatusBlocks,
+  BuildStatusBlocksFromSamples,
+  type StatusBlock,
+} from './lib/status-blocks';
+// The bucketing moved to lib/status-blocks so the list view's history column
+// shares it; re-exported so every existing importer keeps working.
+export {
+  BuildOverallStatusBlocks,
+  BuildStatusBlocksFromSamples,
+  DeriveSampleState,
+  FreeKioskReachabilitySamples,
+  MONITOR_STATE_SEVERITY,
+} from './lib/status-blocks';
+export type { StatusBlock, StatusStateCounts } from './lib/status-blocks';
 
 // Discriminated view-model for the currently-open monitor history modal.
 type MonitorHistoryEntity =
@@ -62,23 +89,6 @@ type MonitorHistoryEntity =
   | { type: 'dummy'; id: string; title: string; dummy: DummyClientView }
   | { type: 'freekiosk'; id: string; title: string; terminal: FreeKioskTerminalView }
   | { type: 'client'; id: string; title: string; client: ClientView | null };
-
-// Per-state sample tallies inside a single timeline block.
-interface StatusStateCounts {
-  ONLINE: number;
-  DEGRADED: number;
-  OFFLINE: number;
-}
-
-// A single one-hour-window timeline block (one per minute).
-interface StatusBlock {
-  start: number;
-  end: number;
-  state: string;
-  count: number;
-  counts: StatusStateCounts;
-  latencyMs: number | null;
-}
 
 // Options backing the current-status card / history section heading.
 interface MonitorStatusCardOptions {
@@ -311,8 +321,12 @@ export function RenderMonitoringTargetTile(T: MonitoringTargetView) {
   );
   const TileStateClass = Degraded ? 'DEGRADED' : Online ? 'ONLINE' : NoVerdict ? 'IDLE' : '';
   const TextClass = 'text-light';
+  const Checks = MonitorChecksInOrder(T);
+  const ExpandedClass = Checks.length && IsTargetExpanded(T.TargetID) ? ' CHECKS_EXPANDED' : '';
   return `
-    <div id="MONITOR_TILE_${T.TargetID}" class="SHOWTRAK_PC MONITOR ${TileStateClass}" data-target-id="${T.TargetID}" data-uuid="${DragUUID}" data-flip-key="${DragUUID}" draggable="${
+    <div id="MONITOR_TILE_${T.TargetID}" class="SHOWTRAK_PC MONITOR ${TileStateClass}${ExpandedClass}${
+      Selected.includes(DragUUID) ? ' SELECTED' : ''
+    }" data-target-id="${T.TargetID}" data-uuid="${DragUUID}" data-flip-key="${DragUUID}" draggable="${
       AppMode === 'EDIT' ? 'true' : 'false'
     }">
       <button type="button" class="CLIENT_TILE_COG MONITOR_TILE_COG" aria-label="Edit Monitor" title="Edit Monitor">
@@ -336,7 +350,68 @@ export function RenderMonitoringTargetTile(T: MonitoringTargetView) {
         </h7>
       </div>
       <span class="MONITOR_COMPACT_LATENCY ${CompactStatus.color}" data-type="MONITOR_COMPACT_LATENCY">${Safe(CompactStatus.text)}</span>
+      ${RenderListExpandToggle(T.TargetID, Checks.length)}
+      ${RenderListRowCells(DragUUID, MonitorListState(T))}
+    </div>${Checks.map((Check) => RenderMonitorCheckRow(T, Check)).join('')}`;
+}
+
+function MonitorChecksInOrder(T: MonitoringTargetView): MonitoringCheckView[] {
+  return (Array.isArray(T.Checks) ? T.Checks : [])
+    .filter((Check) => Check && Check.CheckID != null)
+    .slice()
+    .sort((a, b) => (a.Weight || 0) - (b.Weight || 0));
+}
+
+function MonitorCheckName(Check: MonitoringCheckView): string {
+  const MethodMeta = MonitoringMethodsCache.find((m) => m.ID === Check.Method);
+  return Check.Name || (MethodMeta && MethodMeta.Name) || String(Check.Method || '').toUpperCase();
+}
+
+/**
+ * One check of a target, as a row of the list view. A sibling of the target's
+ * tile rather than a child, so the target row keeps its own height and colour;
+ * hidden outside the list and while the target is collapsed. Selectable as
+ * `check:<CheckID>`. Never draggable: a check moves with its target.
+ */
+function RenderMonitorCheckRow(T: MonitoringTargetView, Check: MonitoringCheckView): string {
+  const ID = CheckRowID(Check.CheckID);
+  const Collapsed = IsTargetExpanded(T.TargetID) ? '' : ' is-collapsed';
+  const SelectedClass = Selected.includes(ID) ? ' SELECTED' : '';
+  // Shown as selected while its target is (see MarkCheckRowsOf in selection.ts).
+  const ParentClass = Selected.includes(`monitor:${T.TargetID}`) ? ' PARENT_SELECTED' : '';
+  return `
+    <div id="MONITOR_CHECK_${Check.CheckID}" class="SHOWTRAK_PC MONITOR_CHECK ${MonitorCheckStateClass(
+      Check
+    )}${SelectedClass}${ParentClass}${Collapsed}" data-uuid="${ID}" data-check-id="${Check.CheckID}" data-target-id="${
+      T.TargetID
+    }" data-flip-key="${ID}" draggable="false">
+      <h5 class="mb-0" data-type="Name">${Safe(MonitorCheckName(Check))}</h5>
+      <label class="text-sm" data-type="Method">${Safe(String(Check.Method || '').toUpperCase())} · ${Safe(
+        FormatInterval(T.Interval)
+      )}</label>
+      <small class="text-sm text-light" data-type="Address">${Safe(Check.Address || '')}</small>
+      <div class="SHOWTRAK_PC_STATUS d-grid" data-type="CHECK_DETAIL">
+        <h7 class="mb-0 text-light" data-type="CHECK_DETAIL_TEXT">${Safe(MonitorCheckDetail(Check))}</h7>
+      </div>
+      ${RenderListRowCells(ID, MonitorCheckListState(Check))}
     </div>`;
+}
+
+/** Patch a target's check rows in place from a live update. */
+function UpdateMonitorCheckRows(T: MonitoringTargetView): void {
+  for (const Check of MonitorChecksInOrder(T)) {
+    const $row = $(`#MONITOR_CHECK_${Check.CheckID}`);
+    if (!$row.length) continue;
+    const StateClass = MonitorCheckStateClass(Check);
+    $row
+      .toggleClass('ONLINE', StateClass === 'ONLINE')
+      .toggleClass('DEGRADED', StateClass === 'DEGRADED')
+      .toggleClass('IDLE', StateClass === 'IDLE');
+    $row.children('[data-type="Name"]').text(MonitorCheckName(Check));
+    $row.children('[data-type="Address"]').text(Check.Address || '');
+    $row.find('[data-type="CHECK_DETAIL_TEXT"]').text(MonitorCheckDetail(Check));
+    UpdateListRowState($row, MonitorCheckListState(Check));
+  }
 }
 
 export function UpdateMonitoringTargetTile(T: MonitoringTargetView) {
@@ -381,6 +456,8 @@ export function UpdateMonitoringTargetTile(T: MonitoringTargetView) {
   ToggleIndicator('MONITOR_STATUS', Online && !NoVerdict);
   ToggleIndicator('INDICATOR_OFFLINE', !Online && !NoVerdict);
   $tile.find('[data-type="OFFLINE_SINCE"]').attr('data-offlinesince', GetMonitoringOfflineSince(T));
+  UpdateListRowState($tile, MonitorListState(T));
+  UpdateMonitorCheckRows(T);
 }
 
 // The history modal is target-centric: it renders an overall status timeline
@@ -611,17 +688,6 @@ export async function LoadHistorySamplesForContext() {
   }
 }
 
-// Possible timeline/status states. All resolve to a CSS variable driven colour
-// (see main.css :root --status-*) so the palette lives in one place:
-//   IDLE / UNAVAILABLE -> grey, OFFLINE -> red, DEGRADED -> orange, ONLINE -> green.
-export const MONITOR_STATE_SEVERITY = {
-  IDLE: -1,
-  UNAVAILABLE: -1,
-  ONLINE: 0,
-  DEGRADED: 1,
-  OFFLINE: 2,
-};
-
 export function MonitorStateLabel(State: string) {
   switch (State) {
     case 'ONLINE':
@@ -635,105 +701,6 @@ export function MonitorStateLabel(State: string) {
     default:
       return 'Idle';
   }
-}
-
-export function DeriveSampleState(Sample: HistorySample | null | undefined) {
-  if (!Sample) return null;
-  if (!Sample.online) return 'OFFLINE' as const;
-  if (Sample.degraded) return 'DEGRADED' as const;
-  return 'ONLINE' as const;
-}
-
-// Bucket a single sample series into a fixed number of one-hour timeline
-// blocks. Blocks with no samples stay IDLE (grey) so gaps read as "not enough
-// data" instead of implying a state we never observed.
-export function BuildStatusBlocksFromSamples(Samples: HistorySample[]) {
-  const Now = Date.now();
-  const WindowStart = Now - MONITOR_HISTORY_WINDOW_MS;
-  const BlockMs = MONITOR_HISTORY_WINDOW_MS / MONITOR_HISTORY_BLOCK_COUNT;
-  const Sorted = (Array.isArray(Samples) ? Samples : [])
-    .filter((S) => S && Number.isFinite(Number(S.ts)))
-    .sort((a, b) => a.ts - b.ts);
-
-  const Blocks: StatusBlock[] = [];
-  for (let i = 0; i < MONITOR_HISTORY_BLOCK_COUNT; i++) {
-    const Start = WindowStart + i * BlockMs;
-    const End = Start + BlockMs;
-    let State = 'IDLE';
-    let Worst = -1;
-    let Count = 0;
-    let LatencySum = 0;
-    let LatencyCount = 0;
-    const Counts: StatusStateCounts = { ONLINE: 0, DEGRADED: 0, OFFLINE: 0 };
-    for (const S of Sorted) {
-      const Ts = Number(S.ts);
-      if (Ts < Start || Ts >= End) continue;
-      Count += 1;
-      const SampleState = DeriveSampleState(S);
-      if (SampleState) {
-        Counts[SampleState] += 1;
-        const Severity = MONITOR_STATE_SEVERITY[SampleState];
-        if (Severity > Worst) {
-          Worst = Severity;
-          State = SampleState;
-        }
-      }
-      if (S.latencyMs != null && Number.isFinite(Number(S.latencyMs))) {
-        LatencySum += Number(S.latencyMs);
-        LatencyCount += 1;
-      }
-    }
-    Blocks.push({
-      start: Start,
-      end: End,
-      state: State,
-      count: Count,
-      counts: Counts,
-      latencyMs: LatencyCount ? LatencySum / LatencyCount : null,
-    });
-  }
-  return Blocks;
-}
-
-// Combine per-check block timelines into a single overall timeline, mirroring
-// the server aggregation: OFFLINE only when every reporting check is offline,
-// DEGRADED when any is offline/degraded, otherwise ONLINE. Blocks where no
-// check reported data stay IDLE (grey).
-export function BuildOverallStatusBlocks(PerCheckBlocks: StatusBlock[][]) {
-  const Now = Date.now();
-  const WindowStart = Now - MONITOR_HISTORY_WINDOW_MS;
-  const BlockMs = MONITOR_HISTORY_WINDOW_MS / MONITOR_HISTORY_BLOCK_COUNT;
-  const Blocks: StatusBlock[] = [];
-  for (let i = 0; i < MONITOR_HISTORY_BLOCK_COUNT; i++) {
-    const States: string[] = [];
-    const Counts = { ONLINE: 0, DEGRADED: 0, OFFLINE: 0 };
-    for (const CheckBlocks of PerCheckBlocks) {
-      const Block = CheckBlocks[i];
-      if (Block && Block.state && Block.state !== 'IDLE' && Block.state !== 'UNAVAILABLE') {
-        States.push(Block.state);
-      }
-      if (Block && Block.counts) {
-        Counts.ONLINE += Block.counts.ONLINE || 0;
-        Counts.DEGRADED += Block.counts.DEGRADED || 0;
-        Counts.OFFLINE += Block.counts.OFFLINE || 0;
-      }
-    }
-    let State = 'IDLE';
-    if (States.length) {
-      if (States.every((S) => S === 'OFFLINE')) State = 'OFFLINE';
-      else if (States.some((S) => S === 'OFFLINE' || S === 'DEGRADED')) State = 'DEGRADED';
-      else State = 'ONLINE';
-    }
-    Blocks.push({
-      start: WindowStart + i * BlockMs,
-      end: WindowStart + (i + 1) * BlockMs,
-      state: State,
-      count: States.length,
-      counts: Counts,
-      latencyMs: null,
-    });
-  }
-  return Blocks;
 }
 
 export function FormatBlockTime(Ts: number) {
@@ -760,17 +727,20 @@ export function RenderStatusTimeline(Blocks: StatusBlock[]) {
 
 // Custom hover tooltip for a timeline block: shows the hovered minute plus a
 // per-state count breakdown (coloured dot + label left, count right).
-export function HideStatusTimelineTooltip() {
-  const El = document.getElementById('MONITOR_HISTORY_TOOLTIP');
+// The tooltip host defaults to the view modal's; the list view passes its own,
+// which sits outside the modal so it shows while the modal is closed.
+export function HideStatusTimelineTooltip(TooltipID = 'MONITOR_HISTORY_TOOLTIP') {
+  const El = document.getElementById(TooltipID);
   if (El) El.classList.add('d-none');
 }
 
 export function ShowStatusTimelineTooltip(
   BlockEl: Element | null,
   ClientX: number,
-  ClientY: number
+  ClientY: number,
+  TooltipID = 'MONITOR_HISTORY_TOOLTIP'
 ) {
-  const Tooltip = document.getElementById('MONITOR_HISTORY_TOOLTIP');
+  const Tooltip = document.getElementById(TooltipID);
   if (!Tooltip || !BlockEl) return;
   const Ts = Number(BlockEl.getAttribute('data-ts'));
   const Rows = [

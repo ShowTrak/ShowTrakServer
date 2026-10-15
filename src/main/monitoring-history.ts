@@ -266,6 +266,39 @@ function getEntityHistorySamples(entityType: string, id: unknown): HistorySample
   return store.get(key) || [];
 }
 
+// Every series in one store from `sinceTs` on, keyed by its entity id. Feeds the
+// list view's history column, which draws a timeline for every row at once —
+// one call for the lot rather than one per row.
+function getEntityHistorySamplesSince(
+  entityType: string,
+  sinceTs: number
+): Record<string, HistorySample[]> {
+  pruneMonitoringHistoryStore();
+  const store = getHistoryStore(entityType);
+  const out: Record<string, HistorySample[]> = {};
+  if (!store) return out;
+  for (const [key, samples] of store.entries()) {
+    const recent = samples.filter((s) => s && s.ts >= sinceTs);
+    if (recent.length) out[String(key)] = recent.map((s) => ({ ...s }));
+  }
+  return out;
+}
+
+// The overall-status series for every client, dummy client and monitoring
+// check. Checks rather than targets: a target's overall timeline is combined
+// from its checks in the renderer, exactly as the view modal does it.
+function getStatusHistoryOverviewSamples(sinceTs: number): {
+  Clients: Record<string, HistorySample[]>;
+  Dummies: Record<string, HistorySample[]>;
+  Checks: Record<string, HistorySample[]>;
+} {
+  return {
+    Clients: getEntityHistorySamplesSince(ENTITY_CLIENT, sinceTs),
+    Dummies: getEntityHistorySamplesSince(ENTITY_DUMMY_CLIENT, sinceTs),
+    Checks: getEntityHistorySamplesSince(ENTITY_MONITOR_TARGET, sinceTs),
+  };
+}
+
 function recordMonitoringHistorySample(target: MonitoringTargetLike | null | undefined): void {
   if (!target || !target.TargetID) return;
   const checks = Array.isArray(target.Checks) ? target.Checks : [];
@@ -923,6 +956,7 @@ export {
   recordEntityHistorySample,
   syncEntityHistoryStore,
   getEntityHistorySamples,
+  getStatusHistoryOverviewSamples,
   recordMonitoringHistorySample,
   syncMonitoringHistoryStore,
   getMonitoringCheckHistory,

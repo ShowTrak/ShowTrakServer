@@ -38,6 +38,7 @@ const INVOKE_CHANNELS = [
   // Clients
   'GetClient',
   'GetClientHistory',
+  'GetStatusHistoryOverview',
   'GetClientApplicationHistory',
   'GetClientUSBHistory',
   'GetClientDisplayHistory',

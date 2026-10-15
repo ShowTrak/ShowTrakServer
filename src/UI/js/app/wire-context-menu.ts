@@ -9,6 +9,7 @@ import {
   AllClients,
   FreeKioskCommandsCache,
   FreeKioskTerminals,
+  MonitoringTargets,
   ScriptList,
   Selected,
   Settings,
@@ -30,6 +31,7 @@ import {
 } from './selection-init';
 import { ClearSelection, Select, SelectAll } from './selection';
 import {
+  GetFavouritesForChecks,
   GetFavouritesForSelection,
   GetMethodAction,
   RunMonitoringAction,
@@ -120,8 +122,11 @@ export function wireContextMenu() {
       // Client, monitoring and dummy tiles are all selectable targets; groups
       // are not. Right-clicking a not-yet-selected tile narrows the selection
       // to just that tile before the menu is built.
+      // A check row held by its selected target counts as selected: the menu
+      // opens on the current selection rather than narrowing it to the check.
       const IsSelectableTile = TileUUID && !$tile.hasClass('GROUP');
-      if (IsSelectableTile && !Selected.includes(TileUUID)) {
+      const IsHeldByParent = $tile.hasClass('PARENT_SELECTED');
+      if (IsSelectableTile && !IsHeldByParent && !Selected.includes(TileUUID)) {
         ClearSelection();
         Select(TileUUID);
       }
@@ -170,15 +175,27 @@ export function wireContextMenu() {
       // tiles carry prefixed selection UUIDs (monitor:<TargetID>, dummy:<UUID>,
       // kiosk:<UUID>); everything else is a plain adopted-client UUID.
       const MonitorTargetIDs: string[] = [];
+      // The list view's check rows (check:<CheckID>).
+      const CheckIDs: string[] = [];
       const DummyUUIDs: string[] = [];
       const KioskUUIDs: string[] = [];
       const ClientUUIDs: string[] = [];
       for (const UUID of Selected) {
         const Value = String(UUID);
         if (Value.startsWith('monitor:')) MonitorTargetIDs.push(Value.slice('monitor:'.length));
+        else if (Value.startsWith('check:')) CheckIDs.push(Value.slice('check:'.length));
         else if (Value.startsWith('dummy:')) DummyUUIDs.push(Value.slice('dummy:'.length));
         else if (Value.startsWith('kiosk:')) KioskUUIDs.push(Value.slice('kiosk:'.length));
         else ClientUUIDs.push(UUID);
+      }
+      // A check whose target is also selected is already covered by the
+      // target's actions; offering it again would run it twice.
+      const SelectedTargetIDs = new Set(MonitorTargetIDs.map(String));
+      for (let Index = CheckIDs.length - 1; Index >= 0; Index--) {
+        const Parent = MonitoringTargets.find((Target) =>
+          (Target.Checks || []).some((Check) => String(Check.CheckID) === CheckIDs[Index])
+        );
+        if (Parent && SelectedTargetIDs.has(String(Parent.TargetID))) CheckIDs.splice(Index, 1);
       }
 
       const SelectedClients = ClientUUIDs.map((UUID) =>
@@ -359,6 +376,67 @@ export function wireContextMenu() {
         });
       }
 
+      // --- Individual checks (list view) -----------------------------------
+      // The same actions as a target's, narrowed to exactly the checks that are
+      // selected: a starred action runs on the selected checks of its method
+      // and on no other check of their targets.
+      if (CheckIDs.length > 0) {
+        PushSection('Checks');
+        const CheckWord = (Count: number) => (Count === 1 ? 'this check' : `${Count} checks`);
+
+        for (const { Favourite, TargetIDs, CheckIDs: ForChecks } of GetFavouritesForChecks(
+          CheckIDs
+        )) {
+          const Action = GetMethodAction(Favourite.Method, Favourite.ActionID);
+          Options.push({
+            Type: 'Action',
+            Title: Favourite.Label,
+            Class: Action && Action.Destructive ? 'text-warning' : 'text-light',
+            Icon: `bi-${Favourite.Icon || 'lightning'}`,
+            IconColour: Action && Action.Destructive ? '#e74c3c' : '#9b59b6',
+            ActsOnSelection: true,
+            Action: async function () {
+              if (Action && Action.Destructive) {
+                const Confirmed = await ConfirmationDialog(
+                  `${Favourite.Label} on ${CheckWord(ForChecks.length)}?`
+                );
+                if (!Confirmed) return false;
+              }
+              await RunMonitoringAction(
+                TargetIDs,
+                Favourite.Method,
+                Favourite.ActionID,
+                Favourite.Params || {},
+                Favourite.Label,
+                ForChecks
+              );
+            },
+          });
+        }
+
+        Options.push({
+          Type: 'Action',
+          Title: CheckIDs.length === 1 ? 'Run Check Now' : 'Run Checks Now',
+          Class: 'text-light',
+          Icon: 'bi-arrow-repeat',
+          IconColour: '#3498db',
+          ActsOnSelection: true,
+          Action: async function () {
+            Notify(
+              CheckIDs.length === 1 ? 'Running check…' : `Running ${CheckIDs.length} checks…`,
+              'info'
+            );
+            try {
+              await Promise.all(
+                CheckIDs.map((CheckID) => window.API.RunMonitoringCheckNow(Number(CheckID)))
+              );
+            } catch (err) {
+              HandleNonFatalError('SelectionInit:RunCheckNow', err);
+            }
+          },
+        });
+      }
+
       // --- Dummy clients --------------------------------------------------
       if (DummyUUIDs.length > 0) {
         PushSection('Dummy Clients');
@@ -531,11 +609,12 @@ export function wireContextMenu() {
     }
 
     if (Selected.length > 0) {
-      // Wake On LAN only applies to real adopted clients; monitoring, dummy and
-      // FreeKiosk tiles carry prefixed selection UUIDs and are excluded.
+      // Wake On LAN only applies to real adopted clients; monitoring, check,
+      // dummy and FreeKiosk rows carry prefixed selection UUIDs and are excluded.
       const WolTargets = Selected.filter(
         (UUID) =>
           !String(UUID).startsWith('monitor:') &&
+          !String(UUID).startsWith('check:') &&
           !String(UUID).startsWith('dummy:') &&
           !String(UUID).startsWith('kiosk:')
       );

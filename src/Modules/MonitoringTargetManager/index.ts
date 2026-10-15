@@ -478,7 +478,10 @@ const Manager = {
     TargetIDs: unknown,
     Method: string,
     ActionID: string,
-    Params: Record<string, unknown> = {}
+    Params: Record<string, unknown> = {},
+    // Narrows the action to these checks. Null runs it on every check of the
+    // method on each target, which is what a selected TARGET means.
+    CheckIDs: number[] | null = null
   ): Promise<Result<MonitoringActionSummary>> {
     if (!MonitoringMethods.Has(Method)) return Fail(`Unknown monitoring method: ${Method}`);
     const Action = MonitoringMethods.GetAction(Method, ActionID);
@@ -507,14 +510,20 @@ const Manager = {
           return;
         }
 
-        const Checks = Target.Checks.filter((Check) => Check.Method === Method);
+        const OnlyChecks = Array.isArray(CheckIDs) ? new Set(CheckIDs.map(Number)) : null;
+        const Checks = Target.Checks.filter(
+          (Check) =>
+            Check.Method === Method && (!OnlyChecks || OnlyChecks.has(Number(Check.CheckID)))
+        );
         if (!Checks.length) {
           Results.push({
             TargetID: ID,
             CheckID: 0,
             Nickname: Target.Nickname,
             Success: false,
-            Error: `No ${Method} check on this target`,
+            Error: OnlyChecks
+              ? `None of the selected checks on this target is a ${Method} check`
+              : `No ${Method} check on this target`,
             Detail: null,
           });
           return;

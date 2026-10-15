@@ -686,5 +686,20 @@ test('MonitoringTargetManager.RunAction fans one action across a mixed selection
     const [badAction] = await Manager.RunAction([1], 'pjlink', 'nope', {});
     assert.match(badAction, /Unknown action/);
     assert.equal(actionCalls.length, 1);
+
+    // Narrowed to checks (the list view's check rows): only those checks run,
+    // and a target none of whose selected checks match the method says so
+    // rather than falling back to its other checks.
+    actionCalls.length = 0;
+    const [, notThisCheck] = await Manager.RunAction([1], 'pjlink', 'power.on', {}, [2]);
+    assert.equal(notThisCheck.Succeeded, 0);
+    assert.match(notThisCheck.Results[0].Error, /None of the selected checks/);
+    assert.equal(actionCalls.length, 0);
+    const [, thisCheck] = await Manager.RunAction([1], 'pjlink', 'power.on', {}, [1]);
+    assert.equal(thisCheck.Succeeded, 1);
+    assert.deepEqual(
+      actionCalls.map((call) => call.checkID),
+      [1]
+    );
   });
 });

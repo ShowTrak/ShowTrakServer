@@ -128,6 +128,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     // ---- Clients ----------------------------------------------------------
     GetClient: async (UUID) => rpc('GetClient', UUID),
     GetClientHistory: async (UUID) => rpc('GetClientHistory', UUID),
+    GetStatusHistoryOverview: async () => rpc('GetStatusHistoryOverview'),
     GetClientApplicationHistory: async (UUID) => rpc('GetClientApplicationHistory', UUID),
     GetClientUSBHistory: async (UUID) => rpc('GetClientUSBHistory', UUID),
     GetClientDisplayHistory: async (UUID) => rpc('GetClientDisplayHistory', UUID),
@@ -297,8 +298,8 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     DeleteMonitoringTarget: async (TargetID) => rpc('DeleteMonitoringTarget', TargetID),
     SetFullMonitoringTargetList: (cb) => sub('SetFullMonitoringTargetList', cb),
     MonitoringTargetUpdated: (cb) => sub('MonitoringTargetUpdated', cb),
-    RunMonitoringAction: async (TargetIDs, Method, ActionID, Params) =>
-      rpc('RunMonitoringAction', TargetIDs, Method, ActionID, Params),
+    RunMonitoringAction: async (TargetIDs, Method, ActionID, Params, CheckIDs) =>
+      rpc('RunMonitoringAction', TargetIDs, Method, ActionID, Params, CheckIDs),
     GetMonitoringActionFavourites: async () => rpc('GetMonitoringActionFavourites'),
     SetMonitoringActionFavourite: async (Method, ActionID, Params, Favourite) =>
       rpc('SetMonitoringActionFavourite', Method, ActionID, Params, Favourite),

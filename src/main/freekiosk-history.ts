@@ -259,6 +259,31 @@ export function getFreeKioskMetricHistory(
   return Series;
 }
 
+/**
+ * Every terminal's reachability series (poll latency) from `SinceTs` on, keyed
+ * by UUID, for the list view's history column.
+ *
+ * Flat runs are stored as one sample, so a terminal that has answered steadily
+ * for hours may have nothing inside the window at all. The last sample before
+ * the window is kept for that reason: it is the value the window opens on, and
+ * the renderer carries it forward exactly as it does in the view modal.
+ */
+export function getFreeKioskReachabilitySince(
+  SinceTs: number
+): Record<string, FreeKioskMetricSample[]> {
+  pruneFreeKioskHistory();
+  const Out: Record<string, FreeKioskMetricSample[]> = {};
+  for (const [UUID, Metrics] of Store) {
+    const Samples = Metrics.get(STATUS_SERIES_KEY);
+    if (!Samples || !Samples.length) continue;
+    let First = Samples.findIndex((Sample) => Sample.ts >= SinceTs);
+    if (First === -1) First = Samples.length;
+    const Recent = Samples.slice(Math.max(0, First - 1));
+    Out[UUID] = Recent.map((Sample) => ({ ...Sample }));
+  }
+  return Out;
+}
+
 /** Forget a deleted terminal outright. */
 export function dropFreeKioskHistory(UUID: unknown): void {
   const Key = NormalizeUUID(UUID);

@@ -1,9 +1,11 @@
 import type { DummyClientView } from '@showtrak/protocol';
 import { openModal } from './lib/modal';
 import { OfflineBadgeContent } from './lib/status-badges';
-import { AppMode, DummyClientEditorUUID, Tags, setDummyClientEditorUUID } from './state';
+import { AppMode, DummyClientEditorUUID, Selected, Tags, setDummyClientEditorUUID } from './state';
 import { ResolveEntityTags } from './lib/tag-badges';
 import { RenderTagBadgeRow } from './lib/tag-badge-view';
+import { DummyListState } from './lib/list-view';
+import { RenderListRowCells, UpdateListRowState } from './list-view';
 import { ErrorMessage, Safe } from './utils';
 import { FormatInterval } from './monitoring';
 import { CloseAllModals } from './modals';
@@ -86,7 +88,9 @@ export function RenderDummyClientTile(D: DummyClientView) {
     ResolveEntityTags(Tags, { ScopedID: String(D.UUID), GroupID: D.GroupID ?? null })
   );
   return `
-    <div id="DUMMY_TILE_${D.UUID}" class="SHOWTRAK_PC DUMMY ${TileStateClass}" data-dummy-uuid="${
+    <div id="DUMMY_TILE_${D.UUID}" class="SHOWTRAK_PC DUMMY ${TileStateClass}${
+      Selected.includes(DragUUID) ? ' SELECTED' : ''
+    }" data-dummy-uuid="${
       D.UUID
     }" data-uuid="${DragUUID}" data-flip-key="${DragUUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
       <button type="button" class="CLIENT_TILE_COG DUMMY_TILE_COG" aria-label="Edit Dummy Client" title="Edit Dummy Client">
@@ -121,6 +125,7 @@ export function RenderDummyClientTile(D: DummyClientView) {
           ${OfflineBadgeContent()}
         </h7>
       </div>
+      ${RenderListRowCells(DragUUID, DummyListState(D))}
     </div>`;
 }
 
@@ -151,6 +156,7 @@ export function UpdateDummyClientTile(D: DummyClientView) {
     .removeClass('text-light text-success text-warning')
     .addClass(Compact.color)
     .toggleClass('d-none', Compact.offline);
+  UpdateListRowState($tile, DummyListState(D));
 
   const ToggleIndicator = (Type: string, Show: boolean) => {
     $tile

@@ -67,7 +67,14 @@ const monitoringHistoryStub = {
   },
 };
 
-const methodsMgr = recordingManager({ GetAll: () => state.methods });
+const methodsMgr = recordingManager({
+  GetAll: () => state.methods,
+  // Just enough of the registry for RunMonitoringAction's validators.
+  Has: (id) => id === 'pjlink',
+  GetAction: (method, action) =>
+    method === 'pjlink' && action === 'power.on' ? { ID: 'power.on' } : null,
+  NormalizeActionParams: () => ({}),
+});
 const targetMgr = recordingManager({
   GetAll: () => state.getAll,
   Get: () => state.get,
@@ -77,11 +84,16 @@ const targetMgr = recordingManager({
   Create: () => state.create,
   Update: () => state.update,
   Delete: () => state.del,
+  RunAction: () => [null, { Total: 1, Succeeded: 1, Failed: 0, Results: [] }],
 });
 
 const restore = installModuleMocks([
   { match: matchesModule('electron/main'), value: { ipcMain: { handle() {} } } },
   { match: matchesModule('../monitoring-history'), value: monitoringHistoryStub },
+  {
+    match: matchesModule('../status-history-overview'),
+    value: { getStatusHistoryOverview: () => ({ Clients: { c1: [{ At: 8 }] } }) },
+  },
   { match: matchesModule('/Modules/MonitoringMethods'), value: { Manager: methodsMgr } },
   { match: matchesModule('/Modules/MonitoringTargetManager'), value: { Manager: targetMgr } },
 ]);
@@ -115,6 +127,7 @@ test('registers a handler for every monitoring channel', () => {
     'RunAllMonitoringChecksNow',
     'GetDummyClientHistory',
     'GetClientHistory',
+    'GetStatusHistoryOverview',
     'GetClientApplicationHistory',
     'GetClientUSBHistory',
     'GetClientDisplayHistory',
@@ -303,4 +316,30 @@ test('DeleteMonitoringTarget validates the id and reports failure', async () => 
 
   state.del = ['referenced by an alert rule', null];
   assert.deepEqual(await Handler(null, 1), ['referenced by an alert rule', null]);
+});
+
+test("the list view reads every row's history in one call, with no input to validate", async () => {
+  assert.deepEqual(await GetHandler('GetStatusHistoryOverview')(null), {
+    Clients: { c1: [{ At: 8 }] },
+  });
+});
+
+test('a check action runs on every check of its method unless narrowed to some', async () => {
+  const Handler = GetHandler('RunMonitoringAction');
+  targetMgr.__calls.length = 0;
+  await Handler(null, [1], 'pjlink', 'power.on', {});
+  await Handler(null, [1], 'pjlink', 'power.on', {}, ['7', 7, 8]);
+  const Calls = targetMgr.__callsTo('RunAction').map((Call) => Call.args);
+  // Absent means "every check", as before the list view could select checks.
+  assert.deepEqual(Calls[0], [[1], 'pjlink', 'power.on', {}, null]);
+  // Validated like target ids: numeric, de-duplicated.
+  assert.deepEqual(Calls[1], [[1], 'pjlink', 'power.on', {}, [7, 8]]);
+});
+
+test('a malformed check filter is refused before anything runs', async () => {
+  const Handler = GetHandler('RunMonitoringAction');
+  targetMgr.__calls.length = 0;
+  const [Err] = await Handler(null, [1], 'pjlink', 'power.on', {}, ['abc']);
+  assert.match(Err, /numeric/);
+  assert.equal(targetMgr.__callsTo('RunAction').length, 0);
 });

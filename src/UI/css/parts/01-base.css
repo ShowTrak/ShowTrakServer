@@ -180,7 +180,7 @@ body.is-web #APPLICATION {
   gap: 6px;
 }
 
-/* Compact mode button group */
+/* Bottom-bar toggles */
 :root {
   --bottom-bar-toggle-height: 26px;
   /* Shared status palette. Client tile backgrounds AND history timeline blocks
@@ -206,8 +206,9 @@ body.is-web #APPLICATION {
   --tile-status-height: 20px;
 }
 
-/* The bottom-bar SHOW/EDIT switch uses the shared `.st-segmented-toggle` look
-   (see 02-controls.css); here it is just sized to the bottom-bar toggle height. */
+/* The bottom-bar SHOW/EDIT and GRID/COMPACT/LIST switches use the shared
+   `.st-segmented-toggle` look (see 02-controls.css); here they are just sized
+   to the bottom-bar toggle height. */
 .mode-group.st-segmented-toggle {
   height: var(--bottom-bar-toggle-height);
   align-items: stretch;
@@ -220,19 +221,22 @@ body.is-web #APPLICATION {
   font-size: 12px;
 }
 
-#COMPACT_MODE_BTN.compact-mode-btn {
-  width: 30px;
-  height: var(--bottom-bar-toggle-height);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border-width: 1px;
-  transition:
-    background-color 140ms ease,
-    color 140ms ease,
-    border-color 140ms ease,
-    transform 140ms ease;
+/* With the three-way view switch, the left of the bar is three toggles wide;
+   tighten them on narrower windows so they keep clear of the centred
+   selection count. */
+.view-mode-group .st-segmented-toggle-btn {
+  padding-left: 0.65rem;
+  padding-right: 0.65rem;
+}
+
+@media (max-width: 1150px) {
+  #APP_BOTTOM_BAR .mode-group .st-segmented-toggle-btn,
+  #ALERT_ACTIONS_TOGGLE_BTN .alert-actions-toggle-segment {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
 }
 
 /* The ALERTS toggle wears the same `.st-segmented-toggle` track as the SHOW/EDIT
@@ -275,22 +279,6 @@ body.is-web #APPLICATION {
 #ALERT_ACTIONS_TOGGLE_BTN:disabled {
   cursor: default;
   opacity: 0.65;
-}
-
-#COMPACT_MODE_BTN.compact-mode-btn:hover {
-  transform: none;
-}
-
-#COMPACT_MODE_BTN.compact-mode-btn.btn-outline-light:hover,
-#COMPACT_MODE_BTN.compact-mode-btn.btn-outline-light:focus {
-  background-color: rgba(255, 255, 255, 0.028) !important;
-  border-color: rgba(255, 255, 255, 0.32) !important;
-  color: rgba(255, 255, 255, 0.88) !important;
-}
-
-#COMPACT_MODE_BTN.compact-mode-btn .bi {
-  font-size: 13px;
-  line-height: 1;
 }
 
 /* Flex utility: allow a flex child to shrink below its content's intrinsic

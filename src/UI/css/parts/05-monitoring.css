@@ -36,6 +36,47 @@
   animation: showtrak-identify-pulse 1.25s ease-in-out infinite;
 }
 
+/* Solid tile colours for Grid and Compact.
+ *
+ * The status colours above are translucent, so a tile took on its group's
+ * tint: green on a red-tinted group read as olive, and the same state looked
+ * different from group to group. Here each state is the same colour already
+ * composited over the plain (untinted) group background, so a tile looks
+ * exactly as it did in an untinted group, whatever group it is in.
+ *
+ * The mixes repeat the --status-* colours and alphas (color-mix cannot take a
+ * colour's alpha as its percentage) — keep the two in step. Solid colours
+ * rather than a layered background, so a change of state still fades.
+ *
+ * Not the list view, whose rows are neutral and whose groups are untinted, and
+ * not an identifying tile, whose pulse animates its background. */
+:root {
+  --tile-solid-base: #17152e;
+  --tile-solid-offline: color-mix(in srgb, rgb(255 0 0) 24%, var(--tile-solid-base));
+  --tile-solid-online: color-mix(in srgb, rgb(18 255 0) 32%, var(--tile-solid-base));
+  --tile-solid-degraded: color-mix(in srgb, rgb(255 140 0) 32%, var(--tile-solid-base));
+  --tile-solid-idle: color-mix(in srgb, rgb(64 64 64) 50%, var(--tile-solid-base));
+  --tile-solid-pending: color-mix(in srgb, rgb(0 123 255) 25%, var(--tile-solid-base));
+}
+
+/* In the same order as the translucent rules, so the same state wins when a
+ * tile briefly carries two classes mid-update. */
+body:not(.list-mode) .SHOWTRAK_PC:not(.IDENTIFYING) {
+  background-color: var(--tile-solid-offline) !important;
+}
+body:not(.list-mode) .SHOWTRAK_PC.ONLINE:not(.IDENTIFYING) {
+  background-color: var(--tile-solid-online) !important;
+}
+body:not(.list-mode) .SHOWTRAK_PC.IDLE:not(.IDENTIFYING) {
+  background-color: var(--tile-solid-idle) !important;
+}
+body:not(.list-mode) .SHOWTRAK_PC.DEGRADED:not(.IDENTIFYING) {
+  background-color: var(--tile-solid-degraded) !important;
+}
+body:not(.list-mode) .SHOWTRAK_PC.PENDING:not(.IDENTIFYING) {
+  background-color: var(--tile-solid-pending) !important;
+}
+
 .SHOWTRAK_PC_STATUS {
   height: var(--tile-status-height) !important;
   min-height: var(--tile-status-height);
@@ -448,9 +489,10 @@ body.compact-mode .SHOWTRAK_PC.MONITOR > .MONITOR_COMPACT_LATENCY {
 
 /* --- Dummy client tiles --- */
 /* In compact mode only the name + a short status badge should remain; hide the
- * "Dummy" type label (the IP line and status indicator rows are already hidden
+ * "Dummy" / "Kiosk" type label (the IP line and status indicator rows are already hidden
  * by the shared compact rules above, and the offline timer is re-shown). */
-body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='DummyLabel'] {
+body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='DummyLabel'],
+body.compact-mode .SHOWTRAK_PC.FREEKIOSK > [data-type='FreeKioskLabel'] {
   display: none !important;
 }
 
@@ -2180,7 +2222,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   /* --- Hide desktop-only toggles in the bottom bar on mobile --- */
   body.mobile-view #APP_BOTTOM_BAR .mode-group,
   body.mobile-view #ALERT_ACTIONS_TOGGLE_BTN,
-  body.mobile-view #COMPACT_MODE_BTN {
+  body.mobile-view #VIEW_MODE_TOGGLE {
     display: none !important;
   }
 

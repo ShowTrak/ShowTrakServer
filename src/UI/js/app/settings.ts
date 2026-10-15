@@ -1,7 +1,6 @@
 import {
   AlertActionsEnabled,
   Capabilities,
-  CompactMode,
   SettingDebounceTimers,
   Settings,
   SettingsGroups,
@@ -10,18 +9,19 @@ import {
 } from './state';
 import {
   InitMobileView,
-  LoadCompactModePreference,
+  LoadViewModePreference,
   RenderAlertActionsToggle,
   RenderMode,
   SetAlertActionsEnabled,
-  SetCompactMode,
+  SetViewMode,
+  WireViewModeToggle,
 } from './mode';
 import { GetAlertVolume, HandleNonFatalError, Safe, ShowQRModal } from './utils';
 import { Notify } from './selection-init';
 import { ConfirmationDialog } from './lib/toasts';
 import { ResolveSettingsTab } from './lib/settings-tabs';
 import type { RemoteDeviceView, SettingGroupView, SettingView } from '@showtrak/protocol';
-// Wires the mode/compact/alert-action buttons and fetches initial settings +
+// Wires the mode/view/alert-action buttons and fetches initial settings +
 // mode state. Formerly a DOMContentLoaded handler; InitSettings() calls it
 // directly (fire-and-forget) once the bootstrap orchestrator runs — the DOM is
 // already parsed at that point on both surfaces.
@@ -30,9 +30,9 @@ async function WireSettingsControls() {
   const btnShow = document.getElementById('MODE_BTN_SHOW');
   const btnEdit = document.getElementById('MODE_BTN_EDIT');
   const btnAlertActions = document.getElementById('ALERT_ACTIONS_TOGGLE_BTN');
-  const btnCompact = document.getElementById('COMPACT_MODE_BTN');
 
-  SetCompactMode(LoadCompactModePreference(), { persist: false });
+  SetViewMode(LoadViewModePreference(), { persist: false, animate: false });
+  WireViewModeToggle();
   // Lock to the compact mobile layout when the viewport is narrow, and keep it
   // in sync as the viewport / orientation changes.
   InitMobileView();
@@ -66,12 +66,6 @@ async function WireSettingsControls() {
       await SetAlertActionsEnabled(!AlertActionsEnabled);
     });
     btnAlertActions.dataset.bound = '1';
-  }
-  if (btnCompact && !btnCompact.dataset.bound) {
-    btnCompact.addEventListener('click', () => {
-      SetCompactMode(!CompactMode);
-    });
-    btnCompact.dataset.bound = '1';
   }
   // Initialize with backend mode
   try {

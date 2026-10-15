@@ -1,5 +1,7 @@
-import { AlertActionsEnabled, Capabilities, CompactMode, ConfirmDialogActive } from './state';
-import { SetAlertActionsEnabled, SetCompactMode } from './mode';
+import { AlertActionsEnabled, Capabilities, ConfirmDialogActive, ViewMode } from './state';
+import { SetAlertActionsEnabled, SetViewMode } from './mode';
+import { NextViewMode } from './lib/list-view';
+import { SetListTargetsExpanded } from './list-view';
 import { HandleNonFatalError } from './utils';
 import { ShowShortcutsModal } from './dnd';
 import { AlertsVisible, DismissAllAlerts, ToggleAlertsTray } from './alerts-tray';
@@ -89,10 +91,17 @@ export function InitKeyboard() {
         return;
       }
 
-      // Toggle compact/expanded mode
+      // List view: expand (Right) or collapse (Left) monitoring targets into
+      // their checks — the selected targets, or all of them with none selected.
+      if (!e.shiftKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+        if (SetListTargetsExpanded(e.key === 'ArrowRight')) e.preventDefault();
+        return;
+      }
+
+      // Cycle the view mode: Grid -> Compact -> List
       if (!e.shiftKey && key === 'e') {
         e.preventDefault();
-        SetCompactMode(!CompactMode);
+        SetViewMode(NextViewMode(ViewMode));
         return;
       }
     }

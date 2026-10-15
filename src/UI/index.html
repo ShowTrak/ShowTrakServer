@@ -32,6 +32,9 @@
         <div id="APPLICATION_CONTENT" class="pb-3"></div>
       </div>
     </div>
+    <!-- Hover tooltip for the list view's history column. Outside the view modal
+         (whose own tooltip host is hidden along with it). -->
+    <div id="LIST_HISTORY_TOOLTIP" class="monitor-history-tooltip d-none" role="status"></div>
     <div id="IDENTIFY_STATUS_BANNER" class="d-none" role="status" aria-live="polite">
       <div class="identify-status-content">
         <span id="IDENTIFY_STATUS_TEXT">You are currently identifying 0 clients</span>
@@ -58,16 +61,37 @@
           >
             <span class="st-segmented-toggle-btn alert-actions-toggle-segment">ALERTS</span>
           </button>
-          <button
-            type="button"
-            id="COMPACT_MODE_BTN"
-            class="btn btn-outline-light btn-sm compact-mode-btn"
-            title="Toggle Compact Mode"
-            aria-label="Toggle Compact Mode"
-            aria-pressed="false"
+          <div
+            id="VIEW_MODE_TOGGLE"
+            class="mode-group view-mode-group st-segmented-toggle"
+            role="group"
+            aria-label="View Mode"
           >
-            <i id="COMPACT_MODE_ICON" class="bi bi-arrows-angle-contract"></i>
-          </button>
+            <button
+              type="button"
+              class="st-segmented-toggle-btn is-active"
+              data-view-mode="grid"
+              aria-pressed="true"
+            >
+              GRID
+            </button>
+            <button
+              type="button"
+              class="st-segmented-toggle-btn"
+              data-view-mode="compact"
+              aria-pressed="false"
+            >
+              COMPACT
+            </button>
+            <button
+              type="button"
+              class="st-segmented-toggle-btn"
+              data-view-mode="list"
+              aria-pressed="false"
+            >
+              LIST
+            </button>
+          </div>
         </div>
         <div class="bar-section center">
           <button

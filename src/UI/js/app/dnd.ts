@@ -92,7 +92,9 @@ export function ShowShortcutsModal() {
   items.push({ title: 'Switch to Edit Mode', shortcut: 'Ctrl/Cmd+2' });
   items.push({ title: 'ShowTrak Preferences', shortcut: 'Ctrl/Cmd+,' });
   items.push({ title: 'LAN Discovery Wizard', shortcut: 'Ctrl/Cmd+L' });
-  items.push({ title: 'Toggle Compact/Expanded Mode', shortcut: 'Ctrl/Cmd+E' });
+  items.push({ title: 'Cycle View (Grid / Compact / List)', shortcut: 'Ctrl/Cmd+E' });
+  items.push({ title: 'Expand Monitoring Targets (List View)', shortcut: 'Ctrl/Cmd+Right' });
+  items.push({ title: 'Collapse Monitoring Targets (List View)', shortcut: 'Ctrl/Cmd+Left' });
   // Alerts
   items.push({ title: 'Toggle Alert Actions Enabled/Disabled', shortcut: 'Ctrl/Cmd+T' });
   items.push({ title: 'Toggle Alerts Panel', shortcut: 'Ctrl/Cmd+Y' });
@@ -328,9 +330,13 @@ export function positionGhostMarker(container: HTMLElement, x: number, y: number
     DnDState.sourceSpacer.style.display = isSourceGroup ? 'none' : '';
   }
 
+  // Check rows (list view) are hidden while dragging and move with their target,
+  // so they are never a drop position of their own.
   const tiles = Array.from<Element>(container.querySelectorAll('.SHOWTRAK_PC')).filter(
     (el) =>
-      !el.classList.contains('dnd-ghost') && el.getAttribute('data-uuid') !== DnDState.dragUUID
+      !el.classList.contains('dnd-ghost') &&
+      !el.classList.contains('MONITOR_CHECK') &&
+      el.getAttribute('data-uuid') !== DnDState.dragUUID
   );
   const HYSTERESIS_X = 6; // horizontal jitter buffer within a row
   const ROW_TOL = 14; // tolerance to group tiles into rows
@@ -347,6 +353,28 @@ export function positionGhostMarker(container: HTMLElement, x: number, y: number
       container.insertBefore(DnDState.ghostEl, placeholder);
     } else {
       container.appendChild(DnDState.ghostEl);
+    }
+    return;
+  }
+
+  // List view: every tile is a full-width row in a single column, so the drop
+  // slot is decided by height alone — before the first row whose midpoint is
+  // below the pointer. The tile-grid logic below reads left/right within a row,
+  // which for a full-width row would hinge on which half of the screen the
+  // pointer happens to be in.
+  if (document.body.classList.contains('list-mode')) {
+    if (!DnDState.ghostEl) DnDState.ghostEl = createGhostEl();
+    const ghost = DnDState.ghostEl;
+    applyGhostSize(ghost, tiles[0]!.getBoundingClientRect());
+    const below = tiles.find((t) => {
+      const r = t.getBoundingClientRect();
+      return y < r.top + r.height / 2;
+    });
+    if (below) {
+      if (ghost.nextSibling !== below) below.parentNode!.insertBefore(ghost, below);
+    } else {
+      const last = tiles[tiles.length - 1]!;
+      if (last.nextSibling !== ghost) last.parentNode!.insertBefore(ghost, last.nextSibling);
     }
     return;
   }
@@ -496,7 +524,11 @@ export function computeOrderWithGhost(container: HTMLElement, dragUUID: string) 
       order.push(dragUUID);
       continue;
     }
-    if (el.classList && el.classList.contains('SHOWTRAK_PC')) {
+    if (
+      el.classList &&
+      el.classList.contains('SHOWTRAK_PC') &&
+      !el.classList.contains('MONITOR_CHECK')
+    ) {
       const id = el.getAttribute('data-uuid');
       if (id && id !== dragUUID) order.push(id);
     }

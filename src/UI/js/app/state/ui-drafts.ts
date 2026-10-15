@@ -280,10 +280,20 @@ export function setAppMode(value: string): void {
   AppMode = value;
 }
 
+// --- View mode (Grid | Compact | List) ---
+// Grid is the full tile, Compact the one-line tile, List a table of rows. The
+// legacy compact flag is still read once, so an operator who had compact on
+// before the third mode existed keeps it.
+export type ViewMode = 'grid' | 'compact' | 'list';
+export const VIEW_MODE_STORAGE_KEY = 'showtrak.ui.viewMode';
 export const COMPACT_MODE_STORAGE_KEY = 'showtrak.ui.compactMode';
+export let ViewMode: ViewMode = 'grid';
+// Derived from ViewMode, never set on its own: kept because the SDK's
+// compact-view commands still speak in terms of on/off.
 export let CompactMode = false;
-export function setCompactMode(value: boolean): void {
-  CompactMode = value;
+export function setViewMode(value: ViewMode): void {
+  ViewMode = value;
+  CompactMode = value === 'compact';
 }
 
 export let AlertActionsEnabled = true;

@@ -41,6 +41,7 @@ import { FormatMetricValue } from './lib/metric-format';
 import { BuildMetricChartModel, RenderMetricChartSvg } from './lib/metric-chart';
 import type { MetricChartThreshold } from './lib/metric-chart';
 import { ExpandMetricSeries } from './lib/metric-series';
+import { FreeKioskReachabilitySamples } from './lib/status-blocks';
 import {
   BuildLiveStatusText,
   BuildStatusBlocksFromSamples,
@@ -565,17 +566,10 @@ export function RenderFreeKioskModal($timelines: JQuery<HTMLElement>): void {
   const Catalogue = FreeKioskMetricCatalogCache;
 
   const State = String(Terminal.State || 'IDLE');
-  // Poll latency doubles as the reachability series: it is only ever recorded
-  // with a reading when a poll actually answered. Expanded first, or a terminal
-  // with steady latency shows one live block and fifty-nine grey ones.
-  const StatusSamples: HistorySample[] = ExpandMetricSeries(
+  // Poll latency is the reachability series (see FreeKioskReachabilitySamples).
+  const StatusSamples: HistorySample[] = FreeKioskReachabilitySamples(
     FreeKioskSeries.get('poll_latencyMs')
-  ).map((Sample) => ({
-    ts: Sample.ts,
-    online: Sample.ok,
-    degraded: Sample.breach,
-    latencyMs: Sample.n,
-  }));
+  );
 
   // Status: the terminal's overall status, then the history of every reading
   // with a check armed — the at-a-glance view of everything being monitored.

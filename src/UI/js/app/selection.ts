@@ -5,6 +5,21 @@
 import { AlertActionsEnabled, GroupSelectableUUIDCache, Selected, setSelected } from './state';
 import { HandleNonFatalError } from './utils';
 
+// The list view's check rows show as selected for as long as their target is:
+// a selected target acts on all of its checks, so the rows say so. The
+// inheritance is display only — the check ids are not added to the selection,
+// or every action would run twice on the same device, once per target and once
+// per check. A check selected on its own keeps that selection underneath, and
+// it shows again when the target is deselected.
+function MarkCheckRowsOf(UUID: string | undefined, ParentSelected: boolean) {
+  const Value = String(UUID || '');
+  if (!Value.startsWith('monitor:')) return;
+  $(`.MONITOR_CHECK[data-target-id='${Value.slice('monitor:'.length)}']`).toggleClass(
+    'PARENT_SELECTED',
+    ParentSelected
+  );
+}
+
 export function IsSelected(UUID: string) {
   return Selected.includes(UUID);
 }
@@ -44,6 +59,7 @@ export function Select(UUID: string | undefined) {
   if (Selected.includes(String(UUID))) return;
   Selected.push(String(UUID));
   $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).addClass('SELECTED');
+  MarkCheckRowsOf(UUID, true);
   UpdateSelectionCount();
   return;
 }
@@ -51,6 +67,7 @@ export function Select(UUID: string | undefined) {
 export function Deselect(UUID: string) {
   setSelected(Selected.filter((id) => id !== UUID));
   $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).removeClass('SELECTED');
+  MarkCheckRowsOf(UUID, false);
   UpdateSelectionCount();
   return;
 }
@@ -60,15 +77,18 @@ export function ClearSelection() {
     $(`.SHOWTRAK_PC[data-uuid='${uuid}']`).removeClass('SELECTED');
   });
   setSelected([]);
+  $('.MONITOR_CHECK.PARENT_SELECTED').removeClass('PARENT_SELECTED');
   UpdateSelectionCount();
   return;
 }
 
 // Select every selectable tile: adopted clients plus monitoring and dummy
-// tiles (which carry prefixed data-uuid values). Groups are not selectable.
+// tiles (which carry prefixed data-uuid values). Groups are not selectable, and
+// nor are the list view's check rows: their target is already being selected,
+// and an action on both would run twice on the same device.
 export function SelectAll() {
   $('.SHOWTRAK_PC[data-uuid]').each(function () {
-    if ($(this).hasClass('GROUP')) return;
+    if ($(this).hasClass('GROUP') || $(this).hasClass('MONITOR_CHECK')) return;
     const UUID = $(this).attr('data-uuid');
     if (UUID) Select(UUID);
   });
@@ -85,9 +105,11 @@ export function ToggleSelection(UUID: string | undefined) {
   if (Selected.includes(String(UUID))) {
     setSelected(Selected.filter((id) => id !== UUID));
     $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).removeClass('SELECTED');
+    MarkCheckRowsOf(UUID, false);
   } else {
     Selected.push(String(UUID));
     $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).addClass('SELECTED');
+    MarkCheckRowsOf(UUID, true);
   }
   UpdateSelectionCount();
 }

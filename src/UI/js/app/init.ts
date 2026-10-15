@@ -197,6 +197,9 @@ export async function WireGlobalUI() {
   });
   $(document).on('click', '.SHOWTRAK_PC', function (e) {
     e.preventDefault();
+    // A check row whose target is selected is selected through it, and stays
+    // so until the target is deselected.
+    if ($(this).hasClass('PARENT_SELECTED')) return false;
     // Monitoring, dummy and FreeKiosk tiles are selectable via their prefixed
     // data-uuid (monitor:/dummy:/kiosk:), so the context menu can offer
     // per-type actions.
@@ -223,6 +226,12 @@ export async function WireGlobalUI() {
     e.stopPropagation();
     // Ignore dblclick on pending-adoption tiles
     if ($(this).hasClass('PENDING')) return false;
+    // A check row (list view) opens its target's view, where its history is.
+    if ($(this).hasClass('MONITOR_CHECK')) {
+      const tid = $(this).attr('data-target-id');
+      if (tid) OpenMonitoringTargetHistory(parseInt(tid, 10));
+      return false;
+    }
     // Monitoring tiles always open history on dblclick; edit mode uses the cog.
     if ($(this).hasClass('MONITOR')) {
       const tid = $(this).attr('data-target-id');
