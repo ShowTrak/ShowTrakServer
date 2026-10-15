@@ -269,7 +269,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Key: 'WEBUI_ALLOW_CLIENT_MANAGEMENT',
     Title: 'Client Management',
     Description:
-      'Allow the Web UI to adopt, edit, replace, unadopt clients and change critical USB/app/display flags. Still requires the server to be in Edit mode.',
+      'Allow the Web UI to adopt, edit, replace, unadopt clients and change monitored USB/app/display flags. Still requires the server to be in Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -345,7 +345,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Key: 'REMOTE_ALLOW_CLIENT_MANAGEMENT',
     Title: 'Client Management',
     Description:
-      'Allow ShowTrak Remote to edit clients (nickname, group, MAC addresses, critical entities). Also requires the server to be in Edit mode.',
+      'Allow ShowTrak Remote to edit clients (nickname, group, MAC addresses, monitored entities). Also requires the server to be in Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },

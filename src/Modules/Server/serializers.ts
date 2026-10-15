@@ -7,6 +7,10 @@ import type {
   GroupView,
   Vitals,
   RunningApplicationsSnapshot,
+  ClientResourceAlarm,
+  ClientSystemChecks,
+  PowerStatusSnapshot,
+  TemperaturesSnapshot,
 } from '@showtrak/protocol';
 import { EmptyAudioView } from '../ClientManager/audio';
 import { EmptyNetworkStatusView } from '../ClientManager/network';
@@ -37,6 +41,11 @@ interface PublicClientSource {
   // either a full heartbeat Vitals or, before the first heartbeat, empty
   // placeholder objects. The projection re-narrows to the wire shape on output.
   Vitals?: unknown;
+  BootTime?: number | null;
+  PowerStatus?: unknown;
+  Temperatures?: unknown;
+  SystemChecks?: unknown;
+  ResourceAlarms?: unknown;
   Integrated?: unknown;
   Identifying?: unknown;
   Unassigned?: unknown;
@@ -115,6 +124,15 @@ const ToPublicClient = (c: PublicClientSource): ClientView => ({
   Online: c.Online,
   LastSeen: c.LastSeen,
   Vitals: (c.Vitals ?? null) as Vitals | null,
+  BootTime: typeof c.BootTime === 'number' ? c.BootTime : null,
+  PowerStatus: (c.PowerStatus ?? null) as PowerStatusSnapshot | null,
+  Temperatures: (c.Temperatures ?? null) as TemperaturesSnapshot | null,
+  ...(c.SystemChecks && typeof c.SystemChecks === 'object'
+    ? { SystemChecks: c.SystemChecks as ClientSystemChecks }
+    : {}),
+  ResourceAlarms: Array.isArray(c.ResourceAlarms)
+    ? (c.ResourceAlarms as ClientResourceAlarm[])
+    : [],
   USBDeviceList: Array.isArray(c.USBDeviceList) ? c.USBDeviceList : [],
   CriticalUSBDevices: Array.isArray(c.CriticalUSBDevices) ? c.CriticalUSBDevices : [],
   CriticalUSBSerials: Array.isArray(c.CriticalUSBSerials) ? c.CriticalUSBSerials : [],

@@ -207,9 +207,9 @@ export function AudioEndpointBadge(Endpoint: AudioEndpointView): {
   if (!Endpoint.IsCritical) {
     return {
       State: 'plain',
-      Label: 'Critical',
+      Label: 'Monitor',
       Icon: 'bi-check-circle',
-      Title: 'Mark as critical',
+      Title: 'Monitor this audio device',
     };
   }
   if (Endpoint.Missing) {
@@ -217,15 +217,15 @@ export function AudioEndpointBadge(Endpoint: AudioEndpointView): {
       State: 'missing',
       Label: 'Missing',
       Icon: 'bi-x-circle-fill',
-      Title: 'Remove critical status (device not connected)',
+      Title: 'Stop monitoring (device not connected)',
     };
   }
   if (!Endpoint.IsConnected) {
     return {
       State: 'unreported',
-      Label: 'Critical',
+      Label: 'Monitored',
       Icon: 'bi-question-circle',
-      Title: 'Remove critical status (not reported yet)',
+      Title: 'Stop monitoring (not reported yet)',
     };
   }
   if (Endpoint.Issues.length) {
@@ -233,14 +233,14 @@ export function AudioEndpointBadge(Endpoint: AudioEndpointView): {
       State: 'issue',
       Label: 'Changed',
       Icon: 'bi-exclamation-triangle-fill',
-      Title: 'Remove critical status (conditions not met)',
+      Title: 'Stop monitoring (conditions not met)',
     };
   }
   return {
     State: 'healthy',
-    Label: 'Critical',
+    Label: 'Monitored',
     Icon: 'bi-check-circle-fill',
-    Title: 'Remove critical status',
+    Title: 'Stop monitoring',
   };
 }
 

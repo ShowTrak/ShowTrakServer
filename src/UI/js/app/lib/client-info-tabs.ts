@@ -19,6 +19,7 @@ export type ClientInfoTabKey =
   | 'audio'
   | 'network'
   | 'apps'
+  | 'power'
   | 'actions'
   | 'controls'
   | 'content'
@@ -45,6 +46,7 @@ const CLIENT_INFO_TABS_BY_KIND: Readonly<Record<ClientInfoKind, readonly ClientI
     { Key: 'audio', Title: 'Audio' },
     { Key: 'network', Title: 'Network' },
     { Key: 'apps', Title: 'Applications' },
+    { Key: 'power', Title: 'Power & Thermal' },
   ],
   integrated: [STATUS_TAB, INFO_TAB],
   target: [STATUS_TAB, { Key: 'actions', Title: 'Actions' }],

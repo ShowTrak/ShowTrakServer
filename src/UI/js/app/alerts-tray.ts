@@ -28,6 +28,19 @@ interface AddAlertInput {
 }
 
 export const Alerts: Alert[] = [];
+
+// Nothing in the tray is worth keeping past 12 hours (mirrors
+// HISTORY_RETENTION_MS on the server). The tray otherwise grew for as long as
+// the window stayed open — on a permanent install, weeks of alerts.
+const ALERT_TRAY_RETENTION_MS = 12 * 60 * 60 * 1000;
+
+// Drop expired entries in place (Alerts is a shared, exported binding).
+export function PruneExpiredAlerts(Now: number = Date.now()): void {
+  const Cutoff = Now - ALERT_TRAY_RETENTION_MS;
+  for (let Index = Alerts.length - 1; Index >= 0; Index--) {
+    if (Alerts[Index]!.time < Cutoff) Alerts.splice(Index, 1);
+  }
+}
 export let AlertsVisible = false;
 // Track adoption alerts per device UUID so we can auto-dismiss
 export const PendingAdoptionAlerts = new Map<string, string>();
@@ -52,6 +65,7 @@ export function AddAlert({
     dismissed: false,
   };
   Alerts.unshift(alert);
+  PruneExpiredAlerts(alert.time);
   UpdateAlertsIndicator();
   if (AlertsVisible) RenderAlerts();
   // Also show a top-center toast linked to this alert
@@ -128,6 +142,8 @@ export function RenderAlerts() {
   const tray = document.getElementById('ALERTS_TRAY');
   const list = document.getElementById('ALERTS_LIST');
   if (!tray || !list) return;
+  // A tray left closed for a day still opens without yesterday's alerts.
+  PruneExpiredAlerts();
   const items = Alerts.filter((a) => !a.dismissed);
   if (items.length === 0) {
     list.innerHTML = `<div class="text-muted p-2 text-center">No alerts</div>`;

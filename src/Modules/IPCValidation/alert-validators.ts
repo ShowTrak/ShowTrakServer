@@ -1,35 +1,12 @@
 // Alert rule scope / action / trigger validators.
 import { fail, isPlainObject, normalizeNonEmptyString } from './primitives';
 import type { IPCValidationManager } from './index';
+import { TRIGGERS } from '../AlertsManager/triggers';
 
-const ALERT_TRIGGER_TYPES = new Set([
-  'CLIENT_OFFLINE',
-  'CLIENT_DEGRADED',
-  'CLIENT_ONLINE',
-  'SCRIPT_EXECUTION_FAILED',
-  'FREEKIOSK_METRIC_ALARM',
-  'USB_DEVICE_CONNECTED',
-  'USB_DEVICE_DISCONNECTED',
-  'NON_CRITICAL_USB_DEVICE_CONNECTED',
-  'NON_CRITICAL_USB_DEVICE_DISCONNECTED',
-  'CRITICAL_USB_DEVICE_CONNECTED',
-  'CRITICAL_USB_DEVICE_DISCONNECTED',
-  'APPLICATION_STARTED',
-  'APPLICATION_STOPPED',
-  'CRITICAL_APPLICATION_STARTED',
-  'CRITICAL_APPLICATION_STOPPED',
-  'NON_CRITICAL_APPLICATION_STARTED',
-  'NON_CRITICAL_APPLICATION_STOPPED',
-  'AUDIO_DEVICE_CONNECTED',
-  'AUDIO_DEVICE_DISCONNECTED',
-  'CRITICAL_AUDIO_DEVICE_CONNECTED',
-  'CRITICAL_AUDIO_DEVICE_DISCONNECTED',
-  'NON_CRITICAL_AUDIO_DEVICE_CONNECTED',
-  'NON_CRITICAL_AUDIO_DEVICE_DISCONNECTED',
-  'AUDIO_DEFAULT_DEVICE_CHANGED',
-  'AUDIO_DEVICE_MUTED',
-  'AUDIO_FORMAT_CHANGED',
-]);
+// Every trigger the AlertsManager defines. Derived rather than listed: a copy
+// here drifted once already, and a trigger the server offers but the validator
+// refuses is a rule that cannot be saved.
+const ALERT_TRIGGER_TYPES: ReadonlySet<string> = new Set(Object.values(TRIGGERS));
 
 export = function registerAlertValidators(Manager: IPCValidationManager): void {
   function normalizeAlertScope(value: unknown) {

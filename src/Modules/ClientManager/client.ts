@@ -18,7 +18,6 @@ import {
 import type {
   USBDevice,
   ClientDisplay,
-  RunningApplicationItem,
   IntegratedAction,
   AudioDevicesView,
   AudioEndpointView,
@@ -30,6 +29,17 @@ import type {
   USBCapabilities,
   NetworkInterfaceView,
   NetworkStatusView,
+  ClientResourceAlarm,
+  ClientResourceAlarmKey,
+  ClientSystemCheckKey,
+  ClientSystemChecks,
+  ClientPowerCheck,
+  ClientThermalCheck,
+  ClientUptimeCheck,
+  ClientUsageCheck,
+  PowerStatusSnapshot,
+  RunningApplicationsCapabilities,
+  TemperaturesSnapshot,
 } from '@showtrak/protocol';
 import {
   EmptyAudioView,
@@ -54,6 +64,37 @@ import {
   normalizeCriticalNetworkEntry,
   normalizeInterfaceName,
 } from './network';
+import {
+  APPLICATION_NOT_FOREGROUND_WARNING,
+  APPLICATION_NOT_RESPONDING_WARNING,
+  ActiveResourceAlarms,
+  EmptyResourceAlarmState,
+  IsReboot,
+  PercentReading,
+  StepResourceAlarm,
+  UptimeSecondsOf,
+  diffDisplays,
+  diffNetworkInterfaces,
+  normalizePowerStatus,
+  normalizeTemperatures,
+  trackUSBDevices,
+  type ClientHealthEvent,
+  type ResourceAlarmState,
+  type USBMemory,
+} from './health';
+import {
+  EmptySystemChecks,
+  HottestSensor,
+  PowerBreaches,
+  RESOURCE_ALARM_KEYS,
+  SYSTEM_CHECK_WARNINGS,
+  SystemCheckField,
+  ThermalBreaches,
+  UptimeBreach,
+  UsageBreach,
+  type SystemCheck,
+} from './system-checks';
+import { TRIGGERS } from '../AlertsManager/triggers';
 
 const Logger = CreateLogger('ClientManager');
 
@@ -118,14 +159,41 @@ function sortRunningApplications(Items: DedupedRunningApplication[]): DedupedRun
   });
 }
 
+// Responsiveness is part of the signature so a hang (or recovery) is stored and
+// judged even when the set of applications is unchanged.
 function runningApplicationsSignature(
   TotalCount: number,
   Truncated: boolean,
   Items: DedupedRunningApplication[]
 ): string {
   return `${TotalCount}|${Truncated ? '1' : '0'}|${Items.map(
-    (Entry) => `${Entry.Name}:${Entry.Count}`
+    (Entry) => `${Entry.Name}:${Entry.Count}${Entry.Responding === false ? ':hung' : ''}`
   ).join('|')}`;
+}
+
+// One application's responsiveness across its instances: hung if ANY is hung,
+// unknown if any could not be read, absent when the client cannot say at all.
+function mergeResponding(
+  A: boolean | null | undefined,
+  B: boolean | null | undefined
+): boolean | null | undefined {
+  if (A === false || B === false) return false;
+  if (A === null || B === null) return null;
+  if (A === true || B === true) return true;
+  return undefined;
+}
+
+function normalizeResponding(Value: unknown): boolean | null | undefined {
+  if (Value === undefined) return undefined;
+  return typeof Value === 'boolean' ? Value : null;
+}
+
+// What the client says its application collector can report. Null for a client
+// that predates the field, which reports neither.
+function normalizeApplicationCapabilities(Value: unknown): RunningApplicationsCapabilities | null {
+  if (!Value || typeof Value !== 'object') return null;
+  const C = Value as Record<string, unknown>;
+  return { Responding: C.Responding === true, Foreground: C.Foreground === true };
 }
 
 // --- Local domain shapes ---------------------------------------------------
@@ -135,6 +203,10 @@ interface CriticalApplicationEntry {
   Name: string;
   Key: string;
   Timestamp: number | null;
+  // Fault when another application holds the focused window.
+  RequireForeground: boolean;
+  // Fault when its windows stop answering the operating system.
+  RequireResponding: boolean;
 }
 
 // The augmented per-entity view entries the _rebuild* methods emit for the
@@ -146,6 +218,11 @@ interface RunningApplicationViewEntry {
   IsRunning: boolean;
   IsCritical: boolean;
   Missing: boolean;
+  // Absent when the client cannot tell (see RunningApplicationItem.Responding).
+  Responding?: boolean | null;
+  IsForeground: boolean;
+  RequireForeground: boolean;
+  RequireResponding: boolean;
 }
 
 // Vitals as held in RAM: the last heartbeat's payload, or empty objects before
@@ -155,6 +232,13 @@ interface ClientVitals {
   CPU: Record<string, unknown>;
   Ram: Record<string, unknown>;
   Uptime: Record<string, unknown>;
+}
+
+// A stored running application: the wire item, de-duplicated by name.
+interface ObservedRunningApplication {
+  Name: string;
+  Count: number;
+  Responding?: boolean | null;
 }
 
 // Network interfaces as normalized by SetNetworkInterfaces (a superset of the
@@ -186,8 +270,11 @@ interface ObservedRunningApplicationsState {
   SampledAt: number | null;
   TotalCount: number;
   Truncated: boolean;
-  Items: RunningApplicationItem[];
+  Items: ObservedRunningApplication[];
   Status: RunningAppStatus;
+  // Absent (undefined) when the client cannot report the foreground at all.
+  Foreground?: string | null;
+  Capabilities: RunningApplicationsCapabilities | null;
 }
 interface RunningApplicationsView {
   SampledAt: number | null;
@@ -195,6 +282,8 @@ interface RunningApplicationsView {
   Truncated: boolean;
   Items: RunningApplicationViewEntry[];
   Status: RunningAppStatus;
+  Foreground?: string | null;
+  Capabilities: RunningApplicationsCapabilities | null;
 }
 
 // Options accepted by the DB-backed setters: `markUnsaved: false` suppresses
@@ -208,6 +297,7 @@ interface PersistOptions {
 interface DedupedRunningApplication {
   Name: string;
   Count: number;
+  Responding?: boolean | null;
 }
 
 // Seed accepted by the constructor: a persisted `ClientRow` (mirrored in
@@ -241,6 +331,12 @@ interface ClientConstructorInput {
 // leaves the client itself plain data, and entries disappear with the client.
 const StartupGraceTimers = new WeakMap<Client, ReturnType<typeof setTimeout>>();
 
+// Threshold-alarm bookkeeping and last-seen USB devices, held off the client for
+// the same reason: the client is serialized whole, and this is working state,
+// not something any surface displays (ResourceAlarms is the displayed result).
+const ResourceAlarmStates = new WeakMap<Client, ResourceAlarmState>();
+const USBMemories = new WeakMap<Client, USBMemory>();
+
 class Client {
   // Persisted identity + ordering (mirrors DB/rows.ts ClientRow).
   UUID: string;
@@ -264,6 +360,10 @@ class Client {
   // Seconds a dropped connection is tolerated before the client reads offline.
   // null inherits CLIENT_OFFLINE_GRACE_SECONDS — see ./offline-grace.
   OfflineGraceSeconds: number | null;
+  // Monitored system checks (CPU, memory, uptime, power, thermal); a null
+  // check is not monitored. Loaded from CriticalSystemChecks — see
+  // ./system-checks for what each condition means.
+  SystemChecks: ClientSystemChecks;
   // Stable, human-friendly OSC/API identifier. Unique across the shared client
   // namespace (real clients + monitors + dummies). Back-filled non-null on boot.
   Slug: string | null;
@@ -277,6 +377,17 @@ class Client {
   Online: boolean;
   LastSeen: number;
   Vitals: ClientVitals;
+  // When the operating system last booted, derived from its uptime. Kept while
+  // offline so the last known boot stays visible; UptimeSeconds is the latest
+  // reading, used to recognise a restart (uptime only ever counts up).
+  BootTime: number | null;
+  UptimeSeconds: number | null;
+  // Battery/mains/sleep and temperatures, as last reported. Null until the
+  // client reports them (clients before 3.22.0 never do).
+  PowerStatus: PowerStatusSnapshot | null;
+  Temperatures: TemperaturesSnapshot | null;
+  // System-check conditions currently failing (see ./health). Empty while offline.
+  ResourceAlarms: ClientResourceAlarm[];
   Degraded: boolean;
   DegradedWarnings: string[];
   // Online, inside the start-up window, and holding at least one inferred fault
@@ -399,6 +510,7 @@ class Client {
       typeof Data.RunOnLaunchDelaySeconds === 'number' ? Data.RunOnLaunchDelaySeconds : null;
     this.OfflineGraceSeconds =
       typeof Data.OfflineGraceSeconds === 'number' ? Data.OfflineGraceSeconds : null;
+    this.SystemChecks = EmptySystemChecks();
     this.Slug = Data.Slug || null;
     // Stored as sqlite 0/1, so coerce rather than trust the raw row value.
     this.Unassigned = !!Data.Unassigned;
@@ -411,6 +523,11 @@ class Client {
       Ram: {},
       Uptime: {},
     };
+    this.BootTime = null;
+    this.UptimeSeconds = null;
+    this.PowerStatus = null;
+    this.Temperatures = null;
+    this.ResourceAlarms = [];
     this.ConnectedUSBDeviceList = [];
     this.USBDeviceList = [];
     this.CriticalUSBDevices = [];
@@ -465,6 +582,7 @@ class Client {
         Message: null,
         Platform: null,
       },
+      Capabilities: null,
     };
     this.RunningApplications = {
       SampledAt: null,
@@ -476,6 +594,7 @@ class Client {
         Message: null,
         Platform: null,
       },
+      Capabilities: null,
     };
     this.RunningApplicationsSignature = null;
     this.ObservedRunningApplicationsSignature = null;
@@ -505,6 +624,11 @@ class Client {
       this._rebuildAudioView(false);
       this.HasNetworkTelemetry = false;
       this._rebuildNetworkView(false);
+      // A threshold says nothing about a machine that is not reporting, so the
+      // alarms stand down rather than ride out the outage. The next session
+      // re-proves them — a CPU still pegged after a reconnect re-raises once it
+      // has been over for the sustain window again.
+      this._resetResourceAlarms();
     }
     this._refreshClientHealthState();
     Logger.debug(`Client ${this.UUID} Online updated to ${Online}`);
@@ -531,6 +655,274 @@ class Client {
       Ram: AsRecord(Source.Ram),
       Uptime: AsRecord(Source.Uptime),
     };
+    this._observeUptime(UptimeSecondsOf(this.Vitals.Uptime));
+    // Judged on every heartbeat: the sustain window of the usage checks is
+    // timed by the readings themselves.
+    if (this._evaluateSystemChecks()) this._refreshClientHealthState();
+    BroadcastManager.emit('ClientUpdated', this);
+  }
+
+  /**
+   * Step every system-check alarm against the latest readings. Returns true
+   * when an alarm was raised or cleared, so the caller knows to re-judge health.
+   * Cheap enough to run on every report: each step is a few comparisons.
+   */
+  _evaluateSystemChecks(): boolean {
+    const Checks = this.SystemChecks;
+    const Cpu = PercentReading(this.Vitals.CPU.UsagePercentage);
+    const Ram = PercentReading(this.Vitals.Ram.UsagePercentage);
+    const Power = PowerBreaches(Checks.Power, this.PowerStatus);
+    const Thermal = ThermalBreaches(Checks.Thermal, this.Temperatures);
+    const Battery = this.PowerStatus ? this.PowerStatus.Battery : null;
+    const Hottest = HottestSensor(this.Temperatures);
+    const Uptime = this.UptimeSeconds;
+    let Changed = 0;
+    Changed |= this._stepResourceAlarm(
+      'cpu',
+      UsageBreach(Checks.Cpu, Cpu),
+      Cpu === null ? null : Math.round(Cpu),
+      Checks.Cpu ? Checks.Cpu.MaxPercent : null,
+      (Checks.Cpu ? Checks.Cpu.SustainSeconds : 0) * 1000
+    );
+    Changed |= this._stepResourceAlarm(
+      'ram',
+      UsageBreach(Checks.Ram, Ram),
+      Ram === null ? null : Math.round(Ram),
+      Checks.Ram ? Checks.Ram.MaxPercent : null,
+      (Checks.Ram ? Checks.Ram.SustainSeconds : 0) * 1000
+    );
+    Changed |= this._stepResourceAlarm(
+      'uptime',
+      UptimeBreach(Checks.Uptime, Uptime),
+      Uptime === null ? null : Math.round((Uptime / 86400) * 10) / 10,
+      Checks.Uptime ? Checks.Uptime.MaxDays : null,
+      0,
+      { BootTime: this.BootTime }
+    );
+    Changed |= this._stepResourceAlarm('power', Power.power, 'battery', null, 0, {
+      Battery,
+    });
+    Changed |= this._stepResourceAlarm(
+      'battery',
+      Power.battery,
+      Battery ? Battery.Percent : null,
+      Checks.Power ? Checks.Power.MinBatteryPercent : null,
+      0,
+      { Battery }
+    );
+    Changed |= this._stepResourceAlarm(
+      'charging',
+      Power.charging,
+      Battery ? Battery.Percent : null,
+      Checks.Power ? Checks.Power.ChargingBelowPercent : null,
+      0,
+      { Battery }
+    );
+    Changed |= this._stepResourceAlarm(
+      'temperature',
+      Thermal.temperature,
+      Hottest ? Hottest.Celsius : null,
+      Checks.Thermal ? Checks.Thermal.MaxCelsius : null,
+      0,
+      { Sensor: Hottest ? Hottest.Name : null }
+    );
+    Changed |= this._stepResourceAlarm(
+      'thermal',
+      Thermal.thermal,
+      this.Temperatures ? this.Temperatures.ThermalState : null,
+      Checks.Thermal ? Checks.Thermal.MaxThermalState : null,
+      0
+    );
+    return Changed !== 0;
+  }
+
+  /** Replace every system check (on load). */
+  SetSystemChecks(Entries: Array<{ Key: ClientSystemCheckKey; Check: SystemCheck }>) {
+    const Next = EmptySystemChecks();
+    for (const Entry of Array.isArray(Entries) ? Entries : []) {
+      if (Entry && Entry.Key && Entry.Check) {
+        (Next as unknown as Record<string, SystemCheck>)[SystemCheckField(Entry.Key)] = Entry.Check;
+      }
+    }
+    this.SystemChecks = Next;
+    if (this._evaluateSystemChecks()) this._refreshClientHealthState();
+  }
+
+  /** Monitor a system check, or change its conditions. Judged at once against the last readings. */
+  MarkSystemCheck(Key: ClientSystemCheckKey, Check: SystemCheck) {
+    this.SystemChecks = { ...this.SystemChecks, [SystemCheckField(Key)]: Check };
+    if (this._evaluateSystemChecks()) this._refreshClientHealthState();
+  }
+
+  /** Stop monitoring a system check; any alarm it held clears at once. */
+  UnmarkSystemCheck(Key: ClientSystemCheckKey) {
+    this.SystemChecks = { ...this.SystemChecks, [SystemCheckField(Key)]: null };
+    if (this._evaluateSystemChecks()) this._refreshClientHealthState();
+  }
+
+  /** The monitored check for one key, or null. */
+  GetSystemCheck(
+    Key: ClientSystemCheckKey
+  ): ClientUsageCheck | ClientUptimeCheck | ClientPowerCheck | ClientThermalCheck | null {
+    return this.SystemChecks[SystemCheckField(Key)];
+  }
+
+  // Track boot time from uptime, and announce a restart: uptime only ever
+  // counts up, so a reading well below the last one is a fresh boot. The first
+  // reading this server sees is a baseline, not a reboot — and because this
+  // object outlives the connection, the comparison spans the outage a reboot
+  // causes, which is exactly the window it has to see across.
+  _observeUptime(UptimeSeconds: number | null) {
+    if (UptimeSeconds === null) return;
+    const Previous = this.UptimeSeconds;
+    const PreviousBoot = this.BootTime;
+    this.UptimeSeconds = UptimeSeconds;
+    const Boot = Date.now() - UptimeSeconds * 1000;
+    // Round to the minute so a boot time derived a second apart each heartbeat
+    // reads (and serializes) as the same instant.
+    this.BootTime = Math.round(Boot / 60000) * 60000;
+    if (!IsReboot(Previous, UptimeSeconds)) return;
+    this._emitHealthEvent({
+      TriggerTypes: [TRIGGERS.CLIENT_REBOOTED],
+      Severity: 'warning',
+      Details: {
+        BootTime: this.BootTime,
+        PreviousBootTime: PreviousBoot,
+        PreviousUptimeSeconds: Previous,
+        UptimeSeconds,
+      },
+    });
+  }
+
+  // Advance one threshold alarm and announce a change. Returns 1 when the
+  // alarm was raised or cleared (so the caller knows to re-judge health), else 0.
+  _stepResourceAlarm(
+    Key: ClientResourceAlarmKey,
+    Breaching: boolean | null,
+    Value: number | string | null,
+    Threshold: number | string | null,
+    SustainMs: number,
+    Extra: Record<string, unknown> = {}
+  ): number {
+    let State = ResourceAlarmStates.get(this);
+    if (!State) {
+      State = EmptyResourceAlarmState();
+      ResourceAlarmStates.set(this, State);
+    }
+    // Judged only while connected: an offline machine has no readings.
+    const Effective = this.Online ? Breaching : null;
+    const Outcome = StepResourceAlarm(
+      State[Key],
+      Key,
+      Effective,
+      Value,
+      Threshold,
+      SustainMs,
+      Date.now()
+    );
+    this.ResourceAlarms = ActiveResourceAlarms(State);
+    if (!Outcome) return 0;
+    const Trigger = {
+      cpu: TRIGGERS.CPU_USAGE_HIGH,
+      ram: TRIGGERS.RAM_USAGE_HIGH,
+      uptime: TRIGGERS.UPTIME_HIGH,
+      power: TRIGGERS.CRITICAL_POWER_ON_BATTERY,
+      battery: TRIGGERS.BATTERY_LOW,
+      charging: TRIGGERS.BATTERY_NOT_CHARGING,
+      temperature: TRIGGERS.TEMPERATURE_HIGH,
+      thermal: TRIGGERS.THERMAL_STATE_HIGH,
+    }[Key];
+    // Raising alerts; clearing only tells the alert manager the condition has
+    // ended (CLIENT_RECOVERED speaks for the client as a whole).
+    this._emitHealthEvent({
+      TriggerTypes: Outcome === 'raised' ? [Trigger] : [],
+      Severity: 'warning',
+      Details: { Metric: Key, Value, Threshold, ...Extra },
+      Condition: { Key: `resource:${Key}`, Active: Outcome === 'raised' },
+    });
+    return 1;
+  }
+
+  _resetResourceAlarms() {
+    const State = ResourceAlarmStates.get(this);
+    if (!State) return;
+    for (const Key of RESOURCE_ALARM_KEYS) {
+      this._stepResourceAlarm(Key, null, null, null, 0);
+    }
+  }
+
+  _emitHealthEvent(Event: ClientHealthEvent) {
+    BroadcastManager.emit('ClientHealthEvent', this, Event);
+  }
+
+  /**
+   * Store a battery / mains / sleep report and derive what changed.
+   *
+   * Sleep and wake are read from the client's own timestamps rather than from
+   * the moment a report lands: a machine going to sleep may not get its last
+   * report out, and the one it sends on waking carries both. The first report
+   * this server sees is a baseline — an old resume is not news.
+   */
+  SetPowerStatus(Snapshot: unknown) {
+    const Previous = this.PowerStatus;
+    const Next = normalizePowerStatus(Snapshot);
+    this.PowerStatus = Next;
+
+    if (Previous) {
+      const Suspended =
+        Next.LastSuspendAt !== null && Next.LastSuspendAt !== Previous.LastSuspendAt;
+      const Resumed = Next.LastResumeAt !== null && Next.LastResumeAt !== Previous.LastResumeAt;
+      // Both at once means the "going to sleep" report never made it out, so
+      // the wake is the news; announcing the sleep after the fact helps no one.
+      if (Suspended && !Resumed) {
+        this._emitHealthEvent({
+          TriggerTypes: [TRIGGERS.CLIENT_SLEEPING],
+          Severity: 'warning',
+          Details: { SuspendedAt: Next.LastSuspendAt },
+        });
+      }
+      if (Resumed) {
+        this._emitHealthEvent({
+          TriggerTypes: [TRIGGERS.CLIENT_RESUMED],
+          Severity: 'info',
+          Details: {
+            SuspendedAt: Next.LastSuspendAt,
+            ResumedAt: Next.LastResumeAt,
+            AsleepSeconds:
+              Next.LastSuspendAt !== null &&
+              Next.LastResumeAt !== null &&
+              Next.LastResumeAt >= Next.LastSuspendAt
+                ? Math.round((Next.LastResumeAt - Next.LastSuspendAt) / 1000)
+                : null,
+          },
+        });
+      }
+      if (Previous.OnBattery !== null && Next.OnBattery !== null) {
+        if (!Previous.OnBattery && Next.OnBattery) {
+          this._emitHealthEvent({
+            TriggerTypes: [TRIGGERS.POWER_ON_BATTERY],
+            Severity: 'warning',
+            Details: { Battery: Next.Battery },
+          });
+        } else if (Previous.OnBattery && !Next.OnBattery) {
+          this._emitHealthEvent({
+            TriggerTypes: [TRIGGERS.POWER_RESTORED],
+            Severity: 'success',
+            Details: { Battery: Next.Battery },
+          });
+        }
+      }
+    }
+
+    if (this._evaluateSystemChecks()) this._refreshClientHealthState();
+    BroadcastManager.emit('ClientUpdated', this);
+  }
+
+  /** Store a temperature report and judge the thermal check against it. */
+  SetTemperatures(Snapshot: unknown) {
+    const Next = normalizeTemperatures(Snapshot);
+    this.Temperatures = Next;
+    if (this._evaluateSystemChecks()) this._refreshClientHealthState();
     BroadcastManager.emit('ClientUpdated', this);
   }
   SetIntegratedState(State: unknown, Message: unknown) {
@@ -550,9 +942,11 @@ class Client {
     return true;
   }
   SetUSBDeviceList(USBDeviceList: unknown) {
+    const BaselineTrusted = this.HasUSBTelemetry;
     this.ConnectedUSBDeviceList = Array.isArray(USBDeviceList) ? USBDeviceList : [];
     this.HasUSBTelemetry = true;
     this._rebuildUSBDeviceView();
+    this._trackUSBDevices(BaselineTrusted);
     Logger.debug(`Client ${this.UUID} USB Device List updated`);
     BroadcastManager.emit('ClientUpdated', this);
     return;
@@ -632,9 +1026,13 @@ class Client {
     return true;
   }
   SetDisplayList(DisplayList: unknown) {
+    const Previous = this.ConnectedDisplayList;
+    const PreviousView = this.DisplayList;
+    const BaselineTrusted = this.HasDisplayTelemetry;
     this.ConnectedDisplayList = Array.isArray(DisplayList) ? DisplayList : [];
     this.HasDisplayTelemetry = true;
     this._rebuildDisplayView();
+    if (BaselineTrusted) this._emitDisplayTransitions(Previous, PreviousView);
     Logger.debug(`Client ${this.UUID} Display List updated`);
     BroadcastManager.emit('ClientUpdated', this);
     return;
@@ -653,6 +1051,8 @@ class Client {
   ApplyDisplayDelta(Delta: unknown) {
     const D = AsRecord(Delta);
     const current = Array.isArray(this.ConnectedDisplayList) ? this.ConnectedDisplayList : [];
+    const PreviousView = this.DisplayList;
+    const BaselineTrusted = this.HasDisplayTelemetry;
     const byID = new Map<string, ClientDisplay>();
     for (const display of current) {
       const ID = normalizeDisplayID(AsRecord(display).DisplayID);
@@ -676,10 +1076,63 @@ class Client {
     // by the time one lands the topology has been reported at least once.
     this.HasDisplayTelemetry = true;
     this._rebuildDisplayView();
+    if (BaselineTrusted) this._emitDisplayTransitions(current, PreviousView);
     Logger.debug(
       `Client ${this.UUID} Display delta applied (${this.ConnectedDisplayList.length} displays)`
     );
     BroadcastManager.emit('ClientUpdated', this);
+  }
+  // Displays that appeared, went or changed between two trusted lists. Whether
+  // one is critical is read from the view it was judged in: before the change
+  // for one that went, after it for one that arrived or changed.
+  _emitDisplayTransitions(Previous: ClientDisplay[], PreviousView: DisplayViewEntry[]) {
+    const Transitions = diffDisplays(Previous, this.ConnectedDisplayList);
+    const CriticalIn = (View: DisplayViewEntry[], DisplayID: unknown) => {
+      const ID = normalizeDisplayID(DisplayID);
+      return !!ID && View.some((Entry) => Entry.IsCritical && Entry.DisplayID === ID);
+    };
+    const Describe = (Display: ClientDisplay) => ({
+      DisplayID: Display.DisplayID,
+      Label: Display.Label ?? null,
+      ScreenNumber: Display.ScreenNumber ?? null,
+      Width: Display.Width,
+      Height: Display.Height,
+      RefreshRate: Display.RefreshRate ?? null,
+      ScaleFactor: Display.ScaleFactor,
+      Rotation: Display.Rotation,
+      Primary: !!Display.Primary,
+    });
+    for (const Display of Transitions.Added) {
+      const IsCritical = CriticalIn(this.DisplayList, Display.DisplayID);
+      this._emitHealthEvent({
+        TriggerTypes: IsCritical
+          ? [TRIGGERS.DISPLAY_CONNECTED, TRIGGERS.CRITICAL_DISPLAY_CONNECTED]
+          : [TRIGGERS.DISPLAY_CONNECTED],
+        Severity: 'info',
+        Details: { Display: Describe(Display), IsCritical },
+      });
+    }
+    for (const Display of Transitions.Removed) {
+      const IsCritical = CriticalIn(PreviousView, Display.DisplayID);
+      this._emitHealthEvent({
+        TriggerTypes: IsCritical
+          ? [TRIGGERS.DISPLAY_DISCONNECTED, TRIGGERS.CRITICAL_DISPLAY_DISCONNECTED]
+          : [TRIGGERS.DISPLAY_DISCONNECTED],
+        Severity: 'warning',
+        Details: { Display: Describe(Display), IsCritical },
+      });
+    }
+    for (const Change of Transitions.Changed) {
+      this._emitHealthEvent({
+        TriggerTypes: [TRIGGERS.DISPLAY_CONFIGURATION_CHANGED],
+        Severity: 'warning',
+        Details: {
+          Display: Describe(Change.Display),
+          Previous: Describe(Change.Previous),
+          IsCritical: CriticalIn(this.DisplayList, Change.Display.DisplayID),
+        },
+      });
+    }
   }
   SetCriticalDisplays(Displays: unknown) {
     const Normalized: CriticalDisplay[] = [];
@@ -754,6 +1207,8 @@ class Client {
         Name,
         Key,
         Timestamp: TimestampOrNull(Entry.Timestamp),
+        RequireForeground: Entry.RequireForeground === true,
+        RequireResponding: Entry.RequireResponding !== false,
       });
     }
     this.CriticalApplications = Normalized;
@@ -779,6 +1234,9 @@ class Client {
       if (!Existing.Timestamp && A.Timestamp) {
         Existing.Timestamp = TimestampOrNull(A.Timestamp);
       }
+      for (const Condition of ['RequireForeground', 'RequireResponding'] as const) {
+        if (typeof A[Condition] === 'boolean') Existing[Condition] = A[Condition] as boolean;
+      }
       this._rebuildRunningApplicationsView();
       return false;
     }
@@ -786,6 +1244,8 @@ class Client {
       Name,
       Key,
       Timestamp: TimestampOrNull(A.Timestamp),
+      RequireForeground: A.RequireForeground === true,
+      RequireResponding: A.RequireResponding !== false,
     });
     this.CriticalApplicationKeys = this.CriticalApplications.map(
       (Entry: CriticalApplicationEntry) => Entry.Key
@@ -807,6 +1267,18 @@ class Client {
     this._rebuildRunningApplicationsView();
     return true;
   }
+  // A critical application that must hold the focused window and does not. Only
+  // judged when the client can report the foreground and named one: an unknown
+  // owner (null — a lock screen, an elevation prompt, or an unreadable window)
+  // is not evidence that the show application lost focus.
+  _isOutOfForeground(Entry: RunningApplicationViewEntry): boolean {
+    if (!Entry.RequireForeground || !Entry.IsRunning) return false;
+    const View = this.RunningApplications;
+    if (!View.Capabilities || !View.Capabilities.Foreground) return false;
+    if (typeof View.Foreground !== 'string' || !View.Foreground) return false;
+    return !Entry.IsForeground;
+  }
+
   _refreshClientHealthState() {
     // Each domain is only judged once the client has reported it on this
     // connection. Until then its "missing" list is an artefact of having no
@@ -824,7 +1296,21 @@ class Client {
         ? this.MissingCriticalApplications.length
         : 0;
     const Warnings: string[] = [];
-    if (MissingApplicationCount > 0) Warnings.push('Critical Application Issue');
+    if (MissingApplicationCount > 0) Warnings.push('Monitored Application Issue');
+    if (CanEvaluateCriticalApplications) {
+      const CriticalRunning = (this.RunningApplications.Items || []).filter(
+        (Entry) => Entry.IsCritical && Entry.IsRunning
+      );
+      if (CriticalRunning.some((Entry) => Entry.RequireResponding && Entry.Responding === false)) {
+        Warnings.push(APPLICATION_NOT_RESPONDING_WARNING);
+      }
+      if (CriticalRunning.some((Entry) => this._isOutOfForeground(Entry))) {
+        Warnings.push(APPLICATION_NOT_FOREGROUND_WARNING);
+      }
+    }
+    // Threshold alarms already waited out their sustain window, and are only
+    // ever raised while online, so they are published like any other fault.
+    for (const Alarm of this.ResourceAlarms) Warnings.push(SYSTEM_CHECK_WARNINGS[Alarm.Key]);
     if (this.HasUSBTelemetry && Array.isArray(this.USBWarnings)) {
       Warnings.push(...this.USBWarnings);
     }
@@ -900,6 +1386,52 @@ class Client {
     if (typeof Timer.unref === 'function') Timer.unref();
     StartupGraceTimers.set(this, Timer);
   }
+  // Moved, re-flashed or failing devices, judged against what was last seen of
+  // each (see trackUSBDevices). An untrusted pass only records the baseline.
+  _trackUSBDevices(Trusted: boolean) {
+    let Memory = USBMemories.get(this);
+    if (!Memory) {
+      Memory = new Map();
+      USBMemories.set(this, Memory);
+    }
+    const Transitions = trackUSBDevices(Memory, this.ConnectedUSBDeviceList, Trusted);
+    for (const Transition of Transitions) {
+      const Device = Transition.Device;
+      const IsCritical =
+        this.IsUSBDeviceCritical(Device.SerialNumber) ||
+        this.USBDeviceList.some(
+          (Entry) =>
+            Entry.IsCritical &&
+            Entry.IsConnected &&
+            !Entry.SerialNumber &&
+            Entry.Location === Device.Location &&
+            Entry.ProductName === (Device.ProductName ?? null)
+        );
+      const Base = { Device, IsCritical };
+      if (Transition.Kind === 'moved') {
+        this._emitHealthEvent({
+          TriggerTypes: [TRIGGERS.USB_DEVICE_MOVED],
+          Severity: 'warning',
+          Details: { ...Base, PreviousLocation: Transition.Previous?.Location ?? null },
+        });
+      } else if (Transition.Kind === 'firmware') {
+        this._emitHealthEvent({
+          TriggerTypes: [TRIGGERS.USB_FIRMWARE_CHANGED],
+          Severity: 'warning',
+          Details: {
+            ...Base,
+            PreviousFirmwareVersion: Transition.Previous?.FirmwareVersion ?? null,
+          },
+        });
+      } else {
+        this._emitHealthEvent({
+          TriggerTypes: [TRIGGERS.USB_DEVICE_ERROR],
+          Severity: 'error',
+          Details: Base,
+        });
+      }
+    }
+  }
   _rebuildUSBDeviceView(Refresh = true) {
     const Result = buildUSBView(
       Array.isArray(this.ConnectedUSBDeviceList) ? this.ConnectedUSBDeviceList : [],
@@ -941,6 +1473,10 @@ class Client {
         .filter((Entry): Entry is [string, CriticalApplicationEntry] => !!Entry)
     );
 
+    const ForegroundKey =
+      typeof this.ObservedRunningApplications?.Foreground === 'string'
+        ? normalizeApplicationKey(this.ObservedRunningApplications.Foreground)
+        : null;
     const Running: RunningApplicationViewEntry[] = Observed.map((Entry) => {
       const Name = normalizeApplicationName(Entry && Entry.Name) || 'Unknown Application';
       const Key = normalizeApplicationKey(Name);
@@ -952,6 +1488,10 @@ class Client {
         IsRunning: true,
         IsCritical: !!CriticalEntry,
         Missing: false,
+        ...(Entry.Responding !== undefined ? { Responding: Entry.Responding } : {}),
+        IsForeground: !!Key && Key === ForegroundKey,
+        RequireForeground: !!(CriticalEntry && CriticalEntry.RequireForeground),
+        RequireResponding: !!(CriticalEntry && CriticalEntry.RequireResponding),
       };
     });
 
@@ -967,6 +1507,9 @@ class Client {
         IsRunning: false,
         IsCritical: true,
         Missing: true,
+        IsForeground: false,
+        RequireForeground: Entry.RequireForeground,
+        RequireResponding: Entry.RequireResponding,
       });
     }
 
@@ -981,11 +1524,20 @@ class Client {
         Message: null,
         Platform: null,
       },
+      ...(this.ObservedRunningApplications?.Foreground !== undefined
+        ? { Foreground: this.ObservedRunningApplications.Foreground }
+        : {}),
+      Capabilities: this.ObservedRunningApplications?.Capabilities ?? null,
     };
     this.RunningApplicationsSignature = `${this.RunningApplications.TotalCount}|${
       this.RunningApplications.Truncated ? '1' : '0'
     }|${this.RunningApplications.Items.map(
-      (Entry) => `${Entry.Name}:${Entry.IsRunning ? '1' : '0'}:${Entry.IsCritical ? '1' : '0'}`
+      (Entry) =>
+        `${Entry.Name}:${Entry.IsRunning ? '1' : '0'}:${Entry.IsCritical ? '1' : '0'}:${
+          Entry.Responding === false ? 'h' : ''
+        }:${Entry.IsForeground ? 'f' : ''}:${
+          Entry.RequireResponding ? 'h' : ''
+        }${Entry.RequireForeground ? 'g' : ''}`
     ).join('|')}`;
     this._refreshClientHealthState();
   }
@@ -1000,6 +1552,7 @@ class Client {
    */
   SetAudioDevices(Snapshot: unknown) {
     const Previous = this.ObservedAudio;
+    const PreviousOutOfRange = this._audioLevelsOutOfRange();
     const Next = normalizeAudioSnapshot(Snapshot);
     const BaselineTrusted = this.HasAudioTelemetry;
     const SampleTrusted = Next.Status.State === 'ok';
@@ -1013,8 +1566,40 @@ class Client {
           IsCritical: this.IsAudioDeviceCritical(Change.Endpoint.EndpointID),
         });
       }
+      // A critical endpoint's level leaving (or returning to) its allowed range.
+      const OutOfRange = this._audioLevelsOutOfRange();
+      for (const [EndpointID, Endpoint] of OutOfRange) {
+        if (PreviousOutOfRange.has(EndpointID)) continue;
+        this._emitHealthEvent({
+          TriggerTypes: [TRIGGERS.AUDIO_VOLUME_OUT_OF_RANGE],
+          Severity: 'warning',
+          Details: { AudioDevice: { ...Endpoint, IsCritical: true } },
+          Condition: { Key: `audio-volume:${EndpointID}`, Active: true },
+        });
+      }
+      for (const [EndpointID, Endpoint] of PreviousOutOfRange) {
+        if (OutOfRange.has(EndpointID)) continue;
+        this._emitHealthEvent({
+          TriggerTypes: [],
+          Severity: 'success',
+          Details: { AudioDevice: { ...Endpoint, IsCritical: true } },
+          Condition: { Key: `audio-volume:${EndpointID}`, Active: false },
+        });
+      }
     }
     BroadcastManager.emit('ClientUpdated', this);
+  }
+
+  // Critical endpoints whose level is outside the range they must keep.
+  _audioLevelsOutOfRange(): Map<string, AudioEndpointView> {
+    const Out = new Map<string, AudioEndpointView>();
+    for (const Endpoint of this.AudioDevices.Endpoints || []) {
+      const Issues = Array.isArray(Endpoint.Issues) ? Endpoint.Issues : [];
+      if (Endpoint.IsCritical && Issues.some((Issue) => Issue && Issue.Kind === 'volume')) {
+        Out.set(Endpoint.EndpointID, Endpoint);
+      }
+    }
+    return Out;
   }
   SetCriticalAudioDevices(Devices: unknown) {
     const Normalized: CriticalAudioDevice[] = [];
@@ -1118,12 +1703,15 @@ class Client {
   SetNetworkInterfaces(Interfaces: unknown) {
     try {
       const normalized = normalizeNetworkInterfaces(Interfaces);
+      const Previous = this.NetworkInterfaces;
+      const BaselineTrusted = this.HasNetworkTelemetry;
       this.NetworkInterfaces = normalized;
       // The full list is the authority, so it is what makes the critical checks
       // trustworthy on this connection; a delta only amends it.
       this.HasNetworkTelemetry = true;
       this.NetworkSampledAt = Date.now();
       this._rebuildNetworkView();
+      if (BaselineTrusted) this._emitNetworkTransitions(Previous);
       Logger.debug(`Client ${this.UUID} Network Interfaces updated (${normalized.length})`);
       BroadcastManager.emit('ClientUpdated', this);
     } catch (e) {
@@ -1162,15 +1750,57 @@ class Client {
         }
       }
 
+      const Previous = this.NetworkInterfaces;
       this.NetworkInterfaces = Array.from(byName.values());
       if (this.HasNetworkTelemetry) this.NetworkSampledAt = Date.now();
       this._rebuildNetworkView();
+      if (this.HasNetworkTelemetry) this._emitNetworkTransitions(Previous);
       Logger.debug(
         `Client ${this.UUID} Network Interfaces delta applied (${this.NetworkInterfaces.length} interfaces)`
       );
       BroadcastManager.emit('ClientUpdated', this);
     } catch (e) {
       Logger.error('Failed to apply network interface delta for', this.UUID, e);
+    }
+  }
+  // Interfaces that came up, went down, or changed address or router between
+  // two trusted lists (see diffNetworkInterfaces for what counts).
+  _emitNetworkTransitions(Previous: NormalizedNetworkInterface[]) {
+    const Transitions = diffNetworkInterfaces(
+      Previous as Parameters<typeof diffNetworkInterfaces>[0],
+      this.NetworkInterfaces as Parameters<typeof diffNetworkInterfaces>[1]
+    );
+    const Critical = (Name: string) => this.IsNetworkInterfaceCritical(Name);
+    for (const Iface of Transitions.Up) {
+      this._emitHealthEvent({
+        TriggerTypes: [TRIGGERS.NETWORK_INTERFACE_UP],
+        Severity: 'info',
+        Details: { Interface: Iface, IsCritical: Critical(Iface.Name) },
+      });
+    }
+    for (const Iface of Transitions.Down) {
+      const IsCritical = Critical(Iface.Name);
+      this._emitHealthEvent({
+        TriggerTypes: IsCritical
+          ? [TRIGGERS.NETWORK_INTERFACE_DOWN, TRIGGERS.CRITICAL_NETWORK_INTERFACE_DOWN]
+          : [TRIGGERS.NETWORK_INTERFACE_DOWN],
+        Severity: 'warning',
+        Details: { Interface: Iface, IsCritical },
+      });
+    }
+    for (const Change of Transitions.AddressChanged) {
+      this._emitHealthEvent({
+        TriggerTypes: [TRIGGERS.NETWORK_ADDRESS_CHANGED],
+        Severity: 'warning',
+        Details: { Interface: Change, IsCritical: Critical(Change.Name) },
+      });
+    }
+    for (const Change of Transitions.GatewayChanged) {
+      this._emitHealthEvent({
+        TriggerTypes: [TRIGGERS.NETWORK_GATEWAY_CHANGED],
+        Severity: 'warning',
+        Details: { Interface: Change, IsCritical: Critical(Change.Name) },
+      });
     }
   }
   SetScriptsFingerprint(ScriptsFingerprint: unknown) {
@@ -1189,17 +1819,9 @@ class Client {
   }
   SetRunningApplications(Snapshot: unknown) {
     const S = AsRecord(Snapshot);
-    const PreviousItems = Array.isArray(this.ObservedRunningApplications?.Items)
-      ? this.ObservedRunningApplications.Items
-      : [];
-    const PreviousByKey = new Map<string, DedupedRunningApplication>(
-      PreviousItems.map((Entry): [string, DedupedRunningApplication] | null => {
-        const Name = normalizeApplicationName(Entry && Entry.Name);
-        const Key = normalizeApplicationKey(Name);
-        if (!Name || !Key) return null;
-        return [Key, { Name, Count: Math.max(1, parseInt(String(Entry.Count), 10) || 1) }];
-      }).filter((Pair): Pair is [string, DedupedRunningApplication] => Pair !== null)
-    );
+    const PreviousByKey = this._observedApplicationsByKey();
+    const PreviousFaults = this._applicationFaults();
+    const PreviousForeground = this.ObservedRunningApplications?.Foreground;
     const RawItems: unknown[] = Array.isArray(S.Items) ? S.Items : [];
     const RawStatus = AsRecord(S.Status);
     const NextStatus = {
@@ -1225,6 +1847,18 @@ class Client {
       PreviousStatus.State !== NextStatus.State ||
       PreviousStatus.Message !== NextStatus.Message ||
       PreviousStatus.Platform !== NextStatus.Platform;
+    // Absent stays absent (the client cannot say); anything else is a name or null.
+    const NextForeground =
+      S.Foreground === undefined
+        ? undefined
+        : typeof S.Foreground === 'string' && S.Foreground.trim()
+          ? S.Foreground.trim()
+          : null;
+    const NextCapabilities = normalizeApplicationCapabilities(S.Capabilities);
+    const PreviousCapabilities = this.ObservedRunningApplications?.Capabilities ?? null;
+    const FocusChanged =
+      NextForeground !== PreviousForeground ||
+      JSON.stringify(NextCapabilities) !== JSON.stringify(PreviousCapabilities);
 
     // Started/stopped are DIFFS, and a diff is only meaningful against a
     // snapshot we trust. Two cases produce a baseline we do not:
@@ -1255,12 +1889,16 @@ class Client {
       const Key = normalizeApplicationKey(Name);
       if (!Name || !Key) continue;
       const Count = Math.max(1, parseInt(String(Entry.Count), 10) || 1);
+      const Responding = normalizeResponding(Entry.Responding);
       const Existing = Deduped.get(Key);
       if (Existing) {
         Existing.Count += Count;
+        const Merged = mergeResponding(Existing.Responding, Responding);
+        if (Merged === undefined) delete Existing.Responding;
+        else Existing.Responding = Merged;
         continue;
       }
-      Deduped.set(Key, { Name, Count });
+      Deduped.set(Key, { Name, Count, ...(Responding !== undefined ? { Responding } : {}) });
     }
 
     const Items = sortRunningApplications(Array.from(Deduped.values()));
@@ -1273,10 +1911,15 @@ class Client {
     if (
       !ShouldSkipItems &&
       this.ObservedRunningApplicationsSignature === Signature &&
-      !StatusChanged
+      !StatusChanged &&
+      !FocusChanged
     )
       return;
 
+    const Focus = {
+      ...(NextForeground !== undefined ? { Foreground: NextForeground } : {}),
+      Capabilities: NextCapabilities,
+    };
     if (!ShouldSkipItems) {
       this.ObservedRunningApplications = {
         SampledAt,
@@ -1284,11 +1927,14 @@ class Client {
         Truncated,
         Items,
         Status: NextStatus,
+        ...Focus,
       };
       this.ObservedRunningApplicationsSignature = Signature;
     } else {
+      const { Foreground: _Stale, ...Kept } = this.ObservedRunningApplications;
+      void _Stale;
       this.ObservedRunningApplications = {
-        ...this.ObservedRunningApplications,
+        ...Kept,
         SampledAt,
         TotalCount: Math.max(
           0,
@@ -1299,26 +1945,96 @@ class Client {
             ? S.Truncated
             : !!this.ObservedRunningApplications.Truncated,
         Status: NextStatus,
+        ...Focus,
       };
     }
 
     if (ShouldSkipItems) {
       this._rebuildRunningApplicationsView();
+      if (SampleTrusted && BaselineTrusted) {
+        this._emitApplicationTransitions(PreviousByKey, PreviousFaults, PreviousForeground, false);
+      }
       BroadcastManager.emit('ClientUpdated', this);
       return;
     }
 
+    this._rebuildRunningApplicationsView();
     if (SampleTrusted && BaselineTrusted) {
+      this._emitApplicationTransitions(PreviousByKey, PreviousFaults, PreviousForeground, true);
+    }
+    BroadcastManager.emit('ClientUpdated', this);
+  }
+
+  // The stored applications keyed by their case-insensitive name.
+  _observedApplicationsByKey(): Map<string, DedupedRunningApplication> {
+    const ByKey = new Map<string, DedupedRunningApplication>();
+    for (const Entry of Array.isArray(this.ObservedRunningApplications?.Items)
+      ? this.ObservedRunningApplications.Items
+      : []) {
+      const Name = normalizeApplicationName(Entry && Entry.Name);
+      const Key = normalizeApplicationKey(Name);
+      if (!Name || !Key) continue;
+      const Responding = normalizeResponding(Entry.Responding);
+      ByKey.set(Key, {
+        Name,
+        Count: Math.max(1, parseInt(String(Entry.Count), 10) || 1),
+        ...(Responding !== undefined ? { Responding } : {}),
+      });
+    }
+    return ByKey;
+  }
+
+  // The application faults the current view shows: every hung application, and
+  // the critical ones that must hold the foreground and do not.
+  _applicationFaults(): {
+    Hung: Map<string, RunningApplicationViewEntry>;
+    Unfocused: Map<string, RunningApplicationViewEntry>;
+  } {
+    const Hung = new Map<string, RunningApplicationViewEntry>();
+    const Unfocused = new Map<string, RunningApplicationViewEntry>();
+    for (const Entry of this.RunningApplications.Items || []) {
+      if (!Entry.Key || !Entry.IsRunning) continue;
+      if (Entry.Responding === false) Hung.set(Entry.Key, Entry);
+      if (Entry.IsCritical && this._isOutOfForeground(Entry)) Unfocused.set(Entry.Key, Entry);
+    }
+    return { Hung, Unfocused };
+  }
+
+  /**
+   * Announce what changed between two trusted application samples: starts and
+   * stops (when the item list was reported), hangs and recoveries, a critical
+   * application gaining a second instance, the foreground moving, and a
+   * critical application losing (or regaining) the foreground it must hold.
+   */
+  _emitApplicationTransitions(
+    PreviousByKey: Map<string, DedupedRunningApplication>,
+    PreviousFaults: ReturnType<Client['_applicationFaults']>,
+    PreviousForeground: string | null | undefined,
+    ItemsReported: boolean
+  ) {
+    const Items = this.ObservedRunningApplications.Items;
+    if (ItemsReported) {
       const NextKeys = new Set(
         Items.map((Entry) => normalizeApplicationKey(Entry.Name)).filter(Boolean)
       );
       for (const Entry of Items) {
         const Key = normalizeApplicationKey(Entry.Name);
-        if (!Key || PreviousByKey.has(Key)) continue;
-        BroadcastManager.emit('ApplicationStarted', this, {
-          Name: Entry.Name,
-          Count: Entry.Count,
-        });
+        if (!Key) continue;
+        const Before = PreviousByKey.get(Key);
+        if (!Before) {
+          BroadcastManager.emit('ApplicationStarted', this, {
+            Name: Entry.Name,
+            Count: Entry.Count,
+          });
+          continue;
+        }
+        if (Before.Count <= 1 && Entry.Count > 1 && this.IsApplicationCritical(Entry.Name)) {
+          this._emitHealthEvent({
+            TriggerTypes: [TRIGGERS.CRITICAL_APPLICATION_MULTIPLE_INSTANCES],
+            Severity: 'warning',
+            Details: { Application: { Name: Entry.Name, Count: Entry.Count }, IsCritical: true },
+          });
+        }
       }
       for (const [Key, Entry] of PreviousByKey.entries()) {
         if (NextKeys.has(Key)) continue;
@@ -1329,8 +2045,74 @@ class Client {
       }
     }
 
-    this._rebuildRunningApplicationsView();
-    BroadcastManager.emit('ClientUpdated', this);
+    const Faults = this._applicationFaults();
+    for (const [Key, Entry] of Faults.Hung) {
+      if (PreviousFaults.Hung.has(Key)) continue;
+      this._emitHealthEvent({
+        TriggerTypes:
+          Entry.IsCritical && Entry.RequireResponding
+            ? [TRIGGERS.APPLICATION_NOT_RESPONDING, TRIGGERS.CRITICAL_APPLICATION_NOT_RESPONDING]
+            : [TRIGGERS.APPLICATION_NOT_RESPONDING],
+        Severity: 'warning',
+        Details: {
+          Application: { Name: Entry.Name, Count: Entry.Count },
+          IsCritical: Entry.IsCritical,
+        },
+        Condition: { Key: `app-hung:${Key}`, Active: true },
+      });
+    }
+    for (const [Key, Entry] of PreviousFaults.Hung) {
+      if (Faults.Hung.has(Key)) continue;
+      // Responding again (rather than gone, or no longer readable) is news.
+      const Now = (this.RunningApplications.Items || []).find(
+        (Item) => Item.Key === Key && Item.IsRunning
+      );
+      this._emitHealthEvent({
+        TriggerTypes: Now && Now.Responding === true ? [TRIGGERS.APPLICATION_RESPONDING] : [],
+        Severity: 'success',
+        Details: {
+          Application: { Name: Entry.Name, Count: Entry.Count },
+          IsCritical: Entry.IsCritical,
+        },
+        Condition: { Key: `app-hung:${Key}`, Active: false },
+      });
+    }
+
+    const NextForeground = this.ObservedRunningApplications.Foreground;
+    if (
+      PreviousForeground !== undefined &&
+      NextForeground !== undefined &&
+      typeof NextForeground === 'string' &&
+      NextForeground !== PreviousForeground
+    ) {
+      this._emitHealthEvent({
+        TriggerTypes: [TRIGGERS.FOREGROUND_APPLICATION_CHANGED],
+        Severity: 'info',
+        Details: { Application: { Name: NextForeground }, PreviousForeground },
+      });
+    }
+    for (const [Key, Entry] of Faults.Unfocused) {
+      if (PreviousFaults.Unfocused.has(Key)) continue;
+      this._emitHealthEvent({
+        TriggerTypes: [TRIGGERS.CRITICAL_APPLICATION_LOST_FOREGROUND],
+        Severity: 'warning',
+        Details: {
+          Application: { Name: Entry.Name, Count: Entry.Count },
+          IsCritical: true,
+          Foreground: NextForeground ?? null,
+        },
+        Condition: { Key: `app-foreground:${Key}`, Active: true },
+      });
+    }
+    for (const [Key, Entry] of PreviousFaults.Unfocused) {
+      if (Faults.Unfocused.has(Key)) continue;
+      this._emitHealthEvent({
+        TriggerTypes: [],
+        Severity: 'success',
+        Details: { Application: { Name: Entry.Name, Count: Entry.Count }, IsCritical: true },
+        Condition: { Key: `app-foreground:${Key}`, Active: false },
+      });
+    }
   }
   /**
    * Merge an incremental running-application change into the observed snapshot.
@@ -1343,28 +2125,19 @@ class Client {
    */
   ApplyApplicationDelta(Delta: unknown) {
     const D = AsRecord(Delta);
-    const byKey = new Map<string, DedupedRunningApplication>();
-    for (const Entry of Array.isArray(this.ObservedRunningApplications?.Items)
-      ? this.ObservedRunningApplications.Items
-      : []) {
-      const Name = normalizeApplicationName(Entry && Entry.Name);
-      const Key = normalizeApplicationKey(Name);
-      if (!Name || !Key) continue;
-      byKey.set(Key, { Name, Count: Math.max(1, parseInt(String(Entry.Count), 10) || 1) });
-    }
-
-    const Started: DedupedRunningApplication[] = [];
-    const Stopped: DedupedRunningApplication[] = [];
+    const PreviousByKey = this._observedApplicationsByKey();
+    const PreviousFaults = this._applicationFaults();
+    const PreviousForeground = this.ObservedRunningApplications?.Foreground;
+    const byKey = new Map<string, DedupedRunningApplication>(
+      Array.from(PreviousByKey.entries()).map(([Key, Entry]) => [Key, { ...Entry }])
+    );
 
     for (const raw of Array.isArray(D.Stopped) ? D.Stopped : []) {
       // Stopped carries bare names; the started/changed lists carry entries.
       const Name = normalizeApplicationName(typeof raw === 'string' ? raw : AsRecord(raw).Name);
       const Key = normalizeApplicationKey(Name);
       if (!Key) continue;
-      const Existing = byKey.get(Key);
-      if (!Existing) continue;
       byKey.delete(Key);
-      Stopped.push(Existing);
     }
 
     for (const key of ['Started', 'Changed'] as const) {
@@ -1374,11 +2147,11 @@ class Client {
         const AppKey = normalizeApplicationKey(Name);
         if (!Name || !AppKey) continue;
         const Count = Math.max(1, parseInt(String(Entry.Count), 10) || 1);
+        const Responding = normalizeResponding(Entry.Responding);
         // Only a genuinely new key is a start. A "Changed" entry for something
         // we had not seen still counts as one, which keeps the alert correct
         // when a delta arrives against a stale baseline.
-        if (!byKey.has(AppKey)) Started.push({ Name, Count });
-        byKey.set(AppKey, { Name, Count });
+        byKey.set(AppKey, { Name, Count, ...(Responding !== undefined ? { Responding } : {}) });
       }
     }
 
@@ -1403,8 +2176,26 @@ class Client {
           ? RawStatus.Platform.trim()
           : this.ObservedRunningApplications?.Status?.Platform || null,
     };
+    const Foreground =
+      D.Foreground === undefined
+        ? undefined
+        : typeof D.Foreground === 'string' && D.Foreground.trim()
+          ? D.Foreground.trim()
+          : null;
+    const Capabilities =
+      D.Capabilities === undefined
+        ? (this.ObservedRunningApplications?.Capabilities ?? null)
+        : normalizeApplicationCapabilities(D.Capabilities);
 
-    this.ObservedRunningApplications = { SampledAt, TotalCount, Truncated, Items, Status };
+    this.ObservedRunningApplications = {
+      SampledAt,
+      TotalCount,
+      Truncated,
+      Items,
+      Status,
+      ...(Foreground !== undefined ? { Foreground } : {}),
+      Capabilities,
+    };
     this.ObservedRunningApplicationsSignature = runningApplicationsSignature(
       TotalCount,
       Truncated,
@@ -1418,16 +2209,10 @@ class Client {
     const BaselineTrusted = this.HasApplicationTelemetry;
     this.HasApplicationTelemetry = Status.State === 'ok';
 
-    if (BaselineTrusted && Status.State === 'ok') {
-      for (const Entry of Started) {
-        BroadcastManager.emit('ApplicationStarted', this, { Name: Entry.Name, Count: Entry.Count });
-      }
-      for (const Entry of Stopped) {
-        BroadcastManager.emit('ApplicationStopped', this, { Name: Entry.Name, Count: Entry.Count });
-      }
-    }
-
     this._rebuildRunningApplicationsView();
+    if (BaselineTrusted && Status.State === 'ok') {
+      this._emitApplicationTransitions(PreviousByKey, PreviousFaults, PreviousForeground, true);
+    }
     BroadcastManager.emit('ClientUpdated', this);
   }
 
@@ -1447,6 +2232,7 @@ class Client {
       : Current.slice();
     this.ConnectedUSBDeviceList.push(Device || {});
     this._rebuildUSBDeviceView();
+    this._trackUSBDevices(this.HasUSBTelemetry);
     BroadcastManager.emit('ClientUpdated', this);
     BroadcastManager.emit('USBDeviceAdded', this, Device);
     return;
@@ -1471,6 +2257,7 @@ class Client {
         Index === -1 ? Current.slice() : Current.slice(0, Index).concat(Current.slice(Index + 1));
     }
     this._rebuildUSBDeviceView();
+    this._trackUSBDevices(this.HasUSBTelemetry);
     BroadcastManager.emit('ClientUpdated', this);
     BroadcastManager.emit('USBDeviceRemoved', this, Device);
     return;
@@ -1614,6 +2401,16 @@ class Client {
       this.Version = Previous;
       Logger.error('Failed to update client version');
       return Fail(Err);
+    }
+    // An update (or a rollback) the client just came back with. A first version
+    // is not a change — nor is replacing the "X.X.X" a freshly adopted client is
+    // created with — and neither is a client momentarily reporting none.
+    if (Previous && Version && /\d+\.\d+/.test(Previous)) {
+      this._emitHealthEvent({
+        TriggerTypes: [TRIGGERS.CLIENT_VERSION_CHANGED],
+        Severity: 'info',
+        Details: { PreviousVersion: Previous, Version },
+      });
     }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} version updated to ${Version}`);

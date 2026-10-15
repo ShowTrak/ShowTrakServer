@@ -101,9 +101,9 @@ export function USBDeviceBadge(Device: USBDeviceView): {
   if (!Device.IsCritical) {
     return {
       State: 'plain',
-      Label: 'Critical',
+      Label: 'Monitor',
       Icon: 'bi-check-circle',
-      Title: 'Mark as critical',
+      Title: 'Monitor this USB device',
     };
   }
   if (Device.IsConnected === false) {
@@ -112,14 +112,14 @@ export function USBDeviceBadge(Device: USBDeviceView): {
         State: 'missing',
         Label: 'Missing',
         Icon: 'bi-x-circle-fill',
-        Title: 'Remove critical status (device disconnected)',
+        Title: 'Stop monitoring (device disconnected)',
       };
     }
     return {
       State: 'absent',
-      Label: 'Critical',
+      Label: 'Monitored',
       Icon: 'bi-question-circle',
-      Title: 'Remove critical status (not connected)',
+      Title: 'Stop monitoring (not connected)',
     };
   }
   const Issues = Device.Issues || [];
@@ -128,7 +128,7 @@ export function USBDeviceBadge(Device: USBDeviceView): {
       State: 'short',
       Label: 'Short',
       Icon: 'bi-x-circle-fill',
-      Title: 'Remove critical status (fewer connected than expected)',
+      Title: 'Stop monitoring (fewer connected than expected)',
     };
   }
   if (Issues.length) {
@@ -136,14 +136,14 @@ export function USBDeviceBadge(Device: USBDeviceView): {
       State: 'issue',
       Label: 'Changed',
       Icon: 'bi-exclamation-triangle-fill',
-      Title: 'Remove critical status (conditions not met)',
+      Title: 'Stop monitoring (conditions not met)',
     };
   }
   return {
     State: 'healthy',
-    Label: 'Critical',
+    Label: 'Monitored',
     Icon: 'bi-check-circle-fill',
-    Title: 'Remove critical status',
+    Title: 'Stop monitoring',
   };
 }
 

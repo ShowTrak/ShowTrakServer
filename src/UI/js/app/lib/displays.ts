@@ -114,9 +114,9 @@ export function DisplayBadge(Display: ClientDisplayView): {
   if (!Display.IsCritical) {
     return {
       State: 'plain',
-      Label: 'Critical',
+      Label: 'Monitor',
       Icon: 'bi-check-circle',
-      Title: 'Mark as critical',
+      Title: 'Monitor this display',
     };
   }
   if (Display.Missing) {
@@ -124,18 +124,16 @@ export function DisplayBadge(Display: ClientDisplayView): {
       State: 'missing',
       Label: 'Missing',
       Icon: 'bi-x-circle-fill',
-      Title: 'Remove critical status (display disconnected)',
+      Title: 'Stop monitoring (display disconnected)',
     };
   }
   if (Display.IsConnected === false) {
     const Allowed = !!Display.Critical && !Display.Critical.RequirePresent;
     return {
       State: Allowed ? 'absent' : 'unreported',
-      Label: 'Critical',
+      Label: 'Monitored',
       Icon: 'bi-question-circle',
-      Title: Allowed
-        ? 'Remove critical status (not connected)'
-        : 'Remove critical status (not reported yet)',
+      Title: Allowed ? 'Stop monitoring (not connected)' : 'Stop monitoring (not reported yet)',
     };
   }
   if ((Display.Issues || []).length || Display.Mismatch) {
@@ -143,14 +141,14 @@ export function DisplayBadge(Display: ClientDisplayView): {
       State: 'issue',
       Label: 'Changed',
       Icon: 'bi-exclamation-triangle-fill',
-      Title: 'Remove critical status (conditions not met)',
+      Title: 'Stop monitoring (conditions not met)',
     };
   }
   return {
     State: 'healthy',
-    Label: 'Critical',
+    Label: 'Monitored',
     Icon: 'bi-check-circle-fill',
-    Title: 'Remove critical status',
+    Title: 'Stop monitoring',
   };
 }
 

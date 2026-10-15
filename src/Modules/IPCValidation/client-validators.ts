@@ -6,7 +6,14 @@ import {
   MIN_OFFLINE_GRACE_SECONDS,
   MAX_OFFLINE_GRACE_SECONDS,
 } from '../ClientManager/offline-grace';
+import {
+  IsSystemCheckKey,
+  MAX_SUSTAIN_SECONDS,
+  MAX_TEMPERATURE_CELSIUS,
+  MAX_UPTIME_DAYS,
+} from '../ClientManager/system-checks';
 import type {
+  ClientSystemCheckPayloadResult,
   AudioLevelRequestResult,
   CriticalAudioDevicePayloadResult,
   CriticalNetworkInterfacePayloadResult,
@@ -228,11 +235,18 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     if (!isPlainObject(value)) {
       fail('Critical application payload must be an object');
     }
+    const Conditions: Record<string, boolean> = {};
+    for (const Key of ['RequireResponding', 'RequireForeground'] as const) {
+      if (value[Key] === undefined) continue;
+      if (typeof value[Key] !== 'boolean') fail(`${Key} must be a boolean when present`);
+      Conditions[Key] = value[Key] as boolean;
+    }
     return {
       Name: normalizeNonEmptyString(value.Name, 'Name', {
         minLength: 1,
         maxLength: 256,
       }),
+      ...Conditions,
     };
   };
 
@@ -377,6 +391,79 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
       const end = ParseIP(out.RangeEnd)!;
       if (start.Family !== end.Family) fail('RangeStart and RangeEnd must be the same family');
       if (start.Value > end.Value) fail('RangeStart cannot be after RangeEnd');
+    }
+    return out;
+  };
+
+  Manager.SystemCheckKey = (value: unknown) => {
+    if (!IsSystemCheckKey(value)) fail('Key must be one of cpu, ram, uptime, power, thermal');
+    return value;
+  };
+
+  // A system-check edit. Each field is checked against the check it belongs
+  // to, so a stray field from another check is refused rather than ignored.
+  Manager.ClientSystemCheckPayload = (value: unknown) => {
+    if (!isPlainObject(value)) fail('System check payload must be an object');
+    const Key = Manager.SystemCheckKey(value.Key);
+    const out: ClientSystemCheckPayloadResult = { Key };
+    const Allowed: Record<string, string[]> = {
+      cpu: ['MaxPercent', 'SustainSeconds'],
+      ram: ['MaxPercent', 'SustainSeconds'],
+      uptime: ['MaxDays'],
+      power: ['RequireMains', 'MinBatteryPercent', 'ChargingBelowPercent'],
+      thermal: ['MaxCelsius', 'MaxThermalState'],
+    };
+    const Whole = (Field: string, Min: number, Max: number, Nullable = true): number | null => {
+      const Raw = value[Field];
+      if (Raw === null && Nullable) return null;
+      const n = Number(Raw);
+      if (
+        Raw === null ||
+        Raw === '' ||
+        typeof Raw === 'boolean' ||
+        !Number.isInteger(n) ||
+        n < Min ||
+        n > Max
+      ) {
+        fail(`${Field} must be a whole number from ${Min} to ${Max}`);
+      }
+      return n;
+    };
+    for (const Field of Object.keys(value)) {
+      if (Field === 'Key' || value[Field] === undefined) continue;
+      if (!Allowed[Key]!.includes(Field)) fail(`${Field} does not apply to the ${Key} check`);
+      switch (Field) {
+        case 'MaxPercent':
+          out.MaxPercent = Whole(Field, 1, 100);
+          break;
+        case 'SustainSeconds':
+          out.SustainSeconds = Whole(Field, 0, MAX_SUSTAIN_SECONDS, false) as number;
+          break;
+        case 'MaxDays':
+          out.MaxDays = Whole(Field, 1, MAX_UPTIME_DAYS);
+          break;
+        case 'RequireMains':
+          if (typeof value.RequireMains !== 'boolean') fail('RequireMains must be true or false');
+          out.RequireMains = value.RequireMains as boolean;
+          break;
+        case 'MinBatteryPercent':
+          out.MinBatteryPercent = Whole(Field, 1, 100);
+          break;
+        case 'ChargingBelowPercent':
+          out.ChargingBelowPercent = Whole(Field, 1, 100);
+          break;
+        case 'MaxCelsius':
+          out.MaxCelsius = Whole(Field, 1, MAX_TEMPERATURE_CELSIUS);
+          break;
+        case 'MaxThermalState': {
+          const State = value.MaxThermalState;
+          if (State !== null && State !== 'nominal' && State !== 'fair' && State !== 'serious') {
+            fail('MaxThermalState must be nominal, fair or serious');
+          }
+          out.MaxThermalState = State as ClientSystemCheckPayloadResult['MaxThermalState'];
+          break;
+        }
+      }
     }
     return out;
   };

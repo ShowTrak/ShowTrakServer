@@ -175,7 +175,7 @@ export function BindClientInfoDisplayHandlers(
           : await window.API.MarkClientDisplayCritical(UUID, { DisplayID });
         if (Err) return void Notify(String(Err), 'error');
         await Notify(
-          IsCritical ? 'Critical display status removed' : 'Display marked as critical',
+          IsCritical ? 'Display no longer monitored' : 'Display is now monitored',
           'success',
           1400
         );

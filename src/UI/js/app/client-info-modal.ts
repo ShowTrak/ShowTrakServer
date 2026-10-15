@@ -2,7 +2,7 @@
 // RenderClientInfoDetails (renders every tab/section). Extracted from
 // selection-init.ts (REFACTOR_PLAN.md Phase 7). Imports are added below;
 // cross-references back into selection-init are call-time only (safe cycle).
-import type { ClientView, RunningApplicationsStatus } from '@showtrak/protocol';
+import type { ClientView } from '@showtrak/protocol';
 import { openModal } from './lib/modal';
 import {
   ClientInfoOpenUUID,
@@ -18,7 +18,7 @@ import {
   setMonitorHistoryTooltipHover,
   set__clientInfoRefreshInFlight,
 } from './state';
-import { FormatBytes, HandleNonFatalError, Safe } from './utils';
+import { HandleNonFatalError, Safe } from './utils';
 import { GetClientStatusDisplayText } from './client-list';
 import { ScriptColourHex } from './lib/script-colours';
 import { GetTagMembershipKind, ResolveEntityTags, TagBadgeLabel } from './lib/tag-badges';
@@ -50,6 +50,16 @@ import {
   RenderClientInfoNetwork,
 } from './client-info-network';
 import { ResetClientInfoTab, SetClientInfoKind } from './client-info-nav';
+import {
+  BindClientInfoSystemHandlers,
+  ClearClientInfoSystem,
+  RenderClientInfoSystem,
+} from './client-info-health';
+import {
+  BindClientInfoApplicationHandlers,
+  ClearClientInfoApplications,
+  RenderClientInfoApplications,
+} from './client-info-applications';
 
 export async function OpenClientInfo(UUID: string) {
   try {
@@ -133,38 +143,9 @@ export async function OpenClientInfo(UUID: string) {
   BindClientInfoDisplayHandlers(() => ClientInfoOpenUUID, RefreshOpenClient, Notify);
   BindClientInfoAudioHandlers(() => ClientInfoOpenUUID, RefreshOpenClient, Notify);
   BindClientInfoNetworkHandlers(() => ClientInfoOpenUUID, RefreshOpenClient, Notify);
+  BindClientInfoSystemHandlers(() => ClientInfoOpenUUID, RefreshOpenClient, Notify);
 
-  $('#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS')
-    .off('click.critical-app-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_APP')
-    .on('click.critical-app-toggle', '.SHOWTRAK_TOGGLE_CRITICAL_APP', async function () {
-      try {
-        const NameToken = ($(this).attr('data-name') || '').toString();
-        const ApplicationName = decodeURIComponent(NameToken);
-        const IsCritical = String($(this).attr('data-critical') || '0') === '1';
-        if (!ClientInfoOpenUUID || !ApplicationName) return;
-
-        const [Err] = IsCritical
-          ? await window.API.RemoveClientApplicationCritical(ClientInfoOpenUUID, ApplicationName)
-          : await window.API.MarkClientApplicationCritical(ClientInfoOpenUUID, {
-              Name: ApplicationName,
-            });
-        if (Err) return Notify(String(Err), 'error');
-
-        await Notify(
-          IsCritical ? 'Critical application status removed' : 'Application marked as critical',
-          'success',
-          1400
-        );
-
-        const Fresh = await window.API.GetClient(ClientInfoOpenUUID);
-        if (Fresh) {
-          $('#CLIENT_INFO_STATUS').val(GetClientStatusDisplayText(Fresh));
-          RenderClientInfoDetails(Fresh);
-        }
-      } catch (err) {
-        HandleNonFatalError('OpenClientInfo:ToggleCriticalApplication', err);
-      }
-    });
+  BindClientInfoApplicationHandlers(() => ClientInfoOpenUUID, RefreshOpenClient, Notify);
 
   // mark modal as open for this UUID and clear when hidden
   setClientInfoOpenUUID(UUID);
@@ -270,6 +251,10 @@ export function RenderClientInfoDetails(Client: ClientView) {
     $('#CLIENT_INFO_NETWORK_V4_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_NETWORK_V6_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_RUNNING_APPS_SECTION').toggleClass('d-none', IsIntegrated);
+    $('#CLIENT_INFO_POWER_SECTION').toggleClass('d-none', IsIntegrated);
+    $('#CLIENT_INFO_TEMPERATURE_SECTION').toggleClass('d-none', IsIntegrated);
+    // An SDK client reports no operating system: no usage, uptime or power.
+    $('#CLIENT_INFO_SYSTEM_SECTION').toggleClass('d-none', IsIntegrated);
     SetClientInfoKind(IsIntegrated ? 'integrated' : 'client');
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
@@ -295,53 +280,13 @@ export function RenderClientInfoDetails(Client: ClientView) {
     HandleNonFatalError('ClientInfo:RenderTags', err);
   }
 
-  // Vitals (CPU/RAM) progress bars
-  try {
-    const rawCpu = Client && Client.Vitals ? Client.Vitals.CPU?.UsagePercentage : 0;
-    const cpuNum = typeof rawCpu === 'number' ? rawCpu : parseFloat(rawCpu);
-    const cpuClamped = isNaN(cpuNum) ? 0 : Math.max(0, Math.min(100, cpuNum));
-
-    const rawRam = Client && Client.Vitals ? Client.Vitals.Ram?.UsagePercentage : 0;
-    const ramNum = typeof rawRam === 'number' ? rawRam : parseFloat(rawRam);
-    const ramClamped = isNaN(ramNum) ? 0 : Math.max(0, Math.min(100, ramNum));
-
-    $('#CLIENT_INFO_CPU_BAR')
-      .css('width', `${cpuClamped}%`)
-      .attr('aria-valuenow', cpuClamped.toFixed(0));
-    $('#CLIENT_INFO_CPU_LABEL').text(`${cpuClamped.toFixed(0)}%`);
-    $('#CLIENT_INFO_RAM_BAR')
-      .css('width', `${ramClamped}%`)
-      .attr('aria-valuenow', ramClamped.toFixed(0));
-    // Compose RAM label: used/total (percent%) if we have byte counts
-    const ramUsed =
-      Client && Client.Vitals && typeof Client.Vitals.Ram?.Used !== 'undefined'
-        ? Client.Vitals.Ram.Used
-        : null;
-    const ramTotal =
-      Client && Client.Vitals && typeof Client.Vitals.Ram?.Total !== 'undefined'
-        ? Client.Vitals.Ram.Total
-        : null;
-    if (ramUsed != null && ramTotal != null) {
-      const usedStr = FormatBytes(ramUsed);
-      const totalStr = FormatBytes(ramTotal);
-      if (usedStr && totalStr) {
-        $('#CLIENT_INFO_RAM_LABEL').text(`${usedStr} / ${totalStr} (${ramClamped.toFixed(0)}%)`);
-      } else {
-        $('#CLIENT_INFO_RAM_LABEL').text(`${ramClamped.toFixed(0)}%`);
-      }
-    } else {
-      $('#CLIENT_INFO_RAM_LABEL').text(`${ramClamped.toFixed(0)}%`);
-    }
-  } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
-
   if (IsIntegrated) {
     try {
+      ClearClientInfoSystem();
       ClearClientInfoUSB();
       ClearClientInfoDisplays();
       ClearClientInfoAudio();
-      $('#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS').attr('data-render-key', '').html('');
+      ClearClientInfoApplications();
       ClearClientInfoNetwork();
     } catch (err) {
       HandleNonFatalError('SelectionInit:NonFatal', err);
@@ -373,103 +318,18 @@ export function RenderClientInfoDetails(Client: ClientView) {
     HandleNonFatalError('ClientInfo:RenderAudio', err);
   }
 
+  // System checks: CPU, memory and uptime (Info tab), power and thermal.
+  try {
+    RenderClientInfoSystem(Client);
+  } catch (err) {
+    HandleNonFatalError('ClientInfo:RenderSystem', err);
+  }
+
   // Running applications
   try {
-    const $appsList = $('#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS');
-    const apps = Array.isArray(Client?.RunningApplications?.Items)
-      ? Client.RunningApplications.Items
-      : [];
-    const appStatus: Partial<RunningApplicationsStatus> = Client?.RunningApplications?.Status || {};
-    const appStatusState =
-      typeof appStatus.State === 'string' && appStatus.State.trim().length > 0
-        ? appStatus.State.trim().toLowerCase()
-        : 'unknown';
-    const appStatusMessage =
-      typeof appStatus.Message === 'string' && appStatus.Message.trim().length > 0
-        ? appStatus.Message.trim()
-        : null;
-    const renderKey = `${Client?.UUID || ''}::${apps
-      .map(
-        (app) =>
-          `${app?.Name || ''}|${app?.IsCritical ? '1' : '0'}|${app?.IsRunning === false ? '0' : '1'}`
-      )
-      .join(';;')}::${appStatusState}|${appStatusMessage || ''}`;
-
-    if (($appsList.attr('data-render-key') || '') !== renderKey) {
-      if (apps.length === 0) {
-        let filler = '';
-        if (appStatusState === 'permission_denied' || appStatusState === 'error') {
-          filler += `
-            <div class="rounded-3 p-2 bg-danger bg-opacity-25 border border-danger-subtle">
-              <h6 class="mb-1">Application Monitoring Warning</h6>
-              <p class="text-sm mb-0">${Safe(
-                appStatusMessage ||
-                  'The client cannot collect running applications because system permission was denied.'
-              )}</p>
-            </div>`;
-        }
-        filler += `
-          <div class="rounded-3 p-2 bg-ghost">
-            <h6 class="mb-0">No applications reported</h6>
-            <p class="text-sm mb-0">The client has not sent an application snapshot yet.</p>
-          </div>`;
-        $appsList.html(filler);
-      } else {
-        let html = '';
-        if (appStatusState === 'permission_denied' || appStatusState === 'error') {
-          html += `
-            <div class="rounded-3 p-2 bg-danger bg-opacity-25 border border-danger-subtle">
-              <h6 class="mb-1">Application Monitoring Warning</h6>
-              <p class="text-sm mb-0">${Safe(
-                appStatusMessage ||
-                  'The client cannot collect running applications because system permission was denied.'
-              )}</p>
-            </div>`;
-        }
-        for (const app of apps) {
-          const name = app?.Name ? String(app.Name) : 'Unknown Application';
-          const IsCritical = !!app?.IsCritical;
-          const IsRunning = app?.IsRunning !== false;
-          const NameToken = encodeURIComponent(name);
-          html += `
-            <div class="rounded-3 p-2 bg-ghost SHOWTRAK_CLIENT_USB_DEVICE_CARD">
-              <div class="d-flex align-items-center gap-2">
-                <h6 class="mb-0">${Safe(name)}</h6>
-              </div>
-              <button
-                type="button"
-                class="SHOWTRAK_TOGGLE_CRITICAL_USB SHOWTRAK_TOGGLE_CRITICAL_APP ${IsCritical ? 'is-critical' : ''} ${
-                  IsCritical && !IsRunning ? 'is-disconnected-critical' : ''
-                }"
-                data-name="${NameToken}"
-                data-critical="${IsCritical ? '1' : '0'}"
-                title="${
-                  IsCritical && !IsRunning
-                    ? 'Remove critical status (application not running)'
-                    : IsCritical
-                      ? 'Remove critical status'
-                      : 'Mark as critical'
-                }"
-                aria-label="${
-                  IsCritical && !IsRunning
-                    ? 'Remove critical status (application not running)'
-                    : IsCritical
-                      ? 'Remove critical status'
-                      : 'Mark as critical'
-                }"
-              >
-                <i class="bi ${IsCritical && !IsRunning ? 'bi-x-circle-fill' : IsCritical ? 'bi-check-circle-fill' : 'bi-check-circle'}"></i>
-                <span>${IsCritical && !IsRunning ? 'Not Running' : 'Critical'}</span>
-              </button>
-            </div>`;
-        }
-        $appsList.html(html);
-      }
-
-      $appsList.attr('data-render-key', renderKey);
-    }
+    RenderClientInfoApplications(Client);
   } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
+    HandleNonFatalError('ClientInfo:RenderApplications', err);
   }
 
   // Network Interfaces

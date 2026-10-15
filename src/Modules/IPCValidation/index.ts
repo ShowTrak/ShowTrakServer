@@ -6,6 +6,7 @@
 // Every validator throws (via `fail`) on invalid input and otherwise returns a
 // normalized value. The Manager type below is the composition of every domain's
 // validator surface; each domain file imports it to type its register function.
+import type { ClientSystemCheckKey } from '@showtrak/protocol';
 
 // Present only when the request carried them; absent keeps the current value.
 export interface CriticalUSBConditionOptionsResult {
@@ -28,6 +29,9 @@ export interface CriticalUSBNamePayloadResult extends CriticalUSBConditionOption
 
 export interface CriticalApplicationPayloadResult {
   Name: string;
+  // Absent leaves an existing entry's foreground condition as it was.
+  RequireForeground?: boolean;
+  RequireResponding?: boolean;
 }
 
 export interface CriticalDisplayPayloadResult {
@@ -63,6 +67,20 @@ export interface CriticalNetworkInterfacePayloadResult {
   RangeEnd?: string | null;
   Netmask?: string | null;
   Gateway?: string | null;
+}
+
+// A system-check edit. Only the fields the request carried are present; an
+// absent field keeps its current value and null stops guarding it.
+export interface ClientSystemCheckPayloadResult {
+  Key: ClientSystemCheckKey;
+  MaxPercent?: number | null;
+  SustainSeconds?: number;
+  MaxDays?: number | null;
+  RequireMains?: boolean;
+  MinBatteryPercent?: number | null;
+  ChargingBelowPercent?: number | null;
+  MaxCelsius?: number | null;
+  MaxThermalState?: 'nominal' | 'fair' | 'serious' | null;
 }
 
 export interface AudioLevelRequestResult {
@@ -114,6 +132,8 @@ export interface IPCValidationManager {
   AudioLevelRequest(value: unknown): AudioLevelRequestResult;
   NetworkInterfaceName(value: unknown, fieldName?: string): string;
   CriticalNetworkInterfacePayload(value: unknown): CriticalNetworkInterfacePayloadResult;
+  SystemCheckKey(value: unknown): ClientSystemCheckKey;
+  ClientSystemCheckPayload(value: unknown): ClientSystemCheckPayloadResult;
   ClientUpdatePayload(value: unknown): Record<string, unknown>;
 
   // Monitoring targets (monitoring-validators.ts)

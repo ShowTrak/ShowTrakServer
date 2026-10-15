@@ -25,6 +25,7 @@ import type {
   ClientView,
   DummyClientView,
   FreeKioskTerminalView,
+  FreeKioskMetricSample,
   HistorySample,
   MonitoringCheckView,
   MonitoringTargetView,
@@ -36,6 +37,8 @@ import { AudioTimelineLiveState } from './lib/audio-devices';
 import { DisplayKey, DisplayTimelineLiveState } from './lib/displays';
 import { USBTimelineLiveState } from './lib/usb-devices';
 import { NetworkTimelineLiveState } from './lib/network-interfaces';
+import { SYSTEM_CHECK_ORDER, SystemCheckCardFor, SystemCheckLiveState } from './lib/system-health';
+import { UsageChartHtml } from './client-info-health';
 import { openModal } from './lib/modal';
 import { RefreshClientInfoTabs, ResetClientInfoTab, SetClientInfoKind } from './client-info-nav';
 import {
@@ -574,6 +577,35 @@ export async function LoadHistorySamplesForContext() {
       MonitorHistorySeries.push({
         networkInterfaceName: String(Iface.InterfaceName),
         samples: Array.isArray(Iface.samples) ? Iface.samples : [],
+      });
+    }
+
+    // Monitored system checks: a healthy/failing series each, and the CPU and
+    // memory readings their line charts are drawn from.
+    let checks: Array<{ CheckKey?: string; samples?: HistorySample[] }> = [];
+    try {
+      checks = await window.API.GetClientSystemCheckHistory(String(entity.id));
+    } catch {
+      checks = [];
+    }
+    let vitals: { Cpu?: FreeKioskMetricSample[]; Ram?: FreeKioskMetricSample[] } = {};
+    try {
+      vitals = (await window.API.GetClientVitalsHistory(String(entity.id))) || {};
+    } catch {
+      vitals = {};
+    }
+    const ChecksByKey = new Map(
+      (Array.isArray(checks) ? checks : [])
+        .filter((Check) => Check && Check.CheckKey)
+        .map((Check) => [String(Check.CheckKey), Check.samples] as const)
+    );
+    for (const Key of SYSTEM_CHECK_ORDER) {
+      const Samples = ChecksByKey.get(Key);
+      MonitorHistorySeries.push({
+        systemCheckKey: Key,
+        samples: Array.isArray(Samples) ? Samples : [],
+        ...(Key === 'cpu' ? { metricSamples: Array.isArray(vitals.Cpu) ? vitals.Cpu : [] } : {}),
+        ...(Key === 'ram' ? { metricSamples: Array.isArray(vitals.Ram) ? vitals.Ram : [] } : {}),
       });
     }
   }
@@ -1135,6 +1167,33 @@ function RenderMonitoringHistoryEntity(
       )
     );
 
+    // Monitored system checks, straight under the client's own timeline: CPU
+    // and memory as usage charts with their limit, uptime, power and thermal as
+    // healthy/failing timelines. Driven by the client's CURRENT checks, so
+    // monitoring one shows its row at once.
+    const Viewed = { ...Client, UUID: String(Client.UUID || '') } as ClientView;
+    for (const Key of SYSTEM_CHECK_ORDER) {
+      const Card = SystemCheckCardFor(Viewed, Key);
+      if (!Card.Monitored) continue;
+      const Series = MonitorHistorySeries.find((Entry) => Entry && Entry.systemCheckKey === Key);
+      const Live = SystemCheckLiveState(Viewed, Card);
+      const Body =
+        Key === 'cpu' || Key === 'ram'
+          ? UsageChartHtml(Card, Viewed, (Series && Series.metricSamples) || [])
+          : RenderStatusTimeline(BuildStatusBlocksFromSamples((Series && Series.samples) || []));
+      $timelines.append(
+        `<div class="monitor-history-section">` +
+          RenderMonitorStatusCard({
+            state: Live.State,
+            name: Card.Title,
+            sub: 'Monitored System Check',
+            statusText: Live.Label,
+          }) +
+          Body +
+          `</div>`
+      );
+    }
+
     // Per-critical-application timelines (running vs not running over the past
     // hour). Rendered the same way individual monitoring checks are. The rows
     // are driven by the client's CURRENT critical applications (not just the
@@ -1176,7 +1235,7 @@ function RenderMonitoringHistoryEntity(
           {
             state: LiveState,
             name: Name,
-            sub: 'Critical Application',
+            sub: 'Monitored Application',
             statusText: StatusLabel,
           },
           Blocks
@@ -1215,7 +1274,7 @@ function RenderMonitoringHistoryEntity(
           {
             state: Live.State,
             name: Name,
-            sub: 'Critical USB Device',
+            sub: 'Monitored USB Device',
             statusText: Live.Label,
           },
           Blocks
@@ -1261,7 +1320,7 @@ function RenderMonitoringHistoryEntity(
           {
             state: Live.State,
             name: Name,
-            sub: 'Critical USB Device',
+            sub: 'Monitored USB Device',
             statusText: Live.Label,
           },
           Blocks
@@ -1300,7 +1359,7 @@ function RenderMonitoringHistoryEntity(
           {
             state: Live.State,
             name: Name,
-            sub: 'Critical Display',
+            sub: 'Monitored Display',
             statusText: Live.Label,
           },
           Blocks
@@ -1327,7 +1386,8 @@ function RenderMonitoringHistoryEntity(
           {
             state: Live.State,
             name: Endpoint.Name || 'Audio Device',
-            sub: Endpoint.Direction === 'input' ? 'Critical Audio Input' : 'Critical Audio Output',
+            sub:
+              Endpoint.Direction === 'input' ? 'Monitored Audio Input' : 'Monitored Audio Output',
             statusText: Live.Label,
           },
           BuildStatusBlocksFromSamples(SamplesByAudioEndpoint.get(Endpoint.EndpointID) || [])
@@ -1354,7 +1414,7 @@ function RenderMonitoringHistoryEntity(
           {
             state: Live.State,
             name: Iface.Name,
-            sub: 'Critical Network Interface',
+            sub: 'Monitored Network Interface',
             statusText: Live.Label,
           },
           BuildStatusBlocksFromSamples(SamplesByInterface.get(Iface.Name) || [])

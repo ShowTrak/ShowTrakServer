@@ -74,6 +74,46 @@ function isScopeMatch(Rule: AlertRule, Context: AlertContext, Tags?: readonly Sc
   );
 }
 
+// Triggers raised from a client's health telemetry (see ClientManager/health).
+// None takes configuration, so each matches its own stimulus exactly.
+const HEALTH_TRIGGERS: ReadonlySet<string> = new Set([
+  TRIGGERS.CLIENT_RECOVERED,
+  TRIGGERS.CLIENT_REBOOTED,
+  TRIGGERS.CLIENT_VERSION_CHANGED,
+  TRIGGERS.CLIENT_SLEEPING,
+  TRIGGERS.CLIENT_RESUMED,
+  TRIGGERS.CPU_USAGE_HIGH,
+  TRIGGERS.RAM_USAGE_HIGH,
+  TRIGGERS.UPTIME_HIGH,
+  TRIGGERS.TEMPERATURE_HIGH,
+  TRIGGERS.THERMAL_STATE_HIGH,
+  TRIGGERS.BATTERY_LOW,
+  TRIGGERS.BATTERY_NOT_CHARGING,
+  TRIGGERS.CRITICAL_POWER_ON_BATTERY,
+  TRIGGERS.POWER_ON_BATTERY,
+  TRIGGERS.POWER_RESTORED,
+  TRIGGERS.APPLICATION_NOT_RESPONDING,
+  TRIGGERS.CRITICAL_APPLICATION_NOT_RESPONDING,
+  TRIGGERS.APPLICATION_RESPONDING,
+  TRIGGERS.CRITICAL_APPLICATION_MULTIPLE_INSTANCES,
+  TRIGGERS.FOREGROUND_APPLICATION_CHANGED,
+  TRIGGERS.CRITICAL_APPLICATION_LOST_FOREGROUND,
+  TRIGGERS.DISPLAY_CONNECTED,
+  TRIGGERS.DISPLAY_DISCONNECTED,
+  TRIGGERS.CRITICAL_DISPLAY_CONNECTED,
+  TRIGGERS.CRITICAL_DISPLAY_DISCONNECTED,
+  TRIGGERS.DISPLAY_CONFIGURATION_CHANGED,
+  TRIGGERS.NETWORK_INTERFACE_UP,
+  TRIGGERS.NETWORK_INTERFACE_DOWN,
+  TRIGGERS.CRITICAL_NETWORK_INTERFACE_DOWN,
+  TRIGGERS.NETWORK_ADDRESS_CHANGED,
+  TRIGGERS.NETWORK_GATEWAY_CHANGED,
+  TRIGGERS.USB_DEVICE_MOVED,
+  TRIGGERS.USB_FIRMWARE_CHANGED,
+  TRIGGERS.USB_DEVICE_ERROR,
+  TRIGGERS.AUDIO_VOLUME_OUT_OF_RANGE,
+]);
+
 // Whether a single trigger type on the rule matches the runtime context. The
 // CLIENT_DEGRADED case additionally consults the rule's TriggerConfig.Source.
 function singleTriggerMatches(
@@ -158,7 +198,7 @@ function singleTriggerMatches(
       return false;
     }
     default:
-      return false;
+      return HEALTH_TRIGGERS.has(TriggerType) && Context.TriggerType === TriggerType;
   }
 }
 
@@ -237,13 +277,13 @@ function describeAudioContext(Context: AlertContext): string | null {
     case TRIGGERS.AUDIO_DEVICE_DISCONNECTED:
       return `${Name} disconnected from ${Client}`;
     case TRIGGERS.CRITICAL_AUDIO_DEVICE_CONNECTED:
-      return `${Name} (critical) connected to ${Client}`;
+      return `${Name} (monitored) connected to ${Client}`;
     case TRIGGERS.CRITICAL_AUDIO_DEVICE_DISCONNECTED:
-      return `${Name} (critical) disconnected from ${Client}`;
+      return `${Name} (monitored) disconnected from ${Client}`;
     case TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_CONNECTED:
-      return `${Name} (non-critical) connected to ${Client}`;
+      return `${Name} (unmonitored) connected to ${Client}`;
     case TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_DISCONNECTED:
-      return `${Name} (non-critical) disconnected from ${Client}`;
+      return `${Name} (unmonitored) disconnected from ${Client}`;
     case TRIGGERS.AUDIO_DEVICE_MUTED:
       return `${Name} was muted on ${Client}`;
     case TRIGGERS.AUDIO_DEFAULT_DEVICE_CHANGED: {
@@ -269,6 +309,147 @@ function describeAudioContext(Context: AlertContext): string | null {
   }
 }
 
+function describeDisplay(Value: unknown): string {
+  const D = (Value && typeof Value === 'object' ? Value : {}) as Record<string, unknown>;
+  const Label = typeof D.Label === 'string' && D.Label.trim() ? D.Label.trim() : null;
+  const Screen = Number.isFinite(Number(D.ScreenNumber))
+    ? `Screen ${Number(D.ScreenNumber)}`
+    : null;
+  return Label || Screen || 'A display';
+}
+
+function describeDisplayMode(Value: unknown): string {
+  const D = (Value && typeof Value === 'object' ? Value : {}) as Record<string, unknown>;
+  const Hz = Number.isFinite(Number(D.RefreshRate))
+    ? `@${Math.round(Number(D.RefreshRate))}Hz`
+    : '';
+  return `${D.Width}x${D.Height}${Hz}`;
+}
+
+function describeInterface(Context: AlertContext): string {
+  const I = (
+    Context.Interface && typeof Context.Interface === 'object' ? Context.Interface : {}
+  ) as Record<string, unknown>;
+  return typeof I.Name === 'string' && I.Name ? I.Name : 'A network interface';
+}
+
+function describeDuration(Seconds: unknown): string {
+  const n = Number(Seconds);
+  if (!Number.isFinite(n) || n < 0) return '';
+  if (n < 90) return `${Math.round(n)}s`;
+  if (n < 5400) return `${Math.round(n / 60)}m`;
+  return `${Math.round(n / 3600)}h`;
+}
+
+function describeHealthContext(Context: AlertContext): string | null {
+  const Client = Context.EntityName || 'Client';
+  const App = describeApplication(Context);
+  const Value = Context.Value == null ? null : Number(Context.Value);
+  const Threshold = Context.Threshold == null ? null : Number(Context.Threshold);
+  switch (Context.TriggerType) {
+    case TRIGGERS.CLIENT_RECOVERED:
+      return `${Client} recovered`;
+    case TRIGGERS.CLIENT_REBOOTED:
+      return `${Client} restarted`;
+    case TRIGGERS.CLIENT_VERSION_CHANGED:
+      return `${Client} updated from ${Context.PreviousVersion || 'unknown'} to ${Context.Version || 'unknown'}`;
+    case TRIGGERS.CLIENT_SLEEPING:
+      return `${Client} is going to sleep`;
+    case TRIGGERS.CLIENT_RESUMED: {
+      const Asleep = describeDuration(Context.AsleepSeconds);
+      return `${Client} woke from sleep${Asleep ? ` after ${Asleep}` : ''}`;
+    }
+    case TRIGGERS.CPU_USAGE_HIGH:
+      return `${Client} CPU at ${Value ?? '?'}% (limit ${Threshold ?? '?'}%)`;
+    case TRIGGERS.RAM_USAGE_HIGH:
+      return `${Client} memory at ${Value ?? '?'}% (limit ${Threshold ?? '?'}%)`;
+    case TRIGGERS.UPTIME_HIGH:
+      return `${Client} has been up ${Value ?? '?'} days without a restart (limit ${Threshold ?? '?'} days)`;
+    case TRIGGERS.TEMPERATURE_HIGH: {
+      const Sensor =
+        typeof Context.Sensor === 'string' && Context.Sensor ? ` (${Context.Sensor})` : '';
+      return `${Client} at ${Value ?? '?'}°C${Sensor}, limit ${Threshold ?? '?'}°C`;
+    }
+    case TRIGGERS.THERMAL_STATE_HIGH:
+      return `${Client} is throttling to cool down (thermal state ${
+        typeof Context.Value === 'string' ? Context.Value : 'raised'
+      })`;
+    case TRIGGERS.BATTERY_LOW:
+      return `${Client} battery at ${Value ?? '?'}% (limit ${Threshold ?? '?'}%)`;
+    case TRIGGERS.BATTERY_NOT_CHARGING:
+      return `${Client} battery is not charging at ${Value ?? '?'}% while on mains power`;
+    case TRIGGERS.CRITICAL_POWER_ON_BATTERY:
+      return `${Client} (monitored) is running on battery`;
+    case TRIGGERS.POWER_ON_BATTERY:
+      return `${Client} lost mains power and is running on battery`;
+    case TRIGGERS.POWER_RESTORED:
+      return `${Client} is back on mains power`;
+    case TRIGGERS.APPLICATION_NOT_RESPONDING:
+      return `${App} is not responding on ${Client}`;
+    case TRIGGERS.CRITICAL_APPLICATION_NOT_RESPONDING:
+      return `${App} (monitored) is not responding on ${Client}`;
+    case TRIGGERS.APPLICATION_RESPONDING:
+      return `${App} is responding again on ${Client}`;
+    case TRIGGERS.CRITICAL_APPLICATION_MULTIPLE_INSTANCES: {
+      const Count = Number((Context.Application || {}).Count);
+      return `${App} (monitored) is running ${Number.isFinite(Count) ? `${Count} instances` : 'more than once'} on ${Client}`;
+    }
+    case TRIGGERS.FOREGROUND_APPLICATION_CHANGED:
+      return `${App} is now in the foreground on ${Client}`;
+    case TRIGGERS.CRITICAL_APPLICATION_LOST_FOREGROUND: {
+      const Front =
+        typeof Context.Foreground === 'string' && Context.Foreground ? Context.Foreground : null;
+      return `${App} (monitored) lost the foreground on ${Client}${Front ? ` to ${Front}` : ''}`;
+    }
+    case TRIGGERS.DISPLAY_CONNECTED:
+      return `${describeDisplay(Context.Display)} connected to ${Client}`;
+    case TRIGGERS.CRITICAL_DISPLAY_CONNECTED:
+      return `${describeDisplay(Context.Display)} (monitored) connected to ${Client}`;
+    case TRIGGERS.DISPLAY_DISCONNECTED:
+      return `${describeDisplay(Context.Display)} disconnected from ${Client}`;
+    case TRIGGERS.CRITICAL_DISPLAY_DISCONNECTED:
+      return `${describeDisplay(Context.Display)} (monitored) disconnected from ${Client}`;
+    case TRIGGERS.DISPLAY_CONFIGURATION_CHANGED:
+      return `${describeDisplay(Context.Display)} on ${Client} changed from ${describeDisplayMode(Context.Previous)} to ${describeDisplayMode(Context.Display)}`;
+    case TRIGGERS.NETWORK_INTERFACE_UP:
+      return `${describeInterface(Context)} came up on ${Client}`;
+    case TRIGGERS.NETWORK_INTERFACE_DOWN:
+      return `${describeInterface(Context)} went down on ${Client}`;
+    case TRIGGERS.CRITICAL_NETWORK_INTERFACE_DOWN:
+      return `${describeInterface(Context)} (monitored) went down on ${Client}`;
+    case TRIGGERS.NETWORK_ADDRESS_CHANGED: {
+      const I = (Context.Interface || {}) as Record<string, unknown>;
+      const Now = Array.isArray(I.Addresses) ? I.Addresses.join(', ') : 'a new address';
+      return `${describeInterface(Context)} on ${Client} changed address to ${Now}`;
+    }
+    case TRIGGERS.NETWORK_GATEWAY_CHANGED: {
+      const I = (Context.Interface || {}) as Record<string, unknown>;
+      return `${describeInterface(Context)} on ${Client} changed router to ${I.Gateway || 'none'}`;
+    }
+    case TRIGGERS.USB_DEVICE_MOVED: {
+      const Device = (Context.Device || {}) as Record<string, unknown>;
+      return `${describeUSBDevice(Context)} moved to port ${Device.Location || '?'} on ${Client}`;
+    }
+    case TRIGGERS.USB_FIRMWARE_CHANGED: {
+      const Device = (Context.Device || {}) as Record<string, unknown>;
+      return `${describeUSBDevice(Context)} firmware changed to ${Device.FirmwareVersion || '?'} on ${Client}`;
+    }
+    case TRIGGERS.USB_DEVICE_ERROR: {
+      const Device = (Context.Device || {}) as Record<string, unknown>;
+      const State = (Device.DeviceState || {}) as Record<string, unknown>;
+      const Why = typeof State.Message === 'string' && State.Message ? `: ${State.Message}` : '';
+      return `${describeUSBDevice(Context)} reports a device problem on ${Client}${Why}`;
+    }
+    case TRIGGERS.AUDIO_VOLUME_OUT_OF_RANGE: {
+      const Device = (Context.AudioDevice || {}) as Record<string, unknown>;
+      const Level = Number.isFinite(Number(Device.Volume)) ? ` (${Number(Device.Volume)}%)` : '';
+      return `${describeAudioDevice(Device)} level out of range on ${Client}${Level}`;
+    }
+    default:
+      return null;
+  }
+}
+
 // "Lobby Kiosk — Battery Level 12% is below 20%". The reason is worded by the
 // alarm evaluator, which is the only thing that knows the metric's unit and
 // precision, so it is used verbatim rather than rebuilt here.
@@ -281,6 +462,8 @@ function describeFreeKioskAlarm(Context: AlertContext): string {
 function describeContext(Context: AlertContext): string {
   const Audio = describeAudioContext(Context);
   if (Audio) return Audio;
+  const Health = describeHealthContext(Context);
+  if (Health) return Health;
   if (Context.TriggerType === TRIGGERS.FREEKIOSK_METRIC_ALARM) {
     return describeFreeKioskAlarm(Context);
   }
@@ -306,16 +489,16 @@ function describeContext(Context: AlertContext): string {
     return `${describeUSBDevice(Context)} disconnected from ${Context.EntityName || 'Client'}`;
   }
   if (Context.TriggerType === TRIGGERS.NON_CRITICAL_USB_DEVICE_CONNECTED) {
-    return `${describeUSBDevice(Context)} (non-critical) connected to ${Context.EntityName || 'Client'}`;
+    return `${describeUSBDevice(Context)} (unmonitored) connected to ${Context.EntityName || 'Client'}`;
   }
   if (Context.TriggerType === TRIGGERS.NON_CRITICAL_USB_DEVICE_DISCONNECTED) {
-    return `${describeUSBDevice(Context)} (non-critical) disconnected from ${Context.EntityName || 'Client'}`;
+    return `${describeUSBDevice(Context)} (unmonitored) disconnected from ${Context.EntityName || 'Client'}`;
   }
   if (Context.TriggerType === TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED) {
-    return `${describeUSBDevice(Context)} (critical) connected to ${Context.EntityName || 'Client'}`;
+    return `${describeUSBDevice(Context)} (monitored) connected to ${Context.EntityName || 'Client'}`;
   }
   if (Context.TriggerType === TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED) {
-    return `${describeUSBDevice(Context)} (critical) disconnected from ${Context.EntityName || 'Client'}`;
+    return `${describeUSBDevice(Context)} (monitored) disconnected from ${Context.EntityName || 'Client'}`;
   }
   if (Context.TriggerType === TRIGGERS.APPLICATION_STARTED) {
     return `${describeApplication(Context)} started on ${Context.EntityName || 'Client'}`;
@@ -324,16 +507,16 @@ function describeContext(Context: AlertContext): string {
     return `${describeApplication(Context)} stopped on ${Context.EntityName || 'Client'}`;
   }
   if (Context.TriggerType === TRIGGERS.CRITICAL_APPLICATION_STARTED) {
-    return `${describeApplication(Context)} (critical) started on ${Context.EntityName || 'Client'}`;
+    return `${describeApplication(Context)} (monitored) started on ${Context.EntityName || 'Client'}`;
   }
   if (Context.TriggerType === TRIGGERS.CRITICAL_APPLICATION_STOPPED) {
-    return `${describeApplication(Context)} (critical) stopped on ${Context.EntityName || 'Client'}`;
+    return `${describeApplication(Context)} (monitored) stopped on ${Context.EntityName || 'Client'}`;
   }
   if (Context.TriggerType === TRIGGERS.NON_CRITICAL_APPLICATION_STARTED) {
-    return `${describeApplication(Context)} (non-critical) started on ${Context.EntityName || 'Client'}`;
+    return `${describeApplication(Context)} (unmonitored) started on ${Context.EntityName || 'Client'}`;
   }
   if (Context.TriggerType === TRIGGERS.NON_CRITICAL_APPLICATION_STOPPED) {
-    return `${describeApplication(Context)} (non-critical) stopped on ${Context.EntityName || 'Client'}`;
+    return `${describeApplication(Context)} (unmonitored) stopped on ${Context.EntityName || 'Client'}`;
   }
   return 'Alert triggered';
 }

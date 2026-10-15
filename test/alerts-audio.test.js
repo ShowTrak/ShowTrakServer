@@ -125,7 +125,7 @@ test('a critical disconnect fires the generic and the critical trigger, not the 
   );
   assert.equal(
     executed[1].Description,
-    'Dante Virtual Soundcard (output) (critical) disconnected from FOH PC'
+    'Dante Virtual Soundcard (output) (monitored) disconnected from FOH PC'
   );
 });
 
@@ -145,7 +145,7 @@ test('a non-critical connect fires the generic and the non-critical trigger', as
       [
         'NON_CRITICAL_AUDIO_DEVICE_CONNECTED',
         'info',
-        'Scarlett 2i2 (input) (non-critical) connected to FOH PC',
+        'Scarlett 2i2 (input) (unmonitored) connected to FOH PC',
       ],
     ]
   );

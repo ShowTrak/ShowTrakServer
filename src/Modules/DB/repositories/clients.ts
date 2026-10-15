@@ -106,6 +106,8 @@ export function CreateClientsRepository(DB: DBManager) {
           UUID,
         ]);
         if (networkErr) throw networkErr;
+        const [systemErr] = await run('DELETE FROM CriticalSystemChecks WHERE UUID = ?', [UUID]);
+        if (systemErr) throw systemErr;
         const [macErr] = await run('DELETE FROM ClientMacAddresses WHERE UUID = ?', [UUID]);
         if (macErr) throw macErr;
         // Variable overrides describe this client specifically, so they go with
@@ -179,6 +181,12 @@ export function CreateClientsRepository(DB: DBManager) {
           [NewUUID, OldUUID]
         );
         if (criticalNetworkErr) throw criticalNetworkErr;
+
+        const [criticalSystemErr] = await run(
+          'UPDATE CriticalSystemChecks SET UUID = ? WHERE UUID = ?',
+          [NewUUID, OldUUID]
+        );
+        if (criticalSystemErr) throw criticalSystemErr;
 
         // Replacing a client means real hardware took over the slot, so the old
         // slot's observed MACs describe a different machine and must not be

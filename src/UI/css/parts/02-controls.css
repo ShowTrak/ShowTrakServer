@@ -771,6 +771,21 @@ input[type='range']::-moz-range-progress,
   z-index: 3;
 }
 
+/* Category heading inside the trigger picker. */
+.alert-multiselect-heading {
+  padding: 0.5rem 0.75rem 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.alert-multiselect-heading:not(:first-child) {
+  margin-top: 0.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .alert-multiselect-menu {
   position: absolute;
   top: calc(100% + 4px);

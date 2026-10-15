@@ -225,6 +225,27 @@ const Manager = {
     BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
   },
 
+  // Retention: forget settled (Completed/Failed) entries that finished before
+  // `Cutoff`. Pending ones are never touched, however old. Returns how many were
+  // dropped, and only notifies the UI when something actually changed.
+  PruneSettledBefore(Cutoff: number): number {
+    const Remaining: ScriptExecution[] = [];
+    let Dropped = 0;
+    for (const Request of ScriptExecutions) {
+      const FinishedAt = Request.Timer && Request.Timer.End != null ? Request.Timer.End : null;
+      if (Request.Status !== 'Pending' && FinishedAt != null && FinishedAt < Cutoff) {
+        Manager.ClearTimeout(Request);
+        Dropped += 1;
+      } else {
+        Remaining.push(Request);
+      }
+    }
+    if (!Dropped) return 0;
+    ScriptExecutions = Remaining;
+    BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
+    return Dropped;
+  },
+
   // Drop only settled (Completed/Failed) entries, preserving anything still
   // Pending — queued or in flight. Used as the "reset" when a new batch starts
   // so a fresh run clears the finished rows from the last batch but never

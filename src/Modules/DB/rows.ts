@@ -171,6 +171,8 @@ export interface CriticalApplicationRow {
   ApplicationKey: string;
   ApplicationName: string;
   Timestamp: number;
+  RequireForeground?: number; // 0 | 1; absent on rows read before migration 55
+  RequireResponding?: number; // 0 | 1; absent on rows read before migration 57 (= 1)
 }
 
 export interface CriticalDisplayRow {
@@ -214,6 +216,23 @@ export interface CriticalNetworkInterfaceRow {
   RangeEnd: string | null;
   Netmask: string | null;
   Gateway: string | null;
+  Timestamp: number;
+}
+
+// One monitored system check of one client (see ClientManager/system-checks).
+// Only the columns of its own check are meaningful; a NULL condition is not
+// guarded.
+export interface SystemCheckRow {
+  UUID: string;
+  CheckKey: string; // 'cpu' | 'ram' | 'uptime' | 'power' | 'thermal'
+  MaxPercent: number | null; // cpu, ram
+  SustainSeconds: number | null; // cpu, ram
+  MaxDays: number | null; // uptime, in days
+  RequireMains: number; // power; sqlite 0/1
+  MinBatteryPercent: number | null; // power
+  ChargingBelowPercent: number | null; // power
+  MaxCelsius: number | null; // thermal
+  MaxThermalState: string | null; // thermal: 'nominal' | 'fair' | 'serious'
   Timestamp: number;
 }
 

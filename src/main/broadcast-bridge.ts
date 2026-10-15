@@ -28,6 +28,7 @@ import { Manager as MonitoringActionFavourites } from '../Modules/MonitoringActi
 import { Manager as DummyClientManager } from '../Modules/DummyClientManager';
 import { Manager as FreeKioskManager } from '../Modules/FreeKioskManager';
 import { recordFreeKioskHistorySamples, syncFreeKioskHistoryStore } from './freekiosk-history';
+import { recordClientVitalsSample, syncClientVitalsHistory } from './client-vitals-history';
 import { Manager as AlertsManager } from '../Modules/AlertsManager';
 import { Manager as TagManager } from '../Modules/TagManager';
 import { Manager as VariableManager } from '../Modules/VariableManager';
@@ -54,6 +55,8 @@ import {
   syncMonitoringHistoryStore,
   recordDummyHistorySample,
   syncDummyHistoryStore,
+  recordClientSystemCheckHistorySamples,
+  syncClientSystemCheckHistoryStore,
   recordClientHistorySample,
   syncClientHistoryStore,
 } from './monitoring-history';
@@ -244,6 +247,16 @@ async function AudioDeviceChanged(Client: BroadcastClient, Change: unknown): Pro
   );
 }
 
+// A health event derived by the Client entity: thresholds, reboots, sleep,
+// hung or unfocused applications, display/network/USB/audio transitions (see
+// ClientManager/health). Deliberately NOT gated on the main window: these are
+// alerts, and a server running with its window closed must still raise them.
+async function ClientHealthEvent(Client: BroadcastClient, Event: unknown): Promise<void> {
+  AlertsManager.HandleClientHealthEvent(Client, Event).catch((Err: unknown) =>
+    Logger.error('AlertsManager.HandleClientHealthEvent failed', Err)
+  );
+}
+
 async function ReadoptDevice(UUID: string): Promise<void> {
   await ServerManager.SendMessageByGroup(UUID, 'Adopt');
 }
@@ -301,6 +314,8 @@ async function ClientUpdated(Client: BroadcastClient): Promise<void> {
   }
 
   recordClientHistorySample(Client);
+  recordClientVitalsSample(Client);
+  recordClientSystemCheckHistorySamples(Client);
 
   const UUID = Client && Client.UUID ? Client.UUID : null;
   const IsOnline = !!(Client && Client.Online);
@@ -350,6 +365,8 @@ async function UpdateFullClientList(): Promise<void> {
   const [GroupsErr, Groups] = await GroupManager.GetAll();
   if (GroupsErr) return Logger.error('Failed to fetch client groups:', GroupsErr);
   syncClientHistoryStore(Clients || []);
+  syncClientVitalsHistory(Clients || []);
+  syncClientSystemCheckHistoryStore(Clients || []);
   PushToRenderers('SetFullClientList', Clients, Groups);
 }
 
@@ -743,6 +760,7 @@ function RegisterBroadcastBridge(): void {
   BroadcastManager.on('ApplicationStarted', ApplicationStarted);
   BroadcastManager.on('ApplicationStopped', ApplicationStopped);
   BroadcastManager.on('AudioDeviceChanged', AudioDeviceChanged);
+  BroadcastManager.on('ClientHealthEvent', ClientHealthEvent);
   BroadcastManager.on('ReadoptDevice', ReadoptDevice);
   BroadcastManager.on('ReinitializeSystem', ReinitializeSystem);
   BroadcastManager.on('ClientUpdated', ClientUpdated);

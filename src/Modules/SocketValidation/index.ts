@@ -137,6 +137,12 @@ function Heartbeat(
     if (Uptime !== undefined) {
       const Normalized = Tolerate(() => {
         if (!isPlainObject(Uptime)) fail('Vitals.Uptime must be an object');
+        // Seconds arrived with client 3.22.0; older clients omit it, and the
+        // key stays absent so the server falls back to parsing Formatted.
+        const Seconds = Tolerate(
+          () => normalizeOptionalFiniteNumber(Uptime.Seconds, 'Vitals.Uptime.Seconds'),
+          onWarn
+        );
         return {
           Formatted: Tolerate(
             () =>
@@ -145,6 +151,7 @@ function Heartbeat(
               }),
             onWarn
           ),
+          ...(Seconds !== null && Seconds >= 0 ? { Seconds: Math.floor(Seconds) } : {}),
         };
       }, onWarn);
       if (Normalized) Vitals.Uptime = Normalized;
@@ -352,6 +359,29 @@ function RunningApplicationsStatus(value: unknown) {
   };
 }
 
+// Hung-app and foreground support, as the client declares it. Absent on older
+// clients, and kept absent so the server can tell "cannot say" from "no".
+function ApplicationCapabilities(
+  value: unknown
+): { Responding: boolean; Foreground: boolean } | undefined {
+  if (!isPlainObject(value)) return undefined;
+  return { Responding: value.Responding === true, Foreground: value.Foreground === true };
+}
+
+// The focused application: absent (cannot say), a name, or null (none/unknown).
+function ApplicationForeground(value: Record<string, unknown>, fieldName: string) {
+  if (value.Foreground === undefined) return {};
+  return {
+    Foreground: normalizeOptionalString(value.Foreground, fieldName, { maxLength: 256 }),
+  };
+}
+
+// An application's responsiveness: absent when the client cannot tell.
+function ApplicationResponding(item: Record<string, unknown>) {
+  if (item.Responding === undefined) return {};
+  return { Responding: typeof item.Responding === 'boolean' ? item.Responding : null };
+}
+
 // --- Incremental telemetry -------------------------------------------------
 // A delta is untrusted input like everything else here, and is bounded by the
 // same per-domain caps as the full list it amends: a client cannot use a delta
@@ -396,7 +426,9 @@ function ApplicationDelta(value: unknown) {
       });
       if (!Name) return [];
       const Count = normalizeOptionalFiniteNumber(item.Count, `${fieldName}[${index}].Count`);
-      return [{ Name, Count: Count && Count > 0 ? Math.floor(Count) : 1 }];
+      return [
+        { Name, Count: Count && Count > 0 ? Math.floor(Count) : 1, ...ApplicationResponding(item) },
+      ];
     });
   };
   return {
@@ -407,12 +439,16 @@ function ApplicationDelta(value: unknown) {
     TotalCount: normalizeOptionalFiniteNumber(value.TotalCount, 'ApplicationDelta.TotalCount'),
     Truncated: value.Truncated === true,
     Status: RunningApplicationsStatus(value.Status),
+    ...ApplicationForeground(value, 'ApplicationDelta.Foreground'),
+    ...(ApplicationCapabilities(value.Capabilities)
+      ? { Capabilities: ApplicationCapabilities(value.Capabilities) }
+      : {}),
   };
 }
 
 function RunningApplications(value: unknown): Record<string, unknown> {
   if (!isPlainObject(value)) fail('RunningApplications payload must be an object');
-  let Items: Array<{ Name: string; Count: number }> = [];
+  let Items: Array<{ Name: string; Count: number; Responding?: boolean | null }> = [];
   if (value.Items !== undefined && value.Items !== null) {
     const list = normalizeBoundedArray(value.Items, 'Items', {
       maxItems: MAX_RUNNING_APPLICATIONS,
@@ -422,10 +458,11 @@ function RunningApplications(value: unknown): Record<string, unknown> {
       const Name = normalizeOptionalString(item.Name, `Items[${index}].Name`);
       if (!Name) return [];
       const Count = normalizeOptionalFiniteNumber(item.Count, `Items[${index}].Count`);
-      return [{ Name, Count: Count === null ? 1 : Count }];
+      return [{ Name, Count: Count === null ? 1 : Count, ...ApplicationResponding(item) }];
     });
   }
   const Status = RunningApplicationsStatus(value.Status);
+  const Capabilities = ApplicationCapabilities(value.Capabilities);
   return {
     SampledAt: normalizeOptionalFiniteNumber(value.SampledAt, 'SampledAt'),
     TotalCount: normalizeOptionalFiniteNumber(value.TotalCount, 'TotalCount'),
@@ -433,6 +470,75 @@ function RunningApplications(value: unknown): Record<string, unknown> {
     Items,
     Status,
     NoChanges: value.NoChanges === true,
+    ...ApplicationForeground(value, 'Foreground'),
+    ...(Capabilities ? { Capabilities } : {}),
+  };
+}
+
+// --- Power and temperatures ---------------------------------------------------
+// Shape and bounds only; meaning (enums, clamping) is decided by ClientManager.
+
+const MAX_TEMPERATURE_SENSORS = 64;
+
+function CollectorStatus(value: unknown, fieldName: string): Record<string, unknown> | null {
+  if (!isPlainObject(value)) return null;
+  return {
+    State: normalizeOptionalString(value.State, `${fieldName}.State`, { maxLength: 32 }),
+    Message: normalizeOptionalString(value.Message, `${fieldName}.Message`, { maxLength: 512 }),
+    Platform: normalizeOptionalString(value.Platform, `${fieldName}.Platform`, { maxLength: 32 }),
+    Backend: normalizeOptionalString(value.Backend, `${fieldName}.Backend`, { maxLength: 64 }),
+  };
+}
+
+/** The client's `PowerStatus` snapshot. */
+function PowerStatus(value: unknown): Record<string, unknown> {
+  if (!isPlainObject(value)) fail('PowerStatus payload must be an object');
+  let Battery: Record<string, unknown> | null = null;
+  if (value.Battery !== undefined && value.Battery !== null) {
+    if (!isPlainObject(value.Battery)) fail('PowerStatus.Battery must be an object when present');
+    Battery = {
+      Percent: normalizeOptionalFiniteNumber(value.Battery.Percent, 'Battery.Percent'),
+      Charging: OptionalBoolean(value.Battery.Charging),
+      TimeRemainingMinutes: normalizeOptionalFiniteNumber(
+        value.Battery.TimeRemainingMinutes,
+        'Battery.TimeRemainingMinutes'
+      ),
+    };
+  }
+  return {
+    SampledAt: normalizeOptionalFiniteNumber(value.SampledAt, 'SampledAt'),
+    Status: CollectorStatus(value.Status, 'Status'),
+    Battery,
+    OnBattery: OptionalBoolean(value.OnBattery),
+    LastSuspendAt: normalizeOptionalFiniteNumber(value.LastSuspendAt, 'LastSuspendAt'),
+    LastResumeAt: normalizeOptionalFiniteNumber(value.LastResumeAt, 'LastResumeAt'),
+  };
+}
+
+/** The client's `Temperatures` snapshot. */
+function Temperatures(value: unknown): Record<string, unknown> & { Sensors: unknown[] } {
+  if (!isPlainObject(value)) fail('Temperatures payload must be an object');
+  const list = normalizeBoundedArray(value.Sensors ?? [], 'Sensors', {
+    maxItems: MAX_TEMPERATURE_SENSORS,
+  });
+  const Sensors = list.flatMap((item, index) => {
+    if (!isPlainObject(item)) fail(`Sensors[${index}] must be an object`);
+    const Name = normalizeOptionalString(item.Name, `Sensors[${index}].Name`, { maxLength: 128 });
+    const Celsius = normalizeOptionalFiniteNumber(item.Celsius, `Sensors[${index}].Celsius`);
+    if (!Name || Celsius === null) return [];
+    return [
+      {
+        Name,
+        Kind: normalizeOptionalString(item.Kind, `Sensors[${index}].Kind`, { maxLength: 16 }),
+        Celsius,
+      },
+    ];
+  });
+  return {
+    SampledAt: normalizeOptionalFiniteNumber(value.SampledAt, 'SampledAt'),
+    Status: CollectorStatus(value.Status, 'Status'),
+    Sensors,
+    ThermalState: normalizeOptionalString(value.ThermalState, 'ThermalState', { maxLength: 16 }),
   };
 }
 
@@ -562,6 +668,8 @@ export const Manager = {
   NetworkInterfaces,
   RunningApplications,
   AudioDevices,
+  PowerStatus,
+  Temperatures,
   NetworkInterfaceDelta,
   DisplayDelta,
   ApplicationDelta,

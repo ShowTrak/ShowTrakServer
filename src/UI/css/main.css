@@ -1095,6 +1095,21 @@ input[type='range']::-moz-range-progress,
   z-index: 3;
 }
 
+/* Category heading inside the trigger picker. */
+.alert-multiselect-heading {
+  padding: 0.5rem 0.75rem 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.alert-multiselect-heading:not(:first-child) {
+  margin-top: 0.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .alert-multiselect-menu {
   position: absolute;
   top: calc(100% + 4px);
@@ -2763,6 +2778,44 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   background: rgba(220, 53, 69, 0.24);
 }
 
+/* Power & Thermal readings (and similar key/value health lists): label and
+   value, rules between rows only, matching the conditions tables below. */
+.SHOWTRAK_HEALTH_TABLE {
+  width: 100%;
+  text-align: left;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.SHOWTRAK_HEALTH_TABLE tr + tr > * {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.SHOWTRAK_HEALTH_TABLE th,
+.SHOWTRAK_HEALTH_TABLE td {
+  padding: 0.35rem 0.25rem;
+  vertical-align: middle;
+}
+
+.SHOWTRAK_HEALTH_TABLE th {
+  width: 45%;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.SHOWTRAK_HEALTH_TABLE td {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.SHOWTRAK_HEALTH_TABLE tr.is-failing td {
+  color: #ff9f40;
+}
+
+.SHOWTRAK_HEALTH_TABLE tr.is-healthy td {
+  color: #4fd18b;
+}
+
 /* Conditions of a critical endpoint: key, value, tick. Rules between rows
    only, never between columns. */
 .SHOWTRAK_AUDIO_CONDITIONS {
@@ -2886,6 +2939,33 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   text-transform: uppercase;
   padding: 0.2rem 0.5rem;
   cursor: default;
+}
+
+/* --- System checks (client info modal) ----------------------------------- */
+/* CPU, memory, uptime, power and thermal cards reuse the audio card and
+   conditions-table classes; only the chart and the thermal-state picker need
+   anything of their own. */
+.SHOWTRAK_SYSTEM_CHART {
+  margin-top: 0.5rem;
+}
+
+.SHOWTRAK_SYSTEM_COND_SELECT select {
+  padding: 0.1rem 0.4rem;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.SHOWTRAK_SYSTEM_COND_SELECT select:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.SHOWTRAK_SYSTEM_COND_SELECT option {
+  background: #1d1a2f;
+  color: #ffffff;
 }
 /* Dark-themed hint popovers (USB critical-state + monitoring field notes) */
 .SHOWTRAK_USB_POPOVER,

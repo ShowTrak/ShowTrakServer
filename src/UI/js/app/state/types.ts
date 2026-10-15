@@ -2,7 +2,7 @@
 // the wire, so they live here rather than in the shared protocol package).
 // Extracted from the old monolithic state.ts when it was partitioned into
 // this state/ folder; re-exported through the state barrel unchanged.
-import type { HistorySample } from '@showtrak/protocol';
+import type { FreeKioskMetricSample, HistorySample } from '@showtrak/protocol';
 
 /** One check row inside the monitoring-target editor draft. */
 export interface MonitoringEditorCheck {
@@ -52,6 +52,10 @@ export interface MonitorHistorySeriesEntry {
   audioEndpointID?: string;
   audioName?: string;
   networkInterfaceName?: string;
+  /** A monitored system check (cpu, ram, uptime, power, thermal). */
+  systemCheckKey?: string;
+  /** CPU or memory usage readings, for that check's line chart. */
+  metricSamples?: FreeKioskMetricSample[];
 }
 
 /** Identifies which entity the history modal is currently showing. */

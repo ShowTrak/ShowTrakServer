@@ -514,6 +514,31 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       { serial: true }
     );
 
+    // Battery, mains and sleep/resume, and temperatures (clients from 3.22.0).
+    // Serialized so a "going to sleep" report and the one sent on waking are
+    // judged in the order the client sent them.
+    GuardedOn(
+      'PowerStatus',
+      (Snapshot) => [SocketValidation.PowerStatus(Snapshot)],
+      async (Snapshot: ReturnType<typeof SocketValidation.PowerStatus>) => {
+        Logger.debug(`Power status received from ${socket.UUID}`);
+        await ClientManager.SetPowerStatus(socket.UUID, Snapshot);
+      },
+      { serial: true }
+    );
+
+    GuardedOn(
+      'Temperatures',
+      (Snapshot) => [SocketValidation.Temperatures(Snapshot)],
+      async (Snapshot: ReturnType<typeof SocketValidation.Temperatures>) => {
+        Logger.debug(
+          `Temperatures received from ${socket.UUID} (${Snapshot.Sensors.length} sensors)`
+        );
+        await ClientManager.SetTemperatures(socket.UUID, Snapshot);
+      },
+      { serial: true }
+    );
+
     /**
      * Capability handshake.
      *

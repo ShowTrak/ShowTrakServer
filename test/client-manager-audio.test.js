@@ -322,11 +322,11 @@ test('a failed write leaves the in-memory critical list untouched', async () => 
   await Manager.SetAudioDevices('c1', snapshot([endpoint()]));
   await DB.Run('DROP TABLE CriticalAudioDevices');
   const [markErr] = await Manager.MarkAudioDeviceCritical('c1', { EndpointID: 'wasapi:{dvs-out}' });
-  assert.match(markErr, /Failed to save critical audio device/);
+  assert.match(markErr, /Failed to save monitored audio device/);
   const [, client] = await Manager.Get('c1');
   assert.deepEqual(client.CriticalAudioDevices, []);
   const [removeErr] = await Manager.RemoveAudioDeviceCritical('c1', 'wasapi:{dvs-out}');
-  assert.match(removeErr, /Failed to remove critical audio device/);
+  assert.match(removeErr, /Failed to remove monitored audio device/);
 });
 
 test('deleting a client deletes its critical audio rows; replacing one moves them', async () => {

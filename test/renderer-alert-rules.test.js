@@ -127,8 +127,8 @@ test('critical and non-critical variants read differently', () => {
   const NonCritical = triggerSummaryText('NON_CRITICAL_USB_DEVICE_DISCONNECTED');
   const Any = triggerSummaryText('USB_DEVICE_DISCONNECTED');
 
-  assert.match(Critical, /critical/);
-  assert.match(NonCritical, /non-critical/);
+  assert.match(Critical, /\bmonitored/);
+  assert.match(NonCritical, /unmonitored/);
   assert.equal(new Set([Critical, NonCritical, Any]).size, 3);
 });
 

@@ -29,6 +29,12 @@ import {
 import { NormalizeIntegratedActions } from './integrated-actions';
 import { makeCriticalIndex } from './critical-index';
 import {
+  normalizeSystemCheckRow,
+  resolveSystemCheck,
+  SystemCheckToRow,
+  type SystemCheck,
+} from './system-checks';
+import {
   ResolveOfflineGraceSeconds,
   SchedulePendingTimeout,
   CancelPendingTimeout,
@@ -61,8 +67,10 @@ import type {
   CriticalAudioDeviceRow,
   CriticalNetworkInterfaceRow,
   ClientMacAddressRow,
+  SystemCheckRow,
 } from '../DB/rows';
 import type {
+  ClientSystemCheckKey,
   CriticalAudioDevice,
   CriticalDisplay,
   CriticalNetworkInterface,
@@ -79,6 +87,7 @@ import type {
   CriticalDisplayPayloadResult,
   CriticalAudioDevicePayloadResult,
   CriticalNetworkInterfacePayloadResult,
+  ClientSystemCheckPayloadResult,
 } from '../IPCValidation';
 
 // One entry of the `SystemInfo` MAC-address map: the client reports each
@@ -158,6 +167,9 @@ export interface ClientManagerType {
   RemoveDisplayCritical(UUID: string, DisplayID: unknown): Promise<Result<boolean>>;
   IsDisplayCritical(UUID: string, DisplayID: unknown): Promise<Result<boolean>>;
   SetAudioDevices(UUID: string, Snapshot: unknown): Promise<Result<string>>;
+  // Battery / mains / sleep, and temperatures (clients from 3.22.0).
+  SetPowerStatus(UUID: string, Snapshot: unknown): Promise<Result<string>>;
+  SetTemperatures(UUID: string, Snapshot: unknown): Promise<Result<string>>;
   // Mark an endpoint critical or update its conditions; Ok(true) when newly marked.
   MarkAudioDeviceCritical(
     UUID: string,
@@ -170,6 +182,8 @@ export interface ClientManagerType {
     Interface: CriticalNetworkInterfacePayloadResult
   ): Promise<Result<boolean>>;
   RemoveNetworkInterfaceCritical(UUID: string, Name: unknown): Promise<Result<boolean>>;
+  MarkSystemCheck(UUID: string, Check: ClientSystemCheckPayloadResult): Promise<Result<boolean>>;
+  RemoveSystemCheck(UUID: string, Key: ClientSystemCheckKey): Promise<Result<boolean>>;
   // Per-client MAC addresses (the Wake-on-LAN target set). Add resolves to
   // Ok(true) when a new address was stored, Ok(false) when it was already on
   // file or was a reported address filtered out as non-external.
@@ -237,6 +251,7 @@ function applyCriticalState(Entity: Client): Client {
   CriticalDisplays.applyState(Entity);
   CriticalAudio.applyState(Entity);
   CriticalNetwork.applyState(Entity);
+  CriticalSystemChecks.applyState(Entity);
   MacAddresses.applyState(Entity);
   return Entity;
 }
@@ -294,6 +309,8 @@ interface ApplicationIndexEntry {
   Name: string;
   Key: string;
   Timestamp: number | null;
+  RequireForeground: boolean;
+  RequireResponding: boolean;
 }
 const CriticalUSB = makeCriticalIndex<CriticalUSBDeviceRow, CriticalUSBDevice>({
   loadAll: () => CriticalRepo.LoadAllUSB(),
@@ -327,7 +344,15 @@ const CriticalApplications = makeCriticalIndex<CriticalApplicationRow, Applicati
     return {
       UUID,
       Key: ApplicationKey,
-      Entry: { Name: ApplicationName, Key: ApplicationKey, Timestamp: Row.Timestamp || null },
+      Entry: {
+        Name: ApplicationName,
+        Key: ApplicationKey,
+        Timestamp: Row.Timestamp || null,
+        RequireForeground: Number(Row.RequireForeground) === 1,
+        // Absent before migration 57, when it was always judged.
+        RequireResponding:
+          Row.RequireResponding === undefined || Number(Row.RequireResponding) === 1,
+      },
     };
   },
   apply: (client, entries) => client.SetCriticalApplications(entries),
@@ -388,6 +413,20 @@ const CriticalNetwork = makeCriticalIndex<CriticalNetworkInterfaceRow, CriticalN
     return { UUID, Key: Entry.Name, Entry };
   },
   apply: (client, entries) => client.SetCriticalNetworkInterfaces(entries),
+});
+
+const CriticalSystemChecks = makeCriticalIndex<
+  SystemCheckRow,
+  { Key: ClientSystemCheckKey; Check: SystemCheck }
+>({
+  loadAll: () => CriticalRepo.LoadAllSystemChecks(),
+  fromRow: (Row) => {
+    const UUID = Row && Row.UUID ? String(Row.UUID) : '';
+    const Entry = normalizeSystemCheckRow(Row);
+    if (!UUID || !Entry) return null;
+    return { UUID, Key: Entry.Key, Entry };
+  },
+  apply: (client, entries) => client.SetSystemChecks(entries),
 });
 
 Manager.Timeout = async (UUID: string) => {
@@ -567,21 +606,38 @@ Manager.MarkApplicationCritical = async (
   if (!ApplicationName) return Fail('Application name is required');
 
   const ApplicationKey = ApplicationName.toLowerCase();
-  const Timestamp = Date.now();
+  // Re-marking an application that is already monitored updates its
+  // conditions; a condition the payload does not mention keeps what it had. A
+  // monitored application must always run; a first mark also requires it to
+  // respond, and leaves the foreground.
+  const Existing = Target.CriticalApplications.find((Entry) => Entry.Key === ApplicationKey);
+  const Pick = (Key: 'RequireForeground' | 'RequireResponding', First: boolean) =>
+    typeof Application?.[Key] === 'boolean'
+      ? (Application[Key] as boolean)
+      : Existing
+        ? Existing[Key]
+        : First;
+  const Conditions = {
+    RequireForeground: Pick('RequireForeground', false),
+    RequireResponding: Pick('RequireResponding', true),
+  };
+  const Timestamp = Existing && Existing.Timestamp ? Existing.Timestamp : Date.now();
   const [WriteErr] = await CriticalRepo.MarkApplication(
     UUID,
     ApplicationKey,
-    ApplicationName,
-    Timestamp
+    Existing ? Existing.Name : ApplicationName,
+    Timestamp,
+    Conditions
   );
-  if (WriteErr) return Fail('Failed to save critical application');
+  if (WriteErr) return Fail('Failed to save monitored application');
 
   CriticalApplications.setForClient(UUID, ApplicationKey, {
-    Name: ApplicationName,
+    Name: Existing ? Existing.Name : ApplicationName,
     Key: ApplicationKey,
     Timestamp,
+    ...Conditions,
   });
-  Target.MarkCriticalApplication({ Name: ApplicationName, Timestamp });
+  Target.MarkCriticalApplication({ Name: ApplicationName, Timestamp, ...Conditions });
   BroadcastManager.emit('ClientUpdated', Target);
   return Ok(true);
 };
@@ -596,7 +652,7 @@ Manager.RemoveApplicationCritical = async (UUID: string, ApplicationName: unknow
   const ApplicationKey = NormalizedName.toLowerCase();
 
   const [WriteErr] = await CriticalRepo.RemoveApplication(UUID, ApplicationKey);
-  if (WriteErr) return Fail('Failed to remove critical application');
+  if (WriteErr) return Fail('Failed to remove monitored application');
 
   CriticalApplications.removeForClient(UUID, ApplicationKey);
 
@@ -613,7 +669,7 @@ Manager.IsApplicationCritical = async (UUID: string, ApplicationName: unknown) =
   if (Cached) return Ok(Cached.has(NormalizedName));
 
   const [Err, Row] = await CriticalRepo.IsApplicationCritical(UUID, NormalizedName);
-  if (Err) return Fail('Failed to determine critical application status');
+  if (Err) return Fail('Failed to determine monitored application status');
   return Ok(!!Row);
 };
 
@@ -681,7 +737,7 @@ Manager.MarkUSBDeviceCritical = async (UUID: string, Device: CriticalUSBDevicePa
     ...USBConditionColumns(Entry),
     Timestamp: Entry.Timestamp ?? Date.now(),
   });
-  if (WriteErr) return Fail('Failed to save critical USB device');
+  if (WriteErr) return Fail('Failed to save monitored USB device');
 
   CriticalUSB.setForClient(UUID, SerialNumber, Entry);
   Target.MarkCriticalUSBDevice(Entry);
@@ -698,7 +754,7 @@ Manager.RemoveUSBDeviceCritical = async (UUID: string, SerialNumber: unknown) =>
   if (!NormalizedSerial) return Fail('Device serial number is required');
 
   const [WriteErr] = await CriticalRepo.RemoveUSB(UUID, NormalizedSerial);
-  if (WriteErr) return Fail('Failed to remove critical USB device');
+  if (WriteErr) return Fail('Failed to remove monitored USB device');
 
   CriticalUSB.removeForClient(UUID, NormalizedSerial);
 
@@ -715,7 +771,7 @@ Manager.IsUSBDeviceCritical = async (UUID: string, SerialNumber: unknown) => {
   if (Cached) return Ok(Cached.has(Normalized));
 
   const [Err, Row] = await CriticalRepo.IsUSBCritical(UUID, Normalized);
-  if (Err) return Fail('Failed to determine critical USB status');
+  if (Err) return Fail('Failed to determine monitored USB status');
   return Ok(!!Row);
 };
 
@@ -762,7 +818,7 @@ Manager.MarkUSBNameCritical = async (UUID: string, Device: CriticalUSBNamePayloa
     ...USBConditionColumns(Entry),
     Timestamp: Entry.Timestamp ?? Date.now(),
   });
-  if (WriteErr) return Fail('Failed to save critical USB device');
+  if (WriteErr) return Fail('Failed to save monitored USB device');
 
   CriticalUSBNames.setForClient(UUID, NameKey, Entry);
   Target.MarkCriticalUSBName(Entry);
@@ -782,7 +838,7 @@ Manager.RemoveUSBNameCritical = async (UUID: string, Device: CriticalUSBNamePayl
   if (!NameKey) return Fail('Device name is required');
 
   const [WriteErr] = await CriticalRepo.RemoveUSBName(UUID, NameKey);
-  if (WriteErr) return Fail('Failed to remove critical USB device');
+  if (WriteErr) return Fail('Failed to remove monitored USB device');
 
   CriticalUSBNames.removeForClient(UUID, NameKey);
   Target.UnmarkCriticalUSBName(NameKey);
@@ -798,7 +854,7 @@ Manager.IsUSBNameCritical = async (UUID: string, NameKey: unknown) => {
   if (Cached) return Ok(Cached.has(Normalized));
 
   const [Err, Row] = await CriticalRepo.IsUSBNameCritical(UUID, Normalized);
-  if (Err) return Fail('Failed to determine critical USB status');
+  if (Err) return Fail('Failed to determine monitored USB status');
   return Ok(!!Row);
 };
 
@@ -871,7 +927,7 @@ Manager.MarkDisplayCritical = async (UUID: string, Display: CriticalDisplayPaylo
     PositionY: Entry.PositionY,
     Timestamp: Entry.Timestamp ?? Date.now(),
   });
-  if (WriteErr) return Fail('Failed to save critical display');
+  if (WriteErr) return Fail('Failed to save monitored display');
   if (Rekeyed) {
     const [RemoveErr] = await CriticalRepo.RemoveDisplay(UUID, Existing.DisplayID);
     if (RemoveErr) Logger.error('Failed to retire a re-keyed critical display', RemoveErr);
@@ -896,7 +952,7 @@ Manager.RemoveDisplayCritical = async (UUID: string, DisplayID: unknown) => {
   const NormalizedID = Target.FindCriticalDisplay(RequestedID).Critical?.DisplayID ?? RequestedID;
 
   const [WriteErr] = await CriticalRepo.RemoveDisplay(UUID, NormalizedID);
-  if (WriteErr) return Fail('Failed to remove critical display');
+  if (WriteErr) return Fail('Failed to remove monitored display');
 
   CriticalDisplays.removeForClient(UUID, NormalizedID);
 
@@ -913,7 +969,7 @@ Manager.IsDisplayCritical = async (UUID: string, DisplayID: unknown) => {
   if (Cached) return Ok(Cached.has(Normalized));
 
   const [Err, Row] = await CriticalRepo.IsDisplayCritical(UUID, Normalized);
-  if (Err) return Fail('Failed to determine critical display status');
+  if (Err) return Fail('Failed to determine monitored display status');
   return Ok(!!Row);
 };
 
@@ -923,6 +979,22 @@ Manager.SetAudioDevices = async (UUID: string, Snapshot: unknown) => {
   if (!Target) return Fail('Client Not Found');
   Target.SetAudioDevices(Snapshot);
   return Ok('Audio devices updated successfully');
+};
+
+Manager.SetPowerStatus = async (UUID: string, Snapshot: unknown) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+  Target.SetPowerStatus(Snapshot);
+  return Ok('Power status updated successfully');
+};
+
+Manager.SetTemperatures = async (UUID: string, Snapshot: unknown) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+  Target.SetTemperatures(Snapshot);
+  return Ok('Temperatures updated successfully');
 };
 
 Manager.MarkAudioDeviceCritical = async (
@@ -960,7 +1032,7 @@ Manager.MarkAudioDeviceCritical = async (
     MaxVolume: Entry.MaxVolume,
     Timestamp: Entry.Timestamp ?? Date.now(),
   });
-  if (WriteErr) return Fail('Failed to save critical audio device');
+  if (WriteErr) return Fail('Failed to save monitored audio device');
 
   CriticalAudio.setForClient(UUID, EndpointID, Entry);
   Target.MarkCriticalAudioDevice(Entry);
@@ -976,7 +1048,7 @@ Manager.RemoveAudioDeviceCritical = async (UUID: string, EndpointID: unknown) =>
   if (!Normalized) return Fail('Audio device identifier is required');
 
   const [WriteErr] = await CriticalRepo.RemoveAudio(UUID, Normalized);
-  if (WriteErr) return Fail('Failed to remove critical audio device');
+  if (WriteErr) return Fail('Failed to remove monitored audio device');
 
   CriticalAudio.removeForClient(UUID, Normalized);
   Target.UnmarkCriticalAudioDevice(Normalized);
@@ -1021,7 +1093,7 @@ Manager.MarkNetworkInterfaceCritical = async (
     Gateway: Entry.Gateway,
     Timestamp: Entry.Timestamp ?? Date.now(),
   });
-  if (WriteErr) return Fail('Failed to save critical network interface');
+  if (WriteErr) return Fail('Failed to save monitored network interface');
 
   CriticalNetwork.setForClient(UUID, Name, Entry);
   Target.MarkCriticalNetworkInterface(Entry);
@@ -1037,10 +1109,49 @@ Manager.RemoveNetworkInterfaceCritical = async (UUID: string, Name: unknown) => 
   if (!Normalized) return Fail('Network interface name is required');
 
   const [WriteErr] = await CriticalRepo.RemoveNetwork(UUID, Normalized);
-  if (WriteErr) return Fail('Failed to remove critical network interface');
+  if (WriteErr) return Fail('Failed to remove monitored network interface');
 
   CriticalNetwork.removeForClient(UUID, Normalized);
   Target.UnmarkCriticalNetworkInterface(Normalized);
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(true);
+};
+
+Manager.MarkSystemCheck = async (UUID: string, Check: ClientSystemCheckPayloadResult) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+  const Key = Check.Key;
+  const Existing = CriticalSystemChecks.getForClient(UUID, false)?.get(Key) || null;
+  const Next = resolveSystemCheck(
+    Key,
+    Check as unknown as Record<string, unknown>,
+    Existing ? Existing.Check : null,
+    Target.PowerStatus,
+    Target.Temperatures
+  );
+  const Timestamp = Date.now();
+  const [WriteErr] = await CriticalRepo.MarkSystemCheck(
+    SystemCheckToRow(UUID, Key, Next, Timestamp)
+  );
+  if (WriteErr) return Fail('Failed to save monitored system check');
+
+  CriticalSystemChecks.setForClient(UUID, Key, { Key, Check: Next });
+  Target.MarkSystemCheck(Key, Next);
+  BroadcastManager.emit('ClientUpdated', Target);
+  return Ok(!Existing);
+};
+
+Manager.RemoveSystemCheck = async (UUID: string, Key: ClientSystemCheckKey) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+
+  const [WriteErr] = await CriticalRepo.RemoveSystemCheck(UUID, Key);
+  if (WriteErr) return Fail('Failed to stop monitoring system check');
+
+  CriticalSystemChecks.removeForClient(UUID, Key);
+  Target.UnmarkSystemCheck(Key);
   BroadcastManager.emit('ClientUpdated', Target);
   return Ok(true);
 };
@@ -1410,6 +1521,7 @@ Manager.Delete = async (UUID: string) => {
   CriticalDisplays.clearForClient(UUID);
   CriticalAudio.clearForClient(UUID);
   CriticalNetwork.clearForClient(UUID);
+  CriticalSystemChecks.clearForClient(UUID);
   MacAddresses.clearForClient(UUID);
   Logger.success(`Client ${UUID} deleted successfully`);
   return Ok(true);
@@ -1454,6 +1566,7 @@ Manager.ReplaceClient = async (CurrentUUID: unknown, ReplacementUUID: unknown) =
   CriticalDisplays.rekeyClient(OldUUID, NewUUID);
   CriticalAudio.rekeyClient(OldUUID, NewUUID);
   CriticalNetwork.rekeyClient(OldUUID, NewUUID);
+  CriticalSystemChecks.rekeyClient(OldUUID, NewUUID);
   // MAC addresses cannot be re-keyed in memory the way the critical indexes are:
   // ReplaceClientUUID drops the old slot's *reported* addresses (they describe
   // the machine being replaced) while carrying its manual ones across, so the
@@ -1537,6 +1650,7 @@ Manager.Init = async () => {
   await CriticalDisplays.load();
   await CriticalAudio.load();
   await CriticalNetwork.load();
+  await CriticalSystemChecks.load();
   await MacAddresses.load();
   const [Err, Clients] = await ClientsRepo.GetAll();
   if (Err || !Clients) {
@@ -1662,6 +1776,7 @@ Manager.ClearCache = async () => {
   CriticalDisplays.clear();
   CriticalAudio.clear();
   CriticalNetwork.clear();
+  CriticalSystemChecks.clear();
   MacAddresses.clear();
   Manager.Initialized = false;
   return;

@@ -17,6 +17,7 @@ import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as SettingsManager } from '../SettingsManager';
 import { Manager as ClientManager } from '../ClientManager';
 import { Ok, Fail } from '../Utils';
+import { HISTORY_RETENTION_MS } from '../Config/constants';
 import type { Result } from '../../types/result';
 import type { FogTaskRow } from '../DB/rows';
 import type { FogStatusView, FogHostView, FogTaskTypeView, FogTaskView } from '@showtrak/protocol';
@@ -54,7 +55,7 @@ const STATE_CANCELLED = 5;
 const UNSEEN_TASK_GRACE_MS = 90000;
 
 // Finished tasks are kept this long so the panel can show recent history.
-const FINISHED_TASK_RETENTION_MS = 24 * 60 * 60 * 1000;
+const FINISHED_TASK_RETENTION_MS = HISTORY_RETENTION_MS;
 
 // ---- Runtime state ---------------------------------------------------------
 

@@ -1,6 +1,6 @@
 // Repository for the critical-entity tables (CriticalUSBDevices,
 // CriticalApplications, CriticalDisplays, CriticalAudioDevices,
-// CriticalNetworkInterfaces). Receives the DB manager instead of
+// CriticalNetworkInterfaces, CriticalSystemChecks). Receives the DB manager instead of
 // importing it so test DB mocks injected into ClientManager propagate through
 // unchanged. SQL strings are byte-identical to the historical inline
 // statements — tests match on them.
@@ -15,6 +15,7 @@ import type {
   CriticalDisplayRow,
   CriticalUSBDeviceRow,
   CriticalUSBDeviceNameRow,
+  SystemCheckRow,
 } from '../rows';
 
 export function CreateCriticalEntitiesRepository(DB: DBManager) {
@@ -99,18 +100,29 @@ export function CreateCriticalEntitiesRepository(DB: DBManager) {
     // --- Applications -------------------------------------------------------
     LoadAllApplications(): Promise<DBResult<CriticalApplicationRow[]>> {
       return DB.All<CriticalApplicationRow>(
-        'SELECT UUID, ApplicationKey, ApplicationName, Timestamp FROM CriticalApplications'
+        'SELECT UUID, ApplicationKey, ApplicationName, Timestamp, RequireForeground, RequireResponding FROM CriticalApplications'
       );
     },
     MarkApplication(
       UUID: string,
       ApplicationKey: string,
       ApplicationName: string,
-      Timestamp: number
+      Timestamp: number,
+      Conditions: {
+        RequireForeground?: boolean;
+        RequireResponding?: boolean;
+      } = {}
     ): Promise<DBResult<unknown>> {
       return DB.Run(
-        'INSERT OR REPLACE INTO CriticalApplications (UUID, ApplicationKey, ApplicationName, Timestamp) VALUES (?, ?, ?, ?)',
-        [UUID, ApplicationKey, ApplicationName, Timestamp]
+        'INSERT OR REPLACE INTO CriticalApplications (UUID, ApplicationKey, ApplicationName, Timestamp, RequireForeground, RequireResponding) VALUES (?, ?, ?, ?, ?, ?)',
+        [
+          UUID,
+          ApplicationKey,
+          ApplicationName,
+          Timestamp,
+          Conditions.RequireForeground ? 1 : 0,
+          Conditions.RequireResponding === false ? 0 : 1,
+        ]
       );
     },
     RemoveApplication(UUID: string, ApplicationKey: string): Promise<DBResult<unknown>> {
@@ -240,6 +252,40 @@ export function CreateCriticalEntitiesRepository(DB: DBManager) {
     },
     DeleteAllNetworkForClient(UUID: string): Promise<DBResult<unknown>> {
       return DB.Run('DELETE FROM CriticalNetworkInterfaces WHERE UUID = ?', [UUID]);
+    },
+
+    // --- System checks ------------------------------------------------------
+    LoadAllSystemChecks(): Promise<DBResult<SystemCheckRow[]>> {
+      return DB.All<SystemCheckRow>(
+        'SELECT UUID, CheckKey, MaxPercent, SustainSeconds, MaxDays, RequireMains, MinBatteryPercent, ChargingBelowPercent, MaxCelsius, MaxThermalState, Timestamp FROM CriticalSystemChecks'
+      );
+    },
+    MarkSystemCheck(Row: SystemCheckRow): Promise<DBResult<unknown>> {
+      return DB.Run(
+        'INSERT OR REPLACE INTO CriticalSystemChecks (UUID, CheckKey, MaxPercent, SustainSeconds, MaxDays, RequireMains, MinBatteryPercent, ChargingBelowPercent, MaxCelsius, MaxThermalState, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          Row.UUID,
+          Row.CheckKey,
+          Row.MaxPercent,
+          Row.SustainSeconds,
+          Row.MaxDays,
+          Row.RequireMains,
+          Row.MinBatteryPercent,
+          Row.ChargingBelowPercent,
+          Row.MaxCelsius,
+          Row.MaxThermalState,
+          Row.Timestamp,
+        ]
+      );
+    },
+    RemoveSystemCheck(UUID: string, CheckKey: string): Promise<DBResult<unknown>> {
+      return DB.Run('DELETE FROM CriticalSystemChecks WHERE UUID = ? AND CheckKey = ?', [
+        UUID,
+        CheckKey,
+      ]);
+    },
+    DeleteAllSystemChecksForClient(UUID: string): Promise<DBResult<unknown>> {
+      return DB.Run('DELETE FROM CriticalSystemChecks WHERE UUID = ?', [UUID]);
     },
   };
 }

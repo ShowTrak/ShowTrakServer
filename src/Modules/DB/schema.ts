@@ -252,6 +252,8 @@ Schema.push({
             ApplicationKey TEXT NOT NULL, \
             ApplicationName TEXT NOT NULL, \
             Timestamp BIGINT(11) NOT NULL, \
+            RequireForeground INTEGER NOT NULL DEFAULT 0, \
+            RequireResponding INTEGER NOT NULL DEFAULT 1, \
             PRIMARY KEY (UUID, ApplicationKey) \
     )',
 });
@@ -323,6 +325,29 @@ Schema.push({
             Gateway TEXT, \
             Timestamp BIGINT(11) NOT NULL, \
             PRIMARY KEY (UUID, Name) \
+    )',
+});
+
+// Monitored system checks: one row per (client, check) the operator monitors —
+// CPU, memory, uptime, power or thermal — holding the conditions it must keep.
+// Only the columns of the row's own check are used; a NULL condition is not
+// guarded. Created here rather than by a migration, for the same reason as
+// CriticalAudioDevices.
+Schema.push({
+  Name: 'CriticalSystemChecks',
+  SQL: 'CREATE TABLE IF NOT EXISTS `CriticalSystemChecks` ( \
+            UUID TEXT NOT NULL, \
+            CheckKey TEXT NOT NULL, \
+            MaxPercent INTEGER, \
+            SustainSeconds INTEGER, \
+            MaxDays INTEGER, \
+            RequireMains INTEGER NOT NULL DEFAULT 0, \
+            MinBatteryPercent INTEGER, \
+            ChargingBelowPercent INTEGER, \
+            MaxCelsius INTEGER, \
+            MaxThermalState TEXT, \
+            Timestamp BIGINT(11) NOT NULL, \
+            PRIMARY KEY (UUID, CheckKey) \
     )',
 });
 
@@ -740,6 +765,28 @@ Schema.Migrations = [
   // means "inherit" the CLIENT_OFFLINE_GRACE_SECONDS setting (default 0), so
   // every existing client keeps going offline the moment its socket closes.
   { Version: 51, SQL: 'ALTER TABLE `Clients` ADD COLUMN OfflineGraceSeconds INTEGER' },
+  // Versions 52-54 added per-client resource-threshold columns to Clients. They
+  // were withdrawn before release in favour of CriticalSystemChecks; a
+  // development database that applied them keeps three unused columns.
+  // A critical application may also be required to hold the focused window.
+  // Existing rows only ever required the application to be running.
+  {
+    Version: 55,
+    SQL: 'ALTER TABLE `CriticalApplications` ADD COLUMN RequireForeground INTEGER NOT NULL DEFAULT 0',
+  },
+  // Version 56 added CriticalApplications.RequireRunning, withdrawn before
+  // release: a monitored application is always required to run. A development
+  // database that applied it keeps an unused column.
+  // A monitored application's responding condition became tickable like the
+  // foreground one. On by default: every existing row was already judged when
+  // it stopped responding.
+  {
+    Version: 57,
+    SQL: 'ALTER TABLE `CriticalApplications` ADD COLUMN RequireResponding INTEGER NOT NULL DEFAULT 1',
+  },
+  // The uptime limit is set in days. Before release it was hours (MaxHours); a
+  // development database that created the table then keeps that column unused.
+  { Version: 58, SQL: 'ALTER TABLE `CriticalSystemChecks` ADD COLUMN MaxDays INTEGER' },
 ];
 
 export = Schema;

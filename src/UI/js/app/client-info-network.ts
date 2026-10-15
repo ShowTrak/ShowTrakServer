@@ -268,7 +268,9 @@ export function BindClientInfoNetworkHandlers(
           : await window.API.MarkClientNetworkInterfaceCritical(UUID, { Name, Family });
         if (Err) return void Notify(String(Err), 'error');
         await Notify(
-          IsCritical ? 'Critical network status removed' : 'Network interface marked as critical',
+          IsCritical
+            ? 'Network interface no longer monitored'
+            : 'Network interface is now monitored',
           'success',
           1400
         );

@@ -169,6 +169,10 @@ const restore = installModuleMocks([
       syncDummyHistoryStore: (v) => history.push(['sync-dummy', v]),
       recordClientHistorySample: (v) => history.push(['client', v]),
       syncClientHistoryStore: (v) => history.push(['sync-client', v]),
+      // System-check timelines are recorded beside the client's own; not
+      // asserted here (see system-checks.test.js).
+      recordClientSystemCheckHistorySamples: () => {},
+      syncClientSystemCheckHistoryStore: () => {},
     },
   },
   {

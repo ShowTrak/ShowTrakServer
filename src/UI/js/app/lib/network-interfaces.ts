@@ -271,9 +271,9 @@ export function NetworkInterfaceBadge(Iface: NetworkInterfaceView): {
   if (!Iface.IsCritical) {
     return {
       State: 'plain',
-      Label: 'Critical',
+      Label: 'Monitor',
       Icon: 'bi-check-circle',
-      Title: 'Mark as critical',
+      Title: 'Monitor this interface',
     };
   }
   if (Iface.Missing) {
@@ -281,7 +281,7 @@ export function NetworkInterfaceBadge(Iface: NetworkInterfaceView): {
       State: 'missing',
       Label: 'Missing',
       Icon: 'bi-x-circle-fill',
-      Title: 'Remove critical status (interface not connected)',
+      Title: 'Stop monitoring (interface not connected)',
     };
   }
   if (!Iface.IsConnected) {
@@ -289,11 +289,11 @@ export function NetworkInterfaceBadge(Iface: NetworkInterfaceView): {
     const Absent = Iface.Critical && !Iface.Critical.RequirePresent;
     return {
       State: Absent ? 'absent' : 'unreported',
-      Label: 'Critical',
+      Label: 'Monitored',
       Icon: 'bi-question-circle',
       Title: Absent
-        ? 'Remove critical status (not connected, which is allowed)'
-        : 'Remove critical status (not reported yet)',
+        ? 'Stop monitoring (not connected, which is allowed)'
+        : 'Stop monitoring (not reported yet)',
     };
   }
   if (Iface.Issues.length) {
@@ -301,14 +301,14 @@ export function NetworkInterfaceBadge(Iface: NetworkInterfaceView): {
       State: 'issue',
       Label: 'Changed',
       Icon: 'bi-exclamation-triangle-fill',
-      Title: 'Remove critical status (conditions not met)',
+      Title: 'Stop monitoring (conditions not met)',
     };
   }
   return {
     State: 'healthy',
-    Label: 'Critical',
+    Label: 'Monitored',
     Icon: 'bi-check-circle-fill',
-    Title: 'Remove critical status',
+    Title: 'Stop monitoring',
   };
 }
 

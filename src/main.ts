@@ -316,11 +316,15 @@ import {
   UpdateAdoptionList,
 } from './main/broadcast-bridge';
 import { RegisterAllHandlers } from './main/registrars';
+import { StartHistoryRetentionSweep } from './main/history-retention';
 RegisterBroadcastBridge();
 // Faults that were already true at start-up are held rather than announced as
 // fresh outages; this slow sweep is what raises the ones that turn out to be
 // real once the rig has had time to finish coming up.
 StartAlertBaselineSweep();
+// Everything ShowTrak remembers ages out after 12 hours; this reaches the stores
+// nothing writes to any more (see ./main/history-retention).
+StartHistoryRetentionSweep();
 
 // --- Autosave ----------------------------------------------------------------
 // The autosave timer lives in ./main/autosave; reschedule it on settings change

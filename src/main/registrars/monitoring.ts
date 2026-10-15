@@ -12,7 +12,9 @@ import {
   getClientDisplayHistorySamples,
   getClientAudioHistorySamples,
   getClientNetworkHistorySamples,
+  getClientSystemCheckHistorySamples,
 } from '../monitoring-history';
+import { getClientVitalsHistory } from '../client-vitals-history';
 import { Manager as MonitoringMethods } from '../../Modules/MonitoringMethods';
 import { Manager as MonitoringTargetManager } from '../../Modules/MonitoringTargetManager';
 import { Manager as MonitoringActionFavourites } from '../../Modules/MonitoringActionFavourites';
@@ -183,6 +185,24 @@ function register(): void {
       return [];
     }
     return getClientNetworkHistorySamples(UUID);
+  });
+
+  RPC.handle('GetClientSystemCheckHistory', async (_Event: unknown, UUID: unknown) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch {
+      return [];
+    }
+    return getClientSystemCheckHistorySamples(UUID);
+  });
+
+  RPC.handle('GetClientVitalsHistory', async (_Event: unknown, UUID: unknown) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch {
+      return { Cpu: [], Ram: [] };
+    }
+    return getClientVitalsHistory(UUID);
   });
 
   RPC.handle(

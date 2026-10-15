@@ -215,7 +215,7 @@ export function BindClientInfoUSBHandlers(
               });
         if (Err) return void Notify(String(Err), 'error');
         await Notify(
-          IsCritical ? 'Critical USB status removed' : 'USB device marked as critical',
+          IsCritical ? 'USB device no longer monitored' : 'USB device is now monitored',
           'success',
           1400
         );

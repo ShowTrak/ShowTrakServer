@@ -14,8 +14,10 @@ import type {
   CriticalDisplayPayloadResult,
   CriticalAudioDevicePayloadResult,
   CriticalNetworkInterfacePayloadResult,
+  ClientSystemCheckPayloadResult,
   AudioLevelRequestResult,
 } from '../../Modules/IPCValidation';
+import type { ClientSystemCheckKey } from '@showtrak/protocol';
 import { Manager as ClientManager } from '../../Modules/ClientManager';
 import { Manager as AdoptionManager } from '../../Modules/AdoptionManager';
 import { Manager as ServerManager } from '../../Modules/Server';
@@ -192,6 +194,29 @@ function register(): void {
         IPCValidation.NetworkInterfaceName(Name),
       ],
       (UUID: string, Name: string) => ClientManager.RemoveNetworkInterfaceCritical(UUID, Name)
+    )
+  );
+
+  RPC.handle(
+    'MarkClientSystemCheck',
+    createTupleHandler<[string, ClientSystemCheckPayloadResult], unknown>(
+      (UUID: unknown, Check: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.ClientSystemCheckPayload(Check),
+      ],
+      (UUID: string, Check: ClientSystemCheckPayloadResult) =>
+        ClientManager.MarkSystemCheck(UUID, Check)
+    )
+  );
+
+  RPC.handle(
+    'RemoveClientSystemCheck',
+    createTupleHandler<[string, ClientSystemCheckKey], unknown>(
+      (UUID: unknown, Key: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.SystemCheckKey(Key),
+      ],
+      (UUID: string, Key: ClientSystemCheckKey) => ClientManager.RemoveSystemCheck(UUID, Key)
     )
   );
 

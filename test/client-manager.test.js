@@ -207,6 +207,9 @@ test('ClientManager stores running applications as runtime-only state', async ()
         IsRunning: true,
         IsCritical: false,
         Missing: false,
+        IsForeground: false,
+        RequireForeground: false,
+        RequireResponding: false,
       },
       {
         Name: 'Spotify',
@@ -215,8 +218,13 @@ test('ClientManager stores running applications as runtime-only state', async ()
         IsRunning: true,
         IsCritical: false,
         Missing: false,
+        IsForeground: false,
+        RequireForeground: false,
+        RequireResponding: false,
       },
     ],
+    // A client that predates hung/foreground detection declares neither.
+    Capabilities: null,
   });
   assert.deepEqual(trackedRuns, []);
   assert.deepEqual(untrackedRuns, []);
@@ -296,7 +304,7 @@ test('ClientManager tracks critical applications and emits started/stopped trans
   clientAfterFirstSnapshot.OnlineSince = 0;
   clientAfterFirstSnapshot._refreshClientHealthState();
   assert.equal(clientAfterFirstSnapshot.Degraded, true);
-  assert.deepEqual(clientAfterFirstSnapshot.DegradedWarnings, ['Critical Application Issue']);
+  assert.deepEqual(clientAfterFirstSnapshot.DegradedWarnings, ['Monitored Application Issue']);
   assert.ok(
     clientAfterFirstSnapshot.RunningApplications.Items.some(
       (Entry) => Entry.Name === 'Spotify' && Entry.IsRunning === false && Entry.IsCritical === true

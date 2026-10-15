@@ -3,7 +3,19 @@
 // so the renderer can draw recent uptime graphs. Samples older than MAX_AGE
 // are pruned. The backing Maps are encapsulated here; callers interact only
 // through exported helpers.
-const MONITORING_HISTORY_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+import { HISTORY_RETENTION_MS } from '../Modules/Config/constants';
+
+const MONITORING_HISTORY_MAX_AGE_MS = HISTORY_RETENTION_MS;
+// Readings closer together than this collapse into one: a burst of updates for
+// the same event is a single observation.
+const DUPLICATE_UPDATE_WINDOW_MS = 900;
+// While nothing changes, keep at most one reading per this interval. A ShowTrak
+// client heartbeats every second and every heartbeat re-records its status, so
+// without this a healthy client stored ~43,000 identical readings over the 12h
+// window. The timeline draws one-minute blocks and leaves a block with no
+// reading grey, so a steady run still needs a reading in every block — this
+// keeps four, while any change of state is still recorded the moment it lands.
+const STEADY_STATE_SAMPLE_INTERVAL_MS = 15 * 1000;
 const ENTITY_MONITOR_TARGET = 'monitor-target';
 const ENTITY_DUMMY_CLIENT = 'dummy-client';
 const ENTITY_CLIENT = 'client';
@@ -63,6 +75,8 @@ interface NamedHistoryEntry {
 interface RunningApplicationsLike {
   Status?: unknown;
   Items?: unknown;
+  Foreground?: unknown;
+  Capabilities?: unknown;
 }
 interface ClientHardwareTelemetryLike {
   UUID?: unknown;
@@ -73,6 +87,11 @@ interface ClientHardwareTelemetryLike {
   DisplayList?: unknown;
   AudioDevices?: { Endpoints?: unknown } | null;
   NetworkStatus?: { Interfaces?: unknown } | null;
+  SystemChecks?: unknown;
+  ResourceAlarms?: unknown;
+  PowerStatus?: unknown;
+  Temperatures?: unknown;
+  UptimeSeconds?: unknown;
 }
 
 // Resolved critical-entity state produced by the per-domain extractors below and
@@ -124,8 +143,53 @@ function normalizeLatency(latencyMs: unknown): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
+// Whether `next` repeats what the series already says, so recording it would
+// add nothing. Extends the newest reading in place when it does: a quick
+// repeat is the same observation, and a steady run keeps its first reading
+// fixed and drags its latest forward until the run is due another point.
+function absorbRepeatSample(samples: HistorySample[], next: HistorySample): boolean {
+  const last = samples.length ? samples[samples.length - 1]! : null;
+  if (
+    !last ||
+    last.online !== next.online ||
+    last.degraded !== next.degraded ||
+    !(
+      (last.latencyMs == null && next.latencyMs == null) ||
+      Math.round(last.latencyMs || 0) === Math.round(next.latencyMs || 0)
+    )
+  ) {
+    return false;
+  }
+  if (next.ts - last.ts < DUPLICATE_UPDATE_WINDOW_MS) {
+    last.ts = next.ts;
+    return true;
+  }
+  const previous = samples.length > 1 ? samples[samples.length - 2]! : null;
+  if (
+    previous &&
+    previous.online === last.online &&
+    previous.degraded === last.degraded &&
+    next.ts - previous.ts < STEADY_STATE_SAMPLE_INTERVAL_MS
+  ) {
+    last.ts = next.ts;
+    return true;
+  }
+  return false;
+}
+
+// Every named per-entity store (critical applications, USB, displays, audio,
+// network), so the retention sweep can reach them too. Registered by the
+// factory below.
+const NamedHistoryStores: NamedHistoryStore[] = [];
+
+// Drop everything older than the 12h window from EVERY store — not only the
+// series that happen to be recorded into. A client that goes offline stops
+// recording, and its last readings would otherwise outlive the window for as
+// long as the server runs. Called on read, on list sync, and by the periodic
+// retention sweep (see ./history-retention).
 function pruneMonitoringHistoryStore(now: number = Date.now()): void {
   const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
+  for (const named of NamedHistoryStores) named.prune(now);
   for (const store of Object.values(MonitoringHistoryStores)) {
     for (const [key, samples] of store.entries()) {
       const next = Array.isArray(samples)
@@ -159,20 +223,7 @@ function recordEntityHistorySample(
   };
 
   const samples = store.get(key) || [];
-  const last = samples.length ? samples[samples.length - 1] : null;
-  const duplicateQuickUpdate =
-    last &&
-    now - last.ts < 900 &&
-    last.online === normalized.online &&
-    last.degraded === normalized.degraded &&
-    ((last.latencyMs == null && normalized.latencyMs == null) ||
-      Math.round(last.latencyMs || 0) === Math.round(normalized.latencyMs || 0));
-
-  if (duplicateQuickUpdate) {
-    last!.ts = now;
-  } else {
-    samples.push(normalized);
-  }
+  if (!absorbRepeatSample(samples, normalized)) samples.push(normalized);
 
   const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
   while (samples.length && samples[0]!.ts < cutoff) samples.shift();
@@ -327,6 +378,7 @@ interface NamedHistoryStore {
   record(client: ClientHardwareTelemetryLike | null | undefined, sampledAt?: number | null): void;
   sync(list: unknown): void;
   get(uuid: unknown): Array<Record<string, string | HistorySample[]>>;
+  prune(now?: number): void;
 }
 
 function createNamedHistoryStore(
@@ -364,21 +416,16 @@ function createNamedHistoryStore(
         degraded: !!state.degraded,
         latencyMs: null,
       };
-      const last = previousSamples.length ? previousSamples[previousSamples.length - 1] : null;
-      // Collapse a rapid repeat of the same reading into the latest timestamp.
-      // The degraded comparison is a no-op for domains that never set it (USB /
+      // Collapse a repeat of the same reading (see absorbRepeatSample). The
+      // degraded comparison is a no-op for domains that never set it (USB /
       // applications), and correctly separates matched/mismatched display bars.
-      let nextSamples: HistorySample[];
-      if (
-        last &&
-        now - last.ts < 900 &&
-        last.online === sample.online &&
-        last.degraded === sample.degraded
-      ) {
-        nextSamples = previousSamples.slice(0, -1).concat({ ...last, ts: now });
-      } else {
-        nextSamples = previousSamples.concat(sample);
+      // The newest point is copied before it can be extended: a series handed
+      // out by get() shares its point objects, and must not move under a reader.
+      const nextSamples = previousSamples.slice();
+      if (nextSamples.length) {
+        nextSamples[nextSamples.length - 1] = { ...nextSamples[nextSamples.length - 1]! };
       }
+      if (!absorbRepeatSample(nextSamples, sample)) nextSamples.push(sample);
       while (nextSamples.length && nextSamples[0]!.ts < cutoff) nextSamples.shift();
       perEntity.set(state.key, {
         Name: state.name || (existing && existing.Name) || state.key,
@@ -425,7 +472,23 @@ function createNamedHistoryStore(
     return out;
   }
 
-  return { record, sync, get };
+  function prune(now: number = Date.now()): void {
+    const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
+    for (const [uuid, perEntity] of Array.from(store.entries())) {
+      for (const [entityKey, entry] of Array.from(perEntity.entries())) {
+        const kept = (Array.isArray(entry.Points) ? entry.Points : []).filter(
+          (s: HistorySample) => s && Number(s.ts) >= cutoff
+        );
+        if (kept.length) perEntity.set(entityKey, { Name: entry.Name, Points: kept });
+        else perEntity.delete(entityKey);
+      }
+      if (!perEntity.size) store.delete(uuid);
+    }
+  }
+
+  const named = { record, sync, get, prune };
+  NamedHistoryStores.push(named);
+  return named;
 }
 
 // Resolve the current running/not-running state for every critical application
@@ -448,13 +511,32 @@ function extractCriticalApplicationStates(
   const state = String(status.State || 'unknown').toLowerCase();
   if (state !== 'ok') return null;
   const items = Array.isArray(running.Items) ? running.Items : [];
+  const capabilities = (
+    running.Capabilities && typeof running.Capabilities === 'object' ? running.Capabilities : {}
+  ) as { Foreground?: unknown };
+  // Only a named owner is evidence that the application lost focus (see
+  // Client._isOutOfForeground).
+  const focusKnown =
+    capabilities.Foreground === true &&
+    typeof running.Foreground === 'string' &&
+    !!running.Foreground;
   const states: NamedEntityState[] = [];
   for (const item of items) {
     if (!item || !item.IsCritical) continue;
     const name = typeof item.Name === 'string' && item.Name.trim() ? item.Name.trim() : null;
     const key = typeof item.Key === 'string' && item.Key.trim() ? item.Key.trim() : name;
     if (!key) continue;
-    states.push({ key, name: name || key, online: item.IsRunning !== false, degraded: false });
+    const isRunning = item.IsRunning !== false;
+    // Running but breaking a condition — hung, or not holding the foreground it
+    // must — is "online but degraded" (orange), as for a USB device.
+    const hung = item.RequireResponding !== false && item.Responding === false;
+    const unfocused = item.RequireForeground === true && focusKnown && !item.IsForeground;
+    states.push({
+      key,
+      name: name || key,
+      online: isRunning,
+      degraded: isRunning && (hung || unfocused),
+    });
   }
   return states;
 }
@@ -751,7 +833,91 @@ function getClientNetworkHistorySamples(
   }>;
 }
 
+// Resolve each monitored system check (CPU, memory, uptime, power, thermal) to
+// healthy or failing. A check with nothing to judge — the client offline, or a
+// power/thermal collector that has not reported or cannot — leaves a gap, so a
+// machine without the hardware never paints a verdict.
+const SYSTEM_CHECKS: Array<{ key: string; field: string; name: string }> = [
+  { key: 'cpu', field: 'Cpu', name: 'CPU' },
+  { key: 'ram', field: 'Ram', name: 'Memory' },
+  { key: 'uptime', field: 'Uptime', name: 'Uptime' },
+  { key: 'power', field: 'Power', name: 'Power' },
+  { key: 'thermal', field: 'Thermal', name: 'Thermal' },
+];
+const ALARM_CHECK: Record<string, string> = {
+  cpu: 'cpu',
+  ram: 'ram',
+  uptime: 'uptime',
+  power: 'power',
+  battery: 'power',
+  charging: 'power',
+  temperature: 'thermal',
+  thermal: 'thermal',
+};
+
+function collectorReporting(snapshot: unknown): boolean {
+  const status =
+    snapshot && typeof snapshot === 'object'
+      ? (snapshot as { Status?: { State?: unknown } }).Status
+      : null;
+  return !!status && status.State === 'ok';
+}
+
+function extractSystemCheckStates(
+  client: ClientHardwareTelemetryLike | null | undefined
+): NamedEntityState[] | null {
+  if (!client || !client.Online) return null;
+  const checks = (
+    client.SystemChecks && typeof client.SystemChecks === 'object' ? client.SystemChecks : {}
+  ) as Record<string, unknown>;
+  const failing = new Set<string>();
+  for (const alarm of Array.isArray(client.ResourceAlarms) ? client.ResourceAlarms : []) {
+    const check = alarm && ALARM_CHECK[String((alarm as { Key?: unknown }).Key)];
+    if (check) failing.add(check);
+  }
+  const states: NamedEntityState[] = [];
+  for (const check of SYSTEM_CHECKS) {
+    if (!checks[check.field]) continue;
+    if (check.key === 'power' && !collectorReporting(client.PowerStatus)) continue;
+    if (check.key === 'thermal' && !collectorReporting(client.Temperatures)) continue;
+    if (check.key === 'uptime' && typeof client.UptimeSeconds !== 'number') continue;
+    states.push({
+      key: check.key,
+      name: check.name,
+      online: true,
+      degraded: failing.has(check.key),
+    });
+  }
+  return states;
+}
+
+const ClientSystemCheckHistory = createNamedHistoryStore(extractSystemCheckStates, 'CheckKey');
+
+function recordClientSystemCheckHistorySamples(
+  client: ClientHardwareTelemetryLike | null | undefined,
+  sampledAt: number | null = null
+): void {
+  ClientSystemCheckHistory.record(client, sampledAt);
+}
+
+function syncClientSystemCheckHistoryStore(list: unknown): void {
+  ClientSystemCheckHistory.sync(list);
+}
+
+function getClientSystemCheckHistorySamples(
+  uuid: unknown
+): Array<{ CheckKey: string; Name: string; samples: HistorySample[] }> {
+  return ClientSystemCheckHistory.get(uuid) as Array<{
+    CheckKey: string;
+    Name: string;
+    samples: HistorySample[];
+  }>;
+}
+
 export {
+  recordClientSystemCheckHistorySamples,
+  syncClientSystemCheckHistoryStore,
+  getClientSystemCheckHistorySamples,
   MONITORING_HISTORY_MAX_AGE_MS,
   pruneMonitoringHistoryStore,
   recordEntityHistorySample,

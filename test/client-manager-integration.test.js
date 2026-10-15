@@ -533,7 +533,7 @@ test('a critical application missing during the start-up window reads as startin
   client._refreshClientHealthState();
   assert.equal(client.Initialising, false);
   assert.equal(client.Degraded, true);
-  assert.ok(client.DegradedWarnings.includes('Critical Application Issue'));
+  assert.ok(client.DegradedWarnings.includes('Monitored Application Issue'));
   assert.ok(events.includes('ClientUpdated'));
 });
 

@@ -100,3 +100,21 @@ export const DEFAULT_MONITORING_INTERVAL_MS = 30000;
 
 // How long DB shutdown waits for in-flight SQLite operations to drain.
 export const DB_PENDING_OPERATION_TIMEOUT_MS = 15000;
+
+// The longest anything is remembered for: status timelines, metric history,
+// alert history, finished script executions, finished FOG tasks. Twelve hours
+// covers a show day plus its get-in; nothing older is ever looked at, and
+// keeping it only costs memory and DB size on a server that runs for weeks.
+export const HISTORY_RETENTION_MS = 12 * 60 * 60 * 1000;
+
+// How often the retention sweep runs. Stores are also trimmed when they are
+// read or written; the sweep is what reaches the ones nothing touches any more
+// (a client that went offline stops recording, but its readings still age out).
+export const HISTORY_RETENTION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+
+// The first ShowTrak Client release that reports battery/mains, sleep and
+// resume, temperatures, hung applications and the foreground application.
+// Older clients read as "update the client" for these rather than as
+// unsupported hardware. MUST match the client version that ships the feature —
+// the renderer has its own copy (lib/system-health.ts).
+export const MINIMUM_SYSTEM_HEALTH_VERSION: readonly [number, number, number] = [3, 22, 0];

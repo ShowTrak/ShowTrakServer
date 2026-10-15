@@ -284,7 +284,7 @@ export function BindClientInfoAudioHandlers(
           : await window.API.MarkClientAudioDeviceCritical(UUID, { EndpointID });
         if (Err) return void Notify(String(Err), 'error');
         await Notify(
-          IsCritical ? 'Critical audio status removed' : 'Audio device marked as critical',
+          IsCritical ? 'Audio device no longer monitored' : 'Audio device is now monitored',
           'success',
           1400
         );

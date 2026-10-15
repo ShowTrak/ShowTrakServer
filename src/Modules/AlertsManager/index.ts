@@ -7,6 +7,11 @@ import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as TagManager } from '../TagManager';
 import { ScopeReferencesTags } from '../ScopeMatching';
 import { Ok, Fail } from '../Utils';
+import {
+  ALERT_BASELINE_SETTLE_MS,
+  HISTORY_RETENTION_MS,
+  HISTORY_RETENTION_SWEEP_INTERVAL_MS,
+} from '../Config/constants';
 import type { Result } from '../../types/result';
 import type { AlertTriggerType, TagView } from '@showtrak/protocol';
 import type { AlertRuleWriteRow } from '../DB/repositories/alert-rules';
@@ -102,6 +107,7 @@ interface AlertsManagerType {
   HandleNonCriticalApplicationStopped: ClientEventHandler;
   HandleAudioDeviceChange(Client: AlertEntityLike, Change: unknown): Promise<void>;
   HandleClientUpdated(Client: AlertEntityLike): Promise<void>;
+  HandleClientHealthEvent(Client: AlertEntityLike, Event: unknown): Promise<void>;
   HandleMonitoringTargetUpdated(Target: AlertTargetLike): Promise<void>;
   HandleFreeKioskTerminalUpdated(Terminal: AlertEntityLike): Promise<void>;
   HandleScriptExecutionUpdated(Executions: unknown): Promise<void>;
@@ -131,6 +137,10 @@ let RuleList: AlertRule[] = [];
 // immediately, so an outage seconds into a show is still caught.
 const EntityOnlineState = new Map<string, boolean>();
 const EntityDegradedState = new Map<string, boolean>();
+// Entities whose degraded alert was actually raised (on the transition, or by
+// the settle sweep). CLIENT_RECOVERED only follows one of these: "recovered"
+// from a fault nobody was told about is noise.
+const EntityDegradedAnnounced = new Set<string>();
 // Which metrics were breaching on a FreeKiosk terminal's previous poll, so an
 // alarm fires once when it starts rather than on every poll while it persists.
 const FreeKioskAlarmState = new Map<string, Set<string>>();
@@ -181,15 +191,18 @@ function clearBaselineFault(FaultKey: string) {
 }
 
 // AlertHistory retention. The table is append-only (a row per rule firing), so
-// without a cap it grows without bound over a long-running show. Keep the newest
-// ALERT_HISTORY_MAX_ROWS entries, pruned on a low-frequency unref'd timer (plus
-// once at Init to bound histories carried over from a previous session).
+// without a cap it grows without bound over a long-running show. Rows older than
+// HISTORY_RETENTION_MS (12h) are dropped, and the newest ALERT_HISTORY_MAX_ROWS
+// bound a burst inside that window. Pruned on a low-frequency unref'd timer
+// (plus once at Init to bound histories carried over from a previous session).
 const ALERT_HISTORY_MAX_ROWS = 10000;
-const ALERT_HISTORY_PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const ALERT_HISTORY_PRUNE_INTERVAL_MS = HISTORY_RETENTION_SWEEP_INTERVAL_MS;
 let historyPruneTimer: ReturnType<typeof setInterval> | null = null;
 
 async function pruneAlertHistory() {
   try {
+    const [AgeErr] = await HistoryRepo.PruneOlderThan(Date.now() - HISTORY_RETENTION_MS);
+    if (AgeErr) Logger.error('Failed to prune alert history', AgeErr);
     const [Err] = await HistoryRepo.PruneToMaxRows(ALERT_HISTORY_MAX_ROWS);
     if (Err) Logger.error('Failed to prune alert history', Err);
   } catch (error) {
@@ -330,47 +343,94 @@ Manager.GetTriggers = () => {
     { ID: TRIGGERS.USB_DEVICE_DISCONNECTED, Name: 'USB Device Disconnected' },
     {
       ID: TRIGGERS.NON_CRITICAL_USB_DEVICE_CONNECTED,
-      Name: 'Non Critical USB Device Connected',
+      Name: 'Unmonitored USB Device Connected',
     },
     {
       ID: TRIGGERS.NON_CRITICAL_USB_DEVICE_DISCONNECTED,
-      Name: 'Non Critical USB Device Disconnected',
+      Name: 'Unmonitored USB Device Disconnected',
     },
-    { ID: TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED, Name: 'Critical USB Device Connected' },
+    { ID: TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED, Name: 'Monitored USB Device Connected' },
     {
       ID: TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED,
-      Name: 'Critical USB Device Disconnected',
+      Name: 'Monitored USB Device Disconnected',
     },
     { ID: TRIGGERS.AUDIO_DEVICE_CONNECTED, Name: 'Audio Device Connected' },
     { ID: TRIGGERS.AUDIO_DEVICE_DISCONNECTED, Name: 'Audio Device Disconnected' },
     {
       ID: TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_CONNECTED,
-      Name: 'Non Critical Audio Device Connected',
+      Name: 'Unmonitored Audio Device Connected',
     },
     {
       ID: TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_DISCONNECTED,
-      Name: 'Non Critical Audio Device Disconnected',
+      Name: 'Unmonitored Audio Device Disconnected',
     },
-    { ID: TRIGGERS.CRITICAL_AUDIO_DEVICE_CONNECTED, Name: 'Critical Audio Device Connected' },
+    { ID: TRIGGERS.CRITICAL_AUDIO_DEVICE_CONNECTED, Name: 'Monitored Audio Device Connected' },
     {
       ID: TRIGGERS.CRITICAL_AUDIO_DEVICE_DISCONNECTED,
-      Name: 'Critical Audio Device Disconnected',
+      Name: 'Monitored Audio Device Disconnected',
     },
     { ID: TRIGGERS.AUDIO_DEFAULT_DEVICE_CHANGED, Name: 'Default Audio Device Changed' },
     { ID: TRIGGERS.AUDIO_DEVICE_MUTED, Name: 'Audio Device Muted' },
     { ID: TRIGGERS.AUDIO_FORMAT_CHANGED, Name: 'Audio Format Changed' },
     { ID: TRIGGERS.APPLICATION_STARTED, Name: 'Application Started' },
     { ID: TRIGGERS.APPLICATION_STOPPED, Name: 'Application Stopped' },
-    { ID: TRIGGERS.CRITICAL_APPLICATION_STARTED, Name: 'Critical Application Started' },
-    { ID: TRIGGERS.CRITICAL_APPLICATION_STOPPED, Name: 'Critical Application Stopped' },
+    { ID: TRIGGERS.CRITICAL_APPLICATION_STARTED, Name: 'Monitored Application Started' },
+    { ID: TRIGGERS.CRITICAL_APPLICATION_STOPPED, Name: 'Monitored Application Stopped' },
     {
       ID: TRIGGERS.NON_CRITICAL_APPLICATION_STARTED,
-      Name: 'Non Critical Application Started',
+      Name: 'Unmonitored Application Started',
     },
     {
       ID: TRIGGERS.NON_CRITICAL_APPLICATION_STOPPED,
-      Name: 'Non Critical Application Stopped',
+      Name: 'Unmonitored Application Stopped',
     },
+    { ID: TRIGGERS.CLIENT_RECOVERED, Name: 'Client Recovered' },
+    { ID: TRIGGERS.CLIENT_REBOOTED, Name: 'Client Restarted' },
+    { ID: TRIGGERS.CLIENT_VERSION_CHANGED, Name: 'Client Version Changed' },
+    { ID: TRIGGERS.CLIENT_SLEEPING, Name: 'Client Going To Sleep' },
+    { ID: TRIGGERS.CLIENT_RESUMED, Name: 'Client Woke From Sleep' },
+    { ID: TRIGGERS.CPU_USAGE_HIGH, Name: 'CPU Usage High' },
+    { ID: TRIGGERS.RAM_USAGE_HIGH, Name: 'Memory Usage High' },
+    { ID: TRIGGERS.UPTIME_HIGH, Name: 'Restart Overdue' },
+    { ID: TRIGGERS.TEMPERATURE_HIGH, Name: 'Temperature High' },
+    { ID: TRIGGERS.THERMAL_STATE_HIGH, Name: 'Thermal Throttling' },
+    { ID: TRIGGERS.BATTERY_LOW, Name: 'Battery Low' },
+    { ID: TRIGGERS.BATTERY_NOT_CHARGING, Name: 'Battery Not Charging' },
+    { ID: TRIGGERS.CRITICAL_POWER_ON_BATTERY, Name: 'Monitored Client On Battery' },
+    { ID: TRIGGERS.POWER_ON_BATTERY, Name: 'Running On Battery' },
+    { ID: TRIGGERS.POWER_RESTORED, Name: 'Mains Power Restored' },
+    { ID: TRIGGERS.APPLICATION_NOT_RESPONDING, Name: 'Application Not Responding' },
+    {
+      ID: TRIGGERS.CRITICAL_APPLICATION_NOT_RESPONDING,
+      Name: 'Monitored Application Not Responding',
+    },
+    { ID: TRIGGERS.APPLICATION_RESPONDING, Name: 'Application Responding Again' },
+    {
+      ID: TRIGGERS.CRITICAL_APPLICATION_MULTIPLE_INSTANCES,
+      Name: 'Monitored Application Running More Than Once',
+    },
+    { ID: TRIGGERS.FOREGROUND_APPLICATION_CHANGED, Name: 'Foreground Application Changed' },
+    {
+      ID: TRIGGERS.CRITICAL_APPLICATION_LOST_FOREGROUND,
+      Name: 'Monitored Application Lost Foreground',
+    },
+    { ID: TRIGGERS.DISPLAY_CONNECTED, Name: 'Display Connected' },
+    { ID: TRIGGERS.DISPLAY_DISCONNECTED, Name: 'Display Disconnected' },
+    { ID: TRIGGERS.CRITICAL_DISPLAY_CONNECTED, Name: 'Monitored Display Connected' },
+    { ID: TRIGGERS.CRITICAL_DISPLAY_DISCONNECTED, Name: 'Monitored Display Disconnected' },
+    { ID: TRIGGERS.DISPLAY_CONFIGURATION_CHANGED, Name: 'Display Configuration Changed' },
+    { ID: TRIGGERS.NETWORK_INTERFACE_UP, Name: 'Network Interface Up' },
+    { ID: TRIGGERS.NETWORK_INTERFACE_DOWN, Name: 'Network Interface Down' },
+    {
+      ID: TRIGGERS.CRITICAL_NETWORK_INTERFACE_DOWN,
+      Name: 'Monitored Network Interface Down',
+    },
+    { ID: TRIGGERS.NETWORK_ADDRESS_CHANGED, Name: 'Network Address Changed' },
+    { ID: TRIGGERS.NETWORK_GATEWAY_CHANGED, Name: 'Network Router Changed' },
+    { ID: TRIGGERS.USB_DEVICE_MOVED, Name: 'USB Device Moved' },
+    { ID: TRIGGERS.USB_FIRMWARE_CHANGED, Name: 'USB Firmware Changed' },
+    { ID: TRIGGERS.USB_DEVICE_ERROR, Name: 'USB Device Error' },
+    { ID: TRIGGERS.AUDIO_VOLUME_OUT_OF_RANGE, Name: 'Audio Level Out Of Range' },
   ];
 };
 
@@ -636,6 +696,100 @@ Manager.HandleNonCriticalApplicationStopped = makeClientEventHandler(
   'Application'
 );
 
+// The degraded edge, shared by clients, monitors and checks: hold a fault that
+// was already true at first sight, announce a new one, and announce the
+// recovery of one that was announced. Recovery needs the entity to still be
+// online — dropping offline is not getting better, and is alerted separately.
+async function settleDegradedState(
+  Key: string,
+  Online: boolean,
+  Degraded: boolean,
+  DegradedContext: () => AlertContext,
+  RecoveredContext: () => AlertContext
+) {
+  const SeenDegradedBefore = EntityDegradedState.has(Key);
+  const PrevDegraded = EntityDegradedState.get(Key) === true;
+  const CurrentDegraded = Online && Degraded;
+  EntityDegradedState.set(Key, CurrentDegraded);
+
+  if (!CurrentDegraded) {
+    clearBaselineFault(`degraded:${Key}`);
+    if (EntityDegradedAnnounced.delete(Key) && PrevDegraded && Online) {
+      await evaluateAgainstRules(RecoveredContext());
+    }
+  } else if (!SeenDegradedBefore) {
+    noteBaselineFault(`degraded:${Key}`, DegradedContext());
+  } else if (!PrevDegraded) {
+    EntityDegradedAnnounced.add(Key);
+    await evaluateAgainstRules(DegradedContext());
+  } else {
+    refreshBaselineFault(`degraded:${Key}`, DegradedContext());
+  }
+}
+
+// Condition faults (a threshold breach, a hung application) held while the
+// server settles are keyed per client, condition and trigger, so a condition
+// that ends can clear every trigger it was held under.
+function conditionFaultKey(UUID: string, Condition: string, TriggerType: string): string {
+  return `condition:${UUID}:${Condition}:${TriggerType}`;
+}
+
+/**
+ * One health event derived by a Client entity (see ClientManager/health).
+ *
+ * A moment (a reboot, a display unplugged) is evaluated at once: the entity
+ * only derives it from two trusted reports, so it is never a restart artefact.
+ * A condition (CPU over threshold, an application hung) is different — at
+ * server start every client that is already struggling would announce itself at
+ * once — so one raised inside the settle period is held like any fault that
+ * predates us, announced once by the sweep if it is still standing, and dropped
+ * the moment the entity says it has ended.
+ */
+Manager.HandleClientHealthEvent = async (Client: AlertEntityLike, Event: unknown) => {
+  if (!Client || !Client.UUID || !Event || typeof Event !== 'object') return;
+  if (Client.Unassigned) return;
+  const E = Event as {
+    TriggerTypes?: unknown;
+    Severity?: unknown;
+    Details?: unknown;
+    Condition?: { Key?: unknown; Active?: unknown } | null;
+  };
+  const TriggerTypes = Array.isArray(E.TriggerTypes)
+    ? E.TriggerTypes.filter((T): T is string => typeof T === 'string')
+    : [];
+  const Details =
+    E.Details && typeof E.Details === 'object' ? (E.Details as Record<string, unknown>) : {};
+  const ConditionKey = E.Condition && typeof E.Condition.Key === 'string' ? E.Condition.Key : null;
+  const UUID = Client.UUID;
+
+  if (ConditionKey && E.Condition && E.Condition.Active !== true) {
+    const Prefix = `condition:${UUID}:${ConditionKey}:`;
+    for (const FaultKey of Array.from(PendingBaselineFaults.keys())) {
+      if (FaultKey.startsWith(Prefix)) clearBaselineFault(FaultKey);
+    }
+  }
+
+  const Settling = Date.now() - StartedAt < ALERT_BASELINE_SETTLE_MS;
+  for (const TriggerType of TriggerTypes) {
+    const Context: AlertContext = {
+      ...Details,
+      TriggerType,
+      EntityType: 'client',
+      EntityName: Client.Nickname || Client.Hostname || UUID,
+      UUID,
+      GroupID: Client.GroupID == null ? null : Client.GroupID,
+      IP: Client.IP || null,
+      Severity: typeof E.Severity === 'string' ? E.Severity : 'warning',
+      RawData: Client,
+    };
+    if (ConditionKey && E.Condition && E.Condition.Active === true && Settling) {
+      noteBaselineFault(conditionFaultKey(UUID, ConditionKey, TriggerType), Context);
+      continue;
+    }
+    await evaluateAgainstRules(Context);
+  }
+};
+
 Manager.HandleClientUpdated = async (Client: AlertEntityLike) => {
   if (!Client || !Client.UUID) return;
 
@@ -686,28 +840,24 @@ Manager.HandleClientUpdated = async (Client: AlertEntityLike) => {
     refreshBaselineFault(`offline:${Key}`, OfflineContext());
   }
 
-  const SeenDegradedBefore = EntityDegradedState.has(Key);
-  const PrevDegraded = EntityDegradedState.get(Key) === true;
-  const CurrentDegraded = Current && !!Client.Degraded;
-  EntityDegradedState.set(Key, CurrentDegraded);
-
-  const DegradedContext = (): AlertContext => ({
-    ...ClientBase,
-    TriggerType: TRIGGERS.CLIENT_DEGRADED,
-    Severity: 'warning',
-    Degraded: true,
-    RawData: Client,
-  });
-
-  if (!CurrentDegraded) {
-    clearBaselineFault(`degraded:${Key}`);
-  } else if (!SeenDegradedBefore) {
-    noteBaselineFault(`degraded:${Key}`, DegradedContext());
-  } else if (!PrevDegraded) {
-    await evaluateAgainstRules(DegradedContext());
-  } else {
-    refreshBaselineFault(`degraded:${Key}`, DegradedContext());
-  }
+  await settleDegradedState(
+    Key,
+    Current,
+    !!Client.Degraded,
+    () => ({
+      ...ClientBase,
+      TriggerType: TRIGGERS.CLIENT_DEGRADED,
+      Severity: 'warning',
+      Degraded: true,
+      RawData: Client,
+    }),
+    () => ({
+      ...ClientBase,
+      TriggerType: TRIGGERS.CLIENT_RECOVERED,
+      Severity: 'success',
+      RawData: Client,
+    })
+  );
 };
 
 // Per-metric alarms for a FreeKiosk terminal.
@@ -820,30 +970,26 @@ Manager.HandleMonitoringTargetUpdated = async (Target: AlertTargetLike) => {
     refreshBaselineFault(`offline:${Key}`, TargetOfflineContext());
   }
 
-  const SeenDegradedBefore = EntityDegradedState.has(Key);
-  const PrevDegraded = EntityDegradedState.get(Key) === true;
-  const CurrentDegraded = Current && !!Target.Degraded;
-  EntityDegradedState.set(Key, CurrentDegraded);
-
-  const TargetDegradedContext = (): AlertContext => ({
-    ...TargetBase,
-    TriggerType: TRIGGERS.CLIENT_DEGRADED,
-    Severity: 'warning',
-    Degraded: true,
-    LastLatencyMs: Target.LastLatencyMs == null ? null : Target.LastLatencyMs,
-    LastError: Target.LastError || null,
-    RawData: Target,
-  });
-
-  if (!CurrentDegraded) {
-    clearBaselineFault(`degraded:${Key}`);
-  } else if (!SeenDegradedBefore) {
-    noteBaselineFault(`degraded:${Key}`, TargetDegradedContext());
-  } else if (!PrevDegraded) {
-    await evaluateAgainstRules(TargetDegradedContext());
-  } else {
-    refreshBaselineFault(`degraded:${Key}`, TargetDegradedContext());
-  }
+  await settleDegradedState(
+    Key,
+    Current,
+    !!Target.Degraded,
+    () => ({
+      ...TargetBase,
+      TriggerType: TRIGGERS.CLIENT_DEGRADED,
+      Severity: 'warning',
+      Degraded: true,
+      LastLatencyMs: Target.LastLatencyMs == null ? null : Target.LastLatencyMs,
+      LastError: Target.LastError || null,
+      RawData: Target,
+    }),
+    () => ({
+      ...TargetBase,
+      TriggerType: TRIGGERS.CLIENT_RECOVERED,
+      Severity: 'success',
+      RawData: Target,
+    })
+  );
 
   // Per-check alerts (opt-in via check:<CheckID> scope).
   const TargetName = Target.Nickname || Target.Address || `Target ${Target.TargetID}`;
@@ -895,30 +1041,26 @@ Manager.HandleMonitoringTargetUpdated = async (Target: AlertTargetLike) => {
       refreshBaselineFault(`offline:${CheckKey}`, CheckOfflineContext());
     }
 
-    const SeenCheckDegradedBefore = EntityDegradedState.has(CheckKey);
-    const PrevCheckDegraded = EntityDegradedState.get(CheckKey) === true;
-    const CurrentCheckDegraded = CurrentCheck && !!Check.Degraded;
-    EntityDegradedState.set(CheckKey, CurrentCheckDegraded);
-
-    const CheckDegradedContext = (): AlertContext => ({
-      ...BaseContext,
-      TriggerType: TRIGGERS.CLIENT_DEGRADED,
-      Severity: 'warning',
-      Degraded: true,
-      LastLatencyMs: Check.LastLatencyMs == null ? null : Check.LastLatencyMs,
-      LastError: Check.LastError || null,
-      RawData: Check,
-    });
-
-    if (!CurrentCheckDegraded) {
-      clearBaselineFault(`degraded:${CheckKey}`);
-    } else if (!SeenCheckDegradedBefore) {
-      noteBaselineFault(`degraded:${CheckKey}`, CheckDegradedContext());
-    } else if (!PrevCheckDegraded) {
-      await evaluateAgainstRules(CheckDegradedContext());
-    } else {
-      refreshBaselineFault(`degraded:${CheckKey}`, CheckDegradedContext());
-    }
+    await settleDegradedState(
+      CheckKey,
+      CurrentCheck,
+      !!Check.Degraded,
+      () => ({
+        ...BaseContext,
+        TriggerType: TRIGGERS.CLIENT_DEGRADED,
+        Severity: 'warning',
+        Degraded: true,
+        LastLatencyMs: Check.LastLatencyMs == null ? null : Check.LastLatencyMs,
+        LastError: Check.LastError || null,
+        RawData: Check,
+      }),
+      () => ({
+        ...BaseContext,
+        TriggerType: TRIGGERS.CLIENT_RECOVERED,
+        Severity: 'success',
+        RawData: Check,
+      })
+    );
   }
 };
 
@@ -977,6 +1119,9 @@ Manager.FlushSettledBaselineFaults = async (MinAgeMs: number, Clients: AlertEnti
     if (Now - Fault.FirstSeenAt < MinAgeMs) continue;
     PendingBaselineFaults.delete(FaultKey);
     Raised += 1;
+    if (FaultKey.startsWith('degraded:')) {
+      EntityDegradedAnnounced.add(FaultKey.slice('degraded:'.length));
+    }
     await evaluateAgainstRules(Fault.Context);
   }
 
@@ -1011,6 +1156,7 @@ Manager.Reload = async () => {
   RuleList = [];
   EntityOnlineState.clear();
   EntityDegradedState.clear();
+  EntityDegradedAnnounced.clear();
   PendingBaselineFaults.clear();
   // The reloaded state is as fresh as a boot, so give it the same settle period
   // rather than announcing everything the first sweep finds.

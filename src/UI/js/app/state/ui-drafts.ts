@@ -137,7 +137,62 @@ export const ALERT_TRIGGER_ALLOWLIST = new Set([
   'AUDIO_DEFAULT_DEVICE_CHANGED',
   'AUDIO_DEVICE_MUTED',
   'AUDIO_FORMAT_CHANGED',
+  'CLIENT_RECOVERED',
+  'CLIENT_REBOOTED',
+  'CLIENT_VERSION_CHANGED',
+  'CLIENT_SLEEPING',
+  'CLIENT_RESUMED',
+  'CPU_USAGE_HIGH',
+  'RAM_USAGE_HIGH',
+  'UPTIME_HIGH',
+  'TEMPERATURE_HIGH',
+  'THERMAL_STATE_HIGH',
+  'BATTERY_LOW',
+  'BATTERY_NOT_CHARGING',
+  'CRITICAL_POWER_ON_BATTERY',
+  'POWER_ON_BATTERY',
+  'POWER_RESTORED',
+  'APPLICATION_NOT_RESPONDING',
+  'CRITICAL_APPLICATION_NOT_RESPONDING',
+  'APPLICATION_RESPONDING',
+  'CRITICAL_APPLICATION_MULTIPLE_INSTANCES',
+  'FOREGROUND_APPLICATION_CHANGED',
+  'CRITICAL_APPLICATION_LOST_FOREGROUND',
+  'DISPLAY_CONNECTED',
+  'DISPLAY_DISCONNECTED',
+  'CRITICAL_DISPLAY_CONNECTED',
+  'CRITICAL_DISPLAY_DISCONNECTED',
+  'DISPLAY_CONFIGURATION_CHANGED',
+  'NETWORK_INTERFACE_UP',
+  'NETWORK_INTERFACE_DOWN',
+  'CRITICAL_NETWORK_INTERFACE_DOWN',
+  'NETWORK_ADDRESS_CHANGED',
+  'NETWORK_GATEWAY_CHANGED',
+  'USB_DEVICE_MOVED',
+  'USB_FIRMWARE_CHANGED',
+  'USB_DEVICE_ERROR',
+  'AUDIO_VOLUME_OUT_OF_RANGE',
 ]);
+
+// How the trigger picker groups the catalog. A trigger missing from every
+// group still shows, under "Other", so a server newer than this table never
+// hides one.
+export const ALERT_TRIGGER_CATEGORIES: Array<{ Title: string; Match: RegExp }> = [
+  {
+    Title: 'Status',
+    Match: /^CLIENT_(ONLINE|OFFLINE|DEGRADED|RECOVERED|REBOOTED|VERSION_CHANGED|SLEEPING|RESUMED)$/,
+  },
+  { Title: 'Resources & Power', Match: /^(CPU_|RAM_|TEMPERATURE_|BATTERY_|POWER_)/ },
+  {
+    Title: 'Applications',
+    Match: /(APPLICATION_|^FOREGROUND_)/,
+  },
+  { Title: 'Displays', Match: /DISPLAY_/ },
+  { Title: 'Network', Match: /^(CRITICAL_)?NETWORK_/ },
+  { Title: 'USB', Match: /USB_/ },
+  { Title: 'Audio', Match: /AUDIO_/ },
+  { Title: 'Scripts & Kiosks', Match: /^(SCRIPT_|FREEKIOSK_)/ },
+];
 
 // --- Network discovery ---
 export let NetworkDiscoveryScanID: string | null = null;

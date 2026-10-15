@@ -2968,34 +2968,14 @@ Loading licence...</pre>
                       />
                       <label for="CLIENT_INFO_STATUS">Status</label>
                     </div>
-                    <div class="rounded-3 p-2 bg-ghost-light">
-                      <h6 class="mb-0">Usage</h6>
-                    </div>
-                    <div id="CLIENT_INFO_VITALS" class="d-grid gap-2">
-                      <div class="text-sm d-flex justify-content-between">
-                        <span>CPU</span>
-                        <span id="CLIENT_INFO_CPU_LABEL">0%</span>
+                    <!-- CPU, memory and uptime: one card each, with the usage
+                         history charts and the Monitor toggle and conditions
+                         (see client-info-health.ts). Hidden for SDK clients. -->
+                    <div id="CLIENT_INFO_SYSTEM_SECTION" class="d-grid gap-2">
+                      <div class="rounded-3 p-2 bg-ghost-light">
+                        <h6 class="mb-0">Usage</h6>
                       </div>
-                      <div class="progress">
-                        <div
-                          id="CLIENT_INFO_CPU_BAR"
-                          class="progress-bar bg-white"
-                          role="progressbar"
-                          style="width: 0%"
-                        ></div>
-                      </div>
-                      <div class="text-sm d-flex justify-content-between">
-                        <span>RAM</span>
-                        <span id="CLIENT_INFO_RAM_LABEL">0%</span>
-                      </div>
-                      <div class="progress">
-                        <div
-                          id="CLIENT_INFO_RAM_BAR"
-                          class="progress-bar bg-white"
-                          role="progressbar"
-                          style="width: 0%"
-                        ></div>
-                      </div>
+                      <div id="SHOWTRAK_CLIENT_INFO_SYSTEM" class="d-grid gap-2"></div>
                     </div>
                     <!-- Read-only mirror of the tiles' badges. Sits directly under the
                    usage charts so the operator sees what a machine IS right
@@ -3067,6 +3047,28 @@ Loading licence...</pre>
                       <h6 class="mb-0">IPv6 Interfaces</h6>
                     </div>
                     <div id="SHOWTRAK_CLIENT_INFO_NET_IPV6" class="d-grid gap-2"></div>
+                  </div>
+
+                  <div
+                    id="CLIENT_INFO_POWER_SECTION"
+                    class="d-grid gap-2"
+                    data-client-info-tab="power"
+                  >
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Power</h6>
+                    </div>
+                    <div id="SHOWTRAK_CLIENT_INFO_POWER" class="d-grid gap-2"></div>
+                  </div>
+
+                  <div
+                    id="CLIENT_INFO_TEMPERATURE_SECTION"
+                    class="d-grid gap-2"
+                    data-client-info-tab="power"
+                  >
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Thermal</h6>
+                    </div>
+                    <div id="SHOWTRAK_CLIENT_INFO_TEMPERATURES" class="d-grid gap-2"></div>
                   </div>
 
                   <div
