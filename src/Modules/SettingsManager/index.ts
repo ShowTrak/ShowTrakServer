@@ -11,6 +11,12 @@ import { CreateSettingsRepository } from '../DB/repositories/settings';
 
 const Logger = CreateLogger('Settings');
 
+// Secrets whose values must never reach a log line: the log file is what an
+// operator sends back when asked, and the log console streams to the Web UI.
+// PASSWORD-typed settings are secret by definition; these two are typed STRING
+// because the settings modal shows them in the clear on purpose.
+const SECRET_SETTING_KEYS = new Set(['WEBUI_PASSWORD', 'SDK_API_KEY']);
+
 const SettingsRepo = CreateSettingsRepository(DB);
 
 // Runtime, cached representation of a single setting.
@@ -252,7 +258,8 @@ const Manager: SettingsManagerShape = {
 
     Settings.set(Key, Setting);
 
-    Logger.log(`Setting ${Key} updated to ${Value}`);
+    const IsSecret = Setting.Type === 'PASSWORD' || SECRET_SETTING_KEYS.has(Key);
+    Logger.log(`Setting ${Key} updated to ${IsSecret ? '(hidden)' : Value}`);
 
     BroadcastManager.emit('SettingsUpdated');
 
