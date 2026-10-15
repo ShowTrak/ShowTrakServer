@@ -15,7 +15,7 @@
 // Extracted verbatim from the old selection-init god-module so that file can
 // become a pure re-export barrel.
 import { setConfirmDialogActive } from '../state';
-import { HandleNonFatalError, Safe } from '../utils';
+import { HandleNonFatalError, Safe, WithFullStop } from '../utils';
 import { DismissAlert, iconForAlert } from '../alerts-tray';
 import { UpdateIdentifyStatusBanner } from '../identify';
 
@@ -142,9 +142,11 @@ export function showAlertStyleToast({
   attachHoverPauseDismiss(el, duration);
 }
 
+// Every toast reads as a sentence: dynamic messages (errors handed back by the
+// server, labels joined at runtime) get the full stop literals carry already.
 export async function Notify(Message: unknown, Type = 'info', Duration = 5000) {
   showAlertStyleToast({
-    title: Message,
+    title: WithFullStop(Message),
     message: '',
     type: Type,
     duration: Duration,
@@ -154,7 +156,16 @@ export async function Notify(Message: unknown, Type = 'info', Duration = 5000) {
 
 // --- 2. Confirmation dialog -------------------------------------------------
 
-export async function ConfirmationDialog(Message: unknown) {
+/** Options accepted by {@link ConfirmationDialog}. */
+export interface ConfirmationDialogOptions {
+  /**
+   * The confirm button's label, naming the action in Title Case ("Delete Tag",
+   * "Run Script"). Required so no dialog falls back to a vague "Confirm".
+   */
+  ConfirmLabel: string;
+}
+
+export async function ConfirmationDialog(Message: unknown, Options: ConfirmationDialogOptions) {
   return new Promise((resolve) => {
     // Create or reuse toast container
     const existing = document.getElementById('SHOWTRAK_CONFIRM_TOAST');
@@ -172,7 +183,9 @@ export async function ConfirmationDialog(Message: unknown) {
 					<div class="confirm-toast-msg">${Safe(Message)}</div>
 					<div class="confirm-toast-actions">
 						<button type="button" class="btn btn-sm btn-secondary" id="CONFIRM_TOAST_CANCEL" tabindex="0">Cancel</button>
-						<button type="button" class="btn btn-sm btn-danger" id="CONFIRM_TOAST_CONFIRM" tabindex="0">Confirm</button>
+						<button type="button" class="btn btn-sm btn-danger" id="CONFIRM_TOAST_CONFIRM" tabindex="0">${Safe(
+              Options.ConfirmLabel
+            )}</button>
 					</div>
 				</div>
 			</div>`;
@@ -259,7 +272,8 @@ interface CriticalConfirmationOptions {
   message: string;
   /** Optional names listed under the message (e.g. the target clients). */
   items?: string[];
-  confirmLabel?: string;
+  /** The confirm button's label, naming the action in Title Case ("Run Script"). */
+  confirmLabel: string;
 }
 
 const CRITICAL_CONFIRM_MAX_ITEMS = 8;
@@ -292,7 +306,7 @@ export function CriticalConfirmationDialog(Options: CriticalConfirmationOptions)
 					<div class="critical-confirm-actions">
 						<button type="button" class="btn critical-confirm-cancel" id="CRITICAL_CONFIRM_CANCEL">Cancel</button>
 						<button type="button" class="btn critical-confirm-go" id="CRITICAL_CONFIRM_GO">${Safe(
-              Options.confirmLabel || 'Continue'
+              Options.confirmLabel
             )}</button>
 					</div>
 				</div>

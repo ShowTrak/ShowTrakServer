@@ -6,10 +6,10 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-soft);
   cursor: pointer;
   transition:
     color 120ms ease,
@@ -46,16 +46,16 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 #ADD_MONITORING_TARGET_MENU.dropdown-menu,
 #SETTINGS_MENU.dropdown-menu {
   min-width: 240px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0.6rem;
-  background: rgba(23, 20, 38, 0.98);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: rgb(var(--surface-2-rgb) / 0.98);
   padding: 0.35rem;
 }
 #ADD_MONITORING_TARGET_MENU .dropdown-item,
 #SETTINGS_MENU .dropdown-item {
-  color: rgba(255, 255, 255, 0.92);
-  border-radius: 0.45rem;
-  font-size: 13px;
+  color: var(--text-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
   padding: 0.45rem 0.6rem;
 }
 #SETTINGS_MENU .dropdown-item {
@@ -66,8 +66,8 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 }
 #SETTINGS_MENU .dropdown-item .menu-shortcut {
   margin-left: auto;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 11px;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
@@ -79,24 +79,24 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   color: #fff;
 }
 #SETTINGS_MENU .dropdown-header {
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 11px;
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 0.35rem 0.6rem 0.15rem;
 }
 #ADD_MONITORING_TARGET_MENU .dropdown-divider,
 #SETTINGS_MENU .dropdown-divider {
-  border-top-color: rgba(255, 255, 255, 0.12);
+  border-top-color: var(--border-default);
   margin: 0.3rem 0.2rem;
 }
 #SETTINGS_MENU .dropdown-item.text-danger {
-  color: #ff6b6b !important;
+  color: var(--danger-text) !important;
 }
 #SETTINGS_MENU .dropdown-item.text-danger:hover,
 #SETTINGS_MENU .dropdown-item.text-danger:focus {
-  background: rgba(255, 107, 107, 0.15);
-  color: #ff8787 !important;
+  background: rgb(var(--danger-text-rgb) / 0.15);
+  color: var(--danger-text-hover) !important;
 }
 #NAVBAR_CORE_BUTTON.settings-btn:hover,
 #ADD_MONITORING_TARGET_BTN.settings-btn:hover {
@@ -119,7 +119,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   margin-right: 0;
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.7); /* grey by default */
+  color: var(--text-secondary); /* grey by default */
   cursor: pointer;
 }
 #ALERTS_BUTTON .bi {
@@ -133,10 +133,10 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   min-width: 15px;
   height: 15px;
   padding: 0 3px;
-  border-radius: 999px;
-  background: #ff9800;
+  border-radius: var(--radius-pill);
+  background: var(--status-graph-degraded);
   color: #111;
-  font-size: 9px;
+  font-size: var(--fs-3xs);
   font-weight: 900;
   display: grid;
   place-items: center;
@@ -144,18 +144,18 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 
 @keyframes pulse-orange {
   0% {
-    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.55);
+    box-shadow: 0 0 0 0 rgb(var(--status-graph-degraded-rgb) / 0.55);
   }
   70% {
-    box-shadow: 0 0 0 8px rgba(255, 152, 0, 0);
+    box-shadow: 0 0 0 8px rgb(var(--status-graph-degraded-rgb) / 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0);
+    box-shadow: 0 0 0 0 rgb(var(--status-graph-degraded-rgb) / 0);
   }
 }
 
 #ALERTS_BUTTON.has-alerts .bi {
-  color: #ffb54d;
+  color: rgb(var(--warning-soft-rgb));
   animation: pulse-orange 1.8s infinite;
 }
 
@@ -171,7 +171,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   margin-right: 0;
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   cursor: pointer;
 }
 #FOG_BUTTON.fog-btn.d-none {
@@ -190,10 +190,10 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   min-width: 15px;
   height: 15px;
   padding: 0 3px;
-  border-radius: 999px;
-  background: #4d9fff;
+  border-radius: var(--radius-pill);
+  background: var(--info);
   color: #06121f;
-  font-size: 9px;
+  font-size: var(--fs-3xs);
   font-weight: 900;
   display: grid;
   place-items: center;
@@ -201,18 +201,18 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 
 @keyframes pulse-blue {
   0% {
-    box-shadow: 0 0 0 0 rgba(77, 159, 255, 0.5);
+    box-shadow: 0 0 0 0 rgb(var(--info-rgb) / 0.5);
   }
   70% {
-    box-shadow: 0 0 0 8px rgba(77, 159, 255, 0);
+    box-shadow: 0 0 0 8px rgb(var(--info-rgb) / 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(77, 159, 255, 0);
+    box-shadow: 0 0 0 0 rgb(var(--info-rgb) / 0);
   }
 }
 
 #FOG_BUTTON.has-tasks .bi {
-  color: #8cc4ff;
+  color: var(--info-text);
   animation: pulse-blue 1.8s infinite;
 }
 
@@ -220,14 +220,15 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 #FOG_TRAY.fog-tray {
   position: fixed;
   right: 10px;
-  bottom: 48px; /* above bottom bar, same anchor as the alerts tray */
+  /* Above the bottom bar, same anchor as the alerts tray. */
+  bottom: calc(var(--bottom-bar-height) + 12px);
   width: min(390px, calc(100vw - 20px));
   max-height: min(62vh, 560px);
   overflow: hidden;
-  z-index: 1100;
-  background: rgba(29, 26, 47, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
+  z-index: var(--z-toast);
+  background: rgb(var(--surface-2-rgb) / 0.98);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
   box-shadow:
     0 18px 42px rgba(0, 0, 0, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -244,8 +245,8 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0));
 }
 #FOG_TRAY .fog-status {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 #FOG_TRAY .fog-status.is-offline {
   color: #ff9b7a;
@@ -256,10 +257,10 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 11px;
+  color: var(--text-soft);
+  font-size: var(--fs-xs);
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -284,9 +285,9 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   display: grid;
   gap: 6px;
   padding: 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
 }
 .fog-task-item .fog-task-title {
   display: flex;
@@ -296,43 +297,43 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 }
 .fog-task-item .fog-task-name {
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-md);
 }
 .fog-task-item .fog-task-state {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-soft);
   white-space: nowrap;
 }
 /* State colouring follows FOG's state IDs: 3 in-progress, 4 complete, 5 cancelled. */
 .fog-task-item[data-state='3'] .fog-task-state {
-  background: rgba(77, 159, 255, 0.22);
-  color: #a8d2ff;
+  background: rgb(var(--info-rgb) / 0.22);
+  color: var(--info-text);
 }
 .fog-task-item[data-state='4'] .fog-task-state {
-  background: rgba(80, 200, 120, 0.2);
-  color: #96e6b3;
+  background: rgb(var(--success-text-rgb) / 0.2);
+  color: var(--success-text-soft);
 }
 .fog-task-item[data-state='5'] .fog-task-state {
-  background: rgba(255, 128, 128, 0.18);
-  color: #ffb0a8;
+  background: rgb(var(--danger-text-rgb) / 0.18);
+  color: var(--danger-text-soft);
 }
 .fog-task-item .fog-task-client {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.62);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 .fog-task-item .fog-task-bar {
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.12);
   overflow: hidden;
 }
 .fog-task-item .fog-task-bar span {
   display: block;
   height: 100%;
-  background: #4d9fff;
+  background: var(--info);
   transition: width 0.4s ease;
 }
 /* Running but no percentage yet: a segment slides across so it reads as "working"
@@ -356,20 +357,20 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 }
 .fog-task-item .fog-task-cancel {
   appearance: none;
-  border: 1px solid rgba(255, 128, 128, 0.35);
-  background: rgba(255, 128, 128, 0.12);
-  color: #ffb0a8;
-  font-size: 11px;
+  border: 1px solid rgb(var(--danger-text-rgb) / 0.35);
+  background: rgb(var(--danger-text-rgb) / 0.12);
+  color: var(--danger-text-soft);
+  font-size: var(--fs-xs);
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   transition:
     background 0.15s ease,
     border-color 0.15s ease;
 }
 .fog-task-item .fog-task-cancel:hover {
-  background: rgba(255, 128, 128, 0.22);
-  border-color: rgba(255, 128, 128, 0.55);
+  background: rgb(var(--danger-text-rgb) / 0.22);
+  border-color: rgb(var(--danger-text-rgb) / 0.55);
 }
 .fog-task-item .fog-task-cancel:disabled {
   opacity: 0.5;
@@ -378,22 +379,22 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 .fog-empty {
   padding: 18px 10px;
   text-align: center;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
 }
 
 /* Alerts tray */
 #ALERTS_TRAY.alerts-tray {
   position: fixed;
   right: 10px;
-  bottom: 48px; /* above bottom bar */
+  bottom: calc(var(--bottom-bar-height) + 12px); /* above bottom bar */
   width: min(390px, calc(100vw - 20px));
   max-height: min(62vh, 560px);
   overflow: hidden;
-  z-index: 1100;
-  background: rgba(29, 26, 47, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
+  z-index: var(--z-toast);
+  background: rgb(var(--surface-2-rgb) / 0.98);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
   box-shadow:
     0 18px 42px rgba(0, 0, 0, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -417,7 +418,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   overflow: auto;
 }
 .alert-item {
-  --alert-accent: rgba(255, 181, 77, 0.9);
+  --alert-accent: rgb(var(--warning-soft-rgb) / 0.9);
   position: relative;
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -425,9 +426,9 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   align-items: center;
   background:
     linear-gradient(165deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03)),
-    rgba(17, 14, 31, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 11px;
+    rgb(var(--surface-0-rgb) / 0.68);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
   padding: 10px;
   box-shadow:
     0 7px 18px rgba(0, 0, 0, 0.28),
@@ -445,7 +446,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   top: 8px;
   bottom: 8px;
   width: 3px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--alert-accent);
   opacity: 0.95;
 }
@@ -461,21 +462,21 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   height: 26px;
   display: grid;
   place-items: center;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--alert-accent) 24%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--alert-accent) 32%, transparent);
 }
 .alert-item .alert-icon i {
-  font-size: 15px;
+  font-size: var(--fs-xl);
   color: color-mix(in srgb, var(--alert-accent) 86%, #fff);
 }
 .alert-item .alert-content {
   display: grid;
   align-content: center;
   min-height: 26px;
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   line-height: 1.3;
-  color: rgba(255, 255, 255, 0.96);
+  color: var(--text-strong);
 }
 
 .alert-item .alert-content > div:first-child {
@@ -485,12 +486,12 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 }
 .alert-item .alert-content strong {
   color: #fff;
-  font-size: 13px;
+  font-size: var(--fs-md);
   letter-spacing: 0.01em;
 }
 .alert-item .alert-meta {
-  font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.76);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
   opacity: 1;
 }
 .alert-item.single-line .alert-content {
@@ -504,9 +505,9 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 .alert-item .btn-dismiss {
   border: 0;
   background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-strong);
   padding: 2px 7px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   line-height: 1;
   transition:
     background-color 120ms ease,
@@ -517,32 +518,32 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 }
 
 .alert-item[data-severity='success'] {
-  --alert-accent: rgba(63, 214, 111, 0.92);
+  --alert-accent: rgb(var(--success-text-rgb) / 0.92);
 }
 
 .alert-item[data-severity='warning'] {
-  --alert-accent: rgba(255, 181, 77, 0.96);
+  --alert-accent: rgb(var(--warning-soft-rgb) / 0.96);
 }
 
 .alert-item[data-severity='error'] {
-  --alert-accent: rgba(255, 107, 107, 0.96);
+  --alert-accent: rgb(var(--danger-text-rgb) / 0.96);
 }
 
 .alert-item[data-severity='info'] {
-  --alert-accent: rgba(102, 184, 255, 0.96);
+  --alert-accent: rgb(var(--info-rgb) / 0.96);
 }
 
 .alert-rule-open {
   position: relative;
   width: 100%;
   padding-right: 2rem !important;
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: var(--surface-ghost);
   color: #fff;
   cursor: pointer;
 }
 
 .alert-rule-open:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--surface-ghost-hover);
 }
 
 .alert-rule-chevron {
@@ -550,9 +551,9 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   right: 0.65rem;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 0.95rem;
+  font-size: var(--fs-xl);
   line-height: 1;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-muted);
   pointer-events: none;
 }
 
@@ -563,7 +564,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 }
 
 .alert-action-open:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--surface-ghost-hover);
 }
 
 .alert-action-chevron {
@@ -571,9 +572,9 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   right: 0.65rem;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 0.95rem;
+  font-size: var(--fs-xl);
   line-height: 1;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-muted);
   pointer-events: none;
 }
 
@@ -680,7 +681,7 @@ input[type='range']:focus,
 input[type='range']::-webkit-slider-runnable-track,
 .form-range::-webkit-slider-runnable-track {
   height: 0.36rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(180deg, var(--st-slider-track-focus), var(--st-slider-track));
 }
 
@@ -701,7 +702,7 @@ input[type='range']::-moz-range-track,
 .form-range::-moz-range-track {
   height: 0.36rem;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(180deg, var(--st-slider-track-focus), var(--st-slider-track));
 }
 
@@ -718,7 +719,7 @@ input[type='range']::-moz-range-thumb,
 input[type='range']::-moz-range-progress,
 .form-range::-moz-range-progress {
   height: 0.36rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--st-slider-fill);
 }
 
@@ -732,10 +733,10 @@ input[type='range']::-moz-range-progress,
   position: relative;
   min-height: calc(3.5rem + 2px);
   padding: 1.625rem 2rem 0.5rem 0.75rem !important;
-  background-color: rgba(255, 255, 255, 0.03) !important;
+  background-color: var(--surface-ghost) !important;
   color: #fff !important;
   border: none !important;
-  border-radius: 0.5rem !important;
+  border-radius: var(--radius-md) !important;
 }
 
 /* Center the chevron on the full toggle height (the label/value use asymmetric
@@ -752,7 +753,7 @@ input[type='range']::-moz-range-progress,
 
 .alert-multiselect-toggle:hover,
 .alert-multiselect-toggle:focus {
-  background-color: #ffffff1d !important;
+  background-color: var(--surface-ghost-active) !important;
   color: #fff !important;
 }
 
@@ -763,27 +764,27 @@ input[type='range']::-moz-range-progress,
   top: 0;
   left: 0;
   padding: 1rem 0.75rem;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-muted);
   pointer-events: none;
   transform-origin: 0 0;
   transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
   white-space: nowrap;
-  z-index: 3;
+  z-index: var(--z-float);
 }
 
 /* Category heading inside the trigger picker. */
 .alert-multiselect-heading {
   padding: 0.5rem 0.75rem 0.25rem;
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-subtle);
 }
 
 .alert-multiselect-heading:not(:first-child) {
   margin-top: 0.25rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .alert-multiselect-menu {
@@ -793,11 +794,11 @@ input[type='range']::-moz-range-progress,
   right: 0;
   max-height: 360px;
   overflow: auto;
-  background: #201a3f;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  background: var(--menu-bg);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
-  z-index: 2000;
+  z-index: var(--z-dropdown);
   padding: 6px;
   display: grid;
   gap: 2px;
@@ -809,13 +810,13 @@ input[type='range']::-moz-range-progress,
   gap: 8px;
   align-items: center;
   padding: 4px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 0.92rem;
+  font-size: var(--fs-xl);
 }
 
 .alert-multiselect-option:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-ghost-hover);
 }
 
 .alert-multiselect-option input[type='checkbox'] {
@@ -896,8 +897,8 @@ input[type='range']::-moz-range-progress,
 
 .alert-scope-entity-icon {
   flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-size: var(--fs-xl);
   line-height: 1;
 }
 
@@ -918,11 +919,11 @@ input[type='range']::-moz-range-progress,
 }
 
 .scope-picker-section-title {
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-subtle);
   padding: 0.35rem 0.25rem 0;
 }
 
@@ -930,8 +931,8 @@ input[type='range']::-moz-range-progress,
    on a client tile. */
 .scope-picker-tag .scope-picker-tag-icon {
   flex: 0 0 auto;
-  color: var(--scope-tag-colour, rgba(255, 255, 255, 0.72));
-  font-size: 0.95rem;
+  color: var(--scope-tag-colour, var(--text-secondary));
+  font-size: var(--fs-xl);
   line-height: 1;
 }
 
@@ -947,12 +948,12 @@ input[type='range']::-moz-range-progress,
   flex: 0 0 auto;
   margin-left: 0.35rem;
   padding: 0.05rem 0.35rem;
-  border-radius: 999px;
-  font-size: 0.68rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.09);
   white-space: nowrap;
   overflow: hidden;
@@ -961,7 +962,7 @@ input[type='range']::-moz-range-progress,
 }
 
 .bg-ghost {
-  background-color: rgba(255, 255, 255, 0.03) !important;
+  background-color: var(--surface-ghost) !important;
 }
 
 /* Shared modal titlebar: back button + centred title + close button. The row
@@ -984,7 +985,7 @@ input[type='range']::-moz-range-progress,
 .st-segmented-toggle {
   display: inline-flex;
   padding: 0.15rem;
-  border-radius: 0.6rem;
+  border-radius: var(--radius-md);
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.09);
 }
@@ -993,13 +994,13 @@ input[type='range']::-moz-range-progress,
   appearance: none;
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.25rem 0.85rem;
-  border-radius: 0.45rem;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition:
     background 0.12s ease,
@@ -1007,7 +1008,7 @@ input[type='range']::-moz-range-progress,
 }
 
 .st-segmented-toggle-btn:hover:not(:disabled) {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-strong);
 }
 
 .st-segmented-toggle-btn.is-active {
@@ -1079,11 +1080,11 @@ input[type='range']::-moz-range-progress,
   width: 100%;
   text-align: left;
   border: 0;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 0.5rem 0.7rem;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.65);
-  background-color: rgba(255, 255, 255, 0.03);
+  font-size: var(--fs-lg);
+  color: var(--text-muted);
+  background-color: var(--surface-ghost);
   cursor: pointer;
   transition:
     background-color 0.15s ease,
@@ -1091,8 +1092,8 @@ input[type='range']::-moz-range-progress,
 }
 
 .settings-nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.9);
+  background-color: var(--surface-ghost-hover);
+  color: var(--text-strong);
 }
 
 .settings-nav-item.active {
@@ -1156,7 +1157,7 @@ input[type='range']::-moz-range-progress,
   transform: rotate(180deg);
   font-weight: 700;
   letter-spacing: 0.1rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1192,12 +1193,12 @@ input[type='range']::-moz-range-progress,
 }
 .tag-picker-title {
   font-weight: 700;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--fs-md);
+  color: var(--text-soft);
 }
 .tag-picker-hint {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: var(--fs-xs);
+  color: var(--text-subtle);
 }
 .tag-picker-list {
   display: flex;
@@ -1205,8 +1206,8 @@ input[type='range']::-moz-range-progress,
   gap: 6px;
 }
 .tag-picker-empty {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
 }
 .tag-picker-chip {
   --tag-colour: #7f8c8d;
@@ -1215,11 +1216,11 @@ input[type='range']::-moz-range-progress,
   gap: 6px;
   max-width: 100%;
   padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
   background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 11px;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1231,7 +1232,7 @@ input[type='range']::-moz-range-progress,
     color 140ms ease;
 }
 .tag-picker-chip i {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1;
   color: var(--tag-colour);
 }
@@ -1245,11 +1246,11 @@ input[type='range']::-moz-range-progress,
 .tag-picker-chip.is-on {
   border-color: var(--tag-colour);
   background: color-mix(in srgb, var(--tag-colour) 22%, transparent);
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-strong);
 }
 .tag-picker-chip:hover:not(:disabled) {
   border-color: var(--tag-colour);
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-strong);
 }
 /* Inherited from a group or from "all clients": on, but not this client's to
  * turn off. Not greyed out — it IS applied — just not interactive. */
@@ -1260,10 +1261,10 @@ input[type='range']::-moz-range-progress,
 }
 .tag-picker-chip-via {
   padding: 0 5px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(0, 0, 0, 0.3);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 9px;
+  color: var(--text-muted);
+  font-size: var(--fs-3xs);
   letter-spacing: 0.06em;
 }
 /* Client Info renders the same chips with no interaction at all. */
@@ -1283,12 +1284,12 @@ input[type='range']::-moz-range-progress,
 }
 .mac-address-editor-title {
   font-weight: 700;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--fs-md);
+  color: var(--text-soft);
 }
 .mac-address-editor-hint {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: var(--fs-xs);
+  color: var(--text-subtle);
 }
 .mac-address-list {
   display: grid;
@@ -1299,13 +1300,13 @@ input[type='range']::-moz-range-progress,
   align-items: center;
   gap: 8px;
   padding: 7px 8px 7px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
 }
 .mac-address-item .mac-address-value {
   font-family: var(--bs-font-monospace, monospace);
-  font-size: 13px;
+  font-size: var(--fs-md);
   letter-spacing: 0.02em;
   flex: 1 1 auto;
   overflow: hidden;
@@ -1313,33 +1314,33 @@ input[type='range']::-moz-range-progress,
   white-space: nowrap;
 }
 .mac-address-item .mac-address-tag {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-soft);
   white-space: nowrap;
 }
 /* The address currently serving the client's active connection. */
 .mac-address-item .mac-address-tag.is-active {
-  background: rgba(80, 200, 120, 0.2);
-  color: #96e6b3;
+  background: rgb(var(--success-text-rgb) / 0.2);
+  color: var(--success-text-soft);
 }
 .mac-address-item .mac-address-remove {
   flex: 0 0 auto;
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-subtle);
   padding: 2px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   line-height: 1;
 }
 .mac-address-item .mac-address-remove:hover {
-  background: rgba(255, 90, 90, 0.18);
-  color: #ff9d9d;
+  background: rgb(var(--danger-text-rgb) / 0.18);
+  color: var(--danger-text-hover);
 }
 .mac-address-empty {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
   padding: 6px 2px;
 }

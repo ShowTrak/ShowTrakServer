@@ -161,7 +161,7 @@ async function ToggleTagMembership(TagID: number, Entity: TagBadgeEntity): Promi
     if (Err) await Notify(String(Err), 'error');
   } catch (Error) {
     HandleNonFatalError('TagPicker:ToggleTagMembership', Error);
-    await Notify('Failed to update tag', 'error');
+    await Notify('Failed to update tag.', 'error');
   }
 }
 

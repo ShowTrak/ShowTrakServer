@@ -147,7 +147,7 @@ function EndpointCard(Endpoint: AudioEndpointView, Capabilities: AudioCapabiliti
       </div>
       ${Endpoint.Issues.map(
         (Issue) =>
-          `<small class="d-block mt-1 text-start text-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue.Message)}</small>`
+          `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue.Message)}</small>`
       ).join('')}
       ${LevelRow(Endpoint, Capabilities)}
       ${ConditionsTable(Endpoint, Capabilities)}
@@ -284,7 +284,7 @@ export function BindClientInfoAudioHandlers(
           : await window.API.MarkClientAudioDeviceCritical(UUID, { EndpointID });
         if (Err) return void Notify(String(Err), 'error');
         await Notify(
-          IsCritical ? 'Audio device no longer monitored' : 'Audio device is now monitored',
+          IsCritical ? 'Audio device no longer monitored.' : 'Audio device is now monitored.',
           'success',
           1400
         );

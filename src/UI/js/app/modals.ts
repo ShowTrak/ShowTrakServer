@@ -78,7 +78,7 @@ export async function ExecuteScript(
   _ResetList?: unknown
 ) {
   const ScriptTarget = ScriptList.find((s) => s.ID === Script);
-  if (!ScriptTarget) return Notify('Script not found', 'error');
+  if (!ScriptTarget) return Notify('Script not found.', 'error');
   await window.API.ExecuteScript(Script, Targets, true);
   ShowExecutionToast();
 }
@@ -118,7 +118,10 @@ export function InitSimpleModalHeaders() {
     title: 'Update Manager',
     onClose: dismiss('SHOWTRAK_MODAL_UPDATE_MANAGER'),
   });
-  build('SETTINGS_HEADER', { title: 'Settings', onClose: dismiss('SHOWTRAK_MODAL_SETTINGS') });
+  build('SETTINGS_HEADER', {
+    title: 'ShowTrak Preferences',
+    onClose: dismiss('SHOWTRAK_MODAL_SETTINGS'),
+  });
   build('FOG_TASK_HEADER', {
     title: 'Schedule FOG Task',
     onClose: dismiss('SHOWTRAK_MODAL_FOG_TASK'),
@@ -143,7 +146,7 @@ export function InitSimpleModalHeaders() {
   });
   build('GROUP_CREATION_HEADER', {
     title: 'Create New Group',
-    onClose: dismiss('SHOWTRAL_MODAL_GROUPCREATION'),
+    onClose: dismiss('SHOWTRAK_MODAL_GROUPCREATION'),
   });
   build('UNASSIGNED_CLIENT_CREATION_HEADER', {
     title: 'Create Unassigned Clients',
@@ -247,7 +250,7 @@ export async function OpenAboutModal() {
 
   const DependenciesContainer = $('#SHOWTRAK_ABOUT_DEPENDENCIES');
   const DependenciesCount = $('#SHOWTRAK_ABOUT_DEPENDENCY_COUNT');
-  DependenciesContainer.empty().text('Loading dependencies...');
+  DependenciesContainer.empty().text('Loading dependencies…');
   DependenciesCount.text('');
 
   try {
@@ -261,13 +264,13 @@ export async function OpenAboutModal() {
     DependenciesContainer.append(RenderAboutDependencyList(RuntimeDependencies));
     DependenciesCount.text(`${RuntimeDependencies.length} total`);
   } catch {
-    DependenciesContainer.empty().text('Could not load dependencies.');
+    DependenciesContainer.empty().text('Failed to load dependencies.');
     DependenciesCount.text('Unavailable');
   }
 
   const LicenseText = $('#SHOWTRAK_ABOUT_LICENSE');
   const LicenseToggle = $('#SHOWTRAK_ABOUT_LICENSE_TOGGLE');
-  LicenseText.addClass('d-none').text('Loading licence...');
+  LicenseText.addClass('d-none').text('Loading licence…');
   LicenseToggle.text('Show full licence');
   LicenseToggle.off('click').on('click', () => {
     const Hidden = LicenseText.hasClass('d-none');
@@ -284,7 +287,7 @@ export async function OpenAboutModal() {
 
     LicenseText.text(License);
   } catch {
-    LicenseText.text('Could not load the licence text.');
+    LicenseText.text('Failed to load the licence text.');
   }
 
   openModal('SHOWTRAK_MODAL_ABOUT');
@@ -298,7 +301,7 @@ export async function OpenShow() {
     await Notify(String(Err), 'error');
     return;
   }
-  await Notify('Opened ShowTrak file.', 'success');
+  await Notify('Opened show file.', 'success');
 }
 
 // Derive a display name from a .ShowTrak path: basename without the extension.
@@ -321,7 +324,7 @@ export async function SaveShow() {
     await Notify(String(Err), 'error');
     return;
   }
-  await Notify('Saved ShowTrak file.', 'success');
+  await Notify('Saved show file.', 'success');
 }
 
 export async function SaveShowAs() {
@@ -332,12 +335,13 @@ export async function SaveShowAs() {
     await Notify(String(Err), 'error');
     return;
   }
-  await Notify('Saved ShowTrak file.', 'success');
+  await Notify('Saved show file.', 'success');
 }
 
 export async function NewShow() {
   const Confirmed = await ConfirmationDialog(
-    'Create a new show? This clears the current working data.'
+    'Create a new show file? This clears the current working data.',
+    { ConfirmLabel: 'New Show File' }
   );
   if (!Confirmed) return;
   const [Err] = await window.API.NewShow();
@@ -345,7 +349,7 @@ export async function NewShow() {
     await Notify(String(Err), 'error');
     return;
   }
-  await Notify('Created new show.', 'success');
+  await Notify('Created new show file.', 'success');
 }
 
 // Populate the FOG section of the client editor: the host dropdown and the
@@ -713,13 +717,20 @@ export async function OpenClientEditor(UUID: string) {
   $('#SHOWTRAK_CLIENT_EDITOR_REMOVE')
     .off('click')
     .on('click', async () => {
-      await CloseAllModals();
+      // Confirm over the open editor so Cancel leaves the operator where they were.
+      const Label = Nickname || Hostname || 'this client';
       const Confirmation = await ConfirmationDialog(
-        `Are you sure you want to delete ${Nickname || Hostname}?`
+        `Delete ${Label}? It will need to be adopted again to come back.`,
+        { ConfirmLabel: 'Delete Client' }
       );
       if (!Confirmation) return;
-      await window.API.UnadoptClient(UUID);
-      await Notify(`Unadopted ${Nickname ? Nickname : Hostname}`, 'success');
+      const [Err] = ((await window.API.UnadoptClient(UUID)) || []) as [unknown, unknown];
+      if (Err) {
+        await Notify(`Failed to delete client: ${Err}`, 'error');
+        return;
+      }
+      await CloseAllModals();
+      await Notify(`Deleted ${Label}.`, 'success');
     });
 
   const replacementCandidates = (Array.isArray(PendingAdoption) ? PendingAdoption : []).filter(
@@ -787,7 +798,13 @@ export async function OpenClientEditor(UUID: string) {
         Payload.Variables = CollectClientVariables();
       }
 
-      await window.API.UpdateClient(UUID, Payload);
+      const [Err] = await window.API.UpdateClient(UUID, Payload);
+      if (Err) {
+        // Keep the editor open so nothing the operator typed is lost.
+        await Notify(`Failed to update client: ${Err}`, 'error');
+        return;
+      }
+      await Notify('Client updated.', 'success');
       await CloseAllModals();
     });
 
@@ -853,7 +870,7 @@ export async function OpenClientReplacementModal(Client: ClientView) {
       }
 
       await CloseAllModals();
-      await Notify('Client replaced successfully', 'success');
+      await Notify('Client replaced successfully.', 'success');
     });
 
   await CloseAllModals();

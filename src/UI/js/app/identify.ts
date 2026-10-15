@@ -135,7 +135,7 @@ export async function StopIdentifyingForUUIDs(UUIDs: string[]) {
   if (Missing.length) ApplyIdentifyStateLocally(Missing, false);
   const Errors = Failed.map((Entry) => Entry.Error).filter(Boolean);
   if (Errors.length) {
-    Notify(String(Errors[0]), 'danger');
+    Notify(String(Errors[0]), 'error');
   }
   return { succeeded: Succeeded, failed: Failed };
 }

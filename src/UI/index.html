@@ -103,7 +103,7 @@
           >
             <i class="bi bi-x-circle"></i>
           </button>
-          <span id="SELECTION_STATUS" class="cursor-pointer">0 Clients Selected</span>
+          <span id="SELECTION_STATUS" class="cursor-pointer">0 Targets Selected</span>
         </div>
         <div class="bar-section right">
           <button
@@ -121,8 +121,8 @@
               type="button"
               id="ADD_MONITORING_TARGET_BTN"
               class="settings-btn dropdown-toggle no-drag"
-              title="Add Monitoring Target"
-              aria-label="Add Monitoring Target"
+              title="Add Monitor"
+              aria-label="Add Monitor"
               data-bs-toggle="dropdown"
               data-bs-offset="0,6"
               data-bs-auto-close="true"
@@ -133,7 +133,7 @@
             <ul class="dropdown-menu dropdown-menu-end" id="ADD_MONITORING_TARGET_MENU">
               <li>
                 <button type="button" class="dropdown-item" id="ADD_TARGET_MANUAL_ACTION">
-                  Create Monitoring Target
+                  Create Monitor
                 </button>
               </li>
               <li>
@@ -208,8 +208,8 @@
               type="button"
               id="NAVBAR_CORE_BUTTON"
               class="settings-btn dropdown-toggle no-drag"
-              title="Settings"
-              aria-label="Settings"
+              title="Menu"
+              aria-label="Menu"
               data-bs-toggle="dropdown"
               data-bs-offset="0,6"
               data-bs-auto-close="true"
@@ -221,26 +221,26 @@
               <li><h6 class="dropdown-header">Show File</h6></li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_NEW">
-                  <span>New Show</span>
-                  <span class="menu-shortcut">Cmd/Ctrl+N</span>
+                  <span>New Show File</span>
+                  <span class="menu-shortcut">Ctrl/Cmd+N</span>
                 </button>
               </li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_OPEN">
-                  <span>Open</span>
-                  <span class="menu-shortcut">Cmd/Ctrl+O</span>
+                  <span>Open Show File…</span>
+                  <span class="menu-shortcut">Ctrl/Cmd+O</span>
                 </button>
               </li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SAVE">
-                  <span>Save</span>
-                  <span class="menu-shortcut">Cmd/Ctrl+S</span>
+                  <span>Save Show File</span>
+                  <span class="menu-shortcut">Ctrl/Cmd+S</span>
                 </button>
               </li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SAVEAS">
-                  <span>Save As</span>
-                  <span class="menu-shortcut">Cmd/Ctrl+Shift+S</span>
+                  <span>Save Show File As…</span>
+                  <span class="menu-shortcut">Ctrl/Cmd+Shift+S</span>
                 </button>
               </li>
               <li><hr class="dropdown-divider" /></li>
@@ -332,7 +332,7 @@
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_OPEN_SETTINGS">
                   <span>ShowTrak Preferences</span>
-                  <span class="menu-shortcut">Cmd/Ctrl+,</span>
+                  <span class="menu-shortcut">Ctrl/Cmd+,</span>
                 </button>
               </li>
               <li>
@@ -366,7 +366,7 @@
         <strong>Alerts</strong>
         <div class="alerts-actions">
           <button type="button" class="btn btn-sm btn-light" id="ALERTS_DISMISS_ALL">
-            Dismiss All (Ctrl+U)
+            Dismiss All (Ctrl/Cmd+U)
           </button>
         </div>
       </div>
@@ -427,14 +427,16 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <strong class="mb-0"> No Show Open </strong>
+            <strong class="mb-0"> No Show File Open </strong>
             <p class="text-muted text-sm mb-2">
-              Open an existing ShowTrak file or create a new show to get started.
+              Open an existing show file or create a new one to get started.
             </p>
 
             <div class="d-grid gap-2">
-              <button type="button" class="btn btn-success" id="NO_SHOW_OPEN">Open Show</button>
-              <button type="button" class="btn btn-light" id="NO_SHOW_NEW">New Show</button>
+              <button type="button" class="btn btn-success" id="NO_SHOW_OPEN">
+                Open Show File…
+              </button>
+              <button type="button" class="btn btn-light" id="NO_SHOW_NEW">New Show File</button>
             </div>
           </div>
         </div>
@@ -457,14 +459,14 @@
           <div class="modal-body text-center">
             <strong class="mb-0"> Save Your Existing Data </strong>
             <p class="text-muted text-sm mb-2">
-              ShowTrak now stores configuration and show data in a .showtrak file. We found data
-              from a previous version that is not yet saved to a file. Choose a location to save it
-              now to avoid losing your data.
+              ShowTrak now stores configuration and show data in a show file (.showtrak). We found
+              data from a previous version that is not yet saved to a show file. Choose a location
+              to save it now to avoid losing your data.
             </p>
 
             <div class="d-grid gap-2">
               <button type="button" class="btn btn-success" id="MIGRATE_SAVE">
-                Save Show File
+                Save Show File As…
               </button>
             </div>
           </div>
@@ -564,7 +566,7 @@
                   id="SHOWTRAK_ABOUT_DEPENDENCIES"
                   class="SHOWTRAK_ABOUT_DEPENDENCIES_LIST text-muted"
                 >
-                  Loading dependencies...
+                  Loading dependencies…
                 </div>
               </div>
             </div>
@@ -589,7 +591,7 @@
                   class="SHOWTRAK_ABOUT_LICENSE_TEXT rounded bg-ghost-light p-2 small d-none mb-0"
                   style="max-height: 260px; overflow: auto; white-space: pre-wrap"
                 >
-Loading licence...</pre>
+Loading licence…</pre>
               </div>
             </div>
           </div>
@@ -628,7 +630,7 @@ Loading licence...</pre>
               <div class="flex-grow-1">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                   <strong id="APP_UPDATE_STATUS" class="SHOWTRAK_APP_UPDATE_STATUS">
-                    Checking for updates...
+                    Checking for updates…
                   </strong>
                   <span
                     id="APP_UPDATE_VERSION"
@@ -700,7 +702,7 @@ Loading licence...</pre>
               <button
                 type="button"
                 id="GROUP_MANAGER_EDITOR_DELETE"
-                class="btn btn-sm script-manager-delete-btn"
+                class="btn btn-sm btn-delete"
                 title="Delete group"
               >
                 <i class="bi bi-trash"></i> Delete Group
@@ -869,7 +871,7 @@ Loading licence...</pre>
                 <i class="bi bi-arrow-clockwise"></i> Refresh
               </button>
             </div>
-            <p id="UPDATE_MANAGER_RELEASE" class="text-light mb-1">Release: loading...</p>
+            <p id="UPDATE_MANAGER_RELEASE" class="text-light mb-1">Release: loading…</p>
             <p id="UPDATE_MANAGER_STATUS" class="text-muted mb-2">
               Download latest release from the server and push updates over LAN. Always update
               clients before updating ShowTrak Server to avoid compatibility issues.
@@ -889,7 +891,7 @@ Loading licence...</pre>
 
             <div id="UPDATE_MANAGER_DOWNLOAD_PROGRESS_WRAPPER" class="d-none mb-2">
               <div class="small text-muted mb-1" id="UPDATE_MANAGER_DOWNLOAD_PROGRESS_TEXT">
-                Preparing download...
+                Preparing download…
               </div>
               <div class="progress UPDATE_MANAGER_DOWNLOAD_PROGRESS">
                 <div
@@ -909,7 +911,7 @@ Loading licence...</pre>
                 Download Selected Release
               </button>
               <button type="button" class="btn btn-success" id="UPDATE_MANAGER_DEPLOY_ALL">
-                Deploy Release To Selected Clients
+                Deploy Release to Selected Clients
               </button>
             </div>
 
@@ -1028,7 +1030,7 @@ Loading licence...</pre>
                 <button
                   type="button"
                   id="SCRIPT_MANAGER_DELETE"
-                  class="btn btn-sm script-manager-delete-btn"
+                  class="btn btn-sm btn-delete"
                   title="Delete script"
                 >
                   <i class="bi bi-trash"></i> Delete
@@ -1271,7 +1273,7 @@ Loading licence...</pre>
                 <button
                   type="button"
                   id="TAG_MANAGER_DELETE"
-                  class="btn btn-sm script-manager-delete-btn"
+                  class="btn btn-sm btn-delete"
                   title="Delete tag"
                 >
                   <i class="bi bi-trash"></i> Delete
@@ -1404,7 +1406,7 @@ Loading licence...</pre>
                 <button
                   type="button"
                   id="VARIABLE_MANAGER_DELETE"
-                  class="btn btn-sm script-manager-delete-btn"
+                  class="btn btn-sm btn-delete"
                   title="Delete variable"
                 >
                   <i class="bi bi-trash"></i> Delete
@@ -1601,7 +1603,7 @@ Loading licence...</pre>
                 id="SETTINGS_NAV"
                 class="settings-nav"
                 role="tablist"
-                aria-label="Settings categories"
+                aria-label="Preferences categories"
               ></nav>
               <div id="SETTINGS_CONTENT" class="settings-content">
                 <div id="SETTINGS" class="d-grid gap-2"></div>
@@ -1714,7 +1716,7 @@ Loading licence...</pre>
                   <select class="form-select" id="CLIENT_EDITOR_RUNONLAUNCH_SCRIPT">
                     <option value="">None</option>
                   </select>
-                  <label for="CLIENT_EDITOR_RUNONLAUNCH_SCRIPT">Run On Launch</label>
+                  <label for="CLIENT_EDITOR_RUNONLAUNCH_SCRIPT">Run on Launch</label>
                 </div>
                 <div class="form-floating">
                   <input
@@ -1853,7 +1855,7 @@ Loading licence...</pre>
               class="btn btn-ghost text-light"
               id="SHOWTRAK_CLIENT_EDITOR_UPDATE"
             >
-              Check For Updates
+              Check for Updates
             </button>
             <button
               type="button"
@@ -1862,11 +1864,7 @@ Loading licence...</pre>
             >
               Replace Client
             </button>
-            <button
-              type="button"
-              class="btn btn-ghost text-danger"
-              id="SHOWTRAK_CLIENT_EDITOR_REMOVE"
-            >
+            <button type="button" class="btn btn-delete" id="SHOWTRAK_CLIENT_EDITOR_REMOVE">
               Delete Client
             </button>
           </div>
@@ -1993,9 +1991,9 @@ Loading licence...</pre>
 
     <div
       class="modal fade"
-      id="SHOWTRAL_MODAL_GROUPCREATION"
+      id="SHOWTRAK_MODAL_GROUPCREATION"
       tabindex="-1"
-      aria-labelledby="SHOWTRAL_MODAL_GROUPCREATION_Label"
+      aria-labelledby="SHOWTRAK_MODAL_GROUPCREATION_Label"
       aria-hidden="true"
     >
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
@@ -2120,12 +2118,8 @@ Loading licence...</pre>
                 <small id="MONITORING_TARGET_SAVE_HINT" class="text-muted text-center"></small>
 
                 <div id="MONITORING_TARGET_DANGER_ZONE" class="d-none">
-                  <button
-                    type="button"
-                    class="btn btn-ghost text-danger w-100"
-                    id="MONITORING_TARGET_DELETE"
-                  >
-                    Delete Monitoring Target
+                  <button type="button" class="btn btn-delete w-100" id="MONITORING_TARGET_DELETE">
+                    Delete Monitor
                   </button>
                 </div>
               </div>
@@ -2240,11 +2234,7 @@ Loading licence...</pre>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  class="btn btn-ghost text-danger w-100"
-                  id="MONITORING_CHECK_DELETE"
-                >
+                <button type="button" class="btn btn-delete w-100" id="MONITORING_CHECK_DELETE">
                   Remove Check
                 </button>
               </div>
@@ -2468,11 +2458,7 @@ Loading licence...</pre>
             </div>
 
             <div id="FREEKIOSK_DANGER_ZONE" class="d-none">
-              <button
-                type="button"
-                class="btn btn-ghost text-danger w-100 mt-2"
-                id="FREEKIOSK_DELETE"
-              >
+              <button type="button" class="btn btn-delete w-100 mt-2" id="FREEKIOSK_DELETE">
                 Delete FreeKiosk Terminal
               </button>
             </div>
@@ -2565,11 +2551,7 @@ Loading licence...</pre>
             </div>
 
             <div id="DUMMY_CLIENT_DANGER_ZONE" class="d-none">
-              <button
-                type="button"
-                class="btn btn-ghost text-danger w-100 mt-2"
-                id="DUMMY_CLIENT_DELETE"
-              >
+              <button type="button" class="btn btn-delete w-100 mt-2" id="DUMMY_CLIENT_DELETE">
                 Delete Dummy Client
               </button>
             </div>
@@ -2661,7 +2643,7 @@ Loading licence...</pre>
                   <div id="ALERT_RULE_ACTIONS_LIST" class="d-grid gap-2"></div>
 
                   <div class="d-grid gap-2 mt-1" id="ALERT_RULE_EDITOR_ACTIONS">
-                    <button type="button" class="btn btn-danger d-none" id="ALERT_RULE_DELETE">
+                    <button type="button" class="btn btn-delete d-none" id="ALERT_RULE_DELETE">
                       Delete
                     </button>
                   </div>
@@ -2679,7 +2661,7 @@ Loading licence...</pre>
                 <div id="ALERT_ACTION_EDITOR_SETTINGS" class="d-grid gap-2"></div>
 
                 <div class="d-grid">
-                  <button type="button" class="btn btn-danger" id="ALERT_ACTION_EDITOR_DELETE">
+                  <button type="button" class="btn btn-delete" id="ALERT_ACTION_EDITOR_DELETE">
                     Delete Action
                   </button>
                 </div>
@@ -2759,37 +2741,6 @@ Loading licence...</pre>
             <div class="row g-2 mt-0">
               <div class="col-12 d-grid">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div
-      class="modal fade"
-      id="SHOWTRAL_MODAL_CONFIRMATION"
-      tabindex="-1"
-      aria-labelledby="SHOWTRAL_MODAL_CONFIRMATION_Label"
-      aria-hidden="true"
-    >
-      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-          <div class="modal-body text-center">
-            <h6 id="SHOWTRAK_CONFIRMATION_MESSAGE" class="mb-0">
-              Are you sure you want to do this?
-            </h6>
-
-            <div class="row g-2 mt-1">
-              <div class="col-6 d-grid">
-                <button type="button" class="btn btn-secondary" id="SHOWTRAK_CONFIRMATION_CANCEL">
-                  Cancel
-                </button>
-              </div>
-              <div class="col-6 d-grid">
-                <button type="button" class="btn btn-danger" id="SHOWTRAK_CONFIRMATION_CONFIRM">
-                  Confirm
-                </button>
               </div>
             </div>
           </div>

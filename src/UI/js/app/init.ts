@@ -308,7 +308,7 @@ export async function Init() {
     // moved, the working data is wiped so we can prompt for a fresh start.
     const [, MissingResult] = (await window.API.EnsureShowFileExists()) || [];
     if (MissingResult && MissingResult.Missing) {
-      await Notify('Previous show file was missing. Open or create a new show.', 'error');
+      await Notify('The previous show file was missing. Open or create a new show file.', 'error');
     }
     const CurrentShowFile = await window.API.GetCurrentShowFile();
     RenderShowFileName(CurrentShowFile);
@@ -327,7 +327,7 @@ export async function Init() {
         return;
       }
       closeModal('SHOWTRAK_MODAL_NO_SHOW');
-      await Notify('Created new show.', 'success');
+      await Notify('Created new show file.', 'success');
     });
 
     // Legacy-data migration guard: force a Save As before continuing so data from

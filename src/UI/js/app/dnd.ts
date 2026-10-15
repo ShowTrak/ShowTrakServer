@@ -84,17 +84,17 @@ export function ShowShortcutsModal() {
   items.push({ title: 'Select All', shortcut: 'Ctrl/Cmd+A' });
   items.push({ title: 'Clear Selection', shortcut: 'Ctrl/Cmd+D' });
   // Core menu actions
-  items.push({ title: 'New Show', shortcut: 'Ctrl/Cmd+N' });
-  items.push({ title: 'Open Show', shortcut: 'Ctrl/Cmd+O' });
-  items.push({ title: 'Save Show', shortcut: 'Ctrl/Cmd+S' });
-  items.push({ title: 'Save Show As', shortcut: 'Ctrl/Cmd+Shift+S' });
+  items.push({ title: 'New Show File', shortcut: 'Ctrl/Cmd+N' });
+  items.push({ title: 'Open Show File…', shortcut: 'Ctrl/Cmd+O' });
+  items.push({ title: 'Save Show File', shortcut: 'Ctrl/Cmd+S' });
+  items.push({ title: 'Save Show File As…', shortcut: 'Ctrl/Cmd+Shift+S' });
   items.push({ title: 'Switch to Show Mode', shortcut: 'Ctrl/Cmd+1' });
   items.push({ title: 'Switch to Edit Mode', shortcut: 'Ctrl/Cmd+2' });
   items.push({ title: 'ShowTrak Preferences', shortcut: 'Ctrl/Cmd+,' });
   items.push({ title: 'LAN Discovery Wizard', shortcut: 'Ctrl/Cmd+L' });
   items.push({ title: 'Cycle View (Grid / Compact / List)', shortcut: 'Ctrl/Cmd+E' });
-  items.push({ title: 'Expand Monitoring Targets (List View)', shortcut: 'Ctrl/Cmd+Right' });
-  items.push({ title: 'Collapse Monitoring Targets (List View)', shortcut: 'Ctrl/Cmd+Left' });
+  items.push({ title: 'Expand Monitors (List View)', shortcut: 'Ctrl/Cmd+Right' });
+  items.push({ title: 'Collapse Monitors (List View)', shortcut: 'Ctrl/Cmd+Left' });
   // Alerts
   items.push({ title: 'Toggle Alert Actions Enabled/Disabled', shortcut: 'Ctrl/Cmd+T' });
   items.push({ title: 'Toggle Alerts Panel', shortcut: 'Ctrl/Cmd+Y' });

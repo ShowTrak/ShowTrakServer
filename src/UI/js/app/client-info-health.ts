@@ -175,7 +175,7 @@ export function SystemCardHtml(
   History: { Cpu: FreeKioskMetricSample[]; Ram: FreeKioskMetricSample[] } | null
 ): string {
   const Note = Card.Note
-    ? `<small class="d-block mb-0 text-start ${Card.Note.Tone === 'danger' ? 'text-warning' : 'text-light'}">${Safe(
+    ? `<small class="d-block mb-0 text-start ${Card.Note.Tone === 'danger' ? 'st-condition-failing' : 'text-light'}">${Safe(
         Card.Note.Title
       )} — ${Safe(Card.Note.Body)}</small>`
     : '';
@@ -200,7 +200,7 @@ export function SystemCardHtml(
       ${Chart}
       ${Card.Issues.map(
         (Issue) =>
-          `<small class="d-block mt-1 text-start text-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue)}</small>`
+          `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue)}</small>`
       ).join('')}
       ${ConditionsTable(Card)}
       ${Extra(Card, Client)}
@@ -326,7 +326,7 @@ export function BindClientInfoSystemHandlers(
         if (Err) return void Notify(String(Err), 'error');
         const Title = $(this).closest('.SHOWTRAK_SYSTEM_CARD').find('h6').first().text() || 'Check';
         await Notify(
-          Monitored ? `${Title} no longer monitored` : `${Title} is now monitored`,
+          Monitored ? `${Title} no longer monitored.` : `${Title} is now monitored.`,
           'success',
           1400
         );

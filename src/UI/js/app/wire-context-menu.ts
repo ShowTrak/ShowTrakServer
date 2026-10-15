@@ -137,7 +137,7 @@ export function wireContextMenu() {
     if (Selected.length == 0) {
       Options.push({
         Type: 'Info',
-        Title: 'No Selected Clients',
+        Title: 'No Targets Selected',
         Class: 'text-muted',
       });
     }
@@ -257,7 +257,8 @@ export function wireContextMenu() {
                 if (!Confirmation) return false;
               } else if (Level === 'Standard') {
                 const Confirmation = await ConfirmationDialog(
-                  `Are you sure you want to run "${Script.Name}" on ${Targets.length} Client${Plural}?`
+                  `Are you sure you want to run "${Script.Name}" on ${Targets.length} client${Plural}?`,
+                  { ConfirmLabel: 'Run Script' }
                 );
                 if (!Confirmation) return false;
               }
@@ -334,7 +335,8 @@ export function wireContextMenu() {
                 const Confirmed = await ConfirmationDialog(
                   `${Favourite.Label} on ${
                     TargetIDs.length === 1 ? 'this monitor' : `${TargetIDs.length} monitors`
-                  }?`
+                  }?`,
+                  { ConfirmLabel: Favourite.Label }
                 );
                 if (!Confirmed) return false;
               }
@@ -398,7 +400,8 @@ export function wireContextMenu() {
             Action: async function () {
               if (Action && Action.Destructive) {
                 const Confirmed = await ConfirmationDialog(
-                  `${Favourite.Label} on ${CheckWord(ForChecks.length)}?`
+                  `${Favourite.Label} on ${CheckWord(ForChecks.length)}?`,
+                  { ConfirmLabel: Favourite.Label }
                 );
                 if (!Confirmed) return false;
               }
@@ -481,7 +484,7 @@ export function wireContextMenu() {
             Action: async function () {
               const [Err, Summary] = await window.API.RunFreeKioskTerminalsNow(KioskUUIDs);
               if (Err) return Notify(Err, 'error');
-              Notify(`Polled ${Summary?.Succeeded ?? 0}/${Summary?.Total ?? 0} ${Plural}`, 'info');
+              Notify(`Polled ${Summary?.Succeeded ?? 0}/${Summary?.Total ?? 0} ${Plural}.`, 'info');
             },
           });
         }
@@ -517,7 +520,8 @@ export function wireContextMenu() {
             Action: async function () {
               if (Command.Destructive) {
                 const Confirmed = await ConfirmationDialog(
-                  `${Command.Label} on ${KioskUUIDs.length === 1 ? 'this terminal' : Plural}?`
+                  `${Command.Label} on ${KioskUUIDs.length === 1 ? 'this terminal' : Plural}?`,
+                  { ConfirmLabel: Command.Label }
                 );
                 if (!Confirmed) return false;
               }
@@ -530,7 +534,7 @@ export function wireContextMenu() {
                   'error'
                 );
               }
-              Notify(`${Command.Label} sent to ${Plural}`, 'success');
+              Notify(`${Command.Label} sent to ${Plural}.`, 'success');
             },
           });
         }
@@ -576,7 +580,7 @@ export function wireContextMenu() {
               });
               if (Succeeded.length) ApplyIdentifyStateLocally(Succeeded, true);
               const Errors = Failed.map((Entry) => Entry.Error).filter(Boolean);
-              if (Errors.length) Notify(String(Errors[0]), 'danger');
+              if (Errors.length) Notify(String(Errors[0]), 'error');
             } catch (err) {
               HandleNonFatalError('SelectionInit:Identify', err);
             }
@@ -609,7 +613,7 @@ export function wireContextMenu() {
     }
 
     if (Selected.length > 0) {
-      // Wake On LAN only applies to real adopted clients; monitoring, check,
+      // Wake on LAN only applies to real adopted clients; monitoring, check,
       // dummy and FreeKiosk rows carry prefixed selection UUIDs and are excluded.
       const WolTargets = Selected.filter(
         (UUID) =>
@@ -622,7 +626,7 @@ export function wireContextMenu() {
       if (SYSTEM_ALLOW_WOL && WolTargets.length > 0) {
         Options.push({
           Type: 'Action',
-          Title: 'Wake On LAN',
+          Title: 'Wake on LAN',
           Class: 'text-light',
           Icon: 'bi-power',
           IconColour: '#2ecc71',
@@ -637,7 +641,7 @@ export function wireContextMenu() {
         Type: 'Action',
         Title: 'Clear Selection',
         Class: 'text-light',
-        Shortcut: 'Ctrl+D',
+        Shortcut: 'Ctrl/Cmd+D',
         Icon: 'bi-x-circle',
         IconColour: '#e74c3c',
         Action: async function () {
@@ -650,7 +654,7 @@ export function wireContextMenu() {
       Type: 'Action',
       Title: 'Select All',
       Class: 'text-light',
-      Shortcut: 'Ctrl+A',
+      Shortcut: 'Ctrl/Cmd+A',
       Icon: 'bi-check-all',
       IconColour: '#3498db',
       Action: async function () {

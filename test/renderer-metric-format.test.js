@@ -101,7 +101,7 @@ test('a long URL is truncated so it fits a row', () => {
   const long = `https://example.com/${'a'.repeat(300)}`;
   const shown = FormatMetricValue(url, long);
   assert.equal(shown.length, 60);
-  assert.ok(shown.endsWith('...'));
+  assert.ok(shown.endsWith('…'));
   // A short one is left alone.
   assert.equal(FormatMetricValue(url, 'https://example.com'), 'https://example.com');
 });

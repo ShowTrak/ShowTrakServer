@@ -196,7 +196,7 @@ export async function OpenDummyClientEditor(UUID: string | null | undefined = nu
   let Existing = null;
   if (UUID) {
     Existing = await window.API.GetDummyClient(UUID);
-    if (!Existing) return Notify('Dummy client not found', 'error');
+    if (!Existing) return Notify('Dummy client not found.', 'error');
   }
 
   let Defaults = { DummyID: '', Nickname: '', Interval: 30000 };
@@ -262,10 +262,10 @@ export async function OpenDummyClientEditor(UUID: string | null | undefined = nu
       }
       const Interval = parseInt(String($('#DUMMY_CLIENT_INTERVAL').val() || ''), 10);
 
-      if (!DummyID) return Notify('Please enter an ID', 'error');
+      if (!DummyID) return Notify('Please enter an ID.', 'error');
       // DummyID doubles as the dummy's slug: letters, digits, - and _; no spaces.
       if (!/^[A-Za-z0-9_-]+$/.test(DummyID))
-        return Notify('ID may only contain letters, numbers, - and _', 'error');
+        return Notify('ID may only contain letters, numbers, hyphens and underscores.', 'error');
 
       const Payload = {
         DummyID,
@@ -278,11 +278,11 @@ export async function OpenDummyClientEditor(UUID: string | null | undefined = nu
         if (DummyClientEditorUUID) {
           const [Err] = await window.API.UpdateDummyClient(DummyClientEditorUUID, Payload);
           if (Err) return Notify(Err, 'error');
-          await Notify('Dummy client updated', 'success');
+          await Notify('Dummy client updated.', 'success');
         } else {
           const [Err] = await window.API.CreateDummyClient(Payload);
           if (Err) return Notify(Err, 'error');
-          await Notify('Dummy client created', 'success');
+          await Notify('Dummy client created.', 'success');
         }
         await CloseAllModals();
       } catch (e) {
@@ -295,12 +295,13 @@ export async function OpenDummyClientEditor(UUID: string | null | undefined = nu
     .on('click.dummy', async () => {
       if (!DummyClientEditorUUID) return;
       const Confirmation = await ConfirmationDialog(
-        'Delete this dummy client? This cannot be undone.'
+        'Delete this dummy client? This cannot be undone.',
+        { ConfirmLabel: 'Delete Dummy Client' }
       );
       if (!Confirmation) return;
       const [Err] = await window.API.DeleteDummyClient(DummyClientEditorUUID);
       if (Err) return Notify(Err, 'error');
-      await Notify('Dummy client deleted', 'success');
+      await Notify('Dummy client deleted.', 'success');
       await CloseAllModals();
     });
 

@@ -85,7 +85,9 @@ interface DeploymentUiState {
 export function InitClientList() {
   window.API.ShutdownRequested(async () => {
     await CloseAllModals();
-    const Confirmation = await ConfirmationDialog('Are you sure you want to shutdown ShowTrak?');
+    const Confirmation = await ConfirmationDialog('Are you sure you want to close ShowTrak?', {
+      ConfirmLabel: 'Close ShowTrak',
+    });
     if (!Confirmation) return;
     await window.API.Shutdown(true);
   });

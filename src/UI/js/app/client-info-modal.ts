@@ -73,7 +73,7 @@ export async function OpenClientInfo(UUID: string) {
   } catch (e) {
     console.error('Failed to fetch client', e);
   }
-  if (!Client) return Notify('Client not found', 'error');
+  if (!Client) return Notify('Client not found.', 'error');
 
   const { Nickname, Hostname, IP, MacAddress, OperatingSystem, GroupID } = Client;
   // Group title lookup

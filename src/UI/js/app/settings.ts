@@ -19,7 +19,7 @@ import {
 import { GetAlertVolume, HandleNonFatalError, Safe, ShowQRModal } from './utils';
 import { Notify } from './selection-init';
 import { ConfirmationDialog } from './lib/toasts';
-import { ResolveSettingsTab } from './lib/settings-tabs';
+import { FormatSettingValue, ResolveSettingsTab } from './lib/settings-tabs';
 import type { RemoteDeviceView, SettingGroupView, SettingView } from '@showtrak/protocol';
 // Wires the mode/view/alert-action buttons and fetches initial settings +
 // mode state. Formerly a DOMContentLoaded handler; InitSettings() calls it
@@ -236,8 +236,7 @@ function SyncRenderedSettingValues(SettingsList: SettingView[]) {
     } else {
       $el.val(String(Incoming.Value ?? ''));
       if (Incoming.Type === 'SLIDER') {
-        const unit = Incoming.Unit ? Safe(Incoming.Unit) : '';
-        $(`#${elementId}_VALUE`).text(`${Incoming.Value}${unit}`);
+        $(`#${elementId}_VALUE`).text(FormatSettingValue(Incoming.Value, Incoming.Unit));
       }
     }
   }
@@ -326,11 +325,13 @@ function RenderSettingsSections(Structure: string) {
             const Set = Settings.find((s) => s.Key === Setting.Key);
             if (Set) Set.Value = NewValue;
             Setting.Value = NewValue;
-            await window.API.SetSetting(Setting.Key, NewValue);
-            Notify(
-              `[${Setting.Title}] ${NewValue ? 'Enabled' : 'Disabled'}`,
-              NewValue ? 'success' : 'error'
-            );
+            const [Err] = await window.API.SetSetting(Setting.Key, NewValue);
+            if (Err) {
+              Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
+              return;
+            }
+            // Turning something off is as much a success as turning it on.
+            Notify(`[${Setting.Title}] ${NewValue ? 'Enabled' : 'Disabled'}.`, 'success');
           });
       } else if (Setting.Type === 'STRING' || Setting.Type === 'PASSWORD') {
         const isWebUiPassword = Setting.Key === 'WEBUI_PASSWORD';
@@ -347,8 +348,8 @@ function RenderSettingsSections(Structure: string) {
         const inputPlaceholder = isWebUiPassword
           ? '4 digit code'
           : isMasked
-            ? 'Paste token...'
-            : 'Enter text...';
+            ? 'Paste token…'
+            : 'Enter text…';
         const initialValue = isWebUiPassword
           ? String(Setting.Value == null ? '' : Setting.Value)
               .replace(/\D/g, '')
@@ -425,7 +426,7 @@ function RenderSettingsSections(Structure: string) {
                 Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
                 return;
               }
-              Notify(`[${Setting.Title}] Saved`, 'success', 1200);
+              Notify(`[${Setting.Title}] Saved.`, 'success', 1200);
             }, 600)
           );
         });
@@ -434,18 +435,26 @@ function RenderSettingsSections(Structure: string) {
         const hasMax = typeof Setting.Max === 'number';
         const minAttr = hasMin ? `min="${Setting.Min}"` : '';
         const maxAttr = hasMax ? `max="${Setting.Max}"` : '';
+        // The unit sits after the range and beside the input, as a slider shows
+        // it beside its readout.
+        const unit = Setting.Unit ? Safe(Setting.Unit) : '';
         const rangeHint =
           hasMin && hasMax
-            ? ` <span class="text-sm text-muted">(${Setting.Min}–${Setting.Max})</span>`
+            ? ` <span class="text-sm text-muted">(${Setting.Min}–${FormatSettingValue(Setting.Max, unit)})</span>`
             : '';
+        const inputHtml = `<input type="number" class="form-control form-control-sm bg-ghost-light text-light border-0" id="SETTING_${
+          Setting.Key
+        }" value="${Safe(Setting.Value)}" step="1" ${minAttr} ${maxAttr} />`;
         $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}${rangeHint}</span>
 						<span class="text-sm mb-0">${Setting.Description}</span>
 					</div>
-					<input type="number" class="form-control form-control-sm bg-ghost-light text-light border-0" id="SETTING_${
-            Setting.Key
-          }" value="${Safe(Setting.Value)}" step="1" ${minAttr} ${maxAttr} />
+					${
+            unit
+              ? `<div class="d-flex align-items-center gap-2">${inputHtml}<span class="text-sm text-muted text-nowrap">${unit}</span></div>`
+              : inputHtml
+          }
 				</div>`);
         $(`#SETTING_${Setting.Key}`)
           .off('input')
@@ -466,8 +475,16 @@ function RenderSettingsSections(Structure: string) {
                 const Set = Settings.find((s) => s.Key === Setting.Key);
                 if (Set) Set.Value = NewValue;
                 Setting.Value = NewValue;
-                await window.API.SetSetting(Setting.Key, NewValue);
-                Notify(`[${Setting.Title}] Saved (${NewValue})`, 'success', 1200);
+                const [Err] = await window.API.SetSetting(Setting.Key, NewValue);
+                if (Err) {
+                  Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
+                  return;
+                }
+                Notify(
+                  `[${Setting.Title}] Saved (${FormatSettingValue(NewValue, Setting.Unit)}).`,
+                  'success',
+                  1200
+                );
               }, 600)
             );
           });
@@ -478,7 +495,7 @@ function RenderSettingsSections(Structure: string) {
         $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-flex justify-content-between align-items-center">
 						<span>${Setting.Title}</span>
-						<span class="text-sm text-muted" id="SETTING_${Setting.Key}_VALUE">${Safe(Setting.Value)}${unit}</span>
+						<span class="text-sm text-muted" id="SETTING_${Setting.Key}_VALUE">${FormatSettingValue(Safe(Setting.Value), unit)}</span>
 					</div>
 					<span class="text-sm mb-0">${Setting.Description}</span>
 					<input type="range" class="form-range" id="SETTING_${
@@ -495,7 +512,7 @@ function RenderSettingsSections(Structure: string) {
             if (NewValue > max) NewValue = max;
             // Update the readout immediately; persistence is debounced so we
             // don't hammer the DB while the user drags the handle.
-            $(`#SETTING_${Setting.Key}_VALUE`).text(`${NewValue}${unit}`);
+            $(`#SETTING_${Setting.Key}_VALUE`).text(FormatSettingValue(NewValue, Setting.Unit));
             if (SettingDebounceTimers.has(Setting.Key))
               clearTimeout(SettingDebounceTimers.get(Setting.Key));
             SettingDebounceTimers.set(
@@ -507,7 +524,11 @@ function RenderSettingsSections(Structure: string) {
                 if (Set) Set.Value = NewValue;
                 Setting.Value = NewValue;
                 await window.API.SetSetting(Setting.Key, NewValue);
-                Notify(`[${Setting.Title}] Saved (${NewValue}${unit})`, 'success', 1200);
+                Notify(
+                  `[${Setting.Title}] Saved (${FormatSettingValue(NewValue, Setting.Unit)}).`,
+                  'success',
+                  1200
+                );
               }, 400)
             );
           });
@@ -537,7 +558,7 @@ function RenderSettingsSections(Structure: string) {
             if (Set) Set.Value = SettingValue;
             Setting.Value = SettingValue;
             await window.API.SetSetting(Setting.Key, NewValue);
-            Notify(`[${Setting.Title}] ${NewValue}`, 'success', 1200);
+            Notify(`[${Setting.Title}] ${NewValue}.`, 'success', 1200);
           });
       }
     }
@@ -648,7 +669,7 @@ async function ShowPairingQR() {
     const Config = await window.API.GetConfig();
     const [Err, Issued] = await window.API.IssueRemotePairingCode();
     if (Err || !Issued) {
-      Notify('Could not create a pairing code', 'error');
+      Notify('Failed to create a pairing code.', 'error');
       return;
     }
     // A URL rather than bare JSON: a phone without the app installed still gets
@@ -709,7 +730,7 @@ async function RenderPairedDevicesSection() {
           <button type="button" class="btn btn-sm bg-ghost text-white" id="PAIRED_DEVICES_QR" title="Show a pairing code" aria-label="Show a pairing code">
             <i class="bi bi-qr-code"></i>
           </button>
-          <button type="button" class="btn btn-sm bg-ghost text-white" id="PAIRED_DEVICES_REVOKE_ALL" title="Revoke every device" aria-label="Revoke every paired device">
+          <button type="button" class="btn btn-sm btn-delete" id="PAIRED_DEVICES_REVOKE_ALL" title="Revoke every device" aria-label="Revoke every paired device">
             <i class="bi bi-x-octagon"></i>
           </button>
         </div>
@@ -729,7 +750,7 @@ async function RenderPairedDevicesSection() {
                 )} &middot; Last seen ${Safe(FormatDeviceTimestamp(Device.LastSeenAt))}</span>
               </div>
             </div>
-            <button type="button" class="btn btn-sm bg-ghost-light text-white flex-shrink-0 ms-2" data-revoke-device="${Safe(
+            <button type="button" class="btn btn-sm btn-delete flex-shrink-0 ms-2" data-revoke-device="${Safe(
               Device.DeviceID
             )}" title="Revoke this device" aria-label="Revoke ${Safe(Device.DeviceName)}">
               <i class="bi bi-trash"></i>
@@ -753,15 +774,16 @@ async function RenderPairedDevicesSection() {
         if (!DeviceID) return;
         const Device = List.find((D) => D.DeviceID === DeviceID);
         const Confirmed = await ConfirmationDialog(
-          `Revoke "${Device ? Device.DeviceName : 'this device'}"? It will be disconnected immediately and must pair again.`
+          `Revoke "${Device ? Device.DeviceName : 'this device'}"? It will be disconnected immediately and must pair again.`,
+          { ConfirmLabel: 'Revoke Device' }
         );
         if (!Confirmed) return;
         const [RevokeErr] = await window.API.RevokeRemoteDevice(DeviceID);
         if (RevokeErr) {
-          Notify('Could not revoke that device', 'error');
+          Notify('Failed to revoke that device.', 'error');
           return;
         }
-        Notify('Device revoked', 'success');
+        Notify('Device revoked.', 'success');
         RenderedPairedDevices = null;
         await RenderPairedDevicesSection();
         BuildSettingsNav();
@@ -772,15 +794,16 @@ async function RenderPairedDevicesSection() {
       .off('click')
       .on('click', async () => {
         const Confirmed = await ConfirmationDialog(
-          `Revoke all ${List.length} paired device${List.length === 1 ? '' : 's'}? Every one will be disconnected immediately and must pair again.`
+          `Revoke all ${List.length} paired device${List.length === 1 ? '' : 's'}? Every one will be disconnected immediately and must pair again.`,
+          { ConfirmLabel: List.length === 1 ? 'Revoke Device' : 'Revoke All Devices' }
         );
         if (!Confirmed) return;
         const [RevokeErr] = await window.API.RevokeAllRemoteDevices();
         if (RevokeErr) {
-          Notify('Could not revoke those devices', 'error');
+          Notify('Failed to revoke those devices.', 'error');
           return;
         }
-        Notify('All devices revoked', 'success');
+        Notify('All devices revoked.', 'success');
         RenderedPairedDevices = null;
         await RenderPairedDevicesSection();
         BuildSettingsNav();

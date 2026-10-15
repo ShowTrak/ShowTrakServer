@@ -51,40 +51,11 @@ body.compact-mode .group-column-grid {
 
 .GROUP_TITLE_CLICKABLE:hover {
   background-color: rgba(255, 255, 255, 0.2) !important;
-  border-radius: 0.3rem;
-}
-
-.GROUP_CREATE_BUTTON {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  font-weight: 700;
-  /* letter-spacing: 0.1rem; */
-  color: rgba(255, 255, 255, 0.6);
-  /* overflow: hidden; */
-  /* text-overflow: ellipsis; */
-  /* white-space: nowrap; */
-  text-transform: uppercase;
-}
-
-.GROUP_CREATE_BUTTON:hover {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  border-radius: 0.3rem;
-}
-
-/* Show the "+" add-group tile only in EDIT mode with a fade */
-/* Target the wrapper that specifically contains the create button */
-.GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
-  opacity: 0;
-  pointer-events: none; /* prevent clicks when hidden */
-  transition: opacity 200ms ease-in-out;
-}
-body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
-  opacity: 1;
-  pointer-events: auto;
+  border-radius: var(--radius-xs);
 }
 
 .SHOWTRAK_CLIENT_PENDING_ADOPTION {
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: var(--surface-ghost);
 }
 
 .text-bold {
@@ -93,7 +64,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 
 .progress {
   height: 3px !important;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
@@ -110,7 +81,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 #APPLICATION_NAVBAR_STATUS {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-subtle);
 }
 
 #APPLICATION_NAVBAR_STATUS:empty {
@@ -118,7 +89,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 #APPLICATION_NAVBAR_FILE {
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-soft);
   font-weight: 600;
 }
 
@@ -130,18 +101,18 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 #APPLICATION_NAVBAR_FILE:not(:empty)::before {
   content: '•';
   margin-right: 0.75rem;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-faint);
   font-weight: 400;
 }
 
 #SHOWTRAK_CONTEXT_MENU {
   display: none;
   position: fixed;
-  z-index: 100000;
-  background: linear-gradient(180deg, #1d1a35 0%, #17142c 100%) !important;
+  z-index: var(--z-context-menu);
+  background: var(--menu-bg) !important;
   color: white;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 0.6rem;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
   padding: 0.35rem;
   max-height: min(70vh, 460px);
@@ -163,7 +134,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 /* Flat rows (no per-item card/background) — only hover/focus lift them,
    matching a minimal filter-menu look rather than a stack of buttons. */
 #SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON {
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--text-soft);
   text-decoration: none !important;
   user-select: none !important;
   -webkit-user-select: none !important;
@@ -174,19 +145,19 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   justify-content: space-between;
   gap: 1rem;
   background-color: transparent;
-  border-radius: 0.4rem;
+  border-radius: var(--radius-sm);
   padding: 0.4rem 0.6rem;
-  font-size: 0.92rem;
+  font-size: var(--fs-xl);
 }
 #SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON[aria-disabled='true'] {
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-subtle);
 }
 #SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON:hover {
-  background-color: rgba(120, 95, 200, 0.16) !important;
+  background-color: rgb(var(--accent-rgb) / 0.16) !important;
 }
 #SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON:focus {
   outline: none;
-  background-color: rgba(120, 95, 200, 0.24) !important;
+  background-color: rgb(var(--accent-rgb) / 0.24) !important;
 }
 
 .SHOWTRAK_CONTEXTMENU_BUTTON {
@@ -204,7 +175,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 #SHOWTRAK_CONTEXT_MENU .context-shortcut {
   flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-subtle);
   font-size: 0.8em;
   margin-left: 1rem;
 }
@@ -240,10 +211,10 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
    panel (no gradient) with a hairline border and soft shadow so it lifts off
    the radial page background. Sizes still vary per modal via .modal-dialog. */
 .modal-content {
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  background: #171331 !important;
+  border: 1px solid var(--border-subtle) !important;
+  background: var(--surface-1) !important;
   color: white;
-  border-radius: 1rem !important;
+  border-radius: var(--radius-xl) !important;
   box-shadow:
     0 24px 60px -20px rgba(0, 0, 0, 0.65),
     0 2px 8px rgba(0, 0, 0, 0.4) !important;
@@ -276,8 +247,8 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_ABOUT_VERSION {
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-size: var(--fs-xl);
   font-weight: 600;
 }
 
@@ -292,20 +263,20 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_ABOUT_WEBSITE_BTN {
-  font-size: 0.96rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   padding: 0.55rem 0.9rem;
 }
 
 .SHOWTRAK_ABOUT_UPDATE_BODY {
-  font-size: 0.94rem;
+  font-size: var(--fs-xl);
 }
 
 /* ---- Software Update modal ---------------------------------------------- */
 
 .SHOWTRAK_APP_UPDATE_HERO {
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
 }
 
 /* Icon area: a tinted circle with a determinate progress ring sitting on its
@@ -325,8 +296,8 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgba(13, 202, 240, 0.14);
-  color: #3dd5f3;
+  background: rgb(var(--info-cyan-rgb) / 0.14);
+  color: var(--info-cyan);
   font-size: 1.4rem;
 }
 
@@ -339,7 +310,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s ease;
-  z-index: 1;
+  z-index: var(--z-base);
 }
 
 .SHOWTRAK_APP_UPDATE_ICON_WRAP.has-progress .SHOWTRAK_APP_UPDATE_RING {
@@ -354,7 +325,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 
 .SHOWTRAK_APP_UPDATE_RING_BAR {
   fill: none;
-  stroke: #3dd5f3;
+  stroke: var(--info-cyan);
   stroke-width: 3;
   stroke-linecap: round;
   /* dasharray = circumference (2·π·r, r=22). Offset is driven from JS. */
@@ -369,8 +340,8 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_APP_UPDATE_VERSION_BADGE {
-  background: rgba(13, 202, 240, 0.18);
-  color: #3dd5f3;
+  background: rgb(var(--info-cyan-rgb) / 0.18);
+  color: var(--info-cyan);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -386,9 +357,9 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   overflow: auto;
   background: rgba(0, 0, 0, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 0.9rem;
+  font-size: var(--fs-lg);
   line-height: 1.55;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--text-soft);
 }
 
 .SHOWTRAK_APP_UPDATE_CHANGELOG > *:first-child {
@@ -405,12 +376,12 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 .SHOWTRAK_APP_UPDATE_CHANGELOG h4,
 .SHOWTRAK_APP_UPDATE_CHANGELOG h5,
 .SHOWTRAK_APP_UPDATE_CHANGELOG h6 {
-  font-size: 0.95rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: #fff;
   margin: 1rem 0 0.4rem;
   padding-bottom: 0.3rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .SHOWTRAK_APP_UPDATE_CHANGELOG p {
@@ -428,19 +399,19 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_APP_UPDATE_CHANGELOG a {
-  color: #3dd5f3;
+  color: var(--info-cyan);
 }
 
 .SHOWTRAK_APP_UPDATE_CHANGELOG code {
   background: rgba(255, 255, 255, 0.1);
   padding: 0.1rem 0.35rem;
-  border-radius: 0.3rem;
-  font-size: 0.82rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-md);
 }
 
 .SHOWTRAK_APP_UPDATE_CHANGELOG pre {
   background: rgba(0, 0, 0, 0.35);
-  border-radius: 0.4rem;
+  border-radius: var(--radius-sm);
   padding: 0.6rem 0.75rem;
   overflow: auto;
 }
@@ -453,16 +424,10 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 .SHOWTRAK_ABOUT_DEPENDENCIES_LIST {
   overflow: auto;
   background: rgba(0, 0, 0, 0.22);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 0.6rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-lg);
   line-height: 1.4;
-}
-
-.SHOWTRAK_ABOUT_DEPENDENCIES_SECTION_TITLE {
-  color: rgba(255, 255, 255, 0.85);
-  font-weight: 700;
-  margin-bottom: 0.35rem;
 }
 
 .SHOWTRAK_ABOUT_DEPENDENCY_ITEM {
@@ -470,7 +435,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.15rem 0;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+  border-bottom: 1px dashed var(--border-subtle);
 }
 
 .SHOWTRAK_ABOUT_DEPENDENCY_ITEM:last-child {
@@ -478,14 +443,14 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_ABOUT_DEPENDENCY_NAME {
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-strong);
   word-break: break-word;
 }
 
 .SHOWTRAK_ABOUT_DEPENDENCY_LINK {
   color: rgba(126, 205, 255, 0.95) !important;
   text-decoration: none;
-  font-size: 0.92rem;
+  font-size: var(--fs-xl);
 }
 
 .SHOWTRAK_ABOUT_DEPENDENCY_LINK:hover,
@@ -495,7 +460,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_ABOUT_DEPENDENCY_VERSION {
-  color: rgba(255, 255, 255, 0.68);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
@@ -508,8 +473,8 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .UPDATE_MANAGER_CLIENT_ITEM {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0.6rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   padding: 0.45rem 0.55rem;
   background: rgba(255, 255, 255, 0.04);
 }
@@ -562,49 +527,49 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   align-items: center;
   gap: 0.35rem;
   flex-wrap: wrap;
-  color: rgba(255, 255, 255, 0.68);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT {
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 6px;
-  font-size: 9px;
+  font-size: var(--fs-3xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   line-height: 1.2;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--text-soft);
   background: rgba(255, 255, 255, 0.08);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.SUCCESS {
   color: #d7ffe8;
-  border-color: rgba(66, 196, 126, 0.55);
-  background: rgba(66, 196, 126, 0.2);
+  border-color: rgb(var(--success-text-rgb) / 0.55);
+  background: rgb(var(--success-text-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.WARNING {
   color: #ffe6b8;
-  border-color: rgba(255, 189, 89, 0.6);
-  background: rgba(255, 189, 89, 0.2);
+  border-color: rgb(var(--warning-soft-rgb) / 0.6);
+  background: rgb(var(--warning-soft-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.INFO {
   color: #d9f1ff;
-  border-color: rgba(88, 187, 245, 0.58);
-  background: rgba(88, 187, 245, 0.2);
+  border-color: rgb(var(--info-rgb) / 0.58);
+  background: rgb(var(--info-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.MUTED {
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--text-secondary);
   border-color: rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.08);
 }
 
 .UPDATE_MANAGER_CLIENT_STATUS {
   text-align: right;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 700;
@@ -618,36 +583,36 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .UPDATE_MANAGER_CLIENT_STATUS_TEXT {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
   min-height: 14px;
   margin-top: 0.18rem;
 }
 
 .UPDATE_MANAGER_WARNING {
-  border: 1px solid rgba(255, 189, 89, 0.45);
-  background: rgba(255, 189, 89, 0.12);
-  border-radius: 0.6rem;
+  border: 1px solid rgb(var(--warning-soft-rgb) / 0.45);
+  background: rgb(var(--warning-soft-rgb) / 0.12);
+  border-radius: var(--radius-md);
   padding: 0.65rem;
 }
 
 .UPDATE_MANAGER_WARNING_TITLE {
-  color: #ffd58a;
-  font-size: 12px;
+  color: var(--warning-text);
+  font-size: var(--fs-sm);
   font-weight: 800;
   margin-bottom: 0.2rem;
 }
 
 .UPDATE_MANAGER_WARNING_TEXT {
   color: rgba(255, 237, 204, 0.9);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .UPDATE_MANAGER_WARNING_LIST {
   margin: 0.45rem 0 0;
   padding-left: 1rem;
   color: rgba(255, 237, 204, 0.92);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .UPDATE_MANAGER_DOWNLOAD_PROGRESS {
@@ -656,25 +621,25 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .UPDATE_MANAGER_RELEASE_BADGE {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-soft);
   background: rgba(255, 255, 255, 0.08);
 }
 
 .UPDATE_MANAGER_RELEASE_BADGE.DOWNLOADED {
   color: #d7ffe8;
-  border-color: rgba(66, 196, 126, 0.55);
-  background: rgba(66, 196, 126, 0.2);
+  border-color: rgb(var(--success-text-rgb) / 0.55);
+  background: rgb(var(--success-text-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_RELEASE_BADGE.NOT_DOWNLOADED {
   color: #ffe5e5;
-  border-color: rgba(220, 84, 84, 0.55);
-  background: rgba(220, 84, 84, 0.2);
+  border-color: rgb(var(--danger-rgb) / 0.55);
+  background: rgb(var(--danger-rgb) / 0.2);
 }
 
 @media (max-width: 576px) {
@@ -687,71 +652,67 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   }
 
   .SHOWTRAK_ABOUT_VERSION {
-    font-size: 0.88rem;
+    font-size: var(--fs-lg);
   }
 
   .SHOWTRAK_ABOUT_CARD .card-body {
-    font-size: 0.92rem;
+    font-size: var(--fs-xl);
   }
 
   .SHOWTRAK_ABOUT_DEPENDENCIES_LIST {
     max-height: 180px;
-    font-size: 0.84rem;
+    font-size: var(--fs-md);
   }
 }
 
 small,
 .text-sm {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
 }
 
-/* Custom Scrollbar Styles */
+/* Custom Scrollbar Styles: the app's own surfaces, not a neutral grey. */
 ::-webkit-scrollbar {
   width: 8px;
-  background: #18181b;
-  border-radius: 1rem;
+  background: var(--surface-0);
+  border-radius: var(--radius-xl);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #35353a;
-  border-radius: 12px;
+  background: var(--surface-3);
+  border-radius: var(--radius-lg);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #505055;
+  background: color-mix(in srgb, var(--surface-3) 82%, #ffffff);
 }
 
 ::-webkit-scrollbar-corner {
-  background: #18181b;
+  background: var(--surface-0);
 }
 
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #35353a #18181b;
+  scrollbar-color: var(--surface-3) var(--surface-0);
 }
 
 /* No visual overlay change for EDIT mode */
 body.mode-edit #APPLICATION_CONTAINER {
-  background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
-}
-
-#STATUS_BAR {
-  display: none;
+  background: var(--app-bg-gradient) !important;
 }
 
 .form-control,
 .form-select {
-  background-color: rgba(255, 255, 255, 0.03) !important;
+  background-color: var(--surface-ghost) !important;
   color: white !important;
   border: none !important;
-  border-radius: 0.5rem !important;
+  border-radius: var(--radius-md) !important;
 }
 
 .form-control:focus,
 .form-select:focus {
   color: white !important;
-  background-color: #ffffff1d !important;
+  background-color: var(--surface-ghost-active) !important;
   outline: 0 !important;
   box-shadow: none !important;
 }
@@ -769,7 +730,7 @@ kbd {
   color: #fff;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   box-shadow:
     inset 0 -1px 0 rgba(0, 0, 0, 0.35),
     0 1px 0 rgba(255, 255, 255, 0.05),
@@ -777,7 +738,7 @@ kbd {
 }
 .key-plus,
 .key-sep {
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-muted);
   padding: 0 0.15rem;
 }
 
@@ -802,7 +763,7 @@ kbd {
 /* Dropdown list colors (Chromium/Electron supports styling option background) */
 select.form-select option,
 select.form-select optgroup {
-  background-color: #1e1643;
+  background-color: var(--surface-2);
   color: #ffffff;
 }
 
@@ -831,24 +792,6 @@ button.btn:focus {
   box-shadow: none !important;
 }
 
-/* Confirmation modal: restore clear keyboard focus rings */
-#SHOWTRAL_MODAL_CONFIRMATION .btn:focus,
-#SHOWTRAL_MODAL_CONFIRMATION .btn:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.85) !important;
-  outline-offset: 2px !important;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18) !important;
-}
-#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CONFIRM:focus,
-#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CONFIRM:focus-visible {
-  outline-color: rgba(220, 53, 69, 0.95) !important; /* match .btn-danger */
-  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.35) !important;
-}
-#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CANCEL:focus,
-#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CANCEL:focus-visible {
-  outline-color: rgba(108, 117, 125, 0.95) !important; /* match .btn-secondary */
-  box-shadow: 0 0 0 3px rgba(108, 117, 125, 0.35) !important;
-}
-
 /* Copy buttons inside form-floating fields */
 .form-floating.has-copy {
   position: relative;
@@ -860,7 +803,7 @@ button.btn:focus {
   transform: translateY(-50%);
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   padding: 0;
   width: 28px;
   height: 28px;
@@ -868,16 +811,11 @@ button.btn:focus {
   place-items: center;
 }
 .form-floating.has-copy .copy-field-btn:hover {
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-strong);
 }
 .form-floating.has-copy .copy-field-btn i {
-  font-size: 15px;
+  font-size: var(--fs-xl);
   line-height: 1;
-}
-
-.SHOWTRAK_CLIENT_USB_DEVICE_CARD {
-  position: relative;
-  padding-right: 6.9rem !important;
 }
 
 .SHOWTRAK_TOGGLE_CRITICAL_USB {
@@ -889,14 +827,14 @@ button.btn:focus {
   height: 30px;
   padding: 0 0.65rem;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: rgba(220, 220, 220, 0.6);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   transition:
     color 120ms ease,
@@ -910,29 +848,37 @@ button.btn:focus {
 
 .SHOWTRAK_TOGGLE_CRITICAL_USB:hover {
   color: rgba(255, 214, 102, 0.9);
-  background-color: rgba(255, 193, 7, 0.12);
+  background-color: rgb(var(--warning-rgb) / 0.12);
 }
 
 .SHOWTRAK_TOGGLE_CRITICAL_USB.is-critical {
-  color: #ffc107;
-  background-color: rgba(255, 193, 7, 0.2);
+  color: var(--warning);
+  background-color: rgb(var(--warning-rgb) / 0.2);
 }
 
 .SHOWTRAK_TOGGLE_CRITICAL_USB.is-critical:hover {
   color: #ffd54a;
-  background-color: rgba(255, 193, 7, 0.24);
+  background-color: rgb(var(--warning-rgb) / 0.24);
 }
 
+/* A monitored item that is missing or failing a condition: the one failing
+   colour (see --condition-failing), whichever kind of item it is. */
 .SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical,
-.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:hover,
-.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:focus {
-  color: #ff6b6b;
-  background-color: rgba(220, 53, 69, 0.24);
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:focus,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-mismatch-critical,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-mismatch-critical:focus,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.st-condition-failing,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.st-condition-failing:focus {
+  color: var(--condition-failing);
+  background-color: rgb(var(--condition-failing-rgb) / 0.24);
   cursor: pointer;
 }
 
-.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:hover {
-  background-color: rgba(220, 53, 69, 0.28);
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-mismatch-critical:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.st-condition-failing:hover {
+  color: var(--condition-failing);
+  background-color: rgb(var(--condition-failing-rgb) / 0.28);
 }
 
 .SHOWTRAK_TOGGLE_CRITICAL_USB.is-unavailable,
@@ -952,10 +898,10 @@ button.btn:focus {
   min-width: 24px;
   height: 24px;
   padding: 0 0.35rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -990,21 +936,14 @@ button.btn:focus {
   flex: 0 0 auto;
 }
 
-.SHOWTRAK_TOGGLE_CRITICAL_AUDIO.is-mismatch-critical,
-.SHOWTRAK_TOGGLE_CRITICAL_AUDIO.is-mismatch-critical:hover,
-.SHOWTRAK_TOGGLE_CRITICAL_AUDIO.is-mismatch-critical:focus {
-  color: #ff9f40;
-  background-color: rgba(253, 126, 20, 0.24);
-}
-
 .SHOWTRAK_AUDIO_DEFAULT_BADGE {
   display: inline-block;
   margin-left: 0.35rem;
   padding: 0.05rem 0.4rem;
-  border-radius: 999px;
-  background: rgba(13, 202, 240, 0.2);
-  color: #6edff6;
-  font-size: 10px;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--info-cyan-rgb) / 0.2);
+  color: var(--info-cyan-soft);
+  font-size: var(--fs-2xs);
   font-weight: 800;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1029,7 +968,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL {
   --st-level-fill: #e2e2ea;
   flex: 1 1 auto;
   height: var(--st-level-height);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   background: rgba(255, 255, 255, 0.12);
   cursor: pointer;
@@ -1048,7 +987,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL:focus-visible {
 
 input[type='range'].SHOWTRAK_AUDIO_LEVEL::-webkit-slider-runnable-track {
   height: var(--st-level-height);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
 }
 
@@ -1068,7 +1007,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-track {
 
 input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-progress {
   height: var(--st-level-height);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--st-level-fill);
 }
 
@@ -1083,7 +1022,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 .SHOWTRAK_AUDIO_LEVEL_VALUE {
   flex: 0 0 2.75rem;
   text-align: right;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1093,11 +1032,11 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-soft);
 }
 
 .SHOWTRAK_AUDIO_MUTE:hover {
@@ -1105,8 +1044,8 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 
 .SHOWTRAK_AUDIO_MUTE.is-muted {
-  color: #ff6b6b;
-  background: rgba(220, 53, 69, 0.24);
+  color: var(--danger-text);
+  background: rgb(var(--danger-rgb) / 0.24);
 }
 
 /* Power & Thermal readings (and similar key/value health lists): label and
@@ -1115,11 +1054,11 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   width: 100%;
   text-align: left;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .SHOWTRAK_HEALTH_TABLE tr + tr > * {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .SHOWTRAK_HEALTH_TABLE th,
@@ -1131,7 +1070,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 .SHOWTRAK_HEALTH_TABLE th {
   width: 45%;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 
 .SHOWTRAK_HEALTH_TABLE td {
@@ -1139,12 +1078,13 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   font-variant-numeric: tabular-nums;
 }
 
-.SHOWTRAK_HEALTH_TABLE tr.is-failing td {
-  color: #ff9f40;
+.SHOWTRAK_HEALTH_TABLE tr.is-failing td,
+.SHOWTRAK_HEALTH_TABLE tr.st-condition-failing td {
+  color: var(--condition-failing);
 }
 
 .SHOWTRAK_HEALTH_TABLE tr.is-healthy td {
-  color: #4fd18b;
+  color: var(--success-text);
 }
 
 /* Conditions of a critical endpoint: key, value, tick. Rules between rows
@@ -1155,11 +1095,11 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   text-align: left;
   margin-top: 0.4rem;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .SHOWTRAK_AUDIO_CONDITIONS tr + tr > * {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .SHOWTRAK_AUDIO_CONDITIONS th,
@@ -1171,7 +1111,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 .SHOWTRAK_AUDIO_CONDITIONS th {
   width: 45%;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 
 .SHOWTRAK_AUDIO_CONDITIONS td {
@@ -1193,11 +1133,12 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 
 .SHOWTRAK_AUDIO_CONDITIONS tr.is-unsupported td {
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-subtle);
 }
 
-.SHOWTRAK_AUDIO_CONDITIONS tr.is-failing td {
-  color: #ff9f40;
+.SHOWTRAK_AUDIO_CONDITIONS tr.is-failing td,
+.SHOWTRAK_AUDIO_CONDITIONS tr.st-condition-failing td {
+  color: var(--condition-failing);
 }
 
 .SHOWTRAK_AUDIO_COND_BOUND {
@@ -1211,7 +1152,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   width: 3.75rem;
   padding: 0.1rem 0.4rem;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.06);
   color: #ffffff;
   font-weight: 700;
@@ -1225,7 +1166,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 
 .SHOWTRAK_AUDIO_COND_BOUND input::placeholder,
 .SHOWTRAK_NET_COND_ADDRESS input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-faint);
 }
 
 /* --- Network interfaces (client info modal) ------------------------------ */
@@ -1260,11 +1201,11 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 /* Where the critical pill would be: internal interfaces cannot be monitored. */
 .SHOWTRAK_NET_INTERNAL_BADGE {
   flex: 0 0 auto;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 193, 7, 0.35);
-  background: rgba(255, 193, 7, 0.15);
-  color: #ffe08a;
-  font-size: 0.68rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgb(var(--warning-rgb) / 0.35);
+  background: rgb(var(--warning-rgb) / 0.15);
+  color: var(--warning-text);
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -1283,7 +1224,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 .SHOWTRAK_SYSTEM_COND_SELECT select {
   padding: 0.1rem 0.4rem;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.06);
   color: #ffffff;
   font-weight: 700;
@@ -1295,6 +1236,6 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 
 .SHOWTRAK_SYSTEM_COND_SELECT option {
-  background: #1d1a2f;
+  background: var(--surface-2);
   color: #ffffff;
 }

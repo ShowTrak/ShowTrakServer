@@ -94,7 +94,7 @@ function ApplicationCard(App: RunningApplicationViewItem, Client: ClientView): s
       ${ApplicationIssues(App, Client)
         .map(
           (Issue) =>
-            `<small class="d-block mt-1 text-start text-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue)}</small>`
+            `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue)}</small>`
         )
         .join('')}
       ${ConditionsTable(App, Client, Token)}
@@ -164,7 +164,7 @@ export function BindClientInfoApplicationHandlers(
           : await window.API.MarkClientApplicationCritical(UUID, { Name });
         if (Err) return void Notify(String(Err), 'error');
         await Notify(
-          IsCritical ? 'Application no longer monitored' : 'Application is now monitored',
+          IsCritical ? 'Application no longer monitored.' : 'Application is now monitored.',
           'success',
           1400
         );

@@ -121,7 +121,7 @@ export function AudioSectionMessage(
       return {
         Title: `${Title} Warning`,
         Body:
-          Client.AudioDevices?.Status?.Message || `The client could not read its audio ${Plural}.`,
+          Client.AudioDevices?.Status?.Message || `The client failed to read its audio ${Plural}.`,
       };
   }
 }

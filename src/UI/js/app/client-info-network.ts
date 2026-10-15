@@ -147,7 +147,7 @@ function InterfaceCard(
       ${(Home ? Iface.Issues : [])
         .map(
           (Issue) =>
-            `<small class="d-block mt-1 text-start text-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue.Message)}</small>`
+            `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue.Message)}</small>`
         )
         .join('')}
       ${Home ? ConditionsTable(Iface, Capabilities) : ''}
@@ -269,8 +269,8 @@ export function BindClientInfoNetworkHandlers(
         if (Err) return void Notify(String(Err), 'error');
         await Notify(
           IsCritical
-            ? 'Network interface no longer monitored'
-            : 'Network interface is now monitored',
+            ? 'Network interface no longer monitored.'
+            : 'Network interface is now monitored.',
           'success',
           1400
         );

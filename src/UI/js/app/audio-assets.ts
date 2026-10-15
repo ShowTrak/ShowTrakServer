@@ -219,7 +219,7 @@ export function getAudioDurationFromDataURL(DataURL: string) {
     Element.addEventListener('loadedmetadata', () => {
       const Duration = Element.duration;
       if (!Number.isFinite(Duration) || Duration <= 0) {
-        done(reject, new Error('Could not determine audio duration'));
+        done(reject, new Error('Failed to determine audio duration'));
         return;
       }
       done(resolve, Duration);
@@ -289,7 +289,7 @@ export async function SelectAndImportAudioAssets() {
   RenderAlertActionsList();
 
   if (Imported) {
-    Notify(`Imported ${Imported} audio asset${Imported === 1 ? '' : 's'}`, 'success', 2500);
+    Notify(`Imported ${Imported} audio asset${Imported === 1 ? '' : 's'}.`, 'success', 2500);
   }
   if (Failures.length) {
     Notify(`Skipped ${Failures.length} file(s): ${Failures.join('; ')}`, 'error', 8000);
@@ -309,7 +309,7 @@ export async function PreviewAudioAsset(ID: string) {
 
   try {
     const [Err, Payload] = await window.API.GetAudioAssetData(ID);
-    if (Err || !Payload) return Notify(Err || 'Audio asset unavailable', 'error');
+    if (Err || !Payload) return Notify(Err || 'Audio asset unavailable.', 'error');
 
     const Controller = playAudioDataURL(Payload.DataURL, Payload.Volume, {
       OnStop: () => {
@@ -393,7 +393,7 @@ export function RenderAudioAssetsList() {
           <button type="button" class="btn btn-sm bg-ghost-light text-white" data-audio-preview title="${IsPreviewPlaying ? 'Stop preview' : 'Preview'}" ${Asset.Missing ? 'disabled' : ''}>
             <i class="bi ${IsPreviewPlaying ? 'bi-stop-fill' : 'bi-play-fill'}"></i>
           </button>
-          <button type="button" class="btn btn-sm btn-danger" data-audio-delete title="Delete">
+          <button type="button" class="btn btn-sm btn-delete" data-audio-delete title="Delete audio asset">
             <i class="bi bi-trash"></i>
           </button>
         </div>
@@ -424,12 +424,13 @@ export function BindAudioAssetRowHandlers() {
       if (!ID) return;
       const Asset = AudioAssetByID(ID);
       const Confirmed = await ConfirmationDialog(
-        `Delete audio asset “${Asset ? Asset.Label : ID}”? This cannot be undone.`
+        `Delete audio asset “${Asset ? Asset.Label : ID}”? This cannot be undone.`,
+        { ConfirmLabel: 'Delete Audio Asset' }
       );
       if (!Confirmed) return;
       const [Err] = await window.API.DeleteAudioAsset(ID);
       if (Err) return Notify(Err, 'error');
-      Notify('Audio asset deleted', 'success', 1500);
+      Notify('Audio asset deleted.', 'success', 1500);
       await LoadAudioAssets();
       RenderAudioAssetsList();
       RenderAlertActionsList();

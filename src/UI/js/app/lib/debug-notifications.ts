@@ -16,7 +16,7 @@ export function TestAllNotifications() {
 
   // 1. Title-only toasts (the Notify() path) — one per severity accent.
   for (const type of SEVERITIES) {
-    steps.push(() => Notify(`${cap(type)} notification (title only)`, type, 20000));
+    steps.push(() => Notify(`${cap(type)} notification (title only).`, type, 20000));
   }
 
   // 2. Title + message toasts — the multi-line layout, one per severity.

@@ -145,7 +145,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Key: 'MONITORING_DEFAULT_INTERVAL_MS',
     Title: 'Default Monitoring Interval',
     Description:
-      'Polling interval applied to monitoring targets and dummy clients that do not set their own. Applies to targets created or reloaded after the change.',
+      'Polling interval applied to monitors and dummy clients that do not set their own. Applies to monitors created or reloaded after the change.',
     Type: 'INTEGER',
     DefaultValue: DEFAULT_MONITORING_INTERVAL_MS,
     Min: 3000,
@@ -158,7 +158,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Key: 'MONITORING_FAILURE_THRESHOLD',
     Title: 'Failures Before Offline',
     Description:
-      'How many checks in a row must fail before a monitoring check is marked offline. 1 reacts to the first miss; raise it to ride out the odd dropped packet. Individual targets and checks can override this. Applies from the next check.',
+      'How many checks in a row must fail before a monitoring check is marked offline. 1 reacts to the first miss; raise it to ride out the odd dropped packet. Individual monitors and checks can override this. Applies from the next check.',
     Type: 'INTEGER',
     DefaultValue: 1,
     Min: 1,
@@ -269,7 +269,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Key: 'WEBUI_ALLOW_CLIENT_MANAGEMENT',
     Title: 'Client Management',
     Description:
-      'Allow the Web UI to adopt, edit, replace, unadopt clients and change monitored USB/app/display flags. Still requires the server to be in Edit mode.',
+      'Allow the Web UI to adopt, edit, replace and delete clients and change monitored USB/app/display flags. Still requires the server to be in Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -287,7 +287,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Key: 'WEBUI_ALLOW_MONITORING_MANAGEMENT',
     Title: 'Monitoring Management',
     Description:
-      'Allow the Web UI to create, edit and delete monitoring targets and dummy clients, and run checks on demand. Still requires the server to be in Edit mode.',
+      'Allow the Web UI to create, edit and delete monitors and dummy clients, and run checks on demand. Still requires the server to be in Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -363,7 +363,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Key: 'REMOTE_ALLOW_MONITORING_MANAGEMENT',
     Title: 'Monitoring Management',
     Description:
-      'Allow ShowTrak Remote to manage monitoring targets, dummy clients and FreeKiosk terminals. Also requires the server to be in Edit mode.',
+      'Allow ShowTrak Remote to manage monitors, dummy clients and FreeKiosk terminals. Also requires the server to be in Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -414,8 +414,8 @@ export const DefaultSettings: SettingDefinition[] = [
   {
     Group: 'System',
     Key: 'SYSTEM_AUTO_MAXIMIZE_ON_BOOT',
-    Title: 'Auto Maximize Window on Boot',
-    Description: 'Automatically maximize the ShowTrak window when the app starts.',
+    Title: 'Auto Maximise Window on Boot',
+    Description: 'Automatically maximise the ShowTrak window when the app starts.',
     Type: 'BOOLEAN',
     DefaultValue: false,
   },
@@ -432,7 +432,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'System',
     Key: 'SYSTEM_AUTOSAVE_ENABLED',
     Title: 'Enable Autosave',
-    Description: 'Automatically save the open ShowTrak file at a regular interval.',
+    Description: 'Automatically save the open show file at a regular interval.',
     Type: 'BOOLEAN',
     DefaultValue: true,
     OnUpdateEvent: 'AutosaveSettingsChanged',
@@ -440,10 +440,11 @@ export const DefaultSettings: SettingDefinition[] = [
   {
     Group: 'System',
     Key: 'SYSTEM_AUTOSAVE_INTERVAL_MINUTES',
-    Title: 'Autosave Interval (Minutes)',
-    Description: 'How often, in minutes, to automatically save the open ShowTrak file.',
+    Title: 'Autosave Interval',
+    Description: 'How often to automatically save the open show file.',
     Type: 'INTEGER',
     DefaultValue: 5,
+    Unit: 'minutes',
     OnUpdateEvent: 'AutosaveSettingsChanged',
   },
   {
@@ -577,6 +578,7 @@ export const Groups: SettingGroup[] = [
   { Name: 'Alerts', Title: 'Alerts' },
   { Name: 'Web UI', Title: 'Web UI' },
   { Name: 'Web UI Permissions', Title: 'Web UI Permissions' },
+  { Name: 'ShowTrak Remote Permissions', Title: 'ShowTrak Remote Permissions' },
   { Name: 'FOG Project', Title: 'FOG Project' },
   { Name: 'FOG Permitted Actions', Title: 'FOG Permitted Actions' },
   { Name: 'System', Title: 'System Settings' },

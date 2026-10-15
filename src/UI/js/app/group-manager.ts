@@ -8,7 +8,7 @@ import { closeAllModals, closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
 import { Safe } from './utils';
 import { SCRIPT_COLOURS } from './lib/script-colours';
-import { Notify, Wait } from './selection-init';
+import { ConfirmationDialog, Notify, Wait } from './selection-init';
 import { DummyClients, GroupUUIDCache, MonitoringTargets, Settings, __LastClients } from './state';
 import {
   BuildGroupWidthOptions,
@@ -30,26 +30,27 @@ export async function OpenGroupCreationModal() {
   let Groups = await window.API.GetAllGroups();
   if (!Groups) Groups = [];
 
-  openModal('SHOWTRAL_MODAL_GROUPCREATION');
+  openModal('SHOWTRAK_MODAL_GROUPCREATION');
 
   $('#GROUP_CREATION_SUBMIT')
     .off('click')
     .on('click', async () => {
       const GroupName = $('#GROUP_CREATION_TITLE').val() as string;
-      if (!GroupName) return Notify('Please enter a group name', 'error');
+      if (!GroupName) return Notify('Please enter a group name.', 'error');
       if (GroupName.length < 3)
-        return Notify('Group name must be at least 3 characters long', 'error');
+        return Notify('Group name must be at least 3 characters long.', 'error');
       if (Groups.some((g) => String(g.Title || '').toLowerCase() === GroupName.toLowerCase())) {
-        return Notify('A group with this name already exists', 'error');
+        return Notify('A group with this name already exists.', 'error');
       }
-      if (GroupName.length > 32) return Notify('Group name must be 32 characters or less', 'error');
+      if (GroupName.length > 32)
+        return Notify('Group name must be 32 characters or less.', 'error');
 
       // Clear the input field
       $('#GROUP_CREATION_TITLE').val('');
 
       await window.API.CreateGroup(GroupName);
       OpenGroupManager();
-      closeModal('SHOWTRAL_MODAL_GROUPCREATION');
+      closeModal('SHOWTRAK_MODAL_GROUPCREATION');
     });
 }
 
@@ -322,13 +323,13 @@ export async function SaveGroupManagerName(
 
   if (NextTitle.length < 3) {
     if (notifyOnValidationError && NextTitle.length > 0) {
-      await Notify('Group name must be at least 3 characters long', 'error');
+      await Notify('Group name must be at least 3 characters long.', 'error');
     }
     return false;
   }
   if (NextTitle.length > 32) {
     if (notifyOnValidationError) {
-      await Notify('Group name must be 32 characters or less', 'error');
+      await Notify('Group name must be 32 characters or less.', 'error');
     }
     return false;
   }
@@ -340,7 +341,7 @@ export async function SaveGroupManagerName(
   );
   if (Duplicate) {
     if (notifyOnValidationError) {
-      await Notify('A group with this name already exists', 'error');
+      await Notify('A group with this name already exists.', 'error');
     }
     return false;
   }
@@ -402,7 +403,14 @@ export function BindGroupManagerEditorHandlers(Groups: GroupView[] = []) {
     .on('click', async function () {
       const GroupID = Number(GroupManagerEditingGroupID);
       if (!Number.isFinite(GroupID)) return;
-      closeModal('SHOWTRAK_MODAL_GROUP_EDITOR');
+      const Group = Groups.find((Candidate) => Number(Candidate.GroupID) === GroupID);
+      const Label = Group && Group.Title ? `"${Group.Title}"` : 'this group';
+      // Confirm over the open editor so Cancel leaves the operator where they were.
+      const Confirmed = await ConfirmationDialog(
+        `Delete ${Label}? Everything in it becomes ungrouped. This cannot be undone.`,
+        { ConfirmLabel: 'Delete Group' }
+      );
+      if (!Confirmed) return;
       await DeleteGroup(GroupID);
     });
 
@@ -561,7 +569,7 @@ export async function OpenGroupManagerEditor(
 
   const Group = Groups.find((G) => Number(G.GroupID) === Number(GroupID));
   if (!Group) {
-    await Notify('Group not found', 'error');
+    await Notify('Group not found.', 'error');
     return;
   }
 
@@ -598,10 +606,18 @@ export async function OpenGroupManagerEditor(
   openModal('SHOWTRAK_MODAL_GROUP_EDITOR');
 }
 
-export async function DeleteGroup(GroupID: number) {
-  await window.API.DeleteGroup(GroupID);
+// Resolves true once the group is gone and the editor has given way to the
+// group list; on failure the operator is told why and the editor stays open.
+export async function DeleteGroup(GroupID: number): Promise<boolean> {
+  const [Err] = ((await window.API.DeleteGroup(GroupID)) || []) as [unknown, unknown];
+  if (Err) {
+    await Notify(`Failed to delete group: ${Err}`, 'error');
+    return false;
+  }
+  closeModal('SHOWTRAK_MODAL_GROUP_EDITOR');
   await OpenGroupManager(true);
   await Notify('Group deleted.', 'success');
+  return true;
 }
 
 export function GroupManagerDragAfterElement(Container: HTMLElement, Y: number) {

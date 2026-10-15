@@ -250,7 +250,7 @@ export async function StartNetworkDiscoveryScan() {
   RenderNetworkDiscoveryResults();
   setNetworkDiscoveryScanning(true);
   RenderNetworkDiscoveryScanButton();
-  SetNetworkDiscoveryStatus('Starting...');
+  SetNetworkDiscoveryStatus('Starting…');
 
   try {
     const [Err, Result] = await window.API.StartNetworkDeviceScan({
@@ -268,7 +268,7 @@ export async function StartNetworkDiscoveryScan() {
       return Notify(Err, 'error');
     }
     setNetworkDiscoveryScanID(Result && Result.ScanID ? Result.ScanID : null);
-    SetNetworkDiscoveryStatus('Scanning...');
+    SetNetworkDiscoveryStatus('Scanning…');
   } catch (e) {
     setNetworkDiscoveryScanning(false);
     RenderNetworkDiscoveryScanButton();

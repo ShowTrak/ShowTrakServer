@@ -186,18 +186,21 @@ test('an unreadable column count falls back to the default', () => {
 
 test('a long group label is truncated with an ellipsis that fits', () => {
   // The ellipsis is included in the budget, so the result is never longer than
-  // the group tab it has to fit inside.
-  assert.equal(Layout.TruncateGroupLabel('Front of House Left'), 'Front of Hous...');
-  assert.equal(Layout.TruncateGroupLabel('Front of House Left').length, 16);
+  // the group tab it has to fit inside, and a cut at a space does not leave the
+  // space dangling before it.
+  assert.equal(Layout.TruncateGroupLabel('Front of House Left'), 'Front of House…');
+  assert.ok(Layout.TruncateGroupLabel('Front of House Left').length <= 16);
+  assert.equal(Layout.TruncateGroupLabel('Front of Housing Left'), 'Front of Housin…');
+  assert.equal(Layout.TruncateGroupLabel('Front of Housing Left').length, 16);
   assert.equal(Layout.TruncateGroupLabel('FOH'), 'FOH');
   assert.equal(Layout.TruncateGroupLabel('Exactly16Chars!!'), 'Exactly16Chars!!');
 });
 
 test('the truncation length is configurable and never produces a bare ellipsis', () => {
-  assert.equal(Layout.TruncateGroupLabel('Projection', 6), 'Pro...');
+  assert.equal(Layout.TruncateGroupLabel('Projection', 6), 'Proje…');
   // Even at an absurd max the first character survives, so a label is never
   // rendered as punctuation alone.
-  assert.equal(Layout.TruncateGroupLabel('Projection', 1), 'P...');
+  assert.equal(Layout.TruncateGroupLabel('Projection', 1), 'P…');
 });
 
 test('an empty or missing group label renders as nothing', () => {

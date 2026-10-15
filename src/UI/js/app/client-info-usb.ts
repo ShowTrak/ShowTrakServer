@@ -74,7 +74,7 @@ function ConditionsTable(Device: USBDeviceView, Capabilities: USBCapabilities | 
 }
 
 function Warning(Message: string): string {
-  return `<small class="d-block mt-1 text-start text-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Message)}</small>`;
+  return `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Message)}</small>`;
 }
 
 function DeviceCard(Device: USBDeviceView, Capabilities: USBCapabilities | null): string {
@@ -215,7 +215,7 @@ export function BindClientInfoUSBHandlers(
               });
         if (Err) return void Notify(String(Err), 'error');
         await Notify(
-          IsCritical ? 'USB device no longer monitored' : 'USB device is now monitored',
+          IsCritical ? 'USB device no longer monitored.' : 'USB device is now monitored.',
           'success',
           1400
         );

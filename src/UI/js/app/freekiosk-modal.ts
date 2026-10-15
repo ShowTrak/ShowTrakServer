@@ -622,7 +622,7 @@ export function RenderFreeKioskModal($timelines: JQuery<HTMLElement>): void {
   }
   for (const [Tab, Entry] of ByTab) {
     const Body = !Catalogue
-      ? `<div class="freekiosk-panel"><em class="text-muted">Could not load the metric list.</em></div>`
+      ? `<div class="freekiosk-panel"><em class="text-muted">Failed to load the metric list.</em></div>`
       : Entry.Html || EmptyMetricTabNote(Terminal, Entry.Sections);
     $timelines.append(Pane(Tab, Body));
   }
@@ -743,7 +743,8 @@ export function WireFreeKioskModal(Rerender: () => void): void {
 
     if (Command.Destructive) {
       const Confirmed = await ConfirmationDialog(
-        `${Command.Label} on "${Terminal.Nickname || Terminal.Address}"?`
+        `${Command.Label} on "${Terminal.Nickname || Terminal.Address}"?`,
+        { ConfirmLabel: Command.Label }
       );
       if (!Confirmed) return;
     }
@@ -761,7 +762,7 @@ export function WireFreeKioskModal(Rerender: () => void): void {
       const Reason = Summary.Results.find((Entry) => !Entry.Success);
       return Notify(`${Command.Label} failed: ${Reason?.Error || 'unknown error'}`, 'error');
     }
-    Notify(`${Command.Label} sent`, 'success');
+    Notify(`${Command.Label} sent.`, 'success');
     // Settle every displayed value within ~200ms rather than waiting out the
     // poll interval.
     await window.API.RunFreeKioskTerminalsNow([Terminal.UUID]);
@@ -788,7 +789,7 @@ export function WireFreeKioskModal(Rerender: () => void): void {
         });
         if (Err || (Summary && Summary.Failed)) {
           const Reason = Err || Summary?.Results.find((E) => !E.Success)?.Error;
-          Notify(`Could not set ${CommandID}: ${Reason || 'unknown error'}`, 'error');
+          Notify(`Failed to set ${CommandID}: ${Reason || 'unknown error'}`, 'error');
           SliderPendingUntil.delete(CommandID);
           return;
         }

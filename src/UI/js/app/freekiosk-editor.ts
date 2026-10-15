@@ -76,7 +76,7 @@ function RenderAlarmFields(Settings: Record<string, unknown>): void {
 
   const Catalogue = FreeKioskMetricCatalogCache;
   if (!Catalogue || !Catalogue.AlarmFields.length) {
-    $host.html('<em class="text-muted">Could not load the metric list.</em>');
+    $host.html('<em class="text-muted">Failed to load the metric list.</em>');
     return;
   }
 
@@ -181,7 +181,7 @@ async function SaveTerminal({ Quiet = false } = {}): Promise<[string | null]> {
         if (!Quiet) Notify(Err, 'error');
         return [Err];
       }
-      if (!Quiet) await Notify('FreeKiosk terminal updated', 'success');
+      if (!Quiet) await Notify('FreeKiosk terminal updated.', 'success');
     } else {
       const [Err, Created] = await window.API.CreateFreeKioskTerminal(Payload);
       if (Err) {
@@ -189,7 +189,7 @@ async function SaveTerminal({ Quiet = false } = {}): Promise<[string | null]> {
         return [Err];
       }
       if (Created && Created.UUID) EditorUUID = String(Created.UUID);
-      if (!Quiet) await Notify('FreeKiosk terminal created', 'success');
+      if (!Quiet) await Notify('FreeKiosk terminal created.', 'success');
     }
     return [null];
   } catch (e) {
@@ -213,7 +213,7 @@ export async function OpenFreeKioskEditor(UUID: string | null | undefined = null
   let Existing = null;
   if (UUID) {
     Existing = await window.API.GetFreeKioskTerminal(UUID);
-    if (!Existing) return Notify('FreeKiosk terminal not found', 'error');
+    if (!Existing) return Notify('FreeKiosk terminal not found.', 'error');
   }
 
   let Defaults = {
@@ -327,12 +327,13 @@ export async function OpenFreeKioskEditor(UUID: string | null | undefined = null
     .on('click.freekiosk', async () => {
       if (!EditorUUID) return;
       const Confirmed = await ConfirmationDialog(
-        'Delete this FreeKiosk terminal? This cannot be undone.'
+        'Delete this FreeKiosk terminal? This cannot be undone.',
+        { ConfirmLabel: 'Delete Terminal' }
       );
       if (!Confirmed) return;
       const [Err] = await window.API.DeleteFreeKioskTerminal(EditorUUID);
       if (Err) return Notify(Err, 'error');
-      await Notify('FreeKiosk terminal deleted', 'success');
+      await Notify('FreeKiosk terminal deleted.', 'success');
       await CloseAllModals();
     });
 

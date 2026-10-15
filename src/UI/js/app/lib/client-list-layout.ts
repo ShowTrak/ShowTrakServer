@@ -140,7 +140,7 @@ export function TruncateGroupLabel(value: string, maxLen = 16): string {
   const text = value == null ? '' : String(value).trim();
   if (!text) return '';
   if (text.length <= maxLen) return text;
-  return `${text.substring(0, Math.max(1, maxLen - 3))}...`;
+  return `${text.substring(0, Math.max(1, maxLen - 1)).trimEnd()}…`;
 }
 
 /**

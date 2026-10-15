@@ -190,11 +190,11 @@ export async function CreateBlankScript() {
   const [Err, Result] = await window.API.CreateScript();
   Btn.prop('disabled', false);
   if (Err || !Result || !Result.id) {
-    Notify(`Could not create script: ${Err || 'unknown error'}`, 'error');
+    Notify(`Failed to create script: ${Err || 'unknown error'}`, 'error');
     return;
   }
   await RefreshScriptManagerList();
-  Notify('Blank script created', 'success');
+  Notify('Blank script created.', 'success');
   OpenScriptManagerEditor(Result.id);
 }
 
@@ -212,7 +212,7 @@ export async function RefreshScriptManagerTemplates(Force: boolean) {
       ? await window.API.RefreshSampleScripts()
       : await window.API.GetSampleScripts();
     if (Err) {
-      Notify(`Could not load sample scripts: ${Err}`, 'error');
+      Notify(`Failed to load sample scripts: ${Err}`, 'error');
       ScriptManagerSampleCache = ScriptManagerSampleCache || [];
     } else {
       ScriptManagerSampleCache = (List || []) as SampleScriptEntry[];
@@ -250,7 +250,7 @@ export async function CreateScriptFromTemplateWithGeneratedID(
       return [Err, Result];
     }
   }
-  return ['Could not generate a unique script ID', null];
+  return ['Failed to generate a unique script ID', null];
 }
 
 export function RenderScriptManagerTemplates() {
@@ -311,12 +311,12 @@ export function RenderScriptManagerTemplates() {
         Hint.classList.add('text-danger');
         Hint.classList.remove('text-muted');
         CreateBtn.disabled = false;
-        Notify(`Could not create script: ${Err}`, 'error');
+        Notify(`Failed to create script: ${Err}`, 'error');
         return;
       }
       const NewID = (Result && Result.id) || '';
       await RefreshScriptManagerList();
-      Notify(`Script "${NewID}" created from template`, 'success');
+      Notify(`Script "${NewID}" created from template.`, 'success');
       OpenScriptManagerEditor(NewID);
     });
 
@@ -398,7 +398,7 @@ export function RenderScriptManagerList() {
 
     const RightContent = Script.valid
       ? `<div class="script-manager-os-list">${RenderScriptManagerOSChips(Script)}</div>`
-      : `<div class="script-manager-os-empty">${Safe(Script.parseError || 'Cannot parse Script.json')}</div>`;
+      : `<div class="script-manager-os-empty">${Safe(Script.parseError || 'Failed to parse Script.json')}</div>`;
 
     const DescriptionLine = Script.description
       ? `<div class="script-manager-item-desc">${Safe(Script.description)}</div>`
@@ -669,10 +669,10 @@ export function RenderScriptManagerFileList(Files: string[]) {
       const RelativeFilePath = decodeURIComponent(EncodedFile);
       const [Err] = await window.API.OpenScriptFile(ScriptManagerEditingId, RelativeFilePath);
       if (Err) {
-        Notify(`Could not open file: ${Err}`, 'error');
+        Notify(`Failed to open file: ${Err}`, 'error');
         return;
       }
-      Notify(`Opened ${RelativeFilePath} for editing`, 'success', 1000);
+      Notify(`Opened ${RelativeFilePath} for editing.`, 'success', 1000);
     });
 
   Container.find('.script-manager-file-run-btn')
@@ -684,15 +684,17 @@ export function RenderScriptManagerFileList(Files: string[]) {
 
       const EncodedFile = $(this).attr('data-file') || '';
       const RelativeFilePath = decodeURIComponent(EncodedFile);
-      const Confirmed = await ConfirmationDialog(`Run ${RelativeFilePath} on this machine now?`);
+      const Confirmed = await ConfirmationDialog(`Run ${RelativeFilePath} on this machine now?`, {
+        ConfirmLabel: 'Run File',
+      });
       if (!Confirmed) return;
 
       const [Err] = await window.API.RunScriptFileLocal(ScriptManagerEditingId, RelativeFilePath);
       if (Err) {
-        Notify(`Could not run file: ${Err}`, 'error');
+        Notify(`Failed to run file: ${Err}`, 'error');
         return;
       }
-      Notify(`Completed ${RelativeFilePath}`, 'success');
+      Notify(`Completed ${RelativeFilePath}.`, 'success');
     });
 }
 
@@ -774,8 +776,8 @@ export async function SaveScriptManagerConfig() {
 
   if (Err) {
     const Issues = Result && Result.errors && Result.errors.length ? Result.errors : [Err];
-    RenderScriptManagerIssues('Could not save — please fix the following:', Issues, 'error');
-    Notify('Could not save script', 'error');
+    RenderScriptManagerIssues('Failed to save — please fix the following:', Issues, 'error');
+    Notify('Failed to save script.', 'error');
     return;
   }
 
@@ -793,9 +795,9 @@ export async function SaveScriptManagerConfig() {
     parseScopeSelection(ScriptWhitelistSelected)
   );
   if (WhitelistErr) {
-    Notify(`Script saved, but the whitelist could not be saved: ${WhitelistErr}`, 'error');
+    Notify(`Script saved, but failed to save the whitelist: ${WhitelistErr}`, 'error');
   } else {
-    Notify('Script saved', 'success');
+    Notify('Script saved.', 'success');
   }
 
   await RefreshScriptManagerList();
@@ -822,7 +824,7 @@ export function InitScriptManager() {
     .empty()
     .append(
       buildModalHeader({
-        title: 'Create From Template',
+        title: 'Create from Template',
         onBack: () => ShowScriptManagerList(),
         onClose: () => closeModal('SHOWTRAK_MODAL_SCRIPTMANAGER'),
       }).$el
@@ -860,14 +862,16 @@ export function InitScriptManager() {
     .on('click', async () => {
       if (!ScriptManagerEditingId) return;
       const ID = ScriptManagerEditingId;
-      const Confirmed = await ConfirmationDialog(`Delete script "${ID}"? This cannot be undone.`);
+      const Confirmed = await ConfirmationDialog(`Delete script "${ID}"? This cannot be undone.`, {
+        ConfirmLabel: 'Delete Script',
+      });
       if (!Confirmed) return;
       const [Err] = await window.API.DeleteScript(ID);
       if (Err) {
         Notify(`Failed to delete script: ${Err}`, 'error');
         return;
       }
-      Notify(`Script "${ID}" deleted`, 'success');
+      Notify(`Script "${ID}" deleted.`, 'success');
       ShowScriptManagerList();
       await RefreshScriptManagerList();
     });

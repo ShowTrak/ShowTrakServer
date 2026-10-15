@@ -220,7 +220,7 @@ export async function OpenFogTaskModal(
   PendingTaskTypes = await window.API.GetFogTaskTypes();
 
   if (!PendingTaskTypes.length) {
-    await Notify('No FOG task types are permitted. Enable some in Settings.', 'error');
+    await Notify('No FOG task types are permitted. Enable some in ShowTrak Preferences.', 'error');
     return;
   }
 
@@ -261,7 +261,8 @@ export async function OpenFogTaskModal(
       const Confirmed = await ConfirmationDialog(
         Type.Destructive
           ? `Schedule "${Type.Name}" on ${ClientLabel}? This is destructive and can cause data loss.`
-          : `Schedule "${Type.Name}" on ${ClientLabel}?`
+          : `Schedule "${Type.Name}" on ${ClientLabel}?`,
+        { ConfirmLabel: 'Schedule Task' }
       );
       if (!Confirmed) return;
 
@@ -304,7 +305,8 @@ export function InitFog(): void {
       if (!Count) return;
 
       const Confirmed = await ConfirmationDialog(
-        `Clear ${Count} finished task${Count === 1 ? '' : 's'} from the list? Running tasks are not affected.`
+        `Clear ${Count} finished task${Count === 1 ? '' : 's'} from the list? Running tasks are not affected.`,
+        { ConfirmLabel: Count === 1 ? 'Clear Task' : 'Clear Tasks' }
       );
       if (!Confirmed) return;
 
@@ -332,7 +334,8 @@ export function InitFog(): void {
       const Target = Task ? Task.ClientName || Task.FogHostName || '' : '';
 
       const Confirmed = await ConfirmationDialog(
-        `Cancel "${Label}"${Target ? ` on ${Target}` : ''}? The task will be stopped in FOG.`
+        `Cancel "${Label}"${Target ? ` on ${Target}` : ''}? The task will be stopped in FOG.`,
+        { ConfirmLabel: 'Cancel Task' }
       );
       if (!Confirmed) return;
 

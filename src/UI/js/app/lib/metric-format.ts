@@ -78,7 +78,7 @@ export function FormatMetricValue(
 
   const Text = String(Value);
   const Limit = Options.MaxLength ?? (Metric.Format === 'url' ? 60 : 0);
-  if (Limit > 0 && Text.length > Limit) return `${Text.slice(0, Limit - 3)}...`;
+  if (Limit > 0 && Text.length > Limit) return `${Text.slice(0, Limit - 1)}…`;
   return Text;
 }
 

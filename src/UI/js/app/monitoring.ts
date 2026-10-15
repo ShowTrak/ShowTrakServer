@@ -1430,7 +1430,7 @@ function RenderMonitoringHistoryEntity(
 
 export async function OpenMonitoringTargetHistory(TargetID: number) {
   const Target = MonitoringTargets.find((T) => Number(T.TargetID) === Number(TargetID));
-  if (!Target) return Notify('Monitoring target not found', 'error');
+  if (!Target) return Notify('Monitor not found.', 'error');
   try {
     await CloseAllModals();
   } catch (err) {
@@ -1460,7 +1460,7 @@ export async function OpenMonitoringTargetHistory(TargetID: number) {
 export async function OpenDummyClientHistory(UUID: string) {
   const DummyUUID = String(UUID || '').trim();
   const Dummy = DummyClients.find((D) => String(D.UUID) === DummyUUID);
-  if (!Dummy) return Notify('Dummy client not found', 'error');
+  if (!Dummy) return Notify('Dummy client not found.', 'error');
 
   try {
     await CloseAllModals();

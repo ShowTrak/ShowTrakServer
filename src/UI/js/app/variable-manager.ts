@@ -134,11 +134,11 @@ export async function CreateVariable() {
   const [Err, Variable] = await window.API.CreateVariable();
   Btn.prop('disabled', false);
   if (Err || !Variable) {
-    Notify(`Could not create variable: ${Err || 'unknown error'}`, 'error');
+    Notify(`Failed to create variable: ${Err || 'unknown error'}`, 'error');
     return;
   }
   await RefreshVariableManagerList();
-  Notify('Variable created', 'success');
+  Notify('Variable created.', 'success');
   OpenVariableManagerEditor(Variable.VariableID);
 }
 
@@ -153,7 +153,7 @@ export async function OpenVariableManagerEditor(VariableID: number) {
   if (VariableManagerEditingId !== VariableID) return;
   const Variable = VariableManagerCache.find((V) => V.VariableID === VariableID);
   if (!Variable) {
-    Notify('Variable no longer exists', 'error');
+    Notify('Variable no longer exists.', 'error');
     ShowVariableManagerList();
     return;
   }
@@ -212,8 +212,8 @@ export async function SaveVariableManagerConfig() {
   if (KeyErr) {
     SaveBtn.prop('disabled', false);
     if (VariableManagerEditingId !== VariableID) return;
-    RenderVariableManagerIssues('Could not save — please fix the following:', [KeyErr]);
-    Notify('Could not save variable', 'error');
+    RenderVariableManagerIssues('Failed to save — please fix the following:', [KeyErr]);
+    Notify('Failed to save variable.', 'error');
     return;
   }
 
@@ -236,11 +236,11 @@ export async function SaveVariableManagerConfig() {
   const Errors = [DefaultErr, DescriptionErr, ExportErr].filter(Boolean) as string[];
   if (Errors.length) {
     RenderVariableManagerIssues('Variable partially saved — the following failed:', Errors);
-    Notify('Variable could not be fully saved', 'error');
+    Notify('Failed to fully save the variable.', 'error');
     return;
   }
 
-  Notify('Variable saved', 'success');
+  Notify('Variable saved.', 'success');
   await RefreshVariableManagerList();
   ShowVariableManagerList();
 }
@@ -334,7 +334,8 @@ export function InitVariableManager() {
       // Spell out the two consequences that are not obvious from "delete":
       // per-client values go too, and exported values leave client machines.
       const Confirmed = await ConfirmationDialog(
-        `Delete ${Label}? Every client's value for it is removed, and it will be cleared from the Windows environment on clients that had it.`
+        `Delete ${Label}? Every client's value for it is removed, and it will be cleared from the Windows environment on clients that had it.`,
+        { ConfirmLabel: 'Delete Variable' }
       );
       if (!Confirmed) return;
       const [Err] = await window.API.DeleteVariable(VariableID);
@@ -342,7 +343,7 @@ export function InitVariableManager() {
         Notify(`Failed to delete variable: ${Err}`, 'error');
         return;
       }
-      Notify(`${Label} deleted`, 'success');
+      Notify(`${Label} deleted.`, 'success');
       ShowVariableManagerList();
       await RefreshVariableManagerList();
     });
@@ -370,7 +371,7 @@ export function InitVariableManager() {
       if (!Text) return;
       void navigator.clipboard
         .writeText(Text)
-        .then(() => Notify(`Copied ${Text}`, 'success'))
-        .catch(() => Notify('Could not copy to clipboard', 'error'));
+        .then(() => Notify(`Copied ${Text}.`, 'success'))
+        .catch(() => Notify('Failed to copy to clipboard.', 'error'));
     });
 }

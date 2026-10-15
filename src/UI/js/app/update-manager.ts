@@ -150,7 +150,7 @@ export function SetUpdateManagerDownloadProgress(Percent = 0, Message = '') {
   $('#UPDATE_MANAGER_DOWNLOAD_PROGRESS_BAR')
     .css('width', `${safePercent}%`)
     .attr('aria-valuenow', safePercent);
-  $('#UPDATE_MANAGER_DOWNLOAD_PROGRESS_TEXT').text(Message || `Downloading... ${safePercent}%`);
+  $('#UPDATE_MANAGER_DOWNLOAD_PROGRESS_TEXT').text(Message || `Downloading… ${safePercent}%`);
 }
 
 export function GetSelectedUpdateManagerReleaseTag() {
@@ -443,14 +443,14 @@ export async function RunUpdateManagerDownloadLatest() {
 
   const selectedTag = GetSelectedUpdateManagerReleaseTag();
   if (!selectedTag) {
-    await Notify('Select a release first', 'error');
+    await Notify('Select a release first.', 'error');
     return;
   }
 
   setUpdateManagerDownloadInProgress(true);
   ApplyUpdateManagerButtonLocks();
-  SetUpdateManagerDownloadProgress(0, `Preparing download for ${selectedTag}...`);
-  $('#UPDATE_MANAGER_STATUS').text(`Downloading ${selectedTag} to ShowTrakServer...`);
+  SetUpdateManagerDownloadProgress(0, `Preparing download for ${selectedTag}…`);
+  $('#UPDATE_MANAGER_STATUS').text(`Downloading ${selectedTag} to ShowTrakServer…`);
 
   try {
     const [Err, Result] = await window.API.DownloadUpdateManagerRelease(selectedTag);
@@ -461,7 +461,7 @@ export async function RunUpdateManagerDownloadLatest() {
     }
 
     SetUpdateManagerDownloadProgress(100, `Downloaded ${Result.ReleaseVersion}`);
-    await Notify(`Downloaded build ${Result.ReleaseVersion}`, 'success');
+    await Notify(`Downloaded build ${Result.ReleaseVersion}.`, 'success');
     await RefreshUpdateManagerStatus();
     await RefreshUpdateManagerReleaseOptions();
   } catch (Err) {
@@ -479,19 +479,19 @@ export async function RunUpdateManagerDeployAll() {
 
   const selectedTag = GetSelectedUpdateManagerReleaseTag();
   if (!selectedTag) {
-    await Notify('Select a release to deploy', 'error');
+    await Notify('Select a release to deploy.', 'error');
     return;
   }
 
   const SelectedTargets = GetSelectedUpdateManagerDeployTargets();
   if (SelectedTargets.length === 0) {
-    await Notify('Select at least one eligible online client', 'error');
+    await Notify('Select at least one eligible online client.', 'error');
     return;
   }
 
   setUpdateManagerRunning(true);
   ApplyUpdateManagerButtonLocks();
-  $('#UPDATE_MANAGER_STATUS').text(`Deploying ${selectedTag} to online clients...`);
+  $('#UPDATE_MANAGER_STATUS').text(`Deploying ${selectedTag} to online clients…`);
 
   try {
     const [Err, Result] = await window.API.DeployUpdateManagerRelease(selectedTag, SelectedTargets);
@@ -501,7 +501,7 @@ export async function RunUpdateManagerDeployAll() {
       return;
     }
 
-    await Notify(`Update sent to ${Result.TargetCount} online clients`, 'success');
+    await Notify(`Update sent to ${Result.TargetCount} online clients.`, 'success');
     $('#UPDATE_MANAGER_STATUS').text(
       `Updating ${Result.TargetCount} online clients to ${Result.ReleaseVersion}.`
     );

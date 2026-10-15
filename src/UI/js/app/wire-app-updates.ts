@@ -82,7 +82,7 @@ function showNotes(info: AppUpdateStatus['info']) {
 // Collapse the modal back to the neutral "checking" look before a fresh check.
 function resetToChecking() {
   setIcon('bi-arrow-repeat', true);
-  $('#APP_UPDATE_STATUS').text('Checking for updates...');
+  $('#APP_UPDATE_STATUS').text('Checking for updates…');
   $('#APP_UPDATE_SUBTEXT').text('Contacting the update server.');
   setVersionBadge('');
   setProgress(null);
@@ -160,21 +160,21 @@ export function wireAppUpdates() {
 
         if (st === 'checking') {
           setIcon('bi-arrow-repeat', true);
-          $status.text('Checking for updates...');
+          $status.text('Checking for updates…');
           $subtext.text('Contacting the update server.');
           setVersionBadge('');
         } else if (st === 'available') {
           const v = payload.info && (payload.info.version || payload.info.tag);
           setIcon('bi-arrow-repeat', true);
           $status.text('Update available');
-          $subtext.text('Downloading the latest release...');
+          $subtext.text('Downloading the latest release…');
           setVersionBadge(v);
           showNotes(payload.info);
         } else if (st === 'downloading') {
           const pct = payload.percent ? Math.floor(payload.percent) : 0;
           setIcon('bi-arrow-repeat', true);
-          $status.text('Downloading update...');
-          $subtext.text(pct >= 100 ? 'Download complete. Preparing update...' : `${pct}% complete`);
+          $status.text('Downloading update…');
+          $subtext.text(pct >= 100 ? 'Download complete. Preparing update…' : `${pct}% complete`);
           setProgress(pct);
         } else if (st === 'downloaded') {
           const v = payload.info && payload.info.version;
@@ -186,7 +186,7 @@ export function wireAppUpdates() {
           $install.removeClass('d-none');
         } else if (st === 'installing') {
           setIcon('bi-gear-wide-connected', true);
-          $status.text('Installing update...');
+          $status.text('Installing update…');
           $subtext.text('ShowTrak will restart shortly.');
         } else if (st === 'installed') {
           setIcon('bi-check-circle-fill');

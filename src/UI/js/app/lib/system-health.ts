@@ -219,7 +219,7 @@ export function HealthSectionMessage(
     default:
       return {
         Title: `${Noun} Warning`,
-        Body: Snapshot?.Status?.Message || `The client could not read its ${What}.`,
+        Body: Snapshot?.Status?.Message || `The client failed to read its ${What}.`,
       };
   }
 }

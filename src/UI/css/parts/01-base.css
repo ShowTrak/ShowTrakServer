@@ -1,10 +1,184 @@
+/* =========================================================================
+   Design tokens
+   -------------------------------------------------------------------------
+   Every shared colour, surface, radius, type size, layer and layout constant
+   lives here, so the rest of the parts say what a value MEANS rather than
+   repeating it. Dark theme only; Bootstrap 5.0.2 loads before this file.
+
+   Colours that need translucent variants are declared as bare channel
+   triplets (`--x-rgb: R G B`) and used as `rgb(var(--x-rgb) / alpha)`, so a
+   hue changes in exactly one place.
+   ========================================================================= */
+:root {
+  /* --- Status palette ------------------------------------------------------
+   * Tile washes: the translucent fills behind client tiles, the check editor's
+   * live status card and drag ghosts. IDLE / UNAVAILABLE -> grey,
+   * OFFLINE -> red, DEGRADED -> orange, ONLINE -> green, PENDING -> blue.
+   * The alphas are percentages so the solid tile colours in 05-monitoring.css
+   * can color-mix by exactly the same amount. */
+  --status-online-rgb: 18 255 0;
+  --status-online-a: 32%;
+  --status-offline-rgb: 255 0 0;
+  --status-offline-a: 24%;
+  --status-degraded-rgb: 255 140 0;
+  --status-degraded-a: 32%;
+  --status-idle-rgb: 64 64 64;
+  --status-idle-a: 50%;
+  /* Pending adoption AND identify share this one blue, everywhere. */
+  --status-pending-rgb: 52 152 219;
+  --status-pending-a: 25%;
+
+  --status-online: rgb(var(--status-online-rgb) / var(--status-online-a));
+  --status-offline: rgb(var(--status-offline-rgb) / var(--status-offline-a));
+  --status-degraded: rgb(var(--status-degraded-rgb) / var(--status-degraded-a));
+  --status-idle: rgb(var(--status-idle-rgb) / var(--status-idle-a));
+  --status-pending: rgb(var(--status-pending-rgb) / var(--status-pending-a));
+
+  /* Saturated variants for timeline blocks, chart lines and status dots.
+   * Tuned apart from the washes on purpose: a solid 18,255,0 block reads as
+   * neon, so the graph hues are their own triplets. Pending has no separate
+   * graph hue — it is the same blue at full strength. */
+  --status-graph-online-rgb: 38 214 44;
+  --status-graph-offline-rgb: 224 36 36;
+  --status-graph-degraded-rgb: 255 149 0;
+  --status-graph-idle-rgb: 120 126 134;
+  --status-graph-online: rgb(var(--status-graph-online-rgb) / 0.98);
+  --status-graph-offline: rgb(var(--status-graph-offline-rgb) / 0.98);
+  --status-graph-degraded: rgb(var(--status-graph-degraded-rgb) / 0.98);
+  --status-graph-idle: rgb(var(--status-graph-idle-rgb) / 0.9);
+  --status-graph-pending: rgb(var(--status-pending-rgb) / 0.98);
+
+  /* A failing monitored condition (USB, audio, display, network, system,
+   * application) turns its client tile DEGRADED, so it wears the degraded
+   * hue. Apply it with `.st-condition-failing`. */
+  --condition-failing-rgb: var(--status-graph-degraded-rgb);
+  --condition-failing: var(--status-graph-degraded);
+
+  /* --- Semantic colours ----------------------------------------------------
+   * The base hues match Bootstrap's so they sit beside .btn-danger /
+   * .text-success and friends; the -text variants are the lighter shades that
+   * stay readable on the dark surfaces. */
+  --danger-rgb: 220 53 69;
+  --danger: rgb(var(--danger-rgb));
+  --danger-text-rgb: 255 107 107;
+  --danger-text: rgb(var(--danger-text-rgb));
+  --danger-text-hover: #ff8787;
+  --danger-text-soft: #ffb3bc;
+
+  --success-rgb: 40 167 69;
+  --success: rgb(var(--success-rgb));
+  --success-text-rgb: 79 209 139;
+  --success-text: rgb(var(--success-text-rgb));
+  --success-text-soft: #96e6b3;
+
+  --warning-rgb: 255 193 7;
+  --warning: rgb(var(--warning-rgb));
+  /* The softer amber the alerts system uses (tray accent, bell icon). */
+  --warning-soft-rgb: 255 181 77;
+  --warning-text: #ffe08a;
+
+  --info-rgb: 77 159 255;
+  --info: rgb(var(--info-rgb));
+  --info-text: #a8d2ff;
+  /* Bootstrap's cyan info, used by the software-update surfaces. */
+  --info-cyan-rgb: 13 202 240;
+  --info-cyan: #3dd5f3;
+  --info-cyan-soft: #6edff6;
+
+  /* The purple that lifts a hovered/focused menu row. */
+  --accent-rgb: 120 95 200;
+
+  /* --- Surfaces ------------------------------------------------------------
+   * 0 is the deepest (the edge of the app backdrop, popovers); each step up is
+   * a raised panel: 1 modals / menu foot, 2 bars, trays and cards, 3 toasts
+   * and sticky table heads. */
+  --surface-0-rgb: 12 9 28;
+  --surface-1-rgb: 23 20 46;
+  --surface-2-rgb: 29 26 47;
+  --surface-3-rgb: 39 35 59;
+  --surface-0: rgb(var(--surface-0-rgb));
+  --surface-1: rgb(var(--surface-1-rgb));
+  --surface-2: rgb(var(--surface-2-rgb));
+  --surface-3: rgb(var(--surface-3-rgb));
+
+  /* Ghost surfaces: a white wash over whatever is underneath. */
+  --surface-ghost: rgb(255 255 255 / 0.03);
+  --surface-ghost-hover: rgb(255 255 255 / 0.08);
+  --surface-ghost-active: rgb(255 255 255 / 0.12);
+
+  --app-bg-gradient: radial-gradient(circle at 50% 80%, var(--surface-1) 0%, var(--surface-0) 100%);
+  /* Right-click menu and the check-actions menu share this surface. */
+  --menu-bg: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
+
+  --border-subtle: rgb(255 255 255 / 0.08);
+  --border-default: rgb(255 255 255 / 0.12);
+
+  /* --- Text ------------------------------------------------------------------
+   * White at fixed strengths, strongest first. */
+  --text-strong: rgb(255 255 255 / 0.92);
+  --text-soft: rgb(255 255 255 / 0.85);
+  --text-secondary: rgb(255 255 255 / 0.72);
+  --text-muted: rgb(255 255 255 / 0.6);
+  --text-subtle: rgb(255 255 255 / 0.45);
+  --text-faint: rgb(255 255 255 / 0.35);
+
+  /* --- Radii ---------------------------------------------------------------- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  /* Tiles (grid, compact and list rows), menus, form fields. */
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* --- Type scale ----------------------------------------------------------- */
+  --fs-3xs: 9px;
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 14px;
+  --fs-xl: 15px;
+
+  /* --- Layout --------------------------------------------------------------- */
+  --bottom-bar-height: 36px;
+  --bottom-bar-toggle-height: 26px;
+  --tile-name-font-size: 1rem;
+  --tile-hostname-font-size: var(--fs-sm);
+  --tile-expanded-width: 220px;
+  --tile-compact-width: 244px;
+  --tile-expanded-height: 100px;
+  --tile-status-height: 20px;
+
+  /* --- Layers --------------------------------------------------------------
+   * Bootstrap 5.0.2 stacks: dropdown 1000, sticky 1020, fixed 1030,
+   * modal-backdrop 1040, modal 1060, popover 1070, tooltip 1080. The app's
+   * layers are placed around those, so keep the relative order:
+   *   bottom bar  < modal backdrop   (an open modal covers the bar)
+   *   toast/tray  > modal            (feedback shows over an open modal)
+   *   dropdown    > Bootstrap tooltip (in-modal pickers and chart tooltips)
+   *   overlay < context menu < dragbar < critical confirm */
+  --z-base: 1;
+  --z-raised: 2;
+  --z-float: 3;
+  --z-sticky: 5;
+  --z-bottom-bar: 1000;
+  --z-toast: 1100;
+  --z-banner: 1200;
+  --z-dropdown: 2000;
+  --z-overlay: 20000;
+  --z-context-menu: 100000;
+  --z-dragbar: 1000000;
+  --z-critical: 1000001;
+}
+
 .dragbar {
-  z-index: 1000000;
+  z-index: var(--z-dragbar);
   position: fixed;
   width: 100vw;
   height: 2rem;
   -webkit-app-region: drag; /* allow window dragging on Electron */
-  background-color: #1d1a2ffc !important;
+  background-color: rgb(var(--surface-2-rgb) / 0.99) !important;
   padding: 0.3rem 0.8rem !important;
   color: #ffffff !important;
   user-select: none !important;
@@ -32,7 +206,7 @@ body.is-web #APPLICATION {
 }
 
 #APPLICATION_NAVBAR_TITLE {
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-strong);
 }
 
 #APPLICATION_CONTAINER {
@@ -48,7 +222,7 @@ body.is-web #APPLICATION {
      flow #APPLICATION grows with its content and the padding counts toward
      the scrollable overflow. (#APPLICATION's min-height still fills the
      viewport when the list is short.) */
-  background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
+  background: var(--app-bg-gradient) !important;
 }
 
 #APPLICATION {
@@ -58,7 +232,7 @@ body.is-web #APPLICATION {
      where the list is a single tall column. */
   min-height: max(100%, 100vh);
   padding-top: 2rem !important;
-  padding-bottom: 36px !important; /* space for bottom bar */
+  padding-bottom: var(--bottom-bar-height) !important; /* space for bottom bar */
   user-select: none !important;
   -webkit-user-select: none !important;
   -moz-user-select: none !important;
@@ -69,37 +243,32 @@ body.is-web #APPLICATION {
   background: transparent !important;
 }
 
-/* Deprecated old floating status bar */
-#STATUS_BAR {
-  display: none;
-}
-
 /* Bottom thin bar */
 #APP_BOTTOM_BAR {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 36px;
-  background: #1d1a2f; /* solid, not transparent */
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  height: var(--bottom-bar-height);
+  background: var(--surface-2); /* solid, not transparent */
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
-  z-index: 1000;
+  z-index: var(--z-bottom-bar);
 }
 
 #IDENTIFY_STATUS_BANNER {
   position: fixed;
   left: 50%;
-  bottom: 44px;
+  bottom: calc(var(--bottom-bar-height) + 8px);
   transform: translateX(-50%);
-  z-index: 1200;
+  z-index: var(--z-banner);
   width: min(560px, calc(100vw - 20px));
   background:
-    radial-gradient(circle at 20% -70%, rgba(72, 171, 255, 0.28), transparent 70%),
+    radial-gradient(circle at 20% -70%, rgb(var(--status-pending-rgb) / 0.28), transparent 70%),
     linear-gradient(160deg, rgba(20, 51, 88, 0.98), rgba(14, 35, 64, 0.98));
-  border: 1px solid rgba(110, 193, 255, 0.34);
-  border-radius: 12px;
+  border: 1px solid rgb(var(--status-pending-rgb) / 0.45);
+  border-radius: var(--radius-lg);
   box-shadow:
     0 14px 30px rgba(4, 24, 48, 0.5),
     inset 0 1px 0 rgba(187, 228, 255, 0.12);
@@ -114,37 +283,38 @@ body.is-web #APPLICATION {
   justify-content: space-between;
   gap: 14px;
   color: rgba(225, 244, 255, 0.96);
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 700;
   line-height: 1.3;
 }
 
+/* A btn-outline-light, so the border-color below is live (outline buttons keep
+   their border; see `.btn` at the end of this file). */
 #IDENTIFY_STOP_ALL_BUTTON {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   white-space: nowrap;
   color: rgba(222, 244, 255, 0.98) !important;
-  border-color: rgba(130, 204, 255, 0.55) !important;
+  border-color: rgb(var(--status-pending-rgb) / 0.7) !important;
   background: linear-gradient(
     160deg,
-    rgba(53, 143, 212, 0.24),
-    rgba(39, 108, 160, 0.18)
+    rgb(var(--status-pending-rgb) / 0.24),
+    rgb(var(--status-pending-rgb) / 0.16)
   ) !important;
-  box-shadow: inset 0 0 0 1px rgba(172, 224, 255, 0.12);
 }
 
 #IDENTIFY_STOP_ALL_BUTTON:hover {
   background: linear-gradient(
     160deg,
-    rgba(72, 171, 255, 0.32),
-    rgba(46, 128, 189, 0.26)
+    rgb(var(--status-pending-rgb) / 0.34),
+    rgb(var(--status-pending-rgb) / 0.26)
   ) !important;
-  border-color: rgba(154, 216, 255, 0.72) !important;
+  border-color: rgb(var(--status-pending-rgb) / 0.9) !important;
 }
 
 #IDENTIFY_STATUS_BANNER.stacked-above-confirm {
-  bottom: 118px;
+  bottom: calc(var(--bottom-bar-height) + 82px);
 }
 
 #APP_BOTTOM_BAR .bar-content {
@@ -160,9 +330,9 @@ body.is-web #APPLICATION {
 }
 #APP_BOTTOM_BAR .bar-section.center {
   justify-self: center;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-soft);
   font-weight: 700;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 #APP_BOTTOM_BAR .bar-section.right {
   justify-self: end;
@@ -181,30 +351,6 @@ body.is-web #APPLICATION {
 }
 
 /* Bottom-bar toggles */
-:root {
-  --bottom-bar-toggle-height: 26px;
-  /* Shared status palette. Client tile backgrounds AND history timeline blocks
-   * both read from these variables so the colour scheme lives in one place.
-   *   IDLE / UNAVAILABLE -> grey, OFFLINE -> red, DEGRADED -> orange, ONLINE -> green */
-  --status-idle: rgba(64, 64, 64, 0.5);
-  --status-unavailable: rgba(64, 64, 64, 0.5);
-  --status-offline: rgba(255, 0, 0, 0.24);
-  --status-degraded: rgba(255, 140, 0, 0.32);
-  --status-online: rgba(18, 255, 0, 0.32);
-  /* More saturated variants used only for the history status timeline blocks. */
-  --status-graph-idle: rgba(120, 126, 134, 0.9);
-  --status-graph-offline: rgba(224, 36, 36, 0.98);
-  --status-graph-degraded: rgba(255, 149, 0, 0.98);
-  --status-graph-online: rgba(38, 214, 44, 0.98);
-  /* Backwards-compatible alias kept for existing references. */
-  --client-online-bg: var(--status-online);
-  --tile-name-font-size: 1rem;
-  --tile-hostname-font-size: 0.72rem;
-  --tile-expanded-width: 220px;
-  --tile-compact-width: 244px;
-  --tile-expanded-height: 100px;
-  --tile-status-height: 20px;
-}
 
 /* The bottom-bar SHOW/EDIT and GRID/COMPACT/LIST switches use the shared
    `.st-segmented-toggle` look (see 02-controls.css); here they are just sized
@@ -218,7 +364,7 @@ body.is-web #APPLICATION {
   align-items: center;
   padding-top: 0;
   padding-bottom: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 /* With the three-way view switch, the left of the bar is three toggles wide;
@@ -234,7 +380,7 @@ body.is-web #APPLICATION {
   #ALERT_ACTIONS_TOGGLE_BTN .alert-actions-toggle-segment {
     padding-left: 0.5rem;
     padding-right: 0.5rem;
-    font-size: 11px;
+    font-size: var(--fs-xs);
     letter-spacing: 0.02em;
   }
 }
@@ -253,27 +399,27 @@ body.is-web #APPLICATION {
   display: inline-flex;
   align-items: center;
   padding: 0 0.85rem;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 #ALERT_ACTIONS_TOGGLE_BTN.alerts-enabled .alert-actions-toggle-segment {
-  background: var(--client-online-bg);
+  background: var(--status-online);
   color: #fff;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 #ALERT_ACTIONS_TOGGLE_BTN.alerts-disabled .alert-actions-toggle-segment {
-  background: rgba(220, 53, 69, 0.92);
+  background: rgb(var(--danger-rgb) / 0.92);
   color: #fff;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 #ALERT_ACTIONS_TOGGLE_BTN:not(:disabled):hover.alerts-enabled .alert-actions-toggle-segment {
-  background: rgba(18, 255, 0, 0.45);
+  background: rgb(var(--status-online-rgb) / 0.45);
 }
 
 #ALERT_ACTIONS_TOGGLE_BTN:not(:disabled):hover.alerts-disabled .alert-actions-toggle-segment {
-  background: rgb(220, 53, 69);
+  background: var(--danger);
 }
 
 #ALERT_ACTIONS_TOGGLE_BTN:disabled {
@@ -290,16 +436,28 @@ body.is-web #APPLICATION {
   min-width: 0;
 }
 
-.btn {
+/* A failing monitored condition: text, icons, and the rows/pills that carry
+   one. The pill and table-row variants live beside their components in
+   03-layout.css; this is the colour itself. */
+.st-condition-failing,
+.st-condition-failing .bi {
+  color: var(--condition-failing) !important;
+}
+
+/* Bootstrap gives every .btn a 1px border; the app's filled buttons are
+   borderless. Outline variants keep theirs — on those the border IS the button.
+   :where() holds this at plain `.btn` specificity, so component rules later in
+   the cascade still set their own borders. */
+.btn:where(:not([class*='btn-outline-'])) {
   border: none;
 }
 
 .btn-ghost {
-  background-color: rgba(255, 255, 255, 0.03) !important;
+  background-color: var(--surface-ghost) !important;
 }
 
 .btn-ghost:hover {
-  background-color: rgba(255, 255, 255, 0.07) !important;
+  background-color: var(--surface-ghost-hover) !important;
 }
 
 .btn-light {
@@ -309,4 +467,30 @@ body.is-web #APPLICATION {
 
 .btn-light:hover {
   background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* THE delete button, app-wide: light red text on a translucent red tint, never
+   a solid fill. Works with .btn, .btn-sm and .w-100. The !importants let it win
+   if it lands beside .btn-ghost / .btn-danger / .text-danger, which it replaces. */
+.btn-delete {
+  color: var(--danger-text) !important;
+  background-color: rgb(var(--danger-rgb) / 0.14) !important;
+  border: none;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+.btn-delete:hover,
+.btn-delete:focus-visible,
+.btn-delete:active,
+.btn-delete.active {
+  color: var(--danger-text-hover) !important;
+  background-color: rgb(var(--danger-rgb) / 0.26) !important;
+}
+
+.btn-delete:disabled,
+.btn-delete.disabled {
+  color: var(--danger-text) !important;
+  background-color: rgb(var(--danger-rgb) / 0.08) !important;
 }

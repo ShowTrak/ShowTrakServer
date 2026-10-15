@@ -137,7 +137,7 @@ test('every non-ok state has a message, preferring what the client said', () => 
   );
   assert.deepEqual(Lib.AudioSectionMessage('error', client({}, { Status: {} }), 'output'), {
     Title: 'Audio Outputs Warning',
-    Body: 'The client could not read its audio outputs.',
+    Body: 'The client failed to read its audio outputs.',
   });
   assert.deepEqual(Lib.AudioSectionMessage('waiting', client(), 'input'), {
     Title: 'Waiting for Audio Inputs',

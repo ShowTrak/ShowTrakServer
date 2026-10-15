@@ -902,11 +902,11 @@ export async function AutoSaveAlertRuleFromEditor() {
   if (IsExisting) {
     const [Err] = await window.API.UpdateAlertRule(String(AlertRuleEditorRuleID), Payload);
     if (Err) return Notify(Err, 'error');
-    Notify('Alert rule saved', 'success', 1200);
+    Notify('Alert rule saved.', 'success', 1200);
   } else {
     const [Err] = await window.API.CreateAlertRule(Payload);
     if (Err) return Notify(Err, 'error');
-    Notify('Alert rule created', 'success', 1200);
+    Notify('Alert rule created.', 'success', 1200);
   }
 }
 
@@ -1030,7 +1030,7 @@ export async function OpenAlertRuleManager() {
       const AssetID = (
         $('#ALERT_ACTION_EDITOR_SETTINGS [data-key="AssetID"]').val() || ''
       ).toString();
-      if (!AssetID) return Notify('Please choose an audio asset', 'error');
+      if (!AssetID) return Notify('Please choose an audio asset.', 'error');
       PreviewAudioAsset(AssetID);
     });
 
@@ -1059,11 +1059,13 @@ export async function OpenAlertRuleManager() {
     .off('click.alertRule')
     .on('click.alertRule', async () => {
       if (!AlertRuleEditorRuleID) return;
-      const Confirmed = await ConfirmationDialog('Delete this alert rule? This cannot be undone.');
+      const Confirmed = await ConfirmationDialog('Delete this alert rule? This cannot be undone.', {
+        ConfirmLabel: 'Delete Alert Rule',
+      });
       if (!Confirmed) return;
       const [Err] = await window.API.DeleteAlertRule(String(AlertRuleEditorRuleID));
       if (Err) return Notify(Err, 'error');
-      Notify('Alert rule deleted', 'success', 1500);
+      Notify('Alert rule deleted.', 'success', 1500);
       ResetAlertRuleEditor();
       ShowAlertListPanel();
     });

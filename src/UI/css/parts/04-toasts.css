@@ -1,77 +1,59 @@
-/* Dark-themed hint popovers (USB critical-state + monitoring field notes) */
-.SHOWTRAK_USB_POPOVER,
+/* Dark-themed hint popovers (monitoring field notes) */
 .SHOWTRAK_MON_POPOVER {
-  --bs-popover-bg: #0c091c;
+  --bs-popover-bg: var(--surface-0);
   --bs-popover-border-color: rgba(255, 255, 255, 0.14);
   --bs-popover-header-bg: transparent;
   --bs-popover-header-border-color: rgba(255, 255, 255, 0.14);
   --bs-popover-body-padding-y: 0.35rem;
   --bs-popover-body-padding-x: 0.55rem;
   --bs-popover-max-width: 240px;
-  background-color: #0c091c !important;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  border-radius: 8px;
+  background-color: var(--surface-0) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-.SHOWTRAK_USB_POPOVER .popover-header,
 .SHOWTRAK_MON_POPOVER .popover-header {
   display: none;
 }
 
-.SHOWTRAK_USB_POPOVER .popover-body,
 .SHOWTRAK_MON_POPOVER .popover-body {
-  color: rgba(255, 255, 255, 0.9) !important;
+  color: var(--text-strong) !important;
   background-color: transparent !important;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   line-height: 1.25;
   padding: 0.35rem 0.55rem;
 }
 
-.SHOWTRAK_USB_POPOVER .popover-arrow::before,
 .SHOWTRAK_MON_POPOVER .popover-arrow::before {
-  border-left-color: rgba(255, 255, 255, 0.14);
-  border-right-color: rgba(255, 255, 255, 0.14);
-  border-top-color: rgba(255, 255, 255, 0.14);
-  border-bottom-color: rgba(255, 255, 255, 0.14);
+  border-left-color: var(--border-default);
+  border-right-color: var(--border-default);
+  border-top-color: var(--border-default);
+  border-bottom-color: var(--border-default);
 }
 
-.SHOWTRAK_USB_POPOVER .popover-arrow::after,
 .SHOWTRAK_MON_POPOVER .popover-arrow::after {
-  border-left-color: #0c091c;
-  border-right-color: #0c091c;
-  border-top-color: #0c091c;
-  border-bottom-color: #0c091c;
+  border-left-color: var(--surface-0);
+  border-right-color: var(--surface-0);
+  border-top-color: var(--surface-0);
+  border-bottom-color: var(--surface-0);
 }
 
 .no-drag {
   -webkit-app-region: no-drag;
 }
 
-#APP_BOTTOM_BAR {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 36px;
-  background: #1d1a2f;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  align-items: center;
-  z-index: 1000;
-}
-
 /* Compact bottom-center confirmation toast */
 #SHOWTRAK_CONFIRM_TOAST.confirm-toast {
   position: fixed;
   left: 50%;
-  bottom: 48px; /* sit above bottom bar */
+  bottom: calc(var(--bottom-bar-height) + 12px); /* sit above bottom bar */
   transform: translateX(-50%);
-  z-index: 1100;
+  z-index: var(--z-toast);
   width: min(560px, calc(100vw - 20px));
-  background: #27233b;
+  background: var(--surface-3);
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
   color: #fff;
 }
@@ -83,9 +65,9 @@
   padding: 10px 12px;
 }
 #SHOWTRAK_CONFIRM_TOAST .confirm-toast-msg {
-  font-size: 13px;
+  font-size: var(--fs-md);
   line-height: 1.3;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-strong);
 }
 #SHOWTRAK_CONFIRM_TOAST .confirm-toast-actions {
   display: flex;
@@ -102,8 +84,8 @@
 }
 #SHOWTRAK_CONFIRM_TOAST #CONFIRM_TOAST_CONFIRM:focus,
 #SHOWTRAK_CONFIRM_TOAST #CONFIRM_TOAST_CONFIRM:focus-visible {
-  outline-color: rgba(220, 53, 69, 0.95) !important;
-  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.35) !important;
+  outline-color: rgb(var(--danger-rgb) / 0.95) !important;
+  box-shadow: 0 0 0 3px rgb(var(--danger-rgb) / 0.35) !important;
 }
 
 /* Critical confirmation: centred red modal over a dimmed screen. Sits above
@@ -111,7 +93,7 @@
 #SHOWTRAK_CRITICAL_CONFIRM.critical-confirm {
   position: fixed;
   inset: 0;
-  z-index: 1000001;
+  z-index: var(--z-critical);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -128,7 +110,7 @@
   color: #fff;
   background: linear-gradient(180deg, #7a0d17 0%, #4d0710 100%);
   border: 2px solid #ff4d5e;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
   animation: critical-confirm-pop 160ms ease-out;
 }
@@ -147,7 +129,7 @@
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-msg {
   font-size: 1.05rem;
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--text-strong);
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-items {
   list-style: none;
@@ -158,18 +140,18 @@
   justify-content: center;
   gap: 6px;
   background: rgba(0, 0, 0, 0.25);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-items li {
   padding: 2px 10px;
-  font-size: 0.85rem;
+  font-size: var(--fs-lg);
   background: rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow-wrap: anywhere;
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-items .critical-confirm-more {
   background: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-actions {
   display: grid;
@@ -181,7 +163,7 @@
   padding: 12px 16px;
   font-size: 1.05rem;
   font-weight: 700;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-cancel {
   background: #fff;
@@ -199,8 +181,8 @@
   color: #fff;
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-go:hover {
-  background: #dc3545;
-  border-color: #dc3545;
+  background: var(--danger);
+  border-color: var(--danger);
   color: #fff;
 }
 #SHOWTRAK_CRITICAL_CONFIRM .btn:focus,
@@ -208,11 +190,6 @@
   outline: 3px solid #ffd1d6 !important;
   outline-offset: 3px !important;
   box-shadow: none !important;
-}
-#SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-hint {
-  margin-top: 12px;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.6);
 }
 @keyframes critical-confirm-fade {
   from {
@@ -235,10 +212,10 @@
   width: min(600px, calc(100vw - 40px));
   max-height: min(78vh, calc(100vh - 96px));
   overflow: auto;
-  z-index: 1100;
-  background: rgba(29, 26, 47, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  z-index: var(--z-toast);
+  background: rgb(var(--surface-2-rgb) / 0.98);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
   /* The huge spread ring acts as a click-through dim backdrop so the panel
      reads as a centered modal without a separate backdrop element. */
   box-shadow:
@@ -259,7 +236,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-subtle);
 }
 #EXECUTION_TOAST .exec-toast-header .exec-toast-close {
   line-height: 1;
@@ -273,9 +250,9 @@
 }
 
 .exec-deploy-summary {
-  background: rgba(60, 175, 130, 0.12);
-  border: 1px solid rgba(60, 175, 130, 0.35);
-  border-radius: 8px;
+  background: rgb(var(--success-rgb) / 0.12);
+  border: 1px solid rgb(var(--success-rgb) / 0.35);
+  border-radius: var(--radius-md);
   padding: 8px;
   display: grid;
   gap: 8px;
@@ -292,18 +269,18 @@
   background: rgba(255, 255, 255, 0.1);
 }
 .exec-deploy-meta {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-strong);
 }
 .exec-deploy-failures {
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid var(--border-default);
   padding-top: 8px;
 }
 .exec-deploy-failures-title {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   margin-bottom: 6px;
 }
@@ -319,10 +296,10 @@
   gap: 4px;
 }
 .exec-deploy-fail-reason {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.82);
-  background: rgba(255, 0, 0, 0.14);
-  border-radius: 6px;
+  font-size: var(--fs-2xs);
+  color: var(--text-soft);
+  background: rgb(var(--danger-rgb) / 0.14);
+  border-radius: var(--radius-sm);
   padding: 4px 6px;
   word-break: break-word;
 }
@@ -332,7 +309,7 @@
   overflow: hidden;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 /* The per-client progress bar IS the row background. Width tracks the reported
    stage (--exec-progress); colour is driven by the state-* class. */
@@ -358,10 +335,10 @@
   animation: exec-fill-shimmer 1.3s linear infinite;
 }
 .exec-item.state-completed .exec-fill {
-  background: rgba(40, 167, 69, 0.32);
+  background: rgb(var(--success-rgb) / 0.32);
 }
 .exec-item.state-failed .exec-fill {
-  background: rgba(220, 53, 69, 0.3);
+  background: rgb(var(--danger-rgb) / 0.3);
 }
 @keyframes exec-fill-shimmer {
   from {
@@ -373,7 +350,7 @@
 }
 .exec-row {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-base);
   display: flex;
   align-items: center;
   min-height: 2.2rem;
@@ -383,7 +360,7 @@
 }
 /* Inline status / error text — stays on the row, never a block below it. */
 .exec-inline {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -391,14 +368,14 @@
   min-width: 0;
 }
 .exec-inline-stage {
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--text-secondary);
 }
 /* Live tail of the script's console output while it runs. Pushed to the right
    edge of the row and vertically centred so it reads as a status trailer. */
 .exec-inline-console {
   font-family:
     ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   color: rgba(205, 216, 255, 0.85);
   flex: 1 1 auto;
   text-align: right;
@@ -407,7 +384,7 @@
 /* Failure reason — same trailer treatment as the console tail above so it hugs
    the right edge and sits centred against the taller client/script chips. */
 .exec-inline-error {
-  color: #ffb4bc;
+  color: var(--danger-text-soft);
   flex: 1 1 auto;
   text-align: right;
   align-self: center;
@@ -428,10 +405,10 @@
   }
 }
 .exec-btn-icon.exec-fail {
-  color: #ff6b78;
+  color: var(--danger-text);
 }
 .exec-btn-icon.exec-queued {
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
 }
 .exec-left {
   display: flex;
@@ -453,19 +430,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.exec-error {
-  font-size: 10px;
-  margin: 0;
-  padding: 8px;
-  background: rgba(255, 0, 0, 0.07);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-  white-space: pre-wrap;
-}
-.exec-toggle {
-  padding: 2px 8px !important;
-}
 .exec-actions {
   width: 22px;
   display: flex;
@@ -485,7 +449,7 @@
   cursor: pointer;
 }
 .exec-btn-icon i {
-  font-size: 14px;
+  font-size: var(--fs-lg);
   line-height: 1;
 }
 .exec-btn-icon:hover {
@@ -493,13 +457,13 @@
 }
 /* success check icon */
 .exec-success {
-  color: #28a745;
+  color: var(--success);
 }
 /* removed exec-info popover styling; modal used instead */
 
 /* Small badge sizing harmony */
 #EXECUTION_TOAST .badge {
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 /* tiny duration text next to icons */
@@ -518,7 +482,7 @@
 }
 
 #NETWORK_DISCOVERY_RESULTS {
-  border-radius: 0.6rem;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.02);
   flex: 1 1 auto;
   min-height: 0;
@@ -529,7 +493,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  border-radius: 0.6rem;
+  border-radius: var(--radius-md);
 }
 .NETWORK_DISCOVERY_TABLE {
   color: #fff;
@@ -538,19 +502,19 @@
 .NETWORK_DISCOVERY_TABLE thead th {
   position: sticky;
   top: 0;
-  z-index: 3;
-  background-color: #27233b;
-  color: rgba(255, 255, 255, 0.86);
-  font-size: 11px;
+  z-index: var(--z-float);
+  background-color: var(--surface-3);
+  color: var(--text-soft);
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-subtle);
   padding-top: 0.45rem;
   padding-bottom: 0.45rem;
 }
 .NETWORK_DISCOVERY_TABLE tbody td {
   border-top: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   vertical-align: middle;
   background: transparent;
   padding-top: 0.55rem;
@@ -565,7 +529,7 @@
   padding-right: 0.75rem;
 }
 .NETWORK_DISCOVERY_TABLE tbody tr:nth-child(odd) td {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-ghost);
 }
 .NETWORK_DISCOVERY_TABLE tbody tr:nth-child(even) td {
   background: rgba(255, 255, 255, 0.075);
@@ -575,16 +539,16 @@
 }
 .NETWORK_DISCOVERY_TABLE .nd-name {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--fs-md);
   line-height: 1.2;
 }
 .NETWORK_DISCOVERY_TABLE .nd-address {
-  color: rgba(255, 255, 255, 0.86);
-  font-size: 12px;
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
 }
 .NETWORK_DISCOVERY_TABLE .nd-details {
-  color: rgba(255, 255, 255, 0.66);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
   line-height: 1.3;
   word-break: break-word;
 }
@@ -605,7 +569,7 @@
 #SHOWTRAK_MODAL_NETWORK_DISCOVERY .modal-dialog {
   position: fixed;
   top: calc(2rem + 12px);
-  bottom: calc(36px + 20px);
+  bottom: calc(var(--bottom-bar-height) + 20px);
   left: 50%;
   transform: translateX(-50%);
   margin: 0;
@@ -639,7 +603,7 @@
   max-height: min(60vh, 540px);
   overflow: auto;
   padding: 0.9rem;
-  border-radius: 0.9rem;
+  border-radius: var(--radius-lg);
   border: 1px solid rgba(148, 211, 255, 0.16);
   background:
     linear-gradient(180deg, rgba(6, 10, 17, 0.98), rgba(11, 18, 29, 0.98)),
@@ -658,7 +622,7 @@
 
 .osc-http-debug-empty {
   color: rgba(199, 216, 237, 0.6);
-  font-size: 0.9rem;
+  font-size: var(--fs-lg);
 }
 
 .osc-http-debug-line {
@@ -668,7 +632,7 @@
   align-items: start;
   padding: 0.2rem 0;
   color: rgba(238, 245, 255, 0.92);
-  font-size: 0.9rem;
+  font-size: var(--fs-lg);
   line-height: 1.45;
 }
 
@@ -683,11 +647,11 @@
 }
 
 .osc-http-debug-line.is-valid .osc-http-debug-status {
-  color: #59d98e;
+  color: var(--success-text);
 }
 
 .osc-http-debug-line.is-invalid .osc-http-debug-status {
-  color: #ff6b6b;
+  color: var(--danger-text);
 }
 
 .osc-http-debug-meta {
@@ -709,11 +673,6 @@
   margin-left: 0.45rem;
 }
 
-.osc-route-card {
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-}
-
 .osc-action-card {
   border: 1px solid rgba(255, 255, 255, 0.09);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -722,11 +681,11 @@
 .osc-route-section-header {
   margin-top: 0.5rem;
   padding: 0.1rem 0.15rem 0.35rem;
-  font-size: 0.74rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
   border-bottom: 1px solid rgba(255, 255, 255, 0.09);
 }
 
@@ -746,26 +705,9 @@
   flex-wrap: wrap;
 }
 
-.osc-action-protocol-block {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.osc-action-protocol-label {
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 700;
-}
-
-.osc-action-protocol-content {
-  display: grid;
-  gap: 0.45rem;
-}
-
 .osc-action-route-methods {
   color: rgba(177, 196, 221, 0.85);
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   font-weight: 600;
@@ -773,11 +715,11 @@
 
 .osc-action-route-unavailable {
   color: rgba(211, 190, 190, 0.74);
-  font-size: 0.84rem;
+  font-size: var(--fs-md);
   padding: 0.55rem;
-  border-radius: 0.55rem;
-  background: rgba(255, 130, 130, 0.07);
-  border: 1px dashed rgba(255, 130, 130, 0.25);
+  border-radius: var(--radius-md);
+  background: rgb(var(--danger-text-rgb) / 0.07);
+  border: 1px dashed rgb(var(--danger-text-rgb) / 0.25);
 }
 
 .osc-route-path {
@@ -785,8 +727,8 @@
   overflow-x: auto;
   white-space: nowrap;
   padding: 0.55rem;
-  border-radius: 0.55rem;
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md);
+  background: var(--surface-ghost);
 }
 
 .osc-route-query-wrap {
@@ -794,9 +736,9 @@
   gap: 0.35rem;
   margin-top: 0.15rem;
   padding: 0.55rem;
-  border-radius: 0.55rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  background: var(--surface-ghost);
+  border: 1px solid var(--border-subtle);
 }
 
 .osc-route-query-grid {
@@ -804,14 +746,14 @@
   grid-template-columns: minmax(110px, 1fr) minmax(110px, 0.8fr) minmax(200px, 1.8fr);
   gap: 0.5rem;
   align-items: center;
-  font-size: 0.82rem;
+  font-size: var(--fs-md);
 }
 
 .osc-route-query-header {
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
 }
 
 .osc-route-query-row {
@@ -833,10 +775,10 @@
 }
 
 .osc-route-value-header {
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
 }
 
 .osc-route-value-row {
@@ -844,7 +786,7 @@
   grid-template-columns: minmax(150px, 0.9fr) minmax(200px, 2fr);
   gap: 0.5rem;
   align-items: baseline;
-  font-size: 0.82rem;
+  font-size: var(--fs-md);
 }
 
 .osc-route-value {
@@ -861,7 +803,7 @@
   display: block;
   margin-top: 0.1rem;
   color: rgba(211, 226, 246, 0.6);
-  font-size: 0.76rem;
+  font-size: var(--fs-sm);
 }
 
 @media (max-width: 720px) {
@@ -876,13 +818,12 @@
   }
 }
 
-.alert-toast-host,
 #ALERTS_TOAST_HOST {
   position: fixed;
   top: 56px; /* below dragbar */
   left: 50%;
   transform: translateX(-50%);
-  z-index: 1200;
+  z-index: var(--z-banner);
   display: grid;
   gap: 10px;
   width: min(680px, calc(100vw - 20px));
@@ -890,9 +831,9 @@
 }
 .alert-toast {
   pointer-events: auto;
-  background: #27233b;
+  background: var(--surface-3);
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
   padding: 11px;
   animation: alert-toast-enter 220ms ease-out;
@@ -912,11 +853,11 @@
 }
 .alert-toast .alert-content {
   min-height: 30px;
-  font-size: 13.5px;
+  font-size: var(--fs-lg);
   line-height: 1.35;
 }
 .alert-toast .alert-content strong {
-  font-size: 14px;
+  font-size: var(--fs-lg);
   line-height: 1.3;
 }
 .alert-toast .btn-dismiss {
@@ -952,7 +893,7 @@
 @media (max-width: 768px) {
   #ALERTS_TRAY.alerts-tray {
     right: 8px;
-    bottom: 44px;
+    bottom: calc(var(--bottom-bar-height) + 8px);
     width: calc(100vw - 16px);
     max-height: min(68vh, 560px);
   }
@@ -963,7 +904,7 @@
 
   #FOG_TRAY.fog-tray {
     right: 8px;
-    bottom: 44px;
+    bottom: calc(var(--bottom-bar-height) + 8px);
     width: calc(100vw - 16px);
     max-height: min(68vh, 560px);
   }
@@ -974,7 +915,7 @@
 
   #SHOWTRAK_CONFIRM_TOAST.confirm-toast {
     width: calc(100vw - 16px);
-    bottom: 44px;
+    bottom: calc(var(--bottom-bar-height) + 8px);
   }
 
   #SHOWTRAK_CONFIRM_TOAST .confirm-toast-body {
@@ -1014,7 +955,7 @@
   align-content: center;
   gap: 0.1rem;
   padding: 0.5rem;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   border: transparent 2px solid;
   transition:
     width 180ms ease,

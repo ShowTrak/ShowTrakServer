@@ -177,11 +177,11 @@ export async function CreateTag() {
   const [Err, Tag] = await window.API.CreateTag();
   Btn.prop('disabled', false);
   if (Err || !Tag) {
-    Notify(`Could not create tag: ${Err || 'unknown error'}`, 'error');
+    Notify(`Failed to create tag: ${Err || 'unknown error'}`, 'error');
     return;
   }
   await RefreshTagManagerList();
-  Notify('Tag created', 'success');
+  Notify('Tag created.', 'success');
   OpenTagManagerEditor(Tag.TagID);
 }
 
@@ -206,7 +206,7 @@ export async function OpenTagManagerEditor(TagID: number) {
   if (TagManagerEditingId !== TagID) return;
   const Tag = TagManagerCache.find((T) => T.TagID === TagID);
   if (!Tag) {
-    Notify('Tag no longer exists', 'error');
+    Notify('Tag no longer exists.', 'error');
     ShowTagManagerList();
     return;
   }
@@ -322,8 +322,8 @@ export async function SaveTagManagerConfig() {
   if (SlugErr) {
     SaveBtn.prop('disabled', false);
     if (TagManagerEditingId !== TagID) return;
-    RenderTagManagerIssues('Could not save — please fix the following:', [SlugErr]);
-    Notify('Could not save tag', 'error');
+    RenderTagManagerIssues('Failed to save — please fix the following:', [SlugErr]);
+    Notify('Failed to save tag.', 'error');
     return;
   }
 
@@ -344,11 +344,11 @@ export async function SaveTagManagerConfig() {
   const Errors = [ColourErr, IconErr, DisplayErr, ScopeErr].filter(Boolean) as string[];
   if (Errors.length) {
     RenderTagManagerIssues('Tag partially saved — the following failed:', Errors);
-    Notify('Tag could not be fully saved', 'error');
+    Notify('Failed to fully save the tag.', 'error');
     return;
   }
 
-  Notify('Tag saved', 'success');
+  Notify('Tag saved.', 'success');
   await RefreshTagManagerList();
   ShowTagManagerList();
 }
@@ -384,14 +384,16 @@ export function InitTagManager() {
       const TagID = TagManagerEditingId;
       const Tag = TagManagerCache.find((T) => T.TagID === TagID);
       const Label = (Tag && Tag.Slug) || `Tag ${TagID}`;
-      const Confirmed = await ConfirmationDialog(`Delete tag "${Label}"? This cannot be undone.`);
+      const Confirmed = await ConfirmationDialog(`Delete tag "${Label}"? This cannot be undone.`, {
+        ConfirmLabel: 'Delete Tag',
+      });
       if (!Confirmed) return;
       const [Err] = await window.API.DeleteTag(TagID);
       if (Err) {
         Notify(`Failed to delete tag: ${Err}`, 'error');
         return;
       }
-      Notify(`Tag "${Label}" deleted`, 'success');
+      Notify(`Tag "${Label}" deleted.`, 'success');
       ShowTagManagerList();
       await RefreshTagManagerList();
     });

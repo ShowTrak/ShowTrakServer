@@ -26,7 +26,7 @@
   display: block;
   width: 100%;
   height: 90px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.04);
   overflow: visible;
 }
@@ -73,8 +73,8 @@
 }
 
 .metric-chart-label {
-  fill: rgba(255, 255, 255, 0.55);
-  font-size: 11px;
+  fill: var(--text-muted);
+  font-size: var(--fs-xs);
   paint-order: stroke;
   stroke: rgba(0, 0, 0, 0.65);
   stroke-width: 3px;
@@ -82,8 +82,8 @@
 }
 
 .metric-chart-empty {
-  fill: rgba(255, 255, 255, 0.35);
-  font-size: 12px;
+  fill: var(--text-faint);
+  font-size: var(--fs-sm);
   text-anchor: middle;
 }
 
@@ -110,8 +110,8 @@
 .freekiosk-section {
   margin-top: 0.75rem;
   padding: 0.75rem;
-  border-radius: 0.5rem;
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md);
+  background: var(--surface-ghost);
 }
 
 /* View modal panes (one per rail tab). The panels inside space themselves by
@@ -138,10 +138,10 @@
 
 .freekiosk-section-title {
   margin: 0 0 0.5rem;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
 }
 
 /* Explains rows that a display mode removed, so the gap reads as deliberate. */
@@ -151,11 +151,11 @@
   gap: 0.4rem;
   margin: 0 0 0.6rem;
   padding: 0.45rem 0.6rem;
-  border-radius: 0.35rem;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.04);
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
 }
 
 .freekiosk-section-note .bi {
@@ -187,8 +187,8 @@
 .freekiosk-metric-label {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.75);
+  font-size: var(--fs-md);
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -198,14 +198,14 @@
    hover state. Only the inline placement next to a label is FreeKiosk's. */
 .freekiosk-metric-note {
   margin-left: 0.35rem;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   vertical-align: baseline;
 }
 
 .freekiosk-metric-value {
   flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
-  font-size: 0.85rem;
+  font-size: var(--fs-lg);
   color: #fff;
 }
 
@@ -213,15 +213,15 @@
    colour: a row wearing it is a row that needs attention. */
 .freekiosk-metric-expected {
   flex: 0 0 auto;
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
   white-space: nowrap;
   color: var(--status-graph-degraded);
 }
 
 .freekiosk-alarm-badge {
   flex: 0 0 auto;
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.35);
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
 }
 
 .freekiosk-alarm-badge.is-breaching {
@@ -243,8 +243,8 @@
 }
 
 .freekiosk-capture-spinner {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: var(--fs-md);
+  color: var(--text-muted);
 }
 
 /* Inline rather than a toast: a 503 "camera in use by another app" is
@@ -252,24 +252,24 @@
 .freekiosk-capture-error {
   margin-top: 0.5rem;
   padding: 0.4rem 0.6rem;
-  border-radius: 0.35rem;
-  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
   color: var(--status-graph-degraded);
-  background: rgba(255, 149, 0, 0.1);
+  background: rgb(var(--status-graph-degraded-rgb) / 0.1);
 }
 
 .freekiosk-control-banner {
   margin-bottom: 0.5rem;
   padding: 0.4rem 0.6rem;
-  border-radius: 0.35rem;
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
+  color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.05);
 }
 
 .freekiosk-capture-frame {
   margin-top: 0.6rem;
-  border-radius: 0.4rem;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   background: #000;
   cursor: zoom-in;
@@ -289,8 +289,8 @@
 
 .freekiosk-capture-caption {
   padding: 0.25rem 0.5rem;
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
   background: rgba(0, 0, 0, 0.45);
 }
 
@@ -303,10 +303,10 @@
 .freekiosk-control-group-title {
   display: block;
   margin-bottom: 0.3rem;
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-subtle);
 }
 
 .freekiosk-control-group-body {
@@ -329,10 +329,10 @@
   justify-content: center;
   gap: 0.35rem;
   padding: 0.25rem 0.6rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0.4rem;
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  color: var(--text-strong);
   background: rgba(255, 255, 255, 0.1);
 }
 
@@ -344,7 +344,7 @@
 
 .freekiosk-btn:disabled {
   opacity: 0.45;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-strong);
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -352,14 +352,14 @@
    tint and the text always agree rather than the text alone carrying it. */
 .freekiosk-command-btn.is-destructive {
   color: var(--status-graph-degraded);
-  border-color: rgba(255, 149, 0, 0.32);
-  background: rgba(255, 149, 0, 0.14);
+  border-color: rgb(var(--status-graph-degraded-rgb) / 0.32);
+  background: rgb(var(--status-graph-degraded-rgb) / 0.14);
 }
 
 .freekiosk-command-btn.is-destructive:hover:not(:disabled),
 .freekiosk-command-btn.is-destructive:focus-visible {
   color: var(--status-graph-degraded);
-  background: rgba(255, 149, 0, 0.24);
+  background: rgb(var(--status-graph-degraded-rgb) / 0.24);
 }
 
 .freekiosk-slider {
@@ -372,8 +372,8 @@
 
 .freekiosk-slider label {
   flex: 0 0 auto;
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -386,8 +386,8 @@
   flex: 0 0 3rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
 }
 
 /* ---- Editor alarms ------------------------------------------------------- */
@@ -395,8 +395,8 @@
 .freekiosk-alarms {
   margin-top: 0.5rem;
   padding: 0.75rem;
-  border-radius: 0.5rem;
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md);
+  background: var(--surface-ghost);
 }
 
 /* Configuration, not monitoring — it decides what the terminal shows and what
@@ -417,13 +417,13 @@
 }
 
 .freekiosk-alarms-title {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: var(--fs-md);
+  color: var(--text-soft);
 }
 
 .freekiosk-alarms-hint {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
 }
 
 /* The monitoring editor spaces its generated fields with `d-grid gap-2` on the
@@ -460,32 +460,32 @@
 .freekiosk-alarm-master {
   margin-bottom: 0.5rem;
   padding: 0.35rem 0.5rem;
-  border-radius: 0.35rem;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.05);
 }
 
 .freekiosk-alarm-section-title {
   display: block;
   margin-bottom: 0.3rem;
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-subtle);
 }
 
 .freekiosk-test-result {
   margin-top: 0.4rem;
   padding: 0.35rem 0.6rem;
-  border-radius: 0.35rem;
-  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
 }
 
 .freekiosk-test-result.is-ok {
   color: var(--status-graph-online);
-  background: rgba(38, 214, 44, 0.1);
+  background: rgb(var(--status-graph-online-rgb) / 0.1);
 }
 
 .freekiosk-test-result.is-error {
   color: var(--status-graph-offline);
-  background: rgba(224, 36, 36, 0.1);
+  background: rgb(var(--status-graph-offline-rgb) / 0.1);
 }

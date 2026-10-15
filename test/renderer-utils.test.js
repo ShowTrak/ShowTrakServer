@@ -17,6 +17,7 @@ const {
   GetAlertVolume,
   HandleNonFatalError,
   WithNonFatal,
+  WithFullStop,
 } = require('../dist-test/UI/js/app/utils.js');
 const { setSettings } = require('../dist-test/UI/js/app/state/server-caches.js');
 
@@ -240,4 +241,26 @@ test('WithNonFatal swallows a throw and returns the fallback', async () => {
   assert.equal(Calls.length, 2);
   assert.equal(Calls[0][0], '[NonFatal] Ctx:Sync');
   assert.equal(Calls[1][0], '[NonFatal] Ctx:Async');
+});
+
+// ---- WithFullStop -----------------------------------------------------------
+
+test('WithFullStop closes a dynamic toast message with a full stop', () => {
+  assert.equal(WithFullStop('Client not found'), 'Client not found.');
+  assert.equal(WithFullStop('Failed to delete tag: in use  '), 'Failed to delete tag: in use.');
+});
+
+test('WithFullStop leaves sentence punctuation alone', () => {
+  assert.equal(WithFullStop('Saved show file.'), 'Saved show file.');
+  assert.equal(WithFullStop('Done!'), 'Done!');
+  assert.equal(WithFullStop('Really?'), 'Really?');
+  assert.equal(WithFullStop('Running checks…'), 'Running checks…');
+});
+
+test('WithFullStop passes empty and non-string messages through', () => {
+  assert.equal(WithFullStop(''), '');
+  assert.equal(WithFullStop(null), null);
+  assert.equal(WithFullStop(undefined), undefined);
+  const Err = { message: 'x' };
+  assert.equal(WithFullStop(Err), Err);
 });

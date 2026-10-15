@@ -1,10 +1,184 @@
+/* =========================================================================
+   Design tokens
+   -------------------------------------------------------------------------
+   Every shared colour, surface, radius, type size, layer and layout constant
+   lives here, so the rest of the parts say what a value MEANS rather than
+   repeating it. Dark theme only; Bootstrap 5.0.2 loads before this file.
+
+   Colours that need translucent variants are declared as bare channel
+   triplets (`--x-rgb: R G B`) and used as `rgb(var(--x-rgb) / alpha)`, so a
+   hue changes in exactly one place.
+   ========================================================================= */
+:root {
+  /* --- Status palette ------------------------------------------------------
+   * Tile washes: the translucent fills behind client tiles, the check editor's
+   * live status card and drag ghosts. IDLE / UNAVAILABLE -> grey,
+   * OFFLINE -> red, DEGRADED -> orange, ONLINE -> green, PENDING -> blue.
+   * The alphas are percentages so the solid tile colours in 05-monitoring.css
+   * can color-mix by exactly the same amount. */
+  --status-online-rgb: 18 255 0;
+  --status-online-a: 32%;
+  --status-offline-rgb: 255 0 0;
+  --status-offline-a: 24%;
+  --status-degraded-rgb: 255 140 0;
+  --status-degraded-a: 32%;
+  --status-idle-rgb: 64 64 64;
+  --status-idle-a: 50%;
+  /* Pending adoption AND identify share this one blue, everywhere. */
+  --status-pending-rgb: 52 152 219;
+  --status-pending-a: 25%;
+
+  --status-online: rgb(var(--status-online-rgb) / var(--status-online-a));
+  --status-offline: rgb(var(--status-offline-rgb) / var(--status-offline-a));
+  --status-degraded: rgb(var(--status-degraded-rgb) / var(--status-degraded-a));
+  --status-idle: rgb(var(--status-idle-rgb) / var(--status-idle-a));
+  --status-pending: rgb(var(--status-pending-rgb) / var(--status-pending-a));
+
+  /* Saturated variants for timeline blocks, chart lines and status dots.
+   * Tuned apart from the washes on purpose: a solid 18,255,0 block reads as
+   * neon, so the graph hues are their own triplets. Pending has no separate
+   * graph hue — it is the same blue at full strength. */
+  --status-graph-online-rgb: 38 214 44;
+  --status-graph-offline-rgb: 224 36 36;
+  --status-graph-degraded-rgb: 255 149 0;
+  --status-graph-idle-rgb: 120 126 134;
+  --status-graph-online: rgb(var(--status-graph-online-rgb) / 0.98);
+  --status-graph-offline: rgb(var(--status-graph-offline-rgb) / 0.98);
+  --status-graph-degraded: rgb(var(--status-graph-degraded-rgb) / 0.98);
+  --status-graph-idle: rgb(var(--status-graph-idle-rgb) / 0.9);
+  --status-graph-pending: rgb(var(--status-pending-rgb) / 0.98);
+
+  /* A failing monitored condition (USB, audio, display, network, system,
+   * application) turns its client tile DEGRADED, so it wears the degraded
+   * hue. Apply it with `.st-condition-failing`. */
+  --condition-failing-rgb: var(--status-graph-degraded-rgb);
+  --condition-failing: var(--status-graph-degraded);
+
+  /* --- Semantic colours ----------------------------------------------------
+   * The base hues match Bootstrap's so they sit beside .btn-danger /
+   * .text-success and friends; the -text variants are the lighter shades that
+   * stay readable on the dark surfaces. */
+  --danger-rgb: 220 53 69;
+  --danger: rgb(var(--danger-rgb));
+  --danger-text-rgb: 255 107 107;
+  --danger-text: rgb(var(--danger-text-rgb));
+  --danger-text-hover: #ff8787;
+  --danger-text-soft: #ffb3bc;
+
+  --success-rgb: 40 167 69;
+  --success: rgb(var(--success-rgb));
+  --success-text-rgb: 79 209 139;
+  --success-text: rgb(var(--success-text-rgb));
+  --success-text-soft: #96e6b3;
+
+  --warning-rgb: 255 193 7;
+  --warning: rgb(var(--warning-rgb));
+  /* The softer amber the alerts system uses (tray accent, bell icon). */
+  --warning-soft-rgb: 255 181 77;
+  --warning-text: #ffe08a;
+
+  --info-rgb: 77 159 255;
+  --info: rgb(var(--info-rgb));
+  --info-text: #a8d2ff;
+  /* Bootstrap's cyan info, used by the software-update surfaces. */
+  --info-cyan-rgb: 13 202 240;
+  --info-cyan: #3dd5f3;
+  --info-cyan-soft: #6edff6;
+
+  /* The purple that lifts a hovered/focused menu row. */
+  --accent-rgb: 120 95 200;
+
+  /* --- Surfaces ------------------------------------------------------------
+   * 0 is the deepest (the edge of the app backdrop, popovers); each step up is
+   * a raised panel: 1 modals / menu foot, 2 bars, trays and cards, 3 toasts
+   * and sticky table heads. */
+  --surface-0-rgb: 12 9 28;
+  --surface-1-rgb: 23 20 46;
+  --surface-2-rgb: 29 26 47;
+  --surface-3-rgb: 39 35 59;
+  --surface-0: rgb(var(--surface-0-rgb));
+  --surface-1: rgb(var(--surface-1-rgb));
+  --surface-2: rgb(var(--surface-2-rgb));
+  --surface-3: rgb(var(--surface-3-rgb));
+
+  /* Ghost surfaces: a white wash over whatever is underneath. */
+  --surface-ghost: rgb(255 255 255 / 0.03);
+  --surface-ghost-hover: rgb(255 255 255 / 0.08);
+  --surface-ghost-active: rgb(255 255 255 / 0.12);
+
+  --app-bg-gradient: radial-gradient(circle at 50% 80%, var(--surface-1) 0%, var(--surface-0) 100%);
+  /* Right-click menu and the check-actions menu share this surface. */
+  --menu-bg: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
+
+  --border-subtle: rgb(255 255 255 / 0.08);
+  --border-default: rgb(255 255 255 / 0.12);
+
+  /* --- Text ------------------------------------------------------------------
+   * White at fixed strengths, strongest first. */
+  --text-strong: rgb(255 255 255 / 0.92);
+  --text-soft: rgb(255 255 255 / 0.85);
+  --text-secondary: rgb(255 255 255 / 0.72);
+  --text-muted: rgb(255 255 255 / 0.6);
+  --text-subtle: rgb(255 255 255 / 0.45);
+  --text-faint: rgb(255 255 255 / 0.35);
+
+  /* --- Radii ---------------------------------------------------------------- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  /* Tiles (grid, compact and list rows), menus, form fields. */
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* --- Type scale ----------------------------------------------------------- */
+  --fs-3xs: 9px;
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 14px;
+  --fs-xl: 15px;
+
+  /* --- Layout --------------------------------------------------------------- */
+  --bottom-bar-height: 36px;
+  --bottom-bar-toggle-height: 26px;
+  --tile-name-font-size: 1rem;
+  --tile-hostname-font-size: var(--fs-sm);
+  --tile-expanded-width: 220px;
+  --tile-compact-width: 244px;
+  --tile-expanded-height: 100px;
+  --tile-status-height: 20px;
+
+  /* --- Layers --------------------------------------------------------------
+   * Bootstrap 5.0.2 stacks: dropdown 1000, sticky 1020, fixed 1030,
+   * modal-backdrop 1040, modal 1060, popover 1070, tooltip 1080. The app's
+   * layers are placed around those, so keep the relative order:
+   *   bottom bar  < modal backdrop   (an open modal covers the bar)
+   *   toast/tray  > modal            (feedback shows over an open modal)
+   *   dropdown    > Bootstrap tooltip (in-modal pickers and chart tooltips)
+   *   overlay < context menu < dragbar < critical confirm */
+  --z-base: 1;
+  --z-raised: 2;
+  --z-float: 3;
+  --z-sticky: 5;
+  --z-bottom-bar: 1000;
+  --z-toast: 1100;
+  --z-banner: 1200;
+  --z-dropdown: 2000;
+  --z-overlay: 20000;
+  --z-context-menu: 100000;
+  --z-dragbar: 1000000;
+  --z-critical: 1000001;
+}
+
 .dragbar {
-  z-index: 1000000;
+  z-index: var(--z-dragbar);
   position: fixed;
   width: 100vw;
   height: 2rem;
   -webkit-app-region: drag; /* allow window dragging on Electron */
-  background-color: #1d1a2ffc !important;
+  background-color: rgb(var(--surface-2-rgb) / 0.99) !important;
   padding: 0.3rem 0.8rem !important;
   color: #ffffff !important;
   user-select: none !important;
@@ -32,7 +206,7 @@ body.is-web #APPLICATION {
 }
 
 #APPLICATION_NAVBAR_TITLE {
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-strong);
 }
 
 #APPLICATION_CONTAINER {
@@ -48,7 +222,7 @@ body.is-web #APPLICATION {
      flow #APPLICATION grows with its content and the padding counts toward
      the scrollable overflow. (#APPLICATION's min-height still fills the
      viewport when the list is short.) */
-  background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
+  background: var(--app-bg-gradient) !important;
 }
 
 #APPLICATION {
@@ -58,7 +232,7 @@ body.is-web #APPLICATION {
      where the list is a single tall column. */
   min-height: max(100%, 100vh);
   padding-top: 2rem !important;
-  padding-bottom: 36px !important; /* space for bottom bar */
+  padding-bottom: var(--bottom-bar-height) !important; /* space for bottom bar */
   user-select: none !important;
   -webkit-user-select: none !important;
   -moz-user-select: none !important;
@@ -69,37 +243,32 @@ body.is-web #APPLICATION {
   background: transparent !important;
 }
 
-/* Deprecated old floating status bar */
-#STATUS_BAR {
-  display: none;
-}
-
 /* Bottom thin bar */
 #APP_BOTTOM_BAR {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 36px;
-  background: #1d1a2f; /* solid, not transparent */
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  height: var(--bottom-bar-height);
+  background: var(--surface-2); /* solid, not transparent */
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
-  z-index: 1000;
+  z-index: var(--z-bottom-bar);
 }
 
 #IDENTIFY_STATUS_BANNER {
   position: fixed;
   left: 50%;
-  bottom: 44px;
+  bottom: calc(var(--bottom-bar-height) + 8px);
   transform: translateX(-50%);
-  z-index: 1200;
+  z-index: var(--z-banner);
   width: min(560px, calc(100vw - 20px));
   background:
-    radial-gradient(circle at 20% -70%, rgba(72, 171, 255, 0.28), transparent 70%),
+    radial-gradient(circle at 20% -70%, rgb(var(--status-pending-rgb) / 0.28), transparent 70%),
     linear-gradient(160deg, rgba(20, 51, 88, 0.98), rgba(14, 35, 64, 0.98));
-  border: 1px solid rgba(110, 193, 255, 0.34);
-  border-radius: 12px;
+  border: 1px solid rgb(var(--status-pending-rgb) / 0.45);
+  border-radius: var(--radius-lg);
   box-shadow:
     0 14px 30px rgba(4, 24, 48, 0.5),
     inset 0 1px 0 rgba(187, 228, 255, 0.12);
@@ -114,37 +283,38 @@ body.is-web #APPLICATION {
   justify-content: space-between;
   gap: 14px;
   color: rgba(225, 244, 255, 0.96);
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 700;
   line-height: 1.3;
 }
 
+/* A btn-outline-light, so the border-color below is live (outline buttons keep
+   their border; see `.btn` at the end of this file). */
 #IDENTIFY_STOP_ALL_BUTTON {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   white-space: nowrap;
   color: rgba(222, 244, 255, 0.98) !important;
-  border-color: rgba(130, 204, 255, 0.55) !important;
+  border-color: rgb(var(--status-pending-rgb) / 0.7) !important;
   background: linear-gradient(
     160deg,
-    rgba(53, 143, 212, 0.24),
-    rgba(39, 108, 160, 0.18)
+    rgb(var(--status-pending-rgb) / 0.24),
+    rgb(var(--status-pending-rgb) / 0.16)
   ) !important;
-  box-shadow: inset 0 0 0 1px rgba(172, 224, 255, 0.12);
 }
 
 #IDENTIFY_STOP_ALL_BUTTON:hover {
   background: linear-gradient(
     160deg,
-    rgba(72, 171, 255, 0.32),
-    rgba(46, 128, 189, 0.26)
+    rgb(var(--status-pending-rgb) / 0.34),
+    rgb(var(--status-pending-rgb) / 0.26)
   ) !important;
-  border-color: rgba(154, 216, 255, 0.72) !important;
+  border-color: rgb(var(--status-pending-rgb) / 0.9) !important;
 }
 
 #IDENTIFY_STATUS_BANNER.stacked-above-confirm {
-  bottom: 118px;
+  bottom: calc(var(--bottom-bar-height) + 82px);
 }
 
 #APP_BOTTOM_BAR .bar-content {
@@ -160,9 +330,9 @@ body.is-web #APPLICATION {
 }
 #APP_BOTTOM_BAR .bar-section.center {
   justify-self: center;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-soft);
   font-weight: 700;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 #APP_BOTTOM_BAR .bar-section.right {
   justify-self: end;
@@ -181,30 +351,6 @@ body.is-web #APPLICATION {
 }
 
 /* Bottom-bar toggles */
-:root {
-  --bottom-bar-toggle-height: 26px;
-  /* Shared status palette. Client tile backgrounds AND history timeline blocks
-   * both read from these variables so the colour scheme lives in one place.
-   *   IDLE / UNAVAILABLE -> grey, OFFLINE -> red, DEGRADED -> orange, ONLINE -> green */
-  --status-idle: rgba(64, 64, 64, 0.5);
-  --status-unavailable: rgba(64, 64, 64, 0.5);
-  --status-offline: rgba(255, 0, 0, 0.24);
-  --status-degraded: rgba(255, 140, 0, 0.32);
-  --status-online: rgba(18, 255, 0, 0.32);
-  /* More saturated variants used only for the history status timeline blocks. */
-  --status-graph-idle: rgba(120, 126, 134, 0.9);
-  --status-graph-offline: rgba(224, 36, 36, 0.98);
-  --status-graph-degraded: rgba(255, 149, 0, 0.98);
-  --status-graph-online: rgba(38, 214, 44, 0.98);
-  /* Backwards-compatible alias kept for existing references. */
-  --client-online-bg: var(--status-online);
-  --tile-name-font-size: 1rem;
-  --tile-hostname-font-size: 0.72rem;
-  --tile-expanded-width: 220px;
-  --tile-compact-width: 244px;
-  --tile-expanded-height: 100px;
-  --tile-status-height: 20px;
-}
 
 /* The bottom-bar SHOW/EDIT and GRID/COMPACT/LIST switches use the shared
    `.st-segmented-toggle` look (see 02-controls.css); here they are just sized
@@ -218,7 +364,7 @@ body.is-web #APPLICATION {
   align-items: center;
   padding-top: 0;
   padding-bottom: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 /* With the three-way view switch, the left of the bar is three toggles wide;
@@ -234,7 +380,7 @@ body.is-web #APPLICATION {
   #ALERT_ACTIONS_TOGGLE_BTN .alert-actions-toggle-segment {
     padding-left: 0.5rem;
     padding-right: 0.5rem;
-    font-size: 11px;
+    font-size: var(--fs-xs);
     letter-spacing: 0.02em;
   }
 }
@@ -253,27 +399,27 @@ body.is-web #APPLICATION {
   display: inline-flex;
   align-items: center;
   padding: 0 0.85rem;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 #ALERT_ACTIONS_TOGGLE_BTN.alerts-enabled .alert-actions-toggle-segment {
-  background: var(--client-online-bg);
+  background: var(--status-online);
   color: #fff;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 #ALERT_ACTIONS_TOGGLE_BTN.alerts-disabled .alert-actions-toggle-segment {
-  background: rgba(220, 53, 69, 0.92);
+  background: rgb(var(--danger-rgb) / 0.92);
   color: #fff;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 #ALERT_ACTIONS_TOGGLE_BTN:not(:disabled):hover.alerts-enabled .alert-actions-toggle-segment {
-  background: rgba(18, 255, 0, 0.45);
+  background: rgb(var(--status-online-rgb) / 0.45);
 }
 
 #ALERT_ACTIONS_TOGGLE_BTN:not(:disabled):hover.alerts-disabled .alert-actions-toggle-segment {
-  background: rgb(220, 53, 69);
+  background: var(--danger);
 }
 
 #ALERT_ACTIONS_TOGGLE_BTN:disabled {
@@ -290,16 +436,28 @@ body.is-web #APPLICATION {
   min-width: 0;
 }
 
-.btn {
+/* A failing monitored condition: text, icons, and the rows/pills that carry
+   one. The pill and table-row variants live beside their components in
+   03-layout.css; this is the colour itself. */
+.st-condition-failing,
+.st-condition-failing .bi {
+  color: var(--condition-failing) !important;
+}
+
+/* Bootstrap gives every .btn a 1px border; the app's filled buttons are
+   borderless. Outline variants keep theirs — on those the border IS the button.
+   :where() holds this at plain `.btn` specificity, so component rules later in
+   the cascade still set their own borders. */
+.btn:where(:not([class*='btn-outline-'])) {
   border: none;
 }
 
 .btn-ghost {
-  background-color: rgba(255, 255, 255, 0.03) !important;
+  background-color: var(--surface-ghost) !important;
 }
 
 .btn-ghost:hover {
-  background-color: rgba(255, 255, 255, 0.07) !important;
+  background-color: var(--surface-ghost-hover) !important;
 }
 
 .btn-light {
@@ -310,6 +468,32 @@ body.is-web #APPLICATION {
 .btn-light:hover {
   background-color: rgba(255, 255, 255, 0.2) !important;
 }
+
+/* THE delete button, app-wide: light red text on a translucent red tint, never
+   a solid fill. Works with .btn, .btn-sm and .w-100. The !importants let it win
+   if it lands beside .btn-ghost / .btn-danger / .text-danger, which it replaces. */
+.btn-delete {
+  color: var(--danger-text) !important;
+  background-color: rgb(var(--danger-rgb) / 0.14) !important;
+  border: none;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+.btn-delete:hover,
+.btn-delete:focus-visible,
+.btn-delete:active,
+.btn-delete.active {
+  color: var(--danger-text-hover) !important;
+  background-color: rgb(var(--danger-rgb) / 0.26) !important;
+}
+
+.btn-delete:disabled,
+.btn-delete.disabled {
+  color: var(--danger-text) !important;
+  background-color: rgb(var(--danger-rgb) / 0.08) !important;
+}
 /* Settings button (cog icon) */
 #NAVBAR_CORE_BUTTON.settings-btn,
 #ADD_MONITORING_TARGET_BTN.settings-btn {
@@ -318,10 +502,10 @@ body.is-web #APPLICATION {
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-soft);
   cursor: pointer;
   transition:
     color 120ms ease,
@@ -358,16 +542,16 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 #ADD_MONITORING_TARGET_MENU.dropdown-menu,
 #SETTINGS_MENU.dropdown-menu {
   min-width: 240px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0.6rem;
-  background: rgba(23, 20, 38, 0.98);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: rgb(var(--surface-2-rgb) / 0.98);
   padding: 0.35rem;
 }
 #ADD_MONITORING_TARGET_MENU .dropdown-item,
 #SETTINGS_MENU .dropdown-item {
-  color: rgba(255, 255, 255, 0.92);
-  border-radius: 0.45rem;
-  font-size: 13px;
+  color: var(--text-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
   padding: 0.45rem 0.6rem;
 }
 #SETTINGS_MENU .dropdown-item {
@@ -378,8 +562,8 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 }
 #SETTINGS_MENU .dropdown-item .menu-shortcut {
   margin-left: auto;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 11px;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
@@ -391,24 +575,24 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   color: #fff;
 }
 #SETTINGS_MENU .dropdown-header {
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 11px;
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 0.35rem 0.6rem 0.15rem;
 }
 #ADD_MONITORING_TARGET_MENU .dropdown-divider,
 #SETTINGS_MENU .dropdown-divider {
-  border-top-color: rgba(255, 255, 255, 0.12);
+  border-top-color: var(--border-default);
   margin: 0.3rem 0.2rem;
 }
 #SETTINGS_MENU .dropdown-item.text-danger {
-  color: #ff6b6b !important;
+  color: var(--danger-text) !important;
 }
 #SETTINGS_MENU .dropdown-item.text-danger:hover,
 #SETTINGS_MENU .dropdown-item.text-danger:focus {
-  background: rgba(255, 107, 107, 0.15);
-  color: #ff8787 !important;
+  background: rgb(var(--danger-text-rgb) / 0.15);
+  color: var(--danger-text-hover) !important;
 }
 #NAVBAR_CORE_BUTTON.settings-btn:hover,
 #ADD_MONITORING_TARGET_BTN.settings-btn:hover {
@@ -431,7 +615,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   margin-right: 0;
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.7); /* grey by default */
+  color: var(--text-secondary); /* grey by default */
   cursor: pointer;
 }
 #ALERTS_BUTTON .bi {
@@ -445,10 +629,10 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   min-width: 15px;
   height: 15px;
   padding: 0 3px;
-  border-radius: 999px;
-  background: #ff9800;
+  border-radius: var(--radius-pill);
+  background: var(--status-graph-degraded);
   color: #111;
-  font-size: 9px;
+  font-size: var(--fs-3xs);
   font-weight: 900;
   display: grid;
   place-items: center;
@@ -456,18 +640,18 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 
 @keyframes pulse-orange {
   0% {
-    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.55);
+    box-shadow: 0 0 0 0 rgb(var(--status-graph-degraded-rgb) / 0.55);
   }
   70% {
-    box-shadow: 0 0 0 8px rgba(255, 152, 0, 0);
+    box-shadow: 0 0 0 8px rgb(var(--status-graph-degraded-rgb) / 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0);
+    box-shadow: 0 0 0 0 rgb(var(--status-graph-degraded-rgb) / 0);
   }
 }
 
 #ALERTS_BUTTON.has-alerts .bi {
-  color: #ffb54d;
+  color: rgb(var(--warning-soft-rgb));
   animation: pulse-orange 1.8s infinite;
 }
 
@@ -483,7 +667,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   margin-right: 0;
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   cursor: pointer;
 }
 #FOG_BUTTON.fog-btn.d-none {
@@ -502,10 +686,10 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   min-width: 15px;
   height: 15px;
   padding: 0 3px;
-  border-radius: 999px;
-  background: #4d9fff;
+  border-radius: var(--radius-pill);
+  background: var(--info);
   color: #06121f;
-  font-size: 9px;
+  font-size: var(--fs-3xs);
   font-weight: 900;
   display: grid;
   place-items: center;
@@ -513,18 +697,18 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 
 @keyframes pulse-blue {
   0% {
-    box-shadow: 0 0 0 0 rgba(77, 159, 255, 0.5);
+    box-shadow: 0 0 0 0 rgb(var(--info-rgb) / 0.5);
   }
   70% {
-    box-shadow: 0 0 0 8px rgba(77, 159, 255, 0);
+    box-shadow: 0 0 0 8px rgb(var(--info-rgb) / 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(77, 159, 255, 0);
+    box-shadow: 0 0 0 0 rgb(var(--info-rgb) / 0);
   }
 }
 
 #FOG_BUTTON.has-tasks .bi {
-  color: #8cc4ff;
+  color: var(--info-text);
   animation: pulse-blue 1.8s infinite;
 }
 
@@ -532,14 +716,15 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 #FOG_TRAY.fog-tray {
   position: fixed;
   right: 10px;
-  bottom: 48px; /* above bottom bar, same anchor as the alerts tray */
+  /* Above the bottom bar, same anchor as the alerts tray. */
+  bottom: calc(var(--bottom-bar-height) + 12px);
   width: min(390px, calc(100vw - 20px));
   max-height: min(62vh, 560px);
   overflow: hidden;
-  z-index: 1100;
-  background: rgba(29, 26, 47, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
+  z-index: var(--z-toast);
+  background: rgb(var(--surface-2-rgb) / 0.98);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
   box-shadow:
     0 18px 42px rgba(0, 0, 0, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -556,8 +741,8 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0));
 }
 #FOG_TRAY .fog-status {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 #FOG_TRAY .fog-status.is-offline {
   color: #ff9b7a;
@@ -568,10 +753,10 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 11px;
+  color: var(--text-soft);
+  font-size: var(--fs-xs);
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -596,9 +781,9 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   display: grid;
   gap: 6px;
   padding: 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
 }
 .fog-task-item .fog-task-title {
   display: flex;
@@ -608,43 +793,43 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 }
 .fog-task-item .fog-task-name {
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-md);
 }
 .fog-task-item .fog-task-state {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-soft);
   white-space: nowrap;
 }
 /* State colouring follows FOG's state IDs: 3 in-progress, 4 complete, 5 cancelled. */
 .fog-task-item[data-state='3'] .fog-task-state {
-  background: rgba(77, 159, 255, 0.22);
-  color: #a8d2ff;
+  background: rgb(var(--info-rgb) / 0.22);
+  color: var(--info-text);
 }
 .fog-task-item[data-state='4'] .fog-task-state {
-  background: rgba(80, 200, 120, 0.2);
-  color: #96e6b3;
+  background: rgb(var(--success-text-rgb) / 0.2);
+  color: var(--success-text-soft);
 }
 .fog-task-item[data-state='5'] .fog-task-state {
-  background: rgba(255, 128, 128, 0.18);
-  color: #ffb0a8;
+  background: rgb(var(--danger-text-rgb) / 0.18);
+  color: var(--danger-text-soft);
 }
 .fog-task-item .fog-task-client {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.62);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 .fog-task-item .fog-task-bar {
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.12);
   overflow: hidden;
 }
 .fog-task-item .fog-task-bar span {
   display: block;
   height: 100%;
-  background: #4d9fff;
+  background: var(--info);
   transition: width 0.4s ease;
 }
 /* Running but no percentage yet: a segment slides across so it reads as "working"
@@ -668,20 +853,20 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 }
 .fog-task-item .fog-task-cancel {
   appearance: none;
-  border: 1px solid rgba(255, 128, 128, 0.35);
-  background: rgba(255, 128, 128, 0.12);
-  color: #ffb0a8;
-  font-size: 11px;
+  border: 1px solid rgb(var(--danger-text-rgb) / 0.35);
+  background: rgb(var(--danger-text-rgb) / 0.12);
+  color: var(--danger-text-soft);
+  font-size: var(--fs-xs);
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   transition:
     background 0.15s ease,
     border-color 0.15s ease;
 }
 .fog-task-item .fog-task-cancel:hover {
-  background: rgba(255, 128, 128, 0.22);
-  border-color: rgba(255, 128, 128, 0.55);
+  background: rgb(var(--danger-text-rgb) / 0.22);
+  border-color: rgb(var(--danger-text-rgb) / 0.55);
 }
 .fog-task-item .fog-task-cancel:disabled {
   opacity: 0.5;
@@ -690,22 +875,22 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 .fog-empty {
   padding: 18px 10px;
   text-align: center;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
 }
 
 /* Alerts tray */
 #ALERTS_TRAY.alerts-tray {
   position: fixed;
   right: 10px;
-  bottom: 48px; /* above bottom bar */
+  bottom: calc(var(--bottom-bar-height) + 12px); /* above bottom bar */
   width: min(390px, calc(100vw - 20px));
   max-height: min(62vh, 560px);
   overflow: hidden;
-  z-index: 1100;
-  background: rgba(29, 26, 47, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
+  z-index: var(--z-toast);
+  background: rgb(var(--surface-2-rgb) / 0.98);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
   box-shadow:
     0 18px 42px rgba(0, 0, 0, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -729,7 +914,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   overflow: auto;
 }
 .alert-item {
-  --alert-accent: rgba(255, 181, 77, 0.9);
+  --alert-accent: rgb(var(--warning-soft-rgb) / 0.9);
   position: relative;
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -737,9 +922,9 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   align-items: center;
   background:
     linear-gradient(165deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03)),
-    rgba(17, 14, 31, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 11px;
+    rgb(var(--surface-0-rgb) / 0.68);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
   padding: 10px;
   box-shadow:
     0 7px 18px rgba(0, 0, 0, 0.28),
@@ -757,7 +942,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   top: 8px;
   bottom: 8px;
   width: 3px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--alert-accent);
   opacity: 0.95;
 }
@@ -773,21 +958,21 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   height: 26px;
   display: grid;
   place-items: center;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--alert-accent) 24%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--alert-accent) 32%, transparent);
 }
 .alert-item .alert-icon i {
-  font-size: 15px;
+  font-size: var(--fs-xl);
   color: color-mix(in srgb, var(--alert-accent) 86%, #fff);
 }
 .alert-item .alert-content {
   display: grid;
   align-content: center;
   min-height: 26px;
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   line-height: 1.3;
-  color: rgba(255, 255, 255, 0.96);
+  color: var(--text-strong);
 }
 
 .alert-item .alert-content > div:first-child {
@@ -797,12 +982,12 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 }
 .alert-item .alert-content strong {
   color: #fff;
-  font-size: 13px;
+  font-size: var(--fs-md);
   letter-spacing: 0.01em;
 }
 .alert-item .alert-meta {
-  font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.76);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
   opacity: 1;
 }
 .alert-item.single-line .alert-content {
@@ -816,9 +1001,9 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 .alert-item .btn-dismiss {
   border: 0;
   background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-strong);
   padding: 2px 7px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   line-height: 1;
   transition:
     background-color 120ms ease,
@@ -829,32 +1014,32 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 }
 
 .alert-item[data-severity='success'] {
-  --alert-accent: rgba(63, 214, 111, 0.92);
+  --alert-accent: rgb(var(--success-text-rgb) / 0.92);
 }
 
 .alert-item[data-severity='warning'] {
-  --alert-accent: rgba(255, 181, 77, 0.96);
+  --alert-accent: rgb(var(--warning-soft-rgb) / 0.96);
 }
 
 .alert-item[data-severity='error'] {
-  --alert-accent: rgba(255, 107, 107, 0.96);
+  --alert-accent: rgb(var(--danger-text-rgb) / 0.96);
 }
 
 .alert-item[data-severity='info'] {
-  --alert-accent: rgba(102, 184, 255, 0.96);
+  --alert-accent: rgb(var(--info-rgb) / 0.96);
 }
 
 .alert-rule-open {
   position: relative;
   width: 100%;
   padding-right: 2rem !important;
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: var(--surface-ghost);
   color: #fff;
   cursor: pointer;
 }
 
 .alert-rule-open:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--surface-ghost-hover);
 }
 
 .alert-rule-chevron {
@@ -862,9 +1047,9 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   right: 0.65rem;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 0.95rem;
+  font-size: var(--fs-xl);
   line-height: 1;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-muted);
   pointer-events: none;
 }
 
@@ -875,7 +1060,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 }
 
 .alert-action-open:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--surface-ghost-hover);
 }
 
 .alert-action-chevron {
@@ -883,9 +1068,9 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   right: 0.65rem;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 0.95rem;
+  font-size: var(--fs-xl);
   line-height: 1;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-muted);
   pointer-events: none;
 }
 
@@ -992,7 +1177,7 @@ input[type='range']:focus,
 input[type='range']::-webkit-slider-runnable-track,
 .form-range::-webkit-slider-runnable-track {
   height: 0.36rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(180deg, var(--st-slider-track-focus), var(--st-slider-track));
 }
 
@@ -1013,7 +1198,7 @@ input[type='range']::-moz-range-track,
 .form-range::-moz-range-track {
   height: 0.36rem;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(180deg, var(--st-slider-track-focus), var(--st-slider-track));
 }
 
@@ -1030,7 +1215,7 @@ input[type='range']::-moz-range-thumb,
 input[type='range']::-moz-range-progress,
 .form-range::-moz-range-progress {
   height: 0.36rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--st-slider-fill);
 }
 
@@ -1044,10 +1229,10 @@ input[type='range']::-moz-range-progress,
   position: relative;
   min-height: calc(3.5rem + 2px);
   padding: 1.625rem 2rem 0.5rem 0.75rem !important;
-  background-color: rgba(255, 255, 255, 0.03) !important;
+  background-color: var(--surface-ghost) !important;
   color: #fff !important;
   border: none !important;
-  border-radius: 0.5rem !important;
+  border-radius: var(--radius-md) !important;
 }
 
 /* Center the chevron on the full toggle height (the label/value use asymmetric
@@ -1064,7 +1249,7 @@ input[type='range']::-moz-range-progress,
 
 .alert-multiselect-toggle:hover,
 .alert-multiselect-toggle:focus {
-  background-color: #ffffff1d !important;
+  background-color: var(--surface-ghost-active) !important;
   color: #fff !important;
 }
 
@@ -1075,27 +1260,27 @@ input[type='range']::-moz-range-progress,
   top: 0;
   left: 0;
   padding: 1rem 0.75rem;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-muted);
   pointer-events: none;
   transform-origin: 0 0;
   transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
   white-space: nowrap;
-  z-index: 3;
+  z-index: var(--z-float);
 }
 
 /* Category heading inside the trigger picker. */
 .alert-multiselect-heading {
   padding: 0.5rem 0.75rem 0.25rem;
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-subtle);
 }
 
 .alert-multiselect-heading:not(:first-child) {
   margin-top: 0.25rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .alert-multiselect-menu {
@@ -1105,11 +1290,11 @@ input[type='range']::-moz-range-progress,
   right: 0;
   max-height: 360px;
   overflow: auto;
-  background: #201a3f;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  background: var(--menu-bg);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
-  z-index: 2000;
+  z-index: var(--z-dropdown);
   padding: 6px;
   display: grid;
   gap: 2px;
@@ -1121,13 +1306,13 @@ input[type='range']::-moz-range-progress,
   gap: 8px;
   align-items: center;
   padding: 4px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 0.92rem;
+  font-size: var(--fs-xl);
 }
 
 .alert-multiselect-option:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-ghost-hover);
 }
 
 .alert-multiselect-option input[type='checkbox'] {
@@ -1208,8 +1393,8 @@ input[type='range']::-moz-range-progress,
 
 .alert-scope-entity-icon {
   flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-size: var(--fs-xl);
   line-height: 1;
 }
 
@@ -1230,11 +1415,11 @@ input[type='range']::-moz-range-progress,
 }
 
 .scope-picker-section-title {
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-subtle);
   padding: 0.35rem 0.25rem 0;
 }
 
@@ -1242,8 +1427,8 @@ input[type='range']::-moz-range-progress,
    on a client tile. */
 .scope-picker-tag .scope-picker-tag-icon {
   flex: 0 0 auto;
-  color: var(--scope-tag-colour, rgba(255, 255, 255, 0.72));
-  font-size: 0.95rem;
+  color: var(--scope-tag-colour, var(--text-secondary));
+  font-size: var(--fs-xl);
   line-height: 1;
 }
 
@@ -1259,12 +1444,12 @@ input[type='range']::-moz-range-progress,
   flex: 0 0 auto;
   margin-left: 0.35rem;
   padding: 0.05rem 0.35rem;
-  border-radius: 999px;
-  font-size: 0.68rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.09);
   white-space: nowrap;
   overflow: hidden;
@@ -1273,7 +1458,7 @@ input[type='range']::-moz-range-progress,
 }
 
 .bg-ghost {
-  background-color: rgba(255, 255, 255, 0.03) !important;
+  background-color: var(--surface-ghost) !important;
 }
 
 /* Shared modal titlebar: back button + centred title + close button. The row
@@ -1296,7 +1481,7 @@ input[type='range']::-moz-range-progress,
 .st-segmented-toggle {
   display: inline-flex;
   padding: 0.15rem;
-  border-radius: 0.6rem;
+  border-radius: var(--radius-md);
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.09);
 }
@@ -1305,13 +1490,13 @@ input[type='range']::-moz-range-progress,
   appearance: none;
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.25rem 0.85rem;
-  border-radius: 0.45rem;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition:
     background 0.12s ease,
@@ -1319,7 +1504,7 @@ input[type='range']::-moz-range-progress,
 }
 
 .st-segmented-toggle-btn:hover:not(:disabled) {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-strong);
 }
 
 .st-segmented-toggle-btn.is-active {
@@ -1391,11 +1576,11 @@ input[type='range']::-moz-range-progress,
   width: 100%;
   text-align: left;
   border: 0;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 0.5rem 0.7rem;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.65);
-  background-color: rgba(255, 255, 255, 0.03);
+  font-size: var(--fs-lg);
+  color: var(--text-muted);
+  background-color: var(--surface-ghost);
   cursor: pointer;
   transition:
     background-color 0.15s ease,
@@ -1403,8 +1588,8 @@ input[type='range']::-moz-range-progress,
 }
 
 .settings-nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.9);
+  background-color: var(--surface-ghost-hover);
+  color: var(--text-strong);
 }
 
 .settings-nav-item.active {
@@ -1468,7 +1653,7 @@ input[type='range']::-moz-range-progress,
   transform: rotate(180deg);
   font-weight: 700;
   letter-spacing: 0.1rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1504,12 +1689,12 @@ input[type='range']::-moz-range-progress,
 }
 .tag-picker-title {
   font-weight: 700;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--fs-md);
+  color: var(--text-soft);
 }
 .tag-picker-hint {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: var(--fs-xs);
+  color: var(--text-subtle);
 }
 .tag-picker-list {
   display: flex;
@@ -1517,8 +1702,8 @@ input[type='range']::-moz-range-progress,
   gap: 6px;
 }
 .tag-picker-empty {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
 }
 .tag-picker-chip {
   --tag-colour: #7f8c8d;
@@ -1527,11 +1712,11 @@ input[type='range']::-moz-range-progress,
   gap: 6px;
   max-width: 100%;
   padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
   background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 11px;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1543,7 +1728,7 @@ input[type='range']::-moz-range-progress,
     color 140ms ease;
 }
 .tag-picker-chip i {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1;
   color: var(--tag-colour);
 }
@@ -1557,11 +1742,11 @@ input[type='range']::-moz-range-progress,
 .tag-picker-chip.is-on {
   border-color: var(--tag-colour);
   background: color-mix(in srgb, var(--tag-colour) 22%, transparent);
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-strong);
 }
 .tag-picker-chip:hover:not(:disabled) {
   border-color: var(--tag-colour);
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-strong);
 }
 /* Inherited from a group or from "all clients": on, but not this client's to
  * turn off. Not greyed out — it IS applied — just not interactive. */
@@ -1572,10 +1757,10 @@ input[type='range']::-moz-range-progress,
 }
 .tag-picker-chip-via {
   padding: 0 5px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(0, 0, 0, 0.3);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 9px;
+  color: var(--text-muted);
+  font-size: var(--fs-3xs);
   letter-spacing: 0.06em;
 }
 /* Client Info renders the same chips with no interaction at all. */
@@ -1595,12 +1780,12 @@ input[type='range']::-moz-range-progress,
 }
 .mac-address-editor-title {
   font-weight: 700;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--fs-md);
+  color: var(--text-soft);
 }
 .mac-address-editor-hint {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: var(--fs-xs);
+  color: var(--text-subtle);
 }
 .mac-address-list {
   display: grid;
@@ -1611,13 +1796,13 @@ input[type='range']::-moz-range-progress,
   align-items: center;
   gap: 8px;
   padding: 7px 8px 7px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
 }
 .mac-address-item .mac-address-value {
   font-family: var(--bs-font-monospace, monospace);
-  font-size: 13px;
+  font-size: var(--fs-md);
   letter-spacing: 0.02em;
   flex: 1 1 auto;
   overflow: hidden;
@@ -1625,34 +1810,34 @@ input[type='range']::-moz-range-progress,
   white-space: nowrap;
 }
 .mac-address-item .mac-address-tag {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-soft);
   white-space: nowrap;
 }
 /* The address currently serving the client's active connection. */
 .mac-address-item .mac-address-tag.is-active {
-  background: rgba(80, 200, 120, 0.2);
-  color: #96e6b3;
+  background: rgb(var(--success-text-rgb) / 0.2);
+  color: var(--success-text-soft);
 }
 .mac-address-item .mac-address-remove {
   flex: 0 0 auto;
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-subtle);
   padding: 2px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   line-height: 1;
 }
 .mac-address-item .mac-address-remove:hover {
-  background: rgba(255, 90, 90, 0.18);
-  color: #ff9d9d;
+  background: rgb(var(--danger-text-rgb) / 0.18);
+  color: var(--danger-text-hover);
 }
 .mac-address-empty {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
   padding: 6px 2px;
 }
 /* Group column layout: groups flow left-to-right across a fixed column grid.
@@ -1708,40 +1893,11 @@ body.compact-mode .group-column-grid {
 
 .GROUP_TITLE_CLICKABLE:hover {
   background-color: rgba(255, 255, 255, 0.2) !important;
-  border-radius: 0.3rem;
-}
-
-.GROUP_CREATE_BUTTON {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  font-weight: 700;
-  /* letter-spacing: 0.1rem; */
-  color: rgba(255, 255, 255, 0.6);
-  /* overflow: hidden; */
-  /* text-overflow: ellipsis; */
-  /* white-space: nowrap; */
-  text-transform: uppercase;
-}
-
-.GROUP_CREATE_BUTTON:hover {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  border-radius: 0.3rem;
-}
-
-/* Show the "+" add-group tile only in EDIT mode with a fade */
-/* Target the wrapper that specifically contains the create button */
-.GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
-  opacity: 0;
-  pointer-events: none; /* prevent clicks when hidden */
-  transition: opacity 200ms ease-in-out;
-}
-body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
-  opacity: 1;
-  pointer-events: auto;
+  border-radius: var(--radius-xs);
 }
 
 .SHOWTRAK_CLIENT_PENDING_ADOPTION {
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: var(--surface-ghost);
 }
 
 .text-bold {
@@ -1750,7 +1906,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 
 .progress {
   height: 3px !important;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
@@ -1767,7 +1923,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 #APPLICATION_NAVBAR_STATUS {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-subtle);
 }
 
 #APPLICATION_NAVBAR_STATUS:empty {
@@ -1775,7 +1931,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 #APPLICATION_NAVBAR_FILE {
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-soft);
   font-weight: 600;
 }
 
@@ -1787,18 +1943,18 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 #APPLICATION_NAVBAR_FILE:not(:empty)::before {
   content: '•';
   margin-right: 0.75rem;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-faint);
   font-weight: 400;
 }
 
 #SHOWTRAK_CONTEXT_MENU {
   display: none;
   position: fixed;
-  z-index: 100000;
-  background: linear-gradient(180deg, #1d1a35 0%, #17142c 100%) !important;
+  z-index: var(--z-context-menu);
+  background: var(--menu-bg) !important;
   color: white;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 0.6rem;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
   padding: 0.35rem;
   max-height: min(70vh, 460px);
@@ -1820,7 +1976,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 /* Flat rows (no per-item card/background) — only hover/focus lift them,
    matching a minimal filter-menu look rather than a stack of buttons. */
 #SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON {
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--text-soft);
   text-decoration: none !important;
   user-select: none !important;
   -webkit-user-select: none !important;
@@ -1831,19 +1987,19 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   justify-content: space-between;
   gap: 1rem;
   background-color: transparent;
-  border-radius: 0.4rem;
+  border-radius: var(--radius-sm);
   padding: 0.4rem 0.6rem;
-  font-size: 0.92rem;
+  font-size: var(--fs-xl);
 }
 #SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON[aria-disabled='true'] {
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-subtle);
 }
 #SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON:hover {
-  background-color: rgba(120, 95, 200, 0.16) !important;
+  background-color: rgb(var(--accent-rgb) / 0.16) !important;
 }
 #SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON:focus {
   outline: none;
-  background-color: rgba(120, 95, 200, 0.24) !important;
+  background-color: rgb(var(--accent-rgb) / 0.24) !important;
 }
 
 .SHOWTRAK_CONTEXTMENU_BUTTON {
@@ -1861,7 +2017,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 #SHOWTRAK_CONTEXT_MENU .context-shortcut {
   flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-subtle);
   font-size: 0.8em;
   margin-left: 1rem;
 }
@@ -1897,10 +2053,10 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
    panel (no gradient) with a hairline border and soft shadow so it lifts off
    the radial page background. Sizes still vary per modal via .modal-dialog. */
 .modal-content {
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  background: #171331 !important;
+  border: 1px solid var(--border-subtle) !important;
+  background: var(--surface-1) !important;
   color: white;
-  border-radius: 1rem !important;
+  border-radius: var(--radius-xl) !important;
   box-shadow:
     0 24px 60px -20px rgba(0, 0, 0, 0.65),
     0 2px 8px rgba(0, 0, 0, 0.4) !important;
@@ -1933,8 +2089,8 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_ABOUT_VERSION {
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-size: var(--fs-xl);
   font-weight: 600;
 }
 
@@ -1949,20 +2105,20 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_ABOUT_WEBSITE_BTN {
-  font-size: 0.96rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   padding: 0.55rem 0.9rem;
 }
 
 .SHOWTRAK_ABOUT_UPDATE_BODY {
-  font-size: 0.94rem;
+  font-size: var(--fs-xl);
 }
 
 /* ---- Software Update modal ---------------------------------------------- */
 
 .SHOWTRAK_APP_UPDATE_HERO {
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
 }
 
 /* Icon area: a tinted circle with a determinate progress ring sitting on its
@@ -1982,8 +2138,8 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgba(13, 202, 240, 0.14);
-  color: #3dd5f3;
+  background: rgb(var(--info-cyan-rgb) / 0.14);
+  color: var(--info-cyan);
   font-size: 1.4rem;
 }
 
@@ -1996,7 +2152,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s ease;
-  z-index: 1;
+  z-index: var(--z-base);
 }
 
 .SHOWTRAK_APP_UPDATE_ICON_WRAP.has-progress .SHOWTRAK_APP_UPDATE_RING {
@@ -2011,7 +2167,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 
 .SHOWTRAK_APP_UPDATE_RING_BAR {
   fill: none;
-  stroke: #3dd5f3;
+  stroke: var(--info-cyan);
   stroke-width: 3;
   stroke-linecap: round;
   /* dasharray = circumference (2·π·r, r=22). Offset is driven from JS. */
@@ -2026,8 +2182,8 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_APP_UPDATE_VERSION_BADGE {
-  background: rgba(13, 202, 240, 0.18);
-  color: #3dd5f3;
+  background: rgb(var(--info-cyan-rgb) / 0.18);
+  color: var(--info-cyan);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -2043,9 +2199,9 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   overflow: auto;
   background: rgba(0, 0, 0, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 0.9rem;
+  font-size: var(--fs-lg);
   line-height: 1.55;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--text-soft);
 }
 
 .SHOWTRAK_APP_UPDATE_CHANGELOG > *:first-child {
@@ -2062,12 +2218,12 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 .SHOWTRAK_APP_UPDATE_CHANGELOG h4,
 .SHOWTRAK_APP_UPDATE_CHANGELOG h5,
 .SHOWTRAK_APP_UPDATE_CHANGELOG h6 {
-  font-size: 0.95rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: #fff;
   margin: 1rem 0 0.4rem;
   padding-bottom: 0.3rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .SHOWTRAK_APP_UPDATE_CHANGELOG p {
@@ -2085,19 +2241,19 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_APP_UPDATE_CHANGELOG a {
-  color: #3dd5f3;
+  color: var(--info-cyan);
 }
 
 .SHOWTRAK_APP_UPDATE_CHANGELOG code {
   background: rgba(255, 255, 255, 0.1);
   padding: 0.1rem 0.35rem;
-  border-radius: 0.3rem;
-  font-size: 0.82rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-md);
 }
 
 .SHOWTRAK_APP_UPDATE_CHANGELOG pre {
   background: rgba(0, 0, 0, 0.35);
-  border-radius: 0.4rem;
+  border-radius: var(--radius-sm);
   padding: 0.6rem 0.75rem;
   overflow: auto;
 }
@@ -2110,16 +2266,10 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 .SHOWTRAK_ABOUT_DEPENDENCIES_LIST {
   overflow: auto;
   background: rgba(0, 0, 0, 0.22);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 0.6rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-lg);
   line-height: 1.4;
-}
-
-.SHOWTRAK_ABOUT_DEPENDENCIES_SECTION_TITLE {
-  color: rgba(255, 255, 255, 0.85);
-  font-weight: 700;
-  margin-bottom: 0.35rem;
 }
 
 .SHOWTRAK_ABOUT_DEPENDENCY_ITEM {
@@ -2127,7 +2277,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.15rem 0;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+  border-bottom: 1px dashed var(--border-subtle);
 }
 
 .SHOWTRAK_ABOUT_DEPENDENCY_ITEM:last-child {
@@ -2135,14 +2285,14 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_ABOUT_DEPENDENCY_NAME {
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-strong);
   word-break: break-word;
 }
 
 .SHOWTRAK_ABOUT_DEPENDENCY_LINK {
   color: rgba(126, 205, 255, 0.95) !important;
   text-decoration: none;
-  font-size: 0.92rem;
+  font-size: var(--fs-xl);
 }
 
 .SHOWTRAK_ABOUT_DEPENDENCY_LINK:hover,
@@ -2152,7 +2302,7 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .SHOWTRAK_ABOUT_DEPENDENCY_VERSION {
-  color: rgba(255, 255, 255, 0.68);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
@@ -2165,8 +2315,8 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .UPDATE_MANAGER_CLIENT_ITEM {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0.6rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   padding: 0.45rem 0.55rem;
   background: rgba(255, 255, 255, 0.04);
 }
@@ -2219,49 +2369,49 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   align-items: center;
   gap: 0.35rem;
   flex-wrap: wrap;
-  color: rgba(255, 255, 255, 0.68);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT {
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 6px;
-  font-size: 9px;
+  font-size: var(--fs-3xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   line-height: 1.2;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--text-soft);
   background: rgba(255, 255, 255, 0.08);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.SUCCESS {
   color: #d7ffe8;
-  border-color: rgba(66, 196, 126, 0.55);
-  background: rgba(66, 196, 126, 0.2);
+  border-color: rgb(var(--success-text-rgb) / 0.55);
+  background: rgb(var(--success-text-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.WARNING {
   color: #ffe6b8;
-  border-color: rgba(255, 189, 89, 0.6);
-  background: rgba(255, 189, 89, 0.2);
+  border-color: rgb(var(--warning-soft-rgb) / 0.6);
+  background: rgb(var(--warning-soft-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.INFO {
   color: #d9f1ff;
-  border-color: rgba(88, 187, 245, 0.58);
-  background: rgba(88, 187, 245, 0.2);
+  border-color: rgb(var(--info-rgb) / 0.58);
+  background: rgb(var(--info-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.MUTED {
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--text-secondary);
   border-color: rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.08);
 }
 
 .UPDATE_MANAGER_CLIENT_STATUS {
   text-align: right;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 700;
@@ -2275,36 +2425,36 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .UPDATE_MANAGER_CLIENT_STATUS_TEXT {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
   min-height: 14px;
   margin-top: 0.18rem;
 }
 
 .UPDATE_MANAGER_WARNING {
-  border: 1px solid rgba(255, 189, 89, 0.45);
-  background: rgba(255, 189, 89, 0.12);
-  border-radius: 0.6rem;
+  border: 1px solid rgb(var(--warning-soft-rgb) / 0.45);
+  background: rgb(var(--warning-soft-rgb) / 0.12);
+  border-radius: var(--radius-md);
   padding: 0.65rem;
 }
 
 .UPDATE_MANAGER_WARNING_TITLE {
-  color: #ffd58a;
-  font-size: 12px;
+  color: var(--warning-text);
+  font-size: var(--fs-sm);
   font-weight: 800;
   margin-bottom: 0.2rem;
 }
 
 .UPDATE_MANAGER_WARNING_TEXT {
   color: rgba(255, 237, 204, 0.9);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .UPDATE_MANAGER_WARNING_LIST {
   margin: 0.45rem 0 0;
   padding-left: 1rem;
   color: rgba(255, 237, 204, 0.92);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .UPDATE_MANAGER_DOWNLOAD_PROGRESS {
@@ -2313,25 +2463,25 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
 }
 
 .UPDATE_MANAGER_RELEASE_BADGE {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-soft);
   background: rgba(255, 255, 255, 0.08);
 }
 
 .UPDATE_MANAGER_RELEASE_BADGE.DOWNLOADED {
   color: #d7ffe8;
-  border-color: rgba(66, 196, 126, 0.55);
-  background: rgba(66, 196, 126, 0.2);
+  border-color: rgb(var(--success-text-rgb) / 0.55);
+  background: rgb(var(--success-text-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_RELEASE_BADGE.NOT_DOWNLOADED {
   color: #ffe5e5;
-  border-color: rgba(220, 84, 84, 0.55);
-  background: rgba(220, 84, 84, 0.2);
+  border-color: rgb(var(--danger-rgb) / 0.55);
+  background: rgb(var(--danger-rgb) / 0.2);
 }
 
 @media (max-width: 576px) {
@@ -2344,71 +2494,67 @@ body.mode-edit .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
   }
 
   .SHOWTRAK_ABOUT_VERSION {
-    font-size: 0.88rem;
+    font-size: var(--fs-lg);
   }
 
   .SHOWTRAK_ABOUT_CARD .card-body {
-    font-size: 0.92rem;
+    font-size: var(--fs-xl);
   }
 
   .SHOWTRAK_ABOUT_DEPENDENCIES_LIST {
     max-height: 180px;
-    font-size: 0.84rem;
+    font-size: var(--fs-md);
   }
 }
 
 small,
 .text-sm {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
 }
 
-/* Custom Scrollbar Styles */
+/* Custom Scrollbar Styles: the app's own surfaces, not a neutral grey. */
 ::-webkit-scrollbar {
   width: 8px;
-  background: #18181b;
-  border-radius: 1rem;
+  background: var(--surface-0);
+  border-radius: var(--radius-xl);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #35353a;
-  border-radius: 12px;
+  background: var(--surface-3);
+  border-radius: var(--radius-lg);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #505055;
+  background: color-mix(in srgb, var(--surface-3) 82%, #ffffff);
 }
 
 ::-webkit-scrollbar-corner {
-  background: #18181b;
+  background: var(--surface-0);
 }
 
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #35353a #18181b;
+  scrollbar-color: var(--surface-3) var(--surface-0);
 }
 
 /* No visual overlay change for EDIT mode */
 body.mode-edit #APPLICATION_CONTAINER {
-  background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%) !important;
-}
-
-#STATUS_BAR {
-  display: none;
+  background: var(--app-bg-gradient) !important;
 }
 
 .form-control,
 .form-select {
-  background-color: rgba(255, 255, 255, 0.03) !important;
+  background-color: var(--surface-ghost) !important;
   color: white !important;
   border: none !important;
-  border-radius: 0.5rem !important;
+  border-radius: var(--radius-md) !important;
 }
 
 .form-control:focus,
 .form-select:focus {
   color: white !important;
-  background-color: #ffffff1d !important;
+  background-color: var(--surface-ghost-active) !important;
   outline: 0 !important;
   box-shadow: none !important;
 }
@@ -2426,7 +2572,7 @@ kbd {
   color: #fff;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   box-shadow:
     inset 0 -1px 0 rgba(0, 0, 0, 0.35),
     0 1px 0 rgba(255, 255, 255, 0.05),
@@ -2434,7 +2580,7 @@ kbd {
 }
 .key-plus,
 .key-sep {
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-muted);
   padding: 0 0.15rem;
 }
 
@@ -2459,7 +2605,7 @@ kbd {
 /* Dropdown list colors (Chromium/Electron supports styling option background) */
 select.form-select option,
 select.form-select optgroup {
-  background-color: #1e1643;
+  background-color: var(--surface-2);
   color: #ffffff;
 }
 
@@ -2488,24 +2634,6 @@ button.btn:focus {
   box-shadow: none !important;
 }
 
-/* Confirmation modal: restore clear keyboard focus rings */
-#SHOWTRAL_MODAL_CONFIRMATION .btn:focus,
-#SHOWTRAL_MODAL_CONFIRMATION .btn:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.85) !important;
-  outline-offset: 2px !important;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18) !important;
-}
-#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CONFIRM:focus,
-#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CONFIRM:focus-visible {
-  outline-color: rgba(220, 53, 69, 0.95) !important; /* match .btn-danger */
-  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.35) !important;
-}
-#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CANCEL:focus,
-#SHOWTRAL_MODAL_CONFIRMATION #SHOWTRAK_CONFIRMATION_CANCEL:focus-visible {
-  outline-color: rgba(108, 117, 125, 0.95) !important; /* match .btn-secondary */
-  box-shadow: 0 0 0 3px rgba(108, 117, 125, 0.35) !important;
-}
-
 /* Copy buttons inside form-floating fields */
 .form-floating.has-copy {
   position: relative;
@@ -2517,7 +2645,7 @@ button.btn:focus {
   transform: translateY(-50%);
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   padding: 0;
   width: 28px;
   height: 28px;
@@ -2525,16 +2653,11 @@ button.btn:focus {
   place-items: center;
 }
 .form-floating.has-copy .copy-field-btn:hover {
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-strong);
 }
 .form-floating.has-copy .copy-field-btn i {
-  font-size: 15px;
+  font-size: var(--fs-xl);
   line-height: 1;
-}
-
-.SHOWTRAK_CLIENT_USB_DEVICE_CARD {
-  position: relative;
-  padding-right: 6.9rem !important;
 }
 
 .SHOWTRAK_TOGGLE_CRITICAL_USB {
@@ -2546,14 +2669,14 @@ button.btn:focus {
   height: 30px;
   padding: 0 0.65rem;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: rgba(220, 220, 220, 0.6);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   transition:
     color 120ms ease,
@@ -2567,29 +2690,37 @@ button.btn:focus {
 
 .SHOWTRAK_TOGGLE_CRITICAL_USB:hover {
   color: rgba(255, 214, 102, 0.9);
-  background-color: rgba(255, 193, 7, 0.12);
+  background-color: rgb(var(--warning-rgb) / 0.12);
 }
 
 .SHOWTRAK_TOGGLE_CRITICAL_USB.is-critical {
-  color: #ffc107;
-  background-color: rgba(255, 193, 7, 0.2);
+  color: var(--warning);
+  background-color: rgb(var(--warning-rgb) / 0.2);
 }
 
 .SHOWTRAK_TOGGLE_CRITICAL_USB.is-critical:hover {
   color: #ffd54a;
-  background-color: rgba(255, 193, 7, 0.24);
+  background-color: rgb(var(--warning-rgb) / 0.24);
 }
 
+/* A monitored item that is missing or failing a condition: the one failing
+   colour (see --condition-failing), whichever kind of item it is. */
 .SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical,
-.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:hover,
-.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:focus {
-  color: #ff6b6b;
-  background-color: rgba(220, 53, 69, 0.24);
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:focus,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-mismatch-critical,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-mismatch-critical:focus,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.st-condition-failing,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.st-condition-failing:focus {
+  color: var(--condition-failing);
+  background-color: rgb(var(--condition-failing-rgb) / 0.24);
   cursor: pointer;
 }
 
-.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:hover {
-  background-color: rgba(220, 53, 69, 0.28);
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-disconnected-critical:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-mismatch-critical:hover,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.st-condition-failing:hover {
+  color: var(--condition-failing);
+  background-color: rgb(var(--condition-failing-rgb) / 0.28);
 }
 
 .SHOWTRAK_TOGGLE_CRITICAL_USB.is-unavailable,
@@ -2609,10 +2740,10 @@ button.btn:focus {
   min-width: 24px;
   height: 24px;
   padding: 0 0.35rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -2647,21 +2778,14 @@ button.btn:focus {
   flex: 0 0 auto;
 }
 
-.SHOWTRAK_TOGGLE_CRITICAL_AUDIO.is-mismatch-critical,
-.SHOWTRAK_TOGGLE_CRITICAL_AUDIO.is-mismatch-critical:hover,
-.SHOWTRAK_TOGGLE_CRITICAL_AUDIO.is-mismatch-critical:focus {
-  color: #ff9f40;
-  background-color: rgba(253, 126, 20, 0.24);
-}
-
 .SHOWTRAK_AUDIO_DEFAULT_BADGE {
   display: inline-block;
   margin-left: 0.35rem;
   padding: 0.05rem 0.4rem;
-  border-radius: 999px;
-  background: rgba(13, 202, 240, 0.2);
-  color: #6edff6;
-  font-size: 10px;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--info-cyan-rgb) / 0.2);
+  color: var(--info-cyan-soft);
+  font-size: var(--fs-2xs);
   font-weight: 800;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -2686,7 +2810,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL {
   --st-level-fill: #e2e2ea;
   flex: 1 1 auto;
   height: var(--st-level-height);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   background: rgba(255, 255, 255, 0.12);
   cursor: pointer;
@@ -2705,7 +2829,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL:focus-visible {
 
 input[type='range'].SHOWTRAK_AUDIO_LEVEL::-webkit-slider-runnable-track {
   height: var(--st-level-height);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
 }
 
@@ -2725,7 +2849,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-track {
 
 input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-progress {
   height: var(--st-level-height);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--st-level-fill);
 }
 
@@ -2740,7 +2864,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 .SHOWTRAK_AUDIO_LEVEL_VALUE {
   flex: 0 0 2.75rem;
   text-align: right;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -2750,11 +2874,11 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-soft);
 }
 
 .SHOWTRAK_AUDIO_MUTE:hover {
@@ -2762,8 +2886,8 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 
 .SHOWTRAK_AUDIO_MUTE.is-muted {
-  color: #ff6b6b;
-  background: rgba(220, 53, 69, 0.24);
+  color: var(--danger-text);
+  background: rgb(var(--danger-rgb) / 0.24);
 }
 
 /* Power & Thermal readings (and similar key/value health lists): label and
@@ -2772,11 +2896,11 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   width: 100%;
   text-align: left;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .SHOWTRAK_HEALTH_TABLE tr + tr > * {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .SHOWTRAK_HEALTH_TABLE th,
@@ -2788,7 +2912,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 .SHOWTRAK_HEALTH_TABLE th {
   width: 45%;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 
 .SHOWTRAK_HEALTH_TABLE td {
@@ -2796,12 +2920,13 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   font-variant-numeric: tabular-nums;
 }
 
-.SHOWTRAK_HEALTH_TABLE tr.is-failing td {
-  color: #ff9f40;
+.SHOWTRAK_HEALTH_TABLE tr.is-failing td,
+.SHOWTRAK_HEALTH_TABLE tr.st-condition-failing td {
+  color: var(--condition-failing);
 }
 
 .SHOWTRAK_HEALTH_TABLE tr.is-healthy td {
-  color: #4fd18b;
+  color: var(--success-text);
 }
 
 /* Conditions of a critical endpoint: key, value, tick. Rules between rows
@@ -2812,11 +2937,11 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   text-align: left;
   margin-top: 0.4rem;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .SHOWTRAK_AUDIO_CONDITIONS tr + tr > * {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .SHOWTRAK_AUDIO_CONDITIONS th,
@@ -2828,7 +2953,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 .SHOWTRAK_AUDIO_CONDITIONS th {
   width: 45%;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 
 .SHOWTRAK_AUDIO_CONDITIONS td {
@@ -2850,11 +2975,12 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 
 .SHOWTRAK_AUDIO_CONDITIONS tr.is-unsupported td {
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-subtle);
 }
 
-.SHOWTRAK_AUDIO_CONDITIONS tr.is-failing td {
-  color: #ff9f40;
+.SHOWTRAK_AUDIO_CONDITIONS tr.is-failing td,
+.SHOWTRAK_AUDIO_CONDITIONS tr.st-condition-failing td {
+  color: var(--condition-failing);
 }
 
 .SHOWTRAK_AUDIO_COND_BOUND {
@@ -2868,7 +2994,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   width: 3.75rem;
   padding: 0.1rem 0.4rem;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.06);
   color: #ffffff;
   font-weight: 700;
@@ -2882,7 +3008,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 
 .SHOWTRAK_AUDIO_COND_BOUND input::placeholder,
 .SHOWTRAK_NET_COND_ADDRESS input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-faint);
 }
 
 /* --- Network interfaces (client info modal) ------------------------------ */
@@ -2917,11 +3043,11 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 /* Where the critical pill would be: internal interfaces cannot be monitored. */
 .SHOWTRAK_NET_INTERNAL_BADGE {
   flex: 0 0 auto;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 193, 7, 0.35);
-  background: rgba(255, 193, 7, 0.15);
-  color: #ffe08a;
-  font-size: 0.68rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgb(var(--warning-rgb) / 0.35);
+  background: rgb(var(--warning-rgb) / 0.15);
+  color: var(--warning-text);
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -2940,7 +3066,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 .SHOWTRAK_SYSTEM_COND_SELECT select {
   padding: 0.1rem 0.4rem;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.06);
   color: #ffffff;
   font-weight: 700;
@@ -2952,83 +3078,65 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 
 .SHOWTRAK_SYSTEM_COND_SELECT option {
-  background: #1d1a2f;
+  background: var(--surface-2);
   color: #ffffff;
 }
-/* Dark-themed hint popovers (USB critical-state + monitoring field notes) */
-.SHOWTRAK_USB_POPOVER,
+/* Dark-themed hint popovers (monitoring field notes) */
 .SHOWTRAK_MON_POPOVER {
-  --bs-popover-bg: #0c091c;
+  --bs-popover-bg: var(--surface-0);
   --bs-popover-border-color: rgba(255, 255, 255, 0.14);
   --bs-popover-header-bg: transparent;
   --bs-popover-header-border-color: rgba(255, 255, 255, 0.14);
   --bs-popover-body-padding-y: 0.35rem;
   --bs-popover-body-padding-x: 0.55rem;
   --bs-popover-max-width: 240px;
-  background-color: #0c091c !important;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  border-radius: 8px;
+  background-color: var(--surface-0) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-.SHOWTRAK_USB_POPOVER .popover-header,
 .SHOWTRAK_MON_POPOVER .popover-header {
   display: none;
 }
 
-.SHOWTRAK_USB_POPOVER .popover-body,
 .SHOWTRAK_MON_POPOVER .popover-body {
-  color: rgba(255, 255, 255, 0.9) !important;
+  color: var(--text-strong) !important;
   background-color: transparent !important;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   line-height: 1.25;
   padding: 0.35rem 0.55rem;
 }
 
-.SHOWTRAK_USB_POPOVER .popover-arrow::before,
 .SHOWTRAK_MON_POPOVER .popover-arrow::before {
-  border-left-color: rgba(255, 255, 255, 0.14);
-  border-right-color: rgba(255, 255, 255, 0.14);
-  border-top-color: rgba(255, 255, 255, 0.14);
-  border-bottom-color: rgba(255, 255, 255, 0.14);
+  border-left-color: var(--border-default);
+  border-right-color: var(--border-default);
+  border-top-color: var(--border-default);
+  border-bottom-color: var(--border-default);
 }
 
-.SHOWTRAK_USB_POPOVER .popover-arrow::after,
 .SHOWTRAK_MON_POPOVER .popover-arrow::after {
-  border-left-color: #0c091c;
-  border-right-color: #0c091c;
-  border-top-color: #0c091c;
-  border-bottom-color: #0c091c;
+  border-left-color: var(--surface-0);
+  border-right-color: var(--surface-0);
+  border-top-color: var(--surface-0);
+  border-bottom-color: var(--surface-0);
 }
 
 .no-drag {
   -webkit-app-region: no-drag;
 }
 
-#APP_BOTTOM_BAR {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 36px;
-  background: #1d1a2f;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  align-items: center;
-  z-index: 1000;
-}
-
 /* Compact bottom-center confirmation toast */
 #SHOWTRAK_CONFIRM_TOAST.confirm-toast {
   position: fixed;
   left: 50%;
-  bottom: 48px; /* sit above bottom bar */
+  bottom: calc(var(--bottom-bar-height) + 12px); /* sit above bottom bar */
   transform: translateX(-50%);
-  z-index: 1100;
+  z-index: var(--z-toast);
   width: min(560px, calc(100vw - 20px));
-  background: #27233b;
+  background: var(--surface-3);
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
   color: #fff;
 }
@@ -3040,9 +3148,9 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   padding: 10px 12px;
 }
 #SHOWTRAK_CONFIRM_TOAST .confirm-toast-msg {
-  font-size: 13px;
+  font-size: var(--fs-md);
   line-height: 1.3;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-strong);
 }
 #SHOWTRAK_CONFIRM_TOAST .confirm-toast-actions {
   display: flex;
@@ -3059,8 +3167,8 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 #SHOWTRAK_CONFIRM_TOAST #CONFIRM_TOAST_CONFIRM:focus,
 #SHOWTRAK_CONFIRM_TOAST #CONFIRM_TOAST_CONFIRM:focus-visible {
-  outline-color: rgba(220, 53, 69, 0.95) !important;
-  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.35) !important;
+  outline-color: rgb(var(--danger-rgb) / 0.95) !important;
+  box-shadow: 0 0 0 3px rgb(var(--danger-rgb) / 0.35) !important;
 }
 
 /* Critical confirmation: centred red modal over a dimmed screen. Sits above
@@ -3068,7 +3176,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 #SHOWTRAK_CRITICAL_CONFIRM.critical-confirm {
   position: fixed;
   inset: 0;
-  z-index: 1000001;
+  z-index: var(--z-critical);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3085,7 +3193,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   color: #fff;
   background: linear-gradient(180deg, #7a0d17 0%, #4d0710 100%);
   border: 2px solid #ff4d5e;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
   animation: critical-confirm-pop 160ms ease-out;
 }
@@ -3104,7 +3212,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-msg {
   font-size: 1.05rem;
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--text-strong);
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-items {
   list-style: none;
@@ -3115,18 +3223,18 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   justify-content: center;
   gap: 6px;
   background: rgba(0, 0, 0, 0.25);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-items li {
   padding: 2px 10px;
-  font-size: 0.85rem;
+  font-size: var(--fs-lg);
   background: rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow-wrap: anywhere;
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-items .critical-confirm-more {
   background: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-actions {
   display: grid;
@@ -3138,7 +3246,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   padding: 12px 16px;
   font-size: 1.05rem;
   font-weight: 700;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-cancel {
   background: #fff;
@@ -3156,8 +3264,8 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   color: #fff;
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-go:hover {
-  background: #dc3545;
-  border-color: #dc3545;
+  background: var(--danger);
+  border-color: var(--danger);
   color: #fff;
 }
 #SHOWTRAK_CRITICAL_CONFIRM .btn:focus,
@@ -3165,11 +3273,6 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   outline: 3px solid #ffd1d6 !important;
   outline-offset: 3px !important;
   box-shadow: none !important;
-}
-#SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-hint {
-  margin-top: 12px;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.6);
 }
 @keyframes critical-confirm-fade {
   from {
@@ -3192,10 +3295,10 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   width: min(600px, calc(100vw - 40px));
   max-height: min(78vh, calc(100vh - 96px));
   overflow: auto;
-  z-index: 1100;
-  background: rgba(29, 26, 47, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  z-index: var(--z-toast);
+  background: rgb(var(--surface-2-rgb) / 0.98);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
   /* The huge spread ring acts as a click-through dim backdrop so the panel
      reads as a centered modal without a separate backdrop element. */
   box-shadow:
@@ -3216,7 +3319,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-subtle);
 }
 #EXECUTION_TOAST .exec-toast-header .exec-toast-close {
   line-height: 1;
@@ -3230,9 +3333,9 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 
 .exec-deploy-summary {
-  background: rgba(60, 175, 130, 0.12);
-  border: 1px solid rgba(60, 175, 130, 0.35);
-  border-radius: 8px;
+  background: rgb(var(--success-rgb) / 0.12);
+  border: 1px solid rgb(var(--success-rgb) / 0.35);
+  border-radius: var(--radius-md);
   padding: 8px;
   display: grid;
   gap: 8px;
@@ -3249,18 +3352,18 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   background: rgba(255, 255, 255, 0.1);
 }
 .exec-deploy-meta {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-strong);
 }
 .exec-deploy-failures {
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid var(--border-default);
   padding-top: 8px;
 }
 .exec-deploy-failures-title {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   margin-bottom: 6px;
 }
@@ -3276,10 +3379,10 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   gap: 4px;
 }
 .exec-deploy-fail-reason {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.82);
-  background: rgba(255, 0, 0, 0.14);
-  border-radius: 6px;
+  font-size: var(--fs-2xs);
+  color: var(--text-soft);
+  background: rgb(var(--danger-rgb) / 0.14);
+  border-radius: var(--radius-sm);
   padding: 4px 6px;
   word-break: break-word;
 }
@@ -3289,7 +3392,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   overflow: hidden;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 /* The per-client progress bar IS the row background. Width tracks the reported
    stage (--exec-progress); colour is driven by the state-* class. */
@@ -3315,10 +3418,10 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   animation: exec-fill-shimmer 1.3s linear infinite;
 }
 .exec-item.state-completed .exec-fill {
-  background: rgba(40, 167, 69, 0.32);
+  background: rgb(var(--success-rgb) / 0.32);
 }
 .exec-item.state-failed .exec-fill {
-  background: rgba(220, 53, 69, 0.3);
+  background: rgb(var(--danger-rgb) / 0.3);
 }
 @keyframes exec-fill-shimmer {
   from {
@@ -3330,7 +3433,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 .exec-row {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-base);
   display: flex;
   align-items: center;
   min-height: 2.2rem;
@@ -3340,7 +3443,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 /* Inline status / error text — stays on the row, never a block below it. */
 .exec-inline {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3348,14 +3451,14 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   min-width: 0;
 }
 .exec-inline-stage {
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--text-secondary);
 }
 /* Live tail of the script's console output while it runs. Pushed to the right
    edge of the row and vertically centred so it reads as a status trailer. */
 .exec-inline-console {
   font-family:
     ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   color: rgba(205, 216, 255, 0.85);
   flex: 1 1 auto;
   text-align: right;
@@ -3364,7 +3467,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 /* Failure reason — same trailer treatment as the console tail above so it hugs
    the right edge and sits centred against the taller client/script chips. */
 .exec-inline-error {
-  color: #ffb4bc;
+  color: var(--danger-text-soft);
   flex: 1 1 auto;
   text-align: right;
   align-self: center;
@@ -3385,10 +3488,10 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   }
 }
 .exec-btn-icon.exec-fail {
-  color: #ff6b78;
+  color: var(--danger-text);
 }
 .exec-btn-icon.exec-queued {
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
 }
 .exec-left {
   display: flex;
@@ -3410,19 +3513,6 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.exec-error {
-  font-size: 10px;
-  margin: 0;
-  padding: 8px;
-  background: rgba(255, 0, 0, 0.07);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-  white-space: pre-wrap;
-}
-.exec-toggle {
-  padding: 2px 8px !important;
-}
 .exec-actions {
   width: 22px;
   display: flex;
@@ -3442,7 +3532,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   cursor: pointer;
 }
 .exec-btn-icon i {
-  font-size: 14px;
+  font-size: var(--fs-lg);
   line-height: 1;
 }
 .exec-btn-icon:hover {
@@ -3450,13 +3540,13 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 /* success check icon */
 .exec-success {
-  color: #28a745;
+  color: var(--success);
 }
 /* removed exec-info popover styling; modal used instead */
 
 /* Small badge sizing harmony */
 #EXECUTION_TOAST .badge {
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 /* tiny duration text next to icons */
@@ -3475,7 +3565,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 
 #NETWORK_DISCOVERY_RESULTS {
-  border-radius: 0.6rem;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.02);
   flex: 1 1 auto;
   min-height: 0;
@@ -3486,7 +3576,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  border-radius: 0.6rem;
+  border-radius: var(--radius-md);
 }
 .NETWORK_DISCOVERY_TABLE {
   color: #fff;
@@ -3495,19 +3585,19 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 .NETWORK_DISCOVERY_TABLE thead th {
   position: sticky;
   top: 0;
-  z-index: 3;
-  background-color: #27233b;
-  color: rgba(255, 255, 255, 0.86);
-  font-size: 11px;
+  z-index: var(--z-float);
+  background-color: var(--surface-3);
+  color: var(--text-soft);
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-subtle);
   padding-top: 0.45rem;
   padding-bottom: 0.45rem;
 }
 .NETWORK_DISCOVERY_TABLE tbody td {
   border-top: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   vertical-align: middle;
   background: transparent;
   padding-top: 0.55rem;
@@ -3522,7 +3612,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   padding-right: 0.75rem;
 }
 .NETWORK_DISCOVERY_TABLE tbody tr:nth-child(odd) td {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-ghost);
 }
 .NETWORK_DISCOVERY_TABLE tbody tr:nth-child(even) td {
   background: rgba(255, 255, 255, 0.075);
@@ -3532,16 +3622,16 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 .NETWORK_DISCOVERY_TABLE .nd-name {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--fs-md);
   line-height: 1.2;
 }
 .NETWORK_DISCOVERY_TABLE .nd-address {
-  color: rgba(255, 255, 255, 0.86);
-  font-size: 12px;
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
 }
 .NETWORK_DISCOVERY_TABLE .nd-details {
-  color: rgba(255, 255, 255, 0.66);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
   line-height: 1.3;
   word-break: break-word;
 }
@@ -3562,7 +3652,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 #SHOWTRAK_MODAL_NETWORK_DISCOVERY .modal-dialog {
   position: fixed;
   top: calc(2rem + 12px);
-  bottom: calc(36px + 20px);
+  bottom: calc(var(--bottom-bar-height) + 20px);
   left: 50%;
   transform: translateX(-50%);
   margin: 0;
@@ -3596,7 +3686,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   max-height: min(60vh, 540px);
   overflow: auto;
   padding: 0.9rem;
-  border-radius: 0.9rem;
+  border-radius: var(--radius-lg);
   border: 1px solid rgba(148, 211, 255, 0.16);
   background:
     linear-gradient(180deg, rgba(6, 10, 17, 0.98), rgba(11, 18, 29, 0.98)),
@@ -3615,7 +3705,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 
 .osc-http-debug-empty {
   color: rgba(199, 216, 237, 0.6);
-  font-size: 0.9rem;
+  font-size: var(--fs-lg);
 }
 
 .osc-http-debug-line {
@@ -3625,7 +3715,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   align-items: start;
   padding: 0.2rem 0;
   color: rgba(238, 245, 255, 0.92);
-  font-size: 0.9rem;
+  font-size: var(--fs-lg);
   line-height: 1.45;
 }
 
@@ -3640,11 +3730,11 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 
 .osc-http-debug-line.is-valid .osc-http-debug-status {
-  color: #59d98e;
+  color: var(--success-text);
 }
 
 .osc-http-debug-line.is-invalid .osc-http-debug-status {
-  color: #ff6b6b;
+  color: var(--danger-text);
 }
 
 .osc-http-debug-meta {
@@ -3666,11 +3756,6 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   margin-left: 0.45rem;
 }
 
-.osc-route-card {
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-}
-
 .osc-action-card {
   border: 1px solid rgba(255, 255, 255, 0.09);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -3679,11 +3764,11 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 .osc-route-section-header {
   margin-top: 0.5rem;
   padding: 0.1rem 0.15rem 0.35rem;
-  font-size: 0.74rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
   border-bottom: 1px solid rgba(255, 255, 255, 0.09);
 }
 
@@ -3703,26 +3788,9 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   flex-wrap: wrap;
 }
 
-.osc-action-protocol-block {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.osc-action-protocol-label {
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 700;
-}
-
-.osc-action-protocol-content {
-  display: grid;
-  gap: 0.45rem;
-}
-
 .osc-action-route-methods {
   color: rgba(177, 196, 221, 0.85);
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   font-weight: 600;
@@ -3730,11 +3798,11 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 
 .osc-action-route-unavailable {
   color: rgba(211, 190, 190, 0.74);
-  font-size: 0.84rem;
+  font-size: var(--fs-md);
   padding: 0.55rem;
-  border-radius: 0.55rem;
-  background: rgba(255, 130, 130, 0.07);
-  border: 1px dashed rgba(255, 130, 130, 0.25);
+  border-radius: var(--radius-md);
+  background: rgb(var(--danger-text-rgb) / 0.07);
+  border: 1px dashed rgb(var(--danger-text-rgb) / 0.25);
 }
 
 .osc-route-path {
@@ -3742,8 +3810,8 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   overflow-x: auto;
   white-space: nowrap;
   padding: 0.55rem;
-  border-radius: 0.55rem;
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md);
+  background: var(--surface-ghost);
 }
 
 .osc-route-query-wrap {
@@ -3751,9 +3819,9 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   gap: 0.35rem;
   margin-top: 0.15rem;
   padding: 0.55rem;
-  border-radius: 0.55rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  background: var(--surface-ghost);
+  border: 1px solid var(--border-subtle);
 }
 
 .osc-route-query-grid {
@@ -3761,14 +3829,14 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   grid-template-columns: minmax(110px, 1fr) minmax(110px, 0.8fr) minmax(200px, 1.8fr);
   gap: 0.5rem;
   align-items: center;
-  font-size: 0.82rem;
+  font-size: var(--fs-md);
 }
 
 .osc-route-query-header {
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
 }
 
 .osc-route-query-row {
@@ -3790,10 +3858,10 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 
 .osc-route-value-header {
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
 }
 
 .osc-route-value-row {
@@ -3801,7 +3869,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   grid-template-columns: minmax(150px, 0.9fr) minmax(200px, 2fr);
   gap: 0.5rem;
   align-items: baseline;
-  font-size: 0.82rem;
+  font-size: var(--fs-md);
 }
 
 .osc-route-value {
@@ -3818,7 +3886,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   display: block;
   margin-top: 0.1rem;
   color: rgba(211, 226, 246, 0.6);
-  font-size: 0.76rem;
+  font-size: var(--fs-sm);
 }
 
 @media (max-width: 720px) {
@@ -3833,13 +3901,12 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   }
 }
 
-.alert-toast-host,
 #ALERTS_TOAST_HOST {
   position: fixed;
   top: 56px; /* below dragbar */
   left: 50%;
   transform: translateX(-50%);
-  z-index: 1200;
+  z-index: var(--z-banner);
   display: grid;
   gap: 10px;
   width: min(680px, calc(100vw - 20px));
@@ -3847,9 +3914,9 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 .alert-toast {
   pointer-events: auto;
-  background: #27233b;
+  background: var(--surface-3);
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
   padding: 11px;
   animation: alert-toast-enter 220ms ease-out;
@@ -3869,11 +3936,11 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 }
 .alert-toast .alert-content {
   min-height: 30px;
-  font-size: 13.5px;
+  font-size: var(--fs-lg);
   line-height: 1.35;
 }
 .alert-toast .alert-content strong {
-  font-size: 14px;
+  font-size: var(--fs-lg);
   line-height: 1.3;
 }
 .alert-toast .btn-dismiss {
@@ -3909,7 +3976,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 @media (max-width: 768px) {
   #ALERTS_TRAY.alerts-tray {
     right: 8px;
-    bottom: 44px;
+    bottom: calc(var(--bottom-bar-height) + 8px);
     width: calc(100vw - 16px);
     max-height: min(68vh, 560px);
   }
@@ -3920,7 +3987,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 
   #FOG_TRAY.fog-tray {
     right: 8px;
-    bottom: 44px;
+    bottom: calc(var(--bottom-bar-height) + 8px);
     width: calc(100vw - 16px);
     max-height: min(68vh, 560px);
   }
@@ -3931,7 +3998,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 
   #SHOWTRAK_CONFIRM_TOAST.confirm-toast {
     width: calc(100vw - 16px);
-    bottom: 44px;
+    bottom: calc(var(--bottom-bar-height) + 8px);
   }
 
   #SHOWTRAK_CONFIRM_TOAST .confirm-toast-body {
@@ -3971,7 +4038,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   align-content: center;
   gap: 0.1rem;
   padding: 0.5rem;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   border: transparent 2px solid;
   transition:
     width 180ms ease,
@@ -4046,33 +4113,34 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 
 /* Pending adoption tile style: blue tint */
 .SHOWTRAK_PC.PENDING {
-  background-color: rgba(0, 123, 255, 0.25) !important;
+  background-color: var(--status-pending) !important;
 }
 
 /* Identify mode: pulse the tile blue while the client shows its overlay.
+ * The same blue as a pending tile (--status-pending-rgb).
  * Listed after ONLINE/DEGRADED/PENDING so it wins whichever base state the
  * tile is in. */
 @keyframes showtrak-identify-pulse {
   0% {
-    background-color: rgba(52, 152, 219, 0.26);
-    box-shadow: 0 0 0 0 rgba(64, 180, 255, 0.68);
+    background-color: rgb(var(--status-pending-rgb) / 0.26);
+    box-shadow: 0 0 0 0 rgb(var(--status-pending-rgb) / 0.68);
   }
   40% {
-    background-color: rgba(52, 152, 219, 0.78);
-    box-shadow: 0 0 0 11px rgba(64, 180, 255, 0.06);
+    background-color: rgb(var(--status-pending-rgb) / 0.78);
+    box-shadow: 0 0 0 11px rgb(var(--status-pending-rgb) / 0.06);
   }
   70% {
-    background-color: rgba(52, 152, 219, 0.54);
-    box-shadow: 0 0 0 16px rgba(64, 180, 255, 0);
+    background-color: rgb(var(--status-pending-rgb) / 0.54);
+    box-shadow: 0 0 0 16px rgb(var(--status-pending-rgb) / 0);
   }
   100% {
-    background-color: rgba(52, 152, 219, 0.26);
-    box-shadow: 0 0 0 0 rgba(64, 180, 255, 0);
+    background-color: rgb(var(--status-pending-rgb) / 0.26);
+    box-shadow: 0 0 0 0 rgb(var(--status-pending-rgb) / 0);
   }
 }
 
 .SHOWTRAK_PC.IDENTIFYING {
-  background-color: rgba(52, 152, 219, 0.58) !important;
+  background-color: rgb(var(--status-pending-rgb) / 0.58) !important;
   animation: showtrak-identify-pulse 1.25s ease-in-out infinite;
 }
 
@@ -4084,19 +4152,40 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
  * composited over the plain (untinted) group background, so a tile looks
  * exactly as it did in an untinted group, whatever group it is in.
  *
- * The mixes repeat the --status-* colours and alphas (color-mix cannot take a
- * colour's alpha as its percentage) — keep the two in step. Solid colours
- * rather than a layered background, so a change of state still fades.
+ * The mixes read the same --status-*-rgb hue and --status-*-a strength as
+ * the translucent --status-* colours (01-base.css), so the two cannot drift.
+ * Solid colours rather than a layered background, so a change of state still
+ * fades.
  *
  * Not the list view, whose rows are neutral and whose groups are untinted, and
  * not an identifying tile, whose pulse animates its background. */
 :root {
-  --tile-solid-base: #17152e;
-  --tile-solid-offline: color-mix(in srgb, rgb(255 0 0) 24%, var(--tile-solid-base));
-  --tile-solid-online: color-mix(in srgb, rgb(18 255 0) 32%, var(--tile-solid-base));
-  --tile-solid-degraded: color-mix(in srgb, rgb(255 140 0) 32%, var(--tile-solid-base));
-  --tile-solid-idle: color-mix(in srgb, rgb(64 64 64) 50%, var(--tile-solid-base));
-  --tile-solid-pending: color-mix(in srgb, rgb(0 123 255) 25%, var(--tile-solid-base));
+  --tile-solid-base: var(--surface-1);
+  --tile-solid-offline: color-mix(
+    in srgb,
+    rgb(var(--status-offline-rgb)) var(--status-offline-a),
+    var(--tile-solid-base)
+  );
+  --tile-solid-online: color-mix(
+    in srgb,
+    rgb(var(--status-online-rgb)) var(--status-online-a),
+    var(--tile-solid-base)
+  );
+  --tile-solid-degraded: color-mix(
+    in srgb,
+    rgb(var(--status-degraded-rgb)) var(--status-degraded-a),
+    var(--tile-solid-base)
+  );
+  --tile-solid-idle: color-mix(
+    in srgb,
+    rgb(var(--status-idle-rgb)) var(--status-idle-a),
+    var(--tile-solid-base)
+  );
+  --tile-solid-pending: color-mix(
+    in srgb,
+    rgb(var(--status-pending-rgb)) var(--status-pending-a),
+    var(--tile-solid-base)
+  );
 }
 
 /* In the same order as the translucent rules, so the same state wins when a
@@ -4120,10 +4209,10 @@ body:not(.list-mode) .SHOWTRAK_PC.PENDING:not(.IDENTIFYING) {
 .SHOWTRAK_PC_STATUS {
   height: var(--tile-status-height) !important;
   min-height: var(--tile-status-height);
-  font-size: 14px !important;
+  font-size: var(--fs-lg) !important;
   font-weight: 600 !important;
   line-height: 1.25;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   align-items: center;
 }
 
@@ -4176,12 +4265,12 @@ body:not(.list-mode) .SHOWTRAK_PC.PENDING:not(.IDENTIFYING) {
   align-self: stretch;
   flex: 1 1 auto;
   min-height: var(--tile-expanded-height);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   padding: 2rem;
   border: transparent 2px solid;
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: var(--surface-ghost);
   cursor: no-drop;
   transition:
     padding 180ms ease,
@@ -4314,10 +4403,10 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
   min-width: 0;
   max-width: 100%;
   padding: 1px 7px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: rgba(0, 0, 0, 0.22);
   color: color-mix(in srgb, var(--tag-colour) 78%, #ffffff);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   line-height: 1.4;
   letter-spacing: 0.04em;
@@ -4354,7 +4443,7 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
   flex: 0 0 auto;
   width: 12px;
   height: 14px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1;
 }
 
@@ -4367,7 +4456,7 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
  * first. */
 .SHOWTRAK_PC > .TILE_TAG_ROW > .TILE_TAG_MORE {
   flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 
 /* Compact mode drops every secondary line, badges included. */
@@ -4387,10 +4476,10 @@ body.compact-mode .SHOWTRAK_PC > .CLIENT_TILE_COMPACT_STATUS:not(.d-none) {
   margin: 0 0 0 auto !important;
   align-items: center;
   justify-content: flex-end;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   line-height: 1.2;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--text-soft);
 }
 
 body.compact-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_HOSTNAME'] {
@@ -4441,7 +4530,7 @@ body.compact-mode
   > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']
   > [data-type='OFFLINE_SINCE']
   .badge {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   line-height: 1.1;
 }
@@ -4472,7 +4561,7 @@ body.compact-mode .SHOWTRAK_PC_PLACEHOLDER p {
 /* Status text uses a slightly smaller font so values like "1234 ms" don't
  * get truncated by the fixed tile width. */
 .SHOWTRAK_PC.MONITOR .SHOWTRAK_PC_STATUS[data-type='MONITOR_STATUS'] {
-  font-size: 11px !important;
+  font-size: var(--fs-xs) !important;
 }
 
 /* Keep the expanded offline indicator on the shared client typography. */
@@ -4522,7 +4611,7 @@ body.compact-mode .SHOWTRAK_PC.MONITOR > .MONITOR_COMPACT_LATENCY {
   display: inline-block;
   flex: 0 0 auto;
   margin-left: 0.5rem;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -4562,9 +4651,9 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 }
 
 .monitor-history-window-label {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
 }
 
 /* --- Status timelines (blocks over the past hour) ----------------------- */
@@ -4596,8 +4685,8 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
    their declared groups. Drawn to match the FreeKiosk Controls tab. */
 .monitor-group-actions {
   padding: 0.75rem;
-  border-radius: 0.5rem;
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md);
+  background: var(--surface-ghost);
   text-align: left;
 }
 
@@ -4611,14 +4700,14 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 
 .monitor-group-actions-title {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-lg);
   font-weight: 700;
   color: #fff;
 }
 
 .monitor-group-actions-scope {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
 }
 
 .monitor-group-actions-group {
@@ -4632,10 +4721,10 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 .monitor-group-actions-group-title {
   display: block;
   margin-bottom: 0.3rem;
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-subtle);
 }
 
 .monitor-group-actions-group-body {
@@ -4653,10 +4742,10 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   justify-content: center;
   gap: 0.35rem;
   padding: 0.25rem 0.6rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0.4rem;
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  color: var(--text-strong);
   background: rgba(255, 255, 255, 0.1);
   cursor: pointer;
 }
@@ -4674,8 +4763,8 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 
 .monitor-group-action-btn.is-destructive {
   color: var(--status-graph-degraded);
-  border-color: rgba(255, 149, 0, 0.32);
-  background: rgba(255, 149, 0, 0.14);
+  border-color: rgb(var(--status-graph-degraded-rgb) / 0.32);
+  background: rgb(var(--status-graph-degraded-rgb) / 0.14);
 }
 
 .monitor-group-action-with-params {
@@ -4685,8 +4774,8 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 }
 
 .monitor-group-action-label {
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.75);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
@@ -4702,11 +4791,11 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   align-items: flex-start;
   gap: 0.4rem;
   padding: 0.45rem 0.6rem;
-  border-radius: 0.35rem;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.04);
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   text-align: left;
 }
 
@@ -4715,7 +4804,7 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 }
 
 .monitor-group-actions-empty {
-  font-size: 0.85rem;
+  font-size: var(--fs-lg);
   padding: 0.75rem;
 }
 
@@ -4725,44 +4814,12 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   gap: 0.35rem;
 }
 
-.status-timeline-row {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.status-timeline-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.45rem;
-  min-width: 0;
-}
-
-.status-timeline-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.status-timeline-sub {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
 .status-timeline {
   display: flex;
   align-items: stretch;
   gap: 2px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 2px;
   background: rgba(255, 255, 255, 0.04);
 }
@@ -4796,8 +4853,8 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 }
 
 .status-timeline-empty {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
   text-align: center;
   padding: 0.5rem 0;
 }
@@ -4805,14 +4862,14 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 /* --- Hover tooltip for timeline blocks ---------------------------------- */
 .monitor-history-tooltip {
   position: fixed;
-  z-index: 2000;
+  z-index: var(--z-dropdown);
   min-width: 150px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(17, 22, 29, 0.96);
-  color: rgba(255, 255, 255, 0.94);
+  background: rgb(var(--surface-0-rgb) / 0.96);
+  color: var(--text-strong);
   padding: 0.45rem 0.55rem;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.35;
   text-align: left;
   pointer-events: none;
@@ -4846,7 +4903,7 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   display: inline-block;
   width: 9px;
   height: 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--status-graph-idle);
 }
 .status-tt-dot.state-ONLINE {
@@ -4866,10 +4923,10 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   align-items: center;
   gap: 0.6rem;
   padding: 0.55rem 0.7rem 0.55rem 0.85rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background:
     linear-gradient(165deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-    rgba(17, 14, 31, 0.55);
+    rgb(var(--surface-0-rgb) / 0.55);
   overflow: visible;
 }
 
@@ -4881,7 +4938,7 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   top: 6px;
   bottom: 6px;
   width: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--status-graph-idle);
 }
 .monitor-status-card.state-ONLINE::before {
@@ -4912,9 +4969,9 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 .monitor-status-card-title {
   flex: 0 1 auto;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-strong);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4924,8 +4981,8 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   display: inline-block;
   flex: 0 1 auto;
   min-width: 0;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.65);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4942,14 +4999,14 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 
 .monitor-status-card-badge {
   background: rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 10px;
+  color: var(--text-strong);
+  font-size: var(--fs-2xs);
 }
 
 .monitor-status-card-state {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-strong);
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4961,8 +5018,8 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   justify-content: center;
   align-items: center;
   gap: 0.9rem;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--fs-sm);
+  color: var(--text-soft);
 }
 
 .monitor-history-legend > span {
@@ -4975,7 +5032,7 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   display: inline-block;
   width: 9px;
   height: 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .status-dot-online {
@@ -5012,22 +5069,22 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   border: 0;
   outline: 2px dashed rgba(255, 255, 255, 0.7);
   outline-offset: -2px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
   opacity: 0.9;
   margin: 0;
 }
 .dnd-ghost.dnd-ghost--online {
-  background-color: var(--client-online-bg);
+  background-color: var(--status-online);
 }
 .dnd-ghost.dnd-ghost--idle {
-  background-color: rgba(64, 64, 64, 0.5);
+  background-color: var(--status-idle);
 }
 .dnd-ghost.dnd-ghost--degraded {
-  background-color: rgba(255, 140, 0, 0.32);
+  background-color: var(--status-degraded);
 }
 .dnd-ghost.dnd-ghost--pending {
-  background-color: rgba(0, 123, 255, 0.25);
+  background-color: var(--status-pending);
 }
 .dnd-ghost.dnd-ghost--monitor {
   outline-style: dashed;
@@ -5046,12 +5103,12 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   right: 6px;
   width: 26px;
   height: 26px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: none;
   display: grid;
   place-items: center;
   background: transparent;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-strong);
   opacity: 0; /* hidden by default (SHOW mode) */
   pointer-events: none; /* do not intercept clicks when hidden */
   transform: scale(0.96);
@@ -5059,10 +5116,10 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
     opacity 160ms ease,
     transform 160ms ease,
     color 160ms ease;
-  z-index: 2;
+  z-index: var(--z-raised);
 }
 .CLIENT_TILE_COG i {
-  font-size: 14px;
+  font-size: var(--fs-lg);
   line-height: 1;
 }
 /* In compact mode, vertically center the cog instead of anchoring to top */
@@ -5128,11 +5185,6 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 .GROUP_MANAGER_GROUP_ITEM:hover {
   background-color: rgba(255, 255, 255, 0.09) !important;
 }
-.GROUP_MANAGER_GROUP_TOGGLE {
-  background: transparent;
-  color: inherit;
-  padding: 0;
-}
 .GROUP_MANAGER_GROUP_OPEN {
   background: transparent;
   color: inherit;
@@ -5141,7 +5193,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 .group-manager-grip {
   display: inline-flex;
   align-items: center;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-subtle);
   cursor: grab;
   font-size: 1.05rem;
   line-height: 1;
@@ -5149,13 +5201,9 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 .group-manager-grip i {
   pointer-events: none;
 }
-.GROUP_MANAGER_GROUP_BODY {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 10px;
-}
 .group-manager-chevron {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.3);
+  font-size: var(--fs-lg);
+  color: var(--text-faint);
   transition: transform 140ms ease;
 }
 .group-manager-chevron.expanded {
@@ -5167,23 +5215,23 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .group-manager-member-row {
   padding: 6px 8px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+  background: var(--surface-ghost);
 }
 .group-manager-member-remove {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
   font-size: 1rem;
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transition:
     color 140ms ease,
     background 140ms ease;
 }
 .group-manager-member-remove:hover {
-  color: #dc3545;
-  background: rgba(220, 53, 69, 0.12);
+  color: var(--danger);
+  background: rgb(var(--danger-rgb) / 0.12);
 }
 .GROUP_MANAGER_GROUP_ITEM_DEFAULT {
   cursor: default;
@@ -5198,11 +5246,11 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   min-width: 2.9rem;
   height: 1.35rem;
   padding: 0 0.45rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgba(255, 255, 255, 0.25);
   background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.95);
-  font-size: 0.68rem;
+  color: var(--text-strong);
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.04em;
   line-height: 1;
@@ -5213,8 +5261,8 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .group-manager-client-header {
   padding: 0 8px;
-  font-size: 0.74rem;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -5255,18 +5303,11 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   opacity: 0.5;
 }
 .script-manager-item-invalid {
-  border: 1px solid rgba(220, 53, 69, 0.5);
-  background-color: rgba(220, 53, 69, 0.1) !important;
+  border: 1px solid rgb(var(--danger-rgb) / 0.5);
+  background-color: rgb(var(--danger-rgb) / 0.1) !important;
 }
 .script-manager-item-disabled {
   opacity: 0.45;
-}
-.script-manager-item-id {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.35);
-  font-weight: 400;
-  line-height: 1.2;
-  margin-bottom: 1px;
 }
 .script-manager-item-name {
   overflow: hidden;
@@ -5274,16 +5315,16 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   white-space: nowrap;
 }
 .script-manager-item-desc {
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
   margin-top: 1px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .script-manager-chevron {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.3);
+  font-size: var(--fs-lg);
+  color: var(--text-faint);
   flex-shrink: 0;
 }
 /* Coloured left-edge accent strip driven by --script-accent CSS var */
@@ -5294,12 +5335,12 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   bottom: 0;
   width: 4px;
   background: var(--script-accent, transparent);
-  border-radius: 6px 0 0 6px;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
 }
 .script-manager-grip {
   display: inline-flex;
   align-items: center;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-subtle);
   cursor: grab;
   font-size: 1.1rem;
   padding-top: 1px;
@@ -5315,9 +5356,9 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   flex-shrink: 0;
   width: 34px;
   height: 34px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 1.05rem;
-  color: var(--script-accent, rgba(255, 255, 255, 0.75));
+  color: var(--script-accent, var(--text-secondary));
   background: color-mix(in srgb, var(--script-accent, #7f8c8d) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--script-accent, #7f8c8d) 32%, transparent);
 }
@@ -5330,35 +5371,35 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   padding: 3px 8px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--border-default);
+  color: var(--text-muted);
 }
 .script-manager-os-chip i {
-  font-size: 0.85rem;
+  font-size: var(--fs-lg);
 }
 .script-manager-os-chip.compatible {
-  background: rgba(40, 209, 124, 0.16);
-  border-color: rgba(40, 209, 124, 0.4);
-  color: #9af0c4;
+  background: rgb(var(--success-text-rgb) / 0.16);
+  border-color: rgb(var(--success-text-rgb) / 0.4);
+  color: var(--success-text-soft);
 }
 .script-manager-os-chip.broken {
-  background: rgba(255, 193, 7, 0.14);
-  border-color: rgba(255, 193, 7, 0.4);
-  color: #ffe08a;
+  background: rgb(var(--warning-rgb) / 0.14);
+  border-color: rgb(var(--warning-rgb) / 0.4);
+  color: var(--warning-text);
 }
 .script-manager-os-chip.missing {
-  background: rgba(220, 53, 69, 0.14);
-  border-color: rgba(220, 53, 69, 0.4);
-  color: #ffb3bc;
+  background: rgb(var(--danger-rgb) / 0.14);
+  border-color: rgb(var(--danger-rgb) / 0.4);
+  color: var(--danger-text-soft);
 }
 .script-manager-os-empty {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
 }
 .script-manager-platform-label {
   display: inline-flex;
@@ -5366,7 +5407,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   gap: 6px;
   width: 90px;
   flex: 0 0 90px;
-  font-size: 0.85rem;
+  font-size: var(--fs-lg);
 }
 .script-manager-platform-label i {
   opacity: 0.8;
@@ -5394,8 +5435,8 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .script-manager-file-row {
   padding: 4px 6px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+  background: var(--surface-ghost);
 }
 .script-manager-file-row i {
   opacity: 0.75;
@@ -5403,10 +5444,10 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 .script-manager-file-edit-btn {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
   padding: 2px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -5415,16 +5456,16 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
     background 150ms ease;
 }
 .script-manager-file-edit-btn:hover {
-  color: #4aa3ff;
-  background: rgba(74, 163, 255, 0.12);
+  color: var(--info);
+  background: rgb(var(--info-rgb) / 0.12);
 }
 .script-manager-file-run-btn {
   background: transparent;
   border: none;
-  color: rgba(106, 217, 138, 0.8);
-  font-size: 0.82rem;
+  color: rgb(var(--success-text-rgb) / 0.8);
+  font-size: var(--fs-md);
   padding: 2px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -5434,88 +5475,72 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
     opacity 150ms ease;
 }
 .script-manager-file-run-btn:hover {
-  color: #8ce6a8;
-  background: rgba(46, 204, 113, 0.12);
+  color: var(--success-text-soft);
+  background: rgb(var(--success-text-rgb) / 0.12);
 }
 .script-manager-file-run-btn:disabled {
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-faint);
   opacity: 0.65;
   cursor: not-allowed;
 }
 .script-manager-issues {
   display: grid;
   gap: 6px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 11px 13px;
-  font-size: 0.82rem;
+  font-size: var(--fs-md);
   line-height: 1.4;
 }
 .script-manager-issues.info {
-  background: rgba(74, 163, 255, 0.12);
-  border: 1px solid rgba(74, 163, 255, 0.35);
-  color: #bcd9ff;
+  background: rgb(var(--info-rgb) / 0.12);
+  border: 1px solid rgb(var(--info-rgb) / 0.35);
+  color: var(--info-text);
 }
 .script-manager-issues.error {
-  background: rgba(220, 53, 69, 0.14);
-  border: 1px solid rgba(220, 53, 69, 0.4);
-  color: #ffb3bc;
+  background: rgb(var(--danger-rgb) / 0.14);
+  border: 1px solid rgb(var(--danger-rgb) / 0.4);
+  color: var(--danger-text-soft);
 }
 .script-manager-issues ul {
   padding-left: 18px;
 }
-/* Delete button in the Script Manager editor header */
-.script-manager-delete-btn {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 1rem;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition:
-    color 150ms ease,
-    background 150ms ease;
-}
-.script-manager-delete-btn:hover {
-  color: #dc3545;
-  background: rgba(220, 53, 69, 0.12);
-}
 .script-manager-folder-btn {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-subtle);
   font-size: 1rem;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transition:
     color 150ms ease,
     background 150ms ease;
 }
 .script-manager-folder-btn:hover {
-  color: #4aa3ff;
-  background: rgba(74, 163, 255, 0.12);
+  color: var(--info);
+  background: rgb(var(--info-rgb) / 0.12);
 }
 .script-manager-create-btn {
   background: transparent;
   border: none;
-  color: rgba(105, 214, 125, 0.78);
+  color: rgb(var(--success-text-rgb) / 0.78);
   font-size: 1rem;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transition:
     color 150ms ease,
     background 150ms ease;
 }
 .script-manager-create-btn:hover {
-  color: #69d67d;
-  background: rgba(105, 214, 125, 0.14);
+  color: var(--success-text);
+  background: rgb(var(--success-text-rgb) / 0.14);
 }
 .script-manager-template-btn {
   background: rgba(255, 255, 255, 0.06);
   border: none;
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 0.85rem;
+  color: var(--text-soft);
+  font-size: var(--fs-lg);
   padding: 5px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transition:
     color 150ms ease,
     background 150ms ease,
@@ -5523,7 +5548,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .script-manager-template-btn:hover {
   color: #ffffff;
-  background: rgba(74, 163, 255, 0.12);
+  background: rgb(var(--info-rgb) / 0.12);
 }
 /* Colour swatch picker */
 .script-manager-swatch {
@@ -5563,7 +5588,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   height: 38px;
   flex: 0 0 38px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background-color: rgba(255, 255, 255, 0.1);
   color: inherit;
   font-size: 1.2rem;
@@ -5598,8 +5623,8 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   min-height: 0;
   padding: 8px 4px;
   border: 2px solid transparent;
-  border-radius: 8px;
-  background-color: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-ghost);
   color: inherit;
   cursor: pointer;
   overflow: hidden;
@@ -5614,7 +5639,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   flex: 0 0 auto;
 }
 .icon-picker-tile-label {
-  font-size: 0.68rem;
+  font-size: var(--fs-xs);
   line-height: 1.1;
   max-width: 100%;
   text-align: center;
@@ -5624,7 +5649,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   opacity: 0.75;
 }
 .icon-picker-tile:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--surface-ghost-hover);
   transform: translateY(-1px);
 }
 .icon-picker-tile.selected {
@@ -5670,7 +5695,7 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU {
   right: 12px !important;
   width: auto !important;
   max-width: none !important;
-  border-radius: 0.9rem;
+  border-radius: var(--radius-lg);
   padding: 0.4rem 0.5rem 0.6rem;
   /* NB: do NOT set `display` here. The base rule keeps the menu `display: none`
      until JS opens it (which sets inline `display: flex`); forcing flex here
@@ -5688,8 +5713,8 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-header {
   top: 0;
   padding-bottom: 0.4rem;
   margin-bottom: 0.25rem;
-  background-color: #2a273b;
-  z-index: 1;
+  background-color: var(--surface-3);
+  z-index: var(--z-base);
 }
 body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-close {
   display: flex;
@@ -5698,10 +5723,10 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-close {
   gap: 0.4rem;
   width: 100%;
   height: 42px;
-  border-radius: 0.55rem;
+  border-radius: var(--radius-md);
   background-color: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 0.95rem;
+  color: var(--text-soft);
+  font-size: var(--fs-xl);
   font-weight: 600;
   cursor: pointer;
   user-select: none;
@@ -5726,7 +5751,7 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.SHOWTRAK_CON
   padding: 0.85rem 0.75rem;
   font-size: 1.05rem;
   background-color: rgba(255, 255, 255, 0.06);
-  border-radius: 0.55rem;
+  border-radius: var(--radius-md);
   margin-bottom: 0.4rem;
 }
 body.mobile-view
@@ -5748,10 +5773,10 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
    body.mobile-view: any finger/pen tap arms a row, whatever the layout
    (RequiresTapConfirm in lib/touch-input.ts). */
 #SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending {
-  background-color: rgba(255, 193, 7, 0.18) !important;
+  background-color: rgb(var(--warning-rgb) / 0.18) !important;
 }
 #SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-title {
-  color: #ffc107 !important;
+  color: var(--warning) !important;
 }
 #SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-shortcut,
 #SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-icon {
@@ -5762,15 +5787,15 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
 .monitoring-check-info-title {
   font-weight: 600;
   color: var(--bs-light, #f8f9fa);
-  font-size: 0.95rem;
+  font-size: var(--fs-xl);
 }
 .monitoring-check-info-links .btn {
-  font-size: 0.8rem;
+  font-size: var(--fs-md);
 }
 
 /* Red asterisk marking a required setting, appended after its label. */
 .monitoring-required {
-  color: var(--bs-danger, #dc3545);
+  color: var(--danger);
   margin-left: 0.15rem;
   font-weight: 600;
 }
@@ -5791,13 +5816,13 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
   justify-content: center;
   color: var(--bs-secondary-color, #9aa0a6);
   cursor: help;
-  font-size: 0.95rem;
+  font-size: var(--fs-xl);
   line-height: 1;
   flex: 0 0 auto;
 }
 .monitoring-note:hover,
 .monitoring-note:focus-visible {
-  color: var(--bs-info, #6edff6);
+  color: var(--info-cyan-soft);
   outline: none;
 }
 
@@ -5814,7 +5839,7 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
   top: 50%;
   right: 0.85rem;
   transform: translateY(-50%);
-  z-index: 3;
+  z-index: var(--z-float);
 }
 /* On selects, sit to the left of the dropdown caret so it stays clickable. */
 .monitoring-note--select {
@@ -5837,8 +5862,8 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
 /* 'list' settings field: a chip/tag input with an add row. The wrapper is a plain
    block (no overlay note), so it sits inside the standard .monitoring-field-wrap. */
 .monitoring-list {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 0.5rem;
+  background: var(--surface-ghost);
+  border-radius: var(--radius-md);
   padding: 0.5rem 0.6rem;
 }
 .monitoring-list-chip {
@@ -5883,12 +5908,12 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
    with a background, matching the app's no-borders / background-shade theme. Status
    is shown by the badge inside; a matched/primary item gets a subtle success tint. */
 .monitoring-debug-card {
-  background-color: rgba(255, 255, 255, 0.03);
-  border-radius: 0.5rem;
+  background-color: var(--surface-ghost);
+  border-radius: var(--radius-md);
   padding: 0.5rem;
 }
 .monitoring-debug-card--match {
-  background-color: rgba(25, 135, 84, 0.18);
+  background-color: rgb(var(--success-rgb) / 0.18);
 }
 
 /* Collapse toggles in the monitoring check editor (Advanced / Last Response) */
@@ -5954,13 +5979,13 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 .web-overlay {
   position: fixed;
   inset: 0;
-  z-index: 20000;
+  z-index: var(--z-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
   /* Match the app shell backdrop: the same dark-indigo radial gradient. */
-  background: radial-gradient(circle at 50% 80%, #151232 0%, #0c091c 100%);
+  background: var(--app-bg-gradient);
 }
 
 .web-overlay-card {
@@ -5970,9 +5995,9 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   align-items: center;
   gap: 12px;
   padding: 28px 24px;
-  border-radius: 16px;
-  background: #1d1a2f;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
   color: #f2f4f7;
   text-align: center;
@@ -5981,7 +6006,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 .web-login-logo {
   width: 56px;
   height: 56px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 
 /* Splash variant of the overlay (loading + disconnected screens): brand mark
@@ -5998,7 +6023,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   transform: translateX(-50%);
   width: 44px;
   height: 44px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 
 .web-splash-body {
@@ -6016,13 +6041,13 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 }
 
 .web-overlay-text {
-  font-size: 0.9rem;
+  font-size: var(--fs-lg);
   color: #aab2bd;
 }
 
 .web-login-error {
-  font-size: 0.85rem;
-  color: #ff6b6b;
+  font-size: var(--fs-lg);
+  color: var(--danger-text);
   width: 100%;
   min-height: 1.1em;
 }
@@ -6099,8 +6124,8 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 
 .web-pin-key {
   appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.05);
   color: #f2f4f7;
   font-size: 1.35rem;
@@ -6145,7 +6170,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 .web-pin-key-enter {
   color: #ffffff;
   background: linear-gradient(180deg, #6d5bd0, #5942b8);
-  border-color: rgba(255, 255, 255, 0.14);
+  border-color: var(--border-default);
 }
 
 .web-pin-key-enter:hover {
@@ -6235,12 +6260,6 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
     text-align: center;
   }
 
-  /* Hide the add-group ("+") tile on mobile — its vertical-rail styling has no
-     place in the stacked header layout and group creation lives in the menu. */
-  body.mobile-view .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
-    display: none !important;
-  }
-
   /* Full-width, single-per-row tiles so nothing overflows a thin screen. The
      compact height/padding/typography are inherited from body.compact-mode. */
   body.mobile-view .SHOWTRAK_PC,
@@ -6269,7 +6288,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   /* --- Taller, touch-friendly bottom bar --- */
   /* Installed as a PWA (viewport-fit=cover) the page extends under the rounded
      screen corners / home indicator, which clipped the bar's icon and
-     "N Clients Selected" text. Grow the bar by the device's safe-area inset and
+     "N Targets Selected" text. Grow the bar by the device's safe-area inset and
      pad its content up above the unsafe region. */
   :root {
     --bottom-bar-height-mobile: 60px;
@@ -6299,7 +6318,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   }
 
   /* Preserve the identify banner's 74px lift when stacked above the confirm
-     toast (desktop: 118px vs 44px anchors). */
+     toast (desktop: bar + 82px vs bar + 8px anchors). */
   body.mobile-view #IDENTIFY_STATUS_BANNER.stacked-above-confirm {
     bottom: calc(var(--bottom-bar-total-mobile) + 66px);
   }
@@ -6330,7 +6349,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
     min-height: 100dvh;
   }
 
-  /* Left-align the "N Clients Selected" status. The left section only held the
+  /* Left-align the "N Targets Selected" status. The left section only held the
      now-hidden toggles, so drop it and collapse the bar to two columns:
      selection status at the start, action buttons pinned to the right. */
   body.mobile-view #APP_BOTTOM_BAR .bar-section.left {
@@ -6346,7 +6365,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
     grid-column: 1 !important;
     justify-self: start !important;
     text-align: left !important;
-    font-size: 14px !important;
+    font-size: var(--fs-lg) !important;
     display: flex !important;
     align-items: center !important;
     gap: 8px !important;
@@ -6367,7 +6386,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
     display: none !important;
   }
 
-  /* --- Clear-selection button (left of the "N Clients Selected" text) --- */
+  /* --- Clear-selection button (left of the "N Targets Selected" text) --- */
   body.mobile-view.has-selection #MOBILE_CLEAR_SELECTION_BTN {
     display: inline-flex !important;
     align-items: center;
@@ -6402,10 +6421,10 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
     height: 40px;
     padding: 0 16px;
     border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: transparent;
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 15px;
+    color: var(--text-strong);
+    font-size: var(--fs-xl);
     font-weight: 700;
     cursor: pointer;
     transition:
@@ -6450,9 +6469,9 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   justify-content: center;
   width: 28px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
   background: rgba(255, 255, 255, 0.04);
 }
 
@@ -6460,7 +6479,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 .monitor-actions-toggle:focus-visible,
 .monitor-actions-toggle.is-open {
   color: #fff;
-  background: rgba(120, 95, 200, 0.24);
+  background: rgb(var(--accent-rgb) / 0.24);
 }
 
 /* The menu itself mirrors the right-click menu (#SHOWTRAK_CONTEXT_MENU): same
@@ -6469,7 +6488,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 .monitor-actions-menu {
   display: none;
   position: fixed;
-  z-index: 100000;
+  z-index: var(--z-context-menu);
   width: max-content;
   min-width: 170px;
   max-width: min(320px, calc(100vw - 16px));
@@ -6477,9 +6496,9 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   overflow-y: auto;
   padding: 0.25rem;
   color: white;
-  background: linear-gradient(180deg, #1d1a35 0%, #17142c 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0.6rem;
+  background: var(--menu-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
   user-select: none;
 }
@@ -6496,10 +6515,10 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 
 .monitor-actions-menu-group {
   padding: 0.2rem 0.45rem 0.05rem;
-  font-size: 0.6rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-subtle);
 }
 
 .monitor-actions-menu-note {
@@ -6508,10 +6527,10 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   gap: 0.4rem;
   margin-bottom: 0.25rem;
   padding: 0.35rem 0.5rem;
-  border-radius: 0.4rem;
-  font-size: 0.74rem;
-  color: #f5c26b;
-  background: rgba(245, 194, 107, 0.08);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  color: rgb(var(--warning-soft-rgb));
+  background: rgb(var(--warning-soft-rgb) / 0.08);
 }
 
 /* One row: the action (or its label + picker + run button) and its star. */
@@ -6519,11 +6538,11 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   display: flex;
   align-items: center;
   gap: 0.2rem;
-  border-radius: 0.4rem;
+  border-radius: var(--radius-sm);
 }
 
 .monitor-action:hover {
-  background-color: rgba(120, 95, 200, 0.16);
+  background-color: rgb(var(--accent-rgb) / 0.16);
 }
 
 .monitor-action-label {
@@ -6534,11 +6553,11 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   min-width: 0;
   padding: 0.2rem 0.45rem;
   border: 0;
-  border-radius: 0.4rem;
-  font-size: 0.78rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
   text-align: left;
   white-space: nowrap;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--text-soft);
   background: transparent;
 }
 
@@ -6548,7 +6567,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 
 button.monitor-action-label:focus-visible {
   outline: none;
-  background-color: rgba(120, 95, 200, 0.24);
+  background-color: rgb(var(--accent-rgb) / 0.24);
 }
 
 .monitor-action-btn:disabled {
@@ -6557,7 +6576,7 @@ button.monitor-action-label:focus-visible {
 }
 
 .monitor-action-btn.is-destructive:not(:disabled) {
-  color: #ff8a80;
+  color: var(--danger-text);
 }
 
 .monitor-action-param {
@@ -6566,7 +6585,7 @@ button.monitor-action-label:focus-visible {
   width: auto;
   padding-top: 0.05rem;
   padding-bottom: 0.05rem;
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
 }
 
 .monitor-action-go {
@@ -6575,10 +6594,10 @@ button.monitor-action-label:focus-visible {
   align-items: center;
   justify-content: center;
   padding: 0.1rem 0.3rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0.35rem;
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  color: var(--text-strong);
   background: rgba(255, 255, 255, 0.1);
 }
 
@@ -6596,16 +6615,16 @@ button.monitor-action-label:focus-visible {
   justify-content: center;
   padding: 0.15rem 0.4rem;
   border: 0;
-  border-radius: 0.4rem;
-  font-size: 0.72rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
   color: rgba(255, 255, 255, 0.25);
   background: transparent;
 }
 
 .monitor-action-star:hover,
 .monitor-action-star:focus-visible {
-  color: rgba(255, 255, 255, 0.75);
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  background: var(--surface-ghost-hover);
 }
 
 .monitor-action-star.is-on {
@@ -6645,7 +6664,7 @@ button.monitor-action-label:focus-visible {
   display: block;
   width: 100%;
   height: 90px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.04);
   overflow: visible;
 }
@@ -6692,8 +6711,8 @@ button.monitor-action-label:focus-visible {
 }
 
 .metric-chart-label {
-  fill: rgba(255, 255, 255, 0.55);
-  font-size: 11px;
+  fill: var(--text-muted);
+  font-size: var(--fs-xs);
   paint-order: stroke;
   stroke: rgba(0, 0, 0, 0.65);
   stroke-width: 3px;
@@ -6701,8 +6720,8 @@ button.monitor-action-label:focus-visible {
 }
 
 .metric-chart-empty {
-  fill: rgba(255, 255, 255, 0.35);
-  font-size: 12px;
+  fill: var(--text-faint);
+  font-size: var(--fs-sm);
   text-anchor: middle;
 }
 
@@ -6729,8 +6748,8 @@ button.monitor-action-label:focus-visible {
 .freekiosk-section {
   margin-top: 0.75rem;
   padding: 0.75rem;
-  border-radius: 0.5rem;
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md);
+  background: var(--surface-ghost);
 }
 
 /* View modal panes (one per rail tab). The panels inside space themselves by
@@ -6757,10 +6776,10 @@ button.monitor-action-label:focus-visible {
 
 .freekiosk-section-title {
   margin: 0 0 0.5rem;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
 }
 
 /* Explains rows that a display mode removed, so the gap reads as deliberate. */
@@ -6770,11 +6789,11 @@ button.monitor-action-label:focus-visible {
   gap: 0.4rem;
   margin: 0 0 0.6rem;
   padding: 0.45rem 0.6rem;
-  border-radius: 0.35rem;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.04);
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
 }
 
 .freekiosk-section-note .bi {
@@ -6806,8 +6825,8 @@ button.monitor-action-label:focus-visible {
 .freekiosk-metric-label {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.75);
+  font-size: var(--fs-md);
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6817,14 +6836,14 @@ button.monitor-action-label:focus-visible {
    hover state. Only the inline placement next to a label is FreeKiosk's. */
 .freekiosk-metric-note {
   margin-left: 0.35rem;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   vertical-align: baseline;
 }
 
 .freekiosk-metric-value {
   flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
-  font-size: 0.85rem;
+  font-size: var(--fs-lg);
   color: #fff;
 }
 
@@ -6832,15 +6851,15 @@ button.monitor-action-label:focus-visible {
    colour: a row wearing it is a row that needs attention. */
 .freekiosk-metric-expected {
   flex: 0 0 auto;
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
   white-space: nowrap;
   color: var(--status-graph-degraded);
 }
 
 .freekiosk-alarm-badge {
   flex: 0 0 auto;
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.35);
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
 }
 
 .freekiosk-alarm-badge.is-breaching {
@@ -6862,8 +6881,8 @@ button.monitor-action-label:focus-visible {
 }
 
 .freekiosk-capture-spinner {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: var(--fs-md);
+  color: var(--text-muted);
 }
 
 /* Inline rather than a toast: a 503 "camera in use by another app" is
@@ -6871,24 +6890,24 @@ button.monitor-action-label:focus-visible {
 .freekiosk-capture-error {
   margin-top: 0.5rem;
   padding: 0.4rem 0.6rem;
-  border-radius: 0.35rem;
-  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
   color: var(--status-graph-degraded);
-  background: rgba(255, 149, 0, 0.1);
+  background: rgb(var(--status-graph-degraded-rgb) / 0.1);
 }
 
 .freekiosk-control-banner {
   margin-bottom: 0.5rem;
   padding: 0.4rem 0.6rem;
-  border-radius: 0.35rem;
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
+  color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.05);
 }
 
 .freekiosk-capture-frame {
   margin-top: 0.6rem;
-  border-radius: 0.4rem;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   background: #000;
   cursor: zoom-in;
@@ -6908,8 +6927,8 @@ button.monitor-action-label:focus-visible {
 
 .freekiosk-capture-caption {
   padding: 0.25rem 0.5rem;
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
   background: rgba(0, 0, 0, 0.45);
 }
 
@@ -6922,10 +6941,10 @@ button.monitor-action-label:focus-visible {
 .freekiosk-control-group-title {
   display: block;
   margin-bottom: 0.3rem;
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-subtle);
 }
 
 .freekiosk-control-group-body {
@@ -6948,10 +6967,10 @@ button.monitor-action-label:focus-visible {
   justify-content: center;
   gap: 0.35rem;
   padding: 0.25rem 0.6rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0.4rem;
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  color: var(--text-strong);
   background: rgba(255, 255, 255, 0.1);
 }
 
@@ -6963,7 +6982,7 @@ button.monitor-action-label:focus-visible {
 
 .freekiosk-btn:disabled {
   opacity: 0.45;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-strong);
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -6971,14 +6990,14 @@ button.monitor-action-label:focus-visible {
    tint and the text always agree rather than the text alone carrying it. */
 .freekiosk-command-btn.is-destructive {
   color: var(--status-graph-degraded);
-  border-color: rgba(255, 149, 0, 0.32);
-  background: rgba(255, 149, 0, 0.14);
+  border-color: rgb(var(--status-graph-degraded-rgb) / 0.32);
+  background: rgb(var(--status-graph-degraded-rgb) / 0.14);
 }
 
 .freekiosk-command-btn.is-destructive:hover:not(:disabled),
 .freekiosk-command-btn.is-destructive:focus-visible {
   color: var(--status-graph-degraded);
-  background: rgba(255, 149, 0, 0.24);
+  background: rgb(var(--status-graph-degraded-rgb) / 0.24);
 }
 
 .freekiosk-slider {
@@ -6991,8 +7010,8 @@ button.monitor-action-label:focus-visible {
 
 .freekiosk-slider label {
   flex: 0 0 auto;
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -7005,8 +7024,8 @@ button.monitor-action-label:focus-visible {
   flex: 0 0 3rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
 }
 
 /* ---- Editor alarms ------------------------------------------------------- */
@@ -7014,8 +7033,8 @@ button.monitor-action-label:focus-visible {
 .freekiosk-alarms {
   margin-top: 0.5rem;
   padding: 0.75rem;
-  border-radius: 0.5rem;
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md);
+  background: var(--surface-ghost);
 }
 
 /* Configuration, not monitoring — it decides what the terminal shows and what
@@ -7036,13 +7055,13 @@ button.monitor-action-label:focus-visible {
 }
 
 .freekiosk-alarms-title {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: var(--fs-md);
+  color: var(--text-soft);
 }
 
 .freekiosk-alarms-hint {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
 }
 
 /* The monitoring editor spaces its generated fields with `d-grid gap-2` on the
@@ -7079,34 +7098,34 @@ button.monitor-action-label:focus-visible {
 .freekiosk-alarm-master {
   margin-bottom: 0.5rem;
   padding: 0.35rem 0.5rem;
-  border-radius: 0.35rem;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.05);
 }
 
 .freekiosk-alarm-section-title {
   display: block;
   margin-bottom: 0.3rem;
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-subtle);
 }
 
 .freekiosk-test-result {
   margin-top: 0.4rem;
   padding: 0.35rem 0.6rem;
-  border-radius: 0.35rem;
-  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
 }
 
 .freekiosk-test-result.is-ok {
   color: var(--status-graph-online);
-  background: rgba(38, 214, 44, 0.1);
+  background: rgb(var(--status-graph-online-rgb) / 0.1);
 }
 
 .freekiosk-test-result.is-error {
   color: var(--status-graph-offline);
-  background: rgba(224, 36, 36, 0.1);
+  background: rgb(var(--status-graph-offline-rgb) / 0.1);
 }
 /* =========================================================================
    List view (body.list-mode)
@@ -7206,7 +7225,7 @@ body.list-mode #PENDING_ADOPTION_SECTION {
 body.list-mode .LIST_TABLE_HEADER {
   position: sticky;
   top: var(--list-sticky-top);
-  z-index: 5;
+  z-index: var(--z-sticky);
   display: grid;
   grid-template-columns: var(--list-cols);
   grid-template-areas: var(--list-areas);
@@ -7218,8 +7237,8 @@ body.list-mode .LIST_TABLE_HEADER {
      they scroll under it; padded to put its labels over the row columns
      (box padding + row border + row padding). */
   padding: 0 calc(4px + 2px + var(--list-row-padding));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(14, 11, 32, 0.94);
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgb(var(--surface-0-rgb) / 0.94);
   backdrop-filter: blur(6px);
   text-align: left;
 }
@@ -7243,7 +7262,7 @@ body.list-mode .GROUP_TITLE_CLICKABLE {
   margin: 0.85rem 4px 0 4px !important;
   padding: 0 calc(var(--list-row-padding) + 2px);
   background-color: transparent !important;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   text-align: left;
 }
@@ -7267,14 +7286,10 @@ body.list-mode .GROUP_TITLE {
   inline-size: auto;
   max-inline-size: 100%;
   padding: 0 !important;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   letter-spacing: 0.08rem;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-soft);
   text-align: left;
-}
-
-body.list-mode .GROUP_TITLE_CLICKABLE:has(.GROUP_CREATE_BUTTON) {
-  display: none !important;
 }
 
 body.list-mode .LIST_COLUMN_LABEL {
@@ -7284,12 +7299,12 @@ body.list-mode .LIST_COLUMN_LABEL {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   text-align: left;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
+  color: var(--text-subtle);
 }
 
 body.list-mode .LIST_COLUMN_LABEL[data-list-column='state'] {
@@ -7320,13 +7335,13 @@ body.list-mode .group-drop-zone {
   gap: 3px !important;
   padding: 4px !important;
   margin: 4px 0 0 0 !important;
-  border-radius: 8px !important;
+  border-radius: var(--radius-md) !important;
 }
 
 /* A group's colour tint is a Grid/Compact thing: in the list it would fight
    the degraded/offline rows, which are the colour that matters here. */
 body.list-mode .group-drop-zone.group-tinted {
-  background-color: rgba(255, 255, 255, 0.03) !important;
+  background-color: var(--surface-ghost) !important;
   box-shadow: none;
 }
 
@@ -7334,7 +7349,7 @@ body.list-mode .group-drop-zone > .dnd-ghost,
 body.list-mode .group-drop-zone > .dnd-source-spacer {
   width: 100% !important;
   height: var(--list-row-height) !important;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 /* One row-height line, "Empty Group — This group has no clients.", in place
@@ -7353,13 +7368,13 @@ body.list-mode .SHOWTRAK_PC_PLACEHOLDER {
 
 body.list-mode .SHOWTRAK_PC_PLACEHOLDER h5 {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
 }
 
 body.list-mode .SHOWTRAK_PC_PLACEHOLDER p {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 /* --- Rows ---------------------------------------------------------------- */
@@ -7375,7 +7390,8 @@ body.list-mode .SHOWTRAK_PC {
   align-items: center;
   align-content: stretch;
   padding: 0 var(--list-row-padding);
-  border-radius: 6px;
+  /* The same radius as a grid tile. */
+  border-radius: var(--radius-md);
   text-align: left;
 }
 
@@ -7402,11 +7418,11 @@ body.list-mode .LIST_GROUP_CHECK {
   justify-content: center;
   width: 15px;
   height: 15px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   border: 1.5px solid rgba(255, 255, 255, 0.55);
   background: rgba(0, 0, 0, 0.18);
   color: transparent;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1;
   transition:
     background-color 120ms ease,
@@ -7435,7 +7451,7 @@ body.list-mode .SHOWTRAK_PC.MONITOR_CHECK.PARENT_SELECTED > .LIST_CHECK,
 body.list-mode .SHOWTRAK_PC.SELECTED > .LIST_CHECK {
   background: #fff;
   border-color: #fff;
-  color: #15122b;
+  color: var(--surface-1);
 }
 
 /* A group's checkbox: a dash while some of its rows are selected, a tick once
@@ -7450,7 +7466,7 @@ body.list-mode
   .LIST_GROUP_CHECK {
   background: #fff;
   border-color: #fff;
-  color: #15122b;
+  color: var(--surface-1);
 }
 
 body.list-mode
@@ -7495,7 +7511,7 @@ body.list-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_HOSTNAME'] {
   min-width: 0;
   width: auto;
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 600;
   line-height: 1.2;
   text-align: left;
@@ -7516,10 +7532,10 @@ body.list-mode .SHOWTRAK_PC > .TILE_TAG_ROW {
   width: auto;
   max-height: none;
   margin: 0;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 1.2;
   text-align: left;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7539,11 +7555,11 @@ body.list-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_IP'] {
   min-width: 0;
   max-height: none;
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.2;
   text-align: left;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.82) !important;
+  color: var(--text-soft) !important;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7556,10 +7572,10 @@ body.list-mode .SHOWTRAK_PC > .LIST_STATE {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   line-height: 1.2;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-strong);
   white-space: nowrap;
   overflow: hidden;
 }
@@ -7569,7 +7585,7 @@ body.list-mode .SHOWTRAK_PC > .LIST_STATE::before {
   flex: 0 0 auto;
   width: 7px;
   height: 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--status-graph-offline);
 }
 
@@ -7584,7 +7600,7 @@ body.list-mode .SHOWTRAK_PC.IDLE > .LIST_STATE::before {
 }
 body.list-mode .SHOWTRAK_PC.PENDING > .LIST_STATE::before,
 body.list-mode .SHOWTRAK_PC.IDENTIFYING > .LIST_STATE::before {
-  background: rgb(64, 180, 255);
+  background: var(--status-graph-pending);
 }
 
 /* Details: whichever of the tile's status lines is showing — the degraded
@@ -7597,14 +7613,14 @@ body.list-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_ACTION'] {
   min-height: 0;
   max-height: none;
   margin: 0;
-  font-size: 12px !important;
+  font-size: var(--fs-sm) !important;
   line-height: 1.2;
   text-align: left;
   overflow: hidden;
 }
 
 body.list-mode .SHOWTRAK_PC.MONITOR .SHOWTRAK_PC_STATUS[data-type='MONITOR_STATUS'] {
-  font-size: 12px !important;
+  font-size: var(--fs-sm) !important;
 }
 
 /* The two vitals bars (CPU/RAM, battery/brightness), stacked thin. */
@@ -7633,7 +7649,7 @@ body.list-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS > [data-type='OFFLINE_SINCE'] 
 }
 
 body.list-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS > [data-type='OFFLINE_SINCE'] .badge {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
@@ -7645,7 +7661,7 @@ body.list-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_ACTION'] {
 
 body.list-mode .SHOWTRAK_PC.PENDING .ADOPT_BTN {
   padding: 1px 12px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 1.4;
 }
 
@@ -7671,10 +7687,10 @@ body.list-mode .SHOWTRAK_PC > .LIST_EXPAND {
   margin-left: -2px;
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: transparent;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
   cursor: pointer;
 }
 
@@ -7695,15 +7711,15 @@ body.list-mode .SHOWTRAK_PC.CHECKS_EXPANDED > .LIST_EXPAND .bi {
    quieter than the rows around it. */
 body.list-mode .SHOWTRAK_PC.MONITOR_CHECK > [data-type='Name'] {
   padding-left: 14px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.86);
+  color: var(--text-soft);
 }
 
 body.list-mode .SHOWTRAK_PC.MONITOR_CHECK > [data-type='Name']::before {
   content: '\2514';
   margin-right: 6px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-faint);
 }
 
 body.list-mode .SHOWTRAK_PC.MONITOR_CHECK > [data-type='Method'] {

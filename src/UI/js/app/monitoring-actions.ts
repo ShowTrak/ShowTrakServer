@@ -584,7 +584,7 @@ export async function RunMonitoringAction(
       CheckIDs
     );
     if (Err) return Notify(String(Err), 'error');
-    if (!Summary) return Notify(`${Label}: no response`, 'error');
+    if (!Summary) return Notify(`${Label}: no response.`, 'error');
     if (Summary.Failed) {
       const Reason = Summary.Results.find((Entry) => !Entry.Success)?.Error || 'failed';
       return Notify(
@@ -673,7 +673,8 @@ export function WireMonitoringActions(Rerender: () => void): void {
 
     if (Action.Destructive) {
       const Confirmed = await ConfirmationDialog(
-        `${Action.Label} on "${Found.Target.Nickname || Found.Check.Address}"?`
+        `${Action.Label} on "${Found.Target.Nickname || Found.Check.Address}"?`,
+        { ConfirmLabel: Action.Label }
       );
       if (!Confirmed) return;
     }
@@ -725,7 +726,9 @@ export function WireMonitoringActions(Rerender: () => void): void {
         Group.Checks.length === 1
           ? `"${Target.Nickname || Group.Checks[0]!.Address}"`
           : `all ${Group.Checks.length} ${Group.Name} checks on "${Target.Nickname}"`;
-      const Confirmed = await ConfirmationDialog(`${Action.Label} on ${Where}?`);
+      const Confirmed = await ConfirmationDialog(`${Action.Label} on ${Where}?`, {
+        ConfirmLabel: Action.Label,
+      });
       if (!Confirmed) return;
     }
 
@@ -759,8 +762,8 @@ export function WireMonitoringActions(Rerender: () => void): void {
       // and the context menu together; the toast just confirms which way it went.
       Notify(
         Next
-          ? 'Starred — it is now in the right-click menu for selected monitors'
-          : 'Removed from the right-click menu',
+          ? 'Starred — it is now in the right-click menu for selected monitors.'
+          : 'Removed from the right-click menu.',
         'success',
         2000
       );

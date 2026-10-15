@@ -42,7 +42,7 @@ export function UpdateSelectionCount() {
   }
 
   $status
-    .text(`${Selected.length} ${Selected.length == 1 ? 'Client' : 'Clients'} Selected`)
+    .text(`${Selected.length} ${Selected.length == 1 ? 'Target' : 'Targets'} Selected`)
     .removeClass('text-danger');
   return;
 }

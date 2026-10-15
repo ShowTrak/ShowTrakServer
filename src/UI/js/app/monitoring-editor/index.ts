@@ -441,7 +441,7 @@ function CollectMonitoringCheckValidationErrors(): string[] {
 
 function RenderMonitoringCheckStatusFromPayload(payload: MonitoringCheckDebug | null) {
   if (!payload || (payload.LastChecked == null && !payload.Html)) {
-    SetMonitoringCheckStatusCard('Pending', 'idle', 'Waiting for the first check to run…');
+    SetMonitoringCheckStatusCard('Checking', 'idle', 'Waiting for the first check to run…');
     return;
   }
   let title = 'Online';
@@ -748,7 +748,7 @@ export async function PerformMonitoringAutoSave() {
             MonitoringEditorState!.Checks[i].CheckID = cr.CheckID;
         });
       }
-      $('#MONITORING_TARGET_MODAL_TITLE').text('Edit Monitoring Target');
+      $('#MONITORING_TARGET_MODAL_TITLE').text('Edit Monitor');
       $('#MONITORING_TARGET_DANGER_ZONE').removeClass('d-none');
       SyncAddCheckButtonState();
     } else {
@@ -857,7 +857,7 @@ export async function OpenMonitoringTargetEditor(
     .empty()
     .append(
       buildModalHeader({
-        title: 'Add Monitoring Target',
+        title: 'Add Monitor',
         titleId: 'MONITORING_TARGET_MODAL_TITLE',
         onClose: () => closeModal('SHOWTRAK_MODAL_MONITORING_TARGET'),
       }).$el
@@ -876,9 +876,7 @@ export async function OpenMonitoringTargetEditor(
       }).$el
     );
 
-  $('#MONITORING_TARGET_MODAL_TITLE').text(
-    Existing ? 'Edit Monitoring Target' : 'Add Monitoring Target'
-  );
+  $('#MONITORING_TARGET_MODAL_TITLE').text(Existing ? 'Edit Monitor' : 'Add Monitor');
   $('#MONITORING_TARGET_DANGER_ZONE').toggleClass('d-none', !Existing);
   // Slug is only shown for an existing target — a new target's slug is generated
   // server-side on create, then editable on the next open.
@@ -1039,13 +1037,13 @@ export async function OpenMonitoringTargetEditor(
     .off('click.mon')
     .on('click.mon', async () => {
       if (MonitoringEditorState!.TargetID == null) return;
-      const Confirmation = await ConfirmationDialog(
-        'Delete this monitoring target? This cannot be undone.'
-      );
+      const Confirmation = await ConfirmationDialog('Delete this monitor? This cannot be undone.', {
+        ConfirmLabel: 'Delete Monitor',
+      });
       if (!Confirmation) return;
       const [Err] = await window.API.DeleteMonitoringTarget(MonitoringEditorState!.TargetID);
       if (Err) return Notify(Err, 'error');
-      await Notify('Monitoring target deleted', 'success');
+      await Notify('Monitor deleted.', 'success');
       await CloseAllModals();
     });
 

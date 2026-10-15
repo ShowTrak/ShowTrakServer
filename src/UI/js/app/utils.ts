@@ -15,6 +15,17 @@ export function GetAlertVolume(): number {
   return Math.min(1, Math.max(0, Pct / 100));
 }
 
+// Close a toast message off as a sentence. Literal messages are written with
+// their own full stop, but dynamic ones (errors handed back by the server,
+// labels joined at runtime) often are not. Messages already ending in sentence
+// punctuation are left alone, and non-strings pass through untouched.
+export function WithFullStop(Message: unknown): unknown {
+  if (typeof Message !== 'string') return Message;
+  const Trimmed = Message.trimEnd();
+  if (!Trimmed) return Message;
+  return /[.!?…]$/.test(Trimmed) ? Trimmed : `${Trimmed}.`;
+}
+
 // The single HTML escaper for the renderer. Escapes all five significant
 // entities (ampersand first), so the result is safe in text content AND in
 // double- or single-quoted attribute values. Always returns a string:
@@ -116,7 +127,7 @@ export async function ShowQRModal(url: string | undefined) {
     } catch (e) {
       // Hard failure: show a short notice (no clickable link)
       HandleNonFatalError('ShowQRModal:Render', e);
-      $canvas.html(`<div class="text-muted small">Unable to generate QR code</div>`);
+      $canvas.html(`<div class="text-muted small">Failed to generate QR code.</div>`);
     }
     // Show modal
     openModal(modalId);
