@@ -1704,6 +1704,13 @@ Loading licence...</pre>
                   <label for="CLIENT_EDITOR_RUNONLAUNCH_DELAY">Launch Delay (seconds)</label>
                 </div>
               </div>
+              <!-- How long a dropped connection is tolerated before this client
+                   reads offline. The first option inherits the Preferences value
+                   and names what it currently resolves to. -->
+              <div class="form-floating">
+                <select class="form-select" id="CLIENT_EDITOR_OFFLINE_GRACE"></select>
+                <label for="CLIENT_EDITOR_OFFLINE_GRACE">Disconnect Grace Period</label>
+              </div>
               <!-- Show variables for this client. One row per variable defined in
                    the Variable Manager; leaving a field empty inherits the
                    default. Hidden for integrated clients, which run no local

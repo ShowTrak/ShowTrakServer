@@ -12,6 +12,7 @@ import {
   SetDefaultFailureThreshold as SetMonitoringDefaultFailureThreshold,
 } from '../Modules/MonitoringTargetManager/normalize';
 import { SetDefaultInterval as SetDummyDefaultInterval } from '../Modules/DummyClientManager/normalize';
+import { SetDefaultOfflineGraceSeconds } from '../Modules/ClientManager/offline-grace';
 import { SetAudioDedupeWindow } from '../Modules/AlertActions/_audio-dedupe';
 import { OSC } from '../Modules/OSC';
 import { setAccidentalShutdownProtection } from './shutdown-coordinator';
@@ -44,7 +45,8 @@ async function ApplyOsc(): Promise<void> {
 
 // Default monitoring / dummy-client interval used for entities that don't set
 // their own. Applies to targets created or reloaded after the change. The
-// failure threshold is resolved on every probe, so it applies from the next one.
+// failure threshold is resolved on every probe, so it applies from the next one;
+// the client disconnect grace is resolved on every disconnect, likewise.
 async function ApplyMonitoringDefaults(): Promise<void> {
   const Ms = await SettingsManager.GetValue('MONITORING_DEFAULT_INTERVAL_MS');
   SetMonitoringDefaultInterval(Ms);
@@ -52,6 +54,7 @@ async function ApplyMonitoringDefaults(): Promise<void> {
   SetMonitoringDefaultFailureThreshold(
     await SettingsManager.GetValue('MONITORING_FAILURE_THRESHOLD')
   );
+  SetDefaultOfflineGraceSeconds(await SettingsManager.GetValue('CLIENT_OFFLINE_GRACE_SECONDS'));
 }
 
 // Window within which repeat requests for the same alert sound collapse to one

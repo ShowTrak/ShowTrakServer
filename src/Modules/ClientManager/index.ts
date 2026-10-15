@@ -29,6 +29,11 @@ import {
 import { NormalizeIntegratedActions } from './integrated-actions';
 import { makeCriticalIndex } from './critical-index';
 import {
+  ResolveOfflineGraceSeconds,
+  SchedulePendingTimeout,
+  CancelPendingTimeout,
+} from './offline-grace';
+import {
   normalizeCriticalAudioEntry,
   normalizeEndpointID,
   resolveCriticalAudioEntry,
@@ -113,6 +118,9 @@ export interface ClientManagerType {
   Init(): Promise<void>;
   ClearCache(): Promise<void>;
   Timeout(UUID: string): Promise<void>;
+  // The client's socket closed. Marks it offline once its grace period has run
+  // out, unless it heartbeats again first; immediately when the grace is 0.
+  Disconnected(UUID: string): Promise<void>;
   Heartbeat(UUID: string, Data: HeartbeatPayload, IP: string): Promise<Result<string>>;
   SystemInfo(UUID: string, Data: SystemInfoData, IP: string): Promise<Result<string>>;
   SetUSBDeviceList(UUID: string, DeviceList: unknown): Promise<Result<string>>;
@@ -392,6 +400,18 @@ Manager.Timeout = async (UUID: string) => {
   return;
 };
 
+Manager.Disconnected = async (UUID: string) => {
+  const Cached = ClientIndex.get(UUID);
+  const Seconds = ResolveOfflineGraceSeconds(Cached ? Cached.OfflineGraceSeconds : null);
+  if (Seconds <= 0) return Manager.Timeout(UUID);
+  Logger.log(`Client ${UUID} disconnected; marking offline in ${Seconds}s unless it reconnects`);
+  SchedulePendingTimeout(UUID, Seconds, () => {
+    Manager.Timeout(UUID).catch((err) =>
+      Logger.error('Failed to time out client after its grace period:', err)
+    );
+  });
+};
+
 // Fast path for frequent telemetry: update cached client or hydrate from DB
 Manager.Heartbeat = async (UUID: string, Data: HeartbeatPayload, IP: string) => {
   let CachedClient = ClientIndex.get(UUID) || null;
@@ -411,6 +431,11 @@ Manager.Heartbeat = async (UUID: string, Data: HeartbeatPayload, IP: string) => 
         BroadcastManager.emit('ClientListChanged');
       }
     }
+  }
+
+  // Back inside its grace period: the disconnect was a blip, not an outage.
+  if (CancelPendingTimeout(UUID)) {
+    Logger.log(`Client ${UUID} reconnected within its grace period`);
   }
 
   await CachedClient.SetVersion(Data.Version || null, { markUnsaved: false });
@@ -1257,6 +1282,12 @@ Manager.Update = async (UUID: string, Data: unknown) => {
     );
     if (SetErr) return Fail(SetErr);
   }
+  if (Object.prototype.hasOwnProperty.call(Fields, 'OfflineGraceSeconds')) {
+    const [SetErr] = await Client.SetOfflineGraceSeconds(
+      Fields.OfflineGraceSeconds as number | null
+    );
+    if (SetErr) return Fail(SetErr);
+  }
   // Variable overrides live in their own table rather than on the client row, so
   // they are delegated instead of set through a Client setter — the Client entity
   // stays plain data describing the machine, not a carrier for show config.
@@ -1372,6 +1403,7 @@ Manager.Delete = async (UUID: string) => {
   if (Err) return Fail('Failed to delete client');
   // Remove from in-memory list
   removeClientFromCache(UUID);
+  CancelPendingTimeout(UUID);
   CriticalUSB.clearForClient(UUID);
   CriticalUSBNames.clearForClient(UUID);
   CriticalApplications.clearForClient(UUID);

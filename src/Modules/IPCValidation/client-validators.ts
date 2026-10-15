@@ -2,6 +2,10 @@
 import { fail, isPlainObject, normalizeNonEmptyString } from './primitives';
 import { NormalizeMacAddress } from '../MacAddress';
 import { IsNetmask, NormalizeIPText, ParseIP } from '../ClientManager/network';
+import {
+  MIN_OFFLINE_GRACE_SECONDS,
+  MAX_OFFLINE_GRACE_SECONDS,
+} from '../ClientManager/offline-grace';
 import type {
   AudioLevelRequestResult,
   CriticalAudioDevicePayloadResult,
@@ -440,6 +444,27 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
           fail(`Run-on-launch delay must be at least ${MIN_LAUNCH_DELAY_SECONDS} seconds`);
         }
         normalized.RunOnLaunchDelaySeconds = num;
+      }
+    }
+
+    // Disconnect grace period: null/empty inherits the server-wide setting.
+    if (Object.prototype.hasOwnProperty.call(value, 'OfflineGraceSeconds')) {
+      hasAnyField = true;
+      const raw = value.OfflineGraceSeconds;
+      if (raw === null || raw === undefined || raw === '') {
+        normalized.OfflineGraceSeconds = null;
+      } else {
+        const num = Number(raw);
+        if (
+          !Number.isInteger(num) ||
+          num < MIN_OFFLINE_GRACE_SECONDS ||
+          num > MAX_OFFLINE_GRACE_SECONDS
+        ) {
+          fail(
+            `Offline grace period must be a whole number of seconds from ${MIN_OFFLINE_GRACE_SECONDS} to ${MAX_OFFLINE_GRACE_SECONDS}`
+          );
+        }
+        normalized.OfflineGraceSeconds = num;
       }
     }
 

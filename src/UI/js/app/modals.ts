@@ -5,7 +5,7 @@ import { SetCompactMode } from './mode';
 import { OpenClientInfo } from './client-info-modal';
 import { OpenMonitoringTargetHistory, OpenDummyClientHistory } from './monitoring';
 import { IsIntegratedClientEntity } from './state/client-labels';
-import { Safe } from './utils';
+import { HandleNonFatalError, Safe } from './utils';
 
 // Minimum launch delay (seconds); mirrors MIN_LAUNCH_DELAY_SECONDS enforced by
 // the server-side ClientUpdatePayload validator.
@@ -27,6 +27,39 @@ import { IsFogAvailable, OpenFogTaskModal } from './fog';
 import { ClearTagPicker, RenderTagPicker } from './tag-picker';
 import type { TagPickerMount } from './tag-picker';
 import type { ClientVariableView, ClientView } from '@showtrak/protocol';
+
+// Mirrors MAX_OFFLINE_GRACE_SECONDS in Modules/ClientManager/offline-grace.
+const MAX_OFFLINE_GRACE_SECONDS = 10;
+
+function OfflineGraceLabel(Seconds: number): string {
+  if (Seconds <= 0) return 'Offline immediately';
+  return Seconds === 1 ? '1 second' : `${Seconds} seconds`;
+}
+
+// Disconnect grace <select>: "use the default" (naming what it resolves to),
+// then every explicit value. '' means inherit.
+async function RenderOfflineGraceSelect(Value: number | null | undefined) {
+  let Inherited = 0;
+  try {
+    // Imported lazily: ../settings pulls in the audio stack at module load.
+    const { GetSettingValue } = await import('./settings');
+    const Raw = Number(await GetSettingValue('CLIENT_OFFLINE_GRACE_SECONDS'));
+    if (Number.isInteger(Raw) && Raw >= 0) Inherited = Raw;
+  } catch (err) {
+    HandleNonFatalError('ClientEditor:LoadOfflineGrace', err);
+  }
+  const $select = $('#CLIENT_EDITOR_OFFLINE_GRACE');
+  $select.empty();
+  $select.append(
+    $('<option></option>')
+      .attr('value', '')
+      .text(`Use default (${OfflineGraceLabel(Inherited)})`)
+  );
+  for (let n = 0; n <= MAX_OFFLINE_GRACE_SECONDS; n++) {
+    $select.append($('<option></option>').attr('value', String(n)).text(OfflineGraceLabel(n)));
+  }
+  $select.val(typeof Value === 'number' ? String(Value) : '');
+}
 
 // UUID of the client whose editor is currently open, or null. Tracked so a
 // SetVariableList push (someone renaming or deleting a variable elsewhere, or on
@@ -660,6 +693,8 @@ export async function OpenClientEditor(UUID: string) {
       });
     });
 
+  await RenderOfflineGraceSelect(Client.OfflineGraceSeconds);
+
   await PopulateFogSection(UUID, (Nickname ? Nickname : Hostname) || UUID);
   await PopulateVariablesSection(UUID, IsIntegrated);
 
@@ -713,9 +748,11 @@ export async function OpenClientEditor(UUID: string) {
         GroupID = parseInt(String(GroupIDRaw));
       }
 
+      const OfflineGraceRaw = parseInt(String($('#CLIENT_EDITOR_OFFLINE_GRACE').val() ?? ''), 10);
       const Payload: Record<string, unknown> = {
         Nickname: Nickname,
         GroupID: GroupID,
+        OfflineGraceSeconds: Number.isFinite(OfflineGraceRaw) ? OfflineGraceRaw : null,
       };
 
       // Slug: only send when the operator actually changed it (a slug never

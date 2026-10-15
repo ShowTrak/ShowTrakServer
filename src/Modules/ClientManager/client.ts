@@ -227,6 +227,7 @@ interface ClientConstructorInput {
   MacAddresses?: ClientMacAddress[];
   RunOnLaunchScriptID?: string | null;
   RunOnLaunchDelaySeconds?: number | null;
+  OfflineGraceSeconds?: number | null;
   Unassigned?: unknown;
   Slug?: string | null;
 }
@@ -260,6 +261,9 @@ class Client {
   IP: string | null;
   RunOnLaunchScriptID: string | null;
   RunOnLaunchDelaySeconds: number | null;
+  // Seconds a dropped connection is tolerated before the client reads offline.
+  // null inherits CLIENT_OFFLINE_GRACE_SECONDS — see ./offline-grace.
+  OfflineGraceSeconds: number | null;
   // Stable, human-friendly OSC/API identifier. Unique across the shared client
   // namespace (real clients + monitors + dummies). Back-filled non-null on boot.
   Slug: string | null;
@@ -393,6 +397,8 @@ class Client {
     this.RunOnLaunchScriptID = Data.RunOnLaunchScriptID || null;
     this.RunOnLaunchDelaySeconds =
       typeof Data.RunOnLaunchDelaySeconds === 'number' ? Data.RunOnLaunchDelaySeconds : null;
+    this.OfflineGraceSeconds =
+      typeof Data.OfflineGraceSeconds === 'number' ? Data.OfflineGraceSeconds : null;
     this.Slug = Data.Slug || null;
     // Stored as sqlite 0/1, so coerce rather than trust the raw row value.
     this.Unassigned = !!Data.Unassigned;
@@ -1673,6 +1679,20 @@ class Client {
     }
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} run-on-launch delay updated to ${RunOnLaunchDelaySeconds}`);
+    return Ok<void>();
+  }
+  async SetOfflineGraceSeconds(OfflineGraceSeconds: number | null): Promise<Result<void>> {
+    if (this.OfflineGraceSeconds === OfflineGraceSeconds) return Ok<void>();
+    const Previous = this.OfflineGraceSeconds;
+    this.OfflineGraceSeconds = OfflineGraceSeconds;
+    const [Err] = await this._persistColumn('OfflineGraceSeconds', OfflineGraceSeconds);
+    if (Err) {
+      this.OfflineGraceSeconds = Previous;
+      Logger.error('Failed to update client offline grace period');
+      return Fail(Err);
+    }
+    BroadcastManager.emit('ClientUpdated', this);
+    Logger.debug(`Client ${this.UUID} offline grace period updated to ${OfflineGraceSeconds}`);
     return Ok<void>();
   }
 }

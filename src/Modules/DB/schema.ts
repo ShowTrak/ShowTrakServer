@@ -43,6 +43,7 @@ Schema.push({
             IP TEXT, \
             RunOnLaunchScriptID TEXT, \
             RunOnLaunchDelaySeconds INTEGER, \
+            OfflineGraceSeconds INTEGER, \
             Unassigned INTEGER NOT NULL DEFAULT 0, \
             Slug TEXT, \
             Timestamp BIGINT(11) NOT NULL \
@@ -735,6 +736,10 @@ Schema.Migrations = [
     Version: 50,
     SQL: 'ALTER TABLE `CriticalUSBDeviceNames` ADD COLUMN RequireNoError INTEGER NOT NULL DEFAULT 1',
   },
+  // Seconds a client may stay disconnected before it is marked offline. NULL
+  // means "inherit" the CLIENT_OFFLINE_GRACE_SECONDS setting (default 0), so
+  // every existing client keeps going offline the moment its socket closes.
+  { Version: 51, SQL: 'ALTER TABLE `Clients` ADD COLUMN OfflineGraceSeconds INTEGER' },
 ];
 
 export = Schema;

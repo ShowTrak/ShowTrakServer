@@ -584,7 +584,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       { serial: true }
     );
 
-    // Cleanup on disconnect: clear adoption entry and mark offline
+    // Cleanup on disconnect: clear adoption entry and mark offline (after the
+    // client's grace period, if it has one).
     GuardedOn('disconnect', null, async (reason: unknown) => {
       if (!socket.UUID) {
         Logger.log('Socket disconnected without UUID:', socket.id, reason);
@@ -593,7 +594,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       Logger.log('Client disconnected', { UUID: socket.UUID, reason });
       await IdentifyManager.HandleDisconnect(socket.UUID);
       AdoptionManager.RemoveClientPendingAdoption(socket.UUID);
-      ClientManager.Timeout(socket.UUID).catch((err) =>
+      ClientManager.Disconnected(socket.UUID).catch((err) =>
         Logger.error('Failed to time out client on disconnect:', err)
       );
     });

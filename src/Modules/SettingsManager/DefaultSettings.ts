@@ -12,6 +12,10 @@ import {
   IsFreeKioskMenuCommand,
 } from '../FreeKiosk/commands';
 import type { FreeKioskCommandDef } from '../FreeKiosk/commands';
+import {
+  MIN_OFFLINE_GRACE_SECONDS,
+  MAX_OFFLINE_GRACE_SECONDS,
+} from '../ClientManager/offline-grace';
 
 // PASSWORD behaves exactly like STRING everywhere on the backend; it only tells the
 // settings renderer to mask the field. Used for secrets that would otherwise sit in
@@ -159,6 +163,19 @@ export const DefaultSettings: SettingDefinition[] = [
     DefaultValue: 1,
     Min: 1,
     Max: 10,
+    OnUpdateEvent: 'MonitoringSettingsChanged',
+  },
+  {
+    Group: 'Monitoring',
+    Key: 'CLIENT_OFFLINE_GRACE_SECONDS',
+    Title: 'Client Disconnect Grace Period',
+    Description:
+      'How long a ShowTrak client may stay disconnected before it is marked offline. 0 marks it offline the moment its connection drops; raise it to ride out brief network blips that the client recovers from on its own. Individual clients can override this. Applies from the next disconnect.',
+    Type: 'SLIDER',
+    DefaultValue: 0,
+    Min: MIN_OFFLINE_GRACE_SECONDS,
+    Max: MAX_OFFLINE_GRACE_SECONDS,
+    Unit: 's',
     OnUpdateEvent: 'MonitoringSettingsChanged',
   },
   {
