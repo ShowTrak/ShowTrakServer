@@ -18,6 +18,11 @@ import type { AppUpdater } from 'electron-updater';
 import { CreateLogger } from '../Modules/Logger';
 import type { InvokeChannel } from '../Modules/IPCRegistry/channels';
 import type { IpcHandler } from './handler-registry';
+import {
+  newestSquirrelPackages,
+  parseSquirrelReleases,
+  readSquirrelDownloadPercent,
+} from './squirrel-releases';
 
 // Minimal shape of the RPC registrar handed to Register(): just the typed
 // `handle(channel, fn)` used to wire the AppUpdate:* invoke channels.
@@ -51,6 +56,17 @@ let checkWatchdogTimer: NodeJS.Timeout | null = null;
 let hasDownloadedUpdate = false;
 let cachedMacDeveloperIdSigned: boolean | null = null;
 const CHECK_TIMEOUT_MS = 20000;
+
+const SQUIRREL_FEED_URL = 'https://github.com/ShowTrak/ShowTrakServer/releases/latest/download/';
+const GITHUB_RELEASE_BY_TAG_API =
+  'https://api.github.com/repos/ShowTrak/ShowTrakServer/releases/tags/';
+const SQUIRREL_META_TIMEOUT_MS = 8000;
+const SQUIRREL_PROGRESS_INTERVAL_MS = 500;
+// Bumped whenever a Squirrel check starts or finishes so in-flight metadata
+// fetches and progress polls from an earlier cycle stop reporting.
+let squirrelSession = 0;
+let squirrelProgressTimer: NodeJS.Timeout | null = null;
+let squirrelReleaseInfo: { version?: string; releaseNotes?: string } | null = null;
 
 function toErrorMessage(value: unknown) {
   if (!value) return 'Unknown error';
@@ -266,16 +282,83 @@ function ensureMacAutoUpdateEligibility() {
   return false;
 }
 
-function isSquirrelWindows() {
+// Squirrel install root (the folder holding Update.exe and packages/), or null
+// when this is not a Squirrel-installed Windows build.
+function getSquirrelRootDir(): string | null {
   try {
-    if (process.platform !== 'win32') return false;
+    if (process.platform !== 'win32') return null;
     const execDir = path.dirname(process.execPath);
-    const updateExe1 = path.resolve(execDir, '..', 'Update.exe');
-    const updateExe2 = path.resolve(execDir, '..', '..', 'Update.exe');
-    return fs.existsSync(updateExe1) || fs.existsSync(updateExe2);
+    for (const rootDir of [path.resolve(execDir, '..'), path.resolve(execDir, '..', '..')]) {
+      if (fs.existsSync(path.join(rootDir, 'Update.exe'))) return rootDir;
+    }
+    return null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+function isSquirrelWindows() {
+  return getSquirrelRootDir() !== null;
+}
+
+function endSquirrelTracking() {
+  squirrelSession++;
+  if (squirrelProgressTimer) {
+    clearInterval(squirrelProgressTimer);
+    squirrelProgressTimer = null;
+  }
+}
+
+async function fetchText(url: string, headers: Record<string, string> = {}) {
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(SQUIRREL_META_TIMEOUT_MS) });
+  if (!res.ok) throw new Error(`GET ${url} failed with status ${res.status}`);
+  return res.text();
+}
+
+// Squirrel's 'update-available' carries no details, so read the version and
+// package sizes from the feed's RELEASES manifest, then poll the package file
+// Squirrel is writing to report real download progress.
+async function trackSquirrelDownload(session: number) {
+  let packages: ReturnType<typeof newestSquirrelPackages> = [];
+  try {
+    packages = newestSquirrelPackages(
+      parseSquirrelReleases(await fetchText(`${SQUIRREL_FEED_URL}RELEASES`))
+    );
+  } catch (e) {
+    Logger.warn('Could not read Squirrel RELEASES manifest; progress unavailable:', e);
+  }
+  const version = packages[0]?.version;
+  if (session !== squirrelSession || !version) return;
+
+  let releaseNotes: string | undefined;
+  try {
+    const release = JSON.parse(
+      await fetchText(`${GITHUB_RELEASE_BY_TAG_API}v${version}`, {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'ShowTrakServer',
+      })
+    );
+    if (release && typeof release.body === 'string') releaseNotes = release.body;
+  } catch (e) {
+    Logger.warn(`Could not fetch release notes for v${version}:`, e);
+  }
+  if (session !== squirrelSession) return;
+
+  squirrelReleaseInfo = { version, releaseNotes };
+  sendAppUpdateStatus({ state: 'available', info: squirrelReleaseInfo });
+
+  const rootDir = getSquirrelRootDir();
+  if (!rootDir) return;
+  let lastPct = -1;
+  const tick = () => {
+    if (session !== squirrelSession) return;
+    const pct = Math.floor(readSquirrelDownloadPercent(rootDir, packages) ?? 0);
+    if (pct === lastPct) return;
+    lastPct = pct;
+    sendAppUpdateStatus({ state: 'downloading', percent: pct });
+  };
+  tick();
+  squirrelProgressTimer = setInterval(tick, SQUIRREL_PROGRESS_INTERVAL_MS);
 }
 
 function initSquirrelUpdater() {
@@ -283,20 +366,26 @@ function initSquirrelUpdater() {
   squirrelUpdaterInitialized = true;
   try {
     SquirrelUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
-    SquirrelUpdater.on('update-available', () =>
-      sendAppUpdateStatus({ state: 'available', info: { tag: 'latest' } })
-    );
-    SquirrelUpdater.on('update-not-available', () => sendAppUpdateStatus({ state: 'none' }));
+    SquirrelUpdater.on('update-available', () => {
+      sendAppUpdateStatus({ state: 'available' });
+      void trackSquirrelDownload(squirrelSession);
+    });
+    SquirrelUpdater.on('update-not-available', () => {
+      endSquirrelTracking();
+      sendAppUpdateStatus({ state: 'none' });
+    });
     SquirrelUpdater.on(
       'update-downloaded',
       (_e: unknown, _notes: unknown, _name: unknown, _date: unknown, _url: unknown) => {
-        sendAppUpdateStatus({ state: 'downloaded', info: { version: _name || 'pending' } });
+        endSquirrelTracking();
+        const version = (_name && String(_name)) || squirrelReleaseInfo?.version;
+        sendAppUpdateStatus({ state: 'downloaded', info: { ...squirrelReleaseInfo, version } });
       }
     );
-    SquirrelUpdater.on('error', (err: unknown) =>
-      sendAppUpdateStatus({ state: 'error', error: String(err) })
-    );
-    // Note: Squirrel's autoUpdater may not emit download-progress; states will jump to downloaded
+    SquirrelUpdater.on('error', (err: unknown) => {
+      endSquirrelTracking();
+      sendAppUpdateStatus({ state: 'error', error: String(err) });
+    });
   } catch {
     /* intentional: the Squirrel updater is unavailable in dev/unpackaged runs; wiring it is best-effort */
   }
@@ -328,12 +417,13 @@ async function handleCheck() {
     try {
       Logger.log('Using Squirrel updater check flow');
       initSquirrelUpdater();
-      const feed = 'https://github.com/ShowTrak/ShowTrakServer/releases/latest/download/';
+      endSquirrelTracking();
+      squirrelReleaseInfo = null;
       // Try both object and string forms for compatibility
       try {
-        SquirrelUpdater.setFeedURL({ url: feed });
+        SquirrelUpdater.setFeedURL({ url: SQUIRREL_FEED_URL });
       } catch {
-        SquirrelUpdater.setFeedURL(feed);
+        SquirrelUpdater.setFeedURL(SQUIRREL_FEED_URL);
       }
       SquirrelUpdater.checkForUpdates();
     } catch (e) {

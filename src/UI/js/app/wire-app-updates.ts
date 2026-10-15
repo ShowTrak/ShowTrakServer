@@ -174,7 +174,7 @@ export function wireAppUpdates() {
           const pct = payload.percent ? Math.floor(payload.percent) : 0;
           setIcon('bi-arrow-repeat', true);
           $status.text('Downloading update...');
-          $subtext.text(`${pct}% complete`);
+          $subtext.text(pct >= 100 ? 'Download complete. Preparing update...' : `${pct}% complete`);
           setProgress(pct);
         } else if (st === 'downloaded') {
           const v = payload.info && payload.info.version;
