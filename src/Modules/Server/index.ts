@@ -173,13 +173,8 @@ const ClientsListHandler = async (req: Request, res: Response) => {
 
   const [TargetsErr, Targets] = await MonitoringTargetManager.GetAll();
   if (TargetsErr) {
-    res.locals.debugTrafficDetail = 'Failed to fetch monitoring targets';
-    return sendApiError(
-      res,
-      500,
-      'MONITORING_TARGETS_FETCH_FAILED',
-      'Failed to fetch monitoring targets'
-    );
+    res.locals.debugTrafficDetail = 'Failed to fetch monitors';
+    return sendApiError(res, 500, 'MONITORING_TARGETS_FETCH_FAILED', 'Failed to fetch monitors');
   }
 
   const [DummiesErr, Dummies] = await DummyClientManager.GetAll();

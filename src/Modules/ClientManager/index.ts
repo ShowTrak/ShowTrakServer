@@ -716,7 +716,8 @@ Manager.MarkUSBDeviceCritical = async (UUID: string, Device: CriticalUSBDevicePa
     KnownDevice ? [KnownDevice] : [],
     Existing
   );
-  if (ResolveErr || !Conditions) return Fail(ResolveErr || 'Failed to resolve critical USB device');
+  if (ResolveErr || !Conditions)
+    return Fail(ResolveErr || 'Failed to resolve monitored USB device');
 
   const Entry: CriticalUSBDevice = {
     SerialNumber,
@@ -795,7 +796,8 @@ Manager.MarkUSBNameCritical = async (UUID: string, Device: CriticalUSBNamePayloa
   );
   const Existing = CriticalUSBNames.getForClient(UUID, false)?.get(NameKey) || null;
   const [ResolveErr, Conditions] = resolveUSBConditions(Device, Live, Existing);
-  if (ResolveErr || !Conditions) return Fail(ResolveErr || 'Failed to resolve critical USB device');
+  if (ResolveErr || !Conditions)
+    return Fail(ResolveErr || 'Failed to resolve monitored USB device');
 
   // The expected quantity is captured from how many are connected when it is
   // first marked (at least one, so the guard means something). Editing its
@@ -909,7 +911,7 @@ Manager.MarkDisplayCritical = async (UUID: string, Display: CriticalDisplayPaylo
     Existing,
     Date.now()
   );
-  if (ResolveErr || !Entry) return Fail(ResolveErr || 'Failed to resolve critical display');
+  if (ResolveErr || !Entry) return Fail(ResolveErr || 'Failed to resolve monitored display');
 
   const Rekeyed = !!Existing && Existing.DisplayID !== Entry.DisplayID;
   const [WriteErr] = await CriticalRepo.MarkDisplay({
@@ -930,7 +932,7 @@ Manager.MarkDisplayCritical = async (UUID: string, Display: CriticalDisplayPaylo
   if (WriteErr) return Fail('Failed to save monitored display');
   if (Rekeyed) {
     const [RemoveErr] = await CriticalRepo.RemoveDisplay(UUID, Existing.DisplayID);
-    if (RemoveErr) Logger.error('Failed to retire a re-keyed critical display', RemoveErr);
+    if (RemoveErr) Logger.error('Failed to retire a re-keyed monitored display', RemoveErr);
     CriticalDisplays.removeForClient(UUID, Existing.DisplayID);
     Target.UnmarkCriticalDisplay(Existing.DisplayID);
   }
@@ -1017,7 +1019,7 @@ Manager.MarkAudioDeviceCritical = async (
     Target.ObservedAudio.Capabilities,
     Date.now()
   );
-  if (ResolveErr || !Entry) return Fail(ResolveErr || 'Failed to resolve critical audio device');
+  if (ResolveErr || !Entry) return Fail(ResolveErr || 'Failed to resolve monitored audio device');
 
   const [WriteErr] = await CriticalRepo.MarkAudio({
     UUID,
@@ -1077,7 +1079,7 @@ Manager.MarkNetworkInterfaceCritical = async (
     Date.now()
   );
   if (ResolveErr || !Entry) {
-    return Fail(ResolveErr || 'Failed to resolve critical network interface');
+    return Fail(ResolveErr || 'Failed to resolve monitored network interface');
   }
 
   const [WriteErr] = await CriticalRepo.MarkNetwork({
@@ -1579,6 +1581,14 @@ Manager.ReplaceClient = async (CurrentUUID: unknown, ReplacementUUID: unknown) =
   BroadcastManager.emit('ClientListChanged');
   BroadcastManager.emit('ClientUpdated', ExistingClient);
   BroadcastManager.emit('AlertRuleListChanged');
+  // The transaction also rewrote tag scopes, script whitelists and the FOG host
+  // link. None of their managers cache those rows server-side (each read goes
+  // to the DB), so refreshing means re-pushing what the UIs hold: the tag list,
+  // the whitelist-decorated script catalog (from cache, fingerprint unchanged,
+  // so no redeploy) and the FOG task panel.
+  BroadcastManager.emit('TagListChanged');
+  BroadcastManager.emit('ScriptsUpdated');
+  BroadcastManager.emit('FogTasksUpdated');
   return Ok(ExistingClient);
 };
 

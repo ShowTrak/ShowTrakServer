@@ -217,7 +217,7 @@ const Manager = {
     BroadcastManager.emit('TagListChanged');
     // Return the freshly-created tag so callers can open it in the editor.
     const Created = await Manager.GetBySlug(Slug);
-    if (!Created) return Fail('Tag created but could not be reloaded');
+    if (!Created) return Fail('Tag created but failed to reload');
     return Ok(Created);
   },
 

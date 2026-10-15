@@ -538,7 +538,7 @@ test('an offline UPS renders the error and a plain-language note', () => {
   const Html = Ups.Debug({ Success: false, Error: 'Request timed out' }, target());
   assert.match(Html, /Offline/);
   assert.match(Html, /Request timed out/);
-  assert.match(Html, /Could not reach the UPS over SNMP/);
+  assert.match(Html, /Failed to reach the UPS over SNMP/);
 });
 
 test('an offline result with no error string still says something useful', () => {

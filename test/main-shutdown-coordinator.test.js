@@ -329,7 +329,7 @@ test('a failed autosave during shutdown reports the error and keeps the app open
   await C.handleMainWindowClose(mainWindowStub, cancelableEvent());
 
   assert.equal(calls.showErrorBox.length, 1);
-  assert.equal(calls.showErrorBox[0].title, 'Unable to Save Show');
+  assert.equal(calls.showErrorBox[0].title, 'Failed to Save Show');
   assert.match(calls.showErrorBox[0].content, /disk full/);
   assert.equal(calls.windowClose, 0);
   assert.equal(calls.quit, 0);

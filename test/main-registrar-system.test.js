@@ -360,7 +360,7 @@ test('GetProjectDependencies reads the real package.json, sorted and filtered', 
 test('GetProjectDependencies reports when package.json cannot be found', async () => {
   state.appPath = path.join(REPO_ROOT, 'does-not-exist', 'nested');
   assert.deepEqual(await GetHandler('GetProjectDependencies')(null), [
-    'Could not locate package.json',
+    'Failed to locate package.json',
     null,
   ]);
 });
@@ -374,5 +374,5 @@ test('GetLicense reads the real LICENSE file', async () => {
 
 test('GetLicense reports when the LICENSE file cannot be found', async () => {
   state.appPath = path.join(REPO_ROOT, 'does-not-exist', 'nested');
-  assert.deepEqual(await GetHandler('GetLicense')(null), ['Could not locate LICENSE file', null]);
+  assert.deepEqual(await GetHandler('GetLicense')(null), ['Failed to locate LICENSE file', null]);
 });

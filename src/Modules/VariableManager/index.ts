@@ -217,7 +217,7 @@ const Manager = {
     BroadcastManager.emit('VariableListChanged');
 
     const [LoadErr, Row] = await VariablesRepo.GetByKey(Unique);
-    if (LoadErr || !Row) return Fail('Variable created but could not be reloaded');
+    if (LoadErr || !Row) return Fail('Variable created but failed to reload');
     Logger.success(`Created variable ${Unique}`);
     return Ok(RowToView(Row, 0));
   },

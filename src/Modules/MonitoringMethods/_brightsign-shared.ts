@@ -678,14 +678,14 @@ export function BrightSignDebug(
     Row('Status', StatusPill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
-      : TextRow('Error', (Result && Result.Error) || 'Could not reach the player'),
+      : TextRow('Error', (Result && Result.Error) || 'Failed to reach the player'),
     ...ExtraRows,
   ]);
   if (!Reachable) {
     return (
       Head +
       '<div class="mt-2">' +
-      Note('Could not reach the BrightSign Local DWS — check it is enabled on the player') +
+      Note('Failed to reach the BrightSign Local DWS — check it is enabled on the player') +
       '</div>'
     );
   }

@@ -128,7 +128,7 @@ test('mqtt method is offline (could not connect) when the connection is refused'
 
   assert.equal(result.Success, false);
   assert.equal(result.Connected, false);
-  assert.match(result.Error, /could not connect/i);
+  assert.match(result.Error, /failed to connect/i);
   assert.equal(mock.created[0].ended, true);
 });
 

@@ -325,7 +325,7 @@ async function trackSquirrelDownload(session: number) {
       parseSquirrelReleases(await fetchText(`${SQUIRREL_FEED_URL}RELEASES`))
     );
   } catch (e) {
-    Logger.warn('Could not read Squirrel RELEASES manifest; progress unavailable:', e);
+    Logger.warn('Failed to read Squirrel RELEASES manifest; progress unavailable:', e);
   }
   const version = packages[0]?.version;
   if (session !== squirrelSession || !version) return;
@@ -340,7 +340,7 @@ async function trackSquirrelDownload(session: number) {
     );
     if (release && typeof release.body === 'string') releaseNotes = release.body;
   } catch (e) {
-    Logger.warn(`Could not fetch release notes for v${version}:`, e);
+    Logger.warn(`Failed to fetch release notes for v${version}:`, e);
   }
   if (session !== squirrelSession) return;
 
@@ -491,7 +491,7 @@ async function handleCheck() {
     } catch (e) {
       sendAppUpdateStatus({
         state: 'error',
-        error: 'Updater config failed: could not create app-update.yml for packaged app.',
+        error: 'Failed to create app-update.yml for the packaged app.',
         info: { details: String(e || 'Unknown error') },
       });
       return;

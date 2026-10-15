@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import { AsyncLocalStorage } from 'async_hooks';
 
 import { CreateLogger } from '../Logger';
 import { DB_PENDING_OPERATION_TIMEOUT_MS } from '../Config/constants';
@@ -60,6 +61,28 @@ let shutdownPromise: Promise<void> | null = null;
 let pendingOperations = 0;
 let pendingDrainResolvers: Array<() => void> = [];
 
+// ---- Transaction serialisation ----------------------------------------------
+// There is one shared sqlite3 connection, and a transaction belongs to the
+// connection, not to whoever issued BEGIN. Left unguarded, two overlapping
+// transactions collide on BEGIN, and any unrelated statement issued while one
+// is open silently joins it (and is thrown away if it rolls back). So:
+//  - exclusive sections (transactions, plus the connection swaps in
+//    ReplaceWithFile/ResetToEmpty) queue on `exclusiveChain` and run one at a time;
+//  - while a transaction is open, statements from outside it wait until it
+//    finishes, and the transaction lets already-issued outside statements drain
+//    before its BEGIN so none of them can land inside it;
+//  - statements issued from inside the transaction go straight through — via
+//    its `run`, or a direct Manager.Run/Get/All made within `fn` (recognised
+//    through AsyncLocalStorage) — so `fn` can never deadlock on its own gate.
+interface OpenTransactionState {
+  Done: Promise<void>;
+}
+const TransactionContext = new AsyncLocalStorage<OpenTransactionState>();
+let exclusiveChain: Promise<void> = Promise.resolve();
+let openTransaction: OpenTransactionState | null = null;
+let outsideOperations = 0;
+let outsideDrainResolvers: Array<() => void> = [];
+
 type DBResult<T> = [unknown, T | null];
 
 // A statement runner scoped to an open transaction, handed to WithTransaction's
@@ -113,15 +136,72 @@ function ResolvePendingDrainWaiters(): void {
   }
 }
 
-function BeginOperation(): boolean {
-  if (isShuttingDown || !DB) return false;
+// InTx marks a statement belonging to the open transaction. Once shutdown has
+// begun only those are still accepted, so a transaction already under way can
+// COMMIT or ROLLBACK instead of being cut off half-way.
+function BeginOperation(InTx = false): boolean {
+  if (!DB) return false;
+  if (isShuttingDown && !InTx) return false;
   pendingOperations += 1;
+  if (!InTx) outsideOperations += 1;
   return true;
 }
 
-function EndOperation(): void {
+function EndOperation(InTx = false): void {
   pendingOperations = Math.max(0, pendingOperations - 1);
+  if (!InTx) {
+    outsideOperations = Math.max(0, outsideOperations - 1);
+    if (outsideOperations === 0) {
+      const Waiters = outsideDrainResolvers;
+      outsideDrainResolvers = [];
+      for (const Resolve of Waiters) Resolve();
+    }
+  }
   ResolvePendingDrainWaiters();
+}
+
+function InsideOpenTransaction(): boolean {
+  return openTransaction !== null && TransactionContext.getStore() === openTransaction;
+}
+
+// Queue behind every earlier exclusive section. Resolves with the release
+// function once this caller is at the front; it must always be called.
+async function AcquireExclusive(): Promise<() => void> {
+  const Previous = exclusiveChain;
+  let Release!: () => void;
+  exclusiveChain = new Promise<void>((resolve) => {
+    Release = resolve;
+  });
+  await Previous;
+  return Release;
+}
+
+// Hold an outside statement while a transaction it is not part of is open.
+// Loops because the next queued transaction may open as soon as this one ends.
+async function WaitForOpenTransaction(): Promise<void> {
+  while (openTransaction && !InsideOpenTransaction()) {
+    await openTransaction.Done;
+  }
+}
+
+// Resolve once every outside statement already handed to sqlite has finished.
+function WaitForOutsideOperations(): Promise<void> {
+  if (outsideOperations === 0) return Promise.resolve();
+  return new Promise((resolve) => outsideDrainResolvers.push(resolve));
+}
+
+// Resolve when `Pending` does, or after TimeoutMs (logging what was abandoned).
+function WaitWithTimeout(Pending: Promise<void>, TimeoutMs: number, Label: string): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      Logger.warn(`Timed out waiting for ${Label} to finish during shutdown`);
+      resolve();
+    }, TimeoutMs);
+    void Pending.then(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
 }
 
 function WaitForPendingOperations(TimeoutMs = DB_PENDING_OPERATION_TIMEOUT_MS): Promise<void> {
@@ -195,6 +275,10 @@ Manager.InitializeSchema = async (): Promise<void> => {
     const AppliedVersion =
       !VersionErr && VersionRow && VersionRow.MaxVersion ? VersionRow.MaxVersion : 0;
 
+    // Migrations run strictly in order and stop at the first failure. Only the
+    // recorded MAX(Version) is consulted on the next boot, so recording anything
+    // above a failed migration would hide it forever; stopping leaves the failed
+    // one (and everything after it) to be retried on the next open.
     const Migrations = Array.isArray(Tables.Migrations) ? Tables.Migrations : [];
     for (const Migration of Migrations) {
       if (Migration.Version <= AppliedVersion) continue;
@@ -208,8 +292,11 @@ Manager.InitializeSchema = async (): Promise<void> => {
         const [, Table, Column] = Match;
         const [PErr, Cols] = await Manager.All<{ name: string }>(`PRAGMA table_info(\`${Table}\`)`);
         if (PErr) {
-          Logger.databaseError(`Migration probe failed for ${Table}`, PErr);
-          continue;
+          Logger.databaseError(
+            `Migration ${Migration.Version} probe failed for ${Table}; stopping migrations here so it is retried on the next open`,
+            PErr
+          );
+          break;
         }
         alreadyApplied = (Cols || []).some((c) => c && c.name === Column);
       }
@@ -220,8 +307,11 @@ Manager.InitializeSchema = async (): Promise<void> => {
         // pure ALTER/CREATE INDEX statements never marked the DB dirty anyway.
         const [Err] = await Manager.Run(SQL, [], { markDirty: false });
         if (Err) {
-          Logger.databaseError(`Migration ${Migration.Version} failed: ${SQL}`, Err);
-          continue;
+          Logger.databaseError(
+            `Migration ${Migration.Version} failed; stopping migrations here so it is retried on the next open: ${SQL}`,
+            Err
+          );
+          break;
         }
         Logger.database(`Applied migration ${Migration.Version}`);
       }
@@ -262,9 +352,9 @@ async function ConfigureConnection(): Promise<void> {
 // Open (or reopen) the SQLite connection and ensure the schema exists before
 // the returned promise resolves. Resets the schema-init state so migrations are
 // re-applied against whatever file is now on disk (e.g. a just-opened .ShowTrak).
+// Deliberately leaves isShuttingDown alone: a connection swap that was already
+// under way when shutdown began must not re-open the gate shutdown just closed.
 function OpenConnection(): Promise<void> {
-  isShuttingDown = false;
-  shutdownPromise = null;
   schemaInitialized = false;
   schemaInitializationPromise = null;
   hasUnsavedChanges = false;
@@ -292,42 +382,81 @@ Manager.Ready = async (): Promise<void> => {
   await readyPromise;
 };
 
+// Raw statement executors. InTx is true for statements that belong to the open
+// transaction; the public wrappers below decide that and apply the gate. Once
+// shutdown has begun an outside statement skips the wait and is refused at
+// once by BeginOperation rather than queueing behind a transaction.
+function ExecGet<T>(Query: string, Params: unknown, InTx: boolean): Promise<DBResult<T>> {
+  return new Promise((resolve) => {
+    if (!BeginOperation(InTx) || !DB) {
+      return resolve([new Error('Database is closing'), null]);
+    }
+    DB.get(Query, Params, (err, row) => {
+      EndOperation(InTx);
+      if (err) {
+        Logger.databaseError('Error fetching data:', err);
+        return resolve([err, null]);
+      }
+      resolve([null, row as T]);
+    });
+  });
+}
+
+function ExecAll<T>(Query: string, Params: unknown, InTx: boolean): Promise<DBResult<T[]>> {
+  return new Promise((resolve) => {
+    if (!BeginOperation(InTx) || !DB) {
+      return resolve([new Error('Database is closing'), null]);
+    }
+    DB.all(Query, Params, (err, rows) => {
+      EndOperation(InTx);
+      if (err) {
+        Logger.databaseError('Error fetching data:', err);
+        return resolve([err, null]);
+      }
+      resolve([null, rows as T[]]);
+    });
+  });
+}
+
+function ExecRun(
+  Query: string,
+  Params: unknown,
+  markDirty: boolean,
+  InTx: boolean
+): Promise<DBResult<RunResult>> {
+  return new Promise((resolve) => {
+    if (!BeginOperation(InTx) || !DB) {
+      return resolve([new Error('Database is closing'), null]);
+    }
+    DB.run(Query, Params, function (this: RunResult, err: Error | null) {
+      if (err) {
+        Logger.databaseError('Error running query:', err);
+        EndOperation(InTx);
+        return resolve([err, null]);
+      }
+      if (markDirty && ShouldMarkAsUnsaved(Query)) {
+        hasUnsavedChanges = true;
+      }
+      EndOperation(InTx);
+      resolve([null, this]);
+    });
+  });
+}
+
 // Wrapper returning [err, row] for single-row queries. Rows default to `any`
 // until callers migrate onto the typed repositories (Phase 3b); repositories
 // pass an explicit row type from ./rows.
 Manager.Get = async <T = DefaultRow>(Query: string, Params?: unknown): Promise<DBResult<T>> => {
-  return new Promise((resolve) => {
-    if (!BeginOperation() || !DB) {
-      return resolve([new Error('Database is closing'), null]);
-    }
-    DB.get(Query, Params, (err, row) => {
-      if (err) {
-        Logger.databaseError('Error fetching data:', err);
-        EndOperation();
-        return resolve([err, null]);
-      }
-      EndOperation();
-      resolve([null, row as T]);
-    });
-  });
+  const InTx = InsideOpenTransaction();
+  if (!InTx && openTransaction && !isShuttingDown) await WaitForOpenTransaction();
+  return ExecGet<T>(Query, Params, InTx);
 };
 
 // Wrapper returning [err, rows] for multi-row queries
 Manager.All = async <T = DefaultRow>(Query: string, Params?: unknown): Promise<DBResult<T[]>> => {
-  return new Promise((resolve) => {
-    if (!BeginOperation() || !DB) {
-      return resolve([new Error('Database is closing'), null]);
-    }
-    DB.all(Query, Params, (err, rows) => {
-      if (err) {
-        Logger.databaseError('Error fetching data:', err);
-        EndOperation();
-        return resolve([err, null]);
-      }
-      EndOperation();
-      resolve([null, rows as T[]]);
-    });
-  });
+  const InTx = InsideOpenTransaction();
+  if (!InTx && openTransaction && !isShuttingDown) await WaitForOpenTransaction();
+  return ExecAll<T>(Query, Params, InTx);
 };
 
 // Wrapper returning [err, stmt] for INSERT/UPDATE/DELETE/DDL
@@ -336,43 +465,62 @@ Manager.Run = async (
   Params?: unknown,
   { markDirty = true }: RunOptions = {}
 ): Promise<DBResult<RunResult>> => {
-  return new Promise((resolve) => {
-    if (!BeginOperation() || !DB) {
-      return resolve([new Error('Database is closing'), null]);
-    }
-    DB.run(Query, Params, function (this: RunResult, err: Error | null) {
-      if (err) {
-        Logger.databaseError('Error running query:', err);
-        EndOperation();
-        return resolve([err, null]);
-      }
-      if (markDirty && ShouldMarkAsUnsaved(Query)) {
-        hasUnsavedChanges = true;
-      }
-      EndOperation();
-      resolve([null, this]);
-    });
-  });
+  const InTx = InsideOpenTransaction();
+  if (!InTx && openTransaction && !isShuttingDown) await WaitForOpenTransaction();
+  return ExecRun(Query, Params, markDirty, InTx);
 };
 
 // Run a series of statements atomically. `fn` receives a `run` bound to the
 // transaction's dirty-tracking options; any throw (or returned [Err, ...]
-// surfaced as a throw by the caller) rolls the transaction back.
+// surfaced as a throw by the caller) rolls the transaction back. Transactions
+// are serialised (see "Transaction serialisation" above): this waits its turn,
+// and outside statements wait for it.
 Manager.WithTransaction = async <T>(
   fn: (run: TxRun) => Promise<T>,
   { markDirty = true }: RunOptions = {}
 ): Promise<DBResult<T>> => {
-  const run: TxRun = (Query, Params) => Manager.Run(Query, Params, { markDirty });
-  const [beginErr] = await run('BEGIN IMMEDIATE TRANSACTION');
-  if (beginErr) return [beginErr, null];
+  // SQLite has no nested BEGIN, and queueing behind ourselves would deadlock,
+  // so a nested call fails fast exactly as a nested BEGIN always did.
+  if (InsideOpenTransaction()) {
+    return [new Error('Cannot start a transaction inside another transaction'), null];
+  }
+  const Release = await AcquireExclusive();
+  if (isShuttingDown || !DB) {
+    Release();
+    return [new Error('Database is closing'), null];
+  }
+  let Finish!: () => void;
+  const State: OpenTransactionState = {
+    Done: new Promise<void>((resolve) => {
+      Finish = resolve;
+    }),
+  };
+  openTransaction = State;
+  // `run` only bypasses the gate while this transaction is the open one; a
+  // reference kept past the end behaves like any other outside write.
+  const run: TxRun = (Query, Params) =>
+    openTransaction === State
+      ? ExecRun(Query, Params, markDirty, true)
+      : Manager.Run(Query, Params, { markDirty });
   try {
-    const value = await fn(run);
-    const [commitErr] = await run('COMMIT');
-    if (commitErr) throw commitErr;
-    return [null, value];
-  } catch (err) {
-    await run('ROLLBACK');
-    return [err instanceof Error ? err : new Error(String(err)), null];
+    await WaitForOutsideOperations();
+    return await TransactionContext.run(State, async (): Promise<DBResult<T>> => {
+      const [beginErr] = await run('BEGIN IMMEDIATE TRANSACTION');
+      if (beginErr) return [beginErr, null];
+      try {
+        const value = await fn(run);
+        const [commitErr] = await run('COMMIT');
+        if (commitErr) throw commitErr;
+        return [null, value];
+      } catch (err) {
+        await run('ROLLBACK');
+        return [err instanceof Error ? err : new Error(String(err)), null];
+      }
+    });
+  } finally {
+    openTransaction = null;
+    Finish();
+    Release();
   }
 };
 
@@ -382,6 +530,14 @@ Manager.Shutdown = async (Options: { TimeoutMs?: number } = {}): Promise<void> =
 
   isShuttingDown = true;
   shutdownPromise = (async () => {
+    // Never close mid-transaction: let an open transaction COMMIT or ROLLBACK,
+    // and an in-progress connection swap finish, first. Transactions still
+    // queued behind them see isShuttingDown when they reach the front and bail.
+    await WaitWithTimeout(
+      AcquireExclusive().then((Release) => Release()),
+      TimeoutMs,
+      'an open transaction'
+    );
     await WaitForPendingOperations(TimeoutMs);
     try {
       await CloseLiveConnection();
@@ -498,10 +654,32 @@ function ValidateDatabaseFile(SourcePath: string): Promise<DBResult<boolean>> {
 // Replace the live working database with SourcePath: validate it, close the
 // current connection, swap the file (clearing any stale sidecar journals), then
 // reconnect and re-run schema migrations. Used by "Open".
+// Run a connection swap as an exclusive section: it waits for any open or
+// queued transaction to finish first (closing the connection mid-transaction
+// would silently discard it), and no transaction can open against the
+// half-swapped connection. Refused once shutdown has begun.
+async function WithExclusiveConnection(
+  Swap: () => Promise<DBResult<string>>
+): Promise<DBResult<string>> {
+  if (InsideOpenTransaction()) {
+    return [new Error('Cannot replace the database from inside a transaction'), null];
+  }
+  const Release = await AcquireExclusive();
+  try {
+    if (isShuttingDown) return [new Error('Database is closing'), null];
+    return await Swap();
+  } finally {
+    Release();
+  }
+}
+
 Manager.ReplaceWithFile = async (SourcePath: string): Promise<DBResult<string>> => {
   const [ValidationErr] = await ValidateDatabaseFile(SourcePath);
   if (ValidationErr) return [ValidationErr, null];
+  return WithExclusiveConnection(() => SwapInFile(SourcePath));
+};
 
+async function SwapInFile(SourcePath: string): Promise<DBResult<string>> {
   try {
     await new Promise<void>((resolve, reject) => {
       if (!DB) return resolve();
@@ -533,12 +711,16 @@ Manager.ReplaceWithFile = async (SourcePath: string): Promise<DBResult<string>> 
     return [err, null];
   }
   return [null, dbPath];
-};
+}
 
 // Reset the working database to an empty state: close the connection, delete the
 // database file and any sidecars, then reconnect (which recreates the schema
 // fresh). Used by "New".
 Manager.ResetToEmpty = async (): Promise<DBResult<string>> => {
+  return WithExclusiveConnection(WipeAndReopen);
+};
+
+async function WipeAndReopen(): Promise<DBResult<string>> {
   try {
     await new Promise<void>((resolve, reject) => {
       if (!DB) return resolve();
@@ -569,7 +751,7 @@ Manager.ResetToEmpty = async (): Promise<DBResult<string>> => {
     return [err, null];
   }
   return [null, dbPath];
-};
+}
 
 // Returns true if any core table holds rows, i.e. the working database contains
 // user data. Used to detect data carried over from a previous boot (e.g. when

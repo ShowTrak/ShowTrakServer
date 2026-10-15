@@ -327,7 +327,7 @@ function register(): void {
           Allowed = !!(await SettingsManager.GetValue('SYSTEM_ALLOW_UNASSIGNED_CLIENTS'));
         } catch (error) {
           Logger.error('Failed to read unassigned client setting', error);
-          return ['Unable to verify that unassigned clients are enabled', null];
+          return ['Failed to verify that unassigned clients are enabled', null];
         }
         if (!Allowed) return ['Unassigned clients are disabled', null];
 
@@ -390,7 +390,7 @@ function register(): void {
     } catch (error) {
       return validationErrorTuple(error);
     }
-    await ScriptExecutionManager.ClearQueue();
+    await ScriptExecutionManager.ClearSettled();
     const tasks = Targets.map(async (UUID: string) => {
       // Resolve the client and its eligibility BEFORE queueing anything so the
       // no-op cases below never create a task (and therefore never surface a UI
@@ -404,7 +404,7 @@ function register(): void {
       const MacAddresses = Client.GetWakeableMacAddresses();
       if (!MacAddresses.length || Client.Online) return;
 
-      const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, 'Wake On LAN');
+      const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, 'Wake on LAN');
       // No RequestID means the task was never queued (the client vanished between
       // the check above and enqueue) — there is nothing to complete.
       if (!RequestID) return;
@@ -422,7 +422,7 @@ function register(): void {
       // would just be noise (a retired NIC's MAC failing is expected).
       const WOLErr =
         Failures.length === MacAddresses.length
-          ? Failures.join('; ') || 'Wake On LAN failed'
+          ? Failures.join('; ') || 'Wake on LAN failed'
           : null;
       await ScriptExecutionManager.Complete(RequestID, WOLErr);
     });

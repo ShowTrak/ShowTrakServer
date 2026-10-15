@@ -160,7 +160,7 @@ function register(): void {
       }
 
       if (!PackageJsonPath) {
-        return ['Could not locate package.json', null];
+        return ['Failed to locate package.json', null];
       }
 
       const PackageJsonRaw = fs.readFileSync(PackageJsonPath, 'utf8');
@@ -201,7 +201,7 @@ function register(): void {
       }
 
       if (!LicensePath) {
-        return ['Could not locate LICENSE file', null];
+        return ['Failed to locate LICENSE file', null];
       }
 
       const License = fs.readFileSync(LicensePath, 'utf8');

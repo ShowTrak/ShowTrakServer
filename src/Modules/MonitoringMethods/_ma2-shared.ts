@@ -395,14 +395,14 @@ export function Ma2DebugHead(
     Row('Status', StatusPill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
-      : TextRow('Error', (Result && Result.Error) || 'Could not reach the console'),
+      : TextRow('Error', (Result && Result.Error) || 'Failed to reach the console'),
     ...ExtraRows,
   ]);
   if (!Reachable) {
     return (
       Head +
       '<div class="mt-2">' +
-      Note('Could not reach the grandMA2 telnet remote (TCP 30000)') +
+      Note('Failed to reach the grandMA2 telnet remote (TCP 30000)') +
       '</div>'
     );
   }

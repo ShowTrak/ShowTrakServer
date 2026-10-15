@@ -120,7 +120,7 @@ function NormalizeClientPlatformKey(Client: Client): string | null {
 function ResolveDispatchBlockReason(Script: DispatchableScript, Client: Client): string | null {
   const PlatformKey = NormalizeClientPlatformKey(Client);
   if (!PlatformKey) {
-    return 'Unable to determine client operating system.';
+    return 'Failed to determine client operating system.';
   }
 
   const Platforms: Record<string, unknown> = Script && Script.Platforms ? Script.Platforms : {};
@@ -218,13 +218,6 @@ const Manager = {
     return ScriptExecutions.find((execution) => execution.RequestID === RequestID) || null;
   },
 
-  // Drop all pending/complete entries and notify the UI
-  async ClearQueue(): Promise<void> {
-    for (const Request of ScriptExecutions) Manager.ClearTimeout(Request);
-    ScriptExecutions = [];
-    BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
-  },
-
   // Retention: forget settled (Completed/Failed) entries that finished before
   // `Cutoff`. Pending ones are never touched, however old. Returns how many were
   // dropped, and only notifies the UI when something actually changed.
@@ -298,7 +291,7 @@ const Manager = {
     return;
   },
 
-  // Enqueue a synthetic/internal action for a client (e.g., Wake On LAN)
+  // Enqueue a synthetic/internal action for a client (e.g., Wake on LAN)
   async AddInternalTaskToQueue(UUID: string, TaskName: string): Promise<string | undefined> {
     const [Err, Client] = await ClientManager.Get(UUID);
     if (Err || !Client) return;

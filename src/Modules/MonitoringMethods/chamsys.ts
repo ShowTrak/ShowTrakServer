@@ -197,11 +197,11 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     Row('Status', StatusPill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
-      : TextRow('Error', (Result && (Result.Error as string)) || 'Could not reach the web server'),
+      : TextRow('Error', (Result && (Result.Error as string)) || 'Failed to reach the web server'),
     ...ExtraRows,
   ]);
   if (!Reachable) {
-    return Head + '<div class="mt-2">' + Note('Could not reach the MagicQ web server') + '</div>';
+    return Head + '<div class="mt-2">' + Note('Failed to reach the MagicQ web server') + '</div>';
   }
   return Head;
 }

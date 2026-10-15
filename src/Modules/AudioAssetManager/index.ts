@@ -285,7 +285,7 @@ Manager.FindMissing = (ReferencedIDs: unknown) => {
 
 // Returns a base64 data URL for an asset so the renderer can preview/play it.
 Manager.GetDataURL = (ID: string) => {
-  if (!Initialized) return Fail('Audio assets not initialized');
+  if (!Initialized) return Fail('Audio assets not initialised');
   const Asset = Manager.Get(ID);
   if (!Asset) return Fail('Audio asset not found');
   if (!assetFileExists(Asset)) return Fail('Audio asset file is missing');

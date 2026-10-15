@@ -208,7 +208,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     return (
       Head +
       '<div class="mt-2">' +
-      Note(Reachable ? 'QLab reported no open workspaces' : 'Could not reach QLab') +
+      Note(Reachable ? 'QLab reported no open workspaces' : 'Failed to reach QLab') +
       '</div>'
     );
   }

@@ -305,7 +305,7 @@ function register(): void {
 
   RPC.handle('OpenScriptsFolder', async (_event: unknown) => {
     const LogsPath = AppDataManager.GetScriptsDirectory();
-    Logger.log('Opening scrippts folder:', LogsPath);
+    Logger.log('Opening scripts folder:', LogsPath);
     // Cross-platform and properly quoted
     await shell.openPath(LogsPath);
     return;

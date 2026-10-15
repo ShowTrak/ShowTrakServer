@@ -152,7 +152,7 @@ async function ReconcileTasks(Config: FogConfig): Promise<boolean> {
 
   const Response = await FogRequest(Config, '/task/active', 'GET');
   if (!Response.Success) {
-    Logger.warn(`Could not read FOG active tasks: ${Response.Error}`);
+    Logger.warn(`Failed to read FOG active tasks: ${Response.Error}`);
     return false;
   }
 
@@ -387,7 +387,7 @@ const Manager = {
 
     const Response = await FogRequest(Config, '/host', 'GET');
     if (!Response.Success) {
-      Logger.warn(`Could not read FOG hosts: ${Response.Error}`);
+      Logger.warn(`Failed to read FOG hosts: ${Response.Error}`);
       // Cache, not an error: the caller wants to render a dropdown either way.
       return Ok<FogHostView[]>(HostCache);
     }

@@ -201,7 +201,7 @@ test("the client's own refusal is passed through; any success in the room wins",
   const silent = deps(client(), (cb) => cb(null, [{ Success: false }, null]));
   assert.match(
     (await SendAudioLevel(silent.deps, 'c1', { EndpointID: 'spk', Volume: 1 }))[0],
-    /could not change/
+    /failed to change/
   );
   // Two sockets across a reconnect: one stale, one live.
   const doubled = deps(client(), (cb) =>

@@ -230,8 +230,8 @@ async function PerformRefresh(Force: boolean): Promise<RefreshResult> {
   try {
     LatestSha = await FetchLatestSha();
   } catch (Err) {
-    Logger.warn(`Unable to check sample scripts for updates: ${(Err as Error).message}`);
-    return { ok: false, error: 'Unable to reach the sample scripts repository' };
+    Logger.warn(`Failed to check sample scripts for updates: ${(Err as Error).message}`);
+    return { ok: false, error: 'Failed to reach the sample scripts repository' };
   }
 
   if (!Force && LatestSha && CachedSha && LatestSha === CachedSha && Samples.length > 0) {
@@ -243,8 +243,8 @@ async function PerformRefresh(Force: boolean): Promise<RefreshResult> {
   try {
     Tree = await FetchRepoTree();
   } catch (Err) {
-    Logger.warn(`Unable to download sample scripts catalog: ${(Err as Error).message}`);
-    return { ok: false, error: 'Unable to download the sample scripts catalog' };
+    Logger.warn(`Failed to download sample scripts catalog: ${(Err as Error).message}`);
+    return { ok: false, error: 'Failed to download the sample scripts catalog' };
   }
 
   let NewSamples: Sample[];

@@ -108,7 +108,7 @@ test('fails closed when the setting cannot be read', async () => {
 
   const [Err, Result] = await GetHandler('CreateUnassignedClients')({}, { Name: 'Rig', Count: 1 });
 
-  assert.equal(Err, 'Unable to verify that unassigned clients are enabled');
+  assert.equal(Err, 'Failed to verify that unassigned clients are enabled');
   assert.equal(Result, null);
   assert.equal(clientMgr.__callsTo('CreateUnassigned').length, 0);
   // Failing closed silently would leave an operator with no idea why slots

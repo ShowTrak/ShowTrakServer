@@ -1166,7 +1166,6 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
     '../ScriptExecutionManager': {
       Manager: {
         ClearSettled: async () => queue.push('clear'),
-        ClearQueue: async () => queue.push('clear'),
         AddToQueue: async (uuid, scriptId) => {
           const requestId = `req-${uuid}-${scriptId}`;
           // Idle client → the real PumpClient would dispatch immediately.
@@ -1253,7 +1252,7 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
   assert.deepEqual(dispatched.args[2], {});
 
   emits.length = 0;
-  await Manager.ExecuteBulkRequest('WOL', ['a'], 'Wake On LAN');
+  await Manager.ExecuteBulkRequest('WOL', ['a'], 'Wake on LAN');
   assert.ok(emits.some((e) => e.room === 'a' && e.event === 'WOL'));
 
   emits.length = 0;
@@ -1375,7 +1374,6 @@ test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve
     '../ScriptExecutionManager': {
       Manager: {
         ClearSettled: async () => {},
-        ClearQueue: async () => {},
         AddToQueue: async () => 'req',
         GetExecution: async () => null,
         AddInternalTaskToQueue: async () => 'req',
@@ -1461,7 +1459,6 @@ test('Server Manager integrated event queue reports mixed target outcomes', asyn
         GetExecution: async () => null,
         Complete: async (requestId, err) => completions.push({ requestId, err }),
         ClearSettled: async () => {},
-        ClearQueue: async () => {},
         AddInternalTaskToQueue: async (_uuid, taskName) => {
           const id = `req-${queueEntries.length + 1}`;
           queueEntries.push({ id, taskName });

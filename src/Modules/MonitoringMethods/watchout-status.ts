@@ -435,7 +435,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     return Head + `<div class="mt-2">${Note(`Degraded: ${Result.DegradedReason}`)}</div>`;
   }
   if (!Replied) {
-    return Head + `<div class="mt-2">${Note('Could not reach WATCHOUT')}</div>`;
+    return Head + `<div class="mt-2">${Note('Failed to reach WATCHOUT')}</div>`;
   }
   return Head;
 }

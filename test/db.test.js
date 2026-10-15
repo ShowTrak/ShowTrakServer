@@ -134,6 +134,221 @@ test('DB records schema migration versions and keeps a fresh database clean', as
   await DB.Shutdown();
 });
 
+// Swap the schema module InitializeSchema requires lazily (after the connection
+// opens) for one whose migration list is replaced. Must be called synchronously
+// right after loadDB, before the open callback fires.
+function withMigrations(migrations) {
+  const Module = require('node:module');
+  const schemaPath = require.resolve('../dist/Modules/DB/schema');
+  const real = require(schemaPath);
+  const fake = [...real];
+  fake.Migrations = migrations(real.Migrations || []);
+  const stub = new Module(schemaPath);
+  stub.filename = schemaPath;
+  stub.exports = fake;
+  stub.loaded = true;
+  require.cache[schemaPath] = stub;
+  return () => {
+    delete require.cache[schemaPath];
+  };
+}
+
+test('DB stops at the first failed migration so it is retried on the next open', async () => {
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const schema = require('../dist/Modules/DB/schema');
+  const top = Math.max(...schema.Migrations.map((m) => m.Version));
+
+  // First open: top+1 fails, so top+2 must neither run nor be recorded.
+  let DB = loadDB(storageDir).Manager;
+  let restore = withMigrations((real) => [
+    ...real,
+    { Version: top + 1, SQL: 'NOT VALID SQL' },
+    { Version: top + 2, SQL: 'CREATE TABLE IF NOT EXISTS `MigAfter` (X INTEGER)' },
+  ]);
+  try {
+    await DB.Ready();
+  } finally {
+    restore();
+  }
+  let [, maxRow] = await DB.Get('SELECT MAX(Version) AS V FROM SchemaMigrations');
+  assert.equal(maxRow.V, top);
+  let [, afterTable] = await DB.Get("SELECT name FROM sqlite_master WHERE name = 'MigAfter'");
+  assert.equal(afterTable, undefined, 'a migration after the failed one ran');
+  await DB.Shutdown();
+
+  // Second open with the migration fixed: both now apply, in order.
+  DB = loadDB(storageDir).Manager;
+  restore = withMigrations((real) => [
+    ...real,
+    { Version: top + 1, SQL: 'CREATE TABLE IF NOT EXISTS `MigRetried` (X INTEGER)' },
+    { Version: top + 2, SQL: 'CREATE TABLE IF NOT EXISTS `MigAfter` (X INTEGER)' },
+  ]);
+  try {
+    await DB.Ready();
+  } finally {
+    restore();
+  }
+  [, maxRow] = await DB.Get('SELECT MAX(Version) AS V FROM SchemaMigrations');
+  assert.equal(maxRow.V, top + 2);
+  const [, retried] = await DB.Get("SELECT name FROM sqlite_master WHERE name = 'MigRetried'");
+  assert.equal(retried.name, 'MigRetried');
+  [, afterTable] = await DB.Get("SELECT name FROM sqlite_master WHERE name = 'MigAfter'");
+  assert.equal(afterTable.name, 'MigAfter');
+  await DB.Shutdown();
+});
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+const tick = (ms = 25) => new Promise((r) => setTimeout(r, ms));
+
+async function countGroups(DB, title) {
+  const [, row] = await DB.Get('SELECT COUNT(*) AS N FROM Groups WHERE Title = ?', [title]);
+  return row.N;
+}
+
+test('DB runs overlapping transactions one at a time instead of failing on BEGIN', async () => {
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const { Manager: DB } = loadDB(storageDir);
+  await DB.Ready();
+
+  const order = [];
+  const holdFirst = deferred();
+  const first = DB.WithTransaction(async (run) => {
+    order.push('first:start');
+    const [err] = await run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', ['First', 1]);
+    if (err) throw err;
+    await holdFirst.promise;
+    order.push('first:end');
+    return 'first';
+  });
+  const second = DB.WithTransaction(async (run) => {
+    order.push('second:start');
+    const [err] = await run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', ['Second', 2]);
+    if (err) throw err;
+    return 'second';
+  });
+
+  await tick();
+  assert.deepEqual(order, ['first:start'], 'the second transaction did not wait its turn');
+  holdFirst.resolve();
+
+  assert.deepEqual(await first, [null, 'first']);
+  assert.deepEqual(await second, [null, 'second']);
+  assert.deepEqual(order, ['first:start', 'first:end', 'second:start']);
+  assert.equal(await countGroups(DB, 'First'), 1);
+  assert.equal(await countGroups(DB, 'Second'), 1);
+
+  await DB.Shutdown();
+});
+
+test('DB keeps an outside write out of a transaction that rolls back', async () => {
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const { Manager: DB } = loadDB(storageDir);
+  await DB.Ready();
+
+  const inserted = deferred();
+  const holdTx = deferred();
+  const tx = DB.WithTransaction(async (run) => {
+    await run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', ['Doomed', 1]);
+    inserted.resolve();
+    await holdTx.promise;
+    throw new Error('boom');
+  });
+  await inserted.promise;
+
+  // Issued while the transaction is open: it must wait, not join it.
+  let outsideSettled = false;
+  const outside = DB.Run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', ['Outsider', 2]).then(
+    (result) => {
+      outsideSettled = true;
+      return result;
+    }
+  );
+  await tick();
+  assert.equal(outsideSettled, false, 'the outside write ran inside the open transaction');
+
+  holdTx.resolve();
+  const [txErr] = await tx;
+  assert.ok(txErr instanceof Error);
+  const [outsideErr] = await outside;
+  assert.equal(outsideErr, null);
+
+  assert.equal(await countGroups(DB, 'Doomed'), 0);
+  assert.equal(await countGroups(DB, 'Outsider'), 1);
+
+  await DB.Shutdown();
+});
+
+test('DB lets a transaction read through the manager directly without deadlocking', async () => {
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const { Manager: DB } = loadDB(storageDir);
+  await DB.Ready();
+
+  // ReplaceClientUUID reads AlertRules with DB.All inside its transaction. That
+  // read belongs to the transaction, so it must bypass the gate (and sees the
+  // transaction's own uncommitted write).
+  const [err, seen] = await DB.WithTransaction(async (run) => {
+    await run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', ['Inner', 1]);
+    const [, row] = await DB.Get('SELECT COUNT(*) AS N FROM Groups WHERE Title = ?', ['Inner']);
+    const [, rows] = await DB.All('SELECT Title FROM Groups WHERE Title = ?', ['Inner']);
+    return [row.N, rows.length];
+  });
+  assert.equal(err, null);
+  assert.deepEqual(seen, [1, 1]);
+
+  // A nested transaction fails fast rather than queueing behind itself.
+  const [outerErr, innerResult] = await DB.WithTransaction(async () =>
+    DB.WithTransaction(async () => 'never')
+  );
+  assert.equal(outerErr, null);
+  assert.ok(innerResult[0] instanceof Error);
+
+  await DB.Shutdown();
+});
+
+test('DB.Shutdown lets an open transaction commit before closing', async () => {
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const { Manager: DB } = loadDB(storageDir);
+  await DB.Ready();
+
+  const inserted = deferred();
+  const holdTx = deferred();
+  const tx = DB.WithTransaction(async (run) => {
+    await run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', ['Survivor', 1]);
+    inserted.resolve();
+    await holdTx.promise;
+    const [err] = await run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', ['Late', 2]);
+    if (err) throw err;
+  });
+  await inserted.promise;
+
+  const shutdown = DB.Shutdown();
+  // New outside work is refused straight away...
+  const [refusedErr] = await DB.Get('SELECT 1');
+  assert.match(String(refusedErr && refusedErr.message), /closing/i);
+  // ...but the open transaction may still finish and commit.
+  holdTx.resolve();
+  const [txErr] = await tx;
+  assert.equal(txErr, null);
+  await shutdown;
+
+  // A queued transaction reaching the front after shutdown is refused.
+  const [lateErr] = await DB.WithTransaction(async () => 'never');
+  assert.match(String(lateErr && lateErr.message), /closing/i);
+
+  const { Manager: Reopened } = loadDB(storageDir);
+  await Reopened.Ready();
+  assert.equal(await countGroups(Reopened, 'Survivor'), 1);
+  assert.equal(await countGroups(Reopened, 'Late'), 1);
+  await Reopened.Shutdown();
+});
+
 test('DB.Get and DB.All surface SQL errors as tuples', async () => {
   const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
   const { Manager: DB } = loadDB(storageDir);

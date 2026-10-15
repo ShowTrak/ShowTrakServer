@@ -410,7 +410,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   ]);
 
   if (!Reachable) {
-    return Head + '<div class="mt-2">' + Note('Could not reach the projector over SNMP') + '</div>';
+    return Head + '<div class="mt-2">' + Note('Failed to reach the projector over SNMP') + '</div>';
   }
   const Notes: string[] = [];
   if (Result.ProfileMissing) {

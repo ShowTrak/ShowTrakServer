@@ -547,5 +547,5 @@ test('long URLs are truncated so they fit a tile', () => {
   const long = `https://example.com/${'a'.repeat(200)}`;
   const shown = FormatMetricValue(metric, long);
   assert.ok(shown.length <= 60);
-  assert.ok(shown.endsWith('...'));
+  assert.ok(shown.endsWith('…'));
 });

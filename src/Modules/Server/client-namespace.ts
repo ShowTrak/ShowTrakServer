@@ -411,7 +411,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       (DeviceList) => [SocketValidation.USBDeviceList(DeviceList)],
       async (DeviceList: ReturnType<typeof SocketValidation.USBDeviceList>) => {
         Logger.log(
-          `USB Device list recieved from ${socket.UUID} (${DeviceList.length} ${
+          `USB Device list received from ${socket.UUID} (${DeviceList.length} ${
             DeviceList.length === 1 ? 'Device' : 'Devices'
           })`
         );

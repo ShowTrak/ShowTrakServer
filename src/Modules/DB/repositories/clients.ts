@@ -125,17 +125,48 @@ export function CreateClientsRepository(DB: DBManager) {
     },
 
     // Atomically re-key a client from OldUUID to NewUUID across the clients row,
-    // all three critical-entity tables, and any AlertRules whose Scope/Actions
-    // JSON references the old UUID. The whole change runs in one transaction so a
-    // partial rename can never persist. `rewriteRuleUUID` rewrites one parsed
-    // JSON value (a rule's Scope or Actions) — ClientManager owns the recursive
-    // UUID-swap logic; this repository owns the multi-table SQL. Returns [Err].
+    // the critical-entity tables, its FOG link, and every JSON scope that names
+    // it: AlertRules (Scope and Actions), Tags and ScriptWhitelists. The whole
+    // change runs in one transaction so a partial rename can never persist.
+    // `rewriteUUID` rewrites one parsed JSON value — ClientManager owns the
+    // recursive UUID-swap logic; this repository owns the multi-table SQL.
+    // Returns [Err].
     ReplaceClientUUID(
       OldUUID: string,
       NewUUID: string,
-      rewriteRuleUUID: (value: unknown) => unknown
+      rewriteUUID: (value: unknown) => unknown
     ): Promise<DBResult<void>> {
       return DB.WithTransaction(async (run) => {
+        // Rewrite one JSON Scope column ({ Workspace, Groups[], Clients[], Tags[] })
+        // for every row whose scope names the old UUID. An unparseable scope is
+        // left exactly as it was rather than clobbered. Table/column names are
+        // fixed literals from the two call sites below, never input.
+        const rewriteScopeColumn = async (
+          SelectSQL: string,
+          UpdateSQL: string,
+          extraParams: () => unknown[]
+        ): Promise<void> => {
+          const [readErr, Rows] = await DB.All<{ RowKey: string | number; Scope: string | null }>(
+            SelectSQL,
+            []
+          );
+          if (readErr) throw readErr;
+          for (const Row of Rows || []) {
+            if (!Row || typeof Row.Scope !== 'string' || !Row.Scope.includes(OldUUID)) continue;
+            let Parsed: unknown;
+            try {
+              Parsed = JSON.parse(Row.Scope);
+            } catch {
+              continue;
+            }
+            const Next = rewriteUUID(Parsed);
+            const NextText = JSON.stringify(Next);
+            if (NextText === JSON.stringify(Parsed)) continue;
+            const [updateErr] = await run(UpdateSQL, [NextText, ...extraParams(), Row.RowKey]);
+            if (updateErr) throw updateErr;
+          }
+        };
+
         // Clearing Unassigned here is what "fills" a reserved slot: the row
         // stops being a placeholder the moment real hardware takes its UUID.
         // It rides the same transaction so a slot can never be left flagged
@@ -246,8 +277,8 @@ export function CreateClientsRepository(DB: DBManager) {
             ParsedActions = null;
           }
 
-          const NextScope = ParsedScope ? rewriteRuleUUID(ParsedScope) : ParsedScope;
-          const NextActions = ParsedActions ? rewriteRuleUUID(ParsedActions) : ParsedActions;
+          const NextScope = ParsedScope ? rewriteUUID(ParsedScope) : ParsedScope;
+          const NextActions = ParsedActions ? rewriteUUID(ParsedActions) : ParsedActions;
 
           const ScopeChanged =
             ParsedScope != null && JSON.stringify(NextScope) !== JSON.stringify(ParsedScope);
@@ -267,6 +298,36 @@ export function CreateClientsRepository(DB: DBManager) {
           );
           if (ruleUpdateErr) throw ruleUpdateErr;
         }
+
+        // Tags and script whitelists list clients by UUID in the same scope
+        // shape, so a slot that was tagged, or allowed to run a restricted
+        // script, keeps that when real hardware takes it over.
+        await rewriteScopeColumn(
+          'SELECT TagID AS RowKey, Scope FROM Tags',
+          'UPDATE Tags SET Scope = ? WHERE TagID = ?',
+          () => []
+        );
+        await rewriteScopeColumn(
+          'SELECT ScriptID AS RowKey, Scope FROM ScriptWhitelists',
+          'UPDATE ScriptWhitelists SET Scope = ?, UpdatedAt = ? WHERE ScriptID = ?',
+          () => [Date.now()]
+        );
+
+        // The FOG host link follows the slot like the rest of its configuration
+        // (DeleteClientCascade drops it only because the client itself is gone).
+        // OR REPLACE because UUID is the primary key: should a stale link for the
+        // arriving UUID exist, the slot's link wins. Its task history moves too,
+        // so the FOG panel keeps labelling those tasks with the client.
+        const [fogLinkErr] = await run('UPDATE OR REPLACE FogHosts SET UUID = ? WHERE UUID = ?', [
+          NewUUID,
+          OldUUID,
+        ]);
+        if (fogLinkErr) throw fogLinkErr;
+        const [fogTaskErr] = await run('UPDATE FogTasks SET UUID = ? WHERE UUID = ?', [
+          NewUUID,
+          OldUUID,
+        ]);
+        if (fogTaskErr) throw fogTaskErr;
       });
     },
   };

@@ -199,8 +199,8 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
           MessageReceived: false,
           Topic,
           Error: LastError
-            ? `Could not connect to broker: ${LastError}`
-            : `Could not connect to broker within ${TimeoutMs}ms`,
+            ? `Failed to connect to broker: ${LastError}`
+            : `Failed to connect to broker within ${TimeoutMs}ms`,
         });
       }
     }, TimeoutMs);
@@ -213,7 +213,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
         Connected: false,
         MessageReceived: false,
         Topic,
-        Error: `Could not connect to broker: ${Err && (Err as Error).message ? (Err as Error).message : String(Err)}`,
+        Error: `Failed to connect to broker: ${Err && (Err as Error).message ? (Err as Error).message : String(Err)}`,
       });
       return;
     }
@@ -263,7 +263,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
         Topic,
         Error: Connected
           ? `Broker error: ${LastError}`
-          : `Could not connect to broker: ${LastError}`,
+          : `Failed to connect to broker: ${LastError}`,
       });
     });
 
@@ -277,7 +277,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
         MessageReceived: false,
         Topic,
         Error: LastError
-          ? `Could not connect to broker: ${LastError}`
+          ? `Failed to connect to broker: ${LastError}`
           : 'Connection closed before CONNACK',
       });
     });
@@ -315,7 +315,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     ),
     Result && (Result.Success || Result.Degraded)
       ? Row('Latency', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
-      : TextRow('Error', (Result && Result.Error) || 'Could not connect'),
+      : TextRow('Error', (Result && Result.Error) || 'Failed to connect'),
     Degraded && Result.DegradedReason ? TextRow('Reason', Result.DegradedReason) : null,
   ]);
 
@@ -326,7 +326,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       Note(
         Connected
           ? 'Connected to broker but no message arrived on the topic'
-          : 'Could not connect to the broker'
+          : 'Failed to connect to the broker'
       ) +
       '</div>'
     );

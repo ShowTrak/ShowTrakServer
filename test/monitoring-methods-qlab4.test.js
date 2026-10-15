@@ -148,5 +148,5 @@ test('qlab4 Debug renders workspace cards and the no-reply branch', () => {
 
   const offline = qlab4.Debug({ Success: false, Error: 'No reply from QLab' }, target);
   assert.match(offline, /No reply/);
-  assert.match(offline, /Could not reach QLab/);
+  assert.match(offline, /Failed to reach QLab/);
 });

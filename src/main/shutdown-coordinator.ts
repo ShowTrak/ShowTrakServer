@@ -103,7 +103,7 @@ async function promptSaveBeforeClose(): Promise<boolean> {
     const [Err] = await BackupManager.Save(currentFilePath);
     if (Err) {
       Logger.error('Failed to autosave show during shutdown:', Err);
-      dialog.showErrorBox('Unable to Save Show', String(Err));
+      dialog.showErrorBox('Failed to Save Show', String(Err));
       return false;
     }
 
@@ -139,7 +139,7 @@ async function promptSaveBeforeClose(): Promise<boolean> {
   const [Err] = await BackupManager.Save(SavePath);
   if (Err) {
     Logger.error('Failed to save show during shutdown:', Err);
-    dialog.showErrorBox('Unable to Save Show', String(Err));
+    dialog.showErrorBox('Failed to Save Show', String(Err));
     return false;
   }
 

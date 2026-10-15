@@ -334,7 +334,7 @@ export function UpsDebug(
       : null,
   ]);
   if (!Reachable) {
-    return Head + '<div class="mt-2">' + Note('Could not reach the UPS over SNMP') + '</div>';
+    return Head + '<div class="mt-2">' + Note('Failed to reach the UPS over SNMP') + '</div>';
   }
   return Head;
 }

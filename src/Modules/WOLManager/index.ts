@@ -158,7 +158,7 @@ export const Manager = {
           SendFromInterface(Packet, Target.From, Target.Broadcast, Count, Interval)
         )
       );
-      return [null, 'Wake On LAN packet sent successfully'];
+      return [null, 'Wake on LAN packet sent successfully'];
     } catch (Err) {
       const Message = Err instanceof Error ? Err.message : String(Err);
       Logger.error(`WOL Wake failed: ${Message}`);

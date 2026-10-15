@@ -80,7 +80,7 @@ const wolMgr = recordingManager({
   Wake: (Mac) => (state.wakeFailures.has(Mac) ? [`no route to ${Mac}`] : [null]),
 });
 const execMgr = recordingManager({
-  ClearQueue: async () => {},
+  ClearSettled: async () => {},
   AddInternalTaskToQueue: async () => {
     if (state.requestIDs) return state.requestIDs.shift();
     state.requestIDCounter += 1;
@@ -498,7 +498,7 @@ test('a wake sends a packet to every known MAC of an offline client', async () =
     wolMgr.__callsTo('Wake').map((C) => C.args[0]),
     ['AA:AA', 'BB:BB', 'CC:CC']
   );
-  assert.equal(execMgr.__callsTo('ClearQueue').length, 1);
+  assert.equal(execMgr.__callsTo('ClearSettled').length, 1);
   assert.deepEqual(execMgr.__callsTo('Complete')[0].args, ['req-1', null]);
 });
 
@@ -580,11 +580,11 @@ test('a mixed target list wakes only the eligible clients', async () => {
   assert.equal(execMgr.__callsTo('AddInternalTaskToQueue').length, 1);
 });
 
-test('the queue is cleared before waking, so stale tasks do not mask the new ones', async () => {
+test('settled rows are cleared before waking, so stale tasks do not mask the new ones', async () => {
   state.clients.set(UUID_A, client({ UUID: UUID_A }));
   await call('WakeOnLan', [UUID_A]);
 
-  const First = execMgr.__calls.findIndex((C) => C.method === 'ClearQueue');
+  const First = execMgr.__calls.findIndex((C) => C.method === 'ClearSettled');
   const Queued = execMgr.__calls.findIndex((C) => C.method === 'AddInternalTaskToQueue');
   assert.ok(First >= 0 && First < Queued);
 });
@@ -602,7 +602,7 @@ test('an invalid target list is refused before the queue is touched', async () =
 test('an empty target list is rejected rather than clearing the queue for nothing', async () => {
   // `List || []` normalizes null/undefined to an empty array, which UUIDList
   // then refuses. Worth pinning: the alternative — treating empty as a silent
-  // success — would still have run ClearQueue, wiping in-flight script tasks in
+  // success — would still have run ClearSettled, wiping finished task rows in
   // response to a request that was going to wake nothing.
   for (const List of [[], null, undefined]) {
     execMgr.__calls.length = 0;

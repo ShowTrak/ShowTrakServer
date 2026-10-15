@@ -190,7 +190,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
 
   Manager.CriticalUSBDevicePayload = (value: unknown) => {
     if (!isPlainObject(value)) {
-      fail('Critical USB payload must be an object');
+      fail('Monitored USB payload must be an object');
     }
     return {
       ...USBConditionOptions(value),
@@ -212,7 +212,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
 
   Manager.CriticalUSBNamePayload = (value: unknown) => {
     if (!isPlainObject(value)) {
-      fail('Critical USB payload must be an object');
+      fail('Monitored USB payload must be an object');
     }
     return {
       ...USBConditionOptions(value),
@@ -233,7 +233,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
 
   Manager.CriticalApplicationPayload = (value: unknown) => {
     if (!isPlainObject(value)) {
-      fail('Critical application payload must be an object');
+      fail('Monitored application payload must be an object');
     }
     const Conditions: Record<string, boolean> = {};
     for (const Key of ['RequireResponding', 'RequireForeground'] as const) {
@@ -269,7 +269,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
   // the display's Label/Width/Height/RefreshRate/ScaleFactor; those are ignored.
   Manager.CriticalDisplayPayload = (value: unknown) => {
     if (!isPlainObject(value)) {
-      fail('Critical display payload must be an object');
+      fail('Monitored display payload must be an object');
     }
     const out: CriticalDisplayPayloadResult = {
       DisplayID: Manager.DisplayID(value.DisplayID),
@@ -304,7 +304,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
   };
 
   Manager.CriticalAudioDevicePayload = (value: unknown) => {
-    if (!isPlainObject(value)) fail('Critical audio device payload must be an object');
+    if (!isPlainObject(value)) fail('Monitored audio device payload must be an object');
     const out: CriticalAudioDevicePayloadResult = {
       EndpointID: Manager.AudioEndpointID(value.EndpointID),
     };
@@ -365,7 +365,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
   };
 
   Manager.CriticalNetworkInterfacePayload = (value: unknown) => {
-    if (!isPlainObject(value)) fail('Critical network interface payload must be an object');
+    if (!isPlainObject(value)) fail('Monitored network interface payload must be an object');
     const out: CriticalNetworkInterfacePayloadResult = {
       Name: Manager.NetworkInterfaceName(value.Name),
     };

@@ -117,7 +117,7 @@ test('Wake broadcasts only on external IPv4 interfaces and reports success', asy
 
   const [err, data] = await Manager.Wake('AA:BB:CC:DD:EE:FF', 1, 50);
   assert.equal(err, null);
-  assert.equal(data, 'Wake On LAN packet sent successfully');
+  assert.equal(data, 'Wake on LAN packet sent successfully');
 
   // The one external IPv4 interface hits both its directed and the limited
   // broadcast; the loopback and IPv6 interfaces are skipped entirely.

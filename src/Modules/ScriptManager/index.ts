@@ -378,7 +378,7 @@ function EnsureScriptDirectoryWatcher(ScriptsDirectory: string) {
     );
   } catch (Err) {
     Logger.warn(
-      `Unable to watch scripts directory (${ScriptsDirectory}): ${(Err as Error).message}`
+      `Failed to watch scripts directory (${ScriptsDirectory}): ${(Err as Error).message}`
     );
   }
 }
@@ -456,7 +456,7 @@ async function LoadScriptFolder(ScriptsDirectory: string, ScriptFolder: string) 
   } catch (err) {
     return new InvalidScript(
       ScriptFolder,
-      `Unable to read Script.json: ${(err as Error).message}`,
+      `Failed to read Script.json: ${(err as Error).message}`,
       ''
     );
   }
@@ -526,7 +526,7 @@ Manager.GetScripts = async (Force = false) => {
     Logger.log(`Loading script from folder: ${ScriptFolder}`);
     const scriptJsonPath = path.join(ScriptsDirectory, ScriptFolder, 'Script.json');
     if (!fs.existsSync(scriptJsonPath)) {
-      Logger.error(`Script.json not found in ${ScriptFolder}, skipping...`);
+      Logger.error(`Script.json not found in ${ScriptFolder}, skipping…`);
       BroadcastManager.emit('Notify', `Script.json not found in ${ScriptFolder}`, 'error', 15000);
       continue;
     }

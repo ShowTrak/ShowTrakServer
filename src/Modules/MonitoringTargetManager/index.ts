@@ -373,7 +373,7 @@ const Manager = {
   async Get(TargetID: unknown): Promise<[string | null, MonitoringTargetView | null]> {
     const ID = Number(TargetID);
     const Cached = TargetList.find((T) => T.TargetID === ID);
-    if (!Cached) return ['Monitoring target not found', null];
+    if (!Cached) return ['Monitor not found', null];
     return [null, Cached.ToJSON()];
   },
 
@@ -455,7 +455,7 @@ const Manager = {
   async RunAllChecksNow(TargetID: unknown): Promise<[string | null, MonitoringTargetView | null]> {
     const ID = Number(TargetID);
     const Target = TargetList.find((T) => Number(T.TargetID) === ID);
-    if (!Target) return ['Monitoring target not found', null];
+    if (!Target) return ['Monitor not found', null];
     await Target.RunChecks();
     BroadcastManager.emit('MonitoringTargetUpdated', Target.ToJSON());
     return [null, Target.ToJSON()];
@@ -504,7 +504,7 @@ const Manager = {
             CheckID: 0,
             Nickname: '',
             Success: false,
-            Error: 'Monitoring target not found',
+            Error: 'Monitor not found',
             Detail: null,
           });
           return;
@@ -588,7 +588,7 @@ const Manager = {
         Now,
         run
       );
-      if (Err || !Res) throw Err || new Error('Failed to create monitoring target');
+      if (Err || !Res) throw Err || new Error('Failed to create monitor');
       const TargetID = Res.lastID;
 
       const CheckRows: MonitoringCheckInput[] = [];
@@ -601,7 +601,7 @@ const Manager = {
       }
       return { TargetID, CheckRows };
     });
-    if (TxErr || !Created) return Fail('Failed to create monitoring target');
+    if (TxErr || !Created) return Fail('Failed to create monitor');
     const { TargetID, CheckRows } = Created;
 
     // Every target must carry a non-null slug for OSC/API addressing. Generate a
@@ -639,7 +639,7 @@ const Manager = {
   ): Promise<Result<MonitoringTargetView>> {
     const ID = Number(TargetID);
     const Target = TargetList.find((T) => T.TargetID === ID);
-    if (!Target) return Fail('Monitoring target not found');
+    if (!Target) return Fail('Monitor not found');
 
     const NextInterval = ClampInterval(
       Object.prototype.hasOwnProperty.call(Payload, 'Interval') ? Payload.Interval : Target.Interval
@@ -686,11 +686,11 @@ const Manager = {
       NextFailureThreshold,
       ID
     );
-    if (Err) return Fail('Failed to update monitoring target');
+    if (Err) return Fail('Failed to update monitor');
 
     if (NextSlug !== null) {
       const [SlugErr] = await TargetsRepo.UpdateSlug(NextSlug, ID);
-      if (SlugErr) return Fail('Failed to update monitoring target slug');
+      if (SlugErr) return Fail('Failed to update monitor slug');
       Target.Slug = NextSlug;
     }
 
@@ -710,7 +710,7 @@ const Manager = {
   async Delete(TargetID: unknown): Promise<Result<boolean>> {
     const ID = Number(TargetID);
     const Idx = TargetList.findIndex((T) => T.TargetID === ID);
-    if (Idx === -1) return Fail('Monitoring target not found');
+    if (Idx === -1) return Fail('Monitor not found');
     // Idx !== -1 (checked above) → in-bounds.
     const Target = TargetList[Idx]!;
     Target.StopLoop();
@@ -719,7 +719,7 @@ const Manager = {
       // The transaction rolled back, so the row (and its checks) survived —
       // the target must keep polling.
       Target.StartLoop();
-      return Fail('Failed to delete monitoring target');
+      return Fail('Failed to delete monitor');
     }
     TargetList.splice(Idx, 1);
     BroadcastManager.emit('MonitoringTargetListChanged');
@@ -766,10 +766,10 @@ const GroupOrdering = createGroupOrdering({
     if (!Manager.Initialized) await Manager.Init();
   },
   labels: {
-    notFound: 'Monitoring target not found',
-    update: 'Failed to update monitoring target',
-    move: 'Failed to move monitoring targets to no group',
-    reconcile: 'Failed to reconcile orphaned monitoring targets',
+    notFound: 'Monitor not found',
+    update: 'Failed to update monitor',
+    move: 'Failed to move monitors to no group',
+    reconcile: 'Failed to reconcile orphaned monitors',
   },
 });
 

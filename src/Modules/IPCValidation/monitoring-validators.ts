@@ -152,7 +152,7 @@ export = function registerMonitoringValidators(Manager: IPCValidationManager): v
   }
 
   Manager.MonitoringTargetCreatePayload = (value: unknown) => {
-    if (!isPlainObject(value)) fail('Monitoring target payload must be an object');
+    if (!isPlainObject(value)) fail('Monitor payload must be an object');
     const out: Record<string, unknown> = {};
     out.Nickname = normalizeNonEmptyString(value.Nickname, 'Nickname', {
       minLength: 1,
@@ -173,7 +173,7 @@ export = function registerMonitoringValidators(Manager: IPCValidationManager): v
   };
 
   Manager.MonitoringTargetUpdatePayload = (value: unknown) => {
-    if (!isPlainObject(value)) fail('Monitoring target payload must be an object');
+    if (!isPlainObject(value)) fail('Monitor payload must be an object');
     const out: Record<string, unknown> = {};
     if (Object.prototype.hasOwnProperty.call(value, 'Nickname')) {
       out.Nickname = normalizeNonEmptyString(value.Nickname, 'Nickname', {

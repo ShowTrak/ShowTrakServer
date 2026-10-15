@@ -410,11 +410,8 @@ const Manager = {
     if (typeof MonitoringTargetManager.MoveGroupToNoGroup === 'function') {
       const [TargetErr] = await MonitoringTargetManager.MoveGroupToNoGroup(GroupID);
       if (TargetErr) {
-        Logger.error(
-          'Failed to move monitoring targets to no group while deleting group:',
-          TargetErr
-        );
-        return Fail('Failed to move monitoring targets to no group');
+        Logger.error('Failed to move monitors to no group while deleting group:', TargetErr);
+        return Fail('Failed to move monitors to no group');
       }
     }
 
@@ -465,8 +462,8 @@ const Manager = {
     if (typeof MonitoringTargetManager.ReconcileOrphanedGroups === 'function') {
       const [TargetErr] = await MonitoringTargetManager.ReconcileOrphanedGroups(GroupIDs);
       if (TargetErr) {
-        Logger.error('Failed to reconcile orphaned monitoring targets:', TargetErr);
-        return Fail('Failed to reconcile orphaned monitoring targets');
+        Logger.error('Failed to reconcile orphaned monitors:', TargetErr);
+        return Fail('Failed to reconcile orphaned monitors');
       }
     }
 

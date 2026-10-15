@@ -181,7 +181,7 @@ function runLocalScriptFile(scriptPath: string, extraArgs: string[] = []) {
         fs.chmodSync(scriptPath, 0o755);
       } catch (chmodError: unknown) {
         const chmodMessage = chmodError instanceof Error ? chmodError.message : String(chmodError);
-        Logger.warn(`Unable to set executable bit on ${scriptPath}: ${chmodMessage}`);
+        Logger.warn(`Failed to set executable bit on ${scriptPath}: ${chmodMessage}`);
       }
     }
 

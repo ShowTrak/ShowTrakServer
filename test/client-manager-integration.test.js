@@ -724,6 +724,72 @@ test('ClientManager.ReplaceClient migrates settings and UUID references', async 
   assert.equal(updatedActions[0].Settings.UUID, 'replacement-client');
 });
 
+test('ClientManager.ReplaceClient carries tag scopes, script whitelists and the FOG link across', async () => {
+  const { Manager, DB, events } = await loadClientManager();
+  await Manager.Create('slot-client');
+
+  const scopeNaming = (uuids) =>
+    JSON.stringify({ Workspace: false, Groups: [3], Clients: uuids, Tags: [] });
+  await DB.Run('INSERT INTO Tags (Slug, Scope) VALUES (?, ?)', [
+    'stage-left',
+    scopeNaming(['slot-client', 'other-client']),
+  ]);
+  await DB.Run('INSERT INTO Tags (Slug, Scope) VALUES (?, ?)', [
+    'untouched',
+    scopeNaming(['other-client']),
+  ]);
+  // An unparseable scope that happens to contain the UUID is left as it was.
+  await DB.Run('INSERT INTO Tags (Slug, Scope) VALUES (?, ?)', ['broken', '{slot-client']);
+  await DB.Run('INSERT INTO ScriptWhitelists (ScriptID, Scope, UpdatedAt) VALUES (?, ?, ?)', [
+    'restart-show',
+    scopeNaming(['slot-client']),
+    1,
+  ]);
+  await DB.Run(
+    'INSERT INTO FogHosts (UUID, FogHostID, FogHostName, Timestamp) VALUES (?, ?, ?, ?)',
+    ['slot-client', 42, 'booth-pc', 1]
+  );
+  await DB.Run(
+    'INSERT INTO FogTasks (UUID, FogHostID, FogHostName, FogTaskID, TaskTypeID, TaskTypeName, StateID, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ['slot-client', 42, 'booth-pc', 7, 1, 'Deploy', 4, 1, 1]
+  );
+
+  events.length = 0;
+  const [replaceErr] = await Manager.ReplaceClient('slot-client', 'real-client');
+  assert.equal(replaceErr, null);
+
+  const tagScope = async (slug) =>
+    (await DB.Get('SELECT Scope FROM Tags WHERE Slug = ?', [slug]))[1].Scope;
+  assert.deepEqual(JSON.parse(await tagScope('stage-left')).Clients, [
+    'real-client',
+    'other-client',
+  ]);
+  assert.deepEqual(JSON.parse(await tagScope('stage-left')).Groups, [3]);
+  assert.deepEqual(JSON.parse(await tagScope('untouched')).Clients, ['other-client']);
+  assert.equal(await tagScope('broken'), '{slot-client');
+
+  const [, whitelist] = await DB.Get(
+    'SELECT Scope, UpdatedAt FROM ScriptWhitelists WHERE ScriptID = ?',
+    ['restart-show']
+  );
+  assert.deepEqual(JSON.parse(whitelist.Scope).Clients, ['real-client']);
+  assert.ok(whitelist.UpdatedAt > 1);
+
+  const [, oldLink] = await DB.Get('SELECT * FROM FogHosts WHERE UUID = ?', ['slot-client']);
+  assert.equal(oldLink, undefined);
+  const [, newLink] = await DB.Get('SELECT FogHostID FROM FogHosts WHERE UUID = ?', [
+    'real-client',
+  ]);
+  assert.equal(newLink.FogHostID, 42);
+  const [, task] = await DB.Get('SELECT UUID FROM FogTasks WHERE FogTaskID = ?', [7]);
+  assert.equal(task.UUID, 'real-client');
+
+  // The UIs are told to re-read what changed.
+  for (const event of ['TagListChanged', 'ScriptsUpdated', 'FogTasksUpdated']) {
+    assert.ok(events.includes(event), `expected ${event}`);
+  }
+});
+
 test('ClientManager.ReplaceClient rejects replacing an online client', async () => {
   const { Manager } = await loadClientManager();
   await Manager.Create('online-client');

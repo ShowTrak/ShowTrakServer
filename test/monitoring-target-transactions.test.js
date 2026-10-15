@@ -120,7 +120,7 @@ test('MonitoringTargetManager.Create rolls back the target when a check insert f
     ],
   });
 
-  assert.match(String(err), /Failed to create monitoring target/i);
+  assert.match(String(err), /Failed to create monitor/i);
   assert.equal(value, null);
 
   // The partially-inserted target must not have been adopted into the runtime

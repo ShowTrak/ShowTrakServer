@@ -819,12 +819,12 @@ export function PJLinkDebugHead(
     Row('Status', StatusPill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
-      : TextRow('Error', (Result && Result.Error) || 'Could not reach the projector'),
+      : TextRow('Error', (Result && Result.Error) || 'Failed to reach the projector'),
     ...ExtraRows,
   ]);
   if (!Reachable) {
     return (
-      Head + '<div class="mt-2">' + Note('Could not reach the projector over PJLink') + '</div>'
+      Head + '<div class="mt-2">' + Note('Failed to reach the projector over PJLink') + '</div>'
     );
   }
   return Head;

@@ -65,7 +65,7 @@ async function MarkDeploymentFailedForTargets(
   Targets: string[],
   ErrorMessage: string
 ): Promise<void> {
-  await ScriptExecutionManager.ClearQueue();
+  await ScriptExecutionManager.ClearSettled();
   for (const UUID of Targets) {
     const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(
       UUID,

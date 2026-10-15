@@ -359,11 +359,11 @@ export function EosDebugHead(
     Row('Status', StatusPill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
-      : TextRow('Error', (Result && Result.Error) || 'Could not reach the console'),
+      : TextRow('Error', (Result && Result.Error) || 'Failed to reach the console'),
     ...ExtraRows,
   ]);
   if (!Reachable) {
-    return Head + '<div class="mt-2">' + Note('Could not reach the console over OSC') + '</div>';
+    return Head + '<div class="mt-2">' + Note('Failed to reach the console over OSC') + '</div>';
   }
   return Head;
 }

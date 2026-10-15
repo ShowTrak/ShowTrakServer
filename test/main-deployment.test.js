@@ -55,7 +55,7 @@ const clientMgr = recordingManager({
 });
 const serverMgr = recordingManager({ ExecuteBulkRequest: async () => undefined });
 const execMgr = recordingManager({
-  ClearQueue: async () => undefined,
+  ClearSettled: async () => undefined,
   AddInternalTaskToQueue: async () => `req-${state.addTaskId++}`,
   Complete: async () => undefined,
 });
@@ -189,7 +189,7 @@ test('an invalid Script.json fails the targets instead of deploying', async () =
   await D.TriggerScriptDeployment(['real-pc']);
 
   assert.deepEqual(dispatches(), [], 'nothing should be deployed');
-  assert.equal(execMgr.__callsTo('ClearQueue').length, 1);
+  assert.equal(execMgr.__callsTo('ClearSettled').length, 1);
   assert.equal(execMgr.__callsTo('AddInternalTaskToQueue').length, 1);
 
   const [, Message] = execMgr.__callsTo('Complete')[0].args;

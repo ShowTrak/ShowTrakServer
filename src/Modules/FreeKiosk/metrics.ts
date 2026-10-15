@@ -1490,6 +1490,6 @@ export function FormatMetricValue(
     return Metric.Unit ? `${Text}${Metric.Unit === '%' ? '' : ' '}${Metric.Unit}` : Text;
   }
   const Text = String(Value);
-  if (Metric.Format === 'url' && Text.length > 60) return `${Text.slice(0, 57)}...`;
+  if (Metric.Format === 'url' && Text.length > 60) return `${Text.slice(0, 59)}…`;
   return Text;
 }

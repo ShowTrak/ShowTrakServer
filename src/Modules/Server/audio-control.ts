@@ -99,5 +99,5 @@ export async function SendAudioLevel(
   const Applied = Responses.find((Reply) => Reply && Reply.Success === true);
   if (Applied) return Ok(true);
   const First = Responses.find((Reply) => Reply && typeof Reply.Error === 'string');
-  return Fail((First && First.Error) || 'The client could not change the audio level');
+  return Fail((First && First.Error) || 'The client failed to change the audio level');
 }

@@ -13,6 +13,15 @@ function load(mocks) {
 
 const noopLogger = { CreateLogger: () => ({ error: () => {}, warn: () => {}, log: () => {} }) };
 
+// Test cleanup: settle anything still pending (disarming its timeout watchdog)
+// and then drop every settled row, so no timer outlives the test.
+async function DrainAll(Manager) {
+  for (const Execution of await Manager.GetAllExecutions()) {
+    if (Execution.Status === 'Pending') await Manager.Complete(Execution.RequestID, null);
+  }
+  await Manager.ClearSettled();
+}
+
 function baseMocks(overrides = {}) {
   let counter = 0;
   return {
@@ -95,8 +104,8 @@ test("ScriptExecutionManager appends and runs each client's scripts sequentially
   assert.equal(failed.Status, 'Failed');
   assert.match(failed.Error, /blew up/);
 
-  // ClearQueue empties the list and notifies the UI.
-  await Manager.ClearQueue();
+  // With everything settled, ClearSettled empties the list and notifies the UI.
+  await Manager.ClearSettled();
   assert.deepEqual(await Manager.GetAllExecutions(), []);
   assert.ok(emitted.some((e) => e.event === 'ScriptExecutionUpdated'));
 });
@@ -268,7 +277,7 @@ test('ToPublicScriptExecution yields a renderer-safe (structured-clone-able) pro
 
   // AddInternalTaskToQueue arms a timeout watchdog, so the raw entry also carries
   // a live TimeoutHandle.
-  await Manager.AddInternalTaskToQueue('uuid-1', 'Wake On LAN');
+  await Manager.AddInternalTaskToQueue('uuid-1', 'Wake on LAN');
   const [raw] = await Manager.GetAllExecutions();
 
   // The raw entry is exactly what used to be pushed — and it is not cloneable.
@@ -281,13 +290,13 @@ test('ToPublicScriptExecution yields a renderer-safe (structured-clone-able) pro
   assert.equal(pub.Client.UUID, 'uuid-1');
   assert.equal(pub.Client.Nickname, 'Booth PC');
   assert.equal(pub.Client.Hostname, 'booth-01');
-  assert.equal(pub.Script.Name, 'Wake On LAN');
+  assert.equal(pub.Script.Name, 'Wake on LAN');
   assert.equal(pub.Status, 'Pending');
   // The non-cloneable fields must not leak into the projection.
   assert.equal('TimeoutHandle' in pub, false);
   assert.equal(typeof pub.Client.SetOnline, 'undefined');
 
-  await Manager.ClearQueue();
+  await DrainAll(Manager);
 });
 
 test('UpdateProgress with a null progress moves only the status text', async () => {
@@ -313,7 +322,7 @@ test('UpdateProgress with a null progress moves only the status text', async () 
   entry = (await Manager.GetAllExecutions()).find((e) => e.RequestID === id);
   assert.equal(entry.StatusText, 'Completed');
 
-  await Manager.ClearQueue();
+  await DrainAll(Manager);
 });
 
 test('SetTimeout labels what timed out', async () => {
@@ -325,5 +334,5 @@ test('SetTimeout labels what timed out', async () => {
   assert.equal(entry.Status, 'Failed');
   assert.equal(entry.Error, 'Integrated event timed out after 20ms');
 
-  await Manager.ClearQueue();
+  await DrainAll(Manager);
 });

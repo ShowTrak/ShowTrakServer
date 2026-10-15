@@ -67,6 +67,9 @@ export function CreateFogRepository(DB: DBManager) {
         [UUID, FogHostID, FogHostName, TaskTypeID, TaskTypeName, Timestamp, Timestamp]
       );
     },
+    // Task progress, errors and pruning are all driven by the poller mirroring FOG's
+    // state, not by an operator editing the show, so they write with markDirty:false
+    // and never flag the show as unsaved.
     UpdateTaskProgress(
       FogTaskRecordID: number,
       FogTaskID: number | null,
@@ -76,7 +79,8 @@ export function CreateFogRepository(DB: DBManager) {
     ): Promise<DBResult<unknown>> {
       return DB.Run(
         'UPDATE FogTasks SET FogTaskID = ?, StateID = ?, Percent = ?, UpdatedAt = ? WHERE FogTaskRecordID = ?',
-        [FogTaskID, StateID, Percent, Timestamp, FogTaskRecordID]
+        [FogTaskID, StateID, Percent, Timestamp, FogTaskRecordID],
+        { markDirty: false }
       );
     },
     SetTaskError(
@@ -84,11 +88,11 @@ export function CreateFogRepository(DB: DBManager) {
       LastError: string | null,
       Timestamp: number
     ): Promise<DBResult<unknown>> {
-      return DB.Run('UPDATE FogTasks SET LastError = ?, UpdatedAt = ? WHERE FogTaskRecordID = ?', [
-        LastError,
-        Timestamp,
-        FogTaskRecordID,
-      ]);
+      return DB.Run(
+        'UPDATE FogTasks SET LastError = ?, UpdatedAt = ? WHERE FogTaskRecordID = ?',
+        [LastError, Timestamp, FogTaskRecordID],
+        { markDirty: false }
+      );
     },
     DeleteTask(FogTaskRecordID: number): Promise<DBResult<unknown>> {
       return DB.Run('DELETE FROM FogTasks WHERE FogTaskRecordID = ?', [FogTaskRecordID]);
@@ -97,9 +101,11 @@ export function CreateFogRepository(DB: DBManager) {
     // because a queued FOG task can legitimately sit waiting for days until the host
     // next boots.
     PruneFinishedTasksBefore(Timestamp: number): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM FogTasks WHERE StateID NOT IN (0, 1, 2, 3) AND UpdatedAt < ?', [
-        Timestamp,
-      ]);
+      return DB.Run(
+        'DELETE FROM FogTasks WHERE StateID NOT IN (0, 1, 2, 3) AND UpdatedAt < ?',
+        [Timestamp],
+        { markDirty: false }
+      );
     },
     // Operator-triggered clear of the finished history, ignoring the retention age.
     // Same state filter as the pruner: open tasks survive, because clearing a row the

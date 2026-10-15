@@ -117,7 +117,7 @@ function EvaluateHealth(Snapshot: Ma2Snapshot, Options: HealthOptions): string[]
   }
   if (Options.CheckShow) {
     if (!Snapshot.ShowFile) {
-      Reasons.push('Could not read the loaded show file');
+      Reasons.push('Failed to read the loaded show file');
     } else if (
       Options.ExpectedShow &&
       NormalizeShow(Snapshot.ShowFile) !== NormalizeShow(Options.ExpectedShow)

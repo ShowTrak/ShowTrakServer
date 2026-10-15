@@ -432,7 +432,7 @@ test('an unreachable repository reports a friendly error and keeps the cache', a
   routes.set(SHA_URL, { throws: true });
   assert.deepEqual(await M.Refresh(), {
     ok: false,
-    error: 'Unable to reach the sample scripts repository',
+    error: 'Failed to reach the sample scripts repository',
   });
   // The previously cached catalog survives — the panel still lists templates.
   assert.equal((await M.GetSampleList()).length, 1);
@@ -445,7 +445,7 @@ test('a failed tree download reports its own error', async () => {
 
   assert.deepEqual(await M.Refresh(), {
     ok: false,
-    error: 'Unable to download the sample scripts catalog',
+    error: 'Failed to download the sample scripts catalog',
   });
 });
 

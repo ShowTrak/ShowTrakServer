@@ -692,8 +692,8 @@ async function runMonitorAction(
       ? await MonitoringTargetManager.GetBySlug(Slug)
       : null;
   if (!Target) {
-    Broadcast.emit('Notify', `OSC - Invalid Monitoring Target "${Slug}"`, 'error');
-    return failureResult(`Invalid Monitoring Target "${Slug}"`);
+    Broadcast.emit('Notify', `OSC - Invalid Monitor "${Slug}"`, 'error');
+    return failureResult(`Invalid Monitor "${Slug}"`);
   }
 
   const Action = MonitoringMethods.GetAction(Method, ActionID);
@@ -766,7 +766,7 @@ function monitorActionValues(WithValue: boolean): OSCRouteValueList {
 OSC.CreateRoute(
   '/API/Monitor/:Slug/:Method/:ActionID',
   async (Req) => runMonitorAction(Req.Slug ?? '', Req.Method ?? '', Req.ActionID ?? '', null),
-  'Run a check action on a Monitoring Target by its slug, method and action ID',
+  'Run a check action on a Monitor by its slug, method and action ID',
   monitorActionValues(false)
 );
 
@@ -774,7 +774,7 @@ OSC.CreateRoute(
   '/API/Monitor/:Slug/:Method/:ActionID/:Value',
   async (Req) =>
     runMonitorAction(Req.Slug ?? '', Req.Method ?? '', Req.ActionID ?? '', Req.Value ?? ''),
-  'Run a check action that takes a value (e.g. pjlink/input.set/31) on a Monitoring Target',
+  'Run a check action that takes a value (e.g. pjlink/input.set/31) on a Monitor',
   monitorActionValues(true)
 );
 
