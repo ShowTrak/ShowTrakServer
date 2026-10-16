@@ -318,7 +318,7 @@ export function RenderClientInfoDetails(Client: ClientView) {
     HandleNonFatalError('ClientInfo:RenderAudio', err);
   }
 
-  // System checks: CPU, memory and uptime (Info tab), power and thermal.
+  // System checks: CPU, memory and uptime (Usage tab), power and thermal.
   try {
     RenderClientInfoSystem(Client);
   } catch (err) {

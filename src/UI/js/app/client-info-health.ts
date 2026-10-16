@@ -1,5 +1,5 @@
 // The monitored system checks in the client info modal: CPU, Memory and Uptime
-// cards on the Info tab (CPU and memory with their usage charts), Power and
+// cards on the Usage tab (CPU and memory with their usage charts), Power and
 // Thermal on the Power & Thermal tab. Each card is styled like a monitored
 // display or network interface — a Monitor toggle, the issues it raises, and
 // an auto-saving conditions table. The decisions live in lib/system-health.

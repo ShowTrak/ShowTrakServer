@@ -2985,18 +2985,8 @@ Loading licence…</pre>
                       />
                       <label for="CLIENT_INFO_STATUS">Status</label>
                     </div>
-                    <!-- CPU, memory and uptime: one card each, with the usage
-                         history charts and the Monitor toggle and conditions
-                         (see client-info-health.ts). Hidden for SDK clients. -->
-                    <div id="CLIENT_INFO_SYSTEM_SECTION" class="d-grid gap-2">
-                      <div class="rounded-3 p-2 bg-ghost-light">
-                        <h6 class="mb-0">Usage</h6>
-                      </div>
-                      <div id="SHOWTRAK_CLIENT_INFO_SYSTEM" class="d-grid gap-2"></div>
-                    </div>
-                    <!-- Read-only mirror of the tiles' badges. Sits directly under the
-                   usage charts so the operator sees what a machine IS right
-                   after what it is DOING. Hidden when it carries no tags. -->
+                    <!-- Read-only mirror of the tiles' badges. Hidden when it
+                         carries no tags. -->
                     <div id="CLIENT_INFO_TAGS_SECTION" class="d-grid gap-2 d-none">
                       <div class="rounded-3 p-2 bg-ghost-light">
                         <h6 class="mb-0">Tags</h6>
@@ -3064,6 +3054,20 @@ Loading licence…</pre>
                       <h6 class="mb-0">IPv6 Interfaces</h6>
                     </div>
                     <div id="SHOWTRAK_CLIENT_INFO_NET_IPV6" class="d-grid gap-2"></div>
+                  </div>
+
+                  <!-- CPU, memory and uptime: one card each, with the usage
+                       history charts and the Monitor toggle and conditions
+                       (see client-info-health.ts). Hidden for SDK clients. -->
+                  <div
+                    id="CLIENT_INFO_SYSTEM_SECTION"
+                    class="d-grid gap-2"
+                    data-client-info-tab="usage"
+                  >
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Usage</h6>
+                    </div>
+                    <div id="SHOWTRAK_CLIENT_INFO_SYSTEM" class="d-grid gap-2"></div>
                   </div>
 
                   <div

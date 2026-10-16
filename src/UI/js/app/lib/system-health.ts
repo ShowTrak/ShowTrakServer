@@ -74,7 +74,7 @@ function FormatTimestamp(Ms: number): string {
 }
 
 /**
- * The Info tab's uptime line. Live while online; once offline the last reading
+ * The Usage tab's uptime line. Live while online; once offline the last reading
  * would freeze and mislead, so only the last known boot is shown.
  */
 export function UptimeText(Client: ClientView): string {

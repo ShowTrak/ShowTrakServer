@@ -27,6 +27,7 @@ test('a ShowTrak Client install gets every tab, Status first', () => {
     'audio',
     'network',
     'apps',
+    'usage',
     'power',
   ]);
   assert.equal(DEFAULT_CLIENT_INFO_TAB, 'status');
