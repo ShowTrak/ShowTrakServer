@@ -39,12 +39,19 @@ test('Logger writes leveled lines to the daily log file', async () => {
     assert.equal(child.Alias, 'TestModule:Sub');
     child.info('from child');
 
-    // Allow the async write queue to drain.
-    await new Promise((r) => setTimeout(r, 100));
-
-    const files = fs.readdirSync(logsDir).filter((f) => f.endsWith('.log'));
-    assert.equal(files.length >= 1, true);
-    const contents = fs.readFileSync(path.join(logsDir, files[0]), 'utf8');
+    // Wait for the async write queue to drain as far as the last line written.
+    // A fixed pause was too short on a loaded CI runner, which then read the
+    // file before the child's line had landed.
+    const readLog = () => {
+      const files = fs.readdirSync(logsDir).filter((f) => f.endsWith('.log'));
+      return files.length ? fs.readFileSync(path.join(logsDir, files[0]), 'utf8') : '';
+    };
+    let contents = readLog();
+    for (let waited = 0; !/from child/.test(contents) && waited < 5000; waited += 25) {
+      await new Promise((r) => setTimeout(r, 25));
+      contents = readLog();
+    }
+    assert.notEqual(contents, '', 'a daily log file was written');
     assert.match(contents, /hello world/);
     assert.match(contents, /a warning/);
     assert.match(contents, /boom/);

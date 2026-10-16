@@ -112,7 +112,12 @@ test('a refused connection reports through OnError', async () => {
 // OnError, promptly, rather than escape as an uncaught exception and leave the
 // session open until its deadline.
 test('a throwing OnData or OnConnect handler settles the session through OnError', async () => {
-  const server = await listen((socket) => socket.write('junk\n'));
+  // The probe destroys its socket mid-conversation, which Linux and Windows
+  // answer with a reset; the fake server must swallow it, not throw.
+  const server = await listen((socket) => {
+    socket.on('error', () => {});
+    socket.write('junk\n');
+  });
   const { port } = server.address();
   try {
     for (const Throws of ['OnData', 'OnConnect']) {
