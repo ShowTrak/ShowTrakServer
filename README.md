@@ -218,8 +218,10 @@ npm ci
 npm run start
 ```
 
-`npm run start` now runs with file watching and automatic rebuild/restart.
-You can also type `rs` in the terminal to force a manual restart.
+`npm run start` builds once, then rebuilds only what each edit touches.
+Renderer, markup and CSS edits reload the window in place, so connected
+clients and the open show survive them; main-process edits restart the app.
+Add `-- --no-app` to build and watch without launching Electron.
 
 ### Useful Scripts
 

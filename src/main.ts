@@ -73,6 +73,7 @@ const path = require('path');
 import { RPC } from './main/rpc';
 import { RegisterRendererSink, PushToRenderers } from './main/renderer-bus';
 import { getMainWindow, setMainWindow, hasMainWindow } from './main/app-window';
+import { StartDevReload } from './main/dev-reload';
 import { configureApplicationMenu } from './main/app-menu';
 import { applyWindowSecurityGuards } from './main/window-guards';
 import { applyWindowZoomShortcuts } from './main/window-zoom';
@@ -228,6 +229,7 @@ app.whenReady().then(async () => {
     ...WINDOW_CHROME_OPTIONS,
   });
   setMainWindow(MainWindow);
+  StartDevReload();
 
   MainWindow.loadFile(path.join(__dirname, 'UI', 'index.html')).then(async () => {
     Logger.log('MainWindow finished loading UI');

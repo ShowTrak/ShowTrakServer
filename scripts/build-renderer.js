@@ -33,8 +33,10 @@ const BUNDLES = [
   },
 ];
 
-async function buildBundle({ name, entry, outfile }) {
-  await esbuild.build({
+// esbuild options for one bundle. Shared with scripts/dev.js, whose watch mode
+// must produce exactly what a full build does.
+function bundleOptions({ entry, outfile }) {
+  return {
     entryPoints: [entry],
     outfile,
     bundle: true,
@@ -44,8 +46,12 @@ async function buildBundle({ name, entry, outfile }) {
     sourcemap: true,
     legalComments: 'none',
     logLevel: 'info',
-  });
-  console.log(`[build-renderer] Bundled ${name} -> ${path.relative(ROOT, outfile)}`);
+  };
+}
+
+async function buildBundle(bundle) {
+  await esbuild.build(bundleOptions(bundle));
+  console.log(`[build-renderer] Bundled ${bundle.name} -> ${path.relative(ROOT, bundle.outfile)}`);
 }
 
 async function main() {
@@ -55,7 +61,11 @@ async function main() {
   console.log(`[build-renderer] Completed (${BUNDLES.length} bundles)`);
 }
 
-main().catch((err) => {
-  console.error('[build-renderer] Failed:', err);
-  process.exit(1);
-});
+module.exports = { BUNDLES, bundleOptions };
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('[build-renderer] Failed:', err);
+    process.exit(1);
+  });
+}
