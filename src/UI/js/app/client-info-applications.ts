@@ -3,6 +3,7 @@
 // Monitor toggle, the issues it raises and, once monitored, an auto-saving
 // conditions table (running, responding, in the foreground). The decisions
 // live in lib/applications.
+import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type {
   ClientView,
   RunningApplicationViewItem,
@@ -22,7 +23,7 @@ const LIST = '#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS';
 
 // Saves of each application's conditions, chained so two quick ticks reach the
 // server in the order they were made.
-const SaveChains = new Map<string, Promise<void>>();
+const Saves = CreateConditionSaveQueue();
 
 function MessageCard(Title: string, Body: string, Tone: 'ghost' | 'danger' = 'ghost'): string {
   const Classes =
@@ -185,25 +186,14 @@ export function BindClientInfoApplicationHandlers(
           $(this).is(':checked');
       });
       const Payload = ApplicationConditionsPayload(Name, Ticks);
-      const Previous = SaveChains.get(Name) || Promise.resolve();
-      const Next = Previous.then(async () => {
-        try {
-          const [Err] = await window.API.MarkClientApplicationCritical(UUID, Payload);
-          // A later tick is already queued: its refresh shows the final state.
-          if (!Err) return void (SaveChains.get(Name) === Next && (await Refresh()));
-          Notify(String(Err), 'error');
-          $(LIST).attr('data-render-key', '');
-          await Refresh();
-        } catch (err) {
-          HandleNonFatalError('ClientInfo:SaveApplicationConditions', err);
-        }
+      return Saves.Enqueue(Name, {
+        Save: async () => (await window.API.MarkClientApplicationCritical(UUID, Payload))[0],
+        Refresh,
+        Notify,
+        ResetRender: () => $(LIST).attr('data-render-key', ''),
+        ErrorContext: 'ClientInfo:SaveApplicationConditions',
       });
-      SaveChains.set(Name, Next);
-      void Next.finally(() => {
-        if (SaveChains.get(Name) === Next) SaveChains.delete(Name);
-      });
-      return Next;
     });
 }
 
-export const _internal = { SaveChains };
+export const _internal = { SaveChains: Saves.Chains };

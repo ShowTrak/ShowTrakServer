@@ -3,6 +3,7 @@
 // conditions, and changing a level or mute on the client machine. Each direction
 // is its own section, built by the same code. The decisions live in
 // lib/audio-devices.
+import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type {
   AudioCapabilities,
   AudioDirection,
@@ -35,7 +36,7 @@ const DIRECTIONS: AudioDirection[] = ['input', 'output'];
 
 // Saves of each endpoint's conditions, chained so two quick ticks reach the
 // server in the order they were made.
-const SaveChains = new Map<string, Promise<void>>();
+const Saves = CreateConditionSaveQueue();
 
 const Token = (EndpointID: string) => encodeURIComponent(EndpointID);
 
@@ -331,30 +332,16 @@ export function BindClientInfoAudioHandlers(
         MinVolume: Bound('MinVolume'),
         MaxVolume: Bound('MaxVolume'),
       });
-      const Previous = SaveChains.get(EndpointID) || Promise.resolve();
-      const Next = Previous.then(async () => {
-        try {
-          if ('Error' in Parsed) {
-            Notify(Parsed.Error, 'error');
-          } else {
-            const [Err] = await window.API.MarkClientAudioDeviceCritical(UUID, Parsed.Payload);
-            // A later tick is already queued: its refresh shows the final state,
-            // so this one would only flash the in-between one.
-            if (!Err) return void (SaveChains.get(EndpointID) === Next && (await Refresh()));
-            Notify(String(Err), 'error');
-          }
-          // Put back what is really saved.
-          $Table.closest('[data-render-key]').attr('data-render-key', '');
-          await Refresh();
-        } catch (err) {
-          HandleNonFatalError('ClientInfo:SaveAudioConditions', err);
-        }
+      return Saves.Enqueue(EndpointID, {
+        Save: async () =>
+          'Error' in Parsed
+            ? Parsed.Error
+            : (await window.API.MarkClientAudioDeviceCritical(UUID, Parsed.Payload))[0],
+        Refresh,
+        Notify,
+        ResetRender: () => $Table.closest('[data-render-key]').attr('data-render-key', ''),
+        ErrorContext: 'ClientInfo:SaveAudioConditions',
       });
-      SaveChains.set(EndpointID, Next);
-      void Next.finally(() => {
-        if (SaveChains.get(EndpointID) === Next) SaveChains.delete(EndpointID);
-      });
-      return Next;
     })
     .on('pointerdown.client-audio', '.SHOWTRAK_AUDIO_LEVEL', function () {
       $(this).attr('data-dragging', '1');
@@ -399,4 +386,4 @@ export function BindClientInfoAudioHandlers(
     });
 }
 
-export const _internal = { SaveChains };
+export const _internal = { SaveChains: Saves.Chains };

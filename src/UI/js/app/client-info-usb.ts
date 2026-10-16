@@ -2,6 +2,7 @@
 // audio and display cards, with a critical toggle and — once critical — an
 // auto-saving conditions table (connected, port, firmware version, device
 // error). The decisions live in lib/usb-devices.
+import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type { ClientView, USBCapabilities, USBDeviceView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
 import {
@@ -24,7 +25,7 @@ export const USB_LIST = '#SHOWTRAK_CLIENT_INFO_USB_DEVICES';
 
 // Saves of each device's conditions, chained so two quick ticks reach the
 // server in the order they were made.
-const SaveChains = new Map<string, Promise<void>>();
+const Saves = CreateConditionSaveQueue();
 
 const Token = (Value: unknown) => (Value ? encodeURIComponent(String(Value)) : '');
 
@@ -237,27 +238,14 @@ export function BindClientInfoUSBHandlers(
         if ($Check.length) Fields[Field] = $Check.is(':checked');
       }
       const Options = ParseUSBRuleFields(Fields) as Record<string, boolean>;
-      const Previous = SaveChains.get(Id.Key) || Promise.resolve();
-      const Next = Previous.then(async () => {
-        try {
-          const [Err] = await Mark(UUID, Id, Options);
-          // A later tick is already queued: its refresh shows the final state,
-          // so this one would only flash the in-between one.
-          if (!Err) return void (SaveChains.get(Id.Key) === Next && (await Refresh()));
-          Notify(String(Err), 'error');
-          // Put back what is really saved.
-          $(USB_LIST).attr('data-render-key', '');
-          await Refresh();
-        } catch (err) {
-          HandleNonFatalError('ClientInfo:SaveUSBConditions', err);
-        }
+      return Saves.Enqueue(Id.Key, {
+        Save: async () => (await Mark(UUID, Id, Options))[0],
+        Refresh,
+        Notify,
+        ResetRender: () => $(USB_LIST).attr('data-render-key', ''),
+        ErrorContext: 'ClientInfo:SaveUSBConditions',
       });
-      SaveChains.set(Id.Key, Next);
-      void Next.finally(() => {
-        if (SaveChains.get(Id.Key) === Next) SaveChains.delete(Id.Key);
-      });
-      return Next;
     });
 }
 
-export const _internal = { SaveChains };
+export const _internal = { SaveChains: Saves.Chains };

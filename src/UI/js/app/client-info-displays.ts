@@ -2,6 +2,7 @@
 // the audio cards, with a critical toggle and — once critical — an auto-saving
 // conditions table (connected, resolution, refresh rate, scaling, rotation,
 // primary, position). The decisions live in lib/displays.
+import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type { ClientDisplayView, ClientView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
 import {
@@ -32,7 +33,7 @@ const CONDITION_FIELDS: DisplayConditionField[] = [
 
 // Saves of each display's conditions, chained so two quick ticks reach the
 // server in the order they were made.
-const SaveChains = new Map<string, Promise<void>>();
+const Saves = CreateConditionSaveQueue();
 
 const Token = (DisplayID: string) => encodeURIComponent(DisplayID);
 
@@ -196,27 +197,14 @@ export function BindClientInfoDisplayHandlers(
         CONDITION_FIELDS.map((Field) => [Field, Checked(Field)])
       ) as Record<DisplayConditionField, boolean>;
       const Payload = ParseDisplayRuleFields(DisplayID, Fields);
-      const Previous = SaveChains.get(DisplayID) || Promise.resolve();
-      const Next = Previous.then(async () => {
-        try {
-          const [Err] = await window.API.MarkClientDisplayCritical(UUID, Payload);
-          // A later tick is already queued: its refresh shows the final state,
-          // so this one would only flash the in-between one.
-          if (!Err) return void (SaveChains.get(DisplayID) === Next && (await Refresh()));
-          Notify(String(Err), 'error');
-          // Put back what is really saved.
-          $(DISPLAY_LIST).attr('data-render-key', '');
-          await Refresh();
-        } catch (err) {
-          HandleNonFatalError('ClientInfo:SaveDisplayConditions', err);
-        }
+      return Saves.Enqueue(DisplayID, {
+        Save: async () => (await window.API.MarkClientDisplayCritical(UUID, Payload))[0],
+        Refresh,
+        Notify,
+        ResetRender: () => $(DISPLAY_LIST).attr('data-render-key', ''),
+        ErrorContext: 'ClientInfo:SaveDisplayConditions',
       });
-      SaveChains.set(DisplayID, Next);
-      void Next.finally(() => {
-        if (SaveChains.get(DisplayID) === Next) SaveChains.delete(DisplayID);
-      });
-      return Next;
     });
 }
 
-export const _internal = { SaveChains };
+export const _internal = { SaveChains: Saves.Chains };

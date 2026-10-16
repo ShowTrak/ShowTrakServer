@@ -5,6 +5,7 @@
 // conditions table (present, IP address, IP range, subnet mask, router); in the
 // other family's list it only shows the addresses. The decisions live in
 // lib/network-interfaces.
+import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type { ClientView, NetworkCapabilities, NetworkInterfaceView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
 import {
@@ -34,7 +35,7 @@ const ALL_LISTS = FAMILIES.map((Family) => NETWORK_LISTS[Family]).join(', ');
 
 // Saves of each interface's conditions, chained so two quick edits reach the
 // server in the order they were made.
-const SaveChains = new Map<string, Promise<void>>();
+const Saves = CreateConditionSaveQueue();
 
 // The last client rendered, so a rebuild held back while a condition was being
 // typed into can be applied once the field loses focus.
@@ -221,29 +222,16 @@ function SaveConditions(
     Netmask: Value('Netmask'),
     Gateway: Value('Gateway'),
   });
-  const Previous = SaveChains.get(Name) || Promise.resolve();
-  const Next = Previous.then(async () => {
-    try {
-      if ('Error' in Parsed) {
-        Notify(Parsed.Error, 'error');
-      } else {
-        const [Err] = await window.API.MarkClientNetworkInterfaceCritical(UUID, Parsed.Payload);
-        // A later edit is already queued: its refresh shows the final state.
-        if (!Err) return void (SaveChains.get(Name) === Next && (await Refresh()));
-        Notify(String(Err), 'error');
-      }
-      // Put back what is really saved.
-      $(ALL_LISTS).attr('data-render-key', '');
-      await Refresh();
-    } catch (err) {
-      HandleNonFatalError('ClientInfo:SaveNetworkConditions', err);
-    }
+  return Saves.Enqueue(Name, {
+    Save: async () =>
+      'Error' in Parsed
+        ? Parsed.Error
+        : (await window.API.MarkClientNetworkInterfaceCritical(UUID, Parsed.Payload))[0],
+    Refresh,
+    Notify,
+    ResetRender: () => $(ALL_LISTS).attr('data-render-key', ''),
+    ErrorContext: 'ClientInfo:SaveNetworkConditions',
   });
-  SaveChains.set(Name, Next);
-  void Next.finally(() => {
-    if (SaveChains.get(Name) === Next) SaveChains.delete(Name);
-  });
-  return Next;
 }
 
 /** Wire the section's controls. `Refresh` re-fetches and re-renders the client. */
@@ -319,4 +307,4 @@ export function BindClientInfoNetworkHandlers(
     });
 }
 
-export const _internal = { SaveChains };
+export const _internal = { SaveChains: Saves.Chains };
