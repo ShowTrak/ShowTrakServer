@@ -15,8 +15,8 @@
 //      "value"` (or an `ERR <reason>` line, captured per-variable rather than
 //      thrown).
 //   4. `LOGOUT` and closes cleanly.
-import net from 'net';
 import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
+import { ReplyQueue, RunTcpSession } from './_tcp-session';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 export const DEFAULT_NUT_PORT = 3493;
@@ -195,105 +195,43 @@ function RunNutSession<T>(
   Label: string,
   Body: (Request: NutRequest) => Promise<T>
 ): Promise<NutSessionOutcome<T>> {
-  return new Promise<NutSessionOutcome<T>>((resolve) => {
-    const Started = Date.now();
-    // Whole-session budget. Socket.setTimeout below is only an IDLE timeout — it
-    // resets on every data event, so across the sequential round trips (auth,
-    // LIST UPS, one GET VAR per variable) a slow-but-trickling daemon could keep
-    // the session alive far beyond TimeoutMs. This absolute deadline caps the total.
-    const BudgetMs = Math.max(500, TimeoutMs | 0);
-    const Socket = new net.Socket();
-    let Buffer0 = '';
-    let Settled = false;
-    let DeadlineTimer: ReturnType<typeof setTimeout> | null = null;
-    let Waiter: {
-      Predicate: (Buf: string) => number | null;
-      Resolve: (Reply: string) => void;
-      Reject: (Err: Error) => void;
-    } | null = null;
+  // Whole-session budget. The socket's own timeout is only an IDLE timeout — it
+  // resets on every data event, so across the sequential round trips (auth,
+  // LIST UPS, one GET VAR per variable) a slow-but-trickling daemon could keep
+  // the session alive far beyond TimeoutMs. The absolute deadline caps the total.
+  const BudgetMs = Math.max(500, TimeoutMs | 0);
+  const Replies = new ReplyQueue(1_000_000);
+  const Failed = (Error: string): NutSessionOutcome<T> => ({ Ok: false, Error });
 
-    const Finish = (Result: NutSessionOutcome<T>) => {
-      if (Settled) return;
-      Settled = true;
-      if (DeadlineTimer) {
-        clearTimeout(DeadlineTimer);
-        DeadlineTimer = null;
-      }
-      try {
-        Socket.destroy();
-      } catch {
-        // ignore
-      }
-      resolve(Result);
-    };
-    const Fail = (Error: string) => Finish({ Ok: false, Error });
-
-    const Pump = () => {
-      if (!Waiter) return;
-      const Consumed = Waiter.Predicate(Buffer0);
-      if (Consumed == null) return;
-      const Reply = Buffer0.slice(0, Consumed);
-      Buffer0 = Buffer0.slice(Consumed);
-      const Current = Waiter;
-      Waiter = null;
-      Current.Resolve(Reply);
-    };
-
-    const FailWaiter = (Err: Error) => {
-      if (!Waiter) return;
-      const Current = Waiter;
-      Waiter = null;
-      Current.Reject(Err);
-    };
-
-    const Request: NutRequest = (Command, Predicate = ReadLine) =>
-      new Promise<string>((Res, Rej) => {
-        Waiter = { Predicate, Resolve: Res, Reject: Rej };
+  return RunTcpSession<NutSessionOutcome<T>>({
+    Address,
+    Port,
+    IdleMs: BudgetMs,
+    DeadlineMs: BudgetMs,
+    // Whatever ends the session also ends the request waiting on a reply, so the
+    // conversation below unwinds instead of hanging.
+    OnSettle: () => Replies.FailPending(new Error('session ended')),
+    OnData: (Chunk, Session) => {
+      if (!Replies.Feed(Chunk.toString('utf8'))) Session.Finish(Failed('Reply too large'));
+    },
+    OnTimeout: (_Session, Kind) =>
+      Failed(
+        Kind === 'deadline'
+          ? `${Label} exceeded ${BudgetMs}ms`
+          : `No reply from upsd after ${TimeoutMs}ms`
+      ),
+    OnError: (Message) => Failed(Message),
+    OnClose: () => Failed('Connection closed before reply'),
+    OnConnect: (Session) => {
+      const Request: NutRequest = (Command, Predicate = ReadLine) => {
+        const Reply = Replies.Next(Predicate);
         try {
-          Socket.write(Command);
+          Session.Socket.write(Command);
         } catch (Err) {
-          Waiter = null;
-          Rej(Err instanceof Error ? Err : new Error(String(Err)));
-          return;
+          Replies.FailPending(Err instanceof Error ? Err : new Error(String(Err)));
         }
-        Pump();
-      });
-
-    Socket.setTimeout(BudgetMs);
-
-    // Absolute cap on the whole session, independent of the (resettable) idle
-    // timeout above.
-    DeadlineTimer = setTimeout(() => {
-      FailWaiter(new Error('timeout'));
-      Fail(`${Label} exceeded ${BudgetMs}ms`);
-    }, BudgetMs);
-
-    Socket.on('data', (Chunk: Buffer) => {
-      Buffer0 += Chunk.toString('utf8');
-      if (Buffer0.length > 1_000_000) {
-        Fail('Reply too large');
-        return;
-      }
-      Pump();
-    });
-
-    Socket.once('timeout', () => {
-      FailWaiter(new Error('timeout'));
-      Fail(`No reply from upsd after ${TimeoutMs}ms`);
-    });
-
-    Socket.once('error', (Err: Error) => {
-      const Msg = Err && Err.message ? Err.message : String(Err);
-      FailWaiter(Err instanceof Error ? Err : new Error(Msg));
-      Fail(Msg);
-    });
-
-    Socket.once('close', () => {
-      FailWaiter(new Error('connection closed'));
-      if (!Settled) Fail('Connection closed before reply');
-    });
-
-    Socket.once('connect', () => {
+        return Reply;
+      };
       void (async () => {
         try {
           // Optional authentication.
@@ -307,22 +245,16 @@ function RunNutSession<T>(
           const Value = await Body(Request);
 
           try {
-            Socket.write('LOGOUT\n');
+            Session.Socket.write('LOGOUT\n');
           } catch {
             // ignore
           }
-          Finish({ Ok: true, Value, LatencyMs: Date.now() - Started });
+          Session.Finish({ Ok: true, Value, LatencyMs: Date.now() - Session.StartedAt });
         } catch (Err) {
-          Fail(Err instanceof Error ? Err.message : String(Err));
+          Session.Finish(Failed(Err instanceof Error ? Err.message : String(Err)));
         }
       })();
-    });
-
-    try {
-      Socket.connect(Port, Address);
-    } catch (Err) {
-      Fail(Err instanceof Error ? Err.message : String(Err));
-    }
+    },
   });
 }
 

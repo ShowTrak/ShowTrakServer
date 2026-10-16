@@ -1,7 +1,7 @@
 // TCP port monitoring. Opens a TCP socket to Target.Address on the configured
 // port and reports success when the three-way handshake completes within the
 // timeout. No data is sent or read, so this is safe against arbitrary services.
-import net from 'net';
+import { ProbeTcpConnect } from './_tcp-session';
 import { Pill, Rows, TextRow, Row, FormatLatency } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
@@ -40,57 +40,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     return { Success: false, Error: `Invalid port: ${Port}` };
   }
 
-  return new Promise<MonitoringResult>((resolve) => {
-    const Started = Date.now();
-    let Settled = false;
-
-    const Socket = new net.Socket();
-
-    const Finish = (Result: MonitoringResult) => {
-      if (Settled) return;
-      Settled = true;
-      try {
-        Socket.destroy();
-      } catch (_e) {
-        // ignore
-      }
-      resolve(Result);
-    };
-
-    Socket.setTimeout(Math.max(200, TimeoutMs | 0));
-
-    Socket.once('connect', () => {
-      Finish({ Success: true, LatencyMs: Date.now() - Started });
-    });
-
-    Socket.once('timeout', () => {
-      Finish({ Success: false, Error: `Connection timed out after ${TimeoutMs}ms` });
-    });
-
-    Socket.once('error', (Err: Error) => {
-      const ErrMsg = Err && Err.message ? Err.message : String(Err);
-      // Errors indicating the port exists but rejected connection = degraded.
-      // Errors indicating no response (timeout, unreachable, DNS fail) = offline.
-      const IsResponseError = ErrMsg.includes('ECONNREFUSED') || ErrMsg.includes('ECONNRESET');
-      Finish({
-        Success: false,
-        ...(IsResponseError ? { Degraded: true } : {}),
-        Error: ErrMsg,
-      });
-    });
-
-    try {
-      Socket.connect(Port, Address);
-    } catch (Err) {
-      const ErrMsg = Err && (Err as Error).message ? (Err as Error).message : String(Err);
-      const IsResponseError = ErrMsg.includes('ECONNREFUSED') || ErrMsg.includes('ECONNRESET');
-      Finish({
-        Success: false,
-        ...(IsResponseError ? { Degraded: true } : {}),
-        Error: ErrMsg,
-      });
-    }
-  });
+  return ProbeTcpConnect(Address, Port, TimeoutMs);
 }
 
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {

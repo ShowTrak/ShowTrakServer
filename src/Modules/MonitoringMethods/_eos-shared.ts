@@ -24,9 +24,9 @@
 // Like PJLink, the whole eos-* family funnels through a single cached status
 // snapshot per console per tick so the health and show checks share one
 // connection.
-import net from 'net';
 import { Manager as CacheManager } from '../CacheManager';
 import { EncodeOscTcp, DecodeOscStream, type OscFraming } from './_osc-shared';
+import { ErrorMessage, RunTcpSession } from './_tcp-session';
 import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -113,72 +113,53 @@ export async function QueryEosStatus(
   OscUser: number,
   TimeoutMs: number
 ): Promise<EosSnapshot> {
-  return new Promise<EosSnapshot>((resolve) => {
-    const Started = Date.now();
-    const BudgetMs = Math.max(300, TimeoutMs | 0);
-    const Socket = new net.Socket();
-    let Stream = Buffer.alloc(0);
-    let Settled = false;
-    let SawAnyEosReply = false;
-    let PingLatencyMs: number | null = null;
-    const Snap: Omit<EosSnapshot, 'Reachable' | 'Error'> = { ...EMPTY_SNAPSHOT };
-    let DeadlineTimer: ReturnType<typeof setTimeout> | null = null;
+  const BudgetMs = Math.max(300, TimeoutMs | 0);
+  let Stream = Buffer.alloc(0);
+  let SawAnyEosReply = false;
+  let PingLatencyMs: number | null = null;
+  const Snap: Omit<EosSnapshot, 'Reachable' | 'Error'> = { ...EMPTY_SNAPSHOT };
 
-    const Finish = (Result: EosSnapshot) => {
-      if (Settled) return;
-      Settled = true;
-      if (DeadlineTimer) {
-        clearTimeout(DeadlineTimer);
-        DeadlineTimer = null;
-      }
-      try {
-        Socket.destroy();
-      } catch {
-        // ignore
-      }
-      resolve(Result);
-    };
+  const Failed = (Error0: string): EosSnapshot => ({
+    Reachable: false,
+    Error: Error0,
+    ...EMPTY_SNAPSHOT,
+  });
+  const Succeeded = (StartedAt: number): EosSnapshot => ({
+    Reachable: true,
+    LatencyMs: PingLatencyMs != null ? PingLatencyMs : Date.now() - StartedAt,
+    ...Snap,
+  });
+  // Any Eos reply at all means the console is reachable; only total silence is
+  // an offline/timeout.
+  const AtTimeout = (StartedAt: number): EosSnapshot =>
+    SawAnyEosReply ? Succeeded(StartedAt) : Failed(`No OSC reply from Eos after ${BudgetMs}ms`);
 
-    const Fail = (Error0: string) => Finish({ Reachable: false, Error: Error0, ...EMPTY_SNAPSHOT });
+  // We have what we need once the ping has echoed and the version is known.
+  // Counts are best-effort within the window.
+  const Done = (): boolean => PingLatencyMs != null && Snap.Version != null;
 
-    // We have what we need once the ping has echoed and the version is known.
-    // Counts are best-effort within the window.
-    const Done = (): boolean => PingLatencyMs != null && Snap.Version != null;
-
-    const Succeed = () =>
-      Finish({
-        Reachable: true,
-        LatencyMs: PingLatencyMs != null ? PingLatencyMs : Date.now() - Started,
-        ...Snap,
-      });
-
-    Socket.setNoDelay(true);
-    Socket.setTimeout(BudgetMs);
-
-    DeadlineTimer = setTimeout(() => {
-      // Any Eos reply at all means the console is reachable; only a total
-      // silence is an offline/timeout.
-      if (SawAnyEosReply) Succeed();
-      else Fail(`No OSC reply from Eos after ${BudgetMs}ms`);
-    }, BudgetMs);
-
-    Socket.once('connect', () => {
+  return RunTcpSession<EosSnapshot>({
+    Address,
+    Port,
+    IdleMs: BudgetMs,
+    DeadlineMs: BudgetMs,
+    NoDelay: true,
+    OnConnect: (Session) => {
       try {
         // Background OSC user so the probe never disturbs the live operator.
-        Socket.write(EncodeOscTcp('/eos/user', [{ Int: OscUser }], Framing));
-        Socket.write(EncodeOscTcp('/eos/ping', [`showtrak-${++PingCounter}`], Framing));
-        Socket.write(EncodeOscTcp('/eos/get/version', [], Framing));
-        Socket.write(EncodeOscTcp('/eos/get/cuelist/count', [], Framing));
-        Socket.write(EncodeOscTcp('/eos/get/patch/count', [], Framing));
+        Session.Socket.write(EncodeOscTcp('/eos/user', [{ Int: OscUser }], Framing));
+        Session.Socket.write(EncodeOscTcp('/eos/ping', [`showtrak-${++PingCounter}`], Framing));
+        Session.Socket.write(EncodeOscTcp('/eos/get/version', [], Framing));
+        Session.Socket.write(EncodeOscTcp('/eos/get/cuelist/count', [], Framing));
+        Session.Socket.write(EncodeOscTcp('/eos/get/patch/count', [], Framing));
       } catch (Err) {
-        Fail(Err instanceof Error ? Err.message : String(Err));
+        Session.Finish(Failed(ErrorMessage(Err)));
       }
-    });
-
-    Socket.on('data', (Chunk: Buffer) => {
+    },
+    OnData: (Chunk, Session) => {
       Stream = Buffer.concat([Stream, Chunk]);
       if (Stream.length > 2_000_000) {
-        Fail('OSC reply too large');
+        Session.Finish(Failed('OSC reply too large'));
         return;
       }
       const { Messages, Rest } = DecodeOscStream(Stream, Framing);
@@ -187,7 +168,7 @@ export async function QueryEosStatus(
         if (!Msg.Address.startsWith('/eos/out')) continue;
         SawAnyEosReply = true;
         if (IsPingReply(Msg.Address)) {
-          if (PingLatencyMs == null) PingLatencyMs = Date.now() - Started;
+          if (PingLatencyMs == null) PingLatencyMs = Date.now() - Session.StartedAt;
         } else if (Msg.Address === '/eos/out/get/version') {
           const V = Msg.Args.find((A) => typeof A === 'string');
           if (V != null) Snap.Version = String(V);
@@ -205,29 +186,14 @@ export async function QueryEosStatus(
           if (V != null) Snap.ActiveCue = String(V);
         }
       }
-      if (Done()) Succeed();
-    });
-
-    Socket.once('timeout', () => {
-      if (SawAnyEosReply) Succeed();
-      else Fail(`No OSC reply from Eos after ${BudgetMs}ms`);
-    });
-
-    Socket.once('error', (Err: Error) => {
-      Fail(Err && Err.message ? Err.message : String(Err));
-    });
-
-    Socket.once('close', () => {
-      if (Settled) return;
-      if (SawAnyEosReply) Succeed();
-      else Fail('Connection closed before any Eos reply');
-    });
-
-    try {
-      Socket.connect(Port, Address);
-    } catch (Err) {
-      Fail(Err instanceof Error ? Err.message : String(Err));
-    }
+      if (Done()) Session.Finish(Succeeded(Session.StartedAt));
+    },
+    OnTimeout: (Session) => AtTimeout(Session.StartedAt),
+    OnError: (Message) => Failed(Message),
+    OnClose: (Session) =>
+      SawAnyEosReply
+        ? Succeeded(Session.StartedAt)
+        : Failed('Connection closed before any Eos reply'),
   });
 }
 

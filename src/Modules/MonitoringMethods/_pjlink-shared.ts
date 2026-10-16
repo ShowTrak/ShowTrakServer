@@ -22,9 +22,9 @@
 // answer. The device class is still captured via CLSS — any Class 2 command
 // (FREZ, SVOL, FILT, RLMP, ...) must gate on it; SendProjectorCommand's callers
 // are responsible for that gate.
-import net from 'net';
 import crypto from 'crypto';
 import { Manager as CacheManager } from '../CacheManager';
+import { ReplyQueue, RunTcpSession } from './_tcp-session';
 import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -333,6 +333,25 @@ function ReadLine(Buf: string): number | null {
   return End;
 }
 
+// Predicate: the next non-blank line, together with any blank lines before it
+// (some projectors pad between replies).
+function ReadNonBlankLine(Buf: string): number | null {
+  let Pos = 0;
+  for (;;) {
+    const Consumed = ReadLine(Buf.slice(Pos));
+    if (Consumed == null) return null;
+    const Line = Buf.slice(Pos, Pos + Consumed);
+    Pos += Consumed;
+    if (Line.trim()) return Pos;
+  }
+}
+
+// The reply line ReadNonBlankLine consumed, without its terminator.
+function LastNonBlankLine(Reply: string): string {
+  const Lines = Reply.split(/\r\n|\r|\n/).filter((Line) => Line.trim());
+  return Lines.length ? Lines[Lines.length - 1]! : '';
+}
+
 // --- Session plumbing --------------------------------------------------------
 
 // Thrown from inside a session body so an ERRA aborts the whole session with the
@@ -360,117 +379,58 @@ async function OpenProjectorSession<T>(
   TimeoutMs: number,
   Body: (Send: PJLinkSend) => Promise<T>
 ): Promise<SessionOutcome<T>> {
-  return new Promise<SessionOutcome<T>>((resolve) => {
-    const Started = Date.now();
-    // Whole-session budget. Socket.setTimeout below is only an IDLE timeout — it
-    // resets on every data event, so across the sequential round trips a
-    // slow-but-trickling device could keep the session alive far beyond
-    // TimeoutMs. This absolute deadline caps the total.
-    const BudgetMs = Math.max(500, TimeoutMs | 0);
-    const Socket = new net.Socket();
-    let Buffer0 = '';
-    let Settled = false;
-    let DeadlineTimer: ReturnType<typeof setTimeout> | null = null;
-    let Waiter: {
-      Resolve: (Line: string) => void;
-      Reject: (Err: Error) => void;
-    } | null = null;
+  // Whole-session budget. The socket's own timeout is only an IDLE timeout — it
+  // resets on every data event, so across the sequential round trips a
+  // slow-but-trickling device could keep the session alive far beyond
+  // TimeoutMs. The absolute deadline caps the total.
+  const BudgetMs = Math.max(500, TimeoutMs | 0);
+  const Replies = new ReplyQueue(1_000_000);
+  const Failed = (Error0: string, AuthFailed?: boolean): SessionOutcome<T> => ({
+    Ok: false,
+    Error: Error0,
+    ...(AuthFailed ? { AuthFailed: true } : {}),
+  });
 
-    const Finish = (Result: SessionOutcome<T>) => {
-      if (Settled) return;
-      Settled = true;
-      if (DeadlineTimer) {
-        clearTimeout(DeadlineTimer);
-        DeadlineTimer = null;
-      }
-      // Prompt close matters: many projectors accept a single PJLink session.
-      try {
-        Socket.destroy();
-      } catch {
-        // ignore
-      }
-      resolve(Result);
-    };
-
-    const Fail = (Error0: string, AuthFailed?: boolean) =>
-      Finish({ Ok: false, Error: Error0, ...(AuthFailed ? { AuthFailed: true } : {}) });
-
-    const Pump = () => {
-      while (Waiter) {
-        const Consumed = ReadLine(Buffer0);
-        if (Consumed == null) return;
-        const Line = Buffer0.slice(0, Consumed).replace(/[\r\n]+$/, '');
-        Buffer0 = Buffer0.slice(Consumed);
-        if (!Line.trim()) continue; // ignore blank lines between replies
-        const Current = Waiter;
-        Waiter = null;
-        Current.Resolve(Line);
-      }
-    };
-
-    const FailWaiter = (Err: Error) => {
-      if (!Waiter) return;
-      const Current = Waiter;
-      Waiter = null;
-      Current.Reject(Err);
-    };
-
-    // Await the next non-empty line, optionally sending a command first.
-    const NextLine = (Payload: Buffer | null): Promise<string> =>
-      new Promise<string>((Res, Rej) => {
-        Waiter = { Resolve: Res, Reject: Rej };
+  // Settling also destroys the socket at once, which matters here: many
+  // projectors accept a single PJLink session.
+  return RunTcpSession<SessionOutcome<T>>({
+    Address,
+    Port,
+    IdleMs: BudgetMs,
+    DeadlineMs: BudgetMs,
+    NoDelay: true,
+    OnSettle: () => Replies.FailPending(new Error('session ended')),
+    OnData: (Chunk, Session) => {
+      if (!Replies.Feed(Chunk.toString('utf8'))) Session.Finish(Failed('Reply too large'));
+    },
+    OnTimeout: (_Session, Kind) =>
+      Failed(
+        Kind === 'deadline'
+          ? `PJLink probe exceeded ${BudgetMs}ms`
+          : `No reply from projector after ${TimeoutMs}ms`
+      ),
+    OnError: (Message) => Failed(Message),
+    OnClose: () => Failed('Connection closed before reply'),
+    OnConnect: (Session) => {
+      // Await the next non-empty line, optionally sending a command first.
+      const NextLine = async (Payload: Buffer | null): Promise<string> => {
+        const Reply = Replies.Next(ReadNonBlankLine);
         if (Payload) {
           try {
-            Socket.write(Payload);
+            Session.Socket.write(Payload);
           } catch (Err) {
-            Waiter = null;
-            Rej(Err instanceof Error ? Err : new Error(String(Err)));
-            return;
+            Replies.FailPending(Err instanceof Error ? Err : new Error(String(Err)));
           }
         }
-        Pump();
-      });
+        return LastNonBlankLine(await Reply);
+      };
 
-    Socket.setNoDelay(true);
-    Socket.setTimeout(BudgetMs);
-
-    DeadlineTimer = setTimeout(() => {
-      FailWaiter(new Error('timeout'));
-      Fail(`PJLink probe exceeded ${BudgetMs}ms`);
-    }, BudgetMs);
-
-    Socket.on('data', (Chunk: Buffer) => {
-      Buffer0 += Chunk.toString('utf8');
-      if (Buffer0.length > 1_000_000) {
-        Fail('Reply too large');
-        return;
-      }
-      Pump();
-    });
-
-    Socket.once('timeout', () => {
-      FailWaiter(new Error('timeout'));
-      Fail(`No reply from projector after ${TimeoutMs}ms`);
-    });
-
-    Socket.once('error', (Err: Error) => {
-      const Msg = Err && Err.message ? Err.message : String(Err);
-      FailWaiter(Err instanceof Error ? Err : new Error(Msg));
-      Fail(Msg);
-    });
-
-    Socket.once('close', () => {
-      FailWaiter(new Error('connection closed'));
-      if (!Settled) Fail('Connection closed before reply');
-    });
-
-    Socket.once('connect', () => {
       void (async () => {
         try {
           // The projector speaks first.
           const Greeting = ParseGreeting(await NextLine(null));
           if (!Greeting) {
-            Fail('Not a PJLink service (unexpected greeting)');
+            Session.Finish(Failed('Not a PJLink service (unexpected greeting)'));
             return;
           }
 
@@ -479,7 +439,7 @@ async function OpenProjectorSession<T>(
             if (!Password) {
               // Bail without sending anything — a wrong digest can trip
               // auth-lockout timers on some brands.
-              Fail('Projector requires a PJLink password', true);
+              Session.Finish(Failed('Projector requires a PJLink password', true));
               return;
             }
             Digest = BuildAuthDigest(Greeting.Seed, Password);
@@ -496,22 +456,16 @@ async function OpenProjectorSession<T>(
           };
 
           const Value = await Body(Send);
-          Finish({ Ok: true, Value, LatencyMs: Date.now() - Started });
+          Session.Finish({ Ok: true, Value, LatencyMs: Date.now() - Session.StartedAt });
         } catch (Err) {
           if (Err instanceof PJLinkAuthError) {
-            Fail(Err.message, true);
+            Session.Finish(Failed(Err.message, true));
             return;
           }
-          Fail(Err instanceof Error ? Err.message : String(Err));
+          Session.Finish(Failed(Err instanceof Error ? Err.message : String(Err)));
         }
       })();
-    });
-
-    try {
-      Socket.connect(Port, Address);
-    } catch (Err) {
-      Fail(Err instanceof Error ? Err.message : String(Err));
-    }
+    },
   });
 }
 
@@ -846,37 +800,25 @@ export async function FetchProjectorIdentity(
   Port: number,
   TimeoutMs: number
 ): Promise<{ Name: string | null; Model: string | null } | null> {
-  return new Promise((resolve) => {
-    const BudgetMs = Math.max(500, TimeoutMs | 0);
-    const Socket = new net.Socket();
-    let Buffer0 = '';
-    let Settled = false;
-    // PJLink allows one outstanding command at a time, so NAME and INF2 are
-    // sent strictly sequentially: greeting -> NAME -> reply -> INF2 -> reply.
-    const Pending = ['NAME', 'INF2'];
-    let AwaitingGreeting = true;
-    const Replies: Record<string, string> = {};
+  type Identity = { Name: string | null; Model: string | null } | null;
+  // PJLink allows one outstanding command at a time, so NAME and INF2 are sent
+  // strictly sequentially: greeting -> NAME -> reply -> INF2 -> reply.
+  const Pending = ['NAME', 'INF2'];
+  let AwaitingGreeting = true;
+  let Buffer0 = '';
+  const Replies: Record<string, string> = {};
 
-    const Finish = (Result: { Name: string | null; Model: string | null } | null) => {
-      if (Settled) return;
-      Settled = true;
-      try {
-        Socket.destroy();
-      } catch {
-        // ignore
-      }
-      resolve(Result);
-    };
-
-    Socket.setTimeout(BudgetMs);
-    Socket.once('timeout', () => Finish(null));
-    Socket.once('error', () => Finish(null));
-    Socket.once('close', () => Finish(null));
-
-    Socket.on('data', (Chunk: Buffer) => {
+  return RunTcpSession<Identity>({
+    Address,
+    Port,
+    IdleMs: Math.max(500, TimeoutMs | 0),
+    OnTimeout: () => null,
+    OnError: () => null,
+    OnClose: () => null,
+    OnData: (Chunk, Session) => {
       Buffer0 += Chunk.toString('utf8');
       if (Buffer0.length > 65536) {
-        Finish(null);
+        Session.Finish(null);
         return;
       }
       let Consumed = ReadLine(Buffer0);
@@ -889,7 +831,7 @@ export async function FetchProjectorIdentity(
         if (AwaitingGreeting) {
           const Greeting = ParseGreeting(Line);
           if (!Greeting || Greeting.Auth) {
-            Finish(null);
+            Session.Finish(null);
             return;
           }
           AwaitingGreeting = false;
@@ -902,23 +844,17 @@ export async function FetchProjectorIdentity(
 
         const Next = Pending.shift();
         if (!Next) {
-          Finish({ Name: Replies.NAME || null, Model: Replies.INF2 || null });
+          Session.Finish({ Name: Replies.NAME || null, Model: Replies.INF2 || null });
           return;
         }
         try {
-          Socket.write(BuildCommand(Next, null));
+          Session.Socket.write(BuildCommand(Next, null));
         } catch {
-          Finish(null);
+          Session.Finish(null);
           return;
         }
       }
-    });
-
-    try {
-      Socket.connect(Port, Address);
-    } catch {
-      Finish(null);
-    }
+    },
   });
 }
 

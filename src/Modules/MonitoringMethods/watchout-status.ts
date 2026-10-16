@@ -42,7 +42,7 @@
 //   - Replied, but show not ready/online            -> degraded ("Not ready")
 //   - Replied via ping only (no getStatus)          -> degraded ("Status unavailable")
 //   - Replied, ready/online (and show matches)      -> online   (Success: true)
-import net from 'net';
+import { RunTcpSession } from './_tcp-session';
 import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
@@ -243,62 +243,34 @@ function Probe(
   Mode: string,
   TimeoutMs: number
 ): Promise<WatchoutReply | null> {
-  return new Promise<WatchoutReply | null>((resolve) => {
-    let Settled = false;
-    let Text = '';
-    const Socket = new net.Socket();
-
-    const Finish = (Reply: WatchoutReply | null) => {
-      if (Settled) return;
-      Settled = true;
-      try {
-        Socket.destroy();
-      } catch (_e) {
-        // ignore
-      }
-      resolve(Reply);
-    };
-
-    Socket.setTimeout(Math.max(500, TimeoutMs | 0));
-
-    Socket.once('connect', () => {
+  let Text = '';
+  return RunTcpSession<WatchoutReply | null>({
+    Address,
+    Port,
+    IdleMs: Math.max(500, TimeoutMs | 0),
+    OnConnect: (Session) => {
       try {
         // authenticate (level 1) then request status; append a ping so a target
         // that does not implement getStatus still answers with a Ready line.
-        Socket.write(`authenticate 1${CRLF}getStatus${CRLF}ping${CRLF}`);
+        Session.Socket.write(`authenticate 1${CRLF}getStatus${CRLF}ping${CRLF}`);
       } catch (_e) {
-        Finish(null);
+        Session.Finish(null);
       }
-    });
-
-    Socket.on('data', (Chunk: Buffer) => {
+    },
+    OnData: (Chunk, Session) => {
       Text += Chunk.toString('utf8');
       if (Text.length > 1_000_000) {
-        Finish(ParseWatchoutReply(Text));
+        Session.Finish(ParseWatchoutReply(Text));
         return;
       }
       // Resolve early only once the richer getStatus Reply is in hand.
       const Reply = ParseWatchoutReply(Text, 'reply');
-      if (Reply) Finish(Reply);
-    });
-
-    Socket.once('timeout', () => {
-      Finish(ParseWatchoutReply(Text));
-    });
-
-    Socket.once('error', () => {
-      Finish(null);
-    });
-
-    Socket.once('close', () => {
-      Finish(ParseWatchoutReply(Text));
-    });
-
-    try {
-      Socket.connect(Port, Address);
-    } catch (_e) {
-      Finish(null);
-    }
+      if (Reply) Session.Finish(Reply);
+    },
+    // Whatever arrived before the line went quiet or closed is the answer.
+    OnTimeout: () => ParseWatchoutReply(Text),
+    OnClose: () => ParseWatchoutReply(Text),
+    OnError: () => null,
   });
 }
 

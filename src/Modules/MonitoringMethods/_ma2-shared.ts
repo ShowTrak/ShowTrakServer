@@ -17,8 +17,8 @@
 // Verbatim protocol strings (login success `Logged in as User`, failure
 // `no login` / `Login incorrect`, disabled `Remote command…disabled`) are drawn
 // from several independent open-source grandMA2 telnet clients.
-import net from 'net';
 import { Manager as CacheManager } from '../CacheManager';
+import { RunTcpSession, type TcpSession } from './_tcp-session';
 import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -132,73 +132,55 @@ export async function QueryMa2Status(
   TimeoutMs: number
 ): Promise<Ma2Snapshot> {
   const WantLogin = !!(User && Password);
-  return new Promise<Ma2Snapshot>((resolve) => {
-    const Started = Date.now();
-    const BudgetMs = Math.max(500, TimeoutMs | 0);
-    const Socket = new net.Socket();
-    let Raw = '';
-    let Settled = false;
-    let Phase: 'banner' | 'login' | 'version' = 'banner';
-    let MarkLen = 0; // index into Clean at the current phase's start
-    let IsGrandMa2 = false;
-    let Banner: string | null = null;
-    let DeadlineTimer: ReturnType<typeof setTimeout> | null = null;
+  const BudgetMs = Math.max(500, TimeoutMs | 0);
+  let Raw = '';
+  let Phase: 'banner' | 'login' | 'version' = 'banner';
+  let MarkLen = 0; // index into Clean at the current phase's start
+  let IsGrandMa2 = false;
+  let Banner: string | null = null;
 
-    const Clean = () => StripAnsi(Raw);
+  const Clean = () => StripAnsi(Raw);
 
-    const Finish = (Result: Ma2Snapshot) => {
-      if (Settled) return;
-      Settled = true;
-      if (DeadlineTimer) {
-        clearTimeout(DeadlineTimer);
-        DeadlineTimer = null;
-      }
-      try {
-        Socket.destroy();
-      } catch {
-        // ignore
-      }
-      resolve(Result);
-    };
+  const Reachable = (
+    Session: TcpSession<Ma2Snapshot>,
+    LoginState: Ma2LoginState,
+    Extra?: { Version?: string | null; ShowFile?: string | null }
+  ): Ma2Snapshot => ({
+    Reachable: true,
+    LatencyMs: Date.now() - Session.StartedAt,
+    IsGrandMa2,
+    LoginState,
+    Version: (Extra && Extra.Version) || null,
+    ShowFile: (Extra && Extra.ShowFile) || null,
+    Banner,
+  });
 
-    const FinishReachable = (
-      LoginState: Ma2LoginState,
-      Extra?: { Version?: string | null; ShowFile?: string | null }
-    ) =>
-      Finish({
-        Reachable: true,
-        LatencyMs: Date.now() - Started,
-        IsGrandMa2,
-        LoginState,
-        Version: (Extra && Extra.Version) || null,
-        ShowFile: (Extra && Extra.ShowFile) || null,
-        Banner,
-      });
+  const Failed = (Error0: string): Ma2Snapshot => ({
+    Reachable: false,
+    Error: Error0,
+    IsGrandMa2,
+    LoginState: 'not-attempted',
+    Version: null,
+    ShowFile: null,
+    Banner,
+  });
 
-    const Fail = (Error0: string) =>
-      Finish({
-        Reachable: false,
-        Error: Error0,
-        IsGrandMa2,
-        LoginState: 'not-attempted',
-        Version: null,
-        ShowFile: null,
-        Banner,
-      });
+  // A banner was seen but the login/version exchange didn't finish in time.
+  const Unfinished = (Session: TcpSession<Ma2Snapshot>, NoBannerError: string): Ma2Snapshot =>
+    Banner != null
+      ? Reachable(Session, Phase === 'banner' ? 'not-attempted' : 'timeout')
+      : Failed(NoBannerError);
 
-    Socket.setNoDelay(true);
-    Socket.setTimeout(BudgetMs);
-
-    DeadlineTimer = setTimeout(() => {
-      // A banner was seen but the login/version exchange didn't finish in time.
-      if (Banner != null) FinishReachable(Phase === 'banner' ? 'not-attempted' : 'timeout');
-      else Fail(`No banner from grandMA2 after ${BudgetMs}ms`);
-    }, BudgetMs);
-
-    Socket.on('data', (Chunk: Buffer) => {
+  return RunTcpSession<Ma2Snapshot>({
+    Address,
+    Port,
+    IdleMs: BudgetMs,
+    DeadlineMs: BudgetMs,
+    NoDelay: true,
+    OnData: (Chunk, Session) => {
       Raw += Chunk.toString('utf8');
       if (Raw.length > 1_000_000) {
-        Fail('Reply too large');
+        Session.Finish(Failed('Reply too large'));
         return;
       }
       const C = Clean();
@@ -208,13 +190,13 @@ export async function QueryMa2Status(
         IsGrandMa2 = IsGrandMa2Banner(C);
         Banner = C.trim().slice(0, 500);
         if (!WantLogin) {
-          FinishReachable('not-attempted');
+          Session.Finish(Reachable(Session, 'not-attempted'));
           return;
         }
         try {
-          Socket.write(`login ${User} ${Password}\r\n`);
+          Session.Socket.write(`login ${User} ${Password}\r\n`);
         } catch (Err) {
-          FinishReachable('error');
+          Session.Finish(Reachable(Session, 'error'));
           void Err;
           return;
         }
@@ -228,9 +210,9 @@ export async function QueryMa2Status(
         const State = ClassifyLogin(Seg);
         if (State === 'ok') {
           try {
-            Socket.write('Version\r\n');
+            Session.Socket.write('Version\r\n');
           } catch {
-            FinishReachable('ok');
+            Session.Finish(Reachable(Session, 'ok'));
             return;
           }
           Phase = 'version';
@@ -238,7 +220,7 @@ export async function QueryMa2Status(
           return;
         }
         if (State) {
-          FinishReachable(State);
+          Session.Finish(Reachable(Session, State));
         }
         return;
       }
@@ -247,30 +229,12 @@ export async function QueryMa2Status(
       const Seg = Clean().slice(MarkLen);
       if (PROMPT_RE.test(Seg)) {
         const Parsed = ParseVersionReply(Seg);
-        FinishReachable('ok', Parsed);
+        Session.Finish(Reachable(Session, 'ok', Parsed));
       }
-    });
-
-    Socket.once('timeout', () => {
-      if (Banner != null) FinishReachable(Phase === 'banner' ? 'not-attempted' : 'timeout');
-      else Fail(`No banner from grandMA2 after ${BudgetMs}ms`);
-    });
-
-    Socket.once('error', (Err: Error) => {
-      Fail(Err && Err.message ? Err.message : String(Err));
-    });
-
-    Socket.once('close', () => {
-      if (Settled) return;
-      if (Banner != null) FinishReachable(Phase === 'banner' ? 'not-attempted' : 'timeout');
-      else Fail('Connection closed before any banner');
-    });
-
-    try {
-      Socket.connect(Port, Address);
-    } catch (Err) {
-      Fail(Err instanceof Error ? Err.message : String(Err));
-    }
+    },
+    OnTimeout: (Session) => Unfinished(Session, `No banner from grandMA2 after ${BudgetMs}ms`),
+    OnError: (Message) => Failed(Message),
+    OnClose: (Session) => Unfinished(Session, 'Connection closed before any banner'),
   });
 }
 

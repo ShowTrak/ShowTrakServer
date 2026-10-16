@@ -11,8 +11,8 @@
 // press opens its own short-lived connection, in keeping with the probe: resolve
 // the workspace, send the passcode if one is set, send the command, and read
 // QLab's acknowledgement before closing.
-import net from 'net';
 import { EncodeOscTcp, DecodeOscStream, type OscArg } from './_osc-shared';
+import { ErrorMessage, RunTcpSession, type TcpSession } from './_tcp-session';
 import {
   ParseQLabReply,
   WorkspaceMatches,
@@ -83,10 +83,6 @@ interface WorkspaceInfo {
   hasPasscodeSet?: unknown;
 }
 
-function ErrText(Err: unknown): string {
-  return Err && (Err as Error).message ? (Err as Error).message : String(Err);
-}
-
 // Open a short-lived TCP connection, send `/workspaces`, and resolve with the
 // reported workspace list (or a failure).
 function QueryWorkspaces(
@@ -94,68 +90,52 @@ function QueryWorkspaces(
   Port: number,
   TimeoutMs: number
 ): Promise<MonitoringResult> {
-  return new Promise<MonitoringResult>((resolve) => {
-    const Started = Date.now();
-    let Settled = false;
-    let Buf = Buffer.alloc(0);
-    const Socket = new net.Socket();
+  let Buf = Buffer.alloc(0);
 
-    const Finish = (Result: MonitoringResult) => {
-      if (Settled) return;
-      Settled = true;
-      try {
-        Socket.destroy();
-      } catch {
-        // ignore
+  // Finishes the session if a /workspaces reply has arrived; reports whether it did.
+  const Extract = (Session: TcpSession<MonitoringResult>): boolean => {
+    const { Messages, Rest } = DecodeOscStream(Buf, 'slip');
+    Buf = Rest;
+    for (const M of Messages) {
+      const Reply = ParseQLabReply(M);
+      if (Reply && Reply.Address.endsWith('/workspaces') && Array.isArray(Reply.Data)) {
+        Session.Finish({
+          Success: true,
+          LatencyMs: Date.now() - Session.StartedAt,
+          Workspaces: Reply.Data,
+        });
+        return true;
       }
-      resolve(Result);
-    };
+    }
+    return false;
+  };
 
-    const Extract = (): boolean => {
-      const { Messages, Rest } = DecodeOscStream(Buf, 'slip');
-      Buf = Rest;
-      for (const M of Messages) {
-        const Reply = ParseQLabReply(M);
-        if (Reply && Reply.Address.endsWith('/workspaces') && Array.isArray(Reply.Data)) {
-          Finish({ Success: true, LatencyMs: Date.now() - Started, Workspaces: Reply.Data });
-          return true;
-        }
-      }
-      return false;
-    };
-
-    Socket.setTimeout(Math.max(200, TimeoutMs | 0));
-
-    Socket.once('connect', () => {
+  return RunTcpSession<MonitoringResult>({
+    Address,
+    Port,
+    IdleMs: Math.max(200, TimeoutMs | 0),
+    OnConnect: (Session) => {
       try {
-        Socket.write(EncodeOscTcp('/workspaces', [], 'slip'));
+        Session.Socket.write(EncodeOscTcp('/workspaces', [], 'slip'));
       } catch (Err) {
-        Finish({ Success: false, Error: ErrText(Err) });
+        Session.Finish({ Success: false, Error: ErrorMessage(Err) });
       }
-    });
-
-    Socket.on('data', (Chunk: Buffer) => {
+    },
+    OnData: (Chunk, Session) => {
       Buf = Buffer.concat([Buf, Chunk]);
       if (Buf.length > 1_000_000) {
-        Finish({ Success: false, Error: 'Reply too large' });
+        Session.Finish({ Success: false, Error: 'Reply too large' });
         return;
       }
-      Extract();
-    });
-
-    Socket.once('timeout', () =>
-      Finish({ Success: false, Error: `No reply from QLab after ${TimeoutMs}ms` })
-    );
-    Socket.once('error', (Err: Error) => Finish({ Success: false, Error: ErrText(Err) }));
-    Socket.once('close', () => {
-      if (!Settled && !Extract()) Finish({ Success: false, Error: 'No reply from QLab' });
-    });
-
-    try {
-      Socket.connect(Port, Address);
-    } catch (Err) {
-      Finish({ Success: false, Error: ErrText(Err) });
-    }
+      Extract(Session);
+    },
+    OnTimeout: () => ({ Success: false, Error: `No reply from QLab after ${TimeoutMs}ms` }),
+    OnError: (Message) => ({ Success: false, Error: Message }),
+    // A reply still buffered when QLab hangs up counts.
+    OnClose: (Session) => {
+      Extract(Session);
+      return { Success: false, Error: 'No reply from QLab' };
+    },
   });
 }
 
@@ -223,51 +203,39 @@ function SendCommand(
   Passcode: string,
   Command: QLabCommand
 ): Promise<MonitoringActionResult> {
-  return new Promise<MonitoringActionResult>((resolve) => {
-    const BudgetMs = Math.max(200, TimeoutMs | 0);
-    let Settled = false;
-    let Buf = Buffer.alloc(0);
-    let Pending: { Key: string; Resolve: (Reply: QLabReply) => void } | null = null;
-    const Socket = new net.Socket();
+  // One absolute budget for the whole exchange (workspaces, passcode, command),
+  // so three sequential round trips cannot each take the full timeout.
+  const BudgetMs = Math.max(200, TimeoutMs | 0);
+  let Buf = Buffer.alloc(0);
+  let Pending: { Key: string; Resolve: (Reply: QLabReply) => void } | null = null;
 
-    // One absolute budget for the whole exchange (workspaces, passcode,
-    // command), so three sequential round trips cannot each take the full
-    // timeout.
-    const Deadline = setTimeout(
-      () => Finish({ Success: false, Error: `No reply from QLab after ${BudgetMs}ms` }),
-      BudgetMs
-    );
-
-    function Finish(Result: MonitoringActionResult): void {
-      if (Settled) return;
-      Settled = true;
-      clearTimeout(Deadline);
-      try {
-        Socket.destroy();
-      } catch {
-        // ignore
-      }
-      resolve(Result);
+  const Write = (Session: TcpSession<MonitoringActionResult>, Addr: string, Args: OscArg[]) => {
+    try {
+      Session.Socket.write(EncodeOscTcp(Addr, Args, 'slip'));
+    } catch (Err) {
+      Session.Finish({ Success: false, Error: ErrorMessage(Err) });
     }
+  };
 
-    const Write = (Addr: string, Args: OscArg[]) => {
-      try {
-        Socket.write(EncodeOscTcp(Addr, Args, 'slip'));
-      } catch (Err) {
-        Finish({ Success: false, Error: ErrText(Err) });
-      }
-    };
+  const Request = (
+    Session: TcpSession<MonitoringActionResult>,
+    Addr: string,
+    Args: OscArg[]
+  ): Promise<QLabReply> =>
+    new Promise<QLabReply>((Res) => {
+      Pending = { Key: ReplyKey(Addr), Resolve: Res };
+      Write(Session, Addr, Args);
+    });
 
-    const Request = (Addr: string, Args: OscArg[]): Promise<QLabReply> =>
-      new Promise<QLabReply>((Res) => {
-        Pending = { Key: ReplyKey(Addr), Resolve: Res };
-        Write(Addr, Args);
-      });
-
-    Socket.on('data', (Chunk: Buffer) => {
+  return RunTcpSession<MonitoringActionResult>({
+    Address,
+    Port,
+    IdleMs: BudgetMs,
+    DeadlineMs: BudgetMs,
+    OnData: (Chunk, Session) => {
       Buf = Buffer.concat([Buf, Chunk]);
       if (Buf.length > 1_000_000) {
-        Finish({ Success: false, Error: 'Reply too large' });
+        Session.Finish({ Success: false, Error: 'Reply too large' });
         return;
       }
       const { Messages, Rest } = DecodeOscStream(Buf, 'slip');
@@ -279,24 +247,23 @@ function SendCommand(
         Pending = null;
         Current.Resolve(Reply);
       }
-    });
-
-    Socket.once('error', (Err: Error) => Finish({ Success: false, Error: ErrText(Err) }));
-    Socket.once('close', () => Finish({ Success: false, Error: 'QLab closed the connection' }));
-
-    Socket.once('connect', () => {
+    },
+    OnTimeout: () => ({ Success: false, Error: `No reply from QLab after ${BudgetMs}ms` }),
+    OnError: (Message) => ({ Success: false, Error: Message }),
+    OnClose: () => ({ Success: false, Error: 'QLab closed the connection' }),
+    OnConnect: (Session) => {
       void (async () => {
         // Without this QLab 4 stays silent after most commands, leaving nothing
         // to tell an accepted GO from a refused one.
-        Write('/alwaysReply', [{ Int: 1 }]);
+        Write(Session, '/alwaysReply', [{ Int: 1 }]);
 
-        const List = await Request('/workspaces', []);
+        const List = await Request(Session, '/workspaces', []);
         const Workspaces = Array.isArray(List.Data) ? (List.Data as WorkspaceRef[]) : [];
         const Match = Wanted
           ? Workspaces.find((W) => WorkspaceMatches(W, Wanted))
           : Workspaces.find((W) => W && typeof W === 'object' && W.uniqueID != null);
         if (!Match || Match.uniqueID == null) {
-          Finish({
+          Session.Finish({
             Success: false,
             Error: Wanted ? 'Workspace not open in QLab' : 'No workspaces open in QLab',
           });
@@ -305,10 +272,10 @@ function SendCommand(
         const Prefix = `/workspace/${String(Match.uniqueID)}`;
 
         if (Passcode) {
-          const Connected = await Request(`${Prefix}/connect`, [Passcode]);
+          const Connected = await Request(Session, `${Prefix}/connect`, [Passcode]);
           // QLab answers a wrong passcode in the reply's data, not its status.
           if (Connected.Status !== 'ok' || Connected.Data === 'badpass') {
-            Finish({
+            Session.Finish({
               Success: false,
               Error: DescribeRefusal(Connected.Data === 'badpass' ? 'badpass' : Connected.Status),
             });
@@ -316,20 +283,14 @@ function SendCommand(
           }
         }
 
-        const Reply = await Request(`${Prefix}${Command.Address}`, Command.Args);
-        Finish(
+        const Reply = await Request(Session, `${Prefix}${Command.Address}`, Command.Args);
+        Session.Finish(
           Reply.Status === 'ok'
             ? { Success: true, Detail: Command.Detail }
             : { Success: false, Error: DescribeRefusal(Reply.Status) }
         );
       })();
-    });
-
-    try {
-      Socket.connect(Port, Address);
-    } catch (Err) {
-      Finish({ Success: false, Error: ErrText(Err) });
-    }
+    },
   });
 }
 
