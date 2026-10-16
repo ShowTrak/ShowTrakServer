@@ -92,12 +92,15 @@ test('every audio trigger is offered, and accepted by the rule validator', () =>
   }
 });
 
-test('the rule editor offers every audio trigger, each with its own phrase', () => {
-  // The editor keeps its own allowlist and drops anything not on it, so a
-  // trigger missing here would be offered by the server and silently discarded.
-  const { ALERT_TRIGGER_ALLOWLIST } = require('../dist-test/UI/js/app/state/ui-drafts.js');
+test('the trigger catalog offers every audio trigger, each with its own phrase', () => {
+  // The catalog is what the rule editor offers and accepts, so a trigger missing
+  // from it would be raised by the server but impossible to write a rule for.
+  const { TRIGGER_CATALOG } = require('../dist/Modules/AlertsManager/triggers');
   for (const trigger of AUDIO_TRIGGERS) {
-    assert.ok(ALERT_TRIGGER_ALLOWLIST.has(trigger), `${trigger} missing from the editor allowlist`);
+    const Row = TRIGGER_CATALOG.find((T) => T.ID === trigger);
+    assert.ok(Row, `${trigger} missing from the trigger catalog`);
+    assert.equal(Row.Category, 'Audio');
+    assert.ok(Row.Summary, `${trigger} has no summary phrase`);
   }
 });
 

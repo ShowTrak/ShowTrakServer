@@ -16,7 +16,7 @@ import type { Result } from '../../types/result';
 import type { AlertTriggerType, TagView } from '@showtrak/protocol';
 import type { AlertRuleWriteRow } from '../DB/repositories/alert-rules';
 
-import { TRIGGERS } from './triggers';
+import { TRIGGERS, TRIGGER_CATALOG } from './triggers';
 import {
   normalizeRuleRow,
   toRowScope,
@@ -332,107 +332,9 @@ Manager.Get = async (RuleID: unknown) => {
   return Ok(Rule);
 };
 
-Manager.GetTriggers = () => {
-  return [
-    { ID: TRIGGERS.CLIENT_OFFLINE, Name: 'Client Offline' },
-    { ID: TRIGGERS.CLIENT_DEGRADED, Name: 'Client Degraded' },
-    { ID: TRIGGERS.CLIENT_ONLINE, Name: 'Client Online' },
-    { ID: TRIGGERS.SCRIPT_EXECUTION_FAILED, Name: 'Script Execution Failed' },
-    { ID: TRIGGERS.FREEKIOSK_METRIC_ALARM, Name: 'FreeKiosk Metric Alarm' },
-    { ID: TRIGGERS.USB_DEVICE_CONNECTED, Name: 'USB Device Connected' },
-    { ID: TRIGGERS.USB_DEVICE_DISCONNECTED, Name: 'USB Device Disconnected' },
-    {
-      ID: TRIGGERS.NON_CRITICAL_USB_DEVICE_CONNECTED,
-      Name: 'Unmonitored USB Device Connected',
-    },
-    {
-      ID: TRIGGERS.NON_CRITICAL_USB_DEVICE_DISCONNECTED,
-      Name: 'Unmonitored USB Device Disconnected',
-    },
-    { ID: TRIGGERS.CRITICAL_USB_DEVICE_CONNECTED, Name: 'Monitored USB Device Connected' },
-    {
-      ID: TRIGGERS.CRITICAL_USB_DEVICE_DISCONNECTED,
-      Name: 'Monitored USB Device Disconnected',
-    },
-    { ID: TRIGGERS.AUDIO_DEVICE_CONNECTED, Name: 'Audio Device Connected' },
-    { ID: TRIGGERS.AUDIO_DEVICE_DISCONNECTED, Name: 'Audio Device Disconnected' },
-    {
-      ID: TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_CONNECTED,
-      Name: 'Unmonitored Audio Device Connected',
-    },
-    {
-      ID: TRIGGERS.NON_CRITICAL_AUDIO_DEVICE_DISCONNECTED,
-      Name: 'Unmonitored Audio Device Disconnected',
-    },
-    { ID: TRIGGERS.CRITICAL_AUDIO_DEVICE_CONNECTED, Name: 'Monitored Audio Device Connected' },
-    {
-      ID: TRIGGERS.CRITICAL_AUDIO_DEVICE_DISCONNECTED,
-      Name: 'Monitored Audio Device Disconnected',
-    },
-    { ID: TRIGGERS.AUDIO_DEFAULT_DEVICE_CHANGED, Name: 'Default Audio Device Changed' },
-    { ID: TRIGGERS.AUDIO_DEVICE_MUTED, Name: 'Audio Device Muted' },
-    { ID: TRIGGERS.AUDIO_FORMAT_CHANGED, Name: 'Audio Format Changed' },
-    { ID: TRIGGERS.APPLICATION_STARTED, Name: 'Application Started' },
-    { ID: TRIGGERS.APPLICATION_STOPPED, Name: 'Application Stopped' },
-    { ID: TRIGGERS.CRITICAL_APPLICATION_STARTED, Name: 'Monitored Application Started' },
-    { ID: TRIGGERS.CRITICAL_APPLICATION_STOPPED, Name: 'Monitored Application Stopped' },
-    {
-      ID: TRIGGERS.NON_CRITICAL_APPLICATION_STARTED,
-      Name: 'Unmonitored Application Started',
-    },
-    {
-      ID: TRIGGERS.NON_CRITICAL_APPLICATION_STOPPED,
-      Name: 'Unmonitored Application Stopped',
-    },
-    { ID: TRIGGERS.CLIENT_RECOVERED, Name: 'Client Recovered' },
-    { ID: TRIGGERS.CLIENT_REBOOTED, Name: 'Client Restarted' },
-    { ID: TRIGGERS.CLIENT_VERSION_CHANGED, Name: 'Client Version Changed' },
-    { ID: TRIGGERS.CLIENT_SLEEPING, Name: 'Client Going To Sleep' },
-    { ID: TRIGGERS.CLIENT_RESUMED, Name: 'Client Woke From Sleep' },
-    { ID: TRIGGERS.CPU_USAGE_HIGH, Name: 'CPU Usage High' },
-    { ID: TRIGGERS.RAM_USAGE_HIGH, Name: 'Memory Usage High' },
-    { ID: TRIGGERS.UPTIME_HIGH, Name: 'Restart Overdue' },
-    { ID: TRIGGERS.TEMPERATURE_HIGH, Name: 'Temperature High' },
-    { ID: TRIGGERS.THERMAL_STATE_HIGH, Name: 'Thermal Throttling' },
-    { ID: TRIGGERS.BATTERY_LOW, Name: 'Battery Low' },
-    { ID: TRIGGERS.BATTERY_NOT_CHARGING, Name: 'Battery Not Charging' },
-    { ID: TRIGGERS.CRITICAL_POWER_ON_BATTERY, Name: 'Monitored Client On Battery' },
-    { ID: TRIGGERS.POWER_ON_BATTERY, Name: 'Running On Battery' },
-    { ID: TRIGGERS.POWER_RESTORED, Name: 'Mains Power Restored' },
-    { ID: TRIGGERS.APPLICATION_NOT_RESPONDING, Name: 'Application Not Responding' },
-    {
-      ID: TRIGGERS.CRITICAL_APPLICATION_NOT_RESPONDING,
-      Name: 'Monitored Application Not Responding',
-    },
-    { ID: TRIGGERS.APPLICATION_RESPONDING, Name: 'Application Responding Again' },
-    {
-      ID: TRIGGERS.CRITICAL_APPLICATION_MULTIPLE_INSTANCES,
-      Name: 'Monitored Application Running More Than Once',
-    },
-    { ID: TRIGGERS.FOREGROUND_APPLICATION_CHANGED, Name: 'Foreground Application Changed' },
-    {
-      ID: TRIGGERS.CRITICAL_APPLICATION_LOST_FOREGROUND,
-      Name: 'Monitored Application Lost Foreground',
-    },
-    { ID: TRIGGERS.DISPLAY_CONNECTED, Name: 'Display Connected' },
-    { ID: TRIGGERS.DISPLAY_DISCONNECTED, Name: 'Display Disconnected' },
-    { ID: TRIGGERS.CRITICAL_DISPLAY_CONNECTED, Name: 'Monitored Display Connected' },
-    { ID: TRIGGERS.CRITICAL_DISPLAY_DISCONNECTED, Name: 'Monitored Display Disconnected' },
-    { ID: TRIGGERS.DISPLAY_CONFIGURATION_CHANGED, Name: 'Display Configuration Changed' },
-    { ID: TRIGGERS.NETWORK_INTERFACE_UP, Name: 'Network Interface Up' },
-    { ID: TRIGGERS.NETWORK_INTERFACE_DOWN, Name: 'Network Interface Down' },
-    {
-      ID: TRIGGERS.CRITICAL_NETWORK_INTERFACE_DOWN,
-      Name: 'Monitored Network Interface Down',
-    },
-    { ID: TRIGGERS.NETWORK_ADDRESS_CHANGED, Name: 'Network Address Changed' },
-    { ID: TRIGGERS.NETWORK_GATEWAY_CHANGED, Name: 'Network Router Changed' },
-    { ID: TRIGGERS.USB_DEVICE_MOVED, Name: 'USB Device Moved' },
-    { ID: TRIGGERS.USB_FIRMWARE_CHANGED, Name: 'USB Firmware Changed' },
-    { ID: TRIGGERS.USB_DEVICE_ERROR, Name: 'USB Device Error' },
-    { ID: TRIGGERS.AUDIO_VOLUME_OUT_OF_RANGE, Name: 'Audio Level Out Of Range' },
-  ];
-};
+// The editor's catalog, straight from the trigger table (see ./triggers).
+Manager.GetTriggers = () =>
+  TRIGGER_CATALOG.map(({ ID, Name, Summary, Category }) => ({ ID, Name, Summary, Category }));
 
 Manager.GetActionTypes = () => {
   return AlertActions.GetAll();

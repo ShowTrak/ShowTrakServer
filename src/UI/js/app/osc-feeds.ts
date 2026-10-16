@@ -37,7 +37,7 @@ import {
   RefreshMonitoringCheckDebugIfOpen,
   RefreshMonitoringEditorIfOpen,
 } from './monitoring-editor';
-import { RenderAlertRuleManagerList } from './alert-rules';
+import { EnsureAlertCatalogsLoaded, RenderAlertRuleManagerList } from './alert-rules';
 import { Notify, RenderClientInfoDetails, UpdateIdentifyStatusBanner } from './selection-init';
 import { UpdateDummyClientTile } from './dummy-clients';
 import { UpdateFreeKioskTile } from './freekiosk';
@@ -694,6 +694,9 @@ export function InitOscFeeds() {
 
   window.API.SetFullAlertRuleList(async (List) => {
     setAlertRulesCache(Array.isArray(List) ? List : []);
+    // Rule summaries are phrased from the trigger catalog; without it every rule
+    // would read "triggers" until the manager was next opened.
+    await EnsureAlertCatalogsLoaded();
     RenderAlertRuleManagerList();
   });
 

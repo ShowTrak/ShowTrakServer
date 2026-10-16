@@ -1,8 +1,6 @@
 import { openModal, closeModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
 import {
-  ALERT_TRIGGER_ALLOWLIST,
-  ALERT_TRIGGER_CATEGORIES,
   AlertActionEditorIsCreating,
   AlertActionTypesCache,
   AlertEditingActionIndex,
@@ -30,7 +28,12 @@ import {
   setAlertTriggerTypesCache,
 } from './state';
 import type { AlertScopeModel } from './state';
-import type { AlertRuleActionView, AlertRuleScope, AlertRuleView } from '@showtrak/protocol';
+import type {
+  AlertRuleActionView,
+  AlertRuleScope,
+  AlertRuleView,
+  AlertTriggerType,
+} from '@showtrak/protocol';
 import { PreviewSound } from './settings';
 import { Safe } from './utils';
 import {
@@ -101,6 +104,14 @@ export function ParseAlertScopeSelection(): ParsedAlertScope {
   return parseScopeSelection(AlertScopeSelected);
 }
 
+// The server's trigger catalog (AlertsManager/triggers) is the allowlist: an ID
+// it does not offer is dropped rather than passed through, so a rule cannot be
+// made to fire on an arbitrary string and a stale rule naming a removed trigger
+// degrades to "no triggers" instead of matching everything.
+function catalogTrigger(ID: string): AlertTriggerType | undefined {
+  return (AlertTriggerTypesCache || []).find((T) => `${T.ID || ''}`.toUpperCase() === ID);
+}
+
 // Keep only allowed, deduped trigger IDs. Empty input yields an empty list; the
 // editor supplies a sensible default separately (see DefaultAlertTriggerTypes).
 export function NormalizeAlertTriggerTypes(TriggerTypes: unknown): string[] {
@@ -113,26 +124,24 @@ export function NormalizeAlertTriggerTypes(TriggerTypes: unknown): string[] {
   const Seen = new Set<string>();
   for (const Raw of List) {
     const Normalized = `${Raw == null ? '' : Raw}`.trim().toUpperCase();
-    if (!ALERT_TRIGGER_ALLOWLIST.has(Normalized) || Seen.has(Normalized)) continue;
+    if (!catalogTrigger(Normalized) || Seen.has(Normalized)) continue;
     Seen.add(Normalized);
     Out.push(Normalized);
   }
   return Out;
 }
 
-// First allowed trigger from the catalog, falling back to CLIENT_OFFLINE. Used
-// as the default selection for a brand-new rule so a trigger is always chosen.
+// First trigger in the catalog, falling back to CLIENT_OFFLINE. Used as the
+// default selection for a brand-new rule so a trigger is always chosen.
 export function DefaultAlertTriggerTypes(): string[] {
-  const First = (AlertTriggerTypesCache || []).find((T) =>
-    ALERT_TRIGGER_ALLOWLIST.has(`${T.ID || ''}`.toUpperCase())
-  );
+  const First = (AlertTriggerTypesCache || []).find((T) => T && T.ID);
   return [First ? `${First.ID}`.toUpperCase() : 'CLIENT_OFFLINE'];
 }
 
 // Human-readable trigger names (from the loaded catalog) for a list of IDs.
 function triggerNamesByIDs(TriggerTypes: string[]): string[] {
   return TriggerTypes.map((ID) => {
-    const Match = (AlertTriggerTypesCache || []).find((T) => `${T.ID || ''}`.toUpperCase() === ID);
+    const Match = catalogTrigger(ID);
     return Match ? Match.Name : ID;
   });
 }
@@ -142,7 +151,7 @@ export function CloseAlertTriggerDropdown() {
 }
 
 // Render the trigger multiselect toggle text + checkbox menu from the current
-// AlertTriggerSelected state, offering every allowlisted trigger in the catalog.
+// AlertTriggerSelected state, offering every trigger in the catalog.
 export function RenderAlertTriggerDropdown() {
   const Selected = new Set(NormalizeAlertTriggerTypes(AlertTriggerSelected));
   const SelectedNames = triggerNamesByIDs(Array.from(Selected));
@@ -157,13 +166,13 @@ export function RenderAlertTriggerDropdown() {
   );
 
   // Grouped by category: the catalog is long enough that a flat list is a
-  // scroll hunt. Catalog order is kept within each group.
+  // scroll hunt. The catalog arrives ordered by category, so first appearance
+  // gives the group order and catalog order is kept within each group.
   const Groups = new Map<string, string[]>();
   for (const T of AlertTriggerTypesCache || []) {
     const ID = `${T.ID || ''}`.toUpperCase();
-    if (!ALERT_TRIGGER_ALLOWLIST.has(ID)) continue;
-    const Category = ALERT_TRIGGER_CATEGORIES.find((C) => C.Match.test(ID));
-    const Title = Category ? Category.Title : 'Other';
+    if (!ID) continue;
+    const Title = T.Category || 'Other';
     const Checked = Selected.has(ID) ? 'checked' : '';
     const Html = `
         <label class="alert-multiselect-option">
@@ -173,8 +182,7 @@ export function RenderAlertTriggerDropdown() {
       `;
     Groups.set(Title, (Groups.get(Title) || []).concat(Html));
   }
-  const Order = ALERT_TRIGGER_CATEGORIES.map((C) => C.Title).concat('Other');
-  const OptionsHtml = Order.filter((Title) => Groups.has(Title))
+  const OptionsHtml = Array.from(Groups.keys())
     .map(
       (Title) =>
         `<div class="alert-multiselect-heading">${Safe(Title)}</div>${Groups.get(Title)!.join('')}`
@@ -615,92 +623,9 @@ export function actionTypeNameByID(ID: string) {
 }
 
 export function triggerSummaryText(TriggerType: string) {
-  if (TriggerType === 'CLIENT_OFFLINE') return 'is offline';
-  if (TriggerType === 'CLIENT_ONLINE') return 'is online';
-  if (TriggerType === 'CLIENT_DEGRADED') return 'is degraded';
-  if (TriggerType === 'SCRIPT_EXECUTION_FAILED') return 'fails to execute a script';
-  if (TriggerType === 'FREEKIOSK_METRIC_ALARM') return 'raises a FreeKiosk metric alarm';
-  if (TriggerType === 'USB_DEVICE_CONNECTED') return 'has a USB device connected';
-  if (TriggerType === 'USB_DEVICE_DISCONNECTED') return 'has a USB device disconnected';
-  if (TriggerType === 'NON_CRITICAL_USB_DEVICE_CONNECTED') {
-    return 'has an unmonitored USB device connected';
-  }
-  if (TriggerType === 'NON_CRITICAL_USB_DEVICE_DISCONNECTED') {
-    return 'has an unmonitored USB device disconnected';
-  }
-  if (TriggerType === 'CRITICAL_USB_DEVICE_CONNECTED')
-    return 'has a monitored USB device connected';
-  if (TriggerType === 'CRITICAL_USB_DEVICE_DISCONNECTED') {
-    return 'has a monitored USB device disconnected';
-  }
-  if (TriggerType === 'AUDIO_DEVICE_CONNECTED') return 'has an audio device connected';
-  if (TriggerType === 'AUDIO_DEVICE_DISCONNECTED') return 'has an audio device disconnected';
-  if (TriggerType === 'CRITICAL_AUDIO_DEVICE_CONNECTED') {
-    return 'has a monitored audio device connected';
-  }
-  if (TriggerType === 'CRITICAL_AUDIO_DEVICE_DISCONNECTED') {
-    return 'has a monitored audio device disconnected';
-  }
-  if (TriggerType === 'NON_CRITICAL_AUDIO_DEVICE_CONNECTED') {
-    return 'has an unmonitored audio device connected';
-  }
-  if (TriggerType === 'NON_CRITICAL_AUDIO_DEVICE_DISCONNECTED') {
-    return 'has an unmonitored audio device disconnected';
-  }
-  if (TriggerType === 'AUDIO_DEFAULT_DEVICE_CHANGED') return 'changes its default audio device';
-  if (TriggerType === 'AUDIO_DEVICE_MUTED') return 'has an audio device muted';
-  if (TriggerType === 'AUDIO_FORMAT_CHANGED') return 'has an audio device change format';
-  if (TriggerType === 'APPLICATION_STARTED') return 'has an application started';
-  if (TriggerType === 'APPLICATION_STOPPED') return 'has an application stopped';
-  if (TriggerType === 'CRITICAL_APPLICATION_STARTED') return 'has a monitored application started';
-  if (TriggerType === 'CRITICAL_APPLICATION_STOPPED') return 'has a monitored application stopped';
-  if (TriggerType === 'NON_CRITICAL_APPLICATION_STARTED') {
-    return 'has an unmonitored application started';
-  }
-  if (TriggerType === 'NON_CRITICAL_APPLICATION_STOPPED') {
-    return 'has an unmonitored application stopped';
-  }
-  return HEALTH_TRIGGER_SUMMARIES[TriggerType] || 'triggers';
+  const Match = catalogTrigger(`${TriggerType || ''}`.toUpperCase());
+  return (Match && Match.Summary) || 'triggers';
 }
-
-// Rule-summary phrases for the triggers raised from client health telemetry.
-const HEALTH_TRIGGER_SUMMARIES: Record<string, string> = {
-  CLIENT_RECOVERED: 'recovers from being degraded',
-  CLIENT_REBOOTED: 'restarts',
-  CLIENT_VERSION_CHANGED: 'changes client version',
-  CLIENT_SLEEPING: 'goes to sleep',
-  CLIENT_RESUMED: 'wakes from sleep',
-  CPU_USAGE_HIGH: 'has high CPU usage',
-  RAM_USAGE_HIGH: 'has high memory usage',
-  UPTIME_HIGH: 'is overdue a restart',
-  TEMPERATURE_HIGH: 'runs hot',
-  THERMAL_STATE_HIGH: 'throttles to cool down',
-  BATTERY_NOT_CHARGING: 'stops charging its battery',
-  CRITICAL_POWER_ON_BATTERY: 'runs on battery while monitored',
-  BATTERY_LOW: 'has a low battery',
-  POWER_ON_BATTERY: 'loses mains power',
-  POWER_RESTORED: 'gets mains power back',
-  APPLICATION_NOT_RESPONDING: 'has an application stop responding',
-  CRITICAL_APPLICATION_NOT_RESPONDING: 'has a monitored application stop responding',
-  APPLICATION_RESPONDING: 'has an application start responding again',
-  CRITICAL_APPLICATION_MULTIPLE_INSTANCES: 'runs a monitored application more than once',
-  FOREGROUND_APPLICATION_CHANGED: 'changes its foreground application',
-  CRITICAL_APPLICATION_LOST_FOREGROUND: 'has a monitored application lose the foreground',
-  DISPLAY_CONNECTED: 'has a display connected',
-  DISPLAY_DISCONNECTED: 'has a display disconnected',
-  CRITICAL_DISPLAY_CONNECTED: 'has a monitored display connected',
-  CRITICAL_DISPLAY_DISCONNECTED: 'has a monitored display disconnected',
-  DISPLAY_CONFIGURATION_CHANGED: 'has a display change configuration',
-  NETWORK_INTERFACE_UP: 'has a network interface come up',
-  NETWORK_INTERFACE_DOWN: 'has a network interface go down',
-  CRITICAL_NETWORK_INTERFACE_DOWN: 'has a monitored network interface go down',
-  NETWORK_ADDRESS_CHANGED: 'changes a network address',
-  NETWORK_GATEWAY_CHANGED: 'changes a network router',
-  USB_DEVICE_MOVED: 'has a USB device moved to another port',
-  USB_FIRMWARE_CHANGED: 'has a USB device change firmware',
-  USB_DEVICE_ERROR: 'has a USB device report a problem',
-  AUDIO_VOLUME_OUT_OF_RANGE: 'has an audio level out of range',
-};
 
 // Join several trigger phrases with "or" so a multi-trigger rule reads naturally
 // (e.g. "is offline or is online"). Falls back to a generic phrase when empty.

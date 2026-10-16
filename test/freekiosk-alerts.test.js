@@ -110,15 +110,13 @@ test('a metric alarm rule can actually be saved, metric filter included', () => 
   assert.deepEqual(payload.TriggerConfig, { Metrics: ['battery_level'] });
 });
 
-test('every trigger the server offers is accepted by the validator and the editor', () => {
-  // The guard that would have caught the FreeKiosk gap: three lists name the
-  // triggers (the offered catalogue, the IPC validator, the editor allowlist),
-  // and a trigger missing from either of the last two is offered but unusable.
+test('every trigger the server offers is accepted by the validator', () => {
+  // The guard that would have caught the FreeKiosk gap: a trigger the catalogue
+  // offers but the IPC validator rejects is offered but unusable. (The editor's
+  // allowlist is the catalogue itself, so it cannot drift.)
   const { Manager } = boot();
   const { Manager: IPCValidation } = require('../dist/Modules/IPCValidation');
-  const { ALERT_TRIGGER_ALLOWLIST } = require('../dist-test/UI/js/app/state/ui-drafts.js');
   for (const { ID } of Manager.GetTriggers()) {
-    assert.ok(ALERT_TRIGGER_ALLOWLIST.has(ID), `${ID} is missing from the editor allowlist`);
     assert.doesNotThrow(
       () =>
         IPCValidation.AlertRuleCreatePayload({

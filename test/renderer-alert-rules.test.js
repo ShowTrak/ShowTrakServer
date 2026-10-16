@@ -38,9 +38,14 @@ const {
   buildRuleSummary,
 } = AlertRules;
 
-const { ALERT_TRIGGER_ALLOWLIST } = State;
+// The editor's allowlist, picker and phrasing all come from the server's trigger
+// catalog, which reaches the renderer over IPC. Seed the cache from the real
+// table so these tests exercise the triggers that actually ship.
+const { TRIGGER_CATALOG } = require('../dist/Modules/AlertsManager/triggers');
+const ALERT_TRIGGER_ALLOWLIST = new Set(TRIGGER_CATALOG.map((T) => T.ID));
 
 function seed({ clients = [], monitors = [], dummies = [], groups = [] } = {}) {
+  State.setAlertTriggerTypesCache(TRIGGER_CATALOG.map((T) => ({ ...T })));
   State.setAllClients(clients);
   State.setMonitoringTargets(monitors);
   State.setDummyClients(dummies);
