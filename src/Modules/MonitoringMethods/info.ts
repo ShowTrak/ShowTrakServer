@@ -287,6 +287,280 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       },
     ],
   },
+  hyperdeck: {
+    Summary:
+      'Connects to a Blackmagic HyperDeck recorder on the HyperDeck Ethernet Protocol (TCP 9993) and reads its transport state and every media slot in one short session, sending only queries. Degraded by default when no media is mounted, the active slot is empty, or a slot reports a media error. Enable the recording toggle to flag a deck that is not recording, and the recording-time toggle to flag recording time left below a minimum (default 15 minutes, counted across all mounted slots because HyperDeck continues recording on the next card when one fills).',
+    Setup: [
+      "Set Address to the HyperDeck's IP address, set in Blackmagic HyperDeck Setup or the deck's Setup menu. The protocol port is 9993.",
+      'HyperDeck accepts a limited number of protocol clients at once. A deck that answers "120 connection failed" reports Degraded — close other control software connected to it.',
+      'Enable Check recording for the period the deck should be rolling, e.g. the show.',
+      'Set the minimum recording time to the longest stretch that must record without a card change. Under Advanced, count the active slot only to be warned before each card fills.',
+    ],
+    Links: [
+      {
+        Label: 'HyperDeck Ethernet Protocol (Blackmagic Design)',
+        Url: 'https://documents.blackmagicdesign.com/DeveloperManuals/HyperDeckEthernetProtocol.pdf',
+      },
+    ],
+  },
+  videohub: {
+    Summary:
+      'Connects to a Blackmagic Videohub router, or a computer running Videohub Server, on the Videohub Ethernet Protocol (TCP 9990) and reads the state dump it sends on connect. It sends nothing, so it cannot change a route, label or lock. Degraded when no router is attached, the router needs a firmware update, or the router reports a hardware alarm (power supply, fan). Enable Check routes to flag listed outputs that are not on their expected inputs.',
+    Setup: [
+      "Set Address to the router's IP address, set in Blackmagic Videohub Setup. For a USB-connected router, use the computer running Videohub Server.",
+      'Enable Check routes and add one Output:Input entry per route, numbered from 1 as on the chassis and in Videohub Control, e.g. 3:7 for output 3 on input 7.',
+      'Only main video outputs are checked. Monitoring outputs and serial ports are not.',
+    ],
+    Links: [
+      {
+        Label: 'Videohub Ethernet Protocol (Blackmagic Design)',
+        Url: 'https://documents.blackmagicdesign.com/DeveloperManuals/VideohubDeveloperInformation.pdf',
+      },
+    ],
+  },
+  atem: {
+    Summary:
+      'Holds a read-only session to a Blackmagic ATEM switcher on UDP 9910 and reads the state the switcher pushes: product name, protocol version, power supplies, ME 1 program and preview, and streaming and recording status on models that have them. Only acknowledgements are sent; no command is ever sent to the switcher.',
+    Setup: [
+      'Find the switcher’s IP address in Blackmagic ATEM Setup (Configure tab) or on its front-panel network menu, and enter it as the address.',
+      'Leave the port at 9910. ATEM switchers always use UDP 9910.',
+      'Leave Check power supplies on. A supply that reports OK and then drops out turns the check Degraded; a supply that has never reported OK while monitored shows as not connected and is not flagged, so a dual-supply switcher run from one supply stays healthy.',
+      'Turn on Check streaming or Check recording only for shows where the switcher must be live or recording for the whole check.',
+      'The check holds one of the switcher’s limited control-client slots and gives it up a few minutes after the check is deleted or disabled.',
+    ],
+    Links: [
+      {
+        Label: 'atem-connection (protocol reference)',
+        Url: 'https://github.com/Sofie-Automation/sofie-atem-connection',
+      },
+      {
+        Label: 'OpenSwitcher UDP protocol notes',
+        Url: 'https://docs.openswitcher.org/udptransport.html',
+      },
+      {
+        Label: 'Blackmagic ATEM support',
+        Url: 'https://www.blackmagicdesign.com/support/family/atem-live-production-switchers',
+      },
+    ],
+  },
+  'artnet-node': {
+    Summary:
+      'Unicasts an ArtPoll to an Art-Net node on UDP 6454 and reads its ArtPollReply: short and long name, node report, firmware, OEM/ESTA codes, MAC and the status of every DMX port (merging the replies of nodes with more than four ports). Online = a reply after the poll within the timeout. Degraded = a port reports a DMX output short or input receive errors, the node report carries a fault code, or (opt-in) the name does not match.',
+    Setup: [
+      "Enter the node's IPv4 address in the Address field. Art-Net always uses UDP port 6454.",
+      'ShowTrak must be on the same network as the node (usually the 2.x.x.x or 10.x.x.x Art-Net range) with UDP 6454 allowed through the firewall.',
+      "Close other Art-Net software on the ShowTrak machine (consoles, DMX-Workshop) or run it elsewhere: with two applications bound to UDP 6454, the node's unicast reply can reach the other application instead.",
+      "Optionally enable the name check and enter the node's short or long name.",
+    ],
+    Links: [
+      { Label: 'Art-Net 4 specification', Url: 'https://art-net.org.uk/downloads/art-net.pdf' },
+    ],
+  },
+  'artnet-timecode': {
+    Summary:
+      'Passively listens for Art-Net timecode (ArtTimeCode) on UDP 6454 and confirms a source is sending it now. Online = packets from that source within the grace period. Degraded = packets keep arriving but the time has not advanced (opt-out), or the timecode type differs from the expected frame rate (opt-in). Many generators stop sending ArtTimeCode when their clock is stopped, so this check suits moments when timecode must be running.',
+    Setup: [
+      "Enter the timecode generator's source IP in the Address field.",
+      'ShowTrak must be on the same network as the generator, with UDP 6454 allowed through the firewall.',
+      'Optionally enable the frame-rate check and choose Film 24, EBU 25, Drop-frame 29.97 or SMPTE 30.',
+    ],
+    Links: [
+      { Label: 'Art-Net 4 specification', Url: 'https://art-net.org.uk/downloads/art-net.pdf' },
+    ],
+  },
+  'shure-wireless': {
+    Summary:
+      'Shure ULX-D, QLX-D, SLX-D and Axient Digital receivers over Shure command strings (TCP 2202). One read-only GET ALL per interval reads every channel: transmitter presence and model, battery bars, charge and runtime, mute, RF level and RF warnings. Battery is checked by default — Degraded when a monitored channel’s pack is at or below the bar or minutes threshold. Require transmitter, Check mute and Check RF warnings are opt-in. Battery is only judged while a transmitter is on.',
+    Setup: [
+      'Point Address at the receiver’s control IP address, not its Dante address. Port 2202 is fixed by Shure.',
+      'List the channel numbers to monitor, or leave Channels empty to monitor every channel the receiver reports.',
+      'Runtime in minutes is reported only for Shure rechargeable packs; AA batteries are judged on bars only.',
+      'Enable Require transmitter only on channels that must always have a pack on, so spares do not raise alerts.',
+    ],
+    Links: [
+      {
+        Label: 'ULX-D command strings (Shure)',
+        Url: 'https://pubs.shure.com/command-strings/ULXD/en-US',
+      },
+      {
+        Label: 'SLX-D command strings (Shure)',
+        Url: 'https://pubs.shure.com/command-strings/SLXD/en-US',
+      },
+      {
+        Label: 'Axient Digital command strings (Shure)',
+        Url: 'https://pubs.shure.com/command-strings/AD4/en-US',
+      },
+    ],
+  },
+  'sennheiser-wireless': {
+    Summary:
+      'Sennheiser Digital 6000 (EM 6000, EM 6000 Dante) and EW-DX (EM 2, EM 2 Dante, EM 4 Dante) receivers over Sennheiser Sound Control (SSC v1, JSON over UDP 45). Read-only queries read every channel: transmitter link, battery level and runtime, mute, RF and link quality, and the receiver’s own warnings. Battery is checked by default — Degraded when a monitored channel’s pack is low or at or below the percentage or minutes threshold. Require transmitter, Check mute and Check receiver warnings are opt-in.',
+    Setup: [
+      'Point Address at the receiver’s control IP address. SSC uses UDP 45; if a Digital 6000 receiver does not answer, set Port to 6970.',
+      'EW-DX firmware 4.0 and later answers SSC v1 only with Legacy Mode enabled for the receiver in Sennheiser Wireless Systems Manager (WSM). Firmware below 4.0 needs no change.',
+      'List the channel numbers to monitor, or leave Channels empty to monitor every channel the receiver reports.',
+      'Runtime in minutes is reported only for rechargeable packs (BA 70, BA 60/61); AA batteries are judged on percentage only.',
+    ],
+    Links: [
+      {
+        Label: 'Sennheiser Sound Control Protocol (SSC)',
+        Url: 'https://docs.cloud.sennheiser.com/en-us/api-docs/api-docs/sound-control-protocol.html',
+      },
+      {
+        Label: 'SSC developer guide for Digital 6000 (TI 1109)',
+        Url: 'https://www.sennheiser.com/globalassets/digizuite/41931-en-ti_1109_v2.2_sennheiser_sound_control_protocol_digital_6000_en.pdf',
+      },
+    ],
+  },
+  'x32-console': {
+    Summary:
+      'Queries a Behringer X32 / Midas M32 console or a Behringer X-Air / Midas MR mixer over its OSC remote protocol (UDP) for model, network name and firmware. Optionally flags a different console name, a muted main bus or muted input channels. Degraded = something answered but is not a console of this family, or an enabled assertion failed; Offline = no reply. Channel mutes reflect each channel’s own mute; mute groups and DCA mutes are not included.',
+    Setup: [
+      'Point Address at the console. X32 and M32 listen on UDP 10023; X-Air (XR12/16/18) and MR mixers listen on UDP 10024, so set Port to 10024 for those.',
+      'No console configuration is required; the OSC remote is always on. The console replies to the port the request came from, so no firewall rule is needed on ShowTrak for an inbound port.',
+      'To check the console name, enter the network name shown under Setup → Network (e.g. X32-02-4A-53).',
+    ],
+    Links: [
+      {
+        Label: 'X32/M32 OSC protocol (P. Maillot)',
+        Url: 'https://github.com/bitfocus/companion-module-behringer-x32/blob/master/docs/X32-OSC.pdf',
+      },
+      {
+        Label: 'Companion X32 module',
+        Url: 'https://github.com/bitfocus/companion-module-behringer-x32',
+      },
+    ],
+  },
+  pixera: {
+    Summary:
+      'Calls PIXERA’s JSON-RPC API over TCP to read the API revision, the open project name and the transport state of each timeline. Optionally flags a different project or listed timelines that are paused, stopped or missing. Degraded = something answered but is not the PIXERA API, or an enabled assertion failed; Offline = no reply.',
+    Setup: [
+      'In PIXERA open Settings → API and set an API access point to protocol JSON/TCP (or JSON/TCP(dl)) with a port. 1400 is the conventional port. Restart PIXERA for the change to take effect.',
+      'Set Port to that access point’s port and Access point protocol to the same protocol. With the wrong protocol PIXERA does not reply.',
+    ],
+    Links: [
+      {
+        Label: 'PIXERA API quick start',
+        Url: 'https://pixera.helpjuice.com/api-quick-start-guide',
+      },
+      {
+        Label: 'Companion PIXERA module',
+        Url: 'https://github.com/bitfocus/companion-module-avstumpfl-pixera',
+      },
+    ],
+  },
+  'obs-studio': {
+    Summary:
+      'Connects to OBS Studio over obs-websocket 5 and reads the OBS and plugin versions, stream and recording state, program scene and performance stats in one request batch. Optionally flags a stream or recording that is not running, and dropped frames since the previous check. Degraded = OBS rejected the password, the server is not obs-websocket 5, or an enabled assertion failed; Offline = the WebSocket server is not reachable.',
+    Setup: [
+      'In OBS open Tools → WebSocket Server Settings, tick Enable WebSocket server and note the Server Port (default 4455).',
+      'If Enable Authentication is ticked, copy the Server Password into Password.',
+      'OBS 28 and later include obs-websocket 5. The older obs-websocket 4.x plugin (port 4444) is not supported.',
+    ],
+    Links: [
+      {
+        Label: 'obs-websocket 5 protocol',
+        Url: 'https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md',
+      },
+    ],
+  },
+  'qsys-core': {
+    Summary:
+      'Q-SYS Core health over Q-SYS Remote Control (QRC, JSON-RPC 2.0 on TCP 1710). Reads platform, state (Active / Standby / Idle), running design, redundancy and emulator flags and the Core status in one read-only session. Degraded by default when the Core status is not OK or the Core is not Active; enable the design and Named Control toggles to also assert the running design and individual control values. Works with hardware Cores and the Q-SYS Designer emulator.',
+    Setup: [
+      'Enable the Q-SYS Remote Control Protocol (JSONRPC) service, TCP 1710, for the Core LAN adapter ShowTrak can reach, in Core Manager → Network → Services (the service label varies by Q-SYS version).',
+      'When Access Control is enabled, create a user with an external-control PIN in Q-SYS Administrator and enter it as User and PIN. Leave both blank when Access Control is off.',
+      'For a redundant pair, add one check per Core and turn off Require Active state on the backup Core’s check, which sits in Standby by design.',
+      'To assert controls, add each control to Named Controls in Q-SYS Designer, redeploy, and list them as Name=Value, e.g. MainMute=unmuted or MainGain=-6. Controls are read only while the Core is Active.',
+    ],
+    Links: [
+      {
+        Label: 'QRC overview (Q-SYS Help)',
+        Url: 'https://help.qsys.com/Content/External_Control_APIs/QRC/QRC_Overview.htm',
+      },
+      {
+        Label: 'QRC commands (Q-SYS Help)',
+        Url: 'https://help.qsys.com/Content/External_Control_APIs/QRC/QRC_Commands.htm',
+      },
+    ],
+  },
+  'yamaha-console': {
+    Summary:
+      'Yamaha digital mixing console health over Yamaha’s Remote Control Protocol (RCP, plain text on TCP 49280). Reads model, firmware version, device name and run mode without changing anything on the desk. Degraded by default when the console is not in its normal run mode; enable the model, alert-status and stereo-master toggles to check those too. Covers CL, QL, TF, DM3, DM7 and RIVAGE PM.',
+    Setup: [
+      'Point Address at the console’s control IP, the NETWORK (Ethernet) port set on the console’s network setup screen, not its Dante primary or secondary port.',
+      'Consoles accept only a few simultaneous remote-control clients (Companion, StageMix and editors count). ShowTrak connects for one query burst per interval and disconnects.',
+      'Check stereo master is on reads MIXER:Current/St/Fader/On for the first stereo bus (ST L and ST R). Other Yamaha products (RIO, Tio, DME) report it as unsupported.',
+    ],
+    Links: [
+      {
+        Label: 'Yamaha RCP specification (DME7, same protocol family)',
+        Url: 'https://data.yamaha.com/files/download/other_assets/8/1623778/DME7_remote_control_protocol_spec_v100_en.pdf',
+      },
+      {
+        Label: 'Bitfocus Companion yamaha-rcp module',
+        Url: 'https://github.com/bitfocus/companion-module-yamaha-rcp',
+      },
+    ],
+  },
+  '7thsense-delta': {
+    Summary:
+      'Connects to a 7thSense Delta Media Server on its external control Telnet port (TCP 23) and reads STATUS in one short session, sending nothing else: server name, Leader / Follower role, show file, play mode, current frame, frame rate, graphics mode and licence. Degraded = the server answered but is not Delta, did not recognise STATUS, has external control switched off (EXTCTRLCOMMS), or an enabled assertion failed; Offline = the port does not answer. Optional assertions flag a server that is not Playing, a frame that has not advanced since the previous check, the wrong show or role, a time-limited licence that has expired or is about to, and GPUs over a temperature limit (read from DeltaMonitor over HTTP).',
+    Setup: [
+      "Set Address to the Delta server's IP address. The external control port is set in DeltaGUI under Configure > Preferences > Communication (TCP External Control, default 23).",
+      'Delta accepts 5 Telnet connections at once by default. Each probe holds one for under a second; show control systems that stay connected use the others.',
+      'Enable Check playing and Check frame advancing for the period the show should be running. Frame advancing also trips on a timeline deliberately held on a frame.',
+      'For a group, add one check per server with Check role enabled so a change of leader is flagged.',
+      "GPU temperature comes from DeltaMonitor, which runs on Infinity, Nucleus, Proton and Nano servers but not on R-Series or P-Series servers. 7thSense documents its web API at http://<server>/api/deltamonitor/ (port 80); the ports list gives DeltaMonitor's own port as 7790.",
+    ],
+    Links: [
+      {
+        Label: 'Delta external control return codes (7thSense)',
+        Url: 'https://portal.7thsense.one/user-guides/MC255-managing-servers/deltagui_external_controls_returncodes.html',
+      },
+      {
+        Label: 'Delta external control commands (7thSense)',
+        Url: 'https://portal.7thsense.one/user-guides/resources/ExternalControlHelp.html',
+      },
+      {
+        Label: 'Network ports used by Delta Server (7thSense)',
+        Url: 'https://portal.7thsense.one/user-guides/M685-systems-comms-ports/ports_ports-used.html',
+      },
+      {
+        Label: 'DeltaMonitor external control commands (7thSense)',
+        Url: 'https://portal.7thsense.one/user-guides/MC255-managing-servers/dmext_external_control_commands.html',
+      },
+    ],
+  },
+  motive: {
+    Summary:
+      'Queries OptiTrack Motive over its NatNet protocol (UDP 1510) for the Motive and NatNet versions, Live/Edit mode, frame rate, units and session folder. Flags Edit mode by default; optionally flags a frame rate other than expected, or listed rigid bodies that are not being tracked (sampled from the live frame stream for up to half a second). Degraded = something answered but is not Motive, or an enabled assertion failed; Offline = no NatNet reply. Read-only: nothing that changes Motive’s state is sent.',
+    Setup: [
+      'In Motive, open View → Settings → Streaming and turn on NatNet streaming (Enable; Broadcast Frame Data in older versions).',
+      'Set Local Interface to the network adapter ShowTrak can reach. Loopback (127.0.0.1) only works when ShowTrak runs on the Motive PC.',
+      'Point Address at that interface’s IPv4 address. Port is Motive’s Command Port (Streaming → advanced settings), default 1510. Allow UDP 1510 inbound on the Motive PC’s firewall.',
+      'For rigid body tracking, also turn on Rigid Bodies under Streaming. In Multicast mode ShowTrak joins the group Motive reports (default 239.255.42.99) on the Data Port (default 1511), so multicast must reach ShowTrak and UDP 1511 must be free or shared on the ShowTrak PC. In Unicast mode frames are sent straight back to ShowTrak.',
+      'List rigid bodies by their name in the Assets pane or by their Streaming ID. Rigid body tracking needs NatNet 3.0 (Motive 2.0) or later; names are fully resolved on NatNet 4.1 (Motive 3.1) or later.',
+    ],
+    Links: [
+      {
+        Label: 'NatNet remote requests/commands',
+        Url: 'https://docs.optitrack.com/developer-tools/natnet-sdk/natnet-remote-requests-commands',
+      },
+      {
+        Label: 'NatNet 4.5 overview',
+        Url: 'https://docs.optitrack.com/developer-tools/natnet-sdk/natnet-4.5',
+      },
+      {
+        Label: 'Motive streaming settings',
+        Url: 'https://docs.optitrack.com/motive-ui-panes/settings/settings-streaming',
+      },
+      {
+        Label: 'NatNet sample projects',
+        Url: 'https://docs.optitrack.com/developer-tools/natnet-sdk/natnet-sample-projects',
+      },
+    ],
+  },
 };
 
 export { MethodInfo };

@@ -34,6 +34,7 @@ import * as dns from './dns';
 import * as sacnUniverse from './sacn-universe';
 import * as sacnUniversePriority from './sacn-universe-priority';
 import * as artnetUniverse from './artnet-universe';
+import * as artnetNode from './artnet-node';
 // Lighting consoles — ETC Eos (OSC)
 import * as eos from './eos';
 // Lighting consoles — MA Lighting grandMA2 (Telnet remote) & grandMA3 (liveness)
@@ -45,18 +46,36 @@ import * as avolites from './avolites';
 import * as chamsys from './chamsys';
 // Video
 import * as ndiSource from './ndi-source';
+// Video — Blackmagic Design switchers, recorders and routers
+import * as atem from './atem';
+import * as hyperdeck from './hyperdeck';
+import * as videohub from './videohub';
+// Video — streaming and recording software
+import * as obsStudio from './obs-studio';
+// Video — motion capture
+import * as motive from './motive';
 // Sound — cue playback & audio networking
 import * as qlab5 from './qlab5';
 import * as qlab4 from './qlab4';
 import * as danteDevice from './dante-device';
+// Sound — wireless microphones
+import * as shureWireless from './shure-wireless';
+import * as sennheiserWireless from './sennheiser-wireless';
+// Sound — mixing consoles and DSP
+import * as x32Console from './x32-console';
+import * as yamahaConsole from './yamaha-console';
+import * as qsysCore from './qsys-core';
 // Media Servers
 import * as watchoutStatus from './watchout-status';
 import * as resolumeStatus from './resolume-status';
 import * as disguiseStatus from './disguise-status';
 import * as milluminStatus from './millumin-status';
+import * as pixera from './pixera';
+import * as sevenSenseDelta from './7thsense-delta';
 // Control & Messaging
 import * as companionStatus from './companion-status';
 import * as mqttTopic from './mqtt-topic';
+import * as artnetTimecode from './artnet-timecode';
 // Digital Signage
 import * as brightsign from './brightsign';
 // Projectors
@@ -87,6 +106,7 @@ const MethodModules: MonitoringMethod[] = [
   sacnUniverse,
   sacnUniversePriority,
   artnetUniverse,
+  artnetNode,
   // Lighting consoles — ETC Eos (OSC)
   eos,
   // Lighting consoles — MA Lighting grandMA2 (Telnet remote) & grandMA3 (liveness)
@@ -98,18 +118,36 @@ const MethodModules: MonitoringMethod[] = [
   chamsys,
   // Video
   ndiSource,
+  // Video — Blackmagic Design switchers, recorders and routers
+  atem,
+  hyperdeck,
+  videohub,
+  // Video — streaming and recording software
+  obsStudio,
+  // Video — motion capture
+  motive,
   // Sound — cue playback & audio networking
   qlab5,
   qlab4,
   danteDevice,
+  // Sound — wireless microphones
+  shureWireless,
+  sennheiserWireless,
+  // Sound — mixing consoles and DSP
+  x32Console,
+  yamahaConsole,
+  qsysCore,
   // Media Servers
   watchoutStatus,
   resolumeStatus,
   disguiseStatus,
   milluminStatus,
+  pixera,
+  sevenSenseDelta,
   // Control & Messaging
   companionStatus,
   mqttTopic,
+  artnetTimecode,
   // Digital Signage
   brightsign,
   // Projectors

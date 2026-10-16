@@ -101,11 +101,14 @@ turns that check off for one machine.
 - Monitor methods for non-ShowTrak devices:
   - Network: ICMP ping, TCP port, HTTP, HTTPS, HTTP JSON, DNS, MQTT topic
   - Show control: QLab 4/5, ETC Eos, grandMA2/MA3, Avolites Titan, ChamSys
-    MagicQ, Bitfocus Companion
-  - Video and media: Resolume, Millumin, Watchout, disguise, BrightSign, NDI
-    sources
+    MagicQ, Bitfocus Companion, Art-Net timecode
+  - Video and media: Resolume, Millumin, Watchout, disguise, PIXERA, 7thSense Delta,
+    BrightSign, NDI sources, Blackmagic ATEM, HyperDeck and Videohub, OBS
+    Studio, OptiTrack Motive
+  - Sound: Shure and Sennheiser wireless (battery, RF, transmitter presence),
+    Behringer X32 / Midas M32, Yamaha CL/QL/RIVAGE PM/DM7, Q-SYS Cores
   - Lighting and audio networks: sACN universes (and priority), Art-Net
-    universes, Dante devices
+    universes and node health, Dante devices
   - Power and projection: NUT and SNMP UPS, PJLink, SNMP projectors
 - Monitoring target CRUD and live status updates
 - Check actions: methods that can control their device (PJLink projector power,
