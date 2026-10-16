@@ -92,6 +92,13 @@ export interface MonitoringActionDef {
   Params?: MonitoringSettingField[];
   /** Needs a confirmation dialog before it is sent. */
   Destructive?: boolean;
+  /**
+   * Keep the control enabled while the check is offline. Offline normally
+   * disables every control (the device cannot be reached, so every press would
+   * fail the same way), but a recovery action — rebooting a player whose status
+   * endpoint has stopped answering — is wanted most at exactly that moment.
+   */
+  AllowedWhileOffline?: boolean;
   Note?: string;
 }
 

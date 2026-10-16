@@ -196,6 +196,46 @@ test('controls are disabled while the check is offline, but not while degraded',
   assert.doesNotMatch(Actions.RenderCheckActionsMenu(fresh), /disabled/);
 });
 
+test('an AllowedWhileOffline action stays enabled when the check is offline', () => {
+  const REBOOT = {
+    ID: 'reboot',
+    Label: 'Reboot Player',
+    Icon: 'arrow-clockwise',
+    Group: 'Player',
+    AllowedWhileOffline: true,
+  };
+  const WAKE = { ID: 'display.wake', Label: 'Wake Display', Icon: 'display', Group: 'Display' };
+  State.setMonitoringMethodsCache([
+    { ID: 'brightsign', Name: 'BrightSign', Actions: [REBOOT, WAKE] },
+  ]);
+  State.setMonitoringActionFavourites([]);
+
+  assert.equal(Actions.IsActionBlocked(REBOOT, true), false);
+  assert.equal(Actions.IsActionBlocked(WAKE, true), true);
+  assert.equal(Actions.IsActionBlocked(WAKE, false), false);
+
+  const offline = { CheckID: 7, Method: 'brightsign', Online: false, LastChecked: Date.now() };
+  const html = Actions.RenderCheckActionsMenu(offline);
+  const button = (id) =>
+    html.match(new RegExp(`<button[^>]*data-action-id="${id.replace('.', '\\.')}"[^>]*>`))[0];
+  assert.doesNotMatch(button('reboot'), /disabled/);
+  assert.match(button('display.wake'), /disabled/);
+  // The banner names what is still available, so the lone live button reads as intended.
+  assert.match(html, /Reboot Player can still be sent/);
+
+  // The Actions tab follows the same rule when every check of the type is offline.
+  const pane = Actions.RenderTargetActionsPane({
+    TargetID: 3,
+    Nickname: 'Lobby',
+    Checks: [offline],
+  });
+  const paneButton = (id) =>
+    pane.match(new RegExp(`<button[^>]*data-action-id="${id.replace('.', '\\.')}"[^>]*>`))[0];
+  assert.doesNotMatch(paneButton('reboot'), /disabled/);
+  assert.match(paneButton('display.wake'), /disabled/);
+  assert.match(pane, /Reboot Player can still be sent/);
+});
+
 test('a starred value the device no longer reports is kept, not silently swapped', () => {
   setMethods();
   State.setMonitoringActionFavourites([]);

@@ -124,6 +124,26 @@ export function IsActionFavourited(
 // ---- Rendering --------------------------------------------------------------
 
 /**
+ * Whether an action's control is disabled. Offline blocks every action except
+ * one its method declares AllowedWhileOffline.
+ */
+export function IsActionBlocked(Action: MonitoringActionDef, Offline: boolean): boolean {
+  return Offline && !Action.AllowedWhileOffline;
+}
+
+/**
+ * The offline banner, naming whatever stays available so a lone enabled button
+ * under a "cannot reach the device" warning does not read as a mistake.
+ */
+function OfflineBannerText(BlockedReason: string, Actions: MonitoringActionDef[]): string {
+  const Still = Actions.filter((Action) => Action.AllowedWhileOffline).map(
+    (Action) => Action.Label
+  );
+  if (!Still.length) return BlockedReason;
+  return `${BlockedReason}. ${Still.join(', ')} can still be sent.`;
+}
+
+/**
  * Which check's menu is open, if any. Module state rather than DOM state for the
  * same reason as the drafts above: the whole timeline list is rebuilt on every
  * target push, and an open menu should not snap shut each time a check ticks.
@@ -251,10 +271,12 @@ export function RenderCheckActionsMenu(Check: MonitoringCheckView): string {
   if (!Actions.length) return '';
 
   // An offline check means ShowTrak cannot reach the device at all, so every
-  // button would fail the same way. Degraded is left enabled on purpose: a
-  // projector sitting in standby reads as degraded, and powering it on is
-  // exactly what the operator opened this menu to do.
-  const Blocked = Check.LastChecked != null && !Check.Online;
+  // button would fail the same way — except an action declared
+  // AllowedWhileOffline, a recovery action that is wanted most at exactly that
+  // moment. Degraded is left enabled on purpose: a projector sitting in standby
+  // reads as degraded, and powering it on is exactly what the operator opened
+  // this menu to do.
+  const Offline = IsCheckOffline(Check);
   const BlockedReason = 'This check is offline — ShowTrak cannot reach the device';
 
   const Groups = new Map<string, MonitoringActionDef[]>();
@@ -268,14 +290,14 @@ export function RenderCheckActionsMenu(Check: MonitoringCheckView): string {
     .map(
       ([Group, List]) =>
         `<div class="monitor-actions-menu-group">${Safe(Group)}</div>${List.map((Action) =>
-          RenderAction(Check, Action, Blocked, BlockedReason)
+          RenderAction(Check, Action, IsActionBlocked(Action, Offline), BlockedReason)
         ).join('')}`
     )
     .join('');
 
-  const Banner = Blocked
+  const Banner = Offline
     ? `<div class="monitor-actions-menu-note"><i class="bi bi-exclamation-triangle"></i><span>${Safe(
-        BlockedReason
+        OfflineBannerText(BlockedReason, Actions)
       )}</span></div>`
     : '';
 
@@ -434,7 +456,6 @@ export function RenderTargetActionsPane(Target: MonitoringTargetView): string {
       Count === 1
         ? 'This check is offline — ShowTrak cannot reach the device'
         : `All ${Count} ${Group.Name} checks are offline — ShowTrak cannot reach them`;
-    const Disabled = Blocked ? 'disabled' : '';
 
     const Scope =
       Count === 1
@@ -442,7 +463,7 @@ export function RenderTargetActionsPane(Target: MonitoringTargetView): string {
         : `Sent to all ${Count} of this target's ${Group.Name} checks.`;
     const OfflineNote = Blocked
       ? `<div class="monitor-group-actions-note"><i class="bi bi-exclamation-triangle"></i><span>${Safe(
-          BlockedReason
+          OfflineBannerText(BlockedReason, Group.Actions)
         )}</span></div>`
       : Offline
         ? `<div class="monitor-group-actions-note"><i class="bi bi-exclamation-triangle"></i><span>${Offline} of ${Count} ${Safe(
@@ -462,7 +483,13 @@ export function RenderTargetActionsPane(Target: MonitoringTargetView): string {
           `<div class="monitor-group-actions-group">
             <span class="monitor-group-actions-group-title">${Safe(Name)}</span>
             <div class="monitor-group-actions-group-body">${List.map((Action) =>
-              RenderGroupAction(TargetID, Group, Action, Disabled, BlockedReason)
+              RenderGroupAction(
+                TargetID,
+                Group,
+                Action,
+                IsActionBlocked(Action, Blocked) ? 'disabled' : '',
+                BlockedReason
+              )
             ).join('')}</div>
           </div>`
       )
