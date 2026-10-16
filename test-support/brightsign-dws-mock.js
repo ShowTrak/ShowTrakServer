@@ -84,10 +84,12 @@ function makeBrightSignDws(options = {}) {
     return `Digest ${Parts.join(', ')}`;
   };
 
-  const serve = (Scheme, Opts, Req) => {
+  const serve = (Scheme, Opts, Req, Payload) => {
     const Headers = Opts.headers || {};
     calls.push({
       Scheme,
+      Method: Opts.method || 'GET',
+      Body: Payload == null ? null : String(Payload),
       Path: Opts.path,
       Hostname: Opts.hostname,
       Port: Opts.port,
@@ -143,9 +145,9 @@ function makeBrightSignDws(options = {}) {
   const makeLib = (Scheme) => ({
     request(Opts) {
       const Req = new EventEmitter();
-      Req.end = () => {
-        if (delayMs > 0) setTimeout(() => serve(Scheme, Opts, Req), delayMs);
-        else setImmediate(() => serve(Scheme, Opts, Req));
+      Req.end = (Payload) => {
+        if (delayMs > 0) setTimeout(() => serve(Scheme, Opts, Req, Payload), delayMs);
+        else setImmediate(() => serve(Scheme, Opts, Req, Payload));
       };
       Req.destroy = (Err) => {
         if (Err) setImmediate(() => Req.emit('error', Err));

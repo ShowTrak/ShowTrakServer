@@ -22,6 +22,12 @@
 // Uptime is reported in the debug panel for context but is never alerted on:
 // judging it would require comparing against the previous poll, and methods are
 // deliberately stateless.
+//
+// Actions: reboot the player, and wake or blank the display on the HDMI output
+// this check watches (the remedy for its "Output in power save" reading).
+// Reboot is the one control left enabled while the check is offline: a player
+// whose status endpoint has stopped answering in time may still take a reboot,
+// and that is the moment an operator reaches for one.
 import {
   CommonBrightSignSettings,
   RunBrightSignProbe,
@@ -39,10 +45,18 @@ import {
   BrightSignDebug,
   MonoRow,
   INFO_PATH,
+  REBOOT_PATH,
+  PowerSavePath,
   type VideoState,
 } from './_brightsign-shared';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
-import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import type {
+  MonitoringActionDef,
+  MonitoringActionResult,
+  MonitoringResult,
+  MonitoringSettingField,
+  MonitoringTargetLike,
+} from './types';
 
 const ID = 'brightsign';
 
@@ -236,6 +250,80 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   return Base;
 }
 
+// --- Actions ----------------------------------------------------------------
+
+const Actions: MonitoringActionDef[] = [
+  {
+    ID: 'reboot',
+    Label: 'Reboot Player',
+    Icon: 'arrow-clockwise',
+    Group: 'Player',
+    Destructive: true,
+    AllowedWhileOffline: true,
+    Note: 'Restarts the player. Playback stops until it has booted and started its presentation again.',
+  },
+  {
+    ID: 'display.wake',
+    Label: 'Wake Display',
+    Icon: 'display',
+    Group: 'Display',
+    Note: 'Takes the HDMI output this check watches (Video output index) out of power save.',
+  },
+  {
+    ID: 'display.sleep',
+    Label: 'Display Power Save',
+    Icon: 'display-fill',
+    Group: 'Display',
+    Destructive: true,
+    Note: 'Puts the display on the HDMI output this check watches into power save, blanking it.',
+  },
+];
+
+async function RunAction(
+  Target: MonitoringTargetLike,
+  ActionID: string
+): Promise<MonitoringActionResult> {
+  const Config = ParseBrightSignConfig(Target);
+  if (!Config.Address) return { Success: false, Error: 'No address configured' };
+  if (Config.Port < 0 || Config.Port > 65535) {
+    return { Success: false, Error: `Invalid port: ${Config.Port}` };
+  }
+
+  if (ActionID === 'reboot') {
+    const Res = await FetchDws(Config, REBOOT_PATH, { Method: 'PUT' });
+    if (!Res.Ok)
+      return { Success: false, Error: Res.Error || 'The player did not accept the reboot' };
+    // The player answers before it goes down, reporting whether it will.
+    const Result = (Res.Payload || {}) as Record<string, unknown>;
+    if (Result.success === false) {
+      return { Success: false, Error: 'The player refused to reboot' };
+    }
+    return { Success: true, Detail: 'Reboot started' };
+  }
+
+  if (ActionID === 'display.wake' || ActionID === 'display.sleep') {
+    const Cfg = (Target && Target.Settings) || {};
+    const Output = Number.isFinite(Number(Cfg.VideoOutput)) ? Number(Cfg.VideoOutput) | 0 : 0;
+    const Sleep = ActionID === 'display.sleep';
+    const Res = await FetchDws(Config, PowerSavePath(Output), {
+      Method: 'PUT',
+      Json: { enabled: Sleep },
+    });
+    if (!Res.Ok) {
+      // The video endpoints do not exist at all on audio-only players.
+      if (Res.NotFound)
+        return { Success: false, Error: `This player has no HDMI output ${Output}` };
+      return { Success: false, Error: Res.Error || 'The player did not accept the change' };
+    }
+    if (Res.Payload === false) {
+      return { Success: false, Error: 'The player could not change the display power save' };
+    }
+    return { Success: true, Detail: Sleep ? 'Display put into power save' : 'Display woken' };
+  }
+
+  return { Success: false, Error: `Unknown BrightSign action "${ActionID}"` };
+}
+
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseBrightSignConfig(Target);
   const Reachable = !!(Result && Result.Success === true);
@@ -266,4 +354,4 @@ export const Description =
   "Reads firmware, power, PoE and uptime from a BrightSign player's Local DWS API and reports a single healthy / degraded verdict. Can optionally also check the video output.";
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = { EvaluateHealth };
-export { ID, Settings, Run, Debug };
+export { ID, Settings, Actions, Run, RunAction, Debug };

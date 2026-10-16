@@ -38,6 +38,13 @@ const MAX_REDIRECTS = 3;
 const DWS_USERNAME = 'admin';
 
 export const INFO_PATH = '/api/v1/info';
+export const REBOOT_PATH = '/api/v1/control/reboot';
+
+// Power-save on one HDMI output: PUT {"enabled": bool} blanks or wakes the
+// display attached to it.
+export function PowerSavePath(Device: unknown): string {
+  return `${VideoPath(Device)}/power-save`;
+}
 
 // The video endpoints are hdmi-only (any other connector is rejected with a 400
 // by the player) and `device` is 0-indexed, so dual-output players are outputs
@@ -241,6 +248,15 @@ interface RawResponse {
   Headers: http.IncomingHttpHeaders;
 }
 
+// The method and JSON body of a DWS request. Reads are bodiless GETs; the
+// control endpoints the check's actions use are PUTs carrying a JSON body.
+export interface DwsRequest {
+  Method: 'GET' | 'PUT';
+  Json?: unknown;
+}
+
+const GET: DwsRequest = { Method: 'GET' };
+
 // One request, no auth handling, no redirect following. Rejects on transport
 // error / timeout. A hard kill timer guarantees no probe can stall the
 // monitoring loop. `BudgetMs` is the time this individual request may take; the
@@ -250,7 +266,8 @@ function SendOnce(
   Url: URL,
   Config: BrightSignConfig,
   AuthHeader: string | null,
-  BudgetMs?: number
+  BudgetMs?: number,
+  Request: DwsRequest = GET
 ): Promise<RawResponse> {
   return new Promise<RawResponse>((resolve, reject) => {
     const Lib = Url.protocol === 'https:' ? https : http;
@@ -276,9 +293,14 @@ function SendOnce(
       Connection: 'close',
     };
     if (AuthHeader) Headers.Authorization = AuthHeader;
+    const Payload = Request.Json === undefined ? null : Buffer.from(JSON.stringify(Request.Json));
+    if (Payload) {
+      Headers['Content-Type'] = 'application/json';
+      Headers['Content-Length'] = String(Payload.length);
+    }
 
     const ReqOpts: https.RequestOptions = {
-      method: 'GET',
+      method: Request.Method,
       hostname: Url.hostname,
       port: Url.port || (Url.protocol === 'https:' ? 443 : 80),
       path: `${Url.pathname}${Url.search || ''}`,
@@ -333,7 +355,7 @@ function SendOnce(
     });
 
     try {
-      Req.end();
+      Req.end(Payload || undefined);
     } catch (Err) {
       clearTimeout(KillTimer);
       Fail(Err instanceof Error ? Err : new Error(String(Err)));
@@ -377,9 +399,17 @@ export function SubResult(Parent: unknown, Key: string): { Value?: unknown; Erro
   return { Error: 'Not reported' };
 }
 
-// Perform a GET against a DWS path, handling the digest challenge and any
-// HTTP->HTTPS redirect. Never throws.
-export async function FetchDws(Config: BrightSignConfig, Path: string): Promise<DwsResponse> {
+// Perform a request (a GET unless told otherwise) against a DWS path, handling
+// the digest challenge and any HTTP->HTTPS redirect. Never throws.
+//
+// A redirected PUT is re-sent as a PUT. That departs from what browsers do with
+// a 301/302, deliberately: the redirect the DWS issues is only its HTTP->HTTPS
+// upgrade, and turning a reboot into a GET would silently do nothing.
+export async function FetchDws(
+  Config: BrightSignConfig,
+  Path: string,
+  Request: DwsRequest = GET
+): Promise<DwsResponse> {
   const Url = BuildUrl(Config, Path);
   if (!Url) return { Ok: false, Error: 'Invalid address' };
 
@@ -402,7 +432,7 @@ export async function FetchDws(Config: BrightSignConfig, Path: string): Promise<
     let Res: RawResponse;
     try {
       if (RemainingMs() <= 0) return TimedOut();
-      Res = await SendOnce(Current, Config, null, RemainingMs());
+      Res = await SendOnce(Current, Config, null, RemainingMs(), Request);
 
       if (Res.Status === 401) {
         const Challenge = ParseDigestChallenge(Res.Headers['www-authenticate']);
@@ -425,14 +455,14 @@ export async function FetchDws(Config: BrightSignConfig, Path: string): Promise<
         const Cnonce = crypto.randomBytes(8).toString('hex');
         const Auth = BuildDigestHeader(
           Challenge,
-          'GET',
+          Request.Method,
           `${Current.pathname}${Current.search || ''}`,
           Config.Username,
           Config.Password,
           Cnonce
         );
         if (RemainingMs() <= 0) return TimedOut();
-        Res = await SendOnce(Current, Config, Auth, RemainingMs());
+        Res = await SendOnce(Current, Config, Auth, RemainingMs(), Request);
         if (Res.Status === 401) {
           return {
             Ok: false,

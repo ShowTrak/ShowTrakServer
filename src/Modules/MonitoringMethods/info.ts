@@ -170,6 +170,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       "The username is always 'admin'; the default password is the player's serial number.",
       'BrightSignOS 9.0.218+ serves HTTPS with a self-signed certificate and redirects HTTP. The redirect is followed and TLS errors are ignored by default so the self-signed certificate does not read as an outage.',
       'Enable a factor toggle to check it. PoE reports Degraded on hardware that does not support it, so only enable PoE on PoE-capable players. The video output index is 0-based; dual-output players use 0 and 1.',
+      'The display actions act on the video output index above. Reboot stays available while the check is offline.',
     ],
     Links: [
       {
