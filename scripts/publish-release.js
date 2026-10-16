@@ -5,7 +5,8 @@
 // notarization key live in repository secrets, so a release cannot be produced
 // from a laptop even if you wanted to. This script is the trigger and the
 // verification around that: it checks the things that silently produce a WRONG
-// release, dispatches the workflow against the current branch, streams the run,
+// release (including a commit CI has not passed), dispatches the workflow
+// against the current branch, streams the run,
 // and then confirms the release that appeared is actually published with its
 // assets attached.
 //
@@ -179,6 +180,32 @@ function checkSubmodulesArePushed() {
   }
 }
 
+// The Build workflow refuses to run past its ci-gate job unless CI passed on the
+// same commit, so this is the early, local answer to the same question: a red
+// commit fails here in a second instead of after a dispatch, and a commit whose
+// CI is still running is flagged so the wait at the start of the run makes sense.
+function readCiState(repo, sha) {
+  const listed = tryRun('gh', [
+    'api',
+    `repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${sha}&per_page=50`,
+    '--jq',
+    '[.workflow_runs[] | {status, conclusion, url: .html_url}]',
+  ]);
+  if (!listed.ok) fail('Could not read the CI status of this commit.', listed.out);
+  let runs = [];
+  try {
+    runs = JSON.parse(listed.out || '[]');
+  } catch {
+    fail('Could not read the CI status of this commit.', listed.out);
+  }
+  if (runs.some((r) => r.conclusion === 'success')) return 'passed';
+  if (!runs.length || runs.some((r) => r.status !== 'completed')) return 'running';
+  fail(
+    `CI did not pass on ${sha.slice(0, 7)}; the build would refuse it.`,
+    runs.map((r) => `${r.conclusion}  ${r.url}`).join('\n')
+  );
+}
+
 function readReleaseState(repo, tag) {
   const view = tryRun('gh', [
     'release',
@@ -254,6 +281,7 @@ async function main() {
 
   checkWorkingTreeIsReleasable(branch, options);
   checkSubmodulesArePushed();
+  const ciState = readCiState(repo, run('git', ['rev-parse', 'HEAD']));
 
   const existing = readReleaseState(repo, tag);
   if (existing && !existing.isDraft && !options.republish) {
@@ -270,6 +298,9 @@ async function main() {
   console.log(`    branch      ${branch} @ ${run('git', ['rev-parse', '--short', 'HEAD'])}`);
   console.log(`    release     ${tag} - ${productName}`);
   console.log(`    macOS       ${options.variant}`);
+  console.log(
+    `    CI          ${ciState === 'passed' ? 'passed' : 'still running; the build waits for it to pass'}`
+  );
   if (existing) {
     // Stated exactly, because this is the line somebody reads before agreeing
     // to it: rebuilding a live release is a different act from updating a draft

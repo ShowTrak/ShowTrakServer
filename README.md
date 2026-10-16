@@ -230,8 +230,12 @@ npm run start
 # Build distributables for current platform
 npm run make
 
-# Run test suite (builds first, then runs all tests)
+# Run test suite (builds first, then runs all tests against an empty
+# sandboxed app-data directory, never your real show data)
 npm run test
+
+# Run one test file
+npm test -- test/db.test.js
 
 # Run tests with coverage report
 npm run test:coverage

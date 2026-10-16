@@ -35,7 +35,42 @@ permissions:
   contents: write
 
 jobs:
+  # Nothing is built, let alone released, from a commit CI has not passed. The
+  # release is usually dispatched straight after the push, so this waits for the
+  # CI run on the same commit rather than requiring it to have finished already.
+  ci-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      actions: read
+    steps:
+      - name: Require a green CI run for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          deadline=$((SECONDS + 45 * 60))
+          while :; do
+            runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$SHA&per_page=50" --jq '.workflow_runs')
+            if jq -e 'any(.[]; .conclusion == "success")' <<<"$runs" >/dev/null; then
+              echo "CI passed for $SHA."
+              exit 0
+            fi
+            if jq -e 'length > 0 and all(.[]; .status == "completed")' <<<"$runs" >/dev/null; then
+              echo "::error::CI did not pass for $SHA; refusing to build a release from it."
+              jq -r '.[] | "  \(.conclusion)  \(.html_url)"' <<<"$runs"
+              exit 1
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for CI on $SHA."
+              exit 1
+            fi
+            echo "Waiting for CI on $SHA..."
+            sleep 30
+          done
+
   release-meta:
+    needs: ci-gate
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}

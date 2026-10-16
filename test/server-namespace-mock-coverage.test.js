@@ -12,7 +12,7 @@
 // during the FreeKiosk work. A comment saying "any manager added here needs a
 // stub" was already in place and was still missed, so this asserts it.
 //
-// TO REPRODUCE CI LOCALLY, run `npm run test:isolated`. It points HOME at an
+// `npm test` reproduces CI locally: it points HOME at an
 // empty directory, so the managers find no database — exactly the condition that
 // separates a green laptop from a red CI job. That command, not this file, is
 // the real check; this one just fails faster and says what to fix.
@@ -82,7 +82,7 @@ for (const [Module, Test] of CASES) {
       `${Test} never stubs: ${Missing.join(', ')}.\n` +
         `Add a stub for each to its mock map. Unstubbed, the real manager opens a ` +
         `live sqlite connection at module load — green locally, broken on CI. ` +
-        `Reproduce with: npm run test:isolated`
+        `Reproduce with: npm test`
     );
   });
 }
