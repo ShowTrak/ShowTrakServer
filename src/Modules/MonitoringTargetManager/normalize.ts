@@ -1,9 +1,9 @@
 // Pure normalization helpers and interval bounds shared across the
 // MonitoringTargetManager modules.
-import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
+import { DEFAULT_MONITORING_INTERVAL_MS, MAX_MONITORING_INTERVAL_MS } from '../Config/constants';
 
 const MIN_INTERVAL_MS = 3000;
-const MAX_INTERVAL_MS = 5 * 60 * 1000;
+const MAX_INTERVAL_MS = MAX_MONITORING_INTERVAL_MS;
 
 // How many failed probes in a row a check needs before it reads offline. 1 is
 // the historical behaviour (the first miss is an outage); higher values ride out

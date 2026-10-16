@@ -24,6 +24,7 @@ import net from 'net';
 import { CreateLogger } from '../Logger';
 import { EncodeOscTcp, DecodeOscStream, type OscArg, type OscMessage } from './_osc-shared';
 import type { MonitoringActionDef, MonitoringResult, MonitoringSettingField } from './types';
+import { MONITORING_INTEREST_TTL_MS } from '../Config/constants';
 
 const Logger = CreateLogger('QLab');
 
@@ -34,7 +35,7 @@ const MAX_PORT = 65535;
 const CONNECT_TIMEOUT_MS = 5000; // give up an unestablished TCP connect after this
 const HEARTBEAT_MS = 10000; // re-query core attributes to refresh + prove liveness
 const STALE_AFTER_MS = 20000; // no successful contact within this → snapshot offline
-const INTEREST_TTL_MS = 120000; // close a connection unobserved this long
+const INTEREST_TTL_MS = MONITORING_INTEREST_TTL_MS; // close a connection unobserved this long
 const SWEEP_INTERVAL_MS = 30000;
 const RECONNECT_BASE_MS = 2000;
 const RECONNECT_MAX_MS = 30000;

@@ -106,6 +106,16 @@ export const STATUS_HISTORY_SAMPLE_INTERVAL_MS = 15 * 1000;
 // method when none is configured (or the configured value is invalid).
 export const DEFAULT_MONITORING_INTERVAL_MS = 30000;
 
+// Longest polling interval a monitoring target may be given.
+export const MAX_MONITORING_INTERVAL_MS = 5 * 60 * 1000;
+
+// How long a monitoring method keeps a process-wide listener or persistent
+// session alive after the last check that asked for it. Interest is only ever
+// refreshed by a check's own Run(), so this MUST outlast the longest interval:
+// shorter, and a slow check finds its listener reaped (and its cache empty)
+// every time it runs, reading Offline forever.
+export const MONITORING_INTEREST_TTL_MS = 2 * MAX_MONITORING_INTERVAL_MS;
+
 // How long DB shutdown waits for in-flight SQLite operations to drain.
 export const DB_PENDING_OPERATION_TIMEOUT_MS = 15000;
 

@@ -33,6 +33,7 @@ import dgram from 'dgram';
 import { CreateLogger } from '../Logger';
 import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency, Card } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import { MONITORING_INTEREST_TTL_MS } from '../Config/constants';
 
 const Logger = CreateLogger('Millumin');
 
@@ -49,7 +50,7 @@ export const DEFAULT_MILLUMIN_INTERVAL_MS = 5000;
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
 const MAX_RECENT_MESSAGES = 12; // recent OSC addresses retained per source for Debug()
-const INTEREST_TTL_MS = 120000; // drop a port's socket if unwatched this long
+const INTEREST_TTL_MS = MONITORING_INTEREST_TTL_MS; // drop a port's socket if unwatched this long
 const SOURCE_RETENTION_MS = 60000; // forget a source unheard-from this long
 const SWEEP_INTERVAL_MS = 30000;
 const RETRY_COOLDOWN_MS = 15000; // after a bind failure, wait before retrying

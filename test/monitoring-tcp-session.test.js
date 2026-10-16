@@ -108,6 +108,40 @@ test('a refused connection reports through OnError', async () => {
   assert.match(result, /ECONNREFUSED/);
 });
 
+// A handler that throws on malformed device data must end its own probe through
+// OnError, promptly, rather than escape as an uncaught exception and leave the
+// session open until its deadline.
+test('a throwing OnData or OnConnect handler settles the session through OnError', async () => {
+  const server = await listen((socket) => socket.write('junk\n'));
+  const { port } = server.address();
+  try {
+    for (const Throws of ['OnData', 'OnConnect']) {
+      const started = Date.now();
+      let socketRef = null;
+      const result = await RunTcpSession({
+        Address: '127.0.0.1',
+        Port: port,
+        IdleMs: 5000,
+        DeadlineMs: 5000,
+        OnConnect: (session) => {
+          socketRef = session.Socket;
+          if (Throws === 'OnConnect') throw new Error('bad greeting');
+        },
+        OnData: () => {
+          throw new Error('bad reply');
+        },
+        OnTimeout: () => 'timeout',
+        OnError: (message) => `error: ${message}`,
+      });
+      assert.equal(result, Throws === 'OnData' ? 'error: bad reply' : 'error: bad greeting');
+      assert.ok(Date.now() - started < 2000, `${Throws} throw should settle at once`);
+      assert.equal(socketRef.destroyed, true);
+    }
+  } finally {
+    await close(server);
+  }
+});
+
 test('ReplyQueue resolves a request once its predicate sees a whole reply', async () => {
   const queue = new ReplyQueue(1000);
   const line = (buf) => {

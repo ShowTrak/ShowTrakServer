@@ -95,14 +95,24 @@ export function RunTcpSession<R>(Spec: TcpSessionSpec<R>): Promise<R> {
       );
     }
 
+    // A protocol handler that throws on hostile or malformed device data must
+    // end its own probe, not escape into the main process as an uncaught
+    // exception and leave the session hanging until its deadline.
+    const Guard = (Handler: () => void): void => {
+      try {
+        Handler();
+      } catch (Err) {
+        Session.Finish(Spec.OnError(ErrorMessage(Err), Session));
+      }
+    };
     if (Spec.OnConnect) {
       const OnConnect = Spec.OnConnect;
-      Socket.once('connect', () => OnConnect(Session));
+      Socket.once('connect', () => Guard(() => OnConnect(Session)));
     }
     if (Spec.OnData) {
       const OnData = Spec.OnData;
       Socket.on('data', (Chunk: Buffer) => {
-        if (!Settled) OnData(Chunk, Session);
+        if (!Settled) Guard(() => OnData(Chunk, Session));
       });
     }
     Socket.once('timeout', () => Session.Finish(Spec.OnTimeout(Session, 'idle')));
