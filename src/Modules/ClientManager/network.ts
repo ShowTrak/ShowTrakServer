@@ -249,8 +249,10 @@ export function normalizeCriticalNetworkEntry(Value: unknown): CriticalNetworkIn
     Name,
     MAC: Mac,
     Family: normalizeNetworkFamily(E.Family),
-    // sqlite hands booleans back as 0/1.
-    RequirePresent: E.RequirePresent === true || E.RequirePresent === 1,
+    // A monitored interface is always required to be present — without that,
+    // monitoring it raises nothing when it goes — so presence is never read from
+    // the row, which also brings back any row saved while it could be unticked.
+    RequirePresent: true,
     Address: OptionalIP(E.Address),
     RangeStart,
     RangeEnd,
@@ -440,6 +442,7 @@ export function buildNetworkView(
 /** Options a mark/update request may carry; absent ones keep their current value. */
 export interface CriticalNetworkOptions {
   Family?: NetworkFamily;
+  /** Ignored: a monitored interface is always required to be present. */
   RequirePresent?: boolean;
   Address?: string | null;
   RangeStart?: string | null;
@@ -484,11 +487,7 @@ export function resolveCriticalNetworkEntry(
     Existing?.Family ??
     DefaultNetworkFamily(Live, Existing);
   const Primary = Live ? PrimaryAddress(Live, Family) : null;
-  const RequirePresent = Has('RequirePresent')
-    ? !!Options.RequirePresent
-    : Existing
-      ? Existing.RequirePresent
-      : true;
+  const RequirePresent = true;
   const Address = Pick('Address', Primary?.address);
   const Netmask = Pick('Netmask', Primary?.netmask);
   const Gateway = Pick('Gateway', Capabilities?.Router ? Live?.gateway : null);

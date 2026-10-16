@@ -176,6 +176,8 @@ export interface DisplayConditionRow {
   Supported: boolean;
   /** Whether the condition is being monitored. */
   Checked: boolean;
+  /** Always on: monitoring a display is requiring it to be connected. Never sent. */
+  Locked: boolean;
   /** The issue this condition currently raises, when it is not met. */
   Failing: string | null;
 }
@@ -202,7 +204,8 @@ export function DisplayConditionRows(Display: ClientDisplayView): DisplayConditi
     Live: string | null,
     Checked: boolean,
     Failing: string | null,
-    AlwaysSupported = false
+    AlwaysSupported = false,
+    Locked = false
   ): DisplayConditionRow => {
     const Supported = Checked || AlwaysSupported || (Connected && Live !== null);
     return {
@@ -211,6 +214,7 @@ export function DisplayConditionRows(Display: ClientDisplayView): DisplayConditi
       Value: !Supported ? 'Unsupported' : ((Checked ? Guarded : null) ?? Live ?? '—'),
       Supported,
       Checked,
+      Locked,
       Failing,
     };
   };
@@ -221,8 +225,9 @@ export function DisplayConditionRows(Display: ClientDisplayView): DisplayConditi
       'Connected',
       null,
       Connected ? 'Yes' : 'No',
-      Critical.RequirePresent,
+      true,
       Issue('missing'),
+      true,
       true
     ),
     Row(
@@ -302,14 +307,13 @@ export function DisplayRenderKey(Client: ClientView, State: DisplaySectionState)
 /** The ticks of a critical display's conditions form, as read from the DOM. */
 export type DisplayRuleFields = Record<DisplayConditionField, boolean>;
 
-/** Turn the conditions form into a request. */
+/** Turn the conditions form into a request. The connected tick is locked on, so it is never sent. */
 export function ParseDisplayRuleFields(
   DisplayID: string,
   Fields: DisplayRuleFields
-): { DisplayID: string } & DisplayRuleFields {
+): { DisplayID: string } & Omit<DisplayRuleFields, 'RequirePresent'> {
   return {
     DisplayID,
-    RequirePresent: !!Fields.RequirePresent,
     CheckResolution: !!Fields.CheckResolution,
     CheckRefreshRate: !!Fields.CheckRefreshRate,
     CheckScale: !!Fields.CheckScale,

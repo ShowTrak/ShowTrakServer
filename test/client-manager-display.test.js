@@ -105,7 +105,7 @@ test('only the ticked conditions are alerted on, and they persist', async () => 
   assert.equal(entry.RequirePresent, true);
 });
 
-test('a display allowed to be absent is not missing', async () => {
+test('a monitored display cannot be allowed to be absent, even when asked', async () => {
   const { Manager } = await loadClientManager();
   await Manager.Create('c2');
   const [, client] = await Manager.Get('c2');
@@ -116,8 +116,8 @@ test('a display allowed to be absent is not missing', async () => {
     RequirePresent: false,
   });
   await Manager.SetDisplayList('c2', []);
-  assert.equal(client.Degraded, false);
-  assert.equal(client.MissingCriticalDisplays.length, 0);
+  assert.equal(client.Degraded, true);
+  assert.equal(client.MissingCriticalDisplays.length, 1);
   assert.equal(client.DisplayList[0].IsConnected, false);
 });
 

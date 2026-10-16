@@ -333,6 +333,8 @@ export interface NetworkConditionRow {
   Supported: boolean;
   /** Whether the condition is being monitored. */
   Checked: boolean;
+  /** Always on: monitoring an interface is requiring it to be present. Never sent. */
+  Locked: boolean;
   /** The issue this condition currently raises, when it is not met. */
   Failing: string | null;
 }
@@ -366,7 +368,8 @@ export function NetworkConditionRows(
       Expected: [],
       Defaults: [],
       Supported: true,
-      Checked: Critical.RequirePresent,
+      Checked: true,
+      Locked: true,
       Failing: Issue('missing'),
     },
     {
@@ -378,6 +381,7 @@ export function NetworkConditionRows(
       Defaults: [Address],
       Supported: true,
       Checked: Critical.Address !== null,
+      Locked: false,
       Failing: Issue('address'),
     },
     {
@@ -390,6 +394,7 @@ export function NetworkConditionRows(
       Defaults: Range ? [Range.Start, Range.End] : ['', ''],
       Supported: true,
       Checked: Critical.RangeStart !== null && Critical.RangeEnd !== null,
+      Locked: false,
       Failing: Issue('range'),
     },
     {
@@ -401,6 +406,7 @@ export function NetworkConditionRows(
       Defaults: [Netmask],
       Supported: true,
       Checked: Critical.Netmask !== null,
+      Locked: false,
       Failing: Issue('netmask'),
     },
     {
@@ -412,6 +418,7 @@ export function NetworkConditionRows(
       Defaults: [Gateway],
       Supported: RouterSupported,
       Checked: Critical.Gateway !== null,
+      Locked: false,
       Failing: Issue('gateway'),
     },
   ];
@@ -448,9 +455,11 @@ export function NetworkRenderKey(
   return `${Client.UUID}::${State}::${Family}::${JSON.stringify(View?.Capabilities ?? null)}::${Interfaces.join(';;')}`;
 }
 
-/** The fields of a critical interface's conditions form, as read from the DOM. */
+/**
+ * The fields of a critical interface's conditions form, as read from the DOM.
+ * Presence is locked on, so it is never read or sent.
+ */
 export interface NetworkRuleFields {
-  RequirePresent: boolean;
   /** Empty strings for an unticked row. */
   Address: string;
   RangeStart: string;
@@ -461,7 +470,6 @@ export interface NetworkRuleFields {
 
 export interface NetworkRulePayload {
   Name: string;
-  RequirePresent: boolean;
   Address: string | null;
   RangeStart: string | null;
   RangeEnd: string | null;
@@ -507,7 +515,6 @@ export function ParseNetworkRuleFields(
   return {
     Payload: {
       Name,
-      RequirePresent: !!Fields.RequirePresent,
       Address: Values.Address ?? null,
       RangeStart: Values.RangeStart ?? null,
       RangeEnd: Values.RangeEnd ?? null,

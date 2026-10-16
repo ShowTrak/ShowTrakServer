@@ -98,11 +98,12 @@ test('a missing interface faults only when presence is required', () => {
   assert.deepEqual(Net.evaluateNetworkIssues(null, critical()), [
     { Kind: 'missing', Message: 'en0 is not connected' },
   ]);
-  // Absent and allowed to be: its address conditions describe it while up.
-  assert.deepEqual(
-    Net.evaluateNetworkIssues(null, critical({ RequirePresent: false, Address: '10.0.0.9' })),
-    []
+  // A row saved while presence could be unticked is required again.
+  const optedOut = Net.normalizeCriticalNetworkEntry(
+    critical({ RequirePresent: 0, Address: '10.0.0.9' })
   );
+  assert.equal(optedOut.RequirePresent, true);
+  assert.equal(Net.evaluateNetworkIssues(null, optedOut)[0].Kind, 'missing');
 });
 
 test('each address condition reports its own fault', () => {
@@ -173,11 +174,11 @@ test('the view judges nothing until the list is trusted', () => {
   assert.equal(trusted.View.Interfaces.find((i) => i.Name === 'lo0').Internal, true);
 });
 
-test('an absent interface that may be absent is listed but never missing', () => {
-  const result = Net.buildNetworkView([], [critical({ RequirePresent: false })], true, 1);
-  assert.equal(result.View.Interfaces[0].Missing, false);
-  assert.deepEqual(result.Missing, []);
-  assert.deepEqual(result.Warnings, []);
+test('an interface saved as allowed to be absent is missing like any other', () => {
+  const optedOut = Net.normalizeCriticalNetworkEntry(critical({ RequirePresent: 0 }));
+  const result = Net.buildNetworkView([], [optedOut], true, 1);
+  assert.equal(result.View.Interfaces[0].Missing, true);
+  assert.equal(result.Missing.length, 1);
 });
 
 test('routers are a capability only when the client reports the field', () => {
@@ -301,6 +302,8 @@ test('a first mark records the family it was marked under', () => {
     2
   );
   assert.equal(updated.Family, 'IPv6');
+  // Presence cannot be turned off, even when a request asks.
+  assert.equal(updated.RequirePresent, true);
 });
 
 test('without a stated family it follows the guarded address, then the addresses it has', () => {

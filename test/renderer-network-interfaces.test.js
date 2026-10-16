@@ -143,13 +143,14 @@ test('the conditions table lists the five conditions with live values and defaul
     { Router: true }
   );
   assert.deepEqual(
-    rows.map((r) => [r.Field, r.Label, r.Value, r.Checked, r.Supported]),
+    rows.map((r) => [r.Field, r.Label, r.Value, r.Checked, r.Supported, r.Locked]),
     [
-      ['RequirePresent', 'Present', 'Yes', true, true],
-      ['Address', 'IP address', '10.0.0.5', true, true],
-      ['Range', 'IP range', '10.0.0.5', false, true],
-      ['Netmask', 'Subnet mask', '255.255.255.0', true, true],
-      ['Gateway', 'Router', '10.0.0.1', false, true],
+      // Present is the point of monitoring an interface: always ticked, never editable.
+      ['RequirePresent', 'Present', 'Yes', true, true, true],
+      ['Address', 'IP address', '10.0.0.5', true, true, false],
+      ['Range', 'IP range', '10.0.0.5', false, true, false],
+      ['Netmask', 'Subnet mask', '255.255.255.0', true, true, false],
+      ['Gateway', 'Router', '10.0.0.1', false, true, false],
     ]
   );
   assert.deepEqual(rows[2].Defaults, ['10.0.0.1', '10.0.0.254']);
@@ -194,8 +195,8 @@ test('SubnetHostRange gives the usable hosts of an IPv4 subnet', () => {
 });
 
 test('the form turns into a request, or a reason it cannot', () => {
+  // Presence is locked on, so the form never reads or sends it.
   const fields = {
-    RequirePresent: true,
     Address: ' 10.0.0.5 ',
     RangeStart: '',
     RangeEnd: '',
@@ -205,7 +206,6 @@ test('the form turns into a request, or a reason it cannot', () => {
   assert.deepEqual(Lib.ParseNetworkRuleFields('en0', fields), {
     Payload: {
       Name: 'en0',
-      RequirePresent: true,
       Address: '10.0.0.5',
       RangeStart: null,
       RangeEnd: null,

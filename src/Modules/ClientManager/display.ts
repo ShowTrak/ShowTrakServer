@@ -272,12 +272,10 @@ export function normalizeCriticalDisplayEntry(Value: unknown): CriticalDisplay |
   return {
     DisplayID,
     Label,
-    // sqlite hands booleans back as 0/1. A row written before presence became a
-    // condition has no value at all, and was always required to be present.
-    RequirePresent:
-      E.RequirePresent === undefined || E.RequirePresent === null
-        ? true
-        : E.RequirePresent === true || E.RequirePresent === 1,
+    // A monitored display is always required to be connected — without that,
+    // monitoring it raises nothing when it goes — so presence is never read from
+    // the row, which also brings back any row saved while it could be unticked.
+    RequirePresent: true,
     Width,
     Height,
     RefreshRate: PositiveWholeOrNull(E.RefreshRate),
@@ -478,6 +476,7 @@ export function buildDisplayView(
 
 /** Options a mark/update request may carry; absent ones keep their current value. */
 export interface CriticalDisplayOptions {
+  /** Ignored: a monitored display is always required to be connected. */
   RequirePresent?: boolean;
   RequirePrimary?: boolean;
   CheckResolution?: boolean;
@@ -512,7 +511,7 @@ export function resolveCriticalDisplayEntry(
   if (!Live && !Existing) return ['That display is not connected to this client', null];
   const Has = (Key: keyof CriticalDisplayOptions) =>
     Object.prototype.hasOwnProperty.call(Options, Key) && Options[Key] !== undefined;
-  const Flag = (Key: 'RequirePresent' | 'RequirePrimary', First: boolean) =>
+  const Flag = (Key: 'RequirePrimary', First: boolean) =>
     Has(Key) ? !!Options[Key] : Existing ? Existing[Key] : First;
   const Wants = (Key: CheckOption, Guarded: boolean, First: boolean) =>
     Has(Key) ? !!Options[Key] : Existing ? Guarded : First;
@@ -581,7 +580,7 @@ export function resolveCriticalDisplayEntry(
     normalizeCriticalDisplayEntry({
       DisplayID,
       Label: LiveLabel ?? Existing?.Label ?? null,
-      RequirePresent: Flag('RequirePresent', true),
+      RequirePresent: true,
       Width,
       Height,
       RefreshRate,

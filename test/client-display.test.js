@@ -82,7 +82,8 @@ test('normalizing reads sqlite 0/1 and drops half a resolution or position', () 
     Rotation: -90,
   });
   assert.equal(entry.DisplayID, 'x');
-  assert.equal(entry.RequirePresent, false);
+  // A row saved while presence could still be unticked is required again.
+  assert.equal(entry.RequirePresent, true);
   assert.equal(entry.RequirePrimary, true);
   assert.equal(entry.Width, null);
   assert.equal(entry.Height, null);
@@ -222,11 +223,14 @@ test('an unknown is never a fault', () => {
   assert.deepEqual(Display.evaluateDisplayIssues(silent, entry), []);
 });
 
-test('absence faults only when presence is required', () => {
+test('absence always faults: a monitored display cannot opt out of being connected', () => {
   assert.deepEqual(Display.evaluateDisplayIssues(null, critical()), [
     { Kind: 'missing', Message: 'DELL U2720Q is not connected' },
   ]);
-  assert.deepEqual(Display.evaluateDisplayIssues(null, critical({ RequirePresent: false })), []);
+  assert.equal(
+    Display.evaluateDisplayIssues(null, critical({ RequirePresent: false }))[0].Kind,
+    'missing'
+  );
 });
 
 // --- View -------------------------------------------------------------------------
@@ -257,10 +261,10 @@ test('nothing is judged before the client has reported on this connection', () =
   assert.deepEqual(result.Missing, []);
 });
 
-test('a display allowed to be absent reads as not connected, never missing', () => {
+test('a display saved as allowed to be absent is missing like any other', () => {
   const result = Display.buildDisplayView([], [critical({ RequirePresent: false })], true);
-  assert.equal(result.List[0].Missing, false);
-  assert.deepEqual(result.Warnings, []);
+  assert.equal(result.List[0].Missing, true);
+  assert.deepEqual(result.Warnings, ['Missing Display']);
 });
 
 // --- Mark requests ----------------------------------------------------------------
@@ -318,7 +322,8 @@ test('ticking a property guards its value now; a guarded one keeps its baseline'
   );
   assert.equal(cleared.Width, null);
   assert.equal(cleared.RefreshRate, null);
-  assert.equal(cleared.RequirePresent, false);
+  // Presence cannot be turned off, even when a request asks.
+  assert.equal(cleared.RequirePresent, true);
 });
 
 test('a disconnected display cannot capture a new condition', () => {

@@ -144,6 +144,10 @@ test('condition rows show the baseline when guarded, the live value when not', (
   assert.equal(byField.CheckPosition.Value, '1920, 0');
   assert.equal(byField.RequirePrimary.Value, 'No');
   assert.equal(byField.RequirePresent.Value, 'Yes');
+  // Connected is the point of monitoring a display: always ticked, never editable.
+  assert.equal(byField.RequirePresent.Checked, true);
+  assert.equal(byField.RequirePresent.Locked, true);
+  assert.equal(byField.CheckResolution.Locked, false);
 });
 
 test('a disconnected display can only clear conditions', () => {
@@ -165,12 +169,11 @@ test('a property the display does not report is unsupported', () => {
   assert.equal(rows.find((Row) => Row.Field === 'CheckRefreshRate').Supported, false);
 });
 
-test('the form becomes a full request', () => {
+test('the form becomes a full request, never carrying the locked connected tick', () => {
   assert.deepEqual(
-    Lib.ParseDisplayRuleFields('d1', { RequirePresent: true, CheckRotation: true }),
+    Lib.ParseDisplayRuleFields('d1', { RequirePresent: false, CheckRotation: true }),
     {
       DisplayID: 'd1',
-      RequirePresent: true,
       CheckResolution: false,
       CheckRefreshRate: false,
       CheckScale: false,
@@ -245,6 +248,8 @@ test('a critical card carries its conditions table and issues', () => {
   );
   assert.match(html, /SHOWTRAK_DISPLAY_CONDITIONS/);
   assert.match(html, /data-rule="CheckRotation"\s+checked/);
+  assert.doesNotMatch(html, /data-rule="CheckRotation"[^>]*disabled/);
+  assert.match(html, /data-rule="RequirePresent"\s+checked disabled/);
   assert.match(html, /Rotation is 90° \(expected 0°\)/);
   assert.match(html, /is-mismatch-critical/);
 });

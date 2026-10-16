@@ -92,7 +92,7 @@ function ConditionsTable(
             <td class="SHOWTRAK_AUDIO_COND_CHECK">${
               Row.Supported
                 ? `<input type="checkbox" class="form-check-input" data-rule="${Row.Field}"
-                    ${Row.Checked ? 'checked' : ''} aria-label="Monitor ${Safe(Row.Label.toLowerCase())}" />`
+                    ${Row.Checked ? 'checked' : ''} ${Row.Locked ? 'disabled' : ''} aria-label="Monitor ${Safe(Row.Label.toLowerCase())}" />`
                 : ''
             }</td>
           </tr>`
@@ -215,7 +215,6 @@ function SaveConditions(
       ? String($Table.find(`input[type="text"][data-rule="${Rule}"]`).val() ?? '')
       : '';
   const Parsed = ParseNetworkRuleFields(Name, {
-    RequirePresent: Checked('RequirePresent'),
     Address: Value('Address'),
     RangeStart: Value('Range', 'RangeStart'),
     RangeEnd: Value('Range', 'RangeEnd'),
