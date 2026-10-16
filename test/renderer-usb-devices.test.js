@@ -133,6 +133,30 @@ test('on Windows every condition can be held', () => {
   assert.equal(rows.CheckFirmware.Checked, false);
   assert.equal(rows.RequireNoError.Value, 'None');
   assert.equal(rows.RequireNoError.Checked, true);
+  // Connected is the point of monitoring a device: always ticked, never editable.
+  assert.equal(rows.RequirePresent.Checked, true);
+  assert.equal(rows.RequirePresent.Locked, true);
+  assert.equal(rows.CheckLocation.Locked, false);
+});
+
+test('the connected tick renders ticked and disabled, even for an old opted-out row', () => {
+  const rows = byField(
+    Lib.USBConditionRows(
+      view({ IsCritical: true, Critical: conditions({ RequirePresent: false }) }),
+      MAC
+    )
+  );
+  assert.equal(rows.RequirePresent.Checked, true);
+  assert.equal(rows.RequirePresent.Locked, true);
+  const html = USB.BuildUSBSectionHtml(
+    client({
+      USBCapabilities: MAC,
+      USBDeviceList: [view({ IsCritical: true, Critical: conditions() })],
+    }),
+    'ok'
+  );
+  assert.match(html, /data-rule="RequirePresent"\s+checked disabled/);
+  assert.doesNotMatch(html, /data-rule="CheckLocation"[^>]*disabled/);
 });
 
 test('off Windows the device error reads Unsupported, even though it is on by default', () => {
@@ -192,10 +216,10 @@ test('a group shows its count and its ports', () => {
   assert.equal(rows.CheckLocation.Value, 'Bus 1 · Port 2, Bus 1 · Port 3');
 });
 
-test('the form sends the device-error tick only when it was offered', () => {
+test('the form sends the device-error tick only when it was offered, and never presence', () => {
   assert.deepEqual(
-    Lib.ParseUSBRuleFields({ RequirePresent: true, CheckLocation: true, CheckFirmware: false }),
-    { RequirePresent: true, CheckLocation: true, CheckFirmware: false }
+    Lib.ParseUSBRuleFields({ RequirePresent: false, CheckLocation: true, CheckFirmware: false }),
+    { CheckLocation: true, CheckFirmware: false }
   );
   assert.equal(Lib.ParseUSBRuleFields({ RequireNoError: false }).RequireNoError, false);
 });

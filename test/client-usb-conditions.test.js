@@ -71,7 +71,8 @@ test('a row written before conditions existed reads as the old guard, plus no de
   });
   const entry = named({ RequirePresent: 0, RequireNoError: 0, Location: '1-3, 1-2,junk' });
   assert.equal(entry.NameKey, 'acme dongle');
-  assert.equal(entry.RequirePresent, false);
+  // A row saved while presence could still be unticked is required again.
+  assert.equal(entry.RequirePresent, true);
   assert.equal(entry.RequireNoError, false);
   assert.equal(entry.Location, '1-2,1-3');
 });
@@ -152,12 +153,14 @@ test('an older client is judged on presence alone, whatever is guarded', () => {
   assert.equal(USB.evaluateUSBIssues(null, entry)[0].Kind, 'missing');
 });
 
-test('absence faults only when presence is required', () => {
-  assert.deepEqual(USB.evaluateUSBIssues(null, critical({ RequirePresent: false })), []);
+test('absence always faults: a monitored device cannot opt out of being connected', () => {
+  assert.equal(USB.evaluateUSBIssues(null, critical({ RequirePresent: false }))[0].Kind, 'missing');
   assert.deepEqual(USB.evaluateUSBNameShortfall(1, named()), [
     { Kind: 'missing', Message: '1 of 2 connected' },
   ]);
-  assert.deepEqual(USB.evaluateUSBNameShortfall(1, named({ RequirePresent: false })), []);
+  assert.deepEqual(USB.evaluateUSBNameShortfall(1, named({ RequirePresent: false })), [
+    { Kind: 'missing', Message: '1 of 2 connected' },
+  ]);
 });
 
 // --- View -------------------------------------------------------------------------
@@ -182,18 +185,19 @@ test('the view keeps every field the renderer and older consumers read', () => {
 
 test('missing devices and short groups still drive the old Missing lists', () => {
   const absent = critical({ SerialNumber: 'GONE' });
-  const allowed = critical({ SerialNumber: 'AWAY', RequirePresent: false });
+  // Saved while presence could be unticked: it is missing like any other.
+  const optedOut = critical({ SerialNumber: 'AWAY', RequirePresent: false });
   const group = named();
   const dongle = legacy({ SerialNumber: null, ManufacturerName: 'Acme', ProductName: 'Dongle' });
-  const result = USB.buildUSBView([dongle], [absent, allowed], [group], true);
+  const result = USB.buildUSBView([dongle], [absent, optedOut], [group], true);
   assert.deepEqual(
     result.MissingDevices.map((Entry) => Entry.SerialNumber),
-    ['GONE']
+    ['GONE', 'AWAY']
   );
   assert.equal(result.MissingNames.length, 1);
-  const allowedCard = result.List.find((Entry) => Entry.SerialNumber === 'AWAY');
-  assert.equal(allowedCard.Missing, false);
-  assert.equal(allowedCard.IsConnected, false);
+  const optedOutCard = result.List.find((Entry) => Entry.SerialNumber === 'AWAY');
+  assert.equal(optedOutCard.Missing, true);
+  assert.equal(optedOutCard.IsConnected, false);
   const dongleCard = result.List.find((Entry) => Entry.NameKey === 'acme dongle');
   assert.equal(dongleCard.Shortfall, true);
   assert.equal(dongleCard.ConnectedCount, 1);
@@ -244,7 +248,8 @@ test('a guarded value keeps its baseline while other conditions change', () => {
   );
   assert.equal(entry.Location, '1-2.4');
   assert.equal(entry.FirmwareVersion, '1.23');
-  assert.equal(entry.RequirePresent, false);
+  // Presence cannot be turned off, even when a request asks.
+  assert.equal(entry.RequirePresent, true);
   // Omitted ticks keep what is stored — including the device-error default a
   // client that cannot read device state never shows.
   assert.equal(entry.RequireNoError, true);

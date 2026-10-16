@@ -131,10 +131,12 @@ export function DescribeDeviceError(State: USBDeviceState): string {
 // --- Critical entries -------------------------------------------------------------
 
 /**
- * The conditions of a stored or requested entry. A row written before
- * conditions existed was always required to be present, and a Windows device
- * that failed used to vanish from the list (so it faulted as missing); no device
- * error is required by default so that keeps faulting now it stays listed.
+ * The conditions of a stored or requested entry. A monitored device is always
+ * required to be connected — without that, monitoring it raises nothing when it
+ * goes — so presence is never read from the row, which also brings back any
+ * row saved while it could still be unticked. A Windows device that failed used
+ * to vanish from the list (so it faulted as missing); no device error is
+ * required by default so that keeps faulting now it stays listed.
  */
 export function normalizeUSBConditions(Value: unknown): CriticalUSBConditions {
   const E = AsRecord(Value);
@@ -142,7 +144,7 @@ export function normalizeUSBConditions(Value: unknown): CriticalUSBConditions {
     Raw === undefined || Raw === null ? true : Raw === true || Raw === 1;
   const Location = LocationList(typeof E.Location === 'string' ? E.Location : null).join(',');
   return {
-    RequirePresent: Flag(E.RequirePresent),
+    RequirePresent: true,
     Location: Location || null,
     FirmwareVersion: normalizeFirmwareVersion(E.FirmwareVersion),
     RequireNoError: Flag(E.RequireNoError),
@@ -406,6 +408,7 @@ export function buildUSBView(
 
 /** Options a mark/update request may carry; absent ones keep their current value. */
 export interface CriticalUSBOptions {
+  /** Ignored: a monitored device is always required to be connected. */
   RequirePresent?: boolean;
   CheckLocation?: boolean;
   CheckFirmware?: boolean;
@@ -431,7 +434,7 @@ export function resolveUSBConditions(
 ): [string | null, CriticalUSBConditions | null] {
   const Has = (Key: keyof CriticalUSBOptions) =>
     Object.prototype.hasOwnProperty.call(Options, Key) && Options[Key] !== undefined;
-  const Flag = (Key: 'RequirePresent' | 'RequireNoError') =>
+  const Flag = (Key: 'RequireNoError') =>
     Has(Key) ? !!Options[Key] : Existing ? Existing[Key] : true;
   const Wants = (Key: 'CheckLocation' | 'CheckFirmware', Guarded: boolean) =>
     Has(Key) ? !!Options[Key] : Existing ? Guarded : false;
@@ -475,7 +478,7 @@ export function resolveUSBConditions(
   return [
     null,
     {
-      RequirePresent: Flag('RequirePresent'),
+      RequirePresent: true,
       Location,
       FirmwareVersion,
       RequireNoError: Flag('RequireNoError'),

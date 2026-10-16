@@ -64,7 +64,7 @@ function ConditionsTable(Device: USBDeviceView, Capabilities: USBCapabilities | 
             <td class="SHOWTRAK_AUDIO_COND_CHECK">${
               Row.Supported
                 ? `<input type="checkbox" class="form-check-input" data-rule="${Row.Field}"
-                    ${Row.Checked ? 'checked' : ''} aria-label="Monitor ${Safe(Row.Label.toLowerCase())}" />`
+                    ${Row.Checked ? 'checked' : ''} ${Row.Locked ? 'disabled' : ''} aria-label="Monitor ${Safe(Row.Label.toLowerCase())}" />`
                 : ''
             }</td>
           </tr>`

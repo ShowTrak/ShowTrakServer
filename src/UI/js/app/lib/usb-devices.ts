@@ -170,6 +170,8 @@ export interface USBConditionRow {
   Supported: boolean;
   /** Whether the condition is being monitored. */
   Checked: boolean;
+  /** Always on: monitoring a device is requiring it to be connected. Never sent. */
+  Locked: boolean;
   /** The issue this condition currently raises, when it is not met. */
   Failing: string | null;
 }
@@ -201,13 +203,15 @@ export function USBConditionRows(
     Live: string | null,
     Checked: boolean,
     Failing: string | null,
-    Supported: boolean
+    Supported: boolean,
+    Locked = false
   ): USBConditionRow => ({
     Field,
     Label,
     Value: !Supported ? 'Unsupported' : ((Checked ? Guarded : null) ?? Live ?? '—'),
     Supported,
     Checked,
+    Locked,
     Failing,
   });
   const ByName = !!Device.IsCriticalByName && typeof Device.Quantity === 'number';
@@ -221,8 +225,9 @@ export function USBConditionRows(
       'Connected',
       null,
       ByName ? `${Device.ConnectedCount ?? 0} of ${Device.Quantity}` : Connected ? 'Yes' : 'No',
-      Critical.RequirePresent,
+      true,
       Issue('missing'),
+      true,
       true
     ),
     Row(
@@ -285,13 +290,13 @@ export type USBRuleFields = Record<USBConditionField, boolean>;
 /**
  * Turn the conditions form into a request. The device-error tick is only sent
  * when its row could be ticked, so saving from a client that cannot read device
- * state leaves the stored default alone.
+ * state leaves the stored default alone. The connected tick is locked on, so it
+ * is never sent.
  */
 export function ParseUSBRuleFields(
   Fields: Partial<USBRuleFields>
 ): Partial<Record<USBConditionField, boolean>> {
   const Out: Partial<Record<USBConditionField, boolean>> = {
-    RequirePresent: !!Fields.RequirePresent,
     CheckLocation: !!Fields.CheckLocation,
     CheckFirmware: !!Fields.CheckFirmware,
   };
