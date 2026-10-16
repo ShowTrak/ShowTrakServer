@@ -46,7 +46,8 @@ export function DescribeLocation(Location: unknown): string | null {
   if (typeof Location !== 'string' || !Location.trim()) return null;
   const Parts = Location.split(',')
     .map((One) => One.trim())
-    .filter((One) => /^\d+-[\d.]+$/.test(One))
+    // The bus is a number, or a Windows controller address ("PCI0:14.0").
+    .filter((One) => /^[A-Za-z0-9_:.()#/]+-[\d.]+$/.test(One))
     .map((One) => {
       const [Bus, Path] = One.split('-');
       return `Bus ${Bus} · Port ${Path}`;

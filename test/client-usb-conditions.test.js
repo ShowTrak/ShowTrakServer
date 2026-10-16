@@ -88,6 +88,20 @@ test('reported values are read loosely, and junk is unknown rather than an error
   assert.equal(USB.DescribeUSBLocation('1-2.4,2-1'), 'Bus 1 · Port 2.4, Bus 2 · Port 1');
 });
 
+test('a Windows bus is a controller address, and stays one part of a stored list', () => {
+  assert.equal(USB.normalizeUSBLocation('PCI0:14.0-3.1'), 'PCI0:14.0-3.1');
+  assert.equal(USB.normalizeUSBLocation('PCI0:02.1/00.0/r1-2'), 'PCI0:02.1/00.0/r1-2');
+  assert.equal(
+    USB.normalizeUSBLocation('ACPI(_SB_)#ACPI(URS0)#USBROOT(0)-1'),
+    'ACPI(_SB_)#ACPI(URS0)#USBROOT(0)-1'
+  );
+  // No port path, or a bus that could hide a separator, is not a location.
+  assert.equal(USB.normalizeUSBLocation('PCI0:14.0'), null);
+  assert.equal(USB.normalizeUSBLocation('PCI 0-1'), null);
+  assert.deepEqual(USB.LocationList('PCI0:14.0-3.1,1-2'), ['1-2', 'PCI0:14.0-3.1']);
+  assert.equal(USB.DescribeUSBLocation('PCI0:14.0-3.1'), 'Bus PCI0:14.0 · Port 3.1');
+});
+
 // --- Capabilities -----------------------------------------------------------------
 
 test('capabilities come from which keys the client sends, not their values', () => {

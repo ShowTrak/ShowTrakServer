@@ -53,11 +53,17 @@ export interface USBDeviceViewEntry extends Record<string, unknown> {
 
 // --- Reported values --------------------------------------------------------------
 
-/** "1-2.4": a bus, then the port path through any hubs. Null when it is not one. */
+/**
+ * "1-2.4": a bus, then the port path through any hubs. Null when it is not one.
+ * The bus is a number on macOS and Linux; a Windows client on usb 3.x names it
+ * by its controller's PCI address, "PCI0:14.0-3.1", or by its raw location path
+ * when that has another shape. Never a "-" or "," inside a bus, since those
+ * separate the port path and the ports in a stored list.
+ */
 export function normalizeUSBLocation(Value: unknown): string | null {
   if (typeof Value !== 'string') return null;
   const Text = Value.trim();
-  return /^\d{1,3}-\d{1,3}(\.\d{1,3}){0,7}$/.test(Text) ? Text : null;
+  return /^[A-Za-z0-9_:.()#/]{1,64}-\d{1,3}(\.\d{1,3}){0,7}$/.test(Text) ? Text : null;
 }
 
 /** A firmware version as reported ("1.23"); null when empty. */

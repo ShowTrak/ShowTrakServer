@@ -71,6 +71,15 @@ function client(overrides = {}) {
   };
 }
 
+test('a Windows port reads under its controller address', () => {
+  assert.equal(Lib.DescribeLocation('PCI0:14.0-3.1'), 'Bus PCI0:14.0 · Port 3.1');
+  assert.equal(
+    Lib.DescribeLocation('PCI0:14.0-3.1,1-2'),
+    'Bus PCI0:14.0 · Port 3.1, Bus 1 · Port 2'
+  );
+  assert.equal(Lib.DescribeLocation('PCI 0-1'), null);
+});
+
 test('the subtitle reads serial, port and firmware', () => {
   assert.equal(Lib.USBDeviceSummary(view()), 'CL12345 · Bus 1 · Port 2.4 · Firmware 1.23');
   assert.equal(Lib.USBDeviceSummary(legacyView()), 'CL12345');
