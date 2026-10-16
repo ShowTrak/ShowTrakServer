@@ -22,8 +22,8 @@
 // Observe().
 import net from 'net';
 import { CreateLogger } from '../Logger';
-import { EncodeOscTcp, DecodeOscStream, type OscMessage } from './_osc-shared';
-import type { MonitoringResult } from './types';
+import { EncodeOscTcp, DecodeOscStream, type OscArg, type OscMessage } from './_osc-shared';
+import type { MonitoringActionDef, MonitoringResult, MonitoringSettingField } from './types';
 
 const Logger = CreateLogger('QLab');
 
@@ -40,6 +40,8 @@ const RECONNECT_BASE_MS = 2000;
 const RECONNECT_MAX_MS = 30000;
 const UPDATE_DEBOUNCE_MS = 200; // coalesce bursts of update notifications
 const MAX_STREAM_BYTES = 4_000_000; // guard against unbounded reply buffering
+const COMMAND_TIMEOUT_MS = 3000; // a control message QLab has not answered by now has failed
+const REFRESH_TIMEOUT_MS = 1500; // how long an action waits for the post-action re-read
 
 // The set of override flags we track. Overrides are GLOBAL (application-level) in
 // QLab, addressed `/overrides/{key}` — NOT workspace-scoped — and are queried with
@@ -123,6 +125,27 @@ export function ParseQLabReply(Message: OscMessage): QLabReply | null {
   }
 }
 
+// The key a reply is matched to its request on: the address with any
+// `/workspace/<id>` prefix removed, since whether QLab echoes the prefix back
+// is not something to depend on.
+export function ReplyKey(Address: string): string {
+  return String(Address || '').replace(/^\/workspace\/[^/]+/, '');
+}
+
+function IsReportedFlag(Data: unknown): boolean {
+  return typeof Data === 'boolean' || typeof Data === 'number';
+}
+
+// Why QLab refused a message, from its reply status. Shown to the operator
+// verbatim, so it names the setting that fixes it.
+export function DescribeRefusal(Status: string): string {
+  if (Status === 'denied') {
+    return 'QLab denied the command — this connection lacks control access. Set an OSC passcode with control access in QLab (Workspace Settings → Network) and enter it on this check';
+  }
+  if (Status === 'badpass') return 'QLab rejected the OSC passcode';
+  return 'QLab could not carry out the command';
+}
+
 // --- Snapshot ---------------------------------------------------------------
 
 export interface QLabCueRef {
@@ -184,6 +207,19 @@ interface Connection {
   HeartbeatTimer: NodeJS.Timeout | null;
   UpdateTimer: NodeJS.Timeout | null;
   Snapshot: QLabSnapshot;
+  Waiters: ReplyWaiter[];
+}
+
+// Someone awaiting QLab's reply to a message this connection sent. Matched on
+// the reply's address with any `/workspace/<id>` prefix stripped (see
+// ReplyKey), first-come first-served. A consuming waiter swallows the reply —
+// an action's acknowledgement carries no state worth applying — while a
+// non-consuming one lets it update the snapshot too.
+interface ReplyWaiter {
+  Key: string;
+  Consume: boolean;
+  Resolve: (Reply: QLabReply | null, Error?: string) => void;
+  Timer: NodeJS.Timeout;
 }
 
 function BuildKey(P: ConnectionParams): string {
@@ -212,6 +248,7 @@ class QLabConnectionManagerImpl {
         HeartbeatTimer: null,
         UpdateTimer: null,
         Snapshot: EmptySnapshot(),
+        Waiters: [],
       };
       this.Connections.set(Key, Conn);
     }
@@ -307,8 +344,106 @@ class QLabConnectionManagerImpl {
 
     const Reply = ParseQLabReply(Message);
     if (!Reply) return;
+    if (this.SettleWaiter(Conn, Reply)) return;
     if (Reply.Status !== 'ok') return;
     this.ApplyReply(Conn, Reply);
+  }
+
+  // Hand a reply to the first waiter expecting its address. Returns true when
+  // that waiter consumed it, so it is not also applied to the snapshot.
+  private SettleWaiter(Conn: Connection, Reply: QLabReply): boolean {
+    const Key = ReplyKey(Reply.Address);
+    const Index = Conn.Waiters.findIndex((Waiter) => Waiter.Key === Key);
+    if (Index === -1) return false;
+    const [Waiter] = Conn.Waiters.splice(Index, 1);
+    clearTimeout(Waiter!.Timer);
+    Waiter!.Resolve(Reply);
+    return Waiter!.Consume;
+  }
+
+  // Send one message and wait for QLab's reply to it (every message is
+  // answered, since the connection opened with /alwaysReply 1). Resolves with
+  // the reply, or null and a reason when none arrives.
+  private Request(
+    Conn: Connection,
+    Address: string,
+    Args: OscArg[],
+    Consume: boolean,
+    TimeoutMs: number
+  ): Promise<{ Reply: QLabReply | null; Error?: string }> {
+    return new Promise((resolve) => {
+      const Waiter: ReplyWaiter = {
+        Key: ReplyKey(Address),
+        Consume,
+        Resolve: (Reply, Error) => resolve({ Reply, Error }),
+        Timer: setTimeout(() => {
+          const Index = Conn.Waiters.indexOf(Waiter);
+          if (Index !== -1) Conn.Waiters.splice(Index, 1);
+          resolve({ Reply: null, Error: `No reply from QLab after ${TimeoutMs}ms` });
+        }, TimeoutMs),
+      };
+      if (typeof Waiter.Timer.unref === 'function') Waiter.Timer.unref();
+      Conn.Waiters.push(Waiter);
+      this.Send(Conn, Address, Args);
+    });
+  }
+
+  private FailWaiters(Conn: Connection, Reason: string): void {
+    const Waiters = Conn.Waiters.splice(0);
+    for (const Waiter of Waiters) {
+      clearTimeout(Waiter.Timer);
+      Waiter.Resolve(null, Reason);
+    }
+  }
+
+  /**
+   * Send a control message over the target's persistent connection and wait
+   * for QLab to acknowledge it. `Scope: 'workspace'` prefixes the address with
+   * the resolved workspace, so the command lands on the workspace this check
+   * watches rather than on every open one.
+   *
+   * There is deliberately no connect-on-demand: a target nobody is observing
+   * has no workspace resolved to address, and the check's own tick opens the
+   * connection well before an operator can press anything.
+   */
+  async Command(
+    Params: ConnectionParams,
+    Address: string,
+    Args: OscArg[],
+    Scope: 'workspace' | 'application'
+  ): Promise<{ Success: boolean; Error?: string }> {
+    const Key = this.Observe(Params);
+    const Conn = this.Connections.get(Key)!;
+    if (Conn.State !== 'ready') {
+      return { Success: false, Error: Conn.Snapshot.Error || 'Not connected to QLab yet' };
+    }
+    if (Scope === 'workspace' && !Conn.Snapshot.WorkspaceID) {
+      return {
+        Success: false,
+        Error: Conn.Params.Workspace ? 'Workspace not open in QLab' : 'No workspaces open in QLab',
+      };
+    }
+    const Full = Scope === 'workspace' ? this.Ws(Conn, Address) : Address;
+    const { Reply, Error } = await this.Request(Conn, Full, Args, true, COMMAND_TIMEOUT_MS);
+    if (!Reply) return { Success: false, Error: Error || 'No reply from QLab' };
+    if (Reply.Status !== 'ok') return { Success: false, Error: DescribeRefusal(Reply.Status) };
+    return { Success: true };
+  }
+
+  /**
+   * Re-read the tracked attributes now and wait for them to land, so the
+   * re-probe an action triggers reports the state it produced rather than the
+   * one it replaced. Best effort: a slow reply only means the tile catches up
+   * on the next heartbeat.
+   */
+  async Refresh(Params: ConnectionParams): Promise<void> {
+    const Conn = this.Connections.get(BuildKey(Params));
+    if (!Conn || Conn.State !== 'ready' || !Conn.Snapshot.WorkspaceID) return;
+    this.QueryCore(Conn);
+    // Replies arrive in the order the queries went out, so the last one
+    // landing means the whole batch has been applied.
+    const Last = OVERRIDE_KEYS[OVERRIDE_KEYS.length - 1];
+    await this.Request(Conn, `/overrides/${Last}`, [], false, REFRESH_TIMEOUT_MS);
   }
 
   private ApplyReply(Conn: Connection, Reply: QLabReply): void {
@@ -343,7 +478,10 @@ class QLabConnectionManagerImpl {
       return;
     }
 
+    // A setter's acknowledgement shares its address with the query but carries
+    // no data, so only a reply that actually reports a value may change state.
     if (Addr.endsWith('/showMode')) {
+      if (!IsReportedFlag(Reply.Data)) return;
       Snap.ShowMode = Reply.Data === true || Reply.Data === 1;
       Snap.Ready = true;
       return;
@@ -358,7 +496,7 @@ class QLabConnectionManagerImpl {
     const OverrideMatch = /\/overrides\/([A-Za-z]+)$/.exec(Addr);
     if (OverrideMatch) {
       const Key = OverrideMatch[1] as OverrideKey;
-      if ((OVERRIDE_KEYS as readonly string[]).includes(Key)) {
+      if ((OVERRIDE_KEYS as readonly string[]).includes(Key) && IsReportedFlag(Reply.Data)) {
         Snap.Overrides[Key] = Reply.Data === true || Reply.Data === 1;
         Snap.Ready = true;
       }
@@ -423,6 +561,7 @@ class QLabConnectionManagerImpl {
     Conn.Snapshot.Connected = false;
     Conn.Snapshot.Ready = false;
     Conn.Snapshot.Error = Reason;
+    this.FailWaiters(Conn, Reason);
     this.ClearTimers(Conn, /* keepReconnect */ true);
     if (Conn.Socket) {
       try {
@@ -479,6 +618,7 @@ class QLabConnectionManagerImpl {
     const Now = Date.now();
     for (const [Key, Conn] of this.Connections) {
       if (Now - Conn.LastInterestAt <= INTEREST_TTL_MS) continue;
+      this.FailWaiters(Conn, 'Connection closed');
       this.ClearTimers(Conn);
       if (Conn.Socket) {
         try {
@@ -498,6 +638,7 @@ class QLabConnectionManagerImpl {
       this.SweepTimer = null;
     }
     for (const Conn of this.Connections.values()) {
+      this.FailWaiters(Conn, 'Connection closed');
       this.ClearTimers(Conn);
       if (Conn.Socket) {
         try {
@@ -530,6 +671,154 @@ export function NormalizeCueList(Data: unknown): QLabCueRef[] {
 
 export const QLabConnectionManager = new QLabConnectionManagerImpl();
 
+// --- Actions shared by QLab 4 and QLab 5 ------------------------------------
+//
+// Every message here is workspace-scoped (`/workspace/<id>/...`): unscoped,
+// QLab 5 delivers a workspace message to EVERY open workspace and QLab 4 to the
+// frontmost one, and neither is necessarily the workspace this check watches.
+//
+// GO is not marked Destructive: firing the next cue is what the button is for,
+// and a confirmation in front of it defeats a quick GO from a favourite. The
+// ones that cut a running show short (stop, hard stop, panic, reset) are.
+
+const CUE_PARAM: MonitoringSettingField = {
+  Key: 'Cue',
+  Label: 'Cue number',
+  Type: 'string',
+  Default: '',
+  Required: true,
+  Note: 'The cue number as shown in QLab. A cue list number GOs that list.',
+};
+
+export const TRANSPORT_ACTIONS: MonitoringActionDef[] = [
+  {
+    ID: 'go',
+    Label: 'GO',
+    Icon: 'play-fill',
+    Group: 'Playback',
+    Note: 'GOs the current cue list from the playhead.',
+  },
+  {
+    ID: 'go.cue',
+    Label: 'GO Cue',
+    Icon: 'skip-forward-fill',
+    Group: 'Playback',
+    Params: [CUE_PARAM],
+    Note: 'Moves the playhead to a cue and GOs it.',
+  },
+  { ID: 'pause', Label: 'Pause All', Icon: 'pause-fill', Group: 'Playback' },
+  { ID: 'resume', Label: 'Resume All', Icon: 'play', Group: 'Playback' },
+  {
+    ID: 'stop',
+    Label: 'Stop All',
+    Icon: 'stop-fill',
+    Group: 'Stop',
+    Destructive: true,
+    Note: 'Stops every cue, letting audio effects such as reverb tails ring out.',
+  },
+  {
+    ID: 'panic',
+    Label: 'Panic',
+    Icon: 'exclamation-octagon',
+    Group: 'Stop',
+    Destructive: true,
+    Note: 'Fades everything out over the workspace panic time, then stops.',
+  },
+  {
+    ID: 'stop.hard',
+    Label: 'Hard Stop',
+    Icon: 'stop-circle-fill',
+    Group: 'Stop',
+    Destructive: true,
+    Note: 'Stops every cue and cuts audio effects immediately.',
+  },
+  {
+    ID: 'reset',
+    Label: 'Reset Workspace',
+    Icon: 'arrow-counterclockwise',
+    Group: 'Stop',
+    Destructive: true,
+    Note: 'Stops everything, returns the playhead to the top and undoes live changes.',
+  },
+];
+
+export const MODE_ACTIONS: MonitoringActionDef[] = [
+  { ID: 'mode.show', Label: 'Show Mode', Icon: 'display', Group: 'Mode' },
+  {
+    ID: 'mode.edit',
+    Label: 'Edit Mode',
+    Icon: 'pencil-square',
+    Group: 'Mode',
+    Note: 'Leaves show mode, so the workspace can be edited.',
+  },
+];
+
+export interface QLabCommand {
+  /** Relative to the workspace: `/go` is sent as `/workspace/<id>/go`. */
+  Address: string;
+  Args: OscArg[];
+  Detail: string;
+}
+
+// The longest cue number accepted. QLab's own limit is far higher; this only
+// stops a pasted paragraph reaching the wire.
+const MAX_CUE_LENGTH = 64;
+
+/**
+ * The OSC message for one shared action, or the reason it cannot be sent.
+ * QLab 5 takes a boolean for show mode, QLab 4 a number read as one.
+ */
+export function BuildQLabCommand(
+  ActionID: string,
+  Params: Record<string, unknown>,
+  Version: 4 | 5
+): QLabCommand | { Error: string } {
+  switch (ActionID) {
+    case 'go':
+      return { Address: '/go', Args: [], Detail: 'GO sent' };
+    case 'go.cue': {
+      const Cue = String(Params.Cue == null ? '' : Params.Cue).trim();
+      if (!Cue) return { Error: 'Enter the cue number to GO' };
+      if (Cue.length > MAX_CUE_LENGTH) return { Error: 'Cue number is too long' };
+      // Always a string argument: QLab ignores `/go 53` but honours `/go "53"`.
+      return { Address: '/go', Args: [Cue], Detail: `GO sent to cue ${Cue}` };
+    }
+    case 'pause':
+      return { Address: '/pause', Args: [], Detail: 'Paused all cues' };
+    case 'resume':
+      return { Address: '/resume', Args: [], Detail: 'Resumed paused cues' };
+    case 'stop':
+      return { Address: '/stop', Args: [], Detail: 'Stopped all cues' };
+    case 'panic':
+      return { Address: '/panic', Args: [], Detail: 'Panic sent' };
+    case 'stop.hard':
+      return { Address: '/hardStop', Args: [], Detail: 'Hard stop sent' };
+    case 'reset':
+      return { Address: '/reset', Args: [], Detail: 'Workspace reset' };
+    case 'mode.show':
+    case 'mode.edit': {
+      const On = ActionID === 'mode.show';
+      return {
+        Address: '/showMode',
+        Args: [Version === 5 ? On : { Int: On ? 1 : 0 }],
+        Detail: On ? 'Switched to show mode' : 'Switched to edit mode',
+      };
+    }
+    default:
+      return { Error: `Unknown QLab action "${ActionID}"` };
+  }
+}
+
+// Bind a GO Cue favourite's cue number into its label.
+export function DescribeQLabAction(
+  ActionID: string,
+  Params: Record<string, unknown>
+): string | null {
+  if (ActionID !== 'go.cue') return null;
+  const Cue = String(Params.Cue == null ? '' : Params.Cue).trim();
+  return Cue ? `GO Cue — ${Cue}` : null;
+}
+
 export function IsValidPort(Port: number): boolean {
   return Number.isInteger(Port) && Port >= MIN_PORT && Port <= MAX_PORT;
 }
@@ -541,6 +830,8 @@ export const _internal = {
   NormalizeCueList,
   BuildKey,
   QLabConnectionManager,
+  ReplyKey,
+  BuildQLabCommand,
 };
 
 // Re-export for the method module's convenience.

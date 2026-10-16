@@ -59,6 +59,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'The default OSC port is 53000. Point the Address at the QLab machine.',
       'Leave the Workspace field blank to inspect whichever workspace is currently open, or name one to target it specifically.',
       'The overrides check flags any engaged override (MIDI, MSC, SysEx, timecode, DMX, or network I/O turned off in QLab’s Overrides window).',
+      'Actions (GO, stop, show mode, overrides) need Control access. If QLab only grants that to a passcode, enter it under Advanced.',
     ],
     Links: [
       {
@@ -73,6 +74,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
     Setup: [
       'In QLab, enable OSC control under Workspace Settings → OSC. The default OSC port is 53000.',
       'Leave the Workspace field blank to accept any open workspace, or name one to require it specifically.',
+      'Actions (GO, stop, show mode) are sent to that same workspace. If it has an OSC passcode, enter it under Advanced.',
     ],
   },
   'dante-device': {

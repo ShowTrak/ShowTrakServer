@@ -6,12 +6,36 @@
 // no /updates subscription, mode/cue/override inspection, or persistent connection;
 // use the QLab 5 check for that. Reuses the shared OSC codec (SLIP framing) and the
 // QLab reply/workspace helpers.
+//
+// The playback and mode actions are shared with QLab 5 (see _qlab-shared). Each
+// press opens its own short-lived connection, in keeping with the probe: resolve
+// the workspace, send the passcode if one is set, send the command, and read
+// QLab's acknowledgement before closing.
 import net from 'net';
-import { EncodeOscTcp, DecodeOscStream } from './_osc-shared';
-import { ParseQLabReply, WorkspaceMatches, DEFAULT_OSC_PORT, IsValidPort } from './_qlab-shared';
+import { EncodeOscTcp, DecodeOscStream, type OscArg } from './_osc-shared';
+import {
+  ParseQLabReply,
+  WorkspaceMatches,
+  DEFAULT_OSC_PORT,
+  IsValidPort,
+  ReplyKey,
+  DescribeRefusal,
+  TRANSPORT_ACTIONS,
+  MODE_ACTIONS,
+  BuildQLabCommand,
+  DescribeQLabAction,
+  type QLabCommand,
+  type QLabReply,
+} from './_qlab-shared';
 import { Esc, Pill, Rows, TextRow, Row, Note, Card, FormatLatency } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
-import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import type {
+  MonitoringActionDef,
+  MonitoringActionResult,
+  MonitoringResult,
+  MonitoringSettingField,
+  MonitoringTargetLike,
+} from './types';
 
 const ID = 'qlab4';
 
@@ -40,6 +64,14 @@ const Settings: MonitoringSettingField[] = [
     Min: 200,
     Max: 30000,
     Advanced: true,
+  },
+  {
+    Key: 'Passcode',
+    Label: 'OSC passcode',
+    Type: 'string',
+    Default: '',
+    Advanced: true,
+    Note: 'Only used by actions, for a workspace that requires an OSC passcode. The check itself never needs one.',
   },
 ];
 
@@ -172,6 +204,153 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   };
 }
 
+// --- Actions ----------------------------------------------------------------
+
+const Actions: MonitoringActionDef[] = [...TRANSPORT_ACTIONS, ...MODE_ACTIONS];
+
+interface WorkspaceRef {
+  uniqueID?: unknown;
+}
+
+// Open a short-lived connection, resolve the workspace the check watches, and
+// send one command to it, resolving with QLab's verdict on that command.
+function SendCommand(
+  Address: string,
+  Port: number,
+  TimeoutMs: number,
+  Wanted: string,
+  Passcode: string,
+  Command: QLabCommand
+): Promise<MonitoringActionResult> {
+  return new Promise<MonitoringActionResult>((resolve) => {
+    const BudgetMs = Math.max(200, TimeoutMs | 0);
+    let Settled = false;
+    let Buf = Buffer.alloc(0);
+    let Pending: { Key: string; Resolve: (Reply: QLabReply) => void } | null = null;
+    const Socket = new net.Socket();
+
+    // One absolute budget for the whole exchange (workspaces, passcode,
+    // command), so three sequential round trips cannot each take the full
+    // timeout.
+    const Deadline = setTimeout(
+      () => Finish({ Success: false, Error: `No reply from QLab after ${BudgetMs}ms` }),
+      BudgetMs
+    );
+
+    function Finish(Result: MonitoringActionResult): void {
+      if (Settled) return;
+      Settled = true;
+      clearTimeout(Deadline);
+      try {
+        Socket.destroy();
+      } catch {
+        // ignore
+      }
+      resolve(Result);
+    }
+
+    const Write = (Addr: string, Args: OscArg[]) => {
+      try {
+        Socket.write(EncodeOscTcp(Addr, Args, 'slip'));
+      } catch (Err) {
+        Finish({ Success: false, Error: ErrText(Err) });
+      }
+    };
+
+    const Request = (Addr: string, Args: OscArg[]): Promise<QLabReply> =>
+      new Promise<QLabReply>((Res) => {
+        Pending = { Key: ReplyKey(Addr), Resolve: Res };
+        Write(Addr, Args);
+      });
+
+    Socket.on('data', (Chunk: Buffer) => {
+      Buf = Buffer.concat([Buf, Chunk]);
+      if (Buf.length > 1_000_000) {
+        Finish({ Success: false, Error: 'Reply too large' });
+        return;
+      }
+      const { Messages, Rest } = DecodeOscStream(Buf, 'slip');
+      Buf = Rest;
+      for (const Message of Messages) {
+        const Reply = ParseQLabReply(Message);
+        if (!Reply || !Pending || ReplyKey(Reply.Address) !== Pending.Key) continue;
+        const Current = Pending;
+        Pending = null;
+        Current.Resolve(Reply);
+      }
+    });
+
+    Socket.once('error', (Err: Error) => Finish({ Success: false, Error: ErrText(Err) }));
+    Socket.once('close', () => Finish({ Success: false, Error: 'QLab closed the connection' }));
+
+    Socket.once('connect', () => {
+      void (async () => {
+        // Without this QLab 4 stays silent after most commands, leaving nothing
+        // to tell an accepted GO from a refused one.
+        Write('/alwaysReply', [{ Int: 1 }]);
+
+        const List = await Request('/workspaces', []);
+        const Workspaces = Array.isArray(List.Data) ? (List.Data as WorkspaceRef[]) : [];
+        const Match = Wanted
+          ? Workspaces.find((W) => WorkspaceMatches(W, Wanted))
+          : Workspaces.find((W) => W && typeof W === 'object' && W.uniqueID != null);
+        if (!Match || Match.uniqueID == null) {
+          Finish({
+            Success: false,
+            Error: Wanted ? 'Workspace not open in QLab' : 'No workspaces open in QLab',
+          });
+          return;
+        }
+        const Prefix = `/workspace/${String(Match.uniqueID)}`;
+
+        if (Passcode) {
+          const Connected = await Request(`${Prefix}/connect`, [Passcode]);
+          // QLab answers a wrong passcode in the reply's data, not its status.
+          if (Connected.Status !== 'ok' || Connected.Data === 'badpass') {
+            Finish({
+              Success: false,
+              Error: DescribeRefusal(Connected.Data === 'badpass' ? 'badpass' : Connected.Status),
+            });
+            return;
+          }
+        }
+
+        const Reply = await Request(`${Prefix}${Command.Address}`, Command.Args);
+        Finish(
+          Reply.Status === 'ok'
+            ? { Success: true, Detail: Command.Detail }
+            : { Success: false, Error: DescribeRefusal(Reply.Status) }
+        );
+      })();
+    });
+
+    try {
+      Socket.connect(Port, Address);
+    } catch (Err) {
+      Finish({ Success: false, Error: ErrText(Err) });
+    }
+  });
+}
+
+async function RunAction(
+  Target: MonitoringTargetLike,
+  ActionID: string,
+  Params: Record<string, unknown>
+): Promise<MonitoringActionResult> {
+  const Address = Target && Target.Address ? String(Target.Address).trim() : '';
+  if (!Address) return { Success: false, Error: 'No address configured' };
+  const Cfg = (Target && Target.Settings) || {};
+  const Port = Number.isFinite(Cfg.Port) ? (Cfg.Port as number) | 0 : DEFAULT_OSC_PORT;
+  if (!IsValidPort(Port)) return { Success: false, Error: `Invalid port: ${Port}` };
+  const TimeoutMs = Number.isFinite(Cfg.Timeout) ? (Cfg.Timeout as number) : 3000;
+  const Wanted = Cfg.Workspace == null ? '' : String(Cfg.Workspace).trim();
+  const Passcode = Cfg.Passcode == null ? '' : String(Cfg.Passcode);
+
+  const Command = BuildQLabCommand(ActionID, Params, 4);
+  if ('Error' in Command) return { Success: false, Error: Command.Error };
+  return SendCommand(Address, Port, TimeoutMs, Wanted, Passcode, Command);
+}
+
 // One card per reported workspace (name, unique ID, passcode state), highlighting
 // the one we are matching on.
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
@@ -240,4 +419,5 @@ export const Description =
   'Connects to a QLab 4 machine over OSC (default TCP 53000) and confirms a workspace is open — a specific one by name, filename, or unique ID, or any open workspace when left blank. A lightweight liveness/workspace check for legacy QLab 4 (end-of-life); use the QLab 5 check for mode, cue, and override inspection.';
 export const Group = 'Sound';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
-export { ID, Settings, Run, Debug };
+export const DescribeAction = DescribeQLabAction;
+export { ID, Settings, Actions, Run, RunAction, Debug };

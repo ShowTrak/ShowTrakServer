@@ -20,12 +20,23 @@ import {
   DEFAULT_OSC_PORT,
   OVERRIDE_KEYS,
   IsValidPort,
+  TRANSPORT_ACTIONS,
+  MODE_ACTIONS,
+  BuildQLabCommand,
+  DescribeQLabAction,
+  type OverrideKey,
   type QLabSnapshot,
   type QLabCueRef,
 } from './_qlab-shared';
 import { Esc, Pill, Rows, TextRow, Row, Note, Card } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
-import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import type {
+  MonitoringActionDef,
+  MonitoringActionResult,
+  MonitoringResult,
+  MonitoringSettingField,
+  MonitoringTargetLike,
+} from './types';
 
 const ID = 'qlab5';
 
@@ -133,7 +144,7 @@ const Settings: MonitoringSettingField[] = [
     Type: 'string',
     Default: '',
     Advanced: true,
-    Note: 'Sent via /connect when the workspace requires an OSC passcode.',
+    Note: 'Sent via /connect when the workspace requires an OSC passcode. Actions need a passcode with control access unless QLab grants that without one.',
   },
 ];
 
@@ -279,6 +290,7 @@ export function EvaluateHealth(Snapshot: QLabSnapshot, Options: HealthOptions): 
 function FriendlyOverride(Key: string): string {
   return Key.replace(/Enabled$/, '')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/^dmx/i, 'DMX')
     .replace(/^msc/i, 'MSC')
     .replace(/^midi/i, 'MIDI')
     .replace(/^sysex/i, 'SysEx')
@@ -355,6 +367,137 @@ function Run(Target: MonitoringTargetLike): MonitoringResult {
   };
 }
 
+// --- Actions ----------------------------------------------------------------
+//
+// Sent over the same persistent connection the check already holds, so a press
+// costs one message and its acknowledgement — no connect, no workspace lookup.
+// The Mode and Overrides groups are the remedies for the two states this check
+// can flag as Degraded: wrong Show/Edit mode, and an I/O override left engaged.
+//
+// QLab's override flags read "enabled": `/overrides/midiInputEnabled false` is
+// what the Overrides window shows as MIDI input switched off. The action labels
+// follow the window rather than the wire.
+
+const OVERRIDE_PARAM: MonitoringSettingField = {
+  Key: 'Override',
+  Label: 'Input / output',
+  Type: 'select',
+  Default: OVERRIDE_KEYS[0],
+  Required: true,
+  Options: OVERRIDE_KEYS.map((Key) => ({ value: Key, label: FriendlyOverride(Key) })),
+};
+
+const Actions: MonitoringActionDef[] = [
+  ...TRANSPORT_ACTIONS,
+  ...MODE_ACTIONS,
+  {
+    ID: 'overrides.restore',
+    Label: 'Enable All I/O',
+    Icon: 'toggles',
+    Group: 'Overrides',
+    Note: 'Switches back on every input and output currently switched off in the Overrides window.',
+  },
+  {
+    ID: 'override.enable',
+    Label: 'Enable I/O',
+    Icon: 'toggle-on',
+    Group: 'Overrides',
+    Params: [OVERRIDE_PARAM],
+  },
+  {
+    ID: 'override.disable',
+    Label: 'Disable I/O',
+    Icon: 'toggle-off',
+    Group: 'Overrides',
+    Params: [OVERRIDE_PARAM],
+    Destructive: true,
+    Note: 'Switches an input or output off in the Overrides window — cues still run but send or receive nothing on it.',
+  },
+];
+
+function IsOverrideKey(Value: unknown): Value is OverrideKey {
+  return (OVERRIDE_KEYS as readonly string[]).includes(String(Value));
+}
+
+async function SetOverrides(
+  P: ReturnType<typeof ResolveConnectionParams>,
+  Keys: OverrideKey[],
+  Enabled: boolean
+): Promise<MonitoringActionResult> {
+  const Failed: string[] = [];
+  let FirstError = '';
+  for (const Key of Keys) {
+    const Outcome = await QLabConnectionManager.Command(
+      P,
+      `/overrides/${Key}`,
+      [Enabled],
+      'application'
+    );
+    if (!Outcome.Success) {
+      Failed.push(FriendlyOverride(Key));
+      FirstError = FirstError || Outcome.Error || 'QLab did not accept the change';
+    }
+  }
+  if (Failed.length === Keys.length) return { Success: false, Error: FirstError };
+  const Names = Keys.map(FriendlyOverride).filter((Name) => !Failed.includes(Name));
+  const Done = `${Names.join(', ')} ${Enabled ? 'enabled' : 'disabled'}`;
+  if (Failed.length) {
+    return { Success: false, Error: `${Done}, but not ${Failed.join(', ')}: ${FirstError}` };
+  }
+  return { Success: true, Detail: Done };
+}
+
+async function RunAction(
+  Target: MonitoringTargetLike,
+  ActionID: string,
+  Params: Record<string, unknown>
+): Promise<MonitoringActionResult> {
+  const P = ResolveConnectionParams(Target);
+  if (P.Error) return { Success: false, Error: P.Error };
+
+  let Outcome: MonitoringActionResult;
+  if (ActionID === 'overrides.restore') {
+    const Snapshot = QLabConnectionManager.Snapshot(QLabConnectionManager.Observe(P));
+    // Only the ones QLab reported as off: a key it never answered may not exist
+    // in this QLab version, and setting it would come back as an error.
+    const Engaged = OVERRIDE_KEYS.filter((Key) => Snapshot.Overrides[Key] === false);
+    if (!Engaged.length) {
+      const Known = OVERRIDE_KEYS.some((Key) => Snapshot.Overrides[Key] != null);
+      return Known
+        ? { Success: true, Detail: 'Every input and output is already enabled' }
+        : { Success: false, Error: 'QLab has not reported its override states yet' };
+    }
+    Outcome = await SetOverrides(P, Engaged, true);
+  } else if (ActionID === 'override.enable' || ActionID === 'override.disable') {
+    if (!IsOverrideKey(Params.Override)) {
+      return { Success: false, Error: 'Choose which input or output to change' };
+    }
+    Outcome = await SetOverrides(P, [Params.Override], ActionID === 'override.enable');
+  } else {
+    const Command = BuildQLabCommand(ActionID, Params, 5);
+    if ('Error' in Command) return { Success: false, Error: Command.Error };
+    const Sent = await QLabConnectionManager.Command(P, Command.Address, Command.Args, 'workspace');
+    Outcome = Sent.Success
+      ? { Success: true, Detail: Command.Detail }
+      : { Success: false, Error: Sent.Error || 'QLab did not accept the command' };
+  }
+
+  // Re-read mode, running cues and overrides before returning, so the re-probe
+  // the caller fires next shows what the press did rather than what it changed.
+  if (Outcome.Success) await QLabConnectionManager.Refresh(P);
+  return Outcome;
+}
+
+function DescribeAction(ActionID: string, Params: Record<string, unknown>): string | null {
+  if (
+    (ActionID === 'override.enable' || ActionID === 'override.disable') &&
+    IsOverrideKey(Params.Override)
+  ) {
+    return `${ActionID === 'override.enable' ? 'Enable' : 'Disable'} ${FriendlyOverride(Params.Override)}`;
+  }
+  return DescribeQLabAction(ActionID, Params);
+}
+
 // --- Debug ------------------------------------------------------------------
 
 function SubPill(Ok: boolean | null): string {
@@ -427,4 +570,4 @@ export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const SupportsLatencyThreshold = false;
 export const RunCacheTtlMs = 0;
 export const _internal = { ParseHealthOptions, EvaluateHealth, CueMatches, FriendlyOverride };
-export { ID, Settings, Run, Debug };
+export { ID, Settings, Actions, Run, RunAction, DescribeAction, Debug };
