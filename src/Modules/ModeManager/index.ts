@@ -1,4 +1,7 @@
 import { EventEmitter } from 'events';
+import { RecordEdit } from '../AuditLog/edits';
+import { Line, Value } from '../AuditLog/message';
+import { AuditStep } from '../Shared/audit-names';
 
 // In-memory application mode. Always defaults to SHOW on boot.
 type AppMode = 'SHOW' | 'EDIT';
@@ -15,6 +18,13 @@ export const Manager = {
     if (Normalized === Mode) return Mode;
     Mode = Normalized;
     Emitter.emit('ModeUpdated', Mode);
+    void AuditStep(() =>
+      RecordEdit({
+        EntityType: 'system',
+        EntityID: null,
+        Summary: Line('Switched to ', Value(Mode === 'EDIT' ? 'Edit Mode' : 'Show Mode')),
+      })
+    );
     return Mode;
   },
   on(Event: string, Callback: (...args: unknown[]) => void): EventEmitter {

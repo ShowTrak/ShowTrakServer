@@ -26,6 +26,10 @@ import {
 } from './serialization';
 import { isScopeMatch, triggerMatches, describeContext } from './evaluation';
 import type { AlertContext, AlertRule } from './evaluation';
+import { RecordEdit, RecordUpdate } from '../AuditLog/edits';
+import { Entity, Line, Value } from '../AuditLog/message';
+import { DiffFields, type FieldSpec } from '../AuditLog/diff';
+import { AuditStep } from '../Shared/audit-names';
 
 const Logger = CreateLogger('AlertsManager');
 
@@ -305,6 +309,84 @@ async function evaluateAgainstRules(Context: AlertContext) {
   }
 }
 
+// --- Audit log ---------------------------------------------------------------
+// A rule is reported in the editor's terms. Action settings are never shown:
+// webhook URLs and tokens live there, so a settings edit reads as "Changed".
+
+function TriggerNames(Rule: AlertRule): string | null {
+  const Names = (Rule.TriggerTypes || []).map(
+    (ID) => TRIGGER_CATALOG.find((Entry) => Entry.ID === ID)?.Name || ID
+  );
+  return Names.length ? Names.join(', ') : null;
+}
+
+function ActionNames(Rule: AlertRule): string | null {
+  const Names = (Rule.Actions || []).map(
+    (Action) => AlertActions.Get(Action.Type)?.Name || Action.Type
+  );
+  return Names.length ? Names.join(', ') : null;
+}
+
+function Counted(Count: number, Noun: string): string | null {
+  return Count ? `${Count} ${Noun}${Count === 1 ? '' : 's'}` : null;
+}
+
+function ScopeSummary(Rule: AlertRule): string {
+  const Scope = Rule.Scope || { Workspace: false, Groups: [], Clients: [], Tags: [] };
+  if (Scope.Workspace) return 'Everything';
+  const Parts = [
+    Counted((Scope.Groups || []).length, 'group'),
+    Counted((Scope.Clients || []).length, 'client'),
+    Counted((Scope.Tags || []).length, 'tag'),
+  ].filter(Boolean);
+  return Parts.length ? Parts.join(', ') : 'Nothing';
+}
+
+// Settings are compared whole and reported as changed: they are JSON, and the
+// action settings hold credentials.
+const RULE_AUDIT_FIELDS: readonly FieldSpec<AlertRule>[] = [
+  { Key: 'Title', Label: 'Rule Title' },
+  { Key: 'Enabled', Label: 'Enabled' },
+  { Key: 'TriggerTypes', Label: 'Triggers', Format: (_Value, Rule) => TriggerNames(Rule) },
+  {
+    Key: 'TriggerConfig',
+    Label: 'Trigger settings',
+    Format: (Value) => JSON.stringify(Value || {}),
+    Secret: true,
+  },
+  { Key: 'Actions', Label: 'Actions', Format: (_Value, Rule) => ActionNames(Rule) },
+  {
+    Key: 'Actions',
+    Label: 'Action settings',
+    Format: (Value) => JSON.stringify(Value || []),
+    Secret: true,
+  },
+];
+
+function RuleChanges(Before: AlertRule, After: AlertRule) {
+  const Changes = DiffFields(Before, After, RULE_AUDIT_FIELDS);
+  // A new set of actions changes their settings too; one line says it.
+  const Fields = new Set(Changes.map((Change) => Change.Field));
+  const Kept = Changes.filter(
+    (Change) =>
+      !(Change.Field === 'Action settings' && Fields.has('Actions')) &&
+      !(Change.Field === 'Trigger settings' && Fields.has('Triggers'))
+  );
+  if (JSON.stringify(Before.Scope || {}) !== JSON.stringify(After.Scope || {})) {
+    // The counts alone would hide a swap of one client for another.
+    const From = ScopeSummary(Before);
+    const To = ScopeSummary(After);
+    Kept.push(
+      From === To ? { Field: 'Targets', From: null, To: 'Changed' } : { Field: 'Targets', From, To }
+    );
+  }
+  return Kept;
+}
+
+function RuleAuditBase(Rule: AlertRule) {
+  return { EntityType: 'alert-rule' as const, EntityID: Rule.RuleID, EntityName: Rule.Title };
+}
+
 Manager.Init = async () => {
   if (Initialized) return;
   const [Err, Rows] = await RulesRepo.GetAll();
@@ -365,6 +447,9 @@ Manager.Create = async (Payload: AlertRuleCreatePayload) => {
 
   RuleList.unshift(Created);
   BroadcastManager.emit('AlertRuleListChanged');
+  await AuditStep(() =>
+    RecordEdit({ ...RuleAuditBase(Created), Summary: Line('Created ', Entity(Created.Title)) })
+  );
   return Ok(Created);
 };
 
@@ -417,16 +502,33 @@ Manager.Update = async (RuleID: unknown, Payload: AlertRuleUpdatePayload) => {
 
   RuleList = RuleList.map((Rule) => (Rule.RuleID === ID ? Updated : Rule));
   BroadcastManager.emit('AlertRuleListChanged');
+  await AuditStep(() =>
+    RecordUpdate({
+      ...RuleAuditBase(Updated),
+      Summary: Line('Edited ', Entity(Updated.Title)),
+      Changes: RuleChanges(Existing, Updated),
+    })
+  );
   return Ok(Updated);
 };
 
 Manager.Delete = async (RuleID: unknown) => {
   if (!Initialized) await Manager.Init();
   const ID = Number(RuleID);
+  const Existing = RuleList.find((Rule) => Rule.RuleID === ID);
   const [Err] = await RulesRepo.Delete(ID);
   if (Err) return Fail('Failed to delete alert rule');
   RuleList = RuleList.filter((Rule) => Rule.RuleID !== ID);
   BroadcastManager.emit('AlertRuleListChanged');
+  if (Existing) {
+    await AuditStep(() =>
+      RecordEdit({
+        ...RuleAuditBase(Existing),
+        Summary: Line('Deleted ', Entity(Existing.Title)),
+        Severity: 'warning',
+      })
+    );
+  }
   return Ok(true);
 };
 
@@ -439,7 +541,18 @@ Manager.GetActionsEnabled = () => {
 };
 
 Manager.SetActionsEnabled = (Enabled: unknown) => {
+  const Changed = AlertActionsEnabled !== !!Enabled;
   AlertActionsEnabled = !!Enabled;
+  if (Changed) {
+    void AuditStep(() =>
+      RecordEdit({
+        EntityType: 'system',
+        EntityID: null,
+        Summary: Line('Alert actions turned ', Value(AlertActionsEnabled ? 'On' : 'Off')),
+        Severity: AlertActionsEnabled ? 'info' : 'warning',
+      })
+    );
+  }
   // Notify integrations (e.g. the SDK control API) of the new global state so
   // their alert-actions feedback stays live regardless of who toggled it.
   BroadcastManager.emit('AlertActionsUpdated', AlertActionsEnabled);

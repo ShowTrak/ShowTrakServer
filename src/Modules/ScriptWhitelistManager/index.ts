@@ -15,6 +15,9 @@ import { CreateScriptWhitelistRepository } from '../DB/repositories/script-white
 import { NormalizeScopeTags, ScopeCoversEntity } from '../ScopeMatching';
 import type { ScopeTag } from '../ScopeMatching';
 import type { ScriptWhitelistScope } from '@showtrak/protocol';
+import { RecordEdit } from '../AuditLog/edits';
+import { Entity, Line } from '../AuditLog/message';
+import { AuditBefore, AuditStep, ScriptName } from '../Shared/audit-names';
 
 const Logger = CreateLogger('ScriptWhitelistManager');
 
@@ -57,6 +60,49 @@ function ParseScopeText(Text: string | null | undefined): ScriptWhitelistScope |
     Logger.warn('Failed to parse stored script whitelist scope; treating as unrestricted', Err);
     return null;
   }
+}
+
+// --- Audit log ---------------------------------------------------------------
+
+function Counted(Count: number, Noun: string): string | null {
+  return Count ? `${Count} ${Noun}${Count === 1 ? '' : 's'}` : null;
+}
+
+// Null (no row) and Workspace both read as "All Clients", as the editor shows.
+function DescribeScope(Scope: ScriptWhitelistScope | null): string {
+  if (!Scope || Scope.Workspace) return 'All Clients';
+  const Parts = [
+    Counted((Scope.Groups || []).length, 'group'),
+    Counted((Scope.Clients || []).length, 'client'),
+    Counted((Scope.Tags || []).length, 'tag'),
+  ].filter(Boolean);
+  return Parts.length ? Parts.join(', ') : 'Nobody';
+}
+
+function RecordWhitelistChange(
+  ScriptID: string,
+  Before: ScriptWhitelistScope | null,
+  After: ScriptWhitelistScope | null
+): Promise<void> {
+  const Unrestricted = (Scope: ScriptWhitelistScope | null) => !Scope || !!Scope.Workspace;
+  if (Unrestricted(Before) && Unrestricted(After)) return Promise.resolve();
+  if (JSON.stringify(Before) === JSON.stringify(After)) return Promise.resolve();
+  return AuditStep(async () => {
+    const Name = (await ScriptName(ScriptID)) || ScriptID;
+    const From = DescribeScope(Before);
+    const To = DescribeScope(After);
+    RecordEdit({
+      EntityType: 'script',
+      EntityID: ScriptID,
+      EntityName: Name,
+      Summary: Line('Changed who can run ', Entity(Name)),
+      Changes: [
+        From === To
+          ? { Field: 'Whitelist', From: null, To: 'Changed' }
+          : { Field: 'Whitelist', From, To },
+      ],
+    });
+  });
 }
 
 const Manager = {
@@ -102,13 +148,16 @@ const Manager = {
   async SetScope(ScriptID: string, Scope: unknown): Promise<void> {
     if (!ScriptID) return;
     const Normalized = NormalizeScope(Scope);
+    const Before = await AuditBefore(() => Manager.GetScope(ScriptID));
     if (Normalized.Workspace) {
       const [Err] = await Repo.Delete(ScriptID);
       if (Err) Logger.error(`Failed to clear whitelist for script ${ScriptID}`, Err);
+      else await RecordWhitelistChange(ScriptID, Before, null);
       return;
     }
     const [Err] = await Repo.Set(ScriptID, JSON.stringify(Normalized), Date.now());
     if (Err) Logger.error(`Failed to save whitelist for script ${ScriptID}`, Err);
+    else await RecordWhitelistChange(ScriptID, Before, Normalized);
   },
 
   // Remove a script's whitelist row (script deleted).

@@ -28,8 +28,49 @@ import { Manager as SettingsManager } from '../../Modules/SettingsManager';
 import { Manager as AppDataManager } from '../../Modules/AppData';
 import { Manager as BroadcastManager } from '../../Modules/Broadcast';
 import { Manager as IPCValidation } from '../../Modules/IPCValidation';
+import { RecordAction } from '../../Modules/AuditLog/edits';
+import { Line, Value } from '../../Modules/AuditLog/message';
+import { ClientDisplayName } from '../../Modules/AuditLog/status';
+import { AuditBefore, AuditStep } from '../../Modules/Shared/audit-names';
 
 const Logger = CreateLogger('Main');
+
+// One action line per client a script or event was sent to, failed or not.
+// Clients outside a script's whitelist were never sent it (ExecuteScripts drops
+// them silently), so they are left out here too. The managers are required
+// lazily: nothing here is needed unless the audit log is recording.
+async function RecordDispatch(
+  Targets: string[],
+  Dispatch: { failed?: Array<{ UUID: string; message: string }> } | null | undefined,
+  Summary: (Client: { IntegratedActions?: unknown }) => ReturnType<typeof Line>,
+  ScriptID: string | null
+): Promise<void> {
+  await AuditStep(async () => {
+    const { Manager: ClientManager } =
+      require('../../Modules/ClientManager') as typeof import('../../Modules/ClientManager');
+    const { Manager: TagManager } =
+      require('../../Modules/TagManager') as typeof import('../../Modules/TagManager');
+    const Failed = (Dispatch && Dispatch.failed) || [];
+    const Scope = ScriptID ? await ScriptWhitelistManager.GetScope(ScriptID) : null;
+    const Restricted = !!Scope && !Scope.Workspace;
+    const AllTags = Restricted ? await TagManager.GetAllViews() : [];
+    const FailedBy = new Map(Failed.map((Entry) => [Entry.UUID, Entry.message]));
+    for (const UUID of Targets) {
+      const [Err, Client] = await ClientManager.Get(UUID);
+      if (Err || !Client) continue;
+      if (Restricted && !ScriptWhitelistManager.IsClientAllowed(Scope, Client, AllTags)) continue;
+      const Failure = FailedBy.get(UUID);
+      RecordAction({
+        EntityType: 'client',
+        EntityID: UUID,
+        EntityName: ClientDisplayName(Client),
+        Summary: Summary(Client),
+        Severity: Failure ? 'error' : 'info',
+        Details: Failure ? [Failure] : [],
+      });
+    }
+  });
+}
 
 function runCommandForOpen(command: string, args: string[]) {
   return new Promise<string | null>((resolve) => {
@@ -85,7 +126,20 @@ function register(): void {
       } catch (error) {
         return validationErrorTuple(error);
       }
-      await ServerManager.ExecuteScripts(ValidScripts, ValidTargets, ValidResetList);
+      const Dispatch = await ServerManager.ExecuteScripts(
+        ValidScripts,
+        ValidTargets,
+        ValidResetList
+      );
+      const ScriptName = await AuditBefore(
+        async () => (await ScriptManager.Get(ValidScripts))?.Name || ValidScripts
+      );
+      await RecordDispatch(
+        ValidTargets,
+        Dispatch,
+        () => Line('Ran script ', Value(ScriptName || ValidScripts)),
+        ValidScripts
+      );
       return [null, true];
     }
   );
@@ -103,7 +157,19 @@ function register(): void {
       } catch (error) {
         return validationErrorTuple(error);
       }
-      await ServerManager.TriggerIntegratedEvent(ValidEventID, ValidTargets);
+      const Dispatch = await ServerManager.TriggerIntegratedEvent(ValidEventID, ValidTargets);
+      await RecordDispatch(
+        ValidTargets,
+        Dispatch,
+        (Client) => {
+          const Action = (
+            Array.isArray(Client.IntegratedActions) ? Client.IntegratedActions : []
+          ).find((Entry: { ID?: unknown }) => Entry && Entry.ID === ValidEventID) as
+            { Label?: string } | undefined;
+          return Line('Triggered ', Value((Action && Action.Label) || ValidEventID));
+        },
+        null
+      );
       return [null, true];
     }
   );
@@ -383,6 +449,16 @@ function register(): void {
 
       Logger.log(`Running local script (${PlatformKey}):`, TargetFilePath);
       const RunErr = await runLocalScriptFile(TargetFilePath, PlatformArgs);
+      await AuditStep(() =>
+        RecordAction({
+          EntityType: 'script',
+          EntityID: String(ID),
+          EntityName: Script.Name || String(ID),
+          Summary: Line('Ran ', Value(Script.Name || String(ID)), ' on this machine'),
+          Severity: RunErr ? 'error' : 'info',
+          Details: [String(RelativeFilePath), ...(RunErr ? [String(RunErr)] : [])],
+        })
+      );
       if (RunErr) return [RunErr, null];
       return [null, true];
     }

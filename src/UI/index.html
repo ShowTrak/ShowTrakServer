@@ -302,6 +302,15 @@
                 <button
                   type="button"
                   class="dropdown-item"
+                  id="SHOWTRAK_MODEL_CORE_AUDIT_LOG_BUTTON"
+                >
+                  Audit Log
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item"
                   id="SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON"
                 >
                   OSC/API Reference
@@ -957,6 +966,25 @@ Loading licence…</pre>
             >
               <div class="osc-http-debug-empty">Send OSC or HTTP traffic to inspect requests.</div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audit Log: the last 24 hours of status changes, edits and actions for
+         everything (each entity's own slice is its view modal's Logs tab). -->
+    <div
+      class="modal fade"
+      id="AUDIT_LOG_MODAL"
+      tabindex="-1"
+      aria-labelledby="AUDIT_LOG_MODAL_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-body audit-log-modal-body">
+            <div id="AUDIT_LOG_HEADER"></div>
+            <div id="AUDIT_LOG_PANEL"></div>
           </div>
         </div>
       </div>
@@ -3103,6 +3131,11 @@ Loading licence…</pre>
                     <div id="SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS" class="d-grid gap-2"></div>
                   </div>
                 </div>
+
+                <!-- Every kind's Logs pane. Outside both sections above: the
+                     history section is rebuilt on every live push, and the
+                     details section is hidden for anything but a client. -->
+                <div id="CLIENT_INFO_LOGS_SECTION" data-client-info-tab="logs"></div>
               </div>
             </div>
 

@@ -14,7 +14,26 @@ import { CreateLogger } from '../Logger';
 import * as SlugService from '../Slug';
 import * as FreeKioskClient from '../FreeKiosk/client';
 import { GetFreeKioskCommand } from '../FreeKiosk/commands';
-import { BuildDefaultAlarmSettings, DisplayModeLabel, GetDisplayMode } from '../FreeKiosk/metrics';
+import {
+  BuildDefaultAlarmSettings,
+  BuildFreeKioskAlarmFields,
+  DisplayModeLabel,
+  FREEKIOSK_METRICS_BY_KEY,
+  GetDisplayMode,
+  OPERATOR_LABELS,
+} from '../FreeKiosk/metrics';
+import type { FreeKioskOperator } from '../FreeKiosk/metrics';
+import { RecordAction, RecordEdit, RecordUpdate } from '../AuditLog/edits';
+import { Entity, Line, Value } from '../AuditLog/message';
+import { DiffFields, FormatValue, type FieldSpec } from '../AuditLog/diff';
+import {
+  AuditBefore,
+  AuditStep,
+  DiffSettings,
+  GroupTitle,
+  RecordGroupMove,
+  Seconds,
+} from '../Shared/audit-names';
 import type { Result } from '../../types/result';
 import type { FreeKioskCamera, FreeKioskImage } from '../FreeKiosk/types';
 
@@ -68,6 +87,96 @@ function Summarize(Results: FreeKioskCommandOutcome[]): FreeKioskCommandSummary 
     Failed: Results.length - Succeeded,
     Results,
   };
+}
+
+// --- Audit log ---------------------------------------------------------------
+
+interface KioskAuditFields {
+  Nickname: string;
+  Address: string;
+  Port: number;
+  ApiKey: string | null;
+  Slug: string | null;
+  Group: string;
+  Interval: string | null;
+  Timeout: string | null;
+}
+
+const KIOSK_AUDIT_FIELDS: readonly FieldSpec<KioskAuditFields>[] = [
+  { Key: 'Nickname', Label: 'Title' },
+  { Key: 'Address', Label: 'IP address or hostname' },
+  { Key: 'Port', Label: 'Port' },
+  { Key: 'ApiKey', Label: 'API key', Secret: true },
+  { Key: 'Slug', Label: 'Slug' },
+  { Key: 'Group', Label: 'Group' },
+  { Key: 'Interval', Label: 'Poll Interval' },
+  { Key: 'Timeout', Label: 'Request Timeout' },
+];
+
+async function KioskAuditFieldsOf(Terminal: FreeKioskTerminal): Promise<KioskAuditFields> {
+  return {
+    Nickname: Terminal.Nickname,
+    Address: Terminal.Address,
+    Port: Terminal.Port,
+    ApiKey: Terminal.ApiKey,
+    Slug: Terminal.Slug,
+    Group: await GroupTitle(Terminal.GroupID),
+    Interval: Seconds(Terminal.Interval / 1000),
+    Timeout: Seconds(Terminal.TimeoutMs / 1000),
+  };
+}
+
+// Settings keys are the alarm editor's fields: a group switch or the display
+// mode by its own label, an alarm's parts by the metric they belong to.
+const ALARM_PART_LABELS: Record<string, string> = {
+  On: 'alarm',
+  Op: 'alert when',
+  V: 'value',
+  V2: 'second value',
+};
+let KioskFieldLabels: Map<string, string> | null = null;
+
+function KioskSettingLabel(Key: string): string {
+  const Alarm = Key.match(/^A_(.+)_(On|Op|V|V2)$/);
+  if (Alarm) {
+    const Metric = FREEKIOSK_METRICS_BY_KEY.get(Alarm[1]!);
+    return `${Metric ? Metric.Label : Alarm[1]} ${ALARM_PART_LABELS[Alarm[2]!]}`;
+  }
+  if (!KioskFieldLabels) {
+    KioskFieldLabels = new Map(
+      BuildFreeKioskAlarmFields().map((Field) => [Field.Key, Field.Label])
+    );
+  }
+  return KioskFieldLabels.get(Key) || Key;
+}
+
+function KioskSettingValue(Key: string, Value: unknown): string | null {
+  if (/_Op$/.test(Key) && typeof Value === 'string') {
+    return OPERATOR_LABELS[Value as FreeKioskOperator] || Value;
+  }
+  return FormatValue(Value);
+}
+
+function KioskAuditBase(Terminal: FreeKioskTerminal) {
+  return {
+    EntityType: 'freekiosk' as const,
+    EntityID: Terminal.UUID,
+    EntityName: Terminal.Nickname,
+  };
+}
+
+// One action line per terminal it reached, so each terminal's history shows it.
+function RecordKioskActions(
+  UUIDs: readonly string[],
+  Summary: (Name: string) => ReturnType<typeof Line>
+) {
+  return AuditStep(() => {
+    for (const UUID of UUIDs) {
+      const Terminal = TerminalList.find((Entry) => Entry.UUID === UUID);
+      if (!Terminal) continue;
+      RecordAction({ ...KioskAuditBase(Terminal), Summary: Summary(Terminal.Nickname) });
+    }
+  });
 }
 
 const Manager = {
@@ -241,6 +350,9 @@ const Manager = {
     TerminalList.push(Terminal);
     Terminal.StartLoop();
     BroadcastManager.emit('FreeKioskTerminalListChanged');
+    await AuditStep(() =>
+      RecordEdit({ ...KioskAuditBase(Terminal), Summary: Line('Created ', Entity(Nickname)) })
+    );
     return Ok(Terminal.ToJSON());
   },
 
@@ -250,6 +362,10 @@ const Manager = {
   ): Promise<Result<FreeKioskTerminalSnapshot>> {
     const Terminal = TerminalList.find((Entry) => Entry.UUID === UUID);
     if (!Terminal) return Fail('FreeKiosk terminal not found');
+    const Before = await AuditBefore(async () => ({
+      Fields: await KioskAuditFieldsOf(Terminal),
+      Settings: { ...Terminal.Settings },
+    }));
 
     let NextSlug = Terminal.Slug;
     if (Object.prototype.hasOwnProperty.call(Payload, 'Slug')) {
@@ -333,6 +449,21 @@ const Manager = {
 
     BroadcastManager.emit('FreeKioskTerminalUpdated', Terminal.ToJSON());
     BroadcastManager.emit('FreeKioskTerminalListChanged');
+    if (Before) {
+      await AuditStep(async () =>
+        RecordUpdate({
+          ...KioskAuditBase(Terminal),
+          Summary: Line('Edited ', Entity(Terminal.Nickname)),
+          Changes: [
+            ...DiffFields(Before.Fields, await KioskAuditFieldsOf(Terminal), KIOSK_AUDIT_FIELDS),
+            ...DiffSettings(Before.Settings, Terminal.Settings, {
+              Label: KioskSettingLabel,
+              Format: KioskSettingValue,
+            }),
+          ],
+        })
+      );
+    }
     return Ok(Terminal.ToJSON());
   },
 
@@ -345,6 +476,13 @@ const Manager = {
     if (Err) return Fail('Failed to delete FreeKiosk terminal');
     TerminalList.splice(Index, 1);
     BroadcastManager.emit('FreeKioskTerminalListChanged');
+    await AuditStep(() =>
+      RecordEdit({
+        ...KioskAuditBase(Terminal),
+        Summary: Line('Deleted ', Entity(Terminal.Nickname)),
+        Severity: 'warning',
+      })
+    );
     return Ok(true);
   },
 
@@ -367,6 +505,7 @@ const Manager = {
         });
       })
     );
+    await RecordKioskActions(UUIDs, (Name) => Line('Polled ', Entity(Name), ' now'));
     return Ok(Summarize(Results));
   },
 
@@ -433,6 +572,18 @@ const Manager = {
       })
     );
 
+    await AuditStep(() => {
+      for (const Outcome of Results) {
+        const Terminal = TerminalList.find((Entry) => Entry.UUID === Outcome.UUID);
+        if (!Terminal) continue;
+        RecordAction({
+          ...KioskAuditBase(Terminal),
+          Summary: Line('Sent ', Value(Command.Label), ' to ', Entity(Terminal.Nickname)),
+          Severity: Outcome.Success ? 'info' : 'error',
+          Details: Outcome.Error ? [Outcome.Error] : [],
+        });
+      }
+    });
     return Ok(Summarize(Results));
   },
 
@@ -446,6 +597,9 @@ const Manager = {
     if (!Terminal) return Fail('FreeKiosk terminal not found');
     const [Err, Image] = await FreeKioskClient.FetchImage(Terminal.Connection(), Kind, Options);
     if (Err || !Image) return Fail(Err || 'Capture failed');
+    await RecordKioskActions([UUID], (Name) =>
+      Line(Kind === 'camera' ? 'Took a camera photo on ' : 'Took a screenshot of ', Entity(Name))
+    );
     return Ok(Image);
   },
 
@@ -476,8 +630,14 @@ const Manager = {
     }
   },
 
-  SetGroupAndWeight(UUID: string, GroupID: number | null, Weight: unknown) {
-    return GroupOrdering.SetGroupAndWeight(UUID, GroupID, Weight);
+  async SetGroupAndWeight(UUID: string, GroupID: number | null, Weight: unknown) {
+    const Terminal = TerminalList.find((Entry) => Entry.UUID === UUID);
+    const FromGroupID = Terminal ? Terminal.GroupID : null;
+    const Result = await GroupOrdering.SetGroupAndWeight(UUID, GroupID, Weight);
+    if (Terminal && !Result[0]) {
+      await RecordGroupMove(KioskAuditBase(Terminal), FromGroupID, Terminal.GroupID);
+    }
+    return Result;
   },
 
   MoveGroupToNoGroup(GroupID: unknown) {

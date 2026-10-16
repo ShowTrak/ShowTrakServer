@@ -35,6 +35,7 @@ export type SurfacePrefix = 'WEBUI' | 'REMOTE';
 // Always allowed for an authed session (read-only / non-mutating).
 const READ_CHANNELS = new Set([
   'Config:Get',
+  'AuditLog:Get',
   'GetClient',
   'GetClientHistory',
   'GetStatusHistoryOverview',
@@ -241,6 +242,7 @@ const PUSH_CHANNELS = [
   'AudioAssetsUpdated',
   // Rainbow Mode is one flag for every surface, so open browsers follow it too.
   'RainbowModeUpdated',
+  'AuditLogAppended',
   // Only ever delivered through ToPublicSettings: the raw payload carries the
   // Web UI passcode, the SDK key and the FOG tokens.
   'UpdateSettings',

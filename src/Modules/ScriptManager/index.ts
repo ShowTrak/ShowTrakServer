@@ -15,6 +15,9 @@ import { Manager as BroadcastManager } from '../Broadcast';
 import { Ok, Fail } from '../Utils';
 import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
 import type { Result } from '../../types/result';
+import { RecordEdit, RecordUpdate } from '../AuditLog/edits';
+import { Entity, Line } from '../AuditLog/message';
+import { AuditBefore, AuditStep, ColourName, DiffSettings, Seconds } from '../Shared/audit-names';
 
 import {
   PLATFORM_KEYS,
@@ -560,6 +563,51 @@ Manager.Get = async (ID: string) => {
   return Script;
 };
 
+// --- Audit log ---------------------------------------------------------------
+// A save is reported field by field, as the Script Manager labels them.
+
+const CONFIRMATION_NAMES: Record<string, string> = {
+  None: 'No confirmation',
+  Standard: 'Confirmation',
+  Critical: 'Critical warning',
+};
+
+const SCRIPT_PLATFORMS = ['Windows', 'macOS', 'Linux'] as const;
+
+function ScriptAuditView(Script: ScriptEditable): Record<string, string | number | boolean | null> {
+  const Filter = Script.consoleFilter;
+  const View: Record<string, string | number | boolean | null> = {
+    ID: Script.id,
+    Name: Script.name,
+    Description: Script.description,
+    Colour: ColourName(Script.colour),
+    Icon: Script.icon,
+    'Before Running': CONFIRMATION_NAMES[Script.confirmation] || Script.confirmation,
+    Enabled: Script.enabled,
+    Timeout: Seconds(Script.timeoutMs / 1000),
+    'Console Filter':
+      Filter && Filter.Mode && Filter.Mode !== 'none'
+        ? `${Filter.Mode}: ${Filter.Pattern}${Filter.Strip ? ' (remove match)' : ''}`
+        : null,
+  };
+  for (const Platform of SCRIPT_PLATFORMS) {
+    View[`${Platform} file`] = (Script.platforms || {})[Platform] || null;
+    View[`${Platform} arguments`] = (Script.arguments || {})[Platform] || null;
+  }
+  return View;
+}
+
+function ScriptAuditBase(ID: string, Name: string | null | undefined) {
+  return { EntityType: 'script' as const, EntityID: ID, EntityName: Name || ID };
+}
+
+function ScriptOrder(): string {
+  return Scripts.slice()
+    .sort((A, B) => (A.Weight || 0) - (B.Weight || 0))
+    .map((Script) => Script.ID)
+    .join('\n');
+}
+
 // A folder ID must be a safe single path segment.
 function IsSafeFolderID(ID: unknown): boolean {
   return (
@@ -641,6 +689,10 @@ Manager.SaveFields = async (
   if (!Fields || typeof Fields !== 'object') {
     return Fail('Invalid fields');
   }
+  const Before = await AuditBefore(async () => {
+    const [Err, Editable] = await Manager.GetEditable(ID);
+    return Err || !Editable ? null : ScriptAuditView(Editable);
+  });
 
   // Resolve the desired new ID (defaults to the current one).
   const DesiredID = typeof Fields.id === 'string' ? Fields.id.trim() : ID;
@@ -712,12 +764,27 @@ Manager.SaveFields = async (
   }
 
   await Manager.ReloadScripts();
+  if (Before) {
+    await AuditStep(async () => {
+      const [Err, Editable] = await Manager.GetEditable(FinalID);
+      if (Err || !Editable) return;
+      RecordUpdate({
+        ...ScriptAuditBase(FinalID, Editable.name),
+        Summary: Line('Edited ', Entity(Editable.name)),
+        Changes: DiffSettings(Before, ScriptAuditView(Editable), { Label: (Key) => Key }),
+      });
+    });
+  }
   return Ok({ id: FinalID, warnings: errors });
 };
 
 // Persist a new ordering by reassigning Weight in folder order.
 Manager.SetOrder = async (OrderedIDs: unknown): Promise<Result<true>> => {
   if (!Array.isArray(OrderedIDs)) return Fail('Invalid order');
+  const Before = await AuditBefore(async () => {
+    if (Scripts.length === 0) await Manager.GetScripts();
+    return ScriptOrder();
+  });
   const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
   let Weight = 10;
   for (const ID of OrderedIDs) {
@@ -735,6 +802,11 @@ Manager.SetOrder = async (OrderedIDs: unknown): Promise<Result<true>> => {
     }
   }
   await Manager.ReloadScripts();
+  if (Before !== null && Before !== ScriptOrder()) {
+    await AuditStep(() =>
+      RecordEdit({ EntityType: 'script', EntityID: null, Summary: Line('Reordered scripts') })
+    );
+  }
   return Ok(true);
 };
 
@@ -810,6 +882,12 @@ Manager.CreateBlank = async (): Promise<Result<{ id: string }>> => {
   }
 
   await Manager.ReloadScripts();
+  await AuditStep(() =>
+    RecordEdit({
+      ...ScriptAuditBase(ID, config.Name),
+      Summary: Line('Created ', Entity(config.Name)),
+    })
+  );
   return Ok({ id: ID });
 };
 
@@ -908,6 +986,12 @@ Manager.CreateFromTemplate = async (
   }
 
   await Manager.ReloadScripts();
+  await AuditStep(() =>
+    RecordEdit({
+      ...ScriptAuditBase(TargetID, config.Name),
+      Summary: Line('Created ', Entity(config.Name || TargetID), ' from a template'),
+    })
+  );
   return { ok: true, id: TargetID };
 };
 
@@ -917,12 +1001,22 @@ Manager.Delete = async (ID: string): Promise<Result<true>> => {
   const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
   const ScriptFolderPath = path.join(ScriptsDirectory, ID);
   if (!fs.existsSync(ScriptFolderPath)) return Fail('Script not found');
+  const Name = await AuditBefore(async () => (await Manager.Get(ID))?.Name || ID);
   try {
     fs.rmSync(ScriptFolderPath, { recursive: true, force: true });
   } catch (err) {
     return Fail(`Failed to delete script folder: ${(err as Error).message}`);
   }
   await Manager.ReloadScripts();
+  if (Name) {
+    await AuditStep(() =>
+      RecordEdit({
+        ...ScriptAuditBase(ID, Name),
+        Summary: Line('Deleted ', Entity(Name)),
+        Severity: 'warning',
+      })
+    );
+  }
   return Ok(true);
 };
 

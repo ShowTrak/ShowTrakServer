@@ -120,6 +120,22 @@ export const HISTORY_RETENTION_MS = 12 * 60 * 60 * 1000;
 // (a deleted client stops recording, but its readings still age out).
 export const HISTORY_RETENTION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
+// The audit log (status changes, edits, actions) keeps a full day, twice the
+// history window: it is what an operator reads back the morning after. It lives
+// in its own database in app data, never in the show file.
+export const AUDIT_LOG_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+// How often entries older than the retention window are purged.
+export const AUDIT_LOG_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+
+// Entries are written in batches: a burst (every client reconnecting after a
+// network blip) lands as one transaction rather than hundreds.
+export const AUDIT_LOG_FLUSH_INTERVAL_MS = 250;
+
+// A hard ceiling on stored entries, whatever their age, so a device flapping
+// many times a second cannot grow the file without bound inside the 24 hours.
+export const AUDIT_LOG_MAX_ENTRIES = 250000;
+
 // The first ShowTrak Client release that reports battery/mains, sleep and
 // resume, temperatures, hung applications and the foreground application.
 // Older clients read as "update the client" for these rather than as

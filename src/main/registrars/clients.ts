@@ -27,6 +27,10 @@ import { Manager as WOLManager } from '../../Modules/WOLManager';
 import { Manager as ScriptExecutionManager } from '../../Modules/ScriptExecutionManager';
 import { Manager as SettingsManager } from '../../Modules/SettingsManager';
 import { Manager as IPCValidation } from '../../Modules/IPCValidation';
+import { RecordAction } from '../../Modules/AuditLog/edits';
+import { Entity, Line } from '../../Modules/AuditLog/message';
+import { ClientDisplayName } from '../../Modules/AuditLog/status';
+import { AuditStep } from '../../Modules/Shared/audit-names';
 
 const Logger = CreateLogger('Main');
 
@@ -425,6 +429,16 @@ function register(): void {
           ? Failures.join('; ') || 'Wake on LAN failed'
           : null;
       await ScriptExecutionManager.Complete(RequestID, WOLErr);
+      await AuditStep(() =>
+        RecordAction({
+          EntityType: 'client',
+          EntityID: UUID,
+          EntityName: ClientDisplayName(Client),
+          Summary: Line('Sent Wake-on-LAN to ', Entity(ClientDisplayName(Client))),
+          Severity: WOLErr ? 'error' : 'info',
+          Details: WOLErr ? [WOLErr] : [`${MacAddresses.length} MAC address(es)`],
+        })
+      );
     });
     await Promise.allSettled(tasks);
     return [null, true];

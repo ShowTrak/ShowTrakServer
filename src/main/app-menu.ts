@@ -71,6 +71,10 @@ function buildMacAppMenuTemplate(deps: AppMenuDeps) {
       click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_UPDATE_MANAGER_BUTTON'),
     },
     {
+      label: 'Audit Log',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_AUDIT_LOG_BUTTON'),
+    },
+    {
       label: 'OSC/API Reference',
       click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_OSC_ROUTE_LIST_BUTTON'),
     },

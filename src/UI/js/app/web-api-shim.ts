@@ -469,6 +469,8 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     GetRainbowMode: async () => AckOrFalse('rainbow:get'),
     SetRainbowMode: async (Enabled) => AckOrFalse('rainbow:set', Enabled),
     OnRainbowModeUpdated: (cb) => sub('RainbowModeUpdated', cb),
+    GetAuditLog: async (Query) => rpc('AuditLog:Get', Query),
+    AuditLogAppended: (cb) => sub('AuditLogAppended', cb),
   };
 }
 

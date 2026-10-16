@@ -10,11 +10,16 @@ const { ipcMain } = require('electron/main');
 import { RegisterHandler } from './handler-registry';
 import type { InvokeChannel } from '../Modules/IPCRegistry/channels';
 import type { IpcHandler } from './handler-registry';
+import { RunWithAuditSource } from '../Modules/AuditLog/source';
 
+// The registry keeps the bare handler: the Web UI and SDK dispatchers run it
+// under their own audit source. Only the desktop path is labelled here.
 const RPC = {
   handle(channel: InvokeChannel, fn: IpcHandler) {
     RegisterHandler(channel, fn);
-    return ipcMain.handle(channel, fn);
+    return ipcMain.handle(channel, (event: unknown, ...args: unknown[]) =>
+      RunWithAuditSource('Desktop', () => fn(event, ...args))
+    );
   },
 };
 

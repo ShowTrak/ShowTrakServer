@@ -63,6 +63,7 @@ import { RegisterRendererSink } from '../../main/renderer-bus';
 import { GetHandler } from '../../main/handler-registry';
 import { AuthorizeChannel } from '../RemoteAccess';
 import { ControlService } from '../ControlService';
+import { RunWithAuditSource } from '../AuditLog/source';
 
 const Logger = CreateLogger('SdkServer');
 
@@ -183,6 +184,8 @@ interface SdkSocket {
    * memory, and it must not outlive the emit.
    */
   PendingDeviceToken?: string | null;
+  /** How the audit log names this session's edits ("SDK", "ShowTrak Remote (iPad)"). */
+  AuditSource?: string;
   emit(event: string, ...args: unknown[]): boolean;
   on(event: string, listener: (...args: never[]) => void): void;
   disconnect(close?: boolean): void;
@@ -455,6 +458,9 @@ function SetupSdkNamespace(io: SdkIOServer) {
           ApiKeyThrottle.Clear(IP);
           socket.AuthMode = 'device';
           socket.DeviceID = Device.DeviceID;
+          socket.AuditSource = Device.DeviceName
+            ? `ShowTrak Remote (${Device.DeviceName})`
+            : 'ShowTrak Remote';
           return next();
         }
 
@@ -495,6 +501,8 @@ function SetupSdkNamespace(io: SdkIOServer) {
           PairingThrottle.Clear(IP);
           socket.AuthMode = 'device';
           socket.DeviceID = Paired.DeviceID;
+          // A fresh pairing carries no stored name yet; the next connect does.
+          socket.AuditSource = 'ShowTrak Remote';
           socket.PendingDeviceToken = Paired.DeviceToken;
           return next();
         }
@@ -622,7 +630,9 @@ function SetupSdkNamespace(io: SdkIOServer) {
     socket.on('command', (name: unknown, args: unknown, ack: AckCallback) => {
       void (async () => {
         try {
-          const Result = await DispatchCommand(name, args);
+          const Result = await RunWithAuditSource(socket.AuditSource || 'SDK', () =>
+            DispatchCommand(name, args)
+          );
           if (typeof ack === 'function') ack(Result);
         } catch (e) {
           Logger.error('SDK command failed:', e);
@@ -652,7 +662,9 @@ function SetupSdkNamespace(io: SdkIOServer) {
           const Handler = GetHandler(channel);
           if (typeof Handler !== 'function') return ack && ack({ error: 'unknown_channel' });
           const Args = Array.isArray(args) ? args : [];
-          const Result = await Handler(null, ...Args);
+          const Result = await RunWithAuditSource(socket.AuditSource || 'ShowTrak Remote', () =>
+            Handler(null, ...Args)
+          );
           if (ack) ack({ result: Result });
         } catch (e) {
           Logger.error('SDK rpc failed:', e);

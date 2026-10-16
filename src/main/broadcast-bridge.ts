@@ -790,6 +790,8 @@ const PASSTHROUGH: Array<[string, string]> = [
   ['DebugTrafficEntry', 'DebugTrafficEntry'],
   // Global alert-actions toggle state, consumed by the SDK control API sink.
   ['AlertActionsUpdated', 'AlertActionsUpdated'],
+  // Audit log entries as they are written, for an open Logs tab or Audit Log.
+  ['AuditLogAppended', 'AuditLogAppended'],
 ];
 
 // Wire every BroadcastManager subscriber and the ModeManager relay. Called once

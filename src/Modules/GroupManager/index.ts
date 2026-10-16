@@ -10,6 +10,10 @@ import { SCRIPT_COLOURS } from '../ScriptManager/schema';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import type { GroupRow } from '../DB/rows';
+import { RecordEdit, RecordUpdate } from '../AuditLog/edits';
+import { Entity, Line } from '../AuditLog/message';
+import { DiffFields, Snapshot, type FieldSpec } from '../AuditLog/diff';
+import { AuditBefore, AuditStep, ColourName, KeyBindName } from '../Shared/audit-names';
 
 const Logger = CreateLogger('GroupManager');
 
@@ -191,6 +195,52 @@ class Group {
   }
 }
 
+// --- Audit log ---------------------------------------------------------------
+// Each Set* below is one field of the Group editor; the setters return Ok for a
+// save that changes nothing, so an edit is diffed rather than assumed.
+
+const GROUP_AUDIT_KEYS = [
+  'Title',
+  'Slug',
+  'isFullWidth',
+  'ColumnSpan',
+  'Colour',
+  'KeyBind',
+] as const;
+
+const GROUP_AUDIT_FIELDS: readonly FieldSpec<Group>[] = [
+  { Key: 'Title', Label: 'Group Name' },
+  { Key: 'Slug', Label: 'Slug' },
+  {
+    Key: 'ColumnSpan',
+    Label: 'Width',
+    Format: (_Value, Group) =>
+      Group.isFullWidth
+        ? 'Full Width'
+        : `${Group.ColumnSpan} ${Group.ColumnSpan === 1 ? 'column' : 'columns'}`,
+  },
+  { Key: 'Colour', Label: 'Colour', Format: ColourName },
+  { Key: 'KeyBind', Label: 'Selection Keybind', Format: KeyBindName },
+];
+
+function GroupAuditBase(Group: { GroupID: number; Title: string | null }) {
+  return {
+    EntityType: 'group' as const,
+    EntityID: Group.GroupID,
+    EntityName: Group.Title,
+  };
+}
+
+function RecordGroupEdit(Group: Group, Before: Group): Promise<void> {
+  return AuditStep(() =>
+    RecordUpdate({
+      ...GroupAuditBase(Group),
+      Summary: Line('Edited ', Entity(Group.Title)),
+      Changes: DiffFields(Before, Group, GROUP_AUDIT_FIELDS),
+    })
+  );
+}
+
 const Manager = {
   async Create(Title: string = 'New Group'): Promise<Result<boolean>> {
     if (!Title) return Fail('Group title is required');
@@ -209,6 +259,12 @@ const Manager = {
       if (SlugErr) Logger.error('Failed to persist new group slug:', SlugErr);
     }
     BroadcastManager.emit('GroupListChanged');
+    await AuditStep(() =>
+      RecordEdit({
+        ...GroupAuditBase({ GroupID, Title }),
+        Summary: Line('Created ', Entity(Title)),
+      })
+    );
     return Ok(true);
   },
 
@@ -219,6 +275,7 @@ const Manager = {
     const [GetErr, Group] = await Manager.Get(GroupID);
     if (GetErr) return Fail(GetErr);
     if (!Group) return Fail('Group not found');
+    const Before = Snapshot(Group, GROUP_AUDIT_KEYS);
 
     const [SlugErr, Resolved] = await SlugService.ResolveGroupSlugEdit(Slug, `group:${GroupID}`);
     if (SlugErr) return Fail(SlugErr);
@@ -228,6 +285,7 @@ const Manager = {
     if (SetErr) return Fail(SetErr);
 
     BroadcastManager.emit('GroupListChanged');
+    await RecordGroupEdit(Group, Before);
     return Ok(true);
   },
 
@@ -265,11 +323,13 @@ const Manager = {
     const [GetErr, Group] = await Manager.Get(GroupID);
     if (GetErr) return Fail(GetErr);
     if (!Group) return Fail('Group not found');
+    const Before = Snapshot(Group, GROUP_AUDIT_KEYS);
 
     const [SetErr] = await Group.SetTitle(Title);
     if (SetErr) return Fail(SetErr);
 
     BroadcastManager.emit('GroupListChanged');
+    await RecordGroupEdit(Group, Before);
     return Ok(true);
   },
 
@@ -279,11 +339,13 @@ const Manager = {
     const [GetErr, Group] = await Manager.Get(GroupID);
     if (GetErr) return Fail(GetErr);
     if (!Group) return Fail('Group not found');
+    const Before = Snapshot(Group, GROUP_AUDIT_KEYS);
 
     const [SetErr] = await Group.SetFullWidth(FullWidth);
     if (SetErr) return Fail(SetErr);
 
     BroadcastManager.emit('GroupListChanged');
+    await RecordGroupEdit(Group, Before);
     return Ok(true);
   },
 
@@ -295,6 +357,7 @@ const Manager = {
     const [GetErr, Group] = await Manager.Get(GroupID);
     if (GetErr) return Fail(GetErr);
     if (!Group) return Fail('Group not found');
+    const Before = Snapshot(Group, GROUP_AUDIT_KEYS);
 
     const [SpanErr] = await Group.SetColumnSpan(ColumnSpan);
     if (SpanErr) return Fail(SpanErr);
@@ -302,6 +365,7 @@ const Manager = {
     if (WidthErr) return Fail(WidthErr);
 
     BroadcastManager.emit('GroupListChanged');
+    await RecordGroupEdit(Group, Before);
     return Ok(true);
   },
 
@@ -312,11 +376,13 @@ const Manager = {
     const [GetErr, Group] = await Manager.Get(GroupID);
     if (GetErr) return Fail(GetErr);
     if (!Group) return Fail('Group not found');
+    const Before = Snapshot(Group, GROUP_AUDIT_KEYS);
 
     const [SetErr] = await Group.SetColour(Colour);
     if (SetErr) return Fail(SetErr);
 
     BroadcastManager.emit('GroupListChanged');
+    await RecordGroupEdit(Group, Before);
     return Ok(true);
   },
 
@@ -329,6 +395,7 @@ const Manager = {
     const [GetErr, Group] = await Manager.Get(GroupID);
     if (GetErr) return Fail(GetErr);
     if (!Group) return Fail('Group not found');
+    const Before = Snapshot(Group, GROUP_AUDIT_KEYS);
 
     const Next = NormalizeKeyBind(KeyBind);
 
@@ -345,6 +412,7 @@ const Manager = {
     if (SetErr) return Fail(SetErr);
 
     BroadcastManager.emit('GroupListChanged');
+    await RecordGroupEdit(Group, Before);
     return Ok(true);
   },
 
@@ -374,6 +442,7 @@ const Manager = {
 
     const Remaining = Existing.filter((GroupID) => !Desired.includes(GroupID));
     const FinalOrder = Desired.concat(Remaining);
+    const Reordered = FinalOrder.some((GroupID, Index) => Existing[Index] !== GroupID);
 
     let Weight = 10;
     for (const GroupID of FinalOrder) {
@@ -386,12 +455,19 @@ const Manager = {
     }
 
     BroadcastManager.emit('GroupListChanged');
+    if (Reordered) {
+      await AuditStep(() =>
+        RecordEdit({ EntityType: 'group', EntityID: null, Summary: Line('Reordered groups') })
+      );
+    }
     return { ok: true };
   },
 
   // Delete a group and move all assigned entities to the default no-group bucket.
   async Delete(GroupID: number): Promise<Result<string>> {
     if (!GroupID) return Fail('GroupID is required to delete a group');
+    // Named before it goes, for the audit log.
+    const Existing = await AuditBefore(async () => (await Manager.Get(GroupID))[1]);
 
     if (typeof ClientManager.MoveGroupToNoGroup === 'function') {
       const [ClientErr] = await ClientManager.MoveGroupToNoGroup(GroupID);
@@ -441,6 +517,15 @@ const Manager = {
     }
     Logger.debug(`Deleted group with ID ${GroupID}`);
     BroadcastManager.emit('GroupListChanged');
+    if (Existing) {
+      await AuditStep(() =>
+        RecordEdit({
+          ...GroupAuditBase(Existing),
+          Summary: Line('Deleted ', Entity(Existing.Title)),
+          Severity: 'warning',
+        })
+      );
+    }
     return Ok('Group Deleted Successfully');
   },
 

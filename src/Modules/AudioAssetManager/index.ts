@@ -8,6 +8,10 @@ import { Manager as AppData } from '../AppData';
 import { Manager as UUID } from '../UUID';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
+import { RecordEdit, RecordUpdate, type EditInput } from '../AuditLog/edits';
+import { Line, Value } from '../AuditLog/message';
+import { DiffFields, Snapshot } from '../AuditLog/diff';
+import { AuditStep } from '../Shared/audit-names';
 
 const Logger = CreateLogger('AudioAssetManager');
 
@@ -359,6 +363,20 @@ Manager.InspectCandidate = (FilePath: unknown) => {
   return Result;
 };
 
+// Audio assets belong to the machine, not to any one entity, so they are logged
+// as system edits named by their label.
+function RecordAudioEdit(Asset: AudioAsset, Summary: string, Extra: Partial<EditInput> = {}) {
+  return AuditStep(() =>
+    RecordEdit({
+      EntityType: 'system',
+      EntityID: null,
+      EntityName: Asset.Label,
+      Summary: Line(Summary, Value(Asset.Label)),
+      ...Extra,
+    })
+  );
+}
+
 // Copies a validated source file into the Audio store and records it in the manifest.
 Manager.Import = async (Payload: AudioImportPayload | null | undefined) => {
   if (!Initialized) await Manager.Init();
@@ -414,6 +432,7 @@ Manager.Import = async (Payload: AudioImportPayload | null | undefined) => {
   }
 
   Logger.info(`Imported audio asset ${Label} (${ID})`);
+  await RecordAudioEdit(Asset, 'Imported audio asset ', { Details: [Asset.OriginalName] });
   return Ok(publicShape(Asset));
 };
 
@@ -421,6 +440,7 @@ Manager.Update = async (ID: string, Payload: AudioUpdatePayload | null | undefin
   if (!Initialized) await Manager.Init();
   const Asset = Manager.Get(ID);
   if (!Asset) return Fail('Audio asset not found');
+  const Before = Snapshot(Asset, ['Label', 'Volume']);
 
   if (Payload && Object.prototype.hasOwnProperty.call(Payload, 'Label')) {
     Asset.Label = SanitizeLabel(Payload.Label);
@@ -430,6 +450,18 @@ Manager.Update = async (ID: string, Payload: AudioUpdatePayload | null | undefin
   }
 
   if (!persistManifest()) return Fail('Failed to update audio asset');
+  await AuditStep(() =>
+    RecordUpdate({
+      EntityType: 'system',
+      EntityID: null,
+      EntityName: Asset.Label,
+      Summary: Line('Edited audio asset ', Value(Asset.Label)),
+      Changes: DiffFields(Before, Asset, [
+        { Key: 'Label', Label: 'Name' },
+        { Key: 'Volume', Label: 'Volume', Format: (Volume) => `${Volume}%` },
+      ]),
+    })
+  );
   return Ok(publicShape(Asset));
 };
 
@@ -447,6 +479,7 @@ Manager.Delete = async (ID: string) => {
 
   Assets = Assets.filter((A) => A.ID !== ID);
   if (!persistManifest()) return Fail('Failed to delete audio asset');
+  await RecordAudioEdit(Asset, 'Deleted audio asset ', { Severity: 'warning' });
   return Ok({ ID });
 };
 

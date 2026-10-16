@@ -22,6 +22,10 @@ import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import type { TagRow } from '../DB/rows';
 import type { TagView, TagScope, TagDisplayMode } from '@showtrak/protocol';
+import { RecordEdit, RecordUpdate } from '../AuditLog/edits';
+import { Entity, Line } from '../AuditLog/message';
+import { DiffFields, Snapshot, type FieldSpec } from '../AuditLog/diff';
+import { AuditBefore, AuditStep, ColourName } from '../Shared/audit-names';
 
 const Logger = CreateLogger('TagManager');
 
@@ -197,6 +201,44 @@ class Tag {
   }
 }
 
+// --- Audit log ---------------------------------------------------------------
+// The Tag editor saves each field on its own, and a setter returns Ok for a
+// save that changes nothing, so an edit is diffed rather than assumed.
+
+const TAG_AUDIT_KEYS = ['Slug', 'Colour', 'Icon', 'Display'] as const;
+
+const TAG_DISPLAY_NAMES: Record<TagDisplayMode, string> = {
+  hidden: 'Hidden',
+  icon: 'Icon',
+  name: 'Name',
+  both: 'Icon + Name',
+};
+
+const TAG_AUDIT_FIELDS: readonly FieldSpec<Tag>[] = [
+  { Key: 'Slug', Label: 'Tag name' },
+  { Key: 'Colour', Label: 'Colour', Format: ColourName },
+  { Key: 'Icon', Label: 'Icon' },
+  {
+    Key: 'Display',
+    Label: 'Tile display',
+    Format: (Value) => TAG_DISPLAY_NAMES[Value as TagDisplayMode] || String(Value),
+  },
+];
+
+function TagAuditBase(Tag: { TagID: number; Slug: string | null }) {
+  return { EntityType: 'tag' as const, EntityID: Tag.TagID, EntityName: Tag.Slug };
+}
+
+function RecordTagEdit(Tag: Tag, Before: Tag): Promise<void> {
+  return AuditStep(() =>
+    RecordUpdate({
+      ...TagAuditBase(Tag),
+      Summary: Line('Edited ', Entity(Tag.Slug)),
+      Changes: DiffFields(Before, Tag, TAG_AUDIT_FIELDS),
+    })
+  );
+}
+
 const Manager = {
   async Create(Label: string = 'tag'): Promise<Result<Tag>> {
     // The slug doubles as the label, so a tag always has a unique non-null slug
@@ -218,6 +260,9 @@ const Manager = {
     // Return the freshly-created tag so callers can open it in the editor.
     const Created = await Manager.GetBySlug(Slug);
     if (!Created) return Fail('Tag created but failed to reload');
+    await AuditStep(() =>
+      RecordEdit({ ...TagAuditBase(Created), Summary: Line('Created ', Entity(Created.Slug)) })
+    );
     return Ok(Created);
   },
 
@@ -228,6 +273,7 @@ const Manager = {
     const [GetErr, Tag] = await Manager.Get(TagID);
     if (GetErr) return Fail(GetErr);
     if (!Tag) return Fail('Tag not found');
+    const Before = Snapshot(Tag, TAG_AUDIT_KEYS);
 
     const [SlugErr, Resolved] = await SlugService.ResolveTagSlugEdit(
       Slug,
@@ -239,6 +285,7 @@ const Manager = {
     if (SetErr) return Fail(SetErr);
 
     BroadcastManager.emit('TagListChanged');
+    await RecordTagEdit(Tag, Before);
     return Ok(true);
   },
 
@@ -247,9 +294,11 @@ const Manager = {
     const [GetErr, Tag] = await Manager.Get(TagID);
     if (GetErr) return Fail(GetErr);
     if (!Tag) return Fail('Tag not found');
+    const Before = Snapshot(Tag, TAG_AUDIT_KEYS);
     const [SetErr] = await Tag.SetColour(Colour);
     if (SetErr) return Fail(SetErr);
     BroadcastManager.emit('TagListChanged');
+    await RecordTagEdit(Tag, Before);
     return Ok(true);
   },
 
@@ -258,9 +307,11 @@ const Manager = {
     const [GetErr, Tag] = await Manager.Get(TagID);
     if (GetErr) return Fail(GetErr);
     if (!Tag) return Fail('Tag not found');
+    const Before = Snapshot(Tag, TAG_AUDIT_KEYS);
     const [SetErr] = await Tag.SetIcon(Icon);
     if (SetErr) return Fail(SetErr);
     BroadcastManager.emit('TagListChanged');
+    await RecordTagEdit(Tag, Before);
     return Ok(true);
   },
 
@@ -269,9 +320,11 @@ const Manager = {
     const [GetErr, Tag] = await Manager.Get(TagID);
     if (GetErr) return Fail(GetErr);
     if (!Tag) return Fail('Tag not found');
+    const Before = Snapshot(Tag, TAG_AUDIT_KEYS);
     const [SetErr] = await Tag.SetDisplay(Display);
     if (SetErr) return Fail(SetErr);
     BroadcastManager.emit('TagListChanged');
+    await RecordTagEdit(Tag, Before);
     return Ok(true);
   },
 
@@ -280,9 +333,15 @@ const Manager = {
     const [GetErr, Tag] = await Manager.Get(TagID);
     if (GetErr) return Fail(GetErr);
     if (!Tag) return Fail('Tag not found');
+    const Before = JSON.stringify(Tag.Scope);
     const [SetErr] = await Tag.SetScope(Scope);
     if (SetErr) return Fail(SetErr);
     BroadcastManager.emit('TagListChanged');
+    if (JSON.stringify(Tag.Scope) !== Before) {
+      await AuditStep(() =>
+        RecordEdit({ ...TagAuditBase(Tag), Summary: Line('Changed members of ', Entity(Tag.Slug)) })
+      );
+    }
     return Ok(true);
   },
 
@@ -312,6 +371,7 @@ const Manager = {
 
     const Remaining = Existing.filter((TagID) => !Desired.includes(TagID));
     const FinalOrder = Desired.concat(Remaining);
+    const Reordered = FinalOrder.some((TagID, Index) => Existing[Index] !== TagID);
 
     let Weight = 10;
     for (const TagID of FinalOrder) {
@@ -324,11 +384,18 @@ const Manager = {
     }
 
     BroadcastManager.emit('TagListChanged');
+    if (Reordered) {
+      await AuditStep(() =>
+        RecordEdit({ EntityType: 'tag', EntityID: null, Summary: Line('Reordered tags') })
+      );
+    }
     return { ok: true };
   },
 
   async Delete(TagID: number): Promise<Result<string>> {
     if (!TagID) return Fail('TagID is required to delete a tag');
+    // Named before it goes, for the audit log.
+    const Existing = await AuditBefore(async () => (await Manager.Get(TagID))[1]);
     const [Err] = await TagsRepo.Delete(TagID);
     if (Err) {
       Logger.error('Failed to delete tag:', Err);
@@ -336,6 +403,15 @@ const Manager = {
     }
     Logger.debug(`Deleted tag with ID ${TagID}`);
     BroadcastManager.emit('TagListChanged');
+    if (Existing) {
+      await AuditStep(() =>
+        RecordEdit({
+          ...TagAuditBase(Existing),
+          Summary: Line('Deleted ', Entity(Existing.Slug)),
+          Severity: 'warning',
+        })
+      );
+    }
     return Ok('Tag Deleted Successfully');
   },
 

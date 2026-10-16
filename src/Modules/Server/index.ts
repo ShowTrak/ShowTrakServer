@@ -37,6 +37,7 @@ import { SendAudioLevel, type AudioControlIO } from './audio-control';
 import type { AudioLevelRequest } from '@showtrak/protocol';
 import type { Result } from '../../types/result';
 import { Manager as IdentifyManager } from '../IdentifyManager';
+import { RunWithAuditSource } from '../AuditLog/source';
 
 const Logger = CreateLogger('WebServer');
 
@@ -270,7 +271,9 @@ for (const Route of OSC.GetRoutes()) {
 
     let Result: Awaited<ReturnType<typeof Route.Callback>> | null = null;
     try {
-      Result = await Route.Callback(Params as Record<string, string>, { IP: SourceIP });
+      Result = await RunWithAuditSource(SourceIP ? `HTTP API (${SourceIP})` : 'HTTP API', () =>
+        Route.Callback(Params as Record<string, string>, { IP: SourceIP })
+      );
     } catch (Error: unknown) {
       const Message = String(
         (Error && (Error as { message?: unknown }).message) ||

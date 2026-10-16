@@ -8,6 +8,11 @@ import type { SettingDefinition, SettingGroup, SettingValue } from './DefaultSet
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as DB } from '../DB';
 import { CreateSettingsRepository } from '../DB/repositories/settings';
+import { RecordEdit } from '../AuditLog/edits';
+import { Line, Value as AuditValue } from '../AuditLog/message';
+import { FormatValue } from '../AuditLog/diff';
+import { CurrentAuditSource } from '../AuditLog/source';
+import { AuditStep, Seconds } from '../Shared/audit-names';
 
 const Logger = CreateLogger('Settings');
 
@@ -64,6 +69,35 @@ function ClampInteger(
     Result = Setting.Max;
   }
   return Result;
+}
+
+function SettingValueText(Setting: Setting, Value: SettingValue): string | null {
+  const Text = FormatValue(Value);
+  if (Text === null || !Setting.Unit || typeof Value !== 'number') return Text;
+  if (Setting.Unit === 's') return Seconds(Value);
+  return Setting.Unit === '%' ? `${Text}%` : `${Text} ${Setting.Unit}`;
+}
+
+// A change made from a surface (Desktop, Web UI, SDK…). One with no surface is
+// ShowTrak's own doing — generating the SDK key on first start — not an edit.
+function RecordSettingChange(Setting: Setting, Previous: SettingValue, IsSecret: boolean) {
+  if (!CurrentAuditSource()) return Promise.resolve();
+  return AuditStep(() =>
+    RecordEdit({
+      EntityType: 'system',
+      EntityID: null,
+      Summary: Line('Changed setting ', AuditValue(Setting.Title || Setting.Key)),
+      Changes: [
+        IsSecret
+          ? { Field: Setting.Title || Setting.Key, From: null, To: 'Changed' }
+          : {
+              Field: Setting.Title || Setting.Key,
+              From: SettingValueText(Setting, Previous),
+              To: SettingValueText(Setting, Setting.Value),
+            },
+      ],
+    })
+  );
 }
 
 function ApplySettingRules(
@@ -249,6 +283,7 @@ const Manager: SettingsManagerShape = {
 
     if (Setting.Value === NormalizedValue) return [null, Setting];
 
+    const Previous = Setting.Value;
     Setting.Value = NormalizedValue;
 
     const [Err] = await SettingsRepo.Upsert(Key, Setting.Value);
@@ -260,6 +295,7 @@ const Manager: SettingsManagerShape = {
 
     const IsSecret = Setting.Type === 'PASSWORD' || SECRET_SETTING_KEYS.has(Key);
     Logger.log(`Setting ${Key} updated to ${IsSecret ? '(hidden)' : Value}`);
+    await RecordSettingChange(Setting, Previous, IsSecret);
 
     BroadcastManager.emit('SettingsUpdated');
 

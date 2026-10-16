@@ -787,6 +787,7 @@ test('every PASSTHROUGH event forwards its payload verbatim on its own channel',
     ['PlayCustomAudio', 'PlayCustomAudio'],
     ['DebugTrafficEntry', 'DebugTrafficEntry'],
     ['AlertActionsUpdated', 'AlertActionsUpdated'],
+    ['AuditLogAppended', 'AuditLogAppended'],
   ]) {
     pushes.length = 0;
     await emit(Event, { a: 1 }, 'second');

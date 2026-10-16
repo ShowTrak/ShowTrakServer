@@ -22,6 +22,12 @@ import { Manager as BroadcastManager } from '../Broadcast';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import type { ClientVariableJoinRow, VariableRow } from '../DB/rows';
+import type { AuditChange } from '@showtrak/protocol';
+import { RecordEdit } from '../AuditLog/edits';
+import { Entity, Line } from '../AuditLog/message';
+import { FormatValue } from '../AuditLog/diff';
+import { ClientDisplayName } from '../AuditLog/status';
+import { AuditBefore, AuditStep } from '../Shared/audit-names';
 import type {
   ClientVariableView,
   VariableEnvironment,
@@ -175,6 +181,36 @@ function JoinRowToView(Row: ClientVariableJoinRow): ClientVariableView {
   };
 }
 
+// --- Audit log ---------------------------------------------------------------
+
+function RecordVariableEdit(
+  Row: { VariableID: number; Key: string },
+  Field: string,
+  From: unknown,
+  To: unknown
+): Promise<void> {
+  const Change: AuditChange = { Field, From: FormatValue(From), To: FormatValue(To) };
+  if (Change.From === Change.To) return Promise.resolve();
+  return AuditStep(() =>
+    RecordEdit({
+      EntityType: 'variable',
+      EntityID: Row.VariableID,
+      EntityName: Row.Key,
+      Summary: Line('Edited ', Entity(Row.Key)),
+      Changes: [Change],
+    })
+  );
+}
+
+// The client a per-client value belongs to, by name. Lazy: ClientManager
+// imports this module.
+async function ClientName(UUID: string): Promise<string> {
+  const { Manager: ClientManager } =
+    require('../ClientManager') as typeof import('../ClientManager');
+  const [, Client] = await ClientManager.Get(UUID);
+  return Client ? ClientDisplayName(Client) : UUID;
+}
+
 const Manager = {
   /** Every definition, with its override count, ordered for the manager UI. */
   async GetAllViews(): Promise<VariableView[]> {
@@ -219,6 +255,14 @@ const Manager = {
     const [LoadErr, Row] = await VariablesRepo.GetByKey(Unique);
     if (LoadErr || !Row) return Fail('Variable created but failed to reload');
     Logger.success(`Created variable ${Unique}`);
+    await AuditStep(() =>
+      RecordEdit({
+        EntityType: 'variable',
+        EntityID: Row.VariableID,
+        EntityName: Row.Key,
+        Summary: Line('Created ', Entity(Row.Key)),
+      })
+    );
     return Ok(RowToView(Row, 0));
   },
 
@@ -270,11 +314,12 @@ const Manager = {
     // definition change and fans out to all of them.
     BroadcastManager.emit('ClientVariablesChanged', null);
     Logger.log(`Variable ${VariableID} renamed to ${Normalized}`);
+    await RecordVariableEdit({ VariableID, Key: Normalized }, 'Variable name', Row.Key, Normalized);
     return Ok(true);
   },
 
   async SetDescription(VariableID: number, Description: unknown): Promise<Result<boolean>> {
-    const [GetErr] = await Manager.Get(VariableID);
+    const [GetErr, Row] = await Manager.Get(VariableID);
     if (GetErr) return Fail(GetErr);
     const Text = String(Description == null ? '' : Description)
       .trim()
@@ -283,11 +328,12 @@ const Manager = {
     if (Err) return Fail('Failed to update variable description');
     // Description is documentation only — it never reaches a client, so no push.
     BroadcastManager.emit('VariableListChanged');
+    if (Row) await RecordVariableEdit(Row, 'Description', Row.Description, Text);
     return Ok(true);
   },
 
   async SetDefault(VariableID: number, DefaultValue: unknown): Promise<Result<boolean>> {
-    const [GetErr] = await Manager.Get(VariableID);
+    const [GetErr, Row] = await Manager.Get(VariableID);
     if (GetErr) return Fail(GetErr);
     const Value = SanitizeValue(DefaultValue);
     const [Err] = await VariablesRepo.UpdateDefault(VariableID, Value);
@@ -297,11 +343,12 @@ const Manager = {
     BroadcastManager.emit('VariableListChanged');
     // Every client that has not overridden this variable just changed value.
     BroadcastManager.emit('ClientVariablesChanged', null);
+    if (Row) await RecordVariableEdit(Row, 'Default value', Row.DefaultValue, Value);
     return Ok(true);
   },
 
   async SetExport(VariableID: number, ExportToSystem: unknown): Promise<Result<boolean>> {
-    const [GetErr] = await Manager.Get(VariableID);
+    const [GetErr, Row] = await Manager.Get(VariableID);
     if (GetErr) return Fail(GetErr);
     const Next = ExportToSystem ? 1 : 0;
     const [Err] = await VariablesRepo.UpdateExport(VariableID, Next);
@@ -312,6 +359,9 @@ const Manager = {
     // Turning the export OFF matters as much as turning it on: the client has to
     // be told so it can remove the value it already wrote to the registry.
     BroadcastManager.emit('ClientVariablesChanged', null);
+    if (Row) {
+      await RecordVariableEdit(Row, 'Windows system environment', !!Row.ExportToSystem, !!Next);
+    }
     return Ok(true);
   },
 
@@ -331,6 +381,15 @@ const Manager = {
     // cleaned up rather than left behind for the life of the machine.
     BroadcastManager.emit('ClientVariablesChanged', null);
     Logger.log(`Deleted variable ${Row.Key}`);
+    await AuditStep(() =>
+      RecordEdit({
+        EntityType: 'variable',
+        EntityID: VariableID,
+        EntityName: Row.Key,
+        Summary: Line('Deleted ', Entity(Row.Key)),
+        Severity: 'warning',
+      })
+    );
     return Ok(true);
   },
 
@@ -364,6 +423,7 @@ const Manager = {
     const [ListErr, Rows] = await VariablesRepo.GetAll();
     if (ListErr) return Fail('Failed to load variables');
     const Known = new Set((Rows || []).map((Row) => Row.VariableID));
+    const Before = await AuditBefore(() => Manager.GetClientViews(ClientUUID));
 
     let Changed = false;
     for (const [RawID, RawValue] of Object.entries(Values)) {
@@ -390,6 +450,32 @@ const Manager = {
       BroadcastManager.emit('VariableListChanged');
       // Only this client's environment moved, so only this client is re-pushed.
       BroadcastManager.emit('ClientVariablesChanged', ClientUUID);
+    }
+    if (Changed && Before) {
+      // Recorded against the client, whose editor this is. Null is "inherits
+      // the default", which is not the same as an empty value.
+      await AuditStep(async () => {
+        const Previous = new Map(Before.map((View) => [View.VariableID, View.Value]));
+        const Changes: AuditChange[] = [];
+        for (const View of await Manager.GetClientViews(ClientUUID)) {
+          const From = Previous.has(View.VariableID) ? Previous.get(View.VariableID)! : null;
+          if (From === View.Value) continue;
+          Changes.push({
+            Field: View.Key,
+            From: From === null ? 'Default' : From || '(empty)',
+            To: View.Value === null ? 'Default' : View.Value || '(empty)',
+          });
+        }
+        if (!Changes.length) return;
+        const Name = await ClientName(ClientUUID);
+        RecordEdit({
+          EntityType: 'client',
+          EntityID: ClientUUID,
+          EntityName: Name,
+          Summary: Line('Changed variables for ', Entity(Name)),
+          Changes,
+        });
+      });
     }
     return Ok(true);
   },

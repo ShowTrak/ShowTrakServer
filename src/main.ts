@@ -66,6 +66,7 @@ import { Manager as BroadcastManager } from './Modules/Broadcast';
 import { Manager as NetworkInterfaces } from './Modules/NetworkInterfaces';
 import { Manager as SettingsManager } from './Modules/SettingsManager';
 import { Manager as ModeManager } from './Modules/ModeManager';
+import { RunWithAuditSource } from './Modules/AuditLog/source';
 import { Wait } from './Modules/Utils';
 const path = require('path');
 
@@ -176,7 +177,8 @@ app.whenReady().then(async () => {
 
   configureApplicationMenu({
     sendAppMenuAction,
-    setMode: (mode: string) => ModeManager.Set(mode),
+    // A menu click is the desktop operator, as much as a click in the window.
+    setMode: (mode: string) => RunWithAuditSource('Desktop', () => ModeManager.Set(mode)),
   });
 
   const ExistingWindow = getMainWindow();
@@ -320,6 +322,12 @@ import {
 } from './main/broadcast-bridge';
 import { RegisterAllHandlers } from './main/registrars';
 import { StartHistoryRetentionSweep } from './main/history-retention';
+import { Manager as AuditLog } from './Modules/AuditLog';
+import { RegisterAuditRecorder } from './main/audit-recorder';
+// The audit log (its own database in app data, never the show file) starts
+// before anything can report a status change, and purges itself to 24 hours.
+AuditLog.Start().catch((Err: unknown) => Logger.error('Failed to start the audit log:', Err));
+RegisterAuditRecorder();
 RegisterBroadcastBridge();
 // Faults that were already true at start-up are held rather than announced as
 // fresh outages; this slow sweep is what raises the ones that turn out to be

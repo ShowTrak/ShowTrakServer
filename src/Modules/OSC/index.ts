@@ -2,6 +2,7 @@ import { CreateLogger } from '../Logger';
 import type { ClientManagerType } from '../ClientManager';
 import { OSC_PORT } from '../Config/constants';
 import { Manager as Broadcast } from '../Broadcast';
+import { RunWithAuditSource } from '../AuditLog/source';
 import { Manager as ScriptManager } from '../ScriptManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as GroupManager } from '../GroupManager';
@@ -342,7 +343,9 @@ async function HandleOSCMessage(Route: unknown, Info: OSCRemoteInfo | undefined)
     // Source address of the UDP packet (used by routes that record sender IPs).
     const Meta = { IP: Info && Info.address ? Info.address : null };
 
-    const RequestComplete = await ValidRoute.Callback(Req, Meta);
+    const RequestComplete = await RunWithAuditSource(Meta.IP ? `OSC (${Meta.IP})` : 'OSC', () =>
+      ValidRoute.Callback(Req, Meta)
+    );
     const RequestPassed =
       RequestComplete && typeof RequestComplete === 'object'
         ? RequestComplete.ok !== false

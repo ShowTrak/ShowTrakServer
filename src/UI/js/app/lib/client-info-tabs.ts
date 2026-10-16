@@ -6,8 +6,11 @@
 // get only Status and Info. Monitoring targets get Status plus Actions (the
 // controls their check types declare, sent to every check of that type on the
 // target). Dummy clients have nothing but their status timeline, so they get
-// Status alone. FreeKiosk terminals split their metric registry across Content,
+// Status (and Logs). FreeKiosk terminals split their metric registry across Content,
 // Screen, Battery, Network and Misc.
+//
+// Every kind ends with Logs: its slice of the audit log (status changes, edits
+// and actions over the past 24 hours).
 //
 // A tab that stops being available while selected falls back to the first tab
 // rather than leaving an empty pane.
@@ -26,7 +29,8 @@ export type ClientInfoTabKey =
   | 'content'
   | 'screen'
   | 'battery'
-  | 'misc';
+  | 'misc'
+  | 'logs';
 
 export type ClientInfoKind = 'client' | 'integrated' | 'target' | 'dummy' | 'freekiosk';
 
@@ -37,6 +41,7 @@ export interface ClientInfoTab {
 
 const STATUS_TAB: ClientInfoTab = { Key: 'status', Title: 'Status' };
 const INFO_TAB: ClientInfoTab = { Key: 'info', Title: 'Info' };
+const LOGS_TAB: ClientInfoTab = { Key: 'logs', Title: 'Logs' };
 
 const CLIENT_INFO_TABS_BY_KIND: Readonly<Record<ClientInfoKind, readonly ClientInfoTab[]>> = {
   client: [
@@ -49,10 +54,11 @@ const CLIENT_INFO_TABS_BY_KIND: Readonly<Record<ClientInfoKind, readonly ClientI
     { Key: 'apps', Title: 'Applications' },
     { Key: 'usage', Title: 'Usage' },
     { Key: 'power', Title: 'Power & Thermal' },
+    LOGS_TAB,
   ],
-  integrated: [STATUS_TAB, INFO_TAB],
-  target: [STATUS_TAB, { Key: 'actions', Title: 'Actions' }],
-  dummy: [STATUS_TAB],
+  integrated: [STATUS_TAB, INFO_TAB, LOGS_TAB],
+  target: [STATUS_TAB, { Key: 'actions', Title: 'Actions' }, LOGS_TAB],
+  dummy: [STATUS_TAB, LOGS_TAB],
   freekiosk: [
     STATUS_TAB,
     { Key: 'controls', Title: 'Controls' },
@@ -61,6 +67,7 @@ const CLIENT_INFO_TABS_BY_KIND: Readonly<Record<ClientInfoKind, readonly ClientI
     { Key: 'battery', Title: 'Battery' },
     { Key: 'network', Title: 'Network' },
     { Key: 'misc', Title: 'Misc' },
+    LOGS_TAB,
   ],
 };
 

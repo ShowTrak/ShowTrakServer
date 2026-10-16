@@ -21,6 +21,16 @@ import {
 import * as SlugService from '../Slug';
 import { DummyClient } from './dummy';
 import type { DummyClientSnapshot } from './dummy';
+import { RecordAction, RecordEdit, RecordUpdate } from '../AuditLog/edits';
+import { Entity, Line } from '../AuditLog/message';
+import { DiffFields, type FieldSpec } from '../AuditLog/diff';
+import {
+  AuditBefore,
+  AuditStep,
+  GroupTitle,
+  RecordGroupMove,
+  Seconds,
+} from '../Shared/audit-names';
 
 const DummiesRepo = CreateDummyClientsRepository(DB);
 
@@ -31,6 +41,39 @@ function GenerateUUID(): string {
     return globalThis.crypto.randomUUID();
   }
   return require('crypto').randomUUID();
+}
+
+// --- Audit log ---------------------------------------------------------------
+
+interface DummyAuditFields {
+  DummyID: string;
+  Nickname: string;
+  Group: string;
+  Interval: string | null;
+}
+
+const DUMMY_AUDIT_FIELDS: readonly FieldSpec<DummyAuditFields>[] = [
+  { Key: 'DummyID', Label: 'Slug / ID' },
+  { Key: 'Nickname', Label: 'Title' },
+  { Key: 'Group', Label: 'Group' },
+  { Key: 'Interval', Label: 'Heartbeat Interval' },
+];
+
+async function DummyAuditFieldsOf(Dummy: DummyClient): Promise<DummyAuditFields> {
+  return {
+    DummyID: Dummy.DummyID,
+    Nickname: Dummy.Nickname,
+    Group: await GroupTitle(Dummy.GroupID),
+    Interval: Seconds(Math.round(Dummy.Interval / 1000)),
+  };
+}
+
+function DummyAuditBase(Dummy: DummyClient) {
+  return {
+    EntityType: 'dummy' as const,
+    EntityID: Dummy.UUID,
+    EntityName: Dummy.Nickname || Dummy.DummyID,
+  };
 }
 
 const Manager = {
@@ -153,6 +196,12 @@ const Manager = {
     });
     DummyList.push(Dummy);
     BroadcastManager.emit('DummyClientListChanged');
+    await AuditStep(() =>
+      RecordEdit({
+        ...DummyAuditBase(Dummy),
+        Summary: Line('Created ', Entity(DummyAuditBase(Dummy).EntityName)),
+      })
+    );
     return Ok(Dummy.ToJSON());
   },
 
@@ -162,6 +211,7 @@ const Manager = {
   ): Promise<Result<DummyClientSnapshot>> {
     const Dummy = DummyList.find((D) => D.UUID === UUID);
     if (!Dummy) return Fail('Dummy client not found');
+    const Before = await AuditBefore(() => DummyAuditFieldsOf(Dummy));
 
     let NextDummyID = Dummy.DummyID;
     if (Object.prototype.hasOwnProperty.call(Payload, 'DummyID')) {
@@ -201,6 +251,15 @@ const Manager = {
 
     BroadcastManager.emit('DummyClientUpdated', Dummy.ToJSON());
     BroadcastManager.emit('DummyClientListChanged');
+    if (Before) {
+      await AuditStep(async () =>
+        RecordUpdate({
+          ...DummyAuditBase(Dummy),
+          Summary: Line('Edited ', Entity(DummyAuditBase(Dummy).EntityName)),
+          Changes: DiffFields(Before, await DummyAuditFieldsOf(Dummy), DUMMY_AUDIT_FIELDS),
+        })
+      );
+    }
     return Ok(Dummy.ToJSON());
   },
 
@@ -213,6 +272,13 @@ const Manager = {
     if (Err) return Fail('Failed to delete dummy client');
     DummyList.splice(Idx, 1);
     BroadcastManager.emit('DummyClientListChanged');
+    await AuditStep(() =>
+      RecordEdit({
+        ...DummyAuditBase(Dummy),
+        Summary: Line('Deleted ', Entity(DummyAuditBase(Dummy).EntityName)),
+        Severity: 'warning',
+      })
+    );
     return Ok(true);
   },
 
@@ -221,6 +287,12 @@ const Manager = {
     const Dummy = DummyList.find((D) => D.UUID === UUID);
     if (!Dummy) return Fail('Dummy client not found');
     Dummy.ResetToIdle();
+    await AuditStep(() =>
+      RecordAction({
+        ...DummyAuditBase(Dummy),
+        Summary: Line('Reset ', Entity(DummyAuditBase(Dummy).EntityName), ' to Idle'),
+      })
+    );
     return Ok(Dummy.ToJSON());
   },
 
@@ -246,8 +318,13 @@ const Manager = {
   },
 
   // Move a dummy to a group with a specific weight (used by drag/drop ordering).
-  SetGroupAndWeight(UUID: string, GroupID: number | null, Weight: unknown) {
-    return GroupOrdering.SetGroupAndWeight(UUID, GroupID, Weight);
+  async SetGroupAndWeight(UUID: string, GroupID: number | null, Weight: unknown) {
+    const Dummy = DummyList.find((D) => D.UUID === UUID);
+    const FromGroupID = Dummy ? Dummy.GroupID : null;
+    const Result = await GroupOrdering.SetGroupAndWeight(UUID, GroupID, Weight);
+    if (Dummy && !Result[0])
+      await RecordGroupMove(DummyAuditBase(Dummy), FromGroupID, Dummy.GroupID);
+    return Result;
   },
 
   // Move all dummies in a specific group into the default no-group bucket (null).

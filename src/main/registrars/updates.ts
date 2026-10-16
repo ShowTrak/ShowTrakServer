@@ -13,6 +13,10 @@ import { Manager as UpdateManager } from '../../Modules/UpdateManager';
 import { Manager as ClientManager } from '../../Modules/ClientManager';
 import { Manager as ServerManager } from '../../Modules/Server';
 import { Manager as IPCValidation } from '../../Modules/IPCValidation';
+import { RecordAction } from '../../Modules/AuditLog/edits';
+import { Line, Value } from '../../Modules/AuditLog/message';
+import { ClientDisplayName } from '../../Modules/AuditLog/status';
+import { AuditStep } from '../../Modules/Shared/audit-names';
 
 const Logger = CreateLogger('Main');
 
@@ -34,6 +38,16 @@ function register(): void {
       [ValidUUID],
       'Check For Software Updates'
     );
+    await AuditStep(async () => {
+      const [, Client] = await ClientManager.Get(ValidUUID);
+      const Name = Client ? ClientDisplayName(Client) : ValidUUID;
+      RecordAction({
+        EntityType: 'client',
+        EntityID: ValidUUID,
+        EntityName: Name,
+        Summary: Line('Checked for software updates'),
+      });
+    });
     return [null, true];
   });
 
@@ -135,6 +149,17 @@ function register(): void {
             },
           }
         );
+        await AuditStep(() => {
+          for (const Client of EligibleClients) {
+            RecordAction({
+              EntityType: 'client',
+              EntityID: Client.UUID,
+              EntityName: ClientDisplayName(Client),
+              Summary: Line('Deployed client software ', Value(SelectedTag)),
+              Details: Client.Version ? [`Was ${Client.Version}`] : [],
+            });
+          }
+        });
 
         return [
           null,

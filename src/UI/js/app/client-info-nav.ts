@@ -16,6 +16,22 @@ import { Safe } from './utils';
 let Kind: ClientInfoKind = 'client';
 let RenderedKind: ClientInfoKind | null = null;
 let ActiveTab: ClientInfoTabKey = DEFAULT_CLIENT_INFO_TAB;
+const TabShownListeners: Array<(Key: ClientInfoTabKey) => void> = [];
+
+// Panes that fetch on demand (Logs) hear when the operator moves between tabs.
+export function OnClientInfoTabShown(Listener: (Key: ClientInfoTabKey) => void) {
+  TabShownListeners.push(Listener);
+}
+
+function AnnounceActiveTab() {
+  for (const Listener of TabShownListeners) {
+    try {
+      Listener(ActiveTab);
+    } catch {
+      /* intentional: one pane's failure must not stop the others hearing it */
+    }
+  }
+}
 
 // The rail's buttons only change with the kind, so they are rebuilt on a kind
 // change rather than on every render.
@@ -30,6 +46,7 @@ function EnsureClientInfoNav() {
       RefreshClientInfoTabs();
       // A new pane starts at its top, not wherever the last one was scrolled to.
       $('#CLIENT_INFO_CONTENT').scrollTop(0);
+      AnnounceActiveTab();
     });
     $nav.data('bound', true);
   }
@@ -76,4 +93,15 @@ export function SetClientInfoKind(Next: ClientInfoKind) {
 export function ResetClientInfoTab() {
   ActiveTab = DEFAULT_CLIENT_INFO_TAB;
   $('#CLIENT_INFO_CONTENT').scrollTop(0);
+  AnnounceActiveTab();
+}
+
+/** Switch to a tab from code (the Audit Log opens an entity on its Logs). */
+export function SelectClientInfoTab(Key: ClientInfoTabKey) {
+  const Next = ResolveClientInfoTab(Key, Kind);
+  if (Next === ActiveTab) return;
+  ActiveTab = Next;
+  RefreshClientInfoTabs();
+  $('#CLIENT_INFO_CONTENT').scrollTop(0);
+  AnnounceActiveTab();
 }

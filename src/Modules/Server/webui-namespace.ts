@@ -38,6 +38,7 @@ import { RegisterRendererSink } from '../../main/renderer-bus';
 import { GetHandler } from '../../main/handler-registry';
 import { CloseLogConsole, OpenLogConsole } from '../../main/log-console';
 import { GetRainbowMode, SetRainbowMode } from '../../main/rainbow-mode';
+import { RunWithAuditSource } from '../AuditLog/source';
 import {
   AuthorizeChannel,
   ReadSurfacePermissions,
@@ -566,7 +567,10 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
         const Handler = GetHandler(channel);
         if (typeof Handler !== 'function') return cb && cb({ error: 'unknown_channel' });
         const Args = Array.isArray(args) ? args : [];
-        const Result = await Handler(null, ...Args);
+        const Address = (socket.handshake && socket.handshake.address) || '';
+        const Result = await RunWithAuditSource(Address ? `Web UI (${Address})` : 'Web UI', () =>
+          Handler(null, ...Args)
+        );
         if (cb) cb({ result: Result });
       } catch (e) {
         Logger.error('Web UI rpc failed:', e);

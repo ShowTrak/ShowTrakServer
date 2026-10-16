@@ -30,6 +30,9 @@ import { Manager as UUIDManager } from '../UUID';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import type { RemoteDeviceRow } from '../DB/rows';
+import { RecordEdit } from '../AuditLog/edits';
+import { Device, Line } from '../AuditLog/message';
+import { AuditBefore, AuditStep } from '../Shared/audit-names';
 
 const Logger = CreateLogger('RemoteDeviceManager');
 
@@ -107,6 +110,13 @@ function ToView(Row: RemoteDeviceRow): RemoteDeviceView {
 
 // Drop codes that have lapsed. Swept lazily on each issue/redeem rather than on a
 // timer, so the map stays bounded to live codes without keeping a handle alive.
+// Paired devices are a server-wide credential list, so system edits.
+function RecordRemoteDeviceEdit(Summary: ReturnType<typeof Line>, Severity?: 'warning') {
+  return AuditStep(() =>
+    RecordEdit({ EntityType: 'system', EntityID: null, Summary, ...(Severity ? { Severity } : {}) })
+  );
+}
+
 function SweepPairingCodes(Now: number): void {
   for (const [Code, ExpiresAt] of PairingCodes) {
     if (ExpiresAt <= Now) PairingCodes.delete(Code);
@@ -168,6 +178,9 @@ const Manager = {
       return Fail('Failed to pair device');
     }
     Logger.log('Paired a new Remote device', { DeviceID });
+    await RecordRemoteDeviceEdit(
+      Line('Paired ShowTrak Remote device ', Device(SanitizeDeviceName(DeviceName)))
+    );
     return Ok({ DeviceID, DeviceToken });
   },
 
@@ -198,9 +211,20 @@ const Manager = {
   async Revoke(DeviceID: unknown): Promise<Result<string>> {
     const ID = typeof DeviceID === 'string' ? DeviceID.trim() : '';
     if (!ID) return Fail('No device specified');
+    const Name = await AuditBefore(async () => {
+      const [, Rows] = await RemoteDevicesRepo.GetAll();
+      const Row = (Rows || []).find((Entry) => Entry.DeviceID === ID);
+      return Row ? ToView(Row).DeviceName : null;
+    });
     const [Err] = await RemoteDevicesRepo.Delete(ID);
     if (Err) return Fail('Failed to revoke device');
     Logger.log('Revoked a Remote device', { DeviceID: ID });
+    if (Name) {
+      await RecordRemoteDeviceEdit(
+        Line('Revoked ShowTrak Remote device ', Device(Name)),
+        'warning'
+      );
+    }
     return Ok(ID);
   },
 
@@ -208,6 +232,7 @@ const Manager = {
     const [Err] = await RemoteDevicesRepo.DeleteAll();
     if (Err) return Fail('Failed to revoke devices');
     Logger.log('Revoked every Remote device.');
+    await RecordRemoteDeviceEdit(Line('Revoked every ShowTrak Remote device'), 'warning');
     return Ok(null);
   },
 };

@@ -18,7 +18,7 @@ const {
 
 const KINDS = ['client', 'integrated', 'target', 'dummy', 'freekiosk'];
 
-test('a ShowTrak Client install gets every tab, Status first', () => {
+test('a ShowTrak Client install gets every tab, Status first and Logs last', () => {
   assert.deepEqual(AvailableClientInfoTabs('client'), [
     'status',
     'info',
@@ -29,20 +29,28 @@ test('a ShowTrak Client install gets every tab, Status first', () => {
     'apps',
     'usage',
     'power',
+    'logs',
   ]);
   assert.equal(DEFAULT_CLIENT_INFO_TAB, 'status');
 });
 
-test('an integrated (SDK) client gets only Status and Info', () => {
-  assert.deepEqual(AvailableClientInfoTabs('integrated'), ['status', 'info']);
+test('an integrated (SDK) client gets only Status, Info and Logs', () => {
+  assert.deepEqual(AvailableClientInfoTabs('integrated'), ['status', 'info', 'logs']);
 });
 
-test('a monitoring target gets Status and Actions', () => {
-  assert.deepEqual(AvailableClientInfoTabs('target'), ['status', 'actions']);
+test('a monitoring target gets Status, Actions and Logs', () => {
+  assert.deepEqual(AvailableClientInfoTabs('target'), ['status', 'actions', 'logs']);
 });
 
-test('a dummy client gets only Status', () => {
-  assert.deepEqual(AvailableClientInfoTabs('dummy'), ['status']);
+test('a dummy client gets only Status and Logs', () => {
+  assert.deepEqual(AvailableClientInfoTabs('dummy'), ['status', 'logs']);
+});
+
+test('every kind ends with the Logs tab', () => {
+  for (const Kind of KINDS) {
+    const Tabs = ClientInfoTabsFor(Kind);
+    assert.deepEqual(Tabs[Tabs.length - 1], { Key: 'logs', Title: 'Logs' }, Kind);
+  }
 });
 
 test('a FreeKiosk terminal gets Status, Controls and its metric tabs', () => {
@@ -54,10 +62,11 @@ test('a FreeKiosk terminal gets Status, Controls and its metric tabs', () => {
     'battery',
     'network',
     'misc',
+    'logs',
   ]);
   assert.deepEqual(
     ClientInfoTabsFor('freekiosk').map((Tab) => Tab.Title),
-    ['Status', 'Controls', 'Content', 'Screen', 'Battery', 'Network', 'Misc']
+    ['Status', 'Controls', 'Content', 'Screen', 'Battery', 'Network', 'Misc', 'Logs']
   );
 });
 

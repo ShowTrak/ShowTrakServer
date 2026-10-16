@@ -58,12 +58,24 @@ import {
   CancelPendingTimeout,
 } from './offline-grace';
 import { AUDIO_KIND, normalizeEndpointID, resolveCriticalAudioEntry } from './audio';
-import { USB_NAME_KIND, USB_SERIAL_KIND, resolveUSBConditions } from './usb';
+import { DescribeUSBLocation, USB_NAME_KIND, USB_SERIAL_KIND, resolveUSBConditions } from './usb';
 import { DISPLAY_KIND, IsWeakDisplayID, resolveCriticalDisplayEntry } from './display';
 import { NETWORK_KIND, normalizeInterfaceName, resolveCriticalNetworkEntry } from './network';
 import type { ClientMacAddressRow, SystemCheckRow } from '../DB/rows';
+import { RecordEdit, RecordUpdate } from '../AuditLog/edits';
+import { Device, Entity, Line, Value } from '../AuditLog/message';
+import { DiffFields, type FieldSpec } from '../AuditLog/diff';
+import { ClientDisplayName } from '../AuditLog/status';
+import { AuditBefore, AuditStep, GroupTitle, ScriptName, Seconds } from '../Shared/audit-names';
 import type {
+  ClientPowerCheck,
   ClientSystemCheckKey,
+  ClientThermalCheck,
+  ClientUptimeCheck,
+  ClientUsageCheck,
+  CriticalAudioDevice,
+  CriticalDisplay,
+  CriticalNetworkInterface,
   CriticalUSBConditions,
   CriticalUSBDevice,
   CriticalUSBName,
@@ -295,6 +307,15 @@ interface ManagedCriticalKind<Row, Entry> extends CriticalIndex<Entry> {
   MarkOn(Target: Client, Entry: Entry): void;
   /** Take the entry under a key off the Client. */
   UnmarkOn(Target: Client, Key: string): void;
+  Audit: CriticalAudit<Entry>;
+}
+
+// How a monitored entry reads in the audit log: its name, and the conditions an
+// edit to it reports, labelled as its conditions table labels them. Presence is
+// locked on for every kind, so it is never reported.
+interface CriticalAudit<Entry> {
+  Name(Entry: Entry): string;
+  Conditions: readonly FieldSpec<Entry>[];
 }
 
 function ManageCriticalKind<Row extends { UUID: string }, Entry>(Spec: {
@@ -304,6 +325,7 @@ function ManageCriticalKind<Row extends { UUID: string }, Entry>(Spec: {
   SetOn(Target: Client, Entries: Entry[]): void;
   MarkOn(Target: Client, Entry: Entry): void;
   UnmarkOn(Target: Client, Key: string): void;
+  Audit: CriticalAudit<Entry>;
 }): ManagedCriticalKind<Row, Entry> {
   const Index = makeCriticalIndex<Row, Entry>({
     loadAll: () => Spec.Table.LoadAll(),
@@ -315,7 +337,167 @@ function ManageCriticalKind<Row extends { UUID: string }, Entry>(Spec: {
     Table: Spec.Table,
     MarkOn: Spec.MarkOn,
     UnmarkOn: Spec.UnmarkOn,
+    Audit: Spec.Audit,
   });
+}
+
+const WithUnit =
+  (Suffix: string) =>
+  (Value: unknown): string | null =>
+    Value === null || Value === undefined || Value === '' ? null : `${Value}${Suffix}`;
+
+const USBLocationText = (Value: unknown) =>
+  typeof Value === 'string' && Value ? DescribeUSBLocation(Value) : null;
+
+function USBConditionSpecs(PortLabel: string): FieldSpec<CriticalUSBConditions>[] {
+  return [
+    { Key: 'Location', Label: PortLabel, Format: USBLocationText },
+    { Key: 'FirmwareVersion', Label: 'Firmware version' },
+    { Key: 'RequireNoError', Label: 'No device error' },
+  ];
+}
+
+const USB_SERIAL_AUDIT: CriticalAudit<CriticalUSBDevice> = {
+  Name: (Entry) => Entry.ProductName || Entry.ManufacturerName || Entry.SerialNumber,
+  Conditions: USBConditionSpecs('Port'),
+};
+
+const USB_NAME_AUDIT: CriticalAudit<CriticalUSBName> = {
+  Name: (Entry) => Entry.ProductName || Entry.ManufacturerName || Entry.NameKey,
+  Conditions: USBConditionSpecs('Ports'),
+};
+
+const APPLICATION_AUDIT: CriticalAudit<CriticalApplicationEntry> = {
+  Name: (Entry) => Entry.Name,
+  Conditions: [
+    { Key: 'RequireResponding', Label: 'Is responding' },
+    { Key: 'RequireForeground', Label: 'Is in foreground' },
+  ],
+};
+
+const DISPLAY_AUDIT: CriticalAudit<CriticalDisplay> = {
+  Name: (Entry) => Entry.Label || 'Display',
+  Conditions: [
+    {
+      Key: 'Width',
+      Label: 'Resolution',
+      Format: (_Value, Entry) =>
+        Entry.Width !== null && Entry.Height !== null ? `${Entry.Width}×${Entry.Height}` : null,
+    },
+    { Key: 'RefreshRate', Label: 'Refresh rate', Format: WithUnit(' Hz') },
+    { Key: 'ScaleFactor', Label: 'Scaling', Format: WithUnit('×') },
+    { Key: 'Rotation', Label: 'Rotation', Format: WithUnit('°') },
+    { Key: 'RequirePrimary', Label: 'Is primary display' },
+    {
+      Key: 'PositionX',
+      Label: 'Position',
+      Format: (_Value, Entry) =>
+        Entry.PositionX !== null && Entry.PositionY !== null
+          ? `${Entry.PositionX},${Entry.PositionY}`
+          : null,
+    },
+  ],
+};
+
+const AUDIO_AUDIT: CriticalAudit<CriticalAudioDevice> = {
+  Name: (Entry) => Entry.Name || 'Audio Device',
+  Conditions: [
+    { Key: 'RequireDefault', Label: 'Is default device' },
+    { Key: 'Channels', Label: 'Channels' },
+    { Key: 'SampleRate', Label: 'Sample rate', Format: WithUnit(' Hz') },
+    { Key: 'RequireUnmuted', Label: 'Is unmuted' },
+    { Key: 'MinVolume', Label: 'Minimum level', Format: WithUnit('%') },
+    { Key: 'MaxVolume', Label: 'Maximum level', Format: WithUnit('%') },
+  ],
+};
+
+const NETWORK_AUDIT: CriticalAudit<CriticalNetworkInterface> = {
+  Name: (Entry) => Entry.Name,
+  Conditions: [
+    { Key: 'Address', Label: 'IP address' },
+    {
+      Key: 'RangeStart',
+      Label: 'IP range',
+      Format: (_Value, Entry) =>
+        Entry.RangeStart && Entry.RangeEnd ? `${Entry.RangeStart} – ${Entry.RangeEnd}` : null,
+    },
+    { Key: 'Netmask', Label: 'Subnet mask' },
+    { Key: 'Gateway', Label: 'Router' },
+  ],
+};
+
+// System checks share no entry type, so their conditions are read off the
+// union of every check's fields (a field a check lacks reads as unchanged).
+type SystemCheckFields = Partial<
+  ClientUsageCheck & ClientUptimeCheck & ClientPowerCheck & ClientThermalCheck
+>;
+
+const SYSTEM_CHECK_NAMES: Record<ClientSystemCheckKey, string> = {
+  cpu: 'CPU usage',
+  ram: 'Memory usage',
+  uptime: 'Uptime',
+  power: 'Power',
+  thermal: 'Temperature',
+};
+
+const THERMAL_STATE_NAMES: Record<string, string> = {
+  nominal: 'Normal',
+  fair: 'Fair',
+  serious: 'Serious',
+};
+
+const SYSTEM_CHECK_CONDITIONS: readonly FieldSpec<SystemCheckFields>[] = [
+  { Key: 'MaxPercent', Label: 'Maximum usage', Format: WithUnit('%') },
+  { Key: 'SustainSeconds', Label: 'For at least', Format: Seconds },
+  { Key: 'MaxDays', Label: 'Maximum uptime', Format: WithUnit(' days') },
+  { Key: 'RequireMains', Label: 'On mains power' },
+  { Key: 'MinBatteryPercent', Label: 'Minimum battery', Format: WithUnit('%') },
+  { Key: 'ChargingBelowPercent', Label: 'Charging when below', Format: WithUnit('%') },
+  { Key: 'MaxCelsius', Label: 'Maximum temperature', Format: WithUnit('°C') },
+  {
+    Key: 'MaxThermalState',
+    Label: 'Maximum thermal state',
+    Format: (Value) => (typeof Value === 'string' ? THERMAL_STATE_NAMES[Value] || Value : null),
+  },
+];
+
+function ClientAuditBase(Target: Client) {
+  return {
+    EntityType: 'client' as const,
+    EntityID: Target.UUID,
+    EntityName: ClientDisplayName(Target),
+  };
+}
+
+// A mark is a new monitored item, or a change to the conditions of one already
+// monitored (only what actually changed is reported).
+function RecordMonitoredMark<Entry>(
+  Target: Client,
+  Name: string,
+  Previous: Entry | null,
+  Next: Entry,
+  Conditions: readonly FieldSpec<Entry>[]
+): Promise<void> {
+  return AuditStep(() => {
+    if (!Previous) {
+      RecordEdit({
+        ...ClientAuditBase(Target),
+        Summary: Line('Started monitoring ', Device(Name)),
+      });
+      return;
+    }
+    RecordUpdate({
+      ...ClientAuditBase(Target),
+      Summary: Line('Changed monitored conditions for ', Device(Name)),
+      Changes: DiffFields(Previous, Next, Conditions),
+    });
+  });
+}
+
+function RecordMonitoredRemoval(Target: Client, Name: string): Promise<void> {
+  return AuditStep(() =>
+    RecordEdit({ ...ClientAuditBase(Target), Summary: Line('Stopped monitoring ', Device(Name)) })
+  );
 }
 
 const CriticalUSB = ManageCriticalKind({
@@ -324,6 +506,7 @@ const CriticalUSB = ManageCriticalKind({
   SetOn: (Target, Entries) => Target.SetCriticalUSBDevices(Entries),
   MarkOn: (Target, Entry) => Target.MarkCriticalUSBDevice(Entry),
   UnmarkOn: (Target, Key) => Target.UnmarkCriticalUSBSerial(Key),
+  Audit: USB_SERIAL_AUDIT,
 });
 
 const CriticalUSBNames = ManageCriticalKind({
@@ -332,6 +515,7 @@ const CriticalUSBNames = ManageCriticalKind({
   SetOn: (Target, Entries) => Target.SetCriticalUSBNames(Entries),
   MarkOn: (Target, Entry) => Target.MarkCriticalUSBName(Entry),
   UnmarkOn: (Target, Key) => Target.UnmarkCriticalUSBName(Key),
+  Audit: USB_NAME_AUDIT,
 });
 
 const CriticalApplications = ManageCriticalKind({
@@ -340,6 +524,7 @@ const CriticalApplications = ManageCriticalKind({
   SetOn: (Target, Entries) => Target.SetCriticalApplications(Entries),
   MarkOn: (Target, Entry) => Target.MarkCriticalApplication(Entry),
   UnmarkOn: (Target, Key) => Target.UnmarkCriticalApplication(Key),
+  Audit: APPLICATION_AUDIT,
 });
 
 const CriticalDisplays = ManageCriticalKind({
@@ -348,6 +533,7 @@ const CriticalDisplays = ManageCriticalKind({
   SetOn: (Target, Entries) => Target.SetCriticalDisplays(Entries),
   MarkOn: (Target, Entry) => Target.MarkCriticalDisplay(Entry),
   UnmarkOn: (Target, Key) => Target.UnmarkCriticalDisplay(Key),
+  Audit: DISPLAY_AUDIT,
 });
 
 const CriticalAudio = ManageCriticalKind({
@@ -356,6 +542,7 @@ const CriticalAudio = ManageCriticalKind({
   SetOn: (Target, Entries) => Target.SetCriticalAudioDevices(Entries),
   MarkOn: (Target, Entry) => Target.MarkCriticalAudioDevice(Entry),
   UnmarkOn: (Target, Key) => Target.UnmarkCriticalAudioDevice(Key),
+  Audit: AUDIO_AUDIT,
 });
 
 const CriticalNetwork = ManageCriticalKind({
@@ -364,18 +551,29 @@ const CriticalNetwork = ManageCriticalKind({
   SetOn: (Target, Entries) => Target.SetCriticalNetworkInterfaces(Entries),
   MarkOn: (Target, Entry) => Target.MarkCriticalNetworkInterface(Entry),
   UnmarkOn: (Target, Key) => Target.UnmarkCriticalNetworkInterface(Key),
+  Audit: NETWORK_AUDIT,
 });
 
 // Index, put on the client and announce an entry that has been persisted.
+// Previous is the entry it replaces, for the audit log; by default whatever the
+// index holds under the same key.
 function ApplyCriticalMark<Row, Entry>(
   Managed: ManagedCriticalKind<Row, Entry>,
   UUID: string,
   Target: Client,
-  Entry: Entry
+  Entry: Entry,
+  Previous: Entry | null = Managed.getForClient(UUID, false)?.get(Managed.Kind.KeyOf(Entry)) ?? null
 ): void {
   Managed.setForClient(UUID, Managed.Kind.KeyOf(Entry), Entry);
   Managed.MarkOn(Target, Entry);
   BroadcastManager.emit('ClientUpdated', Target);
+  void RecordMonitoredMark(
+    Target,
+    Managed.Audit.Name(Entry),
+    Previous,
+    Entry,
+    Managed.Audit.Conditions
+  );
 }
 
 // Persist a resolved entry, then apply it. Ok(Result) once the write lands.
@@ -407,6 +605,7 @@ async function RemoveCritical<Row, Entry>(
   const Requested = Managed.Kind.NormalizeKey(RawKey);
   if (!Requested) return Fail(Managed.Kind.Messages.KeyRequired);
   const Key = ResolveKey(Target, Requested);
+  const Previous = Managed.getForClient(UUID, false)?.get(Key) ?? null;
 
   const [WriteErr] = await Managed.Table.Remove(UUID, Key);
   if (WriteErr) return Fail(Managed.Kind.Messages.RemoveFailed);
@@ -414,6 +613,7 @@ async function RemoveCritical<Row, Entry>(
   Managed.removeForClient(UUID, Key);
   Managed.UnmarkOn(Target, Key);
   BroadcastManager.emit('ClientUpdated', Target);
+  if (Previous) await RecordMonitoredRemoval(Target, Managed.Audit.Name(Previous));
   return Ok(true);
 }
 
@@ -937,7 +1137,7 @@ Manager.MarkDisplayCritical = async (UUID: string, Display: CriticalDisplayPaylo
     Target.UnmarkCriticalDisplay(Existing.DisplayID);
   }
 
-  ApplyCriticalMark(CriticalDisplays, UUID, Target, Entry);
+  ApplyCriticalMark(CriticalDisplays, UUID, Target, Entry, Existing);
   return Ok(!Existing);
 };
 
@@ -1095,6 +1295,13 @@ Manager.MarkSystemCheck = async (UUID: string, Check: ClientSystemCheckPayloadRe
   CriticalSystemChecks.setForClient(UUID, Key, { Key, Check: Next });
   Target.MarkSystemCheck(Key, Next);
   BroadcastManager.emit('ClientUpdated', Target);
+  await RecordMonitoredMark<SystemCheckFields>(
+    Target,
+    SYSTEM_CHECK_NAMES[Key] || Key,
+    Existing ? Existing.Check : null,
+    Next,
+    SYSTEM_CHECK_CONDITIONS
+  );
   return Ok(!Existing);
 };
 
@@ -1103,12 +1310,14 @@ Manager.RemoveSystemCheck = async (UUID: string, Key: ClientSystemCheckKey) => {
   if (Err) return Fail(Err);
   if (!Target) return Fail('Client Not Found');
 
+  const WasMonitored = !!CriticalSystemChecks.getForClient(UUID, false)?.get(Key);
   const [WriteErr] = await CriticalRepo.SystemChecks.Remove(UUID, Key);
   if (WriteErr) return Fail('Failed to stop monitoring system check');
 
   CriticalSystemChecks.removeForClient(UUID, Key);
   Target.UnmarkSystemCheck(Key);
   BroadcastManager.emit('ClientUpdated', Target);
+  if (WasMonitored) await RecordMonitoredRemoval(Target, SYSTEM_CHECK_NAMES[Key] || Key);
   return Ok(true);
 };
 
@@ -1193,6 +1402,15 @@ Manager.AddMacAddress = async (
   MacAddresses.applyState(Target);
   BroadcastManager.emit('ClientUpdated', Target);
   Logger.log(`Client ${UUID} gained ${Source.toLowerCase()} MAC address ${Normalized}`);
+  // A reported address is telemetry, not an edit.
+  if (Source === 'Manual') {
+    await AuditStep(() =>
+      RecordEdit({
+        ...ClientAuditBase(Target),
+        Summary: Line('Added MAC address ', Value(Normalized)),
+      })
+    );
+  }
   return Ok(true);
 };
 
@@ -1206,6 +1424,7 @@ Manager.RemoveMacAddress = async (UUID: string, MacAddress: unknown) => {
 
   const Normalized = NormalizeMacAddress(MacAddress);
   if (!Normalized) return Fail('Invalid MAC address');
+  const WasOnFile = !!MacAddresses.getForClient(UUID, false)?.get(Normalized);
 
   const [WriteErr] = await MacAddressesRepo.Remove(UUID, Normalized);
   if (WriteErr) return Fail('Failed to remove MAC address');
@@ -1220,6 +1439,14 @@ Manager.RemoveMacAddress = async (UUID: string, MacAddress: unknown) => {
   }
   BroadcastManager.emit('ClientUpdated', Target);
   Logger.log(`Client ${UUID} lost MAC address ${Normalized}`);
+  if (WasOnFile) {
+    await AuditStep(() =>
+      RecordEdit({
+        ...ClientAuditBase(Target),
+        Summary: Line('Removed MAC address ', Value(Normalized)),
+      })
+    );
+  }
   return Ok(true);
 };
 
@@ -1300,10 +1527,63 @@ Manager.SystemInfo = async (UUID: string, Data: ValidatedSystemInfo, IP: string)
   return Ok('Heartbeat processed successfully');
 };
 
+// The editor fields an update reports, as the editor names them.
+interface ClientAuditFields {
+  Nickname: string | null;
+  Group: string;
+  Slug: string | null;
+  RunOnLaunch: string | null;
+  LaunchDelay: string | null;
+  OfflineGrace: string | null;
+}
+
+const CLIENT_AUDIT_FIELDS: readonly FieldSpec<ClientAuditFields>[] = [
+  { Key: 'Nickname', Label: 'Nickname' },
+  { Key: 'Group', Label: 'Group' },
+  { Key: 'Slug', Label: 'Slug' },
+  { Key: 'RunOnLaunch', Label: 'Run on Launch' },
+  { Key: 'LaunchDelay', Label: 'Launch Delay' },
+  { Key: 'OfflineGrace', Label: 'Disconnect Grace Period' },
+];
+
+async function ClientAuditFieldsOf(Target: Client): Promise<ClientAuditFields> {
+  return {
+    Nickname: Target.Nickname,
+    Group: await GroupTitle(Target.GroupID),
+    Slug: Target.Slug,
+    RunOnLaunch: await ScriptName(Target.RunOnLaunchScriptID),
+    LaunchDelay: Seconds(Target.RunOnLaunchDelaySeconds),
+    // Null inherits the Preferences value.
+    OfflineGrace:
+      Target.OfflineGraceSeconds === null ? 'Default' : Seconds(Target.OfflineGraceSeconds),
+  };
+}
+
 Manager.Update = async (UUID: string, Data: unknown) => {
   const [Err, Client] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
   if (!Client) return Fail('Client Not Found');
+  // Recorded however the update ends: the setters that ran before a failure
+  // have still landed. Variables are recorded by VariableManager.
+  const Before = await AuditBefore(() => ClientAuditFieldsOf(Client));
+  const Result = await ApplyClientUpdate(UUID, Client, Data);
+  if (Before) {
+    await AuditStep(async () =>
+      RecordUpdate({
+        ...ClientAuditBase(Client),
+        Summary: Line('Edited ', Entity(ClientDisplayName(Client))),
+        Changes: DiffFields(Before, await ClientAuditFieldsOf(Client), CLIENT_AUDIT_FIELDS),
+      })
+    );
+  }
+  return Result;
+};
+
+async function ApplyClientUpdate(
+  UUID: string,
+  Client: Client,
+  Data: unknown
+): Promise<Result<Client>> {
   const Fields = AsRecord(Data);
   const TouchesLaunch =
     Object.prototype.hasOwnProperty.call(Fields, 'RunOnLaunchScriptID') ||
@@ -1366,7 +1646,7 @@ Manager.Update = async (UUID: string, Data: unknown) => {
     if (SetErr) return Fail(SetErr);
   }
   return Ok(Client);
-};
+}
 
 // Adopt a client by creating a durable DB row and adding to the cache
 Manager.Create = async (UUID: string) => {
@@ -1398,8 +1678,29 @@ Manager.Create = async (UUID: string) => {
   if (addClientToCache(Created)) {
     BroadcastManager.emit('ClientListChanged');
   }
+  // The row has no hostname until the client reports in; the pending tile it
+  // was adopted from already knows it.
+  await AuditStep(() => {
+    const Hostname = PendingHostname(UUID);
+    RecordEdit({
+      ...ClientAuditBase(Created),
+      EntityName: Hostname || ClientDisplayName(Created),
+      Summary: Line('Adopted ', Entity(Hostname || ClientDisplayName(Created))),
+      Severity: 'success',
+    });
+  });
   return Ok(true);
 };
+
+function PendingHostname(UUID: string): string | null {
+  // Lazy: AdoptionManager imports this module.
+  const { Manager: AdoptionManager } =
+    require('../AdoptionManager') as typeof import('../AdoptionManager');
+  const Pending = AdoptionManager.GetClientsPendingAdoption().find(
+    (Device) => Device.UUID === UUID
+  );
+  return Pending && Pending.Hostname !== 'No Hostname Found' ? Pending.Hostname : null;
+}
 
 // Operating system every reserved slot starts as. Matches the canonical value
 // the first-party client reports, so platform-gated scripts resolve the same
@@ -1459,11 +1760,26 @@ Manager.CreateUnassigned = async (Name: string, Count: number) => {
   if (!Created.length) return Fail('Failed to create unassigned clients');
   BroadcastManager.emit('ClientListChanged');
   Logger.success(`Created ${Created.length} unassigned client(s)`);
+  await AuditStep(() => {
+    for (const Slot of Created) {
+      RecordEdit({
+        ...ClientAuditBase(Slot),
+        Summary: Line('Created unassigned client ', Entity(ClientDisplayName(Slot))),
+      });
+    }
+  });
   return Ok(Created);
 };
 
 // Unadopt or purge a client; remove from DB and cache
 Manager.Delete = async (UUID: string) => {
+  // Named before it goes, for the audit log.
+  const Name = await AuditBefore(async () => {
+    const Cached = ClientIndex.get(UUID);
+    if (Cached) return ClientDisplayName(Cached);
+    const [, Row] = await ClientsRepo.GetByUUID(UUID);
+    return Row ? ClientDisplayName(Row) : null;
+  });
   // One transaction across all five tables so a mid-sequence failure can never
   // leave the client row and its critical rows half-deleted.
   const [Err] = await ClientsRepo.DeleteClientCascade(UUID);
@@ -1473,6 +1789,17 @@ Manager.Delete = async (UUID: string) => {
   CancelPendingTimeout(UUID);
   for (const Index of CLIENT_SIDE_INDEXES) Index.clearForClient(UUID);
   Logger.success(`Client ${UUID} deleted successfully`);
+  if (Name) {
+    await AuditStep(() =>
+      RecordEdit({
+        EntityType: 'client',
+        EntityID: UUID,
+        EntityName: Name,
+        Summary: Line('Deleted ', Entity(Name)),
+        Severity: 'warning',
+      })
+    );
+  }
   return Ok(true);
 };
 
@@ -1530,6 +1857,19 @@ Manager.ReplaceClient = async (CurrentUUID: unknown, ReplacementUUID: unknown) =
   BroadcastManager.emit('TagListChanged');
   BroadcastManager.emit('ScriptsUpdated');
   BroadcastManager.emit('FogTasksUpdated');
+  await AuditStep(() => {
+    const Hostname = PendingHostname(NewUUID);
+    RecordEdit({
+      ...ClientAuditBase(ExistingClient),
+      Summary: Line(
+        'Replaced ',
+        Entity(ClientDisplayName(ExistingClient)),
+        Hostname ? ' with ' : ' with a new device',
+        Hostname ? Device(Hostname) : null
+      ),
+      Details: [`Previous client ID ${OldUUID}`],
+    });
+  });
   return Ok(ExistingClient);
 };
 
@@ -1671,6 +2011,7 @@ Manager.SetGroupOrder = async (GroupID: unknown, orderedUUIDs: unknown) => {
   if (!Array.isArray(orderedUUIDs)) return Fail('Invalid orderedUUIDs');
   // normalize GroupID null
   const TargetGroupID = (GroupID === undefined ? null : GroupID) as number | string | null;
+  const Moved: Client[] = [];
   let weight = 10;
   for (const uuid of orderedUUIDs) {
     const [err, client] = await Manager.Get(uuid);
@@ -1678,13 +2019,15 @@ Manager.SetGroupOrder = async (GroupID: unknown, orderedUUIDs: unknown) => {
     if (!client) continue;
     // move to target group if needed
     if (client.GroupID !== TargetGroupID) {
-      await client.SetGroupID(TargetGroupID);
+      const [MoveErr] = await client.SetGroupID(TargetGroupID);
+      if (!MoveErr) Moved.push(client);
     }
     await client.SetWeight(weight);
     weight += 10;
   }
   // Emit a single list changed after batch
   BroadcastManager.emit('ClientListChanged');
+  await RecordGroupMoves(Moved, TargetGroupID);
   return Ok(true);
 };
 
@@ -1698,17 +2041,33 @@ Manager.SetGroupOrderWithWeights = async (
   if (!Array.isArray(orderedUUIDs) || !Array.isArray(weights)) return Fail('Invalid input');
   if (orderedUUIDs.length !== weights.length) return Fail('Length mismatch');
   const TargetGroupID = (GroupID === undefined ? null : GroupID) as number | string | null;
+  const Moved: Client[] = [];
   for (let i = 0; i < orderedUUIDs.length; i++) {
     const uuid = orderedUUIDs[i];
     const w = Number(weights[i]) || 0;
     const [err, client] = await Manager.Get(uuid);
     if (err || !client) continue;
-    if (client.GroupID !== TargetGroupID) await client.SetGroupID(TargetGroupID);
+    if (client.GroupID !== TargetGroupID) {
+      const [MoveErr] = await client.SetGroupID(TargetGroupID);
+      if (!MoveErr) Moved.push(client);
+    }
     await client.SetWeight(w);
   }
   BroadcastManager.emit('ClientListChanged');
+  await RecordGroupMoves(Moved, TargetGroupID);
   return Ok(true);
 };
+
+// A drag between groups. Reordering within a group is not an edit worth a line.
+async function RecordGroupMoves(Moved: Client[], GroupID: unknown): Promise<void> {
+  if (!Moved.length) return;
+  await AuditStep(async () => {
+    const Title = await GroupTitle(GroupID);
+    for (const Moving of Moved) {
+      RecordEdit({ ...ClientAuditBase(Moving), Summary: Line('Moved to ', Value(Title)) });
+    }
+  });
+}
 
 Manager.ClearCache = async () => {
   for (const Cached of ClientList) Cached._clearStartupGraceTimer();

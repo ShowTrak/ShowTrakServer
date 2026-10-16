@@ -17,6 +17,20 @@ import type {
   MonitoringTargetView,
 } from '@showtrak/protocol';
 import type { MonitoringTargetRow } from '../DB/rows';
+import type { AuditChange } from '@showtrak/protocol';
+import type { MonitoringSettingField } from '../MonitoringMethods/types';
+import { RecordAction, RecordEdit, RecordUpdate } from '../AuditLog/edits';
+import { Entity, Line, Value } from '../AuditLog/message';
+import { DiffFields, FormatValue, type FieldSpec } from '../AuditLog/diff';
+import { MonitorDisplayName } from '../AuditLog/status';
+import {
+  AuditBefore,
+  AuditStep,
+  DiffSettings,
+  GroupTitle,
+  RecordGroupMove,
+  Seconds,
+} from '../Shared/audit-names';
 
 import {
   MIN_INTERVAL_MS,
@@ -330,6 +344,149 @@ async function RunInit(): Promise<void> {
   BroadcastManager.emit('MonitoringTargetListChanged');
 }
 
+// --- Audit log ---------------------------------------------------------------
+// An edit is reported against the editor's own labels: the monitor's fields,
+// then each check by its label, with its method's settings named as the method
+// names them. A credential the method marks Sensitive never reaches the log.
+
+interface MonitorAuditFields {
+  Nickname: string;
+  Slug: string | null;
+  Group: string;
+  Interval: string | null;
+  FailureThreshold: string;
+}
+
+interface CheckAuditFields {
+  CheckID: number;
+  Name: string;
+  Address: string;
+  Method: string;
+  Settings: Record<string, unknown>;
+  DegradedThresholdMs: number;
+  FailureThreshold: number | null;
+}
+
+const MONITOR_AUDIT_FIELDS: readonly FieldSpec<MonitorAuditFields>[] = [
+  { Key: 'Nickname', Label: 'Name' },
+  { Key: 'Slug', Label: 'Slug' },
+  { Key: 'Group', Label: 'Group' },
+  { Key: 'Interval', Label: 'Check Interval' },
+  { Key: 'FailureThreshold', Label: 'Failures Before Offline' },
+];
+
+const CHECK_AUDIT_FIELDS: readonly FieldSpec<CheckAuditFields>[] = [
+  { Key: 'Name', Label: 'Label' },
+  { Key: 'Method', Label: 'Monitoring Method', Format: (Value) => MethodName(Value) },
+  { Key: 'Address', Label: 'IP / Hostname / Domain' },
+  {
+    Key: 'DegradedThresholdMs',
+    Label: 'Degraded Threshold',
+    Format: (Value) => (Number(Value) > 0 ? `${Value} ms` : 'Off'),
+  },
+  {
+    Key: 'FailureThreshold',
+    Label: 'Failures Before Offline',
+    Format: (Value) => (Value === null || Value === undefined ? 'Default' : String(Value)),
+  },
+];
+
+function MethodName(ID: unknown): string | null {
+  if (typeof ID !== 'string' || !ID) return null;
+  const Method = MonitoringMethods.Get(ID);
+  return Method ? Method.Name : ID;
+}
+
+function CheckName(Check: { Name: string; Method: string }): string {
+  return Check.Name || MethodName(Check.Method) || 'Check';
+}
+
+async function MonitorAuditFieldsOf(Target: MonitoringTarget): Promise<MonitorAuditFields> {
+  return {
+    Nickname: Target.Nickname,
+    Slug: Target.Slug,
+    Group: await GroupTitle(Target.GroupID),
+    Interval: Seconds(Target.Interval / 1000),
+    FailureThreshold:
+      Target.FailureThreshold === null ? 'Default' : String(Target.FailureThreshold),
+  };
+}
+
+function CheckAuditFieldsOf(Check: MonitoringCheck): CheckAuditFields {
+  return {
+    CheckID: Number(Check.CheckID),
+    Name: Check.Name,
+    Address: Check.Address,
+    Method: Check.Method,
+    Settings: { ...(Check.Settings || {}) },
+    DegradedThresholdMs: Check.DegradedThresholdMs,
+    FailureThreshold: Check.FailureThreshold ?? null,
+  };
+}
+
+function CheckSettingChanges(Before: CheckAuditFields, After: CheckAuditFields): AuditChange[] {
+  // A new method brings a whole new settings schema; the method change says it.
+  if (Before.Method !== After.Method) return [];
+  const Method = MonitoringMethods.Get(After.Method);
+  const Fields = new Map<string, MonitoringSettingField>(
+    (Method && Array.isArray(Method.Settings) ? Method.Settings : []).map((Field) => [
+      Field.Key,
+      Field,
+    ])
+  );
+  return DiffSettings(Before.Settings, After.Settings, {
+    Label: (Key) => (Fields.get(Key) ? Fields.get(Key)!.Label : Key),
+    Format: (Key, Value) => {
+      const Option = (Fields.get(Key)?.Options || []).find(
+        (Entry) => typeof Entry === 'object' && Entry.value === Value
+      );
+      return Option && typeof Option === 'object' && Option.label
+        ? Option.label
+        : FormatValue(Value);
+    },
+    // A key the schema no longer declares cannot be vouched for either.
+    Secret: (Key) => !Fields.has(Key) || !!Fields.get(Key)!.Sensitive,
+  });
+}
+
+function CheckListChanges(
+  Before: readonly CheckAuditFields[],
+  After: readonly CheckAuditFields[]
+): AuditChange[] {
+  const Changes: AuditChange[] = [];
+  const Previous = new Map(Before.map((Check) => [Check.CheckID, Check]));
+  const Kept = new Set<number>();
+  for (const Check of After) {
+    const Old = Previous.get(Check.CheckID);
+    if (!Old) {
+      Changes.push({ Field: 'Added check', From: null, To: CheckName(Check) });
+      continue;
+    }
+    Kept.add(Check.CheckID);
+    const Prefix = `${CheckName(Check)}: `;
+    for (const Change of [
+      ...DiffFields(Old, Check, CHECK_AUDIT_FIELDS),
+      ...CheckSettingChanges(Old, Check),
+    ]) {
+      Changes.push({ ...Change, Field: Prefix + Change.Field });
+    }
+  }
+  for (const Check of Before) {
+    if (!Kept.has(Check.CheckID)) {
+      Changes.push({ Field: 'Removed check', From: CheckName(Check), To: null });
+    }
+  }
+  return Changes;
+}
+
+function MonitorAuditBase(Target: { TargetID: number; Nickname: string }) {
+  return {
+    EntityType: 'monitor' as const,
+    EntityID: String(Target.TargetID),
+    EntityName: MonitorDisplayName(Target),
+  };
+}
+
 const Manager = {
   Initialized: false,
   MIN_INTERVAL_MS,
@@ -465,6 +622,12 @@ const Manager = {
       if (!Check) continue;
       await Target.RunChecks([Check]);
       BroadcastManager.emit('MonitoringTargetUpdated', Target.ToJSON());
+      await AuditStep(() =>
+        RecordAction({
+          ...MonitorAuditBase(Target),
+          Summary: Line('Ran ', Value(CheckName(Check)), ' now'),
+        })
+      );
       return Manager.GetCheckDebug(ID);
     }
     return ['Monitoring check not found', null];
@@ -479,6 +642,9 @@ const Manager = {
     if (!Target) return ['Monitor not found', null];
     await Target.RunChecks();
     BroadcastManager.emit('MonitoringTargetUpdated', Target.ToJSON());
+    await AuditStep(() =>
+      RecordAction({ ...MonitorAuditBase(Target), Summary: Line('Ran all checks now') })
+    );
     return [null, Target.ToJSON()];
   },
 
@@ -575,6 +741,22 @@ const Manager = {
       })
     );
 
+    // One line per monitor it was sent to, failed or not.
+    await AuditStep(() => {
+      for (const ID of new Set(Results.map((Entry) => Entry.TargetID))) {
+        const Target = TargetList.find((T) => Number(T.TargetID) === ID);
+        if (!Target) continue;
+        const Mine = Results.filter((Entry) => Entry.TargetID === ID);
+        const Failed = Mine.filter((Entry) => !Entry.Success);
+        RecordAction({
+          ...MonitorAuditBase(Target),
+          Summary: Line('Ran ', Value(Action.Label)),
+          Severity: Failed.length === Mine.length ? 'error' : Failed.length ? 'warning' : 'info',
+          Details: Failed.map((Entry) => Entry.Error || 'Action failed'),
+        });
+      }
+    });
+
     const Succeeded = Results.filter((Entry) => Entry.Success).length;
     return Ok({
       Total: Results.length,
@@ -651,6 +833,13 @@ const Manager = {
     TargetList.push(Target);
     Target.StartLoop();
     BroadcastManager.emit('MonitoringTargetListChanged');
+    await AuditStep(() =>
+      RecordEdit({
+        ...MonitorAuditBase(Target),
+        Summary: Line('Created ', Entity(MonitorDisplayName(Target))),
+        Details: Target.Checks.map((Check) => `Check: ${CheckName(Check)}`),
+      })
+    );
     return Ok(Target.ToJSON());
   },
 
@@ -661,6 +850,10 @@ const Manager = {
     const ID = Number(TargetID);
     const Target = TargetList.find((T) => T.TargetID === ID);
     if (!Target) return Fail('Monitor not found');
+    const Before = await AuditBefore(async () => ({
+      Fields: await MonitorAuditFieldsOf(Target),
+      Checks: Target.Checks.map(CheckAuditFieldsOf),
+    }));
 
     const NextInterval = ClampInterval(
       Object.prototype.hasOwnProperty.call(Payload, 'Interval') ? Payload.Interval : Target.Interval
@@ -725,6 +918,18 @@ const Manager = {
     Target.StartLoop();
     BroadcastManager.emit('MonitoringTargetUpdated', Target.ToJSON());
     BroadcastManager.emit('MonitoringTargetListChanged');
+    if (Before) {
+      await AuditStep(async () =>
+        RecordUpdate({
+          ...MonitorAuditBase(Target),
+          Summary: Line('Edited ', Entity(MonitorDisplayName(Target))),
+          Changes: [
+            ...DiffFields(Before.Fields, await MonitorAuditFieldsOf(Target), MONITOR_AUDIT_FIELDS),
+            ...CheckListChanges(Before.Checks, Target.Checks.map(CheckAuditFieldsOf)),
+          ],
+        })
+      );
+    }
     return Ok(Target.ToJSON());
   },
 
@@ -744,12 +949,25 @@ const Manager = {
     }
     TargetList.splice(Idx, 1);
     BroadcastManager.emit('MonitoringTargetListChanged');
+    await AuditStep(() =>
+      RecordEdit({
+        ...MonitorAuditBase(Target),
+        Summary: Line('Deleted ', Entity(MonitorDisplayName(Target))),
+        Severity: 'warning',
+      })
+    );
     return Ok(true);
   },
 
   // Move a monitoring target to a group with a specific weight (used by drag/drop ordering).
-  SetGroupAndWeight(TargetID: unknown, GroupID: number | null, Weight: unknown) {
-    return GroupOrdering.SetGroupAndWeight(TargetID, GroupID, Weight);
+  async SetGroupAndWeight(TargetID: unknown, GroupID: number | null, Weight: unknown) {
+    const Target = TargetList.find((T) => T.TargetID === Number(TargetID));
+    const FromGroupID = Target ? Target.GroupID : null;
+    const Result = await GroupOrdering.SetGroupAndWeight(TargetID, GroupID, Weight);
+    if (Target && !Result[0]) {
+      await RecordGroupMove(MonitorAuditBase(Target), FromGroupID, Target.GroupID);
+    }
+    return Result;
   },
 
   // Move all monitoring targets from a specific group into the default no-group bucket (null).

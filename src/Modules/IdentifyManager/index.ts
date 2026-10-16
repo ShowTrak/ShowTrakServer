@@ -9,6 +9,10 @@ import { Manager as AdoptionManager } from '../AdoptionManager';
 import { Manager as BroadcastManager } from '../Broadcast';
 import type { Result } from '../../types/result';
 import type { ServerToClientEvents } from '@showtrak/protocol';
+import { RecordAction } from '../AuditLog/edits';
+import { Entity, Line } from '../AuditLog/message';
+import { ClientDisplayName } from '../AuditLog/status';
+import { AuditStep } from '../Shared/audit-names';
 
 const Logger = CreateLogger('IdentifyManager');
 
@@ -85,6 +89,27 @@ async function ClearFlag(UUID: string): Promise<void> {
   }
 }
 
+// Operator-driven starts and stops only; a client dismissing its own overlay or
+// disconnecting is not something anyone did.
+function RecordIdentify(UUID: string, Started: boolean): Promise<void> {
+  return AuditStep(async () => {
+    let Name: string = UUID;
+    if (await ClientManager.Exists(UUID)) {
+      const [, Client] = await ClientManager.Get(UUID);
+      if (Client) Name = ClientDisplayName(Client);
+    } else {
+      const Pending = AdoptionManager.GetClientsPendingAdoption().find((d) => d && d.UUID === UUID);
+      if (Pending) Name = Pending.Hostname;
+    }
+    RecordAction({
+      EntityType: 'client',
+      EntityID: UUID,
+      EntityName: Name,
+      Summary: Line(Started ? 'Started identifying ' : 'Stopped identifying ', Entity(Name)),
+    });
+  });
+}
+
 function EmitIdentifyStateChanged(): void {
   // Force a fresh UI sync regardless of whether the mutation occurred on an
   // adopted or pending client path.
@@ -141,6 +166,7 @@ const Manager = {
     io.to(UUID).emit('Identify', { Nickname });
     EmitIdentifyStateChanged();
     Logger.log(`Identify started for ${UUID}`);
+    await RecordIdentify(UUID, true);
     return Ok(true);
   },
 
@@ -150,11 +176,13 @@ const Manager = {
     UUID = String(UUID || '').trim();
     if (!UUID) return Fail('A client UUID is required.');
 
+    const WasIdentifying = IdentifyingUUIDs.has(UUID);
     await ClearFlag(UUID);
     if (io) io.to(UUID).emit('StopIdentify');
     IdentifyingUUIDs.delete(UUID);
     EmitIdentifyStateChanged();
     Logger.log(`Identify stopped for ${UUID}`);
+    if (WasIdentifying) await RecordIdentify(UUID, false);
     return Ok(true);
   },
 

@@ -18,6 +18,9 @@ import { Manager as MonitoringMethods, stableStringify } from '../MonitoringMeth
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import type { MonitoringActionFavouriteView } from '@showtrak/protocol';
+import { RecordEdit } from '../AuditLog/edits';
+import { Line, Value } from '../AuditLog/message';
+import { AuditStep } from '../Shared/audit-names';
 
 const Logger = CreateLogger('MonitoringActionFavourites');
 const Repo = CreateMonitoringActionFavouritesRepository(DB);
@@ -153,7 +156,8 @@ const Manager = {
     Favourite: boolean
   ): Promise<Result<MonitoringActionFavouriteView[]>> {
     if (!Initialized) await Manager.Init();
-    if (!MonitoringMethods.GetAction(Method, ActionID)) {
+    const Action = MonitoringMethods.GetAction(Method, ActionID);
+    if (!Action) {
       return Fail(`Unknown action "${ActionID}" for method "${Method}"`);
     }
 
@@ -186,6 +190,18 @@ const Manager = {
     }
 
     Broadcast();
+    // Favourites are global (every monitor's menu shares them), so a system edit.
+    await AuditStep(() =>
+      RecordEdit({
+        EntityType: 'system',
+        EntityID: null,
+        Summary: Line(Favourite ? 'Starred ' : 'Unstarred ', Value(Action.Label)),
+        Details: [
+          MonitoringMethods.Get(Method)?.Name || Method,
+          ...(Key && Key !== '{}' ? [Key] : []),
+        ],
+      })
+    );
     return Ok(Manager.GetAll());
   },
 };

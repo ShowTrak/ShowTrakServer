@@ -25,6 +25,7 @@ import { Manager as DummyClientManager } from '../Modules/DummyClientManager';
 import { Manager as FreeKioskManager } from '../Modules/FreeKioskManager';
 import { Manager as NetworkInterfaces } from '../Modules/NetworkInterfaces';
 import { Manager as DBManager } from '../Modules/DB';
+import { Manager as AuditLog } from '../Modules/AuditLog';
 
 const Logger = CreateLogger('Main');
 
@@ -262,6 +263,12 @@ async function runShutdownCleanup(): Promise<void> {
     }
   } catch (Err) {
     Logger.error('FreeKiosk terminal shutdown cleanup failed:', Err);
+  }
+
+  try {
+    await AuditLog.Shutdown();
+  } catch (Err) {
+    Logger.error('Audit log shutdown cleanup failed:', Err);
   }
 
   try {

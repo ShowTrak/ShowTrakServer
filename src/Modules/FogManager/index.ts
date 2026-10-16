@@ -21,6 +21,9 @@ import { HISTORY_RETENTION_MS } from '../Config/constants';
 import type { Result } from '../../types/result';
 import type { FogTaskRow } from '../DB/rows';
 import type { FogStatusView, FogHostView, FogTaskTypeView, FogTaskView } from '@showtrak/protocol';
+import { RecordAction, RecordEdit, type EditInput } from '../AuditLog/edits';
+import { Line, Value, type SummaryPart } from '../AuditLog/message';
+import { AuditBefore, AuditStep } from '../Shared/audit-names';
 import {
   FOG_TASK_TYPES,
   GetFogTaskType,
@@ -275,6 +278,27 @@ function ScheduleNextPoll(): void {
   }, Interval);
 }
 
+// ---- Audit log -------------------------------------------------------------
+// Host links and tasks are recorded against the ShowTrak client they belong to.
+
+function RecordFogEntry(
+  Write: typeof RecordEdit,
+  UUID: string,
+  Summary: SummaryPart[],
+  Extra: Partial<EditInput> = {}
+): Promise<void> {
+  return AuditStep(async () => {
+    const Name = (await ResolveClientName(UUID, null)) || UUID;
+    Write({
+      EntityType: 'client',
+      EntityID: UUID,
+      EntityName: Name,
+      Summary: Line(...Summary),
+      ...Extra,
+    });
+  });
+}
+
 // ---- Views -----------------------------------------------------------------
 
 async function ResolveClientName(
@@ -425,11 +449,18 @@ const Manager = {
   // link when FOG is unreachable.
   async SetHostLink(UUID: string, FogHostID: number | null): Promise<Result<void>> {
     if (!UUID) return Fail('No client specified');
+    const Before = await AuditBefore(async () => (await FogRepo.GetHostLink(UUID))[1] || null);
 
     if (FogHostID == null || FogHostID <= 0) {
       const [Err] = await FogRepo.DeleteHostLink(UUID);
       if (Err) return Fail(String(Err));
       BroadcastManager.emit('FogTasksUpdated');
+      if (Before) {
+        await RecordFogEntry(RecordEdit, UUID, [
+          'Unlinked from FOG host ',
+          Value(Before.FogHostName || `#${Before.FogHostID}`),
+        ]);
+      }
       return Ok<void>();
     }
 
@@ -439,6 +470,12 @@ const Manager = {
     const [Err] = await FogRepo.UpsertHostLink(UUID, FogHostID, Host ? Host.Name : null, Now());
     if (Err) return Fail(String(Err));
     BroadcastManager.emit('FogTasksUpdated');
+    if (!Before || Before.FogHostID !== FogHostID) {
+      await RecordFogEntry(RecordEdit, UUID, [
+        'Linked to FOG host ',
+        Value(Host ? Host.Name : `#${FogHostID}`),
+      ]);
+    }
     return Ok<void>();
   },
 
@@ -505,6 +542,12 @@ const Manager = {
     if (InsertErr) return Fail(String(InsertErr));
 
     Logger.log(`Scheduled FOG task "${TaskType.Name}" on host ${Link.FogHostID}`);
+    await RecordFogEntry(RecordAction, UUID, ['Scheduled FOG task ', Value(TaskType.Name)], {
+      Details: [
+        `FOG host ${Link.FogHostName || `#${Link.FogHostID}`}`,
+        ...(TaskType.RequiresSnapinID ? [`Snapin ID ${SnapinID}`] : []),
+      ],
+    });
 
     // Push immediately so the panel reflects the new task without waiting for the
     // next 30s tick, then poll shortly after to pick up the real task ID and state.
@@ -552,6 +595,12 @@ const Manager = {
       Now()
     );
     Logger.log(`Cancelled FOG task ${Row.FogTaskID} on host ${Row.FogHostID}`);
+    if (Row.UUID) {
+      await RecordFogEntry(RecordAction, Row.UUID, [
+        'Cancelled FOG task ',
+        Value(Row.TaskTypeName || `#${Row.TaskTypeID}`),
+      ]);
+    }
 
     // Cancelled is terminal, so the poller will leave this row alone from here — push
     // now so the panel reflects it immediately rather than at the next 30s tick.
@@ -572,6 +621,13 @@ const Manager = {
 
     Logger.log('Cleared finished FOG tasks');
     BroadcastManager.emit('FogTasksUpdated');
+    await AuditStep(() =>
+      RecordEdit({
+        EntityType: 'system',
+        EntityID: null,
+        Summary: Line('Cleared finished FOG tasks'),
+      })
+    );
 
     return Ok<void>();
   },

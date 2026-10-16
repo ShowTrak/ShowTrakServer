@@ -209,6 +209,7 @@ const INVOKE_CHANNEL_LIST = [
   'LogConsole:Close',
   'RainbowMode:Get',
   'RainbowMode:Set',
+  'AuditLog:Get',
 ] as const satisfies readonly InvokeChannel[];
 type _MissingInvokeChannels = AssertAllChannelsListed<
   Exclude<InvokeChannel, (typeof INVOKE_CHANNEL_LIST)[number]>
@@ -257,6 +258,7 @@ const SUBSCRIBE_CHANNEL_LIST = [
   'SetFogTaskList',
   'LogConsole:Entries',
   'RainbowModeUpdated',
+  'AuditLogAppended',
 ] as const satisfies readonly SubscribeChannel[];
 type _MissingSubscribeChannels = AssertAllChannelsListed<
   Exclude<SubscribeChannel, (typeof SUBSCRIBE_CHANNEL_LIST)[number]>
@@ -603,6 +605,8 @@ const API: ShowTrakAPI = {
   GetRainbowMode: async () => invoke('RainbowMode:Get'),
   SetRainbowMode: async (Enabled) => invoke('RainbowMode:Set', Enabled),
   OnRainbowModeUpdated: (Callback) => subscribe('RainbowModeUpdated', Callback),
+  GetAuditLog: async (Query) => invoke('AuditLog:Get', Query),
+  AuditLogAppended: (Callback) => subscribe('AuditLogAppended', Callback),
 };
 
 contextBridge.exposeInMainWorld('API', API);
