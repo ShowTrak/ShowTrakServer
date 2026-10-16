@@ -258,9 +258,21 @@ test('SacnReceiver ingests a real multicast datagram for an observed universe', 
 
   const client = dgram.createSocket({ type: 'udp4', reuseAddr: true });
   const packet = buildPacket({ universe: UNIVERSE, priority: 77, sourceName: 'E2E' });
-  await new Promise((resolve, reject) => {
-    client.send(packet, 5568, GROUP, (err) => (err ? reject(err) : resolve()));
+  const sendErr = await new Promise((resolve) => {
+    client.send(packet, 5568, GROUP, (err) => resolve(err || null));
   });
+  // A host with no route for multicast refuses the send outright (GitHub's
+  // macOS runners answer EHOSTUNREACH). That is the same missing loopback the
+  // skip below covers, just reported one step earlier.
+  if (sendErr) {
+    client.close();
+    SacnReceiver.Stop();
+    if (['EHOSTUNREACH', 'ENETUNREACH', 'EADDRNOTAVAIL'].includes(sendErr.code)) {
+      t.skip(`multicast send not routable in this environment (${sendErr.code})`);
+      return;
+    }
+    throw sendErr;
+  }
 
   // Poll for the datagram to be received and parsed.
   for (let i = 0; i < 20; i++) {
