@@ -185,6 +185,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'Point Address at the machine running upsd (default port 3493) and set the UPS name exactly as configured in upsd.',
       "upsd must permit queries from ShowTrak's IP — check the ACLs in upsd.conf.",
       'Enable a factor toggle to threshold that reading; each is skipped automatically when the UPS does not report it. Voltage uses the reported nominal ± tolerance, or an explicit min/max.',
+      'Actions (muting the alarm, battery tests) need a username and password under Advanced, for a upsd.users entry whose instcmds include them, e.g. instcmds = beeper.mute test.battery.start.quick.',
     ],
     Links: [{ Label: 'Network UPS Tools', Url: 'https://networkupstools.org/' }],
   },

@@ -7,7 +7,12 @@
 //             unlisted variable replies `ERR VAR-NOT-SUPPORTED`.
 //   list    - the `LIST UPS` reply body (defaults to LIST_OK below).
 //   auth    - { USERNAME, PASSWORD } reply overrides (default 'OK').
+//   cmds    - the instant commands `LIST CMD <ups>` reports (default none), or
+//             a raw reply string (e.g. an ERR line) in place of the list.
+//   instcmd - map of command name -> `INSTCMD` reply (default 'OK\n').
 //   refuse  - never connects; emits ECONNREFUSED then close.
+//
+// The returned object's `sent` array records every line the client wrote.
 //   silent  - connects but never replies (drives the timeout path).
 //   delayMs - per-reply delay (real timer) instead of an immediate nextTick, so
 //             a multi-round-trip probe accrues wall-clock time. Each individual
@@ -22,10 +27,13 @@ function makeNutNet({
   vars = {},
   list = LIST_OK,
   auth = {},
+  cmds = [],
+  instcmd = {},
   refuse = false,
   silent = false,
   delayMs = 0,
 } = {}) {
+  const sent = [];
   class FakeSocket extends EventEmitter {
     constructor() {
       super();
@@ -48,13 +56,25 @@ function makeNutNet({
     write(data) {
       if (silent || refuse) return true;
       const line = String(data).trim();
+      sent.push(line);
       let reply = null;
+      const listCmd = line.match(/^LIST CMD\s+(\S+)/);
+      const inst = line.match(/^INSTCMD\s+\S+\s+(\S+)/);
       if (/^USERNAME\b/.test(line)) {
         reply = auth.USERNAME || 'OK\n';
       } else if (/^PASSWORD\b/.test(line)) {
         reply = auth.PASSWORD || 'OK\n';
       } else if (/^LIST UPS\b/.test(line)) {
         reply = list;
+      } else if (listCmd) {
+        reply =
+          typeof cmds === 'string'
+            ? cmds
+            : `BEGIN LIST CMD ${listCmd[1]}\n${cmds
+                .map((c) => `CMD ${listCmd[1]} ${c}\n`)
+                .join('')}END LIST CMD ${listCmd[1]}\n`;
+      } else if (inst) {
+        reply = instcmd[inst[1]] || 'OK\n';
       } else if (/^LOGOUT\b/.test(line)) {
         reply = null;
       } else {
@@ -81,7 +101,7 @@ function makeNutNet({
       return this;
     }
   }
-  return { Socket: FakeSocket, default: { Socket: FakeSocket } };
+  return { Socket: FakeSocket, default: { Socket: FakeSocket }, sent };
 }
 
 module.exports = { makeNutNet, LIST_OK };

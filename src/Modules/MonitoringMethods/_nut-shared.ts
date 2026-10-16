@@ -34,7 +34,14 @@ export const CommonNutSettings: MonitoringSettingField[] = [
     Required: true,
   },
   { Key: 'UPSName', Label: 'UPS name', Type: 'string', Default: '', Required: true },
-  { Key: 'Username', Label: 'Username', Type: 'string', Default: '', Advanced: true },
+  {
+    Key: 'Username',
+    Label: 'Username',
+    Type: 'string',
+    Default: '',
+    Advanced: true,
+    Note: 'Only needed if upsd requires a login to read. Actions always need one, from a upsd.users entry whose instcmds allow them.',
+  },
   { Key: 'Password', Label: 'Password', Type: 'string', Default: '', Advanced: true },
   {
     Key: 'Timeout',
@@ -146,34 +153,47 @@ function ReadLine(Buf: string): number | null {
   return Idx === -1 ? null : Idx + 1;
 }
 
-// Predicate: consume a whole `LIST UPS` reply — up to and including the
-// `END LIST UPS` line, or an early `ERR` line.
+// Predicate: consume a whole `LIST UPS` / `LIST CMD` reply — up to and
+// including its `END LIST ...` line, or an early `ERR` line.
 function ReadListReply(Buf: string): number | null {
   let Pos = 0;
   while (true) {
     const Nl = Buf.indexOf('\n', Pos);
     if (Nl === -1) return null;
     const Line = Buf.slice(Pos, Nl).trim().toUpperCase();
-    if (Line.startsWith('ERR') || Line === 'END LIST UPS') return Nl + 1;
+    if (Line.startsWith('ERR') || Line.startsWith('END LIST')) return Nl + 1;
     Pos = Nl + 1;
   }
 }
 
-export async function ProbeNut(
+// Send one command and await its (possibly multi-line) reply.
+type NutRequest = (Command: string, Predicate?: (Buf: string) => number | null) => Promise<string>;
+
+// Thrown inside a session body to end the session with this message as its
+// error, e.g. a failed login.
+class NutSessionError extends Error {}
+
+type NutSessionOutcome<T> =
+  { Ok: true; Value: T; LatencyMs: number } | { Ok: false; Error: string };
+
+// One upsd conversation: connect, optionally log in, run Body's requests, then
+// LOGOUT and close. The socket handling, timeouts and authentication are shared
+// by the health probe and the instant-command path so both fail the same way.
+function RunNutSession<T>(
   Address: string,
   Port: number,
   TimeoutMs: number,
-  UpsName: string,
   Username: string,
   Password: string,
-  Vars: string[]
-): Promise<NutProbe> {
-  return new Promise<NutProbe>((resolve) => {
+  Label: string,
+  Body: (Request: NutRequest) => Promise<T>
+): Promise<NutSessionOutcome<T>> {
+  return new Promise<NutSessionOutcome<T>>((resolve) => {
     const Started = Date.now();
-    // Whole-probe budget. Socket.setTimeout below is only an IDLE timeout — it
+    // Whole-session budget. Socket.setTimeout below is only an IDLE timeout — it
     // resets on every data event, so across the sequential round trips (auth,
     // LIST UPS, one GET VAR per variable) a slow-but-trickling daemon could keep
-    // the probe alive far beyond TimeoutMs. This absolute deadline caps the total.
+    // the session alive far beyond TimeoutMs. This absolute deadline caps the total.
     const BudgetMs = Math.max(500, TimeoutMs | 0);
     const Socket = new net.Socket();
     let Buffer0 = '';
@@ -185,7 +205,7 @@ export async function ProbeNut(
       Reject: (Err: Error) => void;
     } | null = null;
 
-    const Finish = (Result: NutProbe) => {
+    const Finish = (Result: NutSessionOutcome<T>) => {
       if (Settled) return;
       Settled = true;
       if (DeadlineTimer) {
@@ -199,6 +219,7 @@ export async function ProbeNut(
       }
       resolve(Result);
     };
+    const Fail = (Error: string) => Finish({ Ok: false, Error });
 
     const Pump = () => {
       if (!Waiter) return;
@@ -218,8 +239,7 @@ export async function ProbeNut(
       Current.Reject(Err);
     };
 
-    // Send a command and await its (possibly multi-line) reply.
-    const Request = (Command: string, Predicate: (Buf: string) => number | null): Promise<string> =>
+    const Request: NutRequest = (Command, Predicate = ReadLine) =>
       new Promise<string>((Res, Rej) => {
         Waiter = { Predicate, Resolve: Res, Reject: Rej };
         try {
@@ -234,22 +254,17 @@ export async function ProbeNut(
 
     Socket.setTimeout(BudgetMs);
 
-    // Absolute cap on the whole probe, independent of the (resettable) idle
+    // Absolute cap on the whole session, independent of the (resettable) idle
     // timeout above.
     DeadlineTimer = setTimeout(() => {
       FailWaiter(new Error('timeout'));
-      Finish({
-        Reachable: false,
-        Error: `NUT probe exceeded ${BudgetMs}ms`,
-        Vars: {},
-        VarErrors: {},
-      });
+      Fail(`${Label} exceeded ${BudgetMs}ms`);
     }, BudgetMs);
 
     Socket.on('data', (Chunk: Buffer) => {
       Buffer0 += Chunk.toString('utf8');
       if (Buffer0.length > 1_000_000) {
-        Finish({ Reachable: false, Error: 'Reply too large', Vars: {}, VarErrors: {} });
+        Fail('Reply too large');
         return;
       }
       Pump();
@@ -257,30 +272,18 @@ export async function ProbeNut(
 
     Socket.once('timeout', () => {
       FailWaiter(new Error('timeout'));
-      Finish({
-        Reachable: false,
-        Error: `No reply from upsd after ${TimeoutMs}ms`,
-        Vars: {},
-        VarErrors: {},
-      });
+      Fail(`No reply from upsd after ${TimeoutMs}ms`);
     });
 
     Socket.once('error', (Err: Error) => {
       const Msg = Err && Err.message ? Err.message : String(Err);
       FailWaiter(Err instanceof Error ? Err : new Error(Msg));
-      Finish({ Reachable: false, Error: Msg, Vars: {}, VarErrors: {} });
+      Fail(Msg);
     });
 
     Socket.once('close', () => {
       FailWaiter(new Error('connection closed'));
-      if (!Settled) {
-        Finish({
-          Reachable: false,
-          Error: 'Connection closed before reply',
-          Vars: {},
-          VarErrors: {},
-        });
-      }
+      if (!Settled) Fail('Connection closed before reply');
     });
 
     Socket.once('connect', () => {
@@ -288,76 +291,22 @@ export async function ProbeNut(
         try {
           // Optional authentication.
           if (Username) {
-            const UserReply = await Request(`USERNAME ${Username}\n`, ReadLine);
-            const UserErr = ParseErr(UserReply);
-            if (UserErr) {
-              Finish({
-                Reachable: false,
-                Error: `Authentication failed (${UserErr})`,
-                Vars: {},
-                VarErrors: {},
-              });
-              return;
-            }
-            const PassReply = await Request(`PASSWORD ${Password}\n`, ReadLine);
-            const PassErr = ParseErr(PassReply);
-            if (PassErr) {
-              Finish({
-                Reachable: false,
-                Error: `Authentication failed (${PassErr})`,
-                Vars: {},
-                VarErrors: {},
-              });
-              return;
-            }
+            const UserErr = ParseErr(await Request(`USERNAME ${Username}\n`));
+            if (UserErr) throw new NutSessionError(`Authentication failed (${UserErr})`);
+            const PassErr = ParseErr(await Request(`PASSWORD ${Password}\n`));
+            if (PassErr) throw new NutSessionError(`Authentication failed (${PassErr})`);
           }
 
-          // List UPS devices.
-          const ListReply = await Request('LIST UPS\n', ReadListReply);
-          const ListErr = ParseErr(ListReply);
-          if (ListErr) {
-            Finish({
-              Reachable: false,
-              Error: `LIST UPS failed (${ListErr})`,
-              Vars: {},
-              VarErrors: {},
-            });
-            return;
-          }
-          const UpsNames = ParseListUps(ListReply);
-
-          // Read each requested variable (best effort — an ERR is captured, not
-          // fatal, so one unsupported variable doesn't sink the whole probe).
-          const VarValues: Record<string, string | null> = {};
-          const VarErrors: Record<string, string | null> = {};
-          for (const VarName of Vars) {
-            const Reply = await Request(`GET VAR ${UpsName} ${VarName}\n`, ReadLine);
-            const Err = ParseErr(Reply);
-            if (Err) {
-              VarValues[VarName] = null;
-              VarErrors[VarName] = Err;
-            } else {
-              VarValues[VarName] = ParseVarValue(Reply);
-              VarErrors[VarName] = null;
-            }
-          }
+          const Value = await Body(Request);
 
           try {
             Socket.write('LOGOUT\n');
           } catch {
             // ignore
           }
-
-          Finish({
-            Reachable: true,
-            LatencyMs: Date.now() - Started,
-            UpsNames,
-            Vars: VarValues,
-            VarErrors,
-          });
+          Finish({ Ok: true, Value, LatencyMs: Date.now() - Started });
         } catch (Err) {
-          const Msg = Err instanceof Error ? Err.message : String(Err);
-          Finish({ Reachable: false, Error: Msg, Vars: {}, VarErrors: {} });
+          Fail(Err instanceof Error ? Err.message : String(Err));
         }
       })();
     });
@@ -365,14 +314,141 @@ export async function ProbeNut(
     try {
       Socket.connect(Port, Address);
     } catch (Err) {
-      Finish({
-        Reachable: false,
-        Error: Err instanceof Error ? Err.message : String(Err),
-        Vars: {},
-        VarErrors: {},
-      });
+      Fail(Err instanceof Error ? Err.message : String(Err));
     }
   });
+}
+
+export async function ProbeNut(
+  Address: string,
+  Port: number,
+  TimeoutMs: number,
+  UpsName: string,
+  Username: string,
+  Password: string,
+  Vars: string[]
+): Promise<NutProbe> {
+  const Outcome = await RunNutSession(
+    Address,
+    Port,
+    TimeoutMs,
+    Username,
+    Password,
+    'NUT probe',
+    async (Request) => {
+      // List UPS devices.
+      const ListReply = await Request('LIST UPS\n', ReadListReply);
+      const ListErr = ParseErr(ListReply);
+      if (ListErr) throw new NutSessionError(`LIST UPS failed (${ListErr})`);
+      const UpsNames = ParseListUps(ListReply);
+
+      // Read each requested variable (best effort — an ERR is captured, not
+      // fatal, so one unsupported variable doesn't sink the whole probe).
+      const VarValues: Record<string, string | null> = {};
+      const VarErrors: Record<string, string | null> = {};
+      for (const VarName of Vars) {
+        const Reply = await Request(`GET VAR ${UpsName} ${VarName}\n`);
+        const Err = ParseErr(Reply);
+        if (Err) {
+          VarValues[VarName] = null;
+          VarErrors[VarName] = Err;
+        } else {
+          VarValues[VarName] = ParseVarValue(Reply);
+          VarErrors[VarName] = null;
+        }
+      }
+      return { UpsNames, Vars: VarValues, VarErrors };
+    }
+  );
+
+  if (!Outcome.Ok) return { Reachable: false, Error: Outcome.Error, Vars: {}, VarErrors: {} };
+  return { Reachable: true, LatencyMs: Outcome.LatencyMs, ...Outcome.Value };
+}
+
+// --- Instant commands -------------------------------------------------------
+//
+// NUT calls a UPS action an "instant command": `INSTCMD <ups> <cmd>`, answered
+// `OK` (or `OK TRACKING <id>` when the server tracks command results) or an ERR
+// line. Sending one needs a login whose upsd.users entry grants that command
+// under `instcmds`; listing them (`LIST CMD <ups>`) needs no login at all.
+
+// Extract the command names from a `LIST CMD` reply. Each entry looks like
+// `CMD <ups> <cmdname>`; BEGIN/END framing lines are ignored.
+export function ParseListCmd(Reply: unknown): string[] {
+  const Out: string[] = [];
+  for (const Line of String(Reply == null ? '' : Reply).split('\n')) {
+    const Match = Line.trim().match(/^CMD\s+\S+\s+(\S+)$/);
+    if (Match) Out.push(Match[1]!);
+  }
+  return Out;
+}
+
+// What an instant-command ERR token means for the operator, naming what fixes it.
+export function DescribeInstCmdError(Token: string, UpsName: string): string {
+  switch (Token.toUpperCase()) {
+    case 'ACCESS-DENIED':
+      return 'upsd refused the command — this NUT user is not allowed to send it (add it to the user’s instcmds in upsd.users)';
+    case 'USERNAME-REQUIRED':
+    case 'PASSWORD-REQUIRED':
+      return 'upsd requires a NUT username and password to send commands';
+    case 'CMD-NOT-SUPPORTED':
+      return 'This UPS does not support that command';
+    case 'UNKNOWN-UPS':
+      return `upsd has no UPS named "${UpsName}"`;
+    case 'DRIVER-NOT-CONNECTED':
+    case 'DATA-STALE':
+      return 'upsd has lost contact with the UPS driver';
+    default:
+      return `upsd refused the command (${Token})`;
+  }
+}
+
+export interface NutCommandResult {
+  Success: boolean;
+  Error?: string;
+  /** The command actually sent — the first of the candidates the UPS lists. */
+  Command?: string;
+}
+
+/**
+ * Send the first of `Candidates` that this UPS lists as supported. Drivers name
+ * the same action differently, so callers pass every name it goes by in order
+ * of preference. A UPS that lists none of them is refused here rather than sent
+ * a command it would reject.
+ */
+export async function SendNutInstCmd(
+  Config: NutConfig,
+  Candidates: string[]
+): Promise<NutCommandResult> {
+  const Outcome = await RunNutSession(
+    Config.Address,
+    Config.Port,
+    Config.TimeoutMs,
+    Config.Username,
+    Config.Password,
+    'NUT command',
+    async (Request): Promise<NutCommandResult> => {
+      const ListReply = await Request(`LIST CMD ${Config.UpsName}\n`, ReadListReply);
+      const ListErr = ParseErr(ListReply);
+      if (ListErr && ListErr.toUpperCase() === 'UNKNOWN-UPS') {
+        return { Success: false, Error: DescribeInstCmdError(ListErr, Config.UpsName) };
+      }
+      // A server that will not list its commands still gets the preferred one
+      // sent, and answers CMD-NOT-SUPPORTED itself if it has to.
+      const Supported = ListErr ? null : ParseListCmd(ListReply);
+      const Command = Supported
+        ? Candidates.find((Name) => Supported.includes(Name))
+        : Candidates[0];
+      if (!Command) return { Success: false, Error: 'This UPS does not support that command' };
+
+      const Reply = await Request(`INSTCMD ${Config.UpsName} ${Command}\n`);
+      const Err = ParseErr(Reply);
+      if (Err) return { Success: false, Error: DescribeInstCmdError(Err, Config.UpsName), Command };
+      return { Success: true, Command };
+    }
+  );
+  if (!Outcome.Ok) return { Success: false, Error: Outcome.Error };
+  return Outcome.Value;
 }
 
 // --- Shared Run/Debug scaffolding -------------------------------------------
@@ -501,4 +577,6 @@ export const _internal = {
   ProbeNut,
   ParseNutConfig,
   RunNutProbe,
+  ParseListCmd,
+  SendNutInstCmd,
 };

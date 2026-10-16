@@ -18,18 +18,28 @@
 //   - UPS not found                                    -> degraded ("UPS not found")
 //   - any factor breached                              -> degraded (combined reason)
 //   - all evaluated factors within limits              -> online   (Success: true)
+//
+// The same check carries the UPS's actions — silencing its alarm and running a
+// battery test — sent as NUT instant commands over their own short upsd login.
 import {
   CommonNutSettings,
   RunNutProbe,
   ClassifyStatus,
   ParseNumber,
   ParseNutConfig,
+  SendNutInstCmd,
   StatePill,
   NutDebug,
   MonoRow,
 } from './_nut-shared';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
-import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import type {
+  MonitoringActionDef,
+  MonitoringActionResult,
+  MonitoringResult,
+  MonitoringSettingField,
+  MonitoringTargetLike,
+} from './types';
 
 const ID = 'nut-ups';
 
@@ -277,6 +287,92 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   return Base;
 }
 
+// --- Actions ----------------------------------------------------------------
+//
+// Deliberately only the alarm and the battery test. NUT also exposes load.off,
+// shutdown.* and friends, which cut power to whatever the UPS is feeding — not
+// something to put one mis-click away on a monitoring tile.
+//
+// Each action lists every instant-command name drivers use for it, preferred
+// first; SendNutInstCmd sends the first one this UPS actually lists.
+
+const ACTION_COMMANDS: Record<string, { Candidates: string[]; Detail: string }> = {
+  'beeper.mute': { Candidates: ['beeper.mute'], Detail: 'Alarm muted' },
+  'beeper.disable': { Candidates: ['beeper.disable', 'beeper.off'], Detail: 'Beeper disabled' },
+  'beeper.enable': { Candidates: ['beeper.enable', 'beeper.on'], Detail: 'Beeper enabled' },
+  'test.battery.quick': {
+    Candidates: ['test.battery.start.quick', 'test.battery.start'],
+    Detail: 'Battery test started',
+  },
+  'test.battery.stop': { Candidates: ['test.battery.stop'], Detail: 'Battery test stopped' },
+};
+
+const Actions: MonitoringActionDef[] = [
+  {
+    ID: 'beeper.mute',
+    Label: 'Mute Alarm',
+    Icon: 'bell-slash',
+    Group: 'Alarm',
+    Note: 'Silences the alarm that is sounding now. The next alarm sounds as normal.',
+  },
+  {
+    ID: 'beeper.disable',
+    Label: 'Disable Beeper',
+    Icon: 'volume-mute',
+    Group: 'Alarm',
+    Note: 'Turns the beeper off until it is enabled again, so later alarms are silent too.',
+  },
+  {
+    ID: 'beeper.enable',
+    Label: 'Enable Beeper',
+    Icon: 'bell',
+    Group: 'Alarm',
+  },
+  {
+    ID: 'test.battery.quick',
+    Label: 'Quick Battery Test',
+    Icon: 'battery-half',
+    Group: 'Battery Test',
+    Destructive: true,
+    Note: 'Runs the load on battery briefly. A failing battery can drop the load during the test.',
+  },
+  {
+    ID: 'test.battery.stop',
+    Label: 'Stop Battery Test',
+    Icon: 'stop-circle',
+    Group: 'Battery Test',
+  },
+];
+
+async function RunAction(
+  Target: MonitoringTargetLike,
+  ActionID: string
+): Promise<MonitoringActionResult> {
+  const Config = ParseNutConfig(Target);
+  if (!Config.Address) return { Success: false, Error: 'No address configured' };
+  if (Config.Port < 1 || Config.Port > 65535) {
+    return { Success: false, Error: `Invalid port: ${Config.Port}` };
+  }
+  if (!Config.UpsName) return { Success: false, Error: 'No UPS name configured' };
+
+  const Spec = ACTION_COMMANDS[ActionID];
+  if (!Spec) return { Success: false, Error: `Unknown NUT action "${ActionID}"` };
+  // upsd only takes instant commands from a logged-in user, so say so up front
+  // rather than sending one to be refused as USERNAME-REQUIRED.
+  if (!Config.Username) {
+    return {
+      Success: false,
+      Error:
+        'Sending commands needs a NUT username and password with instcmds rights — set them under Advanced',
+    };
+  }
+
+  const Outcome = await SendNutInstCmd(Config, Spec.Candidates);
+  if (!Outcome.Success)
+    return { Success: false, Error: Outcome.Error || 'upsd refused the command' };
+  return { Success: true, Detail: Spec.Detail };
+}
+
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseNutConfig(Target);
   const Reachable = !!(Result && Result.Success === true);
@@ -298,5 +394,5 @@ export const Name = 'UPS Health (NUT)';
 export const Description =
   'Reads status, battery charge, load, temperature and input voltage from a NUT upsd server and reports a single healthy / degraded verdict using informed defaults.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
-export const _internal = { EvaluateHealth, ThresholdsOf };
-export { ID, Settings, Run, Debug };
+export const _internal = { EvaluateHealth, ThresholdsOf, ACTION_COMMANDS };
+export { ID, Settings, Actions, Run, RunAction, Debug };
