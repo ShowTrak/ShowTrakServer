@@ -171,7 +171,7 @@ const ClientsListHandler = async (req: Request, res: Response) => {
     return sendApiError(res, 500, 'REMOTE_CLIENTS_FETCH_FAILED', 'Failed to fetch remote clients');
   }
 
-  const [TargetsErr, Targets] = await MonitoringTargetManager.GetAll();
+  const [TargetsErr, Targets] = await MonitoringTargetManager.GetAllRedacted();
   if (TargetsErr) {
     res.locals.debugTrafficDetail = 'Failed to fetch monitors';
     return sendApiError(res, 500, 'MONITORING_TARGETS_FETCH_FAILED', 'Failed to fetch monitors');
@@ -251,7 +251,7 @@ const ClientsListHandler = async (req: Request, res: Response) => {
 // 1. Query/List endpoint (first in the logical list)
 app.get('/API/Clients', ClientsListHandler);
 
-// 2-7. OSC routes mirrored to HTTP (mirrors the logical order defined in OSC/index.js)
+// 2-7. OSC routes mirrored to HTTP as POST (mirrors the logical order defined in OSC/index.js)
 //      System Control → Client → Dummy → Group → Tag → All
 // Mirror all OSC routes to HTTP API routes under /API. Clients/groups are
 // addressed by their slug (a raw UUID/GroupID is still accepted as a fallback).
@@ -296,8 +296,16 @@ for (const Route of OSC.GetRoutes()) {
       Detail,
     });
   };
-  app.get(ApiPath, OSCToHTTPHandler);
   app.post(ApiPath, OSCToHTTPHandler);
+  // Actions are POST-only. A GET can be fired by any page a browser on the show
+  // network happens to load (an <img> or a link prefetch is enough), and these
+  // routes shut the server down, run scripts and reboot devices. A GET gets a
+  // 405 naming the fix rather than a 404, so an old integration fails legibly.
+  app.get(ApiPath, (_req: Request, res: Response) => {
+    res.locals.debugTrafficDetail = 'Action route called with GET';
+    res.set('Allow', 'POST');
+    return sendApiError(res, 405, 'METHOD_NOT_ALLOWED', 'Use POST for this action');
+  });
 }
 
 app.use('/API', (_req: Request, res: Response) => {

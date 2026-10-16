@@ -697,8 +697,25 @@ test('ReinitializeSystem reloads caches then pushes the full topology', async ()
     'SetFullDummyClientList',
     'SetFullFreeKioskTerminalList',
     'SetFullAlertRuleList',
+    'SetTagList',
+    'SetVariableList',
     'SetFullClientList',
   ]);
+});
+
+test('ReinitializeSystem drops the variable cache and re-sends every client its variables', async () => {
+  // A show swap keeps the rig's client UUIDs, so a cache keyed by UUID would go
+  // on serving the previous show's values to every script dispatch.
+  const fanOuts = [];
+  const onChange = (UUID) => fanOuts.push(UUID);
+  bus.on('ClientVariablesChanged', onChange);
+  try {
+    await emit('ReinitializeSystem');
+  } finally {
+    bus.off('ClientVariablesChanged', onChange);
+  }
+  assert.equal(variableMgr.__callsTo('Reset').length, 1);
+  assert.deepEqual(fanOuts, [null]);
 });
 
 test('a failed orphaned-group reconcile is logged but does not abort the rehydrate', async () => {

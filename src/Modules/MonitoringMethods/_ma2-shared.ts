@@ -43,6 +43,7 @@ export const CommonMa2Settings: MonitoringSettingField[] = [
   },
   {
     Key: 'Password',
+    Sensitive: true,
     Label: 'Login password',
     Type: 'string',
     Default: '',

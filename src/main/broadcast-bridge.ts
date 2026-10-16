@@ -287,6 +287,10 @@ async function ReinitializeSystem(): Promise<void> {
   if (typeof DummyClientManager.Reload === 'function') {
     await DummyClientManager.Reload();
   }
+  // The resolved-variable cache is keyed by client UUID, and the same rig keeps
+  // its UUIDs across shows, so without this every client would go on resolving
+  // the previous show's values until some unrelated edit happened to clear it.
+  VariableManager.Reset();
 
   if (typeof GroupManager.ReconcileOrphanedGroups === 'function') {
     const [OrphanErr] = await GroupManager.ReconcileOrphanedGroups();
@@ -305,8 +309,14 @@ async function ReinitializeSystem(): Promise<void> {
   await UpdateDummyClientList();
   await UpdateFreeKioskTerminalList();
   await UpdateAlertRuleList();
+  await UpdateTagList();
+  await UpdateVariableList();
 
   PushToRenderers('SetFullClientList', Clients, Groups);
+
+  // Re-send every connected client its variables for the new show — including
+  // the removal of any the old show exported to the Windows user environment.
+  BroadcastManager.emit('ClientVariablesChanged', null);
 }
 
 async function ClientUpdated(Client: BroadcastClient): Promise<void> {

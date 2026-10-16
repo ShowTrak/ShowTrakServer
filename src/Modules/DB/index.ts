@@ -57,6 +57,9 @@ let schemaInitializationPromise: Promise<void> | null = null;
 let readyPromise: Promise<void> | null = null;
 let hasUnsavedChanges = false;
 let isShuttingDown = false;
+// True while a connection swap holds the exclusive section, so the schema
+// migrations it triggers open their transactions without queueing for it.
+let swapHoldsExclusive = false;
 let shutdownPromise: Promise<void> | null = null;
 let pendingOperations = 0;
 let pendingDrainResolvers: Array<() => void> = [];
@@ -279,50 +282,54 @@ Manager.InitializeSchema = async (): Promise<void> => {
     // recorded MAX(Version) is consulted on the next boot, so recording anything
     // above a failed migration would hide it forever; stopping leaves the failed
     // one (and everything after it) to be retried on the next open.
+    //
+    // Each migration and its SchemaMigrations row commit together. Applied but
+    // unrecorded, a data back-fill would run a second time on the next open;
+    // recorded but not applied, it would never run at all.
+    //
+    // markDirty: false — a migration is schema maintenance, never a user edit,
+    // so applying one must not leave a freshly opened workspace looking unsaved.
+    const InMigrationTransaction = <T>(fn: (run: TxRun) => Promise<T>) =>
+      swapHoldsExclusive
+        ? RunHeldTransaction(fn, false)
+        : Manager.WithTransaction(fn, { markDirty: false });
     const Migrations = Array.isArray(Tables.Migrations) ? Tables.Migrations : [];
     for (const Migration of Migrations) {
       if (Migration.Version <= AppliedVersion) continue;
       const SQL = Migration.SQL;
-      const Match =
-        /ALTER\s+TABLE\s+`?([A-Za-z_][A-Za-z0-9_]*)`?\s+ADD\s+COLUMN\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(
-          SQL
+      const [MigrationErr, Applied] = await InMigrationTransaction(async (run) => {
+        const Match =
+          /ALTER\s+TABLE\s+`?([A-Za-z_][A-Za-z0-9_]*)`?\s+ADD\s+COLUMN\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(
+            SQL
+          );
+        let alreadyApplied = false;
+        if (Match) {
+          const [, Table, Column] = Match;
+          const [PErr, Cols] = await Manager.All<{ name: string }>(
+            `PRAGMA table_info(\`${Table}\`)`
+          );
+          if (PErr) throw PErr;
+          alreadyApplied = (Cols || []).some((c) => c && c.name === Column);
+        }
+        if (!alreadyApplied) {
+          const [Err] = await run(SQL);
+          if (Err) throw Err;
+        }
+        const [RecordErr] = await run(
+          'INSERT OR REPLACE INTO SchemaMigrations (Version, AppliedAt) VALUES (?, ?)',
+          [Migration.Version, Date.now()]
         );
-      let alreadyApplied = false;
-      if (Match) {
-        const [, Table, Column] = Match;
-        const [PErr, Cols] = await Manager.All<{ name: string }>(`PRAGMA table_info(\`${Table}\`)`);
-        if (PErr) {
-          Logger.databaseError(
-            `Migration ${Migration.Version} probe failed for ${Table}; stopping migrations here so it is retried on the next open`,
-            PErr
-          );
-          break;
-        }
-        alreadyApplied = (Cols || []).some((c) => c && c.name === Column);
+        if (RecordErr) throw RecordErr;
+        return !alreadyApplied;
+      });
+      if (MigrationErr) {
+        Logger.databaseError(
+          `Migration ${Migration.Version} failed and was rolled back; stopping migrations here so it is retried on the next open: ${SQL}`,
+          MigrationErr
+        );
+        break;
       }
-      if (!alreadyApplied) {
-        // markDirty: false — a migration is schema maintenance, never a user
-        // edit, so applying one must not leave a freshly opened workspace
-        // looking unsaved. Matters for data-carrying migrations (back-fills);
-        // pure ALTER/CREATE INDEX statements never marked the DB dirty anyway.
-        const [Err] = await Manager.Run(SQL, [], { markDirty: false });
-        if (Err) {
-          Logger.databaseError(
-            `Migration ${Migration.Version} failed; stopping migrations here so it is retried on the next open: ${SQL}`,
-            Err
-          );
-          break;
-        }
-        Logger.database(`Applied migration ${Migration.Version}`);
-      }
-      const [RecordErr] = await Manager.Run(
-        'INSERT OR REPLACE INTO SchemaMigrations (Version, AppliedAt) VALUES (?, ?)',
-        [Migration.Version, Date.now()],
-        { markDirty: false }
-      );
-      if (RecordErr) {
-        Logger.databaseError(`Failed to record migration ${Migration.Version}:`, RecordErr);
-      }
+      if (Applied) Logger.database(`Applied migration ${Migration.Version}`);
     }
     // Tag the database header so saved .ShowTrak files are positively
     // identifiable as ShowTrak documents (used when validating Open targets).
@@ -485,10 +492,21 @@ Manager.WithTransaction = async <T>(
     return [new Error('Cannot start a transaction inside another transaction'), null];
   }
   const Release = await AcquireExclusive();
-  if (isShuttingDown || !DB) {
+  try {
+    if (isShuttingDown || !DB) return [new Error('Database is closing'), null];
+    return await RunHeldTransaction(fn, markDirty);
+  } finally {
     Release();
-    return [new Error('Database is closing'), null];
   }
+};
+
+// The body of WithTransaction, for a caller that already holds the exclusive
+// section. Opening a connection inside a file swap is the case that needs it:
+// the swap owns the section, so queueing for it again would wait on itself.
+async function RunHeldTransaction<T>(
+  fn: (run: TxRun) => Promise<T>,
+  markDirty: boolean
+): Promise<DBResult<T>> {
   let Finish!: () => void;
   const State: OpenTransactionState = {
     Done: new Promise<void>((resolve) => {
@@ -520,9 +538,8 @@ Manager.WithTransaction = async <T>(
   } finally {
     openTransaction = null;
     Finish();
-    Release();
   }
-};
+}
 
 Manager.Shutdown = async (Options: { TimeoutMs?: number } = {}): Promise<void> => {
   const TimeoutMs = Number(Options.TimeoutMs) || DB_PENDING_OPERATION_TIMEOUT_MS;
@@ -665,10 +682,12 @@ async function WithExclusiveConnection(
     return [new Error('Cannot replace the database from inside a transaction'), null];
   }
   const Release = await AcquireExclusive();
+  swapHoldsExclusive = true;
   try {
     if (isShuttingDown) return [new Error('Database is closing'), null];
     return await Swap();
   } finally {
+    swapHoldsExclusive = false;
     Release();
   }
 }

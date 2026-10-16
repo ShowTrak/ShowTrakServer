@@ -49,6 +49,10 @@ export interface MonitoringSettingField {
   // Optional per-input hint. Rendered as a hover popover on a small info icon to
   // the right of the input — keep it to a sentence or two. Escaped before display.
   Note?: string;
+  // Marks a credential (password, passcode, community string). Surfaces that must
+  // not hand credentials out redact it via Utils/redact; the stored value and the
+  // probe are unaffected.
+  Sensitive?: boolean;
   // When set, the field is shown only while the referenced sibling setting
   // matches. An array is ANDed: every condition must hold. Its value is still
   // retained while hidden so toggling the controlling field back on restores it.

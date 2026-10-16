@@ -203,6 +203,70 @@ test('Server client namespace wires telemetry handlers and disconnect cleanup', 
   assert.equal(calls.timeout, 1);
 });
 
+test('a stale socket closing leaves a reconnected client alone', async () => {
+  // The client reconnected before the server noticed its old socket was dead.
+  // When that old socket finally closes, a newer one for the same UUID is still
+  // in the room — so it must not be timed out, un-identified or un-adopted.
+  const calls = { timeout: 0, removeAdopt: 0, identifyDisconnect: 0 };
+
+  const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
+    '../VariableManager': {
+      Manager: {
+        GetPayload: async () => ({ Environment: {}, Exported: [] }),
+        GetEnvironment: async () => ({}),
+      },
+    },
+    '../Logger': loggerStub,
+    '../AdoptionManager': {
+      Manager: {
+        AddClientPendingAdoption: async () => {},
+        RemoveClientPendingAdoption: () => (calls.removeAdopt += 1),
+      },
+    },
+    '../ClientManager': {
+      Manager: {
+        Exists: async () => true,
+        Get: async (uuid) => [null, { UUID: uuid, Online: true, USBDeviceList: [] }],
+        Disconnected: async () => (calls.timeout += 1),
+      },
+    },
+    '../IdentifyManager': {
+      Manager: { HandleDisconnect: async () => (calls.identifyDisconnect += 1) },
+    },
+    '../ScriptManager': { Manager: { GetScripts: async () => [] } },
+    '../ScriptExecutionManager': { Manager: {} },
+    '../ServerIdentity': { Manager: { GetIdentityToken: () => 'server-token-1' } },
+  });
+
+  const rooms = new Map();
+  let connectionHandler;
+  SetupClientNamespace({
+    on: (_e, h) => (connectionHandler = h),
+    sockets: { adapter: { rooms } },
+  });
+
+  const socket = makeSocket({
+    query: { UUID: 'client-1', Adopted: 'true' },
+    address: '10.0.0.9',
+    headers: {},
+  });
+  await connectionHandler(socket);
+  const removeAdoptBefore = calls.removeAdopt;
+
+  // Socket.IO has already removed the closing socket; its successor remains.
+  rooms.set('client-1', new Set(['sock-2']));
+  await socket.trigger('disconnect', 'ping timeout');
+  assert.equal(calls.timeout, 0);
+  assert.equal(calls.identifyDisconnect, 0);
+  assert.equal(calls.removeAdopt, removeAdoptBefore);
+
+  // With the room empty it is a real disconnect again.
+  rooms.delete('client-1');
+  await socket.trigger('disconnect', 'transport close');
+  assert.equal(calls.timeout, 1);
+  assert.equal(calls.identifyDisconnect, 1);
+});
+
 test('Server client namespace re-adopts stale unadopted handshake without adding pending entry', async () => {
   const calls = {
     adopt: 0,
@@ -1048,6 +1112,7 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
   const getRoutes = [];
   const postRoutes = [];
   const getHandlers = {};
+  const postHandlers = {};
   const ioMock = {
     to: (room) => ({ emit: (event, ...args) => emits.push({ room, event, args }) }),
     on: () => {},
@@ -1078,7 +1143,10 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
           getRoutes.push(routePath);
           if (typeof handler === 'function') getHandlers[routePath] = handler;
         };
-        app.post = (routePath) => postRoutes.push(routePath);
+        app.post = (routePath, handler) => {
+          postRoutes.push(routePath);
+          if (typeof handler === 'function') postHandlers[routePath] = handler;
+        };
         return app;
       },
       { static: () => () => {} }
@@ -1129,7 +1197,12 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
     },
     '../MonitoringTargetManager': {
       Manager: {
-        GetAll: async () => [
+        // The anonymous HTTP list must read the credential-masked views; the
+        // unmasked read throwing here pins that.
+        GetAll: async () => {
+          throw new Error('/API/Clients must not read unredacted monitoring targets');
+        },
+        GetAllRedacted: async () => [
           null,
           [
             {
@@ -1184,12 +1257,31 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
     './webui-namespace': { SetupWebUiNamespace: () => {} },
   });
 
-  assert.ok(getRoutes.includes('/API/Shutdown'));
-  assert.ok(postRoutes.includes('/API/Shutdown'));
-  assert.ok(getRoutes.includes('/API/Client/:Slug/Select'));
-  assert.ok(postRoutes.includes('/API/Client/:Slug/Select'));
-  assert.ok(getRoutes.includes('/API/All/Select'));
-  assert.ok(postRoutes.includes('/API/All/Select'));
+  // Actions run on POST only; a GET is answered 405 without running anything.
+  for (const p of ['/API/Shutdown', '/API/Client/:Slug/Select', '/API/All/Select']) {
+    assert.ok(postRoutes.includes(p), `POST ${p} registered`);
+    let status = 200;
+    const headers = {};
+    await getHandlers[p](
+      { params: {} },
+      {
+        locals: {},
+        set(name, value) {
+          headers[name] = value;
+          return this;
+        },
+        status(code) {
+          status = code;
+          return this;
+        },
+        json() {
+          return this;
+        },
+      }
+    );
+    assert.equal(status, 405, `GET ${p} must not run the action`);
+    assert.equal(headers.Allow, 'POST');
+  }
   assert.ok(!getRoutes.includes('/API/Dummy/:id/Heartbeat'));
   assert.ok(!postRoutes.includes('/API/Dummy/:id/Heartbeat'));
   assert.ok(getRoutes.includes('/API/Clients'));
@@ -1260,7 +1352,7 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
   assert.deepEqual(emits[0], { room: 'group-1', event: 'Notify', args: [{ text: 'hi' }] });
 });
 
-test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve end-to-end', async () => {
+test('Server mirrors the REAL OSC tag routes to HTTP POST and they resolve end-to-end', async () => {
   // Loads the real Server AND the real OSC module together (OSC is NOT mocked),
   // so this proves the actual shipped tag OSC routes materialize as HTTP routes
   // and that a request flows through to the real tag scope-expansion logic.
@@ -1268,6 +1360,7 @@ test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve
   const getRoutes = [];
   const postRoutes = [];
   const getHandlers = {};
+  const postHandlers = {};
   const ioMock = {
     to: () => ({ emit: () => {} }),
     on: () => {},
@@ -1306,7 +1399,10 @@ test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve
           getRoutes.push(routePath);
           if (typeof handler === 'function') getHandlers[routePath] = handler;
         };
-        app.post = (routePath) => postRoutes.push(routePath);
+        app.post = (routePath, handler) => {
+          postRoutes.push(routePath);
+          if (typeof handler === 'function') postHandlers[routePath] = handler;
+        };
         return app;
       },
       { static: () => () => {} }
@@ -1386,11 +1482,10 @@ test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve
     path: require('path'),
   });
 
-  // Both surviving tag actions are mounted for both verbs (Select/Deselect were
-  // deprecated and removed).
+  // Both surviving tag actions are mounted (Select/Deselect were deprecated and
+  // removed). GET is registered only to answer 405.
   for (const action of ['WakeOnLAN', 'RunScript/:ScriptID']) {
     const p = `/API/Tag/:Slug/${action}`;
-    assert.ok(getRoutes.includes(p), `GET ${p} registered`);
     assert.ok(postRoutes.includes(p), `POST ${p} registered`);
   }
   for (const action of ['Select', 'Deselect']) {
@@ -1400,7 +1495,7 @@ test('Server mirrors the REAL OSC tag routes to HTTP (GET+POST) and they resolve
   }
 
   // Drive /API/Tag/:Slug/WakeOnLAN end-to-end through the real handler.
-  const handler = getHandlers['/API/Tag/:Slug/WakeOnLAN'];
+  const handler = postHandlers['/API/Tag/:Slug/WakeOnLAN'];
   assert.equal(typeof handler, 'function');
   let statusCode = 200;
   let payload = null;

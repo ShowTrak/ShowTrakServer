@@ -370,6 +370,27 @@ const Manager = {
     return [null, TargetList.map((T) => T.ToJSON())];
   },
 
+  /**
+   * GetAll() with every `Sensitive` check setting masked, for unauthenticated
+   * readers such as the HTTP API. The editors keep reading GetAll(): they save
+   * back the settings they loaded, so a masked value there would overwrite the
+   * real credential.
+   */
+  async GetAllRedacted(): Promise<Result<MonitoringTargetView[]>> {
+    const [Err, Views] = await Manager.GetAll();
+    if (Err) return Fail(Err);
+    return [
+      null,
+      (Views || []).map((View) => ({
+        ...View,
+        Checks: (View.Checks || []).map((Check) => ({
+          ...Check,
+          Settings: MonitoringMethods.RedactSettings(Check.Method, Check.Settings),
+        })),
+      })),
+    ];
+  },
+
   async Get(TargetID: unknown): Promise<[string | null, MonitoringTargetView | null]> {
     const ID = Number(TargetID);
     const Cached = TargetList.find((T) => T.TargetID === ID);

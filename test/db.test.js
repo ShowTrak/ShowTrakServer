@@ -197,6 +197,87 @@ test('DB stops at the first failed migration so it is retried on the next open',
   await DB.Shutdown();
 });
 
+test('every migration is a single SQL statement', () => {
+  // Migrations run through sqlite3's Database#run, which executes only the FIRST
+  // statement of a multi-statement string and silently drops the rest. A second
+  // statement would look applied (the version is recorded) but never have run.
+  const schema = require('../dist/Modules/DB/schema');
+  const multi = schema.Migrations.filter(
+    (m) =>
+      String(m.SQL)
+        .split(';')
+        .map((part) => part.trim())
+        .filter(Boolean).length > 1
+  ).map((m) => m.Version);
+  assert.deepEqual(multi, [], 'split these into one migration per statement');
+});
+
+test('a migration and its version record commit or roll back together', async () => {
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const schema = require('../dist/Modules/DB/schema');
+  const top = Math.max(...schema.Migrations.map((m) => m.Version));
+
+  // A migration whose statement succeeds but whose version then cannot be
+  // recorded: it drops the very table the record goes into. Applied separately,
+  // the drop would stick and the record would fail; atomically, the failed
+  // record rolls the drop back with it.
+  const DB = loadDB(storageDir).Manager;
+  const restore = withMigrations((real) => [
+    ...real,
+    { Version: top + 1, SQL: 'DROP TABLE SchemaMigrations' },
+  ]);
+  try {
+    await DB.Ready();
+  } finally {
+    restore();
+  }
+  const [, table] = await DB.Get("SELECT name FROM sqlite_master WHERE name = 'SchemaMigrations'");
+  assert.equal(table && table.name, 'SchemaMigrations', 'the failed migration was not rolled back');
+  const [, maxRow] = await DB.Get('SELECT MAX(Version) AS V FROM SchemaMigrations');
+  assert.equal(maxRow.V, top);
+  await DB.Shutdown();
+});
+
+test('a migration triggered by opening a show file does not deadlock the swap', async () => {
+  // ReplaceWithFile holds the exclusive section while it reopens the connection,
+  // and reopening runs migrations in transactions. Those must not queue for the
+  // section the swap already owns.
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const schema = require('../dist/Modules/DB/schema');
+  const top = Math.max(...schema.Migrations.map((m) => m.Version));
+  const DB = loadDB(storageDir).Manager;
+  await DB.Ready();
+
+  const snapshotPath = path.join(storageDir, 'snap', 'Show.ShowTrak');
+  const [snapErr] = await DB.SnapshotTo(snapshotPath);
+  assert.equal(snapErr, null);
+
+  const restore = withMigrations((real) => [
+    ...real,
+    { Version: top + 1, SQL: 'CREATE TABLE IF NOT EXISTS `MigOnSwap` (X INTEGER)' },
+  ]);
+  try {
+    const timedOut = Symbol('timed out');
+    let timer;
+    const outcome = await Promise.race([
+      DB.ReplaceWithFile(snapshotPath),
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve(timedOut), 5000);
+      }),
+    ]);
+    clearTimeout(timer);
+    assert.notEqual(outcome, timedOut, 'ReplaceWithFile deadlocked on a pending migration');
+    assert.equal(outcome[0], null);
+  } finally {
+    restore();
+  }
+  const [, created] = await DB.Get("SELECT name FROM sqlite_master WHERE name = 'MigOnSwap'");
+  assert.equal(created.name, 'MigOnSwap');
+  const [, maxRow] = await DB.Get('SELECT MAX(Version) AS V FROM SchemaMigrations');
+  assert.equal(maxRow.V, top + 1);
+  await DB.Shutdown();
+});
+
 function deferred() {
   let resolve;
   const promise = new Promise((r) => {

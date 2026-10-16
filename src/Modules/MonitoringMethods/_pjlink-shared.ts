@@ -44,6 +44,7 @@ export const CommonPJLinkSettings: MonitoringSettingField[] = [
   },
   {
     Key: 'Password',
+    Sensitive: true,
     Label: 'PJLink password',
     Type: 'string',
     Default: '',

@@ -79,6 +79,7 @@ export const CommonBrightSignSettings: MonitoringSettingField[] = [
   },
   {
     Key: 'Password',
+    Sensitive: true,
     Label: 'Password',
     Type: 'string',
     Default: '',

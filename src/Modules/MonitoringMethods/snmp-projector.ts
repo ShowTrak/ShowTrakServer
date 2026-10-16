@@ -77,6 +77,7 @@ const Settings: MonitoringSettingField[] = [
   },
   {
     Key: 'Community',
+    Sensitive: true,
     Label: 'Community string',
     Type: 'string',
     Default: 'public',

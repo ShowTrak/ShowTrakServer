@@ -67,6 +67,7 @@ const Settings: MonitoringSettingField[] = [
   },
   {
     Key: 'Passcode',
+    Sensitive: true,
     Label: 'OSC passcode',
     Type: 'string',
     Default: '',

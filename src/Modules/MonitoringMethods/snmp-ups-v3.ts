@@ -101,7 +101,7 @@ const Settings: MonitoringSettingField[] = [
       { value: 'md5', label: 'MD5' },
     ],
   },
-  { Key: 'AuthPassword', Label: 'Auth password', Type: 'string', Default: '' },
+  { Key: 'AuthPassword', Label: 'Auth password', Type: 'string', Default: '', Sensitive: true },
   {
     Key: 'PrivProtocol',
     Label: 'Priv protocol',
@@ -115,7 +115,7 @@ const Settings: MonitoringSettingField[] = [
       { value: 'des', label: 'DES' },
     ],
   },
-  { Key: 'PrivPassword', Label: 'Priv password', Type: 'string', Default: '' },
+  { Key: 'PrivPassword', Label: 'Priv password', Type: 'string', Default: '', Sensitive: true },
   {
     Key: 'Context',
     Label: 'Context name',

@@ -64,7 +64,14 @@ const Settings: MonitoringSettingField[] = [
     Default: '',
     Note: 'Only needed if the broker requires authentication.',
   },
-  { Key: 'Password', Label: 'Password', Type: 'string', Default: '', Advanced: true },
+  {
+    Key: 'Password',
+    Label: 'Password',
+    Type: 'string',
+    Default: '',
+    Advanced: true,
+    Sensitive: true,
+  },
   {
     Key: 'ExpectedPayload',
     Label: 'Expected payload contains',

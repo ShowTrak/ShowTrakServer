@@ -616,6 +616,20 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
         Logger.log('Socket disconnected without UUID:', socket.id, reason);
         return;
       }
+      // A reconnecting client can open its new socket before the server notices
+      // the old one is gone — a half-open connection only surfaces at the next
+      // ping timeout. Socket.IO takes a socket out of its rooms before emitting
+      // 'disconnect', so anything still in the UUID room is a live successor:
+      // the client is online, and the cleanup below would act on that new
+      // connection (an offline flap, a cancelled identify, a dropped adoption).
+      const LiveSockets = io.sockets?.adapter?.rooms?.get(socket.UUID)?.size ?? 0;
+      if (LiveSockets > 0) {
+        Logger.log('Stale client socket closed; a newer connection is live', {
+          UUID: socket.UUID,
+          reason,
+        });
+        return;
+      }
       Logger.log('Client disconnected', { UUID: socket.UUID, reason });
       await IdentifyManager.HandleDisconnect(socket.UUID);
       AdoptionManager.RemoveClientPendingAdoption(socket.UUID);

@@ -500,7 +500,8 @@ export function InitOscFeeds() {
       const ApiPath = `/API${NormalizedPath === '/' ? '' : NormalizedPath}`;
       return {
         Protocol: 'HTTP',
-        Methods: ['GET', 'POST'],
+        // Actions are POST-only on the server (a GET answers 405).
+        Methods: ['POST'],
         Path: ApiPath,
         Title: Route.Title || `HTTP mirror for ${Route.Path}`,
         Values: Route.Values,

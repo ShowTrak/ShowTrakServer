@@ -11,6 +11,7 @@
 // of them against the contract in ./types.
 import { CreateLogger } from '../Logger';
 import { Manager as CacheManager } from '../CacheManager';
+import { RedactSensitiveValues } from '../Utils/redact';
 import { MethodInfo } from './info';
 import { MethodGroups, DEFAULT_GROUP } from './groups';
 import type {
@@ -288,6 +289,17 @@ const Manager = {
     }
 
     return NormalizeFields(Array.isArray(Method.Settings) ? Method.Settings : [], MethodNormalized);
+  },
+
+  // Stored settings with every `Sensitive` field masked, for surfaces that must
+  // not hand out device credentials. An unknown method yields {}: without its
+  // schema there is no telling which values are secrets, so none are released.
+  RedactSettings: (ID: string, Settings: unknown): Record<string, unknown> => {
+    const Method = Methods.get(ID);
+    if (!Method) return {};
+    const Values =
+      Settings && typeof Settings === 'object' ? (Settings as Record<string, unknown>) : {};
+    return RedactSensitiveValues(Array.isArray(Method.Settings) ? Method.Settings : [], Values);
   },
 
   // --- Controllable actions ------------------------------------------------

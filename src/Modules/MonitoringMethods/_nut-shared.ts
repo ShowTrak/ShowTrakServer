@@ -42,7 +42,14 @@ export const CommonNutSettings: MonitoringSettingField[] = [
     Advanced: true,
     Note: 'Only needed if upsd requires a login to read. Actions always need one, from a upsd.users entry whose instcmds allow them.',
   },
-  { Key: 'Password', Label: 'Password', Type: 'string', Default: '', Advanced: true },
+  {
+    Key: 'Password',
+    Label: 'Password',
+    Type: 'string',
+    Default: '',
+    Advanced: true,
+    Sensitive: true,
+  },
   {
     Key: 'Timeout',
     Label: 'Timeout (ms)',
