@@ -22,6 +22,7 @@ import type {
   NetworkStatusView,
 } from '@showtrak/protocol';
 import { AsRecord } from './normalizers';
+import type { CriticalKind } from './critical-kind';
 
 /** DegradedWarnings entries, one per kind of fault (several kinds share one). */
 export const NETWORK_WARNINGS: Record<NetworkIssueKind, string> = {
@@ -521,3 +522,16 @@ export function resolveCriticalNetworkEntry(
     },
   ];
 }
+
+/** Network interfaces monitored by interface name (see ./critical-kind). */
+export const NETWORK_KIND: CriticalKind<CriticalNetworkInterface> = {
+  KeyOf: (Entry) => Entry.Name,
+  NormalizeKey: normalizeInterfaceName,
+  NormalizeEntry: normalizeCriticalNetworkEntry,
+  Messages: {
+    KeyRequired: 'Network interface name is required',
+    SaveFailed: 'Failed to save monitored network interface',
+    RemoveFailed: 'Failed to remove monitored network interface',
+    LookupFailed: 'Failed to determine monitored network interface status',
+  },
+};

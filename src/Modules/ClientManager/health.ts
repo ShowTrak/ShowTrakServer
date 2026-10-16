@@ -8,7 +8,6 @@
 // evidence gates as the critical-hardware checks — and turns what they return
 // into degraded warnings and `ClientHealthEvent` broadcasts.
 import type {
-  ClientDisplay,
   ClientResourceAlarm,
   ClientResourceAlarmKey,
   CollectorState,
@@ -19,6 +18,7 @@ import type {
   ThermalState,
   USBDevice,
 } from '@showtrak/protocol';
+import type { ValidatedDisplay } from '../SocketValidation';
 import { AsRecord, normalizeSerialNumber } from './normalizers';
 import { RESOURCE_ALARM_KEYS } from './system-checks';
 
@@ -258,9 +258,9 @@ export function normalizeTemperatures(Snapshot: unknown): TemperaturesSnapshot {
 // --- Displays ----------------------------------------------------------------------
 
 export interface DisplayTransitions {
-  Added: ClientDisplay[];
-  Removed: ClientDisplay[];
-  Changed: Array<{ Previous: ClientDisplay; Display: ClientDisplay }>;
+  Added: ValidatedDisplay[];
+  Removed: ValidatedDisplay[];
+  Changed: Array<{ Previous: ValidatedDisplay; Display: ValidatedDisplay }>;
 }
 
 function DisplayKey(Display: unknown): string | null {
@@ -270,7 +270,7 @@ function DisplayKey(Display: unknown): string | null {
 
 // What an operator would call "the display changed": its mode, orientation,
 // role or place on the desktop. Labels and identity tiers are not configuration.
-function DisplayConfiguration(Display: ClientDisplay): string {
+function DisplayConfiguration(Display: ValidatedDisplay): string {
   const D = AsRecord(Display);
   const Bounds = AsRecord(D.Bounds);
   return [
@@ -286,8 +286,11 @@ function DisplayConfiguration(Display: ClientDisplay): string {
 }
 
 /** Displays that appeared, went, or changed configuration between two trusted lists. */
-export function diffDisplays(Previous: ClientDisplay[], Next: ClientDisplay[]): DisplayTransitions {
-  const Before = new Map<string, ClientDisplay>();
+export function diffDisplays(
+  Previous: ValidatedDisplay[],
+  Next: ValidatedDisplay[]
+): DisplayTransitions {
+  const Before = new Map<string, ValidatedDisplay>();
   for (const Display of Previous) {
     const Key = DisplayKey(Display);
     if (Key) Before.set(Key, Display);

@@ -80,6 +80,13 @@ function Tolerate<T>(compute: () => T, onWarn?: (message: string) => void): T | 
   }
 }
 
+/** Vitals as validated: each block present only when the client sent a usable one. */
+export interface ValidatedVitals {
+  CPU?: { UsagePercentage: number | null };
+  Ram?: { Total: number | null; Used: number | null; UsagePercentage: string | null };
+  Uptime?: { Formatted: string | null; Seconds?: number };
+}
+
 // Heartbeat payloads arrive every second per client; validate structure and
 // bound the strings, passing vitals through with only known fields.
 function Heartbeat(
@@ -87,11 +94,11 @@ function Heartbeat(
   onWarn?: (message: string) => void
 ): {
   Version: string | null;
-  Vitals: Record<string, unknown> | null;
+  Vitals: ValidatedVitals | null;
   ScriptsFingerprint: string | null;
 } {
   if (!isPlainObject(data)) fail('Heartbeat payload must be an object');
-  let Vitals: Record<string, unknown> | null = null;
+  let Vitals: ValidatedVitals | null = null;
   if (data.Vitals !== undefined && data.Vitals !== null) {
     if (!isPlainObject(data.Vitals)) fail('Vitals must be an object when present');
     const raw = data.Vitals;
@@ -208,8 +215,8 @@ function USBDevice(
   value: unknown,
   fieldName = 'USBDevice'
 ): {
-  VendorID: number | null;
-  ProductID: number | null;
+  VendorID?: number;
+  ProductID?: number;
   ManufacturerName: string | null;
   ProductName: string | null;
   SerialNumber: string | null;
@@ -218,9 +225,13 @@ function USBDevice(
   DeviceState?: USBDeviceState | null;
 } {
   if (!isPlainObject(value)) fail(`${fieldName} must be an object`);
+  // The protocol types these as optional numbers, so an unreported id stays
+  // absent rather than becoming null.
+  const VendorID = normalizeOptionalFiniteNumber(value.VendorID, `${fieldName}.VendorID`);
+  const ProductID = normalizeOptionalFiniteNumber(value.ProductID, `${fieldName}.ProductID`);
   return {
-    VendorID: normalizeOptionalFiniteNumber(value.VendorID, `${fieldName}.VendorID`),
-    ProductID: normalizeOptionalFiniteNumber(value.ProductID, `${fieldName}.ProductID`),
+    ...(VendorID !== null ? { VendorID } : {}),
+    ...(ProductID !== null ? { ProductID } : {}),
     ManufacturerName: normalizeOptionalString(
       value.ManufacturerName,
       `${fieldName}.ManufacturerName`
@@ -246,7 +257,7 @@ function USBDeviceList(value: unknown) {
   return list.map((device, index) => USBDevice(device, `USBDeviceList[${index}]`));
 }
 
-function Display(value: unknown, fieldName = 'Display'): Record<string, unknown> {
+function Display(value: unknown, fieldName = 'Display') {
   if (!isPlainObject(value)) fail(`${fieldName} must be an object`);
   const Bounds = isPlainObject(value.Bounds)
     ? {
@@ -446,7 +457,7 @@ function ApplicationDelta(value: unknown) {
   };
 }
 
-function RunningApplications(value: unknown): Record<string, unknown> {
+function RunningApplications(value: unknown) {
   if (!isPlainObject(value)) fail('RunningApplications payload must be an object');
   let Items: Array<{ Name: string; Count: number; Responding?: boolean | null }> = [];
   if (value.Items !== undefined && value.Items !== null) {
@@ -480,7 +491,7 @@ function RunningApplications(value: unknown): Record<string, unknown> {
 
 const MAX_TEMPERATURE_SENSORS = 64;
 
-function CollectorStatus(value: unknown, fieldName: string): Record<string, unknown> | null {
+function CollectorStatus(value: unknown, fieldName: string) {
   if (!isPlainObject(value)) return null;
   return {
     State: normalizeOptionalString(value.State, `${fieldName}.State`, { maxLength: 32 }),
@@ -491,9 +502,13 @@ function CollectorStatus(value: unknown, fieldName: string): Record<string, unkn
 }
 
 /** The client's `PowerStatus` snapshot. */
-function PowerStatus(value: unknown): Record<string, unknown> {
+function PowerStatus(value: unknown) {
   if (!isPlainObject(value)) fail('PowerStatus payload must be an object');
-  let Battery: Record<string, unknown> | null = null;
+  let Battery: {
+    Percent: number | null;
+    Charging: boolean | null;
+    TimeRemainingMinutes: number | null;
+  } | null = null;
   if (value.Battery !== undefined && value.Battery !== null) {
     if (!isPlainObject(value.Battery)) fail('PowerStatus.Battery must be an object when present');
     Battery = {
@@ -516,7 +531,7 @@ function PowerStatus(value: unknown): Record<string, unknown> {
 }
 
 /** The client's `Temperatures` snapshot. */
-function Temperatures(value: unknown): Record<string, unknown> & { Sensors: unknown[] } {
+function Temperatures(value: unknown) {
   if (!isPlainObject(value)) fail('Temperatures payload must be an object');
   const list = normalizeBoundedArray(value.Sensors ?? [], 'Sensors', {
     maxItems: MAX_TEMPERATURE_SENSORS,
@@ -546,7 +561,7 @@ function OptionalBoolean(value: unknown): boolean | null {
   return typeof value === 'boolean' ? value : null;
 }
 
-function AudioEndpoint(value: unknown, fieldName: string): Record<string, unknown> {
+function AudioEndpoint(value: unknown, fieldName: string) {
   if (!isPlainObject(value)) fail(`${fieldName} must be an object`);
   return {
     EndpointID: normalizeOptionalString(value.EndpointID, `${fieldName}.EndpointID`, {
@@ -568,7 +583,7 @@ function AudioEndpoint(value: unknown, fieldName: string): Record<string, unknow
   };
 }
 
-function AudioCapabilities(value: unknown): Record<string, unknown> | null {
+function AudioCapabilities(value: unknown) {
   if (!isPlainObject(value)) return null;
   const Scope = (raw: unknown, name: string) =>
     normalizeOptionalString(raw, `Capabilities.${name}`, { maxLength: 16 });
@@ -585,7 +600,7 @@ function AudioCapabilities(value: unknown): Record<string, unknown> | null {
 }
 
 /** The client's `AudioDevices` snapshot. Meaning (enums, dedupe) is decided by ClientManager. */
-function AudioDevices(value: unknown): Record<string, unknown> & { Endpoints: unknown[] } {
+function AudioDevices(value: unknown) {
   if (!isPlainObject(value)) fail('AudioDevices payload must be an object');
   const list = normalizeBoundedArray(value.Endpoints ?? [], 'Endpoints', {
     maxItems: MAX_AUDIO_ENDPOINTS,
@@ -637,6 +652,13 @@ function IntegratedEventFeedback(value: unknown): string {
   return Trimmed.slice(0, INTEGRATED_EVENT_MAX_FEEDBACK_LENGTH);
 }
 
+// The acknowledgement function a client passed with a request. Its payload type
+// is whatever the server replies with, so the caller names it.
+function Ack<Payload = unknown>(value: unknown, eventName: string): (payload: Payload) => void {
+  if (typeof value !== 'function') fail(`${eventName} requires an ack callback`);
+  return value as (payload: Payload) => void;
+}
+
 // Execution request ids are server-generated UUIDs echoed back by the client.
 function RequestID(value: unknown): string {
   return normalizeIdentifier(value, 'RequestID');
@@ -657,7 +679,26 @@ function ExecutionProgress(progress: unknown, statusText: unknown): [number, str
   ];
 }
 
+// What each validator hands on: shape and bounds enforced, strings capped, but
+// enums and clamping still to be decided by ClientManager. The managers take
+// these types rather than `unknown`, so a validator and its consumer cannot
+// drift apart unnoticed.
+export type ValidatedAdoptionHeartbeat = ReturnType<typeof AdoptionHeartbeat>;
+export type ValidatedHeartbeat = ReturnType<typeof Heartbeat>;
+export type ValidatedSystemInfo = ReturnType<typeof SystemInfo>;
+export type ValidatedUSBDevice = ReturnType<typeof USBDevice>;
+export type ValidatedDisplay = ReturnType<typeof Display>;
+export type ValidatedNetworkInterface = ReturnType<typeof NetworkInterfaces>[number];
+export type ValidatedRunningApplications = ReturnType<typeof RunningApplications>;
+export type ValidatedNetworkInterfaceDelta = ReturnType<typeof NetworkInterfaceDelta>;
+export type ValidatedDisplayDelta = ReturnType<typeof DisplayDelta>;
+export type ValidatedApplicationDelta = ReturnType<typeof ApplicationDelta>;
+export type ValidatedAudioDevices = ReturnType<typeof AudioDevices>;
+export type ValidatedPowerStatus = ReturnType<typeof PowerStatus>;
+export type ValidatedTemperatures = ReturnType<typeof Temperatures>;
+
 export const Manager = {
+  Ack,
   HandshakeUUID,
   AdoptionHeartbeat,
   Heartbeat,

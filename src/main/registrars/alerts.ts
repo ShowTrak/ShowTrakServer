@@ -3,7 +3,7 @@
 
 import { RPC } from '../rpc';
 import { createTupleHandler } from '../ipc/create-handler';
-import { Manager as AlertsManager } from '../../Modules/AlertsManager';
+import { Manager as AlertsManager, type AlertRuleCreatePayload } from '../../Modules/AlertsManager';
 import { Manager as IPCValidation } from '../../Modules/IPCValidation';
 
 function register(): void {
@@ -34,12 +34,9 @@ function register(): void {
 
   RPC.handle(
     'CreateAlertRule',
-    createTupleHandler<[Record<string, unknown>], unknown>(
+    createTupleHandler<[AlertRuleCreatePayload], unknown>(
       (Payload: unknown) => IPCValidation.AlertRuleCreatePayload(Payload),
-      // The IPC validator has already normalized this into a valid create payload
-      // (runtime-checked shape the type system can't see across the boundary).
-      (Payload: Record<string, unknown>) =>
-        AlertsManager.Create(Payload as unknown as Parameters<typeof AlertsManager.Create>[0])
+      (Payload) => AlertsManager.Create(Payload)
     )
   );
 

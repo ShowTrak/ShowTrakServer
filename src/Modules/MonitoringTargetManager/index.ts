@@ -56,7 +56,7 @@ interface MonitoringCheckPayload {
 }
 
 // Validated target create/update payloads.
-interface MonitoringTargetCreatePayload {
+export interface MonitoringTargetCreatePayload {
   Nickname: string | null;
   Checks?: unknown;
   Interval?: unknown;

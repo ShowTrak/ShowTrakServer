@@ -3,7 +3,7 @@
 // - Provides a small in-memory list for the UI and transitions to adopted
 import { CreateLogger } from '../Logger';
 import { Manager as BroadcastManager } from '../Broadcast';
-import type { AdoptionHeartbeatPayload } from '@showtrak/protocol';
+import type { ValidatedAdoptionHeartbeat } from '../SocketValidation';
 
 const Logger = CreateLogger('AdoptionManager');
 
@@ -21,7 +21,7 @@ class ClientPendingAdoption {
   IP: string;
   Identifying: boolean;
 
-  constructor(UUID: string, IP: string | null | undefined, Data: AdoptionHeartbeatPayload) {
+  constructor(UUID: string, IP: string | null | undefined, Data: ValidatedAdoptionHeartbeat) {
     this.State = 'Pending';
     this.UUID = UUID;
     this.Hostname = Data.Hostname || 'No Hostname Found';
@@ -48,7 +48,7 @@ const Manager = {
   async AddClientPendingAdoption(
     UUID: string,
     IP: string | null | undefined,
-    Data: AdoptionHeartbeatPayload
+    Data: ValidatedAdoptionHeartbeat
   ): Promise<void> {
     const IsClientMeantToBeAdopted = await ClientManager.Exists(UUID);
     if (IsClientMeantToBeAdopted) {

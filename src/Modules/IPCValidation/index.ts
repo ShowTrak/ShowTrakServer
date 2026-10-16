@@ -7,6 +7,8 @@
 // normalized value. The Manager type below is the composition of every domain's
 // validator surface; each domain file imports it to type its register function.
 import type { ClientSystemCheckKey } from '@showtrak/protocol';
+import type { AlertRuleCreatePayload } from '../AlertsManager';
+import type { MonitoringTargetCreatePayload } from '../MonitoringTargetManager';
 
 // Present only when the request carried them; absent keeps the current value.
 export interface CriticalUSBConditionOptionsResult {
@@ -138,7 +140,8 @@ export interface IPCValidationManager {
 
   // Monitoring targets (monitoring-validators.ts)
   MonitoringTargetID(value: unknown, fieldName?: string): number;
-  MonitoringTargetCreatePayload(value: unknown): Record<string, unknown>;
+  // Typed as the manager's input, so the registrar hands it over without a cast.
+  MonitoringTargetCreatePayload(value: unknown): MonitoringTargetCreatePayload;
   MonitoringTargetUpdatePayload(value: unknown): Record<string, unknown>;
 
   // Dummy clients (dummy-validators.ts)
@@ -164,7 +167,7 @@ export interface IPCValidationManager {
 
   // Alert rules (alert-validators.ts)
   AlertRuleID(value: unknown, fieldName?: string): number;
-  AlertRuleCreatePayload(value: unknown): Record<string, unknown>;
+  AlertRuleCreatePayload(value: unknown): AlertRuleCreatePayload;
   AlertRuleUpdatePayload(value: unknown): Record<string, unknown>;
 
   // Tags (tag-validators.ts)

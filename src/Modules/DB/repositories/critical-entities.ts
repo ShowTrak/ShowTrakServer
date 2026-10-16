@@ -1,12 +1,18 @@
-// Repository for the critical-entity tables (CriticalUSBDevices,
-// CriticalApplications, CriticalDisplays, CriticalAudioDevices,
-// CriticalNetworkInterfaces, CriticalSystemChecks). Receives the DB manager instead of
-// importing it so test DB mocks injected into ClientManager propagate through
-// unchanged. SQL strings are byte-identical to the historical inline
-// statements — tests match on them.
+// Repository for the per-client side tables of monitored ("critical") entries:
+// CriticalUSBDevices, CriticalUSBDeviceNames, CriticalApplications,
+// CriticalDisplays, CriticalAudioDevices, CriticalNetworkInterfaces and
+// CriticalSystemChecks. Receives the DB manager instead of importing it so test
+// DB mocks injected into ClientManager propagate through unchanged.
 //
-// The three table shapes are deliberately parallel; Phase 4 of
-// REFACTOR_PLAN.md generalizes the manager-side triplication on top of this.
+// Every table is the same shape: rows keyed by (UUID, one key column), read in
+// full at start-up and written one at a time. So each table's statements are
+// generated from its column list instead of being written out per table, which
+// is where they had drifted (some tables had a lookup, others not). The column
+// list is the INSERT order. Every name interpolated below is a fixed identifier
+// from this file, never a value from a request.
+//
+// A client's rows are removed by ClientsRepo.DeleteClientCascade, in the same
+// transaction as the client itself, so there is no per-table bulk delete here.
 import type { DBManager, DBResult } from '../index';
 import type {
   CriticalApplicationRow,
@@ -18,274 +24,142 @@ import type {
   SystemCheckRow,
 } from '../rows';
 
+export interface CriticalTable<Row> {
+  LoadAll(): Promise<DBResult<Row[]>>;
+  /** Insert the row, or replace the one under the same (UUID, key). */
+  Mark(Row: Row): Promise<DBResult<unknown>>;
+  Remove(UUID: string, Key: string): Promise<DBResult<unknown>>;
+  /** Whether a row exists under (UUID, key); `Found` is 1 when it does. */
+  Is(UUID: string, Key: string): Promise<DBResult<{ Found: number } | undefined>>;
+}
+
+function DefineCriticalTable<Row extends { UUID: string }>(
+  DB: DBManager,
+  Table: string,
+  KeyColumn: keyof Row & string,
+  Columns: ReadonlyArray<keyof Row & string>
+): CriticalTable<Row> {
+  const ColumnList = Columns.join(', ');
+  const Placeholders = Columns.map(() => '?').join(', ');
+  return {
+    LoadAll: () => DB.All<Row>(`SELECT ${ColumnList} FROM ${Table}`),
+    Mark: (Row) =>
+      DB.Run(
+        `INSERT OR REPLACE INTO ${Table} (${ColumnList}) VALUES (${Placeholders})`,
+        Columns.map((Column) => Row[Column])
+      ),
+    Remove: (UUID, Key) =>
+      DB.Run(`DELETE FROM ${Table} WHERE UUID = ? AND ${KeyColumn} = ?`, [UUID, Key]),
+    Is: (UUID, Key) =>
+      DB.Get<{ Found: number } | undefined>(
+        `SELECT 1 AS Found FROM ${Table} WHERE UUID = ? AND ${KeyColumn} = ? LIMIT 1`,
+        [UUID, Key]
+      ),
+  };
+}
+
 export function CreateCriticalEntitiesRepository(DB: DBManager) {
   return {
-    // --- USB devices --------------------------------------------------------
-    LoadAllUSB(): Promise<DBResult<CriticalUSBDeviceRow[]>> {
-      return DB.All<CriticalUSBDeviceRow>(
-        'SELECT UUID, SerialNumber, ManufacturerName, ProductName, RequirePresent, Location, FirmwareVersion, RequireNoError, Timestamp FROM CriticalUSBDevices'
-      );
-    },
-    MarkUSB(Row: CriticalUSBDeviceRow): Promise<DBResult<unknown>> {
-      return DB.Run(
-        'INSERT OR REPLACE INTO CriticalUSBDevices (UUID, SerialNumber, ManufacturerName, ProductName, RequirePresent, Location, FirmwareVersion, RequireNoError, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          Row.UUID,
-          Row.SerialNumber,
-          Row.ManufacturerName,
-          Row.ProductName,
-          Row.RequirePresent,
-          Row.Location,
-          Row.FirmwareVersion,
-          Row.RequireNoError,
-          Row.Timestamp,
-        ]
-      );
-    },
-    RemoveUSB(UUID: string, SerialNumber: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalUSBDevices WHERE UUID = ? AND SerialNumber = ?', [
-        UUID,
-        SerialNumber,
-      ]);
-    },
-    IsUSBCritical(UUID: string, SerialNumber: string): Promise<DBResult<{ Found: number }>> {
-      return DB.Get<{ Found: number }>(
-        'SELECT 1 AS Found FROM CriticalUSBDevices WHERE UUID = ? AND SerialNumber = ? LIMIT 1',
-        [UUID, SerialNumber]
-      );
-    },
-    DeleteAllUSBForClient(UUID: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalUSBDevices WHERE UUID = ?', [UUID]);
-    },
-
-    // --- Serial-less USB devices (guarded by name + quantity) ---------------
-    LoadAllUSBNames(): Promise<DBResult<CriticalUSBDeviceNameRow[]>> {
-      return DB.All<CriticalUSBDeviceNameRow>(
-        'SELECT UUID, NameKey, ManufacturerName, ProductName, Quantity, RequirePresent, Location, FirmwareVersion, RequireNoError, Timestamp FROM CriticalUSBDeviceNames'
-      );
-    },
-    MarkUSBName(Row: CriticalUSBDeviceNameRow): Promise<DBResult<unknown>> {
-      return DB.Run(
-        'INSERT OR REPLACE INTO CriticalUSBDeviceNames (UUID, NameKey, ManufacturerName, ProductName, Quantity, RequirePresent, Location, FirmwareVersion, RequireNoError, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          Row.UUID,
-          Row.NameKey,
-          Row.ManufacturerName,
-          Row.ProductName,
-          Row.Quantity,
-          Row.RequirePresent,
-          Row.Location,
-          Row.FirmwareVersion,
-          Row.RequireNoError,
-          Row.Timestamp,
-        ]
-      );
-    },
-    RemoveUSBName(UUID: string, NameKey: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalUSBDeviceNames WHERE UUID = ? AND NameKey = ?', [
-        UUID,
-        NameKey,
-      ]);
-    },
-    IsUSBNameCritical(UUID: string, NameKey: string): Promise<DBResult<{ Found: number }>> {
-      return DB.Get<{ Found: number }>(
-        'SELECT 1 AS Found FROM CriticalUSBDeviceNames WHERE UUID = ? AND NameKey = ? LIMIT 1',
-        [UUID, NameKey]
-      );
-    },
-    DeleteAllUSBNamesForClient(UUID: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalUSBDeviceNames WHERE UUID = ?', [UUID]);
-    },
-
-    // --- Applications -------------------------------------------------------
-    LoadAllApplications(): Promise<DBResult<CriticalApplicationRow[]>> {
-      return DB.All<CriticalApplicationRow>(
-        'SELECT UUID, ApplicationKey, ApplicationName, Timestamp, RequireForeground, RequireResponding FROM CriticalApplications'
-      );
-    },
-    MarkApplication(
-      UUID: string,
-      ApplicationKey: string,
-      ApplicationName: string,
-      Timestamp: number,
-      Conditions: {
-        RequireForeground?: boolean;
-        RequireResponding?: boolean;
-      } = {}
-    ): Promise<DBResult<unknown>> {
-      return DB.Run(
-        'INSERT OR REPLACE INTO CriticalApplications (UUID, ApplicationKey, ApplicationName, Timestamp, RequireForeground, RequireResponding) VALUES (?, ?, ?, ?, ?, ?)',
-        [
-          UUID,
-          ApplicationKey,
-          ApplicationName,
-          Timestamp,
-          Conditions.RequireForeground ? 1 : 0,
-          Conditions.RequireResponding === false ? 0 : 1,
-        ]
-      );
-    },
-    RemoveApplication(UUID: string, ApplicationKey: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalApplications WHERE UUID = ? AND ApplicationKey = ?', [
-        UUID,
-        ApplicationKey,
-      ]);
-    },
-    IsApplicationCritical(
-      UUID: string,
-      ApplicationKey: string
-    ): Promise<DBResult<{ Found: number }>> {
-      return DB.Get<{ Found: number }>(
-        'SELECT 1 AS Found FROM CriticalApplications WHERE UUID = ? AND ApplicationKey = ? LIMIT 1',
-        [UUID, ApplicationKey]
-      );
-    },
-    DeleteAllApplicationsForClient(UUID: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalApplications WHERE UUID = ?', [UUID]);
-    },
-
-    // --- Displays -----------------------------------------------------------
-    LoadAllDisplays(): Promise<DBResult<CriticalDisplayRow[]>> {
-      return DB.All<CriticalDisplayRow>(
-        'SELECT UUID, DisplayID, Label, RequirePresent, Width, Height, RefreshRate, ScaleFactor, Rotation, RequirePrimary, PositionX, PositionY, Timestamp FROM CriticalDisplays'
-      );
-    },
-    MarkDisplay(Row: CriticalDisplayRow): Promise<DBResult<unknown>> {
-      return DB.Run(
-        'INSERT OR REPLACE INTO CriticalDisplays (UUID, DisplayID, Label, RequirePresent, Width, Height, RefreshRate, ScaleFactor, Rotation, RequirePrimary, PositionX, PositionY, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          Row.UUID,
-          Row.DisplayID,
-          Row.Label,
-          Row.RequirePresent,
-          Row.Width,
-          Row.Height,
-          Row.RefreshRate,
-          Row.ScaleFactor,
-          Row.Rotation,
-          Row.RequirePrimary,
-          Row.PositionX,
-          Row.PositionY,
-          Row.Timestamp,
-        ]
-      );
-    },
-    RemoveDisplay(UUID: string, DisplayID: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalDisplays WHERE UUID = ? AND DisplayID = ?', [
-        UUID,
-        DisplayID,
-      ]);
-    },
-    IsDisplayCritical(UUID: string, DisplayID: string): Promise<DBResult<{ Found: number }>> {
-      return DB.Get<{ Found: number }>(
-        'SELECT 1 AS Found FROM CriticalDisplays WHERE UUID = ? AND DisplayID = ? LIMIT 1',
-        [UUID, DisplayID]
-      );
-    },
-    DeleteAllDisplaysForClient(UUID: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalDisplays WHERE UUID = ?', [UUID]);
-    },
-
-    // --- Audio endpoints ----------------------------------------------------
-    LoadAllAudio(): Promise<DBResult<CriticalAudioDeviceRow[]>> {
-      return DB.All<CriticalAudioDeviceRow>(
-        'SELECT UUID, EndpointID, Direction, Name, Channels, SampleRate, RequireDefault, RequireUnmuted, MinVolume, MaxVolume, Timestamp FROM CriticalAudioDevices'
-      );
-    },
-    MarkAudio(Row: CriticalAudioDeviceRow): Promise<DBResult<unknown>> {
-      return DB.Run(
-        'INSERT OR REPLACE INTO CriticalAudioDevices (UUID, EndpointID, Direction, Name, Channels, SampleRate, RequireDefault, RequireUnmuted, MinVolume, MaxVolume, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          Row.UUID,
-          Row.EndpointID,
-          Row.Direction,
-          Row.Name,
-          Row.Channels,
-          Row.SampleRate,
-          Row.RequireDefault,
-          Row.RequireUnmuted,
-          Row.MinVolume,
-          Row.MaxVolume,
-          Row.Timestamp,
-        ]
-      );
-    },
-    RemoveAudio(UUID: string, EndpointID: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalAudioDevices WHERE UUID = ? AND EndpointID = ?', [
-        UUID,
-        EndpointID,
-      ]);
-    },
-    DeleteAllAudioForClient(UUID: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalAudioDevices WHERE UUID = ?', [UUID]);
-    },
-
-    // --- Network interfaces -------------------------------------------------
-    LoadAllNetwork(): Promise<DBResult<CriticalNetworkInterfaceRow[]>> {
-      return DB.All<CriticalNetworkInterfaceRow>(
-        'SELECT UUID, Name, MAC, Family, RequirePresent, Address, RangeStart, RangeEnd, Netmask, Gateway, Timestamp FROM CriticalNetworkInterfaces'
-      );
-    },
-    MarkNetwork(Row: CriticalNetworkInterfaceRow): Promise<DBResult<unknown>> {
-      return DB.Run(
-        'INSERT OR REPLACE INTO CriticalNetworkInterfaces (UUID, Name, MAC, Family, RequirePresent, Address, RangeStart, RangeEnd, Netmask, Gateway, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          Row.UUID,
-          Row.Name,
-          Row.MAC,
-          Row.Family,
-          Row.RequirePresent,
-          Row.Address,
-          Row.RangeStart,
-          Row.RangeEnd,
-          Row.Netmask,
-          Row.Gateway,
-          Row.Timestamp,
-        ]
-      );
-    },
-    RemoveNetwork(UUID: string, Name: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalNetworkInterfaces WHERE UUID = ? AND Name = ?', [
-        UUID,
-        Name,
-      ]);
-    },
-    DeleteAllNetworkForClient(UUID: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalNetworkInterfaces WHERE UUID = ?', [UUID]);
-    },
-
-    // --- System checks ------------------------------------------------------
-    LoadAllSystemChecks(): Promise<DBResult<SystemCheckRow[]>> {
-      return DB.All<SystemCheckRow>(
-        'SELECT UUID, CheckKey, MaxPercent, SustainSeconds, MaxDays, RequireMains, MinBatteryPercent, ChargingBelowPercent, MaxCelsius, MaxThermalState, Timestamp FROM CriticalSystemChecks'
-      );
-    },
-    MarkSystemCheck(Row: SystemCheckRow): Promise<DBResult<unknown>> {
-      return DB.Run(
-        'INSERT OR REPLACE INTO CriticalSystemChecks (UUID, CheckKey, MaxPercent, SustainSeconds, MaxDays, RequireMains, MinBatteryPercent, ChargingBelowPercent, MaxCelsius, MaxThermalState, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          Row.UUID,
-          Row.CheckKey,
-          Row.MaxPercent,
-          Row.SustainSeconds,
-          Row.MaxDays,
-          Row.RequireMains,
-          Row.MinBatteryPercent,
-          Row.ChargingBelowPercent,
-          Row.MaxCelsius,
-          Row.MaxThermalState,
-          Row.Timestamp,
-        ]
-      );
-    },
-    RemoveSystemCheck(UUID: string, CheckKey: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalSystemChecks WHERE UUID = ? AND CheckKey = ?', [
-        UUID,
-        CheckKey,
-      ]);
-    },
-    DeleteAllSystemChecksForClient(UUID: string): Promise<DBResult<unknown>> {
-      return DB.Run('DELETE FROM CriticalSystemChecks WHERE UUID = ?', [UUID]);
-    },
+    USB: DefineCriticalTable<CriticalUSBDeviceRow>(DB, 'CriticalUSBDevices', 'SerialNumber', [
+      'UUID',
+      'SerialNumber',
+      'ManufacturerName',
+      'ProductName',
+      'RequirePresent',
+      'Location',
+      'FirmwareVersion',
+      'RequireNoError',
+      'Timestamp',
+    ]),
+    // Serial-less USB devices, guarded by name and quantity.
+    USBNames: DefineCriticalTable<CriticalUSBDeviceNameRow>(
+      DB,
+      'CriticalUSBDeviceNames',
+      'NameKey',
+      [
+        'UUID',
+        'NameKey',
+        'ManufacturerName',
+        'ProductName',
+        'Quantity',
+        'RequirePresent',
+        'Location',
+        'FirmwareVersion',
+        'RequireNoError',
+        'Timestamp',
+      ]
+    ),
+    Applications: DefineCriticalTable<CriticalApplicationRow>(
+      DB,
+      'CriticalApplications',
+      'ApplicationKey',
+      [
+        'UUID',
+        'ApplicationKey',
+        'ApplicationName',
+        'Timestamp',
+        'RequireForeground',
+        'RequireResponding',
+      ]
+    ),
+    Displays: DefineCriticalTable<CriticalDisplayRow>(DB, 'CriticalDisplays', 'DisplayID', [
+      'UUID',
+      'DisplayID',
+      'Label',
+      'RequirePresent',
+      'Width',
+      'Height',
+      'RefreshRate',
+      'ScaleFactor',
+      'Rotation',
+      'RequirePrimary',
+      'PositionX',
+      'PositionY',
+      'Timestamp',
+    ]),
+    Audio: DefineCriticalTable<CriticalAudioDeviceRow>(DB, 'CriticalAudioDevices', 'EndpointID', [
+      'UUID',
+      'EndpointID',
+      'Direction',
+      'Name',
+      'Channels',
+      'SampleRate',
+      'RequireDefault',
+      'RequireUnmuted',
+      'MinVolume',
+      'MaxVolume',
+      'Timestamp',
+    ]),
+    Network: DefineCriticalTable<CriticalNetworkInterfaceRow>(
+      DB,
+      'CriticalNetworkInterfaces',
+      'Name',
+      [
+        'UUID',
+        'Name',
+        'MAC',
+        'Family',
+        'RequirePresent',
+        'Address',
+        'RangeStart',
+        'RangeEnd',
+        'Netmask',
+        'Gateway',
+        'Timestamp',
+      ]
+    ),
+    SystemChecks: DefineCriticalTable<SystemCheckRow>(DB, 'CriticalSystemChecks', 'CheckKey', [
+      'UUID',
+      'CheckKey',
+      'MaxPercent',
+      'SustainSeconds',
+      'MaxDays',
+      'RequireMains',
+      'MinBatteryPercent',
+      'ChargingBelowPercent',
+      'MaxCelsius',
+      'MaxThermalState',
+      'Timestamp',
+    ]),
   };
 }

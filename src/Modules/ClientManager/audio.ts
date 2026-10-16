@@ -24,6 +24,7 @@ import type {
   CriticalAudioDevice,
 } from '@showtrak/protocol';
 import { AsRecord } from './normalizers';
+import type { CriticalKind } from './critical-kind';
 
 /** DegradedWarnings entries, one per kind of fault (several kinds share one). */
 export const AUDIO_WARNINGS: Record<AudioIssueKind, string> = {
@@ -568,3 +569,16 @@ export function IsClientVersionAtLeast(Version: unknown, Minimum: readonly numbe
   }
   return true;
 }
+
+/** Audio endpoints monitored by endpoint id (see ./critical-kind). */
+export const AUDIO_KIND: CriticalKind<CriticalAudioDevice> = {
+  KeyOf: (Entry) => Entry.EndpointID,
+  NormalizeKey: normalizeEndpointID,
+  NormalizeEntry: normalizeCriticalAudioEntry,
+  Messages: {
+    KeyRequired: 'Audio device identifier is required',
+    SaveFailed: 'Failed to save monitored audio device',
+    RemoveFailed: 'Failed to remove monitored audio device',
+    LookupFailed: 'Failed to determine monitored audio device status',
+  },
+};

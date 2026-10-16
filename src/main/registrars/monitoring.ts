@@ -17,7 +17,10 @@ import {
 import { getClientVitalsHistory } from '../client-vitals-history';
 import { getStatusHistoryOverview } from '../status-history-overview';
 import { Manager as MonitoringMethods } from '../../Modules/MonitoringMethods';
-import { Manager as MonitoringTargetManager } from '../../Modules/MonitoringTargetManager';
+import {
+  Manager as MonitoringTargetManager,
+  type MonitoringTargetCreatePayload,
+} from '../../Modules/MonitoringTargetManager';
 import { Manager as MonitoringActionFavourites } from '../../Modules/MonitoringActionFavourites';
 import { Manager as IPCValidation } from '../../Modules/IPCValidation';
 
@@ -230,14 +233,9 @@ function register(): void {
 
   RPC.handle(
     'CreateMonitoringTarget',
-    createTupleHandler<[Record<string, unknown>], unknown>(
+    createTupleHandler<[MonitoringTargetCreatePayload], unknown>(
       (Payload: unknown) => IPCValidation.MonitoringTargetCreatePayload(Payload),
-      // The IPC validator has already normalized this into a valid create payload
-      // (runtime-checked shape the type system can't see across the boundary).
-      (Payload: Record<string, unknown>) =>
-        MonitoringTargetManager.Create(
-          Payload as unknown as Parameters<typeof MonitoringTargetManager.Create>[0]
-        )
+      (Payload) => MonitoringTargetManager.Create(Payload)
     )
   );
 

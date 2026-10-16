@@ -24,6 +24,7 @@ import type {
   USBIssueKind,
 } from '@showtrak/protocol';
 import { AsRecord, normalizeSerialNumber, normalizeUSBNameKey } from './normalizers';
+import type { CriticalKind } from './critical-kind';
 
 /** DegradedWarnings entries, one per kind of fault. */
 export const USB_WARNINGS: Record<USBIssueKind, string> = {
@@ -485,3 +486,29 @@ export function resolveUSBConditions(
     },
   ];
 }
+
+/** USB devices monitored by serial number (see ./critical-kind). */
+export const USB_SERIAL_KIND: CriticalKind<CriticalUSBDevice> = {
+  KeyOf: (Entry) => Entry.SerialNumber,
+  NormalizeKey: normalizeSerialNumber,
+  NormalizeEntry: normalizeCriticalUSBEntry,
+  Messages: {
+    KeyRequired: 'Device serial number is required',
+    SaveFailed: 'Failed to save monitored USB device',
+    RemoveFailed: 'Failed to remove monitored USB device',
+    LookupFailed: 'Failed to determine monitored USB status',
+  },
+};
+
+/** Serial-less USB devices, monitored by make and model and a quantity. */
+export const USB_NAME_KIND: CriticalKind<CriticalUSBName> = {
+  KeyOf: (Entry) => Entry.NameKey,
+  NormalizeKey: (Raw) => (typeof Raw === 'string' ? Raw.trim().toLowerCase() || null : null),
+  NormalizeEntry: normalizeCriticalUSBNameEntry,
+  Messages: {
+    KeyRequired: 'Device name is required',
+    SaveFailed: 'Failed to save monitored USB device',
+    RemoveFailed: 'Failed to remove monitored USB device',
+    LookupFailed: 'Failed to determine monitored USB status',
+  },
+};

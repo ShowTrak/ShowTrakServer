@@ -30,7 +30,9 @@ import type {
   DisplayIssue,
   DisplayIssueKind,
 } from '@showtrak/protocol';
+import type { ValidatedDisplay } from '../SocketValidation';
 import { AsRecord, normalizeDisplayID } from './normalizers';
+import type { CriticalKind } from './critical-kind';
 
 /** DegradedWarnings entries, one per kind of fault (every configuration kind shares one). */
 export const DISPLAY_WARNINGS: Record<DisplayIssueKind, string> = {
@@ -43,8 +45,11 @@ export const DISPLAY_WARNINGS: Record<DisplayIssueKind, string> = {
   position: 'Display Configuration Changed',
 };
 
-/** A reported display as the judging code reads it: the wire shape, loosely. */
-export type ObservedDisplay = Partial<ClientDisplay>;
+/**
+ * A reported display as the judging code reads it: the wire shape, loosely. What
+ * the socket validator produced (any field may be null) or a full ClientDisplay.
+ */
+export type ObservedDisplay = Partial<ClientDisplay> | ValidatedDisplay;
 
 /** A display in the renderer's list: reported, or a critical one that was not. */
 export interface DisplayViewEntry extends Record<string, unknown> {
@@ -593,3 +598,16 @@ export function resolveCriticalDisplayEntry(
     }),
   ];
 }
+
+/** Displays monitored by their reported identity (see ./critical-kind). */
+export const DISPLAY_KIND: CriticalKind<CriticalDisplay> = {
+  KeyOf: (Entry) => Entry.DisplayID,
+  NormalizeKey: normalizeDisplayID,
+  NormalizeEntry: normalizeCriticalDisplayEntry,
+  Messages: {
+    KeyRequired: 'Display identifier is required',
+    SaveFailed: 'Failed to save monitored display',
+    RemoveFailed: 'Failed to remove monitored display',
+    LookupFailed: 'Failed to determine monitored display status',
+  },
+};

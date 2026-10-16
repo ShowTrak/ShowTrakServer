@@ -136,18 +136,18 @@ export = function registerAlertValidators(Manager: IPCValidationManager): void {
 
   Manager.AlertRuleCreatePayload = (value: unknown) => {
     if (!isPlainObject(value)) fail('Alert rule payload must be an object');
-    const out: Record<string, unknown> = {};
-    out.Title = normalizeNonEmptyString(value.Title, 'Title', { minLength: 2, maxLength: 120 });
-    out.Scope = normalizeAlertScope(value.Scope);
-    out.TriggerTypes = normalizeAlertTriggerTypes(
-      Object.prototype.hasOwnProperty.call(value, 'TriggerTypes')
-        ? value.TriggerTypes
-        : value.TriggerType
-    );
-    out.TriggerConfig = normalizeAlertTriggerConfig(value.TriggerConfig);
-    out.Actions = normalizeAlertActions(value.Actions);
-    out.Enabled = Object.prototype.hasOwnProperty.call(value, 'Enabled') ? !!value.Enabled : true;
-    return out;
+    return {
+      Title: normalizeNonEmptyString(value.Title, 'Title', { minLength: 2, maxLength: 120 }),
+      Scope: normalizeAlertScope(value.Scope),
+      TriggerTypes: normalizeAlertTriggerTypes(
+        Object.prototype.hasOwnProperty.call(value, 'TriggerTypes')
+          ? value.TriggerTypes
+          : value.TriggerType
+      ),
+      TriggerConfig: normalizeAlertTriggerConfig(value.TriggerConfig),
+      Actions: normalizeAlertActions(value.Actions),
+      Enabled: Object.prototype.hasOwnProperty.call(value, 'Enabled') ? !!value.Enabled : true,
+    };
   };
 
   Manager.AlertRuleUpdatePayload = (value: unknown) => {

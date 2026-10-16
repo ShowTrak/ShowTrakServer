@@ -10,12 +10,7 @@
 // unhandled rejection.
 import type { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/protocol';
-import type {
-  RunningApplicationsSnapshot,
-  AdoptionHeartbeatPayload,
-  HeartbeatPayload,
-  USBDevice,
-} from '@showtrak/protocol';
+import type { USBDevice } from '@showtrak/protocol';
 import { CreateLogger } from '../Logger';
 import { Manager as AdoptionManager } from '../AdoptionManager';
 import { Manager as ClientManager } from '../ClientManager';
@@ -98,10 +93,13 @@ function makeGuardedOn(
    */
   let telemetryTail: Promise<unknown> = Promise.resolve();
 
-  return function GuardedOn(
+  // The handler's parameters and the validator's result are one type (`| []`
+  // makes the validator's array literal infer as a tuple), so a handler cannot
+  // annotate its payload as a shape the validator never produced.
+  return function GuardedOn<Args extends unknown[] | []>(
     event: string,
-    validate: ((...args: unknown[]) => unknown[]) | null,
-    handler: (...args: never[]) => unknown,
+    validate: ((...args: unknown[]) => Args) | null,
+    handler: (...args: Args) => unknown,
     options: { serial?: boolean } = {}
   ) {
     // Events are registered dynamically by name (some are reserved, e.g.
@@ -235,7 +233,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
     GuardedOn(
       'AdoptionHeartbeat',
       (Data) => [SocketValidation.AdoptionHeartbeat(Data)],
-      async (Data: AdoptionHeartbeatPayload) => {
+      async (Data) => {
         // Guard against stale/incorrect client state so adopted devices never
         // reappear in the pending-adoption lane.
         if (socket.Adopted) {
@@ -259,11 +257,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
 
     GuardedOn(
       'GetScripts',
-      (Callback) => {
-        if (typeof Callback !== 'function') throw new Error('GetScripts requires an ack callback');
-        return [Callback];
-      },
-      async (Callback: (scripts: unknown) => void) => {
+      (Callback) => [SocketValidation.Ack(Callback, 'GetScripts')],
+      async (Callback) => {
         Logger.log(`Client ${socket.UUID} requested scripts.`);
         const Scripts = await ScriptManager.GetScripts();
         Callback(Scripts);
@@ -275,12 +270,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
     // Integrated / unadopted clients get a null config.
     GuardedOn(
       'GetLaunchConfig',
-      (Callback) => {
-        if (typeof Callback !== 'function')
-          throw new Error('GetLaunchConfig requires an ack callback');
-        return [Callback];
-      },
-      async (Callback: (config: unknown) => void) => {
+      (Callback) => [SocketValidation.Ack(Callback, 'GetLaunchConfig')],
+      async (Callback) => {
         // Global toggle for the on-screen abort countdown, applied to every
         // client's launch config so the operator controls it from one place.
         const ShowCountdown = !!(await SettingsManager.GetValue('CLIENT_SHOW_LAUNCH_COUNTDOWN'));
@@ -305,12 +296,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
     // an empty set rather than the show's variables.
     GuardedOn(
       'GetVariables',
-      (Callback) => {
-        if (typeof Callback !== 'function')
-          throw new Error('GetVariables requires an ack callback');
-        return [Callback];
-      },
-      async (Callback: (payload: unknown) => void) => {
+      (Callback) => [SocketValidation.Ack(Callback, 'GetVariables')],
+      async (Callback) => {
         const [Err, Client] = await ClientManager.Get(socket.UUID);
         if (Err || !Client || Client.Integrated === true) {
           return Callback({ Environment: {}, Exported: [] });
@@ -392,7 +379,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
     GuardedOn(
       'Heartbeat',
       (Data) => [SocketValidation.Heartbeat(Data, WarnVitals)],
-      async (Data: HeartbeatPayload) => {
+      async (Data) => {
         const [Err] = await ClientManager.Heartbeat(socket.UUID, Data, socket.IP);
         if (Err) Logger.error('Heartbeat failed for', socket.UUID, Err);
       }
@@ -401,7 +388,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
     GuardedOn(
       'SystemInfo',
       (Data) => [SocketValidation.SystemInfo(Data)],
-      async (Data: Parameters<typeof ClientManager.SystemInfo>[1]) => {
+      async (Data) => {
         await ClientManager.SystemInfo(socket.UUID, Data, socket.IP);
       }
     );
@@ -483,7 +470,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
     GuardedOn(
       'RunningApplications',
       (Snapshot) => [SocketValidation.RunningApplications(Snapshot)],
-      async (Snapshot: RunningApplicationsSnapshot) => {
+      async (Snapshot) => {
         Logger.log(
           `Running applications received from ${socket.UUID} (${Snapshot.Items.length} items)`
         );
@@ -550,12 +537,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
      */
     GuardedOn(
       'GetServerCapabilities',
-      (Callback) => {
-        if (typeof Callback !== 'function')
-          throw new Error('GetServerCapabilities requires an ack callback');
-        return [Callback];
-      },
-      async (Callback: (capabilities: { Deltas: boolean }) => void) => {
+      (Callback) => [SocketValidation.Ack<{ Deltas: boolean }>(Callback, 'GetServerCapabilities')],
+      async (Callback) => {
         Callback({ Deltas: true });
       }
     );

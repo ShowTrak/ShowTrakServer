@@ -153,23 +153,26 @@ export = function registerMonitoringValidators(Manager: IPCValidationManager): v
 
   Manager.MonitoringTargetCreatePayload = (value: unknown) => {
     if (!isPlainObject(value)) fail('Monitor payload must be an object');
-    const out: Record<string, unknown> = {};
-    out.Nickname = normalizeNonEmptyString(value.Nickname, 'Nickname', {
+    const Nickname = normalizeNonEmptyString(value.Nickname, 'Nickname', {
       minLength: 1,
       maxLength: 64,
     });
     if (value.Interval === undefined || value.Interval === null) fail('Interval is required');
     const Interval = Number(value.Interval);
     if (!Number.isFinite(Interval)) fail('Interval must be a number');
-    out.Interval = Interval;
-    out.GroupID = Object.prototype.hasOwnProperty.call(value, 'GroupID')
-      ? Manager.GroupID(value.GroupID)
-      : null;
-    if (Object.prototype.hasOwnProperty.call(value, 'FailureThreshold')) {
-      out.FailureThreshold = normalizeFailureThreshold(value.FailureThreshold, 'FailureThreshold');
-    }
-    out.Checks = normalizeChecks(value.Checks == null ? [] : value.Checks, false);
-    return out;
+    return {
+      Nickname,
+      Interval,
+      GroupID: Object.prototype.hasOwnProperty.call(value, 'GroupID')
+        ? Manager.GroupID(value.GroupID)
+        : null,
+      ...(Object.prototype.hasOwnProperty.call(value, 'FailureThreshold')
+        ? {
+            FailureThreshold: normalizeFailureThreshold(value.FailureThreshold, 'FailureThreshold'),
+          }
+        : {}),
+      Checks: normalizeChecks(value.Checks == null ? [] : value.Checks, false),
+    };
   };
 
   Manager.MonitoringTargetUpdatePayload = (value: unknown) => {

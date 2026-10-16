@@ -1,5 +1,17 @@
 // Client
 // In-memory representation of a connected ShowTrak client.
+import type {
+  ValidatedApplicationDelta,
+  ValidatedAudioDevices,
+  ValidatedDisplay,
+  ValidatedDisplayDelta,
+  ValidatedNetworkInterface,
+  ValidatedNetworkInterfaceDelta,
+  ValidatedPowerStatus,
+  ValidatedRunningApplications,
+  ValidatedTemperatures,
+  ValidatedUSBDevice,
+} from '../SocketValidation';
 import { CreateLogger } from '../Logger';
 import { Manager as DB } from '../DB';
 import { CreateClientsRepository } from '../DB/repositories/clients';
@@ -17,7 +29,6 @@ import {
 } from './normalizers';
 import type {
   USBDevice,
-  ClientDisplay,
   IntegratedAction,
   AudioDevicesView,
   AudioEndpointView,
@@ -47,23 +58,19 @@ import {
   buildAudioView,
   diffAudioEndpoints,
   normalizeAudioSnapshot,
-  normalizeCriticalAudioEntry,
-  normalizeEndpointID,
+  AUDIO_KIND,
   type ObservedAudio,
 } from './audio';
-import { buildDisplayView, normalizeCriticalDisplayEntry, type DisplayViewEntry } from './display';
+import { buildDisplayView, DISPLAY_KIND, type DisplayViewEntry } from './display';
+import { APPLICATION_KIND, type CriticalApplicationEntry } from './applications';
 import {
-  buildUSBView,
-  normalizeCriticalUSBEntry,
-  normalizeCriticalUSBNameEntry,
-  type USBDeviceViewEntry,
-} from './usb';
-import {
-  EmptyNetworkStatusView,
-  buildNetworkView,
-  normalizeCriticalNetworkEntry,
-  normalizeInterfaceName,
-} from './network';
+  CriticalListFrom,
+  HasCriticalEntry,
+  WithCriticalEntry,
+  WithoutCriticalEntry,
+} from './critical-kind';
+import { buildUSBView, USB_NAME_KIND, USB_SERIAL_KIND, type USBDeviceViewEntry } from './usb';
+import { EmptyNetworkStatusView, buildNetworkView, NETWORK_KIND } from './network';
 import {
   APPLICATION_NOT_FOREGROUND_WARNING,
   APPLICATION_NOT_RESPONDING_WARNING,
@@ -107,12 +114,6 @@ export interface ClientMacAddress {
   InterfaceName: string | null;
   FirstSeen: number;
   LastSeen: number;
-}
-
-// Preserve the historical `Value ? Value : null` timestamp passthrough while
-// satisfying the `number | null` field type (timestamps are always numeric).
-function TimestampOrNull(Value: unknown): number | null {
-  return (Value || null) as number | null;
 }
 
 // Normalize a reported interface list into the shape carried in RAM. Shared by
@@ -199,15 +200,6 @@ function normalizeApplicationCapabilities(Value: unknown): RunningApplicationsCa
 // --- Local domain shapes ---------------------------------------------------
 // The persisted "critical" entries we guard, as normalized by the SetCritical*
 // methods and mirrored (minus UUID) by the DB rows in ../DB/rows.ts.
-interface CriticalApplicationEntry {
-  Name: string;
-  Key: string;
-  Timestamp: number | null;
-  // Fault when another application holds the focused window.
-  RequireForeground: boolean;
-  // Fault when its windows stop answering the operating system.
-  RequireResponding: boolean;
-}
 
 // The augmented per-entity view entries the _rebuild* methods emit for the
 // renderer: connected entities merged with their critical/missing status.
@@ -457,7 +449,8 @@ class Client {
   USBWarnings: string[];
 
   // Displays: raw connected list, critical guards, and the rendered view.
-  ConnectedDisplayList: ClientDisplay[];
+  // As validated off the wire; any field may be null (see display.ts ObservedDisplay).
+  ConnectedDisplayList: ValidatedDisplay[];
   DisplayList: DisplayViewEntry[];
   CriticalDisplays: CriticalDisplay[];
   CriticalDisplayIDs: string[];
@@ -863,7 +856,7 @@ class Client {
    * report out, and the one it sends on waking carries both. The first report
    * this server sees is a baseline — an old resume is not news.
    */
-  SetPowerStatus(Snapshot: unknown) {
+  SetPowerStatus(Snapshot: ValidatedPowerStatus) {
     const Previous = this.PowerStatus;
     const Next = normalizePowerStatus(Snapshot);
     this.PowerStatus = Next;
@@ -919,7 +912,7 @@ class Client {
   }
 
   /** Store a temperature report and judge the thermal check against it. */
-  SetTemperatures(Snapshot: unknown) {
+  SetTemperatures(Snapshot: ValidatedTemperatures) {
     const Next = normalizeTemperatures(Snapshot);
     this.Temperatures = Next;
     if (this._evaluateSystemChecks()) this._refreshClientHealthState();
@@ -941,7 +934,7 @@ class Client {
     BroadcastManager.emit('ClientUpdated', this);
     return true;
   }
-  SetUSBDeviceList(USBDeviceList: unknown) {
+  SetUSBDeviceList(USBDeviceList: ValidatedUSBDevice[]) {
     const BaselineTrusted = this.HasUSBTelemetry;
     this.ConnectedUSBDeviceList = Array.isArray(USBDeviceList) ? USBDeviceList : [];
     this.HasUSBTelemetry = true;
@@ -952,80 +945,50 @@ class Client {
     return;
   }
   SetCriticalUSBDevices(Devices: unknown) {
-    const Normalized: CriticalUSBDevice[] = [];
-    const Seen = new Set<string>();
-    for (const Raw of Array.isArray(Devices) ? Devices : []) {
-      const Entry = normalizeCriticalUSBEntry(Raw);
-      if (!Entry || Seen.has(Entry.SerialNumber)) continue;
-      Seen.add(Entry.SerialNumber);
-      Normalized.push(Entry);
-    }
-    this.CriticalUSBDevices = Normalized;
+    this.CriticalUSBDevices = CriticalListFrom(USB_SERIAL_KIND, Devices);
     this._rebuildUSBDeviceView();
   }
   IsUSBDeviceCritical(SerialNumber: unknown) {
-    const Normalized = normalizeSerialNumber(SerialNumber);
-    if (!Normalized) return false;
-    return this.CriticalUSBSerials.includes(Normalized);
+    return HasCriticalEntry(USB_SERIAL_KIND, this.CriticalUSBDevices, SerialNumber);
   }
-  /** Add or replace one serial-keyed critical entry. Returns whether it was new. */
-  MarkCriticalUSBDevice(Device: unknown) {
-    const Entry = normalizeCriticalUSBEntry(Device);
-    if (!Entry) return false;
-    const Index = this.CriticalUSBDevices.findIndex((E) => E.SerialNumber === Entry.SerialNumber);
-    if (Index === -1) this.CriticalUSBDevices.push(Entry);
-    else this.CriticalUSBDevices[Index] = Entry;
+  /** Add or replace one critical entry. Returns whether it was new. */
+  MarkCriticalUSBDevice(Entry: unknown) {
+    const Next = WithCriticalEntry(USB_SERIAL_KIND, this.CriticalUSBDevices, Entry);
+    if (!Next) return false;
+    this.CriticalUSBDevices = Next.List;
     this._rebuildUSBDeviceView();
-    return Index === -1;
+    return Next.Added;
   }
   UnmarkCriticalUSBSerial(SerialNumber: unknown) {
-    const Normalized = normalizeSerialNumber(SerialNumber);
-    if (!Normalized) return false;
-    const PrevLength = this.CriticalUSBDevices.length;
-    this.CriticalUSBDevices = this.CriticalUSBDevices.filter(
-      (Entry) => Entry.SerialNumber !== Normalized
-    );
-    if (this.CriticalUSBDevices.length === PrevLength) return false;
+    const Next = WithoutCriticalEntry(USB_SERIAL_KIND, this.CriticalUSBDevices, SerialNumber);
+    if (!Next) return false;
+    this.CriticalUSBDevices = Next;
     this._rebuildUSBDeviceView();
     return true;
   }
   SetCriticalUSBNames(Devices: unknown) {
-    const Normalized: CriticalUSBName[] = [];
-    const Seen = new Set<string>();
-    for (const Raw of Array.isArray(Devices) ? Devices : []) {
-      const Entry = normalizeCriticalUSBNameEntry(Raw);
-      if (!Entry || Seen.has(Entry.NameKey)) continue;
-      Seen.add(Entry.NameKey);
-      Normalized.push(Entry);
-    }
-    this.CriticalUSBNames = Normalized;
+    this.CriticalUSBNames = CriticalListFrom(USB_NAME_KIND, Devices);
     this._rebuildUSBDeviceView();
   }
   IsUSBNameCritical(NameKey: unknown) {
-    const Normalized = typeof NameKey === 'string' ? NameKey.trim().toLowerCase() : '';
-    if (!Normalized) return false;
-    return this.CriticalUSBNames.some((Entry) => Entry.NameKey === Normalized);
+    return HasCriticalEntry(USB_NAME_KIND, this.CriticalUSBNames, NameKey);
   }
-  /** Add or replace one name-keyed critical entry. Returns whether it was new. */
-  MarkCriticalUSBName(Device: unknown) {
-    const Entry = normalizeCriticalUSBNameEntry(Device);
-    if (!Entry) return false;
-    const Index = this.CriticalUSBNames.findIndex((E) => E.NameKey === Entry.NameKey);
-    if (Index === -1) this.CriticalUSBNames.push(Entry);
-    else this.CriticalUSBNames[Index] = Entry;
+  /** Add or replace one critical entry. Returns whether it was new. */
+  MarkCriticalUSBName(Entry: unknown) {
+    const Next = WithCriticalEntry(USB_NAME_KIND, this.CriticalUSBNames, Entry);
+    if (!Next) return false;
+    this.CriticalUSBNames = Next.List;
     this._rebuildUSBDeviceView();
-    return Index === -1;
+    return Next.Added;
   }
   UnmarkCriticalUSBName(NameKey: unknown) {
-    const Normalized = typeof NameKey === 'string' ? NameKey.trim().toLowerCase() : '';
-    if (!Normalized) return false;
-    const PrevLength = this.CriticalUSBNames.length;
-    this.CriticalUSBNames = this.CriticalUSBNames.filter((Entry) => Entry.NameKey !== Normalized);
-    if (this.CriticalUSBNames.length === PrevLength) return false;
+    const Next = WithoutCriticalEntry(USB_NAME_KIND, this.CriticalUSBNames, NameKey);
+    if (!Next) return false;
+    this.CriticalUSBNames = Next;
     this._rebuildUSBDeviceView();
     return true;
   }
-  SetDisplayList(DisplayList: unknown) {
+  SetDisplayList(DisplayList: ValidatedDisplay[]) {
     const Previous = this.ConnectedDisplayList;
     const PreviousView = this.DisplayList;
     const BaselineTrusted = this.HasDisplayTelemetry;
@@ -1048,27 +1011,23 @@ class Client {
    * attribute-derived id bakes the configuration in, so such a change arrives
    * as a Removed plus an Added, which merges correctly either way.
    */
-  ApplyDisplayDelta(Delta: unknown) {
-    const D = AsRecord(Delta);
+  ApplyDisplayDelta(Delta: ValidatedDisplayDelta) {
     const current = Array.isArray(this.ConnectedDisplayList) ? this.ConnectedDisplayList : [];
     const PreviousView = this.DisplayList;
     const BaselineTrusted = this.HasDisplayTelemetry;
-    const byID = new Map<string, ClientDisplay>();
+    const byID = new Map<string, ValidatedDisplay>();
     for (const display of current) {
-      const ID = normalizeDisplayID(AsRecord(display).DisplayID);
+      const ID = normalizeDisplayID(display.DisplayID);
       if (ID) byID.set(ID, display);
     }
 
-    for (const rawID of Array.isArray(D.Removed) ? D.Removed : []) {
+    for (const rawID of Delta.Removed) {
       const ID = normalizeDisplayID(rawID);
       if (ID) byID.delete(ID);
     }
-    for (const key of ['Added', 'Changed'] as const) {
-      for (const raw of Array.isArray(D[key]) ? (D[key] as unknown[]) : []) {
-        const display = raw as ClientDisplay;
-        const ID = normalizeDisplayID(AsRecord(display).DisplayID);
-        if (ID) byID.set(ID, display);
-      }
+    for (const display of [...Delta.Added, ...Delta.Changed]) {
+      const ID = normalizeDisplayID(display.DisplayID);
+      if (ID) byID.set(ID, display);
     }
 
     this.ConnectedDisplayList = Array.from(byID.values());
@@ -1085,13 +1044,13 @@ class Client {
   // Displays that appeared, went or changed between two trusted lists. Whether
   // one is critical is read from the view it was judged in: before the change
   // for one that went, after it for one that arrived or changed.
-  _emitDisplayTransitions(Previous: ClientDisplay[], PreviousView: DisplayViewEntry[]) {
+  _emitDisplayTransitions(Previous: ValidatedDisplay[], PreviousView: DisplayViewEntry[]) {
     const Transitions = diffDisplays(Previous, this.ConnectedDisplayList);
     const CriticalIn = (View: DisplayViewEntry[], DisplayID: unknown) => {
       const ID = normalizeDisplayID(DisplayID);
       return !!ID && View.some((Entry) => Entry.IsCritical && Entry.DisplayID === ID);
     };
-    const Describe = (Display: ClientDisplay) => ({
+    const Describe = (Display: ValidatedDisplay) => ({
       DisplayID: Display.DisplayID,
       Label: Display.Label ?? null,
       ScreenNumber: Display.ScreenNumber ?? null,
@@ -1135,21 +1094,11 @@ class Client {
     }
   }
   SetCriticalDisplays(Displays: unknown) {
-    const Normalized: CriticalDisplay[] = [];
-    const Seen = new Set<string>();
-    for (const Raw of Array.isArray(Displays) ? Displays : []) {
-      const Entry = normalizeCriticalDisplayEntry(Raw);
-      if (!Entry || Seen.has(Entry.DisplayID)) continue;
-      Seen.add(Entry.DisplayID);
-      Normalized.push(Entry);
-    }
-    this.CriticalDisplays = Normalized;
+    this.CriticalDisplays = CriticalListFrom(DISPLAY_KIND, Displays);
     this._rebuildDisplayView();
   }
   IsDisplayCritical(DisplayID: unknown) {
-    const Normalized = normalizeDisplayID(DisplayID);
-    if (!Normalized) return false;
-    return this.CriticalDisplayIDs.includes(Normalized);
+    return HasCriticalEntry(DISPLAY_KIND, this.CriticalDisplays, DisplayID);
   }
   /**
    * The critical entry a display id refers to, and the reported display it is
@@ -1158,7 +1107,7 @@ class Client {
    */
   FindCriticalDisplay(DisplayID: unknown): {
     Critical: CriticalDisplay | null;
-    Live: ClientDisplay | null;
+    Live: ValidatedDisplay | null;
   } {
     const Normalized = normalizeDisplayID(DisplayID);
     if (!Normalized) return { Critical: null, Live: null };
@@ -1175,95 +1124,39 @@ class Client {
     return { Critical: Entry?.Critical ?? null, Live };
   }
   /** Add or replace one critical entry. Returns whether it was new. */
-  MarkCriticalDisplay(Display: unknown) {
-    const Entry = normalizeCriticalDisplayEntry(Display);
-    if (!Entry) return false;
-    const Index = this.CriticalDisplays.findIndex((E) => E.DisplayID === Entry.DisplayID);
-    if (Index === -1) this.CriticalDisplays.push(Entry);
-    else this.CriticalDisplays[Index] = Entry;
+  MarkCriticalDisplay(Entry: unknown) {
+    const Next = WithCriticalEntry(DISPLAY_KIND, this.CriticalDisplays, Entry);
+    if (!Next) return false;
+    this.CriticalDisplays = Next.List;
     this._rebuildDisplayView();
-    return Index === -1;
+    return Next.Added;
   }
   UnmarkCriticalDisplay(DisplayID: unknown) {
-    const Normalized = normalizeDisplayID(DisplayID);
-    if (!Normalized) return false;
-    const PrevLength = this.CriticalDisplays.length;
-    this.CriticalDisplays = this.CriticalDisplays.filter((Entry) => Entry.DisplayID !== Normalized);
-    if (this.CriticalDisplays.length === PrevLength) return false;
+    const Next = WithoutCriticalEntry(DISPLAY_KIND, this.CriticalDisplays, DisplayID);
+    if (!Next) return false;
+    this.CriticalDisplays = Next;
     this._rebuildDisplayView();
     return true;
   }
   SetCriticalApplications(Applications: unknown) {
-    const List: unknown[] = Array.isArray(Applications) ? Applications : [];
-    const Normalized: CriticalApplicationEntry[] = [];
-    const Seen = new Set<string>();
-    for (const Raw of List) {
-      const Entry = AsRecord(Raw);
-      const Name = normalizeApplicationName(Entry.Name);
-      const Key = normalizeApplicationKey(Name);
-      if (!Name || !Key || Seen.has(Key)) continue;
-      Seen.add(Key);
-      Normalized.push({
-        Name,
-        Key,
-        Timestamp: TimestampOrNull(Entry.Timestamp),
-        RequireForeground: Entry.RequireForeground === true,
-        RequireResponding: Entry.RequireResponding !== false,
-      });
-    }
-    this.CriticalApplications = Normalized;
-    this.CriticalApplicationKeys = Normalized.map((Entry) => Entry.Key);
+    this.CriticalApplications = CriticalListFrom(APPLICATION_KIND, Applications);
     this._rebuildRunningApplicationsView();
-    return;
   }
   IsApplicationCritical(Name: unknown) {
-    const Key = normalizeApplicationKey(Name);
-    if (!Key) return false;
-    return this.CriticalApplicationKeys.includes(Key);
+    return HasCriticalEntry(APPLICATION_KIND, this.CriticalApplications, Name);
   }
-  MarkCriticalApplication(Application: unknown) {
-    const A = AsRecord(Application);
-    const Name = normalizeApplicationName(A.Name);
-    const Key = normalizeApplicationKey(Name);
-    if (!Name || !Key) return false;
-    const Existing = this.CriticalApplications.find(
-      (Entry: CriticalApplicationEntry) => Entry.Key === Key
-    );
-    if (Existing) {
-      if (!Existing.Name) Existing.Name = Name;
-      if (!Existing.Timestamp && A.Timestamp) {
-        Existing.Timestamp = TimestampOrNull(A.Timestamp);
-      }
-      for (const Condition of ['RequireForeground', 'RequireResponding'] as const) {
-        if (typeof A[Condition] === 'boolean') Existing[Condition] = A[Condition] as boolean;
-      }
-      this._rebuildRunningApplicationsView();
-      return false;
-    }
-    this.CriticalApplications.push({
-      Name,
-      Key,
-      Timestamp: TimestampOrNull(A.Timestamp),
-      RequireForeground: A.RequireForeground === true,
-      RequireResponding: A.RequireResponding !== false,
-    });
-    this.CriticalApplicationKeys = this.CriticalApplications.map(
-      (Entry: CriticalApplicationEntry) => Entry.Key
-    );
+  /** Add or replace one critical entry. Returns whether it was new. */
+  MarkCriticalApplication(Entry: unknown) {
+    const Next = WithCriticalEntry(APPLICATION_KIND, this.CriticalApplications, Entry);
+    if (!Next) return false;
+    this.CriticalApplications = Next.List;
     this._rebuildRunningApplicationsView();
-    return true;
+    return Next.Added;
   }
   UnmarkCriticalApplication(Name: unknown) {
-    const Key = normalizeApplicationKey(Name);
-    if (!Key) return false;
-    const PrevLength = this.CriticalApplications.length;
-    this.CriticalApplications = this.CriticalApplications.filter(
-      (Entry: CriticalApplicationEntry) => Entry.Key !== Key
-    );
-    if (this.CriticalApplications.length === PrevLength) return false;
-    this.CriticalApplicationKeys = this.CriticalApplications.map(
-      (Entry: CriticalApplicationEntry) => Entry.Key
-    );
+    const Next = WithoutCriticalEntry(APPLICATION_KIND, this.CriticalApplications, Name);
+    if (!Next) return false;
+    this.CriticalApplications = Next;
     this._rebuildRunningApplicationsView();
     return true;
   }
@@ -1461,6 +1354,7 @@ class Client {
     if (Refresh) this._refreshClientHealthState();
   }
   _rebuildRunningApplicationsView() {
+    this.CriticalApplicationKeys = this.CriticalApplications.map((Entry) => Entry.Key);
     const Observed = Array.isArray(this.ObservedRunningApplications?.Items)
       ? this.ObservedRunningApplications.Items
       : [];
@@ -1550,7 +1444,7 @@ class Client {
    * announce every device as freshly connected, and a failed sample (an empty
    * list) every device as gone.
    */
-  SetAudioDevices(Snapshot: unknown) {
+  SetAudioDevices(Snapshot: ValidatedAudioDevices) {
     const Previous = this.ObservedAudio;
     const PreviousOutOfRange = this._audioLevelsOutOfRange();
     const Next = normalizeAudioSnapshot(Snapshot);
@@ -1602,40 +1496,24 @@ class Client {
     return Out;
   }
   SetCriticalAudioDevices(Devices: unknown) {
-    const Normalized: CriticalAudioDevice[] = [];
-    const Seen = new Set<string>();
-    for (const Raw of Array.isArray(Devices) ? Devices : []) {
-      const Entry = normalizeCriticalAudioEntry(Raw);
-      if (!Entry || Seen.has(Entry.EndpointID)) continue;
-      Seen.add(Entry.EndpointID);
-      Normalized.push(Entry);
-    }
-    this.CriticalAudioDevices = Normalized;
+    this.CriticalAudioDevices = CriticalListFrom(AUDIO_KIND, Devices);
     this._rebuildAudioView();
   }
   IsAudioDeviceCritical(EndpointID: unknown) {
-    const Normalized = normalizeEndpointID(EndpointID);
-    if (!Normalized) return false;
-    return this.CriticalAudioDevices.some((Entry) => Entry.EndpointID === Normalized);
+    return HasCriticalEntry(AUDIO_KIND, this.CriticalAudioDevices, EndpointID);
   }
   /** Add or replace one critical entry. Returns whether it was new. */
-  MarkCriticalAudioDevice(Device: unknown) {
-    const Entry = normalizeCriticalAudioEntry(Device);
-    if (!Entry) return false;
-    const Index = this.CriticalAudioDevices.findIndex((E) => E.EndpointID === Entry.EndpointID);
-    if (Index === -1) this.CriticalAudioDevices.push(Entry);
-    else this.CriticalAudioDevices[Index] = Entry;
+  MarkCriticalAudioDevice(Entry: unknown) {
+    const Next = WithCriticalEntry(AUDIO_KIND, this.CriticalAudioDevices, Entry);
+    if (!Next) return false;
+    this.CriticalAudioDevices = Next.List;
     this._rebuildAudioView();
-    return Index === -1;
+    return Next.Added;
   }
   UnmarkCriticalAudioDevice(EndpointID: unknown) {
-    const Normalized = normalizeEndpointID(EndpointID);
-    if (!Normalized) return false;
-    const PrevLength = this.CriticalAudioDevices.length;
-    this.CriticalAudioDevices = this.CriticalAudioDevices.filter(
-      (Entry) => Entry.EndpointID !== Normalized
-    );
-    if (this.CriticalAudioDevices.length === PrevLength) return false;
+    const Next = WithoutCriticalEntry(AUDIO_KIND, this.CriticalAudioDevices, EndpointID);
+    if (!Next) return false;
+    this.CriticalAudioDevices = Next;
     this._rebuildAudioView();
     return true;
   }
@@ -1651,40 +1529,24 @@ class Client {
     if (Refresh) this._refreshClientHealthState();
   }
   SetCriticalNetworkInterfaces(Interfaces: unknown) {
-    const Normalized: CriticalNetworkInterface[] = [];
-    const Seen = new Set<string>();
-    for (const Raw of Array.isArray(Interfaces) ? Interfaces : []) {
-      const Entry = normalizeCriticalNetworkEntry(Raw);
-      if (!Entry || Seen.has(Entry.Name)) continue;
-      Seen.add(Entry.Name);
-      Normalized.push(Entry);
-    }
-    this.CriticalNetworkInterfaces = Normalized;
+    this.CriticalNetworkInterfaces = CriticalListFrom(NETWORK_KIND, Interfaces);
     this._rebuildNetworkView();
   }
   IsNetworkInterfaceCritical(Name: unknown) {
-    const Normalized = normalizeInterfaceName(Name);
-    if (!Normalized) return false;
-    return this.CriticalNetworkInterfaces.some((Entry) => Entry.Name === Normalized);
+    return HasCriticalEntry(NETWORK_KIND, this.CriticalNetworkInterfaces, Name);
   }
   /** Add or replace one critical entry. Returns whether it was new. */
-  MarkCriticalNetworkInterface(Interface: unknown) {
-    const Entry = normalizeCriticalNetworkEntry(Interface);
-    if (!Entry) return false;
-    const Index = this.CriticalNetworkInterfaces.findIndex((E) => E.Name === Entry.Name);
-    if (Index === -1) this.CriticalNetworkInterfaces.push(Entry);
-    else this.CriticalNetworkInterfaces[Index] = Entry;
+  MarkCriticalNetworkInterface(Entry: unknown) {
+    const Next = WithCriticalEntry(NETWORK_KIND, this.CriticalNetworkInterfaces, Entry);
+    if (!Next) return false;
+    this.CriticalNetworkInterfaces = Next.List;
     this._rebuildNetworkView();
-    return Index === -1;
+    return Next.Added;
   }
   UnmarkCriticalNetworkInterface(Name: unknown) {
-    const Normalized = normalizeInterfaceName(Name);
-    if (!Normalized) return false;
-    const PrevLength = this.CriticalNetworkInterfaces.length;
-    this.CriticalNetworkInterfaces = this.CriticalNetworkInterfaces.filter(
-      (Entry) => Entry.Name !== Normalized
-    );
-    if (this.CriticalNetworkInterfaces.length === PrevLength) return false;
+    const Next = WithoutCriticalEntry(NETWORK_KIND, this.CriticalNetworkInterfaces, Name);
+    if (!Next) return false;
+    this.CriticalNetworkInterfaces = Next;
     this._rebuildNetworkView();
     return true;
   }
@@ -1700,7 +1562,7 @@ class Client {
     this.NetworkWarnings = Result.Warnings;
     if (Refresh) this._refreshClientHealthState();
   }
-  SetNetworkInterfaces(Interfaces: unknown) {
+  SetNetworkInterfaces(Interfaces: ValidatedNetworkInterface[]) {
     try {
       const normalized = normalizeNetworkInterfaces(Interfaces);
       const Previous = this.NetworkInterfaces;
@@ -1727,7 +1589,7 @@ class Client {
    * the step between two samples. Anything it gets wrong is corrected within a
    * resync interval rather than persisting.
    */
-  ApplyNetworkInterfaceDelta(Delta: unknown) {
+  ApplyNetworkInterfaceDelta(Delta: ValidatedNetworkInterfaceDelta) {
     try {
       const D = AsRecord(Delta);
       const byName = new Map<string, NormalizedNetworkInterface>(
@@ -1817,7 +1679,7 @@ class Client {
     this.IntegratedActions = Array.isArray(Actions) ? Actions : [];
     BroadcastManager.emit('ClientUpdated', this);
   }
-  SetRunningApplications(Snapshot: unknown) {
+  SetRunningApplications(Snapshot: ValidatedRunningApplications) {
     const S = AsRecord(Snapshot);
     const PreviousByKey = this._observedApplicationsByKey();
     const PreviousFaults = this._applicationFaults();
@@ -2123,7 +1985,7 @@ class Client {
    * has been applied, the next full snapshot matches the stored state and its
    * own diff finds nothing to report.
    */
-  ApplyApplicationDelta(Delta: unknown) {
+  ApplyApplicationDelta(Delta: ValidatedApplicationDelta) {
     const D = AsRecord(Delta);
     const PreviousByKey = this._observedApplicationsByKey();
     const PreviousFaults = this._applicationFaults();

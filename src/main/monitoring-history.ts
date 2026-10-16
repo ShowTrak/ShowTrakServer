@@ -180,7 +180,7 @@ function absorbRepeatSample(samples: HistorySample[], next: HistorySample): bool
 // Every named per-entity store (critical applications, USB, displays, audio,
 // network), so the retention sweep can reach them too. Registered by the
 // factory below.
-const NamedHistoryStores: NamedHistoryStore[] = [];
+const NamedHistoryStores: Array<Pick<NamedHistoryStore, 'prune'>> = [];
 
 // Drop everything older than the 12h window from EVERY store — not only the
 // series that happen to be recorded into. A client that goes offline stops
@@ -407,17 +407,23 @@ function getClientHistorySamples(uuid: unknown): HistorySample[] {
 // domains differ only in how the current state is extracted from client
 // telemetry and which stable identifier field the getter emits, so a single
 // factory drives all three.
-interface NamedHistoryStore {
+/** One entity's series as the renderer receives it, its id under `KeyField`. */
+type NamedHistorySeries<KeyField extends string> = { [Field in KeyField]: string } & {
+  Name: string;
+  samples: HistorySample[];
+};
+
+interface NamedHistoryStore<KeyField extends string = string> {
   record(client: ClientHardwareTelemetryLike | null | undefined, sampledAt?: number | null): void;
   sync(list: unknown): void;
-  get(uuid: unknown): Array<Record<string, string | HistorySample[]>>;
+  get(uuid: unknown): Array<NamedHistorySeries<KeyField>>;
   prune(now?: number): void;
 }
 
-function createNamedHistoryStore(
+function createNamedHistoryStore<KeyField extends string>(
   extract: (client: ClientHardwareTelemetryLike | null | undefined) => NamedEntityState[] | null,
-  outputKeyField: string
-): NamedHistoryStore {
+  outputKeyField: KeyField
+): NamedHistoryStore<KeyField> {
   const store = new Map<string, Map<string, NamedHistoryEntry>>();
 
   function record(
@@ -488,19 +494,23 @@ function createNamedHistoryStore(
     }
   }
 
-  function get(uuid: unknown): Array<Record<string, string | HistorySample[]>> {
+  function get(uuid: unknown): Array<NamedHistorySeries<KeyField>> {
     const key = normalizeDummyUUID(uuid);
     if (!key) return [];
     const perEntity = store.get(key);
     if (!perEntity) return [];
     const now = Date.now();
     const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
-    const out: Array<Record<string, string | HistorySample[]>> = [];
+    const out: Array<NamedHistorySeries<KeyField>> = [];
     for (const [entityKey, entry] of perEntity.entries()) {
       const samples = (Array.isArray(entry.Points) ? entry.Points : []).filter(
         (s: HistorySample) => s && Number(s.ts) >= cutoff
       );
-      out.push({ [outputKeyField]: entityKey, Name: entry.Name || entityKey, samples });
+      out.push({
+        [outputKeyField]: entityKey,
+        Name: entry.Name || entityKey,
+        samples,
+      } as NamedHistorySeries<KeyField>);
     }
     return out;
   }
@@ -576,26 +586,9 @@ function extractCriticalApplicationStates(
 
 const ClientApplicationHistory = createNamedHistoryStore(extractCriticalApplicationStates, 'Key');
 
-function recordClientApplicationHistorySamples(
-  client: ClientHardwareTelemetryLike | null | undefined,
-  sampledAt: number | null = null
-): void {
-  ClientApplicationHistory.record(client, sampledAt);
-}
-
-function syncClientApplicationHistoryStore(list: unknown): void {
-  ClientApplicationHistory.sync(list);
-}
-
-function getClientApplicationHistorySamples(
-  uuid: unknown
-): Array<{ Key: string; Name: string; samples: HistorySample[] }> {
-  return ClientApplicationHistory.get(uuid) as Array<{
-    Key: string;
-    Name: string;
-    samples: HistorySample[];
-  }>;
-}
+const recordClientApplicationHistorySamples = ClientApplicationHistory.record;
+const syncClientApplicationHistoryStore = ClientApplicationHistory.sync;
+const getClientApplicationHistorySamples = ClientApplicationHistory.get;
 
 // Serial-less critical USB devices are guarded by name + quantity rather than a
 // serial number, so their history is keyed by NameKey. This prefix keeps those
@@ -672,26 +665,9 @@ function extractCriticalUSBStates(
 
 const ClientUSBHistory = createNamedHistoryStore(extractCriticalUSBStates, 'Serial');
 
-function recordClientUSBHistorySamples(
-  client: ClientHardwareTelemetryLike | null | undefined,
-  sampledAt: number | null = null
-): void {
-  ClientUSBHistory.record(client, sampledAt);
-}
-
-function syncClientUSBHistoryStore(list: unknown): void {
-  ClientUSBHistory.sync(list);
-}
-
-function getClientUSBHistorySamples(
-  uuid: unknown
-): Array<{ Serial: string; Name: string; samples: HistorySample[] }> {
-  return ClientUSBHistory.get(uuid) as Array<{
-    Serial: string;
-    Name: string;
-    samples: HistorySample[];
-  }>;
-}
+const recordClientUSBHistorySamples = ClientUSBHistory.record;
+const syncClientUSBHistoryStore = ClientUSBHistory.sync;
+const getClientUSBHistorySamples = ClientUSBHistory.get;
 
 // Resolve the current state for every critical display on a client. Returns
 // null (skip this sample, leaving an idle gap) when the client is offline so we
@@ -733,26 +709,9 @@ function extractCriticalDisplayStates(
 
 const ClientDisplayHistory = createNamedHistoryStore(extractCriticalDisplayStates, 'DisplayID');
 
-function recordClientDisplayHistorySamples(
-  client: ClientHardwareTelemetryLike | null | undefined,
-  sampledAt: number | null = null
-): void {
-  ClientDisplayHistory.record(client, sampledAt);
-}
-
-function syncClientDisplayHistoryStore(list: unknown): void {
-  ClientDisplayHistory.sync(list);
-}
-
-function getClientDisplayHistorySamples(
-  uuid: unknown
-): Array<{ DisplayID: string; Name: string; samples: HistorySample[] }> {
-  return ClientDisplayHistory.get(uuid) as Array<{
-    DisplayID: string;
-    Name: string;
-    samples: HistorySample[];
-  }>;
-}
+const recordClientDisplayHistorySamples = ClientDisplayHistory.record;
+const syncClientDisplayHistoryStore = ClientDisplayHistory.sync;
+const getClientDisplayHistorySamples = ClientDisplayHistory.get;
 
 // Resolve the current state for every critical audio endpoint on a client.
 // Null (an idle gap) while the client is offline, for the reason the display
@@ -792,26 +751,9 @@ function extractCriticalAudioStates(
 
 const ClientAudioHistory = createNamedHistoryStore(extractCriticalAudioStates, 'EndpointID');
 
-function recordClientAudioHistorySamples(
-  client: ClientHardwareTelemetryLike | null | undefined,
-  sampledAt: number | null = null
-): void {
-  ClientAudioHistory.record(client, sampledAt);
-}
-
-function syncClientAudioHistoryStore(list: unknown): void {
-  ClientAudioHistory.sync(list);
-}
-
-function getClientAudioHistorySamples(
-  uuid: unknown
-): Array<{ EndpointID: string; Name: string; samples: HistorySample[] }> {
-  return ClientAudioHistory.get(uuid) as Array<{
-    EndpointID: string;
-    Name: string;
-    samples: HistorySample[];
-  }>;
-}
+const recordClientAudioHistorySamples = ClientAudioHistory.record;
+const syncClientAudioHistoryStore = ClientAudioHistory.sync;
+const getClientAudioHistorySamples = ClientAudioHistory.get;
 
 // Resolve the current state for every critical network interface on a client,
 // on the audio extractor's rules: connected and meeting its conditions is
@@ -845,26 +787,9 @@ function extractCriticalNetworkStates(
 
 const ClientNetworkHistory = createNamedHistoryStore(extractCriticalNetworkStates, 'InterfaceName');
 
-function recordClientNetworkHistorySamples(
-  client: ClientHardwareTelemetryLike | null | undefined,
-  sampledAt: number | null = null
-): void {
-  ClientNetworkHistory.record(client, sampledAt);
-}
-
-function syncClientNetworkHistoryStore(list: unknown): void {
-  ClientNetworkHistory.sync(list);
-}
-
-function getClientNetworkHistorySamples(
-  uuid: unknown
-): Array<{ InterfaceName: string; Name: string; samples: HistorySample[] }> {
-  return ClientNetworkHistory.get(uuid) as Array<{
-    InterfaceName: string;
-    Name: string;
-    samples: HistorySample[];
-  }>;
-}
+const recordClientNetworkHistorySamples = ClientNetworkHistory.record;
+const syncClientNetworkHistoryStore = ClientNetworkHistory.sync;
+const getClientNetworkHistorySamples = ClientNetworkHistory.get;
 
 // Resolve each monitored system check (CPU, memory, uptime, power, thermal) to
 // healthy or failing. A check with nothing to judge — the client offline, or a
@@ -926,26 +851,9 @@ function extractSystemCheckStates(
 
 const ClientSystemCheckHistory = createNamedHistoryStore(extractSystemCheckStates, 'CheckKey');
 
-function recordClientSystemCheckHistorySamples(
-  client: ClientHardwareTelemetryLike | null | undefined,
-  sampledAt: number | null = null
-): void {
-  ClientSystemCheckHistory.record(client, sampledAt);
-}
-
-function syncClientSystemCheckHistoryStore(list: unknown): void {
-  ClientSystemCheckHistory.sync(list);
-}
-
-function getClientSystemCheckHistorySamples(
-  uuid: unknown
-): Array<{ CheckKey: string; Name: string; samples: HistorySample[] }> {
-  return ClientSystemCheckHistory.get(uuid) as Array<{
-    CheckKey: string;
-    Name: string;
-    samples: HistorySample[];
-  }>;
-}
+const recordClientSystemCheckHistorySamples = ClientSystemCheckHistory.record;
+const syncClientSystemCheckHistoryStore = ClientSystemCheckHistory.sync;
+const getClientSystemCheckHistorySamples = ClientSystemCheckHistory.get;
 
 export {
   recordClientSystemCheckHistorySamples,

@@ -60,7 +60,7 @@ interface AlertTargetLike {
 
 // Validated create/update payloads (IPCValidation guarantees Title/TriggerType
 // on create; update is a partial patch).
-interface AlertRuleCreatePayload {
+export interface AlertRuleCreatePayload {
   Title: string;
   Scope?: { Workspace?: unknown; Groups?: unknown; Clients?: unknown; Tags?: unknown };
   TriggerTypes: string[];
