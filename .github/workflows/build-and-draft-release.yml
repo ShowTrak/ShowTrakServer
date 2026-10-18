@@ -146,7 +146,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Linux is pinned, not ubuntu-latest: sqlite3 is compiled on the runner,
+        # so the Linux packages need the runner's glibc or newer (2.38 on 24.04).
+        # Building on a newer image would stop them running on 24.04 LTS.
+        os: [ubuntu-24.04, macos-latest, windows-latest]
 
     runs-on: ${{ matrix.os }}
     env:
