@@ -40,6 +40,7 @@ import {
   ToNumber,
   ToText,
   ConfigIsComplete,
+  ReadHostMacAddresses,
   type FogConfig,
 } from './client';
 
@@ -425,6 +426,7 @@ const Manager = {
         FogHostID: ToNumber(Host.id, 0),
         Name: ToText(Host.name) || `Host ${ToNumber(Host.id, 0)}`,
         MacAddress: ToText(Host.primac) || null,
+        MacAddresses: ReadHostMacAddresses(Host),
         ImageName: ToText(Host.imagename) || (Image ? ToText(Image.name) : '') || null,
       };
     }).sort((A, B) => A.Name.localeCompare(B.Name));

@@ -28,6 +28,7 @@
 import http from 'http';
 import https from 'https';
 import { FOG_REQUEST_TIMEOUT_MS } from '../Config/fog';
+import { NormalizeMacAddress } from '../MacAddress';
 
 export interface FogConfig {
   Protocol: 'http' | 'https';
@@ -187,6 +188,22 @@ export function ToNumber(Value: unknown, Fallback: number = 0): number {
 
 export function ToText(Value: unknown): string {
   return Value == null ? '' : String(Value);
+}
+
+// Every MAC FOG holds for a host, primary first, normalized and de-duplicated.
+//
+// The host getter emits `primac` (the primary, as a string) and `macs` (every
+// address associated with the host, primary included, from getMyMacs) — read
+// from FOG's route.class.php, since the docs mention neither. Anything that is
+// not a valid MAC is dropped rather than failing the whole host.
+export function ReadHostMacAddresses(Host: { primac?: unknown; macs?: unknown }): string[] {
+  const Raw = [Host.primac, ...(Array.isArray(Host.macs) ? Host.macs : [])];
+  const Seen = new Set<string>();
+  for (const Value of Raw) {
+    const Mac = NormalizeMacAddress(Value);
+    if (Mac) Seen.add(Mac);
+  }
+  return [...Seen];
 }
 
 // Health probe. Returns null when healthy, or a human-readable reason when not.

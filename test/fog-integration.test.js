@@ -15,6 +15,7 @@ const {
   ToNumber,
   ConfigIsComplete,
   DescribeConfigGaps,
+  ReadHostMacAddresses,
 } = require('../dist/Modules/FogManager/client');
 const { Manager: IPCValidation } = require('../dist/Modules/IPCValidation');
 const { CreateFogRepository } = require('../dist/Modules/DB/repositories/fog');
@@ -367,4 +368,25 @@ test('age-based pruning also spares open tasks', async () => {
   assert.match(sql, /StateID NOT IN \(0, 1, 2, 3\)/);
   assert.match(sql, /UpdatedAt < \?/);
   assert.deepEqual(params, [1000]);
+});
+
+// ---- Host MAC addresses ------------------------------------------------------
+
+test('a host lists every MAC FOG holds, primary first and de-duplicated', () => {
+  // FOG's getter sends `primac` AND a `macs` list that already includes it.
+  assert.deepEqual(
+    ReadHostMacAddresses({
+      primac: 'aa:bb:cc:dd:ee:01',
+      macs: ['AA:BB:CC:DD:EE:01', 'aa-bb-cc-dd-ee-02'],
+    }),
+    ['AA:BB:CC:DD:EE:01', 'AA:BB:CC:DD:EE:02']
+  );
+});
+
+test('a host with no usable MACs lists none, and junk entries are dropped', () => {
+  assert.deepEqual(ReadHostMacAddresses({}), []);
+  assert.deepEqual(ReadHostMacAddresses({ primac: '', macs: 'not-a-list' }), []);
+  assert.deepEqual(ReadHostMacAddresses({ macs: ['nope', null, 'aabbccddee03'] }), [
+    'AA:BB:CC:DD:EE:03',
+  ]);
 });
