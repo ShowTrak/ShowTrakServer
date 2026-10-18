@@ -58,6 +58,8 @@ import {
   syncDummyHistoryStore,
   recordClientSystemCheckHistorySamples,
   syncClientSystemCheckHistoryStore,
+  recordClientStorageHistorySamples,
+  syncClientStorageHistoryStore,
   recordClientHistorySample,
   syncClientHistoryStore,
 } from './monitoring-history';
@@ -327,6 +329,7 @@ async function ClientUpdated(Client: BroadcastClient): Promise<void> {
   recordClientHistorySample(Client);
   recordClientVitalsSample(Client);
   recordClientSystemCheckHistorySamples(Client);
+  recordClientStorageHistorySamples(Client);
 
   const UUID = Client && Client.UUID ? Client.UUID : null;
   const IsOnline = !!(Client && Client.Online);
@@ -378,6 +381,7 @@ async function UpdateFullClientList(): Promise<void> {
   syncClientHistoryStore(Clients || []);
   syncClientVitalsHistory(Clients || []);
   syncClientSystemCheckHistoryStore(Clients || []);
+  syncClientStorageHistoryStore(Clients || []);
   PushToRenderers('SetFullClientList', Clients, Groups);
 }
 

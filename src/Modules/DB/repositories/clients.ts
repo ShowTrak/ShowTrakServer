@@ -106,6 +106,8 @@ export function CreateClientsRepository(DB: DBManager) {
           UUID,
         ]);
         if (networkErr) throw networkErr;
+        const [storageErr] = await run('DELETE FROM CriticalStorageVolumes WHERE UUID = ?', [UUID]);
+        if (storageErr) throw storageErr;
         const [systemErr] = await run('DELETE FROM CriticalSystemChecks WHERE UUID = ?', [UUID]);
         if (systemErr) throw systemErr;
         const [macErr] = await run('DELETE FROM ClientMacAddresses WHERE UUID = ?', [UUID]);
@@ -212,6 +214,12 @@ export function CreateClientsRepository(DB: DBManager) {
           [NewUUID, OldUUID]
         );
         if (criticalNetworkErr) throw criticalNetworkErr;
+
+        const [criticalStorageErr] = await run(
+          'UPDATE CriticalStorageVolumes SET UUID = ? WHERE UUID = ?',
+          [NewUUID, OldUUID]
+        );
+        if (criticalStorageErr) throw criticalStorageErr;
 
         const [criticalSystemErr] = await run(
           'UPDATE CriticalSystemChecks SET UUID = ? WHERE UUID = ?',

@@ -52,6 +52,7 @@ export interface MonitorHistorySeriesEntry {
   audioEndpointID?: string;
   audioName?: string;
   networkInterfaceName?: string;
+  storageMountPoint?: string;
   /** A monitored system check (cpu, ram, uptime, power, thermal). */
   systemCheckKey?: string;
   /** CPU or memory usage readings, for that check's line chart. */

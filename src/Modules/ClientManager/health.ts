@@ -167,7 +167,7 @@ export function IsReboot(PreviousUptime: number | null, NextUptime: number | nul
 
 const COLLECTOR_STATES: ReadonlySet<string> = new Set(['unknown', 'ok', 'error', 'unsupported']);
 
-function CollectorStatusOf(Value: unknown): PowerStatusSnapshot['Status'] {
+export function CollectorStatusOf(Value: unknown): PowerStatusSnapshot['Status'] {
   const S = AsRecord(Value);
   const State = typeof S.State === 'string' ? S.State.toLowerCase() : 'unknown';
   return {

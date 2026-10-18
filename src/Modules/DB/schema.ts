@@ -328,6 +328,25 @@ Schema.push({
     )',
 });
 
+// Monitored storage volumes: one row per (client, mount point) the operator
+// guards, holding the conditions it must keep. A NULL free-space limit is not
+// guarded. Created here rather than by a migration, for the same reason as
+// CriticalAudioDevices.
+Schema.push({
+  Name: 'CriticalStorageVolumes',
+  SQL: 'CREATE TABLE IF NOT EXISTS `CriticalStorageVolumes` ( \
+            UUID TEXT NOT NULL, \
+            MountPoint TEXT NOT NULL, \
+            Name TEXT, \
+            MinFreePercent INTEGER, \
+            MinFreeGB INTEGER, \
+            RequireWritable INTEGER NOT NULL DEFAULT 0, \
+            RequireHealthy INTEGER NOT NULL DEFAULT 0, \
+            Timestamp BIGINT(11) NOT NULL, \
+            PRIMARY KEY (UUID, MountPoint) \
+    )',
+});
+
 // Monitored system checks: one row per (client, check) the operator monitors —
 // CPU, memory, uptime, power or thermal — holding the conditions it must keep.
 // Only the columns of the row's own check are used; a NULL condition is not

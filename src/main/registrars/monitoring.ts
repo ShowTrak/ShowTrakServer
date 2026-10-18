@@ -12,6 +12,7 @@ import {
   getClientDisplayHistorySamples,
   getClientAudioHistorySamples,
   getClientNetworkHistorySamples,
+  getClientStorageHistorySamples,
   getClientSystemCheckHistorySamples,
 } from '../monitoring-history';
 import { getClientVitalsHistory } from '../client-vitals-history';
@@ -211,6 +212,15 @@ function register(): void {
       return [];
     }
     return getClientNetworkHistorySamples(UUID);
+  });
+
+  RPC.handle('GetClientStorageHistory', async (_Event: unknown, UUID: unknown) => {
+    try {
+      UUID = IPCValidation.UUID(UUID);
+    } catch {
+      return [];
+    }
+    return getClientStorageHistorySamples(UUID);
   });
 
   RPC.handle('GetClientSystemCheckHistory', async (_Event: unknown, UUID: unknown) => {

@@ -3,6 +3,7 @@ import type {
   AudioDevicesView,
   ClientView,
   NetworkStatusView,
+  StorageStatusView,
   USBCapabilities,
   GroupView,
   Vitals,
@@ -14,6 +15,7 @@ import type {
 } from '@showtrak/protocol';
 import { EmptyAudioView } from '../ClientManager/audio';
 import { EmptyNetworkStatusView } from '../ClientManager/network';
+import { EmptyStorageView } from '../ClientManager/storage';
 
 // Structural view of the internal Client entity — only the fields the public
 // projection reads. The array-shaped telemetry is accepted as `unknown` because
@@ -75,6 +77,8 @@ interface PublicClientSource {
   CriticalAudioDevices?: unknown;
   NetworkStatus?: unknown;
   CriticalNetworkInterfaces?: unknown;
+  StorageStatus?: unknown;
+  CriticalStorageVolumes?: unknown;
 }
 
 // Structural view of the internal Group entity read by ToPublicGroup.
@@ -182,6 +186,12 @@ const ToPublicClient = (c: PublicClientSource): ClientView => ({
   CriticalNetworkInterfaces: Array.isArray(c.CriticalNetworkInterfaces)
     ? c.CriticalNetworkInterfaces
     : [],
+  // Only the view, like audio: ObservedStorage is the internal last report.
+  StorageStatus:
+    c.StorageStatus && typeof c.StorageStatus === 'object'
+      ? (c.StorageStatus as StorageStatusView)
+      : EmptyStorageView(),
+  CriticalStorageVolumes: Array.isArray(c.CriticalStorageVolumes) ? c.CriticalStorageVolumes : [],
 });
 
 const ToPublicGroup = (g: PublicGroupSource): GroupView => ({

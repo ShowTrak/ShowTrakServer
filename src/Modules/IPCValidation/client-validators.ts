@@ -12,11 +12,13 @@ import {
   MAX_TEMPERATURE_CELSIUS,
   MAX_UPTIME_DAYS,
 } from '../ClientManager/system-checks';
+import { MAX_FREE_GB, MAX_FREE_PERCENT } from '../ClientManager/storage';
 import type {
   ClientSystemCheckPayloadResult,
   AudioLevelRequestResult,
   CriticalAudioDevicePayloadResult,
   CriticalNetworkInterfacePayloadResult,
+  CriticalStorageVolumePayloadResult,
   CriticalDisplayPayloadResult,
   CriticalUSBConditionOptionsResult,
   IPCValidationManager,
@@ -391,6 +393,38 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
       const end = ParseIP(out.RangeEnd)!;
       if (start.Family !== end.Family) fail('RangeStart and RangeEnd must be the same family');
       if (start.Value > end.Value) fail('RangeStart cannot be after RangeEnd');
+    }
+    return out;
+  };
+
+  Manager.StorageMountPoint = (value: unknown, fieldName = 'MountPoint') => {
+    return normalizeNonEmptyString(value, fieldName, { minLength: 1, maxLength: 512 });
+  };
+
+  // A monitored volume's conditions. A limit is a whole number in range, or
+  // null to stop guarding it; the yes/no conditions are booleans.
+  Manager.CriticalStorageVolumePayload = (value: unknown) => {
+    if (!isPlainObject(value)) fail('Monitored volume payload must be an object');
+    const out: CriticalStorageVolumePayloadResult = {
+      MountPoint: Manager.StorageMountPoint(value.MountPoint),
+    };
+    const Has = (key: string) =>
+      Object.prototype.hasOwnProperty.call(value, key) && value[key] !== undefined;
+    const Limit = (key: 'MinFreePercent' | 'MinFreeGB', max: number): number | null => {
+      const raw = value[key];
+      if (raw === null) return null;
+      const n = Number(raw);
+      if (raw === '' || typeof raw === 'boolean' || !Number.isInteger(n) || n < 1 || n > max) {
+        fail(`${key} must be a whole number from 1 to ${max}`);
+      }
+      return n;
+    };
+    if (Has('MinFreePercent')) out.MinFreePercent = Limit('MinFreePercent', MAX_FREE_PERCENT);
+    if (Has('MinFreeGB')) out.MinFreeGB = Limit('MinFreeGB', MAX_FREE_GB);
+    for (const key of ['RequireWritable', 'RequireHealthy'] as const) {
+      if (!Has(key)) continue;
+      if (typeof value[key] !== 'boolean') fail(`${key} must be true or false`);
+      out[key] = value[key] as boolean;
     }
     return out;
   };

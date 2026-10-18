@@ -14,6 +14,7 @@ import type {
   CriticalDisplayPayloadResult,
   CriticalAudioDevicePayloadResult,
   CriticalNetworkInterfacePayloadResult,
+  CriticalStorageVolumePayloadResult,
   ClientSystemCheckPayloadResult,
   AudioLevelRequestResult,
 } from '../../Modules/IPCValidation';
@@ -198,6 +199,30 @@ function register(): void {
         IPCValidation.NetworkInterfaceName(Name),
       ],
       (UUID: string, Name: string) => ClientManager.RemoveNetworkInterfaceCritical(UUID, Name)
+    )
+  );
+
+  RPC.handle(
+    'MarkClientStorageVolumeCritical',
+    createTupleHandler<[string, CriticalStorageVolumePayloadResult], unknown>(
+      (UUID: unknown, Volume: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.CriticalStorageVolumePayload(Volume),
+      ],
+      (UUID: string, Volume: CriticalStorageVolumePayloadResult) =>
+        ClientManager.MarkStorageVolumeCritical(UUID, Volume)
+    )
+  );
+
+  RPC.handle(
+    'RemoveClientStorageVolumeCritical',
+    createTupleHandler<[string, string], unknown>(
+      (UUID: unknown, MountPoint: unknown) => [
+        IPCValidation.UUID(UUID),
+        IPCValidation.StorageMountPoint(MountPoint),
+      ],
+      (UUID: string, MountPoint: string) =>
+        ClientManager.RemoveStorageVolumeCritical(UUID, MountPoint)
     )
   );
 

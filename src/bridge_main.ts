@@ -49,6 +49,7 @@ const INVOKE_CHANNEL_LIST = [
   'GetClientDisplayHistory',
   'GetClientAudioHistory',
   'GetClientNetworkHistory',
+  'GetClientStorageHistory',
   'GetClientVitalsHistory',
   'GetClientSystemCheckHistory',
   'GetAllGroups',
@@ -88,6 +89,8 @@ const INVOKE_CHANNEL_LIST = [
   'RemoveClientAudioDeviceCritical',
   'MarkClientNetworkInterfaceCritical',
   'RemoveClientNetworkInterfaceCritical',
+  'MarkClientStorageVolumeCritical',
+  'RemoveClientStorageVolumeCritical',
   'MarkClientSystemCheck',
   'RemoveClientSystemCheck',
   'SetClientAudioLevel',
@@ -328,6 +331,7 @@ const API: ShowTrakAPI = {
   GetClientDisplayHistory: async (UUID) => invoke('GetClientDisplayHistory', UUID),
   GetClientAudioHistory: async (UUID) => invoke('GetClientAudioHistory', UUID),
   GetClientNetworkHistory: async (UUID) => invoke('GetClientNetworkHistory', UUID),
+  GetClientStorageHistory: async (UUID) => invoke('GetClientStorageHistory', UUID),
   GetClientVitalsHistory: async (UUID) => invoke('GetClientVitalsHistory', UUID),
   GetClientSystemCheckHistory: async (UUID) => invoke('GetClientSystemCheckHistory', UUID),
   GetAllGroups: async () => invoke('GetAllGroups'),
@@ -444,6 +448,10 @@ const API: ShowTrakAPI = {
     invoke('MarkClientNetworkInterfaceCritical', UUID, Interface),
   RemoveClientNetworkInterfaceCritical: async (UUID, Name) =>
     invoke('RemoveClientNetworkInterfaceCritical', UUID, Name),
+  MarkClientStorageVolumeCritical: async (UUID, Volume) =>
+    invoke('MarkClientStorageVolumeCritical', UUID, Volume),
+  RemoveClientStorageVolumeCritical: async (UUID, MountPoint) =>
+    invoke('RemoveClientStorageVolumeCritical', UUID, MountPoint),
   MarkClientSystemCheck: async (UUID, Check) => invoke('MarkClientSystemCheck', UUID, Check),
   RemoveClientSystemCheck: async (UUID, Key) => invoke('RemoveClientSystemCheck', UUID, Key),
   SetClientAudioLevel: async (UUID, Request) => invoke('SetClientAudioLevel', UUID, Request),

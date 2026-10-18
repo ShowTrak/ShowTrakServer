@@ -173,6 +173,8 @@ const restore = installModuleMocks([
       // asserted here (see system-checks.test.js).
       recordClientSystemCheckHistorySamples: () => {},
       syncClientSystemCheckHistoryStore: () => {},
+      recordClientStorageHistorySamples: () => {},
+      syncClientStorageHistoryStore: () => {},
     },
   },
   {

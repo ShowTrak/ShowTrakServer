@@ -3,7 +3,7 @@
 // What is logged is deliberately narrow: each entity's top-level state
 // (connected/online, offline, degraded, recovered), and the things an operator
 // has chosen to monitor on it — monitored USB devices, displays, audio
-// endpoints, network interfaces and applications, system checks, FreeKiosk
+// endpoints, network interfaces, storage volumes and applications, system checks, FreeKiosk
 // metric alarms and a monitor's checks. Unmonitored hardware coming and going
 // is not, and neither is a heartbeat.
 //
@@ -148,6 +148,13 @@ const NETWORK_WORDS: DomainWords = {
   }),
 };
 
+const STORAGE_WORDS: DomainWords = {
+  Up: 'Remounted',
+  Down: 'Unmounted',
+  Absent: 'Not Mounted',
+  Moved: () => ({ Parts: [' changed'], Details: [] }),
+};
+
 const APPLICATION_WORDS: DomainWords = {
   Up: 'Started',
   Down: 'Stopped',
@@ -172,16 +179,18 @@ export interface ClientStatusLike {
   HasDisplayTelemetry?: unknown;
   HasAudioTelemetry?: unknown;
   HasNetworkTelemetry?: unknown;
+  HasStorageTelemetry?: unknown;
   HasApplicationTelemetry?: unknown;
   USBDeviceList?: unknown;
   DisplayList?: unknown;
   AudioDevices?: { Endpoints?: unknown } | null;
   NetworkStatus?: { Interfaces?: unknown } | null;
+  StorageStatus?: { Volumes?: unknown } | null;
   RunningApplications?: { Items?: unknown; Status?: { State?: unknown } | null } | null;
   ResourceAlarms?: unknown;
 }
 
-type ClientDomain = 'usb' | 'display' | 'audio' | 'network' | 'apps';
+type ClientDomain = 'usb' | 'display' | 'audio' | 'network' | 'storage' | 'apps';
 
 export interface ClientAuditState {
   Online: boolean;
@@ -334,6 +343,43 @@ function NetworkItems(List: unknown): ItemMap {
   return Items;
 }
 
+// A volume's free space moves with every report, so its issues are logged as
+// the condition broken ("Free space below 10%") rather than the live reading —
+// otherwise each report of a filling disk would resolve and re-raise the issue.
+function StorageIssuePhrases(Issues: unknown, Critical: Row | null): string[] {
+  const Phrases: string[] = [];
+  for (const Issue of Rows(Issues)) {
+    let Phrase: string;
+    if (Issue.Kind === 'free_percent') {
+      Phrase = `Free space below ${Text(Critical && Critical.MinFreePercent)}%`;
+    } else if (Issue.Kind === 'free_space') {
+      Phrase = `Free space below ${Text(Critical && Critical.MinFreeGB)} GB`;
+    } else {
+      Phrase = Text(Issue.Message);
+    }
+    if (Phrase && !Phrases.includes(Phrase)) Phrases.push(Phrase);
+  }
+  return Phrases;
+}
+
+function StorageItems(List: unknown): ItemMap {
+  const Items: ItemMap = new Map();
+  for (const Entry of Rows(List)) {
+    if (!Entry.IsCritical) continue;
+    const Critical = (Entry.Critical || null) as Row | null;
+    const Key = Text(Entry.MountPoint);
+    if (!Key) continue;
+    Items.set(Key, {
+      Name: Text(Entry.Name) || Text(Critical && Critical.Name) || Key,
+      Connected: !!Entry.IsConnected,
+      Position: null,
+      Issues: StorageIssuePhrases(Entry.Issues, Critical),
+      Note: null,
+    });
+  }
+  return Items;
+}
+
 function ApplicationItems(List: unknown): ItemMap {
   const Items: ItemMap = new Map();
   for (const Entry of Rows(List)) {
@@ -447,6 +493,12 @@ export function DiffClientStatus(
       !!Client.HasNetworkTelemetry,
       () => NetworkItems(Client.NetworkStatus && Client.NetworkStatus.Interfaces),
       NETWORK_WORDS,
+    ],
+    [
+      'storage',
+      !!Client.HasStorageTelemetry,
+      () => StorageItems(Client.StorageStatus && Client.StorageStatus.Volumes),
+      STORAGE_WORDS,
     ],
     [
       'apps',

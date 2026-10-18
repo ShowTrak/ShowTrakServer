@@ -13,6 +13,7 @@ import type {
   ValidatedNetworkInterfaceDelta,
   ValidatedPowerStatus,
   ValidatedRunningApplications,
+  ValidatedStorageVolumes,
   ValidatedTemperatures,
   ValidatedUSBDevice,
 } from '../SocketValidation';
@@ -61,6 +62,12 @@ import { AUDIO_KIND, normalizeEndpointID, resolveCriticalAudioEntry } from './au
 import { DescribeUSBLocation, USB_NAME_KIND, USB_SERIAL_KIND, resolveUSBConditions } from './usb';
 import { DISPLAY_KIND, IsWeakDisplayID, resolveCriticalDisplayEntry } from './display';
 import { NETWORK_KIND, normalizeInterfaceName, resolveCriticalNetworkEntry } from './network';
+import {
+  STORAGE_KIND,
+  StorageVolumeLabel,
+  normalizeMountPoint,
+  resolveCriticalStorageEntry,
+} from './storage';
 import type { ClientMacAddressRow, SystemCheckRow } from '../DB/rows';
 import { RecordEdit, RecordUpdate } from '../AuditLog/edits';
 import { Device, Entity, Line, Value } from '../AuditLog/message';
@@ -76,6 +83,7 @@ import type {
   CriticalAudioDevice,
   CriticalDisplay,
   CriticalNetworkInterface,
+  CriticalStorageVolume,
   CriticalUSBConditions,
   CriticalUSBDevice,
   CriticalUSBName,
@@ -88,6 +96,7 @@ import type {
   CriticalDisplayPayloadResult,
   CriticalAudioDevicePayloadResult,
   CriticalNetworkInterfacePayloadResult,
+  CriticalStorageVolumePayloadResult,
   ClientSystemCheckPayloadResult,
 } from '../IPCValidation';
 
@@ -177,6 +186,14 @@ export interface ClientManagerType {
     Interface: CriticalNetworkInterfacePayloadResult
   ): Promise<Result<boolean>>;
   RemoveNetworkInterfaceCritical(UUID: string, Name: unknown): Promise<Result<boolean>>;
+  // Mounted volumes (clients from 3.28.0).
+  SetStorageVolumes(UUID: string, Snapshot: ValidatedStorageVolumes): Promise<Result<string>>;
+  // Monitor a volume or update its conditions; Ok(true) when newly monitored.
+  MarkStorageVolumeCritical(
+    UUID: string,
+    Volume: CriticalStorageVolumePayloadResult
+  ): Promise<Result<boolean>>;
+  RemoveStorageVolumeCritical(UUID: string, MountPoint: unknown): Promise<Result<boolean>>;
   MarkSystemCheck(UUID: string, Check: ClientSystemCheckPayloadResult): Promise<Result<boolean>>;
   RemoveSystemCheck(UUID: string, Key: ClientSystemCheckKey): Promise<Result<boolean>>;
   // Per-client MAC addresses (the Wake-on-LAN target set). Add resolves to
@@ -426,6 +443,16 @@ const NETWORK_AUDIT: CriticalAudit<CriticalNetworkInterface> = {
   ],
 };
 
+const STORAGE_AUDIT: CriticalAudit<CriticalStorageVolume> = {
+  Name: (Entry) => StorageVolumeLabel(Entry),
+  Conditions: [
+    { Key: 'MinFreePercent', Label: 'Minimum free space', Format: WithUnit('%') },
+    { Key: 'MinFreeGB', Label: 'Minimum free space', Format: WithUnit(' GB') },
+    { Key: 'RequireWritable', Label: 'Is writable' },
+    { Key: 'RequireHealthy', Label: 'Is healthy' },
+  ],
+};
+
 // System checks share no entry type, so their conditions are read off the
 // union of every check's fields (a field a check lacks reads as unchanged).
 type SystemCheckFields = Partial<
@@ -552,6 +579,15 @@ const CriticalNetwork = ManageCriticalKind({
   MarkOn: (Target, Entry) => Target.MarkCriticalNetworkInterface(Entry),
   UnmarkOn: (Target, Key) => Target.UnmarkCriticalNetworkInterface(Key),
   Audit: NETWORK_AUDIT,
+});
+
+const CriticalStorage = ManageCriticalKind({
+  Kind: STORAGE_KIND,
+  Table: CriticalRepo.Storage,
+  SetOn: (Target, Entries) => Target.SetCriticalStorageVolumes(Entries),
+  MarkOn: (Target, Entry) => Target.MarkCriticalStorageVolume(Entry),
+  UnmarkOn: (Target, Key) => Target.UnmarkCriticalStorageVolume(Key),
+  Audit: STORAGE_AUDIT,
 });
 
 // Index, put on the client and announce an entry that has been persisted.
@@ -688,6 +724,7 @@ const CRITICAL_INDEXES: readonly ClientSideIndex[] = [
   CriticalDisplays,
   CriticalAudio,
   CriticalNetwork,
+  CriticalStorage,
   CriticalSystemChecks,
 ];
 
@@ -1272,6 +1309,58 @@ Manager.MarkNetworkInterfaceCritical = async (
 
 Manager.RemoveNetworkInterfaceCritical = (UUID: string, Name: unknown) =>
   RemoveCritical(CriticalNetwork, UUID, Name);
+
+Manager.SetStorageVolumes = async (UUID: string, Snapshot: ValidatedStorageVolumes) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+  Target.SetStorageVolumes(Snapshot);
+  return Ok('Storage volumes updated successfully');
+};
+
+Manager.MarkStorageVolumeCritical = async (
+  UUID: string,
+  Volume: CriticalStorageVolumePayloadResult
+) => {
+  const [Err, Target] = await Manager.Get(UUID);
+  if (Err) return Fail(Err);
+  if (!Target) return Fail('Client Not Found');
+  const MountPoint = normalizeMountPoint(Volume && Volume.MountPoint);
+  if (!MountPoint) return Fail(STORAGE_KIND.Messages.KeyRequired);
+
+  const Live =
+    Target.ObservedStorage.Volumes.find((Entry) => Entry.MountPoint === MountPoint) || null;
+  const Existing = CriticalStorage.getForClient(UUID, false)?.get(MountPoint) || null;
+  const [ResolveErr, Entry] = resolveCriticalStorageEntry(
+    MountPoint,
+    Volume,
+    Live,
+    Existing,
+    Date.now()
+  );
+  if (ResolveErr || !Entry) return Fail(ResolveErr || 'Failed to resolve monitored volume');
+
+  return CommitCriticalMark(
+    CriticalStorage,
+    UUID,
+    Target,
+    Entry,
+    {
+      UUID,
+      MountPoint: Entry.MountPoint,
+      Name: Entry.Name,
+      MinFreePercent: Entry.MinFreePercent,
+      MinFreeGB: Entry.MinFreeGB,
+      RequireWritable: Entry.RequireWritable ? 1 : 0,
+      RequireHealthy: Entry.RequireHealthy ? 1 : 0,
+      Timestamp: Entry.Timestamp ?? Date.now(),
+    },
+    !Existing
+  );
+};
+
+Manager.RemoveStorageVolumeCritical = (UUID: string, MountPoint: unknown) =>
+  RemoveCritical(CriticalStorage, UUID, MountPoint);
 
 Manager.MarkSystemCheck = async (UUID: string, Check: ClientSystemCheckPayloadResult) => {
   const [Err, Target] = await Manager.Get(UUID);

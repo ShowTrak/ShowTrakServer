@@ -37,6 +37,8 @@ const MAX_RUNNING_APPLICATIONS = 4096;
 const MAX_INTEGRATED_ACTIONS = 256;
 // A large Dante/MADI rig still has a few dozen endpoints; this only bounds abuse.
 const MAX_AUDIO_ENDPOINTS = 256;
+// Every drive letter plus a rack of mounted shares; this only bounds abuse.
+const MAX_STORAGE_VOLUMES = 128;
 
 // Client/device identifier from the socket handshake. Constrained to a
 // selector/room-safe charset — this is the value that ends up in Socket.IO
@@ -561,6 +563,41 @@ function OptionalBoolean(value: unknown): boolean | null {
   return typeof value === 'boolean' ? value : null;
 }
 
+/** The client's `StorageVolumes` snapshot. */
+function StorageVolumes(value: unknown) {
+  if (!isPlainObject(value)) fail('StorageVolumes payload must be an object');
+  const list = normalizeBoundedArray(value.Volumes ?? [], 'Volumes', {
+    maxItems: MAX_STORAGE_VOLUMES,
+  });
+  const Volumes = list.flatMap((item, index) => {
+    if (!isPlainObject(item)) fail(`Volumes[${index}] must be an object`);
+    const field = (name: string) => `Volumes[${index}].${name}`;
+    const MountPoint = normalizeOptionalString(item.MountPoint, field('MountPoint'), {
+      maxLength: 512,
+    });
+    if (!MountPoint) return [];
+    return [
+      {
+        MountPoint,
+        Name: normalizeOptionalString(item.Name, field('Name')),
+        FileSystem: normalizeOptionalString(item.FileSystem, field('FileSystem'), {
+          maxLength: 64,
+        }),
+        Kind: normalizeOptionalString(item.Kind, field('Kind'), { maxLength: 16 }),
+        TotalBytes: normalizeOptionalFiniteNumber(item.TotalBytes, field('TotalBytes')),
+        FreeBytes: normalizeOptionalFiniteNumber(item.FreeBytes, field('FreeBytes')),
+        ReadOnly: OptionalBoolean(item.ReadOnly),
+        Health: normalizeOptionalString(item.Health, field('Health'), { maxLength: 16 }),
+      },
+    ];
+  });
+  return {
+    SampledAt: normalizeOptionalFiniteNumber(value.SampledAt, 'SampledAt'),
+    Status: CollectorStatus(value.Status, 'Status'),
+    Volumes,
+  };
+}
+
 function AudioEndpoint(value: unknown, fieldName: string) {
   if (!isPlainObject(value)) fail(`${fieldName} must be an object`);
   return {
@@ -696,6 +733,7 @@ export type ValidatedApplicationDelta = ReturnType<typeof ApplicationDelta>;
 export type ValidatedAudioDevices = ReturnType<typeof AudioDevices>;
 export type ValidatedPowerStatus = ReturnType<typeof PowerStatus>;
 export type ValidatedTemperatures = ReturnType<typeof Temperatures>;
+export type ValidatedStorageVolumes = ReturnType<typeof StorageVolumes>;
 
 export const Manager = {
   Ack,
@@ -711,6 +749,7 @@ export const Manager = {
   AudioDevices,
   PowerStatus,
   Temperatures,
+  StorageVolumes,
   NetworkInterfaceDelta,
   DisplayDelta,
   ApplicationDelta,

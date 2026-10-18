@@ -1,7 +1,7 @@
 // Repository for the per-client side tables of monitored ("critical") entries:
 // CriticalUSBDevices, CriticalUSBDeviceNames, CriticalApplications,
-// CriticalDisplays, CriticalAudioDevices, CriticalNetworkInterfaces and
-// CriticalSystemChecks. Receives the DB manager instead of importing it so test
+// CriticalDisplays, CriticalAudioDevices, CriticalNetworkInterfaces,
+// CriticalStorageVolumes and CriticalSystemChecks. Receives the DB manager instead of importing it so test
 // DB mocks injected into ClientManager propagate through unchanged.
 //
 // Every table is the same shape: rows keyed by (UUID, one key column), read in
@@ -18,6 +18,7 @@ import type {
   CriticalApplicationRow,
   CriticalAudioDeviceRow,
   CriticalNetworkInterfaceRow,
+  CriticalStorageVolumeRow,
   CriticalDisplayRow,
   CriticalUSBDeviceRow,
   CriticalUSBDeviceNameRow,
@@ -145,6 +146,21 @@ export function CreateCriticalEntitiesRepository(DB: DBManager) {
         'RangeEnd',
         'Netmask',
         'Gateway',
+        'Timestamp',
+      ]
+    ),
+    Storage: DefineCriticalTable<CriticalStorageVolumeRow>(
+      DB,
+      'CriticalStorageVolumes',
+      'MountPoint',
+      [
+        'UUID',
+        'MountPoint',
+        'Name',
+        'MinFreePercent',
+        'MinFreeGB',
+        'RequireWritable',
+        'RequireHealthy',
         'Timestamp',
       ]
     ),

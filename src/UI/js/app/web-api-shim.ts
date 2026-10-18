@@ -165,6 +165,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     GetClientDisplayHistory: async (UUID) => rpc('GetClientDisplayHistory', UUID),
     GetClientAudioHistory: async (UUID) => rpc('GetClientAudioHistory', UUID),
     GetClientNetworkHistory: async (UUID) => rpc('GetClientNetworkHistory', UUID),
+    GetClientStorageHistory: async (UUID) => rpc('GetClientStorageHistory', UUID),
     GetClientVitalsHistory: async (UUID) => rpc('GetClientVitalsHistory', UUID),
     GetClientSystemCheckHistory: async (UUID) => rpc('GetClientSystemCheckHistory', UUID),
     UpdateClient: async (UUID, Data) => rpc('UpdateClient', UUID, Data),
@@ -192,6 +193,10 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
       rpc('MarkClientNetworkInterfaceCritical', UUID, Interface),
     RemoveClientNetworkInterfaceCritical: async (UUID, Name) =>
       rpc('RemoveClientNetworkInterfaceCritical', UUID, Name),
+    MarkClientStorageVolumeCritical: async (UUID, Volume) =>
+      rpc('MarkClientStorageVolumeCritical', UUID, Volume),
+    RemoveClientStorageVolumeCritical: async (UUID, MountPoint) =>
+      rpc('RemoveClientStorageVolumeCritical', UUID, MountPoint),
     MarkClientSystemCheck: async (UUID, Check) => rpc('MarkClientSystemCheck', UUID, Check),
     RemoveClientSystemCheck: async (UUID, Key) => rpc('RemoveClientSystemCheck', UUID, Key),
     SetClientAudioLevel: async (UUID, Request) => rpc('SetClientAudioLevel', UUID, Request),

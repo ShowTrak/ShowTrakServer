@@ -526,6 +526,19 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       { serial: true }
     );
 
+    // Mounted volumes (clients from 3.28.0).
+    GuardedOn(
+      'StorageVolumes',
+      (Snapshot) => [SocketValidation.StorageVolumes(Snapshot)],
+      async (Snapshot: ReturnType<typeof SocketValidation.StorageVolumes>) => {
+        Logger.debug(
+          `Storage volumes received from ${socket.UUID} (${Snapshot.Volumes.length} volumes)`
+        );
+        await ClientManager.SetStorageVolumes(socket.UUID, Snapshot);
+      },
+      { serial: true }
+    );
+
     /**
      * Capability handshake.
      *

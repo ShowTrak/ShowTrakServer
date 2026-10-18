@@ -219,6 +219,17 @@ export interface CriticalNetworkInterfaceRow {
   Timestamp: number;
 }
 
+export interface CriticalStorageVolumeRow {
+  UUID: string;
+  MountPoint: string;
+  Name: string | null;
+  MinFreePercent: number | null;
+  MinFreeGB: number | null;
+  RequireWritable: number; // sqlite 0/1
+  RequireHealthy: number; // sqlite 0/1
+  Timestamp: number;
+}
+
 // One monitored system check of one client (see ClientManager/system-checks).
 // Only the columns of its own check are meaningful; a NULL condition is not
 // guarded.

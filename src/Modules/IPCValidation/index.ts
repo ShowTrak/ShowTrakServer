@@ -71,6 +71,15 @@ export interface CriticalNetworkInterfacePayloadResult {
   Gateway?: string | null;
 }
 
+export interface CriticalStorageVolumePayloadResult {
+  MountPoint: string;
+  // Present only when the request carried them; absent keeps the current value.
+  MinFreePercent?: number | null;
+  MinFreeGB?: number | null;
+  RequireWritable?: boolean;
+  RequireHealthy?: boolean;
+}
+
 // A system-check edit. Only the fields the request carried are present; an
 // absent field keeps its current value and null stops guarding it.
 export interface ClientSystemCheckPayloadResult {
@@ -134,6 +143,8 @@ export interface IPCValidationManager {
   AudioLevelRequest(value: unknown): AudioLevelRequestResult;
   NetworkInterfaceName(value: unknown, fieldName?: string): string;
   CriticalNetworkInterfacePayload(value: unknown): CriticalNetworkInterfacePayloadResult;
+  StorageMountPoint(value: unknown, fieldName?: string): string;
+  CriticalStorageVolumePayload(value: unknown): CriticalStorageVolumePayloadResult;
   SystemCheckKey(value: unknown): ClientSystemCheckKey;
   ClientSystemCheckPayload(value: unknown): ClientSystemCheckPayloadResult;
   ClientUpdatePayload(value: unknown): Record<string, unknown>;

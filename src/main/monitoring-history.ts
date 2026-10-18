@@ -87,6 +87,7 @@ interface ClientHardwareTelemetryLike {
   DisplayList?: unknown;
   AudioDevices?: { Endpoints?: unknown } | null;
   NetworkStatus?: { Interfaces?: unknown } | null;
+  StorageStatus?: { Volumes?: unknown } | null;
   SystemChecks?: unknown;
   ResourceAlarms?: unknown;
   PowerStatus?: unknown;
@@ -178,7 +179,7 @@ function absorbRepeatSample(samples: HistorySample[], next: HistorySample): bool
 }
 
 // Every named per-entity store (critical applications, USB, displays, audio,
-// network), so the retention sweep can reach them too. Registered by the
+// network, storage, system checks), so the retention sweep can reach them too. Registered by the
 // factory below.
 const NamedHistoryStores: Array<Pick<NamedHistoryStore, 'prune'>> = [];
 
@@ -791,6 +792,42 @@ const recordClientNetworkHistorySamples = ClientNetworkHistory.record;
 const syncClientNetworkHistoryStore = ClientNetworkHistory.sync;
 const getClientNetworkHistorySamples = ClientNetworkHistory.get;
 
+// Resolve the current state for every monitored storage volume on a client, on
+// the network extractor's rules: mounted and meeting its conditions is "online",
+// mounted but not (low on space, read-only, unhealthy) is "online but degraded",
+// missing is "offline". A volume not yet judged on this connection is skipped.
+function extractCriticalStorageStates(
+  client: ClientHardwareTelemetryLike | null | undefined
+): NamedEntityState[] | null {
+  if (!client || !client.Online) return null;
+  const volumes = Array.isArray(client.StorageStatus?.Volumes)
+    ? (client.StorageStatus.Volumes as Array<Record<string, unknown> | null>)
+    : [];
+  const states: NamedEntityState[] = [];
+  for (const volume of volumes) {
+    if (!volume || !volume.IsCritical) continue;
+    const mountPoint = typeof volume.MountPoint === 'string' ? volume.MountPoint.trim() : '';
+    if (!mountPoint) continue;
+    const isConnected = volume.IsConnected !== false;
+    if (!isConnected && !volume.Missing) continue;
+    const issues = Array.isArray(volume.Issues) ? volume.Issues : [];
+    const name = typeof volume.Name === 'string' && volume.Name.trim() ? volume.Name.trim() : '';
+    states.push({
+      key: mountPoint,
+      name: name || mountPoint,
+      online: isConnected,
+      degraded: isConnected && issues.length > 0,
+    });
+  }
+  return states;
+}
+
+const ClientStorageHistory = createNamedHistoryStore(extractCriticalStorageStates, 'MountPoint');
+
+const recordClientStorageHistorySamples = ClientStorageHistory.record;
+const syncClientStorageHistoryStore = ClientStorageHistory.sync;
+const getClientStorageHistorySamples = ClientStorageHistory.get;
+
 // Resolve each monitored system check (CPU, memory, uptime, power, thermal) to
 // healthy or failing. A check with nothing to judge — the client offline, or a
 // power/thermal collector that has not reported or cannot — leaves a gap, so a
@@ -889,4 +926,7 @@ export {
   recordClientNetworkHistorySamples,
   syncClientNetworkHistoryStore,
   getClientNetworkHistorySamples,
+  recordClientStorageHistorySamples,
+  syncClientStorageHistoryStore,
+  getClientStorageHistorySamples,
 };

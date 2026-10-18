@@ -9,6 +9,7 @@ import type {
   ValidatedNetworkInterfaceDelta,
   ValidatedPowerStatus,
   ValidatedRunningApplications,
+  ValidatedStorageVolumes,
   ValidatedTemperatures,
   ValidatedUSBDevice,
 } from '../SocketValidation';
@@ -35,11 +36,14 @@ import type {
   CriticalAudioDevice,
   CriticalDisplay,
   CriticalNetworkInterface,
+  CriticalStorageVolume,
   CriticalUSBDevice,
   CriticalUSBName,
   USBCapabilities,
   NetworkInterfaceView,
   NetworkStatusView,
+  StorageStatusView,
+  StorageVolumeView,
   ClientResourceAlarm,
   ClientResourceAlarmKey,
   ClientSystemCheckKey,
@@ -71,6 +75,14 @@ import {
 } from './critical-kind';
 import { buildUSBView, USB_NAME_KIND, USB_SERIAL_KIND, type USBDeviceViewEntry } from './usb';
 import { EmptyNetworkStatusView, buildNetworkView, NETWORK_KIND } from './network';
+import {
+  EmptyObservedStorage,
+  EmptyStorageView,
+  buildStorageView,
+  normalizeStorageSnapshot,
+  STORAGE_KIND,
+  type ObservedStorage,
+} from './storage';
 import {
   APPLICATION_NOT_FOREGROUND_WARNING,
   APPLICATION_NOT_RESPONDING_WARNING,
@@ -423,6 +435,9 @@ class Client {
   // connection is the evidence, and nothing is judged before one arrives.
   HasNetworkTelemetry: boolean;
   NetworkSampledAt: number | null;
+  // Storage follows the audio rule: only a report whose collector said `ok` is
+  // evidence that a monitored volume is (or is not) mounted.
+  HasStorageTelemetry: boolean;
   Identifying: boolean;
   ScriptsFingerprint: string | null;
   NetworkInterfaces: NormalizedNetworkInterface[];
@@ -472,6 +487,14 @@ class Client {
   CriticalNetworkInterfaces: CriticalNetworkInterface[];
   MissingCriticalNetworkInterfaces: NetworkInterfaceView[];
   NetworkWarnings: string[];
+
+  // Storage volumes: the last report, the monitored volumes, and the judged
+  // view (reported ∪ missing-monitored) produced by _rebuildStorageView.
+  ObservedStorage: ObservedStorage;
+  StorageStatus: StorageStatusView;
+  CriticalStorageVolumes: CriticalStorageVolume[];
+  MissingCriticalStorageVolumes: StorageVolumeView[];
+  StorageWarnings: string[];
 
   // Running applications: critical guards, the raw observed snapshot, and the
   // augmented view (observed ∪ missing-critical) with its change signatures.
@@ -560,6 +583,12 @@ class Client {
     this.MissingCriticalNetworkInterfaces = [];
     this.NetworkWarnings = [];
     this.NetworkInterfaces = [];
+    this.HasStorageTelemetry = false;
+    this.ObservedStorage = EmptyObservedStorage();
+    this.StorageStatus = EmptyStorageView();
+    this.CriticalStorageVolumes = [];
+    this.MissingCriticalStorageVolumes = [];
+    this.StorageWarnings = [];
     this.ScriptsFingerprint = null;
     this.Identifying = false;
     this.Integrated = false;
@@ -617,6 +646,8 @@ class Client {
       this._rebuildAudioView(false);
       this.HasNetworkTelemetry = false;
       this._rebuildNetworkView(false);
+      this.HasStorageTelemetry = false;
+      this._rebuildStorageView(false);
       // A threshold says nothing about a machine that is not reporting, so the
       // alarms stand down rather than ride out the outage. The next session
       // re-proves them — a CPU still pegged after a reconnect re-raises once it
@@ -1216,6 +1247,9 @@ class Client {
     if (this.HasNetworkTelemetry && Array.isArray(this.NetworkWarnings)) {
       Warnings.push(...this.NetworkWarnings);
     }
+    if (this.HasStorageTelemetry && Array.isArray(this.StorageWarnings)) {
+      Warnings.push(...this.StorageWarnings);
+    }
 
     // Everything above is INFERRED: the client reported what it has, and we
     // concluded something expected is absent. That conclusion is sound but
@@ -1664,6 +1698,48 @@ class Client {
         Details: { Interface: Change, IsCritical: Critical(Change.Name) },
       });
     }
+  }
+  /** Store a storage report and judge the monitored volumes against it. */
+  SetStorageVolumes(Snapshot: ValidatedStorageVolumes) {
+    const Next = normalizeStorageSnapshot(Snapshot);
+    this.ObservedStorage = Next;
+    this.HasStorageTelemetry = !!Next.Status && Next.Status.State === 'ok';
+    this._rebuildStorageView();
+    Logger.debug(`Client ${this.UUID} Storage volumes updated (${Next.Volumes.length})`);
+    BroadcastManager.emit('ClientUpdated', this);
+  }
+  SetCriticalStorageVolumes(Volumes: unknown) {
+    this.CriticalStorageVolumes = CriticalListFrom(STORAGE_KIND, Volumes);
+    this._rebuildStorageView();
+  }
+  IsStorageVolumeCritical(MountPoint: unknown) {
+    return HasCriticalEntry(STORAGE_KIND, this.CriticalStorageVolumes, MountPoint);
+  }
+  /** Add or replace one monitored volume. Returns whether it was new. */
+  MarkCriticalStorageVolume(Entry: unknown) {
+    const Next = WithCriticalEntry(STORAGE_KIND, this.CriticalStorageVolumes, Entry);
+    if (!Next) return false;
+    this.CriticalStorageVolumes = Next.List;
+    this._rebuildStorageView();
+    return Next.Added;
+  }
+  UnmarkCriticalStorageVolume(MountPoint: unknown) {
+    const Next = WithoutCriticalEntry(STORAGE_KIND, this.CriticalStorageVolumes, MountPoint);
+    if (!Next) return false;
+    this.CriticalStorageVolumes = Next;
+    this._rebuildStorageView();
+    return true;
+  }
+  _rebuildStorageView(Refresh = true) {
+    const Result = buildStorageView(
+      this.ObservedStorage,
+      this.CriticalStorageVolumes,
+      this.HasStorageTelemetry
+    );
+    this.StorageStatus = Result.View;
+    this.MissingCriticalStorageVolumes = Result.Missing;
+    this.StorageWarnings = Result.Warnings;
+    if (Refresh) this._refreshClientHealthState();
   }
   SetScriptsFingerprint(ScriptsFingerprint: unknown) {
     const NextValue =
