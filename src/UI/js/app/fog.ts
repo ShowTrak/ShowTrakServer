@@ -279,10 +279,9 @@ export async function OpenFogTaskModal(
       ToggleFogTray(true);
     });
 
-  // Close the client editor first so the two modals don't stack — the FOG task
-  // modal is launched from inside it, and leaving it open would leave the editor
-  // orphaned behind the task modal.
-  closeModal('SHOWTRAK_CLIENT_EDITOR');
+  // Close the client's view modal that launched this, so the two don't stack
+  // and leave it orphaned behind.
+  closeModal('SHOWTRAK_CLIENT_INFO');
   openModal('SHOWTRAK_MODAL_FOG_TASK');
 }
 

@@ -1704,244 +1704,6 @@ Loading licence…</pre>
       </div>
     </div>
 
-    <div
-      class="modal fade"
-      id="SHOWTRAK_CLIENT_EDITOR"
-      tabindex="-1"
-      aria-labelledby="SHOWTRAK_CLIENT_EDIT_Label"
-      aria-hidden="true"
-    >
-      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-          <div class="modal-body text-center">
-            <div id="CLIENT_EDITOR_HEADER"></div>
-
-            <div class="d-grid gap-2">
-              <div class="form-floating has-copy">
-                <input
-                  type="text"
-                  class="form-control"
-                  id="CLIENT_EDITOR_SLUG"
-                  placeholder="Slug"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-                <label for="CLIENT_EDITOR_SLUG">Slug (API / OSC address)</label>
-                <button
-                  type="button"
-                  class="copy-field-btn"
-                  data-target="#CLIENT_EDITOR_SLUG"
-                  title="Copy"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
-              </div>
-              <div class="form-floating">
-                <input
-                  type="text"
-                  class="form-control"
-                  id="CLIENT_EDITOR_NICKNAME"
-                  placeholder="Nickname"
-                />
-                <label for="CLIENT_EDITOR_NICKNAME">Nickname</label>
-              </div>
-              <div class="form-floating has-copy">
-                <input
-                  type="text"
-                  class="form-control disabled"
-                  id="CLIENT_EDITOR_HOSTNAME"
-                  disabled
-                />
-                <label for="CLIENT_EDITOR_HOSTNAME">Hostname</label>
-                <button
-                  type="button"
-                  class="copy-field-btn"
-                  data-target="#CLIENT_EDITOR_HOSTNAME"
-                  title="Copy"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
-              </div>
-              <div class="form-floating">
-                <select class="form-select" id="CLIENT_EDITOR_GROUPID">
-                  <option value="0" selected>No Group</option>
-                  <option value="1">Viewer</option>
-                </select>
-                <label for="CLIENT_EDITOR_GROUPID">Group</label>
-              </div>
-              <!-- Tags carried by this client. A client belongs to one group but
-                   any number of tags, and membership is stored on the TAG (a
-                   dynamic scope), so toggling a chip rewrites that tag. Chips
-                   inherited from a group or from "all clients" show on but
-                   locked — see tag-picker.ts. -->
-              <div class="tag-picker d-none" id="CLIENT_EDITOR_TAGS_WRAPPER">
-                <div class="tag-picker-head">
-                  <span class="tag-picker-title">Tags</span>
-                  <span class="tag-picker-hint">Create and colour tags in the Tag Manager</span>
-                </div>
-                <div id="CLIENT_EDITOR_TAGS" class="tag-picker-list"></div>
-              </div>
-              <div id="CLIENT_EDITOR_LAUNCH_WRAPPER" class="d-grid gap-2">
-                <div class="form-floating">
-                  <select class="form-select" id="CLIENT_EDITOR_RUNONLAUNCH_SCRIPT">
-                    <option value="">None</option>
-                  </select>
-                  <label for="CLIENT_EDITOR_RUNONLAUNCH_SCRIPT">Run on Launch</label>
-                </div>
-                <div class="form-floating">
-                  <input
-                    type="number"
-                    min="10"
-                    step="1"
-                    class="form-control"
-                    id="CLIENT_EDITOR_RUNONLAUNCH_DELAY"
-                    placeholder="Launch Delay (seconds)"
-                  />
-                  <label for="CLIENT_EDITOR_RUNONLAUNCH_DELAY">Launch Delay (seconds)</label>
-                </div>
-              </div>
-              <!-- How long a dropped connection is tolerated before this client
-                   reads offline. The first option inherits the Preferences value
-                   and names what it currently resolves to. -->
-              <div class="form-floating">
-                <select class="form-select" id="CLIENT_EDITOR_OFFLINE_GRACE"></select>
-                <label for="CLIENT_EDITOR_OFFLINE_GRACE">Disconnect Grace Period</label>
-              </div>
-              <!-- Show variables for this client. One row per variable defined in
-                   the Variable Manager; leaving a field empty inherits the
-                   default. Hidden for integrated clients, which run no local
-                   agent and execute no scripts. -->
-              <div id="CLIENT_EDITOR_VARIABLES_WRAPPER" class="mac-address-editor d-none">
-                <div class="mac-address-editor-head">
-                  <span class="mac-address-editor-title">Variables</span>
-                  <span class="mac-address-editor-hint" id="CLIENT_EDITOR_VARIABLES_HINT"
-                    >Available to this client's scripts</span
-                  >
-                </div>
-                <div id="CLIENT_EDITOR_VARIABLES_LIST" class="d-grid gap-2"></div>
-              </div>
-              <div class="form-floating has-copy">
-                <input type="text" class="form-control disabled" id="CLIENT_EDITOR_IP" disabled />
-                <label for="CLIENT_EDITOR_IP">IP</label>
-                <button
-                  type="button"
-                  class="copy-field-btn"
-                  data-target="#CLIENT_EDITOR_IP"
-                  title="Copy"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
-              </div>
-              <!-- Every MAC the client is known by. Wake-on-LAN fires at all of
-                   them, since which NIC the server can reach is unknowable from
-                   here. Addresses the client reports arrive automatically;
-                   operators can add ones it has never reported (a machine that
-                   has not yet connected) and retire ones it no longer has. -->
-              <div class="mac-address-editor d-none" id="CLIENT_EDITOR_MAC_WRAPPER">
-                <div class="mac-address-editor-head">
-                  <span class="mac-address-editor-title">MAC Addresses</span>
-                  <span class="mac-address-editor-hint">Used for Wake on LAN</span>
-                </div>
-                <div id="CLIENT_EDITOR_MAC_LIST" class="mac-address-list"></div>
-                <div class="input-group mac-address-add">
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="CLIENT_EDITOR_MAC_INPUT"
-                    placeholder="AA:BB:CC:DD:EE:FF"
-                    maxlength="17"
-                    autocomplete="off"
-                    spellcheck="false"
-                  />
-                  <button class="btn btn-secondary" type="button" id="CLIENT_EDITOR_MAC_ADD">
-                    <i class="bi bi-plus-lg"></i>
-                  </button>
-                </div>
-              </div>
-              <div
-                id="CLIENT_EDITOR_UUID_WRAPPER"
-                class="form-floating has-copy"
-                style="display: none"
-              >
-                <input type="text" class="form-control disabled" id="CLIENT_EDITOR_UUID" disabled />
-                <label for="CLIENT_EDITOR_UUID">Client ID</label>
-                <button
-                  type="button"
-                  class="copy-field-btn"
-                  data-target="#CLIENT_EDITOR_UUID"
-                  title="Copy"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
-              </div>
-              <div class="form-floating has-copy">
-                <input
-                  type="text"
-                  class="form-control disabled"
-                  id="CLIENT_EDITOR_VERSION"
-                  disabled
-                />
-                <label for="CLIENT_EDITOR_VERSION">Client Version</label>
-                <button
-                  type="button"
-                  class="copy-field-btn"
-                  data-target="#CLIENT_EDITOR_VERSION"
-                  title="Copy"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
-              </div>
-              <!-- FOG host link. The whole wrapper is hidden unless the FOG
-                   integration is enabled; the select is populated from the live FOG
-                   host list, falling back to the cached link when FOG is offline. -->
-              <div class="d-grid gap-1 d-none" id="CLIENT_EDITOR_FOG_WRAPPER">
-                <div class="form-floating">
-                  <select class="form-select" id="CLIENT_EDITOR_FOG_HOST">
-                    <option value="">Not linked to FOG</option>
-                  </select>
-                  <label for="CLIENT_EDITOR_FOG_HOST">FOG Host</label>
-                </div>
-                <span class="text-sm text-secondary" id="CLIENT_EDITOR_FOG_HINT"></span>
-              </div>
-            </div>
-
-            <div class="d-grid">
-              <button type="button" class="btn btn-success" id="SHOWTRAK_CLIENT_EDITOR_SAVE">
-                Save
-              </button>
-            </div>
-
-            <!-- Only shown when FOG is enabled, reachable, this client is linked to
-                 a host, and at least one task type is permitted in settings. -->
-            <button
-              type="button"
-              class="btn btn-ghost text-info d-none"
-              id="SHOWTRAK_CLIENT_EDITOR_FOG_TASK"
-            >
-              Schedule FOG Task
-            </button>
-            <button
-              type="button"
-              class="btn btn-ghost text-light"
-              id="SHOWTRAK_CLIENT_EDITOR_UPDATE"
-            >
-              Check for Updates
-            </button>
-            <button
-              type="button"
-              class="btn btn-ghost text-warning"
-              id="SHOWTRAK_CLIENT_EDITOR_REPLACE"
-            >
-              Replace Client
-            </button>
-            <button type="button" class="btn btn-delete" id="SHOWTRAK_CLIENT_EDITOR_REMOVE">
-              Delete Client
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Schedule FOG Task. Lists only the task types permitted in settings; the
          backend re-checks that permission regardless of what this modal offers. -->
     <div
@@ -2314,6 +2076,11 @@ Loading licence…</pre>
       </div>
     </div>
 
+    <!-- Add FreeKiosk Terminal. Its form (#FREEKIOSK_FORM) is the ONE copy of
+         the terminal settings form: an existing terminal's Settings tab moves it
+         into the view modal while open and back here after (freekiosk-info-edit.ts),
+         so the schema-driven alarm fields never exist twice with the same ids.
+         `.fk-existing-only` parts are hidden here; `.ci-view-only` twins too. -->
     <div
       class="modal fade"
       id="SHOWTRAK_MODAL_FREEKIOSK_TERMINAL"
@@ -2325,196 +2092,215 @@ Loading licence…</pre>
         <div class="modal-content">
           <div class="modal-body text-center">
             <div class="rounded-3 p-2 bg-ghost-light">
-              <h6 class="mb-0" id="FREEKIOSK_MODAL_TITLE">Add FreeKiosk Terminal</h6>
+              <h6 class="mb-0">Add FreeKiosk Terminal</h6>
             </div>
 
-            <div class="d-grid gap-2 text-start mt-2">
-              <div class="form-floating">
-                <input
-                  type="text"
-                  class="form-control"
-                  id="FREEKIOSK_TITLE"
-                  placeholder="Title"
-                  autocomplete="off"
-                />
-                <label for="FREEKIOSK_TITLE">Title</label>
-              </div>
-              <div class="row g-2">
-                <div class="col-8">
-                  <div class="form-floating">
-                    <input
-                      type="text"
-                      class="form-control"
-                      id="FREEKIOSK_ADDRESS"
-                      placeholder="192.168.1.50"
-                      autocomplete="off"
-                      spellcheck="false"
-                    />
-                    <label for="FREEKIOSK_ADDRESS">IP address or hostname</label>
+            <div id="FREEKIOSK_ADD_FORM_SLOT">
+              <div id="FREEKIOSK_FORM" class="d-grid gap-2 text-start mt-2">
+                <div class="form-floating">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="FREEKIOSK_TITLE"
+                    placeholder="Title"
+                    autocomplete="off"
+                  />
+                  <label for="FREEKIOSK_TITLE">Title</label>
+                </div>
+                <div class="row g-2">
+                  <div class="col-8">
+                    <div class="form-floating">
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="FREEKIOSK_ADDRESS"
+                        placeholder="192.168.1.50"
+                        autocomplete="off"
+                        spellcheck="false"
+                      />
+                      <label for="FREEKIOSK_ADDRESS">IP address or hostname</label>
+                    </div>
+                  </div>
+                  <div class="col-4">
+                    <div class="form-floating">
+                      <input
+                        type="number"
+                        class="form-control"
+                        id="FREEKIOSK_PORT"
+                        placeholder="8080"
+                        min="1"
+                        max="65535"
+                        value="8080"
+                      />
+                      <label for="FREEKIOSK_PORT">Port</label>
+                    </div>
                   </div>
                 </div>
-                <div class="col-4">
-                  <div class="form-floating">
-                    <input
-                      type="number"
-                      class="form-control"
-                      id="FREEKIOSK_PORT"
-                      placeholder="8080"
-                      min="1"
-                      max="65535"
-                      value="8080"
-                    />
-                    <label for="FREEKIOSK_PORT">Port</label>
-                  </div>
-                </div>
-              </div>
-              <!-- Shown in plain text on purpose: the key is stored and exported
+                <!-- Shown in plain text on purpose: the key is stored and exported
                    in plain text anyway, and hiding it only stopped an operator
-                   checking the one thing a failing terminal usually gets wrong. -->
-              <div>
-                <div class="input-group">
-                  <div class="form-floating">
-                    <input
-                      type="text"
-                      class="form-control"
-                      id="FREEKIOSK_API_KEY"
-                      placeholder="API key"
-                      autocomplete="off"
-                      spellcheck="false"
-                    />
-                    <label for="FREEKIOSK_API_KEY">API key (optional)</label>
+                   checking the one thing a failing terminal usually gets wrong.
+                   Read-only, it shows only whether one is set. -->
+                <div class="form-floating ci-view-only">
+                  <input
+                    type="text"
+                    class="form-control disabled"
+                    id="FREEKIOSK_API_KEY_VIEW"
+                    disabled
+                  />
+                  <label for="FREEKIOSK_API_KEY_VIEW">API key</label>
+                </div>
+                <div class="ci-edit-only">
+                  <div class="input-group">
+                    <div class="form-floating">
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="FREEKIOSK_API_KEY"
+                        placeholder="API key"
+                        autocomplete="off"
+                        spellcheck="false"
+                      />
+                      <label for="FREEKIOSK_API_KEY">API key (optional)</label>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn freekiosk-btn copy-field-btn"
+                      data-target="#FREEKIOSK_API_KEY"
+                      title="Copy API key"
+                      aria-label="Copy API key"
+                    >
+                      <i class="bi bi-clipboard"></i>
+                    </button>
                   </div>
+                  <small class="text-muted d-block mt-1">
+                    Leave blank if the device has no key set. Stored and exported in plain text.
+                  </small>
+                </div>
+
+                <div class="form-floating has-copy fk-existing-only" id="FREEKIOSK_SLUG_FIELD">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="FREEKIOSK_SLUG"
+                    placeholder="Slug"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <label for="FREEKIOSK_SLUG">Slug (API / OSC address)</label>
                   <button
                     type="button"
-                    class="btn freekiosk-btn copy-field-btn"
-                    data-target="#FREEKIOSK_API_KEY"
-                    title="Copy API key"
-                    aria-label="Copy API key"
+                    class="copy-field-btn"
+                    data-target="#FREEKIOSK_SLUG"
+                    title="Copy Slug"
+                    aria-label="Copy Slug"
                   >
                     <i class="bi bi-clipboard"></i>
                   </button>
                 </div>
-                <small class="text-muted d-block mt-1">
-                  Leave blank if the device has no key set. Stored and exported in plain text.
-                </small>
-              </div>
 
-              <div class="form-floating d-none" id="FREEKIOSK_SLUG_FIELD">
-                <input
-                  type="text"
-                  class="form-control"
-                  id="FREEKIOSK_SLUG"
-                  placeholder="Slug"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-                <label for="FREEKIOSK_SLUG">Slug (API / OSC address)</label>
-              </div>
-
-              <div class="form-floating">
-                <select class="form-select" id="FREEKIOSK_GROUPID">
-                  <option value="null" selected>No Group</option>
-                </select>
-                <label for="FREEKIOSK_GROUPID">Group</label>
-              </div>
-
-              <!-- Hidden until the terminal exists: there is no ID to put in a
-                   tag's scope before it has been created. -->
-              <div class="tag-picker d-none" id="FREEKIOSK_TAGS_WRAPPER">
-                <div class="tag-picker-head">
-                  <span class="tag-picker-title">Tags</span>
-                  <span class="tag-picker-hint">Create and colour tags in the Tag Manager</span>
+                <div class="form-floating">
+                  <select class="form-select" id="FREEKIOSK_GROUPID">
+                    <option value="null" selected>No Group</option>
+                  </select>
+                  <label for="FREEKIOSK_GROUPID">Group</label>
                 </div>
-                <div id="FREEKIOSK_TAGS" class="tag-picker-list"></div>
-              </div>
 
-              <div class="bg-ghost rounded px-3 py-2">
-                <label
-                  for="FREEKIOSK_INTERVAL"
-                  class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
+                <!-- Existing terminals only: there is no ID to put in a tag's scope
+                   before it has been created. -->
+                <div
+                  id="FREEKIOSK_TAGS_VIEW_SECTION"
+                  class="d-grid gap-2 d-none ci-view-only fk-existing-only"
                 >
-                  <span>Poll Interval</span>
-                  <span id="FREEKIOSK_INTERVAL_LABEL" class="badge bg-ghost-light text-light"
-                    >30s</span
-                  >
-                </label>
-                <input
-                  type="range"
-                  class="form-range"
-                  id="FREEKIOSK_INTERVAL"
-                  min="5000"
-                  max="300000"
-                  step="1000"
-                  value="30000"
-                />
-              </div>
-
-              <div class="bg-ghost rounded px-3 py-2">
-                <label
-                  for="FREEKIOSK_TIMEOUT"
-                  class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
-                >
-                  <span>Request Timeout</span>
-                  <span id="FREEKIOSK_TIMEOUT_LABEL" class="badge bg-ghost-light text-light"
-                    >5s</span
-                  >
-                </label>
-                <input
-                  type="range"
-                  class="form-range"
-                  id="FREEKIOSK_TIMEOUT"
-                  min="1000"
-                  max="30000"
-                  step="500"
-                  value="5000"
-                />
-              </div>
-
-              <div class="d-grid">
-                <button type="button" class="btn freekiosk-btn" id="FREEKIOSK_TEST_CONNECTION">
-                  <i class="bi bi-broadcast"></i> Test Connection
-                </button>
-                <div id="FREEKIOSK_TEST_RESULT" class="freekiosk-test-result d-none"></div>
-              </div>
-
-              <div class="freekiosk-alarms freekiosk-setup">
-                <div class="freekiosk-alarms-head">
-                  <span class="freekiosk-alarms-title">Display Mode</span>
-                  <span class="freekiosk-alarms-hint">
-                    Set on the tablet; tell ShowTrak so it reads the right values
-                  </span>
+                  <div class="rounded-3 p-2 bg-ghost-light text-center">
+                    <h6 class="mb-0">Tags</h6>
+                  </div>
+                  <div id="FREEKIOSK_TAGS_VIEW" class="tag-picker-list is-readonly"></div>
                 </div>
-                <div id="FREEKIOSK_SETUP_SETTINGS" class="freekiosk-alarms-body"></div>
-              </div>
-
-              <div class="freekiosk-alarms">
-                <div class="freekiosk-alarms-head">
-                  <span class="freekiosk-alarms-title">Monitoring &amp; Alarms</span>
-                  <span class="freekiosk-alarms-hint">
-                    Turn on any value to alert when it goes wrong
-                  </span>
-                </div>
-                <div id="FREEKIOSK_ALARM_SETTINGS" class="freekiosk-alarms-body"></div>
-                <div class="accordion accordion-flush" id="FREEKIOSK_ALARM_ADVANCED_WRAP">
-                  <div class="accordion-item bg-transparent">
-                    <h2 class="accordion-header">
-                      <button
-                        class="accordion-button collapsed bg-transparent text-light px-0"
-                        type="button"
-                        data-bs-toggle="collapse"
-                        data-bs-target="#FREEKIOSK_ALARM_ADVANCED_COLLAPSE"
-                      >
-                        Advanced values
-                      </button>
-                    </h2>
-                    <div id="FREEKIOSK_ALARM_ADVANCED_COLLAPSE" class="accordion-collapse collapse">
-                      <div
-                        id="FREEKIOSK_ALARM_ADVANCED"
-                        class="accordion-body px-0 freekiosk-alarms-body"
-                      ></div>
+                <div class="ci-edit-only fk-existing-only">
+                  <div class="tag-picker d-none" id="FREEKIOSK_TAGS_WRAPPER">
+                    <div class="tag-picker-head">
+                      <span class="tag-picker-title">Tags</span>
+                      <span class="tag-picker-hint">Create and colour tags in the Tag Manager</span>
                     </div>
+                    <div id="FREEKIOSK_TAGS" class="tag-picker-list"></div>
                   </div>
                 </div>
+
+                <div class="bg-ghost rounded px-3 py-2">
+                  <label
+                    for="FREEKIOSK_INTERVAL"
+                    class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
+                  >
+                    <span>Poll Interval</span>
+                    <span id="FREEKIOSK_INTERVAL_LABEL" class="badge bg-ghost-light text-light"
+                      >30s</span
+                    >
+                  </label>
+                  <input
+                    type="range"
+                    class="form-range"
+                    id="FREEKIOSK_INTERVAL"
+                    min="5000"
+                    max="300000"
+                    step="1000"
+                    value="30000"
+                  />
+                </div>
+
+                <div class="bg-ghost rounded px-3 py-2">
+                  <label
+                    for="FREEKIOSK_TIMEOUT"
+                    class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
+                  >
+                    <span>Request Timeout</span>
+                    <span id="FREEKIOSK_TIMEOUT_LABEL" class="badge bg-ghost-light text-light"
+                      >5s</span
+                    >
+                  </label>
+                  <input
+                    type="range"
+                    class="form-range"
+                    id="FREEKIOSK_TIMEOUT"
+                    min="1000"
+                    max="30000"
+                    step="500"
+                    value="5000"
+                  />
+                </div>
+
+                <div class="d-grid ci-edit-only fk-existing-only">
+                  <button type="button" class="btn freekiosk-btn" id="FREEKIOSK_TEST_CONNECTION">
+                    <i class="bi bi-broadcast"></i> Test Connection
+                  </button>
+                  <div id="FREEKIOSK_TEST_RESULT" class="freekiosk-test-result d-none"></div>
+                </div>
+
+                <div class="freekiosk-alarms freekiosk-setup">
+                  <div class="freekiosk-alarms-head">
+                    <span class="freekiosk-alarms-title">Display Mode</span>
+                    <span class="freekiosk-alarms-hint">
+                      Set on the tablet; tell ShowTrak so it reads the right values
+                    </span>
+                  </div>
+                  <div id="FREEKIOSK_SETUP_SETTINGS" class="freekiosk-alarms-body"></div>
+                </div>
+
+                <div class="freekiosk-section-note mb-0 fk-add-only">
+                  <i class="bi bi-info-circle"></i>
+                  <span
+                    >New terminals monitor whether content is displaying. Choose everything else to
+                    monitor on the terminal's Content, Screen, Battery, Network and Misc tabs once
+                    it is added.</span
+                  >
+                </div>
+
+                <button
+                  type="button"
+                  class="btn btn-delete w-100 ci-edit-only fk-existing-only"
+                  id="FREEKIOSK_DELETE"
+                >
+                  Delete FreeKiosk Terminal
+                </button>
               </div>
             </div>
 
@@ -2526,17 +2312,13 @@ Loading licence…</pre>
                 <button type="button" class="btn btn-success" id="FREEKIOSK_SAVE">Save</button>
               </div>
             </div>
-
-            <div id="FREEKIOSK_DANGER_ZONE" class="d-none">
-              <button type="button" class="btn btn-delete w-100 mt-2" id="FREEKIOSK_DELETE">
-                Delete FreeKiosk Terminal
-              </button>
-            </div>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- Add Dummy Client. An existing dummy is edited on the Settings tab of its
+         view modal instead (dummy-info-edit.ts). -->
     <div
       class="modal fade"
       id="SHOWTRAK_MODAL_DUMMY_CLIENT"
@@ -2548,7 +2330,7 @@ Loading licence…</pre>
         <div class="modal-content">
           <div class="modal-body text-center">
             <div class="rounded-3 p-2 bg-ghost-light">
-              <h6 class="mb-0" id="DUMMY_CLIENT_MODAL_TITLE">Add Dummy Client</h6>
+              <h6 class="mb-0">Add Dummy Client</h6>
             </div>
 
             <div class="d-grid gap-2 text-start">
@@ -2577,16 +2359,6 @@ Loading licence…</pre>
                   <option value="null" selected>No Group</option>
                 </select>
                 <label for="DUMMY_CLIENT_GROUPID">Group</label>
-              </div>
-
-              <!-- Hidden until the dummy exists: there is no ID to put in a
-                   tag's scope before it has been created. -->
-              <div class="tag-picker d-none" id="DUMMY_CLIENT_TAGS_WRAPPER">
-                <div class="tag-picker-head">
-                  <span class="tag-picker-title">Tags</span>
-                  <span class="tag-picker-hint">Create and colour tags in the Tag Manager</span>
-                </div>
-                <div id="DUMMY_CLIENT_TAGS" class="tag-picker-list"></div>
               </div>
 
               <div class="bg-ghost rounded px-3 py-2">
@@ -2618,12 +2390,6 @@ Loading licence…</pre>
               <div class="col-6 d-grid">
                 <button type="button" class="btn btn-success" id="DUMMY_CLIENT_SAVE">Save</button>
               </div>
-            </div>
-
-            <div id="DUMMY_CLIENT_DANGER_ZONE" class="d-none">
-              <button type="button" class="btn btn-delete w-100 mt-2" id="DUMMY_CLIENT_DELETE">
-                Delete Dummy Client
-              </button>
             </div>
           </div>
         </div>
@@ -2861,26 +2627,41 @@ Loading licence…</pre>
                     class="monitor-history-timelines mt-2"
                     data-client-info-tab="status"
                   ></div>
-
-                  <div class="mt-2" data-client-info-tab="status">
-                    <button
-                      type="button"
-                      class="btn btn-light w-100 d-none"
-                      id="MONITOR_HISTORY_EDIT_BUTTON"
-                      data-target-id=""
-                    >
-                      Edit
-                    </button>
-                  </div>
                 </div>
 
                 <div id="CLIENT_INFO_DETAILS_SECTION" class="d-grid gap-2">
+                  <!-- Info, Variables, Wake on LAN and Actions are the client's
+                       editor as well as its view: in Edit mode they flip to
+                       editable (see client-info-edit.ts), live, whenever the mode
+                       changes. A `.ci-view-only` element shows only while
+                       read-only, a `.ci-edit-only` one only while editable. -->
                   <div class="d-grid gap-2" data-client-info-tab="info">
                     <div class="form-floating has-copy">
                       <input
                         type="text"
-                        class="form-control disabled"
+                        class="form-control ci-draft ci-editable"
+                        id="CLIENT_INFO_SLUG"
+                        placeholder="Slug"
+                        autocomplete="off"
+                        spellcheck="false"
+                        disabled
+                      />
+                      <label for="CLIENT_INFO_SLUG">Slug (API / OSC address)</label>
+                      <button
+                        type="button"
+                        class="copy-field-btn"
+                        data-target="#CLIENT_INFO_SLUG"
+                        title="Copy"
+                      >
+                        <i class="bi bi-clipboard"></i>
+                      </button>
+                    </div>
+                    <div class="form-floating has-copy">
+                      <input
+                        type="text"
+                        class="form-control ci-draft ci-editable"
                         id="CLIENT_INFO_NICKNAME"
+                        placeholder="Nickname"
                         disabled
                       />
                       <label for="CLIENT_INFO_NICKNAME">Nickname</label>
@@ -2927,7 +2708,7 @@ Loading licence…</pre>
                         <i class="bi bi-clipboard"></i>
                       </button>
                     </div>
-                    <div class="form-floating">
+                    <div class="form-floating ci-view-only">
                       <input
                         type="text"
                         class="form-control disabled"
@@ -2935,6 +2716,10 @@ Loading licence…</pre>
                         disabled
                       />
                       <label for="CLIENT_INFO_GROUP">Group</label>
+                    </div>
+                    <div class="form-floating ci-edit-only">
+                      <select class="form-select ci-draft" id="CLIENT_INFO_GROUP_SELECT"></select>
+                      <label for="CLIENT_INFO_GROUP_SELECT">Group</label>
                     </div>
                     <div class="form-floating has-copy">
                       <input
@@ -2948,23 +2733,6 @@ Loading licence…</pre>
                         type="button"
                         class="copy-field-btn"
                         data-target="#CLIENT_INFO_IP"
-                        title="Copy"
-                      >
-                        <i class="bi bi-clipboard"></i>
-                      </button>
-                    </div>
-                    <div class="form-floating has-copy d-none" id="CLIENT_INFO_MAC_WRAPPER">
-                      <input
-                        type="text"
-                        class="form-control disabled"
-                        id="CLIENT_INFO_MAC"
-                        disabled
-                      />
-                      <label for="CLIENT_INFO_MAC">MAC Address</label>
-                      <button
-                        type="button"
-                        class="copy-field-btn"
-                        data-target="#CLIENT_INFO_MAC"
                         title="Copy"
                       >
                         <i class="bi bi-clipboard"></i>
@@ -3013,14 +2781,190 @@ Loading licence…</pre>
                       />
                       <label for="CLIENT_INFO_STATUS">Status</label>
                     </div>
-                    <!-- Read-only mirror of the tiles' badges. Hidden when it
+                    <!-- Run-on-launch script + delay. Hidden for SDK clients,
+                         which run no local agent. -->
+                    <div id="CLIENT_INFO_LAUNCH_WRAPPER" class="d-grid gap-2">
+                      <div class="form-floating ci-view-only">
+                        <input
+                          type="text"
+                          class="form-control disabled"
+                          id="CLIENT_INFO_RUNONLAUNCH_VIEW"
+                          disabled
+                        />
+                        <label for="CLIENT_INFO_RUNONLAUNCH_VIEW">Run on Launch</label>
+                      </div>
+                      <div
+                        class="form-floating ci-view-only"
+                        id="CLIENT_INFO_LAUNCH_DELAY_VIEW_WRAPPER"
+                      >
+                        <input
+                          type="text"
+                          class="form-control disabled"
+                          id="CLIENT_INFO_RUNONLAUNCH_DELAY_VIEW"
+                          disabled
+                        />
+                        <label for="CLIENT_INFO_RUNONLAUNCH_DELAY_VIEW">Launch Delay</label>
+                      </div>
+                      <div class="form-floating ci-edit-only">
+                        <select
+                          class="form-select ci-draft"
+                          id="CLIENT_INFO_RUNONLAUNCH_SCRIPT"
+                        ></select>
+                        <label for="CLIENT_INFO_RUNONLAUNCH_SCRIPT">Run on Launch</label>
+                      </div>
+                      <div class="form-floating ci-edit-only">
+                        <input
+                          type="number"
+                          min="10"
+                          step="1"
+                          class="form-control ci-draft"
+                          id="CLIENT_INFO_RUNONLAUNCH_DELAY"
+                          placeholder="Launch Delay (seconds)"
+                        />
+                        <label for="CLIENT_INFO_RUNONLAUNCH_DELAY">Launch Delay (seconds)</label>
+                      </div>
+                    </div>
+                    <!-- How long a dropped connection is tolerated before this
+                         client reads offline. The first option inherits the
+                         Preferences value and names what it resolves to. -->
+                    <div class="form-floating ci-view-only">
+                      <input
+                        type="text"
+                        class="form-control disabled"
+                        id="CLIENT_INFO_OFFLINE_GRACE_VIEW"
+                        disabled
+                      />
+                      <label for="CLIENT_INFO_OFFLINE_GRACE_VIEW">Disconnect Grace Period</label>
+                    </div>
+                    <div class="form-floating ci-edit-only">
+                      <select class="form-select ci-draft" id="CLIENT_INFO_OFFLINE_GRACE"></select>
+                      <label for="CLIENT_INFO_OFFLINE_GRACE">Disconnect Grace Period</label>
+                    </div>
+                    <!-- FOG host link. Hidden unless the FOG integration is
+                         enabled and reachable; the select is populated from the
+                         live FOG host list, falling back to the cached link when
+                         FOG is offline. Applies on change, not on Save. -->
+                    <div class="d-grid gap-1 d-none" id="CLIENT_INFO_FOG_WRAPPER">
+                      <div class="form-floating ci-view-only">
+                        <input
+                          type="text"
+                          class="form-control disabled"
+                          id="CLIENT_INFO_FOG_HOST_VIEW"
+                          disabled
+                        />
+                        <label for="CLIENT_INFO_FOG_HOST_VIEW">FOG Host</label>
+                      </div>
+                      <div class="form-floating ci-edit-only">
+                        <select class="form-select" id="CLIENT_INFO_FOG_HOST">
+                          <option value="">Not linked to FOG</option>
+                        </select>
+                        <label for="CLIENT_INFO_FOG_HOST">FOG Host</label>
+                      </div>
+                      <span class="text-sm text-secondary" id="CLIENT_INFO_FOG_HINT"></span>
+                    </div>
+                    <!-- Read-only mirror of the tiles' badges, hidden when it
                          carries no tags. -->
-                    <div id="CLIENT_INFO_TAGS_SECTION" class="d-grid gap-2 d-none">
+                    <div id="CLIENT_INFO_TAGS_SECTION" class="d-grid gap-2 d-none ci-view-only">
                       <div class="rounded-3 p-2 bg-ghost-light">
                         <h6 class="mb-0">Tags</h6>
                       </div>
                       <div id="CLIENT_INFO_TAGS" class="tag-picker-list is-readonly"></div>
                     </div>
+                    <!-- Editable: membership is stored on the TAG (a dynamic
+                         scope), so toggling a chip rewrites that tag, at once.
+                         Chips inherited from a group or from "all clients" show
+                         on but locked — see tag-picker.ts. -->
+                    <div class="ci-edit-only">
+                      <div class="tag-picker d-none" id="CLIENT_INFO_TAG_PICKER_WRAPPER">
+                        <div class="tag-picker-head">
+                          <span class="tag-picker-title">Tags</span>
+                          <span class="tag-picker-hint"
+                            >Create and colour tags in the Tag Manager</span
+                          >
+                        </div>
+                        <div id="CLIENT_INFO_TAG_PICKER" class="tag-picker-list"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Show variables for this client: one row per variable defined
+                       in the Variable Manager. Saved with the Info fields. -->
+                  <div
+                    id="CLIENT_INFO_VARIABLES_SECTION"
+                    class="d-grid gap-2"
+                    data-client-info-tab="variables"
+                  >
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Variables</h6>
+                    </div>
+                    <span class="text-sm text-secondary" id="CLIENT_INFO_VARIABLES_HINT"></span>
+                    <div id="CLIENT_INFO_VARIABLES_LIST" class="d-grid gap-2"></div>
+                  </div>
+                  <!-- Every MAC the client is known by. Wake on LAN fires at all
+                       of them, since which NIC the server can reach is unknowable
+                       from here. Addresses the client reports arrive by
+                       themselves; edits apply at once, not on Save. -->
+                  <div id="CLIENT_INFO_WOL_SECTION" class="d-grid gap-2" data-client-info-tab="wol">
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">MAC Addresses</h6>
+                    </div>
+                    <span class="text-sm text-secondary"
+                      >Wake on LAN sends a magic packet to every address listed here.</span
+                    >
+                    <div id="CLIENT_INFO_MAC_LIST" class="mac-address-list"></div>
+                    <div class="input-group mac-address-add ci-edit-only">
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="CLIENT_INFO_MAC_INPUT"
+                        placeholder="AA:BB:CC:DD:EE:FF"
+                        maxlength="17"
+                        autocomplete="off"
+                        spellcheck="false"
+                      />
+                      <button
+                        class="btn btn-secondary"
+                        type="button"
+                        id="CLIENT_INFO_MAC_ADD"
+                        title="Add MAC Address"
+                      >
+                        <i class="bi bi-plus-lg"></i>
+                      </button>
+                    </div>
+                    <div class="d-grid gap-1 ci-edit-only">
+                      <button
+                        type="button"
+                        class="btn btn-ghost text-light"
+                        id="CLIENT_INFO_MAC_FROM_CLIENT"
+                      >
+                        Add Addresses from Client
+                      </button>
+                      <!-- Only while the FOG integration is enabled and
+                           reachable. -->
+                      <button
+                        type="button"
+                        class="btn btn-ghost text-info d-none"
+                        id="CLIENT_INFO_MAC_FROM_FOG"
+                      >
+                        Fetch Addresses from FOG
+                      </button>
+                      <span
+                        class="text-sm text-secondary d-none"
+                        id="CLIENT_INFO_MAC_FOG_HINT"
+                      ></span>
+                    </div>
+                  </div>
+                  <!-- Everything the right-click menu offers for this client, plus
+                       the client's own management actions. Usable in Edit mode
+                       only. -->
+                  <div
+                    id="CLIENT_INFO_ACTIONS_SECTION"
+                    class="d-grid gap-2"
+                    data-client-info-tab="actions"
+                  >
+                    <div class="client-info-actions-hint ci-view-only">
+                      Switch to Edit mode (Ctrl/Cmd+2) to use these actions.
+                    </div>
+                    <div id="CLIENT_INFO_ACTIONS" class="d-grid gap-2"></div>
                   </div>
                   <div id="CLIENT_INFO_USB_SECTION" class="d-grid gap-2" data-client-info-tab="usb">
                     <div class="rounded-3 p-2 bg-ghost-light">
@@ -3084,6 +3028,20 @@ Loading licence…</pre>
                     <div id="SHOWTRAK_CLIENT_INFO_NET_IPV6" class="d-grid gap-2"></div>
                   </div>
 
+                  <!-- Mounted volumes: one card each, with the usage bar and the
+                       Monitor toggle and conditions (see client-info-storage.ts).
+                       Hidden for SDK clients. -->
+                  <div
+                    id="CLIENT_INFO_STORAGE_SECTION"
+                    class="d-grid gap-2"
+                    data-client-info-tab="storage"
+                  >
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Volumes</h6>
+                    </div>
+                    <div id="SHOWTRAK_CLIENT_INFO_STORAGE" class="d-grid gap-2"></div>
+                  </div>
+
                   <!-- CPU, memory and uptime: one card each, with the usage
                        history charts and the Monitor toggle and conditions
                        (see client-info-health.ts). Hidden for SDK clients. -->
@@ -3132,6 +3090,246 @@ Loading licence…</pre>
                   </div>
                 </div>
 
+                <!-- A FreeKiosk terminal's Settings: the terminal form, moved in from
+                     the Add modal while open (freekiosk-info-edit.ts), disabled in
+                     Show mode and committed by the footer Save in Edit mode. What
+                     it monitors is set on its section tabs instead
+                     (freekiosk-monitoring.ts). -->
+                <div
+                  id="FREEKIOSK_INFO_SETTINGS_SECTION"
+                  class="d-none"
+                  data-client-info-tab="settings"
+                ></div>
+
+                <!-- A dummy client's Settings: read-only in Show mode, editable in
+                     Edit mode (dummy-info-edit.ts), committed by the footer Save
+                     like its old editor. Tags apply as they are clicked. -->
+                <div
+                  id="DUMMY_INFO_SETTINGS_SECTION"
+                  class="d-grid gap-2 d-none"
+                  data-client-info-tab="settings"
+                >
+                  <div class="form-floating has-copy">
+                    <input
+                      type="text"
+                      class="form-control di-draft"
+                      id="DUMMY_INFO_ID"
+                      placeholder="ID"
+                      autocomplete="off"
+                      spellcheck="false"
+                      disabled
+                    />
+                    <label for="DUMMY_INFO_ID">Slug / ID (API / OSC address)</label>
+                    <button
+                      type="button"
+                      class="copy-field-btn"
+                      data-target="#DUMMY_INFO_ID"
+                      title="Copy ID"
+                      aria-label="Copy ID"
+                    >
+                      <i class="bi bi-clipboard"></i>
+                    </button>
+                  </div>
+                  <div class="form-floating">
+                    <input
+                      type="text"
+                      class="form-control di-draft"
+                      id="DUMMY_INFO_TITLE"
+                      placeholder="Title"
+                      disabled
+                    />
+                    <label for="DUMMY_INFO_TITLE">Title</label>
+                  </div>
+                  <div class="form-floating ci-view-only">
+                    <input
+                      type="text"
+                      class="form-control disabled"
+                      id="DUMMY_INFO_GROUP"
+                      disabled
+                    />
+                    <label for="DUMMY_INFO_GROUP">Group</label>
+                  </div>
+                  <div class="form-floating ci-edit-only">
+                    <select class="form-select di-draft" id="DUMMY_INFO_GROUP_SELECT"></select>
+                    <label for="DUMMY_INFO_GROUP_SELECT">Group</label>
+                  </div>
+                  <div class="form-floating ci-view-only">
+                    <input
+                      type="text"
+                      class="form-control disabled"
+                      id="DUMMY_INFO_INTERVAL_VIEW"
+                      disabled
+                    />
+                    <label for="DUMMY_INFO_INTERVAL_VIEW">Heartbeat Interval</label>
+                  </div>
+                  <div class="bg-ghost rounded px-3 py-2 text-start ci-edit-only">
+                    <label
+                      for="DUMMY_INFO_INTERVAL"
+                      class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
+                    >
+                      <span>Heartbeat Interval</span>
+                      <span id="DUMMY_INFO_INTERVAL_LABEL" class="badge bg-ghost-light text-light"
+                        >30s</span
+                      >
+                    </label>
+                    <input
+                      type="range"
+                      class="form-range di-draft"
+                      id="DUMMY_INFO_INTERVAL"
+                      min="5000"
+                      max="300000"
+                      step="1000"
+                      value="30000"
+                    />
+                  </div>
+                  <div id="DUMMY_INFO_TAGS_SECTION" class="d-grid gap-2 d-none ci-view-only">
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Tags</h6>
+                    </div>
+                    <div id="DUMMY_INFO_TAGS" class="tag-picker-list is-readonly"></div>
+                  </div>
+                  <div class="ci-edit-only">
+                    <div class="tag-picker d-none" id="DUMMY_INFO_TAG_PICKER_WRAPPER">
+                      <div class="tag-picker-head">
+                        <span class="tag-picker-title">Tags</span>
+                        <span class="tag-picker-hint"
+                          >Create and colour tags in the Tag Manager</span
+                        >
+                      </div>
+                      <div id="DUMMY_INFO_TAG_PICKER" class="tag-picker-list"></div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-delete w-100 ci-edit-only"
+                    id="DUMMY_INFO_DELETE"
+                  >
+                    Delete Dummy Client
+                  </button>
+                </div>
+
+                <!-- A monitor's Settings: read-only in Show mode, editable in Edit
+                     mode (monitor-info-edit.ts), and autosaved like the monitor
+                     editor always was. Outside the history section, which is
+                     rebuilt on every live push and would eat half-typed values. -->
+                <div
+                  id="MONITOR_INFO_SETTINGS_SECTION"
+                  class="d-grid gap-2 d-none"
+                  data-client-info-tab="settings"
+                >
+                  <div class="form-floating has-copy">
+                    <input
+                      type="text"
+                      class="form-control mi-draft"
+                      id="MONITOR_INFO_SLUG"
+                      placeholder="Slug"
+                      autocomplete="off"
+                      spellcheck="false"
+                      disabled
+                    />
+                    <label for="MONITOR_INFO_SLUG">Slug (API / OSC address)</label>
+                    <button
+                      type="button"
+                      class="copy-field-btn"
+                      data-target="#MONITOR_INFO_SLUG"
+                      title="Copy Slug"
+                      aria-label="Copy Slug"
+                    >
+                      <i class="bi bi-clipboard"></i>
+                    </button>
+                  </div>
+                  <div class="form-floating">
+                    <input
+                      type="text"
+                      class="form-control mi-draft"
+                      id="MONITOR_INFO_NICKNAME"
+                      placeholder="Name"
+                      disabled
+                    />
+                    <label for="MONITOR_INFO_NICKNAME">Name</label>
+                  </div>
+                  <div class="form-floating ci-view-only">
+                    <input
+                      type="text"
+                      class="form-control disabled"
+                      id="MONITOR_INFO_INTERVAL_VIEW"
+                      disabled
+                    />
+                    <label for="MONITOR_INFO_INTERVAL_VIEW">Check Interval</label>
+                  </div>
+                  <div class="bg-ghost rounded px-3 py-2 text-start ci-edit-only">
+                    <label
+                      for="MONITOR_INFO_INTERVAL"
+                      class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
+                    >
+                      <span>Check Interval</span>
+                      <span id="MONITOR_INFO_INTERVAL_LABEL" class="badge bg-ghost-light text-light"
+                        >30s</span
+                      >
+                    </label>
+                    <input
+                      type="range"
+                      class="form-range mi-draft"
+                      id="MONITOR_INFO_INTERVAL"
+                      min="3000"
+                      max="300000"
+                      step="1000"
+                      value="30000"
+                    />
+                  </div>
+                  <div class="form-floating ci-view-only">
+                    <input
+                      type="text"
+                      class="form-control disabled"
+                      id="MONITOR_INFO_FAILURE_THRESHOLD_VIEW"
+                      disabled
+                    />
+                    <label for="MONITOR_INFO_FAILURE_THRESHOLD_VIEW">Failures Before Offline</label>
+                  </div>
+                  <div class="form-floating ci-edit-only">
+                    <select
+                      class="form-select mi-draft"
+                      id="MONITOR_INFO_FAILURE_THRESHOLD"
+                    ></select>
+                    <label for="MONITOR_INFO_FAILURE_THRESHOLD">Failures Before Offline</label>
+                  </div>
+                  <div id="MONITOR_INFO_TAGS_SECTION" class="d-grid gap-2 d-none ci-view-only">
+                    <div class="rounded-3 p-2 bg-ghost-light">
+                      <h6 class="mb-0">Tags</h6>
+                    </div>
+                    <div id="MONITOR_INFO_TAGS" class="tag-picker-list is-readonly"></div>
+                  </div>
+                  <div class="ci-edit-only">
+                    <div class="tag-picker d-none" id="MONITOR_INFO_TAG_PICKER_WRAPPER">
+                      <div class="tag-picker-head">
+                        <span class="tag-picker-title">Tags</span>
+                        <span class="tag-picker-hint"
+                          >Create and colour tags in the Tag Manager</span
+                        >
+                      </div>
+                      <div id="MONITOR_INFO_TAG_PICKER" class="tag-picker-list"></div>
+                    </div>
+                  </div>
+                  <div class="rounded-3 p-2 bg-ghost-light">
+                    <h6 class="mb-0">Checks</h6>
+                  </div>
+                  <div id="MONITOR_INFO_CHECK_LIST" class="d-grid gap-2"></div>
+                  <button
+                    type="button"
+                    class="btn btn-light w-100 ci-edit-only"
+                    id="MONITOR_INFO_ADD_CHECK"
+                  >
+                    <i class="bi bi-plus-lg"></i> Add Check
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-delete w-100 ci-edit-only"
+                    id="MONITOR_INFO_DELETE"
+                  >
+                    Delete Monitor
+                  </button>
+                </div>
+
                 <!-- Every kind's Logs pane. Outside both sections above: the
                      history section is rebuilt on every live push, and the
                      details section is hidden for anything but a client. -->
@@ -3139,10 +3337,22 @@ Loading licence…</pre>
               </div>
             </div>
 
-            <div class="row g-2 mt-2">
-              <div class="col-12 d-grid">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-              </div>
+            <!-- Save commits a client's Info and Variables fields together (MACs,
+                 tags and the FOG link apply as they change), or a dummy's
+                 Settings. Shown only for those (monitors autosave), in Edit mode,
+                 and enabled once something has changed. -->
+            <div class="d-flex gap-2 mt-2">
+              <button
+                type="button"
+                class="btn btn-success flex-fill ci-edit-only d-none"
+                id="CLIENT_INFO_SAVE"
+                disabled
+              >
+                Save
+              </button>
+              <button type="button" class="btn btn-light flex-fill" data-bs-dismiss="modal">
+                Close
+              </button>
             </div>
 
             <div

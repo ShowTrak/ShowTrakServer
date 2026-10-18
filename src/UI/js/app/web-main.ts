@@ -94,6 +94,8 @@ interface WebConfig {
   UnassignedClientsEnabled: boolean;
   AllowModeChange: boolean;
   AllowAlertActionsToggle: boolean;
+  AllowClientManagement: boolean;
+  AllowMonitoringManagement: boolean;
   Authed: boolean;
   Mode?: string;
   Version?: string;
@@ -188,6 +190,8 @@ function buildCapabilities(config: WebConfig) {
     allowRemoteScripts: !!config.AllowRemoteScripts,
     wolEnabled: !!config.WOLEnabled,
     allowUnassignedClients: !!config.UnassignedClientsEnabled,
+    canManageClients: !!config.AllowClientManagement,
+    canManageMonitoring: !!config.AllowMonitoringManagement,
   } satisfies CapabilityProfile;
 }
 

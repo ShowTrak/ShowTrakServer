@@ -796,7 +796,8 @@ button.btn:focus {
 .form-floating.has-copy {
   position: relative;
 }
-.form-floating.has-copy .copy-field-btn {
+.form-floating.has-copy .copy-field-btn,
+.form-floating.has-copy .field-reset-btn {
   position: absolute;
   top: 50%;
   right: 8px;
@@ -810,10 +811,16 @@ button.btn:focus {
   display: grid;
   place-items: center;
 }
-.form-floating.has-copy .copy-field-btn:hover {
+.form-floating.has-copy .copy-field-btn:hover,
+.form-floating.has-copy .field-reset-btn:hover:not(:disabled) {
   color: var(--text-strong);
 }
-.form-floating.has-copy .copy-field-btn i {
+.form-floating.has-copy .field-reset-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.form-floating.has-copy .copy-field-btn i,
+.form-floating.has-copy .field-reset-btn i {
   font-size: var(--fs-xl);
   line-height: 1;
 }
@@ -1022,6 +1029,43 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 .SHOWTRAK_AUDIO_LEVEL_VALUE {
   flex: 0 0 2.75rem;
   text-align: right;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A volume's usage: a read-only pill in the audio level bar's style, filled to
+   how full the volume is, with what that leaves beside it. A monitored volume
+   short of free space fills in the failing-condition colour. */
+.SHOWTRAK_STORAGE_USAGE {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.SHOWTRAK_STORAGE_BAR {
+  flex: 1 1 auto;
+  height: 0.6rem;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.SHOWTRAK_STORAGE_BAR > span {
+  display: block;
+  height: 100%;
+  min-width: 0.6rem;
+  border-radius: var(--radius-pill);
+  background: #e2e2ea;
+}
+
+.SHOWTRAK_STORAGE_USAGE.is-low .SHOWTRAK_STORAGE_BAR > span {
+  background: var(--condition-failing);
+}
+
+.SHOWTRAK_STORAGE_USAGE_TEXT {
+  flex: 0 0 auto;
   font-size: var(--fs-sm);
   font-weight: 700;
   font-variant-numeric: tabular-nums;

@@ -60,11 +60,20 @@ interface ContextMenuOption {
   ActsOnSelection?: boolean;
 }
 
-/** Build the menu rows for the current selection (`Selected`). */
-export async function BuildContextMenuOptions(): Promise<ContextMenuOption[]> {
+/**
+ * Build the menu rows for a selection — the current one (`Selected`) by default.
+ *
+ * A client's Actions tab passes just that client and leaves out the rows that
+ * manage the selection itself (Clear Selection, Select All), which mean nothing
+ * there.
+ */
+export async function BuildContextMenuOptions(
+  Selection: readonly string[] = Selected,
+  { IncludeSelectionRows = true }: { IncludeSelectionRows?: boolean } = {}
+): Promise<ContextMenuOption[]> {
   const Options: ContextMenuOption[] = [];
 
-  if (Selected.length == 0) {
+  if (Selection.length == 0 && IncludeSelectionRows) {
     Options.push({
       Type: 'Info',
       Title: 'No Targets Selected',
@@ -72,7 +81,7 @@ export async function BuildContextMenuOptions(): Promise<ContextMenuOption[]> {
     });
   }
 
-  if (Selected.length > 0) {
+  if (Selection.length > 0) {
     // Actions are grouped into sections by the type of selected entity:
     //  - Scripts        -> remote (OS) clients, filtered to their platform.
     //  - Remote Events  -> integrated clients, from their declared actions.
@@ -110,7 +119,7 @@ export async function BuildContextMenuOptions(): Promise<ContextMenuOption[]> {
     const DummyUUIDs: string[] = [];
     const KioskUUIDs: string[] = [];
     const ClientUUIDs: string[] = [];
-    for (const UUID of Selected) {
+    for (const UUID of Selection) {
       const Value = String(UUID);
       if (Value.startsWith('monitor:')) MonitorTargetIDs.push(Value.slice('monitor:'.length));
       else if (Value.startsWith('check:')) CheckIDs.push(Value.slice('check:'.length));
@@ -479,7 +488,7 @@ export async function BuildContextMenuOptions(): Promise<ContextMenuOption[]> {
     }
 
     // Identify / Stop Identifying for selected clients.
-    const IdentifyTargets = Selected.map((UUID) => GetIdentifyTargetByUUID(UUID)).filter(
+    const IdentifyTargets = Selection.map((UUID) => GetIdentifyTargetByUUID(UUID)).filter(
       (Target) => Target && Target.Eligible
     );
     const IdentifyStartTargets = IdentifyTargets.filter((Target) => !Target.IsIdentifying);
@@ -538,10 +547,10 @@ export async function BuildContextMenuOptions(): Promise<ContextMenuOption[]> {
     }
   }
 
-  if (Selected.length > 0) {
+  if (Selection.length > 0) {
     // Wake on LAN only applies to real adopted clients; monitoring, check,
     // dummy and FreeKiosk rows carry prefixed selection UUIDs and are excluded.
-    const WolTargets = Selected.filter(
+    const WolTargets = Selection.filter(
       (UUID) =>
         !String(UUID).startsWith('monitor:') &&
         !String(UUID).startsWith('check:') &&
@@ -563,18 +572,22 @@ export async function BuildContextMenuOptions(): Promise<ContextMenuOption[]> {
         },
       });
     }
-    Options.push({
-      Type: 'Action',
-      Title: 'Clear Selection',
-      Class: 'text-light',
-      Shortcut: 'Ctrl/Cmd+D',
-      Icon: 'bi-x-circle',
-      IconColour: '#e74c3c',
-      Action: async function () {
-        ClearSelection();
-      },
-    });
+    if (IncludeSelectionRows) {
+      Options.push({
+        Type: 'Action',
+        Title: 'Clear Selection',
+        Class: 'text-light',
+        Shortcut: 'Ctrl/Cmd+D',
+        Icon: 'bi-x-circle',
+        IconColour: '#e74c3c',
+        Action: async function () {
+          ClearSelection();
+        },
+      });
+    }
   }
+
+  if (!IncludeSelectionRows) return Options;
 
   Options.push({
     Type: 'Action',

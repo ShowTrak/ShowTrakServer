@@ -29,6 +29,12 @@ import { FreeKioskListState } from './lib/list-view';
 import { RenderListRowCells, UpdateListRowState } from './list-view';
 import { Safe } from './utils';
 import { FormatMetricCompact } from './lib/metric-format';
+import {
+  DisplayModeOf,
+  FreeKioskGroupFieldKey as GroupFieldKey,
+  IsGroupEnabled,
+  MetricAppliesInMode,
+} from './lib/freekiosk-monitoring';
 
 export const FREEKIOSK_TYPE_LABEL = 'KIOSK';
 
@@ -37,49 +43,25 @@ export function FreeKioskScopedID(UUID: string): string {
   return `kiosk:${UUID}`;
 }
 
-/**
- * Settings key for a section's monitoring switch.
- *
- * Mirrors GroupFieldKey in src/Modules/FreeKiosk/metrics — the renderer's
- * tsconfig rootDir is src/UI, so it cannot import the server's copy. The rule is
- * two lines and the server remains the authority: it force-disables the alarms
- * regardless of what this decides to draw.
- */
+// The group and display-mode rules mirror src/Modules/FreeKiosk/metrics — the
+// renderer's tsconfig rootDir is src/UI, so it cannot import the server's copy.
+// They live in lib/freekiosk-monitoring (pure, tested against the server's);
+// these are the names the rest of the renderer already uses. The server remains
+// the authority: it force-disables the alarms regardless of what is drawn.
+
+/** Settings key for a section's monitoring switch. */
 export function FreeKioskGroupFieldKey(Section: string): string {
-  return `G_${Section}_On`;
+  return GroupFieldKey(Section);
 }
 
 /** Absent reads as enabled, matching the server: a pre-groups show file has no keys. */
 export function IsFreeKioskGroupEnabled(Settings: unknown, Section: string): boolean {
-  const Group = (FreeKioskMetricCatalogCache?.Groups || []).find((G) => G.Key === Section);
-  if (Group && Group.Fixed) return true;
-  const Source = (Settings && typeof Settings === 'object' ? Settings : {}) as Record<
-    string,
-    unknown
-  >;
-  const Stored = Source[FreeKioskGroupFieldKey(Section)];
-  if (Stored === undefined || Stored === null || Stored === '') return true;
-  if (typeof Stored === 'boolean') return Stored;
-  const Text = String(Stored).trim().toLowerCase();
-  return !(Text === 'false' || Text === '0' || Text === 'no');
+  return IsGroupEnabled(FreeKioskMetricCatalogCache?.Groups, Settings, Section);
 }
 
-/**
- * The terminal's declared display mode.
- *
- * Mirrors GetDisplayMode in src/Modules/FreeKiosk/metrics, for the same reason
- * the group rule is mirrored. Absent reads as WebView, which is what every
- * terminal configured before this existed was implicitly treated as.
- */
+/** The terminal's declared display mode; absent reads as WebView. */
 export function GetFreeKioskDisplayMode(Settings: unknown): FreeKioskDisplayMode {
-  const Source = (Settings && typeof Settings === 'object' ? Settings : {}) as Record<
-    string,
-    unknown
-  >;
-  const Stored = String(Source.DisplayMode ?? '').trim();
-  return Stored === 'external_app' || Stored === 'media_player' || Stored === 'webview'
-    ? Stored
-    : 'webview';
+  return DisplayModeOf(Settings);
 }
 
 /**
@@ -93,8 +75,7 @@ export function IsFreeKioskMetricInMode(
   Settings: unknown,
   Metric: Pick<FreeKioskMetricView, 'RequiresMode'>
 ): boolean {
-  if (!Metric.RequiresMode || !Metric.RequiresMode.length) return true;
-  return Metric.RequiresMode.includes(GetFreeKioskDisplayMode(Settings));
+  return MetricAppliesInMode(Settings, Metric);
 }
 
 export function GetFreeKioskMetric(Key: string): FreeKioskMetricView | null {

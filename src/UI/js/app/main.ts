@@ -11,7 +11,7 @@
 // initial state push, so it MUST stay last — every push subscription above it
 // has to be registered first or that state is silently dropped.
 import './animations';
-import './state';
+import { MonitorHistoryModalContext } from './state';
 import { InitMode } from './mode';
 import { InitSettings } from './settings';
 import './utils';
@@ -42,6 +42,7 @@ import { Init, WireGlobalUI } from './init';
 import { LoadFreeKioskCatalogues } from './freekiosk';
 import { EnsureMonitoringMethodsLoaded } from './monitoring-editor/method-fields';
 import { WireFreeKioskModal } from './freekiosk-modal';
+import { WireFreeKioskMonitoring } from './freekiosk-monitoring';
 import { WireMonitoringActions } from './monitoring-actions';
 import { RenderMonitoringHistoryModal } from './monitoring';
 
@@ -77,6 +78,13 @@ void LoadFreeKioskCatalogues();
 // wait until the first time the monitoring editor is opened.
 void EnsureMonitoringMethodsLoaded();
 WireFreeKioskModal(() => RenderMonitoringHistoryModal());
+WireFreeKioskMonitoring(
+  () =>
+    MonitorHistoryModalContext && MonitorHistoryModalContext.type === 'freekiosk'
+      ? String(MonitorHistoryModalContext.id || '')
+      : null,
+  () => RenderMonitoringHistoryModal()
+);
 WireMonitoringActions(() => RenderMonitoringHistoryModal());
 void WireGlobalUI();
 void Init();

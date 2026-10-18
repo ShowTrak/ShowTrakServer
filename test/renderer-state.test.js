@@ -130,6 +130,8 @@ test('Capabilities falls back to the full desktop profile when nothing is inject
   assert.equal(Desktop.allowRemoteScripts, true);
   assert.equal(Desktop.wolEnabled, true);
   assert.equal(Desktop.allowUnassignedClients, true);
+  assert.equal(Desktop.canManageClients, true);
+  assert.equal(Desktop.canManageMonitoring, true);
 });
 
 test('Capabilities keeps desktop defaults when window exists but nothing is injected', () => {

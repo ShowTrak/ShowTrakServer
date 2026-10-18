@@ -291,11 +291,20 @@ export function InitMonitoringNotePopovers(HostSelector = MONITORING_FIELD_HOSTS
 // Read a settings field's current value from the DOM as a comparable string.
 // Booleans normalise to 'true' / 'false' to match how VisibleWhen values are
 // serialised into the wrapper's data attribute.
-function ReadMonitoringFieldValue(Key: string): string | null {
-  const $el = $(`#MON_DYN_${Key.replace(/"/g, '\\"')}`);
+//
+// Looked up inside the hosts being evaluated first: the monitoring editor and
+// a FreeKiosk terminal's form both draw schema fields with MON_DYN_ ids, and a
+// document-wide lookup would read whichever copy of a shared key came first.
+function ReadMonitoringFieldValue(Key: string, $Scope?: JQuery<HTMLElement>): string | null {
+  const Escaped = Key.replace(/"/g, '\\"');
+  const $scoped = $Scope ? $Scope.find(`[id="MON_DYN_${Escaped}"]`) : $();
+  const $el = $scoped.length ? $scoped.first() : $(`#MON_DYN_${Escaped}`);
   if (!$el.length) {
     // 'list' fields aren't keyed by MON_DYN_ id; locate the container by data-key.
-    const $list = $(`.monitoring-list[data-key="${Key.replace(/"/g, '\\"')}"]`);
+    const $scopedList = $Scope ? $Scope.find(`.monitoring-list[data-key="${Escaped}"]`) : $();
+    const $list = $scopedList.length
+      ? $scopedList.first()
+      : $(`.monitoring-list[data-key="${Escaped}"]`);
     if ($list.length) {
       return $list
         .find('[data-chip-value]')
@@ -345,7 +354,7 @@ export function ApplyMonitoringConditionalVisibility(HostSelector = MONITORING_F
     const $wrap = $(this);
     const Key = $wrap.attr('data-visible-when-key') || '';
     const Expected = $wrap.attr('data-visible-when-value');
-    const Actual = ReadMonitoringFieldValue(Key);
+    const Actual = ReadMonitoringFieldValue(Key, $hosts);
     $wrap.toggleClass('d-none', String(Expected) !== String(Actual));
   });
 
@@ -363,7 +372,7 @@ export function ApplyMonitoringConditionalVisibility(HostSelector = MONITORING_F
     }
     const Visible = Conditions.every((Condition) => {
       if (!Condition || !Condition.Key) return true;
-      const Actual = String(ReadMonitoringFieldValue(Condition.Key));
+      const Actual = String(ReadMonitoringFieldValue(Condition.Key, $hosts));
       if (Array.isArray(Condition.In)) {
         return Condition.In.some((Candidate) => String(Candidate) === Actual);
       }

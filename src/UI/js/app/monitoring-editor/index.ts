@@ -28,7 +28,7 @@ import {
   setMonitoringEditorTargetID,
 } from '../state';
 import { ErrorMessage, HandleNonFatalError, Safe } from '../utils';
-import { FormatInterval } from '../monitoring';
+import { FormatInterval, OpenMonitoringTargetHistory } from '../monitoring';
 import { CloseAllModals } from '../modals';
 import { ConfirmationDialog, Notify } from '../selection-init';
 import { RenderTagPicker } from '../tag-picker';
@@ -64,7 +64,8 @@ export const MAX_FAILURE_THRESHOLD = 10;
 // (the historical behaviour) if the setting cannot be read.
 let GlobalFailureThreshold = 1;
 
-async function LoadGlobalFailureThreshold() {
+/** Refresh and return the server-wide failure threshold. */
+export async function LoadGlobalFailureThreshold(): Promise<number> {
   try {
     // Imported lazily: ../settings pulls in the audio stack at module load, and
     // a static import here would drag that into every importer of the editor.
@@ -74,6 +75,7 @@ async function LoadGlobalFailureThreshold() {
   } catch (err) {
     HandleNonFatalError('MonitoringEditor:LoadGlobalFailureThreshold', err);
   }
+  return GlobalFailureThreshold;
 }
 
 // '' (inherit) or a whole number 1–10 from a threshold <select>.
@@ -97,7 +99,7 @@ export function FailureThresholdOptions(InheritPrefix: string, Inherited: number
   return Options;
 }
 
-function RenderFailureThresholdSelect(
+export function RenderFailureThresholdSelect(
   Selector: string,
   InheritPrefix: string,
   Inherited: number,
@@ -380,6 +382,10 @@ export function RefreshMonitoringCheckDebugIfOpen(TargetID: number) {
 // instead of running.
 
 let MonitoringStatusRunTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Set when the check editor was opened from a monitor's Settings tab: Back (and
+// deleting the check) then return there instead of to this modal's list view.
+let ReturnToMonitorView = false;
 
 // Status kinds map to the client-status background tints (see monitoring.css).
 const MON_STATUS_KINDS = ['online', 'degraded', 'offline', 'idle'] as const;
@@ -788,16 +794,65 @@ export function RefreshMonitoringEditorIfOpen(TargetID: number) {
   RenderMonitoringCheckList();
 }
 
+// Leave the check editor for the monitor's view modal, on its Settings tab.
+//
+// The check is saved first. A check that cannot be saved yet (a required
+// setting is empty) would otherwise vanish silently, so the operator is asked
+// before it is dropped.
+async function LeaveCheckViewForMonitorView(Options: { Save: boolean }): Promise<void> {
+  const State = MonitoringEditorState;
+  if (!State) return;
+  if (Options.Save) {
+    CommitMonitoringCheckView();
+    if (!MonitoringPayloadIsValid(BuildMonitoringPayload())) {
+      const Discard = await ConfirmationDialog(
+        'This check is missing required settings, so it has not been saved. Discard your changes to it?',
+        { ConfirmLabel: 'Discard Changes' }
+      );
+      if (!Discard) return;
+    } else {
+      await FlushMonitoringCheckSave();
+    }
+  } else {
+    await FlushMonitoringCheckSave();
+  }
+  // Nothing further may fire from the editor: no autosave of a discarded check,
+  // no status re-probe of a view that is no longer open.
+  if (State.saveTimer) clearTimeout(State.saveTimer);
+  State.saveTimer = null;
+  State.pendingSave = false;
+  if (MonitoringStatusRunTimer) clearTimeout(MonitoringStatusRunTimer);
+  MonitoringStatusRunTimer = null;
+  State.View = 'list';
+  State.EditingIndex = null;
+  ReturnToMonitorView = false;
+  if (State.TargetID != null) {
+    await OpenMonitoringTargetHistory(Number(State.TargetID), { Tab: 'settings' });
+  }
+}
+
 const MONITORING_TARGET_TAG_PICKER: TagPickerMount = {
   WrapperSelector: '#MONITORING_TARGET_TAGS_WRAPPER',
   ListSelector: '#MONITORING_TARGET_TAGS',
   Namespace: 'monitorEditorTags',
 };
 
+/**
+ * The monitor editor. An existing monitor's settings now live on the Settings
+ * tab of its view modal, so with a TargetID and no `Check` this opens that tab
+ * instead. `Check` opens straight into one check's edit view (by CheckID, or
+ * 'new' for a blank one), and Back returns to the Settings tab. With no
+ * TargetID it is the Add Monitor flow.
+ */
 export async function OpenMonitoringTargetEditor(
   TargetID: number | null,
-  Prefill: { Nickname?: string; Address?: string; Method?: string | null } | null = null
+  Prefill: { Nickname?: string; Address?: string; Method?: string | null } | null = null,
+  Options: { Check?: { CheckID: number } | 'new' } = {}
 ) {
+  if (TargetID && Options.Check == null) {
+    return OpenMonitoringTargetHistory(Number(TargetID), { Tab: 'settings' });
+  }
+  ReturnToMonitorView = Options.Check != null;
   await CloseAllModals();
   await EnsureMonitoringMethodsLoaded();
   await LoadGlobalFailureThreshold();
@@ -869,6 +924,10 @@ export async function OpenMonitoringTargetEditor(
         title: 'Edit Check',
         titleId: 'MONITORING_CHECK_VIEW_TITLE',
         onBack: () => {
+          if (ReturnToMonitorView) {
+            void LeaveCheckViewForMonitorView({ Save: true });
+            return;
+          }
           CommitMonitoringCheckView();
           ShowMonitoringListView();
         },
@@ -1029,6 +1088,11 @@ export async function OpenMonitoringTargetEditor(
       const index = MonitoringEditorState!.EditingIndex;
       if (index == null) return;
       MonitoringEditorState!.Checks.splice(index, 1);
+      if (ReturnToMonitorView) {
+        MonitoringEditorState!.EditingIndex = null;
+        void LeaveCheckViewForMonitorView({ Save: false });
+        return;
+      }
       ShowMonitoringListView();
       ScheduleMonitoringAutoSave();
     });
@@ -1048,10 +1112,30 @@ export async function OpenMonitoringTargetEditor(
     });
 
   ShowMonitoringListView();
+  if (Options.Check != null && MonitoringEditorState!.TargetID != null) {
+    if (Options.Check === 'new') {
+      MonitoringEditorState!.Checks.push({
+        Name: '',
+        Address: '',
+        Method: DefaultMethod || '',
+        Settings: {},
+        DegradedThresholdMs: 0,
+        FailureThreshold: null,
+      });
+      OpenMonitoringCheckView(MonitoringEditorState!.Checks.length - 1);
+    } else {
+      const CheckID = Options.Check.CheckID;
+      const Index = MonitoringEditorState!.Checks.findIndex(
+        (Check) => Number(Check.CheckID) === Number(CheckID)
+      );
+      if (Index !== -1) OpenMonitoringCheckView(Index);
+    }
+  }
   openModal('SHOWTRAK_MODAL_MONITORING_TARGET');
 
   // Prefilled discovery adds already have a name+address, so try an initial save.
-  ScheduleMonitoringAutoSave();
+  // Opening on a check saves nothing until that check is edited.
+  if (Options.Check == null) ScheduleMonitoringAutoSave();
 }
 
 // A list-chip edit inside ./method-fields has to land in the working state

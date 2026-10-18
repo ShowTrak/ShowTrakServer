@@ -4,7 +4,6 @@
 // re-exports everything here for existing importers.
 import {
   AllClients,
-  AppMode,
   DummyClients,
   FreeKioskTerminals,
   MonitorHistoryModalContext,
@@ -20,6 +19,7 @@ import type {
   ClientApplicationHistorySeries,
   ClientAudioHistorySeries,
   ClientNetworkHistorySeries,
+  ClientStorageHistorySeries,
   ClientDisplayHistorySeries,
   ClientDisplayView,
   ClientUSBHistorySeries,
@@ -38,10 +38,21 @@ import { AudioTimelineLiveState } from './lib/audio-devices';
 import { DisplayKey, DisplayTimelineLiveState } from './lib/displays';
 import { USBTimelineLiveState } from './lib/usb-devices';
 import { NetworkTimelineLiveState } from './lib/network-interfaces';
+import { StorageTimelineLiveState, StorageVolumeTitle } from './lib/storage-volumes';
 import { SYSTEM_CHECK_ORDER, SystemCheckCardFor, SystemCheckLiveState } from './lib/system-health';
 import { UsageChartHtml } from './client-info-health';
 import { openModal } from './lib/modal';
-import { RefreshClientInfoTabs, ResetClientInfoTab, SetClientInfoKind } from './client-info-nav';
+import {
+  RefreshClientInfoTabs,
+  ResetClientInfoTab,
+  SelectClientInfoTab,
+  SetClientInfoKind,
+} from './client-info-nav';
+import type { ClientInfoTabKey } from './lib/client-info-tabs';
+import { MountMonitorInfoEditor } from './monitor-info-edit';
+import { MountDummyInfoEditor } from './dummy-info-edit';
+import { MountFreeKioskInfoEditor } from './freekiosk-info-edit';
+import { HoldFreeKioskModalRender } from './freekiosk-monitoring';
 import {
   RenderFreeKioskModal,
   ResetFreeKioskModalState,
@@ -280,6 +291,21 @@ export async function LoadHistorySamplesForContext() {
       MonitorHistorySeries.push({
         networkInterfaceName: String(Iface.InterfaceName),
         samples: Array.isArray(Iface.samples) ? Iface.samples : [],
+      });
+    }
+
+    // Per-monitored-storage-volume series (mounted / conditions broken / missing).
+    let storage: ClientStorageHistorySeries[] = [];
+    try {
+      storage = await window.API.GetClientStorageHistory(String(entity.id));
+    } catch {
+      storage = [];
+    }
+    for (const Volume of Array.isArray(storage) ? storage : []) {
+      if (!Volume || !Volume.MountPoint) continue;
+      MonitorHistorySeries.push({
+        storageMountPoint: String(Volume.MountPoint),
+        samples: Array.isArray(Volume.samples) ? Volume.samples : [],
       });
     }
 
@@ -566,34 +592,22 @@ export function RenderMonitorStatusCard(Options: MonitorStatusCardOptions) {
     </div>`;
 }
 
-export function UpdateMonitorHistoryEditButtonVisibility(
-  Options: { requireModalOpen?: boolean } = {}
+// Open the view modal for a FreeKiosk terminal, optionally on a given tab (the
+// tile cog opens Settings).
+export async function OpenFreeKioskTerminalHistory(
+  UUID: string,
+  Options: { Tab?: ClientInfoTabKey } = {}
 ) {
-  const RequireModalOpen = Options.requireModalOpen !== false;
-  const Btn = document.getElementById('MONITOR_HISTORY_EDIT_BUTTON') as HTMLButtonElement | null;
-  if (!Btn) return;
-  const ModalOpen = $('#SHOWTRAK_CLIENT_INFO').hasClass('show');
-  const Entity = ResolveMonitorHistoryContextEntity();
-  const CanEditTarget =
-    (!RequireModalOpen || ModalOpen) &&
-    AppMode === 'EDIT' &&
-    Entity &&
-    Entity.type === 'target' &&
-    Entity.target &&
-    Number.isFinite(Number(Entity.target.TargetID));
-
-  Btn.classList.toggle('d-none', !CanEditTarget);
-  Btn.disabled = !CanEditTarget;
-  Btn.setAttribute('data-target-id', CanEditTarget ? String(Entity.target.TargetID) : '');
-}
-
-// Open the view modal for a FreeKiosk terminal.
-export async function OpenFreeKioskTerminalHistory(UUID: string) {
   await CloseAllModals();
   ResetFreeKioskModalState();
   ResetClientInfoTab();
   setMonitorHistoryModalContext({ type: 'freekiosk', id: String(UUID) });
-  await LoadHistorySamplesForContext();
+  await Promise.all([
+    LoadHistorySamplesForContext(),
+    MountFreeKioskInfoEditor(String(UUID)).catch((err) =>
+      HandleNonFatalError('Monitoring:OpenFreeKioskTerminalHistory:MountSettings', err)
+    ),
+  ]);
   // The camera list is fetched by the render, in the background: it asks the
   // device, so awaiting it here held the modal shut for the whole connection
   // timeout whenever the terminal was offline.
@@ -608,14 +622,15 @@ export async function OpenFreeKioskTerminalHistory(UUID: string) {
     });
   }
   openModal('SHOWTRAK_CLIENT_INFO');
+  if (Options.Tab) SelectClientInfoTab(Options.Tab);
 }
 
 export function RenderMonitoringHistoryModal() {
   const Entity = ResolveMonitorHistoryContextEntity();
-  if (!Entity) {
-    UpdateMonitorHistoryEditButtonVisibility();
-    return;
-  }
+  if (!Entity) return;
+  // Never rebuild under a threshold being typed on a FreeKiosk tab; it redraws
+  // once the field loses focus.
+  if (Entity.type === 'freekiosk' && HoldFreeKioskModalRender()) return;
 
   $('#CLIENT_INFO_TITLE').text(Entity.title);
   // The client detail fields (nickname, vitals, USB, network, apps) only make
@@ -624,10 +639,13 @@ export function RenderMonitoringHistoryModal() {
   // integrated clients within the details block, and picks between the client
   // and integrated tab sets, so a client's kind is left to it here.
   $('#CLIENT_INFO_DETAILS_SECTION').toggleClass('d-none', Entity.type !== 'client');
+  // Monitors, dummies and terminals each have a Settings pane under one tab key.
+  $('#MONITOR_INFO_SETTINGS_SECTION').toggleClass('d-none', Entity.type !== 'target');
+  $('#DUMMY_INFO_SETTINGS_SECTION').toggleClass('d-none', Entity.type !== 'dummy');
+  $('#FREEKIOSK_INFO_SETTINGS_SECTION').toggleClass('d-none', Entity.type !== 'freekiosk');
   if (Entity.type === 'freekiosk') SetClientInfoKind('freekiosk');
   else if (Entity.type === 'target') SetClientInfoKind('target');
   else if (Entity.type === 'dummy') SetClientInfoKind('dummy');
-  UpdateMonitorHistoryEditButtonVisibility();
 
   const $timelines = $('#MONITOR_HISTORY_TIMELINES');
   if (!$timelines.length) return;
@@ -1018,6 +1036,33 @@ function RenderMonitoringHistoryEntity(
       );
     }
 
+    // Per-monitored-storage-volume timelines, likewise driven by the client's
+    // CURRENT monitored volumes.
+    const SamplesByMountPoint = new Map<string, HistorySample[]>();
+    for (const Series of MonitorHistorySeries) {
+      if (Series && Series.storageMountPoint) {
+        SamplesByMountPoint.set(String(Series.storageMountPoint), Series.samples);
+      }
+    }
+    const Volumes = Array.isArray(Client?.StorageStatus?.Volumes)
+      ? Client.StorageStatus.Volumes
+      : [];
+    for (const Volume of Volumes) {
+      if (!Volume || !Volume.IsCritical || !Volume.MountPoint) continue;
+      const Live = StorageTimelineLiveState(Volume, !!Client.Online);
+      $timelines.append(
+        RenderMonitorHistorySection(
+          {
+            state: Live.State,
+            name: StorageVolumeTitle(Volume),
+            sub: 'Monitored Volume',
+            statusText: Live.Label,
+          },
+          BuildStatusBlocksFromSamples(SamplesByMountPoint.get(Volume.MountPoint) || [])
+        )
+      );
+    }
+
     RestoreStatusTimelineTooltipAfterRender();
     return;
   }
@@ -1054,7 +1099,11 @@ function RenderMonitoringHistoryEntity(
   RestoreStatusTimelineTooltipAfterRender();
 }
 
-export async function OpenMonitoringTargetHistory(TargetID: number) {
+/** Open a monitor's view modal, optionally on a given tab (the tile cog opens Settings). */
+export async function OpenMonitoringTargetHistory(
+  TargetID: number,
+  Options: { Tab?: ClientInfoTabKey } = {}
+) {
   const Target = MonitoringTargets.find((T) => Number(T.TargetID) === Number(TargetID));
   if (!Target) return Notify('Monitor not found.', 'error');
   try {
@@ -1066,8 +1115,12 @@ export async function OpenMonitoringTargetHistory(TargetID: number) {
   ResetClientInfoTab();
   setMonitorHistoryModalContext({ type: 'target', id: Number(Target.TargetID) });
   setMonitorHistorySeries([]);
-  await LoadHistorySamplesForContext();
-  UpdateMonitorHistoryEditButtonVisibility({ requireModalOpen: false });
+  await Promise.all([
+    LoadHistorySamplesForContext(),
+    MountMonitorInfoEditor(Number(Target.TargetID)).catch((err) =>
+      HandleNonFatalError('Monitoring:OpenMonitoringTargetHistory:MountSettings', err)
+    ),
+  ]);
 
   const $modal = $('#SHOWTRAK_CLIENT_INFO');
   $modal.off('hidden.bs.modal.monitorhistory').on('hidden.bs.modal.monitorhistory', function () {
@@ -1081,9 +1134,14 @@ export async function OpenMonitoringTargetHistory(TargetID: number) {
   });
   openModal('SHOWTRAK_CLIENT_INFO');
   RenderMonitoringHistoryModal();
+  if (Options.Tab) SelectClientInfoTab(Options.Tab);
 }
 
-export async function OpenDummyClientHistory(UUID: string) {
+/** Open a dummy client's view modal, optionally on a given tab (the tile cog opens Settings). */
+export async function OpenDummyClientHistory(
+  UUID: string,
+  Options: { Tab?: ClientInfoTabKey } = {}
+) {
   const DummyUUID = String(UUID || '').trim();
   const Dummy = DummyClients.find((D) => String(D.UUID) === DummyUUID);
   if (!Dummy) return Notify('Dummy client not found.', 'error');
@@ -1097,8 +1155,12 @@ export async function OpenDummyClientHistory(UUID: string) {
   ResetClientInfoTab();
   setMonitorHistoryModalContext({ type: 'dummy', id: DummyUUID });
   setMonitorHistorySeries([]);
-  await LoadHistorySamplesForContext();
-  UpdateMonitorHistoryEditButtonVisibility({ requireModalOpen: false });
+  await Promise.all([
+    LoadHistorySamplesForContext(),
+    MountDummyInfoEditor(DummyUUID).catch((err) =>
+      HandleNonFatalError('Monitoring:OpenDummyClientHistory:MountSettings', err)
+    ),
+  ]);
 
   const $modal = $('#SHOWTRAK_CLIENT_INFO');
   $modal.off('hidden.bs.modal.monitorhistory').on('hidden.bs.modal.monitorhistory', function () {
@@ -1112,4 +1174,5 @@ export async function OpenDummyClientHistory(UUID: string) {
   });
   openModal('SHOWTRAK_CLIENT_INFO');
   RenderMonitoringHistoryModal();
+  if (Options.Tab) SelectClientInfoTab(Options.Tab);
 }

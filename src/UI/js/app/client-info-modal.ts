@@ -1,7 +1,7 @@
-// Read-only Client Info modal: OpenClientInfo (opens + live-refresh loop) and
-// RenderClientInfoDetails (renders every tab/section). Extracted from
-// selection-init.ts (REFACTOR_PLAN.md Phase 7). Imports are added below;
-// cross-references back into selection-init are call-time only (safe cycle).
+// Client Info modal: OpenClientInfo (opens + live-refresh loop) and
+// RenderClientInfoDetails (renders every tab/section). Read-only in Show mode;
+// in Edit mode a ShowTrak Client is edited here too (client-info-edit.ts).
+// Cross-references back into selection-init are call-time only (safe cycle).
 import type { ClientView } from '@showtrak/protocol';
 import { openModal } from './lib/modal';
 import {
@@ -9,7 +9,6 @@ import {
   ClientInfoRefreshTimer,
   FormatClientVersionLabel,
   IsIntegratedClientEntity,
-  Tags,
   __clientInfoRefreshInFlight,
   setClientInfoOpenUUID,
   setClientInfoRefreshTimer,
@@ -18,10 +17,8 @@ import {
   setMonitorHistoryTooltipHover,
   set__clientInfoRefreshInFlight,
 } from './state';
-import { HandleNonFatalError, Safe } from './utils';
+import { HandleNonFatalError } from './utils';
 import { GetClientStatusDisplayText } from './client-list';
-import { ScriptColourHex } from './lib/script-colours';
-import { GetTagMembershipKind, ResolveEntityTags, TagBadgeLabel } from './lib/tag-badges';
 import {
   HideStatusTimelineTooltip,
   LoadHistorySamplesForContext,
@@ -49,7 +46,14 @@ import {
   ClearClientInfoNetwork,
   RenderClientInfoNetwork,
 } from './client-info-network';
-import { ResetClientInfoTab, SetClientInfoKind } from './client-info-nav';
+import {
+  BindClientInfoStorageHandlers,
+  ClearClientInfoStorage,
+  RenderClientInfoStorage,
+} from './client-info-storage';
+import { ResetClientInfoTab, SelectClientInfoTab, SetClientInfoKind } from './client-info-nav';
+import type { ClientInfoTabKey } from './lib/client-info-tabs';
+import { MountClientInfoEditor, RefreshClientInfoEditor } from './client-info-edit';
 import {
   BindClientInfoSystemHandlers,
   ClearClientInfoSystem,
@@ -61,7 +65,8 @@ import {
   RenderClientInfoApplications,
 } from './client-info-applications';
 
-export async function OpenClientInfo(UUID: string) {
+/** Open a client's view modal, optionally on a given tab (the tile cog opens Info). */
+export async function OpenClientInfo(UUID: string, Options: { Tab?: ClientInfoTabKey } = {}) {
   try {
     await CloseAllModals();
   } catch (err) {
@@ -75,43 +80,12 @@ export async function OpenClientInfo(UUID: string) {
   }
   if (!Client) return Notify('Client not found.', 'error');
 
-  const { Nickname, Hostname, IP, MacAddress, OperatingSystem, GroupID } = Client;
-  // Group title lookup
-  let groupTitle = 'No Group';
-  try {
-    const groups = await window.API.GetAllGroups();
-    if (Array.isArray(groups)) {
-      const g = groups.find((x) => x && x.GroupID === GroupID);
-      if (g && g.Title) groupTitle = g.Title;
-    }
-  } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
-  }
+  const { Hostname, IP } = Client;
 
-  $('#CLIENT_INFO_NICKNAME').val(Nickname && Nickname.length ? Nickname : Hostname || '');
+  // Slug, nickname, group and the other editable fields are filled by the
+  // editor layer (MountClientInfoEditor) in whichever mode applies.
   $('#CLIENT_INFO_HOSTNAME').val(Hostname || '');
-  $('#CLIENT_INFO_OPERATING_SYSTEM').val(OperatingSystem || '');
-  $('#CLIENT_INFO_GROUP').val(groupTitle);
   $('#CLIENT_INFO_IP').val(IP || 'Unknown IP');
-  // Every MAC on record, not just the active one — this panel is read-only, so
-  // seeing the full Wake-on-LAN target set is the point. Falls back to the
-  // primary MAC alone if the list has not been populated.
-  const MacList = (Array.isArray(Client.MacAddresses) ? Client.MacAddresses : [])
-    .map((Entry) => String(Entry.MacAddress || '').toUpperCase())
-    .filter(Boolean);
-  if (!MacList.length && MacAddress && String(MacAddress).trim().length > 0) {
-    MacList.push(String(MacAddress).toUpperCase());
-  }
-  if (MacList.length) {
-    $('#CLIENT_INFO_MAC').val(MacList.join(', '));
-    $('label[for="CLIENT_INFO_MAC"]').text(
-      MacList.length === 1 ? 'MAC Address' : `MAC Addresses (${MacList.length})`
-    );
-    $('#CLIENT_INFO_MAC_WRAPPER').removeClass('d-none');
-  } else {
-    $('#CLIENT_INFO_MAC').val('');
-    $('#CLIENT_INFO_MAC_WRAPPER').addClass('d-none');
-  }
   $('#CLIENT_INFO_UUID').val(UUID);
   $('#CLIENT_INFO_VERSION').val(FormatClientVersionLabel(Client));
   $('#CLIENT_INFO_STATUS').val(GetClientStatusDisplayText(Client));
@@ -124,12 +98,16 @@ export async function OpenClientInfo(UUID: string) {
   setMonitorHistoryModalContext({ type: 'client', id: UUID });
   setMonitorHistorySeries([]);
   setMonitorHistoryTooltipHover(null);
-  try {
-    await LoadHistorySamplesForContext();
-  } catch (err) {
-    HandleNonFatalError('OpenClientInfo:LoadHistory', err);
-  }
+  await Promise.all([
+    MountClientInfoEditor(Client).catch((err) =>
+      HandleNonFatalError('OpenClientInfo:MountEditor', err)
+    ),
+    LoadHistorySamplesForContext().catch((err) =>
+      HandleNonFatalError('OpenClientInfo:LoadHistory', err)
+    ),
+  ]);
   RenderMonitoringHistoryModal();
+  if (Options.Tab) SelectClientInfoTab(Options.Tab);
 
   const RefreshOpenClient = async () => {
     if (!ClientInfoOpenUUID) return;
@@ -143,6 +121,7 @@ export async function OpenClientInfo(UUID: string) {
   BindClientInfoDisplayHandlers(() => ClientInfoOpenUUID, RefreshOpenClient, Notify);
   BindClientInfoAudioHandlers(() => ClientInfoOpenUUID, RefreshOpenClient, Notify);
   BindClientInfoNetworkHandlers(() => ClientInfoOpenUUID, RefreshOpenClient, Notify);
+  BindClientInfoStorageHandlers(() => ClientInfoOpenUUID, RefreshOpenClient, Notify);
   BindClientInfoSystemHandlers(() => ClientInfoOpenUUID, RefreshOpenClient, Notify);
 
   BindClientInfoApplicationHandlers(() => ClientInfoOpenUUID, RefreshOpenClient, Notify);
@@ -207,39 +186,6 @@ export async function OpenClientInfo(UUID: string) {
   }
 }
 
-// The tags this client carries, read-only, under the usage charts.
-//
-// Same chip markup as the editor's picker (minus the interaction), so a tag
-// looks the same wherever it appears. Every chip shows its icon here — unlike
-// the tile badges, this panel has the width for it. The section hides entirely
-// when the client has no tags rather than showing an empty box.
-function RenderClientInfoTags(Client: ClientView): void {
-  const Entity = { ScopedID: String(Client.UUID || ''), GroupID: Client.GroupID ?? null };
-  const Applied = ResolveEntityTags(Tags, Entity);
-
-  $('#CLIENT_INFO_TAGS_SECTION').toggleClass('d-none', Applied.length === 0);
-  if (!Applied.length) {
-    $('#CLIENT_INFO_TAGS').html('');
-    return;
-  }
-
-  const Html = Applied.map((Tag) => {
-    const Kind = GetTagMembershipKind(Tag, Entity, Tags);
-    // Naming where a tag came from matters here: it explains why a tag cannot
-    // be removed from this client in the editor.
-    const Via =
-      Kind === 'workspace' ? 'ALL' : Kind === 'group' ? 'GROUP' : Kind === 'tag' ? 'TAG' : '';
-    return `
-      <span class="tag-picker-chip is-on" style="--tag-colour: ${Safe(ScriptColourHex(Tag.Colour))}">
-        <i class="bi bi-${Safe(Tag.Icon || 'tag')}" aria-hidden="true"></i>
-        <span class="tag-picker-chip-label">${Safe(TagBadgeLabel(Tag))}</span>
-        ${Via ? `<span class="tag-picker-chip-via">${Safe(Via)}</span>` : ''}
-      </span>`;
-  }).join('');
-
-  $('#CLIENT_INFO_TAGS').html(Html);
-}
-
 export function RenderClientInfoDetails(Client: ClientView) {
   const IsIntegrated = IsIntegratedClientEntity(Client);
 
@@ -250,6 +196,7 @@ export function RenderClientInfoDetails(Client: ClientView) {
     $('#CLIENT_INFO_AUDIO_OUTPUTS_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_NETWORK_V4_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_NETWORK_V6_SECTION').toggleClass('d-none', IsIntegrated);
+    $('#CLIENT_INFO_STORAGE_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_RUNNING_APPS_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_POWER_SECTION').toggleClass('d-none', IsIntegrated);
     $('#CLIENT_INFO_TEMPERATURE_SECTION').toggleClass('d-none', IsIntegrated);
@@ -274,10 +221,12 @@ export function RenderClientInfoDetails(Client: ClientView) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
   }
 
+  // Info, Variables, Wake on LAN and Actions: read-only parts follow the live
+  // client; fields being edited are left alone.
   try {
-    RenderClientInfoTags(Client);
+    RefreshClientInfoEditor(Client);
   } catch (err) {
-    HandleNonFatalError('ClientInfo:RenderTags', err);
+    HandleNonFatalError('ClientInfo:RefreshEditor', err);
   }
 
   if (IsIntegrated) {
@@ -288,6 +237,7 @@ export function RenderClientInfoDetails(Client: ClientView) {
       ClearClientInfoAudio();
       ClearClientInfoApplications();
       ClearClientInfoNetwork();
+      ClearClientInfoStorage();
     } catch (err) {
       HandleNonFatalError('SelectionInit:NonFatal', err);
     }
@@ -337,5 +287,12 @@ export function RenderClientInfoDetails(Client: ClientView) {
     RenderClientInfoNetwork(Client);
   } catch (err) {
     HandleNonFatalError('ClientInfo:RenderNetwork', err);
+  }
+
+  // Storage volumes
+  try {
+    RenderClientInfoStorage(Client);
+  } catch (err) {
+    HandleNonFatalError('ClientInfo:RenderStorage', err);
   }
 }

@@ -36,11 +36,6 @@ export function setMonitoringEditorState(value: MonitoringEditorStateShape | nul
   MonitoringEditorState = value;
 }
 
-export let DummyClientEditorUUID: string | null = null;
-export function setDummyClientEditorUUID(value: string | null): void {
-  DummyClientEditorUUID = value;
-}
-
 // --- History modal ---
 // History timeline: always show the past hour of checks as a fixed block
 // timeline (no user-selectable range). One block per minute.

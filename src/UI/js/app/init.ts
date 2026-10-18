@@ -9,7 +9,6 @@
 // pushes initial state only once every subscriber is listening.
 import { closeModal, openModal } from './lib/modal';
 import {
-  AppMode,
   Capabilities,
   Config,
   NetworkDiscoveryResults,
@@ -36,7 +35,6 @@ import {
   CloseAllModals,
   NewShow,
   OpenAboutModal,
-  OpenClientEditor,
   OpenGroupCreationModal,
   OpenGroupManager,
   OpenShow,
@@ -171,28 +169,27 @@ export async function WireGlobalUI() {
   $(document).on('click', '.CLIENT_TILE_COG', function (e) {
     e.preventDefault();
     e.stopPropagation();
-    // Monitoring targets use their own editor
+    // Monitoring targets open their view modal on the Settings tab
     if ($(this).hasClass('MONITOR_TILE_COG')) {
       const tid = $(this).closest('.SHOWTRAK_PC').attr('data-target-id');
-      if (tid) OpenMonitoringTargetEditor(parseInt(tid, 10));
+      if (tid) OpenMonitoringTargetHistory(parseInt(tid, 10), { Tab: 'settings' });
       return false;
     }
-    // Dummy clients use their own editor
+    // Dummy clients open their view modal on the Settings tab
     if ($(this).hasClass('DUMMY_TILE_COG')) {
       const duid = $(this).closest('.SHOWTRAK_PC').attr('data-dummy-uuid');
-      if (duid) OpenDummyClientEditor(duid);
+      if (duid) OpenDummyClientHistory(duid, { Tab: 'settings' });
       return false;
     }
     // FreeKiosk terminals use their own editor
     if ($(this).hasClass('FREEKIOSK_TILE_COG')) {
       const kuid = $(this).closest('.SHOWTRAK_PC').attr('data-kiosk-uuid');
-      if (kuid) OpenFreeKioskEditor(kuid);
+      if (kuid) OpenFreeKioskTerminalHistory(kuid, { Tab: 'settings' });
       return false;
     }
+    // Clients (ShowTrak and SDK alike) open their view modal on the Info tab
     const uuid = $(this).closest('.SHOWTRAK_PC').attr('data-uuid');
-    if (uuid) {
-      OpenClientEditor(uuid);
-    }
+    if (uuid) OpenClientInfo(uuid, { Tab: 'info' });
     return false;
   });
   $(document).on('click', '.SHOWTRAK_PC', function (e) {
@@ -479,16 +476,6 @@ export async function Init() {
     .off('shown.bs.modal.monitorHistory')
     .on('shown.bs.modal.monitorHistory', () => {
       RenderMonitoringHistoryModal();
-    });
-
-  $('#MONITOR_HISTORY_EDIT_BUTTON')
-    .off('click.monitorHistoryEdit')
-    .on('click.monitorHistoryEdit', async function (e) {
-      e.preventDefault();
-      if (AppMode !== 'EDIT') return;
-      const TargetID = Number($(this).attr('data-target-id'));
-      if (!Number.isFinite(TargetID)) return;
-      await OpenMonitoringTargetEditor(TargetID);
     });
 
   // Hover tooltip for status-timeline blocks and metric charts.

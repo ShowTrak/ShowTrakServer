@@ -8,11 +8,13 @@
 //               repeated, as a row, on its own tab)
 //   Controls  — buttons and live sliders, then on-demand screenshot / camera
 //   Content, Screen, Battery, Network, Misc
-//             — the registry sections, each row showing the metric's label, its
-//               current value, an alarm badge, and its history chart
+//             — the registry sections as monitoring cards (freekiosk-monitoring):
+//               a Monitor toggle per section, then a conditions table — each
+//               reading's value, the condition it alerts on, a tick, and an
+//               armed reading's history chart beneath its row
 //
-// EVERY metric in the registry gets a row. That is the point of the feature:
-// whatever the device exposes, the operator can see. The chart kind comes from
+// EVERY metric in a monitored section gets a row. That is the point of the
+// feature: whatever the device exposes, the operator can see. The chart kind comes from
 // the registry too — a line for numbers, the existing block timeline for
 // booleans and enums.
 import type {
@@ -52,6 +54,8 @@ import {
 import type { HistorySample } from '@showtrak/protocol';
 import { FREEKIOSK_METRIC_TABS, FreeKioskSectionTab } from './lib/client-info-tabs';
 import type { ClientInfoTabKey, FreeKioskMetricTabKey } from './lib/client-info-tabs';
+import { BuildFreeKioskMonitorCard } from './lib/freekiosk-monitoring';
+import { EffectiveFreeKioskSettings, FreeKioskMonitorCardHtml } from './freekiosk-monitoring';
 
 /** Mirrors FREEKIOSK_DISPLAY_MODES in src/Modules/FreeKiosk/metrics. */
 const DISPLAY_MODE_LABELS: Record<string, string> = {
@@ -191,19 +195,6 @@ export function DescribeExpected(Metric: FreeKioskMetricView, Alarm: ArmedAlarm 
   }
 }
 
-function AlarmBadge(
-  Terminal: FreeKioskTerminalView,
-  Metric: FreeKioskMetricView,
-  Alarm: ArmedAlarm | null
-): string {
-  if (!Alarm) return '';
-  const Breaching = (Terminal.Alarms || []).some((Entry) => Entry && Entry.Key === Metric.Key);
-  const Cls = Breaching ? 'is-breaching' : '';
-  const Title = Breaching ? 'Alarm is breaching' : 'Alarm armed';
-  const Icon = Breaching ? 'exclamation-triangle-fill' : 'bell-fill';
-  return `<span class="freekiosk-alarm-badge ${Cls}" title="${Safe(Title)}"><i class="bi bi-${Icon}"></i></span>`;
-}
-
 // ---- Metric rows -----------------------------------------------------------
 
 /**
@@ -272,80 +263,45 @@ function RenderMetricChart(
   return RenderStatusTimeline(BuildStatusBlocksFromSamples(ToStatusSamples(Samples)));
 }
 
-// Only ever called for a section that IS being monitored — RenderSection drops
-// the whole section otherwise — so there is always history to draw from and an
-// armed alarm is always a live one.
-function RenderMetricRow(Terminal: FreeKioskTerminalView, Metric: FreeKioskMetricView): string {
-  const Value = (Terminal.Metrics || {})[Metric.Key] ?? null;
-  const Alarm = ReadArmedAlarm(Terminal, Metric);
-  // Expanded, because the store compresses flat runs — see lib/metric-series.
-  const Samples = ExpandMetricSeries(FreeKioskSeries.get(Metric.Key));
-  const Breaching = (Terminal.Alarms || []).some((Entry) => Entry && Entry.Key === Metric.Key);
-  const Expected = Breaching ? DescribeExpected(Metric, Alarm) : '';
-  const Body = RenderMetricChart(Metric, Alarm, Samples);
+/**
+ * A registry section as a monitoring card: the Monitor toggle, then a table of
+ * every reading with its current value — always, monitored or not. While the
+ * section is monitored each row also carries the condition it alerts on and a
+ * tick, and an armed reading's history is drawn beneath its row. See
+ * freekiosk-monitoring.
+ */
+function RenderSection(Terminal: FreeKioskTerminalView, Section: string): string {
+  const Catalogue = FreeKioskMetricCatalogCache;
+  if (!Catalogue) return '';
+  const Card = BuildFreeKioskMonitorCard(Catalogue, Terminal, Section);
+  if (!Card) return '';
 
-  // The same popover the monitoring editor uses, rather than a bare title
-  // attribute. `.monitoring-note` is what InitMonitoringNotePopovers looks for,
-  // so the hint is delivered by Bootstrap and styled like every other note in
-  // the app; a title attribute rendered as nothing but a help cursor.
-  const Note = Metric.Note
-    ? `<span class="monitoring-note freekiosk-metric-note" tabindex="0" role="button" aria-label="More information"
-        data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-placement="left"
-        data-bs-content="${Safe(Metric.Note)}"><i class="bi bi-info-circle"></i></span>`
-    : '';
-
-  return `
-    <div class="freekiosk-metric-row${Breaching ? ' is-breaching' : ''}" data-metric-key="${Safe(
-      Metric.Key
-    )}">
-      <div class="freekiosk-metric-head">
-        <span class="freekiosk-metric-label">${Safe(Metric.Label)}${Note}</span>
-        <span class="freekiosk-metric-value">${Safe(
-          FormatMetricValue(Metric, Value)
-        )}</span>${Expected ? `<span class="freekiosk-metric-expected">${Safe(Expected)}</span>` : ''}${AlarmBadge(Terminal, Metric, Alarm)}
-      </div>
-      ${Body}
-    </div>`;
-}
-
-function RenderSection(
-  Terminal: FreeKioskTerminalView,
-  Section: string,
-  Metrics: FreeKioskMetricView[]
-): string {
-  if (!Metrics.length) return '';
-  // A section with monitoring switched off is not rendered at all. Its readings
-  // are still arriving, but nothing is recording or judging them, so showing
-  // them would put numbers on screen that look live and are not being watched —
-  // and an operator scanning a modal does not check each heading for a caveat.
-  // The editor is where the section reappears, next to the switch that hid it.
-  if (!IsFreeKioskGroupEnabled(Terminal.Settings, Section)) return '';
-
-  // Readings that belong to a display mode this terminal is not in are dropped
-  // outright. FreeKiosk never clears webview.currentUrl, so a terminal locked to
-  // an external app reports the last page it loaded for as long as it runs —
-  // indistinguishable, on screen, from a page that is actually up.
-  const Applicable = Metrics.filter((Metric) => IsFreeKioskMetricInMode(Terminal.Settings, Metric));
-  if (!Applicable.length) return '';
-
-  // Say why the rows are missing rather than leaving a thinner section. The
-  // absence is the correct behaviour, but an operator who remembers a URL row
-  // being here needs to know it was removed on purpose.
-  const Dropped = Metrics.length - Applicable.length;
+  // Say why rows are missing rather than leaving a thinner table. The absence is
+  // the correct behaviour, but an operator who remembers a URL row being here
+  // needs to know it was removed on purpose.
   const Mode = GetFreeKioskDisplayMode(Terminal.Settings);
-  const ModeNote = Dropped
-    ? `<div class="freekiosk-section-note"><i class="bi bi-info-circle"></i> Set to ${Safe(
+  const ModeNote = Card.HiddenByMode
+    ? `<div class="freekiosk-section-note mt-1 mb-0"><i class="bi bi-info-circle"></i> Set to ${Safe(
         DISPLAY_MODE_LABELS[Mode] || Mode
-      )} mode. FreeKiosk cannot report which app is in front, and keeps its last WebView readings forever, so ${Dropped === 1 ? 'that reading is' : 'those readings are'} hidden rather than shown stale.</div>`
+      )} mode. FreeKiosk cannot report which app is in front, and keeps its last WebView readings forever, so ${Card.HiddenByMode === 1 ? 'that reading is' : 'those readings are'} hidden rather than shown stale.</div>`
     : '';
 
-  const Rows = Applicable.map((Metric) => RenderMetricRow(Terminal, Metric)).join('');
-  return `
-    <div class="freekiosk-section" data-section="${Safe(Section)}">
-      <h6 class="freekiosk-section-title">${Safe(Section)}</h6>
-      ${ModeNote}
-      ${Rows}
-    </div>`;
+  const MetricByKey = new Map(Catalogue.Metrics.map((Metric) => [Metric.Key, Metric]));
+  return FreeKioskMonitorCardHtml(
+    Card,
+    ModeNote,
+    (Key) => {
+      const Metric = MetricByKey.get(Key);
+      return Metric ? DescribeExpected(Metric, ReadArmedAlarm(Terminal, Metric)) : '';
+    },
+    (Key) => {
+      const Metric = MetricByKey.get(Key);
+      if (!Metric) return '';
+      // Expanded, because the store compresses flat runs — see lib/metric-series.
+      const Samples = ExpandMetricSeries(FreeKioskSeries.get(Metric.Key));
+      return RenderMetricChart(Metric, ReadArmedAlarm(Terminal, Metric), Samples);
+    }
+  );
 }
 
 /**
@@ -545,24 +501,15 @@ function Pane(Tab: ClientInfoTabKey, Html: string): string {
   return `<div class="freekiosk-tab-pane" data-client-info-tab="${Tab}">${Html}</div>`;
 }
 
-/**
- * Why a metric tab drew nothing. Sections are hidden when their monitoring is
- * switched off or when none of their readings apply in this display mode (see
- * RenderSection); an empty tab has to say which, or it reads as broken.
- */
-function EmptyMetricTabNote(Terminal: FreeKioskTerminalView, Sections: string[]): string {
-  const Off = Sections.filter((Section) => !IsFreeKioskGroupEnabled(Terminal.Settings, Section));
-  const Message = Off.length
-    ? `Monitoring for ${Off.join(', ')} is switched off for this terminal. Turn it on in the terminal's settings to see ${Off.length === 1 ? 'its' : 'their'} readings here.`
-    : `None of these readings apply to a terminal in ${
-        DISPLAY_MODE_LABELS[GetFreeKioskDisplayMode(Terminal.Settings)] || 'this'
-      } mode.`;
-  return `<div class="freekiosk-panel"><div class="freekiosk-section-note mb-0"><i class="bi bi-info-circle"></i> ${Safe(Message)}</div></div>`;
-}
-
 export function RenderFreeKioskModal($timelines: JQuery<HTMLElement>): void {
-  const Terminal = OpenTerminal();
-  if (!Terminal) return;
+  const Stored = OpenTerminal();
+  if (!Stored) return;
+  // Drawn with any monitoring change still being saved already applied, so a
+  // toggle reads as done the moment it is clicked.
+  const Terminal: FreeKioskTerminalView = {
+    ...Stored,
+    Settings: EffectiveFreeKioskSettings(Stored.UUID, Stored.Settings),
+  };
   const Catalogue = FreeKioskMetricCatalogCache;
 
   const State = String(Terminal.State || 'IDLE');
@@ -598,7 +545,7 @@ export function RenderFreeKioskModal($timelines: JQuery<HTMLElement>): void {
       ) +
         (MonitoredHtml ||
           (Catalogue
-            ? `<div class="freekiosk-panel"><div class="freekiosk-section-note mb-0"><i class="bi bi-info-circle"></i> No readings are being monitored on this terminal. Arm a check on a reading in the terminal's settings to see its history here.</div></div>`
+            ? `<div class="freekiosk-panel"><div class="freekiosk-section-note mb-0"><i class="bi bi-info-circle"></i> No readings are being monitored on this terminal. Tick a reading on its tab (Content, Screen, Battery, Network or Misc) to monitor it and see its history here.</div></div>`
             : ''))
     )
   );
@@ -606,24 +553,20 @@ export function RenderFreeKioskModal($timelines: JQuery<HTMLElement>): void {
   $timelines.append(Pane('controls', RenderControlsPanel(Terminal) + RenderCapturePanel(Terminal)));
 
   // Each registry section lands on the tab FreeKioskSectionTab names, in
-  // registry order; every metric tab is drawn even when empty, with a note
-  // saying why, so the rail never offers a blank pane.
-  const ByTab = new Map<FreeKioskMetricTabKey, { Sections: string[]; Html: string }>(
-    FREEKIOSK_METRIC_TABS.map((Tab) => [Tab, { Sections: [], Html: '' }])
+  // registry order, as a card the operator can switch monitoring on from.
+  const ByTab = new Map<FreeKioskMetricTabKey, string>(
+    FREEKIOSK_METRIC_TABS.map((Tab) => [Tab, ''])
   );
   if (Catalogue) {
     for (const Section of Catalogue.Sections) {
-      const Metrics = Catalogue.Metrics.filter((Metric) => Metric.Section === Section);
-      if (!Metrics.length) continue;
-      const Entry = ByTab.get(FreeKioskSectionTab(Section))!;
-      Entry.Sections.push(Section);
-      Entry.Html += RenderSection(Terminal, Section, Metrics);
+      const Tab = FreeKioskSectionTab(Section);
+      ByTab.set(Tab, (ByTab.get(Tab) || '') + RenderSection(Terminal, Section));
     }
   }
-  for (const [Tab, Entry] of ByTab) {
+  for (const [Tab, Html] of ByTab) {
     const Body = !Catalogue
       ? `<div class="freekiosk-panel"><em class="text-muted">Failed to load the metric list.</em></div>`
-      : Entry.Html || EmptyMetricTabNote(Terminal, Entry.Sections);
+      : Html;
     $timelines.append(Pane(Tab, Body));
   }
 

@@ -791,6 +791,31 @@ test('Web UI namespace allows mode/alert toggles once permitted, from SHOW mode'
   ]);
 });
 
+test('Web UI greeting tells the browser which entities it may edit', async () => {
+  // The view modals only go editable when these are on. Both default ON (they
+  // were "allowed while in Edit mode" before the toggles existed); `showCogs`,
+  // which is always false on the web, must not be what decides it.
+  const DefaultIo = makeUiIo();
+  loadWebUi({ WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false }).SetupWebUiNamespace(
+    DefaultIo,
+    {}
+  );
+  const DefaultHello = (await connectUiSocket(DefaultIo)).emitted.find((e) => e.event === 'hello');
+  assert.equal(DefaultHello.args[0].AllowClientManagement, true);
+  assert.equal(DefaultHello.args[0].AllowMonitoringManagement, true);
+
+  const DeniedIo = makeUiIo();
+  loadWebUi({
+    WEBUI_ENABLED: true,
+    WEBUI_PASSWORD_PROTECTION_ENABLED: false,
+    WEBUI_ALLOW_CLIENT_MANAGEMENT: false,
+    WEBUI_ALLOW_MONITORING_MANAGEMENT: false,
+  }).SetupWebUiNamespace(DeniedIo, {});
+  const DeniedHello = (await connectUiSocket(DeniedIo)).emitted.find((e) => e.event === 'hello');
+  assert.equal(DeniedHello.args[0].AllowClientManagement, false);
+  assert.equal(DeniedHello.args[0].AllowMonitoringManagement, false);
+});
+
 test('Web UI namespace allows Identify in SHOW mode', async () => {
   const handlers = {
     IdentifyClient: async (_e, uuid) => [null, { UUID: uuid }],

@@ -302,6 +302,10 @@ const GetPublicConfig = async (socket: WebSocket) => {
     // switch. The rpc gate enforces both regardless; these only enable the UI.
     AllowModeChange: Cfg.AllowModeChange,
     AllowAlertActionsToggle: Cfg.AllowAlertActionsToggle,
+    // Whether the view modals offer their editing controls in Edit mode. The rpc
+    // gate (Edit mode + category permission) stays the authority.
+    AllowClientManagement: Cfg.AllowClientManagement,
+    AllowMonitoringManagement: Cfg.AllowMonitoringManagement,
     Authed: !Cfg.RequireAuth || !!(socket && socket.Authed),
     Mode: ModeManager.Get(),
     Version: Config.Application.Version,

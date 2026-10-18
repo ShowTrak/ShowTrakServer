@@ -14,10 +14,13 @@ import type { ViewMode as ViewModeValue } from './state';
 import type { AppMode as AppModeValue } from '@showtrak/protocol';
 import { HandleNonFatalError } from './utils';
 import { RenderPendingAdoptionSection } from './client-list';
-import { UpdateMonitorHistoryEditButtonVisibility } from './monitoring';
 import { initializeEditInteractions } from './dnd';
 import { UpdateSelectionCount } from './selection-init';
 import { SyncListView } from './list-view';
+import { ApplyClientInfoEditMode } from './client-info-edit';
+import { ApplyMonitorInfoEditMode } from './monitor-info-edit';
+import { ApplyDummyInfoEditMode } from './dummy-info-edit';
+import { ApplyFreeKioskInfoEditMode } from './freekiosk-info-edit';
 import { ParseViewMode, ResolveStoredViewMode } from './lib/list-view';
 
 // --- View mode (Grid | Compact | List) ---------------------------------------
@@ -284,10 +287,17 @@ export function RenderMode(mode: AppModeValue) {
 export function InitMode() {
   window.API.OnModeUpdated((mode) => {
     RenderMode(mode);
+    // An open view modal, whatever it is showing, flips between read-only and
+    // editable in place.
     try {
-      UpdateMonitorHistoryEditButtonVisibility();
+      ApplyClientInfoEditMode();
+      ApplyMonitorInfoEditMode();
+      ApplyDummyInfoEditMode();
+      void ApplyFreeKioskInfoEditMode().catch((err) =>
+        HandleNonFatalError('Mode:ApplyFreeKioskInfoEditMode', err)
+      );
     } catch (err) {
-      HandleNonFatalError('Mode:UpdateMonitorHistoryEditButtonVisibility', err);
+      HandleNonFatalError('Mode:ApplyViewModalEditMode', err);
     }
     // Re-evaluate drag state when mode changes
     try {

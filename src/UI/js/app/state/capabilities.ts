@@ -20,6 +20,11 @@ export interface CapabilityProfile {
   // web surface cannot read settings, so the server folds the feature flag and
   // the WEBUI_ALLOW_UNASSIGNED_CLIENTS permission into this one hint.
   allowUnassignedClients: boolean;
+  // Whether the view modals offer their editing controls in Edit mode: clients,
+  // and monitors/dummies/FreeKiosk terminals respectively. The web surface takes
+  // these from its client- and monitoring-management permissions.
+  canManageClients: boolean;
+  canManageMonitoring: boolean;
 }
 
 const DESKTOP_CAPABILITIES: CapabilityProfile = {
@@ -32,6 +37,8 @@ const DESKTOP_CAPABILITIES: CapabilityProfile = {
   allowRemoteScripts: true,
   wolEnabled: true,
   allowUnassignedClients: true,
+  canManageClients: true,
+  canManageMonitoring: true,
 };
 
 export const Capabilities: CapabilityProfile = (() => {

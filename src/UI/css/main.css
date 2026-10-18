@@ -1648,6 +1648,146 @@ input[type='range']::-moz-range-progress,
   display: none !important;
 }
 
+/* One modal for viewing and editing a client (client-info-edit.ts). While the
+   modal is editable it carries .is-editing, and each read-only element
+   gives way to its editable twin. Both rules beat .d-grid's !important by
+   specificity. */
+#SHOWTRAK_CLIENT_INFO:not(.is-editing) .ci-edit-only,
+#SHOWTRAK_CLIENT_INFO.is-editing .ci-view-only {
+  display: none !important;
+}
+
+/* A disabled dropdown in the view modal is a read-only value (a FreeKiosk
+   terminal's form in Show mode), so it drops the arrow that offers a choice. */
+#SHOWTRAK_CLIENT_INFO .form-select:disabled {
+  background-image: none !important;
+}
+
+/* The Add FreeKiosk Terminal modal holds the terminal form when no terminal's
+   Settings tab has it: there it is always editable, and the parts that need an
+   existing terminal (slug, tags, Test Connection, Delete) do not apply. */
+#SHOWTRAK_MODAL_FREEKIOSK_TERMINAL .ci-view-only,
+#SHOWTRAK_MODAL_FREEKIOSK_TERMINAL .fk-existing-only,
+#SHOWTRAK_CLIENT_INFO .fk-add-only {
+  display: none !important;
+}
+
+/* Read-only fields are disabled; outlining the rest shows at a glance which
+   fields Edit mode lets you change. */
+#SHOWTRAK_CLIENT_INFO.is-editing .form-control:not(:disabled),
+#SHOWTRAK_CLIENT_INFO.is-editing .form-select:not(:disabled) {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.2) !important;
+}
+
+.client-info-actions-hint {
+  padding: 8px 12px;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-subtle);
+  font-size: var(--fs-sm);
+}
+
+.client-info-action-list {
+  display: grid;
+  gap: 6px;
+}
+
+/* Same surface as a .mac-address-item row: an inline list entry. */
+.client-info-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-soft);
+  font-size: var(--fs-md);
+  text-align: left;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+.client-info-action i {
+  flex: 0 0 auto;
+  width: 1.1em;
+  text-align: center;
+}
+.client-info-action span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.client-info-action:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-default);
+}
+.client-info-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.client-info-action-divider {
+  height: 1px;
+  margin: 2px 4px;
+  background: var(--border-subtle);
+}
+
+/* A monitor's checks on its Settings tab. In Edit mode each row opens the
+   check's edit view and can be dragged into a new order by its grip. */
+.monitor-settings-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+}
+.monitor-settings-check-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.monitor-settings-check.is-editable {
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+.monitor-settings-check.is-editable:hover,
+.monitor-settings-check.is-editable:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-default);
+  outline: none;
+}
+.monitor-settings-check-grip {
+  color: var(--text-subtle);
+  cursor: grab;
+}
+.monitor-settings-check.is-dragging {
+  opacity: 0.4;
+}
+
+.client-info-variable {
+  display: grid;
+  gap: 2px;
+}
+/* Keep a long value clear of the floated reset button. */
+.client-info-variable .form-floating.has-copy > .form-control {
+  padding-right: 2.5rem;
+}
+.client-info-variable-note {
+  padding-left: 2px;
+  font-size: var(--fs-xs);
+  color: var(--text-subtle);
+  text-align: left;
+}
+
 .GROUP_TITLE {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
@@ -1667,12 +1807,12 @@ input[type='range']::-moz-range-progress,
   text-align: center;
 }
 
-/* Client editor — MAC address list. Follows the .fog-task-item surface
-   treatment so the rows read as the same family of inline list entries. */
+/* A client's Wake on LAN tab — MAC address list. Follows the .fog-task-item
+   surface treatment so the rows read as the same family of inline list entries. */
 /* --- Tag picker ---
  * Assigning tags from an entity's editor, and the read-only mirror of the same
- * chips in the Client Info panel. Deliberately shares the mac-address-editor's
- * head/hint shape: both are "a list you manage inline" inside the same modal.
+ * chips in the Client Info panel. Deliberately shares the shape of
+ * an inline list's head and hint: both are "a list you manage inline" inside the same modal.
  *
  * A chip is a button in the editor and a span in Client Info; the styling is
  * driven by class, not element, so the two read identically. --tag-colour is set
@@ -1768,25 +1908,6 @@ input[type='range']::-moz-range-progress,
   cursor: default;
 }
 
-.mac-address-editor {
-  display: grid;
-  gap: 8px;
-}
-.mac-address-editor-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-}
-.mac-address-editor-title {
-  font-weight: 700;
-  font-size: var(--fs-md);
-  color: var(--text-soft);
-}
-.mac-address-editor-hint {
-  font-size: var(--fs-xs);
-  color: var(--text-subtle);
-}
 .mac-address-list {
   display: grid;
   gap: 6px;
@@ -1807,6 +1928,11 @@ input[type='range']::-moz-range-progress,
   flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mac-address-item .mac-address-iface {
+  font-size: var(--fs-xs);
+  color: var(--text-subtle);
   white-space: nowrap;
 }
 .mac-address-item .mac-address-tag {
@@ -2638,7 +2764,8 @@ button.btn:focus {
 .form-floating.has-copy {
   position: relative;
 }
-.form-floating.has-copy .copy-field-btn {
+.form-floating.has-copy .copy-field-btn,
+.form-floating.has-copy .field-reset-btn {
   position: absolute;
   top: 50%;
   right: 8px;
@@ -2652,10 +2779,16 @@ button.btn:focus {
   display: grid;
   place-items: center;
 }
-.form-floating.has-copy .copy-field-btn:hover {
+.form-floating.has-copy .copy-field-btn:hover,
+.form-floating.has-copy .field-reset-btn:hover:not(:disabled) {
   color: var(--text-strong);
 }
-.form-floating.has-copy .copy-field-btn i {
+.form-floating.has-copy .field-reset-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.form-floating.has-copy .copy-field-btn i,
+.form-floating.has-copy .field-reset-btn i {
   font-size: var(--fs-xl);
   line-height: 1;
 }
@@ -2864,6 +2997,43 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
 .SHOWTRAK_AUDIO_LEVEL_VALUE {
   flex: 0 0 2.75rem;
   text-align: right;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A volume's usage: a read-only pill in the audio level bar's style, filled to
+   how full the volume is, with what that leaves beside it. A monitored volume
+   short of free space fills in the failing-condition colour. */
+.SHOWTRAK_STORAGE_USAGE {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.SHOWTRAK_STORAGE_BAR {
+  flex: 1 1 auto;
+  height: 0.6rem;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.SHOWTRAK_STORAGE_BAR > span {
+  display: block;
+  height: 100%;
+  min-width: 0.6rem;
+  border-radius: var(--radius-pill);
+  background: #e2e2ea;
+}
+
+.SHOWTRAK_STORAGE_USAGE.is-low .SHOWTRAK_STORAGE_BAR > span {
+  background: var(--condition-failing);
+}
+
+.SHOWTRAK_STORAGE_USAGE_TEXT {
+  flex: 0 0 auto;
   font-size: var(--fs-sm);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -6892,8 +7062,7 @@ button.monitor-action-label:focus-visible {
 
 /* ---- View modal ---------------------------------------------------------- */
 
-.freekiosk-panel,
-.freekiosk-section {
+.freekiosk-panel {
   margin-top: 0.75rem;
   padding: 0.75rem;
   border-radius: var(--radius-md);
@@ -6909,8 +7078,7 @@ button.monitor-action-label:focus-visible {
   gap: 0.75rem;
 }
 
-.freekiosk-tab-pane > .freekiosk-panel,
-.freekiosk-tab-pane > .freekiosk-section {
+.freekiosk-tab-pane > .freekiosk-panel {
   margin-top: 0;
 }
 
@@ -6949,37 +7117,6 @@ button.monitor-action-label:focus-visible {
   flex: 0 0 auto;
 }
 
-.freekiosk-metric-row {
-  padding: 0.4rem 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.freekiosk-metric-row:first-of-type {
-  border-top: none;
-}
-
-.freekiosk-metric-row.is-breaching .freekiosk-metric-value {
-  color: var(--status-graph-degraded);
-  font-weight: 600;
-}
-
-.freekiosk-metric-head {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-}
-
-.freekiosk-metric-label {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: var(--fs-md);
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Sits on .monitoring-note, which supplies the colour, the help cursor and the
    hover state. Only the inline placement next to a label is FreeKiosk's. */
 .freekiosk-metric-note {
@@ -6988,30 +7125,108 @@ button.monitor-action-label:focus-visible {
   vertical-align: baseline;
 }
 
-.freekiosk-metric-value {
-  flex: 0 0 auto;
-  font-variant-numeric: tabular-nums;
-  font-size: var(--fs-lg);
-  color: #fff;
+/* ---- Monitoring cards (section tabs) ------------------------------------ */
+/* A section's card reuses the client's monitored-item card, toggle and
+   conditions table (03-layout.css). Only what a FreeKiosk condition needs on top
+   lives here: a fourth column (the reading, then the condition it alerts on)
+   and an inline operator + threshold. */
+.FREEKIOSK_CONDITIONS th {
+  width: 32%;
 }
 
-/* Only rendered while the alarm is breaching, so it can afford the degraded
-   colour: a row wearing it is a row that needs attention. */
-.freekiosk-metric-expected {
-  flex: 0 0 auto;
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-  color: var(--status-graph-degraded);
+.FREEKIOSK_CONDITIONS .fk-cond-reading {
+  overflow-wrap: anywhere;
 }
 
-.freekiosk-alarm-badge {
-  flex: 0 0 auto;
+/* An unmonitored section is readings alone, so the value takes the rest of the
+   row rather than leaving a gap where the conditions would be. */
+.FREEKIOSK_CONDITIONS.is-readings-only th {
+  width: 45%;
+}
+
+.FREEKIOSK_CONDITIONS .fk-cond-rule-cell {
+  text-align: right;
+}
+
+.fk-cond-rule {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.fk-cond-value,
+.fk-cond-value2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.fk-cond-value.d-none,
+.fk-cond-value2.d-none {
+  display: none !important;
+}
+
+.fk-cond-rule select,
+.fk-cond-rule input[type='text'] {
+  padding: 0.1rem 0.4rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.fk-cond-rule select:focus,
+.fk-cond-rule input[type='text']:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.fk-cond-rule option {
+  background: var(--surface-2);
+  color: #ffffff;
+}
+
+.fk-cond-rule input[type='text'] {
+  width: 10rem;
+  max-width: 100%;
+}
+
+.fk-cond-op-text,
+.fk-cond-unit {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* An unticked condition is still editable — setting it ticks the row — but
+   recedes, so the ticked ones are what the eye lands on. */
+.FREEKIOSK_CONDITIONS tr.is-off .fk-cond-rule {
+  opacity: 0.5;
+}
+
+.FREEKIOSK_CONDITIONS tr.is-off .fk-cond-rule:hover,
+.FREEKIOSK_CONDITIONS tr.is-off .fk-cond-rule:focus-within {
+  opacity: 1;
+}
+
+/* Only rendered while the condition is failing, so it can wear the colour. */
+.fk-cond-expected {
+  display: block;
   font-size: var(--fs-xs);
-  color: var(--text-faint);
+  font-weight: 500;
 }
 
-.freekiosk-alarm-badge.is-breaching {
-  color: var(--status-graph-degraded);
+/* An armed reading's history sits directly under its row, as one unit. */
+.FREEKIOSK_CONDITIONS tr.fk-cond-chart > td {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* Poll is ShowTrak's own measurement and cannot be switched off. */
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-locked,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-locked:hover {
+  cursor: default;
+  color: var(--warning);
+  background-color: rgb(var(--warning-rgb) / 0.2);
 }
 
 /* ---- Capture ------------------------------------------------------------- */
@@ -7216,14 +7431,9 @@ button.monitor-action-label:focus-visible {
    hosts in index.html. These hosts hold sections built in TS, so the same
    spacing is declared here instead — without it every field wrap sits flush
    against the next and sixty alarm rows read as one undifferentiated block. */
-.freekiosk-alarms-body,
-.freekiosk-alarm-section {
+.freekiosk-alarms-body {
   display: grid;
   gap: 0.5rem;
-}
-
-.freekiosk-alarm-section {
-  margin-bottom: 0.6rem;
 }
 
 /* Bootstrap 5.0 has no rules for a .form-floating inside an .input-group — that
@@ -7239,24 +7449,6 @@ button.monitor-action-label:focus-visible {
 #SHOWTRAK_MODAL_FREEKIOSK_TERMINAL .input-group > .form-floating > .form-control {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
-}
-
-/* The section's master switch. Set apart from the checks it governs, so the
-   hierarchy is visible rather than implied by ordering alone. */
-.freekiosk-alarm-master {
-  margin-bottom: 0.5rem;
-  padding: 0.35rem 0.5rem;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.freekiosk-alarm-section-title {
-  display: block;
-  margin-bottom: 0.3rem;
-  font-size: var(--fs-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-subtle);
 }
 
 .freekiosk-test-result {

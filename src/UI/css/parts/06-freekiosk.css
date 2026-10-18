@@ -106,8 +106,7 @@
 
 /* ---- View modal ---------------------------------------------------------- */
 
-.freekiosk-panel,
-.freekiosk-section {
+.freekiosk-panel {
   margin-top: 0.75rem;
   padding: 0.75rem;
   border-radius: var(--radius-md);
@@ -123,8 +122,7 @@
   gap: 0.75rem;
 }
 
-.freekiosk-tab-pane > .freekiosk-panel,
-.freekiosk-tab-pane > .freekiosk-section {
+.freekiosk-tab-pane > .freekiosk-panel {
   margin-top: 0;
 }
 
@@ -163,37 +161,6 @@
   flex: 0 0 auto;
 }
 
-.freekiosk-metric-row {
-  padding: 0.4rem 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.freekiosk-metric-row:first-of-type {
-  border-top: none;
-}
-
-.freekiosk-metric-row.is-breaching .freekiosk-metric-value {
-  color: var(--status-graph-degraded);
-  font-weight: 600;
-}
-
-.freekiosk-metric-head {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-}
-
-.freekiosk-metric-label {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: var(--fs-md);
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Sits on .monitoring-note, which supplies the colour, the help cursor and the
    hover state. Only the inline placement next to a label is FreeKiosk's. */
 .freekiosk-metric-note {
@@ -202,30 +169,108 @@
   vertical-align: baseline;
 }
 
-.freekiosk-metric-value {
-  flex: 0 0 auto;
-  font-variant-numeric: tabular-nums;
-  font-size: var(--fs-lg);
-  color: #fff;
+/* ---- Monitoring cards (section tabs) ------------------------------------ */
+/* A section's card reuses the client's monitored-item card, toggle and
+   conditions table (03-layout.css). Only what a FreeKiosk condition needs on top
+   lives here: a fourth column (the reading, then the condition it alerts on)
+   and an inline operator + threshold. */
+.FREEKIOSK_CONDITIONS th {
+  width: 32%;
 }
 
-/* Only rendered while the alarm is breaching, so it can afford the degraded
-   colour: a row wearing it is a row that needs attention. */
-.freekiosk-metric-expected {
-  flex: 0 0 auto;
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-  color: var(--status-graph-degraded);
+.FREEKIOSK_CONDITIONS .fk-cond-reading {
+  overflow-wrap: anywhere;
 }
 
-.freekiosk-alarm-badge {
-  flex: 0 0 auto;
+/* An unmonitored section is readings alone, so the value takes the rest of the
+   row rather than leaving a gap where the conditions would be. */
+.FREEKIOSK_CONDITIONS.is-readings-only th {
+  width: 45%;
+}
+
+.FREEKIOSK_CONDITIONS .fk-cond-rule-cell {
+  text-align: right;
+}
+
+.fk-cond-rule {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.fk-cond-value,
+.fk-cond-value2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.fk-cond-value.d-none,
+.fk-cond-value2.d-none {
+  display: none !important;
+}
+
+.fk-cond-rule select,
+.fk-cond-rule input[type='text'] {
+  padding: 0.1rem 0.4rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.fk-cond-rule select:focus,
+.fk-cond-rule input[type='text']:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.fk-cond-rule option {
+  background: var(--surface-2);
+  color: #ffffff;
+}
+
+.fk-cond-rule input[type='text'] {
+  width: 10rem;
+  max-width: 100%;
+}
+
+.fk-cond-op-text,
+.fk-cond-unit {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* An unticked condition is still editable — setting it ticks the row — but
+   recedes, so the ticked ones are what the eye lands on. */
+.FREEKIOSK_CONDITIONS tr.is-off .fk-cond-rule {
+  opacity: 0.5;
+}
+
+.FREEKIOSK_CONDITIONS tr.is-off .fk-cond-rule:hover,
+.FREEKIOSK_CONDITIONS tr.is-off .fk-cond-rule:focus-within {
+  opacity: 1;
+}
+
+/* Only rendered while the condition is failing, so it can wear the colour. */
+.fk-cond-expected {
+  display: block;
   font-size: var(--fs-xs);
-  color: var(--text-faint);
+  font-weight: 500;
 }
 
-.freekiosk-alarm-badge.is-breaching {
-  color: var(--status-graph-degraded);
+/* An armed reading's history sits directly under its row, as one unit. */
+.FREEKIOSK_CONDITIONS tr.fk-cond-chart > td {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* Poll is ShowTrak's own measurement and cannot be switched off. */
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-locked,
+.SHOWTRAK_TOGGLE_CRITICAL_USB.is-locked:hover {
+  cursor: default;
+  color: var(--warning);
+  background-color: rgb(var(--warning-rgb) / 0.2);
 }
 
 /* ---- Capture ------------------------------------------------------------- */
@@ -430,14 +475,9 @@
    hosts in index.html. These hosts hold sections built in TS, so the same
    spacing is declared here instead — without it every field wrap sits flush
    against the next and sixty alarm rows read as one undifferentiated block. */
-.freekiosk-alarms-body,
-.freekiosk-alarm-section {
+.freekiosk-alarms-body {
   display: grid;
   gap: 0.5rem;
-}
-
-.freekiosk-alarm-section {
-  margin-bottom: 0.6rem;
 }
 
 /* Bootstrap 5.0 has no rules for a .form-floating inside an .input-group — that
@@ -453,24 +493,6 @@
 #SHOWTRAK_MODAL_FREEKIOSK_TERMINAL .input-group > .form-floating > .form-control {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
-}
-
-/* The section's master switch. Set apart from the checks it governs, so the
-   hierarchy is visible rather than implied by ordering alone. */
-.freekiosk-alarm-master {
-  margin-bottom: 0.5rem;
-  padding: 0.35rem 0.5rem;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.freekiosk-alarm-section-title {
-  display: block;
-  margin-bottom: 0.3rem;
-  font-size: var(--fs-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-subtle);
 }
 
 .freekiosk-test-result {

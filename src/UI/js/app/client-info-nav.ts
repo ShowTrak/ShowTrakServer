@@ -10,8 +10,11 @@ import {
   DEFAULT_CLIENT_INFO_TAB,
   ResolveClientInfoTab,
 } from './lib/client-info-tabs';
-import type { ClientInfoKind, ClientInfoTabKey } from './lib/client-info-tabs';
+import type { ClientInfoKind, ClientInfoSurface, ClientInfoTabKey } from './lib/client-info-tabs';
+import { Capabilities } from './state';
 import { Safe } from './utils';
+
+const Surface: ClientInfoSurface = Capabilities.isWeb ? 'web' : 'desktop';
 
 let Kind: ClientInfoKind = 'client';
 let RenderedKind: ClientInfoKind | null = null;
@@ -42,7 +45,7 @@ function EnsureClientInfoNav() {
     $nav.on('click', '.settings-nav-item', function () {
       const Key = this.getAttribute('data-client-info-tab-target');
       if (Key === ActiveTab) return;
-      ActiveTab = ResolveClientInfoTab(Key, Kind);
+      ActiveTab = ResolveClientInfoTab(Key, Kind, Surface);
       RefreshClientInfoTabs();
       // A new pane starts at its top, not wherever the last one was scrolled to.
       $('#CLIENT_INFO_CONTENT').scrollTop(0);
@@ -53,7 +56,7 @@ function EnsureClientInfoNav() {
   if (RenderedKind === Kind) return;
   RenderedKind = Kind;
   $nav.html(
-    ClientInfoTabsFor(Kind)
+    ClientInfoTabsFor(Kind, Surface)
       .map(
         (Tab) =>
           `<button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-client-info-tab-target="${Safe(Tab.Key)}">${Safe(Tab.Title)}</button>`
@@ -68,8 +71,8 @@ export function RefreshClientInfoTabs() {
   $('#SHOWTRAK_CLIENT_INFO .modal-body').addClass('is-tabbed');
   $('#CLIENT_INFO_NAV').removeClass('d-none');
 
-  ActiveTab = ResolveClientInfoTab(ActiveTab, Kind);
-  const Available: string[] = AvailableClientInfoTabs(Kind);
+  ActiveTab = ResolveClientInfoTab(ActiveTab, Kind, Surface);
+  const Available: string[] = AvailableClientInfoTabs(Kind, Surface);
   $('#CLIENT_INFO_NAV .settings-nav-item').each(function () {
     const Key = this.getAttribute('data-client-info-tab-target') || '';
     const IsActive = Key === ActiveTab;
@@ -96,9 +99,14 @@ export function ResetClientInfoTab() {
   AnnounceActiveTab();
 }
 
+/** The tab the operator is looking at. */
+export function GetActiveClientInfoTab(): ClientInfoTabKey {
+  return ActiveTab;
+}
+
 /** Switch to a tab from code (the Audit Log opens an entity on its Logs). */
 export function SelectClientInfoTab(Key: ClientInfoTabKey) {
-  const Next = ResolveClientInfoTab(Key, Kind);
+  const Next = ResolveClientInfoTab(Key, Kind, Surface);
   if (Next === ActiveTab) return;
   ActiveTab = Next;
   RefreshClientInfoTabs();

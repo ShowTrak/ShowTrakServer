@@ -1,32 +1,25 @@
 import type { DummyClientView } from '@showtrak/protocol';
 import { openModal } from './lib/modal';
 import { OfflineBadgeContent } from './lib/status-badges';
-import { AppMode, DummyClientEditorUUID, Selected, Tags, setDummyClientEditorUUID } from './state';
+import { AppMode, Selected, Tags } from './state';
 import { ResolveEntityTags } from './lib/tag-badges';
 import { RenderTagBadgeRow } from './lib/tag-badge-view';
 import { DummyListState } from './lib/list-view';
 import { RenderListRowCells, UpdateListRowState } from './list-view';
 import { ErrorMessage, Safe } from './utils';
-import { FormatInterval } from './monitoring';
+import { FormatInterval, OpenDummyClientHistory } from './monitoring';
 import { CloseAllModals } from './modals';
-import { ConfirmationDialog, Notify } from './selection-init';
-import { RenderTagPicker } from './tag-picker';
-import type { TagPickerMount } from './tag-picker';
+import { Notify } from './selection-init';
+import { BuildDummyPayload } from './lib/dummy-settings';
 // Dummy Clients (renderer)
 // Renders virtual heartbeat-driven dummy clients inline within their group's
 // drop zone alongside real clients and monitoring targets, and provides the
-// create/edit modal. Where a real client shows its version, a dummy shows the
+// Add Dummy Client modal (an existing dummy is edited on its Settings tab). Where a real client shows its version, a dummy shows the
 // literal label "Dummy".
 
 // Compute the compact-mode status shown to the right of the dummy's name.
 // Offline dummies hide this label and show the offline timer instead.
 export const DUMMY_TYPE_LABEL = 'DUMMY';
-
-const DUMMY_EDITOR_TAG_PICKER: TagPickerMount = {
-  WrapperSelector: '#DUMMY_CLIENT_TAGS_WRAPPER',
-  ListSelector: '#DUMMY_CLIENT_TAGS',
-  Namespace: 'dummyEditorTags',
-};
 
 export function DummyCompactStatus(D: DummyClientView) {
   const State = String(D.State || 'IDLE');
@@ -171,7 +164,8 @@ export function UpdateDummyClientTile(D: DummyClientView) {
   $tile.find('[data-type="OFFLINE_SINCE"]').attr('data-offlinesince', D.LastSeen || '');
 }
 
-export async function PopulateDummyGroupSelect(SelectedGroupID: number | null) {
+/** Fill a group <select> with every group, then No Group. */
+export async function PopulateDummyGroupSelect(Selector: string, SelectedGroupID: number | null) {
   let Groups = await window.API.GetAllGroups();
   if (!Groups) Groups = [];
   Groups.push({
@@ -179,7 +173,7 @@ export async function PopulateDummyGroupSelect(SelectedGroupID: number | null) {
     Title: 'No Group',
     Weight: 100000,
   } as unknown as (typeof Groups)[number]);
-  const $select = $('#DUMMY_CLIENT_GROUPID');
+  const $select = $(Selector);
   $select.html('');
   for (const Group of Groups) {
     $select.append(
@@ -190,57 +184,29 @@ export async function PopulateDummyGroupSelect(SelectedGroupID: number | null) {
   }
 }
 
+/**
+ * The Add Dummy Client modal. An existing dummy's settings live on the Settings
+ * tab of its view modal (dummy-info-edit.ts), so a UUID opens that instead.
+ */
 export async function OpenDummyClientEditor(UUID: string | null | undefined = null) {
+  if (UUID) return OpenDummyClientHistory(String(UUID), { Tab: 'settings' });
   await CloseAllModals();
 
-  let Existing = null;
-  if (UUID) {
-    Existing = await window.API.GetDummyClient(UUID);
-    if (!Existing) return Notify('Dummy client not found.', 'error');
-  }
-
   let Defaults = { DummyID: '', Nickname: '', Interval: 30000 };
-  if (!Existing) {
-    try {
-      const Generated = await window.API.GenerateDummyClientDefaults();
-      if (Generated) Defaults = Generated;
-    } catch {
-      // Non-fatal: fall back to empty defaults.
-    }
+  try {
+    const Generated = await window.API.GenerateDummyClientDefaults();
+    if (Generated) Defaults = Generated;
+  } catch {
+    // Non-fatal: fall back to empty defaults.
   }
 
-  setDummyClientEditorUUID(Existing ? Existing.UUID : null);
-  const D = Existing || Defaults;
-
-  $('#DUMMY_CLIENT_MODAL_TITLE').text(Existing ? 'Edit Dummy Client' : 'Add Dummy Client');
-  $('#DUMMY_CLIENT_DANGER_ZONE').toggleClass('d-none', !Existing);
-
-  $('#DUMMY_CLIENT_TITLE').val(D.Nickname || '');
-  $('#DUMMY_CLIENT_ID').val(D.DummyID || '');
-  const Interval = Number(D.Interval) || 30000;
+  $('#DUMMY_CLIENT_TITLE').val(Defaults.Nickname || '');
+  $('#DUMMY_CLIENT_ID').val(Defaults.DummyID || '');
+  const Interval = Number(Defaults.Interval) || 30000;
   $('#DUMMY_CLIENT_INTERVAL').val(Interval);
   $('#DUMMY_CLIENT_INTERVAL_LABEL').text(FormatInterval(Interval));
 
-  await PopulateDummyGroupSelect(Existing ? Existing.GroupID : null);
-
-  // Dummies are scoped by bare UUID, like real clients. A dummy being created
-  // has none yet, so the picker hides until it exists.
-  RenderTagPicker(
-    DUMMY_EDITOR_TAG_PICKER,
-    Existing ? { ScopedID: String(Existing.UUID), GroupID: Existing.GroupID ?? null } : null
-  );
-
-  $('#DUMMY_CLIENT_GROUPID')
-    .off('change.dummyEditorTags')
-    .on('change.dummyEditorTags', function () {
-      if (!Existing) return;
-      const Raw = $(this).val();
-      const Next = Raw == null || Raw === 'null' ? null : parseInt(String(Raw), 10);
-      RenderTagPicker(DUMMY_EDITOR_TAG_PICKER, {
-        ScopedID: String(Existing.UUID),
-        GroupID: Number.isFinite(Next as number) ? (Next as number) : null,
-      });
-    });
+  await PopulateDummyGroupSelect('#DUMMY_CLIENT_GROUPID', null);
 
   $('#DUMMY_CLIENT_INTERVAL')
     .off('input.dummy')
@@ -251,58 +217,21 @@ export async function OpenDummyClientEditor(UUID: string | null | undefined = nu
   $('#DUMMY_CLIENT_SAVE')
     .off('click.dummy')
     .on('click.dummy', async () => {
-      const DummyID = String($('#DUMMY_CLIENT_ID').val() || '').trim();
-      const Nickname = String($('#DUMMY_CLIENT_TITLE').val() || '').trim();
-      const GroupIDRaw = $('#DUMMY_CLIENT_GROUPID').val();
-      let GroupID: number | null;
-      if (GroupIDRaw == null || GroupIDRaw == 'null') {
-        GroupID = null;
-      } else {
-        GroupID = parseInt(String(GroupIDRaw), 10);
-      }
-      const Interval = parseInt(String($('#DUMMY_CLIENT_INTERVAL').val() || ''), 10);
-
-      if (!DummyID) return Notify('Please enter an ID.', 'error');
-      // DummyID doubles as the dummy's slug: letters, digits, - and _; no spaces.
-      if (!/^[A-Za-z0-9_-]+$/.test(DummyID))
-        return Notify('ID may only contain letters, numbers, hyphens and underscores.', 'error');
-
-      const Payload = {
-        DummyID,
-        Nickname: Nickname || `Dummy ${DummyID.replace(/^DummyClient/, '')}`,
-        Interval,
-        GroupID,
-      };
-
+      const { Payload, Error } = BuildDummyPayload({
+        DummyID: String($('#DUMMY_CLIENT_ID').val() || ''),
+        Nickname: String($('#DUMMY_CLIENT_TITLE').val() || ''),
+        GroupID: String($('#DUMMY_CLIENT_GROUPID').val() ?? ''),
+        Interval: String($('#DUMMY_CLIENT_INTERVAL').val() ?? ''),
+      });
+      if (!Payload) return Notify(Error, 'error');
       try {
-        if (DummyClientEditorUUID) {
-          const [Err] = await window.API.UpdateDummyClient(DummyClientEditorUUID, Payload);
-          if (Err) return Notify(Err, 'error');
-          await Notify('Dummy client updated.', 'success');
-        } else {
-          const [Err] = await window.API.CreateDummyClient(Payload);
-          if (Err) return Notify(Err, 'error');
-          await Notify('Dummy client created.', 'success');
-        }
+        const [Err] = await window.API.CreateDummyClient(Payload);
+        if (Err) return Notify(Err, 'error');
+        await Notify('Dummy client created.', 'success');
         await CloseAllModals();
       } catch (e) {
         Notify(ErrorMessage(e, 'Failed to save dummy client'), 'error');
       }
-    });
-
-  $('#DUMMY_CLIENT_DELETE')
-    .off('click.dummy')
-    .on('click.dummy', async () => {
-      if (!DummyClientEditorUUID) return;
-      const Confirmation = await ConfirmationDialog(
-        'Delete this dummy client? This cannot be undone.',
-        { ConfirmLabel: 'Delete Dummy Client' }
-      );
-      if (!Confirmation) return;
-      const [Err] = await window.API.DeleteDummyClient(DummyClientEditorUUID);
-      if (Err) return Notify(Err, 'error');
-      await Notify('Dummy client deleted.', 'success');
-      await CloseAllModals();
     });
 
   openModal('SHOWTRAK_MODAL_DUMMY_CLIENT');

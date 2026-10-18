@@ -27,7 +27,7 @@ import { Capabilities, Tags } from './state';
 import { HandleNonFatalError, Safe } from './utils';
 import { Notify } from './selection-init';
 import { ScriptColourHex } from './lib/script-colours';
-import { GetTagMembershipKind, TagBadgeLabel } from './lib/tag-badges';
+import { GetTagMembershipKind, ResolveEntityTags, TagBadgeLabel } from './lib/tag-badges';
 import type { TagBadgeEntity, TagMembershipKind } from './lib/tag-badges';
 
 /** The entity a mounted picker is editing, plus where its markup lives. */
@@ -175,6 +175,29 @@ async function ToggleTagMembership(TagID: number, Entity: TagBadgeEntity): Promi
 export function RefreshTagPickerIfMounted(): void {
   if (!Active) return;
   RenderTagPicker(Active.Mount, Active.Entity);
+}
+
+/**
+ * The tags an entity carries as read-only chips — the picker's chips minus the
+ * interaction, so a tag looks the same wherever it appears. Empty markup when
+ * it carries none, so the caller can hide the section.
+ */
+export function RenderReadOnlyTagChips(Entity: TagBadgeEntity): { Html: string; Count: number } {
+  const AllTags = Array.isArray(Tags) ? Tags : [];
+  const Applied = ResolveEntityTags(AllTags, Entity);
+  const Html = Applied.map((Tag) => {
+    const Kind = GetTagMembershipKind(Tag, Entity, AllTags);
+    // Where a tag came from explains why it cannot be removed for one entity.
+    const Via =
+      Kind === 'workspace' ? 'ALL' : Kind === 'group' ? 'GROUP' : Kind === 'tag' ? 'TAG' : '';
+    return `
+      <span class="tag-picker-chip is-on" style="--tag-colour: ${Safe(ScriptColourHex(Tag.Colour))}">
+        <i class="bi bi-${Safe(Tag.Icon || 'tag')}" aria-hidden="true"></i>
+        <span class="tag-picker-chip-label">${Safe(TagBadgeLabel(Tag))}</span>
+        ${Via ? `<span class="tag-picker-chip-via">${Safe(Via)}</span>` : ''}
+      </span>`;
+  }).join('');
+  return { Html, Count: Applied.length };
 }
 
 /** Drop the mount when its editor closes, so a stale target is never redrawn. */

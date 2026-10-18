@@ -43,7 +43,10 @@ import { UpdateDummyClientTile } from './dummy-clients';
 import { UpdateFreeKioskTile } from './freekiosk';
 import { RefreshTagPickerIfMounted } from './tag-picker';
 import { RenderScriptEditorVariableList } from './variable-manager';
-import { RefreshClientEditorVariablesIfMounted } from './modals';
+import { RefreshClientInfoTags, RefreshClientInfoVariables } from './client-info-edit';
+import { RefreshMonitorInfoEditor, RefreshMonitorInfoTags } from './monitor-info-edit';
+import { RefreshDummyInfoEditor, RefreshDummyInfoTags } from './dummy-info-edit';
+import { RefreshFreeKioskInfoEditor, RefreshFreeKioskInfoTags } from './freekiosk-info-edit';
 
 /** One line rendered in the OSC/HTTP debug terminal. */
 interface OscHttpDebugEntry {
@@ -649,6 +652,8 @@ export function InitOscFeeds() {
     setMonitoringTargets(Array.isArray(List) ? List : []);
     // Re-render the full client+monitor view so monitors slot back into their groups.
     RenderFullClientAndMonitorList();
+    // An open Settings tab follows (a no-op for every monitor but the open one).
+    for (const Target of MonitoringTargets) RefreshMonitorInfoEditor(Target);
     UpdateIdentifyStatusBanner();
   });
 
@@ -667,8 +672,10 @@ export function InitOscFeeds() {
     } else {
       UpdateMonitoringTargetTile(Target);
     }
-    // Keep the open editor's per-check status list fresh.
+    // Keep the open editor's per-check status list fresh, and a monitor's
+    // Settings tab if that is what is open.
     RefreshMonitoringEditorIfOpen(Target.TargetID);
+    RefreshMonitorInfoEditor(Target);
     // Keep the open check editor's "last response" debug panel fresh.
     RefreshMonitoringCheckDebugIfOpen(Target.TargetID);
     // If the history modal is showing this target, reload its series live.
@@ -711,17 +718,21 @@ export function InitOscFeeds() {
     // through the server), so an open picker has to redraw or it keeps showing
     // the state from before the click.
     RefreshTagPickerIfMounted();
+    RefreshClientInfoTags();
+    RefreshMonitorInfoTags();
+    RefreshDummyInfoTags();
+    RefreshFreeKioskInfoTags();
   });
 
   // --- Show Variables ---
-  // The script editor's reference list and any open client editor both read
+  // The script editor's reference list and an open client's Variables tab both read
   // from this cache, so a rename or deletion made elsewhere (or by another
   // operator on the web UI) has to redraw them rather than leave stale names
   // that no longer resolve to anything.
   window.API.OnSetVariableList(async (List) => {
     setVariables(Array.isArray(List) ? List : []);
     RenderScriptEditorVariableList();
-    await RefreshClientEditorVariablesIfMounted();
+    await RefreshClientInfoVariables();
   });
 
   // --- Dummy Clients ---
@@ -729,6 +740,8 @@ export function InitOscFeeds() {
     setDummyClients(Array.isArray(List) ? List : []);
     // Re-render the full client+monitor view so dummies slot back into groups.
     RenderFullClientAndMonitorList();
+    // An open Settings tab follows (a no-op for every dummy but the open one).
+    for (const Dummy of DummyClients) RefreshDummyInfoEditor(Dummy);
   });
 
   window.API.DummyClientUpdated(async (Dummy) => {
@@ -746,6 +759,7 @@ export function InitOscFeeds() {
     } else {
       UpdateDummyClientTile(Dummy);
     }
+    RefreshDummyInfoEditor(Dummy);
     if (IsMonitorHistoryContextFor('dummy', Dummy.UUID)) {
       await LoadHistorySamplesForContext();
       RenderMonitoringHistoryModal();
@@ -774,6 +788,8 @@ export function InitOscFeeds() {
     } else {
       UpdateFreeKioskTile(Terminal);
     }
+    // An open Settings tab follows real settings changes, not every poll.
+    await RefreshFreeKioskInfoEditor(Terminal);
     if (IsMonitorHistoryContextFor('freekiosk', Terminal.UUID)) {
       await LoadHistorySamplesForContext();
       RenderMonitoringHistoryModal();
