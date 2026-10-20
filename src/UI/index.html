@@ -35,6 +35,28 @@
     <!-- Hover tooltip for the list view's history column. Outside the view modal
          (whose own tooltip host is hidden along with it). -->
     <div id="LIST_HISTORY_TOOLTIP" class="monitor-history-tooltip d-none" role="status"></div>
+    <!-- The list view's search (Ctrl/Cmd+F), floating over the list's top right.
+         Wired by list-filter.ts. -->
+    <div id="LIST_SEARCH" class="d-none" role="search">
+      <i class="bi bi-search" aria-hidden="true"></i>
+      <input
+        id="LIST_SEARCH_INPUT"
+        type="text"
+        placeholder="Name, tag, IP or group…"
+        aria-label="Filter the list"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <span id="LIST_SEARCH_COUNT" aria-live="polite"></span>
+      <button
+        type="button"
+        id="LIST_SEARCH_CLEAR"
+        title="Clear Filter (Esc)"
+        aria-label="Clear Filter"
+      >
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
     <div id="IDENTIFY_STATUS_BANNER" class="d-none" role="status" aria-live="polite">
       <div class="identify-status-content">
         <span id="IDENTIFY_STATUS_TEXT">You are currently identifying 0 clients</span>

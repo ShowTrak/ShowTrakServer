@@ -95,6 +95,8 @@ export function ShowShortcutsModal() {
   items.push({ title: 'Cycle View (Grid / Compact / List)', shortcut: 'Ctrl/Cmd+E' });
   items.push({ title: 'Expand Monitors (List View)', shortcut: 'Ctrl/Cmd+Right' });
   items.push({ title: 'Collapse Monitors (List View)', shortcut: 'Ctrl/Cmd+Left' });
+  items.push({ title: 'Filter (List View)', shortcut: 'Ctrl/Cmd+F' });
+  items.push({ title: 'Clear Filter (List View)', shortcut: 'Esc' });
   // Alerts
   items.push({ title: 'Toggle Alert Actions Enabled/Disabled', shortcut: 'Ctrl/Cmd+T' });
   items.push({ title: 'Toggle Alerts Panel', shortcut: 'Ctrl/Cmd+Y' });

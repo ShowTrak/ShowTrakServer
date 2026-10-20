@@ -60,6 +60,7 @@ import {
   SyncListView,
   UpdateListRowState,
 } from './list-view';
+import { ApplyListSearch } from './list-filter';
 
 // Deployment-toast working state. This mirrors the runtime shape used below and
 // cached on `window.__ShowTrakDeploymentUiState`; note the ambient window decl
@@ -848,16 +849,24 @@ export function RenderFullClientAndMonitorList() {
   // to their new positions afterwards. Falls back to a plain render when the
   // helper is unavailable or reduced-motion is preferred.
   const ContentRoot = document.getElementById('APPLICATION_CONTENT');
+  // The list's search is put back on the fresh rows before anything measures
+  // them, so the reflow animation slides rows to where they actually end up.
+  const Fill = () => {
+    $('#APPLICATION_CONTENT').html(Filler);
+    try {
+      ApplyListSearch();
+    } catch (e) {
+      HandleNonFatalError('RenderFullClientAndMonitorList:ApplyListSearch', e);
+    }
+  };
   if (
     ContentRoot &&
     window.ShowTrakFlip &&
     typeof window.ShowTrakFlip.AnimateReflow === 'function'
   ) {
-    window.ShowTrakFlip.AnimateReflow(ContentRoot, () => {
-      $('#APPLICATION_CONTENT').html(Filler);
-    });
+    window.ShowTrakFlip.AnimateReflow(ContentRoot, Fill);
   } else {
-    $('#APPLICATION_CONTENT').html(Filler);
+    Fill();
   }
   // A row whose history was cached before this render already carries it; this
   // picks up any that were added or changed since.

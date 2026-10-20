@@ -41,6 +41,7 @@ import { EnsureAlertCatalogsLoaded, RenderAlertRuleManagerList } from './alert-r
 import { Notify, RenderClientInfoDetails, UpdateIdentifyStatusBanner } from './selection-init';
 import { UpdateDummyClientTile } from './dummy-clients';
 import { UpdateFreeKioskTile } from './freekiosk';
+import { RefreshListSearch } from './list-filter';
 import { RefreshTagPickerIfMounted } from './tag-picker';
 import { RenderScriptEditorVariableList } from './variable-manager';
 import { RefreshClientInfoTags, RefreshClientInfoVariables } from './client-info-edit';
@@ -625,6 +626,7 @@ export function InitOscFeeds() {
     }
     const { UUID } = Data;
     UpdateClientTile(Data);
+    RefreshListSearch();
     // If Client Info modal is open for this client, refresh network interfaces (and USB if present)
     try {
       const $modal = $('#SHOWTRAK_CLIENT_INFO');
@@ -671,6 +673,7 @@ export function InitOscFeeds() {
       RenderFullClientAndMonitorList();
     } else {
       UpdateMonitoringTargetTile(Target);
+      RefreshListSearch();
     }
     // Keep the open editor's per-check status list fresh, and a monitor's
     // Settings tab if that is what is open.
@@ -758,6 +761,7 @@ export function InitOscFeeds() {
       RenderFullClientAndMonitorList();
     } else {
       UpdateDummyClientTile(Dummy);
+      RefreshListSearch();
     }
     RefreshDummyInfoEditor(Dummy);
     if (IsMonitorHistoryContextFor('dummy', Dummy.UUID)) {
@@ -787,6 +791,7 @@ export function InitOscFeeds() {
       RenderFullClientAndMonitorList();
     } else {
       UpdateFreeKioskTile(Terminal);
+      RefreshListSearch();
     }
     // An open Settings tab follows real settings changes, not every poll.
     await RefreshFreeKioskInfoEditor(Terminal);

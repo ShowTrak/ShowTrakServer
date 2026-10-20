@@ -332,7 +332,9 @@ body.list-mode .LIST_GROUP_CHECK .bi {
 }
 
 body.list-mode
-  .group-column-item:has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK).SELECTED)
+  .group-column-item:has(
+    > .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .LIST_SEARCH_HIDDEN).SELECTED
+  )
   > .GROUP_TITLE_CLICKABLE
   .LIST_GROUP_CHECK {
   background: #fff;
@@ -341,7 +343,9 @@ body.list-mode
 }
 
 body.list-mode
-  .group-column-item:has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK).SELECTED)
+  .group-column-item:has(
+    > .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .LIST_SEARCH_HIDDEN).SELECTED
+  )
   > .GROUP_TITLE_CLICKABLE
   .LIST_GROUP_CHECK
   .bi-dash-lg {
@@ -349,8 +353,10 @@ body.list-mode
 }
 
 body.list-mode
-  .group-column-item:has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK)):not(
-    :has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK):not(.SELECTED))
+  .group-column-item:has(
+    > .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .LIST_SEARCH_HIDDEN)
+  ):not(
+    :has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .LIST_SEARCH_HIDDEN):not(.SELECTED))
   )
   > .GROUP_TITLE_CLICKABLE
   .LIST_GROUP_CHECK
@@ -359,8 +365,10 @@ body.list-mode
 }
 
 body.list-mode
-  .group-column-item:has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK)):not(
-    :has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK):not(.SELECTED))
+  .group-column-item:has(
+    > .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .LIST_SEARCH_HIDDEN)
+  ):not(
+    :has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .LIST_SEARCH_HIDDEN):not(.SELECTED))
   )
   > .GROUP_TITLE_CLICKABLE
   .LIST_GROUP_CHECK
@@ -649,4 +657,93 @@ body.list-mode .LIST_HISTORY .status-timeline-block {
   body.list-mode .LIST_COLUMN_LABEL[data-list-column='address'] {
     display: none !important;
   }
+}
+
+/* --- Search (Ctrl/Cmd+F) ------------------------------------------------- */
+/* Rows a search does not keep, and the groups it leaves with nothing showing
+   (list-filter.ts). Outranks the list's own display rules and Bootstrap's
+   d-flex on the group wrappers. */
+body.list-mode #APPLICATION_CONTENT .LIST_SEARCH_HIDDEN {
+  display: none !important;
+}
+
+/* Floats just under the sticky heading row, over the list's top right. */
+#LIST_SEARCH {
+  position: fixed;
+  top: calc(var(--list-sticky-top, 2rem) + 0.5rem + 30px + 0.5rem);
+  right: calc(var(--list-gutter, 0.75rem) + 12px);
+  z-index: var(--z-banner);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(340px, calc(100vw - 32px));
+  height: 36px;
+  padding: 0 6px 0 12px;
+  background: rgb(var(--surface-2-rgb) / 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  color: var(--text-strong);
+}
+
+/* Only ever shown in the list; the view switch also clears it. */
+body:not(.list-mode) #LIST_SEARCH {
+  display: none !important;
+}
+
+#LIST_SEARCH:focus-within {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+#LIST_SEARCH > .bi-search {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: var(--fs-sm);
+}
+
+#LIST_SEARCH_INPUT {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--fs-md);
+}
+
+#LIST_SEARCH_INPUT::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+#LIST_SEARCH_COUNT {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#LIST_SEARCH_COUNT.is-empty {
+  color: var(--condition-failing, #f0ad4e);
+}
+
+#LIST_SEARCH_CLEAR {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: var(--fs-sm);
+}
+
+#LIST_SEARCH_CLEAR:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }

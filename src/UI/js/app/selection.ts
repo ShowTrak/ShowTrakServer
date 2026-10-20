@@ -1,9 +1,11 @@
 // Client selection primitives (select / deselect / toggle / clear / count).
 // Extracted from selection-init.ts (REFACTOR_PLAN.md Phase 7). This is a
-// leaf module: it depends only on shared state + utils, so the ~6 modules that
+// leaf module: it depends only on shared state + utils (and the list search's
+// hidden-row set, itself a leaf), so the ~6 modules that
 // import these keep working via the selection-init barrel re-export.
 import { AlertActionsEnabled, GroupSelectableUUIDCache, Selected, setSelected } from './state';
 import { HandleNonFatalError } from './utils';
+import { IsHiddenByListSearch } from './list-filter';
 
 // The list view's check rows show as selected for as long as their target is:
 // a selected target acts on all of its checks, so the rows say so. The
@@ -89,6 +91,8 @@ export function ClearSelection() {
 export function SelectAll() {
   $('.SHOWTRAK_PC[data-uuid]').each(function () {
     if ($(this).hasClass('GROUP') || $(this).hasClass('MONITOR_CHECK')) return;
+    // A list search's hidden rows are out of reach of Select All.
+    if ($(this).hasClass('LIST_SEARCH_HIDDEN')) return;
     const UUID = $(this).attr('data-uuid');
     if (UUID) Select(UUID);
   });
@@ -116,7 +120,10 @@ export function ToggleSelection(UUID: string | undefined) {
 
 export function SelectByGroup(GroupID: string | number | undefined) {
   if (!GroupSelectableUUIDCache.has(`${GroupID}`)) return;
-  const UUIDs: string[] = GroupSelectableUUIDCache.get(`${GroupID}`);
+  // While the list is searched, the group is the rows of it that are showing.
+  const UUIDs: string[] = GroupSelectableUUIDCache.get(`${GroupID}`).filter(
+    (UUID: string) => !IsHiddenByListSearch(UUID)
+  );
 
   if (UUIDs.every((UUID) => IsSelected(UUID))) {
     UUIDs.forEach((UUID) => Deselect(UUID));

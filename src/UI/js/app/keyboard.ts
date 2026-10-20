@@ -2,6 +2,7 @@ import { AlertActionsEnabled, Capabilities, ConfirmDialogActive, ViewMode } from
 import { SetAlertActionsEnabled, SetViewMode } from './mode';
 import { NextViewMode } from './lib/list-view';
 import { SetListTargetsExpanded } from './list-view';
+import { ClearListSearch, OpenListSearch } from './list-filter';
 import { HandleNonFatalError } from './utils';
 import { ShowShortcutsModal } from './dnd';
 import { AlertsVisible, DismissAllAlerts, ToggleAlertsTray } from './alerts-tray';
@@ -98,6 +99,12 @@ export function InitKeyboard() {
         return;
       }
 
+      // List view: filter the rows by name, tag, address or group.
+      if (!e.shiftKey && key === 'f') {
+        if (OpenListSearch()) e.preventDefault();
+        return;
+      }
+
       // Cycle the view mode: Grid -> Compact -> List
       if (!e.shiftKey && key === 'e') {
         e.preventDefault();
@@ -149,6 +156,7 @@ export function InitKeyboard() {
 
     if (e.key === 'Escape') {
       e.preventDefault();
+      ClearListSearch();
       clearIdentifyingViaShortcut();
       return ClearSelection();
     }
