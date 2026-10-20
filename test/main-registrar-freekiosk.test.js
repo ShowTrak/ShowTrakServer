@@ -76,6 +76,39 @@ test('the metric catalogue ships the registry, its alarm schema and its sections
   assert.ok(metric.Operators.includes('below'));
 });
 
+test('the uptime threshold reaches the renderer in days, not the reading’s seconds', async () => {
+  const catalogue = await call('FreeKiosk:GetMetrics');
+  const uptime = catalogue.Metrics.find((m) => m.Key === 'device_uptime');
+  // Dropped from this payload, the editor fell back to Unit and labelled a
+  // threshold typed in days with "s".
+  assert.equal(uptime.ThresholdUnit, 'days');
+  assert.equal(uptime.ThresholdScale, 86400);
+});
+
+test('every field a registry entry declares is delivered, not only the ones listed', async () => {
+  const { FREEKIOSK_METRICS } = require('../dist/Modules/FreeKiosk/metrics');
+  const catalogue = await call('FreeKiosk:GetMetrics');
+  // Any registry field the projection forgets is silently undefined in the
+  // renderer, which then falls back to something plausible but wrong. These are
+  // the server's own: how a reading is extracted, and defaults the alarm schema
+  // (AlarmFields) already carries.
+  const NOT_FOR_THE_RENDERER = new Set([
+    'Path',
+    'Derived',
+    'Unavailable',
+    'DefaultValue',
+    'DefaultValue2',
+    'DefaultOn',
+  ]);
+  for (const metric of FREEKIOSK_METRICS) {
+    const shipped = catalogue.Metrics.find((m) => m.Key === metric.Key);
+    for (const [field, value] of Object.entries(metric)) {
+      if (NOT_FOR_THE_RENDERER.has(field) || value === undefined) continue;
+      assert.notEqual(shipped[field], undefined, `${metric.Key}.${field} is not delivered`);
+    }
+  }
+});
+
 test('the command catalogue never offers JavaScript execution', async () => {
   const commands = await call('FreeKiosk:GetCommands');
   assert.ok(commands.length > 0);

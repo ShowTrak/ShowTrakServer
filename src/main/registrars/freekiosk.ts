@@ -42,6 +42,8 @@ function register(): void {
         Options: Metric.Options ? Metric.Options.slice() : undefined,
         Operators: Metric.Operators.slice(),
         DefaultOperator: Metric.DefaultOperator,
+        ThresholdUnit: Metric.ThresholdUnit,
+        ThresholdScale: Metric.ThresholdScale,
         Format: Metric.Format,
         Advanced: Metric.Advanced,
         Note: Metric.Note,
