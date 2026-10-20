@@ -305,6 +305,24 @@ test('mark payloads carry only the conditions that were sent', () => {
     IPCValidation.CriticalUSBNamePayload({ ProductName: 'Dongle', CheckLocation: true }),
     { CheckLocation: true, ManufacturerName: null, ProductName: 'Dongle' }
   );
+  // A generic device with no manufacturer string: the renderer sends the key
+  // with an undefined value, which Electron IPC preserves.
+  assert.deepEqual(
+    IPCValidation.CriticalUSBNamePayload({ ManufacturerName: undefined, ProductName: 'Dongle' }),
+    { ManufacturerName: null, ProductName: 'Dongle' }
+  );
+  assert.deepEqual(
+    IPCValidation.CriticalUSBNamePayload({ ManufacturerName: null, ProductName: 'Dongle' }),
+    { ManufacturerName: null, ProductName: 'Dongle' }
+  );
+  assert.deepEqual(
+    IPCValidation.CriticalUSBNamePayload({ ManufacturerName: '  ', ProductName: 'Dongle' }),
+    { ManufacturerName: null, ProductName: 'Dongle' }
+  );
+  assert.throws(
+    () => IPCValidation.CriticalUSBNamePayload({ ManufacturerName: 7, ProductName: 'Dongle' }),
+    /ManufacturerName must be a string/
+  );
   assert.throws(
     () => IPCValidation.CriticalUSBDevicePayload({ SerialNumber: 'A', RequireNoError: 1 }),
     /RequireNoError must be true or false/

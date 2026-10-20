@@ -190,6 +190,15 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     return out;
   };
 
+  // A USB name the device may not report (generic devices often have no
+  // manufacturer string). Electron IPC keeps keys whose value is undefined, so
+  // absent, null and blank all mean "not given" rather than a bad value.
+  const USBNameOrNull = (value: unknown, fieldName: string) => {
+    if (value === undefined || value === null) return null;
+    if (typeof value === 'string' && !value.trim()) return null;
+    return normalizeNonEmptyString(value, fieldName, { minLength: 1, maxLength: 256 });
+  };
+
   Manager.CriticalUSBDevicePayload = (value: unknown) => {
     if (!isPlainObject(value)) {
       fail('Monitored USB payload must be an object');
@@ -197,18 +206,8 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     return {
       ...USBConditionOptions(value),
       SerialNumber: Manager.USBSerialNumber(value.SerialNumber),
-      ManufacturerName: Object.prototype.hasOwnProperty.call(value, 'ManufacturerName')
-        ? normalizeNonEmptyString(value.ManufacturerName, 'ManufacturerName', {
-            minLength: 1,
-            maxLength: 256,
-          })
-        : null,
-      ProductName: Object.prototype.hasOwnProperty.call(value, 'ProductName')
-        ? normalizeNonEmptyString(value.ProductName, 'ProductName', {
-            minLength: 1,
-            maxLength: 256,
-          })
-        : null,
+      ManufacturerName: USBNameOrNull(value.ManufacturerName, 'ManufacturerName'),
+      ProductName: USBNameOrNull(value.ProductName, 'ProductName'),
     };
   };
 
@@ -218,18 +217,8 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     }
     return {
       ...USBConditionOptions(value),
-      ManufacturerName: Object.prototype.hasOwnProperty.call(value, 'ManufacturerName')
-        ? normalizeNonEmptyString(value.ManufacturerName, 'ManufacturerName', {
-            minLength: 1,
-            maxLength: 256,
-          })
-        : null,
-      ProductName: Object.prototype.hasOwnProperty.call(value, 'ProductName')
-        ? normalizeNonEmptyString(value.ProductName, 'ProductName', {
-            minLength: 1,
-            maxLength: 256,
-          })
-        : null,
+      ManufacturerName: USBNameOrNull(value.ManufacturerName, 'ManufacturerName'),
+      ProductName: USBNameOrNull(value.ProductName, 'ProductName'),
     };
   };
 
