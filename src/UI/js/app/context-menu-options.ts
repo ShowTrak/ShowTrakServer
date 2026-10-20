@@ -18,6 +18,7 @@ import {
 } from './state';
 import { GetFreeKioskDisplayMode } from './freekiosk';
 import { GetSettingValue } from './settings';
+import { Capabilities } from './state/capabilities';
 import { HandleNonFatalError } from './utils';
 import { ExecuteScript, TriggerIntegratedEvent } from './modals';
 import {
@@ -557,8 +558,13 @@ export async function BuildContextMenuOptions(
         !String(UUID).startsWith('dummy:') &&
         !String(UUID).startsWith('kiosk:')
     );
-    const SYSTEM_ALLOW_WOL = await GetSettingValue('SYSTEM_ALLOW_WOL');
-    if (SYSTEM_ALLOW_WOL && WolTargets.length > 0) {
+    // The browser never receives SYSTEM_ALLOW_WOL (settings reach it through a
+    // public allowlist), so it uses the capability hint the server sends at
+    // connect, which already folds in the WEBUI_ALLOW_WOL permission.
+    const WolEnabled = Capabilities.isWeb
+      ? Capabilities.wolEnabled
+      : !!(await GetSettingValue('SYSTEM_ALLOW_WOL'));
+    if (WolEnabled && WolTargets.length > 0) {
       Options.push({
         Type: 'Action',
         Title: 'Wake on LAN',
