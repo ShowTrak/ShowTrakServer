@@ -112,14 +112,17 @@ function InputHtml(
 
 function ConditionCell(Row: FreeKioskConditionRow): string {
   if (!Row.Alarmable) return '';
+  const Prefix = Row.OperatorText
+    ? `<span class="fk-cond-op-text">${Safe(Row.OperatorText)}</span>`
+    : '';
   const Operator = Row.Operators.length
-    ? `<select data-field="Op" aria-label="${Safe(Row.Label)} alert when">
+    ? `${Prefix}<select data-field="Op" aria-label="${Safe(Row.Label)} expected">
         ${Row.Operators.map(
           (Option) =>
             `<option value="${Safe(Option.Value)}" ${Option.Value === Row.Operator ? 'selected' : ''}>${Safe(Option.Label)}</option>`
         ).join('')}
       </select>`
-    : `<span class="fk-cond-op-text">${Safe(Row.OperatorText)}</span>`;
+    : Prefix;
   const Numeric = Row.Input?.Kind === 'number';
   const Unit = Numeric && Row.Unit ? `<span class="fk-cond-unit">${Safe(Row.Unit)}</span>` : '';
   const Value = Row.Input

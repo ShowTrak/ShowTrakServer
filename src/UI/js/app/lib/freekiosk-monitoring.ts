@@ -25,18 +25,19 @@ const EDGE_OPERATORS = ['changes', 'decreases'];
 const RANGE_OPERATORS = ['outside', 'inside'];
 
 // Fallback wording, used only if the catalogue's operator field is missing.
-// Mirrors OPERATOR_LABELS in src/Modules/FreeKiosk/metrics.
+// Mirrors OPERATOR_LABELS in src/Modules/FreeKiosk/metrics: each stored (breach)
+// operator worded as the expectation it breaks, read after "Expected".
 const OPERATOR_LABELS: Record<string, string> = {
-  below: 'Below',
-  above: 'Above',
-  outside: 'Outside range',
-  inside: 'Inside range',
-  is: 'Is',
-  isNot: 'Is not',
-  contains: 'Contains',
-  notContains: 'Does not contain',
-  changes: 'Changes',
-  decreases: 'Goes backwards',
+  below: 'At least',
+  above: 'At most',
+  outside: 'Between',
+  inside: 'Not between',
+  is: 'Is not',
+  isNot: 'Is',
+  contains: 'Does not contain',
+  notContains: 'Contains',
+  changes: 'Stays the same',
+  decreases: 'Never goes backwards',
 };
 
 /** Settings key for a section's monitoring switch. Mirrors GroupFieldKey. */
@@ -131,7 +132,10 @@ export interface FreeKioskConditionRow {
   /** A picker is drawn only when there is more than one to choose from. */
   Operators: FreeKioskConditionOption[];
   Operator: string;
-  /** What stands in for the picker when there is nothing to choose. */
+  /**
+   * The words before the value. "Expected" ahead of a picker; the whole
+   * expectation ("Expected", "Expected at least") when there is nothing to pick.
+   */
   OperatorText: string;
   Input: FreeKioskConditionInput | null;
   Input2: FreeKioskConditionInput | null;
@@ -243,14 +247,16 @@ export function BuildConditionRow(
       ? NormaliseOptions(OpField?.Options) ||
         Metric.Operators.map((Op) => ({ Value: Op, Label: OPERATOR_LABELS[Op] || Op }))
       : [];
-  // A lone "is not" asks for the state the reading SHOULD be in (every boolean
-  // reads "Expected Yes"); any other lone operator is simply named.
-  const OperatorText =
-    Operators.length || !Alarmable
-      ? ''
-      : Operator === 'isNot'
-        ? 'Expected'
-        : OPERATOR_LABELS[Operator] || Operator;
+  // Every condition is read as an expectation, so every row opens with
+  // "Expected". A lone "is not" needs nothing more — its value IS the expected
+  // state ("Expected Yes"); any other lone operator is named after it
+  // ("Expected at least").
+  const LoneLabel = OPERATOR_LABELS[Operator] || Operator;
+  const OperatorText = !Alarmable
+    ? ''
+    : Operators.length || Operator === 'isNot'
+      ? 'Expected'
+      : `Expected ${LoneLabel.toLowerCase()}`;
   const Input = InputFor(Fields.get(Keys.V), Settings[Keys.V]);
   const Input2 = InputFor(Fields.get(Keys.V2), Settings[Keys.V2]);
   const Breaching =
@@ -267,9 +273,10 @@ export function BuildConditionRow(
     OperatorText,
     Input,
     Input2,
-    // Thresholds are entered in the raw unit (uptime in seconds, storage in
-    // MB), whatever the reading's own display format.
-    Unit: Metric.Unit || '',
+    // Thresholds are entered in their own unit where one is declared (uptime in
+    // days), otherwise the reading's raw unit (storage in MB), whatever the
+    // reading's display format.
+    Unit: Metric.ThresholdUnit || Metric.Unit || '',
     ShowInput: !!Input && !EDGE_OPERATORS.includes(Operator),
     ShowInput2: !!Input2 && RANGE_OPERATORS.includes(Operator),
     Breaching,

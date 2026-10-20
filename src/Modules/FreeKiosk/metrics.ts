@@ -249,19 +249,23 @@ export function IsMetricMonitored(Settings: unknown, MetricKey: string): boolean
 /**
  * The comparison an alarm arms.
  *
- * An operator always states the ALARM condition, never the healthy one: `below
- * 20` fires under 20, and `is No` fires when the reading is No. Every registry
- * default is therefore written as the state worth waking someone for. Getting
- * this backwards for equality while leaving it forwards for thresholds is the
- * obvious trap, so the editor labels the picker "Alert when".
+ * STORED AS THE BREACH, SHOWN AS THE EXPECTATION. The value saved in settings
+ * is the comparison that fires — `below 20` fires under 20, `is none` fires
+ * when the reading is none — and the engine in ./alarms evaluates exactly that.
+ * But nobody configures a terminal by describing its failure: they say what it
+ * should be doing. So every operator is LABELLED as its complement (see
+ * OPERATOR_LABELS) under an "Expected" prefix: `below` reads "Expected at least
+ * 20%", `isNot ac` reads "Expected is ac", and the alert fires when that stops
+ * being true.
  *
- * BOOLEANS ARE THE EXCEPTION, and deliberately so. A two-state metric needs no
- * operator, so no picker is drawn — which leaves the value input as the only
- * thing on screen and nothing to tell the reader that it means "alarm when".
- * Every boolean therefore arms `isNot`, whose value input genuinely IS the
- * expected state: "Screen On — expected Yes" alarms when the screen goes off.
- * That is the only reading of a lone Yes/No box anyone arrives at, and it is
- * now the one the engine performs.
+ * Keeping the stored vocabulary unchanged is deliberate: every show file
+ * written before the wording flipped keeps alerting on exactly what it alerted
+ * on before, and simply reads correctly now. Booleans always worked this way —
+ * they arm `isNot`, so "Screen On — expected Yes" alarms when the screen goes
+ * off — and this generalises that to every metric.
+ *
+ * Each metric lists its operators in the order an expectation is most often
+ * stated, so the picker opens on the natural one.
  */
 export type FreeKioskOperator =
   | 'below'
@@ -288,17 +292,20 @@ export const RANGE_OPERATORS: readonly FreeKioskOperator[] = Object.freeze([
   'inside',
 ] as const);
 
+// Each operator worded as the EXPECTATION it is the breach of, for an
+// "Expected" prefix: `below` is "Expected at least", `is` is "Expected is not".
+// Read the note on FreeKioskOperator before "fixing" these to match the keys.
 export const OPERATOR_LABELS: Readonly<Record<FreeKioskOperator, string>> = Object.freeze({
-  below: 'Below',
-  above: 'Above',
-  outside: 'Outside range',
-  inside: 'Inside range',
-  is: 'Is',
-  isNot: 'Is not',
-  contains: 'Contains',
-  notContains: 'Does not contain',
-  changes: 'Changes',
-  decreases: 'Goes backwards',
+  below: 'At least',
+  above: 'At most',
+  outside: 'Between',
+  inside: 'Not between',
+  is: 'Is not',
+  isNot: 'Is',
+  contains: 'Does not contain',
+  notContains: 'Contains',
+  changes: 'Stays the same',
+  decreases: 'Never goes backwards',
 });
 
 export interface FreeKioskMetric {
@@ -323,6 +330,14 @@ export interface FreeKioskMetric {
   DefaultOperator?: FreeKioskOperator;
   DefaultValue?: number | boolean | string;
   DefaultValue2?: number;
+  /**
+   * The unit a threshold is ENTERED in, when that is not the reading's own.
+   * Uptime is reported in seconds, and nobody thinks about a reboot schedule in
+   * seconds: it is set in days. ThresholdScale converts it back.
+   */
+  ThresholdUnit?: string;
+  /** Reading units per threshold unit (86400 seconds per day). Defaults to 1. */
+  ThresholdScale?: number;
   /** Armed out of the box. Only content_displaying uses this. */
   DefaultOn?: boolean;
   /** Sentinel the device sends to mean "no reading"; mapped to null. */
@@ -346,7 +361,10 @@ export interface FreeKioskMetric {
 
 // ---- The registry ---------------------------------------------------------
 
-const NUMERIC_OPS: readonly FreeKioskOperator[] = ['below', 'above', 'outside', 'inside'];
+// "Not between" is deliberately offered nowhere: no reading here has a band it
+// is healthy on both sides of. The engine still evaluates `inside` so a show
+// file that armed it is judged, not crashed — ParseSettings resets it.
+const NUMERIC_OPS: readonly FreeKioskOperator[] = ['below', 'above', 'outside'];
 
 export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
   // ---- Content ------------------------------------------------------------
@@ -373,8 +391,8 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Chart: 'blocks',
     Format: 'url',
     RequiresMode: ['webview'],
-    Operators: ['is', 'isNot', 'contains', 'notContains', 'changes'],
-    DefaultOperator: 'contains',
+    Operators: ['notContains', 'isNot', 'contains', 'is', 'changes'],
+    DefaultOperator: 'notContains',
     Note: 'Use "Contains" to pin a host or path without having to match query strings exactly. FreeKiosk keeps the last page it loaded here forever, so this is only shown while the terminal is set to WebView mode.',
   },
   {
@@ -383,12 +401,12 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Path: ['webview', 'loading'],
     Type: 'boolean',
     Section: 'Content',
-    Chart: 'blocks',
+    Chart: 'none',
     Advanced: true,
     RequiresMode: ['webview'],
-    Operators: ['isNot'],
-    DefaultOperator: 'isNot',
-    DefaultValue: false,
+    // Not alarmable: every navigation and rotation passes through loading, so a
+    // one-poll check would fire on healthy page changes.
+    Operators: [],
   },
   {
     Key: 'webview_canGoBack',
@@ -463,8 +481,8 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Unit: 'lux',
     Decimals: 1,
     Advanced: true,
-    Operators: ['below', 'above'],
-    DefaultOperator: 'below',
+    // Not alarmable: the same sensor as Ambient Light, which is where to set it.
+    Operators: [],
   },
   {
     Key: 'autoBrightness_min',
@@ -477,8 +495,8 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Min: 0,
     Max: 100,
     Advanced: true,
-    Operators: ['is'],
-    DefaultOperator: 'is',
+    Operators: ['isNot'],
+    DefaultOperator: 'isNot',
   },
   {
     Key: 'autoBrightness_max',
@@ -491,8 +509,8 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Min: 0,
     Max: 100,
     Advanced: true,
-    Operators: ['is'],
-    DefaultOperator: 'is',
+    Operators: ['isNot'],
+    DefaultOperator: 'isNot',
   },
 
   // ---- Battery ------------------------------------------------------------
@@ -506,7 +524,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Unit: '%',
     Min: 0,
     Max: 100,
-    Operators: NUMERIC_OPS,
+    Operators: ['below'],
     DefaultOperator: 'below',
     DefaultValue: 20,
   },
@@ -520,7 +538,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Operators: ['isNot'],
     DefaultOperator: 'isNot',
     DefaultValue: true,
-    Note: 'A permanently-installed terminal should normally always be charging.',
+    Note: 'Many tablets stop reporting charging once the battery is full, so this can alert on a terminal that is plugged in. Power Source is the reliable "is it plugged in" check.',
   },
   {
     Key: 'battery_plugged',
@@ -530,9 +548,10 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Section: 'Battery',
     Chart: 'blocks',
     Options: ['usb', 'ac', 'wireless', 'none'],
-    Operators: ['is', 'isNot', 'changes'],
-    DefaultOperator: 'is',
-    DefaultValue: 'none',
+    Operators: ['isNot', 'is'],
+    DefaultOperator: 'isNot',
+    DefaultValue: 'ac',
+    Note: 'Android reports a wall charger as "ac" and a computer\'s USB port as "usb". Choose "Is not none" to accept any power source.',
   },
   {
     Key: 'battery_temperature',
@@ -543,7 +562,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Chart: 'line',
     Unit: '°C',
     Decimals: 1,
-    Operators: ['above', 'below', 'outside'],
+    Operators: ['above', 'outside'],
     DefaultOperator: 'above',
     DefaultValue: 45,
   },
@@ -568,7 +587,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Section: 'Battery',
     Chart: 'blocks',
     Options: ['good', 'overheat', 'dead', 'over_voltage', 'failure', 'cold', 'unknown'],
-    Operators: ['is', 'isNot'],
+    Operators: ['isNot'],
     DefaultOperator: 'isNot',
     DefaultValue: 'good',
   },
@@ -602,8 +621,8 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Type: 'string',
     Section: 'Network',
     Chart: 'blocks',
-    Operators: ['is', 'isNot', 'changes'],
-    DefaultOperator: 'is',
+    Operators: ['isNot'],
+    DefaultOperator: 'isNot',
     Note: 'The device reports placeholder text such as "WiFi (no permission)" when it cannot read the real SSID.',
   },
   {
@@ -617,7 +636,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Min: -100,
     Max: -30,
     Format: 'dbm',
-    Operators: ['below', 'above'],
+    Operators: ['below'],
     DefaultOperator: 'below',
     DefaultValue: -75,
     Note: 'Closer to zero is stronger. -75 dBm is a reasonable floor for reliable use.',
@@ -632,7 +651,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Unit: '%',
     Min: 0,
     Max: 100,
-    Operators: ['below', 'above'],
+    Operators: ['below'],
     DefaultOperator: 'below',
     DefaultValue: 30,
   },
@@ -660,7 +679,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Section: 'Network',
     Chart: 'line',
     Advanced: true,
-    Operators: ['isNot', 'changes'],
+    Operators: ['changes', 'isNot'],
     DefaultOperator: 'changes',
     Note: 'Worked out from the frequency the device reports. "Changes" catches an access point moving the terminal to another channel or band, which is usually what is behind a Wi-Fi problem that fixes itself.',
   },
@@ -686,7 +705,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Type: 'string',
     Section: 'Network',
     Chart: 'none',
-    Operators: ['is', 'changes'],
+    Operators: ['changes', 'isNot'],
     DefaultOperator: 'changes',
   },
 
@@ -723,9 +742,13 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Chart: 'none',
     Unit: 's',
     Format: 'duration',
-    Operators: ['below', 'above', 'decreases'],
-    DefaultOperator: 'decreases',
-    Note: 'Uptime going backwards means the device restarted. That is the only reliable reboot signal the API offers.',
+    Operators: ['above'],
+    DefaultOperator: 'above',
+    DefaultValue: 7,
+    ThresholdUnit: 'days',
+    ThresholdScale: 86400,
+    Min: 0,
+    Note: 'Alerts when the terminal has gone longer than this without a restart, for kiosks that are meant to be rebooted on a schedule.',
   },
   {
     Key: 'device_version',
@@ -734,8 +757,8 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Type: 'string',
     Section: 'Device',
     Chart: 'none',
-    Operators: ['is', 'isNot', 'changes'],
-    DefaultOperator: 'is',
+    Operators: ['isNot', 'changes'],
+    DefaultOperator: 'isNot',
   },
   {
     Key: 'device_ip',
@@ -744,7 +767,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Type: 'string',
     Section: 'Device',
     Chart: 'none',
-    Operators: ['is', 'changes'],
+    Operators: ['changes', 'isNot'],
     DefaultOperator: 'changes',
   },
   {
@@ -782,8 +805,9 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Section: 'Device',
     Chart: 'none',
     Advanced: true,
-    Operators: ['below', 'is'],
-    DefaultOperator: 'below',
+    // Not alarmable: it only moves with an OS update, which FreeKiosk Version
+    // and the readings already show.
+    Operators: [],
   },
   {
     Key: 'device_hostname',
@@ -840,7 +864,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Operators: NUMERIC_OPS,
     DefaultOperator: 'below',
     DefaultValue: 1,
-    Note: 'Alarm below 1% to catch a terminal that has been muted.',
+    Note: 'Expect at least 1% to catch a terminal that has been muted.',
   },
 
   // ---- Rotation -----------------------------------------------------------
@@ -863,7 +887,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Type: 'number',
     Section: 'Rotation',
     Chart: 'none',
-    Operators: ['is', 'below'],
+    Operators: ['below', 'isNot'],
     DefaultOperator: 'below',
   },
   {
@@ -874,8 +898,8 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Section: 'Rotation',
     Chart: 'none',
     Advanced: true,
-    Operators: ['is'],
-    DefaultOperator: 'is',
+    // Not alarmable: it advances on every rotation by design.
+    Operators: [],
   },
   {
     Key: 'rotation_interval',
@@ -886,8 +910,8 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Chart: 'none',
     Unit: 's',
     Advanced: true,
-    Operators: ['is', 'below', 'above'],
-    DefaultOperator: 'is',
+    Operators: ['isNot'],
+    DefaultOperator: 'isNot',
   },
   {
     Key: 'rotation_urls',
@@ -912,7 +936,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Unit: 'lux',
     Decimals: 1,
     Unavailable: -1,
-    Operators: NUMERIC_OPS,
+    Operators: ['below', 'above'],
     DefaultOperator: 'below',
     Note: 'The device reports -1 when it has no light sensor; that is recorded as no reading rather than as zero.',
   },
@@ -927,8 +951,8 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Decimals: 1,
     Unavailable: -1,
     Advanced: true,
-    Operators: ['below', 'above'],
-    DefaultOperator: 'below',
+    // Not alarmable: it reports someone standing at the kiosk, which is not a fault.
+    Operators: [],
   },
 
   // ---- Storage ------------------------------------------------------------
@@ -942,7 +966,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Unit: '%',
     Min: 0,
     Max: 100,
-    Operators: ['above', 'below'],
+    Operators: ['above'],
     DefaultOperator: 'above',
     DefaultValue: 90,
   },
@@ -968,8 +992,8 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Unit: 'MB',
     Format: 'megabytes',
     Advanced: true,
-    Operators: ['above'],
-    DefaultOperator: 'above',
+    // Not alarmable: Storage Used % and Storage Available already cover it.
+    Operators: [],
   },
   {
     Key: 'storage_totalMB',
@@ -994,7 +1018,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Unit: '%',
     Min: 0,
     Max: 100,
-    Operators: ['above', 'below'],
+    Operators: ['above'],
     DefaultOperator: 'above',
     DefaultValue: 90,
   },
@@ -1027,12 +1051,12 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Path: ['memory', 'usedMB'],
     Type: 'number',
     Section: 'Memory',
-    Chart: 'line',
+    Chart: 'none',
     Unit: 'MB',
     Format: 'megabytes',
     Advanced: true,
-    Operators: ['above'],
-    DefaultOperator: 'above',
+    // Not alarmable: Memory Used % and Memory Available already cover it.
+    Operators: [],
   },
   {
     Key: 'memory_totalMB',
@@ -1129,6 +1153,23 @@ function ValueFieldOptions(
   return undefined;
 }
 
+/** The unit a threshold is typed in: its own, else the reading's. */
+export function ThresholdUnitOf(Metric: FreeKioskMetric): string | undefined {
+  return Metric.ThresholdUnit ?? Metric.Unit;
+}
+
+/** A threshold as typed, converted into the reading's own units. */
+export function ScaleThreshold(Metric: FreeKioskMetric, Value: number): number {
+  return Value * (Metric.ThresholdScale ?? 1);
+}
+
+/** A threshold worded in the unit it was typed in: "7 days", "20%". */
+export function FormatThresholdValue(Metric: FreeKioskMetric, Value: number): string {
+  if (!Metric.ThresholdUnit) return FormatMetricValue(Metric, Value);
+  const Unit = Value === 1 ? Metric.ThresholdUnit.replace(/s$/, '') : Metric.ThresholdUnit;
+  return `${RoundTo(Value, 2)} ${Unit}`;
+}
+
 function ValueFieldLabel(Metric: FreeKioskMetric): string {
   // A metric whose only value-taking comparison is "is not" is asking for the
   // state it SHOULD be in, whatever its type — every boolean, and the Wi-Fi
@@ -1137,11 +1178,12 @@ function ValueFieldLabel(Metric: FreeKioskMetric): string {
   const ValueOps = ValueOperators(Metric);
   if (ValueOps.length && ValueOps.every((Op) => Op === 'isNot')) return 'Expected value';
   if (Metric.Type === 'number') {
-    return Metric.Unit ? `Threshold (${Metric.Unit})` : 'Threshold';
+    const Unit = ThresholdUnitOf(Metric);
+    return Unit ? `Threshold (${Unit})` : 'Threshold';
   }
-  // Everything else has an "Alert when" picker directly above it, which supplies
-  // the verb. Calling this one "Expected value" would contradict it whenever the
-  // chosen operator is Is, Contains or Does not contain.
+  // Everything else has an "Expected" picker directly before it, which already
+  // supplies the expectation; repeating it here would read "Expected is
+  // expected value".
   return 'Value';
 }
 
@@ -1238,7 +1280,7 @@ export function BuildFreeKioskAlarmFields(
     if (Metric.Operators.length > 1) {
       Fields.push({
         Key: Keys.Op,
-        Label: 'Alert when',
+        Label: 'Expected',
         Type: 'select',
         Default: Metric.DefaultOperator || Metric.Operators[0],
         Options: Metric.Operators.map((Op) => ({ value: Op, label: OPERATOR_LABELS[Op] })),
@@ -1282,7 +1324,7 @@ export function BuildFreeKioskAlarmFields(
     if (RangeOps.length) {
       Fields.push({
         Key: Keys.V2,
-        Label: Metric.Unit ? `Upper bound (${Metric.Unit})` : 'Upper bound',
+        Label: ThresholdUnitOf(Metric) ? `Upper bound (${ThresholdUnitOf(Metric)})` : 'Upper bound',
         Type: 'number',
         Default: Metric.DefaultValue2 ?? 0,
         Min: Metric.Min,

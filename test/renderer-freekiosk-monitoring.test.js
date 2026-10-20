@@ -102,7 +102,17 @@ test('a monitored section lists every reading, ticked where an alarm is armed', 
   assert.equal(Level.Input.Kind, 'number');
   assert.equal(Level.Input.Value, '15');
   assert.equal(Level.Unit, '%');
-  assert.ok(Level.Operators.length > 1, 'a picker for a numeric reading');
+  // Battery level only ever has one sensible expectation.
+  assert.equal(Level.Operators.length, 0);
+  assert.equal(Level.OperatorText, 'Expected at least');
+  const Plugged = Card.Rows.find((Row) => Row.Key === 'battery_plugged');
+  assert.equal(Plugged.OperatorText, 'Expected', 'a picker is still prefixed');
+  assert.deepEqual(
+    Plugged.Operators.map((Option) => Option.Label),
+    ['Is', 'Is not']
+  );
+  assert.equal(Plugged.Operator, 'isNot');
+  assert.equal(Plugged.Input.Value, 'ac');
 
   // Shown but not alertable: no tick.
   const Technology = Card.Rows.find((Row) => Row.Key === 'battery_technology');
@@ -129,20 +139,30 @@ test('a lone "is not" reads as the expected state; edge operators hide the value
     ['true', 'false']
   );
 
+  // Uptime is typed in days, whatever the reading is reported in.
   const Uptime = Card.Rows.find((Row) => Row.Key === 'device_uptime');
-  assert.equal(Uptime.Operator, 'decreases');
-  assert.equal(Uptime.ShowInput, false);
+  assert.equal(Uptime.Operator, 'above');
+  assert.equal(Uptime.OperatorText, 'Expected at most');
+  assert.equal(Uptime.Unit, 'days');
+  assert.equal(Uptime.Input.Value, '7');
+
+  const Version = Lib.BuildFreeKioskMonitorCard(
+    Catalogue,
+    terminal({ Settings: { G_Device_On: true, A_device_version_Op: 'changes' } }),
+    'Device'
+  ).Rows.find((Row) => Row.Key === 'device_version');
+  assert.equal(Version.ShowInput, false, 'an edge operator hides the value');
 });
 
 test('range operators reveal the upper bound', () => {
   const Card = Lib.BuildFreeKioskMonitorCard(
     Catalogue,
-    terminal({ Settings: { A_battery_level_Op: 'outside', A_battery_level_V2: 90 } }),
-    'Battery'
+    terminal({ Settings: { A_screen_brightness_Op: 'outside', A_screen_brightness_V2: 90 } }),
+    'Screen'
   );
-  const Level = Card.Rows.find((Row) => Row.Key === 'battery_level');
-  assert.equal(Level.ShowInput2, true);
-  assert.equal(Level.Input2.Value, '90');
+  const Brightness = Card.Rows.find((Row) => Row.Key === 'screen_brightness');
+  assert.equal(Brightness.ShowInput2, true);
+  assert.equal(Brightness.Input2.Value, '90');
 });
 
 test('a breaching reading marks its row and turns the toggle to Alarm, but only while online', () => {
@@ -208,8 +228,9 @@ test('a blank or out-of-range threshold falls back to the default or the bound',
   assert.equal(Blank.A_battery_level_V, Number(Field.Default));
   const High = Lib.BuildRowSettings(Catalogue, Level, { On: true, Op: 'below', V: '250' });
   assert.equal(High.A_battery_level_V, 100);
-  const Junk = Lib.BuildRowSettings(Catalogue, Level, { On: true, Op: 'nonsense', V: '5' });
-  assert.equal(Junk.A_battery_level_Op, Level.DefaultOperator);
+  const Brightness = metric('screen_brightness');
+  const Junk = Lib.BuildRowSettings(Catalogue, Brightness, { On: true, Op: 'nonsense', V: '5' });
+  assert.equal(Junk.A_screen_brightness_Op, Brightness.DefaultOperator);
 });
 
 test('what a row saves is what the server alarms on', () => {

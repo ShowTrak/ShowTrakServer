@@ -806,6 +806,25 @@ Schema.Migrations = [
   // The uptime limit is set in days. Before release it was hours (MaxHours); a
   // development database that created the table then keeps that column unused.
   { Version: 58, SQL: 'ALTER TABLE `CriticalSystemChecks` ADD COLUMN MaxDays INTEGER' },
+  // A FreeKiosk terminal's uptime check is now only "too long without a
+  // restart", set in days rather than seconds. An "above" threshold is
+  // converted; any other comparison ("goes backwards", "below", or none stored)
+  // has no equivalent, so it is switched off at the new 7-day default rather
+  // than left to be judged as "above 0 days" and alert for ever. The operator
+  // key goes either way: a single-comparison metric stores none.
+  {
+    Version: 59,
+    SQL: "UPDATE `FreeKioskTerminals` SET Settings = json_remove( \
+            CASE WHEN json_extract(Settings, '$.A_device_uptime_Op') = 'above' \
+              THEN json_set(Settings, '$.A_device_uptime_V', \
+                round(coalesce(json_extract(Settings, '$.A_device_uptime_V'), 0) / 86400.0, 2)) \
+              ELSE json_set(Settings, '$.A_device_uptime_On', json('false'), '$.A_device_uptime_V', 7) \
+            END, '$.A_device_uptime_Op') \
+          WHERE json_valid(Settings) AND ( \
+            json_type(Settings, '$.A_device_uptime_On') IS NOT NULL \
+            OR json_type(Settings, '$.A_device_uptime_Op') IS NOT NULL \
+            OR json_type(Settings, '$.A_device_uptime_V') IS NOT NULL)",
+  },
 ];
 
 export = Schema;

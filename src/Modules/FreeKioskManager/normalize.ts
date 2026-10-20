@@ -1,6 +1,11 @@
 // Pure normalization helpers and bounds shared across the FreeKioskManager
 // modules. No I/O, so they are unit-testable on their own.
-import { BuildFreeKioskAlarmFields } from '../FreeKiosk/metrics';
+import {
+  AlarmFieldKeys,
+  BuildFreeKioskAlarmFields,
+  FREEKIOSK_METRICS,
+  type FreeKioskOperator,
+} from '../FreeKiosk/metrics';
 
 const MIN_INTERVAL_MS = 5000;
 const MAX_INTERVAL_MS = 5 * 60 * 1000;
@@ -86,9 +91,41 @@ function RandomSuffix(): string {
 // Only the keys the generated alarm schema declares are stored. A show file that
 // predates a metric being withdrawn would otherwise keep feeding settings that
 // nothing evaluates back into the editor.
-const ALARM_FIELD_KEYS: ReadonlySet<string> = new Set(
-  BuildFreeKioskAlarmFields().map((Field) => Field.Key)
+const ALARM_FIELDS = BuildFreeKioskAlarmFields();
+const ALARM_FIELD_KEYS: ReadonlySet<string> = new Set(ALARM_FIELDS.map((Field) => Field.Key));
+const ALARM_FIELD_DEFAULTS: ReadonlyMap<string, unknown> = new Map(
+  ALARM_FIELDS.map((Field) => [Field.Key, Field.Default])
 );
+
+/**
+ * Disarm any condition stored with a comparison its metric no longer offers.
+ *
+ * Read from the RAW record, before unknown keys are dropped: a metric that went
+ * down to one comparison emits no picker field, so its stale `_Op` key is about
+ * to be discarded — and without this its old threshold would then be judged by
+ * whatever comparison is left. A health check armed as "is overheat" would
+ * become "expected overheat" and alert on every healthy battery. The condition
+ * is switched off and its values reset to the registry defaults, so the
+ * operator sees an unticked row with sensible values and re-arms it knowingly.
+ */
+function ResetWithdrawnComparisons(
+  Source: Record<string, unknown>,
+  Settings: Record<string, unknown>
+): void {
+  for (const Metric of FREEKIOSK_METRICS) {
+    if (!Metric.Operators.length) continue;
+    const Keys = AlarmFieldKeys(Metric.Key);
+    const Stored = Source[Keys.Op];
+    if (typeof Stored !== 'string') continue;
+    if ((Metric.Operators as readonly FreeKioskOperator[]).includes(Stored as FreeKioskOperator)) {
+      continue;
+    }
+    for (const Key of [Keys.On, Keys.Op, Keys.V, Keys.V2]) {
+      if (ALARM_FIELD_DEFAULTS.has(Key)) Settings[Key] = ALARM_FIELD_DEFAULTS.get(Key);
+    }
+    Settings[Keys.On] = false;
+  }
+}
 
 /**
  * Read the stored Settings JSON, dropping anything the alarm schema does not
@@ -113,6 +150,7 @@ function ParseSettings(Value: unknown): Record<string, unknown> {
     if (!ALARM_FIELD_KEYS.has(Key)) continue;
     Settings[Key] = Entry;
   }
+  ResetWithdrawnComparisons(Source as Record<string, unknown>, Settings);
   return Settings;
 }
 

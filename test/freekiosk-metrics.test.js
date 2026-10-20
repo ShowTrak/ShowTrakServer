@@ -176,7 +176,7 @@ test('readings with no meaningful shape over time are values, not charts', () =>
   }
   // Storage still alarms — losing the chart must not lose the threshold.
   assert.ok(FREEKIOSK_METRICS_BY_KEY.get('storage_usedPercent').Operators.includes('above'));
-  assert.ok(FREEKIOSK_METRICS_BY_KEY.get('device_uptime').Operators.includes('decreases'));
+  assert.ok(FREEKIOSK_METRICS_BY_KEY.get('device_uptime').Operators.includes('above'));
   // Things that genuinely do move are still charted.
   for (const key of [
     'battery_level',
@@ -307,7 +307,7 @@ test('view-only metrics contribute no alarm fields at all', () => {
 
 test('operator picker and value inputs are gated behind the enable toggle', () => {
   const fields = BuildFreeKioskAlarmFields();
-  const keys = AlarmFieldKeys('battery_level');
+  const keys = AlarmFieldKeys('screen_brightness');
 
   const gates = (field) =>
     Array.isArray(field.VisibleWhen) ? field.VisibleWhen : [field.VisibleWhen];
@@ -376,13 +376,13 @@ test('a section switch is emitted per group, ahead of the checks it governs', ()
 });
 
 test('the upper bound only shows for range operators', () => {
-  const keys = AlarmFieldKeys('battery_level');
+  const keys = AlarmFieldKeys('screen_brightness');
   const fields = BuildFreeKioskAlarmFields();
   const upper = fields.find((f) => f.Key === keys.V2);
-  assert.ok(upper, 'battery_level offers outside/inside so it needs an upper bound');
+  assert.ok(upper, 'screen_brightness offers "between" so it needs an upper bound');
   assert.ok(Array.isArray(upper.VisibleWhen), 'a two-condition gate must be an array');
   const opGate = upper.VisibleWhen.find((c) => c.Key === keys.Op);
-  assert.deepEqual(opGate.In.slice().sort(), ['inside', 'outside']);
+  assert.deepEqual(opGate.In.slice(), ['outside']);
 
   // A metric with no range operator must not emit one.
   const screenKeys = AlarmFieldKeys('screen_on');
@@ -394,11 +394,11 @@ test('the upper bound only shows for range operators', () => {
 
 test('the threshold input is hidden for value-less edge operators', () => {
   const fields = BuildFreeKioskAlarmFields();
-  const keys = AlarmFieldKeys('device_uptime');
+  const keys = AlarmFieldKeys('device_version');
   const value = fields.find((f) => f.Key === keys.V);
   const conditions = Array.isArray(value.VisibleWhen) ? value.VisibleWhen : [value.VisibleWhen];
   const opGate = conditions.find((c) => c.Key === keys.Op);
-  assert.ok(opGate, 'uptime offers "goes backwards", so the value must be operator-gated');
+  assert.ok(opGate, 'the version offers "stays the same", so the value must be operator-gated');
   for (const edge of EDGE_OPERATORS) {
     assert.ok(!opGate.In.includes(edge), `${edge} takes no value but was left visible`);
   }
@@ -548,4 +548,66 @@ test('long URLs are truncated so they fit a tile', () => {
   const shown = FormatMetricValue(metric, long);
   assert.ok(shown.length <= 60);
   assert.ok(shown.endsWith('…'));
+});
+
+// ---- Conditions are stated as expectations --------------------------------
+
+test('every condition is worded as the expectation its stored breach breaks', () => {
+  const { OPERATOR_LABELS } = require('../dist/Modules/FreeKiosk/metrics');
+  // The stored key is the breach; the label is its complement.
+  assert.deepEqual(
+    { ...OPERATOR_LABELS },
+    {
+      below: 'At least',
+      above: 'At most',
+      outside: 'Between',
+      inside: 'Not between',
+      is: 'Is not',
+      isNot: 'Is',
+      contains: 'Does not contain',
+      notContains: 'Contains',
+      changes: 'Stays the same',
+      decreases: 'Never goes backwards',
+    }
+  );
+  const fields = BuildFreeKioskAlarmFields();
+  for (const field of fields.filter((f) => /_Op$/.test(f.Key))) {
+    assert.equal(field.Label, 'Expected', field.Key);
+  }
+});
+
+test('a picker opens on the expectation most often wanted', () => {
+  for (const metric of FREEKIOSK_METRICS) {
+    if (metric.Operators.length < 2) continue;
+    assert.equal(metric.Operators[0], metric.DefaultOperator, metric.Key);
+  }
+});
+
+test('no reading offers a comparison nobody would want', () => {
+  for (const metric of FREEKIOSK_METRICS) {
+    // Nothing here is healthy on both sides of a band.
+    assert.ok(!metric.Operators.includes('inside'), `${metric.Key} offers "not between"`);
+    // Nobody expects a value to be "not X" as its main condition.
+    assert.notEqual(metric.DefaultOperator, 'is', `${metric.Key} opens on "is not"`);
+  }
+  for (const key of [
+    'webview_loading',
+    'rotation_currentIndex',
+    'sensors_proximity',
+    'device_apiLevel',
+  ]) {
+    assert.deepEqual(FREEKIOSK_METRICS_BY_KEY.get(key).Operators, [], key);
+  }
+  // Percentages that only fail in one direction offer only that direction.
+  assert.deepEqual(FREEKIOSK_METRICS_BY_KEY.get('battery_level').Operators, ['below']);
+  assert.deepEqual(FREEKIOSK_METRICS_BY_KEY.get('storage_usedPercent').Operators, ['above']);
+  assert.deepEqual(FREEKIOSK_METRICS_BY_KEY.get('memory_usedPercent').Operators, ['above']);
+});
+
+test('uptime is typed in days', () => {
+  const field = BuildFreeKioskAlarmFields().find(
+    (f) => f.Key === AlarmFieldKeys('device_uptime').V
+  );
+  assert.equal(field.Label, 'Threshold (days)');
+  assert.equal(field.Default, 7);
 });

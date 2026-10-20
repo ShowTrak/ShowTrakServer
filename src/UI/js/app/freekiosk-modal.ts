@@ -152,9 +152,9 @@ function ChartThreshold(Alarm: ArmedAlarm | null): MetricChartThreshold | null {
  * should be, the value alone says everything — repeating the threshold on all
  * sixty-one rows would bury the two that matter.
  *
- * Note the inversion: an armed operator states the ALARM condition, never the
- * healthy one, so the expected value is its complement. "Below 20" armed means
- * "expected 20% or more".
+ * The stored operator is the BREACH comparison, so the expectation is its
+ * complement — the same complement the condition picker shows. A stored
+ * "below 20" is "expected at least 20%".
  */
 export function DescribeExpected(Metric: FreeKioskMetricView, Alarm: ArmedAlarm | null): string {
   if (!Alarm) return '';
@@ -164,21 +164,31 @@ export function DescribeExpected(Metric: FreeKioskMetricView, Alarm: ArmedAlarm 
     typeof Value === 'string' || typeof Value === 'number' || typeof Value === 'boolean'
       ? Value
       : null;
-  const Want = FormatMetricValue(Metric, Scalar(Alarm.value));
-  const Want2 = FormatMetricValue(Metric, Scalar(Alarm.value2));
+  // A threshold typed in its own unit (uptime in days) is worded in that unit,
+  // not run through the reading's format — "7" would otherwise read as "7s".
+  const Threshold = (Value: unknown): string => {
+    const Numeric = typeof Value === 'number' ? Value : Number(Scalar(Value) ?? NaN);
+    if (!Metric.ThresholdUnit || !Number.isFinite(Numeric)) {
+      return FormatMetricValue(Metric, Scalar(Value));
+    }
+    const Unit = Numeric === 1 ? Metric.ThresholdUnit.replace(/s$/, '') : Metric.ThresholdUnit;
+    return `${Math.round(Numeric * 100) / 100} ${Unit}`;
+  };
+  const Want = Threshold(Alarm.value);
+  const Want2 = Threshold(Alarm.value2);
   switch (Alarm.operator) {
     case 'below':
-      return `expected ${Want} or more`;
+      return `expected at least ${Want}`;
     case 'above':
-      return `expected ${Want} or less`;
+      return `expected at most ${Want}`;
     case 'outside':
       return `expected ${Want} to ${Want2}`;
     case 'inside':
       return `expected outside ${Want} to ${Want2}`;
     case 'is':
       // Booleans never reach here — they arm `isNot`, so their value is already
-      // the expected state. This is the enum/string case, where the operator
-      // picker really did say "alert when it IS this".
+      // the expected state. This is the enum/string case, picked as "Expected
+      // is not …".
       return `expected anything but ${Want}`;
     case 'isNot':
       return `expected ${Want}`;
@@ -187,7 +197,7 @@ export function DescribeExpected(Metric: FreeKioskMetricView, Alarm: ArmedAlarm 
     case 'notContains':
       return `expected to contain "${Want}"`;
     case 'changes':
-      return 'expected to hold steady';
+      return 'expected to stay the same';
     case 'decreases':
       return 'expected never to go backwards';
     default:

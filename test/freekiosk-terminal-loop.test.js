@@ -239,19 +239,20 @@ test('a failed poll goes offline and records why', async () => {
 });
 
 test('an outage resets the edge comparison so it cannot fire on stale data', async () => {
-  // "Uptime went backwards" must mean the device rebooted, not that ShowTrak
-  // compared a fresh reading against one from before an outage of unknown length.
+  // "The channel changed" must mean the access point moved the terminal, not
+  // that ShowTrak compared a fresh reading against one from before an outage of
+  // unknown length.
   const events = [];
-  let uptime = 90000;
+  let frequency = 5180; // channel 36
   let fail = false;
   const Terminal = loadTerminal({
     events,
     getStatus: async () =>
-      fail ? ['down', null] : [null, { Status: { device: { uptime } }, LatencyMs: 1 }],
+      fail ? ['down', null] : [null, { Status: { wifi: { frequency } }, LatencyMs: 1 }],
   });
   const terminal = new Terminal({
     ...ROW,
-    Settings: JSON.stringify({ A_device_uptime_On: true, A_device_uptime_Op: 'decreases' }),
+    Settings: JSON.stringify({ A_wifi_channel_On: true, A_wifi_channel_Op: 'changes' }),
   });
 
   await terminal.Run();
@@ -261,11 +262,11 @@ test('an outage resets the edge comparison so it cannot fire on stale data', asy
   await terminal.Run();
 
   fail = false;
-  uptime = 30; // Looks like a reboot, but there is nothing trustworthy to compare to.
+  frequency = 5200; // Looks like a move, but there is nothing trustworthy to compare to.
   await terminal.Run();
   assert.equal(terminal.Degraded, false, 'no alarm without a comparable previous poll');
 
-  uptime = 10; // Now there is a real, uninterrupted decrease.
+  frequency = 5220; // Now there is a real, uninterrupted change.
   await terminal.Run();
   assert.equal(terminal.Degraded, true);
 });

@@ -130,7 +130,7 @@ async function KioskAuditFieldsOf(Terminal: FreeKioskTerminal): Promise<KioskAud
 // mode by its own label, an alarm's parts by the metric they belong to.
 const ALARM_PART_LABELS: Record<string, string> = {
   On: 'alarm',
-  Op: 'alert when',
+  Op: 'expected',
   V: 'value',
   V2: 'second value',
 };

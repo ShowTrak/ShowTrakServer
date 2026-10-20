@@ -28,8 +28,8 @@ const armed = (operator, value, value2) => ({ operator, value, value2 });
 
 test('a numeric threshold is stated as the healthy side of the line', () => {
   const battery = metric({ Unit: '%' });
-  assert.equal(DescribeExpected(battery, armed('below', 20)), 'expected 20% or more');
-  assert.equal(DescribeExpected(battery, armed('above', 90)), 'expected 90% or less');
+  assert.equal(DescribeExpected(battery, armed('below', 20)), 'expected at least 20%');
+  assert.equal(DescribeExpected(battery, armed('above', 90)), 'expected at most 90%');
 });
 
 test('a range operator names both bounds, and inside is the complement of outside', () => {
@@ -74,7 +74,7 @@ test('substring operators quote the needle', () => {
 test('edge operators have no threshold to name', () => {
   const uptime = metric({ Key: 'device_uptime', Format: 'duration', Unit: 's' });
   assert.equal(DescribeExpected(uptime, armed('decreases')), 'expected never to go backwards');
-  assert.equal(DescribeExpected(uptime, armed('changes')), 'expected to hold steady');
+  assert.equal(DescribeExpected(uptime, armed('changes')), 'expected to stay the same');
 });
 
 test('an unarmed metric says nothing at all', () => {
@@ -85,5 +85,5 @@ test('a threshold that is not a scalar degrades rather than printing [object Obj
   // Settings survive a JSON round trip, so nothing guarantees a scalar landed
   // back in the field a number was saved into.
   const shown = DescribeExpected(metric({ Unit: '%' }), armed('below', { nope: true }));
-  assert.equal(shown, 'expected — or more');
+  assert.equal(shown, 'expected at least —');
 });

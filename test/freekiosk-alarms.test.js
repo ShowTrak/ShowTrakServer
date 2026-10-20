@@ -1,10 +1,11 @@
 // FreeKiosk threshold evaluation.
 //
-// The rule that matters most here: an operator states the ALARM condition, not
-// the healthy one. `below 20` fires under 20 and `is No` fires when the reading
-// is No. Getting that backwards for equality while leaving it forwards for
-// thresholds would make every boolean alarm fire permanently, so the direction
-// of each operator is asserted explicitly rather than assumed.
+// The rule that matters most here: a STORED operator is the breach comparison.
+// `below 20` fires under 20 and `is No` fires when the reading is No. The editor
+// shows each one as its complement — the expectation, "Expected at least 20%" —
+// but this engine only ever sees the breach. Getting the direction backwards
+// for equality while leaving it forwards for thresholds would make every
+// boolean alarm fire permanently, so each operator is asserted explicitly.
 //
 // Which is why every boolean METRIC in the registry arms `isNot` rather than
 // `is`: a two-state metric draws no operator picker, so its lone Yes/No box has
@@ -175,14 +176,14 @@ test('a disabled alarm never breaches even when the condition holds', () => {
 // ---- Settings parsing -----------------------------------------------------
 
 test('parses the flat settings record into per-metric configs', () => {
-  const keys = AlarmFieldKeys('battery_level');
+  const keys = AlarmFieldKeys('screen_brightness');
   const configs = ParseAlarmSettings({
     [keys.On]: true,
     [keys.Op]: 'above',
     [keys.V]: 80,
     [keys.V2]: 95,
   });
-  const config = configs.get('battery_level');
+  const config = configs.get('screen_brightness');
   assert.equal(config.Enabled, true);
   assert.equal(config.Operator, 'above');
   assert.equal(config.Value, 80);
@@ -310,31 +311,80 @@ test('only armed metrics are evaluated at all', () => {
 });
 
 test('previous readings are threaded through to the edge operators', () => {
-  const keys = AlarmFieldKeys('device_uptime');
-  const settings = { [keys.On]: true, [keys.Op]: 'decreases' };
-  assert.equal(EvaluateAllAlarms({ device_uptime: 10 }, settings, null)[0].Breach, false);
+  const keys = AlarmFieldKeys('wifi_channel');
+  const settings = { G_Network_On: true, [keys.On]: true, [keys.Op]: 'changes' };
+  const channel = (results) => results.find((r) => r.Key === 'wifi_channel');
+  assert.equal(channel(EvaluateAllAlarms({ wifi_channel: 36 }, settings, null)).Breach, false);
   assert.equal(
-    EvaluateAllAlarms({ device_uptime: 10 }, settings, { device_uptime: 90000 })[0].Breach,
+    channel(EvaluateAllAlarms({ wifi_channel: 36 }, settings, { wifi_channel: 40 })).Breach,
     true
   );
+});
+
+// ---- Uptime -----------------------------------------------------------------
+
+test('uptime is only judged as too long without a restart, set in days', () => {
+  // Read in seconds, typed in days: "Expected at most 7 days".
+  const uptime = FREEKIOSK_METRICS_BY_KEY.get('device_uptime');
+  assert.deepEqual(uptime.Operators, ['above']);
+  const keys = AlarmFieldKeys('device_uptime');
+  const settings = { G_Device_On: true, [keys.On]: true, [keys.V]: 7 };
+  const judged = (seconds) =>
+    EvaluateAllAlarms({ device_uptime: seconds }, settings).find((r) => r.Key === 'device_uptime');
+  assert.equal(judged(6 * 86400).Breach, false);
+  assert.equal(judged(7 * 86400).Breach, false, 'exactly the limit is still within it');
+  const over = judged(9 * 86400 + 3600);
+  assert.equal(over.Breach, true);
+  assert.equal(over.Reason, 'Uptime is 9d 1h (expected at most 7 days)');
+  assert.equal(
+    EvaluateAllAlarms({ device_uptime: 2 * 86400 }, { ...settings, [keys.V]: 1 })[0].Reason,
+    'Uptime is 2d 0h (expected at most 1 day)'
+  );
+});
+
+test('Power Source is expected to be ac out of the box, so ac is healthy', () => {
+  const keys = AlarmFieldKeys('battery_plugged');
+  const settings = { ...BuildDefaultAlarmSettings(), [keys.On]: true };
+  const plugged = (value) =>
+    EvaluateAllAlarms({ battery_plugged: value }, settings).find(
+      (r) => r.Key === 'battery_plugged'
+    );
+  assert.equal(plugged('ac').Breach, false);
+  assert.equal(plugged('none').Breach, true);
+  assert.equal(plugged('usb').Reason, 'Power Source is usb (expected ac)');
 });
 
 // ---- Reason wording -------------------------------------------------------
 
 test('reasons read as a human sentence with the value in them', () => {
-  assert.equal(judge('battery_level', 'below', 20, 12).Reason, 'Battery Level 12% is below 20%');
+  // Every reason names the reading and the expectation it broke.
+  assert.equal(
+    judge('battery_level', 'below', 20, 12).Reason,
+    'Battery Level is 12% (expected at least 20%)'
+  );
   assert.equal(
     judge('battery_temperature', 'above', 45, 51.2).Reason,
-    'Battery Temperature 51.2 °C is above 45 °C'
+    'Battery Temperature is 51.2 °C (expected at most 45 °C)'
   );
   assert.equal(
     judge('battery_health', 'isNot', 'good', 'overheat').Reason,
     'Battery Health is overheat (expected good)'
   );
-  assert.equal(judge('battery_plugged', 'is', 'none', 'none').Reason, 'Power Source: none');
+  assert.equal(
+    judge('battery_plugged', 'isNot', 'ac', 'usb').Reason,
+    'Power Source is usb (expected ac)'
+  );
+  assert.equal(
+    judge('battery_plugged', 'is', 'none', 'none').Reason,
+    'Power Source is none (expected anything but none)'
+  );
   assert.equal(
     judge('battery_level', 'outside', 20, 95, null, 80).Reason,
-    'Battery Level 95% is outside 20%–80%'
+    'Battery Level is 95% (expected 20%–80%)'
+  );
+  assert.equal(
+    judge('webview_currentUrl', 'notContains', 'dashboard', 'https://x/error').Reason,
+    'Current URL does not contain "dashboard" (expected it to)'
   );
   assert.equal(
     judge('wifi_ssid', 'changes', null, 'Guest', 'Backstage').Reason,

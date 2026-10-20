@@ -6,8 +6,9 @@
 // list; the AlertsManager turns the false->true edges into alerts.
 //
 // Two rules run through everything here:
-//   - An operator states the ALARM condition, not the healthy one (see the note
-//     on FreeKioskOperator in ./metrics).
+//   - A stored operator is the BREACH comparison, which the editor shows as
+//     its complement — the expectation (see the note on FreeKioskOperator in
+//     ./metrics). This file only ever sees the breach.
 //   - A metric with no reading NEVER breaches. A device that lacks a light
 //     sensor, or a poll that failed, must not satisfy a "below" alarm — absence
 //     of evidence is not evidence of a fault.
@@ -16,7 +17,9 @@ import {
   FREEKIOSK_METRICS_BY_KEY,
   AlarmFieldKeys,
   FormatMetricValue,
+  FormatThresholdValue,
   IsMetricActive,
+  ScaleThreshold,
   type FreeKioskMetric,
   type FreeKioskOperator,
 } from './metrics';
@@ -108,7 +111,7 @@ export function ParseAlarmSettings(Settings: unknown): Map<string, FreeKioskAlar
 function FormatThreshold(Metric: FreeKioskMetric, Value: unknown): string {
   if (Metric.Type === 'number') {
     const Parsed = AsNumber(Value);
-    return Parsed == null ? '?' : FormatMetricValue(Metric, Parsed);
+    return Parsed == null ? '?' : FormatThresholdValue(Metric, Parsed);
   }
   if (Metric.Type === 'boolean') {
     const Parsed = AsBoolean(Value);
@@ -130,25 +133,27 @@ function BuildReason(
   const Want = FormatThreshold(Metric, Threshold);
   const Want2 = FormatThreshold(Metric, Threshold2);
 
+  // Every reason names the reading and the expectation it broke, in the same
+  // "(expected …)" form, because the operator was configured as that
+  // expectation. "Power Source is usb (expected ac)" says both what is wrong and
+  // what right looks like, in one line that still fits on a tile.
   switch (Operator) {
     case 'below':
-      return `${Metric.Label} ${Shown} is below ${Want}`;
+      return `${Metric.Label} is ${Shown} (expected at least ${Want})`;
     case 'above':
-      return `${Metric.Label} ${Shown} is above ${Want}`;
+      return `${Metric.Label} is ${Shown} (expected at most ${Want})`;
     case 'outside':
-      return `${Metric.Label} ${Shown} is outside ${Want}–${Want2}`;
+      return `${Metric.Label} is ${Shown} (expected ${Want}–${Want2})`;
     case 'inside':
-      return `${Metric.Label} ${Shown} is within ${Want}–${Want2}`;
+      return `${Metric.Label} is ${Shown} (expected outside ${Want}–${Want2})`;
     case 'is':
-      // "Displaying Content: No", "Power Source: none" — terse on purpose, since
-      // this is the text that has to fit on a tile.
-      return `${Metric.Label}: ${Shown}`;
+      return `${Metric.Label} is ${Shown} (expected anything but ${Want})`;
     case 'isNot':
       return `${Metric.Label} is ${Shown} (expected ${Want})`;
     case 'contains':
-      return `${Metric.Label} contains "${Want}"`;
+      return `${Metric.Label} contains "${Want}" (expected it not to)`;
     case 'notContains':
-      return `${Metric.Label} does not contain "${Want}"`;
+      return `${Metric.Label} does not contain "${Want}" (expected it to)`;
     case 'changes':
       return `${Metric.Label} changed (${FormatMetricValue(Metric, Previous)} → ${Shown})`;
     case 'decreases':
@@ -205,7 +210,10 @@ export function EvaluateMetricAlarm(
     Breach = Now != null && Before != null && Now < Before;
   } else if (Metric.Type === 'number') {
     const Now = AsNumber(Value);
-    const Limit = AsNumber(Config.Value);
+    // Thresholds are typed in their own unit (uptime in days) and compared in
+    // the reading's (seconds).
+    const Typed = AsNumber(Config.Value);
+    const Limit = Typed == null ? null : ScaleThreshold(Metric, Typed);
     if (Now == null || Limit == null) return Idle;
     if (Operator === 'below') Breach = Now < Limit;
     else if (Operator === 'above') Breach = Now > Limit;
@@ -216,8 +224,9 @@ export function EvaluateMetricAlarm(
     else if (Operator === 'is') Breach = Now === Limit;
     else if (Operator === 'isNot') Breach = Now !== Limit;
     else {
-      const Upper = AsNumber(Config.Value2);
-      if (Upper == null) return Idle;
+      const TypedUpper = AsNumber(Config.Value2);
+      if (TypedUpper == null) return Idle;
+      const Upper = ScaleThreshold(Metric, TypedUpper);
       // Tolerate the bounds being entered the wrong way round rather than
       // silently never firing.
       const Low = Math.min(Limit, Upper);
