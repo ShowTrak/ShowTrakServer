@@ -659,19 +659,20 @@ body.list-mode .LIST_HISTORY .status-timeline-block {
   }
 }
 
-/* --- Search (Ctrl/Cmd+F) ------------------------------------------------- */
+/* --- Search (Ctrl/Cmd+F), in every view mode ----------------------------- */
 /* Rows a search does not keep, and the groups it leaves with nothing showing
    (list-filter.ts). Outranks the list's own display rules and Bootstrap's
    d-flex on the group wrappers. */
-body.list-mode #APPLICATION_CONTENT .LIST_SEARCH_HIDDEN {
+#APPLICATION_CONTENT .LIST_SEARCH_HIDDEN {
   display: none !important;
 }
 
-/* Floats just under the sticky heading row, over the list's top right. */
+/* Floats over the top right of the tiles, just under the window's drag bar;
+   in the list, just under the sticky heading row. */
 #LIST_SEARCH {
   position: fixed;
-  top: calc(var(--list-sticky-top, 2rem) + 0.5rem + 30px + 0.5rem);
-  right: calc(var(--list-gutter, 0.75rem) + 12px);
+  top: calc(2rem + 0.5rem);
+  right: 1rem;
   z-index: var(--z-banner);
   display: flex;
   align-items: center;
@@ -686,9 +687,14 @@ body.list-mode #APPLICATION_CONTENT .LIST_SEARCH_HIDDEN {
   color: var(--text-strong);
 }
 
-/* Only ever shown in the list; the view switch also clears it. */
-body:not(.list-mode) #LIST_SEARCH {
-  display: none !important;
+body.is-web #LIST_SEARCH,
+body.macos-native-fullscreen #LIST_SEARCH {
+  top: 0.5rem;
+}
+
+body.list-mode #LIST_SEARCH {
+  top: calc(var(--list-sticky-top) + 0.5rem + 30px + 0.5rem);
+  right: calc(var(--list-gutter) + 12px);
 }
 
 #LIST_SEARCH:focus-within {

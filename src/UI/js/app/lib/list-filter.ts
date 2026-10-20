@@ -1,6 +1,6 @@
-// Pure rules behind the list view's search filter (Ctrl/Cmd+F). No DOM, no
-// module state: ../list-filter.ts owns the search box and hides the rows; this
-// decides which rows a search keeps.
+// Pure rules behind the search filter (Ctrl/Cmd+F), in every view mode. No
+// DOM, no module state: ../list-filter.ts owns the search box and hides the
+// rows; this decides which rows a search keeps.
 //
 // A row is searched by what an operator would type to find it: its name, its
 // tags, its address and the name of the group it sits in. Each word of the
@@ -16,6 +16,7 @@ import type {
   TagView,
 } from '@showtrak/protocol';
 import { ResolveEntityTags, TagBadgeLabel } from './tag-badges';
+import { CHECK_SELECTION_PREFIX } from './list-view';
 
 /** The search box's text as lower-cased words. No words means no filter. */
 export function ParseListSearch(Query: unknown): string[] {
@@ -119,5 +120,36 @@ export function MatchListSearch(
 ): Set<string> {
   const Out = new Set<string>();
   for (const [Key, Fields] of Index) if (MatchesListSearch(Fields, Terms)) Out.add(Key);
+  return Out;
+}
+
+/**
+ * The rows left showing: the search's matches plus everything selected, so a
+ * search never hides what an action is about to run on. A selected check row
+ * keeps its target, as check rows show and hide with their target. A row stays
+ * out of sight only while it is neither matched nor selected.
+ */
+export function KeepSelectedRows(
+  Matched: ReadonlySet<string>,
+  Selected: readonly string[],
+  Monitors: Pick<MonitoringTargetView, 'TargetID' | 'Checks'>[]
+): Set<string> {
+  const Out = new Set(Matched);
+  const SelectedChecks = new Set<string>();
+  for (const ID of Selected || []) {
+    const Key = String(ID);
+    if (Key.startsWith(CHECK_SELECTION_PREFIX)) {
+      SelectedChecks.add(Key.slice(CHECK_SELECTION_PREFIX.length));
+    } else {
+      Out.add(Key);
+    }
+  }
+  if (!SelectedChecks.size) return Out;
+  for (const T of Monitors || []) {
+    if (!T || T.TargetID == null || !Array.isArray(T.Checks)) continue;
+    if (T.Checks.some((Check) => Check && SelectedChecks.has(String(Check.CheckID)))) {
+      Out.add(`monitor:${T.TargetID}`);
+    }
+  }
   return Out;
 }

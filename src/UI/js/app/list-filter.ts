@@ -1,29 +1,35 @@
-// List view search: Ctrl/Cmd+F opens a box over the top right of the list, and
-// typing in it hides every row that does not match (lib/list-filter.ts decides
-// which), and every group left with nothing showing — empty groups included.
+// Search: Ctrl/Cmd+F opens a box over the top right of the client list, in any
+// view mode, and typing in it hides every row (or tile) that does not match
+// (lib/list-filter.ts decides which), and every group left with nothing
+// showing — empty groups included.
 //
-// The filter is a way of looking at the list, not part of it: it exists only
-// in the list view, and Escape or any switch of view mode drops it. It hides
-// rows with a class rather than leaving them out of the render, so the full
-// re-render, the live in-place patches and the selection all keep working on
-// rows that are merely out of sight, and the filter is put back on the fresh
-// DOM after each render.
+// The filter is a way of looking at the list, not part of it: Escape drops it,
+// and it carries across a switch of view mode. It hides rows with a class
+// rather than leaving them out of the render, so the full re-render, the live
+// in-place patches and the selection all keep working on rows that are merely
+// out of sight, and the filter is put back on the fresh DOM after each render.
 //
-// Selection is left alone: a row selected before a search stays selected while
-// hidden. Select All and a group header's click select only what is showing.
+// A selected row always shows, matched or not, so a search never hides what an
+// action is about to run on; deselect it and it drops out. Select All and a
+// group header's click select only what is showing.
 import {
   DummyClients,
   FreeKioskTerminals,
   MonitoringTargets,
   PendingAdoption,
+  Selected,
   Tags,
-  ViewMode,
   __LastClients,
   __LastGroups,
 } from './state';
 import { HandleNonFatalError } from './utils';
 import { BuildGroupRenderOrder } from './lib/client-list-layout';
-import { BuildListSearchIndex, MatchListSearch, ParseListSearch } from './lib/list-filter';
+import {
+  BuildListSearchIndex,
+  KeepSelectedRows,
+  MatchListSearch,
+  ParseListSearch,
+} from './lib/list-filter';
 
 const HIDDEN_CLASS = 'LIST_SEARCH_HIDDEN';
 
@@ -46,9 +52,8 @@ export function IsHiddenByListSearch(Key: string): boolean {
   return HiddenKeys.has(String(Key));
 }
 
-/** Open the search box and put the cursor in it. List view only. */
+/** Open the search box and put the cursor in it. */
 export function OpenListSearch(): boolean {
-  if (ViewMode !== 'list') return false;
   WireListSearch();
   const Box = SearchBox();
   const Input = SearchInput();
@@ -74,12 +79,13 @@ export function ClearListSearch(): void {
 }
 
 /**
- * Put the current search on the rendered list: hide the rows it does not keep,
- * then every group (and the Discover section) with no row left showing.
+ * Put the current search on the rendered list: hide the rows it neither matches
+ * nor finds selected, then every group (and the Discover section) with no row
+ * left showing.
  */
 export function ApplyListSearch(): void {
   const Content = document.getElementById('APPLICATION_CONTENT');
-  const Terms = ViewMode === 'list' ? ParseListSearch(Query) : [];
+  const Terms = ParseListSearch(Query);
   document.body.classList.toggle('list-searching', Terms.length > 0);
   HiddenKeys.clear();
   if (!Content) return;
@@ -92,7 +98,7 @@ export function ApplyListSearch(): void {
     return;
   }
 
-  const Keep = MatchListSearch(
+  const Matched = MatchListSearch(
     BuildListSearchIndex({
       Groups: BuildGroupRenderOrder(__LastGroups),
       Tags,
@@ -104,8 +110,10 @@ export function ApplyListSearch(): void {
     }),
     Terms
   );
+  const Keep = KeepSelectedRows(Matched, Selected, MonitoringTargets);
 
-  let Shown = 0;
+  // Counted as matches: a selected row kept on show is not one.
+  let Matches = 0;
   let Total = 0;
   for (const Row of Array.from(Content.querySelectorAll<HTMLElement>('.SHOWTRAK_PC[data-uuid]'))) {
     // A check row goes wherever its target goes.
@@ -118,7 +126,7 @@ export function ApplyListSearch(): void {
     if (IsCheck) continue;
     Total++;
     if (Hidden) HiddenKeys.add(Key);
-    else Shown++;
+    if (Matched.has(Key)) Matches++;
   }
   const Sections = Content.querySelectorAll<HTMLElement>(
     '.group-column-item, #PENDING_ADOPTION_SECTION'
@@ -127,12 +135,13 @@ export function ApplyListSearch(): void {
     const Showing = Section.querySelector(`.SHOWTRAK_PC[data-uuid]:not(.${HIDDEN_CLASS})`);
     Section.classList.toggle(HIDDEN_CLASS, !Showing);
   }
-  RenderMatchCount(Shown, Total, true);
+  RenderMatchCount(Matches, Total, true);
 }
 
 /**
- * Re-apply after a live in-place patch (a renamed client, a new IP), coalesced
- * to one pass per frame however many patches land. Nothing to do with no search.
+ * Re-apply after a live in-place patch (a renamed client, a new IP) or a change
+ * of selection, coalesced to one pass per frame however many land. Nothing to
+ * do with no search.
  */
 export function RefreshListSearch(): void {
   if (!Query || RefreshQueued) return;
@@ -147,11 +156,11 @@ export function RefreshListSearch(): void {
   });
 }
 
-function RenderMatchCount(Shown: number, Total: number, Searching: boolean): void {
+function RenderMatchCount(Matches: number, Total: number, Searching: boolean): void {
   const Count = document.getElementById('LIST_SEARCH_COUNT');
   if (!Count) return;
-  Count.textContent = !Searching ? '' : Shown ? `${Shown} of ${Total}` : 'No Matches';
-  Count.classList.toggle('is-empty', Searching && !Shown);
+  Count.textContent = !Searching ? '' : Matches ? `${Matches} of ${Total}` : 'No Matches';
+  Count.classList.toggle('is-empty', Searching && !Matches);
 }
 
 function WireListSearch(): void {

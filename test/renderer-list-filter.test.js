@@ -1,4 +1,4 @@
-// Exercises the list view's search (Ctrl/Cmd+F): the pure rules in
+// Exercises the search filter (Ctrl/Cmd+F, every view mode): the pure rules in
 // src/UI/js/app/lib/list-filter.ts.
 //
 // What is at stake:
@@ -120,4 +120,26 @@ test('pending devices are not found by group or tag', () => {
 
 test('no search keeps every row', () => {
   assert.equal(Search('').length, 6);
+});
+
+test('a selected row stays showing whether or not it matches', () => {
+  const Matched = new Set(['c-1']);
+  const Keep = Filter.KeepSelectedRows(Matched, ['c-2', 'dummy:d-1'], []);
+  assert.deepEqual([...Keep].sort(), ['c-1', 'c-2', 'dummy:d-1']);
+  // The matches themselves are left alone, so the count still counts matches.
+  assert.deepEqual([...Matched], ['c-1']);
+});
+
+test('a deselected row is back to whether it matches', () => {
+  const Keep = Filter.KeepSelectedRows(new Set(['c-1']), [], []);
+  assert.deepEqual([...Keep], ['c-1']);
+});
+
+test('a selected check row keeps its target showing', () => {
+  const Monitors = [
+    { TargetID: 7, Checks: [{ CheckID: 70 }, { CheckID: 71 }] },
+    { TargetID: 8, Checks: [{ CheckID: 80 }] },
+  ];
+  const Keep = Filter.KeepSelectedRows(new Set(), ['check:71'], Monitors);
+  assert.deepEqual([...Keep], ['monitor:7']);
 });

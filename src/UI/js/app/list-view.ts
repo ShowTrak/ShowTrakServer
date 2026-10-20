@@ -32,7 +32,6 @@ import {
   ShowStatusTimelineTooltip,
 } from './monitoring';
 import { BuildListHistoryBlocks, CHECK_SELECTION_PREFIX } from './lib/list-view';
-import { ClearListSearch } from './list-filter';
 
 /** How often the history column is refetched while the list is showing. */
 const LIST_HISTORY_REFRESH_MS = 20 * 1000;
@@ -276,7 +275,6 @@ export function SyncListView(): void {
   }
   HideStatusTimelineTooltip(LIST_HISTORY_TOOLTIP_ID);
   DeselectCheckRows();
-  ClearListSearch();
   FillListHistoryCells();
 }
 

@@ -17,7 +17,6 @@ import { RenderPendingAdoptionSection } from './client-list';
 import { initializeEditInteractions } from './dnd';
 import { UpdateSelectionCount } from './selection-init';
 import { SyncListView } from './list-view';
-import { ClearListSearch } from './list-filter';
 import { ApplyClientInfoEditMode } from './client-info-edit';
 import { ApplyMonitorInfoEditMode } from './monitor-info-edit';
 import { ApplyDummyInfoEditMode } from './dummy-info-edit';
@@ -149,7 +148,6 @@ export function SetViewMode(
     }
   }
   const Current = PendingViewMode ?? ViewMode;
-  if (Next !== Current) ClearListSearch();
   if (Next === Current && PendingViewMode == null) {
     RenderViewMode(Next);
     return;

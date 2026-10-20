@@ -99,7 +99,7 @@ export function InitKeyboard() {
         return;
       }
 
-      // List view: filter the rows by name, tag, address or group.
+      // Filter the rows by name, tag, address or group.
       if (!e.shiftKey && key === 'f') {
         if (OpenListSearch()) e.preventDefault();
         return;

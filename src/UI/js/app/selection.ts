@@ -1,11 +1,11 @@
 // Client selection primitives (select / deselect / toggle / clear / count).
 // Extracted from selection-init.ts (REFACTOR_PLAN.md Phase 7). This is a
-// leaf module: it depends only on shared state + utils (and the list search's
-// hidden-row set, itself a leaf), so the ~6 modules that
+// leaf module: it depends only on shared state + utils (and the search filter,
+// itself a leaf), so the ~6 modules that
 // import these keep working via the selection-init barrel re-export.
 import { AlertActionsEnabled, GroupSelectableUUIDCache, Selected, setSelected } from './state';
 import { HandleNonFatalError } from './utils';
-import { IsHiddenByListSearch } from './list-filter';
+import { IsHiddenByListSearch, RefreshListSearch } from './list-filter';
 
 // The list view's check rows show as selected for as long as their target is:
 // a selected target acts on all of its checks, so the rows say so. The
@@ -63,6 +63,7 @@ export function Select(UUID: string | undefined) {
   $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).addClass('SELECTED');
   MarkCheckRowsOf(UUID, true);
   UpdateSelectionCount();
+  RefreshListSearch();
   return;
 }
 
@@ -71,6 +72,8 @@ export function Deselect(UUID: string) {
   $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).removeClass('SELECTED');
   MarkCheckRowsOf(UUID, false);
   UpdateSelectionCount();
+  // A row kept on show only because it was selected drops out of a search.
+  RefreshListSearch();
   return;
 }
 
@@ -81,6 +84,7 @@ export function ClearSelection() {
   setSelected([]);
   $('.MONITOR_CHECK.PARENT_SELECTED').removeClass('PARENT_SELECTED');
   UpdateSelectionCount();
+  RefreshListSearch();
   return;
 }
 
@@ -91,7 +95,7 @@ export function ClearSelection() {
 export function SelectAll() {
   $('.SHOWTRAK_PC[data-uuid]').each(function () {
     if ($(this).hasClass('GROUP') || $(this).hasClass('MONITOR_CHECK')) return;
-    // A list search's hidden rows are out of reach of Select All.
+    // A search's hidden rows are out of reach of Select All.
     if ($(this).hasClass('LIST_SEARCH_HIDDEN')) return;
     const UUID = $(this).attr('data-uuid');
     if (UUID) Select(UUID);
@@ -116,6 +120,7 @@ export function ToggleSelection(UUID: string | undefined) {
     MarkCheckRowsOf(UUID, true);
   }
   UpdateSelectionCount();
+  RefreshListSearch();
 }
 
 export function SelectByGroup(GroupID: string | number | undefined) {
