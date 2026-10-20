@@ -338,6 +338,12 @@ export interface FreeKioskMetric {
   ThresholdUnit?: string;
   /** Reading units per threshold unit (86400 seconds per day). Defaults to 1. */
   ThresholdScale?: number;
+  /**
+   * How far a reading may sit from an "Is" value and still count as it, in the
+   * reading's units. For a level someone sets — brightness at 80% — where the
+   * device can report 79 or 81 for the same setting. Absent means exact.
+   */
+  Tolerance?: number;
   /** Armed out of the box. Only content_displaying uses this. */
   DefaultOn?: boolean;
   /** Sentinel the device sends to mean "no reading"; mapped to null. */
@@ -365,6 +371,12 @@ export interface FreeKioskMetric {
 // is healthy on both sides of. The engine still evaluates `inside` so a show
 // file that armed it is judged, not crashed — ParseSettings resets it.
 const NUMERIC_OPS: readonly FreeKioskOperator[] = ['below', 'above', 'outside'];
+
+// A level someone sets on the device rather than one that drifts: it can also
+// be expected at an exact value ("Expected is 80%"), and is then allowed this
+// far either side.
+const SET_LEVEL_OPS: readonly FreeKioskOperator[] = [...NUMERIC_OPS, 'isNot'];
+const SET_LEVEL_TOLERANCE = 1;
 
 export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
   // ---- Content ------------------------------------------------------------
@@ -456,9 +468,11 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Unit: '%',
     Min: 0,
     Max: 100,
-    Operators: NUMERIC_OPS,
+    Operators: SET_LEVEL_OPS,
     DefaultOperator: 'below',
     DefaultValue: 10,
+    Tolerance: SET_LEVEL_TOLERANCE,
+    Note: 'Choose "Is" to expect the level it was set to. Within 1% either side counts as a match.',
   },
   {
     Key: 'autoBrightness_enabled',
@@ -497,6 +511,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Advanced: true,
     Operators: ['isNot'],
     DefaultOperator: 'isNot',
+    Tolerance: SET_LEVEL_TOLERANCE,
   },
   {
     Key: 'autoBrightness_max',
@@ -511,6 +526,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Advanced: true,
     Operators: ['isNot'],
     DefaultOperator: 'isNot',
+    Tolerance: SET_LEVEL_TOLERANCE,
   },
 
   // ---- Battery ------------------------------------------------------------
@@ -861,10 +877,11 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Unit: '%',
     Min: 0,
     Max: 100,
-    Operators: NUMERIC_OPS,
+    Operators: SET_LEVEL_OPS,
     DefaultOperator: 'below',
     DefaultValue: 1,
-    Note: 'Expect at least 1% to catch a terminal that has been muted.',
+    Tolerance: SET_LEVEL_TOLERANCE,
+    Note: 'Expect at least 1% to catch a terminal that has been muted, or choose "Is" to expect the level it was set to. Within 1% either side counts as a match.',
   },
 
   // ---- Rotation -----------------------------------------------------------

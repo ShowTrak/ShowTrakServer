@@ -92,6 +92,25 @@ test('is fires when the reading equals the armed value', () => {
   assert.equal(judge('memory_lowMemory', 'is', true, true).Breach, true);
 });
 
+test('brightness and volume can be expected at an exact level, within 1%', () => {
+  for (const key of ['screen_brightness', 'audio_volume']) {
+    assert.ok(metric(key).Operators.includes('isNot'), `${key} offers Is`);
+    assert.equal(judge(key, 'isNot', 80, 80).Breach, false);
+    assert.equal(judge(key, 'isNot', 80, 79).Breach, false);
+    assert.equal(judge(key, 'isNot', 80, 81).Breach, false);
+    assert.equal(judge(key, 'isNot', 80, 78).Breach, true);
+    assert.equal(judge(key, 'isNot', 80, 82).Breach, true);
+  }
+  assert.equal(
+    judge('screen_brightness', 'isNot', 80, 50).Reason,
+    'Brightness is 50% (expected 80%)'
+  );
+});
+
+test('a metric with no tolerance is still matched exactly', () => {
+  assert.equal(judge('wifi_channel', 'isNot', 36, 37).Breach, true);
+});
+
 test('is accepts the string form a select stores', () => {
   // The value input is a <select>, so the setting round-trips as 'true'/'false'.
   assert.equal(judge('screen_on', 'is', 'false', false).Breach, true);

@@ -220,9 +220,11 @@ export function EvaluateMetricAlarm(
     // Equality on a number is not just for the Wi-Fi channel: rotation interval,
     // API level and the auto-brightness bounds all declare `is` too, and every
     // one of them used to fall through to the range branch, find no upper bound
-    // and return "not breaching" for ever.
-    else if (Operator === 'is') Breach = Now === Limit;
-    else if (Operator === 'isNot') Breach = Now !== Limit;
+    // and return "not breaching" for ever. A set level (brightness at 80%)
+    // counts as matched within its tolerance, so a device reporting 79 or 81
+    // for the same setting is not a fault.
+    else if (Operator === 'is') Breach = Math.abs(Now - Limit) <= (Metric.Tolerance ?? 0);
+    else if (Operator === 'isNot') Breach = Math.abs(Now - Limit) > (Metric.Tolerance ?? 0);
     else {
       const TypedUpper = AsNumber(Config.Value2);
       if (TypedUpper == null) return Idle;

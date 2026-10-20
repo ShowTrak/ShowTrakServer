@@ -99,6 +99,8 @@ test('every field a registry entry declares is delivered, not only the ones list
     'DefaultValue',
     'DefaultValue2',
     'DefaultOn',
+    // How an "Is" comparison is judged; the metric's Note tells the operator.
+    'Tolerance',
   ]);
   for (const metric of FREEKIOSK_METRICS) {
     const shipped = catalogue.Metrics.find((m) => m.Key === metric.Key);
