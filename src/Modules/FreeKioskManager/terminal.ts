@@ -126,6 +126,13 @@ class FreeKioskTerminal {
   private _gen = 0;
   /** Last poll's readings, so the edge operators have something to compare to. */
   private _previous: Record<string, FreeKioskReading> | null = null;
+  /**
+   * What the last poll compared against. `_previous` has already moved on to
+   * that poll's own readings, so re-judging them under new settings needs the
+   * baseline it actually used — otherwise a `changes` condition compares the
+   * readings with themselves and can never fire.
+   */
+  private _baseline: Record<string, FreeKioskReading> | null = null;
 
   constructor(Row: FreeKioskTerminalRow | FreeKioskTerminalInput) {
     this.UUID = String(Row.UUID);
@@ -225,6 +232,7 @@ class FreeKioskTerminal {
       // must not let an edge operator fire against a stale comparison when the
       // device comes back.
       this._previous = null;
+      this._baseline = null;
       return false;
     }
 
@@ -233,10 +241,35 @@ class FreeKioskTerminal {
       control_enabled: this.ControlEnabled,
     });
 
-    const Results = EvaluateAllAlarms(Values, this.Settings, this._previous);
+    this.Online = true;
+    this._baseline = this._previous;
+    this.ApplyAlarms(Values, this._baseline);
+    this.LastLatencyMs = Reading.LatencyMs;
+    this.LastSuccessAt = this.LastChecked;
+    this.Metrics = Values;
+    this._previous = Values;
+    return true;
+  }
+
+  /**
+   * Re-judge the last successful poll's readings against the current settings,
+   * so an edited condition takes effect now rather than on the next poll — up to
+   * a full interval later. Returns false when there is nothing to judge (never
+   * polled, or the last poll failed): an offline terminal stays plainly offline.
+   */
+  ReevaluateAlarms(): boolean {
+    if (this.Online !== true) return false;
+    this.ApplyAlarms(this.Metrics, this._baseline);
+    return true;
+  }
+
+  private ApplyAlarms(
+    Values: Record<string, FreeKioskReading>,
+    Previous: Record<string, FreeKioskReading> | null
+  ): void {
+    const Results = EvaluateAllAlarms(Values, this.Settings, Previous);
     const Breaches = Results.filter((Result: FreeKioskAlarmResult) => Result.Breach);
 
-    this.Online = true;
     this.Degraded = Breaches.length > 0;
     this.DegradedWarnings = Breaches.map((Result) => Result.Reason as string);
     this.Alarms = Breaches.map((Result) => ({
@@ -246,11 +279,6 @@ class FreeKioskTerminal {
       Reason: Result.Reason as string,
     }));
     this.LastError = this.Degraded ? BuildDegradedReason(Results) : null;
-    this.LastLatencyMs = Reading.LatencyMs;
-    this.LastSuccessAt = this.LastChecked;
-    this.Metrics = Values;
-    this._previous = Values;
-    return true;
   }
 
   StartLoop(): void {

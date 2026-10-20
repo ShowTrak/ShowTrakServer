@@ -446,6 +446,10 @@ const Manager = {
     Terminal.Settings = NextSettings;
     Terminal.GroupID = NextGroupID == null ? null : NextGroupID;
     Terminal.SetInterval(NextInterval);
+    // Judge the readings already on screen against the edited conditions, so an
+    // alarm raises or clears as the editor saves instead of on the next poll.
+    // The broadcast below carries the new verdict to the tile and the alerts.
+    Terminal.ReevaluateAlarms();
 
     BroadcastManager.emit('FreeKioskTerminalUpdated', Terminal.ToJSON());
     BroadcastManager.emit('FreeKioskTerminalListChanged');

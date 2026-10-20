@@ -586,6 +586,85 @@ test('turning that alarm off returns the terminal to online', async () => {
   }
 });
 
+// The device stub counts nothing, so "no new poll" is proven by the readings'
+// timestamp standing still across the edit.
+test('disarming a breaching condition clears the alarm as the edit saves', async () => {
+  const device = await startFreeKioskDevice({
+    status: { screen: { on: false, screensaverActive: false } },
+  });
+  try {
+    await withManager(async (Manager, db, events) => {
+      const [, created] = await Manager.Create({ Address: '127.0.0.1', Port: device.port });
+      await Manager.RunNow([created.UUID]);
+      const [, before] = await Manager.Get(created.UUID);
+      assert.equal(before.State, 'DEGRADED');
+
+      events.length = 0;
+      const [err, updated] = await Manager.Update(created.UUID, {
+        Settings: { A_content_displaying_On: false },
+      });
+      assert.equal(err, null);
+      assert.equal(updated.State, 'ONLINE');
+      assert.deepEqual(updated.Alarms, []);
+      assert.equal(updated.LastError, null);
+      assert.equal(updated.LastChecked, before.LastChecked);
+      // The alerts engine and the tile both read the broadcast, not the return.
+      const broadcast = events.find(([name]) => name === 'FreeKioskTerminalUpdated');
+      assert.equal(broadcast[1].Degraded, false);
+    });
+  } finally {
+    await device.close();
+  }
+});
+
+test('arming a condition the last readings already break degrades the terminal at once', async () => {
+  const device = await startFreeKioskDevice({});
+  try {
+    await withManager(async (Manager, db, events) => {
+      const [, created] = await Manager.Create({ Address: '127.0.0.1', Port: device.port });
+      await Manager.RunNow([created.UUID]);
+      const [, before] = await Manager.Get(created.UUID);
+      assert.equal(before.State, 'ONLINE');
+      assert.equal(before.Metrics.battery_level, 87);
+
+      events.length = 0;
+      const [err, updated] = await Manager.Update(created.UUID, {
+        Settings: {
+          ...before.Settings,
+          G_Battery_On: true,
+          A_battery_level_On: true,
+          A_battery_level_Op: 'below',
+          A_battery_level_V: 90,
+        },
+      });
+      assert.equal(err, null);
+      assert.equal(updated.State, 'DEGRADED');
+      assert.equal(updated.LastChecked, before.LastChecked);
+      assert.deepEqual(
+        updated.Alarms.map((Alarm) => Alarm.Key),
+        ['battery_level']
+      );
+      const broadcast = events.find(([name]) => name === 'FreeKioskTerminalUpdated');
+      assert.equal(broadcast[1].Alarms[0].Key, 'battery_level');
+    });
+  } finally {
+    await device.close();
+  }
+});
+
+test('editing conditions on an offline terminal leaves it offline', async () => {
+  await withManager(async (Manager) => {
+    const [, created] = await Manager.Create({ Address: '127.0.0.1', Port: 1, TimeoutMs: 1000 });
+    await Manager.RunNow([created.UUID]);
+    const [, updated] = await Manager.Update(created.UUID, {
+      Settings: { A_content_displaying_On: true },
+    });
+    assert.equal(updated.State, 'OFFLINE');
+    assert.equal(updated.Degraded, false);
+    assert.ok(updated.LastError);
+  });
+});
+
 test('an unreachable terminal reads offline, not degraded', async () => {
   // Degraded means "answering, but something is wrong". With no data at all
   // there is nothing to judge, so it must be plainly offline.
