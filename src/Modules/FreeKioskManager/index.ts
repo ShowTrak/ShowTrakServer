@@ -59,6 +59,29 @@ const TerminalsRepo = CreateFreeKioskTerminalsRepository(DB);
 
 let TerminalList: FreeKioskTerminal[] = [];
 
+// In-flight Init(), so concurrent callers share one run instead of each building
+// their own TerminalList. Boot fires Init() without awaiting it, and every
+// `if (!Initialized) await Init()` call site that lands before it finishes (the
+// renderer's first GetAll, BackfillSlugs) would otherwise start a second one.
+// The losing list's terminals keep polling for ever with the settings they were
+// loaded with, and no edit ever reaches them — so a condition the operator has
+// since changed goes on raising, and clearing, once every interval.
+let InitPromise: Promise<void> | null = null;
+
+async function RunInit(): Promise<void> {
+  const [Err, Rows] = await TerminalsRepo.GetAll();
+  if (Err) {
+    Logger.error('Failed to load FreeKiosk terminals', Err);
+    Manager.Initialized = true;
+    TerminalList = [];
+    return;
+  }
+  TerminalList = (Rows || []).map((Row) => new FreeKioskTerminal(Row));
+  Manager.Initialized = true;
+  for (const Terminal of TerminalList) Terminal.StartLoop();
+  BroadcastManager.emit('FreeKioskTerminalListChanged');
+}
+
 function GenerateUUID(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
     return globalThis.crypto.randomUUID();
@@ -201,22 +224,21 @@ const Manager = {
   },
 
   async Init(): Promise<void> {
-    const [Err, Rows] = await TerminalsRepo.GetAll();
-    if (Err) {
-      Logger.error('Failed to load FreeKiosk terminals', Err);
-      Manager.Initialized = true;
-      TerminalList = [];
-      return;
-    }
-    TerminalList = (Rows || []).map((Row) => new FreeKioskTerminal(Row));
-    Manager.Initialized = true;
-    for (const Terminal of TerminalList) Terminal.StartLoop();
-    BroadcastManager.emit('FreeKioskTerminalListChanged');
+    if (Manager.Initialized) return;
+    if (InitPromise) return InitPromise;
+    InitPromise = RunInit().finally(() => {
+      InitPromise = null;
+    });
+    return InitPromise;
   },
 
   // Rebuild runtime state from the DB after external bulk changes (opening a
   // different show file, importing config).
   async Reload(): Promise<void> {
+    // Let any in-flight Init settle first, otherwise Manager.Init() below just
+    // hands back that older run's promise and the reload reads the old show's
+    // rows — and that run's loops, started after the StopLoop sweep, leak.
+    if (InitPromise) await InitPromise.catch(() => undefined);
     for (const Terminal of TerminalList) Terminal.StopLoop();
     TerminalList = [];
     Manager.Initialized = false;
