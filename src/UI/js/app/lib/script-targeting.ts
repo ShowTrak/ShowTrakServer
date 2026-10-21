@@ -85,3 +85,29 @@ export function ResolveScriptTargets(
     .filter((Client) => IsScriptTargetable(Script, Client, Tags))
     .map((Client) => Client.UUID);
 }
+
+/** Why a selected client won't run a script, as the menu's info popover words it. */
+export type ScriptSkipReason = 'Disabled' | 'Unsupported' | 'Offline';
+
+/**
+ * Why a script won't run on a client, or null when it will.
+ *
+ * Unsupported is its OS, Disabled is the whitelist and Offline is the machine
+ * itself. The first that applies wins, so a client that is both offline and
+ * outside the whitelist reads as Disabled: coming back online won't help it.
+ */
+export function GetScriptSkipReason(
+  Script: TargetableScript,
+  Client: Pick<ClientView, 'UUID' | 'GroupID' | 'OperatingSystem' | 'Online'> | null | undefined,
+  Tags?: TagView[] | null
+): ScriptSkipReason | null {
+  const Compatible = Array.isArray(Script && Script.CompatiblePlatforms)
+    ? (Script.CompatiblePlatforms as string[])
+    : [];
+  if (!Client || !Client.OperatingSystem || !Compatible.includes(Client.OperatingSystem)) {
+    return 'Unsupported';
+  }
+  if (!IsClientWhitelisted(Script && Script.Whitelist, Client, Tags)) return 'Disabled';
+  if (!Client.Online) return 'Offline';
+  return null;
+}

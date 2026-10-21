@@ -2178,6 +2178,77 @@ body.compact-mode .group-column-grid {
   opacity: 1;
 }
 
+/* Names the kind of client the rows below it act on (ShowTrak Clients,
+   Monitors, FreeKiosk, …). Not a menu item, so keyboard navigation skips it. */
+#SHOWTRAK_CONTEXT_MENU .context-section-header {
+  padding: 0.35rem 0.6rem 0.15rem;
+  color: var(--text-subtle);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Info icon on an action that will skip part of the selection; hovering it
+   opens #SHOWTRAK_CONTEXT_UNSUPPORTED_POPOVER (wire-context-menu.ts). It sits
+   flush right, mirroring the leading .context-icon slot: its centre is the
+   same distance from the right edge as the icon's is from the left (the
+   negative margins let the hover square grow past the 1.1rem slot without
+   moving that centre or the title's gap). */
+#SHOWTRAK_CONTEXT_MENU .context-shortcut:empty {
+  display: none;
+}
+#SHOWTRAK_CONTEXT_MENU .context-unsupported {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: -0.2rem -0.2rem -0.2rem -0.2rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-subtle);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: default;
+}
+#SHOWTRAK_CONTEXT_MENU .context-unsupported:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-strong);
+}
+#SHOWTRAK_CONTEXT_UNSUPPORTED_POPOVER {
+  display: none;
+  position: fixed;
+  z-index: calc(var(--z-context-menu) + 1);
+  max-width: 280px;
+  padding: 0.4rem 0.6rem;
+  background: var(--surface-0);
+  color: var(--text-strong);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  pointer-events: none;
+}
+#SHOWTRAK_CONTEXT_UNSUPPORTED_POPOVER .context-unsupported-heading {
+  color: var(--text-subtle);
+  margin-bottom: 0.2rem;
+}
+#SHOWTRAK_CONTEXT_UNSUPPORTED_POPOVER .context-unsupported-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+#SHOWTRAK_CONTEXT_UNSUPPORTED_POPOVER .context-unsupported-name {
+  overflow-wrap: anywhere;
+}
+#SHOWTRAK_CONTEXT_UNSUPPORTED_POPOVER .context-unsupported-reason {
+  flex: 0 0 auto;
+  color: var(--text-subtle);
+}
+
 /* Close button header only appears in the mobile action-sheet layout. */
 #SHOWTRAK_CONTEXT_MENU .context-menu-header {
   display: none;
@@ -6114,7 +6185,8 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
   color: var(--warning) !important;
 }
 #SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-shortcut,
-#SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-icon {
+#SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-icon,
+#SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-unsupported {
   display: none !important;
 }
 

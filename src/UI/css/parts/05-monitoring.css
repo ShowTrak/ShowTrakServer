@@ -1672,7 +1672,8 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
   color: var(--warning) !important;
 }
 #SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-shortcut,
-#SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-icon {
+#SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-icon,
+#SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.context-confirm-pending .context-unsupported {
   display: none !important;
 }
 

@@ -182,6 +182,52 @@ function BindContextMenuKeyboard($menu: JQuery) {
     });
 }
 
+// The popover listing the clients an action won't run on. It lives on <body>
+// rather than in the menu, whose overflow would clip it, so it is positioned
+// against the icon and hidden whenever the menu could have closed.
+const UNSUPPORTED_POPOVER_ID = 'SHOWTRAK_CONTEXT_UNSUPPORTED_POPOVER';
+
+function ShowUnsupportedPopover(
+  Anchor: HTMLElement,
+  SkippedOn: NonNullable<ContextMenuOption['SkippedOn']>
+) {
+  let Popover = document.getElementById(UNSUPPORTED_POPOVER_ID);
+  if (!Popover) {
+    Popover = document.createElement('div');
+    Popover.id = UNSUPPORTED_POPOVER_ID;
+    Popover.setAttribute('role', 'tooltip');
+    document.body.appendChild(Popover);
+  }
+  Popover.innerHTML =
+    `<div class="context-unsupported-heading">Won't run on:</div>` +
+    SkippedOn.map(
+      ({ Name, Reason }) =>
+        `<div class="context-unsupported-row">` +
+        `<span class="context-unsupported-name">${Safe(Name)}</span>` +
+        `<span class="context-unsupported-reason">${Safe(Reason)}</span>` +
+        `</div>`
+    ).join('');
+  Popover.style.display = 'block';
+  const Gap = 8;
+  const Rect = Anchor.getBoundingClientRect();
+  const Width = Popover.offsetWidth;
+  const Height = Popover.offsetHeight;
+  // To the right of the icon, or the left when that would leave the window.
+  let Left = Rect.right + Gap;
+  if (Left + Width > window.innerWidth - Gap) Left = Math.max(Gap, Rect.left - Gap - Width);
+  const Top = Math.max(
+    Gap,
+    Math.min(Rect.top + Rect.height / 2 - Height / 2, window.innerHeight - Gap - Height)
+  );
+  Popover.style.left = `${Left}px`;
+  Popover.style.top = `${Top}px`;
+}
+
+function HideUnsupportedPopover() {
+  const Popover = document.getElementById(UNSUPPORTED_POPOVER_ID);
+  if (Popover) Popover.style.display = 'none';
+}
+
 // Draw the rows. An action row runs on a click, or on a confirming second tap
 // for touch input and the mobile layout (see RequiresTapConfirm).
 function RenderContextMenuOptions(
@@ -189,6 +235,7 @@ function RenderContextMenuOptions(
   Options: ContextMenuOption[],
   LastPointerType: () => string | null
 ) {
+  HideUnsupportedPopover();
   $menu.html('');
   $menu.append(
     `<div class="context-menu-header">` +
@@ -201,6 +248,11 @@ function RenderContextMenuOptions(
   Options.forEach((option) => {
     if (option.Type === 'Divider') {
       $options.append(`<hr>`);
+    }
+    if (option.Type === 'Header') {
+      $options.append(
+        `<div class="context-section-header" role="presentation">${Safe(option.Title)}</div>`
+      );
     }
     if (option.Type === 'Info') {
       $options.append(
@@ -221,6 +273,12 @@ function RenderContextMenuOptions(
       const iconHtml = `<span class="context-icon"><i class="bi ${Safe(
         iconClass
       )}"${iconStyle}></i></span>`;
+      // An action that will skip some of the selection carries an info icon;
+      // hovering it lists the clients it won't run on.
+      const unsupportedHtml = option.SkippedOn?.length
+        ? `<span class="context-unsupported" aria-label="Won't run on every selected client">` +
+          `<i class="bi bi-info-circle"></i></span>`
+        : '';
       $options.append(
         `<a class="SHOWTRAK_CONTEXTMENU_BUTTON dropdown-item ${Safe(
           option.Class
@@ -228,9 +286,19 @@ function RenderContextMenuOptions(
           iconHtml +
           `<span class="context-title">${Safe(option.Title)}</span>` +
           `<span class="context-shortcut">${Safe(option.Shortcut || '')}</span>` +
+          unsupportedHtml +
           `</a>`
       );
       const $option = $options.find('a:last');
+      if (option.SkippedOn?.length) {
+        const SkippedOn = option.SkippedOn;
+        $option
+          .find('.context-unsupported')
+          .on('mouseenter', function () {
+            ShowUnsupportedPopover(this, SkippedOn);
+          })
+          .on('mouseleave', HideUnsupportedPopover);
+      }
       // Stash the original title so a pending row can be restored (e.g. when
       // another row is tapped and this one reverts out of its confirm state).
       $option.data('optionTitle', String(option.Title || ''));
@@ -420,6 +488,11 @@ export function wireContextMenu() {
     $menu.hide();
     return;
   });
+  // The menu closes from several places (clicks, Escape, running an action);
+  // none of them fire mouseleave on the info icon, so the popover follows here.
+  document.addEventListener('pointerdown', HideUnsupportedPopover, { capture: true });
+  document.addEventListener('keydown', HideUnsupportedPopover, { capture: true });
+  $menu.on('scroll', HideUnsupportedPopover);
   $menu.on('click', 'a', function (e) {
     e.stopPropagation();
     $menu.hide();

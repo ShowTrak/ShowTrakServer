@@ -33,7 +33,12 @@ const TARGETING_PATH = path.join(
   'script-targeting.js'
 );
 
-const { IsClientWhitelisted, IsScriptTargetable, ResolveScriptTargets } = require(TARGETING_PATH);
+const {
+  GetScriptSkipReason,
+  IsClientWhitelisted,
+  IsScriptTargetable,
+  ResolveScriptTargets,
+} = require(TARGETING_PATH);
 
 const client = (O = {}) => ({ UUID: 'c1', GroupID: 1, OperatingSystem: 'Windows', ...O });
 const script = (O = {}) => ({ CompatiblePlatforms: ['Windows'], Whitelist: null, ...O });
@@ -275,4 +280,18 @@ test('a tag-restricted script is offered on the machines the tag covers', () => 
   assert.equal(IsScriptTargetable(Script, Windows('c1'), Tags), true);
   assert.equal(IsScriptTargetable(Script, Windows('c2'), Tags), false);
   assert.deepEqual(ResolveScriptTargets(Script, [Windows('c1'), Windows('c2')], Tags), ['c1']);
+});
+
+// --- Skip reasons (the context menu's info popover) -------------------------
+
+test('a skip reason names the OS before the whitelist before the machine', () => {
+  const Script = script({ Whitelist: { Workspace: false, Groups: [], Clients: ['c1'], Tags: [] } });
+  const Reason = (O) => GetScriptSkipReason(Script, client({ Online: true, ...O }));
+
+  assert.equal(Reason({}), null);
+  assert.equal(Reason({ Online: false }), 'Offline');
+  assert.equal(Reason({ UUID: 'c2' }), 'Disabled');
+  assert.equal(Reason({ UUID: 'c2', Online: false }), 'Disabled');
+  assert.equal(Reason({ OperatingSystem: 'Linux', UUID: 'c2', Online: false }), 'Unsupported');
+  assert.equal(Reason({ OperatingSystem: undefined }), 'Unsupported');
 });

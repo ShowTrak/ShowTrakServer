@@ -37,7 +37,11 @@ import {
   GetMethodAction,
   RunMonitoringAction,
 } from './monitoring-actions';
-import { ResolveScriptTargets } from './lib/script-targeting';
+import {
+  GetScriptSkipReason,
+  ResolveScriptTargets,
+  type ScriptSkipReason,
+} from './lib/script-targeting';
 import {
   FREEKIOSK_MENU_POLL_SETTING_KEY,
   FreeKioskMenuSettingKey,
@@ -45,8 +49,8 @@ import {
 } from './lib/freekiosk-menu';
 
 export // One row in the right-click / mobile context menu. `Type` selects how the row
-// renders (informational label, divider, or actionable item); the remaining
-// fields are only meaningful for `Action` (and `Info`) rows.
+// renders (informational label, section header, divider, or actionable item);
+// the remaining fields are only meaningful for `Action` (and `Info`) rows.
 interface ContextMenuOption {
   Type: string;
   Title?: string;
@@ -54,6 +58,9 @@ interface ContextMenuOption {
   Shortcut?: string;
   Icon?: string;
   IconColour?: string;
+  // Selected clients the action will skip, and why; listed in a popover on
+  // the row's info icon.
+  SkippedOn?: { Name: string; Reason: ScriptSkipReason }[];
   // Resolves to `false` when the user backed out of a confirmation.
   Action?: () => unknown;
   // Runs something against the selected entities, so it may clear the
@@ -84,10 +91,14 @@ export async function BuildContextMenuOptions(
 
   if (Selection.length > 0) {
     // Actions are grouped into sections by the type of selected entity:
-    //  - Scripts        -> remote (OS) clients, filtered to their platform.
-    //  - Remote Events  -> integrated clients, from their declared actions.
-    //  - Monitoring     -> monitoring targets (monitor: prefixed selection).
-    //  - Dummy Clients  -> dummy clients (dummy: prefixed selection).
+    //  - ShowTrak Clients -> remote (OS) clients: scripts filtered to their
+    //                        platform, then Identify and Wake on LAN.
+    //  - SDK Clients      -> integrated clients, from their declared actions.
+    //  - Monitors         -> monitoring targets (monitor: prefixed selection).
+    //  - Checks           -> list-view check rows (check: prefixed selection).
+    //  - Dummy Clients    -> dummy clients (dummy: prefixed selection).
+    //  - FreeKiosk        -> FreeKiosk terminals (kiosk: prefixed selection).
+    // Clear Selection / Select All follow under "Other".
     // Every option offered by ANY selected type is displayed, but each action
     // only runs against the compatible subset of the selection. A section is
     // only rendered when it has at least one option.
@@ -144,19 +155,23 @@ export async function BuildContextMenuOptions(
     const RemoteClients = SelectedClients.filter((Client) => !IsIntegratedClient(Client));
     const IntegratedClients = SelectedClients.filter((Client) => IsIntegratedClient(Client));
 
-    // Sections are grouped by client type and separated by a divider; the
-    // first section has no leading divider.
+    // Sections are grouped by client type, each under a header naming the
+    // type, and separated by a divider; the first section has no leading
+    // divider.
     let SectionsRendered = 0;
-    const PushSection = (_Title: string) => {
+    const PushSection = (Title: string) => {
       if (SectionsRendered > 0) Options.push({ Type: 'Divider' });
+      Options.push({ Type: 'Header', Title });
       SectionsRendered += 1;
     };
 
-    // --- Scripts (remote clients) ---------------------------------------
+    // --- ShowTrak Clients (remote clients) -------------------------------
+    // Scripts, then Identify and Wake on LAN.
+    const ClientOptions: ContextMenuOption[] = [];
+
     // A script is offered if it is compatible with ANY selected remote client;
     // running it targets only the remote clients whose OS it supports.
     if (RemoteClients.length > 0) {
-      const ScriptOptions: ContextMenuOption[] = [];
       for (const Script of ScriptList) {
         // A client is a valid target only if the script is enabled, supports
         // its OS AND the script's whitelist admits it. A script with zero
@@ -172,13 +187,20 @@ export async function BuildContextMenuOptions(
         // terminal glyph for older scripts without one.
         const ScriptIconName =
           typeof Script.Icon === 'string' && Script.Icon.trim() ? Script.Icon.trim() : 'terminal';
-        ScriptOptions.push({
+        const SkippedOn = RemoteClients.flatMap((Client) => {
+          const Reason = GetScriptSkipReason(Script, Client, Tags);
+          return Reason
+            ? [{ Name: Client.Nickname || Client.Hostname || Client.UUID, Reason }]
+            : [];
+        });
+        ClientOptions.push({
           Type: 'Action',
           Title: `${Script.Name}`,
           Class: '',
           // Scripts show their chosen icon tinted with their assigned colour.
           Icon: `bi-${ScriptIconName}`,
           IconColour: ColourFromIndex(Script.Colour),
+          SkippedOn,
           ActsOnSelection: true,
           Action: async function () {
             const Plural = Targets.length == 1 ? '' : 's';
@@ -206,10 +228,96 @@ export async function BuildContextMenuOptions(
           },
         });
       }
-      if (ScriptOptions.length > 0) {
-        PushSection('Scripts');
-        Options.push(...ScriptOptions);
-      }
+    }
+
+    // Identify / Stop Identifying for selected clients.
+    const IdentifyTargets = Selection.map((UUID) => GetIdentifyTargetByUUID(UUID)).filter(
+      (Target) => Target && Target.Eligible
+    );
+    const IdentifyStartTargets = IdentifyTargets.filter((Target) => !Target.IsIdentifying);
+    const IdentifyStopTargets = IdentifyTargets.filter((Target) => Target.IsIdentifying);
+
+    if (IdentifyStartTargets.length > 0) {
+      ClientOptions.push({
+        Type: 'Action',
+        Title: IdentifyStartTargets.length === 1 ? 'Identify Client' : 'Identify Clients',
+        Class: 'text-light',
+        Icon: 'bi-broadcast-pin',
+        IconColour: '#2ecc71',
+        ActsOnSelection: true,
+        Action: async function () {
+          try {
+            const UUIDs = IdentifyStartTargets.map((Target) => Target.UUID);
+            const Results = await Promise.all(UUIDs.map((UUID) => window.API.IdentifyClient(UUID)));
+            const Succeeded: string[] = [];
+            const Failed: { UUID: string; Error: unknown }[] = [];
+            Results.forEach((Result, Index) => {
+              const Err = Array.isArray(Result) ? Result[0] : null;
+              // Results is mapped 1:1 from UUIDs, so Index is always in range
+              if (Err) Failed.push({ UUID: UUIDs[Index]!, Error: Err });
+              else Succeeded.push(UUIDs[Index]!);
+            });
+            if (Succeeded.length) ApplyIdentifyStateLocally(Succeeded, true);
+            const Errors = Failed.map((Entry) => Entry.Error).filter(Boolean);
+            if (Errors.length) Notify(String(Errors[0]), 'error');
+          } catch (err) {
+            HandleNonFatalError('SelectionInit:Identify', err);
+          }
+        },
+      });
+    }
+
+    if (IdentifyStopTargets.length > 0) {
+      ClientOptions.push({
+        Type: 'Action',
+        Title: IdentifyStopTargets.length === 1 ? 'Stop Identifying' : 'Stop Identifying Selected',
+        Class: 'text-light',
+        Icon: 'bi-slash-circle',
+        IconColour: '#f1c40f',
+        ActsOnSelection: true,
+        Action: async function () {
+          try {
+            await StopIdentifyingForUUIDs(IdentifyStopTargets.map((Target) => Target.UUID));
+          } catch (err) {
+            HandleNonFatalError('SelectionInit:StopIdentify', err);
+          }
+        },
+      });
+    }
+
+    // Wake on LAN only applies to real adopted clients; monitoring, check,
+    // dummy and FreeKiosk rows carry prefixed selection UUIDs and are excluded.
+    const WolTargets = Selection.filter(
+      (UUID) =>
+        !String(UUID).startsWith('monitor:') &&
+        !String(UUID).startsWith('check:') &&
+        !String(UUID).startsWith('dummy:') &&
+        !String(UUID).startsWith('kiosk:')
+    );
+    // The browser never receives SYSTEM_ALLOW_WOL (settings reach it through a
+    // public allowlist), so it uses the capability hint the server sends at
+    // connect, which already folds in the WEBUI_ALLOW_WOL permission.
+    const WolEnabled = Capabilities.isWeb
+      ? Capabilities.wolEnabled
+      : !!(await GetSettingValue('SYSTEM_ALLOW_WOL'));
+    if (WolEnabled && WolTargets.length > 0) {
+      ClientOptions.push({
+        Type: 'Action',
+        Title: 'Wake on LAN',
+        Class: 'text-light',
+        Icon: 'bi-power',
+        IconColour: '#2ecc71',
+        ActsOnSelection: true,
+        Action: async function () {
+          window.API.WakeOnLan(WolTargets);
+          ShowExecutionToastIfActive();
+        },
+      });
+    }
+
+    if (ClientOptions.length > 0) {
+      PushSection('ShowTrak Clients');
+      Options.push(...ClientOptions);
     }
 
     // --- Remote Events (integrated clients) -----------------------------
@@ -247,14 +355,14 @@ export async function BuildContextMenuOptions(
           },
         }));
       if (EventOptions.length > 0) {
-        PushSection('Remote Events');
+        PushSection('SDK Clients');
         Options.push(...EventOptions);
       }
     }
 
     // --- Monitoring targets --------------------------------------------
     if (MonitorTargetIDs.length > 0) {
-      PushSection('Monitoring');
+      PushSection('Monitors');
 
       // Starred check actions first: they are the things an operator reaches
       // for mid-show (power a row of projectors on, close their shutters),
@@ -452,7 +560,9 @@ export async function BuildContextMenuOptions(
         KioskOptions.push({
           Type: 'Action',
           Title: Command.Label,
-          Class: Command.Destructive ? 'text-warning' : 'text-light',
+          // Destructive commands keep white text; the red icon and the
+          // confirmation mark them out.
+          Class: 'text-light',
           Icon: `bi-${Command.Icon}`,
           IconColour: Command.Destructive ? '#e74c3c' : '#9b59b6',
           ActsOnSelection: true,
@@ -479,7 +589,7 @@ export async function BuildContextMenuOptions(
       }
 
       if (KioskOptions.length > 0) {
-        PushSection('FreeKiosk Terminals');
+        PushSection('FreeKiosk');
         Options.push(...KioskOptions);
       }
     }
@@ -487,114 +597,25 @@ export async function BuildContextMenuOptions(
     if (SectionsRendered > 0) {
       Options.push({ Type: 'Divider' });
     }
-
-    // Identify / Stop Identifying for selected clients.
-    const IdentifyTargets = Selection.map((UUID) => GetIdentifyTargetByUUID(UUID)).filter(
-      (Target) => Target && Target.Eligible
-    );
-    const IdentifyStartTargets = IdentifyTargets.filter((Target) => !Target.IsIdentifying);
-    const IdentifyStopTargets = IdentifyTargets.filter((Target) => Target.IsIdentifying);
-
-    if (IdentifyStartTargets.length > 0) {
-      Options.push({
-        Type: 'Action',
-        Title: IdentifyStartTargets.length === 1 ? 'Identify Client' : 'Identify Clients',
-        Class: 'text-light',
-        Icon: 'bi-broadcast-pin',
-        IconColour: '#2ecc71',
-        ActsOnSelection: true,
-        Action: async function () {
-          try {
-            const UUIDs = IdentifyStartTargets.map((Target) => Target.UUID);
-            const Results = await Promise.all(UUIDs.map((UUID) => window.API.IdentifyClient(UUID)));
-            const Succeeded: string[] = [];
-            const Failed: { UUID: string; Error: unknown }[] = [];
-            Results.forEach((Result, Index) => {
-              const Err = Array.isArray(Result) ? Result[0] : null;
-              // Results is mapped 1:1 from UUIDs, so Index is always in range
-              if (Err) Failed.push({ UUID: UUIDs[Index]!, Error: Err });
-              else Succeeded.push(UUIDs[Index]!);
-            });
-            if (Succeeded.length) ApplyIdentifyStateLocally(Succeeded, true);
-            const Errors = Failed.map((Entry) => Entry.Error).filter(Boolean);
-            if (Errors.length) Notify(String(Errors[0]), 'error');
-          } catch (err) {
-            HandleNonFatalError('SelectionInit:Identify', err);
-          }
-        },
-      });
-    }
-
-    if (IdentifyStopTargets.length > 0) {
-      Options.push({
-        Type: 'Action',
-        Title: IdentifyStopTargets.length === 1 ? 'Stop Identifying' : 'Stop Identifying Selected',
-        Class: 'text-light',
-        Icon: 'bi-slash-circle',
-        IconColour: '#f1c40f',
-        ActsOnSelection: true,
-        Action: async function () {
-          try {
-            await StopIdentifyingForUUIDs(IdentifyStopTargets.map((Target) => Target.UUID));
-          } catch (err) {
-            HandleNonFatalError('SelectionInit:StopIdentify', err);
-          }
-        },
-      });
-    }
-
-    if (IdentifyStartTargets.length + IdentifyStopTargets.length > 0) {
-      Options.push({ Type: 'Divider' });
-    }
-  }
-
-  if (Selection.length > 0) {
-    // Wake on LAN only applies to real adopted clients; monitoring, check,
-    // dummy and FreeKiosk rows carry prefixed selection UUIDs and are excluded.
-    const WolTargets = Selection.filter(
-      (UUID) =>
-        !String(UUID).startsWith('monitor:') &&
-        !String(UUID).startsWith('check:') &&
-        !String(UUID).startsWith('dummy:') &&
-        !String(UUID).startsWith('kiosk:')
-    );
-    // The browser never receives SYSTEM_ALLOW_WOL (settings reach it through a
-    // public allowlist), so it uses the capability hint the server sends at
-    // connect, which already folds in the WEBUI_ALLOW_WOL permission.
-    const WolEnabled = Capabilities.isWeb
-      ? Capabilities.wolEnabled
-      : !!(await GetSettingValue('SYSTEM_ALLOW_WOL'));
-    if (WolEnabled && WolTargets.length > 0) {
-      Options.push({
-        Type: 'Action',
-        Title: 'Wake on LAN',
-        Class: 'text-light',
-        Icon: 'bi-power',
-        IconColour: '#2ecc71',
-        ActsOnSelection: true,
-        Action: async function () {
-          window.API.WakeOnLan(WolTargets);
-          ShowExecutionToastIfActive();
-        },
-      });
-    }
-    if (IncludeSelectionRows) {
-      Options.push({
-        Type: 'Action',
-        Title: 'Clear Selection',
-        Class: 'text-light',
-        Shortcut: 'Ctrl/Cmd+D',
-        Icon: 'bi-x-circle',
-        IconColour: '#e74c3c',
-        Action: async function () {
-          ClearSelection();
-        },
-      });
-    }
   }
 
   if (!IncludeSelectionRows) return Options;
 
+  // Selection management stays last, under its own header.
+  Options.push({ Type: 'Header', Title: 'Other' });
+  if (Selection.length > 0) {
+    Options.push({
+      Type: 'Action',
+      Title: 'Clear Selection',
+      Class: 'text-light',
+      Shortcut: 'Ctrl/Cmd+D',
+      Icon: 'bi-x-circle',
+      IconColour: '#e74c3c',
+      Action: async function () {
+        ClearSelection();
+      },
+    });
+  }
   Options.push({
     Type: 'Action',
     Title: 'Select All',
