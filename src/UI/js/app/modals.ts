@@ -5,7 +5,7 @@ import { SetCompactMode } from './mode';
 import { OpenClientInfo } from './client-info-modal';
 import { OpenMonitoringTargetHistory, OpenDummyClientHistory } from './monitoring';
 import { Safe } from './utils';
-import { ConfirmationDialog, Notify, ShowExecutionToast, Wait } from './selection-init';
+import { ConfirmationDialog, Notify, ShowExecutionToastIfActive, Wait } from './selection-init';
 import { ClearTagPicker } from './tag-picker';
 import type { ClientView } from '@showtrak/protocol';
 
@@ -22,14 +22,14 @@ export async function ExecuteScript(
   const ScriptTarget = ScriptList.find((s) => s.ID === Script);
   if (!ScriptTarget) return Notify('Script not found.', 'error');
   await window.API.ExecuteScript(Script, Targets, true);
-  ShowExecutionToast();
+  ShowExecutionToastIfActive();
 }
 
 // Trigger an integrated client event (declared by an integrated client) on the
 // given targets. Mirrors ExecuteScript but uses the integrated event protocol.
 export async function TriggerIntegratedEvent(EventID: string, Targets: string[]) {
   await window.API.TriggerIntegratedEvent(EventID, Targets);
-  ShowExecutionToast('Integrated Events');
+  ShowExecutionToastIfActive('Integrated Events');
 }
 
 // Build the shared header (title + close) for the simpler single-panel modals.
@@ -104,7 +104,7 @@ export function InitModals() {
     if (Type == 'ExecuteScript') return await ExecuteScript(Args, Targets);
     if (Type == 'WOL') {
       window.API.WakeOnLan(Targets);
-      ShowExecutionToast();
+      ShowExecutionToastIfActive();
       return;
     }
     if (Type == 'InternalScript') return;

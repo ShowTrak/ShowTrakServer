@@ -31,7 +31,7 @@ import type {
 import { AppMode, Capabilities, PendingAdoption, ScriptList } from './state';
 import { IsIntegratedClientEntity } from './state/client-labels';
 import { HandleNonFatalError, Safe } from './utils';
-import { ConfirmationDialog, Notify, ShowExecutionToast } from './selection-init';
+import { ConfirmationDialog, Notify, ShowExecutionToastIfActive } from './selection-init';
 import { ClearTagPicker, RenderReadOnlyTagChips, RenderTagPicker } from './tag-picker';
 import type { TagPickerMount } from './tag-picker';
 import { IsFogAvailable, OpenFogTaskModal } from './fog';
@@ -904,7 +904,7 @@ function BuildManageRows(Client: ClientView, Fog: FogState, Integrated: boolean)
       IconColour: '#3498db',
       Run: async () => {
         await window.API.CheckForUpdatesOnClient(UUID);
-        ShowExecutionToast();
+        ShowExecutionToastIfActive();
       },
     });
   }

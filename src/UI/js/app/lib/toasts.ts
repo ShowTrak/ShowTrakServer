@@ -376,6 +376,25 @@ export function CriticalConfirmationDialog(Options: CriticalConfirmationOptions)
 // next push shows it, then the stale timer fires), which reads as a flash.
 let execToastRemoveTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Whether the last executions push held any queued or running (non-deployment)
+// work. Kept by the push handler in client-list.ts.
+let executionsInProgress = false;
+
+export function SetExecutionsInProgress(InProgress: boolean) {
+  executionsInProgress = InProgress;
+}
+
+/**
+ * Open the panel straight after the operator runs an action — but only when work
+ * is already in progress. Otherwise the executions push opens it once the action
+ * has actually queued something, so an action that reached no devices (a tag or
+ * selection with nothing applicable, Wake on LAN on machines already online)
+ * never opens an empty box.
+ */
+export function ShowExecutionToastIfActive(title?: string) {
+  if (executionsInProgress) ShowExecutionToast(title);
+}
+
 export function ShowExecutionToast(title?: string) {
   if (execToastRemoveTimer) {
     clearTimeout(execToastRemoveTimer);

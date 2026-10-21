@@ -48,6 +48,7 @@ import {
   ConfirmationDialog,
   HideExecutionToast,
   RenderClientInfoDetails,
+  SetExecutionsInProgress,
   ShowExecutionToast,
   UpdateIdentifyStatusBanner,
 } from './selection-init';
@@ -131,6 +132,15 @@ export {
   TruncateGroupLabel,
 } from './lib/client-list-layout';
 
+/** How long the execution panel stays up once everything has settled. */
+function ExecutionPanelDwellMs(): number {
+  const Setting = (Array.isArray(Settings) ? Settings : []).find(
+    (S) => S && S.Key === 'UI_EXECUTION_PANEL_DWELL_SECONDS'
+  );
+  const Seconds = Number(Setting ? Setting.Value : NaN);
+  return (Number.isFinite(Seconds) && Seconds >= 0 ? Seconds : 5) * 1000;
+}
+
 // Registers the script-execution / script-list / full-client-list push
 // handlers. Bodies unchanged from the former import-time subscriptions.
 function InitClientListPush() {
@@ -169,6 +179,10 @@ function InitClientListPush() {
       window.__ShowTrakExecutionAutoDismissTimer = null;
     }
 
+    SetExecutionsInProgress(
+      nonDeploymentExecutions.some((Request) => Request && Request.Status === 'Pending')
+    );
+
     // Suppress deployment-only execution toasts. Deployments still run server-side,
     // but they should not hijack the execution UI on app load or integrated actions.
     if (nonDeploymentExecutions.length === 0) {
@@ -180,11 +194,12 @@ function InitClientListPush() {
       return;
     }
 
-    // Auto-dismiss the execution panel 5 seconds after every execution has SETTLED
-    // — whether it succeeded or failed. Queued and running executions are both
-    // Status='Pending', so the panel stays open while any work remains, and if a
-    // new batch is started within the 5s window the else-branch below cancels the
-    // countdown — the panel only closes 5s after the LAST script finishes.
+    // Auto-dismiss the execution panel a dwell time (UI_EXECUTION_PANEL_DWELL_SECONDS)
+    // after every execution has SETTLED — whether it succeeded or failed. Queued
+    // and running executions are both Status='Pending', so the panel stays open
+    // while any work remains, and if a new batch is started within the dwell the
+    // else-branch below cancels the countdown — the panel only closes once the
+    // dwell has passed since the LAST script finished.
     const shouldAutoDismissNonDeployment =
       nonDeploymentExecutions.length > 0 &&
       nonDeploymentExecutions.every((Request) => Request && Request.Status !== 'Pending');
@@ -203,7 +218,7 @@ function InitClientListPush() {
           } catch (e) {
             HandleNonFatalError('ClearSettledScriptExecutions', e);
           }
-        }, 5000);
+        }, ExecutionPanelDwellMs());
       }
     } else if (window.__ShowTrakExecutionAutoDismissTimer) {
       clearTimeout(window.__ShowTrakExecutionAutoDismissTimer);

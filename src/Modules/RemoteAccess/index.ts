@@ -269,6 +269,8 @@ const PUBLIC_SETTING_KEYS = new Set<string>([
   'UI_GROUP_COLUMN_COUNT',
   // The Web UI applies this to its own selection after its own actions.
   'UI_CLEAR_SELECTION_AFTER_ACTION',
+  // The browser's execution panel closes on the same dwell as the desktop's.
+  'UI_EXECUTION_PANEL_DWELL_SECONDS',
 ]);
 
 /** Reduce a settings list to the rows a remote surface may see. */

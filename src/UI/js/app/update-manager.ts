@@ -6,7 +6,7 @@
 // closeAllModals()+Wait so this module has no back-reference into modals.
 import { closeAllModals, openModal } from './lib/modal';
 import { ErrorMessage, Safe } from './utils';
-import { Notify, ShowExecutionToast, Wait } from './selection-init';
+import { Notify, ShowExecutionToastIfActive, Wait } from './selection-init';
 import {
   FormatClientVersionLabel,
   UpdateManagerClientProgress,
@@ -506,7 +506,7 @@ export async function RunUpdateManagerDeployAll() {
       `Updating ${Result.TargetCount} online clients to ${Result.ReleaseVersion}.`
     );
     RenderUpdateManagerClientList();
-    ShowExecutionToast('Updating Client Software');
+    ShowExecutionToastIfActive('Updating Client Software');
   } catch (Err) {
     const Message = ErrorMessage(Err);
     $('#UPDATE_MANAGER_STATUS').text(Message);

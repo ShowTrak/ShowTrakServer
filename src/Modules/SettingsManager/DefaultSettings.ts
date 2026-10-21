@@ -75,6 +75,18 @@ export const DefaultSettings: SettingDefinition[] = [
   },
   {
     Group: 'Features',
+    Key: 'UI_EXECUTION_PANEL_DWELL_SECONDS',
+    Title: 'Execution Panel Dwell Time',
+    Description:
+      'How long the script execution panel stays open after every script, Wake on LAN and other action in it has finished. 0 closes it as soon as the last one finishes.',
+    Type: 'SLIDER',
+    DefaultValue: 5,
+    Min: 0,
+    Max: 60,
+    Unit: 's',
+  },
+  {
+    Group: 'Features',
     Key: 'CLIENT_SHOW_LAUNCH_COUNTDOWN',
     Title: 'Show Auto Launch Countdown',
     Description:

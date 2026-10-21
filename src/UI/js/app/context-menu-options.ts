@@ -27,7 +27,7 @@ import {
   CriticalConfirmationDialog,
   GetIdentifyTargetByUUID,
   Notify,
-  ShowExecutionToast,
+  ShowExecutionToastIfActive,
   StopIdentifyingForUUIDs,
 } from './selection-init';
 import { ClearSelection, SelectAll } from './selection';
@@ -574,7 +574,7 @@ export async function BuildContextMenuOptions(
         ActsOnSelection: true,
         Action: async function () {
           window.API.WakeOnLan(WolTargets);
-          ShowExecutionToast();
+          ShowExecutionToastIfActive();
         },
       });
     }

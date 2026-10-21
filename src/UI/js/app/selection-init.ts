@@ -26,6 +26,8 @@ export {
   Notify,
   RemoveAlertToastById,
   ShowExecutionToast,
+  SetExecutionsInProgress,
+  ShowExecutionToastIfActive,
   enableExecToastOutsideClose,
   showAlertStyleToast,
 } from './lib/toasts';
