@@ -217,7 +217,8 @@ const ClientsListHandler = async (req: Request, res: Response) => {
   }));
 
   // Listed read-only here. Commands go through /API/FreeKiosk/<slug>/<command>
-  // (the OSC route mirrored below), which is bounded by the FreeKiosk command
+  // or its /API/Group|Tag/<slug>/FreeKiosk/<command> forms (the OSC routes
+  // mirrored below), which are bounded by the FreeKiosk command
   // allowlist; the SDK still has no FreeKiosk control.
   const FreeKioskEntities = (Kiosks || []).map((Kiosk) => ({
     ...Kiosk,

@@ -785,17 +785,79 @@ OSC.CreateRoute(
 //
 //   /API/FreeKiosk/<terminal-slug>/<command>
 //   /API/FreeKiosk/<terminal-slug>/<command>/<value>
+//   /API/Group/<group-slug>/FreeKiosk/<command>[/<value>]
+//   /API/Tag/<tag-slug>/FreeKiosk/<command>[/<value>]
+//   /API/All/FreeKiosk/<command>[/<value>]
 //
 // e.g. /API/FreeKiosk/lobby-tablet/reboot
 //      /API/FreeKiosk/lobby-tablet/brightness/40
+//      /API/Group/foyer/FreeKiosk/screen.off
 //
 // The command map in FreeKiosk/commands is the allowlist, and the value runs
 // through the same validator as the view modal's FreeKiosk:Command channel, so
 // OSC can send exactly what the UI can and nothing more — /api/js stays
 // unreachable. As with check actions, the trailing value fills the command's
-// one parameter because this router never reads OSC arguments.
+// one parameter because this router never reads OSC arguments. The Group, Tag
+// and All forms send to every FreeKiosk terminal they cover; other client types
+// are not touched.
+type OSCFreeKioskTerminal = NonNullable<Awaited<ReturnType<typeof FreeKioskManager.GetBySlug>>>;
+
+// The terminals a FreeKiosk route addresses, plus how to name them in the
+// notification ("lobby-tablet", or "3 FreeKiosk terminals in group …").
+type FreeKioskTargets = [string, null, null] | [null, OSCFreeKioskTerminal[], string];
+
+// `Where` is the trailing scope (` in group "Foyer" (foyer)`), empty for All.
+function describeTerminalSet(Terminals: OSCFreeKioskTerminal[], Where: string): FreeKioskTargets {
+  if (!Terminals.length) return [`No FreeKiosk terminals${Where}`, null, null];
+  const Noun = Terminals.length === 1 ? 'FreeKiosk terminal' : 'FreeKiosk terminals';
+  return [null, Terminals, `${Terminals.length} ${Noun}${Where}`];
+}
+
+async function getFreeKioskTerminalBySlug(Slug: string): Promise<FreeKioskTargets> {
+  const Terminal =
+    typeof FreeKioskManager.GetBySlug === 'function'
+      ? await FreeKioskManager.GetBySlug(Slug)
+      : null;
+  if (!Terminal) return [`Invalid FreeKiosk Terminal "${Slug}"`, null, null];
+  return [null, [Terminal], `"${Terminal.Slug || Terminal.UUID}"`];
+}
+
+async function getGroupFreeKioskTerminals(GroupKey: string): Promise<FreeKioskTargets> {
+  const Group = await resolveGroupByKey(GroupKey);
+  if (!Group) return [`Invalid Group "${GroupKey}"`, null, null];
+  const [Err, Terminals] = await FreeKioskManager.GetAll();
+  if (Err) return ['Failed to fetch FreeKiosk terminals', null, null];
+  const Members = (Terminals || []).filter(
+    (Terminal) => Terminal.GroupID != null && Number(Terminal.GroupID) === Number(Group.GroupID)
+  );
+  return describeTerminalSet(
+    Members,
+    ` in group "${Group.Title}" (${Group.Slug || Group.GroupID})`
+  );
+}
+
+// Terminals are tag members by bare UUID or by group, like any other client, so
+// the same scope predicate as getTagClients decides membership.
+async function getTagFreeKioskTerminals(TagKey: string): Promise<FreeKioskTargets> {
+  const Tag = await resolveTagByKey(TagKey);
+  if (!Tag) return [`Invalid Tag "${TagKey}"`, null, null];
+  const [Err, Terminals] = await FreeKioskManager.GetAll();
+  if (Err) return ['Failed to fetch FreeKiosk terminals', null, null];
+  const AllTags = await TagManager.GetAllViews();
+  const Members = (Terminals || []).filter((Terminal) =>
+    ScriptWhitelistManager.IsClientAllowed(Tag.Scope, Terminal, AllTags)
+  );
+  return describeTerminalSet(Members, ` in tag "${Tag.Slug || Tag.TagID}"`);
+}
+
+async function getAllFreeKioskTerminals(): Promise<FreeKioskTargets> {
+  const [Err, Terminals] = await FreeKioskManager.GetAll();
+  if (Err) return ['Failed to fetch FreeKiosk terminals', null, null];
+  return describeTerminalSet(Terminals || [], '');
+}
+
 async function runFreeKioskCommand(
-  Slug: string,
+  Targets: Promise<FreeKioskTargets>,
   CommandID: string,
   Value: string | null
 ): Promise<RouteResult> {
@@ -804,11 +866,8 @@ async function runFreeKioskCommand(
     return failureResult(Detail);
   };
 
-  const Terminal =
-    typeof FreeKioskManager.GetBySlug === 'function'
-      ? await FreeKioskManager.GetBySlug(Slug)
-      : null;
-  if (!Terminal) return fail(`Invalid FreeKiosk Terminal "${Slug}"`);
+  const [TargetErr, Terminals, Target] = await Targets;
+  if (Terminals === null) return fail(TargetErr);
 
   const Command = GetFreeKioskCommand(CommandID);
   if (!Command) return fail(`Unknown FreeKiosk command "${CommandID}"`);
@@ -829,17 +888,26 @@ async function runFreeKioskCommand(
     return fail(`${Command.Label}: ${DescribeError(Err)}`);
   }
 
-  const [Err, Summary] = await FreeKioskManager.SendCommand([Terminal.UUID], CommandID, Params);
+  const UUIDs = Terminals.map((Terminal) => Terminal.UUID);
+  const [Err, Summary] = await FreeKioskManager.SendCommand(UUIDs, CommandID, Params);
   if (Err || !Summary) return fail(Err || `${Command.Label} failed`);
   if (Summary.Failed > 0) {
     // The device's own refusal ("needs Device Owner", "remote control is
-    // disabled") is the useful part, so it is surfaced verbatim.
-    const Reason = Summary.Results.find((Entry) => !Entry.Success)?.Error || 'Command failed';
-    return fail(`${Command.Label} on "${Terminal.Slug || Terminal.UUID}": ${Reason}`);
+    // disabled") is the useful part, so it is surfaced verbatim — per terminal
+    // when several were addressed, since each may refuse for its own reason.
+    const Failures = Summary.Results.filter((Entry) => !Entry.Success);
+    const Reasons =
+      Terminals.length === 1
+        ? Failures[0]?.Error || 'Command failed'
+        : Failures.map((Entry) => {
+            const Terminal = Terminals.find((Candidate) => Candidate.UUID === Entry.UUID);
+            const Name = Terminal ? Terminal.Slug || Terminal.UUID : Entry.UUID;
+            return `"${Name}": ${Entry.Error || 'Command failed'}`;
+          }).join('; ');
+    const Count = Terminals.length === 1 ? '' : ` (${Summary.Failed} failed)`;
+    return fail(`${Command.Label} on ${Target}${Count}: ${Reasons}`);
   }
-  return successResult(
-    `${Command.Label} sent to "${Terminal.Slug || Terminal.UUID}"${Value != null ? ` (${Value})` : ''}`
-  );
+  return successResult(`${Command.Label} sent to ${Target}${Value != null ? ` (${Value})` : ''}`);
 }
 
 // The commands each FreeKiosk route accepts, straight from the allowlist.
@@ -863,15 +931,76 @@ function freeKioskCommandValues(WithValue: boolean): OSCRouteValueList {
 
 OSC.CreateRoute(
   '/API/FreeKiosk/:Slug/:CommandID',
-  async (Req) => runFreeKioskCommand(Req.Slug ?? '', Req.CommandID ?? '', null),
+  async (Req) =>
+    runFreeKioskCommand(getFreeKioskTerminalBySlug(Req.Slug ?? ''), Req.CommandID ?? '', null),
   'Send a command (e.g. reboot) to a FreeKiosk Terminal by its slug and command ID',
   freeKioskCommandValues(false)
 );
 
 OSC.CreateRoute(
   '/API/FreeKiosk/:Slug/:CommandID/:Value',
-  async (Req) => runFreeKioskCommand(Req.Slug ?? '', Req.CommandID ?? '', Req.Value ?? ''),
+  async (Req) =>
+    runFreeKioskCommand(
+      getFreeKioskTerminalBySlug(Req.Slug ?? ''),
+      Req.CommandID ?? '',
+      Req.Value ?? ''
+    ),
   'Send a command that takes a value (e.g. brightness/40) to a FreeKiosk Terminal',
+  freeKioskCommandValues(true)
+);
+
+OSC.CreateRoute(
+  '/API/Group/:Slug/FreeKiosk/:CommandID',
+  async (Req) =>
+    runFreeKioskCommand(getGroupFreeKioskTerminals(Req.Slug ?? ''), Req.CommandID ?? '', null),
+  'Send a command (e.g. reboot) to every FreeKiosk Terminal in a Group by its slug',
+  freeKioskCommandValues(false)
+);
+
+OSC.CreateRoute(
+  '/API/Group/:Slug/FreeKiosk/:CommandID/:Value',
+  async (Req) =>
+    runFreeKioskCommand(
+      getGroupFreeKioskTerminals(Req.Slug ?? ''),
+      Req.CommandID ?? '',
+      Req.Value ?? ''
+    ),
+  'Send a command that takes a value (e.g. brightness/40) to every FreeKiosk Terminal in a Group',
+  freeKioskCommandValues(true)
+);
+
+OSC.CreateRoute(
+  '/API/Tag/:Slug/FreeKiosk/:CommandID',
+  async (Req) =>
+    runFreeKioskCommand(getTagFreeKioskTerminals(Req.Slug ?? ''), Req.CommandID ?? '', null),
+  'Send a command (e.g. reboot) to every FreeKiosk Terminal carrying a Tag by its slug',
+  freeKioskCommandValues(false)
+);
+
+OSC.CreateRoute(
+  '/API/Tag/:Slug/FreeKiosk/:CommandID/:Value',
+  async (Req) =>
+    runFreeKioskCommand(
+      getTagFreeKioskTerminals(Req.Slug ?? ''),
+      Req.CommandID ?? '',
+      Req.Value ?? ''
+    ),
+  'Send a command that takes a value (e.g. brightness/40) to every FreeKiosk Terminal carrying a Tag',
+  freeKioskCommandValues(true)
+);
+
+OSC.CreateRoute(
+  '/API/All/FreeKiosk/:CommandID',
+  async (Req) => runFreeKioskCommand(getAllFreeKioskTerminals(), Req.CommandID ?? '', null),
+  'Send a command (e.g. reboot) to every FreeKiosk Terminal',
+  freeKioskCommandValues(false)
+);
+
+OSC.CreateRoute(
+  '/API/All/FreeKiosk/:CommandID/:Value',
+  async (Req) =>
+    runFreeKioskCommand(getAllFreeKioskTerminals(), Req.CommandID ?? '', Req.Value ?? ''),
+  'Send a command that takes a value (e.g. brightness/40) to every FreeKiosk Terminal',
   freeKioskCommandValues(true)
 );
 

@@ -144,21 +144,26 @@ function loadOSC(overrides = {}, { WithSocket = true } = {}) {
     '../FreeKioskManager': {
       Manager: {
         GetBySlug: async (slug) =>
-          slug === 'lobby-tablet' ? { UUID: 'kiosk-1', Slug: 'lobby-tablet' } : null,
+          slug === 'lobby-tablet' ? { UUID: 'kiosk-1', Slug: 'lobby-tablet', GroupID: 1 } : null,
+        // Two terminals in group 1 (so also tag "foh"), one in group 2.
+        GetAll: async () => [
+          null,
+          [
+            { UUID: 'kiosk-1', Slug: 'lobby-tablet', GroupID: 1 },
+            { UUID: 'kiosk-2', Slug: 'bar-tablet', GroupID: 1 },
+            { UUID: 'kiosk-3', Slug: 'stage-tablet', GroupID: 2 },
+          ],
+        ],
+        // Only kiosk-1 refuses "lock", so a group send fails partially.
         SendCommand: async (uuids, commandID, params) => {
           kioskCalls.push([uuids, commandID, params]);
-          if (commandID === 'lock') {
-            return [
-              null,
-              {
-                Total: 1,
-                Succeeded: 0,
-                Failed: 1,
-                Results: [{ UUID: 'kiosk-1', Success: false, Error: 'Needs Device Owner' }],
-              },
-            ];
-          }
-          return [null, { Total: 1, Succeeded: 1, Failed: 0, Results: [{ Success: true }] }];
+          const Results = uuids.map((UUID) =>
+            commandID === 'lock' && UUID === 'kiosk-1'
+              ? { UUID, Success: false, Error: 'Needs Device Owner' }
+              : { UUID, Success: true, Error: null }
+          );
+          const Failed = Results.filter((r) => !r.Success).length;
+          return [null, { Total: uuids.length, Succeeded: uuids.length - Failed, Failed, Results }];
         },
       },
     },
@@ -254,6 +259,12 @@ test('OSC registers the built-in routes', () => {
   assert.ok(routes.includes('/API/Monitor/:Slug/:Method/:ActionID/:Value'));
   assert.ok(routes.includes('/API/FreeKiosk/:Slug/:CommandID'));
   assert.ok(routes.includes('/API/FreeKiosk/:Slug/:CommandID/:Value'));
+  assert.ok(routes.includes('/API/Group/:Slug/FreeKiosk/:CommandID'));
+  assert.ok(routes.includes('/API/Group/:Slug/FreeKiosk/:CommandID/:Value'));
+  assert.ok(routes.includes('/API/Tag/:Slug/FreeKiosk/:CommandID'));
+  assert.ok(routes.includes('/API/Tag/:Slug/FreeKiosk/:CommandID/:Value'));
+  assert.ok(routes.includes('/API/All/FreeKiosk/:CommandID'));
+  assert.ok(routes.includes('/API/All/FreeKiosk/:CommandID/:Value'));
 });
 
 test('OSC TriggerEvent routes delegate to ControlService for every scope', async () => {
@@ -574,6 +585,88 @@ test("OSC surfaces the terminal's own refusal of a FreeKiosk command", async () 
   assert.ok(error, 'a refusal must be reported');
   assert.match(String(error[1]), /Device Owner/);
   assert.ok(!successNotified(broadcastEvents));
+});
+
+test('OSC sends a FreeKiosk command to every terminal in a group, and only those', async () => {
+  const { handlers, kioskCalls, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/Group/main/FreeKiosk/reboot']);
+  await handlers.message(['/API/Group/1/FreeKiosk/brightness/40']);
+  assert.deepEqual(kioskCalls, [
+    [['kiosk-1', 'kiosk-2'], 'reboot', {}],
+    [['kiosk-1', 'kiosk-2'], 'brightness', { value: 40 }],
+  ]);
+  assert.ok(successNotified(broadcastEvents));
+});
+
+test('OSC sends a FreeKiosk command to every terminal a tag covers', async () => {
+  const { handlers, kioskCalls } = loadOSC();
+  // "foh" scopes group 1, which holds kiosk-1 and kiosk-2.
+  await handlers.message(['/API/Tag/foh/FreeKiosk/screen.off']);
+  await handlers.message(['/API/Tag/5/FreeKiosk/volume/20']);
+  assert.deepEqual(kioskCalls, [
+    [['kiosk-1', 'kiosk-2'], 'screen.off', {}],
+    [['kiosk-1', 'kiosk-2'], 'volume', { value: 20 }],
+  ]);
+});
+
+test('OSC sends a FreeKiosk command to every terminal over the All route', async () => {
+  const { handlers, kioskCalls, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/All/FreeKiosk/wake']);
+  await handlers.message(['/API/All/FreeKiosk/brightness/40']);
+  assert.deepEqual(kioskCalls, [
+    [['kiosk-1', 'kiosk-2', 'kiosk-3'], 'wake', {}],
+    [['kiosk-1', 'kiosk-2', 'kiosk-3'], 'brightness', { value: 40 }],
+  ]);
+  assert.ok(successNotified(broadcastEvents));
+});
+
+test('OSC All/FreeKiosk refuses when there are no terminals', async () => {
+  const { handlers, kioskCalls, broadcastEvents } = loadOSC({
+    '../FreeKioskManager': {
+      Manager: {
+        GetAll: async () => [null, []],
+        SendCommand: async () => [null, { Total: 0, Succeeded: 0, Failed: 0, Results: [] }],
+      },
+    },
+  });
+  await handlers.message(['/API/All/FreeKiosk/reboot']);
+  assert.deepEqual(kioskCalls, []);
+  assert.match(String(errorNotices(broadcastEvents)[0][1]), /No FreeKiosk terminals$/);
+});
+
+test('OSC group/tag FreeKiosk routes refuse unknown targets, bad commands and empty sets', async () => {
+  const { handlers, kioskCalls, broadcastEvents } = loadOSC({
+    '../GroupManager': {
+      Manager: {
+        Get: async () => [null, null],
+        GetBySlug: async (slug) =>
+          slug === 'empty' ? { GroupID: 9, Title: 'Empty', Slug: 'empty' } : null,
+      },
+    },
+  });
+  await handlers.message(['/API/Group/nope/FreeKiosk/reboot']);
+  await handlers.message(['/API/Tag/nope/FreeKiosk/reboot']);
+  await handlers.message(['/API/Tag/foh/FreeKiosk/js']);
+  await handlers.message(['/API/Tag/foh/FreeKiosk/volume/150']);
+  await handlers.message(['/API/Group/empty/FreeKiosk/reboot']);
+  assert.deepEqual(kioskCalls, []);
+  const errors = errorNotices(broadcastEvents).map(([, detail]) => String(detail));
+  assert.equal(errors.length, 5);
+  assert.match(errors[0], /Invalid Group "nope"/);
+  assert.match(errors[1], /Invalid Tag "nope"/);
+  assert.match(errors[2], /Unknown FreeKiosk command/);
+  assert.match(errors[3], /between 0 and 100/);
+  assert.match(errors[4], /No FreeKiosk terminals in group "Empty"/);
+});
+
+test('OSC names each refusing terminal when a group FreeKiosk command partly fails', async () => {
+  const { handlers, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/Group/main/FreeKiosk/lock']);
+  const [error] = errorNotices(broadcastEvents);
+  assert.ok(error, 'a partial failure must be reported');
+  assert.match(String(error[1]), /2 FreeKiosk terminals in group "Main" \(main\) \(1 failed\)/);
+  assert.match(String(error[1]), /"lobby-tablet": Needs Device Owner/);
+  assert.doesNotMatch(String(error[1]), /bar-tablet/);
 });
 
 // --- Documented values --------------------------------------------------------
