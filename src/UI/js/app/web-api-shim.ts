@@ -332,6 +332,8 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     UpdateMonitoringTarget: async (TargetID, Payload) =>
       rpc('UpdateMonitoringTarget', TargetID, Payload),
     DeleteMonitoringTarget: async (TargetID) => rpc('DeleteMonitoringTarget', TargetID),
+    MoveMonitoringCheck: async (CheckID, ToTargetID) =>
+      rpc('MoveMonitoringCheck', CheckID, ToTargetID),
     SetFullMonitoringTargetList: (cb) => sub('SetFullMonitoringTargetList', cb),
     MonitoringTargetUpdated: (cb) => sub('MonitoringTargetUpdated', cb),
     RunMonitoringAction: async (TargetIDs, Method, ActionID, Params, CheckIDs) =>

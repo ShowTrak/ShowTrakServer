@@ -61,6 +61,16 @@ export function CreateMonitoringChecksRepository(DB: DBManager) {
       );
     },
 
+    // Re-parent a check onto another target, keeping its CheckID (and with it
+    // the check's status history).
+    SetTarget(TargetID: number, Weight: number, CheckID: number): Promise<DBResult<unknown>> {
+      return DB.Run('UPDATE MonitoringChecks SET TargetID = ?, Weight = ? WHERE CheckID = ?', [
+        TargetID,
+        Weight,
+        CheckID,
+      ]);
+    },
+
     Delete(CheckID: number): Promise<DBResult<unknown>> {
       return DB.Run('DELETE FROM MonitoringChecks WHERE CheckID = ?', [CheckID]);
     },

@@ -157,6 +157,7 @@ const MONITORING_CHANNELS = new Set([
   'CreateMonitoringTarget',
   'UpdateMonitoringTarget',
   'DeleteMonitoringTarget',
+  'MoveMonitoringCheck',
   'RunMonitoringCheckNow',
   'RunAllMonitoringChecksNow',
   // Running a check action acts on a real device, so it sits with the other

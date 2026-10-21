@@ -136,6 +136,7 @@ const INVOKE_CHANNEL_LIST = [
   'CreateMonitoringTarget',
   'UpdateMonitoringTarget',
   'DeleteMonitoringTarget',
+  'MoveMonitoringCheck',
   'GetAllDummyClients',
   'GetDummyClient',
   'GenerateDummyClientDefaults',
@@ -502,6 +503,8 @@ const API: ShowTrakAPI = {
   UpdateMonitoringTarget: async (TargetID, Payload) =>
     invoke('UpdateMonitoringTarget', TargetID, Payload),
   DeleteMonitoringTarget: async (TargetID) => invoke('DeleteMonitoringTarget', TargetID),
+  MoveMonitoringCheck: async (CheckID, ToTargetID) =>
+    invoke('MoveMonitoringCheck', CheckID, ToTargetID),
   SetFullMonitoringTargetList: (Callback) => subscribe('SetFullMonitoringTargetList', Callback),
   MonitoringTargetUpdated: (Callback) => subscribe('MonitoringTargetUpdated', Callback),
   RunMonitoringAction: async (TargetIDs, Method, ActionID, Params, CheckIDs) =>

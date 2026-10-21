@@ -933,6 +933,49 @@ const Manager = {
     return Ok(Target.ToJSON());
   },
 
+  // Move one check to another monitor. The row is re-parented rather than
+  // copied, so the check keeps its CheckID, status history and live state.
+  async MoveCheck(CheckID: unknown, ToTargetID: unknown): Promise<Result<MonitoringTargetView>> {
+    const ID = Number(CheckID);
+    const From = TargetList.find((T) => T.Checks.some((C) => Number(C.CheckID) === ID));
+    if (!From) return Fail('Check not found');
+    const To = TargetList.find((T) => T.TargetID === Number(ToTargetID));
+    if (!To) return Fail('Monitor not found');
+    if (To === From) return Fail('The check is already on this monitor');
+    const Check = From.Checks.find((C) => Number(C.CheckID) === ID)!;
+
+    // Lands at the bottom of the destination's check list.
+    const Weight = To.Checks.reduce((Max, C) => Math.max(Max, C.Weight), 90) + 10;
+    const [Err] = await ChecksRepo.SetTarget(To.TargetID, Weight, ID);
+    if (Err) return Fail('Failed to move check');
+
+    From.Checks = From.Checks.filter((C) => C !== Check);
+    Check.TargetID = To.TargetID;
+    Check.Weight = Weight;
+    To.Checks.push(Check);
+    From.RecomputeAggregate();
+    To.RecomputeAggregate();
+
+    BroadcastManager.emit('MonitoringTargetUpdated', From.ToJSON());
+    BroadcastManager.emit('MonitoringTargetUpdated', To.ToJSON());
+    BroadcastManager.emit('MonitoringTargetListChanged');
+    await AuditStep(() => {
+      RecordUpdate({
+        ...MonitorAuditBase(From),
+        Summary: Line('Edited ', Entity(MonitorDisplayName(From))),
+        Changes: [{ Field: 'Moved check out', From: CheckName(Check), To: MonitorDisplayName(To) }],
+      });
+      RecordUpdate({
+        ...MonitorAuditBase(To),
+        Summary: Line('Edited ', Entity(MonitorDisplayName(To))),
+        Changes: [
+          { Field: 'Moved check in', From: MonitorDisplayName(From), To: CheckName(Check) },
+        ],
+      });
+    });
+    return Ok(To.ToJSON());
+  },
+
   async Delete(TargetID: unknown): Promise<Result<boolean>> {
     const ID = Number(TargetID);
     const Idx = TargetList.findIndex((T) => T.TargetID === ID);

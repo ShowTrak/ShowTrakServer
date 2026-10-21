@@ -2088,11 +2088,34 @@ Loading licence…</pre>
                   </div>
                 </div>
 
+                <button type="button" class="btn btn-light w-100" id="MONITORING_CHECK_MOVE">
+                  Move Check…
+                </button>
                 <button type="button" class="btn btn-delete w-100" id="MONITORING_CHECK_DELETE">
                   Remove Check
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pick the monitor a check moves to (see monitoring-editor/index.ts). It
+         hides the check editor and restores it on Back. -->
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_MONITORING_CHECK_MOVE"
+      tabindex="-1"
+      aria-labelledby="MONITORING_CHECK_MOVE_TITLE"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center d-grid gap-2">
+            <div id="MONITORING_CHECK_MOVE_HEADER"></div>
+            <p class="text-muted text-sm mb-0">Choose the monitor to move this check to.</p>
+            <div id="MONITORING_CHECK_MOVE_LIST" class="d-grid gap-2"></div>
           </div>
         </div>
       </div>

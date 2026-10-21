@@ -268,6 +268,18 @@ function register(): void {
       (TargetID: number) => MonitoringTargetManager.Delete(TargetID)
     )
   );
+
+  RPC.handle(
+    'MoveMonitoringCheck',
+    createTupleHandler<[number, number], unknown>(
+      (CheckID: unknown, ToTargetID: unknown) => [
+        IPCValidation.MonitoringTargetID(CheckID, 'CheckID'),
+        IPCValidation.MonitoringTargetID(ToTargetID),
+      ],
+      (CheckID: number, ToTargetID: number) =>
+        MonitoringTargetManager.MoveCheck(CheckID, ToTargetID)
+    )
+  );
 }
 
 export { register };

@@ -24,13 +24,14 @@ import {
   MonitoringEditorState,
   MonitoringMethodsCache,
   MonitoringTargets,
+  __LastGroups,
   setMonitoringEditorState,
   setMonitoringEditorTargetID,
 } from '../state';
 import { ErrorMessage, HandleNonFatalError, Safe } from '../utils';
 import { FormatInterval, OpenMonitoringTargetHistory } from '../monitoring';
 import { CloseAllModals } from '../modals';
-import { ConfirmationDialog, Notify } from '../selection-init';
+import { ConfirmationDialog, Notify, Wait } from '../selection-init';
 import { RenderTagPicker } from '../tag-picker';
 import type { TagPickerMount } from '../tag-picker';
 import {
@@ -831,6 +832,136 @@ async function LeaveCheckViewForMonitorView(Options: { Save: boolean }): Promise
   }
 }
 
+// --- Move a check to another monitor ----------------------------------------
+//
+// The picker hides the check editor and Back restores it untouched. Moving
+// re-parents the saved check on the server, so it keeps its CheckID and its
+// status history; the check is then dropped from this editor's working state
+// so no later autosave of this monitor puts it back.
+
+const MOVE_CHECK_MODAL = 'SHOWTRAK_MODAL_MONITORING_CHECK_MOVE';
+const MONITORING_TARGET_MODAL = 'SHOWTRAK_MODAL_MONITORING_TARGET';
+
+function MoveCheckCandidates(SourceTargetID: number) {
+  const GroupTitles = new Map(__LastGroups.map((Group) => [Group.GroupID, Group.Title || '']));
+  return MonitoringTargets.filter((Target) => Number(Target.TargetID) !== SourceTargetID)
+    .map((Target) => ({
+      TargetID: Number(Target.TargetID),
+      Name: Target.Nickname || Target.Address || `Monitor ${Target.TargetID}`,
+      Group: Target.GroupID == null ? 'No Group' : GroupTitles.get(Target.GroupID) || '',
+      CheckCount: Array.isArray(Target.Checks) ? Target.Checks.length : 0,
+    }))
+    .sort((A, B) => A.Name.localeCompare(B.Name, undefined, { numeric: true }));
+}
+
+async function ReturnFromMoveCheckPicker() {
+  closeModal(MOVE_CHECK_MODAL);
+  await Wait(300);
+  openModal(MONITORING_TARGET_MODAL);
+}
+
+async function OpenMoveCheckPicker() {
+  const State = MonitoringEditorState;
+  if (!State || State.View !== 'check' || State.TargetID == null) return;
+  const SourceTargetID = Number(State.TargetID);
+
+  // Only a saved check can move: the server re-parents its row.
+  CommitMonitoringCheckView();
+  if (!MonitoringPayloadIsValid(BuildMonitoringPayload())) {
+    Notify('Fill in the required settings before moving this check.', 'error');
+    return;
+  }
+  await FlushMonitoringCheckSave();
+  const Index = State.EditingIndex;
+  const Check = Index == null ? null : State.Checks[Index];
+  if (!Check || Check.CheckID == null) {
+    Notify('This check could not be saved, so it cannot be moved yet.', 'error');
+    return;
+  }
+  const CheckID = Number(Check.CheckID);
+
+  $('#MONITORING_CHECK_MOVE_HEADER')
+    .empty()
+    .append(
+      buildModalHeader({
+        title: 'Move Check',
+        titleId: 'MONITORING_CHECK_MOVE_TITLE',
+        onBack: () => void ReturnFromMoveCheckPicker(),
+        onClose: () => closeModal(MOVE_CHECK_MODAL),
+      }).$el
+    );
+
+  const Candidates = MoveCheckCandidates(SourceTargetID);
+  const $List = $('#MONITORING_CHECK_MOVE_LIST').empty();
+  if (!Candidates.length) {
+    $List.append(
+      '<div class="bg-ghost rounded p-3 text-muted text-center">There are no other monitors to move this check to.</div>'
+    );
+  }
+  for (const Candidate of Candidates) {
+    const Detail = [
+      Candidate.Group,
+      `${Candidate.CheckCount} ${Candidate.CheckCount === 1 ? 'check' : 'checks'}`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    $List.append(`
+      <div class="d-flex align-items-center gap-2 bg-ghost rounded p-2">
+        <div class="flex-grow-1 text-start">
+          <div class="text-light">${Safe(Candidate.Name)}</div>
+          <small class="text-muted">${Safe(Detail)}</small>
+        </div>
+        <button type="button" class="btn btn-light btn-sm MONITORING_CHECK_MOVE_TO" data-target-id="${Candidate.TargetID}">
+          Move
+        </button>
+      </div>`);
+  }
+
+  $List.off('click.move').on('click.move', '.MONITORING_CHECK_MOVE_TO', async function () {
+    const ToTargetID = parseInt($(this).attr('data-target-id') || '', 10);
+    if (!Number.isFinite(ToTargetID)) return;
+    const Destination = Candidates.find((Candidate) => Candidate.TargetID === ToTargetID);
+    $List.find('.MONITORING_CHECK_MOVE_TO').prop('disabled', true);
+    let Err: string | null = null;
+    try {
+      [Err] = await window.API.MoveMonitoringCheck(CheckID, ToTargetID);
+    } catch (e) {
+      Err = ErrorMessage(e, 'Failed to move check');
+    }
+    if (Err) {
+      $List.find('.MONITORING_CHECK_MOVE_TO').prop('disabled', false);
+      Notify(Err, 'error');
+      return;
+    }
+
+    // The server no longer has this check on the monitor; make sure nothing
+    // here re-saves it (an autosave would insert it again as a new check).
+    if (State.saveTimer) clearTimeout(State.saveTimer);
+    State.saveTimer = null;
+    State.pendingSave = false;
+    if (MonitoringStatusRunTimer) clearTimeout(MonitoringStatusRunTimer);
+    MonitoringStatusRunTimer = null;
+    State.Checks = State.Checks.filter((Entry) => Number(Entry.CheckID) !== CheckID);
+    State.View = 'list';
+    State.EditingIndex = null;
+
+    closeModal(MOVE_CHECK_MODAL);
+    Notify(`Check moved to ${Destination ? Destination.Name : 'another monitor'}.`, 'success');
+    await Wait(300);
+    if (ReturnToMonitorView) {
+      ReturnToMonitorView = false;
+      await OpenMonitoringTargetHistory(SourceTargetID, { Tab: 'settings' });
+      return;
+    }
+    ShowMonitoringListView();
+    openModal(MONITORING_TARGET_MODAL);
+  });
+
+  closeModal(MONITORING_TARGET_MODAL);
+  await Wait(300);
+  openModal(MOVE_CHECK_MODAL);
+}
+
 const MONITORING_TARGET_TAG_PICKER: TagPickerMount = {
   WrapperSelector: '#MONITORING_TARGET_TAGS_WRAPPER',
   ListSelector: '#MONITORING_TARGET_TAGS',
@@ -1080,6 +1211,12 @@ export async function OpenMonitoringTargetEditor(
     .off('click.moncheck')
     .on('click.moncheck', function () {
       RunMonitoringCheckNow();
+    });
+
+  $('#MONITORING_CHECK_MOVE')
+    .off('click.moncheck')
+    .on('click.moncheck', function () {
+      void OpenMoveCheckPicker();
     });
 
   $('#MONITORING_CHECK_DELETE')

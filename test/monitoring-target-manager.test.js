@@ -703,3 +703,104 @@ test('MonitoringTargetManager.RunAction fans one action across a mixed selection
     );
   });
 });
+
+test('MonitoringTargetManager.MoveCheck re-parents a check onto another monitor', async () => {
+  await withFakeTimers(async () => {
+    const events = [];
+    const runCalls = [];
+    const CheckRow = (CheckID, TargetID, Weight) => ({
+      CheckID,
+      TargetID,
+      Name: `Check ${CheckID}`,
+      Address: '10.0.0.1',
+      Method: 'ping',
+      Settings: JSON.stringify({}),
+      DegradedThresholdMs: 0,
+      Weight,
+      LastSuccessAt: null,
+      Timestamp: 1,
+    });
+    const TargetRow = (TargetID, Nickname) => ({
+      TargetID,
+      Nickname,
+      Address: '',
+      Method: 'ping',
+      Interval: 5000,
+      Settings: JSON.stringify({}),
+      GroupID: null,
+      Weight: 100,
+      LastSuccessAt: null,
+      DegradedThresholdMs: 0,
+      Timestamp: 1,
+    });
+
+    const dbMock = {
+      Manager: {
+        All: async (sql) =>
+          String(sql).includes('MonitoringChecks')
+            ? [null, [CheckRow(10, 1, 100), CheckRow(11, 1, 110), CheckRow(20, 2, 100)]]
+            : [null, [TargetRow(1, 'Source'), TargetRow(2, 'Destination')]],
+        Run: async (sql, params) => {
+          runCalls.push([sql, params]);
+          return [null, { changes: 1 }];
+        },
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
+      },
+    };
+
+    const modulePath = path.join(
+      __dirname,
+      '..',
+      'dist',
+      'Modules',
+      'MonitoringTargetManager',
+      'index.js'
+    );
+    const { Manager } = loadWithMocks(modulePath, {
+      '../Logger': { CreateLogger: () => ({ error: () => {}, warn: () => {} }) },
+      '../DB': dbMock,
+      '../Broadcast': { Manager: { emit: (event, payload) => events.push([event, payload]) } },
+      '../MonitoringMethods': {
+        Manager: {
+          Has: () => true,
+          Get: () => null,
+          NormalizeSettings: (_id, settings) => settings,
+          Run: async () => ({ Success: true, LatencyMs: 1 }),
+          GetActionOptions: () => ({}),
+        },
+      },
+      '../Utils': require('../dist/Modules/Utils'),
+    });
+
+    await Manager.Init();
+    runCalls.length = 0;
+
+    const [err, moved] = await Manager.MoveCheck(11, 2);
+    assert.equal(err, null);
+    assert.equal(moved.TargetID, 2);
+    // Same CheckID, appended after the destination's existing check.
+    assert.deepEqual(
+      moved.Checks.map((Check) => Check.CheckID),
+      [20, 11]
+    );
+    assert.deepEqual(runCalls, [
+      ['UPDATE MonitoringChecks SET TargetID = ?, Weight = ? WHERE CheckID = ?', [2, 110, 11]],
+    ]);
+    const [, source] = await Manager.Get(1);
+    assert.deepEqual(
+      source.Checks.map((Check) => Check.CheckID),
+      [10]
+    );
+    const updated = events.filter(([event]) => event === 'MonitoringTargetUpdated');
+    assert.deepEqual(
+      updated.map(([, view]) => view.TargetID),
+      [1, 2]
+    );
+
+    runCalls.length = 0;
+    assert.match((await Manager.MoveCheck(10, 1))[0], /already/i);
+    assert.match((await Manager.MoveCheck(10, 99))[0], /not found/i);
+    assert.match((await Manager.MoveCheck(999, 2))[0], /not found/i);
+    assert.equal(runCalls.length, 0);
+  });
+});

@@ -84,6 +84,7 @@ const targetMgr = recordingManager({
   Create: () => state.create,
   Update: () => state.update,
   Delete: () => state.del,
+  MoveCheck: () => [null, { TargetID: 2 }],
   RunAction: () => [null, { Total: 1, Succeeded: 1, Failed: 0, Results: [] }],
 });
 
@@ -135,6 +136,7 @@ test('registers a handler for every monitoring channel', () => {
     'CreateMonitoringTarget',
     'UpdateMonitoringTarget',
     'DeleteMonitoringTarget',
+    'MoveMonitoringCheck',
   ]) {
     assert.equal(typeof GetHandler(Channel), 'function', `missing handler for ${Channel}`);
   }
@@ -316,6 +318,23 @@ test('DeleteMonitoringTarget validates the id and reports failure', async () => 
 
   state.del = ['referenced by an alert rule', null];
   assert.deepEqual(await Handler(null, 1), ['referenced by an alert rule', null]);
+});
+
+test('MoveMonitoringCheck validates both ids before moving', async () => {
+  const Handler = GetHandler('MoveMonitoringCheck');
+  targetMgr.__calls.length = 0;
+  assert.deepEqual(await Handler(null, 7, 2), [null, { TargetID: 2 }]);
+  assert.deepEqual(targetMgr.__callsTo('MoveCheck')[0].args, [7, 2]);
+
+  targetMgr.__calls.length = 0;
+  for (const [CheckID, ToTargetID] of [
+    [0, 2],
+    [7, 'nope'],
+  ]) {
+    const [Err] = await Handler(null, CheckID, ToTargetID);
+    assert.equal(typeof Err, 'string');
+  }
+  assert.equal(targetMgr.__callsTo('MoveCheck').length, 0);
 });
 
 test("the list view reads every row's history in one call, with no input to validate", async () => {

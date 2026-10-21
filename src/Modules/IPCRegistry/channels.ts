@@ -145,6 +145,7 @@ const INVOKE_CHANNELS = [
   'CreateMonitoringTarget',
   'UpdateMonitoringTarget',
   'DeleteMonitoringTarget',
+  'MoveMonitoringCheck',
   // Check actions: one channel for every action of every method. The method +
   // action pair is validated against the registry in the registrar, so a
   // per-action channel would add registry/bridge/shim entries without adding
