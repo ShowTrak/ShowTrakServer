@@ -274,6 +274,21 @@ const PUBLIC_SETTING_KEYS = new Set<string>([
   'UI_EXECUTION_PANEL_DWELL_SECONDS',
 ]);
 
+/**
+ * Strip secrets from an invoke result before it leaves for a remote surface.
+ *
+ * GetFreeKioskTerminal answers the desktop editor, which shows the stored API
+ * key so it can be edited; a remote surface gets HasApiKey only. Its editor
+ * then treats a blank key field as "keep the stored key".
+ */
+export function ToRemoteResult(Channel: string, Result: unknown): unknown {
+  if (Channel === 'GetFreeKioskTerminal' && Result && typeof Result === 'object') {
+    const { ApiKey: _ApiKey, ...Rest } = Result as Record<string, unknown>;
+    return Rest;
+  }
+  return Result;
+}
+
 /** Reduce a settings list to the rows a remote surface may see. */
 export function ToPublicSettings<T>(Settings: readonly T[] | null | undefined): T[] {
   if (!Array.isArray(Settings)) return [];

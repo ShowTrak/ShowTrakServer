@@ -55,6 +55,7 @@ import {
   PUSH_ALLOWLIST,
   SUPPRESSED_BULK_ACTIONS,
   ToPublicSettings,
+  ToRemoteResult,
 } from '../RemoteAccess';
 
 const Logger = CreateLogger('WebServer');
@@ -575,7 +576,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
         const Result = await RunWithAuditSource(Address ? `Web UI (${Address})` : 'Web UI', () =>
           Handler(null, ...Args)
         );
-        if (cb) cb({ result: Result });
+        if (cb) cb({ result: ToRemoteResult(channel, Result) });
       } catch (e) {
         Logger.error('Web UI rpc failed:', e);
         if (cb) cb({ error: 'failed' });

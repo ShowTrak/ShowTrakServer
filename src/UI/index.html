@@ -2207,9 +2207,22 @@ Loading licence…</pre>
                       />
                       <label for="FREEKIOSK_API_KEY">API key (optional)</label>
                     </div>
+                    <!-- Only when a key is stored but this surface was not given
+                         it (the Web UI): a blank field then keeps the key, so
+                         removing it needs its own gesture. -->
+                    <button
+                      type="button"
+                      class="btn freekiosk-btn d-none"
+                      id="FREEKIOSK_API_KEY_CLEAR"
+                      title="Remove API key"
+                      aria-label="Remove API key"
+                    >
+                      <i class="bi bi-x-lg"></i>
+                    </button>
                     <button
                       type="button"
                       class="btn freekiosk-btn copy-field-btn"
+                      id="FREEKIOSK_API_KEY_COPY"
                       data-target="#FREEKIOSK_API_KEY"
                       title="Copy API key"
                       aria-label="Copy API key"
@@ -2217,7 +2230,7 @@ Loading licence…</pre>
                       <i class="bi bi-clipboard"></i>
                     </button>
                   </div>
-                  <small class="text-muted d-block mt-1">
+                  <small class="text-muted d-block mt-1" id="FREEKIOSK_API_KEY_HINT">
                     Leave blank if the device has no key set. Stored and exported in plain text.
                   </small>
                 </div>

@@ -61,7 +61,7 @@ import {
 import { PasscodeMatches } from './webui-namespace';
 import { RegisterRendererSink } from '../../main/renderer-bus';
 import { GetHandler } from '../../main/handler-registry';
-import { AuthorizeChannel } from '../RemoteAccess';
+import { AuthorizeChannel, ToRemoteResult } from '../RemoteAccess';
 import { ControlService } from '../ControlService';
 import { RunWithAuditSource } from '../AuditLog/source';
 
@@ -665,7 +665,7 @@ function SetupSdkNamespace(io: SdkIOServer) {
           const Result = await RunWithAuditSource(socket.AuditSource || 'ShowTrak Remote', () =>
             Handler(null, ...Args)
           );
-          if (ack) ack({ result: Result });
+          if (ack) ack({ result: ToRemoteResult(channel, Result) });
         } catch (e) {
           Logger.error('SDK rpc failed:', e);
           if (ack) ack({ error: 'failed' });

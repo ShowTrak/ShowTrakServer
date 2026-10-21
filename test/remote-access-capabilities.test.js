@@ -128,6 +128,20 @@ test('ToPublicSettings passes only the allowlisted keys', () => {
   }
 });
 
+test('a FreeKiosk API key never leaves for a remote surface', () => {
+  // The desktop editor is handed the key; the shared handler returns it, so the
+  // remote dispatchers must strip it. HasApiKey stays so the editor knows one is set.
+  const Mod = load();
+  const Terminal = { UUID: 'k1', HasApiKey: true, ApiKey: 'secret' };
+  assert.deepEqual(Mod.ToRemoteResult('GetFreeKioskTerminal', Terminal), {
+    UUID: 'k1',
+    HasApiKey: true,
+  });
+  assert.equal(Terminal.ApiKey, 'secret', 'the handler result is not mutated');
+  assert.equal(Mod.ToRemoteResult('GetFreeKioskTerminal', null), null);
+  assert.equal(Mod.ToRemoteResult('GetClient', Terminal), Terminal);
+});
+
 test('an unknown channel is denied rather than passed through', async () => {
   const Mod = load({ settings: ALL_ON });
   assert.deepEqual(await Mod.AuthorizeChannel('REMOTE', 'DropAllTables'), {

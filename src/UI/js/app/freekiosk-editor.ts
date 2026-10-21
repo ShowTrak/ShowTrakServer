@@ -11,6 +11,7 @@
 // The display mode is drawn by the SAME field renderer the monitoring editor
 // uses, from the schema the server generates out of its metric registry.
 import { openModal } from './lib/modal';
+import { ApiKeyPayload } from './lib/freekiosk-api-key';
 import { CloseAllModals } from './modals';
 import { Notify } from './selection-init';
 import { ErrorMessage, Safe } from './utils';
@@ -120,6 +121,27 @@ export interface FreeKioskFormSource {
   Settings?: Record<string, unknown> | null;
 }
 
+// Whether the form was filled without the stored key, and whether the operator
+// has since asked to remove it. Reset on every fill.
+let ApiKeyWithheld = false;
+let ApiKeyClearRequested = false;
+
+function RenderApiKeyField(): void {
+  const Typed = !!String($('#FREEKIOSK_API_KEY').val() || '').trim();
+  const Kept = ApiKeyWithheld && !ApiKeyClearRequested;
+  $('#FREEKIOSK_API_KEY_CLEAR').toggleClass('d-none', !Kept || Typed);
+  // Nothing to copy from a field that never holds the stored key.
+  $('#FREEKIOSK_API_KEY_COPY').toggleClass('d-none', ApiKeyWithheld && !Typed);
+  $('#FREEKIOSK_API_KEY').attr('placeholder', Kept ? 'Key set' : 'API key');
+  $('#FREEKIOSK_API_KEY_HINT').text(
+    Kept
+      ? 'A key is set. Leave blank to keep it, type a new one to replace it, or remove it.'
+      : ApiKeyWithheld
+        ? 'The key will be removed when you save. Type one to set a new key instead.'
+        : 'Leave blank if the device has no key set. Stored and exported in plain text.'
+  );
+}
+
 /** Fill the form from a terminal (or the Add defaults). */
 export async function FillFreeKioskForm(K: FreeKioskFormSource): Promise<void> {
   $('#FREEKIOSK_TEST_RESULT').addClass('d-none').text('');
@@ -128,12 +150,15 @@ export async function FillFreeKioskForm(K: FreeKioskFormSource): Promise<void> {
   $('#FREEKIOSK_PORT').val(Number(K.Port) || 8080);
   $('#FREEKIOSK_SLUG').val(K.Slug || '');
 
-  // The field carries the real stored key, so it is the whole truth: whatever is
-  // in it on save is what the terminal ends up with, and emptying it clears the
-  // key. That is why there is no separate "clear" button — with the value shown,
-  // a second gesture for the same thing would only be ambiguous.
+  // Given the stored key (the desktop), the field carries it and is the whole
+  // truth: emptying it clears the key, so no separate clear button. Not given it
+  // (the Web UI), the field starts blank, a blank save keeps the key, and the
+  // clear button is the way to remove it. See lib/freekiosk-api-key.
+  ApiKeyWithheld = !!K.HasApiKey && K.ApiKey === undefined;
+  ApiKeyClearRequested = false;
   $('#FREEKIOSK_API_KEY').val(K.ApiKey || '');
   $('#FREEKIOSK_API_KEY_VIEW').val(K.HasApiKey || K.ApiKey ? 'Set' : 'Not set');
+  RenderApiKeyField();
 
   const Interval = Number(K.Interval) || 30000;
   $('#FREEKIOSK_INTERVAL').val(Interval);
@@ -172,12 +197,14 @@ export function BuildFreeKioskPayload(
     Settings: CollectFreeKioskSetupSettings(),
   };
 
-  // The field shows the stored key, so it is authoritative: an emptied field
-  // is a request to remove the key, not a request to leave it alone. The
-  // manager still needs the explicit flag to do it.
-  const ApiKey = String($('#FREEKIOSK_API_KEY').val() || '').trim();
-  if (ApiKey) Payload.ApiKey = ApiKey;
-  else Payload.ClearApiKey = true;
+  Object.assign(
+    Payload,
+    ApiKeyPayload({
+      Typed: String($('#FREEKIOSK_API_KEY').val() || ''),
+      Withheld: ApiKeyWithheld,
+      ClearRequested: ApiKeyClearRequested,
+    })
+  );
 
   if (Existing) {
     const Slug = String($('#FREEKIOSK_SLUG').val() || '').trim();
@@ -204,6 +231,13 @@ export function BindFreeKioskForm(): void {
   });
   $('#FREEKIOSK_TIMEOUT').on('input.freekiosk', function () {
     $('#FREEKIOSK_TIMEOUT_LABEL').text(FormatInterval($(this).val()));
+  });
+  $('#FREEKIOSK_API_KEY').on('input.freekiosk', () => RenderApiKeyField());
+  $('#FREEKIOSK_API_KEY_CLEAR').on('click.freekiosk', function () {
+    ApiKeyClearRequested = true;
+    RenderApiKeyField();
+    // The view pane's Save tracks changes off input/change events.
+    $(this).trigger('change');
   });
 }
 
