@@ -19,6 +19,8 @@ const Surface: ClientInfoSurface = Capabilities.isWeb ? 'web' : 'desktop';
 let Kind: ClientInfoKind = 'client';
 let RenderedKind: ClientInfoKind | null = null;
 let ActiveTab: ClientInfoTabKey = DEFAULT_CLIENT_INFO_TAB;
+// Tabs carrying an active alarm (lib/client-info-alarms), marked on the rail.
+let AlarmTabs = new Set<ClientInfoTabKey>();
 const TabShownListeners: Array<(Key: ClientInfoTabKey) => void> = [];
 
 // Panes that fetch on demand (Logs) hear when the operator moves between tabs.
@@ -59,7 +61,7 @@ function EnsureClientInfoNav() {
     ClientInfoTabsFor(Kind, Surface)
       .map(
         (Tab) =>
-          `<button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-client-info-tab-target="${Safe(Tab.Key)}">${Safe(Tab.Title)}</button>`
+          `<button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-client-info-tab-target="${Safe(Tab.Key)}"><span class="settings-nav-item-title">${Safe(Tab.Title)}</span><i class="bi bi-exclamation-triangle-fill settings-nav-item-alarm d-none" role="img" aria-label="Alarm active"></i></button>`
       )
       .join('')
   );
@@ -80,6 +82,9 @@ export function RefreshClientInfoTabs() {
       .toggleClass('d-none', !Available.includes(Key))
       .toggleClass('active', IsActive)
       .attr('aria-selected', IsActive ? 'true' : 'false');
+    $(this)
+      .find('.settings-nav-item-alarm')
+      .toggleClass('d-none', !AlarmTabs.has(Key as ClientInfoTabKey));
   });
   $('#CLIENT_INFO_CONTENT [data-client-info-tab]').each(function () {
     $(this).toggleClass('is-inactive-tab', this.getAttribute('data-client-info-tab') !== ActiveTab);
@@ -92,9 +97,16 @@ export function SetClientInfoKind(Next: ClientInfoKind) {
   RefreshClientInfoTabs();
 }
 
-/** Each newly opened entity starts on the first tab. */
+/** Mark the tabs with an active alarm; the rest are cleared. */
+export function SetClientInfoAlarmTabs(Tabs: readonly ClientInfoTabKey[]) {
+  AlarmTabs = new Set(Tabs);
+  RefreshClientInfoTabs();
+}
+
+/** Each newly opened entity starts on the first tab, with no alarms until it renders. */
 export function ResetClientInfoTab() {
   ActiveTab = DEFAULT_CLIENT_INFO_TAB;
+  AlarmTabs = new Set();
   $('#CLIENT_INFO_CONTENT').scrollTop(0);
   AnnounceActiveTab();
 }

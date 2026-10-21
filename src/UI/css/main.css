@@ -1587,6 +1587,23 @@ input[type='range']::-moz-range-progress,
     color 0.15s ease;
 }
 
+/* The view modal's rail marks a tab with an active alarm. */
+#CLIENT_INFO_NAV .settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-nav-item-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-nav-item-alarm {
+  flex: 0 0 auto;
+  color: var(--warning);
+}
+
 .settings-nav-item:hover {
   background-color: var(--surface-ghost-hover);
   color: var(--text-strong);

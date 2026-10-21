@@ -51,7 +51,13 @@ import {
   ClearClientInfoStorage,
   RenderClientInfoStorage,
 } from './client-info-storage';
-import { ResetClientInfoTab, SelectClientInfoTab, SetClientInfoKind } from './client-info-nav';
+import {
+  ResetClientInfoTab,
+  SelectClientInfoTab,
+  SetClientInfoAlarmTabs,
+  SetClientInfoKind,
+} from './client-info-nav';
+import { ClientAlarmTabs } from './lib/client-info-alarms';
 import type { ClientInfoTabKey } from './lib/client-info-tabs';
 import { MountClientInfoEditor, RefreshClientInfoEditor } from './client-info-edit';
 import {
@@ -203,6 +209,7 @@ export function RenderClientInfoDetails(Client: ClientView) {
     // An SDK client reports no operating system: no usage, uptime or power.
     $('#CLIENT_INFO_SYSTEM_SECTION').toggleClass('d-none', IsIntegrated);
     SetClientInfoKind(IsIntegrated ? 'integrated' : 'client');
+    SetClientInfoAlarmTabs(ClientAlarmTabs(Client));
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
   }

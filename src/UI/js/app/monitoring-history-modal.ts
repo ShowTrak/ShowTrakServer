@@ -5,6 +5,7 @@
 import {
   AllClients,
   DummyClients,
+  FreeKioskMetricCatalogCache,
   FreeKioskTerminals,
   MonitorHistoryModalContext,
   MonitorHistorySeries,
@@ -46,9 +47,11 @@ import {
   RefreshClientInfoTabs,
   ResetClientInfoTab,
   SelectClientInfoTab,
+  SetClientInfoAlarmTabs,
   SetClientInfoKind,
 } from './client-info-nav';
 import type { ClientInfoTabKey } from './lib/client-info-tabs';
+import { DummyAlarmTabs, FreeKioskAlarmTabs, MonitorAlarmTabs } from './lib/client-info-alarms';
 import { MountMonitorInfoEditor } from './monitor-info-edit';
 import { MountDummyInfoEditor } from './dummy-info-edit';
 import { MountFreeKioskInfoEditor } from './freekiosk-info-edit';
@@ -646,6 +649,14 @@ export function RenderMonitoringHistoryModal() {
   if (Entity.type === 'freekiosk') SetClientInfoKind('freekiosk');
   else if (Entity.type === 'target') SetClientInfoKind('target');
   else if (Entity.type === 'dummy') SetClientInfoKind('dummy');
+  // A client's alarms are marked by RenderClientInfoDetails.
+  if (Entity.type === 'freekiosk') {
+    SetClientInfoAlarmTabs(
+      FreeKioskAlarmTabs(Entity.terminal.Alarms, FreeKioskMetricCatalogCache?.Metrics)
+    );
+  } else if (Entity.type === 'target') {
+    SetClientInfoAlarmTabs(MonitorAlarmTabs(Entity.target.Checks));
+  } else if (Entity.type === 'dummy') SetClientInfoAlarmTabs(DummyAlarmTabs(Entity.dummy));
 
   const $timelines = $('#MONITOR_HISTORY_TIMELINES');
   if (!$timelines.length) return;
