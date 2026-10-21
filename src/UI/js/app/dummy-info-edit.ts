@@ -31,6 +31,11 @@ const DUMMY_INFO_TAG_PICKER: TagPickerMount = {
   WrapperSelector: '#DUMMY_INFO_TAG_PICKER_WRAPPER',
   ListSelector: '#DUMMY_INFO_TAG_PICKER',
   Namespace: 'dummyInfoTags',
+  ReturnTo: async (UUID) => {
+    const { OpenDummyClientHistory } = await import('./monitoring-history-modal');
+    await OpenDummyClientHistory(UUID, { Tab: 'settings' });
+  },
+  HasUnsavedChanges: () => HasUnsavedChanges(),
 };
 
 interface MountedDummy {

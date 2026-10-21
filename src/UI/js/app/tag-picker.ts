@@ -17,6 +17,10 @@
 //   other client it covers — never what someone editing a single machine
 //   intends. The chip says where it came from instead.
 //
+// The picker ends in an Open Tag Manager button. Closing the Tag Manager reopens
+// the editor it came from, on the same tab, so creating a tag mid-edit does not
+// lose the operator's place.
+//
 // Applying immediately rather than on the editor's Save mirrors the MAC address
 // list in the same client-editor modal, which also writes as you click; it also
 // sidesteps the fact that the three editors do not agree on a save model (the
@@ -25,7 +29,7 @@
 import type { TagView } from '@showtrak/protocol';
 import { Capabilities, Tags } from './state';
 import { HandleNonFatalError, Safe } from './utils';
-import { Notify } from './selection-init';
+import { ConfirmationDialog, Notify } from './selection-init';
 import { ScriptColourHex } from './lib/script-colours';
 import { GetTagMembershipKind, ResolveEntityTags, TagBadgeLabel } from './lib/tag-badges';
 import type { TagBadgeEntity, TagMembershipKind } from './lib/tag-badges';
@@ -38,6 +42,10 @@ export interface TagPickerMount {
   ListSelector: string;
   /** jQuery event namespace, so two mounted pickers never cross-fire. */
   Namespace: string;
+  /** Reopen this entity's editor when the Tag Manager opened from here closes. */
+  ReturnTo?: (ScopedID: string) => unknown;
+  /** Unsaved edits in the editor, which opening the Tag Manager would discard. */
+  HasUnsavedChanges?: () => boolean;
 }
 
 interface ActiveTagPicker {
@@ -96,9 +104,10 @@ function RenderTagPickerChip(Tag: TagView, Entity: TagBadgeEntity, AllTags: TagV
  */
 export function RenderTagPicker(Mount: TagPickerMount, Entity: TagBadgeEntity | null): void {
   const $Wrapper = $(Mount.WrapperSelector);
-  // Tag management is desktop-only (the server allowlists no Tags:Set* channel
-  // for the Web UI), so the browser gets read-only badges and no picker.
-  const Editable = !!Entity && !!Entity.ScopedID && !Capabilities.isWeb;
+  // Tags are client management: the Web UI offers the picker (and the server
+  // accepts its writes) only with the client-management permission. Every
+  // editor that mounts a picker already requires Edit mode.
+  const Editable = !!Entity && !!Entity.ScopedID && Capabilities.canManageClients;
 
   $Wrapper.toggleClass('d-none', !Editable);
   if (!Editable || !Entity) {
@@ -108,6 +117,7 @@ export function RenderTagPicker(Mount: TagPickerMount, Entity: TagBadgeEntity | 
   }
 
   Active = { Mount, Entity };
+  RenderManageButton(Mount, Entity);
 
   const List = Array.isArray(Tags) ? Tags : [];
   if (!List.length) {
@@ -126,6 +136,41 @@ export function RenderTagPicker(Mount: TagPickerMount, Entity: TagBadgeEntity | 
       if (!Number.isInteger(TagID)) return;
       await ToggleTagMembership(TagID, Entity);
     });
+}
+
+/**
+ * The Open Tag Manager button under the chips. Added once per wrapper and
+ * rebound on every render, so it always returns to the entity now mounted.
+ */
+function RenderManageButton(Mount: TagPickerMount, Entity: TagBadgeEntity): void {
+  const $Wrapper = $(Mount.WrapperSelector);
+  if (!$Wrapper.find('.tag-picker-manage').length) {
+    $Wrapper.append(`
+      <div class="d-grid">
+        <button type="button" class="btn btn-ghost text-light tag-picker-manage">
+          <i class="bi bi-tags" aria-hidden="true"></i> Open Tag Manager
+        </button>
+      </div>`);
+  }
+  $Wrapper
+    .find('.tag-picker-manage')
+    .off(`click.${Mount.Namespace}`)
+    .on(`click.${Mount.Namespace}`, () => void OpenTagManagerFrom(Mount, Entity.ScopedID));
+}
+
+async function OpenTagManagerFrom(Mount: TagPickerMount, ScopedID: string): Promise<void> {
+  if (Mount.HasUnsavedChanges && Mount.HasUnsavedChanges()) {
+    const Confirmed = await ConfirmationDialog(
+      'Opening the Tag Manager discards your unsaved changes here. Continue?',
+      { ConfirmLabel: 'Discard and Open' }
+    );
+    if (!Confirmed) return;
+  }
+  // Lazy: the Tag Manager pulls in the script manager and the pickers, none of
+  // which an editor needs until this button is pressed.
+  const { OpenTagManager } = await import('./tag-manager');
+  const ReturnTo = Mount.ReturnTo;
+  await OpenTagManager({ ReturnTo: ReturnTo ? () => ReturnTo(ScopedID) : undefined });
 }
 
 /**

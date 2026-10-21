@@ -38,6 +38,13 @@ const MONITOR_INFO_TAG_PICKER: TagPickerMount = {
   WrapperSelector: '#MONITOR_INFO_TAG_PICKER_WRAPPER',
   ListSelector: '#MONITOR_INFO_TAG_PICKER',
   Namespace: 'monitorInfoTags',
+  // Scoped as `monitor:<TargetID>`. Settings autosave, so nothing is left unsaved.
+  ReturnTo: async (ScopedID) => {
+    const { OpenMonitoringTargetHistory } = await import('./monitoring-history-modal');
+    await OpenMonitoringTargetHistory(Number(ScopedID.replace(/^monitor:/, '')), {
+      Tab: 'settings',
+    });
+  },
 };
 
 interface MountedMonitor {

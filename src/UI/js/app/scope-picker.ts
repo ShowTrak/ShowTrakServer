@@ -334,6 +334,11 @@ async function CloseScopePicker(): Promise<void> {
   }
 }
 
+/** Whether the picker has hidden this modal and will reopen it when it closes. */
+export function IsScopePickerHolding(ModalId: string): boolean {
+  return RestoreModalId === ModalId;
+}
+
 // Record which modal is currently visible so it can be restored on close.
 function captureCurrentModal(): string | null {
   const Open = document.querySelector('.modal.show');

@@ -54,15 +54,24 @@ const GROUPS = [
 ];
 
 /** Seed the shared entity caches the model is built from. */
-function seed({ clients = [], monitors = [], dummies = [] } = {}) {
+function seed({ clients = [], monitors = [], dummies = [], kiosks = [] } = {}) {
   State.setAllClients(clients);
   State.setMonitoringTargets(monitors);
   State.setDummyClients(dummies);
+  State.setFreeKioskTerminals(kiosks);
 }
 
 const client = (O = {}) => ({ UUID: 'c1', Nickname: 'FOH PC', GroupID: 1, Weight: 0, ...O });
 const monitor = (O = {}) => ({ TargetID: 1, Nickname: 'UPS', GroupID: 1, Weight: 0, ...O });
 const dummy = (O = {}) => ({ UUID: 'd1', Nickname: 'Projector', GroupID: 2, Weight: 0, ...O });
+const kiosk = (O = {}) => ({
+  UUID: 'k1',
+  Nickname: 'Lobby',
+  Address: '10.0.0.9',
+  GroupID: 2,
+  Weight: 0,
+  ...O,
+});
 
 const model = (Options = {}) => buildScopeModel({ Groups: GROUPS, ...Options });
 
@@ -96,6 +105,7 @@ test('each entity kind has its own icon', () => {
   assert.equal(scopeIconClass('monitor'), 'bi-diagram-3');
   assert.equal(scopeIconClass('monitor-check'), 'bi-diagram-3');
   assert.equal(scopeIconClass('dummy'), 'bi-cpu');
+  assert.equal(scopeIconClass('freekiosk'), 'bi-tablet');
   assert.equal(scopeIconClass('nonsense'), '');
 });
 
@@ -155,6 +165,23 @@ test('IncludeKinds restricts what the picker will offer', () => {
 
   const NoChecks = model({ IncludeKinds: ['monitor'] });
   assert.deepEqual(NoChecks.AllClientValues, ['client:monitor:1']);
+});
+
+test('FreeKiosk terminals are offered only when asked for', () => {
+  // Tags opt in; alert rules and scripts have no FreeKiosk targeting, so the
+  // default must not start offering terminals there.
+  seed({ clients: [client()], kiosks: [kiosk()] });
+
+  assert.ok(!model().AllClientValueSet.has('client:k1'));
+
+  const Tagging = model({ IncludeKinds: ['showtrak', 'freekiosk'] });
+  assert.ok(Tagging.AllClientValueSet.has('client:k1'), 'scoped by bare UUID');
+  assert.deepEqual(
+    Tagging.Groups.find((G) => G.GroupID === 2).ChildValues,
+    ['client:k1'],
+    'nested under its group'
+  );
+  assert.equal(Tagging.LabelByValue.get('client:k1'), 'Lobby (10.0.0.9)');
 });
 
 test('integrated clients can be excluded, since they cannot run scripts', () => {

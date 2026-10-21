@@ -22,7 +22,13 @@
 // does not: its membership is another scope which may itself name tags, so a
 // tag is only ever an explicit token — never inferred from, and never collapsed
 // into, the entities it happens to cover today.
-import { AllClients, DummyClients, MonitoringTargets, IsIntegratedClientEntity } from '../state';
+import {
+  AllClients,
+  DummyClients,
+  FreeKioskTerminals,
+  MonitoringTargets,
+  IsIntegratedClientEntity,
+} from '../state';
 import type {
   AlertScopeEntity,
   AlertScopeGroupNode,
@@ -33,7 +39,7 @@ import { ScriptColourHex } from './script-colours';
 import { ScopeCoversEntity } from './scope-matching';
 import type { GroupView, TagView } from '@showtrak/protocol';
 
-export type ScopeEntityKind = 'showtrak' | 'monitor' | 'monitor-check' | 'dummy';
+export type ScopeEntityKind = 'showtrak' | 'monitor' | 'monitor-check' | 'dummy' | 'freekiosk';
 
 // Which entities the picker may display. Every field is optional bar Groups;
 // the defaults reproduce the original alert behaviour (all kinds, grouped).
@@ -42,7 +48,10 @@ export interface ScopeSourceOptions {
   Groups: GroupView[];
   /** Tags offered as selectable categories. Omit/empty to hide the section. */
   Tags?: TagView[];
-  /** Entity kinds to include. Defaults to all four. */
+  /**
+   * Entity kinds to include. Defaults to every kind bar FreeKiosk, which only
+   * tags opt into (alert rules and scripts have no FreeKiosk targeting).
+   */
   IncludeKinds?: ScopeEntityKind[];
   /** Drop integrated (SDK) clients from the 'showtrak' set. */
   ExcludeIntegrated?: boolean;
@@ -79,6 +88,7 @@ export function scopeIconClass(Kind: string): string {
   if (Kind === 'showtrak') return 'bi-display';
   if (Kind === 'monitor' || Kind === 'monitor-check') return 'bi-diagram-3';
   if (Kind === 'dummy') return 'bi-cpu';
+  if (Kind === 'freekiosk') return 'bi-tablet';
   return '';
 }
 
@@ -248,6 +258,26 @@ export function buildScopeModel(Options: ScopeSourceOptions): AlertScopeModel {
         ),
         IconClass: scopeIconClass('dummy'),
         Weight: Dummy.Weight || 0,
+      });
+    }
+  }
+
+  if (IncludeKinds.has('freekiosk')) {
+    for (const Terminal of FreeKioskTerminals || []) {
+      if (!Terminal || !Terminal.UUID) continue;
+      // Scoped by bare UUID, like dummies and the per-terminal tag picker.
+      Entities.push({
+        Kind: 'freekiosk',
+        Value: `client:${Terminal.UUID}`,
+        ScopedID: String(Terminal.UUID),
+        GroupID: Terminal.GroupID == null ? null : Terminal.GroupID,
+        Label: buildScopeEntityLabel(
+          Terminal.Nickname || Terminal.Hostname || Terminal.Address || Terminal.UUID,
+          Terminal.Nickname ? Terminal.Address || '' : '',
+          Terminal.UUID
+        ),
+        IconClass: scopeIconClass('freekiosk'),
+        Weight: Terminal.Weight || 0,
       });
     }
   }

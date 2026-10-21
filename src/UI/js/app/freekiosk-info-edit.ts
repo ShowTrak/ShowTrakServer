@@ -33,12 +33,23 @@ import {
   ShowFreeKioskTestResult,
 } from './freekiosk-editor';
 import type { FreeKioskFormSource } from './freekiosk-editor';
+import type { TagPickerMount } from './tag-picker';
 import { EffectiveFreeKioskSettings } from './freekiosk-monitoring';
 
 const MODAL_ID = 'SHOWTRAK_CLIENT_INFO';
 // Shared with the other view-modal editors: whichever entity is mounted owns it.
 const EDITING_CLASS = 'is-editing';
 const PANE = '#FREEKIOSK_INFO_SETTINGS_SECTION';
+
+// The form's picker, plus the way back here from the Tag Manager.
+const TAG_PICKER: TagPickerMount = {
+  ...FREEKIOSK_EDITOR_TAG_PICKER,
+  ReturnTo: async (UUID) => {
+    const { OpenFreeKioskTerminalHistory } = await import('./monitoring-history-modal');
+    await OpenFreeKioskTerminalHistory(UUID, { Tab: 'settings' });
+  },
+  HasUnsavedChanges: () => HasUnsavedChanges(),
+};
 
 interface MountedTerminal {
   UUID: string;
@@ -240,7 +251,7 @@ function RenderTags(): void {
   // Scoped by bare UUID, like every other client-like entity.
   const ScopedID = Mounted.UUID;
   if (Editing) {
-    RenderTagPicker(FREEKIOSK_EDITOR_TAG_PICKER, { ScopedID, GroupID: SelectedGroupID() });
+    RenderTagPicker(TAG_PICKER, { ScopedID, GroupID: SelectedGroupID() });
     return;
   }
   ClearTagPicker();

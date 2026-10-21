@@ -61,6 +61,11 @@ let IconPickerAllIcons: string[] = [];
 // search box is empty.
 const ICON_PICKER_RENDER_LIMIT = 400;
 
+/** Whether the picker has hidden this modal and will reopen it when it closes. */
+export function IsIconPickerHolding(ModalId: string): boolean {
+  return IconPickerRestoreModalId === ModalId;
+}
+
 // Record which modal is currently visible so we can restore it on close.
 function CaptureCurrentModal(): string | null {
   const Open = document.querySelector('.modal.show');

@@ -1,15 +1,15 @@
 import type { GroupView, TagDisplayMode, TagView } from '@showtrak/protocol';
-import { closeModal, openModal } from './lib/modal';
+import { closeModal, onceHidden, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
 import { HandleNonFatalError, Safe } from './utils';
 import { CloseAllModals } from './modals';
 import { ConfirmationDialog, Notify } from './selection-init';
-import { NormalizeIconName, OpenIconPicker } from './icon-picker';
+import { IsIconPickerHolding, NormalizeIconName, OpenIconPicker } from './icon-picker';
 // Tags reuse the Scripts colour palette (index-based) and its swatch/icon CSS,
 // so the palette + hex helper are imported rather than duplicated.
 import { SCRIPT_COLOURS, ScriptColourHex } from './script-manager';
 import { buildScopeModel, parseScopeSelection, scopeToSelectedValues } from './lib/scope-model';
-import { bindScopeButton, renderScopeButton } from './scope-picker';
+import { IsScopePickerHolding, bindScopeButton, renderScopeButton } from './scope-picker';
 import type { ScopePickerConfig } from './scope-picker';
 import { SummarizeTagScope } from './lib/tag-summary';
 import { Tags as AllTags } from './state';
@@ -22,9 +22,11 @@ import { Tags as AllTags } from './state';
 //   (hidden / icon / name / icon+name — presentation only, targeting is
 //   unaffected) and — via the shared scope picker ("client selector") — the
 //   tag's dynamic membership scope. All client kinds
-//   (real clients, monitoring targets, dummy clients) are taggable, and a tag
+//   (real clients, monitoring targets, dummy clients, FreeKiosk terminals) are
+//   taggable, and a tag
 //   may also absorb other tags, making it a superset of them.
 
+const MODAL_ID = 'SHOWTRAK_MODAL_TAGMANAGER';
 const DEFAULT_TAG_ICON = 'tag';
 // Tile presentation modes, in the order the segmented toggle shows them.
 const TAG_DISPLAY_MODES: TagDisplayMode[] = ['hidden', 'icon', 'name', 'both'];
@@ -40,6 +42,9 @@ let TagManagerEditingIcon: string = DEFAULT_TAG_ICON;
 // the icon (rather than read back off the DOM) because the toggle is a set of
 // buttons, not a form control.
 let TagManagerEditingDisplay: TagDisplayMode = DEFAULT_TAG_DISPLAY;
+// Where to go back to when the Tag Manager closes — the entity editor it was
+// opened from. Null when it was opened from the menu.
+let TagManagerReturnTo: (() => unknown) | null = null;
 
 // --- Tag scope ("client selector") editor state ----------------------------
 // The membership picker reuses the shared scope picker across every client
@@ -69,16 +74,17 @@ const TagScopeConfig: ScopePickerConfig = {
       Groups: TagScopeGroups,
       Tags: AllTags,
       ExcludeTagID: TagManagerEditingId,
-      IncludeKinds: ['showtrak', 'monitor', 'dummy'],
+      IncludeKinds: ['showtrak', 'monitor', 'dummy', 'freekiosk'],
     }),
   ToggleRender: 'html',
 };
 
-export async function OpenTagManager() {
+export async function OpenTagManager(Options: { ReturnTo?: () => unknown } = {}) {
   await CloseAllModals();
+  TagManagerReturnTo = Options.ReturnTo || null;
   ShowTagManagerList();
   await RefreshTagManagerList();
-  openModal('SHOWTRAK_MODAL_TAGMANAGER');
+  openModal(MODAL_ID);
 }
 
 export function ShowTagManagerList() {
@@ -360,7 +366,7 @@ export function InitTagManager() {
     .append(
       buildModalHeader({
         title: 'Tag Manager',
-        onClose: () => closeModal('SHOWTRAK_MODAL_TAGMANAGER'),
+        onClose: () => closeModal(MODAL_ID),
       }).$el
     );
   $('#TAG_MANAGER_EDITOR_HEADER')
@@ -369,9 +375,27 @@ export function InitTagManager() {
       buildModalHeader({
         title: 'Tag Editor',
         onBack: () => ShowTagManagerList(),
-        onClose: () => closeModal('SHOWTRAK_MODAL_TAGMANAGER'),
+        onClose: () => closeModal(MODAL_ID),
       }).$el
     );
+
+  // Opened from an entity's tag picker: closing returns to that editor. The icon
+  // and scope pickers hide the Tag Manager while they are open and reopen it
+  // after, which is not the operator leaving.
+  $(`#${MODAL_ID}`)
+    .off('hide.bs.modal.tagManagerReturn')
+    .on('hide.bs.modal.tagManagerReturn', (Event) => {
+      if (Event.target !== Event.currentTarget) return;
+      if (IsIconPickerHolding(MODAL_ID) || IsScopePickerHolding(MODAL_ID)) return;
+      const ReturnTo = TagManagerReturnTo;
+      TagManagerReturnTo = null;
+      if (!ReturnTo) return;
+      onceHidden(MODAL_ID, () => {
+        // Something else was opened in its place; leave the operator there.
+        if (document.querySelector('.modal.show')) return;
+        void ReturnTo();
+      });
+    });
 
   $('#TAG_MANAGER_CREATE')
     .off('click')

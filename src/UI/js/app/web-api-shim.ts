@@ -396,21 +396,20 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     AlertTriggered: (cb) => sub('AlertTriggered', cb),
     CreateShowTrakAlert: (cb) => sub('CreateShowTrakAlert', cb),
 
-    // ---- Tags (read allowed; management desktop-only) --------------------
-    // The browser renders the same client tiles as the desktop, and their tag
-    // badges are derived from this list, so reading it is part of drawing the
-    // dashboard. Every mutation below stays a no-op — the server does not
-    // allowlist a single Tags:Set* channel for the web namespace either.
+    // ---- Tags --------------------------------------------------------------
+    // Reading is always allowed: the tiles' tag badges are derived from this
+    // list. Every mutation needs Edit mode and the client-management
+    // permission, enforced by the server.
     GetAllTags: async () => rpc('Tags:GetAll'),
     OnSetTagList: (cb) => sub('SetTagList', cb),
-    CreateTag: nullTuple,
-    SetTagSlug: nullTuple,
-    SetTagColour: nullTuple,
-    SetTagIcon: nullTuple,
-    SetTagDisplay: nullTuple,
-    SetTagScope: nullTuple,
-    SetTagOrder: nullTuple,
-    DeleteTag: nullTuple,
+    CreateTag: async (Label) => rpc('Tags:Create', Label),
+    SetTagSlug: async (TagID, Slug) => rpc('Tags:SetSlug', TagID, Slug),
+    SetTagColour: async (TagID, Colour) => rpc('Tags:SetColour', TagID, Colour),
+    SetTagIcon: async (TagID, Icon) => rpc('Tags:SetIcon', TagID, Icon),
+    SetTagDisplay: async (TagID, Display) => rpc('Tags:SetDisplay', TagID, Display),
+    SetTagScope: async (TagID, Scope) => rpc('Tags:SetScope', TagID, Scope),
+    SetTagOrder: async (OrderedTagIDs) => rpc('Tags:SetOrder', OrderedTagIDs),
+    DeleteTag: async (TagID) => rpc('Tags:Delete', TagID),
 
     // ---- Show Variables (read allowed; management desktop-only) ----------
     // The browser can see which variables exist and what a client resolves to —

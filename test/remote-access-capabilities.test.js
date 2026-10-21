@@ -210,6 +210,38 @@ for (const [Permission, Channel] of CATEGORIES) {
   });
 }
 
+test('tag management rides client management and edit mode', async () => {
+  // Tags are labelled collections of clients; the Tag Manager and the editors'
+  // tag pickers write through these channels.
+  const Channels = [
+    'Tags:Create',
+    'Tags:SetSlug',
+    'Tags:SetColour',
+    'Tags:SetIcon',
+    'Tags:SetDisplay',
+    'Tags:SetScope',
+    'Tags:SetOrder',
+    'Tags:Delete',
+  ];
+  const Allowed = load({ settings: ALL_ON, mode: 'EDIT' });
+  const Show = load({ settings: ALL_ON, mode: 'SHOW' });
+  const NoClients = load({
+    settings: { ...ALL_ON, WEBUI_ALLOW_CLIENT_MANAGEMENT: 0 },
+    mode: 'EDIT',
+  });
+  for (const Channel of Channels) {
+    assert.equal((await Allowed.AuthorizeChannel('WEBUI', Channel)).allowed, true, Channel);
+    assert.deepEqual(await Show.AuthorizeChannel('WEBUI', Channel), {
+      allowed: false,
+      reason: 'edit_mode_required',
+    });
+    assert.deepEqual(await NoClients.AuthorizeChannel('WEBUI', Channel), {
+      allowed: false,
+      reason: 'forbidden',
+    });
+  }
+});
+
 test('one surface losing a permission does not affect the other', async () => {
   const Mod = load({ settings: { ...ALL_ON, REMOTE_ALLOW_CLIENT_MANAGEMENT: 0 }, mode: 'EDIT' });
   assert.equal((await Mod.AuthorizeChannel('REMOTE', 'UpdateClient')).allowed, false);

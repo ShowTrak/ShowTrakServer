@@ -60,6 +60,11 @@ const CLIENT_INFO_TAG_PICKER: TagPickerMount = {
   WrapperSelector: '#CLIENT_INFO_TAG_PICKER_WRAPPER',
   ListSelector: '#CLIENT_INFO_TAG_PICKER',
   Namespace: 'clientInfoTags',
+  ReturnTo: async (UUID) => {
+    const { OpenClientInfo } = await import('./client-info-modal');
+    await OpenClientInfo(UUID, { Tab: 'info' });
+  },
+  HasUnsavedChanges: () => HasUnsavedChanges(),
 };
 
 interface FogState {

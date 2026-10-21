@@ -70,8 +70,7 @@ const READ_CHANNELS = new Set([
   'GenerateFreeKioskTerminalDefaults',
   'FreeKiosk:GetCameraList',
   // Reading tags is not tag management: the browser needs the list to render the
-  // badges on its client tiles. Every mutation (Tags:SetScope et al) is absent
-  // from every list below, so a browser can see tags but never edit them.
+  // badges on its client tiles. Editing them is client management (below).
   'Tags:GetAll',
   // Same reasoning as tags: reading variables is show documentation the browser
   // needs to explain what a client will do, not variable management. Every
@@ -131,6 +130,16 @@ const CLIENT_CHANNELS = new Set([
   'UnadoptClient',
   'ReplaceClient',
   'AdoptDevice',
+  // Tags are labelled collections of clients, so managing them — the Tag
+  // Manager and every editor's tag picker — rides the client permission.
+  'Tags:Create',
+  'Tags:SetSlug',
+  'Tags:SetColour',
+  'Tags:SetIcon',
+  'Tags:SetDisplay',
+  'Tags:SetScope',
+  'Tags:SetOrder',
+  'Tags:Delete',
 ]);
 const GROUP_CHANNELS = new Set([
   'CreateGroup',
