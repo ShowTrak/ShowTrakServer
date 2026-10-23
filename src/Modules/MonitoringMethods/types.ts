@@ -41,6 +41,21 @@ export interface MonitoringSettingField {
   // For Type 'list': hints how each entry is validated/coerced. 'number' keeps only
   // entries that parse as finite numbers; 'string' (default) trims and keeps text.
   ItemType?: 'string' | 'number';
+  // For Type 'names': one name box per channel, Count of them. The value is a
+  // string[] of exactly that length; a blank entry means the default, which is
+  // ItemDefault with {n} replaced by the channel number (e.g. 'Channel {n}').
+  Count?: number;
+  ItemDefault?: string;
+  // For Type 'channels': a checkbox per channel, in these groups. The value is a
+  // string[] of the ticked channels' IDs, `<Prefix>:<n>` (e.g. 'out:1'). Each box
+  // is labelled with the name from the 'names' setting NamesKey, if any.
+  Groups?: Array<{
+    Prefix: string;
+    Label: string;
+    Count: number;
+    ItemDefault: string;
+    NamesKey?: string;
+  }>;
   Advanced?: boolean;
   // Marks a setting the check cannot run without. The editor appends a red
   // asterisk to the label. Purely a display hint — server-side validation in the
@@ -130,8 +145,43 @@ export interface LiveLevelsFrame {
   /** 'connecting' until the first meters arrive; 'unavailable' carries Message. */
   State: 'connecting' | 'live' | 'unavailable';
   Message: string | null;
-  /** dBFS per channel; null = no signal (−∞) or not yet read. */
-  Channels: Array<{ Label: string; Db: number | null }>;
+  /**
+   * dBFS per channel; null = no signal (−∞) or not yet read. Group heads a block
+   * of meters in the monitor view ('Inputs', 'Outputs'); Tile marks the ones the
+   * dashboard tile shows. Control marks a channel the view may move (see
+   * SetLiveLevel), with its current Fader (dB, null = −∞) and Muted when read.
+   */
+  Channels: Array<{
+    ID: string;
+    Group: string;
+    Label: string;
+    Db: number | null;
+    // In the monitor view (its group is toggled on there) / on the tile.
+    View?: boolean;
+    Tile?: boolean;
+    Control?: boolean;
+    Fader?: number | null;
+    Muted?: boolean;
+  }>;
+}
+
+/** A fader level (dB, null = −∞) or a mute, sent from the monitor view. */
+export interface LiveLevelChange {
+  Fader?: number | null;
+  Muted?: boolean;
+}
+
+// --- Tile widgets ---------------------------------------------------------------
+//
+// A monitor whose only check is of a method with a tile widget shows that widget
+// at the bottom of its dashboard tile, in place of the latency line. Kind picks
+// the renderer's drawer (src/UI/js/app/tile-widgets.ts); Data is whatever that
+// drawer needs from the check's last result. 'levels' draws live meters from
+// the check's tile channels (StartLiveLevels), streamed only while a dashboard is
+// open.
+export interface MonitoringTileWidget {
+  Kind: string;
+  Data?: unknown;
 }
 
 export interface MonitoringMethod {
@@ -199,6 +249,24 @@ export interface MonitoringMethod {
     Target: MonitoringTargetLike,
     OnFrame: (Frame: LiveLevelsFrame) => void
   ): () => void;
+  /**
+   * The widget this check puts on its monitor's tile when it is the monitor's
+   * only check, or null for the usual latency line. Result is the check's last
+   * probe result (null before the first). Must be pure and must never throw.
+   */
+  GetTileWidget?(
+    Target: MonitoringTargetLike,
+    Result: MonitoringResult | null
+  ): MonitoringTileWidget | null;
+  /**
+   * Move one live channel's fader or mute (a channel the frames mark Control).
+   * Must resolve rather than throw for a refusal, with the reason.
+   */
+  SetLiveLevel?(
+    Target: MonitoringTargetLike,
+    ChannelID: string,
+    Change: LiveLevelChange
+  ): Promise<MonitoringActionResult>;
   NormalizeSettings?(Input: unknown): Record<string, unknown>;
   GetRunCacheKeyExtra?(Target: MonitoringTargetLike, Settings: Record<string, unknown>): unknown;
   GetRunCacheTtlMs?(Target: MonitoringTargetLike): number;

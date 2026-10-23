@@ -37,7 +37,12 @@ import { ToPublicClient, ToPublicGroup } from './serializers';
 import { RegisterRendererSink } from '../../main/renderer-bus';
 import { GetHandler } from '../../main/handler-registry';
 import { CloseLogConsole, OpenLogConsole } from '../../main/log-console';
-import { CloseMonitorLiveLevels, OpenMonitorLiveLevels } from '../../main/monitoring-live';
+import {
+  CloseMonitorLiveLevels,
+  CloseMonitorTileLevels,
+  OpenMonitorLiveLevels,
+  OpenMonitorTileLevels,
+} from '../../main/monitoring-live';
 import { GetRainbowMode, SetRainbowMode } from '../../main/rainbow-mode';
 import { RunWithAuditSource } from '../AuditLog/source';
 import {
@@ -623,6 +628,21 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
     });
     socket.on('monitorlive:close', () => CloseMonitorLiveLevels(LiveLevelsKey));
     socket.on('disconnect', () => CloseMonitorLiveLevels(LiveLevelsKey));
+    // The dashboard's tile meters, on the same terms.
+    socket.on('monitortiles:open', async (cb: AckCallback) => {
+      try {
+        if (!(await IsAuthed(socket))) return cb && cb({ error: 'unauthorized' });
+        const Snapshot = OpenMonitorTileLevels(LiveLevelsKey, (Frames) => {
+          if (!socket.Authed) throw new Error('Session ended');
+          socket.emit('MonitorTileLevels:Frames', Frames);
+        });
+        if (cb) cb({ result: Snapshot });
+      } catch {
+        if (cb) cb({ error: 'failed' });
+      }
+    });
+    socket.on('monitortiles:close', () => CloseMonitorTileLevels(LiveLevelsKey));
+    socket.on('disconnect', () => CloseMonitorTileLevels(LiveLevelsKey));
 
     // Rainbow Mode, toggled from the console. Same reasoning: kept off the rpc
     // bridge so it never appears in the documented surface.

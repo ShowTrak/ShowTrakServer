@@ -1,6 +1,12 @@
 import { AppMode, MonitoringMethodsCache, Selected, Tags } from './state';
 import type { MonitoringCheckView, MonitoringTargetView } from '@showtrak/protocol';
 import { Safe } from './utils';
+import {
+  SyncTileWidgetStreams,
+  TileWidgetRowHtml,
+  TileWidgetShowing,
+  UpdateTileWidget,
+} from './tile-widgets';
 import { OfflineBadgeContent } from './lib/status-badges';
 import { ResolveEntityTags } from './lib/tag-badges';
 import { RenderTagBadgeRow } from './lib/tag-badge-view';
@@ -84,6 +90,8 @@ export function RenderMonitoringTargetTile(T: MonitoringTargetView) {
   const ExpandedClass = Checks.length && IsTargetExpanded(T.TargetID) ? ' CHECKS_EXPANDED' : '';
   return `
     <div id="MONITOR_TILE_${T.TargetID}" class="SHOWTRAK_PC MONITOR ${TileStateClass}${ExpandedClass}${
+      TileWidgetShowing(T) ? ' HAS_TILE_WIDGET' : ''
+    }${
       Selected.includes(DragUUID) ? ' SELECTED' : ''
     }" data-target-id="${T.TargetID}" data-uuid="${DragUUID}" data-flip-key="${DragUUID}" draggable="${
       AppMode === 'EDIT' ? 'true' : 'false'
@@ -100,9 +108,10 @@ export function RenderMonitoringTargetTile(T: MonitoringTargetView) {
       <div class="SHOWTRAK_PC_STATUS ${NoVerdict ? 'd-grid' : 'd-none'}" data-type="INDICATOR_IDLE">
         <h7 class="mb-0 text-light" data-type="MONITOR_IDLE_LABEL">${IsIdle ? 'Idle' : 'Checking'}</h7>
       </div>
-      <div class="SHOWTRAK_PC_STATUS ${Online && !NoVerdict ? 'd-grid' : 'd-none'}" data-type="MONITOR_STATUS">
+      <div class="SHOWTRAK_PC_STATUS ${Online && !NoVerdict && !TileWidgetShowing(T) ? 'd-grid' : 'd-none'}" data-type="MONITOR_STATUS">
         <h7 class="mb-0 ${TextClass}" data-type="MONITOR_STATUS_LABEL">${Safe(Status)}</h7>
       </div>
+      ${TileWidgetRowHtml(T)}
       <div class="SHOWTRAK_PC_STATUS ${!Online && !NoVerdict ? 'd-grid' : 'd-none'}" data-type="INDICATOR_OFFLINE">
         <h7 class="mb-0" data-type="OFFLINE_SINCE" data-offlinesince="${Safe(OfflineSince)}">
           ${OfflineBadgeContent()}
@@ -212,7 +221,10 @@ export function UpdateMonitoringTargetTile(T: MonitoringTargetView) {
       .toggleClass('d-none', !Show);
   };
   ToggleIndicator('INDICATOR_IDLE', NoVerdict);
-  ToggleIndicator('MONITOR_STATUS', Online && !NoVerdict);
+  // A tile widget (e.g. live output meters) stands in for a healthy status line.
+  ToggleIndicator('MONITOR_STATUS', Online && !NoVerdict && !TileWidgetShowing(T));
+  UpdateTileWidget(T);
+  SyncTileWidgetStreams();
   ToggleIndicator('INDICATOR_OFFLINE', !Online && !NoVerdict);
   $tile.find('[data-type="OFFLINE_SINCE"]').attr('data-offlinesince', GetMonitoringOfflineSince(T));
   UpdateListRowState($tile, MonitorListState(T));

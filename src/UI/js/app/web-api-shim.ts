@@ -19,6 +19,7 @@
 import type {
   LogConsoleSnapshot,
   MonitorLiveLevelsSnapshot,
+  MonitorTileLevelsSnapshot,
   ShowTrakAPI,
 } from '@showtrak/protocol';
 
@@ -109,12 +110,15 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     }
   });
 
-  // Likewise an open monitor view's live levels.
+  // Likewise an open monitor view's live levels, and the dashboard's tile meters.
   let LiveLevelsTarget: number | null = null;
+  let TileLevelsOpen = false;
   socket.on('connect', () => {
-    if (LiveLevelsTarget === null) return;
     try {
-      socket.emit('monitorlive:open', LiveLevelsTarget, () => undefined);
+      if (LiveLevelsTarget !== null) {
+        socket.emit('monitorlive:open', LiveLevelsTarget, () => undefined);
+      }
+      if (TileLevelsOpen) socket.emit('monitortiles:open', () => undefined);
     } catch {
       /* intentional: the next reconnect tries again */
     }
@@ -514,6 +518,35 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
       return null;
     },
     OnMonitorLiveLevels: (cb) => sub('MonitorLiveLevels:Frames', cb),
+    SetMonitorLiveLevel: async (TargetID, CheckID, ChannelID, Change, Final) =>
+      rpc('MonitorLiveLevels:Set', TargetID, CheckID, ChannelID, Change, Final),
+    OpenMonitorTileLevels: async () => {
+      TileLevelsOpen = true;
+      return new Promise((resolve) => {
+        const Timer = setTimeout(() => resolve(null), CONSOLE_ACK_TIMEOUT_MS);
+        const Settle = (Snapshot: MonitorTileLevelsSnapshot | null) => {
+          clearTimeout(Timer);
+          resolve(Snapshot);
+        };
+        try {
+          socket.emit('monitortiles:open', (res: Ack) =>
+            Settle(res && res.result ? (res.result as MonitorTileLevelsSnapshot) : null)
+          );
+        } catch {
+          Settle(null);
+        }
+      });
+    },
+    CloseMonitorTileLevels: async () => {
+      TileLevelsOpen = false;
+      try {
+        socket.emit('monitortiles:close');
+      } catch {
+        /* intentional: the server also stops on disconnect */
+      }
+      return null;
+    },
+    OnMonitorTileLevels: (cb) => sub('MonitorTileLevels:Frames', cb),
     GetRainbowMode: async () => AckOrFalse('rainbow:get'),
     SetRainbowMode: async (Enabled) => AckOrFalse('rainbow:set', Enabled),
     OnRainbowModeUpdated: (cb) => sub('RainbowModeUpdated', cb),

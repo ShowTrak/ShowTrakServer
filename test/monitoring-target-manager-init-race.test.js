@@ -101,6 +101,7 @@ function loadManager({ events, onTargetsRead }) {
     '../Broadcast': { Manager: { emit: (event, payload) => events.push([event, payload]) } },
     '../MonitoringMethods': {
       Manager: {
+        GetTileWidget: () => null,
         Has: (id) => id === 'http' || id === 'ping',
         NormalizeSettings: (_id, settings) => ({ ...settings }),
         Run: async () => ({ Success: true, LatencyMs: 25 }),

@@ -100,6 +100,7 @@ test('MonitoringTargetManager initializes rows and handles create/update/delete 
 
     const monitoringMethodsMock = {
       Manager: {
+        GetTileWidget: () => null,
         Has: (id) => methodSet.has(id),
         NormalizeSettings: (id, settings) => {
           normalizeCalls.push([id, settings]);
@@ -317,6 +318,7 @@ test('MonitoringTargetManager reload replaces runtime list from latest DB rows',
       '../Broadcast': { Manager: { emit: () => {} } },
       '../MonitoringMethods': {
         Manager: {
+          GetTileWidget: () => null,
           Has: () => true,
           NormalizeSettings: (_id, settings) => settings,
           Run: async () => ({ Success: true, LatencyMs: 10 }),
@@ -398,6 +400,7 @@ test('MonitoringTargetManager moves group members and orphaned targets to no gro
       '../Broadcast': { Manager: { emit: (event) => events.push(event) } },
       '../MonitoringMethods': {
         Manager: {
+          GetTileWidget: () => null,
           Has: () => true,
           NormalizeSettings: (_id, settings) => settings,
           Run: async () => ({ Success: true, LatencyMs: 10 }),
@@ -489,6 +492,7 @@ test('MonitoringTargetManager.RunCheckNow runs a check, broadcasts, and returns 
     let runInvocations = 0;
     const monitoringMethodsMock = {
       Manager: {
+        GetTileWidget: () => null,
         Has: () => true,
         NormalizeSettings: (_id, settings) => settings,
         Run: async () => {
@@ -613,6 +617,7 @@ test('MonitoringTargetManager.RunAction fans one action across a mixed selection
 
     const monitoringMethodsMock = {
       Manager: {
+        GetTileWidget: () => null,
         Has: (id) => id === 'pjlink' || id === 'ping',
         NormalizeSettings: (_id, settings) => settings,
         Run: async () => {
@@ -762,6 +767,7 @@ test('MonitoringTargetManager.MoveCheck re-parents a check onto another monitor'
       '../Broadcast': { Manager: { emit: (event, payload) => events.push([event, payload]) } },
       '../MonitoringMethods': {
         Manager: {
+          GetTileWidget: () => null,
           Has: () => true,
           Get: () => null,
           NormalizeSettings: (_id, settings) => settings,

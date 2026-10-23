@@ -8,8 +8,11 @@
 // are then updated in place as frames arrive.
 import type { MonitorLiveLevelsCheck, MonitorLiveLevelsSnapshot } from '@showtrak/protocol';
 import {
+  FaderToSlider,
+  FormatFader,
   FormatLevel,
   LevelPercent,
+  SliderToFader,
   LevelZoneOf,
   LiveLevelsCardHtml,
   LiveLevelsSignature,
@@ -17,11 +20,23 @@ import {
   type PeakState,
 } from './lib/live-levels';
 import { HandleNonFatalError } from './utils';
+import { Notify } from './selection-init';
+
+// While dragging a fader, sends go out at most this often; the final value goes
+// out on release. After a move, the unit's echo is ignored for a moment so the
+// slider does not jump back to a value from before it.
+const SEND_INTERVAL_MS = 100;
+const HOLD_AFTER_MOVE_MS = 1500;
 
 let WatchedTarget: number | null = null;
 let Checks = new Map<number, MonitorLiveLevelsCheck>();
 const Peaks = new Map<string, PeakState>();
 let Unsubscribe: (() => void) | null = null;
+// `<CheckID>:<ChannelID>` → until when the slider is the operator's, not the unit's.
+const HeldUntil = new Map<string, number>();
+const Dragging = new Set<string>();
+const SendTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const LastSentAt = new Map<string, number>();
 
 /** The slot under a check's timeline, filled from the last snapshot. */
 export function LiveLevelsSlotHtml(CheckID: number): string {
@@ -68,7 +83,124 @@ export function ApplyLiveLevels(): void {
       }
       if (Value) Value.textContent = FormatLevel(Channel.Db);
       if (Bar && Channel.Db != null) Bar.setAttribute('aria-valuenow', String(Channel.Db));
+      if (Channel.Control) PatchControls(Row, Check, Channel);
     });
+  });
+}
+
+function ControlKey(CheckID: number, ChannelID: string): string {
+  return `${CheckID}:${ChannelID}`;
+}
+
+function PatchControls(
+  Row: HTMLElement,
+  Check: MonitorLiveLevelsCheck,
+  Channel: MonitorLiveLevelsCheck['Channels'][number]
+): void {
+  const Live = Check.State === 'live';
+  const Fader = Row.querySelector<HTMLInputElement>('.live-levels-fader');
+  const FaderValue = Row.querySelector<HTMLElement>('.live-levels-fader-value');
+  const Mute = Row.querySelector<HTMLButtonElement>('.live-levels-mute');
+  const Key = ControlKey(Check.CheckID, Channel.ID);
+  const Held = Dragging.has(Key) || (HeldUntil.get(Key) || 0) > Date.now();
+  if (Fader) {
+    Fader.disabled = !Live || Channel.Fader === undefined;
+    if (!Held) {
+      Fader.value = String(FaderToSlider(Channel.Fader));
+      if (FaderValue) FaderValue.textContent = FormatFader(Channel.Fader);
+    }
+  }
+  if (Mute) {
+    Mute.disabled = !Live || Channel.Muted === undefined;
+    if (!Held) {
+      Mute.classList.toggle('is-muted', !!Channel.Muted);
+      Mute.setAttribute('aria-pressed', Channel.Muted ? 'true' : 'false');
+    }
+  }
+}
+
+// The control a DOM event came from: its check and channel.
+function ControlTarget(El: Element): { CheckID: number; ChannelID: string } | null {
+  const Row = El.closest<HTMLElement>('.live-levels-row');
+  const Slot = El.closest<HTMLElement>('.monitor-live-levels-slot');
+  if (!Row || !Slot || !Row.dataset.channelId) return null;
+  return { CheckID: Number(Slot.dataset.checkId), ChannelID: Row.dataset.channelId };
+}
+
+function SendChange(
+  CheckID: number,
+  ChannelID: string,
+  Change: { Fader?: number | null; Muted?: boolean },
+  Final: boolean
+): void {
+  if (WatchedTarget == null) return;
+  const Key = ControlKey(CheckID, ChannelID);
+  HeldUntil.set(Key, Date.now() + HOLD_AFTER_MOVE_MS);
+  LastSentAt.set(Key, Date.now());
+  window.API.SetMonitorLiveLevel(WatchedTarget, CheckID, ChannelID, Change, Final)
+    .then((Result) => {
+      // Mid-drag failures would toast ten times a second; the release reports.
+      if (Result && !Result.Success && (Final || Change.Muted !== undefined)) {
+        Notify(Result.Error || 'The change was not applied.', 'error');
+      }
+    })
+    .catch((Err: unknown) => HandleNonFatalError('MonitorLiveLevels:Set', Err));
+}
+
+function OnFaderInput(Input: HTMLInputElement, Final: boolean): void {
+  const Target = ControlTarget(Input);
+  if (!Target) return;
+  const Key = ControlKey(Target.CheckID, Target.ChannelID);
+  const Fader = SliderToFader(Number(Input.value));
+  const Readout = Input.parentElement?.querySelector<HTMLElement>('.live-levels-fader-value');
+  if (Readout) Readout.textContent = FormatFader(Fader);
+  const Pending = SendTimers.get(Key);
+  if (Pending) clearTimeout(Pending);
+  SendTimers.delete(Key);
+  if (Final) {
+    Dragging.delete(Key);
+    SendChange(Target.CheckID, Target.ChannelID, { Fader }, true);
+    return;
+  }
+  Dragging.add(Key);
+  const Wait = SEND_INTERVAL_MS - (Date.now() - (LastSentAt.get(Key) || 0));
+  if (Wait <= 0) SendChange(Target.CheckID, Target.ChannelID, { Fader }, false);
+  else {
+    SendTimers.set(
+      Key,
+      setTimeout(() => {
+        SendTimers.delete(Key);
+        SendChange(Target.CheckID, Target.ChannelID, { Fader }, false);
+      }, Wait)
+    );
+  }
+}
+
+function OnMuteClick(Button: HTMLButtonElement): void {
+  const Target = ControlTarget(Button);
+  if (!Target) return;
+  const Muted = !Button.classList.contains('is-muted');
+  Button.classList.toggle('is-muted', Muted);
+  Button.setAttribute('aria-pressed', Muted ? 'true' : 'false');
+  SendChange(Target.CheckID, Target.ChannelID, { Muted }, true);
+}
+
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('input', (Event) => {
+    const El = Event.target as HTMLElement | null;
+    if (El && El.classList && El.classList.contains('live-levels-fader')) {
+      OnFaderInput(El as HTMLInputElement, false);
+    }
+  });
+  document.addEventListener('change', (Event) => {
+    const El = Event.target as HTMLElement | null;
+    if (El && El.classList && El.classList.contains('live-levels-fader')) {
+      OnFaderInput(El as HTMLInputElement, true);
+    }
+  });
+  document.addEventListener('click', (Event) => {
+    const El = (Event.target as HTMLElement | null)?.closest?.('.live-levels-mute');
+    if (El) OnMuteClick(El as HTMLButtonElement);
   });
 }
 
@@ -99,6 +231,10 @@ export function StopMonitorLiveLevels(): void {
   WatchedTarget = null;
   Checks = new Map();
   Peaks.clear();
+  for (const Timer of SendTimers.values()) clearTimeout(Timer);
+  SendTimers.clear();
+  Dragging.clear();
+  HeldUntil.clear();
   if (Unsubscribe) Unsubscribe();
   Unsubscribe = null;
   window.API.CloseMonitorLiveLevels().catch((Err: unknown) =>

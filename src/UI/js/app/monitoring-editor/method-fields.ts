@@ -194,6 +194,80 @@ export function BuildMonitoringCheckFieldHtml(Field: MonitoringSettingField, Val
       </div>`
     );
   }
+  if (Field.Type === 'channels') {
+    // A checkbox per channel, grouped. Each box's name is filled in from the
+    // group's 'names' field by RefreshMonitoringChannelPickerNames, so it follows
+    // what the operator types there.
+    const Groups = Array.isArray(Field.Groups) ? Field.Groups : [];
+    // A single group reads a bare number as its channel (a setting saved when it
+    // was a typed list of numbers).
+    const Only = Groups.length === 1 ? Groups[0] : null;
+    const Picked = new Set(
+      (Array.isArray(Val) ? (Val as unknown[]) : []).map((V) => {
+        const Text = String(V == null ? '' : V).trim();
+        return Only && /^\d+$/.test(Text) ? `${Only.Prefix}:${Number(Text)}` : Text;
+      })
+    );
+    const GroupsHtml = Groups.map((Group) => {
+      const Count = Math.max(0, Math.min(256, Number(Group.Count) | 0));
+      const Boxes = Array.from({ length: Count }, (_, I) => {
+        const ID = `${Group.Prefix}:${I + 1}`;
+        const Default = String(Group.ItemDefault || '{n}').replace(/\{n\}/g, String(I + 1));
+        return `<label class="monitoring-channels-item">
+            <input type="checkbox" class="form-check-input monitoring-channels-box" value="${Safe(ID)}" ${
+              Picked.has(ID) ? 'checked' : ''
+            } />
+            <span class="monitoring-channels-number">${I + 1}</span>
+            <span class="monitoring-channels-name" data-names-key="${Safe(
+              Group.NamesKey || ''
+            )}" data-index="${I}" data-default="${Safe(Default)}">${Safe(Default)}</span>
+          </label>`;
+      }).join('');
+      // One group needs no heading: the field's own label says what it is.
+      return `<div class="monitoring-channels-group">
+          ${Only ? '' : `<div class="monitoring-channels-group-label">${Safe(Group.Label)}</div>`}
+          <div class="monitoring-channels-grid">${Boxes}</div>
+        </div>`;
+    }).join('');
+    return (
+      BuildMonitoringFieldWrapOpen(Field, 'monitoring-channels-field') +
+      `<div class="monitoring-channels" data-key="${Safe(Field.Key)}" data-type="channels">
+        <div class="d-flex align-items-center justify-content-between mb-1">
+          <label class="form-label mb-0 small text-muted">${BuildMonitoringLabelHtml(Field)}</label>
+          ${BuildMonitoringNoteIconHtml(Field)}
+        </div>
+        ${GroupsHtml}
+      </div></div>`
+    );
+  }
+  if (Field.Type === 'names') {
+    // One name box per channel. A blank box means the default, shown as its
+    // placeholder, so the stored list only carries what the operator typed.
+    const Count = Math.max(0, Math.min(256, Number(Field.Count) | 0));
+    const Values = Array.isArray(Val) ? (Val as unknown[]) : [];
+    const Template = String(Field.ItemDefault || '{n}');
+    const Rows = Array.from({ length: Count }, (_, I) => {
+      const Default = Template.replace(/\{n\}/g, String(I + 1));
+      const Current = String(Values[I] == null ? '' : Values[I]);
+      return `<label class="monitoring-names-row">
+          <span class="monitoring-names-number">${I + 1}</span>
+          <input type="text" class="form-control form-control-sm monitoring-names-input" maxlength="64"
+            value="${Safe(Current)}" placeholder="${Safe(Default)}" aria-label="${Safe(
+              `${Field.Label || Field.Key} ${I + 1}`
+            )}" />
+        </label>`;
+    }).join('');
+    return (
+      BuildMonitoringFieldWrapOpen(Field, 'monitoring-names-field') +
+      `<div class="monitoring-names" data-key="${Safe(Field.Key)}" data-type="names">
+        <div class="d-flex align-items-center justify-content-between mb-1">
+          <label class="form-label mb-0 small text-muted">${BuildMonitoringLabelHtml(Field)}</label>
+          ${BuildMonitoringNoteIconHtml(Field)}
+        </div>
+        <div class="monitoring-names-grid">${Rows}</div>
+      </div></div>`
+    );
+  }
   if (Field.Type === 'list') {
     // A multi-value chip/tag input. The container carries data-key/data-type so
     // CollectMonitoringCheckDynamicSettings() can read the chips as a string[].
@@ -347,8 +421,31 @@ export function ValidateMonitoringRequiredFields(HostSelector = MONITORING_FIELD
 // Show/hide conditional fields based on the current value of the field each one
 // depends on. Called after render and on every settings change so gated inputs
 // (e.g. a threshold behind an "enable" toggle) appear and disappear live.
+// Name each channel checkbox after its 'names' field: what is typed there, or
+// the box's default (e.g. Channel 3). Runs on every edit, alongside visibility.
+export function RefreshMonitoringChannelPickerNames(HostSelector = MONITORING_FIELD_HOSTS) {
+  const $hosts = $(HostSelector);
+  $hosts.find('.monitoring-channels-name').each(function () {
+    const El = this as HTMLElement;
+    const NamesKey = El.dataset.namesKey || '';
+    const Typed = NamesKey
+      ? String(
+          $hosts
+            .find(
+              `.monitoring-names[data-key="${NamesKey.replace(/"/g, '\\"')}"] .monitoring-names-input`
+            )
+            .eq(Number(El.dataset.index))
+            .val() || ''
+        ).trim()
+      : '';
+    const Name = Typed || El.dataset.default || '';
+    if (El.textContent !== Name) El.textContent = Name;
+  });
+}
+
 export function ApplyMonitoringConditionalVisibility(HostSelector = MONITORING_FIELD_HOSTS) {
   const $hosts = $(HostSelector);
+  RefreshMonitoringChannelPickerNames(HostSelector);
 
   $hosts.find('.monitoring-field-wrap[data-visible-when-key]').each(function () {
     const $wrap = $(this);
@@ -478,6 +575,16 @@ export function CollectMonitoringCheckDynamicSettings(
       } else if (type === 'number') {
         const n = Number($el.val());
         out[key] = Number.isFinite(n) ? n : null;
+      } else if (type === 'channels') {
+        out[key] = $el
+          .find('.monitoring-channels-box:checked')
+          .map((_, e) => String($(e).val() || ''))
+          .get();
+      } else if (type === 'names') {
+        out[key] = $el
+          .find('.monitoring-names-input')
+          .map((_, e) => String($(e).val() || '').trim())
+          .get();
       } else if (type === 'list') {
         out[key] = $el
           .find('[data-chip-value]')

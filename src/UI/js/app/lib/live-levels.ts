@@ -16,6 +16,34 @@ export const PEAK_FALL_DB_PER_SEC = 20;
 
 export type LevelZone = 'ok' | 'hot' | 'clip';
 
+/**
+ * The fader slider runs from −60 to +10 dB in 0.5 dB steps, with one step below
+ * the bottom for −∞. The unit goes down to −127 dB; a fader set below −60 sits
+ * at the bottom of the slider and its value is shown as it is.
+ */
+export const FADER_SLIDER_MIN = -60.5;
+export const FADER_SLIDER_MAX = 10;
+export const FADER_SLIDER_STEP = 0.5;
+
+/** The slider position for a fader level (null = −∞). */
+export function FaderToSlider(Fader: number | null | undefined): number {
+  if (Fader == null || !Number.isFinite(Fader)) return FADER_SLIDER_MIN;
+  return Math.min(FADER_SLIDER_MAX, Math.max(FADER_SLIDER_MIN + FADER_SLIDER_STEP, Fader));
+}
+
+/** The fader level a slider position sends (null = −∞). */
+export function SliderToFader(Position: number): number | null {
+  if (!Number.isFinite(Position) || Position <= FADER_SLIDER_MIN) return null;
+  return Math.round(Math.min(FADER_SLIDER_MAX, Position) * 10) / 10;
+}
+
+/** `-6.0`, `+3.5`, `0.0` or `−∞`, as a fader readout. */
+export function FormatFader(Fader: number | null | undefined): string {
+  if (Fader === undefined) return '—';
+  if (Fader === null || !Number.isFinite(Fader)) return '−∞';
+  return `${Fader > 0 ? '+' : ''}${Fader.toFixed(1)}`;
+}
+
 /** Bar width in percent of the scale, 0-100. No signal is an empty bar. */
 export function LevelPercent(Db: number | null): number {
   if (Db == null || !Number.isFinite(Db)) return 0;
@@ -84,29 +112,74 @@ function Escape(Value: unknown): string {
  */
 export function LiveLevelsSignature(Check: MonitorLiveLevelsCheck): string {
   const Status = LiveLevelsStatus(Check);
-  return JSON.stringify([Check.Name, Status.Kind, Status.Text, Check.Channels.map((C) => C.Label)]);
+  return JSON.stringify([
+    Check.Name,
+    Status.Kind,
+    Status.Text,
+    Check.Channels.map((C) => [C.ID, C.Group, C.Label, !!C.Control]),
+  ]);
 }
 
-/** The card's markup with empty bars; levels are filled in by the caller. */
+/**
+ * The card's markup with empty bars; levels are filled in by the caller. Each
+ * channel is a strip of its own: name and level on top, the meter, and (with
+ * live control on) its fader and mute underneath. Strips carry their channel
+ * number (Input 1-8, Output 1-8) and keep their index in Channels as data-index.
+ */
 export function LiveLevelsCardHtml(Check: MonitorLiveLevelsCheck): string {
   const Status = LiveLevelsStatus(Check);
-  const Rows = Check.Channels.map(
-    (Channel, Index) =>
-      `<div class="live-levels-row" data-index="${Index}">` +
-      `<span class="live-levels-number">${Index + 1}</span>` +
-      `<span class="live-levels-label" title="${Escape(Channel.Label)}">${Escape(Channel.Label)}</span>` +
-      `<span class="live-levels-bar" role="meter" aria-label="${Escape(Channel.Label)}" aria-valuemin="${METER_FLOOR_DB}" aria-valuemax="0">` +
-      '<span class="live-levels-fill"></span><span class="live-levels-peak"></span></span>' +
-      '<span class="live-levels-value">−∞</span>' +
-      '</div>'
+  const Groups: Array<{ Name: string; Strips: string[] }> = [];
+  Check.Channels.forEach((Channel, Index) => {
+    const Name = Channel.Group || '';
+    let Group = Groups[Groups.length - 1];
+    if (!Group || Group.Name !== Name) {
+      Group = { Name, Strips: [] };
+      Groups.push(Group);
+    }
+    Group.Strips.push(
+      `<div class="live-levels-row live-levels-strip" data-index="${Index}" data-channel-id="${Escape(Channel.ID)}">` +
+        '<div class="live-levels-strip-head">' +
+        `<span class="live-levels-number">${ChannelNumber(Channel.ID, Group.Strips.length + 1)}</span>` +
+        `<span class="live-levels-label" title="${Escape(Channel.Label)}">${Escape(Channel.Label)}</span>` +
+        '<span class="live-levels-value">−∞</span>' +
+        '</div>' +
+        `<span class="live-levels-bar" role="meter" aria-label="${Escape(Channel.Label)}" aria-valuemin="${METER_FLOOR_DB}" aria-valuemax="0">` +
+        '<span class="live-levels-fill"></span><span class="live-levels-peak"></span></span>' +
+        (Channel.Control ? ControlCellsHtml(Channel) : '') +
+        '</div>'
+    );
+  });
+  const Body = Groups.map(
+    (Group) =>
+      (Group.Name ? `<div class="live-levels-group">${Escape(Group.Name)}</div>` : '') +
+      `<div class="live-levels-strips">${Group.Strips.join('')}</div>`
   ).join('');
   return (
     `<div class="live-levels-card is-${Status.Kind}">` +
     '<div class="live-levels-head">' +
-    `<span class="live-levels-title">${Escape(Check.Name ? `${Check.Name} · Input Levels` : 'Input Levels')}</span>` +
+    `<span class="live-levels-title">${Escape(Check.Name ? `${Check.Name} · Levels` : 'Levels')}</span>` +
     `<span class="live-levels-status is-${Status.Kind}">${Escape(Status.Text)}</span>` +
     '</div>' +
-    (Rows ? `<div class="live-levels-rows">${Rows}</div>` : '') +
+    (Body ? `<div class="live-levels-rows">${Body}</div>` : '') +
+    '</div>'
+  );
+}
+
+// The channel number out of an ID like 'in:3'; Fallback when there is none.
+function ChannelNumber(ID: string, Fallback: number): number {
+  const N = Number(String(ID || '').split(':')[1]);
+  return Number.isInteger(N) && N > 0 ? N : Fallback;
+}
+
+// A strip's fader (with its value) and mute, under its meter.
+function ControlCellsHtml(Channel: MonitorLiveLevelsCheck['Channels'][number]): string {
+  const Name = Escape(Channel.Label);
+  return (
+    '<div class="live-levels-strip-controls">' +
+    `<input type="range" class="form-range live-levels-fader" min="${FADER_SLIDER_MIN}" max="${FADER_SLIDER_MAX}" step="${FADER_SLIDER_STEP}" value="${FaderToSlider(Channel.Fader)}" aria-label="${Name} fader">` +
+    `<span class="live-levels-fader-value">${Escape(FormatFader(Channel.Fader))}</span>` +
+    `<button type="button" class="btn btn-sm live-levels-mute${Channel.Muted ? ' is-muted' : ''}" aria-pressed="${Channel.Muted ? 'true' : 'false'}" aria-label="Mute ${Name}" title="Mute">` +
+    '<i class="bi bi-volume-mute-fill"></i></button>' +
     '</div>'
   );
 }

@@ -41,6 +41,7 @@ function loadTarget({ onEmit, runImpl, onError }) {
     '../Broadcast': { Manager: { emit: (...args) => onEmit(...args) } },
     '../MonitoringMethods': {
       Manager: {
+        GetTileWidget: () => null,
         Run: runImpl || (async () => ({ Success: true, LatencyMs: 10 })),
         BuildDebug: () => '<div>debug</div>',
         GetActionOptions: () => ({}),

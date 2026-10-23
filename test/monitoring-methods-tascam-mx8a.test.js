@@ -33,6 +33,11 @@ function defaultState() {
     state[`ANLGOUT/${n}/NAME`] = `"Output${n}"`;
     state[`ANLGOUT/${n}/TESTTONE`] = 'OFF';
     state[`ANLGIN/${n}/METER/PRE`] = 'OFF';
+    state[`ANLGOUT/${n}/METER`] = 'OFF';
+    state[`MIX/${n}/METER`] = 'OFF';
+    state[`MIX/${n}/FADER`] = '0.0';
+    state[`ANLGIN/${n}/FADER`] = '0.0';
+    state[`ANLGOUT/${n}/FADER`] = '0.0';
   }
   return state;
 }
@@ -49,7 +54,7 @@ function defaultState() {
 //   raw        a string to send on connect instead of speaking the protocol
 //   silentOn   a command line never answered
 //   rejectKeys keys a SET refuses with ERR2
-//   levels     input number → meter value (hex) sent while metering
+//   levels     meter key (or input number) → meter value (hex) sent while metering
 //   single     true: like the real unit, a second connection while one is open
 //              is told "Another User Already Connected" and hung up on
 function startUnit(options = {}) {
@@ -153,10 +158,16 @@ function startUnit(options = {}) {
                 meterTimer = setInterval(
                   () => {
                     const keys = Object.keys(state).filter(
-                      (k) => /^ANLGIN\/\d\/METER\/PRE$/.test(k) && state[k] === 'ON'
+                      (k) =>
+                        /^(ANLGIN\/\d\/METER\/PRE|ANLGOUT\/\d\/METER|MIX\/\d\/METER)$/.test(k) &&
+                        state[k] === 'ON'
                     );
                     if (!keys.length || socket.destroyed) return;
-                    const values = keys.map((k) => `${k}:${levels[k.split('/')[1]] || '00000000'}`);
+                    const level = (k) =>
+                      levels[k] ||
+                      (k.startsWith('ANLGIN/') && levels[k.split('/')[1]]) ||
+                      '00000000';
+                    const values = keys.map((k) => `${k}:${level(k)}`);
                     socket.write(`METER ${values.join(' ')}\r\n`);
                   },
                   Number(state['METER/INTERVAL']) || 100
@@ -275,7 +286,7 @@ test('mute checks: muted channels named, unknown keys and invalid entries report
   const M = load();
   const state = {
     'ANLGIN/3/MUTE': 'ON',
-    'ANLGIN/3/NAME': '"Lectern Mic"',
+    'ANLGIN/3/NAME': '"Name on the unit"',
     'ANLGOUT/8/MUTE': 'ON',
   };
   await withUnit({ state }, async (unit) => {
@@ -286,11 +297,12 @@ test('mute checks: muted channels named, unknown keys and invalid entries report
         MonitoredInputs: [1, 3, 3],
         MonitoredMixes: [2],
         MonitoredOutputs: [8, 9],
+        InputLabels: ['', '', 'Lectern Mic'],
       })
     );
     assert.equal(r.Degraded, true);
     assert.match(r.DegradedReason, /Input 3 \(Lectern Mic\) is muted/);
-    assert.match(r.DegradedReason, /Output 8 \(Output8\) is muted/);
+    assert.match(r.DegradedReason, /Output 8 is muted/);
     assert.match(r.DegradedReason, /Mix 2 mute not read \(not available on this unit\)/);
     assert.match(r.DegradedReason, /Invalid channel "Output 9" \(use 1 to 8\)/);
     assert.doesNotMatch(r.DegradedReason, /Input 1/);
@@ -298,40 +310,25 @@ test('mute checks: muted channels named, unknown keys and invalid entries report
       unit.received.includes('GET ANLGIN/1/MUTE ANLGIN/3/MUTE MIX/2/MUTE ANLGOUT/8/MUTE'),
       unit.received.join('\n')
     );
-    // Names are only read for the muted channels.
-    assert.ok(unit.received.includes('GET ANLGIN/3/NAME ANLGOUT/8/NAME'));
-  });
-});
-
-test('names are read four to a GET', async () => {
-  const M = load();
-  const state = {};
-  for (let n = 1; n <= 6; n++) state[`ANLGIN/${n}/MUTE`] = 'ON';
-  await withUnit({ state }, async (unit) => {
-    const r = await M.Run(
-      target(unit.port, { CheckMutes: true, MonitoredInputs: [1, 2, 3, 4, 5, 6] })
+    // Names come from the check's settings; the unit's are never read.
+    assert.ok(
+      unit.received.every((l) => !/(ANLGIN|ANLGOUT|MIX)\/\d\/NAME/.test(l)),
+      unit.received.join('\n')
     );
-    assert.equal(r.Mutes.filter((m) => m.Name).length, 6);
-    const nameGets = unit.received.filter(
-      (l) => l.startsWith('GET ANLGIN/') && l.endsWith('/NAME')
-    );
-    assert.deepEqual(nameGets, [
-      'GET ANLGIN/1/NAME ANLGIN/2/NAME ANLGIN/3/NAME ANLGIN/4/NAME',
-      'GET ANLGIN/5/NAME ANLGIN/6/NAME',
-    ]);
   });
 });
 
 test('pushed NOTIFY / METER lines are skipped, fragmented UTF-8 reassembled', async () => {
   const M = load();
-  const state = { 'ANLGIN/1/MUTE': 'ON', 'ANLGIN/1/NAME': '"Bühne Mic"' };
+  const state = { 'ANLGIN/1/MUTE': 'ON', 'DEVICE/NAME': '"Bühne Rack"' };
   await withUnit({ push: true, fragment: true, state }, async (unit) => {
     const r = await M.Run(
       target(unit.port, { Timeout: 4000, CheckMutes: true, MonitoredInputs: [1] })
     );
     assert.equal(r.Success, true, r.Error);
     assert.equal(r.Model, 'MX-8A');
-    assert.equal(r.DegradedReason, 'Input 1 (Bühne Mic) is muted');
+    assert.equal(r.DeviceName, 'Bühne Rack');
+    assert.equal(r.DegradedReason, 'Input 1 is muted');
   });
 });
 
@@ -401,9 +398,13 @@ test('pure helpers', () => {
 
 test('Debug renders healthy, mutes, offline and escapes device text', async () => {
   const M = load();
-  const state = { 'ANLGIN/3/MUTE': 'ON', 'ANLGIN/3/NAME': '"<b>Mic</b>"' };
+  const state = { 'ANLGIN/3/MUTE': 'ON' };
   await withUnit({ state }, async (unit) => {
-    const t = target(unit.port, { CheckMutes: true, MonitoredInputs: [1, 3] });
+    const t = target(unit.port, {
+      CheckMutes: true,
+      MonitoredInputs: [1, 3],
+      InputLabels: ['', '', '<b>Mic</b>'],
+    });
     const r = await M.Run(t);
     const html = M.Debug(r, t);
     assert.match(html, /1\.10 \(build 0022\)/);
@@ -557,18 +558,25 @@ test('HasLiveLevels follows the toggle; MeterToDb reads the spec table', () => {
 
 test('live levels: meters stream, the check reads over the same connection, and stopping restores', async () => {
   const M = load();
-  const state = { 'ANLGIN/2/NAME': '"Lectern Mic"', 'ANLGIN/5/METER/PRE': 'ON' };
+  const state = { 'ANLGIN/5/METER/PRE': 'ON' };
   const levels = { 1: '80000000', 2: '4026E73C' };
   await withUnit({ state, levels, single: true }, async (unit) => {
-    const t = target(unit.port, { ReadLevels: true, CheckMutes: true, MonitoredInputs: [1] });
+    const t = target(unit.port, {
+      ReadLevels: true,
+      CheckMutes: true,
+      MonitoredInputs: [1],
+      InputLabels: ['', 'Lectern Mic'],
+    });
     const frames = [];
     const stop = M.StartLiveLevels(t, (f) => frames.push(f));
     assert.equal(frames[0].State, 'connecting');
 
     const live = await waitFor(() => frames.find((f) => f.State === 'live'));
+    // Inputs only: output levels are off for this check.
     assert.equal(live.Channels.length, 8);
+    assert.ok(live.Channels.every((c) => c.Group === 'Inputs' && !c.Tile));
     assert.equal(live.Channels[1].Label, 'Lectern Mic');
-    assert.equal(live.Channels[0].Label, 'Input1');
+    assert.equal(live.Channels[0].Label, 'Channel 1');
     assert.equal(live.Channels[0].Db, 0);
     assert.equal(live.Channels[1].Db, -6);
     assert.equal(live.Channels[2].Db, null);
@@ -588,7 +596,12 @@ test('live levels: meters stream, the check reads over the same connection, and 
     // Input 5's meter switch was already on, so it is left on.
     assert.equal(
       sets[sets.length - 1],
-      'SET ' + [1, 2, 3, 4, 6, 7, 8].map((n) => `ANLGIN/${n}/METER/PRE:OFF`).join(' ')
+      'SET ' +
+        [
+          ...[1, 2, 3, 4, 6, 7, 8].map((n) => `ANLGIN/${n}/METER/PRE:OFF`),
+          ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => `MIX/${n}/METER:OFF`),
+          ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => `ANLGOUT/${n}/METER:OFF`),
+        ].join(' ')
     );
     assert.equal(unit.state['ANLGIN/5/METER/PRE'], 'ON');
     assert.equal(unit.state['ANLGIN/1/METER/PRE'], 'OFF');
@@ -638,5 +651,366 @@ test('live levels: a dropped connection reads as unavailable until it reconnects
     unit.dropAll();
     await waitFor(() => frames.some((f) => f.State === 'unavailable'));
     stop();
+  });
+});
+
+test('output levels: their own toggle, names from the settings, and a tile-only subset', async () => {
+  const M = load();
+  const levels = {
+    'ANLGOUT/1/METER': '80000000',
+    'ANLGOUT/2/METER': '4026E73C',
+    'MIX/3/METER': '4026E73C',
+    3: '80000000',
+  };
+  const OutputLabels = ['Main L', 'Main R'];
+  const MixLabels = ['', '', 'Program'];
+  await withUnit({ levels, single: true }, async (unit) => {
+    const both = target(unit.port, { ReadLevels: true, ReadOutputLevels: true, OutputLabels });
+    const tileOnly = target(unit.port, {
+      ShowTileLevels: true,
+      // Stored out of order and with an unknown ID: shown in display order.
+      TileChannels: ['out:2', 'mix:3', 'out:1', 'out:9', 'in:2'],
+      OutputLabels,
+      MixLabels,
+    });
+    const a = [];
+    const b = [];
+    const stopA = M.StartLiveLevels(both, (f) => a.push(f));
+    const stopB = M.StartLiveLevels(tileOnly, (f) => b.push(f));
+    const full = await waitFor(() => a.find((f) => f.State === 'live'));
+    // Inputs and outputs for the view; mix buses only ever go on a tile.
+    assert.equal(full.Channels.length, 16);
+    assert.ok(full.Channels.every((c) => c.View && c.Group !== 'Mixes'));
+    assert.deepEqual(
+      full.Channels.slice(7, 10).map((c) => [c.Group, c.Label]),
+      [
+        ['Inputs', 'Channel 8'],
+        ['Outputs', 'Main L'],
+        ['Outputs', 'Main R'],
+      ]
+    );
+    assert.equal(full.Channels[2].Db, 0);
+    assert.equal(full.Channels[8].Db, 0);
+    assert.equal(full.Channels[9].Db, -6);
+    // No tile on this check, so nothing is marked for one.
+    assert.ok(full.Channels.every((c) => !c.Tile));
+
+    // The tile-only check sees just its picked channels, in display order,
+    // marked for the tile and not for the view.
+    const tile = await waitFor(() => b.find((f) => f.State === 'live'));
+    assert.deepEqual(
+      tile.Channels.map((c) => [c.ID, c.Label, c.Db, c.Tile, c.View]),
+      [
+        ['in:2', 'Channel 2', null, true, undefined],
+        ['mix:3', 'Program', -6, true, undefined],
+        ['out:1', 'Main L', 0, true, undefined],
+        ['out:2', 'Main R', -6, true, undefined],
+      ]
+    );
+    // Both checks share the one connection the unit allows.
+    assert.equal(unit.stats.connections, 1);
+    stopA();
+    stopB();
+    await waitFor(() => unit.stats.open === 0);
+  });
+});
+
+test('HasLiveLevels and GetTileWidget follow their toggles', () => {
+  const M = load();
+  assert.equal(M.HasLiveLevels(target(1, { ReadOutputLevels: true })), true);
+  assert.equal(
+    M.HasLiveLevels(target(1, { ShowTileLevels: true, TileChannels: ['out:1'] })),
+    false
+  );
+  assert.deepEqual(M.GetTileWidget(target(1, { ShowTileLevels: true, TileChannels: ['mix:1'] })), {
+    Kind: 'levels',
+  });
+  assert.equal(M.GetTileWidget(target(1, { ShowTileLevels: true, TileChannels: [] })), null);
+  assert.equal(
+    M.GetTileWidget(target(1, { ShowTileLevels: true, TileChannels: ['out:9', 'x:1', 1] })),
+    null
+  );
+  assert.equal(M.GetTileWidget(target(1, { TileChannels: ['out:1'] })), null);
+  const wanted = M._internal.ParseLevelsWanted(
+    target(1, { ShowTileLevels: true, TileChannels: ['out:2', 'out:1', 'out:1'] })
+  );
+  assert.equal(wanted.Inputs, false);
+  assert.equal(wanted.Outputs, false);
+  assert.deepEqual(wanted.TileChannels, ['out:1', 'out:2']);
+});
+
+// --- Names, silence and live control ---------------------------------------------
+
+test('names come from the settings: defaults for blanks, used by meters and messages', async () => {
+  const M = load();
+  const state = { 'ANLGIN/3/MUTE': 'ON', 'ANLGIN/3/NAME': '"Name on the unit"' };
+  await withUnit({ state, levels: { 1: '80000000' } }, async (unit) => {
+    const t = target(unit.port, {
+      ReadLevels: true,
+      ReadOutputLevels: true,
+      CheckMutes: true,
+      MonitoredInputs: [3],
+      InputLabels: [' Presenter ', '', 'Lectern Mic'],
+      OutputLabels: ['', 'Main R'],
+    });
+    const r = await M.Run(t);
+    assert.equal(r.DegradedReason, 'Input 3 (Lectern Mic) is muted');
+    const frames = [];
+    const stop = M.StartLiveLevels(t, (f) => frames.push(f));
+    const live = await waitFor(() => frames.find((f) => f.State === 'live'));
+    assert.deepEqual(
+      live.Channels.map((c) => c.Label).filter((_, i) => [0, 1, 2, 8, 9].includes(i)),
+      ['Presenter', 'Channel 2', 'Lectern Mic', 'Output 1', 'Main R']
+    );
+    // The unit's own names are never asked for.
+    assert.ok(unit.received.every((l) => !/(ANLGIN|ANLGOUT|MIX)\/\d\/NAME/.test(l)));
+    stop();
+    await waitFor(() => unit.stats.open === 0);
+  });
+  const { ParseLabelOverrides } = M._internal;
+  assert.deepEqual(
+    [...ParseLabelOverrides(target(1, { MixLabels: ['Program', '  ', 'x'.repeat(80)] })).mix],
+    [
+      [1, 'Program'],
+      [3, 'x'.repeat(64)],
+    ]
+  );
+});
+
+test('meters below the silence threshold read as no signal', async () => {
+  const M = load();
+  // 0x0020C49B = -60 dBFS, 0x000014F8 ≈ -100 dBFS.
+  const levels = { 1: '0020C49B', 2: '000014F8' };
+  await withUnit({ levels }, async (unit) => {
+    const frames = [];
+    const stop = M.StartLiveLevels(target(unit.port, { ReadLevels: true }), (f) => frames.push(f));
+    const live = await waitFor(() => frames.find((f) => f.State === 'live'));
+    assert.equal(live.Channels[0].Db, -60);
+    assert.equal(live.Channels[1].Db, null);
+    stop();
+    await waitFor(() => unit.stats.open === 0);
+    const frames2 = [];
+    const stop2 = M.StartLiveLevels(
+      target(unit.port, { ReadLevels: true, SilenceBelowDb: -50 }),
+      (f) => frames2.push(f)
+    );
+    const live2 = await waitFor(() => frames2.find((f) => f.State === 'live'));
+    assert.equal(live2.Channels[0].Db, null);
+    stop2();
+    await waitFor(() => unit.stats.open === 0);
+  });
+});
+
+test('live control: faders and mutes are read, moved, and refused when off', async () => {
+  const M = load();
+  const state = { 'ANLGIN/2/FADER': '-6.0', 'ANLGIN/4/MUTE': 'ON', 'ANLGOUT/1/FADER': '-INF' };
+  await withUnit({ state, levels: { 1: '80000000' }, single: true }, async (unit) => {
+    const t = target(unit.port, {
+      ReadLevels: true,
+      InputControl: true,
+      ReadOutputLevels: true,
+      OutputControl: false,
+    });
+    const frames = [];
+    const stop = M.StartLiveLevels(t, (f) => frames.push(f));
+    const live = await waitFor(() => frames.find((f) => f.State === 'live'));
+    const byId = Object.fromEntries(live.Channels.map((c) => [c.ID, c]));
+    assert.equal(byId['in:2'].Control, true);
+    assert.equal(byId['in:2'].Fader, -6);
+    assert.equal(byId['in:4'].Muted, true);
+    assert.equal(byId['in:1'].Fader, 0);
+    // Outputs are showing but not controllable.
+    assert.equal(byId['out:1'].Control, undefined);
+    assert.equal(byId['out:1'].Fader, undefined);
+
+    assert.deepEqual(await M.SetLiveLevel(t, 'in:2', { Fader: 3.25 }), {
+      Success: true,
+      Detail: 'Input 2 fader set to +3.3 dB',
+    });
+    assert.equal(unit.state['ANLGIN/2/FADER'], '+3.3');
+    assert.deepEqual(await M.SetLiveLevel(t, 'in:2', { Fader: null }), {
+      Success: true,
+      Detail: 'Input 2 fader set to −∞',
+    });
+    assert.equal(unit.state['ANLGIN/2/FADER'], '-INF');
+    assert.deepEqual(await M.SetLiveLevel(t, 'in:4', { Muted: false }), {
+      Success: true,
+      Detail: 'Input 4 unmuted',
+    });
+    assert.equal(unit.state['ANLGIN/4/MUTE'], 'OFF');
+
+    const shown = await waitFor(() =>
+      frames.find((f) => f.Channels.some((c) => c.ID === 'in:2' && c.Fader === null))
+    );
+    assert.ok(shown.Channels.find((c) => c.ID === 'in:4').Muted === false);
+
+    // Refusals: control off for outputs, out-of-range, unknown, both at once.
+    assert.match(
+      (await M.SetLiveLevel(t, 'out:1', { Muted: true })).Error,
+      /output control is turned off/
+    );
+    assert.match((await M.SetLiveLevel(t, 'in:1', { Fader: 11 })).Error, /from -127 to \+10 dB/);
+    assert.match((await M.SetLiveLevel(t, 'in:1', { Fader: NaN })).Error, /from -127/);
+    assert.match((await M.SetLiveLevel(t, 'in:9', { Muted: true })).Error, /Unknown channel/);
+    assert.match((await M.SetLiveLevel(t, 'mix:1', { Muted: true })).Error, /no live control/);
+    assert.match(
+      (await M.SetLiveLevel(t, 'in:1', { Fader: 0, Muted: true })).Error,
+      /either a fader level or a mute/
+    );
+    // Still a single connection for all of it.
+    assert.equal(unit.stats.connections, 1);
+    stop();
+    await waitFor(() => unit.stats.open === 0);
+    assert.match((await M.SetLiveLevel(t, 'in:1', { Muted: true })).Error, /not connected/);
+  });
+});
+
+test('live control needs its levels showing; changes made elsewhere come through', async () => {
+  const M = load();
+  const { ParseLevelsWanted } = M._internal;
+  const w = ParseLevelsWanted(target(1, { InputControl: true, OutputControl: true }));
+  assert.equal(w.InputControl, false);
+  assert.equal(w.OutputControl, false);
+  assert.equal(ParseLevelsWanted(target(1, {})).SilenceBelowDb, -90);
+  assert.equal(ParseLevelsWanted(target(1, { SilenceBelowDb: -300 })).SilenceBelowDb, -127);
+
+  // A fader moved by a second client (here: a raw session) reaches the frames
+  // through the unit's NOTIFY.
+  await withUnit({ levels: { 1: '80000000' } }, async (unit) => {
+    const t = target(unit.port, { ReadLevels: true, InputControl: true });
+    const frames = [];
+    const stop = M.StartLiveLevels(t, (f) => frames.push(f));
+    await waitFor(() => frames.find((f) => f.State === 'live'));
+    const other = M.StartLiveLevels(
+      target(unit.port, { ReadLevels: true, InputControl: true }),
+      () => undefined
+    );
+    await M.SetLiveLevel(t, 'in:5', { Fader: -12 });
+    await waitFor(() =>
+      frames.find((f) => f.Channels.some((c) => c.ID === 'in:5' && c.Fader === -12))
+    );
+    other();
+    stop();
+    await waitFor(() => unit.stats.open === 0);
+  });
+});
+
+// --- One unit, one connection ---------------------------------------------------
+
+const BUSY = /only control connection/;
+
+test('a settings save hands the live connection over instead of opening a second', async () => {
+  const M = load();
+  await withUnit({ single: true, levels: { 1: '80000000' } }, async (unit) => {
+    const frames = [];
+    const stopOld = M.StartLiveLevels(target(unit.port, { ReadLevels: true }), (f) =>
+      frames.push(f)
+    );
+    await waitFor(() => frames.some((f) => f.State === 'live'));
+    // What the hub does on a save: the successor starts, then the old one stops.
+    const next = [];
+    const stopNew = M.StartLiveLevels(
+      target(unit.port, { ReadLevels: true, ReadOutputLevels: true, InputLabels: ['Lectern'] }),
+      (f) => next.push(f)
+    );
+    stopOld();
+    const live = await waitFor(() =>
+      next.find((f) => f.State === 'live' && f.Channels.length === 16)
+    );
+    assert.equal(live.Channels[0].Label, 'Lectern');
+    // Even the other order (stop, then start) rejoins within the linger.
+    stopNew();
+    const again = [];
+    const stopAgain = M.StartLiveLevels(target(unit.port, { ReadLevels: true }), (f) =>
+      again.push(f)
+    );
+    await waitFor(() => again.some((f) => f.State === 'live'));
+    assert.equal(unit.stats.connections, 1);
+    assert.ok([...frames, ...next, ...again].every((f) => !BUSY.test(f.Message || '')));
+    stopAgain();
+    await waitFor(() => unit.stats.open === 0);
+  });
+});
+
+test('a check or action while live is connecting waits for it and rides on it', async () => {
+  const M = load();
+  await withUnit({ single: true, levels: { 1: '80000000' } }, async (unit) => {
+    const t = target(unit.port, { ReadLevels: true });
+    const stop = M.StartLiveLevels(t, () => undefined);
+    // Straight away, before the live session has logged in.
+    const [r, a] = await Promise.all([M.Run(t), M.RunAction(t, 'identify', {})]);
+    assert.equal(r.Login, 'ok', r.DegradedReason);
+    assert.deepEqual(a, { Success: true, Detail: 'Identifying' });
+    assert.equal(unit.stats.connections, 1);
+    stop();
+    await waitFor(() => unit.stats.open === 0);
+  });
+});
+
+test('after the last viewer, a new connection waits for the old one to close', async () => {
+  const M = load();
+  await withUnit({ single: true, levels: { 1: '80000000' } }, async (unit) => {
+    const t = target(unit.port, { ReadLevels: true });
+    const first = [];
+    const stop = M.StartLiveLevels(t, (f) => first.push(f));
+    await waitFor(() => first.some((f) => f.State === 'live'));
+    stop();
+    // Past the linger: the old session is closing (putting the meters back).
+    await waitFor(() => M._internal.LiveSessions.size === 0, 4000);
+    const second = [];
+    const stop2 = M.StartLiveLevels(t, (f) => second.push(f));
+    // A check in the gap takes its turn rather than colliding either.
+    const r = await M.Run(t);
+    assert.notEqual(r.Login, 'busy');
+    await waitFor(() => second.some((f) => f.State === 'live'), 4000);
+    assert.ok(second.every((f) => !BUSY.test(f.Message || '')));
+    stop2();
+    await waitFor(() => unit.stats.open === 0, 4000);
+  });
+});
+
+test('a corrected password replaces a refused one without waiting for the retry', async () => {
+  const M = load();
+  await withUnit({ single: true, password: 'right', levels: { 1: '80000000' } }, async (unit) => {
+    const wrong = [];
+    const stopWrong = M.StartLiveLevels(
+      target(unit.port, { ReadLevels: true, Password: 'nope' }),
+      (f) => wrong.push(f)
+    );
+    await waitFor(() => wrong.some((f) => /refused the password/.test(f.Message || '')));
+    const right = [];
+    const started = Date.now();
+    const stopRight = M.StartLiveLevels(
+      target(unit.port, { ReadLevels: true, Password: 'right' }),
+      (f) => right.push(f)
+    );
+    stopWrong();
+    await waitFor(() => right.some((f) => f.State === 'live'));
+    // Well inside the 5 s retry a failed connection otherwise waits.
+    assert.ok(Date.now() - started < 2500);
+    stopRight();
+    await waitFor(() => unit.stats.open === 0);
+  });
+});
+
+test('mute checkboxes: channel IDs and numbers saved before them both work', async () => {
+  const M = load();
+  const state = { 'ANLGIN/3/MUTE': 'ON', 'MIX/2/MUTE': 'ON', 'ANLGOUT/8/MUTE': 'ON' };
+  await withUnit({ state }, async (unit) => {
+    const r = await M.Run(
+      target(unit.port, {
+        CheckMutes: true,
+        // New: IDs from the checkboxes. A wrong group's ID is reported, not read.
+        MonitoredInputs: ['in:3', 'in:1', 'out:3'],
+        // Old: a typed list of numbers, as 3.28.12 saved it.
+        MonitoredMixes: [2],
+        MonitoredOutputs: ['8'],
+      })
+    );
+    assert.match(r.DegradedReason, /Input 3 is muted/);
+    assert.match(r.DegradedReason, /Mix 2 is muted/);
+    assert.match(r.DegradedReason, /Output 8 is muted/);
+    assert.match(r.DegradedReason, /Invalid channel "Input out:3"/);
+    assert.doesNotMatch(r.DegradedReason, /Input 1/);
   });
 });

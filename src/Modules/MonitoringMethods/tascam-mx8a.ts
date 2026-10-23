@@ -15,8 +15,7 @@
 //   3. `GET ANLGOUT/<n>/TESTTONE …` for outputs 1-8, only while the test tone is
 //      on, to say which outputs it is reaching.
 //   4. `GET ANLGIN/<n>/MUTE MIX/<n>/MUTE ANLGOUT/<n>/MUTE …` for the listed
-//      channels, then `…/NAME` for the muted ones (at most four per GET, since
-//      a name can be 96 bytes and the unit splits replies over 1024 bytes).
+//      channels. Channel names come from the check's settings, not the unit.
 //
 // NOTIFY (setting changes) and METER lines can arrive at any time and are
 // skipped wherever they land. Nothing in Run() changes the unit: it never
@@ -39,6 +38,7 @@ import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   LiveLevelsFrame,
   MonitoringActionDef,
+  MonitoringTileWidget,
   MonitoringActionResult,
   MonitoringResult,
   MonitoringSettingField,
@@ -52,8 +52,11 @@ const DEFAULT_TIMEOUT_MS = 4000;
 const MAX_BUFFERED_CHARS = 64_000;
 // The MX-8A has 8 analog inputs, 8 mix buses and 8 analog outputs.
 const CHANNELS = 8;
-// Names are up to 96 bytes, so four per GET keeps a reply under 1024 bytes.
-const NAMES_PER_GET = 4;
+// The unit's noise floor sits around −95 to −98 dBFS; below this reads as silence.
+const DEFAULT_SILENCE_DB = -90;
+// Fader range per the spec: −∞, or −127.0 to +10.0 dB in 0.1 dB steps.
+const FADER_MIN_DB = -127;
+const FADER_MAX_DB = 10;
 
 const Settings: MonitoringSettingField[] = [
   {
@@ -90,30 +93,60 @@ const Settings: MonitoringSettingField[] = [
   },
   {
     Key: 'MonitoredInputs',
-    Label: 'Inputs',
-    Type: 'list',
-    ItemType: 'number',
+    Label: 'Inputs that must not be muted',
+    // Checkboxes. Checks saved before 3.29.0 hold bare numbers ([3]), which the
+    // field reads as this group's channels; new saves store IDs ('in:3').
+    Type: 'channels',
+    Groups: [
+      {
+        Prefix: 'in',
+        Label: 'Inputs',
+        Count: CHANNELS,
+        ItemDefault: 'Channel {n}',
+        NamesKey: 'InputLabels',
+      },
+    ],
     Default: [],
     VisibleWhen: { Key: 'CheckMutes', Equals: true },
-    Note: 'Analog input numbers, 1 to 8, that should never be muted.',
+    Note: 'Tick each input that should never be muted. The check reads Degraded while any ticked one is.',
   },
   {
     Key: 'MonitoredMixes',
-    Label: 'Mix buses',
-    Type: 'list',
-    ItemType: 'number',
+    Label: 'Mix buses that must not be muted',
+    // Checkboxes. Checks saved before 3.29.0 hold bare numbers ([3]), which the
+    // field reads as this group's channels; new saves store IDs ('mix:3').
+    Type: 'channels',
+    Groups: [
+      {
+        Prefix: 'mix',
+        Label: 'Mix buses',
+        Count: CHANNELS,
+        ItemDefault: 'Mix {n}',
+        NamesKey: 'MixLabels',
+      },
+    ],
     Default: [],
     VisibleWhen: { Key: 'CheckMutes', Equals: true },
-    Note: 'Mix bus numbers, 1 to 8, that should never be muted.',
+    Note: 'Tick each mix bus that should never be muted. The check reads Degraded while any ticked one is.',
   },
   {
     Key: 'MonitoredOutputs',
-    Label: 'Outputs',
-    Type: 'list',
-    ItemType: 'number',
+    Label: 'Outputs that must not be muted',
+    // Checkboxes. Checks saved before 3.29.0 hold bare numbers ([3]), which the
+    // field reads as this group's channels; new saves store IDs ('out:3').
+    Type: 'channels',
+    Groups: [
+      {
+        Prefix: 'out',
+        Label: 'Outputs',
+        Count: CHANNELS,
+        ItemDefault: 'Output {n}',
+        NamesKey: 'OutputLabels',
+      },
+    ],
     Default: [],
     VisibleWhen: { Key: 'CheckMutes', Equals: true },
-    Note: 'Analog output numbers, 1 to 8, that should never be muted.',
+    Note: 'Tick each output that should never be muted. The check reads Degraded while any ticked one is.',
   },
   {
     Key: 'ReadLevels',
@@ -121,6 +154,103 @@ const Settings: MonitoringSettingField[] = [
     Type: 'boolean',
     Default: false,
     Note: 'Shows the eight input meters (pre-fader) in the monitor view while it is open. While they are showing, ShowTrak holds the unit’s only control connection, so MX Connect or a control system cannot connect.',
+  },
+  {
+    Key: 'InputControl',
+    Label: 'Live input control',
+    Type: 'boolean',
+    Default: false,
+    VisibleWhen: { Key: 'ReadLevels', Equals: true },
+    Note: 'Adds a fader and a mute button to each input in the monitor view. Changes are sent to the unit straight away, with no confirmation.',
+  },
+  {
+    Key: 'ReadOutputLevels',
+    Label: 'Show live output levels',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Shows the eight output meters in the monitor view while it is open. While they are showing, ShowTrak holds the unit’s only control connection, so MX Connect or a control system cannot connect.',
+  },
+  {
+    Key: 'OutputControl',
+    Label: 'Live output control',
+    Type: 'boolean',
+    Default: false,
+    VisibleWhen: { Key: 'ReadOutputLevels', Equals: true },
+    Note: 'Adds a fader and a mute button to each output in the monitor view. Changes are sent to the unit straight away, with no confirmation.',
+  },
+  {
+    Key: 'ShowTileLevels',
+    Label: 'Show levels on the tile',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Shows the chosen channels’ meters at the bottom of the monitor’s dashboard tile, when this is the monitor’s only check. The dashboard is usually open, so ShowTrak then holds the unit’s only control connection almost all the time: MX Connect or a control system cannot connect.',
+  },
+  {
+    Key: 'TileChannels',
+    Label: 'Channels on the tile',
+    Type: 'channels',
+    Groups: [
+      {
+        Prefix: 'in',
+        Label: 'Inputs',
+        Count: CHANNELS,
+        ItemDefault: 'Channel {n}',
+        NamesKey: 'InputLabels',
+      },
+      {
+        Prefix: 'mix',
+        Label: 'Mix buses',
+        Count: CHANNELS,
+        ItemDefault: 'Mix {n}',
+        NamesKey: 'MixLabels',
+      },
+      {
+        Prefix: 'out',
+        Label: 'Outputs',
+        Count: CHANNELS,
+        ItemDefault: 'Output {n}',
+        NamesKey: 'OutputLabels',
+      },
+    ],
+    Default: ['out:1', 'out:2'],
+    VisibleWhen: { Key: 'ShowTileLevels', Equals: true },
+    Note: 'Tick the channels whose meters the tile shows, e.g. outputs 1 and 2 for a main left and right. Up to three fit one to a line; more go two to a line.',
+  },
+  {
+    Key: 'SilenceBelowDb',
+    Label: 'Treat as silence below (dBFS)',
+    Type: 'number',
+    Default: DEFAULT_SILENCE_DB,
+    Min: -127,
+    Max: 0,
+    Note: 'A meter below this reads as −∞ and an empty bar, so the unit’s noise floor (around −95 dBFS) does not flicker. Applies to the monitor view and the tile.',
+  },
+  {
+    Key: 'InputLabels',
+    Label: 'Input names',
+    Type: 'names',
+    Count: CHANNELS,
+    ItemDefault: 'Channel {n}',
+    Default: [],
+    Note: 'A name for each input, used throughout ShowTrak: the meters, the tile and the check’s messages. Leave a box blank for the default. The unit is not changed.',
+  },
+  {
+    Key: 'MixLabels',
+    Label: 'Mix bus names',
+    Type: 'names',
+    Count: CHANNELS,
+    ItemDefault: 'Mix {n}',
+    Default: [],
+    Note: 'A name for each mix bus, used throughout ShowTrak: the meters, the tile and the check’s messages. Leave a box blank for the default. The unit is not changed.',
+  },
+  {
+    Key: 'OutputLabels',
+    Label: 'Output names',
+    Type: 'names',
+    Count: CHANNELS,
+    ItemDefault: 'Output {n}',
+    Default: [],
+    Note: 'A name for each output, used throughout ShowTrak: the meters, the tile and the check’s messages. Leave a box blank for the default. The unit is not changed.',
   },
   {
     Key: 'Timeout',
@@ -182,6 +312,28 @@ function ParseConfig(Target: MonitoringTargetLike): MxConfig {
   };
 }
 
+// The names set in ShowTrak, number → name per channel kind. Pure — exported via
+// _internal.
+function ParseLabelOverrides(
+  Target: MonitoringTargetLike
+): Record<ChannelKind, Map<number, string>> {
+  const Cfg = (Target && Target.Settings) || {};
+  // One entry per channel, by position (a 'names' setting); blank = default.
+  const Parse = (List: unknown) => {
+    const Out = new Map<number, string>();
+    (Array.isArray(List) ? List : []).slice(0, CHANNELS).forEach((Raw, I) => {
+      const Name = String(Raw == null ? '' : Raw).trim();
+      if (Name) Out.set(I + 1, Name.slice(0, 64));
+    });
+    return Out;
+  };
+  return {
+    input: Parse(Cfg.InputLabels),
+    mix: Parse(Cfg.MixLabels),
+    output: Parse(Cfg.OutputLabels),
+  };
+}
+
 function ParseHealthOptions(Target: MonitoringTargetLike): HealthOptions {
   const Cfg = (Target && Target.Settings) || {};
   const CheckMutes = Cfg.CheckMutes === true;
@@ -196,7 +348,11 @@ function ParseHealthOptions(Target: MonitoringTargetLike): HealthOptions {
     for (const [Kind, List] of Lists) {
       const Seen = new Set<number>();
       for (const Raw of Array.isArray(List) ? List : []) {
-        const N = Number(Raw);
+        // A channel ID ('in:3', from the checkboxes) or a bare number (saved
+        // before the checkboxes, when these were typed lists).
+        const Text_ = String(Raw == null ? '' : Raw).trim();
+        const Match = /^(?:([a-z]+):)?(\d+)$/.exec(Text_);
+        const N = Match && (!Match[1] || Match[1] === ID_PREFIX[Kind]) ? Number(Match[2]) : NaN;
         if (!Number.isInteger(N) || N < 1 || N > CHANNELS) {
           InvalidChannels.push(`${KIND_LABEL[Kind]} ${String(Raw)}`);
           continue;
@@ -565,15 +721,6 @@ async function ReadUnit(
         };
       });
       Snapshot.Mutes = Readings;
-
-      SetStage('the channel names');
-      const Muted = Readings.filter((R) => R.Muted);
-      for (let I = 0; I < Muted.length; I += NAMES_PER_GET) {
-        const Batch = Muted.slice(I, I + NAMES_PER_GET);
-        const NameKey = (R: MuteReading) => `${KIND_PREFIX[R.Kind]}/${R.Channel}/NAME`;
-        const Names = await GetValues(Ask, Batch.map(NameKey));
-        for (const R of Batch) R.Name = Text(Names[NameKey(R)]);
-      }
     }
   } catch (Err) {
     if (!(Err instanceof UnexpectedReply)) throw Err;
@@ -581,13 +728,20 @@ async function ReadUnit(
   }
 }
 
-function QueryUnit(Config: MxConfig, Channels: MonitoredChannel[]): Promise<MxProbe> {
+async function QueryUnit(Config: MxConfig, Channels: MonitoredChannel[]): Promise<MxProbe> {
   // While live levels are showing, this server already holds the unit's only
   // connection, so the reads ride on it (between meter lines) instead of being
-  // turned away as "Another User Already Connected".
-  const Live = LiveSessions.get(LiveKey(Config));
-  if (Live && Live.Ask) return QueryOverLive(Config, Live.Ask, Live, Channels);
-  return QueryOwnSession(Config, Channels);
+  // turned away as "Another User Already Connected". One still connecting is
+  // waited for rather than raced.
+  const Key = LiveKey(Config);
+  const Ask = await LiveAskFor(Key, Config.TimeoutMs);
+  if (Ask) return QueryOverLive(Config, Ask.Ask, Ask.Live, Channels);
+  return OnUnit(Key, () => {
+    // A live session may have come up while this waited its turn.
+    const Live = LiveForUnit(Key);
+    if (Live && Live.Ask) return QueryOverLive(Config, Live.Ask, Live, Channels);
+    return QueryOwnSession(Config, Channels);
+  });
 }
 
 async function QueryOverLive(
@@ -732,6 +886,10 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   }
 
   const { Snapshot } = Probe;
+  const Overrides = ParseLabelOverrides(Target);
+  for (const Reading of Snapshot.Mutes || []) {
+    Reading.Name = Overrides[Reading.Kind].get(Reading.Channel) ?? Reading.Name;
+  }
   const Reasons = EvaluateHealth(Snapshot, Options);
   return {
     Success: true,
@@ -752,14 +910,22 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 
 // --- Live levels ---------------------------------------------------------------------
 //
-// While the monitor's view is open and Show live input levels is on, one
+// While someone is watching (the monitor's view with Show live input / output
+// levels on, or a dashboard tile with Show output levels on the tile), one
 // connection per unit is held open (see src/main/monitoring-live.ts):
 //
-//   1. GET ANLGIN/1..8/METER/PRE      what the meter switches were, to put back
-//   2. GET ANLGIN/1..8/NAME           labels, four to a GET
-//   3. SET ANLGIN/1..8/METER/PRE:ON   pre-fader input meters on
+//   1. GET ANLGIN/1..8/METER/PRE MIX/1..8/METER ANLGOUT/1..8/METER
+//                                     what the meter switches were, to put back
+//   2. GET …/FADER, …/MUTE            fader and mute state, for live control
+//   3. SET …:ON                       pre-fader input, mix bus and output meters on
 //   4. SET METER/TOTAL:10000 METER/INTERVAL:100, again every 5 s: the unit sends
-//      `METER ANLGIN/<n>/METER/PRE:<hex>` every 100 ms for TOTAL ms after each.
+//      `METER ANLGIN/<n>/METER/PRE:<hex> … MIX/<n>/METER … ANLGOUT/<n>/METER:<hex>` every 100 ms
+//      for TOTAL ms after each.
+//
+// Inputs, mix buses and outputs are always metered together: they arrive on the
+// same line, so the extra groups cost nothing, and checks on the same unit that want
+// different groups share the one connection the unit allows. Each subscriber's
+// frames carry only the groups its own check asks for.
 //
 // The meter value is a 32-bit linear amplitude, 0x80000000 = 0 dBFS (spec
 // appendix 5.3). On the last viewer leaving, METER/TOTAL:0 stops the stream and
@@ -776,14 +942,101 @@ const LIVE_FRAME_MS = 100;
 const LIVE_STALE_MS = 2_000;
 const FULL_SCALE = 2 ** 31;
 
+// The metered channels, in display order: inputs 1-8, mix buses 1-8, then
+// outputs 1-8. ID is what the tile picker stores and the monitor view sends back
+// to move a fader ('in:3', 'mix:1', 'out:1').
+interface MeterChannel {
+  ID: string;
+  Group: 'Inputs' | 'Mixes' | 'Outputs';
+  Kind: ChannelKind;
+  Number: number;
+  MeterKey: string;
+  FaderKey: string;
+  MuteKey: string;
+}
+
+const GROUP_OF: Record<ChannelKind, MeterChannel['Group']> = {
+  input: 'Inputs',
+  mix: 'Mixes',
+  output: 'Outputs',
+};
+const ID_PREFIX: Record<ChannelKind, string> = { input: 'in', mix: 'mix', output: 'out' };
+
+function MeterChannelFor(Kind: ChannelKind, N: number): MeterChannel {
+  const Prefix = KIND_PREFIX[Kind];
+  return {
+    ID: `${ID_PREFIX[Kind]}:${N}`,
+    Group: GROUP_OF[Kind],
+    Kind,
+    Number: N,
+    MeterKey: Kind === 'input' ? `${Prefix}/${N}/METER/PRE` : `${Prefix}/${N}/METER`,
+    FaderKey: `${Prefix}/${N}/FADER`,
+    MuteKey: `${Prefix}/${N}/MUTE`,
+  };
+}
+
+const METER_CHANNELS: MeterChannel[] = [
+  ...Array.from({ length: CHANNELS }, (_, I) => MeterChannelFor('input', I + 1)),
+  ...Array.from({ length: CHANNELS }, (_, I) => MeterChannelFor('mix', I + 1)),
+  ...Array.from({ length: CHANNELS }, (_, I) => MeterChannelFor('output', I + 1)),
+];
+const METER_INDEX = new Map(METER_CHANNELS.map((C, I) => [C.MeterKey, I]));
+const FADER_INDEX = new Map(METER_CHANNELS.map((C, I) => [C.FaderKey, I]));
+const MUTE_INDEX = new Map(METER_CHANNELS.map((C, I) => [C.MuteKey, I]));
+const ID_INDEX = new Map(METER_CHANNELS.map((C, I) => [C.ID, I]));
+
+// What one subscriber's check asks to see. Pure — exported via _internal.
+export interface LevelsWanted {
+  Inputs: boolean;
+  Outputs: boolean;
+  // Channel IDs shown on the dashboard tile; empty when the tile shows none.
+  TileChannels: string[];
+  // Faders and mutes offered in the monitor view, per group.
+  InputControl: boolean;
+  OutputControl: boolean;
+  // Meters below this read as silence.
+  SilenceBelowDb: number;
+  Labels: Record<ChannelKind, Map<number, string>>;
+}
+
+function ParseLevelsWanted(Target: MonitoringTargetLike): LevelsWanted {
+  const Cfg = (Target && Target.Settings) || {};
+  // Known channels only, in display order whatever order they were stored in.
+  const Picked = new Set(
+    (Array.isArray(Cfg.TileChannels) ? Cfg.TileChannels : []).map((V) => String(V))
+  );
+  const TileChannels =
+    Cfg.ShowTileLevels === true
+      ? METER_CHANNELS.filter((C) => Picked.has(C.ID)).map((C) => C.ID)
+      : [];
+  const Silence = Number(Cfg.SilenceBelowDb);
+  return {
+    Inputs: Cfg.ReadLevels === true,
+    Outputs: Cfg.ReadOutputLevels === true,
+    TileChannels,
+    // Control needs its group's levels showing: the faders live on those rows.
+    InputControl: Cfg.ReadLevels === true && Cfg.InputControl === true,
+    OutputControl: Cfg.ReadOutputLevels === true && Cfg.OutputControl === true,
+    SilenceBelowDb:
+      Cfg.SilenceBelowDb != null && Cfg.SilenceBelowDb !== '' && Number.isFinite(Silence)
+        ? Math.min(0, Math.max(FADER_MIN_DB, Silence))
+        : DEFAULT_SILENCE_DB,
+    Labels: ParseLabelOverrides(Target),
+  };
+}
+
 interface LiveSession {
   Key: string;
   Config: MxConfig;
-  Subscribers: Set<(Frame: LiveLevelsFrame) => void>;
+  Subscribers: Map<(Frame: LiveLevelsFrame) => void, LevelsWanted>;
   // Set while logged in and metering; serialised, safe to share.
   Ask: ((Command: string) => Promise<string>) | null;
-  Labels: string[];
+  // Per METER_CHANNELS entry.
   Levels: Array<number | null>;
+  // Fader in dB (null = −∞) and mute, from GET at the start, NOTIFY and the
+  // periodic refresh; undefined until read.
+  Faders: Array<number | null | undefined>;
+  Mutes: Array<boolean | undefined>;
   LastMeterAt: number;
   State: LiveLevelsFrame['State'];
   Message: string | null;
@@ -794,15 +1047,82 @@ interface LiveSession {
   End: (() => void) | null;
   RetryTimer: ReturnType<typeof setTimeout> | null;
   FrameTimer: ReturnType<typeof setInterval> | null;
+  // Set while nobody is subscribed: the session is kept this long in case a
+  // viewer comes straight back (a settings save restarts every stream).
+  LingerTimer: ReturnType<typeof setTimeout> | null;
+  // Reconnect at once rather than after LIVE_RETRY_MS (the password changed).
+  RetrySoon: boolean;
+  // The current connection, settled once it has closed.
+  Connection: Promise<void> | null;
 }
+
+// --- One unit, one connection ---------------------------------------------------------
+//
+// The unit accepts a single TCP connection, so everything this method opens to
+// it is arranged around that:
+//   - one live session per unit (address + port), shared by every check and
+//     viewer on it, and kept for UNIT_LINGER_MS after the last one leaves;
+//   - checks and actions ride on the live session when there is one, wait for
+//     it while it is connecting, and otherwise take turns (OnUnit);
+//   - a new connection waits for a closing live session to finish putting the
+//     meters back, and for any check or action in flight.
+// Without this a settings save, which stops a stream and starts its successor,
+// turned the successor away as "Another User Already Connected".
+
+const UNIT_LINGER_MS = 1500;
+// A turned-away connection (another session of ours was still closing, or a
+// controller briefly connected) tries again sooner than other failures.
+const BUSY_RETRY_MS = 1500;
 
 const LiveSessions = new Map<string, LiveSession>();
+// Per unit: the closing live connection, and the queue of checks and actions.
+const Closing = new Map<string, Promise<void>>();
+const UnitQueues = new Map<string, Promise<unknown>>();
 
 function LiveKey(Config: MxConfig): string {
-  return `${Config.Address.toLowerCase()}|${Config.Port}|${Config.Password}`;
+  return `${Config.Address.toLowerCase()}|${Config.Port}`;
 }
 
-const PRE_KEYS = Array.from({ length: CHANNELS }, (_, I) => `ANLGIN/${I + 1}/METER/PRE`);
+function LiveForUnit(Key: string): LiveSession | null {
+  const Live = LiveSessions.get(Key);
+  return Live && !Live.Stopped ? Live : null;
+}
+
+// The live connection to ride on: at once if logged in, after waiting (up to
+// BudgetMs) if it is still connecting, or null when there is none to use.
+async function LiveAskFor(
+  Key: string,
+  BudgetMs: number
+): Promise<{ Live: LiveSession; Ask: (Command: string) => Promise<string> } | null> {
+  const Deadline = Date.now() + Math.max(500, BudgetMs | 0);
+  for (;;) {
+    const Live = LiveForUnit(Key);
+    if (!Live) return null;
+    if (Live.Ask) return { Live, Ask: Live.Ask };
+    if (Live.State !== 'connecting' || Date.now() >= Deadline) return null;
+    await new Promise((Resolve) => setTimeout(Resolve, 50));
+  }
+}
+
+// Run Fn with the unit to itself: after earlier checks and actions on it, and
+// after a closing live connection has gone.
+function OnUnit<T>(Key: string, Fn: () => Promise<T>): Promise<T> {
+  const Before = UnitQueues.get(Key) || Promise.resolve();
+  const Run = Before.then(() => Closing.get(Key)).then(Fn);
+  const Tail = Run.catch(() => undefined);
+  UnitQueues.set(Key, Tail);
+  void Tail.then(() => {
+    if (UnitQueues.get(Key) === Tail) UnitQueues.delete(Key);
+  });
+  return Run;
+}
+
+// What a channel is called until it is named in the check's settings.
+function DefaultLabel(Channel: MeterChannel): string {
+  const Word =
+    Channel.Group === 'Inputs' ? 'Channel' : Channel.Group === 'Mixes' ? 'Mix' : 'Output';
+  return `${Word} ${Channel.Number}`;
+}
 
 // `<hex>` → dBFS to 0.1 dB; null for silence or anything unreadable.
 function MeterToDb(Value: string): number | null {
@@ -812,15 +1132,47 @@ function MeterToDb(Value: string): number | null {
   return Math.round(200 * Math.log10(Linear / FULL_SCALE)) / 10;
 }
 
+// `-INF` → null, `-6.0` / `+3.5` → dB; undefined for anything else.
+function ParseFader(Value: string | undefined): number | null | undefined {
+  if (Value == null) return undefined;
+  if (/^-INF$/i.test(Value.trim())) return null;
+  const N = Number(Value);
+  return Number.isFinite(N) ? N : undefined;
+}
+
+// Fader and mute values out of a GET reply or a NOTIFY line.
+function ApplyControlValues(Live: LiveSession, Values: Record<string, string>): void {
+  for (const [Key, Value] of Object.entries(Values)) {
+    const Fader = FADER_INDEX.get(Key);
+    if (Fader != null) {
+      const Db = ParseFader(Value);
+      if (Db !== undefined) Live.Faders[Fader] = Db;
+      continue;
+    }
+    const Mute = MUTE_INDEX.get(Key);
+    if (Mute != null) {
+      const Muted = OnOff(Value);
+      if (Muted != null) Live.Mutes[Mute] = Muted;
+    }
+  }
+}
+
 function ApplyMeterLine(Live: LiveSession, Line: string): void {
+  if (/^NOTIFY\b/i.test(Line)) {
+    // Someone moved a fader or mute (MX Connect is locked out, but the unit's
+    // front panel, GPI and wall controllers are not).
+    const Parsed = ParseReply(Line.replace(/^NOTIFY/i, 'GET'));
+    if (Parsed) ApplyControlValues(Live, Parsed.Values);
+    return;
+  }
   if (!/^METER\b/i.test(Line)) return;
   let Any = false;
   for (const Param of SplitParams(Line.replace(/^METER\s*/i, ''))) {
-    const Match = /^ANLGIN\/(\d+)\/METER\/PRE:(.*)$/i.exec(Param);
-    if (!Match) continue;
-    const Index = Number(Match[1]) - 1;
-    if (Index < 0 || Index >= CHANNELS) continue;
-    Live.Levels[Index] = MeterToDb(Match[2] as string);
+    const Colon = Param.indexOf(':');
+    if (Colon <= 0) continue;
+    const Index = METER_INDEX.get(Param.slice(0, Colon).toUpperCase());
+    if (Index == null) continue;
+    Live.Levels[Index] = MeterToDb(Param.slice(Colon + 1));
     Any = true;
   }
   if (Any) {
@@ -830,23 +1182,51 @@ function ApplyMeterLine(Live: LiveSession, Line: string): void {
   }
 }
 
-function LiveFrame(Live: LiveSession): LiveLevelsFrame {
+// The frame one subscriber sees: the groups its monitor view shows (marked View)
+// and the channels its tile shows (marked Tile); nothing else.
+function LiveFrame(Live: LiveSession, Wanted: LevelsWanted): LiveLevelsFrame {
   const Stale = Live.State === 'live' && Date.now() - Live.LastMeterAt > LIVE_STALE_MS;
+  const Showing = Live.State === 'live' && !Stale;
+  const Channels: LiveLevelsFrame['Channels'] = [];
+  METER_CHANNELS.forEach((Channel, I) => {
+    const OnTile = Wanted.TileChannels.includes(Channel.ID);
+    const InView =
+      Channel.Group === 'Inputs'
+        ? Wanted.Inputs
+        : Channel.Group === 'Outputs'
+          ? Wanted.Outputs
+          : false;
+    if (!InView && !OnTile) return;
+    const Raw = Showing ? (Live.Levels[I] ?? null) : null;
+    const Control =
+      InView && (Channel.Group === 'Inputs' ? Wanted.InputControl : Wanted.OutputControl);
+    Channels.push({
+      ID: Channel.ID,
+      Group: Channel.Group,
+      Label: Wanted.Labels[Channel.Kind].get(Channel.Number) || DefaultLabel(Channel),
+      Db: Raw != null && Raw < Wanted.SilenceBelowDb ? null : Raw,
+      ...(InView ? { View: true } : {}),
+      ...(OnTile ? { Tile: true } : {}),
+      ...(Control
+        ? {
+            Control: true,
+            ...(Live.Faders[I] !== undefined ? { Fader: Live.Faders[I] as number | null } : {}),
+            ...(Live.Mutes[I] !== undefined ? { Muted: Live.Mutes[I] as boolean } : {}),
+          }
+        : {}),
+    });
+  });
   return {
     State: Stale ? 'unavailable' : Live.State,
     Message: Stale ? 'The unit stopped sending levels' : Live.Message,
-    Channels: Live.Labels.map((Label, I) => ({
-      Label,
-      Db: Live.State === 'live' && !Stale ? (Live.Levels[I] ?? null) : null,
-    })),
+    Channels,
   };
 }
 
 function EmitLive(Live: LiveSession): void {
-  const Frame = LiveFrame(Live);
-  for (const Send of Live.Subscribers) {
+  for (const [Send, Wanted] of Live.Subscribers) {
     try {
-      Send(Frame);
+      Send(LiveFrame(Live, Wanted));
     } catch {
       // A subscriber's failure is its own; the others still get the frame.
     }
@@ -875,7 +1255,18 @@ function Serialise(
 function ConnectLive(Live: LiveSession): void {
   Live.End = null;
   Live.Cancel = null;
-  void RunMxSession<void>({
+  void (async () => {
+    // Wait for the unit: a closing live connection, and checks or actions in
+    // flight, would each turn this one away.
+    await Closing.get(Live.Key);
+    await UnitQueues.get(Live.Key);
+    if (Live.Stopped) return;
+    RunLiveConnection(Live);
+  })();
+}
+
+function RunLiveConnection(Live: LiveSession): void {
+  const Connection = RunMxSession<void>({
     Config: Live.Config,
     Persistent: true,
     OnPushed: (Line) => ApplyMeterLine(Live, Line),
@@ -903,25 +1294,33 @@ function ConnectLive(Live: LiveSession): void {
         return SetLiveProblem(Live, `Unexpected reply "${Reply.slice(0, 60)}"`);
       }
       const Ask = Serialise(RawAsk);
-      const Before = await GetValues(Ask, PRE_KEYS);
-      for (let I = 0; I < CHANNELS; I += NAMES_PER_GET) {
-        const Keys = Array.from(
-          { length: Math.min(NAMES_PER_GET, CHANNELS - I) },
-          (_, J) => `ANLGIN/${I + J + 1}/NAME`
+      const MeterKeys = METER_CHANNELS.map((C) => C.MeterKey);
+      const Before = await GetValues(Ask, MeterKeys);
+      const RefreshControls = async () => {
+        ApplyControlValues(
+          Live,
+          await GetValues(
+            Ask,
+            METER_CHANNELS.map((C) => C.FaderKey)
+          )
         );
-        const Names = await GetValues(Ask, Keys);
-        Keys.forEach((Key, J) => {
-          Live.Labels[I + J] = Text(Names[Key]) || `Input ${I + J + 1}`;
-        });
-      }
+        ApplyControlValues(
+          Live,
+          await GetValues(
+            Ask,
+            METER_CHANNELS.map((C) => C.MuteKey)
+          )
+        );
+      };
+      await RefreshControls();
       const Renew = `SET METER/TOTAL:${LIVE_METER_TOTAL_MS} METER/INTERVAL:${LIVE_METER_INTERVAL_MS}`;
       const Restore = async () => {
         Live.Ask = null;
         await Ask('SET METER/TOTAL:0');
-        const WasOff = PRE_KEYS.filter((Key) => OnOff(Before[Key]) === false);
+        const WasOff = MeterKeys.filter((Key) => OnOff(Before[Key]) === false);
         if (WasOff.length) await Ask(`SET ${WasOff.map((Key) => `${Key}:OFF`).join(' ')}`);
       };
-      await Ask(`SET ${PRE_KEYS.map((Key) => `${Key}:ON`).join(' ')}`);
+      await Ask(`SET ${MeterKeys.map((Key) => `${Key}:ON`).join(' ')}`);
       await Ask(Renew);
       if (Live.Stopped) return Restore();
 
@@ -929,8 +1328,12 @@ function ConnectLive(Live: LiveSession): void {
       let Release: () => void = () => undefined;
       const Released = new Promise<void>((Resolve) => (Release = Resolve));
       Live.End = Release;
+      // The renew keeps meters flowing; the refresh catches a fader or mute moved
+      // where the unit sends no NOTIFY.
       const RenewTimer = setInterval(() => {
-        Ask(Renew).catch(() => undefined);
+        Ask(Renew)
+          .then(RefreshControls)
+          .catch(() => undefined);
       }, LIVE_RENEW_MS);
       if (typeof RenewTimer.unref === 'function') RenewTimer.unref();
       await Released;
@@ -947,16 +1350,22 @@ function ConnectLive(Live: LiveSession): void {
     Live.End = null;
     Live.Cancel = null;
     if (Live.Stopped) return;
-    if (Live.State !== 'unavailable') SetLiveProblem(Live, 'The unit closed the connection');
+    // A deliberate reconnect (a corrected password) is not a problem to show.
+    if (Live.State !== 'unavailable' && !Live.RetrySoon) {
+      SetLiveProblem(Live, 'The unit closed the connection');
+    }
+    const Delay = Live.RetrySoon ? 0 : Live.Message === BUSY_ERROR ? BUSY_RETRY_MS : LIVE_RETRY_MS;
+    Live.RetrySoon = false;
     Live.RetryTimer = setTimeout(() => {
       Live.RetryTimer = null;
       if (Live.Stopped) return;
       Live.State = 'connecting';
       Live.Message = null;
       ConnectLive(Live);
-    }, LIVE_RETRY_MS);
+    }, Delay);
     if (typeof Live.RetryTimer.unref === 'function') Live.RetryTimer.unref();
   });
+  Live.Connection = Connection;
 }
 
 // Drop and remake the connection, keeping the viewers. Cancelled outright: a
@@ -969,6 +1378,15 @@ function RestartLive(Live: LiveSession): void {
 function StopLive(Live: LiveSession): void {
   Live.Stopped = true;
   if (LiveSessions.get(Live.Key) === Live) LiveSessions.delete(Live.Key);
+  if (Live.LingerTimer) clearTimeout(Live.LingerTimer);
+  Live.LingerTimer = null;
+  // Until the connection has closed (meters put back), the next one waits.
+  if (Live.Connection) {
+    const Done: Promise<void> = Live.Connection.then(() => {
+      if (Closing.get(Live.Key) === Done) Closing.delete(Live.Key);
+    });
+    Closing.set(Live.Key, Done);
+  }
   if (Live.RetryTimer) clearTimeout(Live.RetryTimer);
   Live.RetryTimer = null;
   if (Live.FrameTimer) clearInterval(Live.FrameTimer);
@@ -983,9 +1401,15 @@ function StopLive(Live: LiveSession): void {
   } else if (Cancel) Cancel();
 }
 
+// The monitor view shows levels for this check.
 function HasLiveLevels(Target: MonitoringTargetLike): boolean {
-  const Cfg = (Target && Target.Settings) || {};
-  return Cfg.ReadLevels === true;
+  const Wanted = ParseLevelsWanted(Target);
+  return Wanted.Inputs || Wanted.Outputs;
+}
+
+// The dashboard tile shows levels for this check (when it is its monitor's only one).
+function GetTileWidget(Target: MonitoringTargetLike): MonitoringTileWidget | null {
+  return ParseLevelsWanted(Target).TileChannels.length ? { Kind: 'levels' } : null;
 }
 
 function StartLiveLevels(
@@ -1011,10 +1435,11 @@ function StartLiveLevels(
     const Created: LiveSession = {
       Key,
       Config,
-      Subscribers: new Set(),
+      Subscribers: new Map(),
       Ask: null,
-      Labels: Array.from({ length: CHANNELS }, (_, I) => `Input ${I + 1}`),
-      Levels: Array.from({ length: CHANNELS }, () => null),
+      Levels: METER_CHANNELS.map(() => null),
+      Faders: METER_CHANNELS.map(() => undefined),
+      Mutes: METER_CHANNELS.map(() => undefined),
       LastMeterAt: 0,
       State: 'connecting',
       Message: null,
@@ -1023,6 +1448,9 @@ function StartLiveLevels(
       End: null,
       RetryTimer: null,
       FrameTimer: null,
+      LingerTimer: null,
+      RetrySoon: false,
+      Connection: null,
     };
     Created.FrameTimer = setInterval(() => EmitLive(Created), LIVE_FRAME_MS);
     if (typeof Created.FrameTimer.unref === 'function') Created.FrameTimer.unref();
@@ -1031,12 +1459,126 @@ function StartLiveLevels(
     Live = Created;
   }
   const Session = Live;
-  Session.Subscribers.add(OnFrame);
-  OnFrame(LiveFrame(Session));
+  // Back before the linger ran out (e.g. the settings were just saved).
+  if (Session.LingerTimer) clearTimeout(Session.LingerTimer);
+  Session.LingerTimer = null;
+  // A corrected password replaces one the unit refused; a working connection is
+  // kept whatever the newcomer's settings say.
+  if (!Session.Ask && Config.Password !== Session.Config.Password) {
+    Session.Config = Config;
+    Session.RetrySoon = true;
+    if (Session.RetryTimer) {
+      clearTimeout(Session.RetryTimer);
+      Session.RetryTimer = null;
+      Session.State = 'connecting';
+      Session.Message = null;
+      ConnectLive(Session);
+    } else RestartLive(Session);
+  }
+  const Wanted = ParseLevelsWanted(Target);
+  Session.Subscribers.set(OnFrame, Wanted);
+  OnFrame(LiveFrame(Session, Wanted));
   return () => {
     if (!Session.Subscribers.delete(OnFrame)) return;
-    if (!Session.Subscribers.size) StopLive(Session);
+    if (Session.Subscribers.size || Session.Stopped) return;
+    Session.LingerTimer = setTimeout(() => {
+      Session.LingerTimer = null;
+      if (!Session.Subscribers.size) StopLive(Session);
+    }, UNIT_LINGER_MS);
+    if (typeof Session.LingerTimer.unref === 'function') Session.LingerTimer.unref();
   };
+}
+
+// Move one channel's fader or mute from the monitor view. Rides on the held
+// connection: there is no other while levels are showing.
+async function SetLiveLevel(
+  Target: MonitoringTargetLike,
+  ChannelID: string,
+  Change: { Fader?: number | null; Muted?: boolean }
+): Promise<MonitoringActionResult> {
+  const Index = ID_INDEX.get(String(ChannelID));
+  if (Index == null) return { Success: false, Error: `Unknown channel "${String(ChannelID)}"` };
+  const Channel = METER_CHANNELS[Index]!;
+  const Wanted = ParseLevelsWanted(Target);
+  if (Channel.Group === 'Mixes') {
+    return {
+      Success: false,
+      Error: 'Mix buses are shown on the tile only; they have no live control.',
+    };
+  }
+  const Allowed = Channel.Group === 'Inputs' ? Wanted.InputControl : Wanted.OutputControl;
+  if (!Allowed) {
+    return {
+      Success: false,
+      Error: `Live ${Channel.Group === 'Inputs' ? 'input' : 'output'} control is turned off for this check.`,
+    };
+  }
+  let Command: string;
+  let Detail: string;
+  const Live = LiveSessions.get(LiveKey(ParseConfig(Target)));
+  const Label = ChannelLabel({
+    Kind: Channel.Kind,
+    Channel: Channel.Number,
+    Name: Wanted.Labels[Channel.Kind].get(Channel.Number) || null,
+  });
+  if (typeof Change.Muted === 'boolean' && Change.Fader === undefined) {
+    Command = `SET ${Channel.MuteKey}:${Change.Muted ? 'ON' : 'OFF'}`;
+    Detail = `${Label} ${Change.Muted ? 'muted' : 'unmuted'}`;
+  } else if (Change.Muted === undefined && Change.Fader !== undefined) {
+    const Db = Change.Fader;
+    if (Db !== null && !(typeof Db === 'number' && Db >= FADER_MIN_DB && Db <= FADER_MAX_DB)) {
+      return {
+        Success: false,
+        Error: `A fader level must be from ${FADER_MIN_DB} to +${FADER_MAX_DB} dB, or −∞.`,
+      };
+    }
+    const Value =
+      Db === null ? '-INF' : `${Db > 0 ? '+' : ''}${(Math.round(Db * 10) / 10).toFixed(1)}`;
+    Command = `SET ${Channel.FaderKey}:${Value}`;
+    Detail = `${Label} fader set to ${Db === null ? '−∞' : `${Value} dB`}`;
+  } else {
+    return { Success: false, Error: 'Send either a fader level or a mute, not both.' };
+  }
+  if (!Live || !Live.Ask) {
+    return { Success: false, Error: 'Live levels are not connected to the unit.' };
+  }
+  let Line: string;
+  let Timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    const BudgetMs = Math.max(500, Live.Config.TimeoutMs | 0);
+    const Answer = await Promise.race([
+      Live.Ask(Command),
+      new Promise<null>((Resolve) => (Timer = setTimeout(() => Resolve(null), BudgetMs))),
+    ]);
+    if (Answer === null) {
+      // Whatever is stuck on the shared connection would hold up everything after it.
+      RestartLive(Live);
+      return {
+        Success: false,
+        Error: 'The unit did not answer in time. The change may or may not have been applied.',
+      };
+    }
+    Line = Answer;
+  } catch {
+    return { Success: false, Error: 'The connection to the unit closed before it answered.' };
+  } finally {
+    if (Timer) clearTimeout(Timer);
+  }
+  const Parsed = ParseReply(Line);
+  if (!Parsed || Parsed.Type !== 'SET') {
+    return { Success: false, Error: `Unexpected reply "${Line.slice(0, 60)}"` };
+  }
+  const Refused = Object.entries(Parsed.Values).find(([, V]) => IsError(V));
+  if (Refused) {
+    return {
+      Success: false,
+      Error: `The unit refused ${Refused[0]} (${DescribeError(Refused[1])}).`,
+    };
+  }
+  // Shown at once rather than after the next refresh.
+  if (Change.Muted !== undefined) Live.Mutes[Index] = Change.Muted;
+  else Live.Faders[Index] = Change.Fader ?? null;
+  return { Success: true, Detail };
 }
 
 // --- Controllable actions ------------------------------------------------------------
@@ -1218,24 +1760,7 @@ function SendUnitCommand(Config: MxConfig, Built: BuiltAction): Promise<Monitori
         };
       }
       Sent = true;
-      const Line = await Ask(Built.Command);
-      const Parsed = ParseReply(Line);
-      if (!Parsed) {
-        return {
-          Success: false,
-          Error: /^NG\b/i.test(Line)
-            ? 'The unit did not recognise the command.'
-            : `Unexpected reply "${Line.slice(0, 60)}"`,
-        };
-      }
-      const Refused = Object.entries(Parsed.Values).find(([, V]) => IsError(V));
-      if (Refused) {
-        return {
-          Success: false,
-          Error: `The unit refused ${Refused[0]} (${DescribeError(Refused[1])}).`,
-        };
-      }
-      return { Success: true, Detail: Built.Detail };
+      return InterpretSetReply(await Ask(Built.Command), Built);
     },
   });
 }
@@ -1255,7 +1780,66 @@ async function RunAction(
   }
   const Built = BuildActionCommand(ActionID, Params || {});
   if (!Built.Ok) return { Success: false, Error: Built.Error };
-  return SendUnitCommand(Config, Built);
+  const Key = LiveKey(Config);
+  const Ask = await LiveAskFor(Key, Config.TimeoutMs);
+  if (Ask) return SendOverLive(Ask.Live, Ask.Ask, Built);
+  return OnUnit(Key, () => {
+    const Live = LiveForUnit(Key);
+    if (Live && Live.Ask) return SendOverLive(Live, Live.Ask, Built);
+    return SendUnitCommand(Config, Built);
+  });
+}
+
+// An action on the held live connection: the unit allows no other.
+async function SendOverLive(
+  Live: LiveSession,
+  Ask: (Command: string) => Promise<string>,
+  Built: BuiltAction
+): Promise<MonitoringActionResult> {
+  let Timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    const Line = await Promise.race([
+      Ask(Built.Command),
+      new Promise<null>((Resolve) => {
+        Timer = setTimeout(() => Resolve(null), Math.max(500, Live.Config.TimeoutMs | 0));
+      }),
+    ]);
+    if (Line === null) {
+      RestartLive(Live);
+      return {
+        Success: false,
+        Error: 'The unit did not answer in time. The command may or may not have been applied.',
+      };
+    }
+    return InterpretSetReply(Line, Built);
+  } catch {
+    // A reboot drops the connection, possibly before it answers.
+    if (Built.CloseMeansDone) return { Success: true, Detail: Built.Detail };
+    return { Success: false, Error: 'The unit closed the connection before answering' };
+  } finally {
+    if (Timer) clearTimeout(Timer);
+  }
+}
+
+// What the unit's answer to a SET means for an action.
+function InterpretSetReply(Line: string, Built: BuiltAction): MonitoringActionResult {
+  const Parsed = ParseReply(Line);
+  if (!Parsed) {
+    return {
+      Success: false,
+      Error: /^NG\b/i.test(Line)
+        ? 'The unit did not recognise the command.'
+        : `Unexpected reply "${Line.slice(0, 60)}"`,
+    };
+  }
+  const Refused = Object.entries(Parsed.Values).find(([, V]) => IsError(V));
+  if (Refused) {
+    return {
+      Success: false,
+      Error: `The unit refused ${Refused[0]} (${DescribeError(Refused[1])}).`,
+    };
+  }
+  return { Success: true, Detail: Built.Detail };
 }
 
 function DescribeAction(ActionID: string, Params: Record<string, unknown>): string | null {
@@ -1383,6 +1967,8 @@ export const _internal = {
   QueryUnit,
   BuildActionCommand,
   MeterToDb,
+  ParseLevelsWanted,
+  ParseLabelOverrides,
   LiveSessions,
 };
 export {
@@ -1394,5 +1980,7 @@ export {
   DescribeAction,
   Debug,
   HasLiveLevels,
+  GetTileWidget,
   StartLiveLevels,
+  SetLiveLevel,
 };

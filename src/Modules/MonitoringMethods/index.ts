@@ -15,6 +15,7 @@ import { RedactSensitiveValues } from '../Utils/redact';
 import { MethodInfo } from './info';
 import { MethodGroups, DEFAULT_GROUP } from './groups';
 import type {
+  LiveLevelChange,
   LiveLevelsFrame,
   MonitoringActionDef,
   MonitoringActionOptions,
@@ -23,6 +24,7 @@ import type {
   MonitoringResult,
   MonitoringSettingField,
   MonitoringTargetLike,
+  MonitoringTileWidget,
 } from './types';
 
 // General
@@ -295,6 +297,41 @@ function NormalizeFields(
     let Value: unknown = Source[Key];
     // A 'list' field is an array; only fall back to the default when it is truly
     // absent (not for a legitimately empty array the user cleared).
+    if (Field.Type === 'channels') {
+      // Only IDs of channels that exist, once each, in group then channel order.
+      const Groups = Array.isArray(Field.Groups) ? Field.Groups : [];
+      const Raw = Value === undefined && Array.isArray(Field.Default) ? Field.Default : Value;
+      // With a single group a bare number is that group's channel, so a setting
+      // that used to be a typed list of numbers keeps its values.
+      const Only = Groups.length === 1 ? Groups[0] : null;
+      const Picked = new Set(
+        (Array.isArray(Raw) ? (Raw as unknown[]) : []).map((V) => {
+          const Text = String(V == null ? '' : V).trim();
+          return Only && /^\d+$/.test(Text) ? `${Only.Prefix}:${Number(Text)}` : Text;
+        })
+      );
+      const List: string[] = [];
+      for (const Group of Groups) {
+        const Count = Math.max(0, Math.min(256, Number(Group.Count) | 0));
+        for (let N = 1; N <= Count; N++) {
+          if (Picked.has(`${Group.Prefix}:${N}`)) List.push(`${Group.Prefix}:${N}`);
+        }
+      }
+      out[Key] = List;
+      continue;
+    }
+    if (Field.Type === 'names') {
+      // One entry per channel, by position: trimmed, capped, blank = default.
+      const Count = Math.max(0, Math.min(256, Number(Field.Count) | 0));
+      const Raw = Array.isArray(Value) ? (Value as unknown[]) : [];
+      out[Key] = Array.from({ length: Count }, (_, I) =>
+        String(Raw[I] == null ? '' : Raw[I])
+          .replace(/[\r\n\t]+/g, ' ')
+          .trim()
+          .slice(0, 64)
+      );
+      continue;
+    }
     if (Field.Type === 'list') {
       const Raw = Array.isArray(Value)
         ? Value
@@ -531,6 +568,44 @@ const Manager = {
       return Method.HasLiveLevels(Target) === true;
     } catch {
       return false;
+    }
+  },
+
+  // The widget a check puts on its monitor's tile (see MonitoringTileWidget);
+  // null for none, or when the method's hook throws.
+  GetTileWidget: (
+    ID: string,
+    Target: MonitoringTargetLike,
+    Result: MonitoringResult | null
+  ): MonitoringTileWidget | null => {
+    const Method = Methods.get(ID);
+    if (!Method || typeof Method.GetTileWidget !== 'function') return null;
+    try {
+      const Widget = Method.GetTileWidget(Target, Result);
+      return Widget && typeof Widget.Kind === 'string' && Widget.Kind ? Widget : null;
+    } catch {
+      return null;
+    }
+  },
+
+  // Move one live channel's fader or mute (see MonitoringMethod.SetLiveLevel).
+  SetLiveLevel: async (
+    ID: string,
+    Target: MonitoringTargetLike,
+    ChannelID: string,
+    Change: LiveLevelChange
+  ): Promise<MonitoringActionResult> => {
+    const Method = Methods.get(ID);
+    if (!Method || typeof Method.SetLiveLevel !== 'function') {
+      return { Success: false, Error: 'This check type has no live control' };
+    }
+    try {
+      return await Method.SetLiveLevel(Target, ChannelID, Change);
+    } catch (Err) {
+      return {
+        Success: false,
+        Error: Err && (Err as Error).message ? (Err as Error).message : String(Err),
+      };
     }
   },
 

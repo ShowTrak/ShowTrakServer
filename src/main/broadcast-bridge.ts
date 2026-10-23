@@ -479,6 +479,8 @@ function BuildMonitoringSignature(Target: BroadcastMonitoringTarget): string {
     Target.LastError,
     Target.CheckCount,
     Target.LastChecked != null,
+    // A result-driven widget changes with its data, not only with settings.
+    Target.TileWidget,
     Checks.map((Check) => [
       Check && Check.CheckID,
       Check && Check.Name,

@@ -17,7 +17,9 @@ const { MonitoringTarget } = loadWithMocks(modulePath, {
   '../Logger': { CreateLogger: () => ({ error: () => {} }) },
   '../DB': { Manager: { Run: async () => [null, { changes: 1 }] } },
   '../Broadcast': { Manager: { emit: () => {} } },
-  '../MonitoringMethods': { Manager: { Run: async () => ({ Success: true, LatencyMs: 10 }) } },
+  '../MonitoringMethods': {
+    Manager: { Run: async () => ({ Success: true, LatencyMs: 10 }), GetTileWidget: () => null },
+  },
 });
 
 function buildTarget(checks) {

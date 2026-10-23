@@ -2585,15 +2585,58 @@ button.monitor-action-label:focus-visible {
 }
 
 .live-levels-rows {
-  display: grid;
-  grid-template-columns: auto minmax(0, 8rem) minmax(0, 1fr) 4.2rem;
-  align-items: center;
-  column-gap: 0.5rem;
-  row-gap: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
-.live-levels-row {
-  display: contents;
+.live-levels-group {
+  margin-top: 0.25rem;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.live-levels-group:first-child {
+  margin-top: 0;
+}
+
+/* One strip per channel: a subtly tinted block of its own. */
+.live-levels-strips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.4rem;
+}
+
+.live-levels-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.live-levels-strip-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.live-levels-strip-head .live-levels-label {
+  flex: 1 1 auto;
+}
+
+.live-levels-strip-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
 }
 
 .live-levels-number {
@@ -2652,14 +2695,234 @@ button.monitor-action-label:focus-visible {
   white-space: nowrap;
 }
 
-@media (max-width: 520px) {
-  .live-levels-rows {
-    grid-template-columns: auto minmax(0, 5rem) minmax(0, 1fr) 3.8rem;
-  }
+.live-levels-fader {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 1rem;
+}
+
+.live-levels-fader-value {
+  flex: 0 0 2.8rem;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text-muted);
+}
+
+.live-levels-mute {
+  padding: 0.05rem 0.4rem;
+  line-height: 1;
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.live-levels-mute.is-muted {
+  color: #fff;
+  background: var(--status-graph-offline);
+  border-color: transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .live-levels-fill {
     transition: none;
   }
+}
+
+/* Monitor tile widgets (tile-widgets.ts): a check type's own footer, in the
+   status row in place of the latency line. In grid view a showing widget also
+   takes the address line's room (the tile is a fixed height). 'levels' draws a
+   named row per tile output: its name, then a thin bar with the white peak-hold
+   line the monitor view's meters have. Four or more outputs go two to a row. */
+body:not(.compact-mode):not(.list-mode)
+  .SHOWTRAK_PC.MONITOR.HAS_TILE_WIDGET
+  > [data-type='Address'] {
+  display: none !important;
+}
+
+body:not(.compact-mode):not(.list-mode)
+  .SHOWTRAK_PC.MONITOR.HAS_TILE_WIDGET
+  > .MONITOR_TILE_WIDGET {
+  height: 36px !important;
+}
+
+.MONITOR_TILE_WIDGET {
+  align-content: center;
+}
+
+.MONITOR_TILE_LEVELS {
+  display: grid;
+  /* Name column as wide as the longest name (capped), so every bar starts at
+     the same place right after it. */
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-content: center;
+  align-items: center;
+  gap: 2px 5px;
+  height: 100%;
+  min-width: 0;
+}
+
+.MONITOR_TILE_LEVELS[data-count='4'],
+.MONITOR_TILE_LEVELS[data-count='5'],
+.MONITOR_TILE_LEVELS[data-count='6'],
+.MONITOR_TILE_LEVELS[data-count='7'],
+.MONITOR_TILE_LEVELS[data-count='8'] {
+  grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
+  gap: 1px 5px;
+}
+
+/* A row is just its name and bar, laid out by the grid above. */
+.MONITOR_TILE_LEVEL_ROW {
+  display: contents;
+}
+
+.MONITOR_TILE_LEVEL_LABEL {
+  max-width: 7rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.MONITOR_TILE_LEVELS[data-count='4'] .MONITOR_TILE_LEVEL_LABEL,
+.MONITOR_TILE_LEVELS[data-count='5'] .MONITOR_TILE_LEVEL_LABEL,
+.MONITOR_TILE_LEVELS[data-count='6'] .MONITOR_TILE_LEVEL_LABEL,
+.MONITOR_TILE_LEVELS[data-count='7'] .MONITOR_TILE_LEVEL_LABEL,
+.MONITOR_TILE_LEVELS[data-count='8'] .MONITOR_TILE_LEVEL_LABEL {
+  max-width: 3.5rem;
+}
+
+.MONITOR_TILE_LEVELS[data-count='7'] .MONITOR_TILE_LEVEL_LABEL,
+.MONITOR_TILE_LEVELS[data-count='8'] .MONITOR_TILE_LEVEL_LABEL {
+  font-size: 8px;
+}
+
+.MONITOR_TILE_LEVEL {
+  position: relative;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.MONITOR_TILE_LEVEL_FILL {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  /* White like client CPU/RAM bars (a green bar vanishes on a green tile),
+     soft enough that the solid peak line stands out from it. */
+  background: rgba(255, 255, 255, 0.55);
+  transition: width 180ms linear;
+}
+
+.MONITOR_TILE_LEVEL_FILL[data-zone='hot'] {
+  background: var(--status-graph-degraded);
+}
+
+.MONITOR_TILE_LEVEL_FILL[data-zone='clip'],
+.MONITOR_TILE_LEVEL_PEAK[data-zone='clip'] {
+  background: var(--status-graph-offline);
+}
+
+.MONITOR_TILE_LEVEL_PEAK {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -2px;
+  background: #fff;
+}
+
+.MONITOR_TILE_WIDGET_TEXT {
+  font-size: var(--fs-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .MONITOR_TILE_LEVEL_FILL {
+    transition: none;
+  }
+}
+
+/* A 'names' setting: one name box per channel, two columns where there is room. */
+.monitoring-names-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.35rem 0.75rem;
+}
+
+.monitoring-names-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.monitoring-names-number {
+  flex: 0 0 1.4rem;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text-muted);
+}
+
+.monitoring-names-input {
+  min-width: 0;
+}
+
+/* A 'channels' setting: a checkbox per channel, grouped, named after the
+   channel's 'names' field. */
+.monitoring-channels-group + .monitoring-channels-group {
+  margin-top: 0.5rem;
+}
+
+.monitoring-channels-group-label {
+  margin-bottom: 0.25rem;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.monitoring-channels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.25rem 0.75rem;
+}
+
+.monitoring-channels-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.monitoring-channels-box {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.monitoring-channels-number {
+  flex: 0 0 1rem;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text-muted);
+}
+
+.monitoring-channels-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
 }

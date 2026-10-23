@@ -164,6 +164,9 @@ const MONITORING_CHANNELS = new Set([
   // mutations rather than the readers. The method + action pair is still
   // resolved against the MonitoringMethods registry in the registrar.
   'RunMonitoringAction',
+  // Moving a live fader or mute acts on the device like an action does, so it
+  // needs the same rights (Edit mode and monitoring management on the Web UI).
+  'MonitorLiveLevels:Set',
   'SetMonitoringActionFavourite',
   'CreateDummyClient',
   'UpdateDummyClient',

@@ -18,7 +18,12 @@ import type {
 } from '@showtrak/protocol';
 import type { MonitoringTargetRow } from '../DB/rows';
 import type { AuditChange } from '@showtrak/protocol';
-import type { MonitoringSettingField, MonitoringTargetLike } from '../MonitoringMethods/types';
+import type {
+  LiveLevelChange,
+  MonitoringActionResult,
+  MonitoringSettingField,
+  MonitoringTargetLike,
+} from '../MonitoringMethods/types';
 import { RecordAction, RecordEdit, RecordUpdate } from '../AuditLog/edits';
 import { Entity, Line, Value } from '../AuditLog/message';
 import { DiffFields, FormatValue, type FieldSpec } from '../AuditLog/diff';
@@ -602,6 +607,56 @@ const Manager = {
       Method: C.Method,
       Check: C,
     }));
+  },
+
+  // The checks drawn as a 'levels' widget on their monitor's tile: each the only
+  // check of its monitor, with tile levels turned on.
+  GetTileLevelChecks(): Array<{
+    TargetID: number;
+    CheckID: number;
+    Name: string;
+    Method: string;
+    Check: MonitoringTargetLike;
+  }> {
+    const Out = [];
+    for (const Target of TargetList) {
+      const Widget = Target.TileWidget();
+      if (!Widget || Widget.Kind !== 'levels') continue;
+      const Only = Target.Checks[0]!;
+      Out.push({
+        TargetID: Number(Target.TargetID),
+        CheckID: Number(Only.CheckID),
+        Name: Only.Name || '',
+        Method: Only.Method,
+        Check: Only,
+      });
+    }
+    return Out;
+  },
+
+  // Move a live channel's fader or mute from the monitor view. Final marks the
+  // end of a fader drag: only that, and mutes, go in the audit log, so dragging
+  // a fader writes one line rather than one per step.
+  async SetLiveLevel(
+    TargetID: number,
+    CheckID: number,
+    ChannelID: string,
+    Change: LiveLevelChange,
+    Final: boolean
+  ): Promise<MonitoringActionResult> {
+    const Target = TargetList.find((T) => Number(T.TargetID) === Number(TargetID));
+    const Check = Target && Target.Checks.find((C) => Number(C.CheckID) === Number(CheckID));
+    if (!Target || !Check) return { Success: false, Error: 'Monitoring check not found' };
+    const Result = await MonitoringMethods.SetLiveLevel(Check.Method, Check, ChannelID, Change);
+    if (Result.Success && (Final || Change.Muted !== undefined)) {
+      await AuditStep(() =>
+        RecordAction({
+          ...MonitorAuditBase(Target),
+          Summary: Line(Result.Detail || 'Live control', ' (', Value(CheckName(Check)), ')'),
+        })
+      );
+    }
+    return Result;
   },
 
   // Return the most recent (RAM-only) debug panel for a single check.

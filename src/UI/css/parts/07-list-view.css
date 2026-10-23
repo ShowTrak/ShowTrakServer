@@ -508,6 +508,16 @@ body.list-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_ONLINE'] 
   max-width: 180px;
 }
 
+/* A monitor's tile widget (e.g. output meters), sized like the vitals bars. */
+body.list-mode .SHOWTRAK_PC.MONITOR > .SHOWTRAK_PC_STATUS[data-type='MONITOR_WIDGET'] {
+  max-width: 180px;
+}
+
+body.list-mode .SHOWTRAK_PC.MONITOR .MONITOR_TILE_LEVELS {
+  grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
+  height: auto;
+}
+
 /* A word the State column already says. */
 body.list-mode .SHOWTRAK_PC.MONITOR > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_IDLE'],
 body.list-mode .SHOWTRAK_PC.DUMMY > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_IDLE'],

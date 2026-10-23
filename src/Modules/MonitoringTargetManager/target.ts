@@ -21,6 +21,8 @@ import type {
   MonitoringTargetView,
 } from '@showtrak/protocol';
 
+import type { MonitoringResult, MonitoringTileWidget } from '../MonitoringMethods/types';
+
 import {
   ParseSettings,
   ClampInterval,
@@ -88,6 +90,8 @@ class MonitoringCheck {
   LastDebugHtml: string | null;
   LastDebugAt: number | null;
   LastActionOptions: MonitoringActionOptions;
+  // The last probe result (RAM-only), for result-driven tile widgets.
+  LastResult: MonitoringResult | null;
 
   constructor(Row: MonitoringCheckInput) {
     this.CheckID = Row.CheckID;
@@ -131,6 +135,7 @@ class MonitoringCheck {
     // Dynamic choices for this check's action parameters, refreshed on every
     // run (see MonitoringMethods.GetActionOptions). RAM-only.
     this.LastActionOptions = {};
+    this.LastResult = null;
   }
 
   EffectiveFailureThreshold(Inherited: number = GetDefaultFailureThreshold()): number {
@@ -220,6 +225,7 @@ class MonitoringCheck {
     }
     // Cache the rendered debug panel (RAM-only) from this run's raw result.
     this.LastDebugHtml = MonitoringMethods.BuildDebug(this.Method, Result, this);
+    this.LastResult = Result || null;
     this.LastDebugAt = Now;
     // Refresh the action parameter choices this device reports (e.g. the input
     // sources a projector lists). A failed probe keeps the last known set rather
@@ -335,8 +341,18 @@ class MonitoringTarget {
       LastError: this.LastError,
       CheckCount: this.Checks.length,
       Checks: this.Checks.map((C) => C.ToJSON(Inherited)),
+      TileWidget: this.TileWidget(),
       Type: 'monitor',
     };
+  }
+
+  // A tile widget is drawn only when its check is the monitor's only one: the
+  // tile has room for one, and with several checks whose would it be?
+  TileWidget(): (MonitoringTileWidget & { CheckID: number }) | null {
+    if (this.Checks.length !== 1) return null;
+    const Only = this.Checks[0]!;
+    const Widget = MonitoringMethods.GetTileWidget(Only.Method, Only, Only.LastResult);
+    return Widget ? { ...Widget, CheckID: Number(Only.CheckID) } : null;
   }
 
   _aggregateLastSuccessAt(): number | null {

@@ -527,3 +527,39 @@ test('MonitoringMethods Manager.Run deduplicates concurrent identical checks', a
   assert.deepEqual(B, sharedResult);
   assert.deepEqual(C, sharedResult);
 });
+
+// A 'names' setting is one entry per channel, by position: always Count long,
+// trimmed, single-line and capped, blank meaning the default.
+test('names settings normalize to one entry per channel', () => {
+  const { Manager } = loadWithMocks(methodPath('index.js'), { '../Logger': loggerStub() });
+  const n = Manager.NormalizeSettings('tascam-mx8a', {
+    InputLabels: [' Lectern ', null, 'two\nlines', 'x'.repeat(100), 5],
+    OutputLabels: 'not a list',
+  });
+  assert.deepEqual(n.InputLabels, ['Lectern', '', 'two lines', 'x'.repeat(64), '5', '', '', '']);
+  assert.deepEqual(n.OutputLabels, ['', '', '', '', '', '', '', '']);
+  assert.deepEqual(n.MixLabels, ['', '', '', '', '', '', '', '']);
+});
+
+// A 'channels' setting keeps only IDs of channels that exist, once each, in
+// group then channel order; absent means its default.
+test('channels settings normalize to known IDs in display order', () => {
+  const { Manager } = loadWithMocks(methodPath('index.js'), { '../Logger': loggerStub() });
+  const picked = Manager.NormalizeSettings('tascam-mx8a', {
+    TileChannels: ['out:2', 'mix:1', 'out:2', 'in:9', 'bogus', 'in:3', null],
+  });
+  assert.deepEqual(picked.TileChannels, ['in:3', 'mix:1', 'out:2']);
+  assert.deepEqual(Manager.NormalizeSettings('tascam-mx8a', {}).TileChannels, ['out:1', 'out:2']);
+  assert.deepEqual(Manager.NormalizeSettings('tascam-mx8a', { TileChannels: [] }).TileChannels, []);
+});
+
+test('a single-group channels setting keeps numbers saved when it was a typed list', () => {
+  const { Manager } = loadWithMocks(methodPath('index.js'), { '../Logger': loggerStub() });
+  const n = Manager.NormalizeSettings('tascam-mx8a', {
+    MonitoredInputs: [3, '1', 'in:5', 9],
+    MonitoredOutputs: ['out:2', 'in:2'],
+  });
+  assert.deepEqual(n.MonitoredInputs, ['in:1', 'in:3', 'in:5']);
+  assert.deepEqual(n.MonitoredOutputs, ['out:2']);
+  assert.deepEqual(n.MonitoredMixes, []);
+});

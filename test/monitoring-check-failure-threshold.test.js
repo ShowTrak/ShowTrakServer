@@ -21,6 +21,7 @@ function load() {
     '../Broadcast': { Manager: { emit: () => {} } },
     '../MonitoringMethods': {
       Manager: {
+        GetTileWidget: () => null,
         Run: async () => probeResults.shift(),
         BuildDebug: () => null,
         GetActionOptions: () => ({}),

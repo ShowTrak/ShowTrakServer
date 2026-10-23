@@ -62,6 +62,7 @@ import {
   UpdateListRowState,
 } from './list-view';
 import { ApplyListSearch } from './list-filter';
+import { SyncTileWidgets } from './tile-widgets';
 
 // Deployment-toast working state. This mirrors the runtime shape used below and
 // cached on `window.__ShowTrakDeploymentUiState`; note the ambient window decl
@@ -889,6 +890,13 @@ export function RenderFullClientAndMonitorList() {
     SyncListView();
   } catch (e) {
     HandleNonFatalError('RenderFullClientAndMonitorList:SyncListView', e);
+  }
+  // Monitor tile widgets: fill the fresh rows from what has already streamed, and
+  // open or close the tile meter stream for the monitors now on the dashboard.
+  try {
+    SyncTileWidgets();
+  } catch (e) {
+    HandleNonFatalError('RenderFullClientAndMonitorList:SyncTileWidgets', e);
   }
   // Initialize or teardown edit-mode interactions after render
   try {
