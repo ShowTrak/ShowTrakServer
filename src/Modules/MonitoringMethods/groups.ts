@@ -50,6 +50,13 @@ export const MethodGroups: Record<string, string> = {
   'x32-console': 'Sound',
   'yamaha-console': 'Sound',
   'qsys-core': 'Sound',
+  'biamp-tesira': 'Sound',
+  'symetrix-dsp': 'Sound',
+  'allen-heath-console': 'Sound',
+  'digico-console': 'Sound',
+  // Sound — amplifiers
+  'dbaudio-amp': 'Sound',
+  'powersoft-amp': 'Sound',
   // Video sources & media servers
   'ndi-source': 'Video',
   'watchout-status': 'Video',
@@ -62,6 +69,15 @@ export const MethodGroups: Record<string, string> = {
   atem: 'Video',
   hyperdeck: 'Video',
   videohub: 'Video',
+  // Video — LED and presentation processors
+  'brompton-tessera': 'Video',
+  'barco-eventmaster': 'Video',
+  'analogway-livepremier': 'Video',
+  // Video — AJA recorders, converters and frame syncs; PTZ cameras
+  // Video — Datapath Fx4 display controllers
+  'datapath-fx4': 'Video',
+  'aja-device': 'Video',
+  'ptz-camera': 'Video',
   // Video — streaming and recording software
   'obs-studio': 'Video',
   // Video — motion capture (OptiTrack NatNet)
@@ -82,4 +98,6 @@ export const MethodGroups: Record<string, string> = {
   http: 'Web Services',
   'http-json': 'Web Services',
   dns: 'Web Services',
+  // Generic SNMP GET against any agent
+  'snmp-oid': 'Web Services',
 };

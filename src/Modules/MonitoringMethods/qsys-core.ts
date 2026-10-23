@@ -10,6 +10,13 @@
 //      only on an Active Core (QRC says commands sent to the inactive Core of a
 //      redundant pair are ignored or refused with -32604, so asking would just
 //      burn the timeout).
+//   4. Design devices — only when Check design devices is on, and only on an
+//      Active Core. `Component.GetComponents` lists the design's Named
+//      Components (those whose Script Access is External or All; the default,
+//      None, hides a component from QRC entirely), then each device is read with
+//      `Component.Get` { Name, Controls: [status] }, or `Component.GetControls`
+//      for an amplifier whose channel fault LEDs are wanted. Those reads are
+//      sent together and matched by id, as Q-SYS's own QRWC library does.
 //
 // Framing: every message in both directions is one JSON object terminated by a
 // NUL byte. Responses carry the request's numeric id; the Core also pushes an
@@ -17,25 +24,78 @@
 // and whenever its state changes. Replies are therefore matched by id, never by
 // arrival order, and notifications are only ever used as a fallback snapshot.
 //
-// Nothing here changes Core state: Logon / StatusGet / Control.Get are all
+// The check changes nothing on the Core: Logon / StatusGet / Control.Get /
+// Component.GetComponents / Component.Get / Component.GetControls are all
 // reads. The session closes as soon as the last answer arrives, well inside the
 // Core's 60-second idle disconnect, so no NoOp keep-alive is needed.
+//
+// Actions (operator-pressed, separate session each): Snapshot.Load and
+// Control.Set, exactly as QRC_Commands documents them. Both are sent only after
+// StatusGet shows the Core is Active, since the inactive Core of a redundant
+// pair refuses QRC commands (-32604).
 //
 // Status.Code: the QRC page only documents 0 = "OK". The Core's status uses the
 // same 0–5 scale as every Q-SYS Status control (0 OK, 1 Compromised, 2 Fault,
 // 3 Unknown / Not Present, 4 Missing, 5 Initializing), so a non-zero code is
 // reported with that label AND the Core's own Status.String, which is the text
 // an operator recognises from Core Manager.
+//
+// Design devices. Documented (help.qsys.com Schematic Library, Status topic):
+// a device Status component's status pin uses the 0–5 scale above, where 3 is
+// "Not Present" (a device whose Is Required property is No, or a dynamically
+// paired one not yet paired), which Q-SYS itself does not treat as an error.
+// Older device topics (CX-Q / DPA-Q / SPA-Q status and Amp Output, TSC status,
+// I/O Frame status) still document 3 as "Unknown (red)" and 4 as "Updating",
+// so code 3 only counts as Not Present when the status text says so.
+//   - Component Type strings: QRC only says Type "identifies the component's
+//     class". The exact strings come from QSC's developer-community reference
+//     list (github.com/Q-SYS-Communities-for-Developers/reference-files,
+//     Lua Modules/ComponentSelector), e.g. amplifier_cxq_status, cxq_amplifier,
+//     lcqln_status, io_status, touch_screen_status, onvif_camera_operative,
+//     io_usb_bridge; they are also the Schematic Library topic file names. Only
+//     status components (and amplifier Amp Output components) are read, so a
+//     design's DSP blocks and I/O cards cost nothing. A `*_status` Type not in
+//     that list (newer hardware) is placed by keyword.
+//   - The status control's script name `status`: the topics give display names
+//     only ("Amplifier Status", "Touchscreen Status"). The Core's own Status
+//     component is read as `status` by a published Q-SYS plugin
+//     (github.com/llamafilm/qsys-plugin-prometheus-exporter); device Status
+//     components are INFERRED to match, and it is a setting so an installer can
+//     correct it from Designer's Tools → View Component Controls Info.
+//   - Amplifier faults: the Amp Output topics document Protect, Over Current and
+//     Short LEDs per channel (and a Status pin). Their script names are INFERRED
+//     to contain those words; only boolean controls count. DAC Output Limit and
+//     Limit light on a hard-driven signal, not a fault, so they never count.
+import { StringDecoder } from 'string_decoder';
+import type net from 'net';
 import { RunTcpSession, type TcpSession } from './_tcp-session';
 import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
-import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import type {
+  MonitoringActionDef,
+  MonitoringActionOptions,
+  MonitoringActionResult,
+  MonitoringResult,
+  MonitoringSettingField,
+  MonitoringTargetLike,
+} from './types';
 
 const ID = 'qsys-core';
 const DEFAULT_PORT = 1710;
 const DEFAULT_TIMEOUT_MS = 4000;
-// A StatusGet reply is a few hundred bytes; anything this large is not a Core.
-const MAX_BUFFERED_CHARS = 1_000_000;
+// The largest single reply expected is Component.GetComponents on a big design
+// (every Named Component with its Properties). An unterminated frame past this
+// is not a Core.
+const MAX_BUFFERED_CHARS = 8_000_000;
+// Design devices read per probe. Only status components count, but a large
+// design can still expose hundreds; past this the rest are counted, not read.
+const MAX_DEVICES = 128;
+// Device reads in flight at once. Enough to finish a big design in a handful
+// of round trips without dropping 128 requests on the Core in one burst.
+const MAX_IN_FLIGHT = 8;
+// Device problems quoted in DegradedReason before the rest are summarised.
+const MAX_DEVICE_REASONS = 5;
+const DEFAULT_STATUS_CONTROL = 'status';
 
 const Settings: MonitoringSettingField[] = [
   {
@@ -108,6 +168,128 @@ const Settings: MonitoringSettingField[] = [
     Note: 'One Name=Value per entry, e.g. MainMute=unmuted, MainMute=false or MainGain=-6. Compared with the control’s string (e.g. "unmuted", "-6.0dB"), then its value; case is ignored, numbers compare numerically and true/false match a 1/0 value.',
   },
   {
+    Key: 'CheckDevices',
+    Label: 'Check design devices',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Also reads the status of the amplifiers, I/O frames, cameras, bridges and touch panels in the running design, and is Degraded when any of them is not OK. Each device needs Script Access set to External or All in Q-SYS Designer. Devices are only read while the Core is Active.',
+  },
+  {
+    Key: 'DeviceSource',
+    Label: 'Devices to check',
+    Type: 'select',
+    Default: 'discover',
+    Options: [
+      { value: 'discover', label: 'Find them in the design' },
+      { value: 'list', label: 'Only the devices listed' },
+    ],
+    VisibleWhen: { Key: 'CheckDevices', Equals: true },
+    Note: 'Find them in the design checks every device the Core exposes in the categories below. Only the devices listed checks exactly the Code Names you enter, and reports any it cannot find.',
+  },
+  {
+    Key: 'DeviceNames',
+    Label: 'Device Code Names',
+    Type: 'list',
+    ItemType: 'string',
+    Default: [],
+    VisibleWhen: [
+      { Key: 'CheckDevices', Equals: true },
+      { Key: 'DeviceSource', Equals: 'list' },
+    ],
+    Note: 'The Code Name of each device’s Status component, as shown in its Properties in Q-SYS Designer, e.g. Amp-Stage-L.',
+  },
+  {
+    Key: 'DeviceAmps',
+    Label: 'Amplifiers',
+    Type: 'boolean',
+    Default: true,
+    VisibleWhen: [
+      { Key: 'CheckDevices', Equals: true },
+      { Key: 'DeviceSource', Equals: 'discover' },
+    ],
+    Note: 'CX-Q, CXD-Q, DPA-Q, SPA-Q and MPA-Q amplifiers.',
+  },
+  {
+    Key: 'DeviceIo',
+    Label: 'I/O frames and peripherals',
+    Type: 'boolean',
+    Default: true,
+    VisibleWhen: [
+      { Key: 'CheckDevices', Equals: true },
+      { Key: 'DeviceSource', Equals: 'discover' },
+    ],
+    Note: 'QIO and I/O-Frame expanders, DCIO, Core Flex I/O, and NL / NM peripherals that share the QIO Status component.',
+  },
+  {
+    Key: 'DeviceCameras',
+    Label: 'Cameras',
+    Type: 'boolean',
+    Default: true,
+    VisibleWhen: [
+      { Key: 'CheckDevices', Equals: true },
+      { Key: 'DeviceSource', Equals: 'discover' },
+    ],
+    Note: 'NC Series PTZ cameras.',
+  },
+  {
+    Key: 'DeviceBridges',
+    Label: 'Bridges',
+    Type: 'boolean',
+    Default: true,
+    VisibleWhen: [
+      { Key: 'CheckDevices', Equals: true },
+      { Key: 'DeviceSource', Equals: 'discover' },
+    ],
+    Note: 'I/O-USB bridges, USB video bridges and PTZ-IP bridges.',
+  },
+  {
+    Key: 'DeviceTouchPanels',
+    Label: 'Touch panels',
+    Type: 'boolean',
+    Default: true,
+    VisibleWhen: [
+      { Key: 'CheckDevices', Equals: true },
+      { Key: 'DeviceSource', Equals: 'discover' },
+    ],
+    Note: 'TSC Series touch screen controllers.',
+  },
+  {
+    Key: 'DeviceOther',
+    Label: 'Other devices',
+    Type: 'boolean',
+    Default: false,
+    VisibleWhen: [
+      { Key: 'CheckDevices', Equals: true },
+      { Key: 'DeviceSource', Equals: 'discover' },
+    ],
+    Note: 'Any other exposed status component, such as NV Series video endpoints, page stations or plugins.',
+  },
+  {
+    Key: 'CheckAmpFaults',
+    Label: 'Check amplifier channel faults',
+    Type: 'boolean',
+    Default: true,
+    VisibleWhen: { Key: 'CheckDevices', Equals: true },
+    Note: 'Degraded when an amplifier channel shows Protect, Over Current or Short. These are on the amplifier’s Amp Output component, which needs Script Access too. Limiter lights are not faults and are ignored.',
+  },
+  {
+    Key: 'FlagNotPresent',
+    Label: 'Flag Not Present devices',
+    Type: 'boolean',
+    Default: false,
+    VisibleWhen: { Key: 'CheckDevices', Equals: true },
+    Note: 'Q-SYS reports a device that is not required, or not yet paired, as Not Present and does not treat that as an error. Turn this on to report it anyway.',
+  },
+  {
+    Key: 'StatusControlName',
+    Label: 'Status control name',
+    Type: 'string',
+    Default: DEFAULT_STATUS_CONTROL,
+    Advanced: true,
+    VisibleWhen: { Key: 'CheckDevices', Equals: true },
+    Note: 'The name of the status control inside each device component. Leave it as status unless Tools → View Component Controls Info in Q-SYS Designer shows a different name.',
+  },
+  {
     Key: 'Timeout',
     Label: 'Timeout (ms)',
     Type: 'number',
@@ -115,7 +297,7 @@ const Settings: MonitoringSettingField[] = [
     Min: 500,
     Max: 30000,
     Advanced: true,
-    Note: 'Budget for the whole session: connect, logon, status and control reads.',
+    Note: 'Budget for the whole session: connect, logon, status, control and device reads.',
   },
 ];
 
@@ -143,6 +325,23 @@ interface HealthOptions {
   Assertions: ControlAssertion[];
   // Entries that could not be read as Name=Value; reported, never sent.
   InvalidAssertions: string[];
+  CheckDevices: boolean;
+  Devices: DevicePlan;
+}
+
+export type DeviceCategory = 'amp' | 'io' | 'camera' | 'bridge' | 'touch' | 'other';
+
+// What to read for design devices. Pure data, so EvaluateHealth and Debug see
+// the same choices QueryCore acted on.
+export interface DevicePlan {
+  Source: 'discover' | 'list';
+  // Code Names to read, for the 'list' source.
+  Names: string[];
+  // Categories read by the 'discover' source.
+  Categories: DeviceCategory[];
+  AmpFaults: boolean;
+  FlagNotPresent: boolean;
+  StatusControl: string;
 }
 
 function ParseConfig(Target: MonitoringTargetLike): QsysConfig {
@@ -181,6 +380,39 @@ function ParseControlAssertions(Input: unknown): {
   return { Assertions, Invalid };
 }
 
+function ParseDeviceNames(Input: unknown): string[] {
+  const List = Array.isArray(Input) ? Input : [];
+  const Names: string[] = [];
+  for (const Raw of List) {
+    const Name = String(Raw == null ? '' : Raw).trim();
+    if (Name && !Names.includes(Name)) Names.push(Name);
+  }
+  return Names;
+}
+
+function ParseDevicePlan(Cfg: Record<string, unknown>): DevicePlan {
+  // Category toggles default ON except Other: absent means the default.
+  const Categories: DeviceCategory[] = [];
+  if (Cfg.DeviceAmps !== false) Categories.push('amp');
+  if (Cfg.DeviceIo !== false) Categories.push('io');
+  if (Cfg.DeviceCameras !== false) Categories.push('camera');
+  if (Cfg.DeviceBridges !== false) Categories.push('bridge');
+  if (Cfg.DeviceTouchPanels !== false) Categories.push('touch');
+  if (Cfg.DeviceOther === true) Categories.push('other');
+  const StatusControl =
+    typeof Cfg.StatusControlName === 'string' && Cfg.StatusControlName.trim()
+      ? Cfg.StatusControlName.trim()
+      : DEFAULT_STATUS_CONTROL;
+  return {
+    Source: Cfg.DeviceSource === 'list' ? 'list' : 'discover',
+    Names: ParseDeviceNames(Cfg.DeviceNames),
+    Categories,
+    AmpFaults: Cfg.CheckAmpFaults !== false,
+    FlagNotPresent: Cfg.FlagNotPresent === true,
+    StatusControl,
+  };
+}
+
 function ParseHealthOptions(Target: MonitoringTargetLike): HealthOptions {
   const Cfg = (Target && Target.Settings) || {};
   const CheckControls = Cfg.CheckControls === true;
@@ -196,6 +428,8 @@ function ParseHealthOptions(Target: MonitoringTargetLike): HealthOptions {
     CheckControls,
     Assertions: Parsed.Assertions,
     InvalidAssertions: Parsed.Invalid,
+    CheckDevices: Cfg.CheckDevices === true,
+    Devices: ParseDevicePlan(Cfg),
   };
 }
 
@@ -222,10 +456,22 @@ const ERROR_MESSAGES: Record<number, string> = {
   [-32602]: 'Invalid params',
   [-32603]: 'Server error',
   [-32604]: 'Core is on Standby',
+  2: 'Invalid Page Request ID',
+  3: 'Bad Page Request',
+  4: 'Missing file',
+  5: 'Change Groups exhausted',
+  6: 'Unknown change group',
   7: 'Unknown component name',
   8: 'Unknown control',
+  9: 'Illegal mixer channel index',
   10: 'Logon required',
 };
+
+// QRC's documented codes this method acts on.
+const ERR_UNKNOWN_COMPONENT = 7;
+const ERR_UNKNOWN_CONTROL = 8;
+const ERR_LOGON_REQUIRED = 10;
+const ERR_STANDBY = -32604;
 
 // Device JSON is untrusted: every conversion below reads primitives only, by
 // typeof, so an object where a string or number belongs (or one with a hostile
@@ -417,6 +663,299 @@ function DescribeReading(Reading: ControlReading): string {
   return String(Reading.Value);
 }
 
+// --- Design devices ------------------------------------------------------------
+
+// Device status labels on the Status topic's 0–5 scale. Code 3 is "Not
+// Present" there but "Unknown" on older device topics, and 4 is "Updating" on
+// amplifiers, so the device's own status text is preferred wherever it is
+// given (see DescribeDeviceStatus).
+const DEVICE_STATUS_LABELS: Record<number, string> = {
+  0: 'OK',
+  1: 'Compromised',
+  2: 'Fault',
+  3: 'Unknown',
+  4: 'Missing',
+  5: 'Initializing',
+};
+
+const NOT_PRESENT_RE = /not\s*present/i;
+
+// Code 3 reads as Not Present only when the device says so in its text.
+function IsNotPresent(Code: number | null, Text: string | null): boolean {
+  return Code === 3 && NOT_PRESENT_RE.test(Text || '');
+}
+
+function DeviceStatusLabel(Code: number | null, Text: string | null = null): string {
+  if (Code == null) return 'Unknown';
+  if (IsNotPresent(Code, Text)) return 'Not Present';
+  return DEVICE_STATUS_LABELS[Code] || `Code ${Code}`;
+}
+
+const CATEGORY_LABELS: Record<DeviceCategory, string> = {
+  amp: 'Amplifier',
+  io: 'I/O',
+  camera: 'Camera',
+  bridge: 'Bridge',
+  touch: 'Touch panel',
+  other: 'Device',
+};
+
+// Device status component Types, from QSC's developer-community component
+// reference list (see the header). Anything listed here is read in discovery.
+const DEVICE_TYPES: Record<string, DeviceCategory> = {
+  amplifier_cxq_status: 'amp',
+  amplifier_dpa_status: 'amp',
+  spaq_status: 'amp',
+  io_status: 'io',
+  io_22_status: 'io',
+  io_510i_status: 'io',
+  io_core_110f_status: 'io',
+  io_core_8_flex_status: 'io',
+  io_core_nano_status: 'io',
+  io_dcio_status: 'io',
+  lcqln_status: 'io',
+  onvif_camera_operative: 'camera',
+  io_usb_bridge: 'bridge',
+  usb_uvc: 'bridge',
+  touch_screen_status: 'touch',
+  page_station_hardware_status: 'other',
+  vstreamer_status: 'other',
+  vstreamer_nv1smb_status: 'other',
+};
+
+// Amp Output components: they carry a Status pin AND the channel fault LEDs.
+const AMP_OUTPUT_TYPES = new Set(['cxq_amplifier', 'spaq_amplifier', 'amplifier_dataport']);
+
+// Status-named components that are not inventory devices: the Core itself
+// (StatusGet already covers it), the status-combining logic block, and the
+// POTS line controllers (a phone line, not a piece of hardware).
+const NOT_DEVICE_RE = /^(core_status|status_combiner|pots_control_status)/;
+
+// Keyword fallback for a `*_status` Type not in the list (newer hardware),
+// first match wins: the specific words first so a USB video bridge is a
+// bridge, not a camera.
+const CATEGORY_PATTERNS: Array<[DeviceCategory, RegExp]> = [
+  ['touch', /touch|tsc/],
+  ['bridge', /usb|bridge|ptz[-_ ]?ip/],
+  ['camera', /camera|onvif|(^|_)nc[-_ ]?\d/],
+  ['amp', /amplifier|cxq|cxd|dpa|spa|mpa/],
+  ['io', /qio|lcqln|dcio|(^|_)io(_|$)|flex/],
+];
+
+function IsAmpOutputType(Type: string | null): boolean {
+  const Lower = (Type || '').toLowerCase();
+  return AMP_OUTPUT_TYPES.has(Lower) || /^[a-z0-9]+_amplifier$/.test(Lower);
+}
+
+// Component Type → device category, or null when the component is not a
+// device status component at all (a DSP block, an I/O card, a script…).
+function CategorizeType(Type: string | null): DeviceCategory | null {
+  const Lower = (Type || '').toLowerCase();
+  if (!Lower) return null;
+  if (DEVICE_TYPES[Lower]) return DEVICE_TYPES[Lower];
+  if (IsAmpOutputType(Lower)) return 'amp';
+  if (NOT_DEVICE_RE.test(Lower)) return null;
+  // Plugins and extensions: QSC's list types them %PLUGIN%_<id> / %EXT%_<id>.
+  if (/^%(plugin|ext)%/.test(Lower)) return 'other';
+  if (!/_status$/.test(Lower)) return null;
+  for (const [Category, Pattern] of CATEGORY_PATTERNS) {
+    if (Pattern.test(Lower)) return Category;
+  }
+  return 'other';
+}
+
+export interface DesignComponent {
+  Name: string;
+  Type: string | null;
+}
+
+// Read a Component.GetComponents result: every entry with a string Name.
+function ParseComponentList(Result: unknown): DesignComponent[] {
+  if (!Array.isArray(Result)) return [];
+  const Out: DesignComponent[] = [];
+  for (const Entry of Result) {
+    if (!Entry || typeof Entry !== 'object') continue;
+    const Obj = Entry as Record<string, unknown>;
+    const Name = typeof Obj.Name === 'string' && Obj.Name ? Obj.Name : PrimString(Obj.ID);
+    if (!Name) continue;
+    Out.push({ Name, Type: PrimString(Obj.Type) });
+  }
+  return Out;
+}
+
+export interface DeviceReading {
+  Name: string;
+  Type: string | null;
+  Category: DeviceCategory;
+  // false until its reply arrives; a probe that ran out of time leaves it false.
+  Read: boolean;
+  // The Core knows the component (false: error 7, wrong Code Name or Script
+  // Access None).
+  Found: boolean;
+  HasStatus: boolean;
+  StatusCode: number | null;
+  StatusString: string | null;
+  // Amplifier fault controls that are lit, by control name.
+  Faults: string[];
+  // Whether fault controls were looked for (GetControls was used).
+  FaultsChecked: boolean;
+  Error: string | null;
+}
+
+function NewDeviceReading(Component: DesignComponent, Category: DeviceCategory): DeviceReading {
+  return {
+    Name: Component.Name,
+    Type: Component.Type,
+    Category,
+    Read: false,
+    Found: false,
+    HasStatus: false,
+    StatusCode: null,
+    StatusString: null,
+    Faults: [],
+    FaultsChecked: false,
+    Error: null,
+  };
+}
+
+// Channel fault indicators from the Amp Output topics: Protect, Over Current
+// and Short. Matched on the control's script name, which is INFERRED to
+// contain those words; settings next to them (suppress, reset, lockout,
+// enable) never count. DAC Output Limit and Limit are deliberately absent:
+// they light whenever the signal is driven into the limiter, which is a level
+// matter during a loud show, not an amplifier fault.
+const FAULT_NAME_RE = /protect|short|over[\s._-]?current/i;
+const NOT_FAULT_NAME_RE = /suppress|reset|lock|enable|threshold|select/i;
+const BOOLEAN_TYPES = new Set(['boolean', 'led', 'indicator', 'button']);
+
+function IsLitFault(Control: Record<string, unknown>): boolean {
+  const Name = typeof Control.Name === 'string' ? Control.Name : '';
+  if (!FAULT_NAME_RE.test(Name) || NOT_FAULT_NAME_RE.test(Name)) return false;
+  const Type = typeof Control.Type === 'string' ? Control.Type.toLowerCase() : '';
+  const Value = Control.Value;
+  // Only on/off controls: a float named "clip" (a meter) is not a fault LED.
+  if (typeof Value === 'boolean') return Value;
+  if (!BOOLEAN_TYPES.has(Type)) return false;
+  const Num = PrimNumber(Value);
+  return Num != null && Num !== 0;
+}
+
+// Fill a reading from a Component.Get / Component.GetControls result
+// ({ Name, Controls: [...] }). The status control is matched without regard
+// to case; faults are only looked for when every control was returned.
+function ApplyDeviceResult(
+  Reading: DeviceReading,
+  Result: unknown,
+  StatusControl: string,
+  AllControls: boolean
+): void {
+  Reading.Read = true;
+  Reading.Found = true;
+  const Obj = Result && typeof Result === 'object' ? (Result as Record<string, unknown>) : {};
+  const Controls = Array.isArray(Obj.Controls) ? Obj.Controls : [];
+  const Want = StatusControl.toLowerCase();
+  for (const Entry of Controls) {
+    if (!Entry || typeof Entry !== 'object') continue;
+    const Control = Entry as Record<string, unknown>;
+    const Name = typeof Control.Name === 'string' ? Control.Name : '';
+    if (Name.toLowerCase() === Want && !Reading.HasStatus) {
+      Reading.HasStatus = true;
+      Reading.StatusCode = PrimNumber(Control.Value);
+      Reading.StatusString = typeof Control.String === 'string' ? Control.String : null;
+    } else if (AllControls && IsLitFault(Control)) {
+      Reading.Faults.push(Name);
+    }
+  }
+  Reading.FaultsChecked = AllControls;
+}
+
+function ApplyDeviceError(Reading: DeviceReading, Err: QrcError): void {
+  Reading.Read = true;
+  if (Err.Code === ERR_UNKNOWN_COMPONENT) {
+    Reading.Found = false;
+    return;
+  }
+  Reading.Found = true;
+  // Unknown control: the component exists but has no control by that name.
+  if (Err.Code === ERR_UNKNOWN_CONTROL) return;
+  Reading.Error = DescribeError(Err);
+}
+
+// Is this status a problem? Not Present is not an error in Q-SYS's own terms
+// unless the user asked for it to be.
+function DeviceStatusBad(Reading: DeviceReading, FlagNotPresent: boolean): boolean {
+  const Code = Reading.StatusCode;
+  if (Code == null || Code === 0) return false;
+  if (IsNotPresent(Code, Reading.StatusString) && !FlagNotPresent) return false;
+  return true;
+}
+
+// Words a Q-SYS status text starts with when it already names its state
+// ("Fault - PSU over temperature", "Updating firmware").
+const STATUS_WORD_RE =
+  /^(ok|compromised|fault|unknown|not\s*present|missing|initializing|updating)\b/i;
+
+// The device's own status text when it names the state; otherwise the label
+// for its code, with the text after it.
+function DescribeDeviceStatus(Reading: DeviceReading): string {
+  const Text = (Reading.StatusString || '').trim();
+  if (Text && STATUS_WORD_RE.test(Text)) return Text;
+  const Label = DeviceStatusLabel(Reading.StatusCode, Reading.StatusString);
+  return Text ? `${Label}: ${Text}` : Label;
+}
+
+// The reasons the design devices are unhealthy. Readings that never arrived
+// are covered by the session's Incomplete reason, not repeated per device.
+function EvaluateDevices(Snapshot: CoreSnapshot, Plan: DevicePlan): string[] {
+  const Reasons: string[] = [];
+  if (Snapshot.DevicesSkipped) return Reasons; // Standby / Idle: RequireActive speaks for it
+  if (Snapshot.DiscoveryError) {
+    Reasons.push(`Could not list design devices: ${Snapshot.DiscoveryError}`);
+    return Reasons;
+  }
+  const Devices = Snapshot.Devices;
+  if (!Devices) return Reasons;
+  const Problems: string[] = [];
+  for (const Reading of Devices) {
+    if (!Reading.Read) continue;
+    const Label = `${CATEGORY_LABELS[Reading.Category]} "${Reading.Name}"`;
+    if (!Reading.Found) {
+      Problems.push(
+        `${Label} not found (check its Code Name and that Script Access is External or All)`
+      );
+      continue;
+    }
+    if (Reading.Error) {
+      Problems.push(`${Label} could not be read (${Reading.Error})`);
+      continue;
+    }
+    if (!Reading.HasStatus) {
+      // A discovered component with no status control is quietly skipped; a
+      // listed one was named on purpose. Lit faults count either way.
+      if (Plan.Source === 'list') {
+        Problems.push(`${Label} has no "${Plan.StatusControl}" control`);
+      }
+    } else if (DeviceStatusBad(Reading, Plan.FlagNotPresent)) {
+      Problems.push(`${Label} ${DescribeDeviceStatus(Reading)}`);
+    }
+    if (Reading.Faults.length) {
+      Problems.push(`${Label} channel fault: ${Reading.Faults.join(', ')}`);
+    }
+  }
+  if (
+    Plan.Source === 'discover' &&
+    !Snapshot.Incomplete &&
+    !Devices.some((Reading) => Reading.Read && (Reading.HasStatus || Reading.FaultsChecked))
+  ) {
+    Problems.push('No design devices found (set Script Access to External or All)');
+  }
+  Reasons.push(...Problems.slice(0, MAX_DEVICE_REASONS));
+  if (Problems.length > MAX_DEVICE_REASONS) {
+    Reasons.push(`${Problems.length - MAX_DEVICE_REASONS} more device problems`);
+  }
+  return Reasons;
+}
+
 // --- One-connection probe ------------------------------------------------------
 
 export type LogonState = 'not-attempted' | 'ok' | 'rejected';
@@ -434,6 +973,16 @@ export interface CoreSnapshot {
   Controls: ControlReading[] | null;
   // Why the controls were not read (Standby/Idle Core), for the debug panel.
   ControlsSkipped: string | null;
+  // Design devices, in the order they were asked for. Null when not checked.
+  Devices: DeviceReading[] | null;
+  // Why the devices were not read (Standby/Idle Core).
+  DevicesSkipped: string | null;
+  // Component.GetComponents failed.
+  DiscoveryError: string | null;
+  // Exposed components no enabled category matched, for the debug panel.
+  DevicesUnmatched: DesignComponent[] | null;
+  // Matching devices beyond MAX_DEVICES, counted but not read.
+  DevicesOverLimit: number;
   // A stage that did not finish inside the budget, as a human reason.
   Incomplete: string | null;
 }
@@ -446,7 +995,92 @@ type RpcReply = { Result: unknown } | { Error: QrcError };
 
 class SessionEnded extends Error {}
 
-function QueryCore(Config: QsysConfig, ControlNames: string[]): Promise<CoreProbe> {
+// One QRC connection's framing and request bookkeeping, shared by the probe
+// and the actions. Replies are matched by id; anything without an id we are
+// waiting for (EngineStatus) goes to OnNotification.
+class QrcChannel {
+  private readonly Decoder = new StringDecoder('utf8');
+  private Buffered = '';
+  private NextId = 1;
+  private readonly Pending = new Map<number, (Reply: RpcReply) => void>();
+  private readonly Failers = new Set<(Err: Error) => void>();
+  BytesSeen = 0;
+
+  constructor(private readonly OnNotification: (Msg: Record<string, unknown>) => void) {}
+
+  // Take one chunk. False when the peer has sent more unterminated data than
+  // any Core reply could be.
+  Feed(Chunk: Buffer): boolean {
+    this.BytesSeen += Chunk.length;
+    // A StringDecoder keeps a UTF-8 character split across chunks intact.
+    this.Buffered += this.Decoder.write(Chunk);
+    if (this.Buffered.length > MAX_BUFFERED_CHARS) return false;
+    // Only re-split when a terminator arrived: a big reply comes in many
+    // chunks, and scanning the whole buffer for each would be quadratic.
+    if (!Chunk.includes(0)) return true;
+    const { Frames, Rest } = SplitFrames(this.Buffered);
+    this.Buffered = Rest;
+    for (const Frame of Frames) this.HandleFrame(Frame);
+    return true;
+  }
+
+  private HandleFrame(Frame: string): void {
+    let Msg: unknown;
+    try {
+      Msg = JSON.parse(Frame);
+    } catch {
+      return; // junk between frames; a non-Core answer stays unrecognised
+    }
+    if (!Msg || typeof Msg !== 'object' || Array.isArray(Msg)) return;
+    const Obj = Msg as Record<string, unknown>;
+    const Id = PrimNumber(Obj.id);
+    const Resolve = Id != null ? this.Pending.get(Id) : undefined;
+    if (Id == null || !Resolve) {
+      this.OnNotification(Obj);
+      return;
+    }
+    this.Pending.delete(Id);
+    Resolve(
+      'error' in Obj && Obj.error != null
+        ? { Error: ParseError(Obj.error) }
+        : { Result: Obj.result }
+    );
+  }
+
+  Call(Socket: net.Socket, Method: string, Params: unknown): Promise<RpcReply> {
+    return new Promise<RpcReply>((Resolve, Reject) => {
+      const Id = this.NextId++;
+      const Fail = (Err: Error) => Reject(Err);
+      this.Failers.add(Fail);
+      this.Pending.set(Id, (Reply) => {
+        this.Failers.delete(Fail);
+        Resolve(Reply);
+      });
+      try {
+        Socket.write(
+          JSON.stringify({ jsonrpc: '2.0', id: Id, method: Method, params: Params }) + '\0'
+        );
+      } catch (Err) {
+        this.Failers.delete(Fail);
+        this.Pending.delete(Id);
+        Reject(Err instanceof Error ? Err : new Error(String(Err)));
+      }
+    });
+  }
+
+  // The session ended: every call still waiting rejects with SessionEnded.
+  Close(): void {
+    for (const Fail of this.Failers) Fail(new SessionEnded('session ended'));
+    this.Failers.clear();
+    this.Pending.clear();
+  }
+}
+
+function QueryCore(
+  Config: QsysConfig,
+  ControlNames: string[],
+  Devices: DevicePlan | null = null
+): Promise<CoreProbe> {
   const BudgetMs = Math.max(500, Config.TimeoutMs | 0);
   const Snapshot: CoreSnapshot = {
     IsQsys: false,
@@ -457,14 +1091,25 @@ function QueryCore(Config: QsysConfig, ControlNames: string[]): Promise<CoreProb
     StatusGetError: null,
     Controls: null,
     ControlsSkipped: null,
+    Devices: null,
+    DevicesSkipped: null,
+    DiscoveryError: null,
+    DevicesUnmatched: null,
+    DevicesOverLimit: 0,
     Incomplete: null,
   };
-  let Buffer0 = '';
-  let BytesSeen = 0;
   let Stage = 'connect';
-  let NextId = 1;
-  const Pending = new Map<number, (Reply: RpcReply) => void>();
-  const Failers = new Set<(Err: Error) => void>();
+  const Channel = new QrcChannel((Obj) => {
+    if (Obj.method !== 'EngineStatus') return;
+    const Parsed = ParseCoreStatus(Obj.params);
+    if (!Parsed) return;
+    Snapshot.IsQsys = true;
+    // Keep it only as a fallback: StatusGet also carries Platform and Status.
+    if (Snapshot.StatusSource !== 'StatusGet') {
+      Snapshot.Status = Parsed;
+      Snapshot.StatusSource = 'EngineStatus';
+    }
+  });
 
   const Reached = (Session: TcpSession<CoreProbe>): CoreProbe => ({
     Reachable: true,
@@ -474,41 +1119,9 @@ function QueryCore(Config: QsysConfig, ControlNames: string[]): Promise<CoreProb
 
   // Ending early (timeout / close): reachable if the Core said anything at all.
   const Unfinished = (Session: TcpSession<CoreProbe>, NoReplyError: string): CoreProbe => {
-    if (!BytesSeen) return { Reachable: false, Error: NoReplyError, Refused: false };
+    if (!Channel.BytesSeen) return { Reachable: false, Error: NoReplyError, Refused: false };
     if (Snapshot.IsQsys) Snapshot.Incomplete = `The Core did not finish ${Stage} in time`;
     return Reached(Session);
-  };
-
-  const HandleFrame = (Frame: string): void => {
-    let Msg: unknown;
-    try {
-      Msg = JSON.parse(Frame);
-    } catch {
-      return; // junk between frames; a non-Core answer stays IsQsys = false
-    }
-    if (!Msg || typeof Msg !== 'object' || Array.isArray(Msg)) return;
-    const Obj = Msg as Record<string, unknown>;
-    if (Obj.method === 'EngineStatus') {
-      const Parsed = ParseCoreStatus(Obj.params);
-      if (Parsed) {
-        Snapshot.IsQsys = true;
-        // Keep it only as a fallback: StatusGet also carries Platform and Status.
-        if (Snapshot.StatusSource !== 'StatusGet') {
-          Snapshot.Status = Parsed;
-          Snapshot.StatusSource = 'EngineStatus';
-        }
-      }
-      return;
-    }
-    const Id = PrimNumber(Obj.id);
-    const Resolve = Id != null ? Pending.get(Id) : undefined;
-    if (Id == null || !Resolve) return;
-    Pending.delete(Id);
-    Resolve(
-      'error' in Obj && Obj.error != null
-        ? { Error: ParseError(Obj.error) }
-        : { Result: Obj.result }
-    );
   };
 
   return RunTcpSession<CoreProbe>({
@@ -517,21 +1130,9 @@ function QueryCore(Config: QsysConfig, ControlNames: string[]): Promise<CoreProb
     IdleMs: BudgetMs,
     DeadlineMs: BudgetMs,
     NoDelay: true,
-    OnSettle: () => {
-      for (const Fail of Failers) Fail(new SessionEnded('session ended'));
-      Failers.clear();
-      Pending.clear();
-    },
+    OnSettle: () => Channel.Close(),
     OnData: (Chunk, Session) => {
-      BytesSeen += Chunk.length;
-      Buffer0 += Chunk.toString('utf8');
-      if (Buffer0.length > MAX_BUFFERED_CHARS) {
-        Session.Finish(Reached(Session));
-        return;
-      }
-      const { Frames, Rest } = SplitFrames(Buffer0);
-      Buffer0 = Rest;
-      for (const Frame of Frames) HandleFrame(Frame);
+      if (!Channel.Feed(Chunk)) Session.Finish(Reached(Session));
     },
     OnTimeout: (Session) => Unfinished(Session, `No reply from the Q-SYS Core after ${BudgetMs}ms`),
     OnError: (Message) => ({
@@ -542,24 +1143,7 @@ function QueryCore(Config: QsysConfig, ControlNames: string[]): Promise<CoreProb
     OnClose: (Session) => Unfinished(Session, 'Connection closed before any reply'),
     OnConnect: (Session) => {
       const Call = (Method: string, Params: unknown): Promise<RpcReply> =>
-        new Promise<RpcReply>((Resolve, Reject) => {
-          const Id = NextId++;
-          const Fail = (Err: Error) => Reject(Err);
-          Failers.add(Fail);
-          Pending.set(Id, (Reply) => {
-            Failers.delete(Fail);
-            Resolve(Reply);
-          });
-          try {
-            Session.Socket.write(
-              JSON.stringify({ jsonrpc: '2.0', id: Id, method: Method, params: Params }) + '\0'
-            );
-          } catch (Err) {
-            Failers.delete(Fail);
-            Pending.delete(Id);
-            Reject(Err instanceof Error ? Err : new Error(String(Err)));
-          }
-        });
+        Channel.Call(Session.Socket, Method, Params);
 
       void (async () => {
         try {
@@ -581,7 +1165,7 @@ function QueryCore(Config: QsysConfig, ControlNames: string[]): Promise<CoreProb
             // Logon required / Standby are Q-SYS's own codes; method-not-found
             // from some other JSON-RPC server is not a Core.
             const Code = StatusReply.Error.Code;
-            if (Code === 10 || Code === -32604) Snapshot.IsQsys = true;
+            if (Code === ERR_LOGON_REQUIRED || Code === ERR_STANDBY) Snapshot.IsQsys = true;
             Snapshot.StatusGetError = DescribeError(StatusReply.Error);
           } else {
             const Parsed = ParseCoreStatus(StatusReply.Result);
@@ -619,6 +1203,18 @@ function QueryCore(Config: QsysConfig, ControlNames: string[]): Promise<CoreProb
               }
             }
           }
+          if (Devices && Snapshot.IsQsys) {
+            const State = Snapshot.Status ? Snapshot.Status.State : null;
+            if (!Snapshot.Status) {
+              Snapshot.DevicesSkipped = 'Core status unknown';
+            } else if (State !== 'Active') {
+              Snapshot.DevicesSkipped = `Core is ${State || 'not Active'}`;
+            } else {
+              await ReadDevices(Call, Devices, Snapshot, (Next) => {
+                Stage = Next;
+              });
+            }
+          }
           Session.Finish(Reached(Session));
         } catch (Err) {
           if (Err instanceof SessionEnded) return; // already settled by timeout/close
@@ -631,6 +1227,91 @@ function QueryCore(Config: QsysConfig, ControlNames: string[]): Promise<CoreProb
       })();
     },
   });
+}
+
+type RpcCall = (Method: string, Params: unknown) => Promise<RpcReply>;
+
+// Choose and read the design devices. Readings are put on the Snapshot before
+// any is sent, so a probe that runs out of time still reports the ones that
+// answered.
+async function ReadDevices(
+  Call: RpcCall,
+  Plan: DevicePlan,
+  Snapshot: CoreSnapshot,
+  SetStage: (Stage: string) => void
+): Promise<void> {
+  let Wanted: Array<{ Component: DesignComponent; Category: DeviceCategory }>;
+  if (Plan.Source === 'list') {
+    if (!Plan.Names.length) {
+      Snapshot.Devices = [];
+      return;
+    }
+    // The Type is unknown without GetComponents. It is only fetched when
+    // amplifier faults are wanted, so a listed Amp Output still gets its fault
+    // LEDs read; a failure here is not fatal.
+    const Types = new Map<string, string | null>();
+    if (Plan.AmpFaults) {
+      SetStage('Component.GetComponents');
+      const Listing = await Call('Component.GetComponents', 'test');
+      if (!('Error' in Listing)) {
+        for (const Component of ParseComponentList(Listing.Result)) {
+          Types.set(Component.Name, Component.Type);
+        }
+      }
+    }
+    Wanted = Plan.Names.map((Name) => {
+      const Type = Types.get(Name) ?? null;
+      return { Component: { Name, Type }, Category: CategorizeType(Type) ?? 'other' };
+    });
+  } else {
+    SetStage('Component.GetComponents');
+    // The QRC page lists no parameters but its example sends "test"; Q-SYS's
+    // own QRWC library sends the same, so this mirrors both.
+    const Listing = await Call('Component.GetComponents', 'test');
+    if ('Error' in Listing) {
+      Snapshot.DiscoveryError = DescribeError(Listing.Error);
+      return;
+    }
+    const Enabled = new Set(Plan.Categories);
+    const Unmatched: DesignComponent[] = [];
+    Wanted = [];
+    for (const Component of ParseComponentList(Listing.Result)) {
+      const Category = CategorizeType(Component.Type);
+      if (Category == null) continue; // not a device status component
+      if (Enabled.has(Category)) Wanted.push({ Component, Category });
+      else if (Category === 'other') Unmatched.push(Component);
+    }
+    Snapshot.DevicesUnmatched = Unmatched;
+  }
+
+  if (Wanted.length > MAX_DEVICES) {
+    Snapshot.DevicesOverLimit = Wanted.length - MAX_DEVICES;
+    Wanted = Wanted.slice(0, MAX_DEVICES);
+  }
+  const Readings = Wanted.map((Entry) => NewDeviceReading(Entry.Component, Entry.Category));
+  Snapshot.Devices = Readings;
+  if (!Readings.length) return;
+
+  SetStage('Component.Get');
+  // A few at a time, matched by id: a big design is read in a handful of round
+  // trips without one burst of a hundred requests at the Core.
+  let Next = 0;
+  const Worker = async (): Promise<void> => {
+    for (let Reading = Readings[Next++]; Reading; Reading = Readings[Next++]) {
+      // Only an Amp Output component carries the channel fault LEDs, so only
+      // it is read whole; everything else asks for the status control alone.
+      const AllControls = Plan.AmpFaults && IsAmpOutputType(Reading.Type);
+      const Reply = AllControls
+        ? await Call('Component.GetControls', { Name: Reading.Name })
+        : await Call('Component.Get', {
+            Name: Reading.Name,
+            Controls: [{ Name: Plan.StatusControl }],
+          });
+      if ('Error' in Reply) ApplyDeviceError(Reading, Reply.Error);
+      else ApplyDeviceResult(Reading, Reply.Result, Plan.StatusControl, AllControls);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(MAX_IN_FLIGHT, Readings.length) }, Worker));
 }
 
 // --- Evaluation ----------------------------------------------------------------
@@ -646,7 +1327,7 @@ function EvaluateHealth(Snapshot: CoreSnapshot, Options: HealthOptions): string[
   const LogonRejected = Snapshot.LogonState === 'rejected';
   if (LogonRejected) Reasons.push('Logon rejected (check the user and PIN)');
   if (Snapshot.StatusGetError) {
-    const NeedsLogon = /logon required/i.test(Snapshot.StatusGetError);
+    const NeedsLogon = /logon required|\(10\)$/i.test(Snapshot.StatusGetError);
     if (!NeedsLogon) Reasons.push(`StatusGet failed: ${Snapshot.StatusGetError}`);
     else if (!LogonRejected) Reasons.push('Logon required: set a user and PIN');
   }
@@ -703,6 +1384,8 @@ function EvaluateHealth(Snapshot: CoreSnapshot, Options: HealthOptions): string[
       }
     }
   }
+
+  if (Options.CheckDevices) Reasons.push(...EvaluateDevices(Snapshot, Options.Devices));
   return Reasons;
 }
 
@@ -715,7 +1398,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Options = ParseHealthOptions(Target);
   const Names = Array.from(new Set(Options.Assertions.map((A) => A.Name)));
 
-  const Probe = await QueryCore(Config, Names);
+  const Probe = await QueryCore(Config, Names, Options.CheckDevices ? Options.Devices : null);
   if (!Probe.Reachable) {
     return { Success: false, ...(Probe.Refused ? { Degraded: true } : {}), Error: Probe.Error };
   }
@@ -741,7 +1424,303 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     LogonError: Snapshot.LogonError,
     Controls: Snapshot.Controls,
     ControlsSkipped: Snapshot.ControlsSkipped,
+    ...(Options.CheckDevices
+      ? {
+          Devices: Snapshot.Devices,
+          DevicesSkipped: Snapshot.DevicesSkipped,
+          DiscoveryError: Snapshot.DiscoveryError,
+          DevicesUnmatched: Snapshot.DevicesUnmatched,
+          DevicesOverLimit: Snapshot.DevicesOverLimit,
+        }
+      : {}),
   };
+}
+
+// --- Actions -----------------------------------------------------------------
+
+const Actions: MonitoringActionDef[] = [
+  {
+    ID: 'snapshot.load',
+    Label: 'Load Snapshot',
+    Icon: 'collection-play',
+    Group: 'Snapshots',
+    Destructive: true,
+    Params: [
+      {
+        Key: 'Bank',
+        Label: 'Snapshot bank',
+        Type: 'string',
+        Default: '',
+        Required: true,
+        Note: 'The name of the snapshot bank, as given to it in Q-SYS Designer.',
+      },
+      {
+        Key: 'Snapshot',
+        Label: 'Snapshot',
+        Type: 'number',
+        Required: true,
+        Note: 'The snapshot number within the bank, starting at 1.',
+      },
+      {
+        Key: 'Ramp',
+        Label: 'Ramp (seconds)',
+        Type: 'number',
+        Default: 0,
+        Note: 'How long the Core takes to move the controls to the snapshot. 0 loads it at once.',
+      },
+    ],
+    Note: 'Recalls a saved snapshot, changing every control it holds. Sent only to the Active Core.',
+  },
+  {
+    ID: 'control.set',
+    Label: 'Set Named Control',
+    Icon: 'sliders',
+    Group: 'Named Controls',
+    Destructive: true,
+    Params: [
+      {
+        Key: 'Name',
+        Label: 'Named Control',
+        Type: 'string',
+        Default: '',
+        Required: true,
+        Note: 'The control’s name in the Named Controls list in Q-SYS Designer.',
+      },
+      {
+        Key: 'Value',
+        Label: 'Value',
+        Type: 'string',
+        Default: '',
+        Required: true,
+        Note: 'A number (e.g. -6 for a gain), true or false (e.g. for a mute), or text. Sent only to the Active Core.',
+      },
+    ],
+    Note: 'Sets one Named Control to a value, e.g. a mute or a gain.',
+  },
+];
+
+// The Value a Control.Set carries. QRC takes a number, string or boolean: the
+// words true / false become booleans (a mute or toggle), a number becomes a
+// number (a gain), and anything else is sent as text (a combo box choice).
+function ParseControlValue(Raw: unknown): string | number | boolean | null {
+  if (Raw == null || typeof Raw === 'object') return null;
+  if (typeof Raw === 'boolean') return Raw;
+  if (typeof Raw === 'number') return Number.isFinite(Raw) ? Raw : null;
+  const Text = String(Raw).trim();
+  if (!Text) return null;
+  const Lower = Text.toLowerCase();
+  if (Lower === 'true') return true;
+  if (Lower === 'false') return false;
+  if (NUMBER_RE.test(Text)) return Number(Text);
+  return Text;
+}
+
+function ParamText(Value: unknown): string {
+  return Value == null || typeof Value === 'object' ? '' : String(Value).trim();
+}
+
+type CommandOutcome = { Ok: true; Result: unknown } | { Ok: false; Error: string };
+
+// Words for a refusal every command can get.
+function SessionRefusal(Err: QrcError): string | null {
+  if (Err.Code === ERR_LOGON_REQUIRED) {
+    return 'The Core needs a logon. Set the user and PIN on this check.';
+  }
+  if (Err.Code === ERR_STANDBY) {
+    return 'The Core is on Standby. Commands are only sent to the Active Core.';
+  }
+  return null;
+}
+
+// One short session: Logon (when a user is set), StatusGet to confirm the Core
+// is Active, then the one command. The configured Timeout covers all of it.
+function SendCoreCommand(
+  Config: QsysConfig,
+  Method: string,
+  Params: unknown,
+  DescribeRefusal: (Err: QrcError) => string
+): Promise<CommandOutcome> {
+  const BudgetMs = Math.max(500, Config.TimeoutMs | 0);
+  // A Core announces itself with EngineStatus on connect, so a silent Core and
+  // a device that is not a Core at all can be told apart.
+  let SawCore = false;
+  const Channel = new QrcChannel((Obj) => {
+    if (Obj.method === 'EngineStatus') SawCore = true;
+  });
+  let Answered = false;
+  const Ended = (NoReply: string): CommandOutcome => ({
+    Ok: false,
+    Error: Answered
+      ? `The Core did not confirm the command within ${BudgetMs}ms`
+      : SawCore
+        ? `The Core did not answer within ${BudgetMs}ms`
+        : Channel.BytesSeen
+          ? 'The device did not answer as a Q-SYS Core'
+          : NoReply,
+  });
+  return RunTcpSession<CommandOutcome>({
+    Address: Config.Address,
+    Port: Config.Port,
+    IdleMs: BudgetMs,
+    DeadlineMs: BudgetMs,
+    NoDelay: true,
+    OnSettle: () => Channel.Close(),
+    OnData: (Chunk, Session) => {
+      if (!Channel.Feed(Chunk)) {
+        Session.Finish({ Ok: false, Error: 'The device did not answer as a Q-SYS Core' });
+      }
+    },
+    OnTimeout: () => Ended(`No reply from the Q-SYS Core after ${BudgetMs}ms`),
+    OnError: (Message) => ({ Ok: false, Error: Message }),
+    OnClose: () => Ended('Connection closed before any reply'),
+    OnConnect: (Session) => {
+      const Call = (M: string, P: unknown) => Channel.Call(Session.Socket, M, P);
+      void (async () => {
+        try {
+          if (Config.User) {
+            const Logon = await Call('Logon', { User: Config.User, Password: Config.Password });
+            if ('Error' in Logon) {
+              Session.Finish({
+                Ok: false,
+                Error: 'The Core refused the logon. Check the user and PIN on this check.',
+              });
+              return;
+            }
+          }
+          const StatusReply = await Call('StatusGet', 0);
+          if ('Error' in StatusReply) {
+            Session.Finish({
+              Ok: false,
+              Error:
+                SessionRefusal(StatusReply.Error) ||
+                `The Core did not report its state: ${DescribeError(StatusReply.Error)}`,
+            });
+            return;
+          }
+          const Status = ParseCoreStatus(StatusReply.Result);
+          if (!Status) {
+            Session.Finish({ Ok: false, Error: 'The device did not answer as a Q-SYS Core' });
+            return;
+          }
+          if (Status.State !== 'Active') {
+            Session.Finish({
+              Ok: false,
+              Error: `The Core is ${Status.State || 'not Active'}, not Active. Commands are only sent to the Active Core.`,
+            });
+            return;
+          }
+          Answered = true;
+          const Reply = await Call(Method, Params);
+          if ('Error' in Reply) {
+            Session.Finish({
+              Ok: false,
+              Error: SessionRefusal(Reply.Error) || DescribeRefusal(Reply.Error),
+            });
+            return;
+          }
+          Session.Finish({ Ok: true, Result: Reply.Result });
+        } catch (Err) {
+          if (Err instanceof SessionEnded) return;
+          Session.Finish({ Ok: false, Error: Err instanceof Error ? Err.message : String(Err) });
+        }
+      })();
+    },
+  });
+}
+
+function FormatRamp(Ramp: number): string {
+  return Ramp > 0 ? ` over ${Ramp} s` : '';
+}
+
+async function RunAction(
+  Target: MonitoringTargetLike,
+  ActionID: string,
+  Params: Record<string, unknown>
+): Promise<MonitoringActionResult> {
+  const Config = ParseConfig(Target);
+  if (!Config.Address) return { Success: false, Error: 'No address configured' };
+  if (Config.Port < 1 || Config.Port > 65535) {
+    return { Success: false, Error: `Invalid port: ${Config.Port}` };
+  }
+  const P = Params || {};
+
+  if (ActionID === 'snapshot.load') {
+    const Bank = ParamText(P.Bank);
+    if (!Bank) return { Success: false, Error: 'Enter the snapshot bank name' };
+    const SnapshotNo = PrimNumber(P.Snapshot);
+    if (SnapshotNo == null || !Number.isInteger(SnapshotNo) || SnapshotNo < 1) {
+      return { Success: false, Error: 'The snapshot number must be a whole number from 1 up' };
+    }
+    const RampRaw = P.Ramp == null || P.Ramp === '' ? 0 : PrimNumber(P.Ramp);
+    if (RampRaw == null || RampRaw < 0 || RampRaw > 600) {
+      return { Success: false, Error: 'The ramp must be between 0 and 600 seconds' };
+    }
+    // QRC_Commands: Name is the bank, Bank is the snapshot number within it,
+    // Ramp is optional (seconds).
+    const Wire: Record<string, unknown> = { Name: Bank, Bank: SnapshotNo };
+    if (RampRaw > 0) Wire.Ramp = RampRaw;
+    const Outcome = await SendCoreCommand(
+      Config,
+      'Snapshot.Load',
+      Wire,
+      (Err) => `The Core did not load snapshot ${SnapshotNo} from "${Bank}": ${DescribeError(Err)}`
+    );
+    if (!Outcome.Ok) return { Success: false, Error: Outcome.Error };
+    return {
+      Success: true,
+      Detail: `Snapshot ${SnapshotNo} loaded from "${Bank}"${FormatRamp(RampRaw)}`,
+    };
+  }
+
+  if (ActionID === 'control.set') {
+    const Name = ParamText(P.Name);
+    if (!Name) return { Success: false, Error: 'Enter the Named Control to set' };
+    const Value = ParseControlValue(P.Value);
+    if (Value == null) return { Success: false, Error: `Enter a value for "${Name}"` };
+    const Outcome = await SendCoreCommand(Config, 'Control.Set', { Name, Value }, (Err) =>
+      Err.Code === ERR_UNKNOWN_CONTROL
+        ? `The Core has no Named Control called "${Name}"`
+        : `The Core did not set "${Name}": ${DescribeError(Err)}`
+    );
+    if (!Outcome.Ok) return { Success: false, Error: Outcome.Error };
+    return { Success: true, Detail: `${Name} set to ${String(Value)}` };
+  }
+
+  return { Success: false, Error: `Unknown Q-SYS action "${ActionID}"` };
+}
+
+// Offer the Named Controls this check already reads (its control assertions)
+// as the choices for Set Named Control.
+function GetActionOptions(Result: MonitoringResult): MonitoringActionOptions {
+  const Readings = Result && Array.isArray(Result.Controls) ? Result.Controls : null;
+  if (!Readings) return {};
+  const Names: string[] = [];
+  for (const Reading of Readings) {
+    const Name =
+      Reading && typeof Reading === 'object' ? (Reading as { Name?: unknown }).Name : null;
+    if (typeof Name === 'string' && Name && !Names.includes(Name)) Names.push(Name);
+  }
+  if (!Names.length) return {};
+  return { Name: Names.map((Name) => ({ value: Name, label: Name })) };
+}
+
+// Bind the parameters into a favourite's label.
+function DescribeAction(ActionID: string, Params: Record<string, unknown>): string | null {
+  const P = Params || {};
+  if (ActionID === 'snapshot.load') {
+    const Bank = ParamText(P.Bank);
+    const SnapshotNo = PrimNumber(P.Snapshot);
+    if (!Bank || SnapshotNo == null) return null;
+    const Ramp = PrimNumber(P.Ramp) || 0;
+    return `Load Snapshot — ${Bank} ${SnapshotNo}${FormatRamp(Ramp)}`;
+  }
+  if (ActionID === 'control.set') {
+    const Name = ParamText(P.Name);
+    const Value = ParseControlValue(P.Value);
+    if (!Name || Value == null) return null;
+    return `Set ${Name} — ${String(Value)}`;
+  }
+  return null;
 }
 
 // --- Debug panel -----------------------------------------------------------------
@@ -791,7 +1770,12 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const StatusText =
     Code == null
       ? null
-      : `${StatusLabel(Code)}${Result.StatusString ? ` — ${String(Result.StatusString)}` : ''}`;
+      : `${StatusLabel(Code)}${
+          Result.StatusString &&
+          String(Result.StatusString).trim().toLowerCase() !== StatusLabel(Code).toLowerCase()
+            ? ` — ${String(Result.StatusString)}`
+            : ''
+        }`;
   const Flags: string[] = [];
   if (Result.IsRedundant === true) Flags.push('Redundant');
   if (Result.IsEmulator === true) Flags.push('Emulator');
@@ -863,12 +1847,100 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     ControlsHtml = `<div class="mt-2 d-grid gap-1">${ControlsHtml}</div>`;
   }
 
-  return Rows(Body) + ControlsHtml;
+  return Rows(Body) + ControlsHtml + DevicesDebug(Result, Options);
+}
+
+// One card per design device: its status as the Core reports it, plus any lit
+// amplifier fault, then notes for what was skipped or not matched.
+function DevicesDebug(Result: MonitoringResult, Options: HealthOptions): string {
+  if (!Options.CheckDevices) return '';
+  const Plan = Options.Devices;
+  const Parts: string[] = ['<div class="text-muted small mt-2">Design devices</div>'];
+  if (Result.DevicesSkipped) {
+    Parts.push(Note(`Devices not read: ${String(Result.DevicesSkipped)}`));
+  } else if (Result.DiscoveryError) {
+    Parts.push(Note(`Could not list design devices: ${String(Result.DiscoveryError)}`));
+  } else if (!Array.isArray(Result.Devices)) {
+    Parts.push(Note('Devices not read'));
+  } else {
+    const Readings = Result.Devices as DeviceReading[];
+    if (!Readings.length) {
+      Parts.push(
+        Note(
+          Plan.Source === 'list'
+            ? 'No devices listed'
+            : 'No devices found in the enabled categories. Each needs Script Access set to External or All.'
+        )
+      );
+    }
+    for (const Reading of Readings) {
+      // Discovery reads every component in a category; ones with no status
+      // control are not devices and are left out of the table.
+      if (
+        Plan.Source === 'discover' &&
+        Reading.Read &&
+        Reading.Found &&
+        !Reading.HasStatus &&
+        !Reading.Faults.length &&
+        !Reading.Error
+      ) {
+        continue;
+      }
+      const Bad = DeviceStatusBad(Reading, Plan.FlagNotPresent) || Reading.Faults.length > 0;
+      let Badge: string;
+      if (!Reading.Read) Badge = Pill('muted', 'Not read in time');
+      else if (!Reading.Found) Badge = Pill('danger', 'Not found');
+      else if (Reading.Error) Badge = Pill('danger', 'Error');
+      else if (!Reading.HasStatus)
+        Badge = Pill('warning', Reading.Faults.length ? 'Channel fault' : 'No status control');
+      else if (Reading.StatusCode == null) Badge = Pill('muted', Reading.StatusString || 'Unknown');
+      else Badge = Pill(Bad ? 'warning' : 'success', DescribeDeviceStatus(Reading));
+      const Detail = [
+        CATEGORY_LABELS[Reading.Category] || 'Device',
+        Reading.Type ? `type ${Reading.Type}` : null,
+        Reading.Faults.length ? `faults: ${Reading.Faults.join(', ')}` : null,
+        Reading.FaultsChecked && !Reading.Faults.length ? 'no channel faults' : null,
+        Reading.Error,
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      Parts.push(
+        Card({
+          Title: Reading.Name,
+          TitleClass: 'font-monospace',
+          Badge,
+          Highlight: Reading.Read && Reading.HasStatus && !Bad,
+          BodyHtml: `<div class="text-muted small text-break">${Esc(Detail)}</div>`,
+        })
+      );
+    }
+    const OverLimit = Number(Result.DevicesOverLimit) || 0;
+    if (OverLimit > 0) {
+      Parts.push(Note(`${OverLimit} more devices not read (limit ${MAX_DEVICES} per check)`));
+    }
+  }
+  const Unmatched = Array.isArray(Result.DevicesUnmatched)
+    ? (Result.DevicesUnmatched as DesignComponent[])
+    : [];
+  if (Unmatched.length) {
+    const Shown = Unmatched.slice(0, 12)
+      .map((Component) =>
+        Component.Type ? `${Component.Name} (${Component.Type})` : Component.Name
+      )
+      .join(', ');
+    const More = Unmatched.length > 12 ? ` and ${Unmatched.length - 12} more` : '';
+    Parts.push(
+      Note(
+        `Not in a device category: ${Shown}${More}. Turn on Other devices, or list a device by its Code Name, to check it.`
+      )
+    );
+  }
+  return `<div class="mt-2 d-grid gap-1">${Parts.join('')}</div>`;
 }
 
 export const Name = 'Q-SYS Core';
 export const Description =
-  'Connects to a Q-SYS Core over Q-SYS Remote Control (QRC, TCP 1710) and reads its status, state, running design and redundancy flags — read-only. Reports Degraded when the Core status is not OK or the Core is not Active, and optionally when the design or listed Named Controls are not as expected.';
+  'Connects to a Q-SYS Core over Q-SYS Remote Control (QRC, TCP 1710) and reads its status, state, running design and redundancy flags without changing anything. Reports Degraded when the Core status is not OK or the Core is not Active, and optionally when the design or listed Named Controls are not as expected, or when an amplifier, I/O frame, camera, bridge or touch panel in the design is not OK. Its actions load a snapshot or set a Named Control on the Active Core.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = {
   ParseConfig,
@@ -883,5 +1955,13 @@ export const _internal = {
   StatusLabel,
   EvaluateHealth,
   QueryCore,
+  ParseDevicePlan,
+  CategorizeType,
+  ParseComponentList,
+  ApplyDeviceResult,
+  IsLitFault,
+  EvaluateDevices,
+  DeviceStatusLabel,
+  ParseControlValue,
 };
-export { ID, Settings, Run, Debug };
+export { ID, Settings, Actions, Run, RunAction, GetActionOptions, DescribeAction, Debug };

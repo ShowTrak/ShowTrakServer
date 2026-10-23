@@ -350,6 +350,56 @@ test('every registered monitoring method has editor help and a group', () => {
   }
 });
 
+// Action params pass through NormalizeFields before RunAction sees them: a blank
+// or junk number becomes its Default and is clamped to Min/Max, and an unknown
+// select value becomes its Default. On a destructive action that turns a
+// mistyped OSC value into a real command (scene 600 recalled as scene 500, a
+// blank channel muting every channel), so those params must have no clamp and
+// no default, leaving RunAction to refuse the value. A select with no Default
+// is fine: an unknown value normalizes to nothing RunAction will accept. The
+// allow-list holds defaults reviewed as safe.
+test('destructive monitoring actions never let normalization invent a target', () => {
+  const { Manager } = loadWithMocks(methodPath('index.js'), { '../Logger': loggerStub() });
+  const SafeDefaults = new Set([
+    // Take with no screen named takes the main screen; it moves no content.
+    'analogway-livepremier/transition.take/Screen',
+    // The memory is required; with no screen listed it loads to the main screen.
+    'analogway-livepremier/memory.program/Screens',
+    // OSC fills only the first param (the instance tag), so without a channel
+    // default Tesira mute could not be sent over OSC; 1 is the block's first channel.
+    'biamp-tesira/mute.on/Channel',
+    // A ramp of 0 loads the snapshot at once, which is what no ramp means.
+    'qsys-core/snapshot.load/Ramp',
+  ]);
+
+  for (const method of Manager.GetAll()) {
+    for (const action of method.Actions) {
+      if (!action.Destructive) continue;
+      for (const param of action.Params || []) {
+        const where = `${method.ID}/${action.ID}/${param.Key}`;
+        assert.equal(param.Min, undefined, `${where} has a Min, which clamps`);
+        assert.equal(param.Max, undefined, `${where} has a Max, which clamps`);
+        const hasDefault = param.Default !== undefined && param.Default !== '';
+        const isEmptyList = Array.isArray(param.Default) && param.Default.length === 0;
+        if (hasDefault && !isEmptyList) {
+          assert.ok(SafeDefaults.has(where), `${where} has a default that a blank value falls to`);
+        }
+      }
+    }
+  }
+
+  // The case that shipped: a misspelt QLab override used to normalize to the
+  // first override in the list (DMX output) and switch it off.
+  const { OVERRIDE_KEYS } = require(methodPath('_qlab-shared.js'));
+  for (const Override of ['dmxOutputEnabled ', 'bogus', '']) {
+    const normalized = Manager.NormalizeActionParams('qlab5', 'override.disable', { Override });
+    assert.ok(
+      !OVERRIDE_KEYS.includes(normalized.Override),
+      `override.disable normalized ${JSON.stringify(Override)} to ${normalized.Override}`
+    );
+  }
+});
+
 test('MonitoringMethods registry exposes public shapes and normalizes settings', () => {
   const { Manager } = loadWithMocks(methodPath('index.js'), { '../Logger': loggerStub() });
 
@@ -357,15 +407,24 @@ test('MonitoringMethods registry exposes public shapes and normalizes settings',
   const ids = all.map((m) => m.ID).sort();
   assert.deepEqual(ids, [
     '7thsense-delta',
+    'aja-device',
+    'allen-heath-console',
+    'analogway-livepremier',
     'artnet-node',
     'artnet-timecode',
     'artnet-universe',
     'atem',
     'avolites',
+    'barco-eventmaster',
+    'biamp-tesira',
     'brightsign',
+    'brompton-tessera',
     'chamsys',
     'companion-status',
     'dante-device',
+    'datapath-fx4',
+    'dbaudio-amp',
+    'digico-console',
     'disguise-status',
     'dns',
     'eos',
@@ -383,6 +442,8 @@ test('MonitoringMethods registry exposes public shapes and normalizes settings',
     'ping',
     'pixera',
     'pjlink',
+    'powersoft-amp',
+    'ptz-camera',
     'qlab4',
     'qlab5',
     'qsys-core',
@@ -391,9 +452,11 @@ test('MonitoringMethods registry exposes public shapes and normalizes settings',
     'sacn-universe-priority',
     'sennheiser-wireless',
     'shure-wireless',
+    'snmp-oid',
     'snmp-projector',
     'snmp-ups',
     'snmp-ups-v3',
+    'symetrix-dsp',
     'tcp-port',
     'videohub',
     'watchout-status',

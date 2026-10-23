@@ -30,6 +30,7 @@ import * as tcpPort from './tcp-port';
 import * as http from './http';
 import * as httpJson from './http-json';
 import * as dns from './dns';
+import * as snmpOid from './snmp-oid';
 // Lighting (DMX)
 import * as sacnUniverse from './sacn-universe';
 import * as sacnUniversePriority from './sacn-universe-priority';
@@ -50,6 +51,14 @@ import * as ndiSource from './ndi-source';
 import * as atem from './atem';
 import * as hyperdeck from './hyperdeck';
 import * as videohub from './videohub';
+// Video — LED and presentation processors
+import * as bromptonTessera from './brompton-tessera';
+import * as barcoEventmaster from './barco-eventmaster';
+import * as analogwayLivepremier from './analogway-livepremier';
+import * as datapathFx4 from './datapath-fx4';
+// Video — AJA devices and PTZ cameras
+import * as ajaDevice from './aja-device';
+import * as ptzCamera from './ptz-camera';
 // Video — streaming and recording software
 import * as obsStudio from './obs-studio';
 // Video — motion capture
@@ -65,6 +74,13 @@ import * as sennheiserWireless from './sennheiser-wireless';
 import * as x32Console from './x32-console';
 import * as yamahaConsole from './yamaha-console';
 import * as qsysCore from './qsys-core';
+import * as biampTesira from './biamp-tesira';
+import * as symetrixDsp from './symetrix-dsp';
+import * as allenHeathConsole from './allen-heath-console';
+import * as digicoConsole from './digico-console';
+// Sound — amplifiers
+import * as dbaudioAmp from './dbaudio-amp';
+import * as powersoftAmp from './powersoft-amp';
 // Media Servers
 import * as watchoutStatus from './watchout-status';
 import * as resolumeStatus from './resolume-status';
@@ -102,6 +118,7 @@ const MethodModules: MonitoringMethod[] = [
   http,
   httpJson,
   dns,
+  snmpOid,
   // Lighting (DMX)
   sacnUniverse,
   sacnUniversePriority,
@@ -122,6 +139,14 @@ const MethodModules: MonitoringMethod[] = [
   atem,
   hyperdeck,
   videohub,
+  // Video — LED and presentation processors
+  bromptonTessera,
+  barcoEventmaster,
+  analogwayLivepremier,
+  datapathFx4,
+  // Video — AJA devices and PTZ cameras
+  ajaDevice,
+  ptzCamera,
   // Video — streaming and recording software
   obsStudio,
   // Video — motion capture
@@ -137,6 +162,13 @@ const MethodModules: MonitoringMethod[] = [
   x32Console,
   yamahaConsole,
   qsysCore,
+  biampTesira,
+  symetrixDsp,
+  allenHeathConsole,
+  digicoConsole,
+  // Sound — amplifiers
+  dbaudioAmp,
+  powersoftAmp,
   // Media Servers
   watchoutStatus,
   resolumeStatus,

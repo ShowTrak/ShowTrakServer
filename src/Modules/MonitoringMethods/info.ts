@@ -466,12 +466,16 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
   },
   'qsys-core': {
     Summary:
-      'Q-SYS Core health over Q-SYS Remote Control (QRC, JSON-RPC 2.0 on TCP 1710). Reads platform, state (Active / Standby / Idle), running design, redundancy and emulator flags and the Core status in one read-only session. Degraded by default when the Core status is not OK or the Core is not Active; enable the design and Named Control toggles to also assert the running design and individual control values. Works with hardware Cores and the Q-SYS Designer emulator.',
+      'Q-SYS Core health over Q-SYS Remote Control (QRC, JSON-RPC 2.0 on TCP 1710). Reads platform, state (Active / Standby / Idle), running design, redundancy and emulator flags and the Core status in one read-only session. Degraded by default when the Core status is not OK or the Core is not Active; enable the design and Named Control toggles to also assert the running design and individual control values. Turn on Check design devices to also read the status of the amplifiers (CX-Q, DPA-Q, SPA-Q), I/O frames and peripherals (QIO, I/O-Frame, Core Flex I/O), NC Series cameras, PTZ-IP, I/O-USB and USB video bridges and TSC touch panels in the running design, plus amplifier channel Protect, Over Current and Short faults. Two actions, both confirmed before sending and only sent to the Active Core: Load Snapshot recalls a snapshot from a named bank, with an optional ramp, and Set Named Control sets one Named Control to a value. Works with hardware Cores and the Q-SYS Designer emulator.',
     Setup: [
       'Enable the Q-SYS Remote Control Protocol (JSONRPC) service, TCP 1710, for the Core LAN adapter ShowTrak can reach, in Core Manager → Network → Services (the service label varies by Q-SYS version).',
       'When Access Control is enabled, create a user with an external-control PIN in Q-SYS Administrator and enter it as User and PIN. Leave both blank when Access Control is off.',
       'For a redundant pair, add one check per Core and turn off Require Active state on the backup Core’s check, which sits in Standby by design.',
       'To assert controls, add each control to Named Controls in Q-SYS Designer, redeploy, and list them as Name=Value, e.g. MainMute=unmuted or MainGain=-6. Controls are read only while the Core is Active.',
+      'To check design devices, Q-SYS must be told that outside systems may read them. In Q-SYS Designer, select each device’s Status component (and, for amplifier channel faults, its Amp Output component), open Properties, and set Script Access to External or All. The default, None, hides the component from ShowTrak completely. Save to the Core and run the design again.',
+      'Choose Find them in the design to check every exposed device in the ticked categories, or Only the devices listed to name devices by the Code Name shown in their Properties. The debug panel lists exposed components that matched no category, with their type, so they can be listed by name instead.',
+      'Devices are read only while the Core is Active. A device that is not required, or not yet paired, shows as Not Present; Q-SYS does not count that as a fault, so neither does ShowTrak unless Flag Not Present devices is on.',
+      'Load Snapshot needs the snapshot bank’s name as given in Q-SYS Designer and the snapshot number. Set Named Control needs the control in the Named Controls list; the controls this check already asserts are offered as choices. Both use the same user and PIN as the check.',
     ],
     Links: [
       {
@@ -481,6 +485,22 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       {
         Label: 'QRC commands (Q-SYS Help)',
         Url: 'https://help.qsys.com/Content/External_Control_APIs/QRC/QRC_Commands.htm',
+      },
+      {
+        Label: 'Code Name and Script Access (Q-SYS Help)',
+        Url: 'https://help.qsys.com/Content/Control_Scripting/Code_Name_Script_Access.htm',
+      },
+      {
+        Label: 'Status values (Q-SYS Help)',
+        Url: 'https://help.qsys.com/Content/Control_Scripting/status_overview.htm',
+      },
+      {
+        Label: 'Amp Output, CX-Q / DPA-Q (Q-SYS Help)',
+        Url: 'https://help.qsys.com/Content/Schematic_Library/cxq_amplifier.htm',
+      },
+      {
+        Label: 'Q-SYS component types (Q-SYS developer community)',
+        Url: 'https://github.com/Q-SYS-Communities-for-Developers/reference-files/blob/main/Lua%20Modules/ComponentSelector/init.lua',
       },
     ],
   },
@@ -558,6 +578,350 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       {
         Label: 'NatNet sample projects',
         Url: 'https://docs.optitrack.com/developer-tools/natnet-sdk/natnet-sample-projects',
+      },
+    ],
+  },
+  'snmp-oid': {
+    Summary:
+      'Reads one or more OIDs from any SNMP agent over v1, v2c or v3 and shows each value with its type. Each OID can carry a check: equals, not equals, greater than, less than, contains or present. Offline when the agent does not answer; Degraded when an OID is missing (noSuchObject, noSuchInstance, endOfMibView) or a check fails, naming the OID and its value. For switches, PDUs, amplifiers and other devices without a dedicated ShowTrak method.',
+    Setup: [
+      'Enable SNMP on the device. For v1/v2c match the community string (default "public"); for v3 enter the username and the auth/priv protocols and passwords exactly as configured on the device.',
+      'Add one OID per entry, in numeric form (e.g. 1.3.6.1.2.1.1.5.0). A leading dot is ignored. Names such as sysName.0 are not accepted — look the number up in the device MIB.',
+      'To check a value, follow the OID with a comparison: 1.3.6.1.2.1.1.5.0 = Stage Left, 1.3.6.1.2.1.2.2.1.8.1 != 2, an OID > 20 or < 50, contains Text, or present. A bare OID only has to exist. Give the same OID twice to check a range.',
+      'Numbers (Integer, Counter, Gauge, TimeTicks, Counter64) compare numerically. Text compares without regard to case; write "" to match an empty value. Binary values are shown as hex and compare as hex, so a MAC address can be written 00:1a:2b:3c:4d:5e.',
+      'A credential mismatch is reported as Offline, because an agent silently drops a request it will not authenticate.',
+    ],
+    Links: [
+      {
+        Label: 'RFC 3416 — SNMPv2 protocol operations',
+        Url: 'https://datatracker.ietf.org/doc/html/rfc3416',
+      },
+      {
+        Label: 'RFC 3414 — SNMPv3 User-based Security Model',
+        Url: 'https://datatracker.ietf.org/doc/html/rfc3414',
+      },
+      {
+        Label: 'RFC 1213 — MIB-II',
+        Url: 'https://datatracker.ietf.org/doc/html/rfc1213',
+      },
+    ],
+  },
+  'powersoft-amp': {
+    Summary:
+      'Queries a Powersoft X Series or Canali DSP amplifier (Duecanali, Quattrocanali, Ottocanali) over its UDP control protocol for the model, serial number, standby state, amplifier and channel alarms, and output mutes. Optionally flags standby, amplifier faults (mains phase, converter, AUX voltage, over-temperature, fan), channel faults (over-temperature, rail voltage, low load protection, thermal SOA, AUX current, other), input clip, muted outputs or a different serial number. Degraded = something answered but is not a Powersoft amplifier, or an enabled assertion failed; Offline = no reply. The check itself only reads; the Power On, Standby, Mute Output and Unmute Output actions are sent only when an operator presses them.',
+    Setup: [
+      'Point Address at the amplifier. It listens on UDP 1234 and replies to the port the request came from, so no inbound firewall rule is needed on ShowTrak.',
+      'No amplifier configuration is required. Powersoft discourages using this protocol to change settings alongside ArmoníaPlus: the check only reads, and the actions change just standby and the output mutes.',
+      'The mute actions use the output mute ("Way EQ" in Armonía), one channel or all of them. Channels are numbered from 1.',
+      'Some alarms (mains phase, AUX voltage, power supply and moderate/high over-temperature, thermal SOA, AUX current) are reported by X Series amplifiers only.',
+      'To check the serial number, enter the serial shown in ArmoníaPlus.',
+    ],
+    Links: [
+      {
+        Label: 'Powersoft X Series / Canali DSP UDP protocol (PDF)',
+        Url: 'https://github.com/bitfocus/companion-module-powersoft-amplifiers/blob/main/docs/API_for_X_T_Canali-DSP_0.16.pdf',
+      },
+      {
+        Label: 'Companion Powersoft module',
+        Url: 'https://github.com/bitfocus/companion-module-powersoft-amplifiers',
+      },
+    ],
+  },
+  'dbaudio-amp': {
+    Summary:
+      'd&b audiotechnik amplifier health over AES70 (OCA), using the OCP.1 binary protocol on TCP. Reads model, firmware, device name, serial number, device state, power (on or standby) and each channel’s mute, input signal (ISP), limiter (GR) and overload (OVL) indicators in one read-only session. Degraded by default when the amplifier is in standby, reports an error or a channel is in overload; enable the mute, limiting, input signal and device name toggles to check those too. Covers D20, D40, D80, 10D, 30D, 40D and 5D.',
+    Setup: [
+      'Connect the amplifier’s Ethernet port to a network ShowTrak can reach and give it an IP address (d&b R1 or the amplifier’s front panel shows it). The amplifier must be on the same network that d&b R1 uses to control it.',
+      'Leave Amplifier model on Detect automatically, or pick the model to skip the port search. D20, D80, 10D and 30D use port 30013; D40, 40D and 5D use port 50014.',
+      'Overload is a momentary indicator, so a check only sees an overload that is happening as it runs.',
+      'To catch a swapped amplifier, turn on Check device name and enter the name set in R1.',
+      'The Power On, Standby, Mute Channel and Unmute Channel actions act on the same power and channel mute that R1 shows. If Power On reports that the object was not found, pick the amplifier model instead of Detect automatically.',
+    ],
+    Links: [
+      {
+        Label: 'd&b OCA / AES70 overview',
+        Url: 'https://www.dbaudio.com/global/en/solutions/signal-distribution-and-networking/ocaaes70/',
+      },
+      {
+        Label: 'AES70 standards (OCA Alliance)',
+        Url: 'https://www.ocaalliance.com/resources/standards__specifications/',
+      },
+      {
+        Label: 'NanoOcp d&b object definitions (GitHub)',
+        Url: 'https://github.com/ChristianAhrens/NanoOcp/blob/main/Source/Ocp1ObjectDefinitions.h',
+      },
+      {
+        Label: 'Companion d&b amps module (GitHub)',
+        Url: 'https://github.com/bitfocus/companion-module-dbaudiotechnik-amps',
+      },
+    ],
+  },
+  'biamp-tesira': {
+    Summary:
+      'Biamp Tesira health over the Tesira Text Protocol (TTP) on Telnet, TCP 23. Reads model, serial number, firmware, hostname, network interface status and the active fault list in one read-only session. Degraded by default while the device has an active fault, including faults on expanders it proxies; enable the port and attribute toggles to also require link on named network ports and assert individual block attributes. Works with Tesira SERVER and SERVER-IO, TesiraFORTÉ and TesiraLUX.',
+    Setup: [
+      'Enable Telnet on the device: in Tesira software open Device Maintenance → Network Settings and tick Telnet under Services. Telnet has been off by default since 2016-era firmware.',
+      'On an unprotected system leave the username and password as default / default. On a protected system enter a user configured in the system. The check only reads, so an observer-level user is enough for it; the Recall Preset, Mute and Unmute actions need a controller-level user or higher.',
+      'The actions recall a preset by ID (such as 1001) or by name, and mute or unmute one channel of a level or mute block by its instance tag. Each press opens its own short session using the same port and login as the check.',
+      'Add one check per Tesira server-class device. The fault list covers the device you connect to and any expanders that use it as their proxy, not other servers in the system.',
+      'To assert block attributes, list each as instance tag, attribute and index, then =expected value, e.g. Level1 mute 1=false or Level1 level 1=-10. Instance tags are case sensitive; the Tesira Command String Calculator shows the right attribute names.',
+      'SSH (TCP 22) is not supported; the check uses Telnet only.',
+    ],
+    Links: [
+      {
+        Label: 'Tesira Text Protocol (Biamp Cornerstone)',
+        Url: 'https://support.biamp.com/Tesira/Control/Tesira_Text_Protocol',
+      },
+      {
+        Label: 'TTP fault responses (Biamp Cornerstone)',
+        Url: 'https://support.biamp.com/Tesira/Control/Tesira_TTP_fault_responses',
+      },
+      {
+        Label: 'DEVICE attributes (Tesira Help)',
+        Url: 'https://tesira-help.biamp.com/System_Control/Tesira_Text_Protocol/Attribute_tables/Service_Addresses/Device.html',
+      },
+      {
+        Label: 'Telnet negotiation (Tesira Help)',
+        Url: 'https://tesira-help.biamp.com/System_Control/Tesira_Text_Protocol/Telnet.htm',
+      },
+      {
+        Label: 'TTP security and login (Tesira Help)',
+        Url: 'https://tesira-help.biamp.com/System_Control/Tesira_Text_Protocol/TTP_Security.htm',
+      },
+    ],
+  },
+  'symetrix-dsp': {
+    Summary:
+      'Symetrix Composer DSP health over the Composer Control Protocol (plain text on TCP 48631). Confirms the unit answers commands (NOP), and reads its firmware version report and the last preset loaded, all read-only. The protocol has no fault or status command, so health beyond that comes from control numbers: enable the toggles to assert the loaded preset and the values of listed control numbers, such as the Status LEDs on Composer’s power supply and thermal diagnostics panels. Works with Radius NX, Edge, Prism, Solus NX and other Composer units.',
+    Setup: [
+      'No setup is needed on the unit for the connectivity and version check: the control port is always on TCP 48631.',
+      'To check health, give control numbers to what matters in Composer, e.g. the Status LEDs on the Power Supply and Thermal diagnostics panels (0 = OK, 65535 = Failed), then push the site file. List them as 101=0, or with a comparison such as 205>=30000. Buttons and LEDs read 0 or 65535; on and off also work.',
+      'Turn on Check last preset to confirm the expected preset is loaded. A unit that has not loaded a preset since it started reports none.',
+      'The actions load a preset by number and set a control number to a position from 0 to 65535. Set Control offers the control numbers listed in the control assertions. Each press opens its own short session and closes it as soon as the unit answers.',
+      'A unit accepts six TCP control sessions and closes the least recently used one when a seventh connects. If a control system already holds six, this check or an action can displace one of them.',
+    ],
+    Links: [
+      {
+        Label: 'Composer Control Protocol (Symetrix)',
+        Url: 'https://composer-docs.symetrix.co/control/reference-topics/control-protocol/CP_Introduction.html',
+      },
+      {
+        Label: 'Control commands: GS2, GPR, CS, LP (Symetrix)',
+        Url: 'https://composer-docs.symetrix.co/control/reference-topics/control-protocol/CP_Control_Commands.html',
+      },
+      {
+        Label: 'Setup commands: NOP, V (Symetrix)',
+        Url: 'https://composer-docs.symetrix.co/control/reference-topics/control-protocol/CP_Setup_Commands.html',
+      },
+      {
+        Label: 'Parameter notes: diagnostics values (Symetrix)',
+        Url: 'https://composer-docs.symetrix.co/control/reference-topics/control-protocol/CP_Parameter_Notes.html',
+      },
+    ],
+  },
+  'allen-heath-console': {
+    Summary:
+      'Allen & Heath console health over the MIDI over TCP protocol (TCP 51325, or 51328 for a dLive Surface). On dLive and Avantis it asks for the name of Input 1, which proves the console is answering; an SQ has no such query, so without mute checks only the connection is tested. Optional checks flag a muted main mix (Main 1 on dLive, LR on SQ) and muted input channels on dLive and SQ. Avantis documents no mute query, so mutes are not read there. The check only sends documented queries. Operator actions recall a scene and mute or unmute an input channel; recall and mute ask for confirmation first.',
+    Setup: [
+      'Choose the console family, and point Address at the console: the dLive MixRack (port 51325) or Surface (port 51328), the Avantis, or the SQ network port. The encrypted ports (51327 and 51329) are not supported.',
+      'Set Base MIDI channel to the channel set under Utility, Control, MIDI on dLive and Avantis (Avantis ships set to 12), or Utility, General, MIDI on SQ. With the wrong channel the console stays silent and the check reads offline.',
+      'SQ mute checks need SQ firmware 1.5.0 or later. Older SQ firmware may treat the query as a mute toggle, so leave them off on older desks.',
+      'The current scene is not reported: these consoles only send a scene number when a scene is recalled, and have no query for it.',
+      'Mute checks read each channel’s own mute. Mute groups and DCA mutes are not reflected.',
+      'Actions use the same base MIDI channel, so set it correctly before pressing one: a wrong channel would act on a different kind of channel. On dLive and Avantis the console must answer a name query before the action is sent. Scene recall on dLive needs the MixRack (port 51325), because the Surface treats the same message as a cue recall.',
+    ],
+    Links: [
+      {
+        Label: 'dLive MIDI over TCP/IP protocol V2.0',
+        Url: 'https://www.allen-heath.com/content/uploads/2024/06/dLive-MIDI-Over-TCP-Protocol-V2.0.pdf',
+      },
+      {
+        Label: 'SQ MIDI protocol (Issue 5)',
+        Url: 'https://www.allen-heath.com/content/uploads/2023/11/SQ-MIDI-Protocol-Issue5.pdf',
+      },
+      {
+        Label: 'Avantis MIDI TCP/IP protocol',
+        Url: 'https://support.allen-heath.com/hc/en-gb/articles/45146889174801-Avantis-MIDI-TCP-IP-Protocol',
+      },
+      {
+        Label: 'Bitfocus Companion allenheath-dlive module',
+        Url: 'https://github.com/bitfocus/companion-module-allenheath-dlive',
+      },
+      {
+        Label: 'Bitfocus Companion allenheath-sq module',
+        Url: 'https://github.com/bitfocus/companion-module-allenheath-sq',
+      },
+    ],
+  },
+  'digico-console': {
+    Summary:
+      'DiGiCo SD and Quantum console health over the DiGiCo Pad (iPad) OSC interface. Reads the console name, the loaded session file and the current snapshot index. Optional checks flag a different session and muted input channels. The check only sends "/?" queries. Operator actions fire a snapshot and mute or unmute an input channel; each is sent once, only after the console has answered. Offline means the console did not answer, which is usually the External Control setup.',
+    Setup: [
+      'On the console, open System, External Control, set Enable External Control to Yes and add a DiGiCo Pad device with this computer’s IP address. Enable it.',
+      'Set that device’s Send port to this check’s Listen port (default 7000) and its Rcv port to the Console receive port (default 7001). The console sends replies only to that IP and Send port, so the Listen port must be free on this computer (close Companion’s DiGiCo module if it uses the same port).',
+      'Under Commands Allowed, load the iPad command file for the console (iPadv2sd8-9-11-12 on SD8, SD9, SD11 and SD12, ipad_q3 on Quantum). Without it the console ignores the queries.',
+      'Current snapshot is the snapshot’s position in the list, not its number on the surface, so it is shown but not checked. Fire Snapshot takes the same position number.',
+    ],
+    Links: [
+      {
+        Label: 'Bitfocus Companion digico-osc module (command table)',
+        Url: 'https://github.com/bitfocus/companion-module-digico-osc',
+      },
+      {
+        Label: 'DiGiCo: generic OSC control on the SD range',
+        Url: 'https://digico.biz/digico-opens-up-the-sd-range-with-generic-osc-control/',
+      },
+    ],
+  },
+  'brompton-tessera': {
+    Summary:
+      'Reads a Brompton Tessera LED processor (SX40, S8, S4, M2, T1, T8) over its HTTP IP control API in one request: model, software version, active input and format, panel counts, blackout, freeze and test pattern, active preset, failover partner, cable loops and processor temperatures. By default flags panels that are offline or reporting errors; optional toggles also flag blackout, freeze, test pattern, an unexpected or missing input format, hot sensors, a missing failover partner and broken cable loops. Degraded = the processor answered but an enabled assertion failed; Offline = no answer, or not the Tessera API.',
+    Setup: [
+      'In Tessera open the Live Control tile and enable IP control. The API is served on port 80 and has no password.',
+      'Expected panels: leave at 0 to expect every panel the processor controls to be online, or enter the number that should be online.',
+      'Temperatures and fan readings need newer Tessera firmware. Older versions simply do not report them. Brompton does not document their unit, so temperatures are taken to be °C.',
+      'Actions: Blackout, Freeze and Recall Preset ask for confirmation. Clear Blackout, Unfreeze and Test Pattern Off restore the picture. Recall Preset lists the presets the processor reports.',
+    ],
+    Links: [
+      {
+        Label: 'Tessera IP Control API (3.1.0)',
+        Url: 'https://github.com/bitfocus/companion-module-brompton-tessera/blob/main/docs/TesseraIPControlAPI3_1_0_Beta4.pdf',
+      },
+      {
+        Label: 'Companion Brompton Tessera module',
+        Url: 'https://github.com/bitfocus/companion-module-brompton-tessera',
+      },
+    ],
+  },
+  'barco-eventmaster': {
+    Summary:
+      'Calls a Barco Event Master processor (E2, S3, EX, Encore3) over its JSON-RPC API on port 9999: frame type and software version, card over-temperature and fan warnings, power supply status and the video status of every input source. By default flags card temperature or fan warnings and a power supply that has lost AC or DC; optional toggles also flag cards that are not Ready, an empty power supply slot, sources without valid video and frozen sources. Degraded = the processor answered but an enabled assertion failed; Offline = no answer, or not Event Master.',
+    Setup: [
+      'Point the check at the host processor. In a host and client system, Event Master only answers JSON-RPC on the host unit.',
+      'Port 9999 is fixed by Barco. No login is needed.',
+      'To watch input signal, enable Check input signal and list the source names to watch, or leave the list empty to watch every live input.',
+      'Actions: Recall Preset to Preview runs straight away; Recall Preset to Program, Take and Cut ask for confirmation first. Take and Cut act on every armed destination, as the buttons on the controller do.',
+      'If multi-operator mode is on in Event Master, set Multi-operator mode under Advanced so the actions run as an operator or the super operator.',
+    ],
+    Links: [
+      {
+        Label: 'Barco JSON-RPC for Encore3 v10.0',
+        Url: 'https://github.com/bitfocus/companion-module-barco-eventmaster/blob/master/docs/Barco%20JSON%20RPC%20with%20Encore3%20processors%20v10.0-Final.pdf',
+      },
+      {
+        Label: 'Barco JSON-RPC for Event Master 8.2',
+        Url: 'https://github.com/bitfocus/companion-module-barco-eventmaster/blob/master/docs/JSON_RPC_with_EM_processors_Doc_8_2.docx',
+      },
+      {
+        Label: 'Companion Barco Event Master module',
+        Url: 'https://github.com/bitfocus/companion-module-barco-eventmaster',
+      },
+    ],
+  },
+  'analogway-livepremier': {
+    Summary:
+      'Reads an Analog Way LivePremier unit (Aquilon RS and C series, firmware 4.0 or later) over its REST API: model, label and firmware version, plus whether each listed input has a valid signal, is enabled and is frozen. Optional toggles flag inputs without a valid signal and an unexpected firmware version. The REST API does not report power supplies, fans or temperatures. Degraded = the unit answered but the password is missing or wrong, or an enabled assertion failed; Offline = no answer, or not the LivePremier REST API.',
+    Setup: [
+      'In the Web RCS open Application Programming Interfaces and enable the REST API.',
+      'If the Web RCS is password protected, enter the password. ShowTrak logs in as Admin and reuses the session.',
+      'To watch inputs, enable Check input signal and list the input numbers as shown in the Web RCS.',
+      'Actions: Load Memory to Preview runs straight away; Load Memory to Program and Take (one screen) ask for confirmation first. They use the same password as the check.',
+    ],
+    Links: [
+      {
+        Label: 'LivePremier REST API Programmer’s Guide v4.01',
+        Url: "https://s3.eu-west-3.amazonaws.com/aw.store01/Site+Internet/Series/LivePremier/Common/Rest+API+Programmer's+Guide/livepremier_rest_api_programmers_guide_v4.1.pdf",
+      },
+      {
+        Label: 'LivePremier REST API Programmer’s Guide v4.0',
+        Url: "https://s3.eu-west-3.amazonaws.com/aw.store01/Site+Internet/Series/LivePremier/Common/Rest+API+Programmer's+Guide/livepremier_rest_api_programmers_guide_v4.0.pdf",
+      },
+    ],
+  },
+  'aja-device': {
+    Summary:
+      "Reads an AJA Ki Pro, HELO / HELO Plus, FS-series frame sync or other AJA network device over AJA's REST parameter API (HTTP /config), sending only get requests. It lists the device's own alarms from its parameter descriptors (desc.json) and reads the recorder state, media remaining, video input and name where the device has them. Degraded by default when the device raises an alarm (input loss, temperature, dropped frames and so on) or its recorder or streamer reports a failure. Enable the recording toggle to flag a device that is not recording, and the media toggle to flag free space below a minimum (default 10%). Controls: Record and Stop on a Ki Pro or HELO, Play on a Ki Pro, and Start / Stop Streaming on a HELO.",
+    Setup: [
+      "Set Address to the device's IP address, the same one you open its web interface with. The port is 80 unless it has been changed.",
+      'If authentication is turned on in the device, enter its password. Leave it blank otherwise.',
+      'Choose the lowest alarm severity that should degrade the check. Alarms below it are still shown.',
+      'Enable Check recording for the period the recorder should be rolling, e.g. the show.',
+      'Model and firmware are not shown: AJA does not document a parameter for them.',
+      'Alarms the device has been told to suppress are still shown: AJA does not document how to tell which alarm a suppression setting belongs to.',
+      "The controls send AJA's documented transport commands. Stop on a Ki Pro pauses first; pressed again it returns to idle. A control the device does not have (streaming on a Ki Pro, play on a HELO) is refused without sending anything.",
+    ],
+    Links: [
+      {
+        Label: 'AJA REST API (AJA Video Systems)',
+        Url: 'https://gitlab.aja.com/pub/rest_api',
+      },
+      {
+        Label: 'AJA alarm parameters (protobuf)',
+        Url: 'https://gitlab.aja.com/pub/rest_api/-/blob/master/08_Protobuf_Encoded_Parameters.md',
+      },
+      {
+        Label: 'HELO REST commands',
+        Url: 'https://gitlab.aja.com/pub/rest_api/-/blob/master/HELO/03_HELO_Commands.md',
+      },
+      {
+        Label: 'Ki Pro Ultra Plus / Ultra 12G REST commands',
+        Url: 'https://gitlab.aja.com/pub/rest_api/-/blob/master/KiProUltraPlus_KiProUltra12G/06_KPUP_KPU12G_Commands.md',
+      },
+    ],
+  },
+  'ptz-camera': {
+    Summary:
+      'Queries a PTZ camera, sending only inquiries. Panasonic AW-series cameras are read over their HTTP control interface (power, model, software version, error information, red tally); Sony cameras over VISCA over IP on UDP 52381 (power, model and ROM version, pan/tilt mechanism status, red tally where the model supports it). Degraded by default when the camera is in standby or reports an error such as a fan, temperature, motor or pan/tilt fault. Controls: Power On, Standby and Recall Preset.',
+    Setup: [
+      "Choose the protocol, then set Address to the camera's IP address.",
+      'Panasonic: the HTTP port is 80. If the camera requires authentication for control commands, enter its username and password; Digest and Basic are both supported.',
+      'Sony: turn on VISCA over IP in the camera. The port is 52381. If the camera answers other controllers but never this check, set Receive replies on to UDP 52381 under Advanced.',
+      'Panasonic error codes vary by model. Codes that mean the same on every model are named; others are shown as their hex code, to look up in the camera’s interface specification.',
+      'Turn off Check standby for cameras that are meant to sit in standby between shows.',
+      'Recall Preset takes the preset number as the camera shows it, starting at 1 (Panasonic 1 to 100). A camera in standby refuses presets until it is powered on.',
+    ],
+    Links: [
+      {
+        Label: 'Panasonic HD/4K Integrated Camera Interface Specifications',
+        Url: 'https://eww.pass.panasonic.co.jp/pro-av/support/content/guide/DEF/InterfaceSpecifications_CompatibleModelTable_E.pdf',
+      },
+      {
+        Label: 'Panasonic camera protocol notes (Bitfocus Companion)',
+        Url: 'https://github.com/bitfocus/companion-module-panasonic-cameras',
+      },
+      {
+        Label: 'Sony BRC-X400 / SRG-X400 VISCA Command List (VISCA over IP)',
+        Url: 'https://sony.net/Products/CameraSystem/CA/BRC_X400_SRG_X400/Technical_Document/E042100211.pdf',
+      },
+      {
+        Label: 'Sony VISCA command lists (Bitfocus Companion)',
+        Url: 'https://github.com/bitfocus/companion-module-sony-visca/tree/main/protocol',
+      },
+    ],
+  },
+  'datapath-fx4': {
+    Summary:
+      'Reads a Datapath Fx4, Fx4-SDI or Fx4-HDR video wall controller over its REST API: serial, firmware, friendly name, active and preferred input, the active input format, power supply rails, temperature, HDCP and, for each output in use, whether it is on, live or showing a test pattern, and its format. By default flags no input signal, a power supply fault and an HDCP failure; optional toggles also flag a fallback from the preferred input, an unexpected input format, outputs switched off, test patterns and a high temperature. Degraded = the controller answered but an enabled assertion failed; Offline = no answer, or not the Fx4 REST API.',
+    Setup: [
+      'Connect one of the Fx4 LAN ports to the show network and give it an IP address in Wall Designer (Devices, device properties). The REST API is served on port 80.',
+      'The check only reads, and reads need no password. If a password has been set on the Fx4, enter it under Device password so the actions work.',
+      'Outputs in use: set how many outputs feed screens, counting from output 1, so an unused output is not checked.',
+      'Check preferred input: the Fx4 falls back to another input when the preferred one loses its signal. Turn this on to be told when that happens.',
+      'Datapath does not publish a temperature limit. Leave the temperature check off, or set the limit a few degrees above what the controller normally reads.',
+      'Actions: Set Preferred Input, Show Test Pattern and Switch Output Off ask for confirmation. Show Live Input and Switch Output On restore the picture. Changes are not saved to the controller, so a restart brings back its saved settings.',
+    ],
+    Links: [
+      {
+        Label: 'Fx4-HDR, Fx4-SDI and Fx4 REST API v3.0.1 (SDK download)',
+        Url: 'https://www.datapathsoftware.com/downloads/fx4-hdr-fx4-sdi-and-fx4-rest-api-v3-0-1-2/',
+      },
+      {
+        Label: 'Fx4-HDR user guide',
+        Url: 'https://www.datapathdocuments.co.uk/wp-content/uploads/Fx4-HDR_User_Guide_EN.pdf',
+      },
+      {
+        Label: 'Companion Datapath Fx4 module',
+        Url: 'https://github.com/bitfocus/companion-module-datapath-fx4',
       },
     ],
   },
