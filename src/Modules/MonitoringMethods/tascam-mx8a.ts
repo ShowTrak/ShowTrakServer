@@ -1070,6 +1070,10 @@ interface LiveSession {
 // turned the successor away as "Another User Already Connected".
 
 const UNIT_LINGER_MS = 1500;
+// After one of our connections to a unit closes, the unit takes a moment to let
+// it go; connecting again sooner is turned away as "Another User Already
+// Connected" (seen on CI against a local socket, and expected of the real unit).
+const UNIT_RELEASE_MS = 1000;
 // A turned-away connection (another session of ours was still closing, or a
 // controller briefly connected) tries again sooner than other failures.
 const BUSY_RETRY_MS = 1500;
@@ -1078,6 +1082,19 @@ const LiveSessions = new Map<string, LiveSession>();
 // Per unit: the closing live connection, and the queue of checks and actions.
 const Closing = new Map<string, Promise<void>>();
 const UnitQueues = new Map<string, Promise<unknown>>();
+// Per unit: when our last connection to it closed.
+const LastClosedAt = new Map<string, number>();
+
+function MarkUnitReleased(Key: string): void {
+  LastClosedAt.set(Key, Date.now());
+}
+
+// Wait out UNIT_RELEASE_MS since our last connection to the unit closed.
+async function WaitForUnitRelease(Key: string): Promise<void> {
+  const At = LastClosedAt.get(Key);
+  const Wait = At == null ? 0 : At + UNIT_RELEASE_MS - Date.now();
+  if (Wait > 0) await new Promise((Resolve) => setTimeout(Resolve, Wait));
+}
 
 function LiveKey(Config: MxConfig): string {
   return `${Config.Address.toLowerCase()}|${Config.Port}`;
@@ -1108,7 +1125,10 @@ async function LiveAskFor(
 // after a closing live connection has gone.
 function OnUnit<T>(Key: string, Fn: () => Promise<T>): Promise<T> {
   const Before = UnitQueues.get(Key) || Promise.resolve();
-  const Run = Before.then(() => Closing.get(Key)).then(Fn);
+  const Run = Before.then(() => Closing.get(Key))
+    .then(() => WaitForUnitRelease(Key))
+    .then(Fn)
+    .finally(() => MarkUnitReleased(Key));
   const Tail = Run.catch(() => undefined);
   UnitQueues.set(Key, Tail);
   void Tail.then(() => {
@@ -1260,6 +1280,7 @@ function ConnectLive(Live: LiveSession): void {
     // flight, would each turn this one away.
     await Closing.get(Live.Key);
     await UnitQueues.get(Live.Key);
+    await WaitForUnitRelease(Live.Key);
     if (Live.Stopped) return;
     RunLiveConnection(Live);
   })();
@@ -1343,6 +1364,7 @@ function RunLiveConnection(Live: LiveSession): void {
       return Restore();
     },
   }).then(() => {
+    MarkUnitReleased(Live.Key);
     Live.Ask = null;
     // A dropped connection leaves its wait pending; release it so its renew
     // timer stops (its restore then fails quietly on the closed session).

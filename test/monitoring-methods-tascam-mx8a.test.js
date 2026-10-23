@@ -56,7 +56,9 @@ function defaultState() {
 //   rejectKeys keys a SET refuses with ERR2
 //   levels     meter key (or input number) → meter value (hex) sent while metering
 //   single     true: like the real unit, a second connection while one is open
-//              is told "Another User Already Connected" and hung up on
+//              is told "Another User Already Connected" and hung up on. A closed
+//              connection keeps the slot for releaseMs (default 300) after it
+//              goes, as a unit does while it notices the close.
 function startUnit(options = {}) {
   const {
     password = '',
@@ -68,6 +70,7 @@ function startUnit(options = {}) {
     rejectKeys = [],
     levels = {},
     single = false,
+    releaseMs = 300,
   } = options;
   const state = { ...defaultState(), ...(options.state || {}) };
   const received = [];
@@ -90,7 +93,9 @@ function startUnit(options = {}) {
       socket.on('close', () => {
         sockets.delete(socket);
         stopMeters();
-        if (!turnedAway) stats.open--;
+        if (turnedAway) return;
+        if (single && releaseMs > 0) setTimeout(() => stats.open--, releaseMs);
+        else stats.open--;
       });
       const send = (text) => {
         if (!fragment) return socket.write(text);
@@ -985,9 +990,10 @@ test('a corrected password replaces a refused one without waiting for the retry'
       (f) => right.push(f)
     );
     stopWrong();
-    await waitFor(() => right.some((f) => f.State === 'live'));
-    // Well inside the 5 s retry a failed connection otherwise waits.
-    assert.ok(Date.now() - started < 2500);
+    await waitFor(() => right.some((f) => f.State === 'live'), 4500);
+    // Well inside the 5 s retry a failed connection otherwise waits (the unit
+    // still gets its second to let the refused connection go).
+    assert.ok(Date.now() - started < 4000);
     stopRight();
     await waitFor(() => unit.stats.open === 0);
   });
