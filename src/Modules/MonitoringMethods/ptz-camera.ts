@@ -374,7 +374,10 @@ export function CreatePanasonicClient(
   };
   let Challenge: Record<string, string> | 'basic' | null = null;
   let Nc = 0;
-  let LastSentAt = 0;
+  // When the previous command's reply (or failure) came back. The gap is timed
+  // from here, not from the send: each command opens a new connection, so a
+  // slow connect would otherwise land two commands closer than 130 ms apart.
+  let LastDoneAt = 0;
 
   const AuthHeader = (Path: string): string | null => {
     if (!Challenge || (!Username && !Password)) return null;
@@ -396,21 +399,23 @@ export function CreatePanasonicClient(
   // One command. Undefined when no usable answer came (transport failure,
   // budget spent, or the login was refused — see State).
   const Ask = async (Path: string): Promise<PanasonicAnswer | undefined> => {
-    // Respect the spec's minimum gap between commands.
-    const Gap = LastSentAt ? PANASONIC_GAP_MS - (Date.now() - LastSentAt) : 0;
-    if (Gap > 0) {
-      if (Remaining() <= Gap) return undefined;
-      await Sleep(Gap);
-    }
     for (let Attempt = 0; Attempt < 2; Attempt++) {
+      // Respect the spec's minimum gap between commands, including the
+      // authenticated retry after a 401.
+      const Gap = LastDoneAt ? PANASONIC_GAP_MS - (Date.now() - LastDoneAt) : 0;
+      if (Gap > 0) {
+        if (Remaining() <= Gap) return undefined;
+        await Sleep(Gap);
+      }
       if (Remaining() <= 0) return undefined;
-      LastSentAt = Date.now();
       let Reply: HttpReply;
       try {
         Reply = await HttpGet(Address, Port, Path, Remaining(), AuthHeader(Path));
       } catch (Err) {
         State.LastError = Err instanceof Error ? Err.message : String(Err);
         return undefined;
+      } finally {
+        LastDoneAt = Date.now();
       }
       if (State.FirstReplyAt === null) State.FirstReplyAt = Date.now();
       State.Reachable = true;
