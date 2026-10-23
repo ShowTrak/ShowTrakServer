@@ -23,6 +23,7 @@ import { register as registerNetwork } from './network';
 import { register as registerScripts } from './scripts';
 import { register as registerRemoteDevices } from './remote-devices';
 import { register as registerLogConsole } from './log-console';
+import { register as registerMonitoringLive } from './monitoring-live';
 import { register as registerAuditLog } from './audit-log';
 
 function RegisterAllHandlers(): void {
@@ -43,6 +44,7 @@ function RegisterAllHandlers(): void {
   registerScripts();
   registerRemoteDevices();
   registerLogConsole();
+  registerMonitoringLive();
   registerAuditLog();
 }
 

@@ -148,6 +148,12 @@ function loadControlService({ __identifyResult, ...overrides } = {}) {
         },
       },
     },
+    // The live levels hub reaches the real monitor manager (and its DB) from
+    // main/, under a request string the stubs above do not cover.
+    '../../main/monitoring-live': {
+      OpenMonitorLiveLevels: () => ({ TargetID: 0, Checks: [] }),
+      CloseMonitorLiveLevels: () => undefined,
+    },
     '../../main/handler-registry': { GetHandler: (channel) => handlers[channel] },
     ...overrides,
   };

@@ -35,6 +35,12 @@ import type {
   USBDeviceView,
 } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
+import {
+  ApplyLiveLevels,
+  LiveLevelsSlotHtml,
+  StartMonitorLiveLevels,
+  StopMonitorLiveLevels,
+} from './live-levels';
 import { AudioTimelineLiveState } from './lib/audio-devices';
 import { DisplayKey, DisplayTimelineLiveState } from './lib/displays';
 import { USBTimelineLiveState } from './lib/usb-devices';
@@ -720,7 +726,9 @@ function RenderMonitoringHistoryEntity(
           sub: Check.Address || '',
           badge: String(Check.Method || '').toUpperCase(),
           statusText: BuildLiveStatusText(LiveState, Check.LastLatencyMs, Check.LastError),
-        }) + RenderTimelineWithActions(Check, RenderStatusTimeline(Blocks))
+        }) +
+          RenderTimelineWithActions(Check, RenderStatusTimeline(Blocks)) +
+          LiveLevelsSlotHtml(Number(Check.CheckID))
       );
     }
 
@@ -767,6 +775,7 @@ function RenderMonitoringHistoryEntity(
         Target
       )}</div>`
     );
+    ApplyLiveLevels();
     PositionOpenActionsMenu();
     RestoreStatusTimelineTooltipAfterRender();
     return;
@@ -1142,10 +1151,13 @@ export async function OpenMonitoringTargetHistory(
     // A half-typed control parameter belongs to the panel that was open, not to
     // the next monitor the operator looks at.
     ResetActionParamDrafts();
+    // A live level stream can hold a device's only control connection.
+    StopMonitorLiveLevels();
   });
   openModal('SHOWTRAK_CLIENT_INFO');
   RenderMonitoringHistoryModal();
   if (Options.Tab) SelectClientInfoTab(Options.Tab);
+  void StartMonitorLiveLevels(Number(Target.TargetID));
 }
 
 /** Open a dummy client's view modal, optionally on a given tab (the tile cog opens Settings). */

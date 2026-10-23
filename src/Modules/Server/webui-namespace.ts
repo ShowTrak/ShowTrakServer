@@ -37,6 +37,7 @@ import { ToPublicClient, ToPublicGroup } from './serializers';
 import { RegisterRendererSink } from '../../main/renderer-bus';
 import { GetHandler } from '../../main/handler-registry';
 import { CloseLogConsole, OpenLogConsole } from '../../main/log-console';
+import { CloseMonitorLiveLevels, OpenMonitorLiveLevels } from '../../main/monitoring-live';
 import { GetRainbowMode, SetRainbowMode } from '../../main/rainbow-mode';
 import { RunWithAuditSource } from '../AuditLog/source';
 import {
@@ -602,6 +603,26 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
     });
     socket.on('logconsole:close', () => CloseLogConsole(LogConsoleKey));
     socket.on('disconnect', () => CloseLogConsole(LogConsoleKey));
+
+    // --- Live levels ----------------------------------------------------------
+    // Same reasoning as the log console: meters stream to THIS socket only, and
+    // only while its monitor view is open. A stream can hold a device's only
+    // control connection, so it stops on close, disconnect, or losing the session.
+    const LiveLevelsKey = `web:${socket.id}`;
+    socket.on('monitorlive:open', async (TargetID: unknown, cb: AckCallback) => {
+      try {
+        if (!(await IsAuthed(socket))) return cb && cb({ error: 'unauthorized' });
+        const Snapshot = OpenMonitorLiveLevels(LiveLevelsKey, TargetID, (Frames) => {
+          if (!socket.Authed) throw new Error('Session ended');
+          socket.emit('MonitorLiveLevels:Frames', Frames);
+        });
+        if (cb) cb({ result: Snapshot });
+      } catch {
+        if (cb) cb({ error: 'failed' });
+      }
+    });
+    socket.on('monitorlive:close', () => CloseMonitorLiveLevels(LiveLevelsKey));
+    socket.on('disconnect', () => CloseMonitorLiveLevels(LiveLevelsKey));
 
     // Rainbow Mode, toggled from the console. Same reasoning: kept off the rpc
     // bridge so it never appears in the documented surface.

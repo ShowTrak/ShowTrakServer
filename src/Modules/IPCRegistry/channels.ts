@@ -36,6 +36,8 @@ const INVOKE_CHANNELS = [
   'OpenScriptsFolder',
   'LogConsole:Open',
   'LogConsole:Close',
+  'MonitorLiveLevels:Open',
+  'MonitorLiveLevels:Close',
   'RainbowMode:Get',
   'RainbowMode:Set',
   'AuditLog:Get',
@@ -288,6 +290,7 @@ const SUBSCRIBE_CHANNELS = [
   'FogStatusUpdated',
   'SetFogTaskList',
   'LogConsole:Entries',
+  'MonitorLiveLevels:Frames',
   'RainbowModeUpdated',
   'AuditLogAppended',
 ] as const;

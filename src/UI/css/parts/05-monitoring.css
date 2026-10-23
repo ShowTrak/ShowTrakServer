@@ -2530,3 +2530,136 @@ button.monitor-action-label:focus-visible {
   color: #f5d547;
   background: rgba(241, 196, 15, 0.14);
 }
+
+/* Live levels: input meters under a check's timeline while the view is open
+   (live-levels.ts). Bars run from -60 dBFS to 0; amber from -12, red from -3. */
+.monitor-live-levels-slot:empty {
+  display: none;
+}
+
+.live-levels-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    rgb(var(--surface-0-rgb) / 0.55);
+}
+
+.live-levels-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.live-levels-title {
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-levels-status {
+  flex: 0 0 auto;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.live-levels-status.is-live {
+  color: var(--status-graph-online);
+}
+
+.live-levels-status.is-problem {
+  flex: 0 1 auto;
+  color: var(--status-graph-degraded);
+  text-align: right;
+}
+
+.live-levels-card.is-problem .live-levels-rows,
+.live-levels-card.is-connecting .live-levels-rows {
+  opacity: 0.45;
+}
+
+.live-levels-rows {
+  display: grid;
+  grid-template-columns: auto minmax(0, 8rem) minmax(0, 1fr) 4.2rem;
+  align-items: center;
+  column-gap: 0.5rem;
+  row-gap: 0.3rem;
+}
+
+.live-levels-row {
+  display: contents;
+}
+
+.live-levels-number {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.live-levels-label {
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-levels-bar {
+  position: relative;
+  height: 0.6rem;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.live-levels-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--status-graph-online);
+  transition: width 90ms linear;
+}
+
+.live-levels-fill[data-zone='hot'] {
+  background: var(--status-graph-degraded);
+}
+
+.live-levels-fill[data-zone='clip'],
+.live-levels-peak[data-zone='clip'] {
+  background: var(--status-graph-offline);
+}
+
+.live-levels-peak {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -2px;
+  background: #e2e2ea;
+}
+
+.live-levels-value {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .live-levels-rows {
+    grid-template-columns: auto minmax(0, 5rem) minmax(0, 1fr) 3.8rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-levels-fill {
+    transition: none;
+  }
+}

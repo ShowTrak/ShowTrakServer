@@ -121,6 +121,19 @@ export interface MonitoringActionResult {
  */
 export type MonitoringActionOptions = Record<string, Array<{ value: string; label: string }>>;
 
+// --- Live levels ----------------------------------------------------------------
+//
+// A check can also stream audio meters while its monitor's view is open (see
+// src/main/monitoring-live.ts). Nothing streams while nobody is watching.
+
+export interface LiveLevelsFrame {
+  /** 'connecting' until the first meters arrive; 'unavailable' carries Message. */
+  State: 'connecting' | 'live' | 'unavailable';
+  Message: string | null;
+  /** dBFS per channel; null = no signal (−∞) or not yet read. */
+  Channels: Array<{ Label: string; Db: number | null }>;
+}
+
 export interface MonitoringMethod {
   ID: string;
   Name: string;
@@ -172,6 +185,20 @@ export interface MonitoringMethod {
    */
   InvalidateCaches?(Target: MonitoringTargetLike): void;
   Debug?(Result: MonitoringResult, Target: MonitoringTargetLike): string;
+  /**
+   * Whether this check streams live levels (see StartLiveLevels), usually a
+   * setting the operator turned on. Must be pure and must never throw.
+   */
+  HasLiveLevels?(Target: MonitoringTargetLike): boolean;
+  /**
+   * Start streaming live levels for a check while someone is watching its view.
+   * OnFrame is called with the current state at a steady rate; the returned
+   * function stops the stream. Never called unless HasLiveLevels said yes.
+   */
+  StartLiveLevels?(
+    Target: MonitoringTargetLike,
+    OnFrame: (Frame: LiveLevelsFrame) => void
+  ): () => void;
   NormalizeSettings?(Input: unknown): Record<string, unknown>;
   GetRunCacheKeyExtra?(Target: MonitoringTargetLike, Settings: Record<string, unknown>): unknown;
   GetRunCacheTtlMs?(Target: MonitoringTargetLike): number;

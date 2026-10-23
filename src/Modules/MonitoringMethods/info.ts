@@ -719,6 +719,23 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       },
     ],
   },
+  'tascam-mx8a': {
+    Summary:
+      'TASCAM MX-8A matrix mixer health over TEAC’s Ethernet control protocol (plain text on TCP 54726). Logs in, then reads the model, firmware version, serial number, sample rate and test tone state, all read-only. Can also show live input levels while the monitor’s view is open. The protocol has no fault or temperature status, so health is the unit’s settings: Degraded while the test tone is on, and optionally while listed inputs, mix buses or outputs are muted. Operator actions identify the unit, stop the test tone, mute or unmute a channel and reboot; mute and reboot ask for confirmation first.',
+    Setup: [
+      'Give the unit a fixed IP address in MX Connect, and point Address at it. The control port is always TCP 54726.',
+      'If a network password is set in MX Connect, enter it in Password. A new unit has none, so leave it blank.',
+      'The unit accepts only one control connection at a time. While MX Connect or a control system is connected, the check reads online but cannot read the unit’s settings, and the actions are refused. A controller that connects during the check’s short session is turned away and has to retry.',
+      'To check mutes, turn on Check mutes and list the inputs, mix buses and outputs, 1 to 8, that should never be muted. The name set in MX Connect is shown for a muted channel.',
+      'Turn on Show live input levels to see the eight input meters (pre-fader) on the monitor’s Status tab. They stream only while that view is open, on the desktop or in the Web UI. Meanwhile ShowTrak holds the unit’s only control connection, so MX Connect or a control system cannot connect until the view is closed. The check keeps running over the same connection.',
+    ],
+    Links: [
+      {
+        Label: 'MX-8A/DCP Series RS-232C/Ethernet protocol (TASCAM)',
+        Url: 'https://tascam.jp/downloads/products/tascam/mx-8a/mx_dcp_protocolspec_v100_e.pdf',
+      },
+    ],
+  },
   'allen-heath-console': {
     Summary:
       'Allen & Heath console health over the MIDI over TCP protocol (TCP 51325, or 51328 for a dLive Surface). On dLive and Avantis it asks for the name of Input 1, which proves the console is answering; an SQ has no such query, so without mute checks only the connection is tested. Optional checks flag a muted main mix (Main 1 on dLive, LR on SQ) and muted input channels on dLive and SQ. Avantis documents no mute query, so mutes are not read there. The check only sends documented queries. Operator actions recall a scene and mute or unmute an input channel; recall and mute ask for confirmation first.',

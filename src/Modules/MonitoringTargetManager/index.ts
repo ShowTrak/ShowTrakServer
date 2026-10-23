@@ -18,7 +18,7 @@ import type {
 } from '@showtrak/protocol';
 import type { MonitoringTargetRow } from '../DB/rows';
 import type { AuditChange } from '@showtrak/protocol';
-import type { MonitoringSettingField } from '../MonitoringMethods/types';
+import type { MonitoringSettingField, MonitoringTargetLike } from '../MonitoringMethods/types';
 import { RecordAction, RecordEdit, RecordUpdate } from '../AuditLog/edits';
 import { Entity, Line, Value } from '../AuditLog/message';
 import { DiffFields, FormatValue, type FieldSpec } from '../AuditLog/diff';
@@ -583,6 +583,25 @@ const Manager = {
     }
     if (Count) Logger.log(`Back-filled slugs for ${Count} monitoring target(s)`);
     return Count;
+  },
+
+  // The checks on a target that stream live levels while its view is open. Each
+  // check instance is a valid target-like argument for its method (Address and
+  // Settings live on it), and is handed out as is.
+  GetLiveLevelChecks(TargetID: unknown): Array<{
+    CheckID: number;
+    Name: string;
+    Method: string;
+    Check: MonitoringTargetLike;
+  }> {
+    const Target = TargetList.find((T) => Number(T.TargetID) === Number(TargetID));
+    if (!Target) return [];
+    return Target.Checks.filter((C) => MonitoringMethods.HasLiveLevels(C.Method, C)).map((C) => ({
+      CheckID: Number(C.CheckID),
+      Name: C.Name || '',
+      Method: C.Method,
+      Check: C,
+    }));
   },
 
   // Return the most recent (RAM-only) debug panel for a single check.

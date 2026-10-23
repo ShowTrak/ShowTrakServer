@@ -15,6 +15,7 @@ import { RedactSensitiveValues } from '../Utils/redact';
 import { MethodInfo } from './info';
 import { MethodGroups, DEFAULT_GROUP } from './groups';
 import type {
+  LiveLevelsFrame,
   MonitoringActionDef,
   MonitoringActionOptions,
   MonitoringActionResult,
@@ -76,6 +77,7 @@ import * as yamahaConsole from './yamaha-console';
 import * as qsysCore from './qsys-core';
 import * as biampTesira from './biamp-tesira';
 import * as symetrixDsp from './symetrix-dsp';
+import * as tascamMx8a from './tascam-mx8a';
 import * as allenHeathConsole from './allen-heath-console';
 import * as digicoConsole from './digico-console';
 // Sound — amplifiers
@@ -164,6 +166,7 @@ const MethodModules: MonitoringMethod[] = [
   qsysCore,
   biampTesira,
   symetrixDsp,
+  tascamMx8a,
   allenHeathConsole,
   digicoConsole,
   // Sound — amplifiers
@@ -515,6 +518,47 @@ const Manager = {
         Success: false,
         Error: Err && (Err as Error).message ? (Err as Error).message : String(Err),
       };
+    }
+  },
+
+  // Whether a check streams live levels while its view is open. False for a
+  // method without them, or when the method's own hook throws.
+  HasLiveLevels: (ID: string, Target: MonitoringTargetLike): boolean => {
+    const Method = Methods.get(ID);
+    if (!Method || typeof Method.HasLiveLevels !== 'function') return false;
+    if (typeof Method.StartLiveLevels !== 'function') return false;
+    try {
+      return Method.HasLiveLevels(Target) === true;
+    } catch {
+      return false;
+    }
+  },
+
+  // Start a check's live level stream; null when it has none. The returned
+  // function stops it and never throws.
+  StartLiveLevels: (
+    ID: string,
+    Target: MonitoringTargetLike,
+    OnFrame: (Frame: LiveLevelsFrame) => void
+  ): (() => void) | null => {
+    const Method = Methods.get(ID);
+    if (!Method || typeof Method.StartLiveLevels !== 'function') return null;
+    try {
+      const Stop = Method.StartLiveLevels(Target, OnFrame);
+      return () => {
+        try {
+          Stop();
+        } catch (Err) {
+          Logger.warn(
+            `Stopping live levels failed for method ${ID}: ${Err && (Err as Error).message ? (Err as Error).message : Err}`
+          );
+        }
+      };
+    } catch (Err) {
+      Logger.warn(
+        `Live levels failed to start for method ${ID}: ${Err && (Err as Error).message ? (Err as Error).message : Err}`
+      );
+      return null;
     }
   },
 

@@ -16,7 +16,11 @@
 // their UI triggers are hidden by the capability layer, and the server denies
 // them regardless.
 
-import type { LogConsoleSnapshot, ShowTrakAPI } from '@showtrak/protocol';
+import type {
+  LogConsoleSnapshot,
+  MonitorLiveLevelsSnapshot,
+  ShowTrakAPI,
+} from '@showtrak/protocol';
 
 type Ack = { result?: unknown; error?: string };
 
@@ -100,6 +104,17 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     if (LogConsoleLevel === null) return;
     try {
       socket.emit('logconsole:open', LogConsoleLevel, () => undefined);
+    } catch {
+      /* intentional: the next reconnect tries again */
+    }
+  });
+
+  // Likewise an open monitor view's live levels.
+  let LiveLevelsTarget: number | null = null;
+  socket.on('connect', () => {
+    if (LiveLevelsTarget === null) return;
+    try {
+      socket.emit('monitorlive:open', LiveLevelsTarget, () => undefined);
     } catch {
       /* intentional: the next reconnect tries again */
     }
@@ -472,6 +487,33 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
       return null;
     },
     OnLogConsoleEntries: (cb) => sub('LogConsole:Entries', cb),
+    OpenMonitorLiveLevels: async (TargetID) => {
+      LiveLevelsTarget = TargetID;
+      return new Promise((resolve) => {
+        const Timer = setTimeout(() => resolve(null), CONSOLE_ACK_TIMEOUT_MS);
+        const Settle = (Snapshot: MonitorLiveLevelsSnapshot | null) => {
+          clearTimeout(Timer);
+          resolve(Snapshot);
+        };
+        try {
+          socket.emit('monitorlive:open', TargetID, (res: Ack) =>
+            Settle(res && res.result ? (res.result as MonitorLiveLevelsSnapshot) : null)
+          );
+        } catch {
+          Settle(null);
+        }
+      });
+    },
+    CloseMonitorLiveLevels: async () => {
+      LiveLevelsTarget = null;
+      try {
+        socket.emit('monitorlive:close');
+      } catch {
+        /* intentional: the server also stops on disconnect */
+      }
+      return null;
+    },
+    OnMonitorLiveLevels: (cb) => sub('MonitorLiveLevels:Frames', cb),
     GetRainbowMode: async () => AckOrFalse('rainbow:get'),
     SetRainbowMode: async (Enabled) => AckOrFalse('rainbow:set', Enabled),
     OnRainbowModeUpdated: (cb) => sub('RainbowModeUpdated', cb),

@@ -52,6 +52,7 @@ export const MethodGroups: Record<string, string> = {
   'qsys-core': 'Sound',
   'biamp-tesira': 'Sound',
   'symetrix-dsp': 'Sound',
+  'tascam-mx8a': 'Sound',
   'allen-heath-console': 'Sound',
   'digico-console': 'Sound',
   // Sound — amplifiers

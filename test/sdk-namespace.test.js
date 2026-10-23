@@ -154,6 +154,12 @@ function loadSdk() {
       '../../main/renderer-bus': { RegisterRendererSink: (fn) => sinks.push(fn) },
       // webui-namespace loads for real (we want its PasscodeMatches); these are
       // the extra siblings it pulls in.
+      // The live levels hub reaches the real monitor manager (and its DB) from
+      // main/, under a request string the stubs above do not cover.
+      '../../main/monitoring-live': {
+        OpenMonitorLiveLevels: () => ({ TargetID: 0, Checks: [] }),
+        CloseMonitorLiveLevels: () => undefined,
+      },
       '../../main/handler-registry': { GetHandler: (channel) => state.handlers[channel] },
       '../Broadcast': { Manager: broadcast },
       // Pairing state. Stubbed for the usual reason (the real manager pulls in
