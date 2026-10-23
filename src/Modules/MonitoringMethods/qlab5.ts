@@ -379,11 +379,13 @@ function Run(Target: MonitoringTargetLike): MonitoringResult {
 // what the Overrides window shows as MIDI input switched off. The action labels
 // follow the window rather than the wire.
 
+// No Default: normalization replaces an unknown select value with the Default,
+// so an OSC press naming a misspelt override would otherwise switch off the
+// first one in the list. Without it the value fails IsOverrideKey and is refused.
 const OVERRIDE_PARAM: MonitoringSettingField = {
   Key: 'Override',
   Label: 'Input / output',
   Type: 'select',
-  Default: OVERRIDE_KEYS[0],
   Required: true,
   Options: OVERRIDE_KEYS.map((Key) => ({ value: Key, label: FriendlyOverride(Key) })),
 };
