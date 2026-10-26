@@ -160,13 +160,6 @@ const MONITORING_CHANNELS = new Set([
   'MoveMonitoringCheck',
   'RunMonitoringCheckNow',
   'RunAllMonitoringChecksNow',
-  // Running a check action acts on a real device, so it sits with the other
-  // mutations rather than the readers. The method + action pair is still
-  // resolved against the MonitoringMethods registry in the registrar.
-  'RunMonitoringAction',
-  // Moving a live fader or mute acts on the device like an action does, so it
-  // needs the same rights (Edit mode and monitoring management on the Web UI).
-  'MonitorLiveLevels:Set',
   'SetMonitoringActionFavourite',
   'CreateDummyClient',
   'UpdateDummyClient',
@@ -183,6 +176,21 @@ const MONITORING_CHANNELS = new Set([
   'FreeKiosk:CaptureScreenshot',
   'FreeKiosk:CaptureCamera',
 ]);
+
+// Running a monitoring action drives a real device the way a script does — power
+// a row of projectors on, close their shutters, move a fader — so it is a
+// SHOW-time control, NOT a management mutation. The desktop runs these in any
+// mode; the remote surfaces once lumped them in with monitoring management and
+// so refused them outside EDIT mode, which made them unusable during a show —
+// exactly when an operator reaches for a starred action on their phone or in a
+// browser. They get their own category and permission so running actions can be
+// allowed (or denied) on its own, without unlocking the rest of monitoring
+// management and without having to leave SHOW mode. Like the script channels
+// below, this category is deliberately NOT gated on EDIT mode.
+//
+// MonitorLiveLevels:Set (dragging a live fader or toggling a mute) acts on the
+// device the same way a check action does, so it rides the same permission.
+const MONITORING_ACTION_CHANNELS = new Set(['RunMonitoringAction', 'MonitorLiveLevels:Set']);
 const ALERT_CHANNELS = new Set([
   'CreateAlertRule',
   'UpdateAlertRule',
@@ -323,6 +331,12 @@ export interface SurfacePermissions {
   AllowClientManagement: boolean;
   AllowGroupManagement: boolean;
   AllowMonitoringManagement: boolean;
+  /**
+   * Whether this surface may RUN monitoring actions (check actions and live
+   * level/mute changes). A SHOW-time device control, independent of (and NOT
+   * gated on) EDIT mode or the monitoring-management category above.
+   */
+  AllowMonitoringActions: boolean;
   AllowAlertManagement: boolean;
   AllowUnassignedClients: boolean;
   /** Global Wake-on-LAN feature flag; ANDed with the per-surface permission. */
@@ -353,6 +367,7 @@ export async function ReadSurfacePermissions(Prefix: SurfacePrefix): Promise<Sur
     AllowClientManagement: true,
     AllowGroupManagement: true,
     AllowMonitoringManagement: true,
+    AllowMonitoringActions: true,
     AllowAlertManagement: true,
     AllowUnassignedClients: true,
     WOLEnabled: false,
@@ -368,6 +383,7 @@ export async function ReadSurfacePermissions(Prefix: SurfacePrefix): Promise<Sur
       AllowClientManagement: await ReadBool(`${Prefix}_ALLOW_CLIENT_MANAGEMENT`, true),
       AllowGroupManagement: await ReadBool(`${Prefix}_ALLOW_GROUP_MANAGEMENT`, true),
       AllowMonitoringManagement: await ReadBool(`${Prefix}_ALLOW_MONITORING_MANAGEMENT`, true),
+      AllowMonitoringActions: await ReadBool(`${Prefix}_ALLOW_MONITORING_ACTIONS`, true),
       AllowAlertManagement: await ReadBool(`${Prefix}_ALLOW_ALERT_MANAGEMENT`, true),
       AllowUnassignedClients: await ReadBool(`${Prefix}_ALLOW_UNASSIGNED_CLIENTS`, true),
       WOLEnabled: !!(await SettingsManager.GetValue('SYSTEM_ALLOW_WOL')),
@@ -431,6 +447,13 @@ export async function AuthorizeChannel(
     if (!Category) return { allowed: false, reason: 'forbidden' };
     return { allowed: true, reason: null };
   }
+  // Running a monitoring action is a SHOW-time device control, so — like scripts
+  // and WOL below — it is governed by its own permission and NOT gated on EDIT
+  // mode. This is what lets a browser or phone power a projector on mid-show.
+  if (MONITORING_ACTION_CHANNELS.has(channel)) {
+    if (!Cfg.AllowMonitoringActions) return { allowed: false, reason: 'forbidden' };
+    return { allowed: true, reason: null };
+  }
   if (SCRIPT_CHANNELS.has(channel)) {
     if (!Cfg.AllowRemoteScripts) return { allowed: false, reason: 'forbidden' };
     return { allowed: true, reason: null };
@@ -450,6 +473,7 @@ export {
   CLIENT_CHANNELS,
   GROUP_CHANNELS,
   MONITORING_CHANNELS,
+  MONITORING_ACTION_CHANNELS,
   ALERT_CHANNELS,
   UNASSIGNED_CHANNELS,
   EDIT_CHANNELS,

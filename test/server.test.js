@@ -407,6 +407,12 @@ function loadWebUi(settings, options = {}) {
       Manager: { GetAll: async () => [null, [{ GroupID: 1, Title: 'G', Weight: 1 }]] },
     },
     '../MonitoringTargetManager': { Manager: { GetAll: async () => [null, []] } },
+    // Same DB-at-module-load reason as the whitelist/tag stubs below: the real
+    // favourites manager opens sqlite. Init is a no-op and GetAll returns the
+    // list the initial-state push emits.
+    '../MonitoringActionFavourites': {
+      Manager: { Init: async () => undefined, GetAll: () => [] },
+    },
     '../FreeKioskManager': { Manager: { GetAll: async () => [null, []] } },
     '../DummyClientManager': { Manager: { GetAll: async () => [null, []] } },
     '../AlertsManager': { Manager: { GetAll: async () => [null, []] } },
@@ -1072,6 +1078,25 @@ test('Web UI initial state sends the public settings before the client list', as
     [{ Key: 'UI_GROUP_COLUMN_COUNT', Value: 4 }],
     [],
   ]);
+});
+
+test('Web UI initial state sends the monitoring action favourites', async () => {
+  // The right-click menu's starred actions are built from this list. It was
+  // never part of the initial hydration, so a freshly-loaded browser showed no
+  // favourites until a later star/unstar push happened to arrive.
+  const { SetupWebUiNamespace } = loadWebUi(
+    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false },
+    { settingRows: SETTING_ROWS }
+  );
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
+
+  const Events = socket.emitted.map((e) => e.event);
+  assert.ok(
+    Events.includes('SetFullMonitoringActionFavouriteList'),
+    'initial state never emitted the favourite list'
+  );
 });
 
 // The browser answers `hello` at once (rpc Settings:Get, or auth:login with a
