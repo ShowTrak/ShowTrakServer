@@ -25,6 +25,7 @@ import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as ClientManager } from '../ClientManager';
 import { Manager as GroupManager } from '../GroupManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
+import { Manager as MonitoringActionFavourites } from '../MonitoringActionFavourites';
 import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as FreeKioskManager } from '../FreeKioskManager';
 import { Manager as AlertsManager } from '../AlertsManager';
@@ -463,6 +464,17 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
 
         const [mErr, monitors] = await MonitoringTargetManager.GetAll();
         socket.emit('SetFullMonitoringTargetList', mErr ? [] : monitors || []);
+
+        // The favourite list is what the browser's right-click menu is built
+        // from, so it has to arrive with the first paint like the monitor list
+        // itself — otherwise a freshly-loaded browser shows no starred actions
+        // until someone happens to star/unstar one and triggers a push.
+        try {
+          await MonitoringActionFavourites.Init();
+          socket.emit('SetFullMonitoringActionFavouriteList', MonitoringActionFavourites.GetAll());
+        } catch {
+          socket.emit('SetFullMonitoringActionFavouriteList', []);
+        }
 
         const [dErr, dummies] = await DummyClientManager.GetAll();
         socket.emit('SetFullDummyClientList', dErr ? [] : dummies || []);

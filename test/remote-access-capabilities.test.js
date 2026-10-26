@@ -289,6 +289,46 @@ test('script execution defaults OFF and is not gated on edit mode', async () => 
   assert.equal((await On.AuthorizeChannel('REMOTE', 'TriggerIntegratedEvent')).allowed, true);
 });
 
+test('running monitoring actions defaults ON and is not gated on edit mode', async () => {
+  // Running a check action (power a projector on, move a fader) drives a real
+  // device like a script does — a SHOW-time control, so mode must not gate it.
+  // Unlike scripts it defaults ON: it is the whole point of reaching for a
+  // starred action on a phone or browser mid-show, and it was available (in
+  // EDIT mode) before it had its own permission.
+  for (const Prefix of ['WEBUI', 'REMOTE']) {
+    for (const Channel of ['RunMonitoringAction', 'MonitorLiveLevels:Set']) {
+      // Nothing set at all, SHOW mode: still allowed (default ON, no mode gate).
+      const Unset = load({ settings: {}, mode: 'SHOW' });
+      assert.deepEqual(
+        await Unset.AuthorizeChannel(Prefix, Channel),
+        { allowed: true, reason: null },
+        `${Prefix} "${Channel}" should run in SHOW mode by default`
+      );
+    }
+  }
+});
+
+test('running monitoring actions obeys its own permission', async () => {
+  // Its own toggle, independent of monitoring MANAGEMENT: an operator can allow
+  // running actions while locking down create/edit/delete, or the reverse.
+  const Off = load({ settings: { ...ALL_ON, WEBUI_ALLOW_MONITORING_ACTIONS: 0 }, mode: 'EDIT' });
+  for (const Channel of ['RunMonitoringAction', 'MonitorLiveLevels:Set']) {
+    assert.deepEqual(
+      await Off.AuthorizeChannel('WEBUI', Channel),
+      { allowed: false, reason: 'forbidden' },
+      `"${Channel}" should be forbidden with the actions permission off`
+    );
+  }
+  // Monitoring management staying on does not re-grant it, and vice versa.
+  assert.equal((await Off.AuthorizeChannel('WEBUI', 'CreateMonitoringTarget')).allowed, true);
+
+  const NoMgmt = load({
+    settings: { ...ALL_ON, WEBUI_ALLOW_MONITORING_MANAGEMENT: 0 },
+    mode: 'SHOW',
+  });
+  assert.equal((await NoMgmt.AuthorizeChannel('WEBUI', 'RunMonitoringAction')).allowed, true);
+});
+
 test('WOL needs the global feature AND the per-surface permission', async () => {
   const Both = load({ settings: ALL_ON });
   assert.equal((await Both.AuthorizeChannel('REMOTE', 'WakeOnLan')).allowed, true);

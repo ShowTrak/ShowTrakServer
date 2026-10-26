@@ -305,6 +305,15 @@ export const DefaultSettings: SettingDefinition[] = [
   },
   {
     Group: 'Web UI Permissions',
+    Key: 'WEBUI_ALLOW_MONITORING_ACTIONS',
+    Title: 'Run Monitoring Actions',
+    Description:
+      'Allow the Web UI to run check actions on devices (power a projector on/off, set an input, mute an output) and move live faders — including starred actions in the right-click menu. These are show-time controls, so they work in both Show and Edit mode.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
+    Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_ALERT_MANAGEMENT',
     Title: 'Alert Rule Management',
     Description:
@@ -376,6 +385,15 @@ export const DefaultSettings: SettingDefinition[] = [
     Title: 'Monitoring Management',
     Description:
       'Allow ShowTrak Remote to manage monitors, dummy clients and FreeKiosk terminals. Also requires the server to be in Edit mode.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+  },
+  {
+    Group: 'ShowTrak Remote Permissions',
+    Key: 'REMOTE_ALLOW_MONITORING_ACTIONS',
+    Title: 'Run Monitoring Actions',
+    Description:
+      'Allow ShowTrak Remote to run check actions on devices (power, input, mute) and move live faders. These are show-time controls, so they work in both Show and Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },

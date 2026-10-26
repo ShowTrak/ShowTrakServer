@@ -206,6 +206,12 @@ function loadSdk() {
           },
         },
       },
+      // webui-namespace (loaded for real above) now hydrates the favourite list
+      // on connect. Stub the manager so the real one — which requires ../DB and
+      // opens sqlite at module load — is never pulled in here.
+      '../MonitoringActionFavourites': {
+        Manager: { Init: async () => undefined, GetAll: () => state.actionFavourites || [] },
+      },
       '../DummyClientManager': {
         Manager: {
           GetAll: async () => {
