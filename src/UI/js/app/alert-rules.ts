@@ -385,11 +385,11 @@ export function RenderAlertActionSettingsFields(
       let PreviewButton = '';
       if (Field.Preview === 'sound') {
         PreviewButton = `<button type="button" class="btn bg-ghost text-white" data-sound-preview title="Preview sound">
-              <i class="bi bi-play-fill"></i> Preview
+              <i class="bi bi-play"></i> Preview
             </button>`;
       } else if (Field.Preview === 'audio-asset') {
         PreviewButton = `<button type="button" class="btn bg-ghost text-white" data-audio-asset-preview title="Preview audio asset">
-              <i class="bi bi-play-fill"></i> Preview
+              <i class="bi bi-play"></i> Preview
             </button>`;
       }
       Html += `
@@ -444,7 +444,7 @@ export function RenderAlertActionsList() {
     const ActionType = actionTypeByID(Action.Type);
     const MissingAudio = isAudioAssetActionMissing(Action);
     const WarningIcon = MissingAudio
-      ? '<i class="bi bi-exclamation-triangle-fill text-warning ms-2" title="The audio file for this action is missing" aria-label="Audio file missing"></i>'
+      ? '<i class="bi bi-exclamation-triangle text-warning ms-2" title="The audio file for this action is missing" aria-label="Audio file missing"></i>'
       : '';
     Html += `
       <div class="rounded bg-ghost p-2 d-grid gap-1 text-start border-0 alert-action-open" data-action-index="${Index}" role="button" tabindex="0">
@@ -756,7 +756,7 @@ export function RenderAlertRuleManagerList() {
       isAudioAssetActionMissing(Action)
     );
     const WarningIcon = HasMissingAudio
-      ? '<i class="bi bi-exclamation-triangle-fill text-warning ms-2" title="An audio file used by this alert is missing" aria-label="Audio file missing"></i>'
+      ? '<i class="bi bi-exclamation-triangle text-warning ms-2" title="An audio file used by this alert is missing" aria-label="Audio file missing"></i>'
       : '';
     Html += `
       <div class="rounded bg-ghost p-2 d-grid gap-1 text-start border-0 alert-rule-open" data-ruleid="${Rule.RuleID}" role="button" tabindex="0">

@@ -1639,7 +1639,7 @@ function MuteActions(Kind: ChannelKind): MonitoringActionDef[] {
     {
       ID: `${Kind}.mute`,
       Label: `Mute ${Noun}`,
-      Icon: 'volume-mute-fill',
+      Icon: 'volume-mute',
       Group: MUTE_GROUPS[Kind],
       Destructive: true,
       Params: [ChannelParam(Kind)],
@@ -1648,7 +1648,7 @@ function MuteActions(Kind: ChannelKind): MonitoringActionDef[] {
     {
       ID: `${Kind}.unmute`,
       Label: `Unmute ${Noun}`,
-      Icon: 'volume-up-fill',
+      Icon: 'volume-up',
       Group: MUTE_GROUPS[Kind],
       Params: [ChannelParam(Kind)],
       Note: `Unmutes one ${Noun.toLowerCase()} on the unit.`,

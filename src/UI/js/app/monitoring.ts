@@ -97,7 +97,7 @@ export function RenderMonitoringTargetTile(T: MonitoringTargetView) {
       AppMode === 'EDIT' ? 'true' : 'false'
     }">
       <button type="button" class="CLIENT_TILE_COG MONITOR_TILE_COG" aria-label="Edit Monitor" title="Edit Monitor">
-        <i class="bi bi-gear-fill"></i>
+        <i class="bi bi-gear"></i>
       </button>
       <label class="text-sm ${TagBadges ? 'd-none' : ''}" data-type="Method">${Safe(MethodLabel)} · ${Safe(
         FormatInterval(T.Interval)

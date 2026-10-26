@@ -153,6 +153,8 @@ function InitSettingsPush() {
 
     if (CanReuse) SyncRenderedSettingValues(Incoming);
     else RenderSettingsSections(Structure);
+    // BuildSettingsNav runs below, so the rail picks up any group change.
+    ApplySettingDependencies();
 
     // Re-render after settings arrive so layout-dependent controls like the group
     // column count pick up UI_GROUP_COLUMN_COUNT on the browser surface.
@@ -192,8 +194,9 @@ function ComputeSettingsStructure(
   GroupsList: SettingGroupView[]
 ): string {
   return JSON.stringify([
-    GroupsList.map((g) => [g?.Name, g?.Title]),
+    GroupsList.map((g) => [g?.Name, g?.Title, g?.ShowWhen]),
     SettingsList.map((s) => [
+      s?.ShowWhen,
       s?.Group,
       s?.Key,
       s?.Title,
@@ -242,6 +245,42 @@ function SyncRenderedSettingValues(SettingsList: SettingView[]) {
   }
 }
 
+// Progressive disclosure: true when every BOOLEAN setting a ShowWhen list names
+// is on (or there is no list). Reads the shared Settings cache, which the change
+// handlers update optimistically, so a toggle reveals its children immediately.
+function DependenciesMet(ShowWhen: string[] | null | undefined): boolean {
+  if (!ShowWhen || !ShowWhen.length) return true;
+  return ShowWhen.every((Key) => !!Settings.find((s) => s && s.Key === Key)?.Value);
+}
+
+// Show or hide each rendered setting row and group section by its ShowWhen.
+// Hiding never touches the value. Returns whether any group's visibility
+// changed, as that also changes which tabs the rail should offer.
+function ApplySettingDependencies(): boolean {
+  $('#SETTINGS [data-setting-key]').each(function () {
+    const Setting = RenderedSettings.get(this.getAttribute('data-setting-key') || '');
+    $(this).toggleClass('d-none', !DependenciesMet(Setting?.ShowWhen));
+  });
+  let GroupsChanged = false;
+  for (const Group of SettingsGroups) {
+    const $section = $('#SETTINGS .settings-section').filter(
+      (_, el) => el.getAttribute('data-nav-key') === Group.Name
+    );
+    if (!$section.length) continue;
+    const Hidden = !DependenciesMet(Group.ShowWhen);
+    if ($section.hasClass('d-none') === Hidden) continue;
+    $section.toggleClass('d-none', Hidden);
+    GroupsChanged = true;
+  }
+  return GroupsChanged;
+}
+
+// Called after a control saves locally, so dependents follow without waiting
+// for the settings push.
+function RefreshSettingDependencies() {
+  if (ApplySettingDependencies()) BuildSettingsNav();
+}
+
 // Capture scroll position and keyboard focus/caret inside the settings modal,
 // returning a restore function to call once the DOM work is done. Emptying a
 // scroll container clamps its scrollTop to 0, so even a full rebuild keeps the
@@ -281,6 +320,12 @@ function CaptureSettingsViewState(): () => void {
   };
 }
 
+// The muted line under a setting's title. Settings whose title says it all have
+// no description, and get no empty line either.
+function DescriptionLine(Description: string | null | undefined): string {
+  return Description ? `<span class="text-sm mb-0">${Description}</span>` : '';
+}
+
 // Build every settings section from scratch and bind its controls.
 function RenderSettingsSections(Structure: string) {
   $('#SETTINGS').html('');
@@ -305,14 +350,21 @@ function RenderSettingsSections(Structure: string) {
       // The control handlers below close over this object; SyncRenderedSettingValues
       // keeps it current so their "did the value actually change" guards hold.
       RenderedSettings.set(Setting.Key, Setting);
+      // Each branch below appends exactly one row; it is tagged after the chain
+      // so ApplySettingDependencies can find it.
+      const RowCountBefore = $target.children().length;
       if (Setting.Type === 'BOOLEAN') {
-        $target.append(`<div class="bg-ghost p-2 rounded d-flex justify-content-between text-start">
+        $target.append(`<div class="bg-ghost p-2 rounded d-flex justify-content-between text-start${
+          Setting.Description ? '' : ' align-items-center'
+        }">
 					<div class="d-grid">
 						<span>${Setting.Title}</span>
-						<span class="text-sm mb-0">${Setting.Description}</span>
+						${DescriptionLine(Setting.Description)}
 					</div>
 					<div class="form-check form-switch">
-						<input class="form-check-input" style="margin-top: 0.6em !important;" type="checkbox" id="SETTING_${Setting.Key}" ${
+						<input class="form-check-input" style="margin-top: ${
+              Setting.Description ? '0.6em' : '0'
+            } !important;" type="checkbox" id="SETTING_${Setting.Key}" ${
               Setting.Value ? 'checked' : ''
             }>
 					</div>
@@ -325,6 +377,7 @@ function RenderSettingsSections(Structure: string) {
             const Set = Settings.find((s) => s.Key === Setting.Key);
             if (Set) Set.Value = NewValue;
             Setting.Value = NewValue;
+            RefreshSettingDependencies();
             const [Err] = await window.API.SetSetting(Setting.Key, NewValue);
             if (Err) {
               Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
@@ -359,7 +412,7 @@ function RenderSettingsSections(Structure: string) {
         $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}</span>
-						<span class="text-sm mb-0">${Setting.Description}</span>
+						${DescriptionLine(Setting.Description)}
 					</div>
 					<input type="${inputType}" inputmode="${inputMode}" class="form-control form-control-sm bg-ghost-light text-light border-0" id="SETTING_${
             Setting.Key
@@ -448,7 +501,7 @@ function RenderSettingsSections(Structure: string) {
         $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}${rangeHint}</span>
-						<span class="text-sm mb-0">${Setting.Description}</span>
+						${DescriptionLine(Setting.Description)}
 					</div>
 					${
             unit
@@ -497,7 +550,7 @@ function RenderSettingsSections(Structure: string) {
 						<span>${Setting.Title}</span>
 						<span class="text-sm text-muted" id="SETTING_${Setting.Key}_VALUE">${FormatSettingValue(Safe(Setting.Value), unit)}</span>
 					</div>
-					<span class="text-sm mb-0">${Setting.Description}</span>
+					${DescriptionLine(Setting.Description)}
 					<input type="range" class="form-range" id="SETTING_${
             Setting.Key
           }" min="${min}" max="${max}" step="1" value="${Safe(Setting.Value)}" />
@@ -544,7 +597,7 @@ function RenderSettingsSections(Structure: string) {
         $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
 					<div class="d-grid">
 						<span>${Setting.Title}</span>
-						<span class="text-sm mb-0">${Setting.Description}</span>
+						${DescriptionLine(Setting.Description)}
 					</div>
 					<select class="form-select form-select-sm bg-ghost-light text-light border-0" id="SETTING_${Setting.Key}">${optionsHtml}</select>
 				</div>`);
@@ -560,6 +613,9 @@ function RenderSettingsSections(Structure: string) {
             await window.API.SetSetting(Setting.Key, NewValue);
             Notify(`[${Setting.Title}] ${NewValue}.`, 'success', 1200);
           });
+      }
+      if ($target.children().length > RowCountBefore) {
+        $target.children().last().attr('data-setting-key', Setting.Key);
       }
     }
   }
@@ -825,7 +881,8 @@ function BuildSettingsNav() {
   const $nav = $('#SETTINGS_NAV');
   if (!$nav.length || !$content.length) return;
 
-  const sections = $content.find('.settings-section[data-nav-title]').toArray();
+  // Groups hidden by ApplySettingDependencies get no tab.
+  const sections = $content.find('.settings-section[data-nav-title]:not(.d-none)').toArray();
   $nav.empty();
 
   // A single (or no) category needs no tabs — reclaim the space and show it all.

@@ -17,9 +17,12 @@ const { installModuleMocks, matchesModule, recordingManager } = require('./helpe
 const state = {
   currentFilePath: '/shows/current.showtrak',
   saveResult: [null, { Saved: true }],
-  openResult: [null, { Opened: true }],
+  openResult: [null, { Status: 'Opened', FilePath: '/shows/opened.showtrak' }],
   newResult: [null, { Created: true }],
   ensureResult: [null, { Missing: false }],
+  checkResult: [null, null],
+  acceptResult: [null, { FilePath: '/shows/old.showtrak', BackupPath: '/backups/old.showtrak' }],
+  declineResult: [null, 'Upgrade declined'],
   hasUnsavedWorkingData: false,
   saveDialog: { canceled: false, filePath: '/shows/picked.showtrak' },
   openDialog: { canceled: false, filePaths: ['/shows/opened.showtrak'] },
@@ -30,9 +33,12 @@ const showFileUpdated = [];
 const backupMgr = recordingManager({
   GetCurrentFilePath: () => state.currentFilePath,
   Save: () => state.saveResult,
-  Open: () => state.openResult,
+  RequestOpen: () => state.openResult,
   New: () => state.newResult,
   EnsureCurrentFileExists: () => state.ensureResult,
+  CheckCurrentFile: () => state.checkResult,
+  AcceptUpgrade: () => state.acceptResult,
+  DeclineUpgrade: () => state.declineResult,
   HasUnsavedWorkingData: () => state.hasUnsavedWorkingData,
 });
 const fileSelectorMgr = recordingManager({
@@ -72,9 +78,15 @@ register();
 test.beforeEach(() => {
   state.currentFilePath = '/shows/current.showtrak';
   state.saveResult = [null, { Saved: true }];
-  state.openResult = [null, { Opened: true }];
+  state.openResult = [null, { Status: 'Opened', FilePath: '/shows/opened.showtrak' }];
   state.newResult = [null, { Created: true }];
   state.ensureResult = [null, { Missing: false }];
+  state.checkResult = [null, null];
+  state.acceptResult = [
+    null,
+    { FilePath: '/shows/old.showtrak', BackupPath: '/backups/old.showtrak' },
+  ];
+  state.declineResult = [null, 'Upgrade declined'];
   state.hasUnsavedWorkingData = false;
   state.saveDialog = { canceled: false, filePath: '/shows/picked.showtrak' };
   state.openDialog = { canceled: false, filePaths: ['/shows/opened.showtrak'] };
@@ -91,6 +103,8 @@ test('registers a handler for every show channel', () => {
     'Show:GetCurrentFile',
     'Show:HasUnsavedData',
     'Show:EnsureFileExists',
+    'Show:CheckUpgrade',
+    'Show:ResolveUpgrade',
     'Show:New',
   ]) {
     assert.equal(typeof GetHandler(Channel), 'function', `missing handler for ${Channel}`);
@@ -168,9 +182,27 @@ test('Show:SaveAs surfaces a write failure without announcing an update', async 
 
 test('Show:Open loads the first selected path and announces the change', async () => {
   const Result = await GetHandler('Show:Open')(null);
-  assert.deepEqual(Result, [null, { Opened: true }]);
-  assert.deepEqual(backupMgr.__callsTo('Open')[0].args, ['/shows/opened.showtrak']);
+  assert.deepEqual(Result, [null, { Status: 'Opened', FilePath: '/shows/opened.showtrak' }]);
+  assert.deepEqual(backupMgr.__callsTo('RequestOpen')[0].args, ['/shows/opened.showtrak']);
   assert.deepEqual(showFileUpdated, ['/shows/current.showtrak']);
+});
+
+test('Show:Open hands an older file back for confirmation without announcing a change', async () => {
+  // Nothing has been opened yet: the title bar must keep naming the old show
+  // until the operator agrees to the upgrade.
+  const Upgrade = {
+    FilePath: '/shows/opened.showtrak',
+    FileName: 'opened.showtrak',
+    FileVersion: '3.28.0',
+    CurrentVersion: '3.29.3',
+  };
+  state.openResult = [null, { Status: 'UpgradeRequired', Upgrade }];
+
+  assert.deepEqual(await GetHandler('Show:Open')(null), [
+    null,
+    { Status: 'UpgradeRequired', Upgrade },
+  ]);
+  assert.deepEqual(showFileUpdated, []);
 });
 
 test('Show:Open reports cancellation for a dismissed or empty selection', async () => {
@@ -182,7 +214,7 @@ test('Show:Open reports cancellation for a dismissed or empty selection', async 
     backupMgr.__calls.length = 0;
     state.openDialog = Dialog;
     assert.deepEqual(await GetHandler('Show:Open')(null), ['Cancelled By User', null]);
-    assert.equal(backupMgr.__callsTo('Open').length, 0);
+    assert.equal(backupMgr.__callsTo('RequestOpen').length, 0);
   }
 });
 
@@ -229,12 +261,78 @@ test('Show:EnsureFileExists passes an error through untouched', async () => {
   assert.deepEqual(showFileUpdated, []);
 });
 
+// --- Show:CheckUpgrade / Show:ResolveUpgrade ----------------------------------
+
+test('Show:CheckUpgrade passes the pending upgrade through', async () => {
+  assert.deepEqual(await GetHandler('Show:CheckUpgrade')(null), [null, null]);
+  const Upgrade = { FilePath: '/shows/current.showtrak', FileVersion: null };
+  state.checkResult = [null, Upgrade];
+  assert.deepEqual(await GetHandler('Show:CheckUpgrade')(null), [null, Upgrade]);
+});
+
+test('Show:ResolveUpgrade(true) backs up and upgrades, then announces the file', async () => {
+  const Result = await GetHandler('Show:ResolveUpgrade')(null, true);
+  assert.deepEqual(Result, [
+    null,
+    { FilePath: '/shows/old.showtrak', BackupPath: '/backups/old.showtrak' },
+  ]);
+  assert.equal(backupMgr.__callsTo('AcceptUpgrade').length, 1);
+  assert.equal(backupMgr.__callsTo('DeclineUpgrade').length, 0);
+  assert.deepEqual(showFileUpdated, ['/shows/current.showtrak']);
+});
+
+test('Show:ResolveUpgrade(false) declines and announces the cleared show', async () => {
+  state.currentFilePath = null;
+  assert.deepEqual(await GetHandler('Show:ResolveUpgrade')(null, false), [
+    null,
+    'Upgrade declined',
+  ]);
+  assert.equal(backupMgr.__callsTo('DeclineUpgrade').length, 1);
+  assert.equal(backupMgr.__callsTo('AcceptUpgrade').length, 0);
+  assert.deepEqual(showFileUpdated, [null]);
+});
+
+test('Show:ResolveUpgrade rejects a non-boolean answer without acting on it', async () => {
+  // Declining wipes the working data, so a malformed answer must never be
+  // read as "no".
+  for (const Answer of [undefined, null, 'false', 0]) {
+    const [Err] = await GetHandler('Show:ResolveUpgrade')(null, Answer);
+    assert.match(String(Err), /must be a boolean/);
+  }
+  assert.equal(backupMgr.__callsTo('AcceptUpgrade').length, 0);
+  assert.equal(backupMgr.__callsTo('DeclineUpgrade').length, 0);
+});
+
+test('Show:ResolveUpgrade surfaces a failed backup without announcing an update', async () => {
+  state.acceptResult = ['Failed to back up the show file: EACCES', null];
+  assert.deepEqual(await GetHandler('Show:ResolveUpgrade')(null, true), [
+    'Failed to back up the show file: EACCES',
+    null,
+  ]);
+  assert.deepEqual(showFileUpdated, []);
+});
+
 // --- Show:New ---------------------------------------------------------------
 
-test('Show:New resets the show and announces the new (empty) file', async () => {
+test('Show:New saves the new show where the operator chose and announces it', async () => {
   assert.deepEqual(await GetHandler('Show:New')(null), [null, { Created: true }]);
-  assert.equal(backupMgr.__callsTo('New').length, 1);
+  assert.equal(fileSelectorMgr.__callsTo('SaveDialog').length, 1);
+  assert.deepEqual(backupMgr.__callsTo('New')[0].args, ['/shows/picked.showtrak']);
   assert.deepEqual(showFileUpdated, ['/shows/current.showtrak']);
+});
+
+test('Show:New does nothing when the operator cancels choosing a location', async () => {
+  // A new show always has a file behind it: no location, no new show, and the
+  // current working data is left alone.
+  for (const Dialog of [
+    { canceled: true, filePath: null },
+    { canceled: false, filePath: '' },
+  ]) {
+    state.saveDialog = Dialog;
+    assert.deepEqual(await GetHandler('Show:New')(null), ['Cancelled By User', null]);
+  }
+  assert.equal(backupMgr.__callsTo('New').length, 0);
+  assert.deepEqual(showFileUpdated, []);
 });
 
 test('Show:New surfaces a failure without announcing an update', async () => {

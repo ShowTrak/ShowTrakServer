@@ -112,7 +112,7 @@ export function USBDeviceBadge(Device: USBDeviceView): {
       return {
         State: 'missing',
         Label: 'Missing',
-        Icon: 'bi-x-circle-fill',
+        Icon: 'bi-x-circle',
         Title: 'Stop monitoring (device disconnected)',
       };
     }
@@ -128,7 +128,7 @@ export function USBDeviceBadge(Device: USBDeviceView): {
     return {
       State: 'short',
       Label: 'Short',
-      Icon: 'bi-x-circle-fill',
+      Icon: 'bi-x-circle',
       Title: 'Stop monitoring (fewer connected than expected)',
     };
   }
@@ -136,14 +136,14 @@ export function USBDeviceBadge(Device: USBDeviceView): {
     return {
       State: 'issue',
       Label: 'Changed',
-      Icon: 'bi-exclamation-triangle-fill',
+      Icon: 'bi-exclamation-triangle',
       Title: 'Stop monitoring (conditions not met)',
     };
   }
   return {
     State: 'healthy',
     Label: 'Monitored',
-    Icon: 'bi-check-circle-fill',
+    Icon: 'bi-check-circle',
     Title: 'Stop monitoring',
   };
 }

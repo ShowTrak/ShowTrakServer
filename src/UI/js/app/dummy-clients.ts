@@ -87,7 +87,7 @@ export function RenderDummyClientTile(D: DummyClientView) {
       D.UUID
     }" data-uuid="${DragUUID}" data-flip-key="${DragUUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
       <button type="button" class="CLIENT_TILE_COG DUMMY_TILE_COG" aria-label="Edit Dummy Client" title="Edit Dummy Client">
-        <i class="bi bi-gear-fill"></i>
+        <i class="bi bi-gear"></i>
       </button>
       <label class="text-sm ${TagBadges ? 'd-none' : ''}" data-type="DummyLabel">${DUMMY_TYPE_LABEL}</label>
       ${TagBadges}

@@ -1,5 +1,6 @@
 // SettingsManager
-// - Loads default settings and merges persisted overrides from DB
+// - Loads default settings and merges persisted overrides from DB (or, for
+//   install-scoped settings, from the install-level store)
 // - Coerces types on read/write to keep a consistent shape across the app
 // - Emits 'SettingsUpdated' and optional per-setting events on change
 import { CreateLogger } from '../Logger';
@@ -8,6 +9,7 @@ import type { SettingDefinition, SettingGroup, SettingValue } from './DefaultSet
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as DB } from '../DB';
 import { CreateSettingsRepository } from '../DB/repositories/settings';
+import { CreateInstallSettingsStore } from './install-settings';
 import { RecordEdit } from '../AuditLog/edits';
 import { Line, Value as AuditValue } from '../AuditLog/message';
 import { FormatValue } from '../AuditLog/diff';
@@ -23,6 +25,13 @@ const Logger = CreateLogger('Settings');
 const SECRET_SETTING_KEYS = new Set(['WEBUI_PASSWORD', 'SDK_API_KEY']);
 
 const SettingsRepo = CreateSettingsRepository(DB);
+const InstallSettingsStore = CreateInstallSettingsStore();
+
+// Install-scoped settings persist outside the show file; everything else is
+// stored in the open show's database.
+function StoreFor(Setting: { Scope?: SettingDefinition['Scope'] | null }) {
+  return Setting.Scope === 'INSTALL' ? InstallSettingsStore : SettingsRepo;
+}
 
 // Runtime, cached representation of a single setting.
 interface Setting {
@@ -39,6 +48,8 @@ interface Setting {
   Min: number | null;
   Max: number | null;
   Unit: string | null;
+  Scope: SettingDefinition['Scope'] | null;
+  ShowWhen: string[] | null;
 }
 
 interface SettingsManagerShape {
@@ -136,8 +147,22 @@ const Manager: SettingsManagerShape = {
       }
 
       for (const Setting of DefaultSettings) {
-        const [Err, ManualSetting] = await SettingsRepo.GetByKey(Setting.Key);
+        let [Err, ManualSetting] = await StoreFor(Setting).GetByKey(Setting.Key);
         if (Err) throw Err;
+
+        // An install-scoped setting the install store has never seen used to be
+        // stored per show file. Adopt the open show's value once (or the default)
+        // and record it, so later show swaps never seed it again.
+        if (Setting.Scope === 'INSTALL' && !ManualSetting) {
+          [Err, ManualSetting] = await SettingsRepo.GetByKey(Setting.Key);
+          if (Err) throw Err;
+          const [SeedErr] = await InstallSettingsStore.Upsert(
+            Setting.Key,
+            ManualSetting ? ManualSetting.Value : Setting.DefaultValue
+          );
+          if (SeedErr)
+            Logger.error(`Failed to migrate ${Setting.Key} to install settings:`, SeedErr);
+        }
 
         // Normalize value based on type so persisted strings/ints map to the declared Setting.Type
         const normalize = (val: unknown): SettingValue => {
@@ -196,6 +221,8 @@ const Manager: SettingsManagerShape = {
           Min: typeof Setting.Min === 'number' ? Setting.Min : null,
           Max: typeof Setting.Max === 'number' ? Setting.Max : null,
           Unit: Setting.Unit || null,
+          Scope: Setting.Scope || null,
+          ShowWhen: Setting.ShowWhen || null,
         };
 
         Settings.set(NewSetting.Key, NewSetting);
@@ -286,7 +313,7 @@ const Manager: SettingsManagerShape = {
     const Previous = Setting.Value;
     Setting.Value = NormalizedValue;
 
-    const [Err] = await SettingsRepo.Upsert(Key, Setting.Value);
+    const [Err] = await StoreFor(Setting).Upsert(Key, Setting.Value);
     if (Err) return ['Error updating setting', null];
 
     Setting.isDefault = Setting.Value === Setting.DefaultValue;

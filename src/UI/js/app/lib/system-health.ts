@@ -510,14 +510,14 @@ function Badge(Key: ClientSystemCheckKey, Monitored: boolean, HasIssue: boolean)
     return {
       State: 'issue',
       Label: 'Alarm',
-      Icon: 'bi-exclamation-triangle-fill',
+      Icon: 'bi-exclamation-triangle',
       Title: 'Stop monitoring (conditions not met)',
     };
   }
   return {
     State: 'healthy',
     Label: 'Monitored',
-    Icon: 'bi-check-circle-fill',
+    Icon: 'bi-check-circle',
     Title: 'Stop monitoring',
   };
 }

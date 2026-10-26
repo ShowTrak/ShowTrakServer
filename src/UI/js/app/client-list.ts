@@ -494,9 +494,9 @@ function InitClientListPush() {
       // spinning) across the rapid console-tail updates while running.
       let indicatorHtml = '';
       if (state === 'completed') {
-        indicatorHtml = `<span class="exec-btn-icon exec-success" role="img" aria-label="Completed"><i class="bi bi-check-circle-fill"></i></span>`;
+        indicatorHtml = `<span class="exec-btn-icon exec-success" role="img" aria-label="Completed"><i class="bi bi-check-circle"></i></span>`;
       } else if (state === 'failed') {
-        indicatorHtml = `<span class="exec-btn-icon exec-fail" role="img" aria-label="Failed"><i class="bi bi-exclamation-triangle-fill"></i></span>`;
+        indicatorHtml = `<span class="exec-btn-icon exec-fail" role="img" aria-label="Failed"><i class="bi bi-exclamation-triangle"></i></span>`;
       } else if (state === 'running') {
         indicatorHtml = `<span class="exec-spinner" role="img" aria-label="Running"></span>`;
       } else {
@@ -631,7 +631,7 @@ export function RenderClientTile(Client: ClientView): string {
     UUID && Selected.includes(UUID) ? 'SELECTED' : ''
   }" data-uuid="${UUID}" data-flip-key="client:${UUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
 				<button type="button" class="CLIENT_TILE_COG" aria-label="Edit Client" title="Edit Client">
-					<i class="bi bi-gear-fill"></i>
+					<i class="bi bi-gear"></i>
 				</button>
 				<label class="text-sm ${TagBadges ? 'd-none' : ''}" data-type="Hostname">
         ${Safe(HostnameVersionLabel)}
@@ -930,7 +930,7 @@ function InitPendingAdoptionPush() {
           title,
           message: msg,
           clientUUID: uuid,
-          iconHtml: '<i class="bi bi-person-plus-fill"></i>',
+          iconHtml: '<i class="bi bi-person-plus"></i>',
         });
         PendingAdoptionAlerts.set(uuid, id);
       }

@@ -58,6 +58,18 @@ Schema.push({
     )',
 });
 
+// Facts about the show file itself rather than its contents: which ShowTrak
+// Server version created it and which last saved it (CreatedWithVersion,
+// SavedWithVersion). Read straight from a .ShowTrak file before it is opened,
+// so an older file can be backed up before this version upgrades it.
+Schema.push({
+  Name: 'ShowFileInfo',
+  SQL: 'CREATE TABLE IF NOT EXISTS `ShowFileInfo` ( \
+            Key TEXT PRIMARY KEY, \
+            Value TEXT \
+    )',
+});
+
 // Monitoring Targets are a separate kind of "client": no installed agent, just
 // server-driven probes (ping, http, etc). Method-specific config is stored as
 // JSON in the Settings column so new methods can introduce new fields without

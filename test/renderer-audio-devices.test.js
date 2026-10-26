@@ -200,7 +200,7 @@ test('the critical badge reflects every endpoint state', () => {
   assert.equal(badge({}).State, 'plain');
   assert.deepEqual(
     [badge({ IsCritical: true }).State, badge({ IsCritical: true }).Icon],
-    ['healthy', 'bi-check-circle-fill']
+    ['healthy', 'bi-check-circle']
   );
   assert.equal(
     badge({ IsCritical: true, Issues: [{ Kind: 'muted', Message: 'Muted' }] }).Label,
@@ -513,7 +513,7 @@ test('each section lists only its own direction, with no notes about the platfor
 
 test('a card titles like a display card: no icon, title and subtitle left-aligned', () => {
   const html = Audio.BuildAudioSectionHtml(client(), 'ok', 'output');
-  assert.doesNotMatch(html, /bi-speaker-fill|bi-mic-fill|SHOWTRAK_AUDIO_ICON/);
+  assert.doesNotMatch(html, /bi-(speaker|mic)\b|SHOWTRAK_AUDIO_ICON/);
   assert.match(
     html,
     /<div class="SHOWTRAK_AUDIO_TITLE text-start">\s*<h6 class="mb-0">MacBook Pro Speakers/
@@ -822,12 +822,12 @@ test('RenderClientInfoAudio rebuilds on a structural change and patches levels o
   assert.equal(mute.classes.has('is-muted'), true);
   assert.equal(mute.attrs['data-muted'], '1');
   assert.equal(mute.attrs.title, 'Unmute');
-  assert.equal(icon.attrs.class, 'bi bi-volume-mute-fill');
+  assert.equal(icon.attrs.class, 'bi bi-volume-mute');
 
   // Unmuting flips it back.
   Audio.RenderClientInfoAudio(client({}, { Endpoints: [endpoint({ Volume: 64, Muted: false })] }));
   assert.equal(mute.classes.has('is-muted'), false);
-  assert.equal(icon.attrs.class, 'bi bi-volume-up-fill');
+  assert.equal(icon.attrs.class, 'bi bi-volume-up');
 
   // A new input rebuilds the inputs section and leaves the outputs alone.
   inputs.htmlValue = null;

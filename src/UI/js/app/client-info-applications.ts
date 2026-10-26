@@ -95,7 +95,7 @@ function ApplicationCard(App: RunningApplicationViewItem, Client: ClientView): s
       ${ApplicationIssues(App, Client)
         .map(
           (Issue) =>
-            `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue)}</small>`
+            `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle me-1"></i>${Safe(Issue)}</small>`
         )
         .join('')}
       ${ConditionsTable(App, Client, Token)}

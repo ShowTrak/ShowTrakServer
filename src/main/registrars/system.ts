@@ -97,6 +97,13 @@ function register(): void {
     return;
   });
 
+  RPC.handle('OpenBackupsFolder', async (_event: unknown) => {
+    const BackupsPath = AppDataManager.GetBackupsDirectory();
+    Logger.log('Opening backups folder:', BackupsPath);
+    await shell.openPath(BackupsPath);
+    return;
+  });
+
   RPC.handle('OpenDiscordInviteLinkInBrowser', async (_event: unknown, _URL: unknown) => {
     const url = 'https://discord.gg/DACmwsbSGW';
     await shell.openExternal(url);

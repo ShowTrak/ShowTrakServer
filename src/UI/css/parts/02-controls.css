@@ -1,5 +1,6 @@
-/* Settings button (cog icon) */
+/* Settings (cog) and show file buttons */
 #NAVBAR_CORE_BUTTON.settings-btn,
+#FILE_MENU_BUTTON.settings-btn,
 #ADD_MONITORING_TARGET_BTN.settings-btn {
   display: inline-flex;
   align-items: center;
@@ -16,7 +17,8 @@
     transform 120ms ease;
 }
 #ADD_MONITORING_TARGET_DROPDOWN .dropdown-toggle::after,
-#SETTINGS_MENU_DROPDOWN .dropdown-toggle::after {
+#SETTINGS_MENU_DROPDOWN .dropdown-toggle::after,
+#FILE_MENU_DROPDOWN .dropdown-toggle::after {
   display: none;
 }
 /* Only show add-target controls while in edit mode, with 300ms fade. */
@@ -44,27 +46,36 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
     visibility 0s linear 0s;
 }
 #ADD_MONITORING_TARGET_MENU.dropdown-menu,
-#SETTINGS_MENU.dropdown-menu {
+#SETTINGS_MENU.dropdown-menu,
+#FILE_MENU.dropdown-menu {
   min-width: 240px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   background: rgb(var(--surface-2-rgb) / 0.98);
   padding: 0.35rem;
+  /* These menus open from the bottom bar. Capped to the space above it so Popper
+     can always flip them upward; a menu taller than the window would otherwise
+     open downward, off-screen, and look like the button does nothing. */
+  max-height: calc(100vh - var(--bottom-bar-height) - 24px);
+  overflow-y: auto;
 }
 #ADD_MONITORING_TARGET_MENU .dropdown-item,
-#SETTINGS_MENU .dropdown-item {
+#SETTINGS_MENU .dropdown-item,
+#FILE_MENU .dropdown-item {
   color: var(--text-strong);
   border-radius: var(--radius-sm);
   font-size: var(--fs-md);
   padding: 0.45rem 0.6rem;
 }
-#SETTINGS_MENU .dropdown-item {
+#SETTINGS_MENU .dropdown-item,
+#FILE_MENU .dropdown-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
 }
-#SETTINGS_MENU .dropdown-item .menu-shortcut {
+#SETTINGS_MENU .dropdown-item .menu-shortcut,
+#FILE_MENU .dropdown-item .menu-shortcut {
   margin-left: auto;
   color: var(--text-muted);
   font-size: var(--fs-xs);
@@ -74,11 +85,14 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 #ADD_MONITORING_TARGET_MENU .dropdown-item:hover,
 #ADD_MONITORING_TARGET_MENU .dropdown-item:focus,
 #SETTINGS_MENU .dropdown-item:hover,
-#SETTINGS_MENU .dropdown-item:focus {
+#SETTINGS_MENU .dropdown-item:focus,
+#FILE_MENU .dropdown-item:hover,
+#FILE_MENU .dropdown-item:focus {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
-#SETTINGS_MENU .dropdown-header {
+#SETTINGS_MENU .dropdown-header,
+#FILE_MENU .dropdown-header {
   color: var(--text-subtle);
   font-size: var(--fs-xs);
   text-transform: uppercase;
@@ -86,7 +100,8 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   padding: 0.35rem 0.6rem 0.15rem;
 }
 #ADD_MONITORING_TARGET_MENU .dropdown-divider,
-#SETTINGS_MENU .dropdown-divider {
+#SETTINGS_MENU .dropdown-divider,
+#FILE_MENU .dropdown-divider {
   border-top-color: var(--border-default);
   margin: 0.3rem 0.2rem;
 }
@@ -99,10 +114,12 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   color: var(--danger-text-hover) !important;
 }
 #NAVBAR_CORE_BUTTON.settings-btn:hover,
+#FILE_MENU_BUTTON.settings-btn:hover,
 #ADD_MONITORING_TARGET_BTN.settings-btn:hover {
   color: #fff;
 }
 #NAVBAR_CORE_BUTTON.settings-btn .bi,
+#FILE_MENU_BUTTON.settings-btn .bi,
 #ADD_MONITORING_TARGET_BTN.settings-btn .bi {
   font-size: 16px;
   line-height: 1;

@@ -265,8 +265,8 @@ test('each alert type has its own icon, with a generic fallback', () => {
   assert.match(iconForAlert({ type: 'usb' }), /bi-usb-symbol/);
   assert.match(iconForAlert({ type: 'online' }), /bi-wifi"/);
   assert.match(iconForAlert({ type: 'offline' }), /bi-wifi-off/);
-  assert.match(iconForAlert({ type: 'anything-else' }), /bi-exclamation-circle-fill/);
-  assert.match(iconForAlert({}), /bi-exclamation-circle-fill/);
+  assert.match(iconForAlert({ type: 'anything-else' }), /bi-exclamation-circle/);
+  assert.match(iconForAlert({}), /bi-exclamation-circle/);
 });
 
 test('a caller-supplied icon wins over the type default', () => {

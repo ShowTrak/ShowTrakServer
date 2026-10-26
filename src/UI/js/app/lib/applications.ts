@@ -97,7 +97,7 @@ export function ApplicationBadge(
     return {
       State: 'missing',
       Label: 'Not Running',
-      Icon: 'bi-x-circle-fill',
+      Icon: 'bi-x-circle',
       Title: 'Stop monitoring (application not running)',
     };
   }
@@ -105,14 +105,14 @@ export function ApplicationBadge(
     return {
       State: 'issue',
       Label: 'Issue',
-      Icon: 'bi-exclamation-triangle-fill',
+      Icon: 'bi-exclamation-triangle',
       Title: 'Stop monitoring (conditions not met)',
     };
   }
   return {
     State: 'healthy',
     Label: 'Monitored',
-    Icon: 'bi-check-circle-fill',
+    Icon: 'bi-check-circle',
     Title: 'Stop monitoring',
   };
 }

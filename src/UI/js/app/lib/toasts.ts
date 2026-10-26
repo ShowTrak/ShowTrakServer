@@ -34,10 +34,10 @@ interface AlertStyleToastOptions {
 
 export function iconForType(type: unknown) {
   const t = String(type || 'info').toLowerCase();
-  if (t === 'success') return '<i class="bi bi-check-circle-fill"></i>';
-  if (t === 'warning') return '<i class="bi bi-exclamation-triangle-fill"></i>';
-  if (t === 'error') return '<i class="bi bi-x-circle-fill"></i>';
-  return '<i class="bi bi-info-circle-fill"></i>';
+  if (t === 'success') return '<i class="bi bi-check-circle"></i>';
+  if (t === 'warning') return '<i class="bi bi-exclamation-triangle"></i>';
+  if (t === 'error') return '<i class="bi bi-x-circle"></i>';
+  return '<i class="bi bi-info-circle"></i>';
 }
 
 // Auto-remove `el` after `duration` ms, pausing the countdown while the pointer
@@ -299,7 +299,7 @@ export function CriticalConfirmationDialog(Options: CriticalConfirmationOptions)
 			<div id="SHOWTRAK_CRITICAL_CONFIRM" class="critical-confirm no-drag">
 				<div class="critical-confirm-panel" role="alertdialog" aria-modal="true"
 					aria-labelledby="CRITICAL_CONFIRM_TITLE" aria-describedby="CRITICAL_CONFIRM_MSG">
-					<div class="critical-confirm-icon"><i class="bi bi-exclamation-octagon-fill"></i></div>
+					<div class="critical-confirm-icon"><i class="bi bi-exclamation-octagon"></i></div>
 					<h2 class="critical-confirm-title" id="CRITICAL_CONFIRM_TITLE">${Safe(Options.title)}</h2>
 					<div class="critical-confirm-msg" id="CRITICAL_CONFIRM_MSG">${Safe(Options.message)}</div>
 					${ItemsHtml}

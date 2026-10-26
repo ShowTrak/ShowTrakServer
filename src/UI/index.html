@@ -65,6 +65,35 @@
         </button>
       </div>
     </div>
+    <!-- Floating Software Update progress (wire-app-updates.ts) -->
+    <button
+      type="button"
+      id="APP_UPDATE_FLOAT"
+      class="d-none"
+      role="status"
+      aria-live="polite"
+      title="Open Software Update"
+    >
+      <span class="app-update-float-head">
+        <span class="app-update-float-title">
+          <i class="bi bi-cloud-arrow-down" aria-hidden="true"></i>
+          Software Update
+        </span>
+        <span id="APP_UPDATE_FLOAT_VERSION" class="app-update-float-version"></span>
+      </span>
+      <span
+        id="APP_UPDATE_FLOAT_TRACK"
+        class="app-update-float-track"
+        role="progressbar"
+        aria-label="Software update download progress"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <span id="APP_UPDATE_FLOAT_BAR" class="app-update-float-bar"></span>
+      </span>
+      <span id="APP_UPDATE_FLOAT_DETAIL" class="app-update-float-detail"></span>
+    </button>
     <!-- Bottom Bar -->
     <div id="APP_BOTTOM_BAR">
       <div class="bar-content">
@@ -150,7 +179,7 @@
               data-bs-auto-close="true"
               aria-expanded="false"
             >
-              <i class="bi bi-plus-circle-fill"></i>
+              <i class="bi bi-plus-circle"></i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end" id="ADD_MONITORING_TARGET_MENU">
               <li>
@@ -213,7 +242,7 @@
             title="Toggle FOG Tasks Panel"
             aria-label="FOG Tasks"
           >
-            <i class="bi bi-hdd-network-fill"></i>
+            <i class="bi bi-hdd-network"></i>
             <span class="fog-count d-none">0</span>
           </button>
           <button
@@ -222,7 +251,7 @@
             title="Toggle Alerts Panel (Ctrl/Cmd+Y)"
             aria-label="Alerts"
           >
-            <i class="bi bi-exclamation-circle-fill"></i>
+            <i class="bi bi-exclamation-circle"></i>
             <span class="alerts-count d-none">0</span>
           </button>
           <div class="dropdown no-drag" id="SETTINGS_MENU_DROPDOWN">
@@ -237,47 +266,9 @@
               data-bs-auto-close="true"
               aria-expanded="false"
             >
-              <i class="bi bi-gear-fill"></i>
+              <i class="bi bi-gear"></i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end" id="SETTINGS_MENU">
-              <li><h6 class="dropdown-header">Show File</h6></li>
-              <li>
-                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_NEW">
-                  <span>New Show File</span>
-                  <span class="menu-shortcut">Ctrl/Cmd+N</span>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_OPEN">
-                  <span>Open Show File…</span>
-                  <span class="menu-shortcut">Ctrl/Cmd+O</span>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SAVE">
-                  <span>Save Show File</span>
-                  <span class="menu-shortcut">Ctrl/Cmd+S</span>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SAVEAS">
-                  <span>Save Show File As…</span>
-                  <span class="menu-shortcut">Ctrl/Cmd+Shift+S</span>
-                </button>
-              </li>
-              <li><hr class="dropdown-divider" /></li>
-              <li><h6 class="dropdown-header">Folders</h6></li>
-              <li>
-                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_LOGSFOLDER">
-                  Open Logs Directory
-                </button>
-              </li>
-              <li>
-                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SCRIPTSFOLDER">
-                  Open Scripts Directory
-                </button>
-              </li>
-              <li><hr class="dropdown-divider" /></li>
               <li><h6 class="dropdown-header">Manage</h6></li>
               <li>
                 <button type="button" class="dropdown-item" id="ADD_TARGET_BROWSE_ACTION">
@@ -386,6 +377,65 @@
               </li>
             </ul>
           </div>
+          <div class="dropdown no-drag" id="FILE_MENU_DROPDOWN">
+            <button
+              type="button"
+              id="FILE_MENU_BUTTON"
+              class="settings-btn dropdown-toggle no-drag"
+              title="Show File and Folders"
+              aria-label="Show File and Folders"
+              data-bs-toggle="dropdown"
+              data-bs-offset="0,6"
+              data-bs-auto-close="true"
+              aria-expanded="false"
+            >
+              <i class="bi bi-file-earmark"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" id="FILE_MENU">
+              <li><h6 class="dropdown-header">Show File</h6></li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_NEW">
+                  <span>New Show File</span>
+                  <span class="menu-shortcut">Ctrl/Cmd+N</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_OPEN">
+                  <span>Open Show File…</span>
+                  <span class="menu-shortcut">Ctrl/Cmd+O</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SAVE">
+                  <span>Save Show File</span>
+                  <span class="menu-shortcut">Ctrl/Cmd+S</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SAVEAS">
+                  <span>Save Show File As…</span>
+                  <span class="menu-shortcut">Ctrl/Cmd+Shift+S</span>
+                </button>
+              </li>
+              <li><hr class="dropdown-divider" /></li>
+              <li><h6 class="dropdown-header">Folders</h6></li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_LOGSFOLDER">
+                  Open Logs Folder
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SCRIPTSFOLDER">
+                  Open Scripts Folder
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_BACKUPSFOLDER">
+                  Open Backups Folder
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
@@ -458,8 +508,8 @@
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <strong class="mb-0"> No Show File Open </strong>
-            <p class="text-muted text-sm mb-2">
+            <strong class="mb-0" id="SHOWTRAK_MODAL_NO_SHOW_Label"> No Show File Open </strong>
+            <p class="text-muted text-sm mb-2 text-break" id="NO_SHOW_MESSAGE">
               Open an existing show file or create a new one to get started.
             </p>
 
@@ -474,6 +524,42 @@
       </div>
     </div>
     <!-- End No Show Open Prompt Modal -->
+
+    <!-- Show File Upgrade Prompt Modal -->
+    <div
+      class="modal fade"
+      id="SHOWTRAK_MODAL_UPGRADE_SHOW"
+      tabindex="-1"
+      data-bs-backdrop="static"
+      data-bs-keyboard="false"
+      aria-labelledby="SHOWTRAK_MODAL_UPGRADE_SHOW_Label"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <strong class="mb-0" id="SHOWTRAK_MODAL_UPGRADE_SHOW_Label">
+              Upgrade Show File?
+            </strong>
+            <p class="text-muted text-sm mb-2 text-break" id="UPGRADE_SHOW_MESSAGE"></p>
+            <p class="text-muted text-sm mb-2">
+              A backup of the original file is saved to the Backups folder before anything changes.
+              Open it any time from Open Backups Folder in the settings menu.
+            </p>
+
+            <div class="d-grid gap-2">
+              <button type="button" class="btn btn-success" id="UPGRADE_SHOW_ACCEPT">
+                Back Up and Upgrade
+              </button>
+              <button type="button" class="btn btn-light" id="UPGRADE_SHOW_DECLINE">
+                Create a New Show File Instead
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- End Show File Upgrade Prompt Modal -->
 
     <!-- Legacy Data Migration Prompt Modal -->
     <div

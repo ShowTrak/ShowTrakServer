@@ -49,12 +49,16 @@ function buildMacAppMenuTemplate(deps: AppMenuDeps) {
     },
     { type: 'separator' },
     {
-      label: 'Open Logs Directory',
+      label: 'Open Logs Folder',
       click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_LOGSFOLDER'),
     },
     {
-      label: 'Open Scripts Directory',
+      label: 'Open Scripts Folder',
       click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_SCRIPTSFOLDER'),
+    },
+    {
+      label: 'Open Backups Folder',
+      click: () => sendAppMenuAction('SHOWTRAK_MODEL_CORE_BACKUPSFOLDER'),
     },
     { type: 'separator' },
     {

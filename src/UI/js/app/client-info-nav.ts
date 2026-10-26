@@ -61,7 +61,7 @@ function EnsureClientInfoNav() {
     ClientInfoTabsFor(Kind, Surface)
       .map(
         (Tab) =>
-          `<button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-client-info-tab-target="${Safe(Tab.Key)}"><span class="settings-nav-item-title">${Safe(Tab.Title)}</span><i class="bi bi-exclamation-triangle-fill settings-nav-item-alarm d-none" role="img" aria-label="Alarm active"></i></button>`
+          `<button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-client-info-tab-target="${Safe(Tab.Key)}"><span class="settings-nav-item-title">${Safe(Tab.Title)}</span><i class="bi bi-exclamation-triangle settings-nav-item-alarm d-none" role="img" aria-label="Alarm active"></i></button>`
       )
       .join('')
   );

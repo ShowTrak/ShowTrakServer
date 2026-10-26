@@ -1850,10 +1850,11 @@ html:has(body.is-web) {
   background: #160f35 !important;
 }
 
-/* Desktop-only chrome hidden on the web: navbar/dragbar and the cogs
-   (settings) menu. Mode/alerts toggles stay visible as read-only state. */
+/* Desktop-only chrome hidden on the web: navbar/dragbar, the cogs (settings)
+   menu and the show file menu. Mode/alerts toggles stay visible as read-only state. */
 body.is-web .dragbar,
-body.is-web #SETTINGS_MENU_DROPDOWN {
+body.is-web #SETTINGS_MENU_DROPDOWN,
+body.is-web #FILE_MENU_DROPDOWN {
   display: none !important;
 }
 

@@ -86,7 +86,7 @@ export const FREEKIOSK_COMMANDS = Object.freeze([
   {
     ID: 'screen.off',
     Label: 'Screen Off',
-    Icon: 'display-fill',
+    Icon: 'display',
     Method: 'GET',
     Path: '/api/screen/off',
     Group: 'Power',
@@ -96,7 +96,7 @@ export const FREEKIOSK_COMMANDS = Object.freeze([
   {
     ID: 'lock',
     Label: 'Lock Device',
-    Icon: 'lock-fill',
+    Icon: 'lock',
     Method: 'GET',
     Path: '/api/lock',
     Group: 'Power',

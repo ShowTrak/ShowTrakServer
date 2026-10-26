@@ -981,7 +981,7 @@ const Actions: MonitoringActionDef[] = [
   {
     ID: 'record.stop',
     Label: 'Stop',
-    Icon: 'stop-fill',
+    Icon: 'stop',
     Group: 'Transport',
     Destructive: true,
     Note: 'Stops recording on a HELO, or sends Stop to a Ki Pro, which ends a recording or playback.',
@@ -989,7 +989,7 @@ const Actions: MonitoringActionDef[] = [
   {
     ID: 'play',
     Label: 'Play',
-    Icon: 'play-fill',
+    Icon: 'play',
     Group: 'Transport',
     Note: 'Plays the current clip. Ki Pro only.',
   },

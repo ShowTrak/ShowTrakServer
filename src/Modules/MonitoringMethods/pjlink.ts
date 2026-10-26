@@ -252,14 +252,14 @@ const Actions: MonitoringActionDef[] = [
   {
     ID: 'shutter.close',
     Label: 'Close Shutter',
-    Icon: 'eye-slash-fill',
+    Icon: 'eye-slash',
     Group: 'Shutter',
     Note: 'A/V mute on — blanks picture and sound without powering down.',
   },
   {
     ID: 'shutter.open',
     Label: 'Open Shutter',
-    Icon: 'eye-fill',
+    Icon: 'eye',
     Group: 'Shutter',
     Note: 'A/V mute off.',
   },
@@ -307,14 +307,14 @@ const Actions: MonitoringActionDef[] = [
   {
     ID: 'volume.up',
     Label: 'Volume Up',
-    Icon: 'volume-up-fill',
+    Icon: 'volume-up',
     Group: 'Audio',
     Note: `One step per press. ${CLASS_2_NOTE}`,
   },
   {
     ID: 'volume.down',
     Label: 'Volume Down',
-    Icon: 'volume-down-fill',
+    Icon: 'volume-down',
     Group: 'Audio',
     Note: `One step per press. ${CLASS_2_NOTE}`,
   },

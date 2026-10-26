@@ -52,6 +52,11 @@ export interface SettingRow {
   Value: unknown; // BLOB
 }
 
+export interface ShowFileInfoRow {
+  Key: string; // 'CreatedWithVersion' | 'SavedWithVersion'
+  Value: string | null;
+}
+
 export interface MonitoringTargetRow {
   TargetID: number;
   Nickname: string | null;

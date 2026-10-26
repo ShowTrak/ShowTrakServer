@@ -148,7 +148,7 @@ function InterfaceCard(
       ${(Home ? Iface.Issues : [])
         .map(
           (Issue) =>
-            `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue.Message)}</small>`
+            `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle me-1"></i>${Safe(Issue.Message)}</small>`
         )
         .join('')}
       ${Home ? ConditionsTable(Iface, Capabilities) : ''}

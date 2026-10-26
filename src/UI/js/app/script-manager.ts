@@ -651,7 +651,7 @@ export function RenderScriptManagerFileList(Files: string[]) {
           title="${Safe(RunTitle)}"
           ${CanRunLocally ? '' : 'disabled'}
         >
-          <i class="bi bi-play-fill"></i>
+          <i class="bi bi-play"></i>
           Run Locally
         </button>
       </div>

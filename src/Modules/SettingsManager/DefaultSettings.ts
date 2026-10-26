@@ -36,20 +36,113 @@ export interface SettingDefinition {
   // Optional unit label shown alongside numeric/slider values in the UI (e.g. '%', 'ms').
   Unit?: string;
   OnUpdateEvent?: string;
+  // 'INSTALL' stores the value with this installation of ShowTrak (see
+  // install-settings.ts) instead of in the open show file, so it does not change
+  // when a different show is opened. Omitted means per show file.
+  Scope?: 'INSTALL';
+  // Progressive disclosure: Preferences shows this setting only while every
+  // BOOLEAN setting named here is on. Purely presentational: a hidden setting
+  // keeps its value, and the backend still reads the parent toggle itself.
+  ShowWhen?: string[];
 }
 
 export interface SettingGroup {
   Name: string;
   Title: string;
+  // As SettingDefinition.ShowWhen, for a whole group (and its Preferences tab).
+  ShowWhen?: string[];
 }
 
 export const DefaultSettings: SettingDefinition[] = [
+  // Machine settings are stored with this installation (Scope: 'INSTALL'),
+  // not in the show file, and get the first Preferences tab.
+  {
+    Group: 'Machine',
+    Key: 'SYSTEM_PREVENT_DISPLAY_SLEEP',
+    Title: 'Prevent Display Sleep',
+    Description: '',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+    OnUpdateEvent: 'DisplaySleepSettingsChanged',
+    Scope: 'INSTALL',
+  },
+  {
+    Group: 'Machine',
+    Key: 'SYSTEM_AUTO_MAXIMIZE_ON_BOOT',
+    Title: 'Auto Maximise Window on Boot',
+    Description: '',
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+    Scope: 'INSTALL',
+  },
+  {
+    Group: 'Machine',
+    Key: 'SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4',
+    Title: 'Stop Accidental Shutdowns',
+    Description: 'Ask for confirmation before quitting ShowTrak.',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+    OnUpdateEvent: 'ShutdownProtectionChanged',
+    Scope: 'INSTALL',
+  },
+  {
+    Group: 'Machine',
+    Key: 'SYSTEM_AUTO_UPDATE_ENABLED',
+    Title: 'Automatic Updates',
+    Description:
+      'Download new releases in the background. They install the next time ShowTrak restarts.',
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+    OnUpdateEvent: 'AutoUpdateSettingsChanged',
+    Scope: 'INSTALL',
+  },
+  {
+    Group: 'Machine',
+    Key: 'SYSTEM_AUTOSAVE_ENABLED',
+    Title: 'Enable Autosave',
+    Description: '',
+    Type: 'BOOLEAN',
+    DefaultValue: true,
+    OnUpdateEvent: 'AutosaveSettingsChanged',
+    Scope: 'INSTALL',
+  },
+  {
+    Group: 'Machine',
+    Key: 'SYSTEM_AUTOSAVE_INTERVAL_MINUTES',
+    Title: 'Autosave Interval',
+    Description: '',
+    Type: 'INTEGER',
+    DefaultValue: 5,
+    ShowWhen: ['SYSTEM_AUTOSAVE_ENABLED'],
+    Unit: 'minutes',
+    OnUpdateEvent: 'AutosaveSettingsChanged',
+    Scope: 'INSTALL',
+  },
+  {
+    Group: 'Machine',
+    Key: 'SYSTEM_WORKSPACE_DEFAULT_EDITOR',
+    Title: 'Workspace Default Editor',
+    Description: 'Editor used to open script files from Script Manager.',
+    Type: 'OPTION',
+    DefaultValue: 'System Default',
+    Options: ['System Default', 'Visual Studio Code'],
+    Scope: 'INSTALL',
+  },
+  {
+    Group: 'Machine',
+    Key: 'SYSTEM_ALLOW_UNASSIGNED_CLIENTS',
+    Title: 'Unassigned Clients',
+    Description: 'Create empty client slots now and fill them with a real device later.',
+    Type: 'BOOLEAN',
+    DefaultValue: false,
+    Scope: 'INSTALL',
+  },
   {
     Group: 'Layout',
     Key: 'UI_GROUP_COLUMN_COUNT',
     Title: 'Group Columns',
     Description:
-      'Number of columns used to lay out groups. Groups set to Full Width span every column; other groups span the number of columns set in the group editor, capped at this count.',
+      'Full Width groups span every column. Other groups use their own width, capped at this count.',
     Type: 'INTEGER',
     DefaultValue: 2,
     Min: 2,
@@ -60,7 +153,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Features',
     Key: 'SYSTEM_ALLOW_WOL',
     Title: 'Wake on LAN',
-    Description: 'Enable Wake on LAN functionality to wake up clients remotely.',
+    Description: '',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -69,7 +162,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Key: 'UI_CLEAR_SELECTION_AFTER_ACTION',
     Title: 'Clear Selection After Actions',
     Description:
-      'Deselect clients once a script, Wake on LAN or other action is run from the context menu. Only the screen that ran the action is cleared; other windows and Web UI users keep their selection.',
+      'Deselect clients after running an action from the context menu. Other screens keep their selection.',
     Type: 'BOOLEAN',
     DefaultValue: false,
   },
@@ -77,8 +170,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Features',
     Key: 'UI_EXECUTION_PANEL_DWELL_SECONDS',
     Title: 'Execution Panel Dwell Time',
-    Description:
-      'How long the script execution panel stays open after every script, Wake on LAN and other action in it has finished. 0 closes it as soon as the last one finishes.',
+    Description: 'How long the execution panel stays open after its last action finishes.',
     Type: 'SLIDER',
     DefaultValue: 5,
     Min: 0,
@@ -90,25 +182,15 @@ export const DefaultSettings: SettingDefinition[] = [
     Key: 'CLIENT_SHOW_LAUNCH_COUNTDOWN',
     Title: 'Show Auto Launch Countdown',
     Description:
-      'Show the visible abort countdown on clients before a run-on-launch script fires. When disabled the script still runs after its delay, but without the on-screen countdown or a chance to cancel.',
+      'Show a cancellable countdown on clients before a launch script runs. The script runs either way.',
     Type: 'BOOLEAN',
     DefaultValue: true,
-  },
-  {
-    Group: 'Features',
-    Key: 'SYSTEM_ALLOW_UNASSIGNED_CLIENTS',
-    Title: 'Unassigned Clients',
-    Description:
-      'Allow empty client slots to be created ahead of time and filled in later by replacing them with a real device. Disabled by default.',
-    Type: 'BOOLEAN',
-    DefaultValue: false,
   },
   {
     Group: 'Network',
     Key: 'SYSTEM_OSC_ENABLED',
     Title: 'OSC Control',
-    Description:
-      'Enable the inbound OSC control server so external consoles can drive ShowTrak. Applies immediately.',
+    Description: '',
     Type: 'BOOLEAN',
     DefaultValue: true,
     OnUpdateEvent: 'OscSettingsChanged',
@@ -117,10 +199,10 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Network',
     Key: 'SYSTEM_OSC_PORT',
     Title: 'OSC Control Port',
-    Description:
-      'UDP port the inbound OSC control server listens on. Changes apply immediately — update any OSC senders to match.',
+    Description: '',
     Type: 'INTEGER',
     DefaultValue: OSC_PORT,
+    ShowWhen: ['SYSTEM_OSC_ENABLED'],
     Min: 1,
     Max: 65535,
     OnUpdateEvent: 'OscSettingsChanged',
@@ -129,8 +211,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'SDK / Integration API',
     Key: 'SDK_API_ENABLED',
     Title: 'SDK Control API',
-    Description:
-      'Enable the WebSocket control API (the /sdk namespace) used by the ShowTrak Server SDK and integrations such as the Bitfocus Companion module. Connections require the API key below.',
+    Description: 'Used by the ShowTrak SDK and integrations such as Bitfocus Companion.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -139,25 +220,25 @@ export const DefaultSettings: SettingDefinition[] = [
     Key: 'SDK_API_KEY',
     Title: 'SDK API Key',
     Description:
-      'Required key integrations must present to connect to the control API. Auto-generated on first boot — copy it into your integration (e.g. the Companion connection settings). Change it to revoke existing integrations.',
+      'Integrations must present this key to connect. Change it to revoke every integration.',
     Type: 'STRING',
     DefaultValue: '',
+    ShowWhen: ['SDK_API_ENABLED'],
   },
   {
     Group: 'SDK / Integration API',
     Key: 'SDK_ALLOW_REMOTE_PAIRING',
     Title: 'Allow ShowTrak Remote Pairing',
-    Description:
-      'Allow new phones and tablets running ShowTrak Remote to pair with this server. Pairing uses the Web UI passcode (or a scanned pairing code), not the API key above — so this can be turned off without affecting integrations such as Companion. Devices that are already paired keep working; use Revoke on the paired devices list to remove one.',
+    Description: 'Allow new phones and tablets to pair. Already paired devices keep working.',
     Type: 'BOOLEAN',
     DefaultValue: true,
+    ShowWhen: ['SDK_API_ENABLED'],
   },
   {
     Group: 'Monitoring',
     Key: 'MONITORING_DEFAULT_INTERVAL_MS',
     Title: 'Default Monitoring Interval',
-    Description:
-      'Polling interval applied to monitors and dummy clients that do not set their own. Applies to monitors created or reloaded after the change.',
+    Description: 'Used by monitors and dummy clients that do not set their own.',
     Type: 'INTEGER',
     DefaultValue: DEFAULT_MONITORING_INTERVAL_MS,
     Min: 3000,
@@ -170,7 +251,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Key: 'MONITORING_FAILURE_THRESHOLD',
     Title: 'Failures Before Offline',
     Description:
-      'How many checks in a row must fail before a monitoring check is marked offline. 1 reacts to the first miss; raise it to ride out the odd dropped packet. Individual monitors and checks can override this. Applies from the next check.',
+      'Consecutive failed checks before a check is marked offline. Monitors can override this.',
     Type: 'INTEGER',
     DefaultValue: 1,
     Min: 1,
@@ -182,7 +263,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Key: 'CLIENT_OFFLINE_GRACE_SECONDS',
     Title: 'Client Disconnect Grace Period',
     Description:
-      'How long a ShowTrak client may stay disconnected before it is marked offline. 0 marks it offline the moment its connection drops; raise it to ride out brief network blips that the client recovers from on its own. Individual clients can override this. Applies from the next disconnect.',
+      'How long a client can be disconnected before it is marked offline. Clients can override this.',
     Type: 'SLIDER',
     DefaultValue: 0,
     Min: MIN_OFFLINE_GRACE_SECONDS,
@@ -194,7 +275,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Alerts',
     Key: 'ALERT_SOUND_VOLUME',
     Title: 'Alert Sound Volume',
-    Description: 'Master volume for the built-in and custom alert sounds played on the server.',
+    Description: '',
     Type: 'SLIDER',
     DefaultValue: 100,
     Min: 0,
@@ -205,8 +286,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Alerts',
     Key: 'ALERT_SOUND_DEDUPE_WINDOW_MS',
     Title: 'Alert Sound Repeat Window',
-    Description:
-      'When several alerts ask for the SAME sound within this window, only the first one is played and the rest are dropped silently — so one fault matching a client, a group and a tag rule is a single clear cue rather than a smear. Different sounds are unaffected: two built-in tones, or two different custom assets, still play together. Set to 0 to play every alert sound.',
+    Description: 'Repeats of the same sound within this window are skipped. 0 plays every alert.',
     Type: 'INTEGER',
     DefaultValue: ALERT_AUDIO_DEDUPE_DEFAULT_MS,
     Min: 0,
@@ -219,7 +299,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Web UI',
     Key: 'WEBUI_ENABLED',
     Title: 'Web UI Enabled',
-    Description: 'Enable access to the Web UI.',
+    Description: '',
     Type: 'BOOLEAN',
     DefaultValue: true,
     // Re-evaluate live Web UI sessions when access is toggled: disabling must
@@ -230,8 +310,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Web UI',
     Key: 'WEBUI_PASSWORD_PROTECTION_ENABLED',
     Title: 'Password Protection Enabled',
-    Description:
-      'Require a password to access the Web UI. Sessions are remembered per browser tab and can be ended with the Logout button.',
+    Description: 'Require the passcode to open the Web UI.',
     Type: 'BOOLEAN',
     DefaultValue: false,
     // Toggling protection must invalidate existing sessions so already-connected
@@ -242,10 +321,10 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Web UI',
     Key: 'WEBUI_PASSWORD',
     Title: 'Password (4 Digit Numeric)',
-    Description:
-      'Optional 4 digit numeric passcode used to access the Web UI when password protection is enabled.',
+    Description: '',
     Type: 'STRING',
     DefaultValue: '',
+    ShowWhen: ['WEBUI_PASSWORD_PROTECTION_ENABLED'],
     // Changing the passcode must invalidate every existing session so live
     // browsers are forced to re-authenticate with the new code.
     OnUpdateEvent: 'WebUiSettingsChanged',
@@ -254,7 +333,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_IDENTIFY',
     Title: 'Identify Clients',
-    Description: 'Allow the Web UI to flash the identify overlay on a client screen.',
+    Description: '',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -262,8 +341,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_MODE_CHANGE',
     Title: 'Switch Show/Edit Mode',
-    Description:
-      'Allow the Web UI to switch the server between Show and Edit mode. Edit mode is what unlocks the management permissions below, for every connected device. Connected browsers pick up a change when they reload.',
+    Description: 'Edit mode unlocks the management permissions below.',
     Type: 'BOOLEAN',
     DefaultValue: false,
   },
@@ -271,8 +349,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_ALERT_ACTIONS_TOGGLE',
     Title: 'Toggle Alert Actions',
-    Description:
-      'Allow the Web UI to turn alert actions on and off for the whole server. Connected browsers pick up a change when they reload.',
+    Description: 'Turn alert actions on and off for the whole server.',
     Type: 'BOOLEAN',
     DefaultValue: false,
   },
@@ -280,8 +357,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_CLIENT_MANAGEMENT',
     Title: 'Client Management',
-    Description:
-      'Allow the Web UI to adopt, edit, replace and delete clients, change monitored USB/app/display flags, and manage and assign tags. Still requires the server to be in Edit mode.',
+    Description: 'Adopt, edit, replace and delete clients, and manage tags. Requires Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -289,8 +365,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_GROUP_MANAGEMENT',
     Title: 'Group Management',
-    Description:
-      'Allow the Web UI to create, rename, delete and reorder groups. Still requires the server to be in Edit mode.',
+    Description: 'Requires Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -298,8 +373,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_MONITORING_MANAGEMENT',
     Title: 'Monitoring Management',
-    Description:
-      'Allow the Web UI to create, edit and delete monitors and dummy clients, and run checks on demand. Still requires the server to be in Edit mode.',
+    Description: 'Manage monitors and dummy clients. Requires Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -307,8 +381,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_MONITORING_ACTIONS',
     Title: 'Run Monitoring Actions',
-    Description:
-      'Allow the Web UI to run check actions on devices (power a projector on/off, set an input, mute an output) and move live faders — including starred actions in the right-click menu. These are show-time controls, so they work in both Show and Edit mode.',
+    Description: 'Power, input, mute and fader controls on devices. Works in Show mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -316,8 +389,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_ALERT_MANAGEMENT',
     Title: 'Alert Rule Management',
-    Description:
-      'Allow the Web UI to create, edit, delete and enable/disable alert rules. Still requires the server to be in Edit mode.',
+    Description: 'Requires Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -325,25 +397,25 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_UNASSIGNED_CLIENTS',
     Title: 'Unassigned Clients',
-    Description:
-      'Allow unassigned client slots to be created from the Web UI. Also requires the global Unassigned Clients feature to be enabled, and the server to be in Edit mode.',
+    Description: 'Requires Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
+    ShowWhen: ['SYSTEM_ALLOW_UNASSIGNED_CLIENTS'],
   },
   {
     Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_WOL',
     Title: 'Wake on LAN',
-    Description:
-      'Allow Wake on LAN to be triggered from the Web UI. Also requires the global Wake on LAN feature to be enabled.',
+    Description: '',
     Type: 'BOOLEAN',
     DefaultValue: true,
+    ShowWhen: ['SYSTEM_ALLOW_WOL'],
   },
   {
     Group: 'Web UI Permissions',
     Key: 'WEBUI_ALLOW_REMOTE_SCRIPT_EXECUTION',
     Title: 'Script Execution',
-    Description: 'Allow scripts and integrated events to be triggered from the Web UI.',
+    Description: 'Run scripts and integrated events.',
     Type: 'BOOLEAN',
     DefaultValue: false,
   },
@@ -356,8 +428,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'ShowTrak Remote Permissions',
     Key: 'REMOTE_ALLOW_IDENTIFY',
     Title: 'Identify Clients',
-    Description:
-      'Allow ShowTrak Remote to flash the identify overlay on a client screen. Mutates nothing, and is the reason to hold a phone in the first place: working out which machine in a rack is which.',
+    Description: '',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -365,8 +436,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'ShowTrak Remote Permissions',
     Key: 'REMOTE_ALLOW_CLIENT_MANAGEMENT',
     Title: 'Client Management',
-    Description:
-      'Allow ShowTrak Remote to edit clients (nickname, group, MAC addresses, monitored entities, tags). Also requires the server to be in Edit mode.',
+    Description: 'Edit clients and their tags. Requires Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -374,8 +444,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'ShowTrak Remote Permissions',
     Key: 'REMOTE_ALLOW_GROUP_MANAGEMENT',
     Title: 'Group Management',
-    Description:
-      'Allow ShowTrak Remote to create, rename, reorder and delete groups. Also requires the server to be in Edit mode.',
+    Description: 'Requires Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -383,8 +452,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'ShowTrak Remote Permissions',
     Key: 'REMOTE_ALLOW_MONITORING_MANAGEMENT',
     Title: 'Monitoring Management',
-    Description:
-      'Allow ShowTrak Remote to manage monitors, dummy clients and FreeKiosk terminals. Also requires the server to be in Edit mode.',
+    Description: 'Manage monitors, dummy clients and FreeKiosk terminals. Requires Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -392,8 +460,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'ShowTrak Remote Permissions',
     Key: 'REMOTE_ALLOW_MONITORING_ACTIONS',
     Title: 'Run Monitoring Actions',
-    Description:
-      'Allow ShowTrak Remote to run check actions on devices (power, input, mute) and move live faders. These are show-time controls, so they work in both Show and Edit mode.',
+    Description: 'Power, input, mute and fader controls on devices. Works in Show mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -401,8 +468,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'ShowTrak Remote Permissions',
     Key: 'REMOTE_ALLOW_ALERT_MANAGEMENT',
     Title: 'Alert Management',
-    Description:
-      'Allow ShowTrak Remote to create, edit and delete alert rules. Also requires the server to be in Edit mode.',
+    Description: 'Requires Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -410,89 +476,33 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'ShowTrak Remote Permissions',
     Key: 'REMOTE_ALLOW_UNASSIGNED_CLIENTS',
     Title: 'Create Unassigned Clients',
-    Description:
-      'Allow ShowTrak Remote to create unassigned client slots. Also requires the global unassigned clients feature and Edit mode.',
+    Description: 'Requires Edit mode.',
     Type: 'BOOLEAN',
     DefaultValue: true,
+    ShowWhen: ['SYSTEM_ALLOW_UNASSIGNED_CLIENTS'],
   },
   {
     Group: 'ShowTrak Remote Permissions',
     Key: 'REMOTE_ALLOW_WOL',
     Title: 'Wake on LAN',
-    Description:
-      'Allow Wake on LAN to be triggered from ShowTrak Remote. Also requires the global Wake on LAN feature to be enabled.',
+    Description: '',
     Type: 'BOOLEAN',
     DefaultValue: true,
+    ShowWhen: ['SYSTEM_ALLOW_WOL'],
   },
   {
     Group: 'ShowTrak Remote Permissions',
     Key: 'REMOTE_ALLOW_REMOTE_SCRIPT_EXECUTION',
     Title: 'Script Execution',
-    Description: 'Allow scripts and integrated events to be triggered from ShowTrak Remote.',
+    Description: 'Run scripts and integrated events.',
     Type: 'BOOLEAN',
     DefaultValue: false,
-  },
-  {
-    Group: 'System',
-    Key: 'SYSTEM_PREVENT_DISPLAY_SLEEP',
-    Title: 'Prevent Display Sleep',
-    Description: 'Prevents the display from going to sleep while ShowTrak is running.',
-    Type: 'BOOLEAN',
-    DefaultValue: true,
-    OnUpdateEvent: 'DisplaySleepSettingsChanged',
-  },
-  {
-    Group: 'System',
-    Key: 'SYSTEM_AUTO_MAXIMIZE_ON_BOOT',
-    Title: 'Auto Maximise Window on Boot',
-    Description: 'Automatically maximise the ShowTrak window when the app starts.',
-    Type: 'BOOLEAN',
-    DefaultValue: false,
-  },
-  {
-    Group: 'System',
-    Key: 'SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4',
-    Title: 'Stop Accidental Shutdowns',
-    Description: 'Requires confirmation before quitting ShowTrak from system or app quit actions.',
-    Type: 'BOOLEAN',
-    DefaultValue: true,
-    OnUpdateEvent: 'ShutdownProtectionChanged',
-  },
-  {
-    Group: 'System',
-    Key: 'SYSTEM_AUTOSAVE_ENABLED',
-    Title: 'Enable Autosave',
-    Description: 'Automatically save the open show file at a regular interval.',
-    Type: 'BOOLEAN',
-    DefaultValue: true,
-    OnUpdateEvent: 'AutosaveSettingsChanged',
-  },
-  {
-    Group: 'System',
-    Key: 'SYSTEM_AUTOSAVE_INTERVAL_MINUTES',
-    Title: 'Autosave Interval',
-    Description: 'How often to automatically save the open show file.',
-    Type: 'INTEGER',
-    DefaultValue: 5,
-    Unit: 'minutes',
-    OnUpdateEvent: 'AutosaveSettingsChanged',
-  },
-  {
-    Group: 'System',
-    Key: 'SYSTEM_WORKSPACE_DEFAULT_EDITOR',
-    Title: 'Workspace Default Editor',
-    Description:
-      'Choose which editor is used to edit script files from Script Manager. "System Default" uses your OS default app.',
-    Type: 'OPTION',
-    DefaultValue: 'System Default',
-    Options: ['System Default', 'Visual Studio Code'],
   },
   {
     Group: 'System',
     Key: 'SYSTEM_LOG_LEVEL',
     Title: 'Log Level',
-    Description:
-      'Minimum severity written to the console and daily log files. More verbose levels (debug, trace) help when diagnosing issues.',
+    Description: 'Use debug or trace when diagnosing issues.',
     Type: 'OPTION',
     DefaultValue: 'info',
     Options: ['error', 'warn', 'info', 'debug', 'trace'],
@@ -502,8 +512,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'FOG Project',
     Key: 'FOG_ENABLED',
     Title: 'FOG Project Integration',
-    Description:
-      'Enable integration with a FOG Project server so imaging tasks can be scheduled against clients from ShowTrak. The integration only reports as connected once the details below successfully reach the FOG API.',
+    Description: 'Schedule FOG imaging tasks against clients.',
     Type: 'BOOLEAN',
     DefaultValue: false,
     OnUpdateEvent: 'FogSettingsChanged',
@@ -512,10 +521,10 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'FOG Project',
     Key: 'FOG_PROTOCOL',
     Title: 'Protocol',
-    Description:
-      'Whether to reach the FOG server over http or https. Self-signed certificates are accepted, so https does not guarantee the connection is verified.',
+    Description: 'Self-signed certificates are accepted.',
     Type: 'OPTION',
     DefaultValue: 'http',
+    ShowWhen: ['FOG_ENABLED'],
     Options: ['http', 'https'],
     OnUpdateEvent: 'FogSettingsChanged',
   },
@@ -523,20 +532,20 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'FOG Project',
     Key: 'FOG_HOST',
     Title: 'FOG Server Address',
-    Description:
-      'Hostname or IP address of the FOG server. Do not include the protocol, port or /fog path — just the address, e.g. 10.0.0.10.',
+    Description: 'Hostname or IP only, e.g. 10.0.0.10.',
     Type: 'STRING',
     DefaultValue: '',
+    ShowWhen: ['FOG_ENABLED'],
     OnUpdateEvent: 'FogSettingsChanged',
   },
   {
     Group: 'FOG Project',
     Key: 'FOG_PORT',
     Title: 'Port',
-    Description:
-      'Port the FOG web interface listens on. Leave at 0 to use the protocol default (80 for http, 443 for https).',
+    Description: '0 uses the protocol default.',
     Type: 'INTEGER',
     DefaultValue: 0,
+    ShowWhen: ['FOG_ENABLED'],
     Min: 0,
     Max: 65535,
     OnUpdateEvent: 'FogSettingsChanged',
@@ -545,20 +554,20 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'FOG Project',
     Key: 'FOG_API_TOKEN',
     Title: 'API Token',
-    Description:
-      'System-wide FOG API token, found under FOG Configuration → FOG Settings → API System. Paste it exactly as shown in the FOG web interface — it is already encoded, and re-encoding it will cause the connection to be rejected.',
+    Description: 'From FOG Configuration > FOG Settings > API System. Paste it exactly as shown.',
     Type: 'PASSWORD',
     DefaultValue: '',
+    ShowWhen: ['FOG_ENABLED'],
     OnUpdateEvent: 'FogSettingsChanged',
   },
   {
     Group: 'FOG Project',
     Key: 'FOG_USER_TOKEN',
     Title: 'User Token',
-    Description:
-      'Per-user FOG API token, found under Users → (your user) → API. The user must have "User API Enable" ticked in FOG, otherwise the connection is rejected.',
+    Description: 'From Users > your user > API. The user needs "User API Enable" ticked.',
     Type: 'PASSWORD',
     DefaultValue: '',
+    ShowWhen: ['FOG_ENABLED'],
     OnUpdateEvent: 'FogSettingsChanged',
   },
   // One permission toggle per host-schedulable FOG task type. Generated from the task
@@ -568,9 +577,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'FOG Permitted Actions',
     Key: FogTaskPermissionKey(Type.TaskTypeID),
     Title: Type.Name,
-    Description: Type.Destructive
-      ? `Allow the "${Type.Name}" task to be scheduled from ShowTrak. This task is destructive and can result in data loss on the target machine.`
-      : `Allow the "${Type.Name}" task to be scheduled from ShowTrak.`,
+    Description: Type.Destructive ? 'Destructive. Can erase data on the target machine.' : '',
     Type: 'BOOLEAN',
     DefaultValue: false,
   })),
@@ -582,7 +589,7 @@ export const DefaultSettings: SettingDefinition[] = [
     Group: 'FreeKiosk',
     Key: FREEKIOSK_MENU_POLL_SETTING_KEY,
     Title: 'Poll Now',
-    Description: 'Show "Poll Now" in the right-click menu for FreeKiosk terminals.',
+    Description: 'Show in the FreeKiosk right-click menu.',
     Type: 'BOOLEAN',
     DefaultValue: true,
   },
@@ -592,13 +599,14 @@ export const DefaultSettings: SettingDefinition[] = [
       Group: 'FreeKiosk',
       Key: FreeKioskMenuSettingKey(Command.ID),
       Title: Command.Label,
-      Description: `Show "${Command.Label}" in the right-click menu for FreeKiosk terminals.`,
+      Description: 'Show in the FreeKiosk right-click menu.',
       Type: 'BOOLEAN',
       DefaultValue: true,
     })),
 ];
 
 export const Groups: SettingGroup[] = [
+  { Name: 'Machine', Title: 'Machine Settings' },
   { Name: 'Layout', Title: 'Layout' },
   { Name: 'Features', Title: 'Features' },
   { Name: 'Network', Title: 'Network' },
@@ -607,9 +615,14 @@ export const Groups: SettingGroup[] = [
   { Name: 'SDK / Integration API', Title: 'SDK / Integration API' },
   { Name: 'Alerts', Title: 'Alerts' },
   { Name: 'Web UI', Title: 'Web UI' },
-  { Name: 'Web UI Permissions', Title: 'Web UI Permissions' },
-  { Name: 'ShowTrak Remote Permissions', Title: 'ShowTrak Remote Permissions' },
+  { Name: 'Web UI Permissions', Title: 'Web UI Permissions', ShowWhen: ['WEBUI_ENABLED'] },
+  // ShowTrak Remote connects through the SDK namespace, so it is off with it.
+  {
+    Name: 'ShowTrak Remote Permissions',
+    Title: 'ShowTrak Remote Permissions',
+    ShowWhen: ['SDK_API_ENABLED'],
+  },
   { Name: 'FOG Project', Title: 'FOG Project' },
-  { Name: 'FOG Permitted Actions', Title: 'FOG Permitted Actions' },
+  { Name: 'FOG Permitted Actions', Title: 'FOG Permitted Actions', ShowWhen: ['FOG_ENABLED'] },
   { Name: 'System', Title: 'System Settings' },
 ];

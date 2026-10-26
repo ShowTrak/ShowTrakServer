@@ -16,6 +16,7 @@ import { SetDefaultOfflineGraceSeconds } from '../Modules/ClientManager/offline-
 import { SetAudioDedupeWindow } from '../Modules/AlertActions/_audio-dedupe';
 import { OSC } from '../Modules/OSC';
 import { setAccidentalShutdownProtection } from './shutdown-coordinator';
+import { Manager as AppUpdater } from './app-updater';
 
 const Logger = CreateLogger('Main');
 
@@ -90,6 +91,12 @@ async function ApplyDisplaySleep(): Promise<void> {
   }
 }
 
+// Background check-and-download of app updates; installs on the next restart.
+async function ApplyAutomaticUpdates(): Promise<void> {
+  const Enabled = await SettingsManager.GetValue('SYSTEM_AUTO_UPDATE_ENABLED');
+  AppUpdater.SetAutomaticUpdates(!!Enabled);
+}
+
 function RunGuarded(Label: string, Fn: () => Promise<void>): void {
   Fn().catch((Err) => Logger.error(`Failed to apply ${Label}:`, Err));
 }
@@ -102,6 +109,7 @@ export async function initLiveSettings(): Promise<void> {
   await ApplyAlertAudioDedupe();
   await ApplyDisplaySleep();
   await ApplyOsc();
+  await ApplyAutomaticUpdates();
 
   BroadcastManager.on('LoggingSettingsChanged', () =>
     RunGuarded('log level', () => ApplyLogLevel(true))
@@ -118,5 +126,8 @@ export async function initLiveSettings(): Promise<void> {
   );
   BroadcastManager.on('DisplaySleepSettingsChanged', () =>
     RunGuarded('display sleep blocker', ApplyDisplaySleep)
+  );
+  BroadcastManager.on('AutoUpdateSettingsChanged', () =>
+    RunGuarded('automatic updates', ApplyAutomaticUpdates)
   );
 }

@@ -5,7 +5,9 @@
 // off a check; the live OnAppUpdateStatus listener then updates the headline,
 // download progress bar, action buttons and rendered changelog. GitHub release
 // notes arrive as either HTML (run through the allowlist sanitizer) or Markdown
-// (rendered via the shared safe renderer).
+// (rendered via the shared safe renderer). While a check or download is in
+// flight, reopening the modal shows its progress rather than starting another,
+// and a floating progress bar tracks it whenever the modal is closed.
 import type { AppUpdateStatus } from '@showtrak/protocol';
 import { HandleNonFatalError } from './utils';
 import { CloseAllModals } from './modals';
@@ -13,6 +15,24 @@ import { openModal } from './lib/modal';
 import { renderMarkdownSafe, sanitizeUpdateNotesHtml } from './lib/markdown';
 
 const MODAL_ID = 'SHOWTRAK_MODAL_APP_UPDATE';
+
+// The most recent status from main, and the version of the update in flight.
+let latestStatus: AppUpdateStatus | null = null;
+let activeVersion = '';
+
+function isInProgress(status: AppUpdateStatus | null) {
+  const st = status && status.state;
+  return st === 'checking' || st === 'available' || st === 'downloading';
+}
+
+function formatVersion(version: unknown) {
+  const label = version ? String(version) : '';
+  return label && !/^v/i.test(label) ? `v${label}` : label;
+}
+
+function downloadPercent(status: AppUpdateStatus) {
+  return status.percent ? Math.max(0, Math.min(100, Math.floor(status.percent))) : 0;
+}
 
 // Set the hero icon (a Bootstrap Icons glyph), optionally spinning it.
 function setIcon(icon: string, spin = false) {
@@ -44,7 +64,7 @@ function setVersionBadge(version: unknown) {
     $badge.addClass('d-none').text('');
     return;
   }
-  $badge.removeClass('d-none').text(/^v/i.test(label) ? label : `v${label}`);
+  $badge.removeClass('d-none').text(formatVersion(label));
 }
 
 // electron-updater ships release notes in different shapes across platforms.
@@ -73,9 +93,7 @@ function showNotes(info: AppUpdateStatus['info']) {
   const looksHtml = /<\w+[^>]*>/.test(notes);
   $notes.html(looksHtml ? sanitizeUpdateNotesHtml(notes) : renderMarkdownSafe(notes));
   const version = info && (info.version || info.tag);
-  $('#APP_UPDATE_NOTES_VERSION').text(
-    version ? (/^v/i.test(String(version)) ? String(version) : `v${version}`) : ''
-  );
+  $('#APP_UPDATE_NOTES_VERSION').text(formatVersion(version));
   $wrap.removeClass('d-none');
 }
 
@@ -91,16 +109,115 @@ function resetToChecking() {
   $('#APP_UPDATE_INSTALL_BTN').addClass('d-none');
 }
 
-// Open the Software Update modal and (optionally) start a check.
-export async function OpenAppUpdateModal(runCheck = true) {
-  await CloseAllModals();
+// Show the floating "Software Update" bar while an update is downloading and
+// the modal itself is closed. Plain checks stay silent so the periodic
+// background check doesn't flash it up when there is nothing new.
+function renderFloatingProgress() {
+  const $float = $('#APP_UPDATE_FLOAT');
+  const modalOpen = $('#' + MODAL_ID).hasClass('show');
+  const st = latestStatus && latestStatus.state;
+  if (!latestStatus || (st !== 'available' && st !== 'downloading') || modalOpen) {
+    $float.addClass('d-none');
+    return;
+  }
+  const downloading = st === 'downloading';
+  const pct = downloading ? downloadPercent(latestStatus) : 0;
+  $('#APP_UPDATE_FLOAT_VERSION').text(formatVersion(activeVersion));
+  $('#APP_UPDATE_FLOAT_DETAIL').text(downloading ? `Downloading… ${pct}%` : 'Starting download…');
+  $('#APP_UPDATE_FLOAT_BAR')
+    .toggleClass('is-indeterminate', !downloading)
+    .css('width', downloading ? `${pct}%` : '');
+  $('#APP_UPDATE_FLOAT_TRACK').attr('aria-valuenow', String(pct));
+  $float.removeClass('d-none');
+}
+
+// Ask main for a fresh check, unless one is already running, in which case
+// the modal simply keeps showing that run's progress.
+async function startCheck() {
+  if (isInProgress(latestStatus)) return;
   resetToChecking();
-  openModal(MODAL_ID);
-  if (!runCheck) return;
   try {
     await window.API.CheckForAppUpdates();
   } catch (err) {
     HandleNonFatalError('AppUpdate:Check', err);
+  }
+}
+
+// Open the Software Update modal and (optionally) start a check. A run that is
+// already in flight is shown as-is instead of being restarted.
+export async function OpenAppUpdateModal(runCheck = true) {
+  await CloseAllModals();
+  if (latestStatus && isInProgress(latestStatus)) {
+    renderStatus(latestStatus);
+  } else if (runCheck) {
+    resetToChecking();
+  }
+  openModal(MODAL_ID);
+  if (runCheck) await startCheck();
+}
+
+// Paint one updater status into the modal.
+function renderStatus(payload: AppUpdateStatus) {
+  const st = (payload && payload.state) || 'none';
+  const $status = $('#APP_UPDATE_STATUS');
+  const $subtext = $('#APP_UPDATE_SUBTEXT');
+  const $install = $('#APP_UPDATE_INSTALL_BTN');
+
+  // Reset the transient bits every tick; each branch re-enables what it needs.
+  $install.addClass('d-none');
+  setProgress(null);
+
+  if (st === 'checking') {
+    setIcon('bi-arrow-repeat', true);
+    $status.text('Checking for updates…');
+    $subtext.text('Contacting the update server.');
+    setVersionBadge('');
+  } else if (st === 'available') {
+    const v = payload.info && (payload.info.version || payload.info.tag);
+    setIcon('bi-arrow-repeat', true);
+    $status.text('Update available');
+    $subtext.text('Downloading the latest release…');
+    setVersionBadge(v);
+    showNotes(payload.info);
+  } else if (st === 'downloading') {
+    const pct = downloadPercent(payload);
+    setIcon('bi-arrow-repeat', true);
+    $status.text('Downloading update…');
+    $subtext.text(pct >= 100 ? 'Download complete. Preparing update…' : `${pct}% complete`);
+    setProgress(pct);
+    if (payload.info) {
+      setVersionBadge(payload.info.version || payload.info.tag);
+      showNotes(payload.info);
+    }
+  } else if (st === 'downloaded') {
+    const v = payload.info && payload.info.version;
+    setIcon('bi-check-circle');
+    $status.text('Update ready to install');
+    $subtext.text('Install now to restart ShowTrak on the new version.');
+    setVersionBadge(v);
+    showNotes(payload.info);
+    $install.removeClass('d-none');
+  } else if (st === 'installing') {
+    setIcon('bi-gear-wide-connected', true);
+    $status.text('Installing update…');
+    $subtext.text('ShowTrak will restart shortly.');
+  } else if (st === 'installed') {
+    setIcon('bi-check-circle');
+    $status.text('Update installed');
+    $subtext.text(
+      payload.simulated
+        ? 'Simulated install complete. Restart the app to finish.'
+        : 'Restart the app to finish updating.'
+    );
+  } else if (st === 'none') {
+    setIcon('bi-check-circle');
+    $status.text("You're up to date");
+    $subtext.text('You have the latest version of ShowTrak Server.');
+    setVersionBadge('');
+  } else if (st === 'error') {
+    setIcon('bi-exclamation-triangle');
+    $status.text('Update failed');
+    $subtext.text(payload.error || 'An unknown error occurred while checking for updates.');
   }
 }
 
@@ -119,14 +236,7 @@ export function wireAppUpdates() {
     // Re-run a check from within the update modal.
     $('#APP_UPDATE_CHECK_BTN')
       .off('click')
-      .on('click', async () => {
-        resetToChecking();
-        try {
-          await window.API.CheckForAppUpdates();
-        } catch (err) {
-          HandleNonFatalError('AppUpdate:Check', err);
-        }
-      });
+      .on('click', () => startCheck());
 
     // Install & restart.
     $('#APP_UPDATE_INSTALL_BTN')
@@ -146,66 +256,27 @@ export function wireAppUpdates() {
         $('#' + MODAL_ID).modal('hide');
       });
 
+    // The floating bar opens the modal; it hides while the modal is up and
+    // comes back if the modal is dismissed mid-download.
+    $('#APP_UPDATE_FLOAT')
+      .off('click')
+      .on('click', () => OpenAppUpdateModal(false));
+    $('#' + MODAL_ID)
+      .off('show.bs.modal.appUpdate hidden.bs.modal.appUpdate')
+      .on('show.bs.modal.appUpdate', () => $('#APP_UPDATE_FLOAT').addClass('d-none'))
+      .on('hidden.bs.modal.appUpdate', () => renderFloatingProgress());
+
     // Listen for updater status from main.
     window.API.OnAppUpdateStatus((payload) => {
       try {
-        const st = (payload && payload.state) || 'none';
-        const $status = $('#APP_UPDATE_STATUS');
-        const $subtext = $('#APP_UPDATE_SUBTEXT');
-        const $install = $('#APP_UPDATE_INSTALL_BTN');
-
-        // Reset the transient bits every tick; each branch re-enables what it needs.
-        $install.addClass('d-none');
-        setProgress(null);
-
-        if (st === 'checking') {
-          setIcon('bi-arrow-repeat', true);
-          $status.text('Checking for updates…');
-          $subtext.text('Contacting the update server.');
-          setVersionBadge('');
-        } else if (st === 'available') {
-          const v = payload.info && (payload.info.version || payload.info.tag);
-          setIcon('bi-arrow-repeat', true);
-          $status.text('Update available');
-          $subtext.text('Downloading the latest release…');
-          setVersionBadge(v);
-          showNotes(payload.info);
-        } else if (st === 'downloading') {
-          const pct = payload.percent ? Math.floor(payload.percent) : 0;
-          setIcon('bi-arrow-repeat', true);
-          $status.text('Downloading update…');
-          $subtext.text(pct >= 100 ? 'Download complete. Preparing update…' : `${pct}% complete`);
-          setProgress(pct);
-        } else if (st === 'downloaded') {
-          const v = payload.info && payload.info.version;
-          setIcon('bi-check-circle-fill');
-          $status.text('Update ready to install');
-          $subtext.text('Install now to restart ShowTrak on the new version.');
-          setVersionBadge(v);
-          showNotes(payload.info);
-          $install.removeClass('d-none');
-        } else if (st === 'installing') {
-          setIcon('bi-gear-wide-connected', true);
-          $status.text('Installing update…');
-          $subtext.text('ShowTrak will restart shortly.');
-        } else if (st === 'installed') {
-          setIcon('bi-check-circle-fill');
-          $status.text('Update installed');
-          $subtext.text(
-            payload.simulated
-              ? 'Simulated install complete. Restart the app to finish.'
-              : 'Restart the app to finish updating.'
-          );
-        } else if (st === 'none') {
-          setIcon('bi-check-circle');
-          $status.text("You're up to date");
-          $subtext.text('You have the latest version of ShowTrak Server.');
-          setVersionBadge('');
-        } else if (st === 'error') {
-          setIcon('bi-exclamation-triangle-fill');
-          $status.text('Update failed');
-          $subtext.text(payload.error || 'An unknown error occurred while checking for updates.');
-        }
+        latestStatus = payload || null;
+        const st = payload && payload.state;
+        const info = payload && payload.info;
+        if (st === 'checking') activeVersion = '';
+        const v = info && (info.version || info.tag);
+        if (v) activeVersion = String(v);
+        renderStatus(payload);
+        renderFloatingProgress();
       } catch (err) {
         HandleNonFatalError('AppUpdate:Status', err);
       }

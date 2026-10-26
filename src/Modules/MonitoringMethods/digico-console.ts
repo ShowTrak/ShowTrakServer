@@ -671,7 +671,7 @@ const Actions: MonitoringActionDef[] = [
   {
     ID: 'mute.on',
     Label: 'Mute Input',
-    Icon: 'mic-mute-fill',
+    Icon: 'mic-mute',
     Group: 'Mute',
     Destructive: true,
     Params: [CHANNEL_PARAM],
@@ -680,7 +680,7 @@ const Actions: MonitoringActionDef[] = [
   {
     ID: 'mute.off',
     Label: 'Unmute Input',
-    Icon: 'mic-fill',
+    Icon: 'mic',
     Group: 'Mute',
     Params: [CHANNEL_PARAM],
     Note: 'Unmutes one input channel. Control group mutes still apply.',

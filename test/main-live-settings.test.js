@@ -34,6 +34,7 @@ const state = {
   alertAudioDedupeMs: 500,
   confirmShutdown: true,
   preventDisplaySleep: false,
+  autoUpdate: false,
   getValueThrows: false,
 };
 
@@ -49,6 +50,7 @@ const settingsMgr = recordingManager({
     if (key === 'ALERT_SOUND_DEDUPE_WINDOW_MS') return state.alertAudioDedupeMs;
     if (key === 'SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4') return state.confirmShutdown;
     if (key === 'SYSTEM_PREVENT_DISPLAY_SLEEP') return state.preventDisplaySleep;
+    if (key === 'SYSTEM_AUTO_UPDATE_ENABLED') return state.autoUpdate;
     return null;
   },
 });
@@ -72,6 +74,7 @@ const intervals = { monitoring: [], dummy: [] };
 const failureThresholds = [];
 const audioDedupeWindows = [];
 const shutdownProtection = [];
+const automaticUpdates = [];
 
 const restore = installModuleMocks([
   { match: matchesModule('electron/main'), value: {} },
@@ -116,6 +119,10 @@ const restore = installModuleMocks([
     match: matchesModule('./shutdown-coordinator'),
     value: { setAccidentalShutdownProtection: (v) => shutdownProtection.push(v) },
   },
+  {
+    match: matchesModule('./app-updater'),
+    value: { Manager: { SetAutomaticUpdates: (v) => automaticUpdates.push(v) } },
+  },
 ]);
 test.after(() => restore());
 
@@ -139,6 +146,7 @@ function resetRecorders() {
   failureThresholds.length = 0;
   audioDedupeWindows.length = 0;
   shutdownProtection.length = 0;
+  automaticUpdates.length = 0;
   blocker.started.length = 0;
   blocker.stopped.length = 0;
   osc.__calls.length = 0;
@@ -267,6 +275,22 @@ test('a shutdown-protection change is forwarded as a real boolean', async () => 
   await emit('ShutdownProtectionChanged');
   assert.deepEqual(shutdownProtection, [false]);
   state.confirmShutdown = true;
+});
+
+test('automatic updates stay off at boot by default and follow later changes', async () => {
+  state.autoUpdate = false;
+  await initLiveSettings();
+  assert.deepEqual(automaticUpdates, [false]);
+
+  automaticUpdates.length = 0;
+  state.autoUpdate = 1;
+  await emit('AutoUpdateSettingsChanged');
+  assert.deepEqual(automaticUpdates, [true], 'forwarded as a real boolean');
+
+  automaticUpdates.length = 0;
+  state.autoUpdate = false;
+  await emit('AutoUpdateSettingsChanged');
+  assert.deepEqual(automaticUpdates, [false]);
 });
 
 // --- powerSaveBlocker lifecycle --------------------------------------------

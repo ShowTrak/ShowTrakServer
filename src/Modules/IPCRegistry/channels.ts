@@ -34,6 +34,7 @@ const INVOKE_CHANNELS = [
   'Mode:Set',
   'OpenLogsFolder',
   'OpenScriptsFolder',
+  'OpenBackupsFolder',
   'LogConsole:Open',
   'LogConsole:Close',
   'MonitorLiveLevels:Open',
@@ -113,6 +114,8 @@ const INVOKE_CHANNELS = [
   'Show:GetCurrentFile',
   'Show:HasUnsavedData',
   'Show:EnsureFileExists',
+  'Show:CheckUpgrade',
+  'Show:ResolveUpgrade',
 
   // Scripts / execution
   'ExecuteScript',

@@ -123,7 +123,7 @@ export function DisplayBadge(Display: ClientDisplayView): {
     return {
       State: 'missing',
       Label: 'Missing',
-      Icon: 'bi-x-circle-fill',
+      Icon: 'bi-x-circle',
       Title: 'Stop monitoring (display disconnected)',
     };
   }
@@ -140,14 +140,14 @@ export function DisplayBadge(Display: ClientDisplayView): {
     return {
       State: 'issue',
       Label: 'Changed',
-      Icon: 'bi-exclamation-triangle-fill',
+      Icon: 'bi-exclamation-triangle',
       Title: 'Stop monitoring (conditions not met)',
     };
   }
   return {
     State: 'healthy',
     Label: 'Monitored',
-    Icon: 'bi-check-circle-fill',
+    Icon: 'bi-check-circle',
     Title: 'Stop monitoring',
   };
 }

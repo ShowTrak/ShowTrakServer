@@ -252,11 +252,14 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     GetCurrentShowFile: resolveNull,
     HasUnsavedShowData: resolveFalse,
     EnsureShowFileExists: emptyArray,
+    CheckShowFileUpgrade: nullTuple,
+    ResolveShowFileUpgrade: nullTuple,
     OnShowFileUpdated: noSub,
 
     // ---- Folders / menu / window (desktop-only) --------------------------
     OpenLogsFolder: resolveNull,
     OpenScriptsFolder: resolveNull,
+    OpenBackupsFolder: resolveNull,
     OnAppMenuAction: noSub,
     OnWindowFullscreenChanged: noSub,
 

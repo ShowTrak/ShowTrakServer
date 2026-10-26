@@ -421,6 +421,95 @@ body.compact-mode .group-column-grid {
   animation: spin 1.4s linear infinite;
 }
 
+/* Floating download progress, shown while an update downloads with the modal
+   closed. Bottom-right so it stays clear of the centred identify banner and
+   confirmation toast; clicking it reopens the modal. */
+#APP_UPDATE_FLOAT {
+  position: fixed;
+  right: 12px;
+  bottom: calc(var(--bottom-bar-height) + 12px);
+  z-index: var(--z-toast);
+  width: min(320px, calc(100vw - 24px));
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  text-align: left;
+  background: var(--surface-3);
+  border: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+#APP_UPDATE_FLOAT.d-none {
+  display: none;
+}
+
+#APP_UPDATE_FLOAT .app-update-float-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#APP_UPDATE_FLOAT .app-update-float-title {
+  font-size: var(--fs-md);
+  font-weight: 700;
+}
+#APP_UPDATE_FLOAT .app-update-float-title .bi {
+  color: var(--info-cyan);
+  margin-right: 4px;
+}
+
+#APP_UPDATE_FLOAT .app-update-float-version {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgb(var(--info-cyan-rgb) / 0.18);
+  color: var(--info-cyan);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+#APP_UPDATE_FLOAT .app-update-float-version:empty {
+  display: none;
+}
+
+#APP_UPDATE_FLOAT .app-update-float-track {
+  position: relative;
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+#APP_UPDATE_FLOAT .app-update-float-bar {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--info-cyan);
+  transition: width 0.25s ease;
+}
+/* Before the first progress tick: a sliding sliver instead of an empty bar. */
+#APP_UPDATE_FLOAT .app-update-float-bar.is-indeterminate {
+  width: 30%;
+  animation: app-update-float-slide 1.2s ease-in-out infinite;
+}
+@keyframes app-update-float-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+#APP_UPDATE_FLOAT .app-update-float-detail {
+  font-size: var(--fs-sm);
+  color: var(--text-soft);
+}
+
 /* Changelog: rendered release notes styled as readable prose rather than the
    old pre-wrapped raw block. */
 .SHOWTRAK_APP_UPDATE_CHANGELOG {

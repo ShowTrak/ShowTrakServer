@@ -122,7 +122,7 @@ function VolumeCard(Volume: StorageVolumeView): string {
       ${UsageBar(Volume)}
       ${Volume.Issues.map(
         (Issue) =>
-          `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue.Message)}</small>`
+          `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle me-1"></i>${Safe(Issue.Message)}</small>`
       ).join('')}
       ${ConditionsTable(Volume)}
     </div>`;

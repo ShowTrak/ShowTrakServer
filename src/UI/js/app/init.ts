@@ -33,12 +33,15 @@ import { OpenOSCDictionary, OpenOscHttpDebugTerminal } from './osc-feeds';
 import {
   ApplyUpdateManagerButtonLocks,
   CloseAllModals,
+  CreateNewShowFile,
   NewShow,
   OpenAboutModal,
   OpenGroupCreationModal,
   OpenGroupManager,
+  OpenNoShowPrompt,
   OpenShow,
   OpenUpdateManagerModal,
+  PromptShowFileUpgrade,
   RenderShowFileName,
   SaveShow,
   SaveShowAs,
@@ -57,7 +60,6 @@ import { OpenAlertRuleManager, OpenCreateAlertRuleEditor } from './alert-rules';
 import {
   GetIdentifyingUUIDs,
   HideExecutionToast,
-  Notify,
   StopIdentifyingForUUIDs,
   UpdateIdentifyStatusBanner,
 } from './selection-init';
@@ -302,11 +304,9 @@ export async function Init() {
     // Show the currently open .ShowTrak file name in the navbar and keep it in
     // sync as files are opened/saved/created.
     // First, verify the previously open file still exists; if it was deleted or
-    // moved, the working data is wiped so we can prompt for a fresh start.
+    // moved, the working data is wiped and the empty state asks for the file.
     const [, MissingResult] = (await window.API.EnsureShowFileExists()) || [];
-    if (MissingResult && MissingResult.Missing) {
-      await Notify('The previous show file was missing. Open or create a new show file.', 'error');
-    }
+    const MissingShowFile = MissingResult && MissingResult.Missing ? MissingResult.FilePath : null;
     const CurrentShowFile = await window.API.GetCurrentShowFile();
     RenderShowFileName(CurrentShowFile);
     window.API.OnShowFileUpdated((Path) => RenderShowFileName(Path));
@@ -317,14 +317,10 @@ export async function Init() {
       const Opened = await window.API.GetCurrentShowFile();
       if (Opened) closeModal('SHOWTRAK_MODAL_NO_SHOW');
     });
+    // A new show must be saved somewhere: cancelling the location prompt
+    // leaves the operator here rather than with an untitled show.
     $('#NO_SHOW_NEW').on('click', async () => {
-      const [Err] = await window.API.NewShow();
-      if (Err) {
-        await Notify(String(Err), 'error');
-        return;
-      }
-      closeModal('SHOWTRAK_MODAL_NO_SHOW');
-      await Notify('Created new show file.', 'success');
+      if (await CreateNewShowFile()) closeModal('SHOWTRAK_MODAL_NO_SHOW');
     });
 
     // Legacy-data migration guard: force a Save As before continuing so data from
@@ -335,18 +331,30 @@ export async function Init() {
       if (Saved) closeModal('SHOWTRAK_MODAL_MIGRATE');
     });
 
-    if (!CurrentShowFile) {
+    if (MissingShowFile) {
+      OpenNoShowPrompt(
+        `The last show file could not be found at ${MissingShowFile}. It may have been moved, ` +
+          'renamed or deleted. Open the show file you want to use.'
+      );
+    } else if (!CurrentShowFile) {
       const HasLegacyData = await window.API.HasUnsavedShowData();
       if (HasLegacyData) {
         openModal('SHOWTRAK_MODAL_MIGRATE');
       } else {
-        openModal('SHOWTRAK_MODAL_NO_SHOW');
+        OpenNoShowPrompt();
       }
+    } else {
+      // After an update the open show file was last saved by an older version:
+      // ask before upgrading it. Not awaited, as Loaded() below must not wait
+      // on the operator.
+      const [, Upgrade] = (await window.API.CheckShowFileUpgrade()) || [];
+      if (Upgrade) void PromptShowFileUpgrade(Upgrade);
     }
   } else {
-    // Ensure the desktop-only modal never leaks into the browser surface.
+    // Ensure the desktop-only modals never leak into the browser surface.
     closeModal('SHOWTRAK_MODAL_NO_SHOW');
     closeModal('SHOWTRAK_MODAL_MIGRATE');
+    closeModal('SHOWTRAK_MODAL_UPGRADE_SHOW');
   }
 
   $('#SHOWTRAK_MODEL_CORE_OPEN_SETTINGS').on('click', async () => {
@@ -376,23 +384,30 @@ export async function Init() {
     }
   );
 
-  const settingsMenu = document.getElementById('SETTINGS_MENU');
-  $('#SETTINGS_MENU_DROPDOWN')
-    .off('shown.bs.dropdown.settingsOffset hidden.bs.dropdown.settingsOffset')
-    .on('shown.bs.dropdown.settingsOffset', () => {
-      if (!settingsMenu) return;
-      const currentTransform = settingsMenu.style.transform || '';
-      if (currentTransform.includes('translateY(-10px)')) return;
-      settingsMenu.style.transform = `${currentTransform} translateY(-10px)`.trim();
-    })
-    .on('hidden.bs.dropdown.settingsOffset', () => {
-      if (!settingsMenu) return;
-      const currentTransform = settingsMenu.style.transform || '';
-      settingsMenu.style.transform = currentTransform
-        .replace(' translateY(-10px)', '')
-        .replace('translateY(-10px)', '')
-        .trim();
-    });
+  // The settings (cog) and show file menus both sit 10px higher than Popper
+  // places them.
+  for (const [DropdownID, MenuID] of [
+    ['SETTINGS_MENU_DROPDOWN', 'SETTINGS_MENU'],
+    ['FILE_MENU_DROPDOWN', 'FILE_MENU'],
+  ] as const) {
+    const menu = document.getElementById(MenuID);
+    $(`#${DropdownID}`)
+      .off('shown.bs.dropdown.settingsOffset hidden.bs.dropdown.settingsOffset')
+      .on('shown.bs.dropdown.settingsOffset', () => {
+        if (!menu) return;
+        const currentTransform = menu.style.transform || '';
+        if (currentTransform.includes('translateY(-10px)')) return;
+        menu.style.transform = `${currentTransform} translateY(-10px)`.trim();
+      })
+      .on('hidden.bs.dropdown.settingsOffset', () => {
+        if (!menu) return;
+        const currentTransform = menu.style.transform || '';
+        menu.style.transform = currentTransform
+          .replace(' translateY(-10px)', '')
+          .replace('translateY(-10px)', '')
+          .trim();
+      });
+  }
 
   $('#ADD_TARGET_MANUAL_ACTION').on('click', async () => {
     await OpenMonitoringTargetEditor(null);
@@ -557,6 +572,10 @@ export async function Init() {
 
   $('#SHOWTRAK_MODEL_CORE_SCRIPTSFOLDER').on('click', async () => {
     await window.API.OpenScriptsFolder();
+  });
+
+  $('#SHOWTRAK_MODEL_CORE_BACKUPSFOLDER').on('click', async () => {
+    await window.API.OpenBackupsFolder();
   });
 
   $('#SHOWTRAK_MODEL_CORE_SAVEAS').on('click', async () => {

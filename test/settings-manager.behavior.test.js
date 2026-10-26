@@ -185,3 +185,155 @@ test('SettingsManager clamps INTEGER settings to Min/Max on read and write', asy
   assert.equal(inErr, null);
   assert.equal(inSetting.Value, 4);
 });
+
+test('SettingsManager keeps install-scoped settings out of the show database', async () => {
+  // An install-scoped value must survive opening a different show file, so it
+  // is read from and written to the install store and never touches the DB.
+  const defaultSettings = [
+    {
+      Group: 'System',
+      Key: 'SHOW_SETTING',
+      Title: 'Show',
+      Description: 'Per show file',
+      Type: 'BOOLEAN',
+      DefaultValue: false,
+    },
+    {
+      Group: 'System',
+      Key: 'INSTALL_SETTING',
+      Title: 'Install',
+      Description: 'Per install',
+      Type: 'BOOLEAN',
+      DefaultValue: false,
+      Scope: 'INSTALL',
+    },
+  ];
+
+  const dbReads = [];
+  const dbWrites = [];
+  const dbMock = {
+    Manager: {
+      Ready: async () => {},
+      Get: async (_sql, params) => {
+        dbReads.push(params[0]);
+        return [null, null];
+      },
+      Run: async (_sql, params) => {
+        dbWrites.push(params[0]);
+        return [null, { changes: 1 }];
+      },
+    },
+  };
+
+  const installValues = new Map([['INSTALL_SETTING', '1']]);
+  const installWrites = [];
+  const installStore = {
+    GetByKey: async (Key) =>
+      installValues.has(Key) ? [null, { Key, Value: installValues.get(Key) }] : [null, null],
+    Upsert: async (Key, Value) => {
+      installWrites.push([Key, Value]);
+      installValues.set(Key, Value);
+      return [null, true];
+    },
+  };
+
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'SettingsManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => ({ log: () => {}, error: () => {} }) },
+    '../Broadcast': { Manager: { emit: () => {} } },
+    '../DB': dbMock,
+    './install-settings': { CreateInstallSettingsStore: () => installStore },
+    './DefaultSettings': {
+      DefaultSettings: defaultSettings,
+      Groups: [{ Name: 'System', Title: 'System' }],
+    },
+  });
+
+  assert.equal(await Manager.GetValue('INSTALL_SETTING'), true);
+  assert.deepEqual(dbReads, ['SHOW_SETTING']);
+
+  await Manager.Set('INSTALL_SETTING', false);
+  await Manager.Set('SHOW_SETTING', true);
+  assert.deepEqual(installWrites, [['INSTALL_SETTING', false]]);
+  assert.deepEqual(dbWrites, ['SHOW_SETTING']);
+
+  // Reloading after a show swap re-reads the install value from the install store.
+  await Manager.Reload();
+  assert.equal(await Manager.GetValue('INSTALL_SETTING'), false);
+});
+
+test('an install-scoped setting adopts the open show value once, then ignores show files', async () => {
+  // These settings used to be stored per show file. The first load copies the
+  // open show's value (or the default) into the install store so nobody's
+  // existing choice resets; after that, swapping shows must not re-seed it.
+  const defaultSettings = [
+    {
+      Group: 'System',
+      Key: 'MIGRATED',
+      Title: 'Migrated',
+      Description: 'Had a value in the show file',
+      Type: 'BOOLEAN',
+      DefaultValue: true,
+      Scope: 'INSTALL',
+    },
+    {
+      Group: 'System',
+      Key: 'NEVER_SET',
+      Title: 'Never set',
+      Description: 'Had no value in the show file',
+      Type: 'INTEGER',
+      DefaultValue: 5,
+      Scope: 'INSTALL',
+    },
+  ];
+
+  let showValues = new Map([['MIGRATED', { Value: '0' }]]);
+  const dbMock = {
+    Manager: {
+      Ready: async () => {},
+      Get: async (_sql, params) => [null, showValues.get(params[0]) || null],
+      Run: async () => [null, { changes: 1 }],
+    },
+  };
+
+  const installValues = new Map();
+  const installStore = {
+    GetByKey: async (Key) =>
+      installValues.has(Key) ? [null, { Key, Value: installValues.get(Key) }] : [null, null],
+    Upsert: async (Key, Value) => {
+      installValues.set(Key, Value);
+      return [null, true];
+    },
+  };
+
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'SettingsManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => ({ log: () => {}, error: () => {} }) },
+    '../Broadcast': { Manager: { emit: () => {} } },
+    '../DB': dbMock,
+    './install-settings': { CreateInstallSettingsStore: () => installStore },
+    './DefaultSettings': {
+      DefaultSettings: defaultSettings,
+      Groups: [{ Name: 'System', Title: 'System' }],
+    },
+  });
+
+  assert.equal(await Manager.GetValue('MIGRATED'), false);
+  assert.equal(await Manager.GetValue('NEVER_SET'), 5);
+  assert.deepEqual(
+    [...installValues],
+    [
+      ['MIGRATED', '0'],
+      ['NEVER_SET', 5],
+    ]
+  );
+
+  // Open a different show whose file says otherwise: the install value holds.
+  showValues = new Map([
+    ['MIGRATED', { Value: '1' }],
+    ['NEVER_SET', { Value: '9' }],
+  ]);
+  await Manager.Reload();
+  assert.equal(await Manager.GetValue('MIGRATED'), false);
+  assert.equal(await Manager.GetValue('NEVER_SET'), 5);
+});

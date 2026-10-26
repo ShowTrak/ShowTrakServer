@@ -55,6 +55,11 @@ let getMainWindow: () => BrowserWindow | null = () => null;
 let checkWatchdogTimer: NodeJS.Timeout | null = null;
 let hasDownloadedUpdate = false;
 let cachedMacDeveloperIdSigned: boolean | null = null;
+// The most recent status sent to the renderer, and the release info of the
+// update currently being fetched. A check requested while one is already in
+// flight replays these instead of restarting the updater mid-download.
+let lastStatus: AppUpdateStatusPayload | null = null;
+let activeInfo: unknown = null;
 const CHECK_TIMEOUT_MS = 20000;
 
 const SQUIRREL_FEED_URL = 'https://github.com/ShowTrak/ShowTrakServer/releases/latest/download/';
@@ -67,6 +72,16 @@ const SQUIRREL_PROGRESS_INTERVAL_MS = 500;
 let squirrelSession = 0;
 let squirrelProgressTimer: NodeJS.Timeout | null = null;
 let squirrelReleaseInfo: { version?: string; releaseNotes?: string } | null = null;
+
+// Automatic updates (the SYSTEM_AUTO_UPDATE_ENABLED setting). While enabled, a
+// packaged build checks in the background shortly after boot and then on an
+// interval; whatever it downloads is installed on the next restart. It never
+// restarts the app itself — that is always the operator's call mid-show.
+const AUTO_CHECK_INITIAL_DELAY_MS = 60 * 1000;
+const AUTO_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+let automaticUpdatesEnabled = false;
+let autoCheckInitialTimer: NodeJS.Timeout | null = null;
+let autoCheckIntervalTimer: NodeJS.Timeout | null = null;
 
 function toErrorMessage(value: unknown) {
   if (!value) return 'Unknown error';
@@ -140,8 +155,34 @@ function runSimulatedInstall() {
   setTimeout(() => sendAppUpdateStatus({ state: 'installed', simulated: true }), 600);
 }
 
+function isUpdateInProgress() {
+  const state = lastStatus && lastStatus.state;
+  return state === 'checking' || state === 'available' || state === 'downloading';
+}
+
+function forwardToRenderer(payload: AppUpdateStatusPayload) {
+  try {
+    const MainWindow = getMainWindow();
+    if (MainWindow && !MainWindow.isDestroyed()) {
+      MainWindow.webContents.send('AppUpdate:Status', payload);
+    }
+  } catch {
+    /* intentional: forwarding status to a closing window is best-effort */
+  }
+}
+
 function sendAppUpdateStatus(payload: AppUpdateStatusPayload) {
   const state = payload && payload.state;
+  if (state === 'checking') {
+    activeInfo = null;
+  } else if (state === 'available' && payload.info) {
+    activeInfo = payload.info;
+  } else if (state === 'downloading' && !payload.info && activeInfo) {
+    // Carry the release info on progress ticks so a late listener (the floating
+    // progress bar, a reloaded window) can still name the version.
+    payload = { ...payload, info: activeInfo };
+  }
+  lastStatus = payload;
   try {
     if (state) {
       Logger.log(`Updater status: ${state}`);
@@ -164,14 +205,7 @@ function sendAppUpdateStatus(payload: AppUpdateStatusPayload) {
   if (state === 'available' || state === 'none' || state === 'error' || state === 'downloaded') {
     clearCheckWatchdog();
   }
-  try {
-    const MainWindow = getMainWindow();
-    if (MainWindow && !MainWindow.isDestroyed()) {
-      MainWindow.webContents.send('AppUpdate:Status', payload);
-    }
-  } catch {
-    /* intentional: forwarding status to a closing window is best-effort */
-  }
+  forwardToRenderer(payload);
 }
 
 function normalizeUpdaterError(err: unknown): AppUpdateStatusPayload {
@@ -394,6 +428,14 @@ function initSquirrelUpdater() {
 async function handleCheck() {
   Logger.log('AppUpdate:Check invoked');
 
+  // Already checking or downloading: restarting the updater would error, so
+  // just re-send where the current run is up to.
+  if (isUpdateInProgress() && lastStatus) {
+    Logger.log(`AppUpdate:Check skipped; update already ${lastStatus.state}`);
+    forwardToRenderer(lastStatus);
+    return;
+  }
+
   if (app.isPackaged && !ensureMacAutoUpdateEligibility()) {
     Logger.warn('AppUpdate:Check continuing despite macOS signing eligibility warning');
   }
@@ -439,7 +481,7 @@ async function handleCheck() {
       autoUpdater = updater;
       Logger.log('Initialized electron-updater in handleCheck()');
       autoUpdater.autoDownload = true;
-      autoUpdater.autoInstallOnAppQuit = false;
+      autoUpdater.autoInstallOnAppQuit = automaticUpdatesEnabled;
       autoUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
       autoUpdater.on('update-available', (info: unknown) =>
         sendAppUpdateStatus({ state: 'available', info })
@@ -566,7 +608,7 @@ function initElectronUpdater() {
     autoUpdater = updater;
     Logger.log('Initialized electron-updater in initElectronUpdater()');
     autoUpdater.autoDownload = true; // download when found
-    autoUpdater.autoInstallOnAppQuit = false;
+    autoUpdater.autoInstallOnAppQuit = automaticUpdatesEnabled;
     autoUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
     autoUpdater.on('update-available', (info: unknown) =>
       sendAppUpdateStatus({ state: 'available', info })
@@ -586,6 +628,41 @@ function initElectronUpdater() {
   }
 }
 
+function runAutomaticCheck() {
+  if (!automaticUpdatesEnabled) return;
+  // Nothing more to fetch until the downloaded update has been installed.
+  if (hasDownloadedUpdate) return;
+  Logger.log('Running automatic background update check');
+  handleCheck().catch((e) => Logger.error('Automatic update check failed:', e));
+}
+
+function clearAutomaticCheckTimers() {
+  if (autoCheckInitialTimer) clearTimeout(autoCheckInitialTimer);
+  if (autoCheckIntervalTimer) clearInterval(autoCheckIntervalTimer);
+  autoCheckInitialTimer = null;
+  autoCheckIntervalTimer = null;
+}
+
+// Turn background checking on or off. Unpackaged (dev) runs never check
+// automatically: their check is only a UI simulation.
+function SetAutomaticUpdates(Enabled: boolean) {
+  const Next = !!Enabled && app.isPackaged;
+  if (autoUpdater) autoUpdater.autoInstallOnAppQuit = Next;
+  if (Next === automaticUpdatesEnabled) return;
+  automaticUpdatesEnabled = Next;
+  clearAutomaticCheckTimers();
+  if (!Next) {
+    Logger.log('Automatic updates disabled');
+    return;
+  }
+  Logger.log('Automatic updates enabled');
+  autoCheckInitialTimer = setTimeout(() => {
+    autoCheckInitialTimer = null;
+    runAutomaticCheck();
+  }, AUTO_CHECK_INITIAL_DELAY_MS);
+  autoCheckIntervalTimer = setInterval(runAutomaticCheck, AUTO_CHECK_INTERVAL_MS);
+}
+
 // Wire the IPC handlers and perform the eager electron-updater init. Pass a
 // provider returning the current main BrowserWindow (it is created lazily).
 function Register(RPC: RpcRegistrar, options: RegisterOptions = {}) {
@@ -601,4 +678,5 @@ export const Manager = {
   Register,
   sendAppUpdateStatus,
   isSquirrelWindows,
+  SetAutomaticUpdates,
 };

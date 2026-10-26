@@ -643,7 +643,7 @@ const Actions: MonitoringActionDef[] = [
   {
     ID: 'output.disable',
     Label: 'Switch Output Off',
-    Icon: 'display-fill',
+    Icon: 'display',
     Group: 'Output',
     Destructive: true,
     Params: [OUTPUT_PARAM],

@@ -137,12 +137,12 @@ export function setPreviewButtonState(ID: string, IsPlaying: boolean) {
 
   if (IsPlaying) {
     $button.attr('title', 'Stop preview');
-    $button.html('<i class="bi bi-stop-fill"></i>');
+    $button.html('<i class="bi bi-stop"></i>');
     return;
   }
 
   $button.attr('title', 'Preview');
-  $button.html('<i class="bi bi-play-fill"></i>');
+  $button.html('<i class="bi bi-play"></i>');
 }
 
 // Called by the bootstrap orchestrator in main.ts — never at import time.
@@ -391,7 +391,7 @@ export function RenderAudioAssetsList() {
         </div>
         <div class="d-flex gap-1 flex-shrink-0 audio-asset-actions">
           <button type="button" class="btn btn-sm bg-ghost-light text-white" data-audio-preview title="${IsPreviewPlaying ? 'Stop preview' : 'Preview'}" ${Asset.Missing ? 'disabled' : ''}>
-            <i class="bi ${IsPreviewPlaying ? 'bi-stop-fill' : 'bi-play-fill'}"></i>
+            <i class="bi ${IsPreviewPlaying ? 'bi-stop' : 'bi-play'}"></i>
           </button>
           <button type="button" class="btn btn-sm btn-delete" data-audio-delete title="Delete audio asset">
             <i class="bi bi-trash"></i>

@@ -494,8 +494,9 @@ body.is-web #APPLICATION {
   color: var(--danger-text) !important;
   background-color: rgb(var(--danger-rgb) / 0.08) !important;
 }
-/* Settings button (cog icon) */
+/* Settings (cog) and show file buttons */
 #NAVBAR_CORE_BUTTON.settings-btn,
+#FILE_MENU_BUTTON.settings-btn,
 #ADD_MONITORING_TARGET_BTN.settings-btn {
   display: inline-flex;
   align-items: center;
@@ -512,7 +513,8 @@ body.is-web #APPLICATION {
     transform 120ms ease;
 }
 #ADD_MONITORING_TARGET_DROPDOWN .dropdown-toggle::after,
-#SETTINGS_MENU_DROPDOWN .dropdown-toggle::after {
+#SETTINGS_MENU_DROPDOWN .dropdown-toggle::after,
+#FILE_MENU_DROPDOWN .dropdown-toggle::after {
   display: none;
 }
 /* Only show add-target controls while in edit mode, with 300ms fade. */
@@ -540,27 +542,36 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
     visibility 0s linear 0s;
 }
 #ADD_MONITORING_TARGET_MENU.dropdown-menu,
-#SETTINGS_MENU.dropdown-menu {
+#SETTINGS_MENU.dropdown-menu,
+#FILE_MENU.dropdown-menu {
   min-width: 240px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   background: rgb(var(--surface-2-rgb) / 0.98);
   padding: 0.35rem;
+  /* These menus open from the bottom bar. Capped to the space above it so Popper
+     can always flip them upward; a menu taller than the window would otherwise
+     open downward, off-screen, and look like the button does nothing. */
+  max-height: calc(100vh - var(--bottom-bar-height) - 24px);
+  overflow-y: auto;
 }
 #ADD_MONITORING_TARGET_MENU .dropdown-item,
-#SETTINGS_MENU .dropdown-item {
+#SETTINGS_MENU .dropdown-item,
+#FILE_MENU .dropdown-item {
   color: var(--text-strong);
   border-radius: var(--radius-sm);
   font-size: var(--fs-md);
   padding: 0.45rem 0.6rem;
 }
-#SETTINGS_MENU .dropdown-item {
+#SETTINGS_MENU .dropdown-item,
+#FILE_MENU .dropdown-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
 }
-#SETTINGS_MENU .dropdown-item .menu-shortcut {
+#SETTINGS_MENU .dropdown-item .menu-shortcut,
+#FILE_MENU .dropdown-item .menu-shortcut {
   margin-left: auto;
   color: var(--text-muted);
   font-size: var(--fs-xs);
@@ -570,11 +581,14 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 #ADD_MONITORING_TARGET_MENU .dropdown-item:hover,
 #ADD_MONITORING_TARGET_MENU .dropdown-item:focus,
 #SETTINGS_MENU .dropdown-item:hover,
-#SETTINGS_MENU .dropdown-item:focus {
+#SETTINGS_MENU .dropdown-item:focus,
+#FILE_MENU .dropdown-item:hover,
+#FILE_MENU .dropdown-item:focus {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
-#SETTINGS_MENU .dropdown-header {
+#SETTINGS_MENU .dropdown-header,
+#FILE_MENU .dropdown-header {
   color: var(--text-subtle);
   font-size: var(--fs-xs);
   text-transform: uppercase;
@@ -582,7 +596,8 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   padding: 0.35rem 0.6rem 0.15rem;
 }
 #ADD_MONITORING_TARGET_MENU .dropdown-divider,
-#SETTINGS_MENU .dropdown-divider {
+#SETTINGS_MENU .dropdown-divider,
+#FILE_MENU .dropdown-divider {
   border-top-color: var(--border-default);
   margin: 0.3rem 0.2rem;
 }
@@ -595,10 +610,12 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   color: var(--danger-text-hover) !important;
 }
 #NAVBAR_CORE_BUTTON.settings-btn:hover,
+#FILE_MENU_BUTTON.settings-btn:hover,
 #ADD_MONITORING_TARGET_BTN.settings-btn:hover {
   color: #fff;
 }
 #NAVBAR_CORE_BUTTON.settings-btn .bi,
+#FILE_MENU_BUTTON.settings-btn .bi,
 #ADD_MONITORING_TARGET_BTN.settings-btn .bi {
   font-size: 16px;
   line-height: 1;
@@ -2404,6 +2421,95 @@ body.compact-mode .group-column-grid {
 
 .SHOWTRAK_APP_UPDATE_SPIN {
   animation: spin 1.4s linear infinite;
+}
+
+/* Floating download progress, shown while an update downloads with the modal
+   closed. Bottom-right so it stays clear of the centred identify banner and
+   confirmation toast; clicking it reopens the modal. */
+#APP_UPDATE_FLOAT {
+  position: fixed;
+  right: 12px;
+  bottom: calc(var(--bottom-bar-height) + 12px);
+  z-index: var(--z-toast);
+  width: min(320px, calc(100vw - 24px));
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  text-align: left;
+  background: var(--surface-3);
+  border: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+#APP_UPDATE_FLOAT.d-none {
+  display: none;
+}
+
+#APP_UPDATE_FLOAT .app-update-float-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#APP_UPDATE_FLOAT .app-update-float-title {
+  font-size: var(--fs-md);
+  font-weight: 700;
+}
+#APP_UPDATE_FLOAT .app-update-float-title .bi {
+  color: var(--info-cyan);
+  margin-right: 4px;
+}
+
+#APP_UPDATE_FLOAT .app-update-float-version {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgb(var(--info-cyan-rgb) / 0.18);
+  color: var(--info-cyan);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+#APP_UPDATE_FLOAT .app-update-float-version:empty {
+  display: none;
+}
+
+#APP_UPDATE_FLOAT .app-update-float-track {
+  position: relative;
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+#APP_UPDATE_FLOAT .app-update-float-bar {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--info-cyan);
+  transition: width 0.25s ease;
+}
+/* Before the first progress tick: a sliding sliver instead of an empty bar. */
+#APP_UPDATE_FLOAT .app-update-float-bar.is-indeterminate {
+  width: 30%;
+  animation: app-update-float-slide 1.2s ease-in-out infinite;
+}
+@keyframes app-update-float-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+#APP_UPDATE_FLOAT .app-update-float-detail {
+  font-size: var(--fs-sm);
+  color: var(--text-soft);
 }
 
 /* Changelog: rendered release notes styled as readable prose rather than the
@@ -6363,10 +6469,11 @@ html:has(body.is-web) {
   background: #160f35 !important;
 }
 
-/* Desktop-only chrome hidden on the web: navbar/dragbar and the cogs
-   (settings) menu. Mode/alerts toggles stay visible as read-only state. */
+/* Desktop-only chrome hidden on the web: navbar/dragbar, the cogs (settings)
+   menu and the show file menu. Mode/alerts toggles stay visible as read-only state. */
 body.is-web .dragbar,
-body.is-web #SETTINGS_MENU_DROPDOWN {
+body.is-web #SETTINGS_MENU_DROPDOWN,
+body.is-web #FILE_MENU_DROPDOWN {
   display: none !important;
 }
 

@@ -205,7 +205,7 @@ export function RenderFreeKioskTile(K: FreeKioskTerminalView): string {
       AppMode === 'EDIT' ? 'true' : 'false'
     }">
       <button type="button" class="CLIENT_TILE_COG FREEKIOSK_TILE_COG" aria-label="Edit FreeKiosk Terminal" title="Edit FreeKiosk Terminal">
-        <i class="bi bi-gear-fill"></i>
+        <i class="bi bi-gear"></i>
       </button>
       <label class="text-sm ${
         TagBadges ? 'd-none' : ''

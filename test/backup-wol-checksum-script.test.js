@@ -23,8 +23,20 @@ test('BackupManager saves, opens, and creates new ShowTrak files', async () => {
   const replaceCalls = [];
   let resetCalls = 0;
   let hasUnsavedChanges = true;
+  const stamps = [];
+  const currentVersion = require('../package.json').version;
   const dbMock = {
     Manager: {
+      // Version stamping into the ShowFileInfo table.
+      Run: async (sql, params) => {
+        stamps.push(params);
+        return [null, { changes: 1, lastID: 0 }];
+      },
+      // Every file on disk here was saved by this version: no upgrade prompts.
+      ReadFileInfo: async () => [
+        null,
+        { CreatedWithVersion: currentVersion, SavedWithVersion: currentVersion },
+      ],
       // Emulate VACUUM INTO by writing a placeholder snapshot file.
       SnapshotTo: async (target) => {
         snapshotCalls.push(target);
@@ -63,6 +75,7 @@ test('BackupManager saves, opens, and creates new ShowTrak files', async () => {
   assert.match(saveMsg, /saved/i);
   assert.deepEqual(snapshotCalls, [savePath]);
   assert.equal(fs.existsSync(savePath), true);
+  assert.deepEqual(stamps, [['SavedWithVersion', currentVersion]]);
   // The open file path is persisted so it survives a relaunch.
   assert.equal(Manager.GetCurrentFilePath(), savePath);
   assert.equal(JSON.parse(fs.readFileSync(statePath, 'utf8')).CurrentFilePath, savePath);
@@ -87,16 +100,23 @@ test('BackupManager saves, opens, and creates new ShowTrak files', async () => {
   assert.match(String(missingErr), /does not exist/i);
   assert.equal(replaceCalls.length, 1);
 
-  // New: resets the database to empty and clears the current file pointer.
+  // New: resets the database to empty, then saves it straight away to the
+  // chosen location, so the new show always has a file behind it.
+  const newPath = path.join(tmpDir, 'New.ShowTrak');
   const resetBeforeNew = resetCalls;
-  const [newErr, newMsg] = await Manager.New();
+  stamps.length = 0;
+  const [newErr, newMsg] = await Manager.New(newPath);
   assert.equal(newErr, null);
   assert.match(newMsg, /new show/i);
   assert.equal(resetCalls, resetBeforeNew + 1);
-  assert.equal(Manager.GetCurrentFilePath(), null);
-  assert.equal(JSON.parse(fs.readFileSync(statePath, 'utf8')).CurrentFilePath, null);
-  // With no file associated but data present, it reports unsaved legacy data.
-  assert.equal(await Manager.HasUnsavedWorkingData(), true);
+  assert.deepEqual(stamps, [
+    ['CreatedWithVersion', currentVersion],
+    ['SavedWithVersion', currentVersion],
+  ]);
+  assert.equal(snapshotCalls.at(-1), newPath);
+  assert.equal(Manager.GetCurrentFilePath(), newPath);
+  assert.equal(JSON.parse(fs.readFileSync(statePath, 'utf8')).CurrentFilePath, newPath);
+  assert.equal(await Manager.HasUnsavedWorkingData(), false);
   assert.equal(await Manager.HasUnsavedChanges(), false);
 
   // Boot-time integrity check: re-associate a file then delete it from disk;
@@ -108,6 +128,7 @@ test('BackupManager saves, opens, and creates new ShowTrak files', async () => {
   const [missingCheckErr, missingResult] = await Manager.EnsureCurrentFileExists();
   assert.equal(missingCheckErr, null);
   assert.equal(missingResult.Missing, true);
+  assert.equal(missingResult.FilePath, savePath);
   assert.equal(resetCalls, resetBeforeMissing + 1);
   assert.equal(Manager.GetCurrentFilePath(), null);
   assert.equal(JSON.parse(fs.readFileSync(statePath, 'utf8')).CurrentFilePath, null);

@@ -227,7 +227,7 @@ function RenderAction(
         ${Fields}
         <button type="button" class="monitor-action-btn monitor-action-go${Destructive}" ${Ids}
           title="${Safe(Title)}" aria-label="${Safe(Action.Label)}" ${Disabled}>
-          <i class="bi bi-play-fill"></i>
+          <i class="bi bi-play"></i>
         </button>
         ${RenderStar(Ids, Favourited)}
       </div>`;
@@ -420,7 +420,7 @@ function RenderGroupAction(
         Action.Label
       )}</span>
       ${Fields}
-      ${Button('<i class="bi bi-play-fill"></i>', Action.Label)}
+      ${Button('<i class="bi bi-play"></i>', Action.Label)}
     </span>`;
 }
 

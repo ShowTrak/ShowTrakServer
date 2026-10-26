@@ -115,8 +115,16 @@ interface DBManager {
   MarkClean(): void;
   SnapshotTo(TargetPath: string): Promise<DBResult<string>>;
   ReplaceWithFile(SourcePath: string): Promise<DBResult<string>>;
+  ReadFileInfo(SourcePath: string): Promise<DBResult<ShowFileInfo>>;
   ResetToEmpty(): Promise<DBResult<string>>;
   HasData(): Promise<boolean>;
+}
+
+// What a .ShowTrak file records about itself in its ShowFileInfo table. Both
+// are null for a file saved before the table existed.
+interface ShowFileInfo {
+  CreatedWithVersion: string | null;
+  SavedWithVersion: string | null;
 }
 
 const Manager = {} as DBManager;
@@ -124,7 +132,7 @@ const Manager = {} as DBManager;
 // Consumed by the repository factories in ./repositories/* (they receive the
 // DB manager as an argument rather than importing it, so test DB mocks
 // injected into managers propagate through them unchanged).
-export type { DBManager, DBResult, RunOptions, TxRun };
+export type { DBManager, DBResult, RunOptions, ShowFileInfo, TxRun };
 
 function ResolvePendingDrainWaiters(): void {
   if (pendingOperations !== 0) return;
@@ -696,6 +704,35 @@ Manager.ReplaceWithFile = async (SourcePath: string): Promise<DBResult<string>> 
   const [ValidationErr] = await ValidateDatabaseFile(SourcePath);
   if (ValidationErr) return [ValidationErr, null];
   return WithExclusiveConnection(() => SwapInFile(SourcePath));
+};
+
+// Read the ShowFileInfo of a .ShowTrak file on disk without opening it as the
+// working database: validated first, then probed read-only, so the file is
+// never modified. A valid file with no ShowFileInfo table predates version
+// stamping and reports both versions as null.
+Manager.ReadFileInfo = async (SourcePath: string): Promise<DBResult<ShowFileInfo>> => {
+  const [ValidationErr] = await ValidateDatabaseFile(SourcePath);
+  if (ValidationErr) return [ValidationErr, null];
+  return new Promise((resolve) => {
+    const Probe = new sqlite3.Database(SourcePath, sqlite3.OPEN_READONLY, (err: Error | null) => {
+      if (err) return resolve([new Error('Selected file is not a valid ShowTrak file'), null]);
+      Probe.all(
+        'SELECT Key, Value FROM ShowFileInfo',
+        (qErr: Error | null, rows: Array<{ Key?: unknown; Value?: unknown }> | undefined) => {
+          Probe.close(() => {});
+          const Info: ShowFileInfo = { CreatedWithVersion: null, SavedWithVersion: null };
+          // No such table: a file from before version stamping.
+          if (qErr) return resolve([null, Info]);
+          for (const Row of rows || []) {
+            const Value = typeof Row.Value === 'string' && Row.Value ? Row.Value : null;
+            if (Row.Key === 'CreatedWithVersion') Info.CreatedWithVersion = Value;
+            if (Row.Key === 'SavedWithVersion') Info.SavedWithVersion = Value;
+          }
+          resolve([null, Info]);
+        }
+      );
+    });
+  });
 };
 
 async function SwapInFile(SourcePath: string): Promise<DBResult<string>> {

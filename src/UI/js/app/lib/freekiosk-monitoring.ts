@@ -288,7 +288,7 @@ function CardBadge(Fixed: boolean, Monitored: boolean, HasIssue: boolean, Title:
     return {
       State: 'locked' as const,
       Label: 'Monitored',
-      Icon: 'bi-check-circle-fill',
+      Icon: 'bi-check-circle',
       Title: `${Title} is always monitored`,
     };
   }
@@ -304,14 +304,14 @@ function CardBadge(Fixed: boolean, Monitored: boolean, HasIssue: boolean, Title:
     return {
       State: 'issue' as const,
       Label: 'Alarm',
-      Icon: 'bi-exclamation-triangle-fill',
+      Icon: 'bi-exclamation-triangle',
       Title: 'Stop monitoring (conditions not met)',
     };
   }
   return {
     State: 'healthy' as const,
     Label: 'Monitored',
-    Icon: 'bi-check-circle-fill',
+    Icon: 'bi-check-circle',
     Title: 'Stop monitoring',
   };
 }

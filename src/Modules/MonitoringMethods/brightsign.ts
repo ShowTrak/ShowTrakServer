@@ -272,7 +272,7 @@ const Actions: MonitoringActionDef[] = [
   {
     ID: 'display.sleep',
     Label: 'Display Power Save',
-    Icon: 'display-fill',
+    Icon: 'display',
     Group: 'Display',
     Destructive: true,
     Note: 'Puts the display on the HDMI output this check watches into power save, blanking it.',

@@ -21,7 +21,7 @@ export const Manager = {
       fs.mkdirSync(appDataPath, { recursive: true });
     }
 
-    const AppDataFolders = ['Logs', 'Scripts', 'Storage', 'SampleScripts', 'Audio'];
+    const AppDataFolders = ['Logs', 'Scripts', 'Storage', 'SampleScripts', 'Audio', 'Backups'];
     AppDataFolders.forEach((folder) => {
       const folderPath = path.join(appDataPath, folder);
       if (!fs.existsSync(folderPath)) {
@@ -48,6 +48,12 @@ export const Manager = {
   // app-global (survives show swaps) on purpose, matching how alert sounds work.
   GetAudioDirectory(): string {
     return path.join(appDataPath, 'Audio');
+  },
+
+  // Copies of show files taken before this version upgraded them, so an
+  // operator can always go back to the file an older version last saved.
+  GetBackupsDirectory(): string {
+    return path.join(appDataPath, 'Backups');
   },
 
   // Cache directory for sample scripts fetched from the public ShowTrak

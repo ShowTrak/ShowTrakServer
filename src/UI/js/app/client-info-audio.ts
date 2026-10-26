@@ -60,7 +60,7 @@ function LevelRow(Endpoint: AudioEndpointView, Capabilities: AudioCapabilities |
     Parts.push(`
       <button type="button" class="SHOWTRAK_AUDIO_MUTE ${Muted ? 'is-muted' : ''}" data-endpoint="${Id}"
         data-muted="${Muted ? '1' : '0'}" title="${Muted ? 'Unmute' : 'Mute'}" aria-label="${Muted ? 'Unmute' : 'Mute'}">
-        <i class="bi ${Muted ? 'bi-volume-mute-fill' : 'bi-volume-up-fill'}"></i>
+        <i class="bi ${Muted ? 'bi-volume-mute' : 'bi-volume-up'}"></i>
       </button>`);
   }
   if (CanControlAudio(Endpoint, Capabilities, 'Volume') && Endpoint.Volume !== null) {
@@ -148,7 +148,7 @@ function EndpointCard(Endpoint: AudioEndpointView, Capabilities: AudioCapabiliti
       </div>
       ${Endpoint.Issues.map(
         (Issue) =>
-          `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Issue.Message)}</small>`
+          `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle me-1"></i>${Safe(Issue.Message)}</small>`
       ).join('')}
       ${LevelRow(Endpoint, Capabilities)}
       ${ConditionsTable(Endpoint, Capabilities)}
@@ -211,7 +211,7 @@ export function PatchAudioLevels($List: JQuery, Client: ClientView): void {
         .attr('data-muted', Muted ? '1' : '0')
         .attr('title', Muted ? 'Unmute' : 'Mute')
         .attr('aria-label', Muted ? 'Unmute' : 'Mute');
-      $Mute.find('i').attr('class', `bi ${Muted ? 'bi-volume-mute-fill' : 'bi-volume-up-fill'}`);
+      $Mute.find('i').attr('class', `bi ${Muted ? 'bi-volume-mute' : 'bi-volume-up'}`);
     }
     PatchConditions($Card, Endpoint, Client.AudioDevices?.Capabilities ?? null);
   }

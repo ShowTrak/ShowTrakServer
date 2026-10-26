@@ -7,7 +7,7 @@ import { OpenMonitoringTargetHistory, OpenDummyClientHistory } from './monitorin
 import { Safe } from './utils';
 import { ConfirmationDialog, Notify, ShowExecutionToastIfActive, Wait } from './selection-init';
 import { ClearTagPicker } from './tag-picker';
-import type { ClientView } from '@showtrak/protocol';
+import type { ClientView, ShowFileUpgrade } from '@showtrak/protocol';
 
 // The former Update Manager and Group Manager god-sections now live in their own
 // modules; re-export them so existing `./modals` importers keep working.
@@ -230,13 +230,78 @@ export async function OpenAboutModal() {
 
 export async function OpenShow() {
   console.log('Opening ShowTrak file');
-  const [Err] = await window.API.OpenShow();
+  const [Err, Outcome] = await window.API.OpenShow();
   if (Err) {
     if (/cancelled by user/i.test(String(Err))) return;
     await Notify(String(Err), 'error');
     return;
   }
+  if (Outcome && Outcome.Status === 'UpgradeRequired') {
+    await PromptShowFileUpgrade(Outcome.Upgrade);
+    return;
+  }
   await Notify('Opened show file.', 'success');
+}
+
+const NO_SHOW_DEFAULT_MESSAGE = 'Open an existing show file or create a new one to get started.';
+
+// The empty state: no show file is open, so ask for one. Message replaces the
+// default prompt (e.g. to say the last show file has gone missing).
+export function OpenNoShowPrompt(Message: string = NO_SHOW_DEFAULT_MESSAGE) {
+  $('#NO_SHOW_MESSAGE').text(Message);
+  openModal('SHOWTRAK_MODAL_NO_SHOW');
+}
+
+// Ask the operator whether to upgrade a show file an older ShowTrak Server
+// saved. Accepting backs the original up and upgrades it; declining leaves it
+// untouched and starts a new show file instead, falling back to the empty state
+// if they then cancel choosing where to save it. Resolves once they answer.
+export function PromptShowFileUpgrade(Upgrade: ShowFileUpgrade): Promise<void> {
+  const SavedWith = Upgrade.FileVersion
+    ? `ShowTrak Server v${Upgrade.FileVersion}`
+    : 'an earlier version of ShowTrak Server';
+  $('#UPGRADE_SHOW_MESSAGE').text(
+    `${Upgrade.FileName} was last saved with ${SavedWith}. Opening it in v${Upgrade.CurrentVersion} ` +
+      'upgrades the file, and older versions may not be able to open it afterwards.'
+  );
+  closeModal('SHOWTRAK_MODAL_NO_SHOW');
+  openModal('SHOWTRAK_MODAL_UPGRADE_SHOW');
+
+  const Buttons = $('#UPGRADE_SHOW_ACCEPT, #UPGRADE_SHOW_DECLINE');
+  return new Promise((resolve) => {
+    const Answer = async (Accept: boolean) => {
+      Buttons.prop('disabled', true);
+      const [Err] = await window.API.ResolveShowFileUpgrade(Accept);
+      Buttons.prop('disabled', false);
+      if (Err) {
+        await Notify(String(Err), 'error');
+        // Still waiting on an answer (the backup failed, say): let them retry.
+        const [, StillPending] = await window.API.CheckShowFileUpgrade();
+        if (StillPending) return;
+      }
+      Buttons.off('click.showUpgrade');
+      closeModal('SHOWTRAK_MODAL_UPGRADE_SHOW');
+      if (!Err && Accept) await Notify(`Backed up and upgraded ${Upgrade.FileName}.`, 'success');
+      if (!Err && !Accept) await CreateNewShowFile();
+      if (!(await window.API.GetCurrentShowFile())) OpenNoShowPrompt();
+      resolve();
+    };
+    Buttons.off('click.showUpgrade');
+    $('#UPGRADE_SHOW_ACCEPT').on('click.showUpgrade', () => Answer(true));
+    $('#UPGRADE_SHOW_DECLINE').on('click.showUpgrade', () => Answer(false));
+  });
+}
+
+// Create a new show file, choosing where it is saved first. False when the
+// operator cancelled the location prompt (nothing has changed) or it failed.
+export async function CreateNewShowFile(): Promise<boolean> {
+  const [Err] = await window.API.NewShow();
+  if (Err) {
+    if (!/cancelled by user/i.test(String(Err))) await Notify(String(Err), 'error');
+    return false;
+  }
+  await Notify('Created new show file.', 'success');
+  return true;
 }
 
 // Derive a display name from a .ShowTrak path: basename without the extension.
@@ -275,16 +340,11 @@ export async function SaveShowAs() {
 
 export async function NewShow() {
   const Confirmed = await ConfirmationDialog(
-    'Create a new show file? This clears the current working data.',
+    'Create a new show file? You choose where to save it, then the current working data is cleared.',
     { ConfirmLabel: 'New Show File' }
   );
   if (!Confirmed) return;
-  const [Err] = await window.API.NewShow();
-  if (Err) {
-    await Notify(String(Err), 'error');
-    return;
-  }
-  await Notify('Created new show file.', 'success');
+  await CreateNewShowFile();
 }
 
 export async function OpenClientReplacementModal(Client: ClientView) {

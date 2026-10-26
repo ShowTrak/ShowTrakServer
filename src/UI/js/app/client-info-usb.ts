@@ -75,7 +75,7 @@ function ConditionsTable(Device: USBDeviceView, Capabilities: USBCapabilities | 
 }
 
 function Warning(Message: string): string {
-  return `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle-fill me-1"></i>${Safe(Message)}</small>`;
+  return `<small class="d-block mt-1 text-start st-condition-failing"><i class="bi bi-exclamation-triangle me-1"></i>${Safe(Message)}</small>`;
 }
 
 function DeviceCard(Device: USBDeviceView, Capabilities: USBCapabilities | null): string {

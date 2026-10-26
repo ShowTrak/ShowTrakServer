@@ -8,6 +8,7 @@
 // against the manifest size gives a real percentage.
 const path = require('path');
 const fs = require('fs');
+import { CompareVersions as compareVersions } from '../Modules/Utils';
 
 export interface SquirrelPackage {
   fileName: string;
@@ -17,16 +18,6 @@ export interface SquirrelPackage {
 
 // Squirrel package names end in `-<version>-full.nupkg` or `-<version>-delta.nupkg`.
 const PACKAGE_NAME = /^.+?-(\d+(?:\.\d+)*(?:-[0-9A-Za-z.]+)?)-(?:full|delta)\.nupkg$/i;
-
-function compareVersions(a: string, b: string) {
-  const pa = a.split(/[.-]/).map((n) => parseInt(n, 10) || 0);
-  const pb = b.split(/[.-]/).map((n) => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const diff = (pa[i] || 0) - (pb[i] || 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
 
 // Parse a RELEASES manifest ("<SHA1> <file> <size>" per line, optionally BOM-prefixed).
 export function parseSquirrelReleases(text: string): SquirrelPackage[] {

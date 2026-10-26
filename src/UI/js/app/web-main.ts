@@ -150,6 +150,8 @@ function applyWebChrome(config: WebConfig) {
     if (dragbar) dragbar.classList.add('d-none');
     const settingsMenu = el('SETTINGS_MENU_DROPDOWN');
     if (settingsMenu) settingsMenu.classList.add('d-none');
+    const fileMenu = el('FILE_MENU_DROPDOWN');
+    if (fileMenu) fileMenu.classList.add('d-none');
     // FOG scheduling is desktop-only: it is destructive and the credentials live
     // server-side. The shim stubs the API too, so this is presentation only.
     const fogButton = el('FOG_BUTTON');

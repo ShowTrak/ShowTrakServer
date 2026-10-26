@@ -179,7 +179,7 @@ function ControlCellsHtml(Channel: MonitorLiveLevelsCheck['Channels'][number]): 
     `<input type="range" class="form-range live-levels-fader" min="${FADER_SLIDER_MIN}" max="${FADER_SLIDER_MAX}" step="${FADER_SLIDER_STEP}" value="${FaderToSlider(Channel.Fader)}" aria-label="${Name} fader">` +
     `<span class="live-levels-fader-value">${Escape(FormatFader(Channel.Fader))}</span>` +
     `<button type="button" class="btn btn-sm live-levels-mute${Channel.Muted ? ' is-muted' : ''}" aria-pressed="${Channel.Muted ? 'true' : 'false'}" aria-label="Mute ${Name}" title="Mute">` +
-    '<i class="bi bi-volume-mute-fill"></i></button>' +
+    '<i class="bi bi-volume-mute"></i></button>' +
     '</div>'
   );
 }

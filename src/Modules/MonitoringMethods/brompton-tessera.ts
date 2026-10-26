@@ -490,7 +490,7 @@ const Actions: MonitoringActionDef[] = [
   {
     ID: 'blackout.on',
     Label: 'Blackout',
-    Icon: 'circle-fill',
+    Icon: 'circle',
     Group: 'Output',
     Destructive: true,
     Note: 'Fades the whole LED wall to black, using the blackout fade time set in Tessera.',
