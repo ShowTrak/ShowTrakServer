@@ -2,14 +2,14 @@
 //
 // Protocol only: it knows how to talk to one terminal and nothing about how
 // ShowTrak stores or broadcasts them. Built on node:http, matching the pattern
-// in MonitoringMethods/_http-shared.ts — an explicit kill timer plus destroy(),
+// in MonitoringMethods/_http-shared.ts: an explicit kill timer plus destroy(),
 // which is what gives a hard cap on a stalled device and byte-capped body
 // reading for free.
 //
 // Two traps in this API drive most of the code below:
 //
 //  1. A refused command still answers HTTP 200 with `success: true`. Privilege
-//     failures — reboot without Device Owner, lock without admin — are reported
+//     failures (reboot without Device Owner, lock without admin) are reported
 //     as `data.executed: false` plus a human-readable `data.error`. Anything
 //     reading the status code or the success flag as the verdict passes every
 //     test against a healthy device and silently no-ops in production.
@@ -115,7 +115,7 @@ function ClassifyTransportError(Err: unknown): FreeKioskRequestFailure {
     return { Kind: 'timeout', Message: 'Timed out waiting for the device' };
   }
   if (Code === 'ECONNREFUSED') {
-    return { Kind: 'transport', Message: 'Connection refused — is the REST API enabled?' };
+    return { Kind: 'transport', Message: 'Connection refused. Is the REST API enabled?' };
   }
   if (Code === 'EHOSTUNREACH' || Code === 'ENETUNREACH') {
     return { Kind: 'transport', Message: 'Device unreachable' };
@@ -125,7 +125,7 @@ function ClassifyTransportError(Err: unknown): FreeKioskRequestFailure {
   }
   // The device accepted the request and then tore the socket down mid-response.
   // Given a reboot or a UI restart that is the command working, so it gets its
-  // own stable message for SendCommand to recognise — see FREEKIOSK_DISCONNECTED.
+  // own stable message for SendCommand to recognise; see FREEKIOSK_DISCONNECTED.
   if (Code === 'ECONNRESET' || Code === 'EPIPE' || /socket hang ?up/i.test(Message)) {
     return { Kind: 'transport', Message: FREEKIOSK_DISCONNECTED };
   }
@@ -263,7 +263,7 @@ function ClassifyHttpFailure(
   const DeviceError = Envelope && Envelope.error != null ? String(Envelope.error).trim() : '';
 
   if (Response.Status === 401) {
-    return { Kind: 'unauthorized', Message: DeviceError || 'Unauthorized — check the API key' };
+    return { Kind: 'unauthorized', Message: DeviceError || 'Unauthorized: check the API key' };
   }
   if (Response.Status === 403) {
     return {
@@ -274,7 +274,7 @@ function ClassifyHttpFailure(
   if (Response.Status === 404) {
     return {
       Kind: 'not-found',
-      Message: 'Endpoint not found — the device may be running an older FreeKiosk build',
+      Message: 'Endpoint not found; the device may be running an older FreeKiosk build',
     };
   }
   if (Response.Status === 503) {
@@ -292,7 +292,7 @@ function ClassifyHttpFailure(
   if (!Envelope) {
     return {
       Kind: 'bad-response',
-      Message: 'Unexpected response from device — is this a FreeKiosk terminal?',
+      Message: 'Unexpected response from device. Is this a FreeKiosk terminal?',
     };
   }
   if (Envelope.success === false) {
@@ -368,7 +368,7 @@ export async function SendCommand(
   // A reboot or UI restart kills the HTTP server mid-response, so the socket
   // dies before an answer arrives. For those commands that IS the success case.
   //
-  // Note how narrow this is. Only a dropped connection counts — a timeout, a
+  // Note how narrow this is. Only a dropped connection counts: a timeout, a
   // refusal, a 403 or a 401 still fail, because each of those means the device
   // was alive enough to say no. Widening it to any error would make Reboot
   // incapable of reporting a genuine failure.
@@ -412,7 +412,7 @@ function CapturePath(Kind: 'screenshot' | 'camera', Options: FreeKioskCaptureOpt
  * Fetch a screenshot or camera photo as a data URL.
  *
  * The buffer is encoded and dropped immediately: captures are never written to
- * disk, never persisted and never broadcast — the data URL is returned only to
+ * disk, never persisted and never broadcast; the data URL is returned only to
  * the renderer that asked for it.
  */
 export async function FetchImage(
@@ -441,7 +441,7 @@ export async function FetchImage(
     if (Failure) return Fail(Failure.Message);
     return Fail(
       Kind === 'camera'
-        ? 'Camera unavailable — check the camera permission and hardware'
+        ? 'Camera unavailable: check the camera permission and hardware'
         : 'Screenshot unavailable'
     );
   }

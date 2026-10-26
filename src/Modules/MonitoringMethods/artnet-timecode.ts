@@ -6,7 +6,7 @@
 // Frames, Seconds, Minutes, Hours and Type (0 Film 24, 1 EBU 25, 2 DF 29.97,
 // 3 SMPTE 30), plus a StreamId (0x00 = master) that older senders transmit as a
 // zero filler. The spec leaves casting to the application; generators usually
-// broadcast it. There is nothing to ask for, so this is passive — like
+// broadcast it. There is nothing to ask for, so this is passive, like
 // artnet-universe it reads the cache of the process-wide receiver in
 // ./_artnet-shared, which tracks per (source IP, StreamId) the latest value, when
 // a packet last arrived and when the value last CHANGED. As in artnet-universe,
@@ -18,7 +18,7 @@
 //             check suits "timecode must be running now" moments, not a rig that
 //             idles between cues.
 //   Degraded  packets arrive but the time has not moved for StallMs
-//             [CheckAdvancing, on] — a paused generator that keeps repeating the
+//             [CheckAdvancing, on]: a paused generator that keeps repeating the
 //             same frame; or the Type differs from the expected rate
 //             [CheckFrameRate, off].
 //
@@ -173,7 +173,7 @@ export function EvaluateTimecode(P: EvaluateParams): MonitoringResult {
     return {
       Success: false,
       Error: !P.Snapshot.Ready
-        ? 'Art-Net listener starting…'
+        ? 'Art-Net listener starting...'
         : `No Art-Net timecode from ${P.Address}` +
           (Heard.length ? ` (heard from ${Heard.join(', ')})` : ''),
       ...Base,
@@ -247,7 +247,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
         : Pill('danger', 'Not receiving');
 
   const Head = Rows([
-    TextRow('Source IP', Address || '—'),
+    TextRow('Source IP', Address || '-'),
     Row('Status', StatusPill),
     Online ? Row('Timecode', Mono(Result.Timecode)) : null,
     Online ? TextRow('Type', Result.TimecodeType) : null,

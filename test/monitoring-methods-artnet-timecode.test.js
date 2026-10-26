@@ -311,7 +311,7 @@ test('the shared receiver ingests a real ArtTimeCode datagram', async (t) => {
   const ready = await rx.WhenReady(1000);
   if (!ready) {
     rx.Stop();
-    t.skip(`Art-Net socket not ready (${rx.ListenerError() || 'binding'}) — cannot bind udp/6454`);
+    t.skip(`Art-Net socket not ready (${rx.ListenerError() || 'binding'}); cannot bind udp/6454`);
     return;
   }
 

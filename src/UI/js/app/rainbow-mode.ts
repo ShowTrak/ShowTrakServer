@@ -9,8 +9,8 @@
 // that goes degraded or offline drops it the moment its class changes.
 //
 // The one thing CSS cannot do is keep the tiles in step: each tile's colour
-// cycle starts when its rainbow appears — when the tile is created, or when it
-// comes back online — and both happen at arbitrary moments. While the mode is
+// cycle starts when its rainbow appears (when the tile is created, or when it
+// comes back online), and both happen at arbitrary moments. While the mode is
 // on, every new cycle is moved onto one shared start time so the colours stay
 // in unison.
 import { HandleNonFatalError } from './utils';
@@ -92,7 +92,7 @@ function Apply(Enabled: unknown): void {
   }, FADE_MS);
 }
 
-// Called by the bootstrap orchestrator in main.ts — never at import time.
+// Called by the bootstrap orchestrator in main.ts, never at import time.
 export function InitRainbowMode() {
   window.API.OnRainbowModeUpdated(Apply);
 

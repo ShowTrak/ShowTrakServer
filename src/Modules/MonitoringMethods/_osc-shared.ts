@@ -1,12 +1,12 @@
 // Shared, dependency-free OSC (Open Sound Control) codec for the lighting-console
-// monitoring family. Supports the two TCP framings the OSC 1.1 spec allows —
-// SLIP (RFC 1055, double-ended) and int32 packet-length prefix (OSC 1.0) — plus
+// monitoring family. Supports the two TCP framings the OSC 1.1 spec allows,
+// SLIP (RFC 1055, double-ended) and int32 packet-length prefix (OSC 1.0), plus
 // unframed UDP packets, and encodes/decodes the handful of argument types a
 // read-only status probe needs (string, int32, float32, booleans).
 //
 // ETC Eos speaks OSC natively (see ./_eos-shared). Eos defaults to the OSC 1.0
 // length-prefix framing on TCP 3032, offers a SLIP-only port (3037), and both
-// framings on the main port depending on the console's "OSC TCP Mode" setting —
+// framings on the main port depending on the console's "OSC TCP Mode" setting,
 // so the encode/decode here is framing-parameterised rather than hard-coded.
 //
 // The QLab check (via _qlab-shared) uses this same codec with SLIP framing; the
@@ -155,7 +155,7 @@ function ParseOscMessage(Packet: Buffer): OscMessage | null {
       } else if (Tag === 'F') {
         Args.push(false);
       } else if (Tag === 'N' || Tag === 'I') {
-        // Null / Impulse — no payload bytes, no meaningful value.
+        // Null / Impulse: no payload bytes, no meaningful value.
       } else if (Tag === 'b') {
         if (Pos + 4 > Packet.length) break;
         const Size = Packet.readUInt32BE(Pos);
@@ -203,7 +203,7 @@ export function DecodeOscStream(
     while (Pos + 4 <= Stream.length) {
       const Size = Stream.readUInt32BE(Pos);
       if (Size < 0 || Size > 10_000_000) {
-        // Framing desync / bogus length — stop and let the caller time out.
+        // Framing desync / bogus length: stop and let the caller time out.
         return { Messages, Rest: Buffer.alloc(0) };
       }
       if (Pos + 4 + Size > Stream.length) break; // incomplete packet

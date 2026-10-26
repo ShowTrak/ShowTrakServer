@@ -18,7 +18,7 @@ type IpcHandler = (event: unknown, ...args: unknown[]) => unknown;
 const Handlers = new Map<string, IpcHandler>();
 
 // Record a handler for a channel (called by the RPC wrapper in main.ts).
-// The channel must exist in the IPC registry — registering an unlisted
+// The channel must exist in the IPC registry; registering an unlisted
 // channel is a compile error.
 function RegisterHandler(channel: InvokeChannel, fn: IpcHandler): void {
   Handlers.set(channel, fn);

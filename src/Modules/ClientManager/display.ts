@@ -1,4 +1,4 @@
-// Critical displays — the pure half.
+// Critical displays: the pure half.
 //
 // Everything here is a function of its arguments: recognising which reported
 // display a critical entry refers to, judging it against its conditions,
@@ -7,17 +7,17 @@
 // these.
 //
 // Identity. The client gives each display the most durable id it can (see
-// ShowTrak Client's DisplayMonitor): an EDID fingerprint ("edid:…"/"mac:…"),
-// else the port it is plugged into ("port:…"), else a composite of its make and
+// ShowTrak Client's DisplayMonitor): an EDID fingerprint ("edid:..."/"mac:..."),
+// else the port it is plugged into ("port:..."), else a composite of its make and
 // CURRENT MODE ("attr:VENDOR:PRODUCT:1920x1080@60:e"), else a per-session handle
-// ("session:…"). The last two are weak: an attribute id changes with the
+// ("session:..."). The last two are weak: an attribute id changes with the
 // resolution, and a session id with every boot. So a critical display is
 // matched to a reported one rather than looked up by id:
 //   1. the same id;
-//   2. for attribute ids, the same id once the mode is set aside — so a display
+//   2. for attribute ids, the same id once the mode is set aside, so a display
 //      whose resolution is not guarded does not go missing when it changes;
 //   3. when either side's id is weak, the same name, if exactly one display and
-//      one critical entry carry it — so a display the client could not
+//      one critical entry carry it, so a display the client could not
 //      fingerprint this time (or could not when it was marked) is still known.
 //
 // The principle the audio and network halves follow holds here too: an unknown
@@ -93,8 +93,8 @@ function RotationOrNull(Value: unknown): number | null {
 /**
  * The values a reported display has now, each null when the client did not say.
  *
- * Resolution is in physical pixels — the reported size is in points, so it is
- * scaled up — which is the output mode an operator means by it, and keeps it
+ * Resolution is in physical pixels (the reported size is in points, so it is
+ * scaled up), which is the output mode an operator means by it, and keeps it
  * independent of scaling: on Windows a scaling change alters the size in points
  * while the output resolution stays put.
  */
@@ -277,8 +277,8 @@ export function normalizeCriticalDisplayEntry(Value: unknown): CriticalDisplay |
   return {
     DisplayID,
     Label,
-    // A monitored display is always required to be connected — without that,
-    // monitoring it raises nothing when it goes — so presence is never read from
+    // A monitored display is always required to be connected (without that,
+    // monitoring it raises nothing when it goes), so presence is never read from
     // the row, which also brings back any row saved while it could be unticked.
     RequirePresent: true,
     Width,
@@ -501,7 +501,7 @@ type CheckOption = Exclude<keyof CriticalDisplayOptions, 'RequirePresent' | 'Req
  * property guards the value it has at that moment; a property that is already
  * guarded keeps its baseline, so editing one condition never quietly accepts a
  * change to another. A disconnected display can have conditions cleared, but
- * not new ones captured — there is nothing to capture.
+ * not new ones captured; there is nothing to capture.
  *
  * `DisplayID` is the id the entry is stored under: the existing entry's, or the
  * live display's on a first mark.

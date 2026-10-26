@@ -9,7 +9,7 @@ const { installJQuery, installHowl } = require('./helpers/renderer-stubs');
 // This modal is the documentation an integrator reads before wiring a lighting
 // desk, a Companion button or a show-control cue to ShowTrak. If a route is
 // mis-rendered or filed under the wrong heading, someone builds a cue against
-// an address that does not exist — and finds out during a show.
+// an address that does not exist, and finds out during a show.
 //
 // The path formatter is also a security boundary in miniature: route paths are
 // rendered as HTML, and the parameter placeholders are the only part that is

@@ -72,7 +72,7 @@ test("ScriptExecutionManager appends and runs each client's scripts sequentially
     ['script-a']
   );
 
-  // Re-queuing the SAME client APPENDS a second row that waits its turn — it is
+  // Re-queuing the SAME client APPENDS a second row that waits its turn; it is
   // not dispatched while script-a is still running.
   const secondId = await Manager.AddToQueue('uuid-1', 'script-b');
   all = await Manager.GetAllExecutions();
@@ -146,7 +146,7 @@ test('ScriptExecutionManager fails a queued script if its client goes offline be
   queued.Client.Online = false;
 
   // script-a finishes and frees the client. PumpClient must NOT dispatch script-b
-  // into the void — it should fail it as offline and leave the client idle.
+  // into the void; it should fail it as offline and leave the client idle.
   await Manager.Complete(runningId, null);
 
   const settled = (await Manager.GetAllExecutions()).find((e) => e.RequestID === queuedId);
@@ -251,7 +251,7 @@ test('ScriptExecutionManager fails early when no script exists for client OS', a
 
 // Regression: pushing raw executions to a renderer crashed with "Failed to
 // serialize arguments" because each entry carries a Client CLASS INSTANCE (has
-// methods) and a live Node timer handle — neither survives structured clone.
+// methods) and a live Node timer handle; neither survives structured clone.
 test('ToPublicScriptExecution yields a renderer-safe (structured-clone-able) projection', async () => {
   const { Manager, ToPublicScriptExecution } = load(
     baseMocks({
@@ -280,7 +280,7 @@ test('ToPublicScriptExecution yields a renderer-safe (structured-clone-able) pro
   await Manager.AddInternalTaskToQueue('uuid-1', 'Wake on LAN');
   const [raw] = await Manager.GetAllExecutions();
 
-  // The raw entry is exactly what used to be pushed — and it is not cloneable.
+  // The raw entry is exactly what used to be pushed, and it is not cloneable.
   assert.throws(() => structuredClone(raw));
 
   const pub = ToPublicScriptExecution(raw);

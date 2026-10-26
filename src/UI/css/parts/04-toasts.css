@@ -358,7 +358,7 @@
   gap: 8px;
   padding: 6px 8px;
 }
-/* Inline status / error text — stays on the row, never a block below it. */
+/* Inline status / error text: stays on the row, never a block below it. */
 .exec-inline {
   font-size: var(--fs-xs);
   line-height: 1.2;
@@ -381,7 +381,7 @@
   text-align: right;
   align-self: center;
 }
-/* Failure reason — same trailer treatment as the console tail above so it hugs
+/* Failure reason: same trailer treatment as the console tail above so it hugs
    the right edge and sits centred against the taller client/script chips. */
 .exec-inline-error {
   color: var(--danger-text-soft);
@@ -471,8 +471,8 @@
   opacity: 0.9;
   color: #fff;
 }
-/* The duration span is an inline box in a flex row, so its line box — not its
-   glyphs — is what gets centred; make it a flex item in its own right so the
+/* The duration span is an inline box in a flex row, so its line box (not its
+   glyphs) is what gets centred; make it a flex item in its own right so the
    text lines up with the 22px status indicator beside it. */
 .exec-time {
   display: inline-flex;

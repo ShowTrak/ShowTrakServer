@@ -1,14 +1,14 @@
 // The scope model: WHICH machines does this apply to.
 //
-// A "scope" backs three editors — alert-rule targets, the per-script whitelist,
-// and tag membership — and is persisted as
+// A "scope" backs three editors (alert-rule targets, the per-script whitelist,
+// and tag membership) and is persisted as
 //   { Workspace: boolean, Groups: number[], Clients: string[], Tags: number[] }
 // The editor works in a flat list of selection VALUES, which is what these
 // helpers convert to and from:
 //   workspace:*            → all clients
 //   tag:<TagID>            → everything carrying that tag (dynamic, may nest)
 //   group:<GroupID>        → a whole group (dynamic: current AND future members)
-//   client:<ScopedID>      → a single entity (plain UUID, or monitor:/check:…)
+//   client:<ScopedID>      → a single entity (plain UUID, or monitor:/check:...)
 //
 // This module is pure: no DOM, no modal. The UI that renders it lives in
 // ../scope-picker.ts. The split exists because the round trip
@@ -20,7 +20,7 @@
 // so selecting every member collapses back to the group (and an operator who
 // unticks one member gets the remaining members listed individually). A TAG
 // does not: its membership is another scope which may itself name tags, so a
-// tag is only ever an explicit token — never inferred from, and never collapsed
+// tag is only ever an explicit token, never inferred from, and never collapsed
 // into, the entities it happens to cover today.
 import {
   AllClients,
@@ -58,7 +58,7 @@ export interface ScopeSourceOptions {
   /** Render group headers (true) or a single flat list (false). Default true. */
   ShowGroups?: boolean;
   /**
-   * Hide one tag from the tag section — the tag currently being edited, which
+   * Hide one tag from the tag section: the tag currently being edited, which
    * must never be offered as a member of itself.
    */
   ExcludeTagID?: number | null;
@@ -384,7 +384,7 @@ export function scopeModelEntities(Model: AlertScopeModel): AlertScopeEntity[] {
  * For display only. The picker shows these as covered-but-not-selected, because
  * unticking one would be a lie: the only way to exclude it would be to rewrite
  * the tag, which changes every other scope that uses that tag. Naming the tag
- * responsible is the point — "covered" without "by what" leaves the operator
+ * responsible is the point: "covered" without "by what" leaves the operator
  * hunting for why a machine they never picked is in the list.
  */
 export function resolveTagCoverage(
@@ -430,7 +430,7 @@ export function resolveTagCoveredValues(
 /**
  * Collapse a set of directly-selected entity values back into a stored scope.
  *
- * `ExistingTags` is carried through untouched — tag selections are explicit
+ * `ExistingTags` is carried through untouched; tag selections are explicit
  * tokens and are never re-derived from the entities they cover (see the note at
  * the top of this file).
  */

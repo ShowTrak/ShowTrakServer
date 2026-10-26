@@ -1,6 +1,6 @@
 // The audit log in the renderer: the Logs tab of the view modal (one entity)
-// and the Audit Log modal (everything). Both are the same panel — a search box,
-// filters, the rows, and "Load Older" — over GetAuditLog, kept live by the
+// and the Audit Log modal (everything). Both are the same panel (a search box,
+// filters, the rows, and "Load Older") over GetAuditLog, kept live by the
 // AuditLogAppended push while they are on screen. Row markup and the live
 // filter live in lib/audit-log.
 import type { AuditEntityType, AuditLogEntry, AuditLogQuery } from '@showtrak/protocol';
@@ -67,7 +67,7 @@ class AuditLogPanel {
     ).join('');
     this.$root.addClass('audit-log-panel').html(`
       <div class="audit-log-toolbar">
-        <input type="search" class="form-control form-control-sm audit-log-search" placeholder="Search…" aria-label="Search the audit log" />
+        <input type="search" class="form-control form-control-sm audit-log-search" placeholder="Search..." aria-label="Search the audit log" />
         ${this.Options.EntityTypeFilter ? `<select class="form-select form-select-sm audit-log-type" aria-label="Show entries for">${Types}</select>` : ''}
         <select class="form-select form-select-sm audit-log-category" aria-label="Show activity">${Categories}</select>
       </div>

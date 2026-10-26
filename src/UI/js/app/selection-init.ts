@@ -1,6 +1,6 @@
 // Re-export barrel. Phase 7 pulled the global bootstrap out (the document-ready
 // IIFE and Init() now live in ./init.ts, called explicitly by main.ts); the
-// remaining live logic — toasts, the confirmation dialog, the identify flow —
+// remaining live logic (toasts, the confirmation dialog, the identify flow)
 // has since been moved into the leaf modules below. This file now holds NO
 // logic and NO side effects: importing it only re-exports, so the ~20 modules
 // that still reach for these symbols here keep working unchanged.

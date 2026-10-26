@@ -31,7 +31,7 @@ export function SummarizeTagScope(Tag: TagView | null | undefined): string {
   if (GroupCount) Parts.push(`${GroupCount} group${GroupCount === 1 ? '' : 's'}`);
   if (ClientCount) Parts.push(`${ClientCount} client${ClientCount === 1 ? '' : 's'}`);
 
-  // An empty scope is a real and confusing state — a tag that exists but
-  // targets nothing — so it has to say so rather than render blank.
+  // An empty scope is a real and confusing state (a tag that exists but
+  // targets nothing), so it has to say so rather than render blank.
   return Parts.length ? Parts.join(' + ') : 'No clients';
 }

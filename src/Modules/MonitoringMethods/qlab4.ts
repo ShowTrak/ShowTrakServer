@@ -1,7 +1,7 @@
 // QLab 4 workspace monitoring. QLab 4 is end-of-life, so this is deliberately a
 // minimal, per-tick probe rather than the persistent, deep-inspection QLab 5 check:
 // it opens a short-lived OSC/TCP connection, asks QLab for its open workspaces
-// (`/workspaces` — supported since QLab 3), and confirms a workspace is open — a
+// (`/workspaces`, supported since QLab 3), and confirms a workspace is open: a
 // named one, or any open workspace when the field is blank. It intentionally does
 // no /updates subscription, mode/cue/override inspection, or persistent connection;
 // use the QLab 5 check for that. Reuses the shared OSC codec (SLIP framing) and the
@@ -334,7 +334,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   else StatusPill = Pill('warning', Wanted ? 'Not found' : 'No workspaces');
 
   const Head = Rows([
-    TextRow('Host', `${Address || '—'}:${Port}`),
+    TextRow('Host', `${Address || '-'}:${Port}`),
     Row('Status', StatusPill),
     Wanted ? TextRow('Looking for', Wanted) : null,
     Reachable
@@ -378,7 +378,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
 export const Name = 'QLab 4';
 export const Description =
-  'Connects to a QLab 4 machine over OSC (default TCP 53000) and confirms a workspace is open — a specific one by name, filename, or unique ID, or any open workspace when left blank. A lightweight liveness/workspace check for legacy QLab 4 (end-of-life); use the QLab 5 check for mode, cue, and override inspection.';
+  'Connects to a QLab 4 machine over OSC (default TCP 53000) and confirms a workspace is open: a specific one by name, filename, or unique ID, or any open workspace when left blank. A lightweight liveness/workspace check for legacy QLab 4 (end-of-life); use the QLab 5 check for mode, cue, and override inspection.';
 export const Group = 'Sound';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const DescribeAction = DescribeQLabAction;

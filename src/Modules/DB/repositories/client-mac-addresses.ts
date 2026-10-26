@@ -1,9 +1,9 @@
-// ClientMacAddresses repository — every SQL statement touching the per-client
+// ClientMacAddresses repository: every SQL statement touching the per-client
 // MAC address table. Factory receives the DB manager (never imports '../index'
 // at runtime) so test-injected DB mocks in ClientManager propagate through.
 //
 // Callers are expected to pass MacAddress already normalized (upper-case,
-// colon-separated) via Modules/MacAddress — this repository does no formatting,
+// colon-separated) via Modules/MacAddress; this repository does no formatting,
 // mirroring how ScriptWhitelists leaves JSON parsing to its manager.
 import type { DBManager, DBResult } from '../index';
 import type { ClientMacAddressRow } from '../rows';
@@ -73,7 +73,7 @@ export function CreateClientMacAddressesRepository(DB: DBManager) {
 }
 
 // Ingest writes ride RunWithoutDirtyTracking so a client merely reporting the
-// NICs it already had does not mark the workspace unsaved — matching how
+// NICs it already had does not mark the workspace unsaved, matching how
 // Hostname/OperatingSystem/MacAddress are persisted from SystemInfo.
 function ResolveRun(DB: DBManager, { markUnsaved = true }: { markUnsaved?: boolean }) {
   return markUnsaved === false && typeof DB.RunWithoutDirtyTracking === 'function'

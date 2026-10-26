@@ -74,9 +74,9 @@ let pendingDrainResolvers: Array<() => void> = [];
 //  - while a transaction is open, statements from outside it wait until it
 //    finishes, and the transaction lets already-issued outside statements drain
 //    before its BEGIN so none of them can land inside it;
-//  - statements issued from inside the transaction go straight through — via
+//  - statements issued from inside the transaction go straight through (via
 //    its `run`, or a direct Manager.Run/Get/All made within `fn` (recognised
-//    through AsyncLocalStorage) — so `fn` can never deadlock on its own gate.
+//    through AsyncLocalStorage)), so `fn` can never deadlock on its own gate.
 interface OpenTransactionState {
   Done: Promise<void>;
 }
@@ -295,7 +295,7 @@ Manager.InitializeSchema = async (): Promise<void> => {
     // unrecorded, a data back-fill would run a second time on the next open;
     // recorded but not applied, it would never run at all.
     //
-    // markDirty: false — a migration is schema maintenance, never a user edit,
+    // markDirty: false; a migration is schema maintenance, never a user edit,
     // so applying one must not leave a freshly opened workspace looking unsaved.
     const InMigrationTransaction = <T>(fn: (run: TxRun) => Promise<T>) =>
       swapHoldsExclusive
@@ -595,9 +595,9 @@ Manager.MarkClean = (): void => {
 Manager.SnapshotTo = async (TargetPath: string): Promise<DBResult<string>> => {
   // VACUUM INTO requires its destination to not already exist, so we cannot
   // point it directly at an existing TargetPath. Rather than unlink() the
-  // existing file first — which fails with EPERM under a dev/unpackaged run,
+  // existing file first (which fails with EPERM under a dev/unpackaged run,
   // where the process lacks the installed app's entitlement to delete a file
-  // the OS tags with another provenance — we VACUUM into a fresh temp file in
+  // the OS tags with another provenance), we VACUUM into a fresh temp file in
   // the same directory and rename() it over the target. rename() replaces the
   // file in place using the write grant the save dialog already provided and
   // never needs a separate delete permission on the existing file. Keeping the

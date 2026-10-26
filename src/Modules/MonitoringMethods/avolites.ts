@@ -78,7 +78,7 @@ function NormalizeShow(Value: unknown): string {
     .replace(/\.(isf|show)$/i, '');
 }
 
-// The reasons a reachable console is unhealthy, per the enabled toggles. Pure —
+// The reasons a reachable console is unhealthy, per the enabled toggles. Pure;
 // exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: TitanSnapshot, Options: HealthOptions): string[] {
   const Reasons: string[] = [];
@@ -89,7 +89,7 @@ function EvaluateHealth(Snapshot: TitanSnapshot, Options: HealthOptions): string
     Snapshot.Version &&
     !Snapshot.Version.startsWith(Options.ExpectedVersion)
   ) {
-    Reasons.push(`Titan ${Snapshot.Version} (expected ${Options.ExpectedVersion}…)`);
+    Reasons.push(`Titan ${Snapshot.Version} (expected ${Options.ExpectedVersion}...)`);
   }
 
   if (Options.CheckShow) {
@@ -134,7 +134,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
         'Titan',
         String(Result.TitanVersion || 'Unknown') +
           (Options.CheckVersion && Options.ExpectedVersion
-            ? ` (expected ${Options.ExpectedVersion}…)`
+            ? ` (expected ${Options.ExpectedVersion}...)`
             : '')
       )
     );

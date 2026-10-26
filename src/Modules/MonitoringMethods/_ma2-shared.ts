@@ -3,19 +3,19 @@
 // grandMA2 exposes a raw (non-RFC-854) command-line socket on TCP 30000. On
 // connect the console speaks first: an ANSI-coloured "MA²" banner, an advisory
 // `Please login!`, and a command prompt of the form `[<layer>]>` (default
-// `[Fixture]>`). Those three markers positively fingerprint a grandMA2 — a bare
-// open port will not produce them — and reading them requires sending nothing,
+// `[Fixture]>`). Those three markers positively fingerprint a grandMA2 (a bare
+// open port will not produce them), and reading them requires sending nothing,
 // so the default health check is side-effect free.
 //
 // Optionally, when a user + password are supplied, the probe performs a real
 // `login <user> <pass>` and reads the read-only `Version` command (software
 // version + loaded show file). Login occupies a remote user session on the desk
-// (MA recommends a dedicated user), so it is opt-in — leave the credentials
+// (MA recommends a dedicated user), so it is opt-in; leave the credentials
 // blank for pure liveness. The probe only ever sends `login` and `Version`; it
 // never sends a command that changes console state.
 //
 // Verbatim protocol strings (login success `Logged in as User`, failure
-// `no login` / `Login incorrect`, disabled `Remote command…disabled`) are drawn
+// `no login` / `Login incorrect`, disabled `Remote command...disabled`) are drawn
 // from several independent open-source grandMA2 telnet clients.
 import { Manager as CacheManager } from '../CacheManager';
 import { RunTcpSession, type TcpSession } from './_tcp-session';
@@ -225,7 +225,7 @@ export async function QueryMa2Status(
         return;
       }
 
-      // version phase — wait for the response to be prompt-terminated.
+      // version phase; wait for the response to be prompt-terminated.
       const Seg = Clean().slice(MarkLen);
       if (PROMPT_RE.test(Seg)) {
         const Parsed = ParseVersionReply(Seg);
@@ -355,7 +355,7 @@ export function Ma2DebugHead(
 ): string {
   const Reachable = !!(Result && Result.Success === true);
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Result && Result.Ma2Version ? TextRow('Software', String(Result.Ma2Version)) : null,
     Row('Status', StatusPill),
     Reachable

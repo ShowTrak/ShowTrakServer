@@ -1,4 +1,4 @@
-// Live levels card in a monitor's view — the decisions, without the DOM.
+// Live levels card in a monitor's view: the decisions, without the DOM.
 //
 // The server streams dBFS per channel while the view is open (see
 // src/main/monitoring-live.ts); this lays out a card of horizontal meters and
@@ -39,7 +39,7 @@ export function SliderToFader(Position: number): number | null {
 
 /** `-6.0`, `+3.5`, `0.0` or `−∞`, as a fader readout. */
 export function FormatFader(Fader: number | null | undefined): string {
-  if (Fader === undefined) return '—';
+  if (Fader === undefined) return '-';
   if (Fader === null || !Number.isFinite(Fader)) return '−∞';
   return `${Fader > 0 ? '+' : ''}${Fader.toFixed(1)}`;
 }
@@ -93,7 +93,7 @@ export function LiveLevelsStatus(Check: MonitorLiveLevelsCheck): {
   Kind: 'live' | 'connecting' | 'problem';
 } {
   if (Check.State === 'live') return { Text: 'Live', Kind: 'live' };
-  if (Check.State === 'connecting') return { Text: 'Connecting…', Kind: 'connecting' };
+  if (Check.State === 'connecting') return { Text: 'Connecting...', Kind: 'connecting' };
   return { Text: Check.Message || 'Levels unavailable', Kind: 'problem' };
 }
 

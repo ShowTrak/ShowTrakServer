@@ -1,14 +1,14 @@
 // Shared renderer entry point (desktop bundle + Web UI via dynamic import).
 //
-// Modules are imported first — imports carry declarations only, never side
-// effects — then initialized explicitly in the original module load order.
+// Modules are imported first (imports carry declarations only, never side
+// effects), then initialized explicitly in the original module load order.
 // The desktop bundle loads with `defer` and the Web UI imports this after the
 // document is ready, so the DOM is always parsed by the time this runs; the
 // former DOMContentLoaded handlers are invoked directly from the Init*()
 // functions.
 //
 // Hard invariant: Init() (init.ts) calls window.API.Loaded() to request the
-// initial state push, so it MUST stay last — every push subscription above it
+// initial state push, so it MUST stay last: every push subscription above it
 // has to be registered first or that state is silently dropped.
 import './animations';
 import { MonitorHistoryModalContext } from './state';
@@ -74,7 +74,7 @@ InitAuditLog();
 // per render. Not awaited: a tile renders fine before they land.
 void LoadFreeKioskCatalogues();
 // The method catalogue carries each check type's declared actions, and the
-// monitor view modal draws its control panel from them — so it can no longer
+// monitor view modal draws its control panel from them, so it can no longer
 // wait until the first time the monitoring editor is opened.
 void EnsureMonitoringMethodsLoaded();
 WireFreeKioskModal(() => RenderMonitoringHistoryModal());

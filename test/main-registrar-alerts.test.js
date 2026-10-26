@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
-// Exercises src/main/registrars/alerts.ts — alert rule CRUD plus the global
+// Exercises src/main/registrars/alerts.ts: alert rule CRUD plus the global
 // alert-actions kill switch.
 //
 // The kill switch is the interesting one: it is what an operator hits to stop
@@ -211,7 +211,7 @@ test('UpdateAlertRule validates the id and the payload', async () => {
   assert.equal(alertsMgr.__callsTo('Update').length, 0);
 });
 
-test('UpdateAlertRule is a partial update — absent keys are not sent', async () => {
+test('UpdateAlertRule is a partial update: absent keys are not sent', async () => {
   // The editor saves one field at a time; carrying absent keys through as
   // undefined would blank the rest of the rule.
   await GetHandler('UpdateAlertRule')(null, 1, { Title: 'Renamed' });
@@ -220,7 +220,7 @@ test('UpdateAlertRule is a partial update — absent keys are not sent', async (
 });
 
 test('DeleteAlertRule pairs an invalid id with the false fallback', async () => {
-  // invalidFallback:false here — the renderer reads the payload slot as a
+  // invalidFallback:false here; the renderer reads the payload slot as a
   // boolean success flag.
   const [Err, Data] = await GetHandler('DeleteAlertRule')(null, 'nope');
   assert.equal(typeof Err, 'string');

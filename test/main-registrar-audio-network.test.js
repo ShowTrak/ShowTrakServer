@@ -5,7 +5,7 @@ const { installModuleMocks, matchesModule, recordingManager } = require('./helpe
 // Exercises src/main/registrars/audio.ts and src/main/registrars/network.ts.
 //
 // Grouped because both are small and both share the pattern of pushing a
-// broadcast/callback to the renderers as a side effect of a mutation — the
+// broadcast/callback to the renderers as a side effect of a mutation; the
 // property worth pinning is that the push happens ONLY on success, so the
 // renderer never refetches on the strength of a failed write.
 //
@@ -118,7 +118,7 @@ test('Audio:GetData returns the payload tuple for a valid id', async () => {
 
 test('Audio:GetData returns a validation tuple for a bad id', async () => {
   // Unlike the other readers this one returns a TUPLE, so a bad id must not
-  // collapse to null — the renderer shows the message.
+  // collapse to null; the renderer shows the message.
   const [Err, Data] = await GetHandler('Audio:GetData')(null, '   ');
   assert.equal(typeof Err, 'string');
   assert.equal(Data, null);

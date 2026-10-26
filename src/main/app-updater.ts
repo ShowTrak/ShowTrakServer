@@ -76,7 +76,7 @@ let squirrelReleaseInfo: { version?: string; releaseNotes?: string } | null = nu
 // Automatic updates (the SYSTEM_AUTO_UPDATE_ENABLED setting). While enabled, a
 // packaged build checks in the background shortly after boot and then on an
 // interval; whatever it downloads is installed on the next restart. It never
-// restarts the app itself — that is always the operator's call mid-show.
+// restarts the app itself; that is always the operator's call mid-show.
 const AUTO_CHECK_INITIAL_DELAY_MS = 60 * 1000;
 const AUTO_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 let automaticUpdatesEnabled = false;

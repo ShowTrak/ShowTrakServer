@@ -1,7 +1,7 @@
 // Broadcast → renderer bridge for the main process.
 //
 // The back-end managers emit domain events on the shared BroadcastManager
-// ("ClientUpdated", "MonitoringTargetListChanged", …). This module subscribes to
+// ("ClientUpdated", "MonitoringTargetListChanged", etc.). This module subscribes to
 // every one of them and fans the resulting state out to the renderer surfaces
 // via the RendererBus (desktop window + authed Web UI sockets). It also owns the
 // authoritative list-refresh functions (`Update*List`) that both the event
@@ -9,8 +9,8 @@
 //
 // Extracted verbatim from main.ts. The only structural change is the small
 // `PASSTHROUGH` table for the pure-indirection push subscribers; every function
-// body — including the `hasMainWindow()` guards that gate side effects such as
-// alert handling and history recording — is preserved so behavior is unchanged.
+// body (including the `hasMainWindow()` guards that gate side effects such as
+// alert handling and history recording) is preserved so behavior is unchanged.
 
 import type { USBDevice } from '@showtrak/protocol';
 import { CreateLogger } from '../Modules/Logger';
@@ -119,7 +119,7 @@ async function UpdateSettings(): Promise<void> {
 }
 
 // A device counts as critical for alerting if it's guarded by serial number, or
-// — for serial-less devices — if its name is guarded (name + quantity path).
+// (for serial-less devices) if its name is guarded (name + quantity path).
 async function ResolveUSBDeviceCritical(
   UUID: string,
   Device: USBDevice
@@ -267,7 +267,7 @@ async function ReadoptDevice(UUID: string): Promise<void> {
 // Full re-hydration: clear caches, re-fetch, and send authoritative lists.
 async function ReinitializeSystem(): Promise<void> {
   if (!hasMainWindow()) return;
-  Logger.log('Reinitialising system…');
+  Logger.log('Reinitialising system...');
 
   // Refresh manager caches that hold DB-backed state in memory.
   if (typeof SettingsManager.Reload === 'function') {
@@ -316,7 +316,7 @@ async function ReinitializeSystem(): Promise<void> {
 
   PushToRenderers('SetFullClientList', Clients, Groups);
 
-  // Re-send every connected client its variables for the new show — including
+  // Re-send every connected client its variables for the new show, including
   // the removal of any the old show exported to the Windows user environment.
   BroadcastManager.emit('ClientVariablesChanged', null);
 }
@@ -410,13 +410,13 @@ async function UpdateMonitoringActionFavouriteList(): Promise<void> {
 // time, whether or not anything changed. Three things consume that event, and
 // they do NOT want the same cadence:
 //
-//   - history sampling  — wants every tick; the latency/uptime timeline is
+//   - history sampling  - wants every tick; the latency/uptime timeline is
 //                         literally a per-tick series, so it must never be
 //                         skipped.
-//   - alert evaluation  — transition-driven (it compares against the previous
+//   - alert evaluation  - transition-driven (it compares against the previous
 //                         online/degraded state), so an unchanged tick costs a
 //                         Map get/set and nothing else. Also cheap to keep.
-//   - the renderer push — the expensive one: an IPC send to the desktop window
+//   - the renderer push - the expensive one: an IPC send to the desktop window
 //                         plus a socket emit to every authed Web UI client,
 //                         each followed by a tile re-render.
 //
@@ -426,16 +426,16 @@ async function UpdateMonitoringActionFavouriteList(): Promise<void> {
 // pushed) and drops the three fields that advance every tick without ever being
 // rendered:
 //
-//   Timestamp      — no consumer reads it.
-//   LastChecked    — read only as a null/non-null "has this ever run" test
+//   Timestamp      - no consumer reads it.
+//   LastChecked    - read only as a null/non-null "has this ever run" test
 //                    (LiveCheckState), so it is folded to a boolean.
-//   LastSuccessAt  — only feeds the offline-since counter, which is hidden
+//   LastSuccessAt  - only feeds the offline-since counter, which is hidden
 //                    while a target is online; the moment one goes offline,
 //                    Online flips and that alone forces a push.
 //
 // The win lands on exactly the targets that were pure waste: anything sitting
-// offline (unchanged payload forever), and the presence-style checks — sACN,
-// Art-Net, NDI, Millumin, MQTT — that report no latency at all, so a healthy
+// offline (unchanged payload forever), and the presence-style checks (sACN,
+// Art-Net, NDI, Millumin, MQTT) that report no latency at all, so a healthy
 // one is byte-identical tick after tick.
 //
 // The SDK's ToPublicMonitor projection is a strict subset of these fields, so a
@@ -526,7 +526,7 @@ async function MonitoringTargetUpdated(Target: BroadcastMonitoringTarget): Promi
       PushToRenderers('MonitoringTargetUpdated', Target);
     }
   } else {
-    // No usable TargetID to key on — push unconditionally rather than drop it.
+    // No usable TargetID to key on; push unconditionally rather than drop it.
     PushToRenderers('MonitoringTargetUpdated', Target);
   }
 
@@ -682,7 +682,7 @@ async function ValidateAlertAudioAssets(): Promise<void> {
 }
 
 // UI-triggered audio feedback (short, non-blocking). Note: intentionally has no
-// window guard — matches the original main.ts behavior.
+// window guard; matches the original main.ts behavior.
 async function PlaySound(SoundName: unknown): Promise<void> {
   PushToRenderers('PlaySound', SoundName);
 }
@@ -758,7 +758,7 @@ function StartAlertBaselineSweep(): void {
 }
 
 // Status history is recorded when an update arrives, which a connected client
-// sends every second but an offline one never does — so a client that stayed
+// sends every second but an offline one never does, so a client that stayed
 // down showed a single red block at the disconnect and grey for the rest of
 // its outage. This writes every client's and dummy client's current status on
 // a steady cadence so the timeline (list view and the Status tab) keeps

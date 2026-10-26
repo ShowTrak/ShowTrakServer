@@ -1,4 +1,4 @@
-// Exercises src/UI/js/app/lib/freekiosk-monitoring.ts — the section cards a
+// Exercises src/UI/js/app/lib/freekiosk-monitoring.ts: the section cards a
 // FreeKiosk terminal's monitoring is set on (a Monitor toggle per section, then
 // a conditions table of its readings).
 //

@@ -218,7 +218,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Extra: Array<string | null> = [];
 
   if (Mode === 'json') {
-    Extra.push(TextRow('JSON path', (Result && (Result.JsonPath as string)) || '—'));
+    Extra.push(TextRow('JSON path', (Result && (Result.JsonPath as string)) || '-'));
     if (Result && Object.prototype.hasOwnProperty.call(Result, 'MatchedValue')) {
       Extra.push(
         Row('Resolved value', `<span class="font-monospace">${Esc(Result.MatchedValue)}</span>`)
@@ -226,7 +226,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     }
   } else if (Mode === 'text') {
     const Found = !!(Result && Result.Success);
-    Extra.push(TextRow('Expected substring', (Result && (Result.Expected as string)) || '—'));
+    Extra.push(TextRow('Expected substring', (Result && (Result.Expected as string)) || '-'));
     Extra.push(
       Row('Body match', Pill(Found ? 'success' : 'danger', Found ? 'Found' : 'Not found'))
     );

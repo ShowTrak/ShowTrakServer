@@ -50,7 +50,7 @@ function NormalizeScope(Raw: unknown): ScriptWhitelistScope {
 }
 
 // Parse a stored Scope JSON string. Returns a normalized scope, or null when the
-// text is unusable (treated by callers as "unrestricted" — fail open, since this
+// text is unusable (treated by callers as "unrestricted"; fail open, since this
 // governs running scripts on the operator's own machines, not a trust boundary).
 function ParseScopeText(Text: string | null | undefined): ScriptWhitelistScope | null {
   if (typeof Text !== 'string' || !Text.trim()) return null;
@@ -112,7 +112,7 @@ const Manager = {
   // batch against a single fetched scope without re-reading the DB per client.
   //
   // `Tags` is the full tag list, needed only to expand `Scope.Tags` (tags nest,
-  // so the expansion is a graph walk — see ../ScopeMatching). Omitting it is
+  // so the expansion is a graph walk; see ../ScopeMatching). Omitting it is
   // safe for scopes that name no tags and silently under-matches for scopes
   // that do, so every caller handling operator-authored scopes passes it.
   IsClientAllowed(
@@ -167,7 +167,7 @@ const Manager = {
     if (Err) Logger.error(`Failed to delete whitelist for script ${ScriptID}`, Err);
   },
 
-  // Follow a script folder rename so its whitelist is not silently orphaned —
+  // Follow a script folder rename so its whitelist is not silently orphaned:
   // an orphaned (lost) whitelist would revert a restricted script back to "all
   // clients", so this is a correctness/safety fix, not just cleanup.
   async RenameScript(OldScriptID: string, NewScriptID: string): Promise<void> {

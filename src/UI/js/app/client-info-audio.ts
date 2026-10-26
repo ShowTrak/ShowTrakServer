@@ -351,7 +351,7 @@ export function BindClientInfoAudioHandlers(
       if (Level === null) return;
       $(this).siblings('.SHOWTRAK_AUDIO_LEVEL_VALUE').text(`${Level}%`);
     })
-    // `change` fires once, on release — one request per gesture, not one per pixel.
+    // `change` fires once, on release: one request per gesture, not one per pixel.
     .on('change.client-audio', '.SHOWTRAK_AUDIO_LEVEL', async function () {
       const $Slider = $(this);
       $Slider.removeAttr('data-dragging');

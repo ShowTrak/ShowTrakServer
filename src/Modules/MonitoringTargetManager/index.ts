@@ -58,7 +58,7 @@ let TargetList: MonitoringTarget[] = [];
 // In-flight Init(), so concurrent callers share one run instead of each building
 // their own TargetList. `Initialized` only flips at the very end of Init, so
 // every `if (!Initialized) await Init()` call site that fires during boot would
-// otherwise start a competing rebuild — and the losing batch's targets stay in
+// otherwise start a competing rebuild, and the losing batch's targets stay in
 // their StartLoop()'d state, broadcasting stale snapshots forever.
 let InitPromise: Promise<void> | null = null;
 
@@ -298,7 +298,7 @@ async function ReconcileChecks(
 // Rebuild TargetList from the DB and start every target's polling loop. Always
 // reached through Manager.Init(), which serialises concurrent callers.
 async function RunInit(): Promise<void> {
-  // Retire any loops from a previous TargetList before it is discarded —
+  // Retire any loops from a previous TargetList before it is discarded:
   // an orphaned target keeps ticking and broadcasting a stale snapshot
   // (old Nickname, old check set) against the same TargetID.
   for (const T of TargetList) T.StopLoop();
@@ -726,7 +726,7 @@ const Manager = {
    * Fan one check action out across the named targets.
    *
    * A target runs the action once per check that declares it, so a selection
-   * mixing a projector with a DNS probe simply does nothing on the probe — the
+   * mixing a projector with a DNS probe simply does nothing on the probe; the
    * same "offer it where it applies, run it where it applies" rule the script
    * and integrated-event menus already follow. A target with no matching check
    * is reported as a failure rather than skipped silently, so a selection that
@@ -1059,7 +1059,7 @@ const Manager = {
     Target.StopLoop();
     const [Err] = await TargetsRepo.DeleteTargetCascade(ID);
     if (Err) {
-      // The transaction rolled back, so the row (and its checks) survived —
+      // The transaction rolled back, so the row (and its checks) survived;
       // the target must keep polling.
       Target.StartLoop();
       return Fail('Failed to delete monitor');

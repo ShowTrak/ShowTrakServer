@@ -3,7 +3,7 @@ import { AppMode } from './state';
 import { HandleNonFatalError, Safe } from './utils';
 import { DismissAlert, PendingAdoptionAlerts } from './alerts-tray';
 // Global event delegation for Adopt buttons (works across re-renders).
-// Called by the bootstrap orchestrator in main.ts — never at import time.
+// Called by the bootstrap orchestrator in main.ts, never at import time.
 export function InitDnd() {
   document.addEventListener('click', async (e) => {
     const target = e.target as HTMLButtonElement | null;
@@ -20,7 +20,7 @@ export function InitDnd() {
     if (!UUID) return;
     try {
       btn.disabled = true;
-      btn.textContent = 'Adopting…';
+      btn.textContent = 'Adopting...';
       // Auto-dismiss any existing adoption alert for this UUID immediately
       try {
         const id = PendingAdoptionAlerts.get(UUID);
@@ -85,9 +85,9 @@ export function ShowShortcutsModal() {
   items.push({ title: 'Clear Selection', shortcut: 'Ctrl/Cmd+D' });
   // Core menu actions
   items.push({ title: 'New Show File', shortcut: 'Ctrl/Cmd+N' });
-  items.push({ title: 'Open Show File…', shortcut: 'Ctrl/Cmd+O' });
+  items.push({ title: 'Open Show File', shortcut: 'Ctrl/Cmd+O' });
   items.push({ title: 'Save Show File', shortcut: 'Ctrl/Cmd+S' });
-  items.push({ title: 'Save Show File As…', shortcut: 'Ctrl/Cmd+Shift+S' });
+  items.push({ title: 'Save Show File As', shortcut: 'Ctrl/Cmd+Shift+S' });
   items.push({ title: 'Switch to Show Mode', shortcut: 'Ctrl/Cmd+1' });
   items.push({ title: 'Switch to Edit Mode', shortcut: 'Ctrl/Cmd+2' });
   items.push({ title: 'ShowTrak Preferences', shortcut: 'Ctrl/Cmd+,' });
@@ -312,7 +312,7 @@ export function clearGhost() {
     if (placeholder) placeholder.style.display = '';
   }
   DnDState.ghostEl = null;
-  // Ghost is no longer in the source group — restore spacer visibility.
+  // Ghost is no longer in the source group; restore spacer visibility.
   if (DnDState.sourceSpacer) DnDState.sourceSpacer.style.display = '';
 }
 
@@ -325,7 +325,7 @@ export function applyGhostSize(ghost: HTMLElement, fallbackRect: DOMRect | null)
 
 export function positionGhostMarker(container: HTMLElement, x: number, y: number) {
   // When the ghost enters the source group the spacer's job is done by the
-  // ghost itself — hide it so we don't have two slots for one tile.
+  // ghost itself; hide it so we don't have two slots for one tile.
   const isSourceGroup =
     normalizeGroupId(container.getAttribute('data-groupid')) === DnDState.sourceGroupId;
   if (DnDState.sourceSpacer) {
@@ -360,7 +360,7 @@ export function positionGhostMarker(container: HTMLElement, x: number, y: number
   }
 
   // List view: every tile is a full-width row in a single column, so the drop
-  // slot is decided by height alone — before the first row whose midpoint is
+  // slot is decided by height alone: before the first row whose midpoint is
   // below the pointer. The tile-grid logic below reads left/right within a row,
   // which for a full-width row would hinge on which half of the screen the
   // pointer happens to be in.

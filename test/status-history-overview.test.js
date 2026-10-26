@@ -7,7 +7,7 @@
 //   - the keys: the renderer looks rows up by client/dummy UUID, CheckID and
 //     terminal UUID, so a series filed under the wrong key is a grey graph;
 //   - a FreeKiosk terminal's flat run is ONE stored sample, possibly from hours
-//     ago — dropping it for being outside the window would draw a terminal that
+//     ago; dropping it for being outside the window would draw a terminal that
 //     has answered steadily all afternoon as having no data at all.
 const test = require('node:test');
 const { mock } = test;

@@ -74,7 +74,7 @@ const ScriptWhitelistConfig: ScopePickerConfig = {
   Namespace: 'scriptWhitelist',
   Title: 'Script Whitelist',
   // Shown only when nothing is selected. The genuine "all clients" state is
-  // Workspace:true, which renders "All Clients" via its own branch — an empty
+  // Workspace:true, which renders "All Clients" via its own branch; an empty
   // selection instead means no client may run the script.
   Placeholder: 'No clients',
   Hint: 'Only these machines may run the script. Groups and tags are resolved at dispatch, so machines added to them later are covered too.',
@@ -103,7 +103,7 @@ export function SetScriptManagerEditorIcon(Icon: unknown) {
   const Preview = document.querySelector('#SCRIPT_MANAGER_ICON_PREVIEW i');
   if (Preview) Preview.className = `bi bi-${Name}`;
   const PreviewButton = document.getElementById('SCRIPT_MANAGER_ICON_PREVIEW');
-  if (PreviewButton) PreviewButton.title = `Icon: ${Name} — click to change`;
+  if (PreviewButton) PreviewButton.title = `Icon: ${Name} (click to change)`;
 }
 
 export function GetScriptManagerPlatformKey() {
@@ -202,7 +202,7 @@ export async function OpenScriptManagerTemplates() {
   ShowScriptManagerTemplates();
   const Container = document.getElementById('SCRIPT_MANAGER_TEMPLATES_LIST') as HTMLElement;
   Container.innerHTML =
-    '<div class="p-3 rounded bg-ghost text-center text-muted">Loading sample scripts…</div>';
+    '<div class="p-3 rounded bg-ghost text-center text-muted">Loading sample scripts...</div>';
   await RefreshScriptManagerTemplates(false);
 }
 
@@ -590,7 +590,7 @@ export function RenderScriptManagerPlatforms(
 
     const OptionHtml = Options.map((File) => {
       if (File === '') {
-        return `<option value=""${Selected === '' ? ' selected' : ''}>— None —</option>`;
+        return `<option value=""${Selected === '' ? ' selected' : ''}>- None -</option>`;
       }
       const Missing = !ScriptManagerEditingFiles.includes(File) ? ' (missing)' : '';
       return `<option value="${Safe(File)}"${File === Selected ? ' selected' : ''}>${Safe(
@@ -776,7 +776,7 @@ export async function SaveScriptManagerConfig() {
 
   if (Err) {
     const Issues = Result && Result.errors && Result.errors.length ? Result.errors : [Err];
-    RenderScriptManagerIssues('Failed to save — please fix the following:', Issues, 'error');
+    RenderScriptManagerIssues('Failed to save. Please fix the following:', Issues, 'error');
     Notify('Failed to save script.', 'error');
     return;
   }
@@ -806,7 +806,7 @@ export async function SaveScriptManagerConfig() {
 }
 
 // Formerly a DOMContentLoaded handler; called by the bootstrap orchestrator in
-// main.ts once the DOM is parsed — never at import time.
+// main.ts once the DOM is parsed, never at import time.
 export function InitScriptManager() {
   // Each view carries the shared modal header. The list is top-level (title +
   // close); the templates and editor views add a Back to the list. Per-view

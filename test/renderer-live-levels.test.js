@@ -71,7 +71,7 @@ test('card markup escapes device names; the signature ignores levels', () => {
     Lib.LiveLevelsSignature({ ...check, State: 'unavailable', Message: 'Busy' })
   );
   assert.match(Lib.LiveLevelsCardHtml({ ...check, State: 'unavailable', Message: 'Busy' }), /Busy/);
-  assert.equal(Lib.LiveLevelsStatus({ ...check, State: 'connecting' }).Text, 'Connecting…');
+  assert.equal(Lib.LiveLevelsStatus({ ...check, State: 'connecting' }).Text, 'Connecting...');
 });
 
 const Tiles = require('../dist-test/UI/js/app/lib/tile-widgets.js');
@@ -100,7 +100,7 @@ test('a tile widget only stands in for a healthy status line', () => {
 });
 
 test('the levels footer shows bars when live and a short line otherwise', () => {
-  assert.deepEqual(Tiles.TileLevelsView(undefined), { Bars: [], Text: 'Levels…' });
+  assert.deepEqual(Tiles.TileLevelsView(undefined), { Bars: [], Text: 'Levels...' });
   assert.deepEqual(Tiles.TileLevelsView({ State: 'unavailable', Message: 'Busy', Channels: [] }), {
     Bars: [],
     Text: 'Busy',
@@ -154,7 +154,7 @@ test('fader slider: −∞ at the bottom, clamped to its range, readout as sent'
   assert.equal(Lib.SliderToFader(-60), -60);
   assert.equal(Lib.SliderToFader(3.5), 3.5);
   assert.equal(Lib.FormatFader(null), '−∞');
-  assert.equal(Lib.FormatFader(undefined), '—');
+  assert.equal(Lib.FormatFader(undefined), '-');
   assert.equal(Lib.FormatFader(3.5), '+3.5');
   assert.equal(Lib.FormatFader(-6), '-6.0');
 });

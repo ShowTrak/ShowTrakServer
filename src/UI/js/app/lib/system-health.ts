@@ -1,7 +1,7 @@
 // The monitored system checks (CPU, memory, uptime, power, thermal) as the view
-// modal presents them — one card each, styled like a monitored display: a
-// toggle, the issues it raises, and an auto-saving conditions table. Decisions only — the markup lives in
-// ../client-info-health and ../client-info-modal — so the wording and the
+// modal presents them: one card each, styled like a monitored display: a
+// toggle, the issues it raises, and an auto-saving conditions table. Decisions only (the markup lives in
+// ../client-info-health and ../client-info-modal), so the wording and the
 // states can be tested without a DOM.
 import type {
   ClientPowerCheck,
@@ -82,7 +82,7 @@ export function UptimeText(Client: ClientView): string {
     typeof Client.BootTime === 'number' && Client.BootTime > 0
       ? `booted ${FormatTimestamp(Client.BootTime)}`
       : '';
-  if (!Client.Online) return Boot ? `Offline — last ${Boot}` : 'Unknown (offline)';
+  if (!Client.Online) return Boot ? `Offline - last ${Boot}` : 'Unknown (offline)';
   const Seconds = UptimeSecondsOf(Client);
   if (Seconds === null) return 'Waiting for the client';
   return Boot ? `${FormatDuration(Seconds)} (${Boot})` : FormatDuration(Seconds);
@@ -138,12 +138,12 @@ function AlarmLimit(Key: ClientResourceAlarmKey, Threshold: number | string | nu
   }
 }
 
-/** "High CPU usage — 97% (limit 90%) for 4m 10s". */
+/** "High CPU usage - 97% (limit 90%) for 4m 10s". */
 export function ResourceAlarmText(Alarm: ClientResourceAlarm, Now: number = Date.now()): string {
   const Label = ALARM_LABELS[Alarm.Key] || 'Alarm';
   const Limit = AlarmLimit(Alarm.Key, Alarm.Threshold);
   const Since = Number.isFinite(Alarm.Since) ? FormatDuration((Now - Alarm.Since) / 1000) : '';
-  const Value = Alarm.Key === 'power' ? '' : ` — ${AlarmValue(Alarm.Key, Alarm.Value)}`;
+  const Value = Alarm.Key === 'power' ? '' : ` - ${AlarmValue(Alarm.Key, Alarm.Value)}`;
   return `${Label}${Value}${Limit ? ` (${Limit})` : ''}${Since ? ` for ${Since}` : ''}`;
 }
 
@@ -197,7 +197,7 @@ export function HealthSectionMessage(
       return {
         Title: `${Noun} Unsupported`,
         Body: `Monitoring ${What} needs ShowTrak Client ${MINIMUM_SYSTEM_HEALTH_VERSION_LABEL} or later${
-          Client.Version ? ` — this client runs ${Client.Version}` : ''
+          Client.Version ? ` (this client runs ${Client.Version})` : ''
         }. Update the client to monitor it.`,
       };
     case 'waiting':
@@ -261,8 +261,8 @@ export function PowerDetailRows(Power: PowerStatusSnapshot, Now: number = Date.n
 const THERMAL_STATE_LABELS: Record<ThermalState, string> = {
   nominal: 'Normal',
   fair: 'Fair',
-  serious: 'Serious — throttling',
-  critical: 'Critical — throttling hard',
+  serious: 'Serious - throttling',
+  critical: 'Critical - throttling hard',
 };
 
 /** What the operating system's thermal state means, in an operator's words. */
@@ -302,8 +302,8 @@ export function TemperatureRows(
 // --- System check cards ---------------------------------------------------------------
 //
 // One card per check, in the shape every monitored-hardware card has: a title
-// and live summary, a Monitor toggle, the issues it is raising, and — once
-// monitored — a conditions table whose rows save as they change. A tick guards
+// and live summary, a Monitor toggle, the issues it is raising, and (once
+// monitored) a conditions table whose rows save as they change. A tick guards
 // a condition; unticking stops guarding it (null on the wire).
 
 export type SystemConditionField =
@@ -654,7 +654,7 @@ function PowerCard(Client: ClientView): SystemCheckCard {
     Rows: Check
       ? [
           Row('RequireMains', 'On mains power', {
-            Value: Power && Power.OnBattery !== null ? (Power.OnBattery ? 'No' : 'Yes') : '—',
+            Value: Power && Power.OnBattery !== null ? (Power.OnBattery ? 'No' : 'Yes') : '-',
             Capable: !Known || Power!.OnBattery !== null,
             Checked: Check.RequireMains,
             Alarms,
@@ -819,7 +819,7 @@ export function SystemCheckLiveState(
   // The issue and its reading only: the limit and the duration are on the card,
   // and the status line has room for one short phrase.
   if (Card.Issues.length) {
-    const Short = Card.Issues[0]!.replace(/ \([^)]*\)/, '').replace(/ for [^—]*$/, '');
+    const Short = Card.Issues[0]!.replace(/ \([^)]*\)/, '').replace(/ for [^-]*$/, '');
     return { State: 'DEGRADED', Label: Short };
   }
   return { State: 'ONLINE', Label: Card.Summary || 'Healthy' };

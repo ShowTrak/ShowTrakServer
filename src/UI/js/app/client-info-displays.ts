@@ -1,5 +1,5 @@
 // Displays section of the client info modal: one card per display, styled like
-// the audio cards, with a critical toggle and — once critical — an auto-saving
+// the audio cards, with a critical toggle and (once critical) an auto-saving
 // conditions table (connected, resolution, refresh rate, scaling, rotation,
 // primary, position). The decisions live in lib/displays.
 import { CreateConditionSaveQueue } from './lib/condition-save-queue';

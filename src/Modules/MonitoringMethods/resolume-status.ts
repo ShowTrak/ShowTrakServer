@@ -209,8 +209,8 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   if (Result.Version) Extra.push(TextRow('Version', String(Result.Version)));
 
   if (Object.prototype.hasOwnProperty.call(Result, 'ExpectedComposition')) {
-    Extra.push(TextRow('Current composition', String(Result.CurrentComposition ?? '—')));
-    Extra.push(TextRow('Expected composition', String(Result.ExpectedComposition ?? '—')));
+    Extra.push(TextRow('Current composition', String(Result.CurrentComposition ?? '-')));
+    Extra.push(TextRow('Expected composition', String(Result.ExpectedComposition ?? '-')));
     const Matched = !Result.Degraded;
     Extra.push(
       Row(

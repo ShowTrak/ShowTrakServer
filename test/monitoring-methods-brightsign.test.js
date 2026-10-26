@@ -180,7 +180,7 @@ test('running on battery degrades the player', async () => {
 
 test('a power sub-object that errored does not crash or falsely pass', async () => {
   // The DWS returns 200 with {"error"} instead of {"result"} when a sub-probe
-  // fails — the whole payload must not be treated as healthy.
+  // fails; the whole payload must not be treated as healthy.
   const brokenPower = { ...INFO_HEALTHY, power: { error: 'Not supported on this platform' } };
   const dws = makeBrightSignDws({ auth: CREDS, routes: { [INFO_PATH]: brokenPower } });
   const bs = loadBs(dws);

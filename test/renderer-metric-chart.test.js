@@ -1,4 +1,4 @@
-// Exercises src/UI/js/app/lib/metric-chart.ts — the first real chart in this
+// Exercises src/UI/js/app/lib/metric-chart.ts: the first real chart in this
 // app, and the first thing here that draws a VALUE rather than a verdict.
 //
 // Two properties matter more than the geometry:
@@ -41,7 +41,7 @@ const build = (samples, options = {}) => BuildMetricChartModel(samples, { now: N
 
 test('the bucket grid matches the block timeline exactly', () => {
   // Same window, same count, same half-open [start, end) membership as
-  // BuildStatusBlocksFromSamples — this is what keeps a stacked chart and
+  // BuildStatusBlocksFromSamples; this is what keeps a stacked chart and
   // timeline aligned column for column.
   const model = build([]);
   assert.equal(model.buckets.length, MONITOR_HISTORY_BLOCK_COUNT);

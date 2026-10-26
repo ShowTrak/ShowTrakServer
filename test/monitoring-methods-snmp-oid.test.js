@@ -10,7 +10,7 @@ const { loadWithMocks } = require('../test-support/load-with-mocks');
 //
 // Only `net-snmp` is stubbed. The stub answers like a real agent would: a
 // varbind per requested OID, with the BER type tag, an exception type
-// (128/129/130) for a missing object, and — in v1 mode — a whole-request
+// (128/129/130) for a missing object, and (in v1 mode) a whole-request
 // RequestFailedError(noSuchName) when any OID is missing.
 
 function methodPath(name) {

@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-// Covers src/UI/js/app/lib/markdown.ts — the Markdown -> safe-HTML renderer used
+// Covers src/UI/js/app/lib/markdown.ts, the Markdown -> safe-HTML renderer used
 // for GitHub release notes in the update modal.
 //
 // This is an HTML sink: the output is injected with jQuery's .html(), so these
@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 // markup. Loaded from dist-test/ (see test/renderer-utils.test.js for why).
 //
 // NOTE: the third export, sanitizeUpdateNotesHtml, needs DOMParser and is not
-// covered here — it is DOM-dependent by design (it deliberately uses the
+// covered here; it is DOM-dependent by design (it deliberately uses the
 // browser's own parser to avoid mutation XSS). Covering it needs the WP-1
 // strategy decision on jsdom.
 const { sanitizeHref, renderMarkdownSafe } = require('../dist-test/UI/js/app/lib/markdown.js');

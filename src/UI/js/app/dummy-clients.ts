@@ -75,7 +75,7 @@ export function RenderDummyClientTile(D: DummyClientView) {
   const DragUUID = `dummy:${D.UUID}`;
   const Compact = DummyCompactStatus(D);
   // A dummy is scoped by its bare UUID (the `dummy:` prefix above is a drag/
-  // selection key, not a scope ID) — the scope dropdown stores `client:<UUID>`
+  // selection key, not a scope ID); the scope dropdown stores `client:<UUID>`
   // for dummies exactly as it does for ShowTrak clients.
   const TagBadges = RenderTagBadgeRow(
     ResolveEntityTags(Tags, { ScopedID: String(D.UUID), GroupID: D.GroupID ?? null })

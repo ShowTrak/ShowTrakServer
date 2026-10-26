@@ -2,7 +2,7 @@
 //
 // This map is the allowlist. The IPC validator resolves a requested command
 // against it and rejects anything absent, so the set of things a terminal can be
-// told to do is exactly what is declared here — no blocklist to keep current.
+// told to do is exactly what is declared here: no blocklist to keep current.
 //
 // That is why /api/js is not here. FreeKiosk will evaluate arbitrary JavaScript
 // inside the kiosk WebView; exposing it would put remote code execution one
@@ -36,7 +36,7 @@ export interface FreeKioskCommandDef {
    * Display modes this command does anything in. Absent means all of them.
    *
    * This is not cosmetic. FreeKiosk accepts a WebView command in External App
-   * mode, answers `executed: true`, and does nothing — verified against a live
+   * mode, answers `executed: true`, and does nothing (verified against a live
    * device, where POSTing a new URL in app mode left `webview.currentUrl`
    * untouched. Reporting that as a success would be a lie ShowTrak told on the
    * device's behalf, so a command outside its modes is refused rather than sent.
@@ -71,7 +71,7 @@ export const FREEKIOSK_COMMANDS = Object.freeze([
     Group: 'Power',
     Bulk: true,
     Control: 'button',
-    Note: 'Dismisses the screensaver. Does not turn a physically-off panel back on — use Screen On for that.',
+    Note: 'Dismisses the screensaver. Does not turn a physically-off panel back on; use Screen On for that.',
   },
   {
     ID: 'screen.on',
@@ -91,7 +91,7 @@ export const FREEKIOSK_COMMANDS = Object.freeze([
     Path: '/api/screen/off',
     Group: 'Power',
     Control: 'button',
-    Note: 'Without Device Owner, Device Admin or the accessibility service the device can only dim to 0% — the panel stays on but appears black.',
+    Note: 'Without Device Owner, Device Admin or the accessibility service the device can only dim to 0%: the panel stays on but appears black.',
   },
   {
     ID: 'lock',

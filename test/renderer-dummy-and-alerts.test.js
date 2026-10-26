@@ -15,7 +15,7 @@ const path = require('node:path');
 // on.
 //
 // The alerts tray needs a DOM, so it gets a ~20-line micro-stub rather than
-// jsdom — this is the third strategy from WP-1, used where a module touches the
+// jsdom; this is the third strategy from WP-1, used where a module touches the
 // DOM narrowly. Everything else here is pure.
 
 const APP = path.join(__dirname, '..', 'dist-test', 'UI', 'js', 'app');
@@ -146,14 +146,14 @@ test('an IPv4-mapped IPv6 address is shown as plain IPv4', () => {
   assert.equal(DummyDisplayIP('::ffff:10.0.0.5'), '10.0.0.5');
 });
 
-test('a BRACKETED IPv4-mapped address keeps its prefix — documented, not endorsed', () => {
+test('a BRACKETED IPv4-mapped address keeps its prefix: documented, not endorsed', () => {
   // Asymmetry in the normalisation order: the `::ffff:` prefix is stripped
   // before the brackets, so a bracketed one never matches the prefix test. The
   // plain and bracketed loopback forms both still resolve correctly, which is
   // why this has never been visible.
   //
   // Left alone because it is not reachable: this value comes from a socket's
-  // remoteAddress, which is never bracketed — bracket syntax belongs to
+  // remoteAddress, which is never bracketed; bracket syntax belongs to
   // `[host]:port` URLs, which is not what feeds this.
   assert.equal(DummyDisplayIP('[::ffff:10.0.0.5]'), '::ffff:10.0.0.5');
   assert.equal(DummyDisplayIP('[::1]'), 'localhost', 'loopback is unaffected either way');

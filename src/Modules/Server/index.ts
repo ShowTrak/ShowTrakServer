@@ -351,7 +351,7 @@ SetScriptDispatchHandler((UUID: string, RequestID: string, ScriptID: string) => 
   // values that were current when it actually started, not when it was queued.
   //
   // The resolve is a cache hit in the steady state, but it is still async, so the
-  // emit moves off this tick. That is deliberate and safe — the client is idle by
+  // emit moves off this tick. That is deliberate and safe: the client is idle by
   // definition (PumpClient only dispatches to an idle client) and the timeout
   // watchdog has already been armed by the caller, so nothing is racing. A
   // failure must never stop a script from running, so the fallback dispatches
@@ -369,7 +369,7 @@ SetScriptDispatchHandler((UUID: string, RequestID: string, ScriptID: string) => 
 // Re-push resolved variables when a definition or an override changes.
 //
 // A null UUID means a DEFINITION changed (a default, a rename, an export toggle,
-// a deletion), which moves every client that has not overridden that variable —
+// a deletion), which moves every client that has not overridden that variable,
 // so it fans out to all of them. A specific UUID means only that client's
 // overrides moved. Both paths matter for the Windows registry export: a client
 // that is not told a variable was deleted will leave the value in HKCU forever.
@@ -453,13 +453,13 @@ Manager.ExecuteScripts = async (ScriptID: string, Targets: string[], ResetList?:
   // Authoritative whitelist gate. The UI already hides a script for
   // non-whitelisted clients, but re-enforce here so a stale/tampered renderer
   // can never dispatch a script to a client outside its whitelist. Clients not
-  // permitted are silently dropped (not queued, not reported as failures) — the
+  // permitted are silently dropped (not queued, not reported as failures); the
   // remaining permitted subset still runs. An unrestricted script (no scope, or
   // Workspace) skips the per-client resolves entirely.
   const Scope = await ScriptWhitelistManager.GetScope(ScriptID);
   if (Scope && !Scope.Workspace) {
     // A whitelist may admit clients by tag, and tags nest, so the resolve needs
-    // the whole tag list — fetched once for the batch.
+    // the whole tag list, fetched once for the batch.
     const AllTags = await TagManager.GetAllViews();
     const Allowed: string[] = [];
     for (const UUID of Targets) {

@@ -1,9 +1,9 @@
-// A client's view modal doubles as its editor — a ShowTrak Client install's
+// A client's view modal doubles as its editor: a ShowTrak Client install's
 // and an SDK (integrated) client's alike.
 //
 // Every editable thing renders read-only in Show mode and editable in Edit mode,
-// and flips live when the mode changes — from the bottom bar, Ctrl/Cmd+1/2, or
-// another surface — without reopening the modal:
+// and flips live when the mode changes (from the bottom bar, Ctrl/Cmd+1/2, or
+// another surface) without reopening the modal:
 //
 //   Info       slug, nickname, group, run on launch, launch delay, disconnect
 //              grace, FOG host link and tags (no launch fields for an SDK
@@ -186,7 +186,7 @@ export function UnmountClientInfoEditor(): void {
 
 /**
  * Re-evaluate Show/Edit for the open modal. Called on every mode change, so the
- * panes flip in place. Leaving Edit mode with unsaved changes discards them —
+ * panes flip in place. Leaving Edit mode with unsaved changes discards them;
  * the read-only view must show what is saved, not what was half-typed.
  */
 export function ApplyClientInfoEditMode(): void {
@@ -232,7 +232,7 @@ export function RefreshClientInfoTags(): void {
 
 /**
  * After a variable push (a variable added, renamed or deleted elsewhere): redraw
- * the rows. Anything typed into them is dropped — the row it belonged to may be
+ * the rows. Anything typed into them is dropped; the row it belonged to may be
  * gone, and half of a stale form is worse than the current truth.
  */
 export async function RefreshClientInfoVariables(): Promise<void> {
@@ -529,7 +529,7 @@ async function SaveClientSettings(): Promise<void> {
 
 /**
  * One row per variable defined in the show. Editable rows hold this client's own
- * value — empty means "use the default", and the default is named underneath so
+ * value; empty means "use the default", and the default is named underneath so
  * an empty box never reads as an unexplained blank. Read-only rows show the
  * value the client's scripts actually get.
  */
@@ -643,7 +643,7 @@ function RenderFogField(): void {
     Fog.LinkedID
       ? Host && Host.ImageName
         ? `Assigned image: ${Host.ImageName}`
-        : 'No image assigned in FOG — Deploy tasks will fail.'
+        : 'No image assigned in FOG; Deploy tasks will fail.'
       : Editing
         ? 'Link this client to a FOG host to schedule imaging tasks.'
         : ''
@@ -687,7 +687,7 @@ function RenderMacList(): void {
       const Mac = String(Entry.MacAddress || '');
       const IsActive = !!ActiveMac && Mac === ActiveMac;
       // Manual entries are labelled so typed addresses can be told from reported
-      // ones — the two behave differently on removal (a reported address the
+      // ones: the two behave differently on removal (a reported address the
       // client still has comes back on its next report).
       const Tag = IsActive
         ? '<span class="mac-address-tag is-active">Active</span>'

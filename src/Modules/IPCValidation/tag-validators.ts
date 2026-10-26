@@ -1,8 +1,8 @@
 // Tag IPC validators. Normalizes the identifiers/payloads used by the Tag
 // Manager handlers (Tags:*). Slug validation is shared with groups/clients
 // (Manager.Slug); colour is a palette index; scope mirrors the alert/whitelist
-// scope shape but — because tags apply to every client kind — its Clients are
-// scoped-ID strings (plain UUID, or monitor:/check:… prefixes), not bare UUIDs.
+// scope shape but, because tags apply to every client kind, its Clients are
+// scoped-ID strings (plain UUID, or monitor:/check:... prefixes), not bare UUIDs.
 import { fail, isPlainObject } from './primitives';
 import type { IPCValidationManager } from './index';
 
@@ -28,7 +28,7 @@ export = function registerTagValidators(Manager: IPCValidationManager): void {
       return parseInt(normalized, 10);
     }
     fail(`${fieldName} is invalid`);
-    // unreachable — fail throws
+    // unreachable: fail throws
     return 0;
   };
 

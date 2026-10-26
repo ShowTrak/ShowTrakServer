@@ -598,7 +598,7 @@ function ChannelLabel(State: DigicoChannelState): string {
   return State.Name ? `Ch ${State.Channel} (${State.Name})` : `Ch ${State.Channel}`;
 }
 
-// The reasons a reachable console is unhealthy, per the enabled toggles. Pure —
+// The reasons a reachable console is unhealthy, per the enabled toggles. Pure;
 // exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: DigicoSnapshot, Options: HealthOptions): string[] {
   const Reasons: string[] = [];
@@ -853,7 +853,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Head = Rows([
     TextRow(
       'Host',
-      `${Config.Address || '—'}:${Config.Port} (replies to port ${Config.ListenPort})`
+      `${Config.Address || '-'}:${Config.Port} (replies to port ${Config.ListenPort})`
     ),
     Reachable && Result.ConsoleName ? TextRow('Console', String(Result.ConsoleName)) : null,
     Row('Status', StatePill(Result)),

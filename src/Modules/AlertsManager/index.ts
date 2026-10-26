@@ -135,7 +135,7 @@ let RuleList: AlertRule[] = [];
 //
 // That is what keeps a server restart quiet. A rig that is still coming up has
 // monitors failing and half its machines absent, and every one of those is a
-// state that predates us rather than something that just happened — announcing
+// state that predates us rather than something that just happened; announcing
 // them as fresh outages buries the one alert that matters. Anything that
 // changes after that first observation is a real transition and alerts
 // immediately, so an outage seconds into a show is still caught.
@@ -156,8 +156,8 @@ let AlertActionsEnabled = true;
 
 // A fault that was already true the first time we looked at an entity.
 //
-// It is not announced as it is found — at server start that would fire for
-// every monitor whose device is mid-boot — but it is not thrown away either,
+// It is not announced as it is found (at server start that would fire for
+// every monitor whose device is mid-boot), but it is not thrown away either,
 // because a device that is genuinely dead would then only ever be discoverable
 // by looking at the screen. Each one is held here and announced ONCE if it is
 // still true when the settle period has passed (see FlushSettledBaselineFaults,
@@ -183,7 +183,7 @@ function noteBaselineFault(FaultKey: string, Context: AlertContext) {
 
 // Update a held fault's details without creating one. A fault that persists
 // between snapshots must not become "pending" if it was announced the moment it
-// happened — that would announce the same outage a second time when the settle
+// happened; that would announce the same outage a second time when the settle
 // sweep runs.
 function refreshBaselineFault(FaultKey: string, Context: AlertContext) {
   const Existing = PendingBaselineFaults.get(FaultKey);
@@ -294,7 +294,7 @@ async function executeRule(Rule: AlertRule, Context: AlertContext) {
 async function evaluateAgainstRules(Context: AlertContext) {
   // Rules that target tags need the tag list to resolve membership. Reading it
   // costs a query, so it is fetched once per event and only when some enabled
-  // rule actually names a tag — the common case (no tag-targeted rules) still
+  // rule actually names a tag; the common case (no tag-targeted rules) still
   // evaluates without touching the DB.
   let Tags: TagView[] | undefined;
   if (RuleList.some((Rule) => Rule.Enabled && ScopeReferencesTags(Rule.Scope))) {
@@ -714,7 +714,7 @@ Manager.HandleNonCriticalApplicationStopped = makeClientEventHandler(
 // The degraded edge, shared by clients, monitors and checks: hold a fault that
 // was already true at first sight, announce a new one, and announce the
 // recovery of one that was announced. Recovery needs the entity to still be
-// online — dropping offline is not getting better, and is alerted separately.
+// online: dropping offline is not getting better, and is alerted separately.
 async function settleDegradedState(
   Key: string,
   Online: boolean,
@@ -754,9 +754,9 @@ function conditionFaultKey(UUID: string, Condition: string, TriggerType: string)
  *
  * A moment (a reboot, a display unplugged) is evaluated at once: the entity
  * only derives it from two trusted reports, so it is never a restart artefact.
- * A condition (CPU over threshold, an application hung) is different — at
+ * A condition (CPU over threshold, an application hung) is different: at
  * server start every client that is already struggling would announce itself at
- * once — so one raised inside the settle period is held like any fault that
+ * once, so one raised inside the settle period is held like any fault that
  * predates us, announced once by the sweep if it is still standing, and dropped
  * the moment the entity says it has ended.
  */
@@ -881,7 +881,7 @@ Manager.HandleClientUpdated = async (Client: AlertEntityLike) => {
 // snapshot is client-shaped, so broadcast-bridge routes it through
 // HandleClientUpdated exactly as it does a dummy client, and CLIENT_OFFLINE /
 // CLIENT_ONLINE / CLIENT_DEGRADED work unchanged. This adds only the finer
-// signal — which specific metric started breaching.
+// signal: which specific metric started breaching.
 Manager.HandleFreeKioskTerminalUpdated = async (Terminal: AlertEntityLike) => {
   if (!Terminal || !Terminal.UUID) return;
 
@@ -921,7 +921,7 @@ Manager.HandleFreeKioskTerminalUpdated = async (Terminal: AlertEntityLike) => {
 
     if (!FreeKioskSeenState.has(UUID)) {
       // First sighting of this terminal since boot. Something already breaching
-      // is a pre-existing condition, not an event — suppress it the same way a
+      // is a pre-existing condition, not an event; suppress it the same way a
       // client that was already offline at start-up is suppressed.
       noteBaselineFault(FaultKey, Context());
     } else if (!Tracked.has(MetricKey)) {
@@ -943,7 +943,7 @@ Manager.HandleMonitoringTargetUpdated = async (Target: AlertTargetLike) => {
   if (!Target || !Target.TargetID) return;
   // No check has reached a verdict yet (idle, or still inside its failure
   // threshold on first contact): unknown is not down, so there is nothing to
-  // record — not even as a start-up baseline fault.
+  // record, not even as a start-up baseline fault.
   if (Target.LastChecked == null) return;
 
   const Key = `monitor:${Target.TargetID}`;

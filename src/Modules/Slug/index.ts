@@ -4,17 +4,17 @@
 // entities over the API instead of an opaque UUID or autoincrement id. Slugs are
 // `^[A-Za-z0-9_-]{1,64}$` (letters, digits, `_` and `-`; mixed case allowed) and
 // must be unique within their namespace. Uniqueness is compared case-insensitively
-// so `Foo` and `foo` can never both exist — otherwise OSC addressing would be
+// so `Foo` and `foo` can never both exist; otherwise OSC addressing would be
 // ambiguous.
 //
 // There are two namespaces:
-//   * clients  — shared across ALL client-like entities (real Clients,
+//   * clients  - shared across ALL client-like entities (real Clients,
 //                MonitoringTargets, DummyClients and FreeKioskTerminals). A
 //                dummy's slug IS its existing DummyID column; the rest use a Slug
 //                column. Because the namespace spans four tables it cannot be a
 //                DB UNIQUE constraint, so uniqueness is enforced here in the app.
-//   * groups   — the Groups table's Slug column.
-//   * tags     — the Tags table's Slug column (its own independent namespace;
+//   * groups   - the Groups table's Slug column.
+//   * tags     - the Tags table's Slug column (its own independent namespace;
 //                the tag slug doubles as the tag's display label).
 //
 // Scripts have their own slug (the on-disk folder name) owned by ScriptManager
@@ -66,7 +66,7 @@ export function IsValidSlug(value: unknown): boolean {
   return typeof value === 'string' && SLUG_PATTERN.test(value);
 }
 
-// Append `-2`, `-3`, … to Base until the (case-insensitive) result is free.
+// Append `-2`, `-3`, etc. to Base until the (case-insensitive) result is free.
 function Dedupe(Base: string, TakenLower: Set<string>): string {
   const Root = Base || 'item';
   if (!TakenLower.has(Root.toLowerCase())) return Root;
@@ -208,7 +208,7 @@ export async function GenerateUniqueTagSlug(
 
 // Validate + de-collide a user-supplied slug for the client namespace. Sanitizes
 // friendly input (e.g. "Front of House" -> "Front-of-House"); returns an error
-// string if nothing usable remains. Does NOT auto-suffix on collision — a manual
+// string if nothing usable remains. Does NOT auto-suffix on collision; a manual
 // edit that collides is rejected so the operator picks another.
 export async function ResolveClientSlugEdit(
   Raw: unknown,

@@ -1,4 +1,4 @@
-// Critical network interfaces — the pure half.
+// Critical network interfaces: the pure half.
 //
 // Everything here is a function of its arguments: parsing addresses, judging a
 // critical interface against its conditions, building the view the renderer
@@ -11,7 +11,7 @@
 // The principle the audio half follows holds here too: an unknown is never a
 // fault. A router the client cannot read is skipped rather than failed, and an
 // interface that is allowed to be absent (presence not required) has nothing
-// else judged while it is gone — "when it is up, it must have this address".
+// else judged while it is gone: "when it is up, it must have this address".
 import type {
   CriticalNetworkInterface,
   NetworkCapabilities,
@@ -167,7 +167,7 @@ function IsLinkLocalV6(Address: unknown): boolean {
 
 /**
  * The address an operator would call "the interface's IP": its first IPv4
- * address, else its first routable IPv6 one — or, given a family, that family's.
+ * address, else its first routable IPv6 one, or, given a family, that family's.
  * What a first mark guards.
  */
 export function PrimaryAddress(
@@ -250,8 +250,8 @@ export function normalizeCriticalNetworkEntry(Value: unknown): CriticalNetworkIn
     Name,
     MAC: Mac,
     Family: normalizeNetworkFamily(E.Family),
-    // A monitored interface is always required to be present — without that,
-    // monitoring it raises nothing when it goes — so presence is never read from
+    // A monitored interface is always required to be present (without that,
+    // monitoring it raises nothing when it goes), so presence is never read from
     // the row, which also brings back any row saved while it could be unticked.
     RequirePresent: true,
     Address: OptionalIP(E.Address),
@@ -332,7 +332,7 @@ export function evaluateNetworkIssues(
     const Pinned = Same.filter((Address) => SameIP(Address.address, Critical.Address));
     const Judged = Pinned.length ? Pinned : Same;
     if (Judged.length && !Judged.some((Address) => SameIP(Address.netmask, Critical.Netmask))) {
-      const Current = Judged.map((Address) => String(Address.netmask ?? '—'));
+      const Current = Judged.map((Address) => String(Address.netmask ?? '-'));
       Issues.push({
         Kind: 'netmask',
         Message: `Subnet mask is ${Current.join(', ')} (expected ${Critical.Netmask})`,
@@ -459,7 +459,7 @@ export interface CriticalNetworkOptions {
  * up, keep the address it has now with the mask it has now, and keep its router
  * (when the client reports one). An interface that is currently missing can
  * still have its conditions edited; a first mark on one the client has never
- * reported is refused, and so is any mark on an internal interface — loopback
+ * reported is refused, and so is any mark on an internal interface; loopback
  * is not something that can go wrong on a show network.
  */
 export function resolveCriticalNetworkEntry(

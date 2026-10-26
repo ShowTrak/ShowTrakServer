@@ -136,8 +136,8 @@ test('NetworkInterfaces preserves the nested payload the client actually sends',
 
   // Copied from the client's NetworkMonitor.normalize() output. This validator
   // used to reconstruct a flat PascalCase shape that neither side produced, so
-  // every field read as undefined and the whole payload was rewritten to nulls
-  // — the client record ended up storing `{ name: 'unknown', addresses: [] }`
+  // every field read as undefined and the whole payload was rewritten to nulls:
+  // the client record ended up storing `{ name: 'unknown', addresses: [] }`
   // for every interface. The previous version of this test asserted that flat
   // shape, so it passed while the feature was broken end to end.
   const [iface] = SocketValidation.NetworkInterfaces([

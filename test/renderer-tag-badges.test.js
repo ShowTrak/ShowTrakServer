@@ -101,13 +101,13 @@ test('a workspace tag covers every client, as workspace membership', () => {
 
 test('direct membership outranks group and workspace', () => {
   // The editor only offers a toggle for direct membership, so a client that is
-  // BOTH named directly and covered by its group must report 'direct' — else
+  // BOTH named directly and covered by its group must report 'direct', else
   // its own entry would be unremovable through the UI that wrote it.
   const T = tag(1, 'foh', { Workspace: true, Groups: [2], Clients: ['uuid-a'] });
   assert.equal(GetTagMembershipKind(T, client('uuid-a', 2)), 'direct');
 });
 
-test('an EMPTY scope covers nothing — the opposite of a script whitelist', () => {
+test('an EMPTY scope covers nothing, the opposite of a script whitelist', () => {
   // This is the trap that makes this predicate distinct from
   // script-targeting's IsClientWhitelisted, where an empty scope means
   // "unrestricted". Sharing that behaviour here would stamp every freshly
@@ -221,7 +221,7 @@ test('the +N chip is budgeted for, not added on top of a full row', () => {
 
 test('at least one badge is always shown, even when nothing fits', () => {
   // An all-overflow row ("+3") would tell the operator the machine is tagged
-  // while withholding every tag name — strictly worse than one clipped badge.
+  // while withholding every tag name, strictly worse than one clipped badge.
   const Tags = [
     tag(1, 'an-extremely-long-tag-name-that-cannot-fit', { Workspace: true }),
     tag(2, 'another-very-long-one', { Workspace: true }),
@@ -240,7 +240,7 @@ test('no tags means no row at all', () => {
 // The renderer replaces the per-character table with real canvas measurement of
 // the row's own font (lib/tag-badge-metrics). The table alone ran under the UI
 // stack's uppercase metrics, so rows that it called a perfect fit rendered over
-// the tile and were cropped by `overflow: hidden` — no "+N", just a sliced
+// the tile and were cropped by `overflow: hidden`: no "+N", just a sliced
 // badge. These cover the seam, which is the part that can be tested off-DOM.
 
 /** Runs `Body` with `Measure` installed, and always uninstalls it after. */
@@ -310,7 +310,7 @@ test('a measurer that cannot measure falls back to the table, not to zero', () =
 
 test('the fallback table costs digits as full-width characters', () => {
   // `1` and `J` were listed as narrow glyphs and are not, so a slug like `LX-1`
-  // was costed a third under what it drew — enough on its own to crop a row.
+  // was costed a third under what it drew, enough on its own to crop a row.
   assert.equal(EstimateLabelWidth('1'), EstimateLabelWidth('0'));
   assert.equal(EstimateLabelWidth('J'), EstimateLabelWidth('K'));
   assert.ok(EstimateLabelWidth('I') < EstimateLabelWidth('1'));
@@ -409,7 +409,7 @@ test('icon mode draws the icon and no label; name mode the reverse', () => {
   const IconOnly = RenderTagBadgeRow([shown('icon', 'foh', 'star')]);
   assert.match(IconOnly, /<i class="bi bi-star TILE_TAG_ICON"><\/i>/);
   assert.ok(!IconOnly.includes('TILE_TAG_LABEL'), 'icon mode should draw no label');
-  // Still identifiable on hover — an icon alone does not name the tag.
+  // Still identifiable on hover; an icon alone does not name the tag.
   assert.match(IconOnly, /title="FOH"/);
 
   const NameOnly = RenderTagBadgeRow([shown('name', 'foh', 'star')]);
@@ -434,7 +434,7 @@ test('an unusable icon name falls back to the tag glyph rather than emitting jun
 
 test('an icon badge is costed narrower than the same tag with its name', () => {
   // The fit is decided from an estimate before the row is in the DOM, so each
-  // mode has to be measured as what it actually renders — costing an icon-only
+  // mode has to be measured as what it actually renders; costing an icon-only
   // badge as if it carried its label would hide badges that would have fitted.
   const Icon = EstimateTagBadgeWidth(shown('icon', 'recording'));
   const Name = EstimateTagBadgeWidth(shown('name', 'recording'));
@@ -465,7 +465,7 @@ test('a row of icon-only badges fits more tags than the same tags named', () => 
 
 test('a hostile tag slug cannot break out of the badge markup', () => {
   // Slugs are validated on the way in, but this row is built by string
-  // concatenation inside a tile — the escaping is what makes that safe.
+  // concatenation inside a tile; the escaping is what makes that safe.
   const Html = RenderTagBadgeRow([tag(1, '"><img src=x onerror=alert(1)>', { Workspace: true })]);
   assert.ok(!Html.includes('<img'), 'markup survived into the row');
   assert.match(Html, /&quot;&gt;&lt;IMG/);

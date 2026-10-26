@@ -1,4 +1,4 @@
-// Electron main process entrypoint — composition root. Responsibilities:
+// Electron main process entrypoint and composition root. Responsibilities:
 // - Enforce single-instance behavior
 // - Boot the back-end managers (their require-time side effects bind the HTTP +
 //   Socket.IO server and the OSC UDP listener; explicit Init() calls follow)
@@ -6,8 +6,8 @@
 // - Own the window / shutdown lifecycle (save prompts, cleanup, power hooks)
 // - Wire the decomposed IPC registrars and the broadcast → renderer bridge
 //
-// The bulk of the previous 2,600-line file — the ~90 IPC handlers, the ~23
-// broadcast subscribers, and the deployment orchestration — now lives under
+// The bulk of the previous 2,600-line file (the ~90 IPC handlers, the ~23
+// broadcast subscribers, and the deployment orchestration) now lives under
 // src/main/ (registrars/, broadcast-bridge.ts, deployment.ts, initial-state.ts).
 import type { BrowserWindow as ElectronBrowserWindow } from 'electron';
 const { app, BrowserWindow } = require('electron/main');
@@ -48,7 +48,7 @@ SampleScriptsManager.Initialize();
 import './Modules/Server'; // binds HTTP + Socket.IO server on load
 import { Manager as BonjourManager } from './Modules/Bonjour';
 // Init reads settings to build its TXT record, so it is async. Nothing here waits
-// on the announcement — publishing is fire-and-forget, and a failure inside is
+// on the announcement; publishing is fire-and-forget, and a failure inside is
 // already logged rather than thrown.
 void BonjourManager.Init();
 import './Modules/OSC'; // binds the OSC UDP listener on load
@@ -274,7 +274,7 @@ app.whenReady().then(async () => {
       .catch((Err: unknown) => Logger.error('Failed to init AudioAssetManager:', Err));
     // The FOG poller always starts; it reports "not enabled" until the setting is
     // turned on, which is what lets the toggle take effect without a restart.
-    // Deliberately not awaited — a slow or unreachable FOG server must not hold up
+    // Deliberately not awaited: a slow or unreachable FOG server must not hold up
     // the main window appearing.
     FogManager.Start().catch((Err: unknown) => Logger.error('Failed to start FogManager:', Err));
     await Wait(PRELOADER_MIN_DISPLAY_MS);
@@ -362,8 +362,8 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', handleBeforeQuit);
 
-// The power-save blocker (Prevent Display Sleep) is applied — and kept in sync
-// on change — by ./main/live-settings (initLiveSettings, wired above).
+// The power-save blocker (Prevent Display Sleep) is applied (and kept in sync
+// on change) by ./main/live-settings (initLiveSettings, wired above).
 
 powerMonitor.on('shutdown', handlePowerMonitorShutdown);
 

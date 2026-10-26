@@ -1,7 +1,7 @@
 // Transient UI/editor/modal state: selection, in-flight editor drafts, history
 // modal context, alert-rule drafts, network-discovery + update-manager progress,
 // client-info modal bookkeeping, and application mode. None of this mirrors
-// backend truth — it is renderer-local working state (distinct from the
+// backend truth; it is renderer-local working state (distinct from the
 // authoritative caches in ./server-caches). Each `export let` keeps its setter
 // here; the state barrel re-exports all of it so consumers are unchanged.
 import type {

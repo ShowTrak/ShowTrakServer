@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
-// Exercises src/main/registrars/clients.ts — everything except the
+// Exercises src/main/registrars/clients.ts: everything except the
 // CreateUnassignedClients gate, which has its own file
 // (main-registrar-unassigned-clients.test.js).
 //
@@ -224,7 +224,7 @@ test('a malformed UUID is refused by every per-client handler', async () => {
   // that will happily act on whatever it is given, so validation is the boundary.
   //
   // Note what "malformed" means here: IPCValidation.UUID is a non-empty string
-  // check (2-128 chars), NOT a UUID-format check — client UUIDs are hardware
+  // check (2-128 chars), NOT a UUID-format check; client UUIDs are hardware
   // fingerprints, not RFC 4122 values. So the boundary rejects empty, oversized
   // and non-string identifiers, and nothing narrower.
   const Cases = [
@@ -275,7 +275,7 @@ test('each critical-entity channel calls its own manager method', async () => {
   // These twelve handlers are near-identical copy-paste blocks, so the realistic
   // failure is a mis-wired pair: "remove" calling the mark method, or the USB
   // serial channel calling the USB name one. That would silently mark a device
-  // critical when the operator asked to un-mark it — and a critical entity
+  // critical when the operator asked to un-mark it, and a critical entity
   // showing as missing degrades the client.
   const Cases = [
     ['UpdateClient', { Nickname: 'FOH' }, 'Update'],
@@ -338,7 +338,7 @@ test('adopting runs create, state, message and deployment in order', async () =>
 });
 
 test('re-adopting an existing client is not an error', async () => {
-  // Re-adoption is a normal recovery action — a client that lost its profile
+  // Re-adoption is a normal recovery action: a client that lost its profile
   // reappears as pending while its row still exists. Treating the duplicate as a
   // failure would leave it stuck in that state.
   state.createErr = 'Client already exists';
@@ -377,7 +377,7 @@ test('AdoptDevice pairs an invalid UUID with false, matching its siblings', asyn
 
 test('unadopting tells the client to let go BEFORE deleting its row', async () => {
   // Order matters: deleting first would leave a machine that still believes it
-  // is adopted, reconnecting to a server that no longer knows it — an orphan
+  // is adopted, reconnecting to a server that no longer knows it: an orphan
   // that has to be found and reset by hand.
   const [Err, Result] = await call('UnadoptClient', UUID_A);
 
@@ -435,7 +435,7 @@ test('a client cannot be replaced by itself', async () => {
 
 test('the replacement must still be pending adoption', async () => {
   // The guard against replacing with a machine that is already an adopted
-  // client — that would give two client rows the same identity.
+  // client; that would give two client rows the same identity.
   for (const Pending of [[], [{ UUID: UUID_A }], null, undefined, 'not an array']) {
     clientMgr.__calls.length = 0;
     state.pendingAdoption = Pending;
@@ -486,7 +486,7 @@ test('both UUIDs are validated, and the error names which one failed', async () 
 
 test('a wake sends a packet to every known MAC of an offline client', async () => {
   // A machine with several NICs can only be reached through whichever one the
-  // server shares a network with, and the server cannot know which — so all of
+  // server shares a network with, and the server cannot know which, so all of
   // them get a packet.
   state.clients.set(UUID_A, client({ UUID: UUID_A, Macs: ['AA:AA', 'BB:BB', 'CC:CC'] }));
 
@@ -601,8 +601,8 @@ test('an invalid target list is refused before the queue is touched', async () =
 
 test('an empty target list is rejected rather than clearing the queue for nothing', async () => {
   // `List || []` normalizes null/undefined to an empty array, which UUIDList
-  // then refuses. Worth pinning: the alternative — treating empty as a silent
-  // success — would still have run ClearSettled, wiping finished task rows in
+  // then refuses. Worth pinning: the alternative (treating empty as a silent
+  // success) would still have run ClearSettled, wiping finished task rows in
   // response to a request that was going to wake nothing.
   for (const List of [[], null, undefined]) {
     execMgr.__calls.length = 0;

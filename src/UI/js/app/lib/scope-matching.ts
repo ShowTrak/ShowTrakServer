@@ -12,7 +12,7 @@
 // below carries a visited set so a cycle terminates instead of hanging the UI.
 //
 // As on the server, this answers ONLY "is it covered": what an ABSENT scope
-// means is the caller's decision, and the callers genuinely disagree — an absent
+// means is the caller's decision, and the callers genuinely disagree: an absent
 // script whitelist means "every client", an absent tag scope means "no clients".
 
 /** Permissive scope shape: accepts wire views and editor drafts alike. */
@@ -28,8 +28,8 @@ export interface ScopeShape {
  *
  * `ScopedID` is the string the scope picker persists into `Scope.Clients`: a
  * plain UUID for ShowTrak and dummy clients, `monitor:<TargetID>` for a
- * monitoring target. Getting it wrong is silent — the scope simply never
- * matches — so tile builders derive it from the same value they put in the
+ * monitoring target. Getting it wrong is silent (the scope simply never
+ * matches), so tile builders derive it from the same value they put in the
  * tile's `data-uuid`.
  */
 export interface ScopeEntity {
@@ -129,7 +129,7 @@ export function ScopeMembershipKindFor(
 /**
  * Whether a scope covers an entity by any route, expanding tags recursively.
  *
- * Omit `Tags` and tag references contribute nothing — correct only for scopes
+ * Omit `Tags` and tag references contribute nothing, correct only for scopes
  * that cannot contain tags, so pass the tag list whenever the scope was
  * authored by an operator.
  */

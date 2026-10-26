@@ -9,7 +9,7 @@ const { HISTORY_RETENTION_MS } = require('../dist/Modules/Config/constants');
 // Nothing ShowTrak remembers is kept beyond 12 hours, and a steady signal does
 // not cost a reading per heartbeat. These pin both halves: the thinning of
 // steady runs in the status timelines (without ever leaving a one-minute block
-// empty, which the timeline would draw grey), and the age-out of every store —
+// empty, which the timeline would draw grey), and the age-out of every store,
 // including the ones nothing records into any more.
 
 const History = require(path.join(__dirname, '..', 'dist', 'main', 'monitoring-history.js'));

@@ -8,7 +8,7 @@ const { loadWithMocks } = require('../test-support/load-with-mocks');
 //
 // local-scripts.test.js covers the pure helpers (containment, path and version
 // normalising, argument splitting). This covers what was left: choosing HOW to
-// launch a file, and actually running it — previously 0%, and the part that
+// launch a file, and actually running it: previously 0%, and the part that
 // touches the host OS.
 //
 // A "local script" runs on the ShowTrak Server machine itself, triggered from
@@ -40,7 +40,7 @@ const REAL_PLATFORM = Object.getOwnPropertyDescriptor(process, 'platform');
  * The platform must stay forced for the duration of the test, not just the
  * load: resolveLocalScriptLauncher reads `process.platform` when it is CALLED.
  * Restoring it straight after require made every Windows assertion run against
- * the host's own table — and one of them still passed, because `.exe` happens
+ * the host's own table, and one of them still passed, because `.exe` happens
  * to hit the same "run it directly" default on POSIX. That is a false pass of
  * exactly the kind that made the Client's recovery suite green on macOS while
  * being broken everywhere else, so it is worth naming here.
@@ -110,7 +110,7 @@ test('a Windows executable is run directly, not through a shell', () => {
   // handling.
   //
   // Asserted alongside a .bat in the same load, because "run it directly" is
-  // ALSO the POSIX default — on its own this assertion passes even when the
+  // ALSO the POSIX default; on its own this assertion passes even when the
   // platform is not actually win32, and would prove nothing.
   const { Mod } = load({ platform: 'win32' });
 

@@ -1,4 +1,4 @@
-// Displays section of the client info modal — the decisions, without the DOM.
+// Displays section of the client info modal: the decisions, without the DOM.
 //
 // What the section shows, the badge each display's critical toggle wears, the
 // conditions a critical display can be held to, and turning the conditions
@@ -7,7 +7,7 @@ import type { ClientDisplayView, ClientView, CriticalDisplay } from '@showtrak/p
 
 /**
  * Which overall message the section shows:
- *  - `outdated`: the client predates display monitoring — no list, no controls;
+ *  - `outdated`: the client predates display monitoring: no list, no controls;
  *  - `offline`: nothing live to show beyond the critical baselines;
  *  - `ok`: render the displays.
  */
@@ -169,7 +169,7 @@ export interface DisplayConditionRow {
   Label: string;
   /**
    * What is guarded ("3840 × 2160") when monitored, else what the display
-   * reports now; "—" when neither is known, "Unsupported" when it cannot be held.
+   * reports now; "-" when neither is known, "Unsupported" when it cannot be held.
    */
   Value: string;
   /** Whether this display can be held to it. A condition already set always is, so it can be cleared. */
@@ -183,13 +183,13 @@ export interface DisplayConditionRow {
 }
 
 const YesNo = (Value: boolean | null | undefined) =>
-  Value === null || Value === undefined ? '—' : Value ? 'Yes' : 'No';
+  Value === null || Value === undefined ? '-' : Value ? 'Yes' : 'No';
 
 /**
  * The conditions table of a critical display, one row per condition. A guarded
  * property shows its baseline (what it must be); an unguarded one what the
  * display reports now (what ticking it would guard). A disconnected display can
- * only have conditions cleared — there is nothing to capture a new one from.
+ * only have conditions cleared; there is nothing to capture a new one from.
  */
 export function DisplayConditionRows(Display: ClientDisplayView): DisplayConditionRow[] {
   const Critical: CriticalDisplay | null | undefined = Display.Critical;
@@ -211,7 +211,7 @@ export function DisplayConditionRows(Display: ClientDisplayView): DisplayConditi
     return {
       Field,
       Label,
-      Value: !Supported ? 'Unsupported' : ((Checked ? Guarded : null) ?? Live ?? '—'),
+      Value: !Supported ? 'Unsupported' : ((Checked ? Guarded : null) ?? Live ?? '-'),
       Supported,
       Checked,
       Locked,
@@ -326,7 +326,7 @@ export function ParseDisplayRuleFields(
 /**
  * The live state of a critical display's history row: green while connected and
  * meeting its conditions, orange while connected but not, red while missing.
- * Idle while the client is offline or the display has not been judged yet — a
+ * Idle while the client is offline or the display has not been judged yet; a
  * timeline must never paint a state nobody observed.
  */
 export function DisplayTimelineLiveState(

@@ -7,7 +7,7 @@ import type { ValidatedAdoptionHeartbeat } from '../SocketValidation';
 
 const Logger = CreateLogger('AdoptionManager');
 
-// Not-yet-migrated JS manager — typed loosely until its own migration.
+// Not-yet-migrated JS manager, typed loosely until its own migration.
 import { Manager as ClientManager } from '../ClientManager';
 
 // Ephemeral list of discoverable, not-yet-adopted clients

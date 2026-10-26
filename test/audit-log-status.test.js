@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 // What the audit log records as a status change: each entity's top-level state
-// and the things monitored on it — never unmonitored hardware, never a
+// and the things monitored on it, never unmonitored hardware, never a
 // heartbeat that changes nothing. Each diff is pure, so a scenario is a series
 // of snapshots fed through it.
 const {

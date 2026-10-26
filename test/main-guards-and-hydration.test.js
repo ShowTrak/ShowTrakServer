@@ -4,12 +4,12 @@ const { installModuleMocks, matchesModule } = require('./helpers/main-mocks');
 
 // Exercises three small but load-bearing main-process modules:
 //
-//   src/main/process-guards.ts  — the last line of defence that keeps a live
+//   src/main/process-guards.ts  - the last line of defence that keeps a live
 //     show running when a NIC flap throws out of native/third-party code.
-//   src/main/window-guards.ts   — per-window security: external links go to the
+//   src/main/window-guards.ts   - per-window security: external links go to the
 //     OS browser, in-app navigation away from the UI is blocked, both fail
 //     CLOSED.
-//   src/main/initial-state.ts   — what a freshly (re)loaded renderer hydrates.
+//   src/main/initial-state.ts   - what a freshly (re)loaded renderer hydrates.
 //
 // The REAL NetworkErrors classifier is used for the guards, so the transient-vs-
 // fatal decision is genuinely exercised rather than stubbed away.

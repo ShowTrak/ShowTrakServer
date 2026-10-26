@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { installModuleMocks } = require('./helpers/main-mocks');
 
-// Exercises src/Modules/SampleScripts/index.ts — the cached catalog of sample
+// Exercises src/Modules/SampleScripts/index.ts: the cached catalog of sample
 // script templates fetched from the public ShowTrak/SampleScripts repository.
 //
 // The security surface is the pair of path guards. Entries in the repo tree are
@@ -22,7 +22,7 @@ const { installModuleMocks } = require('./helpers/main-mocks');
 // NOTE the mock matchers below: this module lives inside src/Modules/, so it
 // imports its siblings as '../Logger' / '../AppData' / '../Broadcast'. A
 // suffix-only '/Modules/AppData' matcher does NOT match those and would let the
-// real manager load — which means writing to the operator's live app data.
+// real manager load, which means writing to the operator's live app data.
 
 const CacheRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-samples-'));
 test.after(() => fs.rmSync(CacheRoot, { recursive: true, force: true }));
@@ -104,7 +104,7 @@ test.after(() => restore());
   assert.equal(
     Probe.Manager.GetSampleScriptsDirectory(),
     CacheRoot,
-    'AppData mock did not apply — refusing to run against real app data'
+    'AppData mock did not apply; refusing to run against real app data'
   );
 }
 
@@ -434,7 +434,7 @@ test('an unreachable repository reports a friendly error and keeps the cache', a
     ok: false,
     error: 'Failed to reach the sample scripts repository',
   });
-  // The previously cached catalog survives — the panel still lists templates.
+  // The previously cached catalog survives; the panel still lists templates.
   assert.equal((await M.GetSampleList()).length, 1);
 });
 

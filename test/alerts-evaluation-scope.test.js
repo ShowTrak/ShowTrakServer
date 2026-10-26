@@ -60,7 +60,7 @@ test('a tag-watching rule fires for a monitoring target the tag covers', () => {
 
 test('without the tag list a tag-watching rule matches nothing', () => {
   // The evaluator always passes the list; this pins the safe direction for any
-  // caller that does not — a rule that misses, never one that fires wrongly.
+  // caller that does not: a rule that misses, never one that fires wrongly.
   const Tags = [tag(1, { Clients: ['c1'] })];
   assert.equal(isScopeMatch(rule({ Tags: [1] }), clientCtx('c1')), false);
   assert.equal(isScopeMatch(rule({ Tags: [1] }), clientCtx('c1'), Tags), true);

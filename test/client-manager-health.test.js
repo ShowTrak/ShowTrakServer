@@ -11,7 +11,7 @@ const { CLIENT_STARTUP_GRACE_MS } = require('../dist/Modules/Config/constants');
 // Client health through the real ClientManager and a real (throwaway) SQLite
 // database: monitored system checks (CPU, memory, uptime, power, thermal), reboots, sleep and wake, battery
 // and temperatures, hung and unfocused applications, and the display / network
-// / USB / version transitions — what each does to the client's state, and which
+// / USB / version transitions: what each does to the client's state, and which
 // `ClientHealthEvent`s reach the alert pipeline.
 
 function loggerStub() {

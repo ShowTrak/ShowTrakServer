@@ -97,7 +97,7 @@ export interface AlertScopeGroupNode {
  *
  * Unlike a group, a tag carries no fixed child list: its membership is itself a
  * scope (and may name further tags), so it is offered as a single selectable
- * row and resolved — recursively — only when something needs the entities.
+ * row and resolved (recursively) only when something needs the entities.
  */
 export interface AlertScopeTagNode {
   Kind: 'tag';

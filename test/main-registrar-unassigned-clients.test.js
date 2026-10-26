@@ -8,7 +8,7 @@ const { installModuleMocks, matchesModule, recordingManager } = require('./helpe
 //
 // The setting gate is the point of these tests: the renderer hides the entry
 // point when SYSTEM_ALLOW_UNASSIGNED_CLIENTS is off, but this handler is the only
-// authority, so it must refuse on its own — including when the setting cannot be
+// authority, so it must refuse on its own, including when the setting cannot be
 // read at all.
 
 const state = {

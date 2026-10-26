@@ -65,7 +65,7 @@ export function CreateVariablesRepository(DB: DBManager) {
 
     // Deleting a definition must take every client's override with it. SQLite
     // foreign keys are not enabled on this connection, so the cascade is
-    // explicit — and transactional, because a definition that vanished while its
+    // explicit, and transactional, because a definition that vanished while its
     // overrides survived would leave rows no UI can ever reach or clean up.
     Delete(VariableID: number): Promise<DBResult<void>> {
       return DB.WithTransaction(async (run) => {
@@ -81,7 +81,7 @@ export function CreateVariablesRepository(DB: DBManager) {
     /**
      * Every definition with this client's override attached (NULL when it
      * inherits). A LEFT JOIN so a client that has overridden nothing still gets
-     * the full list — the client editor renders one row per *definition*, not
+     * the full list; the client editor renders one row per *definition*, not
      * one per override.
      */
     GetForClient(UUID: string): Promise<DBResult<ClientVariableJoinRow[]>> {
@@ -113,7 +113,7 @@ export function CreateVariablesRepository(DB: DBManager) {
       );
     },
 
-    /** Clearing an override is a delete, not an empty string — the client goes
+    /** Clearing an override is a delete, not an empty string: the client goes
      * back to inheriting the default, and must keep tracking it if it changes. */
     ClearClientValue(UUID: string, VariableID: number): Promise<DBResult<unknown>> {
       return DB.Run('DELETE FROM ClientVariables WHERE UUID = ? AND VariableID = ?', [

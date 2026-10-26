@@ -5,7 +5,7 @@
 // WP-1 decision: hand-rolled micro-stubs for the call shapes a given function
 // actually uses, rather than adopting jsdom (which Tom declined).
 //
-// Install what a test needs BEFORE requiring the module under test — several
+// Install what a test needs BEFORE requiring the module under test; several
 // renderer modules read globals at module scope.
 
 /**
@@ -14,7 +14,7 @@
  * jQuery's API is almost entirely fluent, so a Proxy returning itself covers
  * essentially every shape a render function uses. Value-returning accessors
  * answer '' and `length` answers 0, so `if (!$el.length) return;` guards take
- * their early-exit path — which is what we want: the tests here are about the
+ * their early-exit path, which is what we want: the tests here are about the
  * decisions, not the markup.
  */
 function chainable() {
@@ -83,7 +83,7 @@ function installDocument() {
  * Install the `Howl` vendor global.
  *
  * settings.ts constructs Howl instances at MODULE SCOPE, so any module that
- * transitively imports it fails to load without this — which is four of them
+ * transitively imports it fails to load without this, which is four of them
  * (alert-rules, osc-feeds, audio-assets, wire-context-menu).
  */
 function installHowl() {

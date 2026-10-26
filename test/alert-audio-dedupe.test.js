@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
 
-// Exercises dist/Modules/AlertActions/_audio-dedupe.js — the window that collapses
+// Exercises dist/Modules/AlertActions/_audio-dedupe.js: the window that collapses
 // repeat requests for the SAME alert sound into a single audible playback.
 //
 // The properties that matter:
@@ -23,7 +23,7 @@ const MODULE_PATH = path.join(
   '_audio-dedupe.js'
 );
 
-/** Fresh module state per test — the window and the open claims are module-level. */
+/** Fresh module state per test; the window and the open claims are module-level. */
 function loadDedupe() {
   return loadWithMocks(MODULE_PATH, {});
 }

@@ -37,7 +37,7 @@ const loggerStub = {
 // `this._events`, so calling `on` with `this` detached (e.g. `const register =
 // socket.on; register(...)`) throws `Cannot read properties of undefined`. If
 // the mock stored handlers in a closure it would silently accept such unbound
-// calls and hide that whole class of regression (it did — see the `.bind(socket)`
+// calls and hide that whole class of regression (it did; see the `.bind(socket)`
 // fix in client-namespace.ts). Keying off `this` reproduces the real crash so
 // any unbound extraction fails the suite here instead of only in production.
 function makeSocket(handshake) {
@@ -59,7 +59,7 @@ function makeSocket(handshake) {
       this.disconnected = flag;
     },
     on(event, handler) {
-      // Throws if `this` is undefined/global — matching Socket.IO's `this._events`.
+      // Throws if `this` is undefined/global, matching Socket.IO's `this._events`.
       this._handlers[event] = handler;
     },
     async trigger(event, ...args) {
@@ -206,7 +206,7 @@ test('Server client namespace wires telemetry handlers and disconnect cleanup', 
 test('a stale socket closing leaves a reconnected client alone', async () => {
   // The client reconnected before the server noticed its old socket was dead.
   // When that old socket finally closes, a newer one for the same UUID is still
-  // in the room — so it must not be timed out, un-identified or un-adopted.
+  // in the room, so it must not be timed out, un-identified or un-adopted.
   const calls = { timeout: 0, removeAdopt: 0, identifyDisconnect: 0 };
 
   const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
@@ -427,8 +427,8 @@ function loadWebUi(settings, options = {}) {
     '../ScriptManager': {
       Manager: { GetScripts: async () => [{ ID: 's1', Name: 'Deploy', Weight: 1 }] },
     },
-    // Mock the whitelist manager so the real one — which requires ../DB and opens
-    // a live sqlite connection at module load — is never pulled in. Without this
+    // Mock the whitelist manager so the real one (which requires ../DB and opens
+    // a live sqlite connection at module load) is never pulled in. Without this
     // the initial-state push touches the real DB, whose load-time async behavior
     // is environment-dependent and cancels these tests on CI (the event loop
     // drains mid-test). DecorateCatalog is identity here; scope decoration is
@@ -1033,7 +1033,7 @@ test('Web UI namespace forwards allowlisted pushes with serialization, dropping 
 });
 
 // The settings push carries the Web UI passcode, the SDK key and the FOG tokens,
-// so it reaches the browser only through the public-settings filter — and must
+// so it reaches the browser only through the public-settings filter, and must
 // still reach it, or the browser lays groups out on its default column count
 // instead of the one the desktop is set to.
 const SETTING_ROWS = [
@@ -1102,7 +1102,7 @@ test('Web UI initial state sends the monitoring action favourites', async () => 
 // The browser answers `hello` at once (rpc Settings:Get, or auth:login with a
 // stored passcode). Socket.IO drops an event that arrives before its listener
 // exists, so a listener attached after the initial-state reads left the browser
-// waiting on an ack that never came — stuck on "Connecting…".
+// waiting on an ack that never came, stuck on "Connecting...".
 test('Web UI listeners are attached before the connection handler awaits anything', async () => {
   const { SetupWebUiNamespace } = loadWebUi({
     WEBUI_ENABLED: true,
@@ -1463,7 +1463,7 @@ test('Server mirrors the REAL OSC tag routes to HTTP POST and they resolve end-t
       },
       { static: () => () => {} }
     ),
-    // OSC is REAL — so are Config/constants + NetworkErrors it pulls in.
+    // OSC is REAL, so are Config/constants + NetworkErrors it pulls in.
     '../Config': { Config: { Application: { Port: 0, Version: '1.0' } } },
     '../AppData': {
       Manager: { GetScriptsDirectory: () => '/tmp/scripts', GetStorageDirectory: () => '/tmp' },
@@ -1474,7 +1474,7 @@ test('Server mirrors the REAL OSC tag routes to HTTP POST and they resolve end-t
     '../Broadcast': {
       Manager: { emit: (...args) => broadcastEvents.push(args), on: () => {} },
     },
-    // A tag "foh" whose scope is group 1 — expands to r1 only.
+    // A tag "foh" whose scope is group 1: expands to r1 only.
     '../TagManager': {
       Manager: {
         Get: async () => [null, null],
@@ -1801,7 +1801,7 @@ test('Web UI login rate-limits an IP after repeated failures and blocks even a c
     );
   }
 
-  // The next attempt is locked out — and crucially, even the CORRECT passcode is
+  // The next attempt is locked out, and crucially, even the CORRECT passcode is
   // refused while the lockout is active (the limiter gates before the compare).
   await socket.trigger('auth:login', { password: '1234' }, (r) => (resp = r));
   assert.equal(resp.error, 'rate_limited');
@@ -1867,7 +1867,7 @@ test('Web UI passcode comparison is length-agnostic and correct', () => {
   assert.equal(PasscodeMatches('1234', '1234'), true);
   assert.equal(PasscodeMatches('1234', '1235'), false);
   // Differing lengths must return false, not throw (timingSafeEqual would throw
-  // on unequal buffers — the hash step guards against that).
+  // on unequal buffers; the hash step guards against that).
   assert.equal(PasscodeMatches('1', '123456'), false);
   assert.equal(PasscodeMatches('', ''), true);
 });

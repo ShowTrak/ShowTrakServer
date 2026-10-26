@@ -12,8 +12,8 @@
 // response code, `208 transport info:`; Videohub uses an all-caps name,
 // `VIDEO OUTPUT ROUTING:`) and in their body lines (HyperDeck and the Videohub
 // device / alarm blocks are `Key: Value`; Videohub's label / routing / lock
-// blocks are `<index> <value>`). What they share — the framing, the CR LF
-// handling and the `Key: Value` reading — lives here.
+// blocks are `<index> <value>`). What they share (the framing, the CR LF
+// handling and the `Key: Value` reading) lives here.
 //
 // HyperDeck also sends single-line replies with NO blank-line terminator
 // (`200 ok`, `102 invalid value`, `120 connection failed`): a header that does
@@ -89,7 +89,7 @@ export function SplitBlocks(
 /**
  * Read `Key: Value` body lines into a map keyed by the LOWER-CASED key. Split
  * on the first colon only, so values that contain colons (timecodes) survive.
- * Lines without a colon are ignored — both protocols tell clients to skip lines
+ * Lines without a colon are ignored; both protocols tell clients to skip lines
  * they do not recognise. Case is folded because Videohub capitalises its keys
  * inconsistently across firmware (`Unique ID` vs `Unique id`).
  */

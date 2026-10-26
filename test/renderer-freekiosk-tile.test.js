@@ -1,4 +1,4 @@
-// Exercises src/UI/js/app/freekiosk.ts — the FreeKiosk tile markup.
+// Exercises src/UI/js/app/freekiosk.ts: the FreeKiosk tile markup.
 //
 // RenderFreeKioskTile returns a string, so it can be asserted without a DOM.
 // What is actually at stake:
@@ -124,7 +124,7 @@ test('the compact status mirrors the state', () => {
 
 test('the vitals bars draw empty before the first poll', () => {
   // No catalogue is loaded in this context, so the formatter has no metric to
-  // work from — it must still produce something, not throw or print undefined.
+  // work from; it must still produce something, not throw or print undefined.
   // An absent reading has to be an EMPTY bar: a missing battery level drawn
   // full would read across a room as a healthy tablet.
   const html = FreeKiosk.FreeKioskVitalsBars(terminal({ Metrics: {} }));
@@ -163,7 +163,7 @@ test('charging is stated in the tooltip and changes nothing visually', () => {
   assert.match(charging, /title="Battery [^"]*\(charging\)"/);
   assert.ok(!charging.includes('is-charging'));
 
-  // Identical markup apart from the tooltip text — nothing about the bar itself
+  // Identical markup apart from the tooltip text; nothing about the bar itself
   // reacts to the charging state.
   assert.equal(
     charging.replace(/ \(charging\)/, ''),

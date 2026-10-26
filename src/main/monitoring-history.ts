@@ -13,7 +13,7 @@ const DUPLICATE_UPDATE_WINDOW_MS = 900;
 // client heartbeats every second and every heartbeat re-records its status, so
 // without this a healthy client stored ~43,000 identical readings over the 12h
 // window. The timeline draws one-minute blocks and leaves a block with no
-// reading grey, so a steady run still needs a reading in every block — this
+// reading grey, so a steady run still needs a reading in every block; this
 // keeps four, while any change of state is still recorded the moment it lands.
 const STEADY_STATE_SAMPLE_INTERVAL_MS = 15 * 1000;
 const ENTITY_MONITOR_TARGET = 'monitor-target';
@@ -136,7 +136,7 @@ function normalizeLatency(latencyMs: unknown): number | null {
   // null and '' both coerce to a finite 0, so without this guard they would be
   // stored as "answered in 0ms" rather than "no timing". That is not academic:
   // a check sets LastLatencyMs to null on EVERY failure, so every offline
-  // sample would record a zero, and the timeline averages latency per block —
+  // sample would record a zero, and the timeline averages latency per block,
   // dragging the mean toward zero for any block containing an outage, which is
   // precisely the block an operator inspects.
   if (latencyMs == null || latencyMs === '') return null;
@@ -183,7 +183,7 @@ function absorbRepeatSample(samples: HistorySample[], next: HistorySample): bool
 // factory below.
 const NamedHistoryStores: Array<Pick<NamedHistoryStore, 'prune'>> = [];
 
-// Drop everything older than the 12h window from EVERY store — not only the
+// Drop everything older than the 12h window from EVERY store, not only the
 // series that happen to be recorded into. A client that goes offline stops
 // recording, and its last readings would otherwise outlive the window for as
 // long as the server runs. Called on read, on list sync, and by the periodic
@@ -268,7 +268,7 @@ function getEntityHistorySamples(entityType: string, id: unknown): HistorySample
 }
 
 // Every series in one store from `sinceTs` on, keyed by its entity id. Feeds the
-// list view's history column, which draws a timeline for every row at once —
+// list view's history column, which draws a timeline for every row at once:
 // one call for the lot rather than one per row.
 function getEntityHistorySamplesSince(
   entityType: string,
@@ -571,8 +571,8 @@ function extractCriticalApplicationStates(
     const key = typeof item.Key === 'string' && item.Key.trim() ? item.Key.trim() : name;
     if (!key) continue;
     const isRunning = item.IsRunning !== false;
-    // Running but breaking a condition — hung, or not holding the foreground it
-    // must — is "online but degraded" (orange), as for a USB device.
+    // Running but breaking a condition (hung, or not holding the foreground it
+    // must) is "online but degraded" (orange), as for a USB device.
     const hung = item.RequireResponding !== false && item.Responding === false;
     const unfocused = item.RequireForeground === true && focusKnown && !item.IsForeground;
     states.push({
@@ -603,7 +603,7 @@ const CRITICAL_USB_NAME_HISTORY_PREFIX = 'usbname:';
 // observe. Devices with a serial are tracked per serial; serial-less devices
 // marked critical-by-name are tracked once per name. Missing (or, by name, short
 // of the expected quantity) is "offline" (red); connected but breaking another
-// condition — port, firmware, a device error — is "online but degraded"
+// condition (port, firmware, a device error) is "online but degraded"
 // (orange). A device absent but allowed to be leaves a gap.
 function extractCriticalUSBStates(
   client: ClientHardwareTelemetryLike | null | undefined
@@ -760,7 +760,7 @@ const getClientAudioHistorySamples = ClientAudioHistory.get;
 // on the audio extractor's rules: connected and meeting its conditions is
 // "online", connected but not is "online but degraded", missing is "offline".
 // An interface that is absent but allowed to be (presence not required), or not
-// yet judged on this connection, is skipped — an idle gap, never a red bar.
+// yet judged on this connection, is skipped: an idle gap, never a red bar.
 function extractCriticalNetworkStates(
   client: ClientHardwareTelemetryLike | null | undefined
 ): NamedEntityState[] | null {
@@ -829,8 +829,8 @@ const syncClientStorageHistoryStore = ClientStorageHistory.sync;
 const getClientStorageHistorySamples = ClientStorageHistory.get;
 
 // Resolve each monitored system check (CPU, memory, uptime, power, thermal) to
-// healthy or failing. A check with nothing to judge — the client offline, or a
-// power/thermal collector that has not reported or cannot — leaves a gap, so a
+// healthy or failing. A check with nothing to judge (the client offline, or a
+// power/thermal collector that has not reported or cannot) leaves a gap, so a
 // machine without the hardware never paints a verdict.
 const SYSTEM_CHECKS: Array<{ key: string; field: string; name: string }> = [
   { key: 'cpu', field: 'Cpu', name: 'CPU' },

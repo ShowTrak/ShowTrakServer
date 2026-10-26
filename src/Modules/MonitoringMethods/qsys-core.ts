@@ -1,16 +1,16 @@
 // Q-SYS Core health over QRC (Q-SYS Remote Control, the JSON-RPC 2.0 API on
 // TCP 1710). One short-lived session per probe:
 //
-//   1. `Logon` { User, Password } — only when a user is supplied. Cores with
+//   1. `Logon` { User, Password }: only when a user is supplied. Cores with
 //      Access Control enabled refuse other methods without it (error 10,
 //      "Logon required"); the password is the user's external-control PIN.
-//   2. `StatusGet` — Platform, State (Active / Standby / Idle), DesignName,
+//   2. `StatusGet`: Platform, State (Active / Standby / Idle), DesignName,
 //      DesignCode, IsRedundant, IsEmulator and Status { Code, String }.
-//   3. `Control.Get` [names] — only when control assertions are enabled, and
+//   3. `Control.Get` [names]: only when control assertions are enabled, and
 //      only on an Active Core (QRC says commands sent to the inactive Core of a
 //      redundant pair are ignored or refused with -32604, so asking would just
 //      burn the timeout).
-//   4. Design devices — only when Check design devices is on, and only on an
+//   4. Design devices: only when Check design devices is on, and only on an
 //      Active Core. `Component.GetComponents` lists the design's Named
 //      Components (those whose Script Access is External or All; the default,
 //      None, hides a component from QRC entirely), then each device is read with
@@ -127,7 +127,7 @@ const Settings: MonitoringSettingField[] = [
     Label: 'Check Core status',
     Type: 'boolean',
     Default: true,
-    Note: 'Degraded while the Core reports anything other than OK (Compromised, Fault, Missing, Initializing…), quoting the Core’s own status text.',
+    Note: 'Degraded while the Core reports anything other than OK (Compromised, Fault, Missing, Initializing...), quoting the Core’s own status text.',
   },
   {
     Key: 'RequireActive',
@@ -659,7 +659,7 @@ function ControlMatches(Expected: string, Reading: ControlReading): boolean {
 
 function DescribeReading(Reading: ControlReading): string {
   if (Reading.String != null && Reading.String !== '') return Reading.String;
-  if (Reading.Value === undefined) return '—';
+  if (Reading.Value === undefined) return '-';
   return String(Reading.Value);
 }
 
@@ -748,7 +748,7 @@ function IsAmpOutputType(Type: string | null): boolean {
 }
 
 // Component Type → device category, or null when the component is not a
-// device status component at all (a DSP block, an I/O card, a script…).
+// device status component at all (a DSP block, an I/O card, a script...).
 function CategorizeType(Type: string | null): DeviceCategory | null {
   const Lower = (Type || '').toLowerCase();
   if (!Lower) return null;
@@ -1316,7 +1316,7 @@ async function ReadDevices(
 
 // --- Evaluation ----------------------------------------------------------------
 
-// The reasons a reachable Core is unhealthy, per the enabled options. Pure —
+// The reasons a reachable Core is unhealthy, per the enabled options. Pure;
 // exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: CoreSnapshot, Options: HealthOptions): string[] {
   if (!Snapshot.IsQsys) return ['Responded, but not as a Q-SYS Core (QRC)'];
@@ -1712,13 +1712,13 @@ function DescribeAction(ActionID: string, Params: Record<string, unknown>): stri
     const SnapshotNo = PrimNumber(P.Snapshot);
     if (!Bank || SnapshotNo == null) return null;
     const Ramp = PrimNumber(P.Ramp) || 0;
-    return `Load Snapshot — ${Bank} ${SnapshotNo}${FormatRamp(Ramp)}`;
+    return `Load Snapshot - ${Bank} ${SnapshotNo}${FormatRamp(Ramp)}`;
   }
   if (ActionID === 'control.set') {
     const Name = ParamText(P.Name);
     const Value = ParseControlValue(P.Value);
     if (!Name || Value == null) return null;
-    return `Set ${Name} — ${String(Value)}`;
+    return `Set ${Name} - ${String(Value)}`;
   }
   return null;
 }
@@ -1743,7 +1743,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       : Pill('success', 'Healthy');
 
   const Head = [
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Row('Status', StatePill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
@@ -1773,7 +1773,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       : `${StatusLabel(Code)}${
           Result.StatusString &&
           String(Result.StatusString).trim().toLowerCase() !== StatusLabel(Code).toLowerCase()
-            ? ` — ${String(Result.StatusString)}`
+            ? ` - ${String(Result.StatusString)}`
             : ''
         }`;
   const Flags: string[] = [];
@@ -1806,7 +1806,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       ? TextRow(
           'Logon',
           (LOGON_LABELS[Result.LogonState as LogonState] || String(Result.LogonState)) +
-            (Result.LogonError ? ` — ${String(Result.LogonError)}` : '')
+            (Result.LogonError ? ` - ${String(Result.LogonError)}` : '')
         )
       : null,
     Result.StatusSource === 'EngineStatus'
@@ -1833,7 +1833,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
             ? Pill('success', DescribeReading(Reading))
             : Pill('warning', DescribeReading(Reading));
         const Detail = Reading.Found
-          ? `Expected ${Assertion ? Assertion.Expected : '—'} · value ${Reading.Value === undefined ? '—' : String(Reading.Value)}`
+          ? `Expected ${Assertion ? Assertion.Expected : '-'} · value ${Reading.Value === undefined ? '-' : String(Reading.Value)}`
           : Reading.Error || 'Not found';
         return Card({
           Title: Reading.Name,

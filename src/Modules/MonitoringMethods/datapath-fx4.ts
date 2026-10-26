@@ -840,7 +840,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       : 'No signal';
 
   const Head = Rows([
-    TextRow('Controller', `${Address || '—'}${R.FriendlyName ? ` (${R.FriendlyName})` : ''}`),
+    TextRow('Controller', `${Address || '-'}${R.FriendlyName ? ` (${R.FriendlyName})` : ''}`),
     Row('Status', StatePill(Result)),
     Reachable
       ? Row('Reply time', Mono(FormatLatency(R.LatencyMs)))

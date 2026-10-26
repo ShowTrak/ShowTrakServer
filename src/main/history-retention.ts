@@ -3,7 +3,7 @@
 // Nothing ShowTrak remembers is ever needed beyond HISTORY_RETENTION_MS (12h).
 // Each store trims itself when it is read or written, but a store nothing
 // touches any more never would: a client that is deleted stops recording, so
-// its last readings — and a finished script run nobody clears — would otherwise
+// its last readings (and a finished script run nobody clears) would otherwise
 // sit in memory for as long as the server runs, which on a permanent install is
 // weeks. This sweep is the backstop that reaches all of them.
 //

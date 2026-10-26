@@ -467,7 +467,7 @@ test('motive reports an unsupported command instead of hanging on it', async () 
 });
 
 // A slow Motive that does not know `command`: the first send goes unanswered
-// until the re-send, then BOTH sends are answered "unrecognised" — the second
+// until the re-send, then BOTH sends are answered "unrecognised", the second
 // arriving 30 ms later, while the next request (whose own reply takes 100 ms)
 // is in flight.
 function slowUnrecognised(command) {

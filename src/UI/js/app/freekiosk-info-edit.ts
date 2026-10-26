@@ -77,8 +77,8 @@ function CanEdit(): boolean {
   );
 }
 
-// The settings a push could change. Live readings (battery, screen, …) churn on
-// every poll and are not settings, so they stay out — or the form would be
+// The settings a push could change. Live readings (battery, screen, etc.) churn on
+// every poll and are not settings, so they stay out, or the form would be
 // refilled every few seconds. So do the monitoring settings, which this tab
 // does not show: ticking a condition on another tab must not refill this one.
 function SettingsSignature(Terminal: FreeKioskFormSource): string {
@@ -294,7 +294,7 @@ async function SaveTerminal(): Promise<void> {
 
 async function TestConnection(): Promise<void> {
   if (!Mounted || !Editing) return;
-  ShowFreeKioskTestResult('Polling…', 'ok');
+  ShowFreeKioskTestResult('Polling...', 'ok');
   const [Err, Summary] = await window.API.RunFreeKioskTerminalsNow([Mounted.UUID]);
   if (Err) return ShowFreeKioskTestResult(Err, 'error');
   if (Summary && Summary.Succeeded) return ShowFreeKioskTestResult('Device answered.', 'ok');

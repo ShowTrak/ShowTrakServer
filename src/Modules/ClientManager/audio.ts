@@ -1,4 +1,4 @@
-// Audio endpoint monitoring — the pure half.
+// Audio endpoint monitoring: the pure half.
 //
 // Everything here is a function of its arguments: normalising a reported
 // snapshot, judging a critical endpoint against its baseline, building the view
@@ -152,7 +152,7 @@ function normalizeEndpoint(Value: unknown): AudioEndpoint | null {
 
 /**
  * Normalise a reported snapshot into what is stored. The socket validator has
- * already bounded and reconstructed it; this decides meaning — an endpoint
+ * already bounded and reconstructed it; this decides meaning: an endpoint
  * without a usable id or direction is dropped, and a repeated id keeps its first
  * occurrence, so one bad row can never make two devices share a baseline.
  */
@@ -229,7 +229,7 @@ function DescribeBounds(Min: number | null, Max: number | null): string {
 /**
  * Judge one critical endpoint. `Endpoint` is null when the client did not report
  * it. Each check runs only when the baseline asks for it AND the live value is
- * known — a null reading is the platform saying "I cannot tell", not a fault.
+ * known; a null reading is the platform saying "I cannot tell", not a fault.
  */
 export function evaluateAudioIssues(
   Endpoint: AudioEndpoint | null,
@@ -379,7 +379,7 @@ export interface AudioChange {
 
 /**
  * Derive transitions between two snapshots. Only meaningful when both are
- * trusted — the caller guarantees that, for the same reason the application diff
+ * trusted; the caller guarantees that, for the same reason the application diff
  * does: diffing against "nothing yet" would announce every device as new.
  */
 export function diffAudioEndpoints(
@@ -445,7 +445,7 @@ export interface CriticalAudioOptions {
  * means "guard the count it has now". An endpoint that is currently missing can
  * still have its rules edited: it keeps the baseline it was marked with rather
  * than losing it for want of a live reading. A first mark on an endpoint the
- * client has never reported is refused — there is nothing to take a baseline
+ * client has never reported is refused; there is nothing to take a baseline
  * from, and no way to name its direction.
  *
  * Defaults for a FIRST mark follow what the operator is looking at: the default
@@ -509,7 +509,7 @@ export function resolveCriticalAudioEntry(
 
 /**
  * Whether the server may forward a level/mute change to this endpoint, judged
- * from the client's own capabilities — so the operator gets the real reason at
+ * from the client's own capabilities, so the operator gets the real reason at
  * once instead of a round trip to the client to hear it.
  */
 export function audioControlRefusal(

@@ -4,7 +4,7 @@
 // is any surface that renders the ShowTrak UI: the Electron desktop window and
 // (once wired) each authed Web UI socket. Routing every push through this bus
 // guarantees the desktop and web surfaces receive identical events and cannot
-// drift apart — which is the root cause the Web UI historically fell behind.
+// drift apart, which is the root cause the Web UI historically fell behind.
 //
 // Sinks decide for themselves which channels they care about (e.g. the web sink
 // applies an allowlist + per-channel serialization); the bus is a dumb fan-out.

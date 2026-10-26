@@ -1,13 +1,13 @@
 // A FreeKiosk terminal's monitoring, edited where its readings are shown: one
 // card per registry section on the Content, Screen, Battery, Network and Misc
-// tabs, styled like a ShowTrak client's monitored items — a Monitor toggle in
+// tabs, styled like a ShowTrak client's monitored items: a Monitor toggle in
 // the header over a table of every reading's current value, which, once the
 // section is monitored, gains the condition each alerts on and a tick. The
 // model is built in lib/freekiosk-monitoring.
 //
 // The save model is the client cards' too: every toggle, tick and threshold
 // saves as it changes. Only the terminal's Settings are sent, merged over what
-// is stored, so nothing else about the terminal is touched — and a save still in
+// is stored, so nothing else about the terminal is touched, and a save still in
 // flight is merged into the next one, and into what is drawn meanwhile, so quick
 // edits neither undo each other nor flicker back while the push catches up.
 import type { FreeKioskMetricView, FreeKioskTerminalView } from '@showtrak/protocol';
@@ -324,7 +324,7 @@ export function WireFreeKioskMonitoring(GetUUID: () => string | null, Redraw: ()
       if (Event.key === 'Enter') $(this).trigger('blur');
     })
     .on('focusout.freekioskMonitoring', `${HOST} .FREEKIOSK_CONDITIONS ${TYPED}`, () => {
-      // Apply a redraw held back while this field had focus — after the
+      // Apply a redraw held back while this field had focus, after the
       // `change` that fires first has had its chance to save.
       setTimeout(() => {
         if (!Pending || HoldFreeKioskModalRender()) return;

@@ -2,14 +2,14 @@
 //
 // Several managers require ../DB and open a live sqlite connection when their
 // module is first loaded. Run against a developer's real app-data directory,
-// that connection succeeds against — and migrates — the real working database,
+// that connection succeeds against (and migrates) the real working database,
 // and a test that forgot to stub such a manager passes in milliseconds. CI has
-// no such database, and the same test hangs until it times out — which is how a
+// no such database, and the same test hangs until it times out, which is how a
 // green local run has three times shipped a red pipeline.
 //
 // Pointing HOME (and the Windows/XDG equivalents) at an empty directory moves
-// the app-data path somewhere that does not exist, so every run — local, CI and
-// coverage — sees the same empty machine and never touches real show data.
+// the app-data path somewhere that does not exist, so every run (local, CI and
+// coverage) sees the same empty machine and never touches real show data.
 //
 // Extra arguments are passed through to `node --test`, so a single file runs as
 // `npm test -- test/db.test.js`.

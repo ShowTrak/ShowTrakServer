@@ -49,7 +49,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Port = Number.isFinite(Cfg.Port) ? (Cfg.Port as number) | 0 : 80;
   const Open = !!(Result && Result.Success);
   return Rows([
-    TextRow('Host', Address || '—'),
+    TextRow('Host', Address || '-'),
     TextRow('Port', String(Port)),
     Row('Port state', Pill(Open ? 'success' : 'danger', Open ? 'Accepting' : 'Closed / filtered')),
     Open

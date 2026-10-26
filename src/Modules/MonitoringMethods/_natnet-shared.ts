@@ -2,7 +2,7 @@
 //
 // Source of truth: the official NatNet SDK direct-depacketization samples,
 // which OptiTrack's NatNet 4.5 page names as the reference for the bitstream
-// syntax — PacketClient.cpp and the PythonClient NatNetClient.py (SDK 4.5),
+// syntax: PacketClient.cpp and the PythonClient NatNetClient.py (SDK 4.5),
 // plus NatNetTypes.h from the same SDK. Every layout below is copied from them;
 // nothing is inferred from captures.
 //
@@ -12,20 +12,20 @@
 //     NAT_FRAMEOFDATA 7, NAT_MESSAGESTRING 8, NAT_DISCONNECT 9, NAT_KEEPALIVE 10,
 //     NAT_UNRECOGNIZED_REQUEST 100.
 //   - NAT_CONNECT payload (PacketClient): sSender (char[256] name, u8[4] app
-//     version, u8[4] NatNet version — all zero from a client) + sConnectionOptions
+//     version, u8[4] NatNet version, all zero from a client) + sConnectionOptions
 //     (bool subscribedDataOnly, u8[4] BitstreamVersion) + 4 spare bytes = 273
 //     bytes. A zero BitstreamVersion means "send your current version", so the
 //     probe never asks Motive to change what it streams.
 //   - NAT_SERVERINFO payload: sSender (264 bytes), then on NatNet 3.0+ servers
 //     sSender_Server's tail (packed): u64 HighResClockFrequency, u16 DataPort,
-//     bool IsMulticast, u8[4] MulticastGroupAddress — 279 bytes in all.
+//     bool IsMulticast, u8[4] MulticastGroupAddress: 279 bytes in all.
 //   - NAT_REQUEST payload: NUL-terminated command string. The NAT_RESPONSE
 //     carries no echo of the command: 4 bytes is a number (int or float
 //     depending on the command), anything else a NUL-terminated string.
-//   - NAT_MODELDEF: int32 dataset count, then per dataset int32 type and — on
-//     NatNet 4.1+ only — an int32 byte size, then the description.
+//   - NAT_MODELDEF: int32 dataset count, then per dataset int32 type and (on
+//     NatNet 4.1+ only) an int32 byte size, then the description.
 //   - NAT_FRAMEOFDATA: int32 frame number, marker sets, legacy "other" markers,
-//     rigid bodies, … Each section starts with an int32 count; on NatNet 4.1+ an
+//     rigid bodies, etc. Each section starts with an int32 count; on NatNet 4.1+ an
 //     int32 byte count of the section's data follows the count. A NatNet 3.0+
 //     rigid body is int32 id, 3 floats position, 4 floats orientation, float mean
 //     error, int16 params (bit 0 = tracking valid) = 38 bytes.

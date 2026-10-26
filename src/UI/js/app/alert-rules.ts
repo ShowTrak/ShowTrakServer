@@ -366,7 +366,7 @@ export function RenderAlertActionSettingsFields(
           AudioOptions.unshift({ Value, Label: `${ExistingLabel} (missing)` });
         }
         if (!AudioOptions.length) {
-          AudioOptions = [{ Value: '', Label: 'No audio assets — import some first' }];
+          AudioOptions = [{ Value: '', Label: 'No audio assets (import some first)' }];
         }
         Options = AudioOptions;
       } else {
@@ -808,15 +808,15 @@ export async function AutoSaveAlertRuleFromEditor() {
   const HasContent =
     !!Payload.Title || (Array.isArray(Payload.Actions) && Payload.Actions.length > 0);
 
-  // Nothing entered for a new rule — don't create an empty record.
+  // Nothing entered for a new rule; don't create an empty record.
   if (!IsExisting && !HasContent) return;
 
   const Problem = !Payload.Title
-    ? 'Rule not saved — a title is required'
+    ? 'Rule not saved: a title is required'
     : !Array.isArray(Payload.TriggerTypes) || !Payload.TriggerTypes.length
-      ? 'Rule not saved — select at least one trigger'
+      ? 'Rule not saved: select at least one trigger'
       : !Array.isArray(Payload.Actions) || !Payload.Actions.length
-        ? 'Rule not saved — add at least one action'
+        ? 'Rule not saved: add at least one action'
         : null;
 
   if (Problem) {

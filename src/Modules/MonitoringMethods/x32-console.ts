@@ -5,7 +5,7 @@
 // cross-checked against Bitfocus companion-module-behringer-x32):
 //   - X32/M32 listen on UDP 10023; X-Air (XR12/16/18) and MR mixers on 10024.
 //   - The console replies to the IP and port the request came FROM, so one
-//     ephemeral socket per probe is enough — nothing has to be bound to a fixed
+//     ephemeral socket per probe is enough; nothing has to be bound to a fixed
 //     port and two checks never fight over one.
 //   - `/xinfo` (no args) -> `/xinfo ,ssss <ip> <network name> <model> <firmware>`
 //     e.g. `192.168.1.62`, `X32-02-4A-53`, `X32`, `3.04`. Models seen in the
@@ -30,8 +30,8 @@
 //     families without asking the operator which one they have.
 //   - Nothing is ever written to the console and `/xremote` is never sent, so
 //     the console does not start pushing updates at us.
-//   - A mute group or DCA mute does NOT change a channel's `mix/on` — the
-//     console keeps the two separate — so the channel check reports the
+//   - A mute group or DCA mute does NOT change a channel's `mix/on` (the
+//     console keeps the two separate), so the channel check reports the
 //     channel's own mute button only.
 import dgram from 'dgram';
 import net from 'net';
@@ -201,7 +201,7 @@ function ParseOnSwitch(Arg: unknown): boolean | null {
 }
 
 // Decode an `/xinfo` reply. Null unless it carries the four strings a console
-// sends — that shape is the fingerprint. The first string is the console's IP
+// sends; that shape is the fingerprint. The first string is the console's IP
 // on X32 firmware; some X-Air firmware is reported to put the OSC server
 // version (e.g. V0.04) there instead, so it is only kept when it is an IP.
 // Name, model and firmware sit at the same positions either way.
@@ -449,7 +449,7 @@ function ChannelLabel(State: X32ChannelState): string {
   return State.Name ? `Ch ${State.Channel} (${State.Name})` : `Ch ${State.Channel}`;
 }
 
-// The reasons a reachable console is unhealthy, per the enabled toggles. Pure —
+// The reasons a reachable console is unhealthy, per the enabled toggles. Pure,
 // exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: X32Snapshot, Options: HealthOptions): string[] {
   if (!Snapshot.IsConsole) {
@@ -548,7 +548,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     .join(' · ');
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Identity ? TextRow('Console', Identity) : null,
     Reachable && Result.Firmware ? TextRow('Firmware', Result.Firmware) : null,
     Reachable && Result.ReportedIp ? TextRow('Reported IP', Result.ReportedIp) : null,

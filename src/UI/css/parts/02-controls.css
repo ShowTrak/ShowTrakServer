@@ -176,7 +176,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   animation: pulse-orange 1.8s infinite;
 }
 
-/* FOG tasks button — mirrors the alerts button, sits immediately left of it.
+/* FOG tasks button: mirrors the alerts button, sits immediately left of it.
    Hidden entirely (d-none) unless the FOG integration is enabled and reachable. */
 #FOG_BUTTON.fog-btn {
   position: relative;
@@ -954,7 +954,7 @@ input[type='range']::-moz-range-progress,
 }
 
 /* A machine pulled in by a selected tag: shown so the operator can see the real
-   reach of the selection, but not tickable — the only way to exclude it is to
+   reach of the selection, but not tickable; the only way to exclude it is to
    edit the tag, which would change every other scope using that tag. */
 .scope-picker-implied {
   opacity: 0.72;
@@ -1042,7 +1042,7 @@ input[type='range']::-moz-range-progress,
 /* Full-width variant: segments share the row equally instead of sizing to their
    own text, so a four-option switch (the tag display mode) still lines up
    inside a modal field. Padding is tightened and the labels forced onto one
-   line — the longest ("Icon + Name") would otherwise wrap and make its segment
+   line; the longest ("Icon + Name") would otherwise wrap and make its segment
    taller than the other three. */
 .st-segmented-toggle.st-segmented-toggle-fill {
   display: flex;
@@ -1345,7 +1345,7 @@ input[type='range']::-moz-range-progress,
   text-align: center;
 }
 
-/* A client's Wake on LAN tab — MAC address list. Follows the .fog-task-item
+/* A client's Wake on LAN tab: MAC address list. Follows the .fog-task-item
    surface treatment so the rows read as the same family of inline list entries. */
 /* --- Tag picker ---
  * Assigning tags from an entity's editor, and the read-only mirror of the same
@@ -1427,7 +1427,7 @@ input[type='range']::-moz-range-progress,
   color: var(--text-strong);
 }
 /* Inherited from a group or from "all clients": on, but not this client's to
- * turn off. Not greyed out — it IS applied — just not interactive. */
+ * turn off. Not greyed out (it IS applied), just not interactive. */
 .tag-picker-chip.is-locked,
 .tag-picker-chip:disabled {
   cursor: default;

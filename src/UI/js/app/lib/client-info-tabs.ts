@@ -13,7 +13,7 @@
 // Every entity is edited from this modal too (in Edit mode). A client's Info,
 // Variables, Wake on LAN and Actions tabs, and every other kind's Settings tab,
 // switch between read-only and editable as the mode changes (client-info-edit,
-// monitor-info-edit, dummy-info-edit and freekiosk-info-edit) — on the Web UI
+// monitor-info-edit, dummy-info-edit and freekiosk-info-edit); on the Web UI
 // too, when its management permissions allow. A client's Actions is desktop
 // only: its update and FOG actions are not exposed to the Web UI.
 //

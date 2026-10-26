@@ -1,8 +1,8 @@
 // Bitfocus Companion (3.x/4.x) reachability check.
 //
 // Companion exposes its web/admin UI on HTTP port 8000 by default. That web
-// root ("/") always serves the admin GUI as an HTML 200 response and — unlike
-// the REST endpoints under "/api/..." — does NOT require the operator to have
+// root ("/") always serves the admin GUI as an HTML 200 response and, unlike
+// the REST endpoints under "/api/...", does NOT require the operator to have
 // enabled the HTTP API in Settings->HTTP. Companion 3.x has no clean JSON
 // version/health endpoint (see bitfocus/companion discussion #4101: the REST
 // API is button/variable control only, no system/version resource), so the
@@ -62,7 +62,7 @@ const Settings: MonitoringSettingField[] = [
 
 // Best-effort version sniff from the returned body. Companion has no version
 // endpoint, but some responses/pages embed a "version": "x.y.z" or "Companion
-// vX.Y.Z" token. Returns null when nothing recognisable is present — this is
+// vX.Y.Z" token. Returns null when nothing recognisable is present; this is
 // display-only and never affects the online/offline decision.
 function ExtractVersion(Body: unknown): string | null {
   const Text = String(Body == null ? '' : Body);
@@ -91,7 +91,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 
   // A failed request (no reply, refused, timeout, or status outside the
   // expected range) is already shaped as an Offline result by the shared
-  // helper — pass it straight through without leaking the captured body.
+  // helper; pass it straight through without leaking the captured body.
   if (!Result.Success) {
     return {
       Success: false,

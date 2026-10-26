@@ -14,12 +14,12 @@ function cap(s: string) {
 export function TestAllNotifications() {
   const steps: Array<() => void> = [];
 
-  // 1. Title-only toasts (the Notify() path) — one per severity accent.
+  // 1. Title-only toasts (the Notify() path): one per severity accent.
   for (const type of SEVERITIES) {
     steps.push(() => Notify(`${cap(type)} notification (title only).`, type, 20000));
   }
 
-  // 2. Title + message toasts — the multi-line layout, one per severity.
+  // 2. Title + message toasts: the multi-line layout, one per severity.
   for (const type of SEVERITIES) {
     steps.push(() =>
       showAlertStyleToast({

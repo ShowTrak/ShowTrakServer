@@ -10,13 +10,13 @@ const { installJQuery } = require('./helpers/renderer-stubs');
 //
 //   1. The SAVE GATE. MonitoringPayloadIsValid decides whether a check is
 //      complete enough to persist. Too lax and a half-configured check is saved
-//      and silently never runs — the operator believes a device is monitored
+//      and silently never runs; the operator believes a device is monitored
 //      when nothing is watching it. Too strict and a legitimate check (a
 //      network-wide NDI discovery, which has no address) cannot be saved at all.
 //
 //   2. The DISCOVERY MERGE. Scan results arrive from several sources for the
 //      same address, and a later, vaguer result must never overwrite a more
-//      specific earlier one — otherwise a projector correctly identified by
+//      specific earlier one; otherwise a projector correctly identified by
 //      PJLink degrades to a generic host as soon as an mDNS packet lands.
 
 installJQuery();
@@ -367,7 +367,7 @@ test('a method that does not use an address can be saved without one', () => {
 
 test('an unknown method is assumed to need an address', () => {
   // Fail closed: if the renderer has not been told whether a method uses an
-  // address, requiring one is the safer default — a check with a spurious
+  // address, requiring one is the safer default: a check with a spurious
   // address is fixable, one that silently never runs is not noticed.
   editorState({ Checks: [check({ Method: 'method-from-the-future', Address: '' })] });
   assert.equal(MonitoringPayloadIsValid(BuildMonitoringPayload()), false);

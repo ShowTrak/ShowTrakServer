@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
 // Exercises the groups registrar end-to-end through the REAL rpc wrapper, the
-// REAL IPCValidation, and the REAL createTupleHandler — only the sqlite-backed
+// REAL IPCValidation, and the REAL createTupleHandler; only the sqlite-backed
 // domain managers and Electron are stubbed. This is what the plan's Phase 4.1
 // "registrar/rpc tests" asks for: proof that a registrar wires the right
 // channels, validates input, and delegates/routes correctly.

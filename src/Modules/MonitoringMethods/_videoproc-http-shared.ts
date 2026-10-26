@@ -1,7 +1,7 @@
 // Shared HTTP/JSON transport for the video processor checks (Brompton Tessera,
 // Barco Event Master, Analog Way LivePremier). All three expose a small
 // HTTP API that answers JSON, and each probe makes one to a handful of
-// requests — so the transport, the whole-probe deadline and the address
+// requests, so the transport, the whole-probe deadline and the address
 // parsing live here, while each method owns its own endpoints and verdicts.
 // The operator actions use the same transport with their own short deadline.
 //
@@ -244,7 +244,7 @@ export function DeviceErrorText(Json: unknown, Body?: string): string | null {
   }
   const Raw = StrOrNull(Body);
   if (!Raw || Raw.startsWith('<')) return null;
-  return Raw.length > 160 ? `${Raw.slice(0, 160)}…` : Raw;
+  return Raw.length > 160 ? `${Raw.slice(0, 160)}...` : Raw;
 }
 
 export function TimeoutOf(Cfg: Record<string, unknown>, Default: number): number {

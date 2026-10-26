@@ -1,4 +1,4 @@
-// Critical USB devices — the pure half.
+// Critical USB devices: the pure half.
 //
 // Everything here is a function of its arguments: reading the optional fields a
 // client reports, judging a critical device (by serial) or a critical group of
@@ -9,7 +9,7 @@
 //
 // Clients before 3.27.0 report a device's names and serial only. The port it is
 // plugged into, its firmware version and (on Windows) its Plug and Play problem
-// state came later, so every one of them may be absent — and an absent or
+// state came later, so every one of them may be absent, and an absent or
 // unreadable value is never a fault, the principle the display, audio and
 // network halves follow. A condition on something a client cannot report simply
 // waits until it can.
@@ -133,8 +133,8 @@ export function DescribeDeviceError(State: USBDeviceState): string {
 
 /**
  * The conditions of a stored or requested entry. A monitored device is always
- * required to be connected — without that, monitoring it raises nothing when it
- * goes — so presence is never read from the row, which also brings back any
+ * required to be connected (without that, monitoring it raises nothing when it
+ * goes), so presence is never read from the row, which also brings back any
  * row saved while it could still be unticked. A Windows device that failed used
  * to vanish from the list (so it faulted as missing); no device error is
  * required by default so that keeps faulting now it stays listed.
@@ -423,7 +423,7 @@ export interface CriticalUSBOptions {
  *
  * A FIRST mark guards presence, and no device error (judged only where the
  * client reports it). Ticking the port or firmware guards what the device has at
- * that moment — for a group, the ports all of them occupy, and the one firmware
+ * that moment: for a group, the ports all of them occupy, and the one firmware
  * they all report; a guarded value keeps its baseline, so editing one condition
  * never quietly accepts a change to another. A disconnected device can have
  * conditions cleared, but not new ones captured.

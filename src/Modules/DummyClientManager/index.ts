@@ -144,7 +144,7 @@ const Manager = {
   },
 
   // Resolve a dummy by slug (its DummyID, case-insensitive), for OSC/API/SDK
-  // addressing — mirrors MonitoringTargetManager.GetBySlug.
+  // addressing; mirrors MonitoringTargetManager.GetBySlug.
   async GetBySlug(Slug: string): Promise<DummyClientSnapshot | null> {
     if (!Slug) return null;
     if (!Manager.Initialized) await Manager.Init();

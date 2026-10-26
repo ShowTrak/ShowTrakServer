@@ -1,5 +1,5 @@
 // Storage tab of the client info modal: one card per mounted volume, styled
-// like the network interface cards — the volume's label as the title, a usage
+// like the network interface cards: the volume's label as the title, a usage
 // bar, the Monitor toggle and, once monitored, an auto-saving conditions table
 // (mounted, minimum free space as a share and as an amount, writable, healthy).
 // The decisions live in lib/storage-volumes.
@@ -267,7 +267,7 @@ export function BindClientInfoStorageHandlers(
       'focusout.client-storage',
       '.SHOWTRAK_STORAGE_CONDITIONS input[type="number"]',
       function () {
-        // Apply a rebuild that was held back while this field had focus — after
+        // Apply a rebuild that was held back while this field had focus, after
         // the `change` that fires first has had its chance to save.
         setTimeout(() => {
           if (!Pending || $(LIST).find('input[type="number"]:focus').length) return;

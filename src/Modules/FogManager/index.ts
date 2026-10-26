@@ -7,7 +7,7 @@
 // - ShowTrak deliberately never edits FOG configuration. It creates and observes
 //   tasks; it does not assign images, edit hosts or change FOG settings. The one
 //   place this is visible is Deploy, which requires the host to already have an
-//   image assigned in FOG — we surface the assigned image rather than setting it.
+//   image assigned in FOG; we surface the assigned image rather than setting it.
 // - All FOG state lives in its own tables (FogHosts, FogTasks) so the integration
 //   can be turned off or removed without touching core client data.
 import { CreateLogger } from '../Logger';
@@ -143,8 +143,8 @@ interface FogActiveTask {
 // FOG's task-creation endpoint returns no task ID (the body is the literal string
 // `null`), so a newly scheduled row has no FOG identifier. The first poll that sees
 // an active task on the same host with the same type adopts it. That match is
-// inherently best-effort — if the same task type is scheduled twice on one host in
-// quick succession the pairing is arbitrary — but the alternative is no tracking at
+// inherently best-effort (if the same task type is scheduled twice on one host in
+// quick succession the pairing is arbitrary), but the alternative is no tracking at
 // all, and the displayed state is correct either way.
 async function ReconcileTasks(Config: FogConfig): Promise<boolean> {
   const [OpenErr, OpenRows] = await FogRepo.GetOpenTasks();
@@ -192,7 +192,7 @@ async function ReconcileTasks(Config: FogConfig): Promise<boolean> {
       ClaimedTaskIDs.add(TaskID);
       const StateID = ToNumber(Match.stateID, Row.StateID);
       // FOG exposes both `percent` (display text) and `pct` (numeric). Prefer the
-      // text, fall back to the number, and only show it once actually in progress —
+      // text, fall back to the number, and only show it once actually in progress:
       // percent is meaningless while a task is still queued.
       const Percent = StateID === 3 ? ToText(Match.percent) || `${ToNumber(Match.pct, 0)}%` : null;
 
@@ -230,7 +230,7 @@ async function ReconcileTasks(Config: FogConfig): Promise<boolean> {
 }
 
 // Read a task's terminal state directly. Falls back to Complete when FOG cannot
-// tell us — the task is definitively no longer running either way.
+// tell us; the task is definitively no longer running either way.
 async function ReadFinalState(Config: FogConfig, FogTaskID: number): Promise<number> {
   const Response = await FogRequest(Config, `/task/${FogTaskID}`, 'GET');
   if (!Response.Success) return STATE_COMPLETE;
@@ -254,7 +254,7 @@ async function PollOnce(): Promise<void> {
     // Prune old finished tasks opportunistically rather than on a separate timer.
     await FogRepo.PruneFinishedTasksBefore(Now() - FINISHED_TASK_RETENTION_MS);
 
-    // Push when task state moved, or when FOG just came back — the panel shows the
+    // Push when task state moved, or when FOG just came back: the panel shows the
     // connection state too, so recovery is itself worth rendering.
     if (Changed || !WasHealthy) BroadcastManager.emit('FogTasksUpdated');
   } catch (Err) {
@@ -531,7 +531,7 @@ const Manager = {
       return Fail(Response.Error || 'FOG rejected the task');
     }
 
-    // Success is signalled by the 200 alone — FOG returns the literal string `null`
+    // Success is signalled by the 200 alone; FOG returns the literal string `null`
     // and no task ID, so the record starts unpaired and the poller adopts it.
     const [InsertErr] = await FogRepo.InsertTask(
       UUID,
@@ -563,7 +563,7 @@ const Manager = {
 
   // Cancel a running FOG task from the panel.
   //
-  // FOG cancels an active task via DELETE on the task resource — the mirror of the
+  // FOG cancels an active task via DELETE on the task resource, the mirror of the
   // GET /task/{id} used to read a task's terminal state. A task we have not yet
   // paired to a FOG task ID cannot be cancelled: FOG's create endpoint returns no ID,
   // so until the poller adopts a live task there is nothing to address. That window
@@ -578,7 +578,7 @@ const Manager = {
     if (!Row) return Fail('That task no longer exists');
     if (!OPEN_STATE_IDS.includes(Row.StateID)) return Fail('That task has already finished');
     if (Row.FogTaskID == null) {
-      return Fail('FOG has not picked this task up yet — try again in a moment');
+      return Fail('FOG has not picked this task up yet; try again in a moment');
     }
 
     const Config = await LoadConfig();
@@ -604,7 +604,7 @@ const Manager = {
       ]);
     }
 
-    // Cancelled is terminal, so the poller will leave this row alone from here — push
+    // Cancelled is terminal, so the poller will leave this row alone from here; push
     // now so the panel reflects it immediately rather than at the next 30s tick.
     BroadcastManager.emit('FogTasksUpdated');
 
@@ -614,7 +614,7 @@ const Manager = {
   // Clear the finished-task history from the panel.
   //
   // Purely local: these rows are ShowTrak's own record of tasks FOG has already
-  // finished with, so nothing is sent to FOG and no health check is needed —
+  // finished with, so nothing is sent to FOG and no health check is needed:
   // tidying up history must work even while the FOG server is unreachable.
   // Open tasks are deliberately left behind (see DeleteFinishedTasks).
   async ClearFinishedTasks(): Promise<Result<void>> {

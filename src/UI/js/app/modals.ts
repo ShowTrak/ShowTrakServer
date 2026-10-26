@@ -96,7 +96,7 @@ export function InitSimpleModalHeaders() {
   // dismissible/manageable panel, so they keep their plain centred titles.
 }
 
-// Called by the bootstrap orchestrator in main.ts — never at import time.
+// Called by the bootstrap orchestrator in main.ts, never at import time.
 export function InitModals() {
   InitSimpleModalHeaders();
 
@@ -120,7 +120,7 @@ export function InitModals() {
       return await OpenClientInfo(String(Id));
     }
     // SDK control API: dismiss whatever is open. Like OpenClientModal this only
-    // reaches the desktop window — the web namespace suppresses both types.
+    // reaches the desktop window; the web namespace suppresses both types.
     if (Type == 'CloseModals') return closeAllModals();
     // SDK control API: drive the compact/expanded view (persisted, like the UI).
     if (Type == 'SetCompactView') return SetCompactMode(!!Args, { persist: true });
@@ -185,7 +185,7 @@ export async function OpenAboutModal() {
 
   const DependenciesContainer = $('#SHOWTRAK_ABOUT_DEPENDENCIES');
   const DependenciesCount = $('#SHOWTRAK_ABOUT_DEPENDENCY_COUNT');
-  DependenciesContainer.empty().text('Loading dependencies…');
+  DependenciesContainer.empty().text('Loading dependencies...');
   DependenciesCount.text('');
 
   try {
@@ -205,7 +205,7 @@ export async function OpenAboutModal() {
 
   const LicenseText = $('#SHOWTRAK_ABOUT_LICENSE');
   const LicenseToggle = $('#SHOWTRAK_ABOUT_LICENSE_TOGGLE');
-  LicenseText.addClass('d-none').text('Loading licence…');
+  LicenseText.addClass('d-none').text('Loading licence...');
   LicenseToggle.text('Show full licence');
   LicenseToggle.off('click').on('click', () => {
     const Hidden = LicenseText.hasClass('d-none');

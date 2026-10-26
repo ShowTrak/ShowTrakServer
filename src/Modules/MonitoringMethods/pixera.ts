@@ -14,16 +14,16 @@
 //                        four characters "0xPX".
 //     Replies use the same framing as the access point. Sending the wrong one
 //     gets no reply at all, so the framing is a setting here.
-//   - JSON-RPC 2.0, matched by id: {"jsonrpc":"2.0","id":1,"method":"…",
-//     "params":{…}} → {"jsonrpc":"2.0","id":1,"result":…}.
+//   - JSON-RPC 2.0, matched by id: {"jsonrpc":"2.0","id":1,"method":"...",
+//     "params":{...}} → {"jsonrpc":"2.0","id":1,"result":...}.
 //
-// Methods used (all documented getters — nothing that changes state):
+// Methods used (all documented getters; nothing that changes state):
 //   Pixera.Utility.getApiRevision            → int (even = release, odd = beta)
 //   Pixera.Session.getProjectName            → string
 //   Pixera.Timelines.getTimelineNames        → string[]
 //   Pixera.Compound.getTransportModeOnTimeline {timelineName} → 1 Play, 2 Pause, 3 Stop
 //
-// PIXERA reports no application version over the API — only the API revision —
+// PIXERA reports no application version over the API (only the API revision),
 // so that is what the identity shows.
 //
 // Design: one short-lived connection. The three identity reads go out together,
@@ -180,14 +180,14 @@ function EncodeRequest(
   if (Framing === 'dl') return Buffer.concat([Body, DL_DELIMITER]);
   const Header = Buffer.alloc(8);
   PXR1_TAG.copy(Header, 0);
-  // The length is the payload's BYTE count (not its character count — a
+  // The length is the payload's BYTE count (not its character count: a
   // non-ASCII timeline name would otherwise desync the stream).
   Header.writeUInt32LE(Body.length, 4);
   return Buffer.concat([Header, Body]);
 }
 
 // Pull every complete message out of the accumulated stream. Each message is
-// recognised by its own shape — a "pxr1" header, or JSON up to "0xPX" — so a
+// recognised by its own shape (a "pxr1" header, or JSON up to "0xPX"), so a
 // reply in either framing is read whichever one was sent. Returns the payload
 // strings and the unconsumed tail; Desync is set when the stream cannot be
 // framed at all (junk), so the caller can stop waiting.
@@ -230,7 +230,7 @@ interface RpcReply {
 }
 
 // Device JSON is untrusted: only primitive fields are read, and nothing is
-// coerced with Number()/String() — an object with a hostile toString/valueOf
+// coerced with Number()/String(): an object with a hostile toString/valueOf
 // (e.g. {"id":{"toString":1}}) would otherwise throw.
 function ParseReply(Text: string): RpcReply | null {
   let Parsed: unknown;
@@ -427,7 +427,7 @@ export function QueryPixera(Config: PixeraConfig, Wanted: string[]): Promise<Pix
         if (Reply && !Replies.has(Reply.Id)) Replies.set(Reply.Id, Reply);
       }
       if (Decoded.Desync && RevisionAt == null) {
-        // Not PIXERA's framing at all — no point waiting out the deadline.
+        // Not PIXERA's framing at all; no point waiting out the deadline.
         Session.Finish(Reached(Session));
         return;
       }
@@ -439,7 +439,7 @@ export function QueryPixera(Config: PixeraConfig, Wanted: string[]): Promise<Pix
       if (RevisionAt != null || AnyBytes) return Reached(Session);
       return {
         Reachable: false,
-        Error: `No reply within ${BudgetMs}ms — check the access point protocol matches`,
+        Error: `No reply within ${BudgetMs}ms; check the access point protocol matches`,
         Refused: false,
       };
     },
@@ -472,7 +472,7 @@ const TRANSPORT_LABELS: Record<PixeraTransport, string> = {
   stop: 'stopped',
 };
 
-// The reasons a reachable PIXERA is unhealthy, per the enabled toggles. Pure —
+// The reasons a reachable PIXERA is unhealthy, per the enabled toggles. Pure;
 // exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: PixeraSnapshot, Options: HealthOptions): string[] {
   if (!Snapshot.IsPixera) return ['Responded, but does not look like the PIXERA JSON API'];
@@ -566,7 +566,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Head = Rows([
     TextRow(
       'Host',
-      `${Config.Address || '—'}:${Config.Port} (${Config.Framing === 'dl' ? 'JSON/TCP(dl)' : 'JSON/TCP'})`
+      `${Config.Address || '-'}:${Config.Port} (${Config.Framing === 'dl' ? 'JSON/TCP(dl)' : 'JSON/TCP'})`
     ),
     Reachable && Result.ApiRevision != null
       ? TextRow('API revision', `${Result.ApiRevision}${Result.ApiBeta ? ' (beta)' : ''}`)

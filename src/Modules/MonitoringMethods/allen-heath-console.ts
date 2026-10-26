@@ -600,7 +600,7 @@ function ChannelLabel(State: AhChannelState): string {
   return State.Name ? `Ch ${State.Channel} (${State.Name})` : `Ch ${State.Channel}`;
 }
 
-// The reasons a reachable console is unhealthy, per the enabled toggles. Pure —
+// The reasons a reachable console is unhealthy, per the enabled toggles. Pure;
 // exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: AhSnapshot, Options: HealthOptions, Family: AhFamily): string[] {
   if (Snapshot.IsAllenHeath === false) {
@@ -943,10 +943,10 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Family = FAMILY_LABELS[Config.Family];
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     TextRow(
       'Console',
-      `${Family}, MIDI channel ${Config.BaseChannel >= 0 ? Config.BaseChannel + 1 : '—'}`
+      `${Family}, MIDI channel ${Config.BaseChannel >= 0 ? Config.BaseChannel + 1 : '-'}`
     ),
     Row('Status', StatePill(Result)),
     Reachable

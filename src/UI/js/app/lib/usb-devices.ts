@@ -1,4 +1,4 @@
-// USB section of the client info modal — the decisions, without the DOM.
+// USB section of the client info modal: the decisions, without the DOM.
 //
 // What the section shows, the badge each device's critical toggle wears, the
 // conditions a critical device can be held to, and turning the conditions table
@@ -59,7 +59,7 @@ function Text(Value: unknown): string | null {
   return typeof Value === 'string' && Value.trim() ? Value.trim() : null;
 }
 
-/** "Device error: This device cannot start (Code 10)" — null when it is working or unknown. */
+/** "Device error: This device cannot start (Code 10)", or null when it is working or unknown. */
 export function USBDeviceError(Device: USBDeviceView): string | null {
   const State = Device.DeviceState;
   if (!State || !State.ErrorCode) return null;
@@ -164,7 +164,7 @@ export interface USBConditionRow {
   Field: USBConditionField;
   /** Key-style label, e.g. "Firmware version". */
   Label: string;
-  /** What is guarded when monitored, else what the device reports now; "—" when neither is known. */
+  /** What is guarded when monitored, else what the device reports now; "-" when neither is known. */
   Value: string;
   /** Whether this device can be held to it. */
   Supported: boolean;
@@ -208,7 +208,7 @@ export function USBConditionRows(
   ): USBConditionRow => ({
     Field,
     Label,
-    Value: !Supported ? 'Unsupported' : ((Checked ? Guarded : null) ?? Live ?? '—'),
+    Value: !Supported ? 'Unsupported' : ((Checked ? Guarded : null) ?? Live ?? '-'),
     Supported,
     Checked,
     Locked,
@@ -305,7 +305,7 @@ export function ParseUSBRuleFields(
 }
 
 /**
- * The live state of a critical device's history row — or, guarded by name, of
+ * The live state of a critical device's history row or, guarded by name, of
  * the group (every card of the name): green while connected and meeting its
  * conditions, orange while connected but not, red while missing or short. Idle
  * while the client is offline, or while a device allowed to be absent is.

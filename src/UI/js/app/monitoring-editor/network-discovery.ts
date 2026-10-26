@@ -5,7 +5,7 @@
 // hands a chosen device to the monitoring editor as a pre-filled target.
 //
 // Extracted from the 1581-line monitoring-editor.ts. It shared a file with the
-// editor only because both are reached from the same modal — nothing in the
+// editor only because both are reached from the same modal; nothing in the
 // editor calls into this module, so it is a self-contained feature.
 import type { NetworkScanEvent, NetworkScanResult } from '@showtrak/protocol';
 import { closeModal, openModal } from '../lib/modal';
@@ -250,7 +250,7 @@ export async function StartNetworkDiscoveryScan() {
   RenderNetworkDiscoveryResults();
   setNetworkDiscoveryScanning(true);
   RenderNetworkDiscoveryScanButton();
-  SetNetworkDiscoveryStatus('Starting…');
+  SetNetworkDiscoveryStatus('Starting...');
 
   try {
     const [Err, Result] = await window.API.StartNetworkDeviceScan({
@@ -268,7 +268,7 @@ export async function StartNetworkDiscoveryScan() {
       return Notify(Err, 'error');
     }
     setNetworkDiscoveryScanID(Result && Result.ScanID ? Result.ScanID : null);
-    SetNetworkDiscoveryStatus('Scanning…');
+    SetNetworkDiscoveryStatus('Scanning...');
   } catch (e) {
     setNetworkDiscoveryScanning(false);
     RenderNetworkDiscoveryScanButton();

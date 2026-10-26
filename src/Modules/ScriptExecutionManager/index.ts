@@ -52,8 +52,8 @@ interface ScriptExecution {
 }
 
 // The renderer-safe projection of an execution. A live ScriptExecution carries a
-// Client CLASS INSTANCE and a Node timer handle (TimeoutHandle) — neither
-// survives Electron's structured-clone IPC (or the Web UI socket) — so anything
+// Client CLASS INSTANCE and a Node timer handle (TimeoutHandle); neither
+// survives Electron's structured-clone IPC (or the Web UI socket), so anything
 // pushed to a renderer MUST go through this plain-object projection instead of
 // the raw entry.
 interface PublicScriptExecution {
@@ -172,7 +172,7 @@ function PumpClient(UUID: string | null | undefined): void {
 
   // Re-validate eligibility at dispatch time, not just at enqueue. A script can
   // wait in this queue behind an in-flight one for a long time, and the client
-  // may go offline (or otherwise become ineligible) in the meantime — the
+  // may go offline (or otherwise become ineligible) in the meantime; the
   // enqueue-time fast-fail only covers the instant of enqueue. Without this,
   // dispatching to a now-dead client parks a live entry that holds the client's
   // whole queue hostage until its full timeout elapses. Client is the live
@@ -188,7 +188,7 @@ function PumpClient(UUID: string | null | undefined): void {
     Next.Timer.End = Date.now();
     Next.Timer.Duration = 0;
     BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
-    // This entry is settled and no longer blocks the client — try the next
+    // This entry is settled and no longer blocks the client; try the next
     // queued script (which is re-validated the same way). Failed/settled entries
     // are excluded from both checks above, so this recursion terminates.
     PumpClient(UUID);
@@ -240,7 +240,7 @@ const Manager = {
   },
 
   // Drop only settled (Completed/Failed) entries, preserving anything still
-  // Pending — queued or in flight. Used as the "reset" when a new batch starts
+  // Pending (queued or in flight). Used as the "reset" when a new batch starts
   // so a fresh run clears the finished rows from the last batch but never
   // disturbs scripts that are still queued or running.
   async ClearSettled(): Promise<void> {
@@ -283,7 +283,7 @@ const Manager = {
         Request.Timer.Duration = Request.Timer.End - Request.Timer.Start;
       }
       BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
-      // The client is free again — dispatch its next queued script.
+      // The client is free again; dispatch its next queued script.
       if (!Request.Internal) PumpClient(Request.Client ? Request.Client.UUID : null);
     }, Timeout);
     // The timeout watchdog must not, by itself, keep the process alive.
@@ -326,8 +326,8 @@ const Manager = {
     return RequestID;
   },
 
-  // Enqueue a script for a client. Always appends to the bottom of the queue —
-  // never replaces an existing entry — so starting a new run while one is in
+  // Enqueue a script for a client. Always appends to the bottom of the queue,
+  // never replaces an existing entry, so starting a new run while one is in
   // flight leaves the running/queued work untouched and the new script simply
   // waits its turn (per-client sequential execution, driven by PumpClient).
   async AddToQueue(UUID: string, ScriptID: string): Promise<string | undefined> {
@@ -440,7 +440,7 @@ const Manager = {
     Request.Timer.End = Date.now();
     Request.Timer.Duration = Request.Timer.End - Request.Timer.Start;
     BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
-    // The client is free again — dispatch its next queued script (if any).
+    // The client is free again; dispatch its next queued script (if any).
     if (!Request.Internal) PumpClient(Request.Client ? Request.Client.UUID : null);
   },
 };

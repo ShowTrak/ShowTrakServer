@@ -28,7 +28,7 @@ function load() {
       },
     },
   });
-  // Same instance target.js required — loadWithMocks evicted the folder, so
+  // Same instance target.js required: loadWithMocks evicted the folder, so
   // this is the fresh copy with the compiled-in default of 1.
   const Normalize = require(path.join(DIR, 'normalize.js'));
   return { MonitoringTarget, Normalize };

@@ -2,7 +2,7 @@
    List view (body.list-mode)
    -------------------------------------------------------------------------
    The list is the same tiles, laid out as table rows. Every tile already
-   carries the list-only cells (checkbox, status word, history graph — see
+   carries the list-only cells (checkbox, status word, history graph; see
    list-view.ts); they are hidden in Grid and Compact and placed here.
 
    The rows and the one sticky heading row share a single column template, so
@@ -223,7 +223,7 @@ body.list-mode .group-drop-zone > .dnd-source-spacer {
   border-radius: var(--radius-sm);
 }
 
-/* One row-height line, "Empty Group — This group has no clients.", in place
+/* One row-height line, "Empty Group - This group has no clients.", in place
    of the tile view's 100px centred block. */
 body.list-mode .SHOWTRAK_PC_PLACEHOLDER {
   display: flex;
@@ -399,7 +399,7 @@ body.list-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_HOSTNAME'] {
   white-space: nowrap;
 }
 
-/* Type: OS + version / method + interval / "Dummy" / "FreeKiosk" — or the
+/* Type: OS + version / method + interval / "Dummy" / "FreeKiosk", or the
    tile's tag badges, which take that line's place exactly as on the tile. */
 body.list-mode .SHOWTRAK_PC > [data-type='Hostname'],
 body.list-mode .SHOWTRAK_PC > [data-type='Method'],
@@ -482,7 +482,7 @@ body.list-mode .SHOWTRAK_PC.IDENTIFYING > .LIST_STATE::before {
   background: var(--status-graph-pending);
 }
 
-/* Details: whichever of the tile's status lines is showing — the degraded
+/* Details: whichever of the tile's status lines is showing: the degraded
    warning, a monitor's latency, the offline timer, or the vitals bars. */
 body.list-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS,
 body.list-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_ACTION'] {

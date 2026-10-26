@@ -1,7 +1,7 @@
 // FreeKiosk terminal identifier, payload and command validators.
 //
 // The command validator is the security boundary for this feature. It resolves
-// a requested command against FREEKIOSK_COMMANDS and rejects anything absent —
+// a requested command against FREEKIOSK_COMMANDS and rejects anything absent,
 // so the set of things a terminal can be told to do is exactly what that map
 // declares, with no blocklist to keep current. /api/js (arbitrary JavaScript in
 // the kiosk WebView) is simply not in the map, and is therefore unreachable.
@@ -137,7 +137,7 @@ export = function registerFreeKioskValidators(Manager: IPCValidationManager): vo
       out.Port = normalizePort(source.Port);
     }
     if (Object.prototype.hasOwnProperty.call(source, 'ApiKey')) {
-      // A blank key means "leave it alone" — the editor is never given the
+      // A blank key means "leave it alone"; the editor is never given the
       // stored key back, so it cannot resubmit one.
       const key = source.ApiKey == null ? '' : String(source.ApiKey);
       if (key.trim()) out.ApiKey = key.trim().slice(0, 256);

@@ -6,7 +6,7 @@
 // establishing a full Web Remote session has been field-reported to crash the
 // master console session and consumes one of only two remote slots. The one
 // safe, non-intrusive signal is therefore a bare TCP handshake against the Web
-// Remote port (default 8080; HTTP is also on 80) — we connect and immediately
+// Remote port (default 8080; HTTP is also on 80): we connect and immediately
 // close, sending no HTTP request and no OSC. Online when the handshake completes.
 //
 // This is liveness only: MA3 has no documented, safe read-only API for show
@@ -62,7 +62,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Port = Number.isFinite(Cfg.Port) ? (Cfg.Port as number) | 0 : DEFAULT_MA3_PORT;
   const Open = !!(Result && Result.Success);
   return Rows([
-    TextRow('Host', `${Address || '—'}:${Port}`),
+    TextRow('Host', `${Address || '-'}:${Port}`),
     Row('Web Remote', Pill(Open ? 'success' : 'danger', Open ? 'Reachable' : 'Closed / filtered')),
     Open
       ? Row('Handshake', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
@@ -72,6 +72,6 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
 export const Name = 'grandMA3';
 export const Description =
-  'Confirms a grandMA3 console (or onPC) is reachable by opening a TCP connection to its Web Remote port (default 8080) and closing it immediately — no data is sent, so it is safe against a live console. grandMA3 exposes no safe read-only status API over the network, so this is a liveness check only. The Web Remote must be enabled on the console.';
+  'Confirms a grandMA3 console (or onPC) is reachable by opening a TCP connection to its Web Remote port (default 8080) and closing it immediately; no data is sent, so it is safe against a live console. grandMA3 exposes no safe read-only status API over the network, so this is a liveness check only. The Web Remote must be enabled on the console.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export { ID, Settings, Run, Debug };

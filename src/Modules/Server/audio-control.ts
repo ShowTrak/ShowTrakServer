@@ -4,8 +4,8 @@
 // exercised with a fake Socket.IO server. Every refusal the server can work out
 // for itself is made HERE, before anything is sent: an outdated client, an
 // offline one, an endpoint it never reported, or a control its platform does not
-// offer. The client re-checks all of it — it is the authority on its own
-// hardware — but an operator should hear "macOS can only change the default
+// offer. The client re-checks all of it (it is the authority on its own
+// hardware), but an operator should hear "macOS can only change the default
 // output" at once, not after a round trip.
 import type { AudioLevelResult, AudioLevelRequest } from '@showtrak/protocol';
 import { AUDIO_LEVEL_TIMEOUT_MS, MINIMUM_AUDIO_MONITORING_VERSION } from '../Config/constants';

@@ -374,7 +374,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Running = !!(Result && Result.Running);
 
   const Head = Rows([
-    TextRow('Host', `${Address || '—'}:${Port}`),
+    TextRow('Host', `${Address || '-'}:${Port}`),
     TextRow('Mode', String(Mode)),
     Row('Status', StatusPill),
     Replied ? TextRow('Show', ShowName || '(none)') : null,
@@ -395,7 +395,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
                   ShowMatches(ShowName, Expected) ? 'success' : 'warning',
                   ShowMatches(ShowName, Expected) ? 'Match' : 'Mismatch'
                 )
-              : Pill('muted', '—'))
+              : Pill('muted', '-'))
         )
       : null,
     Replied

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-// Exercises src/UI/js/app/lib/client-list-layout.ts — the pure layout and
+// Exercises src/UI/js/app/lib/client-list-layout.ts: the pure layout and
 // status rules extracted from client-list.ts (1018 LOC, previously 0%).
 //
 // This is the first pass of the "extract pure logic" strategy: the decisions
@@ -79,7 +79,7 @@ test('a client still starting up says so rather than claiming to be Online', () 
   const Starting = { Online: true, Initialising: true };
   assert.equal(Layout.GetClientStatusDisplayText(Starting), 'Starting Up');
   assert.equal(Layout.GetClientCompactStatusLabel(Starting), 'Starting Up');
-  // Grey, like an idle monitor — not the green of a machine that is ready.
+  // Grey, like an idle monitor, not the green of a machine that is ready.
   assert.equal(Layout.GetClientTileStateClass(Starting), 'IDLE');
 
   // A published fault outranks it: once something is genuinely degraded, that
@@ -135,7 +135,7 @@ test('the tile shows the first degraded warning', () => {
 
 test('a degraded client with no usable warning still says something', () => {
   // A client can be marked degraded by a rule that populated no message, and an
-  // empty warning band is worse than a generic one — it reads as a render bug.
+  // empty warning band is worse than a generic one; it reads as a render bug.
   for (const Warnings of [[], null, undefined, [''], ['   '], [null]]) {
     assert.equal(
       Layout.GetTileWarningText({ DegradedWarnings: Warnings }),
@@ -188,19 +188,19 @@ test('a long group label is truncated with an ellipsis that fits', () => {
   // The ellipsis is included in the budget, so the result is never longer than
   // the group tab it has to fit inside, and a cut at a space does not leave the
   // space dangling before it.
-  assert.equal(Layout.TruncateGroupLabel('Front of House Left'), 'Front of House…');
-  assert.ok(Layout.TruncateGroupLabel('Front of House Left').length <= 16);
-  assert.equal(Layout.TruncateGroupLabel('Front of Housing Left'), 'Front of Housin…');
+  assert.equal(Layout.TruncateGroupLabel('Audio Rack A Left'), 'Audio Rack A...');
+  assert.ok(Layout.TruncateGroupLabel('Audio Rack A Left').length <= 16);
+  assert.equal(Layout.TruncateGroupLabel('Front of Housing Left'), 'Front of Hous...');
   assert.equal(Layout.TruncateGroupLabel('Front of Housing Left').length, 16);
   assert.equal(Layout.TruncateGroupLabel('FOH'), 'FOH');
   assert.equal(Layout.TruncateGroupLabel('Exactly16Chars!!'), 'Exactly16Chars!!');
 });
 
 test('the truncation length is configurable and never produces a bare ellipsis', () => {
-  assert.equal(Layout.TruncateGroupLabel('Projection', 6), 'Proje…');
+  assert.equal(Layout.TruncateGroupLabel('Projection', 6), 'Pro...');
   // Even at an absurd max the first character survives, so a label is never
   // rendered as punctuation alone.
-  assert.equal(Layout.TruncateGroupLabel('Projection', 1), 'P…');
+  assert.equal(Layout.TruncateGroupLabel('Projection', 1), 'P...');
 });
 
 test('an empty or missing group label renders as nothing', () => {
@@ -314,7 +314,7 @@ test('a group is tinted only with a colour the operator chose from the palette',
   assert.equal(Layout.GetGroupTintHex({ Colour: 4 }), '#3498db');
   // Index 0 is red, not "no colour".
   assert.equal(Layout.GetGroupTintHex({ Colour: 0 }), '#e74c3c');
-  // Unset, cleared, or out-of-range means a plain box — never the grey fallback
+  // Unset, cleared, or out-of-range means a plain box, never the grey fallback
   // scripts and tags use, which would tint every pre-existing group.
   assert.equal(Layout.GetGroupTintHex({}), null);
   assert.equal(Layout.GetGroupTintHex({ Colour: null }), null);
@@ -367,7 +367,7 @@ test('clients within a group are ordered by weight', () => {
 test('a monitor or dummy with a falsy GroupID lands in the ungrouped bucket', () => {
   // The database can hand back 0 rather than null. Comparing it strictly
   // against null would match no group at all and the entity would vanish from
-  // the layout entirely — present in the data, invisible on screen.
+  // the layout entirely: present in the data, invisible on screen.
   const Members = Layout.SelectGroupMembers(
     null,
     [],
@@ -489,7 +489,7 @@ test('the welcome panel shows only on a genuinely empty install', () => {
 });
 
 test('the welcome panel is hidden as soon as anything exists', () => {
-  // Including the case that only a monitor or only a dummy has been added —
+  // Including the case that only a monitor or only a dummy has been added;
   // telling an operator who just configured a UPS check that they have nothing
   // configured reads as the app having lost their work.
   assert.equal(Layout.ShouldShowWelcomePanel(2, [], [], []), false, 'a real group exists');
@@ -501,7 +501,7 @@ test('the welcome panel is hidden as soon as anything exists', () => {
 // ---- FreeKiosk terminals ---------------------------------------------------
 //
 // Terminals join the same weight scale as every other client-like type, so a
-// drag can interleave all four. Getting this wrong does not throw — the tiles
+// drag can interleave all four. Getting this wrong does not throw; the tiles
 // simply appear in the wrong order, or not at all.
 
 test('a group collects its FreeKiosk terminals too', () => {

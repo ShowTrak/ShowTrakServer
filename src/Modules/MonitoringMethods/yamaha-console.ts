@@ -1,20 +1,20 @@
 // Yamaha digital mixing console health over Yamaha's Remote Control Protocol
 // (RCP, formerly "SCP"): plain ASCII text over TCP 49280, one command per line
-// terminated by LF. The console answers each command with one line —
-// `OK <command> <args…> <value>` or `ERROR <command> <code>` — and may
-// interleave unsolicited `NOTIFY …` lines (parameter or scene changes made on
+// terminated by LF. The console answers each command with one line
+// (`OK <command> <args...> <value>` or `ERROR <command> <code>`) and may
+// interleave unsolicited `NOTIFY ...` lines (parameter or scene changes made on
 // the surface), which are skipped.
 //
 // One short-lived session per probe, all reads:
 //
-//   1. `devstatus runmode`   — "normal", or e.g. "booting" / "update" (Yamaha's
+//   1. `devstatus runmode`:   "normal", or e.g. "booting" / "update" (Yamaha's
 //                              RCP specs say the device takes no other commands
 //                              in those modes, so the probe stops there).
-//   2. `devinfo productname` — e.g. "CL5", "QL1", "TF5", "DM7".
-//   3. `devinfo version`     — firmware version.
-//   4. `devinfo devicename`  — the name assigned to the device.
-//   5. `devstatus error`     — only with CheckAlerts: "none" or an alert.
-//   6. `get MIXER:Current/St/Fader/On 0 0` and `… 1 0` — only with
+//   2. `devinfo productname`: e.g. "CL5", "QL1", "TF5", "DM7".
+//   3. `devinfo version`:     firmware version.
+//   4. `devinfo devicename`:  the name assigned to the device.
+//   5. `devstatus error`:     only with CheckAlerts: "none" or an alert.
+//   6. `get MIXER:Current/St/Fader/On 0 0` and `... 1 0`: only with
 //      CheckMasterMute: the ON key of the first stereo bus, left and right.
 //
 // Nothing is ever `set`, and the session never changes `scpmode` (encoding /
@@ -201,7 +201,7 @@ function ParseLine(Raw: string): RcpLine | null {
 }
 
 // What a pending request is waiting for: an `OK` echoing these leading tokens
-// (e.g. ['devinfo', 'productname']), or any `ERROR` line — commands go one at a
+// (e.g. ['devinfo', 'productname']), or any `ERROR` line; commands go one at a
 // time, so an error can only belong to the command in flight.
 function MatchesRequest(Line: RcpLine, Echo: string[]): boolean {
   if (Line.Status === 'ERROR') return true;
@@ -251,7 +251,7 @@ export type ConsoleSeries = 'CL' | 'QL' | 'TF' | 'DM3' | 'DM7' | 'RIVAGE PM';
 
 // Which console family a product name belongs to. RIVAGE PM components report
 // several product names (surfaces and DSP engines), so that family is matched
-// loosely. Null for anything else (RIO, Tio, DME, DM5, …).
+// loosely. Null for anything else (RIO, Tio, DME, DM5, etc.).
 function DetectSeries(ProductName: string | null): ConsoleSeries | null {
   const Name = (ProductName || '').trim();
   if (/^CL\d/i.test(Name)) return 'CL';
@@ -279,7 +279,7 @@ export interface AlertStatus {
 }
 
 // `devstatus error` answers "none", a bare level ("fault" / "error" /
-// "warning"), or a detailed "flt/<message>// x53 on …" form; read all three.
+// "warning"), or a detailed "flt/<message>// x53 on ..." form; read all three.
 function ParseAlert(Value: string | null): AlertStatus | null {
   if (Value == null) return null;
   const Text = Value.trim();
@@ -407,7 +407,7 @@ function QueryConsole(
         try {
           const RunMode = await Ask('devstatus runmode', ['devstatus', 'runmode']);
           Snapshot.RunMode = AnswerValue(RunMode, 'last');
-          // Yamaha: "booting" and "update" take no other commands — asking
+          // Yamaha: "booting" and "update" take no other commands; asking
           // would only run the budget out.
           if (Snapshot.RunMode && /^(booting|update)$/i.test(Snapshot.RunMode)) {
             Snapshot.NotReady = true;
@@ -480,7 +480,7 @@ function QueryConsole(
 
 // --- Evaluation ----------------------------------------------------------------
 
-// The reasons a reachable console is unhealthy, per the enabled options. Pure —
+// The reasons a reachable console is unhealthy, per the enabled options. Pure;
 // exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: ConsoleSnapshot, Options: HealthOptions): string[] {
   if (!Snapshot.IsYamaha) return ['Responded, but not as a Yamaha console (RCP)'];
@@ -506,7 +506,7 @@ function EvaluateHealth(Snapshot: ConsoleSnapshot, Options: HealthOptions): stri
   if (Options.CheckModel && Options.ExpectedModel) {
     if (!Snapshot.ProductName) Reasons.push('Model not reported');
     else if (!Snapshot.ProductName.toLowerCase().startsWith(Options.ExpectedModel.toLowerCase())) {
-      Reasons.push(`Model ${Snapshot.ProductName} (expected ${Options.ExpectedModel}…)`);
+      Reasons.push(`Model ${Snapshot.ProductName} (expected ${Options.ExpectedModel}...)`);
     }
   }
 
@@ -587,7 +587,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       : Pill('success', 'Healthy');
 
   const Head = [
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Row('Status', StatePill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
@@ -626,7 +626,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
           'Model',
           Product +
             (Options.CheckModel && Options.ExpectedModel
-              ? ` (expected ${Options.ExpectedModel}…)`
+              ? ` (expected ${Options.ExpectedModel}...)`
               : '')
         )
       : null,
@@ -663,7 +663,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
 export const Name = 'Yamaha Console';
 export const Description =
-  'Connects to a Yamaha digital mixing console (CL, QL, TF, DM3, DM7, RIVAGE PM) on its remote control port (TCP 49280) and reads model, firmware and run mode — read-only. Optionally checks the model, the console’s alert status and that the stereo master is on.';
+  'Connects to a Yamaha digital mixing console (CL, QL, TF, DM3, DM7, RIVAGE PM) on its remote control port (TCP 49280) and reads model, firmware and run mode (read-only). Optionally checks the model, the console’s alert status and that the stereo master is on.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = {
   ParseConfig,

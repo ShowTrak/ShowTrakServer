@@ -1,11 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-// The Audio Inputs and Audio Outputs sections of the client info modal — one
+// The Audio Inputs and Audio Outputs sections of the client info modal: one
 // section per direction, built by the same code.
 //
-// lib/audio-devices.ts holds the decisions — which state the section is in,
-// what an outdated client sees, and every "not available on <OS>" sentence — and
+// lib/audio-devices.ts holds the decisions (which state the section is in,
+// what an outdated client sees, and every "not available on <OS>" sentence) and
 // is tested directly. client-info-audio.ts builds the markup (a pure string
 // function, tested as such) and wires the controls, which is tested through a
 // small recording jQuery fake that answers only the call shapes it uses (no
@@ -91,7 +91,10 @@ test('an outdated client reads as unsupported, whatever else it carries', () => 
   assert.equal(Lib.GetAudioSectionState(client({ Version: '3.19.0', Online: false })), 'outdated');
   const message = Lib.AudioSectionMessage('outdated', client({ Version: '3.20.0' }), 'input');
   assert.equal(message.Title, 'Audio Inputs Unsupported');
-  assert.match(message.Body, /needs ShowTrak Client 3\.21\.0 or later — this client runs 3\.20\.0/);
+  assert.match(
+    message.Body,
+    /needs ShowTrak Client 3\.21\.0 or later \(this client runs 3\.20\.0\)/
+  );
   assert.match(message.Body, /control its audio inputs\.$/);
   assert.equal(
     Lib.AudioSectionMessage('outdated', client({ Version: '3.20.0' }), 'output').Title,
@@ -348,7 +351,7 @@ test('a condition the device cannot be held to reads Unsupported, unless already
     Muted: null,
   };
   assert.equal(row(set, ALSA_CAPS, 'RequireUnmuted').Supported, true);
-  assert.equal(row(set, ALSA_CAPS, 'RequireUnmuted').Value, '—');
+  assert.equal(row(set, ALSA_CAPS, 'RequireUnmuted').Value, '-');
   assert.equal(row(set, ALSA_CAPS, 'MaxVolume').Bound, 90);
   // Not connected: judged by what the platform promises, values unknown.
   const away = {
@@ -358,7 +361,7 @@ test('a condition the device cannot be held to reads Unsupported, unless already
     Muted: null,
     Critical: critical(),
   };
-  assert.equal(row(away, FULL_CAPS, 'RequireDefault').Value, '—');
+  assert.equal(row(away, FULL_CAPS, 'RequireDefault').Value, '-');
   assert.equal(row(away, FULL_CAPS, 'MinVolume').Supported, true);
   assert.equal(row(away, MAC_CAPS, 'RequireUnmuted').Supported, true);
   assert.equal(
@@ -366,8 +369,8 @@ test('a condition the device cannot be held to reads Unsupported, unless already
     false,
     'macOS has no input mute at all'
   );
-  assert.equal(row({ ...away, Channels: null }, MAC_CAPS, 'CheckChannels').Value, '—');
-  assert.equal(row({ ...away, SampleRate: null }, MAC_CAPS, 'CheckSampleRate').Value, '—');
+  assert.equal(row({ ...away, Channels: null }, MAC_CAPS, 'CheckChannels').Value, '-');
+  assert.equal(row({ ...away, SampleRate: null }, MAC_CAPS, 'CheckSampleRate').Value, '-');
 });
 
 test('a condition that is not met is flagged on its own row', () => {
@@ -665,7 +668,7 @@ test('a missing critical endpoint shows its baseline and the red badge, without 
   assert.match(html, /is-disconnected-critical/);
   assert.match(html, /Not connected/);
   assert.match(html, /SHOWTRAK_AUDIO_CONDITIONS/);
-  assert.match(html, /<span class="SHOWTRAK_AUDIO_COND_VALUE">—<\/span>/);
+  assert.match(html, /<span class="SHOWTRAK_AUDIO_COND_VALUE">-<\/span>/);
   assert.doesNotMatch(html, /SHOWTRAK_AUDIO_LEVEL"/);
   // Level stays supported: macOS can read the default output's level once it is back.
   assert.match(html, /data-rule="MinVolume"\s+value="" placeholder=""/);

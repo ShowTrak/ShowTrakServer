@@ -283,7 +283,7 @@ export function RenderMode(mode: AppModeValue) {
 }
 
 // Subscribe to backend push updates. Called by the bootstrap orchestrator in
-// main.ts — never at import time.
+// main.ts, never at import time.
 export function InitMode() {
   window.API.OnModeUpdated((mode) => {
     RenderMode(mode);

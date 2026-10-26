@@ -11,14 +11,14 @@
 //
 // There is no framework teardown hook for monitoring methods (see
 // MonitoringTargetManager: check delete/edit only stops the target's tick timer,
-// it never notifies the method). So — exactly like _millumin-shared's
-// MilluminReceiver and _ndi-shared's NdiBrowser — this is a self-reaping,
+// it never notifies the method). So, exactly like _millumin-shared's
+// MilluminReceiver and _ndi-shared's NdiBrowser, this is a self-reaping,
 // module-level singleton: Run() calls Observe() to keep a connection alive, and a
 // periodic sweep closes any connection not observed within an interest TTL. When a
 // check is deleted or repointed, Run() simply stops calling Observe() for the old
 // key and the socket reaps itself.
 //
-// Importing this module has NO side effects — nothing connects until the first
+// Importing this module has NO side effects: nothing connects until the first
 // Observe().
 import net from 'net';
 import { CreateLogger } from '../Logger';
@@ -45,10 +45,10 @@ const COMMAND_TIMEOUT_MS = 3000; // a control message QLab has not answered by n
 const REFRESH_TIMEOUT_MS = 1500; // how long an action waits for the post-action re-read
 
 // The set of override flags we track. Overrides are GLOBAL (application-level) in
-// QLab, addressed `/overrides/{key}` — NOT workspace-scoped — and are queried with
+// QLab, addressed `/overrides/{key}` (NOT workspace-scoped) and are queried with
 // no argument (read), replying with a boolean: true = that subsystem is enabled
 // (normal); false = overridden/suppressed. Querying a key QLab doesn't recognise
-// simply yields no reply — harmless.
+// simply yields no reply (harmless).
 export const OVERRIDE_KEYS = [
   'dmxOutputEnabled',
   'midiInputEnabled',
@@ -141,7 +141,7 @@ function IsReportedFlag(Data: unknown): boolean {
 // verbatim, so it names the setting that fixes it.
 export function DescribeRefusal(Status: string): string {
   if (Status === 'denied') {
-    return 'QLab denied the command — this connection lacks control access. Set an OSC passcode with control access in QLab (Workspace Settings → Network) and enter it on this check';
+    return 'QLab denied the command: this connection lacks control access. Set an OSC passcode with control access in QLab (Workspace Settings → Network) and enter it on this check';
   }
   if (Status === 'badpass') return 'QLab rejected the OSC passcode';
   return 'QLab could not carry out the command';
@@ -213,8 +213,8 @@ interface Connection {
 
 // Someone awaiting QLab's reply to a message this connection sent. Matched on
 // the reply's address with any `/workspace/<id>` prefix stripped (see
-// ReplyKey), first-come first-served. A consuming waiter swallows the reply —
-// an action's acknowledgement carries no state worth applying — while a
+// ReplyKey), first-come first-served. A consuming waiter swallows the reply
+// (an action's acknowledgement carries no state worth applying), while a
 // non-consuming one lets it update the snapshot too.
 interface ReplyWaiter {
   Key: string;
@@ -817,7 +817,7 @@ export function DescribeQLabAction(
 ): string | null {
   if (ActionID !== 'go.cue') return null;
   const Cue = String(Params.Cue == null ? '' : Params.Cue).trim();
-  return Cue ? `GO Cue — ${Cue}` : null;
+  return Cue ? `GO Cue - ${Cue}` : null;
 }
 
 export function IsValidPort(Port: number): boolean {

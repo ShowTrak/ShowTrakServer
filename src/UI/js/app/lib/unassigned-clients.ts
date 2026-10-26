@@ -63,7 +63,7 @@ export function ValidateUnassignedClientRequest(
  * hint the server sends at connect (which already folds in both the system and
  * the Web UI flags).
  *
- * Fails CLOSED on anything unreadable — an entry point that is offered and then
+ * Fails CLOSED on anything unreadable: an entry point that is offered and then
  * refused by the server is worse than one that is simply absent.
  */
 export function ResolveUnassignedClientsEnabled(

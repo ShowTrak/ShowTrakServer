@@ -2,7 +2,7 @@
 //
 // FreeKiosk wraps every JSON response in a `{ success, data, timestamp }`
 // envelope. Reads return their sub-object under `data`; control endpoints
-// return a command result under `data` whose real verdict is `executed` — see
+// return a command result under `data` whose real verdict is `executed`; see
 // the comment on FreeKioskCommandResult, which is the single most important
 // behaviour in this module.
 
@@ -18,7 +18,7 @@ export interface FreeKioskEnvelope<T = unknown> {
  * A control endpoint's result.
  *
  * FreeKiosk answers HTTP 200 with `success: true` even when the device refused
- * the command — a reboot without Device Owner, or a lock without admin rights,
+ * the command: a reboot without Device Owner, or a lock without admin rights,
  * comes back "successful" with `executed: false` and a human-readable `error`.
  * Anything that treats the HTTP status or `success` flag as the verdict will
  * pass every local test and silently no-op in production.
@@ -36,7 +36,7 @@ export interface FreeKioskCommandResult {
  * `device.android`, the device sends `wifi.signalStrength` and
  * `device.androidVersion`), older builds omit whole sub-objects, and a device
  * without a sensor reports -1 rather than dropping the key. Nothing here may be
- * assumed present — the metric registry reads it defensively.
+ * assumed present; the metric registry reads it defensively.
  */
 export interface FreeKioskStatus {
   battery?: Record<string, unknown>;

@@ -3,7 +3,7 @@
 // Extracted verbatim from init.ts, where it was defined inline inside the app
 // update-status handler. Used to render GitHub release notes when they arrive as
 // Markdown (not pre-rendered HTML). Everything is escaped through `Safe` before
-// any markup is emitted, and link hrefs are restricted to http(s)/mailto — so
+// any markup is emitted, and link hrefs are restricted to http(s)/mailto, so
 // the output is safe to inject with `.html()`.
 import { HandleNonFatalError, Safe } from '../utils';
 
@@ -85,7 +85,7 @@ function renderMarkdownSafe(md: unknown): string {
 // with `.html()` is still an unguarded sink, so we run it through an allowlist
 // sanitizer before it reaches the DOM. Rather than regex-scrubbing the string
 // (which misses parser-based mutation XSS), we parse it with the browser's own
-// HTML parser into a DETACHED document — nothing loads or executes — then walk
+// HTML parser into a DETACHED document (nothing loads or executes), then walk
 // the tree and rebuild it from a fixed allowlist of formatting tags. Anything
 // not on the list is unwrapped (its text kept) or, for known-dangerous
 // containers, dropped whole.

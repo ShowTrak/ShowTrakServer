@@ -131,7 +131,7 @@ body.compact-mode .group-column-grid {
   display: none;
 }
 
-/* Flat rows (no per-item card/background) — only hover/focus lift them,
+/* Flat rows (no per-item card/background); only hover/focus lift them,
    matching a minimal filter-menu look rather than a stack of buttons. */
 #SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON {
   color: var(--text-soft);
@@ -194,7 +194,7 @@ body.compact-mode .group-column-grid {
 }
 
 /* Names the kind of client the rows below it act on (ShowTrak Clients,
-   Monitors, FreeKiosk, …). Not a menu item, so keyboard navigation skips it. */
+   Monitors, FreeKiosk, etc.). Not a menu item, so keyboard navigation skips it. */
 #SHOWTRAK_CONTEXT_MENU .context-section-header {
   padding: 0.35rem 0.6rem 0.15rem;
   color: var(--text-subtle);

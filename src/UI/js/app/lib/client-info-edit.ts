@@ -89,7 +89,7 @@ interface ReportedInterface {
  *
  * Wider than what the server ingests on its own: that path also drops
  * locally-administered addresses (virtual adapters, randomized Wi-Fi), which
- * this keeps — the operator pressing "Add from Client" is asking for every
+ * this keeps: the operator pressing "Add from Client" is asking for every
  * address the machine has. The all-zero MAC is still dropped: it belongs to no
  * hardware at all.
  */
@@ -163,7 +163,7 @@ export function ClientSettingsDraftChanged(
 }
 
 /**
- * The UpdateClient payload for a draft — the same shape the client editor has
+ * The UpdateClient payload for a draft: the same shape the client editor has
  * always sent.
  *
  * - An empty nickname falls back to the hostname.
@@ -171,7 +171,7 @@ export function ClientSettingsDraftChanged(
  *   existing slug standing (a slug never auto-changes once set).
  * - Launch fields and variables never travel for an SDK client, which the
  *   server rejects them for.
- * - An emptied variable is null ("inherit the default"), never '' — which would
+ * - An emptied variable is null ("inherit the default"), never '', which would
  *   pin the client to an empty value and stop it tracking the default.
  */
 export function BuildClientUpdatePayload(

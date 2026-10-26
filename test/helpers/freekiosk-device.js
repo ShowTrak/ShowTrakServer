@@ -2,7 +2,7 @@
 // device's REST API closely enough to exercise the protocol client end to end.
 //
 // A real server rather than a stubbed `http` module, because several of the
-// behaviours under test are transport behaviours — a stalled response hitting
+// behaviours under test are transport behaviours: a stalled response hitting
 // the kill timer, an image stream running past the size cap, a body whose
 // declared Content-Length is a lie. None of those are meaningful against a fake
 // module that resolves immediately.
@@ -74,11 +74,11 @@ function errorEnvelope(message) {
  *   status          object   payload for /api/status (default STATUS_HEALTHY)
  *   apiKey          string   when set, requests must carry a matching X-Api-Key
  *   allowControl    bool     false makes every control endpoint answer 403
- *   refuseCommands  bool     answer 200/success:true with executed:false — the
+ *   refuseCommands  bool     answer 200/success:true with executed:false, the
  *                            privilege-failure shape a device without Device
  *                            Owner really sends
  *   stall           bool     accept the request and never answer
- *   hangUp          bool     destroy the socket without answering — what a real
+ *   hangUp          bool     destroy the socket without answering, what a real
  *                            tablet does when a reboot tears the server down
  *                            mid-response
  *   imageBytes      number   size of the body /api/screenshot streams

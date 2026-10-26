@@ -6,7 +6,7 @@ const path = require('node:path');
 //
 // A "scope" answers one question: WHICH machines does this apply to. It backs
 // both the alert-rule targets and the per-script whitelist, so a wrong answer
-// is not a rendering glitch — it is an alert that never fires for the machine
+// is not a rendering glitch; it is an alert that never fires for the machine
 // that failed, or a destructive script offered to a machine it was explicitly
 // restricted away from.
 //
@@ -123,7 +123,7 @@ test('entities are nested under their group', () => {
 });
 
 test('an entity in no group, or in a group that is not shown, falls to the flat list', () => {
-  // It must remain selectable — dropping it would make an entity impossible to
+  // It must remain selectable: dropping it would make an entity impossible to
   // target at all.
   seed({ clients: [client({ UUID: 'c1', GroupID: null }), client({ UUID: 'c2', GroupID: 99 })] });
   const Model = model();
@@ -199,7 +199,7 @@ test('a caller-supplied filter narrows clients and groups', () => {
   const Filtered = model({ ClientFilter: (C) => C.UUID === 'c1' });
   assert.deepEqual(Filtered.AllClientValues, ['client:c1']);
 
-  // A group filtered out does not hide its members — they move to the flat list.
+  // A group filtered out does not hide its members; they move to the flat list.
   const OneGroup = model({ GroupFilter: (G) => G.GroupID === 1 });
   assert.equal(OneGroup.Groups.length, 1);
   assert.deepEqual(
@@ -284,7 +284,7 @@ test('an absent selection parses to an empty scope', () => {
 // --- Resolving a scope to concrete targets ---------------------------------
 
 test('workspace resolves to every entity currently known', () => {
-  // Including ones adopted after the rule was saved — that is the point of
+  // Including ones adopted after the rule was saved; that is the point of
   // storing "workspace" rather than a list.
   seed({ clients: [client({ UUID: 'c1' }), client({ UUID: 'c2', GroupID: 2 })] });
   const Model = model();
@@ -353,7 +353,7 @@ test('a partially selected group stays as individual clients', () => {
 test('an empty group is never collapsed into the scope', () => {
   // Every member of an empty list vacuously satisfies "all selected", so without
   // the length guard the empty Stage group would be bolted onto every scope
-  // that was ever built — quietly widening rules to cover anything later moved
+  // that was ever built, quietly widening rules to cover anything later moved
   // into it.
   //
   // A third client outside FOH keeps this away from the workspace case: if
@@ -532,7 +532,7 @@ test('the tag being edited is withheld from its own list', () => {
 
 test('a tag selection is never collapsed into the machines it covers', () => {
   // This is what makes "everything tagged CORE" mean the tag rather than
-  // today's snapshot of it — a machine tagged tomorrow stays covered.
+  // today's snapshot of it; a machine tagged tomorrow stays covered.
   seed({ clients: [client({ UUID: 'c1', GroupID: 1 })] });
   const Model = model({ Tags: [tag(3, 'core', { Clients: ['c1'] })] });
 

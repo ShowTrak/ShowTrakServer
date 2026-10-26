@@ -84,7 +84,7 @@ interface DeploymentUiState {
   hadRenderableDeployment: boolean;
 }
 
-// Called by the bootstrap orchestrator in main.ts — never at import time.
+// Called by the bootstrap orchestrator in main.ts, never at import time.
 export function InitClientList() {
   window.API.ShutdownRequested(async () => {
     await CloseAllModals();
@@ -196,10 +196,10 @@ function InitClientListPush() {
     }
 
     // Auto-dismiss the execution panel a dwell time (UI_EXECUTION_PANEL_DWELL_SECONDS)
-    // after every execution has SETTLED — whether it succeeded or failed. Queued
+    // after every execution has SETTLED, whether it succeeded or failed. Queued
     // and running executions are both Status='Pending', so the panel stays open
     // while any work remains, and if a new batch is started within the dwell the
-    // else-branch below cancels the countdown — the panel only closes once the
+    // else-branch below cancels the countdown; the panel only closes once the
     // dwell has passed since the LAST script finished.
     const shouldAutoDismissNonDeployment =
       nonDeploymentExecutions.length > 0 &&
@@ -212,7 +212,7 @@ function InitClientListPush() {
           HideExecutionToast();
           // Wipe the finished rows now the panel is gone, so the next run renders
           // into an empty list rather than stacking on the previous batch. Only
-          // settled entries are dropped — anything queued or running in the
+          // settled entries are dropped; anything queued or running in the
           // meantime survives.
           try {
             await window.API.ClearSettledScriptExecutions();
@@ -365,7 +365,7 @@ function InitClientListPush() {
     const listEl = $list[0] as HTMLElement | undefined;
     if (!listEl) return;
 
-    // Durations render white regardless of how long they took — the row's state
+    // Durations render white regardless of how long they took; the row's state
     // (fill colour + indicator) already carries success/failure, so colouring the
     // timing on top of it read as a second, conflicting signal.
     function durationText(ms: number) {
@@ -376,12 +376,12 @@ function InitClientListPush() {
       const text = value == null ? '' : String(value).trim();
       if (!text) return '';
       if (text.length <= maxLen) return text;
-      return `${text.substring(0, Math.max(1, maxLen - 1))}…`;
+      return `${text.substring(0, Math.max(1, maxLen - 3))}...`;
     }
 
     // The execution list is patched IN PLACE (keyed by RequestID) rather than
     // rebuilt with innerHTML on every push. Wholesale rebuilds recreate the
-    // spinner and progress-fill DOM nodes, restarting their CSS animations — with
+    // spinner and progress-fill DOM nodes, restarting their CSS animations; with
     // console-tail updates arriving several times a second that reads as glitchy
     // flicker. Reusing each row's nodes and touching only the volatile bits keeps
     // the spinner spinning and the gradient/width transition smooth.
@@ -503,7 +503,7 @@ function InitClientListPush() {
         indicatorHtml = `<span class="exec-btn-icon exec-queued" role="img" aria-label="Queued"><i class="bi bi-hourglass-split"></i></span>`;
       }
 
-      // Inline status/error text (sits on the same row — never a block below).
+      // Inline status/error text (sits on the same row, never a block below).
       // Returned as data so it can be applied to a persistent span via textContent.
       let inlineClass = '';
       let inlineText = '';
@@ -518,7 +518,7 @@ function InitClientListPush() {
         // generic label until the first line arrives.
         const isConsole = !!rawStatusText && rawStatusText !== 'Running';
         inlineClass = `exec-inline exec-inline-stage${isConsole ? ' exec-inline-console' : ''}`;
-        inlineText = isConsole ? truncateExecutionLabel(rawStatusText, 64) : 'Running…';
+        inlineText = isConsole ? truncateExecutionLabel(rawStatusText, 64) : 'Running...';
         inlineTitle = rawStatusText;
       } else if (state === 'pending') {
         inlineClass = 'exec-inline exec-inline-stage';
@@ -555,7 +555,7 @@ function InitClientListPush() {
         listEl.appendChild(el);
       }
 
-      // Volatile updates only — the .exec-fill and spinner nodes are never replaced
+      // Volatile updates only: the .exec-fill and spinner nodes are never replaced
       // unless the state changes, so their animations run uninterrupted.
       el.style.setProperty('--exec-progress', `${fillPercent}%`);
       if (el.dataset.state !== state) {
@@ -678,15 +678,15 @@ export function RenderClientTile(Client: ClientView): string {
 // UpdateMonitoringTargetTile / UpdateDummyClientTile.
 //
 // Everything below is resolved through `$tile` rather than a repeated
-// `[data-uuid='…']` lookup, which fixes two things at once:
+// `[data-uuid='...']` lookup, which fixes two things at once:
 //
-//   Correctness — `[data-uuid='X']` is not tile-scoped. A client UUID also
+//   Correctness: `[data-uuid='X']` is not tile-scoped. A client UUID also
 //   appears on the Update Manager's row and its checkbox, so the class toggles
 //   below used to land on those too. (Nothing is lost by scoping: the same
 //   ClientUpdated handler re-renders that list from its own state when the
 //   modal is open, which is the authoritative path.)
 //
-//   Cost — attribute selectors take jQuery's slow path, so each one was a
+//   Cost: attribute selectors take jQuery's slow path, so each one was a
 //   document-wide querySelectorAll. This ran ~29 of them per tile per update,
 //   on every client's heartbeat. The id lookup is a single getElementById and
 //   every child query is scoped to that subtree.

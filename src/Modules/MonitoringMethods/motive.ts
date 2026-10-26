@@ -17,7 +17,7 @@
 //     streaming IDs).
 //   - Frames (NAT_FRAMEOFDATA): in multicast mode Motive sends them once to the
 //     group (default 239.255.42.99:1511); in unicast mode it sends them to the
-//     socket that sent NAT_CONNECT — both official samples handle frames on the
+//     socket that sent NAT_CONNECT; both official samples handle frames on the
 //     command socket for that reason, and send NAT_KEEPALIVE in unicast mode.
 //
 // Design:
@@ -609,7 +609,7 @@ export function QueryMotive(
         return;
       }
       // Unicast frames arrive on the command socket (see OnCommandMessage).
-      // Multicast — or a server that did not say — needs the group joined.
+      // Multicast (or a server that did not say) needs the group joined.
       if (Info.Connection && !Info.Connection.Multicast) return;
       const Group = Info.Connection ? Info.Connection.MulticastGroup : DEFAULT_MULTICAST_GROUP;
       const Port = Info.Connection ? Info.Connection.DataPort : DEFAULT_DATA_PORT;
@@ -889,7 +889,7 @@ function FormatNumber(N: number): string {
   return String(Math.round(N * 1000) / 1000);
 }
 
-// The reasons a reachable server is unhealthy, per the enabled toggles. Pure —
+// The reasons a reachable server is unhealthy, per the enabled toggles. Pure;
 // exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: MotiveSnapshot, Options: HealthOptions): string[] {
   if (!Snapshot.IsNatNet) return ['Responded, but not with NatNet server info'];
@@ -1019,7 +1019,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     Result && typeof Result.UnitsToMillimeters === 'number' ? Result.UnitsToMillimeters : null;
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     App ? TextRow('Application', App) : null,
     Reachable && Result.NatNetVersion ? TextRow('NatNet', Result.NatNetVersion) : null,
     Row('Status', StatePill(Result)),
@@ -1044,7 +1044,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       Head +
       '<div class="mt-2">' +
       Note(
-        'Failed to reach Motive’s NatNet server. In Motive, open Settings → Streaming, turn on NatNet streaming (Enable, or Broadcast Frame Data in older versions) and set Local Interface to a network ShowTrak can reach — Loopback only works when ShowTrak runs on the Motive PC.'
+        'Failed to reach Motive’s NatNet server. In Motive, open Settings → Streaming, turn on NatNet streaming (Enable, or Broadcast Frame Data in older versions) and set Local Interface to a network ShowTrak can reach. Loopback only works when ShowTrak runs on the Motive PC.'
       ) +
       '</div>'
     );

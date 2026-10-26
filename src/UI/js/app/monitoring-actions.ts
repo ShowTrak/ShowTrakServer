@@ -48,7 +48,7 @@ export function GetMethodAction(Method: string, ActionID: string): MonitoringAct
 /**
  * The choices offered for one action parameter on one check: whatever the device
  * itself reported this probe (ActionOptions), else the field's own static
- * Options, else none — in which case the field renders as free text.
+ * Options, else none, in which case the field renders as free text.
  */
 function ResolveParamOptions(
   Check: MonitoringCheckView,
@@ -89,7 +89,7 @@ export function GetActionParams(
 
 /**
  * Whether two parameter sets name the same favourite, compared the way the
- * server's canonical key does — per declared field, coerced to a string.
+ * server's canonical key does: per declared field, coerced to a string.
  *
  * This only decides whether the star draws lit. The server re-derives the
  * identity when the star is pressed, so a disagreement here can at worst show a
@@ -165,7 +165,7 @@ function RenderParamField(
 
   if (Options.length) {
     // A value the device no longer offers is kept as its own option rather than
-    // silently snapping to the first one — a starred "Set Input - Digital 2"
+    // silently snapping to the first one: a starred "Set Input - Digital 2"
     // should still read as Digital 2 when the projector stops listing it.
     const Known = Options.some((Option) => Option.value === Value);
     const All =
@@ -190,7 +190,7 @@ function RenderStar(Ids: string, Favourited: boolean): string {
       aria-pressed="${Favourited ? 'true' : 'false'}"
       title="${
         Favourited
-          ? 'Starred — shown in the right-click menu for selected monitors'
+          ? 'Starred: shown in the right-click menu for selected monitors'
           : 'Star this action so it appears in the right-click menu'
       }">
       <i class="bi bi-star${Favourited ? '-fill' : ''}"></i>
@@ -200,7 +200,7 @@ function RenderStar(Ids: string, Favourited: boolean): string {
 /**
  * One menu row. A plain action is a single clickable row with its star at the
  * end. A parameterised one keeps its label, then its picker, then a small run
- * button — the row itself can't be the trigger, or choosing an input from the
+ * button; the row itself can't be the trigger, or choosing an input from the
  * picker would fire it.
  */
 function RenderAction(
@@ -271,13 +271,13 @@ export function RenderCheckActionsMenu(Check: MonitoringCheckView): string {
   if (!Actions.length) return '';
 
   // An offline check means ShowTrak cannot reach the device at all, so every
-  // button would fail the same way — except an action declared
+  // button would fail the same way, except an action declared
   // AllowedWhileOffline, a recovery action that is wanted most at exactly that
   // moment. Degraded is left enabled on purpose: a projector sitting in standby
   // reads as degraded, and powering it on is exactly what the operator opened
   // this menu to do.
   const Offline = IsCheckOffline(Check);
-  const BlockedReason = 'This check is offline — ShowTrak cannot reach the device';
+  const BlockedReason = 'This check is offline; ShowTrak cannot reach the device';
 
   const Groups = new Map<string, MonitoringActionDef[]>();
   for (const Action of Actions) {
@@ -317,7 +317,7 @@ export function PositionOpenActionsMenu(): void {
   const Menu = document.querySelector<HTMLElement>(`.monitor-actions-menu${Selector}`);
   const Toggle = document.querySelector<HTMLElement>(`.monitor-actions-toggle${Selector}`);
   if (!Menu || !Toggle) {
-    // The check went away (deleted, or the modal moved on) — nothing to anchor to.
+    // The check went away (deleted, or the modal moved on): nothing to anchor to.
     OpenMenuCheckID = null;
     return;
   }
@@ -427,8 +427,8 @@ function RenderGroupAction(
 /**
  * The Actions tab for a monitoring target: one panel per check type that
  * declares actions, titled with the type, holding its actions in their declared
- * groups. A press goes to EVERY check of that type on the target — the server's
- * RunAction already fans out per check — so a target watching four projectors
+ * groups. A press goes to EVERY check of that type on the target (the server's
+ * RunAction already fans out per check), so a target watching four projectors
  * powers all four on with one button.
  */
 export function RenderTargetActionsPane(Target: MonitoringTargetView): string {
@@ -449,13 +449,13 @@ export function RenderTargetActionsPane(Target: MonitoringTargetView): string {
     const Offline = Group.Checks.filter(IsCheckOffline).length;
     // Every check offline means every press would fail the same way. Some
     // offline is left enabled: the rest still take it, and the toast reports
-    // which part of the batch refused. Degraded never blocks — a projector in
+    // which part of the batch refused. Degraded never blocks: a projector in
     // standby reads as degraded, and powering it on is the point.
     const Blocked = Offline === Count;
     const BlockedReason =
       Count === 1
-        ? 'This check is offline — ShowTrak cannot reach the device'
-        : `All ${Count} ${Group.Name} checks are offline — ShowTrak cannot reach them`;
+        ? 'This check is offline; ShowTrak cannot reach the device'
+        : `All ${Count} ${Group.Name} checks are offline; ShowTrak cannot reach them`;
 
     const Scope =
       Count === 1
@@ -545,7 +545,7 @@ export interface FavouriteForChecks {
 
 /**
  * The starred actions that apply to a selection of check rows, each narrowed to
- * the selected checks of its method — a favourite for PJLink offered on a
+ * the selected checks of its method: a favourite for PJLink offered on a
  * selection holding one PJLink check and one ping check runs on that one check.
  */
 export function GetFavouritesForChecks(CheckIDs: string[]): FavouriteForChecks[] {
@@ -590,7 +590,7 @@ export function ResetActionParamDrafts(): void {
 /**
  * Fire one action across the given targets and report what happened.
  *
- * A mixed result is reported as a mixed result: "3/6 — the projector is busy"
+ * A mixed result is reported as a mixed result: "3/6 - the projector is busy"
  * rather than a bare failure, because when five projectors took the command and
  * one refused, the operator needs to know which half of that they are looking at.
  */
@@ -615,7 +615,7 @@ export async function RunMonitoringAction(
     if (Summary.Failed) {
       const Reason = Summary.Results.find((Entry) => !Entry.Success)?.Error || 'failed';
       return Notify(
-        `${Label}: ${Summary.Succeeded}/${Summary.Total} — ${Reason}`,
+        `${Label}: ${Summary.Succeeded}/${Summary.Total} - ${Reason}`,
         Summary.Succeeded ? 'warning' : 'error'
       );
     }
@@ -656,7 +656,7 @@ export function WireMonitoringActions(Rerender: () => void): void {
     Rerender();
   });
 
-  // Clicking anywhere outside the open menu, or Escape, dismisses it — the same
+  // Clicking anywhere outside the open menu, or Escape, dismisses it, the same
   // as the right-click menu. Escape is stopped so it doesn't close the modal too.
   $(document).on('mousedown', (e) => {
     if (OpenMenuCheckID == null) return;
@@ -789,7 +789,7 @@ export function WireMonitoringActions(Rerender: () => void): void {
       // and the context menu together; the toast just confirms which way it went.
       Notify(
         Next
-          ? 'Starred — it is now in the right-click menu for selected monitors.'
+          ? 'Starred: it is now in the right-click menu for selected monitors.'
           : 'Removed from the right-click menu.',
         'success',
         2000

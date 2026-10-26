@@ -3,7 +3,7 @@
 //
 // Like sACN, NDI discovery is *passive*: every running NDI source advertises
 // itself on mDNS as a service instance of type `_ndi._tcp`, and there is nothing
-// to actively probe — you simply listen for the announcements. Each source shows
+// to actively probe; you simply listen for the announcements. Each source shows
 // up as one service instance whose name looks like "MACHINE-NAME (Source Name)".
 //
 // So instead of opening a socket per check we run ONE process-wide mDNS browser
@@ -16,7 +16,7 @@
 //     and sweeps entries not heard from within a retention window.
 //
 // Freshness note: bonjour's Browser emits `up` for a source EXACTLY ONCE (the
-// first time it is discovered) and `down` only on an explicit goodbye packet —
+// first time it is discovered) and `down` only on an explicit goodbye packet;
 // re-announcements from our periodic re-query are deduped internally and never
 // re-emitted. Relying on `up` alone therefore freezes each source's timestamp at
 // its discovery time, so the grace window would expire ~8s after boot and never
@@ -26,8 +26,8 @@
 // bookkeeping (`up`/`down`); the tap only keeps timestamps honest.
 //
 // A check's Run() merely reads that cache and asks "was a source matching my
-// target seen within the grace window?". The browser is fully lazy — nothing
-// starts until the first Observe() — so importing this module (e.g. from the
+// target seen within the grace window?". The browser is fully lazy (nothing
+// starts until the first Observe()), so importing this module (e.g. from the
 // method registry) has NO side effects.
 import { CreateLogger } from '../Logger';
 import { CreateBonjourErrorHandler } from '@showtrak/protocol/runtime';
@@ -198,7 +198,7 @@ class NdiBrowserImpl {
     this.EnsureStarted();
   }
 
-  // Read the current cache. Does not start the browser — callers Observe() first.
+  // Read the current cache. Does not start the browser; callers Observe() first.
   Snapshot(): NdiSnapshot {
     return {
       Ready: this.State === 'ready',
@@ -244,7 +244,7 @@ class NdiBrowserImpl {
     });
 
     // Tap the raw multicast-dns response stream so re-announcements refresh each
-    // source's timestamp (bonjour's `up` fires only once — see the file header).
+    // source's timestamp (bonjour's `up` fires only once; see the file header).
     const Mdns = ExtractMdns(Instance);
     if (Mdns) {
       const Handler: MdnsResponseHandler = (Packet) => this.HandleResponse(Packet);
@@ -477,7 +477,7 @@ export function EvaluateNdi(P: EvaluateParams): MonitoringResult {
     Success: false,
     Error: P.Snapshot.Ready
       ? `NDI source not found (${Fresh.length} source${Fresh.length === 1 ? '' : 's'} visible)`
-      : 'NDI browser starting…',
+      : 'NDI browser starting...',
     Matched: false,
     ...WithSources,
   };
@@ -519,7 +519,7 @@ export function BuildNdiDebug(Result: MonitoringResult, Target: MonitoringTarget
   const StatusPill = Online ? Pill('success', 'Present') : Pill('danger', 'Not found');
 
   const Head = Rows([
-    TextRow('Target source', SourceName || '—'),
+    TextRow('Target source', SourceName || '-'),
     TextRow('Match mode', MatchMode === 'exact' ? 'Exact' : 'Contains'),
     Row('Status', StatusPill),
     Online
@@ -531,10 +531,7 @@ export function BuildNdiDebug(Result: MonitoringResult, Target: MonitoringTarget
         ? TextRow('Detail', Result.Error as string)
         : null,
     // Discovery is network-wide via mDNS, so the check's Address field is unused.
-    Row(
-      'Address',
-      '<span class="text-muted small">Not used — NDI discovery is network-wide</span>'
-    ),
+    Row('Address', '<span class="text-muted small">Not used: NDI discovery is network-wide</span>'),
   ]);
 
   const Sources: NdiSource[] = Array.isArray(Result && Result.Sources)

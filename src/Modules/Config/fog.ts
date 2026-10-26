@@ -10,7 +10,7 @@
 //     The schema wins: 12 = All Snapins, 13 = Single Snapin.
 //
 // The `ttIsAccess` column decides whether a type may be scheduled against a host, a
-// group, or both. The API does NOT enforce this — `Route::task()` only checks that the
+// group, or both. The API does NOT enforce this: `Route::task()` only checks that the
 // TaskType row exists, so posting a group-only type to a host endpoint is accepted and
 // then misbehaves downstream. We only ever schedule against hosts, so group-only types
 // are excluded from this table entirely.
@@ -23,8 +23,8 @@ export interface FogTaskType {
   // Type 13 targets one specific snapin and needs its ID passed as `deploySnapins`.
   RequiresSnapinID?: boolean;
   // Imaging tasks (Deploy/Capture) stream a partclone percentage FOG reports as it
-  // runs, so a progress bar is meaningful. Every other type is effectively opaque —
-  // it flips straight from queued to complete — so the panel shows only its state.
+  // runs, so a progress bar is meaningful. Every other type is effectively opaque
+  // (it flips straight from queued to complete), so the panel shows only its state.
   SupportsProgress?: boolean;
 }
 
@@ -69,7 +69,7 @@ export function FogTaskPermissionKey(TaskTypeID: number): string {
 }
 
 // FOG task state IDs, from the `taskStates` seed. `/fog/task/active` filters on
-// stateID IN (0,1,2,3) — note it includes 0, which has no row in the states table.
+// stateID IN (0,1,2,3); note it includes 0, which has no row in the states table.
 export const FOG_TASK_STATES: Record<number, string> = {
   0: 'Pending',
   1: 'Queued',

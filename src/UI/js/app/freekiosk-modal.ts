@@ -3,19 +3,19 @@
 // Reuses #SHOWTRAK_CLIENT_INFO (as the monitor and dummy history modals do) and
 // renders one pane per tab of the modal's rail (see lib/client-info-tabs):
 //
-//   Status    — overall status card + status timeline, then a status card and
+//   Status    - overall status card + status timeline, then a status card and
 //               history chart for every reading with a check armed (each one
 //               repeated, as a row, on its own tab)
-//   Controls  — buttons and live sliders, then on-demand screenshot / camera
+//   Controls  - buttons and live sliders, then on-demand screenshot / camera
 //   Content, Screen, Battery, Network, Misc
-//             — the registry sections as monitoring cards (freekiosk-monitoring):
-//               a Monitor toggle per section, then a conditions table — each
+//             - the registry sections as monitoring cards (freekiosk-monitoring):
+//               a Monitor toggle per section, then a conditions table: each
 //               reading's value, the condition it alerts on, a tick, and an
 //               armed reading's history chart beneath its row
 //
 // EVERY metric in a monitored section gets a row. That is the point of the
 // feature: whatever the device exposes, the operator can see. The chart kind comes from
-// the registry too — a line for numbers, the existing block timeline for
+// the registry too: a line for numbers, the existing block timeline for
 // booleans and enums.
 import type {
   FreeKioskCommandDef,
@@ -67,7 +67,7 @@ const DISPLAY_MODE_LABELS: Record<string, string> = {
 /** Series for the open terminal, keyed by metric. Refilled on every push. */
 let FreeKioskSeries = new Map<string, FreeKioskMetricSample[]>();
 
-/** A capture is held only while the modal is open — never persisted anywhere. */
+/** A capture is held only while the modal is open, never persisted anywhere. */
 let LastCapture: { DataUrl: string; Bytes: number; CapturedAt: number; Kind: string } | null = null;
 let CaptureError: string | null = null;
 let CaptureInFlight = false;
@@ -149,11 +149,11 @@ function ChartThreshold(Alarm: ArmedAlarm | null): MetricChartThreshold | null {
  * What the reading was supposed to be, in the operator's words.
  *
  * Shown only while the alarm is actually breaching. When a value is where it
- * should be, the value alone says everything — repeating the threshold on all
+ * should be, the value alone says everything; repeating the threshold on all
  * sixty-one rows would bury the two that matter.
  *
  * The stored operator is the BREACH comparison, so the expectation is its
- * complement — the same complement the condition picker shows. A stored
+ * complement, the same complement the condition picker shows. A stored
  * "below 20" is "expected at least 20%".
  */
 export function DescribeExpected(Metric: FreeKioskMetricView, Alarm: ArmedAlarm | null): string {
@@ -165,7 +165,7 @@ export function DescribeExpected(Metric: FreeKioskMetricView, Alarm: ArmedAlarm 
       ? Value
       : null;
   // A threshold typed in its own unit (uptime in days) is worded in that unit,
-  // not run through the reading's format — "7" would otherwise read as "7s".
+  // not run through the reading's format: "7" would otherwise read as "7s".
   const Threshold = (Value: unknown): string => {
     const Numeric = typeof Value === 'number' ? Value : Number(Scalar(Value) ?? NaN);
     if (!Metric.ThresholdUnit || !Number.isFinite(Numeric)) {
@@ -186,9 +186,9 @@ export function DescribeExpected(Metric: FreeKioskMetricView, Alarm: ArmedAlarm 
     case 'inside':
       return `expected outside ${Want} to ${Want2}`;
     case 'is':
-      // Booleans never reach here — they arm `isNot`, so their value is already
+      // Booleans never reach here: they arm `isNot`, so their value is already
       // the expected state. This is the enum/string case, picked as "Expected
-      // is not …".
+      // is not ...".
       return `expected anything but ${Want}`;
     case 'isNot':
       return `expected ${Want}`;
@@ -212,8 +212,8 @@ export function DescribeExpected(Metric: FreeKioskMetricView, Alarm: ArmedAlarm 
  *
  * `breach` is the only thing that colours a block. It was recorded at sample
  * time from the alarm the operator actually armed, so the timeline says exactly
- * what the tile said at that instant. This used to also guess — treating a false
- * reading of any boolean as bad — which painted "Can Go Back: No" and every
+ * what the tile said at that instant. This used to also guess, treating a false
+ * reading of any boolean as bad, which painted "Can Go Back: No" and every
  * other perfectly healthy false in degraded orange, alarm or no alarm.
  */
 function ToStatusSamples(Samples: FreeKioskMetricSample[]): HistorySample[] {
@@ -231,13 +231,13 @@ function ToStatusSamples(Samples: FreeKioskMetricSample[]): HistorySample[] {
  *
  * NOTHING, unless a check is armed on it. Without one there is no standard to
  * judge a reading against, so a chart could only report that the device answered
- * — and "a value existed sixty times" is not information anybody acts on. Worse,
+ * and "a value existed sixty times" is not information anybody acts on. Worse,
  * it looks like a verdict: an unarmed block timeline is solid green whatever the
  * reading was, because nothing was breaching when nothing was being judged.
  *
  * With a check armed, the registry's `Chart` picks the KIND. 'line' graphs the
- * value with its threshold shaded. Everything else — booleans, enums, and the
- * readings whose shape over time says nothing, like uptime and storage — gets
+ * value with its threshold shaded. Everything else (booleans, enums, and the
+ * readings whose shape over time says nothing, like uptime and storage) gets
  * the pass/fail timeline instead, coloured from the recorded breach flag.
  */
 export function MetricChartKind(
@@ -275,7 +275,7 @@ function RenderMetricChart(
 
 /**
  * A registry section as a monitoring card: the Monitor toggle, then a table of
- * every reading with its current value — always, monitored or not. While the
+ * every reading with its current value: always, monitored or not. While the
  * section is monitored each row also carries the condition it alerts on and a
  * tick, and an armed reading's history is drawn beneath its row. See
  * freekiosk-monitoring.
@@ -307,7 +307,7 @@ function RenderSection(Terminal: FreeKioskTerminalView, Section: string): string
     (Key) => {
       const Metric = MetricByKey.get(Key);
       if (!Metric) return '';
-      // Expanded, because the store compresses flat runs — see lib/metric-series.
+      // Expanded, because the store compresses flat runs; see lib/metric-series.
       const Samples = ExpandMetricSeries(FreeKioskSeries.get(Metric.Key));
       return RenderMetricChart(Metric, ReadArmedAlarm(Terminal, Metric), Samples);
     }
@@ -338,7 +338,7 @@ export function FreeKioskMetricLiveState(
  * One monitored reading on the Status tab, drawn the way the client's Status
  * tab draws a critical display or interface: a status card (coloured by the
  * alarm's verdict) as the heading, its history chart directly beneath. Only
- * readings with a check armed get one — they are the ones with a history — and
+ * readings with a check armed get one (they are the ones with a history), and
  * the same section and display-mode rules as RenderSection apply, so Status
  * never shows a chart its own tab would hide. The full row appears again,
  * among the section's other readings, on the section's own tab.
@@ -424,7 +424,7 @@ function RenderCapturePanel(Terminal: FreeKioskTerminalView): string {
           <i class="bi bi-camera"></i> Take Photo
         </button>
         ${CameraSelect}
-        ${CaptureInFlight ? '<span class="freekiosk-capture-spinner">Capturing…</span>' : ''}
+        ${CaptureInFlight ? '<span class="freekiosk-capture-spinner">Capturing...</span>' : ''}
       </div>
       ${Error_}
       ${Frame}
@@ -440,7 +440,7 @@ function RenderControlsPanel(Terminal: FreeKioskTerminalView): string {
   const Disabled = Blocked ? 'disabled' : '';
 
   // Only what works in the mode this terminal is set up for. "Reload Page" on a
-  // kiosk locked to an app is not merely irrelevant — the device would accept it,
+  // kiosk locked to an app is not merely irrelevant: the device would accept it,
   // answer executed:true and do nothing, so offering it invites a click that
   // reports success and changes nothing.
   const Mode = GetFreeKioskDisplayMode(Terminal.Settings);
@@ -487,14 +487,14 @@ function RenderControlsPanel(Terminal: FreeKioskTerminalView): string {
 
   // Say which controls the mode removed, and where to change it. Hiding them
   // silently sends an operator hunting for a button that is working exactly as
-  // designed — the failure this note exists to prevent was a real one.
+  // designed; the failure this note exists to prevent was a real one.
   const Hidden = Commands.filter((Command) => Command.Modes && !Command.Modes.includes(Mode));
   const ModeNote = Hidden.length
     ? `<div class="freekiosk-section-note"><i class="bi bi-info-circle"></i> This terminal is set to ${Safe(
         DISPLAY_MODE_LABELS[Mode] || Mode
       )} mode, so ${Safe(
         Hidden.map((Command) => Command.Label).join(', ')
-      )} ${Hidden.length === 1 ? 'is' : 'are'} hidden — ${Hidden.length === 1 ? 'it acts' : 'they act'} on the WebView. Change the display mode in this terminal's settings if that is wrong.</div>`
+      )} ${Hidden.length === 1 ? 'is' : 'are'} hidden: ${Hidden.length === 1 ? 'it acts' : 'they act'} on the WebView. Change the display mode in this terminal's settings if that is wrong.</div>`
     : '';
 
   return `
@@ -529,7 +529,7 @@ export function RenderFreeKioskModal($timelines: JQuery<HTMLElement>): void {
   );
 
   // Status: the terminal's overall status, then the history of every reading
-  // with a check armed — the at-a-glance view of everything being monitored.
+  // with a check armed: the at-a-glance view of everything being monitored.
   // Readings nobody is watching have no history to show and stay on their tabs.
   // In registry section order, then registry order within a section, so the
   // list reads the same as the tabs do.
@@ -581,7 +581,7 @@ export function RenderFreeKioskModal($timelines: JQuery<HTMLElement>): void {
   }
 
   // The rows are appended, not bound, so the popovers have to be attached after
-  // every render — including the 30s live refresh, which replaces the DOM.
+  // every render, including the 30s live refresh, which replaces the DOM.
   InitMonitoringNotePopovers('#MONITOR_HISTORY_TIMELINES');
 
   EnsureFreeKioskCameras(Terminal);
@@ -661,7 +661,7 @@ function EnsureFreeKioskCameras(Terminal: FreeKioskTerminalView): void {
 
 // Sliders are debounced then reconciled by an immediate re-poll. The pending
 // window stops the next push writing over a value the operator is still
-// dragging — and, once it lapses, lets a device that refused the command snap
+// dragging and, once it lapses, lets a device that refused the command snap
 // the control back rather than leaving it lying.
 const SLIDER_DEBOUNCE_MS = 400;
 const SliderTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -705,7 +705,7 @@ export function WireFreeKioskModal(Rerender: () => void): void {
     // Commands that need parameters are configured from the editor or the
     // context menu prompt; the modal only fires the parameterless ones.
     if (Command.Params && Command.Params.length) {
-      Notify(`${Command.Label} needs parameters — use the right-click menu.`, 'info');
+      Notify(`${Command.Label} needs parameters: use the right-click menu.`, 'info');
       return;
     }
 

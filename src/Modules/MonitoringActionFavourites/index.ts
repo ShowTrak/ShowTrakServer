@@ -30,7 +30,7 @@ interface Favourite {
   Method: string;
   ActionID: string;
   Params: Record<string, unknown>;
-  /** The canonical JSON the row is keyed on — see CanonicalParams. */
+  /** The canonical JSON the row is keyed on; see CanonicalParams. */
   ParamsKey: string;
   Weight: number;
 }
@@ -46,7 +46,7 @@ let InitPromise: Promise<void> | null = null;
  * different rows depending on which order the renderer happened to build the
  * object in, and the unique index would never catch the duplicate. Parameters
  * are normalized through the action's own schema first, so a value that the
- * form would clamp is stored clamped — the identity matches what the action
+ * form would clamp is stored clamped: the identity matches what the action
  * will actually do, not what was typed.
  */
 function CanonicalParams(Method: string, ActionID: string, Params: unknown): string {
@@ -146,7 +146,7 @@ const Manager = {
 
   /**
    * Star or unstar one action + parameter combination. Idempotent in both
-   * directions — the star is a toggle in a UI that may be several clicks ahead
+   * directions: the star is a toggle in a UI that may be several clicks ahead
    * of the database, so setting a state it is already in must succeed quietly.
    */
   async Set(

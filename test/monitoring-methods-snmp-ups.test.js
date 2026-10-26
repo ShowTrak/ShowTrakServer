@@ -15,8 +15,8 @@ const { loadWithMocks } = require('../test-support/load-with-mocks');
 // on battery. The two directions that matter are a false "healthy" (nobody is
 // told the mains dropped) and a false "offline" (an alarm every poll, which
 // trains the operator to ignore the panel). The probe deliberately treats a
-// missing MIB object as `null` — plenty of cards do not populate temperature or
-// input voltage — while treating a transport failure as offline, and that
+// missing MIB object as `null` (plenty of cards do not populate temperature or
+// input voltage) while treating a transport failure as offline, and that
 // distinction is exactly what this pins.
 //
 // Only `net-snmp` is stubbed; the real UPS-MIB OID table, health evaluation,
@@ -396,7 +396,7 @@ test('normal readings raise nothing', () => {
     ),
     []
   );
-  // Booster / reducer mean the UPS is correcting voltage — normal operation.
+  // Booster / reducer mean the UPS is correcting voltage: normal operation.
   assert.deepEqual(EvaluateHealth({ OutputSource: 6 }, THRESHOLDS), []);
   assert.deepEqual(EvaluateHealth({ OutputSource: 7 }, THRESHOLDS), []);
   // Unknown battery status is not a fault on its own.

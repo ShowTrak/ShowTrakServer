@@ -45,7 +45,7 @@ function takeRequests(state) {
 }
 
 // A fake PIXERA API access point.
-//   framing     : 'pxr1' | 'dl' — what this access point accepts; the other gets silence
+//   framing     : 'pxr1' | 'dl': what this access point accepts; the other gets silence
 //   project     : getProjectName result
 //   timelines   : { name: transportMode }
 //   revision    : getApiRevision result

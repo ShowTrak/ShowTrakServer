@@ -261,8 +261,8 @@ function applyCriticalState(Entity: Client): Client {
   return Entity;
 }
 
-// Insert TargetClient into the cache, or — if an instance for its UUID already
-// resides — return that resident instance and discard the newcomer. `added`
+// Insert TargetClient into the cache, or (if an instance for its UUID already
+// resides) return that resident instance and discard the newcomer. `added`
 // reports whether an insert happened (drives the ClientListChanged emit);
 // `client` is always the authoritative cached instance. Returning the resident
 // closes the race where two concurrent hydrations of the same UUID would each
@@ -1413,7 +1413,7 @@ Manager.RemoveSystemCheck = async (UUID: string, Key: ClientSystemCheckKey) => {
 // Record one MAC against a client, or refresh it if already on file.
 //
 // 'Reported' addresses come from the client's own NIC enumeration and are
-// filtered to physical, externally-reachable interfaces — loopback, virtual
+// filtered to physical, externally-reachable interfaces; loopback, virtual
 // adapters and randomized Wi-Fi addresses cannot wake a machine and would only
 // bloat the table. 'Manual' addresses skip that filter: an operator typing an
 // address has context we don't (a NIC we have never seen, an unusual adapter),
@@ -1445,7 +1445,7 @@ Manager.AddMacAddress = async (
   const Now = Date.now();
   const Existing = MacAddresses.getForClient(UUID, false)?.get(Normalized) || null;
   if (Existing) {
-    // Already on file — refresh liveness only. Notably this does NOT relabel a
+    // Already on file: refresh liveness only. Notably this does NOT relabel a
     // manual entry as 'Reported' once the client reports it, so the editor keeps
     // showing how the address got there.
     //
@@ -1504,7 +1504,7 @@ Manager.AddMacAddress = async (
 };
 
 // Forget a MAC. A 'Reported' address the client still has comes back on its next
-// NIC report — removal is for retiring addresses the machine no longer carries,
+// NIC report; removal is for retiring addresses the machine no longer carries,
 // not for permanently suppressing a live one.
 Manager.RemoveMacAddress = async (UUID: string, MacAddress: unknown) => {
   const [Err, Target] = await Manager.Get(UUID);
@@ -1521,7 +1521,7 @@ Manager.RemoveMacAddress = async (UUID: string, MacAddress: unknown) => {
   MacAddresses.removeForClient(UUID, Normalized);
   MacAddresses.applyState(Target);
   // Clients.MacAddress is a denormalized copy of one of these rows, so clear it
-  // when it is the one that just went — otherwise the editor's summary field
+  // when it is the one that just went, otherwise the editor's summary field
   // outlives the entry it mirrors. The next report repopulates it if live.
   if (NormalizeMacAddress(Target.MacAddress) === Normalized) {
     await Target.SetMacAddress(null, { markUnsaved: false });
@@ -1540,8 +1540,8 @@ Manager.RemoveMacAddress = async (UUID: string, MacAddress: unknown) => {
 };
 
 // Flatten a normalized NetworkInterfaces snapshot into (MAC, interface name)
-// pairs worth storing. Addresses the OS marks `internal` — loopback, and on some
-// platforms tunnel endpoints — are dropped here: they belong to no physical NIC
+// pairs worth storing. Addresses the OS marks `internal` (loopback, and on some
+// platforms tunnel endpoints) are dropped here: they belong to no physical NIC
 // and no magic packet sent to them could ever reach a sleeping machine.
 function CollectReportedMacAddresses(
   Interfaces: Array<{ name?: string; addresses?: Array<{ mac?: unknown; internal?: boolean }> }>
@@ -1685,7 +1685,7 @@ async function ApplyClientUpdate(
   if (Object.prototype.hasOwnProperty.call(Fields, 'Variables') && Client.Integrated === true) {
     return Fail('Variables are not supported for integrated clients');
   }
-  // Surface the first failed persist rather than reporting Ok unconditionally —
+  // Surface the first failed persist rather than reporting Ok unconditionally:
   // the setters roll their own RAM back on failure, so returning Fail here keeps
   // the UI's view aligned with what actually landed in the row.
   if (Object.prototype.hasOwnProperty.call(Fields, 'Nickname')) {
@@ -1725,7 +1725,7 @@ async function ApplyClientUpdate(
     if (SetErr) return Fail(SetErr);
   }
   // Variable overrides live in their own table rather than on the client row, so
-  // they are delegated instead of set through a Client setter — the Client entity
+  // they are delegated instead of set through a Client setter; the Client entity
   // stays plain data describing the machine, not a carrier for show config.
   if (Object.prototype.hasOwnProperty.call(Fields, 'Variables')) {
     const [SetErr] = await VariableManager.SetClientValues(
@@ -1796,7 +1796,7 @@ function PendingHostname(UUID: string): string | null {
 // way they will once real hardware fills the slot.
 const UNASSIGNED_DEFAULT_OS = 'Windows';
 
-// Create one or more reserved slots — client rows with no hardware behind them,
+// Create one or more reserved slots: client rows with no hardware behind them,
 // standing in for machines that have not arrived yet. Their UUIDs are random
 // (nothing will ever connect with them) and every descriptive field is filler;
 // the operator later points a real device at the slot via ReplaceClient, which
@@ -1821,7 +1821,7 @@ Manager.CreateUnassigned = async (Name: string, Count: number) => {
     );
     if (InsertErr) {
       Logger.error('Failed to insert unassigned client', InsertErr);
-      // Slots already inserted stay — they are independently valid, and the
+      // Slots already inserted stay; they are independently valid, and the
       // caller is told how many landed rather than losing the whole batch.
       break;
     }
@@ -1978,7 +1978,7 @@ Manager.Exists = async (UUID: string) => {
 Manager.Get = async (UUID: string) => {
   // No Init() warm-up here on purpose: unlike GetAll (which must return the
   // whole list), a single Get is fully served by the cache-then-DB path below,
-  // and Init() rebuilds ClientList from DB rows — which would discard any live
+  // and Init() rebuilds ClientList from DB rows, which would discard any live
   // cached instance (and its runtime-only online/vitals state) mid-session.
   // Check in memory first
   const CachedClient = ClientIndex.get(UUID);

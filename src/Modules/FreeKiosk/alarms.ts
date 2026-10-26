@@ -7,10 +7,10 @@
 //
 // Two rules run through everything here:
 //   - A stored operator is the BREACH comparison, which the editor shows as
-//     its complement — the expectation (see the note on FreeKioskOperator in
+//     its complement: the expectation (see the note on FreeKioskOperator in
 //     ./metrics). This file only ever sees the breach.
 //   - A metric with no reading NEVER breaches. A device that lacks a light
-//     sensor, or a poll that failed, must not satisfy a "below" alarm — absence
+//     sensor, or a poll that failed, must not satisfy a "below" alarm; absence
 //     of evidence is not evidence of a fault.
 import {
   FREEKIOSK_METRICS,
@@ -82,7 +82,7 @@ export function ParseAlarmSettings(Settings: unknown): Map<string, FreeKioskAlar
     // display mode the metric does not apply to. Doing it here, in the one
     // funnel every evaluation goes through, is what stops a threshold left over
     // from when the group was on firing against a metric nobody is watching any
-    // more — the editor hides those fields, so nobody would even see where the
+    // more; the editor hides those fields, so nobody would even see where the
     // alert had come from. The mode gate matters more: a URL check left armed on
     // a terminal since switched to an external app would keep passing forever
     // against a page that is no longer on screen.
@@ -134,7 +134,7 @@ function BuildReason(
   const Want2 = FormatThreshold(Metric, Threshold2);
 
   // Every reason names the reading and the expectation it broke, in the same
-  // "(expected …)" form, because the operator was configured as that
+  // "(expected ...)" form, because the operator was configured as that
   // expectation. "Power Source is usb (expected ac)" says both what is wrong and
   // what right looks like, in one line that still fits on a tile.
   switch (Operator) {
@@ -158,7 +158,7 @@ function BuildReason(
       return `${Metric.Label} changed (${FormatMetricValue(Metric, Previous)} → ${Shown})`;
     case 'decreases':
       return Metric.Key === 'device_uptime'
-        ? `${Metric.Label} went backwards (${Shown}) — the device restarted`
+        ? `${Metric.Label} went backwards (${Shown}); the device restarted`
         : `${Metric.Label} went backwards (${FormatMetricValue(Metric, Previous)} → ${Shown})`;
     default:
       return `${Metric.Label} ${Shown}`;
@@ -295,7 +295,7 @@ const REASON_SUMMARY_LIMIT = 3;
 
 /**
  * Collapse breaches into the one line the tile and the status card show. Three
- * reasons then "+N more" — the same treatment a monitoring target gives a
+ * reasons then "+N more": the same treatment a monitoring target gives a
  * multi-fault verdict, so a terminal with a dozen alarms still reads.
  */
 export function BuildDegradedReason(Results: readonly FreeKioskAlarmResult[]): string {

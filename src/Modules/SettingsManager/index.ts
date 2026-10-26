@@ -89,8 +89,8 @@ function SettingValueText(Setting: Setting, Value: SettingValue): string | null 
   return Setting.Unit === '%' ? `${Text}%` : `${Text} ${Setting.Unit}`;
 }
 
-// A change made from a surface (Desktop, Web UI, SDK…). One with no surface is
-// ShowTrak's own doing — generating the SDK key on first start — not an edit.
+// A change made from a surface (Desktop, Web UI, SDK, etc.). One with no surface is
+// ShowTrak's own doing (generating the SDK key on first start), not an edit.
 function RecordSettingChange(Setting: Setting, Previous: SettingValue, IsSecret: boolean) {
   if (!CurrentAuditSource()) return Promise.resolve();
   return AuditStep(() =>

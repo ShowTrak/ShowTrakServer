@@ -6,8 +6,8 @@
 //
 // Commands go through a single channel rather than one per action. Twenty
 // channels would each need an entry in the registry, the preload bridge, the
-// Web UI shim and the Web UI allowlist for no added safety — the command name is
-// validated against the fixed FREEKIOSK_COMMANDS allowlist either way — and the
+// Web UI shim and the Web UI allowlist for no added safety (the command name is
+// validated against the fixed FREEKIOSK_COMMANDS allowlist either way), and the
 // single channel fans a bulk selection out server-side, so the context menu
 // makes one call and gets one aggregate result.
 import { RPC } from '../rpc';

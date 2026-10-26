@@ -274,7 +274,7 @@ function BuildHttpDebug(
   const HasStatus = Number.isFinite(Number(Status)) && Number(Status) > 0;
 
   return Rows([
-    TextRow('Request', `${Method} ${Scheme.toUpperCase()} ${Address || '—'}${Path}`),
+    TextRow('Request', `${Method} ${Scheme.toUpperCase()} ${Address || '-'}${Path}`),
     HasStatus
       ? Row('Status', Pill(StatusKind(Status), `HTTP ${Number(Status)}`))
       : Row('Reachable', Pill(Success ? 'success' : 'danger', Success ? 'Yes' : 'No')),

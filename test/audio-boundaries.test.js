@@ -230,7 +230,7 @@ test('remote surfaces: changing a level is a show-time action behind the script 
     allowed: false,
     reason: 'forbidden',
   });
-  // Allowed in SHOW mode once permitted — a level is adjusted during the show.
+  // Allowed in SHOW mode once permitted; a level is adjusted during the show.
   const open = loadRemote({ REMOTE_ALLOW_REMOTE_SCRIPT_EXECUTION: 1 }, 'SHOW');
   assert.deepEqual(await open.AuthorizeChannel('REMOTE', 'SetClientAudioLevel'), {
     allowed: true,

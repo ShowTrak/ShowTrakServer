@@ -11,7 +11,7 @@ const { CLIENT_STARTUP_GRACE_MS } = require('../dist/Modules/Config/constants');
 //
 // A freshly-connected client holds its critical-hardware guards for
 // CLIENT_STARTUP_GRACE_MS (the show software is still launching), which is not
-// what the guard tests below are about — they are about what happens once the
+// what the guard tests below are about; they are about what happens once the
 // machine is up. Backdating the connection puts them past that window; the
 // window itself has its own tests.
 function markStarted(client) {
@@ -135,7 +135,7 @@ test('ClientManager hydrates a heartbeat from the database when uncached', async
   assert.equal(invalidMsg, null);
 });
 
-// Hotplug events are the real-time USB signal — the client sends one per plug
+// Hotplug events are the real-time USB signal: the client sends one per plug
 // and the server applies it to the connected list incrementally. That only works
 // if applying an event is correct on its own; it used to be papered over by a
 // full device list arriving immediately afterwards, which no longer happens.
@@ -151,7 +151,7 @@ test('adding a serial-less USB device leaves the other serial-less devices conne
   await Manager.USBDeviceAdded('dev-1', mouse);
   const [, afterAdd] = await Manager.Get('dev-1');
   // Matching on a normalised serial number treated every absent serial as equal,
-  // so plugging in one unserialised device filtered out every other one — the
+  // so plugging in one unserialised device filtered out every other one; the
   // keyboard and hub simply vanished from the server's view until the next full
   // list arrived.
   assert.equal(afterAdd.ConnectedUSBDeviceList.length, 3);
@@ -428,7 +428,7 @@ test('ClientManager tracks critical displays and flags resolution/refresh change
 // heartbeat lands immediately and its USB, display and application reports
 // follow a second apart, so between them the server holds guards for hardware
 // it has been told nothing about. Judging that silence as "missing" marked every
-// client degraded on connect — and at server start, with the whole rig
+// client degraded on connect, and at server start, with the whole rig
 // connecting at once, that arrived as a wave of alerts for faults that did not
 // exist.
 test('hardware a client has not reported yet is unknown, not missing', async () => {
@@ -451,7 +451,7 @@ test('hardware a client has not reported yet is unknown, not missing', async () 
 
   // The server restarts (or the client reconnects): the heartbeat arrives, the
   // hardware reports have not. Started long enough ago that the start-up window
-  // is not what is holding the fault back — only the missing evidence is.
+  // is not what is holding the fault back; only the missing evidence is.
   client.SetOnline(false);
   markStarted(client);
   assert.equal(client.Degraded, false, 'silence about a device is not a report that it is gone');
@@ -460,7 +460,7 @@ test('hardware a client has not reported yet is unknown, not missing', async () 
   // is genuinely connected and still says so.
   assert.equal(client.Online, true);
 
-  // Reporting displays proves nothing about USB — the gates are per-domain.
+  // Reporting displays proves nothing about USB: the gates are per-domain.
   await Manager.SetDisplayList('booth-1', [
     { DisplayID: '100', Label: 'Primary', Width: 1920, Height: 1080, RefreshRate: 60 },
   ]);
@@ -476,7 +476,7 @@ test('hardware a client has not reported yet is unknown, not missing', async () 
 });
 
 // The other half of the start-up problem. Once a machine's telemetry DOES
-// arrive, the report is accurate — the show software genuinely is not running
+// arrive, the report is accurate: the show software genuinely is not running
 // yet, because the machine finished booting ten seconds ago. That is a true
 // observation of a state that is about to fix itself, and at rig power-up it
 // arrives from every machine at once.
@@ -520,7 +520,7 @@ test('a critical application missing during the start-up window reads as startin
   assert.equal(client.Degraded, false);
 
   // A machine that is still missing it when the window closes is a real fault,
-  // and is published as one — this is the case the window must not swallow.
+  // and is published as one; this is the case the window must not swallow.
   await Manager.SetRunningApplications('stage-1', {
     SampledAt: Date.now(),
     TotalCount: 1,
@@ -900,7 +900,7 @@ test('ClientManager.ReplaceClient migrates critical USB-name rows in the databas
   const [replaceErr] = await Manager.ReplaceClient('legacy-names', 'replacement-names');
   assert.equal(replaceErr, null);
 
-  // After the rename it must follow the client to the new UUID — not be orphaned
+  // After the rename it must follow the client to the new UUID, not be orphaned
   // under the old one, which was the pre-fix behaviour (in-memory rekey only).
   const [, oldRow] = await DB.Get('SELECT UUID FROM CriticalUSBDeviceNames WHERE UUID = ?', [
     'legacy-names',
@@ -958,7 +958,7 @@ test('ClientManager.Get adopts an uncached client into the cache so callers shar
   // Runtime-only mutation on the hydrated instance.
   first.SetOnline(true);
 
-  // A second Get must return the same adopted instance, carrying the mutation —
+  // A second Get must return the same adopted instance, carrying the mutation,
   // proving Get cached the hydrated client rather than returning a fresh orphan.
   const [secondErr, second] = await Manager.Get('adopt-1');
   assert.equal(secondErr, null);
@@ -970,7 +970,7 @@ test('ClientManager.Get adopts an uncached client into the cache so callers shar
 // A delta amends state that the corresponding full list replaces outright. The
 // full list stays the authority, so the property that matters most here is that
 // applying a delta leaves the client in exactly the state the equivalent full
-// list would have produced — otherwise the next resync would report a spurious
+// list would have produced; otherwise the next resync would report a spurious
 // change and the two paths would fight each other forever.
 
 test('a network interface delta adds, changes and removes interfaces', async () => {

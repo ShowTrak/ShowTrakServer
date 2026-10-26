@@ -53,7 +53,7 @@ test('DeleteTargetCascade surfaces the error when the target delete fails', asyn
 
   const [err, value] = await Repo.DeleteTargetCascade(42);
   // The checks delete already ran, but the failing target delete rolls the whole
-  // transaction back — the caller must see the failure, not a silent partial.
+  // transaction back; the caller must see the failure, not a silent partial.
   assert.equal(value, null);
   assert.ok(err, 'a failed cascade must surface an error');
 });

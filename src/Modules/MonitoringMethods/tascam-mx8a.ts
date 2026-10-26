@@ -1,5 +1,5 @@
 // TASCAM MX-8A matrix mixer health over TEAC's RS-232C/ETHERNET protocol
-// ("TASCAM MX-8A/DCP Series … protocol specifications", v1.00): plain text on
+// ("TASCAM MX-8A/DCP Series ... protocol specifications", v1.00): plain text on
 // TCP 54726 (fixed), every command and reply ending in CR+LF. One short-lived
 // session per probe, one command in flight at a time:
 //
@@ -9,12 +9,12 @@
 //                             `Another User Already Connected` and hangs up.
 //   2. `GET DEVICE/MODELNAME DEVICE/NAME DEVICE/VER/SYSTEM DEVICE/SERIAL
 //       DEVICE/SAMPLE TESTTONE/ENABLE`
-//                           → `OK GET DEVICE/MODELNAME:"MX-8A" …`, one
+//                           → `OK GET DEVICE/MODELNAME:"MX-8A" ...`, one
 //                             `Key:Value` per key asked; a key the unit cannot
 //                             answer reads `Key:ERR<n>`.
-//   3. `GET ANLGOUT/<n>/TESTTONE …` for outputs 1-8, only while the test tone is
+//   3. `GET ANLGOUT/<n>/TESTTONE ...` for outputs 1-8, only while the test tone is
 //      on, to say which outputs it is reaching.
-//   4. `GET ANLGIN/<n>/MUTE MIX/<n>/MUTE ANLGOUT/<n>/MUTE …` for the listed
+//   4. `GET ANLGIN/<n>/MUTE MIX/<n>/MUTE ANLGOUT/<n>/MUTE ...` for the listed
 //      channels. Channel names come from the check's settings, not the unit.
 //
 // NOTIFY (setting changes) and METER lines can arrive at any time and are
@@ -312,7 +312,7 @@ function ParseConfig(Target: MonitoringTargetLike): MxConfig {
   };
 }
 
-// The names set in ShowTrak, number → name per channel kind. Pure — exported via
+// The names set in ShowTrak, number → name per channel kind. Pure; exported via
 // _internal.
 function ParseLabelOverrides(
   Target: MonitoringTargetLike
@@ -382,7 +382,7 @@ function IsPushed(Line: string): boolean {
 
 /**
  * A predicate for ReplyQueue: how many leading characters end with the first
- * line that answers a command — skipping blank lines and pushed NOTIFY / METER
+ * line that answers a command, skipping blank lines and pushed NOTIFY / METER
  * lines. Null while no such line has arrived.
  */
 function NextReplyLine(Buffered: string): number | null {
@@ -430,10 +430,10 @@ export interface ParsedReply {
 }
 
 /**
- * `OK GET Key:Value …` / `OK SET [Key:ERR<n> …]`. The spec's own error example
+ * `OK GET Key:Value ...` / `OK SET [Key:ERR<n> ...]`. The spec's own error example
  * also shows the reply without the leading OK (`GET Key:ERR1`), and one GET
  * example answered `OK SET`, so both are accepted. Null for anything else,
- * including `NG …` (command not recognised).
+ * including `NG ...` (command not recognised).
  */
 function ParseReply(Line: string): ParsedReply | null {
   const Match = /^(?:OK\s+)?(GET|SET)(?:\s+(.*))?$/i.exec(Line.trim());
@@ -830,7 +830,7 @@ function QueryOwnSession(Config: MxConfig, Channels: MonitoredChannel[]): Promis
 
 // --- Evaluation ----------------------------------------------------------------------
 
-// The reasons a reachable unit is unhealthy, per the enabled options. Pure —
+// The reasons a reachable unit is unhealthy, per the enabled options. Pure;
 // exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: MxSnapshot, Options: HealthOptions): string[] {
   if (Snapshot.Login === 'unexpected') return ['Responded, but not as a TASCAM MX-8A control port'];
@@ -916,10 +916,10 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 //
 //   1. GET ANLGIN/1..8/METER/PRE MIX/1..8/METER ANLGOUT/1..8/METER
 //                                     what the meter switches were, to put back
-//   2. GET …/FADER, …/MUTE            fader and mute state, for live control
-//   3. SET …:ON                       pre-fader input, mix bus and output meters on
+//   2. GET .../FADER, .../MUTE        fader and mute state, for live control
+//   3. SET ...:ON                     pre-fader input, mix bus and output meters on
 //   4. SET METER/TOTAL:10000 METER/INTERVAL:100, again every 5 s: the unit sends
-//      `METER ANLGIN/<n>/METER/PRE:<hex> … MIX/<n>/METER … ANLGOUT/<n>/METER:<hex>` every 100 ms
+//      `METER ANLGIN/<n>/METER/PRE:<hex> ... MIX/<n>/METER ... ANLGOUT/<n>/METER:<hex>` every 100 ms
 //      for TOTAL ms after each.
 //
 // Inputs, mix buses and outputs are always metered together: they arrive on the
@@ -985,7 +985,7 @@ const FADER_INDEX = new Map(METER_CHANNELS.map((C, I) => [C.FaderKey, I]));
 const MUTE_INDEX = new Map(METER_CHANNELS.map((C, I) => [C.MuteKey, I]));
 const ID_INDEX = new Map(METER_CHANNELS.map((C, I) => [C.ID, I]));
 
-// What one subscriber's check asks to see. Pure — exported via _internal.
+// What one subscriber's check asks to see. Pure; exported via _internal.
 export interface LevelsWanted {
   Inputs: boolean;
   Outputs: boolean;
@@ -1607,7 +1607,7 @@ async function SetLiveLevel(
 //
 // Each press opens its own session (same port, password and budget as the
 // check), logs in, sends ONE documented SET and closes as soon as the unit
-// answers `OK SET` (applied) or `OK SET Key:ERR<n>` / `NG …` (refused):
+// answers `OK SET` (applied) or `OK SET Key:ERR<n>` / `NG ...` (refused):
 //   SET DEVICE/IDENTIFY:EXE            flash the unit's front panel (about 5 s)
 //   SET TESTTONE/ENABLE:OFF            stop the test tone
 //   SET ANLGIN|MIX|ANLGOUT/<n>/MUTE:ON|OFF
@@ -1692,7 +1692,7 @@ interface BuiltAction {
   CloseMeansDone?: boolean;
 }
 
-// Validate an action's parameters and build its one command. Pure — exported
+// Validate an action's parameters and build its one command. Pure; exported
 // via _internal for unit tests.
 function BuildActionCommand(
   ActionID: string,
@@ -1886,7 +1886,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       : Pill('success', 'Healthy');
 
   const Head = [
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Row('Status', StatePill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
@@ -1976,7 +1976,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
 export const Name = 'TASCAM MX-8A';
 export const Description =
-  'Logs in to a TASCAM MX-8A matrix mixer on its Ethernet control port (TCP 54726) and confirms it answers, reading its model, firmware, serial number and sample rate — read-only. Reports Degraded while the test tone is on, and optionally while listed inputs, mix buses or outputs are muted.';
+  'Logs in to a TASCAM MX-8A matrix mixer on its Ethernet control port (TCP 54726) and confirms it answers, reading its model, firmware, serial number and sample rate (read-only). Reports Degraded while the test tone is on, and optionally while listed inputs, mix buses or outputs are muted.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = {
   ParseConfig,

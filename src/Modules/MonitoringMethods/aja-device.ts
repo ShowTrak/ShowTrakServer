@@ -1,4 +1,4 @@
-// AJA device check over AJA's REST parameter API — the same `/config` interface
+// AJA device check over AJA's REST parameter API: the same `/config` interface
 // on Ki Pro recorders, HELO / HELO Plus streamers, FS-series frame syncs and the
 // other AJA network products. Built for "the recorder stopped and nobody saw"
 // and for the alarms the device already raises on its own front panel.
@@ -10,7 +10,7 @@
 //       {"paramid":"33619978","name":"eParamID_VideoInSelect","value":"1","value_name":"HDMI"}
 //     `value_name` is the enum text (a copy of the value for integers).
 //   - GET /desc.json lists EVERY parameter descriptor the device has, as an
-//     array of {param_id: "eParamID_…", param_name, string_attributes[], …}.
+//     array of {param_id: "eParamID_...", param_name, string_attributes[], ...}.
 //     Parameter sets vary per product and firmware, so the descriptors decide
 //     which of the status parameters below are worth asking for at all.
 //   - Alarms are parameters whose descriptor carries the string attributes
@@ -28,13 +28,13 @@
 //     has no separate input-signal rule: the device's own alarm is the source
 //     of truth, whatever the product calls it.
 //   - Authentication, when turned on in the device: POST /authenticator/login
-//     with `password_provided=…` answers {"login":"success"} and a session
+//     with `password_provided=...` answers {"login":"success"} and a session
 //     cookie that every later request returns. Companion's HELO module notes a
 //     404 is how an expired session shows, so a 401/403/404 with a cookie
 //     triggers one fresh login.
 //
 // Status parameters read when the device has them (sources noted per entry in
-// STATUS_PARAMS). Every request is `action=get` — nothing that changes device
+// STATUS_PARAMS). Every request is `action=get`; nothing that changes device
 // state is ever sent. The login POST creates a web session, nothing more.
 //
 // Not read: model and firmware. AJA documents no parameter for either, and
@@ -44,7 +44,7 @@
 // documented `/config?action=set` command parameters:
 //   - Ki Pro family (Ki Pro GO / Ultra / Ultra Plus / Ultra 12G chapters):
 //     eParamID_TransportCommand 1 Play, 3 Record, 4 Stop. AJA: "Stop: once to
-//     pause, twice to stop (idle)" — either way a recording ends.
+//     pause, twice to stop (idle)"; either way a recording ends.
 //   - HELO / HELO Plus (chapter 03): eParamID_ReplicatorCommand 1 Record,
 //     2 Stop Recording, 3 Stream, 4 Stop Streaming.
 //   The family is told apart by which command parameter the device describes
@@ -1136,7 +1136,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Reachable = !!(Result && Result.Success === true);
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Reachable && Result.SystemName ? TextRow('Name', String(Result.SystemName)) : null,
     Row('Status', BmdStatePill(Result, 'Healthy')),
     Reachable && Result.DegradedReason ? TextRow('Reason', String(Result.DegradedReason)) : null,

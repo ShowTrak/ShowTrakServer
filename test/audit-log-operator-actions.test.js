@@ -14,7 +14,7 @@ const { installModuleMocks, matchesModule, recordingManager } = require('./helpe
 //
 // OSC and the HTTP API are not in the list on purpose: their WOL and script
 // routes do not call these handlers, they broadcast OSCBulkAction and the
-// desktop window replays it over IPC — so those runs are logged, but as
+// desktop window replays it over IPC, so those runs are logged, but as
 // "Desktop", and only while the window is open.
 
 const UUID_A = '11111111-1111-4111-8111-111111111111';

@@ -3,7 +3,7 @@ const { mock } = require('node:test');
 const assert = require('node:assert/strict');
 const { installModuleMocks, matchesModule } = require('./helpers/main-mocks');
 
-// Covers src/main/autosave.ts — the periodic snapshot of the open show file back
+// Covers src/main/autosave.ts: the periodic snapshot of the open show file back
 // to its path. The other half of not losing a show (see
 // test/main-shutdown-coordinator.test.js for the shutdown half).
 //

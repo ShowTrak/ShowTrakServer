@@ -14,7 +14,7 @@
 //
 // Power is checked by default: a supply dying mid-show is a hardware fault worth
 // knowing about without opting in. Only a supply that has reported OK since
-// this address was first watched can fail — dual-supply switchers are routinely
+// this address was first watched can fail: dual-supply switchers are routinely
 // run from one supply (several of atem-connection's real dumps show exactly
 // that), and flagging the unconnected one would be a permanent false alarm.
 // Single-supply models never report a failure. Streaming and recording are
@@ -135,7 +135,7 @@ const RECORDING_FAULTS: RecordingError[] = [
 ];
 
 export function SourceLabel(Source: AtemSource | null): string {
-  if (!Source) return '—';
+  if (!Source) return '-';
   if (!Source.Name) return Source.ShortName || `Source ${Source.Id}`;
   return Source.ShortName && Source.ShortName !== Source.Name
     ? `${Source.Name} (${Source.ShortName})`
@@ -313,7 +313,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Recording = R.Recording as { State: string; Error: RecordingError } | null | undefined;
 
   return Rows([
-    TextRow('Host', `${Address || '—'}:${Port}`),
+    TextRow('Host', `${Address || '-'}:${Port}`),
     Row('Status', StatusPill),
     R.ProductName ? TextRow('Product', R.ProductName) : null,
     R.ProtocolVersion ? TextRow('Protocol version', R.ProtocolVersion) : null,

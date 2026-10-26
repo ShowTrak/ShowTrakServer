@@ -9,7 +9,7 @@ import { IsHiddenByListSearch, RefreshListSearch } from './list-filter';
 
 // The list view's check rows show as selected for as long as their target is:
 // a selected target acts on all of its checks, so the rows say so. The
-// inheritance is display only — the check ids are not added to the selection,
+// inheritance is display only: the check ids are not added to the selection,
 // or every action would run twice on the same device, once per target and once
 // per check. A check selected on its own keeps that selection underneath, and
 // it shows again when the target is deselected.

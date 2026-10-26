@@ -3,7 +3,7 @@ const { mock } = require('node:test');
 const assert = require('node:assert/strict');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
-// Exercises src/main/deployment.ts — the script-deployment state machine.
+// Exercises src/main/deployment.ts: the script-deployment state machine.
 //
 // Deployments are triggered from several directions at once (catalog change,
 // client-online transition, adoption, manual request), so the whole point of
@@ -12,8 +12,8 @@ const { installModuleMocks, matchesModule, recordingManager } = require('./helpe
 //
 //   - a fresh deployment resets the queue (resetQueue: true);
 //   - a second trigger for the SAME fingerprint dispatches only the targets not
-//     already in flight, and does NOT reset the queue — resetting would wipe the
-//     deployment already running;
+//     already in flight, and does NOT reset the queue (resetting would wipe the
+//     deployment already running);
 //   - a duplicate trigger with no new targets is dropped entirely;
 //   - a trigger with a DIFFERENT fingerprint is queued until the current session
 //     drains, then flushed exactly once.
@@ -170,7 +170,7 @@ test('an empty or non-array target list is a no-op', async () => {
     await D.TriggerScriptDeployment(Empty);
   }
   assert.deepEqual(dispatches(), []);
-  // Not even the fingerprint is read — it bails on the empty list first.
+  // Not even the fingerprint is read; it bails on the empty list first.
   assert.equal(scriptMgr.__callsTo('GetDeploymentFingerprint').length, 0);
 });
 

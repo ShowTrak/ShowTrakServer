@@ -3,16 +3,16 @@
 //
 // Eos speaks OSC over TCP (default port 3032) with no authentication. On connect
 // the console does NOT push a handshake, so the probe drives the exchange:
-//   /eos/user       0          — act as the "background" OSC user (id 0) so the
+//   /eos/user       0          - act as the "background" OSC user (id 0) so the
 //                                probe never touches the live operator's command
 //                                line. Non-intrusive and side-effect free.
-//   /eos/ping       <token>    — Eos replies /eos/out/ping echoing the argument;
+//   /eos/ping       <token>    - Eos replies /eos/out/ping echoing the argument;
 //                                the round trip is the liveness + latency signal.
-//   /eos/get/version           — replies /eos/out/get/version with the software
-//                                version string (a direct request/response — no
+//   /eos/get/version           - replies /eos/out/get/version with the software
+//                                version string (a direct request/response, no
 //                                subscription needed).
-//   /eos/get/cuelist/count     — replies /eos/out/get/cuelist/count <int>.
-//   /eos/get/patch/count       — replies /eos/out/get/patch/count <int>.
+//   /eos/get/cuelist/count     - replies /eos/out/get/cuelist/count <int>.
+//   /eos/get/patch/count       - replies /eos/out/get/patch/count <int>.
 // Any /eos/out/... reply positively identifies an Eos console (not just an open
 // port). All of the above are read-only; the probe never sends /eos/reset (which
 // mutates OSC session state) or any command-line keyword.
@@ -49,8 +49,8 @@ export const CommonEosSettings: MonitoringSettingField[] = [
     Type: 'select',
     Default: 'length',
     Options: [
-      { value: 'length', label: 'OSC 1.0 (packet length) — Eos default' },
-      { value: 'slip', label: 'OSC 1.1 (SLIP) — e.g. port 3037' },
+      { value: 'length', label: 'OSC 1.0 (packet length) - Eos default' },
+      { value: 'slip', label: 'OSC 1.1 (SLIP) - e.g. port 3037' },
     ],
     Advanced: true,
   },
@@ -320,7 +320,7 @@ export function EosDebugHead(
     .filter((Part) => Part != null && String(Part).trim() !== '')
     .join(' · ');
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Identity ? TextRow('Console', Identity) : null,
     Row('Status', StatusPill),
     Reachable

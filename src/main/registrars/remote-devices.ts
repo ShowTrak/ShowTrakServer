@@ -3,7 +3,7 @@
 //
 // This surface is DESKTOP ONLY, and deliberately absent from both remote channel
 // allowlists. A phone must not be able to enumerate the other phones paired to a
-// workspace, and — more to the point — must not be able to revoke them: a stolen
+// workspace, and, more to the point, must not be able to revoke them: a stolen
 // device that can revoke every other device turns one compromised phone into a
 // locked-out production. Revocation is a decision made at the desk.
 
@@ -23,7 +23,7 @@ function register(): void {
     const [Err, RevokedID] = await RemoteDeviceManager.Revoke(DeviceID);
     if (Err) return [Err, null];
     // Eject the live session too. The `/sdk` namespace listens for this; without
-    // it a connected phone would keep its socket — and full control — until it
+    // it a connected phone would keep its socket (and full control) until it
     // happened to reconnect, which is exactly the window revocation exists to
     // close.
     BroadcastManager.emit('RemoteDeviceRevoked', RevokedID);
@@ -50,7 +50,7 @@ function register(): void {
     }
   });
 
-  // Invalidate the displayed code — the pane closing, or the operator cancelling.
+  // Invalidate the displayed code: the pane closing, or the operator cancelling.
   // A code that is no longer on screen should not still be redeemable for the
   // remainder of its minute.
   RPC.handle('Remote:ClearPairingCode', async () => {

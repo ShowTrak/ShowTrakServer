@@ -38,7 +38,7 @@ interface AlertContext {
 }
 
 // `Tags` is the full tag list, needed only to expand a rule that targets tags
-// (tags nest, so expansion is a graph walk — see ../ScopeMatching). Omitting it
+// (tags nest, so expansion is a graph walk; see ../ScopeMatching). Omitting it
 // silently under-matches such rules, so the evaluator always supplies it.
 function isScopeMatch(Rule: AlertRule, Context: AlertContext, Tags?: readonly ScopeTag[]): boolean {
   const Scope = Rule.Scope || {};
@@ -57,7 +57,7 @@ function isScopeMatch(Rule: AlertRule, Context: AlertContext, Tags?: readonly Sc
   if (Workspace) return true;
   if (Context.GroupID != null && GroupIDs.has(Number(Context.GroupID))) return true;
 
-  // The scoped id this event's entity is named by in a scope's Clients list —
+  // The scoped id this event's entity is named by in a scope's Clients list,
   // also what a targeted tag's own membership is resolved against.
   const ScopedID =
     Context.EntityType === 'monitor' && Context.TargetID != null
@@ -450,13 +450,13 @@ function describeHealthContext(Context: AlertContext): string | null {
   }
 }
 
-// "Lobby Kiosk — Battery Level 12% is below 20%". The reason is worded by the
+// "Lobby Kiosk - Battery Level 12% is below 20%". The reason is worded by the
 // alarm evaluator, which is the only thing that knows the metric's unit and
 // precision, so it is used verbatim rather than rebuilt here.
 function describeFreeKioskAlarm(Context: AlertContext): string {
   const Name = Context.EntityName || 'FreeKiosk terminal';
   const Reason = Context.Reason ? String(Context.Reason) : String(Context.MetricLabel || 'alarm');
-  return `${Name} — ${Reason}`;
+  return `${Name} - ${Reason}`;
 }
 
 function describeContext(Context: AlertContext): string {

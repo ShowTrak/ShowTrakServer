@@ -58,7 +58,7 @@ function loadBonjour(settings = {}) {
     '../Config': { Config: { Application: { Port: 1234 }, Shared: { Version: '3.0.0' } } },
     '../ServerIdentity': { Manager: { GetIdentityToken: () => 'server-identity-token' } },
     // Stubbed for the usual reason: unstubbed, SettingsManager pulls in ../DB and
-    // opens a live sqlite connection at module load — green locally, broken on CI.
+    // opens a live sqlite connection at module load: green locally, broken on CI.
     '../SettingsManager': {
       Manager: {
         GetValue: async (Key) => {
@@ -109,7 +109,7 @@ test('Bonjour.OnFind registers a callback for discovered services', () => {
 //
 // These let the app's server list say "PIN required", or grey out a server that
 // will refuse the connection anyway, WITHOUT anyone having to tap it first. They
-// are advisory only — mDNS is unauthenticated and trivially spoofed, so the
+// are advisory only; mDNS is unauthenticated and trivially spoofed, so the
 // handshake re-reads every one of these and remains the authority.
 
 test('Init advertises the discovery hints Remote reads', async () => {

@@ -1,7 +1,7 @@
 // Touch long-press -> context menu, as a DOM-free state machine.
 //
 // iOS/iPadOS WebKit never fires `contextmenu` for a long-press, and every
-// browser on iPad (Chrome included) is WebKit underneath — so on a tablet wide
+// browser on iPad (Chrome included) is WebKit underneath, so on a tablet wide
 // enough to get the desktop layout (no bottom-bar Actions button) there was no
 // way to open the context menu at all. wire-context-menu.ts feeds pointer
 // events in here and opens the menu when onLongPress fires.

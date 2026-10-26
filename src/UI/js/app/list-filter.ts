@@ -1,7 +1,7 @@
 // Search: Ctrl/Cmd+F opens a box over the top right of the client list, in any
 // view mode, and typing in it hides every row (or tile) that does not match
 // (lib/list-filter.ts decides which), and every group left with nothing
-// showing — empty groups included.
+// showing, empty groups included.
 //
 // The filter is a way of looking at the list, not part of it: Escape drops it,
 // and it carries across a switch of view mode. It hides rows with a class

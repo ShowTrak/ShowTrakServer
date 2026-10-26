@@ -1,6 +1,6 @@
 // MA Lighting grandMA2 telnet-remote check. Opens the command-line socket
 // (TCP 30000), fingerprints the grandMA2 banner (a bare open port won't produce
-// it) and reports online / offline — sending nothing, so it is safe against a
+// it) and reports online / offline, sending nothing, so it is safe against a
 // live console. Reachability and login success are always evaluated; the
 // software-version and loaded-show assertions are opt-in via their toggles (off
 // by default) and require login credentials, since both are read over a real
@@ -83,7 +83,7 @@ function NormalizeShow(Value: unknown): string {
 
 // The reasons a reachable console is unhealthy, per the enabled toggles. Login
 // state is always judged (a supplied credential that is rejected is a fault);
-// version/show assertions additionally require a completed login. Pure —
+// version/show assertions additionally require a completed login. Pure;
 // exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: Ma2Snapshot, Options: HealthOptions): string[] {
   if (!Snapshot.IsGrandMa2) return ['Responded, but does not look like a grandMA2 telnet remote'];
@@ -113,7 +113,7 @@ function EvaluateHealth(Snapshot: Ma2Snapshot, Options: HealthOptions): string[]
     Snapshot.Version &&
     !Snapshot.Version.startsWith(Options.ExpectedVersion)
   ) {
-    Reasons.push(`Version ${Snapshot.Version} (expected ${Options.ExpectedVersion}…)`);
+    Reasons.push(`Version ${Snapshot.Version} (expected ${Options.ExpectedVersion}...)`);
   }
   if (Options.CheckShow) {
     if (!Snapshot.ShowFile) {
@@ -162,7 +162,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
           'Software',
           String(Result.Ma2Version) +
             (Options.CheckVersion && Options.ExpectedVersion
-              ? ` (expected ${Options.ExpectedVersion}…)`
+              ? ` (expected ${Options.ExpectedVersion}...)`
               : '')
         )
       );
@@ -185,7 +185,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
 export const Name = 'grandMA2';
 export const Description =
-  'Connects to a grandMA2 console (or onPC) on its Telnet remote (TCP 30000) and confirms it responds as a grandMA2 — sending no commands, so it is safe against a live desk. Supply a login user + password to enable the optional software-version and loaded-show checks, which log in over the remote to read those values. Enable the Telnet remote in Setup → Console → Global Settings.';
+  'Connects to a grandMA2 console (or onPC) on its Telnet remote (TCP 30000) and confirms it responds as a grandMA2, sending no commands, so it is safe against a live desk. Supply a login user + password to enable the optional software-version and loaded-show checks, which log in over the remote to read those values. Enable the Telnet remote in Setup → Console → Global Settings.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = { ParseHealthOptions, NormalizeShow, EvaluateHealth };
 export { ID, Settings, Run, Debug };

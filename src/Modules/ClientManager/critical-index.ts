@@ -3,7 +3,7 @@
 // USB devices, applications and displays each maintained a byte-for-byte
 // parallel triple in index.ts: a `Map<clientUUID, Map<key, entry>>`, a
 // `getCritical*MapForClient` accessor, an `applyCritical*State` projector, and
-// a `loadCritical*Index` warm-up loader — differing only in the backing repo
+// a `loadCritical*Index` warm-up loader, differing only in the backing repo
 // method, the row→entry projection, and which `SetCritical*` sink on the Client
 // receives the collected entries. This factory captures that shared machinery
 // (the `createGroupOrdering` pattern), leaving only the per-kind config inline.

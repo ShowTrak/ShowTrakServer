@@ -7,17 +7,17 @@
 // four arms are flat lookups, but `Tags` is not: a tag's own membership is
 // itself a scope, so a tag may be a SUPERSET of other tags and resolving one
 // means walking a graph the operator authored by hand. That graph can contain a
-// cycle (tag A includes B includes A) — which is why this walk is written once,
+// cycle (tag A includes B includes A), which is why this walk is written once,
 // here, with a visited set, rather than open-coded at each of the five call
 // sites that need it.
 //
 // Everything here is pure: callers pass the entity and the tag list. The
 // renderer keeps a mirror of this file at src/UI/js/app/lib/scope-matching.ts
-// (it cannot import main-process modules) — the two must stay in step, and both
+// (it cannot import main-process modules); the two must stay in step, and both
 // are covered by tests that pin the same cases.
 //
 // NOTE on defaults: this module answers ONLY "is it covered". It deliberately
-// says nothing about what an absent scope means, because the callers disagree —
+// says nothing about what an absent scope means, because the callers disagree:
 // a missing script whitelist means "everyone", a missing tag scope means
 // "nobody". That decision stays with each caller.
 

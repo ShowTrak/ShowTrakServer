@@ -2,14 +2,14 @@
 //
 // The rule that matters most here: a STORED operator is the breach comparison.
 // `below 20` fires under 20 and `is No` fires when the reading is No. The editor
-// shows each one as its complement — the expectation, "Expected at least 20%" —
+// shows each one as its complement (the expectation, "Expected at least 20%"),
 // but this engine only ever sees the breach. Getting the direction backwards
 // for equality while leaving it forwards for thresholds would make every
 // boolean alarm fire permanently, so each operator is asserted explicitly.
 //
 // Which is why every boolean METRIC in the registry arms `isNot` rather than
 // `is`: a two-state metric draws no operator picker, so its lone Yes/No box has
-// to mean the expected state — the only thing anyone reads it as. The operators
+// to mean the expected state, the only thing anyone reads it as. The operators
 // below are still tested in both directions; it is the registry that chooses.
 //
 // The second rule: a metric with no reading never breaches. A tablet with no
@@ -119,7 +119,7 @@ test('is accepts the string form a select stores', () => {
 
 test('equality works on numeric metrics, not only on strings and booleans', () => {
   // These used to fall through to the range branch, find no upper bound and
-  // return "not breaching" for ever — so `is` on rotation interval, API level,
+  // return "not breaching" for ever, so `is` on rotation interval, API level,
   // the auto-brightness bounds and the Wi-Fi channel was silently dead.
   assert.equal(judge('wifi_channel', 'isNot', 36, 6).Breach, true);
   assert.equal(judge('wifi_channel', 'isNot', 36, 36).Breach, false);
@@ -219,7 +219,7 @@ test('an operator the metric no longer offers falls back to its default', () => 
 
 test('a boolean arms isNot, so its stored value is the state the operator wants', () => {
   // Booleans draw no operator picker, which leaves the Yes/No box as the only
-  // thing on screen — so it has to mean "expected", not "alert when". Arming
+  // thing on screen, so it has to mean "expected", not "alert when". Arming
   // "expected Yes" must pass on Yes and fire on No, in that order.
   const keys = AlarmFieldKeys('webview_canGoBack');
   const settings = { [keys.On]: true, [keys.V]: 'true' };

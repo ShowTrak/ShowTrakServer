@@ -17,7 +17,7 @@
 //   delayMs - per-reply delay (real timer) instead of an immediate nextTick, so
 //             a multi-round-trip probe accrues wall-clock time. Each individual
 //             gap stays under delayMs, so the (resettable) idle timeout never
-//             fires — only an absolute whole-probe deadline can end it. Used to
+//             fires; only an absolute whole-probe deadline can end it. Used to
 //             prove ProbeNut caps total time rather than idle time.
 const { EventEmitter } = require('node:events');
 

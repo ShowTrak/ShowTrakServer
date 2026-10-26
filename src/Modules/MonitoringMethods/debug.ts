@@ -2,7 +2,7 @@
 // monitoring method renders inside the check editor. Every value that could
 // originate from an external system (DNS records, QLab workspace names, HTTP
 // bodies, error text, ...) MUST be passed through Esc() before being placed in
-// the markup — the resulting HTML is injected into the renderer via innerHTML.
+// the markup; the resulting HTML is injected into the renderer via innerHTML.
 export function Esc(Value: unknown): string {
   return String(Value == null ? '' : Value)
     .replace(/&/g, '&amp;')
@@ -57,11 +57,11 @@ export interface CardOptions {
   TitleClass?: string;
   // Pre-built badge/pill HTML shown at the card's right edge (already safe).
   Badge?: string | null;
-  // Pre-built HTML placed beneath the header row (already safe — escape your own
+  // Pre-built HTML placed beneath the header row (already safe; escape your own
   // untrusted values before passing them in).
   BodyHtml?: string;
   // Marks the matched/primary item with a subtle success-tinted background. Status
-  // is otherwise conveyed by the badge — never a border or a fully-coloured card.
+  // is otherwise conveyed by the badge, never a border or a fully-coloured card.
   Highlight?: boolean;
 }
 
@@ -88,7 +88,7 @@ export function Card(Options: CardOptions): string {
 
 export function FormatLatency(Ms: unknown): string {
   const N = Number(Ms);
-  if (!Number.isFinite(N)) return '—';
+  if (!Number.isFinite(N)) return '-';
   if (N < 1) return '<1 ms';
   return `${Math.round(N)} ms`;
 }

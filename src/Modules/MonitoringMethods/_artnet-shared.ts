@@ -14,9 +14,9 @@
 //                                            and handed to any poll in flight.
 //       ArtTimeCode  (OpTimeCode 0x9700)  -> latest value per (source IP, StreamId),
 //                                            only while a timecode check is watching.
-//     Everything else (ArtPoll from consoles, ArtSync, RDM, …) is ignored.
-//   - SENDS ArtPoll (OpPoll 0x2000), so the node's reply comes back to 6454 —
-//     the socket that is already listening — rather than to an ephemeral port a
+//     Everything else (ArtPoll from consoles, ArtSync, RDM, etc.) is ignored.
+//   - SENDS ArtPoll (OpPoll 0x2000), so the node's reply comes back to 6454
+//     (the socket that is already listening) rather than to an ephemeral port a
 //     spec-following node would never answer.
 //
 // Because the socket is bound to the wildcard address, the kernel delivers
@@ -28,7 +28,7 @@
 // application. That is inherent to sharing a UDP port and is called out in the
 // node check's Info text.
 //
-// The receiver is fully lazy — nothing binds until the first check asks — so
+// The receiver is fully lazy (nothing binds until the first check asks), so
 // importing this module has no side effects. Field offsets are from the Art-Net 4
 // specification (Artistic Licence, document revision 1.4dp, 23/10/2025).
 import dgram from 'dgram';
@@ -53,7 +53,7 @@ export const PROTOCOL_VERSION = 14;
 const OFFSET_ID = 0;
 const OFFSET_OPCODE = 8; // uint16, transmitted low byte first
 const OFFSET_PROTVER = 10; // uint16, big-endian (absent from ArtPollReply)
-const HEADER_LENGTH = 10; // ID + OpCode — enough to dispatch
+const HEADER_LENGTH = 10; // ID + OpCode: enough to dispatch
 
 // Valid Port-Address range: Net (7 bits) << 8 | SubUni (8 bits) = 0..32767.
 export const MIN_UNIVERSE = 0;
@@ -144,7 +144,7 @@ export function ParseArtnetPacket(Msg: Buffer, SourceAddress: string): ArtnetSou
 
 // Build the 22-byte Art-Net 4 ArtPoll. Every optional field is zero:
 //   Flags = 0x00:   targeted mode off (we want the node whatever it is patched to),
-//                   no diagnostics, and bit 1 clear — "only send ArtPollReply in
+//                   no diagnostics, and bit 1 clear: "only send ArtPollReply in
 //                   response to an ArtPoll", so we never ask the node to start
 //                   sending us unsolicited replies. ArtPoll is the discovery packet
 //                   every controller sends every 2.5–3 s; it changes no
@@ -213,7 +213,7 @@ const PORT_PROTOCOLS: Record<number, string> = {
   6: 'DALI',
 };
 
-// Table 4 — Style codes.
+// Table 4: Style codes.
 export const STYLE_CODES: Record<number, string> = {
   0: 'Node',
   1: 'Controller',
@@ -240,7 +240,7 @@ export interface ArtPollReplyPort {
 }
 
 export interface ArtPollReply {
-  // The datagram's source IP — what a check matches the target Address against.
+  // The datagram's source IP: what a check matches the target Address against.
   Address: string;
   // The IP the node reports in the packet (field 3). Usually equal to Address.
   ReportedIp: string;
@@ -313,8 +313,8 @@ export function ParseArtPollReply(
   const SubSwitch = Byte(PR.SubSwitch);
 
   // Ports: only when every per-port array (up to SwOut) is present, and only the
-  // slots whose PortTypes declare a direction. NumPorts is advisory — the spec
-  // notes the information is implicit in PortTypes — and nodes commonly report
+  // slots whose PortTypes declare a direction. NumPorts is advisory (the spec
+  // notes the information is implicit in PortTypes), and nodes commonly report
   // four slots with only some populated.
   const Ports: ArtPollReplyPort[] = [];
   const HasGoodOutputB = Msg.length >= PR.GoodOutputB + PORT_COUNT;
@@ -528,7 +528,7 @@ class ArtnetReceiverImpl {
     Entry.LastInterestAt = Date.now();
   }
 
-  // Read the current cache for a universe. Does not start the socket — callers
+  // Read the current cache for a universe. Does not start the socket; callers
   // are expected to Observe() first.
   Snapshot(Universe: number): ArtnetSnapshot {
     const Entry = this.Universes.get(Universe);
@@ -635,7 +635,7 @@ class ArtnetReceiverImpl {
       const Err = this.ListenerError();
       return {
         Ok: false,
-        Error: Err ? `Art-Net listener error: ${Err}` : 'Art-Net listener starting…',
+        Error: Err ? `Art-Net listener error: ${Err}` : 'Art-Net listener starting...',
       };
     }
 
@@ -666,7 +666,7 @@ class ArtnetReceiverImpl {
         }
       };
 
-      // Any reply from the node after our ArtPoll went out counts — including one
+      // Any reply from the node after our ArtPoll went out counts, including one
       // provoked by another controller's poll, since it equally proves the node
       // is alive now. Replies heard BEFORE the poll never do.
       const Listener = (Reply: ArtPollReply): void => {

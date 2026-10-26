@@ -90,7 +90,7 @@ test('A Tick already in flight when StopLoop lands does not broadcast or re-arm'
   const tick = target.Tick();
 
   // The tick is now parked on the check's network call, exactly where a delete
-  // would catch it. StopLoop cannot cancel it — it can only mark it doomed.
+  // would catch it. StopLoop cannot cancel it; it can only mark it doomed.
   target.StopLoop();
   gate.resolve();
   await tick;
@@ -101,7 +101,7 @@ test('A Tick already in flight when StopLoop lands does not broadcast or re-arm'
   assert.equal(
     emitted.length,
     0,
-    'a stopped target must not broadcast MonitoringTargetUpdated — that is what resurrects a deleted tile in the UI'
+    'a stopped target must not broadcast MonitoringTargetUpdated; that is what resurrects a deleted tile in the UI'
   );
   assert.equal(target._timer, null, 'a stopped target must not re-arm its poll timer');
 });
@@ -166,12 +166,12 @@ test('A Tick in flight when StartLoop lands retires instead of re-arming a secon
   assert.equal(
     emitted.length,
     0,
-    'the superseded tick must not broadcast — its snapshot predates the update'
+    'the superseded tick must not broadcast; its snapshot predates the update'
   );
   assert.equal(
     target._timer,
     revived,
-    'the superseded tick must not overwrite the timer StartLoop armed — two live chains means duplicate broadcasts per interval'
+    'the superseded tick must not overwrite the timer StartLoop armed; two live chains means duplicate broadcasts per interval'
   );
   target.StopLoop();
 });

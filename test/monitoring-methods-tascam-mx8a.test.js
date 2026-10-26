@@ -43,7 +43,7 @@ function defaultState() {
 }
 
 // A fake MX-8A on the Ethernet protocol: CR+LF lines, a password login, then
-// `GET k …` → `OK GET k:v …` and `SET k:v …` → `OK SET` plus a NOTIFY.
+// `GET k ...` → `OK GET k:v ...` and `SET k:v ...` → `OK SET` plus a NOTIFY.
 //
 // Options:
 //   state      key → value overrides (values as sent, names quoted)

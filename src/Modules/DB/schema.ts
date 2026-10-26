@@ -116,7 +116,7 @@ Schema.push({
     )',
 });
 
-// Starred check actions. A favourite is one (Method, ActionID, Params) triple —
+// Starred check actions. A favourite is one (Method, ActionID, Params) triple:
 // the parameters are part of the identity, so "Set Input -> Digital 1" and
 // "Set Input -> HDMI 2" are two separate favourites rather than one entry whose
 // value the operator has to re-type at the moment they need it.
@@ -359,8 +359,8 @@ Schema.push({
     )',
 });
 
-// Monitored system checks: one row per (client, check) the operator monitors —
-// CPU, memory, uptime, power or thermal — holding the conditions it must keep.
+// Monitored system checks: one row per (client, check) the operator monitors
+// (CPU, memory, uptime, power or thermal), holding the conditions it must keep.
 // Only the columns of the row's own check are used; a NULL condition is not
 // guarded. Created here rather than by a migration, for the same reason as
 // CriticalAudioDevices.
@@ -385,7 +385,7 @@ Schema.push({
 // Per-show whitelist of which clients/groups may run a given script. Scripts
 // themselves live on disk (machine-global), but *who* may run each one is
 // show-specific, so it belongs in the DB (and therefore the .ShowTrak file).
-// A script with NO row here is unrestricted (all clients) — this is the default
+// A script with NO row here is unrestricted (all clients); this is the default
 // for every script, and is what lets brand-new clients automatically inherit
 // access to any script that has not been explicitly restricted. Scope is the
 // same JSON shape as AlertRules.Scope: { Workspace, Groups[], Clients[], Tags[] }.
@@ -408,7 +408,7 @@ Schema.push({
 // tag makes this one a superset of it.
 //
 // Display is how the tag draws on a client tile: 'hidden' | 'icon' | 'name' |
-// 'both'. It is presentation only — a hidden tag still targets scripts, alerts
+// 'both'. It is presentation only: a hidden tag still targets scripts, alerts
 // and OSC exactly as a shown one does. The default is 'name', which is what
 // every tag did before the column existed.
 Schema.push({
@@ -426,7 +426,7 @@ Schema.push({
 
 // Every MAC address a client is known by, one row per address. A machine with
 // several external NICs (wired + wireless, or multiple VLANs) has several, and
-// Wake-on-LAN fans a magic packet out to all of them — which NIC is reachable
+// Wake-on-LAN fans a magic packet out to all of them; which NIC is reachable
 // depends on where the server sits, so guessing one is unreliable.
 //
 // Superseded `Clients.MacAddress`, which held only the MAC of the interface
@@ -436,7 +436,7 @@ Schema.push({
 //
 // Source records how an address arrived: 'Reported' from the client's own NIC
 // enumeration, 'Manual' from an operator typing it into the client editor. Both
-// are woken identically — Source exists so the UI can label them and so a
+// are woken identically; Source exists so the UI can label them and so a
 // hand-entered MAC for a machine that has never connected is not mistaken for
 // observed data. Reported addresses re-appear on the next report if deleted;
 // that is deliberate (deletion is for retiring MACs the client no longer has).
@@ -509,7 +509,7 @@ Schema.push({
 //
 // Only the SHA-256 of each token is stored. A leaked database therefore does not
 // hand an attacker a working credential, and there is no path that needs the
-// plaintext back — it is returned once, at pairing, and never again.
+// plaintext back: it is returned once, at pairing, and never again.
 Schema.push({
   Name: 'RemoteDevices',
   SQL: 'CREATE TABLE IF NOT EXISTS `RemoteDevices` ( \
@@ -522,14 +522,14 @@ Schema.push({
     )',
 });
 
-// Show Variables — operator-defined values a client's scripts read as
+// Show Variables: operator-defined values a client's scripts read as
 // environment variables (`GAME_VERSION` reaches a batch file as
 // `%SHOWTRAK_VAR_GAME_VERSION%`).
 //
 // Key holds the BARE name; the `SHOWTRAK_VAR_` prefix is applied when the
 // environment is built, never stored, so the prefix can never be typed twice or
 // half-applied. It is normalized to upper snake case on write because the
-// Windows environment is case-insensitive — `Game_Version` and `GAME_VERSION`
+// Windows environment is case-insensitive: `Game_Version` and `GAME_VERSION`
 // are one variable there and two on POSIX, so only one spelling may exist. The
 // NOCASE unique index is the in-table safety net for that.
 //
@@ -538,7 +538,7 @@ Schema.push({
 // export outlives the process and has to be reconciled and cleaned up; a
 // variable only ever needed inside a ShowTrak script should not be in there.
 //
-// Values are stored and travel in the clear — they ride inside exported show
+// Values are stored and travel in the clear; they ride inside exported show
 // files, and on Windows exported ones land in the registry of every client.
 // They are configuration, not secrets, and the UI says so.
 Schema.push({
@@ -557,7 +557,7 @@ Schema.push({
 // Per-client overrides of a variable's default.
 //
 // Keyed on VariableID rather than on the key text so renaming a variable in the
-// manager keeps every client's value — a rename is a display change, not a data
+// manager keeps every client's value: a rename is a display change, not a data
 // migration. A client with no row here inherits Variables.DefaultValue.
 Schema.push({
   Name: 'ClientVariables',
@@ -575,7 +575,7 @@ Schema.push({
 // Installs that predate the version table are back-filled by probing
 // PRAGMA table_info before each ALTER (sqlite has no "ADD COLUMN IF NOT
 // EXISTS"), so an already-present column records its version without re-running.
-// Append new migrations with the next version — never reuse or reorder.
+// Append new migrations with the next version; never reuse or reorder.
 Schema.Migrations = [
   {
     Version: 1,
@@ -672,7 +672,7 @@ Schema.Migrations = [
           FROM `Clients` WHERE MacAddress IS NOT NULL AND TRIM(MacAddress) != ''",
   },
   // Per-tag tile presentation. Existing tags all drew their name, so 'name' is
-  // both the column default and the upgrade value — nobody's tiles change
+  // both the column default and the upgrade value, so nobody's tiles change
   // appearance on upgrade.
   {
     Version: 25,
@@ -680,7 +680,7 @@ Schema.Migrations = [
   },
   // FreeKiosk terminals. The table itself is created by the Schema block above on
   // both new and existing installs, so only its indexes need versioning. The slug
-  // index is the same in-table safety net the other sluggable entities have —
+  // index is the same in-table safety net the other sluggable entities have;
   // note the client slug namespace is shared across Clients, MonitoringTargets,
   // DummyClients and now FreeKioskTerminals, which no single-table constraint can
   // express; that uniqueness is enforced in the Slug service.
@@ -694,8 +694,8 @@ Schema.Migrations = [
   },
   // Paired Remote devices. The table is created by the Schema block above on both
   // new and existing installs, so only the index needs versioning. Every
-  // handshake looks a device up by token hash, so that lookup — not the DeviceID
-  // primary key — is the one on the hot path.
+  // handshake looks a device up by token hash, so that lookup (not the DeviceID
+  // primary key) is the one on the hot path.
   {
     Version: 28,
     SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_remotedevices_tokenhash ON `RemoteDevices` (TokenHash)',
@@ -704,8 +704,8 @@ Schema.Migrations = [
   // and existing installs, so only the indexes need versioning. The NOCASE
   // unique index on Key enforces the single-spelling rule the Windows
   // environment requires; ClientVariables is indexed on UUID because resolving
-  // one client's environment — the hot path, hit on every connect and every
-  // dispatch — looks up by client, not by variable.
+  // one client's environment (the hot path, hit on every connect and every
+  // dispatch) looks up by client, not by variable.
   {
     Version: 29,
     SQL: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_variables_key ON `Variables` (Key COLLATE NOCASE)',

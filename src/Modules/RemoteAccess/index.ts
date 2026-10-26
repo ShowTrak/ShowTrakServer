@@ -1,4 +1,4 @@
-// Capability model for the server's REMOTE surfaces — the Web UI (`/ui`) and
+// Capability model for the server's REMOTE surfaces: the Web UI (`/ui`) and
 // ShowTrak Remote (`/sdk`).
 //
 // Which invoke channels a remote surface may reach, and under what conditions.
@@ -9,7 +9,7 @@
 // Someone adds a channel to one surface and forgets the other; or removes a
 // dangerous one from a surface and leaves it live on the other. The push list is
 // already `satisfies`-checked against the IPC registry so a typo fails the build
-// — that guarantee should protect both surfaces from ONE definition.
+// and that guarantee should protect both surfaces from ONE definition.
 //
 // What DOES differ per surface is the settings the permissions are read from,
 // which is the single `Prefix` parameter threaded through everything below. The
@@ -28,7 +28,7 @@ import type { SubscribeChannel } from '../IPCRegistry/channels';
 /**
  * Settings prefix identifying a remote surface. Every permission this module
  * reads is `<Prefix>_ALLOW_<CATEGORY>`, so adding a third surface is a new
- * member here plus its settings — not another copy of the allowlists.
+ * member here plus its settings, not another copy of the allowlists.
  */
 export type SurfacePrefix = 'WEBUI' | 'REMOTE';
 
@@ -88,7 +88,7 @@ const READ_CHANNELS = new Set([
 ]);
 
 // Allowed regardless of mode: non-destructive, show-time actions (identifying
-// a client just flashes an overlay on its screen — no state is mutated).
+// a client just flashes an overlay on its screen; no state is mutated).
 const IDENTIFY_CHANNELS = new Set(['IdentifyClient', 'StopIdentifyingClient']);
 
 // Switching between SHOW and EDIT. Not itself gated on mode (it is how you
@@ -104,7 +104,7 @@ const ALERT_ACTIONS_CHANNELS = new Set(['AlertActionsEnabled:Set']);
 
 // Management mutations, split into finite capability categories so each can be
 // permitted/denied independently from the Web UI Permissions settings. Every
-// category ALSO requires the server to be in EDIT mode — edit-mode is
+// category ALSO requires the server to be in EDIT mode: edit-mode is
 // authoritative on the desktop and the web merely mirrors it, so the per-category
 // toggles further restrict (never widen) what a browser may mutate.
 const CLIENT_CHANNELS = new Set([
@@ -130,8 +130,8 @@ const CLIENT_CHANNELS = new Set([
   'UnadoptClient',
   'ReplaceClient',
   'AdoptDevice',
-  // Tags are labelled collections of clients, so managing them — the Tag
-  // Manager and every editor's tag picker — rides the client permission.
+  // Tags are labelled collections of clients, so managing them (the Tag
+  // Manager and every editor's tag picker) rides the client permission.
   'Tags:Create',
   'Tags:SetSlug',
   'Tags:SetColour',
@@ -177,11 +177,11 @@ const MONITORING_CHANNELS = new Set([
   'FreeKiosk:CaptureCamera',
 ]);
 
-// Running a monitoring action drives a real device the way a script does — power
-// a row of projectors on, close their shutters, move a fader — so it is a
+// Running a monitoring action drives a real device the way a script does (power
+// a row of projectors on, close their shutters, move a fader), so it is a
 // SHOW-time control, NOT a management mutation. The desktop runs these in any
 // mode; the remote surfaces once lumped them in with monitoring management and
-// so refused them outside EDIT mode, which made them unusable during a show —
+// so refused them outside EDIT mode, which made them unusable during a show,
 // exactly when an operator reaches for a starred action on their phone or in a
 // browser. They get their own category and permission so running actions can be
 // allowed (or denied) on its own, without unlocking the rest of monitoring
@@ -216,7 +216,7 @@ const EDIT_CHANNELS = new Set([
 //
 // Setting a client's audio level sits here rather than with client management:
 // it changes what a live machine is doing in the room, exactly like running a
-// script on it, and it must work in SHOW mode — which the management categories
+// script on it, and it must work in SHOW mode, which the management categories
 // deliberately do not. It inherits the script permission's off-by-default stance.
 const SCRIPT_CHANNELS = new Set([
   'SetClientAudioLevel',
@@ -311,7 +311,7 @@ export function ToPublicSettings<T>(Settings: readonly T[] | null | undefined): 
 
 // OSCBulkAction is allowlisted as a whole (WOL/ExecuteScript are legitimate web
 // actions), but a few of its types drive the operator's own
-// desktop window rather than a shared server state — opening or closing modals on
+// desktop window rather than a shared server state: opening or closing modals on
 // every logged-in browser would yank the UI out from under whoever is using it.
 // These types are dropped from the web push and delivered to the desktop only.
 const SUPPRESSED_BULK_ACTIONS = new Set<string>(['OpenClientModal', 'CloseModals']);
@@ -348,14 +348,14 @@ export interface SurfacePermissions {
 /**
  * Read one surface's permissions.
  *
- * Defaults match the historical Web UI behaviour — management categories ON
+ * Defaults match the historical Web UI behaviour: management categories ON
  * (they were "allowed while in Edit mode" long before the toggles existed),
  * script execution, mode changes and the alert-actions switch OFF (the last two
  * were denied outright before they had permissions). Only the Web UI has
  * settings rows for those two, so ShowTrak Remote always reads the default. ShowTrak Remote adopts the same defaults deliberately:
  * one rule for both remote surfaces is easier to hold in your head than two, and
  * the controls that actually carry the weight for a lost phone are the PIN at
- * pairing, the EDIT-mode gate and revocation — not a conservative default.
+ * pairing, the EDIT-mode gate and revocation, not a conservative default.
  */
 export async function ReadSurfacePermissions(Prefix: SurfacePrefix): Promise<SurfacePermissions> {
   let Permissions: SurfacePermissions = {
@@ -447,8 +447,8 @@ export async function AuthorizeChannel(
     if (!Category) return { allowed: false, reason: 'forbidden' };
     return { allowed: true, reason: null };
   }
-  // Running a monitoring action is a SHOW-time device control, so — like scripts
-  // and WOL below — it is governed by its own permission and NOT gated on EDIT
+  // Running a monitoring action is a SHOW-time device control, so (like scripts
+  // and WOL below) it is governed by its own permission and NOT gated on EDIT
   // mode. This is what lets a browser or phone power a projector on mid-show.
   if (MONITORING_ACTION_CHANNELS.has(channel)) {
     if (!Cfg.AllowMonitoringActions) return { allowed: false, reason: 'forbidden' };

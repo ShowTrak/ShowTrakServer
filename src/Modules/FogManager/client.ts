@@ -71,7 +71,7 @@ function DescribeStatus(StatusCode: number, BodyText: string): string {
   if (StatusCode === 401) {
     return 'FOG rejected the user token. Check the token, and that the user has "User API Enable" ticked in FOG.';
   }
-  if (StatusCode === 404) return 'FOG returned 404 — the host or task no longer exists.';
+  if (StatusCode === 404) return 'FOG returned 404; the host or task no longer exists.';
   if (StatusCode === 501) return 'FOG rejected the task type as invalid.';
   // FOG reports genuine server-side failures as {"error": "..."} with a 500.
   if (StatusCode >= 500) {
@@ -109,7 +109,7 @@ export function FogRequest(
         method: String(Method || 'GET').toUpperCase(),
         ...(IsHttps ? { agent: InsecureAgent } : {}),
         headers: {
-          // Sent verbatim — see the note at the top of this file.
+          // Sent verbatim; see the note at the top of this file.
           'fog-api-token': Config.ApiToken,
           'fog-user-token': Config.UserToken,
           'Content-Type': 'application/json',
@@ -179,7 +179,7 @@ export function ParseJson<T>(Response: FogResponse): T | null {
   }
 }
 
-// FOG serialises every scalar as a string — IDs, booleans ("0"/"1") and numbers
+// FOG serialises every scalar as a string: IDs, booleans ("0"/"1") and numbers
 // alike. Coerce at the boundary so nothing downstream has to think about it.
 export function ToNumber(Value: unknown, Fallback: number = 0): number {
   const N = Number(Value);
@@ -193,7 +193,7 @@ export function ToText(Value: unknown): string {
 // Every MAC FOG holds for a host, primary first, normalized and de-duplicated.
 //
 // The host getter emits `primac` (the primary, as a string) and `macs` (every
-// address associated with the host, primary included, from getMyMacs) — read
+// address associated with the host, primary included, from getMyMacs), read
 // from FOG's route.class.php, since the docs mention neither. Anything that is
 // not a valid MAC is dropped rather than failing the whole host.
 export function ReadHostMacAddresses(Host: { primac?: unknown; macs?: unknown }): string[] {
@@ -209,7 +209,7 @@ export function ReadHostMacAddresses(Host: { primac?: unknown; macs?: unknown })
 // Health probe. Returns null when healthy, or a human-readable reason when not.
 //
 // /fog/system/info is the cheapest call that exercises reachability, the API-enabled
-// flag and both tokens in one go. Note it DOES require auth — the docs claim
+// flag and both tokens in one go. Note it DOES require auth; the docs claim
 // otherwise, and they are wrong. The body is the bare text `success`, not JSON.
 export async function CheckHealth(Config: FogConfig): Promise<string | null> {
   const Gap = DescribeConfigGaps(Config);
@@ -219,7 +219,7 @@ export async function CheckHealth(Config: FogConfig): Promise<string | null> {
   if (!Response.Success) return Response.Error || 'FOG server unreachable';
   if (Response.BodyText.trim() !== 'success') {
     // A 200 whose body is not `success` means we were served something other than
-    // the API — typically an HTML page from a reverse proxy sitting in front of FOG.
+    // the API, typically an HTML page from a reverse proxy sitting in front of FOG.
     return 'FOG responded, but not with the expected API reply. Check the address and port point at the FOG web interface.';
   }
   return null;

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 // What a FreeKiosk save does to the stored API key. The Web UI is never given
-// the key, so its field starts blank — and that blank used to be sent as
+// the key, so its field starts blank, and that blank used to be sent as
 // "clear", wiping the key on every Web UI save.
 
 const { ApiKeyPayload } = require('../dist-test/UI/js/app/lib/freekiosk-api-key.js');

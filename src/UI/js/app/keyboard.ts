@@ -12,7 +12,7 @@ import {
   SelectAll,
   StopIdentifyingForUUIDs,
 } from './selection-init';
-// Called by the bootstrap orchestrator in main.ts — never at import time.
+// Called by the bootstrap orchestrator in main.ts, never at import time.
 export function InitKeyboard() {
   document.addEventListener('keydown', function (e) {
     // Suppress global shortcuts while a confirmation prompt is active
@@ -93,7 +93,7 @@ export function InitKeyboard() {
       }
 
       // List view: expand (Right) or collapse (Left) monitoring targets into
-      // their checks — the selected targets, or all of them with none selected.
+      // their checks: the selected targets, or all of them with none selected.
       if (!e.shiftKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
         if (SetListTargetsExpanded(e.key === 'ArrowRight')) e.preventDefault();
         return;

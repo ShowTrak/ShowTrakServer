@@ -5,7 +5,7 @@ const path = require('node:path');
 const { loadWithMocks } = require('../test-support/load-with-mocks');
 
 // Edits in the audit log: the field diff every manager reports through, and
-// one manager end to end — that an edit is recorded with its before → after
+// one manager end to end: that an edit is recorded with its before → after
 // once the log is recording, and that nothing is looked up or recorded while
 // it is not (which is every other test in the suite).
 const { DiffFields, FormatValue, Snapshot } = require('../dist/Modules/AuditLog/diff');

@@ -42,7 +42,7 @@
       <input
         id="LIST_SEARCH_INPUT"
         type="text"
-        placeholder="Name, tag, IP or group…"
+        placeholder="Name, tag, IP or group..."
         aria-label="Filter the list"
         autocomplete="off"
         spellcheck="false"
@@ -401,7 +401,7 @@
               </li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_OPEN">
-                  <span>Open Show File…</span>
+                  <span>Open Show File...</span>
                   <span class="menu-shortcut">Ctrl/Cmd+O</span>
                 </button>
               </li>
@@ -413,7 +413,7 @@
               </li>
               <li>
                 <button type="button" class="dropdown-item" id="SHOWTRAK_MODEL_CORE_SAVEAS">
-                  <span>Save Show File As…</span>
+                  <span>Save Show File As...</span>
                   <span class="menu-shortcut">Ctrl/Cmd+Shift+S</span>
                 </button>
               </li>
@@ -515,7 +515,7 @@
 
             <div class="d-grid gap-2">
               <button type="button" class="btn btn-success" id="NO_SHOW_OPEN">
-                Open Show File…
+                Open Show File
               </button>
               <button type="button" class="btn btn-light" id="NO_SHOW_NEW">New Show File</button>
             </div>
@@ -583,7 +583,7 @@
 
             <div class="d-grid gap-2">
               <button type="button" class="btn btn-success" id="MIGRATE_SAVE">
-                Save Show File As…
+                Save Show File As
               </button>
             </div>
           </div>
@@ -683,7 +683,7 @@
                   id="SHOWTRAK_ABOUT_DEPENDENCIES"
                   class="SHOWTRAK_ABOUT_DEPENDENCIES_LIST text-muted"
                 >
-                  Loading dependencies…
+                  Loading dependencies...
                 </div>
               </div>
             </div>
@@ -708,7 +708,7 @@
                   class="SHOWTRAK_ABOUT_LICENSE_TEXT rounded bg-ghost-light p-2 small d-none mb-0"
                   style="max-height: 260px; overflow: auto; white-space: pre-wrap"
                 >
-Loading licence…</pre>
+Loading licence...</pre>
               </div>
             </div>
           </div>
@@ -747,7 +747,7 @@ Loading licence…</pre>
               <div class="flex-grow-1">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                   <strong id="APP_UPDATE_STATUS" class="SHOWTRAK_APP_UPDATE_STATUS">
-                    Checking for updates…
+                    Checking for updates...
                   </strong>
                   <span
                     id="APP_UPDATE_VERSION"
@@ -988,7 +988,7 @@ Loading licence…</pre>
                 <i class="bi bi-arrow-clockwise"></i> Refresh
               </button>
             </div>
-            <p id="UPDATE_MANAGER_RELEASE" class="text-light mb-1">Release: loading…</p>
+            <p id="UPDATE_MANAGER_RELEASE" class="text-light mb-1">Release: loading...</p>
             <p id="UPDATE_MANAGER_STATUS" class="text-muted mb-2">
               Download latest release from the server and push updates over LAN. Always update
               clients before updating ShowTrak Server to avoid compatibility issues.
@@ -1008,7 +1008,7 @@ Loading licence…</pre>
 
             <div id="UPDATE_MANAGER_DOWNLOAD_PROGRESS_WRAPPER" class="d-none mb-2">
               <div class="small text-muted mb-1" id="UPDATE_MANAGER_DOWNLOAD_PROGRESS_TEXT">
-                Preparing download…
+                Preparing download...
               </div>
               <div class="progress UPDATE_MANAGER_DOWNLOAD_PROGRESS">
                 <div
@@ -1376,7 +1376,7 @@ Loading licence…</pre>
                   <span class="text-sm">Available variables</span>
                   <span class="text-sm text-muted mb-0"
                     >Show variables are set in the environment before this script runs. Click a name
-                    to copy it. Values are per-client — set them in each client's editor, or change
+                    to copy it. Values are per-client; set them in each client's editor, or change
                     the default in the Variable Manager.</span
                   >
                   <div id="SCRIPT_MANAGER_VARIABLE_LIST" class="d-grid gap-1"></div>
@@ -1514,7 +1514,7 @@ Loading licence…</pre>
                     </button>
                   </div>
                   <span class="text-sm text-muted mb-0"
-                    >How this tag draws on client tiles. Hidden is presentation only — the tag still
+                    >How this tag draws on client tiles. Hidden is presentation only; the tag still
                     targets scripts, alerts and OSC exactly as before.</span
                   >
                 </div>
@@ -1658,7 +1658,7 @@ Loading licence…</pre>
                   <span class="text-sm text-muted mb-0"
                     >Writes the value into each Windows client's user environment, so programs
                     started after the change can read it. Applications already running will not see
-                    it until they are restarted. macOS and Linux clients ignore this — scripts on
+                    it until they are restarted. macOS and Linux clients ignore this: scripts on
                     those machines still get the variable, but nothing else does.</span
                   >
                 </div>
@@ -1671,7 +1671,7 @@ Loading licence…</pre>
                   ></span>
                   <span class="text-sm text-muted mb-0"
                     >Give a specific machine its own value from that client's editor. Variables are
-                    stored in the show file and travel with it — treat them as configuration, not as
+                    stored in the show file and travel with it; treat them as configuration, not as
                     secrets.</span
                   >
                 </div>
@@ -1828,7 +1828,7 @@ Loading licence…</pre>
             <div class="d-grid gap-2 mt-2">
               <div class="bg-ghost p-2 rounded text-start d-grid gap-1">
                 <span class="text-sm text-secondary">Target</span>
-                <strong id="FOG_TASK_TARGET">—</strong>
+                <strong id="FOG_TASK_TARGET">-</strong>
                 <span class="text-sm text-secondary" id="FOG_TASK_TARGET_IMAGE"></span>
               </div>
               <div class="form-floating">
@@ -2175,7 +2175,7 @@ Loading licence…</pre>
                 </div>
 
                 <button type="button" class="btn btn-light w-100" id="MONITORING_CHECK_MOVE">
-                  Move Check…
+                  Move Check...
                 </button>
                 <button type="button" class="btn btn-delete w-100" id="MONITORING_CHECK_DELETE">
                   Remove Check
@@ -3017,7 +3017,7 @@ Loading licence…</pre>
                     <!-- Editable: membership is stored on the TAG (a dynamic
                          scope), so toggling a chip rewrites that tag, at once.
                          Chips inherited from a group or from "all clients" show
-                         on but locked — see tag-picker.ts. -->
+                         on but locked (see tag-picker.ts). -->
                     <div class="ci-edit-only">
                       <div class="tag-picker d-none" id="CLIENT_INFO_TAG_PICKER_WRAPPER">
                         <div class="tag-picker-head">
@@ -3516,7 +3516,7 @@ Loading licence…</pre>
       <img src="./img/icon-filled.png" alt="ShowTrak" class="web-splash-logo" />
       <div class="web-splash-body" role="status" aria-live="polite">
         <div class="spinner-border text-light" aria-hidden="true"></div>
-        <div class="web-overlay-text">Connecting…</div>
+        <div class="web-overlay-text">Connecting...</div>
       </div>
     </div>
     <div id="WEB_LOGIN_OVERLAY" class="web-overlay d-none">
@@ -3586,7 +3586,7 @@ Loading licence…</pre>
       <div class="web-splash-body" role="alert">
         <div class="spinner-border text-light" aria-hidden="true"></div>
         <div class="web-overlay-title">Connection Lost</div>
-        <div class="web-overlay-text">Reconnecting to ShowTrak Server…</div>
+        <div class="web-overlay-text">Reconnecting to ShowTrak Server...</div>
       </div>
     </div>
   </body>

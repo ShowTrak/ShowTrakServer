@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-// Covers src/UI/js/app/lib/qr-svg.ts — the self-contained QR encoder that
+// Covers src/UI/js/app/lib/qr-svg.ts: the self-contained QR encoder that
 // renders straight to an SVG string (used by the "Scan to Open" modal for the
 // Web UI URL). Loaded from dist-test/ (see test/renderer-utils.test.js for why).
 //
@@ -209,7 +209,7 @@ test('QrToSvg produces different output for different payloads', () => {
 
 test('QrToSvg honours the error-correction level', () => {
   // Higher ECC spends more codewords on recovery, so the same payload either
-  // changes pattern or needs a bigger symbol — it must not be ignored.
+  // changes pattern or needs a bigger symbol; it must not be ignored.
   const Low = QrToSvg('a'.repeat(120), { ecc: 'LOW', border: 0 });
   const High = QrToSvg('a'.repeat(120), { ecc: 'HIGH', border: 0 });
   assert.notEqual(Low, High);

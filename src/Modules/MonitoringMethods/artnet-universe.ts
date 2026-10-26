@@ -7,7 +7,7 @@
 //
 //   - A single UDP socket bound to port 6454 (shared with SO_REUSEADDR).
 //   - Unlike sACN, Art-Net is delivered by directed broadcast or unicast, NOT
-//     multicast, so there are no groups to join — binding the socket is enough
+//     multicast, so there are no groups to join; binding the socket is enough
 //     to receive every universe on the wire. Because the socket is bound to the
 //     wildcard address (0.0.0.0), the kernel delivers broadcast/unicast arriving
 //     on ANY interface, including VLAN NICs that appear or disappear at runtime;
@@ -18,11 +18,11 @@
 //
 // Art-Net has no per-packet priority (that is an sACN concept) and ArtDmx carries
 // no source name, so a universe is either being transmitted from the target or it
-// is not — there is a single check with no priority variant.
+// is not; there is a single check with no priority variant.
 //
 // Universes whose checks stop asking about them are swept out after a couple of
-// minutes so the map doesn't grow forever. The receiver is fully lazy — nothing
-// binds until the first Observe() — so importing this module has no side effects.
+// minutes so the map doesn't grow forever. The receiver is fully lazy (nothing
+// binds until the first Observe()), so importing this module has no side effects.
 // The socket itself lives in ./_artnet-shared, shared with the node-health and
 // timecode checks: Art-Net fixes everything to port 6454, so there is only ever
 // one socket.
@@ -136,7 +136,7 @@ export function EvaluateArtnet(P: EvaluateParams): MonitoringResult {
     Success: false,
     Error: P.Snapshot.Ready
       ? `No Art-Net data for universe ${P.Universe} from ${P.Address}`
-      : 'Art-Net listener starting…',
+      : 'Art-Net listener starting...',
     Matched: false,
     ...WithSources,
   };
@@ -187,7 +187,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       : Pill('danger', 'Not receiving');
 
   const Head = Rows([
-    TextRow('Source IP', Address || '—'),
+    TextRow('Source IP', Address || '-'),
     TextRow('Universe', String(Universe)),
     Row('Status', StatusPill),
     Online

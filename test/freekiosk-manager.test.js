@@ -417,7 +417,7 @@ test('a device with remote control disabled is recorded as such', async () => {
     await withManager(async (Manager) => {
       const [, created] = await Manager.Create({ Address: '127.0.0.1', Port: device.port });
       const before = await Manager.Get(created.UUID);
-      // Unknowable until something is sent — the device only reveals the setting
+      // Unknowable until something is sent: the device only reveals the setting
       // by refusing a command.
       assert.equal(before[1].ControlEnabled, null);
 
@@ -462,7 +462,7 @@ test('a refused privileged command is reported as a failure', async () => {
 
 test("a command the terminal's mode makes meaningless never reaches the device", async () => {
   // FreeKiosk answers a WebView command in app mode with executed:true and does
-  // nothing — confirmed against a real device, where POSTing a URL in app mode
+  // nothing, confirmed against a real device, where POSTing a URL in app mode
   // left webview.currentUrl untouched. Sending it anyway would have ShowTrak
   // report a success on the device's behalf that never happened, so the refusal
   // happens here and the request is never made at all.
@@ -488,7 +488,7 @@ test("a command the terminal's mode makes meaningless never reaches the device",
 });
 
 test('the same command is sent when the terminal is in the mode it applies to', async () => {
-  // The inverse of the test above — without it, a bug that refused everything
+  // The inverse of the test above: without it, a bug that refused everything
   // would look like correct behaviour.
   const device = await startFreeKioskDevice({});
   try {
@@ -708,7 +708,7 @@ test('readings are kept when a poll fails so the modal is not blank', async () =
 test('a reboot that drops the connection is reported as success, not a hang-up error', async () => {
   // A tablet that actually reboots tears down its HTTP server mid-response, so
   // the socket dies before an answer arrives. Reporting "socket hang up" there
-  // marks the command failed precisely when it worked — and teaches an operator
+  // marks the command failed precisely when it worked, and teaches an operator
   // to ignore the one error that would matter if it were real.
   const device = await startFreeKioskDevice({ hangUp: true });
   try {

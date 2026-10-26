@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-// Exercises src/UI/js/app/lib/script-targeting.ts — the rules that decide which
+// Exercises src/UI/js/app/lib/script-targeting.ts: the rules that decide which
 // machines a script is OFFERED against in the context menu.
 //
 // Extracted from wire-context-menu.ts, where it was a private function inside a
@@ -12,7 +12,7 @@ const path = require('node:path');
 // ScriptWhitelistManager.IsClientAllowed. This is the renderer's copy, and its
 // job is to keep a restricted machine out of the menu in the first place. That
 // still matters: a script offered against the wrong machine is a script an
-// operator will eventually run on the wrong machine — and scripts are how you
+// operator will eventually run on the wrong machine, and scripts are how you
 // reboot, shut down or reconfigure a rig mid-show.
 //
 // Both directions are failures:
@@ -160,7 +160,7 @@ test('a client with no reported OS is never a target', () => {
 
 test('a script with no compatible platforms targets nothing', () => {
   // Empty means "declared for no platform", which is different from
-  // "unrestricted" — the whitelist handles that axis, not this one.
+  // "unrestricted"; the whitelist handles that axis, not this one.
   for (const CompatiblePlatforms of [[], null, undefined, 'Windows']) {
     assert.equal(
       IsScriptTargetable(script({ CompatiblePlatforms }), client()),
@@ -191,7 +191,7 @@ test('a multi-platform script targets each of its platforms', () => {
 
 test('only the admitted subset of a mixed selection is targeted', () => {
   // The behaviour the menu depends on: with a mix, the script shows once and
-  // runs for the admitted subset only — it does not run for everyone, and it
+  // runs for the admitted subset only; it does not run for everyone, and it
   // does not disappear.
   const Script = script({
     CompatiblePlatforms: ['Windows'],
@@ -245,7 +245,7 @@ test('selection order is preserved, so the menu matches the tile order', () => {
 
 // --- Tag-based whitelists ----------------------------------------------------
 // A whitelist may admit machines by tag, and tags nest. Getting this wrong here
-// hides a script from a machine that is in fact permitted — the operator sees
+// hides a script from a machine that is in fact permitted: the operator sees
 // no entry in the menu and no reason why.
 
 const wlTag = (TagID, Scope) => ({

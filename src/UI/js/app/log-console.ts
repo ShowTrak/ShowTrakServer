@@ -1,5 +1,5 @@
 // Hidden log console: a live feed of the server's log, opened by typing the
-// Konami code anywhere outside a text field. Deliberately undocumented — it is
+// Konami code anywhere outside a text field. Deliberately undocumented; it is
 // a production debugging aid, so it appears in no menu, shortcut list or help.
 //
 // The server streams lines only while this modal is open, already filtered to
@@ -88,7 +88,7 @@ function OnKeyDown(e: KeyboardEvent): void {
     }
     return;
   }
-  // A third Up keeps the two before it: "Up Up Up Down…" is still a match.
+  // A third Up keeps the two before it: "Up Up Up Down..." is still a match.
   KonamiProgress = Key === 'arrowup' ? (KonamiProgress === 2 ? 2 : 1) : 0;
 }
 
@@ -199,13 +199,13 @@ async function Load(): Promise<void> {
     ShowNotice('The log feed is unavailable.');
     return;
   }
-  ShowNotice('Waiting for log lines…');
+  ShowNotice('Waiting for log lines...');
   AppendEntries(Snapshot.Entries);
   AppendEntries(Held);
   Held = [];
 }
 
-// Called by the bootstrap orchestrator in main.ts — never at import time.
+// Called by the bootstrap orchestrator in main.ts, never at import time.
 export function InitLogConsole() {
   // Capture phase, and never preventDefault: the arrows and B/A keep doing
   // whatever they normally do, so typing the code has no visible side effect.
@@ -235,14 +235,14 @@ export function InitLogConsole() {
   // Clears the screen only; LastSeq stays put so cleared lines do not return.
   $('#LOG_CONSOLE_CLEAR')
     .off('click.logconsole')
-    .on('click.logconsole', () => ShowNotice('Waiting for log lines…'));
+    .on('click.logconsole', () => ShowNotice('Waiting for log lines...'));
 
   $('#LOG_CONSOLE_MODAL')
     .off('show.bs.modal.logconsole hidden.bs.modal.logconsole')
     .on('show.bs.modal.logconsole', () => {
       IsOpen = true;
       $('#LOG_CONSOLE_LEVEL').val(Level);
-      ShowNotice('Connecting…');
+      ShowNotice('Connecting...');
       void Load();
     })
     .on('hidden.bs.modal.logconsole', () => {

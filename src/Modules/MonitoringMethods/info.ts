@@ -3,13 +3,13 @@
 // method file) so all editor copy lives in one reviewable place; the registry
 // attaches the matching entry to each method's public shape.
 //
-// This is informational only — it never affects how a check runs. When adding a
+// This is informational only; it never affects how a check runs. When adding a
 // new monitoring method, add its help here too (same discipline as registering
 // it in index.ts).
 //
 // Style: state facts, not reassurances. Name supported vendors/ports/defaults
 // explicitly rather than saying "most" or "best effort". Keep per-input hints on
-// the setting's `Note` field (see MonitoringSettingField), not in Setup — Setup
+// the setting's `Note` field (see MonitoringSettingField), not in Setup. Setup
 // is for the sequence of actions, not for describing individual fields. Put
 // specifications and API references in `Links`, not inline in the prose.
 import type { MonitoringMethodInfo } from './types';
@@ -41,7 +41,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
   },
   'http-json': {
     Summary:
-      'HTTP or HTTPS request that also asserts the response body — either a JSON path equals a value, or the body contains a substring. The response body is read up to 1 MiB.',
+      'HTTP or HTTPS request that also asserts the response body: either a JSON path equals a value, or the body contains a substring. The response body is read up to 1 MiB.',
     Setup: [
       'Set a JSON path (e.g. data.status) and an expected value, or leave the path empty for a plain substring match.',
     ],
@@ -79,7 +79,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
   },
   'dante-device': {
     Summary:
-      'Passively browses mDNS for Audinate Dante devices and confirms one matching the configured name is advertising. Browses both _netaudio-arc._udp (port 4440) and _netaudio-cmc._udp (port 8800), merging them into one device record, so a device stays Online while it answers on either. Reports presence only — Dante does not publish subscription state over mDNS.',
+      'Passively browses mDNS for Audinate Dante devices and confirms one matching the configured name is advertising. Browses both _netaudio-arc._udp (port 4440) and _netaudio-cmc._udp (port 8800), merging them into one device record, so a device stays Online while it answers on either. Reports presence only; Dante does not publish subscription state over mDNS.',
     Setup: [
       'Enter the device name exactly as it appears in Dante Controller, or a substring of it with Match mode set to Contains.',
       'ShowTrak must be on the same network / VLAN as the Dante primary interface. Dante devices do not answer mDNS across a router unless an mDNS reflector is configured.',
@@ -124,20 +124,20 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
   },
   ma2: {
     Summary:
-      'Connects to a grandMA2 console or onPC on its Telnet remote (TCP 30000) and confirms it responds as a grandMA2 — sending no commands, so it is safe against a live desk. Enable the version or show toggle to also log in and check the software version or loaded show file.',
+      'Connects to a grandMA2 console or onPC on its Telnet remote (TCP 30000) and confirms it responds as a grandMA2, sending no commands, so it is safe against a live desk. Enable the version or show toggle to also log in and check the software version or loaded show file.',
     Setup: [
       'Enable the Telnet remote under Setup → Console → Global Settings → Telnet (Login Enabled). It is off by default.',
-      'Leave the login user and password blank for a read-only liveness check. The version and show toggles require credentials — use a dedicated Telnet user rather than a live operator account.',
+      'Leave the login user and password blank for a read-only liveness check. The version and show toggles require credentials; use a dedicated Telnet user rather than a live operator account.',
     ],
   },
   ma3: {
     Summary:
-      'Confirms a grandMA3 console or onPC is reachable by opening and immediately closing a TCP connection to its Web Remote port (default 8080). Liveness only — grandMA3 exposes no safe read-only status API over the network, and opening a full Web Remote session can crash a live console.',
+      'Confirms a grandMA3 console or onPC is reachable by opening and immediately closing a TCP connection to its Web Remote port (default 8080). Liveness only: grandMA3 exposes no safe read-only status API over the network, and opening a full Web Remote session can crash a live console.',
     Setup: ['Enable the Web Remote on the console under the Network menu.'],
   },
   avolites: {
     Summary:
-      'Connects to an Avolites Titan console over the Titan WebAPI (HTTP, TCP 4430) and reads the software version and current show name. Read-only — it issues only /titan/get requests. Not available on Titan One / T1. Online when the WebAPI answers; enable the version and show toggles to also flag an unexpected version or a wrong loaded show.',
+      'Connects to an Avolites Titan console over the Titan WebAPI (HTTP, TCP 4430) and reads the software version and current show name. Read-only: it issues only /titan/get requests. Not available on Titan One / T1. Online when the WebAPI answers; enable the version and show toggles to also flag an unexpected version or a wrong loaded show.',
     Setup: [
       'Enable the WebAPI on the console. If the port is refused, the check reports that it needs enabling.',
     ],
@@ -151,7 +151,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
     Summary:
       'Discovers NDI video sources on the network via mDNS and confirms a named source is being advertised. Presence-only: Online when seen, Offline when not. Source names take the form "MACHINE (Source Name)".',
     Setup: [
-      'Discovery is network-wide — the Address field is not used.',
+      'Discovery is network-wide; the Address field is not used.',
       'ShowTrak and the NDI source must share a subnet that passes mDNS / Bonjour.',
     ],
   },
@@ -181,10 +181,10 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
   },
   'nut-ups': {
     Summary:
-      'UPS health via Network UPS Tools (NUT). Reports reachability and ups.status by default — Online on mains, Degraded on battery, low/replace battery, overload, or alarm. Enable the charge, load, temperature, and input-voltage toggles to also threshold those readings in the same probe.',
+      'UPS health via Network UPS Tools (NUT). Reports reachability and ups.status by default: Online on mains, Degraded on battery, low/replace battery, overload, or alarm. Enable the charge, load, temperature, and input-voltage toggles to also threshold those readings in the same probe.',
     Setup: [
       'Point Address at the machine running upsd (default port 3493) and set the UPS name exactly as configured in upsd.',
-      "upsd must permit queries from ShowTrak's IP — check the ACLs in upsd.conf.",
+      "upsd must permit queries from ShowTrak's IP; check the ACLs in upsd.conf.",
       'Enable a factor toggle to threshold that reading; each is skipped automatically when the UPS does not report it. Voltage uses the reported nominal ± tolerance, or an explicit min/max.',
       'Actions (muting the alarm, battery tests) need a username and password under Advanced, for a upsd.users entry whose instcmds include them, e.g. instcmds = beeper.mute test.battery.start.quick.',
     ],
@@ -192,7 +192,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
   },
   'snmp-ups': {
     Summary:
-      'UPS health via SNMP v1/v2c against the standard UPS-MIB (RFC 1628) — no NUT server required. Reports reachability, battery status, output source, and active alarms by default (Degraded on battery, bypass, or low/depleted battery). Enable the charge, load, and temperature toggles to threshold those readings too. Compatible with Eaton/MGE Network-M2/M3, Riello NetMan 204/208, APC Network Management Card 2/3 (AP96xx), CyberPower RMCARD, Tripp Lite, and Vertiv/Liebert cards.',
+      'UPS health via SNMP v1/v2c against the standard UPS-MIB (RFC 1628); no NUT server required. Reports reachability, battery status, output source, and active alarms by default (Degraded on battery, bypass, or low/depleted battery). Enable the charge, load, and temperature toggles to threshold those readings too. Compatible with Eaton/MGE Network-M2/M3, Riello NetMan 204/208, APC Network Management Card 2/3 (AP96xx), CyberPower RMCARD, Tripp Lite, and Vertiv/Liebert cards.',
     Setup: [
       'Point Address at the UPS network card itself (its own IP, not a NUT server) and enable SNMP v1/v2c on the card.',
       'For cards locked to SNMPv3 (username + auth/priv), use "UPS Health (SNMP v3)" instead.',
@@ -200,7 +200,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
     ],
     Links: [
       {
-        Label: 'RFC 1628 — UPS Management Information Base',
+        Label: 'RFC 1628 - UPS Management Information Base',
         Url: 'https://datatracker.ietf.org/doc/html/rfc1628',
       },
     ],
@@ -215,11 +215,11 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
     ],
     Links: [
       {
-        Label: 'RFC 1628 — UPS Management Information Base',
+        Label: 'RFC 1628 - UPS Management Information Base',
         Url: 'https://datatracker.ietf.org/doc/html/rfc1628',
       },
       {
-        Label: 'RFC 3414 — SNMPv3 User-based Security Model',
+        Label: 'RFC 3414 - SNMPv3 User-based Security Model',
         Url: 'https://datatracker.ietf.org/doc/html/rfc3414',
       },
     ],
@@ -259,7 +259,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       "Passively listens for Millumin's outbound OSC feedback and confirms the configured machine is sending it, via a grace window. Presence-only.",
     Setup: [
       "In Millumin, open Device manager (⌘K) → OSC, enable 'API feedback', and add ShowTrak's IP and the listen port as an OSC destination.",
-      "Set Address to the Millumin machine's IP — it is matched against the OSC source.",
+      "Set Address to the Millumin machine's IP; it is matched against the OSC source.",
     ],
   },
   pjlink: {
@@ -268,13 +268,13 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
     Setup: [
       'Enable PJLink on the projector under its Network / Control settings. Epson ships with it disabled.',
       'Enter the PJLink password if one is set, or leave it blank when authentication is off.',
-      'Enable a factor toggle to check it. Input codes are two characters — source type (1 RGB, 2 Video, 3 Digital, 4 Storage, 5 Network) + input number, e.g. 31. Laser models without lamps are handled automatically.',
+      'Enable a factor toggle to check it. Input codes are two characters: source type (1 RGB, 2 Video, 3 Digital, 4 Storage, 5 Network) + input number, e.g. 31. Laser models without lamps are handled automatically.',
     ],
     Links: [{ Label: 'PJLink specification (JBMIA)', Url: 'https://pjlink.jbmia.or.jp/english/' }],
   },
   'snmp-projector': {
     Summary:
-      'Reads projector status over SNMP using a brand profile — Epson and Christie report lamp / light-source hours; NEC/Sharp, Sony, Barco, and Panasonic report SNMP reachability and device identity only. Generic covers unlisted brands. SNMP support and OIDs vary by brand and model; prefer a PJLink check where available.',
+      'Reads projector status over SNMP using a brand profile: Epson and Christie report lamp / light-source hours; NEC/Sharp, Sony, Barco, and Panasonic report SNMP reachability and device identity only. Generic covers unlisted brands. SNMP support and OIDs vary by brand and model; prefer a PJLink check where available.',
     Setup: [
       'Enable SNMP on the projector and match the community string (default "public").',
       'Pick the brand profile, or Generic for unlisted brands.',
@@ -282,7 +282,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
     ],
     Links: [
       {
-        Label: 'RFC 1157 — Simple Network Management Protocol',
+        Label: 'RFC 1157 - Simple Network Management Protocol',
         Url: 'https://datatracker.ietf.org/doc/html/rfc1157',
       },
     ],
@@ -292,7 +292,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'Connects to a Blackmagic HyperDeck recorder on the HyperDeck Ethernet Protocol (TCP 9993) and reads its transport state and every media slot in one short session, sending only queries. Degraded by default when no media is mounted, the active slot is empty, or a slot reports a media error. Enable the recording toggle to flag a deck that is not recording, and the recording-time toggle to flag recording time left below a minimum (default 15 minutes, counted across all mounted slots because HyperDeck continues recording on the next card when one fills).',
     Setup: [
       "Set Address to the HyperDeck's IP address, set in Blackmagic HyperDeck Setup or the deck's Setup menu. The protocol port is 9993.",
-      'HyperDeck accepts a limited number of protocol clients at once. A deck that answers "120 connection failed" reports Degraded — close other control software connected to it.',
+      'HyperDeck accepts a limited number of protocol clients at once. A deck that answers "120 connection failed" reports Degraded; close other control software connected to it.',
       'Enable Check recording for the period the deck should be rolling, e.g. the show.',
       'Set the minimum recording time to the longest stretch that must record without a card change. Under Advanced, count the active slot only to be warned before each card fills.',
     ],
@@ -370,7 +370,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
   },
   'shure-wireless': {
     Summary:
-      'Shure ULX-D, QLX-D, SLX-D and Axient Digital receivers over Shure command strings (TCP 2202). One read-only GET ALL per interval reads every channel: transmitter presence and model, battery bars, charge and runtime, mute, RF level and RF warnings. Battery is checked by default — Degraded when a monitored channel’s pack is at or below the bar or minutes threshold. Require transmitter, Check mute and Check RF warnings are opt-in. Battery is only judged while a transmitter is on.',
+      'Shure ULX-D, QLX-D, SLX-D and Axient Digital receivers over Shure command strings (TCP 2202). One read-only GET ALL per interval reads every channel: transmitter presence and model, battery bars, charge and runtime, mute, RF level and RF warnings. Battery is checked by default: Degraded when a monitored channel’s pack is at or below the bar or minutes threshold. Require transmitter, Check mute and Check RF warnings are opt-in. Battery is only judged while a transmitter is on.',
     Setup: [
       'Point Address at the receiver’s control IP address, not its Dante address. Port 2202 is fixed by Shure.',
       'List the channel numbers to monitor, or leave Channels empty to monitor every channel the receiver reports.',
@@ -394,7 +394,7 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
   },
   'sennheiser-wireless': {
     Summary:
-      'Sennheiser Digital 6000 (EM 6000, EM 6000 Dante) and EW-DX (EM 2, EM 2 Dante, EM 4 Dante) receivers over Sennheiser Sound Control (SSC v1, JSON over UDP 45). Read-only queries read every channel: transmitter link, battery level and runtime, mute, RF and link quality, and the receiver’s own warnings. Battery is checked by default — Degraded when a monitored channel’s pack is low or at or below the percentage or minutes threshold. Require transmitter, Check mute and Check receiver warnings are opt-in.',
+      'Sennheiser Digital 6000 (EM 6000, EM 6000 Dante) and EW-DX (EM 2, EM 2 Dante, EM 4 Dante) receivers over Sennheiser Sound Control (SSC v1, JSON over UDP 45). Read-only queries read every channel: transmitter link, battery level and runtime, mute, RF and link quality, and the receiver’s own warnings. Battery is checked by default: Degraded when a monitored channel’s pack is low or at or below the percentage or minutes threshold. Require transmitter, Check mute and Check receiver warnings are opt-in.',
     Setup: [
       'Point Address at the receiver’s control IP address. SSC uses UDP 45; if a Digital 6000 receiver does not answer, set Port to 6970.',
       'EW-DX firmware 4.0 and later answers SSC v1 only with Legacy Mode enabled for the receiver in Sennheiser Wireless Systems Manager (WSM). Firmware below 4.0 needs no change.',
@@ -586,22 +586,22 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       'Reads one or more OIDs from any SNMP agent over v1, v2c or v3 and shows each value with its type. Each OID can carry a check: equals, not equals, greater than, less than, contains or present. Offline when the agent does not answer; Degraded when an OID is missing (noSuchObject, noSuchInstance, endOfMibView) or a check fails, naming the OID and its value. For switches, PDUs, amplifiers and other devices without a dedicated ShowTrak method.',
     Setup: [
       'Enable SNMP on the device. For v1/v2c match the community string (default "public"); for v3 enter the username and the auth/priv protocols and passwords exactly as configured on the device.',
-      'Add one OID per entry, in numeric form (e.g. 1.3.6.1.2.1.1.5.0). A leading dot is ignored. Names such as sysName.0 are not accepted — look the number up in the device MIB.',
+      'Add one OID per entry, in numeric form (e.g. 1.3.6.1.2.1.1.5.0). A leading dot is ignored. Names such as sysName.0 are not accepted; look the number up in the device MIB.',
       'To check a value, follow the OID with a comparison: 1.3.6.1.2.1.1.5.0 = Stage Left, 1.3.6.1.2.1.2.2.1.8.1 != 2, an OID > 20 or < 50, contains Text, or present. A bare OID only has to exist. Give the same OID twice to check a range.',
       'Numbers (Integer, Counter, Gauge, TimeTicks, Counter64) compare numerically. Text compares without regard to case; write "" to match an empty value. Binary values are shown as hex and compare as hex, so a MAC address can be written 00:1a:2b:3c:4d:5e.',
       'A credential mismatch is reported as Offline, because an agent silently drops a request it will not authenticate.',
     ],
     Links: [
       {
-        Label: 'RFC 3416 — SNMPv2 protocol operations',
+        Label: 'RFC 3416 - SNMPv2 protocol operations',
         Url: 'https://datatracker.ietf.org/doc/html/rfc3416',
       },
       {
-        Label: 'RFC 3414 — SNMPv3 User-based Security Model',
+        Label: 'RFC 3414 - SNMPv3 User-based Security Model',
         Url: 'https://datatracker.ietf.org/doc/html/rfc3414',
       },
       {
-        Label: 'RFC 1213 — MIB-II',
+        Label: 'RFC 1213 - MIB-II',
         Url: 'https://datatracker.ietf.org/doc/html/rfc1213',
       },
     ],

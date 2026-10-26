@@ -8,7 +8,7 @@
 //
 // The `mqtt` npm package handles the wire protocol. Auto-reconnect is disabled
 // (reconnectPeriod: 0) and the client is fully torn down with end(true) on every
-// exit path — Run() is invoked on every monitoring tick, so a leaked socket or
+// exit path; Run() is invoked on every monitoring tick, so a leaked socket or
 // keep-alive timer would accumulate quickly.
 //
 // Result semantics (consumed by MonitoringTarget.Tick):
@@ -115,7 +115,7 @@ function TruncatePayload(Payload: unknown): string {
     Str = String(Payload == null ? '' : Payload);
   }
   if (Str.length > MAX_PAYLOAD_CHARS) {
-    return Str.slice(0, MAX_PAYLOAD_CHARS) + '…';
+    return Str.slice(0, MAX_PAYLOAD_CHARS - 2) + '...';
   }
   return Str;
 }
@@ -312,9 +312,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   else StatePill = Pill('danger', 'Not connected');
 
   const Head = Rows([
-    TextRow('Broker', `${Address || '—'}:${Port}`),
+    TextRow('Broker', `${Address || '-'}:${Port}`),
     TextRow('Protocol', Protocol),
-    TextRow('Topic', Topic || '—'),
+    TextRow('Topic', Topic || '-'),
     Row('Connection', StatePill),
     Row(
       'Message',

@@ -6,8 +6,8 @@
 // de-collision) and value sanitization belong to VariableManager, which owns the
 // canonical rules and is also reached from the socket layer. Duplicating them
 // here would give two definitions of a legal key that could drift. These
-// validators only enforce the wire SHAPE — that an ID is an ID and a string is a
-// string — so a malformed renderer payload is refused before it reaches a
+// validators only enforce the wire SHAPE (that an ID is an ID and a string is a
+// string), so a malformed renderer payload is refused before it reaches a
 // manager that assumes well-formed input.
 import { fail, isPlainObject } from './primitives';
 import type { IPCValidationManager } from './index';
@@ -30,7 +30,7 @@ export = function registerVariableValidators(Manager: IPCValidationManager): voi
       return parseInt(normalized, 10);
     }
     fail(`${fieldName} is invalid`);
-    // unreachable — fail throws
+    // unreachable: fail throws
     return 0;
   };
 
@@ -45,7 +45,7 @@ export = function registerVariableValidators(Manager: IPCValidationManager): voi
 
   // The client editor's override map: VariableID -> value, where null means
   // "clear the override and inherit the default again". null and '' are
-  // different states and both are preserved — '' pins the value to empty.
+  // different states and both are preserved: '' pins the value to empty.
   Manager.ClientVariableMap = (value: unknown) => {
     if (value == null) return {};
     if (!isPlainObject(value)) fail('Variables must be an object');

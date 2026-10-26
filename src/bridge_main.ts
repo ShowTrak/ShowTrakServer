@@ -15,7 +15,7 @@ import type { InvokeChannel, SubscribeChannel } from './Modules/IPCRegistry/chan
 type AssertAllChannelsListed<T extends never> = T;
 
 // NOTE: This file is a SANDBOXED preload script. Its `require` can only resolve
-// Electron built-ins, NOT local files — so the channel allowlists must be
+// Electron built-ins, NOT local files, so the channel allowlists must be
 // inlined here (they cannot be imported from src/Modules/IPCRegistry/channels
 // at runtime). The registry remains the single source of truth and drift is a
 // COMPILE error: the type-only imports below are erased from the emitted JS,
@@ -585,7 +585,7 @@ const API: ShowTrakAPI = {
   SetTagOrder: async (OrderedTagIDs) => invoke('Tags:SetOrder', OrderedTagIDs),
   DeleteTag: async (TagID) => invoke('Tags:Delete', TagID),
   OnSetTagList: (Callback) => subscribe('SetTagList', Callback),
-  // Show Variables. Writing a client's overrides is not here — it rides the
+  // Show Variables. Writing a client's overrides is not here; it rides the
   // UpdateClient payload as a `Variables` field so the editor saves in one go.
   GetAllVariables: async () => invoke('Variables:GetAll'),
   CreateVariable: async (Key) => invoke('Variables:Create', Key),

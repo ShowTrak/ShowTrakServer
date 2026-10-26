@@ -7,9 +7,9 @@ const { loadWithMocks } = require('../test-support/load-with-mocks');
 // VariableManager: show variables that reach a client's scripts as environment
 // variables (GAME_VERSION arrives as %SHOWTRAK_VAR_GAME_VERSION%).
 //
-// Loaded against an in-memory repository so the manager's real logic runs —
+// Loaded against an in-memory repository so the manager's real logic runs (
 // key normalization, default-vs-override resolution, environment building and
-// cache invalidation — without a database.
+// cache invalidation) without a database.
 //
 // The properties pinned here are the ones whose failure is silent in a show:
 //
@@ -185,7 +185,7 @@ test('creating with a colliding name de-collides instead of failing', async () =
   const { Manager } = load();
   const [, first] = await Manager.Create('ROOM');
   const [, second] = await Manager.Create('ROOM');
-  // Creation is a button press with no name typed yet — the operator renames it.
+  // Creation is a button press with no name typed yet; the operator renames it.
   assert.equal(first.Key, 'ROOM');
   assert.equal(second.Key, 'ROOM_2');
 });
@@ -221,7 +221,7 @@ test('an override beats the default, and clearing it goes back to inheriting', a
     'TEST_GAME'
   );
 
-  // null means "inherit again" — and must keep tracking later default changes.
+  // null means "inherit again", and must keep tracking later default changes.
   await Manager.SetClientValues('client-1', { [created.VariableID]: null });
   assert.equal(
     (await Manager.GetPayload('client-1')).Environment.SHOWTRAK_VAR_GAME_VERSION,
@@ -249,7 +249,7 @@ test('a variable with no value anywhere is still emitted', async () => {
   await Manager.Create('GAME_VERSION');
 
   // Omitting it would leave the literal text %SHOWTRAK_VAR_GAME_VERSION% in a
-  // batch file — the single most confusing failure this feature has.
+  // batch file: the single most confusing failure this feature has.
   const { Environment } = await Manager.GetPayload('client-1');
   assert.equal(Object.hasOwn(Environment, 'SHOWTRAK_VAR_GAME_VERSION'), true);
   assert.equal(Environment.SHOWTRAK_VAR_GAME_VERSION, '');

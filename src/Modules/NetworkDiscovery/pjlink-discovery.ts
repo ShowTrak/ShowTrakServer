@@ -3,7 +3,7 @@
 // replies from UDP 4352 with `%2ACKN=<MAC>\r` after a random 0–10s delay. The
 // projector's IP is the source address of that datagram.
 //
-// Class 1-only projectors do not answer SRCH — those are still found by the
+// Class 1-only projectors do not answer SRCH; those are still found by the
 // TCP 4352 port probe in the main scanner. This strategy is purely additive.
 import dgram from 'dgram';
 import { CreateLogger } from '../Logger';
@@ -42,7 +42,7 @@ export interface PJLinkDiscoveryOptions {
 }
 
 // Start a best-effort PJLink discovery. Datagram send/socket errors are logged,
-// never thrown — a projector found this way is a bonus on top of the TCP probe.
+// never thrown; a projector found this way is a bonus on top of the TCP probe.
 export function StartPJLinkDiscovery(Options: PJLinkDiscoveryOptions): PJLinkDiscoveryHandle {
   const Port = Options.TargetPort || PJLINK_UDP_PORT;
   const Targets =

@@ -1,6 +1,6 @@
 // Blackmagic Design Videohub router check, over the Videohub Ethernet Protocol
 // (TCP 9990). Confirms the router is present and, optionally, that named
-// outputs are still routed to the inputs the show depends on — the "someone
+// outputs are still routed to the inputs the show depends on: the "someone
 // re-patched the projector feed" failure.
 //
 // The protocol is entirely server-push: on connect the Videohub Server dumps
@@ -20,8 +20,8 @@
 //   END PRELUDE:            (newer firmware) the dump is complete
 // Ports are 0-based on the wire and 1-based on the chassis and in the UI.
 //
-// So the probe sends NOTHING: it reads until END PRELUDE, or — on older
-// firmware that never sends it — until the device and routing blocks are in
+// So the probe sends NOTHING: it reads until END PRELUDE, or (on older
+// firmware that never sends it) until the device and routing blocks are in
 // and the stream has gone quiet, then closes. With no bytes sent it cannot
 // change a route, a label or a lock. When the server has no router attached it
 // sends `Device present: false` and nothing more, so the probe stops there.
@@ -32,7 +32,7 @@
 //     (incompatible router firmware) are Degraded with the reason.
 //   - CheckAlarms (default ON): any ALARM STATUS entry that is not `ok` (a
 //     failed PSU or fan) is a hardware fault an operator wants to hear about,
-//     and routers without the block are unaffected — so it costs nothing to
+//     and routers without the block are unaffected, so it costs nothing to
 //     leave on.
 //   - CheckRoutes (default OFF) + ExpectedRoutes: `Output:Input` pairs in
 //     chassis (1-based) numbering. A malformed or out-of-range entry is NOT
@@ -512,7 +512,7 @@ export function CheckRoutes(Snap: VideohubSnapshot, Entries: string[]): RouteChe
 }
 
 // The reasons a reachable server is unhealthy, per the enabled assertions.
-// Pure — exported via _internal for unit tests.
+// Pure; exported via _internal for unit tests.
 function EvaluateHealth(Snap: VideohubSnapshot, Options: VideohubOptions): string[] {
   if (!Snap.IsVideohub) return ['Responded, but does not look like a Videohub'];
   if (!Snap.SawDevice) return ['Timed out before the router described itself'];
@@ -637,7 +637,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const BadAlarms = Alarms.filter((A) => String(A.Status).toLowerCase() !== 'ok');
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Reachable && Result.Model ? TextRow('Model', String(Result.Model)) : null,
     Reachable && Result.FriendlyName ? TextRow('Name', String(Result.FriendlyName)) : null,
     Reachable && Result.ProtocolVersion
@@ -725,13 +725,15 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     Html +
     `<div class="text-muted small mt-2 mb-1">Routing (${Routes.length} outputs)</div>` +
     `<div class="d-grid gap-0">${Lines}</div>` +
-    (Routes.length > Shown.length ? Note(`…and ${Routes.length - Shown.length} more outputs`) : '')
+    (Routes.length > Shown.length
+      ? Note(`...and ${Routes.length - Shown.length} more outputs`)
+      : '')
   );
 }
 
 export const Name = 'Blackmagic Videohub';
 export const Description =
-  'Connects to a Blackmagic Videohub router (or Videohub Server) on the Videohub Ethernet Protocol (TCP 9990) and reads the state dump it sends on connect — sending nothing, so it cannot change a route. Degraded when no router is attached, the router needs a firmware update, or a hardware alarm is raised; optionally also when a listed output is not routed to its expected input.';
+  'Connects to a Blackmagic Videohub router (or Videohub Server) on the Videohub Ethernet Protocol (TCP 9990) and reads the state dump it sends on connect, sending nothing, so it cannot change a route. Degraded when no router is attached, the router needs a firmware update, or a hardware alarm is raised; optionally also when a listed output is not routed to its expected input.';
 export const Group = 'Video';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = {

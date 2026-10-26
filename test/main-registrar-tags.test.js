@@ -2,13 +2,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
-// Exercises src/main/registrars/tags.ts — the Tags:* channels.
+// Exercises src/main/registrars/tags.ts: the Tags:* channels.
 //
 // Tags are cross-cutting colour+icon collections whose membership is a dynamic
 // scope ({ Workspace, Groups[], Clients[] }). The scope entries are scoped-ID
 // strings (a bare UUID, or a prefixed "monitor:12" / "check:3"), so the
 // validation boundary here is what stops a malformed scope reaching the
-// manager and silently matching nothing — or everything.
+// manager and silently matching nothing, or everything.
 //
 // Real IPCValidation runs; only the managers and Electron are stubbed.
 

@@ -160,10 +160,10 @@ test('FormatSampleRate and FormatDanteLatency render operator-facing units', () 
   const { FormatSampleRate, FormatDanteLatency } = loadDante()._internal;
   assert.equal(FormatSampleRate(48000), '48 kHz');
   assert.equal(FormatSampleRate(44100), '44.1 kHz');
-  assert.equal(FormatSampleRate(0), '—');
+  assert.equal(FormatSampleRate(0), '-');
   assert.equal(FormatDanteLatency(1000000), '1 ms');
   assert.equal(FormatDanteLatency(250000), '0.25 ms');
-  assert.equal(FormatDanteLatency('nope'), '—');
+  assert.equal(FormatDanteLatency('nope'), '-');
 });
 
 // --- evaluation logic (pure) -------------------------------------------------

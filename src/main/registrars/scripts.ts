@@ -177,7 +177,7 @@ function register(): void {
   // Wipe the finished rows from the execution panel. Fired by the renderer when
   // the panel auto-dismisses, so the next batch renders into an empty list
   // instead of stacking on top of the previous run's results. Pending entries
-  // survive — a batch queued during the dismiss window must not be dropped.
+  // survive; a batch queued during the dismiss window must not be dropped.
   RPC.handle('Scripts:ClearSettledExecutions', async () => {
     await ScriptExecutionManager.ClearSettled();
     return [null, true];
@@ -262,7 +262,7 @@ function register(): void {
   });
 
   // Script Manager: read the per-show whitelist scope for one script. Returns
-  // null when unrestricted (all clients) — the default for every script.
+  // null when unrestricted (all clients), the default for every script.
   RPC.handle('Scripts:GetWhitelist', async (_Event: unknown, ID: unknown) => {
     let ValidID;
     try {
@@ -284,7 +284,7 @@ function register(): void {
       return validationErrorTuple(error);
     }
     await ScriptWhitelistManager.SetScope(ValidID, ValidScope);
-    // Re-push the catalog (from cache — no disk reload, fingerprint unchanged so
+    // Re-push the catalog (from cache: no disk reload, fingerprint unchanged so
     // no redundant deployment) so every UI immediately reflects the restriction.
     BroadcastManager.emit('ScriptsUpdated');
     return [null, true];

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { installModuleMocks, matchesModule } = require('./helpers/main-mocks');
 
-// Covers src/main/shutdown-coordinator.ts — the "may we quit yet, and what must
+// Covers src/main/shutdown-coordinator.ts: the "may we quit yet, and what must
 // we save first" state machine.
 //
 // This is the highest consequence-per-line file in the main process: it owns the
@@ -312,7 +312,7 @@ test('with autosave on and no unsaved changes, close proceeds without saving', a
 test('with autosave on and unsaved changes, the show is saved once before closing', async () => {
   const C = freshCoordinator({ autosaveEnabled: true, hasUnsavedChanges: true });
   await C.handleMainWindowClose(mainWindowStub, cancelableEvent());
-  // Saved silently to the known path — no prompt.
+  // Saved silently to the known path, no prompt.
   assert.deepEqual(calls.save, ['/shows/current.showtrak']);
   assert.equal(calls.messageBox.length, 0);
   assert.deepEqual(calls.showFileUpdated, ['/shows/current.showtrak']);
@@ -584,7 +584,7 @@ test('before-quit routes through the window so save prompts still fire', () => {
   C.handleBeforeQuit(Event);
   assert.equal(calls.preventDefault, 1);
   assert.equal(calls.windowClose, 1);
-  // Cleanup has NOT run yet — the window close has to be approved first.
+  // Cleanup has NOT run yet; the window close has to be approved first.
   assert.deepEqual(calls.dbShutdown, []);
 });
 
@@ -633,7 +633,7 @@ test('before-quit stops preventing the default once cleanup has completed', asyn
 
 test('cleanup still closes the database when earlier steps throw', async () => {
   // Every step is independently guarded so one failing subsystem cannot strand
-  // the database open — that is what would actually corrupt a show file.
+  // the database open; that is what would actually corrupt a show file.
   const C = freshCoordinator({
     throwOn: { stopAutosave: true, networkStop: true, monitoring: true, dummy: true },
   });

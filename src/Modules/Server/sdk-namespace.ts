@@ -1,33 +1,33 @@
 // SDK control API (`/sdk`) Socket.IO namespace.
 //
 // The external-integration surface: the ShowTrak Server SDK (and anything built
-// on it — the Companion module, the ShowTrak Remote app) connects here to drive
+// on it: the Companion module, the ShowTrak Remote app) connects here to drive
 // the instance in real time and receive live status pushes. Supports multiple
 // concurrent clients natively (Socket.IO fan-out).
 //
 // Two mechanisms, mirroring the Web UI namespace but purpose-built and simpler:
-//   1. PUSH — one renderer sink (shared RendererBus) forwards an allowlist of
+//   1. PUSH: one renderer sink (shared RendererBus) forwards an allowlist of
 //      state channels to every connected socket, serialized for the wire.
-//   2. COMMAND — a single `command` event dispatches to the transport-agnostic
+//   2. COMMAND: a single `command` event dispatches to the transport-agnostic
 //      ControlService once the handshake has authenticated.
-//   3. RPC — a single `rpc` event dispatches to the SAME shared IPC handlers the
+//   3. RPC: a single `rpc` event dispatches to the SAME shared IPC handlers the
 //      desktop uses, behind the SAME capability model as the Web UI (see
 //      ../RemoteAccess). Deny by default, and available to PAIRED DEVICES ONLY.
 //
 // Auth is REQUIRED, and comes in two flavours that are NOT interchangeable:
 //
-//   API key    — a 48-hex secret, auto-generated on first boot, presented on
+//   API key:     a 48-hex secret, auto-generated on first boot, presented on
 //                every handshake. This is how integrations connect. It is copied
 //                into a config file by hand, so it is long and never typed.
 //
-//   Device token — issued when a ShowTrak Remote device pairs (with the
+//   Device token: issued when a ShowTrak Remote device pairs (with the
 //                workspace PIN, a scanned pairing code, or nothing when PIN
 //                protection is off) and persisted in the RemoteDevices table.
 //                Revocable per device from Settings.
 //
 // The distinction matters beyond bookkeeping: a device session is stamped with
 // AuthMode 'device', which is what the management bridge will gate on. An API key
-// must never inherit privileges its holder did not ask for — a Companion install
+// must never inherit privileges its holder did not ask for; a Companion install
 // wants to fire cues, not delete groups.
 //
 // No key configured / disabled feature / wrong credential → refused at the
@@ -82,12 +82,12 @@ const SDK_AUTH_WINDOW_MS = 60 * 1000; // rolling window over which failures are 
 const SDK_AUTH_LOCKOUT_MS = 5 * 60 * 1000; // cool-off once a threshold trips
 
 // The API key is a 192-bit random secret (24 random bytes), so this is NOT a
-// brute-force defence — that keyspace is far out of reach. It is a deliberately
+// brute-force defence; that keyspace is far out of reach. It is a deliberately
 // GENEROUS abuse backstop: it only stops a broken or hostile client from
 // hammering the handshake indefinitely.
 const SDK_AUTH_MAX_FAILURES = 100;
 
-// The workspace PIN is 4 digits — a 10,000-key space. This threshold IS the
+// The workspace PIN is 4 digits, a 10,000-key space. This threshold IS the
 // brute-force defence, so it matches the Web UI login throttle rather than the
 // generous API-key figure above. At 100 failures/minute a 4-digit PIN falls in
 // well under two hours; at 10 with a five-minute lockout it does not.
@@ -145,7 +145,7 @@ function CreateAuthThrottle(MaxFailures: number) {
 const ApiKeyThrottle = CreateAuthThrottle(SDK_AUTH_MAX_FAILURES);
 const PairingThrottle = CreateAuthThrottle(SDK_PAIRING_MAX_FAILURES);
 
-// Structural socket/namespace types — the `/sdk` namespace speaks its own
+// Structural socket/namespace types: the `/sdk` namespace speaks its own
 // string-keyed command/push protocol, not the client wire contract.
 interface SdkSocket {
   id: string;
@@ -156,7 +156,7 @@ interface SdkSocket {
       /**
        * Explicit pairing intent. Required rather than inferred from the presence
        * of a PIN, because pairing with protection off carries no credential at
-       * all — without an explicit flag, "pair me" and "I forgot my API key" would
+       * all; without an explicit flag, "pair me" and "I forgot my API key" would
        * be the same handshake.
        */
       pair?: boolean;
@@ -170,7 +170,7 @@ interface SdkSocket {
   };
   /**
    * How this socket authenticated. Stamped by the handshake middleware and read
-   * wherever privilege differs between an integration and a paired device — most
+   * wherever privilege differs between an integration and a paired device, most
    * importantly by the Phase 0b `rpc` bridge, which is device-only.
    */
   AuthMode?: SdkAuthMode;
@@ -180,7 +180,7 @@ interface SdkSocket {
    * A freshly minted token, held between the middleware and the connection
    * handler. Socket.IO middleware cannot return a payload with next(), so a
    * successful pairing parks the plaintext token here and the connection handler
-   * emits it. Cleared immediately after — this is the only moment it exists in
+   * emits it. Cleared immediately after; this is the only moment it exists in
    * memory, and it must not outlive the emit.
    */
   PendingDeviceToken?: string | null;
@@ -227,7 +227,7 @@ const SDK_PUSH_ALLOWLIST = new Set<string>([
   'UpdateScriptExecutions',
   'Notify',
   // Management screens need more than a status grid does. These carry the state
-  // a device editing the workspace has to see change under it — pending
+  // a device editing the workspace has to see change under it: pending
   // adoptions appearing, an alert rule being edited at the desk, a USB device
   // plugged into a machine someone is standing at.
   'SetDevicesPendingAdoption',
@@ -237,7 +237,7 @@ const SDK_PUSH_ALLOWLIST = new Set<string>([
   'SetOSCList',
   // Deliberately still excluded, matching the Web UI: desktop-only channels
   // (menu actions, show-file, fullscreen, native/app updates, network discovery)
-  // and ANYTHING carrying settings — settings hold the SDK API key and the
+  // and ANYTHING carrying settings: settings hold the SDK API key and the
   // workspace PIN, so a surface that could read them could mint its own access.
 ]);
 
@@ -276,7 +276,7 @@ interface SdkConfig {
   PairingEnabled: boolean;
   /**
    * Whether pairing must present the workspace PIN. Protection is only
-   * meaningful when a passcode is actually set — the same rule the Web UI
+   * meaningful when a passcode is actually set, the same rule the Web UI
    * applies, so "protection on, passcode blank" does not lock everyone out.
    */
   RequirePin: boolean;
@@ -387,7 +387,7 @@ function SetupSdkNamespace(io: SdkIOServer) {
   // Ensure a key exists so the operator can always find one in Settings.
   EnsureApiKey().catch(() => {});
 
-  // Forward allowlisted pushes to every connected socket (all are authed — the
+  // Forward allowlisted pushes to every connected socket (all are authed; the
   // handshake middleware refuses unauthenticated connections).
   RegisterRendererSink((channel: string, ...args: unknown[]) => {
     if (!SDK_PUSH_ALLOWLIST.has(channel)) return;
@@ -411,12 +411,12 @@ function SetupSdkNamespace(io: SdkIOServer) {
   // Handshake gate. Three credentials are accepted, in a fixed order so a socket
   // presenting more than one cannot shop for the most permissive:
   //
-  //   1. deviceToken  — an already-paired ShowTrak Remote device.
-  //   2. pair: true   — a device asking to pair, with the workspace PIN, a
+  //   1. deviceToken  - an already-paired ShowTrak Remote device.
+  //   2. pair: true   - a device asking to pair, with the workspace PIN, a
   //                     scanned pairing code, or nothing when PIN protection is
   //                     off. Succeeds by minting a token, never by admitting an
   //                     unauthenticated socket.
-  //   3. apiKey       — an integration (the SDK, Companion). Unchanged.
+  //   3. apiKey       - an integration (the SDK, Companion). Unchanged.
   //
   // Anything else is refused. Every path that reaches next() without an error is
   // a path that hands out control of a live show, so there is no default-allow
@@ -478,7 +478,7 @@ function SetupSdkNamespace(io: SdkIOServer) {
 
           const PresentedCode = String(Auth.pairingCode || '').trim();
           if (PresentedCode) {
-            // A scanned code stands in for the PIN entirely — it is single-use
+            // A scanned code stands in for the PIN entirely; it is single-use
             // and expires in a minute, which makes it the stronger of the two.
             if (!RemoteDeviceManager.RedeemPairingCode(PresentedCode)) {
               PairingThrottle.RecordFailure(IP, Now);
@@ -493,7 +493,7 @@ function SetupSdkNamespace(io: SdkIOServer) {
           }
           // else: protection is off, so the workspace has no PIN to present.
           // This mirrors the Web UI, which lets a browser straight in under the
-          // same setting — the operator has chosen an open workspace.
+          // same setting: the operator has chosen an open workspace.
 
           const [PairErr, Paired] = await RemoteDeviceManager.Pair(Auth.deviceName, Auth.platform);
           if (PairErr || !Paired) return next(new Error('Pairing failed'));
@@ -617,7 +617,7 @@ function SetupSdkNamespace(io: SdkIOServer) {
     });
 
     // Hand back a token minted during this handshake. This is the only time the
-    // plaintext exists outside the device — only its hash was persisted — so it
+    // plaintext exists outside the device (only its hash was persisted), so it
     // is emitted before any state and cleared immediately afterwards.
     if (socket.PendingDeviceToken) {
       const DeviceToken = socket.PendingDeviceToken;
@@ -642,7 +642,7 @@ function SetupSdkNamespace(io: SdkIOServer) {
     });
 
     // Management bridge. Dispatches to the SAME shared IPC handlers the desktop
-    // and Web UI use, behind the SAME deny-by-default capability model — so a
+    // and Web UI use, behind the SAME deny-by-default capability model, so a
     // mutation has exactly one implementation and one authorisation rule no
     // matter which surface asked for it.
     //

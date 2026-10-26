@@ -3,7 +3,7 @@
 // runs a TTP server. One short-lived session per probe:
 //
 //   1. Telnet option negotiation. Tesira opens by offering options (IAC WILL /
-//      IAC DO …) and, per Biamp's Telnet page, "if the Control System does not
+//      IAC DO ...) and, per Biamp's Telnet page, "if the Control System does not
 //      respond to the Telnet session options negotiations, the session will not
 //      go ahead". Every offer is refused, exactly as Biamp prescribes for a raw
 //      client: WILL → DON'T, DO → WON'T, option byte returned as received.
@@ -16,7 +16,7 @@
 //      credentials were refused.
 //   3. The banner "Welcome to the Tesira Text Protocol Server" marks the
 //      session as ready (documented).
-//   4. Reads, one at a time, each answered by a single "+OK …" or "-ERR …" line:
+//   4. Reads, one at a time, each answered by a single "+OK ..." or "-ERR ..." line:
 //        DEVICE get deviceInfo        model, revision, serial, firmware
 //          (falls back to DEVICE get serialNumber + DEVICE get version when a
 //           firmware answers -ERR; deviceInfo's response shape is documented
@@ -25,7 +25,7 @@
 //        DEVICE get networkStatus     hostname, per-interface link / IP / MAC
 //        DEVICE get activeFaultList   the active fault list
 //        DEVICE get networkPortInfo   only when port checks are enabled
-//        <InstanceTag> get <attribute> [index …]   only when attribute
+//        <InstanceTag> get <attribute> [index ...]   only when attribute
 //          assertions are enabled
 //
 // TTP values are JSON-like but not JSON: members are separated by spaces, not
@@ -226,7 +226,7 @@ function CheckCredentials(Config: TesiraConfig): string | null {
     : null;
 }
 
-// `InstanceTag attribute [index …]=Expected`. The FIRST `=` separates them.
+// `InstanceTag attribute [index ...]=Expected`. The FIRST `=` separates them.
 function ParseAttributeAssertions(Input: unknown): {
   Assertions: AttributeAssertion[];
   Invalid: string[];
@@ -327,7 +327,7 @@ export class TelnetNegotiator {
             this.Verb = Byte;
             this.State = 'option';
           } else if (Byte === SB) this.State = 'sb';
-          else this.State = 'data'; // a two-byte command (NOP, GA, …)
+          else this.State = 'data'; // a two-byte command (NOP, GA, etc.)
           break;
         case 'option': {
           this.State = 'data';
@@ -475,8 +475,8 @@ function ParseTtpValue(Text: string): TtpValue {
 export type TtpReply =
   { Ok: true; Body: TtpValue; Raw: string } | { Ok: false; Error: string; Raw: string };
 
-// One reply line: `+OK`, `+OK "value":…`, `+OK "networkPortInfo":[…]`, the
-// non-verbose `+OK [[…]]`, or an error (`-ERR …`, or any other line starting
+// One reply line: `+OK`, `+OK "value":...`, `+OK "networkPortInfo":[...]`, the
+// non-verbose `+OK [[...]]`, or an error (`-ERR ...`, or any other line starting
 // with `-`).
 function ParseReplyLine(Line: string): TtpReply {
   const Raw = Line.trim();
@@ -591,8 +591,8 @@ function IndicatorSeverity(Indicator: string): FaultSeverity | null {
 /**
  * Flatten an activeFaultList value into its faults. Each entry is one device
  * (this one, then any expander it proxies) with an indicator and a fault list:
- * verbose `{"id":INDICATOR_… "name":… "faults":[{"id":… "name":…}] "serialNumber":…}`
- * or non-verbose `[2 "Minor Fault in Device" [[89 "…"]] "02196874"]`. An entry
+ * verbose `{"id":INDICATOR_... "name":... "faults":[{"id":... "name":...}] "serialNumber":...}`
+ * or non-verbose `[2 "Minor Fault in Device" [[89 "..."]] "02196874"]`. An entry
  * whose indicator is a fault but whose list is empty still counts, under the
  * indicator's own name. Null when the value is not a list at all.
  */
@@ -701,9 +701,9 @@ function ValueMatches(Expected: string, Actual: TtpValue | undefined): boolean {
 }
 
 function DescribeValue(Value: TtpValue | undefined): string {
-  if (Value === undefined || Value === null) return '—';
+  if (Value === undefined || Value === null) return '-';
   if (Array.isArray(Value)) return `[${Value.map(DescribeValue).join(' ')}]`;
-  if (typeof Value === 'object') return '{…}';
+  if (typeof Value === 'object') return '{...}';
   return String(Value);
 }
 
@@ -745,7 +745,7 @@ function DetectLoginPrompt(Text: string): 'username' | 'password' | null {
 }
 
 // How many leading characters of Buffered end with the first reply line
-// (`+OK…` or `-…`) that answers Sent; anything before it (blank lines, a
+// (`+OK...` or `-...`) that answers Sent; anything before it (blank lines, a
 // subscription push, the device's echo of Sent) is consumed with it. The echo
 // is skipped by name so an instance tag that starts with "-" is not mistaken
 // for an error. Null while no complete reply line has arrived.
@@ -779,7 +779,7 @@ function LastReplyLine(Consumed: string, Sent = ''): string {
 type TtpCall = (Command: string) => Promise<TtpReply>;
 
 // What to do once the banner has arrived. SetStage names the step under way,
-// for the "did not finish … in time" reason if the budget runs out.
+// for the "did not finish ... in time" reason if the budget runs out.
 type TtpWork = (
   Call: TtpCall,
   Snapshot: TesiraSnapshot,
@@ -1012,7 +1012,7 @@ function CountedFaults(Faults: Fault[] | null, MajorOnly: boolean): Fault[] {
   return Out;
 }
 
-// The reasons a reachable device is unhealthy, per the enabled options. Pure —
+// The reasons a reachable device is unhealthy, per the enabled options. Pure:
 // exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: TesiraSnapshot, Options: HealthOptions): string[] {
   if (Snapshot.LoginState === 'rejected') {
@@ -1126,7 +1126,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 //   DEVICE recallPresetByName <name>     Device Services table, "Recall a preset by preset name"
 //   <InstanceTag> set mute <index> true|false   TTP Overview's own example
 //                                               ("Level3 set mute 3 true")
-// Tesira answers a set or a service with "+OK" and a refusal with "-ERR …".
+// Tesira answers a set or a service with "+OK" and a refusal with "-ERR ...".
 //
 // A preset name with spaces is sent in double quotes, as the TTP Overview says a
 // value with spaces may be. An instance tag with spaces is quoted the same way,
@@ -1210,7 +1210,7 @@ interface BuiltCommand {
   InstanceTag: string | null;
 }
 
-// Validate an action's parameters and build its one command line. Pure —
+// Validate an action's parameters and build its one command line. Pure:
 // exported via _internal for unit tests.
 function BuildActionCommand(
   ActionID: string,
@@ -1339,13 +1339,13 @@ function DescribeAction(ActionID: string, Params: Record<string, unknown>): stri
   const Text = (Value: unknown) => String(Value == null ? '' : Value).trim();
   if (ActionID === 'preset.recall') {
     const Preset = Text(Params.Preset);
-    return Preset ? `Recall Preset — ${Preset}` : null;
+    return Preset ? `Recall Preset - ${Preset}` : null;
   }
   if (ActionID === 'mute.on' || ActionID === 'mute.off') {
     const Tag = Text(Params.InstanceTag);
     if (!Tag) return null;
     const Channel = Text(Params.Channel) || '1';
-    return `${ActionID === 'mute.on' ? 'Mute' : 'Unmute'} — ${Tag} channel ${Channel}`;
+    return `${ActionID === 'mute.on' ? 'Mute' : 'Unmute'} - ${Tag} channel ${Channel}`;
   }
   return null;
 }
@@ -1370,7 +1370,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       : Pill('success', 'Healthy');
 
   const Head = [
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Row('Status', StatePill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
@@ -1411,7 +1411,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     ...Interfaces.map((I) =>
       TextRow(
         `Interface ${I.Name}`,
-        [I.Ip, I.Link, I.Mac].filter((Part) => Part != null && Part !== '').join(' · ') || '—'
+        [I.Ip, I.Link, I.Mac].filter((Part) => Part != null && Part !== '').join(' · ') || '-'
       )
     ),
     Result.LoginState && Result.LoginState !== 'not-asked'
@@ -1493,7 +1493,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
           ? Pill('danger', 'Not read')
           : Pill(Ok ? 'success' : 'warning', DescribeValue(Reading.Value));
         const Detail = Reading.Found
-          ? `Expected ${Assertion ? Assertion.Expected : '—'}`
+          ? `Expected ${Assertion ? Assertion.Expected : '-'}`
           : Reading.Error || 'Not read';
         return Card({
           Title: Reading.Label,
@@ -1512,7 +1512,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
 export const Name = 'Biamp Tesira';
 export const Description =
-  'Connects to a Biamp Tesira server, TesiraFORTÉ or TesiraLUX over the Tesira Text Protocol on Telnet (TCP 23) and reads its model, serial number, firmware, hostname, network status and active fault list — read-only. Reports Degraded while the device has an active fault, and optionally when a listed network port has no link or a listed block attribute is not as expected.';
+  'Connects to a Biamp Tesira server, TesiraFORTÉ or TesiraLUX over the Tesira Text Protocol on Telnet (TCP 23) and reads its model, serial number, firmware, hostname, network status and active fault list (read-only). Reports Degraded while the device has an active fault, and optionally when a listed network port has no link or a listed block attribute is not as expected.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = {
   ParseConfig,

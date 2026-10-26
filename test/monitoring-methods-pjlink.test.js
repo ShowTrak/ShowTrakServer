@@ -14,7 +14,7 @@ function methodPath(name) {
 }
 
 // Load the family fresh, sharing one _pjlink-shared instance (and thus one
-// snapshot cache) between the methods — mirrors how the registry loads them.
+// snapshot cache) between the methods; mirrors how the registry loads them.
 function loadShared() {
   return require(methodPath('_pjlink-shared.js'));
 }
@@ -24,7 +24,7 @@ function loadPjlink() {
 
 // The snapshot cache is keyed on address|port|password|timeout, so two tests
 // that happen to be handed the same ephemeral port within the ~1s TTL would
-// share a snapshot — the second test then judges the first test's projector.
+// share a snapshot; the second test then judges the first test's projector.
 // Rare locally, common on CI where the kernel recycles ports quickly.
 function resetSnapshotCache() {
   const { Manager } = require(path.join(__dirname, '..', 'dist', 'Modules', 'CacheManager'));
@@ -469,7 +469,7 @@ test('an ERR token from a set command is reported in plain language', async () =
 
     const busy = await pjlink.RunAction(Target, 'power.on', {});
     assert.equal(busy.Success, false);
-    // ERR3 on a set is the one an operator hits most — warming up or cooling.
+    // ERR3 on a set is the one an operator hits most: warming up or cooling.
     assert.match(String(busy.Error), /ERR3/);
     assert.match(String(busy.Error), /busy/i);
 
@@ -550,7 +550,7 @@ test('a projector that is not there reports the connection failure, not a hang',
 
 test('DescribeAction binds the chosen input into a favourite label', () => {
   const pjlink = loadPjlink();
-  assert.equal(pjlink.DescribeAction('input.set', { Input: '31' }), 'Set Input — Digital 1 (31)');
+  assert.equal(pjlink.DescribeAction('input.set', { Input: '31' }), 'Set Input - Digital 1 (31)');
   // Everything else has no parameters, so its plain label already says it all.
   assert.equal(pjlink.DescribeAction('power.on', {}), null);
   assert.equal(pjlink.DescribeAction('input.set', {}), null);

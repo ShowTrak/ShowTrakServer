@@ -64,7 +64,7 @@ let TerminalList: FreeKioskTerminal[] = [];
 // `if (!Initialized) await Init()` call site that lands before it finishes (the
 // renderer's first GetAll, BackfillSlugs) would otherwise start a second one.
 // The losing list's terminals keep polling for ever with the settings they were
-// loaded with, and no edit ever reaches them — so a condition the operator has
+// loaded with, and no edit ever reaches them, so a condition the operator has
 // since changed goes on raising, and clearing, once every interval.
 let InitPromise: Promise<void> | null = null;
 
@@ -237,7 +237,7 @@ const Manager = {
   async Reload(): Promise<void> {
     // Let any in-flight Init settle first, otherwise Manager.Init() below just
     // hands back that older run's promise and the reload reads the old show's
-    // rows — and that run's loops, started after the StopLoop sweep, leak.
+    // rows, and that run's loops, started after the StopLoop sweep, leak.
     if (InitPromise) await InitPromise.catch(() => undefined);
     for (const Terminal of TerminalList) Terminal.StopLoop();
     TerminalList = [];
@@ -273,7 +273,7 @@ const Manager = {
   /**
    * The editor's read: the snapshot plus the stored API key.
    *
-   * ToJSON() deliberately omits the key — it is pushed to every Web UI on every
+   * ToJSON() deliberately omits the key: it is pushed to every Web UI on every
    * poll and stringified into alert history. This is the one deliberate
    * exception, and it stays an exception by being a direct reply to a single
    * UUID rather than anything that gets broadcast.
@@ -548,7 +548,7 @@ const Manager = {
     Params: Record<string, unknown> = {}
   ): Promise<Result<FreeKioskCommandSummary>> {
     if (!Manager.Initialized) await Manager.Init();
-    // The command map IS the allowlist — an unknown id never reaches the device.
+    // The command map IS the allowlist; an unknown id never reaches the device.
     const Command = GetFreeKioskCommand(CommandID);
     if (!Command) return Fail(`Unknown FreeKiosk command "${CommandID}"`);
 
@@ -562,7 +562,7 @@ const Manager = {
         }
         // Refuse a command the terminal's mode makes meaningless, rather than
         // sending it and reporting whatever the device says. FreeKiosk accepts a
-        // WebView command in app mode, answers executed:true and does nothing —
+        // WebView command in app mode, answers executed:true and does nothing,
         // so forwarding it would turn a silent no-op into a reported success.
         if (Command.Modes && !Command.Modes.includes(GetDisplayMode(Terminal.Settings))) {
           Results.push({
@@ -613,7 +613,7 @@ const Manager = {
     return Ok(Summarize(Results));
   },
 
-  /** Capture a screenshot or camera photo. Never persisted — see FetchImage. */
+  /** Capture a screenshot or camera photo. Never persisted; see FetchImage. */
   async Capture(
     UUID: string,
     Kind: 'screenshot' | 'camera',

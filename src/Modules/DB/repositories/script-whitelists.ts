@@ -2,7 +2,7 @@
 // Receives the DB manager instead of importing it so test DB mocks injected
 // into the manager propagate through unchanged (mirrors the other repos).
 //
-// A missing row means "unrestricted" (all clients) — callers treat a null Get()
+// A missing row means "unrestricted" (all clients); callers treat a null Get()
 // result as full access. Scope is stored verbatim as a JSON string; parsing is
 // the manager's responsibility, not the repository's.
 import type { DBManager, DBResult } from '../index';

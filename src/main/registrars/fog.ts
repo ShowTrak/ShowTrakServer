@@ -88,7 +88,7 @@ function register(): void {
     )
   );
 
-  // Takes no arguments — which rows count as finished is decided by the repository,
+  // Takes no arguments; which rows count as finished is decided by the repository,
   // never by the renderer, so there is nothing here to validate.
   RPC.handle(
     'Fog:ClearFinishedTasks',

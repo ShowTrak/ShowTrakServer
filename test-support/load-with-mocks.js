@@ -10,7 +10,7 @@ const path = require('node:path');
  * that reads the same mocked dependencies: that module captures the FIRST
  * test's mocks at require time and, being cached, serves them to every
  * subsequent load. The symptom is a suite where the early tests pass and the
- * later ones assert against stale settings — which is exactly how it presented
+ * later ones assert against stale settings, which is exactly how it presented
  * when the capability model moved out of webui-namespace into RemoteAccess.
  */
 function loadWithMocks(modulePath, mocks, { alsoEvict = [] } = {}) {

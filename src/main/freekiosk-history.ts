@@ -2,7 +2,7 @@
 //
 // A sibling of monitoring-history.ts rather than an addition to it: that store
 // records a status verdict (online / degraded / latency), whereas a terminal
-// records a VALUE per metric — a battery percentage, a temperature, an SSID.
+// records a VALUE per metric: a battery percentage, a temperature, an SSID.
 // The 12h window is imported from there so the retention policy is stated once.
 //
 // One sample shape serves both chart kinds. `n` carries numeric metrics and `s`
@@ -43,14 +43,14 @@ export const FREEKIOSK_HISTORY_MAX_SERIES_POINTS = 2000;
 /** Collapse window for a repeat reading, matching the monitoring history store. */
 const COALESCE_WINDOW_MS = 900;
 
-/** Categorical values are capped — a kiosk URL can be arbitrarily long. */
+/** Categorical values are capped; a kiosk URL can be arbitrarily long. */
 const MAX_CATEGORICAL_LENGTH = 64;
 
 /**
  * The one series recorded whether or not anything is armed on it.
  *
  * Poll latency is ShowTrak's own measurement rather than a device reading, and
- * it is what the terminal's overall status timeline is built from — gating it on
+ * it is what the terminal's overall status timeline is built from; gating it on
  * a check nobody has any reason to arm would blank that timeline.
  */
 const STATUS_SERIES_KEY = 'poll_latencyMs';
@@ -103,7 +103,7 @@ function Append(Samples: FreeKioskMetricSample[], Next: FreeKioskMetricSample): 
     // Flat-run compression with a two-point anchor: once the last TWO samples
     // already say the same thing, extend the second rather than pushing a third.
     // The run keeps its first and last point, so a step signal is reproduced
-    // exactly — while a screen that has been on for twelve hours costs two
+    // exactly, while a screen that has been on for twelve hours costs two
     // samples instead of fourteen hundred.
     if (Previous && SamplesEqual(Previous, Last)) {
       Last.ts = Next.ts;
@@ -169,7 +169,7 @@ export function recordFreeKioskHistorySamples(
   for (const Metric of FREEKIOSK_METRICS) {
     // Only record what is actually being judged.
     //
-    // A sample from an unarmed metric carries breach:false — not because the
+    // A sample from an unarmed metric carries breach:false, not because the
     // reading was good, but because nothing was assessing it. Keeping those and
     // then arming a check would hand the operator an hour of green that was
     // never judged, which is precisely the false reassurance the charts are
@@ -231,7 +231,7 @@ export function syncFreeKioskHistoryStore(List: unknown): void {
  * Every series for one terminal, or just the ones asked for.
  *
  * One call returns them all on purpose. A terminal has around sixty metrics, and
- * the view modal reloads on every push while it is open — asking for them one at
+ * the view modal reloads on every push while it is open; asking for them one at
  * a time would mean sixty IPC round-trips every poll.
  */
 export function getFreeKioskMetricHistory(

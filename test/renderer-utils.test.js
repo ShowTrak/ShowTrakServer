@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-// Covers src/UI/js/app/utils.ts — the renderer's shared helpers.
+// Covers src/UI/js/app/utils.ts: the renderer's shared helpers.
 //
 // These load from dist-test/ rather than dist/: the shipped renderer is an
 // esbuild IIFE bundle, so tsconfig.renderer.test.json emits the same sources as
@@ -157,7 +157,7 @@ test('GetAlertVolume defaults to full volume rather than muting on a bad value',
   setSettings([{ Key: 'ALERT_SOUND_VOLUME', Value: 'loud' }]);
   assert.equal(GetAlertVolume(), 1);
   setSettings([{ Key: 'ALERT_SOUND_VOLUME', Value: null }]);
-  // Number(null) is 0, which is finite — a null value really does mute.
+  // Number(null) is 0, which is finite; a null value really does mute.
   assert.equal(GetAlertVolume(), 0);
 });
 
@@ -254,7 +254,7 @@ test('WithFullStop leaves sentence punctuation alone', () => {
   assert.equal(WithFullStop('Saved show file.'), 'Saved show file.');
   assert.equal(WithFullStop('Done!'), 'Done!');
   assert.equal(WithFullStop('Really?'), 'Really?');
-  assert.equal(WithFullStop('Running checks…'), 'Running checks…');
+  assert.equal(WithFullStop('Running checks...'), 'Running checks...');
 });
 
 test('WithFullStop passes empty and non-string messages through', () => {

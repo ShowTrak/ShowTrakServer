@@ -451,9 +451,9 @@ export function ShowMetricChartTooltip(HitEl: Element | null, ClientX: number, C
   const Decimals = Number(HitEl.getAttribute('data-decimals')) || 0;
 
   const Show = (Raw: string | null) => {
-    if (Raw == null || Raw === '') return '—';
+    if (Raw == null || Raw === '') return '-';
     const Value = Number(Raw);
-    if (!Number.isFinite(Value)) return '—';
+    if (!Number.isFinite(Value)) return '-';
     const Text = Value.toFixed(Decimals);
     return Unit ? (Unit === '%' ? `${Text}%` : `${Text} ${Unit}`) : Text;
   };
@@ -521,7 +521,7 @@ export function SyncHistoryTooltipToPointer(Hit: Element | null, X: number, Y: n
  *
  * Called after a re-render, and on scroll. Scrolling is the case worth naming:
  * the content moves out from under a pointer that never moved, so NO mouse
- * event fires and nothing would otherwise reconsider the tooltip — it just
+ * event fires and nothing would otherwise reconsider the tooltip; it just
  * hangs there over whatever scrolled into its place.
  */
 export function RestoreStatusTimelineTooltipAfterRender() {
@@ -832,7 +832,7 @@ function RenderMonitoringHistoryEntity(
     // hour). Rendered the same way individual monitoring checks are. The rows
     // are driven by the client's CURRENT critical applications (not just the
     // fetched history series) so marking or unmarking an application updates the
-    // modal immediately — even before any history samples exist for it — instead
+    // modal immediately (even before any history samples exist for it) instead
     // of waiting for the next client snapshot.
     const SamplesByAppKey = new Map<string, HistorySample[]>();
     for (const Series of MonitorHistorySeries) {

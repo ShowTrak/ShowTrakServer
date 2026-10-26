@@ -1,7 +1,7 @@
 // IPv4 Interfaces and IPv6 Interfaces sections of the client info modal, built
 // by the same code like the audio inputs/outputs: one card per interface,
 // styled like the audio cards. On the interface's home family (see HomeFamily)
-// the card carries the critical toggle and — once critical — an auto-saving
+// the card carries the critical toggle and (once critical) an auto-saving
 // conditions table (present, IP address, IP range, subnet mask, router); in the
 // other family's list it only shows the addresses. The decisions live in
 // lib/network-interfaces.
@@ -298,7 +298,7 @@ export function BindClientInfoNetworkHandlers(
       if (Event.key === 'Enter') $(this).trigger('blur');
     })
     .on('focusout.client-network', '.SHOWTRAK_NET_CONDITIONS input[type="text"]', function () {
-      // Apply a rebuild that was held back while this field had focus — after
+      // Apply a rebuild that was held back while this field had focus, after
       // the `change` that fires first has had its chance to save.
       setTimeout(() => {
         if (!Pending || $(ALL_LISTS).find('input[type="text"]:focus').length) return;

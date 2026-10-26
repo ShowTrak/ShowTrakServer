@@ -1,7 +1,7 @@
 // DummyClients-table repository. Receives the DB manager instead of importing
 // it so test DB mocks injected into DummyClientManager propagate through
 // unchanged. SQL strings are byte-identical to the historical inline
-// statements — tests match on them.
+// statements; tests match on them.
 import type { DBManager, DBResult } from '../index';
 import type { DummyClientRow } from '../rows';
 
@@ -43,7 +43,7 @@ export function CreateDummyClientsRepository(DB: DBManager) {
       return DB.Run('DELETE FROM DummyClients WHERE UUID = ?', [UUID]);
     },
 
-    // Persist quietly (no dirty tracking) — the IP is auto-discovered runtime
+    // Persist quietly (no dirty tracking); the IP is auto-discovered runtime
     // data, not a user edit to the show document. Falls back to Run on DB
     // stubs that don't implement RunWithoutDirtyTracking.
     SetIP(IP: string | null, UUID: string): Promise<DBResult<unknown>> {

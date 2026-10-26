@@ -187,7 +187,7 @@ test('ArtnetReceiver ingests a real datagram for an observed universe', async (t
   if (!snap.Ready) {
     ArtnetReceiver.Stop();
     t.skip(
-      `Art-Net socket not ready (${snap.Error || 'binding'}) — environment cannot bind udp/6454`
+      `Art-Net socket not ready (${snap.Error || 'binding'}); environment cannot bind udp/6454`
     );
     return;
   }

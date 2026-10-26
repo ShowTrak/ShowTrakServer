@@ -5,7 +5,7 @@
 // auto-update handlers that read and wrote them. That handshake is the whole
 // state machine of "may we quit yet, and what must we save/clean up first"; it
 // lives here as encapsulated state with one handler method per Electron event.
-// main.ts stays the composition root — it registers the events and delegates
+// main.ts stays the composition root; it registers the events and delegates
 // their bodies to these methods. Behavior is identical to the original inline
 // handlers; only the ownership of the flags moved.
 import type { BrowserWindow as ElectronBrowserWindow } from 'electron';

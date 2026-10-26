@@ -333,7 +333,7 @@ test('http method reports connection errors against a closed port', async () => 
 });
 
 // Registering a method takes three edits in three files (index.ts, info.ts,
-// groups.ts) and nothing but discipline previously enforced the last two — a
+// groups.ts) and nothing but discipline previously enforced the last two: a
 // method missing from info.ts or groups.ts still runs, it just renders with no
 // setup help and lands in the "Other" bucket. Assert the set is complete.
 test('every registered monitoring method has editor help and a group', () => {

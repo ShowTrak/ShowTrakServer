@@ -163,7 +163,7 @@ test('mqtt internal helpers clamp timeout, truncate payloads and evaluate expect
   const long = 'a'.repeat(300);
   const truncated = TruncatePayload(Buffer.from(long));
   assert.equal(truncated.length, 257); // 256 chars + ellipsis
-  assert.ok(truncated.endsWith('…'));
+  assert.ok(truncated.endsWith('...'));
 
   assert.equal(EvaluatePayload('ONLINE now', 'ONLINE'), null);
   assert.equal(EvaluatePayload('anything', ''), null); // no expectation set

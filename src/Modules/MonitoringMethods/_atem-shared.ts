@@ -5,7 +5,7 @@
 // open-source atem-connection library (github.com/Sofie-Automation/
 // sofie-atem-connection, src/lib/atemSocketChild.ts and src/commands/**) and
 // checked against the real switcher state dumps that library keeps as test
-// fixtures (src/__tests__/connection/*.data — 27 dumps from Mini through
+// fixtures (src/__tests__/connection/*.data: 27 dumps from Mini through
 // Constellation 8K). The `atem-connection` package itself is deliberately NOT a
 // dependency: it pulls in a worker-thread wrapper and the whole command set for
 // the sake of reading seven commands, and distributable size matters.
@@ -21,7 +21,7 @@
 // 0x04 IsRetransmit, 0x08 RetransmitRequest, 0x10 AckReply.
 //
 // Handshake: the client sends a 20-byte hello (SYN flag); the switcher answers
-// with a SYN packet whose first payload byte is a status — 0x02 accepted, 0x03
+// with a SYN packet whose first payload byte is a status: 0x02 accepted, 0x03
 // "no free client slots" (PyATEMMax), 0x04 seen when the switcher is trying to
 // recover a dropped session. The client acks the answer's packet id, after which
 // the switcher switches to its own session id (taken from every later packet)
@@ -37,15 +37,15 @@
 //
 // DESIGN. A full state dump runs to ~100 KB on a Constellation 8K and ATEMs
 // accept only a handful of control clients, so reconnecting per probe would be
-// wasteful and could lock real operators out. Instead — like _qlab-shared's
-// connection manager — one persistent session is held per address:port, every
+// wasteful and could lock real operators out. Instead, like _qlab-shared's
+// connection manager, one persistent session is held per address:port, every
 // reliable packet is acked, a cached snapshot is updated from incoming commands,
 // and a sweep reaps any session no check has asked about for a few minutes.
 // There is no framework teardown hook for monitoring methods, so that interest
 // TTL is how a deleted or repointed check lets go of the switcher.
 //
 // The client is strictly read-only: it never sends a command, only the hello
-// and acks. Importing this module has no side effects — nothing opens until the
+// and acks. Importing this module has no side effects; nothing opens until the
 // first Observe().
 import dgram from 'dgram';
 import net from 'net';
@@ -71,7 +71,7 @@ export const PacketFlag = {
 } as const;
 
 // Hello-answer status bytes (first payload byte of the switcher's SYN reply).
-const HELLO_STATUS_CLIENT = 0x01; // what a CLIENT sends — seen back only from an echo
+const HELLO_STATUS_CLIENT = 0x01; // what a CLIENT sends; seen back only from an echo
 const HELLO_STATUS_FULL = 0x03;
 
 // Timings. Mutable only through ConfigureTimings (tests).
@@ -103,7 +103,7 @@ export interface AtemPacket {
 }
 
 // Decode one datagram. Null for anything shorter than a header or whose length
-// field disagrees with the datagram size — atem-connection drops those too.
+// field disagrees with the datagram size; atem-connection drops those too.
 export function ParsePacket(Packet: Buffer): AtemPacket | null {
   if (!Buffer.isBuffer(Packet) || Packet.length < HEADER_LENGTH) return null;
   const Word = Packet.readUInt16BE(0);
@@ -391,8 +391,8 @@ export interface AtemPsu {
   Index: number; // 1-based
   Ok: boolean; // reporting OK right now
   // Has reported OK at some point while this address has been watched. A
-  // supply that is down and never was up is simply not connected — common on
-  // dual-supply models run from one supply — and is not a failure.
+  // supply that is down and never was up is simply not connected (common on
+  // dual-supply models run from one supply) and is not a failure.
   SeenOk: boolean;
 }
 
@@ -709,7 +709,7 @@ class AtemSessionManagerImpl {
       this.Lost(S, 'The switcher has no free connections (too many control clients)');
       return;
     }
-    // Any other status — 0x02 accepted, or a 0x04 recovery answer — starts a
+    // Any other status (0x02 accepted, or a 0x04 recovery answer) starts a
     // fresh session: ack it and expect a new full dump. A hello answer arriving
     // mid-session (the switcher restarted or reset our session) lands here too.
     const WasEstablished = S.Phase === 'established';

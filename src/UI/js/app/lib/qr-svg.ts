@@ -5,7 +5,7 @@
 // depended on a runtime <script> fetch, rendered to <canvas>/<img> (timing- and
 // environment-sensitive), and the code even mixed in a second library's API
 // (createDataURL) that was never loaded. Here everything is pure computation in
-// TypeScript with an SVG string as output — no async, no canvas, no globals.
+// TypeScript with an SVG string as output: no async, no canvas, no globals.
 //
 // Algorithm ported from Project Nayuki's "QR Code generator" (MIT License):
 //   https://www.nayuki.io/page/qr-code-generator-library
@@ -23,7 +23,7 @@ const ECC_FORMAT_BITS: Record<Ecc, number> = { LOW: 1, MEDIUM: 0, QUARTILE: 3, H
 
 // Encode `text` and return a complete, self-contained SVG string. `border` is
 // the quiet-zone width in modules; `dark`/`light` are CSS colours; `size`, when
-// given, sets explicit width/height (px) on the root — otherwise the SVG scales
+// given, sets explicit width/height (px) on the root; otherwise the SVG scales
 // to its container via the viewBox alone.
 export function QrToSvg(
   text: string,
@@ -66,7 +66,7 @@ function encodeText(text: string, ecc: Ecc): boolean[][] {
   const data = utf8Bytes(text);
 
   // Build the byte-mode data segment bit buffer (without version-dependent
-  // length prefix yet — length header width depends on the chosen version).
+  // length prefix yet; length header width depends on the chosen version).
   let version = 1;
   let dataCapacityBits = 0;
   for (; version <= 40; version++) {
@@ -283,7 +283,7 @@ function alignmentPatternPositions(version: number): number[] {
   if (version === 1) return [];
   const numAlign = Math.floor(version / 7) + 2;
   // Positions are 6 and (size-7), with the interior ones evenly spaced. The
-  // step must round UP to an even number — using floor here places the interior
+  // step must round UP to an even number; using floor here places the interior
   // patterns wrong for versions where the division isn't exact (v15 was the
   // first such case). Version 32 is a documented spec exception.
   const step = version === 32 ? 26 : Math.ceil((version * 4 + 4) / (numAlign * 2 - 2)) * 2;
@@ -479,7 +479,7 @@ function computePenalty(modules: boolean[][], size: number): number {
 
 const ECC_ORDINAL: Record<Ecc, number> = { LOW: 0, MEDIUM: 1, QUARTILE: 2, HIGH: 3 };
 
-// [eccOrdinal][version] — index 0 of the inner arrays is unused (versions 1..40).
+// [eccOrdinal][version]: index 0 of the inner arrays is unused (versions 1..40).
 // prettier-ignore
 const ECC_CODEWORDS_PER_BLOCK: number[][] = [
   [-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],

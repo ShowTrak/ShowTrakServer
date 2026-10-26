@@ -11,7 +11,7 @@
 //
 // Hand-rolled SVG rather than a charting library. The app vendors its
 // dependencies for offline use, and one line series with a threshold band is not
-// worth a bundle — nor the risk of a chart library's own idea of how to handle
+// worth a bundle, nor the risk of a chart library's own idea of how to handle
 // gaps, which is the detail that matters most here.
 import type { FreeKioskMetricSample } from '@showtrak/protocol';
 import { MONITOR_HISTORY_BLOCK_COUNT, MONITOR_HISTORY_WINDOW_MS } from './history-window';
@@ -83,7 +83,7 @@ function Round(Value: number, Decimals = 2): number {
  * The bucketing is deliberately identical to BuildStatusBlocksFromSamples: same
  * window, same count, same half-open [start, end) membership. Bucket i of a
  * chart therefore spans the same instants as block i of a timeline, so a chart
- * stacked above one lines up column for column — which is the whole point of
+ * stacked above one lines up column for column, which is the whole point of
  * mixing the two in a single modal.
  */
 export function BuildMetricChartModel(

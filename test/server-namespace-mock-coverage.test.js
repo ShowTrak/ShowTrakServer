@@ -13,7 +13,7 @@
 // stub" was already in place and was still missed, so this asserts it.
 //
 // `npm test` reproduces CI locally: it points HOME at an
-// empty directory, so the managers find no database — exactly the condition that
+// empty directory, so the managers find no database, exactly the condition that
 // separates a green laptop from a red CI job. That command, not this file, is
 // the real check; this one just fails faster and says what to fix.
 const test = require('node:test');
@@ -36,13 +36,13 @@ function ManagersRequiredBy(RelativePath) {
 /**
  * Every manager a test file stubs anywhere in it.
  *
- * Matches both mock styles in this suite — loadWithMocks keys like
+ * Matches both mock styles in this suite: loadWithMocks keys like
  * `'../FreeKioskManager':` and installModuleMocks matchers like
  * `matchesModule('/Modules/FreeKioskManager')`.
  *
  * Scanned whole rather than per call site: the mock maps are frequently a named
  * variable reused across several calls, so there is no reliable literal to
- * attribute to an individual one. The limit is deliberate — this catches a
+ * attribute to an individual one. The limit is deliberate: this catches a
  * manager stubbed NOWHERE, which is how this has gone wrong every time, but not
  * one missed in a single call site among several.
  */
@@ -71,7 +71,7 @@ const CASES = [
 for (const [Module, Test] of CASES) {
   test(`${Test} stubs every manager ${Module.split('/').slice(-2).join('/')} requires`, () => {
     const Required = ManagersRequiredBy(Module);
-    assert.ok(Required.length > 0, `found no manager imports in ${Module} — has it moved?`);
+    assert.ok(Required.length > 0, `found no manager imports in ${Module}; has it moved?`);
 
     const Stubbed = ManagersStubbedBy(Test);
     const Missing = Required.filter((Name) => !Stubbed.has(Name));
@@ -81,7 +81,7 @@ for (const [Module, Test] of CASES) {
       [],
       `${Test} never stubs: ${Missing.join(', ')}.\n` +
         `Add a stub for each to its mock map. Unstubbed, the real manager opens a ` +
-        `live sqlite connection at module load — green locally, broken on CI. ` +
+        `live sqlite connection at module load: green locally, broken on CI. ` +
         `Reproduce with: npm test`
     );
   });

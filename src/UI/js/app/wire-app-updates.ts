@@ -39,7 +39,7 @@ function setIcon(icon: string, spin = false) {
   $('#APP_UPDATE_ICON').attr('class', `bi ${icon}${spin ? ' SHOWTRAK_APP_UPDATE_SPIN' : ''}`);
 }
 
-// Circumference of the progress ring (2·π·r, r=22) — matches the SVG/CSS.
+// Circumference of the progress ring (2·π·r, r=22); matches the SVG/CSS.
 const RING_CIRCUMFERENCE = 2 * Math.PI * 22;
 
 // Show/fill (or hide) the circular progress ring around the hero icon. Passing
@@ -72,7 +72,7 @@ function extractNotes(info: AppUpdateStatus['info']) {
   if (!info) return '';
   const raw = info.releaseNotes || info.notes || info.body || '';
   if (Array.isArray(raw)) {
-    // mac: array of releases — take the first entry's notes
+    // mac: array of releases; take the first entry's notes
     const first = raw.find(Boolean);
     return (first && (first.releaseNotes || first.notes || first.body)) || '';
   }
@@ -100,7 +100,7 @@ function showNotes(info: AppUpdateStatus['info']) {
 // Collapse the modal back to the neutral "checking" look before a fresh check.
 function resetToChecking() {
   setIcon('bi-arrow-repeat', true);
-  $('#APP_UPDATE_STATUS').text('Checking for updates…');
+  $('#APP_UPDATE_STATUS').text('Checking for updates...');
   $('#APP_UPDATE_SUBTEXT').text('Contacting the update server.');
   setVersionBadge('');
   setProgress(null);
@@ -123,7 +123,9 @@ function renderFloatingProgress() {
   const downloading = st === 'downloading';
   const pct = downloading ? downloadPercent(latestStatus) : 0;
   $('#APP_UPDATE_FLOAT_VERSION').text(formatVersion(activeVersion));
-  $('#APP_UPDATE_FLOAT_DETAIL').text(downloading ? `Downloading… ${pct}%` : 'Starting download…');
+  $('#APP_UPDATE_FLOAT_DETAIL').text(
+    downloading ? `Downloading... ${pct}%` : 'Starting download...'
+  );
   $('#APP_UPDATE_FLOAT_BAR')
     .toggleClass('is-indeterminate', !downloading)
     .css('width', downloading ? `${pct}%` : '');
@@ -169,21 +171,21 @@ function renderStatus(payload: AppUpdateStatus) {
 
   if (st === 'checking') {
     setIcon('bi-arrow-repeat', true);
-    $status.text('Checking for updates…');
+    $status.text('Checking for updates...');
     $subtext.text('Contacting the update server.');
     setVersionBadge('');
   } else if (st === 'available') {
     const v = payload.info && (payload.info.version || payload.info.tag);
     setIcon('bi-arrow-repeat', true);
     $status.text('Update available');
-    $subtext.text('Downloading the latest release…');
+    $subtext.text('Downloading the latest release...');
     setVersionBadge(v);
     showNotes(payload.info);
   } else if (st === 'downloading') {
     const pct = downloadPercent(payload);
     setIcon('bi-arrow-repeat', true);
-    $status.text('Downloading update…');
-    $subtext.text(pct >= 100 ? 'Download complete. Preparing update…' : `${pct}% complete`);
+    $status.text('Downloading update...');
+    $subtext.text(pct >= 100 ? 'Download complete. Preparing update...' : `${pct}% complete`);
     setProgress(pct);
     if (payload.info) {
       setVersionBadge(payload.info.version || payload.info.tag);
@@ -199,7 +201,7 @@ function renderStatus(payload: AppUpdateStatus) {
     $install.removeClass('d-none');
   } else if (st === 'installing') {
     setIcon('bi-gear-wide-connected', true);
-    $status.text('Installing update…');
+    $status.text('Installing update...');
     $subtext.text('ShowTrak will restart shortly.');
   } else if (st === 'installed') {
     setIcon('bi-check-circle');

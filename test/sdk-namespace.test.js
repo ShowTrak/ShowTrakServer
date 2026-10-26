@@ -7,20 +7,20 @@ const { EventEmitter } = require('node:events');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
 
-// Exercises src/Modules/Server/sdk-namespace.ts — the `/sdk` Socket.IO namespace.
+// Exercises src/Modules/Server/sdk-namespace.ts: the `/sdk` Socket.IO namespace.
 //
 // This is the EXTERNAL integration surface: the published @showtrak/server-sdk
 // package, the Companion module, and anything else an operator wires up connect
 // here to drive a live show. That makes two things worth testing hard.
 //
 //   1. The handshake is the ONLY gate. Unlike the Web UI namespace there is no
-//      second per-command capability check — once a socket is connected it can
+//      second per-command capability check: once a socket is connected it can
 //      send `system.shutdownForce`. So every path that reaches `next()` without
 //      an error is a path that hands out full control of the instance.
 //
 //   2. The push allowlist and the command map ARE the published contract. A
 //      renamed channel or a dropped command silently breaks every integration
-//      out in the field, with no compiler to catch it — the SDK is a separate
+//      out in the field, with no compiler to catch it; the SDK is a separate
 //      package on a separate release cycle.
 //
 // Only the managers, ControlService and the renderer bus are stubbed. The REAL
@@ -75,7 +75,7 @@ function freshState() {
     devicesByToken: {},
     validPairingCodes: new Set(),
     pairResult: [null, { DeviceID: 'device-1', DeviceToken: 'minted-token' }],
-    // The shared IPC handlers the rpc bridge dispatches to — the SAME registry
+    // The shared IPC handlers the rpc bridge dispatches to: the SAME registry
     // the desktop uses, which is the whole point of the bridge.
     rpcCalls: [],
     handlers: {
@@ -207,8 +207,8 @@ function loadSdk() {
         },
       },
       // webui-namespace (loaded for real above) now hydrates the favourite list
-      // on connect. Stub the manager so the real one — which requires ../DB and
-      // opens sqlite at module load — is never pulled in here.
+      // on connect. Stub the manager so the real one (which requires ../DB and
+      // opens sqlite at module load) is never pulled in here.
       '../MonitoringActionFavourites': {
         Manager: { Init: async () => undefined, GetAll: () => state.actionFavourites || [] },
       },
@@ -457,7 +457,7 @@ test('allowlisted channels with no projection pass through untouched', () => {
 
 test('a payload the serializer cannot handle is dropped, not thrown', () => {
   // ToPublicClient reads properties off the argument; a null entry in the list
-  // would throw inside the bus fan-out and — without this guard — take out
+  // would throw inside the bus fan-out and (without this guard) take out
   // delivery to every OTHER renderer sink, including the desktop window.
   const { NS, push } = boot();
   const Socket = fakeSocket();
@@ -499,7 +499,7 @@ test('a wrong API key is refused', async () => {
 
 test('a key of the wrong LENGTH is refused rather than crashing the compare', async () => {
   // timingSafeEqual throws on mismatched buffer lengths. PasscodeMatches hashes
-  // both sides first so the lengths always agree — if that ever changes, every
+  // both sides first so the lengths always agree; if that ever changes, every
   // handshake with a short key would fall into the catch and return
   // 'Auth failed' instead of a clean rejection.
   const { NS } = boot();
@@ -554,7 +554,7 @@ test('an unset enabled flag defaults to ON', async () => {
 
 test('settings being unreadable refuses the connection instead of opening it', async () => {
   // GetSdkConfig swallows the error and falls back to Enabled:true with an EMPTY
-  // key — which then trips the not-configured guard. Verifying the fallback is
+  // key, which then trips the not-configured guard. Verifying the fallback is
   // closed, not open.
   state = freshState();
   state.settingsGetThrows = true;
@@ -618,7 +618,7 @@ test('a successful handshake clears that IP’s failure record', async () => {
 });
 
 test('a lockout expires on its own and the IP is let back in', async () => {
-  // No timer sits behind the throttle — the map is swept lazily on each
+  // No timer sits behind the throttle: the map is swept lazily on each
   // handshake, which is also what keeps it bounded to currently-active IPs on a
   // long-running server. Time is faked because the cool-off is five minutes.
   const { NS } = boot();
@@ -646,7 +646,7 @@ test('a lockout expires on its own and the IP is let back in', async () => {
 });
 
 test('a refused connection never runs the throttle for a disabled or unconfigured API', async () => {
-  // Neither is the caller's fault, so neither should count toward a lockout —
+  // Neither is the caller's fault, so neither should count toward a lockout;
   // otherwise turning the feature on would leave clients locked out.
   state = freshState();
   state.settings.SDK_API_KEY = '';
@@ -660,8 +660,8 @@ test('a refused connection never runs the throttle for a disabled or unconfigure
 
 // --- ShowTrak Remote pairing -------------------------------------------------
 //
-// The second credential this namespace accepts. Unlike the API key — which is
-// copied into a config file once and never typed — a device pairs against the
+// The second credential this namespace accepts. Unlike the API key (which is
+// copied into a config file once and never typed), a device pairs against the
 // 4-digit workspace PIN, so the tests below care as much about what is REFUSED,
 // and how fast, as about what succeeds.
 
@@ -938,7 +938,7 @@ test('a paired device reaches the shared IPC handler', async () => {
   const Ack = await rpc(NS, deviceSocket(), 'UpdateClient', ['client-1', { Nickname: 'FOH' }]);
 
   assert.deepEqual(Ack, { result: [null, true] });
-  // The leading null is the IPC event placeholder the desktop handlers expect —
+  // The leading null is the IPC event placeholder the desktop handlers expect:
   // the same shape the Web UI's rpc bridge passes, because it is the same
   // handler being called.
   assert.deepEqual(state.rpcCalls, [['UpdateClient', null, 'client-1', { Nickname: 'FOH' }]]);
@@ -1281,7 +1281,7 @@ test('missing slug fields become empty strings for the resolver to reject', asyn
 });
 
 test('alerts.set coerces any truthy value to a real boolean', async () => {
-  // The mid-show alert kill switch — a string 'false' must not read as enabled.
+  // The mid-show alert kill switch: a string 'false' must not read as enabled.
   const { Mod } = loadSdk();
   for (const [Input, Expected] of [
     [true, true],

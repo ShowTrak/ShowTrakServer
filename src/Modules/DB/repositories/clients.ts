@@ -1,13 +1,13 @@
 // Clients-table repository. Receives the DB manager instead of importing it so
 // test DB mocks injected into ClientManager propagate through unchanged.
-// SQL strings are byte-identical to the historical inline statements — tests
+// SQL strings are byte-identical to the historical inline statements; tests
 // match on them.
 import type { DBManager, DBResult } from '../index';
 import type { ClientRow } from '../rows';
 
 // The only client columns a setter is permitted to persist. `Column` is string-
 // interpolated into the UPDATE (SQLite cannot bind an identifier), so it must be
-// constrained to a fixed set here — this allowlist is that guard, not any
+// constrained to a fixed set here; this allowlist is that guard, not any
 // entity-level validation. Mirrors the DB-backed setters in ClientManager/client.ts.
 const UPDATABLE_CLIENT_COLUMNS: ReadonlySet<string> = new Set([
   'Nickname',
@@ -43,7 +43,7 @@ export function CreateClientsRepository(DB: DBManager) {
 
     // Insert a reserved slot for hardware that does not exist yet. Unlike
     // Insert (which describes a real machine mid-adoption), every descriptive
-    // column here is filler the operator is expected to overwrite — either by
+    // column here is filler the operator is expected to overwrite, either by
     // editing the client or by replacing it with a real device, which clears
     // the Unassigned flag.
     InsertUnassigned(
@@ -67,7 +67,7 @@ export function CreateClientsRepository(DB: DBManager) {
     },
 
     // Persist a single column of a client row. `Column` is interpolated (not
-    // bindable), so it is checked against UPDATABLE_CLIENT_COLUMNS first — an
+    // bindable), so it is checked against UPDATABLE_CLIENT_COLUMNS first; an
     // unknown name is refused rather than concatenated into the SQL.
     UpdateColumn(
       UUID: string,
@@ -88,7 +88,7 @@ export function CreateClientsRepository(DB: DBManager) {
     // Delete a client and every critical-entity row keyed to it, atomically.
     // The statements ride one transaction so a partial failure can never
     // leave the client row gone but its critical rows orphaned (or vice versa).
-    // Table SQL is inlined here — matching the ReplaceClientUUID precedent —
+    // Table SQL is inlined here (matching the ReplaceClientUUID precedent)
     // because cross-table transactions are owned by this repository. Returns [Err].
     DeleteClientCascade(UUID: string): Promise<DBResult<void>> {
       return DB.WithTransaction(async (run) => {
@@ -130,7 +130,7 @@ export function CreateClientsRepository(DB: DBManager) {
     // the critical-entity tables, its FOG link, and every JSON scope that names
     // it: AlertRules (Scope and Actions), Tags and ScriptWhitelists. The whole
     // change runs in one transaction so a partial rename can never persist.
-    // `rewriteUUID` rewrites one parsed JSON value — ClientManager owns the
+    // `rewriteUUID` rewrites one parsed JSON value; ClientManager owns the
     // recursive UUID-swap logic; this repository owns the multi-table SQL.
     // Returns [Err].
     ReplaceClientUUID(
@@ -229,7 +229,7 @@ export function CreateClientsRepository(DB: DBManager) {
 
         // Replacing a client means real hardware took over the slot, so the old
         // slot's observed MACs describe a different machine and must not be
-        // inherited — the replacement's own report repopulates them. Manual
+        // inherited; the replacement's own report repopulates them. Manual
         // entries are kept: an operator who typed a MAC against a reserved slot
         // did so precisely so the arriving machine could be woken.
         const [macDeleteErr] = await run(
@@ -252,7 +252,7 @@ export function CreateClientsRepository(DB: DBManager) {
         // (GAME_VERSION for the machine driving screen 3), so the replacement
         // machine should inherit them exactly as it inherits the nickname and
         // group. OR REPLACE because the arriving client may already carry its
-        // own rows for the same variables — the slot's values win, since that is
+        // own rows for the same variables; the slot's values win, since that is
         // what the operator configured for this position.
         const [variableErr] = await run(
           'UPDATE OR REPLACE ClientVariables SET UUID = ? WHERE UUID = ?',

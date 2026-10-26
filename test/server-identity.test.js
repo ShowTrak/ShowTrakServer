@@ -13,7 +13,7 @@ function identityPath() {
 }
 
 // The module derives its storage path with path.join(), so the in-memory file
-// store has to be keyed the same way — a hardcoded '/storage/...' literal misses
+// store has to be keyed the same way; a hardcoded '/storage/...' literal misses
 // entirely on platforms whose separator is not '/'.
 function identityFilePath() {
   return path.join('/storage', 'server-identity.json');

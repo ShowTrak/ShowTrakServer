@@ -1,5 +1,5 @@
 // Live levels: streams audio meters from monitoring checks to whichever surfaces
-// are showing them — the desktop window and/or individual Web UI sockets. Two
+// are showing them: the desktop window and/or individual Web UI sockets. Two
 // kinds of viewer:
 //
 //   - a monitor's view: every meter of that monitor's checks with live levels on;
@@ -7,7 +7,7 @@
 //     (its only check has tile levels on), fewer channels at a slower rate.
 //
 // A check only streams while someone is watching it, and one stream serves both
-// kinds of viewer. That matters beyond bandwidth — a stream can hold a device's
+// kinds of viewer. That matters beyond bandwidth: a stream can hold a device's
 // only control connection (the TASCAM MX-8A accepts one), so it must not outlive
 // the last viewer.
 //

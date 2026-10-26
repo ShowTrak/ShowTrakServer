@@ -4,8 +4,8 @@
 //
 // Everything here is pure (or keeps its state in objects the Client hands in),
 // so the rules can be tested without a socket, a DB or a timer. The Client
-// entity owns WHEN these run — only against telemetry it trusts, on the same
-// evidence gates as the critical-hardware checks — and turns what they return
+// entity owns WHEN these run (only against telemetry it trusts, on the same
+// evidence gates as the critical-hardware checks) and turns what they return
 // into degraded warnings and `ClientHealthEvent` broadcasts.
 import type {
   ClientResourceAlarm,
@@ -36,7 +36,7 @@ export type ClientHealthSeverity = 'info' | 'warning' | 'error' | 'success';
  * `Condition` marks something that stays true for a while (CPU over its
  * threshold) rather than a moment (a reboot). The alert manager holds a
  * condition that was already true at server start instead of announcing it,
- * and needs to hear when it ends — see AlertsManager.HandleClientHealthEvent.
+ * and needs to hear when it ends; see AlertsManager.HandleClientHealthEvent.
  */
 export interface ClientHealthEvent {
   TriggerTypes: string[];
@@ -76,7 +76,7 @@ export function EmptyResourceAlarmState(): ResourceAlarmState {
  * Advance one alarm by one reading. Returns what changed, if anything.
  *
  * A breach must last `SustainMs` before the alarm is raised, and the reading
- * must stay back inside the threshold as long again before it clears — the
+ * must stay back inside the threshold as long again before it clears: the
  * same window both ways, so a machine hovering at its limit does not flap.
  * `Breaching` is null when there is nothing to judge (no telemetry, or the
  * condition is not monitored): any standing alarm clears at once and nothing
@@ -387,7 +387,7 @@ export function diffNetworkInterfaces(
 // --- USB devices -----------------------------------------------------------------------
 
 // What was last seen of one device. Kept after the device is unplugged, so the
-// same serial reappearing on another port reads as moved — unplug and replug
+// same serial reappearing on another port reads as moved; unplug and replug
 // elsewhere is exactly how a device gets moved.
 export interface USBDeviceMemory {
   Location: string | null;

@@ -29,7 +29,7 @@
 //
 // Online / Degraded / Offline mapping:
 //   * No response / connection refused / status outside the expected range -> Offline
-//     (Success:false, Error) — produced by PerformHttpRequest.
+//     (Success:false, Error), produced by PerformHttpRequest.
 //   * Reachable + valid response, and either no assertion configured or the assertion
 //     passes -> Online (LatencyMs + best-effort machine name / averageFPS for display).
 //   * Reachable + valid response but a configured JsonPath assertion resolves to the

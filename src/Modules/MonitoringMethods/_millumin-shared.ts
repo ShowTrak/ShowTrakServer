@@ -4,7 +4,7 @@
 //
 // Millumin's OSC integration is fundamentally one-directional feedback: when the
 // operator enables "API feedback" (Device manager -> CMD+K -> OSC tab -> "API
-// feedback"), Millumin SENDS OSC messages — all prefixed `/millumin` — to the
+// feedback"), Millumin SENDS OSC messages (all prefixed `/millumin`) to the
 // OSC destination(s) configured in that same Device manager. Examples:
 //   /millumin/board/launchedColumn        [index, "name"]
 //   /millumin/layer:myLayer/mediaStarted  [index, "name", duration]
@@ -24,7 +24,7 @@
 // feedback", and add ShowTrak's IP address + this ListenPort as an OSC output
 // destination. Without this, Millumin sends nothing and the check reads Offline.
 //
-// Importing this module has no side effects — nothing binds until the first
+// Importing this module has no side effects; nothing binds until the first
 // Observe(). Result semantics (consumed by MonitoringTarget.Tick):
 //   Success:true             -> online   (matching OSC seen from target within grace)
 //   Success:false + hint      -> offline  (OSC arriving, but from a different IP)
@@ -422,7 +422,7 @@ export function EvaluateMillumin(P: EvaluateParams): MonitoringResult {
   }
 
   if (FreshSources.length) {
-    // Millumin OSC is arriving, but not from the configured machine — the target
+    // Millumin OSC is arriving, but not from the configured machine; the target
     // is not confirmed present, so this is Offline (the aggregator only honours
     // Degraded on a Success:true result). The other source is surfaced as a hint.
     const Other = FreshSources[0]!; // non-empty: length checked above
@@ -439,7 +439,7 @@ export function EvaluateMillumin(P: EvaluateParams): MonitoringResult {
     Success: false,
     Error: P.Snapshot.Ready
       ? `No Millumin OSC${FilterNote} from ${P.Address} in ${P.GracePeriodMs}ms`
-      : 'Millumin OSC listener starting…',
+      : 'Millumin OSC listener starting...',
     Matched: false,
     ...WithSources,
   };
@@ -493,7 +493,7 @@ export function BuildMilluminDebug(Result: MonitoringResult, Target: MonitoringT
 
   const Head = Rows([
     TextRow('Approach', 'Passive OSC feedback listener'),
-    TextRow('Millumin IP', Address || '—'),
+    TextRow('Millumin IP', Address || '-'),
     TextRow('Listen port', `udp/${ListenPort}`),
     AddressFilter ? TextRow('Address filter', AddressFilter) : null,
     Row('Status', StatusPill),

@@ -1,5 +1,5 @@
 // The Applications section of the client info modal, as decisions only: one
-// card per application, styled like every other monitored-hardware card — a
+// card per application, styled like every other monitored-hardware card: a
 // summary line, the Monitor toggle, the issues it raises, and (once monitored)
 // a conditions table: running, responding, in the foreground. A condition this
 // client cannot detect reads "Unsupported" in its row. The markup lives in
@@ -12,7 +12,7 @@ export type ApplicationConditionField =
 export interface ApplicationConditionRow {
   Field: ApplicationConditionField;
   Label: string;
-  /** What the application is doing now ("Yes", "No", "—"), or "Unsupported". */
+  /** What the application is doing now ("Yes", "No", "-"), or "Unsupported". */
   Value: string;
   /** Whether this client can detect it. Unsupported rows have no tick and are never sent. */
   Supported: boolean;
@@ -33,7 +33,7 @@ export interface ApplicationBadgeView {
 }
 
 const YesNo = (Value: boolean | null | undefined) =>
-  Value === true ? 'Yes' : Value === false ? 'No' : '—';
+  Value === true ? 'Yes' : Value === false ? 'No' : '-';
 
 /** What the client's collector can detect: hung applications, the focused one. */
 function Capable(Client: ClientView): { Responding: boolean; Foreground: boolean } {
@@ -140,7 +140,7 @@ export function ApplicationConditionRows(
     {
       Field: 'RequireResponding',
       Label: 'Is responding',
-      Value: Can.Responding ? (Running ? YesNo(App.Responding) : '—') : 'Unsupported',
+      Value: Can.Responding ? (Running ? YesNo(App.Responding) : '-') : 'Unsupported',
       Supported: Can.Responding,
       Checked: App.RequireResponding !== false,
       Locked: false,
@@ -152,7 +152,7 @@ export function ApplicationConditionRows(
       Value: Can.Foreground
         ? Running && FocusKnown(Client)
           ? YesNo(!!App.IsForeground)
-          : '—'
+          : '-'
         : 'Unsupported',
       Supported: Can.Foreground,
       Checked: !!App.RequireForeground,
@@ -164,7 +164,7 @@ export function ApplicationConditionRows(
 
 /**
  * Read a conditions table back into a request. Unsupported rows are left out
- * so their stored value survives — responding is on by default, and a client
+ * so their stored value survives: responding is on by default, and a client
  * that cannot detect hangs must not quietly switch it off.
  */
 export function ApplicationConditionsPayload(

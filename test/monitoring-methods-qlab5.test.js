@@ -302,7 +302,7 @@ test('integration: persistent connection resolves the workspace and evaluates to
   };
 
   try {
-    // First Run kicks off Observe(); poll until the snapshot is populated —
+    // First Run kicks off Observe(); poll until the snapshot is populated,
     // including the GLOBAL /overrides/{key} replies (regression: these were
     // previously queried workspace-scoped and never landed → "unknown").
     method.Run(target);

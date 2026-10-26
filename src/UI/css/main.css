@@ -37,7 +37,7 @@
   /* Saturated variants for timeline blocks, chart lines and status dots.
    * Tuned apart from the washes on purpose: a solid 18,255,0 block reads as
    * neon, so the graph hues are their own triplets. Pending has no separate
-   * graph hue — it is the same blue at full strength. */
+   * graph hue; it is the same blue at full strength. */
   --status-graph-online-rgb: 38 214 44;
   --status-graph-offline-rgb: 224 36 36;
   --status-graph-degraded-rgb: 255 149 0;
@@ -217,7 +217,7 @@ body.is-web #APPLICATION {
   /* Block flow, NOT grid: as a grid item #APPLICATION gets pinned to the
      container's height instead of growing with an overflowing client list, so
      its content spills past its bottom edge and the padding-bottom reserved
-     for the fixed bottom bar lands mid-list instead of below it — the end of
+     for the fixed bottom bar lands mid-list instead of below it, and the end of
      the list then scrolls to rest underneath the bar, unreachable. In block
      flow #APPLICATION grows with its content and the padding counts toward
      the scrollable overflow. (#APPLICATION's min-height still fills the
@@ -228,7 +228,7 @@ body.is-web #APPLICATION {
 #APPLICATION {
   /* min-height (not height): fill the viewport when content is sparse so the
      gradient covers the screen, but GROW past it when the group/client list is
-     tall — a fixed height here clips the overflow and kills scrolling on mobile,
+     tall; a fixed height here clips the overflow and kills scrolling on mobile,
      where the list is a single tall column. */
   min-height: max(100%, 100vh);
   padding-top: 2rem !important;
@@ -445,7 +445,7 @@ body.is-web #APPLICATION {
 }
 
 /* Bootstrap gives every .btn a 1px border; the app's filled buttons are
-   borderless. Outline variants keep theirs — on those the border IS the button.
+   borderless. Outline variants keep theirs; on those the border IS the button.
    :where() holds this at plain `.btn` specificity, so component rules later in
    the cascade still set their own borders. */
 .btn:where(:not([class*='btn-outline-'])) {
@@ -672,7 +672,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   animation: pulse-orange 1.8s infinite;
 }
 
-/* FOG tasks button — mirrors the alerts button, sits immediately left of it.
+/* FOG tasks button: mirrors the alerts button, sits immediately left of it.
    Hidden entirely (d-none) unless the FOG integration is enabled and reachable. */
 #FOG_BUTTON.fog-btn {
   position: relative;
@@ -1450,7 +1450,7 @@ input[type='range']::-moz-range-progress,
 }
 
 /* A machine pulled in by a selected tag: shown so the operator can see the real
-   reach of the selection, but not tickable — the only way to exclude it is to
+   reach of the selection, but not tickable; the only way to exclude it is to
    edit the tag, which would change every other scope using that tag. */
 .scope-picker-implied {
   opacity: 0.72;
@@ -1538,7 +1538,7 @@ input[type='range']::-moz-range-progress,
 /* Full-width variant: segments share the row equally instead of sizing to their
    own text, so a four-option switch (the tag display mode) still lines up
    inside a modal field. Padding is tightened and the labels forced onto one
-   line — the longest ("Icon + Name") would otherwise wrap and make its segment
+   line; the longest ("Icon + Name") would otherwise wrap and make its segment
    taller than the other three. */
 .st-segmented-toggle.st-segmented-toggle-fill {
   display: flex;
@@ -1841,7 +1841,7 @@ input[type='range']::-moz-range-progress,
   text-align: center;
 }
 
-/* A client's Wake on LAN tab — MAC address list. Follows the .fog-task-item
+/* A client's Wake on LAN tab: MAC address list. Follows the .fog-task-item
    surface treatment so the rows read as the same family of inline list entries. */
 /* --- Tag picker ---
  * Assigning tags from an entity's editor, and the read-only mirror of the same
@@ -1923,7 +1923,7 @@ input[type='range']::-moz-range-progress,
   color: var(--text-strong);
 }
 /* Inherited from a group or from "all clients": on, but not this client's to
- * turn off. Not greyed out — it IS applied — just not interactive. */
+ * turn off. Not greyed out (it IS applied), just not interactive. */
 .tag-picker-chip.is-locked,
 .tag-picker-chip:disabled {
   cursor: default;
@@ -2133,7 +2133,7 @@ body.compact-mode .group-column-grid {
   display: none;
 }
 
-/* Flat rows (no per-item card/background) — only hover/focus lift them,
+/* Flat rows (no per-item card/background); only hover/focus lift them,
    matching a minimal filter-menu look rather than a stack of buttons. */
 #SHOWTRAK_CONTEXT_MENU a.SHOWTRAK_CONTEXTMENU_BUTTON {
   color: var(--text-soft);
@@ -2196,7 +2196,7 @@ body.compact-mode .group-column-grid {
 }
 
 /* Names the kind of client the rows below it act on (ShowTrak Clients,
-   Monitors, FreeKiosk, …). Not a menu item, so keyboard navigation skips it. */
+   Monitors, FreeKiosk, etc.). Not a menu item, so keyboard navigation skips it. */
 #SHOWTRAK_CONTEXT_MENU .context-section-header {
   padding: 0.35rem 0.6rem 0.15rem;
   color: var(--text-subtle);
@@ -3805,7 +3805,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   gap: 8px;
   padding: 6px 8px;
 }
-/* Inline status / error text — stays on the row, never a block below it. */
+/* Inline status / error text: stays on the row, never a block below it. */
 .exec-inline {
   font-size: var(--fs-xs);
   line-height: 1.2;
@@ -3828,7 +3828,7 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   text-align: right;
   align-self: center;
 }
-/* Failure reason — same trailer treatment as the console tail above so it hugs
+/* Failure reason: same trailer treatment as the console tail above so it hugs
    the right edge and sits centred against the taller client/script chips. */
 .exec-inline-error {
   color: var(--danger-text-soft);
@@ -3918,8 +3918,8 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   opacity: 0.9;
   color: #fff;
 }
-/* The duration span is an inline box in a flex row, so its line box — not its
-   glyphs — is what gets centred; make it a flex item in its own right so the
+/* The duration span is an inline box in a flex row, so its line box (not its
+   glyphs) is what gets centred; make it a flex item in its own right so the
    text lines up with the 22px status indicator beside it. */
 .exec-time {
   display: inline-flex;
@@ -4867,7 +4867,7 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
  *
  * Overflow is belt-and-braces with the width estimate in lib/tag-badges: the
  * estimate decides how many badges to emit, and `overflow: hidden` guarantees a
- * mis-estimate clips rather than wraps. Identical rules for every tile kind —
+ * mis-estimate clips rather than wraps. Identical rules for every tile kind:
  * a tagged monitor must read the same as a tagged client. */
 .SHOWTRAK_PC > .TILE_TAG_ROW {
   display: flex;
@@ -4883,18 +4883,18 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
   white-space: nowrap;
 }
 
-/* A badge sits on top of the tile's STATUS colour, which changes under it —
+/* A badge sits on top of the tile's STATUS colour, which changes under it:
  * green online, amber degraded, grey idle, pulsing blue while identifying. A
  * translucent TAG-coloured fill mixes with a colour it cannot predict, and a
  * red tag on an amber tile turns to mud. A white overlay (the offline-timer
- * badge / `.exec-chip` idiom) was tried and rejected — it read as a highlight
+ * badge / `.exec-chip` idiom) was tried and rejected; it read as a highlight
  * where a dark chip belongs, not as isolation.
  *
  * Settled: a translucent BLACK overlay, light enough not to read as an opaque
  * near-black hole (that was tried too, and was too heavy), dark enough that it
  * still isolates the badge from whichever status wash is underneath.
  *
- * The tag's colour carries the identity through the text alone — no ring, no
+ * The tag's colour carries the identity through the text alone: no ring, no
  * dot. Text is lifted toward white because several palette entries (purple,
  * both greys) are too dark to read at 10px; mixing rather than lightening
  * per-colour keeps each tag's hue recognisable. */
@@ -4904,8 +4904,8 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
   align-items: center;
   gap: 4px;
   /* Shrinkable, unlike the icon and the chip. A badge only ever shrinks when the
-   * row is over its 200px anyway — the fit in lib/tag-badges measures the real
-   * font, so a row it accepted does not reach this — and the one case that
+   * row is over its 200px anyway (the fit in lib/tag-badges measures the real
+   * font, so a row it accepted does not reach this), and the one case that
    * always overflows is a single tag longer than the whole tile, which the fit
    * shows regardless (a bare "+2" would name none of the tags). Fixed-width
    * there, the badge would push the "+N" past the row's clip and the tile would
@@ -4937,13 +4937,13 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
 }
 
 /* Per-tag display mode (hidden / icon / name / icon+name) changes what a badge
- * CONTAINS but must never change how tall it is — every tile is a fixed height
+ * CONTAINS but must never change how tall it is: every tile is a fixed height
  * and the row is a fixed 20px, so a taller badge in one mode would show up as
  * uneven rows across the show.
  *
  * The icon is therefore boxed to exactly the label's line box: 14px tall (the
  * label's 10px x 1.4 line-height) and a fixed 12px wide. The glyph is scaled to
- * fit that box rather than the box growing to fit the glyph — 12px reads
+ * fit that box rather than the box growing to fit the glyph; 12px reads
  * clearly at tile distance while still sitting inside 14px. The fixed width
  * also keeps icon-only badges a uniform size instead of jittering with each
  * glyph's natural advance, which is what the width estimate in
@@ -4960,7 +4960,7 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
 }
 
 /* The "+N" chip stands for several tags at once, so it takes no single tag's
- * colour — same surface, neutral text.
+ * colour: same surface, neutral text.
  *
  * It is the one thing in the row that must never shrink or be clipped: it is
  * the only signal that the tile has tags it is not showing, so a row that drops
@@ -6570,7 +6570,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
    Web passcode screen: dot indicators + numeric keypad
    ------------------------------------------------------------------------- */
 
-/* The login screen sits directly on the overlay's purple gradient — no card
+/* The login screen sits directly on the overlay's purple gradient: no card
    backdrop, border, or shadow (unlike the loading / disabled overlays). */
 .web-login-card {
   width: min(320px, 100%);
@@ -6582,7 +6582,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 }
 
 /* The real value lives here (autofill target + submitLogin() read path), but
-   it is visually removed — entry happens via the keypad and the dots below. */
+   it is visually removed; entry happens via the keypad and the dots below. */
 .web-pin-hidden-input {
   position: absolute;
   width: 1px;
@@ -6709,7 +6709,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
    -------------------------------------------------------------------------
    `body.mobile-view` is toggled from JS (see InitMobileView in 02-mode.ts) in
    lockstep with the `(max-width: 768px)` media query, and mobile is *locked* to
-   compact mode — so `body.compact-mode` is always present too and the compact
+   compact mode, so `body.compact-mode` is always present too and the compact
    tile/font styling is inherited as-is (no re-declaration needed, which keeps
    the sizing identical to a normal compact toggle).
 
@@ -6841,7 +6841,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
      The scroll container's `height: calc(100% - 2rem)` resolves `100%` against
      the initial containing block, which on iOS Safari is the *large* viewport
      (URL bar collapsed). That makes the container taller than the visible area,
-     so tall content still fits inside it and there is nothing to scroll — the
+     so tall content still fits inside it and there is nothing to scroll; the
      bottom of the client list ends up unreachable behind the URL/bottom bar.
      Size the scrollport to the *dynamic* viewport (`dvh`, tracking the visible
      area) so it becomes shorter than the content and scrolls. `vh` is the
@@ -7551,7 +7551,7 @@ body:not(.compact-mode):not(.list-mode)
 
    Appended after 05-monitoring.css by the build (scripts/build-css.js globs
    parts/*.css in filename order), so it can lean on the monitoring timeline
-   styles it sits beside — the metric chart deliberately reuses the same
+   styles it sits beside: the metric chart deliberately reuses the same
    --status-graph-* palette so a chart and a timeline in one modal read as one
    system. */
 
@@ -7789,7 +7789,7 @@ body:not(.compact-mode):not(.list-mode)
   color: var(--text-secondary);
 }
 
-/* An unticked condition is still editable — setting it ticks the row — but
+/* An unticked condition is still editable (setting it ticks the row) but
    recedes, so the ticked ones are what the eye lands on. */
 .FREEKIOSK_CONDITIONS tr.is-off .fk-cond-rule {
   opacity: 0.5;
@@ -7909,7 +7909,7 @@ body:not(.compact-mode):not(.list-mode)
   align-items: center;
 }
 
-/* Bootstrap's bare `.btn` inherits --bs-body-color — near-black text on no
+/* Bootstrap's bare `.btn` inherits --bs-body-color: near-black text on no
    background, which is all but invisible on this theme. Every FreeKiosk action
    button therefore carries its own tint: a translucent wash of its own text
    colour, the same treatment the badges and chips elsewhere in the app use.
@@ -7992,7 +7992,7 @@ body:not(.compact-mode):not(.list-mode)
   background: var(--surface-ghost);
 }
 
-/* Configuration, not monitoring — it decides what the terminal shows and what
+/* Configuration, not monitoring: it decides what the terminal shows and what
    Start Kiosk Mode sends. It shares the alarms panel's shape so the editor reads
    as one column, and takes an accent edge so it is not mistaken for a second
    block of checks. */
@@ -8021,15 +8021,15 @@ body:not(.compact-mode):not(.list-mode)
 
 /* The monitoring editor spaces its generated fields with `d-grid gap-2` on the
    hosts in index.html. These hosts hold sections built in TS, so the same
-   spacing is declared here instead — without it every field wrap sits flush
+   spacing is declared here instead; without it every field wrap sits flush
    against the next and sixty alarm rows read as one undifferentiated block. */
 .freekiosk-alarms-body {
   display: grid;
   gap: 0.5rem;
 }
 
-/* Bootstrap 5.0 has no rules for a .form-floating inside an .input-group — that
-   arrived in 5.2, and this build is 5.0.2 — so the field neither flexes to fill
+/* Bootstrap 5.0 has no rules for a .form-floating inside an .input-group (that
+   arrived in 5.2, and this build is 5.0.2), so the field neither flexes to fill
    the row nor drops its right-hand rounding under the copy button. Scoped to the
    modal rather than declared globally, since it is patching a gap in a vendored
    version rather than stating a rule of the design. */
@@ -8063,7 +8063,7 @@ body:not(.compact-mode):not(.list-mode)
    List view (body.list-mode)
    -------------------------------------------------------------------------
    The list is the same tiles, laid out as table rows. Every tile already
-   carries the list-only cells (checkbox, status word, history graph — see
+   carries the list-only cells (checkbox, status word, history graph; see
    list-view.ts); they are hidden in Grid and Compact and placed here.
 
    The rows and the one sticky heading row share a single column template, so
@@ -8284,7 +8284,7 @@ body.list-mode .group-drop-zone > .dnd-source-spacer {
   border-radius: var(--radius-sm);
 }
 
-/* One row-height line, "Empty Group — This group has no clients.", in place
+/* One row-height line, "Empty Group - This group has no clients.", in place
    of the tile view's 100px centred block. */
 body.list-mode .SHOWTRAK_PC_PLACEHOLDER {
   display: flex;
@@ -8460,7 +8460,7 @@ body.list-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_HOSTNAME'] {
   white-space: nowrap;
 }
 
-/* Type: OS + version / method + interval / "Dummy" / "FreeKiosk" — or the
+/* Type: OS + version / method + interval / "Dummy" / "FreeKiosk", or the
    tile's tag badges, which take that line's place exactly as on the tile. */
 body.list-mode .SHOWTRAK_PC > [data-type='Hostname'],
 body.list-mode .SHOWTRAK_PC > [data-type='Method'],
@@ -8543,7 +8543,7 @@ body.list-mode .SHOWTRAK_PC.IDENTIFYING > .LIST_STATE::before {
   background: var(--status-graph-pending);
 }
 
-/* Details: whichever of the tile's status lines is showing — the degraded
+/* Details: whichever of the tile's status lines is showing: the degraded
    warning, a monitor's latency, the offline timer, or the vitals bars. */
 body.list-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS,
 body.list-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_ACTION'] {

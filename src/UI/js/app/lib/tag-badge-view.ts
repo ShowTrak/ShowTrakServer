@@ -1,15 +1,15 @@
 // Markup for the tile tag-badge row.
 //
 // Kept beside the fitting rules (./tag-badges) rather than inside any one tile
-// builder, because all three tile kinds — ShowTrak clients, monitoring targets
-// and dummy clients — render the identical row. The user requirement is that
+// builder, because all three tile kinds (ShowTrak clients, monitoring targets
+// and dummy clients) render the identical row. The user requirement is that
 // tagged tiles look the same whatever they are, so there is exactly one builder.
 //
 // The row REPLACES the tile's type line (OS + version / method + interval /
 // "Dummy") rather than sitting alongside it: tiles are a fixed 220x100, so an
 // extra row would push their own content out. Both elements are always emitted
 // and exactly one carries `d-none`, which removes it from the tile's grid
-// entirely — so a tagged tile is the same height as an untagged one.
+// entirely, so a tagged tile is the same height as an untagged one.
 
 import type { TagView } from '@showtrak/protocol';
 import { Safe } from '../utils';
@@ -27,8 +27,8 @@ import {
 /**
  * One badge: the tag's icon and/or upper-cased slug, in the tag's own colour.
  *
- * The colour carries the identity — the contents are drawn in it and the pill is
- * filled with a transparent tint of it — so no separate swatch is needed. Both
+ * The colour carries the identity (the contents are drawn in it and the pill is
+ * filled with a transparent tint of it), so no separate swatch is needed. Both
  * are driven off one `--tag-colour` custom property rather than two inline
  * declarations, so the CSS owns the tint ratio.
  *
@@ -55,11 +55,11 @@ function RenderTagBadge(Tag: TagView): string {
  * The whole row, or '' when the entity carries no tags it may draw.
  *
  * The row's `title` lists every tag that overflowed, so the "+N" chip is never a
- * dead end — hovering the tile still answers "which tags?". Tags set to
+ * dead end; hovering the tile still answers "which tags?". Tags set to
  * `hidden` are absent from the row and from that list: the tile is meant to look
  * as though they were not there.
  *
- * Returning '' when every tag is hidden matters — the tile builders swap the
+ * Returning '' when every tag is hidden matters: the tile builders swap the
  * type line (OS / method / "Dummy") back in whenever this is empty, so a client
  * carrying only hidden tags reads exactly like an untagged one.
  */

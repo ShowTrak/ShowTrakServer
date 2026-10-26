@@ -1,5 +1,5 @@
 // The Applications section of the client info modal: one card per application,
-// styled like the audio, display and network cards — a summary line, the
+// styled like the audio, display and network cards: a summary line, the
 // Monitor toggle, the issues it raises and, once monitored, an auto-saving
 // conditions table (running, responding, in the foreground). The decisions
 // live in lib/applications.

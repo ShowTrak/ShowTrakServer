@@ -130,7 +130,7 @@ export interface ClientMacAddress {
 
 // Normalize a reported interface list into the shape carried in RAM. Shared by
 // the full-list setter and the delta applier so both paths store identical
-// records — a delta that normalized differently would make an interface look
+// records; a delta that normalized differently would make an interface look
 // changed on the next full list and flap forever.
 function normalizeNetworkInterfaces(Interfaces: unknown): NormalizedNetworkInterface[] {
   const List: unknown[] = Array.isArray(Interfaces) ? Interfaces : [];
@@ -330,7 +330,7 @@ interface ClientConstructorInput {
 //
 // A Client instance is broadcast as-is: it crosses Electron's IPC to the
 // renderer (structured clone) and is JSON-stringified into alert history. A
-// Node timer handle survives neither — it is circular, so stringify throws, and
+// Node timer handle survives neither: it is circular, so stringify throws, and
 // it is not cloneable, so the IPC send fails. Keeping the handles in a WeakMap
 // leaves the client itself plain data, and entries disappear with the client.
 const StartupGraceTimers = new WeakMap<Client, ReturnType<typeof setTimeout>>();
@@ -349,7 +349,7 @@ class Client {
   OperatingSystem: string | null;
   GroupID: number | null;
   Weight: number;
-  // The MAC of the interface serving the active socket IP — the "primary"
+  // The MAC of the interface serving the active socket IP, the "primary"
   // address, kept for display and back-compat. Waking uses MacAddresses below,
   // which is the full set; this is only ever one of them.
   MacAddress: string | null;
@@ -362,10 +362,10 @@ class Client {
   RunOnLaunchScriptID: string | null;
   RunOnLaunchDelaySeconds: number | null;
   // Seconds a dropped connection is tolerated before the client reads offline.
-  // null inherits CLIENT_OFFLINE_GRACE_SECONDS — see ./offline-grace.
+  // null inherits CLIENT_OFFLINE_GRACE_SECONDS; see ./offline-grace.
   OfflineGraceSeconds: number | null;
   // Monitored system checks (CPU, memory, uptime, power, thermal); a null
-  // check is not monitored. Loaded from CriticalSystemChecks — see
+  // check is not monitored. Loaded from CriticalSystemChecks; see
   // ./system-checks for what each condition means.
   SystemChecks: ClientSystemChecks;
   // Stable, human-friendly OSC/API identifier. Unique across the shared client
@@ -410,7 +410,7 @@ class Client {
   // the instant it connects: its heartbeat lands first and the USB, display and
   // application reports follow one second apart (see the client's on-connect
   // sequence). Treating that gap as "the devices are gone" marked every client
-  // degraded for the first few seconds of every connection — and at server
+  // degraded for the first few seconds of every connection, and at server
   // start, with the whole rig connecting at once, that arrived as a wave of
   // alerts for faults that never existed.
   //
@@ -517,7 +517,7 @@ class Client {
     this.MacAddress = Data.MacAddress || null;
     // Populated by the manager's MacAddresses index immediately after
     // construction (the rows live in a second table, so they cannot ride the
-    // constructor input) — see applyCriticalState in ClientManager/index.ts.
+    // constructor input); see applyCriticalState in ClientManager/index.ts.
     this.MacAddresses = Array.isArray(Data.MacAddresses) ? Data.MacAddresses : [];
     this.Version = Data.Version || null;
     this.IP = Data.IP || null;
@@ -650,7 +650,7 @@ class Client {
       this._rebuildStorageView(false);
       // A threshold says nothing about a machine that is not reporting, so the
       // alarms stand down rather than ride out the outage. The next session
-      // re-proves them — a CPU still pegged after a reconnect re-raises once it
+      // re-proves them: a CPU still pegged after a reconnect re-raises once it
       // has been over for the sustain window again.
       this._resetResourceAlarms();
     }
@@ -793,7 +793,7 @@ class Client {
 
   // Track boot time from uptime, and announce a restart: uptime only ever
   // counts up, so a reading well below the last one is a fresh boot. The first
-  // reading this server sees is a baseline, not a reboot — and because this
+  // reading this server sees is a baseline, not a reboot, and because this
   // object outlives the connection, the comparison spans the outage a reboot
   // causes, which is exactly the window it has to see across.
   _observeUptime(UptimeSeconds: number | null) {
@@ -885,7 +885,7 @@ class Client {
    * Sleep and wake are read from the client's own timestamps rather than from
    * the moment a report lands: a machine going to sleep may not get its last
    * report out, and the one it sends on waking carries both. The first report
-   * this server sees is a baseline — an old resume is not news.
+   * this server sees is a baseline; an old resume is not news.
    */
   SetPowerStatus(Snapshot: ValidatedPowerStatus) {
     const Previous = this.PowerStatus;
@@ -1038,7 +1038,7 @@ class Client {
    * Keyed by DisplayID, which is the client's most durable identifier for a
    * panel (EDID fingerprint where available, falling back through port and
    * attribute composites). A display whose resolution or refresh rate changed
-   * keeps its DisplayID only when identified by EDID or port — an
+   * keeps its DisplayID only when identified by EDID or port; an
    * attribute-derived id bakes the configuration in, so such a change arrives
    * as a Removed plus an Added, which merges correctly either way.
    */
@@ -1193,7 +1193,7 @@ class Client {
   }
   // A critical application that must hold the focused window and does not. Only
   // judged when the client can report the foreground and named one: an unknown
-  // owner (null — a lock screen, an elevation prompt, or an unreadable window)
+  // owner (null: a lock screen, an elevation prompt, or an unreadable window)
   // is not evidence that the show application lost focus.
   _isOutOfForeground(Entry: RunningApplicationViewEntry): boolean {
     if (!Entry.RequireForeground || !Entry.IsRunning) return false;
@@ -1206,7 +1206,7 @@ class Client {
   _refreshClientHealthState() {
     // Each domain is only judged once the client has reported it on this
     // connection. Until then its "missing" list is an artefact of having no
-    // data rather than a fault — see HasUSBTelemetry above.
+    // data rather than a fault; see HasUSBTelemetry above.
     const ProcessStatusState = String(
       this.RunningApplications &&
         this.RunningApplications.Status &&
@@ -1256,7 +1256,7 @@ class Client {
     // premature on a machine that is still booting, so inside the start-up
     // window it is held rather than published (see CLIENT_STARTUP_GRACE_MS).
     //
-    // The integrated reason below is not inferred — an SDK client saying "I am
+    // The integrated reason below is not inferred: an SDK client saying "I am
     // degraded, here is why" is a statement of fact from the thing itself, so
     // it is never held and a self-reporting client stays instantly alertable.
     const HoldingStartupWarnings = Warnings.length > 0 && this._isWithinStartupGrace();
@@ -1618,8 +1618,8 @@ class Client {
   /**
    * Merge an incremental interface change into the stored list.
    *
-   * The full list stays the authority — it arrives on connect and on the
-   * periodic resync and REPLACES this state — so a delta only has to describe
+   * The full list stays the authority (it arrives on connect and on the
+   * periodic resync and REPLACES this state), so a delta only has to describe
    * the step between two samples. Anything it gets wrong is corrected within a
    * resync interval rather than persisting.
    */
@@ -1811,9 +1811,9 @@ class Client {
     //     the common one at client start-up), and diffing against it announces
     //     every application as stopped when nothing stopped at all.
     //
-    // Either way the snapshot is still stored — the UI shows the sampler
+    // Either way the snapshot is still stored (the UI shows the sampler
     // status, and the critical-application health check already ignores a
-    // non-ok state — but no transition is derived from it. The next trusted
+    // non-ok state), but no transition is derived from it. The next trusted
     // sample diffs against a trusted baseline and reports real changes.
     const SampleTrusted = NextStatus.State === 'ok';
     const BaselineTrusted = this.HasApplicationTelemetry;
@@ -2217,7 +2217,7 @@ class Client {
   }
 
   // Persistent fields (DB-backed). Each setter mutates RAM, persists, and on a
-  // failed write restores the previous RAM value before returning Fail — so the
+  // failed write restores the previous RAM value before returning Fail, so the
   // in-memory entity can never claim a change the row did not accept. A no-op
   // (value unchanged) is reported as success.
   async SetNickname(Nickname: string | null): Promise<Result<void>> {
@@ -2316,7 +2316,7 @@ class Client {
     return Ok<void>();
   }
   /** Project the client's MAC set onto the instance. Called by the manager's
-   *  MacAddresses index (see applyCriticalState); performs no writes — every
+   *  MacAddresses index (see applyCriticalState); performs no writes; every
    *  mutation goes through Manager.AddClientMacAddress / RemoveClientMacAddress,
    *  which keep the index and the DB in step. */
   SetMacAddresses(MacAddresses: ClientMacAddress[]) {
@@ -2325,7 +2325,7 @@ class Client {
       .sort((A, B) => A.FirstSeen - B.FirstSeen || A.MacAddress.localeCompare(B.MacAddress));
   }
 
-  /** Every stored MAC — the full target list for Wake-on-LAN. */
+  /** Every stored MAC: the full target list for Wake-on-LAN. */
   GetWakeableMacAddresses(): string[] {
     return this.MacAddresses.map((Entry) => Entry.MacAddress).filter(Boolean);
   }
@@ -2341,8 +2341,8 @@ class Client {
       return Fail(Err);
     }
     // An update (or a rollback) the client just came back with. A first version
-    // is not a change — nor is replacing the "X.X.X" a freshly adopted client is
-    // created with — and neither is a client momentarily reporting none.
+    // is not a change, nor is replacing the "X.X.X" a freshly adopted client is
+    // created with, and neither is a client momentarily reporting none.
     if (Previous && Version && /\d+\.\d+/.test(Previous)) {
       this._emitHealthEvent({
         TriggerTypes: [TRIGGERS.CLIENT_VERSION_CHANGED],

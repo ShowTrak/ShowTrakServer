@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
-// Exercises src/main/registrars/updates.ts — client software updates.
+// Exercises src/main/registrars/updates.ts: client software updates.
 //
 // `UpdateManager:DeployRelease` is the most consequential handler in the whole
 // registrar layer: it pushes a new build out to real machines over the LAN. It
@@ -11,7 +11,7 @@ const { installModuleMocks, matchesModule, recordingManager } = require('./helpe
 // on that version or currently offline are filtered out) and every one of them
 // exists to stop a bad rollout. They are tested individually here.
 //
-// The real `normalizeVersionToken` from local-scripts is used deliberately —
+// The real `normalizeVersionToken` from local-scripts is used deliberately:
 // the "is this client already on this version" comparison is the logic under
 // test, so stubbing it would hollow out the interesting case.
 
@@ -355,7 +355,7 @@ test('DeployRelease dispatches the LAN update with the feed path and version', a
   assert.equal(Command, 'UpdateSoftwareFromLAN');
   assert.deepEqual(Targets, ['client-uuid-1', 'client-uuid-2']);
   assert.equal(Label, 'Updating Client Software');
-  // resetQueue:false — a rollout must not wipe work already queued for these
+  // resetQueue:false; a rollout must not wipe work already queued for these
   // clients. The payload carries the RELATIVE FeedPath (the client resolves it
   // to an absolute FeedURL itself).
   assert.deepEqual(Options, {

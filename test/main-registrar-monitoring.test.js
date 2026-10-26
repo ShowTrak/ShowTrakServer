@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
-// Exercises src/main/registrars/monitoring.ts — monitoring targets/methods plus
+// Exercises src/main/registrars/monitoring.ts: monitoring targets/methods plus
 // the six history readers.
 //
 // The theme here is the reader contract's EMPTY FALLBACK, and the fact that it
@@ -241,7 +241,7 @@ test('every history reader falls back to [] on invalid input, never null', async
 });
 
 test('the check-history reader labels its field as CheckID, not TargetID', async () => {
-  // Shared validator, distinct field name — the message the renderer shows
+  // Shared validator, distinct field name; the message the renderer shows
   // should name the thing the user actually selected.
   await GetHandler('GetMonitoringCheckHistory')(null, 1);
   assert.deepEqual(historyCalls, [['check', 1]]);

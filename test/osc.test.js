@@ -133,7 +133,7 @@ function loadOSC(overrides = {}, { WithSocket = true } = {}) {
                 Total: 1,
                 Succeeded: 0,
                 Failed: 1,
-                Results: [{ Success: false, Error: 'ERR3 — the projector is busy' }],
+                Results: [{ Success: false, Error: 'ERR3 - the projector is busy' }],
               },
             ];
           }
@@ -311,7 +311,7 @@ test('OSC absorbs a malformed inbound packet without tearing the server down', (
 
 // Since node-osc 11 the Server re-emits underlying socket errors too, with no
 // remote-info. The `_sock` listener already reports those, so the Server handler
-// must not also mislabel them as a bad packet — one socket error, one report.
+// must not also mislabel them as a bad packet: one socket error, one report.
 test('OSC reports a socket error once when the dgram socket is reachable', () => {
   const { broadcastEvents, handlers, socketHandlers } = loadOSC();
   const Err = Object.assign(new Error('bind EADDRINUSE 0.0.0.0:57121'), { code: 'EADDRINUSE' });
@@ -492,7 +492,7 @@ test('OSC runs a check action on a monitoring target addressed by slug', async (
 test('OSC fills an action parameter from the trailing path value', async () => {
   const { handlers, actionCalls } = loadOSC();
   await handlers.message(['/API/Monitor/proj-sl/pjlink/input.set/31']);
-  // The value lands on the action's FIRST declared parameter — the only one a
+  // The value lands on the action's FIRST declared parameter, the only one a
   // single-value route can address unambiguously.
   assert.deepEqual(actionCalls, [[[4], 'pjlink', 'input.set', { Input: '31' }]]);
 });

@@ -2,14 +2,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
-// Exercises src/main/registrars/fog.ts — the FOG Project imaging integration.
+// Exercises src/main/registrars/fog.ts: the FOG Project imaging integration.
 //
 // Two behaviours here are deliberate design decisions worth pinning:
 //   1. FOG being unreachable is NOT an error for the readers. The client editor
 //      and tasks panel must still open when the FOG server is down, showing the
-//      last known state — so the readers hand back whatever the manager has.
+//      last known state, so the readers hand back whatever the manager has.
 //   2. Validation here is shape-only. Whether a task type is permitted, and
-//      whether the client is linked to a host, is re-checked inside FogManager —
+//      whether the client is linked to a host, is re-checked inside FogManager;
 //      the renderer is never the authority on what may be imaged. Imaging a
 //      machine is destructive, so that split matters.
 //
@@ -162,7 +162,7 @@ test('Fog:ScheduleTask passes a null snapin for every task type but Single Snapi
 });
 
 test('Fog:ScheduleTask rejects a malformed task type before the manager', async () => {
-  // Shape-only rejection. Permission is re-checked in the manager — this just
+  // Shape-only rejection. Permission is re-checked in the manager; this just
   // stops garbage arriving.
   const Handler = GetHandler('Fog:ScheduleTask');
   for (const Bad of [0, -1, 'abc', null, undefined]) {
@@ -205,7 +205,7 @@ test('Fog:CancelTask surfaces a manager refusal', async () => {
 
 test('Fog:ClearFinishedTasks takes no arguments and ignores any that are sent', async () => {
   // Which rows count as finished is decided by the repository, never by the
-  // renderer — so there is deliberately nothing to validate.
+  // renderer, so there is deliberately nothing to validate.
   const [Err] = await GetHandler('Fog:ClearFinishedTasks')(null, 'ignored', 42);
   assert.equal(Err, null);
   assert.deepEqual(fogMgr.__callsTo('ClearFinishedTasks')[0].args, []);

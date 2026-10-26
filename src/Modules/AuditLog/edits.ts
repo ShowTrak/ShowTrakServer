@@ -2,7 +2,7 @@
 //
 // Managers call these at the point a change has actually been made (after the
 // write succeeded), with names as they read at that moment. The surface that
-// asked for it (Desktop, Web UI, OSC…) is picked up from the request context;
+// asked for it (Desktop, Web UI, OSC, etc.) is picked up from the request context;
 // see ./source.
 import type { AuditChange, AuditEntityType, AuditSegment, AuditSeverity } from '@showtrak/protocol';
 import { Manager as AuditLog } from './index';

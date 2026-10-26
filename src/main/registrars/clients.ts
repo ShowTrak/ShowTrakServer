@@ -263,7 +263,7 @@ function register(): void {
     )
   );
 
-  // Manually record an extra MAC for a client — for machines whose NIC the
+  // Manually record an extra MAC for a client, for machines whose NIC the
   // server has never observed (never yet connected, or a card only used on a
   // network the server cannot see) but which still need waking.
   RPC.handle(
@@ -348,7 +348,7 @@ function register(): void {
       (Payload: unknown) => IPCValidation.UnassignedClientCreatePayload(Payload),
       async (Payload: { Name: string; Count: number }) => {
         // The renderer hides the entry point when the feature is off, but the
-        // setting is re-read here because that is the only authoritative gate —
+        // setting is re-read here because that is the only authoritative gate:
         // a stale or bypassed renderer must not be able to create slots. Fails
         // closed if the read throws.
         let Allowed = false;
@@ -425,17 +425,17 @@ function register(): void {
       // no-op cases below never create a task (and therefore never surface a UI
       // notification). Only clients we will actually wake get an entry.
       const [ClientErr, Client] = await ClientManager.Get(UUID);
-      // The client vanished between validation and now — nothing to wake, and no
+      // The client vanished between validation and now; nothing to wake, and no
       // task was queued, so stay silent.
       if (ClientErr || !Client) return;
       // WOL isn't possible/needed here: no MAC on record (unsupported) or the
-      // client is already online. Silently skip — don't spam with notifications.
+      // client is already online. Silently skip; don't spam with notifications.
       const MacAddresses = Client.GetWakeableMacAddresses();
       if (!MacAddresses.length || Client.Online) return;
 
       const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(UUID, 'Wake on LAN');
       // No RequestID means the task was never queued (the client vanished between
-      // the check above and enqueue) — there is nothing to complete.
+      // the check above and enqueue); there is nothing to complete.
       if (!RequestID) return;
       // A machine with several NICs can only be woken via whichever one the
       // server can actually reach, and we cannot know which that is, so wake all

@@ -17,7 +17,7 @@ function readSrc(relative) {
 // are PascalCase). Local helpers in the shim are lowercase and thus excluded.
 //
 // Anchored to indentation depth: both API surfaces are one flat object literal,
-// so every method key sits at the same (shallowest) indent — 2 spaces in
+// so every method key sits at the same (shallowest) indent: 2 spaces in
 // bridge_main.ts, 4 in the shim where the object is nested inside a function.
 // Anything deeper is a wrapped function parameter, not a method. Those are also
 // PascalCase here (`Type:`, `Targets:`, `Settings:`), so without this filter

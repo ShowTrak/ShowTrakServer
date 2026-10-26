@@ -57,7 +57,7 @@ export function ParseMonitorInterval(Raw: unknown): number {
 
 /**
  * Checks in the given CheckID order. Anything the order does not mention keeps
- * its place after the ones it does — a check added elsewhere mid-drag must not
+ * its place after the ones it does; a check added elsewhere mid-drag must not
  * be dropped, since leaving it out of a save deletes it.
  */
 export function ReorderChecks<T extends { CheckID: number }>(
@@ -90,7 +90,7 @@ export function CheckOrderChanged(Before: readonly number[], After: readonly num
  * `Order` if given. Null when it cannot be saved: a monitor needs a name.
  *
  * The slug travels only when changed and non-empty (a slug never auto-changes),
- * and the group is carried through untouched — it is set by dragging the tile.
+ * and the group is carried through untouched; it is set by dragging the tile.
  */
 export function BuildMonitorUpdatePayload(
   Target: TargetLike,

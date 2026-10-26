@@ -17,7 +17,7 @@ import { EmptyAudioView } from '../ClientManager/audio';
 import { EmptyNetworkStatusView } from '../ClientManager/network';
 import { EmptyStorageView } from '../ClientManager/storage';
 
-// Structural view of the internal Client entity — only the fields the public
+// Structural view of the internal Client entity: only the fields the public
 // projection reads. The array-shaped telemetry is accepted as `unknown` because
 // the projection re-validates each field with `Array.isArray` before copying it
 // (which narrows it to a safe array), so the caller's exact element types are
@@ -33,7 +33,7 @@ interface PublicClientSource {
   Slug?: string | null;
   IP?: string | null;
   MacAddress?: string | null;
-  // Every MAC the client is known by — the full Wake-on-LAN target set, of which
+  // Every MAC the client is known by: the full Wake-on-LAN target set, of which
   // MacAddress above is the currently-active one. Loose here like the other
   // array telemetry; re-narrowed on output.
   MacAddresses?: unknown;
@@ -241,12 +241,12 @@ interface PublicDummySource {
 }
 
 // Monitors and dummies are surfaced to the SDK as CLIENT-shaped views so external
-// integrations (Companion, etc.) treat them uniformly with real clients — they
+// integrations (Companion, etc.) treat them uniformly with real clients: they
 // appear in the client list, carry status + label, and are addressable by slug.
 // They reuse ToPublicClient to fill the full ClientView shape (empty telemetry),
 // then override two things:
-//   - Type — the wire discriminator ('monitor' / 'dummy' instead of 'client').
-//   - UUID — a synthetic scoped id (`monitor:<TargetID>` / `dummy:<UUID>`) matching
+//   - Type: the wire discriminator ('monitor' / 'dummy' instead of 'client').
+//   - UUID: a synthetic scoped id (`monitor:<TargetID>` / `dummy:<UUID>`) matching
 //     the shared slug-namespace owner convention, so tag-scope membership (which
 //     stores these scoped ids) resolves for them too.
 // The Type override is not expressible against ClientView's 'client' literal, so
@@ -283,7 +283,7 @@ const ToPublicDummy = (d: PublicDummySource): ClientView =>
   }) as unknown as ClientView;
 
 // FreeKiosk terminals follow the same projection. Deliberately read-only: the
-// SDK and HTTP API can see a terminal's status but cannot command it — control
+// SDK and HTTP API can see a terminal's status but cannot command it; control
 // stays on the desktop and Web UI surfaces.
 const ToPublicFreeKiosk = (k: PublicFreeKioskSource): ClientView =>
   ({

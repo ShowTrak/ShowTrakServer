@@ -40,7 +40,7 @@ function ArmContextMenuRow($menu: JQuery, $row: JQuery) {
 
 // Run a row's action, then clear the selection when UI_CLEAR_SELECTION_AFTER_ACTION
 // is on. The setting is global, but only the surface whose menu ran the action
-// clears — and only its own selection: selection never leaves the renderer, and
+// clears, and only its own selection: selection never leaves the renderer, and
 // OSC/SDK-triggered runs don't come through here. A confirmation the user backed
 // out of resolves to false and keeps the selection.
 async function RunContextMenuOption(option: ContextMenuOption) {
@@ -372,7 +372,7 @@ function PositionContextMenu($menu: JQuery, e: JQuery.TriggeredEvent) {
   // `display: flex` so the header stays pinned while .context-menu-options
   // scrolls internally; desktop uses `block`. We set this inline (rather than
   // leaning on a CSS rule) so the menu's default `display: none` holds until
-  // it is actually opened — otherwise an empty menu floats on load.
+  // it is actually opened; otherwise an empty menu floats on load.
   $menu.css({
     display: isMobileMenu ? 'flex' : 'block',
     visibility: 'hidden',
@@ -530,7 +530,7 @@ const LONG_PRESS_EXCLUDED =
 // Touch/pen long-press opens the context menu, for iPadOS where WebKit never
 // fires `contextmenu` from a touch (see lib/long-press.ts). The menu is opened
 // by triggering the same synthetic `contextmenu` the Actions button and
-// keyboard shortcuts use, dispatched on whatever is under the finger NOW —
+// keyboard shortcuts use, dispatched on whatever is under the finger NOW;
 // tiles re-render on live status updates, so the pointerdown target may have
 // been replaced during the hold.
 function wireTouchLongPress(): LongPressTracker {

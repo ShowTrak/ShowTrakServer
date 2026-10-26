@@ -261,7 +261,7 @@ const Manager = {
     return await DB.HasUnsavedChanges();
   },
 
-  // "Save As" — write the entire working database out to a portable .ShowTrak
+  // "Save As": write the entire working database out to a portable .ShowTrak
   // file. The whole database is dumped as a single snapshot, so there is no
   // per-table maintenance and runtime performance is unaffected (the cost is
   // taken only when saving).
@@ -304,7 +304,7 @@ const Manager = {
     return [null, 'Saved successfully'];
   },
 
-  // "Open" — replace the working database with the selected .ShowTrak file. The
+  // "Open": replace the working database with the selected .ShowTrak file. The
   // DB layer validates the file, swaps it in, and re-applies schema migrations.
   // A full re-hydration of in-memory caches/UI is then triggered. The UI goes
   // through RequestOpen, which asks before an older file is upgraded.
@@ -325,7 +325,7 @@ const Manager = {
     return [null, 'Opened successfully'];
   },
 
-  // "New" — reset the working database to an empty show and save it straight
+  // "New": reset the working database to an empty show and save it straight
   // away to Path, so a new show always has a file behind it.
   async New(Path: string): Promise<BackupResult<string>> {
     Logger.log('Creating new ShowTrak show at:', Path);

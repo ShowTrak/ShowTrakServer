@@ -5,7 +5,7 @@
 // tile / keybind wiring) and Init() (show-file bootstrap, cogs-menu wiring and
 // the final window.API.Loaded() handshake). The bootstrap orchestrator in
 // main.ts calls WireGlobalUI() then Init(), after every module's Init*()
-// subscriptions are registered — Loaded() must stay last so the main process
+// subscriptions are registered; Loaded() must stay last so the main process
 // pushes initial state only once every subscriber is listening.
 import { closeModal, openModal } from './lib/modal';
 import {

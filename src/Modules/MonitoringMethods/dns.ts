@@ -151,7 +151,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     (Cfg.ExpectedValue == null ? '' : String(Cfg.ExpectedValue).trim());
 
   const Head = Rows([
-    TextRow('Hostname', Address || '—'),
+    TextRow('Hostname', Address || '-'),
     TextRow('Record type', RecordType),
     Row('Result', Pill(Success ? 'success' : 'danger', Success ? 'Resolved' : 'Failed')),
     Success

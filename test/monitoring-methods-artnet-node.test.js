@@ -561,12 +561,12 @@ test('Run receives a real ArtPollReply over loopback on the shared socket', asyn
   const ready = await rx.WhenReady(1000);
   if (!ready) {
     rx.Stop();
-    t.skip(`Art-Net socket not ready (${rx.ListenerError() || 'binding'}) — cannot bind udp/6454`);
+    t.skip(`Art-Net socket not ready (${rx.ListenerError() || 'binding'}); cannot bind udp/6454`);
     return;
   }
 
-  // Our ArtPoll goes to 127.0.0.1:6454 — the receiver itself, which ignores
-  // it — and the fake node answers from an ephemeral port, as a node replying
+  // Our ArtPoll goes to 127.0.0.1:6454 (the receiver itself, which ignores
+  // it) and the fake node answers from an ephemeral port, as a node replying
   // with a different source port would.
   const node = dgram.createSocket('udp4');
   const reply = buildReply({ ip: [127, 0, 0, 1], shortName: 'Loopback' });

@@ -1,8 +1,8 @@
 // QLab 5+ workspace monitoring. Holds a persistent OSC/TCP connection to QLab,
 // subscribes to its `/updates` feed, and asserts live state inside a workspace.
 // Baseline behaviour confirms a workspace is open (a named one, or whichever is
-// open when the Workspace field is blank); each further assertion — workspace name,
-// Show/Edit mode, running cues, overrides — is opt-in via its own toggle. Transport,
+// open when the Workspace field is blank); each further assertion (workspace name,
+// Show/Edit mode, running cues, overrides) is opt-in via its own toggle. Transport,
 // the persistent self-reaping connection manager, and the snapshot live in
 // ./_qlab-shared.
 //
@@ -11,7 +11,7 @@
 // checks upgrade in place.)
 //
 // One MonitoringCheck collapses to a single Online/Degraded/Offline tri-state (the
-// framework has no multi-result checks), so — like eos.ts — every enabled toggle is
+// framework has no multi-result checks), so, like eos.ts, every enabled toggle is
 // evaluated and any failure aggregates into one Degraded reason. QLab exposes no OSC
 // for workspace warnings or video FPS (Workspace Status Window is GUI-only), so those
 // are intentionally absent.
@@ -221,7 +221,7 @@ export function EvaluateHealth(Snapshot: QLabSnapshot, Options: HealthOptions): 
         Ok,
         Detail: Ok
           ? `“${Actual}”`
-          : `“${Actual || '—'}” (expected ${Options.WorkspaceNameMatch === 'contains' ? 'to contain ' : ''}“${Expected}”)`,
+          : `“${Actual || '-'}” (expected ${Options.WorkspaceNameMatch === 'contains' ? 'to contain ' : ''}“${Expected}”)`,
       });
     }
   }
@@ -345,7 +345,8 @@ function Run(Target: MonitoringTargetLike): MonitoringResult {
   // Not yet usable: still connecting, unreachable, or the workspace isn't open.
   if (!Snapshot.WorkspaceID) {
     const Error =
-      Snapshot.Error || (Snapshot.Connected ? 'Workspace not open in QLab' : 'Connecting to QLab…');
+      Snapshot.Error ||
+      (Snapshot.Connected ? 'Workspace not open in QLab' : 'Connecting to QLab...');
     return { Success: false, Error, ...SnapshotExtras(Snapshot, []) };
   }
   if (Snapshot.Stale) {
@@ -371,7 +372,7 @@ function Run(Target: MonitoringTargetLike): MonitoringResult {
 // --- Actions ----------------------------------------------------------------
 //
 // Sent over the same persistent connection the check already holds, so a press
-// costs one message and its acknowledgement — no connect, no workspace lookup.
+// costs one message and its acknowledgement: no connect, no workspace lookup.
 // The Mode and Overrides groups are the remedies for the two states this check
 // can flag as Degraded: wrong Show/Edit mode, and an I/O override left engaged.
 //
@@ -414,7 +415,7 @@ const Actions: MonitoringActionDef[] = [
     Group: 'Overrides',
     Params: [OVERRIDE_PARAM],
     Destructive: true,
-    Note: 'Switches an input or output off in the Overrides window — cues still run but send or receive nothing on it.',
+    Note: 'Switches an input or output off in the Overrides window; cues still run but send or receive nothing on it.',
   },
 ];
 
@@ -524,7 +525,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const WorkspaceName = Result && Result.WorkspaceName != null ? String(Result.WorkspaceName) : '';
 
   const Head = Rows([
-    TextRow('Host', `${Address || '—'}:${Port}`),
+    TextRow('Host', `${Address || '-'}:${Port}`),
     Row('Status', StatusPill),
     WorkspaceName ? TextRow('Workspace', WorkspaceName) : null,
     !Online && Result && Result.Error ? TextRow('Detail', Result.Error as string) : null,
@@ -539,7 +540,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       '<div class="mt-2">' +
       Note(
         Online
-          ? 'No workspace assertions enabled — reporting reachability only'
+          ? 'No workspace assertions enabled; reporting reachability only'
           : 'Not connected to the workspace yet'
       ) +
       '</div>'

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
-// Exercises src/main/registrars/dummy.ts — the dummy (placeholder) client CRUD
+// Exercises src/main/registrars/dummy.ts: the dummy (placeholder) client CRUD
 // channels.
 //
 // This registrar shows BOTH main-process handler contracts side by side, so the
@@ -178,8 +178,8 @@ test('DeleteDummyClient delegates and reports failure', async () => {
 test('DeleteDummyClient pairs an invalid UUID with the false fallback', async () => {
   // invalidFallback:false, matching every other Delete/* handler (alerts, tags,
   // clients, fog): the renderer reads the payload slot as a boolean success
-  // flag. This handler originally omitted the option — harmlessly, since its
-  // only caller destructures `const [Err]` — and was brought into line with the
+  // flag. This handler originally omitted the option (harmlessly, since its
+  // only caller destructures `const [Err]`) and was brought into line with the
   // convention create-handler.ts documents.
   const [Err, Data] = await GetHandler('DeleteDummyClient')(null, null);
   assert.equal(typeof Err, 'string');

@@ -427,7 +427,7 @@ Manager.DownloadRelease = async (Tag: unknown = null, Options: DownloadOptions =
     }
   };
 
-  pushProgress(0, 'preparing', 'Checking release metadata…');
+  pushProgress(0, 'preparing', 'Checking release metadata...');
 
   const release = (await getReleaseByTag(Tag)) as GithubRelease;
   const version = String(release.tag_name || release.name || '').trim();

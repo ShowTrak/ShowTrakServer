@@ -147,7 +147,7 @@ test('IsClientAllowed: a whitelisted tag admits its members, through nesting', (
 
 test('IsClientAllowed: a cycle between tags terminates instead of hanging', () => {
   const { Manager } = load();
-  // Two tags that name each other — reachable by editing each in turn, so it
+  // Two tags that name each other, reachable by editing each in turn, so it
   // has to resolve, not spin.
   const tags = [
     { TagID: 1, Scope: { Workspace: false, Groups: [], Clients: [], Tags: [2] } },

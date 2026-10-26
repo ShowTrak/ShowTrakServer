@@ -11,7 +11,7 @@ const Logger = CreateLogger('WOLManager');
 const WOL_PORT = 9;
 
 // A magic packet is 6 bytes of 0xFF ("synchronization stream") followed by the
-// target MAC repeated 16 times — 6 + (6 * 16) = 102 bytes total.
+// target MAC repeated 16 times: 6 + (6 * 16) = 102 bytes total.
 const SYNC_STREAM = 'ff'.repeat(6);
 const MAC_REPEAT = 16;
 
@@ -48,8 +48,8 @@ function BroadcastAddress(Address: string, Netmask: string): string {
 
 /**
  * Every external IPv4 interface paired with the broadcast addresses to send from
- * it. Each interface contributes one entry per destination — its subnet-directed
- * broadcast and the limited broadcast — bound to that interface's own source
+ * it. Each interface contributes one entry per destination (its subnet-directed
+ * broadcast and the limited broadcast), bound to that interface's own source
  * address so each datagram egresses the correct segment.
  */
 function BroadcastTargets(): Array<{ From: string; Broadcast: string }> {

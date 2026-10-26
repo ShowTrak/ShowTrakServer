@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-// Exercises src/main/squirrel-releases.ts — recovering the incoming version and
+// Exercises src/main/squirrel-releases.ts: recovering the incoming version and
 // download progress that Electron's Squirrel.Windows updater does not report.
 
 const {

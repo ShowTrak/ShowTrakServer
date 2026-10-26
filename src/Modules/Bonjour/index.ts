@@ -86,7 +86,7 @@ const instance = bonjour({ reuseAddr: true, loopback: true });
 let publishedService: BonjourPublishedService | null = null;
 
 // Advisory hints published in the TXT record so ShowTrak Remote's discovery list
-// can describe a server before anyone taps it — "PIN required", or greyed out
+// can describe a server before anyone taps it: "PIN required", or greyed out
 // because it will refuse the connection anyway. They are HINTS ONLY: mDNS is
 // unauthenticated and trivially spoofed on a hostile network, so the handshake in
 // sdk-namespace.ts re-reads every one of these from settings and remains the sole

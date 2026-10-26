@@ -49,7 +49,7 @@ function ClampPort(Value: unknown): number {
  * Reduce whatever the user typed to a bare host.
  *
  * People paste `http://10.0.0.5:8080/` out of a browser, so a scheme, a port and
- * a trailing path are all stripped rather than rejected — the port has its own
+ * a trailing path are all stripped rather than rejected; the port has its own
  * field, and leaving a path on the host would corrupt every request line.
  */
 function NormalizeAddress(Value: unknown): string {
@@ -102,7 +102,7 @@ const ALARM_FIELD_DEFAULTS: ReadonlyMap<string, unknown> = new Map(
  *
  * Read from the RAW record, before unknown keys are dropped: a metric that went
  * down to one comparison emits no picker field, so its stale `_Op` key is about
- * to be discarded — and without this its old threshold would then be judged by
+ * to be discarded, and without this its old threshold would then be judged by
  * whatever comparison is left. A health check armed as "is overheat" would
  * become "expected overheat" and alert on every healthy battery. The condition
  * is switched off and its values reset to the registry defaults, so the

@@ -255,8 +255,8 @@ test('x32 re-sends lost queries until they are answered', async () => {
 
 test('x32 matches replies by address in any order, including inside a bundle', async () => {
   const x32 = loadX32();
-  // Answer /xinfo with a bundle that carries the main-mute value FIRST — a
-  // reply nobody has asked for yet — then the identity.
+  // Answer /xinfo with a bundle that carries the main-mute value FIRST (a
+  // reply nobody has asked for yet), then the identity.
   const bundle = (msgs) => {
     const parts = [Buffer.from('#bundle\0'), Buffer.alloc(8)];
     for (const m of msgs) {
@@ -335,7 +335,7 @@ test('x32 is offline when nothing answers', async () => {
   const result = await x32.Run({ Address: '127.0.0.1', Settings: { Port: port, Timeout: 600 } });
   assert.equal(result.Success, false);
   assert.ok(result.Error);
-  // Either an ICMP refusal (fast) or the whole-probe deadline — never longer.
+  // Either an ICMP refusal (fast) or the whole-probe deadline, never longer.
   assert.ok(Date.now() - started < 1500);
 });
 

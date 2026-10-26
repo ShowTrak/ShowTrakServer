@@ -6,14 +6,14 @@
 // per-character width table, and a table cannot know the font: it ran a few
 // percent under the UI stack's uppercase metrics, so a row that the fit called
 // "fits exactly" rendered a glyph or two over the tile and was cropped by the
-// row's `overflow: hidden` — no "+N", just a sliced badge.
+// row's `overflow: hidden`: no "+N", just a sliced badge.
 //
 // Canvas text measurement fixes that without giving the reflow back: measureText
 // touches no layout, so the exact advance width of a label in the row's own
 // computed font is free. This module reads that font off a probe styled by the
 // real CSS selectors (so the numbers cannot drift from the stylesheet the way
 // hard-coded ones do), installs a measurer into tag-badges, and memoizes per
-// label — the same handful of slugs are measured across every tile on screen.
+// label; the same handful of slugs are measured across every tile on screen.
 
 import { SetTagBadgeLabelMeasurer } from './tag-badges';
 
@@ -30,7 +30,7 @@ let Prepared = false;
  *
  * The badge row's type is only reachable through the descendant selectors
  * `.SHOWTRAK_PC > .TILE_TAG_ROW .TILE_TAG_LABEL`, so the probe reproduces that
- * whole chain rather than a bare span — a span alone would report the body font
+ * whole chain rather than a bare span; a span alone would report the body font
  * and measure everything short.
  *
  * The probe is absolutely positioned off-screen and removed immediately, so it
@@ -72,7 +72,7 @@ function ReadBadgeFont(): { Font: string; Spacing: string } | null {
  * The measuring context, built once.
  *
  * `letterSpacing` is applied on the context because the badge row is tracked at
- * 0.04em — ~0.4px per character, which over a full row is most of a glyph. Where
+ * 0.04em: ~0.4px per character, which over a full row is most of a glyph. Where
  * the property is unsupported the assignment is simply ignored and labels
  * measure marginally narrow, which is why {@link MeasureBadgeLabel} still rounds
  * its result up.
@@ -132,7 +132,7 @@ export function MeasureBadgeLabel(Label: string): number {
  * `fonts.ready` pass exists because a webfont arriving after the first
  * measurement would change every width underneath the cache; dropping the cache
  * and the context makes the next render measure against the font that actually
- * landed. Fits already on screen are left alone — they are corrected by the next
+ * landed. Fits already on screen are left alone; they are corrected by the next
  * client list render, which any tag edit triggers anyway.
  */
 export function InitTagBadgeMetrics(): void {

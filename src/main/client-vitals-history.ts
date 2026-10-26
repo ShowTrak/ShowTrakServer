@@ -5,7 +5,7 @@
 // draws both with the same chart code. The difference is the input: a client
 // heartbeats every second and usage moves on nearly every one, so flat-run
 // compression would save nothing. Readings are instead averaged into one point
-// per POINT_INTERVAL_MS, and only the chart's window is kept — the modal draws
+// per POINT_INTERVAL_MS, and only the chart's window is kept: the modal draws
 // the last hour, and nothing else reads these.
 //
 // `breach` is recorded at sample time from the alarm the client actually held,

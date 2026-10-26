@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
-// Exercises src/main/broadcast-bridge.ts — the fan-out from the back-end
+// Exercises src/main/broadcast-bridge.ts: the fan-out from the back-end
 // managers' domain events to every renderer surface (desktop window + authed
 // Web UI sockets).
 //
@@ -12,14 +12,14 @@ const { installModuleMocks, matchesModule, recordingManager } = require('./helpe
 //   1. THE hasMainWindow() GUARD. Pushing to a torn-down window throws, so
 //      almost every handler bails early without one.
 //   2. THE DELIBERATE EXCEPTIONS TO IT. ClientUpdated and DummyClientUpdated
-//      still record history and fire alerts with no window — a headless server
+//      still record history and fire alerts with no window; a headless server
 //      must keep alerting. Only the *push* is guarded. Losing that distinction
 //      silently stops alerts whenever the window is closed.
 //   3. THE PASSTHROUGH ALLOWLIST. A hand-maintained [event, channel] table; the
 //      classic thing to rot when a new event is added and never wired.
 //   4. THE SERIALIZATION PROJECTION on script executions. Raw entries carry a
 //      Client class instance and a Node timer handle that Electron IPC cannot
-//      structured-clone — pushing them raw is the "Failed to serialize
+//      structured-clone; pushing them raw is the "Failed to serialize
 //      arguments" crash.
 //
 // BroadcastManager is a REAL EventEmitter so RegisterBroadcastBridge's wiring is
@@ -230,7 +230,7 @@ const { normalizeUSBNameKey } = require('../dist/Modules/ClientManager/normalize
 
 const Bridge = require('../dist/main/broadcast-bridge');
 
-// Wiring is NOT a module-load side effect — the composition root calls this once
+// Wiring is NOT a module-load side effect; the composition root calls this once
 // after the managers are initialized. Do the same here, exactly once, so the
 // emit-driven tests below reach the real handlers.
 Bridge.RegisterBroadcastBridge();
@@ -332,7 +332,7 @@ test('every list refresh is a no-op without a main window', async () => {
   await Bridge.UpdateFogStatus();
 
   assert.deepEqual(pushes, []);
-  // And no manager was queried either — the guard is the first statement.
+  // And no manager was queried either; the guard is the first statement.
   assert.equal(clientMgr.__callsTo('GetAll').length, 0);
 });
 
@@ -562,7 +562,7 @@ test('a criticality lookup failure is logged and fires no criticality alert', as
   assert.equal(logs.errors.length, 1);
   assert.equal(alertsMgr.__callsTo('HandleCriticalUSBDeviceConnected').length, 0);
   assert.equal(alertsMgr.__callsTo('HandleNonCriticalUSBDeviceConnected').length, 0);
-  // The plain connected alert still fires — only the criticality branch is lost.
+  // The plain connected alert still fires; only the criticality branch is lost.
   assert.equal(alertsMgr.__callsTo('HandleUSBDeviceConnected').length, 1);
 });
 
@@ -850,7 +850,7 @@ test('Notify and PlaySound forward to the renderers with their defaults', async 
 // Each target re-emits MonitoringTargetUpdated on every tick of its own
 // interval, changed or not. The renderer push is the expensive consumer (an IPC
 // send plus a socket emit per authed Web UI client, each followed by a tile
-// re-render), so it is skipped when the payload would paint identically —
+// re-render), so it is skipped when the payload would paint identically,
 // while history sampling and alert evaluation still see EVERY tick.
 //
 // The two directions both matter, and they pull against each other: suppress
@@ -912,7 +912,7 @@ test('an unchanged monitoring tick is pushed once, but always recorded and alert
   const pushed = pushes.filter(([channel]) => channel === 'MonitoringTargetUpdated');
   assert.equal(pushed.length, 1, 'an identical payload must not be re-pushed to the renderers');
 
-  // The timeline is a per-tick series — skipping samples would put gaps in the
+  // The timeline is a per-tick series; skipping samples would put gaps in the
   // uptime/latency graph, which is the thing this must never do.
   assert.equal(
     history.filter(([kind]) => kind === 'monitoring').length,
@@ -929,7 +929,7 @@ test('an unchanged monitoring tick is pushed once, but always recorded and alert
 test('only the per-tick timestamps advancing does not re-push', async () => {
   const ID = 9002;
   await emit('MonitoringTargetUpdated', monitorSnapshot(ID));
-  // Exactly what a healthy presence check (sACN / NDI / MQTT — no latency)
+  // Exactly what a healthy presence check (sACN / NDI / MQTT, no latency)
   // produces on its next tick: new clock values, nothing renderable changed.
   await emit(
     'MonitoringTargetUpdated',

@@ -1,4 +1,4 @@
-// Monitor tile widgets — the decisions, without the DOM.
+// Monitor tile widgets: the decisions, without the DOM.
 //
 // A monitor whose only check offers a tile widget (MonitoringTargetView
 // .TileWidget) draws it in the tile's footer row in place of the latency line,
@@ -45,7 +45,7 @@ export function TileLevelsView(
   Bars: TileLevelBar[];
   Text: string | null;
 } {
-  if (!Tile || Tile.State === 'connecting') return { Bars: [], Text: 'Levels…' };
+  if (!Tile || Tile.State === 'connecting') return { Bars: [], Text: 'Levels...' };
   if (Tile.State === 'unavailable') {
     return { Bars: [], Text: Tile.Message || 'Levels unavailable' };
   }

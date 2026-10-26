@@ -288,7 +288,7 @@ test('ClientManager tracks critical applications and emits started/stopped trans
 
   // The first snapshot of a connection is a baseline, not a set of transitions.
   // Diffing it against the empty list this process started with would announce
-  // every application on the machine as freshly started — which is what every
+  // every application on the machine as freshly started, which is what every
   // client did at once whenever the server restarted.
   assert.equal(
     events.filter(([event]) => event === 'ApplicationStarted').length,
@@ -355,7 +355,7 @@ test('ClientManager tracks critical applications and emits started/stopped trans
   );
 });
 
-// The client reports an EMPTY list with a non-ok status when its sampler fails —
+// The client reports an EMPTY list with a non-ok status when its sampler fails,
 // macOS withholding automation permission at start-up being the common one.
 // Diffing against that used to announce every application on the machine as
 // stopped, firing a critical-application alert for software that never stopped,

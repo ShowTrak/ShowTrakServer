@@ -1,6 +1,6 @@
 // Shared recursive directory copy used by the asset/Web UI build steps.
 //
-// TypeScript sources are NEVER shipped — esbuild owns the compiled renderer
+// TypeScript sources are NEVER shipped; esbuild owns the compiled renderer
 // bundles (dist/UI/js/app/bundle.js, dist/WebUI/main.js), so any `.ts` file is
 // skipped. Callers may additionally skip specific resolved directories/files.
 const fs = require('node:fs');

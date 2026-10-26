@@ -211,7 +211,7 @@ process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
 
 async function main() {
-  log('Full build…');
+  log('Full build...');
   const built = spawnSync(NPM, ['run', 'build'], { cwd: ROOT, stdio: 'inherit', shell: true });
   if (built.status !== 0) {
     log('Initial build failed; fix the errors above and run `npm start` again.');

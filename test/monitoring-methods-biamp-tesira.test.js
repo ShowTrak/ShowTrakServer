@@ -600,14 +600,14 @@ test('echoed commands are skipped, even for an instance tag starting with "-"', 
 
 test('DescribeAction binds the preset, tag and channel', () => {
   const M = load();
-  assert.equal(M.DescribeAction('preset.recall', { Preset: '1001' }), 'Recall Preset — 1001');
+  assert.equal(M.DescribeAction('preset.recall', { Preset: '1001' }), 'Recall Preset - 1001');
   assert.equal(
     M.DescribeAction('mute.on', { InstanceTag: 'Level1', Channel: '2' }),
-    'Mute — Level1 channel 2'
+    'Mute - Level1 channel 2'
   );
   assert.equal(
     M.DescribeAction('mute.off', { InstanceTag: 'Level1', Channel: '2' }),
-    'Unmute — Level1 channel 2'
+    'Unmute - Level1 channel 2'
   );
   assert.equal(M.DescribeAction('preset.recall', {}), null);
 });

@@ -4,7 +4,7 @@
 // request/response text protocol. The individual NUT monitoring methods
 // (status / battery charge / load / temperature / input voltage / combined
 // health) all talk to the same daemon and differ only in which variables they
-// read and how they judge the result — so the connection handling, the LIST UPS
+// read and how they judge the result, so the connection handling, the LIST UPS
 // preamble, variable reads, and the common editor Settings all live here.
 //
 // Over a single connection ProbeNut():
@@ -160,7 +160,7 @@ function ReadLine(Buf: string): number | null {
   return Idx === -1 ? null : Idx + 1;
 }
 
-// Predicate: consume a whole `LIST UPS` / `LIST CMD` reply — up to and
+// Predicate: consume a whole `LIST UPS` / `LIST CMD` reply, up to and
 // including its `END LIST ...` line, or an early `ERR` line.
 function ReadListReply(Buf: string): number | null {
   let Pos = 0;
@@ -195,7 +195,7 @@ function RunNutSession<T>(
   Label: string,
   Body: (Request: NutRequest) => Promise<T>
 ): Promise<NutSessionOutcome<T>> {
-  // Whole-session budget. The socket's own timeout is only an IDLE timeout — it
+  // Whole-session budget. The socket's own timeout is only an IDLE timeout: it
   // resets on every data event, so across the sequential round trips (auth,
   // LIST UPS, one GET VAR per variable) a slow-but-trickling daemon could keep
   // the session alive far beyond TimeoutMs. The absolute deadline caps the total.
@@ -281,7 +281,7 @@ export async function ProbeNut(
       if (ListErr) throw new NutSessionError(`LIST UPS failed (${ListErr})`);
       const UpsNames = ParseListUps(ListReply);
 
-      // Read each requested variable (best effort — an ERR is captured, not
+      // Read each requested variable (best effort: an ERR is captured, not
       // fatal, so one unsupported variable doesn't sink the whole probe).
       const VarValues: Record<string, string | null> = {};
       const VarErrors: Record<string, string | null> = {};
@@ -326,7 +326,7 @@ export function ParseListCmd(Reply: unknown): string[] {
 export function DescribeInstCmdError(Token: string, UpsName: string): string {
   switch (Token.toUpperCase()) {
     case 'ACCESS-DENIED':
-      return 'upsd refused the command — this NUT user is not allowed to send it (add it to the user’s instcmds in upsd.users)';
+      return 'upsd refused the command: this NUT user is not allowed to send it (add it to the user’s instcmds in upsd.users)';
     case 'USERNAME-REQUIRED':
     case 'PASSWORD-REQUIRED':
       return 'upsd requires a NUT username and password to send commands';
@@ -345,7 +345,7 @@ export function DescribeInstCmdError(Token: string, UpsName: string): string {
 export interface NutCommandResult {
   Success: boolean;
   Error?: string;
-  /** The command actually sent — the first of the candidates the UPS lists. */
+  /** The command actually sent: the first of the candidates the UPS lists. */
   Command?: string;
 }
 
@@ -402,7 +402,7 @@ export interface NutConfig {
 }
 
 // Parse the common connection settings off a target, defaulting anything the
-// caller left unset. Never throws — used by both Run (via ReadNutConfig) and the
+// caller left unset. Never throws; used by both Run (via ReadNutConfig) and the
 // Debug renderer.
 export function ParseNutConfig(Target: MonitoringTargetLike): NutConfig {
   const Cfg = (Target && Target.Settings) || {};
@@ -452,7 +452,7 @@ export async function RunNutProbe(
 
   const UpsNames = Probe.UpsNames || [];
   if (!UpsNameMatches(UpsNames, Config.UpsName)) {
-    // upsd answered, so it is reachable — but this UPS is misconfigured.
+    // upsd answered, so it is reachable, but this UPS is misconfigured.
     return {
       Result: {
         Success: true,
@@ -487,8 +487,8 @@ export function NutDebug(
 ): string {
   const Reachable = !!(Result && Result.Success === true);
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
-    TextRow('UPS', Config.UpsName || '—'),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
+    TextRow('UPS', Config.UpsName || '-'),
     Row('Status', StatusPill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)

@@ -96,7 +96,7 @@ interface ScriptSaveResult {
 
 // CreateFromTemplate keeps a discriminated-object return (not Result<T>)
 // because the renderer's auto-retry loop needs to distinguish an ID *conflict*
-// from a genuine failure — information a `[string, null]` failure tuple cannot
+// from a genuine failure, information a `[string, null]` failure tuple cannot
 // carry. See CreateScriptFromTemplateWithGeneratedID in the renderer.
 interface ScriptTemplateResult {
   ok: boolean;
@@ -372,8 +372,8 @@ function EnsureScriptDirectoryWatcher(ScriptsDirectory: string) {
       }
     );
     // Background filesystem watcher: like the reload timer above, it must never
-    // be the thing holding the event loop open, or a clean shutdown — and the
-    // test runner — would hang waiting on a watch that never ends on its own.
+    // be the thing holding the event loop open, or a clean shutdown (and the
+    // test runner) would hang waiting on a watch that never ends on its own.
     if (typeof ScriptDirectoryWatcher.unref === 'function') ScriptDirectoryWatcher.unref();
     ScriptDirectoryWatcherPath = ScriptsDirectory;
     Logger.log(
@@ -529,7 +529,7 @@ Manager.GetScripts = async (Force = false) => {
     Logger.log(`Loading script from folder: ${ScriptFolder}`);
     const scriptJsonPath = path.join(ScriptsDirectory, ScriptFolder, 'Script.json');
     if (!fs.existsSync(scriptJsonPath)) {
-      Logger.error(`Script.json not found in ${ScriptFolder}, skipping…`);
+      Logger.error(`Script.json not found in ${ScriptFolder}, skipping...`);
       BroadcastManager.emit('Notify', `Script.json not found in ${ScriptFolder}`, 'error', 15000);
       continue;
     }

@@ -36,7 +36,7 @@ interface OSCServerInstance {
   _sock?: OSCSocketLike;
 }
 
-// Not-yet-migrated JS manager — typed loosely until its own migration.
+// Not-yet-migrated JS manager, typed loosely until its own migration.
 import { Manager as ClientManager } from '../ClientManager';
 
 // The live OSC server. Recreated when the OSC port setting changes (driven by
@@ -71,12 +71,12 @@ function StartOSCServer(Port: number): void {
     }
     // node-osc emits 'error' on the Server for undecodable inbound packets. An
     // EventEmitter with no 'error' listener throws, so a single malformed UDP
-    // datagram would crash the app — absorb them here as a warning instead.
+    // datagram would crash the app; absorb them here as a warning instead.
     //
     // Since node-osc 11 the Server also re-emits socket errors, without the
     // remote-info argument that every decode failure carries. Those are already
     // covered by the `_sock` listener above, so only the rinfo-bearing case is a
-    // bad packet — anything else falls through to the socket handling (which the
+    // bad packet; anything else falls through to the socket handling (which the
     // `_sock` listener does directly when it is available).
     OSCServer!.on('error', (Err, Info) => {
       if (!Info) {
@@ -94,7 +94,7 @@ function StartOSCServer(Port: number): void {
 }
 
 // Handle an asynchronous error on the OSC listener's socket. Transient network
-// errors (interface loss) are logged and ignored — a bound 0.0.0.0 listener
+// errors (interface loss) are logged and ignored; a bound 0.0.0.0 listener
 // recovers on its own. A bind failure means the port is unusable, so we tear the
 // dead socket down and surface it to the operator.
 function HandleOSCSocketError(Port: number, Err: Error): void {
@@ -166,7 +166,7 @@ type OSCClient = NonNullable<Awaited<ReturnType<ClientManagerType['GetAll']>>[1]
 type OSCTag = NonNullable<Awaited<ReturnType<typeof TagManager.GetBySlug>>>;
 
 // One accepted value for a route's placeholder(s), as listed in the OSC/API
-// reference — e.g. `pjlink/power.on` for a check action, `reboot` for a
+// reference, e.g. `pjlink/power.on` for a check action, `reboot` for a
 // FreeKiosk command. Plain data so it survives the JSON clone that pushes the
 // route list to the renderer.
 interface OSCRouteValue {
@@ -273,7 +273,7 @@ async function resolveTagByKey(Key: string): Promise<OSCTag | null> {
 
 // Expand a tag into its member clients. Unlike a group (a single GroupID FK),
 // tag membership is the dynamic Scope { Workspace, Groups[], Clients[], Tags[] },
-// so a client belongs when it matches that scope — reusing the same predicate
+// so a client belongs when it matches that scope, reusing the same predicate
 // the script whitelist uses (Workspace = all, else by explicit UUID, group, or
 // membership of another tag this one absorbs).
 async function getTagClients(
@@ -429,7 +429,7 @@ OSC.CreateRoute(
 );
 
 // Individual Client Operations
-// Clients are addressed by their slug — the encouraged, human-friendly key.
+// Clients are addressed by their slug: the encouraged, human-friendly key.
 // resolveClientByKey still resolves a raw UUID as a transitional fallback, but
 // the route param, docs and titles all lead with the slug.
 OSC.CreateRoute(
@@ -485,7 +485,7 @@ OSC.CreateRoute(
   'Deliver a heartbeat to a Dummy Client by its slug'
 );
 
-// Group Operations. Groups are addressed by their slug — the encouraged key.
+// Group Operations. Groups are addressed by their slug: the encouraged key.
 // getGroupClients/resolveGroupByKey still accept a numeric GroupID as a
 // transitional fallback, but the param, docs and titles lead with the slug.
 OSC.CreateRoute(
@@ -622,8 +622,8 @@ OSC.CreateRoute(
 
 // Integrated Event Operations.
 //
-// Unlike WOL/RunScript — which the renderer applies from an `OSCBulkAction`
-// broadcast — integrated events have no renderer branch, so these delegate to
+// Unlike WOL/RunScript (which the renderer applies from an `OSCBulkAction`
+// broadcast), integrated events have no renderer branch, so these delegate to
 // ControlService (the same command surface the SDK uses). That reuses its
 // integrated-client filtering and dispatches through the shared
 // TriggerIntegratedEvent IPC handler, so an event fired over OSC behaves
@@ -668,7 +668,7 @@ OSC.CreateRoute(
 
 // Monitoring Check Actions.
 //
-// A monitoring check reads a device; an action DOES something to it — power a
+// A monitoring check reads a device; an action DOES something to it: power a
 // projector on, close its shutter, select an input. The route names the method
 // that owns the action, so every check type shares one shape and a new one
 // becomes OSC-addressable the moment it declares actions, with no route here:
@@ -758,7 +758,7 @@ function monitorActionValues(WithValue: boolean): OSCRouteValueList {
       if (WithValue !== Boolean(First)) continue;
       Entries.push({
         Value: `${Method.ID}/${Action.ID}${First ? `/${describeValueParam(First)}` : ''}`,
-        Label: `${Method.Name} — ${Action.Label}`,
+        Label: `${Method.Name} - ${Action.Label}`,
         ...(Action.Note ? { Note: Action.Note } : {}),
       });
     }
@@ -795,7 +795,7 @@ OSC.CreateRoute(
 //
 // The command map in FreeKiosk/commands is the allowlist, and the value runs
 // through the same validator as the view modal's FreeKiosk:Command channel, so
-// OSC can send exactly what the UI can and nothing more — /api/js stays
+// OSC can send exactly what the UI can and nothing more; /api/js stays
 // unreachable. As with check actions, the trailing value fills the command's
 // one parameter because this router never reads OSC arguments. The Group, Tag
 // and All forms send to every FreeKiosk terminal they cover; other client types
@@ -803,7 +803,7 @@ OSC.CreateRoute(
 type OSCFreeKioskTerminal = NonNullable<Awaited<ReturnType<typeof FreeKioskManager.GetBySlug>>>;
 
 // The terminals a FreeKiosk route addresses, plus how to name them in the
-// notification ("lobby-tablet", or "3 FreeKiosk terminals in group …").
+// notification ("lobby-tablet", or "3 FreeKiosk terminals in group ...").
 type FreeKioskTargets = [string, null, null] | [null, OSCFreeKioskTerminal[], string];
 
 // `Where` is the trailing scope (` in group "Foyer" (foyer)`), empty for All.
@@ -893,7 +893,7 @@ async function runFreeKioskCommand(
   if (Err || !Summary) return fail(Err || `${Command.Label} failed`);
   if (Summary.Failed > 0) {
     // The device's own refusal ("needs Device Owner", "remote control is
-    // disabled") is the useful part, so it is surfaced verbatim — per terminal
+    // disabled") is the useful part, so it is surfaced verbatim, per terminal
     // when several were addressed, since each may refuse for its own reason.
     const Failures = Summary.Results.filter((Entry) => !Entry.Success);
     const Reasons =
@@ -1006,7 +1006,7 @@ OSC.CreateRoute(
 
 // Bind the listener on load using the compiled-in default port so OSC control
 // works immediately. main/live-settings applies the configured port (and any
-// later change) via OSC.RestartServer — keeping this module free of settings/DB.
+// later change) via OSC.RestartServer, keeping this module free of settings/DB.
 StartOSCServer(OSC_PORT);
 
 export { OSC };

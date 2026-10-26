@@ -145,7 +145,7 @@ export function setPreviewButtonState(ID: string, IsPlaying: boolean) {
   $button.html('<i class="bi bi-play"></i>');
 }
 
-// Called by the bootstrap orchestrator in main.ts — never at import time.
+// Called by the bootstrap orchestrator in main.ts, never at import time.
 export function InitAudioAssets() {
   // Alert action -> server -> renderer: play a custom asset at its saved volume,
   // scaled by the master alert volume setting.

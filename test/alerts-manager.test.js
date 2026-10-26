@@ -417,7 +417,7 @@ test('AlertsManager fires client degraded only on state transitions', async () =
   await Manager.Init();
 
   // First sighting: already degraded. This is what a server restart looks like
-  // to the alert engine, and it must NOT alert — the fault predates us, so
+  // to the alert engine, and it must NOT alert: the fault predates us, so
   // announcing it as fresh would bury the real ones under a start-up wave.
   await Manager.HandleClientUpdated({
     UUID: 'client-10',
@@ -481,7 +481,7 @@ test('AlertsManager fires client degraded only on state transitions', async () =
 // The start-up case that made monitors the loudest source of false alerts: the
 // rig is still coming up, so the first tick of a multi-check target finds the
 // projector answering and the show-control app not yet listening. That is a
-// state we inherited, not an event — the tile shows it, and the alert waits for
+// state we inherited, not an event; the tile shows it, and the alert waits for
 // something to actually change.
 test('AlertsManager treats a monitor found degraded on its first tick as a baseline', async () => {
   const executeCalls = [];
@@ -641,7 +641,7 @@ test('AlertsManager announces start-up faults that outlast the settle period', a
 
   // MinAge 0: everything still pending has outlasted the period.
   const Raised = await Manager.FlushSettledBaselineFaults(0, [
-    // Never reported at all — a machine that was off when the server started.
+    // Never reported at all: a machine that was off when the server started.
     { UUID: 'client-off', Nickname: 'Booth 3', Online: false },
     // A reserved slot is offline by definition and is never a fault.
     { UUID: 'client-slot', Nickname: 'Spare', Online: false, Unassigned: true },
@@ -731,7 +731,7 @@ test('AlertsManager holds a start-up fault until the settle period has actually 
     Address: '10.0.0.9',
   });
 
-  // A sweep that runs before the period is up announces nothing — including for
+  // A sweep that runs before the period is up announces nothing, including for
   // clients that never reported, which is what stops a sweep landing seconds
   // after boot from alerting for every machine still powering on.
   const Early = await Manager.FlushSettledBaselineFaults(60_000, [
@@ -802,7 +802,7 @@ test('AlertsManager ignores a monitor that has not reached a verdict yet', async
   assert.equal(Raised, 0, 'an unknown monitor is not a start-up fault');
   assert.equal(executeCalls.length, 0);
 
-  // Its first real verdict is the baseline, exactly as if it had just booted —
+  // Its first real verdict is the baseline, exactly as if it had just booted,
   // so a confirmed outage found that way is filed, not announced on the spot.
   await Manager.HandleMonitoringTargetUpdated({
     ...pending,

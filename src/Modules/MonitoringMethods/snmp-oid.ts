@@ -16,7 +16,7 @@
 // (> 10 and < 50); it is fetched once.
 //
 // Offline = no SNMP response at all (timeout, unreachable, wrong community or
-// v3 credentials — an agent silently drops a request it will not authenticate).
+// v3 credentials: an agent silently drops a request it will not authenticate).
 // Degraded = the agent answered but an OID is missing (noSuchObject,
 // noSuchInstance, endOfMibView, or a v1 noSuchName) or an assertion failed.
 import snmp from 'net-snmp';
@@ -37,7 +37,7 @@ const ID = 'snmp-oid';
 
 const DEFAULT_TIMEOUT_MS = 4000;
 const MAX_ENTRIES = 64;
-// sysUpTime.0 (RFC 1213 MIB-II) — every SNMP agent implements it, so a new
+// sysUpTime.0 (RFC 1213 MIB-II): every SNMP agent implements it, so a new
 // check is useful before the operator has typed anything.
 const DEFAULT_OID = '1.3.6.1.2.1.1.3.0';
 
@@ -294,7 +294,7 @@ export interface OidReading {
 }
 
 // Decode an OctetString: printable UTF-8 text when it is (trailing NUL padding
-// trimmed — many agents pad fixed-width strings), else spaced uppercase hex.
+// trimmed; many agents pad fixed-width strings), else spaced uppercase hex.
 export function DecodeOctets(Buf: Buffer): { Text: string; Hex: boolean } {
   let End = Buf.length;
   while (End > 0 && Buf[End - 1] === 0) End--;
@@ -409,7 +409,7 @@ function Shorten(Value: string): string {
 }
 
 // Evaluate one entry against its OID's decoded reading. Returns null when it
-// holds, or the reason (naming the OID and the value) when it does not. Pure —
+// holds, or the reason (naming the OID and the value) when it does not. Pure,
 // exported via _internal for unit tests.
 export function EvaluateEntry(Entry: OidEntry, Read: Decoded): string | null {
   const R = Read.Reading;
@@ -685,7 +685,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     Config.Version === '3' ? `v3 · ${V3IdentityLabel(Config)}` : `v${Config.Version}`;
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Row('SNMP', `<span class="font-monospace">${Esc(Identity)}</span>`),
     Row('Status', StatePill(Result)),
     Reachable

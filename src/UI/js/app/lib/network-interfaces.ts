@@ -1,4 +1,4 @@
-// Network section of the client info modal — the decisions, without the DOM.
+// Network section of the client info modal: the decisions, without the DOM.
 //
 // What the section shows, which interfaces may be marked critical, and the
 // conditions table of a critical one. The server judges the conditions; this
@@ -135,8 +135,8 @@ function IsLinkLocalV6(Address: unknown): boolean {
 }
 
 /**
- * The address a first mark guards: the first IPv4, else the first routable IPv6
- * — or, given a family, that family's.
+ * The address a first mark guards: the first IPv4, else the first routable IPv6,
+ * or, given a family, that family's.
  */
 export function PrimaryAddress(
   Iface: NetworkInterfaceView,
@@ -155,7 +155,7 @@ export function PrimaryAddress(
 }
 
 /**
- * The usable host range of the subnet `Address` sits in — what ticking "IP
+ * The usable host range of the subnet `Address` sits in: what ticking "IP
  * range" starts from. 10.0.0.5/255.255.255.0 gives 10.0.0.1–10.0.0.254. A /31,
  * a /32, or anything that is not IPv4 gives just the address itself.
  */
@@ -232,7 +232,7 @@ export function NetworkInterfaceTitle(
 
 /**
  * The card's subtitle: "en0 · 255.255.255.0 · Router 10.0.0.1 · AA:BB:CC:DD:EE:FF"
- * — the interface name first, then whatever else is known.
+ * (the interface name first, then whatever else is known).
  */
 export function NetworkInterfaceSummary(
   Iface: NetworkInterfaceView,
@@ -323,7 +323,7 @@ export interface NetworkConditionRow {
   Label: string;
   /** Whether the row takes typed values (all but presence do). */
   Editable: boolean;
-  /** What the interface reports now ("Yes", "10.0.0.5", "—"), or "Unsupported". */
+  /** What the interface reports now ("Yes", "10.0.0.5", "-"), or "Unsupported". */
   Value: string;
   /** The guarded value(s): one for most rows, start and end for the range. */
   Expected: string[];
@@ -358,7 +358,7 @@ export function NetworkConditionRows(
   const Range = Primary ? SubnetHostRange(Primary.address, Primary.netmask) : null;
   const Gateway = Iface.IsConnected && Iface.Gateway ? Iface.Gateway : '';
   const RouterSupported = !!Capabilities?.Router || Critical.Gateway !== null;
-  const Dash = (Value: string) => Value || '—';
+  const Dash = (Value: string) => Value || '-';
   return [
     {
       Field: 'RequirePresent',

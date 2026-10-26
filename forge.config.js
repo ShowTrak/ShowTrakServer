@@ -39,13 +39,13 @@ module.exports = {
     // maps, dotfiles), roughly doubling the asar. Top-level dirs are anchored
     // with `^/` so we don't accidentally match paths inside node_modules.
     ignore: [
-      // Source & build inputs — assets are served from dist/ (see
+      // Source & build inputs: assets are served from dist/ (see
       // src/Modules/Server/index.ts resolving __dirname/../../WebUI); the app
       // icon is read from disk at package time, not from the asar.
       /^\/src($|\/)/,
       // shared/ is the @showtrak/protocol submodule. With derefSymlinks the
       // package ships as real files under node_modules/@showtrak/protocol, so
-      // this second copy at the top level is dead weight — drop it wholesale.
+      // this second copy at the top level is dead weight; drop it wholesale.
       /^\/shared($|\/)/,
       // ...and inside the dereferenced copy, ship exactly what Node needs to
       // resolve `@showtrak/protocol/runtime`: package.json for the exports map
@@ -168,7 +168,7 @@ module.exports = {
     // 3.16.2 shipped a Windows build whose @showtrak/protocol was an unusable
     // link (see derefSymlinks above) and nothing caught it until the app failed
     // to boot on a user's machine. The dependency resolves by bare specifier, so
-    // a broken copy is invisible until runtime — assert the real files are in
+    // a broken copy is invisible until runtime, so assert the real files are in
     // the staged tree, on every platform, before it gets sealed into the asar.
     packageAfterCopy: async (_forgeConfig, buildPath) => {
       const pkgDir = path.join(buildPath, 'node_modules', '@showtrak', 'protocol');

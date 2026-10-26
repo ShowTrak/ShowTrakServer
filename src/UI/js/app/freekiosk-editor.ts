@@ -4,7 +4,7 @@
 //
 // A flat form, modelled on the dummy-client editor: connection, group, tags,
 // polling and the declared display mode. What the terminal MONITORS is not
-// here — it is switched on and tuned on the section tabs of the terminal's view
+// here; it is switched on and tuned on the section tabs of the terminal's view
 // modal (freekiosk-monitoring.ts), next to the readings it judges. A new
 // terminal starts from the server's defaults for that.
 //

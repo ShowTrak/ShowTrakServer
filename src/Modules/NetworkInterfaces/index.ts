@@ -1,6 +1,6 @@
 // Central authority for the host's network interfaces.
 //
-// The OS can gain or lose interfaces at any time — a VLAN NIC coming up, a USB
+// The OS can gain or lose interfaces at any time: a VLAN NIC coming up, a USB
 // Ethernet adapter being plugged in, Wi-Fi dropping, a VPN connecting. Node
 // exposes no event for this, so this module polls os.networkInterfaces() on a
 // modest interval, diffs against the previous snapshot, and emits a 'change'
@@ -39,7 +39,7 @@ const DEFAULT_POLL_INTERVAL_MS = 5000;
 const MIN_POLL_INTERVAL_MS = 1000;
 
 const Emitter = new EventEmitter();
-// One listener per interested subsystem (sACN receiver, main-process bridge, …)
+// One listener per interested subsystem (sACN receiver, main-process bridge, etc.)
 // plus headroom; keep the default 10-listener warning from firing spuriously.
 Emitter.setMaxListeners(64);
 

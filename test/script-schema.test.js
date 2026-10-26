@@ -65,7 +65,7 @@ test('NormalizeScriptConfig repairs invalid values', () => {
   );
   assert.equal(config.Name, 'Fix');
   assert.equal(config.Weight, 5);
-  // 99 is out of range — should fall back to default
+  // 99 is out of range; should fall back to default
   assert.equal(config.Colour, 6);
   assert.equal(config.Confirmation, false);
   assert.equal(config.Platforms.Windows, '');

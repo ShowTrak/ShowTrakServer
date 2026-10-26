@@ -1,8 +1,8 @@
 // The shared colour palette used by anything the operator colour-codes:
 // scripts, tags, and the tile badges derived from them.
 //
-// Extracted from script-manager.ts (a large DOM-bound module) so leaf modules —
-// notably the tile tag badges, which run inside the client-list render — can
+// Extracted from script-manager.ts (a large DOM-bound module) so leaf modules
+// (notably the tile tag badges, which run inside the client-list render) can
 // resolve a colour without pulling the Script Manager UI in behind it.
 // script-manager.ts re-exports both names, so its public surface is unchanged.
 

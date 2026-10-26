@@ -8,13 +8,13 @@
 //
 // Two secrets with deliberately different lifetimes live here:
 //
-//   Device token — 32 random bytes, persisted (hashed) and long-lived. This is
+//   Device token: 32 random bytes, persisted (hashed) and long-lived. This is
 //   what a paired phone actually authenticates with. It is long because it is
 //   never typed by a human, and persisted because the server is restarted
 //   between shows: an operator must not have to re-pair because the desk
 //   rebooted mid-show.
 //
-//   Pairing code — 8 random bytes, in memory, single-use, 60s. This is what the
+//   Pairing code: 8 random bytes, in memory, single-use, 60s. This is what the
 //   QR code carries. It is short-lived precisely because it is displayed on a
 //   screen anyone in the room might see, and single-use so a photograph of the
 //   screen is worthless the moment the code is redeemed.
@@ -43,7 +43,7 @@ const RemoteDevicesRepo = CreateRemoteDevicesRepository(DB);
 const TOKEN_BYTES = 32;
 
 // A QR code is read by a camera, not a person, so this only has to survive being
-// scanned — 8 bytes keeps the code dense enough to scan reliably at arm's length
+// scanned; 8 bytes keeps the code dense enough to scan reliably at arm's length
 // while staying well out of guessing range for its 60-second life.
 const PAIRING_CODE_BYTES = 8;
 
@@ -55,7 +55,7 @@ const PAIRING_CODE_TTL_MS = 60 * 1000;
 // list, so it is clamped on the way in rather than trusted at the point of use.
 const MAX_DEVICE_NAME_LENGTH = 64;
 
-/** Platforms a pairing device may declare. Advisory — used only for the icon. */
+/** Platforms a pairing device may declare. Advisory: used only for the icon. */
 const KNOWN_PLATFORMS = new Set(['ios', 'android']);
 
 /** A paired device as the settings pane sees it. Never carries the token. */
@@ -161,7 +161,7 @@ const Manager = {
   /**
    * Mint and persist a new device token. The caller is responsible for having
    * already authorised the pairing (PIN checked, or code redeemed, or protection
-   * disabled) — this method does not decide who may pair.
+   * disabled); this method does not decide who may pair.
    */
   async Pair(DeviceName: unknown, Platform: unknown): Promise<Result<PairingResult>> {
     const DeviceID = UUIDManager.Generate();
@@ -186,7 +186,7 @@ const Manager = {
 
   /**
    * Resolve a presented device token to its device, refreshing LastSeenAt.
-   * Returns null for an unknown or revoked token — the caller turns that into a
+   * Returns null for an unknown or revoked token; the caller turns that into a
    * distinguishable handshake error so the app can drop its stored token and
    * re-prompt, rather than retrying a credential that will never work again.
    */

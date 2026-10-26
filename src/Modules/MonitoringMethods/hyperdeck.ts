@@ -7,7 +7,7 @@
 //        500 connection info:
 //        protocol version: 1.11
 //        model: HyperDeck Studio HD Plus
-//      (blank line). That banner fingerprints a HyperDeck — a bare open port
+//      (blank line). That banner fingerprints a HyperDeck; a bare open port
 //      will not produce it. A deck already serving its maximum number of
 //      clients sends `120 connection failed` instead and hangs up.
 //   2. `device info`    -> 204: protocol version, model, slot count, software
@@ -66,7 +66,7 @@ const DEFAULT_PORT = 9993;
 const DEFAULT_MIN_RECORD_MINUTES = 15;
 // HyperDeck Extreme reports its CFast slots, the external USB-C drive and the
 // cache; nothing ships with more than a handful. The cap only bounds a deck that
-// reports a nonsense slot count — the Timeout budget bounds the rest.
+// reports a nonsense slot count; the Timeout budget bounds the rest.
 const MAX_SLOTS = 8;
 // A status conversation is a few hundred bytes; anything far beyond that is not
 // a HyperDeck talking to us.
@@ -136,7 +136,7 @@ export interface HyperDeckMessage {
   Fields: Record<string, string>;
 }
 
-/** Parse one framed reply. Null when the header is not `NNN text` — not a HyperDeck. */
+/** Parse one framed reply. Null when the header is not `NNN text`, i.e. not a HyperDeck. */
 function ParseMessage(Header: string, Lines: string[]): HyperDeckMessage | null {
   const Match = Header.match(/^(\d{3})\s+(.*?):?$/);
   if (!Match || !Match[1]) return null;
@@ -460,7 +460,7 @@ function ActiveSlot(Snap: HyperDeckSnapshot): HyperDeckSlot | null {
  * 'all' (the default) adds up every MOUNTED slot. HyperDeck Studio-family decks
  * continue recording on the next card when the active one fills, so the
  * active card alone under-states the headroom and would warn at every card
- * change during a long record — the warning operators learn to ignore. The sum
+ * change during a long record: the warning operators learn to ignore. The sum
  * is the honest answer to "will the rest of the show fit?". 'active' is offered
  * for crews who swap cards by hand and want warning before each one fills.
  *
@@ -492,7 +492,7 @@ export function RemainingRecordTime(
 
 const WholeMinutes = (Seconds: number): number => Math.floor(Seconds / 60);
 
-// The reasons a reachable deck is unhealthy, per the enabled assertions. Pure —
+// The reasons a reachable deck is unhealthy, per the enabled assertions. Pure;
 // exported via _internal for unit tests.
 function EvaluateHealth(Snap: HyperDeckSnapshot, Options: HyperDeckOptions): string[] {
   if (!Snap.IsHyperDeck) return ['Responded, but does not look like a HyperDeck'];
@@ -650,7 +650,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Reachable = !!(Result && Result.Success === true);
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Reachable && Result.Model ? TextRow('Model', String(Result.Model)) : null,
     Reachable && Result.DeviceName ? TextRow('Name', String(Result.DeviceName)) : null,
     Reachable && (Result.SoftwareVersion || Result.ProtocolVersion)

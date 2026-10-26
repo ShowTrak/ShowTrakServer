@@ -1,4 +1,4 @@
-// SNMP UPS health check (v1 / v2c) — reads the standard UPS-MIB (RFC 1628) over
+// SNMP UPS health check (v1 / v2c): reads the standard UPS-MIB (RFC 1628) over
 // community-authenticated SNMP. Works across the whole range of network-managed
 // UPS cards that implement RFC 1628 (Eaton/MGE, Riello NetMan, APC, CyberPower,
 // Tripp Lite, ...). For cards configured for SNMPv3 (user + auth/priv), use the
@@ -187,7 +187,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
 export const Name = 'UPS Health (SNMP v1/v2c)';
 export const Description =
-  'Reads status, battery charge, load, temperature, input voltage and active alarms from any UPS network card that implements the standard UPS-MIB (RFC 1628) over community-authenticated SNMP (v1/v2c) — Eaton/MGE, Riello NetMan, APC, CyberPower and most others — and reports a single healthy / degraded verdict.';
+  'Reads status, battery charge, load, temperature, input voltage and active alarms from any UPS network card that implements the standard UPS-MIB (RFC 1628) over community-authenticated SNMP (v1/v2c), such as Eaton/MGE, Riello NetMan, APC, CyberPower and most others, and reports a single healthy / degraded verdict.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = { ParseConfig, EvaluateHealth };
 export { ID, Settings, Run, Debug };

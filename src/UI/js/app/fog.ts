@@ -1,4 +1,4 @@
-// FOG Project integration — renderer.
+// FOG Project integration: renderer.
 //
 // Three surfaces:
 //   1. The FOG button in the bottom bar (left of Alerts), shown only while the
@@ -170,7 +170,7 @@ export function ToggleFogTray(force?: boolean): void {
     $(document)
       .off('mousedown.fogTray touchstart.fogTray')
       .on('mousedown.fogTray touchstart.fogTray', function (Event) {
-        // The confirm dialog is appended to <body>, outside the tray — treat it as
+        // The confirm dialog is appended to <body>, outside the tray; treat it as
         // "inside" so cancelling a task does not dismiss the tray behind the prompt.
         const Inside =
           $(Event.target).closest('#FOG_TRAY, #FOG_BUTTON, #SHOWTRAK_CONFIRM_TOAST').length > 0;
@@ -226,7 +226,7 @@ export async function OpenFogTaskModal(
 
   $('#FOG_TASK_TARGET').text(ClientLabel);
   // Deploy fails outright if the FOG host has no image assigned, and ShowTrak
-  // deliberately never assigns one — so surface what FOG already has rather than
+  // deliberately never assigns one, so surface what FOG already has rather than
   // letting the operator find out via a 500.
   $('#FOG_TASK_TARGET_IMAGE').text(
     ImageName ? `Assigned image: ${ImageName}` : 'No image assigned in FOG'
@@ -295,7 +295,7 @@ export function InitFog(): void {
   }
 
   // Header markup is static, so bind straight to the button. Running tasks are
-  // never cleared — the backend filters by state, and the wording says so, so the
+  // never cleared; the backend filters by state, and the wording says so, so the
   // operator cannot mistake this for a bulk cancel.
   $('#FOG_CLEAR_FINISHED')
     .off('click.fogClear')

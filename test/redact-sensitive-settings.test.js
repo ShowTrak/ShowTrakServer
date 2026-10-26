@@ -7,7 +7,7 @@ const { Manager: Methods } = require('../dist/Modules/MonitoringMethods');
 // Device credentials live in monitoring check settings. The anonymous HTTP API
 // serves those settings, so every credential field is flagged `Sensitive` on its
 // schema and masked on the way out. These tests pin the helper, the registry
-// hook, and — most importantly — that no credential-looking field is left
+// hook, and (most importantly) that no credential-looking field is left
 // unflagged when a new method is added.
 
 test('RedactSensitiveValues masks flagged non-empty values and nothing else', () => {

@@ -200,7 +200,7 @@ test('yamaha-console CheckModel matches a case-insensitive prefix', async () => 
     assert.ok(!ok.Degraded, ok.DegradedReason);
     const bad = await run(yamaha, desk, { CheckModel: true, ExpectedModel: 'CL5' });
     assert.equal(bad.Degraded, true);
-    assert.equal(bad.DegradedReason, 'Model QL1 (expected CL5…)');
+    assert.equal(bad.DegradedReason, 'Model QL1 (expected CL5...)');
   });
 });
 

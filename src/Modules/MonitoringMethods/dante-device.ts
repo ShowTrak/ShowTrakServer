@@ -7,7 +7,7 @@
 //   Success:true  -> online  (a matching device seen within the grace window)
 //   Success:false -> offline (no matching device, or the browser is unavailable)
 //
-// This reports device presence only — not subscription health. Dante does not
+// This reports device presence only, not subscription health. Dante does not
 // carry subscription state in mDNS; see the header of _dante-shared.ts.
 import {
   Settings as DanteSettings,

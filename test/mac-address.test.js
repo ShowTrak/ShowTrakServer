@@ -47,7 +47,7 @@ test('IsExternalMacAddress rejects the all-zero MAC reported by loopback', () =>
 });
 
 test('IsExternalMacAddress rejects multicast addresses', () => {
-  // Least-significant bit of the first octet set — never a NIC's own address.
+  // Least-significant bit of the first octet set: never a NIC's own address.
   assert.equal(IsExternalMacAddress('01:00:5E:00:00:FB'), false);
   assert.equal(IsExternalMacAddress('FF:FF:FF:FF:FF:FF'), false);
 });

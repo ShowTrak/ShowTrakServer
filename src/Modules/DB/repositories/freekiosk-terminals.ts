@@ -60,7 +60,7 @@ export function CreateFreeKioskTerminalsRepository(DB: DBManager) {
     },
 
     // Separate from UpdateDetails so an edit that leaves the key field blank
-    // means "unchanged" rather than "clear it" — the editor never receives the
+    // means "unchanged" rather than "clear it": the editor never receives the
     // stored key back, so it cannot resubmit it.
     UpdateApiKey(ApiKey: string | null, UUID: string): Promise<DBResult<unknown>> {
       return DB.Run('UPDATE FreeKioskTerminals SET ApiKey = ? WHERE UUID = ?', [ApiKey, UUID]);
@@ -74,7 +74,7 @@ export function CreateFreeKioskTerminalsRepository(DB: DBManager) {
       return DB.Run('DELETE FROM FreeKioskTerminals WHERE UUID = ?', [UUID]);
     },
 
-    // Persist quietly (no dirty tracking) — a successful poll is observed
+    // Persist quietly (no dirty tracking): a successful poll is observed
     // runtime state, not a user edit, and marking the show dirty every 30
     // seconds would prompt to save a document nobody changed. Falls back to Run
     // on DB stubs that don't implement RunWithoutDirtyTracking.

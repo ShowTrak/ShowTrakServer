@@ -36,7 +36,7 @@ export function normalizeNonEmptyString(
 }
 
 // A string that may legitimately be absent; null/undefined normalize to null,
-// anything else must be a string (trimmed, length-capped — over-long input is
+// anything else must be a string (trimmed, length-capped; over-long input is
 // truncated rather than rejected since telemetry strings are display-only).
 export function normalizeOptionalString(
   value: unknown,

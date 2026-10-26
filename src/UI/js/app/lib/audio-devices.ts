@@ -1,4 +1,4 @@
-// Audio section of the client info modal — the decisions, without the DOM.
+// Audio section of the client info modal: the decisions, without the DOM.
 //
 // What the section shows and what it may offer (a level slider, a mute button,
 // a condition). What a device supports is derived from the capabilities the
@@ -37,7 +37,7 @@ export function IsVersionAtLeast(Version: unknown, Minimum: readonly number[]): 
 
 /**
  * Which overall message the section shows:
- *  - `outdated`: the client predates audio monitoring — the whole section is
+ *  - `outdated`: the client predates audio monitoring; the whole section is
  *    unsupported, no lists, no controls;
  *  - `waiting`: a capable client that has not reported yet (just connected);
  *  - `offline`: nothing live to show beyond the critical baselines;
@@ -78,7 +78,7 @@ export function AudioDirectionTitle(Direction: AudioDirection): string {
 /**
  * The headline + body for every state except `ok`, for one direction's section.
  * Inputs and outputs are separate sections, so an unsupported client shows the
- * message in each — each section has to stand on its own.
+ * message in each: each section has to stand on its own.
  */
 export function AudioSectionMessage(
   State: Exclude<AudioSectionState, 'ok'>,
@@ -96,7 +96,7 @@ export function AudioSectionMessage(
       return {
         Title: `${Title} Unsupported`,
         Body: `Audio monitoring needs ShowTrak Client ${MINIMUM_AUDIO_VERSION_LABEL} or later${
-          Client.Version ? ` — this client runs ${Client.Version}` : ''
+          Client.Version ? ` (this client runs ${Client.Version})` : ''
         }. Update the client to monitor and control its audio ${Plural}.`,
       };
     case 'waiting':
@@ -156,7 +156,7 @@ export function FormatSampleRate(Hz: number | null | undefined): string | null {
   return `${Number.isInteger(Khz) ? Khz : Number(Khz.toFixed(1))} kHz`;
 }
 
-/** "Focusrite · USB · 18 ch · 96 kHz" — whatever the platform reported. */
+/** "Focusrite · USB · 18 ch · 96 kHz": whatever the platform reported. */
 export function AudioEndpointSummary(Endpoint: AudioEndpointView): string {
   const Parts: string[] = [];
   if (Endpoint.Manufacturer) Parts.push(Endpoint.Manufacturer);
@@ -258,7 +258,7 @@ export interface AudioConditionRow {
   Field: AudioConditionField;
   /** Key-style label, e.g. "Is default output". */
   Label: string;
-  /** What the device reports now ("Yes", "2", "48 kHz", "—"), or "Unsupported". */
+  /** What the device reports now ("Yes", "2", "48 kHz", "-"), or "Unsupported". */
   Value: string;
   /** Whether this device can be held to it. A condition already set always is, so it can be cleared. */
   Supported: boolean;
@@ -270,7 +270,7 @@ export interface AudioConditionRow {
   Failing: string | null;
 }
 
-const YesNo = (Value: boolean | null) => (Value === null ? '—' : Value ? 'Yes' : 'No');
+const YesNo = (Value: boolean | null) => (Value === null ? '-' : Value ? 'Yes' : 'No');
 
 /**
  * The conditions table of a critical endpoint, one row per condition, in a
@@ -315,7 +315,7 @@ export function AudioConditionRows(
     Row(
       'RequireDefault',
       `Is default ${Endpoint.Direction}`,
-      Endpoint.IsConnected ? YesNo(Endpoint.IsDefault) : '—',
+      Endpoint.IsConnected ? YesNo(Endpoint.IsDefault) : '-',
       !!Capabilities?.DefaultDevice,
       Critical.RequireDefault,
       Issue('not_default')
@@ -323,7 +323,7 @@ export function AudioConditionRows(
     Row(
       'CheckChannels',
       'Channels',
-      Endpoint.Channels ? String(Endpoint.Channels) : '—',
+      Endpoint.Channels ? String(Endpoint.Channels) : '-',
       !!Capabilities?.Channels,
       Critical.Channels !== null,
       Issue('channels')
@@ -331,7 +331,7 @@ export function AudioConditionRows(
     Row(
       'CheckSampleRate',
       'Sample rate',
-      FormatSampleRate(Endpoint.SampleRate) ?? '—',
+      FormatSampleRate(Endpoint.SampleRate) ?? '-',
       !!Capabilities?.SampleRate,
       Critical.SampleRate !== null,
       Issue('sample_rate')
@@ -347,7 +347,7 @@ export function AudioConditionRows(
     Row(
       'MinVolume',
       'Minimum level',
-      Volume === null ? '—' : `${Volume}%`,
+      Volume === null ? '-' : `${Volume}%`,
       Readable('Volume'),
       Critical.MinVolume !== null,
       LevelIssue && Volume !== null && Critical.MinVolume !== null && Volume < Critical.MinVolume
@@ -358,7 +358,7 @@ export function AudioConditionRows(
     Row(
       'MaxVolume',
       'Maximum level',
-      Volume === null ? '—' : `${Volume}%`,
+      Volume === null ? '-' : `${Volume}%`,
       Readable('Volume'),
       Critical.MaxVolume !== null,
       LevelIssue && Volume !== null && Critical.MaxVolume !== null && Volume > Critical.MaxVolume
@@ -397,7 +397,7 @@ export function AudioRenderKey(
       Endpoint.Volume === null ? 'n' : 'v',
       Endpoint.Muted === null ? 'n' : 'm',
       Endpoint.Issues.map((Issue) => Issue.Message).join(','),
-      // Which condition rows exist and can be ticked — not whether they are.
+      // Which condition rows exist and can be ticked, not whether they are.
       AudioConditionRows(Endpoint, View.Capabilities)
         .map((Row) => `${Row.Field}${Row.Supported ? 1 : 0}`)
         .join(','),
@@ -465,7 +465,7 @@ export function ParseAudioRuleFields(
 /**
  * The live state of a critical endpoint's history row: green while connected and
  * meeting its conditions, orange while connected but not, red while missing.
- * Idle while the client is offline or the endpoint has not been judged yet —
+ * Idle while the client is offline or the endpoint has not been judged yet:
  * a timeline must never paint a state nobody observed.
  */
 export function AudioTimelineLiveState(

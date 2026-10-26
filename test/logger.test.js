@@ -92,7 +92,7 @@ test('Logger.configure toggles level gating', async () => {
 // This went wrong silently and stayed wrong: the default was derived from
 // NODE_ENV alone, but a packaged Electron app has no NODE_ENV, so every shipped
 // server ran at 'debug' and wrote debug chatter to its daily log file forever.
-// Nothing caught it because SYSTEM_LOG_LEVEL *looked* correct — it defaults to
+// Nothing caught it because SYSTEM_LOG_LEVEL *looked* correct; it defaults to
 // 'info', and main/live-settings.ts skips applying a still-default setting at
 // boot, so the settings UI read "info" while the logger did not.
 //

@@ -2,7 +2,7 @@
 // the loop that polls it.
 //
 // The loop mechanics are lifted from MonitoringTarget deliberately rather than
-// reinvented — the generation counter and the overlap guard exist because a poll
+// reinvented: the generation counter and the overlap guard exist because a poll
 // that is already awaiting the network cannot be cancelled, and without them a
 // restarted loop leaves two live timer chains racing each other.
 //
@@ -10,7 +10,7 @@
 // IPC by structured clone and is JSON-stringified into alert history, so it must
 // stay plain data: no timers, no class instances, no cycles. The timer and the
 // previous-readings map are therefore instance fields that the snapshot never
-// touches — and the API key is deliberately absent from it, because the snapshot
+// touches, and the API key is deliberately absent from it, because the snapshot
 // also reaches the Web UI and the alert log.
 import { Manager as BroadcastManager } from '../Broadcast';
 import { CreateLogger } from '../Logger';
@@ -116,7 +116,7 @@ class FreeKioskTerminal {
   LastChecked: number | null = null;
   LastSuccessAt: number | null = null;
   LastLatencyMs: number | null = null;
-  /** null until a control command has been attempted — see SetControlEnabled. */
+  /** null until a control command has been attempted; see SetControlEnabled. */
   ControlEnabled: boolean | null = null;
 
   // ---- Loop internals (never serialised) ----
@@ -129,7 +129,7 @@ class FreeKioskTerminal {
   /**
    * What the last poll compared against. `_previous` has already moved on to
    * that poll's own readings, so re-judging them under new settings needs the
-   * baseline it actually used — otherwise a `changes` condition compares the
+   * baseline it actually used; otherwise a `changes` condition compares the
    * readings with themselves and can never fire.
    */
   private _baseline: Record<string, FreeKioskReading> | null = null;
@@ -162,8 +162,8 @@ class FreeKioskTerminal {
 
   /**
    * Record what a control attempt revealed about the device's remote-control
-   * setting. It is unknowable until something is actually sent — the device only
-   * discloses it by refusing — which is why this starts null rather than true.
+   * setting. It is unknowable until something is actually sent (the device only
+   * discloses it by refusing), which is why this starts null rather than true.
    */
   SetControlEnabled(Enabled: boolean): boolean {
     const Changed = this.ControlEnabled !== Enabled;
@@ -253,7 +253,7 @@ class FreeKioskTerminal {
 
   /**
    * Re-judge the last successful poll's readings against the current settings,
-   * so an edited condition takes effect now rather than on the next poll — up to
+   * so an edited condition takes effect now rather than on the next poll, up to
    * a full interval later. Returns false when there is nothing to judge (never
    * polled, or the last poll failed): an offline terminal stays plainly offline.
    */
@@ -285,7 +285,7 @@ class FreeKioskTerminal {
     this.StopLoop();
     this._stopped = false;
     // First poll shortly after boot so a tile does not sit unknown for a whole
-    // interval — 30s is a long time to look broken.
+    // interval; 30s is a long time to look broken.
     const Gen = this._gen;
     this._timer = setTimeout(() => this.Tick(Gen), MONITORING_TICK_INTERVAL_MS);
     this._timer.unref?.();

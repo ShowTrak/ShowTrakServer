@@ -21,7 +21,7 @@ export async function UpdateOfflineIndicators() {
   );
 }
 
-// Tick every second. Called by the bootstrap orchestrator in main.ts — never
+// Tick every second. Called by the bootstrap orchestrator in main.ts, never
 // at import time.
 export function InitOfflineIndicators() {
   setInterval(UpdateOfflineIndicators, 1000);

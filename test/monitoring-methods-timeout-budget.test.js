@@ -17,12 +17,12 @@ function methodPath(name) {
 // The configured Timeout is a budget for the WHOLE probe, not per round trip.
 // These tests drive slow multi-round-trip probes whose total sequential time
 // exceeds the budget while no single gap does, so the fix (an absolute
-// whole-probe cap) is what ends them — the old per-request / idle timeouts would
+// whole-probe cap) is what ends them; the old per-request / idle timeouts would
 // have let them run to completion.
 
 test('NUT probe is bounded by an absolute whole-probe deadline, not the idle timeout', async () => {
-  // Each reply arrives after 150ms — under the 500ms idle timeout, which the
-  // mock socket never fires anyway — but LIST UPS + four GET VARs run ~750ms
+  // Each reply arrives after 150ms (under the 500ms idle timeout, which the
+  // mock socket never fires anyway), but LIST UPS + four GET VARs run ~750ms
   // sequentially, past the 500ms budget.
   const { ProbeNut } = loadWithMocks(methodPath('_nut-shared.js'), {
     net: makeNutNet({

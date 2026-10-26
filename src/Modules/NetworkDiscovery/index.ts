@@ -228,7 +228,7 @@ function startPJLinkScan(scan: Scan) {
         if (scan.Cancelled || scan.Finished) return;
         // Enrich with the projector's own name/model before the single push
         // (pushResult dedupes by Key, so we only emit once). Auth-protected
-        // projectors return null instantly — we never guess a password.
+        // projectors return null instantly; we never guess a password.
         void FetchProjectorIdentity(Address, PJLINK_UDP_PORT, 1500)
           .catch(() => null)
           .then((Identity) => {

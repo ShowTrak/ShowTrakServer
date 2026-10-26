@@ -21,7 +21,7 @@ function main() {
   const next = Buffer.concat(buffers);
 
   // Skip the write when nothing changed so `main.css`'s mtime does not churn on
-  // every build (it lives under src/, which `npm start`'s nodemon watches — a
+  // every build (it lives under src/, which `npm start`'s nodemon watches; a
   // needless rewrite would retrigger the watcher). nodemon also ignores this
   // file explicitly; this is belt-and-suspenders.
   const current = fs.existsSync(OUT) ? fs.readFileSync(OUT) : null;

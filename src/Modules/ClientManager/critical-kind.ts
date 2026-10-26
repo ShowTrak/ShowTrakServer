@@ -3,7 +3,7 @@
 // interfaces.
 //
 // Every kind is the same structure: a per-client list of entries, each stored
-// under one identity, held in three places that must agree — the DB side table,
+// under one identity, held in three places that must agree: the DB side table,
 // the manager's warm index (./critical-index) and the Client entity's own array,
 // from which its renderer view is rebuilt. Each kind used to carry its own copy
 // of the code keeping those in step, and the copies had begun to drift (some

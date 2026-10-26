@@ -17,7 +17,7 @@
 // `GET 0 ALL` makes the receiver report every device property and every
 // channel property, metered ones included (Shure ULX-D / SLX-D / AD command
 // string guides). There is no end-of-reply marker, so the probe reads REP lines
-// until the receiver goes quiet for QUIET_MS, or the Timeout budget runs out —
+// until the receiver goes quiet for QUIET_MS, or the Timeout budget runs out,
 // in which case whatever arrived is still evaluated. SAMPLE lines (sent only if
 // some other controller enabled metering) do not hold the session open.
 //
@@ -40,7 +40,7 @@
 //
 // Assertions: battery is on by default (the reason this check exists); a
 // required transmitter, mute and RF warnings are opt-in. Battery readings are
-// only judged while a transmitter is present — a switched-off spare pack is not
+// only judged while a transmitter is present; a switched-off spare pack is not
 // a flat battery, and that is what Require transmitter is for.
 import { RunTcpSession } from './_tcp-session';
 import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
@@ -227,7 +227,7 @@ function SplitMessages(Buffer: string): { Messages: string[]; Rest: string } {
     let Depth = 0;
     let End = -1;
     // Bounded: a frame longer than MAX_MESSAGE_CHARS is junk anyway, and an
-    // unbounded scan per `<` makes a hostile `<{<{…` buffer quadratic.
+    // unbounded scan per `<` makes a hostile `<{<{...` buffer quadratic.
     const Limit = Math.min(Buffer.length, Start + 1 + MAX_MESSAGE_CHARS);
     for (let I = Start + 1; I < Limit; I++) {
       const C = Buffer[I];
@@ -545,7 +545,7 @@ function ChannelLabel(Number_: number, Name: string): string {
 }
 
 // The battery part of a channel's reason, or null when the battery is fine (or
-// unknown — unknown is never treated as low).
+// unknown; unknown is never treated as low).
 function BatteryIssue(Ch: ShureChannel, Options: EvaluateOptions): string | null {
   const Parts: string[] = [];
   if (
@@ -780,10 +780,10 @@ function FormatBattery(Ch: ShureChannelResult): string {
     Parts.push(
       `${Math.floor(Ch.BatteryMinutes / 60)}:${String(Ch.BatteryMinutes % 60).padStart(2, '0')} left`
     );
-  } else if (Ch.BatteryCalculating) Parts.push('runtime calculating…');
+  } else if (Ch.BatteryCalculating) Parts.push('runtime calculating...');
   else if (Ch.BatteryCommWarning) Parts.push('communication warning');
   if (Ch.BatteryType) Parts.push(Ch.BatteryType);
-  return Parts.length ? Parts.join(' · ') : '—';
+  return Parts.length ? Parts.join(' · ') : '-';
 }
 
 function ChannelBadge(Ch: ShureChannelResult): string {
@@ -807,12 +807,12 @@ function ChannelCard(Ch: ShureChannelResult): string {
   if (Ch.UnregisteredTx) Warnings.push('unregistered transmitter');
 
   const Body = Rows([
-    TextRow('Frequency', Ch.FrequencyMHz != null ? `${Ch.FrequencyMHz.toFixed(3)} MHz` : '—'),
+    TextRow('Frequency', Ch.FrequencyMHz != null ? `${Ch.FrequencyMHz.toFixed(3)} MHz` : '-'),
     TextRow(
       'Transmitter',
       Ch.TxPresent === false
         ? 'None'
-        : [Ch.TxType, Ch.TxDeviceId].filter(Boolean).join(' · ') || (Ch.TxPresent ? 'Present' : '—')
+        : [Ch.TxType, Ch.TxDeviceId].filter(Boolean).join(' · ') || (Ch.TxPresent ? 'Present' : '-')
     ),
     Ch.TxPresent !== false ? TextRow('Battery', FormatBattery(Ch)) : null,
     Rf.length ? TextRow('RF', Rf.join(' · ')) : null,
@@ -839,7 +839,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Str = (Value: unknown): string => (Value == null || Value === '' ? '' : String(Value));
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Row('Status', StatusPill),
     Online && Str(Result.Model || Result.Family)
       ? TextRow('Receiver', [Str(Result.Model), Str(Result.Family)].filter(Boolean).join(' · '))
@@ -884,7 +884,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
 export const Name = 'Wireless Receiver (Shure)';
 export const Description =
-  'Reads every channel of a Shure ULX-D, QLX-D, SLX-D or Axient Digital receiver over its command-string port (TCP 2202) — transmitter presence, battery bars and runtime, mute and RF warnings — and reports Degraded when a monitored channel’s battery is low. Read-only: it sends a single GET request.';
+  'Reads every channel of a Shure ULX-D, QLX-D, SLX-D or Axient Digital receiver over its command-string port (TCP 2202): transmitter presence, battery bars and runtime, mute and RF warnings. It reports Degraded when a monitored channel’s battery is low. Read-only: it sends a single GET request.';
 export const Group = 'Sound';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = {

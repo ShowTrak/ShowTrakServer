@@ -16,7 +16,7 @@
 //   system/processor-name, processor-type, serial-number, software-version, uptime
 //   system/temperature/**, system/fan/**     (newer firmware; see INFERRED below)
 //   panels/statistics/{online,error,associated}-count  (3.1 docs; renamed
-//     devices/statistics/... in 3.4 — both are read)
+//     devices/statistics/... in 3.4; both are read)
 //   override/blackout/enabled, override/freeze/enabled, override/test-pattern/enabled
 //   input/active/source/{port-type,port-number}, input/active/resolution,
 //   input/active/refresh-rate (3.1) or input/ports/<type>/<n>/meta-data (3.4)
@@ -37,7 +37,7 @@
 //
 // Actions (documented writes, Tessera 3.1 PDF section 4 "SET (ENDPOINT)"):
 // each sets one endpoint with the GET form `GET /api/<path>?set=<value>`. The
-// PDF documents it beside `PUT {"data": …}` and the 3.4.3 OpenAPI lists `set`
+// PDF documents it beside `PUT {"data": ...}` and the 3.4.3 OpenAPI lists `set`
 // on every writable GET; it is the form the Companion module sends, so it is
 // the one proven against real processors, and it sidesteps the preset number
 // being typed string in 3.1 but integer in 3.4. A refusal is HTTP 400 with an
@@ -379,7 +379,7 @@ function ParseResolution(Value: unknown): { W: number; H: number } | null {
 
 // The reasons a reachable processor is unhealthy, per the enabled toggles.
 // Unreported readings are skipped rather than failed, except where the reading
-// is the thing being asserted (the input format). Pure — exported for tests.
+// is the thing being asserted (the input format). Pure; exported for tests.
 function EvaluateHealth(Snap: TesseraSnapshot, Cfg: Record<string, unknown>): string[] {
   const Reasons: string[] = [];
 
@@ -656,7 +656,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     : null;
 
   const Head = Rows([
-    TextRow('Processor', `${Address || '—'}${R.ProcessorName ? ` (${R.ProcessorName})` : ''}`),
+    TextRow('Processor', `${Address || '-'}${R.ProcessorName ? ` (${R.ProcessorName})` : ''}`),
     Row('Status', StatePill(Result)),
     Reachable
       ? Row('Reply time', Mono(FormatLatency(R.LatencyMs)))

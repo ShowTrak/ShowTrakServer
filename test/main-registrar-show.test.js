@@ -2,13 +2,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
-// Exercises src/main/registrars/show.ts — the ShowTrak file save/open/new flows
+// Exercises src/main/registrars/show.ts: the ShowTrak file save/open/new flows
 // reached from the File menu and the renderer.
 //
 // Highest-consequence registrar: every path here either writes a show file or
 // tells the renderer which file is current. The property that matters most is
 // that the renderer is only ever told "the show file changed" AFTER a write
-// actually succeeded — a stale title bar convinces an operator their work is
+// actually succeeded; a stale title bar convinces an operator their work is
 // saved when it is not.
 //
 // Follows the pattern in main-registrar-groups.test.js: only the managers and

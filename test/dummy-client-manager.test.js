@@ -67,8 +67,8 @@ function loadManager(dbStub, events) {
     'index.js'
   );
   // The shared Slug service (used for cross-namespace DummyID uniqueness) lives
-  // in a sibling module, so loadWithMocks — which only clears the target
-  // module's own directory — won't reset it. Clear it here so it re-binds to
+  // in a sibling module, so loadWithMocks (which only clears the target
+  // module's own directory) won't reset it. Clear it here so it re-binds to
   // THIS test's DB stub instead of a stale one captured by an earlier test.
   delete require.cache[require.resolve('../dist/Modules/Slug/index.js')];
   return loadWithMocks(modulePath, {
@@ -84,7 +84,7 @@ test('DummyClientManager generates unique slug IDs with matching defaults', asyn
   const Manager = loadManager(db, []);
   await Manager.Init();
 
-  // GenerateDefaults is async now — it derives the DummyID (which doubles as the
+  // GenerateDefaults is async now: it derives the DummyID (which doubles as the
   // dummy's slug) through the shared slug service.
   const defaults = await Manager.GenerateDefaults();
   assert.match(defaults.DummyID, /^Dummy-\d{6}$/);

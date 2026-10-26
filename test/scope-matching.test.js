@@ -4,16 +4,16 @@ const path = require('node:path');
 
 // Scope matching: does this scope cover this machine?
 //
-// The same question is asked on both sides of the app — the server decides
+// The same question is asked on both sides of the app (the server decides
 // whether an alert fires or a script may run, the renderer decides which tags
-// badge a tile and which scripts appear in a menu — so the logic exists TWICE,
+// badge a tile and which scripts appear in a menu), so the logic exists TWICE,
 // once per process (the renderer is bundled for the browser and cannot import
 // main-process modules). This file runs the SAME cases against both copies, so
 // the mirrors cannot drift apart silently.
 //
 // The arm that needs the care is Tags. A tag's membership is itself a scope
 // which may name further tags, so resolving one is a graph walk over data the
-// operator authored by hand — including, inevitably, cycles.
+// operator authored by hand, including, inevitably, cycles.
 
 const SERVER = require(path.join(__dirname, '..', 'dist', 'Modules', 'ScopeMatching', 'index.js'));
 const RENDERER = require(
@@ -79,7 +79,7 @@ for (const [Name, Impl] of IMPLEMENTATIONS) {
 
   test(`[${Name}] a cycle terminates rather than hanging the app`, () => {
     // Authored across two edits (A adds B, then B adds A), so it is reachable
-    // and has to resolve — an infinite walk here would freeze a live show.
+    // and has to resolve; an infinite walk here would freeze a live show.
     const Tags = [tag(1, { Tags: [2] }), tag(2, { Tags: [1], Clients: ['in'] })];
     assert.equal(ScopeCoversEntity(scope({ Tags: [1] }), entity('in'), Tags), true);
     assert.equal(ScopeCoversEntity(scope({ Tags: [1] }), entity('out'), Tags), false);
@@ -93,7 +93,7 @@ for (const [Name, Impl] of IMPLEMENTATIONS) {
 
   test(`[${Name}] a tag that no longer exists contributes no members`, () => {
     // A deleted tag still named by a saved scope must narrow the scope, never
-    // widen it — silently covering everything would be the dangerous failure.
+    // widen it; silently covering everything would be the dangerous failure.
     assert.equal(ScopeCoversEntity(scope({ Tags: [99] }), entity('c1', 1), []), false);
     assert.equal(ScopeCoversEntity(scope({ Tags: [99] }), entity('c1', 1)), false);
   });

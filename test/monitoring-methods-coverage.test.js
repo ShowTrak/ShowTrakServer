@@ -77,7 +77,7 @@ test('ping reports the round-trip time parsed from stdout', async () => {
 });
 
 // A zero exit code is not proof of delivery, so a reply with no round-trip time
-// is a failure rather than a success carrying a wall-clock stand-in — that
+// is a failure rather than a success carrying a wall-clock stand-in; that
 // substitution used to report unreachable hosts as online during boot.
 test('ping fails when stdout has no time= field despite a zero exit code', async () => {
   const capture = {};

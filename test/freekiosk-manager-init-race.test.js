@@ -6,7 +6,7 @@
 // own TerminalList and started its own poll loops; the losing list kept polling
 // with the settings it was loaded with, out of reach of every edit. The field
 // symptom was a Power Source condition re-set to "Expected ac" that still raised
-// "Power Source is ac (expected anything but ac)" for a moment every interval —
+// "Power Source is ac (expected anything but ac)" for a moment every interval:
 // the orphan's broadcast, immediately overwritten by the live loop's.
 const test = require('node:test');
 const assert = require('node:assert/strict');

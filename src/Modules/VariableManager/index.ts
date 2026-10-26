@@ -89,7 +89,7 @@ function InvalidateCache(): void {
  * NUL terminates a C string, so it would silently truncate the value (and
  * Node throws on it outright); CR/LF break batch parsing in ways that look like
  * a corrupt script rather than a bad value. Both are removed rather than
- * rejected — an operator pasting a value with a trailing newline meant the
+ * rejected: an operator pasting a value with a trailing newline meant the
  * value, not the newline.
  */
 function SanitizeValue(Value: unknown): string {
@@ -104,7 +104,7 @@ function SanitizeValue(Value: unknown): string {
  *
  * Spaces and dashes become underscores (operators type "Game Version"), the
  * result is upper-cased, anything outside [A-Z0-9_] is dropped, and a leading
- * digit is prefixed with an underscore — `%1ABC%` is a positional parameter in a
+ * digit is prefixed with an underscore; `%1ABC%` is a positional parameter in a
  * batch file, not a variable reference.
  *
  * Returns null when nothing usable survives, so the caller can report a real
@@ -137,7 +137,7 @@ export function NormalizeKey(Value: unknown): string | null {
  */
 function DescribeReservedKey(Key: string): string | null {
   if (Key.startsWith(VARIABLE_PREFIX)) {
-    return `Enter the variable name without the ${VARIABLE_PREFIX} prefix — ShowTrak adds it for you`;
+    return `Enter the variable name without the ${VARIABLE_PREFIX} prefix; ShowTrak adds it for you`;
   }
   if (Key.startsWith('SHOWTRAK_')) {
     return 'Names starting with SHOWTRAK_ are reserved for ShowTrak’s own variables';
@@ -287,7 +287,7 @@ const Manager = {
 
   /**
    * Rename a variable. Overrides are keyed on VariableID, so every client's
-   * value survives — a rename is a display change, not a data migration.
+   * value survives; a rename is a display change, not a data migration.
    */
   async SetKey(VariableID: number, Key: unknown): Promise<Result<boolean>> {
     const [GetErr, Row] = await Manager.Get(VariableID);
@@ -326,7 +326,7 @@ const Manager = {
       .slice(0, 255);
     const [Err] = await VariablesRepo.UpdateDescription(VariableID, Text);
     if (Err) return Fail('Failed to update variable description');
-    // Description is documentation only — it never reaches a client, so no push.
+    // Description is documentation only; it never reaches a client, so no push.
     BroadcastManager.emit('VariableListChanged');
     if (Row) await RecordVariableEdit(Row, 'Description', Row.Description, Text);
     return Ok(true);
@@ -487,7 +487,7 @@ const Manager = {
    *
    * Every variable is always present, even when empty. Omitting an unset one
    * would leave `%SHOWTRAK_VAR_X%` in a batch file as the literal text
-   * `%SHOWTRAK_VAR_X%` rather than as nothing — the single most confusing
+   * `%SHOWTRAK_VAR_X%` rather than as nothing, the single most confusing
    * failure mode this feature has.
    */
   async GetPayload(UUID: string): Promise<VariablePayload> {
@@ -513,8 +513,8 @@ const Manager = {
       const Value = SanitizeValue(Row.Value == null ? Row.DefaultValue : Row.Value);
 
       // Stop before the block gets big enough for CreateProcess to reject it.
-      // Dropping the tail is worse than dropping nothing, so it is logged loudly
-      // — silent truncation here would look like a variable that "just doesn't
+      // Dropping the tail is worse than dropping nothing, so it is logged loudly:
+      // silent truncation here would look like a variable that "just doesn't
       // work" on one machine.
       const Cost = EnvironmentKey.length + Value.length + 2;
       if (TotalLength + Cost > MAX_TOTAL_ENVIRONMENT_LENGTH) {
@@ -546,7 +546,7 @@ const Manager = {
 
   /**
    * Drop overrides belonging to clients that no longer exist. Show files carry
-   * variables (which is the point — GAME_VERSION belongs to the show), but
+   * variables (which is the point: GAME_VERSION belongs to the show), but
    * overrides are keyed by client UUID, so a show opened on a different rig
    * arrives with rows that can never be reached from any UI.
    */

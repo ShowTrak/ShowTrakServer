@@ -1,4 +1,4 @@
-// IPC handler factory — standardizes the dominant main-process handler shape.
+// IPC handler factory: standardizes the dominant main-process handler shape.
 //
 // There are two handler contracts in the registrars; keep new handlers on the
 // matching one instead of inventing a third:
@@ -9,13 +9,13 @@
 //        - normalize to `[Err, null]` on failure / `[null, Result]` on success
 //      On invalid input the handler resolves to `[message, invalidFallback]`
 //      (`invalidFallback` defaults to `null`; pass `false` when the renderer
-//      treats the payload slot as a boolean success flag — e.g. the Delete/*
+//      treats the payload slot as a boolean success flag, e.g. the Delete/*
 //      and Adopt/Replace handlers).
 //
 //   2. READER handlers return a RAW value (an object, list, or `null`) rather
 //      than a tuple, because the renderer consumes the value directly. These
 //      stay hand-rolled: validate in a `try`, and on invalid input OR a manager
-//      error resolve to the type's empty fallback — `null` for a single object,
+//      error resolve to the type's empty fallback: `null` for a single object,
 //      `[]` for a list. Do NOT route them through `createTupleHandler` (it would
 //      wrap the value in a tuple and break the renderer contract).
 //

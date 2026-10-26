@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
-// Exercises src/main/registrars/system.ts — config, Web UI addresses, mode,
+// Exercises src/main/registrars/system.ts: config, Web UI addresses, mode,
 // settings, external links and the package.json/LICENSE readers.
 //
 // The handler that matters most here is `OpenExternalUrl`. It hands a
@@ -178,7 +178,7 @@ test('OpenExternalUrl forwards the parsed href, not the raw string', async () =>
 // --- The fixed-destination link handlers ------------------------------------
 
 test('the fixed link handlers open their own hard-coded destinations', async () => {
-  // Each ignores any argument the renderer supplies — the destination is not
+  // Each ignores any argument the renderer supplies; the destination is not
   // renderer-controlled.
   await GetHandler('OpenDiscordInviteLinkInBrowser')(null, 'https://evil.example');
   await GetHandler('OpenShowTrakWebsiteInBrowser')(null);

@@ -10,7 +10,7 @@
 // so membership is a graph, cycles included); this file adds only the tag-
 // specific reading of it.
 //
-// IMPORTANT — this is NOT the same predicate as script-targeting's
+// IMPORTANT: this is NOT the same predicate as script-targeting's
 // IsClientWhitelisted, and the two must not be merged. There, an absent or
 // empty scope means "unrestricted" (a script nobody narrowed runs everywhere).
 // Here, an empty scope means the tag has NO members: a tag that targets nothing
@@ -25,8 +25,8 @@ import { ScopeMembershipKindFor } from './scope-matching';
  *
  * `ScopedID` is the same string the scope-dropdown persists into Scope.Clients:
  * a plain UUID for ShowTrak and dummy clients, `monitor:<TargetID>` for a
- * monitoring target. Getting this wrong is silent — the tag simply never
- * matches — so tile builders derive it from the same value they put in the
+ * monitoring target. Getting this wrong is silent (the tag simply never
+ * matches), so tile builders derive it from the same value they put in the
  * tile's `data-uuid`.
  */
 export interface TagBadgeEntity {
@@ -94,7 +94,7 @@ export function TagBadgeLabel(Tag: TagView | null | undefined): string {
 // Presentation only. A tag's display mode says what its badge CONTAINS; it never
 // affects membership, so a hidden tag still targets scripts, alert rules and OSC
 // exactly as a shown one does. Filtering therefore happens here, at the badge
-// layer, and never in ResolveEntityTags — the client editor must keep listing
+// layer, and never in ResolveEntityTags; the client editor must keep listing
 // hidden tags or they would be untoggleable.
 
 const DISPLAY_MODES: TagDisplayMode[] = ['hidden', 'icon', 'name', 'both'];
@@ -103,8 +103,8 @@ const DISPLAY_MODES: TagDisplayMode[] = ['hidden', 'icon', 'name', 'both'];
  * A tag's display mode, defaulted to `name`.
  *
  * `Display` is absent on tags from a server that predates the setting, and on
- * anything hand-built in a test. Those must draw their name — the behaviour
- * every tag had before — rather than vanish, so an unknown value is never read
+ * anything hand-built in a test. Those must draw their name (the behaviour
+ * every tag had before) rather than vanish, so an unknown value is never read
  * as `hidden`.
  */
 export function TagDisplayModeOf(Tag: TagView | null | undefined): TagDisplayMode {
@@ -141,7 +141,7 @@ export function TagShowsLabel(Tag: TagView | null | undefined): boolean {
 /**
  * Drop the tags set to `hidden`.
  *
- * Applied before fitting, so a hidden tag costs no width and — crucially — is
+ * Applied before fitting, so a hidden tag costs no width and, crucially, is
  * not counted into the "+N" chip either. A hidden tag that still bumped the
  * chip would tell the operator a tile has tags it deliberately does not show.
  */
@@ -154,7 +154,7 @@ export function FilterDisplayableTags(Tags: TagView[] | null | undefined): TagVi
 // Badges must never wrap (a second line would push the tile's own content out of
 // a fixed-height tile), so the count has to be decided BEFORE the row is in the
 // DOM. Laying the row out for real would mean a forced reflow per tile on every
-// client list render — hundreds per show — so the row is fitted from a width
+// client list render (hundreds per show), so the row is fitted from a width
 // MODEL instead, and the row is `overflow: hidden` in CSS so that a model that
 // is wrong low clips a badge rather than wrapping the line.
 //
@@ -169,7 +169,7 @@ export function FilterDisplayableTags(Tags: TagView[] | null | undefined): TagVi
 // The table is why "+N" used to be skipped on rows that then clipped: a
 // per-character average cannot know the font, and one that runs even a few
 // percent under across a row of badges loses a whole badge's worth of width.
-// It is now deliberately biased HIGH — over-reserving shows a "+N" one badge
+// It is now deliberately biased HIGH: over-reserving shows a "+N" one badge
 // early, which is a readable row; under-reserving is a cropped one.
 //
 // Constants below are for the badge row's type: 10px, weight 600, uppercase,
@@ -194,7 +194,7 @@ const CHAR_WIDTH_DEFAULT = 7.7;
 const CHAR_WIDTH_NARROW = 4.2;
 const CHAR_WIDTH_WIDE = 10;
 // Only genuinely thin glyphs belong here. Digits and `J` were listed as narrow
-// and are not — a slug like `LX-1` was costed a third under its real width.
+// and are not; a slug like `LX-1` was costed a third under its real width.
 const NARROW_CHARS = new Set("Il|.,:;'!-_ ".split(''));
 const WIDE_CHARS = new Set('MW@%'.split(''));
 
@@ -202,7 +202,7 @@ const WIDE_CHARS = new Set('MW@%'.split(''));
  * Measures a label at the badge row's type, in px. Installed by the renderer.
  *
  * Returning a non-finite or negative number is the documented way to say "I
- * could not measure this" — the table below takes over for that label.
+ * could not measure this"; the table below takes over for that label.
  */
 export type TagBadgeLabelMeasurer = (Label: string) => number;
 
@@ -242,11 +242,11 @@ export function EstimateLabelWidth(Label: string): number {
 
 /**
  * Full width of one badge: the pill's horizontal padding plus whatever its
- * display mode puts inside it — icon, label, or both with a gap between.
+ * display mode puts inside it: icon, label, or both with a gap between.
  *
  * A `hidden` tag is never passed here (FilterDisplayableTags removes it first);
  * were it to slip through it would still measure as a normal badge, which is
- * the safe direction — over-reserving width clips, it does not wrap.
+ * the safe direction: over-reserving width clips, it does not wrap.
  *
  * Rounded up to whole pixels: a row holds several badges, and a third of a
  * pixel conceded on each is how a row that "fits" ends up a glyph over.
@@ -276,7 +276,7 @@ export interface TagBadgeFit {
  *
  * The chip itself takes room, so each candidate is tested against the width left
  * AFTER reserving a chip for whatever would still be hidden. At least one badge
- * is always shown when the entity has tags — an all-overflow row ("+3") would
+ * is always shown when the entity has tags; an all-overflow row ("+3") would
  * tell the operator a machine is tagged while withholding every tag name.
  *
  * Tags set to `hidden` are dropped before any of this: they neither take width

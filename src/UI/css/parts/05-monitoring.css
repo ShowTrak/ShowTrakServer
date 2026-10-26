@@ -248,7 +248,7 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
  *
  * Overflow is belt-and-braces with the width estimate in lib/tag-badges: the
  * estimate decides how many badges to emit, and `overflow: hidden` guarantees a
- * mis-estimate clips rather than wraps. Identical rules for every tile kind —
+ * mis-estimate clips rather than wraps. Identical rules for every tile kind:
  * a tagged monitor must read the same as a tagged client. */
 .SHOWTRAK_PC > .TILE_TAG_ROW {
   display: flex;
@@ -264,18 +264,18 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
   white-space: nowrap;
 }
 
-/* A badge sits on top of the tile's STATUS colour, which changes under it —
+/* A badge sits on top of the tile's STATUS colour, which changes under it:
  * green online, amber degraded, grey idle, pulsing blue while identifying. A
  * translucent TAG-coloured fill mixes with a colour it cannot predict, and a
  * red tag on an amber tile turns to mud. A white overlay (the offline-timer
- * badge / `.exec-chip` idiom) was tried and rejected — it read as a highlight
+ * badge / `.exec-chip` idiom) was tried and rejected; it read as a highlight
  * where a dark chip belongs, not as isolation.
  *
  * Settled: a translucent BLACK overlay, light enough not to read as an opaque
  * near-black hole (that was tried too, and was too heavy), dark enough that it
  * still isolates the badge from whichever status wash is underneath.
  *
- * The tag's colour carries the identity through the text alone — no ring, no
+ * The tag's colour carries the identity through the text alone: no ring, no
  * dot. Text is lifted toward white because several palette entries (purple,
  * both greys) are too dark to read at 10px; mixing rather than lightening
  * per-colour keeps each tag's hue recognisable. */
@@ -285,8 +285,8 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
   align-items: center;
   gap: 4px;
   /* Shrinkable, unlike the icon and the chip. A badge only ever shrinks when the
-   * row is over its 200px anyway — the fit in lib/tag-badges measures the real
-   * font, so a row it accepted does not reach this — and the one case that
+   * row is over its 200px anyway (the fit in lib/tag-badges measures the real
+   * font, so a row it accepted does not reach this), and the one case that
    * always overflows is a single tag longer than the whole tile, which the fit
    * shows regardless (a bare "+2" would name none of the tags). Fixed-width
    * there, the badge would push the "+N" past the row's clip and the tile would
@@ -318,13 +318,13 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
 }
 
 /* Per-tag display mode (hidden / icon / name / icon+name) changes what a badge
- * CONTAINS but must never change how tall it is — every tile is a fixed height
+ * CONTAINS but must never change how tall it is: every tile is a fixed height
  * and the row is a fixed 20px, so a taller badge in one mode would show up as
  * uneven rows across the show.
  *
  * The icon is therefore boxed to exactly the label's line box: 14px tall (the
  * label's 10px x 1.4 line-height) and a fixed 12px wide. The glyph is scaled to
- * fit that box rather than the box growing to fit the glyph — 12px reads
+ * fit that box rather than the box growing to fit the glyph; 12px reads
  * clearly at tile distance while still sitting inside 14px. The fixed width
  * also keeps icon-only badges a uniform size instead of jittering with each
  * glyph's natural advance, which is what the width estimate in
@@ -341,7 +341,7 @@ body.compact-mode .SHOWTRAK_PC > [data-type='Name'] {
 }
 
 /* The "+N" chip stands for several tags at once, so it takes no single tag's
- * colour — same surface, neutral text.
+ * colour: same surface, neutral text.
  *
  * It is the one thing in the row that must never shrink or be clipped: it is
  * the only signal that the tile has tags it is not showing, so a row that drops
@@ -1951,7 +1951,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
    Web passcode screen: dot indicators + numeric keypad
    ------------------------------------------------------------------------- */
 
-/* The login screen sits directly on the overlay's purple gradient — no card
+/* The login screen sits directly on the overlay's purple gradient: no card
    backdrop, border, or shadow (unlike the loading / disabled overlays). */
 .web-login-card {
   width: min(320px, 100%);
@@ -1963,7 +1963,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 }
 
 /* The real value lives here (autofill target + submitLogin() read path), but
-   it is visually removed — entry happens via the keypad and the dots below. */
+   it is visually removed; entry happens via the keypad and the dots below. */
 .web-pin-hidden-input {
   position: absolute;
   width: 1px;
@@ -2090,7 +2090,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
    -------------------------------------------------------------------------
    `body.mobile-view` is toggled from JS (see InitMobileView in 02-mode.ts) in
    lockstep with the `(max-width: 768px)` media query, and mobile is *locked* to
-   compact mode — so `body.compact-mode` is always present too and the compact
+   compact mode, so `body.compact-mode` is always present too and the compact
    tile/font styling is inherited as-is (no re-declaration needed, which keeps
    the sizing identical to a normal compact toggle).
 
@@ -2222,7 +2222,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
      The scroll container's `height: calc(100% - 2rem)` resolves `100%` against
      the initial containing block, which on iOS Safari is the *large* viewport
      (URL bar collapsed). That makes the container taller than the visible area,
-     so tall content still fits inside it and there is nothing to scroll — the
+     so tall content still fits inside it and there is nothing to scroll; the
      bottom of the client list ends up unreachable behind the URL/bottom bar.
      Size the scrollport to the *dynamic* viewport (`dvh`, tracking the visible
      area) so it becomes shorter than the content and scrolls. `vh` is the

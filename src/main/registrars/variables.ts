@@ -5,7 +5,7 @@
 // environment variables: GAME_VERSION arrives as %SHOWTRAK_VAR_GAME_VERSION%.
 // Each carries a default; any client may override it.
 //
-// Writing a client's overrides is deliberately NOT a channel here — it rides the
+// Writing a client's overrides is deliberately NOT a channel here; it rides the
 // existing UpdateClient payload as a `Variables` field, so the client editor
 // saves the whole form in one round trip and one undo-able action.
 

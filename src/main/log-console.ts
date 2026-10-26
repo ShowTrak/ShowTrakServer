@@ -1,5 +1,5 @@
 // Hidden log console: streams the Logger's live feed to whichever surfaces have
-// the console open — the desktop window and/or individual Web UI sockets.
+// the console open: the desktop window and/or individual Web UI sockets.
 //
 // Nothing is streamed to a surface until it opens the console, and a surface
 // only receives lines at or above the level it asked for, so a closed console

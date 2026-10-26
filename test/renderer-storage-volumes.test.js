@@ -81,7 +81,7 @@ test('section state: an old client that never reported is unsupported; one that 
   assert.equal(Lib.StorageSectionMessage('unsupported', Unsupported).Body, 'Nope');
   assert.match(
     Lib.StorageSectionMessage('outdated', client({ Version: '3.27.1' })).Body,
-    /needs ShowTrak Client 3\.28\.0 or later — this client runs 3\.27\.1/
+    /needs ShowTrak Client 3\.28\.0 or later \(this client runs 3\.27\.1\)/
   );
 });
 

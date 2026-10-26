@@ -1,7 +1,7 @@
 // IPC registrar: the hidden log console and its Rainbow Mode toggle, desktop
 // side. The Web UI opens the same console over its own socket events
 // (webui-namespace.ts) because streaming has to target the one socket that
-// asked, which the shared rpc bridge cannot see — it passes a null event. The
+// asked, which the shared rpc bridge cannot see: it passes a null event. The
 // web rpc allowlist does not include these channels.
 
 import { RPC } from '../rpc';

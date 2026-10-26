@@ -7,7 +7,7 @@
 // Worth being explicit about what this is and is not: the AUTHORITATIVE
 // whitelist gate lives server-side in ScriptWhitelistManager.IsClientAllowed.
 // This copy exists so a client that is not permitted never appears in the menu
-// in the first place — it is a usability guard, not the security boundary. It
+// in the first place; it is a usability guard, not the security boundary. It
 // still matters: a script offered against the wrong machine is a script an
 // operator will run on the wrong machine.
 
@@ -17,13 +17,13 @@ import { ScopeCoversEntity } from './scope-matching';
 /**
  * Whether a client is admitted by a script's per-show whitelist.
  *
- * An absent scope, or `Workspace: true`, means unrestricted — that is the
+ * An absent scope, or `Workspace: true`, means unrestricted; that is the
  * default for a script nobody has narrowed. Otherwise the client must be named
  * directly, belong to a whitelisted group, or carry a whitelisted tag.
  *
  * `Tags` is the full tag list, needed only to expand a tag-based whitelist
  * (tags nest). Omitting it under-matches such a whitelist, which here hides a
- * script the client may in fact run — so callers pass it.
+ * script the client may in fact run, so callers pass it.
  */
 export function IsClientWhitelisted(
   Scope: ScriptWhitelistScope | null | undefined,

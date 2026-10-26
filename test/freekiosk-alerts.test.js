@@ -7,7 +7,7 @@
 //      seconds for as long as it stayed flat.
 //   2. Something already breaching the first time ShowTrak sees a terminal is a
 //      pre-existing condition, not an event. Alerting on it would mean every
-//      restart mid-show fires every alarm at once — the same reason a client
+//      restart mid-show fires every alarm at once, the same reason a client
 //      that was already offline at start-up is suppressed.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -47,7 +47,7 @@ function boot(rules = [rule()]) {
     '../AlertActions': {
       Manager: {
         GetAll: () => [{ ID: 'http-api', Name: 'HTTP API' }],
-        // AlertActions.Execute(Action, EventContext) — the context is the
+        // AlertActions.Execute(Action, EventContext): the context is the
         // second argument, not the third.
         Execute: async (_action, context) => {
           executed.push(context);
@@ -143,9 +143,9 @@ test('an alarm that starts breaching fires once, not on every poll', async () =>
   assert.equal(executed[0].MetricKey, 'battery_level');
   assert.equal(executed[0].EntityType, 'freekiosk');
   assert.equal(executed[0].EntityName, 'Lobby Kiosk');
-  assert.match(executed[0].Description, /Lobby Kiosk — Battery Level 12% is below 20%/);
+  assert.match(executed[0].Description, /Lobby Kiosk - Battery Level 12% is below 20%/);
 
-  // Still breaching on the next three polls — no further alerts.
+  // Still breaching on the next three polls; no further alerts.
   await Manager.HandleFreeKioskTerminalUpdated(terminal([BATTERY]));
   await Manager.HandleFreeKioskTerminalUpdated(terminal([BATTERY]));
   await Manager.HandleFreeKioskTerminalUpdated(terminal([BATTERY]));

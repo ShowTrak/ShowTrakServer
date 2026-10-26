@@ -330,7 +330,7 @@ test('FogTaskTypeID and FogSnapinID reject non-positive and malformed values', (
 // ---- Task history pruning --------------------------------------------------
 
 // The Clear button in the tasks tray routes here. Deleting a row for a task that
-// is still running in FOG would orphan it — the poller would have nothing left to
+// is still running in FOG would orphan it; the poller would have nothing left to
 // reconcile against, so the task would vanish from the panel while continuing to
 // image the machine. Both the age-based pruner and the operator-triggered clear
 // must therefore filter on state, not just on age.

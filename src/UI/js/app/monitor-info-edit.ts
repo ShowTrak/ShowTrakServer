@@ -349,7 +349,7 @@ function RenderedCheckOrder(): number[] {
 }
 
 // Drag a row up or down the list: the rows move live under the pointer, and the
-// new order saves on drop. Edit mode only — rows are not draggable otherwise.
+// new order saves on drop. Edit mode only; rows are not draggable otherwise.
 function BindCheckDragging($List: JQuery<HTMLElement>): void {
   $List.on('dragstart', '.monitor-settings-check', function (Event) {
     if (!Editing) return;

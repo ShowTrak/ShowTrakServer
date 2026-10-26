@@ -49,7 +49,7 @@ test('the uptime line is live while online and falls back to the last boot when 
   assert.match(Lib.UptimeText(client({ BootTime: 1_700_000_000_000 })), /^1d 3h \(booted .+\)$/);
   assert.match(
     Lib.UptimeText(client({ Online: false, BootTime: 1_700_000_000_000 })),
-    /^Offline — last booted /
+    /^Offline - last booted /
   );
   assert.equal(Lib.UptimeText(client({ Online: false })), 'Unknown (offline)');
   assert.equal(Lib.UptimeText(client({ Vitals: null })), 'Waiting for the client');
@@ -59,19 +59,19 @@ test('an alarm reads as what, how much, against what, and for how long', () => {
   const Now = 1_000_000;
   assert.equal(
     Lib.ResourceAlarmText({ Key: 'cpu', Value: 97, Threshold: 90, Since: Now - 250000 }, Now),
-    'High CPU usage — 97% (limit 90%) for 4m 10s'
+    'High CPU usage - 97% (limit 90%) for 4m 10s'
   );
   assert.equal(
     Lib.ResourceAlarmText({ Key: 'battery', Value: 12, Threshold: 20, Since: Now }, Now),
-    'Battery low — 12% (minimum 20%) for 0s'
+    'Battery low - 12% (minimum 20%) for 0s'
   );
   assert.equal(
     Lib.ResourceAlarmText({ Key: 'thermal', Value: 'serious', Threshold: 'fair', Since: Now }, Now),
-    'Throttling to cool down — Serious — throttling (allowed up to fair) for 0s'
+    'Throttling to cool down - Serious - throttling (allowed up to fair) for 0s'
   );
   assert.equal(
     Lib.ResourceAlarmText({ Key: 'uptime', Value: 8.5, Threshold: 7, Since: Now }, Now),
-    'Restart overdue — 8d 12h (limit 7 days) for 0s'
+    'Restart overdue - 8d 12h (limit 7 days) for 0s'
   );
   assert.equal(
     Lib.ResourceAlarmText({ Key: 'power', Value: 'battery', Threshold: null, Since: Now }, Now),
@@ -98,7 +98,7 @@ test('power and temperature sections say why there is nothing to show', () => {
   });
   assert.match(
     Lib.HealthSectionMessage('outdated', client({ Version: '3.21.0' }), 'power').Body,
-    /needs ShowTrak Client 3\.22\.0 or later — this client runs 3\.21\.0/
+    /needs ShowTrak Client 3\.22\.0 or later \(this client runs 3\.21\.0\)/
   );
 });
 
@@ -307,7 +307,7 @@ test('a monitored check reads idle, failing or healthy on the Status tab', () =>
   };
   assert.deepEqual(Lib.SystemCheckLiveState(Failing, Lib.SystemCheckCardFor(Failing, 'cpu')), {
     State: 'DEGRADED',
-    Label: 'High CPU usage — 97%',
+    Label: 'High CPU usage - 97%',
   });
   const Offline = { ...Monitored, Online: false };
   assert.deepEqual(Lib.SystemCheckLiveState(Offline, Lib.SystemCheckCardFor(Offline, 'cpu')), {

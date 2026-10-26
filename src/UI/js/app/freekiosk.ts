@@ -43,7 +43,7 @@ export function FreeKioskScopedID(UUID: string): string {
   return `kiosk:${UUID}`;
 }
 
-// The group and display-mode rules mirror src/Modules/FreeKiosk/metrics — the
+// The group and display-mode rules mirror src/Modules/FreeKiosk/metrics; the
 // renderer's tsconfig rootDir is src/UI, so it cannot import the server's copy.
 // They live in lib/freekiosk-monitoring (pure, tested against the server's);
 // these are the names the rest of the renderer already uses. The server remains
@@ -192,7 +192,7 @@ export function RenderFreeKioskTile(K: FreeKioskTerminalView): string {
   const DragUUID = FreeKioskScopedID(K.UUID);
   const Compact = FreeKioskCompactStatus(K);
   // Scoped by its bare UUID: the `kiosk:` prefix above is a drag/selection key,
-  // not a scope id — the scope picker stores bare UUIDs for every client-like
+  // not a scope id; the scope picker stores bare UUIDs for every client-like
   // entity, exactly as it does for dummies.
   const TagBadges = RenderTagBadgeRow(
     ResolveEntityTags(Tags, { ScopedID: String(K.UUID), GroupID: K.GroupID ?? null })

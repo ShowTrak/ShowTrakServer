@@ -1,4 +1,4 @@
-// Monitored storage volumes — the pure half.
+// Monitored storage volumes: the pure half.
 //
 // Everything here is a function of its arguments: normalising a reported
 // snapshot, judging a monitored volume against its conditions, building the
@@ -327,7 +327,7 @@ export interface CriticalStorageOptions {
  * Work out the monitored entry a mark/update request produces.
  *
  * A FIRST mark guards what an operator would want of any show volume: at least
- * 10% free, and — where the volume reports them — that it stays writable and
+ * 10% free, and (where the volume reports them) that it stays writable and
  * its drive stays healthy. A volume that is read-only right now (the sealed
  * macOS system volume, a write-protected card) is not held to writability, or
  * it would fault the moment it was monitored. A volume that is currently

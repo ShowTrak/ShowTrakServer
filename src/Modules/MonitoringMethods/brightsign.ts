@@ -206,7 +206,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   let Video: VideoState | null = null;
   let VideoError: string | null = null;
 
-  // Second request, only when asked for — and skipped outright on audio-only
+  // Second request, only when asked for, and skipped outright on audio-only
   // players, where the video endpoints do not exist at all.
   if (Cfg.IncludeVideo && VideoSupported) {
     const VideoRes = await FetchDws(Config, VideoPath(Cfg.VideoOutput));

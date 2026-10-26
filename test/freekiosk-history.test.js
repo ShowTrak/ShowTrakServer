@@ -3,7 +3,7 @@
 // The interesting behaviour is the compression. A terminal poll writes ~60
 // series every 30 seconds, so storing every reading would be ~86k points per
 // terminal over the 12h window for data that mostly never changes. Flat runs are
-// collapsed to their two endpoints — which has to preserve the SHAPE of a step
+// collapsed to their two endpoints, which has to preserve the SHAPE of a step
 // signal exactly, or a chart would lie about when something changed.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -80,7 +80,7 @@ test('a reading the display mode rules out is not recorded', () => {
   assert.equal(seriesFor(uuid, 'webview_currentUrl').length, 0);
   assert.equal(seriesFor(uuid, 'battery_level').length, 1, 'mode-independent metrics still record');
 
-  // In WebView mode the same poll records it — otherwise this test would pass
+  // In WebView mode the same poll records it; otherwise this test would pass
   // on a fixture that recorded nothing at all.
   const web = nextUUID();
   recordFreeKioskHistorySamples(

@@ -3,7 +3,7 @@
 // Runs in the browser. It connects to the `/ui` Socket.IO namespace, performs
 // the passcode handshake (when configured), installs the web `window.API` shim,
 // injects the capability profile, and then lazily loads the SHARED renderer
-// (`./main`) — the exact same modules the Electron desktop app runs.
+// (`./main`): the exact same modules the Electron desktop app runs.
 //
 // Load order is critical: the shared renderer's bootstrap orchestrator calls
 // `window.API` as soon as `import('./main')` evaluates, so the shim +
@@ -36,7 +36,7 @@ const TOKEN_KEY = 'showtrak_token';
 const PASS_KEY = 'showtrak_passcode';
 
 // Credential persistence. localStorage (not sessionStorage) so an installed
-// PWA can silently re-authenticate after the server restarts — session tokens
+// PWA can silently re-authenticate after the server restarts: session tokens
 // are in-memory server-side, and without re-auth the server stops pushing live
 // state to this socket. sessionStorage is read as a fallback for tokens issued
 // by previous builds.
@@ -79,7 +79,7 @@ try {
 // Handshake over HTTP long-polling, then upgrade to WebSocket when it works.
 // Do NOT put 'websocket' first: Socket.IO never falls back to the second
 // transport when the first one fails, so a browser or network that cannot hold
-// a WebSocket open (seen on iOS Safari) sat on "Connecting…" forever. Starting
+// a WebSocket open (seen on iOS Safari) sat on "Connecting..." forever. Starting
 // on polling always connects, and a failed upgrade just stays on polling.
 const socket = io('/ui', {
   transports: ['polling', 'websocket'],
@@ -182,8 +182,8 @@ function applyWebChrome(config: WebConfig) {
 // The `satisfies CapabilityProfile` keeps the web capability profile
 // structurally in lock-step with the desktop one: adding a field to
 // CapabilityProfile becomes a compile error here until the web surface decides
-// its value (and a typo'd/extra field is rejected too). `satisfies` — rather
-// than a return-type annotation — preserves the inferred object type so the
+// its value (and a typo'd/extra field is rejected too). `satisfies`, rather
+// than a return-type annotation, preserves the inferred object type so the
 // result still assigns to the `Record<string, unknown>`-typed window global.
 // This is the one capability-drift vector the WebUI parity tests don't cover.
 function buildCapabilities(config: WebConfig) {
@@ -241,7 +241,7 @@ async function startApp(config: WebConfig) {
   hide('WEB_LOGIN_OVERLAY');
   hide('WEB_LOADING_OVERLAY');
   // Importing ./main runs the bootstrap orchestrator: every module registers
-  // its subscriptions synchronously (no DOMContentLoaded replay needed — the
+  // its subscriptions synchronously (no DOMContentLoaded replay needed; the
   // former ready handlers are called directly), then Init() runs.
   await import('./main');
   // The shared modules have now registered their subscriptions; ask the server
@@ -338,7 +338,7 @@ function submitLogin() {
 
 // Silently re-authenticate with the stored passcode. Falls back to `onFail`
 // (typically the login screen) when nothing is stored or the server rejects
-// it — rejected credentials are cleared so the keypad is the next stop. On
+// it; rejected credentials are cleared so the keypad is the next stop. On
 // success the server re-runs SendInitialState, which refreshes all live state.
 function tryStoredLogin(onFail: () => void) {
   const stored = getStored(PASS_KEY);
@@ -402,7 +402,7 @@ socket.on('hello', (config: WebConfig) => {
     // settings changed under a live session. If access was revoked, eject to the
     // disabled notice. If the session token survived, just re-hydrate. If it did
     // not (server restart, or the passcode/protection just changed), re-auth with
-    // the stored passcode — without this the server never pushes live updates to
+    // the stored passcode; without this the server never pushes live updates to
     // this socket again and the UI silently goes stale. No stored/valid passcode
     // -> back to the login screen.
     if (!config.Enabled) return showDisabled();
@@ -434,7 +434,7 @@ socket.on('connect', () => {
 });
 
 // Register the offline-splash service worker. It never caches the app shell;
-// it only serves a "Connecting…" splash when ShowTrak Server is unreachable
+// it only serves a "Connecting..." splash when ShowTrak Server is unreachable
 // and reloads back into the app once the server answers (see WebUI/sw.js).
 try {
   if ('serviceWorker' in navigator) {

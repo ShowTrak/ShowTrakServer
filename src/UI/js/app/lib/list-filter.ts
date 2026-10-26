@@ -46,14 +46,14 @@ export interface ListSearchEntities {
 }
 
 /**
- * Every row's searchable fields, keyed by the row's data-uuid — the same keys
+ * Every row's searchable fields, keyed by the row's data-uuid, the same keys
  * the tiles carry: a client's UUID, `monitor:<TargetID>`, `dummy:<UUID>`,
  * `kiosk:<UUID>`. A monitoring target's check rows are not keyed: they show
  * and hide with their target, so a target is also found by its checks' names
  * and addresses.
  *
  * Tags are resolved with the same scope ids the tile builders use, so a row is
- * found by exactly the tags its badges show — and by hidden tags as well, which
+ * found by exactly the tags its badges show, and by hidden tags as well, which
  * exist to target machines and are just as much a way of naming them.
  */
 export function BuildListSearchIndex(Entities: ListSearchEntities): Map<string, string[]> {

@@ -7,7 +7,7 @@
 // double-click, the edit cog, drag-and-drop, the offline counters and every
 // live in-place patch already target the tile, so they all keep working in the
 // list without knowing it exists. This module only adds what a row has and a
-// tile does not — a selection checkbox, a status word, and the history graph.
+// tile does not: a selection checkbox, a status word, and the history graph.
 //
 // The checkbox has no state of its own: CSS draws it from the tile's SELECTED
 // class, so it cannot drift from the selection.
@@ -15,7 +15,7 @@
 // A monitoring target can also be expanded into one row per check (rendered by
 // monitoring.ts, beside the target's tile). Those rows exist only here, so a
 // check's selection never outlives the list: collapsing a target, or leaving
-// the list, drops it — an action must never land on a row nobody can see.
+// the list, drops it; an action must never land on a row nobody can see.
 import {
   AllClients,
   DummyClients,
@@ -126,7 +126,7 @@ function SetTargetExpanded(TargetID: string, Expanded: boolean): void {
 /**
  * Expand or collapse targets from the keyboard (Ctrl/Cmd+Right / Left): the
  * selected monitoring targets when there are any, otherwise every target on
- * the page. List view only — nowhere else shows checks. Returns whether it
+ * the page. List view only; nowhere else shows checks. Returns whether it
  * applied, so the shortcut can leave the keys alone when it did not.
  */
 export function SetListTargetsExpanded(Expanded: boolean): boolean {
@@ -164,7 +164,7 @@ export function ListHistoryCellHtml(Key: string): string {
 /**
  * The cells every tile carries for its list row: selection checkbox, status
  * word, history graph. Hidden in Grid and Compact. Pending-adoption tiles pass
- * `History: false` — a device not yet adopted has no history to show.
+ * `History: false`: a device not yet adopted has no history to show.
  */
 export function RenderListRowCells(
   Key: string,

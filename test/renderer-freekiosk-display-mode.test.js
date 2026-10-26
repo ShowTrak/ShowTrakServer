@@ -3,7 +3,7 @@
 // The renderer cannot import src/Modules (its tsconfig rootDir is src/UI), so
 // the mode rule is mirrored in src/UI/js/app/freekiosk.ts. These tests exist to
 // keep the mirror honest: the server force-disables the alarms regardless of
-// what the renderer draws, so a drifted copy would not corrupt anything — it
+// what the renderer draws, so a drifted copy would not corrupt anything; it
 // would just put a stale URL back on screen, which is the entire bug.
 const test = require('node:test');
 const assert = require('node:assert/strict');

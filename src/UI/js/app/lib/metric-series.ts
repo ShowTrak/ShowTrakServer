@@ -5,7 +5,7 @@
 // samples say the same thing it just moves the second one's timestamp forward,
 // so a screen that has been on for twelve hours costs two samples rather than
 // fourteen hundred. A sample therefore means "this reading held from here until
-// the next sample" — not "this is the only instant anybody looked".
+// the next sample", not "this is the only instant anybody looked".
 //
 // Both bucketers disagreed with that. They count samples per bucket and treat an
 // empty bucket as no data, so a terminal with a steady battery level drew one
@@ -30,7 +30,7 @@ export interface ExpandMetricSeriesOptions {
  * was not running for. A carried-forward `ok: false` stays false, so a genuine
  * outage still paints as a gap rather than being filled in green.
  *
- * Pure, and `now` is injectable — the same contract as BuildMetricChartModel,
+ * Pure, and `now` is injectable: the same contract as BuildMetricChartModel,
  * whose bucket boundaries this must match exactly.
  */
 export function ExpandMetricSeries(

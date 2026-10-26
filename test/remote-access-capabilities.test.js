@@ -1,4 +1,4 @@
-// The shared capability model — Modules/RemoteAccess.
+// The shared capability model: Modules/RemoteAccess.
 //
 // This module decides what a REMOTE surface (the Web UI on `/ui`, ShowTrak
 // Remote on `/sdk`) may reach. It exists as one definition rather than one per
@@ -13,7 +13,7 @@
 //      inside webui-namespace; a refactor that quietly widened one channel for
 //      the browser would be invisible in review. The table-driven pass below
 //      walks every channel in the IPC registry and asserts the decision under
-//      each mode/permission combination — so "behaviour-preserving" is a claim
+//      each mode/permission combination, so "behaviour-preserving" is a claim
 //      the suite checks rather than one the commit message makes.
 //
 //   2. Deny by default really is the default. A channel absent from every
@@ -43,7 +43,7 @@ function load({ settings = {}, mode = 'EDIT' } = {}) {
   });
 }
 
-// Everything on, both global feature flags on, EDIT mode — the most permissive
+// Everything on, both global feature flags on, EDIT mode: the most permissive
 // configuration the model can be in.
 const ALL_ON = {
   SYSTEM_ALLOW_WOL: 1,
@@ -71,7 +71,7 @@ for (const Prefix of ['WEBUI', 'REMOTE']) {
 test('both surfaces reach identical decisions for every registry channel', async () => {
   // The surfaces are deliberately identical: a phone and a browser are both "not
   // the desktop". If a future change makes one stricter, this is the test that
-  // should be updated to say so out loud — not quietly deleted.
+  // should be updated to say so out loud, not quietly deleted.
   const Mod = load({ settings: ALL_ON, mode: 'EDIT' });
 
   for (const Channel of INVOKE_CHANNELS) {
@@ -213,7 +213,7 @@ for (const [Permission, Channel] of CATEGORIES) {
   });
 
   test(`${Permission} off leaves the other categories alone`, async () => {
-    // Categories are independent by design — revoking one must not quietly take
+    // Categories are independent by design: revoking one must not quietly take
     // the others with it.
     const Mod = load({ settings: { ...ALL_ON, [Permission]: 0 }, mode: 'EDIT' });
     for (const [OtherPermission, OtherChannel] of CATEGORIES) {
@@ -264,7 +264,7 @@ test('one surface losing a permission does not affect the other', async () => {
 
 // --- Identify, scripts and WOL ----------------------------------------------
 
-test('identify is allowed in SHOW mode — it mutates nothing', async () => {
+test('identify is allowed in SHOW mode: it mutates nothing', async () => {
   const Mod = load({ settings: ALL_ON, mode: 'SHOW' });
   assert.equal((await Mod.AuthorizeChannel('REMOTE', 'IdentifyClient')).allowed, true);
   assert.equal((await Mod.AuthorizeChannel('REMOTE', 'StopIdentifyingClient')).allowed, true);
@@ -279,7 +279,7 @@ test('identify obeys its own permission', async () => {
 });
 
 test('script execution defaults OFF and is not gated on edit mode', async () => {
-  // Scripts are a SHOW-time action, so mode must not gate them — but they are
+  // Scripts are a SHOW-time action, so mode must not gate them, but they are
   // also the most dangerous thing a remote surface can do, hence the default.
   const Unset = load({ settings: { SYSTEM_ALLOW_WOL: 1 }, mode: 'EDIT' });
   assert.equal((await Unset.AuthorizeChannel('REMOTE', 'ExecuteScript')).allowed, false);
@@ -291,7 +291,7 @@ test('script execution defaults OFF and is not gated on edit mode', async () => 
 
 test('running monitoring actions defaults ON and is not gated on edit mode', async () => {
   // Running a check action (power a projector on, move a fader) drives a real
-  // device like a script does — a SHOW-time control, so mode must not gate it.
+  // device like a script does: a SHOW-time control, so mode must not gate it.
   // Unlike scripts it defaults ON: it is the whole point of reaching for a
   // starred action on a phone or browser mid-show, and it was available (in
   // EDIT mode) before it had its own permission.
@@ -355,7 +355,7 @@ test('unassigned slots need the global feature AND the permission AND edit mode'
 
 test('mode changes and the alert-actions switch default OFF', async () => {
   // Both were denied outright before they had permissions, and switching to
-  // EDIT lifts the master gate for every surface — so unset must mean refused.
+  // EDIT lifts the master gate for every surface, so unset must mean refused.
   const Mod = load({ settings: {}, mode: 'SHOW' });
   for (const Prefix of ['WEBUI', 'REMOTE']) {
     for (const Channel of ['Mode:Set', 'AlertActionsEnabled:Set']) {
@@ -402,7 +402,7 @@ test('the alert-actions switch obeys its own permission in either mode', async (
 
 test('an unreadable settings store falls back to the safe defaults, not to allow-all', async () => {
   // Management defaults are ON, but both global feature flags default OFF and
-  // scripts default OFF — so a settings outage cannot hand a remote surface
+  // scripts default OFF, so a settings outage cannot hand a remote surface
   // anything it would not have had with the features switched off.
   const Mod = load({ settings: { __throws: true }, mode: 'EDIT' });
 

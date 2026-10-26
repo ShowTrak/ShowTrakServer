@@ -1,4 +1,4 @@
-// Which surface an edit or action came from (Desktop, Web UI, OSC, …).
+// Which surface an edit or action came from (Desktop, Web UI, OSC, etc.).
 //
 // Every entry point that dispatches a request runs it inside
 // RunWithAuditSource, and the audit log reads the label back when an edit is

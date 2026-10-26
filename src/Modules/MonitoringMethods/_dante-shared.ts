@@ -1,13 +1,13 @@
 // Shared plumbing for the Dante (Audinate) device-presence monitoring method.
 //
 // Like NDI, Dante discovery is *passive*: every Dante device advertises itself on
-// mDNS, and there is nothing to actively probe — you simply listen. Unlike NDI,
+// mDNS, and there is nothing to actively probe; you simply listen. Unlike NDI,
 // a device announces itself across SEVERAL service types, each carrying a
 // different slice of metadata in its TXT record:
 //
-//   _netaudio-arc._udp   (port 4440) audio routing control — model, firmware
+//   _netaudio-arc._udp   (port 4440) audio routing control: model, firmware
 //                        (router_vers), sample rate, latency_ns, router_info
-//   _netaudio-cmc._udp   (port 8800) control & monitoring — id (MAC), process,
+//   _netaudio-cmc._udp   (port 8800) control & monitoring: id (MAC), process,
 //                        server_vers, channels
 //
 // We browse both and merge them into ONE device record keyed by device name (the
@@ -17,11 +17,11 @@
 //
 // SCOPE: this method reports device *presence* only. Dante subscription health
 // (which receive channels are subscribed, and whether those subscriptions have
-// failed) is NOT carried in mDNS — it lives in the proprietary ARC protocol on
+// failed) is NOT carried in mDNS; it lives in the proprietary ARC protocol on
 // UDP 4440. That is deliberately out of scope here.
 //
 // Freshness note (inherited from the NDI method, same trap): bonjour's Browser
-// emits `up` for a service EXACTLY ONCE and `down` only on an explicit goodbye —
+// emits `up` for a service EXACTLY ONCE and `down` only on an explicit goodbye:
 // re-announcements from our periodic re-query are deduped internally and never
 // re-emitted. Relying on `up` alone freezes each device's timestamp at discovery
 // time, so the grace window would expire seconds after boot and never recover. We
@@ -29,7 +29,7 @@
 // and bump each device's timestamp whenever it re-announces. bonjour still owns
 // add/remove bookkeeping; the tap only keeps timestamps honest.
 //
-// The browser is fully lazy — nothing starts until the first Observe() — so
+// The browser is fully lazy (nothing starts until the first Observe()), so
 // importing this module (e.g. from the method registry) has NO side effects.
 import { CreateLogger } from '../Logger';
 import { CreateBonjourErrorHandler } from '@showtrak/protocol/runtime';
@@ -162,7 +162,7 @@ const { Bonjour } = require('bonjour-service') as {
 const OnBonjourError = CreateBonjourErrorHandler(Logger);
 const bonjour: BonjourFactory = (options) => new Bonjour(options, OnBonjourError);
 
-// The metadata we lift out of the merged TXT records. Every field is optional —
+// The metadata we lift out of the merged TXT records. Every field is optional:
 // TXT content varies by manufacturer and firmware, and a device that answers on
 // only one service type will carry only that service's keys.
 export interface DanteDeviceInfo {
@@ -209,7 +209,7 @@ export function MatchesDevice(
 }
 
 // TXT values arrive as strings from bonjour-service, but can be Buffers if a
-// future version switches to binary mode — coerce defensively.
+// future version switches to binary mode, so coerce defensively.
 function TxtString(
   Txt: Record<string, unknown> | null | undefined,
   Key: string
@@ -265,7 +265,7 @@ function MergeInfo(Existing: DanteDeviceInfo, Incoming: DanteDeviceInfo): DanteD
 // Human-readable sample rate: 48000 -> "48 kHz", 44100 -> "44.1 kHz".
 export function FormatSampleRate(Rate: unknown): string {
   const N = Number(Rate);
-  if (!Number.isFinite(N) || N <= 0) return '—';
+  if (!Number.isFinite(N) || N <= 0) return '-';
   const K = N / 1000;
   return `${Number.isInteger(K) ? K : K.toFixed(1)} kHz`;
 }
@@ -274,7 +274,7 @@ export function FormatSampleRate(Rate: unknown): string {
 // sub-millisecond units operators actually think in (1 ms, 0.25 ms, ...).
 export function FormatDanteLatency(Ns: unknown): string {
   const N = Number(Ns);
-  if (!Number.isFinite(N) || N < 0) return '—';
+  if (!Number.isFinite(N) || N < 0) return '-';
   const Ms = N / 1e6;
   if (Ms >= 1) return `${Number.isInteger(Ms) ? Ms : Ms.toFixed(2)} ms`;
   return `${Ms.toFixed(2)} ms`;
@@ -303,7 +303,7 @@ class DanteBrowserImpl {
     this.EnsureStarted();
   }
 
-  // Read the current cache. Does not start the browser — callers Observe() first.
+  // Read the current cache. Does not start the browser; callers Observe() first.
   Snapshot(): DanteSnapshot {
     return {
       Ready: this.State === 'ready',
@@ -350,7 +350,7 @@ class DanteBrowserImpl {
     });
 
     // Tap the raw multicast-dns response stream so re-announcements refresh each
-    // device's timestamp (bonjour's `up` fires only once — see the file header).
+    // device's timestamp (bonjour's `up` fires only once; see the file header).
     const Mdns = ExtractMdns(Instance);
     if (Mdns) {
       const Handler: MdnsResponseHandler = (Packet) => this.HandleResponse(Packet);
@@ -402,7 +402,7 @@ class DanteBrowserImpl {
     if (Set_) {
       Set_.delete(Service.Type);
       // Only evict the device once it has gone away on EVERY service type it was
-      // visible on — a goodbye on ARC alone doesn't mean the device is offline.
+      // visible on; a goodbye on ARC alone doesn't mean the device is offline.
       if (Set_.size) {
         this.SyncServices(Key);
         return;
@@ -656,7 +656,7 @@ export function EvaluateDante(P: EvaluateParams): MonitoringResult {
     Success: false,
     Error: P.Snapshot.Ready
       ? `Dante device not found (${Fresh.length} device${Fresh.length === 1 ? '' : 's'} visible)`
-      : 'Dante browser starting…',
+      : 'Dante browser starting...',
     Matched: false,
     ...WithDevices,
   };
@@ -702,7 +702,7 @@ export function BuildDanteDebug(Result: MonitoringResult, Target: MonitoringTarg
   const StatusPill = Online ? Pill('success', 'Present') : Pill('danger', 'Not found');
 
   const Head = Rows([
-    TextRow('Target device', DeviceName || '—'),
+    TextRow('Target device', DeviceName || '-'),
     TextRow('Match mode', MatchMode === 'exact' ? 'Exact' : 'Contains'),
     Row('Status', StatusPill),
     Online
@@ -729,7 +729,7 @@ export function BuildDanteDebug(Result: MonitoringResult, Target: MonitoringTarg
     // Discovery is network-wide via mDNS, so the check's Address field is unused.
     Row(
       'Address',
-      '<span class="text-muted small">Not used — Dante discovery is network-wide</span>'
+      '<span class="text-muted small">Not used: Dante discovery is network-wide</span>'
     ),
   ]);
 

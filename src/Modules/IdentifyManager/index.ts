@@ -16,7 +16,7 @@ import { AuditStep } from '../Shared/audit-names';
 
 const Logger = CreateLogger('IdentifyManager');
 
-// Not-yet-migrated JS manager — typed loosely until its own migration.
+// Not-yet-migrated JS manager, typed loosely until its own migration.
 import { Manager as ClientManager } from '../ClientManager';
 
 // Minimal shape of the Socket.IO server surface IdentifyManager drives: it only

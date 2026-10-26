@@ -44,8 +44,8 @@ const MAX_THERMAL_STATES: ReadonlySet<string> = new Set(['nominal', 'fair', 'ser
 
 /**
  * What a first "Monitor" press ticks. Thermal and power are narrowed to what
- * the machine actually reports (see DefaultSystemCheck), so a Mac — which has a
- * thermal state and no readable sensors — is not left guarding a reading it
+ * the machine actually reports (see DefaultSystemCheck), so a Mac (which has a
+ * thermal state and no readable sensors) is not left guarding a reading it
  * will never send.
  */
 export const SYSTEM_CHECK_DEFAULTS = {
@@ -238,7 +238,7 @@ export function UptimeBreach(
 /**
  * Mains, battery level and charging. The battery-level alarm only stands while
  * the battery is not charging: on mains a low charge is recovering, not a fault.
- * Charging is only judged on mains — unplugged, the power-source condition is
+ * Charging is only judged on mains; unplugged, the power-source condition is
  * the one that speaks, and every battery "is not charging".
  */
 export function PowerBreaches(

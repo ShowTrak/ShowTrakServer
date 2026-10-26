@@ -80,7 +80,7 @@ function makeGuardedOn(
    * Tail of the serialized telemetry chain for this socket.
    *
    * Socket.IO dispatches a connection's events in arrival order, but it does not
-   * await the listener — so two async handlers dispatched back to back can both
+   * await the listener, so two async handlers dispatched back to back can both
    * begin, suspend at their first `await ClientManager.Get(...)`, and then apply
    * their mutations in either order. That is harmless while every event replaces
    * the whole list, and not harmless at all once incremental deltas are in play:
@@ -157,7 +157,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       /* intentional: connection logging is best-effort */
     }
     // Expect clients to provide a UUID and whether they believe they are
-    // adopted. The UUID is constrained to a room/selector-safe identifier —
+    // adopted. The UUID is constrained to a room/selector-safe identifier:
     // it flows into Socket.IO rooms, DOM ids and data-uuid attributes.
     try {
       socket.UUID = SocketValidation.HandshakeUUID(
@@ -342,8 +342,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
     );
 
     // Optional progress line pushed by an integrated event while it runs. It
-    // only moves the row's status text — the bar keeps whatever progress it
-    // had — and is dropped once the event settles.
+    // only moves the row's status text (the bar keeps whatever progress it
+    // had) and is dropped once the event settles.
     GuardedOn(
       'IntegratedEventFeedback',
       (RequestID, Message) => [
@@ -545,7 +545,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
      * A client asks once per connection what this server understands, and only
      * starts sending `*Delta` events if the reply says so. A server that predates
      * this event simply never invokes the acknowledgement, and the client stays on
-     * full-list reporting — which is why the client must treat "no reply" as
+     * full-list reporting, which is why the client must treat "no reply" as
      * "no deltas" rather than applying a default.
      */
     GuardedOn(
@@ -613,7 +613,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
         return;
       }
       // A reconnecting client can open its new socket before the server notices
-      // the old one is gone — a half-open connection only surfaces at the next
+      // the old one is gone; a half-open connection only surfaces at the next
       // ping timeout. Socket.IO takes a socket out of its rooms before emitting
       // 'disconnect', so anything still in the UUID room is a live successor:
       // the client is online, and the cleanup below would act on that new

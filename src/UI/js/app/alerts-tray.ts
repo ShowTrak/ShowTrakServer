@@ -31,7 +31,7 @@ export const Alerts: Alert[] = [];
 
 // Nothing in the tray is worth keeping past 12 hours (mirrors
 // HISTORY_RETENTION_MS on the server). The tray otherwise grew for as long as
-// the window stayed open — on a permanent install, weeks of alerts.
+// the window stayed open: on a permanent install, weeks of alerts.
 const ALERT_TRAY_RETENTION_MS = 12 * 60 * 60 * 1000;
 
 // Drop expired entries in place (Alerts is a shared, exported binding).
@@ -197,7 +197,7 @@ export function ToggleAlertsTray(force?: boolean) {
 }
 
 // Formerly a DOMContentLoaded handler; called by the bootstrap orchestrator in
-// main.ts once the DOM is parsed — never at import time.
+// main.ts once the DOM is parsed, never at import time.
 export function InitAlertsTray() {
   const btn = document.getElementById('ALERTS_BUTTON');
   if (btn && !btn.dataset.bound) {

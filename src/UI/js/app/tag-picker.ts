@@ -7,14 +7,14 @@
 //
 // Two design points worth keeping:
 //
-//   Membership is a property of the TAG, not of the client — there is no join
+//   Membership is a property of the TAG, not of the client; there is no join
 //   table. Toggling a chip therefore rewrites that one tag's scope
 //   (Scope.Clients) via the existing Tags:SetScope channel. No new IPC surface
 //   was needed, and the Tag Manager's editor writes the identical shape.
 //
 //   A tag inherited from a group (or from Workspace) renders as an on, LOCKED
 //   chip. Turning it off for one client would mean rewriting the tag for every
-//   other client it covers — never what someone editing a single machine
+//   other client it covers, never what someone editing a single machine
 //   intends. The chip says where it came from instead.
 //
 // The picker ends in an Open Tag Manager button. Closing the Tag Manager reopens
@@ -58,11 +58,11 @@ interface ActiveTagPicker {
 let Active: ActiveTagPicker | null = null;
 
 function MembershipTitle(Kind: TagMembershipKind, Label: string): string {
-  if (Kind === 'workspace') return `${Label} applies to all clients — edit it in the Tag Manager`;
+  if (Kind === 'workspace') return `${Label} applies to all clients; edit it in the Tag Manager`;
   if (Kind === 'group')
-    return `${Label} applies to this client's group — edit it in the Tag Manager`;
+    return `${Label} applies to this client's group; edit it in the Tag Manager`;
   if (Kind === 'tag')
-    return `${Label} covers another tag this client carries — edit it in the Tag Manager`;
+    return `${Label} covers another tag this client carries; edit it in the Tag Manager`;
   if (Kind === 'direct') return `Remove ${Label}`;
   return `Add ${Label}`;
 }
@@ -176,7 +176,7 @@ async function OpenTagManagerFrom(Mount: TagPickerMount, ScopedID: string): Prom
 /**
  * Add or remove this entity from one tag's direct membership.
  *
- * Read-modify-write on the tag's scope, from the push-maintained cache — the
+ * Read-modify-write on the tag's scope, from the push-maintained cache: the
  * same thing the Tag Manager's editor does when it saves. Chips are redrawn by
  * the SetTagList push that follows a successful write, so a failed write leaves
  * the UI showing what the server still holds.
@@ -214,7 +214,7 @@ async function ToggleTagMembership(TagID: number, Entity: TagBadgeEntity): Promi
  * Redraw the mounted picker after a tag list push.
  *
  * Without this, a chip toggled here would keep showing its pre-click state
- * until the editor was reopened — the write succeeds server-side and the UI
+ * until the editor was reopened: the write succeeds server-side and the UI
  * silently disagrees.
  */
 export function RefreshTagPickerIfMounted(): void {
@@ -223,7 +223,7 @@ export function RefreshTagPickerIfMounted(): void {
 }
 
 /**
- * The tags an entity carries as read-only chips — the picker's chips minus the
+ * The tags an entity carries as read-only chips: the picker's chips minus the
  * interaction, so a tag looks the same wherever it appears. Empty markup when
  * it carries none, so the caller can hide the section.
  */

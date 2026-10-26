@@ -7,8 +7,8 @@
 //
 // Extracted from the 1581-line monitoring-editor.ts. This module is a LEAF: it
 // knows about the method catalogue and the DOM, and nothing about the editor's
-// working state or its save cycle. The one place that needed to reach back — a
-// chip input has to push its edit into the editor's working state — is inverted
+// working state or its save cycle. The one place that needed to reach back (a
+// chip input has to push its edit into the editor's working state) is inverted
 // through setFieldEditedHandler below rather than imported, so there is no
 // import cycle with ../monitoring-editor.
 import type { MonitoringSettingField } from '@showtrak/protocol';
@@ -24,7 +24,7 @@ let onFieldEdited: () => void = () => {};
 /** Register the editor's commit function. See the note above. */
 // The monitoring editor's two field hosts. Exposed as the default for the
 // helpers below so another editor can reuse this renderer by passing its own
-// hosts — the emitted HTML and every existing call site are unchanged.
+// hosts; the emitted HTML and every existing call site are unchanged.
 export const MONITORING_FIELD_HOSTS =
   '#MONITORING_CHECK_DYNAMIC_SETTINGS, #MONITORING_CHECK_ADVANCED_SETTINGS';
 
@@ -85,7 +85,7 @@ export function RenderMonitoringMethodOptions($select: JQuery) {
 }
 
 // A small info icon carrying the field's Note. Hovering (or focusing) it reveals
-// a Bootstrap popover with the hint text. Escaped before display — the Note is
+// a Bootstrap popover with the hint text. Escaped before display; the Note is
 // plain text, never markup. ExtraClass positions it (overlay / select variant).
 function BuildMonitoringNoteIconHtml(Field: MonitoringSettingField, ExtraClass = '') {
   const Note = typeof Field.Note === 'string' ? Field.Note.trim() : '';
@@ -108,7 +108,7 @@ function BuildMonitoringLabelHtml(Field: MonitoringSettingField) {
 // Visibility() can show or hide it as that sibling changes.
 //
 // A single Equals condition still emits the original two attributes, unchanged.
-// Anything richer — several conditions ANDed, or a set-membership test — is
+// Anything richer (several conditions ANDed, or a set-membership test) is
 // serialised as JSON into one attribute instead. Keeping the simple case
 // byte-identical means every existing monitoring method renders exactly as
 // before; the JSON form only appears where a method actually needs it.
@@ -291,7 +291,7 @@ export function BuildMonitoringCheckFieldHtml(Field: MonitoringSettingField, Val
         <div class="monitoring-list-chips d-flex flex-wrap gap-1 mb-1">${Chips}</div>
         <div class="input-group input-group-sm monitoring-list-add">
           <input type="${ItemType === 'number' ? 'number' : 'text'}" class="form-control monitoring-list-input"
-            placeholder="Add ${Safe(Field.Label || Field.Key)}…" aria-label="Add ${Safe(
+            placeholder="Add ${Safe(Field.Label || Field.Key)}..." aria-label="Add ${Safe(
               Field.Label || Field.Key
             )}" />
           <button type="button" class="btn btn-ghost text-light monitoring-list-add-btn">Add</button>
@@ -393,7 +393,7 @@ function ReadMonitoringFieldValue(Key: string, $Scope?: JQuery<HTMLElement>): st
 }
 
 // Validate a single required field: flag it invalid (red outline) only once the
-// user has touched it (standard practice — never outline a pristine field) and it
+// user has touched it (standard practice: never outline a pristine field) and it
 // is empty. Non-required fields, and hidden conditional fields, are left alone.
 export function ValidateMonitoringField(El: HTMLElement) {
   const $el = $(El);

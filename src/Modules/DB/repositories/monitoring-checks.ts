@@ -1,7 +1,7 @@
 // MonitoringChecks-table repository. Receives the DB manager instead of
 // importing it so test DB mocks injected into MonitoringTargetManager
 // propagate through unchanged. SQL strings are byte-identical to the
-// historical inline statements — tests match on them.
+// historical inline statements; tests match on them.
 import type { DBManager, DBResult, TxRun } from '../index';
 import type { MonitoringCheckRow } from '../rows';
 
@@ -83,7 +83,7 @@ export function CreateMonitoringChecksRepository(DB: DBManager) {
       ]);
     },
 
-    // Persist quietly (no dirty tracking) — LastSuccessAt is telemetry-driven
+    // Persist quietly (no dirty tracking): LastSuccessAt is telemetry-driven
     // runtime data, not a user edit to the show document. Falls back to Run on
     // DB stubs that don't implement RunWithoutDirtyTracking.
     SetLastSuccessAt(Ts: number, CheckID: number): Promise<DBResult<unknown>> {

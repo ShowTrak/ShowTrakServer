@@ -27,7 +27,7 @@ function freeUdpPort() {
 
 // A fake DiGiCo console: answers "<path>/?" queries by sending "<path> value"
 // to a FIXED feedback port (the DiGiCo Pad device's Send port), never to the
-// port the query came from — the behaviour the method has to cope with.
+// port the query came from: the behaviour the method has to cope with.
 //
 // Options:
 //   feedbackPort   where replies go (required)

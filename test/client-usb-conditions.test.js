@@ -250,7 +250,7 @@ test('a guarded value keeps its baseline while other conditions change', () => {
   assert.equal(entry.FirmwareVersion, '1.23');
   // Presence cannot be turned off, even when a request asks.
   assert.equal(entry.RequirePresent, true);
-  // Omitted ticks keep what is stored — including the device-error default a
+  // Omitted ticks keep what is stored, including the device-error default a
   // client that cannot read device state never shows.
   assert.equal(entry.RequireNoError, true);
 });

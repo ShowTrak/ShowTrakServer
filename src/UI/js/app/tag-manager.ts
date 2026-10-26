@@ -19,8 +19,8 @@ import { Tags as AllTags } from './state';
 //   clients (the slug doubles as the label). Unlike groups, a client may carry
 //   any number of tags.
 // - The editor edits the slug, colour, icon, how the tag draws on client tiles
-//   (hidden / icon / name / icon+name — presentation only, targeting is
-//   unaffected) and — via the shared scope picker ("client selector") — the
+//   (hidden / icon / name / icon+name: presentation only, targeting is
+//   unaffected) and, via the shared scope picker ("client selector"), the
 //   tag's dynamic membership scope. All client kinds
 //   (real clients, monitoring targets, dummy clients, FreeKiosk terminals) are
 //   taggable, and a tag
@@ -42,7 +42,7 @@ let TagManagerEditingIcon: string = DEFAULT_TAG_ICON;
 // the icon (rather than read back off the DOM) because the toggle is a set of
 // buttons, not a form control.
 let TagManagerEditingDisplay: TagDisplayMode = DEFAULT_TAG_DISPLAY;
-// Where to go back to when the Tag Manager closes — the entity editor it was
+// Where to go back to when the Tag Manager closes: the entity editor it was
 // opened from. Null when it was opened from the menu.
 let TagManagerReturnTo: (() => unknown) | null = null;
 
@@ -59,7 +59,7 @@ const TagScopeConfig: ScopePickerConfig = {
   Namespace: 'tagScope',
   Title: 'Tag Members',
   Placeholder: 'No clients',
-  Hint: 'Members are resolved live — a group or tag you pick keeps covering machines added to it later.',
+  Hint: 'Members are resolved live; a group or tag you pick keeps covering machines added to it later.',
   GetSelected: () => TagScopeSelected,
   SetSelected: (values) => {
     TagScopeSelected = values;
@@ -67,7 +67,7 @@ const TagScopeConfig: ScopePickerConfig = {
   GetTags: () => AllTags,
   // Tags apply to every client kind (integrated clients included); only
   // monitoring *checks* are excluded since a check is not itself a client.
-  // A tag may absorb other tags — but never itself, so the tag being edited is
+  // A tag may absorb other tags, but never itself, so the tag being edited is
   // withheld from its own tag list.
   BuildModel: () =>
     buildScopeModel({
@@ -122,7 +122,7 @@ export function RenderTagManagerList() {
     const IconName = NormalizeIconName(Tag.Icon) || DEFAULT_TAG_ICON;
     const Label = Tag.Slug || `Tag ${Tag.TagID}`;
     // A hidden tag draws nothing on tiles, so the list is the only place its
-    // existence is visible — say so here or it looks like a broken tag.
+    // existence is visible; say so here or it looks like a broken tag.
     const HiddenNote = NormalizeTagDisplay(Tag.Display) === 'hidden' ? ' · Hidden on tiles' : '';
     const MemberSummary = `${SummarizeTagScope(Tag)}${HiddenNote}`;
 
@@ -288,7 +288,7 @@ export function SetTagManagerEditorIcon(Icon: unknown) {
   const Preview = document.querySelector('#TAG_MANAGER_ICON_PREVIEW i');
   if (Preview) Preview.className = `bi bi-${Name}`;
   const PreviewButton = document.getElementById('TAG_MANAGER_ICON_PREVIEW');
-  if (PreviewButton) PreviewButton.title = `Icon: ${Name} — click to change`;
+  if (PreviewButton) PreviewButton.title = `Icon: ${Name} (click to change)`;
 }
 
 function CollectTagManagerColour(): number {
@@ -328,7 +328,7 @@ export async function SaveTagManagerConfig() {
   if (SlugErr) {
     SaveBtn.prop('disabled', false);
     if (TagManagerEditingId !== TagID) return;
-    RenderTagManagerIssues('Failed to save — please fix the following:', [SlugErr]);
+    RenderTagManagerIssues('Failed to save. Please fix the following:', [SlugErr]);
     Notify('Failed to save tag.', 'error');
     return;
   }
@@ -349,7 +349,7 @@ export async function SaveTagManagerConfig() {
 
   const Errors = [ColourErr, IconErr, DisplayErr, ScopeErr].filter(Boolean) as string[];
   if (Errors.length) {
-    RenderTagManagerIssues('Tag partially saved — the following failed:', Errors);
+    RenderTagManagerIssues('Tag partially saved. The following failed:', Errors);
     Notify('Failed to fully save the tag.', 'error');
     return;
   }

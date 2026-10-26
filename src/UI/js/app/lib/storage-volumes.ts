@@ -1,4 +1,4 @@
-// Storage section of the client info modal — the decisions, without the DOM.
+// Storage section of the client info modal: the decisions, without the DOM.
 //
 // What the section shows, each volume's card (title, usage, Monitor toggle) and
 // the conditions table of a monitored one. The server judges the conditions;
@@ -62,7 +62,7 @@ export function StorageSectionMessage(
       return {
         Title: 'Storage Unsupported',
         Body: `Monitoring storage needs ShowTrak Client ${MINIMUM_STORAGE_MONITORING_VERSION_LABEL} or later${
-          Client.Version ? ` — this client runs ${Client.Version}` : ''
+          Client.Version ? ` (this client runs ${Client.Version})` : ''
         }. Update the client to monitor it.`,
       };
     case 'waiting':
@@ -100,7 +100,7 @@ export function StorageVolumesOf(Client: ClientView): StorageVolumeView[] {
 // A copy of the formatting in Modules/ClientManager/storage.ts (the renderer is
 // a separate bundle), so the card and the server's issue text agree.
 
-/** "184 GB", "9.4 GB", "512 MB" — rounded down, so a volume under a limit never reads as at it. */
+/** "184 GB", "9.4 GB", "512 MB", rounded down, so a volume under a limit never reads as at it. */
 export function FormatStorageBytes(Bytes: number): string {
   const Units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
   let Value = Math.max(0, Number(Bytes) || 0);
@@ -135,7 +135,7 @@ export function StorageVolumeTitle(Volume: StorageVolumeView): string {
 }
 
 /**
- * The card's subtitle: "/Volumes/Media · apfs · External · 1.8 TB" — the mount
+ * The card's subtitle: "/Volumes/Media · apfs · External · 1.8 TB": the mount
  * point first (unless it is already the title), then whatever else is known.
  */
 export function StorageVolumeSummary(Volume: StorageVolumeView): string {
@@ -285,7 +285,7 @@ export function StorageConditionRows(Volume: StorageVolumeView): StorageConditio
   // A mounted volume says what it can report; a missing one is assumed able to.
   const WritableKnown = !Mounted || Volume.ReadOnly !== null;
   const HealthKnown = !Mounted || Volume.Health !== null;
-  const Dash = (Known: boolean, Text: string) => (!Mounted ? '—' : Known ? Text : 'Unsupported');
+  const Dash = (Known: boolean, Text: string) => (!Mounted ? '-' : Known ? Text : 'Unsupported');
   return [
     {
       Field: 'RequirePresent',

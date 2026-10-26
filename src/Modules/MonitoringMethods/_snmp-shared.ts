@@ -12,7 +12,7 @@ import snmp, {
 import type { MonitoringSettingField, MonitoringSettingVisibleWhen } from './types';
 
 // Editor value -> net-snmp AuthProtocol. 'none' means no message authentication
-// (which, per SNMPv3, also forces no privacy) — i.e. the noAuthNoPriv level.
+// (which, per SNMPv3, also forces no privacy), i.e. the noAuthNoPriv level.
 export const AUTH_PROTOCOLS: Record<string, AuthProtocols> = {
   none: snmp.AuthProtocols.none,
   sha: snmp.AuthProtocols.sha,
@@ -55,7 +55,7 @@ export function LevelLabel(AuthProtocol: string, PrivProtocol: string): string {
 
 // The editor fields for an SNMPv3 user: username, auth/priv protocols and
 // passwords, and the (Advanced) context name. `When` gates every field behind a
-// sibling setting — snmp-oid shows them only while its version select is v3.
+// sibling setting; snmp-oid shows them only while its version select is v3.
 export function V3CredentialFields(When?: MonitoringSettingVisibleWhen): MonitoringSettingField[] {
   const Gate = (Field: MonitoringSettingField): MonitoringSettingField =>
     When ? { ...Field, VisibleWhen: When } : Field;
@@ -104,7 +104,7 @@ export function V3CredentialFields(When?: MonitoringSettingVisibleWhen): Monitor
 export interface V3Credentials {
   Username: string;
   // Selected protocols ('none' when disabled). The effective security level is
-  // derived from these — no separate level field.
+  // derived from these, no separate level field.
   AuthProtocol: string;
   AuthPassword: string;
   PrivProtocol: string;
@@ -117,7 +117,7 @@ export function ParseV3Credentials(Cfg: Record<string, unknown>): V3Credentials 
   const Str = (Value: unknown): string => (Value == null ? '' : String(Value));
   const AuthProtocol = AUTH_PROTOCOLS[Str(Cfg.AuthProtocol)] ? Str(Cfg.AuthProtocol) : 'sha';
   // Privacy is meaningless without authentication, so force it off when auth is
-  // off — this keeps the derived level and the USM user self-consistent.
+  // off; this keeps the derived level and the USM user self-consistent.
   const PrivProtocol = !AuthEnabled(AuthProtocol)
     ? 'none'
     : PRIV_PROTOCOLS[Str(Cfg.PrivProtocol)]

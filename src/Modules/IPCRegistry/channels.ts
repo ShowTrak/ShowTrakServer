@@ -1,4 +1,4 @@
-// IPC channel registry — single source of truth for renderer-facing IPC.
+// IPC channel registry: single source of truth for renderer-facing IPC.
 //
 // Every channel the renderer is allowed to `invoke()` (request/response) or
 // `subscribe()` (main -> renderer push) is declared here ONCE. The preload
@@ -157,7 +157,7 @@ const INVOKE_CHANNELS = [
   // Check actions: one channel for every action of every method. The method +
   // action pair is validated against the registry in the registrar, so a
   // per-action channel would add registry/bridge/shim entries without adding
-  // any safety — the same reasoning as FreeKiosk:Command.
+  // any safety; the same reasoning as FreeKiosk:Command.
   'RunMonitoringAction',
   'GetMonitoringActionFavourites',
   'SetMonitoringActionFavourite',
@@ -224,7 +224,7 @@ const INVOKE_CHANNELS = [
   'Variables:Delete',
   'Variables:GetForClient',
 
-  // Paired ShowTrak Remote devices. Desktop only — never allowlisted for the web
+  // Paired ShowTrak Remote devices. Desktop only; never allowlisted for the web
   // or remote surfaces (see src/main/registrars/remote-devices.ts).
   'Remote:GetDevices',
   'Remote:RevokeDevice',
@@ -302,7 +302,7 @@ const SUBSCRIBE_CHANNELS = [
   'AuditLogAppended',
 ] as const;
 
-// Union types derived from the arrays above — the compile-time contract for
+// Union types derived from the arrays above: the compile-time contract for
 // every layer that names a channel (RPC.handle registrations, the preload
 // bridge allowlists, the handler registry).
 export type InvokeChannel = (typeof INVOKE_CHANNELS)[number];

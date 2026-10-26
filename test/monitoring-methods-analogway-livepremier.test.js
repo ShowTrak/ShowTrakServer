@@ -142,7 +142,7 @@ test('analogway-livepremier: firmware assertion', async () => {
   });
 });
 
-test('analogway-livepremier: password protected — login once, reuse the cookie', async () => {
+test('analogway-livepremier: password protected: login once, reuse the cookie', async () => {
   const M = load();
   await withServer(device({ password: 'secret' }), async (s) => {
     let R = await M.Run(target(s.port));
@@ -420,13 +420,13 @@ test('analogway-livepremier: DescribeAction binds memory, screens and destinatio
   const M = load();
   assert.equal(
     M.DescribeAction('memory.program', { Memory: 30, Screens: [1, 2] }),
-    'Load Memory 30 — Screens 1, 2 (Program)'
+    'Load Memory 30 - Screens 1, 2 (Program)'
   );
   assert.equal(
     M.DescribeAction('memory.preview', { Memory: 4 }),
-    'Load Memory 4 — Screen 1 (Preview)'
+    'Load Memory 4 - Screen 1 (Preview)'
   );
-  assert.equal(M.DescribeAction('transition.take', { Screen: 3 }), 'Take — Screen 3');
+  assert.equal(M.DescribeAction('transition.take', { Screen: 3 }), 'Take - Screen 3');
   assert.equal(M.DescribeAction('memory.program', { Memory: 0 }), null);
   assert.equal(M.DescribeAction('other', {}), null);
 });

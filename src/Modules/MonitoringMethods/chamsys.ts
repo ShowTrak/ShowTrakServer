@@ -1,15 +1,15 @@
 // ChamSys MagicQ console health via the built-in web server.
 //
 // MagicQ (MQ50/70/250M, Compact, MagicQ PC/Mac, MagicQ Go) has an optional web
-// server — disabled by default, enabled in Setup → Network Settings, default TCP
-// 8080 — that serves system-information pages. We issue a single read-only
+// server (disabled by default, enabled in Setup → Network Settings, default TCP
+// 8080) that serves system-information pages. We issue a single read-only
 // GET / and confirm the response is actually a MagicQ web server (not just any
 // service on the port), reporting a single online / offline verdict and, best
 // effort, the software version parsed from the page.
 //
 // MagicQ's OSC surface is deliberately NOT used for probing: its TX/RX ports have
 // no fixed default, there is no query/echo address, and a stray OSC message can
-// activate a playback — so the web server is the safe read-only channel.
+// activate a playback, so the web server is the safe read-only channel.
 import { PerformHttpRequest } from './_http-shared';
 import { Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
@@ -118,7 +118,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     return {
       Success: false,
       ...(Refused ? { Degraded: true } : {}),
-      Error: Refused ? `${ErrMsg} — is the MagicQ web server enabled?` : ErrMsg,
+      Error: Refused ? `${ErrMsg}. Is the MagicQ web server enabled?` : ErrMsg,
     };
   }
 
@@ -158,7 +158,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     return {
       Success: true,
       Degraded: true,
-      DegradedReason: `Version ${Version} (expected ${Config.ExpectedVersion}…)`,
+      DegradedReason: `Version ${Version} (expected ${Config.ExpectedVersion}...)`,
       LatencyMs: Res.LatencyMs,
       Status,
       MagicQVersion: Version,
@@ -188,12 +188,12 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   if (Reachable) {
     ExtraRows.push(TextRow('Software', String(Result.MagicQVersion || 'Unknown')));
     if (Config.CheckVersion && Config.ExpectedVersion) {
-      ExtraRows.push(TextRow('Expected', `${Config.ExpectedVersion}…`));
+      ExtraRows.push(TextRow('Expected', `${Config.ExpectedVersion}...`));
     }
   }
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Row('Status', StatusPill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)

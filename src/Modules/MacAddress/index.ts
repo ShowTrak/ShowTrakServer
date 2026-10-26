@@ -25,7 +25,7 @@ export function NormalizeMacAddress(Value: unknown): string | null {
 }
 
 /**
- * Whether a MAC belongs to a physical, externally-reachable interface — i.e. one
+ * Whether a MAC belongs to a physical, externally-reachable interface, i.e. one
  * worth storing and firing a magic packet at.
  *
  * Rejects, in order:
@@ -35,14 +35,14 @@ export function NormalizeMacAddress(Value: unknown): string | null {
  *    These are never a NIC's own hardware address;
  *  - locally-administered MACs (second-least-significant bit of the first octet
  *    set). Real NICs ship with a globally-unique, vendor-assigned (OUI) address;
- *    the locally-administered bit marks software-assigned ones — Docker bridges,
+ *    the locally-administered bit marks software-assigned ones: Docker bridges,
  *    VirtualBox/VMware/Hyper-V virtual adapters, and randomized Wi-Fi privacy
  *    addresses. None of those wake a machine, and randomized addresses actively
  *    pollute the table by changing on every association.
  *
  * Note this is deliberately independent of the OS `internal` flag: that flag
  * catches loopback but not virtual adapters, and the SystemInfo payload does not
- * carry it at all. Callers that DO have the flag should still honour it — the
+ * carry it at all. Callers that DO have the flag should still honour it; the
  * two filters are complementary.
  */
 export function IsExternalMacAddress(Value: unknown): boolean {

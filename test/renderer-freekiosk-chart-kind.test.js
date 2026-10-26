@@ -1,10 +1,10 @@
-// Exercises MetricChartKind in src/UI/js/app/freekiosk-modal.ts — what gets
+// Exercises MetricChartKind in src/UI/js/app/freekiosk-modal.ts: what gets
 // drawn under a metric's reading in the view modal.
 //
 // The rule is a two-part decision and neither part is obvious from the registry
 // alone. `Chart` describes the VALUE: is its shape over time worth a graph?
 // Uptime, storage and the rotation index say no. But arming a check asks a
-// different question — "was it within limits?" — which has a shape even when the
+// different question ("was it within limits?"), which has a shape even when the
 // number does not, so those metrics still get the pass/fail timeline once
 // somebody is watching them.
 const test = require('node:test');
@@ -28,8 +28,8 @@ const metric = (Chart, over = {}) => ({
 test('nothing is charted unless a check is armed on it', () => {
   // Without a check there is no standard to judge a reading against, so a chart
   // could only report that the device answered. Worse, a block timeline would be
-  // solid green whatever the reading was — nothing breaches when nothing is
-  // being judged — which reads as a verdict rather than as an absence of one.
+  // solid green whatever the reading was (nothing breaches when nothing is
+  // being judged), which reads as a verdict rather than as an absence of one.
   for (const chart of ['line', 'blocks', 'none']) {
     assert.equal(MetricChartKind(metric(chart), false), 'none', chart);
   }
@@ -41,7 +41,7 @@ test('an armed metric is charted the way the registry says', () => {
 });
 
 test('an armed value-only metric gets pass/fail rather than a graph', () => {
-  // Uptime and storage are read as "what is it now" — the number's shape says
+  // Uptime and storage are read as "what is it now"; the number's shape says
   // nothing. Whether it has been WITHIN LIMITS is a different question, and one
   // worth a timeline.
   assert.equal(MetricChartKind(metric('none'), true), 'blocks');
@@ -49,7 +49,7 @@ test('an armed value-only metric gets pass/fail rather than a graph', () => {
 
 // A section with monitoring switched off has no case here at all: RenderSection
 // drops the entire section before any row is built, so nothing that reaches this
-// function is unmonitored. That is why it takes no "monitored" argument — a
+// function is unmonitored. That is why it takes no "monitored" argument: a
 // parameter nothing can ever pass false to is a claim the code cannot keep.
 
 test('the registry metrics that lost their graphs can still show pass/fail', () => {

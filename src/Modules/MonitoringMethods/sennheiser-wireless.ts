@@ -6,14 +6,14 @@
 // Protocol: SSC v1 is JSON over UDP, one message per datagram, default port 45
 // (Sennheiser SSC developer guides, "SSC Transport Layer Adaptations"). A read
 // is the address tree with null leaves; the receiver answers with the same tree
-// filled in, and MUST answer every message — with `{"osc":{"error":[...]}}` for
+// filled in, and MUST answer every message, with `{"osc":{"error":[...]}}` for
 // an address it does not have:
 //
 //   TX: {"rx1":{"name":null,"carrier":null}}
 //   RX: {"rx1":{"name":"LEAD VOX","carrier":578350}}
 //
 // Which receivers speak it:
-//   - Digital 6000 (EM 6000, EM 6000 Dante) — Sennheiser TI 1109 v2.2. Two
+//   - Digital 6000 (EM 6000, EM 6000 Dante): Sennheiser TI 1109 v2.2. Two
 //     channels; the transmitter is /rxN/skx/* (battery is ["70%","5:12"], an
 //     empty array when no transmitter), metering is /mm.
 //   - EW-DX EM 2 / EM 2 Dante / EM 4 Dante on firmware < 4.0, or on 4.0+ with
@@ -22,11 +22,11 @@
 //     warnings}, /mates/txN/{type,mute,battery/{gauge,type,lifetime}},
 //     /m/rxN/{rsqi,divi}.
 // EW-DX firmware 4.0+ without legacy mode speaks only SSCv2 (HTTPS REST with a
-// device password), which this method does not implement — see the report.
+// device password), which this method does not implement; see the report.
 //
 // The probe is two short phases over one UDP socket: read the device identity,
 // then send only that family's queries (both families' when the product is
-// unrecognised — every query is a null-argument read, so an unknown address
+// unrecognised; every query is a null-argument read, so an unknown address
 // costs nothing but an error reply). Replies are deep-merged into one state
 // tree. A phase ends when every query has been answered, after QUIET_MS of
 // silence, or when the Timeout budget runs out; unanswered queries are re-sent
@@ -35,7 +35,7 @@
 //
 // Assertions: battery is on by default; a required transmitter, mute and the
 // receiver's own warnings are opt-in. Battery readings are only judged while a
-// transmitter is linked — a switched-off spare is not a flat battery.
+// transmitter is linked: a switched-off spare is not a flat battery.
 import dgram from 'dgram';
 import dns from 'dns';
 import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
@@ -721,7 +721,7 @@ function ProbeSsc(Config: SscConfig): Promise<ProbeOutcome> {
         : { Ok: false, Error: `No SSC reply after ${Config.TimeoutMs}ms`, Refused: false };
 
     const Run = async (): Promise<void> => {
-      // The whole probe's budget, whatever phase it is in — name resolution
+      // The whole probe's budget, whatever phase it is in, name resolution
       // included, so a slow resolver cannot stretch the probe past Timeout.
       let Resolving = true;
       Later(
@@ -894,7 +894,7 @@ function FormatBattery(Ch: SennheiserChannelResult): string {
   }
   if (Ch.BatteryLow && !Parts.includes('low')) Parts.push('low');
   if (Ch.BatteryType) Parts.push(Ch.BatteryType);
-  return Parts.length ? Parts.join(' · ') : '—';
+  return Parts.length ? Parts.join(' · ') : '-';
 }
 
 function ChannelBadge(Ch: SennheiserChannelResult): string {
@@ -914,12 +914,12 @@ function ChannelCard(Ch: SennheiserChannelResult): string {
   if (Ch.ActiveAntenna) Rf.push(`antenna ${Ch.ActiveAntenna}`);
 
   const Body = Rows([
-    TextRow('Frequency', Ch.FrequencyMHz != null ? `${Ch.FrequencyMHz.toFixed(3)} MHz` : '—'),
+    TextRow('Frequency', Ch.FrequencyMHz != null ? `${Ch.FrequencyMHz.toFixed(3)} MHz` : '-'),
     TextRow(
       'Transmitter',
       Ch.TxPresent === false
         ? 'None'
-        : [Ch.TxType, Ch.TxName].filter(Boolean).join(' · ') || (Ch.TxPresent ? 'Linked' : '—')
+        : [Ch.TxType, Ch.TxName].filter(Boolean).join(' · ') || (Ch.TxPresent ? 'Linked' : '-')
     ),
     Ch.TxPresent !== false ? TextRow('Battery', FormatBattery(Ch)) : null,
     Rf.length ? TextRow('RF', Rf.join(' · ')) : null,
@@ -946,7 +946,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Text = (Value: unknown): string => (Value == null || Value === '' ? '' : String(Value));
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port} (UDP)`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port} (UDP)`),
     Row('Status', StatusPill),
     Online && Text(Result.Model || Result.Family)
       ? TextRow('Receiver', [Text(Result.Model), Text(Result.Family)].filter(Boolean).join(' · '))
@@ -991,7 +991,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
 export const Name = 'Wireless Receiver (Sennheiser)';
 export const Description =
-  'Reads every channel of a Sennheiser Digital 6000 or EW-DX receiver over Sennheiser Sound Control (SSC, UDP 45) — transmitter link, battery level and runtime, mute and receiver warnings — and reports Degraded when a monitored channel’s battery is low. Read-only: it sends only queries.';
+  'Reads every channel of a Sennheiser Digital 6000 or EW-DX receiver over Sennheiser Sound Control (SSC, UDP 45), covering transmitter link, battery level and runtime, mute and receiver warnings, and reports Degraded when a monitored channel’s battery is low. Read-only: it sends only queries.';
 export const Group = 'Sound';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = {

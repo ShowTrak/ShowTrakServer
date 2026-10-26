@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-// Critical network interfaces — the pure half (Modules/ClientManager/network.ts):
+// Critical network interfaces: the pure half (Modules/ClientManager/network.ts):
 // address parsing, judging an interface against its conditions, the renderer's
 // view, and what a mark request resolves to.
 

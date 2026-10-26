@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
 
-// Covers src/main/rainbow-mode.ts — the console's easter egg. One in-memory flag
+// Covers src/main/rainbow-mode.ts: the console's easter egg. One in-memory flag
 // shared by every surface: it must start off on every boot (nothing persists
 // it), and only a real change may be pushed.
 

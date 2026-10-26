@@ -6,7 +6,7 @@
 // modal underneath it and buried the rest of the form, and there was no way to
 // find one machine by name. So the picker is now a screen of its own: the modal
 // you came from is hidden, the picker takes the space, and a back button returns
-// you exactly where you were — the same pattern the icon picker uses.
+// you exactly where you were, the same pattern the icon picker uses.
 //
 // Two behaviours are deliberate and load-bearing:
 //
@@ -190,7 +190,7 @@ export function RenderScopePickerList(): void {
   const Needle = SearchText.trim().toLowerCase();
 
   // "All Clients" is a control, not a search result, so it stays put while
-  // filtering — otherwise the one row that clears a bad selection disappears
+  // filtering; otherwise the one row that clears a bad selection disappears
   // exactly when the operator is hunting through a long list.
   const WorkspaceChecked =
     !!Scope.Workspace ||
@@ -293,7 +293,7 @@ function applyChange(Kind: string, Value: string, Checked: boolean): void {
   // Groups and individual entities share the leaf-set logic: resolve the
   // directly-named entities, edit that set, then re-collapse it (so selecting
   // every member of a group stores the group, and future members stay covered).
-  // Tag tokens are carried through untouched — they are never re-derived.
+  // Tag tokens are carried through untouched; they are never re-derived.
   const SelectedTargets = resolveScopeTargetValues(Scope, Model);
   if (Kind === 'group') {
     const Group = Model.Groups.find((Entry) => Entry.Value === Value);
@@ -403,7 +403,7 @@ export function InitScopePicker(): void {
 
   // Escape / backdrop dismissal goes through Bootstrap rather than our buttons.
   // It must still restore the previous screen, and it still keeps the selection
-  // — there is no cancel. The guard stops our own programmatic hide (inside
+  // (there is no cancel). The guard stops our own programmatic hide (inside
   // CloseScopePicker, which has already cleared ActiveConfig) re-entering here.
   $(`#${MODAL_ID}`).on('hidden.bs.modal', () => {
     if (!ActiveConfig) return;

@@ -1,5 +1,5 @@
 // USB section of the client info modal: one card per device, styled like the
-// audio and display cards, with a critical toggle and — once critical — an
+// audio and display cards, with a critical toggle and (once critical) an
 // auto-saving conditions table (connected, port, firmware version, device
 // error). The decisions live in lib/usb-devices.
 import { CreateConditionSaveQueue } from './lib/condition-save-queue';

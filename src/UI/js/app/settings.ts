@@ -23,7 +23,7 @@ import { FormatSettingValue, ResolveSettingsTab } from './lib/settings-tabs';
 import type { RemoteDeviceView, SettingGroupView, SettingView } from '@showtrak/protocol';
 // Wires the mode/view/alert-action buttons and fetches initial settings +
 // mode state. Formerly a DOMContentLoaded handler; InitSettings() calls it
-// directly (fire-and-forget) once the bootstrap orchestrator runs — the DOM is
+// directly (fire-and-forget) once the bootstrap orchestrator runs; the DOM is
 // already parsed at that point on both surfaces.
 async function WireSettingsControls() {
   // Wire new button group
@@ -112,7 +112,7 @@ export const Sounds: Record<string, Howl> = {
   }),
 };
 
-// Called by the bootstrap orchestrator in main.ts — never at import time.
+// Called by the bootstrap orchestrator in main.ts, never at import time.
 export function InitSettings() {
   void WireSettingsControls();
   window.API.PlaySound(async (SoundName) => {
@@ -122,7 +122,7 @@ export function InitSettings() {
   });
   InitSettingsPush();
   // Keep the Remote Access address list current when the host gains or loses a
-  // network interface (VLAN NIC up/down, adapter plugged in, VPN, …).
+  // network interface (VLAN NIC up/down, adapter plugged in, VPN, etc.).
   window.API.OnNetworkInterfacesChanged(() => {
     void RenderRemoteAccessSection();
   });
@@ -142,7 +142,7 @@ function InitSettingsPush() {
     const IncomingGroups = Array.isArray(NewSettingsGroups) ? NewSettingsGroups : [];
     // Every SetSetting round-trips back here as a push. Rebuilding the panel on
     // each one would collapse #SETTINGS_CONTENT to zero height, resetting its
-    // scroll to the top and dropping keyboard focus mid-edit — so when only
+    // scroll to the top and dropping keyboard focus mid-edit, so when only
     // values changed, keep the existing controls and just sync them.
     const Structure = ComputeSettingsStructure(Incoming, IncomingGroups);
     const CanReuse = Structure === RenderedStructure && $('#SETTINGS').children().length > 0;
@@ -186,7 +186,7 @@ function InitSettingsPush() {
   });
 }
 
-// Signature of everything about the settings list that affects the markup —
+// Signature of everything about the settings list that affects the markup:
 // i.e. everything except the values. Two pushes with the same signature can
 // share one rendered DOM.
 function ComputeSettingsStructure(
@@ -295,7 +295,7 @@ function CaptureSettingsViewState(): () => void {
   let selectionStart: number | null = null;
   let selectionEnd: number | null = null;
   if (active instanceof HTMLInputElement) {
-    // Throws on input types that have no text selection (number, range, …).
+    // Throws on input types that have no text selection (number, range, etc.).
     try {
       selectionStart = active.selectionStart;
       selectionEnd = active.selectionEnd;
@@ -388,7 +388,7 @@ function RenderSettingsSections(Structure: string) {
           });
       } else if (Setting.Type === 'STRING' || Setting.Type === 'PASSWORD') {
         const isWebUiPassword = Setting.Key === 'WEBUI_PASSWORD';
-        // PASSWORD only changes how the field is rendered — it is a plain string
+        // PASSWORD only changes how the field is rendered; it is a plain string
         // everywhere else, so it shares the whole STRING code path below.
         const isMasked = Setting.Type === 'PASSWORD';
         const inputType = isMasked ? 'password' : 'text';
@@ -401,8 +401,8 @@ function RenderSettingsSections(Structure: string) {
         const inputPlaceholder = isWebUiPassword
           ? '4 digit code'
           : isMasked
-            ? 'Paste token…'
-            : 'Enter text…';
+            ? 'Paste token...'
+            : 'Enter text...';
         const initialValue = isWebUiPassword
           ? String(Setting.Value == null ? '' : Setting.Value)
               .replace(/\D/g, '')
@@ -679,7 +679,7 @@ async function RenderRemoteAccessSection() {
           ShowQRModal(url);
         });
     } else {
-      // No addresses to show — drop the nav metadata so it is left out of the
+      // No addresses to show, so drop the nav metadata so it is left out of the
       // category list on rebuild.
       $container
         .removeClass('settings-section')
@@ -718,7 +718,7 @@ function DeviceIcon(Platform: string | null): string {
 
 // Show a QR carrying a fresh single-use pairing code, so a phone can pair
 // without anyone typing an address or a PIN. The code is minted per display and
-// discarded when the modal closes — a QR left on a screen after the operator
+// discarded when the modal closes; a QR left on a screen after the operator
 // walks away must not still be redeemable.
 async function ShowPairingQR() {
   try {
@@ -753,8 +753,8 @@ async function RenderPairedDevicesSection() {
   if (!$container.length) return;
   try {
     const [Err, Devices] = await window.API.GetRemoteDevices();
-    // The browser surface stubs this call out — paired-device management is
-    // desktop only — so an empty result there is expected, not an error.
+    // The browser surface stubs this call out (paired-device management is
+    // desktop only), so an empty result there is expected, not an error.
     const List: RemoteDeviceView[] = Err || !Devices ? [] : Devices;
 
     const Signature = JSON.stringify(List.map((D) => [D.DeviceID, D.DeviceName, D.LastSeenAt]));
@@ -885,7 +885,7 @@ function BuildSettingsNav() {
   const sections = $content.find('.settings-section[data-nav-title]:not(.d-none)').toArray();
   $nav.empty();
 
-  // A single (or no) category needs no tabs — reclaim the space and show it all.
+  // A single (or no) category needs no tabs; reclaim the space and show it all.
   const Tabbed = sections.length > 1;
   $('#SHOWTRAK_MODAL_SETTINGS .modal-body').toggleClass('is-tabbed', Tabbed);
   if (!Tabbed) {

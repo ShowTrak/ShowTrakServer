@@ -127,7 +127,7 @@ test('ma2 degrades when the responder is not a grandMA2', async () => {
       Settings: { Port: server.port, Timeout: 1000 },
     });
     // No prompt / login marker means the banner never "completes"; the probe
-    // times out but has bytes — treated as reachable-but-not-grandMA2 only when
+    // times out but has bytes, treated as reachable-but-not-grandMA2 only when
     // a banner completes. Here it stays offline (no recognised banner).
     assert.equal(result.Success, false);
   } finally {

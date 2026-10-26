@@ -1,7 +1,7 @@
 // The monitored system checks in the client info modal: CPU, Memory and Uptime
 // cards on the Usage tab (CPU and memory with their usage charts), Power and
 // Thermal on the Power & Thermal tab. Each card is styled like a monitored
-// display or network interface — a Monitor toggle, the issues it raises, and
+// display or network interface: a Monitor toggle, the issues it raises, and
 // an auto-saving conditions table. The decisions live in lib/system-health.
 import type { ClientSystemCheckKey, ClientView, FreeKioskMetricSample } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
@@ -69,7 +69,7 @@ function ConditionCell(Row: SystemConditionRow): string {
     return `
       <span class="SHOWTRAK_AUDIO_COND_BOUND SHOWTRAK_SYSTEM_COND_SELECT">
         <select data-rule="${Row.Field}" data-default="${Safe(Input.Default)}" aria-label="${Safe(Row.Label)}">
-          <option value="" ${Input.Value ? '' : 'selected'}>—</option>
+          <option value="" ${Input.Value ? '' : 'selected'}>-</option>
           ${(Input.Options || [])
             .map(
               (Option) =>
@@ -177,7 +177,7 @@ export function SystemCardHtml(
   const Note = Card.Note
     ? `<small class="d-block mb-0 text-start ${Card.Note.Tone === 'danger' ? 'st-condition-failing' : 'text-light'}">${Safe(
         Card.Note.Title
-      )} — ${Safe(Card.Note.Body)}</small>`
+      )}: ${Safe(Card.Note.Body)}</small>`
     : '';
   const Chart =
     Card.Key === 'cpu' || Card.Key === 'ram'
@@ -371,7 +371,7 @@ export function BindClientInfoSystemHandlers(
       }
     )
     .on('focusout.client-system', `.SHOWTRAK_SYSTEM_CONDITIONS ${EDITABLE}`, function () {
-      // Apply a rebuild held back while this field had focus — after the
+      // Apply a rebuild held back while this field had focus, after the
       // `change` that fires first has had its chance to save.
       setTimeout(() => {
         if (!Pending || !Last) return;

@@ -7,13 +7,13 @@
 //                      is up and running and responding to commands"; it is
 //                      also what proves the port is a Symetrix control port.
 //   2. `$v V`        → the multi-line version report ("Firmware Version: V2.000",
-//                      "Build Date: …", …), followed by a second `$q NOP` whose
+//                      "Build Date: ...", etc.), followed by a second `$q NOP` whose
 //                      ACK marks the end of that report. The report has no
 //                      documented terminator, so bracketing it with a NOP is
 //                      this probe's own device (inferred from "one response per
 //                      command, in order"), not a documented framing rule. The
 //                      report's last line ends in a `>` prompt with no line end,
-//                      so that ACK may arrive as "…>ACK" on the same line.
+//                      so that ACK may arrive as "...>ACK" on the same line.
 //   3. `$q GPR`      → the last preset loaded, four digits (0000 = none).
 //   4. `$q GS2 <n>`  → `<n> <value>` for each listed control number, only when
 //                      control assertions are enabled. NAK means the control
@@ -211,7 +211,7 @@ const LINE_END_RE = /\r\n|\r|\n/g;
 // A received line without its surrounding whitespace or `>` prompt marks.
 // Verbose output is framed by `>` with no line end after it (the V example on
 // the Setup Commands page ends "TCP/IP instance #1 of 4 >", the $v SSYSS
-// example reads ">Set System String … succeeded>"), so a `>` can be left at
+// example reads ">Set System String ... succeeded>"), so a `>` can be left at
 // either end of the next line. Tolerated rather than documented as framing.
 function CleanLine(Line: string): string {
   return Line.trim()
@@ -221,7 +221,7 @@ function CleanLine(Line: string): string {
 
 /**
  * A predicate for ReplyQueue: how many leading characters end with the first
- * line that answers Sent — skipping blank lines, pushed data (`#…`) and an echo
+ * line that answers Sent, skipping blank lines, pushed data (`#...`) and an echo
  * of Sent itself. Null while no such line has arrived.
  */
 function ReplyTo(Sent: string): (Buffered: string) => number | null {
@@ -240,7 +240,7 @@ function ReplyTo(Sent: string): (Buffered: string) => number | null {
 
 // Everything up to and including the closing NOP's ACK. The report's last line
 // ends in a `>` prompt with no line end, so that ACK can arrive glued to it
-// ("… TCP/IP instance #1 of 4 >ACK"): a line that is ACK, or ends in `>ACK`.
+// ("... TCP/IP instance #1 of 4 >ACK"): a line that is ACK, or ends in `>ACK`.
 const ACK_LINE_RE = /(?:^|>)\s*ACK$/i;
 
 function UpToAck(Buffered: string): number | null {
@@ -483,7 +483,7 @@ function QueryUnit(Config: SymetrixConfig, Numbers: number[]): Promise<SymetrixP
 
 // --- Evaluation ----------------------------------------------------------------------
 
-// The reasons a reachable unit is unhealthy, per the enabled options. Pure —
+// The reasons a reachable unit is unhealthy, per the enabled options. Pure;
 // exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: SymetrixSnapshot, Options: HealthOptions): string[] {
   if (!Snapshot.IsSymetrix) return ['Responded, but not as a Symetrix control port'];
@@ -615,7 +615,7 @@ const Actions: MonitoringActionDef[] = [
   },
 ];
 
-// Validate an action's parameters and build its one command. Pure — exported
+// Validate an action's parameters and build its one command. Pure; exported
 // via _internal for unit tests.
 function BuildActionCommand(
   ActionID: string,
@@ -776,7 +776,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       : Pill('success', 'Healthy');
 
   const Head = [
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Row('Status', StatePill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
@@ -865,7 +865,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
 export const Name = 'Symetrix DSP';
 export const Description =
-  'Connects to a Symetrix Composer DSP (Radius NX, Edge, Prism, Solus NX) on the Composer Control Protocol (TCP 48631) and confirms it answers commands, reading its firmware version and last loaded preset — read-only. Optionally reports Degraded when the wrong preset is loaded or a listed control number does not hold its expected value, such as a diagnostics status LED.';
+  'Connects to a Symetrix Composer DSP (Radius NX, Edge, Prism, Solus NX) on the Composer Control Protocol (TCP 48631) and confirms it answers commands, reading its firmware version and last loaded preset (read-only). Optionally reports Degraded when the wrong preset is loaded or a listed control number does not hold its expected value, such as a diagnostics status LED.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = {
   ParseConfig,

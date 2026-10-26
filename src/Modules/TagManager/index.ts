@@ -7,7 +7,7 @@
 //   edited with the shared scope picker. Colour is an integer index into the
 //   shared Scripts palette; Icon is a bare Bootstrap Icons name; Display is how
 //   the tag draws on a client tile ('hidden' | 'icon' | 'name' | 'both') and is
-//   presentation only — a hidden tag targets scripts/alerts/OSC as ever.
+//   presentation only; a hidden tag targets scripts/alerts/OSC as ever.
 // - Scope.Tags lets a tag absorb OTHER tags, so a tag can be a superset of
 //   several others. Membership is therefore a graph walk, not a lookup; see
 //   ../ScopeMatching, which owns the walk and its cycle guard.
@@ -69,7 +69,7 @@ function NormalizeDisplay(Value: unknown): TagDisplayMode {
 }
 
 // Coerce arbitrary parsed JSON into a well-formed scope. Groups are numeric
-// (GroupID); Clients are scoped-ID strings (plain UUID, or monitor:/check:…);
+// (GroupID); Clients are scoped-ID strings (plain UUID, or monitor:/check:...);
 // Tags are numeric TagIDs of other tags this one absorbs. Anything malformed is
 // dropped rather than throwing.
 function NormalizeScope(Raw: unknown, SelfTagID?: number): TagScope {
@@ -86,7 +86,7 @@ function NormalizeScope(Raw: unknown, SelfTagID?: number): TagScope {
   }
   // A tag can absorb other tags, but never itself: a self-reference is the one
   // cycle that is unambiguously a mistake, and dropping it here keeps the
-  // stored data clean (deeper cycles are tolerated at resolve time instead —
+  // stored data clean (deeper cycles are tolerated at resolve time instead;
   // they can be authored across two edits, so refusing them here would just
   // move the problem).
   const Tags = NormalizeScopeTags(Obj.Tags).filter((TagID) => TagID !== SelfTagID);

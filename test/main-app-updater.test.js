@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const { installModuleMocks, matchesModule } = require('./helpers/main-mocks');
 
-// Exercises src/main/app-updater.ts — what happens when a check is requested
+// Exercises src/main/app-updater.ts: what happens when a check is requested
 // while an update is already being fetched.
 //
 // Reopening the Software Update modal (or the periodic automatic check firing)

@@ -89,7 +89,7 @@ function ParseHealthOptions(Target: MonitoringTargetLike): HealthOptions {
 
 // The reasons a reachable console is unhealthy, per the enabled toggles. Counts
 // the console did not report within the probe window are treated as unknown
-// (never a failure). Pure — exported via _internal for unit tests.
+// (never a failure). Pure; exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: EosSnapshot, Options: HealthOptions): string[] {
   const Reasons: string[] = [];
 
@@ -99,7 +99,7 @@ function EvaluateHealth(Snapshot: EosSnapshot, Options: HealthOptions): string[]
     Snapshot.Version &&
     !Snapshot.Version.startsWith(Options.ExpectedVersion)
   ) {
-    Reasons.push(`Version ${Snapshot.Version} (expected ${Options.ExpectedVersion}…)`);
+    Reasons.push(`Version ${Snapshot.Version} (expected ${Options.ExpectedVersion}...)`);
   }
 
   if (Options.CheckShow) {
@@ -157,7 +157,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
         'Software',
         String(Result.EosVersion || 'Unknown') +
           (Options.CheckVersion && Options.ExpectedVersion
-            ? ` (expected ${Options.ExpectedVersion}…)`
+            ? ` (expected ${Options.ExpectedVersion}...)`
             : '')
       )
     );

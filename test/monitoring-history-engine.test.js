@@ -100,7 +100,7 @@ test('an unusable id is ignored', () => {
   }
 });
 
-test('a null monitor id lands under check 0 — documented, not endorsed', () => {
+test('a null monitor id lands under check 0: documented, not endorsed', () => {
   // Number(null) is a finite 0, so a null id normalises to the key 0 rather
   // than being rejected. Left alone because it is not reachable: both callers
   // that reach this for monitor targets (recordMonitoringHistorySample and

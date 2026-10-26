@@ -1,6 +1,6 @@
 // Projector status over SNMP (v1 / v2c). Reads standard MIB-II identity
 // (sysDescr / sysUpTime / sysName) for reachability on every SNMP-capable
-// projector, then — per the selected brand profile — any corroborated
+// projector, then, per the selected brand profile, any corroborated
 // vendor OIDs (e.g. Epson / Christie lamp hours). Up to two custom OID
 // assertions are available under Advanced for model-specific values.
 //
@@ -226,7 +226,7 @@ export interface ProjectorReadings {
 }
 
 // Apply the profile + threshold + custom-OID rules to a set of readings and
-// return the degraded reasons (empty when healthy). Pure — exported via
+// return the degraded reasons (empty when healthy). Pure; exported via
 // _internal for unit tests. Brand OIDs that returned no data never contribute
 // a reason.
 export function EvaluateProjector(
@@ -293,7 +293,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 
   const Started = Date.now();
   try {
-    // Identity first — MIB-II is mandatory, so a transport failure here means
+    // Identity first: MIB-II is mandatory, so a transport failure here means
     // the device is unreachable. SNMPv1 fails an entire PDU when any single OID
     // is absent, and brand/custom OIDs are exactly the ones likely to be
     // missing, so every OID is fetched with its own single-OID GET.
@@ -359,7 +359,7 @@ function StatePill(Result: MonitoringResult): string {
 
 function FormatUptime(Ticks: unknown): string {
   const N = Number(Ticks);
-  if (!Number.isFinite(N)) return '—';
+  if (!Number.isFinite(N)) return '-';
   const Seconds = Math.floor(N / 100);
   const Days = Math.floor(Seconds / 86400);
   const Hours = Math.floor((Seconds % 86400) / 3600);
@@ -390,7 +390,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   }
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     IdentityRow('SNMP', `v${Config.Version} · ${Config.Community}`),
     Row('Profile', ProfileValue),
     Row('Status', StatePill(Result)),
@@ -417,7 +417,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   if (Result.ProfileMissing) {
     Notes.push(
       '<div class="mt-2">' +
-        Note('Brand profile returned no data — wrong profile, or SNMP status not exposed?') +
+        Note('Brand profile returned no data: wrong profile, or SNMP status not exposed?') +
         '</div>'
     );
   }
@@ -433,7 +433,7 @@ function IdentityRow(Label: string, Value: unknown): string {
 
 export const Name = 'Projector Status (SNMP)';
 export const Description =
-  'Reads projector status over SNMP (v1/v2c) using a brand profile — Epson and Christie expose lamp hours; other brands fall back to generic SNMP reachability and device identity. Up to two custom OID checks are available under Advanced. Prefer PJLink where available; SNMP support varies by brand and model.';
+  'Reads projector status over SNMP (v1/v2c) using a brand profile: Epson and Christie expose lamp hours; other brands fall back to generic SNMP reachability and device identity. Up to two custom OID checks are available under Advanced. Prefer PJLink where available; SNMP support varies by brand and model.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
 export const _internal = { ParseConfig, EvaluateProjector, GetOneVar, CoerceVarbind };
 export { ID, Settings, Run, Debug };

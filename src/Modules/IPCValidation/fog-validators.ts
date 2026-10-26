@@ -2,7 +2,7 @@
 // (Fog:*).
 //
 // These validate shape only. Whether a task type is actually permitted, and whether
-// the client is linked to a host, is re-checked inside FogManager.ScheduleTask — the
+// the client is linked to a host, is re-checked inside FogManager.ScheduleTask; the
 // renderer is never the authority on what may be scheduled.
 import { fail } from './primitives';
 import type { IPCValidationManager } from './index';
@@ -20,7 +20,7 @@ function toPositiveInt(value: unknown, fieldName: string): number {
     return Parsed;
   }
   fail(`${fieldName} is invalid`);
-  // unreachable — fail throws
+  // unreachable: fail throws
   return 0;
 }
 
@@ -28,7 +28,7 @@ export = function registerFogValidators(Manager: IPCValidationManager): void {
   Manager.FogHostID = (value: unknown, fieldName = 'FogHostID') => toPositiveInt(value, fieldName);
 
   // Null/0/empty means "unlink", which is a legitimate value here rather than an
-  // error — hence a separate validator from FogHostID.
+  // error, hence a separate validator from FogHostID.
   Manager.FogHostIDOrNull = (value: unknown, fieldName = 'FogHostID') => {
     if (value == null || value === '' || value === 0 || value === '0') return null;
     return toPositiveInt(value, fieldName);

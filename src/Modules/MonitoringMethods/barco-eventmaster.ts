@@ -6,15 +6,15 @@
 // companion-module-barco-eventmaster/docs; transport path from that module's
 // barco-eventmaster client library):
 //   - JSON-RPC 2.0 over plain HTTP POST to the host processor on fixed port
-//     9999 ({"jsonrpc":"2.0","id":…,"method":…,"params":{}}). In a host + client
+//     9999 ({"jsonrpc":"2.0","id":...,"method":...,"params":{}}). In a host + client
 //     system, requests go to the host unit. The Barco docs give only the port
 //     ("Enter the request URL with port 9999"); the /jsonrpc path is the one
 //     the open-source client the Companion module uses posts to, so it is an
 //     Advanced setting rather than a constant.
-//   - Each result is {"success":0,"response":…}; success other than 0 is an
+//   - Each result is {"success":0,"response":...}; success other than 0 is an
 //     error.
 //
-// Methods used (all documented reads — nothing that changes state):
+// Methods used (all documented reads; nothing that changes state):
 //   getFrameSettings → System name, FrameCollection.Frame (name, FrameTypeName,
 //                      Version, OSVersion, SysCard, Slot[].Card with
 //                      CardStatusLabel / OverTemp / FanWarn)
@@ -39,8 +39,8 @@
 // Actions (documented in both Barco guides; each is one JSON-RPC call):
 //   preset.preview     activatePreset {presetSno | presetName, type: 0}  (Preview)
 //   preset.program     activatePreset {presetSno | presetName, type: 1}  (Program)
-//   transition.take    allTrans {}   — transitions every armed destination
-//   transition.cut     cut {}        — cuts every armed destination
+//   transition.take    allTrans {}   - transitions every armed destination
+//   transition.cut     cut {}        - cuts every armed destination
 // In multi-operator mode Barco requires {operatorId} or the super operator
 // {password} on these calls; the Operator settings add them. A refusal is a
 // non-zero "success" code, reported as such.
@@ -698,7 +698,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Frames = Array.isArray(R.Frames) ? R.Frames : [];
 
   const Head = Rows([
-    TextRow('Processor', `${Address || '—'}${R.SystemName ? ` (${R.SystemName})` : ''}`),
+    TextRow('Processor', `${Address || '-'}${R.SystemName ? ` (${R.SystemName})` : ''}`),
     Row('Status', StatePill(Result)),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(R.LatencyMs)}</span>`)
@@ -706,7 +706,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     ...Frames.map((F) =>
       TextRow(
         F.Name || 'Frame',
-        [F.Type, F.Version ? `v${F.Version}` : null].filter(Boolean).join(' · ') || '—'
+        [F.Type, F.Version ? `v${F.Version}` : null].filter(Boolean).join(' · ') || '-'
       )
     ),
     Reachable && R.PowerError ? TextRow('Power status', R.PowerError) : null,

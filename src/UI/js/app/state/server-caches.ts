@@ -1,6 +1,6 @@
 // Authoritative server-driven caches: the entity lists and config the main
 // process pushes to the renderer, plus the last-rendered snapshots used for
-// partial re-render. These mirror backend truth — distinct from the transient
+// partial re-render. These mirror backend truth, distinct from the transient
 // UI/editor drafts in ./ui-drafts. Each `export let` keeps its setter here
 // (a setter can only reassign a binding declared in its own module); the
 // state barrel re-exports all of it so consumers are unchanged.
@@ -103,7 +103,7 @@ export function setFreeKioskCommandsCache(value: FreeKioskCommandDef[]): void {
 
 // Tags, ordered by Weight (the Tag Manager's drag order). Membership is a
 // dynamic scope, so which tags a tile carries is derived at render time from
-// this list — see lib/tag-badges. Kept fresh by the SetTagList push, which the
+// this list; see lib/tag-badges. Kept fresh by the SetTagList push, which the
 // server re-emits on every tag change.
 export let Tags: TagView[] = [];
 export function setTags(value: TagView[]): void {

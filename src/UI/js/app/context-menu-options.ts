@@ -69,7 +69,7 @@ interface ContextMenuOption {
 }
 
 /**
- * Build the menu rows for a selection — the current one (`Selected`) by default.
+ * Build the menu rows for a selection: the current one (`Selected`) by default.
  *
  * A client's Actions tab passes just that client and leaves out the rows that
  * manage the selection itself (Clear Selection, Select All), which mean nothing
@@ -368,7 +368,7 @@ export async function BuildContextMenuOptions(
       // for mid-show (power a row of projectors on, close their shutters),
       // whereas Run Checks Now is a diagnostic. A favourite is offered when
       // ANY selected monitor has a check of its method and runs only on those
-      // — the same rule the script and remote-event sections above follow.
+      // (the same rule the script and remote-event sections above follow).
       for (const { Favourite, TargetIDs } of GetFavouritesForSelection(MonitorTargetIDs)) {
         const Action = GetMethodAction(Favourite.Method, Favourite.ActionID);
         Options.push({
@@ -409,8 +409,8 @@ export async function BuildContextMenuOptions(
         Action: async function () {
           Notify(
             MonitorTargetIDs.length === 1
-              ? 'Running checks…'
-              : `Running checks on ${MonitorTargetIDs.length} monitors…`,
+              ? 'Running checks...'
+              : `Running checks on ${MonitorTargetIDs.length} monitors...`,
             'info'
           );
           try {
@@ -474,7 +474,7 @@ export async function BuildContextMenuOptions(
         ActsOnSelection: true,
         Action: async function () {
           Notify(
-            CheckIDs.length === 1 ? 'Running check…' : `Running ${CheckIDs.length} checks…`,
+            CheckIDs.length === 1 ? 'Running check...' : `Running ${CheckIDs.length} checks...`,
             'info'
           );
           try {
@@ -501,8 +501,8 @@ export async function BuildContextMenuOptions(
         Action: async function () {
           Notify(
             DummyUUIDs.length === 1
-              ? 'Resetting to idle…'
-              : `Resetting ${DummyUUIDs.length} dummy clients to idle…`,
+              ? 'Resetting to idle...'
+              : `Resetting ${DummyUUIDs.length} dummy clients to idle...`,
             'info'
           );
           try {
@@ -539,12 +539,12 @@ export async function BuildContextMenuOptions(
 
       // Every bulk-capable command the server declares. Sourcing the list from
       // the server's command map means a command added there appears here
-      // with no renderer change — and, more importantly, that nothing appears
+      // with no renderer change and, more importantly, that nothing appears
       // here which the server would refuse.
       // A selection can span terminals in different display modes, so a
       // mode-specific command is offered only when it applies to EVERY one of
       // them. Offering it for the majority would put an action on the menu
-      // that silently does nothing on the rest — and the server refuses those
+      // that silently does nothing on the rest, and the server refuses those
       // anyway, so the menu would be promising a partial failure.
       const KioskModes = KioskUUIDs.map((UUID) =>
         GetFreeKioskDisplayMode(
@@ -579,7 +579,7 @@ export async function BuildContextMenuOptions(
             if (Summary && Summary.Failed) {
               const Reason = Summary.Results.find((Entry) => !Entry.Success)?.Error;
               return Notify(
-                `${Command.Label}: ${Summary.Succeeded}/${Summary.Total} — ${Reason || 'failed'}`,
+                `${Command.Label}: ${Summary.Succeeded}/${Summary.Total} - ${Reason || 'failed'}`,
                 'error'
               );
             }

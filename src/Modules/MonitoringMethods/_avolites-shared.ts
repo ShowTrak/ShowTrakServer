@@ -68,7 +68,7 @@ export function ExtractTitanValue(Body: unknown): string | null {
       return null;
     }
   } catch {
-    // Not JSON — fall through to the raw text (stripping surrounding quotes).
+    // Not JSON: fall through to the raw text (stripping surrounding quotes).
   }
   return Raw.replace(/^"(.*)"$/, '$1') || null;
 }
@@ -208,7 +208,7 @@ export async function RunAvolitesProbe(
         ...(Refused ? { Degraded: true } : {}),
         // A refused WebAPI port on an otherwise-healthy console is common, so
         // point at the likely cause.
-        Error: Refused ? `${ErrMsg} — is the Titan WebAPI enabled?` : ErrMsg,
+        Error: Refused ? `${ErrMsg}. Is the Titan WebAPI enabled?` : ErrMsg,
       },
     };
   }
@@ -240,7 +240,7 @@ export function AvolitesDebugHead(
 ): string {
   const Reachable = !!(Result && Result.Success === true);
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Result && Result.TitanVersion ? TextRow('Titan', String(Result.TitanVersion)) : null,
     Row('Status', StatusPill),
     Reachable

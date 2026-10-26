@@ -8,7 +8,7 @@ const { loadWithMocks } = require('../test-support/load-with-mocks');
 // QLab 4 and QLab 5 actions against a fake QLab that behaves like one with
 // /alwaysReply on: every message is acknowledged, setters carry no data, and a
 // command can be made to come back 'denied' or 'error'. Every workspace
-// command must arrive workspace-scoped — unscoped, QLab 5 would run it in
+// command must arrive workspace-scoped; unscoped, QLab 5 would run it in
 // every open workspace.
 
 function methodPath(name) {
@@ -175,7 +175,7 @@ test('the actions that cut a running show short ask first; GO does not', () => {
   for (const id of ['go', 'go.cue', 'pause', 'resume', 'mode.show', 'overrides.restore']) {
     assert.ok(!byId[id].Destructive, id);
   }
-  assert.equal(method.DescribeAction('go.cue', { Cue: '12' }), 'GO Cue — 12');
+  assert.equal(method.DescribeAction('go.cue', { Cue: '12' }), 'GO Cue - 12');
   assert.equal(
     method.DescribeAction('override.enable', { Override: 'midiInputEnabled' }),
     'Enable MIDI Input'

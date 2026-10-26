@@ -1,4 +1,4 @@
-// Exercises FreeKioskMetricLiveState in src/UI/js/app/freekiosk-modal.ts — the
+// Exercises FreeKioskMetricLiveState in src/UI/js/app/freekiosk-modal.ts: the
 // colour and text of a monitored reading's status card on the FreeKiosk Status
 // tab. It follows the client's critical displays and interfaces: an offline
 // terminal's reading is unknown rather than faulty, so it must not paint red.

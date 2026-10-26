@@ -6,8 +6,8 @@
 // phasing mess rather than a clear cue. Within a short window the FIRST claim on
 // a given sound wins and the rest are dropped silently.
 //
-// De-duplication is per sound identity, not global: two DIFFERENT sounds — the
-// built-in Alert and Warning tones, or two different custom assets — still play
+// De-duplication is per sound identity, not global: two DIFFERENT sounds (the
+// built-in Alert and Warning tones, or two different custom assets) still play
 // together, because those genuinely carry different information.
 //
 // The claim is deliberately synchronous. Alert actions run via Promise.allSettled

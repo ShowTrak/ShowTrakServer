@@ -4,12 +4,12 @@
 // kept as distinct entry points but unified here behind shared helpers
 // (`iconForType`, the hover-pause auto-dismiss timer) rather than forced into a
 // single component:
-//   1. Alert-style toasts  — top-center, stack in a host, hover-pausable
+//   1. Alert-style toasts:  top-center, stack in a host, hover-pausable
 //      auto-dismiss (`showAlertStyleToast` / `Notify`).
-//   2. Confirmation dialog — single modal toast, promise-based, keyboard-driven
+//   2. Confirmation dialog: single modal toast, promise-based, keyboard-driven
 //      (`ConfirmationDialog`), plus a centred red modal for critical actions
 //      that defaults to Cancel (`CriticalConfirmationDialog`).
-//   3. Execution toast     — persistent region holding a live execution list,
+//   3. Execution toast:     persistent region holding a live execution list,
 //      outside-click to dismiss (`ShowExecutionToast` / `HideExecutionToast`).
 //
 // Extracted verbatim from the old selection-init god-module so that file can
@@ -371,7 +371,7 @@ export function CriticalConfirmationDialog(Options: CriticalConfirmationOptions)
 
 // HideExecutionToast keeps the element in the DOM for 150ms so a quick reopen
 // is instant, then removes it. That pending removal is tracked here so a Show
-// arriving inside the window can cancel it — otherwise the timer would delete
+// arriving inside the window can cancel it; otherwise the timer would delete
 // a toast we just re-showed (a transient empty executions push hides it, the
 // next push shows it, then the stale timer fires), which reads as a flash.
 let execToastRemoveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -385,7 +385,7 @@ export function SetExecutionsInProgress(InProgress: boolean) {
 }
 
 /**
- * Open the panel straight after the operator runs an action — but only when work
+ * Open the panel straight after the operator runs an action, but only when work
  * is already in progress. Otherwise the executions push opens it once the action
  * has actually queued something, so an action that reached no devices (a tag or
  * selection with nothing applicable, Wake on LAN on machines already online)

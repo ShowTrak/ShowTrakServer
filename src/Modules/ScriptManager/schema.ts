@@ -13,7 +13,7 @@ const PLATFORM_KEYS = ['Windows', 'macOS', 'Linux'];
 
 // Console filter match modes. The filter is applied CLIENT-SIDE while a script
 // runs: only console lines that match are surfaced as the live status tail.
-// "none" disables filtering (every line is surfaced — the historical default).
+// "none" disables filtering (every line is surfaced; the historical default).
 // Order is meaningful for display in the Script Manager UI.
 const CONSOLE_FILTER_MODES = ['none', 'startsWith', 'includes', 'regex'];
 const DEFAULT_CONSOLE_FILTER_MODE = 'none';
@@ -87,7 +87,7 @@ function NormalizeArgumentString(value: unknown): string {
 }
 
 // A console filter ({ Mode, Pattern, Strip }). Mode "none" (or an empty Pattern)
-// means "no filter" — every console line is surfaced, the historical behaviour.
+// means "no filter": every console line is surfaced, the historical behaviour.
 // When Strip is true the matched text is removed from the surfaced line (only
 // the remainder is shown as the live status tail). Parsing/matching/stripping
 // happens on the ShowTrakClient; this only validates shape.

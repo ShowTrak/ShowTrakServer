@@ -16,7 +16,7 @@ import { Wait } from './selection-init';
 //
 // "Remembering the screen you were in": before opening, it records which modal
 // (if any) is currently visible, hides it, and restores it once the picker
-// closes — so opening the picker from inside the Script Manager (or any other
+// closes, so opening the picker from inside the Script Manager (or any other
 // modal) returns the operator exactly where they were.
 
 // Normalize any icon reference ("bi bi-terminal", "bi-terminal", "terminal")
@@ -153,7 +153,7 @@ export async function OpenIconPicker(CurrentIcon: unknown = null): Promise<strin
 }
 
 // Formerly a DOMContentLoaded handler; called by the bootstrap orchestrator in
-// main.ts once the DOM is parsed — never at import time.
+// main.ts once the DOM is parsed, never at import time.
 export function InitIconPicker() {
   const SearchInput = document.getElementById('ICON_PICKER_SEARCH') as HTMLInputElement | null;
   if (SearchInput) {

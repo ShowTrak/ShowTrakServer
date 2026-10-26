@@ -70,9 +70,9 @@ test('FormatLatency renders sub-millisecond, rounded, and non-numeric cases', ()
   assert.equal(Debug.FormatLatency(0), '<1 ms'); // 0 < 1
   assert.equal(Debug.FormatLatency(12.6), '13 ms'); // rounded
   assert.equal(Debug.FormatLatency(200), '200 ms');
-  assert.equal(Debug.FormatLatency('not-a-number'), '—');
-  assert.equal(Debug.FormatLatency(undefined), '—'); // Number(undefined) === NaN
-  assert.equal(Debug.FormatLatency(Infinity), '—');
+  assert.equal(Debug.FormatLatency('not-a-number'), '-');
+  assert.equal(Debug.FormatLatency(undefined), '-'); // Number(undefined) === NaN
+  assert.equal(Debug.FormatLatency(Infinity), '-');
   // Number(null) === 0, which is finite and < 1, so it renders as sub-ms.
   assert.equal(Debug.FormatLatency(null), '<1 ms');
 });

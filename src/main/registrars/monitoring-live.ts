@@ -1,7 +1,7 @@
 // IPC registrar: live levels for an open monitor view, desktop side. The Web UI
 // opens the same stream over its own socket events (webui-namespace.ts) because
 // streaming has to target the one socket that asked, which the shared rpc bridge
-// cannot see — it passes a null event.
+// cannot see; it passes a null event.
 
 import { RPC } from '../rpc';
 import { Manager as MonitoringTargetManager } from '../../Modules/MonitoringTargetManager';

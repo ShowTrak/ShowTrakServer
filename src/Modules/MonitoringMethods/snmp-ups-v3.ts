@@ -1,4 +1,4 @@
-// SNMP UPS health check (v3) — reads the standard UPS-MIB (RFC 1628) over
+// SNMP UPS health check (v3): reads the standard UPS-MIB (RFC 1628) over
 // user-authenticated SNMPv3, with optional message authentication (auth) and
 // encryption (priv). Use this for UPS cards configured for SNMPv3 with a
 // username + auth/priv passwords (e.g. a Riello NetMan 208 / Eaton NMC set to

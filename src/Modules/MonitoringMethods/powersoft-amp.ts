@@ -13,7 +13,7 @@
 //     echoes the cookie. The trailing byte is the complement of the frame's own
 //     cmd, so an answer to READGM ends `.. 0x01 0x03`.
 //   - crc16 is over the data field only (0 for empty data), polynomial
-//     x^16+x^15+x^2+1 with the PDF's check value CRC("123456789") = 0xBB3D —
+//     x^16+x^15+x^2+1 with the PDF's check value CRC("123456789") = 0xBB3D,
 //     i.e. CRC-16/ARC. Every request this check sends has empty or all-zero data,
 //     so its CRC is 0 either way. The PDF's own answer diagrams show CRC16 = 0 on
 //     some answers (READALLALARMS2), so the answer CRC is deliberately NOT
@@ -26,9 +26,9 @@
 //                               (operative), 1 = standby ON (not operative).
 //       READGM (1)           -> answer_ok, num_channels, 0, 0, INGAIN0..7 i16LE,
 //                               OUTGAIN0..7 i16LE (cents of dB), INMUTE0..7 u8,
-//                               OUTMUTE0..7 u8 — 52 bytes.
+//                               OUTMUTE0..7 u8; 52 bytes.
 //       READALLALARMS2 (25)  -> answer_ok, gpio_alarms u8, 0 u16, global u32LE,
-//                               channel 0..7 alarms u32LE — 40 bytes.
+//                               channel 0..7 alarms u32LE; 40 bytes.
 //     STANDBY with ON_OFF_READ 1 or 2 changes the power state, so this check
 //     only ever sends it with 0.
 //   - Commands only the operator's actions send (RunAction, never Run):
@@ -595,7 +595,7 @@ export function QueryPowersoft(
 
 // --- Evaluation -------------------------------------------------------------
 
-// The reasons a reachable amplifier is unhealthy, per the enabled toggles. Pure —
+// The reasons a reachable amplifier is unhealthy, per the enabled toggles. Pure;
 // exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: PowersoftSnapshot, Options: HealthOptions): string[] {
   if (!Snapshot.IsAmplifier) {
@@ -1008,7 +1008,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     : [];
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Identity ? TextRow('Amplifier', Identity) : null,
     Reachable && Result.Serial ? TextRow('Serial', Result.Serial) : null,
     Row('Status', StatePill(Result)),

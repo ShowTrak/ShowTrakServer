@@ -90,9 +90,9 @@ const MAX_REMEMBERED_CHECKS = 256;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const CLOSED_EARLY_REASON =
-  'Delta accepted the connection but closed it at once — all Telnet connections may be in use';
+  'Delta accepted the connection but closed it at once; all Telnet connections may be in use';
 const GPU_MISSING =
-  "GPU temperature not available (DeltaMonitor not running — R-Series / P-Series servers don't have it)";
+  "GPU temperature not available (DeltaMonitor not running: R-Series / P-Series servers don't have it)";
 
 const Settings: MonitoringSettingField[] = [
   {
@@ -229,7 +229,7 @@ export class TelnetFilter {
             this.State = 'data';
           } else if (Byte >= WILL && Byte <= DONT) this.State = 'option';
           else if (Byte === SB) this.State = 'sb';
-          else this.State = 'data'; // a two-byte command (NOP, GA, …)
+          else this.State = 'data'; // a two-byte command (NOP, GA, etc.)
           break;
         case 'option':
           this.State = 'data';
@@ -593,7 +593,7 @@ function IsObject(Value: unknown): Value is Record<string, unknown> {
 }
 
 /**
- * `{ "GPUS": [{ "GPU_Id": 0, "Temperature": 50 }, …] }`, also accepted under a
+ * `{ "GPUS": [{ "GPU_Id": 0, "Temperature": 50 }, ...] }`, also accepted under a
  * `data` wrapper (the other DeltaMonitor endpoints use one) and with any key
  * case. Null when no GPU list is present.
  */
@@ -942,7 +942,7 @@ function ResetState(): void {
 
 /**
  * The reasons a reachable server is unhealthy, per the enabled assertions.
- * Pure — exported via _internal for unit tests.
+ * Pure; exported via _internal for unit tests.
  */
 function EvaluateHealth(
   Snap: DeltaSnapshot,
@@ -1047,7 +1047,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   // Accepted and then closed without a byte: the server completed the TCP
   // handshake, so it is up. The usual cause is Delta's Telnet connection limit
   // (5 by default) being held by show control, which is a fault worth seeing
-  // but not an outage — Offline would hide a healthy, playing server.
+  // but not an outage: Offline would hide a healthy, playing server.
   if (Snap.ClosedEarly) {
     return {
       Success: true,
@@ -1150,7 +1150,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Reachable = !!(Result && Result.Success === true);
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Row('Status', StatePill(Result)),
     Reachable && Result.DegradedReason ? TextRow('Reason', String(Result.DegradedReason)) : null,
     Reachable

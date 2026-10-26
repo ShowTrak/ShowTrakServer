@@ -165,7 +165,7 @@ export interface FreeKioskMonitorCard {
   /** How many of the section's readings the display mode removed. */
   HiddenByMode: number;
   /**
-   * Every applicable reading, monitored or not — the current values are always
+   * Every applicable reading, monitored or not; the current values are always
    * visible. The condition and tick columns are drawn only while monitored.
    */
   Rows: FreeKioskConditionRow[];
@@ -248,7 +248,7 @@ export function BuildConditionRow(
         Metric.Operators.map((Op) => ({ Value: Op, Label: OPERATOR_LABELS[Op] || Op }))
       : [];
   // Every condition is read as an expectation, so every row opens with
-  // "Expected". A lone "is not" needs nothing more — its value IS the expected
+  // "Expected". A lone "is not" needs nothing more: its value IS the expected
   // state ("Expected Yes"); any other lone operator is named after it
   // ("Expected at least").
   const LoneLabel = OPERATOR_LABELS[Operator] || Operator;

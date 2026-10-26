@@ -33,8 +33,8 @@
 // Sony (Sony "VISCA Command List" for the BRC-X400 / X401 / SRG-X400 range,
 // whose "VISCA over IP" section defines the framing; model IDs from the other
 // Sony command lists collected in Bitfocus companion-module-sony-visca/protocol):
-//   UDP 52381. Each message is an 8-byte header — payload type, payload
-//   length, 32-bit sequence number — then the VISCA bytes. Sony's payload
+//   UDP 52381. Each message is an 8-byte header (payload type, payload
+//   length, 32-bit sequence number), then the VISCA bytes. Sony's payload
 //   types: 0x0100 VISCA command, 0x0110 VISCA inquiry, 0x0111 VISCA reply,
 //   0x0120 VISCA device setting command (CAM_VersionInq is one of those),
 //   0x0200 / 0x0201 control command / reply. The reply echoes the sequence
@@ -48,7 +48,7 @@
 //   `90 6z ee FF` is an error reply (02 syntax = not supported, 41 not
 //   executable now); that value is then unknown. The pan/tilt status word is
 //   what Sony exposes as a fault: "pan / tilt mechanism is defective" and
-//   "initialization failed". No sequence RESET is ever sent — it would also
+//   "initialization failed". No sequence RESET is ever sent; it would also
 //   reset the counter another controller (Companion, a joystick) relies on.
 //   Not documented by Sony: whether replies go to the sending port or always
 //   to 52381 (the command list names only the camera's port). Companion's
@@ -56,9 +56,9 @@
 //   advanced setting.
 //
 // Actions (RunAction only):
-//   power.on / power.standby — Panasonic #O1 / #O0 (answers p1 / p0); Sony
+//   power.on / power.standby: Panasonic #O1 / #O0 (answers p1 / p0); Sony
 //     CAM_Power 81 01 04 00 02 / 03 FF.
-//   preset.recall — Panasonic #R00–#R99 for presets 1–100 (answers s<nn>);
+//   preset.recall: Panasonic #R00–#R99 for presets 1–100 (answers s<nn>);
 //     Sony preset RECALL 81 01 04 3F 02 pp FF with pp = preset number - 1,
 //     as the BRC-X400 list numbers them (00–63h, presets 1–100; older models
 //     with fewer memories answer a syntax error for higher numbers).
@@ -397,7 +397,7 @@ export function CreatePanasonicClient(
   };
 
   // One command. Undefined when no usable answer came (transport failure,
-  // budget spent, or the login was refused — see State).
+  // budget spent, or the login was refused; see State).
   const Ask = async (Path: string): Promise<PanasonicAnswer | undefined> => {
     for (let Attempt = 0; Attempt < 2; Attempt++) {
       // Respect the spec's minimum gap between commands, including the
@@ -1141,7 +1141,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     Config.Protocol === 'sony' ? `VISCA over IP (UDP ${Config.Port})` : `HTTP ${Config.Port}`;
 
   const Head = Rows([
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Reachable && Result.Model ? TextRow('Model', String(Result.Model)) : null,
     Reachable && Result.Firmware ? TextRow('Software', String(Result.Firmware)) : null,
     Row('Status', BmdStatePill(Result, 'Healthy')),

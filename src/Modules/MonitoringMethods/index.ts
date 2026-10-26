@@ -39,41 +39,41 @@ import * as sacnUniverse from './sacn-universe';
 import * as sacnUniversePriority from './sacn-universe-priority';
 import * as artnetUniverse from './artnet-universe';
 import * as artnetNode from './artnet-node';
-// Lighting consoles — ETC Eos (OSC)
+// Lighting consoles: ETC Eos (OSC)
 import * as eos from './eos';
-// Lighting consoles — MA Lighting grandMA2 (Telnet remote) & grandMA3 (liveness)
+// Lighting consoles: MA Lighting grandMA2 (Telnet remote) & grandMA3 (liveness)
 import * as ma2 from './ma2';
 import * as ma3 from './ma3';
-// Lighting consoles — Avolites Titan (WebAPI)
+// Lighting consoles: Avolites Titan (WebAPI)
 import * as avolites from './avolites';
-// Lighting consoles — ChamSys MagicQ (web server)
+// Lighting consoles: ChamSys MagicQ (web server)
 import * as chamsys from './chamsys';
 // Video
 import * as ndiSource from './ndi-source';
-// Video — Blackmagic Design switchers, recorders and routers
+// Video: Blackmagic Design switchers, recorders and routers
 import * as atem from './atem';
 import * as hyperdeck from './hyperdeck';
 import * as videohub from './videohub';
-// Video — LED and presentation processors
+// Video: LED and presentation processors
 import * as bromptonTessera from './brompton-tessera';
 import * as barcoEventmaster from './barco-eventmaster';
 import * as analogwayLivepremier from './analogway-livepremier';
 import * as datapathFx4 from './datapath-fx4';
-// Video — AJA devices and PTZ cameras
+// Video: AJA devices and PTZ cameras
 import * as ajaDevice from './aja-device';
 import * as ptzCamera from './ptz-camera';
-// Video — streaming and recording software
+// Video: streaming and recording software
 import * as obsStudio from './obs-studio';
-// Video — motion capture
+// Video: motion capture
 import * as motive from './motive';
-// Sound — cue playback & audio networking
+// Sound: cue playback & audio networking
 import * as qlab5 from './qlab5';
 import * as qlab4 from './qlab4';
 import * as danteDevice from './dante-device';
-// Sound — wireless microphones
+// Sound: wireless microphones
 import * as shureWireless from './shure-wireless';
 import * as sennheiserWireless from './sennheiser-wireless';
-// Sound — mixing consoles and DSP
+// Sound: mixing consoles and DSP
 import * as x32Console from './x32-console';
 import * as yamahaConsole from './yamaha-console';
 import * as qsysCore from './qsys-core';
@@ -82,7 +82,7 @@ import * as symetrixDsp from './symetrix-dsp';
 import * as tascamMx8a from './tascam-mx8a';
 import * as allenHeathConsole from './allen-heath-console';
 import * as digicoConsole from './digico-console';
-// Sound — amplifiers
+// Sound: amplifiers
 import * as dbaudioAmp from './dbaudio-amp';
 import * as powersoftAmp from './powersoft-amp';
 // Media Servers
@@ -128,41 +128,41 @@ const MethodModules: MonitoringMethod[] = [
   sacnUniversePriority,
   artnetUniverse,
   artnetNode,
-  // Lighting consoles — ETC Eos (OSC)
+  // Lighting consoles: ETC Eos (OSC)
   eos,
-  // Lighting consoles — MA Lighting grandMA2 (Telnet remote) & grandMA3 (liveness)
+  // Lighting consoles: MA Lighting grandMA2 (Telnet remote) & grandMA3 (liveness)
   ma2,
   ma3,
-  // Lighting consoles — Avolites Titan (WebAPI)
+  // Lighting consoles: Avolites Titan (WebAPI)
   avolites,
-  // Lighting consoles — ChamSys MagicQ (web server)
+  // Lighting consoles: ChamSys MagicQ (web server)
   chamsys,
   // Video
   ndiSource,
-  // Video — Blackmagic Design switchers, recorders and routers
+  // Video: Blackmagic Design switchers, recorders and routers
   atem,
   hyperdeck,
   videohub,
-  // Video — LED and presentation processors
+  // Video: LED and presentation processors
   bromptonTessera,
   barcoEventmaster,
   analogwayLivepremier,
   datapathFx4,
-  // Video — AJA devices and PTZ cameras
+  // Video: AJA devices and PTZ cameras
   ajaDevice,
   ptzCamera,
-  // Video — streaming and recording software
+  // Video: streaming and recording software
   obsStudio,
-  // Video — motion capture
+  // Video: motion capture
   motive,
-  // Sound — cue playback & audio networking
+  // Sound: cue playback & audio networking
   qlab5,
   qlab4,
   danteDevice,
-  // Sound — wireless microphones
+  // Sound: wireless microphones
   shureWireless,
   sennheiserWireless,
-  // Sound — mixing consoles and DSP
+  // Sound: mixing consoles and DSP
   x32Console,
   yamahaConsole,
   qsysCore,
@@ -171,7 +171,7 @@ const MethodModules: MonitoringMethod[] = [
   tascamMx8a,
   allenHeathConsole,
   digicoConsole,
-  // Sound — amplifiers
+  // Sound: amplifiers
   dbaudioAmp,
   powersoftAmp,
   // Media Servers
@@ -249,7 +249,7 @@ function getMethodRunCacheKey(
   // The key MUST be a pure function of exactly what Method.Run() receives, so a
   // cache hit only ever replays a probe computed from identical inputs. Run()
   // reads Address and Settings straight off the target (raw), so we key on those
-  // raw values — NOT a normalized/clamped view. Keying on a normalized view was
+  // raw values, NOT a normalized/clamped view. Keying on a normalized view was
   // unsound: two targets that merely normalize alike (a timeout past the same
   // clamp bound, or an address differing only in case) would collide onto one
   // cached result even though Run() would probe them differently.
@@ -283,7 +283,7 @@ function getMethodRunCacheTtlMs(Method: MonitoringMethod, Target: MonitoringTarg
 // defaults for anything absent, clamp numbers to Min/Max, force booleans, and
 // reject select values that are not in Options. Shared by check settings and
 // action parameters so an action's form obeys exactly the same rules as the
-// editor's — a clamp that holds in one place cannot drift in the other.
+// editor's; a clamp that holds in one place cannot drift in the other.
 function NormalizeFields(
   Schema: MonitoringSettingField[],
   Input: unknown
@@ -439,7 +439,7 @@ const Manager = {
   },
 
   // Dynamic parameter choices for one check, derived from its latest probe
-  // result. A method that offers none (or throws) simply reports nothing —
+  // result. A method that offers none (or throws) simply reports nothing;
   // the renderer then falls back to the action's static field schema.
   GetActionOptions: (ID: string, Result: MonitoringResult): MonitoringActionOptions => {
     const Method = Methods.get(ID);
@@ -474,7 +474,7 @@ const Manager = {
     return (Action && Action.Label) || ActionID;
   },
 
-  // Perform one action against one target. Unlike Run() this is NEVER cached —
+  // Perform one action against one target. Unlike Run() this is NEVER cached:
   // an action is a mutation, and replaying a cached "success" would silently
   // swallow the second press of a button.
   RunAction: async (

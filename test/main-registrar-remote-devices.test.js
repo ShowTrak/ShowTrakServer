@@ -8,7 +8,7 @@ const { installModuleMocks, matchesModule, recordingManager } = require('./helpe
 // The behaviour worth pinning here is the broadcast. Revoking a device has to
 // reach a LIVE session, not just the next handshake: a connected socket never
 // re-presents its credential, so without the emit a revoked phone keeps full
-// control until it happens to reconnect — which is precisely the window
+// control until it happens to reconnect, which is precisely the window
 // revocation exists to close. Deleting the row is the easy half; the emit is the
 // half that is silent when it breaks.
 

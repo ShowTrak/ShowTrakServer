@@ -3,11 +3,11 @@
 // The whole feature exists because of one thing FreeKiosk's API does NOT do.
 // There is no way to read the display mode (`GET /api/mode` answers 405
 // "requires POST") and no way to read the foreground package. Worse, switching a
-// device from WebView to External App changes NOTHING in /api/status —
+// device from WebView to External App changes NOTHING in /api/status:
 // `webview.currentUrl` keeps reporting the last page it loaded, indefinitely.
 //
 // So a terminal locked to an app was showing a URL that looked live, was armed
-// with a check that kept passing, and was accumulating a green history chart —
+// with a check that kept passing, and was accumulating a green history chart,
 // all describing a page nobody was looking at. The operator declares the mode,
 // and everything that depends on a WebView reading disappears when it does not
 // apply. Absence beats a confident wrong answer.
@@ -91,7 +91,7 @@ test('a WebView reading is inactive in every mode that is not WebView', () => {
 
 test('a mode-independent reading is untouched by the mode', () => {
   // content_displaying is screen-on-and-not-screensavered, which is exactly as
-  // true of an external app as of a web page — it is the one Content check that
+  // true of an external app as of a web page; it is the one Content check that
   // survives the switch, and the reason the section does not vanish wholesale.
   const Displaying = FREEKIOSK_METRICS_BY_KEY.get('content_displaying');
   for (const Mode of FREEKIOSK_DISPLAY_MODES) {
@@ -137,7 +137,7 @@ test('a disabled-by-mode check produces no verdict at all, breaching or passing'
     [Keys.V]: 'showtrak.co.uk',
     DisplayMode: 'external_app',
   };
-  // The retained reading would satisfy neither operator ambiguously — the point
+  // The retained reading would satisfy neither operator ambiguously; the point
   // is that it is never consulted.
   const Results = EvaluateAllAlarms({ webview_currentUrl: 'https://showtrak.co.uk' }, Settings);
   assert.equal(
@@ -299,7 +299,7 @@ test('the bulk context menu carries only what makes sense across a selection', (
   // Bulk decides the context menu; the view modal renders every command
   // regardless. Screen Off, the screensaver pair and Beep were dropped from the
   // menu because they are per-device fiddling rather than things worth doing to
-  // a whole selection at once — they remain one click away in the view modal.
+  // a whole selection at once; they remain one click away in the view modal.
   const { FREEKIOSK_COMMANDS_BY_ID } = require(
     path.join(__dirname, '..', 'dist', 'Modules', 'FreeKiosk', 'commands.js')
   );

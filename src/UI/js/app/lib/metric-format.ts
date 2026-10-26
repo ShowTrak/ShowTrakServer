@@ -3,8 +3,8 @@
 // Pure and DOM-free, so it is unit-testable like the other lib/ modules.
 //
 // The server has its own formatter, used to word alarm reasons. This is not a
-// mirror of a decision: the registry itself — the thing that could meaningfully
-// drift — is delivered over IPC, and both formatters are driven entirely by the
+// mirror of a decision: the registry itself (the thing that could meaningfully
+// drift) is delivered over IPC, and both formatters are driven entirely by the
 // Unit / Decimals / Format hints in that payload. The renderer needs its own
 // copy only because it cannot import from src/Modules (its tsconfig rootDir is
 // src/UI).
@@ -44,7 +44,7 @@ export function FormatNumericMetric(Metric: FreeKioskMetricView, Value: number):
 /**
  * The reading as shown in the view modal and on a tile.
  *
- * A null reading is "—" rather than "0" or blank: a device with no light sensor
+ * A null reading is "-" rather than "0" or blank: a device with no light sensor
  * and a device reporting zero lux are different facts, and conflating them
  * would let an operator read a threshold as met when nothing was measured.
  */
@@ -53,11 +53,11 @@ export function FormatMetricValue(
   Value: string | number | boolean | null | undefined,
   Options: { MaxLength?: number } = {}
 ): string {
-  if (!Metric) return Value == null ? '—' : String(Value);
-  if (Value == null || Value === '') return '—';
+  if (!Metric) return Value == null ? '-' : String(Value);
+  if (Value == null || Value === '') return '-';
 
   // A live reading arrives as a real boolean, but a stored alarm threshold comes
-  // back off a <select> as the STRING "true"/"false" — and "false" is truthy, so
+  // back off a <select> as the STRING "true"/"false", and "false" is truthy, so
   // a bare cast prints an armed "expected No" as "expected Yes". Same rule the
   // engine's AsBoolean uses, so the wording can never disagree with the verdict.
   if (Metric.Type === 'boolean') {
@@ -65,20 +65,20 @@ export function FormatMetricValue(
       const Text = Value.trim().toLowerCase();
       if (Text === 'false' || Text === '0' || Text === 'no') return 'No';
       if (Text === 'true' || Text === '1' || Text === 'yes') return 'Yes';
-      return '—';
+      return '-';
     }
     return Value ? 'Yes' : 'No';
   }
 
   if (Metric.Type === 'number') {
     const Numeric = Number(Value);
-    if (!Number.isFinite(Numeric)) return '—';
+    if (!Number.isFinite(Numeric)) return '-';
     return FormatNumericMetric(Metric, Numeric);
   }
 
   const Text = String(Value);
   const Limit = Options.MaxLength ?? (Metric.Format === 'url' ? 60 : 0);
-  if (Limit > 0 && Text.length > Limit) return `${Text.slice(0, Limit - 1)}…`;
+  if (Limit > 0 && Text.length > Limit) return `${Text.slice(0, Limit - 3)}...`;
   return Text;
 }
 
@@ -90,10 +90,10 @@ export function FormatMetricCompact(
   Metric: FreeKioskMetricView | null | undefined,
   Value: string | number | boolean | null | undefined
 ): string {
-  if (!Metric || Value == null || Value === '') return '—';
+  if (!Metric || Value == null || Value === '') return '-';
   if (Metric.Type === 'number' && Metric.Unit === '%') {
     const Numeric = Number(Value);
-    return Number.isFinite(Numeric) ? `${RoundTo(Numeric, 0)}%` : '—';
+    return Number.isFinite(Numeric) ? `${RoundTo(Numeric, 0)}%` : '-';
   }
   return FormatMetricValue(Metric, Value, { MaxLength: 24 });
 }

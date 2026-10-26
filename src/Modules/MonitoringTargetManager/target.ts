@@ -66,7 +66,7 @@ interface MonitoringTargetInput {
 }
 
 // A single probe within a target. Owns its own address/settings/threshold and
-// its own runtime state. Does not own timing — the parent target ticks it.
+// its own runtime state. Does not own timing; the parent target ticks it.
 class MonitoringCheck {
   CheckID: number;
   TargetID: number;
@@ -128,8 +128,8 @@ class MonitoringCheck {
     this.LastChecked = null;
     this.LastLatencyMs = null;
     this.LastError = null;
-    // Most recent method-rendered debug panel (HTML). Cached in memory only —
-    // never persisted — and overwritten on every run.
+    // Most recent method-rendered debug panel (HTML). Cached in memory only
+    // (never persisted) and overwritten on every run.
     this.LastDebugHtml = null;
     this.LastDebugAt = null;
     // Dynamic choices for this check's action parameters, refreshed on every
@@ -182,7 +182,7 @@ class MonitoringCheck {
   //
   // A failed probe only marks the check offline once it has failed
   // `EffectiveFailureThreshold` times in a row. Below that the previous verdict
-  // stands — an online check stays online, and a check that has never answered
+  // stands: an online check stays online, and a check that has never answered
   // stays "not checked yet" rather than being called down on a single dropped
   // packet. Any success resets the run.
   async Run(InheritedFailureThreshold: number = GetDefaultFailureThreshold()) {
@@ -289,7 +289,7 @@ class MonitoringTarget {
     this._stopped = false;
     this._gen = 0;
 
-    // A target with no checks is idle — it has nothing to probe, so it
+    // A target with no checks is idle; it has nothing to probe, so it
     // should not appear online, degraded, or offline.
     // (Online/Degraded already default to false above.)
   }
@@ -307,7 +307,7 @@ class MonitoringTarget {
   }
 
   // Probe the given checks (all of them by default) and refresh the aggregate.
-  // Does not broadcast — callers decide whether the result is still wanted.
+  // Does not broadcast; callers decide whether the result is still wanted.
   async RunChecks(Checks: MonitoringCheck[] = this.Checks) {
     const Inherited = this.InheritedFailureThreshold();
     await Promise.all(Checks.map((Check) => Check.Run(Inherited)));
@@ -370,7 +370,7 @@ class MonitoringTarget {
     const Checks = this.Checks.filter((C) => C.LastChecked != null);
     this.LastChecked = Checks.length ? Math.max(...Checks.map((C) => C.LastChecked!)) : null;
     if (!Checks.length) {
-      // No checks (idle) or none answered yet — either way, no verdict.
+      // No checks (idle) or none answered yet; either way, no verdict.
       this.Online = false;
       this.Degraded = false;
       this.LastLatencyMs = null;
@@ -446,7 +446,7 @@ class MonitoringTarget {
   async Tick(Gen: number = this._gen) {
     if (this._stopped || Gen !== this._gen) return;
     if (this._running) {
-      // overlap protection — schedule next tick and bail
+      // overlap protection: schedule next tick and bail
       this._timer = setTimeout(() => this.Tick(Gen), this.Interval);
       return;
     }

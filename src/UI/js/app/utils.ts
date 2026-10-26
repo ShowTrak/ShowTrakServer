@@ -3,7 +3,7 @@ import { openModal } from './lib/modal';
 import { Settings } from './state';
 
 // Master alert volume as a 0..1 multiplier, read live from the current settings
-// snapshot (ALERT_SOUND_VOLUME — a 0-100 slider). Defaults to full volume when
+// snapshot (ALERT_SOUND_VOLUME, a 0-100 slider). Defaults to full volume when
 // the setting is absent or malformed so alerts are never silently muted.
 export function GetAlertVolume(): number {
   const Setting = Array.isArray(Settings)
@@ -23,7 +23,7 @@ export function WithFullStop(Message: unknown): unknown {
   if (typeof Message !== 'string') return Message;
   const Trimmed = Message.trimEnd();
   if (!Trimmed) return Message;
-  return /[.!?…]$/.test(Trimmed) ? Trimmed : `${Trimmed}.`;
+  return /[.!?\u2026]$/.test(Trimmed) ? Trimmed : `${Trimmed}.`;
 }
 
 // The single HTML escaper for the renderer. Escapes all five significant

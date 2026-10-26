@@ -14,7 +14,7 @@ const MAX_ICON_LENGTH = 64;
 const MIN_COLOUR_INDEX = 0;
 const MAX_COLOUR_INDEX = 7;
 
-// Glyph used when an integrated client declares no icon — which is every client
+// Glyph used when an integrated client declares no icon, which is every client
 // built against an SDK from before icons existed.
 const DEFAULT_ACTION_ICON = 'terminal';
 

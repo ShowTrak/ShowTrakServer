@@ -6,7 +6,7 @@
 //
 // RFC 1628 is implemented by the great majority of network-managed UPS cards
 // (Eaton/MGE Network-M2/M3, Riello NetMan 208/204, APC AP96xx, CyberPower
-// RMCARD, Tripp Lite, ...), so one method works across that whole range — it is
+// RMCARD, Tripp Lite, ...), so one method works across that whole range; it is
 // not tied to any single vendor's proprietary MIB.
 import snmp from 'net-snmp';
 import { Esc, Pill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
@@ -14,7 +14,7 @@ import type { MonitoringResult } from './types';
 
 export const DEFAULT_PORT = 161;
 
-// UPS-MIB scalar OIDs (all end in .0 — a single instance per device).
+// UPS-MIB scalar OIDs (all end in .0: a single instance per device).
 export const OID = {
   BatteryStatus: '1.3.6.1.2.1.33.1.2.1.0',
   Charge: '1.3.6.1.2.1.33.1.2.4.0',
@@ -65,7 +65,7 @@ export interface HealthThresholds {
   MaxLoad: number;
   MaxTemperature: number;
   // Per-factor enable flags. Absent (undefined) counts as enabled so a bare
-  // thresholds object — and checks saved before the toggles existed — keep
+  // thresholds object (and checks saved before the toggles existed) keep
   // evaluating every factor.
   CheckCharge?: boolean;
   CheckLoad?: boolean;
@@ -107,7 +107,7 @@ export function EvaluateHealth(Readings: HealthReadings, T: HealthThresholds): s
   return Reasons;
 }
 
-// A net-snmp session (v1/v2c or v3) — both expose the same get()/close()/on()
+// A net-snmp session (v1/v2c or v3): both expose the same get()/close()/on()
 // surface, so the probe is transport-agnostic once the session is built.
 export type SnmpSession = ReturnType<typeof snmp.createSession>;
 
@@ -297,10 +297,10 @@ export function UpsDebug(
 ): string {
   const Reachable = !!(Result && Result.Success === true);
   const Fmt = (Value: unknown, Suffix: string): string =>
-    Value == null ? '—' : `${Value}${Suffix}`;
+    Value == null ? '-' : `${Value}${Suffix}`;
 
   const Head = Rows([
-    TextRow('Host', `${Address || '—'}:${Port}`),
+    TextRow('Host', `${Address || '-'}:${Port}`),
     ...IdentityRows,
     Row('Status', StatePill(Result)),
     Reachable

@@ -12,7 +12,7 @@ const { installJQuery, installHowl, installDocument } = require('./helpers/rende
 // Individually these are a few lines each. Collectively they are the layer that
 // decides whether an operator can save a script, whether an icon renders,
 // whether an alert plays at the volume they set, and what a show file is
-// called — and every one of them fails silently.
+// called, and every one of them fails silently.
 
 installHowl();
 installJQuery();
@@ -60,7 +60,7 @@ test('a script ID cannot contain spaces, and says so specifically', () => {
 test('a script ID rejects path separators and traversal', () => {
   // This ID is used to build a directory path server-side. The authoritative
   // containment check is there, but offering an invalid ID and failing on save
-  // is a bad experience — and a permissive renderer is how bad values get tried.
+  // is a bad experience, and a permissive renderer is how bad values get tried.
   for (const ID of ['../escape', 'a/b', 'a\\b', './rel', 'a:b', 'a.b', 'a*b']) {
     assert.match(ScriptManagerIDError(ID), /letters, numbers/i, `ID ${JSON.stringify(ID)}`);
   }
@@ -86,7 +86,7 @@ test('script paths are normalised to forward slashes', () => {
 test('a leading ./ is stripped from a script path', () => {
   assert.equal(NormalizeScriptManagerPath('./run.sh'), 'run.sh');
   assert.equal(NormalizeScriptManagerPath('  ./run.sh  '), 'run.sh');
-  // Only the leading one — a relative segment further in is left for the
+  // Only the leading one: a relative segment further in is left for the
   // server's containment check to reject.
   assert.equal(NormalizeScriptManagerPath('a/./b.sh'), 'a/./b.sh');
 });
@@ -123,7 +123,7 @@ test('an icon name is accepted with or without its bi prefix', () => {
 
 test('an icon name that could break out of the class attribute is rejected', () => {
   // The value is interpolated into `class="bi bi-${name}"`, so anything with a
-  // space or a quote could add classes — or attributes — that were not intended.
+  // space or a quote could add classes (or attributes) that were not intended.
   for (const Value of ['terminal x', 'terminal"', "terminal'", 'terminal>', '<script>', 'a b c']) {
     assert.equal(NormalizeIconName(Value), '', `value ${JSON.stringify(Value)}`);
   }
@@ -221,7 +221,7 @@ const { IsFogAvailable } = Fog;
 
 test('FOG defaults to unavailable until the server says otherwise', () => {
   // FogStatus/FogTasks are module-private (no exported setter), so only the
-  // boot state is reachable from here — which is the state that matters most:
+  // boot state is reachable from here, which is the state that matters most:
   // the imaging panel must stay hidden until the server has confirmed FOG is
   // both enabled AND healthy. Showing it early offers imaging actions that
   // would silently fail.
@@ -231,7 +231,7 @@ test('FOG defaults to unavailable until the server says otherwise', () => {
 // OpenTaskCount / FinishedTaskCount are module-private in fog.ts and are
 // reachable only through the DOM render path, so they are not covered here.
 // Extracting them would mean moving FogTasks state out of the module for two
-// one-line filters — not worth the churn against the rest of this pass.
+// one-line filters; not worth the churn against the rest of this pass.
 
 // ===========================================================================
 // Modal formatters

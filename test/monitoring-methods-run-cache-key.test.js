@@ -5,7 +5,7 @@ const { Manager, getMethodRunCacheKey } = require('../dist/Modules/MonitoringMet
 
 // The run-cache memoizes Method.Run(Target) under getMethodRunCacheKey(). For the
 // memoization to be sound the key must be a pure function of exactly what Run()
-// receives — the RAW target — so a cache hit can only ever replay a probe
+// receives (the RAW target), so a cache hit can only ever replay a probe
 // computed from identical inputs. These tests pin that contract.
 const ping = Manager.Get('ping');
 

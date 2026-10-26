@@ -7,7 +7,7 @@
 // semantics live in ./_pjlink-shared.
 //
 // The same check also carries the projector's CONTROL surface (see Actions
-// below) — power, shutter, input and the Class 2 extras — so a projector you can
+// below), power, shutter, input and the Class 2 extras, so a projector you can
 // see the state of is a projector you can drive, from the same tile.
 import {
   CommonPJLinkSettings,
@@ -140,13 +140,13 @@ function ParseHealthOptions(Target: MonitoringTargetLike): HealthOptions {
 }
 
 // All the reasons a reachable projector is unhealthy. Reachability-level device
-// failures are always reported; every other factor is gated by its toggle. Pure
-// — exported via _internal for unit tests.
+// failures are always reported; every other factor is gated by its toggle. Pure;
+// exported via _internal for unit tests.
 function EvaluateHealth(Snapshot: PJLinkSnapshot, Options: HealthOptions): string[] {
   const Reasons: string[] = [];
 
   if (Snapshot.PowerErr === 'ERR3') Reasons.push('Projector busy (ERR3)');
-  // ERR4 anywhere means device failure — report it once.
+  // ERR4 anywhere means device failure; report it once.
   if (
     Snapshot.PowerErr === 'ERR4' ||
     Snapshot.ErstErr === 'ERR4' ||
@@ -157,7 +157,7 @@ function EvaluateHealth(Snapshot: PJLinkSnapshot, Options: HealthOptions): strin
   }
 
   // Power state (opt-in). 'any' means reachable is enough; 'on' accepts only On;
-  // 'on-or-warmup' also accepts warm-up — so standby and cooling degrade.
+  // 'on-or-warmup' also accepts warm-up, so standby and cooling degrade.
   if (Options.CheckPower && Options.ExpectedPower !== 'any' && Snapshot.Power != null) {
     const Accepted = Options.ExpectedPower === 'on' ? [1] : [1, 3];
     if (!Accepted.includes(Snapshot.Power)) {
@@ -197,8 +197,8 @@ function EvaluateHealth(Snapshot: PJLinkSnapshot, Options: HealthOptions): strin
 //
 // The complete set of PJLink SET commands: POWR (power), INPT (input select) and
 // AVMT (the A/V mute that a projectionist calls the shutter) are Class 1 and
-// every device answers them. FREZ (freeze) and SVOL (speaker volume) are Class 2
-// — they are offered anyway because a Class 1 projector answers them ERR1, which
+// every device answers them. FREZ (freeze) and SVOL (speaker volume) are Class 2;
+// they are offered anyway because a Class 1 projector answers them ERR1, which
 // surfaces as "the projector does not support this command", so the device's own
 // refusal is the capability gate rather than a CLSS round trip before every
 // press. Mic volume (MVOL) is deliberately absent: it is Class 2, vanishingly
@@ -254,7 +254,7 @@ const Actions: MonitoringActionDef[] = [
     Label: 'Close Shutter',
     Icon: 'eye-slash',
     Group: 'Shutter',
-    Note: 'A/V mute on — blanks picture and sound without powering down.',
+    Note: 'A/V mute on: blanks picture and sound without powering down.',
   },
   {
     ID: 'shutter.open',
@@ -356,7 +356,7 @@ async function RunAction(
     // otherwise reach the projector as a bare ERR2 with nothing to explain it.
     // Source type 1-6 then the switch number. Class 2 allows an alphabetic
     // switch (1-9, A-Z), so only the FIRST character is constrained to the
-    // defined source types — which is what rules out junk like "ZZ".
+    // defined source types, which is what rules out junk like "ZZ".
     const Code = NormalizeInputCode(Params.Input);
     if (!/^[1-6][0-9A-Z]$/.test(Code)) {
       return {
@@ -401,11 +401,11 @@ function DescribeAction(ActionID: string, Params: Record<string, unknown>): stri
   if (ActionID !== 'input.set') return null;
   const Code = NormalizeInputCode(Params.Input);
   if (!Code) return null;
-  return `Set Input — ${InputLabel(Code)} (${Code})`;
+  return `Set Input - ${InputLabel(Code)} (${Code})`;
 }
 
 // A control command has just changed the projector's power/input/mute state, so
-// the cached snapshot — up to 1.5s old — now describes the state it replaced.
+// the cached snapshot (up to 1.5s old) now describes the state it replaced.
 function InvalidateCaches(Target: MonitoringTargetLike): void {
   InvalidateProjectorSnapshot(ParsePJLinkConfig(Target));
 }
@@ -462,7 +462,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
         )
       );
     } else if (Lamps) {
-      ExtraRows.push(TextRow('Lamp', 'No lamp reported — laser light source?'));
+      ExtraRows.push(TextRow('Lamp', 'No lamp reported: laser light source?'));
     }
 
     if (Result.Input != null && Result.Input !== '') {

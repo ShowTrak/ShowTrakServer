@@ -67,8 +67,8 @@ async function Execute(
   const S = NormalizeSettings(Action && Action.Settings ? Action.Settings : {});
 
   // Adaptive Card delivered via a Power Automate "Workflows" incoming webhook.
-  // Even "text" mode must be an Adaptive Card here — Teams workflows do not accept
-  // a bare text payload — so it collapses to a single-line TextBlock.
+  // Even "text" mode must be an Adaptive Card here (Teams workflows do not accept
+  // a bare text payload), so it collapses to a single-line TextBlock.
   const Body =
     S.Mode === 'text'
       ? [{ type: 'TextBlock', text: OneLineSummary(Context), wrap: true }]

@@ -1,18 +1,18 @@
-// RemoteDeviceManager — the pairing lifecycle for ShowTrak Remote devices.
+// RemoteDeviceManager: the pairing lifecycle for ShowTrak Remote devices.
 //
 // Two secrets with deliberately different lifetimes live in this module, and the
 // tests are weighted accordingly:
 //
 //   The device token is what a paired phone authenticates with forever after. It
 //   must never be stored in plaintext, and it must be returned to the caller
-//   exactly once — there is no path that can recover it afterwards.
+//   exactly once; there is no path that can recover it afterwards.
 //
 //   The pairing code is displayed on a screen anyone in the room can see, so it
 //   has to be single-use and short-lived. "Single-use" is the load-bearing half:
 //   a photograph of the QR is worthless the moment the first device redeems it.
 //
 // The DB is stubbed. Unstubbed, the real manager's ../DB opens a live sqlite
-// connection at module load — green locally, broken on CI (see
+// connection at module load: green locally, broken on CI (see
 // test/server-namespace-mock-coverage.test.js).
 const test = require('node:test');
 const { mock } = test;
@@ -100,7 +100,7 @@ test('pairing persists only the hash of the token it returns', async () => {
 test('a minted token has full entropy, not a truncated or predictable one', async () => {
   // 32 bytes = 256 bits, hex-encoded. This is asserted because the token is the
   // ONLY thing standing between a stranger on the show LAN and full control once
-  // pairing is over — and because a "tidier" shorter token is an easy, silent
+  // pairing is over, and because a "tidier" shorter token is an easy, silent
   // regression to introduce.
   const { Mod } = load();
   const [, First] = await Mod.Manager.Pair('A', 'ios');
@@ -114,7 +114,7 @@ test('a minted token has full entropy, not a truncated or predictable one', asyn
 test('a device name is clamped and stripped of control characters', async () => {
   // Attacker-controlled text that gets rendered in the settings device list. The
   // ANSI escape matters as much as the tab: the pane is not the only place this
-  // string is written — it also reaches the log.
+  // string is written; it also reaches the log.
   const { Mod, calls } = load();
   await Mod.Manager.Pair('Stage\tTablet\u001b[31m', 'ios');
   assert.equal(calls.insert[0][2], 'StageTablet[31m');

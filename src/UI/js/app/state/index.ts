@@ -7,11 +7,11 @@
 // bindings flow through the re-exports, so a setter in a leaf module updates the
 // value every consumer sees.
 //
-//   ./types          — transient UI working-state interfaces
-//   ./capabilities   — desktop/web capability profile (window-injected)
-//   ./client-labels  — pure client-labelling helpers
-//   ./server-caches  — authoritative server-pushed entity caches + config
-//   ./ui-drafts      — transient editor/modal/selection/mode state
+//   ./types          - transient UI working-state interfaces
+//   ./capabilities   - desktop/web capability profile (window-injected)
+//   ./client-labels  - pure client-labelling helpers
+//   ./server-caches  - authoritative server-pushed entity caches + config
+//   ./ui-drafts      - transient editor/modal/selection/mode state
 export * from './types';
 export * from './capabilities';
 export * from './client-labels';

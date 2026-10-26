@@ -34,7 +34,7 @@ export function CreateRemoteDevicesRepository(DB: DBManager) {
       );
     },
     // Touched on every successful handshake, so it is deliberately the narrowest
-    // possible write — no read-modify-write, no other column touched.
+    // possible write: no read-modify-write, no other column touched.
     // A paired device reconnecting is not an edit to the show, so the last-seen
     // bump never flags the show as unsaved.
     TouchLastSeen(DeviceID: string, LastSeenAt: number): Promise<DBResult<unknown>> {

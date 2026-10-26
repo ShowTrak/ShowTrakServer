@@ -135,7 +135,7 @@ test('the star follows the parameters, so one input is starred and another is no
       Method: 'pjlink',
       ActionID: 'input.set',
       Params: { Input: '31' },
-      Label: 'Set Input — Digital 1 (31)',
+      Label: 'Set Input - Digital 1 (31)',
       Icon: 'box-arrow-in-right',
       Weight: 1,
     },

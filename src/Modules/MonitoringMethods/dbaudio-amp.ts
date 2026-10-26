@@ -15,14 +15,14 @@
 // d&b does not publish its amplifier object tree. The object names, numbers
 // and value meanings come from two public open-source clients:
 //   - ChristianAhrens/NanoOcp (LGPL-3.0) Source/Ocp1ObjectDefinitions.h and
-//     AmpController.cpp — the ONo layout and the numbers above, per family:
+//     AmpController.cpp: the ONo layout and the numbers above, per family:
 //       D20 / D80 / 10D / 30D ("Dx") and D40 / 40D ("Dy"): PwrOn 0x100,
 //         Isp 0x400, Gr 0x401, Ovl 0x402;
 //       5D: PwrOn 0x101, Isp 0x401, Gr 0x402, Ovl 0x403;
 //       all: Config_Mute 0x205.
 //     ONo = type(1) << 28 | record(0) << 20 | channel << 15 | boxAndObject,
 //     channel 1–4.
-//   - bitfocus/companion-module-dbaudiotechnik-amps (MIT) main.js — the OCP.1
+//   - bitfocus/companion-module-dbaudiotechnik-amps (MIT) main.js: the OCP.1
 //     ports: 30013 for D20, D80, 10D and 30D; 50014 for D40, 40D and 5D.
 // Inferred, not documented anywhere: that channel 1–4 are the A–D an operator
 // sees; that the family can be told from the model name ("5D" or not). The
@@ -479,7 +479,7 @@ function JoinLetters(Letters: string[]): string {
 }
 
 // The reasons a reachable amplifier is unhealthy, per the enabled options.
-// Pure — exported via _internal for unit tests.
+// Pure: exported via _internal for unit tests.
 function EvaluateHealth(
   Probe: { IsAes70: boolean; Incomplete: boolean; Snapshot: AmpSnapshot },
   Options: HealthOptions
@@ -808,7 +808,7 @@ const FAMILY_LABELS: Record<Family, string> = {
 };
 
 function YesNo(Value: unknown): string {
-  return Value === true ? 'yes' : Value === false ? 'no' : '—';
+  return Value === true ? 'yes' : Value === false ? 'no' : '-';
 }
 
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
@@ -825,7 +825,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     Reachable && Result.Port != null ? String(Result.Port) : PortsFor(Config).join(' or ');
 
   const Head = [
-    TextRow('Host', `${Config.Address || '—'}:${PortText}`),
+    TextRow('Host', `${Config.Address || '-'}:${PortText}`),
     Row('Status', StatePill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)

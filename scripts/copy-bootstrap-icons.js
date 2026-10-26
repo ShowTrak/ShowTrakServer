@@ -1,6 +1,6 @@
 // Copies Bootstrap Icons font and CSS from node_modules into src/UI/vendors for local serving.
 // bootstrap-icons is a devDependency (build-time only; the copied font/CSS ships in dist/), so
-// this postinstall hook requires a full install — it will fail under `npm ci --omit=dev`.
+// this postinstall hook requires a full install; it will fail under `npm ci --omit=dev`.
 //
 // The copied files are gitignored: package.json is the one place the version lives, so a
 // Dependabot bump updates what ships. That makes this copy the ONLY source of the icons, so a

@@ -1,4 +1,4 @@
-// IPC registrar: system-level surface — config, web addresses, application mode,
+// IPC registrar: system-level surface: config, web addresses, application mode,
 // settings read/write, initial-state hydration ('Loaded'), external links,
 // folders, and project dependency listing. Extracted verbatim from main.ts.
 

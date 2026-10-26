@@ -43,7 +43,7 @@ const {
   MONITOR_STATE_SEVERITY,
 } = Monitoring;
 
-// Mirrors state/ui-drafts.ts — a 1-hour window split into 60 one-minute blocks.
+// Mirrors state/ui-drafts.ts: a 1-hour window split into 60 one-minute blocks.
 const WINDOW_MS = 60 * 60 * 1000;
 const BLOCK_COUNT = 60;
 const BLOCK_MS = WINDOW_MS / BLOCK_COUNT;
@@ -91,7 +91,7 @@ test('known methods get their short label and duplicates collapse', () => {
 
 test('an unknown method is humanised rather than dropped', () => {
   // A method added server-side that the renderer has no label for must still
-  // appear — silently omitting it would understate what a target checks.
+  // appear; silently omitting it would understate what a target checks.
   assert.equal(FormatMonitoringCheckSummary(checks('snmp-ups-v3')), 'SNMP UPS V3');
   assert.equal(FormatMonitoringCheckSummary(checks('artnet_universe')), 'ARTNET UNIVERSE');
 });
@@ -188,7 +188,7 @@ test('transport failures are all reported as plain Offline', () => {
 });
 
 test('name-resolution and certificate failures get their own labels', () => {
-  // These are configuration faults, not the device being down — telling them
+  // These are configuration faults, not the device being down; telling them
   // apart is what stops an operator power-cycling a healthy machine.
   for (const Error of ['getaddrinfo ENOTFOUND qlab.local', 'EAI_AGAIN', 'NXDOMAIN returned']) {
     assert.equal(FormatMonitorStatus(false, null, Error, false), 'DNS Error', `error: ${Error}`);
@@ -273,7 +273,7 @@ test('a target with checks that has never run one is awaiting its first check', 
 test('a target awaiting its first check reads as Checking, not Offline', () => {
   // Runtime monitor state is RAM-only and starts at Online: false, so for the
   // first check cycle after the server starts every target on the page would
-  // otherwise paint red — an outage the operator can see is not real, which is
+  // otherwise paint red: an outage the operator can see is not real, which is
   // the fastest way to teach them to ignore a red tile.
   assert.deepEqual(FormatMonitorCompactStatus(false, null, false, false, true), {
     text: 'Checking',
@@ -484,7 +484,7 @@ function overallFirstBlock(FirstStates) {
 
 test('a target is only OFFLINE when every reporting check is offline', () => {
   // This mirrors the server aggregation. Getting it wrong in the other
-  // direction — offline as soon as any check fails — would make a target with
+  // direction (offline as soon as any check fails) would make a target with
   // one flaky check look dead while it is still serving.
   assert.equal(overallFirstBlock(['OFFLINE', 'OFFLINE']).state, 'OFFLINE');
   assert.equal(overallFirstBlock(['OFFLINE', 'ONLINE']).state, 'DEGRADED');

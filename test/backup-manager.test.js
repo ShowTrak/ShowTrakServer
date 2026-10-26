@@ -8,7 +8,7 @@ const { loadWithMocks } = require('../test-support/load-with-mocks');
 
 // Exercises src/Modules/BackupManager against a real working database: the
 // version stamped into every show file, and the promise that a show file an
-// older ShowTrak Server saved is backed up before this version writes to it —
+// older ShowTrak Server saved is backed up before this version writes to it,
 // and is never written to at all until the operator agrees.
 
 const CurrentVersion = require('../package.json').version;

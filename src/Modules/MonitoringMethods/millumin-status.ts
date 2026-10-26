@@ -1,7 +1,7 @@
 // Millumin (Anome) monitoring: passively confirms a Millumin machine is alive by
 // listening for its outbound OSC "API feedback" stream.
 //
-// Millumin does not answer a reliable request/response query — it only SENDS OSC
+// Millumin does not answer a reliable request/response query; it only SENDS OSC
 // feedback (all prefixed `/millumin`) to configured destinations when "API
 // feedback" is enabled. So this check binds a UDP port and treats recent OSC
 // activity from the target machine as the liveness signal. See _millumin-shared.ts
@@ -12,7 +12,7 @@
 //
 // Result semantics (consumed by MonitoringTarget.Tick):
 //   - No matching OSC in the grace window     -> offline  (Success: false)
-//   - OSC arriving, but from a different IP    -> degraded ("OSC from X, not …")
+//   - OSC arriving, but from a different IP    -> degraded ("OSC from X, not ...")
 //   - Matching OSC from the target machine     -> online   (Success: true)
 import {
   BuildMilluminSettings,

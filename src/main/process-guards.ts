@@ -4,7 +4,7 @@
 // Millumin listeners; the WOL sender; the OSC server). But some errors originate
 // several layers deep in third-party libraries or native code and surface as an
 // uncaught exception or unhandled rejection before any of our try/catch or
-// per-socket handlers can see them — the classic case being the mDNS multicast
+// per-socket handlers can see them, the classic case being the mDNS multicast
 // responder throwing `send EADDRNOTAVAIL 224.0.0.251:5353` the instant Ethernet
 // is unplugged or Wi-Fi is switched off.
 //

@@ -166,7 +166,7 @@ function loadControlService({ __identifyResult, ...overrides } = {}) {
 }
 
 // Identify is the one command here that is safe in SHOW mode and mutates
-// nothing — it exists for the operator standing at a rack with a phone, working
+// nothing; it exists for the operator standing at a rack with a phone, working
 // out which machine is which. It resolves a slug to a UUID because that is what
 // IdentifyManager addresses.
 test('Identify resolves a client slug and identifies by UUID', async () => {

@@ -108,7 +108,7 @@ export let OscHttpDebugEntries: OscHttpDebugEntry[] = [];
 export let OscHttpDebugModalOpen = false;
 
 // Which protocol the reference is currently showing, and the last set of action
-// groups pushed from the backend — cached so the toggle can re-render without a
+// groups pushed from the backend, cached so the toggle can re-render without a
 // fresh push.
 export let OscReferenceProtocol: 'OSC' | 'HTTP' = 'OSC';
 export let OscReferenceGroups: OscActionGroup[] = [];
@@ -434,7 +434,7 @@ export async function OpenOscHttpDebugTerminal() {
   openModal('OSC_HTTP_DEBUG_MODAL');
 }
 
-// Called by the bootstrap orchestrator in main.ts — never at import time.
+// Called by the bootstrap orchestrator in main.ts, never at import time.
 // Wires the OSC/HTTP debug modal and registers every OSC-feed push handler;
 // bodies unchanged from the former import-time subscriptions.
 export function InitOscFeeds() {
@@ -545,7 +545,7 @@ export function InitOscFeeds() {
     const SortedGroups = Array.from(ActionGroups.values()).sort((A, B) => {
       const APath = (A.HTTP[0] && A.HTTP[0].Path) || (A.OSC[0] && A.OSC[0].Path) || '';
       const BPath = (B.HTTP[0] && B.HTTP[0].Path) || (B.OSC[0] && B.OSC[0].Path) || '';
-      // Section first (Control, Clients, Tags, …), then the intra-section order.
+      // Section first (Control, Clients, Tags, etc.), then the intra-section order.
       const ASection = getRouteSectionIndex(APath);
       const BSection = getRouteSectionIndex(BPath);
       if (ASection !== BSection) return ASection - BSection;

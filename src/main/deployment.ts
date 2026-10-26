@@ -5,7 +5,7 @@
 // module owns that machinery: fingerprint comparison, the in-flight/queued
 // deployment state machine (so overlapping triggers coalesce instead of
 // stampeding the execution queue), and the debounce timer for filesystem-driven
-// catalog changes. Extracted verbatim from main.ts — behavior is unchanged.
+// catalog changes. Extracted verbatim from main.ts; behavior is unchanged.
 
 import { CreateLogger } from '../Modules/Logger';
 import { SCRIPT_DEPLOY_DEBOUNCE_MS } from '../Modules/Config/constants';
@@ -227,7 +227,7 @@ function ScheduleScriptChangeDeployment(): void {
 }
 
 // Called from the ScriptExecutionUpdated fan-out: once no 'Deploying Scripts'
-// tasks remain pending, the in-flight session is complete — clear it and flush
+// tasks remain pending, the in-flight session is complete, so clear it and flush
 // any deployment that was queued while it ran.
 function ReconcileDeploymentQueueAfterExecutions(Executions: DeploymentExecutionInfo[]): void {
   const PendingScriptDeployments = (Executions || []).filter(

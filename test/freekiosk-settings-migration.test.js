@@ -5,7 +5,7 @@
 // threshold from seconds to days (and switches off uptime comparisons that no
 // longer exist). ParseSettings then disarms any other condition stored with a
 // comparison its metric stopped offering, because otherwise the old threshold
-// would be judged by whatever comparison is left — a health check armed as
+// would be judged by whatever comparison is left: a health check armed as
 // "is overheat" would become "expected overheat" and alert on a good battery.
 const test = require('node:test');
 const assert = require('node:assert/strict');

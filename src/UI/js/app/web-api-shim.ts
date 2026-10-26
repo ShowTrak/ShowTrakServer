@@ -12,7 +12,7 @@
 // Channels/args mirror `src/bridge_main.ts` exactly so both surfaces stay in
 // lock-step (a drift guard test asserts the channel maps match). Desktop-only
 // methods (file dialogs, show-file, script management, native/app updates,
-// network discovery, settings mutation) resolve to safe no-ops on the web —
+// network discovery, settings mutation) resolve to safe no-ops on the web;
 // their UI triggers are hidden by the capability layer, and the server denies
 // them regardless.
 
@@ -40,8 +40,8 @@ export interface WebUiSocket {
   connect(): void;
 }
 
-// Build the rpc caller. Denials/failures resolve to an `[Err, null]` tuple —
-// the dominant renderer return shape — so callers that destructure `[Err]`
+// Build the rpc caller. Denials/failures resolve to an `[Err, null]` tuple
+// (the dominant renderer return shape), so callers that destructure `[Err]`
 // never throw. `T` is the per-channel return shape declared by ShowTrakAPI;
 // the server is trusted to emit it (the assertions below are the single
 // wire->type boundary).
@@ -436,7 +436,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     DeleteTag: async (TagID) => rpc('Tags:Delete', TagID),
 
     // ---- Show Variables (read allowed; management desktop-only) ----------
-    // The browser can see which variables exist and what a client resolves to —
+    // The browser can see which variables exist and what a client resolves to;
     // that is show documentation an operator needs at the desk. Defining and
     // editing them stays desktop-only, matching tags: no Variables:Set* channel
     // is allowlisted for the web namespace either.

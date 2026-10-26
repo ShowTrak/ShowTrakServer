@@ -92,7 +92,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 
       // A zero exit code is not on its own proof of delivery. Windows `ping`
       // exits 0 when the local stack or a router answers with an ICMP
-      // "Destination host unreachable" — that counts as a received packet for
+      // "Destination host unreachable"; that counts as a received packet for
       // exit-code purposes, and happens routinely while the route/interface is
       // still coming up during server boot. Trusting the code alone reported
       // those hosts as online (with a wall-clock latency standing in for the
@@ -106,7 +106,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 
       // Require a real round-trip time. Every ping implementation prints one for
       // an actual echo reply ("time=5ms", "time<1ms", "time=1.23 ms"), so its
-      // absence means nothing came back — never substitute wall-clock here.
+      // absence means nothing came back; never substitute wall-clock here.
       const Match = Stdout.match(/time[=<]\s*([\d.]+)\s*ms/i);
       if (!Match || !Match[1]) {
         return resolve({ Success: false, Error: 'No echo reply' });
@@ -121,7 +121,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Address = Target && Target.Address ? String(Target.Address).trim() : '';
   const Reachable = !!(Result && Result.Success);
   return Rows([
-    TextRow('Host', Address || '—'),
+    TextRow('Host', Address || '-'),
     Row('Reachable', Pill(Reachable ? 'success' : 'danger', Reachable ? 'Yes' : 'No')),
     Reachable
       ? Row('Round-trip', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)

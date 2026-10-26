@@ -38,7 +38,7 @@ test('every metric key is id-safe and unique', () => {
     assert.match(
       metric.Key,
       /^[A-Za-z0-9_]+$/,
-      `${metric.Key} must contain only [A-Za-z0-9_] — a dot breaks the #MON_DYN_ selector`
+      `${metric.Key} must contain only [A-Za-z0-9_]: a dot breaks the #MON_DYN_ selector`
     );
     assert.ok(!seen.has(metric.Key), `duplicate metric key ${metric.Key}`);
     seen.add(metric.Key);
@@ -60,7 +60,7 @@ test('every metric declares a known section and chart kind', () => {
     );
     assert.ok(['line', 'blocks', 'none'].includes(metric.Chart), `${metric.Key} chart kind`);
     // Only numeric metrics can be drawn as a line, and only non-numeric ones as
-    // categorical blocks — the renderer dispatches on this.
+    // categorical blocks; the renderer dispatches on this.
     if (metric.Chart === 'line') assert.equal(metric.Type, 'number', `${metric.Key} line chart`);
     if (metric.Chart === 'blocks') {
       assert.notEqual(metric.Type, 'number', `${metric.Key} block timeline`);
@@ -117,7 +117,7 @@ test('the accelerometer is not a metric, even though the device reports one', ()
 
 test('the Wi-Fi channel is worked out from the frequency, per band', () => {
   // Each band numbers from its own base, so this is ranges rather than one
-  // formula — and the two off-pattern channels are real hardware, not trivia.
+  // formula, and the two off-pattern channels are real hardware, not trivia.
   const cases = [
     [2412, 1],
     [2437, 6],
@@ -157,7 +157,7 @@ test('the channel reads through the registry as a whole number', () => {
 test('readings with no meaningful shape over time are values, not charts', () => {
   // A chart is for a signal you read a trend off. A rotation index, a storage
   // figure that moves once a month or an uptime counter that only ever climbs
-  // are all read as "what is it now" — a line under each is sixty columns of
+  // are all read as "what is it now": a line under each is sixty columns of
   // furniture. They keep their alarms; they just lose the graph.
   const valueOnly = [
     'device_uptime',
@@ -174,7 +174,7 @@ test('readings with no meaningful shape over time are values, not charts', () =>
   for (const key of valueOnly) {
     assert.equal(FREEKIOSK_METRICS_BY_KEY.get(key).Chart, 'none', key);
   }
-  // Storage still alarms — losing the chart must not lose the threshold.
+  // Storage still alarms: losing the chart must not lose the threshold.
   assert.ok(FREEKIOSK_METRICS_BY_KEY.get('storage_usedPercent').Operators.includes('above'));
   assert.ok(FREEKIOSK_METRICS_BY_KEY.get('device_uptime').Operators.includes('above'));
   // Things that genuinely do move are still charted.
@@ -191,7 +191,7 @@ test('readings with no meaningful shape over time are values, not charts', () =>
 test('remote control is reported but never alarmed on', () => {
   // It records how the LAST control command went rather than reading anything
   // from the device, so it cannot change while a terminal is merely watched. An
-  // alarm would fire long after the operator had already been told — a refused
+  // alarm would fire long after the operator had already been told; a refused
   // command reports inline, in the moment, in the device's own words.
   const control = FREEKIOSK_METRICS_BY_KEY.get('control_enabled');
   assert.deepEqual(control.Operators, []);
@@ -321,7 +321,7 @@ test('operator picker and value inputs are gated behind the enable toggle', () =
 
 test("every field in a section is gated on that section's master switch", () => {
   // Not just the enable toggle. Conditional visibility is evaluated against the
-  // DOM, and a hidden checkbox still reports itself as checked — so gating only
+  // DOM, and a hidden checkbox still reports itself as checked, so gating only
   // the toggle would leave its operator and threshold on screen underneath a
   // section that had been switched off.
   const fields = BuildFreeKioskAlarmFields();
@@ -547,7 +547,7 @@ test('long URLs are truncated so they fit a tile', () => {
   const long = `https://example.com/${'a'.repeat(200)}`;
   const shown = FormatMetricValue(metric, long);
   assert.ok(shown.length <= 60);
-  assert.ok(shown.endsWith('…'));
+  assert.ok(shown.endsWith('...'));
 });
 
 // ---- Conditions are stated as expectations --------------------------------

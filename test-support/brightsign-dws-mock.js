@@ -1,8 +1,8 @@
 // A fake `http` / `https` module pair that emulates a BrightSign player's Local
 // DWS well enough to exercise the brightsign* monitoring methods end to end.
 //
-// It speaks real RFC 2617 digest auth — it issues a challenge and verifies the
-// Authorization header the method computes against the configured credentials —
+// It speaks real RFC 2617 digest auth (it issues a challenge and verifies the
+// Authorization header the method computes against the configured credentials),
 // so the auth handshake is genuinely under test rather than stubbed out.
 const { EventEmitter } = require('node:events');
 const crypto = require('node:crypto');
@@ -53,14 +53,14 @@ function envelope(Payload) {
 /**
  * @param {object} options
  * @param {object} options.routes      path -> payload object, or { Status, Body } for a raw reply
- * @param {object} options.auth        { username, password } — when set, digest auth is required
+ * @param {object} options.auth        { username, password }; when set, digest auth is required
  * @param {string} options.qop         digest qop to advertise ('auth' by default; '' for RFC 2069)
  * @param {string} options.algorithm   digest algorithm to advertise (default 'MD5')
  * @param {boolean} options.refuse     emit ECONNREFUSED instead of replying
  * @param {boolean} options.silent     never reply (drives the timeout path)
  * @param {boolean} options.redirectToHttps  answer plain HTTP with a 302 to HTTPS
  * @param {number} options.delayMs     delay each reply by this many ms (real
- *   timer) so a redirect + auth handshake accrues wall-clock time — used to
+ *   timer) so a redirect + auth handshake accrues wall-clock time; used to
  *   prove the whole-probe timeout budget caps the total across every round trip.
  */
 function makeBrightSignDws(options = {}) {
@@ -105,7 +105,7 @@ function makeBrightSignDws(options = {}) {
         })
       );
     }
-    if (silent) return; // never answers — the method's kill timer must fire
+    if (silent) return; // never answers; the method's kill timer must fire
 
     if (redirectToHttps && Scheme === 'http') {
       return Req.emit(

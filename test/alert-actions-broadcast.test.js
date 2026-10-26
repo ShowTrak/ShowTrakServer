@@ -177,7 +177,7 @@ test('play-custom-audio Execute falls back to a built-in sound when the asset is
 // rule and a tag rule), and all of them firing the same sound in the same tick
 // smears it. Within ALERT_SOUND_DEDUPE_WINDOW_MS the first request plays and the
 // rest are dropped silently; different sounds are untouched. The window itself is
-// covered in alert-audio-dedupe.test.js — these assert the wiring at the actions.
+// covered in alert-audio-dedupe.test.js; these assert the wiring at the actions.
 //
 // The de-dupe module is a sibling of the action, so loadWithMocks evicts it too:
 // re-require it AFTER the action to get the same fresh instance the action holds.

@@ -3,7 +3,7 @@
 // The history store compresses flat runs: once two consecutive samples agree it
 // stops pushing and just moves the second one's timestamp forward. A sample
 // therefore means "this held from here until the next sample". Both bucketers
-// disagreed — they count samples per bucket and paint an empty bucket grey — so
+// disagreed (they count samples per bucket and paint an empty bucket grey), so
 // a terminal with a steady reading drew one live column and fifty-nine dead
 // ones. This expansion is what reconciles the two.
 const test = require('node:test');
@@ -45,7 +45,7 @@ test('a two-point flat run fills every bucket between its ends', () => {
 });
 
 test('buckets before the first sample stay empty', () => {
-  // Nothing was recorded then — history is RAM-only, so the app may simply not
+  // Nothing was recorded then; history is RAM-only, so the app may simply not
   // have been running. Filling them would claim knowledge nobody has.
   const half = NOW - WINDOW / 2;
   const expanded = ExpandMetricSeries([sample(half), sample(NOW - 1000)], opts);
@@ -82,7 +82,7 @@ test('breach state is carried with the reading it belonged to', () => {
 });
 
 test('a bucket that already has a sample is left alone', () => {
-  // One sample per poll, uncompressed — expansion must add nothing.
+  // One sample per poll, uncompressed; expansion must add nothing.
   const dense = [];
   for (let i = 0; i < BUCKETS; i += 1) dense.push(sample(NOW - WINDOW + i * BUCKET + BUCKET / 2));
   const expanded = ExpandMetricSeries(dense, opts);

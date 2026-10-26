@@ -10,7 +10,7 @@
 //   - The REST API must be enabled in the Web RCS under Application
 //     Programming Interfaces.
 //   - When the Web RCS is password protected every call answers 401 until the
-//     client logs in with POST /auth/login?identifier=Admin&password=… and sends
+//     client logs in with POST /auth/login?identifier=Admin&password=... and sends
 //     the returned auth-jwt cookie on later calls. That login is the only POST
 //     the check makes; it changes nothing on the unit. Section 10.1 documents
 //     no other form (no body, no header), so the password has to travel in the
@@ -30,7 +30,7 @@
 // Actions (section 3, both guide versions; all POST, answering 204 or 200):
 //   memory.preview /  POST /screens/{screenId}/load-memory
 //   memory.program    {"memoryId": 1–1000, "target": "preview" | "program"}
-//                     — once per chosen screen (screens 1–24)
+//                     once per chosen screen (screens 1–24)
 //   transition.take   POST /screens/{screenId}/take  (no body)
 // Errors are 400 / 404 / 409 with a JSON body explaining them.
 //
@@ -352,7 +352,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     Number.isFinite(Number(Cfg.Port)) && Number(Cfg.Port) > 0 ? Number(Cfg.Port) | 0 : 80;
   const Base = BuildBaseUrl(Target && Target.Address, 'http', Port);
   if (!Base) return { Success: false, Error: 'No address configured' };
-  // Deliberately not trimmed — trailing whitespace can be part of a password.
+  // Deliberately not trimmed: trailing whitespace can be part of a password.
   const Password = Cfg.Password == null ? '' : String(Cfg.Password);
 
   const Started = Date.now();
@@ -599,11 +599,11 @@ function DescribeAction(ActionID: string, Params: Record<string, unknown>): stri
     if (Memory == null || !Screens) return null;
     const To = ActionID === 'memory.program' ? 'Program' : 'Preview';
     const On = ListText(Screens);
-    return `Load Memory ${Memory} — ${On.charAt(0).toUpperCase()}${On.slice(1)} (${To})`;
+    return `Load Memory ${Memory} - ${On.charAt(0).toUpperCase()}${On.slice(1)} (${To})`;
   }
   if (ActionID === 'transition.take') {
     const Screen = WholeNumberIn(P.Screen, 1, MAX_SCREEN);
-    return Screen == null ? null : `Take — Screen ${Screen}`;
+    return Screen == null ? null : `Take - Screen ${Screen}`;
   }
   return null;
 }
@@ -635,7 +635,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Head = Rows([
     TextRow(
       'Unit',
-      `${Address || '—'}${Result && Result.DeviceLabel ? ` (${Result.DeviceLabel})` : ''}`
+      `${Address || '-'}${Result && Result.DeviceLabel ? ` (${Result.DeviceLabel})` : ''}`
     ),
     Row('Status', StatePill(Result)),
     Reachable

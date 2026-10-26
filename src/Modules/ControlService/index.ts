@@ -1,4 +1,4 @@
-// ControlService — transport-agnostic command surface for external integrations.
+// ControlService: transport-agnostic command surface for external integrations.
 //
 // The WebSocket control API (`/sdk` namespace) dispatches every command through
 // this module. Commands are addressed by SLUG (clients/groups/tags/scripts), the
@@ -318,7 +318,7 @@ export const ControlService = {
 
   // Identify ---------------------------------------------------------------
   // Flash the identify overlay on a client's own screen. Unlike every other
-  // command here this mutates nothing and is safe in SHOW mode — which is the
+  // command here this mutates nothing and is safe in SHOW mode, which is the
   // point: it exists for the operator standing in front of a rack trying to work
   // out which machine is which, and that is a job done from a phone.
   //
@@ -341,7 +341,7 @@ export const ControlService = {
     return ok(`Stopped identifying "${c.Slug || c.UUID}"`);
   },
 
-  // Dismiss every open modal on the desktop renderer. No targets — the renderer
+  // Dismiss every open modal on the desktop renderer. No targets; the renderer
   // closes whatever it currently has open.
   async CloseModals(): Promise<CommandResult> {
     emitBulk('CloseModals', []);

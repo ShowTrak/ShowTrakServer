@@ -6,17 +6,17 @@ const path = require('node:path');
 const { Readable } = require('node:stream');
 const { installModuleMocks, matchesModule } = require('./helpers/main-mocks');
 
-// Exercises src/Modules/UpdateManager/index.ts — the LAN client-update cache:
+// Exercises src/Modules/UpdateManager/index.ts, the LAN client-update cache:
 // it downloads a ShowTrakClient release from GitHub, stores it, and serves it
 // over HTTP to every client on the network.
 //
 // Two guards here are the security surface, and both are tested directly:
 //
-//   1. normalizeAssetName() — a GitHub asset name is attacker-influenced text
+//   1. normalizeAssetName(): a GitHub asset name is attacker-influenced text
 //      that becomes a FILENAME in the cache directory. It is reduced to a
 //      basename and scrubbed to [A-Za-z0-9._-], so no asset can be written
 //      outside the cache.
-//   2. The public route's allowlist — /updates/client/latest/:fileName is
+//   2. The public route's allowlist: /updates/client/latest/:fileName is
 //      reachable by anything on the LAN. It basenames the request AND requires
 //      the name to appear in the manifest, so the endpoint can only ever serve
 //      files this server chose to download.
@@ -76,7 +76,7 @@ const restore = installModuleMocks([
   { match: (r) => r === 'https', value: httpsStub },
   {
     // NOTE the matcher shape. UpdateManager sits INSIDE src/Modules/, so it
-    // imports its siblings as '../Logger' and '../AppData' — which do NOT end
+    // imports its siblings as '../Logger' and '../AppData', which do NOT end
     // with '/Modules/Logger' or '/Modules/AppData'. Matching only on the
     // '/Modules/...' suffix silently fails to mock them, the REAL AppDataManager
     // loads, and the tests then read and write the operator's actual
@@ -113,7 +113,7 @@ const { Manager: UpdateManager } = require('../dist/Modules/UpdateManager');
   assert.equal(
     Probe.Manager.GetStorageDirectory(),
     CacheRoot,
-    'AppData mock did not apply — refusing to run against real app data'
+    'AppData mock did not apply; refusing to run against real app data'
   );
 }
 
@@ -213,7 +213,7 @@ test('GetStatus reports not ready for an empty asset list', async () => {
 test('a manifest containing an unusable asset entry reports not-ready, not a crash', async () => {
   // isManifestReady() guards each entry (`if (!asset || !asset.name) return false`);
   // buildPublicAssetList() used to map straight into `asset.name`, so a null
-  // entry threw instead of producing that answer — the IPC handler turned the
+  // entry threw instead of producing that answer; the IPC handler turned the
   // throw into an error tuple and the public /status route 500'd.
   //
   // Not reachable from normal operation (DownloadRelease only ever writes

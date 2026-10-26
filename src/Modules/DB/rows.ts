@@ -317,7 +317,7 @@ export interface RemoteDeviceRow {
   DeviceID: string;
   TokenHash: string; // sha256 hex; the plaintext token is never stored
   DeviceName: string | null; // operator-facing, supplied by the device at pairing
-  Platform: string | null; // 'ios' | 'android' — advisory, for the settings list
+  Platform: string | null; // 'ios' | 'android'; advisory, for the settings list
   PairedAt: number;
   LastSeenAt: number | null; // null until the device's first reconnect
 }

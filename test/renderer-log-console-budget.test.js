@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-// Covers src/UI/js/app/lib/log-console-budget.ts — the cap on what the hidden
+// Covers src/UI/js/app/lib/log-console-budget.ts: the cap on what the hidden
 // log console holds. The console can be left open for days, so what it keeps
 // must be bounded by characters as well as lines: a line can be 20,000
 // characters long.

@@ -11,7 +11,7 @@ const path = require('node:path');
 //     confirms a tag means what they think BEFORE firing an action at it.
 //
 //   - lib/unassigned-clients.ts gates the creation of reserved slots. Neither
-//     of its rules is the security boundary — the main process re-reads the
+//     of its rules is the security boundary; the main process re-reads the
 //     setting and re-validates the payload (see
 //     main-registrar-unassigned-clients.test.js). These exist so the operator
 //     gets a useful message instead of a rejected round trip, and so a disabled
@@ -63,7 +63,7 @@ test('a mixed scope reports both halves', () => {
 });
 
 test('a tag that targets nothing says so rather than rendering blank', () => {
-  // A tag that exists but covers nothing is a real and confusing state — it is
+  // A tag that exists but covers nothing is a real and confusing state; it is
   // usually a scope the operator half-configured and then navigated away from.
   // An empty cell would read as a rendering fault instead.
   assert.equal(SummarizeTagScope(scope()), 'No clients');
@@ -179,7 +179,7 @@ test('the browser uses the capability hint, not the setting', () => {
 
 test('anything unreadable fails closed', () => {
   // An entry point that is offered and then refused by the server is worse than
-  // one that is simply absent — it looks like a bug rather than a policy.
+  // one that is simply absent; it looks like a bug rather than a policy.
   for (const Capabilities of [null, undefined, {}, { isWeb: true }]) {
     assert.equal(
       ResolveUnassignedClientsEnabled(Capabilities, undefined),

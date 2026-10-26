@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 // The Applications section of the client info modal (lib/applications.ts): one
 // card per application with a Monitor toggle and, once monitored, a conditions
-// table — running, responding, in the foreground — where anything this client
+// table (running, responding, in the foreground), where anything this client
 // cannot detect reads "Unsupported" in its row.
 //
 // Loaded from dist-test/ (see test/renderer-utils.test.js for why).

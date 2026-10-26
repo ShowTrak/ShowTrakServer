@@ -3,7 +3,7 @@
 
    Appended after 05-monitoring.css by the build (scripts/build-css.js globs
    parts/*.css in filename order), so it can lean on the monitoring timeline
-   styles it sits beside — the metric chart deliberately reuses the same
+   styles it sits beside: the metric chart deliberately reuses the same
    --status-graph-* palette so a chart and a timeline in one modal read as one
    system. */
 
@@ -241,7 +241,7 @@
   color: var(--text-secondary);
 }
 
-/* An unticked condition is still editable — setting it ticks the row — but
+/* An unticked condition is still editable (setting it ticks the row) but
    recedes, so the ticked ones are what the eye lands on. */
 .FREEKIOSK_CONDITIONS tr.is-off .fk-cond-rule {
   opacity: 0.5;
@@ -361,7 +361,7 @@
   align-items: center;
 }
 
-/* Bootstrap's bare `.btn` inherits --bs-body-color — near-black text on no
+/* Bootstrap's bare `.btn` inherits --bs-body-color: near-black text on no
    background, which is all but invisible on this theme. Every FreeKiosk action
    button therefore carries its own tint: a translucent wash of its own text
    colour, the same treatment the badges and chips elsewhere in the app use.
@@ -444,7 +444,7 @@
   background: var(--surface-ghost);
 }
 
-/* Configuration, not monitoring — it decides what the terminal shows and what
+/* Configuration, not monitoring: it decides what the terminal shows and what
    Start Kiosk Mode sends. It shares the alarms panel's shape so the editor reads
    as one column, and takes an accent edge so it is not mistaken for a second
    block of checks. */
@@ -473,15 +473,15 @@
 
 /* The monitoring editor spaces its generated fields with `d-grid gap-2` on the
    hosts in index.html. These hosts hold sections built in TS, so the same
-   spacing is declared here instead — without it every field wrap sits flush
+   spacing is declared here instead; without it every field wrap sits flush
    against the next and sixty alarm rows read as one undifferentiated block. */
 .freekiosk-alarms-body {
   display: grid;
   gap: 0.5rem;
 }
 
-/* Bootstrap 5.0 has no rules for a .form-floating inside an .input-group — that
-   arrived in 5.2, and this build is 5.0.2 — so the field neither flexes to fill
+/* Bootstrap 5.0 has no rules for a .form-floating inside an .input-group (that
+   arrived in 5.2, and this build is 5.0.2), so the field neither flexes to fill
    the row nor drops its right-hand rounding under the copy button. Scoped to the
    modal rather than declared globally, since it is patching a gap in a vendored
    version rather than stating a rule of the design. */

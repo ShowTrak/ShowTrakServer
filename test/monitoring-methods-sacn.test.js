@@ -252,7 +252,7 @@ test('SacnReceiver ingests a real multicast datagram for an observed universe', 
   let snap = SacnReceiver.Snapshot(UNIVERSE);
   if (!snap.Ready) {
     SacnReceiver.Stop();
-    t.skip(`sACN socket not ready (${snap.Error || 'binding'}) — environment cannot bind udp/5568`);
+    t.skip(`sACN socket not ready (${snap.Error || 'binding'}); environment cannot bind udp/5568`);
     return;
   }
 

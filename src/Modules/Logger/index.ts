@@ -62,7 +62,7 @@ const PlainTypes: Record<string, string> = {
 // --- Log level gating -------------------------------------------------------
 //
 // Detecting a shipped build: a packaged Electron app has no NODE_ENV, so that
-// test alone left every shipped server at 'debug' — writing debug chatter to the
+// test alone left every shipped server at 'debug', writing debug chatter to the
 // daily log file for the life of the install. The SYSTEM_LOG_LEVEL setting could
 // not rescue it either: its default is 'info', and main/live-settings.ts
 // deliberately skips applying a still-default setting at boot, so the settings
@@ -70,7 +70,7 @@ const PlainTypes: Record<string, string> = {
 //
 // Electron sets `process.defaultApp` only when the app was launched from a
 // checkout (`electron .`), so its absence is the "this is a shipped build"
-// signal — the same test `app.isPackaged` performs. It is used here in
+// signal, the same test `app.isPackaged` performs. It is used here in
 // preference to importing `app` because Logger is the lowest module in the tree:
 // everything imports it, and giving it an `electron` dependency would mean it
 // could no longer be loaded outside an Electron main process (the test suite
@@ -135,7 +135,7 @@ function enqueueWrite(line: string): void {
 }
 
 // serializeArg / stripAnsi now come from @showtrak/protocol/runtime (aliased at
-// the import) — both apps formatted log lines identically, and only the sinks
+// the import), both apps formatted log lines identically, and only the sinks
 // they feed differ.
 const serializeArg = SerializeArg;
 const stripAnsi = StripAnsi;
@@ -145,7 +145,7 @@ const stripAnsi = StripAnsi;
 // Every emitted line is also kept in a small in-memory ring and handed to any
 // feed listener (the hidden log console). The feed has its own level, separate
 // from Settings.level: while a console is watching at 'trace', lines below the
-// active level are still produced for the feed — but never written to the
+// active level are still produced for the feed, but never written to the
 // console or the file. With no console watching, FeedLevel is null and nothing
 // below the active level is serialised, so the feed costs nothing extra.
 
@@ -186,7 +186,7 @@ function pushFeed(alias: string, type: string, levelKey: string, msg: string): v
   let Message = stripAnsi(msg);
   if (Message.length > FEED_MAX_MESSAGE_LENGTH) {
     const Extra = Message.length - FEED_MAX_MESSAGE_LENGTH;
-    Message = `${Message.slice(0, FEED_MAX_MESSAGE_LENGTH)}… (${Extra} more characters in the log file)`;
+    Message = `${Message.slice(0, FEED_MAX_MESSAGE_LENGTH)}... (${Extra} more characters in the log file)`;
   }
   const Entry: LogFeedEntry = {
     Seq: ++FeedSeq,
@@ -237,7 +237,7 @@ export function SetLogFeedLevel(Level: string | null): void {
 
 // The log level gates emission uniformly: a message below the active level is
 // written neither to the console nor to the file. (`silent()` bypasses this on
-// purpose — it is always persisted to the file.) A watching log console may
+// purpose; it is always persisted to the file.) A watching log console may
 // still receive it through the feed.
 function writeLine(alias: string, type: string, arg: unknown, levelKey: string): void {
   const Enabled = isLevelEnabled(levelKey);

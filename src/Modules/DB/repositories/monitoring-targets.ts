@@ -1,7 +1,7 @@
 // MonitoringTargets-table repository. Receives the DB manager instead of
 // importing it so test DB mocks injected into MonitoringTargetManager
 // propagate through unchanged. SQL strings are byte-identical to the
-// historical inline statements — tests match on them.
+// historical inline statements; tests match on them.
 import type { DBManager, DBResult, TxRun } from '../index';
 import type { MonitoringTargetRow } from '../rows';
 
@@ -61,7 +61,7 @@ export function CreateMonitoringTargetsRepository(DB: DBManager) {
     // Delete a monitoring target and every check row keyed to it, atomically.
     // Both statements ride one transaction so a partial failure can never leave
     // the target row gone with its checks orphaned (or vice versa). Cross-table
-    // SQL is inlined here — matching the DeleteClientCascade precedent — because
+    // SQL is inlined here (matching the DeleteClientCascade precedent) because
     // the target repository owns the target→checks cascade. Returns [Err].
     DeleteTargetCascade(TargetID: number): Promise<DBResult<void>> {
       return DB.WithTransaction(async (run) => {

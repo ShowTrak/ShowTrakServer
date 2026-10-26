@@ -1,4 +1,4 @@
-// The FreeKiosk metric registry — the single source of truth for everything
+// The FreeKiosk metric registry: the single source of truth for everything
 // per-value in this feature.
 //
 // One declaration per readable value drives all of:
@@ -12,7 +12,7 @@
 //
 // This module is a LEAF: type-only imports, no I/O, no manager, no DB. That is
 // what makes it safe to unit test exhaustively and to hand to the renderer over
-// IPC rather than mirroring it (the renderer cannot import from src/Modules —
+// IPC rather than mirroring it (the renderer cannot import from src/Modules;
 // its tsconfig rootDir is src/UI).
 //
 // KEYS MUST BE ID-SAFE. The field renderer locates inputs with
@@ -67,9 +67,9 @@ export const FREEKIOSK_SECTIONS: readonly FreeKioskMetricSection[] = Object.free
  * the brief was full visibility of everything the device reports.
  *
  * Note what this does NOT save today. Every metric in the registry comes out of
- * the single GET /api/status the poll already makes — the device returns audio,
+ * the single GET /api/status the poll already makes (the device returns audio,
  * autoBrightness, battery, device, memory, rotation, screen, sensors, storage,
- * webview and wifi in one body — so no group can currently cost an extra
+ * webview and wifi in one body), so no group can currently cost an extra
  * request. `Fixed` and this structure are what a group that DID need its own
  * endpoint (GPS, say) would hang off.
  */
@@ -97,7 +97,7 @@ export const FREEKIOSK_METRIC_GROUPS: readonly FreeKioskMetricGroup[] = Object.f
     Key: 'Device',
     Label: 'Device',
     DefaultOn: false,
-    Note: 'Model, Android version, kiosk and Device Owner state, and uptime — which is how a reboot is detected.',
+    Note: 'Model, Android version, kiosk and Device Owner state, and uptime, which is how a reboot is detected.',
   },
   { Key: 'Audio', Label: 'Audio', DefaultOn: false },
   { Key: 'Rotation', Label: 'URL Rotation', DefaultOn: false },
@@ -158,14 +158,14 @@ export function IsMetricGroupEnabled(Settings: unknown, Section: string): boolea
  * THIS IS DECLARED BY THE OPERATOR, NOT READ FROM THE DEVICE, and it has to be:
  * FreeKiosk's API cannot report it. `GET /api/mode` answers 405 "requires POST",
  * and switching a device from WebView to External App changes nothing whatever
- * in /api/status — verified against a live device by diffing the whole payload
+ * in /api/status, verified against a live device by diffing the whole payload
  * across a mode switch, where only uptime and the memory counters moved. No
  * endpoint reports the foreground package either.
  *
  * It exists for one reason: to stop ShowTrak presenting the WebView readings as
  * live on a terminal that is not running the WebView. FreeKiosk retains
  * `webview.currentUrl` from the last page it loaded, so a kiosk locked to an app
- * reports a URL indefinitely — a reading that looks current, is not, and cannot
+ * reports a URL indefinitely: a reading that looks current, is not, and cannot
  * be told apart from a real one by looking at it.
  */
 export type FreeKioskDisplayMode = 'webview' | 'external_app' | 'media_player';
@@ -186,7 +186,7 @@ export const FREEKIOSK_DISPLAY_MODES: readonly {
  * Deliberately NOT one of FREEKIOSK_SECTIONS. The editor buckets fields by
  * section and then walks the real section list, so this bucket falls out of that
  * loop and is drawn on its own, above the alarms. It states what the terminal
- * displays — not a check, and filing it under a heading that reads "turn on any
+ * displays, not a check, and filing it under a heading that reads "turn on any
  * value to alert when it goes wrong" would misdescribe it.
  */
 export const SETUP_SECTION_KEY = 'Setup';
@@ -232,7 +232,7 @@ export function IsMetricInDisplayMode(Settings: unknown, Metric: FreeKioskMetric
  *
  * Both gates in one place, because they have to agree everywhere: the alarm
  * engine, the history store and the view modal each ask this question and a
- * metric that is judged but not shown — or shown but not judged — is a bug in
+ * metric that is judged but not shown (or shown but not judged) is a bug in
  * whichever of them disagreed.
  */
 export function IsMetricActive(Settings: unknown, Metric: FreeKioskMetric): boolean {
@@ -250,8 +250,8 @@ export function IsMetricMonitored(Settings: unknown, MetricKey: string): boolean
  * The comparison an alarm arms.
  *
  * STORED AS THE BREACH, SHOWN AS THE EXPECTATION. The value saved in settings
- * is the comparison that fires — `below 20` fires under 20, `is none` fires
- * when the reading is none — and the engine in ./alarms evaluates exactly that.
+ * is the comparison that fires (`below 20` fires under 20, `is none` fires
+ * when the reading is none), and the engine in ./alarms evaluates exactly that.
  * But nobody configures a terminal by describing its failure: they say what it
  * should be doing. So every operator is LABELLED as its complement (see
  * OPERATOR_LABELS) under an "Expected" prefix: `below` reads "Expected at least
@@ -260,9 +260,9 @@ export function IsMetricMonitored(Settings: unknown, MetricKey: string): boolean
  *
  * Keeping the stored vocabulary unchanged is deliberate: every show file
  * written before the wording flipped keeps alerting on exactly what it alerted
- * on before, and simply reads correctly now. Booleans always worked this way —
- * they arm `isNot`, so "Screen On — expected Yes" alarms when the screen goes
- * off — and this generalises that to every metric.
+ * on before, and simply reads correctly now. Booleans always worked this way:
+ * they arm `isNot`, so "Screen On - expected Yes" alarms when the screen goes
+ * off, and this generalises that to every metric.
  *
  * Each metric lists its operators in the order an expectation is most often
  * stated, so the picker opens on the natural one.
@@ -309,7 +309,7 @@ export const OPERATOR_LABELS: Readonly<Record<FreeKioskOperator, string>> = Obje
 });
 
 export interface FreeKioskMetric {
-  /** Id-safe key. Underscores only — see the header note. */
+  /** Id-safe key. Underscores only; see the header note. */
   Key: string;
   Label: string;
   /** Path into the /api/status `data` object. Empty for derived metrics. */
@@ -340,7 +340,7 @@ export interface FreeKioskMetric {
   ThresholdScale?: number;
   /**
    * How far a reading may sit from an "Is" value and still count as it, in the
-   * reading's units. For a level someone sets — brightness at 80% — where the
+   * reading's units. For a level someone sets (brightness at 80%), where the
    * device can report 79 or 81 for the same setting. Absent means exact.
    */
   Tolerance?: number;
@@ -369,7 +369,7 @@ export interface FreeKioskMetric {
 
 // "Not between" is deliberately offered nowhere: no reading here has a band it
 // is healthy on both sides of. The engine still evaluates `inside` so a show
-// file that armed it is judged, not crashed — ParseSettings resets it.
+// file that armed it is judged, not crashed; ParseSettings resets it.
 const NUMERIC_OPS: readonly FreeKioskOperator[] = ['below', 'above', 'outside'];
 
 // A level someone sets on the device rather than one that drifts: it can also
@@ -445,7 +445,7 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     Operators: ['isNot'],
     DefaultOperator: 'isNot',
     DefaultValue: true,
-    Note: 'The physical panel state. Stays true while the screensaver overlay is up — use Displaying Content to catch that too.',
+    Note: 'The physical panel state. Stays true while the screensaver overlay is up; use Displaying Content to catch that too.',
   },
   {
     Key: 'screen_screensaverActive',
@@ -1114,11 +1114,11 @@ export const FREEKIOSK_METRICS: readonly FreeKioskMetric[] = Object.freeze([
     // it only records how the LAST control command went, so it stays unknown
     // until something is sent and cannot change while a terminal is merely being
     // watched. An alarm on it would fire long after the operator had already
-    // been told — a refused command reports inline, in the moment, with the
+    // been told: a refused command reports inline, in the moment, with the
     // device's own wording.
     Chart: 'none',
     Operators: [],
-    Note: 'How the last control command went, not a reading from the device — FreeKiosk only reveals its remote-control setting by refusing one. Unknown until something is sent.',
+    Note: 'How the last control command went, not a reading from the device; FreeKiosk only reveals its remote-control setting by refusing one. Unknown until something is sent.',
   },
 ] as const satisfies readonly FreeKioskMetric[]);
 
@@ -1189,7 +1189,7 @@ export function FormatThresholdValue(Metric: FreeKioskMetric, Value: number): st
 
 function ValueFieldLabel(Metric: FreeKioskMetric): string {
   // A metric whose only value-taking comparison is "is not" is asking for the
-  // state it SHOULD be in, whatever its type — every boolean, and the Wi-Fi
+  // state it SHOULD be in, whatever its type: every boolean, and the Wi-Fi
   // channel. Keyed on the operators rather than the type so the label can never
   // contradict the comparison the engine will actually make.
   const ValueOps = ValueOperators(Metric);
@@ -1209,7 +1209,7 @@ function ValueFieldLabel(Metric: FreeKioskMetric): string {
  *
  * Per alarmable metric this emits an enable toggle, an operator picker gated on
  * that toggle, and one or two value inputs gated on both the toggle and the
- * chosen operator — which is the progressive disclosure the feature asks for,
+ * chosen operator, which is the progressive disclosure the feature asks for,
  * expressed entirely as data so the existing field renderer draws it unchanged.
  */
 export function BuildFreeKioskAlarmFields(
@@ -1244,7 +1244,7 @@ export function BuildFreeKioskAlarmFields(
       Type: 'select',
       Default: DEFAULT_DISPLAY_MODE,
       Options: FREEKIOSK_DISPLAY_MODES.map((Mode) => ({ value: Mode.Value, label: Mode.Label })),
-      Note: "What this terminal is set up to show. FreeKiosk cannot report this over its API, so ShowTrak has to be told. Setting it here changes nothing on the device — it decides which readings ShowTrak treats as meaningful and which controls it offers. The mode itself is set on the tablet, in FreeKiosk's own settings.",
+      Note: "What this terminal is set up to show. FreeKiosk cannot report this over its API, so ShowTrak has to be told. Setting it here changes nothing on the device; it decides which readings ShowTrak treats as meaningful and which controls it offers. The mode itself is set on the tablet, in FreeKiosk's own settings.",
       MetricSection: SETUP_SECTION_KEY,
     });
   }
@@ -1304,7 +1304,7 @@ export function BuildFreeKioskAlarmFields(
         Advanced: !!Metric.Advanced,
         // The group gate is repeated on every field rather than relied on
         // transitively. Conditions are evaluated against the DOM, and a hidden
-        // enable toggle still reports itself as checked — so gating only the
+        // enable toggle still reports itself as checked, so gating only the
         // toggle would leave its operator and threshold on screen underneath a
         // section that is switched off.
         VisibleWhen: Gate({ Key: Keys.On, Equals: true }),
@@ -1411,7 +1411,7 @@ function CoerceString(Value: unknown): string | null {
  * The 802.11 channel a centre frequency in MHz belongs to.
  *
  * Each band numbers its channels from its own base, so this is a set of ranges
- * rather than one formula — and the two exceptions are real: 2.4 GHz channel 14
+ * rather than one formula, and the two exceptions are real: 2.4 GHz channel 14
  * sits 12 MHz above channel 13 instead of 5, and 6 GHz channel 2 sits below the
  * band's own base rather than above it.
  *
@@ -1445,7 +1445,7 @@ function ReadDerived(Key: string, Status: FreeKioskStatus): string | number | bo
     const On = CoerceBoolean(ReadPath(Status, ['screen', 'on']));
     const Saver = CoerceBoolean(ReadPath(Status, ['screen', 'screensaverActive']));
     // Unknowable rather than false when the device did not report the screen at
-    // all — recording a false here would arm the default alarm on no evidence.
+    // all; recording a false here would arm the default alarm on no evidence.
     if (On == null) return null;
     return On === true && Saver !== true;
   }
@@ -1469,7 +1469,7 @@ function ReadDerived(Key: string, Status: FreeKioskStatus): string | number | bo
  *
  * `Overrides` supplies the metrics ShowTrak measures itself rather than reading
  * from the device (poll latency, whether remote control turned out to be
- * enabled). Every value is a primitive or null — this record is broadcast and
+ * enabled). Every value is a primitive or null: this record is broadcast and
  * serialised into alert history, so it must stay plain data.
  */
 export function ExtractMetricValues(
@@ -1549,6 +1549,6 @@ export function FormatMetricValue(
     return Metric.Unit ? `${Text}${Metric.Unit === '%' ? '' : ' '}${Metric.Unit}` : Text;
   }
   const Text = String(Value);
-  if (Metric.Format === 'url' && Text.length > 60) return `${Text.slice(0, 59)}…`;
+  if (Metric.Format === 'url' && Text.length > 60) return `${Text.slice(0, 57)}...`;
   return Text;
 }

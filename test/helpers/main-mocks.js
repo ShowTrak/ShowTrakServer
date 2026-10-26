@@ -4,7 +4,7 @@
 //
 // The main/ layer (rpc.ts, the registrars) imports `electron/main` and the
 // per-domain managers, which transitively drag in the native sqlite3 addon and
-// the socket server — none of which exist under `node --test`. This installs a
+// the socket server, none of which exist under `node --test`. This installs a
 // `Module._load` shim that returns caller-supplied stubs for matching request
 // strings and defers everything else (create-handler, IPCValidation,
 // handler-registry, rpc itself) to the real loader.

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
-// Exercises src/main/live-settings.ts — the settings that used to need a restart
+// Exercises src/main/live-settings.ts: the settings that used to need a restart
 // and are now applied live.
 //
 // Two properties matter most:
@@ -14,7 +14,7 @@ const { installModuleMocks, matchesModule, recordingManager } = require('./helpe
 //      later change is applied unconditionally. Collapsing the two would make
 //      the app silently stomp on the env default at boot.
 //   2. THE powerSaveBlocker LIFECYCLE. The blocker id must be tracked and
-//      released when the setting is turned off — leaking it keeps a show
+//      released when the setting is turned off; leaking it keeps a show
 //      machine's display awake forever, and double-starting leaks a handle per
 //      toggle.
 //
@@ -224,7 +224,7 @@ test('a monitoring-settings change re-applies the interval to both managers', as
   await emit('MonitoringSettingsChanged');
   assert.deepEqual(intervals.monitoring, [12000]);
   assert.deepEqual(intervals.dummy, [12000]);
-  // The failure threshold rides the same event — it is a monitoring setting.
+  // The failure threshold rides the same event; it is a monitoring setting.
   assert.deepEqual(failureThresholds, [5]);
 });
 
@@ -233,7 +233,7 @@ test('the alert sound de-duplication window is applied at boot and on change', a
   await initLiveSettings();
   assert.deepEqual(audioDedupeWindows, [750]);
 
-  // Turning it off must reach the actions live — an operator silencing a smear
+  // Turning it off must reach the actions live: an operator silencing a smear
   // mid-show cannot be asked to restart the server.
   audioDedupeWindows.length = 0;
   state.alertAudioDedupeMs = 0;

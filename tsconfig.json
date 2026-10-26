@@ -11,7 +11,7 @@
       // The runtime entry point is real emitted JavaScript, so it resolves to
       // the BUILT declarations rather than to source. Pointing it at
       // shared/src/runtime instead would drag those .ts files into this program,
-      // where they sit outside rootDir and fail to compile (TS6059) — and would
+      // where they sit outside rootDir and fail to compile (TS6059), and would
       // typecheck against source while Node loads dist. An exact key outranks
       // the wildcard below, which still covers the ambient .d.ts protocol types.
       //

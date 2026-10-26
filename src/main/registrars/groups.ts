@@ -186,7 +186,7 @@ function register(): void {
       await FreeKioskManager.SetGroupAndWeight(UUID, ParsedGroupID, W);
     }
     // Apply client ordering. ClientManager.SetGroupOrder reassigns weights
-    // sequentially starting at 10, so feed it just the UUIDs in order — but
+    // sequentially starting at 10, so feed it just the UUIDs in order, but
     // we want the shared weight scale, so apply directly per-client instead.
     if (ClientOrder.length) {
       await ClientManager.SetGroupOrderWithWeights(

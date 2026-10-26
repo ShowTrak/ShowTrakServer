@@ -125,7 +125,7 @@ test('a device with remote control disabled says so specifically', async () => {
 });
 
 test('reads still work on a device with remote control disabled', async () => {
-  // The 403 is a control kill switch, not an auth failure — polling must
+  // The 403 is a control kill switch, not an auth failure; polling must
   // continue so the terminal does not read as offline.
   await withDevice({ allowControl: false }, async (_device, connection) => {
     const [err, reading] = await GetStatus(connection);
@@ -247,7 +247,7 @@ test('every command declares a well-formed route and unique id', () => {
     assert.ok(command.Label && command.Icon, `${command.ID} needs a label and icon`);
     // A POST route needs a body from somewhere, or it sends an empty one for no
     // reason. Either the caller supplies it (Params) or the terminal's own
-    // stored configuration does (FromSettings) — and never both, because a
+    // stored configuration does (FromSettings), and never both, because a
     // FromSettings command must stay parameterless for the view modal to fire it
     // as a plain button and for a bulk selection to mean "each on its own setup".
     if (command.Method === 'POST') {

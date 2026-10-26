@@ -1,4 +1,4 @@
-// Exercises src/main/registrars/freekiosk.ts — the FreeKiosk terminal channels.
+// Exercises src/main/registrars/freekiosk.ts: the FreeKiosk terminal channels.
 //
 // The real IPCValidation runs (only the managers and Electron are stubbed), so
 // this is the validation boundary for untrusted renderer input. The command
@@ -137,7 +137,7 @@ test('list and get return raw values, with empty fallbacks', async () => {
 test('the single-terminal read carries the API key, and the list does not', async () => {
   // The editor has to show the key it is about to let you change, so this one
   // reader carries it. The list feeds tiles and the Web UI push, which have no
-  // use for it — GetAll must keep going through the plain snapshot.
+  // use for it; GetAll must keep going through the plain snapshot.
   const one = await call('GetFreeKioskTerminal', 'kiosk-1');
   assert.equal(one.ApiKey, 'secret-key');
   assert.equal(countOf('GetForEditor') > 0, true);
@@ -265,7 +265,7 @@ test('the old ad-hoc mode command is gone, not merely hidden', async () => {
 test('the messaging and audio-playback commands are not offered at all', async () => {
   // Deliberately dropped as useless for this deployment. They are gone from the
   // map, and the map IS the allowlist, so they are unreachable rather than
-  // merely hidden — the same property that keeps /api/js out.
+  // merely hidden: the same property that keeps /api/js out.
   for (const id of ['toast', 'tts', 'audio.play', 'audio.stop']) {
     const [err] = await call('FreeKiosk:Command', ['uuid-a'], id, { text: 'hi' });
     assert.match(String(err), /Unknown FreeKiosk command/, id);

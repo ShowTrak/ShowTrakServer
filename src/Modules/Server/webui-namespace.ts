@@ -1,4 +1,4 @@
-// Web UI (`/ui`) Socket.IO namespace — generic transport bridge.
+// Web UI (`/ui`) Socket.IO namespace: generic transport bridge.
 //
 // The Web UI runs the SAME renderer as the Electron desktop app. To achieve
 // that, this namespace exposes the desktop's IPC surface to the browser over
@@ -12,7 +12,7 @@
 //   2. RPC: a generic `rpc` event dispatches to the SAME IPC handler functions
 //      the desktop uses (via the shared HandlerRegistry), after applying a
 //      strict server-side allowlist + capability gating. NEVER blind-proxy the
-//      full IPC surface — deny by default (OWASP: broken access control).
+//      full IPC surface; deny by default (OWASP: broken access control).
 //
 // Auth remains a simple in-memory session-token model gated on the existing
 // WEBUI_PASSWORD settings.
@@ -194,7 +194,7 @@ function SweepLoginAttempts(now: number): void {
 // Constant-time passcode comparison. Hashing both sides to a fixed-width digest
 // before timingSafeEqual keeps the comparison independent of both content and
 // length (timingSafeEqual itself requires equal-length buffers). NOTE: the
-// passcode is still stored in plaintext settings — hashing at rest is a separate,
+// passcode is still stored in plaintext settings; hashing at rest is a separate,
 // larger change; this only removes the compare-time timing side channel.
 function PasscodeMatches(input: string, expected: string): boolean {
   const A = crypto.createHash('sha256').update(input, 'utf8').digest();
@@ -253,7 +253,7 @@ function TransformWebPush(channel: string, args: unknown[]): unknown[] {
 //
 // The per-category permissions come from the shared capability model, so the
 // browser and ShowTrak Remote can never drift apart on what a category means.
-// Only the auth half — enabled, protection, passcode — is genuinely Web-UI
+// Only the auth half (enabled, protection, passcode) is genuinely Web-UI
 // specific and stays here.
 const GetWebConfig = async () => {
   let Enabled = true;
@@ -377,7 +377,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
   // Re-evaluate every live session whenever the Web UI enable/protection/passcode
   // settings change. Without this, enabling protection (or changing the passcode)
   // would never re-prompt already-connected browsers, and disabling the Web UI
-  // would not eject in-flight sessions — the reported bug.
+  // would not eject in-flight sessions: the reported bug.
   const HandleWebUiSettingsChanged = async () => {
     // Drop every token: reconnects and the re-greeting below must pass the NEW
     // gate. A session that is still valid simply re-authenticates seamlessly
@@ -433,7 +433,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
   // drops it otherwise, and the browser answers `hello` straight away (rpc
   // Settings:Get, or auth:login with a stored passcode). When the listeners were
   // attached after the initial-state reads, a slow first read lost that race and
-  // the ack never came, leaving the browser on "Connecting…" for good.
+  // the ack never came, leaving the browser on "Connecting..." for good.
   ui.on('connection', (socket) => {
     try {
       Logger.log('Web UI connected', { id: socket.id, ip: socket.handshake.address });
@@ -467,7 +467,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
 
         // The favourite list is what the browser's right-click menu is built
         // from, so it has to arrive with the first paint like the monitor list
-        // itself — otherwise a freshly-loaded browser shows no starred actions
+        // itself; otherwise a freshly-loaded browser shows no starred actions
         // until someone happens to star/unstar one and triggers a push.
         try {
           await MonitoringActionFavourites.Init();

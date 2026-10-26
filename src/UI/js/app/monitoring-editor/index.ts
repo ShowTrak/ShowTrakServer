@@ -1,4 +1,4 @@
-// Monitoring target editor (renderer) — the multi-check editor itself.
+// Monitoring target editor (renderer): the multi-check editor itself.
 //
 // Owns the editor's working state and the flow around it: the check list, the
 // per-check edit view, the live status/debug panels, payload building and the
@@ -278,7 +278,7 @@ export function OpenMonitoringCheckView(index: number) {
   // Reset then (re)load the live "last response" debug panel for this check.
   $('#MONITORING_CHECK_DEBUG_META').text('');
   $('#MONITORING_CHECK_DEBUG_BODY').html(
-    '<div class="text-muted small fst-italic">Loading latest response…</div>'
+    '<div class="text-muted small fst-italic">Loading latest response...</div>'
   );
   LoadMonitoringCheckDebug();
   // Populate the live status card with the current known status (no re-probe).
@@ -297,7 +297,7 @@ export function RenderMonitoringCheckDebug(payload: MonitoringCheckDebug | null)
   if (!payload || (payload.LastChecked == null && !payload.Html)) {
     $meta.text('');
     $body.html(
-      '<div class="text-muted small fst-italic">Waiting for the first check to run…</div>'
+      '<div class="text-muted small fst-italic">Waiting for the first check to run...</div>'
     );
     return;
   }
@@ -448,7 +448,7 @@ function CollectMonitoringCheckValidationErrors(): string[] {
 
 function RenderMonitoringCheckStatusFromPayload(payload: MonitoringCheckDebug | null) {
   if (!payload || (payload.LastChecked == null && !payload.Html)) {
-    SetMonitoringCheckStatusCard('Checking', 'idle', 'Waiting for the first check to run…');
+    SetMonitoringCheckStatusCard('Checking', 'idle', 'Waiting for the first check to run...');
     return;
   }
   let title = 'Online';
@@ -473,7 +473,7 @@ function RenderMonitoringCheckStatusFromPayload(payload: MonitoringCheckDebug | 
   );
   if (missed) {
     parts.push(
-      `<div>${Safe(missed)} checks — not marked offline until ${Safe(String(payload.EffectiveFailureThreshold))} in a row fail.</div>`
+      `<div>${Safe(missed)} checks; not marked offline until ${Safe(String(payload.EffectiveFailureThreshold))} in a row fail.</div>`
     );
   }
   if (payload.LastError) {
@@ -533,7 +533,7 @@ export async function RefreshMonitoringCheckStatus(opts: { run?: boolean } = {})
   }
 
   if (opts.run) {
-    SetMonitoringCheckStatusCard('Checking…', 'idle', '');
+    SetMonitoringCheckStatusCard('Checking...', 'idle', '');
     await FlushMonitoringCheckSave();
     if (!MonitoringEditorState || MonitoringEditorState.View !== 'check') return;
   }
@@ -606,7 +606,7 @@ export async function RunMonitoringCheckNow() {
   $btn.prop('disabled', true);
   $icon.addClass('monitoring-spin');
   $('#MONITORING_CHECK_DEBUG_BODY').html(
-    '<div class="text-muted small fst-italic">Running check…</div>'
+    '<div class="text-muted small fst-italic">Running check...</div>'
   );
 
   let payload = null;
@@ -1068,7 +1068,7 @@ export async function OpenMonitoringTargetEditor(
 
   $('#MONITORING_TARGET_MODAL_TITLE').text(Existing ? 'Edit Monitor' : 'Add Monitor');
   $('#MONITORING_TARGET_DANGER_ZONE').toggleClass('d-none', !Existing);
-  // Slug is only shown for an existing target — a new target's slug is generated
+  // Slug is only shown for an existing target; a new target's slug is generated
   // server-side on create, then editable on the next open.
   $('#MONITORING_TARGET_SLUG_WRAPPER').toggleClass('d-none', !Existing);
   // Same rule as the slug above: a target that does not exist yet has no

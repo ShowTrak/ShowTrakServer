@@ -150,7 +150,7 @@ export function SetUpdateManagerDownloadProgress(Percent = 0, Message = '') {
   $('#UPDATE_MANAGER_DOWNLOAD_PROGRESS_BAR')
     .css('width', `${safePercent}%`)
     .attr('aria-valuenow', safePercent);
-  $('#UPDATE_MANAGER_DOWNLOAD_PROGRESS_TEXT').text(Message || `Downloading… ${safePercent}%`);
+  $('#UPDATE_MANAGER_DOWNLOAD_PROGRESS_TEXT').text(Message || `Downloading... ${safePercent}%`);
 }
 
 export function GetSelectedUpdateManagerReleaseTag() {
@@ -449,8 +449,8 @@ export async function RunUpdateManagerDownloadLatest() {
 
   setUpdateManagerDownloadInProgress(true);
   ApplyUpdateManagerButtonLocks();
-  SetUpdateManagerDownloadProgress(0, `Preparing download for ${selectedTag}…`);
-  $('#UPDATE_MANAGER_STATUS').text(`Downloading ${selectedTag} to ShowTrakServer…`);
+  SetUpdateManagerDownloadProgress(0, `Preparing download for ${selectedTag}...`);
+  $('#UPDATE_MANAGER_STATUS').text(`Downloading ${selectedTag} to ShowTrakServer...`);
 
   try {
     const [Err, Result] = await window.API.DownloadUpdateManagerRelease(selectedTag);
@@ -491,7 +491,7 @@ export async function RunUpdateManagerDeployAll() {
 
   setUpdateManagerRunning(true);
   ApplyUpdateManagerButtonLocks();
-  $('#UPDATE_MANAGER_STATUS').text(`Deploying ${selectedTag} to online clients…`);
+  $('#UPDATE_MANAGER_STATUS').text(`Deploying ${selectedTag} to online clients...`);
 
   try {
     const [Err, Result] = await window.API.DeployUpdateManagerRelease(selectedTag, SelectedTargets);

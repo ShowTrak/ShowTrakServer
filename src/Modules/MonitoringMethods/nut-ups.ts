@@ -19,8 +19,8 @@
 //   - any factor breached                              -> degraded (combined reason)
 //   - all evaluated factors within limits              -> online   (Success: true)
 //
-// The same check carries the UPS's actions — silencing its alarm and running a
-// battery test — sent as NUT instant commands over their own short upsd login.
+// The same check carries the UPS's actions (silencing its alarm and running a
+// battery test), sent as NUT instant commands over their own short upsd login.
 import {
   CommonNutSettings,
   RunNutProbe,
@@ -148,7 +148,7 @@ interface HealthThresholds {
   MaxVoltage: number;
   VoltageTolerancePercent: number;
   // Per-factor enable flags. Absent (undefined) counts as enabled so callers that
-  // pass a bare thresholds object — and pre-toggle saved checks — keep evaluating
+  // pass a bare thresholds object (and pre-toggle saved checks) keep evaluating
   // every factor.
   CheckCharge?: boolean;
   CheckLoad?: boolean;
@@ -290,7 +290,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 // --- Actions ----------------------------------------------------------------
 //
 // Deliberately only the alarm and the battery test. NUT also exposes load.off,
-// shutdown.* and friends, which cut power to whatever the UPS is feeding — not
+// shutdown.* and friends, which cut power to whatever the UPS is feeding, not
 // something to put one mis-click away on a monitoring tile.
 //
 // Each action lists every instant-command name drivers use for it, preferred
@@ -363,7 +363,7 @@ async function RunAction(
     return {
       Success: false,
       Error:
-        'Sending commands needs a NUT username and password with instcmds rights — set them under Advanced',
+        'Sending commands needs a NUT username and password with instcmds rights; set them under Advanced',
     };
   }
 
@@ -379,7 +379,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Pill = StatePill(Result, 'Healthy');
 
   const Fmt = (Value: unknown, Suffix: string): string =>
-    Value == null ? '—' : `${Value}${Suffix}`;
+    Value == null ? '-' : `${Value}${Suffix}`;
 
   return NutDebug(Config, Result, Pill, [
     Reachable && Result.Status != null ? MonoRow('ups.status', String(Result.Status)) : null,

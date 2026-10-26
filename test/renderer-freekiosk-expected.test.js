@@ -1,4 +1,4 @@
-// Exercises DescribeExpected in src/UI/js/app/freekiosk-modal.ts — the wording
+// Exercises DescribeExpected in src/UI/js/app/freekiosk-modal.ts: the wording
 // shown beside a breaching metric's current value.
 //
 // The whole point of this string is the inversion. A stored operator states the
@@ -40,7 +40,7 @@ test('a range operator names both bounds, and inside is the complement of outsid
 
 test('a boolean states the value it was armed with, verbatim', () => {
   // Booleans arm `isNot`, so the stored value already IS the expected state.
-  // Crucially it arrives off a <select> as the string "false" — which is truthy,
+  // Crucially it arrives off a <select> as the string "false", which is truthy,
   // so anything that negates it prints the exact opposite of the truth.
   const displaying = metric({
     Key: 'content_displaying',
@@ -85,5 +85,5 @@ test('a threshold that is not a scalar degrades rather than printing [object Obj
   // Settings survive a JSON round trip, so nothing guarantees a scalar landed
   // back in the field a number was saved into.
   const shown = DescribeExpected(metric({ Unit: '%' }), armed('below', { nope: true }));
-  assert.equal(shown, 'expected at least —');
+  assert.equal(shown, 'expected at least -');
 });

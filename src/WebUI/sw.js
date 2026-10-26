@@ -4,7 +4,7 @@
 // caching, so stale bundles can never serve an outdated startup path). The
 // worker exists for exactly one situation: navigating to the Web UI while
 // ShowTrak Server is unreachable. Instead of the browser's error page it
-// serves an embedded splash that shows "Connecting…" while it probes the
+// serves an embedded splash that shows "Connecting..." while it probes the
 // server, escalates to "Unable to Connect" after repeated failures, and
 // reloads back into the real app as soon as the server answers.
 //
@@ -18,7 +18,7 @@ const PRECACHE_PATHS = ['/img/icon-filled.png'];
 
 // How long a navigation may stay pending before the splash takes over. A dead
 // host on a LAN often refuses instantly, but an unreachable/asleep one can
-// hang for a minute or more — far too long to show a white page.
+// hang for a minute or more, far too long to show a white page.
 const NAVIGATION_TIMEOUT_MS = 8000;
 
 const OFFLINE_SPLASH = `<!doctype html>
@@ -88,7 +88,7 @@ const OFFLINE_SPLASH = `<!doctype html>
     <img class="splash-logo" src="/img/icon-filled.png" alt="ShowTrak" onerror="this.style.display='none'" />
     <div id="SPLASH_CONNECTING" class="splash-state" role="status" aria-live="polite">
       <div class="spinner" aria-hidden="true"></div>
-      <div class="splash-text">Connecting&hellip;</div>
+      <div class="splash-text">Connecting...</div>
     </div>
     <div id="SPLASH_FAILED" class="splash-state" role="alert">
       <div class="splash-title">Unable to Connect</div>
@@ -98,12 +98,12 @@ const OFFLINE_SPLASH = `<!doctype html>
       </div>
       <div class="splash-retry">
         <span class="spinner" aria-hidden="true"></span>
-        Waiting for the server&hellip;
+        Waiting for the server...
       </div>
     </div>
     <script>
       (() => {
-        // Probe quickly during the "Connecting…" phase; after CONNECT_ATTEMPTS
+        // Probe quickly during the "Connecting..." phase; after CONNECT_ATTEMPTS
         // consecutive failures switch to "Unable to Connect" and keep probing
         // at a slower cadence until the server answers, then re-enter the app.
         const CONNECT_ATTEMPTS = 5;

@@ -37,7 +37,7 @@
   /* Saturated variants for timeline blocks, chart lines and status dots.
    * Tuned apart from the washes on purpose: a solid 18,255,0 block reads as
    * neon, so the graph hues are their own triplets. Pending has no separate
-   * graph hue — it is the same blue at full strength. */
+   * graph hue; it is the same blue at full strength. */
   --status-graph-online-rgb: 38 214 44;
   --status-graph-offline-rgb: 224 36 36;
   --status-graph-degraded-rgb: 255 149 0;
@@ -217,7 +217,7 @@ body.is-web #APPLICATION {
   /* Block flow, NOT grid: as a grid item #APPLICATION gets pinned to the
      container's height instead of growing with an overflowing client list, so
      its content spills past its bottom edge and the padding-bottom reserved
-     for the fixed bottom bar lands mid-list instead of below it — the end of
+     for the fixed bottom bar lands mid-list instead of below it, and the end of
      the list then scrolls to rest underneath the bar, unreachable. In block
      flow #APPLICATION grows with its content and the padding counts toward
      the scrollable overflow. (#APPLICATION's min-height still fills the
@@ -228,7 +228,7 @@ body.is-web #APPLICATION {
 #APPLICATION {
   /* min-height (not height): fill the viewport when content is sparse so the
      gradient covers the screen, but GROW past it when the group/client list is
-     tall — a fixed height here clips the overflow and kills scrolling on mobile,
+     tall; a fixed height here clips the overflow and kills scrolling on mobile,
      where the list is a single tall column. */
   min-height: max(100%, 100vh);
   padding-top: 2rem !important;
@@ -445,7 +445,7 @@ body.is-web #APPLICATION {
 }
 
 /* Bootstrap gives every .btn a 1px border; the app's filled buttons are
-   borderless. Outline variants keep theirs — on those the border IS the button.
+   borderless. Outline variants keep theirs; on those the border IS the button.
    :where() holds this at plain `.btn` specificity, so component rules later in
    the cascade still set their own borders. */
 .btn:where(:not([class*='btn-outline-'])) {

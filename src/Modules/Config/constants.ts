@@ -26,7 +26,7 @@ export const INTEGRATED_EVENT_MIN_TIMEOUT_MS = 1000;
 export const INTEGRATED_EVENT_MAX_TIMEOUT_MS = 600000;
 
 // Grace added to a client's own timeout before the server's watchdog fires.
-// The client is the better reporter — it knows why its handler stalled — so the
+// The client is the better reporter (it knows why its handler stalled), so the
 // server only steps in once the client has clearly gone silent.
 export const INTEGRATED_EVENT_TIMEOUT_GRACE_MS = 5000;
 
@@ -56,7 +56,7 @@ export const CLIENT_STARTUP_GRACE_MS = 20000;
 // remote level changes. Anything older has no audio monitor at all: its Audio
 // section reads as unsupported and level changes are refused before anything is
 // sent, rather than waiting out a timeout. MUST match the client version that
-// ships the feature — the renderer has its own copy (lib/audio-devices.ts).
+// ships the feature; the renderer has its own copy (lib/audio-devices.ts).
 export const MINIMUM_AUDIO_MONITORING_VERSION: readonly [number, number, number] = [3, 21, 0];
 
 // How long the server waits for a client to apply a level change and say so. The
@@ -82,7 +82,7 @@ export const MONITORING_TICK_INTERVAL_MS = 1500;
 // must persist before it is announced.
 //
 // Alerts are transition-driven, so a device that was dead before the server
-// started is not an event and is not announced as one — that is what stops a
+// started is not an event and is not announced as one; that is what stops a
 // restart mid-show from firing for every machine still coming up. It is not
 // forgotten either: anything still faulty this long after the server (or the
 // entity) was first seen gets one alert, so a genuinely dead device is not
@@ -149,6 +149,6 @@ export const AUDIT_LOG_MAX_ENTRIES = 250000;
 // The first ShowTrak Client release that reports battery/mains, sleep and
 // resume, temperatures, hung applications and the foreground application.
 // Older clients read as "update the client" for these rather than as
-// unsupported hardware. MUST match the client version that ships the feature —
+// unsupported hardware. MUST match the client version that ships the feature;
 // the renderer has its own copy (lib/system-health.ts).
 export const MINIMUM_SYSTEM_HEALTH_VERSION: readonly [number, number, number] = [3, 22, 0];

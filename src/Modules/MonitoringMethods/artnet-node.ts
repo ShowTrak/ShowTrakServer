@@ -1,5 +1,5 @@
 // Art-Net node health: unicasts an ArtPoll to one node and reads its
-// ArtPollReply — identity, the node report, and the per-port status flags.
+// ArtPollReply: identity, the node report, and the per-port status flags.
 //
 // Protocol (Art-Net 4, Artistic Licence):
 //   - ArtPoll (OpPoll 0x2000) is the discovery packet every controller sends
@@ -23,7 +23,7 @@
 //     whoever provoked it, since it proves the same thing.
 //   - Rate limit: concurrent checks of one IP share a single ArtPoll, and a poll
 //     within 1 s of the last reuses its result (see PollNode), so the traffic is
-//     at most one unicast ArtPoll per node per check interval — far below the
+//     at most one unicast ArtPoll per node per check interval, far below the
 //     2.5–3 s broadcast cadence the spec expects of every controller.
 //   - Replies from a node with more than four ports arrive as a burst, one per
 //     BindIndex; after the first we keep listening POLL_SETTLE_MS for the rest
@@ -35,7 +35,7 @@
 //   CheckPortErrors (on)  GoodInput bit 2 "receive errors detected" on an input
 //                         port; GoodOutputA bit 2 "DMX output short detected" on
 //                         an output port. No other GoodInput/GoodOutput bit is an
-//                         error — the rest describe data, merging and conversion.
+//                         error; the rest describe data, merging and conversion.
 //   CheckNodeReport (on)  The NodeReport status code is a fault code (see
 //                         NODE_REPORT_CODES). Advisory and confirmation codes are
 //                         shown but never degrade.
@@ -64,16 +64,16 @@ const DEFAULT_INTERVAL_MS = 10000;
 //
 // Table 3 of the spec. Fault = a condition that is wrong with the node now.
 // Deliberately NOT faults:
-//   RcDebug 0x0000, RcPowerOk 0x0001, RcShNameOk/RcLoNameOk 0x0006/7 — status
+//   RcDebug 0x0000, RcPowerOk 0x0001, RcShNameOk/RcLoNameOk 0x0006/7: status
 //     and confirmations.
-//   RcSocketWr1 0x0003 — one truncated transmission, "most likely caused by a
+//   RcSocketWr1 0x0003: one truncated transmission, "most likely caused by a
 //     collision": a transient that stays reported until the next event, so it
 //     would hold a healthy node Degraded.
-//   RcParseFail 0x0004 — the node received a packet it did not recognise, which
+//   RcParseFail 0x0004: the node received a packet it did not recognise, which
 //     any third-party Art-Net extension on the network can trigger.
-//   RcUserFail 0x000f — front-panel changes ignored because the node is locked
+//   RcUserFail 0x000f: front-panel changes ignored because the node is locked
 //     by remote programming: the configuration is unchanged.
-//   RcFactoryRes 0x0010 — a factory reset occurred; advisory per the spec.
+//   RcFactoryRes 0x0010: a factory reset occurred; advisory per the spec.
 // Unknown codes are shown as-is and never degrade.
 export const NODE_REPORT_CODES: Record<
   number,
@@ -145,7 +145,7 @@ export interface ParsedNodeReport {
   Fault: boolean;
 }
 
-// "#xxxx [yyyy..] zzzzz…": xxxx = hex status code (Table 3), yyyy = decimal count
+// "#xxxx [yyyy..] zzzzz...": xxxx = hex status code (Table 3), yyyy = decimal count
 // of ArtPollReplies sent (rolls over at 9999), zzzz = free text. Nodes vary in
 // spacing and some omit the counter, so both are optional here; a report that
 // does not start with '#' is kept as plain text with no code.
@@ -267,7 +267,7 @@ function DecodePort(P: ArtPollReplyPort, Index: number, BindIndex: number): Node
 // --- Status registers --------------------------------------------------------
 
 // The Status1/2/3 bits worth showing an operator. Capability bits ("supports
-// RDMnet", "supports LLRP"…) are left out: they describe the product, not its
+// RDMnet", "supports LLRP", etc.) are left out: they describe the product, not its
 // state.
 export function DecodeStatus(
   Status1: number,
@@ -329,7 +329,7 @@ function Hex4(N: number): string {
 
 // Merge the replies of one poll (any BindIndex order) into a single snapshot.
 // Identity comes from the root (lowest BindIndex); ports are numbered 1..N in
-// BindIndex order. Pure — exported via _internal.
+// BindIndex order. Pure; exported via _internal.
 export function BuildNodeSnapshot(Replies: ArtPollReply[]): NodeSnapshot | null {
   if (!Replies.length) return null;
   const Sorted = [...Replies].sort((A, B) => A.BindIndex - B.BindIndex);
@@ -430,7 +430,7 @@ export function ParseOptions(Target: MonitoringTargetLike): NodeOptions {
   };
 }
 
-// Every reason a replying node is unhealthy, each gated by its toggle. Pure —
+// Every reason a replying node is unhealthy, each gated by its toggle. Pure;
 // exported via _internal.
 export function EvaluateNode(Snapshot: NodeSnapshot, Options: NodeOptions): string[] {
   const Reasons: string[] = [];
@@ -507,7 +507,7 @@ function UniverseText(Port: NodePort): string {
       ? `universe ${Port.OutputUniverse}`
       : `in ${Port.InputUniverse} / out ${Port.OutputUniverse}`;
   }
-  return `universe ${Port.OutputUniverse ?? Port.InputUniverse ?? '—'}`;
+  return `universe ${Port.OutputUniverse ?? Port.InputUniverse ?? '-'}`;
 }
 
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
@@ -524,7 +524,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   if (!Reachable) {
     return (
       Rows([
-        TextRow('Node IP', Address || '—'),
+        TextRow('Node IP', Address || '-'),
         Row('Status', StatusPill),
         TextRow('Error', (Result && Result.Error) || 'No ArtPollReply'),
       ]) +
@@ -536,16 +536,16 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
   const Report = (Result.Report as ParsedNodeReport | undefined) || null;
   const ReportHtml = Report
-    ? Esc(Report.Raw || '—') +
+    ? Esc(Report.Raw || '-') +
       (Report.Mnemonic ? ` ${Pill(Report.Fault ? 'danger' : 'muted', Report.Mnemonic)}` : '')
-    : '—';
+    : '-';
   const Status = FlagPills(Result.StatusFlags);
   const Head = Rows([
-    TextRow('Node IP', Address || '—'),
+    TextRow('Node IP', Address || '-'),
     Row('Status', StatusPill),
     Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`),
-    TextRow('Short name', Result.ShortName || '—'),
-    TextRow('Long name', Result.LongName || '—'),
+    TextRow('Short name', Result.ShortName || '-'),
+    TextRow('Long name', Result.LongName || '-'),
     Row('Node report', ReportHtml),
     Row('Firmware', `<span class="font-monospace">${Esc(Result.Firmware)}</span>`),
     Row(

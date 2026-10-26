@@ -139,7 +139,7 @@ export function FormatMonitorStatus(
  * A target's runtime state is RAM-only and starts at Online: false, and its
  * first check does not run until a moment after the loop starts. Rendering that
  * gap as offline paints every monitor on the page red for the first check cycle
- * after the server starts — an outage the operator can see is not real, which
+ * after the server starts; an outage the operator can see is not real, which
  * is the fastest way to teach them to ignore a red tile.
  *
  * It is deliberately not rendered as online either. Until a probe has answered

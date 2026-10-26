@@ -25,7 +25,7 @@ export interface AlertActionResult {
 export type AlertContext = Record<string, unknown>;
 
 // The runtime action config handed to Execute (the persisted rule action plus a
-// normalized Settings bag). Fields are intentionally loose — Execute normalizes
+// normalized Settings bag). Fields are intentionally loose; Execute normalizes
 // its own Settings defensively.
 export interface AlertActionInput {
   Type?: string;

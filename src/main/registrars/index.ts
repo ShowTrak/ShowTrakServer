@@ -2,8 +2,8 @@
 // registrations (grouped from the old monolithic main.ts). The composition root
 // calls RegisterAllHandlers() once, inside app.whenReady, to wire them all.
 //
-// Registration order is not significant — each channel maps to exactly one
-// handler and the channels are independent — but the domains are listed in the
+// Registration order is not significant (each channel maps to exactly one
+// handler and the channels are independent), but the domains are listed in the
 // same order they appeared in the original main.ts for easy cross-reference.
 
 import { register as registerSystem } from './system';

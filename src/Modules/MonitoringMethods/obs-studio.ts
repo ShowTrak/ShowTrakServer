@@ -19,13 +19,13 @@
 //     pushes events at us; one batch of five read-only requests (GetVersion,
 //     GetStreamStatus, GetRecordStatus, GetStats, GetCurrentProgramScene); a
 //     normal 1000 close. The configured Timeout bounds the WHOLE probe.
-//   - Node's global WebSocket (Node 22+, Electron's main process) — no
+//   - Node's global WebSocket (Node 22+, Electron's main process): no
 //     dependency. The constructor is swappable through _internal for tests.
 //   - A rejected password is a configuration fault on a reachable OBS, so it is
 //     Degraded with a clear reason rather than Offline.
 //   - Dropped frames are judged over the DELTA since a per-check baseline
 //     (a module-level map; see "Dropped-frame deltas"), not OBS's since-launch
-//     totals —
+//     totals;
 //     otherwise one bad minute an hour ago would degrade the check forever.
 //     OBS keeps three separate counters, matching its Stats dock, and each is
 //     judged on its own against the same percentage:
@@ -279,7 +279,7 @@ function Num(Value: unknown): number | null {
 }
 
 // Turn the batch results into the snapshot. Each request is read on its own,
-// so one failed request leaves the others intact. Pure — exported for tests.
+// so one failed request leaves the others intact. Pure; exported for tests.
 function ParseBatchResults(Results: unknown, Hello: Json, LatencyMs: number): ObsSnapshot {
   const ByType = new Map<string, { Ok: boolean; Data: Json | null; Comment: string }>();
   for (const Item of Array.isArray(Results) ? Results : []) {
@@ -411,7 +411,7 @@ export function QueryObs(Config: ObsConfig): Promise<ObsProbeOutcome> {
           LatencyMs: Latency(),
         });
       } else if (Opened) {
-        // A WebSocket that never says Hello is not obs-websocket 5 — most
+        // A WebSocket that never says Hello is not obs-websocket 5; most
         // likely the old 4.x plugin (port 4444), which waits for requests.
         Finish({
           Kind: 'not-obs',
@@ -583,12 +583,12 @@ function PartialFromHello(Hello: Json, LatencyMs: number): Partial<ObsSnapshot> 
 // Each counter keeps its own baseline sample. A verdict needs a real window:
 // at least MIN_DROP_WINDOW_MS since the baseline AND at least MIN_DROP_FRAMES
 // new frames. Until both hold the OLD baseline is kept and no verdict is given,
-// so a short window — two probes moments apart (a manual run just before a
-// tick) — can never turn 1 skipped frame in 2 into "50%".
+// so a short window, two probes moments apart (a manual run just before a
+// tick), can never turn 1 skipped frame in 2 into "50%".
 //
 // Baselines are keyed per CHECK (the check instance passed to Run carries its
-// CheckID), so two checks on the same OBS with different settings — which the
-// target runs together — never measure against each other's sample. A probe
+// CheckID), so two checks on the same OBS with different settings, which the
+// target runs together, never measure against each other's sample. A probe
 // with no check id (the editor's test run) falls back to address:port.
 
 const MIN_DROP_WINDOW_MS = 5000;
@@ -662,7 +662,7 @@ function StepCounter(
   };
 }
 
-// Advance a check's baseline with a new sample. Pure — exported for tests.
+// Advance a check's baseline with a new sample. Pure; exported for tests.
 function AdvanceDropBaseline(
   Prev: DropBaseline | null,
   Cur: ObsCounters,
@@ -729,7 +729,7 @@ function FormatPercent(Value: number): string {
   return `${Math.round(Value * 10) / 10}%`;
 }
 
-// The reasons a reachable OBS is unhealthy, per the enabled toggles. Pure —
+// The reasons a reachable OBS is unhealthy, per the enabled toggles. Pure;
 // exported via _internal for unit tests.
 function EvaluateHealth(
   Snapshot: ObsSnapshot,
@@ -853,7 +853,7 @@ function MonoRow(Label: string, Value: string): string {
 
 function FormatBytes(Value: unknown): string {
   const N = Number(Value);
-  if (Value == null || !Number.isFinite(N)) return '—';
+  if (Value == null || !Number.isFinite(N)) return '-';
   const Units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let V = N;
   let I = 0;
@@ -875,10 +875,10 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Reachable = !!(Result && Result.Success === true);
   const Num1 = (Value: unknown, Suffix = ''): string =>
     Value == null || !Number.isFinite(Number(Value))
-      ? '—'
+      ? '-'
       : `${Math.round(Number(Value) * 10) / 10}${Suffix}`;
   const Frames = (Skipped: unknown, Total: unknown): string =>
-    Skipped == null || Total == null ? '—' : `${Number(Skipped)} / ${Number(Total)}`;
+    Skipped == null || Total == null ? '-' : `${Number(Skipped)} / ${Number(Total)}`;
 
   const Identity = [
     Result && Result.ObsVersion ? `OBS ${Result.ObsVersion}` : null,
@@ -888,7 +888,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     .join(' · ');
 
   const Rows0: Array<string | null> = [
-    TextRow('Host', `${Config.Address || '—'}:${Config.Port}`),
+    TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Identity ? TextRow('Version', Identity) : null,
     Reachable && Result.PlatformDescription
       ? TextRow('Platform', Result.PlatformDescription)
@@ -946,7 +946,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     const Show = (Delta: DropDelta | null): string =>
       Delta
         ? `${FormatPercent(Delta.Percent)} (${Delta.Skipped} / ${Delta.Total} over ${Math.round(Delta.WindowMs / 1000)} s)`
-        : '—';
+        : '-';
     Rows0.push(
       MonoRow(
         'Drop window',

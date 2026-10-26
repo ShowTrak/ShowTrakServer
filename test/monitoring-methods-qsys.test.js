@@ -1529,15 +1529,15 @@ test('qsys-core offers the Named Controls it reads and labels favourites', () =>
   );
   assert.equal(
     qsys.DescribeAction('snapshot.load', { Bank: 'Scenes', Snapshot: 3, Ramp: 0 }),
-    'Load Snapshot — Scenes 3'
+    'Load Snapshot - Scenes 3'
   );
   assert.equal(
     qsys.DescribeAction('snapshot.load', { Bank: 'Scenes', Snapshot: 3, Ramp: 5 }),
-    'Load Snapshot — Scenes 3 over 5 s'
+    'Load Snapshot - Scenes 3 over 5 s'
   );
   assert.equal(
     qsys.DescribeAction('control.set', { Name: 'MainMute', Value: 'false' }),
-    'Set MainMute — false'
+    'Set MainMute - false'
   );
   assert.equal(qsys.DescribeAction('control.set', { Name: 'MainMute' }), null);
   assert.equal(qsys.DescribeAction('snapshot.load', {}), null);

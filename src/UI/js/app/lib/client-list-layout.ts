@@ -2,12 +2,12 @@
 //
 // Extracted from client-list.ts so the rules that decide what the operator
 // sees can be tested without a DOM. Everything here takes plain data and
-// returns plain data — no jQuery, no `document`, no module state. The rendering
+// returns plain data: no jQuery, no `document`, no module state. The rendering
 // functions in client-list.ts keep the HTML; these keep the decisions.
 //
 // The point is not coverage for its own sake. These are the rules that decide
 // what colour a tile is mid-show, which clients a group-title click selects,
-// and what order tiles appear in after a drag — and every one of them fails
+// and what order tiles appear in after a drag, and every one of them fails
 // silently when it is wrong.
 
 import type {
@@ -52,7 +52,7 @@ export function GetClientStatusDisplayText(Client: Partial<ClientView> | null | 
 /**
  * The status word shown on the tile itself.
  *
- * Differs from the above only by knowing about unassigned slots — and the
+ * Differs from the above only by knowing about unassigned slots, and the
  * ordering matters: Unassigned is checked AFTER Online, so a slot that somehow
  * has a device reporting in shows its real state rather than a stale
  * reservation label.
@@ -140,7 +140,7 @@ export function TruncateGroupLabel(value: string, maxLen = 16): string {
   const text = value == null ? '' : String(value).trim();
   if (!text) return '';
   if (text.length <= maxLen) return text;
-  return `${text.substring(0, Math.max(1, maxLen - 1)).trimEnd()}…`;
+  return `${text.substring(0, Math.max(1, maxLen - 3)).trimEnd()}...`;
 }
 
 /**
@@ -274,7 +274,7 @@ export function SelectGroupMembers(
  * The scoped ids a group-title click should select.
  *
  * These must mirror the tile `data-uuid` values exactly, including the
- * `monitor:` / `dummy:` prefixes from the shared slug-namespace convention —
+ * `monitor:` / `dummy:` prefixes from the shared slug-namespace convention;
  * otherwise "select the whole group" quietly selects only the ShowTrak clients
  * and an action the operator believed was group-wide skips everything else.
  */
@@ -309,7 +309,7 @@ export function BuildMergedTiles(Members: GroupMembers): MergedTileEntry[] {
 /**
  * Whether a group should be rendered at all.
  *
- * Only the synthetic ungrouped bucket is hidden when empty — a real group the
+ * Only the synthetic ungrouped bucket is hidden when empty; a real group the
  * operator created stays visible so they can drag clients into it.
  */
 export function ShouldRenderGroup(GroupID: number | null, Members: GroupMembers): boolean {

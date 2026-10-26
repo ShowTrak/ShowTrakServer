@@ -33,7 +33,7 @@ function register(): void {
   RPC.handle('Show:Save', async () => {
     let CurrentPath = BackupManager.GetCurrentFilePath();
     if (!CurrentPath) {
-      // No file opened or saved yet this session — fall back to Save As.
+      // No file opened or saved yet this session; fall back to Save As.
       const { canceled, filePath } = await FileSelectorManager.SaveDialog('Save ShowTrak File As');
       if (canceled || !filePath) {
         Logger.log('Show:Save canceled');

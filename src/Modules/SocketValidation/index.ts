@@ -41,7 +41,7 @@ const MAX_AUDIO_ENDPOINTS = 256;
 const MAX_STORAGE_VOLUMES = 128;
 
 // Client/device identifier from the socket handshake. Constrained to a
-// selector/room-safe charset — this is the value that ends up in Socket.IO
+// selector/room-safe charset; this is the value that ends up in Socket.IO
 // room names, DOM ids and data-uuid attributes.
 function HandshakeUUID(value: unknown): string {
   return normalizeIdentifier(value, 'UUID');
@@ -70,7 +70,7 @@ function AdoptionHeartbeat(data: unknown): {
 
 // Vitals are display-only telemetry. A malformed one is dropped and reported
 // rather than failing the whole heartbeat, because failing the heartbeat stops
-// the client being marked online — so a cosmetic value in the wrong type would
+// the client being marked online, so a cosmetic value in the wrong type would
 // make a healthy device read as offline indefinitely. Everything that survives
 // is still normalized and bounded exactly as before.
 function Tolerate<T>(compute: () => T, onWarn?: (message: string) => void): T | null {
@@ -301,8 +301,8 @@ function DisplayList(value: unknown) {
   return list.map((display, index) => Display(display, `DisplayList[${index}]`));
 }
 
-// One address on a reported interface. A single NIC carries several — IPv4 plus
-// one or more IPv6 — which is why the wire shape nests them.
+// One address on a reported interface. A single NIC carries several (IPv4 plus
+// one or more IPv6), which is why the wire shape nests them.
 function NetworkInterfaceAddress(value: unknown, fieldName: string) {
   if (!isPlainObject(value)) fail(`${fieldName} must be an object`);
   return {
@@ -323,7 +323,7 @@ function NetworkInterfaceAddress(value: unknown, fieldName: string) {
  * (`{ Name, Address, MAC, Family, Internal }`) that nothing on either side ever
  * produced or consumed. Because the reconstruction reads named fields off the
  * incoming object, every one of them resolved to undefined and the whole
- * payload was rewritten to nulls before any manager saw it — the client record
+ * payload was rewritten to nulls before any manager saw it; the client record
  * then stored `{ name: 'unknown', addresses: [] }` for every interface, and
  * CollectReportedMacAddresses found no MACs to ingest. The visible symptom was
  * Wi-Fi never appearing on a client, since a wired NIC still arrives separately
@@ -361,7 +361,7 @@ function NetworkInterfaces(value: unknown) {
 }
 
 // Health of the client's application collector. Shared by the full snapshot and
-// the delta, which both carry it — a permission failure has to reach the UI
+// the delta, which both carry it: a permission failure has to reach the UI
 // whichever path the client is reporting on.
 function RunningApplicationsStatus(value: unknown) {
   if (!isPlainObject(value)) return null;

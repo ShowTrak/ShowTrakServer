@@ -2,7 +2,7 @@
 //
 // BrightSign players expose a REST API on the player itself ("Local DWS"). All
 // the brightsign* monitoring methods talk to it and differ only in which
-// endpoint they read and how they judge the payload — so the HTTP transport,
+// endpoint they read and how they judge the payload, so the HTTP transport,
 // digest authentication, response unwrapping and the common editor Settings all
 // live here.
 //
@@ -12,7 +12,7 @@
 //     and the default password is the player's serial number. Auth can also be
 //     disabled on the player, so credentials are optional here: we only
 //     authenticate when challenged.
-//  2. Everything is wrapped as {"data":{"result": ...}} — two levels, always.
+//  2. Everything is wrapped as {"data":{"result": ...}}: two levels, always.
 //  3. Sub-objects inside a payload independently degrade to {"error": ...}
 //     INSTEAD OF {"result": ...} while the endpoint still returns HTTP 200. So
 //     every nested read must go through SubResult() rather than assuming
@@ -84,7 +84,7 @@ export const CommonBrightSignSettings: MonitoringSettingField[] = [
     Type: 'string',
     Default: '',
     Required: true,
-    Note: "The Local DWS password — the player's serial number by default. The username is always 'admin'.",
+    Note: "The Local DWS password: the player's serial number by default. The username is always 'admin'.",
   },
   {
     Key: 'IgnoreTlsErrors',
@@ -118,7 +118,7 @@ export interface BrightSignConfig {
 }
 
 // Parse the common connection settings off a target, defaulting anything the
-// caller left unset. Never throws — used by both Run and the Debug renderer.
+// caller left unset. Never throws; used by both Run and the Debug renderer.
 export function ParseBrightSignConfig(Target: MonitoringTargetLike): BrightSignConfig {
   const Cfg = (Target && Target.Settings) || {};
   const Protocol = String(Cfg.Protocol || 'http').toLowerCase() === 'https' ? 'https' : 'http';
@@ -127,7 +127,7 @@ export function ParseBrightSignConfig(Target: MonitoringTargetLike): BrightSignC
     Protocol,
     Port: Number.isFinite(Cfg.Port as number) ? (Cfg.Port as number) | 0 : 0,
     Username: DWS_USERNAME,
-    // Deliberately not trimmed — trailing whitespace can be part of a password.
+    // Deliberately not trimmed; trailing whitespace can be part of a password.
     Password: Cfg.Password == null ? '' : String(Cfg.Password),
     IgnoreTlsErrors: Cfg.IgnoreTlsErrors == null ? true : !!Cfg.IgnoreTlsErrors,
     TimeoutMs: Number.isFinite(Cfg.Timeout as number) ? (Cfg.Timeout as number) : 8000,
@@ -372,7 +372,7 @@ export interface DwsResponse {
   Body?: string;
   LatencyMs?: number;
   Error?: string;
-  // True when the player answered 404 — for the video endpoints this means the
+  // True when the player answered 404: for the video endpoints this means the
   // player has no video API (audio-only), not that it is unhealthy.
   NotFound?: boolean;
   AuthFailed?: boolean;
@@ -450,7 +450,7 @@ export async function FetchDws(
             Ok: false,
             Status: 401,
             AuthFailed: true,
-            Error: 'Authentication required — set the DWS password (default: player serial number)',
+            Error: 'Authentication required; set the DWS password (default: player serial number)',
           };
         }
         const Cnonce = crypto.randomBytes(8).toString('hex');
@@ -469,7 +469,7 @@ export async function FetchDws(
             Ok: false,
             Status: 401,
             AuthFailed: true,
-            Error: 'Authentication failed — check the password',
+            Error: 'Authentication failed; check the password',
           };
         }
       }
@@ -519,7 +519,7 @@ export async function FetchDws(
         Ok: false,
         Status: Res.Status,
         Body: Res.Body,
-        Error: 'Unexpected response shape (no data.result) — is this a BrightSign player?',
+        Error: 'Unexpected response shape (no data.result); is this a BrightSign player?',
       };
     }
 
@@ -673,7 +673,7 @@ export function EvaluateVideo(State: VideoState, ExpectedMode: unknown): string[
 // sibling `upTime` string is human-formatted and not worth parsing.
 export function FormatUptime(Seconds: unknown): string {
   const N = Number(Seconds);
-  if (!Number.isFinite(N) || N < 0) return '—';
+  if (!Number.isFinite(N) || N < 0) return '-';
   const Days = Math.floor(N / 86400);
   const Hours = Math.floor((N % 86400) / 3600);
   const Mins = Math.floor((N % 3600) / 60);
@@ -705,7 +705,7 @@ export function BrightSignDebug(
   const Reachable = !!(Result && Result.Success === true);
   const PortSuffix = Config.Port > 0 ? `:${Config.Port}` : '';
   const Head = Rows([
-    TextRow('Player', `${Config.Protocol}://${Config.Address || '—'}${PortSuffix}`),
+    TextRow('Player', `${Config.Protocol}://${Config.Address || '-'}${PortSuffix}`),
     Row('Status', StatusPill),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
@@ -716,7 +716,7 @@ export function BrightSignDebug(
     return (
       Head +
       '<div class="mt-2">' +
-      Note('Failed to reach the BrightSign Local DWS — check it is enabled on the player') +
+      Note('Failed to reach the BrightSign Local DWS; check it is enabled on the player') +
       '</div>'
     );
   }

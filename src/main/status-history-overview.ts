@@ -2,8 +2,8 @@
 //
 // Backs the list view's history column, which draws a one-hour timeline on
 // every row. The per-entity readers (GetClientHistory, GetMonitoringCheckHistory,
-// ...) would mean one round-trip per row on every refresh — and per CHECK for a
-// monitoring target — so this gathers the same series from the same stores in
+// ...) would mean one round-trip per row on every refresh (and per CHECK for a
+// monitoring target), so this gathers the same series from the same stores in
 // a single call.
 //
 // Only the samples the timeline can draw are returned. The renderer buckets

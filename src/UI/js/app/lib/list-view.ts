@@ -48,7 +48,7 @@ export function NextViewMode(Current: ViewMode): ViewMode {
 // --- Row state words --------------------------------------------------------
 //
 // The list view's Status column states each row's verdict in a word, beside the
-// row colour that already carries it — the word is what survives a colour-blind
+// row colour that already carries it; the word is what survives a colour-blind
 // operator or a washed-out projector. Each mirrors the tile's own state class
 // so the word and the colour can never disagree. (A ShowTrak client's word is
 // GetClientCompactStatusLabel, which already exists for the compact tile.)
@@ -105,7 +105,7 @@ export function MonitorCheckStateClass(
 
 /**
  * The Details cell: latency while it answers, the reason while it is degraded
- * or down. Nothing while the first probe is outstanding — the State column
+ * or down. Nothing while the first probe is outstanding; the State column
  * already says "Checking".
  */
 export function MonitorCheckDetail(Check: Partial<MonitoringCheckView> | null | undefined): string {
@@ -142,7 +142,7 @@ export interface ListHistoryEntities {
  *
  *   - a client or dummy client: its own status series;
  *   - a monitoring target: its checks combined (BuildOverallStatusBlocks), so
- *     the row reads the target's verdict rather than any one check's — and
+ *     the row reads the target's verdict rather than any one check's, and
  *     each check its own series, under `check:<CheckID>`, for its own row;
  *   - a FreeKiosk terminal: its reachability (poll latency) series.
  *

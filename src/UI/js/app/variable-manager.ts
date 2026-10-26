@@ -18,7 +18,7 @@ import { Variables as AllVariables } from './state';
 //   is where they think about the show.
 
 /** Prefix the server applies to every variable. Mirrored from VariableManager's
- * VARIABLE_PREFIX — duplicated rather than imported because the renderer must
+ * VARIABLE_PREFIX, duplicated rather than imported because the renderer must
  * not pull in a module that reaches the database. */
 const VARIABLE_PREFIX = 'SHOWTRAK_VAR_';
 
@@ -170,14 +170,14 @@ export function PopulateVariableManagerEditor(Variable: VariableView) {
 
   const Summary =
     Variable.OverrideCount === 0
-      ? 'No clients have their own value for this variable — every client uses the default.'
+      ? 'No clients have their own value for this variable; every client uses the default.'
       : Variable.OverrideCount === 1
         ? '1 client has its own value for this variable.'
         : `${Variable.OverrideCount} clients have their own value for this variable.`;
   $('#VARIABLE_MANAGER_OVERRIDE_SUMMARY').text(Summary);
 }
 
-/** Keep the "scripts reference it as %…%" hint in step with the name field. */
+/** Keep the "scripts reference it as %...%" hint in step with the name field. */
 export function UpdateVariableUsageHint(Key: string) {
   $('#VARIABLE_MANAGER_USAGE_HINT').text(VariableUsageHint(NormalizeVariableKey(Key)));
 }
@@ -212,7 +212,7 @@ export async function SaveVariableManagerConfig() {
   if (KeyErr) {
     SaveBtn.prop('disabled', false);
     if (VariableManagerEditingId !== VariableID) return;
-    RenderVariableManagerIssues('Failed to save — please fix the following:', [KeyErr]);
+    RenderVariableManagerIssues('Failed to save. Please fix the following:', [KeyErr]);
     Notify('Failed to save variable.', 'error');
     return;
   }
@@ -235,7 +235,7 @@ export async function SaveVariableManagerConfig() {
 
   const Errors = [DefaultErr, DescriptionErr, ExportErr].filter(Boolean) as string[];
   if (Errors.length) {
-    RenderVariableManagerIssues('Variable partially saved — the following failed:', Errors);
+    RenderVariableManagerIssues('Variable partially saved; the following failed:', Errors);
     Notify('Failed to fully save the variable.', 'error');
     return;
   }
@@ -268,7 +268,7 @@ export function RenderScriptEditorVariableList() {
     Row.className = 'd-flex align-items-center gap-2';
     const Usage = VariableUsageHint(Variable.Key);
     // The default is what an un-configured client will actually see, so it is
-    // the useful thing to show beside the name — not the variable's own metadata.
+    // the useful thing to show beside the name, not the variable's own metadata.
     const Detail = Variable.Description
       ? Variable.Description
       : Variable.DefaultValue

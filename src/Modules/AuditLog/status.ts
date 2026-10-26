@@ -2,7 +2,7 @@
 //
 // What is logged is deliberately narrow: each entity's top-level state
 // (connected/online, offline, degraded, recovered), and the things an operator
-// has chosen to monitor on it — monitored USB devices, displays, audio
+// has chosen to monitor on it: monitored USB devices, displays, audio
 // endpoints, network interfaces, storage volumes and applications, system checks, FreeKiosk
 // metric alarms and a monitor's checks. Unmonitored hardware coming and going
 // is not, and neither is a heartbeat.
@@ -62,7 +62,7 @@ function IssueMessages(Issues: unknown): string[] {
 
 // Compare one domain's monitored items. `Previous` null means this domain has
 // never been judged for this entity: only faults are reported then, since an
-// item that is fine was not "connected" just now — it always was.
+// item that is fine was not "connected" just now; it always was.
 function DiffItems(
   Previous: ItemMap | null,
   Next: ItemMap,
@@ -344,7 +344,7 @@ function NetworkItems(List: unknown): ItemMap {
 }
 
 // A volume's free space moves with every report, so its issues are logged as
-// the condition broken ("Free space below 10%") rather than the live reading —
+// the condition broken ("Free space below 10%") rather than the live reading;
 // otherwise each report of a filling disk would resolve and re-raise the issue.
 function StorageIssuePhrases(Issues: unknown, Critical: Row | null): string[] {
   const Phrases: string[] = [];

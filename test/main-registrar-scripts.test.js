@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { installModuleMocks, matchesModule, recordingManager } = require('./helpers/main-mocks');
 
-// Exercises src/main/registrars/scripts.ts — script execution, catalog
+// Exercises src/main/registrars/scripts.ts: script execution, catalog
 // management, and local script file open/run.
 //
 // Three things here decide whether a crafted renderer message can run arbitrary
@@ -15,7 +15,7 @@ const { installModuleMocks, matchesModule, recordingManager } = require('./helpe
 //      renderer-supplied ID + relative path under the scripts directory. A
 //      traversal that escapes it means opening or EXECUTING an arbitrary file.
 //   2. THE MAPPED-EXECUTABLE RESTRICTION. Scripts:RunLocalFile will only run the
-//      file the script's config maps for this platform — not any file that
+//      file the script's config maps for this platform, not any file that
 //      happens to sit in the folder.
 //   3. WHITELIST CONTINUITY ACROSS A RENAME. Renaming a script changes its
 //      folder ID; if the whitelist row did not follow, a script restricted to
@@ -483,7 +483,7 @@ test('ExecuteScript rejects bad input before dispatching anything', async () => 
 
 test('ExecuteScript refuses to dispatch with no targets', async () => {
   // The `Targets || []` in the handler only normalizes null into an array for
-  // the validator — which then rejects it, because running a script against
+  // the validator, which then rejects it, because running a script against
   // zero clients is a no-op the operator almost certainly did not intend.
   const Handler = GetHandler('ExecuteScript');
   for (const Empty of [null, undefined, []]) {
@@ -547,7 +547,7 @@ test('Scripts:GetManagerList projects each script with defaults filled in', asyn
 });
 
 test('Scripts:GetManagerList keeps supplied values and includes invalid scripts', async () => {
-  // Invalid scripts MUST appear — the manager is where they get fixed.
+  // Invalid scripts MUST appear; the manager is where they get fixed.
   state.scripts = [
     {
       ID: 'b',

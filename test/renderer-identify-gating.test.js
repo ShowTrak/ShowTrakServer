@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 // Covers the version-gating and target-eligibility logic in
-// src/UI/js/app/identify.ts — the part of the Identify flow that decides
+// src/UI/js/app/identify.ts, the part of the Identify flow that decides
 // whether the action is offered for a given client at all. Getting this wrong
 // either hides Identify from capable clients or fires it at clients too old to
 // understand it.
@@ -132,7 +132,7 @@ test('GetIdentifyTargetByUUID reports the current identifying state', () => {
 
 test('GetIdentifyTargetByUUID gates a pending-adoption device on version only', () => {
   // A device awaiting adoption is by definition reachable, so there is no
-  // Online flag to consult — only the version gate applies.
+  // Online flag to consult; only the version gate applies.
   setPendingAdoption([{ UUID: 'pending-1', Version: '3.7.0' }]);
   assert.equal(GetIdentifyTargetByUUID('pending-1').Eligible, true);
 
@@ -161,7 +161,7 @@ test('GetIdentifyTargetByUUID returns an ineligible stub for an unknown UUID', (
 /**
  * Install a minimal stand-in for the two jQuery call shapes this function uses:
  * `$(selector).each(cb)` and `$(this).attr('data-uuid')`. This is a stub for one
- * call site, not a DOM — see the WP-1 strategy note in the coverage plan.
+ * call site, not a DOM; see the WP-1 strategy note in the coverage plan.
  */
 function withFakeTiles(uuids, fn) {
   const Had = '$' in globalThis;

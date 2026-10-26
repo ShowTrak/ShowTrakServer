@@ -19,7 +19,7 @@ export interface MonitoringTargetLike {
 // attribute-specific thresholds behind an "enable this check" toggle.
 //
 // Give either Equals (exact match) or In (membership). In exists because some
-// gates cannot be written as an equality — the FreeKiosk alarm schema hides its
+// gates cannot be written as an equality: the FreeKiosk alarm schema hides its
 // threshold input whenever the chosen operator is one of the value-less edge
 // detectors, which is a set test, not a comparison against one value.
 export interface MonitoringSettingVisibleWhen {
@@ -32,7 +32,7 @@ export interface MonitoringSettingField {
   Key: string;
   Label: string;
   // 'string' (default) | 'number' | 'boolean' | 'select' | 'list'. A 'list' field
-  // collects multiple values as a string[] (chip/tag input) — see ItemType.
+  // collects multiple values as a string[] (chip/tag input); see ItemType.
   Type: string;
   Default?: unknown;
   Min?: number;
@@ -58,11 +58,11 @@ export interface MonitoringSettingField {
   }>;
   Advanced?: boolean;
   // Marks a setting the check cannot run without. The editor appends a red
-  // asterisk to the label. Purely a display hint — server-side validation in the
+  // asterisk to the label. Purely a display hint; server-side validation in the
   // method's Run() remains the source of truth.
   Required?: boolean;
   // Optional per-input hint. Rendered as a hover popover on a small info icon to
-  // the right of the input — keep it to a sentence or two. Escaped before display.
+  // the right of the input; keep it to a sentence or two. Escaped before display.
   Note?: string;
   // Marks a credential (password, passcode, community string). Surfaces that must
   // not hand credentials out redact it via Utils/redact; the stored value and the
@@ -76,7 +76,7 @@ export interface MonitoringSettingField {
 }
 
 // Editor-facing "how to set this up" help, shown in a panel below the method
-// picker. Purely informational — never affects probe behaviour. All fields are
+// picker. Purely informational; never affects probe behaviour. All fields are
 // treated as plain text by the renderer (escaped before display).
 export interface MonitoringMethodInfo {
   Summary: string;
@@ -89,7 +89,7 @@ export interface MonitoringMethodInfo {
 // --- Controllable actions ----------------------------------------------------
 //
 // A check READS a device; an action DOES something to it. A method opts in by
-// exporting `Actions` plus a `RunAction` implementation — nothing else in the
+// exporting `Actions` plus a `RunAction` implementation; nothing else in the
 // stack needs to know the method exists. Actions are addressed as
 // `<Method>/<ActionID>` in the UI, over IPC and over OSC, so each method owns a
 // private action namespace and a new check type gains a control surface without
@@ -114,8 +114,8 @@ export interface MonitoringActionDef {
   /**
    * Keep the control enabled while the check is offline. Offline normally
    * disables every control (the device cannot be reached, so every press would
-   * fail the same way), but a recovery action — rebooting a player whose status
-   * endpoint has stopped answering — is wanted most at exactly that moment.
+   * fail the same way), but a recovery action (rebooting a player whose status
+   * endpoint has stopped answering) is wanted most at exactly that moment.
    */
   AllowedWhileOffline?: boolean;
   Note?: string;
@@ -224,7 +224,7 @@ export interface MonitoringMethod {
   GetActionOptions?(Result: MonitoringResult): MonitoringActionOptions;
   /**
    * One-line description of an action WITH its parameters bound, used to label
-   * a starred favourite — 'Set Input - Digital 1 (31)' rather than 'Set Input'.
+   * a starred favourite: 'Set Input - Digital 1 (31)' rather than 'Set Input'.
    * Return null to fall back to the action's plain label. Must be pure.
    */
   DescribeAction?(ActionID: string, Params: Record<string, unknown>): string | null;
