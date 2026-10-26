@@ -76,8 +76,13 @@ try {
   /* body not ready yet; applyWebChrome re-adds it */
 }
 
+// Handshake over HTTP long-polling, then upgrade to WebSocket when it works.
+// Do NOT put 'websocket' first: Socket.IO never falls back to the second
+// transport when the first one fails, so a browser or network that cannot hold
+// a WebSocket open (seen on iOS Safari) sat on "Connecting…" forever. Starting
+// on polling always connects, and a failed upgrade just stays on polling.
 const socket = io('/ui', {
-  transports: ['websocket', 'polling'],
+  transports: ['polling', 'websocket'],
   auth: (cb: (data: { token?: string }) => void) =>
     cb({ token: getStored(TOKEN_KEY) || undefined }),
   reconnection: true,
