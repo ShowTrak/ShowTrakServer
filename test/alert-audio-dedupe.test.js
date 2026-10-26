@@ -66,13 +66,17 @@ test('a refused claim does not extend the window', async () => {
   // Without this, a fault re-firing faster than the window would suppress the
   // sound forever instead of letting it through once per window.
   const Dedupe = loadDedupe();
-  Dedupe.SetAudioDedupeWindow(40);
+  // Margins are wide because Windows timers tick at ~15.6ms: a 25ms sleep in a
+  // 40ms window overran it there. The refusal lands mid-window (~150ms), and
+  // the last claim (~350ms) is past the real window (300ms) but well inside
+  // the one a refusal would have extended it to (~450ms).
+  Dedupe.SetAudioDedupeWindow(300);
 
   assert.equal(Dedupe.ClaimAudioPlayback('sound:Alert'), true);
-  await sleep(25);
+  await sleep(150);
   assert.equal(Dedupe.ClaimAudioPlayback('sound:Alert'), false);
-  await sleep(30);
-  // 55ms after the play that opened it, the window is spent regardless of the
+  await sleep(200);
+  // ~350ms after the play that opened it, the window is spent regardless of the
   // refusal that landed in the middle.
   assert.equal(Dedupe.ClaimAudioPlayback('sound:Alert'), true);
 });
