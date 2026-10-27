@@ -405,6 +405,9 @@ interface HttpReply {
   TooLarge: boolean;
 }
 
+// A request that ran out its budget, as opposed to one the transport refused.
+class ReplyTimeout extends Error {}
+
 /**
  * One request bounded by `BudgetMs`. Rejects on transport failure. Uses the
  * lenient HTTP parser because Companion's Ki Pro module documents older Ki Pro
@@ -438,7 +441,7 @@ function HttpRequest(
       } else resolve(Reply as HttpReply);
     };
     const Timer = setTimeout(
-      () => Finish(new Error(`No reply after ${Math.max(1, BudgetMs | 0)}ms`)),
+      () => Finish(new ReplyTimeout(`No reply after ${Math.max(1, BudgetMs | 0)}ms`)),
       Math.max(1, BudgetMs | 0)
     );
     try {
@@ -554,7 +557,11 @@ const IsAuthStatus = (Status: number) => Status === 401 || Status === 403 || Sta
 // and the one re-login on an expired session. Shared by the probe and the
 // actions so both honour the same password.
 export function CreateAjaClient(Address: string, Port: number, Password: string, Deadline: number) {
-  const Remaining = () => Deadline - Date.now();
+  // Set once a request bounded by the deadline itself times out. A timer can
+  // fire a millisecond before Date.now() reaches the deadline, and the probe
+  // must still see the budget as spent or it reports a cut-short read as whole.
+  let Expired = false;
+  const Remaining = () => (Expired ? 0 : Deadline - Date.now());
   const State = {
     Reachable: false,
     AuthFailed: false,
@@ -573,7 +580,8 @@ export function CreateAjaClient(Address: string, Port: number, Password: string,
     BudgetCapMs = Infinity,
     Body?: string
   ): Promise<HttpReply | null> => {
-    const Left = Math.min(Remaining(), BudgetCapMs);
+    const UntilDeadline = Remaining();
+    const Left = Math.min(UntilDeadline, BudgetCapMs);
     if (Left <= 0) return null;
     try {
       const Reply = await HttpRequest(
@@ -590,6 +598,7 @@ export function CreateAjaClient(Address: string, Port: number, Password: string,
       State.Reachable = true;
       return Reply;
     } catch (Err) {
+      if (Err instanceof ReplyTimeout && Left === UntilDeadline) Expired = true;
       State.LastError = Err instanceof Error ? Err.message : String(Err);
       return null;
     }
