@@ -8,12 +8,11 @@ import {
   setSettingsGroups,
 } from './state';
 import {
+  ApplyStartupViewMode,
   InitMobileView,
-  LoadViewModePreference,
   RenderAlertActionsToggle,
   RenderMode,
   SetAlertActionsEnabled,
-  SetViewMode,
   WireViewModeToggle,
 } from './mode';
 import { GetAlertVolume, HandleNonFatalError, Safe, ShowQRModal } from './utils';
@@ -31,12 +30,6 @@ async function WireSettingsControls() {
   const btnEdit = document.getElementById('MODE_BTN_EDIT');
   const btnAlertActions = document.getElementById('ALERT_ACTIONS_TOGGLE_BTN');
 
-  SetViewMode(LoadViewModePreference(), { persist: false, animate: false });
-  WireViewModeToggle();
-  // Lock to the compact mobile layout when the viewport is narrow, and keep it
-  // in sync as the viewport / orientation changes.
-  InitMobileView();
-
   try {
     const initialSettings = await window.API.GetSettings();
     if (Array.isArray(initialSettings)) {
@@ -45,6 +38,13 @@ async function WireSettingsControls() {
   } catch (err) {
     HandleNonFatalError('Settings:InitSettings', err);
   }
+
+  // Settings first, so the page opens straight into the Default View.
+  ApplyStartupViewMode(Settings.find((s) => s && s.Key === 'UI_DEFAULT_VIEW')?.Value);
+  WireViewModeToggle();
+  // Lock to the compact mobile layout when the viewport is narrow, and keep it
+  // in sync as the viewport / orientation changes.
+  InitMobileView();
 
   if (btnShow && !btnShow.dataset.bound) {
     btnShow.addEventListener('click', async () => {

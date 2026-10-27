@@ -182,6 +182,15 @@ export function LoadViewModePreference(): ViewModeValue {
   }
 }
 
+/**
+ * Open in the Default View preference, falling back to the last view used when
+ * it is missing. Persisted so widening back out of the mobile lock restores it.
+ */
+export function ApplyStartupViewMode(DefaultView: unknown) {
+  const Default = ParseViewMode(DefaultView);
+  SetViewMode(Default ?? LoadViewModePreference(), { persist: Default != null, animate: false });
+}
+
 /** Compact on/off, for callers that still think in those terms (the SDK). */
 export function SetCompactMode(isCompact: boolean, options: { persist?: boolean } = {}) {
   SetViewMode(isCompact ? 'compact' : 'grid', options);

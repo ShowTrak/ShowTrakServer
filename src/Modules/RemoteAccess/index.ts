@@ -279,6 +279,8 @@ const PUSH_ALLOWLIST = new Set<string>(PUSH_CHANNELS);
 // to hide. A key added here is visible to anyone the surface lets in.
 const PUBLIC_SETTING_KEYS = new Set<string>([
   'UI_GROUP_COLUMN_COUNT',
+  // The Web UI opens in the same view as the desktop.
+  'UI_DEFAULT_VIEW',
   // The Web UI applies this to its own selection after its own actions.
   'UI_CLEAR_SELECTION_AFTER_ACTION',
   // The browser's execution panel closes on the same dwell as the desktop's.

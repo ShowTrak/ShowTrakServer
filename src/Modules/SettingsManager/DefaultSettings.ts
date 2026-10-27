@@ -142,6 +142,16 @@ export const DefaultSettings: SettingDefinition[] = [
   },
   {
     Group: 'Layout',
+    Key: 'UI_DEFAULT_VIEW',
+    Title: 'Default View',
+    Description:
+      'The view ShowTrak opens in. The view switch still changes it until the next launch.',
+    Type: 'OPTION',
+    DefaultValue: 'Grid',
+    Options: ['Grid', 'Compact', 'List'],
+  },
+  {
+    Group: 'Layout',
     Key: 'UI_GROUP_COLUMN_COUNT',
     Title: 'Group Columns',
     Description:
@@ -614,7 +624,6 @@ export const Groups: SettingGroup[] = [
   { Name: 'Features', Title: 'Features' },
   { Name: 'Network', Title: 'Network' },
   { Name: 'Monitoring', Title: 'Monitoring' },
-  { Name: 'FreeKiosk', Title: 'FreeKiosk' },
   { Name: 'SDK / Integration API', Title: 'SDK / Integration API' },
   { Name: 'Alerts', Title: 'Alerts' },
   { Name: 'Web UI', Title: 'Web UI' },
@@ -643,5 +652,6 @@ export const Groups: SettingGroup[] = [
     Parent: 'FOG Project',
     ShowWhen: ['FOG_ENABLED'],
   },
+  { Name: 'FreeKiosk', Title: 'FreeKiosk' },
   { Name: 'System', Title: 'System Settings' },
 ];
