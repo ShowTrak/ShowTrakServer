@@ -715,12 +715,6 @@ export async function OpenGroupManager(Relaunching = false) {
     </div>
   `);
 
-  $('#GROUP_MANAGER_GROUP_LIST').append(`
-    <div class="d-grid gap-2 GROUP_MANAGER_GROUP_NEW">
-      <button type="button" class="btn btn-sm btn-success" id="GROUP_MANAGER_NEW_GROUP">New Group</button>
-    </div>
-  `);
-
   const SortableContainer = document.getElementById('GROUP_MANAGER_SORTABLE_LIST');
   if (SortableContainer) {
     SortableContainer.addEventListener('dragover', (Event) => {
@@ -774,9 +768,9 @@ export async function OpenGroupManager(Relaunching = false) {
       }
     );
 
-  $('#GROUP_MANAGER_GROUP_LIST')
-    .off('click', '#GROUP_MANAGER_NEW_GROUP')
-    .on('click', '#GROUP_MANAGER_NEW_GROUP', function () {
+  $('#GROUP_MANAGER_NEW_GROUP')
+    .off('click')
+    .on('click', function () {
       OpenGroupCreationModal();
     });
 

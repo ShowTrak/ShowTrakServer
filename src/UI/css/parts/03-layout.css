@@ -633,9 +633,8 @@ body.compact-mode .group-column-grid {
 }
 
 .UPDATE_MANAGER_CLIENT_ITEM {
-  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 0.45rem 0.55rem;
+  padding: 0.35rem 0.55rem;
   background: rgba(255, 255, 255, 0.04);
 }
 
@@ -692,7 +691,6 @@ body.compact-mode .group-column-grid {
 }
 
 .UPDATE_MANAGER_CLIENT_HINT {
-  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-pill);
   padding: 1px 6px;
   font-size: var(--fs-3xs);
@@ -705,25 +703,21 @@ body.compact-mode .group-column-grid {
 
 .UPDATE_MANAGER_CLIENT_HINT.SUCCESS {
   color: #d7ffe8;
-  border-color: rgb(var(--success-text-rgb) / 0.55);
   background: rgb(var(--success-text-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.WARNING {
   color: #ffe6b8;
-  border-color: rgb(var(--warning-soft-rgb) / 0.6);
   background: rgb(var(--warning-soft-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.INFO {
   color: #d9f1ff;
-  border-color: rgb(var(--info-rgb) / 0.58);
   background: rgb(var(--info-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.MUTED {
   color: var(--text-secondary);
-  border-color: rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -745,7 +739,6 @@ body.compact-mode .group-column-grid {
 .UPDATE_MANAGER_CLIENT_STATUS_TEXT {
   color: var(--text-secondary);
   font-size: var(--fs-xs);
-  min-height: 14px;
   margin-top: 0.18rem;
 }
 
@@ -861,20 +854,47 @@ body.mode-edit #APPLICATION_CONTAINER {
   background: var(--app-bg-gradient) !important;
 }
 
+/* Fields: solid, borderless, a shade per state (tokens in 01-base.css). The
+   !importants outrank the bg-* / border-0 utilities fields still carry. */
 .form-control,
 .form-select {
-  background-color: var(--surface-ghost) !important;
+  background-color: var(--field-bg) !important;
   color: white !important;
   border: none !important;
   border-radius: var(--radius-md) !important;
+  box-shadow: none !important;
+  transition: background-color 150ms ease;
+}
+
+.form-control:hover,
+.form-select:hover {
+  background-color: var(--field-bg-hover) !important;
 }
 
 .form-control:focus,
 .form-select:focus {
   color: white !important;
-  background-color: var(--surface-ghost-active) !important;
+  background-color: var(--field-bg-focus) !important;
   outline: 0 !important;
   box-shadow: none !important;
+}
+
+.form-control.is-invalid,
+.form-select.is-invalid {
+  background-color: var(--field-bg-invalid) !important;
+}
+
+.form-control:disabled,
+.form-control.disabled,
+.form-control[readonly],
+.form-select:disabled {
+  background-color: var(--field-bg-disabled) !important;
+  color: var(--text-soft) !important;
+  opacity: 1;
+}
+
+.form-control::placeholder {
+  color: var(--text-faint);
 }
 
 /* 3D keyboard key styling for <kbd> elements */
@@ -1124,66 +1144,9 @@ button.btn:focus {
   margin-top: 0.35rem;
 }
 
-/* A macOS-style level bar: a pill whose filled part IS the control, no knob.
-   The thumb is a fill-coloured circle the height of the track, so the fill
-   ends in a rounded cap; its shadow paints the fill to its left, and the
-   input clips that shadow to the pill. Qualified by type to outrank the
-   app-wide range styling in 02-controls.css. */
+/* The level bar itself is the app-wide slider (02-controls.css). */
 input[type='range'].SHOWTRAK_AUDIO_LEVEL {
-  --st-level-height: 0.6rem;
-  /* Opaque: a translucent fill would show where the cap overlaps it. */
-  --st-level-fill: #e2e2ea;
   flex: 1 1 auto;
-  height: var(--st-level-height);
-  border-radius: var(--radius-pill);
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.12);
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL:hover,
-input[type='range'].SHOWTRAK_AUDIO_LEVEL:focus-visible {
-  --st-level-fill: #ffffff;
-  background: rgba(255, 255, 255, 0.18);
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL:focus-visible {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL::-webkit-slider-runnable-track {
-  height: var(--st-level-height);
-  border-radius: var(--radius-pill);
-  background: transparent;
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL::-webkit-slider-thumb {
-  width: var(--st-level-height);
-  height: var(--st-level-height);
-  margin-top: 0;
-  border-radius: 50%;
-  background: var(--st-level-fill);
-  box-shadow: calc(-100vw - var(--st-level-height) / 2) 0 0 100vw var(--st-level-fill);
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-track {
-  height: var(--st-level-height);
-  background: transparent;
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-progress {
-  height: var(--st-level-height);
-  border-radius: var(--radius-pill);
-  background: var(--st-level-fill);
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
-  width: var(--st-level-height);
-  height: var(--st-level-height);
-  border-radius: 50%;
-  background: var(--st-level-fill);
-  box-shadow: none;
 }
 
 .SHOWTRAK_AUDIO_LEVEL_VALUE {
@@ -1357,15 +1320,31 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   padding: 0.1rem 0.4rem;
   border: 0;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--field-bg);
   color: #ffffff;
   font-weight: 700;
+  transition: background-color 150ms ease;
+}
+
+/* Room for the stepper chevrons (number-steppers.ts) beside a 3-digit value. */
+.SHOWTRAK_AUDIO_COND_BOUND input.st-number-input {
+  width: 4.75rem;
+}
+
+.SHOWTRAK_AUDIO_COND_BOUND input:hover,
+.SHOWTRAK_NET_COND_ADDRESS input:hover {
+  background: var(--field-bg-hover);
 }
 
 .SHOWTRAK_AUDIO_COND_BOUND input:focus,
 .SHOWTRAK_NET_COND_ADDRESS input:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--field-bg-focus);
+}
+
+.SHOWTRAK_AUDIO_COND_BOUND input:disabled,
+.SHOWTRAK_NET_COND_ADDRESS input:disabled {
+  background: var(--field-bg-disabled);
 }
 
 .SHOWTRAK_AUDIO_COND_BOUND input::placeholder,

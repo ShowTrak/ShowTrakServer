@@ -60,7 +60,7 @@
     <div id="IDENTIFY_STATUS_BANNER" class="d-none" role="status" aria-live="polite">
       <div class="identify-status-content">
         <span id="IDENTIFY_STATUS_TEXT">You are currently identifying 0 clients</span>
-        <button type="button" id="IDENTIFY_STOP_ALL_BUTTON" class="btn btn-sm btn-outline-light">
+        <button type="button" id="IDENTIFY_STOP_ALL_BUTTON" class="btn btn-sm btn-light">
           Stop Identifying
         </button>
       </div>
@@ -796,9 +796,19 @@ Loading licence...</pre>
       <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <div id="GROUP_MANAGER_HEADER"></div>
+            <div id="GROUP_MANAGER_HEADER" class="mb-2"></div>
+            <div class="d-flex justify-content-end gap-2 mb-2 st-action-row">
+              <button
+                type="button"
+                id="GROUP_MANAGER_NEW_GROUP"
+                class="btn btn-sm script-manager-create-btn"
+                title="Create a new group"
+              >
+                <i class="bi bi-plus-lg"></i> New
+              </button>
+            </div>
 
-            <div id="GROUP_MANAGER_GROUP_LIST" class="d-grid gap-2 mt-2"></div>
+            <div id="GROUP_MANAGER_GROUP_LIST" class="d-grid gap-2"></div>
           </div>
         </div>
       </div>
@@ -815,7 +825,7 @@ Loading licence...</pre>
         <div class="modal-content">
           <div class="modal-body text-start">
             <div id="GROUP_EDITOR_HEADER" class="mb-2"></div>
-            <div class="d-flex justify-content-end mb-2">
+            <div class="d-flex justify-content-end mb-2 st-action-row">
               <button
                 type="button"
                 id="GROUP_MANAGER_EDITOR_DELETE"
@@ -983,18 +993,18 @@ Loading licence...</pre>
         <div class="modal-content">
           <div class="modal-body text-start">
             <div id="UPDATE_MANAGER_HEADER" class="mb-2"></div>
-            <div class="d-flex justify-content-end mb-2">
+            <div class="d-flex justify-content-end mb-2 st-action-row">
               <button type="button" class="btn btn-sm btn-light" id="UPDATE_MANAGER_REFRESH">
                 <i class="bi bi-arrow-clockwise"></i> Refresh
               </button>
             </div>
-            <p id="UPDATE_MANAGER_RELEASE" class="text-light mb-1">Release: loading...</p>
-            <p id="UPDATE_MANAGER_STATUS" class="text-muted mb-2">
+            <p id="UPDATE_MANAGER_RELEASE" class="text-light mb-0">Release: loading...</p>
+            <p id="UPDATE_MANAGER_STATUS" class="text-muted text-sm mb-0">
               Download latest release from the server and push updates over LAN. Always update
               clients before updating ShowTrak Server to avoid compatibility issues.
             </p>
 
-            <div class="mb-2">
+            <div>
               <div class="d-flex align-items-center justify-content-between mb-1">
                 <label class="form-label text-sm mb-0" for="UPDATE_MANAGER_RELEASE_SELECT">
                   Release
@@ -1006,7 +1016,7 @@ Loading licence...</pre>
               <select class="form-select" id="UPDATE_MANAGER_RELEASE_SELECT"></select>
             </div>
 
-            <div id="UPDATE_MANAGER_DOWNLOAD_PROGRESS_WRAPPER" class="d-none mb-2">
+            <div id="UPDATE_MANAGER_DOWNLOAD_PROGRESS_WRAPPER" class="d-none">
               <div class="small text-muted mb-1" id="UPDATE_MANAGER_DOWNLOAD_PROGRESS_TEXT">
                 Preparing download...
               </div>
@@ -1023,7 +1033,7 @@ Loading licence...</pre>
               </div>
             </div>
 
-            <div class="d-grid gap-2 mt-2">
+            <div class="d-grid gap-2">
               <button type="button" class="btn btn-info" id="UPDATE_MANAGER_DOWNLOAD_LATEST">
                 Download Selected Release
               </button>
@@ -1032,7 +1042,7 @@ Loading licence...</pre>
               </button>
             </div>
 
-            <div class="d-grid gap-2" id="UPDATE_MANAGER_CLIENT_LIST"></div>
+            <div class="d-grid gap-1" id="UPDATE_MANAGER_CLIENT_LIST"></div>
           </div>
         </div>
       </div>
@@ -1153,7 +1163,7 @@ Loading licence...</pre>
             <!-- List view -->
             <div id="SCRIPT_MANAGER_LIST_VIEW">
               <div id="SCRIPT_MANAGER_LIST_HEADER" class="mb-2"></div>
-              <div class="d-flex justify-content-end gap-2 mb-2">
+              <div class="d-flex justify-content-end gap-2 mb-2 st-action-row">
                 <button
                   type="button"
                   id="SCRIPT_MANAGER_CREATE_TEMPLATE"
@@ -1177,7 +1187,7 @@ Loading licence...</pre>
             <!-- Templates (sample scripts) view -->
             <div id="SCRIPT_MANAGER_TEMPLATES_VIEW" class="d-none">
               <div id="SCRIPT_MANAGER_TEMPLATES_HEADER" class="mb-2"></div>
-              <div class="d-flex justify-content-end mb-2">
+              <div class="d-flex justify-content-end mb-2 st-action-row">
                 <button
                   type="button"
                   id="SCRIPT_MANAGER_TEMPLATES_REFRESH"
@@ -1196,7 +1206,7 @@ Loading licence...</pre>
             <!-- Editor view -->
             <div id="SCRIPT_MANAGER_EDITOR_VIEW" class="d-none">
               <div id="SCRIPT_MANAGER_EDITOR_HEADER" class="mb-2"></div>
-              <div class="d-flex justify-content-end gap-2 mb-2">
+              <div class="d-flex justify-content-end gap-2 mb-2 st-action-row">
                 <button
                   type="button"
                   id="SCRIPT_MANAGER_OPEN_FOLDER"
@@ -1294,7 +1304,6 @@ Loading licence...</pre>
                   <div class="form-check form-switch">
                     <input
                       class="form-check-input"
-                      style="margin-top: 0.6em !important"
                       type="checkbox"
                       id="SCRIPT_MANAGER_FIELD_ENABLED"
                     />
@@ -1400,12 +1409,8 @@ Loading licence...</pre>
                 </div>
               </div>
 
-              <div class="d-flex justify-content-end gap-2 mt-2">
-                <button
-                  type="button"
-                  id="SCRIPT_MANAGER_REVERT"
-                  class="btn btn-sm btn-outline-light"
-                >
+              <div class="d-flex justify-content-end gap-2 mt-2 st-action-row">
+                <button type="button" id="SCRIPT_MANAGER_REVERT" class="btn btn-sm btn-light">
                   <i class="bi bi-arrow-clockwise"></i> Revert
                 </button>
                 <button type="button" id="SCRIPT_MANAGER_SAVE" class="btn btn-sm btn-success">
@@ -1431,7 +1436,7 @@ Loading licence...</pre>
             <!-- List view -->
             <div id="TAG_MANAGER_LIST_VIEW">
               <div id="TAG_MANAGER_LIST_HEADER" class="mb-2"></div>
-              <div class="d-flex justify-content-end gap-2 mb-2">
+              <div class="d-flex justify-content-end gap-2 mb-2 st-action-row">
                 <button
                   type="button"
                   id="TAG_MANAGER_CREATE"
@@ -1447,7 +1452,7 @@ Loading licence...</pre>
             <!-- Editor view -->
             <div id="TAG_MANAGER_EDITOR_VIEW" class="d-none">
               <div id="TAG_MANAGER_EDITOR_HEADER" class="mb-2"></div>
-              <div class="d-flex justify-content-end gap-2 mb-2">
+              <div class="d-flex justify-content-end gap-2 mb-2 st-action-row">
                 <button
                   type="button"
                   id="TAG_MANAGER_DELETE"
@@ -1537,8 +1542,8 @@ Loading licence...</pre>
                 </div>
               </div>
 
-              <div class="d-flex justify-content-end gap-2 mt-2">
-                <button type="button" id="TAG_MANAGER_REVERT" class="btn btn-sm btn-outline-light">
+              <div class="d-flex justify-content-end gap-2 mt-2 st-action-row">
+                <button type="button" id="TAG_MANAGER_REVERT" class="btn btn-sm btn-light">
                   <i class="bi bi-arrow-clockwise"></i> Revert
                 </button>
                 <button type="button" id="TAG_MANAGER_SAVE" class="btn btn-sm btn-success">
@@ -1564,7 +1569,7 @@ Loading licence...</pre>
             <!-- List view -->
             <div id="VARIABLE_MANAGER_LIST_VIEW">
               <div id="VARIABLE_MANAGER_LIST_HEADER" class="mb-2"></div>
-              <div class="d-flex justify-content-end gap-2 mb-2">
+              <div class="d-flex justify-content-end gap-2 mb-2 st-action-row">
                 <button
                   type="button"
                   id="VARIABLE_MANAGER_CREATE"
@@ -1580,7 +1585,7 @@ Loading licence...</pre>
             <!-- Editor view -->
             <div id="VARIABLE_MANAGER_EDITOR_VIEW" class="d-none">
               <div id="VARIABLE_MANAGER_EDITOR_HEADER" class="mb-2"></div>
-              <div class="d-flex justify-content-end gap-2 mb-2">
+              <div class="d-flex justify-content-end gap-2 mb-2 st-action-row">
                 <button
                   type="button"
                   id="VARIABLE_MANAGER_DELETE"
@@ -1677,12 +1682,8 @@ Loading licence...</pre>
                 </div>
               </div>
 
-              <div class="d-flex justify-content-end gap-2 mt-2">
-                <button
-                  type="button"
-                  id="VARIABLE_MANAGER_REVERT"
-                  class="btn btn-sm btn-outline-light"
-                >
+              <div class="d-flex justify-content-end gap-2 mt-2 st-action-row">
+                <button type="button" id="VARIABLE_MANAGER_REVERT" class="btn btn-sm btn-light">
                   <i class="bi bi-arrow-clockwise"></i> Revert
                 </button>
                 <button type="button" id="VARIABLE_MANAGER_SAVE" class="btn btn-sm btn-success">
@@ -2552,7 +2553,7 @@ Loading licence...</pre>
           <div class="modal-body text-center">
             <div id="ALERT_MANAGER_LIST_PANEL" class="d-grid gap-2 text-start mt-1">
               <div id="ALERT_MANAGER_LIST_HEADER"></div>
-              <div class="d-flex justify-content-end gap-2">
+              <div class="d-flex justify-content-end gap-2 st-action-row">
                 <button type="button" class="btn btn-sm btn-light" id="AUDIO_ASSETS_OPEN_BUTTON">
                   Audio Assets
                 </button>
@@ -3051,11 +3052,8 @@ Loading licence...</pre>
                     <div class="rounded-3 p-2 bg-ghost-light">
                       <h6 class="mb-0">MAC Addresses</h6>
                     </div>
-                    <span class="text-sm text-secondary"
-                      >Wake on LAN sends a magic packet to every address listed here.</span
-                    >
                     <div id="CLIENT_INFO_MAC_LIST" class="mac-address-list"></div>
-                    <div class="input-group mac-address-add ci-edit-only">
+                    <div class="d-flex gap-2 mac-address-add ci-edit-only">
                       <input
                         type="text"
                         class="form-control"

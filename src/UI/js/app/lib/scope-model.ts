@@ -235,8 +235,20 @@ export function buildScopeModel(Options: ScopeSourceOptions): AlertScopeModel {
               Check.Name ? Check.Address || '' : '',
               `Check ${Check.CheckID}`
             ),
-            IconClass: scopeIconClass('monitor'),
+            IconClass: scopeIconClass('monitor-check'),
             Weight: Target.Weight || 0,
+            // Nested under its monitor in the picker when that row exists; the
+            // full label still drives search and the button summary.
+            ...(IncludeKinds.has('monitor')
+              ? {
+                  ParentValue: `client:${ScopedID}`,
+                  NestedLabel: buildScopeEntityLabel(
+                    CheckLabel,
+                    Check.Name ? Check.Address || '' : '',
+                    `Check ${Check.CheckID}`
+                  ),
+                }
+              : {}),
           });
         }
       }

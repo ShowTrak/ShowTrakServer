@@ -80,6 +80,13 @@ export interface AlertScopeEntity {
   Label: string;
   IconClass: string;
   Weight: number;
+  /**
+   * A monitor check's monitor (its `client:monitor:<TargetID>` value), when
+   * the monitor is in the model too: the picker nests the check under it.
+   */
+  ParentValue?: string;
+  /** The label to show when nested under ParentValue (no monitor prefix). */
+  NestedLabel?: string;
 }
 
 /** A group node in the alert scope tree, holding its child entities. */

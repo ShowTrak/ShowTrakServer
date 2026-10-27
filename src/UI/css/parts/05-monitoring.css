@@ -635,7 +635,7 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   justify-content: center;
   gap: 0.35rem;
   padding: 0.25rem 0.6rem;
-  border: 1px solid var(--border-default);
+  border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-sm);
   color: var(--text-strong);
@@ -656,7 +656,6 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 
 .monitor-group-action-btn.is-destructive {
   color: var(--status-graph-degraded);
-  border-color: rgb(var(--status-graph-degraded-rgb) / 0.32);
   background: rgb(var(--status-graph-degraded-rgb) / 0.14);
 }
 
@@ -1335,9 +1334,9 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   opacity: 0.75;
 }
 .script-manager-file-edit-btn {
-  background: transparent;
+  background: rgb(var(--info-rgb) / 0.1);
   border: none;
-  color: var(--text-muted);
+  color: rgb(var(--info-rgb) / 0.85);
   font-size: var(--fs-md);
   padding: 2px 6px;
   border-radius: var(--radius-sm);
@@ -1350,10 +1349,10 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .script-manager-file-edit-btn:hover {
   color: var(--info);
-  background: rgb(var(--info-rgb) / 0.12);
+  background: rgb(var(--info-rgb) / 0.2);
 }
 .script-manager-file-run-btn {
-  background: transparent;
+  background: rgb(var(--success-text-rgb) / 0.1);
   border: none;
   color: rgb(var(--success-text-rgb) / 0.8);
   font-size: var(--fs-md);
@@ -1369,10 +1368,11 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .script-manager-file-run-btn:hover {
   color: var(--success-text-soft);
-  background: rgb(var(--success-text-rgb) / 0.12);
+  background: rgb(var(--success-text-rgb) / 0.2);
 }
 .script-manager-file-run-btn:disabled {
   color: var(--text-faint);
+  background: var(--surface-ghost);
   opacity: 0.65;
   cursor: not-allowed;
 }
@@ -1398,9 +1398,9 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   padding-left: 18px;
 }
 .script-manager-folder-btn {
-  background: transparent;
+  background: rgb(var(--info-rgb) / 0.1);
   border: none;
-  color: var(--text-subtle);
+  color: rgb(var(--info-rgb) / 0.85);
   font-size: 1rem;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
@@ -1410,12 +1410,14 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .script-manager-folder-btn:hover {
   color: var(--info);
-  background: rgb(var(--info-rgb) / 0.12);
+  background: rgb(var(--info-rgb) / 0.2);
 }
+/* Tinted at rest so the button stands off the modal surface without a border;
+   hover deepens the same tint. */
 .script-manager-create-btn {
-  background: transparent;
+  background: rgb(var(--success-text-rgb) / 0.1);
   border: none;
-  color: rgb(var(--success-text-rgb) / 0.78);
+  color: rgb(var(--success-text-rgb) / 0.9);
   font-size: 1rem;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
@@ -1425,7 +1427,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .script-manager-create-btn:hover {
   color: var(--success-text);
-  background: rgb(var(--success-text-rgb) / 0.14);
+  background: rgb(var(--success-text-rgb) / 0.2);
 }
 .script-manager-template-btn {
   background: rgba(255, 255, 255, 0.06);
@@ -2306,8 +2308,8 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   }
 
   /* --- Actions button (replaces Add/Alerts on the bottom-right when selected).
-     Matches the bottom-bar ghost-button language: transparent fill, translucent
-     white border/text, subtle hover/active states. --- */
+     A borderless white tint, deepening on hover/active, like the app's other
+     neutral buttons. --- */
   body.mobile-view.has-selection #MOBILE_ACTIONS_BTN {
     display: inline-flex !important;
     align-items: center;
@@ -2315,17 +2317,16 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
     gap: 8px;
     height: 40px;
     padding: 0 16px;
-    border: 1px solid rgba(255, 255, 255, 0.35);
+    border: none;
     border-radius: var(--radius-md);
-    background: transparent;
+    background: rgba(255, 255, 255, 0.1);
     color: var(--text-strong);
     font-size: var(--fs-xl);
     font-weight: 700;
     cursor: pointer;
     transition:
       background-color 120ms ease,
-      color 120ms ease,
-      border-color 120ms ease;
+      color 120ms ease;
   }
 
   body.mobile-view #MOBILE_ACTIONS_BTN .bi {
@@ -2334,11 +2335,11 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 
   body.mobile-view #MOBILE_ACTIONS_BTN:hover,
   body.mobile-view #MOBILE_ACTIONS_BTN:focus {
-    background-color: rgba(255, 255, 255, 0.06);
+    background-color: rgba(255, 255, 255, 0.18);
   }
 
   body.mobile-view #MOBILE_ACTIONS_BTN:active {
-    background-color: rgba(255, 255, 255, 0.12);
+    background-color: rgba(255, 255, 255, 0.24);
   }
 }
 
@@ -2699,7 +2700,6 @@ button.monitor-action-label:focus-visible {
 .live-levels-fader {
   flex: 1 1 auto;
   min-width: 0;
-  height: 1rem;
 }
 
 .live-levels-fader-value {

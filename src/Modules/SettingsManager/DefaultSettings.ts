@@ -51,6 +51,9 @@ export interface SettingGroup {
   Title: string;
   // As SettingDefinition.ShowWhen, for a whole group (and its Preferences tab).
   ShowWhen?: string[];
+  // Renders inside the named group's Preferences tab, under its own heading,
+  // rather than as a tab of its own. The parent must come first in Groups.
+  Parent?: string;
 }
 
 export const DefaultSettings: SettingDefinition[] = [
@@ -419,13 +422,13 @@ export const DefaultSettings: SettingDefinition[] = [
     Type: 'BOOLEAN',
     DefaultValue: false,
   },
-  // ShowTrak Remote permissions. Deliberately the SAME categories and the SAME
+  // ShowTrak Remote. Deliberately the SAME categories and the SAME
   // defaults as the Web UI above: both are remote surfaces reading one shared
   // capability model (Modules/RemoteAccess), and a divergence here would have to
   // be re-explained every time an operator compared the two panes. EDIT mode
   // remains the master gate for every management category regardless.
   {
-    Group: 'ShowTrak Remote Permissions',
+    Group: 'ShowTrak Remote',
     Key: 'REMOTE_ALLOW_IDENTIFY',
     Title: 'Identify Clients',
     Description: '',
@@ -433,7 +436,7 @@ export const DefaultSettings: SettingDefinition[] = [
     DefaultValue: true,
   },
   {
-    Group: 'ShowTrak Remote Permissions',
+    Group: 'ShowTrak Remote',
     Key: 'REMOTE_ALLOW_CLIENT_MANAGEMENT',
     Title: 'Client Management',
     Description: 'Edit clients and their tags. Requires Edit mode.',
@@ -441,7 +444,7 @@ export const DefaultSettings: SettingDefinition[] = [
     DefaultValue: true,
   },
   {
-    Group: 'ShowTrak Remote Permissions',
+    Group: 'ShowTrak Remote',
     Key: 'REMOTE_ALLOW_GROUP_MANAGEMENT',
     Title: 'Group Management',
     Description: 'Requires Edit mode.',
@@ -449,7 +452,7 @@ export const DefaultSettings: SettingDefinition[] = [
     DefaultValue: true,
   },
   {
-    Group: 'ShowTrak Remote Permissions',
+    Group: 'ShowTrak Remote',
     Key: 'REMOTE_ALLOW_MONITORING_MANAGEMENT',
     Title: 'Monitoring Management',
     Description: 'Manage monitors, dummy clients and FreeKiosk terminals. Requires Edit mode.',
@@ -457,7 +460,7 @@ export const DefaultSettings: SettingDefinition[] = [
     DefaultValue: true,
   },
   {
-    Group: 'ShowTrak Remote Permissions',
+    Group: 'ShowTrak Remote',
     Key: 'REMOTE_ALLOW_MONITORING_ACTIONS',
     Title: 'Run Monitoring Actions',
     Description: 'Power, input, mute and fader controls on devices. Works in Show mode.',
@@ -465,7 +468,7 @@ export const DefaultSettings: SettingDefinition[] = [
     DefaultValue: true,
   },
   {
-    Group: 'ShowTrak Remote Permissions',
+    Group: 'ShowTrak Remote',
     Key: 'REMOTE_ALLOW_ALERT_MANAGEMENT',
     Title: 'Alert Management',
     Description: 'Requires Edit mode.',
@@ -473,7 +476,7 @@ export const DefaultSettings: SettingDefinition[] = [
     DefaultValue: true,
   },
   {
-    Group: 'ShowTrak Remote Permissions',
+    Group: 'ShowTrak Remote',
     Key: 'REMOTE_ALLOW_UNASSIGNED_CLIENTS',
     Title: 'Create Unassigned Clients',
     Description: 'Requires Edit mode.',
@@ -482,7 +485,7 @@ export const DefaultSettings: SettingDefinition[] = [
     ShowWhen: ['SYSTEM_ALLOW_UNASSIGNED_CLIENTS'],
   },
   {
-    Group: 'ShowTrak Remote Permissions',
+    Group: 'ShowTrak Remote',
     Key: 'REMOTE_ALLOW_WOL',
     Title: 'Wake on LAN',
     Description: '',
@@ -491,7 +494,7 @@ export const DefaultSettings: SettingDefinition[] = [
     ShowWhen: ['SYSTEM_ALLOW_WOL'],
   },
   {
-    Group: 'ShowTrak Remote Permissions',
+    Group: 'ShowTrak Remote',
     Key: 'REMOTE_ALLOW_REMOTE_SCRIPT_EXECUTION',
     Title: 'Script Execution',
     Description: 'Run scripts and integrated events.',
@@ -518,7 +521,7 @@ export const DefaultSettings: SettingDefinition[] = [
     OnUpdateEvent: 'FogSettingsChanged',
   },
   {
-    Group: 'FOG Project',
+    Group: 'FOG Configuration',
     Key: 'FOG_PROTOCOL',
     Title: 'Protocol',
     Description: 'Self-signed certificates are accepted.',
@@ -529,7 +532,7 @@ export const DefaultSettings: SettingDefinition[] = [
     OnUpdateEvent: 'FogSettingsChanged',
   },
   {
-    Group: 'FOG Project',
+    Group: 'FOG Configuration',
     Key: 'FOG_HOST',
     Title: 'FOG Server Address',
     Description: 'Hostname or IP only, e.g. 10.0.0.10.',
@@ -539,7 +542,7 @@ export const DefaultSettings: SettingDefinition[] = [
     OnUpdateEvent: 'FogSettingsChanged',
   },
   {
-    Group: 'FOG Project',
+    Group: 'FOG Configuration',
     Key: 'FOG_PORT',
     Title: 'Port',
     Description: '0 uses the protocol default.',
@@ -551,7 +554,7 @@ export const DefaultSettings: SettingDefinition[] = [
     OnUpdateEvent: 'FogSettingsChanged',
   },
   {
-    Group: 'FOG Project',
+    Group: 'FOG Configuration',
     Key: 'FOG_API_TOKEN',
     Title: 'API Token',
     Description: 'From FOG Configuration > FOG Settings > API System. Paste it exactly as shown.',
@@ -561,7 +564,7 @@ export const DefaultSettings: SettingDefinition[] = [
     OnUpdateEvent: 'FogSettingsChanged',
   },
   {
-    Group: 'FOG Project',
+    Group: 'FOG Configuration',
     Key: 'FOG_USER_TOKEN',
     Title: 'User Token',
     Description: 'From Users > your user > API. The user needs "User API Enable" ticked.',
@@ -615,14 +618,30 @@ export const Groups: SettingGroup[] = [
   { Name: 'SDK / Integration API', Title: 'SDK / Integration API' },
   { Name: 'Alerts', Title: 'Alerts' },
   { Name: 'Web UI', Title: 'Web UI' },
-  { Name: 'Web UI Permissions', Title: 'Web UI Permissions', ShowWhen: ['WEBUI_ENABLED'] },
+  {
+    Name: 'Web UI Permissions',
+    Title: 'Web UI Permissions',
+    Parent: 'Web UI',
+    ShowWhen: ['WEBUI_ENABLED'],
+  },
   // ShowTrak Remote connects through the SDK namespace, so it is off with it.
   {
-    Name: 'ShowTrak Remote Permissions',
-    Title: 'ShowTrak Remote Permissions',
+    Name: 'ShowTrak Remote',
+    Title: 'ShowTrak Remote',
     ShowWhen: ['SDK_API_ENABLED'],
   },
   { Name: 'FOG Project', Title: 'FOG Project' },
-  { Name: 'FOG Permitted Actions', Title: 'FOG Permitted Actions', ShowWhen: ['FOG_ENABLED'] },
+  {
+    Name: 'FOG Configuration',
+    Title: 'FOG Configuration',
+    Parent: 'FOG Project',
+    ShowWhen: ['FOG_ENABLED'],
+  },
+  {
+    Name: 'FOG Permitted Actions',
+    Title: 'FOG Permitted Actions',
+    Parent: 'FOG Project',
+    ShowWhen: ['FOG_ENABLED'],
+  },
   { Name: 'System', Title: 'System Settings' },
 ];

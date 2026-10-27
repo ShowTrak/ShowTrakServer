@@ -113,6 +113,16 @@
   --border-subtle: rgb(255 255 255 / 0.08);
   --border-default: rgb(255 255 255 / 0.12);
 
+  /* --- Fields ----------------------------------------------------------------
+   * Inputs, textareas and selects are solid and borderless; each state is
+   * its own shade. Disabled sits nearest the modal surface, focus leans
+   * toward the accent purple, invalid toward red. */
+  --field-bg: rgb(38 34 62);
+  --field-bg-hover: rgb(45 41 72);
+  --field-bg-focus: rgb(52 45 88);
+  --field-bg-disabled: rgb(29 26 50);
+  --field-bg-invalid: rgb(66 30 50);
+
   /* --- Text ------------------------------------------------------------------
    * White at fixed strengths, strongest first. */
   --text-strong: rgb(255 255 255 / 0.92);
@@ -170,6 +180,30 @@
   --z-context-menu: 100000;
   --z-dragbar: 1000000;
   --z-critical: 1000001;
+}
+
+/* Text selection is opt-in. An app surface (menus, dialogs, tiles, labels)
+   should not highlight on a stray drag, so nothing is selectable except what
+   an operator would reasonably copy: what they type, code and console
+   output, addresses, and the audit trail. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']),
+textarea,
+[contenteditable]:not([contenteditable='false']),
+pre,
+code,
+.log-console-terminal,
+.osc-http-debug-terminal,
+.exec-inline-console,
+.mac-address-value,
+.SHOWTRAK_NET_ADDRESS,
+.audit-log-list {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .dragbar {
@@ -288,15 +322,12 @@ body.is-web #APPLICATION {
   line-height: 1.3;
 }
 
-/* A btn-outline-light, so the border-color below is live (outline buttons keep
-   their border; see `.btn` at the end of this file). */
 #IDENTIFY_STOP_ALL_BUTTON {
   padding: 4px 10px;
   font-size: var(--fs-sm);
   font-weight: 700;
   white-space: nowrap;
   color: rgba(222, 244, 255, 0.98) !important;
-  border-color: rgb(var(--status-pending-rgb) / 0.7) !important;
   background: linear-gradient(
     160deg,
     rgb(var(--status-pending-rgb) / 0.24),
@@ -310,7 +341,6 @@ body.is-web #APPLICATION {
     rgb(var(--status-pending-rgb) / 0.34),
     rgb(var(--status-pending-rgb) / 0.26)
   ) !important;
-  border-color: rgb(var(--status-pending-rgb) / 0.9) !important;
 }
 
 #IDENTIFY_STATUS_BANNER.stacked-above-confirm {
@@ -390,6 +420,9 @@ body.is-web #APPLICATION {
    lights green while alert actions are armed and red while they are suppressed. */
 #ALERT_ACTIONS_TOGGLE_BTN.alert-actions-toggle-btn {
   appearance: none;
+  /* The track's original border, kept here: the other segmented toggles went
+     borderless, but this one is a <button> and must not fall back to the UA's. */
+  border: 1px solid rgba(255, 255, 255, 0.09);
   height: var(--bottom-bar-toggle-height);
   align-items: stretch;
   cursor: pointer;
@@ -444,11 +477,11 @@ body.is-web #APPLICATION {
   color: var(--condition-failing) !important;
 }
 
-/* Bootstrap gives every .btn a 1px border; the app's filled buttons are
-   borderless. Outline variants keep theirs; on those the border IS the button.
-   :where() holds this at plain `.btn` specificity, so component rules later in
-   the cascade still set their own borders. */
-.btn:where(:not([class*='btn-outline-'])) {
+/* Bootstrap gives every .btn a 1px border; the app's buttons are borderless,
+   outline variants included (they render as the neutral tint below). Plain
+   `.btn` specificity, so component rules later in the cascade can still set
+   their own. */
+.btn {
   border: none;
 }
 
@@ -460,19 +493,104 @@ body.is-web #APPLICATION {
   background-color: var(--surface-ghost-hover) !important;
 }
 
-.btn-light {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  color: white !important;
+/* Bootstrap's colour variants, retinted to the app's look: text in the hue
+   over a translucent wash of it, deepening on hover. Never a solid fill.
+   .btn-success matches the "+ New" button (.script-manager-create-btn).
+   The !importants beat Bootstrap's :active / .show / :disabled fills. */
+.btn-success {
+  --st-btn-rgb: var(--success-text-rgb);
+  --st-btn-hover: var(--success-text);
+}
+.btn-info,
+.btn-primary {
+  --st-btn-rgb: var(--info-rgb);
+  --st-btn-hover: var(--info-text);
+}
+.btn-warning {
+  --st-btn-rgb: var(--warning-soft-rgb);
+  --st-btn-hover: var(--warning-text);
+}
+.btn-light,
+.btn-secondary,
+.btn-dark,
+[class*='btn-outline-'] {
+  --st-btn-rgb: 255 255 255;
+  --st-btn-hover: #fff;
 }
 
-.btn-light:hover {
-  background-color: rgba(255, 255, 255, 0.2) !important;
+.btn-success,
+.btn-info,
+.btn-primary,
+.btn-warning,
+.btn-light,
+.btn-secondary,
+.btn-dark,
+[class*='btn-outline-'] {
+  color: rgb(var(--st-btn-rgb) / 0.9) !important;
+  background-color: rgb(var(--st-btn-rgb) / 0.1) !important;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+.btn-success:hover,
+.btn-info:hover,
+.btn-primary:hover,
+.btn-warning:hover,
+.btn-light:hover,
+.btn-secondary:hover,
+.btn-dark:hover,
+[class*='btn-outline-']:hover,
+.btn-success:active,
+.btn-info:active,
+.btn-primary:active,
+.btn-warning:active,
+.btn-light:active,
+.btn-secondary:active,
+.btn-dark:active,
+[class*='btn-outline-']:active {
+  color: var(--st-btn-hover) !important;
+  background-color: rgb(var(--st-btn-rgb) / 0.2) !important;
+}
+
+.btn-success:focus,
+.btn-info:focus,
+.btn-primary:focus,
+.btn-warning:focus,
+.btn-light:focus,
+.btn-secondary:focus,
+.btn-dark:focus,
+[class*='btn-outline-']:focus,
+.btn-danger:focus,
+.btn-delete:focus {
+  box-shadow: none;
+}
+
+.btn-success:focus-visible,
+.btn-info:focus-visible,
+.btn-primary:focus-visible,
+.btn-warning:focus-visible,
+.btn-light:focus-visible,
+.btn-secondary:focus-visible,
+.btn-dark:focus-visible,
+[class*='btn-outline-']:focus-visible {
+  box-shadow: 0 0 0 2px rgb(var(--st-btn-rgb) / 0.35);
+}
+
+/* A toolbar row of content-sized buttons sits on a faint panel so it reads as
+   an action bar. Rows of full-width buttons go without. */
+.st-action-row {
+  padding: 6px;
+  border-radius: var(--radius-md);
+  background-color: var(--surface-ghost);
 }
 
 /* THE delete button, app-wide: light red text on a translucent red tint, never
    a solid fill. Works with .btn, .btn-sm and .w-100. The !importants let it win
-   if it lands beside .btn-ghost / .btn-danger / .text-danger, which it replaces. */
-.btn-delete {
+   if it lands beside .btn-ghost / .btn-danger / .text-danger, which it replaces.
+   .btn-danger takes the same look. */
+.btn-delete,
+.btn-danger {
   color: var(--danger-text) !important;
   background-color: rgb(var(--danger-rgb) / 0.14) !important;
   border: none;
@@ -484,13 +602,19 @@ body.is-web #APPLICATION {
 .btn-delete:hover,
 .btn-delete:focus-visible,
 .btn-delete:active,
-.btn-delete.active {
+.btn-delete.active,
+.btn-danger:hover,
+.btn-danger:focus-visible,
+.btn-danger:active,
+.btn-danger.active {
   color: var(--danger-text-hover) !important;
   background-color: rgb(var(--danger-rgb) / 0.26) !important;
 }
 
 .btn-delete:disabled,
-.btn-delete.disabled {
+.btn-delete.disabled,
+.btn-danger:disabled,
+.btn-danger.disabled {
   color: var(--danger-text) !important;
   background-color: rgb(var(--danger-rgb) / 0.08) !important;
 }
@@ -1169,71 +1293,320 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   }
 }
 
-/* Global slider styling (macOS-inspired simplified track + thumb) */
-:root {
-  --st-slider-track: rgba(255, 255, 255, 0.16);
-  --st-slider-track-focus: rgba(255, 255, 255, 0.24);
-  --st-slider-fill: rgba(255, 255, 255, 0.92);
-  --st-slider-thumb: #ffffff;
-  --st-slider-thumb-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.34);
-}
-
+/* Sliders, app-wide: the monitoring volume bar. A macOS-style level pill
+   whose filled part IS the control, no visible knob. The thumb is a
+   fill-coloured circle the height of the track, so the fill ends in a rounded
+   cap; its shadow paints the fill to its left, and the input clips that
+   shadow to the pill. Firefox paints the fill with ::-moz-range-progress. */
 input[type='range'],
 .form-range {
+  --st-level-height: 0.6rem;
+  /* Opaque: a translucent fill would show where the cap overlaps it. */
+  --st-level-fill: #e2e2ea;
   -webkit-appearance: none;
   appearance: none;
-  height: 1.15rem;
-  background: transparent;
+  height: var(--st-level-height);
+  padding: 0;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+input[type='range']:hover,
+input[type='range']:focus-visible,
+.form-range:hover,
+.form-range:focus-visible {
+  --st-level-fill: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
 }
 
 input[type='range']:focus,
 .form-range:focus {
   outline: none;
+  box-shadow: none;
+}
+
+input[type='range']:focus-visible,
+.form-range:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
+input[type='range']:disabled,
+.form-range:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 input[type='range']::-webkit-slider-runnable-track,
 .form-range::-webkit-slider-runnable-track {
-  height: 0.36rem;
+  height: var(--st-level-height);
   border-radius: var(--radius-pill);
-  background: linear-gradient(180deg, var(--st-slider-track-focus), var(--st-slider-track));
+  background: transparent;
 }
 
 input[type='range']::-webkit-slider-thumb,
 .form-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 0.82rem;
-  height: 0.82rem;
-  margin-top: -0.23rem;
-  border-radius: 50%;
+  width: var(--st-level-height);
+  height: var(--st-level-height);
+  margin-top: 0;
   border: none;
-  background: var(--st-slider-thumb);
-  box-shadow: var(--st-slider-thumb-shadow);
+  border-radius: 50%;
+  background: var(--st-level-fill);
+  box-shadow: calc(-100vw - var(--st-level-height) / 2) 0 0 100vw var(--st-level-fill);
 }
 
 input[type='range']::-moz-range-track,
 .form-range::-moz-range-track {
-  height: 0.36rem;
+  height: var(--st-level-height);
   border: none;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(180deg, var(--st-slider-track-focus), var(--st-slider-track));
-}
-
-input[type='range']::-moz-range-thumb,
-.form-range::-moz-range-thumb {
-  width: 0.82rem;
-  height: 0.82rem;
-  border: none;
-  border-radius: 50%;
-  background: var(--st-slider-thumb);
-  box-shadow: var(--st-slider-thumb-shadow);
+  background: transparent;
 }
 
 input[type='range']::-moz-range-progress,
 .form-range::-moz-range-progress {
-  height: 0.36rem;
+  height: var(--st-level-height);
   border-radius: var(--radius-pill);
-  background: var(--st-slider-fill);
+  background: var(--st-level-fill);
+}
+
+input[type='range']::-moz-range-thumb,
+.form-range::-moz-range-thumb {
+  width: var(--st-level-height);
+  height: var(--st-level-height);
+  border: none;
+  border-radius: 50%;
+  background: var(--st-level-fill);
+  box-shadow: none;
+}
+
+/* Toggles, checkboxes and radios, matching ShowTrak Portal: flat, borderless
+   squares on the ghost fill, purple once on. Bare .form-check-input boxes in
+   tables and the picker menus' plain checkboxes get the same look. */
+:root {
+  --st-check-fill: rgba(255, 255, 255, 0.04);
+  --st-check-on-fill: rgba(147, 51, 234, 0.35);
+  --st-check-on: #a855f7;
+  --st-check-off: #6b7280;
+  --st-check-focus: 0 0 0 2px rgba(147, 51, 234, 0.18);
+}
+
+.form-check-input[type='checkbox'],
+.form-check-input[type='radio'],
+.alert-multiselect-option input[type='checkbox'] {
+  width: 1.125rem;
+  height: 1.125rem;
+  background-color: var(--st-check-fill);
+  background-image: none;
+  background-size: 0.75rem;
+  background-repeat: no-repeat;
+  background-position: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  -webkit-appearance: none;
+  appearance: none;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.form-check-input[type='radio'] {
+  border-radius: 50%;
+}
+.form-check-input[type='checkbox']:focus,
+.form-check-input[type='radio']:focus,
+.alert-multiselect-option input[type='checkbox']:focus {
+  border-color: transparent;
+  box-shadow: var(--st-check-focus);
+  outline: none;
+}
+.form-check-input[type='checkbox']:checked,
+.alert-multiselect-option input[type='checkbox']:checked {
+  background-color: var(--st-check-on-fill);
+  border-color: transparent;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23a855f7' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
+}
+.form-check-input[type='checkbox']:indeterminate,
+.alert-multiselect-option input[type='checkbox']:indeterminate {
+  background-color: var(--st-check-on-fill);
+  border-color: transparent;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23a855f7' stroke-linecap='round' stroke-width='3' d='M6 10h8'/%3e%3c/svg%3e");
+}
+.form-check-input[type='radio']:checked {
+  background-color: var(--st-check-on-fill);
+  border-color: transparent;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='%23a855f7'/%3e%3c/svg%3e");
+  background-size: 0.625rem;
+}
+.form-check-input:disabled,
+.alert-multiselect-option input[type='checkbox']:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.form-check-label {
+  cursor: pointer;
+}
+
+/* Toggle: a rounded-square track as tall as a .form-control-sm, with a square
+   knob drawn by ::before. Overrides Bootstrap's pill switch. */
+.form-switch {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 0;
+  margin: 0;
+  min-height: 0;
+  vertical-align: middle;
+}
+.form-switch .form-text {
+  flex-basis: 100%;
+  margin-top: 0.25rem;
+}
+.form-switch .form-check-input {
+  /* height = knob + 2 x gap + 2 x border: 1.225 + 0.5 + 0.125 = 1.85rem */
+  --st-toggle-h: 1.85rem;
+  --st-toggle-w: 3.25rem;
+  --st-toggle-knob: 1.225rem;
+  --st-toggle-gap: 0.25rem;
+
+  position: relative;
+  float: none;
+  width: var(--st-toggle-w);
+  height: var(--st-toggle-h);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: var(--radius-sm);
+  background-image: none;
+  transition: background-color 0.15s ease;
+}
+.form-switch .form-check-input::before {
+  content: '';
+  position: absolute;
+  top: var(--st-toggle-gap);
+  left: var(--st-toggle-gap);
+  width: var(--st-toggle-knob);
+  height: var(--st-toggle-knob);
+  border-radius: var(--radius-xs);
+  background: var(--st-check-off);
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+.form-switch .form-check-input:checked,
+.form-switch .form-check-input:focus {
+  background-image: none;
+}
+.form-switch .form-check-input:checked::before {
+  transform: translateX(
+    calc(var(--st-toggle-w) - var(--st-toggle-knob) - var(--st-toggle-gap) * 2 - 2px)
+  );
+  background: var(--st-check-on);
+}
+/* Long labels shrink beside the toggle rather than wrapping under it. */
+.form-switch .form-check-label {
+  flex: 1 1 0;
+  min-width: 0;
+  margin-left: 0.5rem;
+}
+
+/* Number inputs: the native spin buttons are hidden everywhere; a plain
+   chevron pair (number-steppers.ts) sits on the right edge instead. */
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.st-number {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.st-number > .st-number-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.st-number-input {
+  padding-right: 1.5rem !important;
+}
+.st-number-steps {
+  position: absolute;
+  top: 0;
+  right: 0.3rem;
+  bottom: 0;
+  z-index: var(--z-float);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.st-number-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 0.75rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--text-subtle);
+  cursor: pointer;
+  user-select: none;
+  transition: color 120ms ease;
+}
+.st-number-step:hover {
+  color: var(--text-strong);
+}
+.st-number-input:disabled + .st-number-steps,
+.st-number-input[readonly] + .st-number-steps {
+  display: none;
+}
+.st-number-input:disabled,
+.st-number-input[readonly] {
+  padding-right: 0.75rem !important;
+}
+
+/* Preferences: a short value (a number, a 4-digit PIN, a select of short
+   options) sits right of its label, right-aligned, and drops beneath it when
+   the two no longer fit on one line. */
+.setting-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+.setting-inline-label {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+.setting-inline-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+.setting-inline-control .st-number,
+.setting-inline-control > .form-control {
+  width: 8.5rem;
+}
+.setting-inline-control .form-control {
+  text-align: right;
+}
+.setting-inline-control .form-select {
+  width: auto;
+  min-width: 8.5rem;
+}
+.setting-inline > .invalid-feedback {
+  flex-basis: 100%;
+  margin-top: 0;
+  text-align: right;
 }
 
 .alert-multiselect {
@@ -1344,18 +1717,47 @@ input[type='range']::-moz-range-progress,
   gap: 2px;
 }
 
+/* Tree lines are drawn from the row geometry: a row's checkbox is inset by the
+   option's 6px padding and is vertically centred, so the parent's checkbox
+   centre sits at margin-left below, and every row is the same height as its
+   parent's. Each child draws its own curve (from the bottom of the parent's
+   checkbox, or the previous sibling, into its own checkbox); a child with
+   siblings after it also carries the rail on down past its own subtree, so
+   the last child ends in the curve alone. */
 .alert-scope-children {
+  --scope-check-size: 1.125rem;
+  --scope-row-pad: 6px;
+  --scope-row-gap: 2px;
+  --scope-indent: 0.9rem;
   position: relative;
-  margin-left: 1.15rem;
-  padding-left: 0.9rem;
+  margin-left: calc(var(--scope-row-pad) + var(--scope-check-size) / 2 - 0.5px);
+  padding-left: var(--scope-indent);
 }
 
-.alert-scope-children::before {
+.alert-scope-children > .alert-scope-branch {
+  position: relative;
+}
+
+.alert-scope-children > .alert-scope-node::before,
+.alert-scope-children > .alert-scope-branch > .alert-scope-node:first-child::before {
   content: '';
   position: absolute;
-  left: 0.2rem;
+  left: calc(-1 * var(--scope-indent));
+  top: calc(-1 * var(--scope-row-gap) - (100% - var(--scope-check-size)) / 2);
+  bottom: 50%;
+  width: calc(var(--scope-indent) + var(--scope-row-pad) - 3px);
+  height: auto;
+  border-left: 1px solid var(--alert-scope-tree-line-color);
+  border-bottom: 1px solid var(--alert-scope-tree-line-color);
+  border-bottom-left-radius: 8px;
+}
+
+.alert-scope-children > :not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--scope-indent));
   top: 0;
-  bottom: 0.85rem;
+  bottom: calc(-1 * var(--scope-row-gap));
   border-left: 1px solid var(--alert-scope-tree-line-color);
 }
 
@@ -1383,10 +1785,6 @@ input[type='range']::-moz-range-progress,
   border-bottom: 1px solid var(--alert-scope-tree-line-color);
   border-left: 1px solid var(--alert-scope-tree-line-color);
   border-bottom-left-radius: 10px;
-}
-
-.alert-scope-branch:last-child > .alert-scope-children::before {
-  bottom: 1.5rem;
 }
 
 .alert-scope-prefix {
@@ -1500,7 +1898,6 @@ input[type='range']::-moz-range-progress,
   padding: 0.15rem;
   border-radius: var(--radius-md);
   background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.09);
 }
 
 .st-segmented-toggle-btn {
@@ -1706,18 +2103,10 @@ input[type='range']::-moz-range-progress,
   display: none !important;
 }
 
-/* Read-only fields are disabled; outlining the rest shows at a glance which
-   fields Edit mode lets you change. */
-#SHOWTRAK_CLIENT_INFO.is-editing .form-control:not(:disabled),
-#SHOWTRAK_CLIENT_INFO.is-editing .form-select:not(:disabled) {
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.2) !important;
-}
-
 .client-info-actions-hint {
   padding: 8px 12px;
   border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-subtle);
   color: var(--text-subtle);
   font-size: var(--fs-sm);
 }
@@ -1736,13 +2125,11 @@ input[type='range']::-moz-range-progress,
   padding: 8px 12px;
   border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-subtle);
+  border: none;
   color: var(--text-soft);
   font-size: var(--fs-md);
   text-align: left;
-  transition:
-    background-color 140ms ease,
-    border-color 140ms ease;
+  transition: background-color 140ms ease;
 }
 .client-info-action i {
   flex: 0 0 auto;
@@ -1756,7 +2143,6 @@ input[type='range']::-moz-range-progress,
 }
 .client-info-action:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.1);
-  border-color: var(--border-default);
 }
 .client-info-action:disabled {
   opacity: 0.5;
@@ -1777,7 +2163,6 @@ input[type='range']::-moz-range-progress,
   padding: 8px 10px;
   border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-subtle);
 }
 .monitor-settings-check-body {
   flex: 1 1 auto;
@@ -1789,14 +2174,11 @@ input[type='range']::-moz-range-progress,
 }
 .monitor-settings-check.is-editable {
   cursor: pointer;
-  transition:
-    background-color 140ms ease,
-    border-color 140ms ease;
+  transition: background-color 140ms ease;
 }
 .monitor-settings-check.is-editable:hover,
 .monitor-settings-check.is-editable:focus-visible {
   background: rgba(255, 255, 255, 0.1);
-  border-color: var(--border-default);
   outline: none;
 }
 .monitor-settings-check-grip {
@@ -1886,8 +2268,10 @@ input[type='range']::-moz-range-progress,
   gap: 6px;
   max-width: 100%;
   padding: 5px 10px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border-default);
+  /* The tile badge's --radius-xs, scaled up with the chip: same proportion
+     of corner to height, so the two read as one tag. */
+  border-radius: var(--radius-sm);
+  border: none;
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-muted);
   font-size: var(--fs-xs);
@@ -1898,7 +2282,6 @@ input[type='range']::-moz-range-progress,
   cursor: pointer;
   transition:
     background-color 140ms ease,
-    border-color 140ms ease,
     color 140ms ease;
 }
 .tag-picker-chip i {
@@ -1911,16 +2294,18 @@ input[type='range']::-moz-range-progress,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* An applied tag is filled with its own colour so "on" is legible at a glance
- * without relying on the border alone. */
+/* No borders: an applied tag is filled with its own colour, and hover tints
+ * toward it, so state reads from the fill alone. */
 .tag-picker-chip.is-on {
-  border-color: var(--tag-colour);
-  background: color-mix(in srgb, var(--tag-colour) 22%, transparent);
+  background: color-mix(in srgb, var(--tag-colour) 26%, transparent);
   color: var(--text-strong);
 }
 .tag-picker-chip:hover:not(:disabled) {
-  border-color: var(--tag-colour);
+  background: color-mix(in srgb, var(--tag-colour) 14%, rgba(255, 255, 255, 0.05));
   color: var(--text-strong);
+}
+.tag-picker-chip.is-on:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tag-colour) 34%, transparent);
 }
 /* Inherited from a group or from "all clients": on, but not this client's to
  * turn off. Not greyed out (it IS applied), just not interactive. */
@@ -1931,7 +2316,7 @@ input[type='range']::-moz-range-progress,
 }
 .tag-picker-chip-via {
   padding: 0 5px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-xs);
   background: rgba(0, 0, 0, 0.3);
   color: var(--text-muted);
   font-size: var(--fs-3xs);
@@ -1953,7 +2338,6 @@ input[type='range']::-moz-range-progress,
   padding: 7px 8px 7px 10px;
   border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-subtle);
 }
 .mac-address-item .mac-address-value {
   font-family: var(--bs-font-monospace, monospace);
@@ -2635,9 +3019,8 @@ body.compact-mode .group-column-grid {
 }
 
 .UPDATE_MANAGER_CLIENT_ITEM {
-  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 0.45rem 0.55rem;
+  padding: 0.35rem 0.55rem;
   background: rgba(255, 255, 255, 0.04);
 }
 
@@ -2694,7 +3077,6 @@ body.compact-mode .group-column-grid {
 }
 
 .UPDATE_MANAGER_CLIENT_HINT {
-  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-pill);
   padding: 1px 6px;
   font-size: var(--fs-3xs);
@@ -2707,25 +3089,21 @@ body.compact-mode .group-column-grid {
 
 .UPDATE_MANAGER_CLIENT_HINT.SUCCESS {
   color: #d7ffe8;
-  border-color: rgb(var(--success-text-rgb) / 0.55);
   background: rgb(var(--success-text-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.WARNING {
   color: #ffe6b8;
-  border-color: rgb(var(--warning-soft-rgb) / 0.6);
   background: rgb(var(--warning-soft-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.INFO {
   color: #d9f1ff;
-  border-color: rgb(var(--info-rgb) / 0.58);
   background: rgb(var(--info-rgb) / 0.2);
 }
 
 .UPDATE_MANAGER_CLIENT_HINT.MUTED {
   color: var(--text-secondary);
-  border-color: rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -2747,7 +3125,6 @@ body.compact-mode .group-column-grid {
 .UPDATE_MANAGER_CLIENT_STATUS_TEXT {
   color: var(--text-secondary);
   font-size: var(--fs-xs);
-  min-height: 14px;
   margin-top: 0.18rem;
 }
 
@@ -2863,20 +3240,47 @@ body.mode-edit #APPLICATION_CONTAINER {
   background: var(--app-bg-gradient) !important;
 }
 
+/* Fields: solid, borderless, a shade per state (tokens in 01-base.css). The
+   !importants outrank the bg-* / border-0 utilities fields still carry. */
 .form-control,
 .form-select {
-  background-color: var(--surface-ghost) !important;
+  background-color: var(--field-bg) !important;
   color: white !important;
   border: none !important;
   border-radius: var(--radius-md) !important;
+  box-shadow: none !important;
+  transition: background-color 150ms ease;
+}
+
+.form-control:hover,
+.form-select:hover {
+  background-color: var(--field-bg-hover) !important;
 }
 
 .form-control:focus,
 .form-select:focus {
   color: white !important;
-  background-color: var(--surface-ghost-active) !important;
+  background-color: var(--field-bg-focus) !important;
   outline: 0 !important;
   box-shadow: none !important;
+}
+
+.form-control.is-invalid,
+.form-select.is-invalid {
+  background-color: var(--field-bg-invalid) !important;
+}
+
+.form-control:disabled,
+.form-control.disabled,
+.form-control[readonly],
+.form-select:disabled {
+  background-color: var(--field-bg-disabled) !important;
+  color: var(--text-soft) !important;
+  opacity: 1;
+}
+
+.form-control::placeholder {
+  color: var(--text-faint);
 }
 
 /* 3D keyboard key styling for <kbd> elements */
@@ -3126,66 +3530,9 @@ button.btn:focus {
   margin-top: 0.35rem;
 }
 
-/* A macOS-style level bar: a pill whose filled part IS the control, no knob.
-   The thumb is a fill-coloured circle the height of the track, so the fill
-   ends in a rounded cap; its shadow paints the fill to its left, and the
-   input clips that shadow to the pill. Qualified by type to outrank the
-   app-wide range styling in 02-controls.css. */
+/* The level bar itself is the app-wide slider (02-controls.css). */
 input[type='range'].SHOWTRAK_AUDIO_LEVEL {
-  --st-level-height: 0.6rem;
-  /* Opaque: a translucent fill would show where the cap overlaps it. */
-  --st-level-fill: #e2e2ea;
   flex: 1 1 auto;
-  height: var(--st-level-height);
-  border-radius: var(--radius-pill);
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.12);
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL:hover,
-input[type='range'].SHOWTRAK_AUDIO_LEVEL:focus-visible {
-  --st-level-fill: #ffffff;
-  background: rgba(255, 255, 255, 0.18);
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL:focus-visible {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL::-webkit-slider-runnable-track {
-  height: var(--st-level-height);
-  border-radius: var(--radius-pill);
-  background: transparent;
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL::-webkit-slider-thumb {
-  width: var(--st-level-height);
-  height: var(--st-level-height);
-  margin-top: 0;
-  border-radius: 50%;
-  background: var(--st-level-fill);
-  box-shadow: calc(-100vw - var(--st-level-height) / 2) 0 0 100vw var(--st-level-fill);
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-track {
-  height: var(--st-level-height);
-  background: transparent;
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-progress {
-  height: var(--st-level-height);
-  border-radius: var(--radius-pill);
-  background: var(--st-level-fill);
-}
-
-input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
-  width: var(--st-level-height);
-  height: var(--st-level-height);
-  border-radius: 50%;
-  background: var(--st-level-fill);
-  box-shadow: none;
 }
 
 .SHOWTRAK_AUDIO_LEVEL_VALUE {
@@ -3359,15 +3706,31 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL::-moz-range-thumb {
   padding: 0.1rem 0.4rem;
   border: 0;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--field-bg);
   color: #ffffff;
   font-weight: 700;
+  transition: background-color 150ms ease;
+}
+
+/* Room for the stepper chevrons (number-steppers.ts) beside a 3-digit value. */
+.SHOWTRAK_AUDIO_COND_BOUND input.st-number-input {
+  width: 4.75rem;
+}
+
+.SHOWTRAK_AUDIO_COND_BOUND input:hover,
+.SHOWTRAK_NET_COND_ADDRESS input:hover {
+  background: var(--field-bg-hover);
 }
 
 .SHOWTRAK_AUDIO_COND_BOUND input:focus,
 .SHOWTRAK_NET_COND_ADDRESS input:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--field-bg-focus);
+}
+
+.SHOWTRAK_AUDIO_COND_BOUND input:disabled,
+.SHOWTRAK_NET_COND_ADDRESS input:disabled {
+  background: var(--field-bg-disabled);
 }
 
 .SHOWTRAK_AUDIO_COND_BOUND input::placeholder,
@@ -5254,7 +5617,7 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   justify-content: center;
   gap: 0.35rem;
   padding: 0.25rem 0.6rem;
-  border: 1px solid var(--border-default);
+  border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-sm);
   color: var(--text-strong);
@@ -5275,7 +5638,6 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 
 .monitor-group-action-btn.is-destructive {
   color: var(--status-graph-degraded);
-  border-color: rgb(var(--status-graph-degraded-rgb) / 0.32);
   background: rgb(var(--status-graph-degraded-rgb) / 0.14);
 }
 
@@ -5954,9 +6316,9 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   opacity: 0.75;
 }
 .script-manager-file-edit-btn {
-  background: transparent;
+  background: rgb(var(--info-rgb) / 0.1);
   border: none;
-  color: var(--text-muted);
+  color: rgb(var(--info-rgb) / 0.85);
   font-size: var(--fs-md);
   padding: 2px 6px;
   border-radius: var(--radius-sm);
@@ -5969,10 +6331,10 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .script-manager-file-edit-btn:hover {
   color: var(--info);
-  background: rgb(var(--info-rgb) / 0.12);
+  background: rgb(var(--info-rgb) / 0.2);
 }
 .script-manager-file-run-btn {
-  background: transparent;
+  background: rgb(var(--success-text-rgb) / 0.1);
   border: none;
   color: rgb(var(--success-text-rgb) / 0.8);
   font-size: var(--fs-md);
@@ -5988,10 +6350,11 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .script-manager-file-run-btn:hover {
   color: var(--success-text-soft);
-  background: rgb(var(--success-text-rgb) / 0.12);
+  background: rgb(var(--success-text-rgb) / 0.2);
 }
 .script-manager-file-run-btn:disabled {
   color: var(--text-faint);
+  background: var(--surface-ghost);
   opacity: 0.65;
   cursor: not-allowed;
 }
@@ -6017,9 +6380,9 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   padding-left: 18px;
 }
 .script-manager-folder-btn {
-  background: transparent;
+  background: rgb(var(--info-rgb) / 0.1);
   border: none;
-  color: var(--text-subtle);
+  color: rgb(var(--info-rgb) / 0.85);
   font-size: 1rem;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
@@ -6029,12 +6392,14 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .script-manager-folder-btn:hover {
   color: var(--info);
-  background: rgb(var(--info-rgb) / 0.12);
+  background: rgb(var(--info-rgb) / 0.2);
 }
+/* Tinted at rest so the button stands off the modal surface without a border;
+   hover deepens the same tint. */
 .script-manager-create-btn {
-  background: transparent;
+  background: rgb(var(--success-text-rgb) / 0.1);
   border: none;
-  color: rgb(var(--success-text-rgb) / 0.78);
+  color: rgb(var(--success-text-rgb) / 0.9);
   font-size: 1rem;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
@@ -6044,7 +6409,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 }
 .script-manager-create-btn:hover {
   color: var(--success-text);
-  background: rgb(var(--success-text-rgb) / 0.14);
+  background: rgb(var(--success-text-rgb) / 0.2);
 }
 .script-manager-template-btn {
   background: rgba(255, 255, 255, 0.06);
@@ -6925,8 +7290,8 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   }
 
   /* --- Actions button (replaces Add/Alerts on the bottom-right when selected).
-     Matches the bottom-bar ghost-button language: transparent fill, translucent
-     white border/text, subtle hover/active states. --- */
+     A borderless white tint, deepening on hover/active, like the app's other
+     neutral buttons. --- */
   body.mobile-view.has-selection #MOBILE_ACTIONS_BTN {
     display: inline-flex !important;
     align-items: center;
@@ -6934,17 +7299,16 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
     gap: 8px;
     height: 40px;
     padding: 0 16px;
-    border: 1px solid rgba(255, 255, 255, 0.35);
+    border: none;
     border-radius: var(--radius-md);
-    background: transparent;
+    background: rgba(255, 255, 255, 0.1);
     color: var(--text-strong);
     font-size: var(--fs-xl);
     font-weight: 700;
     cursor: pointer;
     transition:
       background-color 120ms ease,
-      color 120ms ease,
-      border-color 120ms ease;
+      color 120ms ease;
   }
 
   body.mobile-view #MOBILE_ACTIONS_BTN .bi {
@@ -6953,11 +7317,11 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 
   body.mobile-view #MOBILE_ACTIONS_BTN:hover,
   body.mobile-view #MOBILE_ACTIONS_BTN:focus {
-    background-color: rgba(255, 255, 255, 0.06);
+    background-color: rgba(255, 255, 255, 0.18);
   }
 
   body.mobile-view #MOBILE_ACTIONS_BTN:active {
-    background-color: rgba(255, 255, 255, 0.12);
+    background-color: rgba(255, 255, 255, 0.24);
   }
 }
 
@@ -7318,7 +7682,6 @@ button.monitor-action-label:focus-visible {
 .live-levels-fader {
   flex: 1 1 auto;
   min-width: 0;
-  height: 1rem;
 }
 
 .live-levels-fader-value {
@@ -7762,15 +8125,21 @@ body:not(.compact-mode):not(.list-mode)
   padding: 0.1rem 0.4rem;
   border: 0;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.06);
+  background-color: var(--field-bg);
   color: #ffffff;
   font-weight: 700;
+  transition: background-color 150ms ease;
+}
+
+.fk-cond-rule select:hover,
+.fk-cond-rule input[type='text']:hover {
+  background-color: var(--field-bg-hover);
 }
 
 .fk-cond-rule select:focus,
 .fk-cond-rule input[type='text']:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.12);
+  background-color: var(--field-bg-focus);
 }
 
 .fk-cond-rule option {
@@ -7922,7 +8291,7 @@ body:not(.compact-mode):not(.list-mode)
   justify-content: center;
   gap: 0.35rem;
   padding: 0.25rem 0.6rem;
-  border: 1px solid var(--border-default);
+  border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-sm);
   color: var(--text-strong);
@@ -7945,7 +8314,6 @@ body:not(.compact-mode):not(.list-mode)
    tint and the text always agree rather than the text alone carrying it. */
 .freekiosk-command-btn.is-destructive {
   color: var(--status-graph-degraded);
-  border-color: rgb(var(--status-graph-degraded-rgb) / 0.32);
   background: rgb(var(--status-graph-degraded-rgb) / 0.14);
 }
 

@@ -111,7 +111,8 @@ function matchesSearch(Label: string, Needle: string): boolean {
 function renderEntityRow(
   Entity: AlertScopeEntity,
   SelectedValues: Set<string>,
-  TagCoverage: Map<string, string[]>
+  TagCoverage: Map<string, string[]>,
+  Label: string = Entity.Label
 ): string {
   const Checked = SelectedValues.has(Entity.Value);
   const ViaTags = TagCoverage.get(Entity.Value) || [];
@@ -125,16 +126,54 @@ function renderEntityRow(
     <label class="alert-multiselect-option alert-scope-node alert-scope-node-client${Implied ? ' scope-picker-implied' : ''}">
       <input type="checkbox" data-kind="client" value="${Safe(Entity.Value)}" ${Checked ? 'checked' : ''} ${Implied ? 'disabled' : ''} />
       <span class="alert-scope-prefix" aria-hidden="true"></span>
-      <span class="alert-scope-label-wrap"><i class="bi ${Safe(Entity.IconClass || '')} alert-scope-entity-icon" aria-hidden="true"></i><span>${Safe(Entity.Label)}</span>${ViaChip}</span>
+      <span class="alert-scope-label-wrap"><i class="bi ${Safe(Entity.IconClass || '')} alert-scope-entity-icon" aria-hidden="true"></i><span>${Safe(Label)}</span>${ViaChip}</span>
     </label>
   `;
 }
 
-function renderGroupBranch(
-  Group: AlertScopeGroupNode,
-  Children: AlertScopeEntity[],
+// A run of entities, with each monitor's checks nested a level beneath it as a
+// branch of their own. A check is ticked on its own: per-check alerts only
+// fire for a rule that names the check, so its monitor's tick does not imply
+// it. A check whose monitor is not in this run (or not in the model at all)
+// stays a flat row under its full "Monitor · Check" label. Search keeps a
+// monitor whose own label or any of whose checks match, and all of its checks
+// when the monitor itself matches.
+function renderEntityList(
+  Entities: AlertScopeEntity[],
   SelectedValues: Set<string>,
   TagCoverage: Map<string, string[]>,
+  Needle: string
+): string {
+  const Present = new Set(Entities.map((Entity) => Entity.Value));
+  const ChecksByParent = new Map<string, AlertScopeEntity[]>();
+  for (const Entity of Entities) {
+    if (!Entity.ParentValue || !Present.has(Entity.ParentValue)) continue;
+    const Existing = ChecksByParent.get(Entity.ParentValue);
+    if (Existing) Existing.push(Entity);
+    else ChecksByParent.set(Entity.ParentValue, [Entity]);
+  }
+  return Entities.filter((Entity) => !(Entity.ParentValue && Present.has(Entity.ParentValue)))
+    .map((Entity) => {
+      const Checks = ChecksByParent.get(Entity.Value) || [];
+      const SelfMatches = matchesSearch(Entity.Label, Needle);
+      const ShownChecks = SelfMatches
+        ? Checks
+        : Checks.filter((Check) => matchesSearch(Check.Label, Needle));
+      if (!SelfMatches && !ShownChecks.length) return '';
+      const Row = renderEntityRow(Entity, SelectedValues, TagCoverage);
+      if (!ShownChecks.length) return Row;
+      const ChecksHtml = ShownChecks.map((Check) =>
+        renderEntityRow(Check, SelectedValues, TagCoverage, Check.NestedLabel || Check.Label)
+      ).join('');
+      return `<div class="alert-scope-branch">${Row}<div class="alert-scope-children">${ChecksHtml}</div></div>`;
+    })
+    .join('');
+}
+
+function renderGroupBranch(
+  Group: AlertScopeGroupNode,
+  ChildrenHtml: string,
+  SelectedValues: Set<string>,
   Scope: { Groups?: unknown[] }
 ): string {
   const ExplicitlySelected = (Scope.Groups || []).some(
@@ -145,9 +184,6 @@ function renderGroupBranch(
     ExplicitlySelected ||
     (Group.ChildValues.length > 0 && SelectedCount === Group.ChildValues.length);
   const Indeterminate = !FullySelected && SelectedCount > 0;
-  const ChildrenHtml = Children.map((Entity) =>
-    renderEntityRow(Entity, SelectedValues, TagCoverage)
-  ).join('');
 
   return `
     <div class="alert-scope-branch">
@@ -229,18 +265,23 @@ export function RenderScopePickerList(): void {
       // A group whose own name matches keeps all its members, so searching for
       // "FOH" offers the whole group rather than an empty header.
       const GroupMatches = matchesSearch(Group.Label, Needle);
-      const Children = GroupMatches
-        ? Group.Children
-        : Group.Children.filter((Entity) => matchesSearch(Entity.Label, Needle));
-      if (!GroupMatches && !Children.length) return '';
-      return renderGroupBranch(Group, Children, SelectedValues, TagCoverage, Scope);
+      const ChildrenHtml = renderEntityList(
+        Group.Children,
+        SelectedValues,
+        TagCoverage,
+        GroupMatches ? '' : Needle
+      );
+      if (!GroupMatches && !ChildrenHtml) return '';
+      return renderGroupBranch(Group, ChildrenHtml, SelectedValues, Scope);
     })
     .join('');
 
-  const UngroupedHtml = (Model.Ungrouped || [])
-    .filter((Entity) => matchesSearch(Entity.Label, Needle))
-    .map((Entity) => renderEntityRow(Entity, SelectedValues, TagCoverage))
-    .join('');
+  const UngroupedHtml = renderEntityList(
+    Model.Ungrouped || [],
+    SelectedValues,
+    TagCoverage,
+    Needle
+  );
 
   const ClientsBody =
     GroupsHtml || UngroupedHtml

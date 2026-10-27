@@ -214,15 +214,21 @@
   padding: 0.1rem 0.4rem;
   border: 0;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.06);
+  background-color: var(--field-bg);
   color: #ffffff;
   font-weight: 700;
+  transition: background-color 150ms ease;
+}
+
+.fk-cond-rule select:hover,
+.fk-cond-rule input[type='text']:hover {
+  background-color: var(--field-bg-hover);
 }
 
 .fk-cond-rule select:focus,
 .fk-cond-rule input[type='text']:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.12);
+  background-color: var(--field-bg-focus);
 }
 
 .fk-cond-rule option {
@@ -374,7 +380,7 @@
   justify-content: center;
   gap: 0.35rem;
   padding: 0.25rem 0.6rem;
-  border: 1px solid var(--border-default);
+  border: none;
   border-radius: var(--radius-sm);
   font-size: var(--fs-sm);
   color: var(--text-strong);
@@ -397,7 +403,6 @@
    tint and the text always agree rather than the text alone carrying it. */
 .freekiosk-command-btn.is-destructive {
   color: var(--status-graph-degraded);
-  border-color: rgb(var(--status-graph-degraded-rgb) / 0.32);
   background: rgb(var(--status-graph-degraded-rgb) / 0.14);
 }
 

@@ -38,6 +38,7 @@ import { InitOfflineIndicators } from './offline-indicators';
 import { InitLogConsole } from './log-console';
 import { InitRainbowMode } from './rainbow-mode';
 import { InitAuditLog } from './audit-log';
+import { InitNumberSteppers } from './number-steppers';
 import { Init, WireGlobalUI } from './init';
 import { LoadFreeKioskCatalogues } from './freekiosk';
 import { EnsureMonitoringMethodsLoaded } from './monitoring-editor/method-fields';
@@ -47,6 +48,9 @@ import { WireMonitoringActions } from './monitoring-actions';
 import { RenderMonitoringHistoryModal } from './monitoring';
 
 InitMode();
+// Ahead of every module that renders fields, so static number inputs are fitted
+// before first paint; later ones are picked up by its observer.
+InitNumberSteppers();
 InitSettings();
 InitKeyboard();
 // Ahead of InitClientList: tile tag rows are fitted from a width model, and the

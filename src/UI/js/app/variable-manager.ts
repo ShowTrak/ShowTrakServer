@@ -275,7 +275,7 @@ export function RenderScriptEditorVariableList() {
         ? `Default: ${Variable.DefaultValue}`
         : 'No default value';
     Row.innerHTML = `
-      <button type="button" class="btn btn-sm btn-outline-light flex-shrink-0 st-variable-copy" data-copy="${Safe(Usage)}" title="Copy ${Safe(Usage)}">
+      <button type="button" class="btn btn-sm btn-light flex-shrink-0 st-variable-copy" data-copy="${Safe(Usage)}" title="Copy ${Safe(Usage)}">
         <code>${Safe(Usage)}</code>
       </button>
       <span class="text-sm text-muted text-truncate">${Safe(Detail)}</span>

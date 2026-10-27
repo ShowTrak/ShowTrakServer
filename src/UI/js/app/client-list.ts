@@ -44,6 +44,7 @@ import { RenderMonitoringTargetTile } from './monitoring';
 import { initializeEditInteractions } from './dnd';
 import { AddAlert, DismissAlert, PendingAdoptionAlerts } from './alerts-tray';
 import { CloseAllModals, UpdateManagerHandleExecutions } from './modals';
+import { UPDATE_EXECUTION_SCRIPT_NAME } from './update-manager';
 import {
   ConfirmationDialog,
   HideExecutionToast,
@@ -145,12 +146,18 @@ function ExecutionPanelDwellMs(): number {
 // Registers the script-execution / script-list / full-client-list push
 // handlers. Bodies unchanged from the former import-time subscriptions.
 function InitClientListPush() {
-  window.API.UpdateScriptExecutions(async (Executions) => {
+  window.API.UpdateScriptExecutions(async (AllExecutions) => {
     try {
-      UpdateManagerHandleExecutions(Executions || []);
+      UpdateManagerHandleExecutions(AllExecutions || []);
     } catch (e) {
       HandleNonFatalError('UpdateManagerHandleExecutions', e);
     }
+    // Client updates report their progress in the Update Manager, so they never
+    // open, fill or hold open the executions panel.
+    const Executions = (AllExecutions || []).filter(
+      (Request) =>
+        !(Request && Request.Script && Request.Script.Name === UPDATE_EXECUTION_SCRIPT_NAME)
+    );
 
     // Close any open popovers before re-render to prevent duplicates
     try {

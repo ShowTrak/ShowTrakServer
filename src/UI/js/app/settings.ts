@@ -194,7 +194,7 @@ function ComputeSettingsStructure(
   GroupsList: SettingGroupView[]
 ): string {
   return JSON.stringify([
-    GroupsList.map((g) => [g?.Name, g?.Title, g?.ShowWhen]),
+    GroupsList.map((g) => [g?.Name, g?.Title, g?.ShowWhen, g?.Parent]),
     SettingsList.map((s) => [
       s?.ShowWhen,
       s?.Group,
@@ -209,6 +209,10 @@ function ComputeSettingsStructure(
     ]),
   ]);
 }
+
+// An OPTION setting whose every choice is at most this long renders its
+// dropdown beside the label rather than under it.
+const SHORT_OPTION_LENGTH = 20;
 
 // Structure signature of the controls currently in #SETTINGS, and the setting
 // objects their change handlers closed over (keyed by Key). The handlers compare
@@ -260,6 +264,10 @@ function ApplySettingDependencies(): boolean {
   $('#SETTINGS [data-setting-key]').each(function () {
     const Setting = RenderedSettings.get(this.getAttribute('data-setting-key') || '');
     $(this).toggleClass('d-none', !DependenciesMet(Setting?.ShowWhen));
+  });
+  $('#SETTINGS .settings-subsection').each(function () {
+    const Group = SettingsGroups.find((g) => g.Name === this.getAttribute('data-group-key'));
+    $(this).toggleClass('d-none', !DependenciesMet(Group?.ShowWhen));
   });
   let GroupsChanged = false;
   for (const Group of SettingsGroups) {
@@ -335,17 +343,29 @@ function RenderSettingsSections(Structure: string) {
   for (const Group of SettingsGroups) {
     const GroupSettings = Settings.filter((s) => s.Group == Group.Name);
     if (!GroupSettings.length) continue;
-    const $target = $(
-      `<div class="settings-section d-grid gap-2" id="SETTINGS_SECTION_${Group.Name}" data-nav-key="${Group.Name}" data-nav-title="${Safe(
-        Group.Title
-      )}"></div>`
-    );
-    $target.append(`<div class="bg-ghost-light p-2 rounded">
+    const Heading = `<div class="bg-ghost-light p-2 rounded">
 			<strong class="text-start">
 				${Group.Title}
 			</strong>
-		</div>`);
-    $(`#SETTINGS`).append($target);
+		</div>`;
+    // A group with a Parent is a sub-section of that group's tab: its own
+    // heading and rows inside the parent's section, hidden on its own ShowWhen.
+    const $parent = Group.Parent
+      ? $('#SETTINGS .settings-section').filter(
+          (_, el) => el.getAttribute('data-nav-key') === Group.Parent
+        )
+      : $();
+    const $target = $parent.length
+      ? $(
+          `<div class="settings-subsection d-grid gap-2" data-group-key="${Safe(Group.Name)}"></div>`
+        )
+      : $(
+          `<div class="settings-section d-grid gap-2" id="SETTINGS_SECTION_${Group.Name}" data-nav-key="${Group.Name}" data-nav-title="${Safe(
+            Group.Title
+          )}"></div>`
+        );
+    $target.append(Heading);
+    ($parent.length ? $parent : $('#SETTINGS')).append($target);
     for (const Setting of GroupSettings) {
       // The control handlers below close over this object; SyncRenderedSettingValues
       // keeps it current so their "did the value actually change" guards hold.
@@ -362,9 +382,7 @@ function RenderSettingsSections(Structure: string) {
 						${DescriptionLine(Setting.Description)}
 					</div>
 					<div class="form-check form-switch">
-						<input class="form-check-input" style="margin-top: ${
-              Setting.Description ? '0.6em' : '0'
-            } !important;" type="checkbox" id="SETTING_${Setting.Key}" ${
+						<input class="form-check-input" type="checkbox" id="SETTING_${Setting.Key}" ${
               Setting.Value ? 'checked' : ''
             }>
 					</div>
@@ -379,12 +397,7 @@ function RenderSettingsSections(Structure: string) {
             Setting.Value = NewValue;
             RefreshSettingDependencies();
             const [Err] = await window.API.SetSetting(Setting.Key, NewValue);
-            if (Err) {
-              Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
-              return;
-            }
-            // Turning something off is as much a success as turning it on.
-            Notify(`[${Setting.Title}] ${NewValue ? 'Enabled' : 'Disabled'}.`, 'success');
+            if (Err) Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
           });
       } else if (Setting.Type === 'STRING' || Setting.Type === 'PASSWORD') {
         const isWebUiPassword = Setting.Key === 'WEBUI_PASSWORD';
@@ -409,14 +422,19 @@ function RenderSettingsSections(Structure: string) {
               .slice(0, 4)
           : Safe(Setting.Value);
 
-        $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
-					<div class="d-grid">
+        const inputHtml = `<input type="${inputType}" inputmode="${inputMode}" class="form-control form-control-sm bg-ghost-light text-light border-0" id="SETTING_${
+          Setting.Key
+        }" value="${initialValue}" placeholder="${inputPlaceholder}" ${inputPattern} />`;
+        // The 4-digit PIN is short enough to sit beside its label; free text
+        // and tokens keep the full width under it.
+        $target.append(`<div class="bg-ghost p-2 rounded text-start ${
+          isWebUiPassword ? 'setting-inline' : 'd-grid gap-1'
+        }">
+					<div class="d-grid${isWebUiPassword ? ' setting-inline-label' : ''}">
 						<span>${Setting.Title}</span>
 						${DescriptionLine(Setting.Description)}
 					</div>
-					<input type="${inputType}" inputmode="${inputMode}" class="form-control form-control-sm bg-ghost-light text-light border-0" id="SETTING_${
-            Setting.Key
-          }" value="${initialValue}" placeholder="${inputPlaceholder}" ${inputPattern} />
+					${isWebUiPassword ? `<div class="setting-inline-control">${inputHtml}</div>` : inputHtml}
 					<div class="invalid-feedback" id="SETTING_${Setting.Key}_ERROR">Must be exactly 4 digits (0-9).</div>
 				</div>`);
 
@@ -477,9 +495,7 @@ function RenderSettingsSections(Structure: string) {
                   errorEl.text('Must be exactly 4 digits (0-9).').show();
                 }
                 Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
-                return;
               }
-              Notify(`[${Setting.Title}] Saved.`, 'success', 1200);
             }, 600)
           );
         });
@@ -498,16 +514,14 @@ function RenderSettingsSections(Structure: string) {
         const inputHtml = `<input type="number" class="form-control form-control-sm bg-ghost-light text-light border-0" id="SETTING_${
           Setting.Key
         }" value="${Safe(Setting.Value)}" step="1" ${minAttr} ${maxAttr} />`;
-        $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
-					<div class="d-grid">
+        $target.append(`<div class="bg-ghost p-2 rounded setting-inline text-start">
+					<div class="d-grid setting-inline-label">
 						<span>${Setting.Title}${rangeHint}</span>
 						${DescriptionLine(Setting.Description)}
 					</div>
-					${
-            unit
-              ? `<div class="d-flex align-items-center gap-2">${inputHtml}<span class="text-sm text-muted text-nowrap">${unit}</span></div>`
-              : inputHtml
-          }
+					<div class="setting-inline-control">${inputHtml}${
+            unit ? `<span class="text-sm text-muted text-nowrap">${unit}</span>` : ''
+          }</div>
 				</div>`);
         $(`#SETTING_${Setting.Key}`)
           .off('input')
@@ -529,15 +543,7 @@ function RenderSettingsSections(Structure: string) {
                 if (Set) Set.Value = NewValue;
                 Setting.Value = NewValue;
                 const [Err] = await window.API.SetSetting(Setting.Key, NewValue);
-                if (Err) {
-                  Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
-                  return;
-                }
-                Notify(
-                  `[${Setting.Title}] Saved (${FormatSettingValue(NewValue, Setting.Unit)}).`,
-                  'success',
-                  1200
-                );
+                if (Err) Notify(`[${Setting.Title}] ${Err}`, 'error', 2200);
               }, 600)
             );
           });
@@ -577,11 +583,6 @@ function RenderSettingsSections(Structure: string) {
                 if (Set) Set.Value = NewValue;
                 Setting.Value = NewValue;
                 await window.API.SetSetting(Setting.Key, NewValue);
-                Notify(
-                  `[${Setting.Title}] Saved (${FormatSettingValue(NewValue, Setting.Unit)}).`,
-                  'success',
-                  1200
-                );
               }, 400)
             );
           });
@@ -594,12 +595,20 @@ function RenderSettingsSections(Structure: string) {
             )}</option>`;
           }
         }
-        $target.append(`<div class="bg-ghost p-2 rounded d-grid gap-1 text-start">
-					<div class="d-grid">
+        // A dropdown of short choices sits beside its label; a long one keeps
+        // the full width under it.
+        const isShort =
+          Array.isArray(Setting.Options) &&
+          Setting.Options.every((opt) => String(opt).length <= SHORT_OPTION_LENGTH);
+        const selectHtml = `<select class="form-select form-select-sm bg-ghost-light text-light border-0" id="SETTING_${Setting.Key}">${optionsHtml}</select>`;
+        $target.append(`<div class="bg-ghost p-2 rounded text-start ${
+          isShort ? 'setting-inline' : 'd-grid gap-1'
+        }">
+					<div class="d-grid${isShort ? ' setting-inline-label' : ''}">
 						<span>${Setting.Title}</span>
 						${DescriptionLine(Setting.Description)}
 					</div>
-					<select class="form-select form-select-sm bg-ghost-light text-light border-0" id="SETTING_${Setting.Key}">${optionsHtml}</select>
+					${isShort ? `<div class="setting-inline-control">${selectHtml}</div>` : selectHtml}
 				</div>`);
         $(`#SETTING_${Setting.Key}`)
           .off('change')
@@ -611,7 +620,6 @@ function RenderSettingsSections(Structure: string) {
             if (Set) Set.Value = SettingValue;
             Setting.Value = SettingValue;
             await window.API.SetSetting(Setting.Key, NewValue);
-            Notify(`[${Setting.Title}] ${NewValue}.`, 'success', 1200);
           });
       }
       if ($target.children().length > RowCountBefore) {

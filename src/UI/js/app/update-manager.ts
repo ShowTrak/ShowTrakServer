@@ -6,7 +6,7 @@
 // closeAllModals()+Wait so this module has no back-reference into modals.
 import { closeAllModals, openModal } from './lib/modal';
 import { ErrorMessage, Safe } from './utils';
-import { Notify, ShowExecutionToastIfActive, Wait } from './selection-init';
+import { Notify, Wait } from './selection-init';
 import {
   FormatClientVersionLabel,
   UpdateManagerClientProgress,
@@ -26,6 +26,10 @@ import {
   setUpdateManagerSelectedReleaseTag,
 } from './state';
 import type { ClientView, ScriptExecutionView } from '@showtrak/protocol';
+
+// The script name the server gives a client-update execution. Its progress is
+// shown per client in the Update Manager, never in the script executions panel.
+export const UPDATE_EXECUTION_SCRIPT_NAME = 'Updating Client Software';
 
 export function FindClientExecutionForUpdate(UUID: string): ScriptExecutionView | null {
   if (!UpdateManagerClientProgress || !(UpdateManagerClientProgress instanceof Map)) return null;
@@ -331,12 +335,21 @@ export function RenderUpdateManagerClientList() {
       manualUpdateClients.push(Name);
     }
 
+    // An eligible online client with nothing running has nothing to report, so
+    // it gets no status line at all rather than a "Ready to update" filler. A
+    // client already on the selected release gets none either: its "Current"
+    // pill says so.
+    const AlreadyCurrent = eligibility.reason === 'Already on selected version';
     const StatusText = Safe(
       IsSelectable
         ? Online
-          ? GetUpdateStatusText(Execution)
+          ? Execution
+            ? GetUpdateStatusText(Execution)
+            : ''
           : eligibility.reason
-        : eligibility.reason
+        : AlreadyCurrent
+          ? ''
+          : eligibility.reason
     );
 
     html += `
@@ -365,7 +378,7 @@ export function RenderUpdateManagerClientList() {
             </div>
           </div>
         </div>
-        <div class="UPDATE_MANAGER_CLIENT_STATUS_TEXT">${StatusText}</div>
+        ${StatusText ? `<div class="UPDATE_MANAGER_CLIENT_STATUS_TEXT">${StatusText}</div>` : ''}
       </div>`;
   }
 
@@ -396,7 +409,7 @@ export function UpdateManagerHandleExecutions(Executions: ScriptExecutionView[] 
 
   for (const Execution of Executions) {
     if (!Execution || !Execution.Client || !Execution.Script) continue;
-    if (String(Execution.Script.Name || '') !== 'Updating Client Software') continue;
+    if (String(Execution.Script.Name || '') !== UPDATE_EXECUTION_SCRIPT_NAME) continue;
     if (!Execution.Client.UUID) continue;
     UpdateManagerClientProgress.set(Execution.Client.UUID, Execution);
   }
@@ -506,7 +519,6 @@ export async function RunUpdateManagerDeployAll() {
       `Updating ${Result.TargetCount} online clients to ${Result.ReleaseVersion}.`
     );
     RenderUpdateManagerClientList();
-    ShowExecutionToastIfActive('Updating Client Software');
   } catch (Err) {
     const Message = ErrorMessage(Err);
     $('#UPDATE_MANAGER_STATUS').text(Message);
