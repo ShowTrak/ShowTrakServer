@@ -30,7 +30,9 @@ try {
     [
       '--test',
       '--test-concurrency=1',
-      '--test-timeout=30000',
+      // Per file. The MX-8A suite waits out the unit's 1 s connection release
+      // between sessions and runs past 30 s on Windows.
+      '--test-timeout=60000',
       '--test-force-exit',
       ...process.argv.slice(2),
     ],

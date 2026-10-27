@@ -535,7 +535,9 @@ test('obs is offline when nothing listens', async () => {
   const port = await freeTcpPort();
   const r = await obs.Run({ Address: '127.0.0.1', Settings: { Port: port, Timeout: 1500 } });
   assert.equal(r.Success, false);
-  assert.match(r.Error, /Failed to connect/);
+  // Windows retries a refused localhost connect for about 2s, so the timeout can
+  // win the race there. Either way the device is offline.
+  assert.match(r.Error, /Failed to connect|Connection timed out/);
 });
 
 test('obs uses an injected WebSocket constructor', async () => {
