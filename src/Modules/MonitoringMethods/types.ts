@@ -184,9 +184,43 @@ export interface MonitoringTileWidget {
   Data?: unknown;
 }
 
+// --- LAN discovery --------------------------------------------------------------
+//
+// What a device this method can monitor looks like on the network, so the LAN
+// discovery wizard can suggest the check rather than leaving the operator to
+// pick from the whole catalogue. Purely declarative: the scan gathers evidence
+// (open TCP ports, mDNS service types, PJLink replies) and the renderer matches
+// it against these, so a method gains discovery without touching the scanner.
+export interface MonitoringMethodDiscovery {
+  // How sure a match makes us. 'high' for a port or service only this kind of
+  // device uses; 'low' for one many devices share (80, 8080, telnet).
+  Confidence: 'high' | 'medium' | 'low';
+  // Any of these TCP ports open is a match. Every port listed across the
+  // catalogue is probed on each live host, so keep generic ports out unless
+  // the confidence says so.
+  TcpPorts?: number[];
+  // mDNS service types, `_type._proto` (e.g. '_qlab._tcp'). Case-insensitive.
+  ServiceTypes?: string[];
+  // Matches a projector that answered PJLink's UDP search.
+  PJLink?: boolean;
+  // Setting filled with the port the match was made on.
+  PortSetting?: string;
+  // Setting filled with the matching mDNS service's instance name, for methods
+  // that find their device by name rather than address (Dante, NDI).
+  NameSetting?: string;
+  // Settings implied by which port, or which service type, matched: the HTTP
+  // method serves both protocols, so port 443 means `Protocol: 'https'`.
+  // Keyed by port number / service type.
+  PortSettings?: Record<string, Record<string, unknown>>;
+  ServiceSettings?: Record<string, Record<string, unknown>>;
+}
+
 export interface MonitoringMethod {
   ID: string;
   Name: string;
+  // LAN discovery signature. When omitted the registry falls back to the central
+  // map in ./discovery (then none: never suggested).
+  Discovery?: MonitoringMethodDiscovery;
   Description?: string;
   Info?: MonitoringMethodInfo;
   // Optional grouping label for the editor's method picker. When omitted the

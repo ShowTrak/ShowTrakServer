@@ -180,7 +180,7 @@ export function BuildMonitoringCheckFieldHtml(Field: MonitoringSettingField, Val
     return (
       BuildMonitoringFieldWrapOpen(
         Field,
-        'form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost rounded p-2'
+        'form-check form-switch ps-0 d-flex align-items-center justify-content-between field-box p-2'
       ) +
       `<label class="form-check-label mb-0 ms-2" for="MON_DYN_${Safe(
         Field.Key

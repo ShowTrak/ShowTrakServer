@@ -329,7 +329,7 @@ export function RenderAlertActionSettingsFields(
 
     if (Type === 'boolean') {
       Html += `
-        <div class="form-check form-switch ps-0 d-flex align-items-center justify-content-between bg-ghost rounded p-2">
+        <div class="form-check form-switch ps-0 d-flex align-items-center justify-content-between field-box p-2">
           <label class="form-check-label mb-0 ms-2" for="alert-action-${Safe(Key)}-${Math.random().toString(36).slice(2)}">${Safe(Field.Label || Key)}</label>
           <input class="form-check-input ms-2 me-2" type="checkbox" data-key="${Safe(Key)}" data-type="boolean" ${Value ? 'checked' : ''} />
         </div>

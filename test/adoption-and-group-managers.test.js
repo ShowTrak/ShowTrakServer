@@ -44,6 +44,36 @@ test('AdoptionManager tracks, updates, and removes pending clients', async () =>
   assert.equal(readoptEvent[1], 'already-adopted');
 });
 
+test('AdoptionManager fills in a listed device as it reports more', async () => {
+  const events = [];
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AdoptionManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => createLoggerStub() },
+    '../Broadcast': { Manager: { emit: (...args) => events.push(args[0]) } },
+    '../ClientManager': { Manager: { Exists: async () => false } },
+  });
+
+  await Manager.ClearAllDevicesPendingAdoption();
+  await Manager.AddClientPendingAdoption('client-1', '10.0.0.10', { Version: '3.30.0' });
+  await Manager.SetState('client-1', 'Adopting');
+  assert.equal(Manager.GetClientsPendingAdoption()[0].Hostname, 'No Hostname Found');
+  assert.equal(Manager.IsPendingAdoption('client-1'), true);
+
+  events.length = 0;
+  await Manager.AddClientPendingAdoption('client-1', '10.0.0.10', { Version: '3.30.0' });
+  assert.deepEqual(events, []);
+
+  await Manager.AddClientPendingAdoption('client-1', '10.0.0.10', {
+    Hostname: 'stage-pc',
+    Version: null,
+  });
+  const [entry] = Manager.GetClientsPendingAdoption();
+  assert.equal(entry.Hostname, 'stage-pc');
+  assert.equal(entry.Version, '3.30.0');
+  assert.equal(entry.State, 'Adopting');
+  assert.deepEqual(events, ['AdoptionListUpdated']);
+});
+
 test('GroupManager creates, fetches, updates, and deletes groups', async () => {
   const runs = [];
   const events = [];

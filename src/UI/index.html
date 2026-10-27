@@ -837,7 +837,7 @@ Loading licence...</pre>
             </div>
 
             <div class="d-grid gap-2">
-              <div class="form-floating bg-ghost rounded">
+              <div class="form-floating">
                 <input
                   type="text"
                   id="GROUP_MANAGER_EDITOR_NAME"
@@ -851,7 +851,7 @@ Loading licence...</pre>
 
               <div
                 id="GROUP_MANAGER_EDITOR_GROUPID_WRAPPER"
-                class="form-floating bg-ghost rounded has-copy group-manager-editor-id-field"
+                class="form-floating has-copy group-manager-editor-id-field"
                 style="display: none"
               >
                 <input
@@ -873,7 +873,7 @@ Loading licence...</pre>
                 </button>
               </div>
 
-              <div class="form-floating bg-ghost rounded has-copy group-manager-editor-id-field">
+              <div class="form-floating has-copy group-manager-editor-id-field">
                 <input
                   type="text"
                   id="GROUP_MANAGER_EDITOR_SLUG"
@@ -1228,7 +1228,7 @@ Loading licence...</pre>
               <div id="SCRIPT_MANAGER_ISSUES" class="script-manager-issues d-none mb-2"></div>
 
               <div class="d-grid gap-2">
-                <div class="form-floating bg-ghost rounded">
+                <div class="form-floating">
                   <input
                     type="text"
                     id="SCRIPT_MANAGER_FIELD_ID"
@@ -1240,7 +1240,7 @@ Loading licence...</pre>
                   <label for="SCRIPT_MANAGER_FIELD_ID">ID</label>
                 </div>
 
-                <div class="form-floating bg-ghost rounded">
+                <div class="form-floating">
                   <input
                     type="text"
                     id="SCRIPT_MANAGER_FIELD_NAME"
@@ -1251,7 +1251,7 @@ Loading licence...</pre>
                   <label for="SCRIPT_MANAGER_FIELD_NAME">Name</label>
                 </div>
 
-                <div class="form-floating bg-ghost rounded script-manager-textarea-float">
+                <div class="form-floating script-manager-textarea-float">
                   <textarea
                     id="SCRIPT_MANAGER_FIELD_DESCRIPTION"
                     class="form-control bg-transparent text-light border-0"
@@ -1466,7 +1466,7 @@ Loading licence...</pre>
               <div id="TAG_MANAGER_ISSUES" class="script-manager-issues d-none mb-2"></div>
 
               <div class="d-grid gap-2">
-                <div class="form-floating bg-ghost rounded">
+                <div class="form-floating">
                   <input
                     type="text"
                     id="TAG_MANAGER_FIELD_SLUG"
@@ -1599,7 +1599,7 @@ Loading licence...</pre>
               <div id="VARIABLE_MANAGER_ISSUES" class="script-manager-issues d-none mb-2"></div>
 
               <div class="d-grid gap-2">
-                <div class="form-floating bg-ghost rounded">
+                <div class="form-floating">
                   <input
                     type="text"
                     id="VARIABLE_MANAGER_FIELD_KEY"
@@ -1616,7 +1616,7 @@ Loading licence...</pre>
                   <code id="VARIABLE_MANAGER_USAGE_HINT">%SHOWTRAK_VAR_NAME%</code>.</span
                 >
 
-                <div class="form-floating bg-ghost rounded">
+                <div class="form-floating">
                   <input
                     type="text"
                     id="VARIABLE_MANAGER_FIELD_DEFAULT"
@@ -1634,7 +1634,7 @@ Loading licence...</pre>
                   than as nothing.</span
                 >
 
-                <div class="form-floating bg-ghost rounded">
+                <div class="form-floating">
                   <input
                     type="text"
                     id="VARIABLE_MANAGER_FIELD_DESCRIPTION"
@@ -1709,7 +1709,7 @@ Loading licence...</pre>
           <div class="modal-body text-start d-grid gap-2">
             <div id="ICON_PICKER_HEADER"></div>
 
-            <div class="form-floating bg-ghost rounded">
+            <div class="form-floating">
               <input
                 type="text"
                 id="ICON_PICKER_SEARCH"
@@ -1748,7 +1748,7 @@ Loading licence...</pre>
 
             <span id="SCOPE_PICKER_HINT" class="text-sm text-muted d-none"></span>
 
-            <div class="form-floating bg-ghost rounded">
+            <div class="form-floating">
               <input
                 type="text"
                 id="SCOPE_PICKER_SEARCH"
@@ -2019,7 +2019,7 @@ Loading licence...</pre>
                   <div id="MONITORING_TARGET_TAGS" class="tag-picker-list"></div>
                 </div>
 
-                <div class="bg-ghost rounded px-3 py-2">
+                <div class="field-box px-3 py-2">
                   <label
                     for="MONITORING_TARGET_INTERVAL"
                     class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
@@ -2371,7 +2371,7 @@ Loading licence...</pre>
                   </div>
                 </div>
 
-                <div class="bg-ghost rounded px-3 py-2">
+                <div class="field-box px-3 py-2">
                   <label
                     for="FREEKIOSK_INTERVAL"
                     class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
@@ -2392,7 +2392,7 @@ Loading licence...</pre>
                   />
                 </div>
 
-                <div class="bg-ghost rounded px-3 py-2">
+                <div class="field-box px-3 py-2">
                   <label
                     for="FREEKIOSK_TIMEOUT"
                     class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
@@ -2506,7 +2506,7 @@ Loading licence...</pre>
                 <label for="DUMMY_CLIENT_GROUPID">Group</label>
               </div>
 
-              <div class="bg-ghost rounded px-3 py-2">
+              <div class="field-box px-3 py-2">
                 <label
                   for="DUMMY_CLIENT_INTERVAL"
                   class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
@@ -2699,6 +2699,7 @@ Loading licence...</pre>
                       <th>Name</th>
                       <th>Address</th>
                       <th>Source</th>
+                      <th>Suggested Check</th>
                       <th>Details</th>
                       <th class="text-end">Action</th>
                     </tr>
@@ -3043,6 +3044,14 @@ Loading licence...</pre>
                     </div>
                     <span class="text-sm text-secondary" id="CLIENT_INFO_VARIABLES_HINT"></span>
                     <div id="CLIENT_INFO_VARIABLES_LIST" class="d-grid gap-2"></div>
+                    <!-- Desktop only: the Web UI cannot manage variables. -->
+                    <button
+                      type="button"
+                      class="btn btn-ghost text-light w-100"
+                      id="CLIENT_INFO_OPEN_VARIABLE_MANAGER"
+                    >
+                      <i class="bi bi-braces" aria-hidden="true"></i> Open Variable Manager
+                    </button>
                   </div>
                   <!-- Every MAC the client is known by. Wake on LAN fires at all
                        of them, since which NIC the server can reach is unknowable
@@ -3304,7 +3313,7 @@ Loading licence...</pre>
                     />
                     <label for="DUMMY_INFO_INTERVAL_VIEW">Heartbeat Interval</label>
                   </div>
-                  <div class="bg-ghost rounded px-3 py-2 text-start ci-edit-only">
+                  <div class="field-box px-3 py-2 text-start ci-edit-only">
                     <label
                       for="DUMMY_INFO_INTERVAL"
                       class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
@@ -3399,7 +3408,7 @@ Loading licence...</pre>
                     />
                     <label for="MONITOR_INFO_INTERVAL_VIEW">Check Interval</label>
                   </div>
-                  <div class="bg-ghost rounded px-3 py-2 text-start ci-edit-only">
+                  <div class="field-box px-3 py-2 text-start ci-edit-only">
                     <label
                       for="MONITOR_INFO_INTERVAL"
                       class="form-label mb-1 d-flex justify-content-between align-items-center w-100"
@@ -3452,9 +3461,23 @@ Loading licence...</pre>
                       <div id="MONITOR_INFO_TAG_PICKER" class="tag-picker-list"></div>
                     </div>
                   </div>
-                  <div class="rounded-3 p-2 bg-ghost-light">
-                    <h6 class="mb-0">Checks</h6>
-                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-delete w-100 ci-edit-only"
+                    id="MONITOR_INFO_DELETE"
+                  >
+                    Delete Monitor
+                  </button>
+                </div>
+
+                <!-- A monitor's Checks: listed read-only in Show mode; in Edit mode
+                     rows drag into a new order, open the check editor, and Add
+                     Check appears (monitor-info-edit.ts). -->
+                <div
+                  id="MONITOR_INFO_CHECKS_SECTION"
+                  class="d-grid gap-2 d-none"
+                  data-client-info-tab="checks"
+                >
                   <div id="MONITOR_INFO_CHECK_LIST" class="d-grid gap-2"></div>
                   <button
                     type="button"
@@ -3462,13 +3485,6 @@ Loading licence...</pre>
                     id="MONITOR_INFO_ADD_CHECK"
                   >
                     <i class="bi bi-plus-lg"></i> Add Check
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-delete w-100 ci-edit-only"
-                    id="MONITOR_INFO_DELETE"
-                  >
-                    Delete Monitor
                   </button>
                 </div>
 

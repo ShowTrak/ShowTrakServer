@@ -3,13 +3,14 @@ import type { Result } from '../../types/result';
 import { CreateLogger } from '../Logger';
 import { CreateBonjourErrorHandler } from '@showtrak/protocol/runtime';
 
-import { clampInt, buildProbeTargets, probeHost } from './network-utils';
+import { clampInt, buildProbeTargets, probeHostPorts } from './network-utils';
 import {
   StartPJLinkDiscovery,
   PJLINK_UDP_PORT,
   type PJLinkDiscoveryHandle,
 } from './pjlink-discovery';
 import { FetchProjectorIdentity } from '../MonitoringMethods/_pjlink-shared';
+import { Manager as MonitoringMethods } from '../MonitoringMethods';
 
 // Minimal structural types for the `bonjour-service` mDNS library, describing only
 // the surface this module touches so the factory-style call sites stay unchanged.
@@ -76,6 +77,7 @@ interface DiscoveryResult {
   Port?: number | null;
   TXT?: Record<string, unknown> | null;
   MethodHint?: string;
+  OpenPorts?: number[];
 }
 
 /** Payload passed to `emitEvent`, before the `ScanID` is attached. */
@@ -103,6 +105,8 @@ interface Scan {
   TimeoutMs: number;
   MaxHostsPerSubnet: number;
   ProbePorts: number[];
+  // Probed on every host that answered ProbePorts, to fingerprint what it is.
+  FingerprintPorts: number[];
   Concurrency: number;
   Seen: Set<string>;
   Browsers: BonjourBrowser[];
@@ -132,6 +136,7 @@ function createScan(options: ScanOptions, onEvent: (payload: ScanEvent) => void)
             (p: unknown) => Number.isInteger(Number(p)) && Number(p) > 0 && Number(p) <= 65535
           ).map(Number)
         : [80, 443, 22, 445, 3389, 8080, PJLINK_UDP_PORT],
+    FingerprintPorts: MonitoringMethods.GetDiscoveryTcpPorts(),
     Concurrency: clampInt(options.Concurrency, 4, 96, 32),
     Seen: new Set(),
     Browsers: [],
@@ -340,20 +345,35 @@ async function startProbeScan(scan: Scan) {
           index += 1;
           if (current >= targets.length) return;
           const ip = targets[current]!; // bounds-checked above (current < targets.length)
-          const openPort = await probeHost(ip, scan.ProbePorts, 350, scan);
-          if (scan.Cancelled || scan.Finished) return;
-          if (openPort != null) {
+          // Liveness first, on a handful of common ports at once: most of the
+          // range is empty, and an empty address costs one timeout this way.
+          const liveness = await probeHostPorts(ip, scan.ProbePorts, 350, scan);
+          if (!liveness || scan.Cancelled || scan.Finished) return;
+          if (liveness.Alive) {
+            // Something answered, so it is worth asking every port a check
+            // type recognises; the wizard suggests checks from what is open.
+            const remaining = scan.FingerprintPorts.filter(
+              (port) => !scan.ProbePorts.includes(port)
+            );
+            const fingerprint = remaining.length
+              ? await probeHostPorts(ip, remaining, 500, scan)
+              : { Alive: true, OpenPorts: [] };
+            if (!fingerprint || scan.Cancelled || scan.Finished) return;
+            const openPorts = [...liveness.OpenPorts, ...fingerprint.OpenPorts].sort(
+              (a, b) => a - b
+            );
+            const firstPort = openPorts[0] ?? null;
             pushResult(scan, {
-              Name: openPort === PJLINK_UDP_PORT ? `Projector ${ip}` : ip,
+              Name: openPorts.includes(PJLINK_UDP_PORT) ? `Projector ${ip}` : ip,
               Address: ip,
               Source: 'probe',
-              Port: openPort,
-              MethodHint:
-                openPort === PJLINK_UDP_PORT
-                  ? 'pjlink'
-                  : openPort === 80 || openPort === 443 || openPort === 8080
-                    ? 'http'
-                    : 'ping',
+              Port: firstPort,
+              OpenPorts: openPorts,
+              MethodHint: openPorts.includes(PJLINK_UDP_PORT)
+                ? 'pjlink'
+                : openPorts.some((port) => port === 80 || port === 443 || port === 8080)
+                  ? 'http'
+                  : 'ping',
             });
           }
           completed += 1;

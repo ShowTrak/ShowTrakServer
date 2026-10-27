@@ -215,6 +215,20 @@ test('NetworkDiscovery network-utils convert IPs and probe ports', async () => {
   // probeHost honors the cancellation flag.
   const cancelled = await utils.probeHost('127.0.0.1', [port], 500, { Cancelled: true });
   assert.equal(cancelled, null);
+
+  // probeHostPorts reports every open port, and counts a refusal as a live host.
+  const listener = net.createServer();
+  await new Promise((resolve) => listener.listen(0, '127.0.0.1', resolve));
+  const openPort = listener.address().port;
+  const both = await utils.probeHostPorts('127.0.0.1', [openPort, port], 1000, {});
+  assert.deepEqual(both, { Alive: true, OpenPorts: [openPort] });
+  await new Promise((resolve) => listener.close(resolve));
+
+  const refusedOnly = await utils.probeHostPorts('127.0.0.1', [port], 1000, {});
+  assert.deepEqual(refusedOnly, { Alive: true, OpenPorts: [] });
+  assert.equal(await utils.probePortState('127.0.0.1', port, 1000), 'refused');
+
+  assert.equal(await utils.probeHostPorts('127.0.0.1', [port], 500, { Cancelled: true }), null);
 });
 
 test('NetworkDiscovery manager starts and stops probe scans', async () => {

@@ -1619,7 +1619,7 @@ input[type='number']::-webkit-inner-spin-button {
   position: relative;
   min-height: calc(3.5rem + 2px);
   padding: 1.625rem 2rem 0.5rem 0.75rem !important;
-  background-color: var(--surface-ghost) !important;
+  background-color: var(--field-bg) !important;
   color: #fff !important;
   border: none !important;
   border-radius: var(--radius-md) !important;
@@ -1637,9 +1637,13 @@ input[type='number']::-webkit-inner-spin-button {
   transform: translateY(-50%);
 }
 
-.alert-multiselect-toggle:hover,
+.alert-multiselect-toggle:hover {
+  background-color: var(--field-bg-hover) !important;
+  color: #fff !important;
+}
+
 .alert-multiselect-toggle:focus {
-  background-color: var(--surface-ghost-active) !important;
+  background-color: var(--field-bg-focus) !important;
   color: #fff !important;
 }
 
@@ -3283,6 +3287,28 @@ body.mode-edit #APPLICATION_CONTAINER {
   color: var(--text-faint);
 }
 
+/* A control that is not itself a field (a range slider under its label, a
+   toggle row) boxed to sit among fields: the same radius and the same shade
+   per state, so it reads as one of them in Edit mode and in Show mode alike. */
+.field-box {
+  background-color: var(--field-bg);
+  border-radius: var(--radius-md);
+  transition: background-color 150ms ease;
+}
+
+.field-box:hover {
+  background-color: var(--field-bg-hover);
+}
+
+.field-box:focus-within {
+  background-color: var(--field-bg-focus);
+}
+
+.field-box:has(input:disabled) {
+  background-color: var(--field-bg-disabled);
+  color: var(--text-soft);
+}
+
 /* 3D keyboard key styling for <kbd> elements */
 kbd {
   display: inline-block;
@@ -4361,6 +4387,14 @@ input[type='range'].SHOWTRAK_AUDIO_LEVEL {
   font-size: var(--fs-xs);
   line-height: 1.3;
   word-break: break-word;
+}
+.NETWORK_DISCOVERY_TABLE .NETWORK_DISCOVERY_METHOD {
+  min-width: 10rem;
+}
+.NETWORK_DISCOVERY_TABLE .nd-reason {
+  font-size: var(--fs-xs);
+  line-height: 1.3;
+  margin-top: 0.15rem;
 }
 #NETWORK_DISCOVERY_TOGGLE_SCAN {
   width: 100%;

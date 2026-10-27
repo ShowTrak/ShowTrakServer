@@ -650,6 +650,7 @@ export function RenderMonitoringHistoryModal() {
   $('#CLIENT_INFO_DETAILS_SECTION').toggleClass('d-none', Entity.type !== 'client');
   // Monitors, dummies and terminals each have a Settings pane under one tab key.
   $('#MONITOR_INFO_SETTINGS_SECTION').toggleClass('d-none', Entity.type !== 'target');
+  $('#MONITOR_INFO_CHECKS_SECTION').toggleClass('d-none', Entity.type !== 'target');
   $('#DUMMY_INFO_SETTINGS_SECTION').toggleClass('d-none', Entity.type !== 'dummy');
   $('#FREEKIOSK_INFO_SETTINGS_SECTION').toggleClass('d-none', Entity.type !== 'freekiosk');
   if (Entity.type === 'freekiosk') SetClientInfoKind('freekiosk');

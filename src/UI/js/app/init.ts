@@ -48,10 +48,12 @@ import {
   SetUpdateManagerDownloadProgress,
 } from './modals';
 import {
+  BuildNetworkDiscoveryChecks,
   HandleNetworkDiscoveryEvent,
   OpenMonitoringTargetEditor,
   OpenNetworkDiscoveryModal,
   ResetNetworkDiscoveryState,
+  SetNetworkDiscoveryChoice,
   SetNetworkDiscoveryStatus,
   StartNetworkDiscoveryScan,
   StopNetworkDiscoveryScan,
@@ -473,11 +475,26 @@ export async function Init() {
       if (!id || !NetworkDiscoveryResults.has(id)) return;
       const selected = NetworkDiscoveryResults.get(id);
       await StopNetworkDiscoveryScan();
+      // A port-probe result is named by its IP, so prefer the hostname then.
+      const Nickname =
+        selected.Name && selected.Name !== selected.Address
+          ? selected.Name
+          : selected.Hostname || selected.Address || '';
       await OpenMonitoringTargetEditor(null, {
-        Nickname: selected.Name || '',
+        Nickname,
         Address: selected.Address || '',
-        Method: selected.MethodHint || null,
+        Hostname: selected.Hostname || null,
+        Checks: BuildNetworkDiscoveryChecks(selected),
       });
+    });
+
+  $('#NETWORK_DISCOVERY_RESULTS')
+    .off('change', '.NETWORK_DISCOVERY_METHOD')
+    .on('change', '.NETWORK_DISCOVERY_METHOD', function () {
+      const id = String($(this).attr('data-id') || '')
+        .trim()
+        .toLowerCase();
+      if (id) SetNetworkDiscoveryChoice(id, String($(this).val() || ''));
     });
 
   $('#SHOWTRAK_MODAL_NETWORK_DISCOVERY')

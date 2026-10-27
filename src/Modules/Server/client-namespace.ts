@@ -376,12 +376,53 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       }
     );
 
+    // A client that believes it is adopted but has no row here (the show file
+    // changed, or its row went while it stayed connected) never sees the
+    // connect-time Unadopt, so it keeps heartbeating. List it for adoption with
+    // what it has reported instead; adopting it creates the row, and its next
+    // heartbeat then lands normally and takes it off the list.
+    let Reported: { Hostname: string | null; OperatingSystem: string | null } = {
+      Hostname: null,
+      OperatingSystem: null,
+    };
+    let ListedFromHeartbeat = false;
+    let LastHeartbeatVersion: string | null = null;
+
+    const ListUnknownClient = () =>
+      AdoptionManager.AddClientPendingAdoption(socket.UUID, socket.IP, {
+        BootTime: null,
+        Hostname: Reported.Hostname,
+        OperatingSystem: Reported.OperatingSystem,
+        Version: LastHeartbeatVersion,
+        ServerIdentity: null,
+      });
+
     GuardedOn(
       'Heartbeat',
       (Data) => [SocketValidation.Heartbeat(Data, WarnVitals)],
       async (Data) => {
+        LastHeartbeatVersion = Data.Version;
         const [Err] = await ClientManager.Heartbeat(socket.UUID, Data, socket.IP);
-        if (Err) Logger.error('Heartbeat failed for', socket.UUID, Err);
+        if (!Err) {
+          if (ListedFromHeartbeat) {
+            ListedFromHeartbeat = false;
+            if (AdoptionManager.IsPendingAdoption(socket.UUID)) {
+              AdoptionManager.RemoveClientPendingAdoption(socket.UUID);
+            }
+          }
+          return;
+        }
+        if (await ClientManager.Exists(socket.UUID)) {
+          Logger.error('Heartbeat failed for', socket.UUID, Err);
+          return;
+        }
+        if (!ListedFromHeartbeat) {
+          ListedFromHeartbeat = true;
+          Logger.warn(
+            `Heartbeat from unknown client ${socket.UUID}; listing it as pending adoption`
+          );
+        }
+        await ListUnknownClient();
       }
     );
 
@@ -389,7 +430,9 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       'SystemInfo',
       (Data) => [SocketValidation.SystemInfo(Data)],
       async (Data) => {
-        await ClientManager.SystemInfo(socket.UUID, Data, socket.IP);
+        Reported = { Hostname: Data.Hostname, OperatingSystem: Data.OperatingSystem };
+        const [Err] = await ClientManager.SystemInfo(socket.UUID, Data, socket.IP);
+        if (Err && ListedFromHeartbeat) await ListUnknownClient();
       }
     );
 

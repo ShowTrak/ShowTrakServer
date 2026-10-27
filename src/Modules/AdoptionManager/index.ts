@@ -57,9 +57,27 @@ const Manager = {
       BroadcastManager.emit('ReadoptDevice', UUID);
       return;
     } else {
-      // Check if the client is already in the list
+      // Already listed: refresh whatever the device has since told us, so an
+      // entry first seen with placeholders fills in as details arrive.
       const existingClient = ClientsPendingAdoption.find((client) => client.UUID === UUID);
-      if (existingClient) return;
+      if (existingClient) {
+        const Fresh = new ClientPendingAdoption(UUID, IP, Data);
+        let Changed = false;
+        if (Data.Hostname && existingClient.Hostname !== Fresh.Hostname) {
+          existingClient.Hostname = Fresh.Hostname;
+          Changed = true;
+        }
+        if (Data.Version && existingClient.Version !== Fresh.Version) {
+          existingClient.Version = Fresh.Version;
+          Changed = true;
+        }
+        if (IP && existingClient.IP !== Fresh.IP) {
+          existingClient.IP = Fresh.IP;
+          Changed = true;
+        }
+        if (Changed) BroadcastManager.emit('AdoptionListUpdated');
+        return;
+      }
       ClientsPendingAdoption.push(new ClientPendingAdoption(UUID, IP, Data));
       Logger.log(`Client ${UUID} added to pending adoption list.`);
       BroadcastManager.emit('AdoptionListUpdated');
@@ -88,6 +106,10 @@ const Manager = {
     Logger.log(`Client ${UUID} state set to ${State}.`);
     BroadcastManager.emit('AdoptionListUpdated');
     return;
+  },
+
+  IsPendingAdoption(UUID: string): boolean {
+    return ClientsPendingAdoption.some((client) => client.UUID === UUID);
   },
 
   // Remove a device from the pending list; safe if missing

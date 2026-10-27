@@ -383,6 +383,80 @@ test('Server client namespace keeps unadopted clients visible for pending adopti
   assert.equal(calls.removeAdopt, 0);
 });
 
+test('heartbeats from an unknown client list it for adoption until it is adopted', async () => {
+  const listed = [];
+  const removed = [];
+  let known = false;
+  const pending = new Set();
+
+  const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
+    '../VariableManager': {
+      Manager: {
+        GetPayload: async () => ({ Environment: {}, Exported: [] }),
+        GetEnvironment: async () => ({}),
+      },
+    },
+    '../Logger': loggerStub,
+    '../AdoptionManager': {
+      Manager: {
+        AddClientPendingAdoption: async (UUID, IP, Data) => {
+          pending.add(UUID);
+          listed.push({ UUID, IP, Data });
+        },
+        IsPendingAdoption: (UUID) => pending.has(UUID),
+        RemoveClientPendingAdoption: (UUID) => {
+          pending.delete(UUID);
+          removed.push(UUID);
+        },
+      },
+    },
+    '../ClientManager': {
+      Manager: {
+        // Present at connect, then gone (e.g. the show file changed).
+        Exists: async () => known,
+        Heartbeat: async () => (known ? [null, 'ok'] : ['Client Not Valid', null]),
+        SystemInfo: async () => (known ? [null, 'ok'] : ['Client Not Found', null]),
+        Disconnected: async () => {},
+      },
+    },
+    '../ScriptManager': { Manager: { GetScripts: async () => [] } },
+    '../ScriptExecutionManager': { Manager: {} },
+    '../ServerIdentity': { Manager: { GetIdentityToken: () => 'server-token-1' } },
+  });
+
+  let connectionHandler;
+  SetupClientNamespace({ on: (_e, h) => (connectionHandler = h) });
+
+  known = true;
+  const socket = makeSocket({
+    query: { UUID: 'client-4', Adopted: 'true' },
+    address: '::ffff:10.0.0.12',
+    headers: {},
+  });
+  await connectionHandler(socket);
+  known = false;
+
+  await socket.trigger('Heartbeat', { Version: '3.30.0', Vitals: {} });
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0].UUID, 'client-4');
+  assert.equal(listed[0].IP, '10.0.0.12');
+  assert.equal(listed[0].Data.Version, '3.30.0');
+  assert.equal(listed[0].Data.Hostname, null);
+
+  // SystemInfo fills in the hostname on the existing entry.
+  await socket.trigger('SystemInfo', { Hostname: 'stage-pc', OperatingSystem: 'Windows' });
+  assert.equal(listed.length, 2);
+  assert.equal(listed[1].Data.Hostname, 'stage-pc');
+  assert.equal(listed[1].Data.OperatingSystem, 'Windows');
+
+  // Operator adopts it: the next heartbeat succeeds and clears the entry.
+  known = true;
+  await socket.trigger('Heartbeat', { Version: '3.30.0', Vitals: {} });
+  assert.deepEqual(removed, ['client-4']);
+  await socket.trigger('Heartbeat', { Version: '3.30.0', Vitals: {} });
+  assert.deepEqual(removed, ['client-4']);
+});
+
 // Helpers to drive the Web UI namespace.
 // options: { mode: 'SHOW'|'EDIT', handlers: { [channel]: fn }, sinks: [] }
 function loadWebUi(settings, options = {}) {

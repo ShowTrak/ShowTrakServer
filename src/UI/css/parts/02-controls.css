@@ -999,7 +999,7 @@ input[type='number']::-webkit-inner-spin-button {
   position: relative;
   min-height: calc(3.5rem + 2px);
   padding: 1.625rem 2rem 0.5rem 0.75rem !important;
-  background-color: var(--surface-ghost) !important;
+  background-color: var(--field-bg) !important;
   color: #fff !important;
   border: none !important;
   border-radius: var(--radius-md) !important;
@@ -1017,9 +1017,13 @@ input[type='number']::-webkit-inner-spin-button {
   transform: translateY(-50%);
 }
 
-.alert-multiselect-toggle:hover,
+.alert-multiselect-toggle:hover {
+  background-color: var(--field-bg-hover) !important;
+  color: #fff !important;
+}
+
 .alert-multiselect-toggle:focus {
-  background-color: var(--surface-ghost-active) !important;
+  background-color: var(--field-bg-focus) !important;
   color: #fff !important;
 }
 

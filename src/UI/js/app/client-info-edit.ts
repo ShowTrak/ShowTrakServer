@@ -260,6 +260,10 @@ function EnsureBound(): void {
 
   $Modal.on('input.clientInfoEdit change.clientInfoEdit', '.ci-draft', () => UpdateSaveButton());
   $('#CLIENT_INFO_SAVE').on('click', () => void SaveClientSettings());
+  // Variables are managed only on the desktop; the Web UI can only fill them in.
+  $('#CLIENT_INFO_OPEN_VARIABLE_MANAGER')
+    .toggleClass('d-none', !!Capabilities.isWeb)
+    .on('click', () => void OpenVariableManagerFromClient());
   $('#CLIENT_INFO_VARIABLES_LIST')
     .on('click', '.field-reset-btn', function () {
       ResetVariable(this);
@@ -492,6 +496,27 @@ function HasUnsavedChanges(): boolean {
 
 function UpdateSaveButton(): void {
   $('#CLIENT_INFO_SAVE').prop('disabled', !HasUnsavedChanges());
+}
+
+// Into the Variable Manager; closing it returns to this client's Variables tab.
+async function OpenVariableManagerFromClient(): Promise<void> {
+  if (!Mounted) return;
+  const { UUID } = Mounted;
+  if (HasUnsavedChanges()) {
+    const Confirmed = await ConfirmationDialog(
+      'Opening the Variable Manager discards your unsaved changes here. Continue?',
+      { ConfirmLabel: 'Discard and Open' }
+    );
+    if (!Confirmed) return;
+  }
+  // Lazy, like the Tag Manager: nothing here needs it until this is pressed.
+  const { OpenVariableManager } = await import('./variable-manager');
+  await OpenVariableManager({
+    ReturnTo: async () => {
+      const { OpenClientInfo } = await import('./client-info-modal');
+      await OpenClientInfo(UUID, { Tab: 'variables' });
+    },
+  });
 }
 
 async function SaveClientSettings(): Promise<void> {

@@ -783,7 +783,7 @@ export function RenderFullClientAndMonitorList() {
                 Welcome to ShowTrak Server v${Safe(Config.Application.Version)}
             </h5>
             <p class="text-light mb-0">
-                You don't have any clients configured yet. Discover clients on your network and adopt them with the Adoption Manager below.
+                You do not have any checks or clients configured yet, discover clients on the network or setup monitoring checks
             </p>
         </div>`;
   }

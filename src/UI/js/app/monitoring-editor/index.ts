@@ -47,6 +47,7 @@ import {
   ValidateMonitoringRequiredFields,
   setFieldEditedHandler,
 } from './method-fields';
+import type { DiscoveryCheckPrefill } from './network-discovery';
 
 // Re-exported so `from './monitoring-editor'` continues to resolve every symbol
 // this module used to define directly.
@@ -384,7 +385,7 @@ export function RefreshMonitoringCheckDebugIfOpen(TargetID: number) {
 
 let MonitoringStatusRunTimer: ReturnType<typeof setTimeout> | null = null;
 
-// Set when the check editor was opened from a monitor's Settings tab: Back (and
+// Set when the check editor was opened from a monitor's Checks tab: Back (and
 // deleting the check) then return there instead of to this modal's list view.
 let ReturnToMonitorView = false;
 
@@ -795,7 +796,7 @@ export function RefreshMonitoringEditorIfOpen(TargetID: number) {
   RenderMonitoringCheckList();
 }
 
-// Leave the check editor for the monitor's view modal, on its Settings tab.
+// Leave the check editor for the monitor's view modal, on its Checks tab.
 //
 // The check is saved first. A check that cannot be saved yet (a required
 // setting is empty) would otherwise vanish silently, so the operator is asked
@@ -828,7 +829,7 @@ async function LeaveCheckViewForMonitorView(Options: { Save: boolean }): Promise
   State.EditingIndex = null;
   ReturnToMonitorView = false;
   if (State.TargetID != null) {
-    await OpenMonitoringTargetHistory(Number(State.TargetID), { Tab: 'settings' });
+    await OpenMonitoringTargetHistory(Number(State.TargetID), { Tab: 'checks' });
   }
 }
 
@@ -950,7 +951,7 @@ async function OpenMoveCheckPicker() {
     await Wait(300);
     if (ReturnToMonitorView) {
       ReturnToMonitorView = false;
-      await OpenMonitoringTargetHistory(SourceTargetID, { Tab: 'settings' });
+      await OpenMonitoringTargetHistory(SourceTargetID, { Tab: 'checks' });
       return;
     }
     ShowMonitoringListView();
@@ -972,12 +973,18 @@ const MONITORING_TARGET_TAG_PICKER: TagPickerMount = {
  * The monitor editor. An existing monitor's settings now live on the Settings
  * tab of its view modal, so with a TargetID and no `Check` this opens that tab
  * instead. `Check` opens straight into one check's edit view (by CheckID, or
- * 'new' for a blank one), and Back returns to the Settings tab. With no
+ * 'new' for a blank one), and Back returns to the Checks tab. With no
  * TargetID it is the Add Monitor flow.
  */
 export async function OpenMonitoringTargetEditor(
   TargetID: number | null,
-  Prefill: { Nickname?: string; Address?: string; Method?: string | null } | null = null,
+  Prefill: {
+    Nickname?: string;
+    Address?: string;
+    Hostname?: string | null;
+    // Checks the new monitor starts with (LAN discovery's suggestions).
+    Checks?: DiscoveryCheckPrefill[];
+  } | null = null,
   Options: { Check?: { CheckID: number } | 'new' } = {}
 ) {
   if (TargetID && Options.Check == null) {
@@ -1026,7 +1033,14 @@ export async function OpenMonitoringTargetEditor(
       FailureThreshold: null,
       Slug: '',
       OriginalSlug: '',
-      Checks: [],
+      Checks: ((Prefill && Prefill.Checks) || []).map((Check) => ({
+        Name: Check.Name,
+        Address: Check.Address,
+        Method: Check.Method,
+        Settings: { ...Check.Settings },
+        DegradedThresholdMs: 0,
+        FailureThreshold: null,
+      })),
       View: 'list',
       EditingIndex: null,
       saveTimer: null,

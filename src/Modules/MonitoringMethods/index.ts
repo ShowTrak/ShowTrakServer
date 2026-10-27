@@ -14,6 +14,7 @@ import { Manager as CacheManager } from '../CacheManager';
 import { RedactSensitiveValues } from '../Utils/redact';
 import { MethodInfo } from './info';
 import { MethodGroups, DEFAULT_GROUP } from './groups';
+import { MethodDiscovery } from './discovery';
 import type {
   LiveLevelChange,
   LiveLevelsFrame,
@@ -227,7 +228,13 @@ function PublicShape(Method: MonitoringMethod) {
     // editor, so a method that gains actions grows a control panel with no
     // second round trip and no client change.
     Actions: Array.isArray(Method.Actions) ? Method.Actions : [],
+    // LAN discovery signature, so the discovery wizard can suggest this check.
+    Discovery: DiscoveryOf(Method),
   };
+}
+
+function DiscoveryOf(Method: MonitoringMethod) {
+  return Method.Discovery || MethodDiscovery[Method.ID] || null;
 }
 
 function stableStringify(Value: unknown): string {
@@ -386,6 +393,16 @@ const Manager = {
   Get: (ID: string): MonitoringMethod | null => Methods.get(ID) || null,
 
   Has: (ID: string): boolean => Methods.has(ID),
+
+  // Every TCP port a discovery signature listens for, so a LAN scan can probe
+  // each live host for all of them.
+  GetDiscoveryTcpPorts: (): number[] => {
+    const Ports = new Set<number>();
+    for (const Method of Methods.values()) {
+      for (const Port of DiscoveryOf(Method)?.TcpPorts || []) Ports.add(Port);
+    }
+    return Array.from(Ports).sort((A, B) => A - B);
+  },
 
   // Apply schema defaults to whatever the user submitted.
   NormalizeSettings: (ID: string, Input: unknown): Record<string, unknown> => {

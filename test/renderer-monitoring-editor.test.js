@@ -233,6 +233,112 @@ test('a result with no usable address is ignored', () => {
   assert.equal(results().size, 0);
 });
 
+// --- Discovery evidence and suggested checks ---------------------------------
+
+const DISCOVERY_METHODS = [
+  { ID: 'ping', Name: 'Ping', Settings: [], Discovery: null },
+  {
+    ID: 'hyperdeck',
+    Name: 'HyperDeck',
+    Settings: [{ Key: 'Port', Type: 'number', Default: 9993 }],
+    Discovery: { Confidence: 'high', TcpPorts: [9993], PortSetting: 'Port' },
+  },
+  {
+    ID: 'http',
+    Name: 'HTTP',
+    Settings: [{ Key: 'Port', Type: 'number', Default: 0 }],
+    Discovery: { Confidence: 'low', TcpPorts: [80, 8080], PortSetting: 'Port' },
+  },
+  {
+    ID: 'pjlink',
+    Name: 'PJLink',
+    Settings: [],
+    Discovery: { Confidence: 'high', PJLink: true },
+  },
+  {
+    ID: 'dante-device',
+    Name: 'Dante Device',
+    UsesAddress: false,
+    Settings: [{ Key: 'DeviceName', Type: 'string', Default: '' }],
+    Discovery: {
+      Confidence: 'high',
+      ServiceTypes: ['_netaudio-arc._udp'],
+      NameSetting: 'DeviceName',
+    },
+  },
+];
+
+test('open ports accumulate across results for an address', () => {
+  MergeNetworkDiscoveryResult({ Address: '10.0.0.5', Source: 'probe', OpenPorts: [80] });
+  MergeNetworkDiscoveryResult({ Address: '10.0.0.5', Source: 'probe', OpenPorts: [9993, 80] });
+  assert.deepEqual(at('10.0.0.5').OpenPorts, [80, 9993]);
+});
+
+test('a PJLink reply is remembered once seen', () => {
+  MergeNetworkDiscoveryResult({ Address: '10.0.0.5', Source: 'pjlink' });
+  MergeNetworkDiscoveryResult({ Address: '10.0.0.5', Source: 'probe', OpenPorts: [80] });
+  assert.equal(at('10.0.0.5').PJLink, true);
+});
+
+test('a port probe does not replace a name an earlier result gave the device', () => {
+  MergeNetworkDiscoveryResult({ Address: '10.0.0.5', Source: 'bonjour', Name: 'Deck 1' });
+  MergeNetworkDiscoveryResult({ Address: '10.0.0.5', Source: 'probe', Name: '10.0.0.5' });
+  assert.equal(at('10.0.0.5').Name, 'Deck 1');
+});
+
+test('Add uses the best suggestion plus a ping check named after the host', () => {
+  State.setMonitoringMethodsCache(DISCOVERY_METHODS);
+  MergeNetworkDiscoveryResult({
+    Address: '10.0.0.5',
+    Source: 'probe',
+    Hostname: 'deck1.local',
+    OpenPorts: [80, 9993],
+  });
+  assert.deepEqual(Editor.BuildNetworkDiscoveryChecks(at('10.0.0.5')), [
+    { Name: 'HyperDeck', Address: '10.0.0.5', Method: 'hyperdeck', Settings: {} },
+    { Name: 'deck1.local', Address: '10.0.0.5', Method: 'ping', Settings: {} },
+  ]);
+});
+
+test("the operator's pick replaces the best suggestion, and survives later results", () => {
+  State.setMonitoringMethodsCache(DISCOVERY_METHODS);
+  MergeNetworkDiscoveryResult({ Address: '10.0.0.5', Source: 'probe', OpenPorts: [8080, 9993] });
+  Editor.SetNetworkDiscoveryChoice('10.0.0.5', 'http');
+  MergeNetworkDiscoveryResult({ Address: '10.0.0.5', Source: 'probe', OpenPorts: [80] });
+
+  const [Chosen] = Editor.BuildNetworkDiscoveryChecks(at('10.0.0.5'));
+  assert.equal(Chosen.Method, 'http');
+  // The probed port that matched, carried over because it is not the default.
+  assert.deepEqual(Chosen.Settings, { Port: 80 });
+});
+
+test('choosing Ping adds just the one ping check', () => {
+  State.setMonitoringMethodsCache(DISCOVERY_METHODS);
+  MergeNetworkDiscoveryResult({ Address: '10.0.0.5', Source: 'probe', OpenPorts: [9993] });
+  Editor.SetNetworkDiscoveryChoice('10.0.0.5', 'ping');
+  assert.deepEqual(Editor.BuildNetworkDiscoveryChecks(at('10.0.0.5')), [
+    { Name: '10.0.0.5', Address: '10.0.0.5', Method: 'ping', Settings: {} },
+  ]);
+});
+
+test('a name-matched check leaves its address empty and carries the device name', () => {
+  State.setMonitoringMethodsCache(DISCOVERY_METHODS);
+  MergeNetworkDiscoveryResult({
+    Address: '10.0.0.7',
+    Source: 'bonjour',
+    Name: 'Stage-Box-1',
+    ServiceType: '_netaudio-arc._udp',
+    Port: 4440,
+  });
+  const [Dante] = Editor.BuildNetworkDiscoveryChecks(at('10.0.0.7'));
+  assert.deepEqual(Dante, {
+    Name: 'Dante Device',
+    Address: '',
+    Method: 'dante-device',
+    Settings: { DeviceName: 'Stage-Box-1' },
+  });
+});
+
 test('resetting discovery clears the accumulated results', () => {
   MergeNetworkDiscoveryResult({ Address: '10.0.0.5', Source: 'probe' });
   assert.equal(results().size, 1);

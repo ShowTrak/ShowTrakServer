@@ -1,5 +1,5 @@
 import type { VariableView } from '@showtrak/protocol';
-import { closeModal, openModal } from './lib/modal';
+import { closeModal, onceHidden, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
 import { HandleNonFatalError, Safe } from './utils';
 import { CloseAllModals } from './modals';
@@ -24,6 +24,9 @@ const VARIABLE_PREFIX = 'SHOWTRAK_VAR_';
 
 let VariableManagerCache: VariableView[] = [];
 let VariableManagerEditingId: number | null = null;
+// Where to go back to when the Variable Manager closes: the client editor it was
+// opened from. Null when it was opened from the menu.
+let VariableManagerReturnTo: (() => unknown) | null = null;
 
 /**
  * Mirror of VariableManager.NormalizeKey for live feedback in the name field.
@@ -51,8 +54,9 @@ export function VariableUsageHint(Key: string): string {
   return `%${EnvironmentKey}%`;
 }
 
-export async function OpenVariableManager() {
+export async function OpenVariableManager(Options: { ReturnTo?: () => unknown } = {}) {
   await CloseAllModals();
+  VariableManagerReturnTo = Options.ReturnTo || null;
   ShowVariableManagerList();
   await RefreshVariableManagerList();
   openModal('SHOWTRAK_MODAL_VARIABLEMANAGER');
@@ -303,6 +307,21 @@ export function InitVariableManager() {
         onClose: () => closeModal('SHOWTRAK_MODAL_VARIABLEMANAGER'),
       }).$el
     );
+
+  // Opened from a client's Variables tab: closing returns to that client.
+  $('#SHOWTRAK_MODAL_VARIABLEMANAGER')
+    .off('hide.bs.modal.variableManagerReturn')
+    .on('hide.bs.modal.variableManagerReturn', (Event) => {
+      if (Event.target !== Event.currentTarget) return;
+      const ReturnTo = VariableManagerReturnTo;
+      VariableManagerReturnTo = null;
+      if (!ReturnTo) return;
+      onceHidden('SHOWTRAK_MODAL_VARIABLEMANAGER', () => {
+        // Something else was opened in its place; leave the operator there.
+        if (document.querySelector('.modal.show')) return;
+        void ReturnTo();
+      });
+    });
 
   $('#VARIABLE_MANAGER_CREATE')
     .off('click')

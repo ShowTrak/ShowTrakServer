@@ -552,6 +552,14 @@
   line-height: 1.3;
   word-break: break-word;
 }
+.NETWORK_DISCOVERY_TABLE .NETWORK_DISCOVERY_METHOD {
+  min-width: 10rem;
+}
+.NETWORK_DISCOVERY_TABLE .nd-reason {
+  font-size: var(--fs-xs);
+  line-height: 1.3;
+  margin-top: 0.15rem;
+}
 #NETWORK_DISCOVERY_TOGGLE_SCAN {
   width: 100%;
   position: relative;

@@ -49,6 +49,7 @@ test('the Web UI leaves client Actions off the rail, and keeps everything else',
   assert.deepEqual(AvailableClientInfoTabs('target', 'web'), [
     'status',
     'actions',
+    'checks',
     'settings',
     'logs',
   ]);
@@ -69,8 +70,14 @@ test('an integrated (SDK) client gets only Status, Info, Wake on LAN, Actions an
   assert.deepEqual(AvailableClientInfoTabs('integrated', 'web'), ['status', 'info', 'wol', 'logs']);
 });
 
-test('a monitoring target gets Status, Actions, Settings and Logs', () => {
-  assert.deepEqual(AvailableClientInfoTabs('target'), ['status', 'actions', 'settings', 'logs']);
+test('a monitoring target gets Status, Actions, Checks, Settings and Logs', () => {
+  assert.deepEqual(AvailableClientInfoTabs('target'), [
+    'status',
+    'actions',
+    'checks',
+    'settings',
+    'logs',
+  ]);
 });
 
 test('a dummy client gets Status, Settings and Logs', () => {

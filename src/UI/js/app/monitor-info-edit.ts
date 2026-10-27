@@ -1,10 +1,11 @@
-// A monitor's Settings tab: its view modal doubling as its editor, the same way
-// a ShowTrak Client's Info tab does (client-info-edit.ts).
+// A monitor's Settings and Checks tabs: its view modal doubling as its editor,
+// the same way a ShowTrak Client's Info tab does (client-info-edit.ts).
 //
-// Show mode renders the slug, name, check interval, failures before offline,
-// tags and checks read-only. Edit mode makes them editable in place, flipping
-// live when the mode changes, and adds dragging checks into a new order,
-// opening a check's edit view, Add Check and Delete Monitor.
+// Show mode renders the slug, name, check interval, failures before offline and
+// tags (Settings) and the checks (Checks) read-only. Edit mode makes them
+// editable in place, flipping live when the mode changes, and adds Delete
+// Monitor to Settings, and to Checks dragging checks into a new order, opening a
+// check's edit view and Add Check.
 //
 // The save model is the monitor editor's: edits autosave half a second after
 // they stop, tags apply as they are clicked. There is no Save button. A check
@@ -90,7 +91,7 @@ function LiveTarget(TargetID: number): MonitoringTargetView | null {
 
 // --- Mounting ----------------------------------------------------------------
 
-/** Take over the view modal's Settings tab for this monitor. */
+/** Take over the view modal's Settings and Checks tabs for this monitor. */
 export async function MountMonitorInfoEditor(TargetID: number): Promise<void> {
   EnsureBound();
   const Token = ++MountToken;

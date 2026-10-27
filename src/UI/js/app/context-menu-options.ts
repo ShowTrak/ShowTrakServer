@@ -285,15 +285,10 @@ export async function BuildContextMenuOptions(
       });
     }
 
-    // Wake on LAN only applies to real adopted clients; monitoring, check,
-    // dummy and FreeKiosk rows carry prefixed selection UUIDs and are excluded.
-    const WolTargets = Selection.filter(
-      (UUID) =>
-        !String(UUID).startsWith('monitor:') &&
-        !String(UUID).startsWith('check:') &&
-        !String(UUID).startsWith('dummy:') &&
-        !String(UUID).startsWith('kiosk:')
-    );
+    // Wake on LAN only applies to real adopted clients. Monitoring, check, dummy
+    // and FreeKiosk rows were partitioned out above, and devices pending
+    // adoption in the Discover lane are plain UUIDs with no AllClients entry.
+    const WolTargets = SelectedClients.map((Client) => Client.UUID);
     // The browser never receives SYSTEM_ALLOW_WOL (settings reach it through a
     // public allowlist), so it uses the capability hint the server sends at
     // connect, which already folds in the WEBUI_ALLOW_WOL permission.

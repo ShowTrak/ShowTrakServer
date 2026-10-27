@@ -131,6 +131,62 @@ export function probePort(ip: string, port: number, timeoutMs: number): Promise<
   });
 }
 
+// Like probePort, but tells a refused connection (the host is up, nothing is
+// listening) apart from no answer at all, since a refusal still proves a host.
+export function probePortState(
+  ip: string,
+  port: number,
+  timeoutMs: number
+): Promise<'open' | 'refused' | 'silent'> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let done = false;
+
+    const complete = (state: 'open' | 'refused' | 'silent') => {
+      if (done) return;
+      done = true;
+      try {
+        socket.destroy();
+      } catch {
+        /* intentional: destroying an already-closed probe socket is harmless */
+      }
+      resolve(state);
+    };
+
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => complete('open'));
+    socket.once('timeout', () => complete('silent'));
+    socket.once('error', (error: NodeJS.ErrnoException) =>
+      complete(error && error.code === 'ECONNREFUSED' ? 'refused' : 'silent')
+    );
+
+    try {
+      socket.connect(port, ip);
+    } catch {
+      complete('silent');
+    }
+  });
+}
+
+/**
+ * Probe every port at once and report which were open, and whether the host
+ * answered at all (an open port or a refusal). Returns null when cancelled.
+ */
+export async function probeHostPorts(
+  ip: string,
+  ports: number[],
+  timeoutMs: number,
+  scan: ScanState
+): Promise<{ Alive: boolean; OpenPorts: number[] } | null> {
+  if (scan.Cancelled) return null;
+  const states = await Promise.all(ports.map((port) => probePortState(ip, port, timeoutMs)));
+  if (scan.Cancelled) return null;
+  return {
+    Alive: states.some((state) => state !== 'silent'),
+    OpenPorts: ports.filter((_port, index) => states[index] === 'open'),
+  };
+}
+
 export async function probeHost(
   ip: string,
   ports: number[],

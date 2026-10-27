@@ -5,17 +5,19 @@
 // Integrated (SDK) clients report none of the hardware/OS inventories, so they
 // get only Status, Info, Wake on LAN and Actions. Monitoring targets get Status,
 // Actions (the controls their check types declare, sent to every check of that
-// type on the target) and Settings (name, interval, tags and checks). Dummy
-// clients get their status timeline and Settings (ID, title, group, interval
-// and tags). FreeKiosk terminals split their metric registry across Content,
-// Screen, Battery, Network and Misc, and add Settings.
+// type on the target), Checks (the check list and Add Check) and Settings
+// (name, interval and tags). Dummy clients get their status timeline and
+// Settings (ID, title, group, interval and tags). FreeKiosk terminals split
+// their metric registry across Content, Screen, Battery, Network and Misc, and
+// add Settings.
 //
 // Every entity is edited from this modal too (in Edit mode). A client's Info,
-// Variables, Wake on LAN and Actions tabs, and every other kind's Settings tab,
-// switch between read-only and editable as the mode changes (client-info-edit,
-// monitor-info-edit, dummy-info-edit and freekiosk-info-edit); on the Web UI
-// too, when its management permissions allow. A client's Actions is desktop
-// only: its update and FOG actions are not exposed to the Web UI.
+// Variables, Wake on LAN and Actions tabs, a monitor's Checks tab, and every
+// other kind's Settings tab, switch between read-only and editable as the mode
+// changes (client-info-edit, monitor-info-edit, dummy-info-edit and
+// freekiosk-info-edit); on the Web UI too, when its management permissions
+// allow. A client's Actions is desktop only: its update and FOG actions are not
+// exposed to the Web UI.
 //
 // Every kind ends with Logs: its slice of the audit log (status changes, edits
 // and actions over the past 24 hours).
@@ -37,6 +39,7 @@ export type ClientInfoTabKey =
   | 'power'
   | 'actions'
   | 'settings'
+  | 'checks'
   | 'controls'
   | 'content'
   | 'screen'
@@ -81,8 +84,15 @@ const CLIENT_INFO_TABS_BY_KIND: Readonly<Record<ClientInfoKind, readonly ClientI
     LOGS_TAB,
   ],
   integrated: [STATUS_TAB, INFO_TAB, WOL_TAB, CLIENT_ACTIONS_TAB, LOGS_TAB],
-  // Settings is the monitor's editor as well as its view, like a client's Info.
-  target: [STATUS_TAB, { Key: 'actions', Title: 'Actions' }, SETTINGS_TAB, LOGS_TAB],
+  // Checks and Settings are the monitor's editor as well as its view, like a
+  // client's Info.
+  target: [
+    STATUS_TAB,
+    { Key: 'actions', Title: 'Actions' },
+    { Key: 'checks', Title: 'Checks' },
+    SETTINGS_TAB,
+    LOGS_TAB,
+  ],
   dummy: [STATUS_TAB, SETTINGS_TAB, LOGS_TAB],
   freekiosk: [
     STATUS_TAB,

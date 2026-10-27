@@ -11,6 +11,7 @@ import type { NetworkScanEvent, NetworkScanResult } from '@showtrak/protocol';
 import { closeModal, openModal } from '../lib/modal';
 import { buildModalHeader } from '../lib/modal-header';
 import {
+  MonitoringMethodsCache,
   NetworkDiscoveryProgress,
   NetworkDiscoveryResults,
   NetworkDiscoveryScanID,
@@ -24,6 +25,7 @@ import { ErrorMessage, HandleNonFatalError, Safe } from '../utils';
 import { CloseAllModals } from '../modals';
 import { Notify } from '../selection-init';
 import { EnsureMonitoringMethodsLoaded } from './method-fields';
+import { FALLBACK_METHOD, SuggestChecks, type CheckSuggestion } from '../lib/check-suggestions';
 
 /** A network-discovered device as merged/stored in the discovery results map. */
 interface DiscoveredDevice {
@@ -35,7 +37,21 @@ interface DiscoveredDevice {
   ServiceType?: string;
   Port?: number | null;
   MethodHint?: string;
-  Services?: Array<{ type: string; port: number | null }>;
+  Services?: Array<{ type: string; port: number | null; name?: string | null }>;
+  // Every TCP port any probe found open, accumulated across results.
+  OpenPorts?: number[];
+  // Answered PJLink's UDP search.
+  PJLink?: boolean;
+  // The check the operator picked from the suggestions; unset means the best.
+  ChosenMethod?: string;
+}
+
+/** A check the wizard hands to the monitor editor. */
+export interface DiscoveryCheckPrefill {
+  Name: string;
+  Address: string;
+  Method: string;
+  Settings: Record<string, unknown>;
 }
 
 export function SetNetworkDiscoveryStatus(label: string) {
@@ -79,47 +95,104 @@ export function SetNetworkDiscoveryProgress(percent: number, current = 0, total 
   }
 }
 
-export function RenderNetworkDiscoveryResults() {
-  const $host = $('#NETWORK_DISCOVERY_RESULTS_BODY');
-  if (!$host.length) return;
-  const list = Array.from<DiscoveredDevice>(NetworkDiscoveryResults.values()).sort((a, b) => {
-    const aIp = ParseIPv4ToNumber(a.Address);
-    const bIp = ParseIPv4ToNumber(b.Address);
-    if (aIp != null && bIp != null) return aIp - bIp;
-    if (aIp != null) return -1;
-    if (bIp != null) return 1;
-    return String(a.Address || '').localeCompare(String(b.Address || ''));
-  });
+/** Check suggestions for a discovered device, most likely first. */
+export function GetNetworkDiscoverySuggestions(Device: DiscoveredDevice): CheckSuggestion[] {
+  return SuggestChecks(Device, MonitoringMethodsCache);
+}
 
-  if (!list.length) {
-    $host.html(`
-      <tr>
-        <td colspan="5" class="text-muted text-center py-3">
-          No devices discovered yet. Start a scan to search your local network.
-        </td>
-      </tr>
-    `);
-    return;
+/** The suggestion that Add will use: the operator's pick, else the best. */
+export function GetNetworkDiscoveryChoice(Device: DiscoveredDevice): CheckSuggestion | null {
+  const Suggestions = GetNetworkDiscoverySuggestions(Device);
+  return (
+    Suggestions.find((Suggestion) => Suggestion.Method === Device.ChosenMethod) ||
+    Suggestions[0] ||
+    null
+  );
+}
+
+export function SetNetworkDiscoveryChoice(ID: string, Method: string) {
+  const Device = NetworkDiscoveryResults.get(ID) as DiscoveredDevice | undefined;
+  if (!Device) return;
+  Device.ChosenMethod = Method;
+  RenderNetworkDiscoveryRow(ID);
+}
+
+/**
+ * The checks a new monitor for this device starts with: the chosen check, plus
+ * a ping check named after the device so its reachability is watched even when
+ * the chosen check is something richer.
+ */
+export function BuildNetworkDiscoveryChecks(Device: DiscoveredDevice): DiscoveryCheckPrefill[] {
+  const Address = String(Device.Address || '').trim();
+  if (!Address) return [];
+  const Label = String(Device.Hostname || '').trim() || Address;
+  const Choice = GetNetworkDiscoveryChoice(Device);
+  const Checks: DiscoveryCheckPrefill[] = [];
+  if (Choice && Choice.Method !== FALLBACK_METHOD) {
+    const Method = MonitoringMethodsCache.find((Entry) => Entry.ID === Choice.Method);
+    Checks.push({
+      Name: Choice.Name,
+      // Name-matched methods (Dante, NDI) ignore the address.
+      Address: Method && Method.UsesAddress === false ? '' : Address,
+      Method: Choice.Method,
+      Settings: { ...Choice.Settings },
+    });
   }
+  if (MonitoringMethodsCache.some((Entry) => Entry.ID === FALLBACK_METHOD)) {
+    Checks.push({ Name: Label, Address, Method: FALLBACK_METHOD, Settings: {} });
+  }
+  return Checks;
+}
 
-  let html = '';
-  for (const item of list) {
-    const id = Safe(item.ID);
-    const sourceKey = String(item.Source || 'unknown').toLowerCase();
-    const sourceLabel =
-      sourceKey === 'bonjour' ? 'mDNS' : sourceKey === 'pjlink' ? 'PJLink' : 'Scan';
-    const serviceList = Array.isArray(item.Services) ? item.Services.slice(0, 5) : [];
-    const details: string[] = [];
-    if (item.Hostname) details.push(`host: ${Safe(item.Hostname)}`);
-    if (serviceList.length) {
-      details.push(`services: ${Safe(serviceList.map((s) => s.type).join(', '))}`);
-    } else if (item.ServiceType) {
-      details.push(`service: ${Safe(item.ServiceType)}`);
-    }
-    if (item.Port) details.push(`port: ${Safe(String(item.Port))}`);
-    const detailsText = details.length ? details.join(' · ') : '-';
-    html += `
-      <tr>
+function CompareDevices(a: DiscoveredDevice, b: DiscoveredDevice) {
+  const aIp = ParseIPv4ToNumber(a.Address);
+  const bIp = ParseIPv4ToNumber(b.Address);
+  if (aIp != null && bIp != null) return aIp - bIp;
+  if (aIp != null) return -1;
+  if (bIp != null) return 1;
+  return String(a.Address || '').localeCompare(String(b.Address || ''));
+}
+
+function SuggestionLabel(Suggestion: CheckSuggestion) {
+  return Suggestion.NeedsSetup ? `${Suggestion.Name} (needs setup)` : Suggestion.Name;
+}
+
+function BuildNetworkDiscoveryRow(item: DiscoveredDevice) {
+  const id = Safe(item.ID);
+  const sourceKey = String(item.Source || 'unknown').toLowerCase();
+  const sourceLabel = sourceKey === 'bonjour' ? 'mDNS' : sourceKey === 'pjlink' ? 'PJLink' : 'Scan';
+  const serviceList = Array.isArray(item.Services) ? item.Services.slice(0, 5) : [];
+  const details: string[] = [];
+  if (item.Hostname) details.push(`host: ${Safe(item.Hostname)}`);
+  if (serviceList.length) {
+    details.push(`services: ${Safe(serviceList.map((s) => s.type).join(', '))}`);
+  } else if (item.ServiceType) {
+    details.push(`service: ${Safe(item.ServiceType)}`);
+  }
+  if (item.OpenPorts && item.OpenPorts.length) {
+    details.push(`open: ${Safe(item.OpenPorts.join(', '))}`);
+  } else if (item.Port) {
+    details.push(`port: ${Safe(String(item.Port))}`);
+  }
+  const detailsText = details.length ? details.join(' · ') : '-';
+
+  const Suggestions = GetNetworkDiscoverySuggestions(item);
+  const Choice = GetNetworkDiscoveryChoice(item);
+  const suggestionCell = Suggestions.length
+    ? `<select class="form-select form-select-sm NETWORK_DISCOVERY_METHOD" data-id="${id}"
+          aria-label="Suggested check">
+        ${Suggestions.map(
+          (Suggestion) =>
+            `<option value="${Safe(Suggestion.Method)}"${
+              Choice && Choice.Method === Suggestion.Method ? ' selected' : ''
+            }>${Safe(SuggestionLabel(Suggestion))}</option>`
+        ).join('')}
+      </select>
+      <div class="nd-reason text-muted small">${Safe(Choice ? Choice.Reason : '')}</div>`
+    : '<span class="text-muted">-</span>';
+
+  return `
+      <tr data-id="${id}">
         <td>
           <div class="nd-name">${Safe(item.Name || item.Address || 'Unnamed Device')}</div>
         </td>
@@ -129,6 +202,7 @@ export function RenderNetworkDiscoveryResults() {
         <td>
           <span class="badge bg-ghost-light text-light">${Safe(sourceLabel)}</span>
         </td>
+        <td>${suggestionCell}</td>
         <td>
           <div class="nd-details">${Safe(detailsText)}</div>
         </td>
@@ -138,8 +212,51 @@ export function RenderNetworkDiscoveryResults() {
           </button>
         </td>
       </tr>`;
+}
+
+export function RenderNetworkDiscoveryResults() {
+  const $host = $('#NETWORK_DISCOVERY_RESULTS_BODY');
+  if (!$host.length) return;
+  const list = Array.from<DiscoveredDevice>(NetworkDiscoveryResults.values()).sort(CompareDevices);
+
+  if (!list.length) {
+    $host.html(`
+      <tr class="nd-empty">
+        <td colspan="6" class="text-muted text-center py-3">
+          No devices discovered yet. Start a scan to search your local network.
+        </td>
+      </tr>
+    `);
+    return;
   }
-  $host.html(html);
+
+  $host.html(list.map(BuildNetworkDiscoveryRow).join(''));
+}
+
+/**
+ * Redraw one device's row in place, or insert it in address order. Results
+ * stream in for the whole scan, and redrawing the table each time would close
+ * a suggestion dropdown the operator had open on another row.
+ */
+export function RenderNetworkDiscoveryRow(ID: string) {
+  const $host = $('#NETWORK_DISCOVERY_RESULTS_BODY');
+  if (!$host.length) return;
+  const Device = NetworkDiscoveryResults.get(ID) as DiscoveredDevice | undefined;
+  if (!Device) return;
+  $host.children('tr.nd-empty').remove();
+  const $row = $(BuildNetworkDiscoveryRow(Device));
+  const $existing = $host.children('tr').filter((_i, el) => $(el).attr('data-id') === ID);
+  if ($existing.length) {
+    $existing.replaceWith($row);
+    return;
+  }
+  const $after = $host.children('tr').filter((_i, el) => {
+    const Other = NetworkDiscoveryResults.get($(el).attr('data-id') || '') as
+      DiscoveredDevice | undefined;
+    return !!Other && CompareDevices(Other, Device) > 0;
+  });
+  if ($after.length) $after.first().before($row);
+  else $host.append($row);
 }
 
 export function ResetNetworkDiscoveryState() {
@@ -162,6 +279,7 @@ export function MergeNetworkDiscoveryResult(result: NetworkScanResult) {
   if (result.Source === 'bonjour') {
     const serviceType = String(result.ServiceType || '').trim();
     const servicePort = result.Port == null ? null : Number(result.Port);
+    const serviceName = String(result.Name || '').trim() || null;
     const dedupeKey = `${serviceType.toLowerCase()}:${Number.isFinite(servicePort) ? servicePort : 0}`;
     if (
       serviceType &&
@@ -172,6 +290,7 @@ export function MergeNetworkDiscoveryResult(result: NetworkScanResult) {
       nextServices.push({
         type: serviceType,
         port: Number.isFinite(servicePort) ? servicePort : null,
+        name: serviceName,
       });
     }
   }
@@ -183,16 +302,28 @@ export function MergeNetworkDiscoveryResult(result: NetworkScanResult) {
   // Likewise keep the richer PJLink source badge once we've seen it.
   const source = existing.Source === 'pjlink' ? 'pjlink' : result.Source || existing.Source;
 
+  const openPorts = Array.from(
+    new Set([...(existing.OpenPorts || []), ...(result.OpenPorts || [])])
+  ).sort((a, b) => a - b);
+
   NetworkDiscoveryResults.set(addressKey, {
     ...existing,
     ...result,
+    // A port probe names the host by its address; keep any real name seen.
+    Name:
+      existing.Name && existing.Name !== existing.Address && result.Source === 'probe'
+        ? existing.Name
+        : result.Name || existing.Name,
     Source: source,
     MethodHint: methodHint,
     Hostname: result.Hostname || existing.Hostname || null,
     Services: nextServices,
+    OpenPorts: openPorts,
+    PJLink: !!existing.PJLink || result.Source === 'pjlink',
+    ChosenMethod: existing.ChosenMethod,
     ID: addressKey,
   });
-  RenderNetworkDiscoveryResults();
+  RenderNetworkDiscoveryRow(addressKey);
 }
 
 export function HandleNetworkDiscoveryEvent(event: NetworkScanEvent) {

@@ -897,6 +897,28 @@ body.mode-edit #APPLICATION_CONTAINER {
   color: var(--text-faint);
 }
 
+/* A control that is not itself a field (a range slider under its label, a
+   toggle row) boxed to sit among fields: the same radius and the same shade
+   per state, so it reads as one of them in Edit mode and in Show mode alike. */
+.field-box {
+  background-color: var(--field-bg);
+  border-radius: var(--radius-md);
+  transition: background-color 150ms ease;
+}
+
+.field-box:hover {
+  background-color: var(--field-bg-hover);
+}
+
+.field-box:focus-within {
+  background-color: var(--field-bg-focus);
+}
+
+.field-box:has(input:disabled) {
+  background-color: var(--field-bg-disabled);
+  color: var(--text-soft);
+}
+
 /* 3D keyboard key styling for <kbd> elements */
 kbd {
   display: inline-block;
