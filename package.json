@@ -104,7 +104,7 @@
     "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript": "~5.7",
-    "typescript-eslint": "^8.71.2"
+    "typescript-eslint": "^8.72.0"
   },
   "dependencies": {
     "@showtrak/protocol": "file:./shared",
