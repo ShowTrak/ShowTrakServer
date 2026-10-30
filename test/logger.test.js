@@ -179,3 +179,61 @@ test('LOG_LEVEL overrides the packaged default, so a field server can be made ve
     'LOG_LEVEL=debug is how a misbehaving server on site produces detail without a rebuild'
   );
 });
+
+test('a burst of lines lands in order, in a handful of appends rather than one each', async (t) => {
+  // File writes are batched: lines logged while an append is in flight go out
+  // together once it lands. Order must survive that.
+  const logsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-logs-'));
+  const previous = { level: process.env.LOG_LEVEL, console: process.env.LOG_TO_CONSOLE };
+  process.env.LOG_LEVEL = 'info';
+  process.env.LOG_TO_CONSOLE = 'false';
+  t.after(() => {
+    process.env.LOG_LEVEL = previous.level;
+    process.env.LOG_TO_CONSOLE = previous.console;
+  });
+
+  let Appends = 0;
+  const RealAppend = fs.promises.appendFile;
+  t.mock.method(fs.promises, 'appendFile', (...Args) => {
+    Appends++;
+    return RealAppend.apply(fs.promises, Args);
+  });
+
+  const Logger = loadLogger(logsDir);
+  const log = Logger.CreateLogger('Burst');
+  for (let I = 0; I < 500; I++) log.info(`line ${I}`);
+  await Logger.flushLogWrites();
+
+  const [File] = fs.readdirSync(logsDir).filter((f) => f.endsWith('.log'));
+  const Lines = fs
+    .readFileSync(path.join(logsDir, File), 'utf8')
+    .split('\n')
+    .filter((L) => / line \d+$/.test(L))
+    .map((L) => Number(L.match(/ line (\d+)$/)[1]));
+  assert.deepEqual(
+    Lines,
+    Array.from({ length: 500 }, (_, I) => I),
+    'every line, in order'
+  );
+  assert.ok(Appends <= 3, `${Appends} appends for 500 lines`);
+});
+
+test('logging recovers when the log folder is removed while running', async (t) => {
+  const logsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-logs-'));
+  const previous = { level: process.env.LOG_LEVEL, console: process.env.LOG_TO_CONSOLE };
+  process.env.LOG_LEVEL = 'info';
+  process.env.LOG_TO_CONSOLE = 'false';
+  t.after(() => {
+    process.env.LOG_LEVEL = previous.level;
+    process.env.LOG_TO_CONSOLE = previous.console;
+  });
+  const Logger = loadLogger(logsDir);
+  const log = Logger.CreateLogger('Gone');
+  log.info('before');
+  await Logger.flushLogWrites();
+  fs.rmSync(logsDir, { recursive: true, force: true });
+  log.info('after');
+  await Logger.flushLogWrites();
+  const [File] = fs.readdirSync(logsDir).filter((f) => f.endsWith('.log'));
+  assert.match(fs.readFileSync(path.join(logsDir, File), 'utf8'), /after/);
+});

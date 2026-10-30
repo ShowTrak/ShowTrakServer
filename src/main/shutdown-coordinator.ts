@@ -9,7 +9,7 @@
 // their bodies to these methods. Behavior is identical to the original inline
 // handlers; only the ownership of the flags moved.
 import type { BrowserWindow as ElectronBrowserWindow } from 'electron';
-import { CreateLogger } from '../Modules/Logger';
+import { CreateLogger, flushLogWrites } from '../Modules/Logger';
 import { DB_PENDING_OPERATION_TIMEOUT_MS } from '../Modules/Config/constants';
 import { stopAutosave } from './autosave';
 const { app } = require('electron/main');
@@ -275,6 +275,15 @@ async function runShutdownCleanup(): Promise<void> {
     await DBManager.Shutdown({ TimeoutMs: DB_PENDING_OPERATION_TIMEOUT_MS });
   } catch (Err) {
     Logger.error('DB shutdown cleanup failed:', Err);
+  }
+
+  // Log lines are appended in batches; give the last of them a moment to reach
+  // the file, but never hold the quit up on a stuck disk.
+  if (typeof flushLogWrites === 'function') {
+    await Promise.race([
+      flushLogWrites().catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, 1000).unref?.()),
+    ]);
   }
 }
 

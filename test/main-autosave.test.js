@@ -20,6 +20,7 @@ function resetState(overrides = {}) {
     currentFilePath: '/shows/current.showtrak',
     saveResult: [null, true],
     getValueThrows: false,
+    unsaved: true,
     ...overrides,
   };
   calls = { save: [], errors: [] };
@@ -59,6 +60,7 @@ const restore = installModuleMocks([
     value: {
       Manager: {
         GetCurrentFilePath: () => state.currentFilePath,
+        HasUnsavedChanges: async () => state.unsaved,
         Save: async (path) => {
           calls.save.push(path);
           return state.saveResult;
@@ -183,6 +185,21 @@ test('a tick is a no-op when no show file is open', async () => {
   mock.timers.tick(MINUTE);
   await flush();
   assert.deepEqual(calls.save, []);
+});
+
+test('a tick skips the save when nothing changed since the last one', async () => {
+  // A save rewrites the whole database to disk; an idle show must not repeat it.
+  const A = freshAutosave({ intervalMinutes: 1, unsaved: false });
+  await A.scheduleAutosave();
+  mock.timers.tick(5 * MINUTE);
+  await flush();
+  assert.deepEqual(calls.save, []);
+
+  // The first edit after that is saved on the next tick.
+  state.unsaved = true;
+  mock.timers.tick(MINUTE);
+  await flush();
+  assert.deepEqual(calls.save, ['/shows/current.showtrak']);
 });
 
 test('a tick follows the current file path when the show is saved elsewhere', async () => {

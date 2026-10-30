@@ -56,6 +56,11 @@ let schemaInitialized = false;
 let schemaInitializationPromise: Promise<void> | null = null;
 let readyPromise: Promise<void> | null = null;
 let hasUnsavedChanges = false;
+// Bumped by every write that marks the show unsaved. A snapshot records it once
+// VACUUM INTO has finished, so MarkClean after a save can tell whether a write
+// landed while the snapshot was being moved into place and so is not in it.
+let dirtyGeneration = 0;
+let snapshotGeneration: number | null = null;
 let isShuttingDown = false;
 // True while a connection swap holds the exclusive section, so the schema
 // migrations it triggers open their transactions without queueing for it.
@@ -451,6 +456,7 @@ function ExecRun(
       }
       if (markDirty && ShouldMarkAsUnsaved(Query)) {
         hasUnsavedChanges = true;
+        dirtyGeneration++;
       }
       EndOperation(InTx);
       resolve([null, this]);
@@ -585,9 +591,36 @@ Manager.RunWithoutDirtyTracking = async (
 
 Manager.HasUnsavedChanges = async (): Promise<boolean> => hasUnsavedChanges;
 
+// After a save this keeps the show unsaved when a write arrived after the
+// snapshot was taken (the rename into place yields, for up to ~1.5 s while a
+// busy file is retried on Windows); otherwise that edit would be in neither the
+// show file nor any later autosave.
 Manager.MarkClean = (): void => {
-  hasUnsavedChanges = false;
+  hasUnsavedChanges = snapshotGeneration !== null && dirtyGeneration !== snapshotGeneration;
+  snapshotGeneration = null;
 };
+
+// Error codes a rename over an existing file can transiently fail with on
+// Windows, while antivirus, a sync client (OneDrive, Dropbox) or the search
+// indexer briefly holds the target open. Elsewhere a rename over an open file
+// succeeds, so these only ever retry there in practice.
+const TRANSIENT_RENAME_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
+const RENAME_RETRY_DELAYS_MS = [50, 100, 200, 400, 800];
+
+async function RenameWithRetry(From: string, To: string): Promise<void> {
+  for (let Attempt = 0; ; Attempt++) {
+    try {
+      await fs.promises.rename(From, To);
+      return;
+    } catch (err) {
+      const Code = (err as NodeJS.ErrnoException | null)?.code;
+      const Delay = RENAME_RETRY_DELAYS_MS[Attempt];
+      if (Delay === undefined || !Code || !TRANSIENT_RENAME_CODES.has(Code)) throw err;
+      Logger.warn(`Show file is busy (${Code}); retrying the save in ${Delay} ms`);
+      await new Promise((resolve) => setTimeout(resolve, Delay));
+    }
+  }
+}
 
 // Write a consistent, compacted snapshot of the entire database to TargetPath.
 // Used by "Save As" to produce a portable .ShowTrak file. VACUUM INTO requires
@@ -611,10 +644,13 @@ Manager.SnapshotTo = async (TargetPath: string): Promise<DBResult<string>> => {
     // VACUUM INTO does not accept bound parameters on all SQLite builds, so the
     // path is inlined as a quoted string literal with single quotes escaped.
     const Escaped = TempPath.replace(/'/g, "''");
+    snapshotGeneration = null;
     const [Err] = await Manager.Run(`VACUUM INTO '${Escaped}'`);
     if (Err) return [Err, null];
-    fs.renameSync(TempPath, TargetPath);
+    const Generation = dirtyGeneration;
+    await RenameWithRetry(TempPath, TargetPath);
     TempPath = null;
+    snapshotGeneration = Generation;
     return [null, TargetPath];
   } catch (err) {
     Logger.databaseError('Failed to snapshot database:', err);

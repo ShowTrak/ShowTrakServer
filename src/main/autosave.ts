@@ -19,6 +19,11 @@ async function RunAutosaveTick(): Promise<void> {
     if (!Enabled) return;
     const CurrentPath = BackupManager.GetCurrentFilePath();
     if (!CurrentPath) return;
+    // Nothing changed since the last save: the file on disk is already current.
+    // Saving is a full VACUUM INTO + rename of the whole database, which every
+    // tick of an idle show used to repeat (and which, on Windows, antivirus and
+    // sync clients then rescan). Shutdown applies the same rule.
+    if (!(await BackupManager.HasUnsavedChanges())) return;
     const [Err] = await BackupManager.Save(CurrentPath);
     if (Err) {
       Logger.error('Autosave failed:', Err);

@@ -105,33 +105,63 @@ function TagPlain(Text: string, Type: string): string {
   }]`;
 }
 
-// Daily rollover: compute today's file on each write and ensure it exists.
+// Daily rollover: each line is filed under the day it was logged.
 function getTodayLogFilePath(): string {
   const fileName = `ShowTrakServer-${GetDatestampLabel()}.log`;
   return path.join(LogDirectory, fileName);
 }
 
-async function ensureTodayLogFile(): Promise<string> {
-  const filePath = getTodayLogFilePath();
+// Append one batch to its file. appendFile creates the file; the folder is only
+// recreated if something removed it while the server was running.
+async function appendBatch(filePath: string, text: string): Promise<void> {
   try {
+    await fsp.appendFile(filePath, text, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException | null)?.code !== 'ENOENT') throw err;
     await fsp.mkdir(LogDirectory, { recursive: true });
-    await fsp.access(filePath).catch(() => fsp.writeFile(filePath, '', 'utf8'));
-  } catch {
-    void 0;
+    await fsp.appendFile(filePath, text, 'utf8');
   }
-  return filePath;
 }
 
-// Simple write queue to keep ordering and avoid sync I/O.
+// Ordered, asynchronous file writes, batched: lines logged while a write is in
+// flight go out together in one append once it lands. This used to be a mkdir,
+// an access check and an open/append/close per line, which during a burst
+// (a reconnect storm, a deployment to every client) was most of the logger's
+// cost, and on Windows each open is also scanned by antivirus.
 let writeTail: Promise<unknown> = Promise.resolve();
+let pendingLines: Array<{ filePath: string; line: string }> = [];
 function enqueueWrite(line: string): void {
   if (IsInInstallation || !Settings.toFile) return;
+  pendingLines.push({ filePath: getTodayLogFilePath(), line });
+  if (pendingLines.length > 1) return; // a flush is already queued for this batch
   writeTail = writeTail
     .then(async () => {
-      const filePath = await ensureTodayLogFile();
-      await fsp.appendFile(filePath, line + '\n', 'utf8');
+      const batch = pendingLines;
+      pendingLines = [];
+      // Consecutive lines for the same day's file become one append; a batch
+      // spanning midnight splits at the rollover, keeping order.
+      let i = 0;
+      while (i < batch.length) {
+        const filePath = batch[i]!.filePath;
+        let text = '';
+        while (i < batch.length && batch[i]!.filePath === filePath) {
+          text += batch[i]!.line + '\n';
+          i++;
+        }
+        try {
+          await appendBatch(filePath, text);
+        } catch {
+          /* file logging is best-effort; the console still has the line */
+        }
+      }
     })
     .catch(() => null);
+}
+
+// Resolves once every line logged so far has been handed to the OS. For tests
+// and orderly shutdown; logging itself never waits on it.
+export function flushLogWrites(): Promise<void> {
+  return writeTail.then(() => (pendingLines.length ? flushLogWrites() : undefined));
 }
 
 // serializeArg / stripAnsi now come from @showtrak/protocol/runtime (aliased at

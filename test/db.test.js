@@ -476,6 +476,93 @@ test('DB.SnapshotTo creates a portable file that ReplaceWithFile can open', asyn
   await DB.Shutdown();
 });
 
+test('DB.SnapshotTo retries a save the OS reports as busy (Windows file locks)', async (t) => {
+  // Antivirus or a sync client briefly holding the show file open makes the
+  // rename over it fail with EBUSY/EPERM on Windows; that must not fail a save.
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const { Manager: DB } = loadDB(storageDir);
+  await DB.Ready();
+  const snapshotPath = path.join(storageDir, 'Show.ShowTrak');
+
+  const RealRename = fs.promises.rename;
+  let Attempts = 0;
+  t.mock.method(fs.promises, 'rename', async (From, To) => {
+    Attempts++;
+    if (Attempts <= 2) {
+      throw Object.assign(new Error('resource busy or locked'), {
+        code: Attempts === 1 ? 'EBUSY' : 'EPERM',
+      });
+    }
+    return RealRename.call(fs.promises, From, To);
+  });
+
+  const [snapErr] = await DB.SnapshotTo(snapshotPath);
+  assert.equal(snapErr, null);
+  assert.equal(Attempts, 3);
+  assert.equal(fs.existsSync(snapshotPath), true);
+  await DB.Shutdown();
+});
+
+test('an edit made while a save is being moved into place keeps the show unsaved', async (t) => {
+  // The snapshot is taken before the rename, so an edit landing during it is
+  // not in the file; MarkClean after the save must not hide it from autosave.
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const { Manager: DB } = loadDB(storageDir);
+  await DB.Ready();
+  const snapshotPath = path.join(storageDir, 'Show.ShowTrak');
+
+  const RealRename = fs.promises.rename;
+  let EditDuringRename = true;
+  t.mock.method(fs.promises, 'rename', async (From, To) => {
+    if (EditDuringRename) {
+      await DB.Run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', ['Late', 1]);
+    }
+    return RealRename.call(fs.promises, From, To);
+  });
+
+  const [snapErr] = await DB.SnapshotTo(snapshotPath);
+  assert.equal(snapErr, null);
+  DB.MarkClean();
+  assert.equal(await DB.HasUnsavedChanges(), true, 'the late edit still needs saving');
+
+  // A save with no edit during it leaves the show clean.
+  EditDuringRename = false;
+  const [againErr] = await DB.SnapshotTo(snapshotPath);
+  assert.equal(againErr, null);
+  DB.MarkClean();
+  assert.equal(await DB.HasUnsavedChanges(), false);
+
+  // MarkClean outside a save (Open, New) always clears.
+  await DB.Run('INSERT INTO Groups (Title, Weight) VALUES (?, ?)', ['Edit', 2]);
+  DB.MarkClean();
+  assert.equal(await DB.HasUnsavedChanges(), false);
+  await DB.Shutdown();
+});
+
+test('DB.SnapshotTo fails at once on a non-transient error and removes its temp file', async (t) => {
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const { Manager: DB } = loadDB(storageDir);
+  await DB.Ready();
+  const snapshotPath = path.join(storageDir, 'Show.ShowTrak');
+
+  let Attempts = 0;
+  t.mock.method(fs.promises, 'rename', async () => {
+    Attempts++;
+    throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' });
+  });
+
+  const [snapErr] = await DB.SnapshotTo(snapshotPath);
+  assert.ok(snapErr);
+  assert.equal(Attempts, 1);
+  assert.equal(fs.existsSync(snapshotPath), false);
+  assert.deepEqual(
+    fs.readdirSync(storageDir).filter((F) => F.includes('.snapshot-')),
+    [],
+    'temp snapshot cleaned up'
+  );
+  await DB.Shutdown();
+});
+
 test('DB.ReplaceWithFile rejects files that are not ShowTrak databases', async () => {
   const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
   const { Manager: DB } = loadDB(storageDir);
