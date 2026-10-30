@@ -635,6 +635,41 @@ test('ClientManager manages groups, ordering, and reconciliation', async () => {
   void DB;
 });
 
+test('moving several clients at once announces the list change once', async () => {
+  // Each ClientListChanged re-sends the whole list to every renderer; a drag
+  // of K clients used to send it K+1 times.
+  const { Manager, events } = await loadClientManager();
+  for (const UUID of ['m1', 'm2', 'm3', 'm4']) await Manager.Create(UUID);
+  // Loaded first: a first load announces the list itself, which is not under test.
+  await Manager.GetAll();
+  const ListChanges = () => events.filter((E) => E === 'ClientListChanged').length;
+
+  let Before = ListChanges();
+  await Manager.SetGroupOrder(3, ['m1', 'm2', 'm3', 'm4']);
+  assert.equal(ListChanges() - Before, 1, 'SetGroupOrder');
+  for (const UUID of ['m1', 'm2', 'm3', 'm4'])
+    assert.equal((await Manager.Get(UUID))[1].GroupID, 3);
+
+  Before = ListChanges();
+  await Manager.SetGroupOrderWithWeights(4, ['m1', 'm2', 'm3'], [5, 6, 7]);
+  assert.equal(ListChanges() - Before, 1, 'SetGroupOrderWithWeights');
+
+  Before = ListChanges();
+  const [, Changed] = await Manager.ReconcileOrphanedGroups([3]);
+  assert.equal(Changed, 3);
+  assert.equal(ListChanges() - Before, 1, 'ReconcileOrphanedGroups');
+
+  Before = ListChanges();
+  await Manager.ReconcileOrphanedGroups([3]);
+  assert.equal(ListChanges() - Before, 0, 'nothing to reconcile, nothing announced');
+
+  // A single, direct move still announces itself.
+  Before = ListChanges();
+  await (await Manager.Get('m1'))[1].SetGroupID(9);
+  assert.equal(ListChanges() - Before, 1);
+  await Manager.ClearCache();
+});
+
 test('ClientManager.Timeout marks a client offline', async () => {
   const { Manager } = await loadClientManager();
   await Manager.Create('t1');

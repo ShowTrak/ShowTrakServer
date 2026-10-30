@@ -110,6 +110,39 @@ interface ScriptExecutionInfo {
   Status?: unknown;
 }
 
+// Client fields that exist only for the main process's own bookkeeping: the raw
+// last reports the views are derived from, and change-detection signatures. No
+// renderer reads them, yet structured-cloning them on every heartbeat (the
+// running-application report alone holds up to 4096 entries) dominated the IPC
+// cost of a large rig.
+const RENDERER_INTERNAL_CLIENT_FIELDS = new Set([
+  'ConnectedUSBDeviceList',
+  'ConnectedDisplayList',
+  'ObservedAudio',
+  'ObservedStorage',
+  'ObservedRunningApplications',
+  'RunningApplicationsSignature',
+  'ObservedRunningApplicationsSignature',
+]);
+
+// Shallow copy of a client without its internal fields. Copies the same own
+// enumerable properties structured clone would have sent, so the renderer sees
+// an unchanged shape minus fields it never read. Anything that is not a plain
+// client object is passed through untouched.
+function ToRendererClient<T>(Client: T): T {
+  if (!Client || typeof Client !== 'object') return Client;
+  const Out: Record<string, unknown> = {};
+  for (const Key of Object.keys(Client)) {
+    if (RENDERER_INTERNAL_CLIENT_FIELDS.has(Key)) continue;
+    Out[Key] = (Client as Record<string, unknown>)[Key];
+  }
+  return Out as T;
+}
+
+function ToRendererClientList<T>(Clients: T[] | null | undefined): T[] {
+  return Array.isArray(Clients) ? Clients.map(ToRendererClient) : [];
+}
+
 // Push the entire settings payload and group metadata to the renderer.
 async function UpdateSettings(): Promise<void> {
   if (!hasMainWindow()) return;
@@ -147,6 +180,8 @@ async function USBDeviceAdded(Client: BroadcastClient, Device: USBDevice): Promi
   Logger.log(
     `USB Device Added to ${Client.UUID} (${Device.ManufacturerName} ${Device.ProductName})`
   );
+  // The SDK forwards this client object as-is, so it goes out whole: these
+  // are rare, and the /sdk payload must not change under existing consumers.
   PushToRenderers('USBDeviceAdded', Client, Device);
   AlertsManager.HandleUSBDeviceConnected(Client, Device).catch((Err: unknown) =>
     Logger.error('AlertsManager.HandleUSBDeviceConnected failed', Err)
@@ -171,6 +206,8 @@ async function USBDeviceRemoved(Client: BroadcastClient, Device: USBDevice): Pro
   Logger.log(
     `USB Device Removed from ${Client.UUID} (${Device.ManufacturerName} ${Device.ProductName})`
   );
+  // The SDK forwards this client object as-is, so it goes out whole: these
+  // are rare, and the /sdk payload must not change under existing consumers.
   PushToRenderers('USBDeviceRemoved', Client, Device);
   AlertsManager.HandleUSBDeviceDisconnected(Client, Device).catch((Err: unknown) =>
     Logger.error('AlertsManager.HandleUSBDeviceDisconnected failed', Err)
@@ -314,7 +351,7 @@ async function ReinitializeSystem(): Promise<void> {
   await UpdateTagList();
   await UpdateVariableList();
 
-  PushToRenderers('SetFullClientList', Clients, Groups);
+  PushToRenderers('SetFullClientList', ToRendererClientList(Clients), Groups);
 
   // Re-send every connected client its variables for the new show, including
   // the removal of any the old show exported to the Windows user environment.
@@ -323,7 +360,7 @@ async function ReinitializeSystem(): Promise<void> {
 
 async function ClientUpdated(Client: BroadcastClient): Promise<void> {
   if (hasMainWindow()) {
-    PushToRenderers('ClientUpdated', Client);
+    PushToRenderers('ClientUpdated', ToRendererClient(Client));
   }
 
   recordClientHistorySample(Client);
@@ -382,8 +419,44 @@ async function UpdateFullClientList(): Promise<void> {
   syncClientVitalsHistory(Clients || []);
   syncClientSystemCheckHistoryStore(Clients || []);
   syncClientStorageHistoryStore(Clients || []);
-  PushToRenderers('SetFullClientList', Clients, Groups);
+  PushToRenderers('SetFullClientList', ToRendererClientList(Clients), Groups);
 }
+
+// Run `Fn` for a burst of triggers at most twice: once now, and once more after
+// it if anything asked while it ran. The follow-up reads the state as it is when
+// it starts, so the last change is always reflected; the triggers in between
+// would only have re-sent the same list.
+function Coalesce(Fn: () => Promise<void>): () => Promise<void> {
+  let Running: Promise<void> | null = null;
+  let Again = false;
+  return () => {
+    if (Running) {
+      Again = true;
+      return Running;
+    }
+    Running = (async () => {
+      try {
+        do {
+          Again = false;
+          try {
+            await Fn();
+          } catch (Err) {
+            // A failed run must not drop the update queued behind it.
+            Logger.error('Coalesced update failed', Err);
+          }
+        } while (Again);
+      } finally {
+        Running = null;
+      }
+    })();
+    return Running;
+  };
+}
+
+// The full list goes to every renderer surface, after a DB read and four
+// history syncs; a burst of list changes (a multi-client drag, an identify
+// toggle, a group delete) needs only the last.
+const CoalescedUpdateFullClientList = Coalesce(UpdateFullClientList);
 
 // Monitoring target fan-out
 async function UpdateMonitoringTargetList(): Promise<void> {
@@ -814,8 +887,8 @@ function RegisterBroadcastBridge(): void {
   BroadcastManager.on('ReinitializeSystem', ReinitializeSystem);
   BroadcastManager.on('ClientUpdated', ClientUpdated);
   BroadcastManager.on('ScriptsUpdated', OnScriptsUpdated);
-  BroadcastManager.on('GroupListChanged', UpdateFullClientList);
-  BroadcastManager.on('ClientListChanged', UpdateFullClientList);
+  BroadcastManager.on('GroupListChanged', CoalescedUpdateFullClientList);
+  BroadcastManager.on('ClientListChanged', CoalescedUpdateFullClientList);
   BroadcastManager.on('MonitoringTargetListChanged', UpdateMonitoringTargetList);
   BroadcastManager.on('MonitoringTargetUpdated', MonitoringTargetUpdated);
   BroadcastManager.on('DummyClientListChanged', UpdateDummyClientList);

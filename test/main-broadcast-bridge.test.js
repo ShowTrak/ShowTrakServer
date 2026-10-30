@@ -420,6 +420,36 @@ test('ClientUpdated still records history and alerts with no window', async () =
   assert.equal(deployments.trigger.length, 1, 'auto-deploy must still fire headless');
 });
 
+test('ClientUpdated sends the renderer the client without its internal raw reports', async () => {
+  // The raw last reports (the running-app report alone can hold 4096 entries)
+  // and change signatures are main-process bookkeeping; cloning them across IPC
+  // on every heartbeat was the dominant cost. History and alerts still see them.
+  const Client = {
+    UUID: 'client-1',
+    Online: true,
+    Vitals: { CPU: { UsagePercentage: 5 } },
+    RunningApplications: { Items: [{ Name: 'show.exe' }] },
+    ObservedRunningApplications: { Items: [{ Name: 'show.exe' }] },
+    ObservedAudio: { Devices: [] },
+    ObservedStorage: { Volumes: [] },
+    ConnectedUSBDeviceList: [{ SerialNumber: 'x' }],
+    ConnectedDisplayList: [{ ID: 'd' }],
+    RunningApplicationsSignature: 'sig',
+    ObservedRunningApplicationsSignature: 'sig2',
+  };
+  await emit('ClientUpdated', Client);
+
+  const Push = pushes.find((P) => P[0] === 'ClientUpdated');
+  assert.deepEqual(Push[1], {
+    UUID: 'client-1',
+    Online: true,
+    Vitals: { CPU: { UsagePercentage: 5 } },
+    RunningApplications: { Items: [{ Name: 'show.exe' }] },
+  });
+  assert.equal(history[0][1], Client, 'history recording still gets the full client');
+  assert.equal(alertsMgr.__callsTo('HandleClientUpdated')[0].args[0], Client);
+});
+
 test('DummyClientUpdated also records and alerts with no window', async () => {
   state.hasWindow = false;
   await emit('DummyClientUpdated', { UUID: 'dummy-1', Online: true });
@@ -1011,4 +1041,26 @@ test('a deleted target stops occupying the signature map', async () => {
     1,
     're-created target must push again rather than match a stale signature'
   );
+});
+
+test('a burst of list changes sends the full client list at most twice, ending current', async () => {
+  // Each refresh is a DB read, four history syncs and the whole list to every
+  // renderer; a burst only needs the state it ends on.
+  reset();
+  pushes.length = 0;
+  for (let I = 0; I < 10; I++) bus.emit(I % 2 ? 'GroupListChanged' : 'ClientListChanged');
+  state.clients = [null, [{ UUID: 'client-1' }, { UUID: 'client-2' }]];
+  await flush(20);
+  const Lists = pushes.filter((P) => P[0] === 'SetFullClientList');
+  assert.ok(Lists.length >= 1 && Lists.length <= 2, `sent ${Lists.length} times`);
+  assert.deepEqual(
+    Lists.at(-1)[1].map((C) => C.UUID),
+    ['client-1', 'client-2'],
+    'the last list sent reflects the final state'
+  );
+
+  // Once settled, the next change is sent again (nothing stays latched).
+  pushes.length = 0;
+  await emit('ClientListChanged');
+  assert.equal(pushes.filter((P) => P[0] === 'SetFullClientList').length, 1);
 });

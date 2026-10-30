@@ -16,6 +16,8 @@
 //
 // Auth remains a simple in-memory session-token model gated on the existing
 // WEBUI_PASSWORD settings.
+import { EmitToSockets } from './push-fanout';
+import type { FanoutNamespace } from './push-fanout';
 import crypto from 'crypto';
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/protocol';
@@ -88,6 +90,8 @@ interface WebNamespace {
   use(fn: (socket: WebSocket, next: (err?: Error) => void) => void): void;
   on(event: 'connection', listener: (socket: WebSocket) => void | Promise<void>): void;
   sockets: { values(): IterableIterator<WebSocket> };
+  // Broadcast operator (encode once); see push-fanout.ts.
+  to?: FanoutNamespace['to'];
 }
 // The Socket.IO server bound to the shared client wire contract (as accepted by
 // SetupClientNamespace); the web namespace is derived from it.
@@ -355,23 +359,22 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
   RegisterRendererSink((channel: string, ...args: unknown[]) => {
     if (!WEB_PUSH_ALLOWLIST.has(channel)) return;
     if (channel === 'OSCBulkAction' && WEB_SUPPRESSED_BULK_ACTIONS.has(String(args[0]))) return;
+    const sockets =
+      ui.sockets && typeof ui.sockets.values === 'function' ? ui.sockets.values() : [];
+    const Targets: WebSocket[] = [];
+    for (const socket of sockets) {
+      if (socket && socket.Authed) Targets.push(socket);
+    }
+    // Nobody to serve: skip projecting the payload (a client push is the whole
+    // public client, on every heartbeat).
+    if (Targets.length === 0) return;
     let payload: unknown[];
     try {
       payload = TransformWebPush(channel, args);
     } catch {
       return;
     }
-    const sockets =
-      ui.sockets && typeof ui.sockets.values === 'function' ? ui.sockets.values() : [];
-    for (const socket of sockets) {
-      if (socket && socket.Authed) {
-        try {
-          socket.emit(channel, ...payload);
-        } catch {
-          /* intentional: one dead/closing socket must not block the push to the rest */
-        }
-      }
-    }
+    EmitToSockets(ui, Targets, channel, payload);
   });
 
   // Re-evaluate every live session whenever the Web UI enable/protection/passcode

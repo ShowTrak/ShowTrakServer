@@ -2234,7 +2234,13 @@ class Client {
     Logger.debug(`Client ${this.UUID} nickname updated to ${Nickname}`);
     return Ok<void>();
   }
-  async SetGroupID(GroupID: number | string | null): Promise<Result<void>> {
+  // `Silent` skips the ClientListChanged emit, for callers moving many clients
+  // that emit it once themselves when done: each emit re-sends the whole list
+  // to every renderer, so a K-client drag used to send it K times.
+  async SetGroupID(
+    GroupID: number | string | null,
+    { Silent = false }: { Silent?: boolean } = {}
+  ): Promise<Result<void>> {
     if (GroupID === 'null') GroupID = null;
     if (this.GroupID === GroupID) return Ok<void>();
     const Previous = this.GroupID;
@@ -2245,7 +2251,7 @@ class Client {
       Logger.error('Failed to update client GroupID');
       return Fail(Err);
     }
-    BroadcastManager.emit('ClientListChanged');
+    if (!Silent) BroadcastManager.emit('ClientListChanged');
     BroadcastManager.emit('ClientUpdated', this);
     Logger.debug(`Client ${this.UUID} GroupID updated to ${GroupID}`);
     return Ok<void>();

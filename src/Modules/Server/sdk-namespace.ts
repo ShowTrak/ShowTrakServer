@@ -34,6 +34,8 @@
 // handshake. Every branch that reaches next() without an error hands out control
 // of a live show, so there is no default-allow path.
 
+import { EmitToSockets } from './push-fanout';
+import type { FanoutNamespace } from './push-fanout';
 import crypto from 'crypto';
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/protocol';
@@ -194,6 +196,8 @@ interface SdkNamespace {
   use(fn: (socket: SdkSocket, next: (err?: Error) => void) => void): void;
   on(event: 'connection', listener: (socket: SdkSocket) => void | Promise<void>): void;
   sockets: { values(): IterableIterator<SdkSocket> };
+  // Broadcast operator (encode once); see push-fanout.ts.
+  to?: FanoutNamespace['to'];
 }
 
 /** Which credential a connected socket presented at the handshake. */
@@ -391,21 +395,18 @@ function SetupSdkNamespace(io: SdkIOServer) {
   // handshake middleware refuses unauthenticated connections).
   RegisterRendererSink((channel: string, ...args: unknown[]) => {
     if (!SDK_PUSH_ALLOWLIST.has(channel)) return;
+    const Targets =
+      sdk.sockets && typeof sdk.sockets.values === 'function'
+        ? Array.from(sdk.sockets.values())
+        : [];
+    if (Targets.length === 0) return;
     let payload: unknown[];
     try {
       payload = TransformSdkPush(channel, args);
     } catch {
       return;
     }
-    const sockets =
-      sdk.sockets && typeof sdk.sockets.values === 'function' ? sdk.sockets.values() : [];
-    for (const socket of sockets) {
-      try {
-        socket.emit(channel, ...payload);
-      } catch {
-        /* one dead socket must not block delivery to the rest */
-      }
-    }
+    EmitToSockets(sdk, Targets, channel, payload);
   });
 
   // Handshake gate. Three credentials are accepted, in a fixed order so a socket

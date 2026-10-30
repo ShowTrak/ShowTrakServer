@@ -2087,9 +2087,10 @@ Manager.ReconcileOrphanedGroups = async (ValidGroupIDs: unknown) => {
     if (Client.GroupID == null) continue;
     const ClientGroupID = Number(Client.GroupID);
     if (Valid.has(ClientGroupID)) continue;
-    await Client.SetGroupID(null);
+    await Client.SetGroupID(null, { Silent: true });
     Changed += 1;
   }
+  if (Changed > 0) BroadcastManager.emit('ClientListChanged');
 
   return Ok(Changed);
 };
@@ -2108,7 +2109,7 @@ Manager.SetGroupOrder = async (GroupID: unknown, orderedUUIDs: unknown) => {
     if (!client) continue;
     // move to target group if needed
     if (client.GroupID !== TargetGroupID) {
-      const [MoveErr] = await client.SetGroupID(TargetGroupID);
+      const [MoveErr] = await client.SetGroupID(TargetGroupID, { Silent: true });
       if (!MoveErr) Moved.push(client);
     }
     await client.SetWeight(weight);
@@ -2137,7 +2138,7 @@ Manager.SetGroupOrderWithWeights = async (
     const [err, client] = await Manager.Get(uuid);
     if (err || !client) continue;
     if (client.GroupID !== TargetGroupID) {
-      const [MoveErr] = await client.SetGroupID(TargetGroupID);
+      const [MoveErr] = await client.SetGroupID(TargetGroupID, { Silent: true });
       if (!MoveErr) Moved.push(client);
     }
     await client.SetWeight(w);
