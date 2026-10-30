@@ -344,7 +344,8 @@ async function RunInit(): Promise<void> {
   // list and push it to every renderer as the complete set.
   TargetList = Next;
 
-  for (const T of TargetList) T.StartLoop();
+  // Spread: the whole list starting at once would otherwise probe in one burst.
+  for (const T of TargetList) T.StartLoop({ Spread: true });
   Manager.Initialized = true;
   BroadcastManager.emit('MonitoringTargetListChanged');
 }
@@ -523,6 +524,17 @@ const Manager = {
         Target.StopLoop();
       } catch {
         /* intentional: stopping each target loop during shutdown is best-effort */
+      }
+    }
+    // A healthy check writes LastSuccessAt only every few minutes; write the
+    // latest of each now so a restart's "offline since" starts from the truth.
+    for (const Target of TargetList) {
+      for (const Check of Target.Checks) {
+        try {
+          await Check.PersistLastSuccessAt();
+        } catch {
+          /* intentional: best-effort, like the loop stop above */
+        }
       }
     }
   },

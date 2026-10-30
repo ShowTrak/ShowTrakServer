@@ -10,7 +10,11 @@
 // Checks that have not reached a verdict yet (see MonitoringCheck.Run's failure
 // threshold) are left out of the aggregate: unknown is not the same as down.
 import { CreateLogger } from '../Logger';
-import { MONITORING_TICK_INTERVAL_MS } from '../Config/constants';
+import {
+  MONITORING_LAST_SUCCESS_PERSIST_MS,
+  MONITORING_START_SPREAD_MS,
+  MONITORING_TICK_INTERVAL_MS,
+} from '../Config/constants';
 import { Manager as DB } from '../DB';
 import { CreateMonitoringChecksRepository } from '../DB/repositories/monitoring-checks';
 import { Manager as BroadcastManager } from '../Broadcast';
@@ -80,6 +84,8 @@ class MonitoringCheck {
   FailureThreshold: number | null;
   Weight: number;
   LastSuccessAt: number | null;
+  // The LastSuccessAt value last written to the database (see Run).
+  PersistedLastSuccessAt: number | null;
   Timestamp: number;
   ConsecutiveFailures: number;
   Online: boolean;
@@ -119,6 +125,7 @@ class MonitoringCheck {
     this.FailureThreshold = ClampFailureThreshold(Row.FailureThreshold);
     this.Weight = typeof Row.Weight === 'number' ? Row.Weight : 100;
     this.LastSuccessAt = Row.LastSuccessAt || null;
+    this.PersistedLastSuccessAt = this.LastSuccessAt;
     this.Timestamp = Row.Timestamp;
 
     // RAM-only runtime state
@@ -189,6 +196,8 @@ class MonitoringCheck {
     const Result = await MonitoringMethods.Run(this.Method, this);
     const Now = Date.now();
     if (Result && Result.Success) {
+      // Recovering (or never confirmed up): its LastSuccessAt is written at once.
+      const WasFailing = this.ConsecutiveFailures > 0 || !this.Online;
       this.ConsecutiveFailures = 0;
       this.LastChecked = Now;
       this.Online = true;
@@ -205,8 +214,19 @@ class MonitoringCheck {
           typeof this.LastLatencyMs === 'number' &&
           this.LastLatencyMs > this.DegradedThresholdMs;
       }
-      await this.SetLastSuccessAt(Now);
+      this.LastSuccessAt = Now;
+      if (
+        WasFailing ||
+        this.PersistedLastSuccessAt == null ||
+        Now - this.PersistedLastSuccessAt >= MONITORING_LAST_SUCCESS_PERSIST_MS
+      ) {
+        await this.PersistLastSuccessAt();
+      }
     } else {
+      // The first failure after a run of successes writes the latest
+      // LastSuccessAt still held only in memory, so a crash or power loss during
+      // the outage cannot leave "offline since" up to the throttle window stale.
+      if (this.ConsecutiveFailures === 0) await this.PersistLastSuccessAt();
       this.ConsecutiveFailures++;
       const AlreadyDown = this.LastChecked != null && !this.Online;
       const Confirmed =
@@ -237,8 +257,23 @@ class MonitoringCheck {
 
   async SetLastSuccessAt(Ts: number) {
     this.LastSuccessAt = Ts;
+    await this.PersistLastSuccessAt();
+  }
+
+  // Write LastSuccessAt to the database if it has moved since the last write.
+  // Called from Run (throttled) and for every check at shutdown.
+  async PersistLastSuccessAt() {
+    const Ts = this.LastSuccessAt;
+    if (Ts == null || Ts === this.PersistedLastSuccessAt) return;
     const [Err] = await ChecksRepo.SetLastSuccessAt(Ts, this.CheckID);
-    if (Err) Logger.error('Failed to persist check LastSuccessAt');
+    if (Err) {
+      Logger.error('Failed to persist check LastSuccessAt');
+      return;
+    }
+    // Only advance: a slower earlier write must not mask a newer one.
+    if (this.PersistedLastSuccessAt == null || Ts > this.PersistedLastSuccessAt) {
+      this.PersistedLastSuccessAt = Ts;
+    }
   }
 }
 
@@ -418,13 +453,28 @@ class MonitoringTarget {
     }
   }
 
-  StartLoop() {
+  // `Spread` staggers the first check (see StartOffsetMs); used when the whole
+  // list starts together. A single monitor restarted after an edit checks
+  // straight away.
+  StartLoop({ Spread = false }: { Spread?: boolean } = {}) {
     this.StopLoop();
     this._stopped = false;
     // Run an initial check shortly after boot so the UI doesn't sit "Unknown"
     // for a full interval.
     const Gen = this._gen;
-    this._timer = setTimeout(() => this.Tick(Gen), MONITORING_TICK_INTERVAL_MS);
+    const Delay = MONITORING_TICK_INTERVAL_MS + (Spread ? this.StartOffsetMs() : 0);
+    this._timer = setTimeout(() => this.Tick(Gen), Delay);
+  }
+
+  // A stable offset within MONITORING_START_SPREAD_MS (capped at this monitor's
+  // interval) so monitors that start together do not probe together. Derived
+  // from the TargetID by Fibonacci hashing, which spreads consecutive ids
+  // evenly, and the same on every boot.
+  StartOffsetMs(): number {
+    const Window = Math.min(MONITORING_START_SPREAD_MS, this.Interval);
+    if (!(Window > 0)) return 0;
+    const Fraction = ((Math.imul(Number(this.TargetID) | 0, 0x9e3779b1) >>> 0) / 2 ** 32) % 1;
+    return Math.floor(Fraction * Window);
   }
 
   StopLoop() {

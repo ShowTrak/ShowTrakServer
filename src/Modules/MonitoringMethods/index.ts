@@ -15,6 +15,11 @@ import { RedactSensitiveValues } from '../Utils/redact';
 import { MethodInfo } from './info';
 import { MethodGroups, DEFAULT_GROUP } from './groups';
 import { MethodDiscovery } from './discovery';
+import { ProbeLimiter } from './_probe-limiter';
+import {
+  MONITORING_MAX_CONCURRENT_PINGS,
+  MONITORING_MAX_CONCURRENT_PROBES,
+} from '../Config/constants';
 import type {
   LiveLevelChange,
   LiveLevelsFrame,
@@ -108,6 +113,11 @@ import * as snmpUps from './snmp-ups';
 import * as snmpUpsV3 from './snmp-ups-v3';
 
 const Logger = CreateLogger('MonitoringMethods');
+
+// Caps how many probes run at once (see _probe-limiter.ts).
+const PROBES = new ProbeLimiter(MONITORING_MAX_CONCURRENT_PROBES, {
+  ping: MONITORING_MAX_CONCURRENT_PINGS,
+});
 
 const RUN_CACHE = CacheManager.GetBucket('MonitoringMethods:Run', {
   defaultTtlMs: 1000,
@@ -564,9 +574,15 @@ const Manager = {
     const CacheKey = getMethodRunCacheKey(ID, Method, Target);
     const CacheTtlMs = getMethodRunCacheTtlMs(Method, Target);
     try {
-      return (await RUN_CACHE.GetOrCreate(CacheKey, () => Method.Run(Target), {
-        ttlMs: CacheTtlMs,
-      })) as MonitoringResult;
+      // The limiter sits inside the cache factory: a cache hit, or a caller
+      // joining an identical probe already in flight, never waits for a slot.
+      return (await RUN_CACHE.GetOrCreate(
+        CacheKey,
+        () => PROBES.Run(ID, async () => Method.Run(Target)),
+        {
+          ttlMs: CacheTtlMs,
+        }
+      )) as MonitoringResult;
     } catch (Err) {
       return {
         Success: false,

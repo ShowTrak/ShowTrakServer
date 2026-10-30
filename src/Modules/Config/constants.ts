@@ -69,14 +69,47 @@ export const AUDIO_LEVEL_TIMEOUT_MS = 10000;
 export const ALERT_AUDIO_DEDUPE_DEFAULT_MS = 500;
 export const ALERT_AUDIO_DEDUPE_MAX_MS = 10000;
 
-// Minimum time the preloader window stays visible before the main window swaps in.
+// Minimum time the preloader window stays visible before the main window swaps
+// in, counted from when it appeared, so it never just flickers.
 export const PRELOADER_MIN_DISPLAY_MS = 800;
+
+// The preloader only appears if the main window is not ready this long after the
+// preloader itself is: a fast start goes straight to the main window.
+export const PRELOADER_SHOW_DELAY_MS = 300;
+
+// Longest the main window waits for the renderer's initial data before it is
+// shown anyway (a renderer that failed to initialise must not stay hidden).
+export const MAIN_WINDOW_READY_TIMEOUT_MS = 5000;
 
 // Stagger between per-client dispatches during a bulk script deployment.
 export const BULK_DISPATCH_DELAY_MS = 150;
 
 // Interval between monitoring target check ticks.
 export const MONITORING_TICK_INTERVAL_MS = 1500;
+
+// Window over which monitors' first checks are spread when the monitor list is
+// (re)built. Monitors all used to start together and, sharing the default
+// interval, kept probing in one burst per interval for as long as the server
+// ran. Each monitor gets a stable offset inside this window (never longer than
+// its own interval), so the bursts are spread out from the start.
+export const MONITORING_START_SPREAD_MS = 10000;
+
+// Most probes that may run at once across every monitor. A probe waiting for a
+// slot has not started its own timeout yet, so queueing can only delay a check,
+// never fail it; a monitor's next check is timed from when its last one ended.
+export const MONITORING_MAX_CONCURRENT_PROBES = 64;
+
+// How often a healthy check's LastSuccessAt is written to the database. It is
+// kept current in memory (the UI reads that) and written on the first success
+// and the first after a failure, and the last one is written when a failure
+// follows, so "offline since" stays exact; otherwise at most this often, and
+// once more at shutdown. Writing it on every successful
+// probe was one autocommit per probe (~100/s for 300 checks at 3 s).
+export const MONITORING_LAST_SUCCESS_PERSIST_MS = 5 * 60 * 1000;
+
+// Tighter cap for ping, which starts an OS process per probe (costly on
+// Windows, and the process start-up runs on the main thread).
+export const MONITORING_MAX_CONCURRENT_PINGS = 24;
 
 // How long a fault that was already true the first time we looked at something
 // must persist before it is announced.

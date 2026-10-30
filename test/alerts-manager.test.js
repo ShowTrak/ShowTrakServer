@@ -968,3 +968,73 @@ test('AlertsManager suppresses offline alerts for unassigned client slots', asyn
   });
   assert.deepEqual(fired(), ['Real PC', 'Now Real']);
 });
+
+test('a script failure is alerted once, however many execution updates repeat it', async () => {
+  // Every ScriptExecutionUpdated carries the WHOLE list, and a failed entry
+  // stays in it until cleared. Each later update used to re-announce it.
+  const executeCalls = [];
+  const events = [];
+  const rules = [
+    {
+      RuleID: 1,
+      Title: 'Script Failure',
+      Scope: JSON.stringify({ Workspace: true, Groups: [], Clients: [] }),
+      TriggerType: 'SCRIPT_EXECUTION_FAILED',
+      TriggerConfig: JSON.stringify({}),
+      Actions: JSON.stringify([{ Type: 'osc-trigger', Settings: {} }]),
+      Enabled: 1,
+      Timestamp: 1,
+      UpdatedAt: 1,
+    },
+  ];
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AlertsManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => ({ error: () => {} }) },
+    '../DB': {
+      Manager: {
+        All: async () => [null, rules],
+        Run: async () => [null, { changes: 1 }],
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
+      },
+    },
+    '../AlertActions': {
+      Manager: {
+        GetAll: () => [],
+        Execute: async (action, context) => {
+          executeCalls.push({ action, context });
+          return { Success: true };
+        },
+      },
+    },
+    '../Broadcast': { Manager: { emit: (event, payload) => events.push([event, payload]) } },
+    '../Utils': require('../dist/Modules/Utils'),
+  });
+  await Manager.Init();
+
+  const Client = { UUID: 'client-1', GroupID: 1, Nickname: 'Booth 1', IP: '10.0.0.1' };
+  const Failed = (RequestID) => ({
+    RequestID,
+    Status: 'Failed',
+    Client,
+    Script: { ID: 's', Name: 'Deploy' },
+    Error: 'Crash',
+  });
+  const Pending = (RequestID) => ({ RequestID, Status: 'Pending', Client, Script: { ID: 's' } });
+  const Alerts = () => events.filter(([E]) => E === 'AlertTriggered').length;
+
+  await Manager.HandleScriptExecutionUpdated([Failed('r1'), Pending('r2')]);
+  await Manager.HandleScriptExecutionUpdated([Failed('r1'), Pending('r2')]);
+  await Manager.HandleScriptExecutionUpdated([Failed('r1'), Pending('r2'), Pending('r3')]);
+  assert.equal(Alerts(), 1, 'the same failure is announced once');
+  assert.equal(executeCalls.length, 1);
+
+  await Manager.HandleScriptExecutionUpdated([Failed('r1'), Failed('r2'), Pending('r3')]);
+  assert.equal(Alerts(), 2, 'a new failure is still announced');
+
+  // Entries without a RequestID cannot be told apart, so keep the old rule.
+  const Anonymous = { ...Failed(undefined) };
+  delete Anonymous.RequestID;
+  await Manager.HandleScriptExecutionUpdated([Anonymous]);
+  await Manager.HandleScriptExecutionUpdated([Anonymous]);
+  assert.equal(Alerts(), 4);
+});

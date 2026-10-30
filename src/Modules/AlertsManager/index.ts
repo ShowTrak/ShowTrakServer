@@ -1079,10 +1079,31 @@ Manager.HandleMonitoringTargetUpdated = async (Target: AlertTargetLike) => {
   }
 };
 
+// RequestIDs whose failure has already been alerted. Every execution update
+// carries the WHOLE list, and a failed entry stays in it until cleared, so
+// without this each later update (any client's progress, a new dispatch)
+// re-announced every past failure: actions, sounds and history all over again.
+const AlertedScriptFailures = new Set<string>();
+
 Manager.HandleScriptExecutionUpdated = async (Executions: unknown) => {
   if (!Array.isArray(Executions)) return;
+  // Forget requests that have left the list, which keeps the set bounded by it.
+  const Present = new Set<string>();
+  for (const Exe of Executions) {
+    if (Exe && Exe.RequestID != null) Present.add(String(Exe.RequestID));
+  }
+  for (const ID of AlertedScriptFailures) {
+    if (!Present.has(ID)) AlertedScriptFailures.delete(ID);
+  }
   for (const Exe of Executions) {
     if (!Exe || Exe.Status !== 'Failed') continue;
+    // An entry without a RequestID cannot be told apart from the next, so it
+    // keeps the old behaviour of being judged every time.
+    if (Exe.RequestID != null) {
+      const ID = String(Exe.RequestID);
+      if (AlertedScriptFailures.has(ID)) continue;
+      AlertedScriptFailures.add(ID);
+    }
     const Client = Exe.Client || {};
     await evaluateAgainstRules({
       TriggerType: TRIGGERS.SCRIPT_EXECUTION_FAILED,

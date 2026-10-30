@@ -186,13 +186,18 @@ const NamedHistoryStores: Array<Pick<NamedHistoryStore, 'prune'>> = [];
 // Drop everything older than the 12h window from EVERY store, not only the
 // series that happen to be recorded into. A client that goes offline stops
 // recording, and its last readings would otherwise outlive the window for as
-// long as the server runs. Called on read, on list sync, and by the periodic
-// retention sweep (see ./history-retention).
+// long as the server runs. Called by the periodic retention sweep (see
+// ./history-retention). Not on reads or list syncs: every series already trims
+// itself when written and is filtered when read, and walking every series of
+// every store on each read (three times per status-overview poll) cost far more
+// than the reads themselves on a large rig.
 function pruneMonitoringHistoryStore(now: number = Date.now()): void {
   const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
   for (const named of NamedHistoryStores) named.prune(now);
   for (const store of Object.values(MonitoringHistoryStores)) {
     for (const [key, samples] of store.entries()) {
+      // Nothing expired: leave the series (and its array) as it is.
+      if (Array.isArray(samples) && samples.length && IsFresh(samples, cutoff)) continue;
       const next = Array.isArray(samples)
         ? samples.filter((s: HistorySample) => s && s.ts >= cutoff)
         : [];
@@ -203,6 +208,12 @@ function pruneMonitoringHistoryStore(now: number = Date.now()): void {
       store.set(key, next);
     }
   }
+}
+
+// Whether every sample is inside the window (and so nothing needs dropping).
+function IsFresh(samples: HistorySample[], cutoff: number): boolean {
+  for (const s of samples) if (!s || !(Number(s.ts) >= cutoff)) return false;
+  return true;
 }
 
 function recordEntityHistorySample(
@@ -254,17 +265,15 @@ function syncEntityHistoryStore<T>(
   for (const existingKey of store.keys()) {
     if (!validKeys.has(existingKey)) store.delete(existingKey);
   }
-
-  pruneMonitoringHistoryStore();
 }
 
 function getEntityHistorySamples(entityType: string, id: unknown): HistorySample[] {
-  pruneMonitoringHistoryStore();
   const store = getHistoryStore(entityType);
   if (!store) return [];
   const key = resolveEntityKey(entityType, id);
   if (key == null) return [];
-  return store.get(key) || [];
+  const cutoff = Date.now() - MONITORING_HISTORY_MAX_AGE_MS;
+  return (store.get(key) || []).filter((s) => s && s.ts >= cutoff);
 }
 
 // Every series in one store from `sinceTs` on, keyed by its entity id. Feeds the
@@ -274,12 +283,12 @@ function getEntityHistorySamplesSince(
   entityType: string,
   sinceTs: number
 ): Record<string, HistorySample[]> {
-  pruneMonitoringHistoryStore();
   const store = getHistoryStore(entityType);
   const out: Record<string, HistorySample[]> = {};
   if (!store) return out;
+  const fromTs = Math.max(Number(sinceTs) || 0, Date.now() - MONITORING_HISTORY_MAX_AGE_MS);
   for (const [key, samples] of store.entries()) {
-    const recent = samples.filter((s) => s && s.ts >= sinceTs);
+    const recent = samples.filter((s) => s && s.ts >= fromTs);
     if (recent.length) out[String(key)] = recent.map((s) => ({ ...s }));
   }
   return out;
@@ -459,9 +468,12 @@ function createNamedHistoryStore<KeyField extends string>(
       // Collapse a repeat of the same reading (see absorbRepeatSample). The
       // degraded comparison is a no-op for domains that never set it (USB /
       // applications), and correctly separates matched/mismatched display bars.
-      // The newest point is copied before it can be extended: a series handed
-      // out by get() shares its point objects, and must not move under a reader.
-      const nextSamples = previousSamples.slice();
+      // The series is extended in place: get() hands out its own filtered
+      // array, never this one. Only the newest point is copied before it can be
+      // extended, because get()'s array shares the point objects and a point
+      // must not move under a reader. (This used to copy the whole series, up
+      // to 12h of points, for every entity of every client on every sample.)
+      const nextSamples = previousSamples;
       if (nextSamples.length) {
         nextSamples[nextSamples.length - 1] = { ...nextSamples[nextSamples.length - 1]! };
       }
@@ -520,6 +532,9 @@ function createNamedHistoryStore<KeyField extends string>(
     const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
     for (const [uuid, perEntity] of Array.from(store.entries())) {
       for (const [entityKey, entry] of Array.from(perEntity.entries())) {
+        if (Array.isArray(entry.Points) && entry.Points.length && IsFresh(entry.Points, cutoff)) {
+          continue;
+        }
         const kept = (Array.isArray(entry.Points) ? entry.Points : []).filter(
           (s: HistorySample) => s && Number(s.ts) >= cutoff
         );
