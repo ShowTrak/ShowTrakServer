@@ -341,6 +341,29 @@ test('a blocker that died underneath us is restarted rather than assumed live', 
   await emit('DisplaySleepSettingsChanged');
 });
 
+test('the server is always kept awake, and the display-sleep preference never releases it', async () => {
+  // App Nap (macOS) and system idle sleep would slow or stop the main-process
+  // timers that run monitoring and offline detection. Not a preference.
+  blocker.started.length = 0;
+  blocker.stopped.length = 0;
+  blocker.active.clear();
+  state.preventDisplaySleep = false;
+  await initLiveSettings();
+  const KeepAwake = blocker.started.filter((B) => B.type === 'prevent-app-suspension');
+  assert.equal(KeepAwake.length, 1);
+
+  state.preventDisplaySleep = true;
+  await emit('DisplaySleepSettingsChanged');
+  state.preventDisplaySleep = false;
+  await emit('DisplaySleepSettingsChanged');
+  assert.equal(blocker.active.has(KeepAwake[0].id), true, 'still held after display sleep toggles');
+  assert.equal(blocker.stopped.includes(KeepAwake[0].id), false);
+
+  // A second init (it is not expected, but must not leak a handle) reuses it.
+  await initLiveSettings();
+  assert.equal(blocker.started.filter((B) => B.type === 'prevent-app-suspension').length, 1);
+});
+
 // --- Error containment ------------------------------------------------------
 
 test('a failing apply is logged and never becomes an unhandled rejection', async () => {

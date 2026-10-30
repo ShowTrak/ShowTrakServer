@@ -91,6 +91,18 @@ async function ApplyDisplaySleep(): Promise<void> {
   }
 }
 
+// Keep the server awake for as long as it runs. Not a preference: monitoring,
+// heartbeat timeouts and alerting all run on main-process timers, and when the
+// window was hidden macOS App Nap could slow them, and system idle sleep stops
+// them outright. The screen may still sleep; whether it does is the separate
+// Prevent Display Sleep preference above.
+let KeepAwakeBlockerId: number | null = null;
+function StartKeepAwake(): void {
+  if (KeepAwakeBlockerId !== null && powerSaveBlocker.isStarted(KeepAwakeBlockerId)) return;
+  KeepAwakeBlockerId = powerSaveBlocker.start('prevent-app-suspension');
+  Logger.log('Keeping the server awake (App Nap and system idle sleep blocked).');
+}
+
 // Background check-and-download of app updates; installs on the next restart.
 async function ApplyAutomaticUpdates(): Promise<void> {
   const Enabled = await SettingsManager.GetValue('SYSTEM_AUTO_UPDATE_ENABLED');
@@ -107,6 +119,7 @@ export async function initLiveSettings(): Promise<void> {
   await ApplyLogLevel(false);
   await ApplyMonitoringDefaults();
   await ApplyAlertAudioDedupe();
+  StartKeepAwake();
   await ApplyDisplaySleep();
   await ApplyOsc();
   await ApplyAutomaticUpdates();
