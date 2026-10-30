@@ -33,7 +33,6 @@ const state = {
   monitoringFailureThreshold: 1,
   alertAudioDedupeMs: 500,
   confirmShutdown: true,
-  preventDisplaySleep: false,
   autoUpdate: false,
   getValueThrows: false,
 };
@@ -49,7 +48,6 @@ const settingsMgr = recordingManager({
     if (key === 'MONITORING_FAILURE_THRESHOLD') return state.monitoringFailureThreshold;
     if (key === 'ALERT_SOUND_DEDUPE_WINDOW_MS') return state.alertAudioDedupeMs;
     if (key === 'SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4') return state.confirmShutdown;
-    if (key === 'SYSTEM_PREVENT_DISPLAY_SLEEP') return state.preventDisplaySleep;
     if (key === 'SYSTEM_AUTO_UPDATE_ENABLED') return state.autoUpdate;
     return null;
   },
@@ -295,73 +293,32 @@ test('automatic updates stay off at boot by default and follow later changes', a
 
 // --- powerSaveBlocker lifecycle --------------------------------------------
 
-test('enabling prevent-display-sleep starts exactly one blocker', async () => {
-  state.preventDisplaySleep = false;
-  await bootThenReset();
-  state.preventDisplaySleep = true;
-  await emit('DisplaySleepSettingsChanged');
-  assert.equal(blocker.started.length, 1);
-  assert.equal(blocker.started[0].type, 'prevent-display-sleep');
-
-  // Re-firing while already active must not leak a second blocker handle.
-  await emit('DisplaySleepSettingsChanged');
-  assert.equal(blocker.started.length, 1);
-});
-
-test('disabling prevent-display-sleep releases the blocker', async () => {
-  // Leaking this keeps a show machine's display awake indefinitely.
-  state.preventDisplaySleep = false;
-  await bootThenReset();
-  state.preventDisplaySleep = true;
-  await emit('DisplaySleepSettingsChanged');
-  const StartedId = blocker.started[0].id;
-
-  state.preventDisplaySleep = false;
-  await emit('DisplaySleepSettingsChanged');
-  assert.deepEqual(blocker.stopped, [StartedId]);
-
-  // Disabling again is a no-op rather than a double-stop.
-  await emit('DisplaySleepSettingsChanged');
-  assert.deepEqual(blocker.stopped, [StartedId]);
-});
-
-test('a blocker that died underneath us is restarted rather than assumed live', async () => {
-  state.preventDisplaySleep = false;
-  await bootThenReset();
-  state.preventDisplaySleep = true;
-  await emit('DisplaySleepSettingsChanged');
-  const FirstId = blocker.started[0].id;
-
-  // Simulate the OS/Electron dropping the blocker without us stopping it.
-  blocker.active.delete(FirstId);
-  await emit('DisplaySleepSettingsChanged');
-  assert.equal(blocker.started.length, 2, 'isStarted is re-checked, not cached');
-
-  state.preventDisplaySleep = false;
-  await emit('DisplaySleepSettingsChanged');
-});
-
-test('the server is always kept awake, and the display-sleep preference never releases it', async () => {
-  // App Nap (macOS) and system idle sleep would slow or stop the main-process
-  // timers that run monitoring and offline detection. Not a preference.
+test('the server and display are always kept awake with a single blocker', async () => {
+  // App Nap (macOS) and system sleep would slow or stop the main-process timers
+  // that run monitoring and offline detection, and a show machine's screen is
+  // meant to stay on. Not a preference.
   blocker.started.length = 0;
   blocker.stopped.length = 0;
   blocker.active.clear();
-  state.preventDisplaySleep = false;
   await initLiveSettings();
-  const KeepAwake = blocker.started.filter((B) => B.type === 'prevent-app-suspension');
-  assert.equal(KeepAwake.length, 1);
+  assert.deepEqual(
+    blocker.started.map((B) => B.type),
+    ['prevent-display-sleep']
+  );
 
-  state.preventDisplaySleep = true;
-  await emit('DisplaySleepSettingsChanged');
-  state.preventDisplaySleep = false;
-  await emit('DisplaySleepSettingsChanged');
-  assert.equal(blocker.active.has(KeepAwake[0].id), true, 'still held after display sleep toggles');
-  assert.equal(blocker.stopped.includes(KeepAwake[0].id), false);
-
-  // A second init (it is not expected, but must not leak a handle) reuses it.
+  // A second init (not expected, but must not leak a handle) reuses it.
   await initLiveSettings();
-  assert.equal(blocker.started.filter((B) => B.type === 'prevent-app-suspension').length, 1);
+  assert.equal(blocker.started.length, 1);
+  assert.deepEqual(blocker.stopped, []);
+});
+
+test('a blocker that died underneath us is restarted rather than assumed live', async () => {
+  blocker.started.length = 0;
+  blocker.active.clear();
+  await initLiveSettings();
+  blocker.active.delete(blocker.started[0].id);
+  await initLiveSettings();
+  assert.equal(blocker.started.length, 2, 'isStarted is re-checked, not cached');
 });
 
 // --- Error containment ------------------------------------------------------
@@ -375,9 +332,8 @@ test('a failing apply is logged and never becomes an unhandled rejection', async
   await emit('MonitoringSettingsChanged');
   await emit('OscSettingsChanged');
   await emit('ShutdownProtectionChanged');
-  await emit('DisplaySleepSettingsChanged');
 
-  assert.equal(logs.errors.length, 4);
+  assert.equal(logs.errors.length, 3);
   for (const Entry of logs.errors) {
     assert.match(String(Entry[0]), /^Failed to apply /);
   }

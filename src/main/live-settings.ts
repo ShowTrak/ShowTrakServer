@@ -72,35 +72,16 @@ async function ApplyShutdownProtection(): Promise<void> {
   setAccidentalShutdownProtection(!!Enabled);
 }
 
-// Display-sleep blocker. Start/stop the Electron powerSaveBlocker to match the
-// setting, tracking the active id so it can be released when toggled off.
-let DisplaySleepBlockerId: number | null = null;
-async function ApplyDisplaySleep(): Promise<void> {
-  const Enabled = await SettingsManager.GetValue('SYSTEM_PREVENT_DISPLAY_SLEEP');
-  if (Enabled) {
-    if (DisplaySleepBlockerId === null || !powerSaveBlocker.isStarted(DisplaySleepBlockerId)) {
-      DisplaySleepBlockerId = powerSaveBlocker.start('prevent-display-sleep');
-      Logger.log('Prevent Display Sleep enabled; powerSaveBlocker started.');
-    }
-  } else if (DisplaySleepBlockerId !== null) {
-    if (powerSaveBlocker.isStarted(DisplaySleepBlockerId)) {
-      powerSaveBlocker.stop(DisplaySleepBlockerId);
-    }
-    DisplaySleepBlockerId = null;
-    Logger.log('Prevent Display Sleep disabled; powerSaveBlocker stopped.');
-  }
-}
-
-// Keep the server awake for as long as it runs. Not a preference: monitoring,
-// heartbeat timeouts and alerting all run on main-process timers, and when the
-// window was hidden macOS App Nap could slow them, and system idle sleep stops
-// them outright. The screen may still sleep; whether it does is the separate
-// Prevent Display Sleep preference above.
+// Keep the server and its screen awake for as long as it runs. Not a
+// preference: monitoring, heartbeat timeouts and alerting all run on
+// main-process timers that macOS App Nap could slow and system sleep stops
+// outright, and a show machine's display is meant to stay on. Blocking display
+// sleep also keeps the system awake.
 let KeepAwakeBlockerId: number | null = null;
 function StartKeepAwake(): void {
   if (KeepAwakeBlockerId !== null && powerSaveBlocker.isStarted(KeepAwakeBlockerId)) return;
-  KeepAwakeBlockerId = powerSaveBlocker.start('prevent-app-suspension');
-  Logger.log('Keeping the server awake (App Nap and system idle sleep blocked).');
+  KeepAwakeBlockerId = powerSaveBlocker.start('prevent-display-sleep');
+  Logger.log('Keeping the server and display awake.');
 }
 
 // Background check-and-download of app updates; installs on the next restart.
@@ -120,7 +101,6 @@ export async function initLiveSettings(): Promise<void> {
   await ApplyMonitoringDefaults();
   await ApplyAlertAudioDedupe();
   StartKeepAwake();
-  await ApplyDisplaySleep();
   await ApplyOsc();
   await ApplyAutomaticUpdates();
 
@@ -136,9 +116,6 @@ export async function initLiveSettings(): Promise<void> {
   BroadcastManager.on('OscSettingsChanged', () => RunGuarded('OSC', ApplyOsc));
   BroadcastManager.on('ShutdownProtectionChanged', () =>
     RunGuarded('shutdown protection', ApplyShutdownProtection)
-  );
-  BroadcastManager.on('DisplaySleepSettingsChanged', () =>
-    RunGuarded('display sleep blocker', ApplyDisplaySleep)
   );
   BroadcastManager.on('AutoUpdateSettingsChanged', () =>
     RunGuarded('automatic updates', ApplyAutomaticUpdates)

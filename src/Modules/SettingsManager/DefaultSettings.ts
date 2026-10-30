@@ -61,16 +61,6 @@ export const DefaultSettings: SettingDefinition[] = [
   // not in the show file, and get the first Preferences tab.
   {
     Group: 'Machine',
-    Key: 'SYSTEM_PREVENT_DISPLAY_SLEEP',
-    Title: 'Prevent Display Sleep',
-    Description: '',
-    Type: 'BOOLEAN',
-    DefaultValue: true,
-    OnUpdateEvent: 'DisplaySleepSettingsChanged',
-    Scope: 'INSTALL',
-  },
-  {
-    Group: 'Machine',
     Key: 'SYSTEM_AUTO_MAXIMIZE_ON_BOOT',
     Title: 'Auto Maximise Window on Boot',
     Description: '',

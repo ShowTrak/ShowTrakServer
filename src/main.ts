@@ -410,8 +410,8 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', handleBeforeQuit);
 
-// The power-save blocker (Prevent Display Sleep) is applied (and kept in sync
-// on change) by ./main/live-settings (initLiveSettings, wired above).
+// The server and display are kept awake by ./main/live-settings
+// (initLiveSettings, wired above).
 
 powerMonitor.on('shutdown', handlePowerMonitorShutdown);
 
