@@ -600,34 +600,6 @@ async function handleInstall() {
   }
 }
 
-// Initialize electron-updater lazily for manual control. Mirrors the original
-// eager init that ran right after the IPC handlers were registered.
-function initElectronUpdater() {
-  try {
-    const { autoUpdater: updater }: { autoUpdater: AppUpdater } = require('electron-updater');
-    autoUpdater = updater;
-    Logger.log('Initialized electron-updater in initElectronUpdater()');
-    autoUpdater.autoDownload = true; // download when found
-    autoUpdater.autoInstallOnAppQuit = automaticUpdatesEnabled;
-    autoUpdater.on('checking-for-update', () => sendAppUpdateStatus({ state: 'checking' }));
-    autoUpdater.on('update-available', (info: unknown) =>
-      sendAppUpdateStatus({ state: 'available', info })
-    );
-    autoUpdater.on('update-not-available', (info: unknown) =>
-      sendAppUpdateStatus({ state: 'none', info })
-    );
-    autoUpdater.on('error', (err: unknown) => sendAppUpdateStatus(normalizeUpdaterError(err)));
-    autoUpdater.on('download-progress', (p: { percent?: number }) =>
-      sendAppUpdateStatus({ state: 'downloading', percent: p && p.percent ? p.percent : 0 })
-    );
-    autoUpdater.on('update-downloaded', (info: unknown) =>
-      sendAppUpdateStatus({ state: 'downloaded', info })
-    );
-  } catch (e) {
-    Logger.error('electron-updater initialization failed:', e);
-  }
-}
-
 function runAutomaticCheck() {
   if (!automaticUpdatesEnabled) return;
   // Nothing more to fetch until the downloaded update has been installed.
@@ -663,15 +635,17 @@ function SetAutomaticUpdates(Enabled: boolean) {
   autoCheckIntervalTimer = setInterval(runAutomaticCheck, AUTO_CHECK_INTERVAL_MS);
 }
 
-// Wire the IPC handlers and perform the eager electron-updater init. Pass a
-// provider returning the current main BrowserWindow (it is created lazily).
+// Wire the IPC handlers. Pass a provider returning the current main
+// BrowserWindow (it is created lazily). electron-updater is not loaded here: it
+// costs ~25 ms on every launch, is never used by unpackaged or Squirrel builds,
+// and handleCheck loads it the first time a packaged build checks (an install
+// can only follow a check, and the background check starts a minute after boot).
 function Register(RPC: RpcRegistrar, options: RegisterOptions = {}) {
   if (typeof options.getMainWindow === 'function') {
     getMainWindow = options.getMainWindow;
   }
   RPC.handle('AppUpdate:Check', handleCheck);
   RPC.handle('AppUpdate:Install', handleInstall);
-  initElectronUpdater();
 }
 
 export const Manager = {

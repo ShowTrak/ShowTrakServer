@@ -11,6 +11,17 @@
 // src/main/ (registrars/, broadcast-bridge.ts, deployment.ts, initial-state.ts).
 import type { BrowserWindow as ElectronBrowserWindow } from 'electron';
 const { app, BrowserWindow } = require('electron/main');
+// Cache V8's compiled code for every module loaded from here on, so later
+// launches skip re-parsing the main process (keyed by file content, so an update
+// invalidates it). First, before the rest of the tree is required. Best-effort:
+// startup never depends on it.
+try {
+  require('node:module').enableCompileCache?.(
+    require('node:path').join(app.getPath('userData'), 'compile-cache')
+  );
+} catch {
+  /* intentional: an unavailable cache only costs the speed-up */
+}
 const { powerMonitor, autoUpdater: nativeAutoUpdater } = require('electron');
 if (require('electron-squirrel-startup')) app.quit();
 
@@ -33,7 +44,12 @@ if (!gotTheLock) {
   Logger.log('Single instance lock acquired');
 }
 
-import { PRELOADER_MIN_DISPLAY_MS } from './Modules/Config/constants';
+import {
+  MAIN_WINDOW_READY_TIMEOUT_MS,
+  PRELOADER_MIN_DISPLAY_MS,
+  PRELOADER_SHOW_DELAY_MS,
+} from './Modules/Config/constants';
+import { whenInitialStateDelivered } from './main/first-paint';
 
 // --- Back-end manager boot ---------------------------------------------------
 // Load order is preserved from the original main.ts. `require('./Modules/Server')`
@@ -173,6 +189,7 @@ function sendAppMenuAction(actionID: string) {
 let PreloaderWindow!: ElectronBrowserWindow;
 
 app.whenReady().then(async () => {
+  Logger.debug('[startup] electron ready');
   if (require('electron-squirrel-startup')) return app.quit();
 
   configureApplicationMenu({
@@ -207,8 +224,21 @@ app.whenReady().then(async () => {
     ...WINDOW_CHROME_OPTIONS,
   });
 
+  // The splash appears only if the main window is not ready shortly after the
+  // splash is (a fast start goes straight to the main window), and once shown it
+  // stays for its minimum so it never flickers. PreloaderShownAt is null until
+  // it has appeared; MainWindowRevealed stops a late timer from showing it.
+  let PreloaderShownAt: number | null = null;
+  let MainWindowRevealed = false;
+  let PreloaderShowTimer: ReturnType<typeof setTimeout> | null = null;
   PreloaderWindow.once('ready-to-show', () => {
-    PreloaderWindow.show();
+    PreloaderShowTimer = setTimeout(() => {
+      PreloaderShowTimer = null;
+      if (MainWindowRevealed || PreloaderWindow.isDestroyed()) return;
+      PreloaderWindow.show();
+      PreloaderShownAt = Date.now();
+      Logger.debug('[startup] splash shown');
+    }, PRELOADER_SHOW_DELAY_MS);
   });
 
   PreloaderWindow.loadFile(path.join(__dirname, 'UI', 'preloader.html'));
@@ -277,12 +307,30 @@ app.whenReady().then(async () => {
     // Deliberately not awaited: a slow or unreachable FOG server must not hold up
     // the main window appearing.
     FogManager.Start().catch((Err: unknown) => Logger.error('Failed to start FogManager:', Err));
-    await Wait(PRELOADER_MIN_DISPLAY_MS);
-    PreloaderWindow.close();
+    // Reveal once the renderer has initialised and received its data, rather
+    // than a fixed 800 ms after the page loaded (which on a fast machine was most
+    // of the startup time). Capped, so a broken renderer is still shown.
+    await whenInitialStateDelivered(MAIN_WINDOW_READY_TIMEOUT_MS);
+    // A splash that did appear stays up for its minimum, counting the time it
+    // has already been showing; one that never appeared never will.
+    if (PreloaderShownAt !== null) {
+      await Wait(Math.max(0, PRELOADER_MIN_DISPLAY_MS - (Date.now() - PreloaderShownAt)));
+    }
+    MainWindowRevealed = true;
+    if (PreloaderShowTimer) clearTimeout(PreloaderShowTimer);
+    if (!PreloaderWindow.isDestroyed()) PreloaderWindow.close();
     if (await SettingsManager.GetValue('SYSTEM_AUTO_MAXIMIZE_ON_BOOT')) {
       MainWindow.maximize();
     }
     MainWindow.show();
+    Logger.debug('[startup] main window shown');
+    // Write the compile cache now that startup has loaded everything it needs:
+    // Node only writes it at a clean exit otherwise, which a hard stop skips.
+    try {
+      require('node:module').flushCompileCache?.();
+    } catch {
+      /* intentional: best-effort, like enabling it */
+    }
   });
   applyWindowSecurityGuards(MainWindow);
   applyWindowZoomShortcuts(MainWindow);

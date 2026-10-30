@@ -16,7 +16,16 @@
 //   - Connected but no message before timeout         -> offline  (no message on topic)
 //   - Message received, ExpectedPayload not contained  -> degraded ("Unexpected payload")
 //   - Message received on the topic within timeout     -> online
-import mqtt, { type MqttClient, type IClientOptions } from 'mqtt';
+import type { MqttClient, IClientOptions } from 'mqtt';
+
+// The mqtt package is loaded on first use rather than at boot: every server
+// loads this method with the registry, few rigs have an MQTT check, and the
+// package costs ~25 ms of every launch.
+let MqttLib: typeof import('mqtt') | null = null;
+function Mqtt(): typeof import('mqtt') {
+  if (!MqttLib) MqttLib = require('mqtt') as typeof import('mqtt');
+  return MqttLib;
+}
 import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency, JsonCodeBlock } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
@@ -213,7 +222,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     }, TimeoutMs);
 
     try {
-      Client = mqtt.connect(Options);
+      Client = Mqtt().connect(Options);
     } catch (Err) {
       Finish({
         Success: false,

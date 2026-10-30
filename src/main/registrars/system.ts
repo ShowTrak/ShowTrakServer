@@ -6,6 +6,7 @@ import { CreateLogger } from '../../Modules/Logger';
 import { RPC } from '../rpc';
 import { validationErrorTuple } from '../ipc/create-handler';
 import { PushInitialDesktopState } from '../initial-state';
+import { markInitialStateDelivered } from '../first-paint';
 const { app } = require('electron/main');
 const { shell } = require('electron');
 const os = require('os');
@@ -85,7 +86,12 @@ function register(): void {
   // Renderer signaled it (re)loaded: push the current authoritative state.
   RPC.handle('Loaded', async () => {
     Logger.log('Application Page Hot Reloaded');
-    await PushInitialDesktopState();
+    try {
+      await PushInitialDesktopState();
+    } finally {
+      // The first one reveals the main window at startup (see first-paint.ts).
+      markInitialStateDelivered();
+    }
     return;
   });
 

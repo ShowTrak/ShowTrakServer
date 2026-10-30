@@ -61,7 +61,22 @@ function mqttMock(scenario) {
   return { module: { connect }, created };
 }
 
+// The method requires `mqtt` lazily, on its first probe, which is after
+// loadWithMocks has restored the real loader. This hook stays installed for the
+// file and hands each test's lazy require the mock that test loaded with.
+let CurrentMqtt = null;
+const Module = require('node:module');
+const RealLoad = Module._load;
+Module._load = function mqttAwareLoad(request) {
+  if (request === 'mqtt' && CurrentMqtt) return CurrentMqtt;
+  return RealLoad.apply(this, arguments);
+};
+test.after(() => {
+  Module._load = RealLoad;
+});
+
 function loadMqtt(mock) {
+  CurrentMqtt = mock.module;
   return loadWithMocks(methodPath('mqtt-topic.js'), { mqtt: mock.module });
 }
 
