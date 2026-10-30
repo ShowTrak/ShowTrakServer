@@ -12,6 +12,7 @@ import type { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/protocol';
 import type { USBDevice } from '@showtrak/protocol';
 import { CreateLogger } from '../Logger';
+import { RejectionBackoff } from './rejection-backoff';
 import { Manager as AdoptionManager } from '../AdoptionManager';
 import { Manager as ClientManager } from '../ClientManager';
 import { Manager as ScriptManager } from '../ScriptManager';
@@ -140,6 +141,7 @@ function makeGuardedOn(
 // Wire the default namespace (ShowTrak client agents) onto the Socket.IO server.
 function SetupClientNamespace(io: ClientNamespaceServer) {
   const localServerIdentity = ServerIdentityManager.GetIdentityToken();
+  const IdentityRejections = new RejectionBackoff();
 
   // Per-connection lifecycle
   io.on('connection', async (socket) => {
@@ -206,15 +208,32 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
         localServerIdentity &&
         socket.ExpectedServerIdentity !== localServerIdentity
       ) {
-        Logger.warn('Adopted client server identity mismatch; rejecting adoption claim', {
-          UUID: socket.UUID,
-          expected: socket.ExpectedServerIdentity,
-          actual: localServerIdentity,
-        });
-        socket.emit('Unadopt', {
-          Reason: 'server_identity_mismatch',
-          ServerIdentity: localServerIdentity,
-        });
+        // Repeats are held back (see rejection-backoff.ts): older clients
+        // reconnect straight back after this, in a tight loop.
+        const Delay = IdentityRejections.NextDelayMs(socket.UUID);
+        const Count = IdentityRejections.Count(socket.UUID);
+        // Logged on the first rejection and then sparsely, not on every retry.
+        if (Count <= 3 || Count % 20 === 0) {
+          Logger.warn('Adopted client server identity mismatch; rejecting adoption claim', {
+            UUID: socket.UUID,
+            expected: socket.ExpectedServerIdentity,
+            actual: localServerIdentity,
+            ...(Count > 1 ? { repeats: Count, delayMs: Delay } : {}),
+          });
+        }
+        const SendUnadopt = () => {
+          if (!socket.connected) return;
+          socket.emit('Unadopt', {
+            Reason: 'server_identity_mismatch',
+            ServerIdentity: localServerIdentity,
+          });
+        };
+        if (Delay > 0) {
+          const Timer = setTimeout(SendUnadopt, Delay);
+          socket.on('disconnect', () => clearTimeout(Timer));
+        } else {
+          SendUnadopt();
+        }
         return;
       }
 

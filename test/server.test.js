@@ -108,6 +108,55 @@ test('Server client namespace rejects sockets without a UUID', async () => {
   assert.equal(socket.disconnected, true);
 });
 
+test('a repeated identity-mismatch rejection is held back, and dropped if the socket leaves', async (t) => {
+  // Older clients reconnect straight back after `Unadopt`; the server must not
+  // answer that loop at full speed. The first answer stays immediate.
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { SetupClientNamespace } = loadWithMocks(serverPath('client-namespace.js'), {
+    '../VariableManager': { Manager: {} },
+    '../Logger': loggerStub,
+    '../AdoptionManager': { Manager: {} },
+    '../ClientManager': { Manager: { Exists: async () => true } },
+    '../ScriptManager': { Manager: {} },
+    '../ScriptExecutionManager': { Manager: {} },
+    '../ServerIdentity': { Manager: { GetIdentityToken: () => 'server-token-1' } },
+  });
+  let connectionHandler;
+  SetupClientNamespace({ on: (_e, h) => (connectionHandler = h) });
+
+  const Claim = () => {
+    const S = makeSocket({
+      query: { UUID: 'client-a', Adopted: 'true', ExpectedServerIdentity: 'other-server' },
+      address: '127.0.0.1',
+      headers: {},
+    });
+    S.connected = true;
+    return S;
+  };
+  const Unadopts = (S) => S.emitted.filter((E) => E.event === 'Unadopt');
+
+  const First = Claim();
+  await connectionHandler(First);
+  assert.equal(Unadopts(First).length, 1, 'first rejection is immediate');
+  assert.equal(Unadopts(First)[0].args[0].Reason, 'server_identity_mismatch');
+  assert.equal(First.hasHandler('Heartbeat'), false, 'a rejected client gets no handlers');
+
+  const Second = Claim();
+  await connectionHandler(Second);
+  assert.equal(Unadopts(Second).length, 0, 'the repeat is held back');
+  t.mock.timers.tick(999);
+  assert.equal(Unadopts(Second).length, 0);
+  t.mock.timers.tick(1);
+  assert.equal(Unadopts(Second).length, 1, 'and sent once the delay passes');
+
+  const Third = Claim();
+  await connectionHandler(Third);
+  await Third.trigger('disconnect');
+  Third.connected = false;
+  t.mock.timers.tick(60000);
+  assert.equal(Unadopts(Third).length, 0, 'nothing is sent to a socket that has gone');
+});
+
 test('Server client namespace wires telemetry handlers and disconnect cleanup', async () => {
   const calls = {
     heartbeat: 0,
