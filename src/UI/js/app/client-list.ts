@@ -20,6 +20,7 @@ import {
   set__LastClients,
   set__LastGroups,
 } from './state';
+import { UpdateOfflineIndicators } from './offline-indicators';
 import { OfflineBadgeContent, UnassignedBadgeContent } from './lib/status-badges';
 import { ResolveEntityTags } from './lib/tag-badges';
 import { RenderTagBadgeRow } from './lib/tag-badge-view';
@@ -37,6 +38,7 @@ import {
   ShouldRenderGroup,
   ShouldShowWelcomePanel,
   TruncateGroupLabel,
+  VitalsBarScale,
 } from './lib/client-list-layout';
 import type { ClientView, ScriptExecutionView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
@@ -653,10 +655,10 @@ export function RenderClientTile(Client: ClientView): string {
 				</small>
         <div class="SHOWTRAK_PC_STATUS ${Online && !Degraded ? 'd-grid' : 'd-none'} gap-2" data-type="INDICATOR_ONLINE">
 					<div class="progress">
-						<div data-type="CPU" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
+						<div data-type="CPU" class="progress-bar bg-white" role="progressbar" style="transform: scaleX(0);"></div>
 					</div>
 					<div class="progress">
-						<div data-type="RAM" class="progress-bar bg-white" role="progressbar" style="width: 0%;"></div>
+						<div data-type="RAM" class="progress-bar bg-white" role="progressbar" style="transform: scaleX(0);"></div>
 					</div>
 				</div>
         <div class="SHOWTRAK_PC_STATUS ${Online && Degraded ? 'd-grid' : 'd-none'}" data-type="INDICATOR_DEGRADED">
@@ -678,6 +680,16 @@ export function RenderClientTile(Client: ClientView): string {
 				</div>
         ${RenderListRowCells(String(UUID), CompactStatusLabel)}
 			</div>`;
+}
+
+// See VitalsBarScale (lib/client-list-layout).
+function SetVitalsBar(
+  $Bar: JQuery,
+  Reading: { UsagePercentage?: unknown } | null | undefined
+): void {
+  const Scale = VitalsBarScale(Reading);
+  // An empty value would REMOVE the inline transform and show a full bar.
+  if (Scale !== null) $Bar.css('transform', Scale);
 }
 
 // Patch an already-rendered client tile in place from a live ClientUpdated
@@ -749,8 +761,8 @@ export function UpdateClientTile(Data: ClientView): void {
 
   if (Online && Vitals) {
     const $Progress = $tile.children('div').children('.progress');
-    $Progress.children('[data-type="CPU"]').css('width', `${Vitals.CPU.UsagePercentage}%`);
-    $Progress.children('[data-type="RAM"]').css('width', `${Vitals.Ram.UsagePercentage}%`);
+    SetVitalsBar($Progress.children('[data-type="CPU"]'), Vitals.CPU);
+    SetVitalsBar($Progress.children('[data-type="RAM"]'), Vitals.Ram);
 
     $IndicatorOffline.addClass('d-none').removeClass('d-grid');
     $IndicatorDegraded.toggleClass('d-grid', Degraded).toggleClass('d-none', !Degraded);
@@ -764,6 +776,7 @@ export function UpdateClientTile(Data: ClientView): void {
   $IndicatorOffline
     .children('[data-type="OFFLINE_SINCE"]')
     .attr('data-offlinesince', Data.LastSeen ?? '');
+  if (!Online) UpdateOfflineIndicators($tile[0]);
 }
 
 export function RenderFullClientAndMonitorList() {
@@ -778,9 +791,12 @@ export function RenderFullClientAndMonitorList() {
   const ColumnCount = GetGroupColumnCount();
 
   if (ShouldShowWelcomePanel(Groups.length, Clients, Monitors, Dummies, Kiosks)) {
+    // The first list push can land before init has fetched the config; render
+    // without the version rather than throwing out of the whole list render.
+    const AppVersion = Config && Config.Application ? Config.Application.Version : null;
     Filler += `<div class="bg-ghost rounded m-3 mb-0 d-grid gap-0 gap-3 p-3">
             <h5 class="text-light mb-0">
-                Welcome to ShowTrak Server v${Safe(Config.Application.Version)}
+                Welcome to ShowTrak Server${AppVersion ? ` v${Safe(AppVersion)}` : ''}
             </h5>
             <p class="text-light mb-0">
                 You do not have any checks or clients configured yet. Discover clients on the network or set up monitoring checks.

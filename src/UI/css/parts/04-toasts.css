@@ -1136,6 +1136,24 @@ body.st-rainbow-leaving .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING):
     margin 180ms ease;
 }
 
+/* The CPU/RAM bars. Every client heartbeats each second, and animating
+   Bootstrap's progress width meant a layout pass every frame for as long as any
+   tile was moving, which with dozens of clients was always. The fill is full
+   width and scaled instead, which the compositor animates without layout. */
+.SHOWTRAK_PC .progress-bar[data-type='CPU'],
+.SHOWTRAK_PC .progress-bar[data-type='RAM'] {
+  width: 100%;
+  transform-origin: left center;
+  transition: transform 0.6s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .SHOWTRAK_PC .progress-bar[data-type='CPU'],
+  .SHOWTRAK_PC .progress-bar[data-type='RAM'] {
+    transition: none;
+  }
+}
+
 .SHOWTRAK_PC > [data-type='Nickname'] {
   transition:
     font-size 180ms ease,

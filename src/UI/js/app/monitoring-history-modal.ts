@@ -172,7 +172,44 @@ export function IsMonitorHistoryContextFor(entityType: string, id: string | numb
 // Fetch the raw sample series backing the open modal. For a monitoring target
 // this pulls one series per check; for a dummy client it pulls its single
 // uptime series.
-export async function LoadHistorySamplesForContext() {
+// Loads never overlap. Each clears the shared series and refills it across many
+// awaits, so two at once (the modal reloads on every client heartbeat and every
+// monitor update) interleaved and drew a series twice, and a slow IPC round
+// let them pile up. A call that lands mid-load joins it and causes exactly one
+// more load after it, which reads the context as it is by then; every caller's
+// promise settles only once the latest load is in, so a render after awaiting
+// it always draws current data.
+let HistoryLoadInFlight: Promise<void> | null = null;
+let HistoryLoadAgain = false;
+
+export function LoadHistorySamplesForContext(): Promise<void> {
+  if (HistoryLoadInFlight) {
+    HistoryLoadAgain = true;
+    return HistoryLoadInFlight;
+  }
+  HistoryLoadInFlight = (async () => {
+    try {
+      // A failed load still runs the one queued behind it; only a failure of
+      // the last load reaches the callers.
+      let LastErr: unknown = null;
+      do {
+        HistoryLoadAgain = false;
+        LastErr = null;
+        try {
+          await LoadHistorySamplesOnce();
+        } catch (Err) {
+          LastErr = Err;
+        }
+      } while (HistoryLoadAgain);
+      if (LastErr) throw LastErr;
+    } finally {
+      HistoryLoadInFlight = null;
+    }
+  })();
+  return HistoryLoadInFlight;
+}
+
+async function LoadHistorySamplesOnce() {
   setMonitorHistorySeries([]);
   const entity = ResolveMonitorHistoryContextEntity();
   if (!entity) return;

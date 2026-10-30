@@ -92,6 +92,10 @@
       recordByNode.set(node, record);
     }
 
+    // Every start state is written first, then ONE reflow commits them all and
+    // one frame starts every transition. Committing each element separately
+    // (write, read offsetWidth) forced a synchronous layout per moved tile.
+    const starts: Array<() => void> = [];
     for (const record of records) {
       const ancestor = FindFlipAncestorRecord(record.node, recordByNode);
 
@@ -99,7 +103,7 @@
         // Skip the enter animation if an ancestor is also new; it already
         // fades the whole subtree in as one unit.
         if (ancestor && ancestor.isNew) continue;
-        AnimateEnter(record.node);
+        starts.push(PrepareEnter(record.node));
         continue;
       }
 
@@ -113,17 +117,23 @@
         dy -= ancestor.dy;
       }
       if (Math.abs(dx) < EPSILON && Math.abs(dy) < EPSILON) continue;
-      AnimateMove(record.node, dx, dy);
+      starts.push(PrepareMove(record.node, dx, dy));
     }
+    if (!starts.length) return;
+    // Force a reflow so the inverted start positions are committed.
+    void (root as HTMLElement).offsetWidth;
+    requestAnimationFrame(() => {
+      for (const start of starts) start();
+    });
   }
 
-  function AnimateMove(node: HTMLElement, dx: number, dy: number) {
+  // Put a moved element at its old position; the returned function (run in the
+  // next frame, after the shared reflow) slides it to its new one.
+  function PrepareMove(node: HTMLElement, dx: number, dy: number): () => void {
     node.style.transition = 'none';
     node.style.transform = `translate(${dx}px, ${dy}px)`;
     node.style.willChange = 'transform';
-    // Force a reflow so the inverted start position is committed.
-    void node.offsetWidth;
-    requestAnimationFrame(() => {
+    return () => {
       node.style.transition = `transform ${MOVE_DURATION}ms ${MOVE_EASING}`;
       node.style.transform = '';
       const cleanup = (event: Event) => {
@@ -134,16 +144,16 @@
         node.removeEventListener('transitionend', cleanup);
       };
       node.addEventListener('transitionend', cleanup);
-    });
+    };
   }
 
-  function AnimateEnter(node: HTMLElement) {
+  // Hide a new element; the returned function fades and scales it in.
+  function PrepareEnter(node: HTMLElement): () => void {
     node.style.transition = 'none';
     node.style.opacity = '0';
     node.style.transform = 'scale(0.96)';
     node.style.willChange = 'opacity, transform';
-    void node.offsetWidth;
-    requestAnimationFrame(() => {
+    return () => {
       node.style.transition = `opacity ${ENTER_DURATION}ms ease, transform ${ENTER_DURATION}ms ${MOVE_EASING}`;
       node.style.opacity = '';
       node.style.transform = '';
@@ -156,7 +166,7 @@
         node.removeEventListener('transitionend', cleanup);
       };
       node.addEventListener('transitionend', cleanup);
-    });
+    };
   }
 
   // Capture the current layout, run the (synchronous) render callback, then

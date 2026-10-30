@@ -9,6 +9,7 @@
 // draws battery and brightness in the same two bars: those are the two readings
 // that tell an operator at a glance whether a tablet on a wall is about to
 // become a problem, and keeping the shape identical means one scan reads both.
+import { UpdateOfflineIndicators } from './offline-indicators';
 import type {
   FreeKioskDisplayMode,
   FreeKioskMetricView,
@@ -293,4 +294,5 @@ export function UpdateFreeKioskTile(K: FreeKioskTerminalView): void {
   ToggleIndicator('INDICATOR_DEGRADED', State === 'DEGRADED');
   ToggleIndicator('INDICATOR_OFFLINE', State === 'OFFLINE');
   $tile.find('[data-type="OFFLINE_SINCE"]').attr('data-offlinesince', K.LastSuccessAt || '');
+  if (State === 'OFFLINE') UpdateOfflineIndicators($tile[0]);
 }

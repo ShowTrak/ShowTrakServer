@@ -1,4 +1,5 @@
 import { AppMode, MonitoringMethodsCache, Selected, Tags } from './state';
+import { UpdateOfflineIndicators } from './offline-indicators';
 import type { MonitoringCheckView, MonitoringTargetView } from '@showtrak/protocol';
 import { Safe } from './utils';
 import {
@@ -227,6 +228,7 @@ export function UpdateMonitoringTargetTile(T: MonitoringTargetView) {
   SyncTileWidgetStreams();
   ToggleIndicator('INDICATOR_OFFLINE', !Online && !NoVerdict);
   $tile.find('[data-type="OFFLINE_SINCE"]').attr('data-offlinesince', GetMonitoringOfflineSince(T));
+  if (!Online && !NoVerdict) UpdateOfflineIndicators($tile[0]);
   UpdateListRowState($tile, MonitorListState(T));
   UpdateMonitorCheckRows(T);
 }

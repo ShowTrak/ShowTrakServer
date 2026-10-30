@@ -582,3 +582,19 @@ test('the welcome panel is hidden once a terminal exists', () => {
   // Omitted entirely: still a genuinely empty install.
   assert.equal(Layout.ShouldShowWelcomePanel(1, [], [], []), true);
 });
+
+test('VitalsBarScale maps a reading to a clamped horizontal scale, and ignores junk', () => {
+  // The CPU/RAM bars are scaled rather than resized (no layout per frame). A
+  // reading that cannot be read must leave the bar alone: an empty transform
+  // would show it full.
+  assert.equal(Layout.VitalsBarScale({ UsagePercentage: 42 }), 'scaleX(0.42)');
+  assert.equal(Layout.VitalsBarScale({ UsagePercentage: '7.5' }), 'scaleX(0.075)');
+  assert.equal(Layout.VitalsBarScale({ UsagePercentage: 0 }), 'scaleX(0)');
+  assert.equal(Layout.VitalsBarScale({ UsagePercentage: 140 }), 'scaleX(1)');
+  assert.equal(Layout.VitalsBarScale({ UsagePercentage: -3 }), 'scaleX(0)');
+  for (const Junk of [undefined, null, '', 'n/a', NaN, Infinity]) {
+    assert.equal(Layout.VitalsBarScale({ UsagePercentage: Junk }), null, String(Junk));
+  }
+  assert.equal(Layout.VitalsBarScale(null), null);
+  assert.equal(Layout.VitalsBarScale({}), null);
+});

@@ -43,6 +43,12 @@ function bundleOptions({ entry, outfile }) {
     format: 'iife',
     target: 'es2022',
     platform: 'browser',
+    // Minified: the bundles were ~1 MB each, parsed on every launch and served
+    // to every browser/phone opening the Web UI. The external source maps keep
+    // stack traces and DevTools mapped to the TypeScript, and keepNames keeps
+    // function/class names readable in error logs.
+    minify: true,
+    keepNames: true,
     sourcemap: true,
     legalComments: 'none',
     logLevel: 'info',

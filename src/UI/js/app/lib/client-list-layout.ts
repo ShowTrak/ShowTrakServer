@@ -341,3 +341,16 @@ export function ShouldShowWelcomePanel(
     (Kiosks || []).length === 0
   );
 }
+
+// A vitals bar's fill as a horizontal scale (see the CPU/RAM bar CSS): scaling
+// is composited, where animating width re-laid-out the tile every frame. An
+// unreadable reading leaves the bar where it was.
+export function VitalsBarScale(
+  Reading: { UsagePercentage?: unknown } | null | undefined
+): string | null {
+  const Raw = Reading ? Reading.UsagePercentage : null;
+  if (Raw == null || Raw === '') return null;
+  const Pct = Number(Raw);
+  if (!Number.isFinite(Pct)) return null;
+  return `scaleX(${Math.min(100, Math.max(0, Pct)) / 100})`;
+}

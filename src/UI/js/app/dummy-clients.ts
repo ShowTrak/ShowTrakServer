@@ -1,4 +1,5 @@
 import type { DummyClientView } from '@showtrak/protocol';
+import { UpdateOfflineIndicators } from './offline-indicators';
 import { openModal } from './lib/modal';
 import { OfflineBadgeContent } from './lib/status-badges';
 import { AppMode, Selected, Tags } from './state';
@@ -162,6 +163,7 @@ export function UpdateDummyClientTile(D: DummyClientView) {
   ToggleIndicator('INDICATOR_DEGRADED', Online && Degraded);
   ToggleIndicator('INDICATOR_OFFLINE', State === 'OFFLINE');
   $tile.find('[data-type="OFFLINE_SINCE"]').attr('data-offlinesince', D.LastSeen || '');
+  if (State === 'OFFLINE') UpdateOfflineIndicators($tile[0]);
 }
 
 /** Fill a group <select> with every group, then No Group. */
