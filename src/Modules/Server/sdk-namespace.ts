@@ -53,6 +53,8 @@ import { Manager as AlertsManager } from '../AlertsManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as FreeKioskManager } from '../FreeKioskManager';
+import { Manager as AdoptionManager } from '../AdoptionManager';
+import { Manager as MonitoringActionFavourites } from '../MonitoringActionFavourites';
 import {
   ToPublicClient,
   ToPublicGroup,
@@ -63,8 +65,9 @@ import {
 import { PasscodeMatches } from './webui-namespace';
 import { RegisterRendererSink } from '../../main/renderer-bus';
 import { GetHandler } from '../../main/handler-registry';
-import { AuthorizeChannel, ToRemoteResult } from '../RemoteAccess';
+import { AuthorizeChannel, ToPublicSettings, ToRemoteResult } from '../RemoteAccess';
 import { ControlService } from '../ControlService';
+import { CloseMonitorLiveLevels, OpenMonitorLiveLevels } from '../../main/monitoring-live';
 import { RunWithAuditSource } from '../AuditLog/source';
 
 const Logger = CreateLogger('SdkServer');
@@ -239,6 +242,18 @@ const SDK_PUSH_ALLOWLIST = new Set<string>([
   'USBDeviceAdded',
   'USBDeviceRemoved',
   'SetOSCList',
+  // What the Web UI's alerts tray, sounds and editors live on, so ShowTrak Remote
+  // can offer the same: a fired alert and its sound, a changed favourite or audio
+  // asset, a new audit log line. None carries a secret.
+  'CreateShowTrakAlert',
+  'PlaySound',
+  'PlayCustomAudio',
+  'AudioAssetsUpdated',
+  'SetFullMonitoringActionFavouriteList',
+  'AuditLogAppended',
+  // Settings ONLY as the Web UI gets them: reduced to the public display keys
+  // (TransformSdkPush), never the list as it is broadcast.
+  'UpdateSettings',
   // Deliberately still excluded, matching the Web UI: desktop-only channels
   // (menu actions, show-file, fullscreen, native/app updates, network discovery)
   // and ANYTHING carrying settings: settings hold the SDK API key and the
@@ -249,6 +264,10 @@ const SDK_PUSH_ALLOWLIST = new Set<string>([
 // and desktop consume). Monitor/dummy channels are projected to the client shape.
 function TransformSdkPush(channel: string, args: unknown[]): unknown[] {
   switch (channel) {
+    case 'UpdateSettings':
+      // The broadcast carries every setting, the SDK API key and the workspace PIN
+      // among them. A remote surface gets the public display keys and nothing else.
+      return [ToPublicSettings(args[0] as unknown[]), []];
     case 'SetFullClientList':
       return [
         ((args[0] as PublicClientInput[]) || []).map(ToPublicClient),
@@ -582,6 +601,34 @@ function SetupSdkNamespace(io: SdkIOServer) {
 
       socket.emit('ModeUpdated', ModeManager.Get());
       socket.emit('AlertActionsUpdated', AlertsManager.GetActionsEnabled());
+
+      // The rest of what the Web UI hydrates with, each on its own so one
+      // failing read cannot cost the session the others. Device sessions only:
+      // an integration never asked for alert rules or layout settings, and
+      // sending them would only grow every Companion connect.
+      if (socket.AuthMode === 'device') {
+        try {
+          socket.emit('UpdateSettings', ToPublicSettings(await SettingsManager.GetAll()), []);
+        } catch {
+          /* intentional: the app falls back to its own layout defaults */
+        }
+        try {
+          socket.emit('SetDevicesPendingAdoption', AdoptionManager.GetClientsPendingAdoption());
+        } catch {
+          socket.emit('SetDevicesPendingAdoption', []);
+        }
+        try {
+          socket.emit('SetFullMonitoringActionFavouriteList', MonitoringActionFavourites.GetAll());
+        } catch {
+          socket.emit('SetFullMonitoringActionFavouriteList', []);
+        }
+        try {
+          const [aErr, Rules] = await AlertsManager.GetAll();
+          socket.emit('SetFullAlertRuleList', aErr ? [] : Rules || []);
+        } catch {
+          socket.emit('SetFullAlertRuleList', []);
+        }
+      }
     } catch (e) {
       Logger.error('SDK initial state failed:', e);
     }
@@ -673,6 +720,32 @@ function SetupSdkNamespace(io: SdkIOServer) {
         }
       })();
     });
+
+    // Live levels: a monitor's audio meters, streamed to THIS socket only while
+    // its view is open, exactly as the Web UI opens them (webui-namespace.ts).
+    // Kept off the rpc bridge for the same reason it is there: the stream has to
+    // target the one socket that asked, which a shared handler cannot see.
+    //
+    // DEVICE SESSIONS ONLY, like rpc: an integration's API key was handed out to
+    // fire cues, not to hold a device's control connection open. Reading meters
+    // needs no mode or permission, as every other read does not. A stream can
+    // keep a device's only control connection busy, so it stops on close and on
+    // disconnect, which a revoked device is put through too.
+    const LiveLevelsKey = `sdk:${socket.id}`;
+    socket.on('monitorlive:open', (TargetID: unknown, ack: AckCallback) => {
+      if (socket.AuthMode !== 'device') return ack && ack({ error: 'forbidden' });
+      try {
+        const Snapshot = OpenMonitorLiveLevels(LiveLevelsKey, TargetID, (Frames) => {
+          socket.emit('MonitorLiveLevels:Frames', Frames);
+        });
+        if (ack) ack({ result: Snapshot });
+      } catch (e) {
+        Logger.error('SDK live levels failed to open:', e);
+        if (ack) ack({ error: 'failed' });
+      }
+    });
+    socket.on('monitorlive:close', () => CloseMonitorLiveLevels(LiveLevelsKey));
+    socket.on('disconnect', () => CloseMonitorLiveLevels(LiveLevelsKey));
   });
 
   return sdk;

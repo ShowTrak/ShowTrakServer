@@ -78,6 +78,9 @@ function freshState() {
     // The shared IPC handlers the rpc bridge dispatches to: the SAME registry
     // the desktop uses, which is the whole point of the bridge.
     rpcCalls: [],
+    // Live-level streams opened and closed through the /sdk socket events.
+    liveOpened: [],
+    liveClosed: [],
     handlers: {
       GetClient: (...args) => {
         state.rpcCalls.push(['GetClient', ...args]);
@@ -157,8 +160,13 @@ function loadSdk() {
       // The live levels hub reaches the real monitor manager (and its DB) from
       // main/, under a request string the stubs above do not cover.
       '../../main/monitoring-live': {
-        OpenMonitorLiveLevels: () => ({ TargetID: 0, Checks: [] }),
-        CloseMonitorLiveLevels: () => undefined,
+        OpenMonitorLiveLevels: (Key, TargetID, Send) => {
+          state.liveOpened.push({ Key, TargetID, Send });
+          return { TargetID: Number(TargetID), Checks: [] };
+        },
+        CloseMonitorLiveLevels: (Key) => {
+          state.liveClosed.push(Key);
+        },
       },
       '../../main/handler-registry': { GetHandler: (channel) => state.handlers[channel] },
       '../Broadcast': { Manager: broadcast },
@@ -189,6 +197,8 @@ function loadSdk() {
             if (state.settingsGetThrows) throw new Error('settings unavailable');
             return state.settings[Key];
           },
+          GetAll: async () =>
+            Object.entries(state.settings).map(([Key, Value]) => ({ Key, Value })),
           Set: async (Key, Value) => {
             state.settingsSet.push([Key, Value]);
             if (state.settingsSetThrows) throw new Error('settings are read-only');
@@ -246,7 +256,15 @@ function loadSdk() {
       },
       '../ScriptWhitelistManager': { Manager: { DecorateCatalog: async (C) => C } },
       '../ModeManager': { Manager: { Get: () => state.mode } },
-      '../AlertsManager': { Manager: { GetActionsEnabled: () => state.alertsEnabled } },
+      '../AlertsManager': {
+        Manager: {
+          GetActionsEnabled: () => state.alertsEnabled,
+          GetAll: async () => [null, state.alertRules || []],
+        },
+      },
+      '../AdoptionManager': {
+        Manager: { GetClientsPendingAdoption: () => state.pendingAdoption || [] },
+      },
     },
     // RemoteAccess owns the capability model the rpc bridge authorises against.
     // It reads the same mocked SettingsManager/ModeManager, so a cached copy
@@ -344,17 +362,23 @@ test('the push allowlist is exactly the channels the SDK publishes', () => {
   const { Mod } = loadSdk();
   assert.deepEqual([...Mod.SDK_PUSH_ALLOWLIST].sort(), [
     'AlertActionsUpdated',
+    'AudioAssetsUpdated',
+    'AuditLogAppended',
     'ClientUpdated',
+    'CreateShowTrakAlert',
     'DummyClientUpdated',
     'FreeKioskTerminalUpdated',
     'ModeUpdated',
     'MonitoringTargetUpdated',
     'Notify',
+    'PlayCustomAudio',
+    'PlaySound',
     'SetDevicesPendingAdoption',
     'SetFullAlertRuleList',
     'SetFullClientList',
     'SetFullDummyClientList',
     'SetFullFreeKioskTerminalList',
+    'SetFullMonitoringActionFavouriteList',
     'SetFullMonitoringTargetList',
     'SetOSCList',
     'SetScriptList',
@@ -362,6 +386,7 @@ test('the push allowlist is exactly the channels the SDK publishes', () => {
     'USBDeviceAdded',
     'USBDeviceRemoved',
     'UpdateScriptExecutions',
+    'UpdateSettings',
   ]);
 });
 
@@ -1359,4 +1384,119 @@ test('SetupSdkNamespace wires the namespace it returns', () => {
   assert.equal(Mod, NS);
   assert.equal(typeof NS.middleware, 'function');
   assert.equal(typeof NS.connectionHandler, 'function');
+});
+
+// --- Live levels (`monitorlive:open` / `monitorlive:close`) -------------------
+//
+// A monitor's audio meters stream to the one socket that opened them. Device
+// sessions only, like rpc, and the stream must never outlive the socket: a held
+// stream can keep a device's only control connection busy.
+
+async function openLive(NS, Socket, TargetID) {
+  await handshake(NS, Socket);
+  await NS.connectionHandler(Socket);
+  return new Promise((resolve) => {
+    Socket.handlers['monitorlive:open'](TargetID, resolve);
+  });
+}
+
+test("a paired device opens a monitor's live levels and receives its frames", async () => {
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  const { NS } = boot();
+  const Socket = deviceSocket({ id: 'phone-1' });
+
+  const Ack = await openLive(NS, Socket, 7);
+
+  assert.deepEqual(Ack, { result: { TargetID: 7, Checks: [] } });
+  assert.equal(state.liveOpened.length, 1);
+  assert.equal(state.liveOpened[0].Key, 'sdk:phone-1');
+  // Frames go to this socket, on the same event name the Web UI receives.
+  const Frame = { TargetID: 7, Checks: [{ CheckID: 1, Channels: [] }] };
+  state.liveOpened[0].Send(Frame);
+  assert.deepEqual(Socket.emitted.at(-1), ['MonitorLiveLevels:Frames', Frame]);
+});
+
+test('an API key session cannot open live levels', async () => {
+  state = freshState();
+  const { NS } = boot();
+
+  const Ack = await openLive(NS, fakeSocket({ apiKey: 'a'.repeat(48) }), 7);
+
+  assert.deepEqual(Ack, { error: 'forbidden' });
+  assert.deepEqual(state.liveOpened, [], 'an integration opened a stream');
+});
+
+test('live levels stop on close and on disconnect', async () => {
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  const { NS } = boot();
+  const Socket = deviceSocket({ id: 'phone-2' });
+  await openLive(NS, Socket, 7);
+
+  Socket.handlers['monitorlive:close']();
+  Socket.handlers.disconnect();
+
+  assert.deepEqual(state.liveClosed, ['sdk:phone-2', 'sdk:phone-2']);
+});
+
+// --- Web UI parity pushes ---------------------------------------------------
+
+test('settings reach the SDK only as the public display keys', () => {
+  // The broadcast carries every setting, the SDK API key and the workspace PIN
+  // among them; only the display keys may leave for a remote surface.
+  const { NS, push } = boot();
+  const Socket = fakeSocket();
+  NS.socketSet.add(Socket);
+
+  push('UpdateSettings', [
+    { Key: 'UI_GROUP_COLUMN_COUNT', Value: 3 },
+    { Key: 'SDK_API_KEY', Value: 'secret' },
+    { Key: 'WEBUI_PASSWORD', Value: '1234' },
+  ]);
+
+  const [Event, Settings] = Socket.emitted[0];
+  assert.equal(Event, 'UpdateSettings');
+  assert.deepEqual(
+    Settings.map((S) => S.Key),
+    ['UI_GROUP_COLUMN_COUNT']
+  );
+});
+
+test('a paired device is sent pending adoptions, favourites, rules and public settings on connect', async () => {
+  state = freshState();
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  state.pendingAdoption = [{ UUID: 'pending-1', Hostname: 'NEW-PC' }];
+  state.actionFavourites = [{ FavouriteID: 1 }];
+  state.alertRules = [{ RuleID: 4 }];
+  state.settings.UI_DEFAULT_VIEW = 'list';
+  const { NS } = boot();
+  const Socket = deviceSocket({ id: 'phone-initial' });
+  await handshake(NS, Socket);
+  await NS.connectionHandler(Socket);
+
+  const Sent = (Event) => Socket.emitted.find((E) => E[0] === Event);
+  assert.deepEqual(Sent('SetDevicesPendingAdoption')[1], state.pendingAdoption);
+  assert.deepEqual(Sent('SetFullMonitoringActionFavouriteList')[1], state.actionFavourites);
+  assert.deepEqual(Sent('SetFullAlertRuleList')[1], state.alertRules);
+  const Keys = Sent('UpdateSettings')[1].map((S) => S.Key);
+  assert.ok(Keys.includes('UI_DEFAULT_VIEW'));
+  assert.ok(!Keys.includes('SDK_API_KEY'), 'the API key was sent on connect');
+});
+
+test('an integration is not sent the device-only initial state', async () => {
+  state = freshState();
+  state.pendingAdoption = [{ UUID: 'pending-1' }];
+  const { NS } = boot();
+  const Socket = fakeSocket({ apiKey: 'a'.repeat(48) });
+  await handshake(NS, Socket);
+  await NS.connectionHandler(Socket);
+
+  for (const Event of ['SetDevicesPendingAdoption', 'UpdateSettings', 'SetFullAlertRuleList']) {
+    assert.equal(
+      Socket.emitted.some((E) => E[0] === Event),
+      false,
+      `${Event} was sent to an integration`
+    );
+  }
 });
