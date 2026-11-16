@@ -25,6 +25,7 @@ function load() {
         Run: async () => probeResults.shift(),
         BuildDebug: () => null,
         GetActionOptions: () => ({}),
+        GetSettingOptions: () => ({}),
       },
     },
   });

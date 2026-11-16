@@ -21,6 +21,7 @@ import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as MonitoringMethods } from '../MonitoringMethods';
 import type {
   MonitoringActionOptions,
+  MonitoringSettingOptions,
   MonitoringCheckView,
   MonitoringTargetView,
 } from '@showtrak/protocol';
@@ -96,6 +97,7 @@ class MonitoringCheck {
   LastDebugHtml: string | null;
   LastDebugAt: number | null;
   LastActionOptions: MonitoringActionOptions;
+  LastSettingOptions: MonitoringSettingOptions;
   // The last probe result (RAM-only), for result-driven tile widgets.
   LastResult: MonitoringResult | null;
 
@@ -142,6 +144,9 @@ class MonitoringCheck {
     // Dynamic choices for this check's action parameters, refreshed on every
     // run (see MonitoringMethods.GetActionOptions). RAM-only.
     this.LastActionOptions = {};
+    // What the device reported for FromDevice settings (a UniFi site's devices),
+    // offered as checkboxes in the check editor. RAM-only, like the above.
+    this.LastSettingOptions = {};
     this.LastResult = null;
   }
 
@@ -252,6 +257,7 @@ class MonitoringCheck {
     // than emptying the picker the moment the device blips.
     if (Result && Result.Success) {
       this.LastActionOptions = MonitoringMethods.GetActionOptions(this.Method, Result);
+      this.LastSettingOptions = MonitoringMethods.GetSettingOptions(this.Method, Result);
     }
   }
 

@@ -31,6 +31,8 @@ export const MethodDiscovery: Record<string, MonitoringMethodDiscovery> = {
   // Every Blackmagic device advertises _blackmagic._tcp; the TCP ports above
   // tell a HyperDeck or Videohub apart, so an ATEM is the low-confidence guess.
   atem: { Confidence: 'low', ServiceTypes: ['_blackmagic._tcp'] },
+  // Cameras advertise the same shared service and nothing that tells them apart.
+  'blackmagic-camera': { Confidence: 'low', ServiceTypes: ['_blackmagic._tcp'] },
   'ndi-source': { Confidence: 'high', ServiceTypes: ['_ndi._tcp'], NameSetting: 'SourceName' },
   'obs-studio': { Confidence: 'high', TcpPorts: [4455], PortSetting: 'Port' },
 
@@ -80,6 +82,8 @@ export const MethodDiscovery: Record<string, MonitoringMethodDiscovery> = {
 
   // Power
   'nut-ups': { Confidence: 'high', TcpPorts: [3493], PortSetting: 'Port' },
+  // Shelly documents _shelly._tcp as specific to Gen2+ devices.
+  'shelly-gen2': { Confidence: 'high', ServiceTypes: ['_shelly._tcp'] },
 
   // Web services: the fallback for anything serving a page. One method serves
   // both protocols and defaults to HTTPS, so the match sets which one.

@@ -332,6 +332,32 @@ test('http method reports connection errors against a closed port', async () => 
   assert.equal(result.Success, false);
 });
 
+// Setting options from a method reach the editor only for FromDevice 'list'
+// settings, and only as well-formed {value, label} items.
+test('GetSettingOptions keeps only FromDevice list keys and well-formed items', () => {
+  const { Manager } = loadWithMocks(methodPath('index.js'), { '../Logger': loggerStub() });
+  const result = {
+    Success: true,
+    SiteDevices: [
+      {
+        Name: 'Core',
+        Mac: '00:11:22:33:44:55',
+        Model: 'USW',
+        Features: ['switching'],
+        State: 'ONLINE',
+      },
+      { Name: 'Core', Mac: '00:11:22:33:44:55' },
+    ],
+  };
+  const options = Manager.GetSettingOptions('unifi-network', result);
+  assert.deepEqual(Object.keys(options), ['MonitoredDevices']);
+  assert.equal(options.MonitoredDevices.length, 1, 'duplicate values are dropped');
+  assert.equal(options.MonitoredDevices[0].value, '00:11:22:33:44:55');
+  // A method without the hook, or an unknown method, offers nothing.
+  assert.deepEqual(Manager.GetSettingOptions('ping', result), {});
+  assert.deepEqual(Manager.GetSettingOptions('nope', result), {});
+});
+
 // Registering a method takes three edits in three files (index.ts, info.ts,
 // groups.ts) and nothing but discipline previously enforced the last two: a
 // method missing from info.ts or groups.ts still runs, it just renders with no
@@ -407,6 +433,7 @@ test('MonitoringMethods registry exposes public shapes and normalizes settings',
   const ids = all.map((m) => m.ID).sort();
   assert.deepEqual(ids, [
     '7thsense-delta',
+    'ableton-link',
     'aja-device',
     'allen-heath-console',
     'analogway-livepremier',
@@ -416,33 +443,44 @@ test('MonitoringMethods registry exposes public shapes and normalizes settings',
     'atem',
     'avolites',
     'barco-eventmaster',
+    'behringer-wing',
     'biamp-tesira',
+    'blackmagic-camera',
     'brightsign',
     'brompton-tessera',
     'chamsys',
+    'clearcom-arcadia',
+    'clearcom-freespeak-ii',
     'companion-status',
     'dante-device',
     'datapath-fx4',
     'dbaudio-amp',
+    'dbaudio-ds100',
     'digico-console',
     'disguise-status',
     'dns',
     'eos',
+    'greengo',
     'http',
     'http-json',
     'hyperdeck',
+    'igmp-querier',
+    'luminex-gigacore',
     'ma2',
     'ma3',
     'millumin-status',
     'motive',
     'mqtt-topic',
     'ndi-source',
+    'netgear-av',
     'nut-ups',
     'obs-studio',
+    'opengear-frame',
     'ping',
     'pixera',
     'pjlink',
     'powersoft-amp',
+    'propresenter',
     'ptz-camera',
     'qlab4',
     'qlab5',
@@ -451,6 +489,7 @@ test('MonitoringMethods registry exposes public shapes and normalizes settings',
     'sacn-universe',
     'sacn-universe-priority',
     'sennheiser-wireless',
+    'shelly-gen2',
     'shure-wireless',
     'snmp-oid',
     'snmp-projector',
@@ -459,6 +498,7 @@ test('MonitoringMethods registry exposes public shapes and normalizes settings',
     'symetrix-dsp',
     'tascam-mx8a',
     'tcp-port',
+    'unifi-network',
     'videohub',
     'watchout-status',
     'x32-console',

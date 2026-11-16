@@ -11,7 +11,7 @@
 // chip input has to push its edit into the editor's working state) is inverted
 // through setFieldEditedHandler below rather than imported, so there is no
 // import cycle with ../monitoring-editor.
-import type { MonitoringSettingField } from '@showtrak/protocol';
+import type { MonitoringSettingField, MonitoringSettingOptions } from '@showtrak/protocol';
 import { MonitoringMethodsCache, setMonitoringMethodsCache } from '../state';
 import { Safe } from '../utils';
 
@@ -159,6 +159,16 @@ export function AddMonitoringListChip($list: JQuery) {
     if (!Number.isFinite(n)) return;
     value = String(n);
   }
+  // Typing a device the checklist already offers ticks its box instead.
+  const $pick = FindMonitoringListPick($list, value);
+  if ($pick) {
+    $pick.prop('checked', true);
+    $input.val('');
+    ApplyMonitoringConditionalVisibility();
+    ValidateMonitoringRequiredFields();
+    onFieldEdited();
+    return;
+  }
   const exists = $list
     .find('[data-chip-value]')
     .map((_, e) => $(e).attr('data-chip-value') || '')
@@ -283,11 +293,16 @@ export function BuildMonitoringCheckFieldHtml(Field: MonitoringSettingField, Val
       BuildMonitoringFieldWrapOpen(Field, 'monitoring-list-field') +
       `<div class="monitoring-list" data-key="${Safe(Field.Key)}" data-type="list" data-item-type="${Safe(
         ItemType
-      )}">
+      )}"${Field.FromDevice ? ' data-from-device="1"' : ''}>
         <div class="d-flex align-items-center justify-content-between mb-1">
           <label class="form-label mb-0 small text-muted">${BuildMonitoringLabelHtml(Field)}</label>
           ${NoteIcon}
         </div>
+        ${
+          Field.FromDevice
+            ? '<div class="monitoring-list-picks mb-1"><div class="text-muted small fst-italic">What the device reports appears here once the check has run.</div></div>'
+            : ''
+        }
         <div class="monitoring-list-chips d-flex flex-wrap gap-1 mb-1">${Chips}</div>
         <div class="input-group input-group-sm monitoring-list-add">
           <input type="${ItemType === 'number' ? 'number' : 'text'}" class="form-control monitoring-list-input"
@@ -586,11 +601,7 @@ export function CollectMonitoringCheckDynamicSettings(
           .map((_, e) => String($(e).val() || '').trim())
           .get();
       } else if (type === 'list') {
-        out[key] = $el
-          .find('[data-chip-value]')
-          .map((_, e) => $(e).attr('data-chip-value') || '')
-          .get()
-          .filter((v) => v !== '');
+        out[key] = ReadMonitoringListValues($el);
       } else {
         out[key] = $el.val();
       }
@@ -612,4 +623,121 @@ export function ResolveMonitoringMethodHint(Hint: unknown) {
     if (match) return match.ID;
   }
   return null;
+}
+
+// --- Device checklists ('list' fields with FromDevice) ------------------------
+// The device's own items (a UniFi site's switches and access points) as a
+// checkbox each, above the chips. A ticked box stores its value exactly as a
+// typed chip would, so the setting stays a string[]; values the device did not
+// report stay as chips, so nothing typed is ever lost.
+
+// Case and separators ignored, so 'AA-BB-…' matches 'aa:bb:…'.
+function MatchKey(Value: unknown): string {
+  return String(Value == null ? '' : Value)
+    .trim()
+    .toLowerCase()
+    .replace(/[\s:._-]/g, '');
+}
+
+// The values a 'list' field holds: ticked device boxes, then typed chips.
+function ReadMonitoringListValues($list: JQuery): string[] {
+  const Picked = $list
+    .find('.monitoring-list-pick:checked')
+    .map((_, e) => String($(e).val() || ''))
+    .get();
+  const Chips = $list
+    .find('[data-chip-value]')
+    .map((_, e) => $(e).attr('data-chip-value') || '')
+    .get();
+  return Array.from(new Set([...Picked, ...Chips])).filter((v) => v !== '');
+}
+
+// The checkbox for the item a typed or stored value names (its value or an
+// alias such as the device name), or null.
+function FindMonitoringListPick($list: JQuery, Value: string): JQuery | null {
+  const Key = MatchKey(Value);
+  if (!Key) return null;
+  let Found: JQuery | null = null;
+  $list.find('.monitoring-list-pick').each(function () {
+    const Keys = [String($(this).val() || ''), ...JSON.parse($(this).attr('data-aliases') || '[]')];
+    if (Keys.some((K) => MatchKey(K) === Key)) {
+      Found = $(this);
+      return false;
+    }
+    return undefined;
+  });
+  return Found;
+}
+
+const PICK_FILTER_MIN = 8;
+
+// Fill each device checklist from the check's latest SettingOptions. A key the
+// payload does not carry leaves its list alone (the check has not run yet, or
+// the last run failed); an unchanged set is skipped so a background refresh
+// never disturbs someone mid-edit.
+export function ApplyMonitoringSettingOptions(
+  Options: MonitoringSettingOptions | null | undefined,
+  HostSelector = MONITORING_FIELD_HOSTS
+) {
+  if (!Options || typeof Options !== 'object') return;
+  $(HostSelector)
+    .find('.monitoring-list[data-from-device]')
+    .each(function () {
+      const $list = $(this);
+      const Key = $list.attr('data-key') || '';
+      const Items = Options[Key];
+      if (!Array.isArray(Items)) return;
+      const Sig = JSON.stringify(Items);
+      if ($list.attr('data-options-sig') === Sig) return;
+      $list.attr('data-options-sig', Sig);
+
+      const Current = ReadMonitoringListValues($list);
+      const Claimed = new Set<string>();
+      const Boxes = Items.map((Item) => {
+        const Keys = [Item.value, ...(Item.aliases || [])].map(MatchKey);
+        const Ticked = Current.filter((V) => Keys.includes(MatchKey(V)));
+        Ticked.forEach((V) => Claimed.add(V));
+        return `<label class="monitoring-list-pick-item" data-filter="${Safe(
+          [Item.label, Item.value, Item.detail || ''].join(' ').toLowerCase()
+        )}">
+            <input type="checkbox" class="form-check-input monitoring-list-pick" value="${Safe(
+              Item.value
+            )}" data-aliases="${Safe(JSON.stringify(Item.aliases || []))}" ${Ticked.length ? 'checked' : ''} />
+            <span class="monitoring-list-pick-text">
+              <span class="monitoring-list-pick-label">${Safe(Item.label)}</span>
+              ${Item.detail ? `<span class="monitoring-list-pick-detail">${Safe(Item.detail)}</span>` : ''}
+            </span>
+          </label>`;
+      }).join('');
+
+      const Filter =
+        Items.length >= PICK_FILTER_MIN
+          ? `<input type="search" class="form-control form-control-sm monitoring-list-pick-filter mb-1" placeholder="Filter…" aria-label="Filter" />`
+          : '';
+      const Body = Items.length
+        ? `${Filter}<div class="monitoring-list-pick-grid">${Boxes}</div>`
+        : '<div class="text-muted small fst-italic">The device reported none.</div>';
+      $list.find('.monitoring-list-picks').html(Body);
+
+      // Stored values the device did not report stay as removable chips.
+      const Rest = Current.filter((V) => !Claimed.has(V));
+      $list
+        .find('.monitoring-list-chips')
+        .html(Rest.map((V) => BuildMonitoringListChipHtml(V)).join(''));
+    });
+}
+
+// Narrow a device checklist to the items whose name, value or detail contains
+// the filter text. Display only; nothing is saved.
+export function FilterMonitoringListPicks($filter: JQuery) {
+  const Text = String($filter.val() || '')
+    .trim()
+    .toLowerCase();
+  $filter
+    .closest('.monitoring-list')
+    .find('.monitoring-list-pick-item')
+    .each(function () {
+      const Haystack = $(this).attr('data-filter') || '';
+      $(this).toggleClass('d-none', !!Text && !Haystack.includes(Text));
+    });
 }

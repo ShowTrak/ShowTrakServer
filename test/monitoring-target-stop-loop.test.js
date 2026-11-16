@@ -45,6 +45,7 @@ function loadTarget({ onEmit, runImpl, onError }) {
         Run: runImpl || (async () => ({ Success: true, LatencyMs: 10 })),
         BuildDebug: () => '<div>debug</div>',
         GetActionOptions: () => ({}),
+        GetSettingOptions: () => ({}),
       },
     },
   }).MonitoringTarget;

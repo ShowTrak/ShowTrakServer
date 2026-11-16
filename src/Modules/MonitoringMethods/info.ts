@@ -945,6 +945,308 @@ const MethodInfo: Record<string, MonitoringMethodInfo> = {
       },
     ],
   },
+  'unifi-network': {
+    Summary:
+      'Reads a UniFi Network site over the official UniFi Network API with an API key: the Network version, every adopted switch, access point and gateway with its state, and optionally the number of connected clients. Offline when the console does not answer, refuses the key or does not serve the API. Degraded when a Monitored device is not online or not adopted, when any device is offline, updating, adopting or disconnected (optional), or when online access points or connected clients fall below a minimum.',
+    Setup: [
+      'In UniFi Network, open Integrations (under Settings, Control Plane on recent versions) and choose Create New API Key. Copy the key straight away: it is shown only once.',
+      'Enter the console address. A UniFi OS console (Cloud Gateway, Dream Machine, Cloud Key) serves the API on port 443 with a self-signed certificate, so Ignore TLS Errors is on by default.',
+      'The official API needs UniFi OS: a UniFi OS console or UniFi OS Server. The older self-hosted Network Application (port 8443) is not a documented server for this API. If your controller serves the API under a different path or port, set API base path and Port in Advanced.',
+      'Leave Site blank for a single-site controller or the default site. Otherwise enter the site name as shown in UniFi Network.',
+      'List Monitored devices by name or MAC address (any separator). Names are matched without regard to case.',
+      'The check only sends GET requests and never changes the network.',
+    ],
+    Links: [
+      {
+        Label: 'UniFi Network API: Getting Started (Ubiquiti)',
+        Url: 'https://developer.ui.com/network/v11.0.97/gettingstarted',
+      },
+      {
+        Label: 'UniFi Network API: OpenAPI document (Ubiquiti)',
+        Url: 'https://developer.ui.com/network/v11.0.97/openapi.json',
+      },
+      {
+        Label: 'UniFi Network API: List Adopted Devices (Ubiquiti)',
+        Url: 'https://developer.ui.com/network/v11.0.97/getadopteddeviceoverviewpage',
+      },
+    ],
+  },
+  'igmp-querier': {
+    Summary:
+      'Shows which device is the IGMP querier on each interface or VLAN of a switch or router, read over SNMP (v1, v2c or v3) from the standard IGMP-STD-MIB (RFC 2933) or MGMD-STD-MIB (RFC 5519). Without a querier, IGMP snooping switches eventually stop forwarding multicast such as Dante, AES67, NDI and sACN. Degraded (or Offline, if you choose) when a monitored interface has no querier. Degraded when the querier is not the expected address. Offline when the device does not answer SNMP.',
+    Setup: [
+      'Point the check at the switch or router that should see the querier, usually the core switch or the device acting as querier. Enable SNMP on it and match the community string, or the v3 user and protocols.',
+      'The device must implement IGMP-STD-MIB or MGMD-STD-MIB. Many AV and enterprise switches report their IGMP snooping querier only in a vendor MIB; those devices show no rows here, and the check reports no querier. Use the SNMP OID check with the vendor OID instead, or the Netgear AV Line check, which reads the querier from the switch’s own API.',
+      'List Monitored interfaces by name as the switch reports it (ifName, e.g. vlan10) or by ifIndex number. Leave empty to require a querier on every active IGMP interface the device reports.',
+      'Set Expected querier address to be warned when a different device takes over as querier.',
+      'When the device itself is the querier, the address is marked “this device”. A credential mismatch is reported as Offline, because an agent silently drops a request it will not authenticate.',
+    ],
+    Links: [
+      { Label: 'RFC 2933: IGMP-STD-MIB', Url: 'https://datatracker.ietf.org/doc/html/rfc2933' },
+      { Label: 'RFC 5519: MGMD-STD-MIB', Url: 'https://datatracker.ietf.org/doc/html/rfc5519' },
+      {
+        Label: 'RFC 2863: IF-MIB (interface names)',
+        Url: 'https://datatracker.ietf.org/doc/html/rfc2863',
+      },
+    ],
+  },
+  'luminex-gigacore': {
+    Summary:
+      'Luminex GigaCore Gen2 switch health over its REST API (GigaCore 10i, 16i, 30i, 10t, 16t, 18t, 20t, 10t-IP, 16tf, O26-I, S30-I), read-only. Reads the name, model, serial and how many ports have a link. Turn on the toggles to report Degraded when a Monitored port is disabled or has no link, or when a Monitored PoE port is off or not sourcing power. Gen1 switches (GigaCore 10, 12, 14R, 16Xt, 16RFO, 26i) use a different API and are not supported.',
+    Setup: [
+      'Enter the switch’s management IP. Automatic tries HTTP first, then HTTPS, and remembers which one answered.',
+      'If a password is set on the switch, enter it. The username is always admin.',
+      'List the ports that matter (uplinks, stage boxes, PoE devices) under Monitored ports and Monitored PoE ports.',
+      'Identify flashes the switch’s LEDs. Power Cycle PoE switches PoE off on one port for five seconds, then back on. It is refused on protected ports and on ports whose PoE is already off.',
+      'The API does not expose port speed, PoE draw or budget, temperatures, fans, power supplies, RLinkX or IGMP querier state, so this check does not read them.',
+    ],
+    Links: [
+      {
+        Label: 'GigaCore Gen2 API documentation (Luminex)',
+        Url: 'https://support.luminex.be/portal/en/kb/articles/gigacore-api-documentation',
+      },
+      {
+        Label: 'GigaCore Q-SYS plugin (Luminex)',
+        Url: 'https://github.com/luminex-lce/gigacore-q-sys-plugin',
+      },
+      {
+        Label: 'Companion module: Luminex GigaCore (Bitfocus)',
+        Url: 'https://github.com/bitfocus/companion-module-luminex-gigacore',
+      },
+    ],
+  },
+  'netgear-av': {
+    Summary:
+      'Netgear AV Line switch health (M4250, M4300, M4350) over the switch’s REST API on HTTPS port 8443, read-only. Logs in once and reuses the login token. Reads model, firmware, serial, uptime, fans and temperatures. Turn on the toggles to report Degraded when a Monitored port has no link or links below a minimum speed, a Monitored PoE port is not delivering power, PoE draw passes a share of the budget, a temperature sensor leaves Normal, or a listed VLAN has no IGMP querier.',
+    Setup: [
+      'Enter the switch’s management IP, and the admin username and password. The API uses a self-signed certificate, so Ignore TLS Errors is on by default.',
+      'List the ports to watch by the number the API gives them (1, 2, 3 …), and optionally a minimum link speed to catch a link that has fallen back to a lower speed.',
+      'For multicast networks (Dante, AES67, NDI), list the VLANs that must have an IGMP querier. Each VLAN is one more request per check.',
+      'Power Cycle PoE restarts the device on one port using the switch’s own PoE reset. It is refused on ports whose PoE is off.',
+      'Power supply state is not in the API. Fan state is shown as the switch reports it but not checked.',
+    ],
+    Links: [
+      {
+        Label: 'Companion module: Netgear AV Line (Bitfocus)',
+        Url: 'https://github.com/bitfocus/companion-module-netgear-avline',
+      },
+      {
+        Label: 'M4300 REST API OpenAPI spec 2.0.0.59 (public copy)',
+        Url: 'https://github.com/ready-1/netgear_m4300_ansible/blob/main/config/m4300_configagent_2_0_0_59.yaml',
+      },
+      {
+        Label: 'Netgear AV Line REST API discussion (Netgear Community)',
+        Url: 'https://community.netgear.com/t5/Managed-Switches/REST-APIs-for-NETGEAR/m-p/2037868',
+      },
+    ],
+  },
+  'behringer-wing': {
+    Summary:
+      'Queries a Behringer WING, WING Rack or WING Compact over its OSC remote protocol (UDP 2223) for the model, console name, serial and firmware, plus the clock, the open show and the active scene. Optionally flags a different console name, an unlocked clock or an unexpected clock source or sample rate, AES50 ports or StageConnect not reporting OK, a different show or scene, or listed strips that are muted (or whose faders are at −∞). Degraded = something answered but is not a WING, or an enabled check failed; Offline = no reply. A channel’s mute is its own mute button; DCA and mute group mutes are listed as their own strips.',
+    Setup: [
+      'Point Address at the console. WING answers OSC on UDP 2223, and the OSC server is always on.',
+      'The console replies to the port the request came from, so ShowTrak needs no inbound firewall rule, and Companion or a tablet on the same computer is not affected.',
+      'List strips as Main 1, Ch 12, Bus 3, Aux 2, Mtx 1, DCA 4 or Mgrp 1.',
+      'Show and scene names can be entered bare (SHOW2, scene_1) or as the console shows them (I:SHOW2/scene_1.snap).',
+      'Scene actions need a show to be open on the console. Scene numbers are positions in the open show’s list, starting at 1.',
+    ],
+    Links: [
+      {
+        Label: 'WING Remote Protocols (P. Maillot)',
+        Url: 'https://docs.rs/crate/libwing/latest/source/Wing-Remote-Protocols.pdf',
+      },
+      {
+        Label: 'Maillot’s WING tools and docs',
+        Url: 'https://sites.google.com/site/patrickmaillot/wing',
+      },
+      {
+        Label: 'Companion module: Behringer WING (Bitfocus)',
+        Url: 'https://github.com/bitfocus/companion-module-behringer-wing',
+      },
+    ],
+  },
+  'ableton-link': {
+    Summary:
+      'Passively listens for Ableton Link on UDP 20808 (multicast 224.76.78.75) and reports how many Link peers are on the network, how many separate sessions they form, their tempo and whether the transport is playing. ShowTrak only listens: it never joins the session, so it never appears in the apps’ peer count. Online = at least the minimum number of peers heard; Degraded = a session split, or a tempo or transport that is not what you expect.',
+    Setup: [
+      'Turn on Link in each app (in Live: Preferences → Link, Tempo & MIDI → Show Link Toggle, then switch Link on in the toolbar).',
+      'Discovery is network-wide; the Address field is not used. ShowTrak must be on the same subnet or VLAN as the Link apps, and the network must pass multicast to 224.76.78.75.',
+      'Link apps announce themselves every 250 ms. The first check after ShowTrak starts listening waits under a second for those announcements.',
+      'The transport check needs Start Stop Sync turned on in at least one Link app; otherwise the transport state is unknown.',
+      'When two sessions meet they merge within a second or two, so a brief split can show while an app joins.',
+    ],
+    Links: [
+      { Label: 'Link source code (GitHub)', Url: 'https://github.com/Ableton/link' },
+      { Label: 'Link documentation (Ableton)', Url: 'https://ableton.github.io/link/' },
+      { Label: 'Ableton Link overview', Url: 'https://www.ableton.com/en/link/' },
+    ],
+  },
+  'clearcom-arcadia': {
+    Summary:
+      'Clear-Com Arcadia Central Station and FreeSpeak Edge base over the CCM REST API (HTTP or HTTPS). Each interval it signs in as admin when needed and makes three read-only requests: station model and firmware, every beltpack’s online state, role, battery, runtime, RSSI and link quality, and the role list. Battery is checked by default: Degraded when a monitored beltpack is at or below the percentage or minutes threshold. Listed roles or beltpacks must be online; link quality is opt-in.',
+    Setup: [
+      'Point Address at the station’s management IP address and enter the admin password you use for its web page.',
+      'List the roles that must always have a beltpack on, e.g. Stage Manager. Leave the list empty to check battery and link on every online beltpack.',
+      'Wired packs and panels appear alongside wireless beltpacks; battery is only judged on those that report one.',
+    ],
+    Links: [
+      {
+        Label: 'Companion module: Clear-Com REST (reference client)',
+        Url: 'https://github.com/bitfocus/companion-module-clearcom-rest',
+      },
+      {
+        Label: 'Arcadia online manual (Clear-Com)',
+        Url: 'https://clearcom.com/DownloadCenter/manuals/Arcadia_Online_Manual/Content/Topics/Upgrading.htm',
+      },
+    ],
+  },
+  'clearcom-freespeak-ii': {
+    Summary:
+      'Clear-Com FreeSpeak II base station (FSII-BASE-II) over its CCM web interface (HTTP, no login). Three read-only requests per interval read base status and firmware, and every beltpack’s online state, role, battery, runtime, RSSI and link quality. Battery is checked by default: Degraded when a monitored beltpack is at or below the percentage or minutes threshold. Listed roles or beltpacks must be online; link quality is opt-in.',
+    Setup: [
+      'Point Address at the base station’s IP address. Leave Device ID at 1 unless the base is part of a linked system.',
+      'List the roles that must always have a beltpack on, e.g. Stage Manager. Leave the list empty to check battery and link on every online beltpack.',
+      'The base’s web interface has no authentication. Keep it on an isolated production network.',
+    ],
+    Links: [
+      {
+        Label: 'Companion module: Clear-Com FreeSpeak II (reference client)',
+        Url: 'https://github.com/bitfocus/companion-module-clearcom-freespeakii',
+      },
+    ],
+  },
+  greengo: {
+    Summary:
+      'Wired Green-GO devices running Green-GO’s OSC remote script (OSC over UDP). Each interval asks the device for its state with the script’s read request and listens for its heartbeat, every 3 seconds. Online when the device answers or its heartbeat is recent. Reports each channel’s members, talk, call and listen state; Degraded when a channel listed as needing members has none. Wireless WBPX beltpacks and WAA antennas cannot run the script.',
+    Setup: [
+      'Add osc-remote.gg5t to the Green-GO configuration, set remoteIP to this computer’s IP address and controlPort to a free UDP port, compile it, and load it on the device.',
+      'Enter the device’s IP address in Address and the script’s controlPort in Control port.',
+      'The script sends to one remoteIP only, so a device reporting to ShowTrak cannot report to Companion at the same time.',
+      'Allow the control port through this computer’s firewall.',
+    ],
+    Links: [
+      {
+        Label: 'Green-GO Companion guide (script setup)',
+        Url: 'https://manual.greengoconnect.com/en/guides/companion/',
+      },
+      {
+        Label: 'osc-remote.gg5t script',
+        Url: 'https://github.com/bitfocus/companion-module-greengo-intercom/blob/master/osc-remote.gg5t',
+      },
+    ],
+  },
+  'dbaudio-ds100': {
+    Summary:
+      'd&b audiotechnik DS100 / DS100M Signal Engine (d&b Soundscape: En-Scene and En-Space) over the d&b OSC protocol on UDP. Reads the device name, firmware, general error flag and error text, status text, audio network sync, matrix size, current scene and En-Space room. Degraded by default when the DS100 raises its error flag or the audio network is not in sync; enable the name, scene, En-Space room and output mute toggles to check those too. Scene recall, next and previous are separate operator actions.',
+    Setup: [
+      'Give the DS100 an IP address ShowTrak can reach (d&b R1 shows it) and enter it as the address. The DS100 listens for OSC on UDP 50010.',
+      'The DS100 always sends its replies to UDP 50011 on the computer that asked, so a firewall on this computer must allow incoming UDP 50011.',
+      'Only one program on this computer can receive on UDP 50011. If a Soundscape controller (the d&b Soundscape plug-in, Companion’s d&b DSP module or another OSC controller) runs on the same computer, the check reports that the port is in use; run ShowTrak or that controller on a different computer.',
+      'To catch a swapped unit, turn on Check device name and enter the name set in R1.',
+      'Scenes are created in R1. Enter the expected scene as shown there, e.g. 7 or 12.05. The current scene and the En-Space room need DS100 firmware that reports them; the matrix size needs V3.00.01 or later.',
+      'Recall Scene, Next Scene and Previous Scene change the show and ask for confirmation. Each is sent once and then confirmed by reading the scene back.',
+    ],
+    Links: [
+      {
+        Label: 'd&b OSC protocol for DS100 (PDF)',
+        Url: 'https://www.dbaudio.com/assets/products/downloads/manuals-documentation/electronics/dbaudio-osc-protocol-ds100-1.3.12-en.pdf',
+      },
+      {
+        Label: 'DS100 Signal Engine (d&b)',
+        Url: 'https://www.dbaudio.com/global/en/products/electronics/ds100',
+      },
+      {
+        Label: 'd&b Soundscape DAW plug-in (GitHub)',
+        Url: 'https://github.com/dbaudio-soundscape/db-Soundscape-DAW-Plugins',
+      },
+      {
+        Label: 'Companion module: d&b DSP (Bitfocus)',
+        Url: 'https://github.com/bitfocus/companion-module-dbaudiotechnik-dsp',
+      },
+    ],
+  },
+  'blackmagic-camera': {
+    Summary:
+      'Reads a Blackmagic camera (URSA Broadcast G2, URSA Cine, PYXIS, Cinema Camera 6K, Studio Camera 4K/6K Plus/Pro, Micro Studio Camera 4K G2) over the Blackmagic Camera Control REST API: model and software version, recording state, timecode, video format and codec, each media slot with its recording time left, power and batteries, tally and reference lock. By default it is Degraded when no media is inserted or no slot is active. Optional checks also flag a camera that is not recording, recording time left below a minimum, an unexpected format or codec, a low battery or the wrong power source, and loss of reference lock. Offline = no answer, or not the camera REST API.',
+    Setup: [
+      'In Blackmagic Camera Setup, turn on Web Media Manager under Network Access. The REST API only answers while it is on.',
+      'Set Address to the camera’s IP address or its Web Media Manager name, both shown in Blackmagic Camera Setup. Choose HTTPS only if secure access is turned on there.',
+      'Enable Check recording for the period the camera should be rolling, e.g. the show.',
+      'Set the minimum recording time to the longest stretch that must record without a card change. It counts the active slot by default. Under Advanced, count every slot if the camera continues recording on the next card.',
+      'For Check recording format, copy the video format and codec exactly as the last response shows them.',
+      'Check power and Check reference lock need camera firmware that includes the power and reference API. On older firmware they report “not reported”.',
+      'Actions: Start Recording and Stop Recording. Stop asks for confirmation. Neither sends anything if the camera is already in the requested state.',
+    ],
+    Links: [
+      {
+        Label: 'REST API for Blackmagic Cameras (Blackmagic Design)',
+        Url: 'https://documents.blackmagicdesign.com/DeveloperManuals/RESTAPIforBlackmagicCameras.pdf',
+      },
+      {
+        Label: 'Camera SDK and software (Blackmagic Design developer)',
+        Url: 'https://www.blackmagicdesign.com/developer/products/camera/sdk-and-software',
+      },
+    ],
+  },
+  propresenter: {
+    Summary:
+      'Reads Renewed Vision ProPresenter 7 (7.9 and later) over its network API: version, audience and stage screen state, the live look, the active presentation, cue and playlist, the layers showing, timers and the stage message. By default it is Degraded when the audience screens are off. Optional checks also flag stage screens that are off, a look other than the expected one, and a presentation other than the expected one. Offline = no answer, or Network not enabled.',
+    Setup: [
+      'In ProPresenter’s Network settings, turn on Enable Network and note the port. Set Port to that number.',
+      'Set Address to the ProPresenter computer’s IP address. Its firewall must allow incoming connections on that port.',
+      'Expected look and Expected presentation are matched by name, ignoring case. Leave them blank to skip them.',
+      'Actions: Next Cue and Previous Cue, Audience Screens On and Stage Screens On. Trigger Clear Group, Clear Layer, Clear All, Set Look and the screens Off actions ask for confirmation. Clear groups and looks are offered from the names ProPresenter last reported.',
+    ],
+    Links: [
+      {
+        Label: 'ProPresenter API (OpenAPI, Renewed Vision)',
+        Url: 'https://openapi.propresenter.com/',
+      },
+    ],
+  },
+  'opengear-frame': {
+    Summary:
+      'Ross openGear frame health (OG3-FR, OGX-FR, DFR-8300) over SNMP from the frame controller (MFC-OG3-N, MFC-8322-S), using Ross’s published OPEN-GEAR-FRAME and OPEN-GEAR-CARD MIBs. Degraded on any frame status fault (PSU fuse, fault, overload, AC missing or switched off, stalled fans, fan door open too long, missing reference card, card error or warning), a faulty power supply, a monitored slot that is empty or offline, and optionally a missing second PSU or a hot intake. Per-card health is not in the public MIBs: card faults come from the frame status, which does not say which slot.',
+    Setup: [
+      'SNMP is a licensed option on the frame controller. Enable it on the SNMP tab of the frame controller in DashBoard (an activation key from Ross is needed) and set the community or v3 user.',
+      'Point Address at the frame controller and choose the SNMP version configured there.',
+      'List the slots that must hold an online card under Monitored slots, using the numbers DashBoard shows.',
+      'Card errors are only raised while the frame is set to notify on card faults (its default). The debug panel shows when the frame is set to ignore them.',
+      'The check uses SNMP rather than the DashBoard connection (TCP 5253), so it never locks DashBoard out of the frame.',
+    ],
+    Links: [
+      {
+        Label: 'Ross Video SNMP MIBs',
+        Url: 'https://www.rossvideo.com/support/software-downloads/ross-video-snmp-mibs',
+      },
+      {
+        Label: 'SNMP Support in the openGear Frame (Ross)',
+        Url: 'https://documentation.rossvideo.com/files/openGear%20Partners/SNMP%20support%20in%20the%20openGear%20frame%20v1.pdf',
+      },
+    ],
+  },
+  'shelly-gen2': {
+    Summary:
+      'Shelly Gen2, Gen3 and Gen4 devices (Plus, Pro, Mini, Plug and others) over the local RPC API: reachability, model, firmware and name, switch state and power, temperature and humidity sensors, inputs, power meters, Wi-Fi signal and component errors. Degraded when a listed switch is in the wrong state, a threshold is breached, or any component reports an error. Actions switch, toggle and power-cycle a relay.',
+    Setup: [
+      'Point Address at the device. The RPC API is plain HTTP on port 80. Gen1 devices do not have it.',
+      'If authentication is enabled on the device, enter its password. The username is always admin (SHA-256 digest). Repeated wrong passwords make the device refuse logins for a while.',
+      'Switch numbers start at 0, as in the device web UI.',
+      'Battery-powered devices (Plus H&T, H&T Gen3) sleep between reports and cannot be polled. Monitor them with the MQTT Topic method instead.',
+      'Switch Off, Toggle and Power Cycle can cut power to show kit and ask for confirmation. Power Cycle has the device itself turn the switch back on after the off time, and is refused when the switch is already off.',
+    ],
+    Links: [
+      { Label: 'Shelly Gen2+ API', Url: 'https://shelly-api-docs.shelly.cloud/gen2/' },
+      {
+        Label: 'Authentication (Shelly)',
+        Url: 'https://shelly-api-docs.shelly.cloud/gen2/General/Authentication',
+      },
+      {
+        Label: 'Switch component (Shelly)',
+        Url: 'https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Switch',
+      },
+    ],
+  },
 };
 
 export { MethodInfo };

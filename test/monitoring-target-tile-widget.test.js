@@ -19,6 +19,7 @@ const { MonitoringTarget } = loadWithMocks(
         Run: async () => ({ Success: true, LatencyMs: 10, Level: -6 }),
         BuildDebug: () => null,
         GetActionOptions: () => ({}),
+        GetSettingOptions: () => ({}),
         GetTileWidget: (method, check, result) => {
           calls.push([method, result]);
           return method === 'tascam-mx8a' ? { Kind: 'levels' } : null;

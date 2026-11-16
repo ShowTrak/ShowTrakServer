@@ -16,6 +16,7 @@ export const GroupOrder: string[] = [
   'Sound',
   'Video',
   'Power',
+  'Network',
   'Web Services',
   'Other',
 ];
@@ -26,6 +27,8 @@ export const MethodGroups: Record<string, string> = {
   'mqtt-topic': 'Show Control',
   // Show control: Art-Net timecode is running
   'artnet-timecode': 'Show Control',
+  // Show control: Ableton Link tempo/transport sync (passive)
+  'ableton-link': 'Show Control',
   // Lighting control (streaming DMX)
   'sacn-universe': 'Lighting',
   'sacn-universe-priority': 'Lighting',
@@ -48,6 +51,7 @@ export const MethodGroups: Record<string, string> = {
   'sennheiser-wireless': 'Sound',
   // Sound: mixing consoles and DSP
   'x32-console': 'Sound',
+  'behringer-wing': 'Sound',
   'yamaha-console': 'Sound',
   'qsys-core': 'Sound',
   'biamp-tesira': 'Sound',
@@ -55,6 +59,12 @@ export const MethodGroups: Record<string, string> = {
   'tascam-mx8a': 'Sound',
   'allen-heath-console': 'Sound',
   'digico-console': 'Sound',
+  // Sound: immersive audio processors (d&b Soundscape)
+  'dbaudio-ds100': 'Sound',
+  // Sound: intercom
+  'clearcom-arcadia': 'Sound',
+  'clearcom-freespeak-ii': 'Sound',
+  greengo: 'Sound',
   // Sound: amplifiers
   'dbaudio-amp': 'Sound',
   'powersoft-amp': 'Sound',
@@ -81,6 +91,11 @@ export const MethodGroups: Record<string, string> = {
   'ptz-camera': 'Video',
   // Video: streaming and recording software
   'obs-studio': 'Video',
+  propresenter: 'Video',
+  // Video: Blackmagic cameras (REST API)
+  'blackmagic-camera': 'Video',
+  // Video: Ross openGear frames (SNMP)
+  'opengear-frame': 'Video',
   // Video: motion capture (OptiTrack NatNet)
   motive: 'Video',
   // Video: digital signage players (BrightSign Local DWS)
@@ -93,6 +108,13 @@ export const MethodGroups: Record<string, string> = {
   // Power / UPS (direct SNMP, e.g. Eaton/MGE, Riello NetMan, APC, CyberPower)
   'snmp-ups': 'Power',
   'snmp-ups-v3': 'Power',
+  // Power: Shelly smart relays, plugs and sensors
+  'shelly-gen2': 'Power',
+  // Network infrastructure: switches, controllers and multicast health
+  'unifi-network': 'Network',
+  'luminex-gigacore': 'Network',
+  'netgear-av': 'Network',
+  'igmp-querier': 'Network',
   // Web / network service reachability
   ping: 'Web Services',
   'tcp-port': 'Web Services',

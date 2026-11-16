@@ -38,8 +38,10 @@ import {
   AddMonitoringListChip,
   ApplyMonitoringConditionalVisibility,
   ApplyMonitoringMethodCapabilities,
+  ApplyMonitoringSettingOptions,
   CollectMonitoringCheckDynamicSettings,
   EnsureMonitoringMethodsLoaded,
+  FilterMonitoringListPicks,
   RenderMonitoringCheckDynamicSettings,
   RenderMonitoringCheckInfo,
   RenderMonitoringMethodOptions,
@@ -323,6 +325,9 @@ export function RenderMonitoringCheckDebug(payload: MonitoringCheckDebug | null)
     }
   }
   $meta.text(when ? `${statusText} · ${when}` : statusText);
+
+  // Offer what the device reported (a UniFi site's devices) as checkboxes.
+  ApplyMonitoringSettingOptions(payload.SettingOptions);
 
   if (payload.Html) {
     $body.html(payload.Html);
@@ -1205,6 +1210,12 @@ export async function OpenMonitoringTargetEditor(
       if (e.key !== 'Enter') return;
       e.preventDefault();
       AddMonitoringListChip($(this).closest('.monitoring-list'));
+    })
+    // Device checklist filter: display only, so it must not reach the [data-key]
+    // handler above (it would commit on every keystroke).
+    .on('input.moncheck change.moncheck', '.monitoring-list-pick-filter', function (e) {
+      e.stopPropagation();
+      FilterMonitoringListPicks($(this));
     })
     .on('click.moncheck', '.monitoring-list-chip-remove', function () {
       $(this).closest('.monitoring-list-chip').remove();

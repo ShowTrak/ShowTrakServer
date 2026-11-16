@@ -41,6 +41,11 @@ export interface MonitoringSettingField {
   // For Type 'list': hints how each entry is validated/coerced. 'number' keeps only
   // entries that parse as finite numbers; 'string' (default) trims and keeps text.
   ItemType?: 'string' | 'number';
+  // For Type 'list': the editor also offers what the device itself reported on the
+  // check's last successful run (the method's GetSettingOptions, keyed by this
+  // field's Key) as a checkbox per item. Ticked items are stored like typed
+  // entries, so the value stays a plain string[] and typing still works.
+  FromDevice?: boolean;
   // For Type 'names': one name box per channel, Count of them. The value is a
   // string[] of exactly that length; a blank entry means the default, which is
   // ItemDefault with {n} replaced by the channel number (e.g. 'Channel {n}').
@@ -135,6 +140,18 @@ export interface MonitoringActionResult {
  * device reported (a projector's actual input sources) instead of free text.
  */
 export type MonitoringActionOptions = Record<string, Array<{ value: string; label: string }>>;
+
+/**
+ * Per-check choices for a FromDevice 'list' setting, keyed by the setting's Key:
+ * the items the device reported on the last successful run (a UniFi site's
+ * devices), so the editor can offer them as checkboxes. `detail` is a secondary
+ * line (model, state); `aliases` are other stored values that mean the same item
+ * (a device's name, where the value is its MAC address).
+ */
+export type MonitoringSettingOptions = Record<
+  string,
+  Array<{ value: string; label: string; detail?: string; aliases?: string[] }>
+>;
 
 // --- Live levels ----------------------------------------------------------------
 //
@@ -256,6 +273,11 @@ export interface MonitoringMethod {
    * and must never throw.
    */
   GetActionOptions?(Result: MonitoringResult): MonitoringActionOptions;
+  /**
+   * Choices for FromDevice 'list' settings (see MonitoringSettingOptions), derived
+   * from a successful probe result. Must be pure and must never throw.
+   */
+  GetSettingOptions?(Result: MonitoringResult): MonitoringSettingOptions;
   /**
    * One-line description of an action WITH its parameters bound, used to label
    * a starred favourite: 'Set Input - Digital 1 (31)' rather than 'Set Input'.

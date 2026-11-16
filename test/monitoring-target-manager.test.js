@@ -501,6 +501,7 @@ test('MonitoringTargetManager.RunCheckNow runs a check, broadcasts, and returns 
         },
         BuildDebug: () => '<div>debug-panel</div>',
         GetActionOptions: () => ({}),
+        GetSettingOptions: () => ({}),
       },
     };
 
@@ -626,6 +627,7 @@ test('MonitoringTargetManager.RunAction fans one action across a mixed selection
         },
         BuildDebug: () => '',
         GetActionOptions: () => ({}),
+        GetSettingOptions: () => ({}),
         GetAction: (method, actionID) =>
           method === 'pjlink' && actionID === 'power.on'
             ? { ID: 'power.on', Label: 'Power On', Icon: 'power', Group: 'Power' }
@@ -773,6 +775,7 @@ test('MonitoringTargetManager.MoveCheck re-parents a check onto another monitor'
           NormalizeSettings: (_id, settings) => settings,
           Run: async () => ({ Success: true, LatencyMs: 1 }),
           GetActionOptions: () => ({}),
+          GetSettingOptions: () => ({}),
         },
       },
       '../Utils': require('../dist/Modules/Utils'),

@@ -14,6 +14,7 @@ import type { TxRun } from '../DB';
 import type {
   MonitoringActionOutcome,
   MonitoringActionSummary,
+  MonitoringCheckDebug,
   MonitoringTargetView,
 } from '@showtrak/protocol';
 import type { MonitoringTargetRow } from '../DB/rows';
@@ -90,21 +91,6 @@ interface MonitoringTargetUpdatePayload {
   GroupID?: number | null;
   Slug?: unknown;
   FailureThreshold?: unknown;
-}
-
-// RAM-only debug snapshot returned by GetCheckDebug / RunCheckNow.
-interface MonitoringCheckDebug {
-  CheckID: number;
-  Method: string;
-  Html: string | null;
-  Online: boolean;
-  Degraded: boolean;
-  LastError: string | null;
-  LastChecked: number | null;
-  LastLatencyMs: number | null;
-  LastDebugAt: number | null;
-  ConsecutiveFailures: number;
-  EffectiveFailureThreshold: number;
 }
 
 function ToRowSettings(Method: string, Settings: unknown): string {
@@ -693,6 +679,7 @@ const Manager = {
           EffectiveFailureThreshold: Check.EffectiveFailureThreshold(
             Target.InheritedFailureThreshold()
           ),
+          SettingOptions: Check.LastSettingOptions,
         },
       ];
     }

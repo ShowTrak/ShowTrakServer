@@ -1773,6 +1773,46 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
 .monitoring-list-chip-remove:hover {
   opacity: 1;
 }
+/* A 'list' field with FromDevice: what the device reported (a UniFi site's
+   devices) as a checkbox each, above the typed chips. */
+.monitoring-list-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.25rem 0.75rem;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.monitoring-list-pick-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.15rem 0;
+  cursor: pointer;
+}
+.monitoring-list-pick {
+  flex: 0 0 auto;
+  margin: 0.15rem 0 0;
+}
+.monitoring-list-pick-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.monitoring-list-pick-label,
+.monitoring-list-pick-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.monitoring-list-pick-label {
+  font-size: var(--fs-sm);
+}
+.monitoring-list-pick-detail {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
 /* Hide number spinners on the add-input to match the other monitoring inputs. */
 .monitoring-list-input[type='number']::-webkit-outer-spin-button,
 .monitoring-list-input[type='number']::-webkit-inner-spin-button {

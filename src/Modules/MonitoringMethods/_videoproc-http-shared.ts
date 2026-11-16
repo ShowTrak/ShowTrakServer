@@ -20,7 +20,7 @@ import { URL } from 'url';
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
 export interface JsonRequest {
-  Method: 'GET' | 'POST';
+  Method: 'GET' | 'POST' | 'PUT';
   // Serialised as the JSON request body when present.
   Json?: unknown;
   // Extra request headers (e.g. a session cookie).

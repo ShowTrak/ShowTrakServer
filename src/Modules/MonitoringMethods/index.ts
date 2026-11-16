@@ -25,6 +25,7 @@ import type {
   LiveLevelsFrame,
   MonitoringActionDef,
   MonitoringActionOptions,
+  MonitoringSettingOptions,
   MonitoringActionResult,
   MonitoringMethod,
   MonitoringResult,
@@ -60,6 +61,7 @@ import * as ndiSource from './ndi-source';
 import * as atem from './atem';
 import * as hyperdeck from './hyperdeck';
 import * as videohub from './videohub';
+import * as blackmagicCamera from './blackmagic-camera';
 // Video: LED and presentation processors
 import * as bromptonTessera from './brompton-tessera';
 import * as barcoEventmaster from './barco-eventmaster';
@@ -68,8 +70,11 @@ import * as datapathFx4 from './datapath-fx4';
 // Video: AJA devices and PTZ cameras
 import * as ajaDevice from './aja-device';
 import * as ptzCamera from './ptz-camera';
+// Video: Ross openGear frames
+import * as opengearFrame from './opengear-frame';
 // Video: streaming and recording software
 import * as obsStudio from './obs-studio';
+import * as propresenter from './propresenter';
 // Video: motion capture
 import * as motive from './motive';
 // Sound: cue playback & audio networking
@@ -79,8 +84,13 @@ import * as danteDevice from './dante-device';
 // Sound: wireless microphones
 import * as shureWireless from './shure-wireless';
 import * as sennheiserWireless from './sennheiser-wireless';
+// Sound: intercom
+import * as clearcomArcadia from './clearcom-arcadia';
+import * as clearcomFreespeakIi from './clearcom-freespeak-ii';
+import * as greengo from './greengo';
 // Sound: mixing consoles and DSP
 import * as x32Console from './x32-console';
+import * as behringerWing from './behringer-wing';
 import * as yamahaConsole from './yamaha-console';
 import * as qsysCore from './qsys-core';
 import * as biampTesira from './biamp-tesira';
@@ -88,6 +98,7 @@ import * as symetrixDsp from './symetrix-dsp';
 import * as tascamMx8a from './tascam-mx8a';
 import * as allenHeathConsole from './allen-heath-console';
 import * as digicoConsole from './digico-console';
+import * as dbaudioDs100 from './dbaudio-ds100';
 // Sound: amplifiers
 import * as dbaudioAmp from './dbaudio-amp';
 import * as powersoftAmp from './powersoft-amp';
@@ -102,6 +113,7 @@ import * as sevenSenseDelta from './7thsense-delta';
 import * as companionStatus from './companion-status';
 import * as mqttTopic from './mqtt-topic';
 import * as artnetTimecode from './artnet-timecode';
+import * as abletonLink from './ableton-link';
 // Digital Signage
 import * as brightsign from './brightsign';
 // Projectors
@@ -111,6 +123,13 @@ import * as snmpProjector from './snmp-projector';
 import * as nutUps from './nut-ups';
 import * as snmpUps from './snmp-ups';
 import * as snmpUpsV3 from './snmp-ups-v3';
+// Power: smart relays and sensors
+import * as shellyGen2 from './shelly-gen2';
+// Network infrastructure
+import * as unifiNetwork from './unifi-network';
+import * as luminexGigacore from './luminex-gigacore';
+import * as netgearAv from './netgear-av';
+import * as igmpQuerier from './igmp-querier';
 
 const Logger = CreateLogger('MonitoringMethods');
 
@@ -154,6 +173,7 @@ const MethodModules: MonitoringMethod[] = [
   atem,
   hyperdeck,
   videohub,
+  blackmagicCamera,
   // Video: LED and presentation processors
   bromptonTessera,
   barcoEventmaster,
@@ -162,8 +182,11 @@ const MethodModules: MonitoringMethod[] = [
   // Video: AJA devices and PTZ cameras
   ajaDevice,
   ptzCamera,
+  // Video: Ross openGear frames
+  opengearFrame,
   // Video: streaming and recording software
   obsStudio,
+  propresenter,
   // Video: motion capture
   motive,
   // Sound: cue playback & audio networking
@@ -173,8 +196,13 @@ const MethodModules: MonitoringMethod[] = [
   // Sound: wireless microphones
   shureWireless,
   sennheiserWireless,
+  // Sound: intercom
+  clearcomArcadia,
+  clearcomFreespeakIi,
+  greengo,
   // Sound: mixing consoles and DSP
   x32Console,
+  behringerWing,
   yamahaConsole,
   qsysCore,
   biampTesira,
@@ -182,6 +210,7 @@ const MethodModules: MonitoringMethod[] = [
   tascamMx8a,
   allenHeathConsole,
   digicoConsole,
+  dbaudioDs100,
   // Sound: amplifiers
   dbaudioAmp,
   powersoftAmp,
@@ -196,6 +225,7 @@ const MethodModules: MonitoringMethod[] = [
   companionStatus,
   mqttTopic,
   artnetTimecode,
+  abletonLink,
   // Digital Signage
   brightsign,
   // Projectors
@@ -205,9 +235,19 @@ const MethodModules: MonitoringMethod[] = [
   nutUps,
   snmpUps,
   snmpUpsV3,
+  // Power: smart relays and sensors
+  shellyGen2,
+  // Network infrastructure
+  unifiNetwork,
+  luminexGigacore,
+  netgearAv,
+  igmpQuerier,
 ];
 
 const Methods = new Map<string, MonitoringMethod>();
+
+// Most items one FromDevice setting offers the editor (see GetSettingOptions).
+const MAX_SETTING_OPTIONS = 500;
 
 for (const Mod of MethodModules) {
   if (!Mod || !Mod.ID) {
@@ -480,6 +520,53 @@ const Manager = {
       );
       return {};
     }
+  },
+
+  // Items the device reported for its FromDevice 'list' settings, from its latest
+  // successful probe. Only keys naming such a setting, with well-formed entries,
+  // get through, so a method cannot push arbitrary data into the editor.
+  GetSettingOptions: (ID: string, Result: MonitoringResult): MonitoringSettingOptions => {
+    const Method = Methods.get(ID);
+    if (!Method || typeof Method.GetSettingOptions !== 'function') return {};
+    let Raw: unknown;
+    try {
+      Raw = Method.GetSettingOptions(Result);
+    } catch (Err) {
+      Logger.warn(
+        `GetSettingOptions failed for method ${ID}: ${Err && (Err as Error).message ? (Err as Error).message : Err}`
+      );
+      return {};
+    }
+    if (!Raw || typeof Raw !== 'object') return {};
+    const Out: MonitoringSettingOptions = {};
+    for (const Field of Method.Settings || []) {
+      if (Field.Type !== 'list' || !Field.FromDevice) continue;
+      const List = (Raw as Record<string, unknown>)[Field.Key];
+      if (!Array.isArray(List)) continue;
+      const Seen = new Set<string>();
+      const Items: MonitoringSettingOptions[string] = [];
+      for (const Item of List.slice(0, MAX_SETTING_OPTIONS)) {
+        if (!Item || typeof Item !== 'object') continue;
+        const Entry = Item as Record<string, unknown>;
+        const Value = typeof Entry.value === 'string' ? Entry.value.trim() : '';
+        if (!Value || Seen.has(Value)) continue;
+        Seen.add(Value);
+        const Label =
+          typeof Entry.label === 'string' && Entry.label.trim() ? Entry.label.trim() : Value;
+        const Option: MonitoringSettingOptions[string][number] = { value: Value, label: Label };
+        if (typeof Entry.detail === 'string' && Entry.detail.trim())
+          Option.detail = Entry.detail.trim();
+        if (Array.isArray(Entry.aliases)) {
+          const Aliases = Entry.aliases
+            .filter((A): A is string => typeof A === 'string' && A.trim() !== '')
+            .map((A) => A.trim());
+          if (Aliases.length) Option.aliases = Aliases;
+        }
+        Items.push(Option);
+      }
+      Out[Field.Key] = Items;
+    }
+    return Out;
   },
 
   // Label for one action with its parameters bound, as a starred favourite shows

@@ -30,6 +30,7 @@ function loadCheck({ writes, results }) {
         Run: async () => results.shift(),
         BuildDebug: () => null,
         GetActionOptions: () => ({}),
+        GetSettingOptions: () => ({}),
       },
     },
   }).MonitoringCheck;
@@ -207,6 +208,7 @@ test('Shutdown writes each check’s latest LastSuccessAt', async (t) => {
         Run: async () => ({ Success: true }),
         BuildDebug: () => null,
         GetActionOptions: () => ({}),
+        GetSettingOptions: () => ({}),
       },
     },
     '../Utils': require('../dist/Modules/Utils'),
