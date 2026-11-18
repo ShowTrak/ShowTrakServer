@@ -170,6 +170,14 @@ module.exports = {
     }),
   ],
   hooks: {
+    // Drop Chromium's UI translations (~45 MB) before the app is copied in and
+    // signed; the UI is English and Chromium falls back to en-US. See
+    // scripts/trim-electron-locales.js.
+    packageAfterExtract: async (_forgeConfig, buildPath) => {
+      const { trimElectronLocales } = require('./scripts/trim-electron-locales');
+      const removed = trimElectronLocales(buildPath);
+      console.log(`[forge] Removed ${removed} unused Chromium locale pack(s)`);
+    },
     // 3.16.2 shipped a Windows build whose @showtrak/protocol was an unusable
     // link (see derefSymlinks above) and nothing caught it until the app failed
     // to boot on a user's machine. The dependency resolves by bare specifier, so
