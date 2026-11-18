@@ -209,6 +209,21 @@ function normalizeApplicationCapabilities(Value: unknown): RunningApplicationsCa
   return { Responding: C.Responding === true, Foreground: C.Foreground === true };
 }
 
+function SameStrings(A: readonly string[], B: readonly string[]): boolean {
+  if (A === B) return true;
+  if (!Array.isArray(A) || !Array.isArray(B) || A.length !== B.length) return false;
+  for (let Index = 0; Index < A.length; Index++) if (A[Index] !== B[Index]) return false;
+  return true;
+}
+
+// A cheap fingerprint of a telemetry report, ignoring when it was sampled. The
+// client re-sends every list on a fixed resync interval (and the power and
+// temperature collectors on a keepalive) whether or not anything changed, so
+// an identical report is the common case and is recognised by this alone.
+function ReportSignature(Report: unknown): string {
+  return JSON.stringify(Report, (Key, Value) => (Key === 'SampledAt' ? undefined : Value));
+}
+
 // --- Local domain shapes ---------------------------------------------------
 // The persisted "critical" entries we guard, as normalized by the SetCritical*
 // methods and mirrored (minus UUID) by the DB rows in ../DB/rows.ts.
@@ -340,6 +355,12 @@ const StartupGraceTimers = new WeakMap<Client, ReturnType<typeof setTimeout>>();
 // not something any surface displays (ResourceAlarms is the displayed result).
 const ResourceAlarmStates = new WeakMap<Client, ResourceAlarmState>();
 const USBMemories = new WeakMap<Client, USBMemory>();
+
+// The signature of the last full report per telemetry domain on this
+// connection (see ReportSignature). Working state like the above, so held off
+// the client. Cleared on disconnect, and per domain by any delta, so a resync
+// after either is always applied in full.
+const ReportSignatures = new WeakMap<Client, Map<string, string>>();
 
 class Client {
   // Persisted identity + ordering (mirrors DB/rows.ts ClientRow).
@@ -634,6 +655,7 @@ class Client {
       this.OnlineSince = Date.now();
     } else {
       this.OnlineSince = null;
+      ReportSignatures.delete(this);
       this._clearStartupGraceTimer();
       this.HasUSBTelemetry = false;
       this._rebuildUSBDeviceView(false);
@@ -757,7 +779,40 @@ class Client {
       Checks.Thermal ? Checks.Thermal.MaxThermalState : null,
       0
     );
+    this._publishResourceAlarms();
     return Changed !== 0;
+  }
+
+  /**
+   * Publish the active alarms as ResourceAlarms, once per evaluation. The
+   * array (and its entries) are only replaced when an alarm or its reading
+   * actually changed, so an unchanged heartbeat leaves the reference alone and
+   * the push pipeline, audit recorder and serializers can tell nothing moved.
+   * Entries are copies: the tracking state mutates its own records in place.
+   */
+  _publishResourceAlarms() {
+    const State = ResourceAlarmStates.get(this);
+    const Current = this.ResourceAlarms;
+    let Count = 0;
+    let Same = true;
+    if (State) {
+      for (const Key of RESOURCE_ALARM_KEYS) {
+        const Active = State[Key].Active;
+        if (!Active) continue;
+        const Published = Current[Count++];
+        if (
+          !Published ||
+          Published.Key !== Active.Key ||
+          Published.Value !== Active.Value ||
+          Published.Threshold !== Active.Threshold ||
+          Published.Since !== Active.Since
+        ) {
+          Same = false;
+        }
+      }
+    }
+    if (Same && Count === Current.length) return;
+    this.ResourceAlarms = State ? ActiveResourceAlarms(State).map((Alarm) => ({ ...Alarm })) : [];
   }
 
   /** Replace every system check (on load). */
@@ -844,7 +899,6 @@ class Client {
       SustainMs,
       Date.now()
     );
-    this.ResourceAlarms = ActiveResourceAlarms(State);
     if (!Outcome) return 0;
     const Trigger = {
       cpu: TRIGGERS.CPU_USAGE_HIGH,
@@ -873,10 +927,34 @@ class Client {
     for (const Key of RESOURCE_ALARM_KEYS) {
       this._stepResourceAlarm(Key, null, null, null, 0);
     }
+    this._publishResourceAlarms();
   }
 
   _emitHealthEvent(Event: ClientHealthEvent) {
     BroadcastManager.emit('ClientHealthEvent', this, Event);
+  }
+
+  /**
+   * Whether a full report for a domain repeats the last one this connection
+   * stored (sample time aside). Records the new signature when it does not, so
+   * the caller rebuilds once and every identical resync after that is skipped.
+   */
+  _isRepeatReport(Domain: string, Report: unknown): boolean {
+    let Signatures = ReportSignatures.get(this);
+    if (!Signatures) {
+      Signatures = new Map();
+      ReportSignatures.set(this, Signatures);
+    }
+    const Signature = ReportSignature(Report);
+    if (Signatures.get(Domain) === Signature) return true;
+    Signatures.set(Domain, Signature);
+    return false;
+  }
+
+  /** Forget a domain's last report, so the next full one is applied whatever it says. */
+  _forgetReport(Domain: string) {
+    const Signatures = ReportSignatures.get(this);
+    if (Signatures) Signatures.delete(Domain);
   }
 
   /**
@@ -890,6 +968,13 @@ class Client {
   SetPowerStatus(Snapshot: ValidatedPowerStatus) {
     const Previous = this.PowerStatus;
     const Next = normalizePowerStatus(Snapshot);
+    // A keepalive repeating the stored report changes nothing anyone judges or
+    // draws; only its sample time moves (kept in place, so the view keeps its
+    // reference and no push goes out for it).
+    if (this._isRepeatReport('power', Next) && Previous) {
+      Previous.SampledAt = Next.SampledAt;
+      return;
+    }
     this.PowerStatus = Next;
 
     if (Previous) {
@@ -945,6 +1030,10 @@ class Client {
   /** Store a temperature report and judge the thermal check against it. */
   SetTemperatures(Snapshot: ValidatedTemperatures) {
     const Next = normalizeTemperatures(Snapshot);
+    if (this._isRepeatReport('temperatures', Next) && this.Temperatures) {
+      this.Temperatures.SampledAt = Next.SampledAt;
+      return;
+    }
     this.Temperatures = Next;
     if (this._evaluateSystemChecks()) this._refreshClientHealthState();
     BroadcastManager.emit('ClientUpdated', this);
@@ -967,7 +1056,11 @@ class Client {
   }
   SetUSBDeviceList(USBDeviceList: ValidatedUSBDevice[]) {
     const BaselineTrusted = this.HasUSBTelemetry;
-    this.ConnectedUSBDeviceList = Array.isArray(USBDeviceList) ? USBDeviceList : [];
+    const List = Array.isArray(USBDeviceList) ? USBDeviceList : [];
+    // The periodic resync repeating what is stored: nothing moved, nothing to
+    // judge or announce.
+    if (this._isRepeatReport('usb', List) && BaselineTrusted) return;
+    this.ConnectedUSBDeviceList = List;
     this.HasUSBTelemetry = true;
     this._rebuildUSBDeviceView();
     this._trackUSBDevices(BaselineTrusted);
@@ -1023,7 +1116,9 @@ class Client {
     const Previous = this.ConnectedDisplayList;
     const PreviousView = this.DisplayList;
     const BaselineTrusted = this.HasDisplayTelemetry;
-    this.ConnectedDisplayList = Array.isArray(DisplayList) ? DisplayList : [];
+    const List = Array.isArray(DisplayList) ? DisplayList : [];
+    if (this._isRepeatReport('display', List) && BaselineTrusted) return;
+    this.ConnectedDisplayList = List;
     this.HasDisplayTelemetry = true;
     this._rebuildDisplayView();
     if (BaselineTrusted) this._emitDisplayTransitions(Previous, PreviousView);
@@ -1062,6 +1157,7 @@ class Client {
     }
 
     this.ConnectedDisplayList = Array.from(byID.values());
+    this._forgetReport('display');
     // A delta only ever follows the full list this connection opened with, so
     // by the time one lands the topology has been reported at least once.
     this.HasDisplayTelemetry = true;
@@ -1265,7 +1361,10 @@ class Client {
 
     this.Initialising = !!this.Online && HoldingStartupWarnings;
     this.Degraded = !!this.Online && Published.length > 0;
-    this.DegradedWarnings = this.Degraded ? Published : [];
+    // Kept by reference when the list reads the same, so the push pipeline sees
+    // an unchanged field rather than a fresh array on every re-judgement.
+    const NextWarnings = this.Degraded ? Published : [];
+    if (!SameStrings(this.DegradedWarnings, NextWarnings)) this.DegradedWarnings = NextWarnings;
     // Arm (or stand down) the timer that publishes whatever is still missing
     // when the window closes.
     this._syncStartupGraceTimer();
@@ -1484,6 +1583,11 @@ class Client {
     const Next = normalizeAudioSnapshot(Snapshot);
     const BaselineTrusted = this.HasAudioTelemetry;
     const SampleTrusted = Next.Status.State === 'ok';
+    if (this._isRepeatReport('audio', Next) && BaselineTrusted === SampleTrusted) {
+      Previous.SampledAt = Next.SampledAt;
+      this.AudioDevices.SampledAt = Next.SampledAt;
+      return;
+    }
     this.ObservedAudio = Next;
     this.HasAudioTelemetry = SampleTrusted;
     this._rebuildAudioView();
@@ -1601,6 +1705,11 @@ class Client {
       const normalized = normalizeNetworkInterfaces(Interfaces);
       const Previous = this.NetworkInterfaces;
       const BaselineTrusted = this.HasNetworkTelemetry;
+      if (this._isRepeatReport('network', normalized) && BaselineTrusted) {
+        this.NetworkSampledAt = Date.now();
+        this.NetworkStatus.SampledAt = this.NetworkSampledAt;
+        return;
+      }
       this.NetworkInterfaces = normalized;
       // The full list is the authority, so it is what makes the critical checks
       // trustworthy on this connection; a delta only amends it.
@@ -1648,6 +1757,7 @@ class Client {
 
       const Previous = this.NetworkInterfaces;
       this.NetworkInterfaces = Array.from(byName.values());
+      this._forgetReport('network');
       if (this.HasNetworkTelemetry) this.NetworkSampledAt = Date.now();
       this._rebuildNetworkView();
       if (this.HasNetworkTelemetry) this._emitNetworkTransitions(Previous);
@@ -1702,8 +1812,14 @@ class Client {
   /** Store a storage report and judge the monitored volumes against it. */
   SetStorageVolumes(Snapshot: ValidatedStorageVolumes) {
     const Next = normalizeStorageSnapshot(Snapshot);
+    const SampleTrusted = !!Next.Status && Next.Status.State === 'ok';
+    if (this._isRepeatReport('storage', Next) && this.HasStorageTelemetry === SampleTrusted) {
+      this.ObservedStorage.SampledAt = Next.SampledAt;
+      this.StorageStatus.SampledAt = Next.SampledAt;
+      return;
+    }
     this.ObservedStorage = Next;
-    this.HasStorageTelemetry = !!Next.Status && Next.Status.State === 'ok';
+    this.HasStorageTelemetry = SampleTrusted;
     this._rebuildStorageView();
     Logger.debug(`Client ${this.UUID} Storage volumes updated (${Next.Volumes.length})`);
     BroadcastManager.emit('ClientUpdated', this);
@@ -1757,8 +1873,6 @@ class Client {
   }
   SetRunningApplications(Snapshot: ValidatedRunningApplications) {
     const S = AsRecord(Snapshot);
-    const PreviousByKey = this._observedApplicationsByKey();
-    const PreviousFaults = this._applicationFaults();
     const PreviousForeground = this.ObservedRunningApplications?.Foreground;
     const RawItems: unknown[] = Array.isArray(S.Items) ? S.Items : [];
     const RawStatus = AsRecord(S.Status);
@@ -1817,7 +1931,23 @@ class Client {
     // sample diffs against a trusted baseline and reports real changes.
     const SampleTrusted = NextStatus.State === 'ok';
     const BaselineTrusted = this.HasApplicationTelemetry;
-    this.HasApplicationTelemetry = SampleTrusted;
+    const ShouldSkipItems = !!S.NoChanges;
+
+    // The 20-second keepalive ("nothing changed") on a trusted baseline: when
+    // the status, focus and counts all repeat, only the sample time moves. It
+    // is updated in place, so the view keeps its reference and no push or
+    // re-judgement follows for a report that changes nothing.
+    if (ShouldSkipItems && SampleTrusted && BaselineTrusted && !StatusChanged && !FocusChanged) {
+      const Observed = this.ObservedRunningApplications;
+      const KeepTotal = Math.max(0, parseInt(String(S.TotalCount), 10) || Observed.TotalCount || 0);
+      const KeepTruncated = typeof S.Truncated === 'boolean' ? S.Truncated : !!Observed.Truncated;
+      if (KeepTotal === Observed.TotalCount && KeepTruncated === !!Observed.Truncated) {
+        const SampledAt = Number.isFinite(Number(S.SampledAt)) ? Number(S.SampledAt) : Date.now();
+        Observed.SampledAt = SampledAt;
+        this.RunningApplications.SampledAt = SampledAt;
+        return;
+      }
+    }
 
     const Deduped = new Map<string, DedupedRunningApplication>();
 
@@ -1845,14 +1975,21 @@ class Client {
     const SampledAt = Number.isFinite(Number(S.SampledAt)) ? Number(S.SampledAt) : Date.now();
     const Signature = runningApplicationsSignature(TotalCount, Truncated, Items);
 
-    const ShouldSkipItems = !!S.NoChanges;
     if (
       !ShouldSkipItems &&
       this.ObservedRunningApplicationsSignature === Signature &&
       !StatusChanged &&
       !FocusChanged
-    )
+    ) {
+      this.HasApplicationTelemetry = SampleTrusted;
       return;
+    }
+
+    // Read before the stored snapshot is replaced; only a report that goes on
+    // to change something pays for them.
+    const PreviousByKey = this._observedApplicationsByKey();
+    const PreviousFaults = this._applicationFaults();
+    this.HasApplicationTelemetry = SampleTrusted;
 
     const Focus = {
       ...(NextForeground !== undefined ? { Foreground: NextForeground } : {}),
@@ -2169,6 +2306,7 @@ class Client {
         )
       : Current.slice();
     this.ConnectedUSBDeviceList.push(Device || {});
+    this._forgetReport('usb');
     this._rebuildUSBDeviceView();
     this._trackUSBDevices(this.HasUSBTelemetry);
     BroadcastManager.emit('ClientUpdated', this);
@@ -2194,6 +2332,7 @@ class Client {
       this.ConnectedUSBDeviceList =
         Index === -1 ? Current.slice() : Current.slice(0, Index).concat(Current.slice(Index + 1));
     }
+    this._forgetReport('usb');
     this._rebuildUSBDeviceView();
     this._trackUSBDevices(this.HasUSBTelemetry);
     BroadcastManager.emit('ClientUpdated', this);

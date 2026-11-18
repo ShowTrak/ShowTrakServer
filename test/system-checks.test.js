@@ -275,6 +275,24 @@ test('heartbeats are averaged into ten-second points, the latest still showing',
   );
 });
 
+test('an update that is not a new reading is not counted twice', () => {
+  // Every ClientUpdated reaches the store (a USB report, an identify toggle), but
+  // only a heartbeat brings a new Vitals object.
+  Vitals._internal.Store.clear();
+  const T0 = 3_000_000;
+  const Client = reading(10, 40);
+  Vitals.recordClientVitalsSample(Client, T0);
+  Vitals.recordClientVitalsSample(Client, T0 + 100);
+  Vitals.recordClientVitalsSample({ ...Client }, T0 + 200);
+  Vitals.recordClientVitalsSample(reading(30, 40), T0 + 1000);
+  const History = Vitals.getClientVitalsHistory('v1', T0 + 2000);
+  assert.deepEqual(
+    History.Cpu.map((S) => S.n),
+    [20],
+    'two readings, averaged once each'
+  );
+});
+
 test('going offline breaks the line, and old points age out', () => {
   Vitals._internal.Store.clear();
   const T0 = 2_000_000;

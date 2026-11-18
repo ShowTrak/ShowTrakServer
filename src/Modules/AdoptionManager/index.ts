@@ -10,8 +10,10 @@ const Logger = CreateLogger('AdoptionManager');
 // Not-yet-migrated JS manager, typed loosely until its own migration.
 import { Manager as ClientManager } from '../ClientManager';
 
-// Ephemeral list of discoverable, not-yet-adopted clients
-let ClientsPendingAdoption: ClientPendingAdoption[] = [];
+// Ephemeral list of discoverable, not-yet-adopted clients, keyed by UUID (a
+// Map keeps insertion order, which is the order the UI lists them in). Every
+// heartbeat from an unadopted machine looks itself up here.
+const ClientsPendingAdoption = new Map<string, ClientPendingAdoption>();
 
 class ClientPendingAdoption {
   State: string;
@@ -34,12 +36,12 @@ class ClientPendingAdoption {
 
 const Manager = {
   GetClientsPendingAdoption(): ClientPendingAdoption[] {
-    return ClientsPendingAdoption;
+    return Array.from(ClientsPendingAdoption.values());
   },
 
   // Reset the list (e.g., on reinitialize)
   async ClearAllDevicesPendingAdoption(): Promise<void> {
-    ClientsPendingAdoption = [];
+    ClientsPendingAdoption.clear();
     BroadcastManager.emit('AdoptionListUpdated');
     return;
   },
@@ -59,7 +61,7 @@ const Manager = {
     } else {
       // Already listed: refresh whatever the device has since told us, so an
       // entry first seen with placeholders fills in as details arrive.
-      const existingClient = ClientsPendingAdoption.find((client) => client.UUID === UUID);
+      const existingClient = ClientsPendingAdoption.get(UUID);
       if (existingClient) {
         const Fresh = new ClientPendingAdoption(UUID, IP, Data);
         let Changed = false;
@@ -78,7 +80,7 @@ const Manager = {
         if (Changed) BroadcastManager.emit('AdoptionListUpdated');
         return;
       }
-      ClientsPendingAdoption.push(new ClientPendingAdoption(UUID, IP, Data));
+      ClientsPendingAdoption.set(UUID, new ClientPendingAdoption(UUID, IP, Data));
       Logger.log(`Client ${UUID} added to pending adoption list.`);
       BroadcastManager.emit('AdoptionListUpdated');
       return;
@@ -88,7 +90,7 @@ const Manager = {
   // Toggle identify mode for a pending device so its tile pulses blue.
   // Returns true when the device exists in the pending list.
   SetIdentifying(UUID: string, Identifying: unknown): boolean {
-    const client = ClientsPendingAdoption.find((client) => client.UUID === UUID);
+    const client = ClientsPendingAdoption.get(UUID);
     if (!client) return false;
     client.Identifying = !!Identifying;
     BroadcastManager.emit('AdoptionListUpdated');
@@ -97,7 +99,7 @@ const Manager = {
 
   // Update UI-visible state for a pending device (e.g., "Adopting")
   async SetState(UUID: string, State: string): Promise<void> {
-    const client = ClientsPendingAdoption.find((client) => client.UUID === UUID);
+    const client = ClientsPendingAdoption.get(UUID);
     if (!client) {
       Logger.log(`Client ${UUID} not found in pending adoption list.`);
       return;
@@ -109,18 +111,17 @@ const Manager = {
   },
 
   IsPendingAdoption(UUID: string): boolean {
-    return ClientsPendingAdoption.some((client) => client.UUID === UUID);
+    return ClientsPendingAdoption.has(UUID);
   },
 
   // Remove a device from the pending list; safe if missing
   RemoveClientPendingAdoption(UUID: string): void {
-    const index = ClientsPendingAdoption.findIndex((client) => client.UUID === UUID);
-    if (index !== -1) {
-      ClientsPendingAdoption.splice(index, 1);
+    if (ClientsPendingAdoption.delete(UUID)) {
       BroadcastManager.emit('AdoptionListUpdated');
       Logger.log(`Client ${UUID} removed from pending adoption list.`);
     } else {
-      Logger.log(`Client ${UUID} not found in pending adoption list.`);
+      // Called on every disconnect and stray adoption heartbeat; not news.
+      Logger.debug(`Client ${UUID} not found in pending adoption list.`);
     }
     return;
   },

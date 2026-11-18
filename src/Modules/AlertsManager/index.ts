@@ -190,6 +190,14 @@ function refreshBaselineFault(FaultKey: string, Context: AlertContext) {
   if (Existing) Existing.Context = Context;
 }
 
+// As refreshBaselineFault, with the context built only when a fault is actually
+// held. Every heartbeat of a degraded client lands here, and almost never with
+// anything pending, so building its context each time was pure garbage.
+function refreshHeldBaselineFault(FaultKey: string, BuildContext: () => AlertContext) {
+  const Existing = PendingBaselineFaults.get(FaultKey);
+  if (Existing) Existing.Context = BuildContext();
+}
+
 function clearBaselineFault(FaultKey: string) {
   PendingBaselineFaults.delete(FaultKey);
 }
@@ -755,7 +763,7 @@ async function settleDegradedState(
     EntityDegradedAnnounced.add(Key);
     await evaluateAgainstRules(DegradedContext());
   } else {
-    refreshBaselineFault(`degraded:${Key}`, DegradedContext());
+    refreshHeldBaselineFault(`degraded:${Key}`, DegradedContext);
   }
 }
 
@@ -840,15 +848,16 @@ Manager.HandleClientUpdated = async (Client: AlertEntityLike) => {
     return;
   }
 
-  const ClientBase = {
+  // Built on demand: an ordinary heartbeat changes nothing here and needs none.
+  const ClientBase = () => ({
     EntityType: 'client',
     EntityName: Client.Nickname || Client.Hostname || UUID,
     UUID,
     GroupID: Client.GroupID == null ? null : Client.GroupID,
     IP: Client.IP || null,
-  };
+  });
   const OfflineContext = (): AlertContext => ({
-    ...ClientBase,
+    ...ClientBase(),
     TriggerType: TRIGGERS.CLIENT_OFFLINE,
     Severity: 'warning',
     RawData: Client,
@@ -862,14 +871,14 @@ Manager.HandleClientUpdated = async (Client: AlertEntityLike) => {
     } else {
       clearBaselineFault(`offline:${Key}`);
       await evaluateAgainstRules({
-        ...ClientBase,
+        ...ClientBase(),
         TriggerType: TRIGGERS.CLIENT_ONLINE,
         Severity: 'success',
         RawData: Client,
       });
     }
   } else if (!Current) {
-    refreshBaselineFault(`offline:${Key}`, OfflineContext());
+    refreshHeldBaselineFault(`offline:${Key}`, OfflineContext);
   }
 
   await settleDegradedState(
@@ -877,14 +886,14 @@ Manager.HandleClientUpdated = async (Client: AlertEntityLike) => {
     Current,
     !!Client.Degraded,
     () => ({
-      ...ClientBase,
+      ...ClientBase(),
       TriggerType: TRIGGERS.CLIENT_DEGRADED,
       Severity: 'warning',
       Degraded: true,
       RawData: Client,
     }),
     () => ({
-      ...ClientBase,
+      ...ClientBase(),
       TriggerType: TRIGGERS.CLIENT_RECOVERED,
       Severity: 'success',
       RawData: Client,

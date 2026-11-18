@@ -1,13 +1,11 @@
 import { closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
 import {
-  AllClients,
   ClientInfoOpenUUID,
   ClientOnlineState,
   DummyClients,
   MonitorHistoryModalContext,
   MonitoringTargets,
-  __LastClients,
   setAlertRulesCache,
   setDummyClients,
   setFreeKioskTerminals,
@@ -18,7 +16,9 @@ import {
   setVariables,
 } from './state';
 import { HandleNonFatalError, Safe } from './utils';
-import { RenderFullClientAndMonitorList, UpdateClientTile } from './client-list';
+import { GetCachedClient, ScheduleFullRender, UpdateClientTile } from './client-list';
+import { ApplyClientPatch } from './lib/client-patches';
+import type { ClientPatch } from './lib/client-patches';
 import {
   IsMonitorHistoryContextFor,
   LoadHistorySamplesForContext,
@@ -434,6 +434,116 @@ export async function OpenOscHttpDebugTerminal() {
   openModal('OSC_HTTP_DEBUG_MODAL');
 }
 
+// --- Live client updates -------------------------------------------------------
+//
+// Each patch is merged into the client's one cached object straight away, so
+// every reader sees current state, and the online/offline alert bookkeeping
+// runs at once. The DOM work (tiles, the list search, open modals) waits for
+// the next animation frame and runs once for everything that changed in
+// between; while the window is hidden no frame comes, so none of it runs until
+// there is something to see.
+const PendingTileUpdates = new Set<string>();
+let TileFlushScheduled = false;
+
+function RequestFrame(Callback: () => void): void {
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(Callback);
+  else setTimeout(Callback, 16);
+}
+
+export function HandleClientPatches(Patches: readonly ClientPatch[]): void {
+  if (!Array.isArray(Patches)) return;
+  for (const Patch of Patches) {
+    try {
+      ApplyLiveClientPatch(Patch);
+    } catch (err) {
+      HandleNonFatalError('ClientPatches:Apply', err);
+    }
+  }
+  if (PendingTileUpdates.size && !TileFlushScheduled) {
+    TileFlushScheduled = true;
+    RequestFrame(() => {
+      FlushClientTileUpdates().catch((err) => HandleNonFatalError('ClientPatches:Flush', err));
+    });
+  }
+}
+
+function ApplyLiveClientPatch(Patch: ClientPatch): void {
+  if (!Patch || typeof Patch.UUID !== 'string') return;
+  const Client = GetCachedClient(Patch.UUID);
+  // Not in the current list: a new client arrives with the full list push.
+  if (!Client) return;
+  ApplyClientPatch(Client, Patch);
+
+  // Online transition handling: auto-dismiss any pending offline alerts when a
+  // client comes back online. Offline transitions intentionally do not raise a
+  // UI notification.
+  const UUID = Patch.UUID;
+  const Online = !!Client.Online;
+  const prev = ClientOnlineState.get(UUID);
+  if (typeof prev === 'boolean' && prev !== Online && Online) {
+    try {
+      let changed = false;
+      for (const a of Alerts) {
+        if (!a.dismissed && a.type === 'offline' && a.clientUUID === UUID) {
+          a.dismissed = true;
+          changed = true;
+        }
+      }
+      if (changed) {
+        UpdateAlertsIndicator();
+        if (AlertsVisible) RenderAlerts();
+      }
+    } catch (err) {
+      HandleNonFatalError('ClientUpdated:DismissOfflineAlert', err);
+    }
+  }
+  ClientOnlineState.set(UUID, Online);
+  PendingTileUpdates.add(UUID);
+}
+
+async function FlushClientTileUpdates(): Promise<void> {
+  TileFlushScheduled = false;
+  const UUIDs = Array.from(PendingTileUpdates);
+  PendingTileUpdates.clear();
+  for (const UUID of UUIDs) {
+    const Client = GetCachedClient(UUID);
+    if (!Client) continue;
+    try {
+      UpdateClientTile(Client);
+    } catch (err) {
+      HandleNonFatalError('ClientUpdated:UpdateClientTile', err);
+    }
+  }
+  RefreshListSearch();
+
+  // Secondary views follow, once per frame rather than once per client.
+  try {
+    if ($('#SHOWTRAK_MODAL_UPDATE_MANAGER').hasClass('show')) RenderUpdateManagerClientList();
+  } catch (err) {
+    HandleNonFatalError('ClientUpdated:UpdateManagerCacheSync', err);
+  }
+  // If the Client Info modal is open for a changed client, refresh it.
+  try {
+    const OpenUUID = ClientInfoOpenUUID;
+    if (OpenUUID && UUIDs.includes(OpenUUID) && $('#SHOWTRAK_CLIENT_INFO').hasClass('show')) {
+      const Client = GetCachedClient(OpenUUID);
+      if (Client) RenderClientInfoDetails(Client);
+    }
+  } catch (err) {
+    HandleNonFatalError('ClientUpdated:RenderClientInfoDetails', err);
+  }
+  // If the shared status-timeline graph is showing a changed client, reload
+  // its series live so the timeline and status card stay current.
+  if (UUIDs.some((UUID) => IsMonitorHistoryContextFor('client', UUID))) {
+    try {
+      await LoadHistorySamplesForContext();
+      RenderMonitoringHistoryModal();
+    } catch (err) {
+      HandleNonFatalError('ClientUpdated:RefreshClientHistory', err);
+    }
+  }
+}
+
 // Called by the bootstrap orchestrator in main.ts, never at import time.
 // Wires the OSC/HTTP debug modal and registers every OSC-feed push handler;
 // bodies unchanged from the former import-time subscriptions.
@@ -565,95 +675,17 @@ export function InitOscFeeds() {
     return;
   });
 
-  window.API.ClientUpdated(async (Data) => {
-    // Keep cached full-client list in sync with live heartbeat updates so
-    // secondary views (e.g. Update Manager) reflect current Online state.
-    try {
-      if (Array.isArray(__LastClients) && Data && Data.UUID) {
-        const idx = __LastClients.findIndex((client) => client && client.UUID === Data.UUID);
-        if (idx >= 0) {
-          __LastClients[idx] = {
-            ...__LastClients[idx],
-            ...Data,
-          };
-        }
-      }
-
-      // Keep AllClients (used by the right-click action menu) in sync too, so the
-      // intersection logic sees live OperatingSystem / IntegratedActions / Online.
-      if (Array.isArray(AllClients) && Data && Data.UUID) {
-        const aidx = AllClients.findIndex((client) => client && client.UUID === Data.UUID);
-        if (aidx >= 0) {
-          AllClients[aidx] = {
-            ...AllClients[aidx],
-            ...Data,
-          };
-        }
-      }
-
-      if ($('#SHOWTRAK_MODAL_UPDATE_MANAGER').hasClass('show')) {
-        RenderUpdateManagerClientList();
-      }
-    } catch (err) {
-      HandleNonFatalError('ClientUpdated:UpdateManagerCacheSync', err);
-    }
-
-    // Online transition handling: auto-dismiss any pending offline alerts when a
-    // client comes back online. Offline transitions intentionally do not raise a
-    // UI notification.
-    try {
-      const prev = ClientOnlineState.get(Data.UUID);
-      if (typeof prev === 'boolean' && prev !== Data.Online && Data.Online) {
-        try {
-          let changed = false;
-          for (const a of Alerts) {
-            if (!a.dismissed && a.type === 'offline' && a.clientUUID === Data.UUID) {
-              a.dismissed = true;
-              changed = true;
-            }
-          }
-          if (changed) {
-            UpdateAlertsIndicator();
-            if (AlertsVisible) RenderAlerts();
-          }
-        } catch (err) {
-          HandleNonFatalError('ClientUpdated:DismissOfflineAlert', err);
-        }
-      }
-      ClientOnlineState.set(Data.UUID, !!Data.Online);
-    } catch (err) {
-      HandleNonFatalError('ClientUpdated:TransitionAlerts', err);
-    }
-    const { UUID } = Data;
-    UpdateClientTile(Data);
-    RefreshListSearch();
-    // If Client Info modal is open for this client, refresh network interfaces (and USB if present)
-    try {
-      const $modal = $('#SHOWTRAK_CLIENT_INFO');
-      if (ClientInfoOpenUUID && ClientInfoOpenUUID === UUID && $modal.hasClass('show')) {
-        RenderClientInfoDetails(Data);
-      }
-    } catch (err) {
-      HandleNonFatalError('ClientUpdated:RenderClientInfoDetails', err);
-    }
-    // If the shared status-timeline graph is showing this client, reload its
-    // series live so the timeline and status card stay current.
-    if (IsMonitorHistoryContextFor('client', UUID)) {
-      try {
-        await LoadHistorySamplesForContext();
-        RenderMonitoringHistoryModal();
-      } catch (err) {
-        HandleNonFatalError('ClientUpdated:RefreshClientHistory', err);
-      }
-    }
-    return;
-  });
+  // Live client changes. The server batches them (ClientPatches: per client,
+  // only the fields that changed); a whole ClientUpdated is handled the same
+  // way, as a patch that happens to carry every field.
+  window.API.ClientPatches((Patches) => HandleClientPatches(Patches));
+  window.API.ClientUpdated((Data) => HandleClientPatches([Data as unknown as ClientPatch]));
 
   // --- Monitoring Targets ---
   window.API.SetFullMonitoringTargetList(async (List) => {
     setMonitoringTargets(Array.isArray(List) ? List : []);
     // Re-render the full client+monitor view so monitors slot back into their groups.
-    RenderFullClientAndMonitorList();
+    ScheduleFullRender();
     // An open Settings tab follows (a no-op for every monitor but the open one).
     for (const Target of MonitoringTargets) RefreshMonitorInfoEditor(Target);
     UpdateIdentifyStatusBanner();
@@ -670,7 +702,7 @@ export function InitOscFeeds() {
     MonitoringTargets[idx] = Target;
     // If a monitor changed groups, re-render. Otherwise update in place.
     if ((prev.GroupID || null) !== (Target.GroupID || null)) {
-      RenderFullClientAndMonitorList();
+      ScheduleFullRender();
     } else {
       UpdateMonitoringTargetTile(Target);
       RefreshListSearch();
@@ -716,7 +748,7 @@ export function InitOscFeeds() {
   // There is no per-tile delta to apply, hence the full re-render.
   window.API.OnSetTagList(async (List) => {
     setTags(Array.isArray(List) ? List : []);
-    RenderFullClientAndMonitorList();
+    ScheduleFullRender();
     // An editor's tag chips are written by this same push (a toggle round-trips
     // through the server), so an open picker has to redraw or it keeps showing
     // the state from before the click.
@@ -742,7 +774,7 @@ export function InitOscFeeds() {
   window.API.SetFullDummyClientList(async (List) => {
     setDummyClients(Array.isArray(List) ? List : []);
     // Re-render the full client+monitor view so dummies slot back into groups.
-    RenderFullClientAndMonitorList();
+    ScheduleFullRender();
     // An open Settings tab follows (a no-op for every dummy but the open one).
     for (const Dummy of DummyClients) RefreshDummyInfoEditor(Dummy);
   });
@@ -758,7 +790,7 @@ export function InitOscFeeds() {
     }
     // If a dummy changed groups (or is new), re-render. Otherwise update in place.
     if (!prev || (prev.GroupID || null) !== (Dummy.GroupID || null)) {
-      RenderFullClientAndMonitorList();
+      ScheduleFullRender();
     } else {
       UpdateDummyClientTile(Dummy);
       RefreshListSearch();
@@ -773,7 +805,7 @@ export function InitOscFeeds() {
   window.API.SetFullFreeKioskTerminalList(async (List) => {
     setFreeKioskTerminals(Array.isArray(List) ? List : []);
     // Re-render the full list so terminals slot back into their groups.
-    RenderFullClientAndMonitorList();
+    ScheduleFullRender();
   });
 
   window.API.FreeKioskTerminalUpdated(async (Terminal) => {
@@ -788,7 +820,7 @@ export function InitOscFeeds() {
     // A group change (or a new terminal) needs a full re-render; anything else
     // is an in-place patch, so a 30s poll does not rebuild the whole list.
     if (!prev || (prev.GroupID || null) !== (Terminal.GroupID || null)) {
-      RenderFullClientAndMonitorList();
+      ScheduleFullRender();
     } else {
       UpdateFreeKioskTile(Terminal);
       RefreshListSearch();

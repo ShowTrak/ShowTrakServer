@@ -111,6 +111,17 @@ function FormatClientVersionLabel(c: PublicClientSource): string {
   return `${IsIntegratedClient(c) ? 'SDK v' : 'v'}${Version}`;
 }
 
+// Shared stand-ins for telemetry a source does not have. The projection is
+// rebuilt for every push, and handing back the same empty value each time keeps
+// it reference-stable, which is how the push pipeline (./client-push) tells an
+// unchanged field from a changed one. Frozen, so no consumer can alter the
+// value every other projection shares; the wire output is identical.
+const NONE = Object.freeze([]) as unknown as never[];
+const NO_APPLICATIONS = Object.freeze({ Items: NONE }) as unknown as RunningApplicationsSnapshot;
+const EMPTY_AUDIO_VIEW = Object.freeze(EmptyAudioView()) as AudioDevicesView;
+const EMPTY_NETWORK_VIEW = Object.freeze(EmptyNetworkStatusView()) as NetworkStatusView;
+const EMPTY_STORAGE_VIEW = Object.freeze(EmptyStorageView()) as StorageStatusView;
+
 const ToPublicClient = (c: PublicClientSource): ClientView => ({
   Type: 'client',
   UUID: c.UUID,
@@ -124,7 +135,7 @@ const ToPublicClient = (c: PublicClientSource): ClientView => ({
   Slug: c.Slug ?? null,
   IP: c.IP,
   MacAddress: c.MacAddress,
-  MacAddresses: Array.isArray(c.MacAddresses) ? c.MacAddresses : [],
+  MacAddresses: Array.isArray(c.MacAddresses) ? c.MacAddresses : NONE,
   Online: c.Online,
   LastSeen: c.LastSeen,
   Vitals: (c.Vitals ?? null) as Vitals | null,
@@ -136,62 +147,61 @@ const ToPublicClient = (c: PublicClientSource): ClientView => ({
     : {}),
   ResourceAlarms: Array.isArray(c.ResourceAlarms)
     ? (c.ResourceAlarms as ClientResourceAlarm[])
-    : [],
-  USBDeviceList: Array.isArray(c.USBDeviceList) ? c.USBDeviceList : [],
-  CriticalUSBDevices: Array.isArray(c.CriticalUSBDevices) ? c.CriticalUSBDevices : [],
-  CriticalUSBSerials: Array.isArray(c.CriticalUSBSerials) ? c.CriticalUSBSerials : [],
+    : NONE,
+  USBDeviceList: Array.isArray(c.USBDeviceList) ? c.USBDeviceList : NONE,
+  CriticalUSBDevices: Array.isArray(c.CriticalUSBDevices) ? c.CriticalUSBDevices : NONE,
+  CriticalUSBSerials: Array.isArray(c.CriticalUSBSerials) ? c.CriticalUSBSerials : NONE,
   MissingCriticalUSBDevices: Array.isArray(c.MissingCriticalUSBDevices)
     ? c.MissingCriticalUSBDevices
-    : [],
-  CriticalUSBNames: Array.isArray(c.CriticalUSBNames) ? c.CriticalUSBNames : [],
+    : NONE,
+  CriticalUSBNames: Array.isArray(c.CriticalUSBNames) ? c.CriticalUSBNames : NONE,
   MissingCriticalUSBNames: Array.isArray(c.MissingCriticalUSBNames)
     ? c.MissingCriticalUSBNames
-    : [],
+    : NONE,
   USBCapabilities: (c.USBCapabilities ?? null) as USBCapabilities | null,
   Degraded: !!c.Degraded,
-  DegradedWarnings: Array.isArray(c.DegradedWarnings) ? c.DegradedWarnings : [],
+  DegradedWarnings: Array.isArray(c.DegradedWarnings) ? c.DegradedWarnings : NONE,
   Initialising: !!c.Initialising,
-  NetworkInterfaces: Array.isArray(c.NetworkInterfaces) ? c.NetworkInterfaces : [],
+  NetworkInterfaces: Array.isArray(c.NetworkInterfaces) ? c.NetworkInterfaces : NONE,
   Integrated: !!c.Integrated,
-  IntegratedActions: Array.isArray(c.IntegratedActions) ? c.IntegratedActions : [],
+  IntegratedActions: Array.isArray(c.IntegratedActions) ? c.IntegratedActions : NONE,
   Identifying: !!c.Identifying,
   Unassigned: !!c.Unassigned,
-  RunningApplications: (c.RunningApplications as RunningApplicationsSnapshot | undefined) ?? {
-    Items: [],
-  },
-  CriticalApplications: Array.isArray(c.CriticalApplications) ? c.CriticalApplications : [],
+  RunningApplications:
+    (c.RunningApplications as RunningApplicationsSnapshot | undefined) ?? NO_APPLICATIONS,
+  CriticalApplications: Array.isArray(c.CriticalApplications) ? c.CriticalApplications : NONE,
   MissingCriticalApplications: Array.isArray(c.MissingCriticalApplications)
     ? c.MissingCriticalApplications
-    : [],
-  DisplayList: Array.isArray(c.DisplayList) ? c.DisplayList : [],
-  CriticalDisplays: Array.isArray(c.CriticalDisplays) ? c.CriticalDisplays : [],
-  CriticalDisplayIDs: Array.isArray(c.CriticalDisplayIDs) ? c.CriticalDisplayIDs : [],
+    : NONE,
+  DisplayList: Array.isArray(c.DisplayList) ? c.DisplayList : NONE,
+  CriticalDisplays: Array.isArray(c.CriticalDisplays) ? c.CriticalDisplays : NONE,
+  CriticalDisplayIDs: Array.isArray(c.CriticalDisplayIDs) ? c.CriticalDisplayIDs : NONE,
   MissingCriticalDisplays: Array.isArray(c.MissingCriticalDisplays)
     ? c.MissingCriticalDisplays
-    : [],
+    : NONE,
   MismatchedCriticalDisplays: Array.isArray(c.MismatchedCriticalDisplays)
     ? c.MismatchedCriticalDisplays
-    : [],
+    : NONE,
   // Only the view: the client entity also holds the raw last report
   // (ObservedAudio), which is an internal baseline, not something to publish.
   AudioDevices:
     c.AudioDevices && typeof c.AudioDevices === 'object'
       ? (c.AudioDevices as AudioDevicesView)
-      : EmptyAudioView(),
-  CriticalAudioDevices: Array.isArray(c.CriticalAudioDevices) ? c.CriticalAudioDevices : [],
+      : EMPTY_AUDIO_VIEW,
+  CriticalAudioDevices: Array.isArray(c.CriticalAudioDevices) ? c.CriticalAudioDevices : NONE,
   NetworkStatus:
     c.NetworkStatus && typeof c.NetworkStatus === 'object'
       ? (c.NetworkStatus as NetworkStatusView)
-      : EmptyNetworkStatusView(),
+      : EMPTY_NETWORK_VIEW,
   CriticalNetworkInterfaces: Array.isArray(c.CriticalNetworkInterfaces)
     ? c.CriticalNetworkInterfaces
-    : [],
+    : NONE,
   // Only the view, like audio: ObservedStorage is the internal last report.
   StorageStatus:
     c.StorageStatus && typeof c.StorageStatus === 'object'
       ? (c.StorageStatus as StorageStatusView)
-      : EmptyStorageView(),
-  CriticalStorageVolumes: Array.isArray(c.CriticalStorageVolumes) ? c.CriticalStorageVolumes : [],
+      : EMPTY_STORAGE_VIEW,
+  CriticalStorageVolumes: Array.isArray(c.CriticalStorageVolumes) ? c.CriticalStorageVolumes : NONE,
 });
 
 const ToPublicGroup = (g: PublicGroupSource): GroupView => ({

@@ -154,6 +154,8 @@ export function PreviewSound(SoundName: string) {
 // re-render). Kept as a separate registrar so InitSettings can live above
 // PreviewSound; body unchanged from the former import-time subscription.
 function InitSettingsPush() {
+  // The UI_* settings the client list was last laid out with (see below).
+  let RenderedLayoutSignature: string | null = null;
   window.API.UpdateSettings(async (NewSettings, NewSettingsGroups) => {
     const Incoming = Array.isArray(NewSettings) ? NewSettings : [];
     const IncomingGroups = Array.isArray(NewSettingsGroups) ? NewSettingsGroups : [];
@@ -174,12 +176,20 @@ function InitSettingsPush() {
     ApplySettingDependencies();
 
     // Re-render after settings arrive so layout-dependent controls like the group
-    // column count pick up UI_GROUP_COLUMN_COUNT on the browser surface.
-    try {
-      const { RenderFullClientAndMonitorList } = await import('./client-list');
-      RenderFullClientAndMonitorList();
-    } catch (err) {
-      HandleNonFatalError('Settings:RefreshAfterUpdate', err);
+    // column count pick up UI_GROUP_COLUMN_COUNT on the browser surface. Only the
+    // UI_* settings shape the list, and every other setting round-trips here on
+    // each change, so the list is redrawn only when one of those moved.
+    const LayoutSignature = JSON.stringify(
+      Incoming.filter((S) => S && String(S.Key).startsWith('UI_')).map((S) => [S.Key, S.Value])
+    );
+    if (LayoutSignature !== RenderedLayoutSignature) {
+      RenderedLayoutSignature = LayoutSignature;
+      try {
+        const { ScheduleFullRender } = await import('./client-list');
+        ScheduleFullRender();
+      } catch (err) {
+        HandleNonFatalError('Settings:RefreshAfterUpdate', err);
+      }
     }
 
     // Keep the gated + menu entry in step with its setting. Imported lazily

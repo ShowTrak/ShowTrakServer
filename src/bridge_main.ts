@@ -242,6 +242,7 @@ const SUBSCRIBE_CHANNEL_LIST = [
   'SetFullClientList',
   'SetScriptList',
   'ClientUpdated',
+  'ClientPatches',
   'UpdateScriptExecutions',
   'ShutdownRequested',
   'USBDeviceAdded',
@@ -306,7 +307,13 @@ function subscribe<Args extends unknown[], Payload extends unknown[] = Args>(
   return () => ipcRenderer.removeListener(channel, handler);
 }
 
-const API: ShowTrakAPI = {
+// Server-internal channels on top of the shared contract (see the matching
+// declaration in src/UI/types/global.d.ts). The payload is passed through.
+interface ServerRendererAPI {
+  ClientPatches(Callback: (Patches: unknown[]) => void): () => void;
+}
+
+const API: ShowTrakAPI & ServerRendererAPI = {
   OpenDiscordInviteLinkInBrowser: async () => invoke('OpenDiscordInviteLinkInBrowser'),
   OpenShowTrakWebsiteInBrowser: async () => invoke('OpenShowTrakWebsiteInBrowser'),
   OpenShowTrakGithubInBrowser: async () => invoke('OpenShowTrakGithubInBrowser'),
@@ -335,16 +342,23 @@ const API: ShowTrakAPI = {
   Loaded: () => invoke('Loaded'),
   Shutdown: async (Confirmed = false) => invoke('Shutdown', Confirmed),
   GetClient: async (UUID) => invoke('GetClient', UUID),
-  GetClientHistory: async (UUID) => invoke('GetClientHistory', UUID),
+  GetClientHistory: async (UUID, WindowMs?: number) => invoke('GetClientHistory', UUID, WindowMs),
   GetStatusHistoryOverview: async () => invoke('GetStatusHistoryOverview'),
-  GetClientApplicationHistory: async (UUID) => invoke('GetClientApplicationHistory', UUID),
-  GetClientUSBHistory: async (UUID) => invoke('GetClientUSBHistory', UUID),
-  GetClientDisplayHistory: async (UUID) => invoke('GetClientDisplayHistory', UUID),
-  GetClientAudioHistory: async (UUID) => invoke('GetClientAudioHistory', UUID),
-  GetClientNetworkHistory: async (UUID) => invoke('GetClientNetworkHistory', UUID),
-  GetClientStorageHistory: async (UUID) => invoke('GetClientStorageHistory', UUID),
+  GetClientApplicationHistory: async (UUID, WindowMs?: number) =>
+    invoke('GetClientApplicationHistory', UUID, WindowMs),
+  GetClientUSBHistory: async (UUID, WindowMs?: number) =>
+    invoke('GetClientUSBHistory', UUID, WindowMs),
+  GetClientDisplayHistory: async (UUID, WindowMs?: number) =>
+    invoke('GetClientDisplayHistory', UUID, WindowMs),
+  GetClientAudioHistory: async (UUID, WindowMs?: number) =>
+    invoke('GetClientAudioHistory', UUID, WindowMs),
+  GetClientNetworkHistory: async (UUID, WindowMs?: number) =>
+    invoke('GetClientNetworkHistory', UUID, WindowMs),
+  GetClientStorageHistory: async (UUID, WindowMs?: number) =>
+    invoke('GetClientStorageHistory', UUID, WindowMs),
   GetClientVitalsHistory: async (UUID) => invoke('GetClientVitalsHistory', UUID),
-  GetClientSystemCheckHistory: async (UUID) => invoke('GetClientSystemCheckHistory', UUID),
+  GetClientSystemCheckHistory: async (UUID, WindowMs?: number) =>
+    invoke('GetClientSystemCheckHistory', UUID, WindowMs),
   GetAllGroups: async () => invoke('GetAllGroups'),
   CreateGroup: async (Title) => invoke('CreateGroup', Title),
   RenameGroup: async (GroupID, Title) => invoke('RenameGroup', GroupID, Title),
@@ -410,6 +424,7 @@ const API: ShowTrakAPI = {
     ),
   SetScriptList: (Callback) => subscribe('SetScriptList', Callback),
   ClientUpdated: (Callback) => subscribe('ClientUpdated', Callback),
+  ClientPatches: (Callback) => subscribe('ClientPatches', Callback),
   UpdateScriptExecutions: (Callback) => subscribe('UpdateScriptExecutions', Callback),
   ShutdownRequested: (Callback) => subscribe('ShutdownRequested', Callback, (): [] => []),
   USBDeviceAdded: (Callback) =>
@@ -508,7 +523,8 @@ const API: ShowTrakAPI = {
   GetMonitoringMethods: async () => invoke('GetMonitoringMethods'),
   GetAllMonitoringTargets: async () => invoke('GetAllMonitoringTargets'),
   GetMonitoringTarget: async (TargetID) => invoke('GetMonitoringTarget', TargetID),
-  GetMonitoringCheckHistory: async (CheckID) => invoke('GetMonitoringCheckHistory', CheckID),
+  GetMonitoringCheckHistory: async (CheckID, WindowMs?: number) =>
+    invoke('GetMonitoringCheckHistory', CheckID, WindowMs),
   GetMonitoringCheckDebug: async (CheckID) => invoke('GetMonitoringCheckDebug', CheckID),
   RunMonitoringCheckNow: async (CheckID) => invoke('RunMonitoringCheckNow', CheckID),
   RunAllMonitoringChecksNow: async (TargetID) => invoke('RunAllMonitoringChecksNow', TargetID),
@@ -530,7 +546,8 @@ const API: ShowTrakAPI = {
   // Dummy Clients
   GetAllDummyClients: async () => invoke('GetAllDummyClients'),
   GetDummyClient: async (UUID) => invoke('GetDummyClient', UUID),
-  GetDummyClientHistory: async (UUID) => invoke('GetDummyClientHistory', UUID),
+  GetDummyClientHistory: async (UUID, WindowMs?: number) =>
+    invoke('GetDummyClientHistory', UUID, WindowMs),
   GenerateDummyClientDefaults: async () => invoke('GenerateDummyClientDefaults'),
   CreateDummyClient: async (Payload) => invoke('CreateDummyClient', Payload),
   UpdateDummyClient: async (UUID, Payload) => invoke('UpdateDummyClient', UUID, Payload),

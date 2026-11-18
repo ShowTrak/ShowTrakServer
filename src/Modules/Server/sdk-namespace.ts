@@ -36,6 +36,7 @@
 
 import { EmitToSockets } from './push-fanout';
 import type { FanoutNamespace } from './push-fanout';
+import { RegisterClientPushSink } from './client-push';
 import crypto from 'crypto';
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/protocol';
@@ -426,6 +427,21 @@ function SetupSdkNamespace(io: SdkIOServer) {
       return;
     }
     EmitToSockets(sdk, Targets, channel, payload);
+  });
+
+  // Client changes, batched (see ./client-push). The SDK contract is unchanged:
+  // the same ClientUpdated event carrying the full public client. Only the
+  // redundant states inside one flush interval are dropped; the latest is
+  // always delivered, and its projection is shared with the Web UI.
+  RegisterClientPushSink((Batch) => {
+    const Targets =
+      sdk.sockets && typeof sdk.sockets.values === 'function'
+        ? Array.from(sdk.sockets.values())
+        : [];
+    if (Targets.length === 0) return;
+    for (let Index = 0; Index < Batch.Clients.length; Index++) {
+      EmitToSockets(sdk, Targets, 'ClientUpdated', [Batch.PublicOf(Index)]);
+    }
   });
 
   // Handshake gate. Three credentials are accepted, in a fixed order so a socket

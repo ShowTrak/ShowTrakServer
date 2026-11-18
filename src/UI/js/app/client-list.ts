@@ -62,10 +62,49 @@ import {
   RenderListRowCells,
   RenderListTableHeader,
   SyncListView,
-  UpdateListRowState,
 } from './list-view';
 import { ApplyListSearch } from './list-filter';
 import { SyncTileWidgets } from './tile-widgets';
+import { IndexClients } from './lib/client-patches';
+
+// Every client of the last full list, by UUID. The values are the list's own
+// objects (shared with __LastClients and AllClients), so a live patch applied
+// through here (see osc-feeds) is seen by every reader without a scan or copy.
+let ClientsByUUID = new Map<string, ClientView>();
+
+/** The merged live client for a UUID, if it is in the current list. */
+export function GetCachedClient(UUID: string): ClientView | undefined {
+  return ClientsByUUID.get(UUID);
+}
+
+// --- Frame scheduling ---------------------------------------------------------
+//
+// Several pushes each ask for a full list render at startup and on a show
+// switch (the client list, monitors, dummies, kiosks, tags, settings). They are
+// coalesced into one render per frame. While the window is hidden no frame
+// comes, so a short timer stands in: the list must still be drawn before the
+// window is first revealed, and full renders are rare enough that this costs
+// nothing while minimised.
+const HIDDEN_RENDER_DELAY_MS = 100;
+let FullRenderPending = false;
+
+function RunPendingFullRender(): void {
+  if (!FullRenderPending) return;
+  RenderFullClientAndMonitorList();
+}
+
+/** Render the full list at the next frame, once however often it is asked. */
+export function ScheduleFullRender(): void {
+  if (FullRenderPending) return;
+  FullRenderPending = true;
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(RunPendingFullRender);
+  setTimeout(RunPendingFullRender, HIDDEN_RENDER_DELAY_MS);
+}
+
+/** Render now if a render is pending (for callers that read the DOM after it). */
+export function FlushFullRender(): void {
+  RunPendingFullRender();
+}
 
 // Deployment-toast working state. This mirrors the runtime shape used below and
 // cached on `window.__ShowTrakDeploymentUiState`; note the ambient window decl
@@ -144,6 +183,17 @@ function ExecutionPanelDwellMs(): number {
   const Seconds = Number(Setting ? Setting.Value : NaN);
   return (Number.isFinite(Seconds) && Seconds >= 0 ? Seconds : 5) * 1000;
 }
+
+// The execution panel's rows by RequestID, with the parts each push touches.
+interface ExecutionRow {
+  El: HTMLElement;
+  Actions: HTMLElement | null;
+  Time: HTMLElement | null;
+  Inline: HTMLElement | null;
+  // The fill scale last written, so an unchanged one is not re-set.
+  Progress: string;
+}
+const ExecutionRows = new Map<string, ExecutionRow>();
 
 // Registers the script-execution / script-list / full-client-list push
 // handlers. Bodies unchanged from the former import-time subscriptions.
@@ -370,8 +420,7 @@ function InitClientListPush() {
       return;
     }
 
-    const $list = $('#SHOWTRAK_EXECUTION_LIST');
-    const listEl = $list[0] as HTMLElement | undefined;
+    const listEl = document.getElementById('SHOWTRAK_EXECUTION_LIST');
     if (!listEl) return;
 
     // Durations render white regardless of how long they took; the row's state
@@ -536,14 +585,20 @@ function InitClientListPush() {
       }
 
       // --- upsert the row ------------------------------------------------------
-      let el = listEl.querySelector<HTMLElement>(`.exec-item[data-request-id="${key}"]`);
-      if (!el) {
-        el = document.createElement('div');
+      // Looked up by RequestID in a Map rather than a selector query per row,
+      // which made every push quadratic in the number of rows.
+      let Row = ExecutionRows.get(key);
+      if (Row && Row.El.parentElement !== listEl) {
+        ExecutionRows.delete(key);
+        Row = undefined;
+      }
+      if (!Row) {
+        const el = document.createElement('div');
         el.className = `exec-item state-${state}`;
         el.setAttribute('data-request-id', key);
         el.dataset.state = state;
         el.dataset.indicator = state;
-        el.style.setProperty('--exec-progress', `${fillPercent}%`);
+        el.style.setProperty('--exec-progress-scale', String(fillPercent / 100));
         const scriptChip =
           uniformScriptName || !rawScriptName
             ? ''
@@ -562,27 +617,40 @@ function InitClientListPush() {
 					</div>
 				</div>`;
         listEl.appendChild(el);
+        Row = {
+          El: el,
+          Actions: el.querySelector<HTMLElement>('.exec-actions'),
+          Time: el.querySelector<HTMLElement>('.exec-time'),
+          Inline: el.querySelector<HTMLElement>('[data-inline]'),
+          Progress: String(fillPercent / 100),
+        };
+        ExecutionRows.set(key, Row);
       }
 
       // Volatile updates only: the .exec-fill and spinner nodes are never replaced
-      // unless the state changes, so their animations run uninterrupted.
-      el.style.setProperty('--exec-progress', `${fillPercent}%`);
+      // unless the state changes, so their animations run uninterrupted. The
+      // fill is a transform (scaleX), so a progress step never relayouts.
+      const el = Row.El;
+      const Progress = String(fillPercent / 100);
+      if (Row.Progress !== Progress) {
+        Row.Progress = Progress;
+        el.style.setProperty('--exec-progress-scale', Progress);
+      }
       if (el.dataset.state !== state) {
         el.classList.remove('state-pending', 'state-running', 'state-completed', 'state-failed');
         el.classList.add(`state-${state}`);
         el.dataset.state = state;
       }
       if (el.dataset.indicator !== state) {
-        const actions = el.querySelector('.exec-actions');
-        if (actions) actions.innerHTML = indicatorHtml;
+        if (Row.Actions) Row.Actions.innerHTML = indicatorHtml;
         el.dataset.indicator = state;
       }
-      const timeEl = el.querySelector<HTMLElement>('.exec-time');
+      const timeEl = Row.Time;
       if (timeEl) {
         if (timeEl.innerHTML !== timeBadge) timeEl.innerHTML = timeBadge;
         timeEl.style.display = timeBadge ? '' : 'none';
       }
-      const inlineEl = el.querySelector<HTMLElement>('[data-inline]');
+      const inlineEl = Row.Inline;
       if (inlineEl) {
         const nextClass = `exec-inline-slot${inlineClass ? ` ${inlineClass}` : ''}`;
         if (inlineEl.className !== nextClass) inlineEl.className = nextClass;
@@ -598,6 +666,9 @@ function InitClientListPush() {
         child.getAttribute('data-request-id') || child.getAttribute('data-exec-key') || '';
       if (!desiredKeys.has(childKey)) child.remove();
     }
+    for (const Key of ExecutionRows.keys()) {
+      if (!desiredKeys.has(Key)) ExecutionRows.delete(Key);
+    }
     return;
   });
 
@@ -608,10 +679,13 @@ function InitClientListPush() {
 
   window.API.SetFullClientList(async (Clients, Groups) => {
     // cache latest full lists
-    set__LastClients(Array.isArray(Clients) ? Clients : []);
+    const List = Array.isArray(Clients) ? Clients : [];
+    set__LastClients(List);
     set__LastGroups(Array.isArray(Groups) ? Groups : []);
-    setAllClients(Array.isArray(Clients) ? Clients.slice() : []);
-    RenderFullClientAndMonitorList();
+    // A copy of the array (callers may reorder it) holding the same objects.
+    setAllClients(List.slice());
+    ClientsByUUID = IndexClients(List);
+    ScheduleFullRender();
   });
 }
 
@@ -682,40 +756,123 @@ export function RenderClientTile(Client: ClientView): string {
 			</div>`;
 }
 
+// --- Live tile updates ---------------------------------------------------------
+//
+// A tile is patched in place on every live change of its client (the patches
+// are applied in frame-sized batches, see osc-feeds). The elements it touches
+// are found once per rendered tile and kept here, and every value written is
+// remembered, so an update that changes nothing costs a few comparisons rather
+// than a dozen child-selector scans and text rewrites.
+interface ClientTileRefs {
+  Tile: HTMLElement;
+  Hostname: HTMLElement | null;
+  Nickname: HTMLElement | null;
+  IP: HTMLElement | null;
+  Compact: HTMLElement | null;
+  ListState: HTMLElement | null;
+  IndicatorOnline: HTMLElement | null;
+  IndicatorOffline: HTMLElement | null;
+  IndicatorDegraded: HTMLElement | null;
+  DegradedWarning: HTMLElement | null;
+  Cpu: HTMLElement | null;
+  Ram: HTMLElement | null;
+  OfflineSince: HTMLElement | null;
+  // What was last written to each slot by this module.
+  Written: Map<string, string>;
+}
+
+const TileRefs = new Map<string, ClientTileRefs>();
+
+function ChildByType(Parent: Element | null, Type: string): HTMLElement | null {
+  if (!Parent) return null;
+  const Children = Parent.children;
+  for (let Index = 0; Index < Children.length; Index++) {
+    const Child = Children[Index]!;
+    if (Child.getAttribute('data-type') === Type) return Child as HTMLElement;
+  }
+  return null;
+}
+
+function ResolveTileRefs(UUID: string): ClientTileRefs | null {
+  const Cached = TileRefs.get(UUID);
+  if (Cached && Cached.Tile.isConnected) return Cached;
+  const Tile = document.getElementById(`CLIENT_TILE_${UUID}`);
+  if (!Tile) {
+    TileRefs.delete(UUID);
+    return null;
+  }
+  const IndicatorOnline = ChildByType(Tile, 'INDICATOR_ONLINE');
+  const IndicatorOffline = ChildByType(Tile, 'INDICATOR_OFFLINE');
+  const IndicatorDegraded = ChildByType(Tile, 'INDICATOR_DEGRADED');
+  const Bar = (Type: string): HTMLElement | null =>
+    IndicatorOnline
+      ? IndicatorOnline.querySelector<HTMLElement>(`.progress > [data-type="${Type}"]`)
+      : null;
+  const Refs: ClientTileRefs = {
+    Tile,
+    Hostname: ChildByType(Tile, 'Hostname'),
+    Nickname: ChildByType(Tile, 'Nickname'),
+    IP: ChildByType(Tile, 'IP'),
+    Compact: ChildByType(Tile, 'COMPACT_ONLINE_STATUS'),
+    ListState: ChildByType(Tile, 'LIST_STATE'),
+    IndicatorOnline,
+    IndicatorOffline,
+    IndicatorDegraded,
+    DegradedWarning: ChildByType(IndicatorDegraded, 'DEGRADED_WARNING'),
+    Cpu: Bar('CPU'),
+    Ram: Bar('RAM'),
+    OfflineSince: ChildByType(IndicatorOffline, 'OFFLINE_SINCE'),
+    Written: new Map(),
+  };
+  TileRefs.set(UUID, Refs);
+  return Refs;
+}
+
+// Whether a slot needs writing: false when it already holds what this module
+// last wrote there. Records the new value.
+function Changed(Refs: ClientTileRefs, Slot: string, Value: string): boolean {
+  if (Refs.Written.get(Slot) === Value) return false;
+  Refs.Written.set(Slot, Value);
+  return true;
+}
+
+function SetTileText(Refs: ClientTileRefs, Slot: string, El: HTMLElement | null, Text: string) {
+  if (!El || !Changed(Refs, Slot, Text)) return;
+  if (El.textContent !== Text) El.textContent = Text;
+}
+
 // See VitalsBarScale (lib/client-list-layout).
 function SetVitalsBar(
-  $Bar: JQuery,
+  Refs: ClientTileRefs,
+  Slot: string,
+  Bar: HTMLElement | null,
   Reading: { UsagePercentage?: unknown } | null | undefined
 ): void {
   const Scale = VitalsBarScale(Reading);
   // An empty value would REMOVE the inline transform and show a full bar.
-  if (Scale !== null) $Bar.css('transform', Scale);
+  if (!Bar || Scale === null || !Changed(Refs, Slot, Scale)) return;
+  Bar.style.transform = Scale;
 }
 
-// Patch an already-rendered client tile in place from a live ClientUpdated
-// payload (called by the osc-feeds subscription). Counterpart to
-// UpdateMonitoringTargetTile / UpdateDummyClientTile.
-//
-// Everything below is resolved through `$tile` rather than a repeated
-// `[data-uuid='...']` lookup, which fixes two things at once:
-//
-//   Correctness: `[data-uuid='X']` is not tile-scoped. A client UUID also
-//   appears on the Update Manager's row and its checkbox, so the class toggles
-//   below used to land on those too. (Nothing is lost by scoping: the same
-//   ClientUpdated handler re-renders that list from its own state when the
-//   modal is open, which is the authoritative path.)
-//
-//   Cost: attribute selectors take jQuery's slow path, so each one was a
-//   document-wide querySelectorAll. This ran ~29 of them per tile per update,
-//   on every client's heartbeat. The id lookup is a single getElementById and
-//   every child query is scoped to that subtree.
+// Show or hide one indicator panel.
+function SetIndicator(El: HTMLElement | null, Visible: boolean): void {
+  if (!El) return;
+  El.classList.toggle('d-grid', Visible);
+  El.classList.toggle('d-none', !Visible);
+}
+
+// Patch an already-rendered client tile in place from a live client (called by
+// the osc-feeds flush). Counterpart to UpdateMonitoringTargetTile /
+// UpdateDummyClientTile. Everything is resolved within the tile itself: a
+// client UUID also appears on the Update Manager's rows, which that modal
+// re-renders from its own state.
 export function UpdateClientTile(Data: ClientView): void {
   const { UUID, Nickname, Hostname, IP, Online, Vitals } = Data;
 
-  const $tile = $(`#CLIENT_TILE_${UUID}`);
+  const Refs = ResolveTileRefs(String(UUID));
   // No tile rendered for this client (filtered out, or a push that arrived
   // mid-rebuild). Every operation below would have been a no-op anyway.
-  if (!$tile.length) return;
+  if (!Refs) return;
 
   const Degraded = !!Data.Degraded;
   const DegradedWarning =
@@ -723,63 +880,68 @@ export function UpdateClientTile(Data: ClientView): void {
       ? String(Data.DegradedWarnings[0])
       : 'Missing USB Device';
 
-  const $IndicatorOnline = $tile.children('.SHOWTRAK_PC_STATUS[data-type="INDICATOR_ONLINE"]');
-  const $IndicatorOffline = $tile.children('.SHOWTRAK_PC_STATUS[data-type="INDICATOR_OFFLINE"]');
-  const $IndicatorDegraded = $tile.children('.SHOWTRAK_PC_STATUS[data-type="INDICATOR_DEGRADED"]');
-
   // Mirrors GetClientTileStateClass: a client inside its start-up window is
   // greyed rather than green, because a guard is still outstanding.
   const Initialising = !!Data.Initialising && !!Online && !Degraded;
+  const Identifying = !!Data.Identifying;
+  const HasVitals = !!(Online && Vitals);
 
-  $tile
-    .toggleClass('ONLINE', Online && !Degraded && !Initialising)
-    .toggleClass('DEGRADED', Degraded)
-    .toggleClass('IDLE', Initialising)
-    .toggleClass('IDENTIFYING', !!Data.Identifying);
+  if (
+    Changed(Refs, 'state', `${!!Online}|${Degraded}|${Initialising}|${Identifying}|${HasVitals}`)
+  ) {
+    const Tile = Refs.Tile;
+    Tile.classList.toggle('ONLINE', !!Online && !Degraded && !Initialising);
+    Tile.classList.toggle('DEGRADED', Degraded);
+    Tile.classList.toggle('IDLE', Initialising);
+    Tile.classList.toggle('IDENTIFYING', Identifying);
+    if (HasVitals) {
+      SetIndicator(Refs.IndicatorOffline, false);
+      SetIndicator(Refs.IndicatorDegraded, Degraded);
+      SetIndicator(Refs.IndicatorOnline, !Degraded);
+    } else {
+      SetIndicator(Refs.IndicatorOffline, true);
+      SetIndicator(Refs.IndicatorOnline, false);
+      SetIndicator(Refs.IndicatorDegraded, false);
+    }
+  }
 
-  $IndicatorDegraded.children('[data-type="DEGRADED_WARNING"]').text(DegradedWarning);
-
-  const $Hostname = $tile.children('[data-type="Hostname"]');
-  const ComputedHostname = FormatClientHostnameVersionLabel(Data);
-  if ($Hostname.text() !== ComputedHostname) $Hostname.text(ComputedHostname);
-
-  const $Nickname = $tile.children('[data-type="Nickname"]');
-  const ComputedNickname = (Nickname && Nickname.length ? Nickname : Hostname) || '';
-  if ($Nickname.text() !== ComputedNickname) $Nickname.text(ComputedNickname);
-
-  const $IP = $tile.children('[data-type="IP"]');
-  const ComputedIP = IP ? IP : 'Unknown IP';
-  if ($IP.text() !== ComputedIP) $IP.text(ComputedIP);
+  SetTileText(Refs, 'warning', Refs.DegradedWarning, DegradedWarning);
+  SetTileText(Refs, 'hostname', Refs.Hostname, FormatClientHostnameVersionLabel(Data));
+  SetTileText(
+    Refs,
+    'nickname',
+    Refs.Nickname,
+    (Nickname && Nickname.length ? Nickname : Hostname) || ''
+  );
+  SetTileText(Refs, 'ip', Refs.IP, IP ? IP : 'Unknown IP');
 
   const CompactLabel = GetClientCompactStatusLabel(Data);
-  const CompactOnlineStatus = $tile.children('[data-type="COMPACT_ONLINE_STATUS"]');
-  if (CompactOnlineStatus.length) {
-    CompactOnlineStatus.text(CompactLabel);
-    CompactOnlineStatus.removeClass('d-none');
+  if (Refs.Compact && Changed(Refs, 'compact', CompactLabel)) {
+    if (Refs.Compact.textContent !== CompactLabel) Refs.Compact.textContent = CompactLabel;
+    Refs.Compact.classList.remove('d-none');
   }
-  UpdateListRowState($tile, CompactLabel);
+  // The list view's state cell (as list-view's UpdateListRowState writes it).
+  SetTileText(Refs, 'list-state', Refs.ListState, CompactLabel);
 
-  if (Online && Vitals) {
-    const $Progress = $tile.children('div').children('.progress');
-    SetVitalsBar($Progress.children('[data-type="CPU"]'), Vitals.CPU);
-    SetVitalsBar($Progress.children('[data-type="RAM"]'), Vitals.Ram);
-
-    $IndicatorOffline.addClass('d-none').removeClass('d-grid');
-    $IndicatorDegraded.toggleClass('d-grid', Degraded).toggleClass('d-none', !Degraded);
-    $IndicatorOnline.toggleClass('d-none', Degraded).toggleClass('d-grid', !Degraded);
-  } else {
-    $IndicatorOffline.addClass('d-grid').removeClass('d-none');
-    $IndicatorOnline.addClass('d-none').removeClass('d-grid');
-    $IndicatorDegraded.addClass('d-none').removeClass('d-grid');
+  if (HasVitals && Vitals) {
+    SetVitalsBar(Refs, 'cpu', Refs.Cpu, Vitals.CPU);
+    SetVitalsBar(Refs, 'ram', Refs.Ram, Vitals.Ram);
   }
 
-  $IndicatorOffline
-    .children('[data-type="OFFLINE_SINCE"]')
-    .attr('data-offlinesince', Data.LastSeen ?? '');
-  if (!Online) UpdateOfflineIndicators($tile[0]);
+  // The offline counter reads this, and only while the client is offline; it
+  // moves with every heartbeat, so it is left alone while online.
+  if (!Online) {
+    const LastSeen = String(Data.LastSeen ?? '');
+    if (Refs.OfflineSince && Changed(Refs, 'offline-since', LastSeen)) {
+      Refs.OfflineSince.setAttribute('data-offlinesince', LastSeen);
+    }
+    UpdateOfflineIndicators(Refs.Tile);
+  }
 }
 
 export function RenderFullClientAndMonitorList() {
+  // This render satisfies any that was scheduled.
+  FullRenderPending = false;
   const Clients = Array.isArray(__LastClients) ? __LastClients.slice() : [];
   const Monitors = Array.isArray(MonitoringTargets) ? MonitoringTargets.slice() : [];
   const Dummies = Array.isArray(DummyClients) ? DummyClients.slice() : [];
@@ -892,6 +1054,8 @@ export function RenderFullClientAndMonitorList() {
   // them, so the reflow animation slides rows to where they actually end up.
   const Fill = () => {
     $('#APPLICATION_CONTENT').html(Filler);
+    // Every tile is new; the cached element references are all stale.
+    TileRefs.clear();
     try {
       ApplyListSearch();
     } catch (e) {

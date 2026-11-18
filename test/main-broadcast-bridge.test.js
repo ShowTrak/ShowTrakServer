@@ -229,6 +229,8 @@ test.after(() => restore());
 const { normalizeUSBNameKey } = require('../dist/Modules/ClientManager/normalizers');
 
 const Bridge = require('../dist/main/broadcast-bridge');
+// The real push pipeline the bridge queues client changes into.
+const ClientPush = require('../dist/Modules/Server/client-push');
 
 // Wiring is NOT a module-load side effect; the composition root calls this once
 // after the managers are initialized. Do the same here, exactly once, so the
@@ -247,6 +249,8 @@ async function emit(event, ...args) {
 }
 
 function reset() {
+  ClientPush.ResetClientPushes();
+  Bridge.ResetScriptExecutionPushes();
   state.hasWindow = true;
   state.cooldownMs = 60_000;
   state.clients = [null, [{ UUID: 'client-1' }]];
@@ -425,7 +429,7 @@ test('ClientUpdated sends the renderer the client without its internal raw repor
   // and change signatures are main-process bookkeeping; cloning them across IPC
   // on every heartbeat was the dominant cost. History and alerts still see them.
   const Client = {
-    UUID: 'client-1',
+    UUID: 'client-internal',
     Online: true,
     Vitals: { CPU: { UsagePercentage: 5 } },
     RunningApplications: { Items: [{ Name: 'show.exe' }] },
@@ -438,14 +442,18 @@ test('ClientUpdated sends the renderer the client without its internal raw repor
     ObservedRunningApplicationsSignature: 'sig2',
   };
   await emit('ClientUpdated', Client);
+  assert.deepEqual(pushes, [], 'client changes are batched, not pushed one by one');
+  ClientPush.FlushClientPushes();
 
-  const Push = pushes.find((P) => P[0] === 'ClientUpdated');
-  assert.deepEqual(Push[1], {
-    UUID: 'client-1',
-    Online: true,
-    Vitals: { CPU: { UsagePercentage: 5 } },
-    RunningApplications: { Items: [{ Name: 'show.exe' }] },
-  });
+  const Push = pushes.find((P) => P[0] === 'ClientPatches');
+  assert.deepEqual(Push[1], [
+    {
+      UUID: 'client-internal',
+      Online: true,
+      Vitals: { CPU: { UsagePercentage: 5 } },
+      RunningApplications: { Items: [{ Name: 'show.exe' }] },
+    },
+  ]);
   assert.equal(history[0][1], Client, 'history recording still gets the full client');
   assert.equal(alertsMgr.__callsTo('HandleClientUpdated')[0].args[0], Client);
 });
@@ -492,9 +500,65 @@ test('the status history sampler logs a failed fetch and still samples the rest'
 });
 
 test('ClientUpdated pushes and records when a window is present', async () => {
-  await emit('ClientUpdated', { UUID: 'client-1', Online: false });
-  assert.deepEqual(pushes, [['ClientUpdated', { UUID: 'client-1', Online: false }]]);
+  await emit('ClientUpdated', { UUID: 'client-window', Online: false });
+  ClientPush.FlushClientPushes();
+  assert.deepEqual(pushes, [['ClientPatches', [{ UUID: 'client-window', Online: false }]]]);
   assert.equal(history.length, 1);
+});
+
+test('client patches carry only what changed, once per flush, in one message', async () => {
+  const A = { UUID: 'patch-a', Online: true, Vitals: { CPU: { UsagePercentage: 1 } }, Big: [1] };
+  const B = { UUID: 'patch-b', Online: true, Vitals: { CPU: { UsagePercentage: 2 } } };
+  await emit('ClientUpdated', A);
+  await emit('ClientUpdated', B);
+  ClientPush.FlushClientPushes();
+  assert.equal(pushes.length, 1, 'both clients ride one message');
+  assert.deepEqual(
+    pushes[0][1].map((P) => P.UUID),
+    ['patch-a', 'patch-b']
+  );
+  pushes.length = 0;
+
+  // A heartbeat: only the reading moved, and two of them inside one flush
+  // interval collapse into the latest.
+  A.Vitals = { CPU: { UsagePercentage: 3 } };
+  await emit('ClientUpdated', A);
+  A.Vitals = { CPU: { UsagePercentage: 4 } };
+  await emit('ClientUpdated', A);
+  ClientPush.FlushClientPushes();
+  assert.deepEqual(pushes, [
+    ['ClientPatches', [{ UUID: 'patch-a', Vitals: { CPU: { UsagePercentage: 4 } } }]],
+  ]);
+  pushes.length = 0;
+
+  // Nothing changed at all: nothing is sent.
+  await emit('ClientUpdated', A);
+  ClientPush.FlushClientPushes();
+  assert.deepEqual(pushes, []);
+
+  // A field that went away is named, so the renderer drops it too.
+  delete A.Big;
+  await emit('ClientUpdated', A);
+  ClientPush.FlushClientPushes();
+  assert.deepEqual(pushes, [['ClientPatches', [{ UUID: 'patch-a', $Removed: ['Big'] }]]]);
+});
+
+test('a full client list flushes queued patches first and restarts the baselines', async () => {
+  const Client = { UUID: 'client-1', Online: true, Vitals: { CPU: { UsagePercentage: 9 } } };
+  state.clients = [null, [Client]];
+  await emit('ClientUpdated', Client);
+  await emit('ClientListChanged');
+  assert.deepEqual(
+    pushes.map((P) => P[0]),
+    ['ClientPatches', 'SetFullClientList'],
+    'the older patch must not land after the list'
+  );
+  pushes.length = 0;
+
+  // The window now holds exactly the list, so the same client again is news to no one.
+  await emit('ClientUpdated', Client);
+  ClientPush.FlushClientPushes();
+  assert.deepEqual(pushes, []);
 });
 
 // --- Online-transition auto-deployment --------------------------------------
@@ -683,6 +747,26 @@ test('script executions are projected before being pushed to the renderer', asyn
   await emit('ScriptExecutionUpdated', Raw);
 
   assert.deepEqual(pushes[0], ['UpdateScriptExecutions', [{ Projected: true, Name: 'reboot' }]]);
+});
+
+test('script execution updates are throttled: the first at once, a burst as its latest', async () => {
+  const First = [{ Script: { Name: 'a' }, Status: 'Pending' }];
+  await emit('ScriptExecutionUpdated', First);
+  assert.equal(channels().filter((C) => C === 'UpdateScriptExecutions').length, 1);
+
+  // Progress lines inside the interval collapse into one trailing push of the
+  // latest list.
+  const Second = [{ Script: { Name: 'b' }, Status: 'Pending' }];
+  const Third = [{ Script: { Name: 'c' }, Status: 'Completed' }];
+  await emit('ScriptExecutionUpdated', Second);
+  await emit('ScriptExecutionUpdated', Third);
+  assert.equal(channels().filter((C) => C === 'UpdateScriptExecutions').length, 1);
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  await flush();
+  const Pushed = pushes.filter((P) => P[0] === 'UpdateScriptExecutions');
+  assert.equal(Pushed.length, 2);
+  assert.deepEqual(Pushed[1][1], [{ Projected: true, Name: 'c' }]);
+  assert.equal(deployments.reconciled.at(-1), Third, 'the reconciler sees the latest list');
 });
 
 test('script executions still reconcile the deployment queue with the RAW entries', async () => {

@@ -45,6 +45,13 @@ import { Manager as ModeManager } from '../Modules/ModeManager';
 import { Manager as BroadcastManager } from '../Modules/Broadcast';
 import { OSC } from '../Modules/OSC';
 import { PushToRenderers } from './renderer-bus';
+import {
+  DiffIntoBaseline,
+  FlushClientPushes,
+  QueueClientPush,
+  RegisterClientPushSink,
+} from '../Modules/Server/client-push';
+import type { ClientPatch, ClientPushBatch, PushClient } from '../Modules/Server/client-push';
 import { hasMainWindow } from './app-window';
 import {
   TriggerScriptDeployment,
@@ -123,6 +130,9 @@ const RENDERER_INTERNAL_CLIENT_FIELDS = new Set([
   'ObservedRunningApplications',
   'RunningApplicationsSignature',
   'ObservedRunningApplicationsSignature',
+  // Advances with every heartbeat and is read by nothing in the renderer (the
+  // tile and history show BootTime), so it would put a field in every patch.
+  'UptimeSeconds',
 ]);
 
 // Shallow copy of a client without its internal fields. Copies the same own
@@ -141,6 +151,54 @@ function ToRendererClient<T>(Client: T): T {
 
 function ToRendererClientList<T>(Clients: T[] | null | undefined): T[] {
   return Array.isArray(Clients) ? Clients.map(ToRendererClient) : [];
+}
+
+// --- Desktop client patches ---------------------------------------------------
+//
+// What the desktop window last received for each client, field by field: the
+// renderer-visible projection of the full list, then every patch applied on
+// top. A flush of the client push pipeline (Modules/Server/client-push) diffs
+// each changed client against this and sends the window only the fields that
+// moved, all clients in one IPC message.
+const DesktopBaselines = new Map<string, Record<string, unknown>>();
+
+function PushClientPatchesToDesktop(Batch: ClientPushBatch): void {
+  if (!hasMainWindow()) {
+    // Nothing to keep in step with; the next window starts from a full list.
+    DesktopBaselines.clear();
+    return;
+  }
+  const Patches: ClientPatch[] = [];
+  for (const Client of Batch.Clients) {
+    let Baseline = DesktopBaselines.get(Client.UUID);
+    if (!Baseline) {
+      Baseline = {};
+      DesktopBaselines.set(Client.UUID, Baseline);
+    }
+    const Patch = DiffIntoBaseline(Client.UUID, Baseline, Client, RENDERER_INTERNAL_CLIENT_FIELDS);
+    if (Patch) Patches.push(Patch);
+  }
+  if (Patches.length) PushToRenderers('ClientPatches', Patches);
+}
+
+// Push a full client list to every surface. Anything still queued is flushed
+// first, so no older patch can land on top of it, and the desktop baselines
+// restart from exactly what the window was sent.
+function PushFullClientList<T extends { UUID: string }>(
+  Clients: readonly T[],
+  Groups: unknown
+): void {
+  FlushClientPushes();
+  const List = ToRendererClientList(Clients as T[]);
+  DesktopBaselines.clear();
+  for (const Entry of List) {
+    if (Entry && typeof Entry.UUID === 'string') {
+      // A copy: later patches update the baseline in place, and the pushed
+      // entry belongs to the push.
+      DesktopBaselines.set(Entry.UUID, { ...Entry } as Record<string, unknown>);
+    }
+  }
+  PushToRenderers('SetFullClientList', List, Groups);
 }
 
 // Push the entire settings payload and group metadata to the renderer.
@@ -351,7 +409,7 @@ async function ReinitializeSystem(): Promise<void> {
   await UpdateTagList();
   await UpdateVariableList();
 
-  PushToRenderers('SetFullClientList', ToRendererClientList(Clients), Groups);
+  PushFullClientList(Clients || [], Groups);
 
   // Re-send every connected client its variables for the new show, including
   // the removal of any the old show exported to the Windows user environment.
@@ -359,9 +417,9 @@ async function ReinitializeSystem(): Promise<void> {
 }
 
 async function ClientUpdated(Client: BroadcastClient): Promise<void> {
-  if (hasMainWindow()) {
-    PushToRenderers('ClientUpdated', ToRendererClient(Client));
-  }
+  // Batched: the window, the Web UI and the SDK hear about it with the next
+  // flush (see Modules/Server/client-push), once however often it changed.
+  if (hasMainWindow()) QueueClientPush(Client as unknown as PushClient);
 
   recordClientHistorySample(Client);
   recordClientVitalsSample(Client);
@@ -419,7 +477,7 @@ async function UpdateFullClientList(): Promise<void> {
   syncClientVitalsHistory(Clients || []);
   syncClientSystemCheckHistoryStore(Clients || []);
   syncClientStorageHistoryStore(Clients || []);
-  PushToRenderers('SetFullClientList', ToRendererClientList(Clients), Groups);
+  PushFullClientList(Clients || [], Groups);
 }
 
 // Run `Fn` for a burst of triggers at most twice: once now, and once more after
@@ -736,6 +794,48 @@ async function UpdateAdoptionList(): Promise<void> {
   PushToRenderers('SetDevicesPendingAdoption', DevicesPendingAdoption);
 }
 
+// Execution updates arrive once per progress line from every running client,
+// and each carries the WHOLE execution list, so a 100-client run used to
+// re-project and re-render the list (and re-run the deployment and alert
+// reconcilers over it) for every line: quadratic. They are throttled here: the
+// first update after a quiet spell goes out at once, any that follow within
+// the interval collapse into one trailing push of the latest list.
+const SCRIPT_EXECUTION_PUSH_INTERVAL_MS = 150;
+let PendingExecutions: ScriptExecutionInfo[] | null = null;
+let ExecutionPushTimer: ReturnType<typeof setTimeout> | null = null;
+let LastExecutionPushAt = 0;
+
+function FlushScriptExecutions(): void {
+  ExecutionPushTimer = null;
+  const Executions = PendingExecutions;
+  PendingExecutions = null;
+  if (!Executions) return;
+  LastExecutionPushAt = Date.now();
+  UpdateScriptExecutions(Executions).catch((Err: unknown) =>
+    Logger.error('Script execution push failed', Err)
+  );
+}
+
+// For tests: forget any pending update and the current throttle window.
+function ResetScriptExecutionPushes(): void {
+  if (ExecutionPushTimer) clearTimeout(ExecutionPushTimer);
+  ExecutionPushTimer = null;
+  PendingExecutions = null;
+  LastExecutionPushAt = 0;
+}
+
+function OnScriptExecutionUpdated(Executions: ScriptExecutionInfo[]): void {
+  PendingExecutions = Executions;
+  if (ExecutionPushTimer) return;
+  const Wait = LastExecutionPushAt + SCRIPT_EXECUTION_PUSH_INTERVAL_MS - Date.now();
+  if (Wait <= 0) {
+    FlushScriptExecutions();
+    return;
+  }
+  ExecutionPushTimer = setTimeout(FlushScriptExecutions, Wait);
+  if (typeof ExecutionPushTimer.unref === 'function') ExecutionPushTimer.unref();
+}
+
 // Execution queue status updates (progress, completion, errors).
 async function UpdateScriptExecutions(Executions: ScriptExecutionInfo[]): Promise<void> {
   if (!hasMainWindow()) return;
@@ -959,6 +1059,7 @@ function RegisterBroadcastBridge(): void {
   BroadcastManager.on('ReadoptDevice', ReadoptDevice);
   BroadcastManager.on('ReinitializeSystem', ReinitializeSystem);
   BroadcastManager.on('ClientUpdated', ClientUpdated);
+  RegisterClientPushSink(PushClientPatchesToDesktop);
   BroadcastManager.on('ScriptsUpdated', OnScriptsUpdated);
   BroadcastManager.on('GroupListChanged', CoalescedUpdateFullClientList);
   BroadcastManager.on('ClientListChanged', CoalescedUpdateFullClientList);
@@ -969,7 +1070,7 @@ function RegisterBroadcastBridge(): void {
   BroadcastManager.on('FreeKioskTerminalListChanged', UpdateFreeKioskTerminalList);
   BroadcastManager.on('FreeKioskTerminalUpdated', FreeKioskTerminalUpdated);
   BroadcastManager.on('AdoptionListUpdated', UpdateAdoptionList);
-  BroadcastManager.on('ScriptExecutionUpdated', UpdateScriptExecutions);
+  BroadcastManager.on('ScriptExecutionUpdated', OnScriptExecutionUpdated);
   BroadcastManager.on('AlertRuleListChanged', UpdateAlertRuleList);
   BroadcastManager.on('TagListChanged', UpdateTagList);
   // Starring or unstarring a check action. The manager emits on every change;
@@ -1026,4 +1127,5 @@ export {
   UpdateFogTaskList,
   UpdateFogStatus,
   ValidateAlertAudioAssets,
+  ResetScriptExecutionPushes,
 };

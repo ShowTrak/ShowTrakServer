@@ -18,9 +18,11 @@
 // WEBUI_PASSWORD settings.
 import { EmitToSockets } from './push-fanout';
 import type { FanoutNamespace } from './push-fanout';
+import { DiffIntoBaseline, FlushClientPushes, RegisterClientPushSink } from './client-push';
+import type { ClientPatch } from './client-push';
 import crypto from 'crypto';
 import type { Server } from 'socket.io';
-import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/protocol';
+import type { ClientToServerEvents, ServerToClientEvents, ClientView } from '@showtrak/protocol';
 import { CreateLogger } from '../Logger';
 import { Config } from '../Config';
 import { Manager as BroadcastManager } from '../Broadcast';
@@ -250,6 +252,22 @@ function TransformWebPush(channel: string, args: unknown[]): unknown[] {
   }
 }
 
+// What the authed browsers last received for each client, field by field (the
+// public projection): the full list, then every patch applied on top. Shared by
+// every socket, which works because each one is handed a full list (resetting
+// this) at a moment when every other socket is exactly at it: a full-list push
+// reaches them all, and a socket's own initial state flushes the pending
+// patches first. Cleared whenever no browser is listening.
+const WebBaselines = new Map<string, Record<string, unknown>>();
+
+function ResetWebBaselines(Views: readonly ClientView[]): void {
+  WebBaselines.clear();
+  for (const View of Views) {
+    // Copies: patches update a baseline in place.
+    if (View && typeof View.UUID === 'string') WebBaselines.set(View.UUID, { ...View });
+  }
+}
+
 // Read a boolean setting, treating an unset value (null/undefined) as the
 // supplied default so the permission model matches DefaultSettings even if a key
 // has never been persisted.
@@ -353,28 +371,59 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
   }, SESSION_SWEEP_INTERVAL_MS);
   if (SweepTimer && typeof SweepTimer.unref === 'function') SweepTimer.unref();
 
-  // Renderer sink: forward allowlisted pushes to every authed web socket. One
-  // sink services the whole namespace (not per-socket) so it stays in lockstep
-  // with the desktop window sink.
-  RegisterRendererSink((channel: string, ...args: unknown[]) => {
-    if (!WEB_PUSH_ALLOWLIST.has(channel)) return;
-    if (channel === 'OSCBulkAction' && WEB_SUPPRESSED_BULK_ACTIONS.has(String(args[0]))) return;
+  const AuthedSockets = (): WebSocket[] => {
     const sockets =
       ui.sockets && typeof ui.sockets.values === 'function' ? ui.sockets.values() : [];
     const Targets: WebSocket[] = [];
     for (const socket of sockets) {
       if (socket && socket.Authed) Targets.push(socket);
     }
-    // Nobody to serve: skip projecting the payload (a client push is the whole
-    // public client, on every heartbeat).
-    if (Targets.length === 0) return;
+    return Targets;
+  };
+
+  // Renderer sink: forward allowlisted pushes to every authed web socket. One
+  // sink services the whole namespace (not per-socket) so it stays in lockstep
+  // with the desktop window sink.
+  RegisterRendererSink((channel: string, ...args: unknown[]) => {
+    if (!WEB_PUSH_ALLOWLIST.has(channel)) return;
+    if (channel === 'OSCBulkAction' && WEB_SUPPRESSED_BULK_ACTIONS.has(String(args[0]))) return;
+    const Targets = AuthedSockets();
+    // Nobody to serve: skip projecting the payload.
+    if (Targets.length === 0) {
+      if (channel === 'SetFullClientList') WebBaselines.clear();
+      return;
+    }
     let payload: unknown[];
     try {
       payload = TransformWebPush(channel, args);
     } catch {
       return;
     }
+    if (channel === 'SetFullClientList') ResetWebBaselines(payload[0] as ClientView[]);
     EmitToSockets(ui, Targets, channel, payload);
+  });
+
+  // Client changes, batched (see ./client-push): every authed browser gets one
+  // ClientPatches message per flush with only the fields that changed.
+  RegisterClientPushSink((Batch) => {
+    const Targets = AuthedSockets();
+    if (Targets.length === 0) {
+      // The next browser starts from a full list, which resets these anyway.
+      WebBaselines.clear();
+      return;
+    }
+    const Patches: ClientPatch[] = [];
+    for (let Index = 0; Index < Batch.Clients.length; Index++) {
+      const UUID = Batch.Clients[Index]!.UUID;
+      let Baseline = WebBaselines.get(UUID);
+      if (!Baseline) {
+        Baseline = {};
+        WebBaselines.set(UUID, Baseline);
+      }
+      const Patch = DiffIntoBaseline(UUID, Baseline, Batch.PublicOf(Index));
+      if (Patch) Patches.push(Patch);
+    }
+    if (Patches.length) EmitToSockets(ui, Targets, 'ClientPatches', [Patches]);
   });
 
   // Re-evaluate every live session whenever the Web UI enable/protection/passcode
@@ -459,11 +508,12 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
 
         const [cErr, clients] = await ClientManager.GetAll();
         const [gErr, groups] = await GroupManager.GetAll();
-        socket.emit(
-          'SetFullClientList',
-          cErr || !clients ? [] : clients.map(ToPublicClient),
-          gErr ? [] : (groups || []).map(ToPublicGroup)
-        );
+        // Every other browser is brought up to date first, so the shared
+        // patch baselines can restart from exactly the list this one gets.
+        FlushClientPushes();
+        const Views = cErr || !clients ? [] : clients.map(ToPublicClient);
+        ResetWebBaselines(Views);
+        socket.emit('SetFullClientList', Views, gErr ? [] : (groups || []).map(ToPublicGroup));
 
         const [mErr, monitors] = await MonitoringTargetManager.GetAll();
         socket.emit('SetFullMonitoringTargetList', mErr ? [] : monitors || []);

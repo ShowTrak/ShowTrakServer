@@ -243,6 +243,18 @@ const Manager = {} as ClientManagerType;
 let ClientList: Client[] = [];
 const ClientIndex = new Map<string, Client>();
 
+// Whether the cache is known to hold every client row. True once Init has
+// loaded the table; every later insert (Create, CreateUnassigned, Replace) goes
+// through the cache too. False before that and between ClearCache and the next
+// Init (a show switch), when a miss still falls back to the database. While it
+// holds, a miss is a definitive "not a client": a show's worth of unknown
+// machines heartbeating after a switch costs a Map lookup, not three queries.
+let CacheAuthoritative = false;
+
+function IsCacheAuthoritative(): boolean {
+  return Manager.Initialized && CacheAuthoritative;
+}
+
 function rebuildClientIndex() {
   ClientIndex.clear();
   for (const Entry of ClientList) {
@@ -732,8 +744,8 @@ const CRITICAL_INDEXES: readonly ClientSideIndex[] = [
 const CLIENT_SIDE_INDEXES: readonly ClientSideIndex[] = [...CRITICAL_INDEXES, MacAddresses];
 
 Manager.Timeout = async (UUID: string) => {
-  const Exists = await Manager.Exists(UUID);
-  if (!Exists) return;
+  // Get answers a miss itself; a separate Exists first only doubled the lookup.
+  if (!ClientIndex.has(UUID) && !(await Manager.Exists(UUID))) return;
   const [Err, TimedOutClient] = await Manager.Get(UUID);
   if (Err) return Logger.error('Failed to get client for timeout:', Err);
   if (!TimedOutClient) return Logger.warn(`Client ${UUID} not found for timeout.`);
@@ -757,7 +769,8 @@ Manager.Disconnected = async (UUID: string) => {
 Manager.Heartbeat = async (UUID: string, Data: ValidatedHeartbeat, IP: string) => {
   let CachedClient = ClientIndex.get(UUID) || null;
   if (!CachedClient) {
-    Logger.warn(`Client ${UUID} not found in memory, fetching from database.`);
+    if (IsCacheAuthoritative()) return Fail('Client Not Valid');
+    Logger.debug(`Client ${UUID} not found in memory, fetching from database.`);
     const [Err, FetchedClient] = await ClientsRepo.GetByUUID(UUID);
     if (Err) {
       Logger.error('Failed to fetch client from database:', Err);
@@ -779,8 +792,15 @@ Manager.Heartbeat = async (UUID: string, Data: ValidatedHeartbeat, IP: string) =
     Logger.log(`Client ${UUID} reconnected within its grace period`);
   }
 
-  await CachedClient.SetVersion(Data.Version || null, { markUnsaved: false });
-  await CachedClient.SetIP(IP || null, { markUnsaved: false });
+  // Both are async (they persist a change), so they are only entered when the
+  // value actually moved; on an ordinary heartbeat neither does.
+  const Version = Data.Version || null;
+  if (CachedClient.Version !== Version) {
+    await CachedClient.SetVersion(Version, { markUnsaved: false });
+  }
+  if (CachedClient.IP !== (IP || null)) {
+    await CachedClient.SetIP(IP || null, { markUnsaved: false });
+  }
   CachedClient.SetScriptsFingerprint(
     Data && Data.ScriptsFingerprint ? Data.ScriptsFingerprint : null
   );
@@ -828,9 +848,6 @@ Manager.SetIdentifying = async (UUID: string, Identifying: unknown) => {
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
   if (!Target) return Fail('Client Not Found');
-  if (addClientToCache(Target)) {
-    BroadcastManager.emit('ClientListChanged');
-  }
   Target.SetIdentifying(Identifying);
   return Ok(true);
 };
@@ -881,9 +898,6 @@ Manager.ApplyApplicationDelta = async (UUID: string, Delta: ValidatedApplication
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
   if (!Target) return Fail('Client Not Found');
-  if (addClientToCache(Target)) {
-    BroadcastManager.emit('ClientListChanged');
-  }
   Target.ApplyApplicationDelta(Delta);
   return Ok('Application delta applied successfully');
 };
@@ -892,9 +906,6 @@ Manager.SetRunningApplications = async (UUID: string, Snapshot: ValidatedRunning
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
   if (!Target) return Fail('Client Not Found');
-  if (addClientToCache(Target)) {
-    BroadcastManager.emit('ClientListChanged');
-  }
   Target.SetRunningApplications(Snapshot || {});
   return Ok('Running applications updated successfully');
 };
@@ -1101,9 +1112,6 @@ Manager.SetDisplayList = async (UUID: string, DisplayList: ValidatedDisplay[]) =
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
   if (!Target) return Fail('Client Not Found');
-  if (addClientToCache(Target)) {
-    BroadcastManager.emit('ClientListChanged');
-  }
   Target.SetDisplayList(DisplayList);
   return Ok('Display List updated successfully');
 };
@@ -1967,6 +1975,7 @@ Manager.Exists = async (UUID: string) => {
   // Check in memory first
   const CachedClient = ClientIndex.get(UUID);
   if (CachedClient) return true;
+  if (IsCacheAuthoritative()) return false;
   // If not found in memory, check in database
   const [Err, Client] = await ClientsRepo.GetByUUID(UUID);
   if (Err) return false;
@@ -1985,6 +1994,7 @@ Manager.Get = async (UUID: string) => {
   if (CachedClient) {
     return Ok(CachedClient);
   }
+  if (IsCacheAuthoritative()) return Fail('Client Not Found');
   // If not found in memory, hydrate from the database and adopt the instance
   // into the cache so callers mutate the resident copy, not a detached orphan.
   const [Err, Row] = await ClientsRepo.GetByUUID(UUID);
@@ -2028,12 +2038,16 @@ Manager.Init = async () => {
   const [Err, Clients] = await ClientsRepo.GetAll();
   if (Err || !Clients) {
     Manager.Initialized = true;
+    // The read failed, so the empty cache proves nothing: misses keep asking
+    // the database.
+    CacheAuthoritative = false;
     ClientList = [];
     rebuildClientIndex();
     return;
   }
   ClientList = Clients.map((row) => applyCriticalState(new Client(row))); // Update in-memory list
   rebuildClientIndex();
+  CacheAuthoritative = true;
   BroadcastManager.emit('ClientListChanged');
   Manager.Initialized = true;
   return;
@@ -2185,6 +2199,7 @@ Manager.ClearCache = async () => {
   ClientList = [];
   rebuildClientIndex();
   for (const Index of CLIENT_SIDE_INDEXES) Index.clear();
+  CacheAuthoritative = false;
   Manager.Initialized = false;
   return;
 };

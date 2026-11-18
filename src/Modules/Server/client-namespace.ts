@@ -406,6 +406,10 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
     };
     let ListedFromHeartbeat = false;
     let LastHeartbeatVersion: string | null = null;
+    // The version the pending entry was last refreshed with. An unknown client
+    // heartbeats every second; once it is listed, only a new version (or a
+    // SystemInfo report, handled there) is anything to refresh.
+    let ListedVersion: string | null = null;
 
     const ListUnknownClient = () =>
       AdoptionManager.AddClientPendingAdoption(socket.UUID, socket.IP, {
@@ -436,11 +440,18 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
           return;
         }
         if (!ListedFromHeartbeat) {
+          // Once per connection: the client keeps heartbeating every second.
           ListedFromHeartbeat = true;
           Logger.warn(
             `Heartbeat from unknown client ${socket.UUID}; listing it as pending adoption`
           );
+        } else if (
+          ListedVersion === LastHeartbeatVersion &&
+          AdoptionManager.IsPendingAdoption(socket.UUID)
+        ) {
+          return;
         }
+        ListedVersion = LastHeartbeatVersion;
         await ListUnknownClient();
       }
     );
@@ -459,7 +470,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       'USBDeviceList',
       (DeviceList) => [SocketValidation.USBDeviceList(DeviceList)],
       async (DeviceList: ReturnType<typeof SocketValidation.USBDeviceList>) => {
-        Logger.log(
+        Logger.debug(
           `USB Device list received from ${socket.UUID} (${DeviceList.length} ${
             DeviceList.length === 1 ? 'Device' : 'Devices'
           })`
@@ -503,7 +514,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       'DisplayList',
       (DisplayList) => [SocketValidation.DisplayList(DisplayList)],
       async (DisplayList: ReturnType<typeof SocketValidation.DisplayList>) => {
-        Logger.log(
+        Logger.debug(
           `Display list received from ${socket.UUID} (${DisplayList.length} ${
             DisplayList.length === 1 ? 'Display' : 'Displays'
           })`
@@ -519,7 +530,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       'NetworkInterfaces',
       (Interfaces) => [SocketValidation.NetworkInterfaces(Interfaces)],
       async (Interfaces: ReturnType<typeof SocketValidation.NetworkInterfaces>) => {
-        Logger.log(
+        Logger.debug(
           `Network interfaces received from ${socket.UUID} (${Interfaces.length} interfaces)`
         );
         await ClientManager.SetNetworkInterfaces(socket.UUID, Interfaces);
@@ -533,7 +544,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       'RunningApplications',
       (Snapshot) => [SocketValidation.RunningApplications(Snapshot)],
       async (Snapshot) => {
-        Logger.log(
+        Logger.debug(
           `Running applications received from ${socket.UUID} (${Snapshot.Items.length} items)`
         );
         await ClientManager.SetRunningApplications(socket.UUID, Snapshot);
@@ -641,7 +652,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       'DisplayDelta',
       (Delta) => [SocketValidation.DisplayDelta(Delta)],
       async (Delta: ReturnType<typeof SocketValidation.DisplayDelta>) => {
-        Logger.log(
+        Logger.debug(
           `Display delta from ${socket.UUID} (+${Delta.Added.length} -${Delta.Removed.length} ~${Delta.Changed.length})`
         );
         await ClientManager.ApplyDisplayDelta(socket.UUID, Delta);

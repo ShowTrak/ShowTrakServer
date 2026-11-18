@@ -201,7 +201,13 @@ export interface ClientAuditState {
   // Kept across a disconnect, so a device unplugged while the machine was down
   // is reported once it reconnects and reports again.
   Domains: Partial<Record<ClientDomain, ItemMap>>;
+  // The list each domain was last judged from. The client rebuilds a view into
+  // a new list whenever it changes and keeps the same one when it does not, so
+  // the same list again (a heartbeat) has nothing new to say and is skipped.
+  Sources?: Partial<Record<ClientDomain, unknown>>;
   Alarms: Map<string, string>;
+  // Likewise the ResourceAlarms list the alarms were last judged from.
+  AlarmSource?: unknown;
 }
 
 type Row = Record<string, unknown>;
@@ -435,38 +441,71 @@ export function ClientDisplayName(Client: {
 }
 
 export function NewClientAuditState(): ClientAuditState {
-  return { Online: false, EverOnline: false, Degraded: false, Domains: {}, Alarms: new Map() };
+  return {
+    Online: false,
+    EverOnline: false,
+    Degraded: false,
+    Domains: {},
+    Sources: {},
+    Alarms: new Map(),
+  };
+}
+
+function SameKeys(A: ReadonlyMap<string, unknown>, B: ReadonlyMap<string, unknown>): boolean {
+  if (A.size !== B.size) return false;
+  for (const Key of A.keys()) if (!B.has(Key)) return false;
+  return true;
 }
 
 export function DiffClientStatus(
   Previous: ClientAuditState | undefined,
   Client: ClientStatusLike
 ): { State: ClientAuditState; Entries: Entry[] } {
-  const State: ClientAuditState = Previous
-    ? { ...Previous, Domains: { ...Previous.Domains }, Alarms: new Map(Previous.Alarms) }
-    : NewClientAuditState();
+  // Copy-on-write: this runs for every client update (every heartbeat), and
+  // almost all of them change nothing, so the previous state is handed back
+  // as it is unless something actually moves. It is never mutated.
+  let State: ClientAuditState = Previous || NewClientAuditState();
+  let Owned = !Previous;
+  const Edit = (): ClientAuditState => {
+    if (!Owned) {
+      State = { ...State, Domains: { ...State.Domains }, Sources: { ...(State.Sources || {}) } };
+      Owned = true;
+    }
+    return State;
+  };
   const Entries: Entry[] = [];
   const UUID = Text(Client.UUID);
   if (!UUID || Client.Unassigned) return { State, Entries };
-  const Name = ClientDisplayName(Client);
-  const Base = { EntityType: 'client' as const, EntityID: UUID, EntityName: Name };
+  let BaseCache: { EntityType: 'client'; EntityID: string; EntityName: string } | null = null;
+  const GetBase = () =>
+    (BaseCache ??= {
+      EntityType: 'client' as const,
+      EntityID: UUID,
+      EntityName: ClientDisplayName(Client),
+    });
   const Say = (Severity: Entry['Severity'], Parts: SummaryPart[], Details: string[] = []) =>
-    Entries.push({ ...Base, Category: 'status', Severity, Summary: Line(...Parts), Details });
+    Entries.push({ ...GetBase(), Category: 'status', Severity, Summary: Line(...Parts), Details });
+  const NameEntity = () => Entity(GetBase().EntityName);
 
   const Online = !!Client.Online;
   if (!Online) {
-    if (State.Online) Say('warning', [Entity(Name), ' Disconnected']);
+    if (State.Online) Say('warning', [NameEntity(), ' Disconnected']);
     // A disconnect stands every alarm down (the client re-proves them once it
     // is back) and ends any degraded state, so neither is "recovered" later.
-    State.Online = false;
-    State.Degraded = false;
-    State.Alarms = new Map();
+    if (State.Online || State.Degraded || State.Alarms.size || 'AlarmSource' in State) {
+      const Next = Edit();
+      Next.Online = false;
+      Next.Degraded = false;
+      Next.Alarms = new Map();
+      delete Next.AlarmSource;
+    }
     return { State, Entries };
   }
   if (!State.Online) {
-    Say('success', [Entity(Name), State.EverOnline ? ' Reconnected' : ' Connected']);
-    State.Online = true;
-    State.EverOnline = true;
+    Say('success', [NameEntity(), State.EverOnline ? ' Reconnected' : ' Connected']);
+    const Next = Edit();
+    Next.Online = true;
+    Next.EverOnline = true;
   }
 
   // Inside the start-up window the client holds what it infers as faults, and
@@ -474,29 +513,39 @@ export function DiffClientStatus(
   // happens once the window publishes its verdict.
   if (Client.Initialising) return { State, Entries };
 
-  const Domains: Array<[ClientDomain, boolean, () => ItemMap, DomainWords]> = [
-    ['usb', !!Client.HasUSBTelemetry, () => USBItems(Client.USBDeviceList), USB_WORDS],
+  const Domains: Array<[ClientDomain, boolean, unknown, () => ItemMap, DomainWords]> = [
+    [
+      'usb',
+      !!Client.HasUSBTelemetry,
+      Client.USBDeviceList,
+      () => USBItems(Client.USBDeviceList),
+      USB_WORDS,
+    ],
     [
       'display',
       !!Client.HasDisplayTelemetry,
+      Client.DisplayList,
       () => DisplayItems(Client.DisplayList),
       DISPLAY_WORDS,
     ],
     [
       'audio',
       !!Client.HasAudioTelemetry,
+      Client.AudioDevices && Client.AudioDevices.Endpoints,
       () => AudioItems(Client.AudioDevices && Client.AudioDevices.Endpoints),
       AUDIO_WORDS,
     ],
     [
       'network',
       !!Client.HasNetworkTelemetry,
+      Client.NetworkStatus && Client.NetworkStatus.Interfaces,
       () => NetworkItems(Client.NetworkStatus && Client.NetworkStatus.Interfaces),
       NETWORK_WORDS,
     ],
     [
       'storage',
       !!Client.HasStorageTelemetry,
+      Client.StorageStatus && Client.StorageStatus.Volumes,
       () => StorageItems(Client.StorageStatus && Client.StorageStatus.Volumes),
       STORAGE_WORDS,
     ],
@@ -504,47 +553,58 @@ export function DiffClientStatus(
       'apps',
       !!Client.HasApplicationTelemetry &&
         Text(Client.RunningApplications?.Status?.State).toLowerCase() === 'ok',
+      Client.RunningApplications?.Items,
       () => ItemsOrEmpty(() => ApplicationItems(Client.RunningApplications?.Items)),
       APPLICATION_WORDS,
     ],
   ];
-  for (const [Domain, Trusted, Read, Words] of Domains) {
+  for (const [Domain, Trusted, Source, Read, Words] of Domains) {
     // Until the domain is reported on this connection its list says nothing.
     if (!Trusted) continue;
+    // Judged from this very list already: nothing can have changed.
+    if (State.Domains[Domain] && State.Sources && State.Sources[Domain] === Source) continue;
     const Next = Read();
-    Entries.push(...DiffItems(State.Domains[Domain] || null, Next, Words, Base));
-    State.Domains[Domain] = Next;
+    Entries.push(...DiffItems(State.Domains[Domain] || null, Next, Words, GetBase()));
+    const Edited = Edit();
+    Edited.Domains[Domain] = Next;
+    Edited.Sources![Domain] = Source;
   }
 
-  const Alarms = AlarmMap(Client.ResourceAlarms);
-  for (const [Key, Alarm] of Alarms) {
-    if (State.Alarms.has(Key)) continue;
-    const Label = SYSTEM_CHECK_WARNINGS[Key as keyof typeof SYSTEM_CHECK_WARNINGS] || Key;
-    const Reading = FormatReading(Key, Alarm.Value);
-    const Limit = FormatReading(Key, Alarm.Threshold);
-    Say(
-      'warning',
-      [Device(Label)],
-      [Reading && Limit ? `${Reading} (limit ${Limit})` : Reading || ''].filter(Boolean)
-    );
+  if (!('AlarmSource' in State) || Client.ResourceAlarms !== State.AlarmSource) {
+    const Alarms = AlarmMap(Client.ResourceAlarms);
+    for (const [Key, Alarm] of Alarms) {
+      if (State.Alarms.has(Key)) continue;
+      const Label = SYSTEM_CHECK_WARNINGS[Key as keyof typeof SYSTEM_CHECK_WARNINGS] || Key;
+      const Reading = FormatReading(Key, Alarm.Value);
+      const Limit = FormatReading(Key, Alarm.Threshold);
+      Say(
+        'warning',
+        [Device(Label)],
+        [Reading && Limit ? `${Reading} (limit ${Limit})` : Reading || ''].filter(Boolean)
+      );
+    }
+    for (const [Key, Label] of State.Alarms) {
+      if (!Alarms.has(Key)) Say('success', [Device(Label), ' cleared']);
+    }
+    const Edited = Edit();
+    if (!SameKeys(Alarms, State.Alarms)) {
+      Edited.Alarms = new Map(
+        [...Alarms.keys()].map((Key) => [
+          Key,
+          SYSTEM_CHECK_WARNINGS[Key as keyof typeof SYSTEM_CHECK_WARNINGS] || Key,
+        ])
+      );
+    }
+    Edited.AlarmSource = Client.ResourceAlarms;
   }
-  for (const [Key, Label] of State.Alarms) {
-    if (!Alarms.has(Key)) Say('success', [Device(Label), ' cleared']);
-  }
-  State.Alarms = new Map(
-    [...Alarms.keys()].map((Key) => [
-      Key,
-      SYSTEM_CHECK_WARNINGS[Key as keyof typeof SYSTEM_CHECK_WARNINGS] || Key,
-    ])
-  );
 
   const Degraded = !!Client.Degraded;
   if (Degraded && !State.Degraded) {
-    Say('warning', [Entity(Name), ' Degraded'], Unique(StringList(Client.DegradedWarnings)));
+    Say('warning', [NameEntity(), ' Degraded'], Unique(StringList(Client.DegradedWarnings)));
   } else if (!Degraded && State.Degraded) {
-    Say('success', [Entity(Name), ' Recovered']);
+    Say('success', [NameEntity(), ' Recovered']);
   }
-  State.Degraded = Degraded;
+  if (State.Degraded !== Degraded) Edit().Degraded = Degraded;
   return { State, Entries };
 }
 

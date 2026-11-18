@@ -424,3 +424,22 @@ test('monitors log each check and their own overall state', () => {
     ]
   );
 });
+
+test('a heartbeat with the same lists hands the state back untouched and judges nothing', () => {
+  // The client keeps a view's list when nothing in it changed.
+  const Snapshot = client({ USBDeviceList: [MOUSE] });
+  const First = DiffClientStatus(undefined, Snapshot);
+  const Second = DiffClientStatus(First.State, { ...Snapshot });
+  assert.equal(Second.State, First.State, 'nothing moved, so no copy is made');
+  assert.deepEqual(Second.Entries, []);
+
+  // It rebuilds a view into a NEW list when it changes; that is judged.
+  const Third = DiffClientStatus(Second.State, {
+    ...Snapshot,
+    USBDeviceList: [{ ...MOUSE, IsConnected: false }],
+  });
+  assert.notEqual(Third.State, Second.State);
+  assert.deepEqual(Texts(Third.Entries), ['Logitech Mouse Disconnected']);
+  // The earlier state is never mutated.
+  assert.equal(First.State.Domains.usb.get('serial:ABC123').Connected, true);
+});

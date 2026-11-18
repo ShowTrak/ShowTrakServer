@@ -311,27 +311,37 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-md);
 }
-/* The per-client progress bar IS the row background. Width tracks the reported
-   stage (--exec-progress); colour is driven by the state-* class. */
+/* The per-client progress bar IS the row background. It spans the row and is
+   scaled to the reported stage (--exec-progress-scale, 0..1); colour is driven
+   by the state-* class. Scale and the shimmer's slide are both transforms, so
+   neither relayouts or repaints the row on every frame. */
 .exec-fill {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: var(--exec-progress, 0%);
+  inset: 0;
+  overflow: hidden;
   pointer-events: none;
-  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: left center;
+  transform: scaleX(var(--exec-progress-scale, 0));
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
   background: rgba(90, 140, 235, 0.28);
 }
 .exec-item.state-pending .exec-fill {
   background: rgba(150, 160, 190, 0.22);
 }
 .exec-item.state-running .exec-fill {
+  background: rgba(90, 140, 235, 0.32);
+}
+.exec-item.state-running .exec-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
   background: linear-gradient(
     90deg,
-    rgba(90, 140, 235, 0.32),
-    rgba(120, 165, 245, 0.42),
-    rgba(90, 140, 235, 0.32)
+    rgba(120, 165, 245, 0),
+    rgba(120, 165, 245, 0.32),
+    rgba(120, 165, 245, 0)
   );
-  background-size: 200% 100%;
+  transform: translateX(-100%);
   animation: exec-fill-shimmer 1.3s linear infinite;
 }
 .exec-item.state-completed .exec-fill {
@@ -342,10 +352,15 @@
 }
 @keyframes exec-fill-shimmer {
   from {
-    background-position: 200% 0;
+    transform: translateX(-100%);
   }
   to {
-    background-position: 0 0;
+    transform: translateX(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .exec-item.state-running .exec-fill::after {
+    animation: none;
   }
 }
 .exec-row {

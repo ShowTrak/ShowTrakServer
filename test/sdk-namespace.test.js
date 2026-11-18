@@ -423,6 +423,32 @@ test('SetFullClientList is projected through the public serializers', () => {
   assert.equal(Groups[0].GroupID, 1);
 });
 
+test('client changes reach the SDK as the same ClientUpdated, once per flush with the latest state', () => {
+  const { NS } = boot();
+  // The instance the namespace just loaded (loadWithMocks reloads its siblings).
+  const ClientPush = require('../dist/Modules/Server/client-push');
+  const Socket = fakeSocket();
+  NS.socketSet.add(Socket);
+
+  const Client = { UUID: 'client-1', Nickname: 'PC', Online: true, Vitals: null };
+  ClientPush.QueueClientPush(Client);
+  Client.Online = false;
+  ClientPush.QueueClientPush(Client);
+  assert.equal(Socket.emitted.length, 0, 'batched until the flush');
+  ClientPush.FlushClientPushes();
+
+  assert.equal(Socket.emitted.length, 1, 'a burst collapses into one event');
+  const [Event, View, Extra] = Socket.emitted[0];
+  assert.equal(Event, 'ClientUpdated');
+  assert.equal(Extra, undefined);
+  // The full public client, exactly as the SDK has always received it.
+  assert.equal(View.Type, 'client');
+  assert.equal(View.UUID, 'client-1');
+  assert.equal(View.Online, false, 'the latest state is the one delivered');
+  assert.ok(Array.isArray(View.USBDeviceList));
+  assert.ok(View.AudioDevices && Array.isArray(View.AudioDevices.Endpoints));
+});
+
 test('a missing client or group argument becomes an empty array, not undefined', () => {
   // An integration iterating the payload would throw on undefined; the SDK's
   // own client code assumes both slots are always arrays.

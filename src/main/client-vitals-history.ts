@@ -37,6 +37,10 @@ interface Entry {
   Ram: FreeKioskMetricSample[];
   Pending: Accumulator | null;
   Online: boolean;
+  // The Vitals object last folded in. Every ClientUpdated arrives here (a
+  // telemetry report, an identify toggle), but a reading only changes with a
+  // heartbeat, which replaces the object; the same one again is a repeat.
+  LastVitals: unknown;
 }
 
 /** Loose shape of the client this store reads. */
@@ -103,14 +107,16 @@ export function recordClientVitalsSample(Client: ClientLike | null | undefined, 
     return;
   }
 
+  if (Item && Item.Online && Item.LastVitals === Client.Vitals) return;
   const Cpu = PercentReading(Client.Vitals?.CPU?.UsagePercentage);
   const Ram = PercentReading(Client.Vitals?.Ram?.UsagePercentage);
   if (Cpu === null && Ram === null) return;
   if (!Item) {
-    Item = { Cpu: [], Ram: [], Pending: null, Online: true };
+    Item = { Cpu: [], Ram: [], Pending: null, Online: true, LastVitals: null };
     Store.set(UUID, Item);
   }
   Item.Online = true;
+  Item.LastVitals = Client.Vitals;
 
   const Acc = (Item.Pending ??= {
     Start: Now,

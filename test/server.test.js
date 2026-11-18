@@ -1155,6 +1155,74 @@ test('Web UI namespace forwards allowlisted pushes with serialization, dropping 
   assert.equal(socket.emitted.length, 0);
 });
 
+test('Web UI browsers get batched client patches holding only what changed', async () => {
+  const sinks = [];
+  const { SetupWebUiNamespace } = loadWebUi(
+    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false },
+    { sinks }
+  );
+  // The instance the namespace just loaded (loadWithMocks reloads its siblings).
+  const ClientPush = require('../dist/Modules/Server/client-push');
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+  const socket = await connectUiSocket(io);
+  const List = socket.emitted.find((e) => e.event === 'SetFullClientList');
+  assert.equal(List.args[0][0].UUID, 'u1');
+
+  // The browser holds { UUID: 'u1', Nickname: 'PC' } from its initial list.
+  socket.emitted.length = 0;
+  const Client = { UUID: 'u1', Nickname: 'PC', Online: true };
+  ClientPush.QueueClientPush(Client);
+  ClientPush.FlushClientPushes();
+  const Patches = socket.emitted.filter((e) => e.event === 'ClientPatches');
+  assert.equal(Patches.length, 1);
+  assert.deepEqual(Patches[0].args[0], [{ UUID: 'u1', Online: true }]);
+  assert.equal(
+    socket.emitted.some((e) => e.event === 'ClientUpdated'),
+    false,
+    'the browser no longer gets whole clients per change'
+  );
+
+  // Nothing new: nothing sent.
+  socket.emitted.length = 0;
+  ClientPush.QueueClientPush(Client);
+  ClientPush.FlushClientPushes();
+  assert.equal(socket.emitted.length, 0);
+
+  // A full list (a structural change) resets what every browser holds.
+  sinks[0]('SetFullClientList', [{ UUID: 'u1', Nickname: 'Renamed', Online: true }], []);
+  socket.emitted.length = 0;
+  ClientPush.QueueClientPush({ UUID: 'u1', Nickname: 'Renamed', Online: true });
+  ClientPush.FlushClientPushes();
+  assert.equal(socket.emitted.length, 0, 'the list already said all of it');
+});
+
+test('a browser joining later is brought up from a full list, after the others are flushed', async () => {
+  const sinks = [];
+  const { SetupWebUiNamespace } = loadWebUi(
+    { WEBUI_ENABLED: true, WEBUI_PASSWORD_PROTECTION_ENABLED: false },
+    { sinks }
+  );
+  const ClientPush = require('../dist/Modules/Server/client-push');
+  const io = makeUiIo();
+  SetupWebUiNamespace(io, {});
+  const First = await connectUiSocket(io);
+  First.emitted.length = 0;
+  ClientPush.QueueClientPush({ UUID: 'u1', Nickname: 'PC', Online: true });
+
+  const Second = makeSocket({ auth: {}, query: {}, address: '127.0.0.2' });
+  Second.id = 'sock-2';
+  io._ns.sockets.set(Second.id, Second);
+  await new Promise((resolve) => io._ns.middlewares[0](Second, resolve));
+  await io._ns._connection(Second);
+
+  // The pending change reached the first browser before the second got its list.
+  const FirstPatches = First.emitted.filter((e) => e.event === 'ClientPatches');
+  assert.equal(FirstPatches.length, 1);
+  assert.deepEqual(FirstPatches[0].args[0], [{ UUID: 'u1', Online: true }]);
+  assert.ok(Second.emitted.some((e) => e.event === 'SetFullClientList'));
+});
+
 // The settings push carries the Web UI passcode, the SDK key and the FOG tokens,
 // so it reaches the browser only through the public-settings filter, and must
 // still reach it, or the browser lays groups out on its default column count

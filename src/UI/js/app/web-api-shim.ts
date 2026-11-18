@@ -20,8 +20,10 @@ import type {
   LogConsoleSnapshot,
   MonitorLiveLevelsSnapshot,
   MonitorTileLevelsSnapshot,
-  ShowTrakAPI,
 } from '@showtrak/protocol';
+
+// The surface `window.API` has (see src/UI/types/global.d.ts).
+type RendererAPI = Window['API'];
 
 type Ack = { result?: unknown; error?: string };
 
@@ -78,7 +80,7 @@ function makeSub(socket: WebUiSocket) {
 }
 
 // Create the `window.API` implementation for the web surface.
-function createWebApi(socket: WebUiSocket): ShowTrakAPI {
+function createWebApi(socket: WebUiSocket): RendererAPI {
   const rpc = makeRpc(socket);
   const sub = makeSub(socket);
 
@@ -177,16 +179,23 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
 
     // ---- Clients ----------------------------------------------------------
     GetClient: async (UUID) => rpc('GetClient', UUID),
-    GetClientHistory: async (UUID) => rpc('GetClientHistory', UUID),
+    GetClientHistory: async (UUID, WindowMs?: number) => rpc('GetClientHistory', UUID, WindowMs),
     GetStatusHistoryOverview: async () => rpc('GetStatusHistoryOverview'),
-    GetClientApplicationHistory: async (UUID) => rpc('GetClientApplicationHistory', UUID),
-    GetClientUSBHistory: async (UUID) => rpc('GetClientUSBHistory', UUID),
-    GetClientDisplayHistory: async (UUID) => rpc('GetClientDisplayHistory', UUID),
-    GetClientAudioHistory: async (UUID) => rpc('GetClientAudioHistory', UUID),
-    GetClientNetworkHistory: async (UUID) => rpc('GetClientNetworkHistory', UUID),
-    GetClientStorageHistory: async (UUID) => rpc('GetClientStorageHistory', UUID),
+    GetClientApplicationHistory: async (UUID, WindowMs?: number) =>
+      rpc('GetClientApplicationHistory', UUID, WindowMs),
+    GetClientUSBHistory: async (UUID, WindowMs?: number) =>
+      rpc('GetClientUSBHistory', UUID, WindowMs),
+    GetClientDisplayHistory: async (UUID, WindowMs?: number) =>
+      rpc('GetClientDisplayHistory', UUID, WindowMs),
+    GetClientAudioHistory: async (UUID, WindowMs?: number) =>
+      rpc('GetClientAudioHistory', UUID, WindowMs),
+    GetClientNetworkHistory: async (UUID, WindowMs?: number) =>
+      rpc('GetClientNetworkHistory', UUID, WindowMs),
+    GetClientStorageHistory: async (UUID, WindowMs?: number) =>
+      rpc('GetClientStorageHistory', UUID, WindowMs),
     GetClientVitalsHistory: async (UUID) => rpc('GetClientVitalsHistory', UUID),
-    GetClientSystemCheckHistory: async (UUID) => rpc('GetClientSystemCheckHistory', UUID),
+    GetClientSystemCheckHistory: async (UUID, WindowMs?: number) =>
+      rpc('GetClientSystemCheckHistory', UUID, WindowMs),
     UpdateClient: async (UUID, Data) => rpc('UpdateClient', UUID, Data),
     MarkClientUSBDeviceCritical: async (UUID, Device) =>
       rpc('MarkClientUSBDeviceCritical', UUID, Device),
@@ -309,6 +318,7 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     SetFullClientList: (cb) => sub('SetFullClientList', cb),
     SetScriptList: (cb) => sub('SetScriptList', cb),
     ClientUpdated: (cb) => sub('ClientUpdated', cb),
+    ClientPatches: (cb) => sub('ClientPatches', cb),
     UpdateScriptExecutions: (cb) => sub('UpdateScriptExecutions', cb),
     ShutdownRequested: noSub,
     USBDeviceAdded: (cb) => sub('USBDeviceAdded', cb),
@@ -346,7 +356,8 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     GetMonitoringMethods: async () => rpc('GetMonitoringMethods'),
     GetAllMonitoringTargets: async () => rpc('GetAllMonitoringTargets'),
     GetMonitoringTarget: async (TargetID) => rpc('GetMonitoringTarget', TargetID),
-    GetMonitoringCheckHistory: async (CheckID) => rpc('GetMonitoringCheckHistory', CheckID),
+    GetMonitoringCheckHistory: async (CheckID, WindowMs?: number) =>
+      rpc('GetMonitoringCheckHistory', CheckID, WindowMs),
     GetMonitoringCheckDebug: async (CheckID) => rpc('GetMonitoringCheckDebug', CheckID),
     RunMonitoringCheckNow: async (CheckID) => rpc('RunMonitoringCheckNow', CheckID),
     RunAllMonitoringChecksNow: async (TargetID) => rpc('RunAllMonitoringChecksNow', TargetID),
@@ -368,7 +379,8 @@ function createWebApi(socket: WebUiSocket): ShowTrakAPI {
     // ---- Dummy clients ----------------------------------------------------
     GetAllDummyClients: async () => rpc('GetAllDummyClients'),
     GetDummyClient: async (UUID) => rpc('GetDummyClient', UUID),
-    GetDummyClientHistory: async (UUID) => rpc('GetDummyClientHistory', UUID),
+    GetDummyClientHistory: async (UUID, WindowMs?: number) =>
+      rpc('GetDummyClientHistory', UUID, WindowMs),
     GenerateDummyClientDefaults: async () => rpc('GenerateDummyClientDefaults'),
     CreateDummyClient: async (Payload) => rpc('CreateDummyClient', Payload),
     UpdateDummyClient: async (UUID, Payload) => rpc('UpdateDummyClient', UUID, Payload),

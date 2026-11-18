@@ -269,6 +269,8 @@ const SUBSCRIBE_CHANNELS = [
   'SetFullClientList',
   'SetScriptList',
   'ClientUpdated',
+  // Batched field-level client changes; server-internal (desktop + Web UI).
+  'ClientPatches',
   'UpdateScriptExecutions',
   'ShutdownRequested',
   'USBDeviceAdded',
