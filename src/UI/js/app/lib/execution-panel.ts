@@ -79,3 +79,39 @@ export function GetCompletedSectionLabel(Completed: number, Total: number): stri
   const All = Math.max(Done, Math.floor(Total));
   return Done === All ? `All ${All} completed` : `${Done} of ${All} completed`;
 }
+
+/**
+ * Name prefix of integrated-device event executions. Mirrors the server's
+ * INTEGRATED_EVENT_PREFIX (src/Modules/ScriptExecutionManager/retry.ts); a test
+ * keeps the two equal.
+ */
+export const INTEGRATED_EVENT_PREFIX = 'Integrated Event: ';
+
+/** The subset of an execution the retry rule reads. */
+type RetryLike = Pick<ScriptExecutionView, 'Status' | 'Internal'> & {
+  Script?: { ID?: string | null; Name?: string | null } | null;
+};
+
+/**
+ * Whether the panel offers Retry on this execution. Mirrors the server's rule
+ * (which stays the authority): a failed script that still exists in the
+ * catalog, or a failed integrated-device event. Deployments, Wake on LAN and
+ * bulk actions (shutdown, restart, update ...) are never offered.
+ */
+export function IsRetryableExecution(
+  Request: RetryLike | null | undefined,
+  KnownScriptIDs: ReadonlySet<string>
+): boolean {
+  if (!Request || Request.Status !== 'Failed' || !Request.Script) return false;
+  if (!Request.Internal) {
+    const ID = typeof Request.Script.ID === 'string' ? Request.Script.ID : '';
+    return !!ID && KnownScriptIDs.has(ID);
+  }
+  const Name = typeof Request.Script.Name === 'string' ? Request.Script.Name : '';
+  return Name.startsWith(INTEGRATED_EVENT_PREFIX) && Name.length > INTEGRATED_EVENT_PREFIX.length;
+}
+
+/** The label of the "retry every failure" button, e.g. "Retry 3 failed". */
+export function GetRetryAllLabel(Count: number): string {
+  return `Retry ${Count} failed`;
+}

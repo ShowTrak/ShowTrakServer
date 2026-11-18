@@ -22,6 +22,7 @@ const { execFile } = require('child_process');
 import { Manager as ServerManager } from '../../Modules/Server';
 import { Manager as ScriptManager } from '../../Modules/ScriptManager';
 import { Manager as ScriptExecutionManager } from '../../Modules/ScriptExecutionManager';
+import { PlanRetries } from '../../Modules/ScriptExecutionManager/retry';
 import { Manager as ScriptWhitelistManager } from '../../Modules/ScriptWhitelistManager';
 import { Manager as SampleScriptsManager } from '../../Modules/SampleScripts';
 import { Manager as SettingsManager } from '../../Modules/SettingsManager';
@@ -173,6 +174,61 @@ function register(): void {
       return [null, true];
     }
   );
+
+  // Retry failed executions from the execution panel. Each retryable failure
+  // (see ScriptExecutionManager/retry) has its row dropped and its action
+  // re-dispatched through the normal path, so the retry takes the failure's
+  // place in the panel and the whitelist, per-client queue and audit log apply
+  // exactly as on the first run. Rows that cannot be retried (or whose script
+  // has since been deleted) are left as they are.
+  RPC.handle('Scripts:RetryExecutions', async (_Event: unknown, RequestIDs: unknown) => {
+    let ValidIDs: string[];
+    try {
+      ValidIDs = IPCValidation.UUIDList(RequestIDs, 'RequestIDs');
+    } catch (error) {
+      return validationErrorTuple(error);
+    }
+    const Executions = await Promise.all(
+      ValidIDs.map((RequestID) => ScriptExecutionManager.GetExecution(RequestID))
+    );
+    const Groups = [];
+    for (const Group of PlanRetries(Executions)) {
+      if (Group.Kind === 'script' && !(await ScriptManager.Get(Group.ID))) continue;
+      Groups.push(Group);
+    }
+    await ScriptExecutionManager.RemoveSettled(Groups.flatMap((Group) => Group.RequestIDs));
+    let Retried = 0;
+    for (const Group of Groups) {
+      Retried += Group.Targets.length;
+      if (Group.Kind === 'script') {
+        const Dispatch = await ServerManager.ExecuteScripts(Group.ID, Group.Targets, false);
+        const ScriptName = await AuditBefore(
+          async () => (await ScriptManager.Get(Group.ID))?.Name || Group.ID
+        );
+        await RecordDispatch(
+          Group.Targets,
+          Dispatch,
+          () => Line('Retried script ', Value(ScriptName || Group.ID)),
+          Group.ID
+        );
+      } else {
+        const Dispatch = await ServerManager.TriggerIntegratedEvent(Group.ID, Group.Targets);
+        await RecordDispatch(
+          Group.Targets,
+          Dispatch,
+          (Client) => {
+            const Action = (
+              Array.isArray(Client.IntegratedActions) ? Client.IntegratedActions : []
+            ).find((Entry: { ID?: unknown }) => Entry && Entry.ID === Group.ID) as
+              { Label?: string } | undefined;
+            return Line('Retried ', Value((Action && Action.Label) || Group.ID));
+          },
+          null
+        );
+      }
+    }
+    return [null, { Retried }];
+  });
 
   // Wipe the finished rows from the execution panel. Fired by the renderer when
   // the panel auto-dismisses, so the next batch renders into an empty list

@@ -9,6 +9,7 @@ import {
   GroupUUIDCache,
   MonitoringTargets,
   PendingAdoption,
+  ScriptList,
   Selected,
   Settings,
   Tags,
@@ -48,6 +49,8 @@ import {
   GetExecutionVisualState,
   GetReportedProgress,
   AllExecutionsSettled,
+  GetRetryAllLabel,
+  IsRetryableExecution,
   ShouldAutoDismissExecutions,
 } from './lib/execution-panel';
 import { HandleNonFatalError, Safe } from './utils';
@@ -59,6 +62,7 @@ import { UPDATE_EXECUTION_SCRIPT_NAME } from './update-manager';
 import {
   ConfirmationDialog,
   HideExecutionToast,
+  Notify,
   OnExecutionToastDismissed,
   RenderClientInfoDetails,
   SetExecutionsInProgress,
@@ -210,6 +214,25 @@ const COMPLETED_SECTION_KEY = '__completed__';
 // The executions the panel last showed (script runs, not deployments), read
 // when the operator dismisses it.
 let LastPanelExecutions: ScriptExecutionView[] = [];
+// RequestIDs of the failures the panel currently offers to retry.
+let RetryableExecutionIDs: string[] = [];
+
+// Ask the server to retry these failed executions. The server re-checks what
+// is retryable and replaces each failure's row with the new run.
+async function RetryExecutions(RequestIDs: string[], Button: HTMLButtonElement | null) {
+  if (!RequestIDs.length) return;
+  if (Button) Button.disabled = true;
+  try {
+    const Result = await window.API.RetryScriptExecutions(RequestIDs);
+    const Err = Array.isArray(Result) ? Result[0] : null;
+    if (Err) Notify(`Retry failed: ${String(Err)}`, 'error', 6000);
+  } catch (e) {
+    HandleNonFatalError('RetryScriptExecutions', e);
+  } finally {
+    // The button is usually gone by now (its row was replaced); harmless if not.
+    if (Button) Button.disabled = false;
+  }
+}
 
 // The collapsed "completed" section, pinned to the top of the execution list
 // (under the deployment summary when there is one). Completed rows are moved
@@ -264,6 +287,20 @@ function InitClientListPush() {
   // Closing it then drops the settled rows, as the auto-dismiss does for a clean
   // batch, so the next push neither reopens the panel on old failures nor
   // stacks a new run under them. Anything still queued or running is kept.
+  // Retry buttons: one per retryable failed row, plus "Retry N failed" in the
+  // panel header. Delegated, so they survive the in-place row updates.
+  $(document)
+    .off('click.execRetry')
+    .on('click.execRetry', '#EXECUTION_TOAST [data-retry-request]', function (e) {
+      e.preventDefault();
+      const RequestID = this.getAttribute('data-retry-request');
+      if (RequestID) void RetryExecutions([RequestID], this as HTMLButtonElement);
+    })
+    .on('click.execRetry', '#EXECUTION_TOAST [data-retry-all]', function (e) {
+      e.preventDefault();
+      void RetryExecutions(RetryableExecutionIDs.slice(), this as HTMLButtonElement);
+    });
+
   OnExecutionToastDismissed(() => {
     if (!AllExecutionsSettled(LastPanelExecutions)) return;
     window.API.ClearSettledScriptExecutions().catch((e: unknown) =>
@@ -572,6 +609,24 @@ function InitClientListPush() {
       ? deploymentRequests
       : nonDeploymentExecutions;
 
+    // Which failures can be retried: a failed script still in the catalog, or a
+    // failed integrated-device event (see lib/execution-panel).
+    const knownScriptIDs = new Set(
+      (Array.isArray(ScriptList) ? ScriptList : []).map((Script) => String(Script.ID))
+    );
+    RetryableExecutionIDs = renderExecutions
+      .filter((Request) => IsRetryableExecution(Request, knownScriptIDs))
+      .map((Request) => String(Request.RequestID));
+    const retryAllButton = document.querySelector<HTMLElement>('#EXECUTION_TOAST [data-retry-all]');
+    if (retryAllButton) {
+      // A single failure has its own row button; the header one is for several.
+      const ShowAll = RetryableExecutionIDs.length > 1;
+      retryAllButton.classList.toggle('d-none', !ShowAll);
+      const Label = GetRetryAllLabel(RetryableExecutionIDs.length);
+      const LabelEl = retryAllButton.querySelector<HTMLElement>('.exec-retry-all-label');
+      if (LabelEl && LabelEl.textContent !== Label) LabelEl.textContent = Label;
+    }
+
     // Completed rows leave the list for the collapsed section at the top.
     const completedCount = CountCompletedExecutions(renderExecutions);
     const completedBody =
@@ -612,6 +667,9 @@ function InitClientListPush() {
       const rawStatusText = Request.StatusText ? String(Request.StatusText).trim() : '';
       const state = GetExecutionVisualState(Request);
       const container = state === 'completed' && completedBody ? completedBody : listEl;
+      const retryable = state === 'failed' && RetryableExecutionIDs.includes(key);
+      // The indicator is rebuilt only when this changes (keeps the spinner alive).
+      const indicatorKey = retryable ? 'failed-retry' : state;
       let fillPercent: number;
       if (state === 'completed') fillPercent = 100;
       else if (state === 'failed') fillPercent = reportedProgress > 0 ? reportedProgress : 100;
@@ -625,7 +683,10 @@ function InitClientListPush() {
       if (state === 'completed') {
         indicatorHtml = `<span class="exec-btn-icon exec-success" role="img" aria-label="Completed"><i class="bi bi-check-circle"></i></span>`;
       } else if (state === 'failed') {
-        indicatorHtml = `<span class="exec-btn-icon exec-fail" role="img" aria-label="Failed"><i class="bi bi-exclamation-triangle"></i></span>`;
+        const Retry = retryable
+          ? `<button type="button" class="exec-btn-icon exec-retry" data-retry-request="${Safe(key)}" title="Retry" aria-label="Retry on ${Safe(fullClientName)}"><i class="bi bi-arrow-clockwise"></i></button>`
+          : '';
+        indicatorHtml = `${Retry}<span class="exec-btn-icon exec-fail" role="img" aria-label="Failed"><i class="bi bi-exclamation-triangle"></i></span>`;
       } else if (state === 'running') {
         indicatorHtml = `<span class="exec-spinner" role="img" aria-label="Running"></span>`;
       } else {
@@ -668,7 +729,7 @@ function InitClientListPush() {
         el.className = `exec-item state-${state}`;
         el.setAttribute('data-request-id', key);
         el.dataset.state = state;
-        el.dataset.indicator = state;
+        el.dataset.indicator = indicatorKey;
         el.style.setProperty('--exec-progress-scale', String(fillPercent / 100));
         const scriptChip =
           uniformScriptName || !rawScriptName
@@ -715,9 +776,9 @@ function InitClientListPush() {
         el.classList.add(`state-${state}`);
         el.dataset.state = state;
       }
-      if (el.dataset.indicator !== state) {
+      if (el.dataset.indicator !== indicatorKey) {
         if (Row.Actions) Row.Actions.innerHTML = indicatorHtml;
-        el.dataset.indicator = state;
+        el.dataset.indicator = indicatorKey;
       }
       const timeEl = Row.Time;
       if (timeEl) {

@@ -104,6 +104,7 @@ const INVOKE_CHANNEL_LIST = [
   'ExecuteScript',
   'TriggerIntegratedEvent',
   'Scripts:ClearSettledExecutions',
+  'Scripts:RetryExecutions',
   'UnadoptClient',
   'ReplaceClient',
   'CreateUnassignedClients',
@@ -492,6 +493,8 @@ const API: ShowTrakAPI & ServerRendererAPI = {
   TriggerIntegratedEvent: async (EventID, Targets) =>
     invoke('TriggerIntegratedEvent', EventID, Targets),
   ClearSettledScriptExecutions: async () => invoke('Scripts:ClearSettledExecutions'),
+  RetryScriptExecutions: async (RequestIDs: string[]) =>
+    invoke('Scripts:RetryExecutions', RequestIDs),
   UnadoptClient: async (UUID) => invoke('UnadoptClient', UUID),
   ReplaceClient: async (CurrentUUID, ReplacementUUID) =>
     invoke('ReplaceClient', CurrentUUID, ReplacementUUID),

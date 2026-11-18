@@ -238,6 +238,25 @@
   padding: 8px 10px;
   border-bottom: 1px solid var(--border-subtle);
 }
+#EXECUTION_TOAST .exec-toast-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* "Retry N failed": shown in the header when several failures can be retried. */
+#EXECUTION_TOAST .exec-retry-all {
+  line-height: 1.2;
+  padding: 2px 8px;
+  color: #fff;
+  background: rgb(var(--danger-rgb) / 0.25);
+  border: 1px solid rgb(var(--danger-rgb) / 0.5);
+}
+#EXECUTION_TOAST .exec-retry-all:hover {
+  background: rgb(var(--danger-rgb) / 0.4);
+}
+#EXECUTION_TOAST .exec-retry-all:disabled {
+  opacity: 0.6;
+}
 #EXECUTION_TOAST .exec-toast-header .exec-toast-close {
   line-height: 1;
   padding: 0 6px;
@@ -499,9 +518,26 @@
   white-space: nowrap;
 }
 .exec-actions {
-  width: 22px;
+  min-width: 22px;
   display: flex;
+  gap: 4px;
   justify-content: flex-end;
+}
+/* Retry on a failed row: sits before the failure icon. */
+.exec-btn-icon.exec-retry {
+  color: var(--text-strong);
+  border-radius: var(--radius-sm);
+}
+.exec-btn-icon.exec-retry:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.exec-btn-icon.exec-retry:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 1px;
+}
+.exec-btn-icon.exec-retry:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 .exec-btn-icon {
   width: 22px;

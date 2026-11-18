@@ -26,6 +26,9 @@ const {
   GetCompletedSectionLabel,
   AllExecutionsSettled,
   ShouldAutoDismissExecutions,
+  IsRetryableExecution,
+  GetRetryAllLabel,
+  INTEGRATED_EVENT_PREFIX,
 } = require(PANEL_PATH);
 
 test('GetReportedProgress clamps to 0-100 and treats junk as 0', () => {
@@ -86,4 +89,31 @@ test('only a run that finished cleanly may close the panel by itself', () => {
   // Nothing to show is not "settled".
   assert.equal(AllExecutionsSettled([]), false);
   assert.equal(ShouldAutoDismissExecutions([]), false);
+});
+
+test('Retry is offered on failed scripts still in the catalog and failed device events', () => {
+  const Known = new Set(['start']);
+  const failed = (Script, Internal = false) => ({ Status: 'Failed', Internal, Script });
+  assert.equal(IsRetryableExecution(failed({ ID: 'start', Name: 'Start Show' }), Known), true);
+  // The script has since been deleted.
+  assert.equal(IsRetryableExecution(failed({ ID: 'gone', Name: 'Gone' }), Known), false);
+  const Event = `${INTEGRATED_EVENT_PREFIX}power-on`;
+  assert.equal(IsRetryableExecution(failed({ ID: Event, Name: Event }, true), Known), true);
+  // Never offered for deployments, Wake on LAN or bulk actions...
+  for (const Name of ['Deploying Scripts', 'Wake on LAN', 'Restart', INTEGRATED_EVENT_PREFIX])
+    assert.equal(IsRetryableExecution(failed({ ID: Name, Name }, true), Known), false, Name);
+  // ...or for anything that did not fail.
+  for (const Status of ['Completed', 'Pending'])
+    assert.equal(
+      IsRetryableExecution({ Status, Internal: false, Script: { ID: 'start' } }, Known),
+      false
+    );
+  assert.equal(GetRetryAllLabel(3), 'Retry 3 failed');
+});
+
+test('the renderer and server agree on the integrated event name prefix', () => {
+  const Server = require(
+    path.join(__dirname, '..', 'dist', 'Modules', 'ScriptExecutionManager', 'retry.js')
+  );
+  assert.equal(INTEGRATED_EVENT_PREFIX, Server.INTEGRATED_EVENT_PREFIX);
 });

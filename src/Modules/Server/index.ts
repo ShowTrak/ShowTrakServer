@@ -3,6 +3,7 @@
 // - Wires the ShowTrak client namespace and the Web UI '/ui' namespace
 //   (implemented in ./client-namespace and ./webui-namespace)
 // - Exposes server-originated action dispatch (scripts, bulk requests, messaging)
+import { INTEGRATED_EVENT_PREFIX } from '../ScriptExecutionManager/retry';
 import path from 'path';
 import type { Request, Response, NextFunction } from 'express';
 import { CreateLogger } from '../Logger';
@@ -559,7 +560,7 @@ Manager.TriggerIntegratedEvent = async (EventID: string, Targets: string[]) => {
     // event dispatch.
     const RequestID = await ScriptExecutionManager.AddInternalTaskToQueue(
       UUID,
-      `Integrated Event: ${EventID}`
+      `${INTEGRATED_EVENT_PREFIX}${EventID}`
     );
     if (!RequestID) {
       Summary.failed.push({ UUID, message: 'Failed to queue event' });

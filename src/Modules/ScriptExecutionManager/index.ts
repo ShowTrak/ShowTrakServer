@@ -256,6 +256,27 @@ const Manager = {
     BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
   },
 
+  // Drop specific settled (Completed/Failed) rows, e.g. the failures a retry is
+  // about to replace. Pending rows are never touched. Returns how many went.
+  async RemoveSettled(RequestIDs: string[]): Promise<number> {
+    const Drop = new Set(RequestIDs);
+    const Remaining: ScriptExecution[] = [];
+    let Removed = 0;
+    for (const Request of ScriptExecutions) {
+      if (Drop.has(Request.RequestID) && Request.Status !== 'Pending') {
+        Manager.ClearTimeout(Request);
+        Removed++;
+      } else {
+        Remaining.push(Request);
+      }
+    }
+    if (Removed > 0) {
+      ScriptExecutions = Remaining;
+      BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
+    }
+    return Removed;
+  },
+
   // Clear a request's pending timeout watchdog, if one is armed.
   ClearTimeout(Request: ScriptExecution): void {
     if (Request.TimeoutHandle) {

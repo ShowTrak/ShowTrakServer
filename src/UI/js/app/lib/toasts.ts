@@ -415,7 +415,10 @@ export function ShowExecutionToast(title?: string) {
 	<div id="EXECUTION_TOAST" class="exec-toast show no-drag" role="region" aria-live="polite" aria-label="Script executions">
 		<div class="exec-toast-header">
 			<strong class="exec-title">${safeTitle}</strong>
-			<button type="button" class="btn btn-sm btn-light exec-toast-close" aria-label="Close">✕</button>
+			<div class="exec-toast-actions">
+				<button type="button" class="btn btn-sm exec-retry-all d-none" data-retry-all><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> <span class="exec-retry-all-label"></span></button>
+				<button type="button" class="btn btn-sm btn-light exec-toast-close" aria-label="Close">✕</button>
+			</div>
 		</div>
 		<div id="SHOWTRAK_EXECUTION_LIST" class="exec-toast-body"></div>
 	</div>`;

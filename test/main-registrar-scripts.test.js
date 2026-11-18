@@ -61,6 +61,7 @@ const state = {
   scope: null,
   editor: 'System Default',
   runError: null,
+  executions: {},
 };
 
 const serverMgr = recordingManager({
@@ -78,7 +79,11 @@ const scriptMgr = recordingManager({
   CreateBlank: () => state.createBlank,
   CreateFromTemplate: () => state.createFromTemplate,
 });
-const execMgr = recordingManager({ ClearSettled: () => undefined });
+const execMgr = recordingManager({
+  ClearSettled: () => undefined,
+  GetExecution: (RequestID) => state.executions[RequestID] || null,
+  RemoveSettled: (RequestIDs) => RequestIDs.length,
+});
 const whitelistMgr = recordingManager({
   GetScope: () => state.scope,
   SetScope: () => undefined,
@@ -165,6 +170,7 @@ test.beforeEach(() => {
   state.scope = null;
   state.editor = 'System Default';
   state.runError = null;
+  state.executions = {};
   ran.length = 0;
   opened.paths.length = 0;
   opened.commands.length = 0;
@@ -188,6 +194,7 @@ test('registers a handler for every scripts channel', () => {
     'ExecuteScript',
     'TriggerIntegratedEvent',
     'Scripts:ClearSettledExecutions',
+    'Scripts:RetryExecutions',
     'DeleteScripts',
     'UpdateScripts',
     'Scripts:GetManagerList',
@@ -508,6 +515,75 @@ test('TriggerIntegratedEvent validates the event id and targets', async () => {
 test('Scripts:ClearSettledExecutions clears only settled rows', async () => {
   assert.deepEqual(await GetHandler('Scripts:ClearSettledExecutions')(null), [null, true]);
   assert.equal(execMgr.__callsTo('ClearSettled').length, 1);
+});
+
+// --- Retrying failed executions ----------------------------------------------
+
+const RID = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const Failed = (n, UUID, Script, Internal = false) => ({
+  RequestID: RID(n),
+  Internal,
+  Status: 'Failed',
+  Client: { UUID },
+  Script,
+});
+
+test('Scripts:RetryExecutions re-runs failed scripts and events, replacing their rows', async () => {
+  state.executions = {
+    [RID(1)]: Failed(1, 'uuid-a', { ID: 'my-script', Name: 'My Script' }),
+    [RID(2)]: Failed(2, 'uuid-b', { ID: 'my-script', Name: 'My Script' }),
+    [RID(3)]: Failed(
+      3,
+      'uuid-c',
+      { ID: 'Integrated Event: power-on', Name: 'Integrated Event: power-on' },
+      true
+    ),
+    // Not retryable: a bulk action and a row that did not fail.
+    [RID(4)]: Failed(4, 'uuid-d', { ID: 'Restart', Name: 'Restart' }, true),
+    [RID(5)]: {
+      ...Failed(5, 'uuid-e', { ID: 'my-script', Name: 'My Script' }),
+      Status: 'Completed',
+    },
+  };
+  const Result = await GetHandler('Scripts:RetryExecutions')(null, [1, 2, 3, 4, 5].map(RID));
+  assert.deepEqual(Result, [null, { Retried: 3 }]);
+  // Only the retryable failures' rows are dropped...
+  assert.deepEqual(execMgr.__callsTo('RemoveSettled')[0].args, [[RID(1), RID(2), RID(3)]]);
+  // ...and each action is re-dispatched once, without resetting the panel.
+  assert.deepEqual(serverMgr.__callsTo('ExecuteScripts')[0].args, [
+    'my-script',
+    ['uuid-a', 'uuid-b'],
+    false,
+  ]);
+  assert.deepEqual(serverMgr.__callsTo('TriggerIntegratedEvent')[0].args, ['power-on', ['uuid-c']]);
+});
+
+test('Scripts:RetryExecutions leaves a failure alone when its script was deleted', async () => {
+  state.script = null;
+  state.executions = { [RID(1)]: Failed(1, 'uuid-a', { ID: 'gone', Name: 'Gone' }) };
+  assert.deepEqual(await GetHandler('Scripts:RetryExecutions')(null, [RID(1)]), [
+    null,
+    { Retried: 0 },
+  ]);
+  assert.deepEqual(execMgr.__callsTo('RemoveSettled')[0].args, [[]]);
+  assert.equal(serverMgr.__callsTo('ExecuteScripts').length, 0);
+});
+
+test('Scripts:RetryExecutions validates the request ids', async () => {
+  const Handler = GetHandler('Scripts:RetryExecutions');
+  for (const Bad of [[], [''], 'not-a-list', null]) {
+    const [Err] = await Handler(null, Bad);
+    assert.equal(typeof Err, 'string', JSON.stringify(Bad));
+  }
+  assert.equal(execMgr.__callsTo('RemoveSettled').length, 0);
+});
+
+test('Scripts:RetryExecutions ignores ids it does not know', async () => {
+  assert.deepEqual(await GetHandler('Scripts:RetryExecutions')(null, ['unknown-request']), [
+    null,
+    { Retried: 0 },
+  ]);
+  assert.equal(serverMgr.__callsTo('ExecuteScripts').length, 0);
 });
 
 test('DeleteScripts and UpdateScripts validate their target lists', async () => {

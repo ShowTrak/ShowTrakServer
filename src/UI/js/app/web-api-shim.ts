@@ -330,6 +330,7 @@ function createWebApi(socket: WebUiSocket): RendererAPI {
     TriggerIntegratedEvent: async (EventID, Targets) =>
       rpc('TriggerIntegratedEvent', EventID, Targets),
     ClearSettledScriptExecutions: async () => rpc('Scripts:ClearSettledExecutions'),
+    RetryScriptExecutions: async (RequestIDs) => rpc('Scripts:RetryExecutions', RequestIDs),
     DeleteScripts: nullTuple,
     UpdateScripts: nullTuple,
     GetScriptManagerList: emptyArray,
