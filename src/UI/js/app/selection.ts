@@ -3,9 +3,62 @@
 // leaf module: it depends only on shared state + utils (and the search filter,
 // itself a leaf), so the ~6 modules that
 // import these keep working via the selection-init barrel re-export.
+//
+// The selection is the shared `Selected` array (other modules read it), with a
+// Set kept beside it for membership. Bulk changes (Select All, a group header)
+// look every tile up in one pass and update the count and the search once:
+// selecting one tile at a time ran two page-wide queries, a linear search of
+// the selection, a count update and a search refresh per tile, so Ctrl+A on
+// 500 tiles was about a thousand scans of the page.
 import { AlertActionsEnabled, GroupSelectableUUIDCache, Selected, setSelected } from './state';
 import { HandleNonFatalError } from './utils';
 import { IsHiddenByListSearch, RefreshListSearch } from './list-filter';
+
+const MONITOR_PREFIX = 'monitor:';
+
+// Membership index over `Selected`. Rebuilt whenever the array is replaced or
+// its length moves without going through here, so it can never disagree.
+let SelectedIndex = new Set<string>();
+let IndexedArray: string[] | null = null;
+let IndexedLength = -1;
+
+function SelectedSet(): Set<string> {
+  if (IndexedArray !== Selected || IndexedLength !== Selected.length) {
+    SelectedIndex = new Set(Selected.map(String));
+    IndexedArray = Selected;
+    IndexedLength = Selected.length;
+  }
+  return SelectedIndex;
+}
+
+function AddToSelected(UUID: string) {
+  const Index = SelectedSet();
+  if (Index.has(UUID)) return;
+  Selected.push(UUID);
+  Index.add(UUID);
+  IndexedLength = Selected.length;
+}
+
+function RemoveFromSelected(UUIDs: ReadonlySet<string>) {
+  if (!UUIDs.size) return;
+  setSelected(Selected.filter((id) => !UUIDs.has(String(id))));
+}
+
+function TilesFor(UUID: string | undefined): JQuery<HTMLElement> {
+  return $(`.SHOWTRAK_PC[data-uuid='${UUID}']`);
+}
+
+/** Every tile and row on the page by data-uuid, from a single query. */
+function TileMap(): Map<string, HTMLElement[]> {
+  const Out = new Map<string, HTMLElement[]>();
+  for (const El of Array.from(document.querySelectorAll<HTMLElement>('.SHOWTRAK_PC[data-uuid]'))) {
+    const UUID = El.getAttribute('data-uuid') || '';
+    const List = Out.get(UUID);
+    if (List) List.push(El);
+    else Out.set(UUID, [El]);
+  }
+  return Out;
+}
 
 // The list view's check rows show as selected for as long as their target is:
 // a selected target acts on all of its checks, so the rows say so. The
@@ -15,15 +68,32 @@ import { IsHiddenByListSearch, RefreshListSearch } from './list-filter';
 // it shows again when the target is deselected.
 function MarkCheckRowsOf(UUID: string | undefined, ParentSelected: boolean) {
   const Value = String(UUID || '');
-  if (!Value.startsWith('monitor:')) return;
-  $(`.MONITOR_CHECK[data-target-id='${Value.slice('monitor:'.length)}']`).toggleClass(
+  if (!Value.startsWith(MONITOR_PREFIX)) return;
+  $(`.MONITOR_CHECK[data-target-id='${Value.slice(MONITOR_PREFIX.length)}']`).toggleClass(
     'PARENT_SELECTED',
     ParentSelected
   );
 }
 
+/** MarkCheckRowsOf for many targets, from a single query. */
+function MarkCheckRowsOfMany(UUIDs: readonly string[], ParentSelected: boolean) {
+  const TargetIDs = new Set(
+    UUIDs.filter((UUID) => UUID.startsWith(MONITOR_PREFIX)).map((UUID) =>
+      UUID.slice(MONITOR_PREFIX.length)
+    )
+  );
+  if (!TargetIDs.size) return;
+  for (const Row of Array.from(
+    document.querySelectorAll<HTMLElement>('.MONITOR_CHECK[data-target-id]')
+  )) {
+    if (TargetIDs.has(Row.getAttribute('data-target-id') || '')) {
+      Row.classList.toggle('PARENT_SELECTED', ParentSelected);
+    }
+  }
+}
+
 export function IsSelected(UUID: string) {
-  return Selected.includes(UUID);
+  return SelectedSet().has(String(UUID));
 }
 
 export function UpdateSelectionCount() {
@@ -52,15 +122,17 @@ export function UpdateSelectionCount() {
 export function Select(UUID: string | undefined) {
   // Allow selecting adopted clients and pending-adoption devices. Monitoring
   // and dummy tiles use prefixed data-uuid values so they never match here.
+  let $tiles: JQuery<HTMLElement>;
   try {
-    const $tiles = $(`.SHOWTRAK_PC[data-uuid='${UUID}']`);
+    $tiles = TilesFor(UUID);
     if (!$tiles || !$tiles.length) return;
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
+    return;
   }
-  if (Selected.includes(String(UUID))) return;
-  Selected.push(String(UUID));
-  $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).addClass('SELECTED');
+  if (IsSelected(String(UUID))) return;
+  AddToSelected(String(UUID));
+  $tiles.addClass('SELECTED');
   MarkCheckRowsOf(UUID, true);
   UpdateSelectionCount();
   RefreshListSearch();
@@ -68,8 +140,8 @@ export function Select(UUID: string | undefined) {
 }
 
 export function Deselect(UUID: string) {
-  setSelected(Selected.filter((id) => id !== UUID));
-  $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).removeClass('SELECTED');
+  RemoveFromSelected(new Set([String(UUID)]));
+  TilesFor(UUID).removeClass('SELECTED');
   MarkCheckRowsOf(UUID, false);
   UpdateSelectionCount();
   // A row kept on show only because it was selected drops out of a search.
@@ -77,10 +149,44 @@ export function Deselect(UUID: string) {
   return;
 }
 
+// Select every UUID in the list that has a tile on the page; one pass over the
+// page, one count update and one search refresh however many there are.
+function SelectMany(UUIDs: readonly string[], Tiles: Map<string, HTMLElement[]> = TileMap()) {
+  const Added: string[] = [];
+  for (const Raw of UUIDs) {
+    const UUID = String(Raw);
+    const Els = Tiles.get(UUID);
+    if (!Els || !Els.length || IsSelected(UUID)) continue;
+    AddToSelected(UUID);
+    for (const El of Els) El.classList.add('SELECTED');
+    Added.push(UUID);
+  }
+  if (!Added.length) return;
+  MarkCheckRowsOfMany(Added, true);
+  UpdateSelectionCount();
+  RefreshListSearch();
+}
+
+// The bulk counterpart of Deselect.
+function DeselectMany(UUIDs: readonly string[], Tiles: Map<string, HTMLElement[]> = TileMap()) {
+  const Removed = new Set(UUIDs.map(String));
+  if (!Removed.size) return;
+  RemoveFromSelected(Removed);
+  for (const UUID of Removed) {
+    for (const El of Tiles.get(UUID) || []) El.classList.remove('SELECTED');
+  }
+  MarkCheckRowsOfMany([...Removed], false);
+  UpdateSelectionCount();
+  RefreshListSearch();
+}
+
 export function ClearSelection() {
-  Selected.forEach((uuid) => {
-    $(`.SHOWTRAK_PC[data-uuid='${uuid}']`).removeClass('SELECTED');
-  });
+  if (Selected.length) {
+    const Tiles = TileMap();
+    for (const UUID of Selected) {
+      for (const El of Tiles.get(String(UUID)) || []) El.classList.remove('SELECTED');
+    }
+  }
   setSelected([]);
   $('.MONITOR_CHECK.PARENT_SELECTED').removeClass('PARENT_SELECTED');
   UpdateSelectionCount();
@@ -93,30 +199,37 @@ export function ClearSelection() {
 // nor are the list view's check rows: their target is already being selected,
 // and an action on both would run twice on the same device.
 export function SelectAll() {
-  $('.SHOWTRAK_PC[data-uuid]').each(function () {
-    if ($(this).hasClass('GROUP') || $(this).hasClass('MONITOR_CHECK')) return;
-    // A search's hidden rows are out of reach of Select All.
-    if ($(this).hasClass('LIST_SEARCH_HIDDEN')) return;
-    const UUID = $(this).attr('data-uuid');
-    if (UUID) Select(UUID);
-  });
+  const Tiles = TileMap();
+  const UUIDs: string[] = [];
+  for (const Els of Tiles.values()) {
+    for (const El of Els) {
+      if (El.classList.contains('GROUP') || El.classList.contains('MONITOR_CHECK')) continue;
+      // A search's hidden rows are out of reach of Select All.
+      if (El.classList.contains('LIST_SEARCH_HIDDEN')) continue;
+      const UUID = El.getAttribute('data-uuid');
+      if (UUID) UUIDs.push(UUID);
+    }
+  }
+  SelectMany(UUIDs, Tiles);
 }
 
 export function ToggleSelection(UUID: string | undefined) {
   // Allow toggling adopted clients and pending-adoption devices.
+  let $tiles: JQuery<HTMLElement>;
   try {
-    const $tiles = $(`.SHOWTRAK_PC[data-uuid='${UUID}']`);
+    $tiles = TilesFor(UUID);
     if (!$tiles || !$tiles.length) return;
   } catch (err) {
     HandleNonFatalError('SelectionInit:NonFatal', err);
+    return;
   }
-  if (Selected.includes(String(UUID))) {
-    setSelected(Selected.filter((id) => id !== UUID));
-    $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).removeClass('SELECTED');
+  if (IsSelected(String(UUID))) {
+    RemoveFromSelected(new Set([String(UUID)]));
+    $tiles.removeClass('SELECTED');
     MarkCheckRowsOf(UUID, false);
   } else {
-    Selected.push(String(UUID));
-    $(`.SHOWTRAK_PC[data-uuid='${UUID}']`).addClass('SELECTED');
+    AddToSelected(String(UUID));
+    $tiles.addClass('SELECTED');
     MarkCheckRowsOf(UUID, true);
   }
   UpdateSelectionCount();
@@ -131,9 +244,9 @@ export function SelectByGroup(GroupID: string | number | undefined) {
   );
 
   if (UUIDs.every((UUID) => IsSelected(UUID))) {
-    UUIDs.forEach((UUID) => Deselect(UUID));
+    DeselectMany(UUIDs);
   } else {
-    UUIDs.forEach((UUID) => Select(UUID));
+    SelectMany(UUIDs);
   }
   return;
 }

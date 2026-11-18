@@ -308,3 +308,107 @@ test('the online/offline colour is case-insensitive and defaults to muted', () =
     assert.equal(GetUpdateStatusClass(Value), 'text-muted', `status ${JSON.stringify(Value)}`);
   }
 });
+
+// --- The client list's live redraw ------------------------------------------
+//
+// The open Update Manager is redrawn on every client heartbeat. It used to sort
+// and rebuild every row each time; now each draw is planned against the last
+// one, so a heartbeat that changes nothing the list shows changes nothing on
+// screen, and one that does replaces only its own row.
+
+const {
+  BuildUpdateManagerListModel,
+  PlanUpdateManagerListPatch,
+  UpdateManagerRenderedFrom,
+  UpdateManagerRowHtml,
+} = UpdateManager;
+
+const NoExecution = () => null;
+const listOf = (Clients, Tag = 'v3.20.0', Selected = new Set()) =>
+  BuildUpdateManagerListModel(Clients, Tag, Selected, NoExecution);
+
+test('the list is sorted by name, case-insensitively', () => {
+  const Model = listOf([
+    client({ UUID: 'b', Nickname: 'beta' }),
+    client({ UUID: 'a', Nickname: 'Alpha' }),
+    client({ UUID: 'c', Hostname: 'charlie' }),
+  ]);
+  assert.deepEqual(
+    Model.Rows.map((Row) => Row.UUID),
+    ['a', 'b', 'c']
+  );
+});
+
+test('no clients draws the empty state rather than rows', () => {
+  const Model = listOf([]);
+  assert.equal(Model.Rows.length, 0);
+  assert.match(Model.EmptyHtml, /No clients found/);
+});
+
+test('a heartbeat that changes nothing shown plans no row changes', () => {
+  const Before = listOf([
+    client({ UUID: 'a', Nickname: 'A' }),
+    client({ UUID: 'b', Nickname: 'B' }),
+  ]);
+  // Vitals and uptime are not on the Update Manager's rows.
+  const After = listOf([
+    client({ UUID: 'a', Nickname: 'A', Vitals: { Cpu: { UsagePercentage: 50 } } }),
+    client({ UUID: 'b', Nickname: 'B', Uptime: 123 }),
+  ]);
+  const Plan = PlanUpdateManagerListPatch(UpdateManagerRenderedFrom(Before), After);
+  assert.deepEqual(Plan, { Full: false, Changed: [] });
+});
+
+test('a change to one client replaces only its row', () => {
+  const Before = listOf([
+    client({ UUID: 'a', Nickname: 'A' }),
+    client({ UUID: 'b', Nickname: 'B' }),
+  ]);
+  const After = listOf([
+    client({ UUID: 'a', Nickname: 'A' }),
+    client({ UUID: 'b', Nickname: 'B', Online: false }),
+  ]);
+  const Plan = PlanUpdateManagerListPatch(UpdateManagerRenderedFrom(Before), After);
+  assert.deepEqual(Plan, { Full: false, Changed: [1] });
+});
+
+test('a tick alone is not a row change, but it is in the drawn markup', () => {
+  const Clients = [client({ UUID: 'a', Nickname: 'A' })];
+  const Before = listOf(Clients, 'v3.20.0', new Set());
+  const After = listOf(Clients, 'v3.20.0', new Set(['a']));
+  // Redrawing the row for its tick would take focus off the box just clicked.
+  assert.deepEqual(PlanUpdateManagerListPatch(UpdateManagerRenderedFrom(Before), After), {
+    Full: false,
+    Changed: [],
+  });
+  assert.equal(After.Rows[0].Checked, true);
+  assert.match(UpdateManagerRowHtml(After.Rows[0]), /\schecked\s/);
+  assert.doesNotMatch(UpdateManagerRowHtml(Before.Rows[0]), /\schecked\s/);
+});
+
+test('a new, removed or reordered client redraws the whole list', () => {
+  const Before = UpdateManagerRenderedFrom(
+    listOf([client({ UUID: 'a', Nickname: 'A' }), client({ UUID: 'b', Nickname: 'B' })])
+  );
+  const Added = listOf([
+    client({ UUID: 'a', Nickname: 'A' }),
+    client({ UUID: 'b', Nickname: 'B' }),
+    client({ UUID: 'c', Nickname: 'C' }),
+  ]);
+  const Removed = listOf([client({ UUID: 'a', Nickname: 'A' })]);
+  const Renamed = listOf([
+    client({ UUID: 'a', Nickname: 'Z' }),
+    client({ UUID: 'b', Nickname: 'B' }),
+  ]);
+  assert.deepEqual(PlanUpdateManagerListPatch(Before, Added), { Full: true });
+  assert.deepEqual(PlanUpdateManagerListPatch(Before, Removed), { Full: true });
+  assert.deepEqual(PlanUpdateManagerListPatch(Before, Renamed), { Full: true });
+  assert.deepEqual(PlanUpdateManagerListPatch(null, Added), { Full: true });
+});
+
+test('a client dropping below the remote-update floor redraws for the warning', () => {
+  const Before = UpdateManagerRenderedFrom(listOf([client({ UUID: 'a', Nickname: 'A' })]));
+  const After = listOf([client({ UUID: 'a', Nickname: 'A', Version: '3.3.0' })]);
+  assert.match(After.WarningHtml, /Manual Update Required/);
+  assert.deepEqual(PlanUpdateManagerListPatch(Before, After), { Full: true });
+});

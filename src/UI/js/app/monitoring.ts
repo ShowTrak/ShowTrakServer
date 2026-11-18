@@ -49,12 +49,6 @@ import {
   IsMonitorAwaitingFirstCheck,
 } from './lib/monitor-format';
 
-export function RenderMonitoringTargetsSection() {
-  // Deprecated: monitoring targets are now rendered inline within their group's
-  // drop zone alongside clients. Kept as a no-op for backwards compatibility.
-  return '';
-}
-
 export function RenderMonitoringTargetTile(T: MonitoringTargetView) {
   const Online = !!T.Online;
   const Degraded = !!T.Degraded;

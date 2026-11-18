@@ -20,6 +20,7 @@ import {
   type PeakState,
 } from './lib/live-levels';
 import { HandleNonFatalError } from './utils';
+import { SetIfChanged, SetMeterOffset, SetMeterScale } from './lib/meter-style';
 import { Notify } from './selection-init';
 
 // While dragging a fader, sends go out at most this often; the final value goes
@@ -71,18 +72,25 @@ export function ApplyLiveLevels(): void {
       const PeakMark = Row.querySelector<HTMLElement>('.live-levels-peak');
       const Value = Row.querySelector<HTMLElement>('.live-levels-value');
       const Bar = Row.querySelector<HTMLElement>('.live-levels-bar');
+      // A composited scale and translation per frame (see lib/meter-style.ts),
+      // and nothing written that has not changed.
       if (Fill) {
-        Fill.style.width = `${LevelPercent(Channel.Db)}%`;
-        Fill.dataset.zone = LevelZoneOf(Channel.Db);
+        SetMeterScale(Fill, LevelPercent(Channel.Db));
+        SetIfChanged(Fill.dataset, 'zone', LevelZoneOf(Channel.Db));
       }
       if (PeakMark) {
         const Percent = LevelPercent(Peak.Db);
-        PeakMark.style.left = `${Percent}%`;
-        PeakMark.dataset.zone = LevelZoneOf(Peak.Db);
-        PeakMark.hidden = Percent <= 0;
+        SetMeterOffset(PeakMark, Percent);
+        SetIfChanged(PeakMark.dataset, 'zone', LevelZoneOf(Peak.Db));
+        if (PeakMark.hidden !== Percent <= 0) PeakMark.hidden = Percent <= 0;
       }
-      if (Value) Value.textContent = FormatLevel(Channel.Db);
-      if (Bar && Channel.Db != null) Bar.setAttribute('aria-valuenow', String(Channel.Db));
+      if (Value) {
+        const Text = FormatLevel(Channel.Db);
+        if (Value.textContent !== Text) Value.textContent = Text;
+      }
+      if (Bar && Channel.Db != null && Bar.getAttribute('aria-valuenow') !== String(Channel.Db)) {
+        Bar.setAttribute('aria-valuenow', String(Channel.Db));
+      }
       if (Channel.Control) PatchControls(Row, Check, Channel);
     });
   });

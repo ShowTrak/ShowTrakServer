@@ -9,7 +9,7 @@
   "description": "Mobile-friendly control surface for ShowTrak Server",
   "icons": [
     {
-      "src": "/images/icon.png",
+      "src": "/img/icon-filled.png",
       "sizes": "192x192",
       "type": "image/png"
     },

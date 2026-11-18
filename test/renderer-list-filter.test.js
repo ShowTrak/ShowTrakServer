@@ -143,3 +143,21 @@ test('a selected check row keeps its target showing', () => {
   const Keep = Filter.KeepSelectedRows(new Set(), ['check:71'], Monitors);
   assert.deepEqual([...Keep], ['monitor:7']);
 });
+
+// A live search rebuilds the index after every heartbeat, so the rows' tags
+// are resolved once per tag list rather than on every build.
+test('a memo gives the same index, and a new tag list is resolved afresh', () => {
+  const Memo = Filter.CreateListSearchTagMemo();
+  const E = Entities();
+  const Plain = Filter.BuildListSearchIndex(E);
+  assert.deepEqual(Filter.BuildListSearchIndex(E, Memo), Plain);
+  assert.deepEqual(Filter.BuildListSearchIndex(E, Memo), Plain, 'reused from the memo');
+  assert.ok(Memo.Labels.size > 0);
+
+  // A tag edit replaces the list: the memo must not answer with the old tags.
+  const Edited = { ...E, Tags: [Tag(3, 'lighting', { Clients: ['c-1'] })] };
+  const Fresh = Filter.BuildListSearchIndex(Edited, Memo);
+  assert.deepEqual(Fresh, Filter.BuildListSearchIndex(Edited));
+  assert.ok(Fresh.get('c-1').includes('LIGHTING'));
+  assert.ok(!Fresh.get('c-1').includes('PROJECTORS'));
+});

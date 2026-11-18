@@ -2703,12 +2703,17 @@ button.monitor-action-label:focus-visible {
   background: rgba(255, 255, 255, 0.12);
 }
 
+/* Meters move ten times a second. The fill is full width and scaled, and the
+   peak line rides a full-width layer that is translated, so a frame is a
+   composited transform rather than a layout of the row (see the CPU/RAM bars).
+   live-levels.ts sets the scale and translation. */
 .live-levels-fill {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
+  inset: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
   background: var(--status-graph-online);
-  transition: width 90ms linear;
+  transition: transform 90ms linear;
 }
 
 .live-levels-fill[data-zone='hot'] {
@@ -2716,14 +2721,24 @@ button.monitor-action-label:focus-visible {
 }
 
 .live-levels-fill[data-zone='clip'],
-.live-levels-peak[data-zone='clip'] {
+.live-levels-peak[data-zone='clip']::after {
   background: var(--status-graph-offline);
 }
 
+/* The layer is the bar's width, so translateX(n%) puts its left edge (and the
+   2px line ending there) n% along the bar. */
 .live-levels-peak {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.live-levels-peak::after {
+  content: '';
   position: absolute;
   top: 0;
   bottom: 0;
+  left: 0;
   width: 2px;
   margin-left: -2px;
   background: #e2e2ea;
@@ -2850,14 +2865,17 @@ body:not(.compact-mode):not(.list-mode)
   background: rgba(0, 0, 0, 0.25);
 }
 
+/* Scaled and translated like the view's meters (.live-levels-fill above):
+   every tile with meters moves ten times a second. */
 .MONITOR_TILE_LEVEL_FILL {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
+  inset: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
   /* White like client CPU/RAM bars (a green bar vanishes on a green tile),
      soft enough that the solid peak line stands out from it. */
   background: rgba(255, 255, 255, 0.55);
-  transition: width 180ms linear;
+  transition: transform 180ms linear;
 }
 
 .MONITOR_TILE_LEVEL_FILL[data-zone='hot'] {
@@ -2865,14 +2883,22 @@ body:not(.compact-mode):not(.list-mode)
 }
 
 .MONITOR_TILE_LEVEL_FILL[data-zone='clip'],
-.MONITOR_TILE_LEVEL_PEAK[data-zone='clip'] {
+.MONITOR_TILE_LEVEL_PEAK[data-zone='clip']::after {
   background: var(--status-graph-offline);
 }
 
 .MONITOR_TILE_LEVEL_PEAK {
   position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.MONITOR_TILE_LEVEL_PEAK::after {
+  content: '';
+  position: absolute;
   top: 0;
   bottom: 0;
+  left: 0;
   width: 2px;
   margin-left: -2px;
   background: #fff;

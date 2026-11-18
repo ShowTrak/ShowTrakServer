@@ -109,8 +109,10 @@ body.list-mode .LIST_TABLE_HEADER {
      (box padding + row border + row padding). */
   padding: 0 calc(4px + 2px + var(--list-row-padding));
   border-bottom: 1px solid var(--border-subtle);
-  background: rgb(var(--surface-0-rgb) / 0.94);
-  backdrop-filter: blur(6px);
+  /* Near-opaque instead of 94% plus a backdrop blur: the blur re-ran over the
+     rows scrolling and updating underneath on every frame, for a 6% show-through
+     nobody could read anyway. */
+  background: rgb(var(--surface-0-rgb) / 0.97);
   text-align: left;
 }
 

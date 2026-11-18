@@ -4,7 +4,7 @@
 // Each widget kind has a drawer: the row's markup, and a patch that runs on every
 // monitor push and whenever its own data arrives. The footer row is always in the
 // tile and its contents are redrawn only when the kind changes, so bars keep
-// their CSS width transition the way client CPU/RAM bars do.
+// their CSS transform transition the way client CPU/RAM bars do.
 //
 // 'levels' is fed by the server's tile meter stream. That stream can hold a
 // device's only control connection, so it is open only while some tile on this
@@ -18,6 +18,7 @@ import { MonitoringTargets } from './state';
 import { ShowsTileWidget, TileLevelsView, TileWidgetKind } from './lib/tile-widgets';
 import type { PeakState } from './lib/live-levels';
 import { HandleNonFatalError } from './utils';
+import { SetIfChanged, SetMeterOffset, SetMeterScale } from './lib/meter-style';
 
 interface TileWidgetDrawer {
   /** The row's inner markup for a freshly drawn widget. */
@@ -48,7 +49,7 @@ const LevelsDrawer: TileWidgetDrawer = {
     Text.hidden = !View.Text;
     Bars.hidden = !!View.Text;
     if (View.Text) return;
-    // Keep the row elements across frames so the width transition runs.
+    // Keep the row elements across frames so the transition runs.
     while (Bars.childElementCount > View.Bars.length) Bars.lastElementChild!.remove();
     while (Bars.childElementCount < View.Bars.length) {
       const Line = document.createElement('span');
@@ -66,15 +67,19 @@ const LevelsDrawer: TileWidgetDrawer = {
       const Fill = Line.querySelector<HTMLElement>('.MONITOR_TILE_LEVEL_FILL')!;
       const Peak = Line.querySelector<HTMLElement>('.MONITOR_TILE_LEVEL_PEAK')!;
       if (Label.textContent !== Bar.Label) Label.textContent = Bar.Label;
-      Fill.style.width = `${Bar.Percent}%`;
-      Fill.dataset.zone = Bar.Zone;
-      Peak.style.left = `${Bar.PeakPercent}%`;
-      Peak.dataset.zone = Bar.PeakZone;
-      Peak.hidden = Bar.PeakPercent <= 0;
+      // Ten frames a second per bar: a composited scale and translation (see
+      // the CSS), and nothing written that has not changed.
+      SetMeterScale(Fill, Bar.Percent);
+      SetIfChanged(Fill.dataset, 'zone', Bar.Zone);
+      SetMeterOffset(Peak, Bar.PeakPercent);
+      SetIfChanged(Peak.dataset, 'zone', Bar.PeakZone);
+      const PeakHidden = Bar.PeakPercent <= 0;
+      if (Peak.hidden !== PeakHidden) Peak.hidden = PeakHidden;
       // The row has no box of its own (display: contents), so each part carries
       // the tooltip.
-      Label.title = Bar.Title;
-      (Fill.parentElement as HTMLElement).title = Bar.Title;
+      if (Label.title !== Bar.Title) Label.title = Bar.Title;
+      const Track = Fill.parentElement as HTMLElement;
+      if (Track.title !== Bar.Title) Track.title = Bar.Title;
     });
   },
 };

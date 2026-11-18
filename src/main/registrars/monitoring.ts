@@ -25,6 +25,45 @@ import {
 import { Manager as MonitoringActionFavourites } from '../../Modules/MonitoringActionFavourites';
 import { Manager as IPCValidation } from '../../Modules/IPCValidation';
 
+// The per-entity status-history reads take an optional trailing `WindowMs`:
+// only samples from that long ago on (by this process's clock, so a browser
+// with a skewed clock still gets the right window). The view modal draws the
+// last hour, and every series otherwise came back with the whole 12h retention,
+// on each reload. Absent, non-numeric or non-positive means everything kept,
+// which is exactly what an older caller (or one that wants it all) gets.
+function HistoryCutoff(WindowMs: unknown): number | null {
+  if (WindowMs == null || WindowMs === '') return null;
+  const Ms = Number(WindowMs);
+  if (!Number.isFinite(Ms) || Ms <= 0) return null;
+  return Date.now() - Ms;
+}
+
+// The tail of a series from `Cutoff` on. Series are stored oldest first, so
+// the start is found by bisection; anything malformed is passed through as is.
+function SamplesSince<T>(Samples: T[], Cutoff: number | null): T[] {
+  if (Cutoff == null || !Array.isArray(Samples) || !Samples.length) return Samples;
+  const Ts = (Sample: T) => Number((Sample as { ts?: unknown } | null)?.ts);
+  if (!Number.isFinite(Ts(Samples[0]!))) return Samples;
+  let Low = 0;
+  let High = Samples.length;
+  while (Low < High) {
+    const Mid = (Low + High) >> 1;
+    if (Ts(Samples[Mid]!) < Cutoff) Low = Mid + 1;
+    else High = Mid;
+  }
+  return Low === 0 ? Samples : Samples.slice(Low);
+}
+
+// The same, for the readers that answer one series per critical entity.
+function SeriesSince<T extends { samples?: unknown }>(List: T[], Cutoff: number | null): T[] {
+  if (Cutoff == null || !Array.isArray(List)) return List;
+  return List.map((Series) =>
+    Series && Array.isArray(Series.samples)
+      ? { ...Series, samples: SamplesSince(Series.samples, Cutoff) }
+      : Series
+  );
+}
+
 function register(): void {
   RPC.handle('GetMonitoringMethods', async () => {
     return MonitoringMethods.GetAll();
@@ -47,14 +86,17 @@ function register(): void {
     return Target;
   });
 
-  RPC.handle('GetMonitoringCheckHistory', async (_Event: unknown, CheckID: unknown) => {
-    try {
-      CheckID = IPCValidation.MonitoringTargetID(CheckID, 'CheckID');
-    } catch {
-      return [];
+  RPC.handle(
+    'GetMonitoringCheckHistory',
+    async (_Event: unknown, CheckID: unknown, WindowMs?: unknown) => {
+      try {
+        CheckID = IPCValidation.MonitoringTargetID(CheckID, 'CheckID');
+      } catch {
+        return [];
+      }
+      return SamplesSince(getMonitoringCheckHistory(CheckID), HistoryCutoff(WindowMs));
     }
-    return getMonitoringCheckHistory(CheckID);
-  });
+  );
 
   RPC.handle('GetMonitoringCheckDebug', async (_Event: unknown, CheckID: unknown) => {
     try {
@@ -146,22 +188,25 @@ function register(): void {
     )
   );
 
-  RPC.handle('GetDummyClientHistory', async (_Event: unknown, UUID: unknown) => {
-    try {
-      UUID = IPCValidation.DummyClientUUID(UUID);
-    } catch {
-      return [];
+  RPC.handle(
+    'GetDummyClientHistory',
+    async (_Event: unknown, UUID: unknown, WindowMs?: unknown) => {
+      try {
+        UUID = IPCValidation.DummyClientUUID(UUID);
+      } catch {
+        return [];
+      }
+      return SamplesSince(getDummyHistorySamples(UUID), HistoryCutoff(WindowMs));
     }
-    return getDummyHistorySamples(UUID);
-  });
+  );
 
-  RPC.handle('GetClientHistory', async (_Event: unknown, UUID: unknown) => {
+  RPC.handle('GetClientHistory', async (_Event: unknown, UUID: unknown, WindowMs?: unknown) => {
     try {
       UUID = IPCValidation.UUID(UUID);
     } catch {
       return [];
     }
-    return getClientHistorySamples(UUID);
+    return SamplesSince(getClientHistorySamples(UUID), HistoryCutoff(WindowMs));
   });
 
   // Takes no input: the list view's history column, every row in one read.
@@ -169,68 +214,86 @@ function register(): void {
     return getStatusHistoryOverview();
   });
 
-  RPC.handle('GetClientApplicationHistory', async (_Event: unknown, UUID: unknown) => {
+  RPC.handle(
+    'GetClientApplicationHistory',
+    async (_Event: unknown, UUID: unknown, WindowMs?: unknown) => {
+      try {
+        UUID = IPCValidation.UUID(UUID);
+      } catch {
+        return [];
+      }
+      return SeriesSince(getClientApplicationHistorySamples(UUID), HistoryCutoff(WindowMs));
+    }
+  );
+
+  RPC.handle('GetClientUSBHistory', async (_Event: unknown, UUID: unknown, WindowMs?: unknown) => {
     try {
       UUID = IPCValidation.UUID(UUID);
     } catch {
       return [];
     }
-    return getClientApplicationHistorySamples(UUID);
+    return SeriesSince(getClientUSBHistorySamples(UUID), HistoryCutoff(WindowMs));
   });
 
-  RPC.handle('GetClientUSBHistory', async (_Event: unknown, UUID: unknown) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-    } catch {
-      return [];
+  RPC.handle(
+    'GetClientDisplayHistory',
+    async (_Event: unknown, UUID: unknown, WindowMs?: unknown) => {
+      try {
+        UUID = IPCValidation.UUID(UUID);
+      } catch {
+        return [];
+      }
+      return SeriesSince(getClientDisplayHistorySamples(UUID), HistoryCutoff(WindowMs));
     }
-    return getClientUSBHistorySamples(UUID);
-  });
+  );
 
-  RPC.handle('GetClientDisplayHistory', async (_Event: unknown, UUID: unknown) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-    } catch {
-      return [];
+  RPC.handle(
+    'GetClientAudioHistory',
+    async (_Event: unknown, UUID: unknown, WindowMs?: unknown) => {
+      try {
+        UUID = IPCValidation.UUID(UUID);
+      } catch {
+        return [];
+      }
+      return SeriesSince(getClientAudioHistorySamples(UUID), HistoryCutoff(WindowMs));
     }
-    return getClientDisplayHistorySamples(UUID);
-  });
+  );
 
-  RPC.handle('GetClientAudioHistory', async (_Event: unknown, UUID: unknown) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-    } catch {
-      return [];
+  RPC.handle(
+    'GetClientNetworkHistory',
+    async (_Event: unknown, UUID: unknown, WindowMs?: unknown) => {
+      try {
+        UUID = IPCValidation.UUID(UUID);
+      } catch {
+        return [];
+      }
+      return SeriesSince(getClientNetworkHistorySamples(UUID), HistoryCutoff(WindowMs));
     }
-    return getClientAudioHistorySamples(UUID);
-  });
+  );
 
-  RPC.handle('GetClientNetworkHistory', async (_Event: unknown, UUID: unknown) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-    } catch {
-      return [];
+  RPC.handle(
+    'GetClientStorageHistory',
+    async (_Event: unknown, UUID: unknown, WindowMs?: unknown) => {
+      try {
+        UUID = IPCValidation.UUID(UUID);
+      } catch {
+        return [];
+      }
+      return SeriesSince(getClientStorageHistorySamples(UUID), HistoryCutoff(WindowMs));
     }
-    return getClientNetworkHistorySamples(UUID);
-  });
+  );
 
-  RPC.handle('GetClientStorageHistory', async (_Event: unknown, UUID: unknown) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-    } catch {
-      return [];
+  RPC.handle(
+    'GetClientSystemCheckHistory',
+    async (_Event: unknown, UUID: unknown, WindowMs?: unknown) => {
+      try {
+        UUID = IPCValidation.UUID(UUID);
+      } catch {
+        return [];
+      }
+      return SeriesSince(getClientSystemCheckHistorySamples(UUID), HistoryCutoff(WindowMs));
     }
-    return getClientStorageHistorySamples(UUID);
-  });
-
-  RPC.handle('GetClientSystemCheckHistory', async (_Event: unknown, UUID: unknown) => {
-    try {
-      UUID = IPCValidation.UUID(UUID);
-    } catch {
-      return [];
-    }
-    return getClientSystemCheckHistorySamples(UUID);
-  });
+  );
 
   RPC.handle('GetClientVitalsHistory', async (_Event: unknown, UUID: unknown) => {
     try {

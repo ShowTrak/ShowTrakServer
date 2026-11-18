@@ -16,6 +16,9 @@ import {
   setMonitorHistorySeries,
   setMonitorHistoryTooltipHover,
 } from './state';
+import type { MonitorHistorySeriesEntry } from './state';
+import { MONITOR_HISTORY_WINDOW_MS } from './lib/history-window';
+import { DisposeMonitoringNotePopovers } from './monitoring-editor/method-fields';
 import type {
   ClientApplicationHistorySeries,
   ClientAudioHistorySeries,
@@ -172,20 +175,108 @@ export function IsMonitorHistoryContextFor(entityType: string, id: string | numb
 // Fetch the raw sample series backing the open modal. For a monitoring target
 // this pulls one series per check; for a dummy client it pulls its single
 // uptime series.
-// Loads never overlap. Each clears the shared series and refills it across many
-// awaits, so two at once (the modal reloads on every client heartbeat and every
-// monitor update) interleaved and drew a series twice, and a slow IPC round
-// let them pile up. A call that lands mid-load joins it and causes exactly one
-// more load after it, which reads the context as it is by then; every caller's
-// promise settles only once the latest load is in, so a render after awaiting
-// it always draws current data.
+// Loads never overlap. Each fills a fresh set of series across many awaits and
+// swaps it in whole at the end, so two at once (the modal reloads on client
+// heartbeats and monitor updates) cannot interleave, a render that lands
+// mid-load draws the last complete set rather than a half-filled one, and a
+// slow IPC round cannot let them pile up. A forced call that lands mid-load
+// joins it and causes exactly one more load after it, which reads the context
+// as it is by then; every caller's promise settles only once the latest load is
+// in, so a render after awaiting it always draws current data.
 let HistoryLoadInFlight: Promise<void> | null = null;
 let HistoryLoadAgain = false;
 
-export function LoadHistorySamplesForContext(): Promise<void> {
+// Live pushes (a client heartbeat every second, every monitor update) reload
+// the open modal's history at most this often. Each reload is a round of IPC
+// reads (nine for a client), and every one of them used to run on every push.
+// Between reloads the status cards still update on every push, as they read
+// the live entity; only the timelines wait, and a change of state does not:
+// a render that draws a different set of states than the last load saw forces
+// a reload at once (see NoteRenderedHistoryStates).
+export const HISTORY_RELOAD_INTERVAL_MS = 15 * 1000;
+
+// How far back a load asks for. The timelines and charts draw the last hour;
+// the margin covers a browser whose clock runs ahead of the server's (the
+// server applies the window by its own clock). The metric series (CPU and
+// memory, FreeKiosk readings) are still read whole: their charts carry the
+// last reading before the window forward into it.
+export const HISTORY_FETCH_WINDOW_MS = MONITOR_HISTORY_WINDOW_MS + 10 * 60 * 1000;
+
+// The status-history reads take an optional trailing window (see
+// main/registrars/monitoring.ts). The shared preload typings predate it.
+interface WindowedHistoryApi {
+  GetMonitoringCheckHistory(CheckID: number, WindowMs?: number): Promise<HistorySample[]>;
+  GetDummyClientHistory(UUID: string, WindowMs?: number): Promise<HistorySample[]>;
+  GetClientHistory(UUID: string, WindowMs?: number): Promise<HistorySample[]>;
+  GetClientApplicationHistory(
+    UUID: string,
+    WindowMs?: number
+  ): Promise<ClientApplicationHistorySeries[]>;
+  GetClientUSBHistory(UUID: string, WindowMs?: number): Promise<ClientUSBHistorySeries[]>;
+  GetClientDisplayHistory(UUID: string, WindowMs?: number): Promise<ClientDisplayHistorySeries[]>;
+  GetClientAudioHistory(UUID: string, WindowMs?: number): Promise<ClientAudioHistorySeries[]>;
+  GetClientNetworkHistory(UUID: string, WindowMs?: number): Promise<ClientNetworkHistorySeries[]>;
+  GetClientStorageHistory(UUID: string, WindowMs?: number): Promise<ClientStorageHistorySeries[]>;
+  GetClientSystemCheckHistory(
+    UUID: string,
+    WindowMs?: number
+  ): Promise<Array<{ CheckKey?: string; samples?: HistorySample[] }>>;
+}
+
+function HistoryApi(): WindowedHistoryApi {
+  return window.API as unknown as WindowedHistoryApi;
+}
+
+/** The entity a load or render is for, as one comparable key. */
+export function HistoryContextKey(
+  Context: { type?: string; id?: string | number } | null | undefined
+): string | null {
+  if (!Context || !Context.type) return null;
+  return `${Context.type}:${String(Context.id ?? '')}`;
+}
+
+/** The last load: which entity, and when it started. */
+export interface HistoryLoadStamp {
+  Key: string;
+  At: number;
+}
+
+/**
+ * Whether a live push should reload the history: a different entity than the
+ * last load, or that load is HISTORY_RELOAD_INTERVAL_MS old. Pure.
+ */
+export function HistoryReloadDue(
+  Last: HistoryLoadStamp | null,
+  Key: string | null,
+  Now: number,
+  IntervalMs: number = HISTORY_RELOAD_INTERVAL_MS
+): boolean {
+  if (!Key) return false;
+  if (!Last || Last.Key !== Key) return true;
+  return Now - Last.At >= IntervalMs || Now < Last.At;
+}
+
+let LastHistoryLoad: HistoryLoadStamp | null = null;
+// The states the first render after the last load drew (null until then).
+let HistoryStatesAtLoad: string | null = null;
+// Which entity the series in MonitorHistorySeries belong to.
+let HistorySeriesKey: string | null = null;
+
+/**
+ * Load the open modal's history. A live push calls it bare and gets a reload
+ * only when one is due (HistoryReloadDue); opening the modal, or anything else
+ * that must have fresh data, passes Force.
+ */
+export function LoadHistorySamplesForContext(Options: { Force?: boolean } = {}): Promise<void> {
   if (HistoryLoadInFlight) {
-    HistoryLoadAgain = true;
+    // A forced load must see the context as it is now, so it queues another
+    // round; a live push just waits for the one already running.
+    if (Options.Force) HistoryLoadAgain = true;
     return HistoryLoadInFlight;
+  }
+  const Key = HistoryContextKey(MonitorHistoryModalContext);
+  if (!Options.Force && Key && !HistoryReloadDue(LastHistoryLoad, Key, Date.now())) {
+    return Promise.resolve();
   }
   HistoryLoadInFlight = (async () => {
     try {
@@ -209,13 +300,41 @@ export function LoadHistorySamplesForContext(): Promise<void> {
   return HistoryLoadInFlight;
 }
 
+/**
+ * After a render: if the states it drew differ from those drawn right after
+ * the last load, something changed state since, and the timelines should show
+ * it now rather than at the next timed reload.
+ */
+function NoteRenderedHistoryStates(Key: string | null, States: string) {
+  if (!Key || !LastHistoryLoad || LastHistoryLoad.Key !== Key) return;
+  if (HistoryStatesAtLoad === null) {
+    HistoryStatesAtLoad = States;
+    return;
+  }
+  if (HistoryStatesAtLoad === States) return;
+  HistoryStatesAtLoad = States;
+  LoadHistorySamplesForContext({ Force: true })
+    .then(() => {
+      if (HistoryContextKey(MonitorHistoryModalContext) === Key) RenderMonitoringHistoryModal();
+    })
+    .catch((Err) => HandleNonFatalError('Monitoring:ReloadHistoryOnStateChange', Err));
+}
+
 async function LoadHistorySamplesOnce() {
-  setMonitorHistorySeries([]);
+  const LoadKey = HistoryContextKey(MonitorHistoryModalContext);
+  // Another entity's series must not be drawn under this one while it loads.
+  if (LoadKey !== HistorySeriesKey) setMonitorHistorySeries([]);
+  HistorySeriesKey = LoadKey;
+  LastHistoryLoad = LoadKey ? { Key: LoadKey, At: Date.now() } : null;
+  HistoryStatesAtLoad = null;
   const entity = ResolveMonitorHistoryContextEntity();
-  if (!entity) return;
+  if (!entity) {
+    setMonitorHistorySeries([]);
+    return;
+  }
   if (entity.type === 'freekiosk') {
-    // A terminal has ~60 series and this reloads on every push while the modal
-    // is open, so they come back in one call rather than one call per metric.
+    // A terminal has ~60 series, so they come back in one call rather than
+    // one call per metric.
     try {
       SetFreeKioskSeries(await window.API.GetFreeKioskHistory(entity.id));
     } catch {
@@ -223,52 +342,61 @@ async function LoadHistorySamplesOnce() {
     }
     return;
   }
+  const Api = HistoryApi();
+  const Window = HISTORY_FETCH_WINDOW_MS;
+  const Series: MonitorHistorySeriesEntry[] = [];
+  // Swapped in whole once complete (see above), unless the modal moved on to
+  // another entity while this one was loading.
+  const Commit = () => {
+    if (HistoryContextKey(MonitorHistoryModalContext) === LoadKey) setMonitorHistorySeries(Series);
+  };
   if (entity.type === 'target') {
     const checks = Array.isArray(entity.target.Checks) ? entity.target.Checks : [];
     for (const check of checks) {
       if (!check || check.CheckID == null) continue;
       let samples: HistorySample[] = [];
       try {
-        samples = await window.API.GetMonitoringCheckHistory(check.CheckID);
+        samples = await Api.GetMonitoringCheckHistory(Number(check.CheckID), Window);
       } catch {
         samples = [];
       }
-      MonitorHistorySeries.push({
+      Series.push({
         checkID: Number(check.CheckID),
         samples: Array.isArray(samples) ? samples : [],
       });
     }
+    Commit();
     return;
   }
   if (entity.type === 'dummy') {
     let samples: HistorySample[] = [];
     try {
-      samples = await window.API.GetDummyClientHistory(String(entity.id));
+      samples = await Api.GetDummyClientHistory(String(entity.id), Window);
     } catch {
       samples = [];
     }
-    MonitorHistorySeries.push({ dummy: true, samples: Array.isArray(samples) ? samples : [] });
+    Series.push({ dummy: true, samples: Array.isArray(samples) ? samples : [] });
   }
   if (entity.type === 'client') {
     let samples: HistorySample[] = [];
     try {
-      samples = await window.API.GetClientHistory(String(entity.id));
+      samples = await Api.GetClientHistory(String(entity.id), Window);
     } catch {
       samples = [];
     }
-    MonitorHistorySeries.push({ client: true, samples: Array.isArray(samples) ? samples : [] });
+    Series.push({ client: true, samples: Array.isArray(samples) ? samples : [] });
 
     // Per-critical-application running/not-running series. Each entry drives its
     // own status timeline in the modal, mirroring per-check monitoring rows.
     let apps: ClientApplicationHistorySeries[] = [];
     try {
-      apps = await window.API.GetClientApplicationHistory(String(entity.id));
+      apps = await Api.GetClientApplicationHistory(String(entity.id), Window);
     } catch {
       apps = [];
     }
     for (const App of Array.isArray(apps) ? apps : []) {
       if (!App || !App.Key) continue;
-      MonitorHistorySeries.push({
+      Series.push({
         applicationKey: String(App.Key),
         applicationName: App.Name ? String(App.Name) : String(App.Key),
         samples: Array.isArray(App.samples) ? App.samples : [],
@@ -279,13 +407,13 @@ async function LoadHistorySamplesOnce() {
     // its own status timeline in the modal, mirroring per-check monitoring rows.
     let usb: ClientUSBHistorySeries[] = [];
     try {
-      usb = await window.API.GetClientUSBHistory(String(entity.id));
+      usb = await Api.GetClientUSBHistory(String(entity.id), Window);
     } catch {
       usb = [];
     }
     for (const Device of Array.isArray(usb) ? usb : []) {
       if (!Device || !Device.Serial) continue;
-      MonitorHistorySeries.push({
+      Series.push({
         usbSerial: String(Device.Serial),
         usbName: Device.Name ? String(Device.Name) : String(Device.Serial),
         samples: Array.isArray(Device.samples) ? Device.samples : [],
@@ -296,13 +424,13 @@ async function LoadHistorySamplesOnce() {
     // its own status timeline in the modal, mirroring per-check monitoring rows.
     let displays: ClientDisplayHistorySeries[] = [];
     try {
-      displays = await window.API.GetClientDisplayHistory(String(entity.id));
+      displays = await Api.GetClientDisplayHistory(String(entity.id), Window);
     } catch {
       displays = [];
     }
     for (const Display of Array.isArray(displays) ? displays : []) {
       if (!Display || !Display.DisplayID) continue;
-      MonitorHistorySeries.push({
+      Series.push({
         displayID: String(Display.DisplayID),
         displayName: Display.Name ? String(Display.Name) : String(Display.DisplayID),
         samples: Array.isArray(Display.samples) ? Display.samples : [],
@@ -312,13 +440,13 @@ async function LoadHistorySamplesOnce() {
     // Per-critical-audio-endpoint series (connected / conditions broken / missing).
     let audio: ClientAudioHistorySeries[] = [];
     try {
-      audio = await window.API.GetClientAudioHistory(String(entity.id));
+      audio = await Api.GetClientAudioHistory(String(entity.id), Window);
     } catch {
       audio = [];
     }
     for (const Endpoint of Array.isArray(audio) ? audio : []) {
       if (!Endpoint || !Endpoint.EndpointID) continue;
-      MonitorHistorySeries.push({
+      Series.push({
         audioEndpointID: String(Endpoint.EndpointID),
         audioName: Endpoint.Name ? String(Endpoint.Name) : String(Endpoint.EndpointID),
         samples: Array.isArray(Endpoint.samples) ? Endpoint.samples : [],
@@ -328,13 +456,13 @@ async function LoadHistorySamplesOnce() {
     // Per-critical-network-interface series (connected / conditions broken / missing).
     let network: ClientNetworkHistorySeries[] = [];
     try {
-      network = await window.API.GetClientNetworkHistory(String(entity.id));
+      network = await Api.GetClientNetworkHistory(String(entity.id), Window);
     } catch {
       network = [];
     }
     for (const Iface of Array.isArray(network) ? network : []) {
       if (!Iface || !Iface.InterfaceName) continue;
-      MonitorHistorySeries.push({
+      Series.push({
         networkInterfaceName: String(Iface.InterfaceName),
         samples: Array.isArray(Iface.samples) ? Iface.samples : [],
       });
@@ -343,13 +471,13 @@ async function LoadHistorySamplesOnce() {
     // Per-monitored-storage-volume series (mounted / conditions broken / missing).
     let storage: ClientStorageHistorySeries[] = [];
     try {
-      storage = await window.API.GetClientStorageHistory(String(entity.id));
+      storage = await Api.GetClientStorageHistory(String(entity.id), Window);
     } catch {
       storage = [];
     }
     for (const Volume of Array.isArray(storage) ? storage : []) {
       if (!Volume || !Volume.MountPoint) continue;
-      MonitorHistorySeries.push({
+      Series.push({
         storageMountPoint: String(Volume.MountPoint),
         samples: Array.isArray(Volume.samples) ? Volume.samples : [],
       });
@@ -359,7 +487,7 @@ async function LoadHistorySamplesOnce() {
     // memory readings their line charts are drawn from.
     let checks: Array<{ CheckKey?: string; samples?: HistorySample[] }> = [];
     try {
-      checks = await window.API.GetClientSystemCheckHistory(String(entity.id));
+      checks = await Api.GetClientSystemCheckHistory(String(entity.id), Window);
     } catch {
       checks = [];
     }
@@ -376,7 +504,7 @@ async function LoadHistorySamplesOnce() {
     );
     for (const Key of SYSTEM_CHECK_ORDER) {
       const Samples = ChecksByKey.get(Key);
-      MonitorHistorySeries.push({
+      Series.push({
         systemCheckKey: Key,
         samples: Array.isArray(Samples) ? Samples : [],
         ...(Key === 'cpu' ? { metricSamples: Array.isArray(vitals.Cpu) ? vitals.Cpu : [] } : {}),
@@ -384,6 +512,7 @@ async function LoadHistorySamplesOnce() {
       });
     }
   }
+  Commit();
 }
 
 export function MonitorStateLabel(State: string) {
@@ -615,12 +744,18 @@ export function BuildLiveStatusText(State: string, LatencyMs: number | null, Err
   return Latency ? `Online · ${Latency}` : 'Online';
 }
 
+// While the view modal renders: every status card's name and state, in order.
+// Which states are on screen is what decides whether the timelines need a
+// reload sooner than the timed one (NoteRenderedHistoryStates).
+let RenderedCardStates: string[] | null = null;
+
 export function RenderMonitorStatusCard(Options: MonitorStatusCardOptions) {
   const State = Options.state || 'IDLE';
   const Name = Options.name || 'Unnamed';
   const Sub = Options.sub || '';
   const Badge = Options.badge || '';
   const StatusText = Options.statusText || MonitorStateLabel(State);
+  if (RenderedCardStates) RenderedCardStates.push(`${Name}\u0001${State}`);
   const SubHtml = Sub ? `<small class="monitor-status-card-sub">${Safe(Sub)}</small>` : '';
   const BadgeHtml = Badge
     ? `<span class="badge monitor-status-card-badge">${Safe(Badge)}</span>`
@@ -649,7 +784,7 @@ export async function OpenFreeKioskTerminalHistory(
   ResetClientInfoTab();
   setMonitorHistoryModalContext({ type: 'freekiosk', id: String(UUID) });
   await Promise.all([
-    LoadHistorySamplesForContext(),
+    LoadHistorySamplesForContext({ Force: true }),
     MountFreeKioskInfoEditor(String(UUID)).catch((err) =>
       HandleNonFatalError('Monitoring:OpenFreeKioskTerminalHistory:MountSettings', err)
     ),
@@ -678,7 +813,8 @@ export function RenderMonitoringHistoryModal() {
   // once the field loses focus.
   if (Entity.type === 'freekiosk' && HoldFreeKioskModalRender()) return;
 
-  $('#CLIENT_INFO_TITLE').text(Entity.title);
+  const Title = document.getElementById('CLIENT_INFO_TITLE');
+  if (Title && Title.textContent !== Entity.title) Title.textContent = Entity.title;
   // The client detail fields (nickname, vitals, USB, network, apps) only make
   // sense for real clients; monitoring targets and dummy clients show just the
   // status timeline. RenderClientInfoDetails owns the per-section gating for
@@ -704,31 +840,115 @@ export function RenderMonitoringHistoryModal() {
 
   const $timelines = $('#MONITOR_HISTORY_TIMELINES');
   if (!$timelines.length) return;
-  // Emptying the pane collapses it, which clamps the scroll position to the top;
-  // live pushes re-render every few seconds, so hold the operator's place.
-  const $content = $('#CLIENT_INFO_CONTENT');
-  const ScrollTop = $content.scrollTop() || 0;
-  $timelines.empty();
+  const Timelines = $timelines[0] as HTMLElement;
   // FreeKiosk terminals and monitoring targets spread themselves across several
   // tabs, so they wrap each part in its own pane; everything else is the Status
   // tab as a whole.
-  if (Entity.type === 'freekiosk' || Entity.type === 'target') {
-    $timelines.removeAttr('data-client-info-tab');
-  } else $timelines.attr('data-client-info-tab', 'status');
+  const PaneTab = Entity.type === 'freekiosk' || Entity.type === 'target' ? null : 'status';
+  if (Timelines.getAttribute('data-client-info-tab') !== PaneTab) {
+    if (PaneTab) Timelines.setAttribute('data-client-info-tab', PaneTab);
+    else Timelines.removeAttribute('data-client-info-tab');
+  }
 
-  RenderMonitoringHistoryEntity(Entity, $timelines);
+  const Key = HistoryContextKey(MonitorHistoryModalContext);
+  RenderedCardStates = [];
+  let Drawn: TimelineParts | null = null;
+  try {
+    Drawn = Entity.type === 'freekiosk' ? null : BuildMonitoringHistoryParts(Entity);
+  } finally {
+    const States = RenderedCardStates.join('\u0002');
+    RenderedCardStates = null;
+    NoteRenderedHistoryStates(Key, States);
+  }
 
-  RefreshClientInfoTabs();
-  if (($content.scrollTop() || 0) !== ScrollTop) $content.scrollTop(ScrollTop);
-  // Again, now that the inactive panes are hidden and the scroll is back: the
-  // pointer lookup inside depends on the final layout.
+  // A live push lands every second or so. When the pane already holds this
+  // entity's sections, only those whose markup changed are swapped, so the pane
+  // never collapses and the scroll position needs no saving: reading it right
+  // after the dashboard tiles were patched forced a layout of the whole page.
+  if (!Drawn || !PatchTimelineParts(Timelines, String(Key), Drawn.Parts)) {
+    // Emptying the pane collapses it, which clamps the scroll position to the
+    // top, so the operator's place is held across a full redraw.
+    const $content = $('#CLIENT_INFO_CONTENT');
+    const ScrollTop = $content.scrollTop() || 0;
+    // Bootstrap 5.0 keeps every popover it made (and a modal hide handler for
+    // each) until disposed, so the FreeKiosk tabs' note popovers are let go
+    // before their elements are.
+    DisposeMonitoringNotePopovers(Timelines);
+    $timelines.empty();
+    DrawnTimelines = null;
+    if (Drawn) {
+      Timelines.innerHTML = Drawn.Parts.join('');
+      DrawnTimelines = {
+        Key: String(Key),
+        Parts: Drawn.Parts.slice(),
+        Els: Array.from(Timelines.children),
+      };
+    } else {
+      // Every metric with its own chart, plus the capture and control panels.
+      RenderFreeKioskModal($timelines);
+    }
+    RefreshClientInfoTabs();
+    if (($content.scrollTop() || 0) !== ScrollTop) $content.scrollTop(ScrollTop);
+  } else {
+    RefreshClientInfoTabs();
+  }
+  if (Drawn && Drawn.After) Drawn.After();
+  // Now that the inactive panes are hidden and the scroll is back: the pointer
+  // lookup inside depends on the final layout.
   RestoreStatusTimelineTooltipAfterRender();
 }
 
-function RenderMonitoringHistoryEntity(
-  Entity: MonitorHistoryEntity,
-  $timelines: JQuery<HTMLElement>
-) {
+/** The view modal's timelines pane as markup: one top-level element per part. */
+interface TimelineParts {
+  Parts: string[];
+  /** Run once the parts are on screen. */
+  After?: () => void;
+}
+
+// What the timelines pane was last drawn from: the entity, each child's markup
+// and the child drawn from it, so the next render can swap just the children
+// whose markup changed.
+let DrawnTimelines: { Key: string; Parts: string[]; Els: Element[] } | null = null;
+
+/** The single element a part's markup describes, or null if it is not one. */
+function ElementFromPart(Html: string): Element | null {
+  const Template = document.createElement('template');
+  Template.innerHTML = Html.trim();
+  return Template.content.childElementCount === 1 ? Template.content.firstElementChild : null;
+}
+
+/**
+ * Swap the changed children of a pane drawn from the same entity's parts.
+ * False (nothing touched or only some parts swapped) when it is not that pane
+ * any more, or a part is not exactly one element: the caller redraws it whole.
+ */
+function PatchTimelineParts(Container: HTMLElement, Key: string, Parts: string[]): boolean {
+  const Drawn = DrawnTimelines;
+  if (
+    !Drawn ||
+    Drawn.Key !== Key ||
+    Drawn.Parts.length !== Parts.length ||
+    Container.childElementCount !== Drawn.Els.length ||
+    Drawn.Els.some((El, Index) => Container.children[Index] !== El)
+  ) {
+    return false;
+  }
+  for (let Index = 0; Index < Parts.length; Index++) {
+    const Part = Parts[Index]!;
+    if (Part === Drawn.Parts[Index]) continue;
+    const Next = ElementFromPart(Part);
+    if (!Next) return false;
+    Drawn.Els[Index]!.replaceWith(Next);
+    Drawn.Els[Index] = Next;
+    Drawn.Parts[Index] = Part;
+  }
+  return true;
+}
+
+function BuildMonitoringHistoryParts(
+  Entity: Exclude<MonitorHistoryEntity, { type: 'freekiosk' }>
+): TimelineParts {
+  const Parts: string[] = [];
   if (Entity.type === 'target') {
     const Target = Entity.target;
     const Checks = Array.isArray(Target.Checks) ? Target.Checks : [];
@@ -805,18 +1025,19 @@ function RenderMonitoringHistoryEntity(
       (CheckSections.length
         ? ''
         : '<div class="status-timeline-empty">This target has no checks yet.</div>');
-    $timelines.append(
-      `<div class="monitor-tab-pane" data-client-info-tab="status">${StatusHtml}</div>`
-    );
-    $timelines.append(
+    Parts.push(`<div class="monitor-tab-pane" data-client-info-tab="status">${StatusHtml}</div>`);
+    Parts.push(
       `<div class="monitor-tab-pane" data-client-info-tab="actions">${RenderTargetActionsPane(
         Target
       )}</div>`
     );
-    ApplyLiveLevels();
-    PositionOpenActionsMenu();
-    RestoreStatusTimelineTooltipAfterRender();
-    return;
+    return {
+      Parts,
+      After: () => {
+        ApplyLiveLevels();
+        PositionOpenActionsMenu();
+      },
+    };
   }
 
   // Client: a single online/degraded status series and one status card. The
@@ -827,7 +1048,7 @@ function RenderMonitoringHistoryEntity(
     const Client = Entity.client || ({} as Partial<ClientView>);
     const ClientState = Client.Online ? (Client.Degraded ? 'DEGRADED' : 'ONLINE') : 'OFFLINE';
     const StatusText = GetClientStatusDisplayText(Client);
-    $timelines.append(
+    Parts.push(
       RenderMonitorHistorySection(
         {
           state: ClientState,
@@ -853,7 +1074,7 @@ function RenderMonitoringHistoryEntity(
         Key === 'cpu' || Key === 'ram'
           ? UsageChartHtml(Card, Viewed, (Series && Series.metricSamples) || [])
           : RenderStatusTimeline(BuildStatusBlocksFromSamples((Series && Series.samples) || []));
-      $timelines.append(
+      Parts.push(
         `<div class="monitor-history-section">` +
           RenderMonitorStatusCard({
             state: Live.State,
@@ -902,7 +1123,7 @@ function RenderMonitoringHistoryEntity(
         LiveState = IsRunning ? 'ONLINE' : 'OFFLINE';
         StatusLabel = IsRunning ? 'Running' : 'Not Running';
       }
-      $timelines.append(
+      Parts.push(
         RenderMonitorHistorySection(
           {
             state: LiveState,
@@ -941,7 +1162,7 @@ function RenderMonitoringHistoryEntity(
       const Product = Device.ProductName ? String(Device.ProductName).trim() : '';
       const Name = [Manufacturer, Product].filter(Boolean).join(' ') || 'USB Device';
       const Live = USBTimelineLiveState([Device], !!Client.Online);
-      $timelines.append(
+      Parts.push(
         RenderMonitorHistorySection(
           {
             state: Live.State,
@@ -987,7 +1208,7 @@ function RenderMonitoringHistoryEntity(
             .toLowerCase() === NameKey
       );
       const Live = USBTimelineLiveState(Group, !!Client.Online);
-      $timelines.append(
+      Parts.push(
         RenderMonitorHistorySection(
           {
             state: Live.State,
@@ -1026,7 +1247,7 @@ function RenderMonitoringHistoryEntity(
       const Name =
         Display.Label && String(Display.Label).trim() ? String(Display.Label).trim() : 'Display';
       const Live = DisplayTimelineLiveState(Display, !!Client.Online);
-      $timelines.append(
+      Parts.push(
         RenderMonitorHistorySection(
           {
             state: Live.State,
@@ -1053,7 +1274,7 @@ function RenderMonitoringHistoryEntity(
     for (const Endpoint of AudioEndpoints) {
       if (!Endpoint || !Endpoint.IsCritical || !Endpoint.EndpointID) continue;
       const Live = AudioTimelineLiveState(Endpoint, !!Client.Online);
-      $timelines.append(
+      Parts.push(
         RenderMonitorHistorySection(
           {
             state: Live.State,
@@ -1081,7 +1302,7 @@ function RenderMonitoringHistoryEntity(
     for (const Iface of Interfaces) {
       if (!Iface || !Iface.IsCritical || !Iface.Name) continue;
       const Live = NetworkTimelineLiveState(Iface, !!Client.Online);
-      $timelines.append(
+      Parts.push(
         RenderMonitorHistorySection(
           {
             state: Live.State,
@@ -1108,7 +1329,7 @@ function RenderMonitoringHistoryEntity(
     for (const Volume of Volumes) {
       if (!Volume || !Volume.IsCritical || !Volume.MountPoint) continue;
       const Live = StorageTimelineLiveState(Volume, !!Client.Online);
-      $timelines.append(
+      Parts.push(
         RenderMonitorHistorySection(
           {
             state: Live.State,
@@ -1121,15 +1342,7 @@ function RenderMonitoringHistoryEntity(
       );
     }
 
-    RestoreStatusTimelineTooltipAfterRender();
-    return;
-  }
-
-  if (Entity.type === 'freekiosk') {
-    // Every metric with its own chart, plus the capture and control panels.
-    RenderFreeKioskModal($timelines);
-    RestoreStatusTimelineTooltipAfterRender();
-    return;
+    return { Parts };
   }
 
   // Dummy client: a single uptime series and one status card.
@@ -1143,7 +1356,7 @@ function RenderMonitoringHistoryEntity(
         ? 'DEGRADED'
         : 'ONLINE'
       : 'OFFLINE';
-  $timelines.append(
+  Parts.push(
     RenderMonitorHistorySection(
       {
         state: DummyState,
@@ -1154,7 +1367,7 @@ function RenderMonitoringHistoryEntity(
       Blocks
     )
   );
-  RestoreStatusTimelineTooltipAfterRender();
+  return { Parts };
 }
 
 /** Open a monitor's view modal, optionally on a given tab (the tile cog opens Settings). */
@@ -1174,7 +1387,7 @@ export async function OpenMonitoringTargetHistory(
   setMonitorHistoryModalContext({ type: 'target', id: Number(Target.TargetID) });
   setMonitorHistorySeries([]);
   await Promise.all([
-    LoadHistorySamplesForContext(),
+    LoadHistorySamplesForContext({ Force: true }),
     MountMonitorInfoEditor(Number(Target.TargetID)).catch((err) =>
       HandleNonFatalError('Monitoring:OpenMonitoringTargetHistory:MountSettings', err)
     ),
@@ -1217,7 +1430,7 @@ export async function OpenDummyClientHistory(
   setMonitorHistoryModalContext({ type: 'dummy', id: DummyUUID });
   setMonitorHistorySeries([]);
   await Promise.all([
-    LoadHistorySamplesForContext(),
+    LoadHistorySamplesForContext({ Force: true }),
     MountDummyInfoEditor(DummyUUID).catch((err) =>
       HandleNonFatalError('Monitoring:OpenDummyClientHistory:MountSettings', err)
     ),

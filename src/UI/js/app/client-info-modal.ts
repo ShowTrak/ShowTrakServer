@@ -108,7 +108,7 @@ export async function OpenClientInfo(UUID: string, Options: { Tab?: ClientInfoTa
     MountClientInfoEditor(Client).catch((err) =>
       HandleNonFatalError('OpenClientInfo:MountEditor', err)
     ),
-    LoadHistorySamplesForContext().catch((err) =>
+    LoadHistorySamplesForContext({ Force: true }).catch((err) =>
       HandleNonFatalError('OpenClientInfo:LoadHistory', err)
     ),
   ]);

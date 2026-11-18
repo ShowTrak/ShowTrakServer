@@ -56,7 +56,24 @@ export interface ListSearchEntities {
  * found by exactly the tags its badges show, and by hidden tags as well, which
  * exist to target machines and are just as much a way of naming them.
  */
-export function BuildListSearchIndex(Entities: ListSearchEntities): Map<string, string[]> {
+/**
+ * Tag labels resolved per row, kept across builds while the tag list is the
+ * same array. A live search rebuilds the index after every heartbeat, and
+ * resolving each row's tags was most of the work.
+ */
+export interface ListSearchTagMemo {
+  Tags: unknown;
+  Labels: Map<string, string[]>;
+}
+
+export function CreateListSearchTagMemo(): ListSearchTagMemo {
+  return { Tags: null, Labels: new Map() };
+}
+
+export function BuildListSearchIndex(
+  Entities: ListSearchEntities,
+  Memo?: ListSearchTagMemo
+): Map<string, string[]> {
   const GroupTitles = new Map<number | null, string>();
   for (const Group of Entities.Groups || []) {
     if (!Group) continue;
@@ -64,6 +81,18 @@ export function BuildListSearchIndex(Entities: ListSearchEntities): Map<string, 
   }
   const Tags = Array.isArray(Entities.Tags) ? Entities.Tags : [];
   const Out = new Map<string, string[]>();
+  if (Memo && Memo.Tags !== Entities.Tags) {
+    Memo.Tags = Entities.Tags;
+    Memo.Labels = new Map();
+  }
+  const LabelsFor = (ScopedID: string, Group: number | null): string[] => {
+    const MemoKey = `${ScopedID}\u0000${Group ?? ''}`;
+    const Known = Memo ? Memo.Labels.get(MemoKey) : undefined;
+    if (Known) return Known;
+    const Labels = ResolveEntityTags(Tags, { ScopedID, GroupID: Group }).map(TagBadgeLabel);
+    if (Memo) Memo.Labels.set(MemoKey, Labels);
+    return Labels;
+  };
 
   const Add = (
     Key: string,
@@ -72,7 +101,7 @@ export function BuildListSearchIndex(Entities: ListSearchEntities): Map<string, 
     Fields: unknown[]
   ) => {
     const Group = GroupID ?? null;
-    const TagLabels = ResolveEntityTags(Tags, { ScopedID, GroupID: Group }).map(TagBadgeLabel);
+    const TagLabels = LabelsFor(ScopedID, Group);
     Out.set(
       Key,
       [...Fields, GroupTitles.get(Group) ?? '', ...TagLabels]

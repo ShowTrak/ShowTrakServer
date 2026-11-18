@@ -377,6 +377,18 @@ export function InitMonitoringNotePopovers(HostSelector = MONITORING_FIELD_HOSTS
     });
 }
 
+// Let go of the note popovers under `Root`. Bootstrap 5.0 keeps every popover
+// it creates (and, inside a modal, a hide handler on that modal) until it is
+// disposed, and disposal has to happen while the element is still in the modal
+// for that handler to come off. Call before replacing the markup they sit in.
+export function DisposeMonitoringNotePopovers(Root: Element | null | undefined) {
+  if (!Root || typeof bootstrap === 'undefined' || !bootstrap.Popover) return;
+  for (const El of Array.from(Root.querySelectorAll('.monitoring-note'))) {
+    const Instance = bootstrap.Popover.getInstance(El);
+    if (Instance) Instance.dispose();
+  }
+}
+
 // Read a settings field's current value from the DOM as a comparable string.
 // Booleans normalise to 'true' / 'false' to match how VisibleWhen values are
 // serialised into the wrapper's data attribute.

@@ -30,7 +30,8 @@ const WEB_HEAD =
   '    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />\n' +
   '    <meta name="theme-color" content="#6d5bd0" />\n' +
   '    <link rel="manifest" href="/manifest.webmanifest" />\n' +
-  '    <link rel="apple-touch-icon" href="/images/icon.png" />';
+  // The 192px render of the same artwork (the 1024px original is 156 KB).
+  '    <link rel="apple-touch-icon" href="/img/icon-filled.png" />';
 
 function buildIndexHtml() {
   const srcIndex = path.join(SRC_UI, 'index.html');

@@ -14,11 +14,11 @@ const OFFLINE_SINCE_SELECTOR =
 // for itself, so a newly offline tile never shows a stale count for a tick.
 export async function UpdateOfflineIndicators(Root?: Element | null) {
   const CurrentTime = new Date().getTime();
-  const Scope = Root ? $(Root) : $(document);
-  Scope.find(OFFLINE_SINCE_SELECTOR).each(function () {
-    if (this.parentElement && this.parentElement.classList.contains('d-none')) return;
-    const LastSeenRaw = $(this).attr('data-offlinesince');
-    if (!LastSeenRaw) return;
+  const Scope: ParentNode = Root || document;
+  for (const El of Array.from(Scope.querySelectorAll<HTMLElement>(OFFLINE_SINCE_SELECTOR))) {
+    if (El.parentElement && El.parentElement.classList.contains('d-none')) continue;
+    const LastSeenRaw = El.getAttribute('data-offlinesince');
+    if (!LastSeenRaw) continue;
     const LastSeen = parseInt(LastSeenRaw);
     const OfflineDuration = CurrentTime - LastSeen;
     const Hours = Math.floor(OfflineDuration / (1000 * 60 * 60));
@@ -28,11 +28,15 @@ export async function UpdateOfflineIndicators(Root?: Element | null) {
     const MM = String(Minutes).padStart(2, '0');
     const SS = String(Seconds).padStart(2, '0');
     const Text = `${HH}:${MM}:${SS}`;
-    // Rebuilding the badge markup is skipped when the count has not moved.
-    if (this.getAttribute('data-offline-text') === Text) return;
-    this.setAttribute('data-offline-text', Text);
-    $(this).html(OfflineBadgeContent(Text));
-  });
+    // Only the count's text node changes each second; the badge is rebuilt
+    // only if something replaced it.
+    const Badge = El.querySelector<HTMLElement>('.badge');
+    if (Badge) {
+      if (Badge.textContent !== Text) Badge.textContent = Text;
+    } else {
+      El.innerHTML = OfflineBadgeContent(Text);
+    }
+  }
 }
 
 // Tick every second. Called by the bootstrap orchestrator in main.ts, never

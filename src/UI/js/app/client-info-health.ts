@@ -5,6 +5,7 @@
 // an auto-saving conditions table. The decisions live in lib/system-health.
 import type { ClientSystemCheckKey, ClientView, FreeKioskMetricSample } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
+import { ClearRenderKeys, RenderKeyIs, SetRenderKey } from './lib/render-key';
 import { BuildMetricChartModel, RenderMetricChartSvg } from './lib/metric-chart';
 import {
   ParseSystemCheckFields,
@@ -243,8 +244,9 @@ export function RenderClientInfoSystem(Client: ClientView): void {
       SystemCardHtml(SystemCheckCardFor(Client, Key), Client, History)
     ).join('');
     const $List = $(List.Selector);
-    if ($List.attr('data-render-key') === Html) continue;
-    $List.attr('data-render-key', Html).html(Html);
+    if (RenderKeyIs($List[0], Html)) continue;
+    SetRenderKey($List[0], Html);
+    $List.html(Html);
   }
 }
 
@@ -252,7 +254,9 @@ export function RenderClientInfoSystem(Client: ClientView): void {
 export function ClearClientInfoSystem(): void {
   Last = null;
   Pending = false;
-  $(ALL_LISTS).attr('data-render-key', '').html('');
+  const $Lists = $(ALL_LISTS);
+  ClearRenderKeys($Lists.get());
+  $Lists.html('');
 }
 
 /** Read a conditions table back into a request and save it. */
@@ -293,7 +297,7 @@ function SaveConditions(
         Notify(String(Err), 'error');
       }
       // Put back what is really saved.
-      $(ALL_LISTS).attr('data-render-key', '');
+      ClearRenderKeys($(ALL_LISTS).get());
       await Refresh();
     } catch (err) {
       HandleNonFatalError('ClientInfo:SaveSystemConditions', err);

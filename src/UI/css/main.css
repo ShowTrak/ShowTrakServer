@@ -779,21 +779,75 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   place-items: center;
 }
 
-@keyframes pulse-orange {
+/* The pulse is a ring growing out from the icon to 8px and fading as it goes.
+   It runs for as long as any alert is undismissed, which is often the whole
+   show, so it is a pseudo-element animated by transform and opacity, which the
+   compositor runs on its own, rather than an animated box-shadow, which had the
+   page repainted every frame. The ring sits at its full reach (8px out) and is
+   scaled down to the icon's edge: the growth follows the old spread exactly
+   (same keyframes, same easing), and the fade is the old ring's thickness times
+   its alpha, sampled, so it reads as the same amount of colour at each moment. */
+@keyframes pulse-ring-grow {
   0% {
-    box-shadow: 0 0 0 0 rgb(var(--status-graph-degraded-rgb) / 0.55);
+    transform: scale(0.53);
   }
-  70% {
-    box-shadow: 0 0 0 8px rgb(var(--status-graph-degraded-rgb) / 0);
-  }
+  70%,
   100% {
-    box-shadow: 0 0 0 0 rgb(var(--status-graph-degraded-rgb) / 0);
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-ring-fade {
+  0% {
+    opacity: 0;
+  }
+  6% {
+    opacity: 0.24;
+  }
+  14% {
+    opacity: 0.6;
+  }
+  22% {
+    opacity: 0.62;
+  }
+  30% {
+    opacity: 0.47;
+  }
+  39% {
+    opacity: 0.27;
+  }
+  47% {
+    opacity: 0.16;
+  }
+  55% {
+    opacity: 0.06;
+  }
+  70%,
+  100% {
+    opacity: 0;
   }
 }
 
 #ALERTS_BUTTON.has-alerts .bi {
+  position: relative;
   color: rgb(var(--warning-soft-rgb));
-  animation: pulse-orange 1.8s infinite;
+}
+
+#ALERTS_BUTTON.has-alerts .bi::after,
+#FOG_BUTTON.has-tasks .bi::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border: 4px solid var(--pulse-ring-colour);
+  pointer-events: none;
+  opacity: 0;
+  animation:
+    pulse-ring-grow 1.8s infinite,
+    pulse-ring-fade 1.8s linear infinite;
+}
+
+#ALERTS_BUTTON.has-alerts .bi::after {
+  --pulse-ring-colour: rgb(var(--status-graph-degraded-rgb) / 0.55);
 }
 
 /* FOG tasks button: mirrors the alerts button, sits immediately left of it.
@@ -836,21 +890,14 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   place-items: center;
 }
 
-@keyframes pulse-blue {
-  0% {
-    box-shadow: 0 0 0 0 rgb(var(--info-rgb) / 0.5);
-  }
-  70% {
-    box-shadow: 0 0 0 8px rgb(var(--info-rgb) / 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgb(var(--info-rgb) / 0);
-  }
+/* The same ring as the alerts button's (pulse-ring above), in blue. */
+#FOG_BUTTON.has-tasks .bi {
+  position: relative;
+  color: var(--info-text);
 }
 
-#FOG_BUTTON.has-tasks .bi {
-  color: var(--info-text);
-  animation: pulse-blue 1.8s infinite;
+#FOG_BUTTON.has-tasks .bi::after {
+  --pulse-ring-colour: rgb(var(--info-rgb) / 0.5);
 }
 
 /* FOG tasks tray */
@@ -869,7 +916,8 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   box-shadow:
     0 18px 42px rgba(0, 0, 0, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
+  /* No backdrop blur: at 98% opacity it was invisible, yet it re-blurred
+     whatever changed underneath (the live tiles) on every frame. */
   color: #fff;
 }
 #FOG_TRAY .fog-header {
@@ -1035,7 +1083,8 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   box-shadow:
     0 18px 42px rgba(0, 0, 0, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
+  /* No backdrop blur: at 98% opacity it was invisible, yet it re-blurred
+     whatever changed underneath (the live tiles) on every frame. */
   color: #fff;
 }
 #ALERTS_TRAY .alerts-header {
@@ -7737,12 +7786,17 @@ button.monitor-action-label:focus-visible {
   background: rgba(255, 255, 255, 0.12);
 }
 
+/* Meters move ten times a second. The fill is full width and scaled, and the
+   peak line rides a full-width layer that is translated, so a frame is a
+   composited transform rather than a layout of the row (see the CPU/RAM bars).
+   live-levels.ts sets the scale and translation. */
 .live-levels-fill {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
+  inset: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
   background: var(--status-graph-online);
-  transition: width 90ms linear;
+  transition: transform 90ms linear;
 }
 
 .live-levels-fill[data-zone='hot'] {
@@ -7750,14 +7804,24 @@ button.monitor-action-label:focus-visible {
 }
 
 .live-levels-fill[data-zone='clip'],
-.live-levels-peak[data-zone='clip'] {
+.live-levels-peak[data-zone='clip']::after {
   background: var(--status-graph-offline);
 }
 
+/* The layer is the bar's width, so translateX(n%) puts its left edge (and the
+   2px line ending there) n% along the bar. */
 .live-levels-peak {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.live-levels-peak::after {
+  content: '';
   position: absolute;
   top: 0;
   bottom: 0;
+  left: 0;
   width: 2px;
   margin-left: -2px;
   background: #e2e2ea;
@@ -7884,14 +7948,17 @@ body:not(.compact-mode):not(.list-mode)
   background: rgba(0, 0, 0, 0.25);
 }
 
+/* Scaled and translated like the view's meters (.live-levels-fill above):
+   every tile with meters moves ten times a second. */
 .MONITOR_TILE_LEVEL_FILL {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
+  inset: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
   /* White like client CPU/RAM bars (a green bar vanishes on a green tile),
      soft enough that the solid peak line stands out from it. */
   background: rgba(255, 255, 255, 0.55);
-  transition: width 180ms linear;
+  transition: transform 180ms linear;
 }
 
 .MONITOR_TILE_LEVEL_FILL[data-zone='hot'] {
@@ -7899,14 +7966,22 @@ body:not(.compact-mode):not(.list-mode)
 }
 
 .MONITOR_TILE_LEVEL_FILL[data-zone='clip'],
-.MONITOR_TILE_LEVEL_PEAK[data-zone='clip'] {
+.MONITOR_TILE_LEVEL_PEAK[data-zone='clip']::after {
   background: var(--status-graph-offline);
 }
 
 .MONITOR_TILE_LEVEL_PEAK {
   position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.MONITOR_TILE_LEVEL_PEAK::after {
+  content: '';
+  position: absolute;
   top: 0;
   bottom: 0;
+  left: 0;
   width: 2px;
   margin-left: -2px;
   background: #fff;
@@ -8630,8 +8705,10 @@ body.list-mode .LIST_TABLE_HEADER {
      (box padding + row border + row padding). */
   padding: 0 calc(4px + 2px + var(--list-row-padding));
   border-bottom: 1px solid var(--border-subtle);
-  background: rgb(var(--surface-0-rgb) / 0.94);
-  backdrop-filter: blur(6px);
+  /* Near-opaque instead of 94% plus a backdrop blur: the blur re-ran over the
+     rows scrolling and updating underneath on every frame, for a 6% show-through
+     nobody could read anyway. */
+  background: rgb(var(--surface-0-rgb) / 0.97);
   text-align: left;
 }
 

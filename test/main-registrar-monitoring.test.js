@@ -240,6 +240,38 @@ test('every history reader falls back to [] on invalid input, never null', async
   assert.deepEqual(historyCalls, [], 'no history lookup should have been attempted');
 });
 
+test('a history read with a window returns only the samples inside it', async () => {
+  // The view modal draws the last hour; without a window every series came
+  // back with the whole retention on each reload.
+  const Now = Date.now();
+  const Old = { ts: Now - 3 * 60 * 60 * 1000, online: true };
+  const Recent = { ts: Now - 10 * 60 * 1000, online: false };
+  const Saved = { ...state.history };
+  try {
+    state.history.client = [Old, Recent];
+    state.history.check = [Old, Recent];
+    state.history.dummy = [Old, Recent];
+    state.history.application = [{ Key: 'app', Name: 'App', samples: [Old, Recent] }];
+    const HourMs = 60 * 60 * 1000;
+    assert.deepEqual(await GetHandler('GetClientHistory')(null, 'client-1', HourMs), [Recent]);
+    assert.deepEqual(await GetHandler('GetMonitoringCheckHistory')(null, 1, HourMs), [Recent]);
+    assert.deepEqual(await GetHandler('GetDummyClientHistory')(null, 'dummy-1', HourMs), [Recent]);
+    assert.deepEqual(await GetHandler('GetClientApplicationHistory')(null, 'client-1', HourMs), [
+      { Key: 'app', Name: 'App', samples: [Recent] },
+    ]);
+    // No window (an older caller), or a nonsense one, still gets everything.
+    for (const Window of [undefined, null, '', 0, -5, 'soon']) {
+      assert.deepEqual(
+        await GetHandler('GetClientHistory')(null, 'client-1', Window),
+        [Old, Recent],
+        `window ${JSON.stringify(Window)}`
+      );
+    }
+  } finally {
+    Object.assign(state.history, Saved);
+  }
+});
+
 test('the check-history reader labels its field as CheckID, not TargetID', async () => {
   // Shared validator, distinct field name; the message the renderer shows
   // should name the thing the user actually selected.

@@ -26,6 +26,7 @@ import { HandleNonFatalError } from './utils';
 import { BuildGroupRenderOrder } from './lib/client-list-layout';
 import {
   BuildListSearchIndex,
+  CreateListSearchTagMemo,
   KeepSelectedRows,
   MatchListSearch,
   ParseListSearch,
@@ -38,6 +39,9 @@ let RefreshQueued = false;
 let Wired = false;
 /** data-uuid of every row the current search hides. */
 const HiddenKeys = new Set<string>();
+// Each row's resolved tags, reused while the tag list is unchanged: a live
+// search re-applies after every heartbeat.
+const TagMemo = CreateListSearchTagMemo();
 
 function SearchBox(): HTMLElement | null {
   return document.getElementById('LIST_SEARCH');
@@ -99,15 +103,18 @@ export function ApplyListSearch(): void {
   }
 
   const Matched = MatchListSearch(
-    BuildListSearchIndex({
-      Groups: BuildGroupRenderOrder(__LastGroups),
-      Tags,
-      Clients: __LastClients,
-      Monitors: MonitoringTargets,
-      Dummies: DummyClients,
-      Kiosks: FreeKioskTerminals,
-      Pending: PendingAdoption,
-    }),
+    BuildListSearchIndex(
+      {
+        Groups: BuildGroupRenderOrder(__LastGroups),
+        Tags,
+        Clients: __LastClients,
+        Monitors: MonitoringTargets,
+        Dummies: DummyClients,
+        Kiosks: FreeKioskTerminals,
+        Pending: PendingAdoption,
+      },
+      TagMemo
+    ),
     Terms
   );
   const Keep = KeepSelectedRows(Matched, Selected, MonitoringTargets);

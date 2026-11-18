@@ -97,28 +97,47 @@ export async function GetSettingValue(Key: string) {
   return Setting.Value;
 }
 
-export const Sounds: Record<string, Howl> = {
-  Notification: new Howl({
-    src: ['audio/alert_1.wav'],
-    volume: 0.5,
-  }),
-  Alert: new Howl({
-    src: ['audio/alert_2.wav'],
-    volume: 0.5,
-  }),
-  Warning: new Howl({
-    src: ['audio/alert_3.wav'],
-    volume: 0.5,
-  }),
+// The built-in alert sounds. AAC first (~37 KB each); the WAV (~530 KB) is the
+// fallback for a browser that cannot play AAC, as Howler plays the first source
+// it can. Howler picks by file extension.
+const SOUND_SOURCES: Record<string, string[]> = {
+  Notification: ['audio/alert_1.m4a', 'audio/alert_1.wav'],
+  Alert: ['audio/alert_2.m4a', 'audio/alert_2.wav'],
+  Warning: ['audio/alert_3.m4a', 'audio/alert_3.wav'],
 };
+
+export const Sounds: Record<string, Howl> = {};
+
+// Created by InitSettings, not at import time, and not preloaded: every page
+// load (every phone opening the Web UI) used to download and decode all three
+// before anything had alerted. Creating the Howls up front still matters, as
+// that is what arms Howler's unlock-on-first-touch for mobile browsers, which
+// otherwise refuse to play a sound that a push (not a tap) starts.
+function CreateSounds() {
+  if (typeof Howl === 'undefined') return;
+  for (const [Name, Src] of Object.entries(SOUND_SOURCES)) {
+    if (Sounds[Name]) continue;
+    Sounds[Name] = new Howl({ src: Src, volume: 0.5, preload: false });
+  }
+}
+
+/** Play a built-in sound at the alert volume, loading it the first time. */
+function PlayBuiltInSound(SoundName: string) {
+  CreateSounds();
+  const sound = Sounds[SoundName] || Sounds.Notification;
+  if (!sound) return;
+  // A sound that has never played is fetched now; play() waits for it.
+  if (typeof sound.state === 'function' && sound.state() === 'unloaded') sound.load();
+  sound.volume(GetAlertVolume());
+  sound.play();
+}
 
 // Called by the bootstrap orchestrator in main.ts, never at import time.
 export function InitSettings() {
+  CreateSounds();
   void WireSettingsControls();
   window.API.PlaySound(async (SoundName) => {
-    const sound = Sounds[SoundName] || Sounds.Notification!; // Notification always present in Sounds
-    sound.volume(GetAlertVolume());
-    sound.play();
+    PlayBuiltInSound(SoundName);
   });
   InitSettingsPush();
   // Keep the Remote Access address list current when the host gains or loses a
@@ -129,9 +148,7 @@ export function InitSettings() {
 }
 
 export function PreviewSound(SoundName: string) {
-  const sound = Sounds[SoundName] || Sounds.Notification!; // Notification always present in Sounds
-  sound.volume(GetAlertVolume());
-  sound.play();
+  PlayBuiltInSound(SoundName);
 }
 // Registers the settings push handler (settings modal + remote-access section
 // re-render). Kept as a separate registrar so InitSettings can live above

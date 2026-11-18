@@ -295,41 +295,77 @@ export function GetUpdateVersionHint(
   return { text: reason || 'Unavailable', className: 'MUTED', title: reason || 'Not eligible' };
 }
 
-export function RenderUpdateManagerClientList() {
-  const $list = $('#UPDATE_MANAGER_CLIENT_LIST');
-  if (!$list.length) return;
+// Stands in for a row checkbox's `checked` attribute in a row's template, so a
+// row whose only change is its tick is not redrawn (see PlanUpdateManagerListPatch).
+const ROW_CHECKED_TOKEN = '\u0000CHECKED\u0000';
 
-  const Clients = Array.isArray(__LastClients) ? __LastClients.slice() : [];
+/** One client row: the template it is drawn from and whether it is ticked. */
+export interface UpdateManagerRowModel {
+  UUID: string;
+  /** The row's markup with ROW_CHECKED_TOKEN where `checked` goes. */
+  Template: string;
+  Checked: boolean;
+}
+
+/** Everything the client list shows, as markup, in display order. */
+export interface UpdateManagerListModel {
+  /** Markup shown in place of the rows when there are none. */
+  EmptyHtml: string | null;
+  /** The "Manual Update Required" box above the rows ('' when not needed). */
+  WarningHtml: string;
+  Rows: UpdateManagerRowModel[];
+}
+
+let NameCollator: Intl.Collator | null = null;
+
+/** Markup of one row, ticked or not. */
+export function UpdateManagerRowHtml(Row: UpdateManagerRowModel): string {
+  return Row.Template.replace(ROW_CHECKED_TOKEN, Row.Checked ? 'checked' : '');
+}
+
+/**
+ * The client list as markup: rows sorted by name, each row's template and
+ * tick, and the manual-update warning. Pure apart from reading its arguments.
+ */
+export function BuildUpdateManagerListModel(
+  ClientsIn: readonly ClientView[] | null | undefined,
+  SelectedTag: string,
+  SelectedClients: ReadonlySet<unknown>,
+  FindExecution: (UUID: string) => ScriptExecutionView | null = FindClientExecutionForUpdate
+): UpdateManagerListModel {
+  const Clients = Array.isArray(ClientsIn) ? ClientsIn.filter(Boolean) : [];
   if (!Clients.length) {
-    $list.html('<div class="text-muted small">No clients found.</div>');
-    return;
+    return {
+      EmptyHtml: '<div class="text-muted small">No clients found.</div>',
+      WarningHtml: '',
+      Rows: [],
+    };
   }
 
-  Clients.sort((a, b) => {
-    const aName = String(a.Nickname || a.Hostname || a.UUID || '').toLowerCase();
-    const bName = String(b.Nickname || b.Hostname || b.UUID || '').toLowerCase();
-    return aName.localeCompare(bName);
-  });
+  // The sort key is worked out once per client rather than twice per
+  // comparison; a collator compares exactly as localeCompare() does.
+  if (!NameCollator) NameCollator = new Intl.Collator();
+  const Collator = NameCollator;
+  const Sorted = Clients.map((Client) => ({
+    Client,
+    Key: String(Client.Nickname || Client.Hostname || Client.UUID || '').toLowerCase(),
+  })).sort((A, B) => Collator.compare(A.Key, B.Key));
 
-  let html = '';
-  const selectedTag = GetSelectedUpdateManagerReleaseTag();
   const manualUpdateClients: ReturnType<typeof Safe>[] = [];
-  if (!(UpdateManagerSelectedClients instanceof Set)) {
-    setUpdateManagerSelectedClients(new Set(UpdateManagerSelectedClients || []));
-  }
+  const Rows: UpdateManagerRowModel[] = [];
 
-  for (const Client of Clients) {
+  for (const { Client } of Sorted) {
     const UUID = Client.UUID;
     const Name = Safe(Client.Nickname || Client.Hostname || UUID);
     const Version = Safe(FormatClientVersionLabel(Client));
     const Online = !!Client.Online;
-    const Execution = FindClientExecutionForUpdate(UUID);
+    const Execution = FindExecution(UUID);
     const Percent = GetUpdateProgressPercent(Execution);
     const Status = Online ? 'Online' : 'Offline';
-    const eligibility = IsClientEligibleForSelectedRelease(Client, selectedTag);
-    const versionHint = GetUpdateVersionHint(Client, selectedTag, eligibility);
+    const eligibility = IsClientEligibleForSelectedRelease(Client, SelectedTag);
+    const versionHint = GetUpdateVersionHint(Client, SelectedTag, eligibility);
     const IsSelectable = !!eligibility.eligible;
-    const IsChecked = IsSelectable && UpdateManagerSelectedClients.has(UUID);
+    const IsChecked = IsSelectable && SelectedClients.has(UUID);
 
     if (!IsSelectable && String(eligibility.reason || '').includes('Manual update required')) {
       manualUpdateClients.push(Name);
@@ -352,15 +388,17 @@ export function RenderUpdateManagerClientList() {
           : eligibility.reason
     );
 
-    html += `
-      <div class="UPDATE_MANAGER_CLIENT_ITEM ${Online ? 'ONLINE' : 'OFFLINE'}" data-uuid="${Safe(UUID)}">
+    Rows.push({
+      UUID: String(UUID),
+      Checked: IsChecked,
+      Template: `<div class="UPDATE_MANAGER_CLIENT_ITEM ${Online ? 'ONLINE' : 'OFFLINE'}" data-uuid="${Safe(UUID)}">
         <div class="UPDATE_MANAGER_CLIENT_HEADER">
           <div class="UPDATE_MANAGER_CLIENT_SELECT_WRAP">
             <input
               class="form-check-input UPDATE_MANAGER_CLIENT_SELECT"
               type="checkbox"
               data-uuid="${Safe(UUID)}"
-              ${IsChecked ? 'checked' : ''}
+              ${ROW_CHECKED_TOKEN}
               ${IsSelectable ? '' : 'disabled'}
             />
           </div>
@@ -379,25 +417,147 @@ export function RenderUpdateManagerClientList() {
           </div>
         </div>
         ${StatusText ? `<div class="UPDATE_MANAGER_CLIENT_STATUS_TEXT">${StatusText}</div>` : ''}
-      </div>`;
+      </div>`,
+    });
   }
 
+  let WarningHtml = '';
   if (manualUpdateClients.length > 0) {
     const warningList = manualUpdateClients
       .map((displayName) => `<li>${displayName}</li>`)
       .join('');
-    html = `
-      <div class="UPDATE_MANAGER_WARNING">
+    WarningHtml = `<div class="UPDATE_MANAGER_WARNING">
         <div class="UPDATE_MANAGER_WARNING_TITLE">Manual Update Required</div>
         <div class="UPDATE_MANAGER_WARNING_TEXT">
           The following clients are running below v3.4.0 and do not support remote updates.
         </div>
         <ul class="UPDATE_MANAGER_WARNING_LIST">${warningList}</ul>
-      </div>
-      ${html}`;
+      </div>`;
   }
 
-  $list.html(html);
+  return { EmptyHtml: null, WarningHtml, Rows };
+}
+
+/** What the list on screen was drawn from, so the next draw can patch it. */
+export interface UpdateManagerRenderedList {
+  /** The warning plus the row order: any change to it redraws the whole list. */
+  LayoutKey: string;
+  /** Each row's template, by UUID. */
+  Templates: Map<string, string>;
+}
+
+/** The layout key of a model (see UpdateManagerRenderedList.LayoutKey). */
+export function UpdateManagerLayoutKey(Model: UpdateManagerListModel): string {
+  if (Model.EmptyHtml != null) return `empty\u0000${Model.EmptyHtml}`;
+  return `${Model.WarningHtml}\u0000${Model.Rows.map((Row) => Row.UUID).join('\u0000')}`;
+}
+
+/** Record a drawn model, for the next PlanUpdateManagerListPatch. */
+export function UpdateManagerRenderedFrom(
+  Model: UpdateManagerListModel
+): UpdateManagerRenderedList {
+  return {
+    LayoutKey: UpdateManagerLayoutKey(Model),
+    Templates: new Map(Model.Rows.map((Row) => [Row.UUID, Row.Template])),
+  };
+}
+
+/**
+ * How to bring the drawn list up to the model: redraw it all (the first draw,
+ * a client added, removed or moved by a rename, the warning changing), or
+ * replace just the rows whose markup changed. A heartbeat that changes nothing
+ * the list shows (vitals, uptime) changes nothing on screen.
+ */
+export function PlanUpdateManagerListPatch(
+  Previous: UpdateManagerRenderedList | null,
+  Model: UpdateManagerListModel
+): { Full: true } | { Full: false; Changed: number[] } {
+  if (!Previous || Previous.LayoutKey !== UpdateManagerLayoutKey(Model)) return { Full: true };
+  const Changed: number[] = [];
+  Model.Rows.forEach((Row, Index) => {
+    if (Previous.Templates.get(Row.UUID) !== Row.Template) Changed.push(Index);
+  });
+  return { Full: false, Changed };
+}
+
+// The list as last drawn into #UPDATE_MANAGER_CLIENT_LIST, and when.
+let RenderedList: UpdateManagerRenderedList | null = null;
+let LastListRenderAt = 0;
+let ListRenderTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Live updates (every client heartbeat, every execution push) redraw the open
+// list at most this often. Each used to sort and rebuild every row, so with N
+// clients heartbeating each second the list was rebuilt N times a second, and
+// a click landing between mousedown and mouseup on a just-replaced checkbox
+// was lost.
+export const UPDATE_MANAGER_LIVE_RENDER_INTERVAL_MS = 1000;
+
+/**
+ * Redraw the client list for a live change. Coalesced: the first call after a
+ * quiet spell draws on the next tick, later ones at most once per
+ * UPDATE_MANAGER_LIVE_RENDER_INTERVAL_MS, and only rows whose markup changed
+ * are touched. A redraw that must land at once (opening the modal, picking a
+ * release) uses RenderUpdateManagerClientListNow.
+ */
+export function RenderUpdateManagerClientList() {
+  if (ListRenderTimer) return;
+  const Delay = Math.max(0, LastListRenderAt + UPDATE_MANAGER_LIVE_RENDER_INTERVAL_MS - Date.now());
+  ListRenderTimer = setTimeout(() => {
+    ListRenderTimer = null;
+    // Closed in the meantime: the next opening draws it fresh.
+    if (!$('#SHOWTRAK_MODAL_UPDATE_MANAGER').hasClass('show')) return;
+    RenderUpdateManagerClientListNow();
+  }, Delay);
+}
+
+/** Draw the client list now, replacing only the rows that changed. */
+export function RenderUpdateManagerClientListNow() {
+  const $list = $('#UPDATE_MANAGER_CLIENT_LIST');
+  if (!$list.length) return;
+  const List = $list[0] as HTMLElement;
+  LastListRenderAt = Date.now();
+
+  if (!(UpdateManagerSelectedClients instanceof Set)) {
+    setUpdateManagerSelectedClients(new Set(UpdateManagerSelectedClients || []));
+  }
+  const Model = BuildUpdateManagerListModel(
+    __LastClients,
+    GetSelectedUpdateManagerReleaseTag(),
+    UpdateManagerSelectedClients
+  );
+
+  const Plan = PlanUpdateManagerListPatch(RenderedList, Model);
+  const RowOffset = Model.WarningHtml ? 1 : 0;
+  // A patch addresses rows by position, so the list on screen must still be
+  // the one recorded; anything else is redrawn rather than patched blind.
+  const DrawnIntact =
+    !Plan.Full &&
+    List.childElementCount === Model.Rows.length + RowOffset &&
+    Model.Rows.every(
+      (Row, Index) => List.children[Index + RowOffset]?.getAttribute('data-uuid') === Row.UUID
+    );
+
+  if (Plan.Full || !DrawnIntact) {
+    List.innerHTML =
+      Model.EmptyHtml != null
+        ? Model.EmptyHtml
+        : Model.WarningHtml + Model.Rows.map(UpdateManagerRowHtml).join('');
+  } else {
+    for (const Index of Plan.Changed) {
+      const El = List.children[Index + RowOffset];
+      if (El) El.outerHTML = UpdateManagerRowHtml(Model.Rows[Index]!);
+    }
+    // Ticks are synced in place rather than by redrawing the row, which would
+    // take focus off a checkbox just clicked.
+    Model.Rows.forEach((Row, Index) => {
+      const Box = List.children[Index + RowOffset]?.querySelector<HTMLInputElement>(
+        '.UPDATE_MANAGER_CLIENT_SELECT'
+      );
+      if (Box && Box.checked !== Row.Checked) Box.checked = Row.Checked;
+    });
+  }
+
+  RenderedList = UpdateManagerRenderedFrom(Model);
 }
 
 export function UpdateManagerHandleExecutions(Executions: ScriptExecutionView[] = []) {
@@ -518,7 +678,7 @@ export async function RunUpdateManagerDeployAll() {
     $('#UPDATE_MANAGER_STATUS').text(
       `Updating ${Result.TargetCount} online clients to ${Result.ReleaseVersion}.`
     );
-    RenderUpdateManagerClientList();
+    RenderUpdateManagerClientListNow();
   } catch (Err) {
     const Message = ErrorMessage(Err);
     $('#UPDATE_MANAGER_STATUS').text(Message);
@@ -535,13 +695,16 @@ export async function OpenUpdateManagerModal() {
   await RefreshUpdateManagerStatus();
   await RefreshUpdateManagerReleaseOptions();
   ResetUpdateManagerClientSelectionDefaults();
-  RenderUpdateManagerClientList();
+  // Drawn from scratch: a patch against the list from an earlier opening could
+  // miss whatever changed while it was closed.
+  RenderedList = null;
+  RenderUpdateManagerClientListNow();
 
   $('#UPDATE_MANAGER_REFRESH')
     .off('click')
     .on('click', async () => {
       await RefreshUpdateManagerStatus();
-      RenderUpdateManagerClientList();
+      RenderUpdateManagerClientListNow();
     });
 
   $('#UPDATE_MANAGER_DOWNLOAD_LATEST')
@@ -561,7 +724,7 @@ export async function OpenUpdateManagerModal() {
     .on('change', function () {
       setUpdateManagerSelectedReleaseTag(String($(this).val() || '').trim());
       ResetUpdateManagerClientSelectionDefaults();
-      RenderUpdateManagerClientList();
+      RenderUpdateManagerClientListNow();
       RenderUpdateManagerReleaseBadge();
       ApplyUpdateManagerButtonLocks();
     });

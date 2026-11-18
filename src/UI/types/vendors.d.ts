@@ -20,6 +20,8 @@ interface Howl {
   play(): number;
   stop(): this;
   pause(): this;
+  load(): this;
+  state(): 'unloaded' | 'loading' | 'loaded';
   volume(value?: number): number | this;
   fade(from: number, to: number, duration: number): this;
 }
@@ -30,19 +32,6 @@ interface HowlConstructor {
 
 declare const Howl: HowlConstructor;
 declare const Howler: { volume(value?: number): number; mute(muted: boolean): void };
-
-// ---- Toastify -------------------------------------------------------------
-
-interface ToastifyInstance {
-  showToast(): void;
-  hideToast(): void;
-}
-
-interface ToastifyConstructor {
-  (options: Record<string, unknown>): ToastifyInstance;
-}
-
-declare const Toastify: ToastifyConstructor;
 
 // ---- Bootstrap ------------------------------------------------------------
 

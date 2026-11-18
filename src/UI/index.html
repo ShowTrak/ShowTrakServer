@@ -6,7 +6,7 @@
     <!--
       Local-only renderer CSP. Scripts are locked to same-origin bundles (no inline
       JS, no eval, no remote) which is the XSS-relevant guard. style-src allows
-      'unsafe-inline' because jQuery/Bootstrap/Toastify set inline style attributes;
+      'unsafe-inline' because jQuery/Bootstrap set inline style attributes;
       img/media allow data: for CSS SVG backgrounds and data-URL alert audio.
     -->
     <meta
@@ -14,15 +14,19 @@
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'"
     />
     <link rel="stylesheet" href="./vendors/bootstrap/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="./vendors/bootstrap-icons/font/bootstrap-icons.css" />
-    <link rel="stylesheet" type="text/css" href="./vendors/toastify/index.min.css" />
+    <link rel="stylesheet" href="./vendors/bootstrap-icons/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="./css/main.css" />
 
     <title>ShowTrak Server</title>
   </head>
   <body>
     <div class="dragbar bg-light d-flex justify-content-center gap-3 align-items-center p-2">
-      <img class="no-drag" id="APPLICATION_NAVBAR_LOGO" src="./img/icon.png" alt="ShowTrak Logo" />
+      <img
+        class="no-drag"
+        id="APPLICATION_NAVBAR_LOGO"
+        src="./img/icon-192.png"
+        alt="ShowTrak Logo"
+      />
       <span class="no-drag" id="APPLICATION_NAVBAR_TITLE">ShowTrak</span>
       <span class="no-drag" id="APPLICATION_NAVBAR_STATUS"></span>
       <span class="no-drag" id="APPLICATION_NAVBAR_FILE"></span>
@@ -604,10 +608,14 @@
           <div class="modal-body text-center SHOWTRAK_ABOUT_MODAL_BODY">
             <div id="ABOUT_HEADER"></div>
             <div class="d-flex justify-content-center my-5">
+              <!-- Lazy: the About modal is hidden until opened, so the browser
+                   leaves this alone until then. -->
               <img
                 class="SHOWTRAK_MODEL_CORE_LOGO"
                 src="./img/ShowTrakServer-Filled.png"
                 alt="ShowTrak Logo"
+                loading="lazy"
+                decoding="async"
               />
             </div>
 
@@ -3535,7 +3543,7 @@ Loading licence...</pre>
     </div>
     <div id="WEB_LOGIN_OVERLAY" class="web-overlay d-none">
       <div class="web-overlay-card web-login-card">
-        <img src="./img/icon.png" alt="ShowTrak" class="web-login-logo" />
+        <img src="./img/icon-192.png" alt="ShowTrak" class="web-login-logo" />
         <div class="web-overlay-title">ShowTrak</div>
         <div class="web-overlay-text">Enter the passcode to continue.</div>
         <div
@@ -3603,15 +3611,14 @@ Loading licence...</pre>
         <div class="web-overlay-text">Reconnecting to ShowTrak Server...</div>
       </div>
     </div>
-  </body>
-  <footer>
+    <!-- Vendor globals, then the app. All deferred, so they run in this order
+         once the document is parsed. -->
     <script src="./vendors/jquery/index.js" defer></script>
     <script src="./vendors/bootstrap/js/bootstrap.bundle.min.js" defer></script>
-    <script src="./vendors/toastify/index.js" defer></script>
-    <script src="./vendors/howler/index.min.js"></script>
+    <script src="./vendors/howler/index.min.js" defer></script>
     <!-- The renderer is authored as TypeScript ES modules under js/app and
          bundled by esbuild (scripts/build-renderer.js) into a single classic
          script. Entry point: js/app/main.ts (imports modules in load order). -->
     <script src="./js/app/bundle.js" defer></script>
-  </footer>
+  </body>
 </html>

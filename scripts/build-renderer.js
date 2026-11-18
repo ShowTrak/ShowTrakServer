@@ -12,7 +12,7 @@
 // Type-checking is performed separately by `tsc --noEmit` against
 // tsconfig.renderer.json; esbuild only transpiles+bundles.
 //
-// Vendor libraries (jQuery, Bootstrap, Toastify, Howler, QRCode, socket.io) stay
+// Vendor libraries (jQuery, Bootstrap, Howler, socket.io) stay
 // as external <script> globals for offline use, so they are NOT imported/bundled.
 const esbuild = require('esbuild');
 const path = require('node:path');

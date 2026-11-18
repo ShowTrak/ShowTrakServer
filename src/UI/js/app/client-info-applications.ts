@@ -10,6 +10,7 @@ import type {
   RunningApplicationsStatus,
 } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
+import { ClearRenderKeys, RenderKeyIs, SetRenderKey } from './lib/render-key';
 import {
   ApplicationBadge,
   ApplicationConditionRows,
@@ -138,12 +139,15 @@ export function BuildApplicationsHtml(Client: ClientView): string {
 export function RenderClientInfoApplications(Client: ClientView): void {
   const $List = $(LIST);
   const Html = BuildApplicationsHtml(Client);
-  if ($List.attr('data-render-key') === Html) return;
-  $List.attr('data-render-key', Html).html(Html);
+  if (RenderKeyIs($List[0], Html)) return;
+  SetRenderKey($List[0], Html);
+  $List.html(Html);
 }
 
 export function ClearClientInfoApplications(): void {
-  $(LIST).attr('data-render-key', '').html('');
+  const $List = $(LIST);
+  ClearRenderKeys($List.get());
+  $List.html('');
 }
 
 /** Wire the section's controls. `Refresh` re-fetches and re-renders the client. */
@@ -190,7 +194,7 @@ export function BindClientInfoApplicationHandlers(
         Save: async () => (await window.API.MarkClientApplicationCritical(UUID, Payload))[0],
         Refresh,
         Notify,
-        ResetRender: () => $(LIST).attr('data-render-key', ''),
+        ResetRender: () => ClearRenderKeys($(LIST).get()),
         ErrorContext: 'ClientInfo:SaveApplicationConditions',
       });
     });
