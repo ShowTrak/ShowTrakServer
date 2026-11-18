@@ -238,14 +238,18 @@ test('ScriptManager re-hashes only the files that changed since the last scan', 
   });
 
   const [first] = await Manager.GetScripts(true);
+  // Listing order is the filesystem's (NTFS sorts case-insensitively, APFS and
+  // ext4 do not); nothing depends on it, since the deployment fingerprint sorts
+  // files itself, so compare as a set.
+  const byPath = (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
   assert.deepEqual(
-    first.Files.map((f) => [f.Path, f.Type]),
+    first.Files.map((f) => [f.Path, f.Type]).sort(byPath),
     [
       ['Script.json', 'file'],
       ['lib', 'directory'],
       [path.join('lib', 'helper.sh'), 'file'],
       ['run.sh', 'file'],
-    ]
+    ].sort(byPath)
   );
   assert.equal(hashed.length, 3);
 
