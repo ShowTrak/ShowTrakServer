@@ -449,8 +449,12 @@ jobs:
         run: |
           # The tag for THIS release is excluded: on a re-run it already exists
           # and points at HEAD, which would otherwise make the range empty.
+          # A stable release skips pre-release tags: its notes should cover
+          # everything since the last stable release, not since its own final
+          # beta (which would leave nothing but the release commit).
           PREVIOUS_TAG=$(git tag --list 'v*' --sort=-v:refname \
             | grep -vFx "$RELEASE_TAG" \
+            | { case "$RELEASE_TAG" in *-*) cat ;; *) grep -vF -e '-' ;; esac; } \
             | head -n 1)
 
           if [ -n "$PREVIOUS_TAG" ]; then
