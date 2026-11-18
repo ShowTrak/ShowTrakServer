@@ -851,11 +851,14 @@ test('ReinitializeSystem aborts the topology push when a fetch fails', async () 
   assert.equal(logs.errors.length, 1);
 });
 
-test('ReinitializeSystem is skipped entirely without a window', async () => {
+test('ReinitializeSystem without a window pushes nothing but still drops the client cache', async () => {
   state.hasWindow = false;
   await emit('ReinitializeSystem');
   assert.deepEqual(pushes, []);
-  assert.equal(clientMgr.__callsTo('ClearCache').length, 0);
+  // The loaded cache answers unknown UUIDs without the database, so a stale one
+  // from the previous show must not survive a switch, window or no window.
+  assert.equal(clientMgr.__callsTo('ClearCache').length, 1);
+  assert.equal(clientMgr.__callsTo('GetAll').length, 0);
 });
 
 // --- RegisterBroadcastBridge: the wiring ------------------------------------

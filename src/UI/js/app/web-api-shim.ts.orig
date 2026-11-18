@@ -1,0 +1,565 @@
+// Web UI transport shim for `window.API`.
+//
+// The browser runs the SAME renderer bundle as the Electron desktop app. The
+// renderer talks to the backend exclusively through `window.API` (the typed
+// ShowTrakAPI surface). On the desktop that object is the Electron preload
+// bridge; here we provide an equivalent implementation backed by the `/ui`
+// Socket.IO namespace:
+//
+//   - invoke-style methods  -> `socket.emit('rpc', channel, args, ack)`
+//   - subscribe-style methods -> `socket.on(channel, cb)`
+//
+// Channels/args mirror `src/bridge_main.ts` exactly so both surfaces stay in
+// lock-step (a drift guard test asserts the channel maps match). Desktop-only
+// methods (file dialogs, show-file, script management, native/app updates,
+// network discovery, settings mutation) resolve to safe no-ops on the web;
+// their UI triggers are hidden by the capability layer, and the server denies
+// them regardless.
+
+import type {
+  LogConsoleSnapshot,
+  MonitorLiveLevelsSnapshot,
+  MonitorTileLevelsSnapshot,
+} from '@showtrak/protocol';
+
+// The surface `window.API` has (see src/UI/types/global.d.ts).
+type RendererAPI = Window['API'];
+
+type Ack = { result?: unknown; error?: string };
+
+// How long a hidden-console request (log feed, Rainbow Mode) waits for its ack.
+const CONSOLE_ACK_TIMEOUT_MS = 10_000;
+
+/**
+ * Minimal surface of the Socket.IO client socket the shim relies on. The real
+ * client is a vendored browser global (no bundled types); `(...args: never[])`
+ * on the handler slots lets any concrete callback be registered.
+ */
+export interface WebUiSocket {
+  emit(event: string, ...args: unknown[]): void;
+  on(event: string, handler: (...args: never[]) => void): void;
+  off(event: string, handler: (...args: never[]) => void): void;
+  connect(): void;
+}
+
+// Build the rpc caller. Denials/failures resolve to an `[Err, null]` tuple
+// (the dominant renderer return shape), so callers that destructure `[Err]`
+// never throw. `T` is the per-channel return shape declared by ShowTrakAPI;
+// the server is trusted to emit it (the assertions below are the single
+// wire->type boundary).
+function makeRpc(socket: WebUiSocket) {
+  return <T = unknown>(channel: string, ...args: unknown[]): Promise<T> =>
+    new Promise<T>((resolve) => {
+      try {
+        socket.emit('rpc', channel, args, (res: Ack) => {
+          if (res && Object.prototype.hasOwnProperty.call(res, 'result')) resolve(res.result as T);
+          else resolve([res && res.error ? res.error : 'forbidden', null] as unknown as T);
+        });
+      } catch (e) {
+        resolve([e instanceof Error ? e.message : String(e), null] as unknown as T);
+      }
+    });
+}
+
+// Build the subscribe binder. Returns an unsubscribe handle like the preload.
+function makeSub(socket: WebUiSocket) {
+  return <Args extends unknown[]>(
+    channel: string,
+    cb: (...payload: Args) => void
+  ): (() => void) => {
+    const handler = (...payload: never[]) => {
+      try {
+        cb(...(payload as unknown as Args));
+      } catch {
+        // Renderer callback errors must not break the socket.
+      }
+    };
+    socket.on(channel, handler);
+    return () => socket.off(channel, handler);
+  };
+}
+
+// Create the `window.API` implementation for the web surface.
+function createWebApi(socket: WebUiSocket): RendererAPI {
+  const rpc = makeRpc(socket);
+  const sub = makeSub(socket);
+
+  // Rainbow Mode rides its own socket events (see webui-namespace.ts). Any
+  // failure or a lost ack reads as "off".
+  const AckOrFalse = (Event: string, ...Args: unknown[]): Promise<boolean> =>
+    new Promise((resolve) => {
+      const Timer = setTimeout(() => resolve(false), CONSOLE_ACK_TIMEOUT_MS);
+      try {
+        socket.emit(Event, ...Args, (res: Ack) => {
+          clearTimeout(Timer);
+          resolve(!!(res && res.result === true));
+        });
+      } catch {
+        clearTimeout(Timer);
+        resolve(false);
+      }
+    });
+
+  // A reconnect is a new socket to the server, so an open log console has to
+  // ask again. Lines logged during the gap are not replayed.
+  let LogConsoleLevel: string | null = null;
+  socket.on('connect', () => {
+    if (LogConsoleLevel === null) return;
+    try {
+      socket.emit('logconsole:open', LogConsoleLevel, () => undefined);
+    } catch {
+      /* intentional: the next reconnect tries again */
+    }
+  });
+
+  // Likewise an open monitor view's live levels, and the dashboard's tile meters.
+  let LiveLevelsTarget: number | null = null;
+  let TileLevelsOpen = false;
+  socket.on('connect', () => {
+    try {
+      if (LiveLevelsTarget !== null) {
+        socket.emit('monitorlive:open', LiveLevelsTarget, () => undefined);
+      }
+      if (TileLevelsOpen) socket.emit('monitortiles:open', () => undefined);
+    } catch {
+      /* intentional: the next reconnect tries again */
+    }
+  });
+
+  // Desktop-only no-op resolvers with shapes matching what callers expect.
+  // Generic so each assignment adopts the ShowTrakAPI return type it stands in
+  // for (the runtime values are fixed; the assertions only widen the type).
+  const nullTuple = async <T>(): Promise<T> => [null, null] as unknown as T;
+  const emptyArray = async <T>(): Promise<T> => [] as unknown as T;
+  const resolveNull = async <T>(): Promise<T> => null as unknown as T;
+  const resolveFalse = async () => false;
+  const noSub = () => () => {};
+
+  return {
+    // ---- External links / meta (desktop-only; no-op on web) ---------------
+    OpenDiscordInviteLinkInBrowser: async () =>
+      window.open('https://discord.gg/showtrak', '_blank'),
+    OpenShowTrakWebsiteInBrowser: async () => window.open('https://showtrak.io', '_blank'),
+    OpenShowTrakGithubInBrowser: async () => window.open('https://github.com/ShowTrak', '_blank'),
+    OpenNpmPackageInBrowser: async (PackageName) =>
+      window.open(`https://www.npmjs.com/package/${PackageName}`, '_blank'),
+    OpenExternalUrl: async (URL) => {
+      const Raw = String(URL || '').trim();
+      if (/^https?:\/\//i.test(Raw)) window.open(Raw, '_blank', 'noopener');
+      return undefined;
+    },
+    GetProjectDependencies: nullTuple,
+    GetLicense: nullTuple,
+    GetConfig: async () => rpc('Config:Get'),
+    GetWebUIAddresses: nullTuple,
+    OnNetworkInterfacesChanged: noSub,
+    GetSettings: async () => rpc('Settings:Get'),
+
+    // Paired-device management is desktop only. The browser gets the same inert
+    // stubs every other desktop-only call gets, so the shared renderer runs
+    // unchanged rather than needing to know which surface it is on.
+    GetRemoteDevices: nullTuple,
+    RevokeRemoteDevice: nullTuple,
+    RevokeAllRemoteDevices: nullTuple,
+    IssueRemotePairingCode: nullTuple,
+    ClearRemotePairingCode: nullTuple,
+
+    // ---- Adoption / updates ----------------------------------------------
+    AdoptDevice: async (UUID) => rpc('AdoptDevice', UUID),
+    CheckForUpdatesOnClient: nullTuple,
+    GetUpdateManagerStatus: nullTuple,
+    GetUpdateManagerReleases: nullTuple,
+    DownloadUpdateManagerRelease: nullTuple,
+    DeployUpdateManagerRelease: nullTuple,
+    OnUpdateManagerDownloadProgress: noSub,
+
+    // ---- Lifecycle (desktop-only) ----------------------------------------
+    Loaded: resolveNull,
+    Shutdown: resolveNull,
+
+    // ---- Clients ----------------------------------------------------------
+    GetClient: async (UUID) => rpc('GetClient', UUID),
+    GetClientHistory: async (UUID, WindowMs?: number) => rpc('GetClientHistory', UUID, WindowMs),
+    GetStatusHistoryOverview: async () => rpc('GetStatusHistoryOverview'),
+    GetClientApplicationHistory: async (UUID, WindowMs?: number) => rpc('GetClientApplicationHistory', UUID, WindowMs),
+    GetClientUSBHistory: async (UUID, WindowMs?: number) => rpc('GetClientUSBHistory', UUID, WindowMs),
+    GetClientDisplayHistory: async (UUID, WindowMs?: number) => rpc('GetClientDisplayHistory', UUID, WindowMs),
+    GetClientAudioHistory: async (UUID, WindowMs?: number) => rpc('GetClientAudioHistory', UUID, WindowMs),
+    GetClientNetworkHistory: async (UUID, WindowMs?: number) => rpc('GetClientNetworkHistory', UUID, WindowMs),
+    GetClientStorageHistory: async (UUID, WindowMs?: number) => rpc('GetClientStorageHistory', UUID, WindowMs),
+    GetClientVitalsHistory: async (UUID) => rpc('GetClientVitalsHistory', UUID),
+    GetClientSystemCheckHistory: async (UUID, WindowMs?: number) => rpc('GetClientSystemCheckHistory', UUID, WindowMs),
+    UpdateClient: async (UUID, Data) => rpc('UpdateClient', UUID, Data),
+    MarkClientUSBDeviceCritical: async (UUID, Device) =>
+      rpc('MarkClientUSBDeviceCritical', UUID, Device),
+    RemoveClientUSBDeviceCritical: async (UUID, SerialNumber) =>
+      rpc('RemoveClientUSBDeviceCritical', UUID, SerialNumber),
+    MarkClientUSBNameCritical: async (UUID, Device) =>
+      rpc('MarkClientUSBNameCritical', UUID, Device),
+    RemoveClientUSBNameCritical: async (UUID, Device) =>
+      rpc('RemoveClientUSBNameCritical', UUID, Device),
+    MarkClientApplicationCritical: async (UUID, Application) =>
+      rpc('MarkClientApplicationCritical', UUID, Application),
+    RemoveClientApplicationCritical: async (UUID, ApplicationName) =>
+      rpc('RemoveClientApplicationCritical', UUID, ApplicationName),
+    MarkClientDisplayCritical: async (UUID, Display) =>
+      rpc('MarkClientDisplayCritical', UUID, Display),
+    RemoveClientDisplayCritical: async (UUID, DisplayID) =>
+      rpc('RemoveClientDisplayCritical', UUID, DisplayID),
+    MarkClientAudioDeviceCritical: async (UUID, Device) =>
+      rpc('MarkClientAudioDeviceCritical', UUID, Device),
+    RemoveClientAudioDeviceCritical: async (UUID, EndpointID) =>
+      rpc('RemoveClientAudioDeviceCritical', UUID, EndpointID),
+    MarkClientNetworkInterfaceCritical: async (UUID, Interface) =>
+      rpc('MarkClientNetworkInterfaceCritical', UUID, Interface),
+    RemoveClientNetworkInterfaceCritical: async (UUID, Name) =>
+      rpc('RemoveClientNetworkInterfaceCritical', UUID, Name),
+    MarkClientStorageVolumeCritical: async (UUID, Volume) =>
+      rpc('MarkClientStorageVolumeCritical', UUID, Volume),
+    RemoveClientStorageVolumeCritical: async (UUID, MountPoint) =>
+      rpc('RemoveClientStorageVolumeCritical', UUID, MountPoint),
+    MarkClientSystemCheck: async (UUID, Check) => rpc('MarkClientSystemCheck', UUID, Check),
+    RemoveClientSystemCheck: async (UUID, Key) => rpc('RemoveClientSystemCheck', UUID, Key),
+    SetClientAudioLevel: async (UUID, Request) => rpc('SetClientAudioLevel', UUID, Request),
+    AddClientMacAddress: async (UUID, MacAddress) => rpc('AddClientMacAddress', UUID, MacAddress),
+    RemoveClientMacAddress: async (UUID, MacAddress) =>
+      rpc('RemoveClientMacAddress', UUID, MacAddress),
+    IdentifyClient: async (UUID) => rpc('IdentifyClient', UUID),
+    StopIdentifyingClient: async (UUID) => rpc('StopIdentifyingClient', UUID),
+    UnadoptClient: async (UUID) => rpc('UnadoptClient', UUID),
+    ReplaceClient: async (CurrentUUID, ReplacementUUID) =>
+      rpc('ReplaceClient', CurrentUUID, ReplacementUUID),
+    CreateUnassignedClients: async (Payload) => rpc('CreateUnassignedClients', Payload),
+    WakeOnLan: async (Targets) => rpc('WakeOnLan', Targets),
+
+    // ---- Groups -----------------------------------------------------------
+    GetAllGroups: async () => rpc('GetAllGroups'),
+    CreateGroup: async (Title) => rpc('CreateGroup', Title),
+    RenameGroup: async (GroupID, Title) => rpc('RenameGroup', GroupID, Title),
+    DeleteGroup: async (GroupID) => rpc('DeleteGroup', GroupID),
+    SetGroupListOrder: async (OrderedGroupIDs) => rpc('Groups:SetOrder', OrderedGroupIDs),
+    SetGroupFullWidth: async (GroupID, FullWidth) => rpc('Groups:SetFullWidth', GroupID, FullWidth),
+    SetGroupColumnSpan: async (GroupID, ColumnSpan) =>
+      rpc('Groups:SetColumnSpan', GroupID, ColumnSpan),
+    SetGroupColour: async (GroupID, Colour) => rpc('Groups:SetColour', GroupID, Colour),
+    SetGroupKeyBind: async (GroupID, KeyBind) => rpc('Groups:SetKeyBind', GroupID, KeyBind),
+    SetGroupSlug: async (GroupID, Slug) => rpc('Groups:SetSlug', GroupID, Slug),
+    SetGroupOrder: async (GroupID, OrderedUUIDs) => rpc('SetGroupOrder', GroupID, OrderedUUIDs),
+
+    // ---- Show file (desktop-only) ----------------------------------------
+    NewShow: nullTuple,
+    SaveShow: nullTuple,
+    SaveShowAs: nullTuple,
+    OpenShow: nullTuple,
+    GetCurrentShowFile: resolveNull,
+    HasUnsavedShowData: resolveFalse,
+    EnsureShowFileExists: emptyArray,
+    CheckShowFileUpgrade: nullTuple,
+    ResolveShowFileUpgrade: nullTuple,
+    OnShowFileUpdated: noSub,
+
+    // ---- Folders / menu / window (desktop-only) --------------------------
+    OpenLogsFolder: resolveNull,
+    OpenScriptsFolder: resolveNull,
+    OpenBackupsFolder: resolveNull,
+    OnAppMenuAction: noSub,
+    OnWindowFullscreenChanged: noSub,
+
+    // ---- Mode (set needs the WEBUI_ALLOW_MODE_CHANGE permission) --------
+    GetMode: async () => rpc('Mode:Get'),
+    // A denial resolves to an error tuple; report the unchanged mode instead.
+    SetMode: async (Mode) => {
+      const Result = await rpc('Mode:Set', Mode);
+      return Result === 'SHOW' || Result === 'EDIT' ? Result : rpc('Mode:Get');
+    },
+    OnModeUpdated: (cb) => sub('ModeUpdated', cb),
+    OnAlertActionsUpdated: (cb) => sub('AlertActionsUpdated', cb),
+
+    // ---- Settings (public subset pushed / mutation desktop-only) ---------
+    SetSetting: nullTuple,
+    // Arrives filtered to the public settings (see ToPublicSettings).
+    UpdateSettings: (Callback) => sub('UpdateSettings', Callback),
+
+    // ---- FOG Project (desktop-only) --------------------------------------
+    // Scheduling imaging tasks is deliberately not exposed to the Web UI: it is
+    // destructive, and the FOG credentials live server-side. The FOG button is
+    // hidden from web chrome, so these stubs are belt-and-braces.
+    GetFogStatus: async () =>
+      ({ Enabled: false, Healthy: false, Message: null, LastCheckedAt: null }) as never,
+    TestFogConnection: async () =>
+      ({ Enabled: false, Healthy: false, Message: null, LastCheckedAt: null }) as never,
+    GetFogHosts: nullTuple,
+    GetFogHostLink: nullTuple,
+    SetFogHostLink: nullTuple,
+    GetFogTaskTypes: emptyArray,
+    GetFogTasks: nullTuple,
+    ScheduleFogTask: nullTuple,
+    CancelFogTask: nullTuple,
+    ClearFinishedFogTasks: nullTuple,
+    OnFogStatusUpdated: noSub,
+    OnSetFogTaskList: noSub,
+
+    // ---- OSC / traffic / toasts ------------------------------------------
+    OSCBulkAction: (cb) => sub('OSCBulkAction', cb),
+    PlaySound: (cb) => sub('PlaySound', cb),
+    Notify: (cb) => sub('Notify', cb),
+    DebugTrafficEntry: (cb) => sub('DebugTrafficEntry', cb),
+    SetOSCList: (cb) => sub('SetOSCList', cb),
+
+    // ---- Client list / telemetry subscriptions ---------------------------
+    SetDevicesPendingAdoption: (cb) => sub('SetDevicesPendingAdoption', cb),
+    SetFullClientList: (cb) => sub('SetFullClientList', cb),
+    SetScriptList: (cb) => sub('SetScriptList', cb),
+    ClientUpdated: (cb) => sub('ClientUpdated', cb),
+    ClientPatches: (cb) => sub('ClientPatches', cb),
+    UpdateScriptExecutions: (cb) => sub('UpdateScriptExecutions', cb),
+    ShutdownRequested: noSub,
+    USBDeviceAdded: (cb) => sub('USBDeviceAdded', cb),
+    USBDeviceRemoved: (cb) => sub('USBDeviceRemoved', cb),
+
+    // ---- Scripts: execution allowed; management desktop-only -------------
+    ExecuteScript: async (Script, Targets, ResetList) =>
+      rpc('ExecuteScript', Script, Targets, ResetList),
+    TriggerIntegratedEvent: async (EventID, Targets) =>
+      rpc('TriggerIntegratedEvent', EventID, Targets),
+    ClearSettledScriptExecutions: async () => rpc('Scripts:ClearSettledExecutions'),
+    DeleteScripts: nullTuple,
+    UpdateScripts: nullTuple,
+    GetScriptManagerList: emptyArray,
+    GetScriptConfig: nullTuple,
+    SaveScriptConfig: nullTuple,
+    GetScriptWhitelist: nullTuple,
+    SetScriptWhitelist: nullTuple,
+    SetScriptOrder: nullTuple,
+    DeleteScript: nullTuple,
+    CreateScript: nullTuple,
+    GetSampleScripts: nullTuple,
+    RefreshSampleScripts: nullTuple,
+    CreateScriptFromTemplate: nullTuple,
+    OpenScriptFolder: nullTuple,
+    OpenScriptFile: nullTuple,
+    RunScriptFileLocal: nullTuple,
+
+    // ---- App update (desktop-only) ---------------------------------------
+    CheckForAppUpdates: nullTuple,
+    InstallAppUpdate: nullTuple,
+    OnAppUpdateStatus: noSub,
+
+    // ---- Monitoring targets ----------------------------------------------
+    GetMonitoringMethods: async () => rpc('GetMonitoringMethods'),
+    GetAllMonitoringTargets: async () => rpc('GetAllMonitoringTargets'),
+    GetMonitoringTarget: async (TargetID) => rpc('GetMonitoringTarget', TargetID),
+    GetMonitoringCheckHistory: async (CheckID, WindowMs?: number) =>
+      rpc('GetMonitoringCheckHistory', CheckID, WindowMs),
+    GetMonitoringCheckDebug: async (CheckID) => rpc('GetMonitoringCheckDebug', CheckID),
+    RunMonitoringCheckNow: async (CheckID) => rpc('RunMonitoringCheckNow', CheckID),
+    RunAllMonitoringChecksNow: async (TargetID) => rpc('RunAllMonitoringChecksNow', TargetID),
+    CreateMonitoringTarget: async (Payload) => rpc('CreateMonitoringTarget', Payload),
+    UpdateMonitoringTarget: async (TargetID, Payload) =>
+      rpc('UpdateMonitoringTarget', TargetID, Payload),
+    DeleteMonitoringTarget: async (TargetID) => rpc('DeleteMonitoringTarget', TargetID),
+    MoveMonitoringCheck: async (CheckID, ToTargetID) =>
+      rpc('MoveMonitoringCheck', CheckID, ToTargetID),
+    SetFullMonitoringTargetList: (cb) => sub('SetFullMonitoringTargetList', cb),
+    MonitoringTargetUpdated: (cb) => sub('MonitoringTargetUpdated', cb),
+    RunMonitoringAction: async (TargetIDs, Method, ActionID, Params, CheckIDs) =>
+      rpc('RunMonitoringAction', TargetIDs, Method, ActionID, Params, CheckIDs),
+    GetMonitoringActionFavourites: async () => rpc('GetMonitoringActionFavourites'),
+    SetMonitoringActionFavourite: async (Method, ActionID, Params, Favourite) =>
+      rpc('SetMonitoringActionFavourite', Method, ActionID, Params, Favourite),
+    SetFullMonitoringActionFavouriteList: (cb) => sub('SetFullMonitoringActionFavouriteList', cb),
+
+    // ---- Dummy clients ----------------------------------------------------
+    GetAllDummyClients: async () => rpc('GetAllDummyClients'),
+    GetDummyClient: async (UUID) => rpc('GetDummyClient', UUID),
+    GetDummyClientHistory: async (UUID, WindowMs?: number) => rpc('GetDummyClientHistory', UUID, WindowMs),
+    GenerateDummyClientDefaults: async () => rpc('GenerateDummyClientDefaults'),
+    CreateDummyClient: async (Payload) => rpc('CreateDummyClient', Payload),
+    UpdateDummyClient: async (UUID, Payload) => rpc('UpdateDummyClient', UUID, Payload),
+    DeleteDummyClient: async (UUID) => rpc('DeleteDummyClient', UUID),
+    ResetDummyClientToIdle: async (UUID) => rpc('ResetDummyClientToIdle', UUID),
+    SetFullDummyClientList: (cb) => sub('SetFullDummyClientList', cb),
+    DummyClientUpdated: (cb) => sub('DummyClientUpdated', cb),
+    GetFreeKioskMetrics: async () => rpc('FreeKiosk:GetMetrics'),
+    GetFreeKioskCommands: async () => rpc('FreeKiosk:GetCommands'),
+    GetAllFreeKioskTerminals: async () => rpc('GetAllFreeKioskTerminals'),
+    GetFreeKioskTerminal: async (UUID) => rpc('GetFreeKioskTerminal', UUID),
+    GetFreeKioskHistory: async (UUID, MetricKeys) => rpc('FreeKiosk:GetHistory', UUID, MetricKeys),
+    GenerateFreeKioskTerminalDefaults: async () => rpc('GenerateFreeKioskTerminalDefaults'),
+    CreateFreeKioskTerminal: async (Payload) => rpc('CreateFreeKioskTerminal', Payload),
+    UpdateFreeKioskTerminal: async (UUID, Payload) => rpc('UpdateFreeKioskTerminal', UUID, Payload),
+    DeleteFreeKioskTerminal: async (UUID) => rpc('DeleteFreeKioskTerminal', UUID),
+    RunFreeKioskTerminalsNow: async (UUIDs) => rpc('FreeKiosk:RunNow', UUIDs),
+    SendFreeKioskCommand: async (UUIDs, Command, Params) =>
+      rpc('FreeKiosk:Command', UUIDs, Command, Params),
+    CaptureFreeKioskScreenshot: async (UUID) => rpc('FreeKiosk:CaptureScreenshot', UUID),
+    CaptureFreeKioskCamera: async (UUID, Options) => rpc('FreeKiosk:CaptureCamera', UUID, Options),
+    GetFreeKioskCameraList: async (UUID) => rpc('FreeKiosk:GetCameraList', UUID),
+    SetFullFreeKioskTerminalList: (cb) => sub('SetFullFreeKioskTerminalList', cb),
+    FreeKioskTerminalUpdated: (cb) => sub('FreeKioskTerminalUpdated', cb),
+
+    // ---- Network discovery (desktop-only) --------------------------------
+    StartNetworkDeviceScan: nullTuple,
+    StopNetworkDeviceScan: nullTuple,
+    OnNetworkDeviceScanEvent: noSub,
+
+    // ---- Alert rules ------------------------------------------------------
+    GetAlertTriggers: async () => rpc('GetAlertTriggers'),
+    GetAlertActionTypes: async () => rpc('GetAlertActionTypes'),
+    GetAllAlertRules: async () => rpc('GetAllAlertRules'),
+    GetAlertRule: async (RuleID) => rpc('GetAlertRule', RuleID),
+    CreateAlertRule: async (Payload) => rpc('CreateAlertRule', Payload),
+    UpdateAlertRule: async (RuleID, Payload) => rpc('UpdateAlertRule', RuleID, Payload),
+    DeleteAlertRule: async (RuleID) => rpc('DeleteAlertRule', RuleID),
+    SetAlertRuleEnabled: async (RuleID, Enabled) => rpc('SetAlertRuleEnabled', RuleID, Enabled),
+    GetAlertActionsEnabled: async () => rpc('AlertActionsEnabled:Get'),
+    // Needs the WEBUI_ALLOW_ALERT_ACTIONS_TOGGLE permission. A denial resolves
+    // to an error tuple; report the unchanged state instead so the toggle
+    // snaps back rather than showing the requested one.
+    SetAlertActionsEnabled: async (Enabled) => {
+      const Result = await rpc('AlertActionsEnabled:Set', Enabled);
+      return typeof Result === 'boolean' ? Result : !!(await rpc('AlertActionsEnabled:Get'));
+    },
+    SetFullAlertRuleList: (cb) => sub('SetFullAlertRuleList', cb),
+    AlertTriggered: (cb) => sub('AlertTriggered', cb),
+    CreateShowTrakAlert: (cb) => sub('CreateShowTrakAlert', cb),
+
+    // ---- Tags --------------------------------------------------------------
+    // Reading is always allowed: the tiles' tag badges are derived from this
+    // list. Every mutation needs Edit mode and the client-management
+    // permission, enforced by the server.
+    GetAllTags: async () => rpc('Tags:GetAll'),
+    OnSetTagList: (cb) => sub('SetTagList', cb),
+    CreateTag: async (Label) => rpc('Tags:Create', Label),
+    SetTagSlug: async (TagID, Slug) => rpc('Tags:SetSlug', TagID, Slug),
+    SetTagColour: async (TagID, Colour) => rpc('Tags:SetColour', TagID, Colour),
+    SetTagIcon: async (TagID, Icon) => rpc('Tags:SetIcon', TagID, Icon),
+    SetTagDisplay: async (TagID, Display) => rpc('Tags:SetDisplay', TagID, Display),
+    SetTagScope: async (TagID, Scope) => rpc('Tags:SetScope', TagID, Scope),
+    SetTagOrder: async (OrderedTagIDs) => rpc('Tags:SetOrder', OrderedTagIDs),
+    DeleteTag: async (TagID) => rpc('Tags:Delete', TagID),
+
+    // ---- Show Variables (read allowed; management desktop-only) ----------
+    // The browser can see which variables exist and what a client resolves to;
+    // that is show documentation an operator needs at the desk. Defining and
+    // editing them stays desktop-only, matching tags: no Variables:Set* channel
+    // is allowlisted for the web namespace either.
+    GetAllVariables: async () => rpc('Variables:GetAll'),
+    GetClientVariables: async (UUID) => rpc('Variables:GetForClient', UUID),
+    OnSetVariableList: (cb) => sub('SetVariableList', cb),
+    CreateVariable: nullTuple,
+    SetVariableKey: nullTuple,
+    SetVariableDescription: nullTuple,
+    SetVariableDefault: nullTuple,
+    SetVariableExport: nullTuple,
+    DeleteVariable: nullTuple,
+
+    // ---- Custom audio assets (read allowed; management desktop-only) -----
+    GetAudioAssets: async () => rpc('Audio:GetAll'),
+    GetAudioAssetData: async (ID) => rpc('Audio:GetData', ID),
+    SelectAudioAssetFiles: nullTuple,
+    ImportAudioAsset: nullTuple,
+    UpdateAudioAsset: nullTuple,
+    DeleteAudioAsset: nullTuple,
+    OpenAudioAssetsFolder: resolveNull,
+    PlayCustomAudio: (cb) => sub('PlayCustomAudio', cb),
+    OnAudioAssetsUpdated: (cb) => sub('AudioAssetsUpdated', cb),
+
+    // ---- Log console -------------------------------------------------------
+    // Own socket events rather than rpc: the server streams to this socket only
+    // while it is open.
+    // Socket.IO drops an ack whose socket disconnects before replying, so the
+    // request gives up after a while rather than leaving the console waiting
+    // (and holding back live lines) forever.
+    OpenLogConsole: async (Level) => {
+      LogConsoleLevel = Level;
+      return new Promise((resolve) => {
+        const Timer = setTimeout(() => resolve(null), CONSOLE_ACK_TIMEOUT_MS);
+        const Settle = (Snapshot: LogConsoleSnapshot | null) => {
+          clearTimeout(Timer);
+          resolve(Snapshot);
+        };
+        try {
+          socket.emit('logconsole:open', Level, (res: Ack) =>
+            Settle(res && res.result ? (res.result as LogConsoleSnapshot) : null)
+          );
+        } catch {
+          Settle(null);
+        }
+      });
+    },
+    CloseLogConsole: async () => {
+      LogConsoleLevel = null;
+      try {
+        socket.emit('logconsole:close');
+      } catch {
+        /* intentional: the server also stops on disconnect */
+      }
+      return null;
+    },
+    OnLogConsoleEntries: (cb) => sub('LogConsole:Entries', cb),
+    OpenMonitorLiveLevels: async (TargetID) => {
+      LiveLevelsTarget = TargetID;
+      return new Promise((resolve) => {
+        const Timer = setTimeout(() => resolve(null), CONSOLE_ACK_TIMEOUT_MS);
+        const Settle = (Snapshot: MonitorLiveLevelsSnapshot | null) => {
+          clearTimeout(Timer);
+          resolve(Snapshot);
+        };
+        try {
+          socket.emit('monitorlive:open', TargetID, (res: Ack) =>
+            Settle(res && res.result ? (res.result as MonitorLiveLevelsSnapshot) : null)
+          );
+        } catch {
+          Settle(null);
+        }
+      });
+    },
+    CloseMonitorLiveLevels: async () => {
+      LiveLevelsTarget = null;
+      try {
+        socket.emit('monitorlive:close');
+      } catch {
+        /* intentional: the server also stops on disconnect */
+      }
+      return null;
+    },
+    OnMonitorLiveLevels: (cb) => sub('MonitorLiveLevels:Frames', cb),
+    SetMonitorLiveLevel: async (TargetID, CheckID, ChannelID, Change, Final) =>
+      rpc('MonitorLiveLevels:Set', TargetID, CheckID, ChannelID, Change, Final),
+    OpenMonitorTileLevels: async () => {
+      TileLevelsOpen = true;
+      return new Promise((resolve) => {
+        const Timer = setTimeout(() => resolve(null), CONSOLE_ACK_TIMEOUT_MS);
+        const Settle = (Snapshot: MonitorTileLevelsSnapshot | null) => {
+          clearTimeout(Timer);
+          resolve(Snapshot);
+        };
+        try {
+          socket.emit('monitortiles:open', (res: Ack) =>
+            Settle(res && res.result ? (res.result as MonitorTileLevelsSnapshot) : null)
+          );
+        } catch {
+          Settle(null);
+        }
+      });
+    },
+    CloseMonitorTileLevels: async () => {
+      TileLevelsOpen = false;
+      try {
+        socket.emit('monitortiles:close');
+      } catch {
+        /* intentional: the server also stops on disconnect */
+      }
+      return null;
+    },
+    OnMonitorTileLevels: (cb) => sub('MonitorTileLevels:Frames', cb),
+    GetRainbowMode: async () => AckOrFalse('rainbow:get'),
+    SetRainbowMode: async (Enabled) => AckOrFalse('rainbow:set', Enabled),
+    OnRainbowModeUpdated: (cb) => sub('RainbowModeUpdated', cb),
+    GetAuditLog: async (Query) => rpc('AuditLog:Get', Query),
+    AuditLogAppended: (cb) => sub('AuditLogAppended', cb),
+  };
+}
+
+export { createWebApi };

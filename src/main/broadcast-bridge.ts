@@ -361,7 +361,14 @@ async function ReadoptDevice(UUID: string): Promise<void> {
 
 // Full re-hydration: clear caches, re-fetch, and send authoritative lists.
 async function ReinitializeSystem(): Promise<void> {
-  if (!hasMainWindow()) return;
+  if (!hasMainWindow()) {
+    // Nothing to re-render, but the client cache must still be dropped: while
+    // it is loaded, a UUID it does not hold is answered "not a client" without
+    // asking the database, so a stale cache from the previous show would turn
+    // this show's clients away. Cleared, misses fall back to the database.
+    await ClientManager.ClearCache();
+    return;
+  }
   Logger.log('Reinitialising system...');
 
   // Refresh manager caches that hold DB-backed state in memory.
