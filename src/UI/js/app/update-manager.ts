@@ -405,17 +405,21 @@ export function BuildUpdateManagerListModel(
     // it gets no status line at all rather than a "Ready to update" filler. A
     // client already on the selected release gets none either: its "Current"
     // pill says so.
+    // An offline client says so once, in the status on the right: the hint pill
+    // and status line would only repeat it.
     const AlreadyCurrent = eligibility.reason === 'Already on selected version';
     const StatusText = Safe(
-      IsSelectable
-        ? Online
-          ? Execution
-            ? GetUpdateStatusText(Execution)
-            : ''
-          : eligibility.reason
-        : AlreadyCurrent
-          ? ''
-          : eligibility.reason
+      !Online
+        ? ''
+        : IsSelectable
+          ? Online
+            ? Execution
+              ? GetUpdateStatusText(Execution)
+              : ''
+            : eligibility.reason
+          : AlreadyCurrent
+            ? ''
+            : eligibility.reason
     );
 
     Rows.push({
@@ -434,13 +438,19 @@ export function BuildUpdateManagerListModel(
           </div>
           <div class="UPDATE_MANAGER_CLIENT_MAIN">
             <div class="UPDATE_MANAGER_CLIENT_NAME">${Name}</div>
-            <div class="UPDATE_MANAGER_CLIENT_META">
-              <span class="UPDATE_MANAGER_CLIENT_VERSION">${Version}</span>
+            ${
+              Online
+                ? `<div class="UPDATE_MANAGER_CLIENT_META">
               <span class="UPDATE_MANAGER_CLIENT_HINT ${Safe(versionHint.className)}" title="${Safe(versionHint.title)}">${Safe(versionHint.text)}</span>
-            </div>
+            </div>`
+                : ''
+            }
           </div>
           <div class="UPDATE_MANAGER_CLIENT_RIGHT">
-            <div class="UPDATE_MANAGER_CLIENT_STATUS ${GetUpdateStatusClass(Status)}">${Safe(Status)}</div>
+            <div class="UPDATE_MANAGER_CLIENT_STATUS_ROW">
+              <span class="UPDATE_MANAGER_CLIENT_VERSION">${Version}</span>
+              <div class="UPDATE_MANAGER_CLIENT_STATUS ${GetUpdateStatusClass(Status)}">${Safe(Status)}</div>
+            </div>
             <div class="progress UPDATE_MANAGER_CLIENT_PROGRESS">
               <div class="progress-bar ${Execution && Execution.Status === 'Failed' ? 'bg-danger' : 'bg-success'}" role="progressbar" style="width: ${Percent}%" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Percent}"></div>
             </div>

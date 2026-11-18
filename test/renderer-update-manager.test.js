@@ -405,3 +405,30 @@ test('a client dropping below the remote-update floor redraws for the warning', 
   assert.match(After.WarningHtml, /Manual Update Required/);
   assert.deepEqual(PlanUpdateManagerListPatch(Before, After), { Full: true });
 });
+
+test('an offline client says so once, beside its version', () => {
+  const Model = BuildUpdateManagerListModel(
+    [
+      client({ UUID: 'off', Online: false, Version: '3.20.0' }),
+      client({ UUID: 'on', Version: '3.13.0' }),
+    ],
+    'v3.14.0',
+    new Set(),
+    () => null
+  );
+  const Offline = UpdateManagerRowHtml(Model.Rows.find((Row) => Row.UUID === 'off'));
+  assert.equal(
+    (Offline.match(/offline/gi) || []).length,
+    2,
+    'the row class and the status, nothing else'
+  );
+  assert.doesNotMatch(Offline, /UPDATE_MANAGER_CLIENT_HINT|UPDATE_MANAGER_CLIENT_STATUS_TEXT/);
+  // The version sits in the status row, next to the status.
+  assert.match(
+    Offline,
+    /UPDATE_MANAGER_CLIENT_STATUS_ROW">\s*<span class="UPDATE_MANAGER_CLIENT_VERSION">[^<]*3\.20\.0[^<]*<\/span>\s*<div class="UPDATE_MANAGER_CLIENT_STATUS[^"]*">Offline</
+  );
+  // An online client keeps its hint pill.
+  const Online = UpdateManagerRowHtml(Model.Rows.find((Row) => Row.UUID === 'on'));
+  assert.match(Online, /UPDATE_MANAGER_CLIENT_HINT INFO[^>]*>Ready</);
+});

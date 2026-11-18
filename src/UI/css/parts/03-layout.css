@@ -659,7 +659,8 @@ body.compact-mode .group-column-grid {
 }
 
 .UPDATE_MANAGER_CLIENT_RIGHT {
-  flex: 0 0 118px;
+  flex: 0 0 auto;
+  min-width: 118px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -719,6 +720,21 @@ body.compact-mode .group-column-grid {
 .UPDATE_MANAGER_CLIENT_HINT.MUTED {
   color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.08);
+}
+
+/* The client's current version sits beside its online/offline status. */
+.UPDATE_MANAGER_CLIENT_STATUS_ROW {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.UPDATE_MANAGER_CLIENT_VERSION {
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
 }
 
 .UPDATE_MANAGER_CLIENT_STATUS {
