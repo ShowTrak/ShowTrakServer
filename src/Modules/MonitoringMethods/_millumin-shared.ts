@@ -300,6 +300,11 @@ class MilluminReceiverImpl {
         if (Now - Src.LastSeenAt > SOURCE_RETENTION_MS) Listener.Sources.delete(Addr);
       }
     }
+    // Nothing left to watch: stop until the next interest re-arms it.
+    if (!this.Ports.size && this.SweepTimer) {
+      clearInterval(this.SweepTimer);
+      this.SweepTimer = null;
+    }
   }
 
   // Test-only teardown so a suite can bind/unbind deterministically.

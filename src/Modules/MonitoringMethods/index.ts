@@ -133,10 +133,15 @@ import * as igmpQuerier from './igmp-querier';
 
 const Logger = CreateLogger('MonitoringMethods');
 
-// Caps how many probes run at once (see _probe-limiter.ts).
-const PROBES = new ProbeLimiter(MONITORING_MAX_CONCURRENT_PROBES, {
-  ping: MONITORING_MAX_CONCURRENT_PINGS,
-});
+// Caps how many probes run at once (see _probe-limiter.ts). Where pings are
+// answered by the shared Windows helper they take no slot at all: each is a line
+// on a pipe rather than a process, and holding slots for 2 s per offline host
+// only starved the queue. ping.ts then caps its own ping.exe fallback.
+const PROBES = new ProbeLimiter(
+  MONITORING_MAX_CONCURRENT_PROBES,
+  ping.UsesSharedHelper ? {} : { ping: MONITORING_MAX_CONCURRENT_PINGS }
+);
+const UNLIMITED_METHODS = new Set<string>(ping.UsesSharedHelper ? [ping.ID] : []);
 
 const RUN_CACHE = CacheManager.GetBucket('MonitoringMethods:Run', {
   defaultTtlMs: 1000,
@@ -665,7 +670,10 @@ const Manager = {
       // joining an identical probe already in flight, never waits for a slot.
       return (await RUN_CACHE.GetOrCreate(
         CacheKey,
-        () => PROBES.Run(ID, async () => Method.Run(Target)),
+        () =>
+          UNLIMITED_METHODS.has(ID)
+            ? Promise.resolve().then(() => Method.Run(Target))
+            : PROBES.Run(ID, async () => Method.Run(Target)),
         {
           ttlMs: CacheTtlMs,
         }

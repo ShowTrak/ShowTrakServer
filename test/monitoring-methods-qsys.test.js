@@ -843,6 +843,47 @@ test('qsys-core CategorizeType sorts the inventory component types', () => {
   }
 });
 
+test('qsys-core lists the design once per DesignCode, not on every probe', async () => {
+  // Component.GetComponents returns every Named Component with its Properties,
+  // megabytes on a big design; it only changes when another design is pushed.
+  const qsys = load();
+  const status = { ...STATUS_OK };
+  const components = DESIGN.map((c) => ({ ...c }));
+  await withCore({ status, components }, async (core) => {
+    const listings = () =>
+      core.received.filter((m) => m.method === 'Component.GetComponents').length;
+    const first = await run(qsys, core, { CheckDevices: true });
+    const second = await run(qsys, core, { CheckDevices: true });
+    assert.equal(listings(), 1, 'the second probe used the cached list');
+    assert.deepEqual(
+      second.Devices.map((d) => d.Name),
+      first.Devices.map((d) => d.Name)
+    );
+
+    // A new design (new DesignCode) is listed afresh.
+    status.DesignCode = 'newDesign01';
+    await run(qsys, core, { CheckDevices: true });
+    assert.equal(listings(), 2);
+
+    // A listed component the Core no longer knows (error 7) drops the list.
+    components.splice(
+      components.findIndex((c) => c.Name === 'QIO-FOH'),
+      1
+    );
+    const stale = await run(qsys, core, { CheckDevices: true });
+    assert.equal(listings(), 2, 'still served from the cache this time');
+    assert.equal(stale.Devices.find((d) => d.Name === 'QIO-FOH').Found, false);
+    const fresh = await run(qsys, core, { CheckDevices: true });
+    assert.equal(listings(), 3, 'and listed again on the next probe');
+    assert.ok(!fresh.Devices.some((d) => d.Name === 'QIO-FOH'));
+
+    // An action (or the registry's invalidation) drops it too.
+    qsys.InvalidateCaches({ Address: '127.0.0.1', Settings: { Port: core.port } });
+    await run(qsys, core, { CheckDevices: true });
+    assert.equal(listings(), 4);
+  });
+});
+
 test('qsys-core discovers healthy design devices with one round trip for all of them', async () => {
   const qsys = load();
   await withCore({ components: DESIGN }, async (core) => {

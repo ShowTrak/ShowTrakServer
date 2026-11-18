@@ -3,7 +3,12 @@
 import { spawn } from 'child_process';
 import os from 'os';
 import { Pill, Rows, TextRow, Row, FormatLatency } from './debug';
-import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
+import {
+  DEFAULT_MONITORING_INTERVAL_MS,
+  MONITORING_MAX_CONCURRENT_PINGS,
+} from '../Config/constants';
+import { DefaultHelperCommand, PingHelperClient } from './_ping-helper';
+import { Semaphore } from './_probe-limiter';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const ID = 'ping';
@@ -37,14 +42,43 @@ function BuildArgs(Address: string, TimeoutMs: number): string[] {
   return ['-c', '1', '-W', String(TimeoutSec), Address];
 }
 
-// Don't shell-interpret; Address is forwarded as a process argument so a value
-// like "; rm -rf /" can never be parsed as a separate command.
+// On Windows pings go to one long-lived helper process instead of a ping.exe
+// each (see _ping-helper.ts); SHOWTRAK_PING_HELPER=0 turns it off. Anything the
+// helper cannot answer still goes to ping.exe below.
+const Helper: PingHelperClient | null =
+  os.platform() === 'win32' && process.env.SHOWTRAK_PING_HELPER !== '0'
+    ? new PingHelperClient(DefaultHelperCommand())
+    : null;
+
+// Whether pings are answered by the shared helper. The registry then lets them
+// skip the probe slots (a helper ping is a line on a pipe, not a process), and
+// the ping.exe fallback below takes its own, smaller pool instead.
+const UsesSharedHelper = !!Helper;
+const SpawnSlots = Helper ? new Semaphore(MONITORING_MAX_CONCURRENT_PINGS) : null;
+
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Address = Target && Target.Address ? String(Target.Address).trim() : '';
   if (!Address) return { Success: false, Error: 'No address configured' };
 
   const Cfg = (Target && Target.Settings) || {};
   const TimeoutMs = Number.isFinite(Cfg.Timeout) ? (Cfg.Timeout as number) : 2000;
+
+  if (Helper && Helper.Available()) {
+    const Answer = await Helper.Ping(Address, TimeoutMs);
+    if (Answer) return { ...Answer };
+  }
+  if (!SpawnSlots) return SpawnPing(Address, TimeoutMs);
+  await SpawnSlots.Acquire();
+  try {
+    return await SpawnPing(Address, TimeoutMs);
+  } finally {
+    SpawnSlots.Release();
+  }
+}
+
+// Don't shell-interpret; Address is forwarded as a process argument so a value
+// like "; rm -rf /" can never be parsed as a separate command.
+function SpawnPing(Address: string, TimeoutMs: number): Promise<MonitoringResult> {
   const Args = BuildArgs(Address, TimeoutMs);
 
   return new Promise<MonitoringResult>((resolve) => {
@@ -132,4 +166,4 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 export const Name = 'Ping (ICMP)';
 export const Description = 'Sends a single ICMP echo request and reports round-trip latency.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
-export { ID, Settings, Run, Debug };
+export { ID, Settings, Run, Debug, UsesSharedHelper };

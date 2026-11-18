@@ -41,6 +41,7 @@
 //              adopted device is not online (when enabled), or fewer access
 //              points / clients than the configured minimum.
 import { BuildBaseUrl, WithPath, RequestJson, IsObject, TimeoutOf } from './_videoproc-http-shared';
+import { WithProbeAgents, type ProbeAgents } from './_probe-agents';
 import type { JsonResponse } from './_videoproc-http-shared';
 import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
@@ -510,7 +511,12 @@ interface Requester {
   Get(Path: string): Promise<JsonResponse>;
 }
 
-function MakeRequester(Config: UnifiConfig, Base: URL, DeadlineAt: number): Requester {
+function MakeRequester(
+  Config: UnifiConfig,
+  Base: URL,
+  DeadlineAt: number,
+  Agents?: ProbeAgents
+): Requester {
   return {
     Get: (Path: string) =>
       RequestJson(WithPath(Base, `${Config.BasePath}${Path}`), {
@@ -518,6 +524,7 @@ function MakeRequester(Config: UnifiConfig, Base: URL, DeadlineAt: number): Requ
         DeadlineAt,
         IgnoreTlsErrors: Config.IgnoreTlsErrors,
         Headers: { 'X-API-KEY': Config.ApiKey },
+        Agents,
       }),
   };
 }
@@ -558,9 +565,17 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   }
   const Base = BuildBaseUrl(Config.Address, 'https', Config.Port);
   if (!Base) return { Success: false, Error: 'Invalid address' };
+  // Four or more requests per probe: one connection (one TLS handshake) for all.
+  return WithProbeAgents((Agents) => Probe(Config, Base, Agents));
+}
 
+async function Probe(
+  Config: UnifiConfig,
+  Base: URL,
+  Agents: ProbeAgents
+): Promise<MonitoringResult> {
   const Started = Date.now();
-  const Req = MakeRequester(Config, Base, Started + Config.TimeoutMs);
+  const Req = MakeRequester(Config, Base, Started + Config.TimeoutMs, Agents);
 
   // 1) Application info: reachability, the key and the version.
   const Info = await Req.Get('/v1/info');

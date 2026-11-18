@@ -77,6 +77,7 @@ import type {
   MonitoringSettingField,
   MonitoringTargetLike,
 } from './types';
+import { CachedLookup } from './_dns-cache';
 
 const ID = 'aja-device';
 const DEFAULT_PORT = 80;
@@ -447,6 +448,7 @@ function HttpRequest(
     try {
       Req = http.request({
         host: Address,
+        lookup: CachedLookup,
         port: Port,
         method: Method,
         path: Path,

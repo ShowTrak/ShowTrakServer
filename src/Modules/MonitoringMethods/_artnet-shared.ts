@@ -698,6 +698,13 @@ class ArtnetReceiverImpl {
   }
 
   private IngestDmx(Msg: Buffer, FromAddress: string): void {
+    // A busy network carries DMX for many universes nothing here watches, up to
+    // 44 packets a second each: read the universe from its two header bytes and
+    // drop those before parsing and normalising anything.
+    if (Msg.length >= DMX_MIN_LENGTH) {
+      const Universe = ((Msg[DMX_OFFSET_NET]! & 0x7f) << 8) | Msg[DMX_OFFSET_SUBUNI]!;
+      if (!this.Universes.has(Universe)) return;
+    }
     const Parsed = ParseArtnetPacket(Msg, FromAddress);
     if (!Parsed) return;
     // Ignore universes nothing is watching.

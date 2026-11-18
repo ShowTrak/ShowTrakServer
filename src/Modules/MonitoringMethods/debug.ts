@@ -93,9 +93,38 @@ export function FormatLatency(Ms: unknown): string {
   return `${Math.round(N)} ms`;
 }
 
+// Longest response body a probe result keeps for its debug panel. A result is
+// held for as long as the check runs (and shared through the run cache), and a
+// body is read whole (up to 1 MiB) only to judge the probe; the panel needs a
+// screenful of it, not the lot.
+export const DEBUG_BODY_MAX_CHARS = 64 * 1024;
+
+// A response body as a probe result keeps it for the debug panel: the first
+// DEBUG_BODY_MAX_CHARS of it. A longer body is copied rather than sliced, since
+// a V8 slice keeps the whole original string alive.
+export function DebugBody(Body: unknown): string {
+  const Text = typeof Body === 'string' ? Body : Body == null ? '' : String(Body);
+  if (Text.length <= DEBUG_BODY_MAX_CHARS) return Text;
+  return Buffer.from(Text.slice(0, DEBUG_BODY_MAX_CHARS), 'utf8').toString('utf8');
+}
+
+const PRE_OPEN =
+  '<pre class="bg-ghost rounded p-2 text-light font-monospace" ' +
+  'style="font-size: 0.8rem; overflow-x: auto; max-height: 300px; margin: 0;">';
+
+// A body cut short by DebugBody cannot be parsed, so it is shown as received.
+function TruncatedBodyBlock(Text: string): string {
+  return (
+    Note(`Showing the first ${Math.round(DEBUG_BODY_MAX_CHARS / 1024)} KB of the response.`) +
+    PRE_OPEN +
+    Esc(Text) +
+    '</pre>'
+  );
+}
+
 // Format a JSON string for safe display: parse if valid, beautify, escape, wrap in <pre>.
 // Returns HTML string. If the input is not valid JSON or can't be beautified, returns
-// a note instead.
+// a note instead (or, for a body cut short by DebugBody, the text as received).
 export function JsonCodeBlock(JsonString: unknown): string {
   if (!JsonString) return Note('No JSON response');
   try {
@@ -108,8 +137,14 @@ export function JsonCodeBlock(JsonString: unknown): string {
       '</pre>'
     );
   } catch (Err) {
-    return Note(`Invalid JSON: ${Err instanceof Error ? Err.message : String(Err)}`);
+    return InvalidJsonBlock(JsonString, Err);
   }
+}
+
+function InvalidJsonBlock(JsonString: unknown, Err: unknown): string {
+  const Text = String(JsonString);
+  if (Text.length >= DEBUG_BODY_MAX_CHARS) return TruncatedBodyBlock(Text);
+  return Note(`Invalid JSON: ${Err instanceof Error ? Err.message : String(Err)}`);
 }
 
 // Format JSON with a highlighted path. Attempts to parse and beautify the JSON,
@@ -164,6 +199,6 @@ export function JsonCodeBlockWithPath(JsonString: unknown, JsonPath: unknown): s
       '</pre>'
     );
   } catch (Err) {
-    return Note(`Invalid JSON: ${Err instanceof Error ? Err.message : String(Err)}`);
+    return InvalidJsonBlock(JsonString, Err);
   }
 }

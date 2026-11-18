@@ -37,7 +37,16 @@
 //   * Reachable but the body is not valid JSON / the JsonPath is missing when an
 //     assertion is configured -> Offline (cannot confirm this is the disguise API).
 import { PerformHttpRequest, BuildHttpDebug } from './_http-shared';
-import { Esc, Pill, Rows, TextRow, Row, JsonCodeBlock, JsonCodeBlockWithPath } from './debug';
+import {
+  DebugBody,
+  Esc,
+  Pill,
+  Rows,
+  TextRow,
+  Row,
+  JsonCodeBlock,
+  JsonCodeBlockWithPath,
+} from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const ID = 'disguise-status';
@@ -194,7 +203,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     JsonPath: JsonPath || undefined,
     MachineName: Summary.MachineName,
     AverageFps: Summary.AverageFps,
-    JsonBody: Body,
+    JsonBody: DebugBody(Body),
   };
   if (Object.prototype.hasOwnProperty.call(Evaluation, 'MatchedValue')) {
     Base.MatchedValue = Evaluation.MatchedValue;
@@ -206,7 +215,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
       Error: Evaluation.Error || 'Health check failed',
       Status: Result.Status,
       JsonPath: JsonPath || undefined,
-      JsonBody: Body,
+      JsonBody: DebugBody(Body),
     };
   }
 

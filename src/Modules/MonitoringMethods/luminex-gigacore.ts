@@ -63,6 +63,7 @@ import {
   type SwitchResponse,
 } from './_switch-shared';
 import { FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { WithProbeAgents, type ProbeAgents } from './_probe-agents';
 import { DEFAULT_MONITORING_INTERVAL_MS, MONITORING_INTEREST_TTL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -257,6 +258,8 @@ interface OpenedSwitch {
   Scheme: Scheme;
   // The GET /api/device reply that settled the scheme.
   Device: SwitchResponse & { Ok: true };
+  // This probe's keep-alive connections, when it has them.
+  Agents?: ProbeAgents;
 }
 
 // GET /api/device on the right scheme. Explicit HTTP/HTTPS (or a URL address
@@ -265,7 +268,8 @@ interface OpenedSwitch {
 // cannot use all of it.
 async function OpenSwitch(
   Config: GigaCoreConfig,
-  DeadlineAt: number
+  DeadlineAt: number,
+  Agents?: ProbeAgents
 ): Promise<{ Ok: true; Switch: OpenedSwitch } | { Ok: false; Error: string; Status?: number }> {
   const Now = Date.now();
   PruneSchemes(Now);
@@ -294,10 +298,11 @@ async function OpenSwitch(
       Headers: AuthHeaders(Config),
       DeadlineAt: Math.min(AttemptDeadline, DeadlineAt),
       IgnoreTlsErrors: Config.IgnoreTlsErrors,
+      Agents,
     });
     if (SchemeAnswered(Res) && Res.Ok) {
       Schemes.set(Key, { Scheme, LastUsedAt: Date.now() });
-      return { Ok: true, Switch: { Base, Scheme, Device: Res } };
+      return { Ok: true, Switch: { Base, Scheme, Device: Res, Agents } };
     }
     if (Res.Ok) {
       LastStatus = Res.Status;
@@ -320,6 +325,7 @@ function Request(
     ...Request,
     Headers: AuthHeaders(Config),
     IgnoreTlsErrors: Config.IgnoreTlsErrors,
+    Agents: Opened.Agents,
   });
 }
 
@@ -501,7 +507,12 @@ function EvaluatePoe(Wanted: number[], Ports: GigaCorePoePort[]): PoeState[] {
 
 // --- Run ----------------------------------------------------------------------------
 
-async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
+// Several requests per probe (device, ports, PoE): one connection for all of them.
+function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
+  return WithProbeAgents((Agents) => Probe(Target, Agents));
+}
+
+async function Probe(Target: MonitoringTargetLike, Agents: ProbeAgents): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
   if (!Config.Address) return { Success: false, Error: 'No address configured' };
   if (Config.Port < 0 || Config.Port > 65535) {
@@ -510,7 +521,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Options = ParseHealthOptions(Target);
   const DeadlineAt = Date.now() + Config.TimeoutMs;
 
-  const Opened = await OpenSwitch(Config, DeadlineAt);
+  const Opened = await OpenSwitch(Config, DeadlineAt, Agents);
   if (!Opened.Ok) {
     return {
       Success: false,

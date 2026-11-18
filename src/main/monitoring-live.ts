@@ -228,8 +228,12 @@ function Sync(): void {
       if (typeof FlushTimer.unref === 'function') FlushTimer.unref();
     }
     if (!Listening) {
+      // Which checks stream depends on their configuration only, and every
+      // configuration change (an edit, a moved or deleted check) announces
+      // itself with MonitoringTargetListChanged. Not MonitoringTargetUpdated:
+      // that fires on every probe of every monitor, and re-syncing on each
+      // (walking every monitor, keying each stream) was most of this hub's cost.
       Listening = true;
-      BroadcastManager.on('MonitoringTargetUpdated', OnTargetsChanged);
       BroadcastManager.on('MonitoringTargetListChanged', OnTargetsChanged);
     }
   } else {
@@ -239,7 +243,6 @@ function Sync(): void {
     TilesDirty = false;
     if (Listening) {
       Listening = false;
-      BroadcastManager.off('MonitoringTargetUpdated', OnTargetsChanged);
       BroadcastManager.off('MonitoringTargetListChanged', OnTargetsChanged);
     }
   }

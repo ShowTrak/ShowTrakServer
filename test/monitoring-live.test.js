@@ -99,17 +99,19 @@ test('opening starts each live check once, frames are batched to the viewer, clo
   });
   // Both frames landed inside one flush.
   assert.equal(got.length, 1);
-  assert.equal(broadcast.listenerCount('MonitoringTargetUpdated'), 1);
+  assert.equal(broadcast.listenerCount('MonitoringTargetListChanged'), 1);
+  // Probe ticks never re-sync: only a configuration change can change what streams.
+  assert.equal(broadcast.listenerCount('MonitoringTargetUpdated'), 0);
 
   hub.CloseMonitorLiveLevels('desktop:1');
   assert.equal(started[0].stopped, false);
   hub.CloseMonitorLiveLevels('web:a');
   assert.ok(started.every((s) => s.stopped));
-  assert.equal(broadcast.listenerCount('MonitoringTargetUpdated'), 0);
+  assert.equal(broadcast.listenerCount('MonitoringTargetListChanged'), 0);
   hub.CloseMonitorLiveLevels('nobody');
 });
 
-test('a settings change or the toggle going off is picked up from the target push', async () => {
+test('a settings change or the toggle going off is picked up from the list change', async () => {
   const { hub, broadcast, targets, started, events } = load();
   targets.set(1, [check(11)]);
   const got = [];
@@ -117,14 +119,14 @@ test('a settings change or the toggle going off is picked up from the target pus
   assert.equal(started.length, 1);
 
   targets.set(1, [check(11, { ReadLevels: true, Password: 'new' })]);
-  broadcast.emit('MonitoringTargetUpdated', {});
+  broadcast.emit('MonitoringTargetListChanged');
   assert.equal(started[0].stopped, true);
   assert.equal(started.length, 2);
   // The successor starts first, so it can take over the device connection.
   assert.deepEqual(events, ['start 0', 'start 1', 'stop 0']);
 
   targets.set(1, []);
-  broadcast.emit('MonitoringTargetUpdated', {});
+  broadcast.emit('MonitoringTargetListChanged');
   assert.equal(started[1].stopped, true);
   await tick();
   assert.deepEqual(got[got.length - 1], { TargetID: 1, Checks: [] });
@@ -187,7 +189,7 @@ test('a dashboard gets only the tile channels of every levels tile', async () =>
   assert.equal(started[0].stopped, false);
   hub.CloseMonitorTileLevels('web:x');
   assert.equal(started[0].stopped, true);
-  assert.equal(broadcast.listenerCount('MonitoringTargetUpdated'), 0);
+  assert.equal(broadcast.listenerCount('MonitoringTargetListChanged'), 0);
 });
 
 test('one stream serves a monitor view and its tile; each sees only its own', async () => {

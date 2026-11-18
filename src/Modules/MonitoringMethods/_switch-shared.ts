@@ -9,6 +9,8 @@ import http from 'http';
 import https from 'https';
 import { URL } from 'url';
 import { Card, Esc, Pill } from './debug';
+import { CachedLookup } from './_dns-cache';
+import type { ProbeAgents } from './_probe-agents';
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 // A port list cannot name more ports than this, so a typo such as 1-99999
@@ -105,6 +107,8 @@ export interface SwitchRequest {
   // Absolute epoch-ms deadline for this request.
   DeadlineAt: number;
   IgnoreTlsErrors?: boolean;
+  // Reuse one connection for the rest of the probe (see _probe-agents).
+  Agents?: ProbeAgents;
 }
 
 export type SwitchResponse =
@@ -191,7 +195,7 @@ export function RequestSwitchJson(Url: URL, Request: SwitchRequest): Promise<Swi
       Host: Url.host,
       'User-Agent': 'ShowTrak-Monitoring/1.0',
       Accept: 'application/json',
-      Connection: 'close',
+      Connection: Request.Agents ? 'keep-alive' : 'close',
       ...(Request.Headers || {}),
     };
     const Payload =
@@ -203,11 +207,14 @@ export function RequestSwitchJson(Url: URL, Request: SwitchRequest): Promise<Swi
     const Options: https.RequestOptions = {
       method: Request.Method,
       hostname: Url.hostname.replace(/^\[|\]$/g, ''),
+      lookup: CachedLookup,
       port: Url.port || (Url.protocol === 'https:' ? 443 : 80),
       path: `${Url.pathname}${Url.search || ''}`,
       headers: Headers,
     };
     if (Url.protocol === 'https:') Options.rejectUnauthorized = !Request.IgnoreTlsErrors;
+    const Agent = Request.Agents ? Request.Agents.For(Url) : undefined;
+    if (Agent) Options.agent = Agent;
 
     try {
       Req = Lib.request(Options);

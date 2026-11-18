@@ -985,6 +985,66 @@ test('a changed latency re-pushes, so the live latency readout cannot freeze', a
   );
 });
 
+// Latency jitter used to defeat the gate: every tick of every check with a
+// latency differed in its raw reading, so nearly all of them were pushed.
+const monitorPushes = () => pushes.filter(([channel]) => channel === 'MonitoringTargetUpdated');
+function withLatency(ID, Ms) {
+  const Snap = monitorSnapshot(ID, { LastLatencyMs: Ms });
+  Snap.Checks[0].LastLatencyMs = Ms;
+  return Snap;
+}
+
+test('a latency that draws the same is not re-pushed', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_000_000 });
+  const ID = 9010;
+  await emit('MonitoringTargetUpdated', withLatency(ID, 0.31));
+  // Both draw "<1ms"; 12.2 and 11.8 both draw "12ms".
+  await emit('MonitoringTargetUpdated', withLatency(ID, 0.44));
+  await emit('MonitoringTargetUpdated', withLatency(ID + 1, 12.2));
+  await emit('MonitoringTargetUpdated', withLatency(ID + 1, 11.8));
+  assert.equal(monitorPushes().length, 2, 'one push per target, none for the repeats');
+});
+
+test('latency jitter is refreshed at most every ten seconds', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_000_000 });
+  const ID = 9012;
+  await emit('MonitoringTargetUpdated', withLatency(ID, 12));
+  t.mock.timers.setTime(1_003_000);
+  await emit('MonitoringTargetUpdated', withLatency(ID, 14));
+  t.mock.timers.setTime(1_006_000);
+  await emit('MonitoringTargetUpdated', withLatency(ID, 13));
+  assert.equal(monitorPushes().length, 1, 'a few ms of jitter does not re-push straight away');
+
+  t.mock.timers.setTime(1_010_000);
+  await emit('MonitoringTargetUpdated', withLatency(ID, 15));
+  assert.equal(monitorPushes().length, 2, 'but the readout catches up within ten seconds');
+  assert.equal(monitorPushes()[1][1].LastLatencyMs, 15, 'with the latest reading');
+
+  t.mock.timers.setTime(1_011_000);
+  await emit('MonitoringTargetUpdated', withLatency(ID, 15.2));
+  assert.equal(monitorPushes().length, 2, 'and the clock restarts from that push');
+});
+
+test('a latency that really moves, appears or goes is pushed at once', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_000_000 });
+  const ID = 9013;
+  await emit('MonitoringTargetUpdated', withLatency(ID, 12));
+  t.mock.timers.setTime(1_001_000);
+  // Beyond max(5 ms, 25%).
+  await emit('MonitoringTargetUpdated', withLatency(ID, 18));
+  t.mock.timers.setTime(1_002_000);
+  // A slow creep is measured from what was last pushed, not from the last tick.
+  await emit('MonitoringTargetUpdated', withLatency(ID, 21));
+  await emit('MonitoringTargetUpdated', withLatency(ID, 24));
+  t.mock.timers.setTime(1_003_000);
+  await emit('MonitoringTargetUpdated', withLatency(ID, null));
+  await emit('MonitoringTargetUpdated', withLatency(ID, 24));
+  assert.deepEqual(
+    monitorPushes().map(([, Target]) => Target.LastLatencyMs),
+    [12, 18, 24, null, 24]
+  );
+});
+
 test('a status change re-pushes', async () => {
   const ID = 9004;
   await emit('MonitoringTargetUpdated', monitorSnapshot(ID));

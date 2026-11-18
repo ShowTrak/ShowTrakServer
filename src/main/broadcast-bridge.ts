@@ -493,11 +493,10 @@ async function UpdateMonitoringActionFavouriteList(): Promise<void> {
 //                         plus a socket emit to every authed Web UI client,
 //                         each followed by a tile re-render.
 //
-// So only the push is gated, and only when the payload would paint identically.
-// The signature below is the renderer-visible projection: it deliberately keeps
-// LastLatencyMs (the tile shows live latency, so a changed reading must be
-// pushed) and drops the three fields that advance every tick without ever being
-// rendered:
+// So only the push is gated, and only when the payload would paint identically
+// (or, for latency, near enough; see below). The signature below is the
+// renderer-visible projection, less latency, and drops the three fields that
+// advance every tick without ever being rendered:
 //
 //   Timestamp      - no consumer reads it.
 //   LastChecked    - read only as a null/non-null "has this ever run" test
@@ -506,14 +505,36 @@ async function UpdateMonitoringActionFavouriteList(): Promise<void> {
 //                    while a target is online; the moment one goes offline,
 //                    Online flips and that alone forces a push.
 //
-// The win lands on exactly the targets that were pure waste: anything sitting
-// offline (unchanged payload forever), and the presence-style checks (sACN,
-// Art-Net, NDI, Millumin, MQTT) that report no latency at all, so a healthy
-// one is byte-identical tick after tick.
+// Latency (the target's and each check's) is judged apart from the rest. The
+// tile shows it rounded to the millisecond ("<1ms" below one), so a reading
+// that draws the same is no change at all. One that draws differently but only
+// jitters (within MONITORING_LATENCY_JITTER_MS / _FRACTION of what was last
+// pushed) waits until MONITORING_LATENCY_REFRESH_MS has passed since the last
+// push; a real move, or a reading appearing or going away, pushes at once. A
+// raw-value comparison let jitter defeat the gate: nearly every tick of every
+// check that reports a latency went to every surface.
 //
-// The SDK's ToPublicMonitor projection is a strict subset of these fields, so a
-// suppressed push can never leave an SDK consumer stale either.
-const LastPushedMonitoringSignature = new Map<number, string>();
+// The win lands on the targets that were pure waste: anything sitting offline
+// (unchanged payload forever), the presence-style checks (sACN, Art-Net, NDI,
+// Millumin, MQTT) that report no latency at all, and every healthy check whose
+// latency merely jitters.
+//
+// The SDK's ToPublicMonitor projection is a strict subset of these fields, and
+// carries no latency at all, so a suppressed push can never leave an SDK
+// consumer stale either.
+const MONITORING_LATENCY_REFRESH_MS = 10_000;
+const MONITORING_LATENCY_JITTER_MS = 5;
+const MONITORING_LATENCY_JITTER_FRACTION = 0.25;
+
+interface PushedMonitoringState {
+  // Everything renderable except latency.
+  Signature: string;
+  // The target's latency, then each check's, as last pushed.
+  Latency: unknown[];
+  At: number;
+}
+
+const LastPushedMonitoringSignature = new Map<number, PushedMonitoringState>();
 
 // Loose shape of the per-check entries read when building the signature.
 interface MonitoringCheckSnapshot {
@@ -548,7 +569,6 @@ function BuildMonitoringSignature(Target: BroadcastMonitoringTarget): string {
     Target.DegradedThresholdMs,
     Target.Online,
     Target.Degraded,
-    Target.LastLatencyMs,
     Target.LastError,
     Target.CheckCount,
     Target.LastChecked != null,
@@ -567,11 +587,60 @@ function BuildMonitoringSignature(Target: BroadcastMonitoringTarget): string {
       Check && Check.Weight,
       Check && Check.Online,
       Check && Check.Degraded,
-      Check && Check.LastLatencyMs,
       Check && Check.LastError,
       !!(Check && Check.LastChecked != null),
     ]),
   ]);
+}
+
+// The target's latency, then each check's.
+function MonitoringLatencies(Target: BroadcastMonitoringTarget): unknown[] {
+  const Checks = Array.isArray(Target.Checks) ? (Target.Checks as MonitoringCheckSnapshot[]) : [];
+  const Out: unknown[] = [Target.LastLatencyMs];
+  for (const Check of Checks) Out.push(Check ? Check.LastLatencyMs : undefined);
+  return Out;
+}
+
+// A latency as the surfaces draw it: whole milliseconds, "<1ms" below one (the
+// tile, list and history modal), "0 ms"/"1 ms" there in the check editor.
+function DisplayedLatency(Value: unknown): string {
+  if (Value == null) return '';
+  const N = Number(Value);
+  if (!Number.isFinite(N)) return `?${String(Value)}`;
+  return `${N < 1 ? '<' : ''}${Math.round(N)}`;
+}
+
+// Whether a latency moved beyond jitter since it was last pushed: a reading
+// gained or lost, or a change past MONITORING_LATENCY_JITTER_MS and _FRACTION.
+function LatencyMoved(Before: unknown, After: unknown): boolean {
+  const A = Before == null ? null : Number(Before);
+  const B = After == null ? null : Number(After);
+  if (A == null || B == null || !Number.isFinite(A) || !Number.isFinite(B)) {
+    return DisplayedLatency(Before) !== DisplayedLatency(After);
+  }
+  return (
+    Math.abs(B - A) >
+    Math.max(MONITORING_LATENCY_JITTER_MS, MONITORING_LATENCY_JITTER_FRACTION * Math.abs(A))
+  );
+}
+
+// Whether this tick must reach the renderers (see the block comment above).
+function ShouldPushMonitoringTarget(
+  Previous: PushedMonitoringState | undefined,
+  Next: PushedMonitoringState
+): boolean {
+  if (!Previous || Previous.Signature !== Next.Signature) return true;
+  if (Previous.Latency.length !== Next.Latency.length) return true;
+  let Redrawn = false;
+  for (let I = 0; I < Next.Latency.length; I++) {
+    const Before = Previous.Latency[I];
+    const After = Next.Latency[I];
+    if (DisplayedLatency(Before) === DisplayedLatency(After)) continue;
+    if (LatencyMoved(Before, After)) return true;
+    Redrawn = true;
+  }
+  // Absolute, so a wall clock stepped backwards cannot hold the refresh off.
+  return Redrawn && Math.abs(Next.At - Previous.At) >= MONITORING_LATENCY_REFRESH_MS;
 }
 
 // Drop signatures for targets that no longer exist, so the map tracks the live
@@ -593,9 +662,13 @@ async function MonitoringTargetUpdated(Target: BroadcastMonitoringTarget): Promi
 
   const TargetID = Number(Target && Target.TargetID);
   if (Number.isFinite(TargetID)) {
-    const Signature = BuildMonitoringSignature(Target);
-    if (LastPushedMonitoringSignature.get(TargetID) !== Signature) {
-      LastPushedMonitoringSignature.set(TargetID, Signature);
+    const Next: PushedMonitoringState = {
+      Signature: BuildMonitoringSignature(Target),
+      Latency: MonitoringLatencies(Target),
+      At: Date.now(),
+    };
+    if (ShouldPushMonitoringTarget(LastPushedMonitoringSignature.get(TargetID), Next)) {
+      LastPushedMonitoringSignature.set(TargetID, Next);
       PushToRenderers('MonitoringTargetUpdated', Target);
     }
   } else {

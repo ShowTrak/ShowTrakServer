@@ -16,6 +16,8 @@
 import http from 'http';
 import https from 'https';
 import { URL } from 'url';
+import { CachedLookup } from './_dns-cache';
+import type { ProbeAgents } from './_probe-agents';
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
@@ -28,6 +30,8 @@ export interface JsonRequest {
   // Absolute epoch-ms deadline shared by every request of one probe.
   DeadlineAt: number;
   IgnoreTlsErrors?: boolean;
+  // Reuse one connection for the rest of the probe (see _probe-agents).
+  Agents?: ProbeAgents;
 }
 
 export type JsonResponse =
@@ -97,7 +101,7 @@ export function RequestJson(Url: URL, Request: JsonRequest): Promise<JsonRespons
       Host: Url.host,
       'User-Agent': 'ShowTrak-Monitoring/1.0',
       Accept: 'application/json',
-      Connection: 'close',
+      Connection: Request.Agents ? 'keep-alive' : 'close',
       ...(Request.Headers || {}),
     };
     const Payload = Request.Json === undefined ? null : Buffer.from(JSON.stringify(Request.Json));
@@ -109,11 +113,14 @@ export function RequestJson(Url: URL, Request: JsonRequest): Promise<JsonRespons
     const Options: https.RequestOptions = {
       method: Request.Method,
       hostname: Url.hostname,
+      lookup: CachedLookup,
       port: Url.port || (Url.protocol === 'https:' ? 443 : 80),
       path: `${Url.pathname}${Url.search || ''}`,
       headers: Headers,
     };
     if (Url.protocol === 'https:') Options.rejectUnauthorized = !Request.IgnoreTlsErrors;
+    const Agent = Request.Agents ? Request.Agents.For(Url) : undefined;
+    if (Agent) Options.agent = Agent;
 
     let Req: http.ClientRequest;
     const KillTimer = setTimeout(() => {

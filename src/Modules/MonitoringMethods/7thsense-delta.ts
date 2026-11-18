@@ -70,6 +70,7 @@ import {
 import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import { CachedLookup } from './_dns-cache';
 
 const ID = '7thsense-delta';
 const DEFAULT_PORT = 23;
@@ -651,6 +652,7 @@ export function FetchGpuTemps(
     try {
       Req = http.request({
         host: Address,
+        lookup: CachedLookup,
         port: HttpPort,
         path: GPU_TEMP_PATH,
         method: 'GET',

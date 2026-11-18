@@ -16,6 +16,15 @@ const DUPLICATE_UPDATE_WINDOW_MS = 900;
 // reading grey, so a steady run still needs a reading in every block; this
 // keeps four, while any change of state is still recorded the moment it lands.
 const STEADY_STATE_SAMPLE_INTERVAL_MS = 15 * 1000;
+// A latency reading only starts a new point when it moves away from the newest
+// point's running mean by more than this many ms AND this fraction of it. Below
+// that it is jitter: it is averaged into the newest point instead. Recording a
+// point for every probe whose latency merely rounded differently grew a
+// jittering check by one point per probe (~890 points an hour for a 3 s check,
+// ~300 MB of heap for 300 checks over the 12 h window), when the timeline draws
+// one-minute blocks that average latency anyway.
+const LATENCY_CHANGE_MIN_MS = 5;
+const LATENCY_CHANGE_FRACTION = 0.25;
 const ENTITY_MONITOR_TARGET = 'monitor-target';
 const ENTITY_DUMMY_CLIENT = 'dummy-client';
 const ENTITY_CLIENT = 'client';
@@ -42,7 +51,18 @@ interface HistorySampleInput {
 // Store keys are numeric TargetIDs for monitor-target checks and UUID strings
 // for dummy/real clients.
 type EntityHistoryKey = string | number;
-type EntityHistoryStore = Map<EntityHistoryKey, HistorySample[]>;
+
+// One entity's series. Points are in recording order, which is time order, so
+// reads and the retention sweep can binary-search the window instead of walking
+// 12 h of points. `LastCount` is how many readings the newest point stands for,
+// so a folded-in latency can keep a running mean (see absorbRepeatSample). Only
+// the newest point is ever changed in place.
+interface HistorySeries {
+  Points: HistorySample[];
+  LastCount: number;
+}
+
+type EntityHistoryStore = Map<EntityHistoryKey, HistorySeries>;
 
 // Loose monitor-target/check shapes consumed by the monitoring history helpers.
 interface MonitoringCheckLike {
@@ -66,9 +86,10 @@ interface StatusEntityLike {
 
 // Named per-entity timeline entry shared by the per-application / per-USB /
 // per-display history stores (the shape is identical across all three).
-interface NamedHistoryEntry {
+interface NamedHistoryEntry extends HistorySeries {
   Name: string;
-  Points: HistorySample[];
+  // The record() call that last reported this entity (see record()).
+  Stamp: number;
 }
 
 // Loose client telemetry shape read by the critical-entity extractors.
@@ -106,9 +127,9 @@ interface NamedEntityState {
 }
 
 const MonitoringHistoryStores: Record<string, EntityHistoryStore> = Object.freeze({
-  [ENTITY_MONITOR_TARGET]: new Map<EntityHistoryKey, HistorySample[]>(),
-  [ENTITY_DUMMY_CLIENT]: new Map<EntityHistoryKey, HistorySample[]>(),
-  [ENTITY_CLIENT]: new Map<EntityHistoryKey, HistorySample[]>(),
+  [ENTITY_MONITOR_TARGET]: new Map<EntityHistoryKey, HistorySeries>(),
+  [ENTITY_DUMMY_CLIENT]: new Map<EntityHistoryKey, HistorySeries>(),
+  [ENTITY_CLIENT]: new Map<EntityHistoryKey, HistorySeries>(),
 });
 
 function getHistoryStore(entityType: string): EntityHistoryStore | null {
@@ -144,38 +165,104 @@ function normalizeLatency(latencyMs: unknown): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
+// Whether two latency readings say the same thing: both absent, or both present
+// and within jitter of each other (see LATENCY_CHANGE_MIN_MS). `reference` is the
+// newest point's running mean.
+function sameLatency(reference: number | null, next: number | null): boolean {
+  if (reference == null || next == null) return reference == null && next == null;
+  return (
+    Math.abs(next - reference) <=
+    Math.max(LATENCY_CHANGE_MIN_MS, LATENCY_CHANGE_FRACTION * Math.abs(reference))
+  );
+}
+
 // Whether `next` repeats what the series already says, so recording it would
 // add nothing. Extends the newest reading in place when it does: a quick
 // repeat is the same observation, and a steady run keeps its first reading
-// fixed and drags its latest forward until the run is due another point.
-function absorbRepeatSample(samples: HistorySample[], next: HistorySample): boolean {
+// fixed and drags its latest forward until the run is due another point. A
+// latency that only jitters is averaged into the point it is folded into, so
+// each point's latency is the mean of the readings it stands for, which is
+// what the timeline's per-minute average then sees.
+//
+// A change of state (online, degraded, a latency reading gained or lost) always
+// appends, however quickly it lands, as does a latency that really moved.
+function absorbRepeatSample(series: HistorySeries, next: HistorySample): boolean {
+  const samples = series.Points;
   const last = samples.length ? samples[samples.length - 1]! : null;
   if (
     !last ||
     last.online !== next.online ||
     last.degraded !== next.degraded ||
-    !(
-      (last.latencyMs == null && next.latencyMs == null) ||
-      Math.round(last.latencyMs || 0) === Math.round(next.latencyMs || 0)
-    )
+    !sameLatency(last.latencyMs, next.latencyMs)
   ) {
     return false;
   }
-  if (next.ts - last.ts < DUPLICATE_UPDATE_WINDOW_MS) {
-    last.ts = next.ts;
-    return true;
+  if (next.ts - last.ts >= DUPLICATE_UPDATE_WINDOW_MS) {
+    const previous = samples.length > 1 ? samples[samples.length - 2]! : null;
+    if (
+      !previous ||
+      previous.online !== last.online ||
+      previous.degraded !== last.degraded ||
+      next.ts - previous.ts >= STEADY_STATE_SAMPLE_INTERVAL_MS
+    ) {
+      return false;
+    }
   }
-  const previous = samples.length > 1 ? samples[samples.length - 2]! : null;
-  if (
-    previous &&
-    previous.online === last.online &&
-    previous.degraded === last.degraded &&
-    next.ts - previous.ts < STEADY_STATE_SAMPLE_INTERVAL_MS
-  ) {
-    last.ts = next.ts;
-    return true;
+  last.ts = next.ts;
+  if (last.latencyMs != null && next.latencyMs != null) {
+    const count = Math.max(1, series.LastCount) + 1;
+    last.latencyMs += (next.latencyMs - last.latencyMs) / count;
+    series.LastCount = count;
   }
-  return false;
+  return true;
+}
+
+// Record `next` into a series: fold it into the newest point or append it, then
+// drop whatever fell out of the window.
+function appendSample(series: HistorySeries, next: HistorySample, cutoff: number): void {
+  if (!absorbRepeatSample(series, next)) {
+    series.Points.push(next);
+    series.LastCount = 1;
+  }
+  const samples = series.Points;
+  while (samples.length && samples[0]!.ts < cutoff) samples.shift();
+}
+
+// Index of the first point at or after `fromTs`. Points are recorded in time
+// order, so this is a binary search rather than a walk over the whole window.
+// (A wall-clock step backwards can leave a few points out of order; the worst
+// that does is draw them in the wrong minute, it never loses the series.)
+function firstIndexAtOrAfter(samples: readonly HistorySample[], fromTs: number): number {
+  let lo = 0;
+  let hi = samples.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (samples[mid]!.ts < fromTs) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+// The points from `fromTs` on, as an array of the reader's own. Only the newest
+// point is ever changed in place (see absorbRepeatSample), so that one is copied
+// and the rest are shared: a reader's points never move under it.
+function readSince(samples: readonly HistorySample[], fromTs: number): HistorySample[] {
+  const from = firstIndexAtOrAfter(samples, fromTs);
+  if (from >= samples.length) return [];
+  const out = samples.slice(from);
+  out[out.length - 1] = { ...out[out.length - 1]! };
+  return out;
+}
+
+// Drop the points that fell out of the window from the front of a series.
+// Returns whether anything is left.
+function trimSeries(series: HistorySeries, cutoff: number): boolean {
+  const samples = series.Points;
+  if (samples.length && samples[0]!.ts >= cutoff) return true;
+  const from = firstIndexAtOrAfter(samples, cutoff);
+  if (from >= samples.length) return false;
+  samples.splice(0, from);
+  return true;
 }
 
 // Every named per-entity store (critical applications, USB, displays, audio,
@@ -190,30 +277,16 @@ const NamedHistoryStores: Array<Pick<NamedHistoryStore, 'prune'>> = [];
 // ./history-retention). Not on reads or list syncs: every series already trims
 // itself when written and is filtered when read, and walking every series of
 // every store on each read (three times per status-overview poll) cost far more
-// than the reads themselves on a large rig.
+// than the reads themselves on a large rig. A series whose oldest point is still
+// inside the window costs one comparison: points are in time order.
 function pruneMonitoringHistoryStore(now: number = Date.now()): void {
   const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
   for (const named of NamedHistoryStores) named.prune(now);
   for (const store of Object.values(MonitoringHistoryStores)) {
-    for (const [key, samples] of store.entries()) {
-      // Nothing expired: leave the series (and its array) as it is.
-      if (Array.isArray(samples) && samples.length && IsFresh(samples, cutoff)) continue;
-      const next = Array.isArray(samples)
-        ? samples.filter((s: HistorySample) => s && s.ts >= cutoff)
-        : [];
-      if (!next.length) {
-        store.delete(key);
-        continue;
-      }
-      store.set(key, next);
+    for (const [key, series] of store.entries()) {
+      if (!trimSeries(series, cutoff)) store.delete(key);
     }
   }
-}
-
-// Whether every sample is inside the window (and so nothing needs dropping).
-function IsFresh(samples: HistorySample[], cutoff: number): boolean {
-  for (const s of samples) if (!s || !(Number(s.ts) >= cutoff)) return false;
-  return true;
 }
 
 function recordEntityHistorySample(
@@ -234,13 +307,12 @@ function recordEntityHistorySample(
     latencyMs: normalizeLatency(sample.latencyMs),
   };
 
-  const samples = store.get(key) || [];
-  if (!absorbRepeatSample(samples, normalized)) samples.push(normalized);
-
-  const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
-  while (samples.length && samples[0]!.ts < cutoff) samples.shift();
-
-  store.set(key, samples);
+  let series = store.get(key);
+  if (!series) {
+    series = { Points: [], LastCount: 0 };
+    store.set(key, series);
+  }
+  appendSample(series, normalized, now - MONITORING_HISTORY_MAX_AGE_MS);
 }
 
 function syncEntityHistoryStore<T>(
@@ -272,13 +344,15 @@ function getEntityHistorySamples(entityType: string, id: unknown): HistorySample
   if (!store) return [];
   const key = resolveEntityKey(entityType, id);
   if (key == null) return [];
-  const cutoff = Date.now() - MONITORING_HISTORY_MAX_AGE_MS;
-  return (store.get(key) || []).filter((s) => s && s.ts >= cutoff);
+  const series = store.get(key);
+  if (!series) return [];
+  return readSince(series.Points, Date.now() - MONITORING_HISTORY_MAX_AGE_MS);
 }
 
 // Every series in one store from `sinceTs` on, keyed by its entity id. Feeds the
 // list view's history column, which draws a timeline for every row at once:
-// one call for the lot rather than one per row.
+// one call for the lot rather than one per row. Each series is binary-searched
+// to the window, so the cost follows the hour drawn, not the 12 h held.
 function getEntityHistorySamplesSince(
   entityType: string,
   sinceTs: number
@@ -287,9 +361,9 @@ function getEntityHistorySamplesSince(
   const out: Record<string, HistorySample[]> = {};
   if (!store) return out;
   const fromTs = Math.max(Number(sinceTs) || 0, Date.now() - MONITORING_HISTORY_MAX_AGE_MS);
-  for (const [key, samples] of store.entries()) {
-    const recent = samples.filter((s) => s && s.ts >= fromTs);
-    if (recent.length) out[String(key)] = recent.map((s) => ({ ...s }));
+  for (const [key, series] of store.entries()) {
+    const recent = readSince(series.Points, fromTs);
+    if (recent.length) out[String(key)] = recent;
   }
   return out;
 }
@@ -435,6 +509,9 @@ function createNamedHistoryStore<KeyField extends string>(
   outputKeyField: KeyField
 ): NamedHistoryStore<KeyField> {
   const store = new Map<string, Map<string, NamedHistoryEntry>>();
+  // Identifies one record() call, so the entities it did not report can be found
+  // without building a set of the ones it did.
+  let recordStamp = 0;
 
   function record(
     client: ClientHardwareTelemetryLike | null | undefined,
@@ -454,41 +531,37 @@ function createNamedHistoryStore<KeyField extends string>(
       store.set(uuid, perEntity);
     }
 
-    const seenKeys = new Set<string>();
+    const stamp = ++recordStamp;
+    let reported = 0;
     for (const state of states) {
-      seenKeys.add(state.key);
-      const existing = perEntity.get(state.key);
-      const previousSamples = Array.isArray(existing && existing.Points) ? existing!.Points : [];
-      const sample: HistorySample = {
-        ts: now,
-        online: !!state.online,
-        degraded: !!state.degraded,
-        latencyMs: null,
-      };
+      let entry = perEntity.get(state.key);
+      if (!entry) {
+        entry = { Name: state.key, Points: [], LastCount: 0, Stamp: 0 };
+        perEntity.set(state.key, entry);
+      }
+      if (entry.Stamp !== stamp) {
+        entry.Stamp = stamp;
+        reported++;
+      }
+      if (state.name) entry.Name = state.name;
       // Collapse a repeat of the same reading (see absorbRepeatSample). The
       // degraded comparison is a no-op for domains that never set it (USB /
       // applications), and correctly separates matched/mismatched display bars.
-      // The series is extended in place: get() hands out its own filtered
-      // array, never this one. Only the newest point is copied before it can be
-      // extended, because get()'s array shares the point objects and a point
-      // must not move under a reader. (This used to copy the whole series, up
-      // to 12h of points, for every entity of every client on every sample.)
-      const nextSamples = previousSamples;
-      if (nextSamples.length) {
-        nextSamples[nextSamples.length - 1] = { ...nextSamples[nextSamples.length - 1]! };
-      }
-      if (!absorbRepeatSample(nextSamples, sample)) nextSamples.push(sample);
-      while (nextSamples.length && nextSamples[0]!.ts < cutoff) nextSamples.shift();
-      perEntity.set(state.key, {
-        Name: state.name || (existing && existing.Name) || state.key,
-        Points: nextSamples,
-      });
+      // The series is extended in place; get() copies the one point that can
+      // change (the newest), so a point a reader holds never moves under it.
+      appendSample(
+        entry,
+        { ts: now, online: !!state.online, degraded: !!state.degraded, latencyMs: null },
+        cutoff
+      );
     }
 
     // Drop history for entities that are no longer marked critical so the modal
     // only shows currently-tracked entities.
-    for (const key of Array.from(perEntity.keys())) {
-      if (!seenKeys.has(key)) perEntity.delete(key);
+    if (perEntity.size > reported) {
+      for (const [key, entry] of perEntity) {
+        if (entry.Stamp !== stamp) perEntity.delete(key);
+      }
     }
     if (!perEntity.size) store.delete(uuid);
   }
@@ -512,17 +585,13 @@ function createNamedHistoryStore<KeyField extends string>(
     if (!key) return [];
     const perEntity = store.get(key);
     if (!perEntity) return [];
-    const now = Date.now();
-    const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
+    const cutoff = Date.now() - MONITORING_HISTORY_MAX_AGE_MS;
     const out: Array<NamedHistorySeries<KeyField>> = [];
     for (const [entityKey, entry] of perEntity.entries()) {
-      const samples = (Array.isArray(entry.Points) ? entry.Points : []).filter(
-        (s: HistorySample) => s && Number(s.ts) >= cutoff
-      );
       out.push({
         [outputKeyField]: entityKey,
         Name: entry.Name || entityKey,
-        samples,
+        samples: readSince(entry.Points, cutoff),
       } as NamedHistorySeries<KeyField>);
     }
     return out;
@@ -530,16 +599,9 @@ function createNamedHistoryStore<KeyField extends string>(
 
   function prune(now: number = Date.now()): void {
     const cutoff = now - MONITORING_HISTORY_MAX_AGE_MS;
-    for (const [uuid, perEntity] of Array.from(store.entries())) {
-      for (const [entityKey, entry] of Array.from(perEntity.entries())) {
-        if (Array.isArray(entry.Points) && entry.Points.length && IsFresh(entry.Points, cutoff)) {
-          continue;
-        }
-        const kept = (Array.isArray(entry.Points) ? entry.Points : []).filter(
-          (s: HistorySample) => s && Number(s.ts) >= cutoff
-        );
-        if (kept.length) perEntity.set(entityKey, { Name: entry.Name, Points: kept });
-        else perEntity.delete(entityKey);
+    for (const [uuid, perEntity] of store) {
+      for (const [entityKey, entry] of perEntity) {
+        if (!trimSeries(entry, cutoff)) perEntity.delete(entityKey);
       }
       if (!perEntity.size) store.delete(uuid);
     }

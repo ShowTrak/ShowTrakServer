@@ -27,7 +27,7 @@
 //   Offline  -> no HTTP response / connection refused / timeout / non-2xx /
 //               invalid JSON (Success:false, Error).
 import { PerformHttpRequest, BuildHttpDebug } from './_http-shared';
-import { Pill, Rows, TextRow, Row, JsonCodeBlock } from './debug';
+import { DebugBody, Pill, Rows, TextRow, Row, JsonCodeBlock } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -156,7 +156,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     Status: ProductResult.Status,
     ProductName: Product.Name,
     Version: Product.Version,
-    ProductBody: ProductResult.Body,
+    ProductBody: DebugBody(ProductResult.Body),
   };
 
   // No composition assertion configured -> reachable is Online.
@@ -187,7 +187,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 
   Out.ExpectedComposition = ExpectedComposition;
   Out.CurrentComposition = CurrentComposition;
-  Out.CompositionBody = CompResult.Body;
+  Out.CompositionBody = DebugBody(CompResult.Body);
 
   if (!CompositionMatches(CurrentComposition, ExpectedComposition)) {
     Out.Degraded = true;

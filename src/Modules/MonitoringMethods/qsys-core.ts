@@ -1210,7 +1210,11 @@ function QueryCore(
             } else if (State !== 'Active') {
               Snapshot.DevicesSkipped = `Core is ${State || 'not Active'}`;
             } else {
-              await ReadDevices(Call, Devices, Snapshot, (Next) => {
+              const Design = {
+                Key: `${Config.Address}:${Config.Port}`,
+                Code: Snapshot.Status.DesignCode,
+              };
+              await ReadDevices(Call, Devices, Snapshot, Design, (Next) => {
                 Stage = Next;
               });
             }
@@ -1231,6 +1235,57 @@ function QueryCore(
 
 type RpcCall = (Method: string, Params: unknown) => Promise<RpcReply>;
 
+// A design's component list, per Core, while its DesignCode stands. Listing it
+// (Component.GetComponents) returns every Named Component with its Properties:
+// megabytes on a big design, and it only changes when another design is pushed,
+// which changes the DesignCode StatusGet already reports on every probe. Also
+// dropped after DESIGN_COMPONENTS_TTL_MS, when a listed component turns out to
+// be unknown, and when an action runs.
+const DESIGN_COMPONENTS_TTL_MS = 10 * 60 * 1000;
+const DesignComponentsCache = new Map<
+  string,
+  { DesignCode: string; At: number; Components: DesignComponent[] }
+>();
+
+interface DesignRef {
+  // Address:Port of the Core.
+  Key: string;
+  DesignCode: string | null;
+}
+
+async function GetDesignComponents(
+  Call: RpcCall,
+  Design: DesignRef
+): Promise<{ Components: DesignComponent[] } | { Error: QrcError }> {
+  const Cached = DesignComponentsCache.get(Design.Key);
+  if (
+    Cached &&
+    Design.DesignCode &&
+    Cached.DesignCode === Design.DesignCode &&
+    Date.now() - Cached.At < DESIGN_COMPONENTS_TTL_MS
+  ) {
+    return { Components: Cached.Components };
+  }
+  // The QRC page lists no parameters but its example sends "test"; Q-SYS's
+  // own QRWC library sends the same, so this mirrors both.
+  const Listing = await Call('Component.GetComponents', 'test');
+  if ('Error' in Listing) {
+    DesignComponentsCache.delete(Design.Key);
+    return { Error: Listing.Error };
+  }
+  const Components = ParseComponentList(Listing.Result);
+  if (Design.DesignCode) {
+    DesignComponentsCache.set(Design.Key, {
+      DesignCode: Design.DesignCode,
+      At: Date.now(),
+      Components,
+    });
+  } else {
+    DesignComponentsCache.delete(Design.Key);
+  }
+  return { Components };
+}
+
 // Choose and read the design devices. Readings are put on the Snapshot before
 // any is sent, so a probe that runs out of time still reports the ones that
 // answered.
@@ -1238,8 +1293,10 @@ async function ReadDevices(
   Call: RpcCall,
   Plan: DevicePlan,
   Snapshot: CoreSnapshot,
+  Design: { Key: string; Code: string | null },
   SetStage: (Stage: string) => void
 ): Promise<void> {
+  const Ref: DesignRef = { Key: Design.Key, DesignCode: Design.Code };
   let Wanted: Array<{ Component: DesignComponent; Category: DeviceCategory }>;
   if (Plan.Source === 'list') {
     if (!Plan.Names.length) {
@@ -1252,9 +1309,9 @@ async function ReadDevices(
     const Types = new Map<string, string | null>();
     if (Plan.AmpFaults) {
       SetStage('Component.GetComponents');
-      const Listing = await Call('Component.GetComponents', 'test');
-      if (!('Error' in Listing)) {
-        for (const Component of ParseComponentList(Listing.Result)) {
+      const Listing = await GetDesignComponents(Call, Ref);
+      if ('Components' in Listing) {
+        for (const Component of Listing.Components) {
           Types.set(Component.Name, Component.Type);
         }
       }
@@ -1265,9 +1322,7 @@ async function ReadDevices(
     });
   } else {
     SetStage('Component.GetComponents');
-    // The QRC page lists no parameters but its example sends "test"; Q-SYS's
-    // own QRWC library sends the same, so this mirrors both.
-    const Listing = await Call('Component.GetComponents', 'test');
+    const Listing = await GetDesignComponents(Call, Ref);
     if ('Error' in Listing) {
       Snapshot.DiscoveryError = DescribeError(Listing.Error);
       return;
@@ -1275,7 +1330,7 @@ async function ReadDevices(
     const Enabled = new Set(Plan.Categories);
     const Unmatched: DesignComponent[] = [];
     Wanted = [];
-    for (const Component of ParseComponentList(Listing.Result)) {
+    for (const Component of Listing.Components) {
       const Category = CategorizeType(Component.Type);
       if (Category == null) continue; // not a device status component
       if (Enabled.has(Category)) Wanted.push({ Component, Category });
@@ -1307,8 +1362,13 @@ async function ReadDevices(
             Name: Reading.Name,
             Controls: [{ Name: Plan.StatusControl }],
           });
-      if ('Error' in Reply) ApplyDeviceError(Reading, Reply.Error);
-      else ApplyDeviceResult(Reading, Reply.Result, Plan.StatusControl, AllControls);
+      if ('Error' in Reply) {
+        ApplyDeviceError(Reading, Reply.Error);
+        // A listed component the Core no longer knows: the list is stale.
+        if (Reply.Error.Code === ERR_UNKNOWN_COMPONENT) DesignComponentsCache.delete(Ref.Key);
+      } else {
+        ApplyDeviceResult(Reading, Reply.Result, Plan.StatusControl, AllControls);
+      }
     }
   };
   await Promise.all(Array.from({ length: Math.min(MAX_IN_FLIGHT, Readings.length) }, Worker));
@@ -1942,7 +2002,15 @@ export const Name = 'Q-SYS Core';
 export const Description =
   'Connects to a Q-SYS Core over Q-SYS Remote Control (QRC, TCP 1710) and reads its status, state, running design and redundancy flags without changing anything. Reports Degraded when the Core status is not OK or the Core is not Active, and optionally when the design or listed Named Controls are not as expected, or when an amplifier, I/O frame, camera, bridge or touch panel in the design is not OK. Its actions load a snapshot or set a Named Control on the Active Core.';
 export const DefaultInterval = DEFAULT_MONITORING_INTERVAL_MS;
+// After an action, or when the registry is told the device changed: list the
+// design afresh on the next probe.
+function InvalidateCaches(Target: MonitoringTargetLike): void {
+  const Config = ParseConfig(Target);
+  DesignComponentsCache.delete(`${Config.Address}:${Config.Port}`);
+}
+
 export const _internal = {
+  DesignComponentsCache,
   ParseConfig,
   ParseHealthOptions,
   ParseControlAssertions,
@@ -1964,4 +2032,14 @@ export const _internal = {
   DeviceStatusLabel,
   ParseControlValue,
 };
-export { ID, Settings, Actions, Run, RunAction, GetActionOptions, DescribeAction, Debug };
+export {
+  ID,
+  Settings,
+  Actions,
+  Run,
+  RunAction,
+  GetActionOptions,
+  DescribeAction,
+  Debug,
+  InvalidateCaches,
+};

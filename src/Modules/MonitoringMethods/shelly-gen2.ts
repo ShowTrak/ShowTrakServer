@@ -60,6 +60,7 @@ import type {
   MonitoringSettingField,
   MonitoringTargetLike,
 } from './types';
+import { CachedLookup } from './_dns-cache';
 
 const ID = 'shelly-gen2';
 
@@ -330,6 +331,7 @@ function SendOnce(Url: URL, AuthHeader: string | null, BudgetMs: number): Promis
       Req = http.request({
         method: 'GET',
         hostname: Url.hostname,
+        lookup: CachedLookup,
         port: Number(Url.port) || DEFAULT_PORT,
         path: `${Url.pathname}${Url.search || ''}`,
         headers: Headers,

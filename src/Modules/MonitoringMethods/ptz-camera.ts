@@ -92,6 +92,7 @@ import type {
   MonitoringSettingField,
   MonitoringTargetLike,
 } from './types';
+import { CachedLookup } from './_dns-cache';
 
 const ID = 'ptz-camera';
 const DEFAULT_HTTP_PORT = 80;
@@ -311,6 +312,7 @@ function HttpGet(
     try {
       Req = http.request({
         host: Address,
+        lookup: CachedLookup,
         port: Port,
         method: 'GET',
         path: Path,

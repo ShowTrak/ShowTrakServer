@@ -94,3 +94,30 @@ test('a named series read stays put while the store keeps recording in place', (
     'the store itself recorded both'
   );
 });
+
+test('the overview returns exactly the points from sinceTs on', () => {
+  // Points are found by binary search now rather than by walking 12 h of them.
+  for (let Minute = 0; Minute < 120; Minute++) {
+    at(START + Minute * 60_000);
+    History.recordClientHistorySample({ UUID: 'c1', Online: Minute % 2 === 0 });
+  }
+  const Since = START + 59 * 60_000;
+  const Points = History.getStatusHistoryOverviewSamples(Since).Clients.c1;
+  assert.equal(Points.length, 61);
+  assert.equal(Points[0].ts, Since);
+  assert.ok(Points.every((P) => P.ts >= Since));
+  assert.deepEqual(History.getStatusHistoryOverviewSamples(START + 200 * 60_000).Clients, {});
+});
+
+test('the retention sweep trims the front of a series and keeps the rest in order', () => {
+  for (let Minute = 0; Minute < 30; Minute++) {
+    at(START + Minute * 60_000);
+    History.recordClientHistorySample({ UUID: 'c1', Online: Minute % 2 === 0 });
+  }
+  const Later = START + HISTORY_RETENTION_MS + 10 * 60_000;
+  History.pruneMonitoringHistoryStore(Later);
+  at(Later);
+  const Kept = History.getClientHistorySamples('c1');
+  assert.equal(Kept.length, 20);
+  assert.equal(Kept[0].ts, START + 10 * 60_000);
+});

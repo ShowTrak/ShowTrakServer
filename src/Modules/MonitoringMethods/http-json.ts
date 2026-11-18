@@ -5,7 +5,16 @@
 //   - Text contains: raw substring search inside the response body.
 // The body is capped at 1 MiB to prevent unbounded memory use.
 import { PerformHttpRequest, BuildHttpDebug } from './_http-shared';
-import { Esc, Pill, Rows, TextRow, Row, JsonCodeBlock, JsonCodeBlockWithPath } from './debug';
+import {
+  DebugBody,
+  Esc,
+  Pill,
+  Rows,
+  TextRow,
+  Row,
+  JsonCodeBlock,
+  JsonCodeBlockWithPath,
+} from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const ID = 'http-json';
@@ -137,7 +146,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
       LatencyMs: Result.LatencyMs,
       Status: Result.Status,
       Mode: 'status',
-      JsonBody: Body,
+      JsonBody: DebugBody(Body),
     };
   }
 
@@ -152,7 +161,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
         Status: Result.Status,
         Mode: 'json',
         JsonPath,
-        JsonBody: Body,
+        JsonBody: DebugBody(Body),
       };
     }
     const Actual = ResolveJsonPath(Parsed, JsonPath);
@@ -163,7 +172,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
         Status: Result.Status,
         Mode: 'json',
         JsonPath,
-        JsonBody: Body,
+        JsonBody: DebugBody(Body),
       };
     }
     if (Expected !== '' && String(Actual) !== Expected) {
@@ -174,7 +183,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
         Mode: 'json',
         JsonPath,
         MatchedValue: String(Actual).slice(0, 256),
-        JsonBody: Body,
+        JsonBody: DebugBody(Body),
       };
     }
     return {
@@ -184,7 +193,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
       Mode: 'json',
       JsonPath,
       MatchedValue: String(Actual).slice(0, 256),
-      JsonBody: Body,
+      JsonBody: DebugBody(Body),
     };
   }
 
@@ -196,7 +205,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
       Status: Result.Status,
       Mode: 'text',
       Expected: Expected.slice(0, 256),
-      JsonBody: Body,
+      JsonBody: DebugBody(Body),
     };
   }
   return {
@@ -205,7 +214,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     Status: Result.Status,
     Mode: 'text',
     Expected: Expected.slice(0, 256),
-    JsonBody: Body,
+    JsonBody: DebugBody(Body),
   };
 }
 

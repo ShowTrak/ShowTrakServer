@@ -668,7 +668,7 @@ const Manager = {
         {
           CheckID: Check.CheckID,
           Method: Check.Method,
-          Html: Check.LastDebugHtml || null,
+          Html: Check.DebugHtml() || null,
           Online: Check.Online,
           Degraded: Check.Degraded,
           LastError: Check.LastError,

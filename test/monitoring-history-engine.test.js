@@ -257,6 +257,91 @@ test('gaining or losing a latency reading appends', () => {
   assert.equal(getEntityHistorySamples(MONITOR, 7).length, 2);
 });
 
+// --- Latency jitter -----------------------------------------------------------
+//
+// A check whose latency only jitters used to add a point for nearly every probe
+// (any change in the rounded millisecond counted), ~890 points an hour for a
+// 3 s check. Jitter is now averaged into the newest point; a real move, a state
+// change, or the steady-run cadence still adds one.
+
+/** Record readings `Every` ms apart, starting at the current clock. */
+function recordSeries(Id, Latencies, Every = 3000, Extra = {}) {
+  for (const [Index, Latency] of Latencies.entries()) {
+    if (Index) advance(Every);
+    recordEntityHistorySample(MONITOR, Id, { online: true, latencyMs: Latency, ...Extra });
+  }
+}
+
+test('latency jitter within a run is averaged into the newest point', () => {
+  startClock();
+  recordSeries(7, [10, 12, 14, 9]);
+
+  const Samples = getEntityHistorySamples(MONITOR, 7);
+  // The run's first reading stays put; the rest fold into one point, 9 s on.
+  assert.deepEqual(
+    Samples.map((S) => [S.ts - START, S.latencyMs]),
+    [
+      [0, 10],
+      [9000, (12 + 14 + 9) / 3],
+    ]
+  );
+});
+
+test('the jitter allowance is 5 ms, or a quarter of the latency when that is more', () => {
+  // [first, second, candidate] 3 s apart: the run's first point stays fixed,
+  // the second is the one a jittering third folds into; a move appends a third.
+  const Cases = [
+    [10, 14.9, 2],
+    [10, 15.1, 3],
+    [100, 124, 2],
+    [100, 126, 3],
+    [100, 76, 2],
+    [100, 74, 3],
+  ];
+  startClock();
+  for (const [Index, [Base, Candidate, Points]] of Cases.entries()) {
+    recordSeries(100 + Index, [Base, Base, Candidate]);
+    assert.equal(
+      getEntityHistorySamples(MONITOR, 100 + Index).length,
+      Points,
+      `${Base} then ${Candidate}`
+    );
+  }
+});
+
+test('a latency that really moves appends at once, even inside the repeat window', () => {
+  startClock();
+  recordSeries(7, [10, 11, 30], 100);
+  assert.deepEqual(
+    getEntityHistorySamples(MONITOR, 7).map((S) => S.latencyMs),
+    [10.5, 30]
+  );
+});
+
+test('a steady jittering run still keeps a point at least every 15 seconds', () => {
+  // The timeline draws one-minute blocks and greys out a block with no point.
+  startClock();
+  const Latencies = Array.from({ length: 200 }, (_, I) => 1 + (I % 3) * 0.7); // 10 minutes at 3 s
+  recordSeries(7, Latencies);
+
+  const Samples = getEntityHistorySamples(MONITOR, 7);
+  assert.ok(Samples.length <= 60, `${Samples.length} points for 10 minutes`);
+  for (let I = 1; I < Samples.length; I++) {
+    assert.ok(Samples[I].ts - Samples[I - 1].ts <= 15_000, `gap before point ${I}`);
+  }
+  // The mean is still a mean of what was measured.
+  for (const S of Samples) assert.ok(S.latencyMs >= 1 && S.latencyMs <= 2.4);
+});
+
+test('a reader holds its own newest point while the store keeps folding into it', () => {
+  startClock();
+  recordSeries(7, [10, 12]);
+  const Held = getEntityHistorySamples(MONITOR, 7);
+  const Newest = { ...Held[Held.length - 1] };
+  recordSeries(7, [14], 3000);
+  assert.deepEqual(Held[Held.length - 1], Newest);
+});
+
 // --- Ageing out -------------------------------------------------------------
 
 test('the retention window is twelve hours', () => {

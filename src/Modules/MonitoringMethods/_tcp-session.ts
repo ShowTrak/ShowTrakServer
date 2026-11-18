@@ -13,6 +13,7 @@
 // of ending means for its result.
 import net from 'net';
 import type { MonitoringResult } from './types';
+import { CachedLookup } from './_dns-cache';
 
 export function ErrorMessage(Err: unknown): string {
   return Err && (Err as Error).message ? (Err as Error).message : String(Err);
@@ -125,7 +126,7 @@ export function RunTcpSession<R>(Spec: TcpSessionSpec<R>): Promise<R> {
     }
 
     try {
-      Socket.connect(Spec.Port, Spec.Address);
+      Socket.connect({ port: Spec.Port, host: Spec.Address, lookup: CachedLookup });
     } catch (Err) {
       Session.Finish(Spec.OnError(ErrorMessage(Err), Session));
     }

@@ -25,6 +25,7 @@ import { CreateLogger } from '../Logger';
 import { EncodeOscTcp, DecodeOscStream, type OscArg, type OscMessage } from './_osc-shared';
 import type { MonitoringActionDef, MonitoringResult, MonitoringSettingField } from './types';
 import { MONITORING_INTEREST_TTL_MS } from '../Config/constants';
+import { CachedLookup } from './_dns-cache';
 
 const Logger = CreateLogger('QLab');
 
@@ -302,7 +303,11 @@ class QLabConnectionManagerImpl {
     });
 
     try {
-      Socket.connect(Conn.Params.Port, Conn.Params.Address);
+      Socket.connect({
+        port: Conn.Params.Port,
+        host: Conn.Params.Address,
+        lookup: CachedLookup,
+      });
     } catch (Err) {
       this.Drop(Conn, Err && (Err as Error).message ? (Err as Error).message : String(Err));
     }

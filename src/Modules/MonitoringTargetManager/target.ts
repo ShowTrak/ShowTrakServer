@@ -94,8 +94,15 @@ class MonitoringCheck {
   LastChecked: number | null;
   LastLatencyMs: number | null;
   LastError: string | null;
-  LastDebugHtml: string | null;
   LastDebugAt: number | null;
+  // What the last probe ran with, so its debug panel is rendered against the
+  // configuration that produced LastResult even if the check was edited since.
+  LastRunMethod: string | null;
+  LastRunTarget: { Address: string; Settings: Record<string, unknown> } | null;
+  // Counts finished probes; the rendered panel belongs to probe _debugHtmlRun.
+  _runCount: number;
+  _debugHtmlRun: number;
+  _debugHtml: string | null;
   LastActionOptions: MonitoringActionOptions;
   LastSettingOptions: MonitoringSettingOptions;
   // The last probe result (RAM-only), for result-driven tile widgets.
@@ -137,10 +144,14 @@ class MonitoringCheck {
     this.LastChecked = null;
     this.LastLatencyMs = null;
     this.LastError = null;
-    // Most recent method-rendered debug panel (HTML). Cached in memory only
-    // (never persisted) and overwritten on every run.
-    this.LastDebugHtml = null;
+    // The last probe's debug panel is rendered on demand from LastResult (see
+    // DebugHtml), only when the check editor asks for it. RAM-only.
     this.LastDebugAt = null;
+    this.LastRunMethod = null;
+    this.LastRunTarget = null;
+    this._runCount = 0;
+    this._debugHtmlRun = 0;
+    this._debugHtml = null;
     // Dynamic choices for this check's action parameters, refreshed on every
     // run (see MonitoringMethods.GetActionOptions). RAM-only.
     this.LastActionOptions = {};
@@ -198,7 +209,15 @@ class MonitoringCheck {
   // stays "not checked yet" rather than being called down on a single dropped
   // packet. Any success resets the run.
   async Run(InheritedFailureThreshold: number = GetDefaultFailureThreshold()) {
-    const Result = await MonitoringMethods.Run(this.Method, this);
+    // Settings is replaced, never edited in place, when the check is edited, so
+    // holding the references is enough to keep what this probe ran with.
+    const Method = this.Method;
+    const Previous = this.LastRunTarget;
+    const RunTarget =
+      Previous && Previous.Address === this.Address && Previous.Settings === this.Settings
+        ? Previous
+        : { Address: this.Address, Settings: this.Settings };
+    const Result = await MonitoringMethods.Run(Method, this);
     const Now = Date.now();
     if (Result && Result.Success) {
       // Recovering (or never confirmed up): its LastSuccessAt is written at once.
@@ -248,10 +267,16 @@ class MonitoringCheck {
         this.LastChecked = Now;
       }
     }
-    // Cache the rendered debug panel (RAM-only) from this run's raw result.
-    this.LastDebugHtml = MonitoringMethods.BuildDebug(this.Method, Result, this);
+    // Keep the raw result (RAM-only); the debug panel is rendered from it only
+    // when the check editor asks (DebugHtml). Rendering it here, after every
+    // probe of every check, re-parsed and pretty-printed whole response bodies
+    // for a panel almost never on screen.
     this.LastResult = Result || null;
     this.LastDebugAt = Now;
+    this._runCount++;
+    this._debugHtml = null;
+    this.LastRunMethod = Method;
+    this.LastRunTarget = RunTarget;
     // Refresh the action parameter choices this device reports (e.g. the input
     // sources a projector lists). A failed probe keeps the last known set rather
     // than emptying the picker the moment the device blips.
@@ -259,6 +284,22 @@ class MonitoringCheck {
       this.LastActionOptions = MonitoringMethods.GetActionOptions(this.Method, Result);
       this.LastSettingOptions = MonitoringMethods.GetSettingOptions(this.Method, Result);
     }
+  }
+
+  // The last probe's debug panel (HTML), rendered from its raw result on first
+  // ask and kept until the next probe. Null before the first probe, or when the
+  // method has no panel.
+  DebugHtml(): string | null {
+    if (this.LastDebugAt == null || !this.LastRunMethod) return null;
+    if (this._debugHtmlRun !== this._runCount) {
+      this._debugHtml = MonitoringMethods.BuildDebug(
+        this.LastRunMethod,
+        this.LastResult as MonitoringResult,
+        this.LastRunTarget || this
+      );
+      this._debugHtmlRun = this._runCount;
+    }
+    return this._debugHtml;
   }
 
   async SetLastSuccessAt(Ts: number) {

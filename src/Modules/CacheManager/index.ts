@@ -7,6 +7,9 @@ import { CreateLogger } from '../Logger';
 
 const Logger = CreateLogger('CacheManager');
 
+// How often a bucket drops its expired entries, at most (see _enforceSize).
+const EXPIRED_SWEEP_INTERVAL_MS = 30_000;
+
 interface CacheEntry {
   Value: unknown;
   ExpiresAt: number;
@@ -30,12 +33,14 @@ class CacheBucket {
   DefaultTtlMs: number;
   MaxEntries: number;
   Map: Map<string, CacheEntry>;
+  LastSweepAt: number;
 
   constructor(Name: string, Options: CacheBucketOptions = {}) {
     this.Name = String(Name || 'default');
     this.DefaultTtlMs = clampTtl(Options.defaultTtlMs, 1000);
     this.MaxEntries = clampCount(Options.maxEntries, 1000);
     this.Map = new Map();
+    this.LastSweepAt = Date.now();
   }
 
   Get(Key: string): unknown {
@@ -133,6 +138,17 @@ class CacheBucket {
   }
 
   _enforceSize(): void {
+    // Expired entries used to go only once the bucket passed MaxEntries, so a
+    // bucket below it kept every stale value (the run cache: one full probe
+    // result, bodies included, per check ever probed, edited checks' old keys
+    // too) for the life of the process. Sweep them now and then instead.
+    const Now = Date.now();
+    if (Now - this.LastSweepAt >= EXPIRED_SWEEP_INTERVAL_MS || Now < this.LastSweepAt) {
+      this.LastSweepAt = Now;
+      for (const [Key, Entry] of this.Map) {
+        if (!Entry.InFlight && isExpired(Entry)) this.Map.delete(Key);
+      }
+    }
     if (this.Map.size <= this.MaxEntries) return;
 
     // First pass: evict expired entries.
