@@ -89,6 +89,13 @@ module.exports = {
     // Use extensionless base path so Electron Packager can resolve
     // platform-specific icon formats (.icns on macOS, .ico on Windows).
     icon: './src/images/icon',
+    // macOS Local Network privacy: Bonjour discovery is raw multicast on UDP
+    // 5353, which macOS blocks for an app that has not been granted Local
+    // Network access. This string is what the permission prompt shows.
+    extendInfo: {
+      NSLocalNetworkUsageDescription:
+        'ShowTrak Server needs local network access to advertise itself to ShowTrak Clients and to monitor devices on your network.',
+    },
     ...(shouldSignMac
       ? {
           osxSign: {
