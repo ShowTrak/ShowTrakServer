@@ -512,7 +512,7 @@ jobs:
           if gh release view "$RELEASE_TAG" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
             IS_DRAFT=$(gh release view "$RELEASE_TAG" --repo "$RELEASE_REPO" --json isDraft -q .isDraft)
             if [ "$IS_DRAFT" = "true" ]; then
-              gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft $PRERELEASE_FLAG --title "$TITLE" --notes-file release-notes.md
+              gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft $PRERELEASE_FLAG --target "$GITHUB_SHA" --title "$TITLE" --notes-file release-notes.md
             else
               echo "Release ${RELEASE_TAG} is already published; updating it in place."
               gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --title "$TITLE" --notes-file release-notes.md
@@ -521,8 +521,11 @@ jobs:
             if git ls-remote --exit-code --tags "https://github.com/${RELEASE_REPO}" "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
               gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --verify-tag --draft $PRERELEASE_FLAG --title "$TITLE" --notes-file release-notes.md
             else
-              echo "Tag ${RELEASE_TAG} does not exist yet; creating it from current commit via release creation."
-              gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft $PRERELEASE_FLAG --title "$TITLE" --notes-file release-notes.md
+              echo "Tag ${RELEASE_TAG} does not exist yet; it is created at the built commit when the release is published."
+              # --target is the commit this run built: without it the tag is
+              # created on the default branch, which is only right when the
+              # release was built from main (not for a beta branch).
+              gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft $PRERELEASE_FLAG --target "$GITHUB_SHA" --title "$TITLE" --notes-file release-notes.md
             fi
           fi
 
