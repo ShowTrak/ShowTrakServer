@@ -27,7 +27,13 @@ import {
 import { ResolveEntityTags } from './lib/tag-badges';
 import { RenderTagBadgeRow } from './lib/tag-badge-view';
 import { FreeKioskListState } from './lib/list-view';
-import { RenderListRowCells, UpdateListRowState } from './list-view';
+import {
+  RenderFreeKioskItemParts,
+  RenderListRowCells,
+  SyncAllItemRows,
+  UpdateFreeKioskItemRows,
+  UpdateListRowState,
+} from './list-view';
 import { Safe } from './utils';
 import { FormatMetricCompact } from './lib/metric-format';
 import {
@@ -100,6 +106,9 @@ export async function LoadFreeKioskCatalogues(): Promise<void> {
     ]);
     if (Catalogue && Array.isArray(Catalogue.Metrics)) setFreeKioskMetricCatalogCache(Catalogue);
     if (Array.isArray(Commands)) setFreeKioskCommandsCache(Commands);
+    // Which readings a terminal monitors is read from the catalogue, so rows
+    // drawn before it arrived had none.
+    SyncAllItemRows();
   } catch {
     // A failed fetch leaves the caches empty; tiles still render, and the
     // editor reports that it could not load its settings rather than throwing.
@@ -199,13 +208,17 @@ export function RenderFreeKioskTile(K: FreeKioskTerminalView): string {
   const TagBadges = RenderTagBadgeRow(
     ResolveEntityTags(Tags, { ScopedID: String(K.UUID), GroupID: K.GroupID ?? null })
   );
+  // List view only: the chevron and one row per monitored reading (list-view.ts).
+  const ItemParts = RenderFreeKioskItemParts(K);
 
   return `
     <div id="FREEKIOSK_TILE_${K.UUID}" class="SHOWTRAK_PC FREEKIOSK ${TileStateClass(K)}${
+      ItemParts.Expanded ? ' CHECKS_EXPANDED' : ''
+    }${
       Selected.includes(DragUUID) ? ' SELECTED' : ''
-    }" data-kiosk-uuid="${K.UUID}" data-uuid="${DragUUID}" data-flip-key="${DragUUID}" draggable="${
-      AppMode === 'EDIT' ? 'true' : 'false'
-    }">
+    }" data-kiosk-uuid="${K.UUID}" data-uuid="${DragUUID}" data-flip-key="${DragUUID}" data-item-shape="${Safe(
+      ItemParts.Shape
+    )}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
       <button type="button" class="CLIENT_TILE_COG FREEKIOSK_TILE_COG" aria-label="Edit FreeKiosk Terminal" title="Edit FreeKiosk Terminal">
         <i class="bi bi-gear"></i>
       </button>
@@ -238,8 +251,9 @@ export function RenderFreeKioskTile(K: FreeKioskTerminalView): string {
           ${OfflineBadgeContent()}
         </h7>
       </div>
+      ${ItemParts.Toggle}
       ${RenderListRowCells(DragUUID, FreeKioskListState(K))}
-    </div>`;
+    </div>${ItemParts.Rows}`;
 }
 
 /** In-place patch, so a poll does not rebuild the whole list. */
@@ -294,4 +308,7 @@ export function UpdateFreeKioskTile(K: FreeKioskTerminalView): void {
   ToggleIndicator('INDICATOR_OFFLINE', State === 'OFFLINE');
   $tile.find('[data-type="OFFLINE_SINCE"]').attr('data-offlinesince', K.LastSuccessAt || '');
   if (State === 'OFFLINE') UpdateOfflineIndicators($tile[0]);
+
+  // The list view's monitored-reading rows under the terminal, when it shows.
+  UpdateFreeKioskItemRows(K);
 }

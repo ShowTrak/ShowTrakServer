@@ -458,7 +458,13 @@ export function wireContextMenu() {
     // opened the menu for is dropped.
     if (e.originalEvent && longPress.OnNativeContextMenu()) return;
 
-    const $tile = $(e.target).closest('.SHOWTRAK_PC');
+    let $tile = $(e.target).closest('.SHOWTRAK_PC');
+    // A monitored-item row (list view) stands for its client or terminal.
+    if ($tile.hasClass('CLIENT_ITEM')) {
+      $tile = $(
+        `.SHOWTRAK_PC[data-uuid="${CSS.escape(String($tile.attr('data-owner-id') || ''))}"]`
+      ).first();
+    }
     if ($tile.length) {
       const TileUUID = $tile.attr('data-uuid');
       // Client, monitoring and dummy tiles are all selectable targets; groups

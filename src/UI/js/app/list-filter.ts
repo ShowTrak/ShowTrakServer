@@ -135,6 +135,12 @@ export function ApplyListSearch(): void {
     if (Hidden) HiddenKeys.add(Key);
     if (Matched.has(Key)) Matches++;
   }
+  // Monitored-item rows go wherever their client or terminal goes.
+  for (const Row of Array.from(
+    Content.querySelectorAll<HTMLElement>('.CLIENT_ITEM[data-owner-id]')
+  )) {
+    Row.classList.toggle(HIDDEN_CLASS, !Keep.has(Row.getAttribute('data-owner-id') || ''));
+  }
   const Sections = Content.querySelectorAll<HTMLElement>(
     '.group-column-item, #PENDING_ADOPTION_SECTION'
   );

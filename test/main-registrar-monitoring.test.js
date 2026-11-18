@@ -93,7 +93,12 @@ const restore = installModuleMocks([
   { match: matchesModule('../monitoring-history'), value: monitoringHistoryStub },
   {
     match: matchesModule('../status-history-overview'),
-    value: { getStatusHistoryOverview: () => ({ Clients: { c1: [{ At: 8 }] } }) },
+    value: {
+      getStatusHistoryOverview: (_Now, Expanded) => ({
+        Clients: { c1: [{ At: 8 }] },
+        ...(Expanded ? { Expanded } : {}),
+      }),
+    },
   },
   { match: matchesModule('/Modules/MonitoringMethods'), value: { Manager: methodsMgr } },
   { match: matchesModule('/Modules/MonitoringTargetManager'), value: { Manager: targetMgr } },
@@ -369,9 +374,15 @@ test('MoveMonitoringCheck validates both ids before moving', async () => {
   assert.equal(targetMgr.__callsTo('MoveCheck').length, 0);
 });
 
-test("the list view reads every row's history in one call, with no input to validate", async () => {
+test("the list view reads every row's history in one call", async () => {
   assert.deepEqual(await GetHandler('GetStatusHistoryOverview')(null), {
     Clients: { c1: [{ At: 8 }] },
+  });
+  // The expanded rows are passed through; the overview normalises them.
+  const Expanded = { Clients: ['c1'], Kiosks: ['k1'] };
+  assert.deepEqual(await GetHandler('GetStatusHistoryOverview')(null, Expanded), {
+    Clients: { c1: [{ At: 8 }] },
+    Expanded,
   });
 });
 

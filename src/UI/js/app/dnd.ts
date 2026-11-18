@@ -64,7 +64,8 @@ export let DnDState: DnDStateShape = {
 
 export function initializeEditInteractions() {
   const isEdit = AppMode === 'EDIT';
-  $('.SHOWTRAK_PC').attr('draggable', String(isEdit));
+  // Check and monitored-item rows (list view) move with their target or client.
+  $('.SHOWTRAK_PC').not('.MONITOR_CHECK, .CLIENT_ITEM').attr('draggable', String(isEdit));
   if (!isEdit) {
     teardownDnD();
     return;
@@ -338,6 +339,7 @@ export function positionGhostMarker(container: HTMLElement, x: number, y: number
     (el) =>
       !el.classList.contains('dnd-ghost') &&
       !el.classList.contains('MONITOR_CHECK') &&
+      !el.classList.contains('CLIENT_ITEM') &&
       el.getAttribute('data-uuid') !== DnDState.dragUUID
   );
   const HYSTERESIS_X = 6; // horizontal jitter buffer within a row
@@ -529,7 +531,8 @@ export function computeOrderWithGhost(container: HTMLElement, dragUUID: string) 
     if (
       el.classList &&
       el.classList.contains('SHOWTRAK_PC') &&
-      !el.classList.contains('MONITOR_CHECK')
+      !el.classList.contains('MONITOR_CHECK') &&
+      !el.classList.contains('CLIENT_ITEM')
     ) {
       const id = el.getAttribute('data-uuid');
       if (id && id !== dragUUID) order.push(id);

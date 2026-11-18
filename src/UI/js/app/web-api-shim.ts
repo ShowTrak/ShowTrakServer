@@ -182,7 +182,8 @@ function createWebApi(socket: WebUiSocket): RendererAPI {
     // ---- Clients ----------------------------------------------------------
     GetClient: async (UUID) => rpc('GetClient', UUID),
     GetClientHistory: async (UUID, WindowMs?: number) => rpc('GetClientHistory', UUID, WindowMs),
-    GetStatusHistoryOverview: async () => rpc('GetStatusHistoryOverview'),
+    GetStatusHistoryOverview: async (Expanded?: { Clients?: string[]; Kiosks?: string[] }) =>
+      rpc('GetStatusHistoryOverview', Expanded),
     GetClientApplicationHistory: async (UUID, WindowMs?: number) =>
       rpc('GetClientApplicationHistory', UUID, WindowMs),
     GetClientUSBHistory: async (UUID, WindowMs?: number) =>

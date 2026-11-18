@@ -276,10 +276,35 @@ export function getFreeKioskReachabilitySince(
   for (const [UUID, Metrics] of Store) {
     const Samples = Metrics.get(STATUS_SERIES_KEY);
     if (!Samples || !Samples.length) continue;
-    let First = Samples.findIndex((Sample) => Sample.ts >= SinceTs);
-    if (First === -1) First = Samples.length;
-    const Recent = Samples.slice(Math.max(0, First - 1));
-    Out[UUID] = Recent.map((Sample) => ({ ...Sample }));
+    Out[UUID] = TailSince(Samples, SinceTs);
+  }
+  return Out;
+}
+
+/** The tail of a series from `SinceTs` on, plus the sample the window opens on. */
+function TailSince(Samples: FreeKioskMetricSample[], SinceTs: number): FreeKioskMetricSample[] {
+  let First = Samples.findIndex((Sample) => Sample.ts >= SinceTs);
+  if (First === -1) First = Samples.length;
+  return Samples.slice(Math.max(0, First - 1)).map((Sample) => ({ ...Sample }));
+}
+
+/**
+ * One terminal's every recorded reading from `SinceTs` on, keyed by metric,
+ * for the list view's rows under an expanded terminal. Only armed readings are
+ * recorded (plus poll latency), so this is what is being monitored. Each series
+ * keeps the sample before the window, as getFreeKioskReachabilitySince does.
+ */
+export function getFreeKioskMetricsSince(
+  UUID: unknown,
+  SinceTs: number
+): Record<string, FreeKioskMetricSample[]> {
+  pruneFreeKioskHistory();
+  const Key = NormalizeUUID(UUID);
+  const Out: Record<string, FreeKioskMetricSample[]> = {};
+  const Metrics = Key ? Store.get(Key) : null;
+  if (!Metrics) return Out;
+  for (const [MetricKey, Samples] of Metrics) {
+    if (Samples.length) Out[MetricKey] = TailSince(Samples, SinceTs);
   }
   return Out;
 }

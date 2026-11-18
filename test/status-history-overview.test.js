@@ -135,3 +135,128 @@ test('a kiosk sends the pre-window sample plus everything inside the window', ()
     ]
   );
 });
+
+// --- Monitored items of expanded clients ---------------------------------------
+//
+// An expanded client in the list shows a row per monitored item, each with its
+// own timeline. Those series are read only for the clients the renderer names
+// (every client's every item on every refresh would be wasted payload), and are
+// keyed `<kind>:<item key>`, which is how lib/client-items.ts looks rows up.
+
+function recordItems(UUID, { Online = true, CpuFailing = false, AppRunning = true } = {}) {
+  const Client = {
+    UUID,
+    Online,
+    SystemChecks: { Cpu: { MaxPercent: 90 } },
+    ResourceAlarms: CpuFailing ? [{ Key: 'cpu' }] : [],
+    RunningApplications: {
+      Status: { State: 'ok' },
+      Items: [{ IsCritical: true, Key: 'qlab', Name: 'QLab', IsRunning: AppRunning }],
+    },
+    USBDeviceList: [
+      { IsCritical: true, SerialNumber: 'SN1', ProductName: 'Stream Deck' },
+      { IsCritical: true, IsCriticalByName: true, NameKey: 'Gamepad', ProductName: 'Gamepad' },
+    ],
+  };
+  History.recordClientSystemCheckHistorySamples(Client);
+  History.recordClientApplicationHistorySamples(Client);
+  History.recordClientUSBHistorySamples(Client);
+}
+
+function dropItems() {
+  for (const Sync of [
+    History.syncClientSystemCheckHistoryStore,
+    History.syncClientApplicationHistoryStore,
+    History.syncClientUSBHistoryStore,
+  ]) {
+    Sync([]);
+  }
+}
+
+test('no items are read unless clients are named', () => {
+  dropItems();
+  at(START - MINUTE);
+  recordItems('client-1');
+  at(START);
+  assert.equal(getStatusHistoryOverview().ClientItems, undefined);
+  assert.equal(getStatusHistoryOverview(START, { Clients: [] }).ClientItems, undefined);
+  assert.equal(getStatusHistoryOverview(START, { Clients: 'client-1' }).ClientItems, undefined);
+  // A bare list (no { Clients }) is not a request.
+  assert.equal(getStatusHistoryOverview(START, ['client-1']).ClientItems, undefined);
+});
+
+test("a named client's items are keyed the way the renderer looks rows up", () => {
+  dropItems();
+  at(START - 10 * MINUTE);
+  recordItems('client-1', { CpuFailing: true, AppRunning: false });
+  recordItems('client-2');
+  at(START);
+
+  const Items = getStatusHistoryOverview(START, { Clients: ['client-1'] }).ClientItems;
+  assert.deepEqual(Object.keys(Items), ['client-1'], 'only the clients named');
+  assert.deepEqual(Object.keys(Items['client-1']).sort(), [
+    'app:qlab',
+    'system:cpu',
+    'usb:SN1',
+    'usb:usbname:gamepad',
+  ]);
+  assert.equal(Items['client-1']['system:cpu'][0].degraded, true);
+  assert.equal(Items['client-1']['app:qlab'][0].online, false);
+});
+
+test('item samples older than the window are left out, and junk names are ignored', () => {
+  dropItems();
+  at(START - 2 * 60 * MINUTE);
+  recordItems('client-1', { AppRunning: true });
+  at(START - 5 * MINUTE);
+  recordItems('client-1', { AppRunning: false });
+  at(START);
+
+  const Items = getStatusHistoryOverview(START, {
+    Clients: [42, null, 'x'.repeat(200), 'client-1', 'client-1'],
+  }).ClientItems;
+  assert.deepEqual(Object.keys(Items), ['client-1']);
+  assert.deepEqual(
+    Items['client-1']['app:qlab'].map((S) => [S.ts, S.online]),
+    [[START - 5 * MINUTE, false]]
+  );
+});
+
+test('a named client with no monitored items gets an empty map', () => {
+  dropItems();
+  at(START);
+  assert.deepEqual(getStatusHistoryOverview(START, { Clients: ['client-9'] }).ClientItems, {
+    'client-9': {},
+  });
+});
+
+// --- Monitored readings of expanded FreeKiosk terminals ------------------------
+
+test("a named terminal's armed readings come back by metric, with the sample the window opens on", () => {
+  dropFreeKioskHistory('kiosk-1');
+  const Terminal = (Level) => ({
+    UUID: 'kiosk-1',
+    Online: true,
+    Settings: { A_battery_level_On: true, A_battery_level_Op: 'below', A_battery_level_V: 20 },
+    Metrics: { battery_level: Level, poll_latencyMs: 20, screen_brightness: 50 },
+    Alarms: Level < 20 ? [{ Key: 'battery_level' }] : [],
+  });
+  recordFreeKioskHistorySamples(Terminal(80), START - 2 * 60 * MINUTE);
+  recordFreeKioskHistorySamples(Terminal(10), START - 5 * MINUTE);
+  at(START);
+
+  const Overview = getStatusHistoryOverview(START, { Kiosks: ['kiosk-1'] });
+  assert.equal(Overview.ClientItems, undefined, 'no clients were named');
+  const Series = Overview.KioskItems['kiosk-1'];
+  assert.ok(Series.battery_level, 'the armed reading');
+  assert.equal(Series.screen_brightness, undefined, 'an unarmed reading is never recorded');
+  assert.deepEqual(
+    Series.battery_level.map((S) => [S.ts, S.n, S.breach]),
+    [
+      [START - 2 * 60 * MINUTE, 80, false],
+      [START - 5 * MINUTE, 10, true],
+    ]
+  );
+  assert.equal(getStatusHistoryOverview(START).KioskItems, undefined);
+  assert.deepEqual(getStatusHistoryOverview(START, { Kiosks: ['nope'] }).KioskItems, { nope: {} });
+});

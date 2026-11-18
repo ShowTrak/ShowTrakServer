@@ -347,7 +347,8 @@ const API: ShowTrakAPI & ServerRendererAPI = {
   Shutdown: async (Confirmed = false) => invoke('Shutdown', Confirmed),
   GetClient: async (UUID) => invoke('GetClient', UUID),
   GetClientHistory: async (UUID, WindowMs?: number) => invoke('GetClientHistory', UUID, WindowMs),
-  GetStatusHistoryOverview: async () => invoke('GetStatusHistoryOverview'),
+  GetStatusHistoryOverview: async (Expanded?: { Clients?: string[]; Kiosks?: string[] }) =>
+    invoke('GetStatusHistoryOverview', Expanded),
   GetClientApplicationHistory: async (UUID, WindowMs?: number) =>
     invoke('GetClientApplicationHistory', UUID, WindowMs),
   GetClientUSBHistory: async (UUID, WindowMs?: number) =>

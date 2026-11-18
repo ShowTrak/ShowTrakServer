@@ -43,7 +43,7 @@ import { FormatMetricValue } from './lib/metric-format';
 import { BuildMetricChartModel, RenderMetricChartSvg } from './lib/metric-chart';
 import type { MetricChartThreshold } from './lib/metric-chart';
 import { ExpandMetricSeries } from './lib/metric-series';
-import { FreeKioskReachabilitySamples } from './lib/status-blocks';
+import { FreeKioskMetricStatusSamples, FreeKioskReachabilitySamples } from './lib/status-blocks';
 import {
   BuildLiveStatusText,
   BuildStatusBlocksFromSamples,
@@ -54,7 +54,17 @@ import {
 import type { HistorySample } from '@showtrak/protocol';
 import { FREEKIOSK_METRIC_TABS, FreeKioskSectionTab } from './lib/client-info-tabs';
 import type { ClientInfoTabKey, FreeKioskMetricTabKey } from './lib/client-info-tabs';
-import { BuildFreeKioskMonitorCard } from './lib/freekiosk-monitoring';
+import {
+  BuildFreeKioskMonitorCard,
+  DescribeExpected,
+  FreeKioskMetricLiveState,
+  ReadArmedAlarm,
+  type ArmedAlarm,
+} from './lib/freekiosk-monitoring';
+
+// Moved to lib/freekiosk-monitoring (the list view's item rows use them too);
+// re-exported for existing importers.
+export { DescribeExpected, FreeKioskMetricLiveState };
 import { EffectiveFreeKioskSettings, FreeKioskMonitorCardHtml } from './freekiosk-monitoring';
 
 /** Mirrors FREEKIOSK_DISPLAY_MODES in src/Modules/FreeKiosk/metrics. */
@@ -107,30 +117,6 @@ function OpenTerminal(): FreeKioskTerminalView | null {
 
 // ---- Alarm configuration read back out of the stored settings ---------------
 
-interface ArmedAlarm {
-  operator: string;
-  value: unknown;
-  value2: unknown;
-}
-
-function ReadArmedAlarm(
-  Terminal: FreeKioskTerminalView,
-  Metric: FreeKioskMetricView
-): ArmedAlarm | null {
-  const Settings = Terminal.Settings || {};
-  if (Settings[`A_${Metric.Key}_On`] !== true) return null;
-  const Stored = Settings[`A_${Metric.Key}_Op`];
-  const Operator =
-    typeof Stored === 'string' && Metric.Operators.includes(Stored as never)
-      ? Stored
-      : Metric.DefaultOperator || Metric.Operators[0] || '';
-  return {
-    operator: String(Operator),
-    value: Settings[`A_${Metric.Key}_V`],
-    value2: Settings[`A_${Metric.Key}_V2`],
-  };
-}
-
 /** The threshold band a numeric chart should shade, if one is armed. */
 function ChartThreshold(Alarm: ArmedAlarm | null): MetricChartThreshold | null {
   if (!Alarm) return null;
@@ -145,86 +131,7 @@ function ChartThreshold(Alarm: ArmedAlarm | null): MetricChartThreshold | null {
   };
 }
 
-/**
- * What the reading was supposed to be, in the operator's words.
- *
- * Shown only while the alarm is actually breaching. When a value is where it
- * should be, the value alone says everything; repeating the threshold on all
- * sixty-one rows would bury the two that matter.
- *
- * The stored operator is the BREACH comparison, so the expectation is its
- * complement, the same complement the condition picker shows. A stored
- * "below 20" is "expected at least 20%".
- */
-export function DescribeExpected(Metric: FreeKioskMetricView, Alarm: ArmedAlarm | null): string {
-  if (!Alarm) return '';
-  // Stored settings are JSON, so a threshold is whatever survived a round trip.
-  // Anything that is not a scalar has no wording, and formats as an em dash.
-  const Scalar = (Value: unknown): string | number | boolean | null =>
-    typeof Value === 'string' || typeof Value === 'number' || typeof Value === 'boolean'
-      ? Value
-      : null;
-  // A threshold typed in its own unit (uptime in days) is worded in that unit,
-  // not run through the reading's format: "7" would otherwise read as "7s".
-  const Threshold = (Value: unknown): string => {
-    const Numeric = typeof Value === 'number' ? Value : Number(Scalar(Value) ?? NaN);
-    if (!Metric.ThresholdUnit || !Number.isFinite(Numeric)) {
-      return FormatMetricValue(Metric, Scalar(Value));
-    }
-    const Unit = Numeric === 1 ? Metric.ThresholdUnit.replace(/s$/, '') : Metric.ThresholdUnit;
-    return `${Math.round(Numeric * 100) / 100} ${Unit}`;
-  };
-  const Want = Threshold(Alarm.value);
-  const Want2 = Threshold(Alarm.value2);
-  switch (Alarm.operator) {
-    case 'below':
-      return `expected at least ${Want}`;
-    case 'above':
-      return `expected at most ${Want}`;
-    case 'outside':
-      return `expected ${Want} to ${Want2}`;
-    case 'inside':
-      return `expected outside ${Want} to ${Want2}`;
-    case 'is':
-      // Booleans never reach here: they arm `isNot`, so their value is already
-      // the expected state. This is the enum/string case, picked as "Expected
-      // is not ...".
-      return `expected anything but ${Want}`;
-    case 'isNot':
-      return `expected ${Want}`;
-    case 'contains':
-      return `expected not to contain "${Want}"`;
-    case 'notContains':
-      return `expected to contain "${Want}"`;
-    case 'changes':
-      return 'expected to stay the same';
-    case 'decreases':
-      return 'expected never to go backwards';
-    default:
-      return '';
-  }
-}
-
 // ---- Metric rows -----------------------------------------------------------
-
-/**
- * Turn a metric's value series into the boolean shape the block timeline reads.
- *
- * `breach` is the only thing that colours a block. It was recorded at sample
- * time from the alarm the operator actually armed, so the timeline says exactly
- * what the tile said at that instant. This used to also guess, treating a false
- * reading of any boolean as bad, which painted "Can Go Back: No" and every
- * other perfectly healthy false in degraded orange, alarm or no alarm.
- */
-function ToStatusSamples(Samples: FreeKioskMetricSample[]): HistorySample[] {
-  return Samples.map((Sample) => {
-    if (!Sample.ok) {
-      // Not a reading: leave it as an idle gap rather than painting a verdict.
-      return { ts: Sample.ts, online: false, degraded: false, latencyMs: null };
-    }
-    return { ts: Sample.ts, online: true, degraded: Sample.breach, latencyMs: null };
-  });
-}
 
 /**
  * What to draw under a metric's reading.
@@ -270,7 +177,7 @@ function RenderMetricChart(
       formatted: (Numeric) => FormatMetricValue(Metric, Numeric),
     });
   }
-  return RenderStatusTimeline(BuildStatusBlocksFromSamples(ToStatusSamples(Samples)));
+  return RenderStatusTimeline(BuildStatusBlocksFromSamples(FreeKioskMetricStatusSamples(Samples)));
 }
 
 /**
@@ -312,26 +219,6 @@ function RenderSection(Terminal: FreeKioskTerminalView, Section: string): string
       return RenderMetricChart(Metric, ReadArmedAlarm(Terminal, Metric), Samples);
     }
   );
-}
-
-/**
- * The state a monitored reading's status card shows, matching the client's
- * critical displays and network interfaces: while the terminal is offline the
- * reading is unknown, not faulty, so it is Idle; a breaching alarm is Degraded
- * (as it is on the tile); anything else is Online. The status text is the
- * reading itself, plus what it should have been while it is breaching.
- */
-export function FreeKioskMetricLiveState(
-  TerminalOnline: boolean,
-  Breaching: boolean,
-  ValueText: string,
-  Expected: string
-): { State: 'IDLE' | 'ONLINE' | 'DEGRADED'; Label: string } {
-  if (!TerminalOnline) return { State: 'IDLE', Label: 'Idle' };
-  if (Breaching) {
-    return { State: 'DEGRADED', Label: Expected ? `${ValueText} · ${Expected}` : ValueText };
-  }
-  return { State: 'ONLINE', Label: ValueText };
 }
 
 /**

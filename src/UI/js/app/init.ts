@@ -199,6 +199,8 @@ export async function WireGlobalUI() {
   });
   $(document).on('click', '.SHOWTRAK_PC', function (e) {
     e.preventDefault();
+    // A monitored-item row (list view) is read-only: nothing to select.
+    if ($(this).hasClass('CLIENT_ITEM')) return false;
     // A check row whose target is selected is selected through it, and stays
     // so until the target is deselected.
     if ($(this).hasClass('PARENT_SELECTED')) return false;
@@ -228,6 +230,13 @@ export async function WireGlobalUI() {
     e.stopPropagation();
     // Ignore dblclick on pending-adoption tiles
     if ($(this).hasClass('PENDING')) return false;
+    // A monitored-item row (list view) opens its client's or terminal's view.
+    if ($(this).hasClass('CLIENT_ITEM')) {
+      const owner = String($(this).attr('data-owner-id') || '');
+      if (owner.startsWith('kiosk:')) OpenFreeKioskTerminalHistory(owner.slice('kiosk:'.length));
+      else if (owner) OpenClientInfo(owner);
+      return false;
+    }
     // A check row (list view) opens its target's view, where its history is.
     if ($(this).hasClass('MONITOR_CHECK')) {
       const tid = $(this).attr('data-target-id');

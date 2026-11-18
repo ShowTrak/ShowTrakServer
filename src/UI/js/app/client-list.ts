@@ -75,6 +75,8 @@ import { RenderFreeKioskTile } from './freekiosk';
 import {
   RenderListGroupHeaderCells,
   RenderListRowCells,
+  RenderClientItemParts,
+  UpdateClientItemRows,
   RenderListTableHeader,
   SyncListView,
 } from './list-view';
@@ -878,9 +880,12 @@ export function RenderClientTile(Client: ClientView): string {
   const TagBadges = RenderTagBadgeRow(
     ResolveEntityTags(Tags, { ScopedID: String(UUID), GroupID: Client.GroupID ?? null })
   );
-  return `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${TileStateClass} ${IdentifyingClass} ${
+  // List view only: the chevron and one row per monitored item (list-view.ts).
+  const ItemParts = RenderClientItemParts(Client);
+  const ExpandedClass = ItemParts.Expanded ? 'CHECKS_EXPANDED' : '';
+  return `<div ID="CLIENT_TILE_${UUID}" class="SHOWTRAK_PC ${TileStateClass} ${IdentifyingClass} ${ExpandedClass} ${
     UUID && Selected.includes(UUID) ? 'SELECTED' : ''
-  }" data-uuid="${UUID}" data-flip-key="client:${UUID}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
+  }" data-uuid="${UUID}" data-flip-key="client:${UUID}" data-item-shape="${Safe(ItemParts.Shape)}" draggable="${AppMode === 'EDIT' ? 'true' : 'false'}">
 				<button type="button" class="CLIENT_TILE_COG" aria-label="Edit Client" title="Edit Client">
 					<i class="bi bi-gear"></i>
 				</button>
@@ -920,8 +925,9 @@ export function RenderClientTile(Client: ClientView): string {
 					</h7>`
           }
 				</div>
+        ${ItemParts.Toggle}
         ${RenderListRowCells(String(UUID), CompactStatusLabel)}
-			</div>`;
+			</div>${ItemParts.Rows}`;
 }
 
 // --- Live tile updates ---------------------------------------------------------
@@ -1105,6 +1111,9 @@ export function UpdateClientTile(Data: ClientView): void {
     }
     UpdateOfflineIndicators(Refs.Tile);
   }
+
+  // The list view's monitored-item rows under the client, when it shows.
+  UpdateClientItemRows(Data);
 }
 
 export function RenderFullClientAndMonitorList() {

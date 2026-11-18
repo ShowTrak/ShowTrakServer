@@ -209,9 +209,11 @@ function register(): void {
     return SamplesSince(getClientHistorySamples(UUID), HistoryCutoff(WindowMs));
   });
 
-  // Takes no input: the list view's history column, every row in one read.
-  RPC.handle('GetStatusHistoryOverview', async () => {
-    return getStatusHistoryOverview();
+  // The list view's history column, every row in one read. The optional
+  // { Clients, Kiosks } names the rows expanded into their monitored items;
+  // anything malformed is ignored rather than refused (see the overview).
+  RPC.handle('GetStatusHistoryOverview', async (_Event: unknown, Expanded?: unknown) => {
+    return getStatusHistoryOverview(Date.now(), Expanded ?? null);
   });
 
   RPC.handle(

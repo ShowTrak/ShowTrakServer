@@ -11,7 +11,10 @@
      check | state | expand | name | type | address | detail | cog | history
 
    A monitoring target can be expanded (the chevron in the expand column) into
-   one indented row per check, each selectable and with its own history.
+   one indented row per check, each selectable and with its own history. A
+   ShowTrak client or FreeKiosk terminal expands the same way into one
+   read-only row per monitored item (.CLIENT_ITEM): no checkbox, but its own
+   history.
 
    Rows are neutral unless something is wrong: only a degraded or offline row
    takes its status colour, so the problems are what stand out in a long list.
@@ -29,9 +32,9 @@
 /* Check rows exist only in the list, and only while their target is expanded.
    They are also hidden mid-drag: they move with their target, and leaving them
    behind while it is in the air would read as the checks being dropped. */
-body:not(.list-mode) .SHOWTRAK_PC.MONITOR_CHECK,
-.SHOWTRAK_PC.MONITOR_CHECK.is-collapsed,
-body:has(.SHOWTRAK_PC.dragging) .SHOWTRAK_PC.MONITOR_CHECK {
+body:not(.list-mode) .SHOWTRAK_PC:is(.MONITOR_CHECK, .CLIENT_ITEM),
+.SHOWTRAK_PC:is(.MONITOR_CHECK, .CLIENT_ITEM).is-collapsed,
+body:has(.SHOWTRAK_PC.dragging) .SHOWTRAK_PC:is(.MONITOR_CHECK, .CLIENT_ITEM) {
   display: none !important;
 }
 
@@ -334,7 +337,8 @@ body.list-mode .LIST_GROUP_CHECK .bi {
 
 body.list-mode
   .group-column-item:has(
-    > .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .LIST_SEARCH_HIDDEN).SELECTED
+    > .group-drop-zone
+      > .SHOWTRAK_PC:not(.MONITOR_CHECK, .CLIENT_ITEM, .LIST_SEARCH_HIDDEN).SELECTED
   )
   > .GROUP_TITLE_CLICKABLE
   .LIST_GROUP_CHECK {
@@ -345,7 +349,8 @@ body.list-mode
 
 body.list-mode
   .group-column-item:has(
-    > .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .LIST_SEARCH_HIDDEN).SELECTED
+    > .group-drop-zone
+      > .SHOWTRAK_PC:not(.MONITOR_CHECK, .CLIENT_ITEM, .LIST_SEARCH_HIDDEN).SELECTED
   )
   > .GROUP_TITLE_CLICKABLE
   .LIST_GROUP_CHECK
@@ -355,9 +360,12 @@ body.list-mode
 
 body.list-mode
   .group-column-item:has(
-    > .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .LIST_SEARCH_HIDDEN)
+    > .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .CLIENT_ITEM, .LIST_SEARCH_HIDDEN)
   ):not(
-    :has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .LIST_SEARCH_HIDDEN):not(.SELECTED))
+    :has(
+      > .group-drop-zone
+        > .SHOWTRAK_PC:not(.MONITOR_CHECK, .CLIENT_ITEM, .LIST_SEARCH_HIDDEN):not(.SELECTED)
+    )
   )
   > .GROUP_TITLE_CLICKABLE
   .LIST_GROUP_CHECK
@@ -367,9 +375,12 @@ body.list-mode
 
 body.list-mode
   .group-column-item:has(
-    > .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .LIST_SEARCH_HIDDEN)
+    > .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .CLIENT_ITEM, .LIST_SEARCH_HIDDEN)
   ):not(
-    :has(> .group-drop-zone > .SHOWTRAK_PC:not(.MONITOR_CHECK, .LIST_SEARCH_HIDDEN):not(.SELECTED))
+    :has(
+      > .group-drop-zone
+        > .SHOWTRAK_PC:not(.MONITOR_CHECK, .CLIENT_ITEM, .LIST_SEARCH_HIDDEN):not(.SELECTED)
+    )
   )
   > .GROUP_TITLE_CLICKABLE
   .LIST_GROUP_CHECK
@@ -597,16 +608,16 @@ body.list-mode .SHOWTRAK_PC.CHECKS_EXPANDED > .LIST_EXPAND .bi {
   transform: rotate(90deg);
 }
 
-/* A check sits under its target: indented, with a branch mark, and a step
-   quieter than the rows around it. */
-body.list-mode .SHOWTRAK_PC.MONITOR_CHECK > [data-type='Name'] {
+/* A check sits under its target, and a monitored item under its client:
+   indented, with a branch mark, and a step quieter than the rows around it. */
+body.list-mode .SHOWTRAK_PC:is(.MONITOR_CHECK, .CLIENT_ITEM) > [data-type='Name'] {
   padding-left: 14px;
   font-size: var(--fs-sm);
   font-weight: 500;
   color: var(--text-soft);
 }
 
-body.list-mode .SHOWTRAK_PC.MONITOR_CHECK > [data-type='Name']::before {
+body.list-mode .SHOWTRAK_PC:is(.MONITOR_CHECK, .CLIENT_ITEM) > [data-type='Name']::before {
   content: '\2514';
   margin-right: 6px;
   color: var(--text-faint);
@@ -615,6 +626,22 @@ body.list-mode .SHOWTRAK_PC.MONITOR_CHECK > [data-type='Name']::before {
 body.list-mode .SHOWTRAK_PC.MONITOR_CHECK > [data-type='Method'] {
   text-transform: uppercase;
   letter-spacing: 0.04rem;
+}
+
+/* A monitored item is read-only: no checkbox (its column stays, so the rest
+   line up), no selection hover, and the reason in full on hover. */
+body.list-mode .SHOWTRAK_PC.CLIENT_ITEM > .LIST_CHECK {
+  visibility: hidden;
+}
+
+body.list-mode .SHOWTRAK_PC.CLIENT_ITEM {
+  cursor: default;
+}
+
+body.list-mode .SHOWTRAK_PC.CLIENT_ITEM [data-type='CHECK_DETAIL_TEXT'] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* History: the row's overall status over the last hour, far right. */

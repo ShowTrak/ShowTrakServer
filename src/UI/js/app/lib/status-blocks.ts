@@ -154,3 +154,29 @@ export function FreeKioskReachabilitySamples(
     latencyMs: Sample.n,
   }));
 }
+
+/**
+ * One FreeKiosk reading's series as status samples, for its block timeline.
+ *
+ * `breach` is the only thing that colours a block. It was recorded at sample
+ * time from the check the operator actually armed, so the timeline says exactly
+ * what the tile said at that instant. A sample with no reading is an idle gap,
+ * not a verdict. Pass `Now` to expand the store's flat runs first (see
+ * ExpandMetricSeries); leave it out for a series that is already expanded.
+ */
+export function FreeKioskMetricStatusSamples(
+  Samples: readonly FreeKioskMetricSample[] | null | undefined,
+  Now?: number
+): HistorySample[] {
+  const Series =
+    Now == null
+      ? Array.isArray(Samples)
+        ? Samples
+        : []
+      : ExpandMetricSeries(Samples, { now: Now });
+  return Series.map((Sample) =>
+    Sample.ok
+      ? { ts: Sample.ts, online: true, degraded: Sample.breach, latencyMs: null }
+      : { ts: Sample.ts, online: false, degraded: false, latencyMs: null }
+  );
+}

@@ -14,6 +14,7 @@ import type {
   FreeKioskMetricCatalog,
   FreeKioskMetricGroupView,
   FreeKioskMetricView,
+  FreeKioskTerminalView,
   MonitoringSettingField,
 } from '@showtrak/protocol';
 import { FormatMetricValue } from './metric-format';
@@ -423,4 +424,111 @@ export function BuildGroupSettings(
   const Group = (Catalogue.Groups || []).find((Entry) => Entry.Key === Section);
   if (Group && Group.Fixed) return {};
   return { [FreeKioskGroupFieldKey(Section)]: Monitored };
+}
+
+// ---- Armed checks and their wording (the Status tab and the list's rows) ----
+
+/** A reading's armed check, read back out of the stored settings. */
+export interface ArmedAlarm {
+  operator: string;
+  value: unknown;
+  value2: unknown;
+}
+
+export function ReadArmedAlarm(
+  Terminal: Pick<FreeKioskTerminalView, 'Settings'>,
+  Metric: FreeKioskMetricView
+): ArmedAlarm | null {
+  const Settings = Terminal.Settings || {};
+  if (Settings[`A_${Metric.Key}_On`] !== true) return null;
+  const Stored = Settings[`A_${Metric.Key}_Op`];
+  const Operator =
+    typeof Stored === 'string' && Metric.Operators.includes(Stored as never)
+      ? Stored
+      : Metric.DefaultOperator || Metric.Operators[0] || '';
+  return {
+    operator: String(Operator),
+    value: Settings[`A_${Metric.Key}_V`],
+    value2: Settings[`A_${Metric.Key}_V2`],
+  };
+}
+
+/**
+ * What the reading was supposed to be, in the operator's words.
+ *
+ * Shown only while the alarm is actually breaching. When a value is where it
+ * should be, the value alone says everything; repeating the threshold on all
+ * sixty-one rows would bury the two that matter.
+ *
+ * The stored operator is the BREACH comparison, so the expectation is its
+ * complement, the same complement the condition picker shows. A stored
+ * "below 20" is "expected at least 20%".
+ */
+export function DescribeExpected(Metric: FreeKioskMetricView, Alarm: ArmedAlarm | null): string {
+  if (!Alarm) return '';
+  // Stored settings are JSON, so a threshold is whatever survived a round trip.
+  // Anything that is not a scalar has no wording, and formats as an em dash.
+  const Scalar = (Value: unknown): string | number | boolean | null =>
+    typeof Value === 'string' || typeof Value === 'number' || typeof Value === 'boolean'
+      ? Value
+      : null;
+  // A threshold typed in its own unit (uptime in days) is worded in that unit,
+  // not run through the reading's format: "7" would otherwise read as "7s".
+  const Threshold = (Value: unknown): string => {
+    const Numeric = typeof Value === 'number' ? Value : Number(Scalar(Value) ?? NaN);
+    if (!Metric.ThresholdUnit || !Number.isFinite(Numeric)) {
+      return FormatMetricValue(Metric, Scalar(Value));
+    }
+    const Unit = Numeric === 1 ? Metric.ThresholdUnit.replace(/s$/, '') : Metric.ThresholdUnit;
+    return `${Math.round(Numeric * 100) / 100} ${Unit}`;
+  };
+  const Want = Threshold(Alarm.value);
+  const Want2 = Threshold(Alarm.value2);
+  switch (Alarm.operator) {
+    case 'below':
+      return `expected at least ${Want}`;
+    case 'above':
+      return `expected at most ${Want}`;
+    case 'outside':
+      return `expected ${Want} to ${Want2}`;
+    case 'inside':
+      return `expected outside ${Want} to ${Want2}`;
+    case 'is':
+      // Booleans never reach here: they arm `isNot`, so their value is already
+      // the expected state. This is the enum/string case, picked as "Expected
+      // is not ...".
+      return `expected anything but ${Want}`;
+    case 'isNot':
+      return `expected ${Want}`;
+    case 'contains':
+      return `expected not to contain "${Want}"`;
+    case 'notContains':
+      return `expected to contain "${Want}"`;
+    case 'changes':
+      return 'expected to stay the same';
+    case 'decreases':
+      return 'expected never to go backwards';
+    default:
+      return '';
+  }
+}
+
+/**
+ * The state a monitored reading's status card shows, matching the client's
+ * critical displays and network interfaces: while the terminal is offline the
+ * reading is unknown, not faulty, so it is Idle; a breaching alarm is Degraded
+ * (as it is on the tile); anything else is Online. The status text is the
+ * reading itself, plus what it should have been while it is breaching.
+ */
+export function FreeKioskMetricLiveState(
+  TerminalOnline: boolean,
+  Breaching: boolean,
+  ValueText: string,
+  Expected: string
+): { State: 'IDLE' | 'ONLINE' | 'DEGRADED'; Label: string } {
+  if (!TerminalOnline) return { State: 'IDLE', Label: 'Idle' };
+  if (Breaching) {
+    return { State: 'DEGRADED', Label: Expected ? `${ValueText} · ${Expected}` : ValueText };
+  }
+  return { State: 'ONLINE', Label: ValueText };
 }
