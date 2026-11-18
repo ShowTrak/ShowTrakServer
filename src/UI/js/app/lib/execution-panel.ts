@@ -77,7 +77,54 @@ export function ShouldAutoDismissExecutions(
 export function GetCompletedSectionLabel(Completed: number, Total: number): string {
   const Done = Math.max(0, Math.floor(Completed));
   const All = Math.max(Done, Math.floor(Total));
-  return Done === All ? `All ${All} completed` : `${Done} of ${All} completed`;
+  if (Done !== All) return `${Done} of ${All} completed`;
+  // "All 1 completed" reads oddly for a single client.
+  return All === 1 ? '1 completed' : `All ${All} completed`;
+}
+
+/**
+ * How far apart (by start time) two executions must be queued to count as
+ * separate tasks. One batch enqueues its clients back to back, a push per
+ * client, so its rows start within milliseconds of each other.
+ */
+export const SEPARATE_TASK_GAP_MS = 2000;
+
+/** The subset of an execution the later-task rule reads. */
+type StartedLike = Pick<ScriptExecutionView, 'RequestID'> & {
+  Timer?: { Start?: number | null } | null;
+};
+
+function StartOf(Request: StartedLike | null | undefined): number {
+  const Start = Request && Request.Timer ? Request.Timer.Start : NaN;
+  return typeof Start === 'number' && Number.isFinite(Start) ? Start : NaN;
+}
+
+/**
+ * Whether another task joined the panel while it was already showing a run:
+ * an execution that was not in the previous list and was queued well after
+ * everything that was (so the next client of the same batch does not count).
+ * The panel then stays up until the operator closes it, since they may still
+ * be reading the first run's results.
+ */
+export function HasLaterTaskJoined(
+  Previous: ReadonlyArray<StartedLike | null | undefined>,
+  Current: ReadonlyArray<StartedLike | null | undefined>
+): boolean {
+  const Known = new Set<string>();
+  let LatestStart = -Infinity;
+  for (const Request of Previous) {
+    if (!Request) continue;
+    Known.add(Request.RequestID);
+    const Start = StartOf(Request);
+    if (Start > LatestStart) LatestStart = Start;
+  }
+  if (!Known.size || LatestStart === -Infinity) return false;
+  return Current.some(
+    (Request) =>
+      !!Request &&
+      !Known.has(Request.RequestID) &&
+      StartOf(Request) - LatestStart > SEPARATE_TASK_GAP_MS
+  );
 }
 
 /**

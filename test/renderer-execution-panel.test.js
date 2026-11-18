@@ -24,6 +24,8 @@ const {
   GetExecutionVisualState,
   CountCompletedExecutions,
   GetCompletedSectionLabel,
+  HasLaterTaskJoined,
+  SEPARATE_TASK_GAP_MS,
   AllExecutionsSettled,
   ShouldAutoDismissExecutions,
   IsRetryableExecution,
@@ -70,6 +72,31 @@ test('GetCompletedSectionLabel shows progress, then "All N" once done', () => {
   assert.equal(GetCompletedSectionLabel(300, 300), 'All 300 completed');
   // Never claims fewer total than completed.
   assert.equal(GetCompletedSectionLabel(5, 3), 'All 5 completed');
+});
+
+test('GetCompletedSectionLabel says "1 completed" for a single client, not "All 1"', () => {
+  assert.equal(GetCompletedSectionLabel(1, 1), '1 completed');
+  assert.equal(GetCompletedSectionLabel(0, 1), '0 of 1 completed');
+  assert.equal(GetCompletedSectionLabel(2, 2), 'All 2 completed');
+});
+
+test('HasLaterTaskJoined spots a second task, not the next client of the same batch', () => {
+  const row = (RequestID, Start) => ({ RequestID, Timer: { Start } });
+  const first = [row('a', 1000), row('b', 1005)];
+  // Nothing on screen yet: a first run never counts as joining.
+  assert.equal(HasLaterTaskJoined([], first), false);
+  // Same rows again, or the same batch still enqueueing: not a new task.
+  assert.equal(HasLaterTaskJoined(first, first), false);
+  assert.equal(HasLaterTaskJoined(first, [...first, row('c', 1010)]), false);
+  // Queued well after the first batch: a second task.
+  assert.equal(
+    HasLaterTaskJoined(first, [...first, row('d', 1005 + SEPARATE_TASK_GAP_MS + 1)]),
+    true
+  );
+  // Rows without a start time never count.
+  assert.equal(HasLaterTaskJoined(first, [...first, { RequestID: 'e' }]), false);
+  assert.equal(HasLaterTaskJoined([{ RequestID: 'x' }], [row('y', 99999)]), false);
+  assert.equal(HasLaterTaskJoined([null], [null, row('z', 5)]), false);
 });
 
 test('only a run that finished cleanly may close the panel by itself', () => {

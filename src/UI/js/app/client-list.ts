@@ -46,6 +46,7 @@ import type { ClientView, ScriptExecutionView } from '@showtrak/protocol';
 import {
   CountCompletedExecutions,
   GetCompletedSectionLabel,
+  HasLaterTaskJoined,
   GetExecutionVisualState,
   GetReportedProgress,
   AllExecutionsSettled,
@@ -225,11 +226,34 @@ let PanelExecutionsByID = new Map<string, ScriptExecutionView>();
 // view closes, so a panel that settled while it was open can now auto-dismiss.
 let ExecutionsHandler: ((All: ScriptExecutionView[]) => Promise<void>) | null = null;
 let LastAllExecutions: ScriptExecutionView[] = [];
+// Set once the operator has shown they are reading the panel (expanded the
+// completed list) or a second task joined a run already on screen. A pinned
+// panel never closes itself; it stays until the operator closes it, as a run
+// with failures does. Cleared whenever the panel goes away.
+let ExecutionPanelPinned = false;
+// When the operator last pressed Retry. A retry swaps failed rows for fresh
+// runs, which would otherwise look like a second task joining and pin the panel.
+let LastRetryAt = 0;
+const RETRY_PIN_GRACE_MS = 3000;
+
+function CancelExecutionAutoDismiss() {
+  if (window.__ShowTrakExecutionAutoDismissTimer) {
+    clearTimeout(window.__ShowTrakExecutionAutoDismissTimer);
+    window.__ShowTrakExecutionAutoDismissTimer = null;
+  }
+}
+
+/** Keep the panel up until the operator closes it. */
+function PinExecutionPanel() {
+  ExecutionPanelPinned = true;
+  CancelExecutionAutoDismiss();
+}
 
 // Ask the server to retry these failed executions. The server re-checks what
 // is retryable and replaces each failure's row with the new run.
 async function RetryExecutions(RequestIDs: string[], Button: HTMLButtonElement | null) {
   if (!RequestIDs.length) return;
+  LastRetryAt = Date.now();
   if (Button) Button.disabled = true;
   try {
     const Result = await window.API.RetryScriptExecutions(RequestIDs);
@@ -277,6 +301,9 @@ function EnsureCompletedSection(
         Toggle.setAttribute('aria-expanded', String(Open));
         Body.hidden = !Open;
         El.classList.toggle('open', Open);
+        // Expanding shows intent to read (e.g. console output), so the panel
+        // must not close itself under the operator from here on.
+        if (Open) PinExecutionPanel();
       });
     }
   }
@@ -321,7 +348,11 @@ function InitClientListPush() {
     });
 
   OnExecutionToastDismissed(() => {
-    if (!AllExecutionsSettled(LastPanelExecutions)) return;
+    ExecutionPanelPinned = false;
+    const Settled = AllExecutionsSettled(LastPanelExecutions);
+    // A task started after this is a fresh run, not one joining this panel.
+    LastPanelExecutions = [];
+    if (!Settled) return;
     window.API.ClearSettledScriptExecutions().catch((e: unknown) =>
       HandleNonFatalError('ClearSettledScriptExecutions:Dismiss', e)
     );
@@ -380,6 +411,8 @@ function InitClientListPush() {
         window.__ShowTrakExecutionAutoDismissTimer = null;
       }
       HideExecutionToast();
+      ExecutionPanelPinned = false;
+      LastPanelExecutions = [];
       return;
     }
 
@@ -390,8 +423,18 @@ function InitClientListPush() {
     // cancels the countdown; the panel only closes once the dwell has passed
     // since the LAST script finished. If anything failed it never closes itself:
     // the operator dismisses it (see OnExecutionToastDismissed below).
+    // Nor does a pinned panel (see ExecutionPanelPinned): a second task joining
+    // a run still on screen pins it, so finishing that task does not sweep away
+    // the first one's results while the operator may be reading them.
+    if (
+      Date.now() - LastRetryAt > RETRY_PIN_GRACE_MS &&
+      HasLaterTaskJoined(LastPanelExecutions, nonDeploymentExecutions)
+    ) {
+      ExecutionPanelPinned = true;
+    }
     LastPanelExecutions = nonDeploymentExecutions;
-    const shouldAutoDismissNonDeployment = ShouldAutoDismissExecutions(nonDeploymentExecutions);
+    const shouldAutoDismissNonDeployment =
+      !ExecutionPanelPinned && ShouldAutoDismissExecutions(nonDeploymentExecutions);
 
     // Never close the panel under an operator who is reading a console; the
     // view re-runs this check when it closes.
@@ -400,6 +443,8 @@ function InitClientListPush() {
         window.__ShowTrakExecutionAutoDismissTimer = setTimeout(async () => {
           window.__ShowTrakExecutionAutoDismissTimer = null;
           HideExecutionToast();
+          ExecutionPanelPinned = false;
+          LastPanelExecutions = [];
           // Wipe the finished rows now the panel is gone, so the next run renders
           // into an empty list rather than stacking on the previous batch. Only
           // settled entries are dropped; anything queued or running in the
