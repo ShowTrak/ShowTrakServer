@@ -143,6 +143,17 @@ export const DefaultSettings: SettingDefinition[] = [
     Scope: 'INSTALL',
   },
   {
+    Group: 'Machine',
+    Key: 'SYSTEM_LOG_LEVEL',
+    Title: 'Log Level',
+    Description: 'Use debug or trace when diagnosing issues.',
+    Type: 'OPTION',
+    DefaultValue: 'info',
+    Options: ['error', 'warn', 'info', 'debug', 'trace'],
+    OnUpdateEvent: 'LoggingSettingsChanged',
+    Scope: 'INSTALL',
+  },
+  {
     Group: 'Layout',
     Key: 'UI_DEFAULT_VIEW',
     Title: 'Default View',
@@ -514,16 +525,6 @@ export const DefaultSettings: SettingDefinition[] = [
     DefaultValue: false,
   },
   {
-    Group: 'System',
-    Key: 'SYSTEM_LOG_LEVEL',
-    Title: 'Log Level',
-    Description: 'Use debug or trace when diagnosing issues.',
-    Type: 'OPTION',
-    DefaultValue: 'info',
-    Options: ['error', 'warn', 'info', 'debug', 'trace'],
-    OnUpdateEvent: 'LoggingSettingsChanged',
-  },
-  {
     Group: 'FOG Project',
     Key: 'FOG_ENABLED',
     Title: 'FOG Project Integration',
@@ -655,5 +656,4 @@ export const Groups: SettingGroup[] = [
     ShowWhen: ['FOG_ENABLED'],
   },
   { Name: 'FreeKiosk', Title: 'FreeKiosk' },
-  { Name: 'System', Title: 'System Settings' },
 ];
