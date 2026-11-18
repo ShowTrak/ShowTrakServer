@@ -35,6 +35,7 @@ import {
   GetTileWarningText,
   ParseGroupColumnCount,
   SelectGroupMembers,
+  ShouldAnimateBars,
   ShouldRenderGroup,
   ShouldShowWelcomePanel,
   TruncateGroupLabel,
@@ -943,6 +944,9 @@ export function RenderFullClientAndMonitorList() {
   // This render satisfies any that was scheduled.
   FullRenderPending = false;
   const Clients = Array.isArray(__LastClients) ? __LastClients.slice() : [];
+  if (typeof document !== 'undefined' && document.body) {
+    document.body.classList.toggle('st-static-bars', !ShouldAnimateBars(Clients.length));
+  }
   const Monitors = Array.isArray(MonitoringTargets) ? MonitoringTargets.slice() : [];
   const Dummies = Array.isArray(DummyClients) ? DummyClients.slice() : [];
   const Kiosks = Array.isArray(FreeKioskTerminals) ? FreeKioskTerminals.slice() : [];

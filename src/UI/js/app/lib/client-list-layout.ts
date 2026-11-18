@@ -354,3 +354,17 @@ export function VitalsBarScale(
   if (!Number.isFinite(Pct)) return null;
   return `scaleX(${Math.min(100, Math.max(0, Pct)) / 100})`;
 }
+
+// Above this many client tiles the CPU/RAM bars stop animating between values.
+// Each bar animating its transform is its own compositor layer, and with a bar
+// moving somewhere on every frame Chromium re-layerises the whole page every
+// frame: measured at 300 tiles, the renderer's main thread was 77% busy in
+// PaintArtifactCompositor::Update with the transitions and 1.8% without them.
+// At a couple of dozen tiles the cost is small (~2.7% vs 0.5%), so smaller rigs
+// keep the smooth bars.
+export const ANIMATED_BAR_TILE_LIMIT = 40;
+
+/** Whether the bars should animate for a list of this many client tiles. */
+export function ShouldAnimateBars(ClientCount: number): boolean {
+  return ClientCount <= ANIMATED_BAR_TILE_LIMIT;
+}

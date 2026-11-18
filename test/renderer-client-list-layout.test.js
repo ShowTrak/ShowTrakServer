@@ -598,3 +598,11 @@ test('VitalsBarScale maps a reading to a clamped horizontal scale, and ignores j
   assert.equal(Layout.VitalsBarScale(null), null);
   assert.equal(Layout.VitalsBarScale({}), null);
 });
+
+test('CPU/RAM bars animate only up to the tile limit', () => {
+  assert.equal(Layout.ANIMATED_BAR_TILE_LIMIT, 40);
+  assert.equal(Layout.ShouldAnimateBars(0), true);
+  assert.equal(Layout.ShouldAnimateBars(40), true);
+  assert.equal(Layout.ShouldAnimateBars(41), false);
+  assert.equal(Layout.ShouldAnimateBars(300), false);
+});

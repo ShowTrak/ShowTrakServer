@@ -5054,6 +5054,14 @@ body.st-rainbow-leaving .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING):
   }
 }
 
+/* Large rigs: the bars jump to each new reading instead of sliding. Hundreds of
+   bars animating at once keep the compositor re-layering the whole page every
+   frame (see ANIMATED_BAR_TILE_LIMIT in js/app/client-list.ts). */
+body.st-static-bars .SHOWTRAK_PC .progress-bar[data-type='CPU'],
+body.st-static-bars .SHOWTRAK_PC .progress-bar[data-type='RAM'] {
+  transition: none;
+}
+
 .SHOWTRAK_PC > [data-type='Nickname'] {
   transition:
     font-size 180ms ease,
