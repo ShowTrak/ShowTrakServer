@@ -304,6 +304,59 @@
   word-break: break-word;
 }
 
+/* Collapsed section pinned to the top of the list: every completed execution
+   moves in here, so the list below only shows queued, running and failed rows.
+   Expanding it lists the completed rows, in the order they finished. */
+.exec-completed {
+  background: rgb(var(--success-rgb) / 0.1);
+  border: 1px solid rgb(var(--success-rgb) / 0.3);
+  border-radius: var(--radius-md);
+}
+.exec-completed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 2.2rem;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.exec-completed-toggle:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-md);
+}
+.exec-completed-toggle:focus-visible {
+  outline: 2px solid rgb(var(--success-rgb) / 0.7);
+  outline-offset: -2px;
+  border-radius: var(--radius-md);
+}
+.exec-completed-chevron {
+  color: var(--text-secondary);
+  transition: transform 0.15s ease;
+}
+.exec-completed.open .exec-completed-chevron {
+  transform: rotate(90deg);
+}
+.exec-completed-icon {
+  color: var(--success);
+}
+.exec-completed-list {
+  display: grid;
+  gap: 6px;
+  padding: 0 6px 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .exec-completed-chevron {
+    transition: none;
+  }
+}
+
 .exec-item {
   position: relative;
   overflow: hidden;

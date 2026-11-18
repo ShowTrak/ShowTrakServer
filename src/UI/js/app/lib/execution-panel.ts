@@ -1,0 +1,57 @@
+// Pure rules for the script execution panel.
+//
+// Extracted from client-list.ts so the decisions can be tested without a DOM:
+// which visual state a row is in, and how the collapsed "completed" section at
+// the top of the panel is labelled. The rendering stays in client-list.ts.
+//
+// Completed rows collapse into that section the moment they finish, so the
+// list itself only ever shows what still needs the operator's eye: queued,
+// running and failed executions.
+
+import type { ScriptExecutionView } from '@showtrak/protocol';
+
+/** One visual state per row: drives its fill colour, indicator and placement. */
+export type ExecutionVisualState = 'pending' | 'running' | 'completed' | 'failed';
+
+/** The subset of an execution these rules read. */
+type ExecutionLike = Pick<ScriptExecutionView, 'Status' | 'Progress'>;
+
+/** The client's reported progress, clamped to 0-100 (0 when missing or bad). */
+export function GetReportedProgress(Request: ExecutionLike | null | undefined): number {
+  const Progress = Request ? Request.Progress : NaN;
+  return typeof Progress === 'number' && Number.isFinite(Progress)
+    ? Math.max(0, Math.min(100, Progress))
+    : 0;
+}
+
+/**
+ * Classify an execution. Queued and running are both Status 'Pending'; once the
+ * client reports the process has spawned (progress reaches the Running stage,
+ * 50) the row counts as running.
+ */
+export function GetExecutionVisualState(
+  Request: ExecutionLike | null | undefined
+): ExecutionVisualState {
+  if (!Request) return 'pending';
+  if (Request.Status === 'Completed') return 'completed';
+  if (Request.Status === 'Failed') return 'failed';
+  return GetReportedProgress(Request) >= 50 ? 'running' : 'pending';
+}
+
+/** How many of these executions have completed successfully. */
+export function CountCompletedExecutions(
+  Executions: ReadonlyArray<ExecutionLike | null | undefined>
+): number {
+  let Count = 0;
+  for (const Request of Executions) {
+    if (GetExecutionVisualState(Request) === 'completed') Count++;
+  }
+  return Count;
+}
+
+/** The completed section's heading, e.g. "212 of 300 completed". */
+export function GetCompletedSectionLabel(Completed: number, Total: number): string {
+  const Done = Math.max(0, Math.floor(Completed));
+  const All = Math.max(Done, Math.floor(Total));
+  return Done === All ? `All ${All} completed` : `${Done} of ${All} completed`;
+}

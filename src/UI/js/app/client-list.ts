@@ -42,6 +42,12 @@ import {
   VitalsBarScale,
 } from './lib/client-list-layout';
 import type { ClientView, ScriptExecutionView } from '@showtrak/protocol';
+import {
+  CountCompletedExecutions,
+  GetCompletedSectionLabel,
+  GetExecutionVisualState,
+  GetReportedProgress,
+} from './lib/execution-panel';
 import { HandleNonFatalError, Safe } from './utils';
 import { RenderMonitoringTargetTile } from './monitoring';
 import { initializeEditInteractions } from './dnd';
@@ -195,6 +201,54 @@ interface ExecutionRow {
   Progress: string;
 }
 const ExecutionRows = new Map<string, ExecutionRow>();
+
+const COMPLETED_SECTION_KEY = '__completed__';
+
+// The collapsed "completed" section, pinned to the top of the execution list
+// (under the deployment summary when there is one). Completed rows are moved
+// into its body, which stays hidden until the operator expands it, so the list
+// only shows what is still queued, running or failed. Created on first use and
+// reused after; the expanded state lives on the element, so a fresh batch (a
+// new element) starts collapsed. Returns the body the completed rows go in.
+function EnsureCompletedSection(
+  ListEl: HTMLElement,
+  Completed: number,
+  Total: number
+): HTMLElement {
+  let Section = ListEl.querySelector<HTMLElement>(
+    `:scope > [data-exec-key="${COMPLETED_SECTION_KEY}"]`
+  );
+  if (!Section) {
+    Section = document.createElement('div');
+    Section.className = 'exec-completed';
+    Section.setAttribute('data-exec-key', COMPLETED_SECTION_KEY);
+    Section.innerHTML = `
+      <button type="button" class="exec-completed-toggle" aria-expanded="false">
+        <i class="bi bi-chevron-right exec-completed-chevron" aria-hidden="true"></i>
+        <i class="bi bi-check-circle-fill exec-completed-icon" aria-hidden="true"></i>
+        <span class="exec-completed-label"></span>
+      </button>
+      <div class="exec-completed-list" hidden></div>`;
+    const Toggle = Section.querySelector<HTMLElement>('.exec-completed-toggle');
+    const Body = Section.querySelector<HTMLElement>('.exec-completed-list');
+    const El = Section;
+    if (Toggle && Body) {
+      Toggle.addEventListener('click', () => {
+        const Open = Toggle.getAttribute('aria-expanded') !== 'true';
+        Toggle.setAttribute('aria-expanded', String(Open));
+        Body.hidden = !Open;
+        El.classList.toggle('open', Open);
+      });
+    }
+  }
+  const Deploy = ListEl.querySelector<HTMLElement>(':scope > [data-exec-key="__deploy__"]');
+  const Anchor = Deploy ? Deploy.nextElementSibling : ListEl.firstElementChild;
+  if (Section !== Anchor) ListEl.insertBefore(Section, Anchor);
+  const Label = Section.querySelector<HTMLElement>('.exec-completed-label');
+  const Text = GetCompletedSectionLabel(Completed, Total);
+  if (Label && Label.textContent !== Text) Label.textContent = Text;
+  return Section.querySelector<HTMLElement>('.exec-completed-list') || Section;
+}
 
 // Registers the script-execution / script-list / full-client-list push
 // handlers. Bodies unchanged from the former import-time subscriptions.
@@ -501,6 +555,14 @@ function InitClientListPush() {
       ? deploymentRequests
       : nonDeploymentExecutions;
 
+    // Completed rows leave the list for the collapsed section at the top.
+    const completedCount = CountCompletedExecutions(renderExecutions);
+    const completedBody =
+      completedCount > 0
+        ? EnsureCompletedSection(listEl, completedCount, renderExecutions.length)
+        : null;
+    if (completedBody) desiredKeys.add(COMPLETED_SECTION_KEY);
+
     for (let i = 0; i < renderExecutions.length; i++) {
       const Request = renderExecutions[i];
       if (!Request) continue; // i is within renderExecutions bounds
@@ -522,26 +584,17 @@ function InitClientListPush() {
       // Progress fill width. Completed always reads full; failed shows however far
       // it got (full if unknown) in red; pending/running follow the reported value
       // with a small floor so the row never looks empty.
-      const reportedProgress =
-        typeof Request.Progress === 'number' && Number.isFinite(Request.Progress)
-          ? Math.max(0, Math.min(100, Request.Progress))
-          : 0;
+      const reportedProgress = GetReportedProgress(Request);
 
       // Classify the execution into one visual state that drives the row's
-      // background progress fill, the right-side indicator, and (on failure) the
-      // inline error. Once the client reports the process has spawned (progress
-      // reaches the Running stage), the row gets a spinner; StatusText from that
-      // point is live console output, so the spinner keys off progress, not text.
+      // background progress fill, the right-side indicator, (on failure) the
+      // inline error, and where the row lives. Once the client reports the
+      // process has spawned (progress reaches the Running stage), the row gets a
+      // spinner; StatusText from that point is live console output, so the
+      // spinner keys off progress, not text.
       const rawStatusText = Request.StatusText ? String(Request.StatusText).trim() : '';
-      const isRunning = Request.Status === 'Pending' && reportedProgress >= 50;
-      const state =
-        Request.Status === 'Completed'
-          ? 'completed'
-          : Request.Status === 'Failed'
-            ? 'failed'
-            : isRunning
-              ? 'running'
-              : 'pending';
+      const state = GetExecutionVisualState(Request);
+      const container = state === 'completed' && completedBody ? completedBody : listEl;
       let fillPercent: number;
       if (state === 'completed') fillPercent = 100;
       else if (state === 'failed') fillPercent = reportedProgress > 0 ? reportedProgress : 100;
@@ -589,7 +642,7 @@ function InitClientListPush() {
       // Looked up by RequestID in a Map rather than a selector query per row,
       // which made every push quadratic in the number of rows.
       let Row = ExecutionRows.get(key);
-      if (Row && Row.El.parentElement !== listEl) {
+      if (Row && !listEl.contains(Row.El)) {
         ExecutionRows.delete(key);
         Row = undefined;
       }
@@ -617,7 +670,7 @@ function InitClientListPush() {
 						<div class="exec-actions">${indicatorHtml}</div>
 					</div>
 				</div>`;
-        listEl.appendChild(el);
+        container.appendChild(el);
         Row = {
           El: el,
           Actions: el.querySelector<HTMLElement>('.exec-actions'),
@@ -632,6 +685,9 @@ function InitClientListPush() {
       // unless the state changes, so their animations run uninterrupted. The
       // fill is a transform (scaleX), so a progress step never relayouts.
       const el = Row.El;
+      // A row that just completed moves into the completed section (appended,
+      // so the section lists rows in the order they finished).
+      if (el.parentElement !== container) container.appendChild(el);
       const Progress = String(fillPercent / 100);
       if (Row.Progress !== Progress) {
         Row.Progress = Progress;
@@ -661,8 +717,11 @@ function InitClientListPush() {
       }
     }
 
-    // Drop rows whose executions are no longer present (e.g. after ClearSettled).
-    for (const child of Array.from(listEl.children)) {
+    // Drop rows whose executions are no longer present (e.g. after ClearSettled),
+    // including completed rows inside the collapsed section.
+    const children = Array.from(listEl.children);
+    if (completedBody) children.push(...Array.from(completedBody.children));
+    for (const child of children) {
       const childKey =
         child.getAttribute('data-request-id') || child.getAttribute('data-exec-key') || '';
       if (!desiredKeys.has(childKey)) child.remove();
