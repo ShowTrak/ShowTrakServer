@@ -13,7 +13,7 @@ import type { BrowserWindow as ElectronBrowserWindow } from 'electron';
 // Process set-up that has to come before any module loads (the libuv thread
 // pool size, V8's compile cache) is done by the entry point, ./boot.ts, which
 // then loads this file as part of the main-process bundle.
-const { app, BrowserWindow } = require('electron/main');
+const { app, BrowserWindow, dialog } = require('electron/main');
 const { powerMonitor, autoUpdater: nativeAutoUpdater } = require('electron');
 if (require('electron-squirrel-startup')) app.quit();
 
@@ -53,12 +53,12 @@ import { Manager as ScriptManager } from './Modules/ScriptManager';
 ScriptManager.GetScripts().catch((Err: unknown) => Logger.error('Failed to load scripts:', Err));
 import { Manager as SampleScriptsManager } from './Modules/SampleScripts';
 SampleScriptsManager.Initialize();
-import './Modules/Server'; // binds HTTP + Socket.IO server on load
+import { Config } from './Modules/Config';
+import { WhenListening as WhenServerListening, Listen as ServerListen } from './Modules/Server'; // binds HTTP + Socket.IO server on load
 import { Manager as BonjourManager } from './Modules/Bonjour';
-// Init reads settings to build its TXT record, so it is async. Nothing here waits
-// on the announcement; publishing is fire-and-forget, and a failure inside is
-// already logged rather than thrown.
-void BonjourManager.Init();
+import { EnsureClientPortBound } from './main/client-port-guard';
+// Bonjour is started in app.whenReady, once the client port is bound: see
+// main/client-port-guard.ts.
 import './Modules/OSC'; // binds the OSC UDP listener on load
 import { Manager as MonitoringTargetManager } from './Modules/MonitoringTargetManager';
 import { Manager as MonitoringActionFavourites } from './Modules/MonitoringActionFavourites';
@@ -183,6 +183,37 @@ let PreloaderWindow!: ElectronBrowserWindow;
 app.whenReady().then(async () => {
   Logger.debug('[startup] electron ready');
   if (require('electron-squirrel-startup')) return app.quit();
+
+  // Nothing opens until the client port is ours: without it no client can
+  // connect, so the operator can only retry (once the port is freed) or quit.
+  const PortBound = await EnsureClientPortBound({
+    Port: Config.Application.Port,
+    Initial: WhenServerListening(),
+    Retry: ServerListen,
+    AskRetry: async (Title, Message, Detail) => {
+      const { response } = await dialog.showMessageBox({
+        type: 'error',
+        title: Title,
+        message: Message,
+        detail: Detail,
+        buttons: ['Retry', 'Quit ShowTrak Server'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+      });
+      return response === 0;
+    },
+    Log: (Message, Err) =>
+      Logger.error(Message, (Err as NodeJS.ErrnoException | null)?.code || Err),
+  });
+  if (!PortBound) {
+    // Nothing has been opened or changed yet, so there is nothing to save.
+    app.exit(0);
+    return;
+  }
+  // Init reads settings to build its TXT record, so it is async. Publishing is
+  // fire-and-forget, and a failure inside is already logged rather than thrown.
+  void BonjourManager.Init();
 
   configureApplicationMenu({
     sendAppMenuAction,

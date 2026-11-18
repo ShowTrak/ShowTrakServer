@@ -50,8 +50,17 @@ import { Server as WebServer } from 'socket.io';
 
 // HTTP server backing express + Socket.IO
 const Server = HTTP.createServer();
+// The bind attempt in flight, if any: an 'error' while one is pending is that
+// bind failing (EADDRINUSE when another program holds the port).
+let PendingListen: { resolve: () => void; reject: (Err: NodeJS.ErrnoException) => void } | null =
+  null;
 Server.on('error', (e: NodeJS.ErrnoException) => {
   Logger.error('HTTP/Socket server error:', e && e.code ? e.code : e);
+  if (PendingListen) {
+    const Pending = PendingListen;
+    PendingListen = null;
+    Pending.reject(e);
+  }
 });
 
 function sendApiError(res: Response, httpStatus: number, code: string | number, message: unknown) {
@@ -691,8 +700,36 @@ SetupSdkNamespace(io);
 // commands to specific client rooms.
 IdentifyManager.RegisterIO(io);
 
-Server.listen(Config.Application.Port, () => {
-  Logger.log(`Socket.IO server running on port ${Config.Application.Port}`);
-});
+// Bind the client/Web UI port. Settles once it is bound, or with the bind error.
+// Clients cannot reach a server that does not hold this port, so start-up waits
+// on it (see main/client-port-guard.ts) and Bonjour is only started after it:
+// advertising a port this process does not hold sends every client to whatever
+// does hold it, where they sit "connected" but never appear for adoption.
+function Listen(): Promise<void> {
+  if (Server.listening) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const Attempt = { resolve, reject };
+    PendingListen = Attempt;
+    // listen() attaches its callback as a 'listening' listener, and a failed
+    // attempt's stays attached: it fires again when a later retry succeeds.
+    // Only the attempt still pending may act on it.
+    Server.listen(Config.Application.Port, () => {
+      if (PendingListen !== Attempt) return;
+      PendingListen = null;
+      Logger.log(`Socket.IO server running on port ${Config.Application.Port}`);
+      Attempt.resolve();
+    });
+  });
+}
 
-export { Manager };
+// Bound on load, as before; start-up picks the outcome up via WhenListening().
+const InitialListen = Listen();
+// The failure is handled by whoever awaits WhenListening(); this only stops it
+// being reported as unhandled before then.
+InitialListen.catch(() => {});
+
+function WhenListening(): Promise<void> {
+  return InitialListen;
+}
+
+export { Manager, WhenListening, Listen };
