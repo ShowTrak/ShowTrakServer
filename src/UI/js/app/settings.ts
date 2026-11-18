@@ -19,6 +19,7 @@ import { GetAlertVolume, HandleNonFatalError, Safe, ShowQRModal } from './utils'
 import { Notify } from './selection-init';
 import { ConfirmationDialog } from './lib/toasts';
 import { FormatSettingValue, ResolveSettingsTab } from './lib/settings-tabs';
+import { GROUP_COLOUR_SATURATION_KEY, ParseGroupColourScale } from './lib/client-list-layout';
 import type { RemoteDeviceView, SettingGroupView, SettingView } from '@showtrak/protocol';
 // Wires the mode/view/alert-action buttons and fetches initial settings +
 // mode state. Formerly a DOMContentLoaded handler; InitSettings() calls it
@@ -175,12 +176,21 @@ function InitSettingsPush() {
     // BuildSettingsNav runs below, so the rail picks up any group change.
     ApplySettingDependencies();
 
+    // Group colour saturation is pure CSS (the tint's strength reads this
+    // variable), so it applies without redrawing the list.
+    document.documentElement.style.setProperty(
+      '--group-tint-scale',
+      String(ParseGroupColourScale(Incoming))
+    );
+
     // Re-render after settings arrive so layout-dependent controls like the group
     // column count pick up UI_GROUP_COLUMN_COUNT on the browser surface. Only the
     // UI_* settings shape the list, and every other setting round-trips here on
     // each change, so the list is redrawn only when one of those moved.
     const LayoutSignature = JSON.stringify(
-      Incoming.filter((S) => S && String(S.Key).startsWith('UI_')).map((S) => [S.Key, S.Value])
+      Incoming.filter(
+        (S) => S && String(S.Key).startsWith('UI_') && S.Key !== GROUP_COLOUR_SATURATION_KEY
+      ).map((S) => [S.Key, S.Value])
     );
     if (LayoutSignature !== RenderedLayoutSignature) {
       RenderedLayoutSignature = LayoutSignature;

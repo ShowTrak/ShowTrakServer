@@ -176,6 +176,18 @@ export const DefaultSettings: SettingDefinition[] = [
     OnUpdateEvent: 'GroupListChanged',
   },
   {
+    Group: 'Layout',
+    Key: 'UI_GROUP_COLOUR_SATURATION',
+    Title: 'Group Colour Saturation',
+    Description: 'How strongly group colours tint their groups. 0% turns the colours off.',
+    Type: 'SLIDER',
+    DefaultValue: 100,
+    Min: 0,
+    // Stronger than the standard tint fights the tiles' status colours.
+    Max: 100,
+    Unit: '%',
+  },
+  {
     Group: 'Features',
     Key: 'SYSTEM_ALLOW_WOL',
     Title: 'Wake on LAN',

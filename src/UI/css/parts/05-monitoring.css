@@ -962,9 +962,15 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 
 /* Optional per-group background tint. A low-strength mix of the palette colour
    keeps it muted enough that tile status colours still read clearly on top.
-   No outline: the tint alone marks the group, as in ShowTrak Portal. */
+   No outline: the tint alone marks the group, as in ShowTrak Portal.
+   --group-tint-scale is the Group Colour Saturation preference (1 = 100%),
+   set on the root by settings.ts. */
 .group-drop-zone.group-tinted {
-  background-color: color-mix(in srgb, var(--group-tint) 9%, transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--group-tint) calc(9% * var(--group-tint-scale, 1)),
+    transparent
+  ) !important;
 }
 
 /* Drag-and-drop visuals */

@@ -182,6 +182,39 @@ test('an unreadable column count falls back to the default', () => {
   }
 });
 
+// --- Group colour saturation -------------------------------------------------
+
+const Saturation = (Value) => [{ Key: 'UI_GROUP_COLOUR_SATURATION', Value }];
+
+test('group colour saturation is a multiplier of the standard tint', () => {
+  assert.equal(Layout.ParseGroupColourScale(Saturation(100)), 1);
+  assert.equal(Layout.ParseGroupColourScale(Saturation(0)), 0);
+  assert.equal(Layout.ParseGroupColourScale(Saturation(25)), 0.25);
+  assert.equal(Layout.ParseGroupColourScale(Saturation('50')), 0.5);
+});
+
+test('group colour saturation is clamped to the slider range', () => {
+  // A bad settings row must not tint a group louder than the standard tint or
+  // produce a negative mix.
+  assert.equal(Layout.ParseGroupColourScale(Saturation(250)), 1);
+  assert.equal(Layout.ParseGroupColourScale(Saturation(-20)), 0);
+});
+
+test('group colour saturation falls back to the standard tint', () => {
+  // Before the preference arrives (or on an older show file), groups keep the
+  // look they always had.
+  for (const Settings of [
+    Saturation('lots'),
+    Saturation(null),
+    Saturation(''),
+    [],
+    null,
+    undefined,
+  ]) {
+    assert.equal(Layout.ParseGroupColourScale(Settings), 1, `settings ${JSON.stringify(Settings)}`);
+  }
+});
+
 // --- Group label ------------------------------------------------------------
 
 test('a long group label is truncated with an ellipsis that fits', () => {

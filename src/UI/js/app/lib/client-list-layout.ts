@@ -135,6 +135,27 @@ export function ParseGroupColumnCount(
   return Math.min(MAX_GROUP_COLUMN_COUNT, Math.max(MIN_GROUP_COLUMN_COUNT, Count));
 }
 
+export const GROUP_COLOUR_SATURATION_KEY = 'UI_GROUP_COLOUR_SATURATION';
+const DEFAULT_GROUP_COLOUR_SATURATION = 100;
+const MAX_GROUP_COLOUR_SATURATION = 100;
+
+/**
+ * How strongly group colours tint their groups, as a multiplier of the standard
+ * tint (1 = 100%, the look every group had before the preference existed).
+ * Clamped to the slider's 0-100% so a bad settings row cannot paint a group
+ * louder than the standard tint; anything unparseable falls back to the standard tint.
+ */
+export function ParseGroupColourScale(Settings: SettingRow[] | null | undefined): number {
+  const Row = Array.isArray(Settings)
+    ? Settings.find((S) => S && S.Key === GROUP_COLOUR_SATURATION_KEY)
+    : null;
+  const Raw = Row ? Row.Value : null;
+  // Number(null) and Number('') are 0, which would read as "colours off".
+  const Percent = Raw === null || Raw === undefined || Raw === '' ? NaN : Number(Raw);
+  if (!Number.isFinite(Percent)) return DEFAULT_GROUP_COLOUR_SATURATION / 100;
+  return Math.min(MAX_GROUP_COLOUR_SATURATION, Math.max(0, Percent)) / 100;
+}
+
 /** Shorten a group title for the vertical group tab. */
 export function TruncateGroupLabel(value: string, maxLen = 16): string {
   const text = value == null ? '' : String(value).trim();

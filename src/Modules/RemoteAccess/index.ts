@@ -287,6 +287,8 @@ const PUBLIC_SETTING_KEYS = new Set<string>([
   'UI_CLEAR_SELECTION_AFTER_ACTION',
   // The browser's execution panel closes on the same dwell as the desktop's.
   'UI_EXECUTION_PANEL_DWELL_SECONDS',
+  // The Web UI tints groups as strongly as the desktop does.
+  'UI_GROUP_COLOUR_SATURATION',
 ]);
 
 /**
