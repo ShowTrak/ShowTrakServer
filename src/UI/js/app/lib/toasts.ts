@@ -464,6 +464,10 @@ export function HideExecutionToast() {
   const $t = $('#EXECUTION_TOAST');
   if ($t.length) {
     $t.removeClass('show');
+    // A console view open inside the panel goes with it (it stops polling once
+    // its element is gone); the panel reopens on the list.
+    $t.removeClass('console-open');
+    $('#EXECUTION_CONSOLE').remove();
     // Remove outside-click handler when closing
     $(document).off('mousedown.execToastOutside touchstart.execToastOutside');
     // keep in DOM for quick reopen; remove after short delay. Tracked so a Show

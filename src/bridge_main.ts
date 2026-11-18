@@ -1,8 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 import type {
   ClientView,
+  ExecutionOutputView,
   GroupView,
   OSCBulkActionType,
+  ResultTuple,
   SettingGroupView,
   SettingView,
   ShowTrakAPI,
@@ -105,6 +107,7 @@ const INVOKE_CHANNEL_LIST = [
   'TriggerIntegratedEvent',
   'Scripts:ClearSettledExecutions',
   'Scripts:RetryExecutions',
+  'Scripts:GetExecutionOutput',
   'UnadoptClient',
   'ReplaceClient',
   'CreateUnassignedClients',
@@ -495,6 +498,10 @@ const API: ShowTrakAPI & ServerRendererAPI = {
   ClearSettledScriptExecutions: async () => invoke('Scripts:ClearSettledExecutions'),
   RetryScriptExecutions: async (RequestIDs: string[]) =>
     invoke('Scripts:RetryExecutions', RequestIDs),
+  GetScriptExecutionOutput: async (RequestID: string, AfterSeq: number) =>
+    invoke('Scripts:GetExecutionOutput', RequestID, AfterSeq) as Promise<
+      ResultTuple<ExecutionOutputView>
+    >,
   UnadoptClient: async (UUID) => invoke('UnadoptClient', UUID),
   ReplaceClient: async (CurrentUUID, ReplacementUUID) =>
     invoke('ReplaceClient', CurrentUUID, ReplacementUUID),

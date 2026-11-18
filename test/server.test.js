@@ -2166,9 +2166,9 @@ test('the server advertises delta support to a client that asks', async () => {
 
   let capabilities = null;
   await H.socket.trigger('GetServerCapabilities', (caps) => (capabilities = caps));
-  // The client treats a missing reply as "no deltas", so this acknowledgement is
-  // the entire opt-in mechanism.
-  assert.deepEqual(capabilities, { Deltas: true });
+  // The client treats a missing reply as "no deltas" (and no console output),
+  // so this acknowledgement is the entire opt-in mechanism for both.
+  assert.deepEqual(capabilities, { Deltas: true, ExecutionOutput: true });
 });
 
 test('delta events reach their ClientManager appliers', async () => {

@@ -336,3 +336,94 @@ test('SetTimeout labels what timed out', async () => {
 
   await DrainAll(Manager);
 });
+
+// --- Console history ----------------------------------------------------------
+
+test('an execution records its lifecycle and streamed output for the console', async () => {
+  const { Manager, SetDispatchHandler } = load(baseMocks());
+  SetDispatchHandler(() => {});
+  const RequestID = await Manager.AddToQueue('uuid-1', 'script-a');
+  await Manager.UpdateProgress(RequestID, 10, 'Preparing');
+  await Manager.UpdateProgress(RequestID, 65, 'Running');
+  assert.equal(
+    Manager.AppendOutput(RequestID, 'uuid-1', [
+      { Stream: 'stdout', Text: 'hello\n' },
+      { Stream: 'stderr', Text: 'careful\n' },
+    ]),
+    true
+  );
+  // The progress tail would duplicate the streamed output, so it is not kept.
+  await Manager.UpdateProgress(RequestID, 65, 'careful');
+  await Manager.Complete(RequestID, null);
+  const View = Manager.GetOutput(RequestID, 0);
+  assert.deepEqual(
+    View.Entries.map((E) => `${E.Kind}:${E.Text.trim()}`),
+    [
+      'stage:Queued',
+      'stage:Sent to client',
+      'stage:Preparing',
+      'stage:Running',
+      'stdout:hello',
+      'stderr:careful',
+      'result:Completed',
+    ]
+  );
+  assert.equal(View.Status, 'Completed');
+  assert.equal(View.HasStreamOutput, true);
+  // The log is not part of what is pushed to the renderers.
+  const { ToPublicScriptExecution } = load(baseMocks());
+  const [Live] = await Manager.GetAllExecutions();
+  assert.equal('Log' in ToPublicScriptExecution(Live), false);
+  await DrainAll(Manager);
+});
+
+test("output is only accepted from the execution's own client while it runs", async () => {
+  const { Manager, SetDispatchHandler } = load(baseMocks());
+  SetDispatchHandler(() => {});
+  const RequestID = await Manager.AddToQueue('uuid-1', 'script-a');
+  const Chunk = [{ Stream: 'stdout', Text: 'x' }];
+  assert.equal(Manager.AppendOutput(RequestID, 'uuid-2', Chunk), false, 'another client');
+  assert.equal(Manager.AppendOutput('no-such-request', 'uuid-1', Chunk), false, 'unknown request');
+  await Manager.Complete(RequestID, null);
+  assert.equal(Manager.AppendOutput(RequestID, 'uuid-1', Chunk), false, 'already settled');
+  assert.equal(Manager.GetOutput(RequestID, 0).HasStreamOutput, false);
+  await DrainAll(Manager);
+  assert.equal(Manager.GetOutput(RequestID, 0), null, 'gone once the row is cleared');
+});
+
+test('an older client still gets a console from its progress lines', async () => {
+  const { Manager, SetDispatchHandler } = load(baseMocks());
+  SetDispatchHandler(() => {});
+  const RequestID = await Manager.AddToQueue('uuid-1', 'script-a');
+  await Manager.UpdateProgress(RequestID, 65, 'Running');
+  await Manager.UpdateProgress(RequestID, 65, 'Copying media 1/3');
+  await Manager.UpdateProgress(RequestID, 65, 'Copying media 2/3');
+  await Manager.Complete(RequestID, 'Disk full');
+  const View = Manager.GetOutput(RequestID, 0);
+  assert.deepEqual(
+    View.Entries.filter((E) => E.Kind !== 'stage').map((E) => [E.Kind, E.Text]),
+    [
+      ['tail', 'Copying media 1/3'],
+      ['tail', 'Copying media 2/3'],
+      ['result', 'Disk full'],
+    ]
+  );
+  assert.equal(View.HasStreamOutput, false);
+  await DrainAll(Manager);
+});
+
+test('a script blocked before dispatch explains why in its console', async () => {
+  const { Manager } = load(
+    baseMocks({
+      '../ClientManager': {
+        Manager: {
+          Get: async (uuid) => [null, { UUID: uuid, OperatingSystem: 'Windows', Online: false }],
+        },
+      },
+    })
+  );
+  const RequestID = await Manager.AddToQueue('uuid-1', 'script-a');
+  const Last = Manager.GetOutput(RequestID, 0).Entries.at(-1);
+  assert.deepEqual([Last.Kind, Last.Text, Last.Error], ['result', 'Client is offline', true]);
+  await DrainAll(Manager);
+});

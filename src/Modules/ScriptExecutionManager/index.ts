@@ -6,6 +6,8 @@ import type { Client } from '../ClientManager/client';
 import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as UUIDManager } from '../UUID';
+import { ExecutionLog } from './output-log';
+import type { ExecutionOutputView, ScriptOutputChunk } from '@showtrak/protocol';
 
 const Logger = CreateLogger('ScriptExecutionManager');
 
@@ -49,6 +51,16 @@ interface ScriptExecution {
   // Handle for the pending timeout watchdog; cleared once the request settles
   // so a completed execution never leaves a live timer dangling.
   TimeoutHandle?: ReturnType<typeof setTimeout> | null;
+  // Console history for the panel's console view. Never part of the public
+  // projection: it is fetched on demand (GetOutput), not pushed with every
+  // update, and it goes away with its row.
+  Log?: ExecutionLog;
+}
+
+// The console log of an execution, created on first use.
+function LogOf(Request: ScriptExecution): ExecutionLog {
+  if (!Request.Log) Request.Log = new ExecutionLog();
+  return Request.Log;
 }
 
 // The renderer-safe projection of an execution. A live ScriptExecution carries a
@@ -187,6 +199,7 @@ function PumpClient(UUID: string | null | undefined): void {
     Next.StatusText = 'Failed';
     Next.Timer.End = Date.now();
     Next.Timer.Duration = 0;
+    LogOf(Next).Result(BlockReason, Next.Timer.End);
     BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
     // This entry is settled and no longer blocks the client; try the next
     // queued script (which is re-validated the same way). Failed/settled entries
@@ -200,6 +213,7 @@ function PumpClient(UUID: string | null | undefined): void {
   // time a script spent waiting in the queue is not counted against it.
   Next.Timer.Start = Date.now();
   Next.StatusText = 'Pending';
+  LogOf(Next).Stage('Sent to client', Next.Timer.Start);
   Manager.SetTimeout(Next.RequestID, Next.Timeout || SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS);
   if (DispatchHandler) {
     DispatchHandler(UUID, Next.RequestID, String(Next.Script ? Next.Script.ID : ''));
@@ -302,6 +316,7 @@ const Manager = {
         Request.Error = Label + ' timed out after ' + Timeout + 'ms';
         Request.Timer.End = Date.now();
         Request.Timer.Duration = Request.Timer.End - Request.Timer.Start;
+        LogOf(Request).Result(Request.Error, Request.Timer.End);
       }
       BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
       // The client is free again; dispatch its next queued script.
@@ -338,6 +353,11 @@ const Manager = {
         ID: TaskName,
         Name: TaskName,
       },
+      Log: (() => {
+        const Log = new ExecutionLog();
+        Log.Stage('Started', Date.now());
+        return Log;
+      })(),
     });
 
     Manager.SetTimeout(RequestID, SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS);
@@ -387,6 +407,7 @@ const Manager = {
       Script: Script,
       Timeout: Timeout,
     };
+    LogOf(Entry).Stage('Queued', Entry.Timer.Start);
     ScriptExecutions.push(Entry);
 
     // An offline or incompatible client can never receive the dispatch, so fail
@@ -401,6 +422,7 @@ const Manager = {
       Entry.Dispatched = true;
       Entry.Timer.End = Date.now();
       Entry.Timer.Duration = 0;
+      LogOf(Entry).Result(DispatchBlockReason, Entry.Timer.End);
       BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
       return RequestID;
     }
@@ -441,9 +463,51 @@ const Manager = {
     }
     if (typeof StatusText === 'string' && StatusText.trim().length > 0) {
       Request.StatusText = StatusText.trim();
+      // Below the Running stage (50) the text names a lifecycle step; from it
+      // on, anything but the word 'Running' is the latest console line.
+      const Text = Request.StatusText;
+      if (Request.Progress < 50 || Text === 'Running') LogOf(Request).Stage(Text, Date.now());
+      else LogOf(Request).Tail(Text, Date.now());
     }
 
     BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
+  },
+
+  // Console output streamed by a client for one of ITS running executions.
+  // Output for another client's request, or for one that has already settled,
+  // is ignored. Returns whether it was recorded.
+  AppendOutput(
+    RequestID: string,
+    FromUUID: string,
+    Chunks: ScriptOutputChunk[],
+    Truncated = false
+  ): boolean {
+    const Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
+    if (!Request || Request.Status !== 'Pending') return false;
+    if (!Request.Client || Request.Client.UUID !== FromUUID) return false;
+    const Log = LogOf(Request);
+    const Now = Date.now();
+    for (const Chunk of Chunks) Log.Output(Chunk.Stream, Chunk.Text, Now);
+    if (Truncated) Log.ClientTruncated = true;
+    return true;
+  },
+
+  // An execution's console history after AfterSeq, or null when the execution
+  // is no longer tracked (cleared from the panel, or replaced by a retry).
+  GetOutput(RequestID: string, AfterSeq = 0): ExecutionOutputView | null {
+    const Request = ScriptExecutions.find((execution) => execution.RequestID === RequestID);
+    if (!Request) return null;
+    const Log = LogOf(Request);
+    const { Entries, LastSeq } = Log.Since(AfterSeq);
+    return {
+      RequestID: Request.RequestID,
+      Status: Request.Status,
+      Entries,
+      LastSeq,
+      Trimmed: Log.Trimmed,
+      HasStreamOutput: Log.HasStreamOutput,
+      ClientTruncated: Log.ClientTruncated,
+    };
   },
 
   // Mark a request as completed or failed; compute duration and broadcast
@@ -460,6 +524,7 @@ const Manager = {
     Request.StatusText = Err ? 'Failed' : 'Completed';
     Request.Timer.End = Date.now();
     Request.Timer.Duration = Request.Timer.End - Request.Timer.Start;
+    LogOf(Request).Result(Request.Error, Request.Timer.End);
     BroadcastManager.emit('ScriptExecutionUpdated', ScriptExecutions);
     // The client is free again; dispatch its next queued script (if any).
     if (!Request.Internal) PumpClient(Request.Client ? Request.Client.UUID : null);

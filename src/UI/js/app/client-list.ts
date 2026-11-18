@@ -54,6 +54,7 @@ import {
   ShouldAutoDismissExecutions,
 } from './lib/execution-panel';
 import { HandleNonFatalError, Safe } from './utils';
+import { IsExecutionConsoleOpen, OpenExecutionConsole } from './execution-console';
 import { RenderMonitoringTargetTile } from './monitoring';
 import { initializeEditInteractions } from './dnd';
 import { AddAlert, DismissAlert, PendingAdoptionAlerts } from './alerts-tray';
@@ -216,6 +217,12 @@ const COMPLETED_SECTION_KEY = '__completed__';
 let LastPanelExecutions: ScriptExecutionView[] = [];
 // RequestIDs of the failures the panel currently offers to retry.
 let RetryableExecutionIDs: string[] = [];
+// Every execution the panel last rendered, by RequestID (for the console view).
+let PanelExecutionsByID = new Map<string, ScriptExecutionView>();
+// The executions push handler and the last list it saw: re-run when a console
+// view closes, so a panel that settled while it was open can now auto-dismiss.
+let ExecutionsHandler: ((All: ScriptExecutionView[]) => Promise<void>) | null = null;
+let LastAllExecutions: ScriptExecutionView[] = [];
 
 // Ask the server to retry these failed executions. The server re-checks what
 // is retryable and replaces each failure's row with the new run.
@@ -296,6 +303,16 @@ function InitClientListPush() {
       const RequestID = this.getAttribute('data-retry-request');
       if (RequestID) void RetryExecutions([RequestID], this as HTMLButtonElement);
     })
+    .on('click.execRetry', '#EXECUTION_TOAST [data-console-request]', function (e) {
+      e.preventDefault();
+      const Execution = PanelExecutionsByID.get(this.getAttribute('data-console-request') || '');
+      if (!Execution) return;
+      // When the view closes, re-evaluate the panel: it may have settled (and
+      // become due to close itself) while the operator was reading.
+      OpenExecutionConsole(Execution, () => {
+        if (ExecutionsHandler) void ExecutionsHandler(LastAllExecutions);
+      });
+    })
     .on('click.execRetry', '#EXECUTION_TOAST [data-retry-all]', function (e) {
       e.preventDefault();
       void RetryExecutions(RetryableExecutionIDs.slice(), this as HTMLButtonElement);
@@ -307,7 +324,8 @@ function InitClientListPush() {
       HandleNonFatalError('ClearSettledScriptExecutions:Dismiss', e)
     );
   });
-  window.API.UpdateScriptExecutions(async (AllExecutions) => {
+  const HandleExecutions = async (AllExecutions: ScriptExecutionView[]) => {
+    LastAllExecutions = AllExecutions || [];
     try {
       UpdateManagerHandleExecutions(AllExecutions || []);
     } catch (e) {
@@ -373,7 +391,9 @@ function InitClientListPush() {
     LastPanelExecutions = nonDeploymentExecutions;
     const shouldAutoDismissNonDeployment = ShouldAutoDismissExecutions(nonDeploymentExecutions);
 
-    if (shouldAutoDismissNonDeployment) {
+    // Never close the panel under an operator who is reading a console; the
+    // view re-runs this check when it closes.
+    if (shouldAutoDismissNonDeployment && !IsExecutionConsoleOpen()) {
       if (!window.__ShowTrakExecutionAutoDismissTimer) {
         window.__ShowTrakExecutionAutoDismissTimer = setTimeout(async () => {
           window.__ShowTrakExecutionAutoDismissTimer = null;
@@ -490,7 +510,8 @@ function InitClientListPush() {
       deploymentSummary.total > 0 &&
       deploymentSummary.finished &&
       deploymentSummary.failed.length === 0 &&
-      nonDeploymentExecutions.length === 0
+      nonDeploymentExecutions.length === 0 &&
+      !IsExecutionConsoleOpen()
     ) {
       if (!window.__ShowTrakDeploymentAutoDismissTimer) {
         window.__ShowTrakDeploymentAutoDismissTimer = setTimeout(() => {
@@ -627,6 +648,12 @@ function InitClientListPush() {
       if (LabelEl && LabelEl.textContent !== Label) LabelEl.textContent = Label;
     }
 
+    PanelExecutionsByID = new Map(
+      renderExecutions.map((Request) => [String(Request.RequestID), Request])
+    );
+    // The execution a console is showing may have been cleared from the list
+    // (a new batch, or replaced by a retry); the console says so itself.
+
     // Completed rows leave the list for the collapsed section at the top.
     const completedCount = CountCompletedExecutions(renderExecutions);
     const completedBody =
@@ -744,6 +771,7 @@ function InitClientListPush() {
             <span class="exec-inline-slot" data-inline></span>
 					</div>
 					<div class="exec-right">
+						<button type="button" class="exec-btn-icon exec-console-btn" data-console-request="${Safe(key)}" title="View console" aria-label="View console for ${Safe(fullClientName)}"><i class="bi bi-terminal"></i></button>
 						<span class="exec-time"></span>
 						<div class="exec-actions">${indicatorHtml}</div>
 					</div>
@@ -808,7 +836,9 @@ function InitClientListPush() {
       if (!desiredKeys.has(Key)) ExecutionRows.delete(Key);
     }
     return;
-  });
+  };
+  ExecutionsHandler = HandleExecutions;
+  window.API.UpdateScriptExecutions(HandleExecutions);
 
   window.API.SetScriptList(async (Scripts) => {
     setScriptList(Scripts);

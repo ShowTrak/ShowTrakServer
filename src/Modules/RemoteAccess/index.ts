@@ -224,6 +224,7 @@ const SCRIPT_CHANNELS = new Set([
   'TriggerIntegratedEvent',
   'Scripts:ClearSettledExecutions',
   'Scripts:RetryExecutions',
+  'Scripts:GetExecutionOutput',
 ]);
 
 // Allowed when the global Wake-on-LAN feature AND the Web UI WOL permission are

@@ -83,6 +83,10 @@ const execMgr = recordingManager({
   ClearSettled: () => undefined,
   GetExecution: (RequestID) => state.executions[RequestID] || null,
   RemoveSettled: (RequestIDs) => RequestIDs.length,
+  GetOutput: (RequestID, AfterSeq) =>
+    state.executions[RequestID]
+      ? { RequestID, Status: 'Pending', Entries: [], LastSeq: AfterSeq, Trimmed: false }
+      : null,
 });
 const whitelistMgr = recordingManager({
   GetScope: () => state.scope,
@@ -195,6 +199,7 @@ test('registers a handler for every scripts channel', () => {
     'TriggerIntegratedEvent',
     'Scripts:ClearSettledExecutions',
     'Scripts:RetryExecutions',
+    'Scripts:GetExecutionOutput',
     'DeleteScripts',
     'UpdateScripts',
     'Scripts:GetManagerList',
@@ -584,6 +589,23 @@ test('Scripts:RetryExecutions ignores ids it does not know', async () => {
     { Retried: 0 },
   ]);
   assert.equal(serverMgr.__callsTo('ExecuteScripts').length, 0);
+});
+
+test('Scripts:GetExecutionOutput returns the history after a Seq, or says it is gone', async () => {
+  const Handler = GetHandler('Scripts:GetExecutionOutput');
+  state.executions = { [RID(1)]: Failed(1, 'uuid-a', { ID: 'my-script' }) };
+  const [Err, View] = await Handler(null, RID(1), 7);
+  assert.equal(Err, null);
+  assert.equal(View.RequestID, RID(1));
+  assert.deepEqual(execMgr.__callsTo('GetOutput')[0].args, [RID(1), 7]);
+  // A junk AfterSeq reads from the start rather than failing.
+  await Handler(null, RID(1), 'junk');
+  assert.deepEqual(execMgr.__callsTo('GetOutput')[1].args, [RID(1), 0]);
+  const [GoneErr, Gone] = await Handler(null, RID(9), 0);
+  assert.equal(typeof GoneErr, 'string');
+  assert.equal(Gone, null);
+  const [BadErr] = await Handler(null, '', 0);
+  assert.equal(typeof BadErr, 'string');
 });
 
 test('DeleteScripts and UpdateScripts validate their target lists', async () => {

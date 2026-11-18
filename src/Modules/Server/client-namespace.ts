@@ -623,9 +623,16 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
      */
     GuardedOn(
       'GetServerCapabilities',
-      (Callback) => [SocketValidation.Ack<{ Deltas: boolean }>(Callback, 'GetServerCapabilities')],
+      (Callback) => [
+        SocketValidation.Ack<{ Deltas: boolean; ExecutionOutput: boolean }>(
+          Callback,
+          'GetServerCapabilities'
+        ),
+      ],
       async (Callback) => {
-        Callback({ Deltas: true });
+        // ExecutionOutput: newer clients stream a running script's console
+        // (ScriptExecutionOutput) only to servers that advertise this.
+        Callback({ Deltas: true, ExecutionOutput: true });
       }
     );
 
@@ -723,6 +730,26 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
         ScriptExecutionManager.Complete(RequestID, Error).catch((err) =>
           Logger.error('Failed to complete script execution:', err)
         );
+      }
+    );
+
+    // A running script's console output (newer clients, only after we have
+    // advertised ExecutionOutput). Recorded against the execution for the
+    // panel's console view; output for a request that is not this client's,
+    // or that has already settled, is dropped by the manager.
+    GuardedOn(
+      'ScriptExecutionOutput',
+      (RequestID, Chunks, Truncated) => [
+        SocketValidation.RequestID(RequestID),
+        ...SocketValidation.ExecutionOutput(Chunks, Truncated),
+      ],
+      (
+        RequestID: string,
+        Chunks: Array<{ Stream: 'stdout' | 'stderr'; Text: string }>,
+        Truncated: boolean
+      ) => {
+        if (!socket.UUID) return;
+        ScriptExecutionManager.AppendOutput(RequestID, socket.UUID, Chunks, Truncated);
       }
     );
 

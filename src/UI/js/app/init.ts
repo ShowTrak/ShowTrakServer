@@ -7,6 +7,7 @@
 // main.ts calls WireGlobalUI() then Init(), after every module's Init*()
 // subscriptions are registered; Loaded() must stay last so the main process
 // pushes initial state only once every subscriber is listening.
+import { CloseExecutionConsole } from './execution-console';
 import { closeModal, openModal } from './lib/modal';
 import {
   Capabilities,
@@ -262,6 +263,8 @@ export async function WireGlobalUI() {
   // Close execution toast on Escape
   $(document).on('keydown.execToast', function (e) {
     if (e.key === 'Escape') {
+      // Escape steps back out of an execution's console before closing the panel.
+      if (CloseExecutionConsole()) return;
       DismissExecutionToast();
     }
   });

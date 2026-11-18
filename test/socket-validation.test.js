@@ -293,3 +293,29 @@ test('Heartbeat stays strict about the payload envelope', () => {
   assert.throws(() => SocketValidation.Heartbeat({ Vitals: 'nope' }), /Vitals must be an object/);
   assert.throws(() => SocketValidation.Heartbeat({ Version: 42 }), /Version must be a string/);
 });
+
+test('ExecutionOutput keeps valid chunks, cuts long text and rejects bad shapes', () => {
+  const [Chunks, Truncated] = SocketValidation.ExecutionOutput(
+    [
+      { Stream: 'stdout', Text: 'hello' },
+      { Stream: 'stderr', Text: 'x'.repeat(40 * 1024), Extra: 'dropped' },
+      { Stream: 'stdout', Text: '' },
+    ],
+    true
+  );
+  assert.deepEqual(
+    Chunks.map((C) => [C.Stream, C.Text.length, Object.keys(C).length]),
+    [
+      ['stdout', 5, 2],
+      ['stderr', 32 * 1024, 2],
+    ]
+  );
+  assert.equal(Truncated, true);
+  assert.equal(SocketValidation.ExecutionOutput([], 'yes')[1], false, 'only a real true counts');
+  assert.throws(() => SocketValidation.ExecutionOutput('text', false));
+  assert.throws(() => SocketValidation.ExecutionOutput([{ Stream: 'stdin', Text: 'a' }], false));
+  assert.throws(() => SocketValidation.ExecutionOutput([{ Stream: 'stdout', Text: 5 }], false));
+  assert.throws(() =>
+    SocketValidation.ExecutionOutput(new Array(300).fill({ Stream: 'stdout', Text: 'a' }), false)
+  );
+});

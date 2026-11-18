@@ -122,6 +122,7 @@ const INVOKE_CHANNELS = [
   'TriggerIntegratedEvent',
   'Scripts:ClearSettledExecutions',
   'Scripts:RetryExecutions',
+  'Scripts:GetExecutionOutput',
   'DeleteScripts',
   'UpdateScripts',
   'Scripts:GetManagerList',

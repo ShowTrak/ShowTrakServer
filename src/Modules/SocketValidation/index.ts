@@ -701,6 +701,30 @@ function RequestID(value: unknown): string {
   return normalizeIdentifier(value, 'RequestID');
 }
 
+// A batch of console output from a running script. Bounded on both axes: the
+// number of chunks and each chunk's text. A chunk that is too long is cut, not
+// rejected, so a script that prints one enormous line still shows its start.
+const MAX_OUTPUT_CHUNKS = 256;
+const MAX_OUTPUT_CHUNK_LENGTH = 32 * 1024;
+function ExecutionOutput(
+  chunks: unknown,
+  truncated: unknown
+): [Array<{ Stream: 'stdout' | 'stderr'; Text: string }>, boolean] {
+  if (!Array.isArray(chunks)) fail('Output chunks must be an array');
+  if (chunks.length > MAX_OUTPUT_CHUNKS) fail(`Too many output chunks (max ${MAX_OUTPUT_CHUNKS})`);
+  const out: Array<{ Stream: 'stdout' | 'stderr'; Text: string }> = [];
+  for (const chunk of chunks) {
+    if (!isPlainObject(chunk)) fail('Output chunk must be an object');
+    const Stream =
+      chunk.Stream === 'stderr' ? 'stderr' : chunk.Stream === 'stdout' ? 'stdout' : null;
+    if (!Stream) fail('Output chunk Stream must be stdout or stderr');
+    if (typeof chunk.Text !== 'string') fail('Output chunk Text must be a string');
+    if (!chunk.Text) continue;
+    out.push({ Stream, Text: chunk.Text.slice(0, MAX_OUTPUT_CHUNK_LENGTH) });
+  }
+  return [out, truncated === true];
+}
+
 function ExecutionError(value: unknown): string | null {
   if (value === null || value === undefined || value === false) return null;
   if (typeof value === 'string') return value.slice(0, 2048);
@@ -759,4 +783,5 @@ export const Manager = {
   RequestID,
   ExecutionError,
   ExecutionProgress,
+  ExecutionOutput,
 };

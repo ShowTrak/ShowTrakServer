@@ -230,6 +230,28 @@ function register(): void {
     return [null, { Retried }];
   });
 
+  // An execution's console history for the panel's console view: the entries
+  // after AfterSeq (0 = everything kept). The view polls this while it is open,
+  // so nothing is pushed for executions nobody is looking at.
+  RPC.handle(
+    'Scripts:GetExecutionOutput',
+    async (_Event: unknown, RequestID: unknown, AfterSeq: unknown) => {
+      let ValidID: string;
+      try {
+        ValidID = IPCValidation.UUID(RequestID, 'RequestID');
+      } catch (error) {
+        return validationErrorTuple(error);
+      }
+      const After = Number(AfterSeq);
+      const Output = ScriptExecutionManager.GetOutput(
+        ValidID,
+        Number.isFinite(After) && After > 0 ? Math.floor(After) : 0
+      );
+      if (!Output) return ['This execution is no longer available.', null];
+      return [null, Output];
+    }
+  );
+
   // Wipe the finished rows from the execution panel. Fired by the renderer when
   // the panel auto-dismisses, so the next batch renders into an empty list
   // instead of stacking on top of the previous run's results. Pending entries

@@ -17,9 +17,11 @@
 // them regardless.
 
 import type {
+  ExecutionOutputView,
   LogConsoleSnapshot,
   MonitorLiveLevelsSnapshot,
   MonitorTileLevelsSnapshot,
+  ResultTuple,
 } from '@showtrak/protocol';
 
 // The surface `window.API` has (see src/UI/types/global.d.ts).
@@ -331,6 +333,10 @@ function createWebApi(socket: WebUiSocket): RendererAPI {
       rpc('TriggerIntegratedEvent', EventID, Targets),
     ClearSettledScriptExecutions: async () => rpc('Scripts:ClearSettledExecutions'),
     RetryScriptExecutions: async (RequestIDs) => rpc('Scripts:RetryExecutions', RequestIDs),
+    GetScriptExecutionOutput: async (RequestID, AfterSeq) =>
+      rpc('Scripts:GetExecutionOutput', RequestID, AfterSeq) as Promise<
+        ResultTuple<ExecutionOutputView>
+      >,
     DeleteScripts: nullTuple,
     UpdateScripts: nullTuple,
     GetScriptManagerList: emptyArray,
