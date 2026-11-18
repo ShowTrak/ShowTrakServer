@@ -92,6 +92,10 @@ let automaticUpdatesEnabled = false;
 let updateChannel: UpdateChannel = 'stable';
 // The Squirrel feed the current check uses (RELEASES is read from it too).
 let activeSquirrelFeed = SQUIRREL_FEED_URL;
+// The GitHub tag of the beta channel's release, when this check uses one. The
+// Squirrel package rewrites a pre-release version ("3.32.0-beta1"), so the
+// tag cannot be rebuilt from it to fetch the release notes.
+let activeSquirrelTag: string | null = null;
 // Whether electron-updater was pointed at a specific release by the beta
 // channel, so a later stable check knows to point it back at GitHub.
 let usingChannelFeed = false;
@@ -409,7 +413,7 @@ async function trackSquirrelDownload(session: number) {
   let releaseNotes: string | undefined;
   try {
     const release = JSON.parse(
-      await fetchText(`${GITHUB_RELEASE_BY_TAG_API}v${version}`, {
+      await fetchText(`${GITHUB_RELEASE_BY_TAG_API}${activeSquirrelTag || `v${version}`}`, {
         Accept: 'application/vnd.github+json',
         'User-Agent': 'ShowTrakServer',
       })
@@ -505,6 +509,7 @@ async function handleCheck() {
       squirrelReleaseInfo = null;
       const ChannelFeed = await resolveChannelFeed();
       activeSquirrelFeed = ChannelFeed ? ChannelFeed.FeedURL : SQUIRREL_FEED_URL;
+      activeSquirrelTag = ChannelFeed ? ChannelFeed.Tag : null;
       // Try both object and string forms for compatibility
       try {
         SquirrelUpdater.setFeedURL({ url: activeSquirrelFeed });

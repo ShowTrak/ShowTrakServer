@@ -465,7 +465,7 @@ jobs:
           # commit itself -- "Release 3.16.1" says nothing in the changelog of
           # release 3.16.1.
           CHANGES=$(git log --no-merges --pretty=format:'- %s' "$RANGE" \
-            | grep -vE '^- Release [0-9]+\.[0-9]+\.[0-9]+$' \
+            | grep -vE '^- Release [0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' \
             || true)
 
           {
@@ -496,6 +496,12 @@ jobs:
         run: |
           TITLE="v${RELEASE_VERSION} - ${RELEASE_PRODUCT_NAME}"
 
+          # A version with a pre-release part (3.32.0-beta.1) is a GitHub
+          # pre-release: only Beta update channels and deliberate deploys pick
+          # it up, never GitHub's "latest" (which every stable install follows).
+          PRERELEASE_FLAG=""
+          case "$RELEASE_VERSION" in *-*) PRERELEASE_FLAG="--prerelease" ;; esac
+
           # A NEW release is always created as a draft, whatever the mode: the
           # assets upload in the next step, and a release published before them
           # is a release people can download with nothing in it.
@@ -506,17 +512,17 @@ jobs:
           if gh release view "$RELEASE_TAG" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
             IS_DRAFT=$(gh release view "$RELEASE_TAG" --repo "$RELEASE_REPO" --json isDraft -q .isDraft)
             if [ "$IS_DRAFT" = "true" ]; then
-              gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft --title "$TITLE" --notes-file release-notes.md
+              gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft $PRERELEASE_FLAG --title "$TITLE" --notes-file release-notes.md
             else
               echo "Release ${RELEASE_TAG} is already published; updating it in place."
               gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --title "$TITLE" --notes-file release-notes.md
             fi
           else
             if git ls-remote --exit-code --tags "https://github.com/${RELEASE_REPO}" "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
-              gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --verify-tag --draft --title "$TITLE" --notes-file release-notes.md
+              gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --verify-tag --draft $PRERELEASE_FLAG --title "$TITLE" --notes-file release-notes.md
             else
               echo "Tag ${RELEASE_TAG} does not exist yet; creating it from current commit via release creation."
-              gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft --title "$TITLE" --notes-file release-notes.md
+              gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft $PRERELEASE_FLAG --title "$TITLE" --notes-file release-notes.md
             fi
           fi
 
@@ -570,5 +576,9 @@ jobs:
       - name: Publish release
         if: ${{ env.RELEASE_MODE == 'publish' }}
         run: |
-          gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft=false --latest
+          # A pre-release is published as one and is never made "latest".
+          case "$RELEASE_VERSION" in
+            *-*) gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft=false --prerelease --latest=false ;;
+            *) gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft=false --latest ;;
+          esac
           echo "Published https://github.com/${RELEASE_REPO}/releases/tag/${RELEASE_TAG}"
