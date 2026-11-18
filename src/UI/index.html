@@ -1017,8 +1017,19 @@ Loading licence...</pre>
                 <label class="form-label text-sm mb-0" for="UPDATE_MANAGER_RELEASE_SELECT">
                   Release
                 </label>
-                <span id="UPDATE_MANAGER_RELEASE_BADGE" class="badge UPDATE_MANAGER_RELEASE_BADGE">
-                  Not downloaded
+                <span class="d-flex gap-1 align-items-center">
+                  <span
+                    id="UPDATE_MANAGER_PRERELEASE_FLAG"
+                    class="badge bg-warning text-dark d-none"
+                  >
+                    Pre-release
+                  </span>
+                  <span
+                    id="UPDATE_MANAGER_RELEASE_BADGE"
+                    class="badge UPDATE_MANAGER_RELEASE_BADGE"
+                  >
+                    Not downloaded
+                  </span>
                 </span>
               </div>
               <select class="form-select" id="UPDATE_MANAGER_RELEASE_SELECT"></select>

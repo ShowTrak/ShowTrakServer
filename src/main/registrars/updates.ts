@@ -10,6 +10,15 @@ import { getMainWindow, hasMainWindow } from '../app-window';
 import { normalizeVersionToken } from '../local-scripts';
 import { Manager as AppUpdater } from '../app-updater';
 import { Manager as UpdateManager } from '../../Modules/UpdateManager';
+import { Manager as SettingsManager } from '../../Modules/SettingsManager';
+import { NormalizeUpdateChannel, type UpdateChannel } from '@showtrak/protocol/runtime';
+
+// The server's update channel (SYSTEM_UPDATE_CHANNEL). It also governs client
+// deployment: pre-release client builds can only be downloaded and deployed
+// from a server on the beta channel.
+async function CurrentUpdateChannel(): Promise<UpdateChannel> {
+  return NormalizeUpdateChannel(await SettingsManager.GetValue('SYSTEM_UPDATE_CHANNEL'));
+}
 import { Manager as ClientManager } from '../../Modules/ClientManager';
 import { Manager as ServerManager } from '../../Modules/Server';
 import { Manager as IPCValidation } from '../../Modules/IPCValidation';
@@ -54,7 +63,7 @@ function register(): void {
   RPC.handle('UpdateManager:GetStatus', async () => {
     try {
       const Status = await UpdateManager.GetStatus();
-      return [null, Status];
+      return [null, { ...Status, Channel: await CurrentUpdateChannel() }];
     } catch (error) {
       return validationErrorTuple(error);
     }
@@ -62,7 +71,7 @@ function register(): void {
 
   RPC.handle('UpdateManager:GetReleases', async () => {
     try {
-      const Releases = await UpdateManager.ListReleases();
+      const Releases = await UpdateManager.ListReleases(await CurrentUpdateChannel());
       return [null, Releases];
     } catch (error) {
       return validationErrorTuple(error);
@@ -72,6 +81,7 @@ function register(): void {
   RPC.handle('UpdateManager:DownloadRelease', async (_Event: unknown, Tag: unknown) => {
     try {
       const Release = await UpdateManager.DownloadRelease(Tag, {
+        Channel: await CurrentUpdateChannel(),
         onProgress: (Progress: unknown) => {
           try {
             if (hasMainWindow()) {
@@ -85,17 +95,45 @@ function register(): void {
 
       return [null, Release];
     } catch (error) {
+      // Progress may already have gone out ("preparing", partial download): a
+      // terminal phase tells every open window the download is over, so none
+      // is left showing a run that will never finish.
+      try {
+        if (hasMainWindow()) {
+          PushToRenderers('UpdateManager:DownloadProgress', {
+            percent: 0,
+            phase: 'error',
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      } catch {
+        /* intentional: best-effort, like the progress pushes above */
+      }
       return validationErrorTuple(error);
     }
   });
 
   RPC.handle(
     'UpdateManager:DeployRelease',
-    async (_Event: unknown, Tag: unknown, Targets: unknown) => {
+    async (_Event: unknown, Tag: unknown, Targets: unknown, ConfirmPrerelease: unknown) => {
       try {
         const Status = await UpdateManager.GetStatus();
         if (!Status || !Status.Ready || !Status.ReleaseVersion) {
           return ['Download a release build before deploying', null];
+        }
+        // A pre-release build reaches clients only from a server on the beta
+        // channel, and only once the operator has confirmed it. Enforced here,
+        // not just in the dialog, so no other path can skip either check.
+        if (Status.Prerelease) {
+          if ((await CurrentUpdateChannel()) !== 'beta') {
+            return [
+              'Pre-release builds can only be deployed when the server is on the Beta update channel',
+              null,
+            ];
+          }
+          if (ConfirmPrerelease !== true) {
+            return ['Deploying a pre-release build needs confirmation', null];
+          }
         }
 
         const SelectedTag = String(Tag || '').trim();
@@ -155,7 +193,12 @@ function register(): void {
               EntityType: 'client',
               EntityID: Client.UUID,
               EntityName: ClientDisplayName(Client),
-              Summary: Line('Deployed client software ', Value(SelectedTag)),
+              Summary: Line(
+                Status.Prerelease
+                  ? 'Deployed pre-release client software '
+                  : 'Deployed client software ',
+                Value(SelectedTag)
+              ),
               Details: Client.Version ? [`Was ${Client.Version}`] : [],
             });
           }

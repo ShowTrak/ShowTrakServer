@@ -91,6 +91,18 @@ export const DefaultSettings: SettingDefinition[] = [
   },
   {
     Group: 'Machine',
+    Key: 'SYSTEM_UPDATE_CHANNEL',
+    Title: 'Update Channel',
+    Description:
+      'Beta also offers pre-releases, always moving to the newest release of any kind. It also allows pre-release client builds to be deployed. Switching back to Stable keeps the installed version until a newer stable release is out.',
+    Type: 'OPTION',
+    DefaultValue: 'Stable',
+    Options: ['Stable', 'Beta'],
+    OnUpdateEvent: 'AutoUpdateSettingsChanged',
+    Scope: 'INSTALL',
+  },
+  {
+    Group: 'Machine',
     Key: 'SYSTEM_AUTOSAVE_ENABLED',
     Title: 'Enable Autosave',
     Description: '',

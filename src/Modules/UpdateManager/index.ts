@@ -5,6 +5,14 @@ import https from 'https';
 import { URL } from 'url';
 
 import { CreateLogger } from '../Logger';
+import {
+  ChannelAllowsRelease,
+  CompareVersions,
+  IsPrereleaseRelease,
+  IsPrereleaseVersion,
+  PickChannelRelease,
+  type UpdateChannel,
+} from '@showtrak/protocol/runtime';
 import { Manager as AppDataManager } from '../AppData';
 
 const Logger = CreateLogger('UpdateManager');
@@ -33,6 +41,9 @@ interface UpdateManifestAsset {
 }
 interface UpdateManifest {
   version?: string;
+  // Whether the cached build is a pre-release (absent in manifests written
+  // before channels existed, which could only be full releases).
+  prerelease?: boolean;
   releasedAt?: string | null;
   downloadedAt?: string | null;
   assets: UpdateManifestAsset[];
@@ -44,6 +55,8 @@ interface ReleaseOption {
   name: string;
   publishedAt: string | null;
   prerelease: boolean;
+  // Whether the server's update channel allows this release.
+  selectable: boolean;
 }
 
 // The public projection of a cached asset (served over the LAN feed).
@@ -60,6 +73,7 @@ interface UpdateStatus {
   DownloadedAt: string | null;
   Assets: PublicUpdateAsset[];
   FeedPath: string;
+  Prerelease: boolean;
 }
 
 interface DownloadProgress {
@@ -69,6 +83,9 @@ interface DownloadProgress {
 }
 interface DownloadOptions {
   onProgress?: (progress: DownloadProgress) => void;
+  // The server's update channel: decides which release "latest" means and
+  // whether a pre-release may be downloaded at all. Defaults to stable.
+  Channel?: UpdateChannel;
 }
 interface DownloadResult {
   ReleaseVersion: string;
@@ -94,7 +111,7 @@ interface ExpressLike {
 
 interface UpdateManagerType {
   GetPublicFeedURLPath(): string;
-  ListReleases(): Promise<ReleaseOption[]>;
+  ListReleases(Channel?: UpdateChannel): Promise<ReleaseOption[]>;
   GetStatus(): Promise<UpdateStatus>;
   DownloadRelease(Tag?: unknown, Options?: DownloadOptions): Promise<DownloadResult>;
   DownloadLatestRelease(Options?: DownloadOptions): Promise<DownloadResult>;
@@ -339,18 +356,20 @@ function buildPublicAssetList(manifest: UpdateManifest | null): PublicUpdateAsse
 
 Manager.GetPublicFeedURLPath = () => `${PUBLIC_BASE_PATH}/`;
 
-function normalizeReleaseOption(release: GithubRelease): ReleaseOption {
+function normalizeReleaseOption(release: GithubRelease, channel: UpdateChannel): ReleaseOption {
   return {
     tag: String(release && release.tag_name ? release.tag_name : '').trim(),
     name: String(release && release.name ? release.name : '').trim(),
     publishedAt: release && release.published_at ? release.published_at : null,
-    prerelease: !!(release && release.prerelease),
+    prerelease: IsPrereleaseRelease(release),
+    selectable: ChannelAllowsRelease(channel, release),
   };
 }
 
 function parseSemverTag(tag: unknown): number[] | null {
   const value = String(tag || '').trim();
-  const match = value.match(/^v?(\d+)\.(\d+)\.(\d+)$/i);
+  // A pre-release suffix ("-beta.1") is allowed; only the core is compared.
+  const match = value.match(/^v?(\d+)\.(\d+)\.(\d+)(?:-[0-9a-z.-]+)?$/i);
   if (!match) return null;
   return [Number(match[1]), Number(match[2]), Number(match[3])];
 }
@@ -367,7 +386,11 @@ function isAtLeastMinimumRelease(tag: unknown): boolean {
   return true;
 }
 
-Manager.ListReleases = async () => {
+// Every listable release, newest version first, each marked with whether the
+// server's channel allows it (pre-releases are listed but only selectable on
+// beta, so an operator on stable can see one exists without being able to
+// deploy it).
+Manager.ListReleases = async (Channel: UpdateChannel = 'stable') => {
   const releases = await requestJson(GITHUB_RELEASES_API);
   if (!Array.isArray(releases)) return [];
 
@@ -376,13 +399,23 @@ Manager.ListReleases = async () => {
       (release: GithubRelease) =>
         release && !release.draft && release.tag_name && isAtLeastMinimumRelease(release.tag_name)
     )
-    .map((release: GithubRelease) => normalizeReleaseOption(release));
+    .sort((a: GithubRelease, b: GithubRelease) => CompareVersions(b.tag_name, a.tag_name))
+    .map((release: GithubRelease) => normalizeReleaseOption(release, Channel));
 };
 
-async function getReleaseByTag(tag: unknown): Promise<unknown> {
+// A release by tag, or the channel's newest when no tag is given: GitHub's
+// "latest" release on stable, the highest version of any kind on beta.
+async function getReleaseByTag(tag: unknown, channel: UpdateChannel): Promise<unknown> {
   const safeTag = String(tag || '').trim();
-  if (!safeTag) return requestJson(GITHUB_RELEASE_API);
-  return requestJson(`${GITHUB_RELEASE_BY_TAG_API}${encodeURIComponent(safeTag)}`);
+  if (safeTag) return requestJson(`${GITHUB_RELEASE_BY_TAG_API}${encodeURIComponent(safeTag)}`);
+  if (channel !== 'beta') return requestJson(GITHUB_RELEASE_API);
+  const releases = await requestJson(GITHUB_RELEASES_API);
+  const picked = PickChannelRelease(
+    Array.isArray(releases) ? (releases as GithubRelease[]) : [],
+    'beta'
+  );
+  if (!picked) throw new Error('No ShowTrak Client release is available');
+  return picked;
 }
 
 Manager.GetStatus = async () => {
@@ -396,6 +429,7 @@ Manager.GetStatus = async () => {
       DownloadedAt: null,
       Assets: [],
       FeedPath: Manager.GetPublicFeedURLPath(),
+      Prerelease: false,
     };
   }
 
@@ -406,6 +440,7 @@ Manager.GetStatus = async () => {
     DownloadedAt: manifest.downloadedAt || null,
     Assets: buildPublicAssetList(manifest),
     FeedPath: Manager.GetPublicFeedURLPath(),
+    Prerelease: manifest.prerelease === true || IsPrereleaseVersion(manifest.version),
   };
 };
 
@@ -429,7 +464,14 @@ Manager.DownloadRelease = async (Tag: unknown = null, Options: DownloadOptions =
 
   pushProgress(0, 'preparing', 'Checking release metadata...');
 
-  const release = (await getReleaseByTag(Tag)) as GithubRelease;
+  const Channel: UpdateChannel = Options && Options.Channel === 'beta' ? 'beta' : 'stable';
+  const release = (await getReleaseByTag(Tag, Channel)) as GithubRelease;
+  // Pre-release builds only reach clients from a server on the beta channel.
+  if (Channel !== 'beta' && IsPrereleaseRelease(release)) {
+    throw new Error(
+      'Pre-release builds can only be downloaded when the server is on the Beta update channel'
+    );
+  }
   const version = String(release.tag_name || release.name || '').trim();
   const assets: GithubAsset[] = Array.isArray(release.assets) ? release.assets : [];
 
@@ -515,6 +557,7 @@ Manager.DownloadRelease = async (Tag: unknown = null, Options: DownloadOptions =
 
   const manifest = {
     version,
+    prerelease: IsPrereleaseRelease(release),
     releasedAt: release.published_at || null,
     downloadedAt: new Date().toISOString(),
     assets: downloadedAssets,

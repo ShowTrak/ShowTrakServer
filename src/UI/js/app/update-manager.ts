@@ -6,7 +6,13 @@
 // closeAllModals()+Wait so this module has no back-reference into modals.
 import { closeAllModals, openModal } from './lib/modal';
 import { ErrorMessage, Safe } from './utils';
-import { Notify, Wait } from './selection-init';
+import { CriticalConfirmationDialog, Notify, Wait } from './selection-init';
+import {
+  GetReleaseOptionLabel,
+  IsPrereleaseTag,
+  IsReleaseOptionSelectable,
+  PickDefaultReleaseTag,
+} from './lib/update-release-options';
 import {
   FormatClientVersionLabel,
   UpdateManagerClientProgress,
@@ -68,7 +74,8 @@ export function NormalizeVersionToken(value: unknown) {
 export function ParseSemverTuple(value: unknown) {
   const match = String(value || '')
     .trim()
-    .match(/^v?(\d+)\.(\d+)\.(\d+)$/i);
+    // A pre-release suffix ("-beta.1") is allowed; only the core is compared.
+    .match(/^v?(\d+)\.(\d+)\.(\d+)(?:-[0-9a-z.-]+)?$/i);
   if (!match) return null;
   return [Number(match[1]), Number(match[2]), Number(match[3])];
 }
@@ -82,7 +89,8 @@ export function IsVersionAtLeast(value: unknown, minimumTuple: number[]) {
     if (current > minimum) return true;
     if (current < minimum) return false;
   }
-  return true;
+  // Exactly the minimum: a pre-release of it (3.4.0-rc1) came before it.
+  return !/-/.test(String(value || '').trim());
 }
 
 export const MINIMUM_REMOTE_UPDATE_VERSION = [3, 4, 0];
@@ -182,7 +190,17 @@ export function RenderUpdateManagerReleaseBadge() {
     .removeClass('DOWNLOADED NOT_DOWNLOADED')
     .addClass(isDownloaded ? 'DOWNLOADED' : 'NOT_DOWNLOADED')
     .text(isDownloaded ? 'Downloaded' : 'Not downloaded');
+
+  // Flag a pre-release selection, so nobody deploys one without noticing.
+  const options = Array.isArray(UpdateManagerReleaseOptions) ? UpdateManagerReleaseOptions : [];
+  $('#UPDATE_MANAGER_PRERELEASE_FLAG').toggleClass(
+    'd-none',
+    !(selectedTag && IsPrereleaseTag(options, selectedTag))
+  );
 }
+
+// The update channel the release picker was last drawn for.
+let PickerChannel: string | null = null;
 
 export function RenderUpdateManagerReleaseOptions() {
   const $select = $('#UPDATE_MANAGER_RELEASE_SELECT');
@@ -194,19 +212,31 @@ export function RenderUpdateManagerReleaseOptions() {
       ? String(UpdateManagerReleaseStatus.ReleaseVersion)
       : '';
 
+  // Pre-releases are listed either way, but on the Stable channel they are
+  // disabled: the server would refuse them (see UpdateManager:DeployRelease).
   let html = '';
   for (const item of options) {
     const tag = String(item && item.tag ? item.tag : '').trim();
     if (!tag) continue;
-    const name = String(item && item.name ? item.name : tag).trim();
-    const isDownloaded = downloadedTag && downloadedTag === tag;
-    html += `<option value="${Safe(tag)}">${Safe(name)}${isDownloaded ? ' (downloaded)' : ''}</option>`;
+    const disabled = IsReleaseOptionSelectable(item) ? '' : ' disabled';
+    html += `<option value="${Safe(tag)}"${disabled}>${Safe(GetReleaseOptionLabel(item, downloadedTag))}</option>`;
   }
 
   $select.html(html);
 
-  const targetTag =
-    UpdateManagerSelectedReleaseTag || downloadedTag || (options[0] && options[0].tag) || '';
+  // After a channel switch the earlier selection (and download) no longer
+  // reflect the operator's intent: default to the new channel's newest release.
+  const channel =
+    UpdateManagerReleaseStatus && UpdateManagerReleaseStatus.Channel
+      ? UpdateManagerReleaseStatus.Channel
+      : 'stable';
+  const channelChanged = PickerChannel !== null && PickerChannel !== channel;
+  PickerChannel = channel;
+  const targetTag = PickDefaultReleaseTag(
+    options,
+    channelChanged ? '' : UpdateManagerSelectedReleaseTag || '',
+    channelChanged ? '' : downloadedTag
+  );
   if (targetTag) {
     $select.val(targetTag);
     setUpdateManagerSelectedReleaseTag(String($select.val() || targetTag));
@@ -662,12 +692,42 @@ export async function RunUpdateManagerDeployAll() {
     return;
   }
 
+  // A pre-release build needs an explicit confirmation (the server also
+  // refuses one without it, and refuses it outright on the Stable channel).
+  const options = Array.isArray(UpdateManagerReleaseOptions) ? UpdateManagerReleaseOptions : [];
+  const IsPrerelease =
+    IsPrereleaseTag(options, selectedTag) ||
+    !!(
+      UpdateManagerReleaseStatus &&
+      UpdateManagerReleaseStatus.Prerelease &&
+      String(UpdateManagerReleaseStatus.ReleaseVersion) === selectedTag
+    );
+  if (IsPrerelease) {
+    const Plural = SelectedTargets.length === 1 ? '' : 's';
+    const Confirmed = await CriticalConfirmationDialog({
+      title: 'Deploy a pre-release?',
+      message: `${selectedTag} is a pre-release build of ShowTrak Client. It has not had the testing a full release gets. Deploy it to ${SelectedTargets.length} client${Plural}?`,
+      items: SelectedTargets.map((UUID) => {
+        const Client = (Array.isArray(__LastClients) ? __LastClients : []).find(
+          (Entry: ClientView) => Entry.UUID === UUID
+        );
+        return (Client && (Client.Nickname || Client.Hostname)) || UUID;
+      }),
+      confirmLabel: 'Deploy Pre-release',
+    });
+    if (!Confirmed) return;
+  }
+
   setUpdateManagerRunning(true);
   ApplyUpdateManagerButtonLocks();
   $('#UPDATE_MANAGER_STATUS').text(`Deploying ${selectedTag} to online clients...`);
 
   try {
-    const [Err, Result] = await window.API.DeployUpdateManagerRelease(selectedTag, SelectedTargets);
+    const [Err, Result] = await window.API.DeployUpdateManagerRelease(
+      selectedTag,
+      SelectedTargets,
+      IsPrerelease
+    );
     if (Err || !Result) {
       await Notify(String(Err), 'error');
       $('#UPDATE_MANAGER_STATUS').text(String(Err));

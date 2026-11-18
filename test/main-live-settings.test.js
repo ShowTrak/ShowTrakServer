@@ -49,6 +49,7 @@ const settingsMgr = recordingManager({
     if (key === 'ALERT_SOUND_DEDUPE_WINDOW_MS') return state.alertAudioDedupeMs;
     if (key === 'SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4') return state.confirmShutdown;
     if (key === 'SYSTEM_AUTO_UPDATE_ENABLED') return state.autoUpdate;
+    if (key === 'SYSTEM_UPDATE_CHANNEL') return state.updateChannel;
     return null;
   },
 });
@@ -73,6 +74,7 @@ const failureThresholds = [];
 const audioDedupeWindows = [];
 const shutdownProtection = [];
 const automaticUpdates = [];
+const updateChannels = [];
 
 const restore = installModuleMocks([
   { match: matchesModule('electron/main'), value: {} },
@@ -119,7 +121,12 @@ const restore = installModuleMocks([
   },
   {
     match: matchesModule('./app-updater'),
-    value: { Manager: { SetAutomaticUpdates: (v) => automaticUpdates.push(v) } },
+    value: {
+      Manager: {
+        SetAutomaticUpdates: (v) => automaticUpdates.push(v),
+        SetUpdateChannel: (v) => updateChannels.push(v),
+      },
+    },
   },
 ]);
 test.after(() => restore());
@@ -349,4 +356,15 @@ test('one failing subscriber does not stop the others from applying later', asyn
   state.monitoringIntervalMs = 3000;
   await emit('MonitoringSettingsChanged');
   assert.deepEqual(intervals.monitoring, [3000]);
+});
+
+test('the update channel reaches the updater at boot and whenever it changes', async () => {
+  state.updateChannel = 'Stable';
+  updateChannels.length = 0;
+  await initLiveSettings();
+  assert.deepEqual(updateChannels, ['Stable']);
+  updateChannels.length = 0;
+  state.updateChannel = 'Beta';
+  await emit('AutoUpdateSettingsChanged');
+  assert.deepEqual(updateChannels, ['Beta']);
 });

@@ -87,6 +87,7 @@ function StartKeepAwake(): void {
 // Background check-and-download of app updates; installs on the next restart.
 async function ApplyAutomaticUpdates(): Promise<void> {
   const Enabled = await SettingsManager.GetValue('SYSTEM_AUTO_UPDATE_ENABLED');
+  AppUpdater.SetUpdateChannel(await SettingsManager.GetValue('SYSTEM_UPDATE_CHANNEL'));
   AppUpdater.SetAutomaticUpdates(!!Enabled);
 }
 

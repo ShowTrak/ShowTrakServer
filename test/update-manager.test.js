@@ -166,6 +166,7 @@ test('GetStatus reports not-ready with no manifest at all', async () => {
     DownloadedAt: null,
     Assets: [],
     FeedPath: '/updates/client/latest/',
+    Prerelease: false,
   });
 });
 
@@ -282,6 +283,7 @@ test('ListReleases normalizes each release to the option shape', async () => {
       name: 'Release 3.14.0',
       publishedAt: '2026-07-01T00:00:00Z',
       prerelease: false,
+      selectable: true,
     },
   ]);
 });
@@ -311,21 +313,29 @@ test('ListReleases drops drafts, tagless entries and builds below the minimum', 
   );
 });
 
-test('ListReleases keeps prereleases but flags them', async () => {
+test('ListReleases keeps pre-releases, flags them and sorts newest version first', async () => {
   routes.set(RELEASES_URL, {
     statusCode: 200,
     body: JSON.stringify([
-      { tag_name: 'v3.15.0-beta.1' },
-      { tag_name: 'v3.15.0', prerelease: true },
+      { tag_name: 'v3.14.0' },
+      { tag_name: 'v3.15.0-beta.1' }, // a pre-release by its version
+      { tag_name: 'v3.15.0-beta.2', prerelease: true },
+      { tag_name: 'v3.14.1', prerelease: true }, // a pre-release by GitHub's flag
     ]),
   });
-  const Releases = await UpdateManager.ListReleases();
-  // The -beta.1 suffix is not a bare triple, so it does not survive the filter.
+  const Stable = await UpdateManager.ListReleases();
   assert.deepEqual(
-    Releases.map((R) => R.tag),
-    ['v3.15.0']
+    Stable.map((R) => [R.tag, R.prerelease, R.selectable]),
+    [
+      ['v3.15.0-beta.2', true, false],
+      ['v3.15.0-beta.1', true, false],
+      ['v3.14.1', true, false],
+      ['v3.14.0', false, true],
+    ]
   );
-  assert.equal(Releases[0].prerelease, true);
+  // On the beta channel every release can be chosen.
+  const Beta = await UpdateManager.ListReleases('beta');
+  assert.ok(Beta.every((R) => R.selectable));
 });
 
 test('ListReleases returns [] when GitHub does not return an array', async () => {
@@ -702,4 +712,60 @@ test('the file route serves nothing at all when there is no manifest', () => {
   const Res = fakeRes();
   Routes.file({ params: { fileName: 'client.exe' } }, Res);
   assert.equal(Res.statusCode, 404);
+});
+
+// --- Update channels --------------------------------------------------------
+
+test('DownloadRelease refuses a pre-release on the stable channel', async () => {
+  routes.set(`${BY_TAG_URL}v3.15.0-beta.1`, {
+    statusCode: 200,
+    body: JSON.stringify({
+      tag_name: 'v3.15.0-beta.1',
+      prerelease: true,
+      assets: [asset('c.exe')],
+    }),
+  });
+  await assert.rejects(
+    () => UpdateManager.DownloadRelease('v3.15.0-beta.1'),
+    /Beta update channel/
+  );
+  assert.equal(fs.existsSync(ManifestPath), false, 'nothing was cached');
+});
+
+test('on beta a pre-release downloads and is remembered as one', async () => {
+  routes.set(`${BY_TAG_URL}v3.15.0-beta.1`, {
+    statusCode: 200,
+    body: JSON.stringify({
+      tag_name: 'v3.15.0-beta.1',
+      prerelease: true,
+      assets: [asset('c.exe')],
+    }),
+  });
+  await UpdateManager.DownloadRelease('v3.15.0-beta.1', { Channel: 'beta' });
+  const Status = await UpdateManager.GetStatus();
+  assert.equal(Status.ReleaseVersion, 'v3.15.0-beta.1');
+  assert.equal(Status.Prerelease, true);
+});
+
+test('a full release is cached as one', async () => {
+  routes.set(LATEST_URL, {
+    statusCode: 200,
+    body: JSON.stringify({ tag_name: 'v3.14.0', assets: [asset('c.exe')] }),
+  });
+  await UpdateManager.DownloadRelease(null, { Channel: 'stable' });
+  assert.equal((await UpdateManager.GetStatus()).Prerelease, false);
+});
+
+test('with no tag, beta downloads the newest release of any kind', async () => {
+  routes.set(RELEASES_URL, {
+    statusCode: 200,
+    body: JSON.stringify([
+      { tag_name: 'v3.14.0', assets: [asset('a.exe')] },
+      { tag_name: 'v3.15.0-beta.2', prerelease: true, assets: [asset('b.exe')] },
+      { tag_name: 'v3.16.0', draft: true, assets: [asset('c.exe')] },
+    ]),
+  });
+  const Result = await UpdateManager.DownloadRelease(null, { Channel: 'beta' });
+  assert.equal(Result.ReleaseVersion, 'v3.15.0-beta.2');
+  assert.equal(requested.includes(LATEST_URL), false, 'stable "latest" is not consulted');
 });

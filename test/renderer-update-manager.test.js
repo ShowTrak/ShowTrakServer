@@ -56,23 +56,16 @@ test('only a strict three-part semver parses', () => {
   assert.deepEqual(ParseSemverTuple('3.14.0'), [3, 14, 0]);
   assert.deepEqual(ParseSemverTuple('v3.14.0'), [3, 14, 0], 'the v prefix is tolerated');
   assert.deepEqual(ParseSemverTuple(' 10.2.33 '), [10, 2, 33]);
+  // A client on a pre-release is still a known version: its core is what the
+  // remote-update minimum is compared against.
+  assert.deepEqual(ParseSemverTuple('3.14.0-beta'), [3, 14, 0]);
+  assert.deepEqual(ParseSemverTuple('v3.32.0-beta.1'), [3, 32, 0]);
 });
 
 test('anything that is not a plain semver fails to parse rather than guessing', () => {
   // Guessing here would be worse than refusing: a client whose version cannot be
   // established must not be treated as new enough to update remotely.
-  for (const Value of [
-    '3.14',
-    '3',
-    '3.14.0.1',
-    '3.14.0-beta',
-    'v3.14.0-rc1',
-    'latest',
-    '',
-    null,
-    undefined,
-    {},
-  ]) {
+  for (const Value of ['3.14', '3', '3.14.0.1', 'latest', '', null, undefined, {}]) {
     assert.equal(ParseSemverTuple(Value), null, `value ${JSON.stringify(Value)} parsed`);
   }
 });

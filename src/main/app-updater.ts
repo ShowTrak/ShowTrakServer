@@ -16,6 +16,11 @@ const { spawnSync } = require('child_process');
 import type { BrowserWindow } from 'electron';
 import type { AppUpdater } from 'electron-updater';
 import { CreateLogger } from '../Modules/Logger';
+import {
+  NormalizeUpdateChannel,
+  ResolveChannelRelease,
+  type UpdateChannel,
+} from '@showtrak/protocol/runtime';
 import type { InvokeChannel } from '../Modules/IPCRegistry/channels';
 import type { IpcHandler } from './handler-registry';
 import {
@@ -80,6 +85,43 @@ let squirrelReleaseInfo: { version?: string; releaseNotes?: string } | null = nu
 const AUTO_CHECK_INITIAL_DELAY_MS = 60 * 1000;
 const AUTO_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 let automaticUpdatesEnabled = false;
+// The SYSTEM_UPDATE_CHANNEL setting. Stable keeps the original behaviour (the
+// GitHub "latest" release). Beta resolves the newest release of any kind (see
+// @showtrak/protocol/runtime update-channel) and points the updater at that
+// release's own files.
+let updateChannel: UpdateChannel = 'stable';
+// The Squirrel feed the current check uses (RELEASES is read from it too).
+let activeSquirrelFeed = SQUIRREL_FEED_URL;
+// Whether electron-updater was pointed at a specific release by the beta
+// channel, so a later stable check knows to point it back at GitHub.
+let usingChannelFeed = false;
+
+// The feed for this check: the stable defaults, or the beta channel's release.
+// A beta lookup that fails falls back to stable rather than failing the check;
+// the updaters never downgrade, so that can only ever offer a newer build.
+async function resolveChannelFeed(): Promise<{ Tag: string; FeedURL: string } | null> {
+  if (updateChannel !== 'beta') return null;
+  try {
+    const Release = await ResolveChannelRelease({
+      Owner: 'ShowTrak',
+      Repo: 'ShowTrakServer',
+      Channel: 'beta',
+      FetchJson: async (Url) =>
+        JSON.parse(
+          await fetchText(Url, {
+            Accept: 'application/vnd.github+json',
+            'User-Agent': 'ShowTrakServer',
+          })
+        ),
+    });
+    if (Release) Logger.log(`Beta channel: checking against ${Release.Tag}`);
+    else Logger.warn('Beta channel: no installable release found; using the stable feed');
+    return Release;
+  } catch (e) {
+    Logger.warn('Beta channel lookup failed; using the stable feed:', e);
+    return null;
+  }
+}
 let autoCheckInitialTimer: NodeJS.Timeout | null = null;
 let autoCheckIntervalTimer: NodeJS.Timeout | null = null;
 
@@ -356,7 +398,7 @@ async function trackSquirrelDownload(session: number) {
   let packages: ReturnType<typeof newestSquirrelPackages> = [];
   try {
     packages = newestSquirrelPackages(
-      parseSquirrelReleases(await fetchText(`${SQUIRREL_FEED_URL}RELEASES`))
+      parseSquirrelReleases(await fetchText(`${activeSquirrelFeed}RELEASES`))
     );
   } catch (e) {
     Logger.warn('Failed to read Squirrel RELEASES manifest; progress unavailable:', e);
@@ -461,11 +503,13 @@ async function handleCheck() {
       initSquirrelUpdater();
       endSquirrelTracking();
       squirrelReleaseInfo = null;
+      const ChannelFeed = await resolveChannelFeed();
+      activeSquirrelFeed = ChannelFeed ? ChannelFeed.FeedURL : SQUIRREL_FEED_URL;
       // Try both object and string forms for compatibility
       try {
-        SquirrelUpdater.setFeedURL({ url: SQUIRREL_FEED_URL });
+        SquirrelUpdater.setFeedURL({ url: activeSquirrelFeed });
       } catch {
-        SquirrelUpdater.setFeedURL(SQUIRREL_FEED_URL);
+        SquirrelUpdater.setFeedURL(activeSquirrelFeed);
       }
       SquirrelUpdater.checkForUpdates();
     } catch (e) {
@@ -540,6 +584,23 @@ async function handleCheck() {
     }
   } else {
     Logger.log('Using packaged app-update.yml config for updater');
+  }
+
+  // Channel: beta points the updater at the chosen release's own files
+  // (latest-mac.yml); stable uses GitHub's "latest" release and never offers a
+  // pre-release, even when the installed build is itself a beta.
+  const ChannelFeed = await resolveChannelFeed();
+  try {
+    if (ChannelFeed) {
+      autoUpdater.setFeedURL({ provider: 'generic', url: ChannelFeed.FeedURL });
+      usingChannelFeed = true;
+    } else if (usingChannelFeed) {
+      autoUpdater.setFeedURL({ provider: 'github', owner: 'ShowTrak', repo: 'ShowTrakServer' });
+      usingChannelFeed = false;
+    }
+    autoUpdater.allowPrerelease = false;
+  } catch (e) {
+    Logger.warn('Failed to apply the update channel; checking with the default feed:', e);
   }
 
   try {
@@ -635,6 +696,14 @@ function SetAutomaticUpdates(Enabled: boolean) {
   autoCheckIntervalTimer = setInterval(runAutomaticCheck, AUTO_CHECK_INTERVAL_MS);
 }
 
+// The SYSTEM_UPDATE_CHANNEL setting; applies from the next check.
+function SetUpdateChannel(Value: unknown) {
+  const Next = NormalizeUpdateChannel(Value);
+  if (Next === updateChannel) return;
+  updateChannel = Next;
+  Logger.log(`Update channel: ${Next}`);
+}
+
 // Wire the IPC handlers. Pass a provider returning the current main
 // BrowserWindow (it is created lazily). electron-updater is not loaded here: it
 // costs ~25 ms on every launch, is never used by unpackaged or Squirrel builds,
@@ -653,4 +722,5 @@ export const Manager = {
   sendAppUpdateStatus,
   isSquirrelWindows,
   SetAutomaticUpdates,
+  SetUpdateChannel,
 };

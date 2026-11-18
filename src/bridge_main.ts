@@ -339,8 +339,8 @@ const API: ShowTrakAPI & ServerRendererAPI = {
   GetUpdateManagerStatus: async () => invoke('UpdateManager:GetStatus'),
   GetUpdateManagerReleases: async () => invoke('UpdateManager:GetReleases'),
   DownloadUpdateManagerRelease: async (Tag) => invoke('UpdateManager:DownloadRelease', Tag),
-  DeployUpdateManagerRelease: async (Tag, Targets) =>
-    invoke('UpdateManager:DeployRelease', Tag, Targets),
+  DeployUpdateManagerRelease: async (Tag, Targets, ConfirmPrerelease) =>
+    invoke('UpdateManager:DeployRelease', Tag, Targets, ConfirmPrerelease === true),
   OnUpdateManagerDownloadProgress: (Callback) =>
     subscribe('UpdateManager:DownloadProgress', Callback),
   Loaded: () => invoke('Loaded'),

@@ -26,6 +26,7 @@ const state = {
   downloadThrows: false,
   clients: [null, []],
   hasWindow: true,
+  channel: 'Stable',
 };
 
 const updateMgr = recordingManager({
@@ -45,6 +46,9 @@ const updateMgr = recordingManager({
 const clientMgr = recordingManager({ GetAll: () => state.clients });
 const serverMgr = recordingManager({ ExecuteBulkRequest: () => undefined });
 const appUpdater = recordingManager({ Register: () => undefined });
+const settingsMgr = recordingManager({
+  GetValue: (Key) => (Key === 'SYSTEM_UPDATE_CHANNEL' ? state.channel : undefined),
+});
 
 const loggerStub = {
   CreateLogger: () => ({
@@ -74,6 +78,7 @@ const restore = installModuleMocks([
   { match: matchesModule('/Modules/UpdateManager'), value: { Manager: updateMgr } },
   { match: matchesModule('/Modules/ClientManager'), value: { Manager: clientMgr } },
   { match: matchesModule('/Modules/Server'), value: { Manager: serverMgr } },
+  { match: matchesModule('/Modules/SettingsManager'), value: { Manager: settingsMgr } },
 ]);
 test.after(() => restore());
 
@@ -95,6 +100,7 @@ test.beforeEach(() => {
   state.downloadThrows = false;
   state.clients = [null, []];
   state.hasWindow = true;
+  state.channel = 'Stable';
   pushes.length = 0;
   for (const M of [updateMgr, clientMgr, serverMgr]) M.__calls.length = 0;
 });
@@ -136,7 +142,10 @@ test('CheckForUpdatesOnClient rejects an invalid UUID before dispatching', async
 // --- Status / releases / download -------------------------------------------
 
 test('UpdateManager:GetStatus and GetReleases wrap their values in a tuple', async () => {
-  assert.deepEqual(await GetHandler('UpdateManager:GetStatus')(null), [null, state.status]);
+  assert.deepEqual(await GetHandler('UpdateManager:GetStatus')(null), [
+    null,
+    { ...state.status, Channel: 'stable' },
+  ]);
   assert.deepEqual(await GetHandler('UpdateManager:GetReleases')(null), [
     null,
     [{ Tag: 'v3.14.0' }],
@@ -376,4 +385,71 @@ test('DeployRelease converts an unexpected throw into an error tuple', async () 
   state.statusThrows = true;
   const [Err] = await GetHandler('UpdateManager:DeployRelease')(null, 'v3.14.0', ['client-uuid-1']);
   assert.match(Err, /status unavailable/);
+});
+
+// --- Update channels and pre-release builds ----------------------------------
+
+test("the server's update channel reaches the release list, download and status", async () => {
+  state.channel = 'Beta';
+  await GetHandler('UpdateManager:GetReleases')(null);
+  assert.deepEqual(updateMgr.__callsTo('ListReleases')[0].args, ['beta']);
+  await GetHandler('UpdateManager:DownloadRelease')(null, 'v3.15.0-beta.1');
+  assert.equal(updateMgr.__callsTo('DownloadRelease')[0].args[1].Channel, 'beta');
+  const [, Status] = await GetHandler('UpdateManager:GetStatus')(null);
+  assert.equal(Status.Channel, 'beta');
+});
+
+test('a pre-release build is never deployed from a server on the stable channel', async () => {
+  state.status = {
+    Ready: true,
+    ReleaseVersion: 'v3.15.0-beta.1',
+    FeedPath: '/f/',
+    Prerelease: true,
+  };
+  state.clients = [null, [client('client-uuid-1')]];
+  const [Err] = await GetHandler('UpdateManager:DeployRelease')(
+    null,
+    'v3.15.0-beta.1',
+    ['client-uuid-1'],
+    true
+  );
+  assert.match(Err, /Beta update channel/);
+  assert.equal(serverMgr.__callsTo('ExecuteBulkRequest').length, 0);
+});
+
+test('on beta, a pre-release deploys only once the operator has confirmed it', async () => {
+  state.channel = 'Beta';
+  state.status = {
+    Ready: true,
+    ReleaseVersion: 'v3.15.0-beta.1',
+    FeedPath: '/f/',
+    Prerelease: true,
+  };
+  state.clients = [null, [client('client-uuid-1')]];
+  const Deploy = GetHandler('UpdateManager:DeployRelease');
+  const [Unconfirmed] = await Deploy(null, 'v3.15.0-beta.1', ['client-uuid-1']);
+  assert.match(Unconfirmed, /needs confirmation/);
+  // Only a real true counts as confirmation.
+  const [Truthy] = await Deploy(null, 'v3.15.0-beta.1', ['client-uuid-1'], 'yes');
+  assert.match(Truthy, /needs confirmation/);
+  assert.equal(serverMgr.__callsTo('ExecuteBulkRequest').length, 0);
+  const [Err, Result] = await Deploy(null, 'v3.15.0-beta.1', ['client-uuid-1'], true);
+  assert.equal(Err, null);
+  assert.equal(Result.TargetCount, 1);
+});
+
+test('a full release still deploys without confirmation on either channel', async () => {
+  state.channel = 'Beta';
+  state.clients = [null, [client('client-uuid-1')]];
+  const [Err] = await GetHandler('UpdateManager:DeployRelease')(null, 'v3.14.0', ['client-uuid-1']);
+  assert.equal(Err, null);
+});
+
+test('a failed download tells the windows it is over', async () => {
+  state.downloadThrows = true;
+  const [Err] = await GetHandler('UpdateManager:DownloadRelease')(null, 'v3.14.0');
+  assert.equal(typeof Err, 'string');
+  const Last = pushes.at(-1);
+  assert.equal(Last[0], 'UpdateManager:DownloadProgress');
+  assert.equal(Last[1].phase, 'error');
 });

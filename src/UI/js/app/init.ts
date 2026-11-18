@@ -627,7 +627,10 @@ export async function Init() {
       if (!Progress) return;
       const Percent = typeof Progress.percent === 'number' ? Progress.percent : 0;
       const Message = Progress.message || '';
-      setUpdateManagerDownloadInProgress((Progress.phase || '') !== 'complete');
+      // 'complete' and 'error' both end a download (a failed one must not
+      // leave the buttons locked as if it were still running).
+      const Phase = Progress.phase || '';
+      setUpdateManagerDownloadInProgress(Phase !== 'complete' && Phase !== 'error');
       SetUpdateManagerDownloadProgress(Percent, Message);
       ApplyUpdateManagerButtonLocks();
     } catch (e) {
