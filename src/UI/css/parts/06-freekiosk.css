@@ -107,9 +107,10 @@
 /* ---- View modal ---------------------------------------------------------- */
 
 .freekiosk-panel {
+  --ctl-r: var(--item-r);
   margin-top: 0.75rem;
   padding: 0.75rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
   background: var(--surface-ghost);
 }
 
@@ -381,7 +382,7 @@
   gap: 0.35rem;
   padding: 0.25rem 0.6rem;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--ctl-r);
   font-size: var(--fs-sm);
   color: var(--text-strong);
   background: rgba(255, 255, 255, 0.1);
@@ -443,9 +444,10 @@
 /* ---- Editor alarms ------------------------------------------------------- */
 
 .freekiosk-alarms {
+  --ctl-r: var(--item-r);
   margin-top: 0.5rem;
   padding: 0.75rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
   background: var(--surface-ghost);
 }
 
@@ -486,24 +488,20 @@
 }
 
 /* Bootstrap 5.0 has no rules for a .form-floating inside an .input-group (that
-   arrived in 5.2, and this build is 5.0.2), so the field neither flexes to fill
-   the row nor drops its right-hand rounding under the copy button. Scoped to the
-   modal rather than declared globally, since it is patching a gap in a vendored
-   version rather than stating a rule of the design. */
+   arrived in 5.2, and this build is 5.0.2), so the field does not flex to fill
+   the row. Scoped to the modal rather than declared globally, since it is
+   patching a gap in a vendored version rather than stating a rule of the
+   design. (The flattened corner under the Remove button comes from the shared
+   .input-group rules in 01-base.css.) */
 #SHOWTRAK_MODAL_FREEKIOSK_TERMINAL .input-group > .form-floating {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-#SHOWTRAK_MODAL_FREEKIOSK_TERMINAL .input-group > .form-floating > .form-control {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
 .freekiosk-test-result {
   margin-top: 0.4rem;
   padding: 0.35rem 0.6rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--ctl-r);
   font-size: var(--fs-md);
 }
 

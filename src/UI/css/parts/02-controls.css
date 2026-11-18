@@ -48,11 +48,13 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 #ADD_MONITORING_TARGET_MENU.dropdown-menu,
 #SETTINGS_MENU.dropdown-menu,
 #FILE_MENU.dropdown-menu {
+  --ctl-r: var(--menu-item-r);
   min-width: 240px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-radius: var(--menu-r);
   background: rgb(var(--surface-2-rgb) / 0.98);
-  padding: 0.35rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  padding: var(--menu-pad);
   /* These menus open from the bottom bar. Capped to the space above it so Popper
      can always flip them upward; a menu taller than the window would otherwise
      open downward, off-screen, and look like the button does nothing. */
@@ -63,7 +65,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
 #SETTINGS_MENU .dropdown-item,
 #FILE_MENU .dropdown-item {
   color: var(--text-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--menu-item-r);
   font-size: var(--fs-md);
   padding: 0.45rem 0.6rem;
 }
@@ -291,11 +293,10 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   overflow: hidden;
   z-index: var(--z-toast);
   background: rgb(var(--surface-2-rgb) / 0.98);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  box-shadow:
-    0 18px 42px rgba(0, 0, 0, 0.48),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border: 0;
+  /* A panel: its list's cards (--inner-r) sit --panel-pad inside it. */
+  border-radius: var(--panel-r);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.48);
   /* No backdrop blur: at 98% opacity it was invisible, yet it re-blurred
      whatever changed underneath (the live tiles) on every frame. */
   color: #fff;
@@ -305,9 +306,9 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   grid-template-columns: 1fr auto auto;
   gap: 10px;
   align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0));
+  padding: 10px var(--panel-pad);
+  /* A shaded band, not a divider line, like a ShowTrak Portal modal header. */
+  background: rgba(255, 255, 255, 0.04);
 }
 #FOG_TRAY .fog-status {
   font-size: var(--fs-xs);
@@ -340,7 +341,7 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   cursor: default;
 }
 #FOG_TRAY .fog-list {
-  padding: 10px;
+  padding: var(--panel-pad);
   display: grid;
   gap: 10px;
   max-height: calc(min(62vh, 560px) - 58px);
@@ -350,9 +351,8 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   display: grid;
   gap: 6px;
   padding: 10px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--inner-r);
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-subtle);
 }
 .fog-task-item .fog-task-title {
   display: flex;
@@ -458,11 +458,10 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   overflow: hidden;
   z-index: var(--z-toast);
   background: rgb(var(--surface-2-rgb) / 0.98);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  box-shadow:
-    0 18px 42px rgba(0, 0, 0, 0.48),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border: 0;
+  /* A panel: its list's cards (--inner-r) sit --panel-pad inside it. */
+  border-radius: var(--panel-r);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.48);
   /* No backdrop blur: at 98% opacity it was invisible, yet it re-blurred
      whatever changed underneath (the live tiles) on every frame. */
   color: #fff;
@@ -472,12 +471,12 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   grid-template-columns: 1fr auto auto;
   gap: 10px;
   align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0));
+  padding: 10px var(--panel-pad);
+  /* A shaded band, not a divider line, like a ShowTrak Portal modal header. */
+  background: rgba(255, 255, 255, 0.04);
 }
 #ALERTS_TRAY .alerts-list {
-  padding: 10px;
+  padding: var(--panel-pad);
   display: grid;
   gap: 10px;
   max-height: calc(min(62vh, 560px) - 58px);
@@ -494,8 +493,8 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
     linear-gradient(165deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03)),
     rgb(var(--surface-0-rgb) / 0.68);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  padding: 10px;
+  border-radius: var(--inner-r);
+  padding: var(--inner-pad);
   box-shadow:
     0 7px 18px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -528,7 +527,9 @@ body.mode-edit #ADD_MONITORING_TARGET_DROPDOWN {
   height: 26px;
   display: grid;
   place-items: center;
-  border-radius: var(--radius-sm);
+  /* The item's padding plus its 1px border sit between this and the item's
+     corner. */
+  border-radius: calc(var(--inner-r) - var(--inner-pad) - 1px);
   background: color-mix(in srgb, var(--alert-accent) 24%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--alert-accent) 32%, transparent);
 }
@@ -901,6 +902,7 @@ input[type='range']::-moz-range-thumb,
   --st-toggle-w: 3.25rem;
   --st-toggle-knob: 1.225rem;
   --st-toggle-gap: 0.25rem;
+  --st-toggle-knob-r: var(--radius-xs);
 
   position: relative;
   float: none;
@@ -909,7 +911,8 @@ input[type='range']::-moz-range-thumb,
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  border-radius: var(--radius-sm);
+  /* knob radius + gap + 1px border, so the knob's corners sit concentric */
+  border-radius: calc(var(--st-toggle-knob-r) + var(--st-toggle-gap) + 1px);
   background-image: none;
   transition: background-color 0.15s ease;
 }
@@ -920,7 +923,7 @@ input[type='range']::-moz-range-thumb,
   left: var(--st-toggle-gap);
   width: var(--st-toggle-knob);
   height: var(--st-toggle-knob);
-  border-radius: var(--radius-xs);
+  border-radius: var(--st-toggle-knob-r);
   background: var(--st-check-off);
   transition:
     transform 0.15s ease,
@@ -1051,7 +1054,7 @@ input[type='number']::-webkit-inner-spin-button {
   background-color: var(--field-bg) !important;
   color: #fff !important;
   border: none !important;
-  border-radius: var(--radius-md) !important;
+  border-radius: var(--ctl-r) !important;
 }
 
 /* Center the chevron on the full toggle height (the label/value use asymmetric
@@ -1114,11 +1117,11 @@ input[type='number']::-webkit-inner-spin-button {
   max-height: 360px;
   overflow: auto;
   background: var(--menu-bg);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+  border: 0;
+  border-radius: var(--menu-r);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
   z-index: var(--z-dropdown);
-  padding: 6px;
+  padding: var(--menu-pad);
   display: grid;
   gap: 2px;
 }
@@ -1129,7 +1132,7 @@ input[type='number']::-webkit-inner-spin-button {
   gap: 8px;
   align-items: center;
   padding: 4px 6px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--menu-item-r);
   cursor: pointer;
   font-size: var(--fs-xl);
 }
@@ -1327,9 +1330,12 @@ input[type='number']::-webkit-inner-spin-button {
    raised, brighter "active" segment. Used by the OSC/HTTP reference switch and
    the bottom-bar SHOW/EDIT switch. Mark the selected button with `.is-active`. */
 .st-segmented-toggle {
+  --st-seg-pad: 0.15rem;
   display: inline-flex;
-  padding: 0.15rem;
-  border-radius: var(--radius-md);
+  padding: var(--st-seg-pad);
+  /* The tray is a control (--ctl-r); its segments sit concentric in it, as
+     in ShowTrak Portal. */
+  border-radius: var(--ctl-r);
   background: rgba(0, 0, 0, 0.25);
 }
 
@@ -1343,7 +1349,7 @@ input[type='number']::-webkit-inner-spin-button {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.25rem 0.85rem;
-  border-radius: var(--radius-sm);
+  border-radius: calc(var(--ctl-r) - var(--st-seg-pad));
   cursor: pointer;
   transition:
     background 0.12s ease,
@@ -1423,7 +1429,8 @@ input[type='number']::-webkit-inner-spin-button {
   width: 100%;
   text-align: left;
   border: 0;
-  border-radius: var(--radius-md);
+  /* Sits straight in the modal's padding. */
+  border-radius: var(--inner-r);
   padding: 0.5rem 0.7rem;
   font-size: var(--fs-lg);
   color: var(--text-muted);
@@ -1538,7 +1545,7 @@ input[type='number']::-webkit-inner-spin-button {
 
 .client-info-actions-hint {
   padding: 8px 12px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--inner-r);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-subtle);
   font-size: var(--fs-sm);
@@ -1556,7 +1563,7 @@ input[type='number']::-webkit-inner-spin-button {
   gap: 10px;
   width: 100%;
   padding: 8px 12px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--inner-r);
   background: rgba(255, 255, 255, 0.05);
   border: none;
   color: var(--text-soft);
@@ -1594,7 +1601,7 @@ input[type='number']::-webkit-inner-spin-button {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--inner-r);
   background: rgba(255, 255, 255, 0.05);
 }
 .monitor-settings-check-body {
@@ -1769,7 +1776,7 @@ input[type='number']::-webkit-inner-spin-button {
   align-items: center;
   gap: 8px;
   padding: 7px 8px 7px 10px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--inner-r);
   background: rgba(255, 255, 255, 0.05);
 }
 .mac-address-item .mac-address-value {

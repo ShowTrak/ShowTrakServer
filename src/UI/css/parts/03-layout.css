@@ -51,7 +51,6 @@ body.compact-mode .group-column-grid {
 
 .GROUP_TITLE_CLICKABLE:hover {
   background-color: rgba(255, 255, 255, 0.2) !important;
-  border-radius: var(--radius-xs);
 }
 
 .SHOWTRAK_CLIENT_PENDING_ADOPTION {
@@ -111,10 +110,10 @@ body.compact-mode .group-column-grid {
   z-index: var(--z-context-menu);
   background: var(--menu-bg) !important;
   color: white;
-  border: 1px solid var(--border-subtle) !important;
-  border-radius: var(--radius-md);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
-  padding: 0.35rem;
+  border: 0 !important;
+  border-radius: var(--menu-r);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  padding: var(--menu-pad);
   max-height: min(70vh, 460px);
   overflow-y: auto;
   overflow-x: hidden;
@@ -145,7 +144,7 @@ body.compact-mode .group-column-grid {
   justify-content: space-between;
   gap: 1rem;
   background-color: transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--menu-item-r);
   padding: 0.4rem 0.6rem;
   font-size: var(--fs-xl);
 }
@@ -222,7 +221,7 @@ body.compact-mode .group-column-grid {
   width: 1.5rem;
   height: 1.5rem;
   margin: -0.2rem -0.2rem -0.2rem -0.2rem;
-  border-radius: var(--radius-sm);
+  border-radius: calc(var(--menu-item-r) - 0.2rem);
   color: var(--text-subtle);
   font-size: 0.85rem;
   line-height: 1;
@@ -240,8 +239,8 @@ body.compact-mode .group-column-grid {
   padding: 0.4rem 0.6rem;
   background: var(--surface-0);
   color: var(--text-strong);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+  border: 0;
+  border-radius: var(--menu-item-r);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
   font-size: var(--fs-sm);
   line-height: 1.4;
@@ -278,24 +277,43 @@ body.compact-mode .group-column-grid {
   padding-top: 2rem !important;
 }
 
-/* Single shared modal surface for every modal in the app. A flat elevated
-   panel (no gradient) with a hairline border and soft shadow so it lifts off
-   the radial page background. Sizes still vary per modal via .modal-dialog. */
+/* Single shared modal surface for every modal in the app, as in ShowTrak
+   Portal: every pop-up is a panel. Panel corners and padding, no border; a
+   soft shadow lifts it off the page. What sits straight in its padding (title
+   bars, tab rails, rows, buttons, fields) takes the inner radius, so its
+   corners run concentric with the modal's. Sizes still vary per modal via
+   .modal-dialog. */
 .modal-content {
-  border: 1px solid var(--border-subtle) !important;
+  border: 0 !important;
   background: var(--surface-1) !important;
   color: white;
-  border-radius: var(--radius-xl) !important;
-  box-shadow:
-    0 24px 60px -20px rgba(0, 0, 0, 0.65),
-    0 2px 8px rgba(0, 0, 0, 0.4) !important;
+  border-radius: var(--panel-r) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
 }
 
 .modal-body {
-  /* background-color: #0c091c !important; */
   color: white;
   display: grid;
   gap: 0.5rem;
+  padding: var(--panel-pad);
+}
+
+/* Every modal dims and blurs the page behind it, like ShowTrak Portal. The
+   tint lives in the colour rather than the backdrop's opacity, so the blur
+   is not faded with it; Bootstrap's fade-in still works. */
+.modal-backdrop {
+  background-color: rgb(var(--surface-0-rgb) / 0.6);
+  backdrop-filter: blur(3px);
+}
+.modal-backdrop.show {
+  opacity: 1;
+}
+/* Large rigs (see ANIMATED_BAR_TILE_LIMIT in js/app/client-list.ts): the blur
+   would re-run over every tile updating underneath it each frame, so the
+   backdrop is a plain, slightly darker tint there. */
+body.st-static-bars .modal-backdrop {
+  background-color: rgb(var(--surface-0-rgb) / 0.7);
+  backdrop-filter: none;
 }
 
 .SHOWTRAK_MODEL_CORE_LOGO {
@@ -308,7 +326,6 @@ body.compact-mode .group-column-grid {
    custom spacing. */
 .SHOWTRAK_ABOUT_MODAL_BODY {
   gap: 0.75rem;
-  padding: 1.2rem;
 }
 
 .SHOWTRAK_ABOUT_TITLE {
@@ -436,7 +453,8 @@ body.compact-mode .group-column-grid {
   text-align: left;
   background: var(--surface-3);
   border: 0;
-  border-radius: var(--radius-lg);
+  /* The same shape as the toasts. */
+  border-radius: calc(var(--item-r) + 10px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
   color: var(--text-strong);
   cursor: pointer;
@@ -584,7 +602,8 @@ body.compact-mode .group-column-grid {
 .SHOWTRAK_ABOUT_DEPENDENCIES_LIST {
   overflow: auto;
   background: rgba(0, 0, 0, 0.22);
-  border-radius: var(--radius-md);
+  /* Sits in an About card's padding. */
+  border-radius: var(--item-r);
   padding: 0.6rem;
   font-size: var(--fs-lg);
   line-height: 1.4;
@@ -633,7 +652,7 @@ body.compact-mode .group-column-grid {
 }
 
 .UPDATE_MANAGER_CLIENT_ITEM {
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
   padding: 0.35rem 0.55rem;
   background: rgba(255, 255, 255, 0.04);
 }
@@ -761,7 +780,7 @@ body.compact-mode .group-column-grid {
 .UPDATE_MANAGER_WARNING {
   border: 1px solid rgb(var(--warning-soft-rgb) / 0.45);
   background: rgb(var(--warning-soft-rgb) / 0.12);
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
   padding: 0.65rem;
 }
 
@@ -877,7 +896,7 @@ body.mode-edit #APPLICATION_CONTAINER {
   background-color: var(--field-bg) !important;
   color: white !important;
   border: none !important;
-  border-radius: var(--radius-md) !important;
+  border-radius: var(--ctl-r) !important;
   box-shadow: none !important;
   transition: background-color 150ms ease;
 }
@@ -918,7 +937,7 @@ body.mode-edit #APPLICATION_CONTAINER {
    per state, so it reads as one of them in Edit mode and in Show mode alike. */
 .field-box {
   background-color: var(--field-bg);
-  border-radius: var(--radius-md);
+  border-radius: var(--ctl-r);
   transition: background-color 150ms ease;
 }
 
@@ -1052,7 +1071,8 @@ button.btn:focus {
   height: 30px;
   padding: 0 0.65rem;
   border: 0;
-  border-radius: var(--radius-pill);
+  /* Sits in its card's corner padding, so a control's corners, not a pill's. */
+  border-radius: var(--ctl-r);
   background: transparent;
   color: rgba(220, 220, 220, 0.6);
   display: inline-flex;

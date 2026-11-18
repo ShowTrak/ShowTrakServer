@@ -9,7 +9,7 @@
   --bs-popover-max-width: 240px;
   background-color: var(--surface-0) !important;
   border: 1px solid var(--border-default) !important;
-  border-radius: var(--radius-md);
+  border-radius: var(--menu-item-r);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
@@ -53,7 +53,9 @@
   width: min(560px, calc(100vw - 20px));
   background: var(--surface-3);
   border: 0;
-  border-radius: var(--radius-lg);
+  /* Its buttons sit about 10px in from its edge. */
+  --ctl-r: var(--item-r);
+  border-radius: calc(var(--item-r) + 10px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
   color: #fff;
 }
@@ -110,7 +112,8 @@
   color: #fff;
   background: linear-gradient(180deg, #7a0d17 0%, #4d0710 100%);
   border: 2px solid #ff4d5e;
-  border-radius: var(--radius-xl);
+  /* The buttons sit 18px (plus the 2px border) above the bottom edge. */
+  border-radius: calc(var(--inner-r) + 18px + 2px);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
   animation: critical-confirm-pop 160ms ease-out;
 }
@@ -140,7 +143,7 @@
   justify-content: center;
   gap: 6px;
   background: rgba(0, 0, 0, 0.25);
-  border-radius: var(--radius-lg);
+  border-radius: var(--inner-r);
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-items li {
   padding: 2px 10px;
@@ -163,7 +166,7 @@
   padding: 12px 16px;
   font-size: 1.05rem;
   font-weight: 700;
-  border-radius: var(--radius-lg);
+  border-radius: var(--inner-r);
 }
 #SHOWTRAK_CRITICAL_CONFIRM .critical-confirm-cancel {
   background: #fff;
@@ -214,8 +217,9 @@
   overflow: auto;
   z-index: var(--z-toast);
   background: rgb(var(--surface-2-rgb) / 0.98);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
+  border: 0;
+  /* A panel, like a modal: its cards (--inner-r) sit --panel-pad inside. */
+  border-radius: var(--panel-r);
   /* The huge spread ring acts as a click-through dim backdrop so the panel
      reads as a centered modal without a separate backdrop element. */
   box-shadow:
@@ -263,7 +267,7 @@
   font-weight: 700;
 }
 #EXECUTION_TOAST .exec-toast-body {
-  padding: 8px;
+  padding: var(--panel-pad);
   display: grid;
   gap: 8px;
 }
@@ -271,7 +275,7 @@
 .exec-deploy-summary {
   background: rgb(var(--success-rgb) / 0.12);
   border: 1px solid rgb(var(--success-rgb) / 0.35);
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
   padding: 8px;
   display: grid;
   gap: 8px;
@@ -335,7 +339,7 @@
 .exec-console {
   display: grid;
   gap: 8px;
-  padding: 8px;
+  padding: var(--panel-pad);
 }
 .exec-console-bar {
   display: flex;
@@ -378,7 +382,7 @@
   font-size: var(--fs-xs);
   color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-sm);
+  border-radius: var(--inner-r);
   padding: 6px 8px;
 }
 .exec-console-output {
@@ -389,7 +393,7 @@
   padding: 10px 12px;
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
   font-family:
     ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   font-size: var(--fs-xs);
@@ -437,7 +441,7 @@
 .exec-completed {
   background: rgb(var(--success-rgb) / 0.1);
   border: 1px solid rgb(var(--success-rgb) / 0.3);
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
 }
 .exec-completed-toggle {
   display: flex;
@@ -456,12 +460,13 @@
 }
 .exec-completed-toggle:hover {
   background: rgba(255, 255, 255, 0.04);
-  border-radius: var(--radius-md);
+  /* fills its card, inside the card's 1px border */
+  border-radius: calc(var(--inner-r) - 1px);
 }
 .exec-completed-toggle:focus-visible {
   outline: 2px solid rgb(var(--success-rgb) / 0.7);
   outline-offset: -2px;
-  border-radius: var(--radius-md);
+  border-radius: calc(var(--inner-r) - 1px);
 }
 .exec-completed-chevron {
   color: var(--text-secondary);
@@ -489,7 +494,11 @@
   overflow: hidden;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
+}
+/* Completed rows sit 6px inside the Completed card. */
+.exec-completed-list .exec-item {
+  border-radius: calc(var(--inner-r) - 1px - 6px);
 }
 /* The per-client progress bar IS the row background. It spans the row and is
    scaled to the reported stage (--exec-progress-scale, 0..1); colour is driven
@@ -694,7 +703,7 @@
 }
 
 #NETWORK_DISCOVERY_RESULTS {
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
   background: rgba(255, 255, 255, 0.02);
   flex: 1 1 auto;
   min-height: 0;
@@ -705,7 +714,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
 }
 .NETWORK_DISCOVERY_TABLE {
   color: #fff;
@@ -823,7 +832,7 @@
   max-height: min(60vh, 540px);
   overflow: auto;
   padding: 0.9rem;
-  border-radius: var(--radius-lg);
+  border-radius: var(--inner-r);
   border: 1px solid rgba(148, 211, 255, 0.16);
   background:
     linear-gradient(180deg, rgba(6, 10, 17, 0.98), rgba(11, 18, 29, 0.98)),
@@ -1085,7 +1094,7 @@ body.st-rainbow-leaving .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING):
   color: rgba(211, 190, 190, 0.74);
   font-size: var(--fs-md);
   padding: 0.55rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--item-r);
   background: rgb(var(--danger-text-rgb) / 0.07);
   border: 1px dashed rgb(var(--danger-text-rgb) / 0.25);
 }
@@ -1095,7 +1104,7 @@ body.st-rainbow-leaving .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING):
   overflow-x: auto;
   white-space: nowrap;
   padding: 0.55rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--item-r);
   background: var(--surface-ghost);
 }
 
@@ -1104,7 +1113,7 @@ body.st-rainbow-leaving .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING):
   gap: 0.35rem;
   margin-top: 0.15rem;
   padding: 0.55rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--item-r);
   background: var(--surface-ghost);
   border: 1px solid var(--border-subtle);
 }
@@ -1201,9 +1210,10 @@ body.st-rainbow-leaving .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING):
   pointer-events: auto;
   background: var(--surface-3);
   border: 0;
-  border-radius: var(--radius-lg);
+  /* Its icon (--item-r) sits 10px in. */
+  border-radius: calc(var(--item-r) + 10px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
-  padding: 11px;
+  padding: 10px;
   animation: alert-toast-enter 220ms ease-out;
 }
 .alert-toast:hover {
@@ -1215,6 +1225,7 @@ body.st-rainbow-leaving .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING):
 .alert-toast .alert-icon {
   width: 30px;
   height: 30px;
+  border-radius: var(--item-r);
 }
 .alert-toast .alert-icon i {
   font-size: 17px;
@@ -1323,7 +1334,7 @@ body.st-rainbow-leaving .SHOWTRAK_PC.ONLINE:not(.DEGRADED, .IDLE, .IDENTIFYING):
   align-content: center;
   gap: 0.1rem;
   padding: 0.5rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--tile-r);
   border: transparent 2px solid;
   transition:
     width 180ms ease,

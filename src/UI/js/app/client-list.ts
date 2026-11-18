@@ -1182,7 +1182,7 @@ export function RenderFullClientAndMonitorList() {
 				${RenderListGroupHeaderCells()}
 			</div>
 		</div>
-	<div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100 group-drop-zone${TintClass}"${TintStyle} data-groupid="${GroupID}">`;
+	<div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center w-100 group-drop-zone${TintClass}"${TintStyle} data-groupid="${GroupID}">`;
 
     if (Merged.length == 0) {
       Filler += `<div class="SHOWTRAK_PC_PLACEHOLDER w-100 p-3">
@@ -1348,7 +1348,7 @@ export function RenderPendingAdoptionSection() {
     html += `      <span class="GROUP_TITLE py-2">DISCOVER</span>`;
     html += `    </div>`;
     html += `  </div>`;
-    html += `  <div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center p-3 gap-3 w-100 group-drop-zone">`;
+    html += `  <div class="bg-ghost rounded m-3 mb-0 d-flex flex-wrap justify-content-start align-items-center w-100 group-drop-zone">`;
     for (const dev of list) {
       const Hostname = dev && dev.Hostname ? dev.Hostname : 'Unknown Host';
       const IP = dev && dev.IP ? dev.IP : 'Unknown IP';

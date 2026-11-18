@@ -158,7 +158,7 @@ body:not(.list-mode) .SHOWTRAK_PC.PENDING:not(.IDENTIFYING) {
   align-self: stretch;
   flex: 1 1 auto;
   min-height: var(--tile-expanded-height);
-  border-radius: var(--radius-md);
+  border-radius: var(--tile-r);
   font-weight: 700;
   color: var(--text-muted);
   padding: 2rem;
@@ -171,6 +171,11 @@ body:not(.list-mode) .SHOWTRAK_PC.PENDING:not(.IDENTIFYING) {
 }
 
 .group-drop-zone {
+  /* A group is a panel of tiles: its corners are a tile's plus the padding
+     they sit in. */
+  padding: var(--group-pad);
+  gap: var(--group-pad);
+  border-radius: calc(var(--tile-r) + var(--group-pad)) !important;
   /* Groups in the column grid stretch to the tallest group on the row, so the
      single wrapped line of a short group would otherwise stretch with it and
      `align-items: center` would float the tiles down to the middle. Packing the
@@ -184,12 +189,42 @@ body:not(.list-mode) .SHOWTRAK_PC.PENDING:not(.IDENTIFYING) {
 
 .GROUP_TITLE_CLICKABLE {
   transition: margin 180ms ease;
+  /* The rail stands beside its group's panel rather than inside it, so it is
+     free of the panel's corners; a tile's keep it a rounded bar, not a
+     capsule. */
+  border-radius: var(--tile-r) !important;
+}
+
+/* Grid and Compact views: tiles fill their group's row. Fixed-width tiles
+   left whatever did not divide into whole tiles as a gap at the end of every
+   group; instead the group lays its tiles on as many columns of at least a
+   tile's width (--zone-tile-min, per view) as fit and shares the spare width
+   out among them. auto-fill (not auto-fit) keeps the empty columns, so a
+   short last row, or a group with one or two tiles, lines up under full
+   columns rather than stretching across the panel, and a tile can never grow
+   past the next column count's width. List keeps its own layout. (Drag and
+   drop sizes its ghost and spacer from the real tile, so they follow the
+   stretched width.) */
+body:not(.list-mode) .group-drop-zone {
+  --zone-tile-min: var(--tile-expanded-width);
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(var(--zone-tile-min), 1fr));
+}
+body.compact-mode .group-drop-zone {
+  --zone-tile-min: var(--tile-compact-width);
+}
+body:not(.list-mode) .group-drop-zone > :is(.SHOWTRAK_PC, .SHOWTRAK_PC_PLACEHOLDER) {
+  width: auto;
+}
+body:not(.list-mode) .group-drop-zone > .SHOWTRAK_PC_PLACEHOLDER {
+  grid-column: 1 / -1;
 }
 
 body.compact-mode .group-drop-zone {
   padding: 0.5rem !important;
   gap: 0.5rem !important;
   margin: 0.5rem 0.25rem 0 0.25rem !important;
+  border-radius: calc(var(--tile-r) + 0.5rem) !important;
 }
 
 body.compact-mode .GROUP_TITLE_CLICKABLE {
@@ -577,8 +612,9 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 /* A monitoring target's Actions tab: one panel per check type, its actions in
    their declared groups. Drawn to match the FreeKiosk Controls tab. */
 .monitor-group-actions {
+  --ctl-r: var(--item-r);
   padding: 0.75rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
   background: var(--surface-ghost);
   text-align: left;
 }
@@ -636,7 +672,7 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   gap: 0.35rem;
   padding: 0.25rem 0.6rem;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--ctl-r);
   font-size: var(--fs-sm);
   color: var(--text-strong);
   background: rgba(255, 255, 255, 0.1);
@@ -711,15 +747,17 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   align-items: stretch;
   gap: 2px;
   height: 28px;
-  border-radius: var(--radius-sm);
-  padding: 2px;
+  --status-timeline-pad: 2px;
+  border-radius: var(--item-r);
+  padding: var(--status-timeline-pad);
   background: rgba(255, 255, 255, 0.04);
 }
 
 .status-timeline-block {
   flex: 1 1 0;
   min-width: 0;
-  border-radius: 2px;
+  /* The end blocks sit in the strip's corners. */
+  border-radius: calc(var(--item-r) - var(--status-timeline-pad));
   background-color: var(--status-graph-idle);
   transition: filter 90ms ease;
 }
@@ -756,8 +794,8 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   position: fixed;
   z-index: var(--z-dropdown);
   min-width: 150px;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--menu-item-r);
+  border: 0;
   background: rgb(var(--surface-0-rgb) / 0.96);
   color: var(--text-strong);
   padding: 0.45rem 0.55rem;
@@ -815,7 +853,7 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   align-items: center;
   gap: 0.6rem;
   padding: 0.55rem 0.7rem 0.55rem 0.85rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
   background:
     linear-gradient(165deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
     rgb(var(--surface-0-rgb) / 0.55);
@@ -827,8 +865,11 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   content: '';
   position: absolute;
   left: -3px;
-  top: 6px;
-  bottom: 6px;
+  /* Spans the card's straight left edge, between the curves of its corners;
+     a one-line card is nearly all corner, so it keeps a 12px minimum. */
+  top: 50%;
+  transform: translateY(-50%);
+  height: max(calc(100% - 2 * var(--inner-r)), 12px);
   width: 6px;
   border-radius: var(--radius-pill);
   background: var(--status-graph-idle);
@@ -944,10 +985,10 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
 }
 
 /* Optional per-group background tint. A low-strength mix of the palette colour
-   keeps it muted enough that tile status colours still read clearly on top. */
+   keeps it muted enough that tile status colours still read clearly on top.
+   No outline: the tint alone marks the group, as in ShowTrak Portal. */
 .group-drop-zone.group-tinted {
   background-color: color-mix(in srgb, var(--group-tint) 9%, transparent) !important;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--group-tint) 14%, transparent);
 }
 
 /* Drag-and-drop visuals */
@@ -961,7 +1002,7 @@ body.compact-mode .SHOWTRAK_PC.DUMMY > [data-type='Name'] {
   border: 0;
   outline: 2px dashed rgba(255, 255, 255, 0.7);
   outline-offset: -2px;
-  border-radius: var(--radius-md);
+  border-radius: var(--tile-r);
   background: transparent;
   opacity: 0.9;
   margin: 0;
@@ -1248,7 +1289,8 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   flex-shrink: 0;
   width: 34px;
   height: 34px;
-  border-radius: var(--radius-md);
+  /* Sits in its row's padding. */
+  border-radius: var(--item-r);
   font-size: 1.05rem;
   color: var(--script-accent, var(--text-secondary));
   background: color-mix(in srgb, var(--script-accent, #7f8c8d) 16%, transparent);
@@ -1339,7 +1381,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   color: rgb(var(--info-rgb) / 0.85);
   font-size: var(--fs-md);
   padding: 2px 6px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--ctl-r);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1357,7 +1399,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   color: rgb(var(--success-text-rgb) / 0.8);
   font-size: var(--fs-md);
   padding: 2px 6px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--ctl-r);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1379,7 +1421,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
 .script-manager-issues {
   display: grid;
   gap: 6px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--inner-r);
   padding: 11px 13px;
   font-size: var(--fs-md);
   line-height: 1.4;
@@ -1403,7 +1445,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   color: rgb(var(--info-rgb) / 0.85);
   font-size: 1rem;
   padding: 4px 8px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--ctl-r);
   transition:
     color 150ms ease,
     background 150ms ease;
@@ -1420,7 +1462,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   color: rgb(var(--success-text-rgb) / 0.9);
   font-size: 1rem;
   padding: 4px 8px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--ctl-r);
   transition:
     color 150ms ease,
     background 150ms ease;
@@ -1435,7 +1477,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   color: var(--text-soft);
   font-size: var(--fs-lg);
   padding: 5px 10px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--ctl-r);
   transition:
     color 150ms ease,
     background 150ms ease,
@@ -1483,7 +1525,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   height: 38px;
   flex: 0 0 38px;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--ctl-r);
   background-color: rgba(255, 255, 255, 0.1);
   color: inherit;
   font-size: 1.2rem;
@@ -1518,7 +1560,7 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   min-height: 0;
   padding: 8px 4px;
   border: 2px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
   background-color: var(--surface-ghost);
   color: inherit;
   cursor: pointer;
@@ -1590,8 +1632,9 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU {
   right: 12px !important;
   width: auto !important;
   max-width: none !important;
-  border-radius: var(--radius-lg);
-  padding: 0.4rem 0.5rem 0.6rem;
+  /* rows (--inner-r) sit 0.5rem inside the sheet, so its corners follow */
+  border-radius: calc(var(--inner-r) + 0.5rem);
+  padding: 0.5rem;
   /* NB: do NOT set `display` here. The base rule keeps the menu `display: none`
      until JS opens it (which sets inline `display: flex`); forcing flex here
      would override that and leave an empty menu floating on load. The
@@ -1618,7 +1661,7 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU .context-menu-close {
   gap: 0.4rem;
   width: 100%;
   height: 42px;
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
   background-color: rgba(255, 255, 255, 0.08);
   color: var(--text-soft);
   font-size: var(--fs-xl);
@@ -1646,7 +1689,7 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > a.SHOWTRAK_CON
   padding: 0.85rem 0.75rem;
   font-size: 1.05rem;
   background-color: rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
   margin-bottom: 0.4rem;
 }
 body.mobile-view
@@ -1758,9 +1801,10 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
 /* 'list' settings field: a chip/tag input with an add row. The wrapper is a plain
    block (no overlay note), so it sits inside the standard .monitoring-field-wrap. */
 .monitoring-list {
+  --ctl-r: var(--item-r);
   background: var(--surface-ghost);
-  border-radius: var(--radius-md);
-  padding: 0.5rem 0.6rem;
+  border-radius: var(--inner-r);
+  padding: var(--inner-pad);
 }
 .monitoring-list-chip {
   font-weight: 500;
@@ -1844,9 +1888,10 @@ body.mobile-view #SHOWTRAK_CONTEXT_MENU > .context-menu-options > hr {
    with a background, matching the app's no-borders / background-shade theme. Status
    is shown by the badge inside; a matched/primary item gets a subtle success tint. */
 .monitoring-debug-card {
+  --ctl-r: var(--item-r);
   background-color: var(--surface-ghost);
-  border-radius: var(--radius-md);
-  padding: 0.5rem;
+  border-radius: var(--inner-r);
+  padding: var(--inner-pad);
 }
 .monitoring-debug-card--match {
   background-color: rgb(var(--success-rgb) / 0.18);
@@ -1932,9 +1977,9 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   align-items: center;
   gap: 12px;
   padding: 28px 24px;
-  border-radius: var(--radius-xl);
+  border-radius: var(--panel-r);
   background: var(--surface-2);
-  border: 1px solid var(--border-subtle);
+  border: 0;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
   color: #f2f4f7;
   text-align: center;
@@ -2213,6 +2258,9 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
      margins here and let the box fit its column exactly. */
   body.mobile-view .group-drop-zone {
     margin-inline: 0 !important;
+    /* One tile per row, at any width: the tiles-fill-the-row grid's minimum
+       column would otherwise overflow a thin phone and fit two on a tablet. */
+    grid-template-columns: minmax(0, 1fr);
   }
 
   /* --- Hide desktop-only toggles in the bottom bar on mobile --- */
@@ -2406,7 +2454,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   width: 28px;
   padding: 0;
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+  border-radius: var(--ctl-r);
   color: var(--text-muted);
   background: rgba(255, 255, 255, 0.04);
 }
@@ -2430,12 +2478,12 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   max-width: min(320px, calc(100vw - 16px));
   max-height: min(70vh, 460px);
   overflow-y: auto;
-  padding: 0.25rem;
+  padding: var(--menu-pad);
   color: white;
   background: var(--menu-bg);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  border: 0;
+  border-radius: var(--menu-r);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
   user-select: none;
 }
 
@@ -2463,7 +2511,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   gap: 0.4rem;
   margin-bottom: 0.25rem;
   padding: 0.35rem 0.5rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--menu-item-r);
   font-size: var(--fs-sm);
   color: rgb(var(--warning-soft-rgb));
   background: rgb(var(--warning-soft-rgb) / 0.08);
@@ -2474,7 +2522,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   display: flex;
   align-items: center;
   gap: 0.2rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--menu-item-r);
 }
 
 .monitor-action:hover {
@@ -2489,7 +2537,7 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
   min-width: 0;
   padding: 0.2rem 0.45rem;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--menu-item-r);
   font-size: var(--fs-sm);
   text-align: left;
   white-space: nowrap;
@@ -2584,7 +2632,7 @@ button.monitor-action-label:focus-visible {
   flex-direction: column;
   gap: 0.45rem;
   padding: 0.55rem 0.7rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--inner-r);
   background:
     linear-gradient(165deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
     rgb(var(--surface-0-rgb) / 0.55);

@@ -132,14 +132,50 @@
   --text-subtle: rgb(255 255 255 / 0.45);
   --text-faint: rgb(255 255 255 / 0.35);
 
-  /* --- Radii ---------------------------------------------------------------- */
+  /* --- Radii ----------------------------------------------------------------
+   * Nested corners follow ONE rule, as in ShowTrak Portal:
+   *   outer radius = inner radius + the padding between them
+   * so anything rounded sitting in a rounded container's padding runs
+   * concentric with it. Three tiers, each a step out from the last:
+   *   panel (--panel-r): modals and other free-standing surfaces, padded
+   *     --panel-pad.
+   *   inner (--inner-r): cards and rows sitting straight in a panel's
+   *     padding (the .bg-ghost.p-2 rows, title bars, tab rails), padded
+   *     --inner-pad (.p-2).
+   *   item  (--item-r): things sitting straight in an inner card's padding.
+   * Controls (buttons, fields, toggles) take --ctl-r, which each container
+   * sets for whatever sits straight in its own padding: a modal gives the
+   * inner radius, an inner card or a menu the item radius. Anywhere else a
+   * control falls back to the item radius.
+   *
+   * A component with its own padding derives its corners from these with
+   * calc(), e.g. calc(var(--item-r) + 4px) for a tray padded 4px around
+   * item-radius buttons, rather than picking a fixed size. */
+  --item-r: 6px;
+  --inner-pad: 0.5rem;
+  --inner-r: calc(var(--item-r) + var(--inner-pad));
+  --panel-pad: 0.75rem;
+  --panel-r: calc(var(--inner-r) + var(--panel-pad));
+
+  /* Menus (the bottom-bar dropdowns, the right-click menu, in-field pickers):
+   * an inner-card-sized surface padded --menu-pad, with rows that sit
+   * concentric in it. */
+  --menu-pad: 0.375rem;
+  --menu-r: var(--inner-r);
+  --menu-item-r: calc(var(--menu-r) - var(--menu-pad));
+
+  /* Tiles (grid and compact) and list rows. */
+  --tile-r: 8px;
+
+  /* Fixed sizes for things that do not nest: badges, chips, pills. */
   --radius-xs: 4px;
   --radius-sm: 6px;
-  /* Tiles (grid, compact and list rows), menus, form fields. */
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
   --radius-pill: 999px;
+
+  --ctl-r: var(--item-r);
 
   /* --- Type scale ----------------------------------------------------------- */
   --fs-3xs: 9px;
@@ -158,6 +194,8 @@
   --tile-expanded-width: 220px;
   --tile-compact-width: 244px;
   --tile-expanded-height: 100px;
+  /* Grid view: the space round and between the tiles in a group's panel. */
+  --group-pad: 0.5rem;
   --tile-status-height: 20px;
 
   /* --- Layers --------------------------------------------------------------
@@ -279,6 +317,9 @@ body.is-web #APPLICATION {
 
 /* Bottom thin bar */
 #APP_BOTTOM_BAR {
+  /* Its switches keep their small shape: about 8px trays round 6px
+     segments. */
+  --ctl-r: calc(6px + 0.15rem);
   position: fixed;
   bottom: 0;
   left: 0;
@@ -302,7 +343,9 @@ body.is-web #APPLICATION {
     radial-gradient(circle at 20% -70%, rgb(var(--status-pending-rgb) / 0.28), transparent 70%),
     linear-gradient(160deg, rgba(20, 51, 88, 0.98), rgba(14, 35, 64, 0.98));
   border: 1px solid rgb(var(--status-pending-rgb) / 0.45);
-  border-radius: var(--radius-lg);
+  /* Like the toasts: its button (--item-r) sits about 10px in. */
+  --ctl-r: var(--item-r);
+  border-radius: calc(var(--item-r) + 10px);
   box-shadow:
     0 14px 30px rgba(4, 24, 48, 0.5),
     inset 0 1px 0 rgba(187, 228, 255, 0.12);
@@ -483,6 +526,53 @@ body.is-web #APPLICATION {
    their own. */
 .btn {
   border: none;
+  border-radius: var(--ctl-r);
+}
+
+/* --- Radius tiers (see the Radii tokens) ------------------------------------
+   Which radius a control takes depends on what it sits in: these containers
+   set --ctl-r for whatever sits straight in their padding. */
+.modal-content {
+  --ctl-r: var(--inner-r);
+}
+
+/* Bootstrap's rounding utilities only ever wrap a padded card or row here
+   (.bg-ghost.p-2 and friends), so they are the inner tier, and what sits in
+   them is the item tier. A card with no padding of its own still lines up
+   with the panel it sits in. */
+.rounded,
+.rounded-1,
+.rounded-2,
+.rounded-3 {
+  border-radius: var(--inner-r) !important;
+  --ctl-r: var(--item-r);
+}
+/* One card straight inside another's padding is an item. */
+:is(.rounded, .rounded-1, .rounded-2, .rounded-3)
+  :is(.rounded, .rounded-1, .rounded-2, .rounded-3) {
+  border-radius: var(--item-r) !important;
+}
+
+/* Bootstrap 5.0's own groups flatten the inner corners of their parts; the
+   fields' radius rule carries !important, so restate those corners. */
+.input-group > :not(:last-child):not(.dropdown-toggle):not(.dropdown-menu),
+.input-group > :not(:last-child) > .form-control,
+.btn-group > .btn:not(:last-child) {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+.input-group > :not(:first-child):not(.dropdown-menu),
+.input-group > :not(:first-child) > .form-control,
+.btn-group > .btn:not(:first-child) {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+/* A hidden end part (the FreeKiosk key's Remove button, shown only on the Web
+   UI) hands the rounded end back to its neighbour. */
+.input-group > :has(+ .d-none:last-child),
+.input-group > :has(+ .d-none:last-child) > .form-control {
+  border-top-right-radius: var(--ctl-r) !important;
+  border-bottom-right-radius: var(--ctl-r) !important;
 }
 
 .btn-ghost {
@@ -580,8 +670,11 @@ body.is-web #APPLICATION {
 /* A toolbar row of content-sized buttons sits on a faint panel so it reads as
    an action bar. Rows of full-width buttons go without. */
 .st-action-row {
-  padding: 6px;
-  border-radius: var(--radius-md);
+  --st-action-row-pad: 6px;
+  padding: var(--st-action-row-pad);
+  /* Sits straight in a modal's padding; its buttons sit concentric in it. */
+  border-radius: var(--inner-r);
+  --ctl-r: calc(var(--inner-r) - var(--st-action-row-pad));
   background-color: var(--surface-ghost);
 }
 

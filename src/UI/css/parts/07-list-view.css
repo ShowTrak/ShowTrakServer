@@ -208,35 +208,34 @@ body.list-mode .group-drop-zone {
   gap: 3px !important;
   padding: 4px !important;
   margin: 4px 0 0 0 !important;
-  border-radius: var(--radius-md) !important;
+  /* a row's corners plus the 4px the rows sit in */
+  border-radius: calc(var(--tile-r) + 4px) !important;
 }
 
 /* A group's colour tint is a Grid/Compact thing: in the list it would fight
    the degraded/offline rows, which are the colour that matters here. */
 body.list-mode .group-drop-zone.group-tinted {
   background-color: var(--surface-ghost) !important;
-  box-shadow: none;
 }
 
 body.list-mode .group-drop-zone > .dnd-ghost,
 body.list-mode .group-drop-zone > .dnd-source-spacer {
   width: 100% !important;
   height: var(--list-row-height) !important;
-  border-radius: var(--radius-sm);
+  border-radius: var(--tile-r);
 }
 
 /* One row-height line, "Empty Group - This group has no clients.", in place
-   of the tile view's 100px centred block. */
+   of the tile view's 100px block, centred both ways like it. */
 body.list-mode .SHOWTRAK_PC_PLACEHOLDER {
   display: flex;
   flex-direction: row;
-  justify-content: flex-start;
-  align-items: baseline;
+  justify-content: center;
+  align-items: center;
   gap: 0.5rem;
   min-height: var(--list-row-height);
   padding: 0 10px !important;
-  align-content: center;
-  text-align: left;
+  text-align: center;
 }
 
 body.list-mode .SHOWTRAK_PC_PLACEHOLDER h5 {
@@ -264,7 +263,7 @@ body.list-mode .SHOWTRAK_PC {
   align-content: stretch;
   padding: 0 var(--list-row-padding);
   /* The same radius as a grid tile. */
-  border-radius: var(--radius-md);
+  border-radius: var(--tile-r);
   text-align: left;
 }
 
@@ -694,7 +693,9 @@ body.list-mode .LIST_HISTORY .status-timeline-block {
   padding: 0 6px 0 12px;
   background: rgb(var(--surface-2-rgb) / 0.97);
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius-md);
+  /* The clear button sits 6px in (5px of height plus the border, and the
+     right padding), so the bar's corners are its corners plus 6px. */
+  border-radius: calc(var(--item-r) + 6px);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
   color: var(--text-strong);
 }
@@ -755,7 +756,7 @@ body.list-mode #LIST_SEARCH {
   height: 24px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--item-r);
   background: transparent;
   color: rgba(255, 255, 255, 0.6);
   font-size: var(--fs-sm);
