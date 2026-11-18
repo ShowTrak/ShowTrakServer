@@ -2095,6 +2095,23 @@ Manager.ReconcileOrphanedGroups = async (ValidGroupIDs: unknown) => {
   return Ok(Changed);
 };
 
+// Run a reorder's writes as one transaction: one commit (and one WAL fsync)
+// for the whole drag, instead of one or two per client in the group. The
+// per-client setters are unchanged and still emit ClientUpdated for each client
+// (SDK consumers see those); their writes, issued inside the transaction's
+// context, join it. If a transaction cannot be opened at all, the writes run
+// on their own as they always did.
+async function InOneCommit(Apply: () => Promise<void>): Promise<void> {
+  let Applied = false;
+  const [Err] = await DB.WithTransaction(async () => {
+    Applied = true;
+    await Apply();
+  });
+  if (!Err) return;
+  Logger.error('Failed to commit the group order as one transaction:', Err);
+  if (!Applied) await Apply();
+}
+
 // Persist a specific order of clients in a group and optionally move clients into that group
 // orderedUUIDs: string[] in the desired order. Any client not in orderedUUIDs will retain existing weight.
 Manager.SetGroupOrder = async (GroupID: unknown, orderedUUIDs: unknown) => {
@@ -2102,19 +2119,21 @@ Manager.SetGroupOrder = async (GroupID: unknown, orderedUUIDs: unknown) => {
   // normalize GroupID null
   const TargetGroupID = (GroupID === undefined ? null : GroupID) as number | string | null;
   const Moved: Client[] = [];
-  let weight = 10;
-  for (const uuid of orderedUUIDs) {
-    const [err, client] = await Manager.Get(uuid);
-    if (err) continue;
-    if (!client) continue;
-    // move to target group if needed
-    if (client.GroupID !== TargetGroupID) {
-      const [MoveErr] = await client.SetGroupID(TargetGroupID, { Silent: true });
-      if (!MoveErr) Moved.push(client);
+  await InOneCommit(async () => {
+    let weight = 10;
+    for (const uuid of orderedUUIDs) {
+      const [err, client] = await Manager.Get(uuid);
+      if (err) continue;
+      if (!client) continue;
+      // move to target group if needed
+      if (client.GroupID !== TargetGroupID) {
+        const [MoveErr] = await client.SetGroupID(TargetGroupID, { Silent: true });
+        if (!MoveErr) Moved.push(client);
+      }
+      await client.SetWeight(weight);
+      weight += 10;
     }
-    await client.SetWeight(weight);
-    weight += 10;
-  }
+  });
   // Emit a single list changed after batch
   BroadcastManager.emit('ClientListChanged');
   await RecordGroupMoves(Moved, TargetGroupID);
@@ -2132,17 +2151,19 @@ Manager.SetGroupOrderWithWeights = async (
   if (orderedUUIDs.length !== weights.length) return Fail('Length mismatch');
   const TargetGroupID = (GroupID === undefined ? null : GroupID) as number | string | null;
   const Moved: Client[] = [];
-  for (let i = 0; i < orderedUUIDs.length; i++) {
-    const uuid = orderedUUIDs[i];
-    const w = Number(weights[i]) || 0;
-    const [err, client] = await Manager.Get(uuid);
-    if (err || !client) continue;
-    if (client.GroupID !== TargetGroupID) {
-      const [MoveErr] = await client.SetGroupID(TargetGroupID, { Silent: true });
-      if (!MoveErr) Moved.push(client);
+  await InOneCommit(async () => {
+    for (let i = 0; i < orderedUUIDs.length; i++) {
+      const uuid = orderedUUIDs[i];
+      const w = Number(weights[i]) || 0;
+      const [err, client] = await Manager.Get(uuid);
+      if (err || !client) continue;
+      if (client.GroupID !== TargetGroupID) {
+        const [MoveErr] = await client.SetGroupID(TargetGroupID, { Silent: true });
+        if (!MoveErr) Moved.push(client);
+      }
+      await client.SetWeight(w);
     }
-    await client.SetWeight(w);
-  }
+  });
   BroadcastManager.emit('ClientListChanged');
   await RecordGroupMoves(Moved, TargetGroupID);
   return Ok(true);

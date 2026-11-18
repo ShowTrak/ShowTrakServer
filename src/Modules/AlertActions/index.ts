@@ -25,6 +25,42 @@ for (const Mod of ActionModules) {
   Actions.set(Mod.ID, Mod);
 }
 
+// Actions that call out over the network, each of which can take its full
+// timeout (5 s by default) against an unreachable host.
+const OUTBOUND_ACTIONS = new Set([
+  'http-api',
+  'discord-webhook',
+  'slack-webhook',
+  'teams-webhook',
+  'telegram-bot',
+]);
+
+// At most this many outbound actions are in flight at once; the rest wait their
+// turn, first come first served. Alerts no longer wait on one another (see
+// AlertsManager), so a burst (the settle sweep raising every client that was
+// already offline at start-up) would otherwise open a connection per alert per
+// webhook at the same moment. Local actions (in-app alerts, sounds, OSC) never
+// wait for a slot.
+const MAX_OUTBOUND_IN_FLIGHT = 16;
+let OutboundInFlight = 0;
+const OutboundQueue: Array<() => void> = [];
+
+function AcquireOutboundSlot(): Promise<void> {
+  if (OutboundInFlight < MAX_OUTBOUND_IN_FLIGHT) {
+    OutboundInFlight += 1;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => OutboundQueue.push(resolve));
+}
+
+// Hand the slot straight to the next waiter, so a new arrival can never slip in
+// between and push the count over the limit.
+function ReleaseOutboundSlot(): void {
+  const Next = OutboundQueue.shift();
+  if (Next) Next();
+  else OutboundInFlight -= 1;
+}
+
 function publicShape(Action: AlertAction) {
   return {
     ID: Action.ID,
@@ -97,7 +133,15 @@ const Manager = {
         ...ActionConfig,
         Settings: Normalized,
       };
-      return await Action.Execute(Prepared, Context, Logger.child(Type));
+      if (!OUTBOUND_ACTIONS.has(Type)) {
+        return await Action.Execute(Prepared, Context, Logger.child(Type));
+      }
+      await AcquireOutboundSlot();
+      try {
+        return await Action.Execute(Prepared, Context, Logger.child(Type));
+      } finally {
+        ReleaseOutboundSlot();
+      }
     } catch (Err) {
       return {
         Success: false,

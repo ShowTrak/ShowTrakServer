@@ -64,7 +64,7 @@ test('SettingsManager coerces values, persists updates, and emits events', async
   const dbMock = {
     Manager: {
       Ready: async () => {},
-      Get: async (_sql, params) => [null, persistedValues.get(params[0]) || null],
+      All: async () => [null, [...persistedValues].map(([Key, Row]) => ({ Key, ...Row }))],
       Run: async (sql, params) => {
         runCalls.push([sql, params]);
         return [null, { changes: 1 }];
@@ -146,7 +146,7 @@ test('SettingsManager clamps INTEGER settings to Min/Max on read and write', asy
   const dbMock = {
     Manager: {
       Ready: async () => {},
-      Get: async (_sql, params) => [null, persistedValues.get(params[0]) || null],
+      All: async () => [null, [...persistedValues].map(([Key, Row]) => ({ Key, ...Row }))],
       Run: async () => [null, { changes: 1 }],
     },
   };
@@ -214,9 +214,17 @@ test('SettingsManager keeps install-scoped settings out of the show database', a
   const dbMock = {
     Manager: {
       Ready: async () => {},
-      Get: async (_sql, params) => {
-        dbReads.push(params[0]);
-        return [null, null];
+      // The show file also holds a stale copy of the install setting, from
+      // before it became install-scoped; it must never be the value used.
+      All: async (sql) => {
+        dbReads.push(sql);
+        return [
+          null,
+          [
+            { Key: 'SHOW_SETTING', Value: '0' },
+            { Key: 'INSTALL_SETTING', Value: '0' },
+          ],
+        ];
       },
       Run: async (_sql, params) => {
         dbWrites.push(params[0]);
@@ -228,11 +236,17 @@ test('SettingsManager keeps install-scoped settings out of the show database', a
   const installValues = new Map([['INSTALL_SETTING', '1']]);
   const installWrites = [];
   const installStore = {
-    GetByKey: async (Key) =>
-      installValues.has(Key) ? [null, { Key, Value: installValues.get(Key) }] : [null, null],
+    GetAll: async () => [null, [...installValues].map(([Key, Value]) => ({ Key, Value }))],
     Upsert: async (Key, Value) => {
       installWrites.push([Key, Value]);
       installValues.set(Key, Value);
+      return [null, true];
+    },
+    UpsertMany: async (Values) => {
+      for (const [Key, Value] of Object.entries(Values)) {
+        installWrites.push([Key, Value]);
+        installValues.set(Key, Value);
+      }
       return [null, true];
     },
   };
@@ -250,7 +264,8 @@ test('SettingsManager keeps install-scoped settings out of the show database', a
   });
 
   assert.equal(await Manager.GetValue('INSTALL_SETTING'), true);
-  assert.deepEqual(dbReads, ['SHOW_SETTING']);
+  // Every show-file setting comes from one SELECT, not a query per key.
+  assert.equal(dbReads.length, 1);
 
   await Manager.Set('INSTALL_SETTING', false);
   await Manager.Set('SHOW_SETTING', true);
@@ -291,17 +306,20 @@ test('an install-scoped setting adopts the open show value once, then ignores sh
   const dbMock = {
     Manager: {
       Ready: async () => {},
-      Get: async (_sql, params) => [null, showValues.get(params[0]) || null],
+      All: async () => [null, [...showValues].map(([Key, Row]) => ({ Key, ...Row }))],
       Run: async () => [null, { changes: 1 }],
     },
   };
 
   const installValues = new Map();
   const installStore = {
-    GetByKey: async (Key) =>
-      installValues.has(Key) ? [null, { Key, Value: installValues.get(Key) }] : [null, null],
+    GetAll: async () => [null, [...installValues].map(([Key, Value]) => ({ Key, Value }))],
     Upsert: async (Key, Value) => {
       installValues.set(Key, Value);
+      return [null, true];
+    },
+    UpsertMany: async (Values) => {
+      for (const [Key, Value] of Object.entries(Values)) installValues.set(Key, Value);
       return [null, true];
     },
   };

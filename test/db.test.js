@@ -687,3 +687,79 @@ test('AlertHistory repository prunes to the newest N rows', async () => {
 
   await DB.Shutdown();
 });
+
+test('opening an older show file strips RawData from its alert history', async () => {
+  // Rows written before the history projection carried the whole live entity
+  // under Context.RawData; migration 60 removes it and keeps the rest.
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const { Manager: DB } = loadDB(storageDir);
+  await DB.Ready();
+  const Old = {
+    TriggerType: 'CLIENT_OFFLINE',
+    EntityName: 'Cab 1',
+    RawData: { Big: 'x'.repeat(5000) },
+  };
+  const Insert =
+    'INSERT INTO AlertHistory (RuleID, TriggerType, TriggerSource, Context, Result, Timestamp) VALUES (1, ?, ?, ?, ?, ?)';
+  await DB.Run(Insert, ['CLIENT_OFFLINE', 'client', JSON.stringify(Old), '{}', Date.now()]);
+  await DB.Run(Insert, ['CLIENT_OFFLINE', 'client', 'not json', '{}', Date.now()]);
+  // Make the file look like one saved before migration 60.
+  await DB.Run('DELETE FROM SchemaMigrations WHERE Version >= 60');
+  const showFile = path.join(storageDir, 'older.ShowTrak');
+  const [snapErr] = await DB.SnapshotTo(showFile);
+  assert.equal(snapErr, null);
+
+  const [openErr] = await DB.ReplaceWithFile(showFile);
+  assert.equal(openErr, null);
+  const [, rows] = await DB.All('SELECT Context FROM AlertHistory ORDER BY HistoryID');
+  assert.deepEqual(JSON.parse(rows[0].Context), {
+    TriggerType: 'CLIENT_OFFLINE',
+    EntityName: 'Cab 1',
+  });
+  // A row that is not JSON is left alone rather than failing the migration.
+  assert.equal(rows[1].Context, 'not json');
+  // Schema maintenance is not an edit.
+  assert.equal(await DB.HasUnsavedChanges(), false);
+
+  await DB.Shutdown();
+});
+
+test('DB.CompactIfFragmented vacuums only a mostly-free working database', async () => {
+  const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-db-'));
+  const { Manager: DB } = loadDB(storageDir);
+  await DB.Ready();
+
+  // A fresh database has nothing worth reclaiming.
+  assert.deepEqual(await DB.CompactIfFragmented({ MinFreeBytes: 0 }), [null, false]);
+
+  const Payload = 'x'.repeat(4000);
+  await DB.WithTransaction(async (run) => {
+    for (let i = 0; i < 500; i++) {
+      await run(
+        'INSERT INTO AlertHistory (RuleID, TriggerType, TriggerSource, Context, Result, Timestamp) VALUES (1, ?, ?, ?, ?, ?)',
+        ['CLIENT_OFFLINE', 'client', Payload, '{}', i]
+      );
+    }
+  });
+  await DB.RunWithoutDirtyTracking('DELETE FROM AlertHistory');
+  DB.MarkClean();
+  const PageCount = async () => (await DB.Get('PRAGMA page_count'))[1].page_count;
+  const Before = await PageCount();
+
+  // Below the byte floor it is left alone, whatever the ratio.
+  assert.deepEqual(await DB.CompactIfFragmented({ MinFreeBytes: 1024 * 1024 * 1024 }), [
+    null,
+    false,
+  ]);
+
+  // A statement issued while the VACUUM holds the connection waits for it.
+  const Compacting = DB.CompactIfFragmented({ MinFreeBytes: 0 });
+  const Reading = DB.Get('SELECT COUNT(*) AS N FROM AlertHistory');
+  assert.deepEqual(await Compacting, [null, true]);
+  assert.deepEqual(await Reading, [null, { N: 0 }]);
+  assert.ok((await PageCount()) < Before / 4, 'the free pages were given back');
+  // The working file is not the show: compacting it is not an edit.
+  assert.equal(await DB.HasUnsavedChanges(), false);
+
+  await DB.Shutdown();
+});

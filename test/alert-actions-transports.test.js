@@ -404,3 +404,64 @@ test('osc-trigger action reports failures when the client throws', async () => {
   assert.equal(result.Success, false);
   assert.match(result.Error, /socket failed/);
 });
+
+test('outbound actions share a bounded pool; local actions never wait for it', async () => {
+  let inFlight = 0;
+  let peak = 0;
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const shownAlerts = [];
+  const slowWebhook = {
+    ID: 'http-api',
+    Name: 'HTTP',
+    Settings: [],
+    Execute: async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await gate;
+      inFlight -= 1;
+      return { Success: true };
+    },
+  };
+  const inApp = {
+    ID: 'showtrak-alert',
+    Name: 'Alert',
+    Settings: [],
+    Execute: async () => {
+      shownAlerts.push(true);
+      return { Success: true };
+    },
+  };
+  const stub = (ID) => ({ ID, Name: ID, Settings: [], Execute: async () => ({ Success: true }) });
+  const { Manager } = loadWithMocks(actionPath('index.js'), {
+    '../Logger': { CreateLogger: () => ({ ...loggerStub(), child: () => loggerStub() }) },
+    './showtrak-alert': inApp,
+    './play-sound': stub('play-sound'),
+    './play-custom-audio': stub('play-custom-audio'),
+    './osc-trigger': stub('osc-trigger'),
+    './http-api': slowWebhook,
+    './discord-webhook': stub('discord-webhook'),
+    './slack-webhook': stub('slack-webhook'),
+    './teams-webhook': stub('teams-webhook'),
+    './telegram-bot': stub('telegram-bot'),
+  });
+
+  const webhooks = Array.from({ length: 20 }, () =>
+    Manager.Execute({ Type: 'http-api', Settings: {} }, {})
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(inFlight, 16, 'the first 16 start; the rest queue');
+
+  // An in-app alert raised while the pool is full is not held up by it.
+  assert.deepEqual(await Manager.Execute({ Type: 'showtrak-alert', Settings: {} }, {}), {
+    Success: true,
+  });
+  assert.equal(shownAlerts.length, 1);
+
+  release();
+  const results = await Promise.all(webhooks);
+  assert.ok(results.every((r) => r.Success));
+  assert.equal(peak, 16);
+});

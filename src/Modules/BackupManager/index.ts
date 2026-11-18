@@ -121,7 +121,7 @@ const Manager = {
   // Copy a show file, untouched, into the Backups folder before anything is
   // written to it. The copy is named after the original and the version that
   // last saved it, e.g. "Main Stage (v3.28.0) 2026-10-26 14-03-12.ShowTrak".
-  BackupFile(FilePath: string, FileVersion: string | null): BackupResult<string> {
+  async BackupFile(FilePath: string, FileVersion: string | null): Promise<BackupResult<string>> {
     try {
       const Dir = AppDataManager.GetBackupsDirectory();
       if (!fs.existsSync(Dir)) fs.mkdirSync(Dir, { recursive: true });
@@ -130,7 +130,9 @@ const Manager = {
       const Stem = `${Base} (v${FileVersion || 'unknown'}) ${BackupTimestamp(new Date())}`;
       let Target = path.join(Dir, `${Stem}${Ext}`);
       for (let n = 2; fs.existsSync(Target); n++) Target = path.join(Dir, `${Stem} (${n})${Ext}`);
-      fs.copyFileSync(FilePath, Target, fs.constants.COPYFILE_EXCL);
+      // Asynchronous: a show file can be tens of megabytes, and a synchronous
+      // copy stalled every client socket and monitor for its duration.
+      await fs.promises.copyFile(FilePath, Target, fs.constants.COPYFILE_EXCL);
       SafeToOverwrite.add(SamePathKey(FilePath));
       Logger.log('Backed up show file before upgrading it:', FilePath, '->', Target);
       return [null, Target];
@@ -195,7 +197,7 @@ const Manager = {
       PendingUpgrade = null;
       return ['ShowTrak file does not exist', null];
     }
-    const [BackupErr, BackupPath] = Manager.BackupFile(Upgrade.FilePath, Upgrade.FileVersion);
+    const [BackupErr, BackupPath] = await Manager.BackupFile(Upgrade.FilePath, Upgrade.FileVersion);
     if (BackupErr || !BackupPath) return [BackupErr, null];
     PendingUpgrade = null;
     if (!IsSamePath(Upgrade.FilePath, CurrentFilePath)) {
@@ -284,7 +286,7 @@ const Manager = {
           Logger.warn('Refusing to save over an older show file before its upgrade is confirmed');
           return ['Confirm the show file upgrade before saving', null];
         }
-        const [BackupErr] = Manager.BackupFile(Path, Inspection.FileVersion);
+        const [BackupErr] = await Manager.BackupFile(Path, Inspection.FileVersion);
         if (BackupErr) return [BackupErr, null];
       }
     }

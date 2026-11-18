@@ -10,18 +10,10 @@
 // broadcast subscribers, and the deployment orchestration) now lives under
 // src/main/ (registrars/, broadcast-bridge.ts, deployment.ts, initial-state.ts).
 import type { BrowserWindow as ElectronBrowserWindow } from 'electron';
+// Process set-up that has to come before any module loads (the libuv thread
+// pool size, V8's compile cache) is done by the entry point, ./boot.ts, which
+// then loads this file as part of the main-process bundle.
 const { app, BrowserWindow } = require('electron/main');
-// Cache V8's compiled code for every module loaded from here on, so later
-// launches skip re-parsing the main process (keyed by file content, so an update
-// invalidates it). First, before the rest of the tree is required. Best-effort:
-// startup never depends on it.
-try {
-  require('node:module').enableCompileCache?.(
-    require('node:path').join(app.getPath('userData'), 'compile-cache')
-  );
-} catch {
-  /* intentional: an unavailable cache only costs the speed-up */
-}
 const { powerMonitor, autoUpdater: nativeAutoUpdater } = require('electron');
 if (require('electron-squirrel-startup')) app.quit();
 
@@ -58,7 +50,7 @@ import { whenInitialStateDelivered } from './main/first-paint';
 // managers are loaded during this module's evaluation via the registrar and
 // broadcast-bridge requires below (each manager pulls its own dependencies).
 import { Manager as ScriptManager } from './Modules/ScriptManager';
-ScriptManager.GetScripts();
+ScriptManager.GetScripts().catch((Err: unknown) => Logger.error('Failed to load scripts:', Err));
 import { Manager as SampleScriptsManager } from './Modules/SampleScripts';
 SampleScriptsManager.Initialize();
 import './Modules/Server'; // binds HTTP + Socket.IO server on load
@@ -204,9 +196,13 @@ app.whenReady().then(async () => {
     setMainWindow(null);
   }
 
-  setAccidentalShutdownProtection(
-    !!(await SettingsManager.GetValue('SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4'))
-  );
+  // Applied once settings have loaded, without holding up the windows: their
+  // creation and page loads overlap the database opening instead of waiting
+  // for it. Nothing can be closed before then; the main window is not shown
+  // until the renderer has its (settings-dependent) initial state.
+  SettingsManager.GetValue('SYSTEM_CONFIRM_SHUTDOWN_ON_ALT_F4')
+    .then((Enabled) => setAccidentalShutdownProtection(!!Enabled))
+    .catch((Err: unknown) => Logger.error('Failed to apply shutdown protection:', Err));
 
   // Lightweight splash that keeps the app responsive while heavy init finishes
   PreloaderWindow = new BrowserWindow({
@@ -302,8 +298,8 @@ app.whenReady().then(async () => {
     AudioAssetManager.Init()
       .then(() => ValidateAlertAudioAssets())
       .catch((Err: unknown) => Logger.error('Failed to init AudioAssetManager:', Err));
-    // The FOG poller always starts; it reports "not enabled" until the setting is
-    // turned on, which is what lets the toggle take effect without a restart.
+    // The FOG poller always starts; while the integration is disabled it polls
+    // once and stops, and turning the setting on starts it without a restart.
     // Deliberately not awaited: a slow or unreachable FOG server must not hold up
     // the main window appearing.
     FogManager.Start().catch((Err: unknown) => Logger.error('Failed to start FogManager:', Err));
@@ -324,6 +320,9 @@ app.whenReady().then(async () => {
     }
     MainWindow.show();
     Logger.debug('[startup] main window shown');
+    // Housekeeping that must not compete with startup: compact the working
+    // database if a past session left it mostly free space (./main/db-maintenance).
+    StartDatabaseMaintenance();
     // Write the compile cache now that startup has loaded everything it needs:
     // Node only writes it at a clean exit otherwise, which a hard stop skips.
     try {
@@ -370,6 +369,7 @@ import {
 } from './main/broadcast-bridge';
 import { RegisterAllHandlers } from './main/registrars';
 import { StartHistoryRetentionSweep } from './main/history-retention';
+import { StartDatabaseMaintenance } from './main/db-maintenance';
 import { Manager as AuditLog } from './Modules/AuditLog';
 import { RegisterAuditRecorder } from './main/audit-recorder';
 // The audit log (its own database in app data, never the show file) starts

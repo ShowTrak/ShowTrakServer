@@ -682,6 +682,72 @@ test('AlertsManager announces start-up faults that outlast the settle period', a
   assert.equal(executeCalls.length, 3, 'a genuine outage after start-up still alerts immediately');
 });
 
+// A slow action (an unreachable webhook) must not hold up every other alert:
+// the sweep raises its faults together, and the rules matching one event run
+// side by side.
+test('AlertsManager raises swept faults and matching rules concurrently', async () => {
+  const started = [];
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const rule = (RuleID, Route) => ({
+    RuleID,
+    Title: `Rule ${RuleID}`,
+    Scope: JSON.stringify({ Workspace: true, Groups: [], Clients: [] }),
+    TriggerType: JSON.stringify(['CLIENT_OFFLINE']),
+    TriggerConfig: JSON.stringify({}),
+    Actions: JSON.stringify([{ Type: 'http-api', Settings: { Route } }]),
+    Enabled: 1,
+    Timestamp: 1,
+    UpdatedAt: 1,
+  });
+  const rules = [rule(1, '/a'), rule(2, '/b')];
+
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'AlertsManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => ({ error: () => {} }) },
+    '../DB': {
+      Manager: {
+        All: async () => [null, rules],
+        Run: async () => [null, { changes: 1 }],
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
+      },
+    },
+    '../AlertActions': {
+      Manager: {
+        GetAll: () => [],
+        Execute: async (action, context) => {
+          started.push(`${context.EntityName} ${action.Settings.Route}`);
+          await gate;
+          return { Success: true };
+        },
+      },
+    },
+    '../Broadcast': { Manager: { emit: () => {} } },
+    '../Utils': require('../dist/Modules/Utils'),
+  });
+  await Manager.Init();
+
+  const Sweep = Manager.FlushSettledBaselineFaults(0, [
+    { UUID: 'c1', Nickname: 'Booth 1', Online: false },
+    { UUID: 'c2', Nickname: 'Booth 2', Online: false },
+    { UUID: 'c3', Nickname: 'Booth 3', Online: false },
+  ]);
+  // Let every queued evaluation reach its actions while none can finish.
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(started.sort(), [
+    'Booth 1 /a',
+    'Booth 1 /b',
+    'Booth 2 /a',
+    'Booth 2 /b',
+    'Booth 3 /a',
+    'Booth 3 /b',
+  ]);
+  release();
+  assert.equal(await Sweep, 3);
+});
+
 test('AlertsManager holds a start-up fault until the settle period has actually passed', async () => {
   const executeCalls = [];
 
@@ -897,7 +963,11 @@ test('AlertsManager suppresses offline alerts for unassigned client slots', asyn
   const { Manager } = loadWithMocks(modulePath, {
     '../Logger': { CreateLogger: () => ({ error: () => {} }) },
     '../DB': {
-      Manager: { All: async () => [null, rules], Run: async () => [null, { changes: 1 }] },
+      Manager: {
+        All: async () => [null, rules],
+        Run: async () => [null, { changes: 1 }],
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
+      },
     },
     '../AlertActions': {
       Manager: {

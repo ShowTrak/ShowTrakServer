@@ -5,7 +5,8 @@
 // save, so a one-line CSS change dropped every connected client and the open
 // show's live state. Here each kind of source has its own incremental watcher:
 //
-//   main process (src/**/*.ts)    tsc --watch     -> restart Electron
+//   main process (src/**/*.ts)    tsc --watch,    -> restart Electron
+//                                 then the bundle (scripts/build-main.js)
 //   renderer (src/UI/js/app)      esbuild watch   -> reload the window
 //   markup / CSS / static assets  copy on change  -> reload the window
 //   protocol runtime (shared/)    build:shared    -> tsc picks it up
@@ -122,6 +123,12 @@ function watchMainProcess() {
       return;
     }
     if (match[1] === '0') {
+      // The app runs the bundle (package.json "main" -> dist/boot.js), so the
+      // fresh per-file output is bundled before the restart picks it up.
+      if (runScript('build-main.js') !== 0) {
+        log('Bundling the main process failed; keeping the running app.');
+        return;
+      }
       log('Main process rebuilt; restarting Electron.');
       restartElectron();
     } else {

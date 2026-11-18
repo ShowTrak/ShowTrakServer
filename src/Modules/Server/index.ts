@@ -38,52 +38,19 @@ import type { AudioLevelRequest } from '@showtrak/protocol';
 import type { Result } from '../../types/result';
 import { Manager as IdentifyManager } from '../IdentifyManager';
 import { RunWithAuditSource } from '../AuditLog/source';
+import { DIST_ROOT } from '../Config/dist-root';
+import { CreateWebUiAssetHandler } from './static-assets';
 
 const Logger = CreateLogger('WebServer');
 
 const HTTP = require('http');
+import type { IncomingMessage, ServerResponse } from 'http';
 import { Server as WebServer } from 'socket.io';
-const express = require('express');
 
 // HTTP server backing express + Socket.IO
 const Server = HTTP.createServer();
 Server.on('error', (e: NodeJS.ErrnoException) => {
   Logger.error('HTTP/Socket server error:', e && e.code ? e.code : e);
-});
-
-const app = express();
-
-UpdateManager.RegisterRoutes(app);
-
-app.use('/API', (req: Request, res: Response, next: NextFunction) => {
-  const startAt = Date.now();
-  res.on('finish', () => {
-    const statusCode = Number(res.statusCode || 0);
-    const sourceIP =
-      req.ip ||
-      (req.socket && req.socket.remoteAddress) ||
-      (req.connection && req.connection.remoteAddress) ||
-      null;
-
-    const detailParts: string[] = [];
-    if (res.locals && res.locals.debugTrafficDetail) {
-      detailParts.push(String(res.locals.debugTrafficDetail));
-    }
-    detailParts.push(`${statusCode || '---'}`);
-    if (Date.now() - startAt >= 0) detailParts.push(`${Date.now() - startAt}ms`);
-    if (sourceIP) detailParts.push(sourceIP);
-
-    Logger.log(`API ${req.method} ${req.originalUrl} -> ${statusCode}`);
-    require('../Broadcast').Manager.emit('DebugTrafficEntry', {
-      protocol: 'http',
-      timestamp: Date.now(),
-      valid: statusCode > 0 && statusCode < 400,
-      summary: `${req.method} ${req.originalUrl || req.url || '/API'}`,
-      detail: detailParts.join(' • '),
-      source: sourceIP,
-    });
-  });
-  next();
 });
 
 function sendApiError(res: Response, httpStatus: number, code: string | number, message: unknown) {
@@ -249,83 +216,151 @@ const ClientsListHandler = async (req: Request, res: Response) => {
   return sendApiSuccess(res, { Data: Results, Count: Results.length });
 };
 
-// API Routes (in logical order)
-// 1. Query/List endpoint (first in the logical list)
-app.get('/API/Clients', ClientsListHandler);
+// The Express app behind every plain HTTP request: the HTTP API, the Web UI,
+// script downloads and the client update feed. Built on the first such request
+// rather than at startup. Express and its dependencies were the largest share
+// of the main process's load time, and Socket.IO traffic (every ShowTrak Client
+// and SDK connection) is answered by engine.io before it reaches this handler.
+function CreateHttpApp() {
+  const express = require('express');
+  const app = express();
 
-// 2-7. OSC routes mirrored to HTTP as POST (mirrors the logical order defined in OSC/index.js)
-//      System Control → Client → Dummy → Group → Tag → All
-// Mirror all OSC routes to HTTP API routes under /API. Clients/groups are
-// addressed by their slug (a raw UUID/GroupID is still accepted as a fallback).
-// Example: /API/Client/:Slug/WakeOnLAN -> /API/Client/:Slug/WakeOnLAN
-for (const Route of OSC.GetRoutes()) {
-  const NormalizedPath =
-    String(Route.Path || '').replace(/^\/(?:ShowTrak|API)(?=\/|$)/i, '') || '/';
-  const ApiPath = `/API${NormalizedPath === '/' ? '' : NormalizedPath}`;
-  const OSCToHTTPHandler = async (req: Request, res: Response) => {
-    const Params = req.params || {};
-    const SourceIP =
-      req.ip ||
-      (req.socket && req.socket.remoteAddress) ||
-      (req.connection && req.connection.remoteAddress) ||
-      null;
+  UpdateManager.RegisterRoutes(app);
 
-    let Result: Awaited<ReturnType<typeof Route.Callback>> | null = null;
-    try {
-      Result = await RunWithAuditSource(SourceIP ? `HTTP API (${SourceIP})` : 'HTTP API', () =>
-        Route.Callback(Params as Record<string, string>, { IP: SourceIP })
-      );
-    } catch (Error: unknown) {
-      const Message = String(
-        (Error && (Error as { message?: unknown }).message) ||
-          Error ||
-          `Unhandled error while processing ${Route.Path}`
-      );
-      res.locals.debugTrafficDetail = Message;
-      return sendApiError(res, 500, 'OSC_HTTP_HANDLER_EXCEPTION', Message);
-    }
+  app.use('/API', (req: Request, res: Response, next: NextFunction) => {
+    const startAt = Date.now();
+    res.on('finish', () => {
+      const statusCode = Number(res.statusCode || 0);
+      const sourceIP =
+        req.ip ||
+        (req.socket && req.socket.remoteAddress) ||
+        (req.connection && req.connection.remoteAddress) ||
+        null;
 
-    const Passed = Result && typeof Result === 'object' ? Result.ok !== false : Result !== false;
-    const Detail =
-      Result && typeof Result === 'object' && Result.detail
-        ? String(Result.detail)
-        : Route.Title || Route.Path;
+      const detailParts: string[] = [];
+      if (res.locals && res.locals.debugTrafficDetail) {
+        detailParts.push(String(res.locals.debugTrafficDetail));
+      }
+      detailParts.push(`${statusCode || '---'}`);
+      if (Date.now() - startAt >= 0) detailParts.push(`${Date.now() - startAt}ms`);
+      if (sourceIP) detailParts.push(sourceIP);
 
-    res.locals.debugTrafficDetail = Detail;
-    if (!Passed) {
-      return sendApiError(res, 400, 'OSC_ROUTE_FAILED', Detail);
-    }
-    return sendApiSuccess(res, {
-      Status: 'OK',
-      Detail,
+      Logger.log(`API ${req.method} ${req.originalUrl} -> ${statusCode}`);
+      require('../Broadcast').Manager.emit('DebugTrafficEntry', {
+        protocol: 'http',
+        timestamp: Date.now(),
+        valid: statusCode > 0 && statusCode < 400,
+        summary: `${req.method} ${req.originalUrl || req.url || '/API'}`,
+        detail: detailParts.join(' • '),
+        source: sourceIP,
+      });
     });
-  };
-  app.post(ApiPath, OSCToHTTPHandler);
-  // Actions are POST-only. A GET can be fired by any page a browser on the show
-  // network happens to load (an <img> or a link prefetch is enough), and these
-  // routes shut the server down, run scripts and reboot devices. A GET gets a
-  // 405 naming the fix rather than a 404, so an old integration fails legibly.
-  app.get(ApiPath, (_req: Request, res: Response) => {
-    res.locals.debugTrafficDetail = 'Action route called with GET';
-    res.set('Allow', 'POST');
-    return sendApiError(res, 405, 'METHOD_NOT_ALLOWED', 'Use POST for this action');
+    next();
   });
+
+  // API Routes (in logical order)
+  // 1. Query/List endpoint (first in the logical list)
+  app.get('/API/Clients', ClientsListHandler);
+
+  // 2-7. OSC routes mirrored to HTTP as POST (mirrors the logical order defined in OSC/index.js)
+  //      System Control → Client → Dummy → Group → Tag → All
+  // Mirror all OSC routes to HTTP API routes under /API. Clients/groups are
+  // addressed by their slug (a raw UUID/GroupID is still accepted as a fallback).
+  // Example: /API/Client/:Slug/WakeOnLAN -> /API/Client/:Slug/WakeOnLAN
+  for (const Route of OSC.GetRoutes()) {
+    const NormalizedPath =
+      String(Route.Path || '').replace(/^\/(?:ShowTrak|API)(?=\/|$)/i, '') || '/';
+    const ApiPath = `/API${NormalizedPath === '/' ? '' : NormalizedPath}`;
+    const OSCToHTTPHandler = async (req: Request, res: Response) => {
+      const Params = req.params || {};
+      const SourceIP =
+        req.ip ||
+        (req.socket && req.socket.remoteAddress) ||
+        (req.connection && req.connection.remoteAddress) ||
+        null;
+
+      let Result: Awaited<ReturnType<typeof Route.Callback>> | null = null;
+      try {
+        Result = await RunWithAuditSource(SourceIP ? `HTTP API (${SourceIP})` : 'HTTP API', () =>
+          Route.Callback(Params as Record<string, string>, { IP: SourceIP })
+        );
+      } catch (Error: unknown) {
+        const Message = String(
+          (Error && (Error as { message?: unknown }).message) ||
+            Error ||
+            `Unhandled error while processing ${Route.Path}`
+        );
+        res.locals.debugTrafficDetail = Message;
+        return sendApiError(res, 500, 'OSC_HTTP_HANDLER_EXCEPTION', Message);
+      }
+
+      const Passed = Result && typeof Result === 'object' ? Result.ok !== false : Result !== false;
+      const Detail =
+        Result && typeof Result === 'object' && Result.detail
+          ? String(Result.detail)
+          : Route.Title || Route.Path;
+
+      res.locals.debugTrafficDetail = Detail;
+      if (!Passed) {
+        return sendApiError(res, 400, 'OSC_ROUTE_FAILED', Detail);
+      }
+      return sendApiSuccess(res, {
+        Status: 'OK',
+        Detail,
+      });
+    };
+    app.post(ApiPath, OSCToHTTPHandler);
+    // Actions are POST-only. A GET can be fired by any page a browser on the show
+    // network happens to load (an <img> or a link prefetch is enough), and these
+    // routes shut the server down, run scripts and reboot devices. A GET gets a
+    // 405 naming the fix rather than a 404, so an old integration fails legibly.
+    app.get(ApiPath, (_req: Request, res: Response) => {
+      res.locals.debugTrafficDetail = 'Action route called with GET';
+      res.set('Allow', 'POST');
+      return sendApiError(res, 405, 'METHOD_NOT_ALLOWED', 'Use POST for this action');
+    });
+  }
+
+  app.use('/API', (_req: Request, res: Response) => {
+    res.locals.debugTrafficDetail = 'API route not found';
+    return sendApiError(res, 404, 'API_ROUTE_NOT_FOUND', 'API route not found');
+  });
+
+  // Script files for ShowTrak Clients, served exactly as before: clients verify
+  // what they download against its checksum, so nothing here re-encodes them.
+  const ScriptDirectory = AppDataManager.GetScriptsDirectory();
+  app.use(express.static(ScriptDirectory));
+  // Serve Web UI (PWA) at root. Its text assets go through the compressing
+  // handler (./static-assets); images, fonts and audio through express.static.
+  // Vendor URLs are versioned (and cached for long) only in a shipped build: a
+  // dev run changes vendor files without changing the version.
+  const WebUIRoot = path.join(DIST_ROOT, 'WebUI');
+  app.use(
+    CreateWebUiAssetHandler(WebUIRoot, {
+      VersionTag: process.defaultApp ? '' : Config.Application.Version,
+    })
+  );
+  app.use('/', express.static(WebUIRoot));
+  app.get('/', (_req: Request, res: Response) => {
+    res.sendFile(path.join(WebUIRoot, 'index.html'));
+  });
+  return app;
 }
 
-app.use('/API', (_req: Request, res: Response) => {
-  res.locals.debugTrafficDetail = 'API route not found';
-  return sendApiError(res, 404, 'API_ROUTE_NOT_FOUND', 'API route not found');
+let HttpApp: ((req: IncomingMessage, res: ServerResponse) => void) | null = null;
+Server.on('request', (req: IncomingMessage, res: ServerResponse) => {
+  if (!HttpApp) {
+    try {
+      HttpApp = CreateHttpApp() as (req: IncomingMessage, res: ServerResponse) => void;
+    } catch (Err) {
+      Logger.error('Failed to set up the HTTP server:', Err);
+      res.statusCode = 500;
+      res.end();
+      return;
+    }
+  }
+  HttpApp(req, res);
 });
-
-const ScriptDirectory = AppDataManager.GetScriptsDirectory();
-app.use(express.static(ScriptDirectory));
-// Serve Web UI (PWA) at root
-const WebUIRoot = path.join(__dirname, '../../WebUI');
-app.use('/', express.static(WebUIRoot));
-app.get('/', (_req: Request, res: Response) => {
-  res.sendFile(path.join(WebUIRoot, 'index.html'));
-});
-Server.on('request', app);
 
 // Initialize Socket.IO server with conservative timeouts. The generics bind
 // the default namespace to the shared wire contract: inbound events must match

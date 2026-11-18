@@ -6,6 +6,7 @@
 import { CreateLogger } from '../Logger';
 import { DefaultSettings, Groups } from './DefaultSettings';
 import type { SettingDefinition, SettingGroup, SettingValue } from './DefaultSettings';
+import type { SettingRow } from '../DB/rows';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as DB } from '../DB';
 import { CreateSettingsRepository } from '../DB/repositories/settings';
@@ -111,6 +112,60 @@ function RecordSettingChange(Setting: Setting, Previous: SettingValue, IsSecret:
   );
 }
 
+// Coerce a persisted or incoming value to the setting's declared type, so
+// stored strings/ints map to the declared Type and out-of-range or unknown
+// values fall back to the default. Shared by the load (Init) and write (Set)
+// paths so the two can never disagree about what a value means.
+function CoerceValue(
+  Setting: {
+    Type: SettingDefinition['Type'];
+    DefaultValue: SettingValue;
+    Options?: string[] | null;
+    Min?: number | null;
+    Max?: number | null;
+  },
+  val: unknown
+): SettingValue {
+  switch (Setting.Type) {
+    case 'BOOLEAN': {
+      if (typeof val === 'boolean') return val;
+      if (val === 1 || val === '1' || val === 'true') return true;
+      if (val === 0 || val === '0' || val === 'false') return false;
+      return !!val;
+    }
+    case 'INTEGER':
+    case 'SLIDER': {
+      if (val === null || val === undefined || val === '') return Setting.DefaultValue;
+      const n = parseInt(val as string, 10);
+      return isNaN(n) ? Setting.DefaultValue : ClampInteger(Setting, n);
+    }
+    case 'STRING':
+    case 'PASSWORD': {
+      return val == null ? '' : String(val);
+    }
+    case 'OPTION': {
+      if (Setting.Options && Array.isArray(Setting.Options)) {
+        return typeof val === 'string' && Setting.Options.includes(val)
+          ? val
+          : Setting.DefaultValue;
+      }
+      return val as SettingValue;
+    }
+    default: {
+      return val as SettingValue;
+    }
+  }
+}
+
+// Index persisted rows by key.
+function ByKey(Rows: SettingRow[] | null): Map<string, SettingRow> {
+  const Index = new Map<string, SettingRow>();
+  for (const Row of Rows || []) {
+    if (Row && typeof Row.Key === 'string') Index.set(Row.Key, Row);
+  }
+  return Index;
+}
+
 function ApplySettingRules(
   Setting: { Key?: string } | null | undefined,
   Value: unknown
@@ -146,59 +201,32 @@ const Manager: SettingsManagerShape = {
         await DB.Ready();
       }
 
+      // Every persisted value in one read per store: a single SELECT of the
+      // show's Settings table and a single read of the install store, rather
+      // than a query (or a file read and parse) per setting.
+      const [ShowErr, ShowRows] = await SettingsRepo.GetAll();
+      if (ShowErr) throw ShowErr;
+      const [InstallErr, InstallRows] = await InstallSettingsStore.GetAll();
+      if (InstallErr) throw InstallErr;
+      const ShowValues = ByKey(ShowRows);
+      const InstallValues = ByKey(InstallRows);
+      // Install-scoped settings adopted from the open show, written in one go.
+      const Seeds: Record<string, unknown> = {};
+
       for (const Setting of DefaultSettings) {
-        let [Err, ManualSetting] = await StoreFor(Setting).GetByKey(Setting.Key);
-        if (Err) throw Err;
+        let ManualSetting =
+          (Setting.Scope === 'INSTALL' ? InstallValues : ShowValues).get(Setting.Key) || null;
 
         // An install-scoped setting the install store has never seen used to be
         // stored per show file. Adopt the open show's value once (or the default)
         // and record it, so later show swaps never seed it again.
         if (Setting.Scope === 'INSTALL' && !ManualSetting) {
-          [Err, ManualSetting] = await SettingsRepo.GetByKey(Setting.Key);
-          if (Err) throw Err;
-          const [SeedErr] = await InstallSettingsStore.Upsert(
-            Setting.Key,
-            ManualSetting ? ManualSetting.Value : Setting.DefaultValue
-          );
-          if (SeedErr)
-            Logger.error(`Failed to migrate ${Setting.Key} to install settings:`, SeedErr);
+          ManualSetting = ShowValues.get(Setting.Key) || null;
+          Seeds[Setting.Key] = ManualSetting ? ManualSetting.Value : Setting.DefaultValue;
         }
 
-        // Normalize value based on type so persisted strings/ints map to the declared Setting.Type
-        const normalize = (val: unknown): SettingValue => {
-          switch (Setting.Type) {
-            case 'BOOLEAN': {
-              if (typeof val === 'boolean') return val;
-              if (val === 1 || val === '1' || val === 'true') return true;
-              if (val === 0 || val === '0' || val === 'false') return false;
-              return !!val;
-            }
-            case 'INTEGER':
-            case 'SLIDER': {
-              if (val === null || val === undefined || val === '') return Setting.DefaultValue;
-              const n = parseInt(val as string, 10);
-              return isNaN(n) ? Setting.DefaultValue : ClampInteger(Setting, n);
-            }
-            case 'STRING':
-            case 'PASSWORD': {
-              return val == null ? '' : String(val);
-            }
-            case 'OPTION': {
-              if (Setting.Options && Array.isArray(Setting.Options)) {
-                return typeof val === 'string' && Setting.Options.includes(val)
-                  ? val
-                  : Setting.DefaultValue;
-              }
-              return val as SettingValue;
-            }
-            default: {
-              return val as SettingValue;
-            }
-          }
-        };
-
         let EffectiveValue: SettingValue = ManualSetting
-          ? normalize(ManualSetting.Value)
+          ? CoerceValue(Setting, ManualSetting.Value)
           : Setting.DefaultValue;
         const [RuleErr, RuleValue] = ApplySettingRules(Setting, EffectiveValue);
         if (RuleErr) {
@@ -228,6 +256,16 @@ const Manager: SettingsManagerShape = {
         Settings.set(NewSetting.Key, NewSetting);
 
         // Avoid log spam during boot; enable if you need verbose setting audits.
+      }
+
+      if (Object.keys(Seeds).length > 0) {
+        const [SeedErr] = await InstallSettingsStore.UpsertMany(Seeds);
+        if (SeedErr) {
+          Logger.error(
+            `Failed to migrate ${Object.keys(Seeds).join(', ')} to install settings:`,
+            SeedErr
+          );
+        }
       }
 
       Manager.Initialized = true;
@@ -270,40 +308,7 @@ const Manager: SettingsManagerShape = {
     const Setting = Settings.get(Key);
     if (!Setting) return ['Invalid Setting Key', null];
 
-    // Coerce incoming value to correct type
-    const coerce = (val: unknown): SettingValue => {
-      switch (Setting.Type) {
-        case 'BOOLEAN': {
-          if (typeof val === 'boolean') return val;
-          if (val === 1 || val === '1' || val === 'true') return true;
-          if (val === 0 || val === '0' || val === 'false') return false;
-          return !!val;
-        }
-        case 'INTEGER':
-        case 'SLIDER': {
-          if (val === null || val === undefined || val === '') return Setting.DefaultValue;
-          const n = parseInt(val as string, 10);
-          return isNaN(n) ? Setting.DefaultValue : ClampInteger(Setting, n);
-        }
-        case 'STRING':
-        case 'PASSWORD': {
-          return val == null ? '' : String(val);
-        }
-        case 'OPTION': {
-          if (Setting.Options && Array.isArray(Setting.Options)) {
-            return typeof val === 'string' && Setting.Options.includes(val)
-              ? val
-              : Setting.DefaultValue;
-          }
-          return val as SettingValue;
-        }
-        default: {
-          return val as SettingValue;
-        }
-      }
-    };
-
-    const CoercedValue = coerce(Value);
+    const CoercedValue = CoerceValue(Setting, Value);
 
     const [RuleErr, NormalizedValue] = ApplySettingRules(Setting, CoercedValue);
     if (RuleErr) return [RuleErr, null];

@@ -1,6 +1,20 @@
 import http from 'http';
 import https from 'https';
 
+// Connections are kept open between requests, so a burst of alerts to one
+// webhook (Discord, Slack, ...) pays the TCP and TLS handshake once rather
+// than per alert. An idle socket is closed after a few seconds, well inside the
+// keep-alive timeout of common servers, so a reused one is rarely stale.
+// Created on first use.
+const KEEP_ALIVE = { keepAlive: true, timeout: 4000 };
+let HttpAgent: http.Agent | null = null;
+let HttpsAgent: https.Agent | null = null;
+
+function AgentFor(IsHttps: boolean): http.Agent {
+  if (IsHttps) return (HttpsAgent ??= new https.Agent(KEEP_ALIVE));
+  return (HttpAgent ??= new http.Agent(KEEP_ALIVE));
+}
+
 interface RequestJsonOpts {
   Url: unknown;
   Method?: string;
@@ -52,6 +66,7 @@ function requestJson({
         port: Parsed.port || (IsHttps ? 443 : 80),
         path: `${Parsed.pathname || '/'}${Parsed.search || ''}`,
         method: MethodUpper,
+        agent: AgentFor(IsHttps),
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(Payload),

@@ -12,6 +12,7 @@ import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
 import { CreateLogger } from '../Modules/Logger';
+import { DIST_ROOT } from '../Modules/Config/dist-root';
 import { getMainWindow, hasMainWindow } from './app-window';
 
 const Logger = CreateLogger('DevReload');
@@ -25,7 +26,7 @@ export function StartDevReload(): void {
   if (Started || app.isPackaged || process.env.SHOWTRAK_DEV_RELOAD !== '1') return;
   Started = true;
 
-  const Root = path.join(__dirname, '..', 'UI');
+  const Root = path.join(DIST_ROOT, 'UI');
   let Timer: ReturnType<typeof setTimeout> | null = null;
   try {
     fs.watch(Root, { recursive: true }, () => {

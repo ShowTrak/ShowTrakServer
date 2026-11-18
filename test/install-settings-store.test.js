@@ -44,3 +44,21 @@ test('a corrupt file reads as empty and is replaced on the next write', async ()
   await Store.Upsert('A', true);
   assert.deepEqual(JSON.parse(fs.readFileSync(FilePath, 'utf8')), { A: true });
 });
+
+test('GetAll reads every value at once and UpsertMany writes several together', async () => {
+  // SettingsManager loads every install setting from one read of the file.
+  const { FilePath, Store } = tempStore();
+  assert.deepEqual(await Store.GetAll(), [null, []]);
+
+  await Store.Upsert('A', true);
+  assert.deepEqual(await Store.UpsertMany({ B: 5, C: 'x' }), [null, true]);
+  assert.deepEqual(await Store.GetAll(), [
+    null,
+    [
+      { Key: 'A', Value: true },
+      { Key: 'B', Value: 5 },
+      { Key: 'C', Value: 'x' },
+    ],
+  ]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(FilePath, 'utf8')), { A: true, B: 5, C: 'x' });
+});

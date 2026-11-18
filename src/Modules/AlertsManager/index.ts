@@ -223,6 +223,19 @@ function startHistoryPruning() {
   void pruneAlertHistory();
 }
 
+// What a history row records about the event: the context minus RawData.
+//
+// RawData is the whole live entity (a client with every vital, USB device,
+// display and application it reports), there for the actions that forward the
+// context (the http-api webhook body posts it unchanged). Stored per row it was
+// most of a saved show file (1.94 MB of a 2.74 MB file) for a table nothing
+// reads back; the projection keeps the event's own fields (who, what, the
+// device/application/metric involved) at a few hundred bytes a row.
+function historyContext(Context: AlertContext) {
+  const { RawData: _RawData, ...Recorded } = Context;
+  return Recorded;
+}
+
 async function writeHistory(
   Rule: AlertRule,
   Context: AlertContext,
@@ -236,7 +249,7 @@ async function writeHistory(
     // Record the specific stimulus that fired, not the rule's whole trigger list.
     TriggerType: Context.TriggerType,
     TriggerSource: Context.EntityType,
-    Context: JSON.stringify(Context),
+    Context: JSON.stringify(historyContext(Context)),
     Result: JSON.stringify(ResultPayload),
     Timestamp: Date.now(),
   });
@@ -301,12 +314,16 @@ async function evaluateAgainstRules(Context: AlertContext) {
     Tags = await TagManager.GetAllViews();
   }
 
-  for (const Rule of RuleList) {
-    if (!Rule.Enabled) continue;
-    if (!isScopeMatch(Rule, Context, Tags)) continue;
-    if (!triggerMatches(Rule, Context)) continue;
-    await executeRule(Rule, Context);
-  }
+  // Every matching rule runs at once rather than one after another: each rule's
+  // actions are independent of every other rule's, and in sequence a single
+  // rule with an unreachable webhook held up every rule after it (its in-app
+  // alert and sound included) for the whole request timeout. Each rule still
+  // records its history row and AlertTriggered event when its own actions are
+  // done, so those now arrive in completion order rather than rule order.
+  const Matching = RuleList.filter(
+    (Rule) => Rule.Enabled && isScopeMatch(Rule, Context, Tags) && triggerMatches(Rule, Context)
+  );
+  await Promise.all(Matching.map((Rule) => executeRule(Rule, Context)));
 }
 
 // --- Audit log ---------------------------------------------------------------
@@ -1149,16 +1166,19 @@ Manager.FlushSettledBaselineFaults = async (MinAgeMs: number, Clients: AlertEnti
   // sweep that runs early (a fault seen seconds after boot) waits its turn.
   if (Now - StartedAt < MinAgeMs) return 0;
 
-  let Raised = 0;
+  // The faults are raised together, not one at a time: awaited in turn, 100
+  // clients that were offline at start-up and one unreachable webhook meant the
+  // last alert went out after ~500 s. Outbound actions still queue for a bounded
+  // number of connections (see AlertActions); everything else fires at once.
+  const Raising: AlertContext[] = [];
 
   for (const [FaultKey, Fault] of Array.from(PendingBaselineFaults.entries())) {
     if (Now - Fault.FirstSeenAt < MinAgeMs) continue;
     PendingBaselineFaults.delete(FaultKey);
-    Raised += 1;
     if (FaultKey.startsWith('degraded:')) {
       EntityDegradedAnnounced.add(FaultKey.slice('degraded:'.length));
     }
-    await evaluateAgainstRules(Fault.Context);
+    Raising.push(Fault.Context);
   }
 
   for (const Client of Clients) {
@@ -1170,8 +1190,7 @@ Manager.FlushSettledBaselineFaults = async (MinAgeMs: number, Clients: AlertEnti
     // either announced as a transition or is already held above.
     if (EntityOnlineState.has(Key)) continue;
     EntityOnlineState.set(Key, false);
-    Raised += 1;
-    await evaluateAgainstRules({
+    Raising.push({
       TriggerType: TRIGGERS.CLIENT_OFFLINE,
       EntityType: 'client',
       EntityName: Client.Nickname || Client.Hostname || Client.UUID,
@@ -1183,7 +1202,8 @@ Manager.FlushSettledBaselineFaults = async (MinAgeMs: number, Clients: AlertEnti
     });
   }
 
-  return Raised;
+  await Promise.all(Raising.map((Context) => evaluateAgainstRules(Context)));
+  return Raising.length;
 };
 
 // Rebuild in-memory rules after external bulk writes (e.g., config import).

@@ -73,6 +73,11 @@ module.exports = {
       /^\/\.gitignore$/,
       /^\/(README|TODO)\.md$/,
       /^\/package-lock\.json$/,
+      // The main process ships as one bundle, dist/main.bundle.js, loaded by
+      // dist/boot.js (scripts/build-main.js). The per-file tsc output it was
+      // built from is for the test suite and is never loaded by the app.
+      /^\/dist\/(Modules|main|types)($|\/)/,
+      /^\/dist\/main\.js$/,
       // Source maps are debug-only; strip from release builds.
       /\.map$/,
       // Cruft.
@@ -187,6 +192,21 @@ module.exports = {
           throw new Error(
             `Packaging aborted: ${file} is missing from the staged app. ` +
               'require("@showtrak/protocol/runtime") would throw at boot.'
+          );
+        }
+      }
+      // The app boots from the main-process bundle; the per-file output is left
+      // out (see `ignore`), so a missing bundle would be an app with no main
+      // process at all.
+      for (const rel of [
+        ['dist', 'boot.js'],
+        ['dist', 'main.bundle.js'],
+      ]) {
+        const file = path.join(buildPath, ...rel);
+        if (!fs.lstatSync(file, { throwIfNoEntry: false })?.isFile()) {
+          throw new Error(
+            `Packaging aborted: ${file} is missing from the staged app. ` +
+              'Run `npm run build` (it bundles the main process) before packaging.'
           );
         }
       }

@@ -41,6 +41,7 @@ function boot(rules = [rule()]) {
       Manager: {
         All: async (sql) => (String(sql).includes('AlertRules') ? [null, rules] : [null, []]),
         Run: async () => [null, { changes: 1 }],
+        RunWithoutDirtyTracking: async () => [null, { changes: 1 }],
         Get: async () => [null, null],
       },
     },

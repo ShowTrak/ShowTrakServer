@@ -211,6 +211,57 @@ test('ScriptManager loads script folders and computes file checksums', async () 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
+test('ScriptManager re-hashes only the files that changed since the last scan', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-scripts-'));
+  const scriptDir = path.join(tmpDir, 'Cached');
+  fs.mkdirSync(path.join(scriptDir, 'lib'), { recursive: true });
+  fs.writeFileSync(
+    path.join(scriptDir, 'Script.json'),
+    JSON.stringify({ Name: 'Cached', Platforms: { macOS: 'run.sh' } }),
+    'utf8'
+  );
+  fs.writeFileSync(path.join(scriptDir, 'run.sh'), 'echo one', 'utf8');
+  fs.writeFileSync(path.join(scriptDir, 'lib', 'helper.sh'), 'echo helper', 'utf8');
+
+  const hashed = [];
+  const modulePath = path.join(__dirname, '..', 'dist', 'Modules', 'ScriptManager', 'index.js');
+  const { Manager } = loadWithMocks(modulePath, {
+    '../Logger': { CreateLogger: () => createLoggerStub() },
+    '../AppData': { Manager: { GetScriptsDirectory: () => tmpDir } },
+    '@showtrak/protocol/runtime': {
+      ChecksumFile: async (file) => {
+        hashed.push(path.relative(scriptDir, file));
+        return `sum:${fs.readFileSync(file, 'utf8')}`;
+      },
+    },
+    '../Broadcast': { Manager: { emit: () => {} } },
+  });
+
+  const [first] = await Manager.GetScripts(true);
+  assert.deepEqual(
+    first.Files.map((f) => [f.Path, f.Type]),
+    [
+      ['Script.json', 'file'],
+      ['lib', 'directory'],
+      [path.join('lib', 'helper.sh'), 'file'],
+      ['run.sh', 'file'],
+    ]
+  );
+  assert.equal(hashed.length, 3);
+
+  // Nothing changed: a rescan hashes nothing.
+  hashed.length = 0;
+  await Manager.GetScripts(true);
+  assert.deepEqual(hashed, []);
+
+  // One file edited: only it is hashed again, and its new checksum is listed.
+  fs.writeFileSync(path.join(scriptDir, 'run.sh'), 'echo two, longer', 'utf8');
+  const [after] = await Manager.GetScripts(true);
+  assert.deepEqual(hashed, ['run.sh']);
+  assert.equal(after.Files.find((f) => f.Path === 'run.sh').Checksum, 'sum:echo two, longer');
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
 test('ScriptManager round-trips the confirmation level through Script.json', async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-scripts-'));
   const scriptDir = path.join(tmpDir, 'Shutdown');

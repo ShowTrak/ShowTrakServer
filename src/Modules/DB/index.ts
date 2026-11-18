@@ -30,13 +30,11 @@ interface RunResult {
   changes: number;
 }
 
-// Row shape assumed for queries that don't pass an explicit type argument.
-// Typed callers (the repositories in ./repositories/*) always supply their own
-// row type. This permissive string-map default only backs the handful of
-// remaining untyped call sites; `unknown` would be more precise but would force
-// changes in call sites owned by other in-flight refactors, so the loose but
-// non-`any` default is retained until those callers adopt explicit row types.
-type DefaultRow = Record<string, string>;
+// Row shape for a query that doesn't pass an explicit type argument. Every
+// caller supplies its own row type (the repositories use ./rows), so the default
+// is `unknown`: a new untyped call site has to say what it reads rather than
+// silently getting a string map.
+type DefaultRow = unknown;
 
 const DatabasePath = AppDataManager.GetStorageDirectory();
 const DatabaseFileName = 'DB.sqlite';
@@ -123,6 +121,14 @@ interface DBManager {
   ReadFileInfo(SourcePath: string): Promise<DBResult<ShowFileInfo>>;
   ResetToEmpty(): Promise<DBResult<string>>;
   HasData(): Promise<boolean>;
+  CompactIfFragmented(Options?: CompactOptions): Promise<DBResult<boolean>>;
+}
+
+// When the working database is worth compacting: at least this share of its
+// pages, and this many bytes, are free.
+interface CompactOptions {
+  MinFreeRatio?: number;
+  MinFreeBytes?: number;
 }
 
 // What a .ShowTrak file records about itself in its ShowFileInfo table. Both
@@ -137,7 +143,7 @@ const Manager = {} as DBManager;
 // Consumed by the repository factories in ./repositories/* (they receive the
 // DB manager as an argument rather than importing it, so test DB mocks
 // injected into managers propagate through them unchanged).
-export type { DBManager, DBResult, RunOptions, ShowFileInfo, TxRun };
+export type { CompactOptions, DBManager, DBResult, RunOptions, ShowFileInfo, TxRun };
 
 function ResolvePendingDrainWaiters(): void {
   if (pendingOperations !== 0) return;
@@ -464,9 +470,8 @@ function ExecRun(
   });
 }
 
-// Wrapper returning [err, row] for single-row queries. Rows default to `any`
-// until callers migrate onto the typed repositories (Phase 3b); repositories
-// pass an explicit row type from ./rows.
+// Wrapper returning [err, row] for single-row queries. Callers pass the row
+// type (repositories use ./rows); see DefaultRow.
 Manager.Get = async <T = DefaultRow>(Query: string, Params?: unknown): Promise<DBResult<T>> => {
   const InTx = InsideOpenTransaction();
   if (!InTx && openTransaction && !isShuttingDown) await WaitForOpenTransaction();
@@ -570,6 +575,15 @@ Manager.Shutdown = async (Options: { TimeoutMs?: number } = {}): Promise<void> =
       'an open transaction'
     );
     await WaitForPendingOperations(TimeoutMs);
+    // Let SQLite refresh the planner statistics this session's queries showed
+    // were missing or stale (the documented "run before closing" call; on a
+    // small database it does nothing measurable). Best-effort: a failure here
+    // must never stand in the way of closing, and it is skipped when a
+    // transaction outlived the wait above rather than run inside it.
+    if (DB && !openTransaction) {
+      const [OptimizeErr] = await ExecRun('PRAGMA optimize', undefined, false, true);
+      if (OptimizeErr) Logger.warn('PRAGMA optimize failed during shutdown', OptimizeErr);
+    }
     try {
       await CloseLiveConnection();
       Logger.log('SQLite connection closed cleanly');
@@ -844,6 +858,70 @@ async function WipeAndReopen(): Promise<DBResult<string>> {
   }
   return [null, dbPath];
 }
+
+// Run one statement with the connection to itself. It queues behind open and
+// queued transactions like one, holds statements from outside until it ends,
+// and lets those already handed to sqlite finish first: SQLite refuses VACUUM
+// while any other statement is in progress on the connection.
+async function RunAlone(Query: string): Promise<DBResult<RunResult>> {
+  if (InsideOpenTransaction()) {
+    return [new Error('Cannot run this statement inside a transaction'), null];
+  }
+  const Release = await AcquireExclusive();
+  let Finish!: () => void;
+  const State: OpenTransactionState = {
+    Done: new Promise<void>((resolve) => {
+      Finish = resolve;
+    }),
+  };
+  try {
+    if (isShuttingDown || !DB) return [new Error('Database is closing'), null];
+    openTransaction = State;
+    await WaitForOutsideOperations();
+    return await ExecRun(Query, undefined, false, true);
+  } finally {
+    if (openTransaction === State) openTransaction = null;
+    Finish();
+    Release();
+  }
+}
+
+// Give back the space a long session leaves free in the working database.
+//
+// Deleted rows (alert history retention, mostly) leave free pages SQLite keeps
+// for reuse rather than returning, so a working database that once held a big
+// history stays that size: one was 25 MB with 98% of its pages free. Saved show
+// files are unaffected (VACUUM INTO writes them compacted), but every open,
+// checkpoint and backup of the working file pays for the dead space. VACUUM
+// rewrites it at the size of its live data. It is only run when most of the file
+// is free, which also keeps it cheap: the cost is the live data, not the file.
+//
+// Resolves [null, true] when it compacted, [null, false] when there was nothing
+// worth doing. The working file is not the show, so this never marks it unsaved.
+Manager.CompactIfFragmented = async ({
+  MinFreeRatio = 0.5,
+  MinFreeBytes = 4 * 1024 * 1024,
+}: CompactOptions = {}): Promise<DBResult<boolean>> => {
+  const [StatsErr, Stats] = await Manager.Get<{
+    PageCount: number;
+    FreePages: number;
+    PageSize: number;
+  }>(
+    'SELECT p.page_count AS PageCount, f.freelist_count AS FreePages, s.page_size AS PageSize FROM pragma_page_count() AS p, pragma_freelist_count() AS f, pragma_page_size() AS s'
+  );
+  if (StatsErr || !Stats) return [StatsErr || new Error('No page statistics'), null];
+  const { PageCount, FreePages, PageSize } = Stats;
+  if (!PageCount || FreePages / PageCount < MinFreeRatio || FreePages * PageSize < MinFreeBytes) {
+    return [null, false];
+  }
+  const StartedAt = Date.now();
+  const [Err] = await RunAlone('VACUUM');
+  if (Err) return [Err, null];
+  Logger.database(
+    `Compacted the working database: ${FreePages} of ${PageCount} pages were free (${Date.now() - StartedAt} ms)`
+  );
+  return [null, true];
+};
 
 // Returns true if any core table holds rows, i.e. the working database contains
 // user data. Used to detect data carried over from a previous boot (e.g. when

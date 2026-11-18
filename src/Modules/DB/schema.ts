@@ -837,6 +837,15 @@ Schema.Migrations = [
             OR json_type(Settings, '$.A_device_uptime_Op') IS NOT NULL \
             OR json_type(Settings, '$.A_device_uptime_V') IS NOT NULL)",
   },
+  // Alert history stopped recording RawData (the whole live entity) with each
+  // row; see AlertsManager's history projection. Strip it from rows written
+  // before, which in a busy show were most of the file. Nothing reads the
+  // column back, and an older server opening the file is unaffected.
+  {
+    Version: 60,
+    SQL: "UPDATE `AlertHistory` SET Context = json_remove(Context, '$.RawData') \
+          WHERE json_valid(Context) AND json_type(Context, '$.RawData') IS NOT NULL",
+  },
 ];
 
 export = Schema;

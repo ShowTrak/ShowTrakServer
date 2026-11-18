@@ -3,7 +3,7 @@
 // - Lives in a JSON file under the app data Storage folder, NOT in the show
 //   database, so the value belongs to this machine and survives opening,
 //   importing or swapping show files.
-// - Mirrors the Settings repository's GetByKey/Upsert shape so the
+// - Mirrors the Settings repository's GetByKey/GetAll/Upsert shape so the
 //   SettingsManager can use either store interchangeably.
 import path from 'path';
 import fs from 'fs';
@@ -21,12 +21,27 @@ export function CreateInstallSettingsStore(GetFilePath: () => string = DefaultFi
   // SettingsManager from initialising. The next write replaces it.
   function ReadAll(): Record<string, unknown> {
     try {
-      const FilePath = GetFilePath();
-      if (!fs.existsSync(FilePath)) return {};
-      const Parsed = JSON.parse(fs.readFileSync(FilePath, 'utf8'));
+      const Parsed = JSON.parse(fs.readFileSync(GetFilePath(), 'utf8'));
       return Parsed && typeof Parsed === 'object' && !Array.isArray(Parsed) ? Parsed : {};
     } catch {
       return {};
+    }
+  }
+
+  // Merge Values into the file. Written to a temp file then renamed, so a crash
+  // mid-write never leaves a truncated file that would silently reset every
+  // install setting.
+  function WriteValues(Values: Record<string, unknown>): DBResult<unknown> {
+    try {
+      const FilePath = GetFilePath();
+      const All = { ...ReadAll(), ...Values };
+      fs.mkdirSync(path.dirname(FilePath), { recursive: true });
+      const TempPath = `${FilePath}.tmp`;
+      fs.writeFileSync(TempPath, JSON.stringify(All, null, 2), 'utf8');
+      fs.renameSync(TempPath, FilePath);
+      return [null, true];
+    } catch (Err) {
+      return [Err, null];
     }
   }
 
@@ -37,21 +52,19 @@ export function CreateInstallSettingsStore(GetFilePath: () => string = DefaultFi
       return [null, { Key, Value: All[Key] }];
     },
 
-    // Write to a temp file then rename, so a crash mid-write never leaves a
-    // truncated file that would silently reset every install setting.
+    // Every stored value from a single read of the file.
+    async GetAll(): Promise<DBResult<SettingRow[]>> {
+      return [null, Object.entries(ReadAll()).map(([Key, Value]) => ({ Key, Value }))];
+    },
+
     async Upsert(Key: string, Value: unknown): Promise<DBResult<unknown>> {
-      try {
-        const FilePath = GetFilePath();
-        const All = ReadAll();
-        All[Key] = Value;
-        fs.mkdirSync(path.dirname(FilePath), { recursive: true });
-        const TempPath = `${FilePath}.tmp`;
-        fs.writeFileSync(TempPath, JSON.stringify(All, null, 2), 'utf8');
-        fs.renameSync(TempPath, FilePath);
-        return [null, true];
-      } catch (Err) {
-        return [Err, null];
-      }
+      return WriteValues({ [Key]: Value });
+    },
+
+    // Several values in one write (the first-run adoption of settings that
+    // used to live in the show file).
+    async UpsertMany(Values: Record<string, unknown>): Promise<DBResult<unknown>> {
+      return WriteValues(Values);
     },
   };
 }

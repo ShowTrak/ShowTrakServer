@@ -406,28 +406,86 @@ async function runWithConcurrency<T>(
   await Promise.all(runners);
 }
 
-// Enumerate files recursively and produce relative paths, adding a checksum later
-function RecursiveFileList(dir: string, baseDir: string = dir): ScriptFileEntry[] {
-  let results: ScriptFileEntry[] = [];
-  const list = fs.readdirSync(dir);
-  list.forEach((file) => {
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-    if (stat && stat.isDirectory()) {
-      results.push({
-        Path: path.relative(baseDir, filePath),
-        Type: 'directory',
-      });
-      results = results.concat(RecursiveFileList(filePath, baseDir));
+// A file found by the folder walk, with the stat fields the checksum cache keys on.
+interface WalkedFile {
+  Entry: ScriptFileEntry;
+  FullPath: string;
+  Size: number;
+  MtimeMs: number;
+  CtimeMs: number;
+}
+
+// Enumerate a folder recursively, producing relative paths in the same order
+// as before (directory entry, then its contents). Asynchronous, so a large
+// scripts folder no longer blocks the main process at boot or on every reload.
+async function RecursiveFileList(
+  dir: string,
+  baseDir: string = dir,
+  Files: WalkedFile[] = []
+): Promise<ScriptFileEntry[]> {
+  const results: ScriptFileEntry[] = [];
+  const list = await fs.promises.readdir(dir);
+  // Stat siblings together, then walk them in listing order.
+  const stats = await Promise.all(list.map((file) => fs.promises.stat(path.join(dir, file))));
+  for (let i = 0; i < list.length; i++) {
+    const filePath = path.join(dir, list[i]!);
+    const stat = stats[i]!;
+    if (stat.isDirectory()) {
+      results.push({ Path: path.relative(baseDir, filePath), Type: 'directory' });
+      results.push(...(await RecursiveFileList(filePath, baseDir, Files)));
     } else {
-      results.push({
+      const Entry: ScriptFileEntry = {
         Path: path.relative(baseDir, filePath),
         Type: 'file',
         Checksum: null,
+      };
+      results.push(Entry);
+      Files.push({
+        Entry,
+        FullPath: filePath,
+        Size: stat.size,
+        MtimeMs: stat.mtimeMs,
+        CtimeMs: stat.ctimeMs,
       });
     }
-  });
+  }
   return results;
+}
+
+// Checksums from earlier scans, keyed by absolute path and valid while the
+// file's size, modification and change times are unchanged. Every scan used to
+// re-hash every file in every script folder, and the folder watcher triggers a
+// full rescan on any change, so editing one Script.json re-read every payload.
+interface CachedChecksum {
+  Size: number;
+  MtimeMs: number;
+  CtimeMs: number;
+  Checksum: string;
+}
+const ChecksumCache = new Map<string, CachedChecksum>();
+
+async function ChecksumWalkedFile(File: WalkedFile): Promise<string | null> {
+  const Cached = ChecksumCache.get(File.FullPath);
+  if (
+    Cached &&
+    Cached.Size === File.Size &&
+    Cached.MtimeMs === File.MtimeMs &&
+    Cached.CtimeMs === File.CtimeMs
+  ) {
+    return Cached.Checksum;
+  }
+  const Checksum = await ChecksumFile(File.FullPath, (m) => Logger.error(m));
+  if (Checksum) {
+    ChecksumCache.set(File.FullPath, {
+      Size: File.Size,
+      MtimeMs: File.MtimeMs,
+      CtimeMs: File.CtimeMs,
+      Checksum,
+    });
+  } else {
+    ChecksumCache.delete(File.FullPath);
+  }
+  return Checksum || null;
 }
 
 // Determine which platforms reference an existing file inside the script folder.
@@ -455,7 +513,7 @@ async function LoadScriptFolder(ScriptsDirectory: string, ScriptFolder: string) 
 
   let RawText: string;
   try {
-    RawText = fs.readFileSync(scriptJsonPath, 'utf-8');
+    RawText = await fs.promises.readFile(scriptJsonPath, 'utf-8');
   } catch (err) {
     return new InvalidScript(
       ScriptFolder,
@@ -483,61 +541,100 @@ async function LoadScriptFolder(ScriptsDirectory: string, ScriptFolder: string) 
   // Persist auto-repairs so the on-disk file always matches the schema.
   if (changed) {
     try {
-      fs.writeFileSync(scriptJsonPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+      await fs.promises.writeFile(scriptJsonPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
       Logger.log(`Normalized Script.json for ${ScriptFolder}`);
     } catch (err) {
       Logger.error(`Failed to write normalized Script.json for ${ScriptFolder}:`, err);
     }
   }
 
-  const AllFilesInFolder = RecursiveFileList(ScriptFolderPath);
-  const filesNeedingChecksum = AllFilesInFolder.filter((f) => f.Type === 'file');
+  const filesNeedingChecksum: WalkedFile[] = [];
+  const AllFilesInFolder = await RecursiveFileList(
+    ScriptFolderPath,
+    ScriptFolderPath,
+    filesNeedingChecksum
+  );
   // Compute checksums with bounded concurrency to avoid blocking startup
   await runWithConcurrency(filesNeedingChecksum, 8, async (File) => {
-    const sum = await ChecksumFile(path.join(ScriptFolderPath, File.Path), (m) => Logger.error(m));
-    File.Checksum = sum || null;
+    File.Entry.Checksum = await ChecksumWalkedFile(File);
   });
 
   const CompatiblePlatforms = ResolveCompatiblePlatforms(ScriptFolderPath, config.Platforms);
   return new Script(ScriptFolder, config, AllFilesInFolder, CompatiblePlatforms, errors);
 }
 
-function ListScriptFolders(ScriptsDirectory: string): string[] {
+async function ListScriptFolders(ScriptsDirectory: string): Promise<string[]> {
   const IsValidScriptFolderName = (FolderName: string) => /^[A-Za-z0-9_-]+$/.test(FolderName);
 
-  return fs.readdirSync(ScriptsDirectory).filter((file) => {
-    const fullPath = path.join(ScriptsDirectory, file);
-    return fs.statSync(fullPath).isDirectory() && IsValidScriptFolderName(file);
-  });
+  const Names = (await fs.promises.readdir(ScriptsDirectory)).filter(IsValidScriptFolderName);
+  const IsFolder = await Promise.all(
+    Names.map((file) =>
+      fs.promises.stat(path.join(ScriptsDirectory, file)).then((stat) => stat.isDirectory())
+    )
+  );
+  return Names.filter((_file, i) => IsFolder[i]);
 }
 
-Manager.GetScripts = async (Force = false) => {
-  if (!Force && Scripts.length > 0) return Scripts; // Return cached catalog
+function FileExists(FilePath: string): Promise<boolean> {
+  return fs.promises.access(FilePath).then(
+    () => true,
+    () => false
+  );
+}
+
+// A scan in progress, which a non-forced request joins rather than starting
+// a second walk of the same folders (boot, a client asking for the catalog and
+// the folder watcher can all arrive together).
+let ScanInFlight: Promise<ScriptCatalogEntry[]> | null = null;
+
+async function ScanScripts(): Promise<ScriptCatalogEntry[]> {
   const TempScripts: ScriptCatalogEntry[] = [];
   const ScriptsDirectory = AppDataManager.GetScriptsDirectory();
   EnsureScriptDirectoryWatcher(ScriptsDirectory);
 
   Logger.log(`Loading scripts from ${ScriptsDirectory}`);
-  if (!fs.existsSync(ScriptsDirectory)) {
+  if (!(await FileExists(ScriptsDirectory))) {
     Scripts = [];
     return Scripts;
   }
 
-  const ScriptFolders = ListScriptFolders(ScriptsDirectory);
+  const ScriptFolders = await ListScriptFolders(ScriptsDirectory);
 
   for (const ScriptFolder of ScriptFolders) {
     Logger.log(`Loading script from folder: ${ScriptFolder}`);
     const scriptJsonPath = path.join(ScriptsDirectory, ScriptFolder, 'Script.json');
-    if (!fs.existsSync(scriptJsonPath)) {
+    if (!(await FileExists(scriptJsonPath))) {
       Logger.error(`Script.json not found in ${ScriptFolder}, skipping...`);
       BroadcastManager.emit('Notify', `Script.json not found in ${ScriptFolder}`, 'error', 15000);
       continue;
     }
     TempScripts.push(await LoadScriptFolder(ScriptsDirectory, ScriptFolder));
   }
+  // Forget checksums of files that are no longer in any script folder.
+  const Present = new Set<string>();
+  for (const Script of TempScripts) {
+    for (const File of Script.Files || []) {
+      if (File.Type === 'file') Present.add(path.join(ScriptsDirectory, Script.ID, File.Path));
+    }
+  }
+  for (const Key of ChecksumCache.keys()) {
+    if (!Present.has(Key)) ChecksumCache.delete(Key);
+  }
   Scripts = TempScripts;
   DeploymentFingerprint = BuildDeploymentFingerprint(Scripts);
   return Scripts;
+}
+
+Manager.GetScripts = async (Force = false) => {
+  if (!Force && Scripts.length > 0) return Scripts; // Return cached catalog
+  if (!Force && ScanInFlight) return ScanInFlight;
+  const Scan = ScanScripts();
+  ScanInFlight = Scan;
+  try {
+    return await Scan;
+  } finally {
+    if (ScanInFlight === Scan) ScanInFlight = null;
+  }
 };
 
 // Reload the catalog from disk and notify listeners (Web UI / connected clients).

@@ -1306,7 +1306,14 @@ test('Server Manager dispatches scripts, bulk requests, and group messages', asy
       },
     },
     '../Logger': loggerStub,
-    http: { createServer: () => ({ on: () => {}, listen: (_p, cb) => cb && cb() }) },
+    // The Express app is built on the first HTTP request; send one at once so
+    // its routes are registered for the assertions below.
+    http: {
+      createServer: () => ({
+        on: (event, listener) => event === 'request' && listener({}, {}),
+        listen: (_p, cb) => cb && cb(),
+      }),
+    },
     'socket.io': {
       Server: class {
         constructor() {
@@ -1554,7 +1561,14 @@ test('Server mirrors the REAL OSC tag routes to HTTP POST and they resolve end-t
       },
     },
     '../Logger': loggerStub,
-    http: { createServer: () => ({ on: () => {}, listen: (_p, cb) => cb && cb() }) },
+    // The Express app is built on the first HTTP request; send one at once so
+    // its routes are registered for the assertions below.
+    http: {
+      createServer: () => ({
+        on: (event, listener) => event === 'request' && listener({}, {}),
+        listen: (_p, cb) => cb && cb(),
+      }),
+    },
     'socket.io': {
       Server: class {
         constructor() {

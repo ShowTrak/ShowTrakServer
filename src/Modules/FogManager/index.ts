@@ -70,6 +70,12 @@ let PollTimer: NodeJS.Timeout | null = null;
 // Guards against overlapping polls when FOG is slow enough that a tick lands while
 // the previous one is still in flight.
 let PollInFlight = false;
+// A poll asked for while one was in flight (a settings change, say), run as soon
+// as that one finishes so the request is never lost.
+let PollRequested = false;
+// FOG_ENABLED as of the last poll. While it is off nothing is scheduled: the
+// FogSettingsChanged event (which a show swap also raises) starts polling again.
+let PollingEnabled = false;
 
 // Host list is cached so the client editor dropdown still has something to show
 // when FOG goes away mid-session. Staleness is acceptable here; an empty dropdown
@@ -99,6 +105,7 @@ function Now(): number {
 
 async function RefreshHealth(): Promise<boolean> {
   const Enabled = await IsEnabled();
+  PollingEnabled = Enabled;
   if (!Enabled) {
     SetHealth(false, null);
     return false;
@@ -241,7 +248,10 @@ async function ReadFinalState(Config: FogConfig, FogTaskID: number): Promise<num
 }
 
 async function PollOnce(): Promise<void> {
-  if (PollInFlight) return;
+  if (PollInFlight) {
+    PollRequested = true;
+    return;
+  }
   PollInFlight = true;
   try {
     const WasHealthy = Healthy;
@@ -261,7 +271,12 @@ async function PollOnce(): Promise<void> {
     Logger.error(`FOG poll failed: ${Err instanceof Error ? Err.message : String(Err)}`);
   } finally {
     PollInFlight = false;
-    ScheduleNextPoll();
+    if (PollRequested && Manager.Running) {
+      PollRequested = false;
+      void PollOnce();
+    } else {
+      ScheduleNextPoll();
+    }
   }
 }
 
@@ -272,7 +287,8 @@ function ScheduleNextPoll(): void {
     clearTimeout(PollTimer);
     PollTimer = null;
   }
-  if (!Manager.Running) return;
+  // Disabled: nothing to poll until the setting changes (see PollingEnabled).
+  if (!Manager.Running || !PollingEnabled) return;
   const Interval = Healthy ? FOG_TASK_POLL_INTERVAL_MS : FOG_UNHEALTHY_POLL_INTERVAL_MS;
   PollTimer = setTimeout(() => {
     void PollOnce();
@@ -344,8 +360,9 @@ const Manager = {
   Running: false,
 
   // Started from main boot. Safe to call when the integration is disabled: the
-  // poller runs regardless and simply reports "not enabled" until it is turned on,
-  // which is what makes toggling the setting take effect without a restart.
+  // first poll records "not enabled" and schedules nothing further, and turning
+  // the setting on (FogSettingsChanged -> SettingsChanged) starts polling without
+  // a restart.
   async Start(): Promise<void> {
     if (Manager.Running) return;
     Manager.Running = true;
@@ -354,6 +371,7 @@ const Manager = {
 
   Stop(): void {
     Manager.Running = false;
+    PollRequested = false;
     if (PollTimer) {
       clearTimeout(PollTimer);
       PollTimer = null;

@@ -43,9 +43,9 @@ test('SettingsManager waits for DB readiness before reading settings', async () 
         readyCalls += 1;
         await deferred.promise;
       },
-      Get: async () => {
+      All: async () => {
         getCalls += 1;
-        return [null, null];
+        return [null, []];
       },
       Run: async () => [null, null],
     },

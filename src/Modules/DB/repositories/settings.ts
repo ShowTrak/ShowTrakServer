@@ -10,6 +10,10 @@ export function CreateSettingsRepository(DB: DBManager) {
     GetByKey(Key: string): Promise<DBResult<SettingRow>> {
       return DB.Get<SettingRow>('SELECT * FROM settings WHERE key = ?', [Key]);
     },
+    // Every persisted setting, for loading them all at once.
+    GetAll(): Promise<DBResult<SettingRow[]>> {
+      return DB.All<SettingRow>('SELECT Key, Value FROM settings');
+    },
     Upsert(Key: string, Value: unknown): Promise<DBResult<unknown>> {
       return DB.Run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [Key, Value]);
     },
