@@ -47,6 +47,8 @@ import {
   GetCompletedSectionLabel,
   GetExecutionVisualState,
   GetReportedProgress,
+  AllExecutionsSettled,
+  ShouldAutoDismissExecutions,
 } from './lib/execution-panel';
 import { HandleNonFatalError, Safe } from './utils';
 import { RenderMonitoringTargetTile } from './monitoring';
@@ -57,6 +59,7 @@ import { UPDATE_EXECUTION_SCRIPT_NAME } from './update-manager';
 import {
   ConfirmationDialog,
   HideExecutionToast,
+  OnExecutionToastDismissed,
   RenderClientInfoDetails,
   SetExecutionsInProgress,
   ShowExecutionToast,
@@ -204,6 +207,10 @@ const ExecutionRows = new Map<string, ExecutionRow>();
 
 const COMPLETED_SECTION_KEY = '__completed__';
 
+// The executions the panel last showed (script runs, not deployments), read
+// when the operator dismisses it.
+let LastPanelExecutions: ScriptExecutionView[] = [];
+
 // The collapsed "completed" section, pinned to the top of the execution list
 // (under the deployment summary when there is one). Completed rows are moved
 // into its body, which stays hidden until the operator expands it, so the list
@@ -253,6 +260,16 @@ function EnsureCompletedSection(
 // Registers the script-execution / script-list / full-client-list push
 // handlers. Bodies unchanged from the former import-time subscriptions.
 function InitClientListPush() {
+  // A batch that finished with failures stays up until the operator closes it.
+  // Closing it then drops the settled rows, as the auto-dismiss does for a clean
+  // batch, so the next push neither reopens the panel on old failures nor
+  // stacks a new run under them. Anything still queued or running is kept.
+  OnExecutionToastDismissed(() => {
+    if (!AllExecutionsSettled(LastPanelExecutions)) return;
+    window.API.ClearSettledScriptExecutions().catch((e: unknown) =>
+      HandleNonFatalError('ClearSettledScriptExecutions:Dismiss', e)
+    );
+  });
   window.API.UpdateScriptExecutions(async (AllExecutions) => {
     try {
       UpdateManagerHandleExecutions(AllExecutions || []);
@@ -310,14 +327,14 @@ function InitClientListPush() {
     }
 
     // Auto-dismiss the execution panel a dwell time (UI_EXECUTION_PANEL_DWELL_SECONDS)
-    // after every execution has SETTLED, whether it succeeded or failed. Queued
-    // and running executions are both Status='Pending', so the panel stays open
-    // while any work remains, and if a new batch is started within the dwell the
-    // else-branch below cancels the countdown; the panel only closes once the
-    // dwell has passed since the LAST script finished.
-    const shouldAutoDismissNonDeployment =
-      nonDeploymentExecutions.length > 0 &&
-      nonDeploymentExecutions.every((Request) => Request && Request.Status !== 'Pending');
+    // after every execution has SETTLED cleanly. Queued and running executions
+    // are both Status='Pending', so the panel stays open while any work remains,
+    // and if a new batch is started within the dwell the else-branch below
+    // cancels the countdown; the panel only closes once the dwell has passed
+    // since the LAST script finished. If anything failed it never closes itself:
+    // the operator dismisses it (see OnExecutionToastDismissed below).
+    LastPanelExecutions = nonDeploymentExecutions;
+    const shouldAutoDismissNonDeployment = ShouldAutoDismissExecutions(nonDeploymentExecutions);
 
     if (shouldAutoDismissNonDeployment) {
       if (!window.__ShowTrakExecutionAutoDismissTimer) {

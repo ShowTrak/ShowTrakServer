@@ -61,7 +61,7 @@ import {
 import { OpenAlertRuleManager, OpenCreateAlertRuleEditor } from './alert-rules';
 import {
   GetIdentifyingUUIDs,
-  HideExecutionToast,
+  DismissExecutionToast,
   StopIdentifyingForUUIDs,
   UpdateIdentifyStatusBanner,
 } from './selection-init';
@@ -262,7 +262,7 @@ export async function WireGlobalUI() {
   // Close execution toast on Escape
   $(document).on('keydown.execToast', function (e) {
     if (e.key === 'Escape') {
-      HideExecutionToast();
+      DismissExecutionToast();
     }
   });
 

@@ -420,12 +420,33 @@ export function ShowExecutionToast(title?: string) {
 		<div id="SHOWTRAK_EXECUTION_LIST" class="exec-toast-body"></div>
 	</div>`;
   $('body').append(html);
-  $('.exec-toast-close').on('click', () => HideExecutionToast());
+  $('.exec-toast-close').on('click', () => DismissExecutionToast());
   // Bind outside click to dismiss on create
   enableExecToastOutsideClose();
 
   // No modal on click per requirements; ensure no handler is attached
   $(document).off('click.execInfo', '.exec-info-btn');
+}
+
+// Listeners told when the OPERATOR closes the panel (close button, a click
+// outside it, Escape), as opposed to it closing itself after the dwell.
+const execToastDismissListeners: Array<() => void> = [];
+export function OnExecutionToastDismissed(Listener: () => void) {
+  execToastDismissListeners.push(Listener);
+}
+
+/** Close the panel because the operator asked to. */
+export function DismissExecutionToast() {
+  const WasOpen = $('#EXECUTION_TOAST').hasClass('show');
+  HideExecutionToast();
+  if (!WasOpen) return;
+  for (const Listener of execToastDismissListeners) {
+    try {
+      Listener();
+    } catch (e) {
+      console.error('Execution panel dismiss listener failed', e);
+    }
+  }
 }
 
 export function HideExecutionToast() {
@@ -469,7 +490,7 @@ export function enableExecToastOutsideClose() {
       const $target = $(e.target);
       const inside = $target.closest('#EXECUTION_TOAST').length > 0;
       if (!inside) {
-        HideExecutionToast();
+        DismissExecutionToast();
       }
     });
 }

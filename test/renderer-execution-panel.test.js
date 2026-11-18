@@ -24,6 +24,8 @@ const {
   GetExecutionVisualState,
   CountCompletedExecutions,
   GetCompletedSectionLabel,
+  AllExecutionsSettled,
+  ShouldAutoDismissExecutions,
 } = require(PANEL_PATH);
 
 test('GetReportedProgress clamps to 0-100 and treats junk as 0', () => {
@@ -65,4 +67,23 @@ test('GetCompletedSectionLabel shows progress, then "All N" once done', () => {
   assert.equal(GetCompletedSectionLabel(300, 300), 'All 300 completed');
   // Never claims fewer total than completed.
   assert.equal(GetCompletedSectionLabel(5, 3), 'All 5 completed');
+});
+
+test('only a run that finished cleanly may close the panel by itself', () => {
+  const done = { Status: 'Completed', Progress: 100 };
+  const failed = { Status: 'Failed', Progress: 100 };
+  const running = { Status: 'Pending', Progress: 60 };
+  // Clean and finished: auto-dismiss after the dwell.
+  assert.equal(AllExecutionsSettled([done, done]), true);
+  assert.equal(ShouldAutoDismissExecutions([done, done]), true);
+  // Any failure keeps it up until the operator dismisses it.
+  assert.equal(AllExecutionsSettled([done, failed]), true);
+  assert.equal(ShouldAutoDismissExecutions([done, failed]), false);
+  assert.equal(ShouldAutoDismissExecutions([failed]), false);
+  // Still working: neither.
+  assert.equal(AllExecutionsSettled([done, running]), false);
+  assert.equal(ShouldAutoDismissExecutions([done, running]), false);
+  // Nothing to show is not "settled".
+  assert.equal(AllExecutionsSettled([]), false);
+  assert.equal(ShouldAutoDismissExecutions([]), false);
 });

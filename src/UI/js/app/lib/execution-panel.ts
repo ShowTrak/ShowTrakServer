@@ -49,6 +49,30 @@ export function CountCompletedExecutions(
   return Count;
 }
 
+/** True once nothing is queued or running (every execution has settled). */
+export function AllExecutionsSettled(
+  Executions: ReadonlyArray<ExecutionLike | null | undefined>
+): boolean {
+  return (
+    Executions.length > 0 &&
+    Executions.every((Request) => !!Request && Request.Status !== 'Pending')
+  );
+}
+
+/**
+ * Whether the panel may close itself after the dwell. Only a clean run does: if
+ * anything failed, the panel stays up until the operator dismisses it, so a
+ * failure is never cleared away while nobody was looking.
+ */
+export function ShouldAutoDismissExecutions(
+  Executions: ReadonlyArray<ExecutionLike | null | undefined>
+): boolean {
+  return (
+    AllExecutionsSettled(Executions) &&
+    !Executions.some((Request) => GetExecutionVisualState(Request) === 'failed')
+  );
+}
+
 /** The completed section's heading, e.g. "212 of 300 completed". */
 export function GetCompletedSectionLabel(Completed: number, Total: number): string {
   const Done = Math.max(0, Math.floor(Completed));

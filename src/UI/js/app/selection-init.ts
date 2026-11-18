@@ -20,10 +20,12 @@ export { Wait } from './lib/wait';
 export {
   ConfirmationDialog,
   CriticalConfirmationDialog,
+  DismissExecutionToast,
   ensureToastHost,
   HideExecutionToast,
   iconForType,
   Notify,
+  OnExecutionToastDismissed,
   RemoveAlertToastById,
   ShowExecutionToast,
   SetExecutionsInProgress,
