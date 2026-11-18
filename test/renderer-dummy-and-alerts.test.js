@@ -69,7 +69,6 @@ test('a reporting dummy shows Online', () => {
   assert.deepEqual(DummyCompactStatus({ Online: true, State: 'ONLINE' }), {
     text: 'Online',
     color: 'text-light',
-    offline: false,
   });
 });
 
@@ -79,18 +78,15 @@ test('a dummy that has never reported shows Idle, not Offline', () => {
   assert.deepEqual(DummyCompactStatus({ State: 'IDLE' }), {
     text: 'Idle',
     color: 'text-light',
-    offline: false,
   });
-  assert.deepEqual(DummyCompactStatus({}), { text: 'Idle', color: 'text-light', offline: false });
+  assert.deepEqual(DummyCompactStatus({}), { text: 'Idle', color: 'text-light' });
 });
 
-test('an offline dummy defers to the offline-since counter', () => {
-  // Empty text with offline:true is what lets the tile render a live "offline
-  // for 4m" timer in place of a static word.
+test('an offline dummy says Offline', () => {
+  // Compact mode hides the offline timer, so the label carries the state.
   assert.deepEqual(DummyCompactStatus({ State: 'OFFLINE', Online: true }), {
-    text: '',
+    text: 'Offline',
     color: 'text-light',
-    offline: true,
   });
 });
 
@@ -103,7 +99,6 @@ test('a degraded dummy shows its first warning, in warning colour', () => {
   assert.deepEqual(Result, {
     text: 'No heartbeat for 90s',
     color: 'text-warning',
-    offline: false,
   });
 });
 
@@ -118,8 +113,8 @@ test('a degraded dummy with no warning still explains itself', () => {
 test('the OFFLINE state outranks degraded', () => {
   // Once it has stopped reporting entirely, why it was degraded is moot.
   const Result = DummyCompactStatus({ State: 'OFFLINE', Online: true, Degraded: true });
-  assert.equal(Result.offline, true);
-  assert.equal(Result.text, '');
+  assert.equal(Result.text, 'Offline');
+  assert.equal(Result.color, 'text-light');
 });
 
 // --- Heartbeat source IP ----------------------------------------------------

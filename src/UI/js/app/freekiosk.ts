@@ -106,19 +106,20 @@ export async function LoadFreeKioskCatalogues(): Promise<void> {
   }
 }
 
-/** The compact-mode status shown to the right of the terminal's name. */
+/** The compact-mode status shown to the right of the terminal's name. Compact
+ * mode hides the offline timer, so an offline terminal says so here. */
 export function FreeKioskCompactStatus(K: FreeKioskTerminalView) {
   const State = String(K.State || 'IDLE');
-  if (State === 'OFFLINE') return { text: '', color: 'text-light', offline: true };
+  if (State === 'OFFLINE') return { text: 'Offline', color: 'text-light' };
   if (State === 'DEGRADED') {
     const Warning =
       Array.isArray(K.DegradedWarnings) && K.DegradedWarnings.length
         ? String(K.DegradedWarnings[0])
         : 'Alarm';
-    return { text: Warning, color: 'text-warning', offline: false };
+    return { text: Warning, color: 'text-warning' };
   }
-  if (State === 'ONLINE') return { text: 'Online', color: 'text-light', offline: false };
-  return { text: 'Idle', color: 'text-light', offline: false };
+  if (State === 'ONLINE') return { text: 'Online', color: 'text-light' };
+  return { text: 'Idle', color: 'text-light' };
 }
 
 /** A 0–100 reading as a bar width. No reading draws an empty bar, never a full one. */
@@ -213,9 +214,7 @@ export function RenderFreeKioskTile(K: FreeKioskTerminalView): string {
       }" data-type="FreeKioskLabel">${FREEKIOSK_TYPE_LABEL}</label>
       ${TagBadges}
       <h5 class="mb-0" data-type="Name">${Safe(K.Nickname || K.Address || 'FreeKiosk')}</h5>
-      <span class="CLIENT_TILE_COMPACT_STATUS FREEKIOSK_COMPACT_STATUS ${Compact.color}${
-        Compact.offline ? ' d-none' : ''
-      }" data-type="FREEKIOSK_COMPACT_STATUS">${Safe(Compact.text)}</span>
+      <span class="CLIENT_TILE_COMPACT_STATUS FREEKIOSK_COMPACT_STATUS ${Compact.color}" data-type="FREEKIOSK_COMPACT_STATUS">${Safe(Compact.text)}</span>
       <small class="text-sm text-light" data-type="IP">${Safe(FreeKioskDisplayAddress(K))}</small>
       <div class="SHOWTRAK_PC_STATUS ${
         State === 'IDLE' ? 'd-grid' : 'd-none'
@@ -279,8 +278,8 @@ export function UpdateFreeKioskTile(K: FreeKioskTerminalView): void {
     .find('[data-type="FREEKIOSK_COMPACT_STATUS"]')
     .text(Compact.text)
     .removeClass('text-light text-success text-warning')
-    .addClass(Compact.color)
-    .toggleClass('d-none', Compact.offline);
+    .removeClass('d-none')
+    .addClass(Compact.color);
   UpdateListRowState($tile, FreeKioskListState(K));
 
   const ToggleIndicator = (Type: string, Show: boolean) => {

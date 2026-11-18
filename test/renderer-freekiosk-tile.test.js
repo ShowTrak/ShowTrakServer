@@ -105,15 +105,16 @@ test('the compact status mirrors the state', () => {
   assert.deepEqual(FreeKiosk.FreeKioskCompactStatus(terminal({ State: 'ONLINE' })), {
     text: 'Online',
     color: 'text-light',
-    offline: false,
   });
   assert.deepEqual(FreeKiosk.FreeKioskCompactStatus(terminal({ State: 'IDLE' })), {
     text: 'Idle',
     color: 'text-light',
-    offline: false,
   });
-  // Offline defers to the offline-since counter rather than a label.
-  assert.equal(FreeKiosk.FreeKioskCompactStatus(terminal({ State: 'OFFLINE' })).offline, true);
+  // Compact mode hides the offline timer, so offline is a label like the rest.
+  assert.deepEqual(FreeKiosk.FreeKioskCompactStatus(terminal({ State: 'OFFLINE' })), {
+    text: 'Offline',
+    color: 'text-light',
+  });
   assert.equal(
     FreeKiosk.FreeKioskCompactStatus(
       terminal({ State: 'DEGRADED', DegradedWarnings: ['Low battery'] })

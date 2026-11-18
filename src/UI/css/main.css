@@ -5883,34 +5883,10 @@ body.compact-mode .SHOWTRAK_PC.PENDING > [data-type='PENDING_ACTION'] {
   margin-left: 0.5rem;
 }
 
-body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']:not(.d-none) {
-  max-height: none;
-  opacity: 1;
-  display: inline-flex !important;
-  flex: 0 0 auto;
-  margin: 0 0 0 0.5rem !important;
-  min-height: 0;
-  align-items: center;
-}
-
-body.compact-mode
-  .SHOWTRAK_PC
-  > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']
-  > [data-type='OFFLINE_SINCE'] {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0;
-  line-height: 1;
-}
-
-body.compact-mode
-  .SHOWTRAK_PC
-  > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE']
-  > [data-type='OFFLINE_SINCE']
-  .badge {
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  line-height: 1.1;
+/* Compact mode shows a tile's state as a word (its compact status label:
+   "Offline" and so on), never the offline-for timer. */
+body.compact-mode .SHOWTRAK_PC > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'] {
+  display: none !important;
 }
 
 body.compact-mode .SHOWTRAK_PC_PLACEHOLDER {
@@ -6520,14 +6496,10 @@ body.compact-mode.mode-edit .CLIENT_TILE_COG:focus-visible {
 /* In compact EDIT mode, hide the right-side status/latency text while the cog is
  * shown (on hover or keyboard focus) so it isn't layered over anything. */
 body.compact-mode.mode-edit .SHOWTRAK_PC:hover > .CLIENT_TILE_COMPACT_STATUS,
-body.compact-mode.mode-edit .SHOWTRAK_PC:hover > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'],
 body.compact-mode.mode-edit .SHOWTRAK_PC:hover > .MONITOR_COMPACT_LATENCY,
 body.compact-mode.mode-edit
   .SHOWTRAK_PC:has(> .CLIENT_TILE_COG:focus-visible)
   > .CLIENT_TILE_COMPACT_STATUS,
-body.compact-mode.mode-edit
-  .SHOWTRAK_PC:has(> .CLIENT_TILE_COG:focus-visible)
-  > .SHOWTRAK_PC_STATUS[data-type='INDICATOR_OFFLINE'],
 body.compact-mode.mode-edit
   .SHOWTRAK_PC:has(> .CLIENT_TILE_COG:focus-visible)
   > .MONITOR_COMPACT_LATENCY {

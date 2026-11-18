@@ -19,23 +19,23 @@ import { BuildDummyPayload } from './lib/dummy-settings';
 // literal label "Dummy".
 
 // Compute the compact-mode status shown to the right of the dummy's name.
-// Offline dummies hide this label and show the offline timer instead.
+// Compact mode hides the offline timer, so an offline dummy says so here.
 export const DUMMY_TYPE_LABEL = 'DUMMY';
 
 export function DummyCompactStatus(D: DummyClientView) {
   const State = String(D.State || 'IDLE');
   const Online = !!D.Online;
   const Degraded = !!D.Degraded;
-  if (State === 'OFFLINE') return { text: '', color: 'text-light', offline: true };
+  if (State === 'OFFLINE') return { text: 'Offline', color: 'text-light' };
   if (Online && Degraded) {
     const Warning =
       Array.isArray(D.DegradedWarnings) && D.DegradedWarnings.length
         ? String(D.DegradedWarnings[0])
         : 'Missed Heartbeat';
-    return { text: Warning, color: 'text-warning', offline: false };
+    return { text: Warning, color: 'text-warning' };
   }
-  if (Online) return { text: 'Online', color: 'text-light', offline: false };
-  return { text: 'Idle', color: 'text-light', offline: false };
+  if (Online) return { text: 'Online', color: 'text-light' };
+  return { text: 'Idle', color: 'text-light' };
 }
 
 // Display helper for heartbeat source IP.
@@ -93,9 +93,7 @@ export function RenderDummyClientTile(D: DummyClientView) {
       <label class="text-sm ${TagBadges ? 'd-none' : ''}" data-type="DummyLabel">${DUMMY_TYPE_LABEL}</label>
       ${TagBadges}
       <h5 class="mb-0" data-type="Name">${Safe(Name)}</h5>
-      <span class="CLIENT_TILE_COMPACT_STATUS DUMMY_COMPACT_STATUS ${Compact.color}${
-        Compact.offline ? ' d-none' : ''
-      }" data-type="DUMMY_COMPACT_STATUS">${Safe(Compact.text)}</span>
+      <span class="CLIENT_TILE_COMPACT_STATUS DUMMY_COMPACT_STATUS ${Compact.color}" data-type="DUMMY_COMPACT_STATUS">${Safe(Compact.text)}</span>
       <small class="text-sm text-light" data-type="IP">${Safe(DummyDisplayIP(D.IP))}</small>
       <div class="SHOWTRAK_PC_STATUS ${
         State === 'IDLE' ? 'd-grid' : 'd-none'
@@ -148,8 +146,8 @@ export function UpdateDummyClientTile(D: DummyClientView) {
     .find('[data-type="DUMMY_COMPACT_STATUS"]')
     .text(Compact.text)
     .removeClass('text-light text-success text-warning')
-    .addClass(Compact.color)
-    .toggleClass('d-none', Compact.offline);
+    .removeClass('d-none')
+    .addClass(Compact.color);
   UpdateListRowState($tile, DummyListState(D));
 
   const ToggleIndicator = (Type: string, Show: boolean) => {
