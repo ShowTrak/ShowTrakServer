@@ -441,7 +441,11 @@ test('shure parser stays linear on a hostile 64 KB buffer of unterminated frames
   const { Messages } = m._internal.SplitMessages(hostile);
   const ms = Number(process.hrtime.bigint() - started) / 1e6;
   assert.deepEqual(Messages, []);
-  assert.ok(ms < 200, `split took ${ms.toFixed(1)}ms`);
+  // ~55 ms normally; V8 coverage (npm run test:coverage sets NODE_V8_COVERAGE)
+  // makes this loop ~5x slower. A quadratic split of 64 KB takes seconds, so the
+  // looser bound under coverage still catches the regression this guards.
+  const BudgetMs = process.env.NODE_V8_COVERAGE ? 1000 : 200;
+  assert.ok(ms < BudgetMs, `split took ${ms.toFixed(1)}ms`);
   // A real frame after the junk is still found once later traffic pushes the
   // junk past the frame bound (until then it is held as a possibly-partial frame).
   const mixed = '<{'.repeat(2000) + '< REP 1 BATT_BARS 003 >' + ' '.repeat(600);
