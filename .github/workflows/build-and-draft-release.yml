@@ -340,8 +340,20 @@ jobs:
           path: out/make/**
           if-no-files-found: error
 
+  # The cross-repo end-to-end checks (ShowTrak-Protocol/e2e) on the commit being
+  # released: this Server against the latest released Client and the other way
+  # round, plus the Companion modules and the QLab definition. They run alongside
+  # the build, and nothing is released unless they pass.
+  e2e:
+    needs: ci-gate
+    uses: ShowTrak/ShowTrak-Protocol/.github/workflows/e2e.yml@main
+    with:
+      server_ref: ${{ github.sha }}
+    permissions:
+      contents: read
+
   release:
-    needs: [release-meta, make]
+    needs: [release-meta, make, e2e]
     if: ${{ needs.release-meta.outputs.should_release == 'true' }}
     runs-on: ubuntu-latest
     env:
