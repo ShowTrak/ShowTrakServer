@@ -3,7 +3,11 @@ import { buildModalHeader } from './lib/modal-header';
 import { Config, PendingAdoption, ScriptList, CompactMode } from './state';
 import { SetCompactMode } from './mode';
 import { OpenClientInfo } from './client-info-modal';
-import { OpenMonitoringTargetHistory, OpenDummyClientHistory } from './monitoring';
+import {
+  OpenMonitoringTargetHistory,
+  OpenDummyClientHistory,
+  OpenFreeKioskTerminalHistory,
+} from './monitoring';
 import { Safe } from './utils';
 import { ConfirmationDialog, Notify, ShowExecutionToastIfActive, Wait } from './selection-init';
 import { ClearTagPicker } from './tag-picker';
@@ -108,15 +112,17 @@ export function InitModals() {
       return;
     }
     if (Type == 'InternalScript') return;
-    // SDK control API: open the view modal for a client, monitor or dummy. The
-    // entity type rides in Args (set by ControlService.OpenClientModal); each
-    // type has its own renderer view. Missing/unknown Args defaults to a client
-    // for backward compatibility with older callers.
+    // SDK control API: open the view modal for a client, monitor, dummy or
+    // FreeKiosk terminal. The entity type rides in Args (set by
+    // ControlService.OpenClientModal); each type has its own renderer view.
+    // Missing/unknown Args defaults to a client for backward compatibility with
+    // older callers.
     if (Type == 'OpenClientModal') {
       const Id = Array.isArray(Targets) ? Targets[0] : null;
       if (!Id) return;
       if (Args === 'monitor') return await OpenMonitoringTargetHistory(Number(Id));
       if (Args === 'dummy') return await OpenDummyClientHistory(String(Id));
+      if (Args === 'freekiosk') return await OpenFreeKioskTerminalHistory(String(Id));
       return await OpenClientInfo(String(Id));
     }
     // SDK control API: dismiss whatever is open. Like OpenClientModal this only
