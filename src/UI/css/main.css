@@ -6528,6 +6528,12 @@ body.mode-edit .CLIENT_TILE_COG:focus-visible {
   color: #ffffff;
 }
 
+/* The cog fills in while hovered or keyboard-focused. */
+.CLIENT_TILE_COG:hover .bi-gear::before,
+.CLIENT_TILE_COG:focus-visible .bi-gear::before {
+  content: '\f3e2'; /* bi-gear-fill */
+}
+
 /* No standalone #MODE_SWITCH positioning; switch sits in bottom bar */
 /* removed old toggle styles (.mode-switch ...) */
 
