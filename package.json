@@ -96,16 +96,16 @@
     "@types/node": "^26.6.6",
     "bootstrap-icons": "^1.13.2",
     "c8": "^12.0.0",
-    "electron": "^45.2.1",
+    "electron": "^45.3.3",
     "esbuild": "^0.28.2",
-    "eslint": "^10.14.0",
+    "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.14.0",
     "husky": "^9.1.7",
-    "prettier": "^3.9.10",
+    "prettier": "^3.10.1",
     "tsx": "^4.23.15",
     "typescript": "~5.7",
-    "typescript-eslint": "^8.72.1"
+    "typescript-eslint": "^8.72.2"
   },
   "dependencies": {
     "@showtrak/protocol": "file:./shared",
