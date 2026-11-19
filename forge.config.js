@@ -71,7 +71,7 @@ module.exports = {
       /^\/eslint\.config\.mjs$/,
       /^\/\.prettier/,
       /^\/\.gitignore$/,
-      /^\/(README|TODO)\.md$/,
+      /^\/(README|TODO|DEVELOPMENT)\.md$/,
       /^\/package-lock\.json$/,
       // The main process ships as one bundle, dist/main.bundle.js, loaded by
       // dist/boot.js (scripts/build-main.js). The per-file tsc output it was
