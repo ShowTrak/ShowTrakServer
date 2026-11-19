@@ -32,11 +32,13 @@ function resetState(overrides = {}) {
     hasWindow: true,
     monitoringShutdownFn: true,
     dummyShutdownFn: true,
+    monitoringHangs: false,
     throwOn: {},
     ...overrides,
   };
   calls = {
     quit: 0,
+    exits: [],
     windowClose: 0,
     preventDefault: 0,
     save: [],
@@ -82,6 +84,9 @@ const appStub = {
   quit: () => {
     calls.quit++;
   },
+  exit: (code) => {
+    calls.exits.push(code);
+  },
 };
 
 const dialogStub = {
@@ -112,6 +117,7 @@ Object.defineProperty(monitoringTargetManager, 'Shutdown', {
       ? async () => {
           calls.monitoringShutdown++;
           maybeThrow('monitoring');
+          if (state.monitoringHangs) await new Promise(() => {});
         }
       : undefined,
 });
@@ -695,4 +701,37 @@ test('quitting to install an update bypasses every shutdown guard', async () => 
   await flush();
   assert.equal(calls.preventDefault, 0, 'blocking here would abort the update install');
   assert.deepEqual(calls.dbShutdown, []);
+});
+
+// --- The cleanup deadline -----------------------------------------------------
+
+test('a cleanup step that hangs is given up on at the deadline, and the app exits', async () => {
+  const C = freshCoordinator({ monitoringHangs: true });
+  C.setShutdownCleanupDeadline(30);
+  await C.handleMainWindowClose(mainWindowStub, cancelableEvent()); // approves
+  calls.quit = 0;
+  C.handleBeforeQuit(cancelableEvent());
+  await flush();
+  assert.deepEqual(calls.exits, []);
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  await flush();
+  // exit, not quit: a quit would wait on the stuck cleanup all over again.
+  assert.deepEqual(calls.exits, [0]);
+  assert.equal(calls.quit, 0);
+  // Any before-quit that follows goes straight through.
+  const After = cancelableEvent();
+  calls.preventDefault = 0;
+  C.handleBeforeQuit(After);
+  assert.equal(calls.preventDefault, 0);
+});
+
+test('a cleanup that finishes in time quits normally, and the deadline is longer than the database timeout', async () => {
+  const C = freshCoordinator();
+  assert.ok(C.SHUTDOWN_CLEANUP_DEADLINE_MS > 15000);
+  await C.handleMainWindowClose(mainWindowStub, cancelableEvent());
+  calls.quit = 0;
+  C.handleBeforeQuit(cancelableEvent());
+  await flush();
+  assert.equal(calls.quit, 1);
+  assert.deepEqual(calls.exits, []);
 });

@@ -35,6 +35,19 @@ interface CancelableEvent {
   preventDefault(): void;
 }
 
+// How long the quit cleanup may take before the app exits anyway. A cleanup step
+// that hangs (a monitoring connection that never answers, a stuck disk) would
+// otherwise leave a windowless process holding the single-instance lock and the
+// ports, and every relaunch would quietly do nothing. Longer than the database's
+// own shutdown timeout, which it must never cut short.
+export const SHUTDOWN_CLEANUP_DEADLINE_MS = 30_000;
+let shutdownCleanupDeadlineMs = SHUTDOWN_CLEANUP_DEADLINE_MS;
+
+/** Change the cleanup deadline (tests). */
+function setShutdownCleanupDeadline(ms: number): void {
+  shutdownCleanupDeadlineMs = ms;
+}
+
 // --- Lifecycle handshake state ----------------------------------------------
 let mainWindowCloseApproved = false;
 let closePromptInFlight = false;
@@ -308,15 +321,27 @@ function handleBeforeQuit(event: CancelableEvent): void {
   if (shutdownCleanupInFlight) return;
 
   shutdownCleanupInFlight = true;
-  runShutdownCleanup()
-    .catch((Err) => {
+  let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
+  const deadline = new Promise<'timeout'>((resolve) => {
+    deadlineTimer = setTimeout(() => resolve('timeout'), shutdownCleanupDeadlineMs);
+  });
+  Promise.race([
+    runShutdownCleanup().catch((Err) => {
       Logger.error('Unexpected error during shutdown cleanup:', Err);
-    })
-    .finally(() => {
-      shutdownCleanupComplete = true;
-      shutdownCleanupInFlight = false;
-      app.quit();
-    });
+    }),
+    deadline,
+  ]).then((outcome) => {
+    if (deadlineTimer) clearTimeout(deadlineTimer);
+    shutdownCleanupComplete = true;
+    shutdownCleanupInFlight = false;
+    if (outcome === 'timeout') {
+      // exit, not quit: a quit would wait on whatever the cleanup is stuck on.
+      Logger.error('Shutdown cleanup did not finish in time; exiting without it');
+      app.exit(0);
+      return;
+    }
+    app.quit();
+  });
 }
 
 function handlePowerMonitorShutdown(event: CancelableEvent): void {
@@ -335,6 +360,7 @@ function handleBeforeQuitForUpdate(): void {
 }
 
 export {
+  setShutdownCleanupDeadline,
   setAccidentalShutdownProtection,
   handleMainWindowClose,
   handleMainWindowClosed,

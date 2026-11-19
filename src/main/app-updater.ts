@@ -7,7 +7,7 @@
 // injected window provider. Behavior is identical to the original inline impl;
 // it has simply been grouped here.
 const { app } = require('electron/main');
-const { autoUpdater: SquirrelUpdater } = require('electron');
+const { autoUpdater: SquirrelUpdater, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -128,6 +128,28 @@ async function resolveChannelFeed(): Promise<{ Tag: string; FeedURL: string } | 
 }
 let autoCheckInitialTimer: NodeJS.Timeout | null = null;
 let autoCheckIntervalTimer: NodeJS.Timeout | null = null;
+// Set while an install is under way, so a second click does not start another.
+let installInFlight = false;
+// Lets the quit an install starts past the shutdown guard. Electron's Windows
+// updater never emits 'before-quit-for-update' (macOS's does), so the Squirrel
+// install calls this itself before it quits; without it, Install in SHOW mode
+// raised the "close ShowTrak?" prompt.
+let beforeQuitForUpdate: () => void = () => undefined;
+
+// Linux packages (zip, deb, rpm) cannot update in place; only an AppImage
+// could, and none is published. electron-updater's Linux updater does nothing
+// at all outside an AppImage (no events, no error), so a check would only ever
+// end in the watchdog's "timed out".
+function linuxUpdatesUnavailable(): boolean {
+  return process.platform === 'linux' && !process.env.APPIMAGE;
+}
+
+const LINUX_UPDATES_UNAVAILABLE_STATUS: AppUpdateStatusPayload = {
+  state: 'error',
+  error:
+    'In-app updates are not available for Linux packages. Download the new version from the GitHub releases page.',
+  info: { reason: 'linux_updates_unavailable' },
+};
 
 function toErrorMessage(value: unknown) {
   if (!value) return 'Unknown error';
@@ -203,7 +225,12 @@ function runSimulatedInstall() {
 
 function isUpdateInProgress() {
   const state = lastStatus && lastStatus.state;
-  return state === 'checking' || state === 'available' || state === 'downloading';
+  return (
+    state === 'checking' ||
+    state === 'available' ||
+    state === 'downloading' ||
+    state === 'installing'
+  );
 }
 
 function forwardToRenderer(payload: AppUpdateStatusPayload) {
@@ -236,6 +263,7 @@ function sendAppUpdateStatus(payload: AppUpdateStatusPayload) {
   } catch {
     /* intentional: status logging is best-effort */
   }
+  if (state === 'error') installInFlight = false;
   if (state === 'downloaded') {
     hasDownloadedUpdate = true;
   } else if (
@@ -389,8 +417,12 @@ function endSquirrelTracking() {
   }
 }
 
+// Electron's net.fetch goes through the system proxy (as Squirrel and
+// electron-updater do); Node's fetch does not, so behind a venue's proxy the
+// beta-channel lookup and release notes would fail while the update itself works.
 async function fetchText(url: string, headers: Record<string, string> = {}) {
-  const res = await fetch(url, { headers, signal: AbortSignal.timeout(SQUIRREL_META_TIMEOUT_MS) });
+  const Fetch: typeof fetch = net && typeof net.fetch === 'function' ? net.fetch : fetch;
+  const res = await Fetch(url, { headers, signal: AbortSignal.timeout(SQUIRREL_META_TIMEOUT_MS) });
   if (!res.ok) throw new Error(`GET ${url} failed with status ${res.status}`);
   return res.text();
 }
@@ -481,6 +513,18 @@ async function handleCheck() {
     forwardToRenderer(lastStatus);
     return;
   }
+  // Downloaded and waiting for a restart: a new check would report "up to
+  // date" (Squirrel already lists the new version) and hide the Install button.
+  if (hasDownloadedUpdate && lastStatus) {
+    Logger.log('AppUpdate:Check skipped; an update is downloaded and ready to install');
+    forwardToRenderer(lastStatus);
+    return;
+  }
+
+  if (app.isPackaged && linuxUpdatesUnavailable()) {
+    sendAppUpdateStatus(LINUX_UPDATES_UNAVAILABLE_STATUS);
+    return;
+  }
 
   if (app.isPackaged && !ensureMacAutoUpdateEligibility()) {
     Logger.warn('AppUpdate:Check continuing despite macOS signing eligibility warning');
@@ -569,7 +613,8 @@ async function handleCheck() {
   });
   if (!hasYml) {
     try {
-      const tmpYml = path.join(os.tmpdir(), `showtrak-app-update-${process.pid}.yml`);
+      // One file, rewritten each launch, rather than one per process left behind.
+      const tmpYml = path.join(os.tmpdir(), 'showtrak-app-update.yml');
       const yml = [
         'provider: github',
         'owner: ShowTrak',
@@ -641,6 +686,7 @@ async function handleInstall() {
     try {
       Logger.log('Using Squirrel updater install flow');
       sendAppUpdateStatus({ state: 'installing' });
+      beforeQuitForUpdate();
       SquirrelUpdater.quitAndInstall();
     } catch (e) {
       sendAppUpdateStatus({ state: 'error', error: String(e) });
@@ -657,10 +703,19 @@ async function handleInstall() {
     });
     return;
   }
+  // On macOS the native updater still has to fetch the package before it can
+  // quit, which takes a moment: say so, and ignore further clicks meanwhile.
+  if (installInFlight) {
+    Logger.log('AppUpdate:Install ignored; an install is already under way');
+    return;
+  }
+  installInFlight = true;
   try {
+    sendAppUpdateStatus({ state: 'installing' });
     Logger.log('Calling electron-updater quitAndInstall(false, true)');
     await autoUpdater.quitAndInstall(false, true);
   } catch (e) {
+    installInFlight = false;
     Logger.error('quitAndInstall failed:', e);
     sendAppUpdateStatus({ state: 'error', error: String(e) });
   }
@@ -684,7 +739,7 @@ function clearAutomaticCheckTimers() {
 // Turn background checking on or off. Unpackaged (dev) runs never check
 // automatically: their check is only a UI simulation.
 function SetAutomaticUpdates(Enabled: boolean) {
-  const Next = !!Enabled && app.isPackaged;
+  const Next = !!Enabled && app.isPackaged && !linuxUpdatesUnavailable();
   if (autoUpdater) autoUpdater.autoInstallOnAppQuit = Next;
   if (Next === automaticUpdatesEnabled) return;
   automaticUpdatesEnabled = Next;
@@ -722,8 +777,14 @@ function Register(RPC: RpcRegistrar, options: RegisterOptions = {}) {
   RPC.handle('AppUpdate:Install', handleInstall);
 }
 
+// What to run just before an install quits the app (see beforeQuitForUpdate).
+function SetBeforeQuitForUpdate(Hook: () => void) {
+  beforeQuitForUpdate = Hook;
+}
+
 export const Manager = {
   Register,
+  SetBeforeQuitForUpdate,
   sendAppUpdateStatus,
   isSquirrelWindows,
   SetAutomaticUpdates,
