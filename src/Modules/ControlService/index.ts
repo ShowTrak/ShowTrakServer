@@ -6,6 +6,8 @@
 // fallback via the managers' Get methods.
 //
 // Dispatch strategy mirrors the split the OSC module and Web UI already use:
+//   - Monitor check actions, FreeKiosk commands and dummy heartbeats go to their
+//     managers, mirroring the OSC routes that offer the same show-time verbs.
 //   - Open-modal / view are renderer concerns → emitted as an `OSCBulkAction`
 //     broadcast the renderer applies (fire-and-forget).
 //   - Real server actions (WOL, scripts, integrated events, save) go through the
@@ -26,6 +28,12 @@ import { Manager as IdentifyManager } from '../IdentifyManager';
 import { Manager as MonitoringTargetManager } from '../MonitoringTargetManager';
 import { Manager as DummyClientManager } from '../DummyClientManager';
 import { Manager as FreeKioskManager } from '../FreeKioskManager';
+import { Manager as MonitoringMethods } from '../MonitoringMethods';
+import { Manager as IPCValidation } from '../IPCValidation';
+import { Manager as ScriptExecutionManager } from '../ScriptExecutionManager';
+import { GetRetryTarget } from '../ScriptExecutionManager/retry';
+import { GetFreeKioskCommand } from '../FreeKiosk/commands';
+import { DescribeError } from '@showtrak/protocol/runtime';
 import { GetHandler } from '../../main/handler-registry';
 
 const Logger = CreateLogger('ControlService');
@@ -67,9 +75,8 @@ async function getAllClients(): Promise<ResolvedClient[]> {
   return Clients as ResolvedClient[];
 }
 
-async function resolveGroupClients(
-  Key: string
-): Promise<[CommandResult, null] | [null, ResolvedClient[]]> {
+// A group by slug, or by numeric GroupID as the transitional fallback.
+async function resolveGroup(Key: string) {
   const Trimmed = String(Key ?? '').trim();
   let Group = null;
   if (/^\d+$/.test(Trimmed)) {
@@ -79,14 +86,11 @@ async function resolveGroupClients(
   if (!Group && typeof GroupManager.GetBySlug === 'function') {
     Group = await GroupManager.GetBySlug(Trimmed);
   }
-  if (!Group) return [fail(`Invalid Group "${Key}"`), null];
-  const Clients = await getAllClients();
-  return [null, Clients.filter((c) => Number(c.GroupID) === Number(Group.GroupID))];
+  return Group || null;
 }
 
-async function resolveTagClients(
-  Key: string
-): Promise<[CommandResult, null] | [null, ResolvedClient[]]> {
+// A tag by slug, or by numeric TagID as the transitional fallback.
+async function resolveTag(Key: string) {
   const Trimmed = String(Key ?? '').trim();
   let Tag = null;
   if (/^\d+$/.test(Trimmed)) {
@@ -96,6 +100,22 @@ async function resolveTagClients(
   if (!Tag && typeof TagManager.GetBySlug === 'function') {
     Tag = await TagManager.GetBySlug(Trimmed);
   }
+  return Tag || null;
+}
+
+async function resolveGroupClients(
+  Key: string
+): Promise<[CommandResult, null] | [null, ResolvedClient[]]> {
+  const Group = await resolveGroup(Key);
+  if (!Group) return [fail(`Invalid Group "${Key}"`), null];
+  const Clients = await getAllClients();
+  return [null, Clients.filter((c) => Number(c.GroupID) === Number(Group.GroupID))];
+}
+
+async function resolveTagClients(
+  Key: string
+): Promise<[CommandResult, null] | [null, ResolvedClient[]]> {
+  const Tag = await resolveTag(Key);
   if (!Tag) return [fail(`Invalid Tag "${Key}"`), null];
   const Clients = await getAllClients();
   // The full tag list expands any tags this one absorbs (tags can nest).
@@ -133,6 +153,134 @@ async function dispatchHandler(
 
 function emitBulk(type: string, uuids: string[], arg: unknown = null): void {
   Broadcast.emit('OSCBulkAction', type, uuids, arg);
+}
+
+// The desktop's three client-list layouts (src/UI/js/app/lib/list-view.ts).
+const VIEW_MODES = ['grid', 'compact', 'list'] as const;
+type ViewMode = (typeof VIEW_MODES)[number];
+
+function parseViewMode(Value: unknown): ViewMode | null {
+  const Text = typeof Value === 'string' ? Value.trim().toLowerCase() : '';
+  return (VIEW_MODES as readonly string[]).includes(Text) ? (Text as ViewMode) : null;
+}
+
+// A command's optional single value. Integrations fill it from a text field, so
+// a blank field means "no value", the same as leaving it out.
+function optionalValue(Value: unknown): string | null {
+  if (Value == null) return null;
+  const Text = String(Value).trim();
+  return Text === '' ? null : Text;
+}
+
+// --- FreeKiosk terminal targets ------------------------------------------
+// Mirrors the OSC FreeKiosk routes (src/Modules/OSC), which address terminals
+// the same four ways. Terminals are client-shaped, so a group or tag covers
+// them by GroupID or scope exactly as it covers clients; other client types in
+// the same group or tag are never touched.
+
+type KioskTerminal = NonNullable<Awaited<ReturnType<typeof FreeKioskManager.GetBySlug>>>;
+
+/** The terminals a command addresses and how to name them, or why there are none. */
+type KioskTargets = [string, null, null] | [null, KioskTerminal[], string];
+
+function describeTerminals(Terminals: KioskTerminal[], Where: string): KioskTargets {
+  if (!Terminals.length) return [`No FreeKiosk terminals${Where}`, null, null];
+  const Noun = Terminals.length === 1 ? 'FreeKiosk terminal' : 'FreeKiosk terminals';
+  return [null, Terminals, `${Terminals.length} ${Noun}${Where}`];
+}
+
+async function allTerminals(): Promise<KioskTerminal[] | null> {
+  const [Err, Terminals] = await FreeKioskManager.GetAll();
+  return Err ? null : ((Terminals || []) as KioskTerminal[]);
+}
+
+async function resolveKioskTargets(
+  Scope: 'terminal' | 'group' | 'tag' | 'all',
+  Key: string
+): Promise<KioskTargets> {
+  if (Scope === 'terminal') {
+    const Terminal =
+      typeof FreeKioskManager.GetBySlug === 'function'
+        ? await FreeKioskManager.GetBySlug(Key)
+        : null;
+    if (!Terminal) return [`Invalid FreeKiosk Terminal "${Key}"`, null, null];
+    return [null, [Terminal], `"${Terminal.Slug || Terminal.UUID}"`];
+  }
+  if (Scope === 'group') {
+    const Group = await resolveGroup(Key);
+    if (!Group) return [`Invalid Group "${Key}"`, null, null];
+    const Terminals = await allTerminals();
+    if (!Terminals) return ['Failed to fetch FreeKiosk terminals', null, null];
+    return describeTerminals(
+      Terminals.filter((T) => T.GroupID != null && Number(T.GroupID) === Number(Group.GroupID)),
+      ` in group "${Group.Slug || Group.GroupID}"`
+    );
+  }
+  if (Scope === 'tag') {
+    const Tag = await resolveTag(Key);
+    if (!Tag) return [`Invalid Tag "${Key}"`, null, null];
+    const Terminals = await allTerminals();
+    if (!Terminals) return ['Failed to fetch FreeKiosk terminals', null, null];
+    const AllTags = await TagManager.GetAllViews();
+    return describeTerminals(
+      Terminals.filter((T) => ScriptWhitelistManager.IsClientAllowed(Tag.Scope, T, AllTags)),
+      ` in tag "${Tag.Slug || Tag.TagID}"`
+    );
+  }
+  const Terminals = await allTerminals();
+  if (!Terminals) return ['Failed to fetch FreeKiosk terminals', null, null];
+  return describeTerminals(Terminals, '');
+}
+
+async function sendKioskCommand(
+  Targets: Promise<KioskTargets>,
+  CommandID: string,
+  RawValue: unknown
+): Promise<CommandResult> {
+  const [TargetErr, Terminals, Target] = await Targets;
+  if (Terminals === null) return fail(TargetErr);
+
+  // The command map is the allowlist, so an integration can send exactly what
+  // the view modal and OSC can, and never a raw device endpoint.
+  const Command = GetFreeKioskCommand(CommandID);
+  if (!Command) return fail(`Unknown FreeKiosk command "${CommandID}"`);
+
+  const Value = optionalValue(RawValue);
+  const First = Array.isArray(Command.Params) ? Command.Params[0] : undefined;
+  if (Value != null && !First) return fail(`${Command.Label} takes no value`);
+  if (Value == null && First) return fail(`${Command.Label} needs a value`);
+
+  let Params: Record<string, unknown>;
+  try {
+    Params = IPCValidation.FreeKioskCommandParams(
+      CommandID,
+      First && Value != null ? { [First.Key]: Value } : {}
+    );
+  } catch (Err) {
+    return fail(`${Command.Label}: ${DescribeError(Err)}`);
+  }
+
+  const [Err, Summary] = await FreeKioskManager.SendCommand(
+    Terminals.map((T) => T.UUID),
+    CommandID,
+    Params
+  );
+  if (Err || !Summary) return fail(Err || `${Command.Label} failed`);
+  if (Summary.Failed > 0) {
+    // The device's own refusal ("needs Device Owner") is the useful part.
+    const Failures = Summary.Results.filter((Entry) => !Entry.Success);
+    const Reasons =
+      Terminals.length === 1
+        ? Failures[0]?.Error || 'Command failed'
+        : Failures.map((Entry) => {
+            const Terminal = Terminals.find((Candidate) => Candidate.UUID === Entry.UUID);
+            const Name = Terminal ? Terminal.Slug || Terminal.UUID : Entry.UUID;
+            return `"${Name}": ${Entry.Error || 'Command failed'}`;
+          }).join('; ');
+    const Count = Terminals.length === 1 ? '' : ` (${Summary.Failed} failed)`;
+    return fail(`${Command.Label} on ${Target}${Count}: ${Reasons}`);
+  }
+  return ok(`${Command.Label} sent to ${Target}${Value != null ? ` (${Value})` : ''}`);
 }
 
 // --- Public command surface ---------------------------------------------
@@ -346,6 +494,147 @@ export const ControlService = {
   async CloseModals(): Promise<CommandResult> {
     emitBulk('CloseModals', []);
     return ok('Closed all modals');
+  },
+
+  // Client-list layout ------------------------------------------------------
+  // Applied by every renderer that receives it, the desktop and each Web UI
+  // browser alike (unlike the modal actions, which are desktop-only). `mode`
+  // names the layout (grid / compact / list); SDKs before 1.8 send only
+  // `compact`, which still means compact vs grid.
+  async SetView(mode: unknown, compact?: unknown): Promise<CommandResult> {
+    let Next = parseViewMode(mode);
+    if (!Next && mode == null && typeof compact === 'boolean') {
+      Next = compact ? 'compact' : 'grid';
+    }
+    if (!Next) return fail(`Unknown view "${String(mode ?? '')}"`);
+    emitBulk('SetViewMode', [], Next);
+    return ok(`View set to ${Next}`);
+  },
+  async ToggleCompactView(): Promise<CommandResult> {
+    emitBulk('ToggleCompactView', []);
+    return ok('Toggled the compact view');
+  },
+
+  // Monitoring check actions -----------------------------------------------
+  // The /sdk twin of the OSC Monitor routes: power a projector on, recall a
+  // console scene. `value` fills the action's first declared parameter (what a
+  // single text field can address); `params` names any of them outright and
+  // wins over `value`. Both are normalised against the action's own schema, as
+  // the desktop's RunMonitoringAction channel does.
+  async RunMonitorAction(
+    slug: string,
+    method: string,
+    actionId: string,
+    value?: unknown,
+    params?: unknown
+  ): Promise<CommandResult> {
+    const Target =
+      typeof MonitoringTargetManager.GetBySlug === 'function'
+        ? await MonitoringTargetManager.GetBySlug(slug)
+        : null;
+    if (!Target) return fail(`Invalid Monitor "${slug}"`);
+
+    const Action = MonitoringMethods.GetAction(method, actionId);
+    if (!Action) return fail(`Unknown action "${method}/${actionId}"`);
+
+    const Raw: Record<string, unknown> = {};
+    const Value = optionalValue(value);
+    if (Value != null) {
+      const First = Array.isArray(Action.Params) ? Action.Params[0] : null;
+      if (!First) return fail(`Action "${method}/${actionId}" takes no value`);
+      Raw[First.Key] = Value;
+    }
+    if (params != null) {
+      if (typeof params !== 'object' || Array.isArray(params)) {
+        return fail('Action parameters must be an object');
+      }
+      Object.assign(Raw, params);
+    }
+    let Params: Record<string, unknown>;
+    try {
+      Params = IPCValidation.MonitoringActionParams(method, actionId, Raw);
+    } catch (Err) {
+      return fail(`${Action.Label}: ${DescribeError(Err)}`);
+    }
+
+    const [Err, Summary] = await MonitoringTargetManager.RunAction(
+      [Target.TargetID],
+      method,
+      actionId,
+      Params
+    );
+    if (Err || !Summary) return fail(Err || 'Action failed');
+    if (Summary.Failed > 0) {
+      // The device's own refusal ("warming up", "wrong password") verbatim.
+      const Reason = Summary.Results.find((Entry) => !Entry.Success)?.Error || 'Action failed';
+      return fail(`${Action.Label} on "${Target.Slug || Target.TargetID}": ${Reason}`);
+    }
+    return ok(
+      `${Action.Label} sent to "${Target.Slug || Target.TargetID}"${Value != null ? ` (${Value})` : ''}`
+    );
+  },
+
+  // FreeKiosk terminal commands --------------------------------------------
+  // The /sdk twin of the OSC FreeKiosk routes. `value` fills the command's one
+  // parameter (brightness, volume) and runs through the same validator.
+  async FreeKioskCommandOnTerminal(
+    slug: string,
+    commandId: string,
+    value?: unknown
+  ): Promise<CommandResult> {
+    return sendKioskCommand(resolveKioskTargets('terminal', slug), commandId, value);
+  },
+  async FreeKioskCommandOnGroup(
+    slug: string,
+    commandId: string,
+    value?: unknown
+  ): Promise<CommandResult> {
+    return sendKioskCommand(resolveKioskTargets('group', slug), commandId, value);
+  },
+  async FreeKioskCommandOnTag(
+    slug: string,
+    commandId: string,
+    value?: unknown
+  ): Promise<CommandResult> {
+    return sendKioskCommand(resolveKioskTargets('tag', slug), commandId, value);
+  },
+  async FreeKioskCommandOnAll(commandId: string, value?: unknown): Promise<CommandResult> {
+    return sendKioskCommand(resolveKioskTargets('all', ''), commandId, value);
+  },
+
+  // Dummy clients -----------------------------------------------------------
+  // The /sdk twin of OSC /API/Dummy/<slug>/Heartbeat. No IP is recorded: the
+  // socket belongs to the integration relaying the heartbeat, not to whatever
+  // the dummy stands for, so its address would be the wrong one.
+  async DummyHeartbeat(slug: string): Promise<CommandResult> {
+    const [Err] = await DummyClientManager.Heartbeat(slug, null);
+    if (Err) return fail(Err);
+    return ok(`Dummy heartbeat accepted for "${slug}"`);
+  },
+
+  // Script executions (the execution panel) ---------------------------------
+  // Retry every failed execution that can be retried: what the panel's Retry
+  // button does. Goes through the same handler, so the whitelist, per-client
+  // queue and audit log apply exactly as on the first run.
+  async RetryFailedExecutions(): Promise<CommandResult> {
+    const Executions = await ScriptExecutionManager.GetAllExecutions();
+    const RequestIDs = Executions.filter((Execution) => GetRetryTarget(Execution)).map(
+      (Execution) => Execution.RequestID
+    );
+    if (RequestIDs.length === 0) return ok('No failed executions to retry');
+    const Handler = GetHandler('Scripts:RetryExecutions');
+    if (typeof Handler !== 'function') return fail('Retry handler unavailable');
+    const Result = await Handler(null, RequestIDs);
+    if (Array.isArray(Result) && Result[0]) return fail(Result[0]);
+    const Retried =
+      Array.isArray(Result) && Result[1] && typeof Result[1] === 'object'
+        ? Number((Result[1] as { Retried?: unknown }).Retried) || 0
+        : RequestIDs.length;
+    return ok(`Retried ${Retried} failed execution${Retried === 1 ? '' : 's'}`);
+  },
+  // Clear finished rows from the panel. Anything still queued or running stays.
+  async ClearSettledExecutions(): Promise<CommandResult> {
+    return dispatchHandler('Scripts:ClearSettledExecutions', [], 'Cleared finished executions');
   },
 
   // Save the current show file --------------------------------------------

@@ -57,6 +57,10 @@ import { Manager as FreeKioskManager } from '../FreeKioskManager';
 import { Manager as AdoptionManager } from '../AdoptionManager';
 import { Manager as MonitoringActionFavourites } from '../MonitoringActionFavourites';
 import {
+  Manager as ScriptExecutionManager,
+  ToPublicScriptExecution,
+} from '../ScriptExecutionManager';
+import {
   ToPublicClient,
   ToPublicGroup,
   ToPublicMonitor,
@@ -261,6 +265,29 @@ const SDK_PUSH_ALLOWLIST = new Set<string>([
   // workspace PIN, so a surface that could read them could mint its own access.
 ]);
 
+// Allowlisted channels that only a paired device (ShowTrak Remote) is sent.
+// They feed management screens and the alert tray's sounds; an integration
+// holding an API key never reads them, and some are heavy: PlayCustomAudio
+// carries a whole audio file, AuditLogAppended fires on every edit. Sending them
+// to every Companion connection would cost each one bandwidth for nothing.
+//
+// No API-key consumer depends on them: SDK releases before 1.7 do not listen
+// for any of them, and from 1.7 on they are documented as device-only. The
+// show-time state an integration does read (clients, tags, scripts, mode,
+// executions, alerts raised, pending adoption) stays on the shared push.
+const SDK_DEVICE_ONLY_PUSH = new Set<string>([
+  'SetFullAlertRuleList',
+  'USBDeviceAdded',
+  'USBDeviceRemoved',
+  'SetOSCList',
+  'PlaySound',
+  'PlayCustomAudio',
+  'AudioAssetsUpdated',
+  'SetFullMonitoringActionFavouriteList',
+  'AuditLogAppended',
+  'UpdateSettings',
+]);
+
 // Serialize a push payload for the SDK wire (same client projection the Web UI
 // and desktop consume). Monitor/dummy channels are projected to the client shape.
 function TransformSdkPush(channel: string, args: unknown[]): unknown[] {
@@ -353,6 +380,10 @@ async function DispatchCommand(name: unknown, rawArgs: unknown) {
   const slug = String(args.slug ?? '');
   const scriptSlug = String(args.scriptSlug ?? '');
   const eventSlug = String(args.eventSlug ?? '');
+  const commandId = String(args.commandId ?? '');
+  // Every name below is additive: an SDK never sends a command it does not know,
+  // and an older server answers a newer one's with "Unknown command" rather than
+  // anything worse, so new verbs need no version handshake.
   switch (name) {
     case 'wol.all':
       return ControlService.WakeAll();
@@ -386,6 +417,32 @@ async function DispatchCommand(name: unknown, rawArgs: unknown) {
       return ControlService.SetMode(String(args.mode ?? 'SHOW'));
     case 'mode.toggle':
       return ControlService.ToggleMode();
+    case 'view.set':
+      return ControlService.SetView(args.mode, args.compact);
+    case 'view.toggle':
+      return ControlService.ToggleCompactView();
+    case 'monitor.action':
+      return ControlService.RunMonitorAction(
+        slug,
+        String(args.method ?? ''),
+        String(args.actionId ?? ''),
+        args.value,
+        args.params
+      );
+    case 'freekiosk.terminal':
+      return ControlService.FreeKioskCommandOnTerminal(slug, commandId, args.value);
+    case 'freekiosk.group':
+      return ControlService.FreeKioskCommandOnGroup(slug, commandId, args.value);
+    case 'freekiosk.tag':
+      return ControlService.FreeKioskCommandOnTag(slug, commandId, args.value);
+    case 'freekiosk.all':
+      return ControlService.FreeKioskCommandOnAll(commandId, args.value);
+    case 'dummy.heartbeat':
+      return ControlService.DummyHeartbeat(slug);
+    case 'executions.retryFailed':
+      return ControlService.RetryFailedExecutions();
+    case 'executions.clearSettled':
+      return ControlService.ClearSettledExecutions();
     case 'identify.client':
       return ControlService.Identify(slug);
     case 'identify.stop':
@@ -415,10 +472,13 @@ function SetupSdkNamespace(io: SdkIOServer) {
   // handshake middleware refuses unauthenticated connections).
   RegisterRendererSink((channel: string, ...args: unknown[]) => {
     if (!SDK_PUSH_ALLOWLIST.has(channel)) return;
-    const Targets =
+    let Targets =
       sdk.sockets && typeof sdk.sockets.values === 'function'
         ? Array.from(sdk.sockets.values())
         : [];
+    if (SDK_DEVICE_ONLY_PUSH.has(channel)) {
+      Targets = Targets.filter((Socket) => Socket.AuthMode === 'device');
+    }
     if (Targets.length === 0) return;
     let payload: unknown[];
     try {
@@ -618,6 +678,23 @@ function SetupSdkNamespace(io: SdkIOServer) {
       socket.emit('ModeUpdated', ModeManager.Get());
       socket.emit('AlertActionsUpdated', AlertsManager.GetActionsEnabled());
 
+      // Work already in flight and devices already waiting. Both lists are
+      // pushed to every session as they change, so without a snapshot here a
+      // session joining mid-run would not see a running script, or a device
+      // waiting for adoption, until the next change. SDKs that predate these
+      // events simply have no listener for them.
+      try {
+        const Executions = await ScriptExecutionManager.GetAllExecutions();
+        socket.emit('UpdateScriptExecutions', (Executions || []).map(ToPublicScriptExecution));
+      } catch {
+        socket.emit('UpdateScriptExecutions', []);
+      }
+      try {
+        socket.emit('SetDevicesPendingAdoption', AdoptionManager.GetClientsPendingAdoption());
+      } catch {
+        socket.emit('SetDevicesPendingAdoption', []);
+      }
+
       // The rest of what the Web UI hydrates with, each on its own so one
       // failing read cannot cost the session the others. Device sessions only:
       // an integration never asked for alert rules or layout settings, and
@@ -627,11 +704,6 @@ function SetupSdkNamespace(io: SdkIOServer) {
           socket.emit('UpdateSettings', ToPublicSettings(await SettingsManager.GetAll()), []);
         } catch {
           /* intentional: the app falls back to its own layout defaults */
-        }
-        try {
-          socket.emit('SetDevicesPendingAdoption', AdoptionManager.GetClientsPendingAdoption());
-        } catch {
-          socket.emit('SetDevicesPendingAdoption', []);
         }
         try {
           socket.emit('SetFullMonitoringActionFavouriteList', MonitoringActionFavourites.GetAll());
@@ -767,4 +839,10 @@ function SetupSdkNamespace(io: SdkIOServer) {
   return sdk;
 }
 
-export { SetupSdkNamespace, DispatchCommand, GetSdkConfig, SDK_PUSH_ALLOWLIST };
+export {
+  SetupSdkNamespace,
+  DispatchCommand,
+  GetSdkConfig,
+  SDK_PUSH_ALLOWLIST,
+  SDK_DEVICE_ONLY_PUSH,
+};

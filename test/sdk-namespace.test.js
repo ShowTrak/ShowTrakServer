@@ -131,6 +131,16 @@ const CONTROL_METHODS = [
   'StopIdentify',
   'OpenClientModal',
   'CloseModals',
+  'SetView',
+  'ToggleCompactView',
+  'RunMonitorAction',
+  'FreeKioskCommandOnTerminal',
+  'FreeKioskCommandOnGroup',
+  'FreeKioskCommandOnTag',
+  'FreeKioskCommandOnAll',
+  'DummyHeartbeat',
+  'RetryFailedExecutions',
+  'ClearSettledExecutions',
   'SaveShow',
   'Shutdown',
   'ShutdownForce',
@@ -264,6 +274,21 @@ function loadSdk() {
       },
       '../AdoptionManager': {
         Manager: { GetClientsPendingAdoption: () => state.pendingAdoption || [] },
+      },
+      '../ScriptExecutionManager': {
+        Manager: {
+          GetAllExecutions: async () => {
+            if (state.executionsThrow) throw new Error('executions unavailable');
+            return state.executions || [];
+          },
+        },
+        // The real projection drops the live Client instance and timer handle;
+        // a recognisable stand-in proves the snapshot went through it.
+        ToPublicScriptExecution: (E) => ({
+          RequestID: E.RequestID,
+          Status: E.Status,
+          Public: true,
+        }),
       },
     },
     // RemoteAccess owns the capability model the rpc bridge authorises against.
@@ -1209,9 +1234,33 @@ test('a connecting socket is sent the full current state', async () => {
     'SetScriptList',
     'ModeUpdated',
     'AlertActionsUpdated',
+    'UpdateScriptExecutions',
+    'SetDevicesPendingAdoption',
   ]);
   assert.equal(Socket.emitted[6][1], 'SHOW');
   assert.equal(Socket.emitted[7][1], true);
+});
+
+test('a connecting socket is sent the executions already in flight, projected', async () => {
+  // Without the snapshot a session joining mid-run would not see a running
+  // script until its next progress update, and a Companion "script running"
+  // button would sit dark while the script ran.
+  state.executions = [{ RequestID: 'r-1', Status: 'Pending', Client: { secret: 'instance' } }];
+  const { NS } = boot();
+  const Socket = fakeSocket({ apiKey: 'a'.repeat(48) });
+  await handshake(NS, Socket);
+  await NS.connectionHandler(Socket);
+  const Sent = Socket.emitted.find((E) => E[0] === 'UpdateScriptExecutions');
+  assert.deepEqual(Sent[1], [{ RequestID: 'r-1', Status: 'Pending', Public: true }]);
+});
+
+test('an execution read failure still sends an empty execution list', async () => {
+  state.executionsThrow = true;
+  const { NS } = boot();
+  const Socket = fakeSocket();
+  await NS.connectionHandler(Socket);
+  const Sent = Socket.emitted.find((E) => E[0] === 'UpdateScriptExecutions');
+  assert.deepEqual(Sent[1], []);
 });
 
 test('a manager error yields an empty list rather than a missing channel', async () => {
@@ -1289,6 +1338,36 @@ test('every published command maps to its ControlService call', async () => {
     ['identify.stop', { slug: 'foh' }, ['StopIdentify', 'foh']],
     ['modal.openClient', { slug: 'foh' }, ['OpenClientModal', 'foh']],
     ['modal.closeAll', {}, ['CloseModals']],
+    ['view.set', { mode: 'list' }, ['SetView', 'list', undefined]],
+    ['view.toggle', {}, ['ToggleCompactView']],
+    [
+      'monitor.action',
+      { slug: 'proj', method: 'pjlink', actionId: 'input.set', value: '31' },
+      ['RunMonitorAction', 'proj', 'pjlink', 'input.set', '31', undefined],
+    ],
+    [
+      'freekiosk.terminal',
+      { slug: 'lobby', commandId: 'brightness', value: 40 },
+      ['FreeKioskCommandOnTerminal', 'lobby', 'brightness', 40],
+    ],
+    [
+      'freekiosk.group',
+      { slug: 'front', commandId: 'reboot' },
+      ['FreeKioskCommandOnGroup', 'front', 'reboot', undefined],
+    ],
+    [
+      'freekiosk.tag',
+      { slug: 'critical', commandId: 'wake' },
+      ['FreeKioskCommandOnTag', 'critical', 'wake', undefined],
+    ],
+    [
+      'freekiosk.all',
+      { commandId: 'volume', value: '20' },
+      ['FreeKioskCommandOnAll', 'volume', '20'],
+    ],
+    ['dummy.heartbeat', { slug: 'proj' }, ['DummyHeartbeat', 'proj']],
+    ['executions.retryFailed', {}, ['RetryFailedExecutions']],
+    ['executions.clearSettled', {}, ['ClearSettledExecutions']],
     ['show.save', {}, ['SaveShow']],
     ['system.shutdown', {}, ['Shutdown']],
     ['system.shutdownForce', {}, ['ShutdownForce']],
@@ -1470,9 +1549,11 @@ test('live levels stop on close and on disconnect', async () => {
 
 test('settings reach the SDK only as the public display keys', () => {
   // The broadcast carries every setting, the SDK API key and the workspace PIN
-  // among them; only the display keys may leave for a remote surface.
+  // among them; only the display keys may leave for a remote surface. Settings
+  // are device-only, so the socket here is a paired device's.
   const { NS, push } = boot();
   const Socket = fakeSocket();
+  Socket.AuthMode = 'device';
   NS.socketSet.add(Socket);
 
   push('UpdateSettings', [
@@ -1518,11 +1599,70 @@ test('an integration is not sent the device-only initial state', async () => {
   await handshake(NS, Socket);
   await NS.connectionHandler(Socket);
 
-  for (const Event of ['SetDevicesPendingAdoption', 'UpdateSettings', 'SetFullAlertRuleList']) {
+  for (const Event of [
+    'UpdateSettings',
+    'SetFullAlertRuleList',
+    'SetFullMonitoringActionFavouriteList',
+  ]) {
     assert.equal(
       Socket.emitted.some((E) => E[0] === Event),
       false,
       `${Event} was sent to an integration`
     );
   }
+  // Pending adoption is show-time state an integration can count, and its
+  // changes were always pushed to every session: the snapshot completes it.
+  const Pending = Socket.emitted.find((E) => E[0] === 'SetDevicesPendingAdoption');
+  assert.deepEqual(Pending[1], state.pendingAdoption);
+});
+
+test('device-only channels reach paired devices but not integrations', async () => {
+  state.devicesByToken['good-token'] = { DeviceID: 'device-1' };
+  const { NS, Mod, push } = boot();
+  const Integration = fakeSocket({ id: 'companion', apiKey: 'a'.repeat(48) });
+  const Device = deviceSocket({ id: 'phone' });
+  await handshake(NS, Integration);
+  await handshake(NS, Device);
+  NS.socketSet.add(Integration);
+  NS.socketSet.add(Device);
+
+  // Every device-only channel is on the allowlist (a device still gets it).
+  for (const Channel of Mod.SDK_DEVICE_ONLY_PUSH) {
+    assert.ok(Mod.SDK_PUSH_ALLOWLIST.has(Channel), Channel);
+  }
+  for (const Channel of Mod.SDK_DEVICE_ONLY_PUSH) push(Channel, []);
+  push('ModeUpdated', 'EDIT');
+  push('CreateShowTrakAlert', { Title: 'Offline', Message: 'FOH', Severity: 'error' });
+  push('UpdateScriptExecutions', []);
+
+  const Seen = (Socket) => Socket.emitted.map((E) => E[0]);
+  assert.deepEqual(Seen(Integration), [
+    'ModeUpdated',
+    'CreateShowTrakAlert',
+    'UpdateScriptExecutions',
+  ]);
+  assert.deepEqual(Seen(Device), [
+    ...Mod.SDK_DEVICE_ONLY_PUSH,
+    'ModeUpdated',
+    'CreateShowTrakAlert',
+    'UpdateScriptExecutions',
+  ]);
+});
+
+test('the device-only channels are pinned', () => {
+  // Moving a channel onto this list takes it away from every API-key
+  // integration, so it is pinned like the allowlist itself.
+  const { Mod } = loadSdk();
+  assert.deepEqual([...Mod.SDK_DEVICE_ONLY_PUSH].sort(), [
+    'AudioAssetsUpdated',
+    'AuditLogAppended',
+    'PlayCustomAudio',
+    'PlaySound',
+    'SetFullAlertRuleList',
+    'SetFullMonitoringActionFavouriteList',
+    'SetOSCList',
+    'USBDeviceAdded',
+    'USBDeviceRemoved',
+    'UpdateSettings',
+  ]);
 });

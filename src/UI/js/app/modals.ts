@@ -1,7 +1,8 @@
 import { closeAllModals, closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
 import { Config, PendingAdoption, ScriptList, CompactMode } from './state';
-import { SetCompactMode } from './mode';
+import { SetCompactMode, SetViewMode } from './mode';
+import { ParseViewMode } from './lib/list-view';
 import { OpenClientInfo } from './client-info-modal';
 import {
   OpenMonitoringTargetHistory,
@@ -128,7 +129,12 @@ export function InitModals() {
     // SDK control API: dismiss whatever is open. Like OpenClientModal this only
     // reaches the desktop window; the web namespace suppresses both types.
     if (Type == 'CloseModals') return closeAllModals();
-    // SDK control API: drive the compact/expanded view (persisted, like the UI).
+    // SDK control API: drive the client-list layout (persisted, like the UI).
+    // SetViewMode names grid / compact / list; the compact pair predates it.
+    if (Type == 'SetViewMode') {
+      const Mode = ParseViewMode(Args);
+      return Mode ? SetViewMode(Mode, { persist: true }) : undefined;
+    }
     if (Type == 'SetCompactView') return SetCompactMode(!!Args, { persist: true });
     if (Type == 'ToggleCompactView') return SetCompactMode(!CompactMode, { persist: true });
   });
