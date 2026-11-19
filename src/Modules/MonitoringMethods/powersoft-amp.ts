@@ -840,7 +840,8 @@ async function RunAction(
   if (Config.Port < 1 || Config.Port > 65535) {
     return { Success: false, Error: `Invalid port: ${Config.Port}` };
   }
-  const Deadline = Date.now() + Math.max(500, Config.TimeoutMs | 0);
+  const BudgetMs = Math.max(500, Config.TimeoutMs | 0);
+  const Deadline = Date.now() + BudgetMs;
 
   if (ActionID === 'power.on' || ActionID === 'power.standby') {
     const On = ActionID === 'power.on';
@@ -848,7 +849,9 @@ async function RunAction(
     const Outcome = await ExchangePowersoft(
       Config,
       [{ Cmd: CMD.STANDBY, Data }],
-      Deadline - Date.now()
+      // The first exchange gets the whole budget, so a timeout names the
+      // configured value rather than whatever was left a millisecond later.
+      BudgetMs
     );
     if (!Outcome.Ok) return { Success: false, Error: Outcome.Error };
     const Answer = Outcome.Answers[0];
@@ -874,7 +877,7 @@ async function RunAction(
   const Read = await ExchangePowersoft(
     Config,
     [{ Cmd: CMD.READGM, Data: Buffer.alloc(0) }],
-    Deadline - Date.now()
+    BudgetMs
   );
   if (!Read.Ok) return { Success: false, Error: Read.Error };
   const Gm = Read.Answers[0] ? ParseReadGm(Read.Answers[0]) : null;
