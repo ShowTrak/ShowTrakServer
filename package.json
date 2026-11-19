@@ -78,7 +78,6 @@
   "devDependencies": {
     "@electron-forge/cli": "^8.0.1",
     "@electron-forge/maker-deb": "^8.0.1",
-    "@electron-forge/maker-dmg": "^8.0.1",
     "@electron-forge/maker-rpm": "^8.0.1",
     "@electron-forge/maker-squirrel": "^8.0.1",
     "@electron-forge/maker-wix": "^8.0.1",
@@ -122,6 +121,9 @@
   },
   "overrides": {
     "node-abi": "^3.94.0",
-    "ws": "^8.21.0"
+    "ws": "^8.21.0",
+    "glob@>=9.0.0 <14.0.2": "^14.0.6",
+    "minimatch@>=7.0.0 <11.0.1": "^11.0.9",
+    "katex@<0.18.2": "^0.18.11"
   }
 }
