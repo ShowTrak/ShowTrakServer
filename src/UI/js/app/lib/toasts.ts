@@ -165,97 +165,146 @@ export interface ConfirmationDialogOptions {
   ConfirmLabel: string;
 }
 
-export async function ConfirmationDialog(Message: unknown, Options: ConfirmationDialogOptions) {
-  return new Promise((resolve) => {
-    // Create or reuse toast container
+// The confirmation waiting for an answer, if any: only one at a time.
+let ActiveConfirmation: { Finish: (Answer: boolean) => void } | null = null;
+
+/**
+ * Close a confirmation that is waiting, as if Cancel was chosen. Called when
+ * whatever it was asked about goes away (every modal is closed for something
+ * else), so a stale question can never be answered.
+ */
+export function CancelConfirmation(): void {
+  ActiveConfirmation?.Finish(false);
+}
+
+/**
+ * Ask a question with Cancel and a named confirm button. Resolves true or false.
+ *
+ * Keys go to the dialog's own buttons, as to any button: Enter or Space on the
+ * focused one (Confirm, to start with), Tab and the arrow keys to move between
+ * them, Escape to cancel. A key pressed anywhere else (typing in a field behind
+ * the dialog) never answers it, and neither does a key held down from before
+ * it opened: the old handler on `document` confirmed on Enter or Space wherever
+ * the focus was. Inside an open modal the dialog is placed in that modal, which
+ * is where Bootstrap keeps the focus, and closing the modal cancels it. Opening
+ * a second dialog cancels the first (which used to stay live, so one Enter
+ * answered both).
+ */
+export async function ConfirmationDialog(
+  Message: unknown,
+  Options: ConfirmationDialogOptions
+): Promise<boolean> {
+  CancelConfirmation();
+  return new Promise<boolean>((resolve) => {
     const existing = document.getElementById('SHOWTRAK_CONFIRM_TOAST');
     if (existing) {
       try {
         existing.remove();
       } catch (err) {
-        HandleNonFatalError('SelectionInit:NonFatal', err);
+        HandleNonFatalError('Toasts:NonFatal', err);
       }
     }
 
     const toastHtml = `
-			<div id="SHOWTRAK_CONFIRM_TOAST" role="dialog" aria-live="assertive" aria-modal="true" class="confirm-toast no-drag">
+			<div id="SHOWTRAK_CONFIRM_TOAST" role="alertdialog" aria-modal="true" aria-labelledby="CONFIRM_TOAST_MESSAGE" class="confirm-toast no-drag">
 				<div class="confirm-toast-body">
-					<div class="confirm-toast-msg">${Safe(Message)}</div>
+					<div class="confirm-toast-msg" id="CONFIRM_TOAST_MESSAGE">${Safe(Message)}</div>
 					<div class="confirm-toast-actions">
-						<button type="button" class="btn btn-sm btn-secondary" id="CONFIRM_TOAST_CANCEL" tabindex="0">Cancel</button>
-						<button type="button" class="btn btn-sm btn-danger" id="CONFIRM_TOAST_CONFIRM" tabindex="0">${Safe(
+						<button type="button" class="btn btn-sm btn-secondary" id="CONFIRM_TOAST_CANCEL">Cancel</button>
+						<button type="button" class="btn btn-sm btn-danger" id="CONFIRM_TOAST_CONFIRM">${Safe(
               Options.ConfirmLabel
             )}</button>
 					</div>
 				</div>
 			</div>`;
 
-    $('body').append(toastHtml);
+    // In the open modal, if there is one: Bootstrap pulls the focus back into
+    // an open modal, so a dialog outside it could never hold the focus.
+    const HostModal = document.querySelector<HTMLElement>('.modal.show');
+    $(HostModal ?? document.body).append(toastHtml);
     const $toast = $('#SHOWTRAK_CONFIRM_TOAST');
     const $btnCancel = $('#CONFIRM_TOAST_CANCEL');
     const $btnConfirm = $('#CONFIRM_TOAST_CONFIRM');
+    const Buttons = () => $toast.find('button').toArray() as HTMLElement[];
+    const Previous = document.activeElement as HTMLElement | null;
 
     setConfirmDialogActive(true);
     UpdateIdentifyStatusBanner();
 
-    const cleanup = () => {
-      $(document).off('keydown.confirmToast');
-      $btnCancel.off('click.confirmToast');
-      $btnConfirm.off('click.confirmToast');
+    let Done = false;
+    const OnEscape = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      // An open context menu takes its own Escape.
+      const $ctx = $('#SHOWTRAK_CONTEXT_MENU');
+      if ($ctx.length && $ctx.is(':visible')) return;
+      // Before the modal behind sees it: Escape cancels the question, not the modal.
+      e.preventDefault();
+      e.stopPropagation();
+      Finish(false);
+    };
+    const Finish = (Answer: boolean) => {
+      if (Done) return;
+      Done = true;
+      ActiveConfirmation = null;
+      document.removeEventListener('keydown', OnEscape, true);
+      if (HostModal) $(HostModal).off('hide.bs.modal.confirmToast');
       try {
         $toast.remove();
       } catch (err) {
-        HandleNonFatalError('SelectionInit:NonFatal', err);
+        HandleNonFatalError('Toasts:NonFatal', err);
       }
       setConfirmDialogActive(false);
       UpdateIdentifyStatusBanner();
+      // Back to where the focus was, if that is still on the page.
+      if (Previous && Previous.isConnected) {
+        try {
+          Previous.focus();
+        } catch {
+          /* intentional: best-effort */
+        }
+      }
+      resolve(Answer);
     };
+    ActiveConfirmation = { Finish };
 
-    $btnCancel.on('click.confirmToast', () => {
-      cleanup();
-      resolve(false);
-    });
-    $btnConfirm.on('click.confirmToast', () => {
-      cleanup();
-      resolve(true);
-    });
+    $btnCancel.on('click', () => Finish(false));
+    $btnConfirm.on('click', () => Finish(true));
 
-    // Keyboard controls while toast is visible
-    $(document).on('keydown.confirmToast', function (e) {
-      // If context menu is open/visible, ignore Enter/Space here
-      const $ctx = $('#SHOWTRAK_CONTEXT_MENU');
-      if ($ctx && $ctx.is(':visible')) {
+    document.addEventListener('keydown', OnEscape, true);
+    if (HostModal) $(HostModal).one('hide.bs.modal.confirmToast', () => Finish(false));
+
+    $toast.on('keydown', (e) => {
+      const Native = e.originalEvent as KeyboardEvent | undefined;
+      // A key held down (from the button that opened the dialog) repeats into
+      // it: never let a repeat answer it.
+      if ((e.key === 'Enter' || e.key === ' ') && Native?.repeat) {
+        e.preventDefault();
         return;
       }
-      const key = e.key;
-      if (key === 'Enter' || key === ' ') {
+      const List = Buttons();
+      const Index = List.indexOf(document.activeElement as HTMLElement);
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
-        const active = document.activeElement;
-        if (active === $btnConfirm.get(0)) return $btnConfirm.trigger('click');
-        if (active === $btnCancel.get(0)) return $btnCancel.trigger('click');
-        // default to confirm if focus is elsewhere
-        return $btnConfirm.trigger('click');
+        const Step = e.key === 'ArrowLeft' ? -1 : 1;
+        const Next = Index === -1 ? List.length - 1 : (Index + Step + List.length) % List.length;
+        List[Next]?.focus();
+        return;
       }
-      if (key === 'Escape') {
+      // Tab stays among the dialog's buttons while it is open.
+      if (e.key === 'Tab') {
         e.preventDefault();
-        return $btnCancel.trigger('click');
-      }
-      if (key === 'ArrowLeft') {
-        e.preventDefault();
-        return $btnCancel.trigger('focus');
-      }
-      if (key === 'ArrowRight') {
-        e.preventDefault();
-        return $btnConfirm.trigger('focus');
+        const Step = e.shiftKey ? -1 : 1;
+        const Next = Index === -1 ? 0 : (Index + Step + List.length) % List.length;
+        List[Next]?.focus();
       }
     });
 
-    // Default focus on Confirm so Enter activates it naturally
+    // Confirm starts with the focus, so Enter (on it) confirms.
     setTimeout(() => {
       try {
-        $btnConfirm.trigger('focus');
+        if (!Done) $btnConfirm.trigger('focus');
       } catch (err) {
-        HandleNonFatalError('SelectionInit:NonFatal', err);
+        HandleNonFatalError('Toasts:NonFatal', err);
       }
     }, 0);
   });
