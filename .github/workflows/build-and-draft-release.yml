@@ -149,7 +149,12 @@ jobs:
         # Linux is pinned, not ubuntu-latest: sqlite3 is compiled on the runner,
         # so the Linux packages need the runner's glibc or newer (2.38 on 24.04).
         # Building on a newer image would stop them running on 24.04 LTS.
-        os: [ubuntu-24.04, macos-latest, windows-latest]
+        #
+        # ubuntu-22.04-arm builds the ARM64 Linux packages (Raspberry Pi and other
+        # ARM boards). It is older than the x64 image on purpose: Raspberry Pi OS 12
+        # (Bookworm) has glibc 2.36, so packages built against 24.04's 2.39 would not
+        # load there; 22.04's 2.35 covers Bookworm, Trixie and Ubuntu 22.04+.
+        os: [ubuntu-24.04, ubuntu-22.04-arm, macos-latest, windows-latest]
 
     runs-on: ${{ matrix.os }}
     env:
@@ -169,11 +174,15 @@ jobs:
           node-version: 24
           cache: npm
 
+      # rpm for the rpm maker, zip for the zip maker (it runs the zip command),
+      # binutils for readelf in the package check, build-essential to compile
+      # sqlite3 on ARM64 (rebuildConfig in forge.config.js). The x64 image has
+      # all but rpm; the ARM64 image carries fewer tools, so they are named.
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm
+          sudo apt-get install -y rpm zip binutils build-essential
 
       - name: Install dependencies
         run: npm ci
@@ -315,6 +324,14 @@ jobs:
           rm -f "$RUNNER_TEMP/signing-cert.p12"
           rm -f "$RUNNER_TEMP/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8"
           security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" || true
+
+      # The ARM64 packages are the Raspberry Pi builds. A native addon for the
+      # wrong machine, or one needing a newer glibc than Raspberry Pi OS has,
+      # packages without complaint and only fails on the Pi, so check every
+      # binary before anything is uploaded (scripts/check-linux-packages.sh).
+      - name: Check the Linux packages
+        if: runner.os == 'Linux'
+        run: bash scripts/check-linux-packages.sh
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7

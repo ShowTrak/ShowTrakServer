@@ -143,7 +143,15 @@ module.exports = {
         }
       : {}),
   },
-  rebuildConfig: {},
+  // On ARM64 Linux (the Raspberry Pi build) sqlite3 is compiled against
+  // Electron's headers rather than downloaded: its prebuilt linux-arm64 binary
+  // is linked against glibc 2.38, and Raspberry Pi OS 12 (Bookworm) has 2.36, so
+  // the app would install there and then fail to open its database. The release
+  // workflow builds ARM64 on ubuntu-22.04-arm (glibc 2.35), and
+  // scripts/check-linux-packages.sh fails the release if any binary in the
+  // package needs more than 2.36. Elsewhere the prebuilt binary is kept.
+  rebuildConfig:
+    process.platform === 'linux' && process.arch === 'arm64' ? { buildFromSource: true } : {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
@@ -207,6 +215,25 @@ module.exports = {
       const { trimElectronLocales } = require('./scripts/trim-electron-locales');
       const removed = trimElectronLocales(buildPath);
       console.log(`[forge] Removed ${removed} unused Chromium locale pack(s)`);
+    },
+    // When sqlite3 is compiled (ARM64 Linux, see rebuildConfig), node-gyp leaves
+    // its working files beside the addon: the SQLite source, object files and
+    // two more copies of the binary, about 25 MB the app never reads. Keep only
+    // build/Release/node_sqlite3.node, which is what sqlite3 loads and all that
+    // a downloaded prebuilt binary brings. Runs after the rebuild, before the
+    // asar is made.
+    packageAfterPrune: async (_forgeConfig, buildPath) => {
+      const sqlite3 = path.join(buildPath, 'node_modules', 'sqlite3');
+      const release = path.join(sqlite3, 'build', 'Release');
+      if (!fs.existsSync(path.join(release, 'node_sqlite3.node'))) return;
+      const remove = (target) => fs.rmSync(target, { recursive: true, force: true });
+      remove(path.join(sqlite3, 'bin'));
+      for (const entry of fs.readdirSync(path.dirname(release))) {
+        if (entry !== 'Release') remove(path.join(path.dirname(release), entry));
+      }
+      for (const entry of fs.readdirSync(release)) {
+        if (entry !== 'node_sqlite3.node') remove(path.join(release, entry));
+      }
     },
     // 3.16.2 shipped a Windows build whose @showtrak/protocol was an unusable
     // link (see derefSymlinks above) and nothing caught it until the app failed
