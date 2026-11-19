@@ -71,13 +71,16 @@ test('a new check clears the previous run’s info', () => {
   assert.deepEqual(statuses()[1], { state: 'downloading', percent: 5 });
 });
 
-test('once the download has finished, a check runs again', async (t) => {
+test('once the download has finished, a check re-sends it rather than checking again', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
   Manager.sendAppUpdateStatus({ state: 'downloaded', info: { version: '3.30.0' } });
   sent.length = 0;
   await handlers['AppUpdate:Check']();
-  assert.equal(statuses()[0].state, 'checking');
-  // Drain the simulated (unpackaged) check so its timers don't outlive the test.
+  // A fresh check would answer "up to date" on Windows (Squirrel already lists
+  // the downloaded version) and hide the Install button.
+  assert.deepEqual(statuses(), [{ state: 'downloaded', info: { version: '3.30.0' } }]);
   t.mock.timers.tick(5000);
-  assert.equal(statuses().at(-1).state, 'downloaded');
+  assert.equal(statuses().length, 1);
+  // Installing it clears the way for the next check.
+  Manager.sendAppUpdateStatus({ state: 'installed' });
 });

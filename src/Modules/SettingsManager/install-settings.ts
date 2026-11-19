@@ -8,6 +8,7 @@
 import path from 'path';
 import fs from 'fs';
 import { Manager as AppDataManager } from '../AppData';
+import { WriteAndSyncFileSync } from '../Utils';
 import type { DBResult } from '../DB';
 import type { SettingRow } from '../DB/rows';
 
@@ -37,7 +38,7 @@ export function CreateInstallSettingsStore(GetFilePath: () => string = DefaultFi
       const All = { ...ReadAll(), ...Values };
       fs.mkdirSync(path.dirname(FilePath), { recursive: true });
       const TempPath = `${FilePath}.tmp`;
-      fs.writeFileSync(TempPath, JSON.stringify(All, null, 2), 'utf8');
+      WriteAndSyncFileSync(TempPath, JSON.stringify(All, null, 2));
       fs.renameSync(TempPath, FilePath);
       return [null, true];
     } catch (Err) {

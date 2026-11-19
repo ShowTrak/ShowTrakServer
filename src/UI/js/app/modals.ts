@@ -1,4 +1,5 @@
 import { closeAllModals, closeModal, openModal } from './lib/modal';
+import { CancelConfirmation } from './lib/toasts';
 import { buildModalHeader } from './lib/modal-header';
 import { Config, PendingAdoption, ScriptList, CompactMode } from './state';
 import { SetCompactMode, SetViewMode } from './mode';
@@ -140,13 +141,29 @@ export function InitModals() {
   });
 }
 
+// The longest a close is waited for (Bootstrap's fade is about 300 ms).
+const MODAL_HIDE_WAIT_MS = 700;
+
+/**
+ * Close every modal and any confirmation waiting in one, and resolve once they
+ * have finished closing. It waits for Bootstrap's 'hidden' event rather than a
+ * fixed 300 ms: a modal reopened while its own close was still finishing would
+ * otherwise get that late event and reset what it had just opened. Resolves at
+ * once when nothing was open.
+ */
 export async function CloseAllModals() {
+  CancelConfirmation();
+  const Closing = Array.from(document.querySelectorAll<HTMLElement>('.modal')).filter(
+    (El) => El.style.display === 'block'
+  );
+  const Hidden = Closing.map(
+    (El) => new Promise<void>((resolve) => $(El).one('hidden.bs.modal', () => resolve()))
+  );
   closeAllModals();
   // Forget which entity the tag picker was editing; a tag push arriving after
   // the editor closed would otherwise redraw chips into a hidden modal.
   ClearTagPicker();
-  await Wait(300);
-  return;
+  if (Hidden.length) await Promise.race([Promise.all(Hidden), Wait(MODAL_HIDE_WAIT_MS)]);
 }
 
 export function FormatDependencyVersion(Version: unknown) {

@@ -636,6 +636,35 @@ async function RenameWithRetry(From: string, To: string): Promise<void> {
   }
 }
 
+// Flush a file's contents to the disk. VACUUM INTO does not sync what it writes,
+// and a rename can reach the disk before the data it points at: a power cut
+// just after a save could otherwise leave the show file empty or torn, with the
+// previous version already replaced.
+async function SyncFile(FilePath: string): Promise<void> {
+  const Handle = await fs.promises.open(FilePath, 'r+');
+  try {
+    await Handle.sync();
+  } finally {
+    await Handle.close();
+  }
+}
+
+// Flush a folder's entries (the rename itself). Not possible on Windows, where
+// opening a folder fails; NTFS journals the rename instead.
+async function SyncDirectory(Dir: string): Promise<void> {
+  if (process.platform === 'win32') return;
+  try {
+    const Handle = await fs.promises.open(Dir, 'r');
+    try {
+      await Handle.sync();
+    } finally {
+      await Handle.close();
+    }
+  } catch {
+    /* intentional: best-effort; the file itself is already on disk */
+  }
+}
+
 // Write a consistent, compacted snapshot of the entire database to TargetPath.
 // Used by "Save As" to produce a portable .ShowTrak file. VACUUM INTO requires
 // the destination to not already exist.
@@ -662,8 +691,10 @@ Manager.SnapshotTo = async (TargetPath: string): Promise<DBResult<string>> => {
     const [Err] = await Manager.Run(`VACUUM INTO '${Escaped}'`);
     if (Err) return [Err, null];
     const Generation = dirtyGeneration;
+    await SyncFile(TempPath);
     await RenameWithRetry(TempPath, TargetPath);
     TempPath = null;
+    await SyncDirectory(Dir);
     snapshotGeneration = Generation;
     return [null, TargetPath];
   } catch (err) {

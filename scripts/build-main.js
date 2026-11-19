@@ -10,8 +10,9 @@
 // dist/boot.js (src/boot.ts) is the entry point: it enables V8's compile cache
 // and then requires this bundle, so the bundle itself is cached too.
 //
-// The input is tsc's CommonJS OUTPUT (dist/main.js), not the TypeScript
-// sources. That is deliberate: tsc emits each `import` as a require() at the
+// The input is tsc's CommonJS OUTPUT (dist/entry.js, which requires dist/main.js
+// unless it is a Squirrel install run), not the TypeScript sources. That is
+// deliberate: tsc emits each `import` as a require() at the
 // point it appears, and main.ts depends on that order (app-data folders and the
 // process guards are set up before the modules that open the database or bind
 // sockets are loaded). Bundled as ES modules, esbuild would hoist every import
@@ -39,7 +40,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
-const ENTRY = path.join(ROOT, 'dist', 'main.js');
+const ENTRY = path.join(ROOT, 'dist', 'entry.js');
 const OUTFILE = path.join(ROOT, 'dist', 'main.bundle.js');
 
 const EXTERNAL = [

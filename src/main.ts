@@ -12,20 +12,11 @@
 import type { BrowserWindow as ElectronBrowserWindow } from 'electron';
 // Process set-up that has to come before any module loads (the libuv thread
 // pool size, V8's compile cache) is done by the entry point, ./boot.ts, which
-// then loads this file as part of the main-process bundle.
+// then loads this file as part of the main-process bundle; Squirrel's install
+// runs stop in ./entry.ts before this file loads.
 const { app, BrowserWindow, dialog } = require('electron/main');
 const { powerMonitor, autoUpdater: nativeAutoUpdater } = require('electron');
-import {
-  HandleSquirrelFileAssociations,
-  OnShowFileRequest,
-  RequestShowFileOpen,
-  ShowFileFromArgv,
-} from './main/file-associations';
-// Squirrel runs the app with --squirrel-install/-updated/-uninstall around an
-// install; register (or remove) the .ShowTrak file association before
-// electron-squirrel-startup makes the shortcuts and the app quits.
-HandleSquirrelFileAssociations();
-if (require('electron-squirrel-startup')) app.quit();
+import { OnShowFileRequest, RequestShowFileOpen, ShowFileFromArgv } from './main/file-associations';
 
 import { Manager as AppDataManager } from './Modules/AppData';
 AppDataManager.Initialize();
@@ -150,6 +141,7 @@ import {
   handlePowerMonitorShutdown,
   handleBeforeQuitForUpdate,
 } from './main/shutdown-coordinator';
+import { Manager as AppUpdater } from './main/app-updater';
 
 // The Electron desktop window is a renderer sink: forward every pushed channel
 // to it (guarded against teardown). Web sockets register their own sink later.
@@ -244,7 +236,6 @@ let PreloaderWindow!: ElectronBrowserWindow;
 
 app.whenReady().then(async () => {
   Logger.debug('[startup] electron ready');
-  if (require('electron-squirrel-startup')) return app.quit();
 
   // Nothing opens until the client port is ours: without it no client can
   // connect, so the operator can only retry (once the port is freed) or quit.
@@ -427,6 +418,11 @@ app.whenReady().then(async () => {
   applyWindowSecurityGuards(MainWindow);
   applyWindowZoomShortcuts(MainWindow);
   MainWindow.on('close', (event) => handleMainWindowClose(MainWindow, event));
+  // Windows: a shutdown, restart or log-off. powerMonitor's 'shutdown' is macOS
+  // and Linux only, so on Windows the show was never saved on the way out. Held
+  // (preventDefault) and routed through the same graceful path; Windows carries
+  // on once the app has quit.
+  MainWindow.on('query-session-end', (event) => handlePowerMonitorShutdown(event));
   MainWindow.on('closed', () => {
     handleMainWindowClosed();
     setMainWindow(null);
@@ -508,7 +504,10 @@ app.on('before-quit', handleBeforeQuit);
 
 powerMonitor.on('shutdown', handlePowerMonitorShutdown);
 
+// macOS's updater emits this; Windows' (Squirrel) does not, so the updater
+// also calls the hook itself just before a Squirrel install quits.
 nativeAutoUpdater.on('before-quit-for-update', handleBeforeQuitForUpdate);
+AppUpdater.SetBeforeQuitForUpdate(handleBeforeQuitForUpdate);
 
 // Final shutdown hook: place for flushing buffers/closing resources if needed.
 app.on('will-quit', (_event: unknown) => {
