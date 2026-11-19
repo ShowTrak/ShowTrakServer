@@ -205,3 +205,21 @@ test('renderMarkdownSafe renders a realistic release-notes document', () => {
   assert.match(Out, /<li>Fixed <strong>crash<\/strong> on launch<\/li>/);
   assert.match(Out, /<a href="https:\/\/example.com" target="_blank" rel="noopener">notes<\/a>/);
 });
+
+test('two links on one line, and URLs with underscores, come out whole', () => {
+  const Html = renderMarkdownSafe(
+    'See [notes](https://example.com/release_notes_v2) and [docs](https://example.com/a_b).'
+  );
+  assert.equal(
+    Html,
+    '<p>See <a href="https://example.com/release_notes_v2" target="_blank" rel="noopener">notes</a> and <a href="https://example.com/a_b" target="_blank" rel="noopener">docs</a>.</p>'
+  );
+  assert.doesNotMatch(Html, /<em>/);
+});
+
+test('inline code keeps its underscores and asterisks', () => {
+  assert.equal(
+    renderMarkdownSafe('Set `SYSTEM_AUTO_UPDATE_ENABLED` and `a*b*c`, then _done_.'),
+    '<p>Set <code>SYSTEM_AUTO_UPDATE_ENABLED</code> and <code>a*b*c</code>, then <em>done</em>.</p>'
+  );
+});

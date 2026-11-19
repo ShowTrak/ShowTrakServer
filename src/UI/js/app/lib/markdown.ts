@@ -13,7 +13,7 @@ export function sanitizeHref(href: string): string {
     const h = String(href || '').trim();
     if (/^(https?:|mailto:)/i.test(h)) return h;
   } catch (err) {
-    HandleNonFatalError('SelectionInit:NonFatal', err);
+    HandleNonFatalError('Markdown:NonFatal', err);
   }
   return '#';
 }
@@ -36,12 +36,18 @@ function renderMarkdownSafe(md: unknown): string {
     const level = Math.min(6, Math.max(1, hashes));
     return `<h${level} class="h${level + 2}">${content}</h${level}>`;
   });
+  // Inline code and links are set aside until the emphasis below has run: its
+  // _ and * patterns would otherwise reach into them (a URL with underscores,
+  // or the target="_blank" of two links on one line, came out with <em> in it).
+  // The placeholder has no _ or * of its own.
+  const inline: string[] = [];
+  const stash = (html: string) => `%%INLINE${inline.push(html) - 1}%%`;
   // Inline code (after fences are removed)
-  text = text.replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`);
+  text = text.replace(/`([^`]+)`/g, (_m, code) => stash(`<code>${code}</code>`));
   // Links
   text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
     const url = sanitizeHref(href);
-    return `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
+    return stash(`<a href="${url}" target="_blank" rel="noopener">${label}</a>`);
   });
   // Unordered lists (group contiguous items)
   text = text.replace(/(?:^|\n)((?:[-*+]\s+.*(?:\n|$))+)/g, (_m, block: string) => {
@@ -71,11 +77,13 @@ function renderMarkdownSafe(md: unknown): string {
       return `<p>${b.replace(/\n/g, '<br/>')}</p>`;
     })
     .join('\n');
-  // Restore fenced code blocks
-  return html.replace(/%%CODEBLOCK_(\d+)%%/g, (_m, i) => {
-    const code = codeBlocks[Number(i)] || '';
-    return `<pre class="mb-2"><code>${code}</code></pre>`;
-  });
+  // Restore fenced code blocks (and, first, the inline code and links)
+  return html
+    .replace(/%%INLINE(\d+)%%/g, (_m, i) => inline[Number(i)] ?? '')
+    .replace(/%%CODEBLOCK_(\d+)%%/g, (_m, i) => {
+      const code = codeBlocks[Number(i)] || '';
+      return `<pre class="mb-2"><code>${code}</code></pre>`;
+    });
 }
 
 // --- Release-notes HTML sanitizer -------------------------------------------
