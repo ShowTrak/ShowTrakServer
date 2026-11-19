@@ -267,6 +267,8 @@ function createWebApi(socket: WebUiSocket): RendererAPI {
     CheckShowFileUpgrade: nullTuple,
     ResolveShowFileUpgrade: nullTuple,
     OnShowFileUpdated: noSub,
+    OpenRequestedShow: nullTuple,
+    OnShowOpenRequested: noSub,
 
     // ---- Folders / menu / window (desktop-only) --------------------------
     OpenLogsFolder: resolveNull,

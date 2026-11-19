@@ -26,9 +26,13 @@ const state = {
   hasUnsavedWorkingData: false,
   saveDialog: { canceled: false, filePath: '/shows/picked.showtrak' },
   openDialog: { canceled: false, filePaths: ['/shows/opened.showtrak'] },
+  hasUnsavedChanges: false,
+  autosave: false,
+  promptResponse: 0,
 };
 
 const showFileUpdated = [];
+const prompts = [];
 
 const backupMgr = recordingManager({
   GetCurrentFilePath: () => state.currentFilePath,
@@ -40,6 +44,7 @@ const backupMgr = recordingManager({
   AcceptUpgrade: () => state.acceptResult,
   DeclineUpgrade: () => state.declineResult,
   HasUnsavedWorkingData: () => state.hasUnsavedWorkingData,
+  HasUnsavedChanges: () => state.hasUnsavedChanges,
 });
 const fileSelectorMgr = recordingManager({
   SaveDialog: () => state.saveDialog,
@@ -64,14 +69,32 @@ const restore = installModuleMocks([
   { match: matchesModule('/Modules/Logger'), value: loggerStub },
   {
     match: matchesModule('../app-window'),
-    value: { sendShowFileUpdated: (path) => showFileUpdated.push(path) },
+    value: { sendShowFileUpdated: (path) => showFileUpdated.push(path), getMainWindow: () => null },
   },
   { match: matchesModule('/Modules/BackupManager'), value: { Manager: backupMgr } },
   { match: matchesModule('/Modules/FileSelectorManager'), value: { Manager: fileSelectorMgr } },
+  {
+    match: matchesModule('/Modules/SettingsManager'),
+    value: { Manager: { GetValue: async () => state.autosave } },
+  },
+  {
+    match: (request) => request === 'electron',
+    value: {
+      dialog: {
+        showMessageBox: async (...args) => {
+          const Options = args[args.length - 1];
+          prompts.push(Options);
+          return { response: state.promptResponse };
+        },
+        showErrorBox: () => {},
+      },
+    },
+  },
 ]);
 test.after(() => restore());
 
 const { register } = require('../dist/main/registrars/show');
+const FileAssociations = require('../dist/main/file-associations');
 const { GetHandler } = require('../dist/main/handler-registry');
 register();
 
@@ -90,6 +113,11 @@ test.beforeEach(() => {
   state.hasUnsavedWorkingData = false;
   state.saveDialog = { canceled: false, filePath: '/shows/picked.showtrak' };
   state.openDialog = { canceled: false, filePaths: ['/shows/opened.showtrak'] };
+  state.hasUnsavedChanges = false;
+  state.autosave = false;
+  state.promptResponse = 0;
+  prompts.length = 0;
+  FileAssociations.ResetShowFileRequestsForTests();
   showFileUpdated.length = 0;
   backupMgr.__calls.length = 0;
   fileSelectorMgr.__calls.length = 0;
@@ -106,6 +134,7 @@ test('registers a handler for every show channel', () => {
     'Show:CheckUpgrade',
     'Show:ResolveUpgrade',
     'Show:New',
+    'Show:OpenRequested',
   ]) {
     assert.equal(typeof GetHandler(Channel), 'function', `missing handler for ${Channel}`);
   }
@@ -339,4 +368,69 @@ test('Show:New surfaces a failure without announcing an update', async () => {
   state.newResult = ['could not reset database', null];
   assert.deepEqual(await GetHandler('Show:New')(null), ['could not reset database', null]);
   assert.deepEqual(showFileUpdated, []);
+});
+
+// --- Show:OpenRequested -----------------------------------------------------
+// A show file double-clicked in Finder/Explorer. The request is held by
+// main/file-associations until the renderer takes it here.
+
+test('Show:OpenRequested with nothing waiting does nothing', async () => {
+  const Result = await GetHandler('Show:OpenRequested')(null);
+  assert.deepEqual(Result, [null, null]);
+  assert.equal(backupMgr.__callsTo('RequestOpen').length, 0);
+});
+
+test('Show:OpenRequested opens a file that launched the app without asking', async () => {
+  FileAssociations.RequestShowFileOpen('/shows/opened.showtrak');
+  const Result = await GetHandler('Show:OpenRequested')(null);
+  assert.deepEqual(Result, [null, { Status: 'Opened', FilePath: '/shows/opened.showtrak' }]);
+  assert.deepEqual(backupMgr.__callsTo('RequestOpen')[0].args, ['/shows/opened.showtrak']);
+  assert.equal(prompts.length, 0);
+  assert.deepEqual(showFileUpdated, ['/shows/current.showtrak']);
+  // Taken: a second call finds nothing.
+  assert.deepEqual(await GetHandler('Show:OpenRequested')(null), [null, null]);
+});
+
+test('Show:OpenRequested asks before a file opened while running replaces the show', async () => {
+  await GetHandler('Show:OpenRequested')(null); // the renderer has started
+  FileAssociations.RequestShowFileOpen('/shows/opened.showtrak');
+  state.promptResponse = 1; // Cancel
+  const Result = await GetHandler('Show:OpenRequested')(null);
+  assert.deepEqual(Result, ['Cancelled By User', null]);
+  assert.equal(prompts.length, 1);
+  assert.match(prompts[0].message, /Open opened\.showtrak\?/);
+  assert.equal(backupMgr.__callsTo('RequestOpen').length, 0);
+});
+
+test('Show:OpenRequested leaves the file that is already open alone', async () => {
+  FileAssociations.RequestShowFileOpen('/shows/current.showtrak');
+  assert.deepEqual(await GetHandler('Show:OpenRequested')(null), [null, null]);
+  assert.equal(backupMgr.__callsTo('RequestOpen').length, 0);
+});
+
+test('Show:OpenRequested saves unsaved changes first when the operator says Save', async () => {
+  state.hasUnsavedChanges = true;
+  state.promptResponse = 0; // Save
+  FileAssociations.RequestShowFileOpen('/shows/opened.showtrak');
+  const Result = await GetHandler('Show:OpenRequested')(null);
+  assert.equal(Result[1].Status, 'Opened');
+  assert.deepEqual(backupMgr.__callsTo('Save')[0].args, ['/shows/current.showtrak']);
+  const Order = backupMgr.__calls
+    .map((c) => c.method)
+    .filter((m) => m === 'Save' || m === 'RequestOpen');
+  assert.deepEqual(Order, ['Save', 'RequestOpen'], 'saved before the new file replaced it');
+});
+
+test('Show:OpenRequested passes an upgrade back for the renderer to ask about', async () => {
+  const Upgrade = {
+    FilePath: '/shows/old.showtrak',
+    FileName: 'old.showtrak',
+    FileVersion: '3.0.0',
+    CurrentVersion: '3.32.1',
+  };
+  state.openResult = [null, { Status: 'UpgradeRequired', Upgrade }];
+  FileAssociations.RequestShowFileOpen('/shows/old.showtrak');
+  const Result = await GetHandler('Show:OpenRequested')(null);
+  assert.deepEqual(Result, [null, { Status: 'UpgradeRequired', Upgrade }]);
+  assert.deepEqual(showFileUpdated, [], 'nothing opened yet');
 });

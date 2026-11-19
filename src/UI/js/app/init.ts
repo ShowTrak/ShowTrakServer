@@ -40,6 +40,7 @@ import {
   OpenGroupCreationModal,
   OpenGroupManager,
   OpenNoShowPrompt,
+  OpenRequestedShow,
   OpenShow,
   OpenUpdateManagerModal,
   PromptShowFileUpgrade,
@@ -319,6 +320,17 @@ export async function Init() {
     // sync as files are opened/saved/created.
     // First, verify the previously open file still exists; if it was deleted or
     // moved, the working data is wiped and the empty state asks for the file.
+    // A show file opened from the operating system replaces the last session's
+    // show before that is checked: it is the show the operator asked for. One
+    // arriving while ShowTrak runs is opened the same way.
+    window.API.OnShowOpenRequested(() => {
+      void OpenRequestedShow().then((Outcome) => {
+        if (Outcome && Outcome.Status === 'UpgradeRequired') {
+          void PromptShowFileUpgrade(Outcome.Upgrade);
+        }
+      });
+    });
+    const Requested = await OpenRequestedShow();
     const [, MissingResult] = (await window.API.EnsureShowFileExists()) || [];
     const MissingShowFile = MissingResult && MissingResult.Missing ? MissingResult.FilePath : null;
     const CurrentShowFile = await window.API.GetCurrentShowFile();
@@ -345,7 +357,10 @@ export async function Init() {
       if (Saved) closeModal('SHOWTRAK_MODAL_MIGRATE');
     });
 
-    if (MissingShowFile) {
+    if (Requested && Requested.Status === 'UpgradeRequired') {
+      // Not awaited, as Loaded() below must not wait on the operator.
+      void PromptShowFileUpgrade(Requested.Upgrade);
+    } else if (MissingShowFile) {
       OpenNoShowPrompt(
         `The last show file could not be found at ${MissingShowFile}. It may have been moved, ` +
           'renamed or deleted. Open the show file you want to use.'

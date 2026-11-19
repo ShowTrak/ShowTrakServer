@@ -116,6 +116,7 @@ const INVOKE_CHANNELS = [
   'Show:EnsureFileExists',
   'Show:CheckUpgrade',
   'Show:ResolveUpgrade',
+  'Show:OpenRequested',
 
   // Scripts / execution
   'ExecuteScript',
@@ -295,6 +296,7 @@ const SUBSCRIBE_CHANNELS = [
   'AudioAssetsUpdated',
   'UpdateManager:DownloadProgress',
   'ShowFileUpdated',
+  'ShowOpenRequested',
   'MainWindowFullscreenChanged',
   'NetworkInterfacesChanged',
   'FogStatusUpdated',

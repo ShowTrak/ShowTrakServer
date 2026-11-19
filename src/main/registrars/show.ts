@@ -6,13 +6,18 @@ import path from 'path';
 import { CreateLogger } from '../../Modules/Logger';
 import { RPC } from '../rpc';
 import { createTupleHandler } from '../ipc/create-handler';
-import { sendShowFileUpdated } from '../app-window';
+import { getMainWindow, sendShowFileUpdated } from '../app-window';
+import { TakeShowFileRequest } from '../file-associations';
+import { ConfirmShowFileReplace, type ReplacePromptDeps } from '../show-file-replace-prompt';
 import { Manager as BackupManager } from '../../Modules/BackupManager';
 import { Manager as FileSelectorManager } from '../../Modules/FileSelectorManager';
+import { Manager as SettingsManager } from '../../Modules/SettingsManager';
 import { Manager as IPCValidation } from '../../Modules/IPCValidation';
 import { RecordEdit } from '../../Modules/AuditLog/edits';
 import { Line, Value } from '../../Modules/AuditLog/message';
 import { AuditStep } from '../../Modules/Shared/audit-names';
+
+const { dialog } = require('electron');
 
 const Logger = CreateLogger('Main');
 
@@ -28,6 +33,59 @@ function RecordShowFile(Verb: string, FilePath: string | null): Promise<void> {
     })
   );
 }
+
+// Open FilePath, asking before an older version's file is upgraded (the result
+// then carries the upgrade for the renderer to put to the operator, answered
+// through Show:ResolveUpgrade).
+async function OpenShowFile(FilePath: string) {
+  Logger.log('Opening ShowTrak file from:', FilePath);
+  const [Err, Result] = await BackupManager.RequestOpen(FilePath);
+  if (Err || !Result) return [Err, null];
+  if (Result.Status === 'Opened') {
+    sendShowFileUpdated(BackupManager.GetCurrentFilePath());
+    await RecordShowFile('Opened Show File ', FilePath);
+  }
+  return [null, Result];
+}
+
+function SamePath(A: string | null, B: string | null): boolean {
+  if (!A || !B) return false;
+  const Key = (P: string) =>
+    process.platform === 'linux' ? path.resolve(P) : path.resolve(P).toLowerCase();
+  return Key(A) === Key(B);
+}
+
+// The replace prompt's view of the app. Dialogs are parented to the main window
+// once it is on screen; during start-up it is still hidden, and a sheet on a
+// hidden window would never be seen.
+const ReplacePromptDeps: ReplacePromptDeps = {
+  GetCurrentFilePath: () => BackupManager.GetCurrentFilePath(),
+  HasUnsavedChanges: () => BackupManager.HasUnsavedChanges(),
+  HasUnsavedWorkingData: () => BackupManager.HasUnsavedWorkingData(),
+  IsAutosaveEnabled: async () => {
+    try {
+      return !!(await SettingsManager.GetValue('SYSTEM_AUTOSAVE_ENABLED'));
+    } catch (Err) {
+      Logger.error('Failed to read the autosave setting:', Err);
+      return false;
+    }
+  },
+  Save: (FilePath) => BackupManager.Save(FilePath),
+  PickSavePath: async () => {
+    const { canceled, filePath } = await FileSelectorManager.SaveDialog('Save ShowTrak File As');
+    return canceled || !filePath ? null : filePath;
+  },
+  ShowMessageBox: async (Options) => {
+    const Window = getMainWindow();
+    const { response } =
+      Window && !Window.isDestroyed() && Window.isVisible()
+        ? await dialog.showMessageBox(Window, Options)
+        : await dialog.showMessageBox(Options);
+    return response;
+  },
+  ShowError: (Title, Message) => dialog.showErrorBox(Title, Message),
+  OnSaved: () => sendShowFileUpdated(BackupManager.GetCurrentFilePath()),
+};
 
 function register(): void {
   RPC.handle('Show:Save', async () => {
@@ -73,14 +131,23 @@ function register(): void {
       Logger.log('Show:Open canceled');
       return ['Cancelled By User', null];
     }
-    Logger.log('Opening ShowTrak file from:', filePaths[0]);
-    const [Err, Result] = await BackupManager.RequestOpen(filePaths[0]!); // non-empty checked above
-    if (Err || !Result) return [Err, null];
-    if (Result.Status === 'Opened') {
-      sendShowFileUpdated(BackupManager.GetCurrentFilePath());
-      await RecordShowFile('Opened Show File ', filePaths[0]!);
+    return await OpenShowFile(filePaths[0]!); // non-empty checked above
+  });
+
+  // A show file opened from the operating system (double-clicked, or Open
+  // With), held by ./file-associations until the renderer is ready for it. The
+  // renderer asks once at start-up and again whenever ShowOpenRequested says
+  // another has arrived. Nothing waiting, or the file already open, is
+  // [null, null].
+  RPC.handle('Show:OpenRequested', async () => {
+    const Request = TakeShowFileRequest();
+    if (!Request) return [null, null];
+    if (SamePath(Request.FilePath, BackupManager.GetCurrentFilePath())) return [null, null];
+    if (!(await ConfirmShowFileReplace(Request, ReplacePromptDeps))) {
+      Logger.log('Show:OpenRequested canceled');
+      return ['Cancelled By User', null];
     }
-    return [null, Result];
+    return await OpenShowFile(Request.FilePath);
   });
 
   // Boot check: the show file left open last session, if an older version

@@ -7,7 +7,7 @@ import { OpenMonitoringTargetHistory, OpenDummyClientHistory } from './monitorin
 import { Safe } from './utils';
 import { ConfirmationDialog, Notify, ShowExecutionToastIfActive, Wait } from './selection-init';
 import { ClearTagPicker } from './tag-picker';
-import type { ClientView, ShowFileUpgrade } from '@showtrak/protocol';
+import type { ClientView, ShowFileOpenOutcome, ShowFileUpgrade } from '@showtrak/protocol';
 
 // The former Update Manager and Group Manager god-sections now live in their own
 // modules; re-export them so existing `./modals` importers keep working.
@@ -241,6 +241,30 @@ export async function OpenShow() {
     return;
   }
   await Notify('Opened show file.', 'success');
+}
+
+// Open the show file the operating system asked for (double-clicked, or Open
+// With). Main asks before it replaces the open show. Calls run one after
+// another, as the start-up check and a ShowOpenRequested push can overlap.
+// Resolves to the outcome, or null when nothing was opened; an upgrade is left
+// to the caller to put to the operator.
+let RequestedShowQueue: Promise<unknown> = Promise.resolve();
+export function OpenRequestedShow(): Promise<ShowFileOpenOutcome | null> {
+  const Run = RequestedShowQueue.then(async () => {
+    const [Err, Outcome] = await window.API.OpenRequestedShow();
+    if (Err) {
+      if (!/cancelled by user/i.test(String(Err))) await Notify(String(Err), 'error');
+      return null;
+    }
+    if (Outcome && Outcome.Status === 'Opened') {
+      closeModal('SHOWTRAK_MODAL_NO_SHOW');
+      closeModal('SHOWTRAK_MODAL_MIGRATE');
+      await Notify(`Opened ${GetShowFileDisplayName(Outcome.FilePath)}.`, 'success');
+    }
+    return Outcome || null;
+  });
+  RequestedShowQueue = Run.catch(() => null);
+  return Run;
 }
 
 const NO_SHOW_DEFAULT_MESSAGE = 'Open an existing show file or create a new one to get started.';

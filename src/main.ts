@@ -15,6 +15,16 @@ import type { BrowserWindow as ElectronBrowserWindow } from 'electron';
 // then loads this file as part of the main-process bundle.
 const { app, BrowserWindow, dialog } = require('electron/main');
 const { powerMonitor, autoUpdater: nativeAutoUpdater } = require('electron');
+import {
+  HandleSquirrelFileAssociations,
+  OnShowFileRequest,
+  RequestShowFileOpen,
+  ShowFileFromArgv,
+} from './main/file-associations';
+// Squirrel runs the app with --squirrel-install/-updated/-uninstall around an
+// install; register (or remove) the .ShowTrak file association before
+// electron-squirrel-startup makes the shortcuts and the app quits.
+HandleSquirrelFileAssociations();
 if (require('electron-squirrel-startup')) app.quit();
 
 import { Manager as AppDataManager } from './Modules/AppData';
@@ -27,7 +37,9 @@ const Logger = CreateLogger('Main');
 import { installProcessGuards } from './main/process-guards';
 installProcessGuards();
 // Gate multiple instances. If another instance is already running, quit early.
-const gotTheLock = app.requestSingleInstanceLock();
+// The arguments go across as additionalData too: Chromium adds its own switches
+// to the argv that 'second-instance' reports, and can reorder it.
+const gotTheLock = app.requestSingleInstanceLock({ argv: process.argv, cwd: process.cwd() });
 if (!gotTheLock) {
   Logger.error('Another instance of ShowTrak Server is already running. Exiting this instance.');
   app.quit();
@@ -35,6 +47,46 @@ if (!gotTheLock) {
 } else {
   Logger.log('Single instance lock acquired');
 }
+
+// --- Show files opened from the operating system ----------------------------
+// Held until the renderer takes them (Show:OpenRequested); see
+// ./main/file-associations. macOS sends 'open-file', before 'ready' when the
+// file launched the app, so it is registered here rather than in whenReady.
+// Windows and Linux pass the path as an argument: ours at launch, or a second
+// instance's, which hands it over and exits.
+app.on('open-file', (event: { preventDefault(): void }, FilePath: string) => {
+  event.preventDefault();
+  Logger.log('Show file opened from the system:', FilePath);
+  RequestShowFileOpen(FilePath);
+});
+{
+  const LaunchFile = ShowFileFromArgv(process.argv.slice(1));
+  if (LaunchFile) {
+    Logger.log('Launched with show file:', LaunchFile);
+    RequestShowFileOpen(LaunchFile);
+  }
+}
+app.on(
+  'second-instance',
+  (_event: unknown, Argv: string[], WorkingDirectory: string, Data: unknown) => {
+    const Handed = (Data && typeof Data === 'object' ? Data : {}) as {
+      argv?: unknown;
+      cwd?: unknown;
+    };
+    const FromData = Array.isArray(Handed.argv) ? (Handed.argv as unknown[]).slice(1) : null;
+    const Cwd = typeof Handed.cwd === 'string' ? Handed.cwd : WorkingDirectory;
+    const FilePath = ShowFileFromArgv(FromData ?? Argv.slice(1), Cwd);
+    FocusMainWindow();
+    if (FilePath) {
+      Logger.log('Show file handed over by a second instance:', FilePath);
+      RequestShowFileOpen(FilePath);
+    }
+  }
+);
+OnShowFileRequest(() => {
+  FocusMainWindow();
+  PushToRenderers('ShowOpenRequested');
+});
 
 import {
   MAIN_WINDOW_READY_TIMEOUT_MS,
@@ -176,6 +228,16 @@ function sendAppMenuAction(actionID: string) {
   } catch {
     // Best-effort UI action dispatch; ignore teardown races.
   }
+}
+
+// Bring the main window forward for a show file opened from the system, or a
+// second launch. Before the window is shown at start-up there is nothing to do:
+// it appears once the renderer is ready.
+function FocusMainWindow() {
+  const Window = getMainWindow();
+  if (!Window || Window.isDestroyed() || !Window.isVisible()) return;
+  if (Window.isMinimized()) Window.restore();
+  Window.focus();
 }
 
 let PreloaderWindow!: ElectronBrowserWindow;

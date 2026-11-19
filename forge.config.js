@@ -95,6 +95,29 @@ module.exports = {
     extendInfo: {
       NSLocalNetworkUsageDescription:
         'ShowTrak Server needs local network access to advertise itself to ShowTrak Clients and to monitor devices on your network.',
+      // .ShowTrak show files open in ShowTrak Server from Finder (double-click,
+      // Open With, dropping on the Dock icon). The type is exported here, as
+      // ShowTrak Server owns the format; the app receives the file through
+      // 'open-file' (src/main/file-associations.ts). Windows registers the same
+      // association from the Squirrel install hooks in that file.
+      CFBundleDocumentTypes: [
+        {
+          CFBundleTypeName: 'ShowTrak Show File',
+          CFBundleTypeRole: 'Editor',
+          LSHandlerRank: 'Owner',
+          LSItemContentTypes: ['uk.co.showtrak.show'],
+        },
+      ],
+      UTExportedTypeDeclarations: [
+        {
+          UTTypeIdentifier: 'uk.co.showtrak.show',
+          UTTypeDescription: 'ShowTrak Show File',
+          UTTypeConformsTo: ['public.data'],
+          UTTypeTagSpecification: {
+            'public.filename-extension': ['showtrak'],
+          },
+        },
+      ],
     },
     ...(shouldSignMac
       ? {
