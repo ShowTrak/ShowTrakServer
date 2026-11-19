@@ -8,7 +8,7 @@
 
 [Website](https://showtrak.co.uk/software/server) · [Download](https://showtrak.co.uk/software/server/downloads) · [Documentation](https://showtrak.co.uk/docs/server) · [Discord](https://discord.gg/DACmwsbSGW)
 
-[![Windows][badge-windows]](https://showtrak.co.uk/software/server/downloads) [![macOS][badge-macos]](https://showtrak.co.uk/software/server/downloads) [![Linux][badge-linux]](https://showtrak.co.uk/software/server/downloads) [![Raspberry Pi][badge-raspberrypi]](https://showtrak.co.uk/software/server/downloads)
+[![Windows][badge-windows]](https://showtrak.co.uk/software/server/downloads) [![macOS][badge-macos]](https://showtrak.co.uk/software/server/downloads) [![Linux][badge-linux]](https://showtrak.co.uk/software/server/downloads) [![Raspberry Pi][badge-raspberrypi]](https://showtrak.co.uk/software/server/downloads) [![CI status][badge-ci]](https://github.com/ShowTrak/ShowTrakServer/actions/workflows/ci.yml)
 
 </div>
 
@@ -66,3 +66,4 @@ Building from source or contributing? See [DEVELOPMENT.md](DEVELOPMENT.md).
 [badge-macos]: https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white
 [badge-linux]: https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black
 [badge-raspberrypi]: https://img.shields.io/badge/Raspberry%20Pi-A22846?style=for-the-badge&logo=raspberrypi&logoColor=white
+[badge-ci]: https://img.shields.io/github/actions/workflow/status/ShowTrak/ShowTrakServer/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI
